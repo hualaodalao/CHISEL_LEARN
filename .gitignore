@@ -1,0 +1,22 @@
+# sbt / Scala
+target/
+project/target/
+project/project/target/
+
+# Bloop / Metals
+.bloop/
+.metals/
+.bsp/
+
+# IDE
+.idea/
+.vscode/
+
+# Generated output
+generated/
+
+# Qoder
+.qoder/
+
+# OS
+.DS_Store
