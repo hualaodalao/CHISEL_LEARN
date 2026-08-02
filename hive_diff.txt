@@ -1,0 +1,996 @@
+diff --git a/src/hive/scala/main/MacUnit.scala b/src/hive/scala/main/MacUnit.scala
+index ec58f90..17d26af 100644
+--- a/src/hive/scala/main/MacUnit.scala
++++ b/src/hive/scala/main/MacUnit.scala
+@@ -85,6 +85,8 @@ object MacUnit {
+ 
+   /** 累加：cReg + product（整数加法 / fp32 加法），结果 cW 位
+     * 仅为 supportedFmts 中的格式生成对应加法路径
++    * 整数路径：有符号加法后截取 cW 位
++    * 浮点路径：对低 32 位做 Fp32.add 后零扩展到 cW（cW<32 时该路径不可达）
+     */
+   def accumulate(cReg: UInt, product: UInt, fmt: DataFormat.Type, cW: Int,
+                  supportedFmts: Set[DataFormat.Type] = AllFmts,
+@@ -92,12 +94,24 @@ object MacUnit {
+     val hasInt = supportedFmts.contains(DataFormat.INT8) || supportedFmts.contains(DataFormat.INT16)
+     val hasFp  = supportedFmts.contains(DataFormat.BF16) || supportedFmts.contains(DataFormat.FP16)
+ 
++    def intAdd: UInt = {
++      val sum = (cReg.asSInt + product.asSInt).asUInt
++      sum(cW - 1, 0)
++    }
++
++    def fpAdd: UInt = {
++      val fpResult = Fp32.add(cReg(31, 0), product(31, 0), rnd)
++      if (cW == 32) fpResult
++      else if (cW > 32) Cat(0.U((cW - 32).W), fpResult)
++      else fpResult(cW - 1, 0) // 不可达（require 已拦截）
++    }
++
+     (hasInt, hasFp) match {
+-      case (true, false)  => (cReg.asSInt + product.asSInt).asUInt
+-      case (false, true)  => Fp32.add(cReg, product, rnd)
++      case (true, false)  => intAdd
++      case (false, true)  => fpAdd
+       case (true, true)   =>
+         val isInt = fmt === DataFormat.INT8 || fmt === DataFormat.INT16
+-        Mux(isInt, (cReg.asSInt + product.asSInt).asUInt, Fp32.add(cReg, product, rnd))
++        Mux(isInt, intAdd, fpAdd)
+       case (false, false) => cReg
+     }
+   }
+diff --git a/src/hive/scala/main/PE.scala b/src/hive/scala/main/PE.scala
+index 81ceb0d..d565a6b 100644
+--- a/src/hive/scala/main/PE.scala
++++ b/src/hive/scala/main/PE.scala
+@@ -1,31 +1,34 @@
+-/** PE：Output-Stationary 处理单元
++/** PE：Weight-Stationary 处理单元
+   *
+-  * @param aW            A 通道位宽（默认 16）
+-  * @param bW            B 通道位宽（默认 16）
+-  * @param cW            累加器位宽（默认 32）
++  * @param aW            激活位宽（默认 16）
++  * @param bW            权重位宽（默认 16）
++  * @param cW            累加器/部分和位宽（默认 48）
+   * @param supportedFmts 本 PE 支持的数据格式集合（默认全部四种）。
+   *                      仅为支持的格式生成 MAC 硬件；运行时收到不支持的 fmt 则
+-  *                      不执行累加，cReg 保持不变（只传递数据/控制）。
++  *                      不执行累加，psum 透传。
+   *
+-  * 数据通路（参数化共享通道）：
+-  *   aIn → MAC（组合） + [Reg] → aOut   水平传播（左→右）
+-  *   bIn → MAC（组合） + [Reg] → bOut   垂直传播（上→下）
+-  *   cReg                                本地累加器（output-stationary）
++  * 数据通路（Weight-Stationary）：
++  *   aIn → [Reg] → aOut                 激活水平传播（左→右）
++  *   wIn → wReg (loadIn时) → wOut       权重垂直加载链（上→下），wOut 为组合输出
++  *   psumIn → MAC → [psumReg] → psumOut 部分和垂直传播（上→下）
+   *
+-  * 时序：io.validIn 当拍门控计算，cReg 在当拍→下一拍边沿更新（1 拍延迟）。
+-  * 传播寄存器仅为下一个 PE 提供 1 拍延迟。
++  * 权重驻留：
++  *   wReg 在 loadIn 有效时捕获 wIn；wOut := wReg（组合输出），形成列移位链。
++  *   连续 n 拍从列顶部压入权重后，第 i 行 PE 驻留第 i 个权重
++  *   （先压入的沉到最底行，最后压入的留在顶行）。
+   *
+-  * C 结果列传递（垂直，上→下，移位寄存器模式）：
+-  *   cIn → cReg → cOut    drain 期间 cReg := cIn（整列同时移位）
+-  *   drainIn → drainOut    drain 广播（组合透传）
+-  *   drain 期间不执行累加，每周期整列 cReg 下移一格
++  * 计算与时序对齐：
++  *   validIn && fmtOk && !loadIn 时：
++  *     psumReg := accumulate(psumIn, aIn * wReg)
++  *   否则（包括 loadIn 期间）：
++  *     psumReg := psumIn（透传，保证下游行 psum/valid 对齐）
++  *   psumOut := psumReg（寄存器输出，严禁组合输出）
+   *
+-  * 控制通路（脉动传播，RegNext 给下一个 PE）：
+-  *   clearIn → [Reg] → clearOut
++  * 控制通路（纵向 RegNext 下行，与 psum 同拍）：
++  *   loadIn  → [Reg] → loadOut
+   *   validIn → [Reg] → validOut
+   *   fmtIn   → [Reg] → fmtOut
+   *   rndIn   → [Reg] → rndOut
+-  *   计算直接使用 io 组合信号（不经寄存器）
+   */
+ 
+ import chisel3._
+@@ -34,60 +37,60 @@ import chisel3.util._
+ class PE(
+   aW: Int = 16,
+   bW: Int = 16,
+-  cW: Int = 32,
++  cW: Int = 48,
+   supportedFmts: Set[DataFormat.Type] = Set(DataFormat.FP16, DataFormat.BF16, DataFormat.INT16, DataFormat.INT8)
+ ) extends Module {
+   val io = IO(new Bundle {
+-    // 数据通道（参数化位宽）
++    // 激活通道（水平）
+     val aIn  = Input(UInt(aW.W))
+     val aOut = Output(UInt(aW.W))
+-    val bIn  = Input(UInt(bW.W))
+-    val bOut = Output(UInt(bW.W))
+-    // C 结果列传递（垂直）
+-    val cIn  = Input(UInt(cW.W))
+-    val cOut = Output(UInt(cW.W))
+-    // drain 控制（垂直传播）
+-    val drainIn  = Input(Bool())
+-    val drainOut = Output(Bool())
+-    // 控制（脉动传播）
+-    val clearIn  = Input(Bool())
+-    val clearOut = Output(Bool())
++    // 权重加载链（纵向）
++    val wIn  = Input(UInt(bW.W))
++    val wOut = Output(UInt(bW.W))
++    // 部分和通道（纵向）
++    val psumIn  = Input(UInt(cW.W))
++    val psumOut = Output(UInt(cW.W))
++    // 权重加载使能（纵向传播）
++    val loadIn  = Input(Bool())
++    val loadOut = Output(Bool())
++    // 控制（纵向传播）
+     val validIn  = Input(Bool())
+     val validOut = Output(Bool())
+-    // 格式（脉动传播）
++    // 格式（纵向传播）
+     val fmtIn  = Input(DataFormat())
+     val fmtOut = Output(DataFormat())
+-    // 舍入模式（脉动传播）
++    // 舍入模式（纵向传播）
+     val rndIn  = Input(RoundingMode())
+     val rndOut = Output(RoundingMode())
+   })
+ 
+-  // --- 格式支持检测（组合，基于当前 io） ---
++  // --- 格式支持检测（组合） ---
+   val fmtOk = supportedFmts.map(f => io.fmtIn === f).reduce(_ || _)
+ 
+-  // --- 可重构 MAC（组合计算，直接使用 io） ---
+-  val cReg = RegInit(0.U(cW.W))
+-  val product = MacUnit.multiply(io.aIn, io.bIn, io.fmtIn, aW, bW, cW, supportedFmts, io.rndIn)
+-
+-  when(io.clearIn) {
+-    cReg := 0.U
+-  }.elsewhen(io.drainIn) {
+-    // drain：将 cIn 写入 cReg（整列同时移位）
+-    cReg := io.cIn
+-  }.elsewhen(io.validIn && fmtOk) {
+-    // 当拍门控累加
+-    cReg := MacUnit.accumulate(cReg, product, io.fmtIn, cW, supportedFmts, io.rndIn)
++  // --- 权重驻留寄存器 ---
++  val wReg = RegInit(0.U(bW.W))
++  when(io.loadIn) {
++    wReg := io.wIn
+   }
++  io.wOut := wReg // 组合输出，形成列移位链
++
++  // --- 可重构 MAC ---
++  val product = MacUnit.multiply(io.aIn, wReg, io.fmtIn, aW, bW, cW, supportedFmts, io.rndIn)
+ 
+-  // --- C 输出：始终输出本地 cReg ---
+-  io.cOut := cReg
+-  io.drainOut := io.drainIn
++  val psumReg = RegInit(0.U(cW.W))
++  when(io.validIn && fmtOk && !io.loadIn) {
++    psumReg := MacUnit.accumulate(io.psumIn, product, io.fmtIn, cW, supportedFmts, io.rndIn)
++  }.otherwise {
++    psumReg := io.psumIn // 透传，保证下游行 psum/valid 对齐
++  }
++  io.psumOut := psumReg
+ 
+-  // --- 传播寄存器（仅为下一个 PE 提供 1 拍延迟） ---
++  // --- 激活传播（水平，RegNext） ---
+   io.aOut := RegNext(io.aIn, 0.U)
+-  io.bOut := RegNext(io.bIn, 0.U)
+-  io.clearOut := RegNext(io.clearIn, false.B)
++
++  // --- 控制传播（纵向，RegNext） ---
++  io.loadOut  := RegNext(io.loadIn, false.B)
+   io.validOut := RegNext(io.validIn, false.B)
+-  io.fmtOut := RegNext(io.fmtIn, DataFormat.INT8)
+-  io.rndOut := RegNext(io.rndIn, RoundingMode.RNE)
++  io.fmtOut   := RegNext(io.fmtIn, DataFormat.INT8)
++  io.rndOut   := RegNext(io.rndIn, RoundingMode.RNE)
+ }
+diff --git a/src/hive/scala/main/SystolicArray.scala b/src/hive/scala/main/SystolicArray.scala
+index 01ce891..5f1ef2a 100644
+--- a/src/hive/scala/main/SystolicArray.scala
++++ b/src/hive/scala/main/SystolicArray.scala
+@@ -1,21 +1,37 @@
+-/** N×N 脉动阵列
++/** N×N Weight-Stationary 脉动阵列
+   *
+   * @param n     阵列维度（默认 8）
+   * @param skew  是否启用输入 skew buffer。
+-  *              true：行 i 延迟 i 周期、列 j 延迟 j 周期，外部可直接同步喂数；
++  *              true：激活行 i 延迟 i 拍；顶部注入的 wIn/loadIn/validIn/fmtIn/rndIn
++  *                    列 j 延迟 j 拍。结果不做 deskew，validOut(j) 指示各列有效拍。
+   *              false：裸 Tile，用于 Cluster 级联（由上层处理对齐）。
+-  * @param aW    A 通道位宽（默认 16）
+-  * @param bW    B 通道位宽（默认 16）
+-  * @param cW    累加器位宽（默认 32）
++  * @param aW    激活位宽（默认 16）
++  * @param bW    权重位宽（默认 16）
++  * @param cW    累加器位宽（默认 0=自动推导 accW = aW + bW + log2Up(n)；
++  *              含 FP16/BF16 时取 max(32, accW)）
+   *
+-  * 接口：
+-  *   - aIn(n)：左侧每行一个 aW-bit A 输入
+-  *   - bIn(n)：顶部每列一个 bW-bit B 输入
+-  *   - aOut(n) / bOut(n)：右侧 / 底部输出（用于级联）
+-  *   - cOut(n)：每列底部的 cW-bit 结果（drain 时逐周期串行输出）
+-  *   - drainIn：drain 脉冲从顶部注入，逐 PE 向下传播
+-  *   - drainOut(n)：每列底部的 drain 输出（用于级联）
+-  *   - clearIn / validIn / fmtIn / rndIn：从左侧/顶部注入，逐 PE 脉动传播
++  * 使用时序（skew=true 场景）：
++  *   阶段 1：加载权重
++  *     拉高 loadIn 连续 n 拍，每拍在 wIn(j) 喂入对应列的权重。
++  *     每列喂入顺序为该列权重自底行向顶行：
++  *       第 0 拍压入 row n-1 的权重（最终沉到最底行 PE），
++  *       第 n-1 拍压入 row 0 的权重（留在顶行 PE）。
++  *     loadIn 在列内广播给所有行 PE（保证同步移位寄存器操作）；
++  *     列 j 的 skew 延迟 j 拍后开始接收。
++  *     外部持续 n 拍即可；skew 处理列间对齐。
++  *
++  *   阶段 2：流入激活
++  *     拉低 loadIn，拉高 validIn，每拍在 aIn(k) 喂入各行激活。
++  *     行 skew 自动对齐数据波前：aIn(k) = A[output_row_t][k]。
++  *     validIn/fmtIn/rndIn 从列顶部注入并逐行 RegNext 下行（与 psum 对齐）。
++  *     每列底部 cOut(j) 随 validOut(j) 逐拍流出结果（无 drain）。
++  *
++  * 权重移位链推导：
++  *   loadIn 在列内广播，wOut=wReg（组合），wIn 级联。
++  *   当 loadIn=true 时，所有 PE 同时执行移位：
++  *     PE(i).wReg := PE(i).wIn = PE(i-1).wOut = PE(i-1).wReg (旧值)
++  *     PE(0).wReg := io.wIn (新值从顶部注入)
++  *   n 拍后：PE(0) = 最后压入值，PE(n-1) = 最先压入值。
+   */
+ 
+ import chisel3._
+@@ -26,115 +42,102 @@ class SystolicArray(
+   skew: Boolean = true,
+   aW: Int = 16,
+   bW: Int = 16,
+-  cW: Int = 32,
++  cW: Int = 0,
+   supportedFmts: Set[DataFormat.Type] = Set(DataFormat.FP16, DataFormat.BF16, DataFormat.INT16, DataFormat.INT8)
+ ) extends Module {
++
++  // --- 位宽自动推导 ---
++  private val hasFp = supportedFmts.contains(DataFormat.FP16) || supportedFmts.contains(DataFormat.BF16)
++  private val hasInt = supportedFmts.contains(DataFormat.INT8) || supportedFmts.contains(DataFormat.INT16)
++  private val autoAccW = aW + bW + log2Up(n)
++  val accW: Int = if (cW != 0) cW else (if (hasFp) math.max(32, autoAccW) else autoAccW)
++
++  // --- elaboration-time require ---
++  if (hasFp) require(accW >= 32, s"含浮点格式时有效 cW($accW) 必须 >= 32")
++  if (hasInt) require(accW >= aW + bW, s"含整数格式时有效 cW($accW) 必须 >= aW($aW) + bW($bW)")
++
+   val io = IO(new Bundle {
+     // 数据
+-    val aIn  = Input(Vec(n, UInt(aW.W)))
+-    val bIn  = Input(Vec(n, UInt(bW.W)))
+-    val aOut = Output(Vec(n, UInt(aW.W)))
+-    val bOut = Output(Vec(n, UInt(bW.W)))
+-    // C 结果（列底部输出，drain 时串行读出）
+-    val cOut = Output(Vec(n, UInt(cW.W)))
+-    // drain 控制
+-    val drainIn  = Input(Bool())
+-    val drainOut = Output(Vec(n, Bool()))
+-    // 控制（脉动传播）
+-    val clearIn = Input(Bool())
++    val aIn   = Input(Vec(n, UInt(aW.W)))
++    val wIn   = Input(Vec(n, UInt(bW.W)))
++    val aOut  = Output(Vec(n, UInt(aW.W)))
++    val wOut  = Output(Vec(n, UInt(bW.W)))
++    // 部分和注入（顶部，供 Cluster 级联；独立使用时接 0）
++    val psumIn = Input(Vec(n, UInt(accW.W)))
++    // 结果输出（底部）
++    val cOut  = Output(Vec(n, UInt(accW.W)))
++    // 控制
++    val loadIn  = Input(Bool())
+     val validIn = Input(Bool())
+     val fmtIn   = Input(DataFormat())
+     val rndIn   = Input(RoundingMode())
++    // 底部输出（用于级联）
++    val validOut = Output(Vec(n, Bool()))
++    val fmtOut   = Output(Vec(n, DataFormat()))
++    val rndOut   = Output(Vec(n, RoundingMode()))
++    val loadOut  = Output(Vec(n, Bool()))
+   })
+ 
+-  val pes = Seq.fill(n, n)(Module(new PE(aW, bW, cW, supportedFmts)))
++  // --- PE 网格 ---
++  val pes = Seq.fill(n, n)(Module(new PE(aW, bW, accW, supportedFmts)))
++
++  // --- 激活输入（带行 skew） ---
++  for (i <- 0 until n) {
++    val aSkewed = if (skew && i > 0) ShiftRegister(io.aIn(i), i) else io.aIn(i)
++    pes(i)(0).io.aIn := aSkewed
++  }
+ 
+-  // 水平连线
+-  val aH = Seq.fill(n, n + 1)(Wire(UInt(aW.W)))
+-  // 垂直连线
+-  val bV = Seq.fill(n + 1, n)(Wire(UInt(bW.W)))
+-  // C 列传递（垂直，移位寄存器链）
+-  val cV = Seq.fill(n + 1, n)(Wire(UInt(cW.W)))
+-  // 控制水平传播
+-  val clrH = Seq.fill(n, n + 1)(Wire(Bool()))
+-  val vldH = Seq.fill(n, n + 1)(Wire(Bool()))
+-  val fmtH = Seq.fill(n, n + 1)(Wire(DataFormat()))
+-  val rndH = Seq.fill(n, n + 1)(Wire(RoundingMode()))
+-  // 控制垂直传播
+-  val clrV = Seq.fill(n + 1, n)(Wire(Bool()))
+-  val vldV = Seq.fill(n + 1, n)(Wire(Bool()))
+-  val fmtV = Seq.fill(n + 1, n)(Wire(DataFormat()))
+-  val rndV = Seq.fill(n + 1, n)(Wire(RoundingMode()))
++  // --- 激活水平链 ---
++  for (i <- 0 until n; j <- 1 until n) {
++    pes(i)(j).io.aIn := pes(i)(j - 1).io.aOut
++  }
++  // 激活输出（右侧最后一列）
++  for (i <- 0 until n) {
++    io.aOut(i) := pes(i)(n - 1).io.aOut
++  }
+ 
+-  // 默认值
+-  for (i <- 0 until n) { aH(i)(0) := 0.U; clrH(i)(0) := false.B; vldH(i)(0) := false.B; fmtH(i)(0) := DataFormat.INT8; rndH(i)(0) := RoundingMode.RNE }
+-  for (j <- 0 until n) { bV(0)(j) := 0.U; clrV(0)(j) := false.B; vldV(0)(j) := false.B; fmtV(0)(j) := DataFormat.INT8; rndV(0)(j) := RoundingMode.RNE; cV(0)(j) := 0.U }
++  // --- 纵向链（每列独立） ---
++  for (j <- 0 until n) {
++    // 列顶部输入（带列 skew）
++    val wTop     = if (skew && j > 0) ShiftRegister(io.wIn(j), j)    else io.wIn(j)
++    val loadCol  = if (skew && j > 0) ShiftRegister(io.loadIn, j)    else io.loadIn
++    val vldTop   = if (skew && j > 0) ShiftRegister(io.validIn, j)   else io.validIn
++    val fmtTop   = if (skew && j > 0) ShiftRegister(io.fmtIn, j)    else io.fmtIn
++    val rndTop   = if (skew && j > 0) ShiftRegister(io.rndIn, j)    else io.rndIn
+ 
+-  // 边界输入（可选 skew：行 i 延迟 i，列 j 延迟 j）
+-  if (skew) {
++    // loadIn: 广播给列内所有行 PE（保证同步移位寄存器操作）
+     for (i <- 0 until n) {
+-      aH(i)(0) := (if (i == 0) io.aIn(i) else ShiftRegister(io.aIn(i), i))
+-      clrH(i)(0) := (if (i == 0) io.clearIn else ShiftRegister(io.clearIn, i))
+-      vldH(i)(0) := (if (i == 0) io.validIn else ShiftRegister(io.validIn, i))
+-      fmtH(i)(0) := (if (i == 0) io.fmtIn else ShiftRegister(io.fmtIn, i))
+-      rndH(i)(0) := (if (i == 0) io.rndIn else ShiftRegister(io.rndIn, i))
++      pes(i)(j).io.loadIn := loadCol
+     }
+-    for (j <- 0 until n) {
+-      bV(0)(j) := (if (j == 0) io.bIn(j) else ShiftRegister(io.bIn(j), j))
+-      clrV(0)(j) := (if (j == 0) io.clearIn else ShiftRegister(io.clearIn, j))
+-      vldV(0)(j) := (if (j == 0) io.validIn else ShiftRegister(io.validIn, j))
+-      fmtV(0)(j) := (if (j == 0) io.fmtIn else ShiftRegister(io.fmtIn, j))
+-      rndV(0)(j) := (if (j == 0) io.rndIn else ShiftRegister(io.rndIn, j))
++
++    // wIn: 组合级联（PE(0) 从顶部，其余从上一行 wOut）
++    pes(0)(j).io.wIn := wTop
++    for (i <- 1 until n) {
++      pes(i)(j).io.wIn := pes(i - 1)(j).io.wOut
+     }
+-  } else {
+-    for (i <- 0 until n) { aH(i)(0) := io.aIn(i) }
+-    for (j <- 0 until n) { bV(0)(j) := io.bIn(j) }
+-    // clear/valid/fmt/rnd 从左上角注入
+-    clrH(0)(0) := io.clearIn
+-    vldH(0)(0) := io.validIn
+-    fmtH(0)(0) := io.fmtIn
+-    rndH(0)(0) := io.rndIn
+-    clrV(0)(0) := io.clearIn
+-    vldV(0)(0) := io.validIn
+-    fmtV(0)(0) := io.fmtIn
+-    rndV(0)(0) := io.rndIn
+-  }
+ 
+-  // 连接 PE 网格
+-  for (i <- 0 until n; j <- 0 until n) {
+-    val pe = pes(i)(j)
+-    pe.io.aIn := aH(i)(j)
+-    pe.io.bIn := bV(i)(j)
+-    pe.io.clearIn := clrH(i)(j) | clrV(i)(j)
+-    pe.io.validIn := vldH(i)(j) | vldV(i)(j)
+-    // fmt/rnd：水平优先
+-    pe.io.fmtIn := Mux(vldH(i)(j) | clrH(i)(j), fmtH(i)(j), fmtV(i)(j))
+-    pe.io.rndIn := Mux(vldH(i)(j) | clrH(i)(j), rndH(i)(j), rndV(i)(j))
+-    // C 列传递 + drain（广播）
+-    pe.io.cIn := cV(i)(j)
+-    pe.io.drainIn := io.drainIn
++    // validIn/fmtIn/rndIn: 从顶部注入并逐行 RegNext 下行（与 psum 对齐）
++    pes(0)(j).io.validIn := vldTop
++    pes(0)(j).io.fmtIn  := fmtTop
++    pes(0)(j).io.rndIn  := rndTop
++    for (i <- 1 until n) {
++      pes(i)(j).io.validIn := pes(i - 1)(j).io.validOut
++      pes(i)(j).io.fmtIn  := pes(i - 1)(j).io.fmtOut
++      pes(i)(j).io.rndIn  := pes(i - 1)(j).io.rndOut
++    }
+ 
+-    // 水平输出 → 下一列
+-    aH(i)(j + 1) := pe.io.aOut
+-    clrH(i)(j + 1) := pe.io.clearOut
+-    vldH(i)(j + 1) := pe.io.validOut
+-    fmtH(i)(j + 1) := pe.io.fmtOut
+-    rndH(i)(j + 1) := pe.io.rndOut
++    // psumIn: 从顶部注入并逐行 psumOut 下行
++    pes(0)(j).io.psumIn := io.psumIn(j)
++    for (i <- 1 until n) {
++      pes(i)(j).io.psumIn := pes(i - 1)(j).io.psumOut
++    }
+ 
+-    // 垂直输出 → 下一行
+-    bV(i + 1)(j) := pe.io.bOut
+-    clrV(i + 1)(j) := pe.io.clearOut
+-    vldV(i + 1)(j) := pe.io.validOut
+-    fmtV(i + 1)(j) := pe.io.fmtOut
+-    rndV(i + 1)(j) := pe.io.rndOut
+-    // C 垂直传递
+-    cV(i + 1)(j) := pe.io.cOut
++    // 底部输出
++    io.cOut(j)     := pes(n - 1)(j).io.psumOut
++    io.wOut(j)     := pes(n - 1)(j).io.wOut
++    io.validOut(j) := pes(n - 1)(j).io.validOut
++    io.fmtOut(j)   := pes(n - 1)(j).io.fmtOut
++    io.rndOut(j)   := pes(n - 1)(j).io.rndOut
++    io.loadOut(j)  := pes(n - 1)(j).io.loadOut
+   }
+-
+-  // 边界输出
+-  for (i <- 0 until n) { io.aOut(i) := aH(i)(n) }
+-  for (j <- 0 until n) { io.bOut(j) := bV(n)(j) }
+-  // C 结果：每列底部输出
+-  for (j <- 0 until n) { io.cOut(j) := cV(n)(j) }
+-  for (j <- 0 until n) { io.drainOut(j) := io.drainIn }
+ }
+diff --git a/src/hive/scala/main/SystolicCluster.scala b/src/hive/scala/main/SystolicCluster.scala
+index bcb2292..c767906 100644
+--- a/src/hive/scala/main/SystolicCluster.scala
++++ b/src/hive/scala/main/SystolicCluster.scala
+@@ -1,13 +1,29 @@
+-/** SystolicCluster：MxM 个 NxN 阵列组成更大集群
++/** SystolicCluster：MxM 个 NxN Weight-Stationary 阵列组成更大集群
+   *
+   * @param arrayN   每个子阵列维度（默认 8）
+   * @param clusterM 集群中子阵列的 M×M 排列（默认 2，即 2×2 = 16×16 等效）
+-  * @param aW       A 通道位宽（默认 16）
+-  * @param bW       B 通道位宽（默认 16）
+-  * @param cW       累加器位宽（默认 32）
++  * @param aW       激活位宽（默认 16）
++  * @param bW       权重位宽（默认 16）
++  * @param cW       累加器位宽（默认 0=自动推导，totalN = arrayN * clusterM）
+   *
+-  * 物理意义：每个子阵列可独立做后端 floorplan 分区，
+-  * 集群级通过 aOut/bOut 边界信号级联数据流。
++  * 子阵列 skew=false；全局 skew 保留：
++  *   - 激活行 i 延迟 i 拍（i = 全局行号 ci*arrayN + r）
++  *   - 顶部权重/控制以 tile 列为单位延迟：tile 列 cj 延迟 cj*arrayN 拍
++  *     （tile 内各列同步，借助激活水平传播的自然延迟实现对齐）
++  *
++  * 权重加载：
++  *   loadIn 广播至同列所有 tile（保证跨 tile 的移位寄存器链同步移位）。
++  *   wIn 纵向级联：上方 tile wOut → 下方 tile wIn。
++  *   外部连续 totalN 拍拉高 loadIn 并喂入权重（自底行向顶行），
++  *   权重流经所有 tile 的移位链，最终各 PE 驻留正确权重。
++  *
++  * 计算：
++  *   validIn/fmtIn/rndIn 从顶行 tile 注入后逐行 pipelined 下行（与 psum 对齐）。
++  *   下方 tile 的 validIn 来自上方 tile 的 validOut（保证 psum 时序对齐）。
++  *   psumIn 纵向级联：上方 cOut → 下方 psumIn；顶行接 0。
++  *
++  * 横向级联：左方 tile aOut → 右方 tile aIn。
++  * cOut/validOut：底部行 tile 输出。
+   */
+ 
+ import chisel3._
+@@ -18,42 +34,60 @@ class SystolicCluster(
+   clusterM: Int = 2,
+   aW: Int = 16,
+   bW: Int = 16,
+-  cW: Int = 32,
++  cW: Int = 0,
+   supportedFmts: Set[DataFormat.Type] = Set(DataFormat.FP16, DataFormat.BF16, DataFormat.INT16, DataFormat.INT8)
+ ) extends Module {
+   val totalN = arrayN * clusterM
+ 
++  // --- 位宽自动推导（用 totalN） ---
++  private val hasFp = supportedFmts.contains(DataFormat.FP16) || supportedFmts.contains(DataFormat.BF16)
++  private val hasInt = supportedFmts.contains(DataFormat.INT8) || supportedFmts.contains(DataFormat.INT16)
++  private val autoAccW = aW + bW + log2Up(totalN)
++  val accW: Int = if (cW != 0) cW else (if (hasFp) math.max(32, autoAccW) else autoAccW)
++
++  // --- elaboration-time require ---
++  if (hasFp) require(accW >= 32, s"含浮点格式时有效 cW($accW) 必须 >= 32")
++  if (hasInt) require(accW >= aW + bW, s"含整数格式时有效 cW($accW) 必须 >= aW($aW) + bW($bW)")
++
+   val io = IO(new Bundle {
+-    val aIn  = Input(Vec(totalN, UInt(aW.W)))
+-    val bIn  = Input(Vec(totalN, UInt(bW.W)))
+-    val aOut = Output(Vec(totalN, UInt(aW.W)))
+-    val bOut = Output(Vec(totalN, UInt(bW.W)))
+-    val cOut = Output(Vec(totalN, UInt(cW.W)))
+-    val drainIn  = Input(Bool())
+-    val drainOut = Output(Vec(totalN, Bool()))
+-    val clearIn = Input(Bool())
++    val aIn   = Input(Vec(totalN, UInt(aW.W)))
++    val wIn   = Input(Vec(totalN, UInt(bW.W)))
++    val aOut  = Output(Vec(totalN, UInt(aW.W)))
++    val wOut  = Output(Vec(totalN, UInt(bW.W)))
++    val cOut  = Output(Vec(totalN, UInt(accW.W)))
++    val loadIn  = Input(Bool())
+     val validIn = Input(Bool())
+     val fmtIn   = Input(DataFormat())
+     val rndIn   = Input(RoundingMode())
++    val validOut = Output(Vec(totalN, Bool()))
+   })
+ 
+-  val arrays = Seq.fill(clusterM, clusterM)(Module(new SystolicArray(arrayN, skew = false, aW, bW, cW, supportedFmts)))
++  // 子阵列：skew=false，统一 accW
++  val arrays = Seq.fill(clusterM, clusterM)(
++    Module(new SystolicArray(arrayN, skew = false, aW, bW, accW, supportedFmts))
++  )
+ 
+-  // 全局 skew：行 i 延迟 i，列 j 延迟 j（覆盖整个 totalN 维度）
+-  val aSkewed = Seq.fill(totalN)(Wire(UInt(aW.W)))
+-  val bSkewed = Seq.fill(totalN)(Wire(UInt(bW.W)))
+-  for (i <- 0 until totalN) {
+-    aSkewed(i) := (if (i == 0) io.aIn(i) else ShiftRegister(io.aIn(i), i))
+-  }
+-  for (j <- 0 until totalN) {
+-    bSkewed(j) := (if (j == 0) io.bIn(j) else ShiftRegister(io.bIn(j), j))
++  // --- 全局 skew ---
++  // 激活行 i 延迟 i 拍（i = 全局行号）
++  val aSkewed = (0 until totalN).map { i =>
++    if (i == 0) io.aIn(i) else ShiftRegister(io.aIn(i), i)
+   }
+ 
+-  // 水平级联 + 垂直级联
++  // 权重/控制以 tile 列为单位延迟
++  val tileColDelay = (0 until clusterM).map(cj => cj * arrayN)
++
++  // 连接子阵列
+   for (ci <- 0 until clusterM; cj <- 0 until clusterM) {
+     val arr = arrays(ci)(cj)
++    val delay = tileColDelay(cj)
++
++    // tile 列级延迟信号
++    val loadDelayed = if (delay == 0) io.loadIn  else ShiftRegister(io.loadIn, delay)
++    val vldDelayed  = if (delay == 0) io.validIn else ShiftRegister(io.validIn, delay)
++    val fmtDelayed  = if (delay == 0) io.fmtIn   else ShiftRegister(io.fmtIn, delay)
++    val rndDelayed  = if (delay == 0) io.rndIn   else ShiftRegister(io.rndIn, delay)
+ 
+-    // A 输入：来自左侧阵列或集群边界（已 skew）
++    // --- 激活（水平）：来自左侧 tile 或集群边界（已全局行 skew） ---
+     for (r <- 0 until arrayN) {
+       val globalRow = ci * arrayN + r
+       if (cj == 0) {
+@@ -63,41 +97,48 @@ class SystolicCluster(
+       }
+     }
+ 
+-    // B 输入：来自上方阵列或集群边界（已 skew）
++    // --- loadIn：广播至同列所有 tile（保证跨 tile 移位链同步） ---
++    arr.io.loadIn := loadDelayed
++
++    // --- wIn：纵向级联 ---
+     for (c <- 0 until arrayN) {
+       val globalCol = cj * arrayN + c
+       if (ci == 0) {
+-        arr.io.bIn(c) := bSkewed(globalCol)
++        arr.io.wIn(c) := (if (delay == 0) io.wIn(globalCol) else ShiftRegister(io.wIn(globalCol), delay))
++      } else {
++        arr.io.wIn(c) := arrays(ci - 1)(cj).io.wOut(c)
++      }
++      // psumIn 纵向级联
++      if (ci == 0) {
++        arr.io.psumIn(c) := 0.U(accW.W)
+       } else {
+-        arr.io.bIn(c) := arrays(ci - 1)(cj).io.bOut(c)
++        arr.io.psumIn(c) := arrays(ci - 1)(cj).io.cOut(c)
+       }
+     }
+ 
+-    // 控制 + fmt + rnd：广播（简化；未来可改为脉动传播）
+-    arr.io.clearIn := io.clearIn
+-    arr.io.validIn := io.validIn
+-    arr.io.fmtIn   := io.fmtIn
+-    arr.io.rndIn   := io.rndIn
+-
+-    // drain 垂直级联：上方阵列的 drainOut(0) → 下方阵列的 drainIn
++    // --- validIn/fmtIn/rndIn：顶行从全局 skew，下方从上方 tile 级联（psum 对齐） ---
+     if (ci == 0) {
+-      arr.io.drainIn := io.drainIn
++      arr.io.validIn := vldDelayed
++      arr.io.fmtIn   := fmtDelayed
++      arr.io.rndIn   := rndDelayed
+     } else {
+-      arr.io.drainIn := arrays(ci - 1)(cj).io.drainOut(0)
++      // 从上方 tile 底部输出级联（取 column 0 代表，tile 内同步）
++      arr.io.validIn := arrays(ci - 1)(cj).io.validOut(0)
++      arr.io.fmtIn   := arrays(ci - 1)(cj).io.fmtOut(0)
++      arr.io.rndIn   := arrays(ci - 1)(cj).io.rndOut(0)
+     }
+   }
+ 
+-  // C 结果：底部行子阵列的 cOut → 集群 cOut
++  // --- 集群输出 ---
+   for (cj <- 0 until clusterM; c <- 0 until arrayN) {
+-    io.cOut(cj * arrayN + c) := arrays(clusterM - 1)(cj).io.cOut(c)
+-    io.drainOut(cj * arrayN + c) := arrays(clusterM - 1)(cj).io.drainOut(c)
++    val globalCol = cj * arrayN + c
++    io.cOut(globalCol)     := arrays(clusterM - 1)(cj).io.cOut(c)
++    io.validOut(globalCol) := arrays(clusterM - 1)(cj).io.validOut(c)
++    io.wOut(globalCol)     := arrays(clusterM - 1)(cj).io.wOut(c)
+   }
+ 
+-  // 集群边界输出
++  // aOut：右侧 tile 列的子阵列输出
+   for (ci <- 0 until clusterM; r <- 0 until arrayN) {
+     io.aOut(ci * arrayN + r) := arrays(ci)(clusterM - 1).io.aOut(r)
+   }
+-  for (cj <- 0 until clusterM; c <- 0 until arrayN) {
+-    io.bOut(cj * arrayN + c) := arrays(clusterM - 1)(cj).io.bOut(c)
+-  }
+ }
+diff --git a/src/hive/scala/test/SystolicArrayTest.scala b/src/hive/scala/test/SystolicArrayTest.scala
+index 2fc6f1d..5c3caec 100644
+--- a/src/hive/scala/test/SystolicArrayTest.scala
++++ b/src/hive/scala/test/SystolicArrayTest.scala
+@@ -6,12 +6,14 @@ import org.scalatest.matchers.should.Matchers
+ 
+ class SystolicArrayTest extends AnyFlatSpec with Matchers {
+ 
+-  behavior of "Hive Systolic Array"
++  behavior of "Hive Weight-Stationary Systolic Array"
+ 
+-  it should "elaborate PE" in {
++  // ===================== Test 1: Elaborate =====================
++  it should "elaborate PE with wReg and psum" in {
+     val v = ChiselStage.emitSystemVerilog(new PE)
+     v should include("module PE")
+-    v should include("cReg")
++    v should include("wReg")
++    v should include("psum")
+   }
+ 
+   it should "elaborate 8x8 SystolicArray" in {
+@@ -20,119 +22,273 @@ class SystolicArrayTest extends AnyFlatSpec with Matchers {
+     v should include("PE")
+   }
+ 
+-  it should "elaborate 2x2 SystolicCluster (4x 8x8 arrays)" in {
++  it should "elaborate 2x2 SystolicCluster" in {
+     val v = ChiselStage.emitSystemVerilog(new SystolicCluster(8, 2))
+     v should include("module SystolicCluster")
+     v should include("SystolicArray")
+   }
+ 
+-  it should "compute 2x2 INT8 matrix multiply correctly" in {
+-    val n = 2
+-    // A = [[1,2],[3,4]], B = [[5,6],[7,8]]
+-    // C = A*B = [[19,22],[43,50]]
+-    val a = Seq(Seq(1, 2), Seq(3, 4))
+-    val b = Seq(Seq(5, 6), Seq(7, 8))
+-    val expected = for (i <- 0 until n) yield
+-      for (j <- 0 until n) yield
+-        (for (k <- 0 until n) yield a(i)(k) * b(k)(j)).sum
+-
+-    simulate(new SystolicArray(n, skew = true)) { dut =>
+-      dut.io.fmtIn.poke(DataFormat.INT8)
+-      dut.io.rndIn.poke(RoundingMode.RNE)
+-      dut.io.clearIn.poke(false.B)
++  // ===================== Helper =====================
++  /** 执行 NxN 矩阵乘仿真（Weight-Stationary）
++    * @param n   阵列维度
++    * @param a   A 矩阵 (n x n)，元素为 Long（已编码为无符号/补码）
++    * @param b   B 矩阵 (n x n)
++    * @param fmt 数据格式
++    * @param aW  激活位宽
++    * @param bW  权重位宽
++    * @param cW  累加器位宽 (0=自动)
++    * @param supportedFmts 支持格式集合
++    * @return 结果矩阵 (n x n) as raw BigInt
++    */
++  private def runMatMul(
++    n: Int, a: Seq[Seq[Long]], b: Seq[Seq[Long]],
++    fmt: DataFormat.Type,
++    aW: Int = 16, bW: Int = 16, cW: Int = 0,
++    supportedFmts: Set[DataFormat.Type] = Set(DataFormat.FP16, DataFormat.BF16, DataFormat.INT16, DataFormat.INT8)
++  ): Array[Array[BigInt]] = {
++    val results = Array.fill(n, n)(BigInt(0))
++    simulate(new SystolicArray(n, skew = true, aW, bW, cW, supportedFmts)) { dut =>
++      val accW = dut.accW
++      // Initialize
++      dut.io.loadIn.poke(false.B)
+       dut.io.validIn.poke(false.B)
+-      dut.io.drainIn.poke(false.B)
+-      for (i <- 0 until n) { dut.io.aIn(i).poke(0.U); dut.io.bIn(i).poke(0.U) }
++      dut.io.fmtIn.poke(fmt)
++      dut.io.rndIn.poke(RoundingMode.RNE)
++      for (i <- 0 until n) {
++        dut.io.aIn(i).poke(0.U)
++        dut.io.wIn(i).poke(0.U)
++        dut.io.psumIn(i).poke(0.U)
++      }
+       dut.clock.step()
+ 
+-      // Cycle 0: clear 脉冲
+-      dut.io.clearIn.poke(true.B)
+-      dut.clock.step()
++      // Phase 1: Load weights (bottom row first)
++      dut.io.loadIn.poke(true.B)
++      for (t <- 0 until n) {
++        val row = n - 1 - t // bottom row first
++        for (j <- 0 until n) {
++          dut.io.wIn(j).poke((b(row)(j) & ((1L << bW) - 1)).U)
++        }
++        dut.clock.step()
++      }
++      dut.io.loadIn.poke(false.B)
++      for (j <- 0 until n) dut.io.wIn(j).poke(0.U)
++      // Wait for column skew propagation (n-1 extra cycles for last column)
++      dut.clock.step(n)
+ 
+-      // Cycle 1..N: valid + 数据
+-      dut.io.clearIn.poke(false.B)
++      // Phase 2: Feed activations (validIn for n cycles)
+       dut.io.validIn.poke(true.B)
+-      for (k <- 0 until n) {
+-        for (i <- 0 until n) {
+-          dut.io.aIn(i).poke(a(i)(k).U(16.W))
+-          dut.io.bIn(i).poke(b(k)(i).U(16.W))
++      for (t <- 0 until n) {
++        for (k <- 0 until n) {
++          dut.io.aIn(k).poke((a(t)(k) & ((1L << aW) - 1)).U)
+         }
+         dut.clock.step()
+       }
+-
+-      // 停止输入，等待传播
+       dut.io.validIn.poke(false.B)
+-      for (i <- 0 until n) { dut.io.aIn(i).poke(0.U); dut.io.bIn(i).poke(0.U) }
+-      for (_ <- 0 until (3 * n)) { dut.clock.step() }
+-
+-      // Drain：持续拉高，整列同时移位，底部先输出最后一行
+-      dut.io.drainIn.poke(true.B)
+-      val results = Array.fill(n, n)(0)
+-      for (i <- (n - 1) to 0 by -1) {
+-        // 当前底部 = row i
++      for (k <- 0 until n) dut.io.aIn(k).poke(0.U)
++
++      // Phase 3: Collect results by polling validOut
++      val collected = Array.fill(n)(0)
++      val maxWait = 4 * n + 10
++      for (_ <- 0 until maxWait) {
+         for (j <- 0 until n) {
+-          results(i)(j) = dut.io.cOut(j).peek().litValue.toInt
++          if (dut.io.validOut(j).peek().litToBoolean && collected(j) < n) {
++            results(collected(j))(j) = dut.io.cOut(j).peek().litValue
++            collected(j) += 1
++          }
+         }
+         dut.clock.step()
+       }
+-      dut.io.drainIn.poke(false.B)
+-
+-      // 验证：results(i)(j) 应等于 expected(i)(j)
+-      for (i <- 0 until n; j <- 0 until n) {
+-        results(i)(j) shouldBe expected(i)(j)
++      // Verify all results collected
++      for (j <- 0 until n) {
++        assert(collected(j) == n, s"Column $j: expected $n results, got ${collected(j)}")
+       }
+     }
++    results
+   }
+ 
++  /** 将 cW 位的无符号值解释为有符号整数 */
++  private def toSigned(raw: BigInt, cW: Int): Long = {
++    if (raw.testBit(cW - 1)) (raw - (BigInt(1) << cW)).toLong
++    else raw.toLong
++  }
++
++  // ===================== Test 2: 2×2 INT8 =====================
++  it should "compute 2x2 INT8 matrix multiply correctly" in {
++    val n = 2
++    val a = Seq(Seq(1L, 2L), Seq(3L, 4L))
++    val b = Seq(Seq(5L, 6L), Seq(7L, 8L))
++    val expected = Seq(Seq(19, 22), Seq(43, 50))
++
++    val results = runMatMul(n, a, b, DataFormat.INT8)
++    for (i <- 0 until n; j <- 0 until n) {
++      results(i)(j).toInt shouldBe expected(i)(j)
++    }
++  }
++
++  // ===================== Test 3: 2×2 INT16 negative =====================
+   it should "compute 2x2 INT16 matrix multiply with negative values" in {
+     val n = 2
+-    val a = Seq(Seq(-1, 2), Seq(3, -4))
+-    val b = Seq(Seq(5, -6), Seq(7, 8))
++    val a = Seq(Seq(-1L, 2L), Seq(3L, -4L))
++    val b = Seq(Seq(5L, -6L), Seq(7L, 8L))
++    val expected = for (i <- 0 until n) yield
++      for (j <- 0 until n) yield
++        (for (k <- 0 until n) yield a(i)(k) * b(k)(j)).sum
++
++    val results = runMatMul(n, a, b, DataFormat.INT16)
++    // Determine accW for sign interpretation
++    val accW = 16 + 16 + Integer.SIZE - Integer.numberOfLeadingZeros(n - 1).max(1) // log2Up(n)
++    val effectiveAccW = math.max(32, accW) // has FP in default fmts
++    for (i <- 0 until n; j <- 0 until n) {
++      toSigned(results(i)(j), effectiveAccW) shouldBe expected(i)(j)
++    }
++  }
++
++  // ===================== Test 4: 4×4 INT16 large values =====================
++  it should "compute 4x4 INT16 with large values using auto-derived cW" in {
++    val n = 4
++    val a = Seq(
++      Seq(30000L, -30000L, 20000L, -10000L),
++      Seq(-25000L, 15000L, -5000L, 30000L),
++      Seq(10000L, 20000L, -30000L, 25000L),
++      Seq(-20000L, -10000L, 30000L, -15000L)
++    )
++    val b = Seq(
++      Seq(10000L, -20000L, 5000L, 30000L),
++      Seq(-15000L, 25000L, -10000L, 20000L),
++      Seq(20000L, -5000L, 30000L, -10000L),
++      Seq(-10000L, 15000L, -20000L, 5000L)
++    )
+     val expected = for (i <- 0 until n) yield
+       for (j <- 0 until n) yield
+         (for (k <- 0 until n) yield a(i)(k) * b(k)(j)).sum
+ 
++    val results = runMatMul(n, a, b, DataFormat.INT16)
++    // accW = 16+16+log2Up(4) = 34; with FP: max(32,34) = 34
++    val effectiveAccW = 34
++    for (i <- 0 until n; j <- 0 until n) {
++      toSigned(results(i)(j), effectiveAccW) shouldBe expected(i)(j)
++    }
++  }
++
++  // ===================== Test 5: Weight reuse (two batches) =====================
++  it should "produce correct results for two activation batches with one weight load" in {
++    val n = 2
++    val b = Seq(Seq(3L, 4L), Seq(5L, 6L))
++    val a1 = Seq(Seq(1L, 2L), Seq(7L, 8L))
++    val a2 = Seq(Seq(2L, 3L), Seq(4L, 5L))
++    val expected1 = for (i <- 0 until n) yield
++      for (j <- 0 until n) yield (for (k <- 0 until n) yield a1(i)(k) * b(k)(j)).sum
++    val expected2 = for (i <- 0 until n) yield
++      for (j <- 0 until n) yield (for (k <- 0 until n) yield a2(i)(k) * b(k)(j)).sum
++
+     simulate(new SystolicArray(n, skew = true)) { dut =>
+-      dut.io.fmtIn.poke(DataFormat.INT16)
+-      dut.io.rndIn.poke(RoundingMode.RNE)
+-      dut.io.clearIn.poke(false.B)
++      val accW = dut.accW
++      // Initialize
++      dut.io.loadIn.poke(false.B)
+       dut.io.validIn.poke(false.B)
+-      dut.io.drainIn.poke(false.B)
+-      for (i <- 0 until n) { dut.io.aIn(i).poke(0.U); dut.io.bIn(i).poke(0.U) }
++      dut.io.fmtIn.poke(DataFormat.INT8)
++      dut.io.rndIn.poke(RoundingMode.RNE)
++      for (i <- 0 until n) { dut.io.aIn(i).poke(0.U); dut.io.wIn(i).poke(0.U); dut.io.psumIn(i).poke(0.U) }
+       dut.clock.step()
+ 
+-      dut.io.clearIn.poke(true.B)
+-      dut.clock.step()
++      // Load weights once
++      dut.io.loadIn.poke(true.B)
++      for (t <- 0 until n) {
++        val row = n - 1 - t
++        for (j <- 0 until n) dut.io.wIn(j).poke(b(row)(j).U)
++        dut.clock.step()
++      }
++      dut.io.loadIn.poke(false.B)
++      for (j <- 0 until n) dut.io.wIn(j).poke(0.U)
++      dut.clock.step(n)
+ 
+-      dut.io.clearIn.poke(false.B)
++      // Batch 1
+       dut.io.validIn.poke(true.B)
+-      for (k <- 0 until n) {
+-        for (i <- 0 until n) {
+-          dut.io.aIn(i).poke((a(i)(k) & 0xFFFF).U(16.W))
+-          dut.io.bIn(i).poke((b(k)(i) & 0xFFFF).U(16.W))
++      for (t <- 0 until n) {
++        for (k <- 0 until n) dut.io.aIn(k).poke(a1(t)(k).U)
++        dut.clock.step()
++      }
++      dut.io.validIn.poke(false.B)
++      for (k <- 0 until n) dut.io.aIn(k).poke(0.U)
++
++      val results1 = Array.fill(n, n)(BigInt(0))
++      val collected1 = Array.fill(n)(0)
++      for (_ <- 0 until 4 * n + 10) {
++        for (j <- 0 until n) {
++          if (dut.io.validOut(j).peek().litToBoolean && collected1(j) < n) {
++            results1(collected1(j))(j) = dut.io.cOut(j).peek().litValue
++            collected1(j) += 1
++          }
+         }
+         dut.clock.step()
+       }
+ 
++      // Batch 2 (same weights, different activations)
++      dut.io.validIn.poke(true.B)
++      for (t <- 0 until n) {
++        for (k <- 0 until n) dut.io.aIn(k).poke(a2(t)(k).U)
++        dut.clock.step()
++      }
+       dut.io.validIn.poke(false.B)
+-      for (i <- 0 until n) { dut.io.aIn(i).poke(0.U); dut.io.bIn(i).poke(0.U) }
+-      for (_ <- 0 until (3 * n)) { dut.clock.step() }
++      for (k <- 0 until n) dut.io.aIn(k).poke(0.U)
+ 
+-      // Drain
+-      dut.io.drainIn.poke(true.B)
+-      val results = Array.fill(n, n)(0)
+-      for (i <- (n - 1) to 0 by -1) {
++      val results2 = Array.fill(n, n)(BigInt(0))
++      val collected2 = Array.fill(n)(0)
++      for (_ <- 0 until 4 * n + 10) {
+         for (j <- 0 until n) {
+-          val raw = dut.io.cOut(j).peek().litValue
+-          results(i)(j) = if (raw > 0x7FFFFFFFL) (raw - 0x100000000L).toInt else raw.toInt
++          if (dut.io.validOut(j).peek().litToBoolean && collected2(j) < n) {
++            results2(collected2(j))(j) = dut.io.cOut(j).peek().litValue
++            collected2(j) += 1
++          }
+         }
+         dut.clock.step()
+       }
+-      dut.io.drainIn.poke(false.B)
+ 
++      // Verify both batches
+       for (i <- 0 until n; j <- 0 until n) {
+-        results(i)(j) shouldBe expected(i)(j)
++        results1(i)(j).toInt shouldBe expected1(i)(j)
++        results2(i)(j).toInt shouldBe expected2(i)(j)
+       }
+     }
+   }
++
++  // ===================== Test 6: Configurable bit widths =====================
++  it should "work with custom aW=8, bW=8, cW=20 (INT8 only)" in {
++    val n = 2
++    val a = Seq(Seq(1L, 2L), Seq(3L, 4L))
++    val b = Seq(Seq(5L, 6L), Seq(7L, 8L))
++    val expected = Seq(Seq(19, 22), Seq(43, 50))
++
++    val results = runMatMul(n, a, b, DataFormat.INT8,
++      aW = 8, bW = 8, cW = 20,
++      supportedFmts = Set(DataFormat.INT8))
++    for (i <- 0 until n; j <- 0 until n) {
++      results(i)(j).toInt shouldBe expected(i)(j)
++    }
++  }
++
++  it should "elaborate with explicit cW=64 and compute INT16 correctly" in {
++    // Elaborate check
++    val v = ChiselStage.emitSystemVerilog(new SystolicArray(2, skew = true, cW = 64))
++    v should include("module SystolicArray")
++
++    // Functional check
++    val n = 2
++    val a = Seq(Seq(100L, 200L), Seq(300L, 400L))
++    val b = Seq(Seq(10L, 20L), Seq(30L, 40L))
++    val expected = for (i <- 0 until n) yield
++      for (j <- 0 until n) yield (for (k <- 0 until n) yield a(i)(k) * b(k)(j)).sum
++
++    val results = runMatMul(n, a, b, DataFormat.INT16, cW = 64)
++    for (i <- 0 until n; j <- 0 until n) {
++      results(i)(j).toLong shouldBe expected(i)(j)
++    }
++  }
++
++  it should "auto-derive cW correctly (verify via Verilog output bit width)" in {
++    // n=4, aW=16, bW=16: autoAccW = 16+16+log2Up(4) = 34; with FP → max(32,34) = 34
++    val v = ChiselStage.emitSystemVerilog(new SystolicArray(4))
++    // cOut should be 34-bit wide; check for [33:0] in Verilog
++    v should include("[33:0]")
++  }
+ }

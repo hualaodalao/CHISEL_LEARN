@@ -85,6 +85,8 @@ object MacUnit {
 
   /** 累加：cReg + product（整数加法 / fp32 加法），结果 cW 位
     * 仅为 supportedFmts 中的格式生成对应加法路径
+    * 整数路径：有符号加法后截取 cW 位
+    * 浮点路径：对低 32 位做 Fp32.add 后零扩展到 cW（cW<32 时该路径不可达）
     */
   def accumulate(cReg: UInt, product: UInt, fmt: DataFormat.Type, cW: Int,
                  supportedFmts: Set[DataFormat.Type] = AllFmts,
@@ -92,12 +94,24 @@ object MacUnit {
     val hasInt = supportedFmts.contains(DataFormat.INT8) || supportedFmts.contains(DataFormat.INT16)
     val hasFp  = supportedFmts.contains(DataFormat.BF16) || supportedFmts.contains(DataFormat.FP16)
 
+    def intAdd: UInt = {
+      val sum = (cReg.asSInt + product.asSInt).asUInt
+      sum(cW - 1, 0)
+    }
+
+    def fpAdd: UInt = {
+      val fpResult = Fp32.add(cReg(31, 0), product(31, 0), rnd)
+      if (cW == 32) fpResult
+      else if (cW > 32) Cat(0.U((cW - 32).W), fpResult)
+      else fpResult(cW - 1, 0) // 不可达（require 已拦截）
+    }
+
     (hasInt, hasFp) match {
-      case (true, false)  => (cReg.asSInt + product.asSInt).asUInt
-      case (false, true)  => Fp32.add(cReg, product, rnd)
+      case (true, false)  => intAdd
+      case (false, true)  => fpAdd
       case (true, true)   =>
         val isInt = fmt === DataFormat.INT8 || fmt === DataFormat.INT16
-        Mux(isInt, (cReg.asSInt + product.asSInt).asUInt, Fp32.add(cReg, product, rnd))
+        Mux(isInt, intAdd, fpAdd)
       case (false, false) => cReg
     }
   }

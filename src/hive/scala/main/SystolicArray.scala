@@ -1,21 +1,25 @@
-/** N×N 脉动阵列
+/** N×N Weight-Stationary 脉动阵列（裸 Tile，无 skew 逻辑）
   *
   * @param n     阵列维度（默认 8）
-  * @param skew  是否启用输入 skew buffer。
-  *              true：行 i 延迟 i 周期、列 j 延迟 j 周期，外部可直接同步喂数；
-  *              false：裸 Tile，用于 Cluster 级联（由上层处理对齐）。
-  * @param aW    A 通道位宽（默认 16）
-  * @param bW    B 通道位宽（默认 16）
-  * @param cW    累加器位宽（默认 32）
+  * @param aW    激活位宽（默认 16）
+  * @param bW    权重位宽（默认 16）
+  * @param cW    累加器位宽（默认 0=自动推导）
   *
-  * 接口：
-  *   - aIn(n)：左侧每行一个 aW-bit A 输入
-  *   - bIn(n)：顶部每列一个 bW-bit B 输入
-  *   - aOut(n) / bOut(n)：右侧 / 底部输出（用于级联）
-  *   - cOut(n)：每列底部的 cW-bit 结果（drain 时逐周期串行输出）
-  *   - drainIn：drain 脉冲从顶部注入，逐 PE 向下传播
-  *   - drainOut(n)：每列底部的 drain 输出（用于级联）
-  *   - clearIn / validIn / fmtIn / rndIn：从左侧/顶部注入，逐 PE 脉动传播
+  * SystolicArray 为"裸 Tile"：仅负责 PE 网格连线，不包含任何 skew 逻辑。
+  * 全局 skew 由上层 SystolicCluster 负责。
+  *
+  * loadIn / weightLoadMode 为每行独立输入，从左侧注入后经 PE 的 RegNext
+  * 链式向右传播（水平脉动）。PE(i)(0) 直接接收 io.loadIn(i)，
+  * PE(i)(j) 从 PE(i)(j-1).loadOut 获取（延迟 j 拍）。
+  *
+  * 权重加载（由 PE 内部根据 weightLoadMode 决定 latch 源）：
+  *   Horizontal：loadIn 期间 aIn 作为权重源，经 aOut 列移位链下传
+  *   Vertical  ：loadIn 期间 psumIn 携带权重，经 psumOut→psumIn 垂直下移
+  *
+  * 使用时序：
+  *   阶段 A：设置 weightLoadMode，拉高 loadIn n 拍（预填充水平脉动链）
+  *   阶段 B：按列注入权重 n 拍
+  *   阶段 C：拉低 loadIn，拉高 validIn，喂入激活
   */
 
 import chisel3._
@@ -23,118 +27,93 @@ import chisel3.util._
 
 class SystolicArray(
   n: Int = 8,
-  skew: Boolean = true,
   aW: Int = 16,
   bW: Int = 16,
-  cW: Int = 32,
+  cW: Int = 0,
   supportedFmts: Set[DataFormat.Type] = Set(DataFormat.FP16, DataFormat.BF16, DataFormat.INT16, DataFormat.INT8)
 ) extends Module {
+
+  // --- 有效位宽派生 ---
+  val aEffW: Int = math.max(aW, bW)
+  private val hasFp  = supportedFmts.contains(DataFormat.FP16) || supportedFmts.contains(DataFormat.BF16)
+  private val hasInt = supportedFmts.contains(DataFormat.INT8) || supportedFmts.contains(DataFormat.INT16)
+  private val autoAccW = aEffW + bW + log2Up(n)
+  val accW: Int = if (cW != 0) math.max(cW, bW)
+                  else if (hasFp) math.max(32, autoAccW)
+                  else autoAccW
+  val cEffW: Int = accW
+
+  // --- elaboration-time require ---
+  if (hasFp)  require(cEffW >= 32,         s"含浮点格式时 cEffW($cEffW) 必须 >= 32")
+  if (hasInt) require(cEffW >= aEffW + bW, s"含整数格式时 cEffW($cEffW) 必须 >= aEffW($aEffW) + bW($bW)")
+  require(cEffW >= bW, s"cEffW($cEffW) 必须 >= bW($bW)")
+
   val io = IO(new Bundle {
-    // 数据
-    val aIn  = Input(Vec(n, UInt(aW.W)))
-    val bIn  = Input(Vec(n, UInt(bW.W)))
-    val aOut = Output(Vec(n, UInt(aW.W)))
-    val bOut = Output(Vec(n, UInt(bW.W)))
-    // C 结果（列底部输出，drain 时串行读出）
-    val cOut = Output(Vec(n, UInt(cW.W)))
-    // drain 控制
-    val drainIn  = Input(Bool())
-    val drainOut = Output(Vec(n, Bool()))
-    // 控制（脉动传播）
-    val clearIn = Input(Bool())
-    val validIn = Input(Bool())
-    val fmtIn   = Input(DataFormat())
-    val rndIn   = Input(RoundingMode())
+    val aIn    = Input(Vec(n, UInt(aEffW.W)))
+    val aOut   = Output(Vec(n, UInt(aEffW.W)))
+    val psumIn = Input(Vec(n, UInt(cEffW.W)))
+    val cOut   = Output(Vec(n, UInt(cEffW.W)))
+    val loadIn = Input(Vec(n, Bool()))              // 每行一个 loadIn（从左侧注入）
+    val validIn = Input(Vec(n, Bool()))              // 每行一个 validIn（从顶部注入）
+    val fmtIn   = Input(Vec(n, DataFormat()))        // 每行一个 fmtIn
+    val rndIn   = Input(Vec(n, RoundingMode()))      // 每行一个 rndIn
+    val weightLoadMode = Input(Vec(n, WeightLoadMode()))  // 每行一个 loadMode
+    val clear   = Input(Bool())  // psumReg 清零信号
+    val validOut = Output(Vec(n, Bool()))
+    val fmtOut   = Output(Vec(n, DataFormat()))
+    val rndOut   = Output(Vec(n, RoundingMode()))
+    val loadOut  = Output(Vec(n, Bool()))
   })
 
-  val pes = Seq.fill(n, n)(Module(new PE(aW, bW, cW, supportedFmts)))
+  // --- PE 网格 ---
+  val pes = Seq.fill(n, n)(Module(new PE(aW, bW, cEffW, supportedFmts)))
 
-  // 水平连线
-  val aH = Seq.fill(n, n + 1)(Wire(UInt(aW.W)))
-  // 垂直连线
-  val bV = Seq.fill(n + 1, n)(Wire(UInt(bW.W)))
-  // C 列传递（垂直，移位寄存器链）
-  val cV = Seq.fill(n + 1, n)(Wire(UInt(cW.W)))
-  // 控制水平传播
-  val clrH = Seq.fill(n, n + 1)(Wire(Bool()))
-  val vldH = Seq.fill(n, n + 1)(Wire(Bool()))
-  val fmtH = Seq.fill(n, n + 1)(Wire(DataFormat()))
-  val rndH = Seq.fill(n, n + 1)(Wire(RoundingMode()))
-  // 控制垂直传播
-  val clrV = Seq.fill(n + 1, n)(Wire(Bool()))
-  val vldV = Seq.fill(n + 1, n)(Wire(Bool()))
-  val fmtV = Seq.fill(n + 1, n)(Wire(DataFormat()))
-  val rndV = Seq.fill(n + 1, n)(Wire(RoundingMode()))
-
-  // 默认值
-  for (i <- 0 until n) { aH(i)(0) := 0.U; clrH(i)(0) := false.B; vldH(i)(0) := false.B; fmtH(i)(0) := DataFormat.INT8; rndH(i)(0) := RoundingMode.RNE }
-  for (j <- 0 until n) { bV(0)(j) := 0.U; clrV(0)(j) := false.B; vldV(0)(j) := false.B; fmtV(0)(j) := DataFormat.INT8; rndV(0)(j) := RoundingMode.RNE; cV(0)(j) := 0.U }
-
-  // 边界输入（可选 skew：行 i 延迟 i，列 j 延迟 j）
-  if (skew) {
-    for (i <- 0 until n) {
-      aH(i)(0) := (if (i == 0) io.aIn(i) else ShiftRegister(io.aIn(i), i))
-      clrH(i)(0) := (if (i == 0) io.clearIn else ShiftRegister(io.clearIn, i))
-      vldH(i)(0) := (if (i == 0) io.validIn else ShiftRegister(io.validIn, i))
-      fmtH(i)(0) := (if (i == 0) io.fmtIn else ShiftRegister(io.fmtIn, i))
-      rndH(i)(0) := (if (i == 0) io.rndIn else ShiftRegister(io.rndIn, i))
+  // --- 列连接块（水平传播）：loadIn/loadMode/validIn/fmtIn/rndIn/aIn 沿 y 方向传播 ---
+  for (x <- 0 until n){
+    for(y <- 0 until n){
+        if(y == 0){
+          pes(x)(y).io.loadIn := io.loadIn(x)
+          pes(x)(y).io.weightLoadMode := io.weightLoadMode(x)
+          // RegNext 对齐：与 RegNext(aIn) 同步，使 validIn 延迟 1 拍
+          pes(x)(y).io.validIn := RegNext(io.validIn(x), false.B)
+          pes(x)(y).io.fmtIn   := RegNext(io.fmtIn(x), DataFormat.INT8)
+          pes(x)(y).io.rndIn   := RegNext(io.rndIn(x), RoundingMode.RNE)
+          pes(x)(y).io.aIn := io.aIn(x)
+          pes(x)(y).io.clear := io.clear
+        }
+        else{
+          pes(x)(y).io.loadIn := pes(x)(y-1).io.loadOut
+          pes(x)(y).io.weightLoadMode := pes(x)(y-1).io.weightLoadModeOut
+          pes(x)(y).io.validIn := pes(x)(y-1).io.validOut
+          pes(x)(y).io.fmtIn  := pes(x)(y-1).io.fmtOut
+          pes(x)(y).io.rndIn  := pes(x)(y-1).io.rndOut
+          pes(x)(y).io.aIn := pes(x)(y-1).io.aOut
+          pes(x)(y).io.clear := io.clear
+        }
+        if(y == n-1){
+          io.validOut(x) := pes(x)(y).io.validOut
+          io.fmtOut(x)   := pes(x)(y).io.fmtOut
+          io.rndOut(x)   := pes(x)(y).io.rndOut
+          io.loadOut(x)  := pes(x)(y).io.loadOut
+          io.aOut(x)  := pes(x)(y).io.aOut
+        }
     }
-    for (j <- 0 until n) {
-      bV(0)(j) := (if (j == 0) io.bIn(j) else ShiftRegister(io.bIn(j), j))
-      clrV(0)(j) := (if (j == 0) io.clearIn else ShiftRegister(io.clearIn, j))
-      vldV(0)(j) := (if (j == 0) io.validIn else ShiftRegister(io.validIn, j))
-      fmtV(0)(j) := (if (j == 0) io.fmtIn else ShiftRegister(io.fmtIn, j))
-      rndV(0)(j) := (if (j == 0) io.rndIn else ShiftRegister(io.rndIn, j))
-    }
-  } else {
-    for (i <- 0 until n) { aH(i)(0) := io.aIn(i) }
-    for (j <- 0 until n) { bV(0)(j) := io.bIn(j) }
-    // clear/valid/fmt/rnd 从左上角注入
-    clrH(0)(0) := io.clearIn
-    vldH(0)(0) := io.validIn
-    fmtH(0)(0) := io.fmtIn
-    rndH(0)(0) := io.rndIn
-    clrV(0)(0) := io.clearIn
-    vldV(0)(0) := io.validIn
-    fmtV(0)(0) := io.fmtIn
-    rndV(0)(0) := io.rndIn
   }
 
-  // 连接 PE 网格
-  for (i <- 0 until n; j <- 0 until n) {
-    val pe = pes(i)(j)
-    pe.io.aIn := aH(i)(j)
-    pe.io.bIn := bV(i)(j)
-    pe.io.clearIn := clrH(i)(j) | clrV(i)(j)
-    pe.io.validIn := vldH(i)(j) | vldV(i)(j)
-    // fmt/rnd：水平优先
-    pe.io.fmtIn := Mux(vldH(i)(j) | clrH(i)(j), fmtH(i)(j), fmtV(i)(j))
-    pe.io.rndIn := Mux(vldH(i)(j) | clrH(i)(j), rndH(i)(j), rndV(i)(j))
-    // C 列传递 + drain（广播）
-    pe.io.cIn := cV(i)(j)
-    pe.io.drainIn := io.drainIn
-
-    // 水平输出 → 下一列
-    aH(i)(j + 1) := pe.io.aOut
-    clrH(i)(j + 1) := pe.io.clearOut
-    vldH(i)(j + 1) := pe.io.validOut
-    fmtH(i)(j + 1) := pe.io.fmtOut
-    rndH(i)(j + 1) := pe.io.rndOut
-
-    // 垂直输出 → 下一行
-    bV(i + 1)(j) := pe.io.bOut
-    clrV(i + 1)(j) := pe.io.clearOut
-    vldV(i + 1)(j) := pe.io.validOut
-    fmtV(i + 1)(j) := pe.io.fmtOut
-    rndV(i + 1)(j) := pe.io.rndOut
-    // C 垂直传递
-    cV(i + 1)(j) := pe.io.cOut
+  // --- 行连接块（垂直传播）：仅 psumIn/psumOut 沿 x 方向传播 ---
+  for( y <- 0 until n)    {
+    for(x <- 0 until n){
+      if(x == 0){
+        pes(x)(y).io.psumIn := io.psumIn(y)
+      }
+      else{
+        pes(x)(y).io.psumIn := pes(x-1)(y).io.psumOut
+      }
+      if(x == n-1)  {
+        io.cOut(y)     := pes(x)(y).io.psumOut
+      }
+    }
   }
-
-  // 边界输出
-  for (i <- 0 until n) { io.aOut(i) := aH(i)(n) }
-  for (j <- 0 until n) { io.bOut(j) := bV(n)(j) }
-  // C 结果：每列底部输出
-  for (j <- 0 until n) { io.cOut(j) := cV(n)(j) }
-  for (j <- 0 until n) { io.drainOut(j) := io.drainIn }
+  
+ 
 }
