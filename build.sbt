@@ -11,6 +11,7 @@ lazy val root = (project in file("."))
     Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "gingercat" / "fetch",
     Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "hive" / "scala" / "main",
     Test / unmanagedSourceDirectories += baseDirectory.value / "src" / "hive" / "scala" / "test",
+    Compile / unmanagedSources / excludeFilter := "MaskedLiteral.scala",
     libraryDependencies ++= Seq(
       "org.chipsalliance" %% "chisel" % "7.13.0",
       "com.lihaoyi" %% "sourcecode" % "0.4.2", // regif: SymbolName 隐式取名（替代 SpinalHDL 宏）

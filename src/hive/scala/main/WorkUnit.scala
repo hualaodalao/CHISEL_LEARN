@@ -1,4 +1,4 @@
-/** 可重构 MAC 单元：根据 fmt 选择整数或浮点乘累加路径
+/** WorkUnit（工作单元）- 乘加计算工具对象
   *
   * 仅为 supportedFmts 中声明的格式生成对应硬件，节省面积。
   * BF16 / FP16 共用同一个 Fp32 乘法器（仅输入转换不同）。
@@ -12,12 +12,12 @@
 import chisel3._
 import chisel3.util._
 
-object MacUnit {
+object WorkUnit {
 
   private val AllFmts = Set(DataFormat.FP16, DataFormat.BF16, DataFormat.INT16, DataFormat.INT8)
 
   /** 计算 a × b 的 cW-bit 结果
-    * 仅为 supportedFmts 中的格式生成乘法器硬件，其余格式输出 0（don't-care，PE 层不会累加）
+    * 仅为 supportedFmts 中的格式生成乘法器硬件，其余格式输出 0（don't-care，HiveWorker 层不会累加）
     * BF16/FP16 共用一个 Fp32.mul（输入转换由 Mux 选择）
     * INT8/INT16 共用一个 16×16 有符号乘法器（INT8 符号扩展）
     */
@@ -78,7 +78,7 @@ object MacUnit {
       candidates += ((fpCond, fpProd))
     }
 
-    // 构建 Mux 树（不支持的格式 → 0，PE 层不会使用）
+    // 构建 Mux 树（不支持的格式 → 0，HiveWorker 层不会使用）
     val raw = buildMuxTree(candidates.toList, 0.U(32.W))
     fitToWidth(raw, cW, fmt, supportedFmts)
   }
