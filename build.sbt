@@ -11,6 +11,8 @@ lazy val root = (project in file("."))
     Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "gingercat" / "fetch",
     Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "hive" / "scala" / "main",
     Test / unmanagedSourceDirectories += baseDirectory.value / "src" / "hive" / "scala" / "test",
+    Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "foragerbee" / "scala" / "main",
+    Test / unmanagedSourceDirectories += baseDirectory.value / "src" / "foragerbee" / "scala" / "test",
     Compile / unmanagedSources / excludeFilter := "MaskedLiteral.scala",
     libraryDependencies ++= Seq(
       "org.chipsalliance" %% "chisel" % "7.13.0",

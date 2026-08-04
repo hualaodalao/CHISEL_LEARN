@@ -2,7 +2,7 @@
   *
   * 架构定位：
   *   权重驻留（Weight-Stationary）HiveWorker，无独立 wIn/wOut 端口。
-  *   权重通过 aIn（loadH 水平模式）或 psumIn（loadV 垂直模式）通道加载到内部 wReg，
+  *   权重仅通过 psumIn（loadV 垂直加载）通道加载到内部 wReg；
   *   计算时 aIn 水平传播、psumIn 垂直传播，权重不动、数据流过。
   *
   * @param aW            激活位宽（默认 16）
@@ -13,37 +13,38 @@
   *                      不执行累加，psumReg 保持。
   *
   * 新架构要点：
-  *   - 新增 fmtReg / rndReg：跟随权重一起加载，后续计算使用内部寄存器
-  *   - 删除 weightLoadMode：拆分为 loadH（水平）和 loadV（垂直）两个独立信号
-  *   - 权重加载时不经过 ShiftRegister：权重自然沿 a/psum PE 链传播
-  *   - 垂直加载时必须同时水平加载配置（fmt/rnd），不存在「仅垂直加载」模式
+  *   - fmtReg / rndReg：随 loadH 锁存的配置，后续计算使用内部寄存器
+  *   - 权重加载不经过 ShiftRegister：权重沿 psum PE 链自然向下传播
+  *   - loadH 与 loadV 职责分离：loadH 只加载配置，loadV 只加载权重
+  *   - 权重加载时同时拉高 loadH（刷新 fmt/rnd）与 loadV（锁存权重）
   *
   * IO 端口语义：
   *   aIn  / aOut   : 激活通道，水平传播（左→右），aEffW 位。
-  *   psumIn / psumOut : 部分和通道，垂直传播（上→下），cEffW 位。
-  *   loadHIn / loadHOut : 水平加载使能（权重 + 配置），水平传播。
-  *   loadVIn / loadVOut : 垂直加载使能（权重），垂直传播。必须与 loadHIn 同时使用。
+  *   psumIn / psumOut : 部分和通道，垂直传播（上→下），cEffW 位；兼作权重加载通道。
+  *   loadHIn / loadHOut : 水平加载使能（仅配置 fmt/rnd），水平传播。
+  *   loadVIn / loadVOut : 垂直加载使能（权重），垂直传播。
   *   validIn / validOut : 数据有效标志，水平传播。
   *   fmtIn   / fmtOut   : 数据格式选择，水平传播。
   *   rndIn   / rndOut   : 舍入模式选择，水平传播。
   *   clear              : psumReg 清零，标量广播。
   *
-  * 权重加载模式（仅两种合法模式，不存在「仅垂直加载」）：
-  *   1. 仅水平（loadHIn=true, loadVIn=false）：权重 + fmt/rnd 从 aIn/fmtIn/rndIn 获取
-  *   2. 水平+垂直同时（loadHIn=true, loadVIn=true）：权重从 psumIn 低位获取，fmt/rnd 从 fmtIn/rndIn 获取
+  * 权重加载协议：
+  *   - loadHIn=true：锁存 fmt/rnd 配置（不动 wReg）
+  *   - loadVIn=true：从 psumIn 低位锁存权重进 wReg，并透传 psumIn 使权重下沉
+  *   - 典型用法：加载阶段同时拉高 loadH+loadV，psumIn 供权重，aIn 无需供数
   *
-  * wReg 锁存逻辑：
-  *   loadH && loadV：权重从 psumIn 低位获取，fmt/rnd 从 fmtIn/rndIn 获取
-  *   仅 loadH：权重 + 配置都从 aIn/fmtIn/rndIn 获取
+  * wReg / 配置锁存逻辑：
+  *   loadV：wReg := psumIn 低位
+  *   loadH：fmtReg := fmtIn，rndReg := rndIn
   *
   * psumReg 逻辑（优先级从高到低）：
   *   1. when(clear)                       → psumReg := 0
-  *   2. elsewhen(loadHIn)                 → psumReg := psumIn（加载期间透传）
+  *   2. elsewhen(loadVIn)                 → psumReg := psumIn（加载期间透传）
   *   3. elsewhen(validIn && fmtOk)        → psumReg := accumulate(psumIn, product, fmtReg, rndReg)
   *   4. otherwise                         → 保持
   *
   * 输出驱动：
-  *   aOut   := loadHIn ? wReg.pad(aEffW) : RegNext(aIn, 0.U)
+  *   aOut   := RegNext(aIn, 0.U)
   *   psumOut := psumReg（loadVIn 期间 psumReg := psumIn 等效透传，loadVIn 撤掉后保持权重自然传播）
   */
 
@@ -109,20 +110,17 @@ class HiveWorker(
   val wReg = RegInit(0.U(bW.W))
 
   // --- wReg / fmtReg / rndReg 锁存逻辑 ---
-  // 注意：不存在「仅垂直加载」模式，垂直加载总伴随水平加载配置（fmt/rnd）
-  when(io.loadHIn && io.loadVIn) {
-    // 同时：权重从 psumIn 低位获取，fmt/rnd 从 fmtIn/rndIn 获取
-    wReg   := io.psumIn(bW - 1, 0)
-    fmtReg := io.fmtIn
-    rndReg := io.rndIn
-  }.elsewhen(io.loadHIn) {
-    // 仅水平：权重 + 配置都从 aIn/fmtIn/rndIn 获取
-    wReg   := io.aIn(bW - 1, 0)
+  // 权重仅经垂直加载（loadV 上升沿，从 psumIn 低位）；水平加载（loadH）仅锁存配置 fmt/rnd。
+  // 二者独立：加载权重时同时拉高 loadH（刷新配置）与 loadV（锁存权重）。
+  when(io.loadVIn) {
+    wReg := io.psumIn(bW - 1, 0)
+  }
+  when(io.loadHIn) {
     fmtReg := io.fmtIn
     rndReg := io.rndIn
   }
 
-  // --- 首次 load 时标记初始化完成（垂直加载总伴随水平，故仅需检测 loadHIn） ---
+  // --- 首次 load 时标记初始化完成（配置随 loadH 锁存） ---
   when(io.loadHIn && !fmtInitActive) {
     fmtInitActive := true.B
   }
@@ -136,8 +134,8 @@ class HiveWorker(
   val psumReg = RegInit(0.U(cEffW.W))
   when(io.clear) {
     psumReg := 0.U
-  }.elsewhen(io.loadHIn) {
-    // 加载期间透传 psumIn（垂直加载总伴随水平，loadHIn 已涵盖所有加载场景）
+  }.elsewhen(io.loadVIn) {
+    // 垂直加载期间透传 psumIn（权重沿 psum 链向下自然传播）
     psumReg := io.psumIn
   }.elsewhen(io.validIn && fmtOk) {
     // 正常计算（使用 fmtReg 和 rndReg）
@@ -145,12 +143,14 @@ class HiveWorker(
   }
 
   // --- psumOut ---
-  // 直接输出 psumReg（loadVIn 期间 psumReg := psumIn，等效透传；
-  // loadVIn 撤掉后 psumReg 保持最后的权重值，自然沿 psum 链向下传播）
+  // 始终输出寄存值。行式权重加载协议（loadV 广播脉冲，每权重行 2 拍：
+  // 偶数拍供数 + loadV 脉冲锁存/下沉，奇数拍保持）依赖 psumReg 逐拍寄存
+  // 使权重每拍下沉一行；若做组合旁路，脉冲拍当前供数会穿透到底部簇，
+  // 深层 PE 锁存到错误权重
   io.psumOut := psumReg
 
-  // --- aOut：loadHIn 时输出 wReg（水平权重传播），否则正常 RegNext(aIn) ---
-  io.aOut := Mux(io.loadHIn, wReg.pad(aEffW), RegNext(io.aIn, 0.U))
+  // --- aOut：激活正常水平传播（权重不再经 a 链加载，去掉 loadH 分支）---
+  io.aOut := RegNext(io.aIn, 0.U)
 
   // --- 控制传播 ---
   io.loadHOut := RegNext(io.loadHIn, false.B)

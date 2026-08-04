@@ -6,22 +6,25 @@
   * @param cW    累加器位宽（默认 0=自动推导）
   *
   * 新架构要点：
-  *   - loadHIn / loadVIn / validIn / fmtIn / rndIn 为标量输入，直接广播到首列 PE（无 ShiftRegister）
+  *   - loadHIn / validIn / fmtIn / rndIn 为标量输入，直接广播到首列 PE（无 ShiftRegister）
   *   - HiveComb 已完成全局 skew，HiveCell 内部不再做行级 skew
-  *   - 控制信号沿 PE 链水平传播（RegNext），自然产生列级延迟
-  *   - loadH/loadV/fmt/rnd 输出为标量（所有行同值）
+  *   - loadH/valid/fmt/rnd 沿水平 PE 链（y 方向）传播（RegNext），自然产生列级延迟
+  *   - loadV 沿垂直 PE 链（x 方向，随 psum 链）传播，与垂直权重波同步下沉
+  *   - loadH/fmt/rnd 输出为标量（所有行同值）
+  *   - 权重仅经 loadV（psumIn）加载；loadH 只锁存配置，不再经 a 链传权重
   *
   * 列连接块（y==0 注入点）：
-  *   所有控制信号直接广播（无 ShiftRegister 链）
+  *   loadH/valid/fmt/rnd 控制信号直接广播（无 ShiftRegister 链）
   *   aIn 保持 per-row
   *
   * 行连接块（x==0 注入点）：
-  *   psumIn 保持 per-column
+  *   psumIn 保持 per-column；loadV 广播到所有列首行 PE
   *
   * 使用时序：
-  *   水平加载：拉高 loadHIn n 拍，权重经 aIn 水平传播
-  *   垂直加载：拉高 loadVIn n 拍，权重经 psumIn 垂直传播
-  *   同时加载：loadHIn+loadVIn，水平仅加载配置，垂直加载权重
+  *   权重加载：同时拉高 loadHIn（配置）+ loadVIn（权重），权重经 psumIn 垂直下沉；
+  *             aIn 无需供权重（loadH 不再从 aIn 锁存 wReg）
+  *   释放后保持 psumIn=权重直到 loadV 沿垂直链排空（约 n 拍），再置 0 并 clear，
+  *   否则尾部仍高的 loadV 会把 0 锁进 wReg
   */
 
 import chisel3._
@@ -81,8 +84,15 @@ class HiveCell(
       if (y == 0) {
         // 控制信号：直接广播（无 ShiftRegister）
         pes(x)(y).io.loadHIn := io.loadHIn
-        pes(x)(y).io.loadVIn := io.loadVIn
-        pes(x)(y).io.validIn := io.validIn  // HiveComb 已 skew，无需再做
+        // valid 沿 x+y 二维传播：x==0 行首接 io.validIn，x>0 行首从上一 x 行
+        // 的 y 链末端级联，使 PE(x,y) 的 valid 相对 io.validIn 延迟 (x+y) 拍，
+        // 与数据波前的行内偏移 x 严格对齐（若只在 y 方向传播并广播所有 x 行，
+        // cj>0 簇的 valid 会滞后数据 x 拍，前几个深度累加被错误门控）
+        if (x == 0) {
+          pes(x)(y).io.validIn := io.validIn
+        } else {
+          pes(x)(y).io.validIn := pes(x - 1)(n - 1).io.validOut
+        }
         pes(x)(y).io.fmtIn   := io.fmtIn
         pes(x)(y).io.rndIn   := io.rndIn
         pes(x)(y).io.aIn     := io.aIn(x)  // per-row 数据
@@ -90,13 +100,13 @@ class HiveCell(
       } else {
         // 传播：从左侧 PE 获取（RegNext 链）
         pes(x)(y).io.loadHIn := pes(x)(y-1).io.loadHOut
-        pes(x)(y).io.loadVIn := pes(x)(y-1).io.loadVOut
         pes(x)(y).io.validIn := pes(x)(y-1).io.validOut
         pes(x)(y).io.fmtIn   := pes(x)(y-1).io.fmtOut
         pes(x)(y).io.rndIn   := pes(x)(y-1).io.rndOut
         pes(x)(y).io.aIn     := pes(x)(y-1).io.aOut
         pes(x)(y).io.clear   := io.clear    // 广播
       }
+
       if (y == n-1) {
         io.validOut(x) := pes(x)(y).io.validOut  // per-row
         io.aOut(x)     := pes(x)(y).io.aOut      // per-row
@@ -108,15 +118,18 @@ class HiveCell(
   io.fmtOut   := pes(n-1)(n-1).io.fmtOut
   io.rndOut   := pes(n-1)(n-1).io.rndOut
   io.loadHOut := pes(n-1)(n-1).io.loadHOut
-  io.loadVOut := pes(n-1)(n-1).io.loadVOut
+  // loadVOut：loadV 已改为 PE 级广播，此处仅为保持接口兼容（透传 RegNext）
+  io.loadVOut := pes(n-1)(0).io.loadVOut
 
   // --- 行连接块（垂直传播）：仅 psumIn/psumOut 沿 x 方向传播 ---
   for (y <- 0 until n) {
     for (x <- 0 until n) {
       if (x == 0) {
         pes(x)(y).io.psumIn := io.psumIn(y)
+        pes(x)(y).io.loadVIn := io.loadVIn
       } else {
         pes(x)(y).io.psumIn := pes(x-1)(y).io.psumOut
+        pes(x)(y).io.loadVIn := pes(x-1)(y).io.loadVOut
       }
       if (x == n-1) {
         io.cOut(y) := pes(x)(y).io.psumOut
