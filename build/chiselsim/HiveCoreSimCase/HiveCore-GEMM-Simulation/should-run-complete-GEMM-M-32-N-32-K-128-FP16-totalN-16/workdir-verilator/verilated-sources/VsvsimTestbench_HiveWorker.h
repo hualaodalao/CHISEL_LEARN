@@ -29,7 +29,6 @@ class alignas(VL_CACHE_LINE_BYTES) VsvsimTestbench_HiveWorker final {
     CData/*0:0*/ __PVT__io_clear;
     CData/*1:0*/ __PVT__fmtReg;
     CData/*2:0*/ __PVT__rndReg;
-    CData/*0:0*/ __PVT__loadVPrev;
     CData/*0:0*/ __PVT__io_loadHOut_REG;
     CData/*0:0*/ __PVT__io_loadVOut_REG;
     CData/*0:0*/ __PVT__io_validOut_REG;

@@ -26,25 +26,23 @@ VL_ATTR_COLD void VsvsimTestbench_HiveWorker___eval_initial__TOP__svsimTestbench
                                      >> 4U));
     vlSelfRef.__PVT__wReg = (0x0000ffffU & (__PVT__unnamedblk3__DOT___RANDOM[0U] 
                                             >> 7U));
-    vlSelfRef.__PVT__loadVPrev = (1U & (__PVT__unnamedblk3__DOT___RANDOM[0U] 
-                                        >> 0x17U));
-    vlSelfRef.__PVT__psumReg = ((0xff000000U & __PVT__unnamedblk3__DOT___RANDOM[0U]) 
-                                | (0x00ffffffU & __PVT__unnamedblk3__DOT___RANDOM[1U]));
-    vlSelfRef.__PVT__io_aOut_REG = ((0x0000ff00U & 
+    vlSelfRef.__PVT__psumReg = ((0xff800000U & __PVT__unnamedblk3__DOT___RANDOM[0U]) 
+                                | (0x007fffffU & __PVT__unnamedblk3__DOT___RANDOM[1U]));
+    vlSelfRef.__PVT__io_aOut_REG = ((0x0000ff80U & 
                                      (__PVT__unnamedblk3__DOT___RANDOM[1U] 
                                       >> 0x00000010U)) 
-                                    | (0x000000ffU 
+                                    | (0x0000007fU 
                                        & __PVT__unnamedblk3__DOT___RANDOM[2U]));
     vlSelfRef.__PVT__io_loadHOut_REG = (1U & (__PVT__unnamedblk3__DOT___RANDOM[2U] 
-                                              >> 8U));
+                                              >> 7U));
     vlSelfRef.__PVT__io_loadVOut_REG = (1U & (__PVT__unnamedblk3__DOT___RANDOM[2U] 
-                                              >> 9U));
+                                              >> 8U));
     vlSelfRef.__PVT__io_validOut_REG = (1U & (__PVT__unnamedblk3__DOT___RANDOM[2U] 
-                                              >> 0x0aU));
+                                              >> 9U));
     vlSelfRef.__PVT__io_fmtOut_REG = (3U & (__PVT__unnamedblk3__DOT___RANDOM[2U] 
-                                            >> 0x0bU));
+                                            >> 0x0aU));
     vlSelfRef.__PVT__io_rndOut_REG = (7U & (__PVT__unnamedblk3__DOT___RANDOM[2U] 
-                                            >> 0x0dU));
+                                            >> 0x0cU));
 }
 
 VL_ATTR_COLD void VsvsimTestbench_HiveWorker___ctor_var_reset(VsvsimTestbench_HiveWorker* vlSelf) {
@@ -73,7 +71,6 @@ VL_ATTR_COLD void VsvsimTestbench_HiveWorker___ctor_var_reset(VsvsimTestbench_Hi
     vlSelf->__PVT__fmtReg = VL_SCOPED_RAND_RESET_I(2, __VscopeHash, 8790608001394970881ull);
     vlSelf->__PVT__rndReg = VL_SCOPED_RAND_RESET_I(3, __VscopeHash, 4326911166844221594ull);
     vlSelf->__PVT__wReg = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 3457238435170325336ull);
-    vlSelf->__PVT__loadVPrev = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 2003047002560406156ull);
     vlSelf->__PVT__psumReg = VL_SCOPED_RAND_RESET_I(32, __VscopeHash, 1128887095844064373ull);
     vlSelf->__PVT__io_aOut_REG = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 15008868841126028511ull);
     vlSelf->__PVT__io_loadHOut_REG = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 3934656467819231932ull);

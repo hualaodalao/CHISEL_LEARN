@@ -14,8 +14,8 @@ VL_ATTR_COLD void VsvsimTestbench_HiveCell___stl_sequent__TOP__svsimTestbench__D
     vlSelfRef.io_rndIn = (7U & ((vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__regFile_3 
                                  >> 8U) & (- (IData)(
                                                      (1U 
-                                                      & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_14)))))));
-    vlSelfRef.io_fmtIn = ((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_14)
+                                                      & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_16)))))));
+    vlSelfRef.io_fmtIn = ((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_16)
                            ? 2U : (3U & vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__regFile_3));
     vlSelfRef.io_validIn = (((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__counter) 
                              < (0x0000ffffU & ((IData)(0x001eU) 
@@ -45,15 +45,15 @@ VL_ATTR_COLD void VsvsimTestbench_HiveCell___stl_sequent__TOP__svsimTestbench__D
                           & (IData)(vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_3));
     vlSelfRef.io_aIn_0 = (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__aRegs_0[0U] 
                           & (IData)(vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_3));
-    vlSelfRef.io_clear = ((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7) 
-                          & (IData)(vlSelfRef.io_loadHIn));
-    vlSelfRef.io_loadVIn = ((IData)(vlSelfRef.io_loadHIn) 
-                            & (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___io_hiveLoadV_T));
+    vlSelfRef.io_clear = ((IData)(vlSelfRef.io_loadHIn) 
+                          & (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_9));
+    vlSelfRef.io_loadVIn = ((~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__empty)) 
+                            & (IData)(vlSelfRef.io_loadHIn));
     vlSelfRef.io_psumIn_7 = ((- (IData)((IData)(vlSelfRef.io_loadVIn))) 
                              & (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
                                   ? (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__ram_ext__DOT__Memory
                                      [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__deq_ptr_value][7U] 
-                                     & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___io_hiveLoadV_T))))
+                                     & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7))))
                                   : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_7[7U] 
                                      & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
                                 & (- (IData)((1U & 
@@ -62,7 +62,7 @@ VL_ATTR_COLD void VsvsimTestbench_HiveCell___stl_sequent__TOP__svsimTestbench__D
                              & (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
                                   ? (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__ram_ext__DOT__Memory
                                      [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__deq_ptr_value][6U] 
-                                     & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___io_hiveLoadV_T))))
+                                     & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7))))
                                   : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_6[6U] 
                                      & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
                                 & (- (IData)((1U & 
@@ -71,7 +71,7 @@ VL_ATTR_COLD void VsvsimTestbench_HiveCell___stl_sequent__TOP__svsimTestbench__D
                              & (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
                                   ? (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__ram_ext__DOT__Memory
                                      [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__deq_ptr_value][5U] 
-                                     & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___io_hiveLoadV_T))))
+                                     & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7))))
                                   : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_5[5U] 
                                      & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
                                 & (- (IData)((1U & 
@@ -80,7 +80,7 @@ VL_ATTR_COLD void VsvsimTestbench_HiveCell___stl_sequent__TOP__svsimTestbench__D
                              & (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
                                   ? (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__ram_ext__DOT__Memory
                                      [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__deq_ptr_value][4U] 
-                                     & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___io_hiveLoadV_T))))
+                                     & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7))))
                                   : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_4[4U] 
                                      & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
                                 & (- (IData)((1U & 
@@ -89,7 +89,7 @@ VL_ATTR_COLD void VsvsimTestbench_HiveCell___stl_sequent__TOP__svsimTestbench__D
                              & (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
                                   ? (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__ram_ext__DOT__Memory
                                      [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__deq_ptr_value][3U] 
-                                     & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___io_hiveLoadV_T))))
+                                     & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7))))
                                   : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_3[3U] 
                                      & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
                                 & (- (IData)((1U & 
@@ -98,7 +98,7 @@ VL_ATTR_COLD void VsvsimTestbench_HiveCell___stl_sequent__TOP__svsimTestbench__D
                              & (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
                                   ? (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__ram_ext__DOT__Memory
                                      [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__deq_ptr_value][2U] 
-                                     & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___io_hiveLoadV_T))))
+                                     & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7))))
                                   : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_2[2U] 
                                      & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
                                 & (- (IData)((1U & 
@@ -107,7 +107,7 @@ VL_ATTR_COLD void VsvsimTestbench_HiveCell___stl_sequent__TOP__svsimTestbench__D
                              & (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
                                   ? (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__ram_ext__DOT__Memory
                                      [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__deq_ptr_value][1U] 
-                                     & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___io_hiveLoadV_T))))
+                                     & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7))))
                                   : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_1[1U] 
                                      & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
                                 & (- (IData)((1U & 
@@ -116,7 +116,7 @@ VL_ATTR_COLD void VsvsimTestbench_HiveCell___stl_sequent__TOP__svsimTestbench__D
                              & (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
                                   ? (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__ram_ext__DOT__Memory
                                      [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__deq_ptr_value][0U] 
-                                     & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___io_hiveLoadV_T))))
+                                     & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7))))
                                   : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_0[0U] 
                                      & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
                                 & (- (IData)((1U & 

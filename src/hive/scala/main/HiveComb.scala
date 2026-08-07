@@ -83,6 +83,7 @@ class HiveComb(
     val rndIn   = Input(RoundingMode())
 
     val clear   = Input(Bool())
+    val loadVLock   = Input(Bool())
 
     val validOut = Output(Vec(totalN, Bool()))
   })
@@ -110,6 +111,10 @@ class HiveComb(
 
     // --- clear：广播（无 skew） ---
     arr.io.clear := io.clear
+    arr.io.loadVLock := io.loadVLock
+    
+    arr.io.loadHIn := io.loadHIn  
+    arr.io.loadVIn := io.loadVIn  
 
     // --- loadHIn/fmtIn/rndIn：首列进入，逐列向右传播 ---
     if (cj == 0) {
@@ -120,6 +125,13 @@ class HiveComb(
       arr.io.loadHIn := arrays(ci)(cj - 1).io.loadHOut
       arr.io.fmtIn   := arrays(ci)(cj - 1).io.fmtOut
       arr.io.rndIn   := arrays(ci)(cj - 1).io.rndOut
+    }
+
+    if (ci == 0){
+      arr.io.loadVIn := io.loadVIn
+    }
+    else{
+      arr.io.loadVIn := arrays(ci-1)(cj).io.loadVOut
     }
 
 
@@ -158,7 +170,6 @@ class HiveComb(
       } else {
         // 非首行：从上方子阵列获取
         arr.io.psumIn(c) := arrays(ci-1)(cj).io.cOut(c)
-        arr.io.loadVIn   := arrays(ci-1)(cj).io.loadVOut
       }
     }
 

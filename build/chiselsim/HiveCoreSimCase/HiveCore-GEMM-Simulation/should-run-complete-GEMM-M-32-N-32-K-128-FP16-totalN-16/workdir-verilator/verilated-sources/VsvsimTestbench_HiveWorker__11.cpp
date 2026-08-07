@@ -419,8 +419,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                                         >> 2U))))))))));
             }
         }
-        if (((IData)(vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_6_5.__PVT__io_loadVOut_REG) 
-             & (~ (IData)(vlSelfRef.__PVT__loadVPrev)))) {
+        if (vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_6_5.__PVT__io_loadVOut_REG) {
             vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_6_5.__PVT__psumReg);
         }
     }
@@ -428,8 +427,6 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
         vlSelfRef.__PVT__fmtReg = vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_4.__PVT__io_fmtOut_REG;
         vlSelfRef.__PVT__rndReg = vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_4.__PVT__io_rndOut_REG;
     }
-    vlSelfRef.__PVT__loadVPrev = ((1U & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__reset))) 
-                                  && (IData)(vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_6_5.__PVT__io_loadVOut_REG));
 }
 
 void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_5__1(VsvsimTestbench_HiveWorker* vlSelf) {
@@ -853,8 +850,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
         vlSelfRef.__PVT__io_aOut_REG = vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_5.__PVT__io_aOut_REG;
         vlSelfRef.__PVT__io_fmtOut_REG = vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_5.__PVT__io_fmtOut_REG;
         vlSelfRef.__PVT__io_rndOut_REG = vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_5.__PVT__io_rndOut_REG;
-        if (((IData)(vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_6_6.__PVT__io_loadVOut_REG) 
-             & (~ (IData)(vlSelfRef.__PVT__loadVPrev)))) {
+        if (vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_6_6.__PVT__io_loadVOut_REG) {
             vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_6_6.__PVT__psumReg);
         }
     }
@@ -866,8 +862,6 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
         vlSelfRef.__PVT__fmtReg = vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_5.__PVT__io_fmtOut_REG;
         vlSelfRef.__PVT__rndReg = vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_5.__PVT__io_rndOut_REG;
     }
-    vlSelfRef.__PVT__loadVPrev = ((1U & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__reset))) 
-                                  && (IData)(vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_6_6.__PVT__io_loadVOut_REG));
 }
 
 void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_7__0(VsvsimTestbench_HiveWorker* vlSelf) {
@@ -875,20 +869,18 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
     VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
     auto& vlSelfRef = std::ref(*vlSelf).get();
     // Body
-    vlSelfRef.__PVT__io_loadHOut_REG = ((1U & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__reset))) 
-                                        && (IData)(vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_6.__PVT__io_loadHOut_REG));
     vlSelfRef.__PVT__io_loadVOut_REG = ((1U & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__reset))) 
                                         && (IData)(vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_6_7.__PVT__io_loadVOut_REG));
     if (vlSymsp->TOP.svsimTestbench__DOT__reset) {
         vlSelfRef.__PVT__io_aOut_REG = 0U;
-        vlSelfRef.__PVT__io_fmtOut_REG = 3U;
         vlSelfRef.__PVT__io_rndOut_REG = 0U;
+        vlSelfRef.__PVT__io_fmtOut_REG = 3U;
         vlSelfRef.__PVT__psumReg = 0U;
         vlSelfRef.__PVT__wReg = 0U;
     } else {
         vlSelfRef.__PVT__io_aOut_REG = vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_6.__PVT__io_aOut_REG;
-        vlSelfRef.__PVT__io_fmtOut_REG = vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_6.__PVT__io_fmtOut_REG;
         vlSelfRef.__PVT__io_rndOut_REG = vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_6.__PVT__io_rndOut_REG;
+        vlSelfRef.__PVT__io_fmtOut_REG = vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_6.__PVT__io_fmtOut_REG;
         if (vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_0_0.io_clear) {
             vlSelfRef.__PVT__psumReg = 0U;
         } else if (vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_6_7.__PVT__io_loadVOut_REG) {
@@ -1273,17 +1265,16 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                                         >> 2U))))))))));
             }
         }
-        if (((IData)(vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_6_7.__PVT__io_loadVOut_REG) 
-             & (~ (IData)(vlSelfRef.__PVT__loadVPrev)))) {
+        if (vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_6_7.__PVT__io_loadVOut_REG) {
             vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_6_7.__PVT__psumReg);
         }
     }
+    vlSelfRef.__PVT__io_loadHOut_REG = ((1U & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__reset))) 
+                                        && (IData)(vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_6.__PVT__io_loadHOut_REG));
     vlSelfRef.__PVT__io_validOut_REG = ((1U & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__reset))) 
                                         && (IData)(vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_6.__PVT__io_validOut_REG));
     if (vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_6.__PVT__io_loadHOut_REG) {
         vlSelfRef.__PVT__fmtReg = vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_6.__PVT__io_fmtOut_REG;
         vlSelfRef.__PVT__rndReg = vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_7_6.__PVT__io_rndOut_REG;
     }
-    vlSelfRef.__PVT__loadVPrev = ((1U & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__reset))) 
-                                  && (IData)(vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_1__pes_6_7.__PVT__io_loadVOut_REG));
 }

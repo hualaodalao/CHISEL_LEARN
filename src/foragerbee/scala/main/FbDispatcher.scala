@@ -91,9 +91,13 @@ class FbDispatcher(cfg: ForagerBeeConfig) extends Module {
 
   // --- PERMUTE 判定 ---
   val isPermute = cmd.op === FbOp.PERMUTE
+  val isIm2col = cmd.op === FbOp.IM2COL
+  val isScatterGather = cmd.op === FbOp.SCATTER || cmd.op === FbOp.GATHER
 
-  // --- 源端 bounding box（支持 PERMUTE stride 重映射） ---
+  // --- 源端 bounding box（支持 PERMUTE stride 重映射 + IM2COL + SCATTER/GATHER） ---
   // PERMUTE 时：srcStride 按 permVec 重映射索引；COPY/TRANSPOSE 时按原维度索引
+  // IM2COL 时：srcEnd = srcAddr + C*H*W*elemBytes（由 shape(0) 传入 src 总字节数）
+  // SCATTER/GATHER 时：srcEnd = srcAddr + shape(0)（软件填入源端总字节范围）
   val newSrcStart = cmd.srcAddr
   val newSrcEnd = {
     val contributions = (1 until cfg.maxDims).map { d =>
@@ -104,11 +108,18 @@ class FbDispatcher(cfg: ForagerBeeConfig) extends Module {
     }
     val outerSum = if (contributions.isEmpty) 0.U(wideW.W)
                    else contributions.reduce(_ +& _)
-    (cmd.srcAddr.pad(wideW) +& outerSum +& dim0Bytes)(addrW - 1, 0)
+    val normalEnd = (cmd.srcAddr.pad(wideW) +& outerSum +& dim0Bytes)(addrW - 1, 0)
+    // IM2COL：保守 bbox = srcAddr + shape(0)（软件填入 src 总字节数）
+    val im2colSrcEnd = (cmd.srcAddr.pad(wideW) +& cmd.shape(0).pad(wideW))(addrW - 1, 0)
+    // SCATTER/GATHER：保守 bbox = srcAddr + shape(0)（软件填入源端总字节范围）
+    val sgSrcEnd = (cmd.srcAddr.pad(wideW) +& cmd.shape(0).pad(wideW))(addrW - 1, 0)
+    Mux(isScatterGather, sgSrcEnd, Mux(isIm2col, im2colSrcEnd, normalEnd))
   }
 
-  // --- 目的端 bounding box（支持 Zero-Padding） ---
+  // --- 目的端 bounding box（支持 Zero-Padding + IM2COL + SCATTER/GATHER） ---
   // Zero-Padding 对 COPY 有效（任意 dimCount）；有 padding 时 dim0/dim1 用 outShape 替代 shape
+  // IM2COL：dstEnd = dstAddr + shape(1)（软件填入 dst 总字节数）
+  // SCATTER/GATHER：dstEnd = dstAddr + shape(1)（软件填入目的端总字节范围）
   val hasPad = cmd.padBefore(0) =/= 0.U || cmd.padAfter(0) =/= 0.U ||
                cmd.padBefore(1) =/= 0.U || cmd.padAfter(1) =/= 0.U
   val outShape0 = cmd.padBefore(0) +& cmd.shape(0) +& cmd.padAfter(0)
@@ -125,7 +136,12 @@ class FbDispatcher(cfg: ForagerBeeConfig) extends Module {
     }
     val outerSum = if (contributions.isEmpty) 0.U(wideW.W)
                    else contributions.reduce(_ +& _)
-    (cmd.dstAddr.pad(wideW) +& outerSum +& dstDim0Bytes)(addrW - 1, 0)
+    val normalEnd = (cmd.dstAddr.pad(wideW) +& outerSum +& dstDim0Bytes)(addrW - 1, 0)
+    // IM2COL：保守 bbox = dstAddr + shape(1)（软件填入 dst 总字节数）
+    val im2colDstEnd = (cmd.dstAddr.pad(wideW) +& cmd.shape(1).pad(wideW))(addrW - 1, 0)
+    // SCATTER/GATHER：保守 bbox = dstAddr + shape(1)（软件填入目的端总字节范围）
+    val sgDstEnd = (cmd.dstAddr.pad(wideW) +& cmd.shape(1).pad(wideW))(addrW - 1, 0)
+    Mux(isScatterGather, sgDstEnd, Mux(isIm2col, im2colDstEnd, normalEnd))
   }
 
   // --- 冲突检测：新命令与每个 in-flight 通道 ---
@@ -152,7 +168,9 @@ class FbDispatcher(cfg: ForagerBeeConfig) extends Module {
   for (p <- 0 until cfg.numPorts) {
     val canTranspose = cfg.resolvedChannelTranspose(p).B
     val canPermute = cfg.resolvedChannelPermute(p).B
-    val capable = (!isTranspose || canTranspose) && (!isPermuteOp || canPermute)
+    val canIm2col = cfg.resolvedChannelIm2col(p).B
+    val canSG = cfg.resolvedChannelScatterGather(p).B
+    val capable = (!isTranspose || canTranspose) && (!isPermuteOp || canPermute) && (!isIm2col || canIm2col) && (!isScatterGather || canSG)
     val idle = !io.chBusy(p) && !infValid(p)
     channelCapable(p) := capable
     channelIdle(p) := idle

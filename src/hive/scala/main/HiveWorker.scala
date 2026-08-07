@@ -74,17 +74,19 @@ class HiveWorker(
     val psumIn  = Input(UInt(cEffW.W))
     val psumOut = Output(UInt(cEffW.W))
 
-    // 水平加载（权重 + 配置）
-    val loadHIn  = Input(Bool())
+    // 水平加载（配置）
+        val loadHIn  = Input(Bool())
     val loadHOut = Output(Bool())
 
     // 垂直加载（仅权重）
+    val loadVLock  = Input(Bool())
     val loadVIn  = Input(Bool())
     val loadVOut = Output(Bool())
 
     // 控制（水平传播：RegNext → 右侧 HiveWorker）
     val validIn  = Input(Bool())
     val validOut = Output(Bool())
+
     // 格式（水平传播：RegNext → 右侧 HiveWorker）
     val fmtIn  = Input(DataFormat())
     val fmtOut = Output(DataFormat())
@@ -112,7 +114,7 @@ class HiveWorker(
   // --- wReg / fmtReg / rndReg 锁存逻辑 ---
   // 权重仅经垂直加载（loadV 上升沿，从 psumIn 低位）；水平加载（loadH）仅锁存配置 fmt/rnd。
   // 二者独立：加载权重时同时拉高 loadH（刷新配置）与 loadV（锁存权重）。
-  when(io.loadVIn) {
+  when(io.loadVLock) {
     wReg := io.psumIn(bW - 1, 0)
   }
   when(io.loadHIn) {
@@ -134,10 +136,10 @@ class HiveWorker(
   val psumReg = RegInit(0.U(cEffW.W))
   when(io.clear) {
     psumReg := 0.U
-  }.elsewhen(io.loadVIn) {
-    // 垂直加载期间透传 psumIn（权重沿 psum 链向下自然传播）
+  }.elsewhen(io.loadVIn){
     psumReg := io.psumIn
-  }.elsewhen(io.validIn && fmtOk) {
+  }
+  elsewhen(io.validIn && fmtOk) {
     // 正常计算（使用 fmtReg 和 rndReg）
     psumReg := WorkUnit.accumulate(io.psumIn, product, fmtReg, cEffW, supportedFmts, rndReg)
   }
@@ -153,8 +155,6 @@ class HiveWorker(
   io.aOut := RegNext(io.aIn, 0.U)
 
   // --- 控制传播 ---
-  io.loadHOut := RegNext(io.loadHIn, false.B)
-  io.loadVOut := RegNext(io.loadVIn, false.B)
   io.validOut := RegNext(io.validIn, false.B)
   io.fmtOut   := RegNext(io.fmtIn, DataFormat.INT8)
   io.rndOut   := RegNext(io.rndIn, RoundingMode.RNE)

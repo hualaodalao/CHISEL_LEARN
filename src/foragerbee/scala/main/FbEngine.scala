@@ -34,7 +34,7 @@
 import chisel3._
 import chisel3.util._
 
-class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, supportsPermute: Boolean = true) extends Module {
+class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, supportsPermute: Boolean = true, supportsIm2col: Boolean = true, supportsScatterGather: Boolean = true) extends Module {
   private val BB = cfg.beatBytes
   private val log2BB = log2Up(BB)
   private val addrW = cfg.addressWidth
@@ -57,13 +57,15 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   })
 
   // --- FSM 状态（显式二进制编码；勿用 Enum，其默认 one-hot 位宽相同会导致状态比较混淆） ---
-  val sIDLE = 0.U(3.W)
-  val sREAD = 1.U(3.W)
-  val sWRITE = 2.U(3.W)
-  val sTRD = 3.U(3.W)
-  val sTWR = 4.U(3.W)
-  val sDONE = 5.U(3.W)
-  val sZWRITE = 6.U(3.W) // Zero-Padding 写状态（发 AW + W 全零突发，不经 dataQueue）
+  val sIDLE   = 0.U(4.W)
+  val sREAD   = 1.U(4.W)
+  val sWRITE  = 2.U(4.W)
+  val sTRD    = 3.U(4.W)
+  val sTWR    = 4.U(4.W)
+  val sDONE   = 5.U(4.W)
+  val sZWRITE = 6.U(4.W) // Zero-Padding 写状态（发 AW + W 全零突发，不经 dataQueue）
+  val sI2C    = 7.U(4.W) // im2col 主状态
+  val sSG     = 8.U(4.W) // scatter/gather 主状态
   val state = RegInit(sIDLE)
 
   // --- 命令锁存 ---
@@ -131,6 +133,35 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
 
   // --- 转置缓冲（仅 supportsTranspose 时实例化） ---
   val transp = if (supportsTranspose) Some(Module(new FbTransposeBuffer(cfg))) else None
+
+  // --- im2col 地址生成器（仅 supportsIm2col 时实例化） ---
+  val im2colGen = if (supportsIm2col) Some(Module(new FbIm2colAddrGen(cfg.addressWidth))) else None
+
+  // --- scatter/gather 描述符控制模块（仅 supportsScatterGather 且 dataWidth 满足要求时实例化） ---
+  private val sgHwEnabled = supportsScatterGather && (cfg.dataWidth >= cfg.addressWidth + 16)
+  val sgCtrl = if (sgHwEnabled) Some(Module(new FbScatterGatherCtrl(cfg.addressWidth, cfg.dataWidth))) else None
+
+  // --- IM2COL 子状态和寄存器 ---
+  val i2cPhase    = RegInit(0.U(2.W))    // 0=决策, 1=读, 2=写, 3=零写
+  val i2cArIssued = RegInit(false.B)
+  val i2cRRemain  = RegInit(0.U(20.W))
+  val i2cAwIssued = RegInit(false.B)
+  val i2cWRemain  = RegInit(0.U(20.W))
+  val i2cSegBeats = RegInit(0.U(20.W))
+  val i2cStarted  = RegInit(false.B)     // start 脉冲已发，避免重复驱动
+
+  // --- Scatter/Gather 子状态寄存器 ---
+  val sgPhase        = RegInit(0.U(2.W))    // 0=等待描述符, 1=数据读, 2=数据写
+  val sgLinearOffset = RegInit(0.U(cfg.addressWidth.W))
+  val sgCurAddr      = Reg(UInt(cfg.addressWidth.W))
+  val sgCurBeats     = Reg(UInt(log2Up(cfg.maxBurstLen + 1).W))
+  val sgArIssued     = RegInit(false.B)
+  val sgRRemain      = Reg(UInt(log2Up(cfg.maxBurstLen + 1).W))
+  val sgAwIssued     = RegInit(false.B)
+  val sgWRemain      = Reg(UInt(log2Up(cfg.maxBurstLen + 1).W))
+  val sgIsGather     = Reg(Bool())
+  val sgSegBeats     = RegInit(0.U(20.W))
+  val sgStarted      = RegInit(false.B)
 
   // --- Zero-Padding 寄存器 ---
   val padActive = RegInit(false.B)         // 当前命令是否有 padding
@@ -293,6 +324,37 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     t.io.outBeat.ready := false.B
   }
 
+  // im2col 地址生成器默认驱动
+  im2colGen.foreach { gen =>
+    gen.io.start := false.B
+    gen.io.srcBase := cmdReg.srcAddr
+    gen.io.dstBase := cmdReg.dstAddr
+    gen.io.elemBytesLog2 := cmdReg.elemBytesLog2
+    gen.io.kernel(0) := cmdReg.im2colKernel(0)
+    gen.io.kernel(1) := cmdReg.im2colKernel(1)
+    gen.io.stride(0) := cmdReg.im2colStride(0)
+    gen.io.stride(1) := cmdReg.im2colStride(1)
+    gen.io.pad(0) := cmdReg.im2colPad(0)
+    gen.io.pad(1) := cmdReg.im2colPad(1)
+    gen.io.dilation(0) := cmdReg.im2colDilation(0)
+    gen.io.dilation(1) := cmdReg.im2colDilation(1)
+    gen.io.inShape(0) := cmdReg.im2colInShape(0)
+    gen.io.inShape(1) := cmdReg.im2colInShape(1)
+    gen.io.inShape(2) := cmdReg.im2colInShape(2)
+    gen.io.advance := false.B
+  }
+
+  // scatter/gather 控制模块默认驱动
+  sgCtrl.foreach { sg =>
+    sg.io.start := false.B
+    sg.io.listAddr := 0.U
+    sg.io.entryCount := 0.U
+    sg.io.advance := false.B
+    sg.io.fetchRd.ready := false.B
+    sg.io.fetchRdData.valid := false.B
+    sg.io.fetchRdData.payload := DontCare
+  }
+
   io.busy := state =/= sIDLE
 
   // ==========================================================================
@@ -336,7 +398,21 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     c.padBefore(1) =/= 0.U || c.padAfter(1) =/= 0.U
   }
 
-  val cBad = cBadBase || permBad || padBad || permPadBad
+  // IM2COL 校验：不支持时报错；参数非零校验
+  val im2colBad = (c.op === FbOp.IM2COL) && {
+    !supportsIm2col.B ||
+    c.im2colKernel(0) === 0.U || c.im2colKernel(1) === 0.U ||
+    c.im2colStride(0) === 0.U || c.im2colStride(1) === 0.U
+  }
+
+  // SCATTER/GATHER 校验：不支持时报错；entryCount=0 或 listAddr 非 beat 对齐
+  val sgBad = (c.op === FbOp.SCATTER || c.op === FbOp.GATHER) && {
+    !sgHwEnabled.B ||
+    c.sgEntryCount === 0.U ||
+    c.sgListAddr(log2BB - 1, 0) =/= 0.U
+  }
+
+  val cBad = cBadBase || permBad || padBad || permPadBad || im2colBad || sgBad
 
   // ==========================================================================
   // IDLE：接收命令、锁存、分流
@@ -381,6 +457,18 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
         t.io.start := true.B
       }
       driveTileParams(c, 0.U, 0.U)
+    }.elsewhen(c.op === FbOp.IM2COL && supportsIm2col.B) {
+      state := sI2C
+      i2cPhase := 0.U
+      i2cStarted := false.B
+    }.elsewhen((c.op === FbOp.SCATTER || c.op === FbOp.GATHER) && sgHwEnabled.B) {
+      state := sSG
+      sgPhase := 0.U
+      sgLinearOffset := 0.U
+      sgIsGather := (c.op === FbOp.GATHER)
+      sgArIssued := false.B
+      sgAwIssued := false.B
+      sgStarted := false.B
     }.otherwise {
       // COPY 和 PERMUTE 路径
       when(hasPad) {
@@ -744,6 +832,248 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
         }.otherwise {
           drainCol := drainCol + 1.U
           twAwIssued := false.B
+        }
+      }
+    }
+  }
+
+  // ==========================================================================
+  // IM2COL：sI2C 子 FSM（仅 supportsIm2col=true 时生成逻辑）
+  // ==========================================================================
+  if (supportsIm2col) {
+    val gen = im2colGen.get
+
+    // micro-row beat 数计算：ceil(kW * elemBytes / beatBytes)
+    val i2cKW = cmdReg.im2colKernel(1)
+    val i2cMicroRowBeats = ((i2cKW * eb).pad(20) +& (BB - 1).U(20.W)) >> log2BB
+
+    when(state === sI2C) {
+      // start 脉冲：进入 sI2C 的第一拍发出
+      when(!i2cStarted) {
+        gen.io.start := true.B
+        i2cStarted := true.B
+      }
+
+      when(gen.io.done) {
+        state := sDONE
+      }.elsewhen(gen.io.valid) {
+        switch(i2cPhase) {
+          is(0.U) { // 决策阶段
+            when(gen.io.isPad) {
+              i2cPhase := 3.U  // 零写
+              i2cAwIssued := false.B
+              i2cWRemain := i2cMicroRowBeats
+            }.otherwise {
+              i2cPhase := 1.U  // 读
+              i2cArIssued := false.B
+            }
+          }
+          is(1.U) { // 读阶段
+            io.bus.rd.valid := !i2cArIssued && queueCredit > 0.U
+            issueRead(gen.io.srcAddr, i2cMicroRowBeats - 1.U)
+            when(io.bus.rd.fire) {
+              i2cArIssued := true.B
+              i2cRRemain := i2cMicroRowBeats
+              i2cSegBeats := i2cMicroRowBeats
+              queueCredit := queueCredit - i2cMicroRowBeats
+            }
+            io.bus.rdData.ready := dataQueue.io.enq.ready
+            dataQueue.io.enq.valid := io.bus.rdData.valid
+            dataQueue.io.enq.bits := io.bus.rdData.payload.data
+            when(io.bus.rdData.fire) {
+              when(io.bus.rdData.payload.err) { errReg := true.B }
+              when(i2cRRemain === 1.U) {
+                i2cPhase := 2.U
+                i2cAwIssued := false.B
+                i2cWRemain := i2cSegBeats
+              }.otherwise {
+                i2cRRemain := i2cRRemain - 1.U
+              }
+            }
+          }
+          is(2.U) { // 写阶段
+            if (cfg.enableConversion) {
+              val conv = converter.get
+              conv.io.in.valid := dataQueue.io.deq.valid
+              conv.io.in.bits := dataQueue.io.deq.bits
+              dataQueue.io.deq.ready := conv.io.in.ready
+              io.bus.wr.valid := conv.io.out.valid
+              io.bus.wr.payload.data := conv.io.out.bits
+              conv.io.out.ready := io.bus.wr.ready
+              when(dataQueue.io.deq.fire) {
+                queueCredit := queueCredit + 1.U
+              }
+            } else {
+              io.bus.wr.valid := dataQueue.io.deq.valid
+              io.bus.wr.payload.data := dataQueue.io.deq.bits
+              dataQueue.io.deq.ready := io.bus.wr.ready
+              when(io.bus.wr.fire) {
+                queueCredit := queueCredit + 1.U
+              }
+            }
+            io.bus.wr.payload.sof := !i2cAwIssued
+            io.bus.wr.payload.eof := i2cWRemain === 1.U
+            io.bus.wr.payload.addr := gen.io.dstAddr
+            io.bus.wr.payload.len := i2cSegBeats - 1.U
+            io.bus.wr.payload.strb := ((BigInt(1) << BB) - 1).U(BB.W)
+            when(io.bus.wr.fire) {
+              i2cWRemain := i2cWRemain - 1.U
+              when(!i2cAwIssued) { i2cAwIssued := true.B }
+            }
+            // 写响应
+            io.bus.wrResp.ready := i2cWRemain === 0.U && i2cAwIssued
+            when(io.bus.wrResp.fire) {
+              when(io.bus.wrResp.payload.err) { errReg := true.B }
+              // micro-row 完成，推进 addrGen
+              gen.io.advance := true.B
+              i2cPhase := 0.U
+            }
+          }
+          is(3.U) { // 零写阶段
+            io.bus.wr.valid := true.B
+            io.bus.wr.payload.sof := !i2cAwIssued
+            io.bus.wr.payload.eof := i2cWRemain === 1.U
+            io.bus.wr.payload.addr := gen.io.dstAddr
+            io.bus.wr.payload.len := i2cMicroRowBeats - 1.U
+            io.bus.wr.payload.data := 0.U
+            io.bus.wr.payload.strb := ((BigInt(1) << BB) - 1).U(BB.W)
+            when(io.bus.wr.fire) {
+              i2cWRemain := i2cWRemain - 1.U
+              when(!i2cAwIssued) { i2cAwIssued := true.B }
+            }
+            io.bus.wrResp.ready := i2cWRemain === 0.U && i2cAwIssued
+            when(io.bus.wrResp.fire) {
+              when(io.bus.wrResp.payload.err) { errReg := true.B }
+              gen.io.advance := true.B
+              i2cPhase := 0.U
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // ==========================================================================
+  // SCATTER/GATHER：sSG 子 FSM（仅 supportsScatterGather=true 时生成逻辑）
+  // ==========================================================================
+  if (sgHwEnabled) {
+    val sg = sgCtrl.get
+
+    when(state === sSG) {
+      // start 脉冲：进入 sSG 的第一拍发出
+      when(!sgStarted) {
+        sg.io.start := true.B
+        sg.io.listAddr := cmdReg.sgListAddr
+        sg.io.entryCount := cmdReg.sgEntryCount
+        sgStarted := true.B
+      }
+
+      // 完成判定：sgCtrl.done 且当前不在数据搬运中
+      when(sg.io.done && sgPhase === 0.U) {
+        state := sDONE
+      }.otherwise {
+        switch(sgPhase) {
+          is(0.U) { // 等待描述符就绪
+            // bus.rd 控制权交给 sgCtrl 用于 fetch 描述符
+            io.bus.rd.valid := sg.io.fetchRd.valid
+            io.bus.rd.payload := sg.io.fetchRd.payload
+            sg.io.fetchRd.ready := io.bus.rd.ready
+
+            // bus.rdData 反馈给 sgCtrl
+            sg.io.fetchRdData.valid := io.bus.rdData.valid
+            sg.io.fetchRdData.payload := io.bus.rdData.payload
+            io.bus.rdData.ready := sg.io.fetchRdData.ready
+
+            // 当 sgCtrl 输出当前条目就绪时，锁存地址和长度
+            when(sg.io.valid) {
+              sgCurAddr := sg.io.curAddr
+              // 条目字节数转换为 beat 数：ceil(len / beatBytes)
+              val lenBeats = (sg.io.curLen +& (BB - 1).U) >> log2BB
+              sgCurBeats := lenBeats
+              sgPhase := 1.U
+              sgArIssued := false.B
+              sgRRemain := 0.U
+            }
+          }
+          is(1.U) { // 数据读阶段
+            // 读地址：GATHER 从散列源读，SCATTER 从线性源读
+            val rdAddr = Mux(sgIsGather,
+              sgCurAddr,
+              (cmdReg.srcAddr.pad(wideW) +& sgLinearOffset.pad(wideW))(addrW - 1, 0))
+
+            // 段长计算
+            val sgRemBeats = sgCurBeats - sgRRemain
+            val sgSeg = sgRemBeats.min(cfg.maxBurstLen.U).min(queueCredit)
+
+            io.bus.rd.valid := !sgArIssued && queueCredit > 0.U && sgSeg > 0.U
+            issueRead(rdAddr, sgSeg - 1.U)
+            when(io.bus.rd.fire) {
+              sgArIssued := true.B
+              sgRRemain := sgSeg
+              sgSegBeats := sgSeg
+              queueCredit := queueCredit - sgSeg
+            }
+
+            // 接收读数据入 dataQueue
+            io.bus.rdData.ready := dataQueue.io.enq.ready
+            dataQueue.io.enq.valid := io.bus.rdData.valid
+            dataQueue.io.enq.bits := io.bus.rdData.payload.data
+            when(io.bus.rdData.fire) {
+              when(io.bus.rdData.payload.err) { errReg := true.B }
+              when(sgRRemain === 1.U) {
+                // 本段读完，进入写阶段
+                sgPhase := 2.U
+                sgAwIssued := false.B
+                sgWRemain := sgSegBeats
+              }.otherwise {
+                sgRRemain := sgRRemain - 1.U
+              }
+            }
+          }
+          is(2.U) { // 数据写阶段
+            // 写地址：GATHER 写线性目的，SCATTER 写散列目的
+            val wrAddr = Mux(sgIsGather,
+              (cmdReg.dstAddr.pad(wideW) +& sgLinearOffset.pad(wideW))(addrW - 1, 0),
+              sgCurAddr)
+
+            // 从 dataQueue 写出
+            io.bus.wr.valid := dataQueue.io.deq.valid
+            io.bus.wr.payload.data := dataQueue.io.deq.bits
+            dataQueue.io.deq.ready := io.bus.wr.ready
+            io.bus.wr.payload.sof := !sgAwIssued
+            io.bus.wr.payload.eof := sgWRemain === 1.U
+            io.bus.wr.payload.addr := wrAddr
+            io.bus.wr.payload.len := sgSegBeats - 1.U
+            io.bus.wr.payload.strb := ((BigInt(1) << BB) - 1).U(BB.W)
+            when(io.bus.wr.fire) {
+              queueCredit := queueCredit + 1.U
+              sgWRemain := sgWRemain - 1.U
+              when(!sgAwIssued) { sgAwIssued := true.B }
+            }
+
+            // 写响应
+            io.bus.wrResp.ready := sgWRemain === 0.U && sgAwIssued
+            when(io.bus.wrResp.fire) {
+              when(io.bus.wrResp.payload.err) { errReg := true.B }
+              // 更新线性偏移
+              sgLinearOffset := sgLinearOffset + (sgSegBeats << log2BB)
+              // 本段数据搬运完成
+              val remainAfterSeg = sgCurBeats - sgSegBeats
+              when(remainAfterSeg === 0.U) {
+                // 当前条目全部搬运完毕，advance 并回 phase 0
+                sg.io.advance := true.B
+                sgPhase := 0.U
+              }.otherwise {
+                // 还有剩余 beat，继续读下一段
+                sgCurBeats := remainAfterSeg
+                // 更新散列端地址偏移（下一段从上次结束位置开始）
+                sgCurAddr := sgCurAddr + (sgSegBeats << log2BB)
+                sgPhase := 1.U
+                sgArIssued := false.B
+                sgRRemain := 0.U
+              }
+            }
+          }
         }
       }
     }

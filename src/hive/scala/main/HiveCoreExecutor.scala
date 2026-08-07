@@ -30,17 +30,7 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
     val err      = Output(Bool())
 
     // 寄存器输入（由顶层寄存器组驱动）
-    val regM       = Input(UInt(32.W))
-    val regN       = Input(UInt(32.W))
-    val regK       = Input(UInt(32.W))
-    val regFmt     = Input(DataFormat())
-    val regRnd     = Input(RoundingMode())
-    val regAAddr   = Input(UInt(cfg.addrWidth.W))
-    val regBAddr   = Input(UInt(cfg.addrWidth.W))
-    val regCAddr   = Input(UInt(cfg.addrWidth.W))
-    val regAStride = Input(UInt(32.W))
-    val regBStride = Input(UInt(32.W))
-    val regCStride = Input(UInt(32.W))
+    val regFile = Input(HiveCoreRegs(cfg))
 
     // DMA0 控制（A buffer）
     val dma0Start  = Output(Bool())
@@ -70,6 +60,7 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
     val hivePsumIn  = Output(Vec(cfg.totalN, UInt(cfg.cEffW.W)))
     val hiveLoadH   = Output(Bool())
     val hiveLoadV   = Output(Bool())
+    val hiveLoadVLock   = Output(Bool())
     val hiveValidIn = Output(Bool())
     val hiveFmtIn   = Output(DataFormat())
     val hiveRndIn   = Output(RoundingMode())
@@ -97,6 +88,7 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
   val sDONE            = 10.U(4.W)
 
   val state = RegInit(sIDLE)
+  val errState = RegInit(false.B)
 
   // ==========================================================================
   // Tiling 寄存器
@@ -115,6 +107,7 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
   val curTileM = Reg(UInt(16.W))  // 实际行数（边界处理）
   val curTileN = Reg(UInt(16.W))  // 实际列数
   val curTileK = Reg(UInt(16.W))  // 实际 K 长度
+  val depthOfCBufferUsed = Reg(UInt(16.W))
 
   // DMA 地址
   val bTileAddr = Reg(UInt(cfg.addrWidth.W))
@@ -124,6 +117,7 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
   // 计算相关
   val counter     = RegInit(0.U(16.W))
   val totalCycles = Reg(UInt(16.W))
+  val loadedRows  = RegInit(0.U(16.W))  // sLOAD_WEIGHT_PE 已喂入的权重行数
 
   // Skew 移位寄存器
   val aRegs   = Reg(Vec(cfg.totalN, UInt((cfg.totalN * cfg.aEffW).W)))
@@ -156,7 +150,7 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
   // ==========================================================================
   io.busy := state =/= sIDLE
   io.done := false.B
-  io.err  := false.B
+  io.err  := errState
 
   io.dma0Start  := false.B
   io.dma0IsLoad := true.B
@@ -212,10 +206,17 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
         mTiles   := (io.regM + totalN.U - 1.U) / totalN.U
         nTiles   := (io.regN + totalN.U - 1.U) / totalN.U
         kTiles   := (io.regK + totalN.U - 1.U) / totalN.U
+        when(io.regFile.loopMode === HiveCoreLoopMode.MNK){
+        depthOfCBufferUsed := mTiles * nTiles * totalN.U
+        }
+        when(io.regFile.loopMode === HiveCoreLoopMode.MKN){
+          depthOfCBufferUsed := mTiles * kTiles * totalN.U
+        }
         curMTile := 0.U
         curNTile := 0.U
         curKTile := 0.U
         doneTiles := 0.U
+        errState := false.B
         state    := sCONFIG_TILE
       }
     }
@@ -241,7 +242,13 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
       io.flushC := curKTile === 0.U  // 第一个 K pass 清空 C buffer；后续保留 partial sums
 
       dmaStarted := false.B
-      state := sLOAD_WEIGHT_DMA
+
+      when(depthOfCBufferUsed > cfg.cBufferDepth.U){
+        state := sIDLE
+        errState := true.B
+      }.otherwise{
+        state := sLOAD_WEIGHT_DMA 
+      }
     }
 
     // --- sLOAD_WEIGHT_DMA: DMA 加载权重到 C buffer ---
@@ -263,15 +270,15 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
     }
 
     // --- sLOAD_WEIGHT_PE: 从 C buffer pop 权重 → 加载到 HiveComb ---
+    // loadH 在整个加载窗口保持拉高（fmt/rnd 配置需时间经阵列横向传播）；
+    // loadV 跟随 cPop 数据有效性：C buffer 暂无数据时 loadV 自然暂停，
+    // DMA 喂数到位后自动恢复，无需固定每 2 拍一次的节流。
     is(sLOAD_WEIGHT_PE) {
-      io.hiveLoadV := io.cPop.fire
-      io.hiveLoadH := true.B
+      io.hiveLoadH := true.B               // 配置加载，整个窗口拉高
+      io.hiveLoadV := io.cPop.valid        // loadV 跟随 cPop 数据有效性
       io.hiveFmtIn := io.regFmt
       io.hiveRndIn := io.regRnd
-
-      // 从 cPop 读取权重（仅前 curTileK 拍 pop）
-      val loadCycles = (curTileK << 1) + totalN.U
-      io.cPop.ready := !counter(0) && (counter >> 1) < curTileK
+      io.cPop.ready := loadedRows < curTileK  // 有数据就消费，直到喂够 curTileK 行
 
       when(io.cPop.fire) {
         for (i <- 0 until cfg.totalN) {
@@ -279,15 +286,24 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
         }
       }
 
-      // 时钟周期计数器
-      counter := counter + 1.U
+      // 已喂权重行数（仅在 cPop 实际 fire 时递增，天然支持反压暂停）
+      when(io.cPop.fire) {
+        loadedRows := loadedRows + 1.U
+      }
 
-      // 等待足够拍数让 loadV 波完全传播排空后再进入下一阶段。
+      // 时钟周期计数器：喂够最后一行权重后，再等 totalN 拍
+      // 让 loadV 链式传播波完全穿过阵列排空
+      when(loadedRows >= curTileK) {
+        counter := counter + 1.U
+      }
+
+      // 退出条件：已喂够 curTileK 行权重 且 经过传播延迟。
       // 权重经 psumReg 逐行寄存下沉后，各 PE 的 psumReg 残留末行权重值，
       // 排空完成当拍发一拍 clear 清零 psum 链（不影响 wReg），再进入计算
-      when(counter >= loadCycles) {
+      when((loadedRows >= curTileK) && (counter >= totalN.U)) {
         io.hiveClear := true.B
         counter    := 0.U
+        loadedRows := 0.U
         dmaStarted := false.B
         curMTile   := 0.U  // 重置 M tile 计数，开始 M 循环
         state      := sLOAD_A_DMA

@@ -44,7 +44,8 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // 0x0A  REG_STATUS    [0]=busy, [1]=done, [2]=err, [31:16]=progress (只读)
   // 0x0B  REG_CONTROL   [0]=clear_done (写1清除)
 
-  val regFile = RegInit(VecInit(Seq.fill(12)(0.U(32.W))))
+  //val regFile = RegInit(VecInit(Seq.fill(12)(0.U(32.W))))
+  val regFile = RegInit(0.U.asTypeOf(HiveCoreRegister(cfg)))
 
   // 状态寄存器辅助
   val doneFlag = RegInit(false.B)
@@ -80,18 +81,11 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   when(io.cmd.fire) {
     val cmd = io.cmd.payload
     switch(cmd.op) {
-      is(HiveCoreOp.REG_WRITE) {
-        // 写入 regAddr 和 regAddr+1 对应的 2 个寄存器
-        val addr0 = cmd.regAddr(3, 0)
-        val addr1 = (cmd.regAddr + 1.U)(3, 0)
-        when(cmd.regAddr < 10.U) { regFile(addr0) := cmd.data0 }  // 0x00-0x09 可写
-        when((cmd.regAddr + 1.U) < 10.U) { regFile(addr1) := cmd.data1 }
-        // 写 REG_CONTROL (0x0B)
-        when(cmd.regAddr === 0x0B.U) {
-          when(cmd.data0(0)) { doneFlag := false.B }  // clear_done
-        }
-        when((cmd.regAddr + 1.U) === 0x0B.U) {
-          when(cmd.data1(0)) { doneFlag := false.B }
+      is(HiveCoreOp.REG_WRITE1 | HiveCoreOp.REG_WRITE2) {
+        val addr0 = cmd.regAddr0(3, 0) 
+        when(cmd.regAddr0 < cfg.registerNumRW.U) { regFile.regs(addr0) := cmd.data0 }  // 0x00-0x09 可写
+        when(cmd.regAddr0 == 0x08.U) {
+              when(cmd.data0(0)) { doneFlag := false.B }  // clear_done
         }
         // 生成响应
         respValid := true.B
@@ -99,24 +93,18 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
         respDone  := false.B
         respErr   := false.B
       }
+      is(HiveCoreOp.REG_WRITE2){
+        val addr1 = cmd.regAddr1(3, 0) 
+        when(cmd.regAddr1 < cfg.registerNumRW.U) { regFile.regs(addr1) := cmd.data1 }  // 0x00-0x09 可写
+        when(cmd.regAddr1 == 0x08.U) {  
+          when(cmd.data1(0)) { doneFlag := false.B }  // clear_done
+        }
+      }
       is(HiveCoreOp.REG_READ) {
         // 读取寄存器
         val addr = cmd.regAddr
         val statusReg = Cat(executor.io.progress, 0.U(13.W), errFlag, doneFlag, executor.io.busy)
-        val readVal = MuxLookup(addr, 0.U)(Seq(
-          0x00.U -> regFile(0),
-          0x01.U -> regFile(1),
-          0x02.U -> regFile(2),
-          0x03.U -> regFile(3),
-          0x04.U -> regFile(4),
-          0x05.U -> regFile(5),
-          0x06.U -> regFile(6),
-          0x07.U -> regFile(7),
-          0x08.U -> regFile(8),
-          0x09.U -> regFile(9),
-          0x0A.U -> statusReg,
-          0x0B.U -> 0.U
-        ))
+        val readVal = regFile.regs(addr)
         respValid := true.B
         respData  := readVal
         respDone  := false.B
@@ -142,18 +130,8 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // Executor 连接寄存器组
   // ==========================================================================
   executor.io.execute := io.cmd.fire && io.cmd.payload.op === HiveCoreOp.EXECUTE
-
-  executor.io.regM       := regFile(0)
+  executor.io.regFile := regFile
   executor.io.regN       := regFile(1)
-  executor.io.regK       := regFile(2)
-  executor.io.regFmt     := regFile(3)(DataFormat.getWidth - 1, 0).asTypeOf(DataFormat())
-  executor.io.regRnd     := regFile(3)(8 + RoundingMode.getWidth - 1, 8).asTypeOf(RoundingMode())
-  executor.io.regAAddr   := regFile(4)
-  executor.io.regBAddr   := regFile(5)
-  executor.io.regCAddr   := regFile(6)
-  executor.io.regAStride := regFile(7)
-  executor.io.regBStride := regFile(8)
-  executor.io.regCStride := regFile(9)
 
   // ==========================================================================
   // DMA0 ↔ Executor + 外部总线

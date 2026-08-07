@@ -9,6 +9,95 @@
 import chisel3._
 import chisel3.util._
 
+/*
+当位于MNK循环的时候，
+
+*/
+
+
+class HiveCoreDmaRdOnly(cfg: HiveCoreConfig) extends Module {
+  val io = IO(new Bundle {
+    val isA = Input(Bool())
+    val dmaIntIF =  HiveCoreDMAIntIF(cfg)
+    val dmaExtRdIF = HiveCoreDMAExtReadOnlyIF(cfg)
+    val calcConfig = Input(HiveCoreExePreCalcConfig(cfg))
+    val regFile = Input(HiveCoreRegs(cfg))
+    val bufPush = Stream(UInt(cfg.dmaDataWidth.W))
+    val bufAvailability = Input(UInt(log2Up(cfg.aBufferDepth + 1).W))
+  })
+
+  // ==========================================================================
+  // GLBFSM 状态编码
+  // ==========================================================================
+  val sIDLE     = 0.U(2.W)
+  val sREQ_EXT  = 1.U(2.W)
+  val sTRANSFER = 2.U(2.W)
+  val sDONE     = 3.U(2.W)    
+
+  // ==========================================================================
+  // GLBFSM 状态编码
+  // ==========================================================================
+  val dmaReqState = RegInit(sIDLE)
+  val dmaRdAddr = RegInit(0.U(cfg.addrWidth.W))
+  val dmaRdTileRowCnt = RegInit(0.U(log2up(cfg.totalN)))
+  val dmaLoop1Cnt = RegInit(0.U(cfg.mnkWidth - log2up(cfg.totalN)+1))
+  val dmaLoop2Cnt = RegInit(0.U(cfg.mnkWidth - log2up(cfg.totalN)+1))
+  val dmaLoop1CntTarget = RegInit(0.U(cfg.mnkWidth - log2up(cfg.totalN)+1))
+  val dmaLoop2CntTarget = RegInit(0.U(cfg.mnkWidth - log2up(cfg.totalN)+1))  
+  val dmaNCnt = RegInit(0.U(log2up(cfg.totalN)))
+  io.dmaExtRdIF.req.addr := dmaRdAddr
+  
+  switch(dmaReqState) {
+    is(sIDLE) {
+      dmaLoop1Cnt := 0.U
+      dmaLoop2Cnt := 0.U
+      when(io.dmaIntIF.start){
+        when(io.isA){
+          dmaLoop1CntTarget := io.calcConfig.mTile * cfg.totalN.U
+          dmaLoop2CntTarget := io.calcConfig.kTile
+        }.otherwise{
+          when(io.regFile.loopMode === HiveCoreLoopMode.MKN){
+            dmaLoop1CntTarget := io.calcConfig.kTile
+            dmaLoop2CntTarget := io.calcConfig.nTile
+          }.otherwise{
+            dmaLoop1CntTarget := io.calcConfig.nTile
+            dmaLoop2CntTarget := io.calcConfig.kTile
+          }
+        }
+        dmaReqState := sREQ_EXT
+      }
+    }
+    is(sREQ_EXT) {
+      io.dmaExtRdIF.req.valid := io.bufAvailability =/= 0.U
+      when(io.dmaExtRdIF.req.fire){
+        when(io.isA){
+          //A矩阵
+          when(dmaLoop1Cnt < dmaLoop1CntTarget){
+            dmaRdAddr := dmaRdAddr + io.calcConfig.aColAddressOffset
+            dmaLoop1Cnt := dmaLoop1Cnt + 1.U
+          }.otherwise{
+            dmaLoop1Cnt := 0.U
+            when(dmaLoop2Cnt < dmaLoop2CntTarget){
+              dmaRdAddr := dmaRdAddr + io.calcConfig.aColAddressOffset + (cfg.totalN * cfg.aW/8).U
+              dmaLoop2Cnt := dmaLoop2Cnt + 1.U
+            }.otherwise{
+              dmaReqState := sIDLE
+            }
+          }
+        }.otherwise{
+          //B矩阵
+          
+
+        }
+        
+      }
+    }
+
+  }
+  
+}
+
+
 class HiveCoreDmaEngine(cfg: HiveCoreConfig, bufWidth: Int) extends Module {
 
   val io = IO(new Bundle {

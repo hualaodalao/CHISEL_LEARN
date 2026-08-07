@@ -57,11 +57,13 @@ class ForagerBee(cfg: ForagerBeeConfig = ForagerBeeConfig()) extends Module {
     val chainBus = if (cfg.enableChaining) Some(master(new FbStreamBus(cfg.dataWidth, cfg.addressWidth))) else None
   })
 
-  // --- 执行层：每通道一个引擎（按 channelTranspose/channelPermute 决定是否含转置缓冲及 PERMUTE 支持） ---
+  // --- 执行层：每通道一个引擎（按 channelTranspose/channelPermute/channelIm2col/channelScatterGather 决定是否含转置缓冲、PERMUTE、IM2COL 及 SG 支持） ---
   val engines = (0 until cfg.numPorts).map { p =>
     Module(new FbEngine(cfg,
       supportsTranspose = cfg.resolvedChannelTranspose(p),
-      supportsPermute = cfg.resolvedChannelPermute(p)
+      supportsPermute = cfg.resolvedChannelPermute(p),
+      supportsIm2col = cfg.resolvedChannelIm2col(p),
+      supportsScatterGather = cfg.resolvedChannelScatterGather(p)
     ))
   }
 

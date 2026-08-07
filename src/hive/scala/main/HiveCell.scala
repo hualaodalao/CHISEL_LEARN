@@ -60,19 +60,21 @@ class HiveCell(
     val cOut   = Output(Vec(n, UInt(cEffW.W)))
 
     // 输入控制（标量）
+    val clear   = Input(Bool())
+    val loadVLock = Input(Bool())
+    
+    val validIn = Input(Bool())
+    val fmtIn   = Input(DataFormat())    
+    val rndIn   = Input(RoundingMode())
     val loadHIn = Input(Bool())
     val loadVIn = Input(Bool())
-    val validIn = Input(Bool())
-    val fmtIn   = Input(DataFormat())
-    val rndIn   = Input(RoundingMode())
-    val clear   = Input(Bool())
 
     // 输出控制
     val validOut = Output(Vec(n, Bool()))  // per-row（计算阶段结果有效）
     val fmtOut   = Output(DataFormat())    // 标量
     val rndOut   = Output(RoundingMode())  // 标量
-    val loadHOut = Output(Bool())          // 标量
-    val loadVOut = Output(Bool())          // 标量
+    val loadHOut = Output(Bool())          // 水平传播到右侧 Cell
+    val loadVOut = Output(Bool())          // 垂直传播到下方 Cell
   })
 
   // --- HiveWorker 网格 ---
@@ -81,9 +83,11 @@ class HiveCell(
   // --- 列连接块（水平传播）：控制信号直接广播，无 ShiftRegister ---
   for (x <- 0 until n) {
     for (y <- 0 until n) {
+      pes(x)(y).io.loadHIn := io.loadHIn  
+      pes(x)(y).io.clear   := io.clear      
+      pes(x)(y).io.loadVLock := io.loadVLock
+
       if (y == 0) {
-        // 控制信号：直接广播（无 ShiftRegister）
-        pes(x)(y).io.loadHIn := io.loadHIn
         // valid 沿 x+y 二维传播：x==0 行首接 io.validIn，x>0 行首从上一 x 行
         // 的 y 链末端级联，使 PE(x,y) 的 valid 相对 io.validIn 延迟 (x+y) 拍，
         // 与数据波前的行内偏移 x 严格对齐（若只在 y 方向传播并广播所有 x 行，
@@ -96,15 +100,13 @@ class HiveCell(
         pes(x)(y).io.fmtIn   := io.fmtIn
         pes(x)(y).io.rndIn   := io.rndIn
         pes(x)(y).io.aIn     := io.aIn(x)  // per-row 数据
-        pes(x)(y).io.clear   := io.clear
+
       } else {
         // 传播：从左侧 PE 获取（RegNext 链）
-        pes(x)(y).io.loadHIn := pes(x)(y-1).io.loadHOut
         pes(x)(y).io.validIn := pes(x)(y-1).io.validOut
         pes(x)(y).io.fmtIn   := pes(x)(y-1).io.fmtOut
         pes(x)(y).io.rndIn   := pes(x)(y-1).io.rndOut
         pes(x)(y).io.aIn     := pes(x)(y-1).io.aOut
-        pes(x)(y).io.clear   := io.clear    // 广播
       }
 
       if (y == n-1) {
@@ -118,18 +120,17 @@ class HiveCell(
   io.fmtOut   := pes(n-1)(n-1).io.fmtOut
   io.rndOut   := pes(n-1)(n-1).io.rndOut
   io.loadHOut := pes(n-1)(n-1).io.loadHOut
-  // loadVOut：loadV 已改为 PE 级广播，此处仅为保持接口兼容（透传 RegNext）
-  io.loadVOut := pes(n-1)(0).io.loadVOut
+  io.loadVOut := pes(n-1)(n-1).io.loadVOut
 
   // --- 行连接块（垂直传播）：仅 psumIn/psumOut 沿 x 方向传播 ---
   for (y <- 0 until n) {
     for (x <- 0 until n) {
       if (x == 0) {
-        pes(x)(y).io.psumIn := io.psumIn(y)
         pes(x)(y).io.loadVIn := io.loadVIn
+        pes(x)(y).io.psumIn := io.psumIn(y)
       } else {
-        pes(x)(y).io.psumIn := pes(x-1)(y).io.psumOut
         pes(x)(y).io.loadVIn := pes(x-1)(y).io.loadVOut
+        pes(x)(y).io.psumIn := pes(x-1)(y).io.psumOut
       }
       if (x == n-1) {
         io.cOut(y) := pes(x)(y).io.psumOut

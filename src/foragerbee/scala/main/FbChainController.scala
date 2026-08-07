@@ -191,6 +191,19 @@ class FbChainController(cfg: ForagerBeeConfig) extends Module {
   injCmd.dstFmt        := extract(offDstFmt, dstFmtBits)
   injCmd.cvtScale      := extract(offCvtScale, cvtScaleBits)
   injCmd.cvtZeroPoint  := extract(offCvtZeroPoint, cvtZeroPointBits)
+  // im2col fields default to 0 (chain controller does not support im2col descriptors in v1)
+  for (d <- 0 until 2) {
+    injCmd.im2colKernel(d)   := 0.U
+    injCmd.im2colStride(d)   := 0.U
+    injCmd.im2colPad(d)      := 0.U
+    injCmd.im2colDilation(d) := 0.U
+  }
+  for (d <- 0 until 3) {
+    injCmd.im2colInShape(d) := 0.U
+  }
+  // scatter/gather fields default to 0 (chain controller does not support SG descriptors in v1)
+  injCmd.sgListAddr   := 0.U
+  injCmd.sgEntryCount := 0.U
 
   // --- FSM 逻辑 ---
   switch(state) {

@@ -58,7 +58,9 @@ case class ForagerBeeConfig(
     enableChaining: Boolean = false,      // 编译时开关：是否启用链式描述符
     chainDescBeats: Int = 0,              // 描述符内存 beat 数（0=自动计算）
     enableConversion: Boolean = false,    // 编译时开关：是否启用格式转换
-    converterPipeStages: Int = 1          // 转换流水线深度（1=组合，2+=流水）
+    converterPipeStages: Int = 1,         // 转换流水线深度（1=组合，2+=流水）
+    channelIm2col: Seq[Boolean] = Seq.empty,  // 每通道是否支持 im2col（默认全 true）
+    channelScatterGather: Seq[Boolean] = Seq.empty  // 每通道是否支持 scatter/gather
 ) {
   /** 实际数据 Queue 深度（-1 表示自动 = max(maxBurstLen, 4)） */
   val resolvedDataQueueDepth: Int =
@@ -71,6 +73,14 @@ case class ForagerBeeConfig(
   val resolvedChannelPermute: Seq[Boolean] =
     if (channelPermute.isEmpty) Seq.fill(numPorts)(true)
     else channelPermute
+  /** 实际的通道 IM2COL 能力序列（空时默认全 true） */
+  val resolvedChannelIm2col: Seq[Boolean] =
+    if (channelIm2col.isEmpty) Seq.fill(numPorts)(true)
+    else channelIm2col
+  /** 实际的通道 SCATTER/GATHER 能力序列（空时默认全 true） */
+  val resolvedChannelScatterGather: Seq[Boolean] =
+    if (channelScatterGather.isEmpty) Seq.fill(numPorts)(true)
+    else channelScatterGather
 
   require(numPorts >= 1 && numPorts <= 4, s"ForagerBeeConfig: numPorts($numPorts) 必须 ∈ [1,4]")
   require(queueDepth >= 1, s"ForagerBeeConfig: queueDepth($queueDepth) 必须 ≥ 1")
@@ -84,6 +94,10 @@ case class ForagerBeeConfig(
     s"ForagerBeeConfig: channelTranspose 长度(${resolvedChannelTranspose.length}) 必须等于 numPorts($numPorts)")
   require(resolvedChannelPermute.length == numPorts,
     s"ForagerBeeConfig: channelPermute 长度(${resolvedChannelPermute.length}) 必须等于 numPorts($numPorts)")
+  require(resolvedChannelIm2col.length == numPorts,
+    s"ForagerBeeConfig: channelIm2col 长度(${resolvedChannelIm2col.length}) 必须等于 numPorts($numPorts)")
+  require(resolvedChannelScatterGather.length == numPorts,
+    s"ForagerBeeConfig: channelScatterGather 长度(${resolvedChannelScatterGather.length}) 必须等于 numPorts($numPorts)")
 
   /** 每 beat 字节数 */
   def beatBytes: Int = dataWidth / 8
@@ -104,6 +118,15 @@ object FbOp extends ChiselEnum {
   /** 多维维度重排（dimCount ∈ [1, maxDims]，dim0 仍为连续突发维；
     通过 permVec 重映射源 stride 索引实现任意维度重排） */
   val PERMUTE = Value
+
+  /** im2col 卷积展开（将 feature map 展开为 GEMM 输入矩阵） */
+  val IM2COL = Value
+
+  /** 分发：从线性源读取，写到多个非连续目的地址（由描述符表指定） */
+  val SCATTER = Value
+
+  /** 聚集：从多个非连续源地址（由描述符表指定）读取，线性写入连续目的缓冲区 */
+  val GATHER = Value
 }
 
 /** 数据格式枚举（用于搬运时原位格式转换） */
@@ -180,6 +203,27 @@ class FbCmd(cfg: ForagerBeeConfig) extends Bundle {
 
   /** 格式转换：量化 zero_point（IEEE-754 FP32 编码） */
   val cvtZeroPoint = UInt(32.W)
+
+  /** im2col：卷积核尺寸 (kH, kW)，非 IM2COL 时忽略 */
+  val im2colKernel = Vec(2, UInt(8.W))
+
+  /** im2col：卷积步长 (sH, sW) */
+  val im2colStride = Vec(2, UInt(8.W))
+
+  /** im2col：输入 padding (pH, pW)，上下/左右对称 */
+  val im2colPad = Vec(2, UInt(8.W))
+
+  /** im2col：空洞卷积膨胀率 (dH, dW) */
+  val im2colDilation = Vec(2, UInt(8.W))
+
+  /** im2col：输入 feature map 形状 (C, H, W) */
+  val im2colInShape = Vec(3, UInt(16.W))
+
+  /** scatter/gather：地址描述符表的内存基址（须按 beat 对齐） */
+  val sgListAddr = UInt(cfg.addressWidth.W)
+
+  /** scatter/gather：描述符表条目数（1..65535） */
+  val sgEntryCount = UInt(16.W)
 }
 
 object FbCmd {

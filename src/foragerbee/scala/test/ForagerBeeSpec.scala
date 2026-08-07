@@ -122,7 +122,7 @@ class FbStreamMemSlave(
 case class FbTestCmd(
     tag: Int = 0,
     transpose: Boolean = false,
-    op: String = "",  // "COPY"/"TRANSPOSE"/"PERMUTE"；为空时由 transpose 推断
+    op: String = "",  // "COPY"/"TRANSPOSE"/"PERMUTE"/"IM2COL"/"SCATTER"/"GATHER"；为空时由 transpose 推断
     dimCount: Int = 1,
     shape: Seq[Int] = Seq(16),
     srcStride: Seq[BigInt] = Seq(16),
@@ -137,7 +137,14 @@ case class FbTestCmd(
     srcFmt: Int = 7,      // FbDataFmt: 0=FP32, 1=FP16, 2=BF16, 3=INT8, 7=NONE
     dstFmt: Int = 7,
     cvtScale: BigInt = 0,
-    cvtZeroPoint: BigInt = 0
+    cvtZeroPoint: BigInt = 0,
+    im2colKernel: Seq[Int] = Seq(0, 0),
+    im2colStride: Seq[Int] = Seq(0, 0),
+    im2colPad: Seq[Int] = Seq(0, 0),
+    im2colDilation: Seq[Int] = Seq(0, 0),
+    im2colInShape: Seq[Int] = Seq(0, 0, 0),
+    sgListAddr: BigInt = 0,
+    sgEntryCount: Int = 0
 )
 
 class ForagerBeeSpec extends AnyFlatSpec with Matchers {
@@ -188,6 +195,9 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       case "COPY"      => FbOp.COPY
       case "TRANSPOSE" => FbOp.TRANSPOSE
       case "PERMUTE"   => FbOp.PERMUTE
+      case "IM2COL"    => FbOp.IM2COL
+      case "SCATTER"   => FbOp.SCATTER
+      case "GATHER"    => FbOp.GATHER
       case _           => FbOp.COPY
     } else if (c.transpose) FbOp.TRANSPOSE else FbOp.COPY
     port.op.poke(actualOp)
@@ -213,6 +223,19 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     port.cvtZeroPoint.poke(c.cvtZeroPoint)
     port.nextDescAddr.poke(0.U)
     port.chainMode.poke(false.B)
+    // im2col fields
+    for (d <- 0 until 2) {
+      port.im2colKernel(d).poke(c.im2colKernel.lift(d).getOrElse(0).U)
+      port.im2colStride(d).poke(c.im2colStride.lift(d).getOrElse(0).U)
+      port.im2colPad(d).poke(c.im2colPad.lift(d).getOrElse(0).U)
+      port.im2colDilation(d).poke(c.im2colDilation.lift(d).getOrElse(0).U)
+    }
+    for (d <- 0 until 3) {
+      port.im2colInShape(d).poke(c.im2colInShape.lift(d).getOrElse(0).U)
+    }
+    // scatter/gather fields
+    port.sgListAddr.poke(c.sgListAddr)
+    port.sgEntryCount.poke(c.sgEntryCount.U)
   }
 
   /** 跑一组命令直到全部 done（或超时 fail），返回 (done 列表, 内存终态)
@@ -1390,6 +1413,327 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     val lo = m.getOrElse(BigInt(0x5000), 0.toByte) & 0xFF
     val hi = m.getOrElse(BigInt(0x5001), 0.toByte) & 0xFF
     (lo | (hi << 8)) shouldBe 0x3F80
+  }
+
+  // ===================== IM2COL 用例 =====================
+
+  // im2col 配置：单通道 + dataWidth=32 (beatBytes=4) 简化对齐
+  private val i2cCfg = ForagerBeeConfig(
+    numPorts = 1, queueDepth = 4, maxDims = 4,
+    tileSize = 8, maxBurstLen = 64,
+    dataWidth = 32, addressWidth = 32,
+    channelIm2col = Seq(true)
+  )
+  private val i2cBB = i2cCfg.beatBytes // 4
+
+  /** im2col 参考实现：计算展开矩阵（元素值 Seq）
+    * featureMap: C*H*W 连续元素，CHW 布局
+    * 遍历顺序（外→内）：oh → ow → c → kh → kw
+    */
+  private def computeIm2col(
+      featureMap: Seq[Int], C: Int, H: Int, W: Int,
+      kH: Int, kW: Int, sH: Int, sW: Int,
+      pH: Int, pW: Int, dH: Int, dW: Int
+  ): Seq[Int] = {
+    val outH = (H + 2 * pH - dH * (kH - 1) - 1) / sH + 1
+    val outW = (W + 2 * pW - dW * (kW - 1) - 1) / sW + 1
+    val result = mutable.ArrayBuffer[Int]()
+    for (oh <- 0 until outH; ow <- 0 until outW;
+         c <- 0 until C; kh <- 0 until kH; kw <- 0 until kW) {
+      val ih = oh * sH + kh * dH - pH
+      val iw = ow * sW + kw * dW - pW
+      if (ih < 0 || ih >= H || iw < 0 || iw >= W) result += 0
+      else result += featureMap(c * H * W + ih * W + iw)
+    }
+    result.toSeq
+  }
+
+  /** 将 2 字节元素序列写入仿真内存（LE） */
+  private def writeElems16(mem: mutable.HashMap[BigInt, Byte], base: BigInt, elems: Seq[Int]): Unit =
+    for ((v, i) <- elems.zipWithIndex) {
+      mem(base + i * 2) = (v & 0xFF).toByte
+      mem(base + i * 2 + 1) = ((v >> 8) & 0xFF).toByte
+    }
+
+  /** 从仿真内存读取 16-bit 元素 */
+  private def readElem16(mem: mutable.HashMap[BigInt, Byte], addr: BigInt): Int = {
+    val lo = mem.getOrElse(addr, 0.toByte) & 0xFF
+    val hi = mem.getOrElse(addr + 1, 0.toByte) & 0xFF
+    lo | (hi << 8)
+  }
+
+  /** 构造 im2col FbTestCmd
+    * shape(0) = srcBboxBytes, shape(1) = dstBboxBytes（用于冲突检测 bbox） */
+  private def mkIm2colCmd(
+      tag: Int, C: Int, H: Int, W: Int,
+      kH: Int, kW: Int, sH: Int, sW: Int,
+      pH: Int, pW: Int, dH: Int, dW: Int,
+      elemBytesLog2: Int, srcAddr: BigInt, dstAddr: BigInt
+  ): FbTestCmd = {
+    val elemBytes = 1 << elemBytesLog2
+    val outH = (H + 2 * pH - dH * (kH - 1) - 1) / sH + 1
+    val outW = (W + 2 * pW - dW * (kW - 1) - 1) / sW + 1
+    val srcBbox = C * H * W * elemBytes
+    val dstBbox = C * kH * kW * outH * outW * elemBytes
+    FbTestCmd(
+      tag = tag, op = "IM2COL", dimCount = 1,
+      shape = Seq(srcBbox, dstBbox),
+      srcStride = Seq(srcBbox), dstStride = Seq(dstBbox),
+      srcAddr = srcAddr, dstAddr = dstAddr,
+      elemBytesLog2 = elemBytesLog2,
+      im2colKernel = Seq(kH, kW),
+      im2colStride = Seq(sH, sW),
+      im2colPad = Seq(pH, pW),
+      im2colDilation = Seq(dH, dW),
+      im2colInShape = Seq(C, H, W)
+    )
+  }
+
+  it should "im2col: basic 1x5x5 kernel3x3 stride1 no padding" in {
+    val iC = 1; val iH = 5; val iW = 5
+    val (kH, kW, sH, sW, pH, pW, dH, dW) = (3, 3, 1, 1, 0, 0, 1, 1)
+    val elemBytesLog2 = 1
+    val featureMap = (0 until iC * iH * iW).toSeq
+    val expected = computeIm2col(featureMap, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW)
+
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    writeElems16(mem, BigInt(0), featureMap)
+    val cmd = mkIm2colCmd(0x10, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW, elemBytesLog2,
+      srcAddr = 0, dstAddr = 0x10000)
+    val (dones, m) = runForagerBee(i2cCfg, Seq(cmd), mem, maxCycles = 50000)
+    dones shouldBe Seq((0x10, false))
+    for (i <- expected.indices) {
+      val actual = readElem16(m, BigInt(0x10000 + i * 2))
+      withClue(s"im2col[${i}] (expected ${expected(i)}, got $actual): ") {
+        actual shouldBe expected(i)
+      }
+    }
+  }
+
+  it should "im2col: vertical padding 1x4x6 kernel3x3 stride1 pH=1 pW=0" in {
+    val iC = 1; val iH = 4; val iW = 6
+    val (kH, kW, sH, sW, pH, pW, dH, dW) = (3, 3, 1, 1, 1, 0, 1, 1)
+    val elemBytesLog2 = 1
+    val featureMap = (0 until iC * iH * iW).map(i => (i * 7 + 3) & 0xFFFF)
+    val expected = computeIm2col(featureMap, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW)
+
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    writeElems16(mem, BigInt(0), featureMap)
+    val cmd = mkIm2colCmd(0x11, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW, elemBytesLog2,
+      srcAddr = 0, dstAddr = 0x10000)
+    val (dones, m) = runForagerBee(i2cCfg, Seq(cmd), mem, maxCycles = 50000)
+    dones shouldBe Seq((0x11, false))
+    // 验证边界零填充行和数据行
+    for (i <- expected.indices) {
+      val actual = readElem16(m, BigInt(0x10000 + i * 2))
+      withClue(s"im2col[${i}] (expected ${expected(i)}, got $actual): ") {
+        actual shouldBe expected(i)
+      }
+    }
+  }
+
+  it should "im2col: stride2 1x8x8 kernel3x3" in {
+    val iC = 1; val iH = 8; val iW = 8
+    val (kH, kW, sH, sW, pH, pW, dH, dW) = (3, 3, 2, 2, 0, 0, 1, 1)
+    val elemBytesLog2 = 1
+    val featureMap = (0 until iC * iH * iW).map(i => (i * 13 + 5) & 0xFFFF)
+    val expected = computeIm2col(featureMap, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW)
+
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    writeElems16(mem, BigInt(0), featureMap)
+    val cmd = mkIm2colCmd(0x12, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW, elemBytesLog2,
+      srcAddr = 0, dstAddr = 0x10000)
+    val (dones, m) = runForagerBee(i2cCfg, Seq(cmd), mem, maxCycles = 50000)
+    dones shouldBe Seq((0x12, false))
+    for (i <- expected.indices) {
+      val actual = readElem16(m, BigInt(0x10000 + i * 2))
+      withClue(s"im2col[${i}] (expected ${expected(i)}, got $actual): ") {
+        actual shouldBe expected(i)
+      }
+    }
+  }
+
+  it should "im2col: multi-channel C=3 H=6 W=6 kernel3x3 stride1" in {
+    val iC = 3; val iH = 6; val iW = 6
+    val (kH, kW, sH, sW, pH, pW, dH, dW) = (3, 3, 1, 1, 0, 0, 1, 1)
+    val elemBytesLog2 = 1
+    val featureMap = (0 until iC * iH * iW).map(i => (i * 11 + 7) & 0xFFFF)
+    val expected = computeIm2col(featureMap, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW)
+
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    writeElems16(mem, BigInt(0), featureMap)
+    val cmd = mkIm2colCmd(0x13, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW, elemBytesLog2,
+      srcAddr = 0, dstAddr = 0x10000)
+    val (dones, m) = runForagerBee(i2cCfg, Seq(cmd), mem, maxCycles = 100000)
+    dones shouldBe Seq((0x13, false))
+    for (i <- expected.indices) {
+      val actual = readElem16(m, BigInt(0x10000 + i * 2))
+      withClue(s"im2col[${i}] (expected ${expected(i)}, got $actual): ") {
+        actual shouldBe expected(i)
+      }
+    }
+  }
+
+  it should "im2col: reject when channel does not support im2col" in {
+    val noI2cCfg = ForagerBeeConfig(
+      numPorts = 1, queueDepth = 4, maxDims = 4,
+      tileSize = 8, maxBurstLen = 64,
+      dataWidth = 32, addressWidth = 32,
+      channelIm2col = Seq(false)
+    )
+    val cmd = mkIm2colCmd(0x14, 1, 4, 4, 3, 3, 1, 1, 0, 0, 1, 1, 1,
+      srcAddr = 0, dstAddr = 0x10000)
+    val (dones, _) = runForagerBee(noI2cCfg, Seq(cmd), mutable.HashMap.empty)
+    dones shouldBe Seq((0x14, true))
+  }
+
+  it should "im2col: reject kernel=0 with err" in {
+    val cmd = FbTestCmd(
+      tag = 0x15, op = "IM2COL", dimCount = 1,
+      shape = Seq(32, 32), srcStride = Seq(32), dstStride = Seq(32),
+      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = 1,
+      im2colKernel = Seq(0, 3), im2colStride = Seq(1, 1),
+      im2colPad = Seq(0, 0), im2colDilation = Seq(1, 1),
+      im2colInShape = Seq(1, 4, 4)
+    )
+    val (dones, _) = runForagerBee(i2cCfg, Seq(cmd), mutable.HashMap.empty)
+    dones shouldBe Seq((0x15, true))
+  }
+
+  // ===================== SCATTER/GATHER 用例 =====================
+
+  private val sgCfg = ForagerBeeConfig(
+    numPorts = 1, queueDepth = 4, maxDims = 4,
+    tileSize = 8, maxBurstLen = 64,
+    dataWidth = 128, addressWidth = 32,
+    channelScatterGather = Seq(true)
+  )
+  private val sgBB = sgCfg.beatBytes // 16
+
+  /** 将一个 scatter/gather 描述符条目写入内存（addr: 低 32bit, len: bits[47:32]） */
+  private def writeSgEntry(mem: mutable.HashMap[BigInt, Byte], entryBase: BigInt, addr: BigInt, len: Int): Unit = {
+    // 低 4 字节 = addr (little-endian)
+    for (b <- 0 until 4) mem(entryBase + b) = ((addr >> (8 * b)) & 0xFF).toByte
+    // 接下来 2 字节 = len (bits 32..47)
+    mem(entryBase + 4) = (len & 0xFF).toByte
+    mem(entryBase + 5) = ((len >> 8) & 0xFF).toByte
+    // 高位填 0（bytes 6..15）
+    for (b <- 6 until sgBB) mem(entryBase + b) = 0.toByte
+  }
+
+  it should "GATHER basic: 3 non-contiguous blocks gathered to linear destination" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val blockLen = 32 // 2 beats each
+    // 在 3 个不连续位置准备源数据
+    fillPattern(mem, 0x1000, blockLen, seed = 10)
+    fillPattern(mem, 0x2000, blockLen, seed = 20)
+    fillPattern(mem, 0x3000, blockLen, seed = 30)
+    // 准备描述符表（3 条目）at 0x5000
+    val listAddr = BigInt(0x5000)
+    writeSgEntry(mem, listAddr + 0 * sgBB, BigInt(0x1000), blockLen)
+    writeSgEntry(mem, listAddr + 1 * sgBB, BigInt(0x2000), blockLen)
+    writeSgEntry(mem, listAddr + 2 * sgBB, BigInt(0x3000), blockLen)
+    // 命令：GATHER，dstAddr=0x8000，total=96B
+    val totalBytes = blockLen * 3
+    val cmd = FbTestCmd(tag = 0xA0, op = "GATHER", dimCount = 1,
+      shape = Seq(totalBytes), srcStride = Seq(totalBytes), dstStride = Seq(totalBytes),
+      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0,
+      sgListAddr = listAddr, sgEntryCount = 3)
+    val (dones, m) = runForagerBee(sgCfg, Seq(cmd), mem, maxCycles = 10000)
+    dones shouldBe Seq((0xA0, false))
+    // 验证 dst = block0 ++ block1 ++ block2
+    for (i <- 0 until blockLen)
+      m(BigInt(0x8000) + i) shouldBe (((i * 7 + 10 * 31 + 3) & 0xFF).toByte)
+    for (i <- 0 until blockLen)
+      m(BigInt(0x8000) + blockLen + i) shouldBe (((i * 7 + 20 * 31 + 3) & 0xFF).toByte)
+    for (i <- 0 until blockLen)
+      m(BigInt(0x8000) + 2 * blockLen + i) shouldBe (((i * 7 + 30 * 31 + 3) & 0xFF).toByte)
+  }
+
+  it should "SCATTER basic: linear source scattered to 3 non-contiguous destinations" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val blockLen = 32 // 2 beats each
+    val totalBytes = blockLen * 3
+    // 准备连续源数据 at 0x1000
+    fillPattern(mem, 0x1000, totalBytes, seed = 42)
+    // 准备描述符表（3 条目）at 0x5000
+    val listAddr = BigInt(0x5000)
+    writeSgEntry(mem, listAddr + 0 * sgBB, BigInt(0x8000), blockLen)
+    writeSgEntry(mem, listAddr + 1 * sgBB, BigInt(0x9000), blockLen)
+    writeSgEntry(mem, listAddr + 2 * sgBB, BigInt(0xA000), blockLen)
+    // 命令：SCATTER，srcAddr=0x1000
+    val cmd = FbTestCmd(tag = 0xA1, op = "SCATTER", dimCount = 1,
+      shape = Seq(totalBytes), srcStride = Seq(totalBytes), dstStride = Seq(totalBytes),
+      srcAddr = 0x1000, dstAddr = 0, elemBytesLog2 = 0,
+      sgListAddr = listAddr, sgEntryCount = 3)
+    val (dones, m) = runForagerBee(sgCfg, Seq(cmd), mem, maxCycles = 10000)
+    dones shouldBe Seq((0xA1, false))
+    // 验证 3 个目的地址处各有正确的 32B 数据
+    for (i <- 0 until blockLen)
+      m(BigInt(0x8000) + i) shouldBe (((i * 7 + 42 * 31 + 3) & 0xFF).toByte)
+    for (i <- 0 until blockLen)
+      m(BigInt(0x9000) + i) shouldBe ((((blockLen + i) * 7 + 42 * 31 + 3) & 0xFF).toByte)
+    for (i <- 0 until blockLen)
+      m(BigInt(0xA000) + i) shouldBe ((((2 * blockLen + i) * 7 + 42 * 31 + 3) & 0xFF).toByte)
+  }
+
+  it should "GATHER variable-length entries (16B + 64B + 32B = 112B)" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    // 3 个不等长源块
+    val len0 = 16; val len1 = 64; val len2 = 32
+    val totalBytes = len0 + len1 + len2 // 112
+    fillPattern(mem, 0x1000, len0, seed = 1)
+    fillPattern(mem, 0x2000, len1, seed = 2)
+    fillPattern(mem, 0x3000, len2, seed = 3)
+    // 描述符表 at 0x5000
+    val listAddr = BigInt(0x5000)
+    writeSgEntry(mem, listAddr + 0 * sgBB, BigInt(0x1000), len0)
+    writeSgEntry(mem, listAddr + 1 * sgBB, BigInt(0x2000), len1)
+    writeSgEntry(mem, listAddr + 2 * sgBB, BigInt(0x3000), len2)
+    // 命令：shape(0) 必须是 beatBytes 整数倍 → 112 % 16 = 0 ✓
+    val cmd = FbTestCmd(tag = 0xA2, op = "GATHER", dimCount = 1,
+      shape = Seq(totalBytes), srcStride = Seq(totalBytes), dstStride = Seq(totalBytes),
+      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0,
+      sgListAddr = listAddr, sgEntryCount = 3)
+    val (dones, m) = runForagerBee(sgCfg, Seq(cmd), mem, maxCycles = 10000)
+    dones shouldBe Seq((0xA2, false))
+    // 验证 dst = block0(16B) ++ block1(64B) ++ block2(32B)
+    var off = 0
+    for (i <- 0 until len0) {
+      m(BigInt(0x8000) + off + i) shouldBe (((i * 7 + 1 * 31 + 3) & 0xFF).toByte)
+    }
+    off += len0
+    for (i <- 0 until len1) {
+      m(BigInt(0x8000) + off + i) shouldBe (((i * 7 + 2 * 31 + 3) & 0xFF).toByte)
+    }
+    off += len1
+    for (i <- 0 until len2) {
+      m(BigInt(0x8000) + off + i) shouldBe (((i * 7 + 3 * 31 + 3) & 0xFF).toByte)
+    }
+  }
+
+  it should "SCATTER rejected when channelScatterGather=false → done.err=true" in {
+    val noSgCfg = ForagerBeeConfig(
+      numPorts = 1, queueDepth = 4, maxDims = 4,
+      tileSize = 8, maxBurstLen = 64,
+      dataWidth = 128, addressWidth = 32,
+      channelScatterGather = Seq(false)
+    )
+    val cmd = FbTestCmd(tag = 0xA3, op = "SCATTER", dimCount = 1,
+      shape = Seq(96), srcStride = Seq(96), dstStride = Seq(96),
+      srcAddr = 0, dstAddr = 0, elemBytesLog2 = 0,
+      sgListAddr = BigInt(0x5000), sgEntryCount = 3)
+    val (dones, _) = runForagerBee(noSgCfg, Seq(cmd), mutable.HashMap.empty)
+    dones shouldBe Seq((0xA3, true))
+  }
+
+  it should "GATHER rejected when sgEntryCount=0 → done.err=true" in {
+    val cmd = FbTestCmd(tag = 0xA4, op = "GATHER", dimCount = 1,
+      shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
+      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0,
+      sgListAddr = BigInt(0x5000), sgEntryCount = 0)
+    val (dones, _) = runForagerBee(sgCfg, Seq(cmd), mutable.HashMap.empty)
+    dones shouldBe Seq((0xA4, true))
   }
 }
 
