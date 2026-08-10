@@ -1,179 +1,230 @@
-/** HiveCombGemmDiagSpec — 复现 HiveCoreExecutor 的驱动协议，隔离验证
-  * HiveComb 在「逐深度不同权重 + aRegs 式外部 skew + 延长 valid + de-skew 收集」
-  * 下能否得到精确 GEMM 结果（INT16，无浮点歧义）。
+/** HiveCombGemmDiagSpec — 用真实 HiveCoreExecutor 硬件驱动 HiveComb 的
+  * 数值正确性测试（DiagExeTop 最小顶层：DMA tie-off，A/B/C 走测试侧
+  * 软件 FIFO），与 HiveCore 端到端计算路径一致，覆盖：
+  *   - 权重经 B buffer 流（bPop）加载：降序供数 + loadV/loadVLock 同拍锁存
+  *   - aRegs skew 供数 + valid 窗口 curTileM + 2*(totalN-1)
+  *   - cDeSkewed + alignedValid(delay=totalN) 流式整行收集
+  *   - 多 M tile（weight-stationary 权重复用）
   *
-  * 与 SystolicArrayTest 的差别：权重不再是全阵列标量，而是 W[k][g] = B[k][g]，
-  * 且激励时序完全照搬 HiveCoreExecutor（aRegs +1 偏移、valid 窗口
-  * curTileM + 2*(totalN-1)、de-skew 对齐、alignedValid delay totalN）。
+  * 注意：cPush.payload 必须在 step 前采样；step 后 peek 会拿到下一拍
+  * payload（cPush 每拍推一行 → 表现为整体错位一行、末行 0）。
   */
 
 import chisel3._
+import chisel3.util._
 import chisel3.simulator.EphemeralSimulator._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+
+/** executor 硬件直驱 HiveComb 的最小测试顶层（testbench 内部用）：
+  * DMA 控制全部 tie-off（单 tile 16x16x16 不触发 DMA），A/B/C 用测试侧软件 FIFO */
+class DiagExeTop(cfg: HiveCoreConfig) extends Module {
+  val io = IO(new Bundle {
+    val execute = Input(Bool())
+    val done    = Output(Bool())
+    val regFile = Input(HiveCoreRegs(cfg))
+    val dma0Start = Output(Bool())
+    val dma1Start = Output(Bool())
+    val dma0Done  = Input(Bool())
+    val dma1Done  = Input(Bool())
+    val bOccupancy = Input(UInt(log2Up(cfg.bBufferDepth + 1).W))
+    val aPop    = Flipped(Stream(UInt((cfg.totalN * cfg.aEffW).W)))
+    val bPop    = Flipped(Stream(UInt((cfg.totalN * cfg.bW).W)))
+    val cPush   = Stream(UInt((cfg.totalN * cfg.cEffW).W))
+  })
+  val exe  = Module(new HiveCoreExecutor(cfg))
+  val hive = Module(new HiveComb(cfg.arrayN, cfg.clusterM, cfg.aW, cfg.bW, cfg.cW, cfg.supportedFmts))
+
+  exe.io.execute := io.execute
+  exe.io.regFile := io.regFile
+  exe.io.regM := io.regFile.m(15, 0)
+  exe.io.regN := io.regFile.n(15, 0)
+  exe.io.regK := io.regFile.k(15, 0)
+  exe.io.regAAddr := io.regFile.aAddr
+  exe.io.regBAddr := io.regFile.bAddr
+  exe.io.regCAddr := io.regFile.cAddr
+  exe.io.regAStride := io.regFile.aStride.pad(16)
+  exe.io.regBStride := io.regFile.bStride.pad(16)
+  exe.io.regFmt := io.regFile.fmt
+  exe.io.regRnd := io.regFile.rnd
+
+  io.dma0Start := exe.io.dma0Start
+  io.dma1Start := exe.io.dma1Start
+  exe.io.dma0Done := io.dma0Done
+  exe.io.dma1Done := io.dma1Done
+  exe.io.dma0Busy := false.B
+  exe.io.dma1Busy := false.B
+  exe.io.bOccupancy := io.bOccupancy
+
+  exe.io.aPop.valid   := io.aPop.valid
+  io.aPop.ready       := exe.io.aPop.ready
+  exe.io.aPop.payload := io.aPop.payload
+  exe.io.bPop.valid   := io.bPop.valid
+  io.bPop.ready       := exe.io.bPop.ready
+  exe.io.bPop.payload := io.bPop.payload
+  exe.io.cPop.valid := false.B
+  exe.io.cPop.payload := 0.U
+  io.cPush.valid   := exe.io.cPush.valid
+  exe.io.cPush.ready := io.cPush.ready
+  io.cPush.payload := exe.io.cPush.payload
+
+  hive.io.aIn    <> exe.io.hiveAIn
+  hive.io.psumIn <> exe.io.hivePsumIn
+  hive.io.loadHIn := exe.io.hiveLoadH
+  hive.io.loadVIn := exe.io.hiveLoadV
+  hive.io.loadVLock := exe.io.hiveLoadVLock
+  hive.io.validIn := exe.io.hiveValidIn
+  hive.io.fmtIn   := exe.io.hiveFmtIn
+  hive.io.rndIn   := exe.io.hiveRndIn
+  hive.io.clear   := exe.io.hiveClear
+  exe.io.hiveCOut    := hive.io.cOut
+  exe.io.hiveValidOut := hive.io.validOut
+
+  io.done := exe.io.done
+}
 
 class HiveCombGemmDiagSpec extends AnyFlatSpec with Matchers {
 
   behavior of "HiveComb under Executor-style drive protocol"
 
-  it should "compute exact 16x16 INT16 GEMM with per-depth weights" in {
-    val arrayN = 8
-    val clusterM = 2
-    val totalN = arrayN * clusterM   // 16
-    val mRows = totalN               // 16 行激活
+  it should "compute exact 32x16x16 FP16 GEMM (2 M tiles) via executor hardware" in {
+    // 决定性实验：用真实 HiveCoreExecutor 硬件驱动 HiveComb（DMA tie-off，
+    // A/B/C 走测试侧软件 FIFO），与 HiveCore 端到端路径一致。若此路径通过而
+    // 软件直驱失败，则说明直驱协议建模有误；若此路径也失败，则为硬件问题。
+    val cfg = HiveCoreConfig()
+    val totalN = cfg.totalN
+    val mRows = 2 * totalN  // M=32：两个 M tile，区分 tile 间相位
 
-    // 激活 / 权重：小的可区分整数
+    // 激活 / 权重：小的可区分整数；本用例用 FP16 编码（与 SimCase 格式一致，
+    // 用于隔离「格式/相位」差异；值域内 FP16 精确表示）
+    def f2h(f: Float): Int = {
+      val bits = java.lang.Float.floatToIntBits(f)
+      val sign = (bits >>> 16) & 0x8000
+      var exp = ((bits >>> 23) & 0xFF) - 127 + 15
+      val man = (bits >>> 13) & 0x3FF
+      if (exp <= 0) 0 else if (exp >= 0x1F) 0x7BFF else sign | (exp << 10) | man
+    }
+    def h2f(h: Int): Float = {
+      val sign = (h & 0x8000) << 16
+      val exp = (h >>> 10) & 0x1F
+      val man = h & 0x3FF
+      if (exp == 0) java.lang.Float.intBitsToFloat(sign)
+      else java.lang.Float.intBitsToFloat(sign | ((exp - 15 + 127) << 23) | (man << 13))
+    }
+    def bits2f(b: Int): Float = java.lang.Float.intBitsToFloat(b)
+
     val A = Array.tabulate(mRows, totalN)((i, k) => ((i + 1) + k).toLong)
     val B = Array.tabulate(totalN, totalN)((k, j) => ((k + 1) * 2 + j).toLong)
     val Cexp = Array.tabulate(mRows, totalN)((i, j) =>
-      (0 until totalN).map(k => A(i)(k) * B(k)(j)).sum)
+      (0 until totalN).map(k => A(i)(k).toDouble * B(k)(j).toDouble).sum)
 
-    // aRegs 式 skew：行 m 于拍 m 进入 aRegs(0)，每拍右移
-    val aRegs = Array.fill(totalN)(Array.fill(totalN)(0L))
+    val aQueue = scala.collection.mutable.Queue[BigInt]()
+    for (m <- 0 until mRows) {
+      var data = BigInt(0)
+      for (k <- 0 until totalN) data |= BigInt(f2h(A(m)(k).toFloat)) << (k * cfg.aEffW)
+      aQueue += data
+    }
+    // 权重行数据（降序），M tile 间权重重新加载，bQueue 耗尽时重新填充
+    val bQueue = scala.collection.mutable.Queue[BigInt]()
+    val bRowsDesc = (0 until totalN).map { beat =>
+      val k = totalN - 1 - beat
+      var data = BigInt(0)
+      for (i <- 0 until totalN) data |= BigInt(f2h(B(k)(i).toFloat)) << (i * cfg.bW)
+      data
+    }
+    bQueue ++= bRowsDesc
+    val collected = scala.collection.mutable.ArrayBuffer[BigInt]()
 
-    val collected = scala.collection.mutable.ArrayBuffer[Array[BigInt]]()
-
-    simulate(new HiveComb(arrayN, clusterM, 16, 16, 32, Set(DataFormat.INT16))) { dut =>
+    simulate(new DiagExeTop(cfg)) { dut =>
       // === 初始化 ===
-      dut.io.loadHIn.poke(false.B); dut.io.loadVIn.poke(false.B)
-      dut.io.validIn.poke(false.B)
-      dut.io.fmtIn.poke(DataFormat.INT16); dut.io.rndIn.poke(RoundingMode.RNE)
-      dut.io.clear.poke(false.B)
-      for (i <- 0 until totalN) dut.io.aIn(i).poke(0.U)
-      for (j <- 0 until totalN) dut.io.psumIn(j).poke(0.U)
-      dut.clock.step()
+      dut.reset.poke(true.B)
+      dut.io.execute.poke(false.B)
+      dut.io.dma0Done.poke(false.B); dut.io.dma1Done.poke(false.B)
+      dut.io.bOccupancy.poke(0.U)
+      dut.io.aPop.valid.poke(false.B); dut.io.aPop.payload.poke(0.U)
+      dut.io.bPop.valid.poke(false.B); dut.io.bPop.payload.poke(0.U)
+      dut.io.cPush.ready.poke(true.B)
+      // 寄存器组：M=N=K=16，fmt=INT16(2)，rnd=RNE(0)，其余 0
+      for (i <- 0 until cfg.registerNum) dut.io.regFile.regs(i).poke(0.U)
+      dut.io.regFile.regs(0).poke(mRows.U)   // M
+      dut.io.regFile.regs(1).poke(16.U)   // N
+      dut.io.regFile.regs(2).poke(16.U)   // K
+      dut.io.regFile.regs(7).poke(0.U)    // fmt=FP16, rnd=RNE
+      dut.clock.step(3)
+      dut.reset.poke(false.B)
+      dut.clock.step(2)
 
-      // === 权重加载（照搬 Executor sLOAD_WEIGHT_PE 行式协议）===
-      // 每权重行 2 拍：偶数拍供行 k（psumIn(g)=B[k][g]）+ loadV 脉冲，奇数拍保持
-      val loadCycles = 2 * totalN + totalN
-      for (c <- 0 until loadCycles) {
-        val beat = c / 2
-        val feeding = (c % 2 == 0) && beat < totalN
-        dut.io.loadVIn.poke(feeding.B)
-        dut.io.loadHIn.poke(true.B)
-        dut.io.fmtIn.poke(DataFormat.INT16); dut.io.rndIn.poke(RoundingMode.RNE)
-        dut.io.validIn.poke(false.B)
-        dut.io.clear.poke(false.B)
-        for (i <- 0 until totalN) dut.io.aIn(i).poke(0.U)
-        for (g <- 0 until totalN) {
-          val w = if (feeding) B(beat)(g) else 0L
-          dut.io.psumIn(g).poke(((w & 0xFFFFL).U))
+      // EXECUTE 单拍脉冲
+      dut.io.execute.poke(true.B); dut.clock.step()
+      dut.io.execute.poke(false.B)
+
+      var cycle = 0
+      var done = false
+      while (!done && cycle < 5000) {
+        // B FIFO 供数
+        if (bQueue.nonEmpty) {
+          dut.io.bPop.valid.poke(true.B)
+          dut.io.bPop.payload.poke(bQueue.head.U)
+        } else {
+          dut.io.bPop.valid.poke(false.B)
         }
-        dut.clock.step()
-      }
-      // 排空完成当拍：clear 一拍（照搬 Executor）
-      dut.io.loadHIn.poke(false.B); dut.io.loadVIn.poke(false.B)
-      for (g <- 0 until totalN) dut.io.psumIn(g).poke(0.U)
-      dut.io.clear.poke(true.B); dut.clock.step()
-      dut.io.clear.poke(false.B); dut.clock.step()
+        dut.io.bOccupancy.poke(bQueue.size.U)
+        // A FIFO 供数
+        if (aQueue.nonEmpty) {
+          dut.io.aPop.valid.poke(true.B)
+          dut.io.aPop.payload.poke(aQueue.head.U)
+        } else {
+          dut.io.aPop.valid.poke(false.B)
+        }
+        dut.io.cPush.ready.poke(true.B)
+        // DMA 即时完成响应（单 tile 无真实 DMA）
+        dut.io.dma0Done.poke(dut.io.dma0Start.peek())
+        dut.io.dma1Done.poke(dut.io.dma1Start.peek())
 
-      // === 计算（照搬 sCOMPUTE：aRegs skew + 延长 valid）===
-      val validCycles = mRows + 2 * (totalN - 1)
-      val totalCycles = validCycles + (totalN - 1)
-
-      // de-skew 历史缓冲（软件侧 ShiftRegister 等效）
-      val cHist = Array.fill(totalN)(scala.collection.mutable.Queue[BigInt]())
-      val vHist = scala.collection.mutable.Queue[Boolean]()
-      var alignCnt = 0
-
-      for (t <- 0 until totalCycles + 4) {
-        // 先用上一拍末的 aRegs 状态驱动 aIn（等效 Executor：aIn(i)@t = 行 t-1-i），
-        // 再移位并把行 t 注入 aRegs(0)
-        dut.io.validIn.poke((t < validCycles).B)
-        dut.io.fmtIn.poke(DataFormat.INT16); dut.io.rndIn.poke(RoundingMode.RNE)
-        dut.io.loadHIn.poke(false.B); dut.io.loadVIn.poke(false.B)
-        dut.io.clear.poke(false.B)
-        // hiveAIn(i) = aRegs(i) 的第 i 个槽位（与 Executor 一致：+1 偏移）
-        for (i <- 0 until totalN) dut.io.aIn(i).poke((aRegs(i)(i) & 0xFFFFL).U)
-        for (g <- 0 until totalN) dut.io.psumIn(g).poke(0.U)
-
-        for (i <- totalN - 1 to 1 by -1) aRegs(i) = aRegs(i - 1)
-        for (k <- 0 until totalN) aRegs(0)(k) = if (t < mRows) A(t)(k) else 0L
+        // fire 判定（step 前采样握手）；cPush.payload 必须在 step 前采样，
+        // 否则拿到的是下一拍 payload（cPush 每拍换一行 → 整体错位一行、末行 0）
+        val bFire = dut.io.bPop.valid.peek().litToBoolean && dut.io.bPop.ready.peek().litToBoolean
+        val aFire = dut.io.aPop.valid.peek().litToBoolean && dut.io.aPop.ready.peek().litToBoolean
+        val cFire = dut.io.cPush.valid.peek().litToBoolean && dut.io.cPush.ready.peek().litToBoolean
+        val cPayload: Option[BigInt] =
+          if (cFire) Some(dut.io.cPush.payload.peek().litValue) else None
+        val finished = dut.io.done.peek().litToBoolean
 
         dut.clock.step()
-
-        // 采样并软件 de-skew：列 c 延迟 (totalN-1-c)，
-        // validOut(0) 升始于拍 15（ci skew 8 + y 链 7），行 m 数据于拍 17+m+g
-        // 就绪于列 g，de-skew 后对齐于拍 m+32，故 alignedValid 延迟 totalN-1
-        for (c <- 0 until totalN) {
-          val d = totalN - 1 - c
-          cHist(c).enqueue(dut.io.cOut(c).peek().litValue)
-          if (cHist(c).size > d + 1) cHist(c).dequeue()
-        }
-        vHist.enqueue(dut.io.validOut(0).peek().litToBoolean)
-        if (vHist.size > totalN) vHist.dequeue()
-
-        val alignedValid = vHist.head
-        if (alignedValid) {
-          if (alignCnt < mRows) {
-            collected += cHist.map(_.head).toArray
-          }
-          alignCnt += 1
-        }
+        cycle += 1
+        if (bFire && bQueue.nonEmpty) bQueue.dequeue()
+        if (aFire && aQueue.nonEmpty) aQueue.dequeue()
+        cPayload.foreach(collected += _)
+        if (finished) done = true
       }
+      println(s"[DIAG-EXE] finished=$done cycle=$cycle collected=${collected.size} rows")
     }
 
     collected.size shouldBe mRows
-    var maxDiff = 0L
+    def rowOf(bits: BigInt, j: Int): Long =
+      ((bits >> (j * cfg.cEffW)) & ((BigInt(1) << cfg.cEffW) - 1)).toLong
+    def rowF(bits: BigInt, j: Int): Double =
+      bits2f(rowOf(bits, j).toInt).toDouble
+    var mismatch = 0
     var firstErr = ""
     for (i <- 0 until mRows; j <- 0 until totalN) {
-      val act = collected(i)(j).toLong
+      val act = rowF(collected(i), j)
       val exp = Cexp(i)(j)
-      if (act != exp && firstErr.isEmpty)
-        firstErr = f"row=$i col=$j expected=$exp actual=$act"
-      maxDiff = math.max(maxDiff, math.abs(act - exp))
+      val absErr = math.abs(act - exp)
+      val relErr = if (math.abs(exp) > 1e-6) absErr / math.abs(exp) else absErr
+      if (relErr > 1e-2 && absErr > 1e-2) {
+        if (firstErr.isEmpty)
+          firstErr = f"row=$i col=$j expected=$exp%.2f actual=$act%.2f"
+        mismatch += 1
+      }
     }
     if (firstErr.nonEmpty) {
-      println(s"[DIAG] first mismatch: $firstErr, maxDiff=$maxDiff")
-      for (i <- Seq(0, 1, 8, 15)) {
-        println(s"[DIAG] row $i expected: ${Cexp(i).mkString(",")}")
-        println(s"[DIAG] row $i actual  : ${collected(i).map(_.toString).mkString(",")}")
+      println(s"[DIAG-EXE] first mismatch: $firstErr, mismatches=$mismatch")
+      for (i <- Seq(0, 1, 15, 16, 17, 30, 31).filter(_ < mRows)) {
+        println(f"[DIAG-EXE] row $i expected: ${Cexp(i).take(4).map(v => f"$v%.0f").mkString(",")},...")
+        println(f"[DIAG-EXE] row $i actual  : ${(0 until 4).map(j => f"${rowF(collected(i), j)}%.0f").mkString(",")},...")
       }
     }
-    // 首次失败时转储时序波形帮助定位（列就绪拍探测）
-    if (maxDiff != 0L) dumpSingleRowWaveform()
-    maxDiff shouldBe 0L
-  }
-
-  /** 单行激励探测：只喂激活行 5（权重全 1），逐拍打印 cOut，
-    * 实测每列承载该行完整和的首拍，校准 de-skew 延迟模型 */
-  private def dumpSingleRowWaveform(): Unit = {
-    val arrayN = 8; val clusterM = 2; val totalN = arrayN * clusterM
-    val rowIdx = 5
-    simulate(new HiveComb(arrayN, clusterM, 16, 16, 32, Set(DataFormat.INT16))) { dut =>
-      dut.io.loadHIn.poke(false.B); dut.io.loadVIn.poke(false.B)
-      dut.io.validIn.poke(false.B)
-      dut.io.fmtIn.poke(DataFormat.INT16); dut.io.rndIn.poke(RoundingMode.RNE)
-      dut.io.clear.poke(false.B)
-      for (i <- 0 until totalN) dut.io.aIn(i).poke(0.U)
-      for (j <- 0 until totalN) dut.io.psumIn(j).poke(0.U)
-      dut.clock.step()
-      // 全 1 权重（行式协议：每行 2 拍，行内容全 1）
-      for (k <- 0 until totalN) {
-        dut.io.loadHIn.poke(true.B)
-        for (g <- 0 until totalN) dut.io.psumIn(g).poke(1.U)
-        dut.io.loadVIn.poke(true.B); dut.clock.step()
-        dut.io.loadVIn.poke(false.B); dut.clock.step()
-      }
-      dut.io.loadHIn.poke(false.B)
-      for (g <- 0 until totalN) dut.io.psumIn(g).poke(0.U)
-      dut.io.clear.poke(true.B); dut.clock.step()
-      dut.io.clear.poke(false.B); dut.clock.step()
-
-      // 只喂一行：aIn(i) 在拍 (rowIdx+1+i) 给 100（Executor +1 相位）
-      val aRegs = Array.fill(totalN)(0L)
-      for (t <- 0 until 90) {
-        dut.io.validIn.poke((t < 70).B)
-        for (i <- 0 until totalN) dut.io.aIn(i).poke((aRegs(i) & 0xFFFFL).U)
-        for (g <- 0 until totalN) dut.io.psumIn(g).poke(0.U)
-        for (i <- totalN - 1 to 1 by -1) aRegs(i) = aRegs(i - 1)
-        aRegs(0) = if (t == rowIdx) 100L else 0L
-        dut.clock.step()
-        val co = (0 until totalN).map(c => dut.io.cOut(c).peek().litValue.toLong)
-        val vo = (0 until totalN).map(c => if (dut.io.validOut(c).peek().litToBoolean) "1" else "0").mkString
-        if (co.exists(_ != 0) || t > 60)
-          println(f"[WAVE] t=$t%3d v=$vo c=${co.mkString(",")}")
-      }
-    }
+    mismatch shouldBe 0
   }
 }

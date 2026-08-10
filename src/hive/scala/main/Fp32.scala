@@ -44,9 +44,11 @@ object Fp32 {
     val mB24 = Cat(1.U(1.W), mB)
     val mProd = mA24 * mB24 // 48-bit
 
-    // 指数相加 - bias(127)
+    // 指数相加 - bias(127)；尾数积 >= 2（mProd(47)=1）需右移 1 位，
+    // 指数必须相应 +1，否则结果恰好为真值的一半（旧实现漏掉该补偿）
     val eSum = eA +& eB // 9-bit to avoid overflow
-    val eOut = Mux(eSum >= 127.U, (eSum - 127.U)(7, 0), 0.U(8.W))
+    val eAdj = eSum + Mux(mProd(47), 1.U(9.W), 0.U(9.W))
+    val eOut = Mux(eAdj >= 127.U, (eAdj - 127.U)(7, 0), 0.U(8.W))
 
     // 规格化：mProd[47] 为 1 时右移 1
     val mNorm = Mux(mProd(47), mProd(46, 24), mProd(45, 23))
@@ -90,11 +92,15 @@ object Fp32 {
     val mAbs = Mux(mSum(26), (-mSum)(25, 0), mSum(25, 0))
 
     // 简化规格化：找最高有效位
+    // leadingZero = 25 - floor(log2(mAbs))：左移 leadingZero 后前导 1 落在 bit 25，
+    // 而隐含 1 的标准位置为 bit 24，故指数修正为 eMax + 1 - leadingZero
+    // （旧实现 eMax - leadingZero 差 1，导致所有产生进位的加法结果指数偏小，
+    // 例如 1.0 + 1.0 输出 1.0 而非 2.0）
     val leadingZero = PriorityEncoder(mAbs.asBools.reverse)
     val mNorm = (mAbs << leadingZero)(24, 2) // 23-bit mantissa（去掉隐含 1）
     val guardBit = (mAbs << leadingZero)(1) // 被截断的最高位
     val mRounded = applyRounding(mNorm, guardBit, sOut, rnd)
-    val eOut = Mux(eMax > leadingZero, eMax - leadingZero, 0.U(8.W))
+    val eOut = Mux(eMax + 1.U > leadingZero, eMax + 1.U - leadingZero, 0.U(8.W))
 
     val sumZero = (mAbs === 0.U)
     Mux(aZero, b,

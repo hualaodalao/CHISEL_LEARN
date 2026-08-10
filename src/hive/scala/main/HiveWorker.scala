@@ -21,8 +21,8 @@
   * IO 端口语义：
   *   aIn  / aOut   : 激活通道，水平传播（左→右），aEffW 位。
   *   psumIn / psumOut : 部分和通道，垂直传播（上→下），cEffW 位；兼作权重加载通道。
-  *   loadHIn / loadHOut : 水平加载使能（仅配置 fmt/rnd），水平传播。
-  *   loadVIn / loadVOut : 垂直加载使能（权重），垂直传播。
+  *   loadHIn  : 水平加载使能（仅配置 fmt/rnd），由 HiveCell 广播（无 loadHOut）。
+  *   loadVIn  : 垂直加载使能（权重），由 HiveCell 广播（无 loadVOut）。
   *   validIn / validOut : 数据有效标志，水平传播。
   *   fmtIn   / fmtOut   : 数据格式选择，水平传播。
   *   rndIn   / rndOut   : 舍入模式选择，水平传播。
@@ -74,14 +74,12 @@ class HiveWorker(
     val psumIn  = Input(UInt(cEffW.W))
     val psumOut = Output(UInt(cEffW.W))
 
-    // 水平加载（配置）
-        val loadHIn  = Input(Bool())
-    val loadHOut = Output(Bool())
+    // 水平加载（配置）：由 HiveCell 广播到所有 PE，无水平传播输出
+    val loadHIn  = Input(Bool())
 
-    // 垂直加载（仅权重）
+    // 垂直加载（仅权重）：由 HiveCell 广播到所有 PE，无垂直传播输出
     val loadVLock  = Input(Bool())
     val loadVIn  = Input(Bool())
-    val loadVOut = Output(Bool())
 
     // 控制（水平传播：RegNext → 右侧 HiveWorker）
     val validIn  = Input(Bool())
@@ -138,8 +136,7 @@ class HiveWorker(
     psumReg := 0.U
   }.elsewhen(io.loadVIn){
     psumReg := io.psumIn
-  }
-  elsewhen(io.validIn && fmtOk) {
+  }.elsewhen(io.validIn && fmtOk) {
     // 正常计算（使用 fmtReg 和 rndReg）
     psumReg := WorkUnit.accumulate(io.psumIn, product, fmtReg, cEffW, supportedFmts, rndReg)
   }

@@ -1,9 +1,9 @@
 /** HiveCore 脉动阵列控制器的队列型缓冲系统。
   *
-  * 包含两个独立的 FIFO 缓冲：
+  * 包含三个独立的 FIFO 缓冲：
   *   - A buffer：激活数据（DMA0 写入，Executor 读出）
-  *   - C buffer：统一缓冲（DMA1/Executor 写入，DMA1/Executor 读出）
-  *     用于权重暂存、计算结果存储、Partial sum 读取
+  *   - B buffer：权重数据（RdOnly DMA 自主扫描写入，Executor 读出，宽 totalN*bW）
+  *   - C buffer：结果缓冲（Executor 写入，DMA1 写回/Executor partial sum 读出）
   */
 
 import chisel3._
@@ -17,7 +17,13 @@ class HiveCoreScratchpad(cfg: HiveCoreConfig) extends Module {
     val aOccupancy    = Output(UInt(log2Up(cfg.aBufferDepth + 1).W))
     val aAvailability = Output(UInt(log2Up(cfg.aBufferDepth + 1).W))
 
-    // C buffer: DMA1/Executor写入, DMA1/Executor读出
+    // B buffer: RdOnly DMA写入(权重), Executor读出
+    val bPush = slave(Stream(UInt((cfg.totalN * cfg.bW).W)))
+    val bPop  = master(Stream(UInt((cfg.totalN * cfg.bW).W)))
+    val bOccupancy    = Output(UInt(log2Up(cfg.bBufferDepth + 1).W))
+    val bAvailability = Output(UInt(log2Up(cfg.bBufferDepth + 1).W))
+
+    // C buffer: Executor写入(结果), DMA1/Executor读出
     val cPush = slave(Stream(UInt((cfg.totalN * cfg.cEffW).W)))
     val cPop  = master(Stream(UInt((cfg.totalN * cfg.cEffW).W)))
     val cOccupancy    = Output(UInt(log2Up(cfg.cBufferDepth + 1).W))
@@ -25,11 +31,13 @@ class HiveCoreScratchpad(cfg: HiveCoreConfig) extends Module {
 
     // flush 控制 (Cmd7 clean)
     val flushA = Input(Bool())
+    val flushB = Input(Bool())
     val flushC = Input(Bool())
   })
 
-  // ---- 实例化两个 StreamFifo ----
+  // ---- 实例化三个 StreamFifo ----
   val aFifo = Module(new StreamFifo(UInt((cfg.totalN * cfg.aEffW).W), cfg.aBufferDepth))
+  val bFifo = Module(new StreamFifo(UInt((cfg.totalN * cfg.bW).W), cfg.bBufferDepth))
   val cFifo = Module(new StreamFifo(UInt((cfg.totalN * cfg.cEffW).W), cfg.cBufferDepth))
 
   // ---- A buffer 连接 ----
@@ -42,6 +50,17 @@ class HiveCoreScratchpad(cfg: HiveCoreConfig) extends Module {
   aFifo.io.flush        := io.flushA
   io.aOccupancy         := aFifo.io.occupancy
   io.aAvailability      := aFifo.io.availability
+
+  // ---- B buffer 连接（权重专用，RdOnly 写入 / Executor 读出）----
+  bFifo.io.push.valid   := io.bPush.valid
+  bFifo.io.push.payload := io.bPush.payload
+  io.bPush.ready        := bFifo.io.push.ready
+  io.bPop.valid         := bFifo.io.pop.valid
+  io.bPop.payload       := bFifo.io.pop.payload
+  bFifo.io.pop.ready    := io.bPop.ready
+  bFifo.io.flush        := io.flushB
+  io.bOccupancy         := bFifo.io.occupancy
+  io.bAvailability      := bFifo.io.availability
 
   // ---- C buffer 连接 ----
   cFifo.io.push.valid   := io.cPush.valid

@@ -73,8 +73,6 @@ class HiveCell(
     val validOut = Output(Vec(n, Bool()))  // per-row（计算阶段结果有效）
     val fmtOut   = Output(DataFormat())    // 标量
     val rndOut   = Output(RoundingMode())  // 标量
-    val loadHOut = Output(Bool())          // 水平传播到右侧 Cell
-    val loadVOut = Output(Bool())          // 垂直传播到下方 Cell
   })
 
   // --- HiveWorker 网格 ---
@@ -89,13 +87,15 @@ class HiveCell(
 
       if (y == 0) {
         // valid 沿 x+y 二维传播：x==0 行首接 io.validIn，x>0 行首从上一 x 行
-        // 的 y 链末端级联，使 PE(x,y) 的 valid 相对 io.validIn 延迟 (x+y) 拍，
-        // 与数据波前的行内偏移 x 严格对齐（若只在 y 方向传播并广播所有 x 行，
-        // cj>0 簇的 valid 会滞后数据 x 拍，前几个深度累加被错误门控）
+        // 行首 PE 的 validOut 级联（仅 +1 拍），使 PE(x,y) 的 valid 相对
+        // io.validIn 延迟 (x+y) 拍，与数据波前的行内偏移 x+y 严格对齐。
+        // （若取上一行 y 链末端 pes(x-1)(n-1)，延迟变为 x*n+y，valid 严重滞后
+        // 数据，深层 PE 在 valid 到达时 a 数据早已排空，累加被清零 → 结果全 0；
+        // 若只在 y 方向传播并广播所有 x 行，cj>0 簇的 valid 会滞后数据 x 拍）
         if (x == 0) {
           pes(x)(y).io.validIn := io.validIn
         } else {
-          pes(x)(y).io.validIn := pes(x - 1)(n - 1).io.validOut
+          pes(x)(y).io.validIn := pes(x - 1)(0).io.validOut
         }
         pes(x)(y).io.fmtIn   := io.fmtIn
         pes(x)(y).io.rndIn   := io.rndIn
@@ -119,17 +119,15 @@ class HiveCell(
   // 标量输出：取最后一行最后一列（所有行同值，任取一行即可）
   io.fmtOut   := pes(n-1)(n-1).io.fmtOut
   io.rndOut   := pes(n-1)(n-1).io.rndOut
-  io.loadHOut := pes(n-1)(n-1).io.loadHOut
-  io.loadVOut := pes(n-1)(n-1).io.loadVOut
 
-  // --- 行连接块（垂直传播）：仅 psumIn/psumOut 沿 x 方向传播 ---
+  // --- 行连接块（垂直传播）：psumIn/psumOut 沿 x 方向传播；
+  //     loadV 广播到所有 PE（loadH/loadVLock 同已在列连接块广播） ---
   for (y <- 0 until n) {
     for (x <- 0 until n) {
+      pes(x)(y).io.loadVIn := io.loadVIn
       if (x == 0) {
-        pes(x)(y).io.loadVIn := io.loadVIn
         pes(x)(y).io.psumIn := io.psumIn(y)
       } else {
-        pes(x)(y).io.loadVIn := pes(x-1)(y).io.loadVOut
         pes(x)(y).io.psumIn := pes(x-1)(y).io.psumOut
       }
       if (x == n-1) {

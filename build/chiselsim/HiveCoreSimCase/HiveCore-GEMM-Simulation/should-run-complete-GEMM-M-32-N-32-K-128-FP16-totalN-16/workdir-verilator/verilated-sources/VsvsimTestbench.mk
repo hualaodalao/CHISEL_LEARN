@@ -37,7 +37,7 @@ VM_PREFIX = VsvsimTestbench
 VM_MODPREFIX = VsvsimTestbench
 # User CFLAGS (from -CFLAGS on Verilator command line)
 VM_USER_CFLAGS = \
-  -std=c++17 -I/Users/wangliutailong/Qoder_Proj/Chisel_Learn/build/chiselsim/HiveCoreSimCase/HiveCore-GEMM-Simulation/should-run-complete-GEMM-M-32-N-32-K-128-FP16-totalN-16/workdir-verilator -DSVSIM_ENABLE_VERILATOR_SUPPORT -DSVSIM_VERILATOR_TRACE_ENABLED \
+  -std=c++17 -I/Users/wangliutailong/Qoder_Proj/Chisel_Learn/build/chiselsim/HiveCoreSimCase/HiveCore-GEMM-Simulation/should-run-complete-GEMM-M-32-N-32-K-128-FP16-totalN-16/workdir-verilator -DSVSIM_ENABLE_VERILATOR_SUPPORT \
 
 # User LDLIBS (from -LDFLAGS on Verilator command line)
 VM_USER_LDLIBS = \

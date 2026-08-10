@@ -30,10 +30,8 @@ simulation: clean
 		'+incdir+/Users/wangliutailong/Qoder_Proj/Chisel_Learn/build/chiselsim/HiveCoreSimCase/HiveCore-GEMM-Simulation/should-run-complete-GEMM-M-32-N-32-K-128-FP16-totalN-16/primary-sources' \
 		'--timescale' \
 		'1ns/100ps' \
-		'--trace' \
-		'--trace-structs' \
 		'-CFLAGS' \
-		'-std=c++17 -I$(shell pwd) -DSVSIM_ENABLE_VERILATOR_SUPPORT -DSVSIM_VERILATOR_TRACE_ENABLED' \
+		'-std=c++17 -I$(shell pwd) -DSVSIM_ENABLE_VERILATOR_SUPPORT' \
 		'+define+ASSERT_VERBOSE_COND=!svsimTestbench.reset' \
 		'+define+PRINTF_COND=!svsimTestbench.reset' \
 		'+define+STOP_COND=!svsimTestbench.reset' \
@@ -44,8 +42,6 @@ simulation: clean
 		'+define+RANDOMIZE_MEM_INIT' \
 		'+define+RANDOMIZE_DELAY=1' \
 		'+define+RANDOM=$$urandom' \
-		'+define+SVSIM_ENABLE_VCD_TRACING_SUPPORT' \
-		'+define+SVSIM_ENABLE_VCD_TRACING_SUPPORT' \
 '-F' \
 		'/Users/wangliutailong/Qoder_Proj/Chisel_Learn/build/chiselsim/HiveCoreSimCase/HiveCore-GEMM-Simulation/should-run-complete-GEMM-M-32-N-32-K-128-FP16-totalN-16/workdir-verilator/sourceFiles.F'
 

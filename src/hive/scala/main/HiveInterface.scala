@@ -68,19 +68,6 @@ class HiveCoreDMAExtWriteOnlyIF(cfg: HiveCoreConfig) extends Bundle {
   })
 }
 
-object HiveCoreDMAIntIF {
-  def apply(cfg: HiveCoreConfig) = new HiveCoreDMAIntIF(cfg)
-}
-
-//内部DMA本质每次读取可写出都是一个Tile块
-class HiveCoreDMAIntIF(cfg: HiveCoreConfig) extends Bundle {
-  val peek = Decoupled(Bool()) //每次peek即读取或者写出一个Tile
-  val start = Input(Bool())
-  val done = Output(Bool())
-  val err = Output(Bool())
-  val busy  = Output(Bool())
-}
-
   
   
 class DmaExtIO(cfg: HiveCoreConfig) extends Bundle {
@@ -132,6 +119,9 @@ class HiveCoreStatus(cfg: HiveCoreConfig) extends Bundle {
   /** A 缓冲当前占用量 */
   val aOccupancy = UInt(log2Up(cfg.aBufferDepth + 1).W)
 
+  /** B（权重）缓冲当前占用量（调试用） */
+  val bOccupancy = UInt(log2Up(cfg.bBufferDepth + 1).W)
+
   /** C 缓冲当前占用量 */
   val cOccupancy = UInt(log2Up(cfg.cBufferDepth + 1).W)
 }
@@ -164,11 +154,18 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
   def aStride = regs(6)(3, 0)
   def bStride = regs(6)(7, 4)
   def cStride = regs(6)(11, 8)
-  def fmt = regs(7)(3, 0).asTypeOf(DataFormat())
-  def rnd = regs(7)(7, 4).asTypeOf(RoundingMode())
-  def loopMode = regs(7)(11, 8).asTypeOf(HiveCoreLoopMode())
+  // 注意：位域宽度必须与枚举实际宽度一致（DataFormat=2bit, RoundingMode=3bit,
+  // HiveCoreLoopMode 仅剩 MKN 单值=1bit），否则 asTypeOf 会因宽度不匹配报错
+  def fmt = regs(7)(1, 0).asTypeOf(DataFormat())
+  def rnd = regs(7)(4, 2).asTypeOf(RoundingMode())
+  def loopMode = regs(7)(5).asTypeOf(HiveCoreLoopMode())
 }
 object HiveCoreRegister {
+  def apply(cfg: HiveCoreConfig) = new HiveCoreRegister(cfg)
+}
+
+/** HiveCoreRegs：HiveCoreRegister 的别名，供 Executor/DMA 等模块引用。 */
+object HiveCoreRegs {
   def apply(cfg: HiveCoreConfig) = new HiveCoreRegister(cfg)
 }
 
@@ -186,4 +183,7 @@ class HiveCoreExePreCalcConfig(cfg: HiveCoreConfig) extends Bundle {
   val aColAddressOffset = UInt(cfg.addrWidth.W)
   val cColAddressOffset = UInt(cfg.addrWidth.W)
   val bColAddressOffset = UInt(cfg.addrWidth.W)
+}
+object HiveCoreExePreCalcConfig {
+  def apply(cfg: HiveCoreConfig) = new HiveCoreExePreCalcConfig(cfg)
 }

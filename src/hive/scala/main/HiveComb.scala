@@ -8,10 +8,9 @@
   * @param cW       累加器位宽（默认 0=自动推导，totalN = arrayN * clusterM）
   *
   * 新架构要点：
-  *   - loadHIn / fmtIn / rndIn 从首列子阵列进入，经 HiveCell 的 loadHOut/fmtOut/rndOut
-  *     逐列（cj 方向）向右传播，与水平权重波（1 PE/拍）同步推进
-  *   - loadVIn 从首行子阵列进入，经 HiveCell 的 loadVOut 逐行（ci 方向）向下传播，
-  *     与垂直权重波下沉节奏（arrayN 拍/子阵列）同步
+  *   - loadHIn / loadVIn 广播到所有子阵列（无 loadHOut/loadVOut 链式传播）
+  *   - fmtIn / rndIn 从首列子阵列进入，经 HiveCell 的 fmtOut/rndOut
+  *     逐列（cj 方向）向右传播
   *   - validIn 需要 array-row 级 skew（ci * arrayN）以对齐行级错峰数据
   *   - fmtIn / rndIn 为配置信号，仅在 loadH 窗口锁存进 PE 配置寄存器，ci 方向无 skew
   *   - aIn 不做内部 skew：HiveCell 与 HiveComb 都直连，错峰供数由外部 feeder 承担
@@ -116,24 +115,19 @@ class HiveComb(
     arr.io.loadHIn := io.loadHIn  
     arr.io.loadVIn := io.loadVIn  
 
-    // --- loadHIn/fmtIn/rndIn：首列进入，逐列向右传播 ---
+    // --- loadHIn/fmtIn/rndIn：loadH 广播（不再链式传播），fmt/rnd 仍逐列向右传播 ---
     if (cj == 0) {
       arr.io.loadHIn := io.loadHIn
       arr.io.fmtIn   := io.fmtIn
       arr.io.rndIn   := io.rndIn
     } else {
-      arr.io.loadHIn := arrays(ci)(cj - 1).io.loadHOut
+      arr.io.loadHIn := io.loadHIn
       arr.io.fmtIn   := arrays(ci)(cj - 1).io.fmtOut
       arr.io.rndIn   := arrays(ci)(cj - 1).io.rndOut
     }
 
-    if (ci == 0){
-      arr.io.loadVIn := io.loadVIn
-    }
-    else{
-      arr.io.loadVIn := arrays(ci-1)(cj).io.loadVOut
-    }
-
+    // loadV：广播到所有子阵列（不再经 loadVOut 链式传播）
+    arr.io.loadVIn := io.loadVIn
 
     // --- validIn：ci 方向行级 skew；cj 方向随数据链级联 ---
     // aIn 经左侧子阵列 aOut 链延迟 arrayN 拍，valid 必须同步级联，
@@ -172,14 +166,6 @@ class HiveComb(
         arr.io.psumIn(c) := arrays(ci-1)(cj).io.cOut(c)
       }
     }
-
-    if (ci == 0){
-      arr.io.loadVIn := io.loadVIn
-    }    
-    else{
-      arr.io.loadVIn := arrays(ci-1)(cj).io.loadVOut
-    }
-    
   }
 
   // --- 集群输出 ---
