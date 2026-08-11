@@ -18,10 +18,10 @@ import chisel3.util._
   * B 矩阵固定「N 外 K 内」遍历（与 Executor 的 N→K→M 消费顺序匹配）：
   *   内层沿 K 方向（kTile*totalN 行，每拍地址 + bRowAddressOffset），
   *   外层扫 nTile 个 N tile（块间跳 bColAddressOffset）。
-  * A 矩阵固定为：内层扫实际 M 行（regFile.m，边界感知不含 padding，
-  *              + aRowAddressOffset 行步进），外层扫 kTile 个 K tile
-  *              （块间跳 aColAddressOffset）。Executor 每 K pass 只消费
-  *              实际 M 行，FIFO 顺序保证逐 kTile 块对齐。
+  * A 矩阵固定为三级遍历「nTile 外 → kTile 中 → M 内」：共 nTiles 轮、
+  *   每轮 kTile×m 行（内层 regFile.m 行 +aRowAddressOffset，中层 kTile 块
+  *   跳 aColAddressOffset，每轮结束 curAddr 复位回 regAAddr），与 executor
+  *   N→K→M 消费序逐拍对齐；execute 单次启动自主供满 nTiles 轮后自然停止。
   *
   * 地址模型（与 HiveCoreExecutor 的 aTileAddr/bTileAddr 一致，字节地址）：
   *   A_tile_addr = regAAddr + mTileIdx*totalN*aRowOffset + kTileIdx*aColOffset
@@ -81,11 +81,19 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   val rowStep = RegInit(0.U(cfg.addrWidth.W))  // 内层每拍地址步进
   val blkJump = RegInit(0.U(cfg.addrWidth.W))  // 块间地址跳转量
   val innerRows = RegInit(0.U(cfg.mnkWidth.W)) // 内层循环总拍数（每 tile 块）
-  val blkTarget = RegInit(0.U(cfg.mnkWidth.W)) // 外层 tile 块总数
+  val blkTarget = RegInit(0.U(cfg.mnkWidth.W)) // 外层 tile 块总数（B 路径 = nTile 数；
+                                               // A 路径复用为每轮 kTile 目标）
 
   val rowCnt = RegInit(0.U(cfg.mnkWidth.W))    // 块内行计数
-  val blkCnt = RegInit(0.U(cfg.mnkWidth.W))    // 已完成 tile 块计数
+  val blkCnt = RegInit(0.U(cfg.mnkWidth.W))    // 已完成 tile 块计数（仅 B 路径使用：
+                                               // = nTile 数；A 路径终止判定用
+                                               // aKtCnt/aNTileCnt，不读 blkCnt）
   val errReg = RegInit(false.B)
+
+  // --- A 路径三级遍历专用寄存器（nTile 外 → kTile 中 → M 内，行升序） ---
+  val aKtCnt   = RegInit(0.U(cfg.mnkWidth.W))  // 当前 nTile 轮内已完成 kTile 数
+  val aNTileCnt = RegInit(0.U(cfg.mnkWidth.W)) // 已完成 nTile 轮数
+  val aNTileTarget = RegInit(0.U(cfg.mnkWidth.W)) // start 锁存 nTile 轮总数（终止目标）
 
   // --- B 路径三级遍历专用寄存器（N 外 → kTile 中 → 块内行降序） ---
   // 权重下沉协议下 PE(x,y) 锁存「最后供数行 - x」，故每个 kTile 块必须按
@@ -127,16 +135,20 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
     blkCnt := 0.U
     errReg := false.B
     when(io.isA) {
-      // A 矩阵：内层扫实际 M 行（regFile.m，边界感知不含 padding 行），
-      // 外层扫 kTile 个 K tile。Executor 每 K pass 只 push 实际 M 行，
-      // 若按 mTile*totalN 扫描会把边界 M 的 padding 行混入 FIFO
+      // A 矩阵：三级遍历「nTile 外 → kTile 中 → M 内」。内层扫实际 M 行
+      // （regFile.m，边界感知不含 padding 行），中层扫 kTile 个 K tile，
+      // 外层共 nTile 轮（每轮结束 curAddr 复位回 aAddr）。Executor 每
+      // K pass 只消费实际 M 行，若按 mTile*totalN 扫描会把 padding 行混入 FIFO
       isAReg  := true.B
       curAddr   := io.regFile.aAddr
       rowStep   := io.calcConfig.aRowAddressOffset
       blkJump   := io.calcConfig.aColAddressOffset -
                    (io.regFile.m - 1.U) * io.calcConfig.aRowAddressOffset
       innerRows := io.regFile.m
-      blkTarget := io.calcConfig.kTile
+      blkTarget := io.calcConfig.kTile    // 中层目标：每轮 kTile 个块（A 复用 blkTarget）
+      aNTileTarget := io.calcConfig.nTile // 外层目标：共 nTile 轮
+      aKtCnt    := 0.U
+      aNTileCnt := 0.U
     }.otherwise {
       // B 矩阵：三级遍历「N 外 → kTile 中 → 块内行降序」。
       // 权重下沉协议下 PE(x,y) 最终锁存「最后供数行 - x」，每个 kTile 块
@@ -185,13 +197,25 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
         }
 
         when(isAReg) {
-          // A 路径：两级遍历（行升序 + 块间跳转），保持原行为
+          // A 路径：三级遍历（M 内行升序 → kTile 中块间跳转 → nTile 外轮间复位）；
+          // 终止比较均用 start 锁存值（blkTarget/aNTileTarget），不直采 io.calcConfig
           when(rowCnt === innerRows - 1.U) {
+            // 本 kTile 块最后一行
             rowCnt := 0.U
-            blkCnt := blkCnt + 1.U
-            when(blkCnt === blkTarget - 1.U) {
-              state := sDONE
+            when(aKtCnt === blkTarget - 1.U) {
+              // 本轮最后一个 kTile 块：推进到下一个 nTile 轮，
+              // 地址复位回 aAddr（每轮供数内容相同，与 executor 重扫语义等价）
+              aKtCnt := 0.U
+              aNTileCnt := aNTileCnt + 1.U
+              when(aNTileCnt === aNTileTarget - 1.U) {
+                state := sDONE
+              }.otherwise {
+                curAddr := io.regFile.aAddr
+                state   := sREQ_EXT
+              }
             }.otherwise {
+              // 跳到下一个 kTile 块起点（块间增量跳转）
+              aKtCnt  := aKtCnt + 1.U
               curAddr := curAddr + blkJump
               state   := sREQ_EXT
             }

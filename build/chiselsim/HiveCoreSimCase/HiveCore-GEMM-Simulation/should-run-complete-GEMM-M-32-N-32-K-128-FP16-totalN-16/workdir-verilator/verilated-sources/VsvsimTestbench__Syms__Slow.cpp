@@ -128,7 +128,7 @@ VsvsimTestbench__Syms::VsvsimTestbench__Syms(VerilatedContext* contextp, const c
     , TOP{this, namep}
 {
     // Check resources
-    Verilated::stackCheck(9616);
+    Verilated::stackCheck(9642);
     // Setup sub module instances
     TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_0_0.ctor(this, "svsimTestbench.dut.hiveComb.arrays_0_0");
     TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_0_0__pes_0_0.ctor(this, "svsimTestbench.dut.hiveComb.arrays_0_0.pes_0_0");

@@ -17,7 +17,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 /** executor 硬件直驱 HiveComb 的最小测试顶层（testbench 内部用）：
-  * 自主 DMA 接口 tie-off（aDmaRescan/cStoreGate 丢弃，occupancy 由测试侧
+  * 自主 DMA 接口 tie-off（cStoreGate 丢弃，occupancy 由测试侧
   * 按软件 FIFO 驱动），A/B/C 用测试侧软件 FIFO */
 class DiagExeTop(cfg: HiveCoreConfig) extends Module {
   val io = IO(new Bundle {
@@ -37,7 +37,7 @@ class DiagExeTop(cfg: HiveCoreConfig) extends Module {
   exe.io.execute := io.execute
   exe.io.regFile := io.regFile
 
-  // 自主 DMA tie-off：aDmaRescan/cStoreGate 无消费者（留空），
+  // 自主 DMA tie-off：cStoreGate 无消费者（留空），
   // occupancy 由测试侧按软件 FIFO 模型驱动
   exe.io.aOccupancy := io.aOccupancy
   exe.io.cOccupancy := io.cOccupancy

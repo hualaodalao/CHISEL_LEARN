@@ -40,8 +40,6 @@ class alignas(VL_CACHE_LINE_BYTES) VsvsimTestbench___024root final {
         CData/*0:0*/ svsimTestbench__DOT__io_cmd_valid;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__respValid;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT___executor_io_done;
-        CData/*0:0*/ svsimTestbench__DOT__dut__DOT___executor_io_flushA;
-        CData/*0:0*/ svsimTestbench__DOT__dut__DOT___executor_io_flushB;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT___executor_io_flushC;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT___cDma_io_bufPop_ready;
         CData/*6:0*/ svsimTestbench__DOT__dut__DOT___scratchpad_io_bOccupancy;
@@ -51,7 +49,6 @@ class alignas(VL_CACHE_LINE_BYTES) VsvsimTestbench___024root final {
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executePulse;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__respDone;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__respErr;
-        CData/*0:0*/ svsimTestbench__DOT__dut__DOT____Vcellinp__aDma__io_start;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT____Vcellinp__cDma__io_bufPop_valid;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__unnamedblk1__DOT___GEN;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__unnamedblk1__DOT___GEN_0;
@@ -86,11 +83,11 @@ class alignas(VL_CACHE_LINE_BYTES) VsvsimTestbench___024root final {
         CData/*3:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__state;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__errState;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__alignedValid_r;
-    };
-    struct {
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__alignedValid_r_1;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__alignedValid_r_2;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__alignedValid_r_3;
+    };
+    struct {
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__alignedValid_r_4;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__alignedValid_r_5;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__alignedValid_r_6;
@@ -103,10 +100,11 @@ class alignas(VL_CACHE_LINE_BYTES) VsvsimTestbench___024root final {
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__alignedValid_r_13;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__alignedValid_r_14;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__alignedValid;
-        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__dmaStarted;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT___layerCapture;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT___layerCapture_0;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__io_cPush_valid_0;
+        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__io_flushB_0;
+        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_3;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_4;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT___io_bPop_ready_T;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__io_bPop_ready_0;
@@ -119,19 +117,16 @@ class alignas(VL_CACHE_LINE_BYTES) VsvsimTestbench___024root final {
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_12;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__io_cPop_ready_0;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_17;
-        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_20;
-        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_21;
-        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_22;
-        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_23;
-        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk2__DOT___GEN_34;
-        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk2__DOT___GEN_35;
-        CData/*3:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk2__DOT___GEN_36;
-        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk2__DOT___GEN_37;
-        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk2__DOT___GEN_38;
-        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk2__DOT___GEN_39;
-        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk2__DOT___GEN_40;
-        QData/*63:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk2__DOT___GEN_41;
-        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk5__DOT___GEN_42;
+        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk2__DOT___GEN_28;
+        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk2__DOT___GEN_29;
+        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk2__DOT___GEN_30;
+        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk2__DOT___GEN_31;
+        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk2__DOT___GEN_32;
+        CData/*3:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk2__DOT__unnamedblk3__DOT___GEN_33;
+        QData/*63:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk2__DOT__unnamedblk3__DOT___GEN_34;
+        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk5__DOT___GEN_35;
+        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk5__DOT___GEN_36;
+        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk7__DOT___GEN_37;
         CData/*1:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__state;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__errReg;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__isAReg;
@@ -139,24 +134,26 @@ class alignas(VL_CACHE_LINE_BYTES) VsvsimTestbench___024root final {
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT___GEN_2;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__io_dmaExtRdIF_rsp_ready_0;
         CData/*1:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__unnamedblk1__DOT___GEN_4;
-        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__unnamedblk1__DOT___GEN_6;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__unnamedblk1__DOT___GEN_7;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__unnamedblk1__DOT___GEN_8;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__unnamedblk1__DOT___GEN_9;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__unnamedblk1__DOT___GEN_10;
+        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__unnamedblk1__DOT___GEN_11;
+        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__unnamedblk1__DOT___GEN_12;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__unnamedblk1__DOT__nextIsLast;
-        CData/*7:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__unnamedblk1__DOT___GEN_11;
+        CData/*0:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__unnamedblk1__DOT___GEN_13;
+        CData/*7:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__unnamedblk1__DOT___GEN_14;
         CData/*1:0*/ svsimTestbench__DOT__dut__DOT__cDma__DOT__state;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__cDma__DOT___GEN_1;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__cDma__DOT___GEN_3;
         CData/*1:0*/ svsimTestbench__DOT__dut__DOT__cDma__DOT__unnamedblk1__DOT___GEN_4;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__cDma__DOT__unnamedblk1__DOT___GEN_5;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__cDma__DOT__unnamedblk1__DOT___GEN_6;
-    };
-    struct {
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__cDma__DOT__unnamedblk1__DOT___GEN_7;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__cDma__DOT__unnamedblk1__DOT___GEN_8;
         CData/*7:0*/ svsimTestbench__DOT__dut__DOT__cDma__DOT__unnamedblk1__DOT___GEN_9;
+    };
+    struct {
         CData/*1:0*/ svsimTestbench__DOT__dut__DOT__aDma__DOT__state;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__aDma__DOT__errReg;
         CData/*0:0*/ svsimTestbench__DOT__dut__DOT__aDma__DOT__io_dmaExtRdIF_cmd_valid_0;
@@ -172,7 +169,6 @@ class alignas(VL_CACHE_LINE_BYTES) VsvsimTestbench___024root final {
         CData/*0:0*/ __Vdpi_export_trigger;
         CData/*0:0*/ __VdfgRegularize_hebeb780c_0_8;
         CData/*0:0*/ __VdfgRegularize_hebeb780c_0_9;
-        CData/*0:0*/ __VdfgRegularize_hebeb780c_0_10;
         CData/*0:0*/ __VstlFirstIteration;
         CData/*0:0*/ __VstlPhaseResult;
         CData/*0:0*/ __VicoPhaseResult;
@@ -201,16 +197,18 @@ class alignas(VL_CACHE_LINE_BYTES) VsvsimTestbench___024root final {
         SData/*15:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__loadedRows;
         SData/*15:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__alignCnt;
         SData/*15:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__drainCounter;
-        SData/*15:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT___nextNTile_T;
-        SData/*15:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk3__DOT___newMTiles_T_3;
-        SData/*15:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk3__DOT___newNTiles_T_3;
-        SData/*15:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk3__DOT___newKTiles_T_3;
+        SData/*15:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk4__DOT___newMTiles_T_3;
+        SData/*15:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk4__DOT___newNTiles_T_3;
+        SData/*15:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk4__DOT___newKTiles_T_3;
         SData/*15:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__blkTarget;
         SData/*15:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__rowCnt;
         SData/*15:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__blkCnt;
+        SData/*15:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__aKtCnt;
+        SData/*15:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__aNTileCnt;
         SData/*15:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__ktCnt;
         SData/*15:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__ktRows;
         SData/*15:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__rowsLastReg;
+        SData/*15:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__unnamedblk1__DOT___GEN_6;
         SData/*15:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__unnamedblk1__DOT___nextIsLast_T_2;
         SData/*15:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__unnamedblk1__DOT___ktCnt_T;
         SData/*15:0*/ svsimTestbench__DOT__dut__DOT__cDma__DOT__innerRows;
@@ -218,11 +216,13 @@ class alignas(VL_CACHE_LINE_BYTES) VsvsimTestbench___024root final {
         SData/*15:0*/ svsimTestbench__DOT__dut__DOT__cDma__DOT__rowCnt;
         SData/*15:0*/ svsimTestbench__DOT__dut__DOT__cDma__DOT__blkCnt;
         SData/*15:0*/ svsimTestbench__DOT__dut__DOT__aDma__DOT__innerRows;
-    };
-    struct {
         SData/*15:0*/ svsimTestbench__DOT__dut__DOT__aDma__DOT__blkTarget;
         SData/*15:0*/ svsimTestbench__DOT__dut__DOT__aDma__DOT__rowCnt;
-        SData/*15:0*/ svsimTestbench__DOT__dut__DOT__aDma__DOT__blkCnt;
+    };
+    struct {
+        SData/*15:0*/ svsimTestbench__DOT__dut__DOT__aDma__DOT__aKtCnt;
+        SData/*15:0*/ svsimTestbench__DOT__dut__DOT__aDma__DOT__aNTileCnt;
+        SData/*15:0*/ svsimTestbench__DOT__dut__DOT__aDma__DOT__aNTileTarget;
         SData/*15:0*/ __VdfgRegularize_hebeb780c_0_3;
         VlWide<18>/*575:0*/ svsimTestbench__DOT__io_dma2Ext_rsp_payload_data;
         VlWide<18>/*575:0*/ svsimTestbench__DOT__io_dma1Ext_readData_payload;
@@ -399,7 +399,7 @@ class alignas(VL_CACHE_LINE_BYTES) VsvsimTestbench___024root final {
         IData/*31:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__cDeSkewed_r_104;
         IData/*31:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__cDeSkewed_13;
         IData/*31:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__cDeSkewed_14;
-        IData/*20:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk4__DOT___remainK_T_2;
+        IData/*20:0*/ svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk1__DOT__unnamedblk6__DOT___remainK_T_2;
         IData/*31:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__curAddr;
         IData/*31:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__bRowStep;
         IData/*31:0*/ svsimTestbench__DOT__dut__DOT__bDma__DOT__bKtJump;
@@ -423,7 +423,7 @@ class alignas(VL_CACHE_LINE_BYTES) VsvsimTestbench___024root final {
         VlUnpacked<VlWide<16>/*511:0*/, 2048> svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__ram_ext__DOT__Memory;
         VlUnpacked<VlWide<8>/*255:0*/, 64> svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ram_ext__DOT__Memory;
         VlUnpacked<VlWide<8>/*255:0*/, 2048> svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__ram_ext__DOT__Memory;
-        VlUnpacked<IData/*31:0*/, 514> svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk6__DOT___RANDOM;
+        VlUnpacked<IData/*31:0*/, 514> svsimTestbench__DOT__dut__DOT__executor__DOT__unnamedblk8__DOT___RANDOM;
         VlUnpacked<QData/*63:0*/, 1> __VstlTriggered;
         VlUnpacked<QData/*63:0*/, 1> __VicoTriggered;
         VlUnpacked<QData/*63:0*/, 2> __VactTriggered;

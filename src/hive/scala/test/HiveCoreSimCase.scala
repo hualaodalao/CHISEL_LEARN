@@ -1,4 +1,4 @@
-/** HiveCore 完整仿真用例：M=32, N=32, K=128, FP16, totalN=16
+/** HiveCore 完整仿真用例：M=32, N=16, K=16, FP16, totalN=16
   *
   * 验证 FSM 完整流程：寄存器配置 → EXECUTE → DMA 加载/存储 → 完成
   * 外部存储器由测试 Memory Model 模拟（地址寻址）：
@@ -20,7 +20,7 @@ import java.nio.file._
 class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
 
   // ========== 测试参数 ==========
-  val M = 16
+  val M = 32
   val N = 16
   val K = 16
 
@@ -132,7 +132,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
 
   behavior of "HiveCore GEMM Simulation"
 
-  it should "run complete GEMM M=32 N=32 K=128 FP16 totalN=16" in {
+  it should "run complete GEMM M=32 N=16 K=16 FP16 totalN=16" in {
 
     // --- 配置 ---
     // 注意: DMA 的 bufAvailability 端口宽度由 aBufferDepth 决定（设计缺陷），
@@ -175,8 +175,8 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
     val bStride = N * (aEffW / 8)       // 16*2 = 32 bytes
     val cStride = N * (cEffW / 8)       // 16*4 = 64 bytes
     // 注意：寄存器映射中每个 stride 仅 4 bit（regs(6) 的 [3:0]/[7:4]/[11:8]），
-    // 只能表达 0~15 字节。本用例 stride(32/64) 无法完整写入，仅低 4 位有效
-    // （M=N=K=totalN 时 tile 索引恒为 0，行步长不参与地址计算，不影响本用例）
+    // 只能表达 0~15 字节。本用例 stride(32/64) 无法完整写入，截断后
+    // 三个 stride 低 4 位均为 0，行步长项为 0，故行步进不参与地址计算
     println(s"[HiveCoreSimCase] WARNING: stride 字段仅 4bit，实际 stride 超出表达范围（既有寄存器映射限制）")
 
     // --- Memory Model: 地址寻址（软件侧按硬件同公式推导期望地址） ---
@@ -549,7 +549,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
     mismatchCnt should be(0)
 
     // --- 复制 VCD 文件到 sim/ 目录 ---
-    val vcdSource = Paths.get("build/chiselsim/HiveCoreSimCase/HiveCore-GEMM-Simulation/should-run-complete-GEMM-M-32-N-32-K-128-FP16-totalN-16/workdir-verilator/trace.vcd")
+    val vcdSource = Paths.get("build/chiselsim/HiveCoreSimCase/HiveCore-GEMM-Simulation/should-run-complete-GEMM-M-32-N-16-K-16-FP16-totalN-16/workdir-verilator/trace.vcd")
     val vcdTarget = Paths.get(s"$simDir/hivecore_sim.vcd")
     if (Files.exists(vcdSource)) {
       Files.copy(vcdSource, vcdTarget, java.nio.file.StandardCopyOption.REPLACE_EXISTING)

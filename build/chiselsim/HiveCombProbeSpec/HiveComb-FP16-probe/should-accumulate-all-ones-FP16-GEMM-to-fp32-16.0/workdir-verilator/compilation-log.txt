@@ -67,4 +67,4 @@ c++  -Wl,-U,__Z15vl_time_stamp64v,-U,__Z13sc_time_stampv,-U,_vlog_startup_routin
 rm VsvsimTestbench__ALL.verilator_deplist.tmp
 - V e r i l a t i o n   R e p o r t: Verilator 5.050 2026-07-01 rev vUNKNOWN-built20260701
 - Verilator: Built from 0.796 MB sources in 5 modules, into 9.767 MB in 22 C++ files needing 0.005 MB
-- Verilator: Walltime 4.998 s (elab=0.027, cvt=1.208, bld=3.668); cpu 0.933 s on 14 threads; allocated 116.594 MB
+- Verilator: Walltime 4.029 s (elab=0.024, cvt=0.660, bld=3.249); cpu 0.809 s on 14 threads; allocated 109.766 MB

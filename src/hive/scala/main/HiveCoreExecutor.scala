@@ -7,9 +7,9 @@
   *   - 内层 M 循环: 权重驻留，连续处理所有 M tiles
   *
   * A/C 数据搬运由自主 DMA 完成（与 bDma 同一范式）：
-  *   - A: RdOnly DMA 在 execute/重扫脉冲启动后自主扫完全部 kTile 块，
-  *     本模块在 sLOAD_A_DMA 仅等待 aOccupancy 积累到位后顺序 pop；
-  *     多 N tile 时经 aDmaRescan 单拍脉冲请求重扫（同拍 flushA）
+  *   - A: RdOnly DMA 在 execute 拍单次启动，内建 nTile 轮次（nTile 外 →
+  *     kTile 中 → M 内），自主供满 nTiles 轮 A 后自然停止；本模块 A 侧
+  *     为纯 pop 消费者，在 sLOAD_A_DMA 仅等待 aOccupancy 积累到位后顺序 pop
   *   - C: WrOnly DMA 在 execute 启动后自主待命，本模块在 sSTORE_C_DMA
   *     拉高 cStoreGate 开门，等 cOccupancy 排空即视为写回完成
   *
@@ -42,8 +42,8 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
     // 截位/补零/类型视图），已全部移除
     val regFile = Input(HiveCoreRegs(cfg))
 
-    // A buffer 自主 DMA（RdOnly）控制：重扫请求（单拍脉冲）+ 占用量感知
-    val aDmaRescan = Output(Bool())                    // 多 N tile 时请求重扫 A（单拍）
+    // A buffer 自主 DMA（RdOnly）：execute 单次启动全自主供数，
+    // 本模块 A 侧无控制输出，仅占用量感知
     val aOccupancy = Input(UInt(log2Up(cfg.aBufferDepth + 1).W))
 
     // C buffer 自主 DMA（WrOnly）控制：store 门控（电平）+ 占用量感知
@@ -148,9 +148,6 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
   val alignCnt     = RegInit(0.U(16.W))
   val drainCounter = RegInit(0.U(16.W))
 
-  // 单拍脉冲保障标志（store 完成检测/aDmaRescan 仅发一拍）
-  val dmaStarted = RegInit(false.B)
-
   // ==========================================================================
   // 默认输出驱动
   // ==========================================================================
@@ -158,7 +155,6 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
   io.done := false.B
   io.err  := errState
 
-  io.aDmaRescan := false.B
   io.cStoreGate := false.B
 
   io.aPop.ready  := false.B
@@ -239,8 +235,12 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
         doneTiles := 0.U
         errState := false.B
         // execute 起始拍清空 A/B buffer（RdOnly DMA 首个 push 至少晚一拍，安全）；
-        // flushA 仅允许在此拍与 N tile 跳转拍拉高：自主预取下 per-tile flush
-        // 会丢弃已预取数据且 RdOnly 不重发 → 死锁
+        // flushA 仅允许在此拍拉高：aDma 内建 nTile 轮次连续供数，任何
+        // per-tile flush 都会丢弃已预取数据且 RdOnly 不重发 → 死锁。
+        // A 侧全局排空不变量仿真检查（仅仿真可见）：上次 execute 中 aDma
+        // push 总行数 = nTiles×kTiles×m = executor 消费总行数，新 execute
+        // 拍 FIFO 必已排空；非 0 说明供/消行数失配（padding 混入/丢数）
+        assert(io.aOccupancy === 0.U, "HiveCoreExecutor: A buffer not drained at execute pulse (previous run aDma push rows != executor consume rows)")
         io.flushA := true.B
         io.flushB := true.B
         state    := sCONFIG_TILE
@@ -262,8 +262,6 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
       // flushC：第一个 K pass 清空 C buffer；后续保留 partial sums
       io.flushC := curKTile === 0.U
 
-      dmaStarted := false.B
-
       // 容量错误也经 sDONE 退出，保证顶层 resp 带 err 标记产生（而非永久等待）
       when(depthOfCBufferUsed > cfg.cBufferDepth.U){
         state := sDONE
@@ -280,7 +278,6 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
     is(sLOAD_WEIGHT_DMA) {
       when(io.bOccupancy >= curTileK) {
         counter    := 0.U
-        dmaStarted := false.B
         state      := sLOAD_WEIGHT_PE
       }
     }
@@ -328,16 +325,15 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
         io.hiveClear := true.B
         counter    := 0.U
         loadedRows := 0.U
-        dmaStarted := false.B
         curMTile   := 0.U  // 重置 M tile 计数，开始 M 循环
         state      := sLOAD_A_DMA
       }
     }
 
-    // --- sLOAD_A_DMA: 等待 A buffer 就绪（不再驱动 DMA 加载 A） ---
-    // A 矩阵由 RdOnly DMA（aDma）在 execute/重扫起始时自主扫描写入 A buffer
-    // （逐 kTile 块各实际 M 行，FIFO 顺序 = Executor 消费顺序），此处仅等待
-    // A buffer 积累 >= 当前 M tile 行数后进入计算逐行 pop。
+    // --- sLOAD_A_DMA: 等待 A buffer 就绪（不驱动 DMA 加载 A） ---
+    // A 矩阵由 RdOnly DMA（aDma）在 execute 拍单次启动后自主连续供数
+    // （nTile 外 → kTile 中 → M 内，每轮 kTile×m 行，FIFO 顺序 = Executor
+    // 消费顺序），此处仅等待 A buffer 积累 >= 当前 M tile 行数后进入计算逐行 pop。
     is(sLOAD_A_DMA) {
       // 动态计算当前 M tile 的参数
       val remainM = io.regFile.m(15, 0) - curMTile * totalN.U
@@ -461,13 +457,11 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
       when(nextMTile < mTiles) {
         // 还有更多 M tiles，复用当前权重
         curMTile   := nextMTile
-        dmaStarted := false.B
         state      := sLOAD_A_DMA
       }.otherwise {
         // 所有 M tiles 完成
         when(curKTile === (kTiles - 1.U)) {
           // 最后一个 K pass，结果写回外部
-          dmaStarted := false.B
           state      := sSTORE_C_DMA
         }.otherwise {
           // 还有更多 K passes，partial sums 留在 C buffer
@@ -484,7 +478,6 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
 
       when(io.cOccupancy === 0.U) {
         doneTiles  := doneTiles + 1.U
-        dmaStarted := false.B
 
         // 推进 N tile
         val nextNTile = curNTile + 1.U
@@ -492,15 +485,11 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
           // 所有 N tiles 完成
           state := sDONE
         }.otherwise {
-          // 下一个 N tile：重置 K 和 M，请求 aDma 重扫（单拍）。
-          // dmaStarted 保证本分支只触发一拍；flushA 与 aDmaRescan 同拍发出；
-          // 安全因 aDma 从 IDLE 重启后首个 push ≥2 拍（start 拍采样 →
-          // sREQ_EXT → sTRANSFER rsp），晚于本拍 flush，不会丢弃重扫数据
-          when(!dmaStarted) {
-            dmaStarted     := true.B
-            io.aDmaRescan := true.B
-            io.flushA     := true.B
-          }
+          // 下一个 N tile：重置 K 和 M。无需重扫/flushA：aDma 内建 nTile
+          // 轮次连续供数，每轮 push 行数（kTiles×m）= executor 每 N tile
+          // 消费行数。注意：本拍 A FIFO 未必排空——aDma 可能已预取下一轮
+          // 部分行（占位 < m 不会被 sLOAD_A_DMA 提前消费，无残留风险）；
+          // 供/消总量平衡由 sIDLE execute 拍的全局排空断言兼底检查
           curNTile := nextNTile
           curKTile := 0.U
           curMTile := 0.U

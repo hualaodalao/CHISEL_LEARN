@@ -102,15 +102,11 @@ VL_ATTR_COLD void VsvsimTestbench___024root___stl_sequent__TOP__0(VsvsimTestbenc
     svsimTestbench__DOT__dut__DOT__executor__DOT___io_cPop_ready_T = 0;
     SData/*10:0*/ __VdfgRegularize_hebeb780c_0_5;
     __VdfgRegularize_hebeb780c_0_5 = 0;
+    CData/*0:0*/ __VdfgRegularize_hebeb780c_0_10;
+    __VdfgRegularize_hebeb780c_0_10 = 0;
     CData/*0:0*/ __VdfgRegularize_hebeb780c_0_11;
     __VdfgRegularize_hebeb780c_0_11 = 0;
-    CData/*0:0*/ __VdfgRegularize_hebeb780c_0_12;
-    __VdfgRegularize_hebeb780c_0_12 = 0;
-    CData/*0:0*/ __VdfgRegularize_hebeb780c_0_13;
-    __VdfgRegularize_hebeb780c_0_13 = 0;
     // Body
-    vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___nextNTile_T 
-        = (0x0000ffffU & ((IData)(1U) + (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__curNTile)));
     vlSelfRef.svsimTestbench__DOT__dut__DOT___executor_io_flushC 
         = ((1U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
            & ((0U != (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
@@ -118,6 +114,9 @@ VL_ATTR_COLD void VsvsimTestbench___024root___stl_sequent__TOP__0(VsvsimTestbenc
     vlSelfRef.svsimTestbench__DOT__dut__DOT__cDma__DOT___GEN_3 
         = ((0U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__cDma__DOT__state)) 
            | (1U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__cDma__DOT__state)));
+    vlSelfRef.svsimTestbench__DOT__dut__DOT___executePulse_T 
+        = ((~ (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__respValid)) 
+           & (IData)(vlSelfRef.svsimTestbench__DOT__io_cmd_valid));
     vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___layerCapture 
         = ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__alignedValid) 
            & (5U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)));
@@ -133,31 +132,25 @@ VL_ATTR_COLD void VsvsimTestbench___024root___stl_sequent__TOP__0(VsvsimTestbenc
     vlSelfRef.svsimTestbench__DOT__dut__DOT__aDma__DOT___GEN_2 
         = ((0U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__aDma__DOT__state)) 
            | (1U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__aDma__DOT__state)));
+    __VdfgRegularize_hebeb780c_0_5 = (0x000007ffU & 
+                                      ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__enq_ptr_value) 
+                                       - (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__deq_ptr_value)));
     vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_9 
         = ((5U != (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
            | (4U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)));
     svsimTestbench__DOT__dut__DOT__executor__DOT___io_cPop_ready_T 
         = ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__counter) 
            < (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__curTileM));
-    vlSelfRef.svsimTestbench__DOT__dut__DOT___executePulse_T 
-        = ((~ (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__respValid)) 
-           & (IData)(vlSelfRef.svsimTestbench__DOT__io_cmd_valid));
-    vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_21 
-        = ((0x0000ffffU & ((IData)(1U) + (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__curNTile))) 
-           >= (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__nTiles));
-    svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__ptr_match 
-        = ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__deq_ptr_value) 
-           == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__enq_ptr_value));
-    __VdfgRegularize_hebeb780c_0_5 = (0x000007ffU & 
-                                      ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__enq_ptr_value) 
-                                       - (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__deq_ptr_value)));
-    __VdfgRegularize_hebeb780c_0_11 = ((5U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
+    __VdfgRegularize_hebeb780c_0_10 = ((5U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
                                        | ((6U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
                                           | (7U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state))));
     svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__ptr_match 
         = ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__deq_ptr_value) 
            == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__enq_ptr_value));
-    __VdfgRegularize_hebeb780c_0_12 = ((3U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
+    svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__ptr_match 
+        = ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__deq_ptr_value) 
+           == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__enq_ptr_value));
+    __VdfgRegularize_hebeb780c_0_11 = ((3U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
                                        | (4U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)));
     vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___io_bPop_ready_T 
         = ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__loadedRows) 
@@ -168,11 +161,15 @@ VL_ATTR_COLD void VsvsimTestbench___024root___stl_sequent__TOP__0(VsvsimTestbenc
     svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ptr_match 
         = ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__deq_ptr_value) 
            == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__enq_ptr_value));
-    __VdfgRegularize_hebeb780c_0_13 = ((1U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
-                                       | (2U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)));
-    vlSelfRef.__VdfgRegularize_hebeb780c_0_10 = ((~ (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__cDma__DOT___GEN_3)) 
-                                                 & (2U 
-                                                    == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__cDma__DOT__state)));
+    vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_3 
+        = ((1U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
+           | (2U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)));
+    vlSelfRef.__VdfgRegularize_hebeb780c_0_9 = ((~ (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__cDma__DOT___GEN_3)) 
+                                                & (2U 
+                                                   == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__cDma__DOT__state)));
+    vlSelfRef.svsimTestbench__DOT__dut__DOT__executePulse 
+        = ((2U == (IData)(vlSelfRef.svsimTestbench__DOT__io_cmd_payload_op)) 
+           & (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT___executePulse_T));
     vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__io_cPush_valid_0 
         = ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___layerCapture_0) 
            & (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___layerCapture));
@@ -180,24 +177,18 @@ VL_ATTR_COLD void VsvsimTestbench___024root___stl_sequent__TOP__0(VsvsimTestbenc
         = ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_6) 
            & (0U != (0x00000fffU & ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__counter) 
                                     >> 4U))));
-    vlSelfRef.svsimTestbench__DOT__dut__DOT__executePulse 
-        = ((2U == (IData)(vlSelfRef.svsimTestbench__DOT__io_cmd_payload_op)) 
-           & (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT___executePulse_T));
-    vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_22 
-        = (1U & (~ ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__dmaStarted) 
-                    | (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_21))));
-    vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__empty 
-        = ((~ (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__maybe_full)) 
-           & (IData)(svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__ptr_match));
-    svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__full 
-        = ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__maybe_full) 
-           & (IData)(svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__ptr_match));
     vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__empty 
         = ((~ (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__maybe_full)) 
            & (IData)(svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__ptr_match));
     vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__full 
         = ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__maybe_full) 
            & (IData)(svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__ptr_match));
+    vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__empty 
+        = ((~ (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__maybe_full)) 
+           & (IData)(svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__ptr_match));
+    svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__full 
+        = ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__maybe_full) 
+           & (IData)(svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__ptr_match));
     vlSelfRef.__VdfgRegularize_hebeb780c_0_1 = (- (IData)(
                                                           (1U 
                                                            & (~ 
@@ -211,18 +202,24 @@ VL_ATTR_COLD void VsvsimTestbench___024root___stl_sequent__TOP__0(VsvsimTestbenc
         = ((~ (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__maybe_full)) 
            & (IData)(svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ptr_match));
     vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_17 
-        = ((IData)(__VdfgRegularize_hebeb780c_0_13) 
-           | ((IData)(__VdfgRegularize_hebeb780c_0_12) 
-              | (IData)(__VdfgRegularize_hebeb780c_0_11)));
+        = ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_3) 
+           | ((IData)(__VdfgRegularize_hebeb780c_0_11) 
+              | (IData)(__VdfgRegularize_hebeb780c_0_10)));
     vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_4 
         = ((0U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
-           | (IData)(__VdfgRegularize_hebeb780c_0_13));
+           | (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_3));
     vlSelfRef.svsimTestbench__DOT__dut__DOT___cDma_io_bufPop_ready 
         = ((IData)(vlSelfRef.svsimTestbench__DOT__io_dma1Ext_writeData_ready) 
-           & (IData)(vlSelfRef.__VdfgRegularize_hebeb780c_0_10));
-    vlSelfRef.svsimTestbench__DOT__dut__DOT___executor_io_flushB 
+           & (IData)(vlSelfRef.__VdfgRegularize_hebeb780c_0_9));
+    vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__io_flushB_0 
         = ((0U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
            & (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executePulse));
+    vlSelfRef.svsimTestbench__DOT__dut__DOT___scratchpad_io_cOccupancy 
+        = (((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__full) 
+            << 0x0000000bU) | (IData)(__VdfgRegularize_hebeb780c_0_5));
+    vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__do_enq 
+        = ((~ (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__full)) 
+           & (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__io_cPush_valid_0));
     vlSelfRef.svsimTestbench__DOT__dut__DOT___scratchpad_io_aOccupancy 
         = (((IData)(svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__full) 
             << 0x0000000bU) | (0x000007ffU & ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__enq_ptr_value) 
@@ -231,12 +228,6 @@ VL_ATTR_COLD void VsvsimTestbench___024root___stl_sequent__TOP__0(VsvsimTestbenc
         = ((~ (IData)(svsimTestbench__DOT__dut__DOT__scratchpad__DOT__aFifo__DOT__queue__DOT__full)) 
            & ((~ (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__aDma__DOT___GEN_2)) 
               & (2U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__aDma__DOT__state))));
-    vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__do_enq 
-        = ((~ (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__full)) 
-           & (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__io_cPush_valid_0));
-    vlSelfRef.svsimTestbench__DOT__dut__DOT___scratchpad_io_cOccupancy 
-        = (((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__full) 
-            << 0x0000000bU) | (IData)(__VdfgRegularize_hebeb780c_0_5));
     vlSelfRef.svsimTestbench__DOT__dut__DOT___scratchpad_io_bOccupancy 
         = (((IData)(svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__full) 
             << 6U) | (0x0000003fU & ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__enq_ptr_value) 
@@ -245,14 +236,15 @@ VL_ATTR_COLD void VsvsimTestbench___024root___stl_sequent__TOP__0(VsvsimTestbenc
         = ((~ (IData)(svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__full)) 
            & ((~ (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__bDma__DOT___GEN_2)) 
               & (2U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__bDma__DOT__state))));
-    vlSelfRef.__VdfgRegularize_hebeb780c_0_9 = (1U 
-                                                & (~ 
-                                                   ((0U 
-                                                     == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
-                                                    | (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_17))));
+    vlSelfRef.svsimTestbench__DOT__dut__DOT__cDma__DOT___GEN_1 
+        = (((0U != (IData)(__VdfgRegularize_hebeb780c_0_5)) 
+            | (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__full)) 
+           & ((~ ((0U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
+                  | (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_17))) 
+              & (8U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state))));
     vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_10 
         = ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_4) 
-           | (IData)(__VdfgRegularize_hebeb780c_0_12));
+           | (IData)(__VdfgRegularize_hebeb780c_0_11));
     vlSelfRef.svsimTestbench__DOT__dut__DOT__aDma__DOT__io_dmaExtRdIF_cmd_valid_0 
         = ((1U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__aDma__DOT__state)) 
            & ((0U != (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__aDma__DOT__state)) 
@@ -261,9 +253,6 @@ VL_ATTR_COLD void VsvsimTestbench___024root___stl_sequent__TOP__0(VsvsimTestbenc
     vlSelfRef.svsimTestbench__DOT__dut__DOT__aDma__DOT___GEN_3 
         = ((IData)(vlSelfRef.svsimTestbench__DOT__io_dma0Ext_rsp_valid) 
            & (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__aDma__DOT__io_dmaExtRdIF_rsp_ready_0));
-    vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_20 
-        = ((8U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
-           & (0U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT___scratchpad_io_cOccupancy)));
     vlSelfRef.svsimTestbench__DOT__dut__DOT__bDma__DOT__io_dmaExtRdIF_cmd_valid_0 
         = ((1U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__bDma__DOT__state)) 
            & ((0U != (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__bDma__DOT__state)) 
@@ -272,14 +261,9 @@ VL_ATTR_COLD void VsvsimTestbench___024root___stl_sequent__TOP__0(VsvsimTestbenc
     vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__do_enq 
         = ((IData)(vlSelfRef.svsimTestbench__DOT__io_dma2Ext_rsp_valid) 
            & (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__bDma__DOT__io_dmaExtRdIF_rsp_ready_0));
-    vlSelfRef.svsimTestbench__DOT__dut__DOT__cDma__DOT___GEN_1 
-        = ((IData)(vlSelfRef.__VdfgRegularize_hebeb780c_0_9) 
-           & ((8U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
-              & ((0U != (IData)(__VdfgRegularize_hebeb780c_0_5)) 
-                 | (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__full))));
     vlSelfRef.svsimTestbench__DOT__dut__DOT___executor_io_done 
         = ((~ ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_10) 
-               | ((IData)(__VdfgRegularize_hebeb780c_0_11) 
+               | ((IData)(__VdfgRegularize_hebeb780c_0_10) 
                   | ((8U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
                      | (9U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)))))) 
            & (0x0aU == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)));
@@ -297,24 +281,12 @@ VL_ATTR_COLD void VsvsimTestbench___024root___stl_sequent__TOP__0(VsvsimTestbenc
                                                                  ((5U 
                                                                    != (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state)) 
                                                                   | (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_10)))))));
-    vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_23 
-        = ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_22) 
-           & (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_20));
     vlSelfRef.svsimTestbench__DOT__dut__DOT____Vcellinp__cDma__io_bufPop_valid 
         = (1U & (~ ((IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__io_cPop_ready_0) 
                     | (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__cFifo__DOT__queue__DOT__empty))));
     vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__io_aPop_ready_0 
         = ((IData)(svsimTestbench__DOT__dut__DOT__executor__DOT___io_cPop_ready_T) 
            & (IData)(vlSelfRef.__VdfgRegularize_hebeb780c_0_8));
-    vlSelfRef.svsimTestbench__DOT__dut__DOT____Vcellinp__aDma__io_start 
-        = (((IData)(vlSelfRef.__VdfgRegularize_hebeb780c_0_9) 
-            & (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_23)) 
-           | (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executePulse));
-    vlSelfRef.svsimTestbench__DOT__dut__DOT___executor_io_flushA 
-        = ((0U == (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
-            ? (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executePulse)
-            : ((~ (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_17)) 
-               & (IData)(vlSelfRef.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_23)));
 }
 
 VL_ATTR_COLD void VsvsimTestbench_HiveCell___stl_sequent__TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_0_0__0(VsvsimTestbench_HiveCell* vlSelf);
@@ -412,8 +384,6 @@ VL_ATTR_COLD void VsvsimTestbench___024root___ctor_var_reset(VsvsimTestbench___0
     const uint64_t __VscopeHash = VL_MURMUR64_HASH(vlSelf->vlNamep);
     vlSelf->svsimTestbench__DOT__dut__DOT__respValid = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 8381803471448556967ull);
     vlSelf->svsimTestbench__DOT__dut__DOT___executor_io_done = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 11940658508391733706ull);
-    vlSelf->svsimTestbench__DOT__dut__DOT___executor_io_flushA = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 2675623876025727215ull);
-    vlSelf->svsimTestbench__DOT__dut__DOT___executor_io_flushB = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 8271799634345323725ull);
     vlSelf->svsimTestbench__DOT__dut__DOT___executor_io_flushC = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 6512474667784598459ull);
     vlSelf->svsimTestbench__DOT__dut__DOT___cDma_io_bufPop_ready = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 13008037930038518879ull);
     vlSelf->svsimTestbench__DOT__dut__DOT___scratchpad_io_aOccupancy = VL_SCOPED_RAND_RESET_I(12, __VscopeHash, 17386508613832172666ull);
@@ -435,7 +405,6 @@ VL_ATTR_COLD void VsvsimTestbench___024root___ctor_var_reset(VsvsimTestbench___0
     vlSelf->svsimTestbench__DOT__dut__DOT__respData = VL_SCOPED_RAND_RESET_I(32, __VscopeHash, 802866819828233123ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__respDone = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 4562364962917458759ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__respErr = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 6717679909452426081ull);
-    vlSelf->svsimTestbench__DOT__dut__DOT____Vcellinp__aDma__io_start = 0;
     vlSelf->svsimTestbench__DOT__dut__DOT____Vcellinp__cDma__io_bufPop_valid = 0;
     vlSelf->svsimTestbench__DOT__dut__DOT__hiveComb__DOT__validSkewedPerRow_r = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 16356137412536486696ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__hiveComb__DOT__validSkewedPerRow_r_1 = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 7545833370507093862ull);
@@ -656,10 +625,11 @@ VL_ATTR_COLD void VsvsimTestbench___024root___ctor_var_reset(VsvsimTestbench___0
     vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT__alignedValid = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 7358806402678718307ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT__alignCnt = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 2543006132000874858ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT__drainCounter = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 1015908321980780456ull);
-    vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT__dmaStarted = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 10977814077613150816ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT___layerCapture = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 14484214670184265964ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT___layerCapture_0 = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 7269466857360382391ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT__io_cPush_valid_0 = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 2227188574889416206ull);
+    vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT__io_flushB_0 = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 8778681329192613662ull);
+    vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_3 = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 6049939135822826904ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_4 = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 8884505387598128282ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT___io_bPop_ready_T = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 18340873143608254463ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT__io_bPop_ready_0 = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 14394751301798304635ull);
@@ -672,17 +642,14 @@ VL_ATTR_COLD void VsvsimTestbench___024root___ctor_var_reset(VsvsimTestbench___0
     vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_12 = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 10818050338547988780ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT__io_cPop_ready_0 = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 2144670971638212141ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_17 = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 17903133445908681635ull);
-    vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_20 = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 3816497770025882485ull);
-    vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT___nextNTile_T = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 13840491083849234422ull);
-    vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_21 = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 9403478310686201076ull);
-    vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_22 = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 2919957061675691093ull);
-    vlSelf->svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_23 = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 12639931909012781032ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__bDma__DOT__state = VL_SCOPED_RAND_RESET_I(2, __VscopeHash, 766146295517368000ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__bDma__DOT__curAddr = VL_SCOPED_RAND_RESET_I(32, __VscopeHash, 7004190271858567036ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__bDma__DOT__blkTarget = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 17187055815817992483ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__bDma__DOT__rowCnt = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 371268198591377789ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__bDma__DOT__blkCnt = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 14702699086852608731ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__bDma__DOT__errReg = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 5303965157840664187ull);
+    vlSelf->svsimTestbench__DOT__dut__DOT__bDma__DOT__aKtCnt = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 2273457514073237003ull);
+    vlSelf->svsimTestbench__DOT__dut__DOT__bDma__DOT__aNTileCnt = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 16620623242377990071ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__bDma__DOT__isAReg = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 18124204997493728358ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__bDma__DOT__ktCnt = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 5404364959451146016ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__bDma__DOT__ktRows = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 9389666569201977377ull);
@@ -711,8 +678,10 @@ VL_ATTR_COLD void VsvsimTestbench___024root___ctor_var_reset(VsvsimTestbench___0
     vlSelf->svsimTestbench__DOT__dut__DOT__aDma__DOT__innerRows = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 4575658822545487594ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__aDma__DOT__blkTarget = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 4637434308755521904ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__aDma__DOT__rowCnt = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 4103220946831905581ull);
-    vlSelf->svsimTestbench__DOT__dut__DOT__aDma__DOT__blkCnt = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 14624823482230185678ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__aDma__DOT__errReg = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 3812367193497000351ull);
+    vlSelf->svsimTestbench__DOT__dut__DOT__aDma__DOT__aKtCnt = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 18278640334542176049ull);
+    vlSelf->svsimTestbench__DOT__dut__DOT__aDma__DOT__aNTileCnt = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 13802611697873724894ull);
+    vlSelf->svsimTestbench__DOT__dut__DOT__aDma__DOT__aNTileTarget = VL_SCOPED_RAND_RESET_I(16, __VscopeHash, 13066293272348818668ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__aDma__DOT__io_dmaExtRdIF_cmd_valid_0 = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 13291376364232916593ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__aDma__DOT___GEN_2 = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 17529287875450064051ull);
     vlSelf->svsimTestbench__DOT__dut__DOT__aDma__DOT__io_dmaExtRdIF_rsp_ready_0 = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 1605075434538011347ull);
@@ -722,7 +691,6 @@ VL_ATTR_COLD void VsvsimTestbench___024root___ctor_var_reset(VsvsimTestbench___0
     vlSelf->__VdfgRegularize_hebeb780c_0_3 = 0;
     vlSelf->__VdfgRegularize_hebeb780c_0_8 = 0;
     vlSelf->__VdfgRegularize_hebeb780c_0_9 = 0;
-    vlSelf->__VdfgRegularize_hebeb780c_0_10 = 0;
     for (int __Vi0 = 0; __Vi0 < 1; ++__Vi0) {
         vlSelf->__VstlTriggered[__Vi0] = 0;
     }

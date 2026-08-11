@@ -70,5 +70,5 @@ c++   -I.  -MMD -I/opt/homebrew/Cellar/verilator/5.050/share/verilator/include -
 c++  -Wl,-U,__Z15vl_time_stamp64v,-U,__Z13sc_time_stampv,-U,_vlog_startup_routines   c-dpi-bridge.o simulation-driver.o verilated.o verilated_dpi.o verilated_threads.o VsvsimTestbench__ALL.a    -pthread -lpthread   -o ../simulation
 rm VsvsimTestbench__ALL.verilator_deplist.tmp
 - V e r i l a t i o n   R e p o r t: Verilator 5.050 2026-07-01 rev vUNKNOWN-built20260701
-- Verilator: Built from 4.474 MB sources in 22 modules, into 10.583 MB in 26 C++ files needing 0.009 MB
-- Verilator: Walltime 9.868 s (elab=0.048, cvt=1.674, bld=7.895); cpu 1.157 s on 14 threads; allocated 117.625 MB
+- Verilator: Built from 4.483 MB sources in 22 modules, into 10.574 MB in 26 C++ files needing 0.009 MB
+- Verilator: Walltime 5.362 s (elab=0.030, cvt=0.713, bld=4.497); cpu 0.864 s on 14 threads; allocated 126.297 MB

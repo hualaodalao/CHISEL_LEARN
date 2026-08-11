@@ -8,7 +8,7 @@
   * 内部组件:
   *   - Register File: 12 个 32-bit 配置/状态寄存器
   *   - Executor: 自动 Tiling FSM
-  *   - aDma (RdOnly): 自主扫描 A 矩阵 → A buffer（多 N tile 时经 aDmaRescan 重扫）
+  *   - aDma (RdOnly): execute 单次启动自主扫描 A 矩阵 → A buffer（内建 nTile 轮次）
   *   - cDma (WrOnly): C buffer → 外部存储（storeGate 门控，末 K pass 开门）
   *   - bDma (RdOnly): 自主扫描整个 B 矩阵 → 独立 B buffer（权重专用）
   *   - Scratchpad: A buffer + B buffer + C buffer
@@ -106,11 +106,12 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   io.dma2Ext <> bDma.io.dmaExtRdIF
 
   // ==========================================================================
-  // aDma 控制接线：execute 起始拍或 Executor 重扫脉冲启动，自主扫完全部 kTile 块
-  // （内层实际 M 行，无 padding）；regFile/calcConfig 复用上方组合 Wire
+  // aDma 控制接线：与 bDma 同为 execute 单次启动全自主供数——内建 nTile
+  // 轮次（nTile 外 → kTile 中 → M 内），供满 nTiles 轮后自然停止；
+  // regFile/calcConfig 复用上方组合 Wire
   // ==========================================================================
   aDma.io.isA         := true.B
-  aDma.io.start       := executePulse || executor.io.aDmaRescan
+  aDma.io.start       := executePulse
   aDma.io.regFile     := regFile
   aDma.io.calcConfig  := calcConfig
   io.dma0Ext <> aDma.io.dmaExtRdIF

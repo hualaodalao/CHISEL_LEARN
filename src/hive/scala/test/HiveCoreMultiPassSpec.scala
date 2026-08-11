@@ -16,8 +16,8 @@
   *     curNTile 推进、bDma 多 N tile 扫描顺序
   *   - M=24, N=16, K=40：尾 M tile（8 行）× 尾 K pass —— 覆盖
   *     curTileM < totalN 的 pop/push 计数与 de-skew 截断
-  *   - M=24, N=32, K=32：尾 M tile × 多 N tile —— 覆盖 aDma 重扫与
-  *     regFile.m 边界感知（innerRows=M）交叠：重扫后仍只供实际 M 行
+  *   - M=24, N=32, K=32：尾 M tile × 多 N tile —— 覆盖 aDma 内建 nTile
+  *     轮次与 regFile.m 边界感知（innerRows=M）交叠：每轮仍只供实际 M 行
   *
   * 外部 DMA 模型与 HiveCoreSimCase 一致：dma0Ext 供 A（cmd/rsp 顺序流）、
   * dma2Ext 供权重（N 外 → kTile 升序 → 块内 K 行降序）、dma1Ext 收 C store
@@ -98,7 +98,7 @@ class HiveCoreMultiPassSpec extends AnyFlatSpec with Matchers with ChiselSim {
     runMultiPassCase(M = 24, N = 16, K = 40)
   }
 
-  it should "handle tail M tile x multi N tiles (rescan overlap): M=24 N=32 K=32 in FP16" in {
+  it should "handle tail M tile x multi N tiles (nTile-round overlap): M=24 N=32 K=32 in FP16" in {
     runMultiPassCase(M = 24, N = 32, K = 32)
   }
 
@@ -144,10 +144,10 @@ class HiveCoreMultiPassSpec extends AnyFlatSpec with Matchers with ChiselSim {
     }
 
     // ========== Executor 循环展开（N 外 → K 中 → M 内） ==========
-    // 自主化后 aDma 在每个 N tile 重扫一轮：每轮按 kTile 块顺序遍历，
-    // 块内供实际 M 行（无 padding）。软件侧按与 RdOnly 相同的地址公式
-    // （regAAddr + m*aStride + kt*totalN*(aEffW/8)，stride 寄存器写 0 故
-    // 行步长项为 0）逐 beat 推导期望 cmd 地址流（重扫轮次地址相同）。
+    // aDma 内建 nTile 轮次（execute 单次启动自主供满 nTiles 轮）：每轮按
+    // kTile 块顺序遍历，块内供实际 M 行（无 padding）。软件侧按与 RdOnly
+    // 相同的地址公式（regAAddr + m*aStride + kt*totalN*(aEffW/8)，stride
+    // 寄存器写 0 故行步长项为 0）逐 beat 推导期望 cmd 地址流（各轮地址相同）。
     // 务必延续 tile-aware 教训：不用 globalBeatIdx/totalN 推算，按块累计
     val beatsPerScan = kTiles * M
     val expDma0Addrs = scala.collection.mutable.ArrayBuffer[Long]()
@@ -160,11 +160,11 @@ class HiveCoreMultiPassSpec extends AnyFlatSpec with Matchers with ChiselSim {
       C_BASE + nt.toLong * totalN * (cEffW / 8) + r.toLong * 0).toVector
 
     // ========== DMA0 (A buffer) beat 数据 ==========
-    // 供数顺序 = aDma 自主扫描顺序 = （重扫轮次 nTile）→ kTile 外 → 实际 M 行内；
+    // 供数顺序 = aDma 自主扫描顺序 = nTile 轮外 → kTile 中 → 实际 M 行内；
     // 每拍一行 = 当前 kTile 的 K 列切片 totalN 个元素。
     // 边界 tile 只供实际 M 行（无 padding），不能按 globalBeatIdx/totalN 推算
     def genDma0Beat(globalBeatIdx: Int): BigInt = {
-      val idx = globalBeatIdx % beatsPerScan  // 重扫轮次供数内容相同
+      val idx = globalBeatIdx % beatsPerScan  // 各 nTile 轮供数内容相同
       val kt = idx / M
       val row = idx % M
       var data = BigInt(0)
@@ -216,7 +216,7 @@ class HiveCoreMultiPassSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
       // ===== DMA 通道状态 =====
       // DMA0 (A RdOnly)：逐拍 rsp 供数 + 逐拍 cmd 地址对账；
-      // 多 N tile 用例下 A 被重扫 nTiles 轮
+      // 多 N tile 用例下 aDma 内建 nTile 轮次连续供 A 共 nTiles 轮
       var dma0BeatsSent = 0
       var dma0Cmds = 0
       val dma0TotalBeats = nTiles * kTiles * M
@@ -371,7 +371,7 @@ class HiveCoreMultiPassSpec extends AnyFlatSpec with Matchers with ChiselSim {
       }
 
       done should be(true)
-      // 多 pass 特征断言：A 被重扫 nTiles 轮，每轮 kTiles 块各实际 M 行
+      // 多 pass 特征断言：aDma 供满 nTiles 轮 A，每轮 kTiles 块各实际 M 行
       dma0Cmds should be(nTiles * kTiles * M)
       dma0BeatsSent should be(nTiles * kTiles * M)
       dma2BeatsSent should be(dma2TotalBeats)
