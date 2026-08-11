@@ -49,6 +49,7 @@ VM_CLASSES_SLOW += \
   VsvsimTestbench___024root__Slow \
   VsvsimTestbench___024root__0__Slow \
   VsvsimTestbench___024root__1__Slow \
+  VsvsimTestbench___024unit__Slow \
   VsvsimTestbench_HiveCell__Slow \
   VsvsimTestbench_HiveCell__0__Slow \
   VsvsimTestbench_HiveWorker__Slow \

@@ -8,4 +8,5 @@ VsvsimTestbench__pch.h.slow.gch: VsvsimTestbench__pch.h \
   /opt/homebrew/Cellar/verilator/5.050/share/verilator/include/verilated_sym_props.h \
   /opt/homebrew/Cellar/verilator/5.050/share/verilator/include/vltstd/svdpi.h \
   VsvsimTestbench__Syms.h VsvsimTestbench.h VsvsimTestbench___024root.h \
-  VsvsimTestbench_HiveCell.h VsvsimTestbench_HiveWorker.h
+  VsvsimTestbench___024unit.h VsvsimTestbench_HiveCell.h \
+  VsvsimTestbench_HiveWorker.h

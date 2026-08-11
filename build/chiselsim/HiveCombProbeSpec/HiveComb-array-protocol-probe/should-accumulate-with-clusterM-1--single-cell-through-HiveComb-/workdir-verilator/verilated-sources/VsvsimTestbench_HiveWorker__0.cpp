@@ -4,15 +4,6 @@
 
 #include "VsvsimTestbench__pch.h"
 
-void VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_0__0(VsvsimTestbench_HiveWorker* vlSelf) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+            VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_0__0\n"); );
-    VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
-    auto& vlSelfRef = std::ref(*vlSelf).get();
-    // Body
-    vlSelfRef.io_psumIn = (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_0 
-                           & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__io_loadVIn))));
-}
-
 void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_0__0(VsvsimTestbench_HiveWorker* vlSelf) {
     VL_DEBUG_IF(VL_DBG_MSGF("+            VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_0__0\n"); );
     VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
@@ -25,7 +16,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
         if (vlSymsp->TOP.svsimTestbench__DOT__io_clear) {
             vlSelfRef.__PVT__psumReg = 0U;
         } else if (vlSymsp->TOP.svsimTestbench__DOT__io_loadVIn) {
-            vlSelfRef.__PVT__psumReg = vlSelfRef.io_psumIn;
+            vlSelfRef.__PVT__psumReg = vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_0;
         } else {
             vlSelfRef.__PVT__unnamedblk1__DOT___product_fpCond_T_1 
                 = (0U == (IData)(vlSelfRef.__PVT__fmtReg));
@@ -191,20 +182,20 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                  + vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product_fpProd_mNorm)
                                               : vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product_fpProd_mNorm))))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T 
-                    = ((0x000000ffU & (vlSelfRef.io_psumIn 
+                    = ((0x000000ffU & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_0 
                                        >> 0x17U)) >= 
                        (0x000000ffU & (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                        >> 0x17U)));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25 
                     = ((0x01000000U | (0x00fffffeU 
-                                       & (vlSelfRef.io_psumIn 
+                                       & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_0 
                                           << 1U))) 
                        >> ((IData)(vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T)
                             ? 0U : (0x0000001fU & (
                                                    (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                                     >> 0x17U) 
                                                    - 
-                                                   (vlSelfRef.io_psumIn 
+                                                   (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_0 
                                                     >> 0x17U)))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mB25 
                     = ((0x01000000U | (0x00fffffeU 
@@ -212,16 +203,16 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                           << 1U))) 
                        >> (((0x000000ffU & (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                             >> 0x17U)) 
-                            >= (0x000000ffU & (vlSelfRef.io_psumIn 
+                            >= (0x000000ffU & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_0 
                                                >> 0x17U)))
                             ? 0U : (0x0000001fU & (
-                                                   (vlSelfRef.io_psumIn 
+                                                   (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_0 
                                                     >> 0x17U) 
                                                    - 
                                                    (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                                     >> 0x17U)))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA_signed 
-                    = (0x03ffffffU & ((vlSelfRef.io_psumIn 
+                    = (0x03ffffffU & ((vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_0 
                                        >> 0x1fU) ? 
                                       (- vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25)
                                        : vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25));
@@ -344,7 +335,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_eOut_T_3 
                     = (0x000000ffU & ((IData)(1U) + 
                                       ((IData)(vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T)
-                                        ? (vlSelfRef.io_psumIn 
+                                        ? (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_0 
                                            >> 0x17U)
                                         : (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                            >> 0x17U))));
@@ -352,13 +343,13 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                     = vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_leadingZero;
                 vlSelfRef.__PVT__psumReg = (((3U == (IData)(vlSelfRef.__PVT__fmtReg)) 
                                              | (IData)(vlSelfRef.__PVT__unnamedblk1__DOT___psumReg_isInt_T_1))
-                                             ? (vlSelfRef.io_psumIn 
+                                             ? (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_0 
                                                 + vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product)
                                              : ((IData)(
                                                         (0U 
                                                          == 
                                                          (0x7fffffffU 
-                                                          & vlSelfRef.io_psumIn)))
+                                                          & vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_0)))
                                                  ? vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product
                                                  : 
                                                 ((IData)(
@@ -366,7 +357,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                           == 
                                                           (0x7fffffffU 
                                                            & vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product)))
-                                                  ? vlSelfRef.io_psumIn
+                                                  ? vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_0
                                                   : 
                                                  ((0U 
                                                    == vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mAbs)
@@ -411,7 +402,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
             }
         }
         if (vlSymsp->TOP.svsimTestbench__DOT__io_loadVLock) {
-            vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSelfRef.io_psumIn);
+            vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_0);
         }
     }
     if (vlSymsp->TOP.svsimTestbench__DOT__io_loadHIn) {
@@ -438,15 +429,6 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                         && (IData)(vlSymsp->TOP.svsimTestbench__DOT__io_validIn));
 }
 
-void VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_1__0(VsvsimTestbench_HiveWorker* vlSelf) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+            VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_1__0\n"); );
-    VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
-    auto& vlSelfRef = std::ref(*vlSelf).get();
-    // Body
-    vlSelfRef.io_psumIn = (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_1 
-                           & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__io_loadVIn))));
-}
-
 void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_1__0(VsvsimTestbench_HiveWorker* vlSelf) {
     VL_DEBUG_IF(VL_DBG_MSGF("+            VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_1__0\n"); );
     VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
@@ -459,7 +441,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
         if (vlSymsp->TOP.svsimTestbench__DOT__io_clear) {
             vlSelfRef.__PVT__psumReg = 0U;
         } else if (vlSymsp->TOP.svsimTestbench__DOT__io_loadVIn) {
-            vlSelfRef.__PVT__psumReg = vlSelfRef.io_psumIn;
+            vlSelfRef.__PVT__psumReg = vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_1;
         } else {
             vlSelfRef.__PVT__unnamedblk1__DOT___product_fpCond_T_1 
                 = (0U == (IData)(vlSelfRef.__PVT__fmtReg));
@@ -625,20 +607,20 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                  + vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product_fpProd_mNorm)
                                               : vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product_fpProd_mNorm))))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T 
-                    = ((0x000000ffU & (vlSelfRef.io_psumIn 
+                    = ((0x000000ffU & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_1 
                                        >> 0x17U)) >= 
                        (0x000000ffU & (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                        >> 0x17U)));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25 
                     = ((0x01000000U | (0x00fffffeU 
-                                       & (vlSelfRef.io_psumIn 
+                                       & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_1 
                                           << 1U))) 
                        >> ((IData)(vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T)
                             ? 0U : (0x0000001fU & (
                                                    (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                                     >> 0x17U) 
                                                    - 
-                                                   (vlSelfRef.io_psumIn 
+                                                   (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_1 
                                                     >> 0x17U)))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mB25 
                     = ((0x01000000U | (0x00fffffeU 
@@ -646,16 +628,16 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                           << 1U))) 
                        >> (((0x000000ffU & (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                             >> 0x17U)) 
-                            >= (0x000000ffU & (vlSelfRef.io_psumIn 
+                            >= (0x000000ffU & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_1 
                                                >> 0x17U)))
                             ? 0U : (0x0000001fU & (
-                                                   (vlSelfRef.io_psumIn 
+                                                   (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_1 
                                                     >> 0x17U) 
                                                    - 
                                                    (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                                     >> 0x17U)))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA_signed 
-                    = (0x03ffffffU & ((vlSelfRef.io_psumIn 
+                    = (0x03ffffffU & ((vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_1 
                                        >> 0x1fU) ? 
                                       (- vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25)
                                        : vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25));
@@ -778,7 +760,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_eOut_T_3 
                     = (0x000000ffU & ((IData)(1U) + 
                                       ((IData)(vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T)
-                                        ? (vlSelfRef.io_psumIn 
+                                        ? (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_1 
                                            >> 0x17U)
                                         : (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                            >> 0x17U))));
@@ -786,13 +768,13 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                     = vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_leadingZero;
                 vlSelfRef.__PVT__psumReg = (((3U == (IData)(vlSelfRef.__PVT__fmtReg)) 
                                              | (IData)(vlSelfRef.__PVT__unnamedblk1__DOT___psumReg_isInt_T_1))
-                                             ? (vlSelfRef.io_psumIn 
+                                             ? (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_1 
                                                 + vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product)
                                              : ((IData)(
                                                         (0U 
                                                          == 
                                                          (0x7fffffffU 
-                                                          & vlSelfRef.io_psumIn)))
+                                                          & vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_1)))
                                                  ? vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product
                                                  : 
                                                 ((IData)(
@@ -800,7 +782,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                           == 
                                                           (0x7fffffffU 
                                                            & vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product)))
-                                                  ? vlSelfRef.io_psumIn
+                                                  ? vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_1
                                                   : 
                                                  ((0U 
                                                    == vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mAbs)
@@ -845,7 +827,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
             }
         }
         if (vlSymsp->TOP.svsimTestbench__DOT__io_loadVLock) {
-            vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSelfRef.io_psumIn);
+            vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_1);
         }
     }
     if (vlSymsp->TOP.svsimTestbench__DOT__io_loadHIn) {
@@ -872,15 +854,6 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                         && (IData)(vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_0.__PVT__io_validOut_REG));
 }
 
-void VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_2__0(VsvsimTestbench_HiveWorker* vlSelf) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+            VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_2__0\n"); );
-    VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
-    auto& vlSelfRef = std::ref(*vlSelf).get();
-    // Body
-    vlSelfRef.io_psumIn = (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_2 
-                           & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__io_loadVIn))));
-}
-
 void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_2__0(VsvsimTestbench_HiveWorker* vlSelf) {
     VL_DEBUG_IF(VL_DBG_MSGF("+            VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_2__0\n"); );
     VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
@@ -893,7 +866,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
         if (vlSymsp->TOP.svsimTestbench__DOT__io_clear) {
             vlSelfRef.__PVT__psumReg = 0U;
         } else if (vlSymsp->TOP.svsimTestbench__DOT__io_loadVIn) {
-            vlSelfRef.__PVT__psumReg = vlSelfRef.io_psumIn;
+            vlSelfRef.__PVT__psumReg = vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_2;
         } else {
             vlSelfRef.__PVT__unnamedblk1__DOT___product_fpCond_T_1 
                 = (0U == (IData)(vlSelfRef.__PVT__fmtReg));
@@ -1059,20 +1032,20 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                  + vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product_fpProd_mNorm)
                                               : vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product_fpProd_mNorm))))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T 
-                    = ((0x000000ffU & (vlSelfRef.io_psumIn 
+                    = ((0x000000ffU & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_2 
                                        >> 0x17U)) >= 
                        (0x000000ffU & (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                        >> 0x17U)));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25 
                     = ((0x01000000U | (0x00fffffeU 
-                                       & (vlSelfRef.io_psumIn 
+                                       & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_2 
                                           << 1U))) 
                        >> ((IData)(vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T)
                             ? 0U : (0x0000001fU & (
                                                    (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                                     >> 0x17U) 
                                                    - 
-                                                   (vlSelfRef.io_psumIn 
+                                                   (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_2 
                                                     >> 0x17U)))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mB25 
                     = ((0x01000000U | (0x00fffffeU 
@@ -1080,16 +1053,16 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                           << 1U))) 
                        >> (((0x000000ffU & (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                             >> 0x17U)) 
-                            >= (0x000000ffU & (vlSelfRef.io_psumIn 
+                            >= (0x000000ffU & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_2 
                                                >> 0x17U)))
                             ? 0U : (0x0000001fU & (
-                                                   (vlSelfRef.io_psumIn 
+                                                   (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_2 
                                                     >> 0x17U) 
                                                    - 
                                                    (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                                     >> 0x17U)))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA_signed 
-                    = (0x03ffffffU & ((vlSelfRef.io_psumIn 
+                    = (0x03ffffffU & ((vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_2 
                                        >> 0x1fU) ? 
                                       (- vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25)
                                        : vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25));
@@ -1212,7 +1185,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_eOut_T_3 
                     = (0x000000ffU & ((IData)(1U) + 
                                       ((IData)(vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T)
-                                        ? (vlSelfRef.io_psumIn 
+                                        ? (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_2 
                                            >> 0x17U)
                                         : (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                            >> 0x17U))));
@@ -1220,13 +1193,13 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                     = vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_leadingZero;
                 vlSelfRef.__PVT__psumReg = (((3U == (IData)(vlSelfRef.__PVT__fmtReg)) 
                                              | (IData)(vlSelfRef.__PVT__unnamedblk1__DOT___psumReg_isInt_T_1))
-                                             ? (vlSelfRef.io_psumIn 
+                                             ? (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_2 
                                                 + vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product)
                                              : ((IData)(
                                                         (0U 
                                                          == 
                                                          (0x7fffffffU 
-                                                          & vlSelfRef.io_psumIn)))
+                                                          & vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_2)))
                                                  ? vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product
                                                  : 
                                                 ((IData)(
@@ -1234,7 +1207,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                           == 
                                                           (0x7fffffffU 
                                                            & vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product)))
-                                                  ? vlSelfRef.io_psumIn
+                                                  ? vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_2
                                                   : 
                                                  ((0U 
                                                    == vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mAbs)
@@ -1279,7 +1252,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
             }
         }
         if (vlSymsp->TOP.svsimTestbench__DOT__io_loadVLock) {
-            vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSelfRef.io_psumIn);
+            vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_2);
         }
     }
     if (vlSymsp->TOP.svsimTestbench__DOT__io_loadHIn) {
@@ -1306,15 +1279,6 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                         && (IData)(vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_1.__PVT__io_validOut_REG));
 }
 
-void VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_3__0(VsvsimTestbench_HiveWorker* vlSelf) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+            VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_3__0\n"); );
-    VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
-    auto& vlSelfRef = std::ref(*vlSelf).get();
-    // Body
-    vlSelfRef.io_psumIn = (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_3 
-                           & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__io_loadVIn))));
-}
-
 void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_3__0(VsvsimTestbench_HiveWorker* vlSelf) {
     VL_DEBUG_IF(VL_DBG_MSGF("+            VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_3__0\n"); );
     VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
@@ -1327,7 +1291,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
         if (vlSymsp->TOP.svsimTestbench__DOT__io_clear) {
             vlSelfRef.__PVT__psumReg = 0U;
         } else if (vlSymsp->TOP.svsimTestbench__DOT__io_loadVIn) {
-            vlSelfRef.__PVT__psumReg = vlSelfRef.io_psumIn;
+            vlSelfRef.__PVT__psumReg = vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_3;
         } else {
             vlSelfRef.__PVT__unnamedblk1__DOT___product_fpCond_T_1 
                 = (0U == (IData)(vlSelfRef.__PVT__fmtReg));
@@ -1493,20 +1457,20 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                  + vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product_fpProd_mNorm)
                                               : vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product_fpProd_mNorm))))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T 
-                    = ((0x000000ffU & (vlSelfRef.io_psumIn 
+                    = ((0x000000ffU & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_3 
                                        >> 0x17U)) >= 
                        (0x000000ffU & (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                        >> 0x17U)));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25 
                     = ((0x01000000U | (0x00fffffeU 
-                                       & (vlSelfRef.io_psumIn 
+                                       & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_3 
                                           << 1U))) 
                        >> ((IData)(vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T)
                             ? 0U : (0x0000001fU & (
                                                    (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                                     >> 0x17U) 
                                                    - 
-                                                   (vlSelfRef.io_psumIn 
+                                                   (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_3 
                                                     >> 0x17U)))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mB25 
                     = ((0x01000000U | (0x00fffffeU 
@@ -1514,16 +1478,16 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                           << 1U))) 
                        >> (((0x000000ffU & (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                             >> 0x17U)) 
-                            >= (0x000000ffU & (vlSelfRef.io_psumIn 
+                            >= (0x000000ffU & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_3 
                                                >> 0x17U)))
                             ? 0U : (0x0000001fU & (
-                                                   (vlSelfRef.io_psumIn 
+                                                   (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_3 
                                                     >> 0x17U) 
                                                    - 
                                                    (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                                     >> 0x17U)))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA_signed 
-                    = (0x03ffffffU & ((vlSelfRef.io_psumIn 
+                    = (0x03ffffffU & ((vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_3 
                                        >> 0x1fU) ? 
                                       (- vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25)
                                        : vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25));
@@ -1646,7 +1610,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_eOut_T_3 
                     = (0x000000ffU & ((IData)(1U) + 
                                       ((IData)(vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T)
-                                        ? (vlSelfRef.io_psumIn 
+                                        ? (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_3 
                                            >> 0x17U)
                                         : (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                            >> 0x17U))));
@@ -1654,13 +1618,13 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                     = vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_leadingZero;
                 vlSelfRef.__PVT__psumReg = (((3U == (IData)(vlSelfRef.__PVT__fmtReg)) 
                                              | (IData)(vlSelfRef.__PVT__unnamedblk1__DOT___psumReg_isInt_T_1))
-                                             ? (vlSelfRef.io_psumIn 
+                                             ? (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_3 
                                                 + vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product)
                                              : ((IData)(
                                                         (0U 
                                                          == 
                                                          (0x7fffffffU 
-                                                          & vlSelfRef.io_psumIn)))
+                                                          & vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_3)))
                                                  ? vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product
                                                  : 
                                                 ((IData)(
@@ -1668,7 +1632,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                           == 
                                                           (0x7fffffffU 
                                                            & vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product)))
-                                                  ? vlSelfRef.io_psumIn
+                                                  ? vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_3
                                                   : 
                                                  ((0U 
                                                    == vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mAbs)
@@ -1713,7 +1677,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
             }
         }
         if (vlSymsp->TOP.svsimTestbench__DOT__io_loadVLock) {
-            vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSelfRef.io_psumIn);
+            vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_3);
         }
     }
     if (vlSymsp->TOP.svsimTestbench__DOT__io_loadHIn) {
@@ -1740,15 +1704,6 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                         && (IData)(vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_2.__PVT__io_validOut_REG));
 }
 
-void VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_4__0(VsvsimTestbench_HiveWorker* vlSelf) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+            VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_4__0\n"); );
-    VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
-    auto& vlSelfRef = std::ref(*vlSelf).get();
-    // Body
-    vlSelfRef.io_psumIn = (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_4 
-                           & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__io_loadVIn))));
-}
-
 void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_4__0(VsvsimTestbench_HiveWorker* vlSelf) {
     VL_DEBUG_IF(VL_DBG_MSGF("+            VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_4__0\n"); );
     VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
@@ -1761,7 +1716,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
         if (vlSymsp->TOP.svsimTestbench__DOT__io_clear) {
             vlSelfRef.__PVT__psumReg = 0U;
         } else if (vlSymsp->TOP.svsimTestbench__DOT__io_loadVIn) {
-            vlSelfRef.__PVT__psumReg = vlSelfRef.io_psumIn;
+            vlSelfRef.__PVT__psumReg = vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_4;
         } else {
             vlSelfRef.__PVT__unnamedblk1__DOT___product_fpCond_T_1 
                 = (0U == (IData)(vlSelfRef.__PVT__fmtReg));
@@ -1927,20 +1882,20 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                  + vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product_fpProd_mNorm)
                                               : vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product_fpProd_mNorm))))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T 
-                    = ((0x000000ffU & (vlSelfRef.io_psumIn 
+                    = ((0x000000ffU & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_4 
                                        >> 0x17U)) >= 
                        (0x000000ffU & (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                        >> 0x17U)));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25 
                     = ((0x01000000U | (0x00fffffeU 
-                                       & (vlSelfRef.io_psumIn 
+                                       & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_4 
                                           << 1U))) 
                        >> ((IData)(vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T)
                             ? 0U : (0x0000001fU & (
                                                    (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                                     >> 0x17U) 
                                                    - 
-                                                   (vlSelfRef.io_psumIn 
+                                                   (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_4 
                                                     >> 0x17U)))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mB25 
                     = ((0x01000000U | (0x00fffffeU 
@@ -1948,16 +1903,16 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                           << 1U))) 
                        >> (((0x000000ffU & (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                             >> 0x17U)) 
-                            >= (0x000000ffU & (vlSelfRef.io_psumIn 
+                            >= (0x000000ffU & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_4 
                                                >> 0x17U)))
                             ? 0U : (0x0000001fU & (
-                                                   (vlSelfRef.io_psumIn 
+                                                   (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_4 
                                                     >> 0x17U) 
                                                    - 
                                                    (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                                     >> 0x17U)))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA_signed 
-                    = (0x03ffffffU & ((vlSelfRef.io_psumIn 
+                    = (0x03ffffffU & ((vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_4 
                                        >> 0x1fU) ? 
                                       (- vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25)
                                        : vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25));
@@ -2080,7 +2035,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_eOut_T_3 
                     = (0x000000ffU & ((IData)(1U) + 
                                       ((IData)(vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T)
-                                        ? (vlSelfRef.io_psumIn 
+                                        ? (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_4 
                                            >> 0x17U)
                                         : (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                            >> 0x17U))));
@@ -2088,13 +2043,13 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                     = vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_leadingZero;
                 vlSelfRef.__PVT__psumReg = (((3U == (IData)(vlSelfRef.__PVT__fmtReg)) 
                                              | (IData)(vlSelfRef.__PVT__unnamedblk1__DOT___psumReg_isInt_T_1))
-                                             ? (vlSelfRef.io_psumIn 
+                                             ? (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_4 
                                                 + vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product)
                                              : ((IData)(
                                                         (0U 
                                                          == 
                                                          (0x7fffffffU 
-                                                          & vlSelfRef.io_psumIn)))
+                                                          & vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_4)))
                                                  ? vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product
                                                  : 
                                                 ((IData)(
@@ -2102,7 +2057,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                           == 
                                                           (0x7fffffffU 
                                                            & vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product)))
-                                                  ? vlSelfRef.io_psumIn
+                                                  ? vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_4
                                                   : 
                                                  ((0U 
                                                    == vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mAbs)
@@ -2147,7 +2102,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
             }
         }
         if (vlSymsp->TOP.svsimTestbench__DOT__io_loadVLock) {
-            vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSelfRef.io_psumIn);
+            vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_4);
         }
     }
     if (vlSymsp->TOP.svsimTestbench__DOT__io_loadHIn) {
@@ -2174,15 +2129,6 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                         && (IData)(vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_3.__PVT__io_validOut_REG));
 }
 
-void VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_5__0(VsvsimTestbench_HiveWorker* vlSelf) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+            VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_5__0\n"); );
-    VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
-    auto& vlSelfRef = std::ref(*vlSelf).get();
-    // Body
-    vlSelfRef.io_psumIn = (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_5 
-                           & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__io_loadVIn))));
-}
-
 void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_5__0(VsvsimTestbench_HiveWorker* vlSelf) {
     VL_DEBUG_IF(VL_DBG_MSGF("+            VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_5__0\n"); );
     VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
@@ -2195,7 +2141,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
         if (vlSymsp->TOP.svsimTestbench__DOT__io_clear) {
             vlSelfRef.__PVT__psumReg = 0U;
         } else if (vlSymsp->TOP.svsimTestbench__DOT__io_loadVIn) {
-            vlSelfRef.__PVT__psumReg = vlSelfRef.io_psumIn;
+            vlSelfRef.__PVT__psumReg = vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_5;
         } else {
             vlSelfRef.__PVT__unnamedblk1__DOT___product_fpCond_T_1 
                 = (0U == (IData)(vlSelfRef.__PVT__fmtReg));
@@ -2361,20 +2307,20 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                  + vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product_fpProd_mNorm)
                                               : vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product_fpProd_mNorm))))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T 
-                    = ((0x000000ffU & (vlSelfRef.io_psumIn 
+                    = ((0x000000ffU & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_5 
                                        >> 0x17U)) >= 
                        (0x000000ffU & (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                        >> 0x17U)));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25 
                     = ((0x01000000U | (0x00fffffeU 
-                                       & (vlSelfRef.io_psumIn 
+                                       & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_5 
                                           << 1U))) 
                        >> ((IData)(vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T)
                             ? 0U : (0x0000001fU & (
                                                    (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                                     >> 0x17U) 
                                                    - 
-                                                   (vlSelfRef.io_psumIn 
+                                                   (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_5 
                                                     >> 0x17U)))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mB25 
                     = ((0x01000000U | (0x00fffffeU 
@@ -2382,16 +2328,16 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                           << 1U))) 
                        >> (((0x000000ffU & (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                             >> 0x17U)) 
-                            >= (0x000000ffU & (vlSelfRef.io_psumIn 
+                            >= (0x000000ffU & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_5 
                                                >> 0x17U)))
                             ? 0U : (0x0000001fU & (
-                                                   (vlSelfRef.io_psumIn 
+                                                   (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_5 
                                                     >> 0x17U) 
                                                    - 
                                                    (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                                     >> 0x17U)))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA_signed 
-                    = (0x03ffffffU & ((vlSelfRef.io_psumIn 
+                    = (0x03ffffffU & ((vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_5 
                                        >> 0x1fU) ? 
                                       (- vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25)
                                        : vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25));
@@ -2514,7 +2460,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_eOut_T_3 
                     = (0x000000ffU & ((IData)(1U) + 
                                       ((IData)(vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T)
-                                        ? (vlSelfRef.io_psumIn 
+                                        ? (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_5 
                                            >> 0x17U)
                                         : (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                            >> 0x17U))));
@@ -2522,13 +2468,13 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                     = vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_leadingZero;
                 vlSelfRef.__PVT__psumReg = (((3U == (IData)(vlSelfRef.__PVT__fmtReg)) 
                                              | (IData)(vlSelfRef.__PVT__unnamedblk1__DOT___psumReg_isInt_T_1))
-                                             ? (vlSelfRef.io_psumIn 
+                                             ? (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_5 
                                                 + vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product)
                                              : ((IData)(
                                                         (0U 
                                                          == 
                                                          (0x7fffffffU 
-                                                          & vlSelfRef.io_psumIn)))
+                                                          & vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_5)))
                                                  ? vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product
                                                  : 
                                                 ((IData)(
@@ -2536,7 +2482,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                           == 
                                                           (0x7fffffffU 
                                                            & vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product)))
-                                                  ? vlSelfRef.io_psumIn
+                                                  ? vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_5
                                                   : 
                                                  ((0U 
                                                    == vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mAbs)
@@ -2581,7 +2527,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
             }
         }
         if (vlSymsp->TOP.svsimTestbench__DOT__io_loadVLock) {
-            vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSelfRef.io_psumIn);
+            vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_5);
         }
     }
     if (vlSymsp->TOP.svsimTestbench__DOT__io_loadHIn) {
@@ -2608,15 +2554,6 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                         && (IData)(vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_4.__PVT__io_validOut_REG));
 }
 
-void VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_6__0(VsvsimTestbench_HiveWorker* vlSelf) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+            VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_6__0\n"); );
-    VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
-    auto& vlSelfRef = std::ref(*vlSelf).get();
-    // Body
-    vlSelfRef.io_psumIn = (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_6 
-                           & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__io_loadVIn))));
-}
-
 void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_6__0(VsvsimTestbench_HiveWorker* vlSelf) {
     VL_DEBUG_IF(VL_DBG_MSGF("+            VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_6__0\n"); );
     VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
@@ -2632,7 +2569,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
         if (vlSymsp->TOP.svsimTestbench__DOT__io_clear) {
             vlSelfRef.__PVT__psumReg = 0U;
         } else if (vlSymsp->TOP.svsimTestbench__DOT__io_loadVIn) {
-            vlSelfRef.__PVT__psumReg = vlSelfRef.io_psumIn;
+            vlSelfRef.__PVT__psumReg = vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_6;
         } else {
             vlSelfRef.__PVT__unnamedblk1__DOT___product_fpCond_T_1 
                 = (0U == (IData)(vlSelfRef.__PVT__fmtReg));
@@ -2798,20 +2735,20 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                  + vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product_fpProd_mNorm)
                                               : vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product_fpProd_mNorm))))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T 
-                    = ((0x000000ffU & (vlSelfRef.io_psumIn 
+                    = ((0x000000ffU & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_6 
                                        >> 0x17U)) >= 
                        (0x000000ffU & (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                        >> 0x17U)));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25 
                     = ((0x01000000U | (0x00fffffeU 
-                                       & (vlSelfRef.io_psumIn 
+                                       & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_6 
                                           << 1U))) 
                        >> ((IData)(vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T)
                             ? 0U : (0x0000001fU & (
                                                    (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                                     >> 0x17U) 
                                                    - 
-                                                   (vlSelfRef.io_psumIn 
+                                                   (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_6 
                                                     >> 0x17U)))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mB25 
                     = ((0x01000000U | (0x00fffffeU 
@@ -2819,16 +2756,16 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                           << 1U))) 
                        >> (((0x000000ffU & (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                             >> 0x17U)) 
-                            >= (0x000000ffU & (vlSelfRef.io_psumIn 
+                            >= (0x000000ffU & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_6 
                                                >> 0x17U)))
                             ? 0U : (0x0000001fU & (
-                                                   (vlSelfRef.io_psumIn 
+                                                   (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_6 
                                                     >> 0x17U) 
                                                    - 
                                                    (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                                     >> 0x17U)))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA_signed 
-                    = (0x03ffffffU & ((vlSelfRef.io_psumIn 
+                    = (0x03ffffffU & ((vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_6 
                                        >> 0x1fU) ? 
                                       (- vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25)
                                        : vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25));
@@ -2951,7 +2888,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_eOut_T_3 
                     = (0x000000ffU & ((IData)(1U) + 
                                       ((IData)(vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T)
-                                        ? (vlSelfRef.io_psumIn 
+                                        ? (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_6 
                                            >> 0x17U)
                                         : (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                            >> 0x17U))));
@@ -2959,13 +2896,13 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                     = vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_leadingZero;
                 vlSelfRef.__PVT__psumReg = (((3U == (IData)(vlSelfRef.__PVT__fmtReg)) 
                                              | (IData)(vlSelfRef.__PVT__unnamedblk1__DOT___psumReg_isInt_T_1))
-                                             ? (vlSelfRef.io_psumIn 
+                                             ? (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_6 
                                                 + vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product)
                                              : ((IData)(
                                                         (0U 
                                                          == 
                                                          (0x7fffffffU 
-                                                          & vlSelfRef.io_psumIn)))
+                                                          & vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_6)))
                                                  ? vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product
                                                  : 
                                                 ((IData)(
@@ -2973,7 +2910,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                           == 
                                                           (0x7fffffffU 
                                                            & vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product)))
-                                                  ? vlSelfRef.io_psumIn
+                                                  ? vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_6
                                                   : 
                                                  ((0U 
                                                    == vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mAbs)
@@ -3021,7 +2958,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
         vlSelfRef.__PVT__io_fmtOut_REG = vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_5.__PVT__io_fmtOut_REG;
         vlSelfRef.__PVT__io_rndOut_REG = vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_5.__PVT__io_rndOut_REG;
         if (vlSymsp->TOP.svsimTestbench__DOT__io_loadVLock) {
-            vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSelfRef.io_psumIn);
+            vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_6);
         }
     }
     vlSelfRef.__PVT__io_validOut_REG = ((1U & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__reset))) 
@@ -3030,15 +2967,6 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
         vlSelfRef.__PVT__fmtReg = vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_5.__PVT__io_fmtOut_REG;
         vlSelfRef.__PVT__rndReg = vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_5.__PVT__io_rndOut_REG;
     }
-}
-
-void VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_7__0(VsvsimTestbench_HiveWorker* vlSelf) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+            VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_7__0\n"); );
-    VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
-    auto& vlSelfRef = std::ref(*vlSelf).get();
-    // Body
-    vlSelfRef.io_psumIn = (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_7 
-                           & (- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__io_loadVIn))));
 }
 
 void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_7__0(VsvsimTestbench_HiveWorker* vlSelf) {
@@ -3064,7 +2992,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
         if (vlSymsp->TOP.svsimTestbench__DOT__io_clear) {
             vlSelfRef.__PVT__psumReg = 0U;
         } else if (vlSymsp->TOP.svsimTestbench__DOT__io_loadVIn) {
-            vlSelfRef.__PVT__psumReg = vlSelfRef.io_psumIn;
+            vlSelfRef.__PVT__psumReg = vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_7;
         } else {
             vlSelfRef.__PVT__unnamedblk1__DOT___product_fpCond_T_1 
                 = (0U == (IData)(vlSelfRef.__PVT__fmtReg));
@@ -3230,20 +3158,20 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                  + vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product_fpProd_mNorm)
                                               : vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product_fpProd_mNorm))))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T 
-                    = ((0x000000ffU & (vlSelfRef.io_psumIn 
+                    = ((0x000000ffU & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_7 
                                        >> 0x17U)) >= 
                        (0x000000ffU & (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                        >> 0x17U)));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25 
                     = ((0x01000000U | (0x00fffffeU 
-                                       & (vlSelfRef.io_psumIn 
+                                       & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_7 
                                           << 1U))) 
                        >> ((IData)(vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T)
                             ? 0U : (0x0000001fU & (
                                                    (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                                     >> 0x17U) 
                                                    - 
-                                                   (vlSelfRef.io_psumIn 
+                                                   (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_7 
                                                     >> 0x17U)))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mB25 
                     = ((0x01000000U | (0x00fffffeU 
@@ -3251,16 +3179,16 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                           << 1U))) 
                        >> (((0x000000ffU & (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                             >> 0x17U)) 
-                            >= (0x000000ffU & (vlSelfRef.io_psumIn 
+                            >= (0x000000ffU & (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_7 
                                                >> 0x17U)))
                             ? 0U : (0x0000001fU & (
-                                                   (vlSelfRef.io_psumIn 
+                                                   (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_7 
                                                     >> 0x17U) 
                                                    - 
                                                    (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                                     >> 0x17U)))));
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA_signed 
-                    = (0x03ffffffU & ((vlSelfRef.io_psumIn 
+                    = (0x03ffffffU & ((vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_7 
                                        >> 0x1fU) ? 
                                       (- vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25)
                                        : vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mA25));
@@ -3383,7 +3311,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                 vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_eOut_T_3 
                     = (0x000000ffU & ((IData)(1U) + 
                                       ((IData)(vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT___psumReg_fpResult_shiftA_T)
-                                        ? (vlSelfRef.io_psumIn 
+                                        ? (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_7 
                                            >> 0x17U)
                                         : (vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product 
                                            >> 0x17U))));
@@ -3391,13 +3319,13 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                     = vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_leadingZero;
                 vlSelfRef.__PVT__psumReg = (((3U == (IData)(vlSelfRef.__PVT__fmtReg)) 
                                              | (IData)(vlSelfRef.__PVT__unnamedblk1__DOT___psumReg_isInt_T_1))
-                                             ? (vlSelfRef.io_psumIn 
+                                             ? (vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_7 
                                                 + vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product)
                                              : ((IData)(
                                                         (0U 
                                                          == 
                                                          (0x7fffffffU 
-                                                          & vlSelfRef.io_psumIn)))
+                                                          & vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_7)))
                                                  ? vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product
                                                  : 
                                                 ((IData)(
@@ -3405,7 +3333,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
                                                           == 
                                                           (0x7fffffffU 
                                                            & vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__product)))
-                                                  ? vlSelfRef.io_psumIn
+                                                  ? vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_7
                                                   : 
                                                  ((0U 
                                                    == vlSelfRef.__PVT__unnamedblk1__DOT__unnamedblk2__DOT__psumReg_fpResult_mAbs)
@@ -3450,7 +3378,7 @@ void VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DO
             }
         }
         if (vlSymsp->TOP.svsimTestbench__DOT__io_loadVLock) {
-            vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSelfRef.io_psumIn);
+            vlSelfRef.__PVT__wReg = (0x0000ffffU & vlSymsp->TOP.svsimTestbench__DOT__io_psumIn_7);
         }
     }
     if (vlSymsp->TOP.svsimTestbench__DOT__io_loadHIn) {

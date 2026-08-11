@@ -15,6 +15,7 @@
 
 // INCLUDE MODULE CLASSES
 #include "VsvsimTestbench___024root.h"
+#include "VsvsimTestbench___024unit.h"
 #include "VsvsimTestbench_HiveCell.h"
 #include "VsvsimTestbench_HiveWorker.h"
 
@@ -27,17 +28,13 @@ using VsvsimTestbench__Vcb_getBitWidthImpl_io_cmd_payload_reg0Addr_t = void (*) 
 using VsvsimTestbench__Vcb_getBitWidthImpl_io_cmd_payload_reg1Addr_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
 using VsvsimTestbench__Vcb_getBitWidthImpl_io_cmd_ready_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
 using VsvsimTestbench__Vcb_getBitWidthImpl_io_cmd_valid_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
-using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_addr_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
-using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_grant_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
-using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_isWrite_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
-using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_len_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
-using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_readData_payload_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
-using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_readData_ready_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
-using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_readData_valid_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
-using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_req_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
-using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_writeData_payload_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
-using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_writeData_ready_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
-using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_writeData_valid_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
+using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_cmd_payload_addr_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
+using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_cmd_ready_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
+using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_cmd_valid_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
+using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_rsp_payload_data_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
+using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_rsp_payload_rsp_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
+using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_rsp_ready_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
+using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_rsp_valid_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
 using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma1Ext_addr_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
 using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma1Ext_grant_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
 using VsvsimTestbench__Vcb_getBitWidthImpl_io_dma1Ext_isWrite_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value);
@@ -77,17 +74,13 @@ using VsvsimTestbench__Vcb_getBitsImpl_io_cmd_payload_reg0Addr_t = void (*) (Vsv
 using VsvsimTestbench__Vcb_getBitsImpl_io_cmd_payload_reg1Addr_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*4:0*/ &value_io_cmd_payload_reg1Addr);
 using VsvsimTestbench__Vcb_getBitsImpl_io_cmd_ready_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ &value_io_cmd_ready);
 using VsvsimTestbench__Vcb_getBitsImpl_io_cmd_valid_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ &value_io_cmd_valid);
-using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_addr_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value_io_dma0Ext_addr);
-using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_grant_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ &value_io_dma0Ext_grant);
-using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_isWrite_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ &value_io_dma0Ext_isWrite);
-using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_len_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, SData/*15:0*/ &value_io_dma0Ext_len);
-using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_readData_payload_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, VlWide<18>/*575:0*/ &value_io_dma0Ext_readData_payload);
-using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_readData_ready_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ &value_io_dma0Ext_readData_ready);
-using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_readData_valid_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ &value_io_dma0Ext_readData_valid);
-using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_req_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ &value_io_dma0Ext_req);
-using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_writeData_payload_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, VlWide<18>/*575:0*/ &value_io_dma0Ext_writeData_payload);
-using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_writeData_ready_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ &value_io_dma0Ext_writeData_ready);
-using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_writeData_valid_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ &value_io_dma0Ext_writeData_valid);
+using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_cmd_payload_addr_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value_io_dma0Ext_cmd_payload_addr);
+using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_cmd_ready_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ &value_io_dma0Ext_cmd_ready);
+using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_cmd_valid_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ &value_io_dma0Ext_cmd_valid);
+using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_rsp_payload_data_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, VlWide<18>/*575:0*/ &value_io_dma0Ext_rsp_payload_data);
+using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_rsp_payload_rsp_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ &value_io_dma0Ext_rsp_payload_rsp);
+using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_rsp_ready_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ &value_io_dma0Ext_rsp_ready);
+using VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_rsp_valid_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ &value_io_dma0Ext_rsp_valid);
 using VsvsimTestbench__Vcb_getBitsImpl_io_dma1Ext_addr_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, IData/*31:0*/ &value_io_dma1Ext_addr);
 using VsvsimTestbench__Vcb_getBitsImpl_io_dma1Ext_grant_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ &value_io_dma1Ext_grant);
 using VsvsimTestbench__Vcb_getBitsImpl_io_dma1Ext_isWrite_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ &value_io_dma1Ext_isWrite);
@@ -126,10 +119,10 @@ using VsvsimTestbench__Vcb_setBitsImpl_io_cmd_payload_op_t = void (*) (VsvsimTes
 using VsvsimTestbench__Vcb_setBitsImpl_io_cmd_payload_reg0Addr_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*4:0*/ value_io_cmd_payload_reg0Addr);
 using VsvsimTestbench__Vcb_setBitsImpl_io_cmd_payload_reg1Addr_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*4:0*/ value_io_cmd_payload_reg1Addr);
 using VsvsimTestbench__Vcb_setBitsImpl_io_cmd_valid_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ value_io_cmd_valid);
-using VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_grant_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ value_io_dma0Ext_grant);
-using VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_readData_payload_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, VlWide<18>/*575:0*/ value_io_dma0Ext_readData_payload);
-using VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_readData_valid_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ value_io_dma0Ext_readData_valid);
-using VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_writeData_ready_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ value_io_dma0Ext_writeData_ready);
+using VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_cmd_ready_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ value_io_dma0Ext_cmd_ready);
+using VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_rsp_payload_data_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, VlWide<18>/*575:0*/ value_io_dma0Ext_rsp_payload_data);
+using VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_rsp_payload_rsp_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ value_io_dma0Ext_rsp_payload_rsp);
+using VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_rsp_valid_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ value_io_dma0Ext_rsp_valid);
 using VsvsimTestbench__Vcb_setBitsImpl_io_dma1Ext_grant_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ value_io_dma1Ext_grant);
 using VsvsimTestbench__Vcb_setBitsImpl_io_dma1Ext_readData_payload_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, VlWide<18>/*575:0*/ value_io_dma1Ext_readData_payload);
 using VsvsimTestbench__Vcb_setBitsImpl_io_dma1Ext_readData_valid_t = void (*) (VsvsimTestbench__Syms* __restrict vlSymsp, CData/*0:0*/ value_io_dma1Ext_readData_valid);
@@ -417,6 +410,7 @@ class alignas(VL_CACHE_LINE_BYTES) VsvsimTestbench__Syms final : public Verilate
 
     // SCOPE NAMES
     VerilatedScope* __Vscopep_svsimTestbench;
+    VerilatedScope* __Vscopep_svsimTestbench__dut__executor__verification_assert;
 
     // CONSTRUCTORS
     VsvsimTestbench__Syms(VerilatedContext* contextp, const char* namep, VsvsimTestbench* modelp);

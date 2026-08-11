@@ -1,9 +1,9 @@
-/** HiveCore 轻量级 DMA 引擎。
+/** HiveCore 轻量级 DMA 引擎（自主 tile 扫描版）。
   *
-  * 仅支持线性数据搬运（push/pop queue），由内部 Executor FSM 直接控制。
-  * 每个 DMA 实例通过 bufWidth 参数指定 buffer 接口位宽：
-  *   - DMA0: bufWidth = cfg.totalN * cfg.aEffW  (A buffer)
-  *   - DMA1: bufWidth = cfg.totalN * cfg.cEffW  (C buffer)
+  * 仅支持线性数据搬运（push/pop queue），启动后完全自主运行，
+  * 由 occupancy/availability 反压，不依赖 Executor 逐请求控制：
+  *   - HiveCoreDmaRdOnly: 外部存储 → buffer（A buffer / B buffer）
+  *   - HiveCoreDmaWrOnly: C buffer → 外部存储（storeGate 门控）
   */
 
 import chisel3._
@@ -18,8 +18,10 @@ import chisel3.util._
   * B 矩阵固定「N 外 K 内」遍历（与 Executor 的 N→K→M 消费顺序匹配）：
   *   内层沿 K 方向（kTile*totalN 行，每拍地址 + bRowAddressOffset），
   *   外层扫 nTile 个 N tile（块间跳 bColAddressOffset）。
-  * A 矩阵固定为：内层扫 mTile*totalN 行（+ aRowAddressOffset 行步进），
-  *              外层扫 kTile 个 K tile（块间跳 aColAddressOffset）。
+  * A 矩阵固定为：内层扫实际 M 行（regFile.m，边界感知不含 padding，
+  *              + aRowAddressOffset 行步进），外层扫 kTile 个 K tile
+  *              （块间跳 aColAddressOffset）。Executor 每 K pass 只消费
+  *              实际 M 行，FIFO 顺序保证逐 kTile 块对齐。
   *
   * 地址模型（与 HiveCoreExecutor 的 aTileAddr/bTileAddr 一致，字节地址）：
   *   A_tile_addr = regAAddr + mTileIdx*totalN*aRowOffset + kTileIdx*aColOffset
@@ -33,6 +35,11 @@ import chisel3.util._
   *
   * 运行模式：启动后完全自主运行——逐 tile 块连续搬运，块间不做任何
   * 上游握手，直到所有 tile 块搬完后发一拍 done 脉冲回 IDLE。
+  *
+  * start 语义：io.start 在任意状态均可重新装载（复位计数/错误、重新锁存
+  * 遍历参数、进入 sREQ_EXT），用于异常路径（Executor errState）后的强制
+  * 重启，避免 DMA 卡在 sREQ_EXT 等永不再来的门控、下次 EXECUTE 携旧参数
+  * 静默写错。安全性：脱离 sTRANSFER 时外部流 ready/valid 自然拉低，无协议违约。
   *
   * @param cfg     HiveCore 配置
   * @param bufWidth buffer push 数据位宽（默认 = extDataWidth，每拍 push 一个 beat）
@@ -107,49 +114,56 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   io.err  := errReg
 
   // ==========================================================================
-  // FSM 主体
+  // start 重新装载（任意状态生效，置于 switch 之前：Chisel last-connect
+  // 语义下覆盖本拍 switch 内的任何状态/计数更新）。
+  // 用途：Executor 异常路径（容量检查失败/cPush 违约）回 idle 后，下次
+  // EXECUTE 的 start 必须能强制重启已卡在 sREQ_EXT/sTRANSFER 的本 DMA，
+  // 否则会携带旧锁存参数继续运行 → 静默数据错。
+  // 安全性：脱离 sTRANSFER 后外部 rsp.ready/bufPush.valid 自然拉低，无协议违约
   // ==========================================================================
+  when(io.start) {
+    state  := sREQ_EXT
+    rowCnt := 0.U
+    blkCnt := 0.U
+    errReg := false.B
+    when(io.isA) {
+      // A 矩阵：内层扫实际 M 行（regFile.m，边界感知不含 padding 行），
+      // 外层扫 kTile 个 K tile。Executor 每 K pass 只 push 实际 M 行，
+      // 若按 mTile*totalN 扫描会把边界 M 的 padding 行混入 FIFO
+      isAReg  := true.B
+      curAddr   := io.regFile.aAddr
+      rowStep   := io.calcConfig.aRowAddressOffset
+      blkJump   := io.calcConfig.aColAddressOffset -
+                   (io.regFile.m - 1.U) * io.calcConfig.aRowAddressOffset
+      innerRows := io.regFile.m
+      blkTarget := io.calcConfig.kTile
+    }.otherwise {
+      // B 矩阵：三级遍历「N 外 → kTile 中 → 块内行降序」。
+      // 权重下沉协议下 PE(x,y) 最终锁存「最后供数行 - x」，每个 kTile 块
+      // 必须按 K 行降序供数（先读块内最高行），executor 顺序 pop 供数后
+      // 才能使 PE(x,y).wReg = B[kTile*totalN + x][y]（正序落位，标准 GEMM）。
+      // 起始地址 = 块内最高行；块内每拍 -bRowOffset；块间用预计算跳转量。
+      isAReg := false.B
+      val rowOff = io.calcConfig.bRowAddressOffset
+      val rowsLast = io.regFile.k - (io.calcConfig.kTile - 1.U) * cfg.totalN.U
+      rowsLastReg := rowsLast
+      val ktRows0 = Mux(io.calcConfig.kTile === 1.U, rowsLast, cfg.totalN.U)
+      ktRows    := ktRows0
+      ktCnt     := 0.U
+      blkTarget := io.calcConfig.nTile
+      curAddr   := io.regFile.bAddr + (ktRows0 - 1.U) * rowOff
+      bRowStep  := 0.U(cfg.addrWidth.W) - rowOff
+      bKtJump     := (2.U * cfg.totalN.U - 1.U) * rowOff
+      bKtJumpLast := (cfg.totalN.U + rowsLast - 1.U) * rowOff
+      bNJump      := io.calcConfig.bColAddressOffset + (cfg.totalN.U - 1.U) * rowOff -
+                     (io.calcConfig.kTile - 1.U) * cfg.totalN.U * rowOff
+    }
+  }
+
   switch(state) {
 
-    // --- sIDLE: 等待 start，锁存遍历参数 ---
-    is(sIDLE) {
-      rowCnt := 0.U
-      blkCnt := 0.U
-      errReg := false.B
-      when(io.start) {
-        when(io.isA) {
-          // A 矩阵：内层扫 mTile*totalN 行，外层扫 kTile 个 K tile
-          isAReg  := true.B
-          curAddr   := io.regFile.aAddr
-          rowStep   := io.calcConfig.aRowAddressOffset
-          blkJump   := io.calcConfig.aColAddressOffset -
-                       (io.calcConfig.mTile * cfg.totalN.U - 1.U) * io.calcConfig.aRowAddressOffset
-          innerRows := io.calcConfig.mTile * cfg.totalN.U
-          blkTarget := io.calcConfig.kTile
-        }.otherwise {
-          // B 矩阵：三级遍历「N 外 → kTile 中 → 块内行降序」。
-          // 权重下沉协议下 PE(x,y) 最终锁存「最后供数行 - x」，每个 kTile 块
-          // 必须按 K 行降序供数（先读块内最高行），executor 顺序 pop 供数后
-          // 才能使 PE(x,y).wReg = B[kTile*totalN + x][y]（正序落位，标准 GEMM）。
-          // 起始地址 = 块内最高行；块内每拍 -bRowOffset；块间用预计算跳转量。
-          isAReg := false.B
-          val rowOff = io.calcConfig.bRowAddressOffset
-          val rowsLast = io.regFile.k - (io.calcConfig.kTile - 1.U) * cfg.totalN.U
-          rowsLastReg := rowsLast
-          val ktRows0 = Mux(io.calcConfig.kTile === 1.U, rowsLast, cfg.totalN.U)
-          ktRows    := ktRows0
-          ktCnt     := 0.U
-          blkTarget := io.calcConfig.nTile
-          curAddr   := io.regFile.bAddr + (ktRows0 - 1.U) * rowOff
-          bRowStep  := 0.U(cfg.addrWidth.W) - rowOff
-          bKtJump     := (2.U * cfg.totalN.U - 1.U) * rowOff
-          bKtJumpLast := (cfg.totalN.U + rowsLast - 1.U) * rowOff
-          bNJump      := io.calcConfig.bColAddressOffset + (cfg.totalN.U - 1.U) * rowOff -
-                         (io.calcConfig.kTile - 1.U) * cfg.totalN.U * rowOff
-        }
-        state := sREQ_EXT
-      }
-    }
+    // --- sIDLE: 等待 start（锁存逻辑在上方统一处理，本状态无动作） ---
+    is(sIDLE) { }
 
     // --- sREQ_EXT: buffer 有空间才发起读命令 ---
     is(sREQ_EXT) {
@@ -238,8 +252,9 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   * C buffer 为严格 FIFO（StreamFifo），写回顺序 = Executor push 顺序，
   * 而 Executor 只有一套固定的 N→K→M 循环（M 恒为最内层），loopMode 只
   * 影响容量检查、不改变 C 写回遍历顺序，因此与 loopMode 无关。
-  *   - 内层沿 M 方向（mTile*totalN 行，每拍地址 + cRowAddressOffset），
-  *     外层扫 nTile 个 N tile（块间跳 cColAddressOffset）
+  *   - 内层沿 M 方向（实际 M 行 regFile.m，边界感知不含 padding，
+  *     每拍地址 + cRowAddressOffset），外层扫 nTile 个 N tile
+  *     （块间跳 cColAddressOffset）
   *
   * 地址模型（与 HiveCoreExecutor 的 cStoreAddr 约定一致，字节地址）：
   *   C_tile_addr = regCAddr + mTileIdx*totalN*cRowOffset + nTileIdx*cColOffset
@@ -247,11 +262,21 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   *   jump = blockOffset - (innerRows - 1) * rowStep
   *
   * 反压策略（与 RdOnly 对称）：
-  *   - C buffer 无数据 (bufOccupancy == 0) 时不发起写请求
+  *   - C buffer 无数据 (bufOccupancy == 0) 或 storeGate 未拉高时不发起写请求
   *   - 数据在外部 writeData.ready 为高时才 pop 发出，天然支持逐拍暂停
+  *
+  * 门控语义：io.storeGate 由 Executor 在末 K pass 的 store 窗口（sSTORE_C_DMA）
+  * 拉高，防止多 pass 中间 partial sum 被误搬；非末 K pass 期间 Executor
+  * 不会进入 store 窗口，storeGate 恒低，本 DMA 即使已 start 也不会写外。
+  * 内层行数锁存实际 M 行（regFile.m）：边界 M 下 Executor 只 push 实际
+  * M 行，若期望 mTile*totalN 行会永久等待挂死。
   *
   * 运行模式：启动后完全自主运行——逐 tile 块连续写回，块间不做任何
   * 上游握手，直到所有 tile 块搬完后发一拍 done 脉冲回 IDLE。
+  *
+  * start 语义：io.start 在任意状态均可重新装载（复位计数/错误、重新锁存
+  * 遍历参数、进入 sREQ_EXT），用于异常路径后的强制重启（同 RdOnly 说明）。
+  * 安全性：脱离 sTRANSFER 时 bufPop.ready/writeData.valid 自然拉低，无协议违约。
   *
   * @param cfg      HiveCore 配置
   * @param bufWidth buffer pop 数据位宽（默认 = extDataWidth，每拍 pop 一个 beat）
@@ -262,6 +287,7 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0) extends Module {
   val io = IO(new Bundle {
     // 控制/状态（无 peek 握手：DMA 启动后自主搬完所有 tile）
     val start = Input(Bool())                        // 启动脉冲
+    val storeGate = Input(Bool())                    // 写出门控（Executor 末 K pass store 窗口拉高）
     val done  = Output(Bool())                       // 完成脉冲
     val busy  = Output(Bool())                       // 忙标志
     val err   = Output(Bool())                       // 错误标志
@@ -313,33 +339,37 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0) extends Module {
   io.err  := errReg
 
   // ==========================================================================
-  // FSM 主体
+  // start 重新装载（任意状态生效，语义与安全性说明见 RdOnly 同构实现）：
+  // Executor 异常回 idle 后下次 EXECUTE 必须能强制重启卡死的本 DMA
   // ==========================================================================
+  when(io.start) {
+    state  := sREQ_EXT
+    rowCnt := 0.U
+    blkCnt := 0.U
+    errReg := false.B
+    // C 矩阵：固定「内 M 外 N」遍历（C buffer 为 FIFO，写回顺序 =
+    // Executor push 顺序，与 loopMode 无关）
+    curAddr := io.regFile.cAddr
+    // 内层沿实际 M 行（regFile.m，边界感知不含 padding），外层扫 nTile 个 N tile
+    // 与 Executor store 顺序一致：每个 N tile 写回所有实际 M 行
+    // （Executor 只 push 实际 M 行，若锁存 mTile*totalN 会永久等待挂死）
+    rowStep   := io.calcConfig.cRowAddressOffset
+    blkJump   := io.calcConfig.cColAddressOffset -
+                 (io.regFile.m - 1.U) * io.calcConfig.cRowAddressOffset
+    innerRows := io.regFile.m
+    blkTarget := io.calcConfig.nTile
+  }
+
   switch(state) {
 
-    // --- sIDLE: 等待 start，锁存 C 矩阵遍历参数 ---
-    is(sIDLE) {
-      rowCnt := 0.U
-      blkCnt := 0.U
-      errReg := false.B
-      when(io.start) {
-        // C 矩阵：固定「内 M 外 N」遍历（C buffer 为 FIFO，写回顺序 =
-        // Executor push 顺序，与 loopMode 无关）
-        curAddr := io.regFile.cAddr
-        // 内层沿 M（mTile*totalN 行），外层扫 nTile 个 N tile
-        // 与 Executor store 顺序一致：每个 N tile 写回所有 M 行
-        rowStep   := io.calcConfig.cRowAddressOffset
-        blkJump   := io.calcConfig.cColAddressOffset -
-                     (io.calcConfig.mTile * cfg.totalN.U - 1.U) * io.calcConfig.cRowAddressOffset
-        innerRows := io.calcConfig.mTile * cfg.totalN.U
-        blkTarget := io.calcConfig.nTile
-        state := sREQ_EXT
-      }
-    }
+    // --- sIDLE: 等待 start（锁存逻辑在上方统一处理，本状态无动作） ---
+    is(sIDLE) { }
 
-    // --- sREQ_EXT: buffer 有数据才发起写请求 ---
+    // --- sREQ_EXT: buffer 有数据且 storeGate 拉高才发起写请求 ---
+    // storeGate 由 Executor 在末 K pass 的 store 窗口拉高，防止多 pass
+    // 中间 partial sum 被误搬出
     is(sREQ_EXT) {
-      when(io.bufOccupancy =/= 0.U) {
+      when(io.bufOccupancy =/= 0.U && io.storeGate) {
         io.dmaExtWrIF.req := true.B
         when(io.dmaExtWrIF.grant) {
           state := sTRANSFER
@@ -377,148 +407,6 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0) extends Module {
     is(sDONE) {
       io.done := true.B
       state := sIDLE
-    }
-  }
-}
-
-
-class HiveCoreDmaEngine(cfg: HiveCoreConfig, bufWidth: Int) extends Module {
-
-  val io = IO(new Bundle {
-    // 内部控制信号（由 Executor FSM 直接驱动）
-    val start     = Input(Bool())       // 脉冲启动传输
-    val isLoad    = Input(Bool())       // true=外部→buffer, false=buffer→外部
-    val addr      = Input(UInt(cfg.addrWidth.W))
-    val len       = Input(UInt(16.W))   // beat 数
-    val busy      = Output(Bool())
-    val done      = Output(Bool())      // 脉冲，完成一次传输
-
-    // 外部数据接口
-    val extReadData  = Input(UInt(cfg.extDataWidth.W))
-    val extReadValid = Input(Bool())
-    val extReadReady = Output(Bool())   // 反压信号：buffer 满时拒绝外部数据
-    val extWriteData = Output(UInt(cfg.extDataWidth.W))
-    val extWriteValid = Output(Bool())
-    val extWriteReady = Input(Bool())
-    val extAddr  = Output(UInt(cfg.addrWidth.W))
-    val extLen   = Output(UInt(16.W))
-    val extReq   = Output(Bool())
-    val extGrant = Input(Bool())
-    val extIsWrite = Output(Bool())
-
-    // Scratchpad buffer 接口（push = 写入 buffer, pop = 从 buffer 读）
-    val bufPush      = master(Stream(UInt(bufWidth.W)))
-    val bufPop       = slave(Stream(UInt(bufWidth.W)))
-    val bufAvailability = Input(UInt(log2Up(cfg.aBufferDepth + 1).W))
-    val bufOccupancy    = Input(UInt(log2Up(cfg.cBufferDepth + 1).W))
-  })
-
-  // ==========================================================================
-  // FSM 状态编码
-  // ==========================================================================
-  val sIDLE     = 0.U(2.W)
-  val sREQ_EXT  = 1.U(2.W)
-  val sTRANSFER = 2.U(2.W)
-  val sDONE     = 3.U(2.W)
-
-  val state = RegInit(sIDLE)
-
-  // ==========================================================================
-  // 内部寄存器
-  // ==========================================================================
-  val addrReg    = Reg(UInt(cfg.addrWidth.W))
-  val lenReg     = Reg(UInt(16.W))
-  val isLoadReg  = Reg(Bool())
-
-  val beatCounter = Reg(UInt(16.W))
-
-  // ==========================================================================
-  // 默认输出
-  // ==========================================================================
-  io.done          := false.B
-  io.extAddr       := 0.U
-  io.extLen        := 0.U
-  io.extReq        := false.B
-  io.extIsWrite    := false.B
-  io.extReadReady  := false.B
-  io.extWriteData  := 0.U
-  io.extWriteValid := false.B
-
-  io.bufPush.valid   := false.B
-  io.bufPush.payload := 0.U
-  io.bufPop.ready    := false.B
-
-  io.busy := state =/= sIDLE
-
-  // ==========================================================================
-  // FSM 逻辑
-  // ==========================================================================
-  switch(state) {
-
-    // --- sIDLE: 等待启动脉冲 ---
-    is(sIDLE) {
-      when(io.start) {
-        isLoadReg   := io.isLoad
-        addrReg     := io.addr
-        lenReg      := io.len
-        beatCounter := io.len
-        state       := sREQ_EXT
-      }
-    }
-
-    // --- sREQ_EXT: 向外部发起请求（检查 buffer 空间/数据量） ---
-    is(sREQ_EXT) {
-      // Load 模式: 确保 buffer 有足够空间接收整个 burst
-      // Store 模式: 确保 buffer 有足够数据发送整个 burst
-      val canRequest = Mux(isLoadReg,
-        io.bufAvailability >= lenReg,
-        io.bufOccupancy >= lenReg)
-
-      when(canRequest) {
-        io.extReq     := true.B
-        io.extAddr    := addrReg
-        io.extLen     := lenReg
-        io.extIsWrite := !isLoadReg
-
-        when(io.extGrant) {
-          state := sTRANSFER
-        }
-      }
-    }
-
-    // --- sTRANSFER: 数据搬运 ---
-    is(sTRANSFER) {
-      when(isLoadReg) {
-        // Load 模式：外部 → buffer
-        // 仅在 buffer 能接收且还有剩余 beat 时才 ready
-        io.extReadReady := io.bufPush.ready && (beatCounter =/= 0.U)
-        when(io.extReadValid && io.bufPush.ready && (beatCounter =/= 0.U)) {
-          io.bufPush.valid   := true.B
-          io.bufPush.payload := io.extReadData
-          beatCounter := beatCounter - 1.U
-        }
-      }.otherwise {
-        // Store 模式：buffer → 外部
-        when((io.bufOccupancy > 0.U) && io.extWriteReady) {
-          io.bufPop.ready    := true.B
-          io.extWriteData    := io.bufPop.payload
-          io.extWriteValid   := io.bufPop.valid
-          when(io.bufPop.fire) {
-            beatCounter := beatCounter - 1.U
-          }
-        }
-      }
-
-      // 传输完成
-      when(beatCounter === 0.U) {
-        state := sDONE
-      }
-    }
-
-    // --- sDONE: 发送完成脉冲 ---
-    is(sDONE) {
-      io.done := true.B
-      state   := sIDLE
     }
   }
 }

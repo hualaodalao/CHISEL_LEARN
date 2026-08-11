@@ -43,164 +43,164 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module HiveComb(	// src/hive/scala/main/HiveComb.scala:48:7
-  input         clock,	// src/hive/scala/main/HiveComb.scala:48:7
-                reset,	// src/hive/scala/main/HiveComb.scala:48:7
-  input  [15:0] io_aIn_0,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_aIn_1,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_aIn_2,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_aIn_3,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_aIn_4,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_aIn_5,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_aIn_6,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_aIn_7,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_aIn_8,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_aIn_9,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_aIn_10,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_aIn_11,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_aIn_12,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_aIn_13,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_aIn_14,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_aIn_15,	// src/hive/scala/main/HiveComb.scala:72:14
-  input  [31:0] io_psumIn_0,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_psumIn_1,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_psumIn_2,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_psumIn_3,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_psumIn_4,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_psumIn_5,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_psumIn_6,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_psumIn_7,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_psumIn_8,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_psumIn_9,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_psumIn_10,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_psumIn_11,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_psumIn_12,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_psumIn_13,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_psumIn_14,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_psumIn_15,	// src/hive/scala/main/HiveComb.scala:72:14
-  output [31:0] io_cOut_0,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_cOut_1,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_cOut_2,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_cOut_3,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_cOut_4,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_cOut_5,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_cOut_6,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_cOut_7,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_cOut_8,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_cOut_9,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_cOut_10,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_cOut_11,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_cOut_12,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_cOut_13,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_cOut_14,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_cOut_15,	// src/hive/scala/main/HiveComb.scala:72:14
-  input         io_loadHIn,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_loadVIn,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_validIn,	// src/hive/scala/main/HiveComb.scala:72:14
-  input  [1:0]  io_fmtIn,	// src/hive/scala/main/HiveComb.scala:72:14
-  input  [2:0]  io_rndIn,	// src/hive/scala/main/HiveComb.scala:72:14
-  input         io_clear,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_loadVLock,	// src/hive/scala/main/HiveComb.scala:72:14
-  output        io_validOut_0,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_validOut_1,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_validOut_2,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_validOut_3,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_validOut_4,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_validOut_5,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_validOut_6,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_validOut_7,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_validOut_8,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_validOut_9,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_validOut_10,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_validOut_11,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_validOut_12,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_validOut_13,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_validOut_14,	// src/hive/scala/main/HiveComb.scala:72:14
-                io_validOut_15	// src/hive/scala/main/HiveComb.scala:72:14
+module HiveComb(	// src/hive/scala/main/HiveComb.scala:51:7
+  input         clock,	// src/hive/scala/main/HiveComb.scala:51:7
+                reset,	// src/hive/scala/main/HiveComb.scala:51:7
+  input  [15:0] io_aIn_0,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_aIn_1,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_aIn_2,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_aIn_3,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_aIn_4,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_aIn_5,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_aIn_6,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_aIn_7,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_aIn_8,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_aIn_9,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_aIn_10,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_aIn_11,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_aIn_12,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_aIn_13,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_aIn_14,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_aIn_15,	// src/hive/scala/main/HiveComb.scala:75:14
+  input  [31:0] io_psumIn_0,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_psumIn_1,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_psumIn_2,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_psumIn_3,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_psumIn_4,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_psumIn_5,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_psumIn_6,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_psumIn_7,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_psumIn_8,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_psumIn_9,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_psumIn_10,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_psumIn_11,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_psumIn_12,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_psumIn_13,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_psumIn_14,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_psumIn_15,	// src/hive/scala/main/HiveComb.scala:75:14
+  output [31:0] io_cOut_0,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_cOut_1,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_cOut_2,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_cOut_3,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_cOut_4,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_cOut_5,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_cOut_6,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_cOut_7,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_cOut_8,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_cOut_9,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_cOut_10,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_cOut_11,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_cOut_12,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_cOut_13,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_cOut_14,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_cOut_15,	// src/hive/scala/main/HiveComb.scala:75:14
+  input         io_loadHIn,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_loadVIn,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_validIn,	// src/hive/scala/main/HiveComb.scala:75:14
+  input  [1:0]  io_fmtIn,	// src/hive/scala/main/HiveComb.scala:75:14
+  input  [2:0]  io_rndIn,	// src/hive/scala/main/HiveComb.scala:75:14
+  input         io_clear,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_loadVLock,	// src/hive/scala/main/HiveComb.scala:75:14
+  output        io_validOut_0,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_validOut_1,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_validOut_2,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_validOut_3,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_validOut_4,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_validOut_5,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_validOut_6,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_validOut_7,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_validOut_8,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_validOut_9,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_validOut_10,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_validOut_11,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_validOut_12,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_validOut_13,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_validOut_14,	// src/hive/scala/main/HiveComb.scala:75:14
+                io_validOut_15	// src/hive/scala/main/HiveComb.scala:75:14
 );
 
-  wire [15:0] _arrays_1_0_io_aOut_0;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [15:0] _arrays_1_0_io_aOut_1;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [15:0] _arrays_1_0_io_aOut_2;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [15:0] _arrays_1_0_io_aOut_3;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [15:0] _arrays_1_0_io_aOut_4;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [15:0] _arrays_1_0_io_aOut_5;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [15:0] _arrays_1_0_io_aOut_6;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [15:0] _arrays_1_0_io_aOut_7;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire        _arrays_1_0_io_validOut_0;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [1:0]  _arrays_1_0_io_fmtOut;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [2:0]  _arrays_1_0_io_rndOut;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [31:0] _arrays_0_1_io_cOut_0;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [31:0] _arrays_0_1_io_cOut_1;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [31:0] _arrays_0_1_io_cOut_2;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [31:0] _arrays_0_1_io_cOut_3;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [31:0] _arrays_0_1_io_cOut_4;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [31:0] _arrays_0_1_io_cOut_5;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [31:0] _arrays_0_1_io_cOut_6;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [31:0] _arrays_0_1_io_cOut_7;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [15:0] _arrays_0_0_io_aOut_0;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [15:0] _arrays_0_0_io_aOut_1;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [15:0] _arrays_0_0_io_aOut_2;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [15:0] _arrays_0_0_io_aOut_3;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [15:0] _arrays_0_0_io_aOut_4;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [15:0] _arrays_0_0_io_aOut_5;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [15:0] _arrays_0_0_io_aOut_6;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [15:0] _arrays_0_0_io_aOut_7;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [31:0] _arrays_0_0_io_cOut_0;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [31:0] _arrays_0_0_io_cOut_1;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [31:0] _arrays_0_0_io_cOut_2;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [31:0] _arrays_0_0_io_cOut_3;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [31:0] _arrays_0_0_io_cOut_4;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [31:0] _arrays_0_0_io_cOut_5;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [31:0] _arrays_0_0_io_cOut_6;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [31:0] _arrays_0_0_io_cOut_7;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire        _arrays_0_0_io_validOut_0;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [1:0]  _arrays_0_0_io_fmtOut;	// src/hive/scala/main/HiveComb.scala:92:11
-  wire [2:0]  _arrays_0_0_io_rndOut;	// src/hive/scala/main/HiveComb.scala:92:11
-  reg         validSkewedPerRow_r;	// src/hive/scala/main/HiveComb.scala:104:53
-  reg         validSkewedPerRow_r_1;	// src/hive/scala/main/HiveComb.scala:104:53
-  reg         validSkewedPerRow_r_2;	// src/hive/scala/main/HiveComb.scala:104:53
-  reg         validSkewedPerRow_r_3;	// src/hive/scala/main/HiveComb.scala:104:53
-  reg         validSkewedPerRow_r_4;	// src/hive/scala/main/HiveComb.scala:104:53
-  reg         validSkewedPerRow_r_5;	// src/hive/scala/main/HiveComb.scala:104:53
-  reg         validSkewedPerRow_r_6;	// src/hive/scala/main/HiveComb.scala:104:53
-  reg         validSkewedPerRow_1;	// src/hive/scala/main/HiveComb.scala:104:53
-  always @(posedge clock) begin	// src/hive/scala/main/HiveComb.scala:48:7
-    validSkewedPerRow_r <= io_validIn;	// src/hive/scala/main/HiveComb.scala:104:53
-    validSkewedPerRow_r_1 <= validSkewedPerRow_r;	// src/hive/scala/main/HiveComb.scala:104:53
-    validSkewedPerRow_r_2 <= validSkewedPerRow_r_1;	// src/hive/scala/main/HiveComb.scala:104:53
-    validSkewedPerRow_r_3 <= validSkewedPerRow_r_2;	// src/hive/scala/main/HiveComb.scala:104:53
-    validSkewedPerRow_r_4 <= validSkewedPerRow_r_3;	// src/hive/scala/main/HiveComb.scala:104:53
-    validSkewedPerRow_r_5 <= validSkewedPerRow_r_4;	// src/hive/scala/main/HiveComb.scala:104:53
-    validSkewedPerRow_r_6 <= validSkewedPerRow_r_5;	// src/hive/scala/main/HiveComb.scala:104:53
-    validSkewedPerRow_1 <= validSkewedPerRow_r_6;	// src/hive/scala/main/HiveComb.scala:104:53
+  wire [15:0] _arrays_1_0_io_aOut_0;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [15:0] _arrays_1_0_io_aOut_1;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [15:0] _arrays_1_0_io_aOut_2;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [15:0] _arrays_1_0_io_aOut_3;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [15:0] _arrays_1_0_io_aOut_4;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [15:0] _arrays_1_0_io_aOut_5;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [15:0] _arrays_1_0_io_aOut_6;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [15:0] _arrays_1_0_io_aOut_7;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire        _arrays_1_0_io_validOut_0;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [1:0]  _arrays_1_0_io_fmtOut;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [2:0]  _arrays_1_0_io_rndOut;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [31:0] _arrays_0_1_io_cOut_0;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [31:0] _arrays_0_1_io_cOut_1;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [31:0] _arrays_0_1_io_cOut_2;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [31:0] _arrays_0_1_io_cOut_3;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [31:0] _arrays_0_1_io_cOut_4;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [31:0] _arrays_0_1_io_cOut_5;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [31:0] _arrays_0_1_io_cOut_6;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [31:0] _arrays_0_1_io_cOut_7;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [15:0] _arrays_0_0_io_aOut_0;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [15:0] _arrays_0_0_io_aOut_1;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [15:0] _arrays_0_0_io_aOut_2;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [15:0] _arrays_0_0_io_aOut_3;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [15:0] _arrays_0_0_io_aOut_4;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [15:0] _arrays_0_0_io_aOut_5;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [15:0] _arrays_0_0_io_aOut_6;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [15:0] _arrays_0_0_io_aOut_7;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [31:0] _arrays_0_0_io_cOut_0;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [31:0] _arrays_0_0_io_cOut_1;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [31:0] _arrays_0_0_io_cOut_2;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [31:0] _arrays_0_0_io_cOut_3;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [31:0] _arrays_0_0_io_cOut_4;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [31:0] _arrays_0_0_io_cOut_5;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [31:0] _arrays_0_0_io_cOut_6;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [31:0] _arrays_0_0_io_cOut_7;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire        _arrays_0_0_io_validOut_0;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [1:0]  _arrays_0_0_io_fmtOut;	// src/hive/scala/main/HiveComb.scala:95:11
+  wire [2:0]  _arrays_0_0_io_rndOut;	// src/hive/scala/main/HiveComb.scala:95:11
+  reg         validSkewedPerRow_r;	// src/hive/scala/main/HiveComb.scala:107:53
+  reg         validSkewedPerRow_r_1;	// src/hive/scala/main/HiveComb.scala:107:53
+  reg         validSkewedPerRow_r_2;	// src/hive/scala/main/HiveComb.scala:107:53
+  reg         validSkewedPerRow_r_3;	// src/hive/scala/main/HiveComb.scala:107:53
+  reg         validSkewedPerRow_r_4;	// src/hive/scala/main/HiveComb.scala:107:53
+  reg         validSkewedPerRow_r_5;	// src/hive/scala/main/HiveComb.scala:107:53
+  reg         validSkewedPerRow_r_6;	// src/hive/scala/main/HiveComb.scala:107:53
+  reg         validSkewedPerRow_1;	// src/hive/scala/main/HiveComb.scala:107:53
+  always @(posedge clock) begin	// src/hive/scala/main/HiveComb.scala:51:7
+    validSkewedPerRow_r <= io_validIn;	// src/hive/scala/main/HiveComb.scala:107:53
+    validSkewedPerRow_r_1 <= validSkewedPerRow_r;	// src/hive/scala/main/HiveComb.scala:107:53
+    validSkewedPerRow_r_2 <= validSkewedPerRow_r_1;	// src/hive/scala/main/HiveComb.scala:107:53
+    validSkewedPerRow_r_3 <= validSkewedPerRow_r_2;	// src/hive/scala/main/HiveComb.scala:107:53
+    validSkewedPerRow_r_4 <= validSkewedPerRow_r_3;	// src/hive/scala/main/HiveComb.scala:107:53
+    validSkewedPerRow_r_5 <= validSkewedPerRow_r_4;	// src/hive/scala/main/HiveComb.scala:107:53
+    validSkewedPerRow_r_6 <= validSkewedPerRow_r_5;	// src/hive/scala/main/HiveComb.scala:107:53
+    validSkewedPerRow_1 <= validSkewedPerRow_r_6;	// src/hive/scala/main/HiveComb.scala:107:53
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// src/hive/scala/main/HiveComb.scala:48:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveComb.scala:48:7
-      `FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveComb.scala:48:7
+  `ifdef ENABLE_INITIAL_REG_	// src/hive/scala/main/HiveComb.scala:51:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveComb.scala:51:7
+      `FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveComb.scala:51:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/hive/scala/main/HiveComb.scala:48:7
-      automatic logic [31:0] _RANDOM[0:0];	// src/hive/scala/main/HiveComb.scala:48:7
-      `ifdef INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveComb.scala:48:7
-        `INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveComb.scala:48:7
+    initial begin	// src/hive/scala/main/HiveComb.scala:51:7
+      automatic logic [31:0] _RANDOM[0:0];	// src/hive/scala/main/HiveComb.scala:51:7
+      `ifdef INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveComb.scala:51:7
+        `INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveComb.scala:51:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/hive/scala/main/HiveComb.scala:48:7
-        _RANDOM[/*Zero width*/ 1'b0] = `RANDOM;	// src/hive/scala/main/HiveComb.scala:48:7
-        validSkewedPerRow_r = _RANDOM[/*Zero width*/ 1'b0][0];	// src/hive/scala/main/HiveComb.scala:48:7, :104:53
-        validSkewedPerRow_r_1 = _RANDOM[/*Zero width*/ 1'b0][1];	// src/hive/scala/main/HiveComb.scala:48:7, :104:53
-        validSkewedPerRow_r_2 = _RANDOM[/*Zero width*/ 1'b0][2];	// src/hive/scala/main/HiveComb.scala:48:7, :104:53
-        validSkewedPerRow_r_3 = _RANDOM[/*Zero width*/ 1'b0][3];	// src/hive/scala/main/HiveComb.scala:48:7, :104:53
-        validSkewedPerRow_r_4 = _RANDOM[/*Zero width*/ 1'b0][4];	// src/hive/scala/main/HiveComb.scala:48:7, :104:53
-        validSkewedPerRow_r_5 = _RANDOM[/*Zero width*/ 1'b0][5];	// src/hive/scala/main/HiveComb.scala:48:7, :104:53
-        validSkewedPerRow_r_6 = _RANDOM[/*Zero width*/ 1'b0][6];	// src/hive/scala/main/HiveComb.scala:48:7, :104:53
-        validSkewedPerRow_1 = _RANDOM[/*Zero width*/ 1'b0][7];	// src/hive/scala/main/HiveComb.scala:48:7, :104:53
+      `ifdef RANDOMIZE_REG_INIT	// src/hive/scala/main/HiveComb.scala:51:7
+        _RANDOM[/*Zero width*/ 1'b0] = `RANDOM;	// src/hive/scala/main/HiveComb.scala:51:7
+        validSkewedPerRow_r = _RANDOM[/*Zero width*/ 1'b0][0];	// src/hive/scala/main/HiveComb.scala:51:7, :107:53
+        validSkewedPerRow_r_1 = _RANDOM[/*Zero width*/ 1'b0][1];	// src/hive/scala/main/HiveComb.scala:51:7, :107:53
+        validSkewedPerRow_r_2 = _RANDOM[/*Zero width*/ 1'b0][2];	// src/hive/scala/main/HiveComb.scala:51:7, :107:53
+        validSkewedPerRow_r_3 = _RANDOM[/*Zero width*/ 1'b0][3];	// src/hive/scala/main/HiveComb.scala:51:7, :107:53
+        validSkewedPerRow_r_4 = _RANDOM[/*Zero width*/ 1'b0][4];	// src/hive/scala/main/HiveComb.scala:51:7, :107:53
+        validSkewedPerRow_r_5 = _RANDOM[/*Zero width*/ 1'b0][5];	// src/hive/scala/main/HiveComb.scala:51:7, :107:53
+        validSkewedPerRow_r_6 = _RANDOM[/*Zero width*/ 1'b0][6];	// src/hive/scala/main/HiveComb.scala:51:7, :107:53
+        validSkewedPerRow_1 = _RANDOM[/*Zero width*/ 1'b0][7];	// src/hive/scala/main/HiveComb.scala:51:7, :107:53
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveComb.scala:48:7
-      `FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveComb.scala:48:7
+    `ifdef FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveComb.scala:51:7
+      `FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveComb.scala:51:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  HiveCell arrays_0_0 (	// src/hive/scala/main/HiveComb.scala:92:11
+  HiveCell arrays_0_0 (	// src/hive/scala/main/HiveComb.scala:95:11
     .clock         (clock),
     .reset         (reset),
     .io_aIn_0      (io_aIn_0),
@@ -219,14 +219,14 @@ module HiveComb(	// src/hive/scala/main/HiveComb.scala:48:7
     .io_aOut_5     (_arrays_0_0_io_aOut_5),
     .io_aOut_6     (_arrays_0_0_io_aOut_6),
     .io_aOut_7     (_arrays_0_0_io_aOut_7),
-    .io_psumIn_0   (io_loadVIn ? io_psumIn_0 : 32'h0),	// src/hive/scala/main/HiveComb.scala:161:32
-    .io_psumIn_1   (io_loadVIn ? io_psumIn_1 : 32'h0),	// src/hive/scala/main/HiveComb.scala:161:32
-    .io_psumIn_2   (io_loadVIn ? io_psumIn_2 : 32'h0),	// src/hive/scala/main/HiveComb.scala:161:32
-    .io_psumIn_3   (io_loadVIn ? io_psumIn_3 : 32'h0),	// src/hive/scala/main/HiveComb.scala:161:32
-    .io_psumIn_4   (io_loadVIn ? io_psumIn_4 : 32'h0),	// src/hive/scala/main/HiveComb.scala:161:32
-    .io_psumIn_5   (io_loadVIn ? io_psumIn_5 : 32'h0),	// src/hive/scala/main/HiveComb.scala:161:32
-    .io_psumIn_6   (io_loadVIn ? io_psumIn_6 : 32'h0),	// src/hive/scala/main/HiveComb.scala:161:32
-    .io_psumIn_7   (io_loadVIn ? io_psumIn_7 : 32'h0),	// src/hive/scala/main/HiveComb.scala:161:32
+    .io_psumIn_0   (io_psumIn_0),
+    .io_psumIn_1   (io_psumIn_1),
+    .io_psumIn_2   (io_psumIn_2),
+    .io_psumIn_3   (io_psumIn_3),
+    .io_psumIn_4   (io_psumIn_4),
+    .io_psumIn_5   (io_psumIn_5),
+    .io_psumIn_6   (io_psumIn_6),
+    .io_psumIn_7   (io_psumIn_7),
     .io_cOut_0     (_arrays_0_0_io_cOut_0),
     .io_cOut_1     (_arrays_0_0_io_cOut_1),
     .io_cOut_2     (_arrays_0_0_io_cOut_2),
@@ -252,18 +252,18 @@ module HiveComb(	// src/hive/scala/main/HiveComb.scala:48:7
     .io_validOut_7 (/* unused */),
     .io_fmtOut     (_arrays_0_0_io_fmtOut),
     .io_rndOut     (_arrays_0_0_io_rndOut)
-  );	// src/hive/scala/main/HiveComb.scala:92:11
-  HiveCell arrays_0_1 (	// src/hive/scala/main/HiveComb.scala:92:11
+  );	// src/hive/scala/main/HiveComb.scala:95:11
+  HiveCell arrays_0_1 (	// src/hive/scala/main/HiveComb.scala:95:11
     .clock         (clock),
     .reset         (reset),
-    .io_aIn_0      (_arrays_0_0_io_aOut_0),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_aIn_1      (_arrays_0_0_io_aOut_1),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_aIn_2      (_arrays_0_0_io_aOut_2),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_aIn_3      (_arrays_0_0_io_aOut_3),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_aIn_4      (_arrays_0_0_io_aOut_4),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_aIn_5      (_arrays_0_0_io_aOut_5),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_aIn_6      (_arrays_0_0_io_aOut_6),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_aIn_7      (_arrays_0_0_io_aOut_7),	// src/hive/scala/main/HiveComb.scala:92:11
+    .io_aIn_0      (_arrays_0_0_io_aOut_0),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_aIn_1      (_arrays_0_0_io_aOut_1),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_aIn_2      (_arrays_0_0_io_aOut_2),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_aIn_3      (_arrays_0_0_io_aOut_3),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_aIn_4      (_arrays_0_0_io_aOut_4),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_aIn_5      (_arrays_0_0_io_aOut_5),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_aIn_6      (_arrays_0_0_io_aOut_6),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_aIn_7      (_arrays_0_0_io_aOut_7),	// src/hive/scala/main/HiveComb.scala:95:11
     .io_aOut_0     (/* unused */),
     .io_aOut_1     (/* unused */),
     .io_aOut_2     (/* unused */),
@@ -272,14 +272,14 @@ module HiveComb(	// src/hive/scala/main/HiveComb.scala:48:7
     .io_aOut_5     (/* unused */),
     .io_aOut_6     (/* unused */),
     .io_aOut_7     (/* unused */),
-    .io_psumIn_0   (io_loadVIn ? io_psumIn_8 : 32'h0),	// src/hive/scala/main/HiveComb.scala:161:32
-    .io_psumIn_1   (io_loadVIn ? io_psumIn_9 : 32'h0),	// src/hive/scala/main/HiveComb.scala:161:32
-    .io_psumIn_2   (io_loadVIn ? io_psumIn_10 : 32'h0),	// src/hive/scala/main/HiveComb.scala:161:32
-    .io_psumIn_3   (io_loadVIn ? io_psumIn_11 : 32'h0),	// src/hive/scala/main/HiveComb.scala:161:32
-    .io_psumIn_4   (io_loadVIn ? io_psumIn_12 : 32'h0),	// src/hive/scala/main/HiveComb.scala:161:32
-    .io_psumIn_5   (io_loadVIn ? io_psumIn_13 : 32'h0),	// src/hive/scala/main/HiveComb.scala:161:32
-    .io_psumIn_6   (io_loadVIn ? io_psumIn_14 : 32'h0),	// src/hive/scala/main/HiveComb.scala:161:32
-    .io_psumIn_7   (io_loadVIn ? io_psumIn_15 : 32'h0),	// src/hive/scala/main/HiveComb.scala:161:32
+    .io_psumIn_0   (io_psumIn_8),
+    .io_psumIn_1   (io_psumIn_9),
+    .io_psumIn_2   (io_psumIn_10),
+    .io_psumIn_3   (io_psumIn_11),
+    .io_psumIn_4   (io_psumIn_12),
+    .io_psumIn_5   (io_psumIn_13),
+    .io_psumIn_6   (io_psumIn_14),
+    .io_psumIn_7   (io_psumIn_15),
     .io_cOut_0     (_arrays_0_1_io_cOut_0),
     .io_cOut_1     (_arrays_0_1_io_cOut_1),
     .io_cOut_2     (_arrays_0_1_io_cOut_2),
@@ -290,9 +290,9 @@ module HiveComb(	// src/hive/scala/main/HiveComb.scala:48:7
     .io_cOut_7     (_arrays_0_1_io_cOut_7),
     .io_clear      (io_clear),
     .io_loadVLock  (io_loadVLock),
-    .io_validIn    (_arrays_0_0_io_validOut_0),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_fmtIn      (_arrays_0_0_io_fmtOut),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_rndIn      (_arrays_0_0_io_rndOut),	// src/hive/scala/main/HiveComb.scala:92:11
+    .io_validIn    (_arrays_0_0_io_validOut_0),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_fmtIn      (_arrays_0_0_io_fmtOut),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_rndIn      (_arrays_0_0_io_rndOut),	// src/hive/scala/main/HiveComb.scala:95:11
     .io_loadHIn    (io_loadHIn),
     .io_loadVIn    (io_loadVIn),
     .io_validOut_0 (/* unused */),
@@ -305,8 +305,8 @@ module HiveComb(	// src/hive/scala/main/HiveComb.scala:48:7
     .io_validOut_7 (/* unused */),
     .io_fmtOut     (/* unused */),
     .io_rndOut     (/* unused */)
-  );	// src/hive/scala/main/HiveComb.scala:92:11
-  HiveCell arrays_1_0 (	// src/hive/scala/main/HiveComb.scala:92:11
+  );	// src/hive/scala/main/HiveComb.scala:95:11
+  HiveCell arrays_1_0 (	// src/hive/scala/main/HiveComb.scala:95:11
     .clock         (clock),
     .reset         (reset),
     .io_aIn_0      (io_aIn_8),
@@ -325,14 +325,14 @@ module HiveComb(	// src/hive/scala/main/HiveComb.scala:48:7
     .io_aOut_5     (_arrays_1_0_io_aOut_5),
     .io_aOut_6     (_arrays_1_0_io_aOut_6),
     .io_aOut_7     (_arrays_1_0_io_aOut_7),
-    .io_psumIn_0   (_arrays_0_0_io_cOut_0),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_psumIn_1   (_arrays_0_0_io_cOut_1),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_psumIn_2   (_arrays_0_0_io_cOut_2),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_psumIn_3   (_arrays_0_0_io_cOut_3),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_psumIn_4   (_arrays_0_0_io_cOut_4),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_psumIn_5   (_arrays_0_0_io_cOut_5),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_psumIn_6   (_arrays_0_0_io_cOut_6),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_psumIn_7   (_arrays_0_0_io_cOut_7),	// src/hive/scala/main/HiveComb.scala:92:11
+    .io_psumIn_0   (_arrays_0_0_io_cOut_0),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_psumIn_1   (_arrays_0_0_io_cOut_1),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_psumIn_2   (_arrays_0_0_io_cOut_2),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_psumIn_3   (_arrays_0_0_io_cOut_3),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_psumIn_4   (_arrays_0_0_io_cOut_4),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_psumIn_5   (_arrays_0_0_io_cOut_5),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_psumIn_6   (_arrays_0_0_io_cOut_6),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_psumIn_7   (_arrays_0_0_io_cOut_7),	// src/hive/scala/main/HiveComb.scala:95:11
     .io_cOut_0     (io_cOut_0),
     .io_cOut_1     (io_cOut_1),
     .io_cOut_2     (io_cOut_2),
@@ -343,7 +343,7 @@ module HiveComb(	// src/hive/scala/main/HiveComb.scala:48:7
     .io_cOut_7     (io_cOut_7),
     .io_clear      (io_clear),
     .io_loadVLock  (io_loadVLock),
-    .io_validIn    (validSkewedPerRow_1),	// src/hive/scala/main/HiveComb.scala:104:53
+    .io_validIn    (validSkewedPerRow_1),	// src/hive/scala/main/HiveComb.scala:107:53
     .io_fmtIn      (io_fmtIn),
     .io_rndIn      (io_rndIn),
     .io_loadHIn    (io_loadHIn),
@@ -358,18 +358,18 @@ module HiveComb(	// src/hive/scala/main/HiveComb.scala:48:7
     .io_validOut_7 (io_validOut_7),
     .io_fmtOut     (_arrays_1_0_io_fmtOut),
     .io_rndOut     (_arrays_1_0_io_rndOut)
-  );	// src/hive/scala/main/HiveComb.scala:92:11
-  HiveCell arrays_1_1 (	// src/hive/scala/main/HiveComb.scala:92:11
+  );	// src/hive/scala/main/HiveComb.scala:95:11
+  HiveCell arrays_1_1 (	// src/hive/scala/main/HiveComb.scala:95:11
     .clock         (clock),
     .reset         (reset),
-    .io_aIn_0      (_arrays_1_0_io_aOut_0),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_aIn_1      (_arrays_1_0_io_aOut_1),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_aIn_2      (_arrays_1_0_io_aOut_2),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_aIn_3      (_arrays_1_0_io_aOut_3),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_aIn_4      (_arrays_1_0_io_aOut_4),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_aIn_5      (_arrays_1_0_io_aOut_5),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_aIn_6      (_arrays_1_0_io_aOut_6),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_aIn_7      (_arrays_1_0_io_aOut_7),	// src/hive/scala/main/HiveComb.scala:92:11
+    .io_aIn_0      (_arrays_1_0_io_aOut_0),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_aIn_1      (_arrays_1_0_io_aOut_1),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_aIn_2      (_arrays_1_0_io_aOut_2),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_aIn_3      (_arrays_1_0_io_aOut_3),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_aIn_4      (_arrays_1_0_io_aOut_4),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_aIn_5      (_arrays_1_0_io_aOut_5),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_aIn_6      (_arrays_1_0_io_aOut_6),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_aIn_7      (_arrays_1_0_io_aOut_7),	// src/hive/scala/main/HiveComb.scala:95:11
     .io_aOut_0     (/* unused */),
     .io_aOut_1     (/* unused */),
     .io_aOut_2     (/* unused */),
@@ -378,14 +378,14 @@ module HiveComb(	// src/hive/scala/main/HiveComb.scala:48:7
     .io_aOut_5     (/* unused */),
     .io_aOut_6     (/* unused */),
     .io_aOut_7     (/* unused */),
-    .io_psumIn_0   (_arrays_0_1_io_cOut_0),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_psumIn_1   (_arrays_0_1_io_cOut_1),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_psumIn_2   (_arrays_0_1_io_cOut_2),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_psumIn_3   (_arrays_0_1_io_cOut_3),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_psumIn_4   (_arrays_0_1_io_cOut_4),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_psumIn_5   (_arrays_0_1_io_cOut_5),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_psumIn_6   (_arrays_0_1_io_cOut_6),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_psumIn_7   (_arrays_0_1_io_cOut_7),	// src/hive/scala/main/HiveComb.scala:92:11
+    .io_psumIn_0   (_arrays_0_1_io_cOut_0),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_psumIn_1   (_arrays_0_1_io_cOut_1),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_psumIn_2   (_arrays_0_1_io_cOut_2),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_psumIn_3   (_arrays_0_1_io_cOut_3),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_psumIn_4   (_arrays_0_1_io_cOut_4),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_psumIn_5   (_arrays_0_1_io_cOut_5),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_psumIn_6   (_arrays_0_1_io_cOut_6),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_psumIn_7   (_arrays_0_1_io_cOut_7),	// src/hive/scala/main/HiveComb.scala:95:11
     .io_cOut_0     (io_cOut_8),
     .io_cOut_1     (io_cOut_9),
     .io_cOut_2     (io_cOut_10),
@@ -396,9 +396,9 @@ module HiveComb(	// src/hive/scala/main/HiveComb.scala:48:7
     .io_cOut_7     (io_cOut_15),
     .io_clear      (io_clear),
     .io_loadVLock  (io_loadVLock),
-    .io_validIn    (_arrays_1_0_io_validOut_0),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_fmtIn      (_arrays_1_0_io_fmtOut),	// src/hive/scala/main/HiveComb.scala:92:11
-    .io_rndIn      (_arrays_1_0_io_rndOut),	// src/hive/scala/main/HiveComb.scala:92:11
+    .io_validIn    (_arrays_1_0_io_validOut_0),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_fmtIn      (_arrays_1_0_io_fmtOut),	// src/hive/scala/main/HiveComb.scala:95:11
+    .io_rndIn      (_arrays_1_0_io_rndOut),	// src/hive/scala/main/HiveComb.scala:95:11
     .io_loadHIn    (io_loadHIn),
     .io_loadVIn    (io_loadVIn),
     .io_validOut_0 (io_validOut_8),
@@ -411,7 +411,7 @@ module HiveComb(	// src/hive/scala/main/HiveComb.scala:48:7
     .io_validOut_7 (io_validOut_15),
     .io_fmtOut     (/* unused */),
     .io_rndOut     (/* unused */)
-  );	// src/hive/scala/main/HiveComb.scala:92:11
-  assign io_validOut_0 = _arrays_1_0_io_validOut_0;	// src/hive/scala/main/HiveComb.scala:48:7, :92:11
+  );	// src/hive/scala/main/HiveComb.scala:95:11
+  assign io_validOut_0 = _arrays_1_0_io_validOut_0;	// src/hive/scala/main/HiveComb.scala:51:7, :95:11
 endmodule
 

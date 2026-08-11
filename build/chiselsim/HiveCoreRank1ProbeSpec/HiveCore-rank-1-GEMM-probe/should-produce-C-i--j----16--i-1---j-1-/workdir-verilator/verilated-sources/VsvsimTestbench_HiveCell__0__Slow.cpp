@@ -9,18 +9,26 @@ VL_ATTR_COLD void VsvsimTestbench_HiveCell___stl_sequent__TOP__svsimTestbench__D
     VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
     auto& vlSelfRef = std::ref(*vlSelf).get();
     // Body
-    vlSelfRef.io_loadHIn = ((~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_6)) 
+    vlSelfRef.io_rndIn = (7U & (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
+                                  ? (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__regFile_regs_7 
+                                     >> 2U) : ((vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__regFile_regs_7 
+                                                >> 2U) 
+                                               & (- (IData)(
+                                                            (1U 
+                                                             & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_9))))))) 
+                                & (- (IData)((1U & 
+                                              (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_4)))))));
+    vlSelfRef.io_fmtIn = ((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_4)
+                           ? 2U : (3U & ((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
+                                          ? vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__regFile_regs_7
+                                          : ((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_9)
+                                              ? 2U : vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__regFile_regs_7))));
+    vlSelfRef.io_loadHIn = ((~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_4)) 
                             & (3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state)));
-    vlSelfRef.io_rndIn = (7U & ((vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__regFile_regs_7 
-                                 >> 2U) & (- (IData)(
-                                                     (1U 
-                                                      & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_15)))))));
-    vlSelfRef.io_fmtIn = ((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_15)
-                           ? 2U : (3U & vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__regFile_regs_7));
     vlSelfRef.io_validIn = (((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__counter) 
                              < (0x0000ffffU & ((IData)(0x001eU) 
                                                + (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__curTileM)))) 
-                            & (IData)(vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_10));
+                            & (IData)(vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_8));
     vlSelfRef.io_aIn_7 = (((vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__aRegs_7[3U] 
                             << 0x00000010U) | (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__aRegs_7[3U] 
                                                >> 0x00000010U)) 
@@ -46,7 +54,7 @@ VL_ATTR_COLD void VsvsimTestbench_HiveCell___stl_sequent__TOP__svsimTestbench__D
     vlSelfRef.io_aIn_0 = (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__aRegs_0[0U] 
                           & (IData)(vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_3));
     vlSelfRef.io_clear = ((IData)(vlSelfRef.io_loadHIn) 
-                          & (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_9));
+                          & (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7));
     vlSelfRef.io_loadVLock = ((IData)(vlSelfRef.io_loadHIn) 
                               & ((~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__empty)) 
                                  & (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___io_bPop_ready_T)));
@@ -57,86 +65,66 @@ VL_ATTR_COLD void VsvsimTestbench_HiveCell___stl_sequent__TOP__svsimTestbench__D
     VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
     auto& vlSelfRef = std::ref(*vlSelf).get();
     // Body
-    vlSelfRef.io_psumIn_7 = ((- (IData)((IData)(vlSelfRef.io_loadVLock))) 
-                             & (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
-                                  ? ((- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7))) 
-                                     & (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ram_ext__DOT__Memory
-                                        [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__deq_ptr_value][3U] 
-                                        >> 0x00000010U))
-                                  : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_7[7U] 
-                                     & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
-                                & (- (IData)((1U & 
-                                              (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_6)))))));
-    vlSelfRef.io_psumIn_6 = ((- (IData)((IData)(vlSelfRef.io_loadVLock))) 
-                             & (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
-                                  ? (0x0000ffffU & 
-                                     ((- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7))) 
-                                      & vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ram_ext__DOT__Memory
-                                      [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__deq_ptr_value][3U]))
-                                  : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_6[6U] 
-                                     & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
-                                & (- (IData)((1U & 
-                                              (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_6)))))));
-    vlSelfRef.io_psumIn_5 = ((- (IData)((IData)(vlSelfRef.io_loadVLock))) 
-                             & (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
-                                  ? ((- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7))) 
-                                     & (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ram_ext__DOT__Memory
-                                        [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__deq_ptr_value][2U] 
-                                        >> 0x00000010U))
-                                  : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_5[5U] 
-                                     & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
-                                & (- (IData)((1U & 
-                                              (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_6)))))));
-    vlSelfRef.io_psumIn_4 = ((- (IData)((IData)(vlSelfRef.io_loadVLock))) 
-                             & (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
-                                  ? (0x0000ffffU & 
-                                     ((- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7))) 
-                                      & vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ram_ext__DOT__Memory
-                                      [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__deq_ptr_value][2U]))
-                                  : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_4[4U] 
-                                     & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
-                                & (- (IData)((1U & 
-                                              (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_6)))))));
-    vlSelfRef.io_psumIn_3 = ((- (IData)((IData)(vlSelfRef.io_loadVLock))) 
-                             & (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
-                                  ? ((- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7))) 
-                                     & (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ram_ext__DOT__Memory
-                                        [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__deq_ptr_value][1U] 
-                                        >> 0x00000010U))
-                                  : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_3[3U] 
-                                     & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
-                                & (- (IData)((1U & 
-                                              (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_6)))))));
-    vlSelfRef.io_psumIn_2 = ((- (IData)((IData)(vlSelfRef.io_loadVLock))) 
-                             & (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
-                                  ? (0x0000ffffU & 
-                                     ((- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7))) 
-                                      & vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ram_ext__DOT__Memory
-                                      [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__deq_ptr_value][1U]))
-                                  : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_2[2U] 
-                                     & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
-                                & (- (IData)((1U & 
-                                              (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_6)))))));
-    vlSelfRef.io_psumIn_1 = ((- (IData)((IData)(vlSelfRef.io_loadVLock))) 
-                             & (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
-                                  ? ((- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7))) 
-                                     & (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ram_ext__DOT__Memory
-                                        [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__deq_ptr_value][0U] 
-                                        >> 0x00000010U))
-                                  : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_1[1U] 
-                                     & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
-                                & (- (IData)((1U & 
-                                              (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_6)))))));
-    vlSelfRef.io_psumIn_0 = ((- (IData)((IData)(vlSelfRef.io_loadVLock))) 
-                             & (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
-                                  ? (0x0000ffffU & 
-                                     ((- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_7))) 
-                                      & vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ram_ext__DOT__Memory
-                                      [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__deq_ptr_value][0U]))
-                                  : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_0[0U] 
-                                     & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
-                                & (- (IData)((1U & 
-                                              (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_6)))))));
+    vlSelfRef.io_psumIn_7 = (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
+                               ? ((- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_5))) 
+                                  & (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ram_ext__DOT__Memory
+                                     [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__deq_ptr_value][3U] 
+                                     >> 0x00000010U))
+                               : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_7[7U] 
+                                  & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
+                             & (- (IData)((1U & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_4))))));
+    vlSelfRef.io_psumIn_6 = (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
+                               ? (0x0000ffffU & ((- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_5))) 
+                                                 & vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ram_ext__DOT__Memory
+                                                 [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__deq_ptr_value][3U]))
+                               : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_6[6U] 
+                                  & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
+                             & (- (IData)((1U & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_4))))));
+    vlSelfRef.io_psumIn_5 = (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
+                               ? ((- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_5))) 
+                                  & (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ram_ext__DOT__Memory
+                                     [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__deq_ptr_value][2U] 
+                                     >> 0x00000010U))
+                               : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_5[5U] 
+                                  & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
+                             & (- (IData)((1U & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_4))))));
+    vlSelfRef.io_psumIn_4 = (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
+                               ? (0x0000ffffU & ((- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_5))) 
+                                                 & vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ram_ext__DOT__Memory
+                                                 [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__deq_ptr_value][2U]))
+                               : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_4[4U] 
+                                  & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
+                             & (- (IData)((1U & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_4))))));
+    vlSelfRef.io_psumIn_3 = (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
+                               ? ((- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_5))) 
+                                  & (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ram_ext__DOT__Memory
+                                     [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__deq_ptr_value][1U] 
+                                     >> 0x00000010U))
+                               : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_3[3U] 
+                                  & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
+                             & (- (IData)((1U & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_4))))));
+    vlSelfRef.io_psumIn_2 = (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
+                               ? (0x0000ffffU & ((- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_5))) 
+                                                 & vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ram_ext__DOT__Memory
+                                                 [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__deq_ptr_value][1U]))
+                               : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_2[2U] 
+                                  & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
+                             & (- (IData)((1U & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_4))))));
+    vlSelfRef.io_psumIn_1 = (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
+                               ? ((- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_5))) 
+                                  & (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ram_ext__DOT__Memory
+                                     [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__deq_ptr_value][0U] 
+                                     >> 0x00000010U))
+                               : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_1[1U] 
+                                  & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
+                             & (- (IData)((1U & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_4))))));
+    vlSelfRef.io_psumIn_0 = (((3U == (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__state))
+                               ? (0x0000ffffU & ((- (IData)((IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_5))) 
+                                                 & vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__ram_ext__DOT__Memory
+                                                 [vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__scratchpad__DOT__bFifo__DOT__queue__DOT__deq_ptr_value][0U]))
+                               : (vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT__cpsRegs_0[0U] 
+                                  & vlSymsp->TOP.__VdfgRegularize_hebeb780c_0_1)) 
+                             & (- (IData)((1U & (~ (IData)(vlSymsp->TOP.svsimTestbench__DOT__dut__DOT__executor__DOT___GEN_4))))));
 }
 
 VL_ATTR_COLD void VsvsimTestbench_HiveCell___stl_sequent__TOP__svsimTestbench__DOT__dut__DOT__hiveComb__DOT__arrays_1_0__0(VsvsimTestbench_HiveCell* vlSelf) {

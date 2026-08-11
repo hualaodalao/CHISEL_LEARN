@@ -2,4 +2,5 @@
 `ifndef layers_HiveCore_Verification_Assert	// src/hive/scala/main/HiveCore.scala:21:7
   `define layers_HiveCore_Verification_Assert
   `include "layers-HiveCore-Verification.sv"	// src/hive/scala/main/HiveCore.scala:21:7
+  `include "layers-HiveCoreExecutor-Verification-Assert.sv"	// src/hive/scala/main/HiveCore.scala:21:7
 `endif // not def layers_HiveCore_Verification_Assert

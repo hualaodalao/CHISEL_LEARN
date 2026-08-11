@@ -812,72 +812,6 @@ void VsvsimTestbench___024root____Vdpiexp_svsimTestbench__DOT__simulation_disabl
     success = 0U;
 }
 
-bool VsvsimTestbench___024root___trigger_anySet__ico(const VlUnpacked<QData/*63:0*/, 1> &in) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root___trigger_anySet__ico\n"); );
-    // Locals
-    IData/*31:0*/ n;
-    // Body
-    n = 0U;
-    do {
-        if (in[n]) {
-            return (1U);
-        }
-        n = ((IData)(1U) + n);
-    } while ((1U > n));
-    return (0U);
-}
-
-#ifdef VL_DEBUG
-VL_ATTR_COLD void VsvsimTestbench___024root___dump_triggers__ico(const VlUnpacked<QData/*63:0*/, 1> &triggers, const std::string &tag);
-#endif  // VL_DEBUG
-void VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_0__0(VsvsimTestbench_HiveWorker* vlSelf);
-void VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_1__0(VsvsimTestbench_HiveWorker* vlSelf);
-void VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_2__0(VsvsimTestbench_HiveWorker* vlSelf);
-void VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_3__0(VsvsimTestbench_HiveWorker* vlSelf);
-void VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_4__0(VsvsimTestbench_HiveWorker* vlSelf);
-void VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_5__0(VsvsimTestbench_HiveWorker* vlSelf);
-void VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_6__0(VsvsimTestbench_HiveWorker* vlSelf);
-void VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_7__0(VsvsimTestbench_HiveWorker* vlSelf);
-
-bool VsvsimTestbench___024root___eval_phase__ico(VsvsimTestbench___024root* vlSelf) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root___eval_phase__ico\n"); );
-    VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
-    auto& vlSelfRef = std::ref(*vlSelf).get();
-    // Locals
-    CData/*0:0*/ __VicoExecute;
-    // Body
-    {
-        // Inlined CFunc: _eval_triggers_vec__ico
-        vlSelfRef.__VicoTriggered[0U] = ((0xfffffffffffffffdULL 
-                                          & vlSelfRef.__VicoTriggered[0U]) 
-                                         | ((QData)((IData)(vlSelfRef.__Vdpi_export_trigger)) 
-                                            << 1U));
-        vlSelfRef.__Vdpi_export_trigger = 0U;
-    }
-#ifdef VL_DEBUG
-    if (VL_UNLIKELY(vlSymsp->_vm_contextp__->debug())) {
-        VsvsimTestbench___024root___dump_triggers__ico(vlSelfRef.__VicoTriggered, "ico"s);
-    }
-#endif
-    __VicoExecute = VsvsimTestbench___024root___trigger_anySet__ico(vlSelfRef.__VicoTriggered);
-    if (__VicoExecute) {
-        {
-            // Inlined CFunc: _eval_ico
-            if ((2ULL & vlSelfRef.__VicoTriggered[0U])) {
-                VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_0__0((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_0));
-                VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_1__0((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_1));
-                VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_2__0((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_2));
-                VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_3__0((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_3));
-                VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_4__0((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_4));
-                VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_5__0((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_5));
-                VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_6__0((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_6));
-                VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_7__0((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_7));
-            }
-        }
-    }
-    return (__VicoExecute);
-}
-
 bool VsvsimTestbench___024root___trigger_anySet__act(const VlUnpacked<QData/*63:0*/, 2> &in) {
     VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root___trigger_anySet__act\n"); );
     // Locals
@@ -1152,16 +1086,6 @@ void VsvsimTestbench___024root___eval_nba(VsvsimTestbench___024root* vlSelf) {
         VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_1__1((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_1));
         VsvsimTestbench_HiveWorker___nba_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_0__1((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_0));
     }
-    if ((1ULL & vlSelfRef.__VnbaTriggered[1U])) {
-        VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_7__0((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_7));
-        VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_0__0((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_0));
-        VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_1__0((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_1));
-        VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_2__0((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_2));
-        VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_3__0((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_3));
-        VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_4__0((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_4));
-        VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_5__0((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_5));
-        VsvsimTestbench_HiveWorker___ico_sequent__TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_6__0((&vlSymsp->TOP__svsimTestbench__DOT__dut__DOT__arrays_0_0__DOT__pes_0_6));
-    }
 }
 
 void VsvsimTestbench___024root___trigger_orInto__act_vec_vec(VlUnpacked<QData/*63:0*/, 2> &out, const VlUnpacked<QData/*63:0*/, 2> &in) {
@@ -1258,20 +1182,8 @@ void VsvsimTestbench___024root___eval(VsvsimTestbench___024root* vlSelf) {
     VsvsimTestbench__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
     auto& vlSelfRef = std::ref(*vlSelf).get();
     // Locals
-    IData/*31:0*/ __VicoIterCount;
     IData/*31:0*/ __VnbaIterCount;
     // Body
-    __VicoIterCount = 0U;
-    do {
-        if (VL_UNLIKELY(((0x00002710U < __VicoIterCount)))) {
-#ifdef VL_DEBUG
-            VsvsimTestbench___024root___dump_triggers__ico(vlSelfRef.__VicoTriggered, "ico"s);
-#endif
-            VL_FATAL_MT("/Users/wangliutailong/Qoder_Proj/Chisel_Learn/build/chiselsim/HiveCombProbeSpec/HiveComb-array-protocol-probe/should-accumulate-with-clusterM-1--single-cell-through-HiveComb-/workdir-verilator/../generated-sources/testbench.sv", 1, "", "DIDNOTCONVERGE: Input combinational region did not converge after '--converge-limit' of 10000 tries");
-        }
-        __VicoIterCount = ((IData)(1U) + __VicoIterCount);
-        vlSelfRef.__VicoPhaseResult = VsvsimTestbench___024root___eval_phase__ico(vlSelf);
-    } while (vlSelfRef.__VicoPhaseResult);
     __VnbaIterCount = 0U;
     do {
         if (VL_UNLIKELY(((0x00002710U < __VnbaIterCount)))) {

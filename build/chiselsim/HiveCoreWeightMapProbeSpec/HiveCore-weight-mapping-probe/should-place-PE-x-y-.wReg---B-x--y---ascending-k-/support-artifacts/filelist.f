@@ -8,9 +8,10 @@ ram_2048x512.sv
 Queue2048_UInt512.sv
 StreamFifo_2.sv
 HiveCoreScratchpad.sv
-HiveCoreDmaEngine.sv
-HiveCoreDmaEngine_1.sv
 HiveCoreDmaRdOnly.sv
+HiveCoreDmaWrOnly.sv
+HiveCoreDmaRdOnly_1.sv
+verification/assert/HiveCoreExecutor_Verification_Assert.sv
 HiveCoreExecutor.sv
 HiveWorker.sv
 HiveCell.sv

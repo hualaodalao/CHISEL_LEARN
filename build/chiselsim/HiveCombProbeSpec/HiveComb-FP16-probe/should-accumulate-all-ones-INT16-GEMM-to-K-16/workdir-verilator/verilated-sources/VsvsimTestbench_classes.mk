@@ -30,7 +30,6 @@ VM_CLASSES_FAST += \
   VsvsimTestbench \
   VsvsimTestbench__Dpi_Export__0 \
   VsvsimTestbench___024root__0 \
-  VsvsimTestbench_HiveCell__0 \
   VsvsimTestbench_HiveWorker__0 \
   VsvsimTestbench_HiveWorker__1 \
   VsvsimTestbench_HiveWorker__2 \

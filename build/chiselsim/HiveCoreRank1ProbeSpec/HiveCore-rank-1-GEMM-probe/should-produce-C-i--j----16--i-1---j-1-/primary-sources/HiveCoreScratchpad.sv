@@ -19,12 +19,12 @@ module HiveCoreScratchpad(	// src/hive/scala/main/HiveCoreScratchpad.scala:12:7
   output [6:0]   io_bOccupancy,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
                  io_bAvailability,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input          io_cPush_valid,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
+  output         io_cPush_ready,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input  [511:0] io_cPush_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   output         io_cPop_valid,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input          io_cPop_ready,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   output [511:0] io_cPop_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   output [11:0]  io_cOccupancy,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
-                 io_cAvailability,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input          io_flushA,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
                  io_flushB,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
                  io_flushC	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
@@ -60,13 +60,13 @@ module HiveCoreScratchpad(	// src/hive/scala/main/HiveCoreScratchpad.scala:12:7
     .clock           (clock),
     .reset           (reset),
     .io_push_valid   (io_cPush_valid),
+    .io_push_ready   (io_cPush_ready),
     .io_push_payload (io_cPush_payload),
     .io_pop_valid    (io_cPop_valid),
     .io_pop_ready    (io_cPop_ready),
     .io_pop_payload  (io_cPop_payload),
     .io_flush        (io_flushC),
-    .io_occupancy    (io_cOccupancy),
-    .io_availability (io_cAvailability)
+    .io_occupancy    (io_cOccupancy)
   );	// src/hive/scala/main/HiveCoreScratchpad.scala:41:21
 endmodule
 

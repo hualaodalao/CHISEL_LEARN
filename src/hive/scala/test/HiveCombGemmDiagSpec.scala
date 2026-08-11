@@ -17,16 +17,15 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 /** executor 硬件直驱 HiveComb 的最小测试顶层（testbench 内部用）：
-  * DMA 控制全部 tie-off（单 tile 16x16x16 不触发 DMA），A/B/C 用测试侧软件 FIFO */
+  * 自主 DMA 接口 tie-off（aDmaRescan/cStoreGate 丢弃，occupancy 由测试侧
+  * 按软件 FIFO 驱动），A/B/C 用测试侧软件 FIFO */
 class DiagExeTop(cfg: HiveCoreConfig) extends Module {
   val io = IO(new Bundle {
     val execute = Input(Bool())
     val done    = Output(Bool())
     val regFile = Input(HiveCoreRegs(cfg))
-    val dma0Start = Output(Bool())
-    val dma1Start = Output(Bool())
-    val dma0Done  = Input(Bool())
-    val dma1Done  = Input(Bool())
+    val aOccupancy = Input(UInt(log2Up(cfg.aBufferDepth + 1).W))
+    val cOccupancy = Input(UInt(log2Up(cfg.cBufferDepth + 1).W))
     val bOccupancy = Input(UInt(log2Up(cfg.bBufferDepth + 1).W))
     val aPop    = Flipped(Stream(UInt((cfg.totalN * cfg.aEffW).W)))
     val bPop    = Flipped(Stream(UInt((cfg.totalN * cfg.bW).W)))
@@ -37,23 +36,11 @@ class DiagExeTop(cfg: HiveCoreConfig) extends Module {
 
   exe.io.execute := io.execute
   exe.io.regFile := io.regFile
-  exe.io.regM := io.regFile.m(15, 0)
-  exe.io.regN := io.regFile.n(15, 0)
-  exe.io.regK := io.regFile.k(15, 0)
-  exe.io.regAAddr := io.regFile.aAddr
-  exe.io.regBAddr := io.regFile.bAddr
-  exe.io.regCAddr := io.regFile.cAddr
-  exe.io.regAStride := io.regFile.aStride.pad(16)
-  exe.io.regBStride := io.regFile.bStride.pad(16)
-  exe.io.regFmt := io.regFile.fmt
-  exe.io.regRnd := io.regFile.rnd
 
-  io.dma0Start := exe.io.dma0Start
-  io.dma1Start := exe.io.dma1Start
-  exe.io.dma0Done := io.dma0Done
-  exe.io.dma1Done := io.dma1Done
-  exe.io.dma0Busy := false.B
-  exe.io.dma1Busy := false.B
+  // 自主 DMA tie-off：aDmaRescan/cStoreGate 无消费者（留空），
+  // occupancy 由测试侧按软件 FIFO 模型驱动
+  exe.io.aOccupancy := io.aOccupancy
+  exe.io.cOccupancy := io.cOccupancy
   exe.io.bOccupancy := io.bOccupancy
 
   exe.io.aPop.valid   := io.aPop.valid
@@ -139,7 +126,8 @@ class HiveCombGemmDiagSpec extends AnyFlatSpec with Matchers {
       // === 初始化 ===
       dut.reset.poke(true.B)
       dut.io.execute.poke(false.B)
-      dut.io.dma0Done.poke(false.B); dut.io.dma1Done.poke(false.B)
+      dut.io.aOccupancy.poke(0.U)
+      dut.io.cOccupancy.poke(0.U)
       dut.io.bOccupancy.poke(0.U)
       dut.io.aPop.valid.poke(false.B); dut.io.aPop.payload.poke(0.U)
       dut.io.bPop.valid.poke(false.B); dut.io.bPop.payload.poke(0.U)
@@ -177,9 +165,11 @@ class HiveCombGemmDiagSpec extends AnyFlatSpec with Matchers {
           dut.io.aPop.valid.poke(false.B)
         }
         dut.io.cPush.ready.poke(true.B)
-        // DMA 即时完成响应（单 tile 无真实 DMA）
-        dut.io.dma0Done.poke(dut.io.dma0Start.peek())
-        dut.io.dma1Done.poke(dut.io.dma1Start.peek())
+        // occupancy 按软件 FIFO 模型驱动：aQueue 剩余 = A buffer 占用（executor
+        // 在 sLOAD_A_DMA 等待 aOccupancy >= thisTileM）；cOccupancy 恒 0（cPush
+        // 直采走，sSTORE_C_DMA 等 cOccupancy===0 立即通过，单 K pass 无 partial sum）
+        dut.io.aOccupancy.poke(aQueue.size.U)
+        dut.io.cOccupancy.poke(0.U)
 
         // fire 判定（step 前采样握手）；cPush.payload 必须在 step 前采样，
         // 否则拿到的是下一拍 payload（cPush 每拍换一行 → 整体错位一行、末行 0）

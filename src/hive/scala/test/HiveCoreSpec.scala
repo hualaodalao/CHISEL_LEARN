@@ -30,10 +30,16 @@ class HiveCoreSpec extends AnyFlatSpec with Matchers {
     v should include("module HiveCoreScratchpad")
   }
 
-  it should "elaborate HiveCoreDmaEngine" in {
+  it should "elaborate HiveCoreDmaRdOnly" in {
     val cfg = HiveCoreConfig()
-    val v = ChiselStage.emitSystemVerilog(new HiveCoreDmaEngine(cfg, cfg.totalN * cfg.aEffW))
-    v should include("module HiveCoreDmaEngine")
+    val v = ChiselStage.emitSystemVerilog(new HiveCoreDmaRdOnly(cfg, bufWidth = cfg.totalN * cfg.aEffW, bufDepth = cfg.aBufferDepth))
+    v should include("module HiveCoreDmaRdOnly")
+  }
+
+  it should "elaborate HiveCoreDmaWrOnly" in {
+    val cfg = HiveCoreConfig()
+    val v = ChiselStage.emitSystemVerilog(new HiveCoreDmaWrOnly(cfg, bufWidth = cfg.totalN * cfg.cEffW))
+    v should include("module HiveCoreDmaWrOnly")
   }
 
   it should "elaborate HiveCoreExecutor" in {
@@ -56,13 +62,15 @@ class HiveCoreSpec extends AnyFlatSpec with Matchers {
       // Initialize
       dut.io.cmd.valid.poke(false.B)
       dut.io.resp.ready.poke(true.B)
-      dut.io.dma0Ext.grant.poke(false.B)
+      // A 只读 DMA 外部通道（cmd/rsp 流接口）：cmd 常就绪，rsp 初始无效
+      dut.io.dma0Ext.cmd.ready.poke(true.B)
+      dut.io.dma0Ext.rsp.valid.poke(false.B)
+      dut.io.dma0Ext.rsp.payload.data.poke(0.U)
+      dut.io.dma0Ext.rsp.payload.rsp.poke(false.B)
+      // C 写回 DMA 外部通道：grant 关闭，writeData 不接收
       dut.io.dma1Ext.grant.poke(false.B)
-      dut.io.dma0Ext.readData.valid.poke(false.B)
-      dut.io.dma0Ext.readData.payload.poke(0.U)
       dut.io.dma1Ext.readData.valid.poke(false.B)
       dut.io.dma1Ext.readData.payload.poke(0.U)
-      dut.io.dma0Ext.writeData.ready.poke(false.B)
       dut.io.dma1Ext.writeData.ready.poke(false.B)
       // B 权重只读 DMA 外部通道初始化
       dut.io.dma2Ext.rsp.valid.poke(false.B)

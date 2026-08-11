@@ -35,7 +35,10 @@
   * skew 策略：
   *   - aIn：本模块不做 skew（见上方 aIn skew 契约），加载/计算阶段统一直连
   *   - validIn：保留 ci * arrayN 的行块级 skew，跟踪行级错峰数据
-  *   - 垂直权重加载模式（loadVIn）：首行 psumIn 不 skew
+  *   - psumIn：首行（ci=0）无条件直连 io.psumIn（无 skew）——加载期
+  *     （loadVIn）传权重；计算期由调用方保证：非回灌窗口驱动 0，
+  *     回灌窗口（K > totalN 多 pass 非首 pass）提供按「行 i 延迟 i 拍」
+  *     skew 的 partial sum 累加基底（如 Executor cpsRegs）
   *
   * 横向级联：左方 tile aOut → 右方 tile aIn。
   * psumIn 纵向级联：上方 cOut → 下方 psumIn；顶行接 0 或 io.psumIn。
@@ -151,16 +154,17 @@ class HiveComb(
       }
     }
 
-    // --- psumIn：per-column，按加载模式动态禁用 skew ---
+    // --- psumIn：per-column，无条件直连（无 skew） ---
     for (c <- 0 until arrayN) {
       val globalCol = cj * arrayN + c
       if (ci == 0) {
-      
-        // 首行：垂直权重加载时直接传 io.psumIn（无 skew），
-        // 计算阶段接 0
-        arr.io.psumIn(c) := Mux(io.loadVIn,
-                                io.psumIn(globalCol),  // 加载模式：无 skew
-                                0.U(cEffW.W))          // 计算阶段：psumIn 为 0
+
+        // 首行：无条件直连 io.psumIn。
+        // 垂直权重加载时传权重；计算阶段（K > totalN 多 pass）由 Executor
+        // 注入 partial sum 作为累加基底（cpsRegs 已按行 i 延迟 i 拍 skew）。
+        // 非回灌窗口（首 pass 计算/sDRAIN/sLOAD）Executor 将 hivePsumIn 全置 0，
+        // 直连不会引入意外数据
+        arr.io.psumIn(c) := io.psumIn(globalCol)
       } else {
         // 非首行：从上方子阵列获取
         arr.io.psumIn(c) := arrays(ci-1)(cj).io.cOut(c)

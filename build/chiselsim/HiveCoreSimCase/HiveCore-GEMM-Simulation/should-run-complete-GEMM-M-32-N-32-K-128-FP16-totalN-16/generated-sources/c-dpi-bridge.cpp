@@ -329,134 +329,94 @@ void setBits_io_dma1Ext_readData_valid(const svBitVecVal* data) {
            setBitsImpl_io_dma1Ext_readData_valid(data);
            svSetScope(prev);
         }
-void getBitWidth_io_dma0Ext_isWrite(int* result) {
+void getBitWidth_io_dma0Ext_cmd_payload_addr(int* result) {
            svScope prev = setScopeToTestBench();
-           getBitWidthImpl_io_dma0Ext_isWrite(result);
+           getBitWidthImpl_io_dma0Ext_cmd_payload_addr(result);
            svSetScope(prev);
         }
-void getBits_io_dma0Ext_isWrite(svBitVecVal* result) {
+void getBits_io_dma0Ext_cmd_payload_addr(svBitVecVal* result) {
            svScope prev = setScopeToTestBench();
-           getBitsImpl_io_dma0Ext_isWrite(result);
+           getBitsImpl_io_dma0Ext_cmd_payload_addr(result);
            svSetScope(prev);
         }
-void getBitWidth_io_dma0Ext_grant(int* result) {
+void getBitWidth_io_dma0Ext_cmd_ready(int* result) {
            svScope prev = setScopeToTestBench();
-           getBitWidthImpl_io_dma0Ext_grant(result);
+           getBitWidthImpl_io_dma0Ext_cmd_ready(result);
            svSetScope(prev);
         }
-void getBits_io_dma0Ext_grant(svBitVecVal* result) {
+void getBits_io_dma0Ext_cmd_ready(svBitVecVal* result) {
            svScope prev = setScopeToTestBench();
-           getBitsImpl_io_dma0Ext_grant(result);
+           getBitsImpl_io_dma0Ext_cmd_ready(result);
            svSetScope(prev);
         }
-void setBits_io_dma0Ext_grant(const svBitVecVal* data) {
+void setBits_io_dma0Ext_cmd_ready(const svBitVecVal* data) {
            svScope prev = setScopeToTestBench();
-           setBitsImpl_io_dma0Ext_grant(data);
+           setBitsImpl_io_dma0Ext_cmd_ready(data);
            svSetScope(prev);
         }
-void getBitWidth_io_dma0Ext_req(int* result) {
+void getBitWidth_io_dma0Ext_cmd_valid(int* result) {
            svScope prev = setScopeToTestBench();
-           getBitWidthImpl_io_dma0Ext_req(result);
+           getBitWidthImpl_io_dma0Ext_cmd_valid(result);
            svSetScope(prev);
         }
-void getBits_io_dma0Ext_req(svBitVecVal* result) {
+void getBits_io_dma0Ext_cmd_valid(svBitVecVal* result) {
            svScope prev = setScopeToTestBench();
-           getBitsImpl_io_dma0Ext_req(result);
+           getBitsImpl_io_dma0Ext_cmd_valid(result);
            svSetScope(prev);
         }
-void getBitWidth_io_dma0Ext_len(int* result) {
+void getBitWidth_io_dma0Ext_rsp_payload_rsp(int* result) {
            svScope prev = setScopeToTestBench();
-           getBitWidthImpl_io_dma0Ext_len(result);
+           getBitWidthImpl_io_dma0Ext_rsp_payload_rsp(result);
            svSetScope(prev);
         }
-void getBits_io_dma0Ext_len(svBitVecVal* result) {
+void getBits_io_dma0Ext_rsp_payload_rsp(svBitVecVal* result) {
            svScope prev = setScopeToTestBench();
-           getBitsImpl_io_dma0Ext_len(result);
+           getBitsImpl_io_dma0Ext_rsp_payload_rsp(result);
            svSetScope(prev);
         }
-void getBitWidth_io_dma0Ext_addr(int* result) {
+void setBits_io_dma0Ext_rsp_payload_rsp(const svBitVecVal* data) {
            svScope prev = setScopeToTestBench();
-           getBitWidthImpl_io_dma0Ext_addr(result);
+           setBitsImpl_io_dma0Ext_rsp_payload_rsp(data);
            svSetScope(prev);
         }
-void getBits_io_dma0Ext_addr(svBitVecVal* result) {
+void getBitWidth_io_dma0Ext_rsp_payload_data(int* result) {
            svScope prev = setScopeToTestBench();
-           getBitsImpl_io_dma0Ext_addr(result);
+           getBitWidthImpl_io_dma0Ext_rsp_payload_data(result);
            svSetScope(prev);
         }
-void getBitWidth_io_dma0Ext_writeData_payload(int* result) {
+void getBits_io_dma0Ext_rsp_payload_data(svBitVecVal* result) {
            svScope prev = setScopeToTestBench();
-           getBitWidthImpl_io_dma0Ext_writeData_payload(result);
+           getBitsImpl_io_dma0Ext_rsp_payload_data(result);
            svSetScope(prev);
         }
-void getBits_io_dma0Ext_writeData_payload(svBitVecVal* result) {
+void setBits_io_dma0Ext_rsp_payload_data(const svBitVecVal* data) {
            svScope prev = setScopeToTestBench();
-           getBitsImpl_io_dma0Ext_writeData_payload(result);
+           setBitsImpl_io_dma0Ext_rsp_payload_data(data);
            svSetScope(prev);
         }
-void getBitWidth_io_dma0Ext_writeData_ready(int* result) {
+void getBitWidth_io_dma0Ext_rsp_ready(int* result) {
            svScope prev = setScopeToTestBench();
-           getBitWidthImpl_io_dma0Ext_writeData_ready(result);
+           getBitWidthImpl_io_dma0Ext_rsp_ready(result);
            svSetScope(prev);
         }
-void getBits_io_dma0Ext_writeData_ready(svBitVecVal* result) {
+void getBits_io_dma0Ext_rsp_ready(svBitVecVal* result) {
            svScope prev = setScopeToTestBench();
-           getBitsImpl_io_dma0Ext_writeData_ready(result);
+           getBitsImpl_io_dma0Ext_rsp_ready(result);
            svSetScope(prev);
         }
-void setBits_io_dma0Ext_writeData_ready(const svBitVecVal* data) {
+void getBitWidth_io_dma0Ext_rsp_valid(int* result) {
            svScope prev = setScopeToTestBench();
-           setBitsImpl_io_dma0Ext_writeData_ready(data);
+           getBitWidthImpl_io_dma0Ext_rsp_valid(result);
            svSetScope(prev);
         }
-void getBitWidth_io_dma0Ext_writeData_valid(int* result) {
+void getBits_io_dma0Ext_rsp_valid(svBitVecVal* result) {
            svScope prev = setScopeToTestBench();
-           getBitWidthImpl_io_dma0Ext_writeData_valid(result);
+           getBitsImpl_io_dma0Ext_rsp_valid(result);
            svSetScope(prev);
         }
-void getBits_io_dma0Ext_writeData_valid(svBitVecVal* result) {
+void setBits_io_dma0Ext_rsp_valid(const svBitVecVal* data) {
            svScope prev = setScopeToTestBench();
-           getBitsImpl_io_dma0Ext_writeData_valid(result);
-           svSetScope(prev);
-        }
-void getBitWidth_io_dma0Ext_readData_payload(int* result) {
-           svScope prev = setScopeToTestBench();
-           getBitWidthImpl_io_dma0Ext_readData_payload(result);
-           svSetScope(prev);
-        }
-void getBits_io_dma0Ext_readData_payload(svBitVecVal* result) {
-           svScope prev = setScopeToTestBench();
-           getBitsImpl_io_dma0Ext_readData_payload(result);
-           svSetScope(prev);
-        }
-void setBits_io_dma0Ext_readData_payload(const svBitVecVal* data) {
-           svScope prev = setScopeToTestBench();
-           setBitsImpl_io_dma0Ext_readData_payload(data);
-           svSetScope(prev);
-        }
-void getBitWidth_io_dma0Ext_readData_ready(int* result) {
-           svScope prev = setScopeToTestBench();
-           getBitWidthImpl_io_dma0Ext_readData_ready(result);
-           svSetScope(prev);
-        }
-void getBits_io_dma0Ext_readData_ready(svBitVecVal* result) {
-           svScope prev = setScopeToTestBench();
-           getBitsImpl_io_dma0Ext_readData_ready(result);
-           svSetScope(prev);
-        }
-void getBitWidth_io_dma0Ext_readData_valid(int* result) {
-           svScope prev = setScopeToTestBench();
-           getBitWidthImpl_io_dma0Ext_readData_valid(result);
-           svSetScope(prev);
-        }
-void getBits_io_dma0Ext_readData_valid(svBitVecVal* result) {
-           svScope prev = setScopeToTestBench();
-           getBitsImpl_io_dma0Ext_readData_valid(result);
-           svSetScope(prev);
-        }
-void setBits_io_dma0Ext_readData_valid(const svBitVecVal* data) {
-           svScope prev = setScopeToTestBench();
-           setBitsImpl_io_dma0Ext_readData_valid(data);
+           setBitsImpl_io_dma0Ext_rsp_valid(data);
            svSetScope(prev);
         }
 void getBitWidth_io_resp_payload_err(int* result) {
@@ -725,95 +685,79 @@ int port_getter(int id, int *bitWidth, void (**getter)(uint8_t*)) {
       getBitWidth_io_dma1Ext_readData_valid(bitWidth);
       *getter = (void(*)(uint8_t*))getBits_io_dma1Ext_readData_valid;
       return 0;
-    case 27: // io_dma0Ext_isWrite
-      getBitWidth_io_dma0Ext_isWrite(bitWidth);
-      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_isWrite;
+    case 27: // io_dma0Ext_cmd_payload_addr
+      getBitWidth_io_dma0Ext_cmd_payload_addr(bitWidth);
+      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_cmd_payload_addr;
       return 0;
-    case 28: // io_dma0Ext_grant
-      getBitWidth_io_dma0Ext_grant(bitWidth);
-      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_grant;
+    case 28: // io_dma0Ext_cmd_ready
+      getBitWidth_io_dma0Ext_cmd_ready(bitWidth);
+      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_cmd_ready;
       return 0;
-    case 29: // io_dma0Ext_req
-      getBitWidth_io_dma0Ext_req(bitWidth);
-      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_req;
+    case 29: // io_dma0Ext_cmd_valid
+      getBitWidth_io_dma0Ext_cmd_valid(bitWidth);
+      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_cmd_valid;
       return 0;
-    case 30: // io_dma0Ext_len
-      getBitWidth_io_dma0Ext_len(bitWidth);
-      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_len;
+    case 30: // io_dma0Ext_rsp_payload_rsp
+      getBitWidth_io_dma0Ext_rsp_payload_rsp(bitWidth);
+      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_rsp_payload_rsp;
       return 0;
-    case 31: // io_dma0Ext_addr
-      getBitWidth_io_dma0Ext_addr(bitWidth);
-      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_addr;
+    case 31: // io_dma0Ext_rsp_payload_data
+      getBitWidth_io_dma0Ext_rsp_payload_data(bitWidth);
+      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_rsp_payload_data;
       return 0;
-    case 32: // io_dma0Ext_writeData_payload
-      getBitWidth_io_dma0Ext_writeData_payload(bitWidth);
-      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_writeData_payload;
+    case 32: // io_dma0Ext_rsp_ready
+      getBitWidth_io_dma0Ext_rsp_ready(bitWidth);
+      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_rsp_ready;
       return 0;
-    case 33: // io_dma0Ext_writeData_ready
-      getBitWidth_io_dma0Ext_writeData_ready(bitWidth);
-      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_writeData_ready;
+    case 33: // io_dma0Ext_rsp_valid
+      getBitWidth_io_dma0Ext_rsp_valid(bitWidth);
+      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_rsp_valid;
       return 0;
-    case 34: // io_dma0Ext_writeData_valid
-      getBitWidth_io_dma0Ext_writeData_valid(bitWidth);
-      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_writeData_valid;
-      return 0;
-    case 35: // io_dma0Ext_readData_payload
-      getBitWidth_io_dma0Ext_readData_payload(bitWidth);
-      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_readData_payload;
-      return 0;
-    case 36: // io_dma0Ext_readData_ready
-      getBitWidth_io_dma0Ext_readData_ready(bitWidth);
-      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_readData_ready;
-      return 0;
-    case 37: // io_dma0Ext_readData_valid
-      getBitWidth_io_dma0Ext_readData_valid(bitWidth);
-      *getter = (void(*)(uint8_t*))getBits_io_dma0Ext_readData_valid;
-      return 0;
-    case 38: // io_resp_payload_err
+    case 34: // io_resp_payload_err
       getBitWidth_io_resp_payload_err(bitWidth);
       *getter = (void(*)(uint8_t*))getBits_io_resp_payload_err;
       return 0;
-    case 39: // io_resp_payload_done
+    case 35: // io_resp_payload_done
       getBitWidth_io_resp_payload_done(bitWidth);
       *getter = (void(*)(uint8_t*))getBits_io_resp_payload_done;
       return 0;
-    case 40: // io_resp_payload_data
+    case 36: // io_resp_payload_data
       getBitWidth_io_resp_payload_data(bitWidth);
       *getter = (void(*)(uint8_t*))getBits_io_resp_payload_data;
       return 0;
-    case 41: // io_resp_ready
+    case 37: // io_resp_ready
       getBitWidth_io_resp_ready(bitWidth);
       *getter = (void(*)(uint8_t*))getBits_io_resp_ready;
       return 0;
-    case 42: // io_resp_valid
+    case 38: // io_resp_valid
       getBitWidth_io_resp_valid(bitWidth);
       *getter = (void(*)(uint8_t*))getBits_io_resp_valid;
       return 0;
-    case 43: // io_cmd_payload_data1
+    case 39: // io_cmd_payload_data1
       getBitWidth_io_cmd_payload_data1(bitWidth);
       *getter = (void(*)(uint8_t*))getBits_io_cmd_payload_data1;
       return 0;
-    case 44: // io_cmd_payload_data0
+    case 40: // io_cmd_payload_data0
       getBitWidth_io_cmd_payload_data0(bitWidth);
       *getter = (void(*)(uint8_t*))getBits_io_cmd_payload_data0;
       return 0;
-    case 45: // io_cmd_payload_reg1Addr
+    case 41: // io_cmd_payload_reg1Addr
       getBitWidth_io_cmd_payload_reg1Addr(bitWidth);
       *getter = (void(*)(uint8_t*))getBits_io_cmd_payload_reg1Addr;
       return 0;
-    case 46: // io_cmd_payload_reg0Addr
+    case 42: // io_cmd_payload_reg0Addr
       getBitWidth_io_cmd_payload_reg0Addr(bitWidth);
       *getter = (void(*)(uint8_t*))getBits_io_cmd_payload_reg0Addr;
       return 0;
-    case 47: // io_cmd_payload_op
+    case 43: // io_cmd_payload_op
       getBitWidth_io_cmd_payload_op(bitWidth);
       *getter = (void(*)(uint8_t*))getBits_io_cmd_payload_op;
       return 0;
-    case 48: // io_cmd_ready
+    case 44: // io_cmd_ready
       getBitWidth_io_cmd_ready(bitWidth);
       *getter = (void(*)(uint8_t*))getBits_io_cmd_ready;
       return 0;
-    case 49: // io_cmd_valid
+    case 45: // io_cmd_valid
       getBitWidth_io_cmd_valid(bitWidth);
       *getter = (void(*)(uint8_t*))getBits_io_cmd_valid;
       return 0;
@@ -864,47 +808,47 @@ int port_setter(int id, int *bitWidth, void (**setter)(const uint8_t*)) {
       getBitWidth_io_dma1Ext_readData_valid(bitWidth);
       *setter = (void(*)(const uint8_t*))setBits_io_dma1Ext_readData_valid;
       return 0;
-    case 28: // io_dma0Ext_grant
-      getBitWidth_io_dma0Ext_grant(bitWidth);
-      *setter = (void(*)(const uint8_t*))setBits_io_dma0Ext_grant;
+    case 28: // io_dma0Ext_cmd_ready
+      getBitWidth_io_dma0Ext_cmd_ready(bitWidth);
+      *setter = (void(*)(const uint8_t*))setBits_io_dma0Ext_cmd_ready;
       return 0;
-    case 33: // io_dma0Ext_writeData_ready
-      getBitWidth_io_dma0Ext_writeData_ready(bitWidth);
-      *setter = (void(*)(const uint8_t*))setBits_io_dma0Ext_writeData_ready;
+    case 30: // io_dma0Ext_rsp_payload_rsp
+      getBitWidth_io_dma0Ext_rsp_payload_rsp(bitWidth);
+      *setter = (void(*)(const uint8_t*))setBits_io_dma0Ext_rsp_payload_rsp;
       return 0;
-    case 35: // io_dma0Ext_readData_payload
-      getBitWidth_io_dma0Ext_readData_payload(bitWidth);
-      *setter = (void(*)(const uint8_t*))setBits_io_dma0Ext_readData_payload;
+    case 31: // io_dma0Ext_rsp_payload_data
+      getBitWidth_io_dma0Ext_rsp_payload_data(bitWidth);
+      *setter = (void(*)(const uint8_t*))setBits_io_dma0Ext_rsp_payload_data;
       return 0;
-    case 37: // io_dma0Ext_readData_valid
-      getBitWidth_io_dma0Ext_readData_valid(bitWidth);
-      *setter = (void(*)(const uint8_t*))setBits_io_dma0Ext_readData_valid;
+    case 33: // io_dma0Ext_rsp_valid
+      getBitWidth_io_dma0Ext_rsp_valid(bitWidth);
+      *setter = (void(*)(const uint8_t*))setBits_io_dma0Ext_rsp_valid;
       return 0;
-    case 41: // io_resp_ready
+    case 37: // io_resp_ready
       getBitWidth_io_resp_ready(bitWidth);
       *setter = (void(*)(const uint8_t*))setBits_io_resp_ready;
       return 0;
-    case 43: // io_cmd_payload_data1
+    case 39: // io_cmd_payload_data1
       getBitWidth_io_cmd_payload_data1(bitWidth);
       *setter = (void(*)(const uint8_t*))setBits_io_cmd_payload_data1;
       return 0;
-    case 44: // io_cmd_payload_data0
+    case 40: // io_cmd_payload_data0
       getBitWidth_io_cmd_payload_data0(bitWidth);
       *setter = (void(*)(const uint8_t*))setBits_io_cmd_payload_data0;
       return 0;
-    case 45: // io_cmd_payload_reg1Addr
+    case 41: // io_cmd_payload_reg1Addr
       getBitWidth_io_cmd_payload_reg1Addr(bitWidth);
       *setter = (void(*)(const uint8_t*))setBits_io_cmd_payload_reg1Addr;
       return 0;
-    case 46: // io_cmd_payload_reg0Addr
+    case 42: // io_cmd_payload_reg0Addr
       getBitWidth_io_cmd_payload_reg0Addr(bitWidth);
       *setter = (void(*)(const uint8_t*))setBits_io_cmd_payload_reg0Addr;
       return 0;
-    case 47: // io_cmd_payload_op
+    case 43: // io_cmd_payload_op
       getBitWidth_io_cmd_payload_op(bitWidth);
       *setter = (void(*)(const uint8_t*))setBits_io_cmd_payload_op;
       return 0;
-    case 49: // io_cmd_valid
+    case 45: // io_cmd_valid
       getBitWidth_io_cmd_valid(bitWidth);
       *setter = (void(*)(const uint8_t*))setBits_io_cmd_valid;
       return 0;

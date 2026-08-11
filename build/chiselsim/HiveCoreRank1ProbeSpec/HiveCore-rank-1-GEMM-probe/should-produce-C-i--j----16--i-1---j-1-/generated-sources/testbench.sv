@@ -26,17 +26,13 @@ module svsimTestbench;
   reg  [$bits(dut.io_dma1Ext_readData_payload)-1:0] io_dma1Ext_readData_payload = '0;
   wire [$bits(dut.io_dma1Ext_readData_ready)-1:0] io_dma1Ext_readData_ready;
   reg  [$bits(dut.io_dma1Ext_readData_valid)-1:0] io_dma1Ext_readData_valid = '0;
-  wire [$bits(dut.io_dma0Ext_isWrite)-1:0] io_dma0Ext_isWrite;
-  reg  [$bits(dut.io_dma0Ext_grant)-1:0] io_dma0Ext_grant = '0;
-  wire [$bits(dut.io_dma0Ext_req)-1:0] io_dma0Ext_req;
-  wire [$bits(dut.io_dma0Ext_len)-1:0] io_dma0Ext_len;
-  wire [$bits(dut.io_dma0Ext_addr)-1:0] io_dma0Ext_addr;
-  wire [$bits(dut.io_dma0Ext_writeData_payload)-1:0] io_dma0Ext_writeData_payload;
-  reg  [$bits(dut.io_dma0Ext_writeData_ready)-1:0] io_dma0Ext_writeData_ready = '0;
-  wire [$bits(dut.io_dma0Ext_writeData_valid)-1:0] io_dma0Ext_writeData_valid;
-  reg  [$bits(dut.io_dma0Ext_readData_payload)-1:0] io_dma0Ext_readData_payload = '0;
-  wire [$bits(dut.io_dma0Ext_readData_ready)-1:0] io_dma0Ext_readData_ready;
-  reg  [$bits(dut.io_dma0Ext_readData_valid)-1:0] io_dma0Ext_readData_valid = '0;
+  wire [$bits(dut.io_dma0Ext_cmd_payload_addr)-1:0] io_dma0Ext_cmd_payload_addr;
+  reg  [$bits(dut.io_dma0Ext_cmd_ready)-1:0] io_dma0Ext_cmd_ready = '0;
+  wire [$bits(dut.io_dma0Ext_cmd_valid)-1:0] io_dma0Ext_cmd_valid;
+  reg  [$bits(dut.io_dma0Ext_rsp_payload_rsp)-1:0] io_dma0Ext_rsp_payload_rsp = '0;
+  reg  [$bits(dut.io_dma0Ext_rsp_payload_data)-1:0] io_dma0Ext_rsp_payload_data = '0;
+  wire [$bits(dut.io_dma0Ext_rsp_ready)-1:0] io_dma0Ext_rsp_ready;
+  reg  [$bits(dut.io_dma0Ext_rsp_valid)-1:0] io_dma0Ext_rsp_valid = '0;
   wire [$bits(dut.io_resp_payload_err)-1:0] io_resp_payload_err;
   wire [$bits(dut.io_resp_payload_done)-1:0] io_resp_payload_done;
   wire [$bits(dut.io_resp_payload_data)-1:0] io_resp_payload_data;
@@ -78,17 +74,13 @@ HiveCore dut (
     .io_dma1Ext_readData_payload(io_dma1Ext_readData_payload),
     .io_dma1Ext_readData_ready(io_dma1Ext_readData_ready),
     .io_dma1Ext_readData_valid(io_dma1Ext_readData_valid),
-    .io_dma0Ext_isWrite(io_dma0Ext_isWrite),
-    .io_dma0Ext_grant(io_dma0Ext_grant),
-    .io_dma0Ext_req(io_dma0Ext_req),
-    .io_dma0Ext_len(io_dma0Ext_len),
-    .io_dma0Ext_addr(io_dma0Ext_addr),
-    .io_dma0Ext_writeData_payload(io_dma0Ext_writeData_payload),
-    .io_dma0Ext_writeData_ready(io_dma0Ext_writeData_ready),
-    .io_dma0Ext_writeData_valid(io_dma0Ext_writeData_valid),
-    .io_dma0Ext_readData_payload(io_dma0Ext_readData_payload),
-    .io_dma0Ext_readData_ready(io_dma0Ext_readData_ready),
-    .io_dma0Ext_readData_valid(io_dma0Ext_readData_valid),
+    .io_dma0Ext_cmd_payload_addr(io_dma0Ext_cmd_payload_addr),
+    .io_dma0Ext_cmd_ready(io_dma0Ext_cmd_ready),
+    .io_dma0Ext_cmd_valid(io_dma0Ext_cmd_valid),
+    .io_dma0Ext_rsp_payload_rsp(io_dma0Ext_rsp_payload_rsp),
+    .io_dma0Ext_rsp_payload_data(io_dma0Ext_rsp_payload_data),
+    .io_dma0Ext_rsp_ready(io_dma0Ext_rsp_ready),
+    .io_dma0Ext_rsp_valid(io_dma0Ext_rsp_valid),
     .io_resp_payload_err(io_resp_payload_err),
     .io_resp_payload_done(io_resp_payload_done),
     .io_resp_payload_data(io_resp_payload_data),
@@ -480,159 +472,111 @@ HiveCore dut (
     value_io_dma1Ext_readData_valid = io_dma1Ext_readData_valid;
   endfunction
 
-  // Port 1b: io_dma0Ext_isWrite
-  export "DPI-C" function getBitWidthImpl_io_dma0Ext_isWrite;
-  function void getBitWidthImpl_io_dma0Ext_isWrite;
+  // Port 1b: io_dma0Ext_cmd_payload_addr
+  export "DPI-C" function getBitWidthImpl_io_dma0Ext_cmd_payload_addr;
+  function void getBitWidthImpl_io_dma0Ext_cmd_payload_addr;
     output int value;
-    value = $bits(dut.io_dma0Ext_isWrite);
+    value = $bits(dut.io_dma0Ext_cmd_payload_addr);
   endfunction
-  export "DPI-C" function getBitsImpl_io_dma0Ext_isWrite;
-  function void getBitsImpl_io_dma0Ext_isWrite;
-    output bit [$bits(dut.io_dma0Ext_isWrite)-1:0] value_io_dma0Ext_isWrite;
-    value_io_dma0Ext_isWrite = io_dma0Ext_isWrite;
+  export "DPI-C" function getBitsImpl_io_dma0Ext_cmd_payload_addr;
+  function void getBitsImpl_io_dma0Ext_cmd_payload_addr;
+    output bit [$bits(dut.io_dma0Ext_cmd_payload_addr)-1:0] value_io_dma0Ext_cmd_payload_addr;
+    value_io_dma0Ext_cmd_payload_addr = io_dma0Ext_cmd_payload_addr;
   endfunction
 
-  // Port 1c: io_dma0Ext_grant
-  export "DPI-C" function getBitWidthImpl_io_dma0Ext_grant;
-  function void getBitWidthImpl_io_dma0Ext_grant;
+  // Port 1c: io_dma0Ext_cmd_ready
+  export "DPI-C" function getBitWidthImpl_io_dma0Ext_cmd_ready;
+  function void getBitWidthImpl_io_dma0Ext_cmd_ready;
     output int value;
-    value = $bits(dut.io_dma0Ext_grant);
+    value = $bits(dut.io_dma0Ext_cmd_ready);
   endfunction
-  export "DPI-C" function setBitsImpl_io_dma0Ext_grant;
-  function void setBitsImpl_io_dma0Ext_grant;
-    input bit [$bits(dut.io_dma0Ext_grant)-1:0] value_io_dma0Ext_grant;
-    io_dma0Ext_grant = value_io_dma0Ext_grant;
+  export "DPI-C" function setBitsImpl_io_dma0Ext_cmd_ready;
+  function void setBitsImpl_io_dma0Ext_cmd_ready;
+    input bit [$bits(dut.io_dma0Ext_cmd_ready)-1:0] value_io_dma0Ext_cmd_ready;
+    io_dma0Ext_cmd_ready = value_io_dma0Ext_cmd_ready;
   endfunction
-  export "DPI-C" function getBitsImpl_io_dma0Ext_grant;
-  function void getBitsImpl_io_dma0Ext_grant;
-    output bit [$bits(dut.io_dma0Ext_grant)-1:0] value_io_dma0Ext_grant;
-    value_io_dma0Ext_grant = io_dma0Ext_grant;
+  export "DPI-C" function getBitsImpl_io_dma0Ext_cmd_ready;
+  function void getBitsImpl_io_dma0Ext_cmd_ready;
+    output bit [$bits(dut.io_dma0Ext_cmd_ready)-1:0] value_io_dma0Ext_cmd_ready;
+    value_io_dma0Ext_cmd_ready = io_dma0Ext_cmd_ready;
   endfunction
 
-  // Port 1d: io_dma0Ext_req
-  export "DPI-C" function getBitWidthImpl_io_dma0Ext_req;
-  function void getBitWidthImpl_io_dma0Ext_req;
+  // Port 1d: io_dma0Ext_cmd_valid
+  export "DPI-C" function getBitWidthImpl_io_dma0Ext_cmd_valid;
+  function void getBitWidthImpl_io_dma0Ext_cmd_valid;
     output int value;
-    value = $bits(dut.io_dma0Ext_req);
+    value = $bits(dut.io_dma0Ext_cmd_valid);
   endfunction
-  export "DPI-C" function getBitsImpl_io_dma0Ext_req;
-  function void getBitsImpl_io_dma0Ext_req;
-    output bit [$bits(dut.io_dma0Ext_req)-1:0] value_io_dma0Ext_req;
-    value_io_dma0Ext_req = io_dma0Ext_req;
+  export "DPI-C" function getBitsImpl_io_dma0Ext_cmd_valid;
+  function void getBitsImpl_io_dma0Ext_cmd_valid;
+    output bit [$bits(dut.io_dma0Ext_cmd_valid)-1:0] value_io_dma0Ext_cmd_valid;
+    value_io_dma0Ext_cmd_valid = io_dma0Ext_cmd_valid;
   endfunction
 
-  // Port 1e: io_dma0Ext_len
-  export "DPI-C" function getBitWidthImpl_io_dma0Ext_len;
-  function void getBitWidthImpl_io_dma0Ext_len;
+  // Port 1e: io_dma0Ext_rsp_payload_rsp
+  export "DPI-C" function getBitWidthImpl_io_dma0Ext_rsp_payload_rsp;
+  function void getBitWidthImpl_io_dma0Ext_rsp_payload_rsp;
     output int value;
-    value = $bits(dut.io_dma0Ext_len);
+    value = $bits(dut.io_dma0Ext_rsp_payload_rsp);
   endfunction
-  export "DPI-C" function getBitsImpl_io_dma0Ext_len;
-  function void getBitsImpl_io_dma0Ext_len;
-    output bit [$bits(dut.io_dma0Ext_len)-1:0] value_io_dma0Ext_len;
-    value_io_dma0Ext_len = io_dma0Ext_len;
+  export "DPI-C" function setBitsImpl_io_dma0Ext_rsp_payload_rsp;
+  function void setBitsImpl_io_dma0Ext_rsp_payload_rsp;
+    input bit [$bits(dut.io_dma0Ext_rsp_payload_rsp)-1:0] value_io_dma0Ext_rsp_payload_rsp;
+    io_dma0Ext_rsp_payload_rsp = value_io_dma0Ext_rsp_payload_rsp;
+  endfunction
+  export "DPI-C" function getBitsImpl_io_dma0Ext_rsp_payload_rsp;
+  function void getBitsImpl_io_dma0Ext_rsp_payload_rsp;
+    output bit [$bits(dut.io_dma0Ext_rsp_payload_rsp)-1:0] value_io_dma0Ext_rsp_payload_rsp;
+    value_io_dma0Ext_rsp_payload_rsp = io_dma0Ext_rsp_payload_rsp;
   endfunction
 
-  // Port 1f: io_dma0Ext_addr
-  export "DPI-C" function getBitWidthImpl_io_dma0Ext_addr;
-  function void getBitWidthImpl_io_dma0Ext_addr;
+  // Port 1f: io_dma0Ext_rsp_payload_data
+  export "DPI-C" function getBitWidthImpl_io_dma0Ext_rsp_payload_data;
+  function void getBitWidthImpl_io_dma0Ext_rsp_payload_data;
     output int value;
-    value = $bits(dut.io_dma0Ext_addr);
+    value = $bits(dut.io_dma0Ext_rsp_payload_data);
   endfunction
-  export "DPI-C" function getBitsImpl_io_dma0Ext_addr;
-  function void getBitsImpl_io_dma0Ext_addr;
-    output bit [$bits(dut.io_dma0Ext_addr)-1:0] value_io_dma0Ext_addr;
-    value_io_dma0Ext_addr = io_dma0Ext_addr;
+  export "DPI-C" function setBitsImpl_io_dma0Ext_rsp_payload_data;
+  function void setBitsImpl_io_dma0Ext_rsp_payload_data;
+    input bit [$bits(dut.io_dma0Ext_rsp_payload_data)-1:0] value_io_dma0Ext_rsp_payload_data;
+    io_dma0Ext_rsp_payload_data = value_io_dma0Ext_rsp_payload_data;
+  endfunction
+  export "DPI-C" function getBitsImpl_io_dma0Ext_rsp_payload_data;
+  function void getBitsImpl_io_dma0Ext_rsp_payload_data;
+    output bit [$bits(dut.io_dma0Ext_rsp_payload_data)-1:0] value_io_dma0Ext_rsp_payload_data;
+    value_io_dma0Ext_rsp_payload_data = io_dma0Ext_rsp_payload_data;
   endfunction
 
-  // Port 20: io_dma0Ext_writeData_payload
-  export "DPI-C" function getBitWidthImpl_io_dma0Ext_writeData_payload;
-  function void getBitWidthImpl_io_dma0Ext_writeData_payload;
+  // Port 20: io_dma0Ext_rsp_ready
+  export "DPI-C" function getBitWidthImpl_io_dma0Ext_rsp_ready;
+  function void getBitWidthImpl_io_dma0Ext_rsp_ready;
     output int value;
-    value = $bits(dut.io_dma0Ext_writeData_payload);
+    value = $bits(dut.io_dma0Ext_rsp_ready);
   endfunction
-  export "DPI-C" function getBitsImpl_io_dma0Ext_writeData_payload;
-  function void getBitsImpl_io_dma0Ext_writeData_payload;
-    output bit [$bits(dut.io_dma0Ext_writeData_payload)-1:0] value_io_dma0Ext_writeData_payload;
-    value_io_dma0Ext_writeData_payload = io_dma0Ext_writeData_payload;
+  export "DPI-C" function getBitsImpl_io_dma0Ext_rsp_ready;
+  function void getBitsImpl_io_dma0Ext_rsp_ready;
+    output bit [$bits(dut.io_dma0Ext_rsp_ready)-1:0] value_io_dma0Ext_rsp_ready;
+    value_io_dma0Ext_rsp_ready = io_dma0Ext_rsp_ready;
   endfunction
 
-  // Port 21: io_dma0Ext_writeData_ready
-  export "DPI-C" function getBitWidthImpl_io_dma0Ext_writeData_ready;
-  function void getBitWidthImpl_io_dma0Ext_writeData_ready;
+  // Port 21: io_dma0Ext_rsp_valid
+  export "DPI-C" function getBitWidthImpl_io_dma0Ext_rsp_valid;
+  function void getBitWidthImpl_io_dma0Ext_rsp_valid;
     output int value;
-    value = $bits(dut.io_dma0Ext_writeData_ready);
+    value = $bits(dut.io_dma0Ext_rsp_valid);
   endfunction
-  export "DPI-C" function setBitsImpl_io_dma0Ext_writeData_ready;
-  function void setBitsImpl_io_dma0Ext_writeData_ready;
-    input bit [$bits(dut.io_dma0Ext_writeData_ready)-1:0] value_io_dma0Ext_writeData_ready;
-    io_dma0Ext_writeData_ready = value_io_dma0Ext_writeData_ready;
+  export "DPI-C" function setBitsImpl_io_dma0Ext_rsp_valid;
+  function void setBitsImpl_io_dma0Ext_rsp_valid;
+    input bit [$bits(dut.io_dma0Ext_rsp_valid)-1:0] value_io_dma0Ext_rsp_valid;
+    io_dma0Ext_rsp_valid = value_io_dma0Ext_rsp_valid;
   endfunction
-  export "DPI-C" function getBitsImpl_io_dma0Ext_writeData_ready;
-  function void getBitsImpl_io_dma0Ext_writeData_ready;
-    output bit [$bits(dut.io_dma0Ext_writeData_ready)-1:0] value_io_dma0Ext_writeData_ready;
-    value_io_dma0Ext_writeData_ready = io_dma0Ext_writeData_ready;
+  export "DPI-C" function getBitsImpl_io_dma0Ext_rsp_valid;
+  function void getBitsImpl_io_dma0Ext_rsp_valid;
+    output bit [$bits(dut.io_dma0Ext_rsp_valid)-1:0] value_io_dma0Ext_rsp_valid;
+    value_io_dma0Ext_rsp_valid = io_dma0Ext_rsp_valid;
   endfunction
 
-  // Port 22: io_dma0Ext_writeData_valid
-  export "DPI-C" function getBitWidthImpl_io_dma0Ext_writeData_valid;
-  function void getBitWidthImpl_io_dma0Ext_writeData_valid;
-    output int value;
-    value = $bits(dut.io_dma0Ext_writeData_valid);
-  endfunction
-  export "DPI-C" function getBitsImpl_io_dma0Ext_writeData_valid;
-  function void getBitsImpl_io_dma0Ext_writeData_valid;
-    output bit [$bits(dut.io_dma0Ext_writeData_valid)-1:0] value_io_dma0Ext_writeData_valid;
-    value_io_dma0Ext_writeData_valid = io_dma0Ext_writeData_valid;
-  endfunction
-
-  // Port 23: io_dma0Ext_readData_payload
-  export "DPI-C" function getBitWidthImpl_io_dma0Ext_readData_payload;
-  function void getBitWidthImpl_io_dma0Ext_readData_payload;
-    output int value;
-    value = $bits(dut.io_dma0Ext_readData_payload);
-  endfunction
-  export "DPI-C" function setBitsImpl_io_dma0Ext_readData_payload;
-  function void setBitsImpl_io_dma0Ext_readData_payload;
-    input bit [$bits(dut.io_dma0Ext_readData_payload)-1:0] value_io_dma0Ext_readData_payload;
-    io_dma0Ext_readData_payload = value_io_dma0Ext_readData_payload;
-  endfunction
-  export "DPI-C" function getBitsImpl_io_dma0Ext_readData_payload;
-  function void getBitsImpl_io_dma0Ext_readData_payload;
-    output bit [$bits(dut.io_dma0Ext_readData_payload)-1:0] value_io_dma0Ext_readData_payload;
-    value_io_dma0Ext_readData_payload = io_dma0Ext_readData_payload;
-  endfunction
-
-  // Port 24: io_dma0Ext_readData_ready
-  export "DPI-C" function getBitWidthImpl_io_dma0Ext_readData_ready;
-  function void getBitWidthImpl_io_dma0Ext_readData_ready;
-    output int value;
-    value = $bits(dut.io_dma0Ext_readData_ready);
-  endfunction
-  export "DPI-C" function getBitsImpl_io_dma0Ext_readData_ready;
-  function void getBitsImpl_io_dma0Ext_readData_ready;
-    output bit [$bits(dut.io_dma0Ext_readData_ready)-1:0] value_io_dma0Ext_readData_ready;
-    value_io_dma0Ext_readData_ready = io_dma0Ext_readData_ready;
-  endfunction
-
-  // Port 25: io_dma0Ext_readData_valid
-  export "DPI-C" function getBitWidthImpl_io_dma0Ext_readData_valid;
-  function void getBitWidthImpl_io_dma0Ext_readData_valid;
-    output int value;
-    value = $bits(dut.io_dma0Ext_readData_valid);
-  endfunction
-  export "DPI-C" function setBitsImpl_io_dma0Ext_readData_valid;
-  function void setBitsImpl_io_dma0Ext_readData_valid;
-    input bit [$bits(dut.io_dma0Ext_readData_valid)-1:0] value_io_dma0Ext_readData_valid;
-    io_dma0Ext_readData_valid = value_io_dma0Ext_readData_valid;
-  endfunction
-  export "DPI-C" function getBitsImpl_io_dma0Ext_readData_valid;
-  function void getBitsImpl_io_dma0Ext_readData_valid;
-    output bit [$bits(dut.io_dma0Ext_readData_valid)-1:0] value_io_dma0Ext_readData_valid;
-    value_io_dma0Ext_readData_valid = io_dma0Ext_readData_valid;
-  endfunction
-
-  // Port 26: io_resp_payload_err
+  // Port 22: io_resp_payload_err
   export "DPI-C" function getBitWidthImpl_io_resp_payload_err;
   function void getBitWidthImpl_io_resp_payload_err;
     output int value;
@@ -644,7 +588,7 @@ HiveCore dut (
     value_io_resp_payload_err = io_resp_payload_err;
   endfunction
 
-  // Port 27: io_resp_payload_done
+  // Port 23: io_resp_payload_done
   export "DPI-C" function getBitWidthImpl_io_resp_payload_done;
   function void getBitWidthImpl_io_resp_payload_done;
     output int value;
@@ -656,7 +600,7 @@ HiveCore dut (
     value_io_resp_payload_done = io_resp_payload_done;
   endfunction
 
-  // Port 28: io_resp_payload_data
+  // Port 24: io_resp_payload_data
   export "DPI-C" function getBitWidthImpl_io_resp_payload_data;
   function void getBitWidthImpl_io_resp_payload_data;
     output int value;
@@ -668,7 +612,7 @@ HiveCore dut (
     value_io_resp_payload_data = io_resp_payload_data;
   endfunction
 
-  // Port 29: io_resp_ready
+  // Port 25: io_resp_ready
   export "DPI-C" function getBitWidthImpl_io_resp_ready;
   function void getBitWidthImpl_io_resp_ready;
     output int value;
@@ -685,7 +629,7 @@ HiveCore dut (
     value_io_resp_ready = io_resp_ready;
   endfunction
 
-  // Port 2a: io_resp_valid
+  // Port 26: io_resp_valid
   export "DPI-C" function getBitWidthImpl_io_resp_valid;
   function void getBitWidthImpl_io_resp_valid;
     output int value;
@@ -697,7 +641,7 @@ HiveCore dut (
     value_io_resp_valid = io_resp_valid;
   endfunction
 
-  // Port 2b: io_cmd_payload_data1
+  // Port 27: io_cmd_payload_data1
   export "DPI-C" function getBitWidthImpl_io_cmd_payload_data1;
   function void getBitWidthImpl_io_cmd_payload_data1;
     output int value;
@@ -714,7 +658,7 @@ HiveCore dut (
     value_io_cmd_payload_data1 = io_cmd_payload_data1;
   endfunction
 
-  // Port 2c: io_cmd_payload_data0
+  // Port 28: io_cmd_payload_data0
   export "DPI-C" function getBitWidthImpl_io_cmd_payload_data0;
   function void getBitWidthImpl_io_cmd_payload_data0;
     output int value;
@@ -731,7 +675,7 @@ HiveCore dut (
     value_io_cmd_payload_data0 = io_cmd_payload_data0;
   endfunction
 
-  // Port 2d: io_cmd_payload_reg1Addr
+  // Port 29: io_cmd_payload_reg1Addr
   export "DPI-C" function getBitWidthImpl_io_cmd_payload_reg1Addr;
   function void getBitWidthImpl_io_cmd_payload_reg1Addr;
     output int value;
@@ -748,7 +692,7 @@ HiveCore dut (
     value_io_cmd_payload_reg1Addr = io_cmd_payload_reg1Addr;
   endfunction
 
-  // Port 2e: io_cmd_payload_reg0Addr
+  // Port 2a: io_cmd_payload_reg0Addr
   export "DPI-C" function getBitWidthImpl_io_cmd_payload_reg0Addr;
   function void getBitWidthImpl_io_cmd_payload_reg0Addr;
     output int value;
@@ -765,7 +709,7 @@ HiveCore dut (
     value_io_cmd_payload_reg0Addr = io_cmd_payload_reg0Addr;
   endfunction
 
-  // Port 2f: io_cmd_payload_op
+  // Port 2b: io_cmd_payload_op
   export "DPI-C" function getBitWidthImpl_io_cmd_payload_op;
   function void getBitWidthImpl_io_cmd_payload_op;
     output int value;
@@ -782,7 +726,7 @@ HiveCore dut (
     value_io_cmd_payload_op = io_cmd_payload_op;
   endfunction
 
-  // Port 30: io_cmd_ready
+  // Port 2c: io_cmd_ready
   export "DPI-C" function getBitWidthImpl_io_cmd_ready;
   function void getBitWidthImpl_io_cmd_ready;
     output int value;
@@ -794,7 +738,7 @@ HiveCore dut (
     value_io_cmd_ready = io_cmd_ready;
   endfunction
 
-  // Port 31: io_cmd_valid
+  // Port 2d: io_cmd_valid
   export "DPI-C" function getBitWidthImpl_io_cmd_valid;
   function void getBitWidthImpl_io_cmd_valid;
     output int value;

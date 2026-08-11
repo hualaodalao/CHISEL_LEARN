@@ -52,18 +52,21 @@ class HiveCoreWeightMapProbeSpec extends AnyFlatSpec with Matchers with ChiselSi
     }
 
     simulate(new HiveCore(cfg)) { dut =>
-      var dma0Active = false; var dma0Len = 0; var dma0Done = 0
-      var dma1Active = false; var dma1Len = 0; var dma1Done = 0
+      var dma0Sent = 0; val dma0Total = 16   // A 常量供数，单 tile 16 beat
+      var dma1Done = 0
       var dma2Sent = 0; val dma2Total = 16
       val storeVals = scala.collection.mutable.ArrayBuffer[BigInt]()
 
       dut.reset.poke(true.B)
       dut.io.cmd.valid.poke(false.B)
       dut.io.resp.ready.poke(true.B)
-      dut.io.dma0Ext.grant.poke(false.B)
+      // A 只读通道：cmd 常就绪，rsp 初始无效
+      dut.io.dma0Ext.cmd.ready.poke(true.B)
+      dut.io.dma0Ext.rsp.valid.poke(false.B)
+      dut.io.dma0Ext.rsp.payload.data.poke(0.U)
+      dut.io.dma0Ext.rsp.payload.rsp.poke(false.B)
+      // C 写回通道：grant 关闭，writeData 不接收
       dut.io.dma1Ext.grant.poke(false.B)
-      dut.io.dma0Ext.readData.valid.poke(false.B)
-      dut.io.dma0Ext.readData.payload.poke(0.U)
       dut.io.dma1Ext.readData.valid.poke(false.B)
       dut.io.dma1Ext.writeData.ready.poke(false.B)
       dut.io.dma1Ext.readData.payload.poke(0.U)
@@ -104,41 +107,21 @@ class HiveCoreWeightMapProbeSpec extends AnyFlatSpec with Matchers with ChiselSi
       var done = false
       var cycle = 0
       while (!done && cycle < 5000) {
-        if (!dma0Active) {
-          if (dut.io.dma0Ext.req.peek().litToBoolean) {
-            dma0Len = dut.io.dma0Ext.len.peek().litValue.toInt
-            dma0Done = 0; dma0Active = true
-            dut.io.dma0Ext.grant.poke(true.B)
-          }
+        // dma0: A load（cmd/rsp 顺序流模型，常量供数）
+        if (dma0Sent < dma0Total) {
+          dut.io.dma0Ext.rsp.valid.poke(true.B)
+          dut.io.dma0Ext.rsp.payload.data.poke(aBeatVal.U)
+          dut.io.dma0Ext.rsp.payload.rsp.poke(false.B)
+          if (dut.io.dma0Ext.rsp.ready.peek().litToBoolean) dma0Sent += 1
         } else {
-          dut.io.dma0Ext.grant.poke(false.B)
-          if (dma0Done < dma0Len) {
-            dut.io.dma0Ext.readData.valid.poke(true.B)
-            dut.io.dma0Ext.readData.payload.poke(aBeatVal.U)
-            if (dut.io.dma0Ext.readData.ready.peek().litToBoolean) dma0Done += 1
-          } else {
-            dut.io.dma0Ext.readData.valid.poke(false.B)
-            dma0Active = false
-          }
+          dut.io.dma0Ext.rsp.valid.poke(false.B)
         }
-        if (!dma1Active) {
-          if (dut.io.dma1Ext.req.peek().litToBoolean) {
-            dma1Len = dut.io.dma1Ext.len.peek().litValue.toInt
-            dma1Done = 0; dma1Active = true
-            dut.io.dma1Ext.grant.poke(true.B)
-          }
-        } else {
-          dut.io.dma1Ext.grant.poke(false.B)
-          if (dma1Done < dma1Len) {
-            dut.io.dma1Ext.writeData.ready.poke(true.B)
-            if (dut.io.dma1Ext.writeData.valid.peek().litToBoolean) {
-              storeVals += dut.io.dma1Ext.writeData.payload.peek().litValue
-              dma1Done += 1
-            }
-          } else {
-            dut.io.dma1Ext.writeData.ready.poke(false.B)
-            dma1Active = false
-          }
+        // dma1: C store（逐 beat req/grant + writeData 握手）
+        dut.io.dma1Ext.grant.poke(true.B)
+        dut.io.dma1Ext.writeData.ready.poke(true.B)
+        if (dut.io.dma1Ext.writeData.valid.peek().litToBoolean) {
+          storeVals += dut.io.dma1Ext.writeData.payload.peek().litValue
+          dma1Done += 1
         }
         // dma2: 位置 p 的权重行值为 p+1
         if (dma2Sent < dma2Total) {
@@ -190,18 +173,21 @@ class HiveCoreWeightMapProbeSpec extends AnyFlatSpec with Matchers with ChiselSi
     }
 
     simulate(new HiveCore(cfg)) { dut =>
-      var dma0Active = false; var dma0Len = 0; var dma0Done = 0
-      var dma1Active = false; var dma1Len = 0; var dma1Done = 0
+      var dma0Sent = 0; val dma0Total = 16   // A 常量供数，单 tile 16 beat
+      var dma1Done = 0
       var dma2Sent = 0; val dma2Total = 16
       val storeVals = scala.collection.mutable.ArrayBuffer[BigInt]()
 
       dut.reset.poke(true.B)
       dut.io.cmd.valid.poke(false.B)
       dut.io.resp.ready.poke(true.B)
-      dut.io.dma0Ext.grant.poke(false.B)
+      // A 只读通道：cmd 常就绪，rsp 初始无效
+      dut.io.dma0Ext.cmd.ready.poke(true.B)
+      dut.io.dma0Ext.rsp.valid.poke(false.B)
+      dut.io.dma0Ext.rsp.payload.data.poke(0.U)
+      dut.io.dma0Ext.rsp.payload.rsp.poke(false.B)
+      // C 写回通道：grant 关闭，writeData 不接收
       dut.io.dma1Ext.grant.poke(false.B)
-      dut.io.dma0Ext.readData.valid.poke(false.B)
-      dut.io.dma0Ext.readData.payload.poke(0.U)
       dut.io.dma1Ext.readData.valid.poke(false.B)
       dut.io.dma1Ext.writeData.ready.poke(false.B)
       dut.io.dma1Ext.readData.payload.poke(0.U)
@@ -242,41 +228,21 @@ class HiveCoreWeightMapProbeSpec extends AnyFlatSpec with Matchers with ChiselSi
       var done = false
       var cycle = 0
       while (!done && cycle < 5000) {
-        if (!dma0Active) {
-          if (dut.io.dma0Ext.req.peek().litToBoolean) {
-            dma0Len = dut.io.dma0Ext.len.peek().litValue.toInt
-            dma0Done = 0; dma0Active = true
-            dut.io.dma0Ext.grant.poke(true.B)
-          }
+        // dma0: A load（cmd/rsp 顺序流模型，常量供数）
+        if (dma0Sent < dma0Total) {
+          dut.io.dma0Ext.rsp.valid.poke(true.B)
+          dut.io.dma0Ext.rsp.payload.data.poke(aBeatVal.U)
+          dut.io.dma0Ext.rsp.payload.rsp.poke(false.B)
+          if (dut.io.dma0Ext.rsp.ready.peek().litToBoolean) dma0Sent += 1
         } else {
-          dut.io.dma0Ext.grant.poke(false.B)
-          if (dma0Done < dma0Len) {
-            dut.io.dma0Ext.readData.valid.poke(true.B)
-            dut.io.dma0Ext.readData.payload.poke(aBeatVal.U)
-            if (dut.io.dma0Ext.readData.ready.peek().litToBoolean) dma0Done += 1
-          } else {
-            dut.io.dma0Ext.readData.valid.poke(false.B)
-            dma0Active = false
-          }
+          dut.io.dma0Ext.rsp.valid.poke(false.B)
         }
-        if (!dma1Active) {
-          if (dut.io.dma1Ext.req.peek().litToBoolean) {
-            dma1Len = dut.io.dma1Ext.len.peek().litValue.toInt
-            dma1Done = 0; dma1Active = true
-            dut.io.dma1Ext.grant.poke(true.B)
-          }
-        } else {
-          dut.io.dma1Ext.grant.poke(false.B)
-          if (dma1Done < dma1Len) {
-            dut.io.dma1Ext.writeData.ready.poke(true.B)
-            if (dut.io.dma1Ext.writeData.valid.peek().litToBoolean) {
-              storeVals += dut.io.dma1Ext.writeData.payload.peek().litValue
-              dma1Done += 1
-            }
-          } else {
-            dut.io.dma1Ext.writeData.ready.poke(false.B)
-            dma1Active = false
-          }
+        // dma1: C store（逐 beat req/grant + writeData 握手）
+        dut.io.dma1Ext.grant.poke(true.B)
+        dut.io.dma1Ext.writeData.ready.poke(true.B)
+        if (dut.io.dma1Ext.writeData.valid.peek().litToBoolean) {
+          storeVals += dut.io.dma1Ext.writeData.payload.peek().litValue
+          dma1Done += 1
         }
         if (dma2Sent < dma2Total) {
           dut.io.dma2Ext.rsp.valid.poke(true.B)

@@ -38,9 +38,6 @@ class alignas(VL_CACHE_LINE_BYTES) VsvsimTestbench___024root final {
     CData/*0:0*/ svsimTestbench__DOT__dut__DOT__validSkewedPerRow_r_6;
     CData/*0:0*/ svsimTestbench__DOT__dut__DOT__validSkewedPerRow_1;
     CData/*0:0*/ __Vdpi_export_trigger;
-    CData/*0:0*/ __VstlFirstIteration;
-    CData/*0:0*/ __VstlPhaseResult;
-    CData/*0:0*/ __VicoPhaseResult;
     CData/*0:0*/ __Vtrigprevexpr___TOP__svsimTestbench__DOT__clock__0;
     CData/*0:0*/ __VactDidInit;
     CData/*0:0*/ __VactPhaseResult;
@@ -80,8 +77,6 @@ class alignas(VL_CACHE_LINE_BYTES) VsvsimTestbench___024root final {
     IData/*31:0*/ svsimTestbench__DOT__simulationState;
     IData/*31:0*/ __Vtrigprevexpr___TOP__svsimTestbench__DOT__simulationState__0;
     IData/*31:0*/ __VactIterCount;
-    VlUnpacked<QData/*63:0*/, 1> __VstlTriggered;
-    VlUnpacked<QData/*63:0*/, 1> __VicoTriggered;
     VlUnpacked<QData/*63:0*/, 2> __VactTriggered;
     VlUnpacked<QData/*63:0*/, 2> __VnbaTriggered;
 

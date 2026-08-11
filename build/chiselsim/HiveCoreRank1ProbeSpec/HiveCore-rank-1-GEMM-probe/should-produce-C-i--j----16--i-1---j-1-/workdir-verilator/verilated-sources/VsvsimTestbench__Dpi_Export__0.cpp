@@ -1030,420 +1030,292 @@ void VsvsimTestbench::getBitsImpl_io_dma1Ext_readData_valid(svBitVecVal* value_i
     VL_SET_SVBV_I(1, value_io_dma1Ext_readData_valid, value_io_dma1Ext_readData_valid__Vcvt);
 }
 
-void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_isWrite(int* value) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_isWrite\n"); );
+void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_cmd_payload_addr(int* value) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_cmd_payload_addr\n"); );
     // Locals
     IData/*31:0*/ value__Vcvt;
     value__Vcvt = 0;
     // Body
     static int __Vfuncnum = -1;
     if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_isWrite");
+        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_cmd_payload_addr");
     }
     const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_isWrite_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_isWrite_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_cmd_payload_addr_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_cmd_payload_addr_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
     (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value__Vcvt);
     *value = value__Vcvt;
 }
 
-void VsvsimTestbench::getBitsImpl_io_dma0Ext_isWrite(svBitVecVal* value_io_dma0Ext_isWrite) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_isWrite\n"); );
+void VsvsimTestbench::getBitsImpl_io_dma0Ext_cmd_payload_addr(svBitVecVal* value_io_dma0Ext_cmd_payload_addr) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_cmd_payload_addr\n"); );
     // Locals
-    CData/*0:0*/ value_io_dma0Ext_isWrite__Vcvt;
-    value_io_dma0Ext_isWrite__Vcvt = 0;
+    IData/*31:0*/ value_io_dma0Ext_cmd_payload_addr__Vcvt;
+    value_io_dma0Ext_cmd_payload_addr__Vcvt = 0;
     // Body
     static int __Vfuncnum = -1;
     if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_isWrite");
+        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_cmd_payload_addr");
     }
     const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_isWrite_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_isWrite_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_isWrite__Vcvt);
-    VL_SET_SVBV_I(1, value_io_dma0Ext_isWrite, value_io_dma0Ext_isWrite__Vcvt);
+    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_cmd_payload_addr_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_cmd_payload_addr_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_cmd_payload_addr__Vcvt);
+    VL_SET_SVBV_I(32, value_io_dma0Ext_cmd_payload_addr, value_io_dma0Ext_cmd_payload_addr__Vcvt);
 }
 
-void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_grant(int* value) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_grant\n"); );
+void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_cmd_ready(int* value) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_cmd_ready\n"); );
     // Locals
     IData/*31:0*/ value__Vcvt;
     value__Vcvt = 0;
     // Body
     static int __Vfuncnum = -1;
     if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_grant");
+        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_cmd_ready");
     }
     const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_grant_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_grant_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_cmd_ready_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_cmd_ready_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
     (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value__Vcvt);
     *value = value__Vcvt;
 }
 
-void VsvsimTestbench::setBitsImpl_io_dma0Ext_grant(const svBitVecVal* value_io_dma0Ext_grant) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::setBitsImpl_io_dma0Ext_grant\n"); );
+void VsvsimTestbench::setBitsImpl_io_dma0Ext_cmd_ready(const svBitVecVal* value_io_dma0Ext_cmd_ready) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::setBitsImpl_io_dma0Ext_cmd_ready\n"); );
     // Locals
-    CData/*0:0*/ value_io_dma0Ext_grant__Vcvt;
-    value_io_dma0Ext_grant__Vcvt = 0;
+    CData/*0:0*/ value_io_dma0Ext_cmd_ready__Vcvt;
+    value_io_dma0Ext_cmd_ready__Vcvt = 0;
     // Body
     static int __Vfuncnum = -1;
     if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("setBitsImpl_io_dma0Ext_grant");
+        __Vfuncnum = Verilated::exportFuncNum("setBitsImpl_io_dma0Ext_cmd_ready");
     }
     const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_grant_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_grant_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    VL_SET_C_SVBV(1, value_io_dma0Ext_grant__Vcvt, value_io_dma0Ext_grant + 0);
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_grant__Vcvt);
+    VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_cmd_ready_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_cmd_ready_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    VL_SET_C_SVBV(1, value_io_dma0Ext_cmd_ready__Vcvt, value_io_dma0Ext_cmd_ready + 0);
+    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_cmd_ready__Vcvt);
 }
 
-void VsvsimTestbench::getBitsImpl_io_dma0Ext_grant(svBitVecVal* value_io_dma0Ext_grant) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_grant\n"); );
+void VsvsimTestbench::getBitsImpl_io_dma0Ext_cmd_ready(svBitVecVal* value_io_dma0Ext_cmd_ready) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_cmd_ready\n"); );
     // Locals
-    CData/*0:0*/ value_io_dma0Ext_grant__Vcvt;
-    value_io_dma0Ext_grant__Vcvt = 0;
+    CData/*0:0*/ value_io_dma0Ext_cmd_ready__Vcvt;
+    value_io_dma0Ext_cmd_ready__Vcvt = 0;
     // Body
     static int __Vfuncnum = -1;
     if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_grant");
+        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_cmd_ready");
     }
     const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_grant_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_grant_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_grant__Vcvt);
-    VL_SET_SVBV_I(1, value_io_dma0Ext_grant, value_io_dma0Ext_grant__Vcvt);
+    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_cmd_ready_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_cmd_ready_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_cmd_ready__Vcvt);
+    VL_SET_SVBV_I(1, value_io_dma0Ext_cmd_ready, value_io_dma0Ext_cmd_ready__Vcvt);
 }
 
-void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_req(int* value) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_req\n"); );
+void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_cmd_valid(int* value) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_cmd_valid\n"); );
     // Locals
     IData/*31:0*/ value__Vcvt;
     value__Vcvt = 0;
     // Body
     static int __Vfuncnum = -1;
     if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_req");
+        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_cmd_valid");
     }
     const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_req_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_req_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_cmd_valid_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_cmd_valid_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
     (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value__Vcvt);
     *value = value__Vcvt;
 }
 
-void VsvsimTestbench::getBitsImpl_io_dma0Ext_req(svBitVecVal* value_io_dma0Ext_req) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_req\n"); );
+void VsvsimTestbench::getBitsImpl_io_dma0Ext_cmd_valid(svBitVecVal* value_io_dma0Ext_cmd_valid) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_cmd_valid\n"); );
     // Locals
-    CData/*0:0*/ value_io_dma0Ext_req__Vcvt;
-    value_io_dma0Ext_req__Vcvt = 0;
+    CData/*0:0*/ value_io_dma0Ext_cmd_valid__Vcvt;
+    value_io_dma0Ext_cmd_valid__Vcvt = 0;
     // Body
     static int __Vfuncnum = -1;
     if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_req");
+        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_cmd_valid");
     }
     const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_req_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_req_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_req__Vcvt);
-    VL_SET_SVBV_I(1, value_io_dma0Ext_req, value_io_dma0Ext_req__Vcvt);
+    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_cmd_valid_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_cmd_valid_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_cmd_valid__Vcvt);
+    VL_SET_SVBV_I(1, value_io_dma0Ext_cmd_valid, value_io_dma0Ext_cmd_valid__Vcvt);
 }
 
-void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_len(int* value) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_len\n"); );
+void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_rsp_payload_rsp(int* value) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_rsp_payload_rsp\n"); );
     // Locals
     IData/*31:0*/ value__Vcvt;
     value__Vcvt = 0;
     // Body
     static int __Vfuncnum = -1;
     if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_len");
+        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_rsp_payload_rsp");
     }
     const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_len_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_len_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_rsp_payload_rsp_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_rsp_payload_rsp_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
     (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value__Vcvt);
     *value = value__Vcvt;
 }
 
-void VsvsimTestbench::getBitsImpl_io_dma0Ext_len(svBitVecVal* value_io_dma0Ext_len) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_len\n"); );
+void VsvsimTestbench::setBitsImpl_io_dma0Ext_rsp_payload_rsp(const svBitVecVal* value_io_dma0Ext_rsp_payload_rsp) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::setBitsImpl_io_dma0Ext_rsp_payload_rsp\n"); );
     // Locals
-    SData/*15:0*/ value_io_dma0Ext_len__Vcvt;
-    value_io_dma0Ext_len__Vcvt = 0;
+    CData/*0:0*/ value_io_dma0Ext_rsp_payload_rsp__Vcvt;
+    value_io_dma0Ext_rsp_payload_rsp__Vcvt = 0;
     // Body
     static int __Vfuncnum = -1;
     if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_len");
+        __Vfuncnum = Verilated::exportFuncNum("setBitsImpl_io_dma0Ext_rsp_payload_rsp");
     }
     const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_len_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_len_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_len__Vcvt);
-    VL_SET_SVBV_I(16, value_io_dma0Ext_len, value_io_dma0Ext_len__Vcvt);
+    VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_rsp_payload_rsp_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_rsp_payload_rsp_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    VL_SET_C_SVBV(1, value_io_dma0Ext_rsp_payload_rsp__Vcvt, value_io_dma0Ext_rsp_payload_rsp + 0);
+    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_rsp_payload_rsp__Vcvt);
 }
 
-void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_addr(int* value) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_addr\n"); );
+void VsvsimTestbench::getBitsImpl_io_dma0Ext_rsp_payload_rsp(svBitVecVal* value_io_dma0Ext_rsp_payload_rsp) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_rsp_payload_rsp\n"); );
+    // Locals
+    CData/*0:0*/ value_io_dma0Ext_rsp_payload_rsp__Vcvt;
+    value_io_dma0Ext_rsp_payload_rsp__Vcvt = 0;
+    // Body
+    static int __Vfuncnum = -1;
+    if (VL_UNLIKELY(__Vfuncnum == -1)) {
+        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_rsp_payload_rsp");
+    }
+    const VerilatedScope* const __Vscopep = Verilated::dpiScope();
+    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_rsp_payload_rsp_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_rsp_payload_rsp_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_rsp_payload_rsp__Vcvt);
+    VL_SET_SVBV_I(1, value_io_dma0Ext_rsp_payload_rsp, value_io_dma0Ext_rsp_payload_rsp__Vcvt);
+}
+
+void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_rsp_payload_data(int* value) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_rsp_payload_data\n"); );
     // Locals
     IData/*31:0*/ value__Vcvt;
     value__Vcvt = 0;
     // Body
     static int __Vfuncnum = -1;
     if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_addr");
+        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_rsp_payload_data");
     }
     const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_addr_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_addr_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_rsp_payload_data_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_rsp_payload_data_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
     (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value__Vcvt);
     *value = value__Vcvt;
 }
 
-void VsvsimTestbench::getBitsImpl_io_dma0Ext_addr(svBitVecVal* value_io_dma0Ext_addr) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_addr\n"); );
+void VsvsimTestbench::setBitsImpl_io_dma0Ext_rsp_payload_data(const svBitVecVal* value_io_dma0Ext_rsp_payload_data) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::setBitsImpl_io_dma0Ext_rsp_payload_data\n"); );
     // Locals
-    IData/*31:0*/ value_io_dma0Ext_addr__Vcvt;
-    value_io_dma0Ext_addr__Vcvt = 0;
+    VlWide<18>/*575:0*/ value_io_dma0Ext_rsp_payload_data__Vcvt;
+    VL_ZERO_W(576, value_io_dma0Ext_rsp_payload_data__Vcvt);
     // Body
     static int __Vfuncnum = -1;
     if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_addr");
+        __Vfuncnum = Verilated::exportFuncNum("setBitsImpl_io_dma0Ext_rsp_payload_data");
     }
     const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_addr_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_addr_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_addr__Vcvt);
-    VL_SET_SVBV_I(32, value_io_dma0Ext_addr, value_io_dma0Ext_addr__Vcvt);
+    VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_rsp_payload_data_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_rsp_payload_data_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    VL_SET_W_SVBV(576, value_io_dma0Ext_rsp_payload_data__Vcvt, value_io_dma0Ext_rsp_payload_data + 0);
+    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_rsp_payload_data__Vcvt);
 }
 
-void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_writeData_payload(int* value) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_writeData_payload\n"); );
+void VsvsimTestbench::getBitsImpl_io_dma0Ext_rsp_payload_data(svBitVecVal* value_io_dma0Ext_rsp_payload_data) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_rsp_payload_data\n"); );
+    // Locals
+    VlWide<18>/*575:0*/ value_io_dma0Ext_rsp_payload_data__Vcvt;
+    VL_ZERO_W(576, value_io_dma0Ext_rsp_payload_data__Vcvt);
+    // Body
+    static int __Vfuncnum = -1;
+    if (VL_UNLIKELY(__Vfuncnum == -1)) {
+        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_rsp_payload_data");
+    }
+    const VerilatedScope* const __Vscopep = Verilated::dpiScope();
+    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_rsp_payload_data_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_rsp_payload_data_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_rsp_payload_data__Vcvt);
+    VL_SET_SVBV_W(576, value_io_dma0Ext_rsp_payload_data, value_io_dma0Ext_rsp_payload_data__Vcvt);
+}
+
+void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_rsp_ready(int* value) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_rsp_ready\n"); );
     // Locals
     IData/*31:0*/ value__Vcvt;
     value__Vcvt = 0;
     // Body
     static int __Vfuncnum = -1;
     if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_writeData_payload");
+        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_rsp_ready");
     }
     const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_writeData_payload_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_writeData_payload_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_rsp_ready_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_rsp_ready_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
     (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value__Vcvt);
     *value = value__Vcvt;
 }
 
-void VsvsimTestbench::getBitsImpl_io_dma0Ext_writeData_payload(svBitVecVal* value_io_dma0Ext_writeData_payload) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_writeData_payload\n"); );
+void VsvsimTestbench::getBitsImpl_io_dma0Ext_rsp_ready(svBitVecVal* value_io_dma0Ext_rsp_ready) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_rsp_ready\n"); );
     // Locals
-    VlWide<18>/*575:0*/ value_io_dma0Ext_writeData_payload__Vcvt;
-    VL_ZERO_W(576, value_io_dma0Ext_writeData_payload__Vcvt);
+    CData/*0:0*/ value_io_dma0Ext_rsp_ready__Vcvt;
+    value_io_dma0Ext_rsp_ready__Vcvt = 0;
     // Body
     static int __Vfuncnum = -1;
     if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_writeData_payload");
+        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_rsp_ready");
     }
     const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_writeData_payload_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_writeData_payload_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_writeData_payload__Vcvt);
-    VL_SET_SVBV_W(576, value_io_dma0Ext_writeData_payload, value_io_dma0Ext_writeData_payload__Vcvt);
+    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_rsp_ready_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_rsp_ready_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_rsp_ready__Vcvt);
+    VL_SET_SVBV_I(1, value_io_dma0Ext_rsp_ready, value_io_dma0Ext_rsp_ready__Vcvt);
 }
 
-void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_writeData_ready(int* value) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_writeData_ready\n"); );
+void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_rsp_valid(int* value) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_rsp_valid\n"); );
     // Locals
     IData/*31:0*/ value__Vcvt;
     value__Vcvt = 0;
     // Body
     static int __Vfuncnum = -1;
     if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_writeData_ready");
+        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_rsp_valid");
     }
     const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_writeData_ready_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_writeData_ready_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_rsp_valid_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_rsp_valid_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
     (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value__Vcvt);
     *value = value__Vcvt;
 }
 
-void VsvsimTestbench::setBitsImpl_io_dma0Ext_writeData_ready(const svBitVecVal* value_io_dma0Ext_writeData_ready) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::setBitsImpl_io_dma0Ext_writeData_ready\n"); );
+void VsvsimTestbench::setBitsImpl_io_dma0Ext_rsp_valid(const svBitVecVal* value_io_dma0Ext_rsp_valid) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::setBitsImpl_io_dma0Ext_rsp_valid\n"); );
     // Locals
-    CData/*0:0*/ value_io_dma0Ext_writeData_ready__Vcvt;
-    value_io_dma0Ext_writeData_ready__Vcvt = 0;
+    CData/*0:0*/ value_io_dma0Ext_rsp_valid__Vcvt;
+    value_io_dma0Ext_rsp_valid__Vcvt = 0;
     // Body
     static int __Vfuncnum = -1;
     if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("setBitsImpl_io_dma0Ext_writeData_ready");
+        __Vfuncnum = Verilated::exportFuncNum("setBitsImpl_io_dma0Ext_rsp_valid");
     }
     const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_writeData_ready_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_writeData_ready_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    VL_SET_C_SVBV(1, value_io_dma0Ext_writeData_ready__Vcvt, value_io_dma0Ext_writeData_ready + 0);
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_writeData_ready__Vcvt);
+    VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_rsp_valid_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_rsp_valid_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    VL_SET_C_SVBV(1, value_io_dma0Ext_rsp_valid__Vcvt, value_io_dma0Ext_rsp_valid + 0);
+    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_rsp_valid__Vcvt);
 }
 
-void VsvsimTestbench::getBitsImpl_io_dma0Ext_writeData_ready(svBitVecVal* value_io_dma0Ext_writeData_ready) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_writeData_ready\n"); );
+void VsvsimTestbench::getBitsImpl_io_dma0Ext_rsp_valid(svBitVecVal* value_io_dma0Ext_rsp_valid) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_rsp_valid\n"); );
     // Locals
-    CData/*0:0*/ value_io_dma0Ext_writeData_ready__Vcvt;
-    value_io_dma0Ext_writeData_ready__Vcvt = 0;
+    CData/*0:0*/ value_io_dma0Ext_rsp_valid__Vcvt;
+    value_io_dma0Ext_rsp_valid__Vcvt = 0;
     // Body
     static int __Vfuncnum = -1;
     if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_writeData_ready");
+        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_rsp_valid");
     }
     const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_writeData_ready_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_writeData_ready_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_writeData_ready__Vcvt);
-    VL_SET_SVBV_I(1, value_io_dma0Ext_writeData_ready, value_io_dma0Ext_writeData_ready__Vcvt);
-}
-
-void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_writeData_valid(int* value) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_writeData_valid\n"); );
-    // Locals
-    IData/*31:0*/ value__Vcvt;
-    value__Vcvt = 0;
-    // Body
-    static int __Vfuncnum = -1;
-    if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_writeData_valid");
-    }
-    const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_writeData_valid_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_writeData_valid_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value__Vcvt);
-    *value = value__Vcvt;
-}
-
-void VsvsimTestbench::getBitsImpl_io_dma0Ext_writeData_valid(svBitVecVal* value_io_dma0Ext_writeData_valid) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_writeData_valid\n"); );
-    // Locals
-    CData/*0:0*/ value_io_dma0Ext_writeData_valid__Vcvt;
-    value_io_dma0Ext_writeData_valid__Vcvt = 0;
-    // Body
-    static int __Vfuncnum = -1;
-    if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_writeData_valid");
-    }
-    const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_writeData_valid_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_writeData_valid_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_writeData_valid__Vcvt);
-    VL_SET_SVBV_I(1, value_io_dma0Ext_writeData_valid, value_io_dma0Ext_writeData_valid__Vcvt);
-}
-
-void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_readData_payload(int* value) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_readData_payload\n"); );
-    // Locals
-    IData/*31:0*/ value__Vcvt;
-    value__Vcvt = 0;
-    // Body
-    static int __Vfuncnum = -1;
-    if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_readData_payload");
-    }
-    const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_readData_payload_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_readData_payload_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value__Vcvt);
-    *value = value__Vcvt;
-}
-
-void VsvsimTestbench::setBitsImpl_io_dma0Ext_readData_payload(const svBitVecVal* value_io_dma0Ext_readData_payload) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::setBitsImpl_io_dma0Ext_readData_payload\n"); );
-    // Locals
-    VlWide<18>/*575:0*/ value_io_dma0Ext_readData_payload__Vcvt;
-    VL_ZERO_W(576, value_io_dma0Ext_readData_payload__Vcvt);
-    // Body
-    static int __Vfuncnum = -1;
-    if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("setBitsImpl_io_dma0Ext_readData_payload");
-    }
-    const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_readData_payload_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_readData_payload_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    VL_SET_W_SVBV(576, value_io_dma0Ext_readData_payload__Vcvt, value_io_dma0Ext_readData_payload + 0);
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_readData_payload__Vcvt);
-}
-
-void VsvsimTestbench::getBitsImpl_io_dma0Ext_readData_payload(svBitVecVal* value_io_dma0Ext_readData_payload) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_readData_payload\n"); );
-    // Locals
-    VlWide<18>/*575:0*/ value_io_dma0Ext_readData_payload__Vcvt;
-    VL_ZERO_W(576, value_io_dma0Ext_readData_payload__Vcvt);
-    // Body
-    static int __Vfuncnum = -1;
-    if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_readData_payload");
-    }
-    const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_readData_payload_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_readData_payload_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_readData_payload__Vcvt);
-    VL_SET_SVBV_W(576, value_io_dma0Ext_readData_payload, value_io_dma0Ext_readData_payload__Vcvt);
-}
-
-void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_readData_ready(int* value) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_readData_ready\n"); );
-    // Locals
-    IData/*31:0*/ value__Vcvt;
-    value__Vcvt = 0;
-    // Body
-    static int __Vfuncnum = -1;
-    if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_readData_ready");
-    }
-    const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_readData_ready_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_readData_ready_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value__Vcvt);
-    *value = value__Vcvt;
-}
-
-void VsvsimTestbench::getBitsImpl_io_dma0Ext_readData_ready(svBitVecVal* value_io_dma0Ext_readData_ready) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_readData_ready\n"); );
-    // Locals
-    CData/*0:0*/ value_io_dma0Ext_readData_ready__Vcvt;
-    value_io_dma0Ext_readData_ready__Vcvt = 0;
-    // Body
-    static int __Vfuncnum = -1;
-    if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_readData_ready");
-    }
-    const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_readData_ready_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_readData_ready_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_readData_ready__Vcvt);
-    VL_SET_SVBV_I(1, value_io_dma0Ext_readData_ready, value_io_dma0Ext_readData_ready__Vcvt);
-}
-
-void VsvsimTestbench::getBitWidthImpl_io_dma0Ext_readData_valid(int* value) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitWidthImpl_io_dma0Ext_readData_valid\n"); );
-    // Locals
-    IData/*31:0*/ value__Vcvt;
-    value__Vcvt = 0;
-    // Body
-    static int __Vfuncnum = -1;
-    if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitWidthImpl_io_dma0Ext_readData_valid");
-    }
-    const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_readData_valid_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitWidthImpl_io_dma0Ext_readData_valid_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value__Vcvt);
-    *value = value__Vcvt;
-}
-
-void VsvsimTestbench::setBitsImpl_io_dma0Ext_readData_valid(const svBitVecVal* value_io_dma0Ext_readData_valid) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::setBitsImpl_io_dma0Ext_readData_valid\n"); );
-    // Locals
-    CData/*0:0*/ value_io_dma0Ext_readData_valid__Vcvt;
-    value_io_dma0Ext_readData_valid__Vcvt = 0;
-    // Body
-    static int __Vfuncnum = -1;
-    if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("setBitsImpl_io_dma0Ext_readData_valid");
-    }
-    const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_readData_valid_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_setBitsImpl_io_dma0Ext_readData_valid_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    VL_SET_C_SVBV(1, value_io_dma0Ext_readData_valid__Vcvt, value_io_dma0Ext_readData_valid + 0);
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_readData_valid__Vcvt);
-}
-
-void VsvsimTestbench::getBitsImpl_io_dma0Ext_readData_valid(svBitVecVal* value_io_dma0Ext_readData_valid) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    VsvsimTestbench___024root::getBitsImpl_io_dma0Ext_readData_valid\n"); );
-    // Locals
-    CData/*0:0*/ value_io_dma0Ext_readData_valid__Vcvt;
-    value_io_dma0Ext_readData_valid__Vcvt = 0;
-    // Body
-    static int __Vfuncnum = -1;
-    if (VL_UNLIKELY(__Vfuncnum == -1)) {
-        __Vfuncnum = Verilated::exportFuncNum("getBitsImpl_io_dma0Ext_readData_valid");
-    }
-    const VerilatedScope* const __Vscopep = Verilated::dpiScope();
-    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_readData_valid_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_readData_valid_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
-    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_readData_valid__Vcvt);
-    VL_SET_SVBV_I(1, value_io_dma0Ext_readData_valid, value_io_dma0Ext_readData_valid__Vcvt);
+    VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_rsp_valid_t __Vcb = reinterpret_cast<VsvsimTestbench__Vcb_getBitsImpl_io_dma0Ext_rsp_valid_t>(VerilatedScope::exportFind(__Vscopep, __Vfuncnum));
+    (*__Vcb)((VsvsimTestbench__Syms*)(__Vscopep->symsp()), value_io_dma0Ext_rsp_valid__Vcvt);
+    VL_SET_SVBV_I(1, value_io_dma0Ext_rsp_valid, value_io_dma0Ext_rsp_valid__Vcvt);
 }
 
 void VsvsimTestbench::getBitWidthImpl_io_resp_payload_err(int* value) {

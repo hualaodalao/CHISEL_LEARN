@@ -1,7 +1,13 @@
 /** HiveCore 完整仿真用例：M=32, N=32, K=128, FP16, totalN=16
   *
   * 验证 FSM 完整流程：寄存器配置 → EXECUTE → DMA 加载/存储 → 完成
-  * 外部存储器由测试 Memory Model 模拟
+  * 外部存储器由测试 Memory Model 模拟（地址寻址）：
+  *   - 软件侧按与硬件相同的地址公式（stride 寄存器仅 4bit，本用例退化
+  *     为 0）逐 beat 推导期望地址；dma0/dma2 响应时先读 cmd.addr 与
+  *     期望对账（未知/不符地址直接报错），再供对应行数据，防止
+  *     「按序供数掩盖地址公式 bug」
+  *   - dma1 逐 beat 校验写地址/len 后记录，C 矩阵重建同时依赖
+  *     地址对账与严格 FIFO 顺序
   */
 
 import chisel3._
@@ -173,40 +179,58 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
     // （M=N=K=totalN 时 tile 索引恒为 0，行步长不参与地址计算，不影响本用例）
     println(s"[HiveCoreSimCase] WARNING: stride 字段仅 4bit，实际 stride 超出表达范围（既有寄存器映射限制）")
 
-    // --- Memory Model: 用 Map 存储已写入的 C 数据 ---
+    // --- Memory Model: 地址寻址（软件侧按硬件同公式推导期望地址） ---
+    // stride 寄存器仅 4bit，本用例 aStride/bStride/cStride 实际写入 0，
+    // 故行步进为 0（块内各行地址退化重合）；块间跳转仍由 aCol/bCol/cCol
+    // 偏移贡献。期望地址序列与硬件 aDma/bDma/cDma 的地址生成公式逐一对账
     val cWriteLog = scala.collection.mutable.ArrayBuffer[(Long, BigInt)]()
 
-    // --- 数据生成: DMA0 (A buffer) beat 数据 ---
-    // 每个 beat 的 lower 256 bits 包含 16 个 FP16 值
-    def genDma0Beat(globalBeatIdx: Int): BigInt = {
+    // --- DMA0 (A buffer) 期望地址序列：aDma 扫描 = nTile 外 → kTile 中 →
+    // 实际 M 行内；addr = aAddr + mIdx*aRowOff + kt*aColOff（aRowOff=0） ---
+    val aKTiles = (K + totalN - 1) / totalN
+    val aNTiles = (N + totalN - 1) / totalN
+    val aRowOff = (aStride & 0xF).toLong
+    val aColOff = totalN.toLong * (aEffW / 8)
+    val expAAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
+    for (_ <- 0 until aNTiles; kt <- 0 until aKTiles; m <- 0 until M)
+      expAAddrSeq += A_BASE + m * aRowOff + kt * aColOff
+    val dma0TotalBeats = expAAddrSeq.size
+    // beat 数据 = 行 m 的 kt 列切片（顺序与期望地址序列同下标）
+    def genDma0Beat(idx: Int): BigInt = {
+      val kt = idx / M
+      val row = idx % M
       var data = BigInt(0)
       for (i <- 0 until totalN) {
-        val elemIdx = globalBeatIdx * totalN + i
-        val row = (elemIdx / K) % M
-        val col = elemIdx % K
+        val col = kt * totalN + i
         val value = if (row < M && col < K) aMatrix(row)(col) else 0
         data = data | (BigInt(value & 0xFFFF) << (i * aEffW))
       }
-      data // 只有 lower 256 bits 有效
+      data
     }
 
-    // --- 数据生成: DMA2 (B buffer) weight beat 数据 ---
-    // 顺序流模型（stride 寄存器仅 4bit，外部地址退化，按 beat 序号供数）：
-    // beat 顺序 = bDma 逻辑扫描顺序 = N 外 → kTile 中 → 块内 K 行降序。
-    // 权重下沉协议要求每个 kTile 块按 K 行降序供数，executor 顺序供数后
-    // PE(x,y).wReg = B[kTile*totalN + x][y]（正序落位，标准 GEMM）。
-    val kRows = K  // 每个 N tile 的 K 方向行数（新扫描只读实际 K 行，不含 padding）
-    def genDma2WeightBeat(globalBeatIdx: Int): BigInt = {
-      val nTileIdx = globalBeatIdx / kRows
-      var idxInBlock = globalBeatIdx % kRows
-      val kTiles = (K + totalN - 1) / totalN
-      val rowsLast = K - (kTiles - 1) * totalN
-      // 按 kTile 升序、块内行降序解析出当前 beat 对应的 K 行号
+    // --- DMA2 (B buffer) 期望地址序列：bDma 扫描 = N 外 → kTile 中 →
+    // 块内 K 行降序；addr = bAddr + kIdx*bRowOff + nt*bColOff（bRowOff=0） ---
+    val bKTiles = (K + totalN - 1) / totalN
+    val nTilesB = (N + totalN - 1) / totalN
+    val bRowOff = (bStride & 0xF).toLong
+    val bColOff = totalN.toLong * (aEffW / 8)
+    val expBAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
+    for (nt <- 0 until nTilesB; kt <- 0 until bKTiles) {
+      val rows = if (kt == bKTiles - 1) K - (bKTiles - 1) * totalN else totalN
+      for (r <- 0 until rows)
+        expBAddrSeq += B_BASE + (kt * totalN + (rows - 1 - r)) * bRowOff + nt * bColOff
+    }
+    val dma2TotalBeats = expBAddrSeq.size
+    // beat 数据（与期望地址序列同下标）：nt 固定，块内 K 行降序
+    def genDma2WeightBeat(idx: Int): BigInt = {
+      val nTileIdx = idx / K
+      var idxInBlock = idx % K
+      val rowsLast = K - (bKTiles - 1) * totalN
       var row = 0
       var kt = 0
       var resolved = false
-      while (kt < kTiles && !resolved) {
-        val rows = if (kt == kTiles - 1) rowsLast else totalN
+      while (kt < bKTiles && !resolved) {
+        val rows = if (kt == bKTiles - 1) rowsLast else totalN
         if (idxInBlock < rows) {
           row = kt * totalN + (rows - 1 - idxInBlock)
           resolved = true
@@ -217,12 +241,20 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
       }
       var data = BigInt(0)
       for (i <- 0 until totalN) {
-        val col = nTileIdx * totalN + i  // N 方向列
+        val col = nTileIdx * totalN + i
         val value = if (row < K && col < N) bMatrix(row)(col) else 0
         data = data | (BigInt(value & 0xFFFF) << (i * cfg.bW))
       }
       data
     }
+
+    // --- DMA1 (C store) 期望地址序列：cDma 扫描 = nTile 外 → 实际 M 行内；
+    // addr = cAddr + mIdx*cRowOff + nt*cColOff（cRowOff=0），len 恒 1 ---
+    val cRowOff = (cStride & 0xF).toLong
+    val cColOff = totalN.toLong * (cEffW / 8)
+    val expCAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
+    for (nt <- 0 until aNTiles; m <- 0 until M)
+      expCAddrSeq += C_BASE + m * cRowOff + nt * cColOff
 
     // --- 仿真 ---
     println(s"[HiveCoreSimCase] Starting simulation: M=$M, N=$N, K=$K, totalN=$totalN")
@@ -232,36 +264,28 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
     simulate(new HiveCore(cfg)) { dut =>
 
       // ===== DMA 通道状态 =====
-      var dma0Active = false
-      var dma0IsWrite = false
-      var dma0Addr = 0L
-      var dma0Len = 0
-      var dma0BeatsDone = 0
-      var dma0TotalBeats = 0
+      // DMA0 (A RdOnly)：逐拍响应 rsp 流（地址寻址，cmd.addr 与期望对账）
+      var dma0BeatsSent = 0
 
-      var dma1Active = false
-      var dma1IsWrite = false
-      var dma1Addr = 0L
-      var dma1Len = 0
-      var dma1BeatsDone = 0
-      var dma1TotalBeats = 0
-      var dma1StoreBeats = 0   // Store beat 全局计数
+      // DMA1 (C WrOnly)：逐 beat 接收 store（len=1 req/grant，地址逐拍对账）
+      var dma1StoreBeats = 0
 
-      // DMA2 (B 权重 RdOnly)：逐拍响应 rsp 流（顺序流模型）
+      // DMA2 (B 权重 RdOnly)：逐拍响应 rsp 流（地址寻址，cmd.addr 与期望对账）
       var dma2BeatsSent = 0
-      val dma2TotalBeats = K * ((N + totalN - 1) / totalN)  // 整个 B 矩阵的行数
 
       // ===== Reset =====
       dut.reset.poke(true.B)
       dut.io.cmd.valid.poke(false.B)
       dut.io.resp.ready.poke(true.B)
-      dut.io.dma0Ext.grant.poke(false.B)
+      // DMA0（A 只读通道）：cmd 常就绪，rsp 初始无效
+      dut.io.dma0Ext.cmd.ready.poke(true.B)
+      dut.io.dma0Ext.rsp.valid.poke(false.B)
+      dut.io.dma0Ext.rsp.payload.data.poke(0.U)
+      dut.io.dma0Ext.rsp.payload.rsp.poke(false.B)
+      // DMA1（C 写回通道）：grant 关闭，writeData 不接收
       dut.io.dma1Ext.grant.poke(false.B)
-      dut.io.dma0Ext.readData.valid.poke(false.B)
-      dut.io.dma0Ext.readData.payload.poke(0.U)
       dut.io.dma1Ext.readData.valid.poke(false.B)
       dut.io.dma1Ext.readData.payload.poke(0.U)
-      dut.io.dma0Ext.writeData.ready.poke(false.B)
       dut.io.dma1Ext.writeData.ready.poke(false.B)
       // DMA2（B 权重只读通道）：cmd 常就绪，rsp 初始无效
       dut.io.dma2Ext.cmd.ready.poke(true.B)
@@ -317,98 +341,61 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
 
       while (!done && cycle < maxCycles) {
 
-        // --- DMA0 响应逻辑 ---
-        if (!dma0Active) {
-          // 检查新请求
-          if (dut.io.dma0Ext.req.peek().litToBoolean) {
-            dma0Addr = dut.io.dma0Ext.addr.peek().litValue.toLong
-            dma0Len = dut.io.dma0Ext.len.peek().litValue.toInt
-            dma0IsWrite = dut.io.dma0Ext.isWrite.peek().litToBoolean
-            dma0BeatsDone = 0
-            dma0Active = true
-            dut.io.dma0Ext.grant.poke(true.B)
-            if (cycle % 10000 == 0 || dma0TotalBeats < 10)
-              println(f"[cycle=$cycle%6d] DMA0 req: addr=0x${dma0Addr}%08X len=$dma0Len isWrite=$dma0IsWrite")
+        // --- DMA0 (A RdOnly) 响应逻辑 ---
+        // 地址寻址：cmd.valid 拍读 cmd.addr 与软件同公式期望对账，
+        // 不符直接 fail（防止按序供数掩盖地址公式 bug）；随后按同下标供行数据
+        if (dma0BeatsSent < dma0TotalBeats) {
+          if (dut.io.dma0Ext.cmd.valid.peek().litToBoolean) {
+            val cmdAddr = dut.io.dma0Ext.cmd.payload.addr.peek().litValue.toLong
+            withClue(s"DMA0 A beat #$dma0BeatsSent addr mismatch: ") {
+              cmdAddr should be(expAAddrSeq(dma0BeatsSent))
+            }
+          }
+          dut.io.dma0Ext.rsp.valid.poke(true.B)
+          dut.io.dma0Ext.rsp.payload.data.poke(genDma0Beat(dma0BeatsSent).U)
+          dut.io.dma0Ext.rsp.payload.rsp.poke(false.B)
+          if (dut.io.dma0Ext.rsp.ready.peek().litToBoolean) {
+            if (dma0BeatsSent < 4)
+              println(f"[cycle=$cycle%6d] DMA0 A beat #$dma0BeatsSent delivered")
+            dma0BeatsSent += 1
           }
         } else {
-          dut.io.dma0Ext.grant.poke(false.B)
-
-          if (!dma0IsWrite) {
-            // Load: 提供读数据
-            // 注意: 不能在 beat fire 的同周期将 valid 置 false (last poke wins)
-            if (dma0BeatsDone < dma0Len) {
-              val beatData = genDma0Beat(dma0TotalBeats)
-              dut.io.dma0Ext.readData.valid.poke(true.B)
-              dut.io.dma0Ext.readData.payload.poke(beatData.U)
-              if (dut.io.dma0Ext.readData.ready.peek().litToBoolean) {
-                dma0BeatsDone += 1
-                dma0TotalBeats += 1
-              }
-            } else {
-              // 所有 beat 已送出, 停止驱动
-              dut.io.dma0Ext.readData.valid.poke(false.B)
-              dut.io.dma0Ext.readData.payload.poke(0.U)
-              dma0Active = false
-            }
-          } else {
-            // Store (DMA0 通常不 store, 但以防万一)
-            if (dma0BeatsDone < dma0Len) {
-              dut.io.dma0Ext.writeData.ready.poke(true.B)
-              if (dut.io.dma0Ext.writeData.valid.peek().litToBoolean) {
-                dma0BeatsDone += 1
-                dma0TotalBeats += 1
-              }
-            } else {
-              dut.io.dma0Ext.writeData.ready.poke(false.B)
-              dma0Active = false
-            }
-          }
+          dut.io.dma0Ext.rsp.valid.poke(false.B)
+          dut.io.dma0Ext.rsp.payload.data.poke(0.U)
+          dut.io.dma0Ext.rsp.payload.rsp.poke(false.B)
         }
 
-        // --- DMA1 响应逻辑（重构后仅 C store） ---
-        if (!dma1Active) {
-          if (dut.io.dma1Ext.req.peek().litToBoolean) {
-            dma1Addr = dut.io.dma1Ext.addr.peek().litValue.toLong
-            dma1Len = dut.io.dma1Ext.len.peek().litValue.toInt
-            dma1IsWrite = dut.io.dma1Ext.isWrite.peek().litToBoolean
-            dma1BeatsDone = 0
-            dma1Active = true
-            dut.io.dma1Ext.grant.poke(true.B)
-            if (cycle % 10000 == 0 || dma1TotalBeats < 10)
-              println(f"[cycle=$cycle%6d] DMA1 req: addr=0x${dma1Addr}%08X len=$dma1Len isWrite=$dma1IsWrite")
+        // --- DMA1 (C WrOnly) 响应逻辑：逐 beat 接收 store ---
+        // cDma 逐 beat 发 req(len=1) 获 grant 后一拍 writeData 握手；
+        // grant/writeData.ready 常开，req 拍校验地址与 len 后记录 store 日志
+        dut.io.dma1Ext.grant.poke(true.B)
+        if (dut.io.dma1Ext.req.peek().litToBoolean) {
+          val reqAddr = dut.io.dma1Ext.addr.peek().litValue.toLong
+          val reqLen  = dut.io.dma1Ext.len.peek().litValue.toInt
+          withClue(s"DMA1 store beat #$dma1StoreBeats addr/len mismatch: ") {
+            reqAddr should be(expCAddrSeq(dma1StoreBeats))
+            reqLen should be(1)
           }
-        } else {
-          dut.io.dma1Ext.grant.poke(false.B)
-
-          if (!dma1IsWrite) {
-            // 重构后 dma1 不再有 load（权重已改走 dma2Ext/B buffer）；
-            // 若意外出现 load 请求，停止供数并告警
-            println(f"[cycle=$cycle%6d] WARNING: unexpected DMA1 load request (weights should use dma2Ext)")
-            dut.io.dma1Ext.readData.valid.poke(false.B)
-            dma1Active = false
-          } else {
-            // Store: 接收 C 结果数据
-            if (dma1BeatsDone < dma1Len) {
-              dut.io.dma1Ext.writeData.ready.poke(true.B)
-              if (dut.io.dma1Ext.writeData.valid.peek().litToBoolean) {
-                val writeData = dut.io.dma1Ext.writeData.payload.peek().litValue
-                cWriteLog += ((dma1Addr + dma1BeatsDone.toLong * bytesPerBeat, writeData))
-                dma1BeatsDone += 1
-                dma1TotalBeats += 1
-                dma1StoreBeats += 1
-              }
-            } else {
-              dut.io.dma1Ext.writeData.ready.poke(false.B)
-              dma1Active = false
-            }
-          }
+          if (dma1StoreBeats < 4)
+            println(f"[cycle=$cycle%6d] DMA1 store req addr=0x$reqAddr%08X")
+        }
+        dut.io.dma1Ext.writeData.ready.poke(true.B)
+        if (dut.io.dma1Ext.writeData.valid.peek().litToBoolean) {
+          val writeData = dut.io.dma1Ext.writeData.payload.peek().litValue
+          cWriteLog += ((expCAddrSeq(dma1StoreBeats), writeData))
+          dma1StoreBeats += 1
         }
 
         // --- DMA2 (B 权重 RdOnly) 响应逻辑 ---
-        // bDma 每发一拍 cmd（读地址）随后等一拍 rsp（读数据）；
-        // rsp.ready 仅在 bDma 的 sTRANSFER 拉高，按 rsp fire 递推 beat 序号，
-        // 顺序流模型按 bDma 逻辑扫描顺序（块内 K 行降序）供数。
+        // 地址寻址：cmd.valid 拍读 cmd.addr 与软件同公式期望对账，
+        // 随后按同下标供权重行数据（块内 K 行降序）
         if (dma2BeatsSent < dma2TotalBeats) {
+          if (dut.io.dma2Ext.cmd.valid.peek().litToBoolean) {
+            val cmdAddr = dut.io.dma2Ext.cmd.payload.addr.peek().litValue.toLong
+            withClue(s"DMA2 weight beat #$dma2BeatsSent addr mismatch: ") {
+              cmdAddr should be(expBAddrSeq(dma2BeatsSent))
+            }
+          }
           dut.io.dma2Ext.rsp.valid.poke(true.B)
           dut.io.dma2Ext.rsp.payload.data.poke(genDma2WeightBeat(dma2BeatsSent).U)
           dut.io.dma2Ext.rsp.payload.rsp.poke(false.B)
@@ -426,7 +413,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
         // --- 检查完成 ---
         if (dut.io.resp.valid.peek().litToBoolean) {
           if (dut.io.resp.payload.done.peek().litToBoolean) {
-            println(f"[cycle=$cycle%6d] EXECUTE complete! Total DMA0 beats=$dma0TotalBeats, DMA1 beats=$dma1TotalBeats, C store beats=$dma1StoreBeats")
+            println(f"[cycle=$cycle%6d] EXECUTE complete! DMA0 beats=$dma0BeatsSent, C store beats=$dma1StoreBeats")
             done = true
           } else if (cycle < 40) {
             println(f"[cycle=$cycle%6d] resp valid (done=0, err=${dut.io.resp.payload.err.peek().litValue})")
@@ -441,7 +428,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
           val bOcc = dut.io.status.bOccupancy.peek().litValue.toInt
           val cOcc = dut.io.status.cOccupancy.peek().litValue.toInt
           val err  = dut.io.status.err.peek().litToBoolean
-          println(f"[cycle=$cycle%6d] progress=$progress busy=$busy err=$err aOcc=$aOcc bOcc=$bOcc cOcc=$cOcc dma0Beats=$dma0TotalBeats dma1Beats=$dma1TotalBeats dma2Beats=$dma2BeatsSent")
+          println(f"[cycle=$cycle%6d] progress=$progress busy=$busy err=$err aOcc=$aOcc bOcc=$bOcc cOcc=$cOcc dma0Beats=$dma0BeatsSent storeBeats=$dma1StoreBeats dma2Beats=$dma2BeatsSent")
         }
 
         dut.clock.step()
@@ -450,14 +437,17 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
 
       if (!done) {
         println(s"[HiveCoreSimCase] WARNING: Simulation timed out at $maxCycles cycles")
-        println(s"  DMA0 active=$dma0Active beats=$dma0BeatsDone/$dma0Len")
-        println(s"  DMA1 active=$dma1Active beats=$dma1BeatsDone/$dma1Len isWrite=$dma1IsWrite")
+        println(s"  DMA0 beats=$dma0BeatsSent/$dma0TotalBeats, store beats=$dma1StoreBeats")
         val progress = dut.io.status.progress.peek().litValue.toInt
         val busy = dut.io.status.busy.peek().litToBoolean
         println(s"  Status: busy=$busy progress=$progress")
       }
 
       done should be(true)
+      // 地址寻址完整性：三路 DMA 的 beat 数均与期望序列一致
+      dma0BeatsSent should be(dma0TotalBeats)
+      dma2BeatsSent should be(dma2TotalBeats)
+      dma1StoreBeats should be(expCAddrSeq.size)
     }
 
     // ===== 写入 C 结果文件 =====
