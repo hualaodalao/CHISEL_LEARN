@@ -35,21 +35,22 @@ class HiveCoreResp extends Bundle {
 // DMA 外部通道接口
 // ============================================================================
 
-/** 外部 DMA 通道接口（简化版，无 IMasterSlave）。
+/** 外部 DMA 只读通道接口（简化版，无 IMasterSlave）。
   *
-  * 方向按 HiveCore（master）视角声明：
-  *   - readData: 从外部存储读入的数据流（master 接收）
-  *   - writeData: 向外部存储写出的数据流（master 驱动）
+  * 方向按 HiveCore（master）视角声明：rsp 为从外部存储读入的数据流。
+  * 数据位宽按通道参数化（aDma = cfg.aExtW，bDma = cfg.bExtW，
+  * 各自匹配对应 buffer 行宽，一拍一行等宽直连）。
   *
-  * @param cfg HiveCore 配置
+  * @param cfg       HiveCore 配置
+  * @param dataWidth 外部数据位宽（bit）
   */
 object HiveCoreDMAExtReadOnlyIF {
-    def apply(cfg: HiveCoreConfig) = new HiveCoreDMAExtReadOnlyIF(cfg)
+    def apply(cfg: HiveCoreConfig, dataWidth: Int) = new HiveCoreDMAExtReadOnlyIF(cfg, dataWidth)
 }
 
-class HiveCoreDMAExtReadOnlyIF(cfg: HiveCoreConfig) extends Bundle {
+class HiveCoreDMAExtReadOnlyIF(cfg: HiveCoreConfig, dataWidth: Int) extends Bundle {
   val rsp = Flipped(Stream(new Bundle {
-    val data = UInt(cfg.extDataWidth.W)
+    val data = UInt(dataWidth.W)
     val rsp = Bool()
   }))
   val cmd = Stream(new Bundle {
@@ -57,26 +58,13 @@ class HiveCoreDMAExtReadOnlyIF(cfg: HiveCoreConfig) extends Bundle {
   })
 }
 
-object HiveCoreDMAExtWriteOnlyIF {
-  def apply(cfg: HiveCoreConfig) = new HiveCoreDMAExtWriteOnlyIF(cfg)
-}
-
-class HiveCoreDMAExtWriteOnlyIF(cfg: HiveCoreConfig) extends Bundle {
-  val cmd = Stream(new Bundle {
-    val data = UInt(cfg.extDataWidth.W)
-    val addr = UInt(cfg.addrWidth.W)
-  })
-}
-
-  
-  
-class DmaExtIO(cfg: HiveCoreConfig) extends Bundle {
+class DmaExtIO(cfg: HiveCoreConfig, dataWidth: Int) extends Bundle {
 
   /** 从外部读入数据（slave 驱动 valid/payload，master 驱动 ready） */
-  val readData = Flipped(new Stream(UInt(cfg.extDataWidth.W)))
+  val readData = Flipped(new Stream(UInt(dataWidth.W)))
 
   /** 向外部写出数据（master 驱动 valid/payload，slave 驱动 ready） */
-  val writeData = new Stream(UInt(cfg.extDataWidth.W))
+  val writeData = new Stream(UInt(dataWidth.W))
 
   /** 访问地址 */
   val addr = Output(UInt(cfg.addrWidth.W))

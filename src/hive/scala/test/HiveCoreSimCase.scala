@@ -140,7 +140,6 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
     val cfg = HiveCoreConfig(
       arrayN = 8,
       clusterM = 2,         // totalN = 16
-      extDataWidth = 576,   // 匹配 C buffer 宽度 (16*36=576)
       aBufferDepth = 2048,
       cBufferDepth = 2048,
       aW = 16,
@@ -150,9 +149,9 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
 
     val totalN = cfg.totalN     // 16
     val aEffW  = cfg.aEffW      // 16
-    val cEffW  = cfg.cEffW      // 36
-    val extW   = cfg.extDataWidth // 576
-    val bytesPerBeat = extW / 8 // 72
+    val cEffW  = cfg.cEffW      // 32（cW=32 显式传入，cEffW=max(cW,bW)）
+    // 各 DMA 通道外部数据位宽（各自匹配 buffer 行宽）：
+    // aExtW = bExtW = 256（16*16），cExtW = 512（16*32，cW=32 时 cEffW=max(cW,bW)）
 
     // --- 生成矩阵 ---
     // element[row][col] = (row + 1.0) + col * 0.1，以 FP16 编码
@@ -258,7 +257,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
 
     // --- 仿真 ---
     println(s"[HiveCoreSimCase] Starting simulation: M=$M, N=$N, K=$K, totalN=$totalN")
-    println(s"[HiveCoreSimCase] Config: aEffW=$aEffW, cEffW=$cEffW, extDataWidth=$extW")
+    println(s"[HiveCoreSimCase] Config: aEffW=$aEffW, cEffW=$cEffW, aExtW=${cfg.aExtW}, bExtW=${cfg.bExtW}, cExtW=${cfg.cExtW}")
     println(s"[HiveCoreSimCase] Strides: A=$aStride, B=$bStride, C=$cStride")
 
     simulate(new HiveCore(cfg)) { dut =>
@@ -455,7 +454,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
 
     val cResult = Array.fill(M, N)(BigInt(0))
 
-    // 解析 C 写入日志: 每个 beat 576 bits = 16 × 36-bit 值
+    // 解析 C 写入日志: 每个 beat 512 bits = 16 × 32-bit 值
     // 简单策略: 按顺序将 beats 映射到 C 矩阵行
     var cBeatIdx = 0
     for ((addr, data) <- cWriteLog) {
@@ -474,7 +473,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
 
     writeBigIntMatrixHex(s"$simDir/C_matrix.txt", cResult, cEffW)
 
-    // C 矩阵浮点文件 - 36-bit 累加器值输出为十进制整数
+    // C 矩阵浮点文件 - 32-bit 累加器值输出为十进制整数
     val cLong = cResult.map(_.map(_.toLong))
     writeMatrixLong(s"$simDir/C_matrix_float.txt", cLong)
 

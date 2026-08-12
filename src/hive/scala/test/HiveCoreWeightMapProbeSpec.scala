@@ -30,7 +30,7 @@ class HiveCoreWeightMapProbeSpec extends AnyFlatSpec with Matchers with ChiselSi
 
   it should "place PE(x,y).wReg = B[x][y] (ascending k)" in {
     val cfg = HiveCoreConfig(
-      arrayN = 8, clusterM = 2, extDataWidth = 576,
+      arrayN = 8, clusterM = 2,
       aBufferDepth = 2048, cBufferDepth = 2048,
       aW = 16, bW = 16, cW = 32
     )
@@ -152,7 +152,7 @@ class HiveCoreWeightMapProbeSpec extends AnyFlatSpec with Matchers with ChiselSi
 
   it should "reveal per-PE weight position via power-of-2 encoding" in {
     val cfg = HiveCoreConfig(
-      arrayN = 8, clusterM = 2, extDataWidth = 576,
+      arrayN = 8, clusterM = 2,
       aBufferDepth = 2048, cBufferDepth = 2048,
       aW = 16, bW = 16, cW = 32
     )

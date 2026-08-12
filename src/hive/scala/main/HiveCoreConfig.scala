@@ -31,7 +31,6 @@ import chisel3.util._
   *                       注意: cBufferDepth 应 >= max(curTileM)，
   *                       即能容纳 partial sum/结果数据，否则 DMA 在
   *                       sREQ_EXT 状态会等待空间释放（不会死锁但会降低吞吐）。
-  * @param extDataWidth   外部数据总线位宽（bit）
   * @param addrWidth      地址位宽
   */
 case class HiveCoreConfig(
@@ -44,7 +43,6 @@ case class HiveCoreConfig(
     aBufferDepth: Int = 64, 
     bBufferDepth: Int = 64,
     cBufferDepth: Int = 64,
-    extDataWidth: Int = 128,
     addrWidth: Int = 32
 ) {
   /*
@@ -76,6 +74,18 @@ case class HiveCoreConfig(
     else autoAccW
   }
 
+  // --- 各 DMA 通道外部数据位宽：分别匹配各自 buffer 行宽（一拍一行，
+  // ext 与 buffer 等宽直连，无位宽适配/拆包逻辑） ---
+
+  /** A 通道外部 DMA 数据位宽（= A buffer 行宽 totalN*aEffW） */
+  val aExtW: Int = totalN * aEffW
+
+  /** B 通道外部 DMA 数据位宽（= B buffer 行宽 totalN*bW） */
+  val bExtW: Int = totalN * bW
+
+  /** C 通道外部 DMA 数据位宽（= C buffer 行宽 totalN*cEffW） */
+  val cExtW: Int = totalN * cEffW
+
   val registerNumRW: Int = 8 
   val registerNum: Int = 9
 
@@ -94,7 +104,6 @@ case class HiveCoreConfig(
   require(aBufferDepth > 0, s"HiveCoreConfig: aBufferDepth($aBufferDepth) 必须 > 0")
   require(bBufferDepth > 0, s"HiveCoreConfig: bBufferDepth($bBufferDepth) 必须 > 0")
   require(cBufferDepth > 0, s"HiveCoreConfig: cBufferDepth($cBufferDepth) 必须 > 0")
-  require(extDataWidth > 0, s"HiveCoreConfig: extDataWidth($extDataWidth) 必须 > 0")
   require(addrWidth > 0, s"HiveCoreConfig: addrWidth($addrWidth) 必须 > 0")
   require(addrWidth <= 32, s"HiveCoreConfig: addrWidth($addrWidth) 必须 <= 32")
 }

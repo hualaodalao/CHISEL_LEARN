@@ -42,12 +42,13 @@ import chisel3.util._
   * 静默写错。安全性：脱离 sTRANSFER 时外部流 ready/valid 自然拉低，无协议违约。
   *
   * @param cfg     HiveCore 配置
-  * @param bufWidth buffer push 数据位宽（默认 = extDataWidth，每拍 push 一个 beat）
+  * @param bufWidth buffer push 数据位宽（默认 = cfg.aExtW；外部 rsp 与本口
+  *                 等宽直连，每拍 push 一个 beat）
   * @param bufDepth buffer 深度（决定 bufAvailability 位宽；默认 = aBufferDepth，
   *                 B 实例需传 bBufferDepth）
   */
 class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 0) extends Module {
-  val pushW = if (bufWidth > 0) bufWidth else cfg.extDataWidth
+  val pushW = if (bufWidth > 0) bufWidth else cfg.aExtW
   val availDepth = if (bufDepth > 0) bufDepth else cfg.aBufferDepth
 
   val io = IO(new Bundle {
@@ -57,7 +58,7 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
     val done  = Output(Bool())                       // 完成脉冲
     val busy  = Output(Bool())                       // 忙标志
     val err   = Output(Bool())                       // 错误标志
-    val dmaExtRdIF = HiveCoreDMAExtReadOnlyIF(cfg)   // 外部只读通道 cmd(addr)/rsp(data)
+    val dmaExtRdIF = HiveCoreDMAExtReadOnlyIF(cfg, pushW)   // 外部只读通道 cmd(addr)/rsp(data)，与 bufPush 等宽直连
     val calcConfig = Input(HiveCoreExePreCalcConfig(cfg))  // 预计算的 tile 数与地址偏移
     val regFile = Input(HiveCoreRegs(cfg))           // 基地址
     val bufPush = master(Stream(UInt(pushW.W)))      // 向 buffer push 数据
@@ -303,10 +304,11 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   * 安全性：脱离 sTRANSFER 时 bufPop.ready/writeData.valid 自然拉低，无协议违约。
   *
   * @param cfg      HiveCore 配置
-  * @param bufWidth buffer pop 数据位宽（默认 = extDataWidth，每拍 pop 一个 beat）
+  * @param bufWidth buffer pop 数据位宽（默认 = cfg.cExtW；外部 writeData 与本口
+  *                 等宽直连，每拍 pop 一个 beat）
   */
 class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0) extends Module {
-  val popW = if (bufWidth > 0) bufWidth else cfg.extDataWidth
+  val popW = if (bufWidth > 0) bufWidth else cfg.cExtW
 
   val io = IO(new Bundle {
     // 控制/状态（无 peek 握手：DMA 启动后自主搬完所有 tile）
@@ -315,7 +317,7 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0) extends Module {
     val done  = Output(Bool())                       // 完成脉冲
     val busy  = Output(Bool())                       // 忙标志
     val err   = Output(Bool())                       // 错误标志
-    val dmaExtWrIF = new DmaExtIO(cfg)               // 外部写通道 req/grant/addr/len/isWrite/writeData
+    val dmaExtWrIF = new DmaExtIO(cfg, popW)               // 外部写通道 req/grant/addr/len/isWrite/writeData，与 bufPop 等宽直连
     val calcConfig = Input(HiveCoreExePreCalcConfig(cfg))  // 预计算的 tile 数与地址偏移
     val regFile = Input(HiveCoreRegs(cfg))           // 仅使用 cAddr 基地址（loopMode 不影响 C 写回遍历）
     val bufPop = slave(Stream(UInt(popW.W)))         // 从 C buffer pop 数据

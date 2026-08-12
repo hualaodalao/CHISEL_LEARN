@@ -17,7 +17,7 @@ class HiveCoreOnesProbeSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   it should "produce C = fp32 16.0 everywhere" in {
     val cfg = HiveCoreConfig(
-      arrayN = 8, clusterM = 2, extDataWidth = 576,
+      arrayN = 8, clusterM = 2,
       aBufferDepth = 2048, cBufferDepth = 2048,
       aW = 16, bW = 16, cW = 32
     )

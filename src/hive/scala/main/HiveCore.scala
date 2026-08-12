@@ -23,14 +23,20 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   val io = IO(new Bundle {
     val cmd  = slave(Stream(new HiveCoreCmd))
     val resp = master(Stream(new HiveCoreResp))
-    // A 矩阵只读 DMA 外部通道（cmd: 读地址流; rsp: 读数据流）
-    val dma0Ext = HiveCoreDMAExtReadOnlyIF(cfg)
-    // C 结果写回 DMA 外部通道（req/grant + writeData 逐 beat 流）。
+    // ── 对外契约（破坏性变更声明，相对旧版统一 extDataWidth 接口）──
+    // 三通道 dmaExt 数据位宽不再由统一 extDataWidth 配置项决定，改为各通道
+    // 独立匹配自身 buffer 行宽：dma0Ext = aExtW、dma1Ext = cExtW、
+    // dma2Ext = bExtW。每个 beat 搬运一整行数据，模块内部不做任何
+    // 拆包/拼包（无 beat 内字段切分、无多 beat 组行），外部存储侧必须按
+    // 对应通道位宽供数（A/B 读）/收数（C 写），否则数据对齐错乱。
+    // A 矩阵只读 DMA 外部通道（cmd: 读地址流; rsp: 读数据流，位宽 = aExtW）
+    val dma0Ext = HiveCoreDMAExtReadOnlyIF(cfg, cfg.aExtW)
+    // C 结果写回 DMA 外部通道（req/grant + writeData 逐 beat 流，位宽 = cExtW）。
     // 握手语义：WrOnly DMA 为逐 beat req/grant，len 恒 1（旧 DmaEngine 的
     // 单 burst len=M 协议已废弃），外部集成方需逐拍 grant + writeData.ready
-    val dma1Ext = new DmaExtIO(cfg)
-    // B 权重专用只读 DMA 外部通道（cmd: 读地址流; rsp: 读数据流）
-    val dma2Ext = HiveCoreDMAExtReadOnlyIF(cfg)
+    val dma1Ext = new DmaExtIO(cfg, cfg.cExtW)
+    // B 权重专用只读 DMA 外部通道（cmd: 读地址流; rsp: 读数据流，位宽 = bExtW）
+    val dma2Ext = HiveCoreDMAExtReadOnlyIF(cfg, cfg.bExtW)
     val status = Output(new HiveCoreStatus(cfg))
   })
 

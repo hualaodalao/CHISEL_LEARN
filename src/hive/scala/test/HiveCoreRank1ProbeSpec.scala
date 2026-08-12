@@ -32,7 +32,7 @@ class HiveCoreRank1ProbeSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   it should "produce C[i][j] = 16*(i+1)*(j+1)" in {
     val cfg = HiveCoreConfig(
-      arrayN = 8, clusterM = 2, extDataWidth = 576,
+      arrayN = 8, clusterM = 2,
       aBufferDepth = 2048, cBufferDepth = 2048,
       aW = 16, bW = 16, cW = 32
     )

@@ -108,7 +108,6 @@ class HiveCoreMultiPassSpec extends AnyFlatSpec with Matchers with ChiselSim {
     val cfg = HiveCoreConfig(
       arrayN = 8,
       clusterM = 2,         // totalN = 16
-      extDataWidth = 576,   // 匹配 C buffer 宽度 (16*36=576)
       aBufferDepth = 2048,
       cBufferDepth = 2048,
       aW = 16,
@@ -117,9 +116,8 @@ class HiveCoreMultiPassSpec extends AnyFlatSpec with Matchers with ChiselSim {
     )
     val totalN = cfg.totalN      // 16
     val aEffW  = cfg.aEffW       // 16
-    val cEffW  = cfg.cEffW       // 36
-    val extW   = cfg.extDataWidth
-    val bytesPerBeat = extW / 8
+    val cEffW  = cfg.cEffW       // 32（cW=32 显式传入，cEffW=max(cW,bW)）
+    // 各 DMA 通道外部数据位宽各自匹配 buffer 行宽：aExtW=bExtW=256，cExtW=512
     require(K > totalN, "本测试要求 K > totalN 以触发多 pass")
     val mTiles = (M + totalN - 1) / totalN
     val nTiles = (N + totalN - 1) / totalN
