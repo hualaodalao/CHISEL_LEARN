@@ -583,6 +583,7 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
 
   // 计算相关
   val tileInterCnt = RegInit(0.U(log2Up(cfg.totalN).W))
+
   
   // CBufferPipe
   val cStoreGateReg = RegInit(false.B)
@@ -600,12 +601,23 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
     cStoreGateReg := false.B
   }
   
-  
+
   // Skew 移位寄存器
   // A 供数为对角线流式：行 m 的第 i 个元素在拍 m+i 经 hiveAIn(i) 进入
   // 第 i 行 PE，垂直 psum 流与行索引严格同步（见 sCOMPUTE 注释）。
-  val aRegs   = Reg(Vec(cfg.totalN, UInt((cfg.totalN * cfg.aEffW).W)))
-  val cpsRegs = Reg(Vec(cfg.totalN, UInt((cfg.totalN * cfg.cEffW).W)))
+  val aSkewed = (0 until cfg.totalN).map { c =>
+    val delay = cfg.totalN - 1 - c
+    if (delay > 0) ShiftRegister(io.aPop.payload(cfg.aW * (c+1)-1, cfg.aW * c), delay)
+    else io.aPop.payload(cfg.aW * (c+1)-1, cfg.aW * c)
+  }
+  for (i <- 0 until cfg.totalN) {
+    io.hiveAIn(i) := aSkewed(i)
+  }
+  val cSkewed = (0 until cfg.totalN).map { c =>
+    val delay = cfg.totalN - 1 - c
+    if (delay > 0) ShiftRegister(io.cPop.payload(cfg.cW * (c+1)-1, cfg.cW * c), delay)
+    else io.cPop.payload(cfg.cW * (c+1)-1, cfg.cW * c)
+  }
 
   // C 输出收集 — 流式输出 de-skew（反向错峰对齐）
   // 结果行以波前形式流出底部行簇：行 m 在列 c 于 (m + 2*totalN - 1 + c) 拍就绪，
@@ -645,10 +657,6 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   io.flushB := false.B
   io.flushC := false.B
 
-  for (i <- 0 until cfg.totalN) {
-    io.hiveAIn(i)    := 0.U
-    io.hivePsumIn(i) := 0.U
-  }
   io.hiveLoadH   := false.B
   io.hiveLoadV   := false.B
   io.hiveValidIn := false.B
@@ -680,6 +688,10 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
     state    := sIDLE
   }
 
+  for (i <- 0 until cfg.totalN) {
+        io.hivePsumIn(i) := 0.U
+  }
+
   // ==========================================================================
   // FSM 主体 (Weight-Stationary: N→K→M)
   // ==========================================================================
@@ -697,8 +709,8 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
         // 否则会采样到未初始化寄存器的随机旧值，误触发容量错误回 idle
         val newNTiles = (io.regFile.n(15, 0) + totalN.U - 1.U) / totalN.U
         val newKTiles = (io.regFile.k(15, 0) + totalN.U - 1.U) / totalN.U
-        nTiles   := newNTiles
-        kTiles   := newKTiles
+        nTiles   := newNTiles - 1.U
+        kTiles   := newKTiles - 1.U
         // 容量检查：C buffer 真实驻留量只有一组 partial sum（mTiles×totalN 行）。
         // K > totalN 时非首 pass 的 pop（回灌）与 push 等量交替，占用恒定，
         // 故 kTiles 不乘进公式（旧公式 mTiles×kTiles×totalN 会在 K 稍大时误报容量错误）
@@ -755,8 +767,9 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
       
       io.hiveValidIn := io.aPop.fire //当需要paritialsum的时候cbufer一定是有效可以被读出
       for(i <- 0 until cfg.totalN){
-        io.hiveAIn(i) := io.aPop.payload(cfg.aW * (i + 1) - 1, cfg.aW * i)
-        io.hivePsumIn(i) := io.cPop.payload(cfg.cW * (i + 1) - 1, cfg.cW * i)
+        when(needPartialSum){
+          io.hivePsumIn(i) := cSkewed(i)
+        }
       }
       
       when(io.aPop.fire){
@@ -791,10 +804,7 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
 
     // --- sDRAIN: 等待剩余输出收集完毕 ---
     is(sDRAIN) {
-      for (i <- cfg.totalN - 1 to 1 by -1) {
-        aRegs(i) := aRegs(i - 1)
-      }
-      aRegs(0) := 0.U
+  
       val anyNewValid = io.hiveValidOut.asUInt.orR
   
       when(anyNewValid) {

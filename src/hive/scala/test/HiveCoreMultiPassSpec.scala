@@ -235,7 +235,11 @@ class HiveCoreMultiPassSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.io.dma0Ext.rsp.valid.poke(false.B)
       dut.io.dma0Ext.rsp.payload.data.poke(0.U)
       dut.io.dma0Ext.rsp.payload.err.poke(false.B)
-      // DMA1（C 写回通道）：grant 关闭，writeData 不接收
+      // DMA1（C 写回通道，req{addr,data}/rsp{err}）：req 常接收，rsp 恒无错
+      dut.io.dma1Ext.req.ready.poke(true.B)
+      dut.io.dma1Ext.rsp.valid.poke(false.B)
+      dut.io.dma1Ext.rsp.payload.err.poke(false.B)
+      // DMA2（B 权重只读通道）：req 常就绪，rsp 初始无效
       dut.io.dma2Ext.req.ready.poke(true.B)
       dut.io.dma2Ext.rsp.valid.poke(false.B)
       dut.io.dma2Ext.rsp.payload.data.poke(0.U)
@@ -316,7 +320,7 @@ class HiveCoreMultiPassSpec extends AnyFlatSpec with Matchers with ChiselSim {
         // --- DMA1 (C WrOnly) 响应：逐 beat store + 逐拍地址对账 ---
 
         if (dut.io.dma1Ext.req.fire.peek().litToBoolean) {
-          val reqAddr = dut.io.dma1Ext.addr.peek().litValue.toLong
+          val reqAddr = dut.io.dma1Ext.req.payload.addr.peek().litValue.toLong
           withClue(s"DMA1 store beat #$dma1StoreBeats addr mismatch: ") {
             if (dma1StoreBeats >= expStoreAddrs.size)
               fail(s"DMA1 store beat #$dma1StoreBeats exceeds expected ${expStoreAddrs.size} beats")
@@ -338,7 +342,7 @@ class HiveCoreMultiPassSpec extends AnyFlatSpec with Matchers with ChiselSim {
         if (dma2BeatsSent < dma2TotalBeats) {
           dut.io.dma2Ext.rsp.valid.poke(true.B)
           dut.io.dma2Ext.rsp.payload.data.poke(genDma2WeightBeat(dma2BeatsSent).U)
-          dut.io.dma2Ext.rsp.payload.rsp.poke(false.B)
+          dut.io.dma2Ext.rsp.payload.err.poke(false.B)
           if (dut.io.dma2Ext.rsp.ready.peek().litToBoolean) {
             if (dma2BeatsSent < 2 || dma2BeatsSent == K || dma2BeatsSent == dma2TotalBeats - 1)
               println(f"[MultiPass] [cycle=$cycle%6d] DMA2 weight beat #$dma2BeatsSent delivered")
@@ -347,7 +351,7 @@ class HiveCoreMultiPassSpec extends AnyFlatSpec with Matchers with ChiselSim {
         } else {
           dut.io.dma2Ext.rsp.valid.poke(false.B)
           dut.io.dma2Ext.rsp.payload.data.poke(0.U)
-          dut.io.dma2Ext.rsp.payload.rsp.poke(false.B)
+          dut.io.dma2Ext.rsp.payload.err.poke(false.B)
         }
 
         // --- 检查完成 ---

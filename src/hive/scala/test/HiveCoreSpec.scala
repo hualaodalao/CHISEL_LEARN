@@ -62,20 +62,19 @@ class HiveCoreSpec extends AnyFlatSpec with Matchers {
       // Initialize
       dut.io.cmd.valid.poke(false.B)
       dut.io.resp.ready.poke(true.B)
-      // A 只读 DMA 外部通道（cmd/rsp 流接口）：cmd 常就绪，rsp 初始无效
-      dut.io.dma0Ext.cmd.ready.poke(true.B)
+      // A 只读 DMA 外部通道（req/rsp 流接口）：req 常就绪，rsp 初始无效
+      dut.io.dma0Ext.req.ready.poke(true.B)
       dut.io.dma0Ext.rsp.valid.poke(false.B)
       dut.io.dma0Ext.rsp.payload.data.poke(0.U)
-      dut.io.dma0Ext.rsp.payload.rsp.poke(false.B)
-      // C 写回 DMA 外部通道：grant 关闭，writeData 不接收
-      dut.io.dma1Ext.grant.poke(false.B)
-      dut.io.dma1Ext.readData.valid.poke(false.B)
-      dut.io.dma1Ext.readData.payload.poke(0.U)
-      dut.io.dma1Ext.writeData.ready.poke(false.B)
+      dut.io.dma0Ext.rsp.payload.err.poke(false.B)
+      // C 写回 DMA 外部通道（req{addr,data}/rsp{err}）：req 不接收，rsp 无效
+      dut.io.dma1Ext.req.ready.poke(false.B)
+      dut.io.dma1Ext.rsp.valid.poke(false.B)
+      dut.io.dma1Ext.rsp.payload.err.poke(false.B)
       // B 权重只读 DMA 外部通道初始化
       dut.io.dma2Ext.rsp.valid.poke(false.B)
       dut.io.dma2Ext.rsp.payload.data.poke(0.U)
-      dut.io.dma2Ext.rsp.payload.rsp.poke(false.B)
+      dut.io.dma2Ext.rsp.payload.err.poke(false.B)
       dut.clock.step()
 
       // Write REG_M (addr 0x00) = 16, REG_N (addr 0x01) = 32

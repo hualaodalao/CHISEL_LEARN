@@ -189,7 +189,7 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
     // --- sTRANSFER: 收数据 push buffer，推进地址与 tile 索引 ---
     is(sNEXT_COL) {
       when(io.isA) {
-        when(nCnt === io.regFile.n - 1.U){
+        when(nCnt === io.calcConfig.nTile - 1.U){
           state := sDONE
         }.otherwise{
           nCnt := nCnt + 1.U
@@ -205,7 +205,7 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
           state := sTRANSFER
         }
       }.otherwise {
-          when(nCnt === io.regFile.n - 1.U){
+          when(nCnt === io.calcConfig.nTile - 1.U){
               state := sDONE
           }.otherwise{
             nCnt := nCnt + 1.U
@@ -331,6 +331,7 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0) extends Module {
   io.done := false.B
   io.busy := state =/= sIDLE
   io.err  := errReg
+  io.doneBlock := false.B
 
   when(state === sIDLE){
     ostCredit := 0.U
@@ -397,7 +398,7 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0) extends Module {
 
 
     is(sNEXT_N) {
-      when(nCnt === io.regFile.n - 1.U){
+      when(nCnt === io.calcConfig.nTile - 1.U){
         state := sDONE
       }.otherwise{
         when(io.peekBlock){
