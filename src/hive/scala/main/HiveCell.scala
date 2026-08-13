@@ -61,7 +61,6 @@ class HiveCell(
 
     // 输入控制（标量）
     val clear   = Input(Bool())
-    val loadVLock = Input(Bool())
     
     val validIn = Input(Bool())
     val fmtIn   = Input(DataFormat())    
@@ -83,7 +82,6 @@ class HiveCell(
     for (y <- 0 until n) {
       pes(x)(y).io.loadHIn := io.loadHIn  
       pes(x)(y).io.clear   := io.clear      
-      pes(x)(y).io.loadVLock := io.loadVLock
 
       if (y == 0) {
         // valid 沿 x+y 二维传播：x==0 行首接 io.validIn，x>0 行首从上一 x 行
@@ -121,7 +119,7 @@ class HiveCell(
   io.rndOut   := pes(n-1)(n-1).io.rndOut
 
   // --- 行连接块（垂直传播）：psumIn/psumOut 沿 x 方向传播；
-  //     loadV 广播到所有 PE（loadH/loadVLock 同已在列连接块广播） ---
+  //     loadV 广播到所有 PE ---
   for (y <- 0 until n) {
     for (x <- 0 until n) {
       pes(x)(y).io.loadVIn := io.loadVIn

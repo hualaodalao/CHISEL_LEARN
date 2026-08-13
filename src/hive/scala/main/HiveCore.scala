@@ -34,7 +34,7 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     // C 结果写回 DMA 外部通道（req/grant + writeData 逐 beat 流，位宽 = cExtW）。
     // 握手语义：WrOnly DMA 为逐 beat req/grant，len 恒 1（旧 DmaEngine 的
     // 单 burst len=M 协议已废弃），外部集成方需逐拍 grant + writeData.ready
-    val dma1Ext = new DmaExtIO(cfg, cfg.cExtW)
+    val dma1Ext = new HiveCoreDMAExtWriteOnlyIF(cfg, cfg.cExtW)
     // B 权重专用只读 DMA 外部通道（cmd: 读地址流; rsp: 读数据流，位宽 = bExtW）
     val dma2Ext = HiveCoreDMAExtReadOnlyIF(cfg, cfg.bExtW)
     val status = Output(new HiveCoreStatus(cfg))
@@ -74,7 +74,7 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   val cDma       = Module(new HiveCoreDmaWrOnly(cfg, bufWidth = cfg.totalN * cfg.cEffW))
   // B 权重专用只读 DMA：bufWidth = 一整行权重（totalN*bW），深度 = bBufferDepth
   val bDma       = Module(new HiveCoreDmaRdOnly(cfg, bufWidth = cfg.totalN * cfg.bW, bufDepth = cfg.bBufferDepth))
-  val executor   = Module(new HiveCoreExecutor(cfg))
+  val executor   = Module(new HiveCoreExecutor2(cfg))
   val hiveComb   = Module(new HiveComb(cfg.arrayN, cfg.clusterM, cfg.aW, cfg.bW, cfg.cW, cfg.supportedFmts))
 
   // ==========================================================================
@@ -93,12 +93,15 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   calcConfig.mTile := (regFile.m + cfg.totalN.U - 1.U) / cfg.totalN.U
   calcConfig.nTile := (regFile.n + cfg.totalN.U - 1.U) / cfg.totalN.U
   calcConfig.kTile := (regFile.k + cfg.totalN.U - 1.U) / cfg.totalN.U
-  calcConfig.aRowAddressOffset := regFile.aStride
-  calcConfig.aColAddressOffset := cfg.totalN.U * (cfg.aEffW / 8).U
-  calcConfig.bRowAddressOffset := regFile.bStride
-  calcConfig.bColAddressOffset := cfg.totalN.U * (cfg.aEffW / 8).U
-  calcConfig.cRowAddressOffset := regFile.cStride
-  calcConfig.cColAddressOffset := cfg.totalN.U * (cfg.cEffW / 8).U
+  
+  calcConfig.aRowAddressOffset := regFile.k * (cfg.aW / 8).U
+  calcConfig.aColTileAddressOffset := cfg.totalN.U * (cfg.aW / 8).U
+  
+  calcConfig.bRowAddressOffset := regFile.n * (cfg.bW / 8).U
+  calcConfig.bColTileAddressOffset := cfg.totalN.U * (cfg.bW / 8).U
+  
+  calcConfig.cRowAddressOffset := regFile.n * (cfg.cW / 8).U
+  calcConfig.cColTileAddressOffset := cfg.totalN.U * (cfg.cW / 8).U
 
   // ==========================================================================
   // bDma 控制接线：execute 起始拍与 Executor 同步启动，自主扫完整个 B 矩阵
@@ -127,7 +130,7 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // 末 K pass 的 store 窗口拉高，防止多 pass 中间 partial sum 被误搬
   // ==========================================================================
   cDma.io.start       := executePulse
-  cDma.io.storeGate   := executor.io.cStoreGate
+  cDma.io.peekBlock        := executor.io.cPeek
   cDma.io.regFile     := regFile
   cDma.io.calcConfig  := calcConfig
   io.dma1Ext <> cDma.io.dmaExtWrIF
@@ -221,7 +224,7 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   scratchpad.io.aPush.valid   := aDma.io.bufPush.valid
   scratchpad.io.aPush.payload := aDma.io.bufPush.payload
   aDma.io.bufPush.ready       := scratchpad.io.aPush.ready
-  aDma.io.bufAvailability     := scratchpad.io.aAvailability
+  aDma.io.bufPopFire          := scratchpad.io.aPop.fire
 
   // ==========================================================================
   // C buffer push：仅 Executor 写结果（cDma 只做 store）
@@ -236,7 +239,7 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   scratchpad.io.bPush.valid   := bDma.io.bufPush.valid
   scratchpad.io.bPush.payload := bDma.io.bufPush.payload
   bDma.io.bufPush.ready       := scratchpad.io.bPush.ready
-  bDma.io.bufAvailability     := scratchpad.io.bAvailability
+  bDma.io.bufPopFire          := scratchpad.io.bPop.fire
 
   executor.io.bPop.valid   := scratchpad.io.bPop.valid
   executor.io.bPop.payload := scratchpad.io.bPop.payload
@@ -246,11 +249,11 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // ==========================================================================
   // C buffer pop mux: cDma(store 写回) 或 Executor(partial sum 读取) 分时复用
   // ==========================================================================
-  scratchpad.io.cPop.ready := executor.io.cPop.ready || cDma.io.bufPop.ready
+  scratchpad.io.cPop.ready := Mux(executor.io.cStoreGate, cDma.io.bufPop.ready, executor.io.cPop.ready)
 
   executor.io.cPop.valid   := scratchpad.io.cPop.valid
   executor.io.cPop.payload := scratchpad.io.cPop.payload
-
+  executor.io.cPeekDone := cDma.io.doneBlock
   cDma.io.bufPop.valid   := scratchpad.io.cPop.valid && !executor.io.cPop.ready
   cDma.io.bufPop.payload := scratchpad.io.cPop.payload
   cDma.io.bufOccupancy   := scratchpad.io.cOccupancy
@@ -264,6 +267,11 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   executor.io.aOccupancy   := scratchpad.io.aOccupancy
   executor.io.cOccupancy   := scratchpad.io.cOccupancy
 
+
+  executor.io.dmaABusy := aDma.io.busy
+  executor.io.dmaBBusy := bDma.io.busy
+  executor.io.dmaCBusy := cDma.io.busy
+
   // ==========================================================================
   // Executor ↔ HiveComb
   // ==========================================================================
@@ -271,10 +279,9 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   hiveComb.io.psumIn   := executor.io.hivePsumIn
   hiveComb.io.loadHIn  := executor.io.hiveLoadH
   hiveComb.io.loadVIn  := executor.io.hiveLoadV
-  hiveComb.io.loadVLock := executor.io.hiveLoadVLock
   hiveComb.io.validIn  := executor.io.hiveValidIn
-  hiveComb.io.fmtIn    := executor.io.hiveFmtIn
-  hiveComb.io.rndIn    := executor.io.hiveRndIn
+  hiveComb.io.fmtIn    := regFile.fmt
+  hiveComb.io.rndIn    := regFile.rnd
   hiveComb.io.clear    := executor.io.hiveClear
 
   executor.io.hiveCOut     := hiveComb.io.cOut

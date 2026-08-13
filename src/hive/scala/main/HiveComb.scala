@@ -85,7 +85,6 @@ class HiveComb(
     val rndIn   = Input(RoundingMode())
 
     val clear   = Input(Bool())
-    val loadVLock   = Input(Bool())
 
     val validOut = Output(Vec(totalN, Bool()))
   })
@@ -113,7 +112,6 @@ class HiveComb(
 
     // --- clear：广播（无 skew） ---
     arr.io.clear := io.clear
-    arr.io.loadVLock := io.loadVLock
     
     arr.io.loadHIn := io.loadHIn  
     arr.io.loadVIn := io.loadVIn  

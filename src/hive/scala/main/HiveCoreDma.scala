@@ -48,8 +48,8 @@ import chisel3.util._
   *                 B 实例需传 bBufferDepth）
   */
 class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 0) extends Module {
-  val pushW = if (bufWidth > 0) bufWidth else cfg.aExtW
-  val availDepth = if (bufDepth > 0) bufDepth else cfg.aBufferDepth
+  val pushW = bufWidth 
+  val availDepth = bufDepth
 
   val io = IO(new Bundle {
     val isA = Input(Bool())                          // 例化时 tie 死：true=A buffer, false=B buffer
@@ -62,16 +62,16 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
     val calcConfig = Input(HiveCoreExePreCalcConfig(cfg))  // 预计算的 tile 数与地址偏移
     val regFile = Input(HiveCoreRegs(cfg))           // 基地址
     val bufPush = master(Stream(UInt(pushW.W)))      // 向 buffer push 数据
-    val bufAvailability = Input(UInt(log2Up(availDepth + 1).W))
+    val bufPopFire = Input(Bool())
   })
 
   // ==========================================================================
   // FSM 状态编码
   // ==========================================================================
-  val sIDLE     = 0.U(2.W)
-  val sREQ_EXT  = 1.U(2.W)   // 发起读命令（检查 buffer 空间）
-  val sTRANSFER = 2.U(2.W)   // 接收数据 push buffer、推进地址
-  val sDONE     = 3.U(2.W)
+  val sIDLE       = 0.U(2.W)
+  val sTRANSFER   = 1.U(2.W)   // 接收数据 push buffer、推进地址
+  val sNEXT_COL  = 2.U(2.W)
+  val sDONE       = 3.U(2.W)
 
   val state = RegInit(sIDLE)
 
@@ -79,43 +79,48 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   // 内部寄存器
   // ==========================================================================
   val curAddr = RegInit(0.U(cfg.addrWidth.W))  // 当前读地址
+  val colAddr = RegInit(0.U(cfg.addrWidth.W))  // 当前读地址
   val rowStep = RegInit(0.U(cfg.addrWidth.W))  // 内层每拍地址步进
-  val blkJump = RegInit(0.U(cfg.addrWidth.W))  // 块间地址跳转量
-  val innerRows = RegInit(0.U(cfg.mnkWidth.W)) // 内层循环总拍数（每 tile 块）
-  val blkTarget = RegInit(0.U(cfg.mnkWidth.W)) // 外层 tile 块总数（B 路径 = nTile 数；
-                                               // A 路径复用为每轮 kTile 目标）
+  val bNextKTileAddressOffset = RegInit(0.U(cfg.addrWidth.W))  // 内层每拍地址步进
+  val kCnt = RegInit(0.U(cfg.mnkWidth.W))
+  val nCnt = RegInit(0.U(cfg.mnkWidth.W))
 
-  val rowCnt = RegInit(0.U(cfg.mnkWidth.W))    // 块内行计数
-  val blkCnt = RegInit(0.U(cfg.mnkWidth.W))    // 已完成 tile 块计数（仅 B 路径使用：
-                                               // = nTile 数；A 路径终止判定用
-                                               // aKtCnt/aNTileCnt，不读 blkCnt）
+  val lineTarget  = RegInit(0.U(16.W))
+  val lineCounter = RegInit(0.U(16.W))
+  val ostCredit= RegInit(0.U(log2Up(bufDepth + 1).W))
   val errReg = RegInit(false.B)
+  val ERR_BUS = 1.U(2.W)
+  val ERR_FIFO = 2.U(2.W)
+  val errState = RegInit(0.U(2.W))
 
-  // --- A 路径三级遍历专用寄存器（nTile 外 → kTile 中 → M 内，行升序） ---
-  val aKtCnt   = RegInit(0.U(cfg.mnkWidth.W))  // 当前 nTile 轮内已完成 kTile 数
-  val aNTileCnt = RegInit(0.U(cfg.mnkWidth.W)) // 已完成 nTile 轮数
-  val aNTileTarget = RegInit(0.U(cfg.mnkWidth.W)) // start 锁存 nTile 轮总数（终止目标）
+  when(state === sIDLE){
+    ostCredit := bufDepth.U
+    errReg := false.B
+  }.otherwise{
+    when(io.dmaExtRdIF.rsp.fire){
+      when(io.dmaExtRdIF.rsp.payload.err){
+        errReg := true.B
+        errState := ERR_BUS
+      }
+    }
 
-  // --- B 路径三级遍历专用寄存器（N 外 → kTile 中 → 块内行降序） ---
-  // 权重下沉协议下 PE(x,y) 锁存「最后供数行 - x」，故每个 kTile 块必须按
-  // K 行降序供数，才能使 PE(x,y).wReg = B[kTile*totalN + x][y]（正序落位）
-  val isAReg   = RegInit(true.B)               // start 时锁存遍历模式
-  val ktCnt    = RegInit(0.U(cfg.mnkWidth.W))  // 当前 nTile 内已完成 kTile 数
-  val ktRows   = RegInit(0.U(cfg.mnkWidth.W))  // 当前 kTile 块行数（边界块可能 < totalN）
-  val rowsLastReg = RegInit(0.U(cfg.mnkWidth.W)) // 末个（边界）kTile 块行数
-  val bRowStep = RegInit(0.U(cfg.addrWidth.W)) // 块内行步进（负值：降序读）
-  val bKtJump  = RegInit(0.U(cfg.addrWidth.W)) // kTile 间跳转量（下一块非边界）
-  val bKtJumpLast = RegInit(0.U(cfg.addrWidth.W)) // kTile 间跳转量（下一块为边界块）
-  val bNJump   = RegInit(0.U(cfg.addrWidth.W)) // nTile 间跳转量
+    when(io.dmaExtRdIF.req.fire & io.bufPopFire){
+    }.elsewhen(io.dmaExtRdIF.req.fire){
+      ostCredit := ostCredit - 1.U
+    }.elsewhen(io.bufPopFire){
+      ostCredit := ostCredit + 1.U
+    }
+    
+  }
 
   // ==========================================================================
   // 默认输出驱动
   // ==========================================================================
-  io.dmaExtRdIF.cmd.valid       := false.B
-  io.dmaExtRdIF.cmd.payload.addr := curAddr
-  io.dmaExtRdIF.rsp.ready       := false.B
+  io.dmaExtRdIF.req.valid       := ostCredit =/= 0.U & state === sTRANSFER
+  io.dmaExtRdIF.req.payload.addr := curAddr
+  io.dmaExtRdIF.rsp.ready       := true.B //buffer永远能push的时候dma才会发请求
 
-  io.bufPush.valid   := false.B
+  io.bufPush.valid   := io.dmaExtRdIF.rsp.valid
   io.bufPush.payload := io.dmaExtRdIF.rsp.payload.data
 
   io.done := false.B
@@ -131,140 +136,104 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   // 安全性：脱离 sTRANSFER 后外部 rsp.ready/bufPush.valid 自然拉低，无协议违约
   // ==========================================================================
   when(io.start) {
-    state  := sREQ_EXT
-    rowCnt := 0.U
-    blkCnt := 0.U
+    state  := sTRANSFER
     errReg := false.B
+    lineCounter := 0.U  
+    
     when(io.isA) {
       // A 矩阵：三级遍历「nTile 外 → kTile 中 → M 内」。内层扫实际 M 行
       // （regFile.m，边界感知不含 padding 行），中层扫 kTile 个 K tile，
       // 外层共 nTile 轮（每轮结束 curAddr 复位回 aAddr）。Executor 每
       // K pass 只消费实际 M 行，若按 mTile*totalN 扫描会把 padding 行混入 FIFO
-      isAReg  := true.B
       curAddr   := io.regFile.aAddr
+      colAddr   := io.calcConfig.aColTileAddressOffset
       rowStep   := io.calcConfig.aRowAddressOffset
-      blkJump   := io.calcConfig.aColAddressOffset -
-                   (io.regFile.m - 1.U) * io.calcConfig.aRowAddressOffset
-      innerRows := io.regFile.m
-      blkTarget := io.calcConfig.kTile    // 中层目标：每轮 kTile 个块（A 复用 blkTarget）
-      aNTileTarget := io.calcConfig.nTile // 外层目标：共 nTile 轮
-      aKtCnt    := 0.U
-      aNTileCnt := 0.U
+      lineTarget  := io.regFile.m
+
     }.otherwise {
+      //B 矩阵是块内降序
+      
       // B 矩阵：三级遍历「N 外 → kTile 中 → 块内行降序」。
       // 权重下沉协议下 PE(x,y) 最终锁存「最后供数行 - x」，每个 kTile 块
       // 必须按 K 行降序供数（先读块内最高行），executor 顺序 pop 供数后
       // 才能使 PE(x,y).wReg = B[kTile*totalN + x][y]（正序落位，标准 GEMM）。
       // 起始地址 = 块内最高行；块内每拍 -bRowOffset；块间用预计算跳转量。
-      isAReg := false.B
-      val rowOff = io.calcConfig.bRowAddressOffset
-      val rowsLast = io.regFile.k - (io.calcConfig.kTile - 1.U) * cfg.totalN.U
-      rowsLastReg := rowsLast
-      val ktRows0 = Mux(io.calcConfig.kTile === 1.U, rowsLast, cfg.totalN.U)
-      ktRows    := ktRows0
-      ktCnt     := 0.U
-      blkTarget := io.calcConfig.nTile
-      curAddr   := io.regFile.bAddr + (ktRows0 - 1.U) * rowOff
-      bRowStep  := 0.U(cfg.addrWidth.W) - rowOff
-      bKtJump     := (2.U * cfg.totalN.U - 1.U) * rowOff
-      bKtJumpLast := (cfg.totalN.U + rowsLast - 1.U) * rowOff
-      bNJump      := io.calcConfig.bColAddressOffset + (cfg.totalN.U - 1.U) * rowOff -
-                     (io.calcConfig.kTile - 1.U) * cfg.totalN.U * rowOff
+      curAddr := io.regFile.bAddr + (cfg.totalN - 1).U * io.calcConfig.bRowAddressOffset
+      colAddr   := io.calcConfig.bColTileAddressOffset + (cfg.totalN - 1).U * io.calcConfig.bRowAddressOffset
+      rowStep   := io.calcConfig.bRowAddressOffset
+      lineTarget  := cfg.totalN.U
+      bNextKTileAddressOffset := (cfg.totalN * 2 - 1).U * io.calcConfig.bRowAddressOffset //这里乘以2的原因是B矩阵是降序读取，那么下一个k维tile需要增加两个
+
     }
   }
 
   switch(state) {
-
     // --- sIDLE: 等待 start（锁存逻辑在上方统一处理，本状态无动作） ---
     is(sIDLE) { }
 
-    // --- sREQ_EXT: buffer 有空间才发起读命令 ---
-    is(sREQ_EXT) {
-      when(io.bufAvailability =/= 0.U) {
-        io.dmaExtRdIF.cmd.valid := true.B
-        when(io.dmaExtRdIF.cmd.fire) {
+    is(sTRANSFER){
+      when(io.dmaExtRdIF.req.fire){
+          when(lineCounter === lineTarget - 1.U){
+            state := sNEXT_COL
+            lineCounter := 0.U
+          }.otherwise{
+            lineCounter := lineCounter + 1.U
+          }
+          when(io.isA){
+            curAddr := curAddr + rowStep
+          }.otherwise{
+            curAddr := curAddr - rowStep
+          }
+      }
+    }
+    // --- sTRANSFER: 收数据 push buffer，推进地址与 tile 索引 ---
+    is(sNEXT_COL) {
+      when(io.isA) {
+        when(nCnt === io.regFile.n - 1.U){
+          state := sDONE
+        }.otherwise{
+          nCnt := nCnt + 1.U
+          when(kCnt === io.calcConfig.kTile - 1.U){ 
+            curAddr := io.regFile.aAddr 
+            colAddr := io.calcConfig.aColTileAddressOffset
+            kCnt := 0.U
+          }.otherwise{
+            curAddr := io.regFile.aAddr + colAddr
+            colAddr := colAddr + io.calcConfig.aColTileAddressOffset
+            kCnt := kCnt + 1.U
+          }
           state := sTRANSFER
         }
+      }.otherwise {
+          when(nCnt === io.regFile.n - 1.U){
+              state := sDONE
+          }.otherwise{
+            nCnt := nCnt + 1.U
+            when(kCnt === io.calcConfig.kTile - 1.U){
+              curAddr := io.regFile.bAddr + colAddr 
+              colAddr := colAddr + io.calcConfig.bColTileAddressOffset
+              kCnt := 0.U
+            }.otherwise{
+              curAddr := curAddr + bNextKTileAddressOffset
+              kCnt := kCnt + 1.U
+            }
+            state := sTRANSFER
+          }
       }
     }
-
-    // --- sTRANSFER: 收数据 push buffer，推进地址与 tile 索引 ---
-    is(sTRANSFER) {
-      io.dmaExtRdIF.rsp.ready := io.bufPush.ready
-      when(io.dmaExtRdIF.rsp.fire) {
-        io.bufPush.valid := true.B
-        when(io.dmaExtRdIF.rsp.payload.rsp) {
-          errReg := true.B  // 外部返回错误响应
-        }
-
-        when(isAReg) {
-          // A 路径：三级遍历（M 内行升序 → kTile 中块间跳转 → nTile 外轮间复位）；
-          // 终止比较均用 start 锁存值（blkTarget/aNTileTarget），不直采 io.calcConfig
-          when(rowCnt === innerRows - 1.U) {
-            // 本 kTile 块最后一行
-            rowCnt := 0.U
-            when(aKtCnt === blkTarget - 1.U) {
-              // 本轮最后一个 kTile 块：推进到下一个 nTile 轮，
-              // 地址复位回 aAddr（每轮供数内容相同，与 executor 重扫语义等价）
-              aKtCnt := 0.U
-              aNTileCnt := aNTileCnt + 1.U
-              when(aNTileCnt === aNTileTarget - 1.U) {
-                state := sDONE
-              }.otherwise {
-                curAddr := io.regFile.aAddr
-                state   := sREQ_EXT
-              }
-            }.otherwise {
-              // 跳到下一个 kTile 块起点（块间增量跳转）
-              aKtCnt  := aKtCnt + 1.U
-              curAddr := curAddr + blkJump
-              state   := sREQ_EXT
-            }
-          }.otherwise {
-            rowCnt  := rowCnt + 1.U
-            curAddr := curAddr + rowStep
-            state   := sREQ_EXT
-          }
-        }.otherwise {
-          // B 路径：块内行降序（bRowStep 为负），kTile 中级、nTile 外级
-          when(rowCnt === ktRows - 1.U) {
-            // 本 kTile 块最后一行
-            rowCnt := 0.U
-            when(ktCnt === io.calcConfig.kTile - 1.U) {
-              // 本 nTile 的最后一个 kTile：推进到下一个 nTile
-              ktCnt  := 0.U
-              blkCnt := blkCnt + 1.U
-              when(blkCnt === blkTarget - 1.U) {
-                state := sDONE
-              }.otherwise {
-                curAddr := curAddr + bNJump
-                ktRows  := cfg.totalN.U  // 新 nTile 的首个 kTile 必为满块
-                state   := sREQ_EXT
-              }
-            }.otherwise {
-              // 跳到下一个 kTile 块的最高行
-              val nextIsLast = (ktCnt + 1.U) === (io.calcConfig.kTile - 1.U)
-              ktCnt   := ktCnt + 1.U
-              ktRows  := Mux(nextIsLast, rowsLastReg, cfg.totalN.U)
-              curAddr := curAddr + Mux(nextIsLast, bKtJumpLast, bKtJump)
-              state   := sREQ_EXT
-            }
-          }.otherwise {
-            // 块内降序：地址按负步进
-            rowCnt  := rowCnt + 1.U
-            curAddr := curAddr + bRowStep
-            state   := sREQ_EXT
-          }
-        }
-      }
-    }
+    
 
     // --- sDONE: 发完成脉冲，回 IDLE ---
     is(sDONE) {
-      io.done := true.B
-      state := sIDLE
+      when(ostCredit === bufDepth.U){
+        io.done := true.B
+        state := sIDLE
+      }
     }
   }
+
+ 
+  
 }
 
 
@@ -313,24 +282,29 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0) extends Module {
   val io = IO(new Bundle {
     // 控制/状态（无 peek 握手：DMA 启动后自主搬完所有 tile）
     val start = Input(Bool())                        // 启动脉冲
-    val storeGate = Input(Bool())                    // 写出门控（Executor 末 K pass store 窗口拉高）
+    val peekBlock  = Input(Bool())                   // 写出一个M维Block控制脉冲
+    val doneBlock = Output(Bool())                   // 完成一个M维Block控制脉冲
     val done  = Output(Bool())                       // 完成脉冲
     val busy  = Output(Bool())                       // 忙标志
     val err   = Output(Bool())                       // 错误标志
-    val dmaExtWrIF = new DmaExtIO(cfg, popW)               // 外部写通道 req/grant/addr/len/isWrite/writeData，与 bufPop 等宽直连
+    val dmaExtWrIF = new HiveCoreDMAExtWriteOnlyIF(cfg, popW)
     val calcConfig = Input(HiveCoreExePreCalcConfig(cfg))  // 预计算的 tile 数与地址偏移
     val regFile = Input(HiveCoreRegs(cfg))           // 仅使用 cAddr 基地址（loopMode 不影响 C 写回遍历）
     val bufPop = slave(Stream(UInt(popW.W)))         // 从 C buffer pop 数据
     val bufOccupancy = Input(UInt(log2Up(cfg.cBufferDepth + 1).W))
   })
 
+  //
+  
+
   // ==========================================================================
   // FSM 状态编码
   // ==========================================================================
-  val sIDLE     = 0.U(2.W)
-  val sREQ_EXT  = 1.U(2.W)   // 发起写请求（检查 buffer 数据量）
-  val sTRANSFER = 2.U(2.W)   // pop buffer 驱动 writeData、推进地址
-  val sDONE     = 3.U(2.W)
+  val sIDLE      = 0.U(3.W)
+  val sFIRST_PEEK = 1.U(3.W)
+  val sTRANSFER_M  = 2.U(3.W)   // pop buffer 驱动 writeData、推进地址  
+  val sNEXT_N = 3.U(3.W)
+  val sDONE      = 4.U(3.W)
 
   val state = RegInit(sIDLE)
 
@@ -338,101 +312,111 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0) extends Module {
   // 内部寄存器
   // ==========================================================================
   val curAddr = RegInit(0.U(cfg.addrWidth.W))  // 当前写地址
+  val colAddr = RegInit(0.U(cfg.addrWidth.W))  // 当前写列地址
   val rowStep = RegInit(0.U(cfg.addrWidth.W))  // 内层每拍地址步进
-  val blkJump = RegInit(0.U(cfg.addrWidth.W))  // 块间地址跳转量
-  val innerRows = RegInit(0.U(cfg.mnkWidth.W)) // 内层循环总拍数（每 tile 块）
-  val blkTarget = RegInit(0.U(cfg.mnkWidth.W)) // 外层 tile 块总数
-
-  val rowCnt = RegInit(0.U(cfg.mnkWidth.W))    // 块内行计数
-  val blkCnt = RegInit(0.U(cfg.mnkWidth.W))    // 已完成 tile 块计数
+  val lineCounter = RegInit(0.U(cfg.mnkWidth.W))
+  val nCnt = RegInit(0.U(cfg.mnkWidth.W))
   val errReg = RegInit(false.B)
+  val ostCredit = RegInit(0.U(log2Up(cfg.cBufferDepth + 1).W))
 
   // ==========================================================================
   // 默认输出驱动
   // ==========================================================================
-  io.dmaExtWrIF.req          := false.B
-  io.dmaExtWrIF.addr         := curAddr
-  io.dmaExtWrIF.len          := 1.U          // 逐 beat 请求，与 RdOnly 逐行 cmd 风格一致
-  io.dmaExtWrIF.isWrite      := true.B       // 只写 DMA
-  io.dmaExtWrIF.readData.ready := false.B    // 只写通道不使用读数据
-  io.dmaExtWrIF.writeData.valid   := false.B
-  io.dmaExtWrIF.writeData.payload := io.bufPop.payload
-
-  io.bufPop.ready := false.B
+  io.dmaExtWrIF.req.valid        := (state === sTRANSFER_M) & io.bufPop.valid
+  io.dmaExtWrIF.req.payload.addr         := curAddr
+  io.dmaExtWrIF.req.payload.data         := io.bufPop.payload
+  io.dmaExtWrIF.rsp.ready        := true.B
+  io.bufPop.ready                := (state === sTRANSFER_M) && io.dmaExtWrIF.req.ready
 
   io.done := false.B
   io.busy := state =/= sIDLE
   io.err  := errReg
 
-  // ==========================================================================
-  // start 重新装载（任意状态生效，语义与安全性说明见 RdOnly 同构实现）：
-  // Executor 异常回 idle 后下次 EXECUTE 必须能强制重启卡死的本 DMA
-  // ==========================================================================
-  when(io.start) {
-    state  := sREQ_EXT
-    rowCnt := 0.U
-    blkCnt := 0.U
-    errReg := false.B
-    // C 矩阵：固定「内 M 外 N」遍历（C buffer 为 FIFO，写回顺序 =
-    // Executor push 顺序，与 loopMode 无关）
-    curAddr := io.regFile.cAddr
-    // 内层沿实际 M 行（regFile.m，边界感知不含 padding），外层扫 nTile 个 N tile
-    // 与 Executor store 顺序一致：每个 N tile 写回所有实际 M 行
-    // （Executor 只 push 实际 M 行，若锁存 mTile*totalN 会永久等待挂死）
-    rowStep   := io.calcConfig.cRowAddressOffset
-    blkJump   := io.calcConfig.cColAddressOffset -
-                 (io.regFile.m - 1.U) * io.calcConfig.cRowAddressOffset
-    innerRows := io.regFile.m
-    blkTarget := io.calcConfig.nTile
+  when(state === sIDLE){
+    ostCredit := 0.U
+  }.otherwise{
+    when(io.dmaExtWrIF.req.fire & io.dmaExtWrIF.rsp.fire){
+      ostCredit := ostCredit
+    }.elsewhen(io.dmaExtWrIF.rsp.fire){
+      ostCredit := ostCredit - 1.U
+    }.elsewhen(io.dmaExtWrIF.req.fire){
+      ostCredit := ostCredit + 1.U
+    }
   }
+
+  when(io.dmaExtWrIF.rsp.fire){
+    when(io.dmaExtWrIF.rsp.payload.err){
+      errReg := true.B
+    }
+  }
+  
 
   switch(state) {
 
     // --- sIDLE: 等待 start（锁存逻辑在上方统一处理，本状态无动作） ---
-    is(sIDLE) { }
+    is(sIDLE) { 
+      // ==========================================================================
+      // start 重新装载（任意状态生效，语义与安全性说明见 RdOnly 同构实现）：
+      // Executor 异常回 idle 后下次 EXECUTE 必须能强制重启卡死的本 DMA
+      // ==========================================================================
+      when(io.start) {
+        state  := sFIRST_PEEK
+        errReg := false.B
+        // C 矩阵：固定「内 M 外 N」遍历（C buffer 为 FIFO，写回顺序 =
+        // Executor push 顺序，与 loopMode 无关）
+        curAddr := io.regFile.cAddr
+        // 内层沿实际 M 行（regFile.m，边界感知不含 padding），外层扫 nTile 个 N tile
+        // 与 Executor store 顺序一致：每个 N tile 写回所有实际 M 行
+        // （Executor 只 push 实际 M 行，若锁存 mTile*totalN 会永久等待挂死）
+        rowStep   := io.calcConfig.cRowAddressOffset
+        colAddr   := io.calcConfig.cColTileAddressOffset
+        nCnt      := 0.U
+      }
 
-    // --- sREQ_EXT: buffer 有数据且 storeGate 拉高才发起写请求 ---
-    // storeGate 由 Executor 在末 K pass 的 store 窗口拉高，防止多 pass
-    // 中间 partial sum 被误搬出
-    is(sREQ_EXT) {
-      when(io.bufOccupancy =/= 0.U && io.storeGate) {
-        io.dmaExtWrIF.req := true.B
-        when(io.dmaExtWrIF.grant) {
-          state := sTRANSFER
-        }
+
+    }
+    
+    is(sFIRST_PEEK) {
+      when(io.peekBlock) {
+        state := sTRANSFER_M
       }
     }
 
-    // --- sTRANSFER: pop buffer 写外部，推进地址与 tile 索引 ---
-    is(sTRANSFER) {
-      io.bufPop.ready             := io.dmaExtWrIF.writeData.ready
-      io.dmaExtWrIF.writeData.valid := io.bufPop.valid
+    is(sTRANSFER_M){
       when(io.bufPop.fire) {
-        when(rowCnt === innerRows - 1.U) {
-          // 本 tile 块最后一行：无需上游握手，自主推进到下一个 tile 块
-          rowCnt := 0.U
-          blkCnt := blkCnt + 1.U
-          when(blkCnt === blkTarget - 1.U) {
-            // 所有 tile 块搬完
-            state := sDONE
-          }.otherwise {
-            // 跳回块起点并前移一个块（buffer 数据量由 sREQ_EXT 检查）
-            curAddr := curAddr + blkJump
-            state   := sREQ_EXT
-          }
+        when(lineCounter === io.regFile.m - 1.U) {
+          lineCounter := 0.U
+          state := sNEXT_N
+          io.doneBlock := true.B
         }.otherwise {
-          // 块内普通行：地址按行步进
-          rowCnt  := rowCnt + 1.U
+          lineCounter := lineCounter + 1.U
           curAddr := curAddr + rowStep
-          state   := sREQ_EXT
         }
       }
     }
 
+
+    is(sNEXT_N) {
+      when(nCnt === io.regFile.n - 1.U){
+        state := sDONE
+      }.otherwise{
+        when(io.peekBlock){
+          nCnt := nCnt + 1.U
+          curAddr := curAddr + colAddr
+          colAddr := colAddr + io.calcConfig.cColTileAddressOffset
+          state := sTRANSFER_M
+        }
+      }
+      
+    }
+
+ 
     // --- sDONE: 发完成脉冲，回 IDLE ---
     is(sDONE) {
-      io.done := true.B
-      state := sIDLE
+      when(ostCredit === 0.U) {
+        io.done := true.B
+        state := sIDLE
+      }
     }
   }
 }

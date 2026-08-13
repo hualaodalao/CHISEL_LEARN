@@ -334,7 +334,8 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
       // ===== 主仿真循环: DMA 响应 + 等待完成 =====
       var done = false
       var cycle = 0
-      val maxCycles = 500000
+      //val maxCycles = 500000
+      val maxCycles = 5000
 
       println("[HiveCoreSimCase] Entering DMA response loop...")
 

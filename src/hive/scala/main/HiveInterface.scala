@@ -51,36 +51,27 @@ object HiveCoreDMAExtReadOnlyIF {
 class HiveCoreDMAExtReadOnlyIF(cfg: HiveCoreConfig, dataWidth: Int) extends Bundle {
   val rsp = Flipped(Stream(new Bundle {
     val data = UInt(dataWidth.W)
-    val rsp = Bool()
+    val err = Bool()
   }))
-  val cmd = Stream(new Bundle {
+  val req = Stream(new Bundle {
     val addr = UInt(cfg.addrWidth.W)
   })
 }
 
-class DmaExtIO(cfg: HiveCoreConfig, dataWidth: Int) extends Bundle {
-
-  /** 从外部读入数据（slave 驱动 valid/payload，master 驱动 ready） */
-  val readData = Flipped(new Stream(UInt(dataWidth.W)))
-
-  /** 向外部写出数据（master 驱动 valid/payload，slave 驱动 ready） */
-  val writeData = new Stream(UInt(dataWidth.W))
-
-  /** 访问地址 */
-  val addr = Output(UInt(cfg.addrWidth.W))
-
-  /** 传输长度（beat 数） */
-  val len = Output(UInt(16.W))
-
-  /** 请求有效 */
-  val req = Output(Bool())
-
-  /** 授权信号（外部返回） */
-  val grant = Input(Bool())
-
-  /** 写方向标志（true = 写，false = 读） */
-  val isWrite = Output(Bool())
+object HiveCoreDMAExtWriteOnlyIF {
+  def apply(cfg: HiveCoreConfig, dataWidth: Int) = new HiveCoreDMAExtWriteOnlyIF(cfg, dataWidth)
 }
+class HiveCoreDMAExtWriteOnlyIF(cfg: HiveCoreConfig, dataWidth: Int) extends Bundle {
+  val rsp = Flipped(Stream(new Bundle {
+    val err = Bool()
+  }))
+  
+  val req = Stream(new Bundle {
+    val addr = UInt(cfg.addrWidth.W)
+    val data = UInt(dataWidth.W)
+  })
+}
+
 
 // ============================================================================
 // 状态 Bundle
@@ -162,15 +153,12 @@ class HiveCoreExePreCalcConfig(cfg: HiveCoreConfig) extends Bundle {
   val mTile = UInt(cfg.mnkWidth.W)    
   val kTile = UInt(cfg.mnkWidth.W)
 
-  def aTileRowBytes = (cfg.aW * cfg.totalN).U
-  def bTileRowBytes = (cfg.bW * cfg.totalN).U
-  def cTileRowBytes = (cfg.cW * cfg.totalN).U
   val aRowAddressOffset = UInt(cfg.addrWidth.W)
   val bRowAddressOffset = UInt(cfg.addrWidth.W)
   val cRowAddressOffset = UInt(cfg.addrWidth.W)
-  val aColAddressOffset = UInt(cfg.addrWidth.W)
-  val cColAddressOffset = UInt(cfg.addrWidth.W)
-  val bColAddressOffset = UInt(cfg.addrWidth.W)
+  val aColTileAddressOffset = UInt(cfg.addrWidth.W) 
+  val cColTileAddressOffset = UInt(cfg.addrWidth.W) 
+  val bColTileAddressOffset = UInt(cfg.addrWidth.W) 
 }
 object HiveCoreExePreCalcConfig {
   def apply(cfg: HiveCoreConfig) = new HiveCoreExePreCalcConfig(cfg)

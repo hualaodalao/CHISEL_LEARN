@@ -32,9 +32,9 @@ object HiveCoreElaborate extends App {
   val cfg = HiveCoreConfig(
     arrayN = 8,
     clusterM = 2,         // totalN = 16
-    aBufferDepth = 16,
-    bBufferDepth = 16,
-    cBufferDepth = 16,
+    aBufferDepth = 128,
+    bBufferDepth = 128,
+    cBufferDepth = 2048,
     aW = 16,
     bW = 16,
     cW = 32

@@ -103,7 +103,7 @@ case class HiveCoreConfig(
   require(clusterM >= 1, s"HiveCoreConfig: clusterM($clusterM) 必须 >= 1")
   require(aBufferDepth > 0, s"HiveCoreConfig: aBufferDepth($aBufferDepth) 必须 > 0")
   require(bBufferDepth > 0, s"HiveCoreConfig: bBufferDepth($bBufferDepth) 必须 > 0")
-  require(cBufferDepth > 0, s"HiveCoreConfig: cBufferDepth($cBufferDepth) 必须 > 0")
+  require(cBufferDepth >= 2*totalN, s"HiveCoreConfig: cBufferDepth($cBufferDepth) 必须 > 2*totalN($totalN)")
   require(addrWidth > 0, s"HiveCoreConfig: addrWidth($addrWidth) 必须 > 0")
   require(addrWidth <= 32, s"HiveCoreConfig: addrWidth($addrWidth) 必须 <= 32")
 }

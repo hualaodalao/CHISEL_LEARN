@@ -231,19 +231,15 @@ class HiveCoreMultiPassSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.io.cmd.valid.poke(false.B)
       dut.io.resp.ready.poke(true.B)
       // DMA0（A 只读通道）：cmd 常就绪，rsp 初始无效
-      dut.io.dma0Ext.cmd.ready.poke(true.B)
+      dut.io.dma0Ext.req.ready.poke(true.B)
       dut.io.dma0Ext.rsp.valid.poke(false.B)
       dut.io.dma0Ext.rsp.payload.data.poke(0.U)
-      dut.io.dma0Ext.rsp.payload.rsp.poke(false.B)
+      dut.io.dma0Ext.rsp.payload.err.poke(false.B)
       // DMA1（C 写回通道）：grant 关闭，writeData 不接收
-      dut.io.dma1Ext.grant.poke(false.B)
-      dut.io.dma1Ext.readData.valid.poke(false.B)
-      dut.io.dma1Ext.readData.payload.poke(0.U)
-      dut.io.dma1Ext.writeData.ready.poke(false.B)
-      dut.io.dma2Ext.cmd.ready.poke(true.B)
+      dut.io.dma2Ext.req.ready.poke(true.B)
       dut.io.dma2Ext.rsp.valid.poke(false.B)
       dut.io.dma2Ext.rsp.payload.data.poke(0.U)
-      dut.io.dma2Ext.rsp.payload.rsp.poke(false.B)
+      dut.io.dma2Ext.rsp.payload.err.poke(false.B)
       dut.clock.step(2)
       dut.reset.poke(false.B)
       dut.clock.step(2)
@@ -292,9 +288,9 @@ class HiveCoreMultiPassSpec extends AnyFlatSpec with Matchers with ChiselSim {
         // --- DMA0 (A RdOnly) 响应：逐拍 rsp 供数 + 逐拍 cmd 地址对账 ---
         // cmd fire 拍（valid && ready，ready 常开）对账地址，与软件侧按
         // RdOnly 地址公式推导的期望逐拍比较，防止“按序供数掩盖地址公式 bug”
-        if (dut.io.dma0Ext.cmd.valid.peek().litToBoolean &&
-            dut.io.dma0Ext.cmd.ready.peek().litToBoolean) {
-          val cmdAddr = dut.io.dma0Ext.cmd.payload.addr.peek().litValue.toLong
+        if (dut.io.dma0Ext.req.valid.peek().litToBoolean &&
+            dut.io.dma0Ext.req.ready.peek().litToBoolean) {
+          val cmdAddr = dut.io.dma0Ext.req.payload.addr.peek().litValue.toLong
           withClue(s"DMA0 cmd #$dma0Cmds addr mismatch: ") {
             if (dma0Cmds >= expDma0Addrs.size)
               fail(s"DMA0 cmd #$dma0Cmds exceeds expected ${expDma0Addrs.size} cmds")
@@ -307,19 +303,19 @@ class HiveCoreMultiPassSpec extends AnyFlatSpec with Matchers with ChiselSim {
         if (dma0BeatsSent < dma0TotalBeats) {
           dut.io.dma0Ext.rsp.valid.poke(true.B)
           dut.io.dma0Ext.rsp.payload.data.poke(genDma0Beat(dma0BeatsSent).U)
-          dut.io.dma0Ext.rsp.payload.rsp.poke(false.B)
+          dut.io.dma0Ext.rsp.payload.err.poke(false.B)
           if (dut.io.dma0Ext.rsp.ready.peek().litToBoolean) {
             dma0BeatsSent += 1
           }
         } else {
           dut.io.dma0Ext.rsp.valid.poke(false.B)
           dut.io.dma0Ext.rsp.payload.data.poke(0.U)
-          dut.io.dma0Ext.rsp.payload.rsp.poke(false.B)
+          dut.io.dma0Ext.rsp.payload.err.poke(false.B)
         }
 
         // --- DMA1 (C WrOnly) 响应：逐 beat store + 逐拍地址对账 ---
-        dut.io.dma1Ext.grant.poke(true.B)
-        if (dut.io.dma1Ext.req.peek().litToBoolean) {
+
+        if (dut.io.dma1Ext.req.fire.peek().litToBoolean) {
           val reqAddr = dut.io.dma1Ext.addr.peek().litValue.toLong
           withClue(s"DMA1 store beat #$dma1StoreBeats addr mismatch: ") {
             if (dma1StoreBeats >= expStoreAddrs.size)
@@ -330,10 +326,10 @@ class HiveCoreMultiPassSpec extends AnyFlatSpec with Matchers with ChiselSim {
             println(f"[MultiPass] [cycle=$cycle%6d] DMA1 store req addr=0x$reqAddr%08X")
           dma1CurAddr = reqAddr
         }
-        dut.io.dma1Ext.writeData.ready.poke(true.B)
-        if (dut.io.dma1Ext.writeData.valid.peek().litToBoolean) {
+        
+        if (dut.io.dma1Ext.req.fire.peek().litToBoolean) {
           // store payload 采样在 step 前（历史教训）
-          val writeData = dut.io.dma1Ext.writeData.payload.peek().litValue
+          val writeData = dut.io.dma1Ext.req.payload.data.peek().litValue
           cWriteLog += ((dma1CurAddr, writeData))
           dma1StoreBeats += 1
         }

@@ -78,7 +78,6 @@ class HiveWorker(
     val loadHIn  = Input(Bool())
 
     // 垂直加载（仅权重）：由 HiveCell 广播到所有 PE，无垂直传播输出
-    val loadVLock  = Input(Bool())
     val loadVIn  = Input(Bool())
 
     // 控制（水平传播：RegNext → 右侧 HiveWorker）
@@ -112,7 +111,7 @@ class HiveWorker(
   // --- wReg / fmtReg / rndReg 锁存逻辑 ---
   // 权重仅经垂直加载（loadV 上升沿，从 psumIn 低位）；水平加载（loadH）仅锁存配置 fmt/rnd。
   // 二者独立：加载权重时同时拉高 loadH（刷新配置）与 loadV（锁存权重）。
-  when(io.loadVLock) {
+  when(io.loadVIn) {
     wReg := io.psumIn(bW - 1, 0)
   }
   when(io.loadHIn) {

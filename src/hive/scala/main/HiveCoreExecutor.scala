@@ -66,10 +66,7 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
     val hivePsumIn  = Output(Vec(cfg.totalN, UInt(cfg.cEffW.W)))
     val hiveLoadH   = Output(Bool())
     val hiveLoadV   = Output(Bool())
-    val hiveLoadVLock   = Output(Bool())
     val hiveValidIn = Output(Bool())
-    val hiveFmtIn   = Output(DataFormat())
-    val hiveRndIn   = Output(RoundingMode())
     val hiveClear   = Output(Bool())
     val hiveCOut    = Input(Vec(cfg.totalN, UInt(cfg.cEffW.W)))
     val hiveValidOut = Input(Vec(cfg.totalN, Bool()))
@@ -173,10 +170,7 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
   }
   io.hiveLoadH   := false.B
   io.hiveLoadV   := false.B
-  io.hiveLoadVLock := false.B
   io.hiveValidIn := false.B
-  io.hiveFmtIn   := DataFormat.INT16
-  io.hiveRndIn   := RoundingMode.RNE
   io.hiveClear   := false.B
 
   io.progress := doneTiles
@@ -288,16 +282,8 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
     // RdOnly DMA 喂数到位后自动恢复，无需固定每 2 拍一次的节流。
     is(sLOAD_WEIGHT_PE) {
       io.hiveLoadH := true.B               // 配置加载，整个窗口拉高
-      // loadV/loadVLock 仅在仍需消费权重行时跟随 bPop 有效性；
-      // 喂够 curTileK 行后必须拉低（即使 FIFO 仍有后续 kTile 数据），
-      // 否则 loadVLock 持续拉高会把排空期流动的 psum 值误锁进深层 wReg
       val feeding = io.bPop.valid && (loadedRows < curTileK)
       io.hiveLoadV := feeding              // loadV 跟随 bPop 数据有效性
-      // loadVLock 为 PE 权重锁存使能（when(loadVLock) wReg := psumIn 低位），
-      // 与 loadV（psum 透传下沉）同拍拉高：权重经 psumIn 逐行下沉的同时被各 PE 锁存
-      io.hiveLoadVLock := feeding
-      io.hiveFmtIn := io.regFile.fmt
-      io.hiveRndIn := io.regFile.rnd
       io.bPop.ready := loadedRows < curTileK  // 有数据就消费，直到喂够 curTileK 行
 
       when(io.bPop.fire) {
@@ -312,16 +298,11 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
         loadedRows := loadedRows + 1.U
       }
 
-      // 时钟周期计数器：喂够最后一行权重后，再等 totalN 拍
-      // 让 loadV 链式传播波完全穿过阵列排空
-      when(loadedRows >= curTileK) {
-        counter := counter + 1.U
-      }
 
       // 退出条件：已喂够 curTileK 行权重 且 经过传播延迟。
       // 权重经 psumReg 逐行寄存下沉后，各 PE 的 psumReg 残留末行权重值，
       // 排空完成当拍发一拍 clear 清零 psum 链（不影响 wReg），再进入计算
-      when((loadedRows >= curTileK) && (counter >= totalN.U)) {
+      when((loadedRows >= curTileK)) {
         io.hiveClear := true.B
         counter    := 0.U
         loadedRows := 0.U
@@ -367,8 +348,6 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
       // valid 必须持续到波尾排空：curTileM（供数）+ 2*(totalN-1)（波传播），
       // 否则行 curTileM-1 尚未流到底部即停止累加，尾部行结果丢失
       io.hiveValidIn := counter < curTileM + (2 * (totalN - 1)).U
-      io.hiveFmtIn   := io.regFile.fmt
-      io.hiveRndIn   := io.regFile.rnd
 
       // A buffer skew（移位寄存器）
       io.aPop.ready := counter < curTileM
@@ -512,5 +491,325 @@ class HiveCoreExecutor(cfg: HiveCoreConfig) extends Module {
       io.done := true.B
       state   := sIDLE
     }
+  }
+}
+
+
+class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
+
+  val io = IO(new Bundle {
+    // 控制
+    val execute  = Input(Bool())        // 脉冲启动
+    val busy     = Output(Bool())
+    val done     = Output(Bool())       // 脉冲完成
+    val err      = Output(Bool())
+
+    //dma状态：
+    val dmaABusy = Input(Bool())
+    val dmaBBusy = Input(Bool())
+    val dmaCBusy = Input(Bool())
+
+    // 寄存器输入（由顶层寄存器组驱动）：全部寄存器统一经 io.regFile 引用。
+    // 此前的拆分端口（regM/regN/regK/regBAddr/regBStride/regFmt/regRnd 及
+    // regAAddr/regCAddr/regAStride）均与 regFile 完全冗余（顶层驱动只是
+    // 截位/补零/类型视图），已全部移除
+    val regFile = Input(HiveCoreRegs(cfg))
+
+    // A buffer 自主 DMA（RdOnly）：execute 单次启动全自主供数，
+    // 本模块 A 侧无控制输出，仅占用量感知
+    val aOccupancy = Input(UInt(log2Up(cfg.aBufferDepth + 1).W))
+
+    // C buffer 自主 DMA（WrOnly）控制：store 门控（电平）+ 占用量感知
+    val cStoreGate = Output(Bool())                    // 末 K pass store 窗口拉高
+    val cPeek      = Output(Bool())
+    val cPeekDone  = Input(Bool())
+    val cOccupancy = Input(UInt(log2Up(cfg.cBufferDepth + 1).W))
+
+    // Scratchpad
+    val aPop  = slave(Stream(UInt((cfg.totalN * cfg.aEffW).W)))
+    // B buffer（权重专用）：RdOnly DMA 自主写入，本模块按行 pop
+    val bPop  = slave(Stream(UInt((cfg.totalN * cfg.bW).W)))
+    val bOccupancy = Input(UInt(log2Up(cfg.bBufferDepth + 1).W))
+    val cPop  = slave(Stream(UInt((cfg.totalN * cfg.cEffW).W)))
+    val cPush = master(Stream(UInt((cfg.totalN * cfg.cEffW).W)))
+    val flushA = Output(Bool())
+    val flushB = Output(Bool())
+    val flushC = Output(Bool())
+
+    // HiveComb 驱动
+    val hiveAIn     = Output(Vec(cfg.totalN, UInt(cfg.aEffW.W)))
+    val hivePsumIn  = Output(Vec(cfg.totalN, UInt(cfg.cEffW.W)))
+    val hiveLoadH   = Output(Bool())
+    val hiveLoadV   = Output(Bool())
+    val hiveValidIn = Output(Bool())
+    val hiveClear   = Output(Bool())
+    val hiveCOut    = Input(Vec(cfg.totalN, UInt(cfg.cEffW.W)))
+    val hiveValidOut = Input(Vec(cfg.totalN, Bool()))
+
+    // 进度
+    val progress = Output(UInt(16.W))
+  })
+
+  // ==========================================================================
+  // FSM 状态编码 (Weight-Stationary: M→N→K loop order)
+  // ==========================================================================
+  val sIDLE            = 0.U(4.W)
+  val sLOAD_B          = 1.U(4.W) //load B buffer to prefile pe weight
+  val sLOAD_A          = 2.U(4.W) //load A buffer to compute
+  val sNEXT_NK_TILE    = 3.U(4.W)
+  val sDRAIN           = 4.U(4.W)
+
+
+  val state = RegInit(sIDLE)
+  val errState = RegInit(false.B)
+
+  // ==========================================================================
+  // Tiling 寄存器
+  // ==========================================================================
+  val totalN = cfg.totalN
+
+  //val mTiles   = Reg(UInt(16.W)) //M维度按行索引
+  val nTiles   = Reg(UInt(16.W)) //N维度按tile索引
+  val kTiles   = Reg(UInt(16.W)) //K维度按tile索引
+  //val curMTile = Reg(UInt(16.W))
+  val curNTile = Reg(UInt(16.W))
+  val curKTile = Reg(UInt(16.W))
+  
+  val doneTiles = Reg(UInt(16.W))
+
+  // 当前 tile 参数
+  val curM = Reg(UInt(16.W))  // 实际行数
+  val depthOfCBufferUsed = Reg(UInt(16.W))
+
+  // 计算相关
+  val tileInterCnt = RegInit(0.U(log2Up(cfg.totalN).W))
+  
+  // CBufferPipe
+  val cStoreGateReg = RegInit(false.B)
+  val cStoreGateRegNxt = RegInit(false.B)
+  val cBufferReservedAtleastTotalN = RegInit(false.B)
+  when(cfg.cBufferDepth.U - io.cOccupancy >= cfg.totalN.U){
+    cBufferReservedAtleastTotalN := true.B
+  }.otherwise{
+    cBufferReservedAtleastTotalN := false.B
+  }
+  io.cStoreGate := cStoreGateReg
+  cStoreGateRegNxt := cStoreGateReg
+  io.cPeek      := ~cStoreGateRegNxt & cStoreGateReg
+  when(io.cPeekDone){
+    cStoreGateReg := false.B
+  }
+  
+  
+  // Skew 移位寄存器
+  // A 供数为对角线流式：行 m 的第 i 个元素在拍 m+i 经 hiveAIn(i) 进入
+  // 第 i 行 PE，垂直 psum 流与行索引严格同步（见 sCOMPUTE 注释）。
+  val aRegs   = Reg(Vec(cfg.totalN, UInt((cfg.totalN * cfg.aEffW).W)))
+  val cpsRegs = Reg(Vec(cfg.totalN, UInt((cfg.totalN * cfg.cEffW).W)))
+
+  // C 输出收集 — 流式输出 de-skew（反向错峰对齐）
+  // 结果行以波前形式流出底部行簇：行 m 在列 c 于 (m + 2*totalN - 1 + c) 拍就绪，
+  // 各列逐列号错峰 1 拍。用 ShiftRegister 将列 c 延迟 (totalN-1-c) 拍，
+  // 使所有列对齐到最后一列（c = totalN-1）的时序后，一次性 push 一整行。
+  val cDeSkewed = (0 until cfg.totalN).map { c =>
+    val delay = cfg.totalN - 1 - c
+    if (delay > 0) ShiftRegister(io.hiveCOut(c), delay)
+    else io.hiveCOut(c)
+  }
+  // 对齐后的 valid：行 m 完整和 de-skew 后于 (m + 2*totalN) 拍对齐；
+  // validOut(0)（底部 ci=1 簇列 0）于拍 2*arrayN 起有效（ci skew + y 链寄存），
+  // 故需再延迟 totalN 拍才与行 0 数据对齐时刻（拍 2*totalN）一致。
+  // 注意延迟必须为 totalN 而非 totalN-1，否则 alignCnt=m 捕获行 m-1（整体错位一行）
+  val alignedValid = ShiftRegister(io.hiveValidOut(0), cfg.totalN)
+  // alignedValid 窗口内已出现的行数（行 m 在 alignCnt=m 拍推出），
+  // 用于截断尾部零填充拍，每 tile 只 push curTileM 行
+  val alignCnt     = RegInit(0.U(16.W))
+  val drainCounter = RegInit(0.U(16.W))
+
+  // ==========================================================================
+  // 默认输出驱动
+  // ==========================================================================
+  io.busy := state =/= sIDLE
+  io.done := false.B
+  io.err  := errState
+
+  io.cStoreGate := false.B
+
+  io.aPop.ready  := false.B
+  io.bPop.ready  := false.B
+  io.cPop.ready  := false.B
+  io.cPush.valid   := false.B
+  io.cPush.payload := 0.U
+
+  io.flushA := false.B
+  io.flushB := false.B
+  io.flushC := false.B
+
+  for (i <- 0 until cfg.totalN) {
+    io.hiveAIn(i)    := 0.U
+    io.hivePsumIn(i) := 0.U
+  }
+  io.hiveLoadH   := false.B
+  io.hiveLoadV   := false.B
+  io.hiveValidIn := false.B
+  io.hiveClear   := false.B
+
+  io.progress := doneTiles
+
+  // ==========================================================================
+  // C 输出收集逻辑（仅 sCOMPUTE 阶段，valid 窗口已覆盖全部结果流出）
+  // cDeSkewed + alignedValid 将各列错峰数据对齐后，一次性 push 一整行到 C buffer。
+  // ==========================================================================
+  when(alignedValid) {
+      io.cPush.valid   := true.B
+      io.cPush.payload := Cat(cDeSkewed.reverse)
+      // 时序不变量（多 pass partial sum 依赖的隐性假设）：
+      // 非首 pass 中 cPop 回灌窗口（counter < curTileM）恒早于 cPush 窗口
+      // （约 2*totalN 拍后结果才流到底部），pop/push 等量交替使 C buffer
+      // 占用恒定在 mTiles×totalN。FSM 不引入 stall，若 push 时 buffer 满
+      // （ready=0）会静默丢数：仿真由下方 assert 捕获，综合后由紧随的
+      // errState 兜底（置错并经 sDONE 退出，避免丢数后继续计算产生静默错误结果）
+      assert(io.cPush.ready, "HiveCoreExecutor: cPush valid but C buffer not ready (pop-before-push invariant violated, partial sum lost)")
+  }
+  // cPush 违约硬件级防护（综合后兜底，与上方仿真 assert 对应）：
+  // 容量公式放宽后生产环境不能再依赖仿真断言，违约拍置 errState 并经
+  // sDONE 退出（而非直回 sIDLE），保证顶层仍能收到带 err 标记的 resp。
+  // 仅改状态机，不反压 cPush 驱动逻辑（不引入 stall）
+  when( state =/= sIDLE & io.cPush.valid && !io.cPush.ready) {
+    errState := true.B
+    state    := sIDLE
+  }
+
+  // ==========================================================================
+  // FSM 主体 (Weight-Stationary: N→K→M)
+  // ==========================================================================
+  switch(state) {
+
+    // --- sIDLE: 等待 execute 脉冲 ---
+    is(sIDLE) {
+      curNTile := 0.U
+      curKTile := 0.U
+      curM := 0.U
+      doneTiles := 0.U
+      when(io.execute) {
+        // 计算 tile 数。注意：mTiles/kTiles 为 Reg，本拍 := 下一拍才生效，
+        // 故 depthOfCBufferUsed 必须用本拍推导的 newMTiles/newKTiles 计算，
+        // 否则会采样到未初始化寄存器的随机旧值，误触发容量错误回 idle
+        val newNTiles = (io.regFile.n(15, 0) + totalN.U - 1.U) / totalN.U
+        val newKTiles = (io.regFile.k(15, 0) + totalN.U - 1.U) / totalN.U
+        nTiles   := newNTiles
+        kTiles   := newKTiles
+        // 容量检查：C buffer 真实驻留量只有一组 partial sum（mTiles×totalN 行）。
+        // K > totalN 时非首 pass 的 pop（回灌）与 push 等量交替，占用恒定，
+        // 故 kTiles 不乘进公式（旧公式 mTiles×kTiles×totalN 会在 K 稍大时误报容量错误）
+        depthOfCBufferUsed := io.regFile.m
+        tileInterCnt := totalN.U - 1.U
+        // execute 起始拍清空 A/B buffer（RdOnly DMA 首个 push 至少晚一拍，安全）；
+        // flushA 仅允许在此拍拉高：aDma 内建 nTile 轮次连续供数，任何
+        // per-tile flush 都会丢弃已预取数据且 RdOnly 不重发 → 死锁。
+        // A 侧全局排空不变量仿真检查（仅仿真可见）：上次 execute 中 aDma
+        // push 总行数 = nTiles×kTiles×m = executor 消费总行数，新 execute
+        // 拍 FIFO 必已排空；非 0 说明供/消行数失配（padding 混入/丢数）
+        assert(io.aOccupancy === 0.U, "HiveCoreExecutor: A buffer not drained at execute pulse (previous run aDma push rows != executor consume rows)")
+        io.flushA := true.B
+        io.flushB := true.B
+        io.flushC := true.B
+        state    := sLOAD_B
+      }
+    }
+
+
+    // --- sLOAD_WEIGHT_PE: 从 B buffer pop 权重 → 加载到 HiveComb ---
+    // loadH 在整个加载窗口保持拉高（fmt/rnd 配置需时间经阵列横向传播）；
+    // loadV 跟随 bPop 数据有效性：B buffer 暂无数据时 loadV 自然暂停，
+    // RdOnly DMA 喂数到位后自动恢复，无需固定每 2 拍一次的节流。
+    is(sLOAD_B) {
+      io.hiveLoadH := true.B               // 配置加载，整个窗口拉高
+      io.hiveLoadV := io.bPop.fire
+      io.bPop.ready := true.B
+
+      for (i <- 0 until cfg.totalN) {
+        io.hivePsumIn(i) := io.bPop.payload(cfg.bW * (i + 1) - 1, cfg.bW * i)
+      }
+
+      // 已喂权重行数（仅在 bPop 实际 fire 时递增，天然支持反压暂停）
+      when(io.bPop.fire) {
+        when(tileInterCnt =/= 0.U){
+          tileInterCnt := tileInterCnt - 1.U
+        }.otherwise{
+          tileInterCnt := totalN.U - 1.U
+          state := sLOAD_A
+        }
+      }
+
+    }
+
+    is(sLOAD_A){
+      val needPartialSum = curKTile > 0.U
+
+      //当需要paritalsum的时候必须占用c口buffer的读出口，因此需要等到CDMA已经将cbuffer搬空让出读口权限
+      val feed = (cBufferReservedAtleastTotalN) & Mux(needPartialSum, cStoreGateReg === false.B, true.B)
+
+      io.aPop.ready := feed
+      io.cPop.ready := feed & needPartialSum
+      
+      io.hiveValidIn := io.aPop.fire //当需要paritialsum的时候cbufer一定是有效可以被读出
+      for(i <- 0 until cfg.totalN){
+        io.hiveAIn(i) := io.aPop.payload(cfg.aW * (i + 1) - 1, cfg.aW * i)
+        io.hivePsumIn(i) := io.cPop.payload(cfg.cW * (i + 1) - 1, cfg.cW * i)
+      }
+      
+      when(io.aPop.fire){
+        when(curM < io.regFile.m - 1.U){
+          curM := curM + 1.U
+        }.otherwise{
+          curM := 0.U
+          state := sNEXT_NK_TILE
+        }
+      }
+    }
+
+    is(sNEXT_NK_TILE){
+      doneTiles := doneTiles + 1.U
+      when(curKTile < kTiles){
+        curKTile := curKTile + 1.U
+        state := sLOAD_B
+      }.otherwise{
+        curKTile := 0.U
+        cStoreGateReg := true.B
+        when(curNTile < nTiles){
+          curNTile := curNTile + 1.U
+          state := sLOAD_B
+        }.otherwise{
+          curNTile := 0.U
+          state := sDRAIN
+        }
+      }
+ 
+    }
+    
+
+    // --- sDRAIN: 等待剩余输出收集完毕 ---
+    is(sDRAIN) {
+      for (i <- cfg.totalN - 1 to 1 by -1) {
+        aRegs(i) := aRegs(i - 1)
+      }
+      aRegs(0) := 0.U
+      val anyNewValid = io.hiveValidOut.asUInt.orR
+  
+      when(anyNewValid) {
+        drainCounter := 0.U
+      }.otherwise {
+        drainCounter := drainCounter + 1.U
+      }
+
+      // 超时退出: 连续 2*totalN 周期无新 valid → 强制退出
+      when(!anyNewValid & !io.dmaCBusy) {
+        io.done := true.B
+        state := sIDLE
+      }
+    }
+
+    
   }
 }
