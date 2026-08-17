@@ -62,14 +62,18 @@ class HiveCell(
     // 输入控制（标量）
     val clear   = Input(Bool())
     
-    val validIn = Input(Bool())
+    val validIn  = Input(Vec(n, Bool()))
+    val validInV = Input(Vec(n, Bool()))
     val fmtIn   = Input(DataFormat())    
     val rndIn   = Input(RoundingMode())
     val loadHIn = Input(Bool())
     val loadVIn = Input(Bool())
+    val loadVInLock = Input(Bool())
 
     // 输出控制
+    val loadVOut = Output(Vec(n, Bool()))
     val validOut = Output(Vec(n, Bool()))  // per-row（计算阶段结果有效）
+    val validOutV = Output(Vec(n, Bool()))
     val fmtOut   = Output(DataFormat())    // 标量
     val rndOut   = Output(RoundingMode())  // 标量
   })
@@ -82,6 +86,7 @@ class HiveCell(
     for (y <- 0 until n) {
       pes(x)(y).io.loadHIn := io.loadHIn  
       pes(x)(y).io.clear   := io.clear      
+      pes(x)(y).io.loadVInLock := io.loadVInLock
 
       if (y == 0) {
         // valid 沿 x+y 二维传播：x==0 行首接 io.validIn，x>0 行首从上一 x 行
@@ -90,20 +95,16 @@ class HiveCell(
         // （若取上一行 y 链末端 pes(x-1)(n-1)，延迟变为 x*n+y，valid 严重滞后
         // 数据，深层 PE 在 valid 到达时 a 数据早已排空，累加被清零 → 结果全 0；
         // 若只在 y 方向传播并广播所有 x 行，cj>0 簇的 valid 会滞后数据 x 拍）
-        if (x == 0) {
-          pes(x)(y).io.validIn := io.validIn
-        } else {
-          pes(x)(y).io.validIn := pes(x - 1)(0).io.validOut
-        }
         pes(x)(y).io.fmtIn   := io.fmtIn
         pes(x)(y).io.rndIn   := io.rndIn
+        pes(x)(y).io.validIn := io.validIn(x)
         pes(x)(y).io.aIn     := io.aIn(x)  // per-row 数据
-
       } else {
         // 传播：从左侧 PE 获取（RegNext 链）
-        pes(x)(y).io.validIn := pes(x)(y-1).io.validOut
+
         pes(x)(y).io.fmtIn   := pes(x)(y-1).io.fmtOut
         pes(x)(y).io.rndIn   := pes(x)(y-1).io.rndOut
+        pes(x)(y).io.validIn := pes(x)(y-1).io.validOut
         pes(x)(y).io.aIn     := pes(x)(y-1).io.aOut
       }
 
@@ -122,13 +123,18 @@ class HiveCell(
   //     loadV 广播到所有 PE ---
   for (y <- 0 until n) {
     for (x <- 0 until n) {
-      pes(x)(y).io.loadVIn := io.loadVIn
       if (x == 0) {
+        pes(x)(y).io.loadVIn := io.loadVIn
+        pes(x)(y).io.validInV := io.validInV(y)
         pes(x)(y).io.psumIn := io.psumIn(y)
       } else {
+        pes(x)(y).io.loadVIn := pes(x-1)(y).io.loadVOut
+        pes(x)(y).io.validInV := pes(x-1)(y).io.validOutV
         pes(x)(y).io.psumIn := pes(x-1)(y).io.psumOut
       }
       if (x == n-1) {
+        io.loadVOut(y) := pes(x)(y).io.loadVOut
+        io.validOutV(y) := pes(x)(y).io.validOutV
         io.cOut(y) := pes(x)(y).io.psumOut
       }
     }

@@ -77,12 +77,16 @@ class HiveWorker(
     // 水平加载（配置）：由 HiveCell 广播到所有 PE，无水平传播输出
     val loadHIn  = Input(Bool())
 
-    // 垂直加载（仅权重）：由 HiveCell 广播到所有 PE，无垂直传播输出
+    // 垂直加载（仅权重）：由 HiveCell 垂直传递，拉高期间传递
+    val loadVInLock = Input(Bool()) //垂直锁存,脉冲
     val loadVIn  = Input(Bool())
+    val loadVOut  = Output(Bool())
 
     // 控制（水平传播：RegNext → 右侧 HiveWorker）
     val validIn  = Input(Bool())
     val validOut = Output(Bool())
+    val validInV  = Input(Bool())
+    val validOutV = Output(Bool())
 
     // 格式（水平传播：RegNext → 右侧 HiveWorker）
     val fmtIn  = Input(DataFormat())
@@ -111,7 +115,7 @@ class HiveWorker(
   // --- wReg / fmtReg / rndReg 锁存逻辑 ---
   // 权重仅经垂直加载（loadV 上升沿，从 psumIn 低位）；水平加载（loadH）仅锁存配置 fmt/rnd。
   // 二者独立：加载权重时同时拉高 loadH（刷新配置）与 loadV（锁存权重）。
-  when(io.loadVIn) {
+  when(io.loadVInLock) {
     wReg := io.psumIn(bW - 1, 0)
   }
   when(io.loadHIn) {
@@ -152,6 +156,8 @@ class HiveWorker(
 
   // --- 控制传播 ---
   io.validOut := RegNext(io.validIn, false.B)
+  io.validOutV := RegNext(io.validInV, false.B)
+  io.loadVOut  := RegNext(io.loadVIn, false.B)
   io.fmtOut   := RegNext(io.fmtIn, DataFormat.INT8)
   io.rndOut   := RegNext(io.rndIn, RoundingMode.RNE)
 }

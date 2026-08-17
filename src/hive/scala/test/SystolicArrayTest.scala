@@ -42,7 +42,9 @@ class SystolicArrayTest extends AnyFlatSpec with Matchers {
       // === Initialize ===
       dut.io.loadHIn.poke(false.B)
       dut.io.loadVIn.poke(false.B)
-      dut.io.validIn.poke(false.B)
+      // 新接口：validIn/validInV 均为 Vec(n, Bool())（水平/垂直方向逐行/逐列）
+      for (i <- 0 until n) { dut.io.validIn(i).poke(false.B) }
+      for (j <- 0 until n) { dut.io.validInV(j).poke(false.B) }
       dut.io.fmtIn.poke(fmt)
       dut.io.rndIn.poke(RoundingMode.RNE)
       for (i <- 0 until n) dut.io.aIn(i).poke(0.U)
@@ -59,7 +61,8 @@ class SystolicArrayTest extends AnyFlatSpec with Matchers {
         for (j <- 0 until n) dut.io.psumIn(j).poke(wVal)
         dut.io.fmtIn.poke(fmt)
         dut.io.rndIn.poke(RoundingMode.RNE)
-        dut.io.validIn.poke(false.B)
+        for (i <- 0 until n) { dut.io.validIn(i).poke(false.B) }
+        for (j <- 0 until n) { dut.io.validInV(j).poke(false.B) }
         dut.io.clear.poke(false.B)
         dut.clock.step()
       }
@@ -67,7 +70,8 @@ class SystolicArrayTest extends AnyFlatSpec with Matchers {
       // === Phase 2: Drain loadV（保持 psumIn=权重直到 loadV 沿 x 链排空）===
       dut.io.loadHIn.poke(false.B)
       dut.io.loadVIn.poke(false.B)
-      dut.io.validIn.poke(false.B)
+      for (i <- 0 until n) { dut.io.validIn(i).poke(false.B) }
+      for (j <- 0 until n) { dut.io.validInV(j).poke(false.B) }
       for (i <- 0 until n) dut.io.aIn(i).poke(0.U)
       for (j <- 0 until n) dut.io.psumIn(j).poke(wVal)
       for (_ <- 0 until (n + 2)) dut.clock.step()
@@ -90,7 +94,8 @@ class SystolicArrayTest extends AnyFlatSpec with Matchers {
         prevVO0 = false
 
         for (t <- 0 until totalPassIter) {
-          dut.io.validIn.poke((t <= n).B)
+          for (i <- 0 until n) { dut.io.validIn(i).poke((t <= n).B) }
+          for (j <- 0 until n) { dut.io.validInV(j).poke((t <= n).B) }
           dut.io.fmtIn.poke(fmt)
           dut.io.rndIn.poke(RoundingMode.RNE)
           dut.io.loadHIn.poke(false.B)
@@ -124,7 +129,8 @@ class SystolicArrayTest extends AnyFlatSpec with Matchers {
       }
 
       // === Phase 5: Final drain ===
-      dut.io.validIn.poke(false.B)
+      for (i <- 0 until n) { dut.io.validIn(i).poke(false.B) }
+      for (j <- 0 until n) { dut.io.validInV(j).poke(false.B) }
       for (j <- 0 until n) dut.io.psumIn(j).poke(0.U)
       dut.io.loadHIn.poke(false.B)
       dut.io.loadVIn.poke(false.B)

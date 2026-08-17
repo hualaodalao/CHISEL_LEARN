@@ -278,6 +278,7 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   hiveComb.io.aIn      := executor.io.hiveAIn
   hiveComb.io.psumIn   := executor.io.hivePsumIn
   hiveComb.io.loadHIn  := executor.io.hiveLoadH
+  hiveComb.io.loadVInLock  := executor.io.hiveLoadVLock
   hiveComb.io.loadVIn  := executor.io.hiveLoadV
   hiveComb.io.validIn  := executor.io.hiveValidIn
   hiveComb.io.fmtIn    := regFile.fmt

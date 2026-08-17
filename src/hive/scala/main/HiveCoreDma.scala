@@ -127,49 +127,45 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   io.busy := state =/= sIDLE
   io.err  := errReg
 
-  // ==========================================================================
-  // start 重新装载（任意状态生效，置于 switch 之前：Chisel last-connect
-  // 语义下覆盖本拍 switch 内的任何状态/计数更新）。
-  // 用途：Executor 异常路径（容量检查失败/cPush 违约）回 idle 后，下次
-  // EXECUTE 的 start 必须能强制重启已卡在 sREQ_EXT/sTRANSFER 的本 DMA，
-  // 否则会携带旧锁存参数继续运行 → 静默数据错。
-  // 安全性：脱离 sTRANSFER 后外部 rsp.ready/bufPush.valid 自然拉低，无协议违约
-  // ==========================================================================
-  when(io.start) {
-    state  := sTRANSFER
-    errReg := false.B
-    lineCounter := 0.U  
-    
-    when(io.isA) {
-      // A 矩阵：三级遍历「nTile 外 → kTile 中 → M 内」。内层扫实际 M 行
-      // （regFile.m，边界感知不含 padding 行），中层扫 kTile 个 K tile，
-      // 外层共 nTile 轮（每轮结束 curAddr 复位回 aAddr）。Executor 每
-      // K pass 只消费实际 M 行，若按 mTile*totalN 扫描会把 padding 行混入 FIFO
-      curAddr   := io.regFile.aAddr
-      colAddr   := io.calcConfig.aColTileAddressOffset
-      rowStep   := io.calcConfig.aRowAddressOffset
-      lineTarget  := io.regFile.m
 
-    }.otherwise {
-      //B 矩阵是块内降序
-      
-      // B 矩阵：三级遍历「N 外 → kTile 中 → 块内行降序」。
-      // 权重下沉协议下 PE(x,y) 最终锁存「最后供数行 - x」，每个 kTile 块
-      // 必须按 K 行降序供数（先读块内最高行），executor 顺序 pop 供数后
-      // 才能使 PE(x,y).wReg = B[kTile*totalN + x][y]（正序落位，标准 GEMM）。
-      // 起始地址 = 块内最高行；块内每拍 -bRowOffset；块间用预计算跳转量。
-      curAddr := io.regFile.bAddr + (cfg.totalN - 1).U * io.calcConfig.bRowAddressOffset
-      colAddr   := io.calcConfig.bColTileAddressOffset + (cfg.totalN - 1).U * io.calcConfig.bRowAddressOffset
-      rowStep   := io.calcConfig.bRowAddressOffset
-      lineTarget  := cfg.totalN.U
-      bNextKTileAddressOffset := (cfg.totalN * 2 - 1).U * io.calcConfig.bRowAddressOffset //这里乘以2的原因是B矩阵是降序读取，那么下一个k维tile需要增加两个
-
-    }
-  }
 
   switch(state) {
     // --- sIDLE: 等待 start（锁存逻辑在上方统一处理，本状态无动作） ---
-    is(sIDLE) { }
+    is(sIDLE) {
+       errReg := false.B
+       lineCounter := 0.U  
+      
+      when(io.isA) {
+          // A 矩阵：三级遍历「nTile 外 → kTile 中 → M 内」。内层扫实际 M 行
+          // （regFile.m，边界感知不含 padding 行），中层扫 kTile 个 K tile，
+          // 外层共 nTile 轮（每轮结束 curAddr 复位回 aAddr）。Executor 每
+          // K pass 只消费实际 M 行，若按 mTile*totalN 扫描会把 padding 行混入 FIFO
+          curAddr   := io.regFile.aAddr
+          colAddr   := io.calcConfig.aColTileAddressOffset
+          rowStep   := io.calcConfig.aRowAddressOffset
+          lineTarget  := io.regFile.m
+
+        }.otherwise {
+          //B 矩阵是块内降序
+          
+          // B 矩阵：三级遍历「N 外 → kTile 中 → 块内行降序」。
+          // 权重下沉协议下 PE(x,y) 最终锁存「最后供数行 - x」，每个 kTile 块
+          // 必须按 K 行降序供数（先读块内最高行），executor 顺序 pop 供数后
+          // 才能使 PE(x,y).wReg = B[kTile*totalN + x][y]（正序落位，标准 GEMM）。
+          // 起始地址 = 块内最高行；块内每拍 -bRowOffset；块间用预计算跳转量。
+          curAddr := io.regFile.bAddr + (cfg.totalN - 1).U * io.calcConfig.bRowAddressOffset
+          colAddr   := io.calcConfig.bColTileAddressOffset + (cfg.totalN - 1).U * io.calcConfig.bRowAddressOffset
+          rowStep   := io.calcConfig.bRowAddressOffset
+          lineTarget  := cfg.totalN.U
+          bNextKTileAddressOffset := (cfg.totalN * 2 ).U * io.calcConfig.bRowAddressOffset //这里乘以2的原因是B矩阵是降序读取，那么下一个k维tile需要增加两个
+
+      }
+      
+      when(io.start){
+        state  := sTRANSFER
+      }
+
+    }
 
     is(sTRANSFER){
       when(io.dmaExtRdIF.req.fire){
@@ -189,36 +185,44 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
     // --- sTRANSFER: 收数据 push buffer，推进地址与 tile 索引 ---
     is(sNEXT_COL) {
       when(io.isA) {
-        when(nCnt === io.calcConfig.nTile - 1.U){
-          state := sDONE
-        }.otherwise{
-          nCnt := nCnt + 1.U
-          when(kCnt === io.calcConfig.kTile - 1.U){ 
-            curAddr := io.regFile.aAddr 
-            colAddr := io.calcConfig.aColTileAddressOffset
-            kCnt := 0.U
-          }.otherwise{
-            curAddr := io.regFile.aAddr + colAddr
-            colAddr := colAddr + io.calcConfig.aColTileAddressOffset
-            kCnt := kCnt + 1.U
-          }
-          state := sTRANSFER
-        }
-      }.otherwise {
+        when(kCnt === io.calcConfig.kTile - 1.U){
+          curAddr := io.regFile.aAddr
+          colAddr := io.calcConfig.aColTileAddressOffset
+          kCnt := 0.U
           when(nCnt === io.calcConfig.nTile - 1.U){
-              state := sDONE
+            state := sDONE
           }.otherwise{
             nCnt := nCnt + 1.U
-            when(kCnt === io.calcConfig.kTile - 1.U){
-              curAddr := io.regFile.bAddr + colAddr 
-              colAddr := colAddr + io.calcConfig.bColTileAddressOffset
-              kCnt := 0.U
-            }.otherwise{
-              curAddr := curAddr + bNextKTileAddressOffset
-              kCnt := kCnt + 1.U
-            }
             state := sTRANSFER
           }
+          
+        }.otherwise{
+          curAddr := io.regFile.aAddr + colAddr
+          colAddr := colAddr + io.calcConfig.aColTileAddressOffset
+          kCnt := kCnt + 1.U
+          state := sTRANSFER
+        }
+        
+        
+        
+      }.otherwise {
+        
+        when(kCnt === io.calcConfig.kTile - 1.U){
+          when(nCnt === io.calcConfig.nTile - 1.U){
+            state := sDONE
+          }.otherwise{
+            kCnt := kCnt + 0.U
+            curAddr := io.regFile.bAddr + colAddr
+            colAddr := colAddr + io.calcConfig.bColTileAddressOffset
+            nCnt := nCnt + 1.U
+            state := sTRANSFER
+          }
+        }.otherwise{
+            kCnt := kCnt + 1.U
+            curAddr := curAddr + bNextKTileAddressOffset
+            state := sTRANSFER
+        }
+ 
       }
     }
     
@@ -326,7 +330,7 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0) extends Module {
   io.dmaExtWrIF.req.payload.addr         := curAddr
   io.dmaExtWrIF.req.payload.data         := io.bufPop.payload
   io.dmaExtWrIF.rsp.ready        := true.B
-  io.bufPop.ready                := (state === sTRANSFER_M) && io.dmaExtWrIF.req.ready
+  io.bufPop.ready                := (state === sTRANSFER_M) & io.dmaExtWrIF.req.ready
 
   io.done := false.B
   io.busy := state =/= sIDLE

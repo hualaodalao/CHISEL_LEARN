@@ -14,7 +14,9 @@ class SystolicArrayDebugSpec extends AnyFlatSpec with Matchers {
       // Init + Weight Load + Drain + Clear
       dut.io.loadHIn.poke(false.B)
       dut.io.loadVIn.poke(false.B)
-      dut.io.validIn.poke(false.B)
+      // 新接口：validIn/validInV 均为 Vec(n, Bool())（水平/垂直方向逐行/逐列）
+      for (i <- 0 until n) { dut.io.validIn(i).poke(false.B) }
+      for (j <- 0 until n) { dut.io.validInV(j).poke(false.B) }
       dut.io.fmtIn.poke(fmt)
       dut.io.rndIn.poke(RoundingMode.RNE)
       for (i <- 0 until n) { dut.io.aIn(i).poke(0.U) }
@@ -27,7 +29,8 @@ class SystolicArrayDebugSpec extends AnyFlatSpec with Matchers {
         dut.io.loadHIn.poke(true.B)
         dut.io.loadVIn.poke(true.B)
         for (i <- 0 until n) { dut.io.aIn(i).poke(0.U) }
-        dut.io.validIn.poke(false.B)
+        for (i <- 0 until n) { dut.io.validIn(i).poke(false.B) }
+        for (j <- 0 until n) { dut.io.validInV(j).poke(false.B) }
         for (j <- 0 until n) { dut.io.psumIn(j).poke(wVal) }
         dut.io.clear.poke(false.B); dut.clock.step()
       }
@@ -35,7 +38,8 @@ class SystolicArrayDebugSpec extends AnyFlatSpec with Matchers {
       // Drain loadV（保持 psumIn=权重直到排空）
       dut.io.loadHIn.poke(false.B)
       dut.io.loadVIn.poke(false.B)
-      dut.io.validIn.poke(false.B)
+      for (i <- 0 until n) { dut.io.validIn(i).poke(false.B) }
+      for (j <- 0 until n) { dut.io.validInV(j).poke(false.B) }
       for (i <- 0 until n) { dut.io.aIn(i).poke(0.U) }
       for (j <- 0 until n) { dut.io.psumIn(j).poke(wVal) }
       for (_ <- 0 until (n + 2)) dut.clock.step()
@@ -49,7 +53,8 @@ class SystolicArrayDebugSpec extends AnyFlatSpec with Matchers {
       val prevVO = Array.fill(n)(false)
       println("=== loadVIn vertical load: pass with n=2 cycles ===")
       for (t <- 0 until 8) {
-        dut.io.validIn.poke((t < n).B)
+        for (i <- 0 until n) { dut.io.validIn(i).poke((t < n).B) }
+        for (j <- 0 until n) { dut.io.validInV(j).poke((t < n).B) }
         dut.io.fmtIn.poke(fmt); dut.io.rndIn.poke(RoundingMode.RNE)
         dut.io.loadHIn.poke(false.B); dut.io.loadVIn.poke(false.B)
         for (i <- 0 until n) {
@@ -59,10 +64,11 @@ class SystolicArrayDebugSpec extends AnyFlatSpec with Matchers {
         for (j <- 0 until n) dut.io.psumIn(j).poke(0.U)
         dut.clock.step()
         val vo = (0 until n).map(i => dut.io.validOut(i).peek().litToBoolean)
+        val voV = (0 until n).map(j => dut.io.validOutV(j).peek().litToBoolean)
         val co = (0 until n).map(i => dut.io.cOut(i).peek().litValue)
         val rising = (0 until n).map(i => vo(i) && !prevVO(i))
         for (i <- 0 until n) prevVO(i) = vo(i)
-        println(f"  t=$t: vld=${t<n} | vOut=(${vo.mkString(",")}) cOut=(${co.mkString(",")}) rising=(${rising.mkString(",")})")
+        println(f"  t=$t: vld=${t<n} | vOut=(${vo.mkString(",")}) vOutV=(${voV.mkString(",")}) cOut=(${co.mkString(",")}) rising=(${rising.mkString(",")})")
       }
 
       // Also test with n+1=3 validIn cycles
@@ -70,7 +76,8 @@ class SystolicArrayDebugSpec extends AnyFlatSpec with Matchers {
       for (i <- 0 until n) prevVO(i) = false
       println("=== loadVIn vertical load: pass with n+1=3 cycles ===")
       for (t <- 0 until 10) {
-        dut.io.validIn.poke((t <= n).B)
+        for (i <- 0 until n) { dut.io.validIn(i).poke((t <= n).B) }
+        for (j <- 0 until n) { dut.io.validInV(j).poke((t <= n).B) }
         dut.io.fmtIn.poke(fmt); dut.io.rndIn.poke(RoundingMode.RNE)
         dut.io.loadHIn.poke(false.B); dut.io.loadVIn.poke(false.B)
         for (i <- 0 until n) {
@@ -81,10 +88,11 @@ class SystolicArrayDebugSpec extends AnyFlatSpec with Matchers {
         for (j <- 0 until n) dut.io.psumIn(j).poke(0.U)
         dut.clock.step()
         val vo = (0 until n).map(i => dut.io.validOut(i).peek().litToBoolean)
+        val voV = (0 until n).map(j => dut.io.validOutV(j).peek().litToBoolean)
         val co = (0 until n).map(i => dut.io.cOut(i).peek().litValue)
         val rising = (0 until n).map(i => vo(i) && !prevVO(i))
         for (i <- 0 until n) prevVO(i) = vo(i)
-        println(f"  t=$t: vld=${t<=n} | vOut=(${vo.mkString(",")}) cOut=(${co.mkString(",")}) rising=(${rising.mkString(",")})")
+        println(f"  t=$t: vld=${t<=n} | vOut=(${vo.mkString(",")}) vOutV=(${voV.mkString(",")}) cOut=(${co.mkString(",")}) rising=(${rising.mkString(",")})")
       }
     }
   }

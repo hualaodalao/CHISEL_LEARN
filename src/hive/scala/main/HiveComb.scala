@@ -47,6 +47,7 @@
 
 import chisel3._
 import chisel3.util._
+import chisel3.dontTouch
 
 class HiveComb(
   arrayN: Int = 8,
@@ -74,11 +75,12 @@ class HiveComb(
 
   val io = IO(new Bundle {
     val aIn    = Input(Vec(totalN, UInt(aEffW.W)))
-    val aOut   = Output(Vec(totalN, UInt(aEffW.W)))
+    //val aOut   = Output(Vec(totalN, UInt(aEffW.W)))
     val psumIn = Input(Vec(totalN, UInt(cEffW.W)))
     val cOut   = Output(Vec(totalN, UInt(cEffW.W)))
 
     val loadHIn = Input(Bool())   // 水平加载（标量）
+    val loadVInLock = Input(Bool())   // 垂直加载（标量）
     val loadVIn = Input(Bool())   // 垂直加载（标量）
     val validIn = Input(Bool())   // 标量 validIn
     val fmtIn   = Input(DataFormat())
@@ -86,8 +88,9 @@ class HiveComb(
 
     val clear   = Input(Bool())
 
-    val validOut = Output(Vec(totalN, Bool()))
+    val validOut = Output(Bool())
   })
+
 
   // 子阵列
   val arrays = Seq.fill(clusterM, clusterM)(
@@ -101,53 +104,100 @@ class HiveComb(
   // 窗口与数据波前严格对齐。若只在 y 方向传播（广播所有 x 行），cj>0 簇的
   // valid 将滞后数据 (x_local) 拍，前几个深度的累加被错误门控
   // fmt/rnd 仅在 loadH 窗口锁存进 PE 配置寄存器，无需跟踪数据时序，直接广播
-  val validSkewedPerRow = (0 until clusterM).map { ci =>
-    val rowDelay = ci * arrayN
-    if (rowDelay == 0) io.validIn else ShiftRegister(io.validIn, rowDelay)
+  val validSkewedShiftRegisters = RegInit(VecInit(Seq.fill(clusterM * arrayN)(false.B)))
+  validSkewedShiftRegisters(0) := io.validIn
+  for(i <- 1 until clusterM*arrayN){
+      validSkewedShiftRegisters(i) := validSkewedShiftRegisters(i-1)
+  }
+  val validSkewedPerRow = WireInit(VecInit(Seq.fill(clusterM*arrayN)(false.B)))
+  val shiftEnableIn = validSkewedPerRow.reduceTree(_ || _)
+  for(i <- 0 until clusterM*arrayN){
+    if(i == 0){
+      validSkewedPerRow(0) := io.validIn
+    }
+    else{
+      validSkewedPerRow(i) := validSkewedShiftRegisters(i-1)
+    }
   }
 
+  //A skew
+  val aSkewedPerRow = WireInit(VecInit(Seq.fill(clusterM*arrayN)(0.U(aEffW.W))))  
+  dontTouch(aSkewedPerRow)
+  for(i <- 0 until clusterM*arrayN){
+    if(i == 0){
+      aSkewedPerRow(0) := io.aIn(0)
+    }
+    else{
+      val delay = i 
+      val aSkewedShiftRegisters = RegInit(VecInit(Seq.fill(delay)(0.U(aEffW.W))))
+      when(shiftEnableIn){
+        aSkewedShiftRegisters(0) := io.aIn(i)
+      }
+      for (j <- 1 until delay){
+        when(shiftEnableIn){
+          aSkewedShiftRegisters(j) := aSkewedShiftRegisters(j-1)
+        }
+      }
+      aSkewedPerRow(i) := aSkewedShiftRegisters(delay - 1)
+    }
+  }
+  //B skew
+  val bSkewedPerRow = WireInit(VecInit(Seq.fill(clusterM*arrayN)(0.U(cEffW.W))))
+  dontTouch(bSkewedPerRow)
+  for(i <- 0 until clusterM*arrayN){
+    if(i == 0){
+      bSkewedPerRow(0) := io.psumIn(0)
+    }
+    else{
+      val delay = i 
+      val bSkewedShiftRegisters = RegInit(VecInit(Seq.fill(delay)(0.U(cEffW.W))))
+      when(shiftEnableIn){
+        bSkewedShiftRegisters(0) := io.psumIn(i)
+      }
+      for (j <- 1 until delay){
+        when(shiftEnableIn){
+          bSkewedShiftRegisters(j) := bSkewedShiftRegisters(j-1)
+        }
+      }
+      when(io.loadVIn){
+        bSkewedPerRow(i) := io.psumIn(i)
+      }.otherwise{
+        bSkewedPerRow(i) := bSkewedShiftRegisters(delay - 1)
+      } 
+    }
+  }
+  
+  
   // 连接子阵列
   for (ci <- 0 until clusterM; cj <- 0 until clusterM) {
     val arr = arrays(ci)(cj)
 
     // --- clear：广播（无 skew） ---
     arr.io.clear := io.clear
-    
-    arr.io.loadHIn := io.loadHIn  
-    arr.io.loadVIn := io.loadVIn  
+    arr.io.loadHIn := io.loadHIn
+    arr.io.loadVInLock := io.loadVInLock
 
     // --- loadHIn/fmtIn/rndIn：loadH 广播（不再链式传播），fmt/rnd 仍逐列向右传播 ---
     if (cj == 0) {
-      arr.io.loadHIn := io.loadHIn
       arr.io.fmtIn   := io.fmtIn
       arr.io.rndIn   := io.rndIn
     } else {
-      arr.io.loadHIn := io.loadHIn
       arr.io.fmtIn   := arrays(ci)(cj - 1).io.fmtOut
       arr.io.rndIn   := arrays(ci)(cj - 1).io.rndOut
     }
 
-    // loadV：广播到所有子阵列（不再经 loadVOut 链式传播）
-    arr.io.loadVIn := io.loadVIn
-
-    // --- validIn：ci 方向行级 skew；cj 方向随数据链级联 ---
-    // aIn 经左侧子阵列 aOut 链延迟 arrayN 拍，valid 必须同步级联，
-    // 否则 cj>0 子阵列的 valid 窗口与数据错位
-    if (cj == 0) {
-      arr.io.validIn := validSkewedPerRow(ci)
-    } else {
-      arr.io.validIn := arrays(ci)(cj - 1).io.validOut(0)
-    }
-
+    
     // --- 激活数据 aIn：per-row，直连（skew 由外部 feeder 负责） ---
     for (r <- 0 until arrayN) {
       val globalRow = ci * arrayN + r
       if (cj == 0) {
         // 首列：直连顶层输入。计算阶段要求外部已按「行 i 延迟 i 拍」错峰供数；
         // 加载阶段本就不需要 skew，两种阶段统一为直连
-        arr.io.aIn(r) := io.aIn(globalRow)
+        arr.io.validIn(r) := validSkewedPerRow(globalRow)
+        arr.io.aIn(r) := aSkewedPerRow(globalRow)
       } else {
         // 非首列：从左侧子阵列获取
+        arr.io.validIn(r) := arrays(ci)(cj-1).io.validOut(r)
         arr.io.aIn(r) := arrays(ci)(cj-1).io.aOut(r)
       }
     }
@@ -162,24 +212,47 @@ class HiveComb(
         // 注入 partial sum 作为累加基底（cpsRegs 已按行 i 延迟 i 拍 skew）。
         // 非回灌窗口（首 pass 计算/sDRAIN/sLOAD）Executor 将 hivePsumIn 全置 0，
         // 直连不会引入意外数据
-        arr.io.psumIn(c) := io.psumIn(globalCol)
+        arr.io.validInV(c) := validSkewedPerRow(globalCol)
+        arr.io.psumIn(c) := bSkewedPerRow(globalCol)
+        arr.io.loadVIn := io.loadVIn
       } else {
         // 非首行：从上方子阵列获取
+        arr.io.loadVIn := arrays(ci-1)(cj).io.loadVOut(c)
+        arr.io.validInV(c) := arrays(ci-1)(cj).io.validOutV(c)
         arr.io.psumIn(c) := arrays(ci-1)(cj).io.cOut(c)
       }
     }
   }
 
   // --- 集群输出 ---
+  // c Deskwe
   // cOut/validOut 从底部行簇取值（psum 从上到下流动，结果在底部行）
+  val cOutAllValidOut = WireInit(VecInit(Seq.fill(clusterM * arrayN)(false.B)))
+  val cOutAllData = WireInit(VecInit(Seq.fill(clusterM * arrayN)(0.U(cEffW.W))))
+  val cOutShiftEn = WireInit(false.B)
+  cOutShiftEn := cOutAllValidOut.reduceTree(_ || _)
   for (cj <- 0 until clusterM; c <- 0 until arrayN) {
     val globalCol = cj * arrayN + c
-    io.cOut(globalCol)     := arrays(clusterM - 1)(cj).io.cOut(c)
-    io.validOut(globalCol) := arrays(clusterM - 1)(cj).io.validOut(c)
+    cOutAllValidOut(globalCol) := arrays(clusterM - 1)(cj).io.validOut(c)
+    cOutAllData(globalCol)     := arrays(clusterM - 1)(cj).io.cOut(c)
   }
-
-  // aOut：右侧 tile 列的子阵列输出
-  for (ci <- 0 until clusterM; r <- 0 until arrayN) {
-    io.aOut(ci * arrayN + r) := arrays(ci)(clusterM - 1).io.aOut(r)
+  for (i <- 0 until clusterM*arrayN){
+    val dly = clusterM * arrayN - 1 - i
+    if(dly == 0){
+      io.cOut(i) := cOutAllData(i)
+    }
+    else{
+      val cOutAllDataDly = RegInit(VecInit(Seq.fill(dly)(0.U(cEffW.W))))
+      cOutAllDataDly(0) := cOutAllData(i)
+      for (j <- 1 until dly){
+        when(cOutShiftEn){
+          cOutAllDataDly(j) := cOutAllDataDly(j-1)
+        }
+      }
+      io.cOut(i) := cOutAllDataDly(dly-1)
+    }
   }
+  io.validOut := arrays(clusterM - 1)(clusterM - 1).io.validOutV(arrayN - 1)
+  
+ 
 }
