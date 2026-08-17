@@ -211,7 +211,7 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
           when(nCnt === io.calcConfig.nTile - 1.U){
             state := sDONE
           }.otherwise{
-            kCnt := kCnt + 0.U
+            kCnt := 0.U
             curAddr := io.regFile.bAddr + colAddr
             colAddr := colAddr + io.calcConfig.bColTileAddressOffset
             nCnt := nCnt + 1.U

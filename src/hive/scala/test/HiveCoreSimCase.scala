@@ -21,7 +21,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
 
   // ========== 测试参数 ==========
   val M = 32
-  val N = 16
+  val N = 32
   val K = 32
 
   val A_BASE: Long = 0x00000000L
@@ -185,10 +185,13 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
     val cWriteLog = scala.collection.mutable.ArrayBuffer[(Long, BigInt)]()
 
     // --- DMA0 (A buffer) 期望地址序列：aDma 扫描 = nTile 外 → kTile 中 →
-    // 实际 M 行内；addr = aAddr + mIdx*aRowOff + kt*aColOff（aRowOff=0） ---
+    // 实际 M 行内；addr = aAddr + mIdx*aRowOff + kt*aColOff。
+    // 行步长与硬件 HiveCore calcConfig 新公式对齐：
+    // aRowAddressOffset := regFile.k*(aW/8)，stride 寄存器不参与
+    // （stride 相关代码用户后续自行删除） ---
     val aKTiles = (K + totalN - 1) / totalN
     val aNTiles = (N + totalN - 1) / totalN
-    val aRowOff = (aStride & 0xF).toLong
+    val aRowOff = K.toLong * (cfg.aW / 8)             // = regFile.k*(aW/8)
     val aColOff = totalN.toLong * (aEffW / 8)
     val expAAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
     for (_ <- 0 until aNTiles; kt <- 0 until aKTiles; m <- 0 until M)
@@ -196,7 +199,8 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
     val dma0TotalBeats = expAAddrSeq.size
     // beat 数据 = 行 m 的 kt 列切片（顺序与期望地址序列同下标）
     def genDma0Beat(idx: Int): BigInt = {
-      val kt = idx / M
+      // 各 nTile 轮重复供同一 A 行集，轮信息需模掉（与 genDma2WeightBeat 对称）
+      val kt = (idx % (aKTiles * M)) / M
       val row = idx % M
       var data = BigInt(0)
       for (i <- 0 until totalN) {
@@ -207,42 +211,53 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
       data
     }
 
-    // --- DMA2 (B buffer) 期望地址序列（按新 RdOnly 硬件行为逐拍推演） ---
-    // 硬件 B 路径：外层共 regFile.n 轮（终止判定 nCnt === regFile.n-1，非
-    // nTile），每轮内 kTile 块，块内恒 totalN 行降序（lineTarget=totalN）。
-    // 偏移不再用 stride 寄存器，由 HiveCore calcConfig 新公式直接推导：
-    //   bRowOff = regFile.n * (bW/8)；bColTileOff = totalN * (bW/8)
-    // 块起点序列：首块 = bAddr + (totalN-1)*bRowOff；其后第 r 块（r>=1）
-    // = bAddr + colAddr_r，colAddr 初值 = bColTileOff + (totalN-1)*bRowOff，
-    // 每轮 +bColTileOff（即块起点逐块 +bColTileOff，相邻块地址区间重叠）；
-    // 块内每拍 -bRowOff。
+    // --- DMA2 (B buffer) 期望地址序列（按新 RdOnly 硬件行为闭式推演） ---
+    // 硬件 B 路径（HiveCoreDma.scala）：外层共 nTile 轮（终止判定
+    // nCnt === calcConfig.nTile-1），每轮内 kTile 块，块内恒 totalN 行降序
+    // （lineTarget=totalN）。两套跳转机制：
+    //   轮内 kTile 跳转：curAddr += 2*totalN*bRowOff（跳转时刻 curAddr 已
+    //     多减一拍，等效块起点 + totalN*bRowOff）；
+    //   轮间 N tile 跳转：curAddr := bAddr + colAddr；colAddr += bColTileOff
+    //     （colAddr 初值 = bColTileOff + (totalN-1)*bRowOff，每轮一次）。
+    // 两套增量跳转的等价闭式：
+    //   blockStart(r, kt) = bAddr + r*bColTileOff + (totalN-1)*bRowOff
+    //                       + kt*totalN*bRowOff
+    // 块内每拍 -bRowOff（偏移由 HiveCore calcConfig 新公式直接推导：
+    // bRowOff = regFile.n*(bW/8)；bColTileOff = totalN*(bW/8)）。
     val bKTiles = (K + totalN - 1) / totalN
     val nTilesB = (N + totalN - 1) / totalN
-    val bRowOff = N.toLong * (cfg.bW / 8)             // = regFile.n*(bW/8) = 32
-    val bColTileOff = totalN.toLong * (cfg.bW / 8)    // = totalN*(bW/8) = 32
+    val bRowOff = N.toLong * (cfg.bW / 8)             // = regFile.n*(bW/8)
+    val bColTileOff = totalN.toLong * (cfg.bW / 8)    // = totalN*(bW/8)
     val expBAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
-    val bNRounds = N                                  // 硬件外层轮数 = regFile.n
-    // colAddr 语义：下一块起点；初值即第二块起点（首块由 curAddr 初值单独给）
-    var bColAddr = bColTileOff + (totalN - 1).toLong * bRowOff
-    var bBlockIdx = 0
-    for (_ <- 0 until bNRounds; _ <- 0 until bKTiles) {
-      val blockStart = if (bBlockIdx == 0) B_BASE + (totalN - 1).toLong * bRowOff
-      else { val s = B_BASE + bColAddr + (totalN - 1).toLong * bRowOff; bColAddr += bColTileOff; s }
-      bBlockIdx += 1
-      for (r <- 0 until totalN)
-        expBAddrSeq += blockStart - r * bRowOff
+    val bNRounds = nTilesB                            // 与 HiveCoreDma 终止判定 nCnt === nTile-1 对齐
+    for (r <- 0 until bNRounds; kt <- 0 until bKTiles) {
+      val blockStart = B_BASE + r.toLong * bColTileOff +
+        (totalN - 1).toLong * bRowOff + kt.toLong * totalN * bRowOff
+      for (r2 <- 0 until totalN)
+        expBAddrSeq += blockStart - r2 * bRowOff
     }
     val dma2TotalBeats = expBAddrSeq.size
-    // 首地址自检：本参数（B_BASE=0x100000, totalN=16, bRowOff=32）下
-    // 首块起点 = 0x100000 + 15*32 = 0x1001E0（块内最后一行）
-    require(expBAddrSeq.head == 0x1001E0L,
-      f"expBAddrSeq.head = 0x${expBAddrSeq.head}%X != expect 0x1001E0")
+    // 自检：首四块块起点（参数化闭式，N=32/K=32 时 = 0x1003c0/0x1007c0/
+    // 0x1003e0/0x1007e0；依赖 bKTiles >= 2，即 K > totalN）
+    require(bKTiles >= 2, s"B 期望序列自检要求 K($K) > totalN($totalN)")
+    require(expBAddrSeq(0) == B_BASE + (totalN - 1).toLong * bRowOff,
+      f"B block0 start 0x${expBAddrSeq(0)}%X mismatch")
+    require(expBAddrSeq(totalN) == B_BASE + (totalN - 1).toLong * bRowOff + totalN.toLong * bRowOff,
+      f"B block1 start 0x${expBAddrSeq(totalN)}%X mismatch")
+    require(expBAddrSeq(2 * totalN) == B_BASE + (totalN - 1).toLong * bRowOff + bColTileOff,
+      f"B block2 start 0x${expBAddrSeq(2 * totalN)}%X mismatch")
+    require(expBAddrSeq(3 * totalN) == B_BASE + (totalN - 1).toLong * bRowOff + bColTileOff + totalN.toLong * bRowOff,
+      f"B block3 start 0x${expBAddrSeq(3 * totalN)}%X mismatch")
+
     // beat 数据（与期望地址序列同下标）：nt 固定，块内 K 行降序
     def genDma2WeightBeat(idx: Int): BigInt = {
-      val nTileIdx = idx / K
-      var idxInBlock = idx % K
+      // 每轮（N tile）硬件扫 bKTiles*totalN 拍（块内恒 totalN 行）；
+      // nTileIdx 决定供数列区间（col = nTileIdx*totalN + i），不可模掉轮信息
+      val beatsPerRound = bKTiles * totalN
+      val nTileIdx = idx / beatsPerRound
+      var idxInBlock = idx % beatsPerRound
       val rowsLast = K - (bKTiles - 1) * totalN
-      var row = 0
+      var row = K    // 默认越界行（供数 0），对应末 kTile 块超 K 范围的 padding 拍
       var kt = 0
       var resolved = false
       while (kt < bKTiles && !resolved) {
@@ -424,10 +439,10 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
               cmdAddr should be(expBAddrSeq(dma2BeatsSent))
             }
             dut.io.dma2Ext.rsp.valid.poke(true.B)
-            // 硬件外层共 regFile.n 轮（本参数 16 轮×16 拍=256 拍），而逻辑
-            // 权重仅 bKTiles*totalN 拍（N<=totalN 时=16 拍）；各轮重复读同一
-            // 权重集，故供数按模取址
-            dut.io.dma2Ext.rsp.payload.data.poke(genDma2WeightBeat(dma2BeatsSent % (bKTiles * totalN)).U)
+            // 硬件外层共 nTile 轮（与 HiveCoreDma 终止判定 nCnt === nTile-1
+            // 对齐），每轮读不同 N tile 列区间，供数下标直接取全序列 beat 号
+            // （轮信息由 nTileIdx 体现，不可模掉）
+            dut.io.dma2Ext.rsp.payload.data.poke(genDma2WeightBeat(dma2BeatsSent).U)
             dut.io.dma2Ext.rsp.payload.err.poke(false.B)
             if (dma2BeatsSent < 4 || dma2BeatsSent == dma2TotalBeats - 1)
               println(f"[cycle=$cycle%6d] DMA2 weight beat #$dma2BeatsSent addr=0x$cmdAddr%X delivered")

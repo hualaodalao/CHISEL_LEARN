@@ -301,13 +301,13 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
         curKTile := curKTile + 1.U
         hasNext := true.B
         state := sDRAIN
-        //state := sLOAD_B
       }.otherwise{
         curKTile := 0.U
         cStoreGateReg := true.B
         when(curNTile < nTiles){
           curNTile := curNTile + 1.U
-          state := sLOAD_B
+          hasNext := true.B
+          state := sDRAIN
         }.otherwise{
           curNTile := 0.U
           state := sDRAIN
