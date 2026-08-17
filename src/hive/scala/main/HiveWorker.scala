@@ -132,7 +132,14 @@ class HiveWorker(
   }
 
   // --- 可重构 MAC（使用 fmtReg / rndReg） ---
-  val product = WorkUnit.multiply(io.aIn(aW - 1, 0), wReg, fmtReg, aW, bW, cEffW, supportedFmts, rndReg)
+  // WorkUnit 已由函数实现重构为独立 HiveWorkUnit Module（便于综合面积
+  // 占比分析）：纯组合 MAC，PE 级状态（wReg/psumReg/fmtReg/rndReg）仍留本模块
+  val workUnit = Module(new HiveWorkUnit(aW, bW, cW, supportedFmts))
+  workUnit.io.a    := io.aIn(aW - 1, 0)
+  workUnit.io.b    := wReg
+  workUnit.io.cReg := io.psumIn
+  workUnit.io.fmt  := fmtReg
+  workUnit.io.rnd  := rndReg
 
   val psumReg = RegInit(0.U(cEffW.W))
   when(io.clear) {
@@ -141,7 +148,7 @@ class HiveWorker(
     psumReg := io.psumIn
   }.elsewhen(io.validIn && fmtOk) {
     // 正常计算（使用 fmtReg 和 rndReg）
-    psumReg := WorkUnit.accumulate(io.psumIn, product, fmtReg, cEffW, supportedFmts, rndReg)
+    psumReg := workUnit.io.sum
   }
 
   // --- psumOut ---
