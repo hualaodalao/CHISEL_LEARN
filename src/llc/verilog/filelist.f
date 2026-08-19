@@ -1,0 +1,12 @@
+tagMem_512x152.sv
+LlcTagArray.sv
+dataMems_512x512.sv
+LlcDataArray.sv
+LlcPlru.sv
+LlcWayPartition.sv
+LlcMshr.sv
+LlcPipeline.sv
+LlcWbBuffer.sv
+LlcWriteMergeBuffer.sv
+LlcPerfCounters.sv
+Llc.sv

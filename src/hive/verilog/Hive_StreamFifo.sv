@@ -8,10 +8,10 @@ module Hive_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
   input          io_pop_ready,	// src/utils/Stream/Stream.scala:363:14
   output [255:0] io_pop_payload,	// src/utils/Stream/Stream.scala:363:14
   input          io_flush,	// src/utils/Stream/Stream.scala:363:14
-  output [7:0]   io_occupancy	// src/utils/Stream/Stream.scala:363:14
+  output [5:0]   io_occupancy	// src/utils/Stream/Stream.scala:363:14
 );
 
-  Hive_Queue128_UInt256 queue (	// src/utils/Stream/Stream.scala:371:21
+  Hive_Queue32_UInt256 queue (	// src/utils/Stream/Stream.scala:371:21
     .clock        (clock),
     .reset        (reset),
     .io_enq_valid (io_push_valid),

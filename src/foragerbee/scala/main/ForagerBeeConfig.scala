@@ -162,6 +162,10 @@ class FbCmd(cfg: ForagerBeeConfig) extends Bundle {
   /** 目的字节步长（COPY：同 srcStride 语义；TRANSPOSE：dstStride(0) = 转置输出行步长） */
   val dstStride = Vec(cfg.maxDims, UInt(cfg.addressWidth.W))
 
+  /** 源张量各维起始索引（子块裁剪：从源张量的 srcStartIdx 位置开始读取）。
+    * 默认全 0（等同于从原点开始），非裁剪场景不需要设置。 */
+  val srcStartIdx = Vec(cfg.maxDims, UInt(16.W))
+
   /** 源基址（须按 beat 对齐） */
   val srcAddr = UInt(cfg.addressWidth.W)
 

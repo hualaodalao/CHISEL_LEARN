@@ -144,7 +144,8 @@ case class FbTestCmd(
     im2colDilation: Seq[Int] = Seq(0, 0),
     im2colInShape: Seq[Int] = Seq(0, 0, 0),
     sgListAddr: BigInt = 0,
-    sgEntryCount: Int = 0
+    sgEntryCount: Int = 0,
+    srcStartIdx: Seq[Int] = Seq(0, 0, 0, 0)
 )
 
 class ForagerBeeSpec extends AnyFlatSpec with Matchers {
@@ -236,6 +237,10 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     // scatter/gather fields
     port.sgListAddr.poke(c.sgListAddr)
     port.sgEntryCount.poke(c.sgEntryCount.U)
+    // srcStartIdx fields
+    for (d <- 0 until port.srcStartIdx.length) {
+      port.srcStartIdx(d).poke(c.srcStartIdx.lift(d).getOrElse(0).U)
+    }
   }
 
   /** 跑一组命令直到全部 done（或超时 fail），返回 (done 列表, 内存终态)
@@ -1734,6 +1739,144 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       sgListAddr = BigInt(0x5000), sgEntryCount = 0)
     val (dones, _) = runForagerBee(sgCfg, Seq(cmd), mutable.HashMap.empty)
     dones shouldBe Seq((0xA4, true))
+  }
+
+  // ===================== sub-block 裁剪 (srcStartIdx) 用例 =====================
+
+  it should "2D sub-block crop: extract 3 rows × 16 cols from 32×8 matrix" in {
+    // 源：32×8 矩阵（行主序，1 byte/elem，行 stride=32）
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    for (r <- 0 until 8; c <- 0 until 32) {
+      mem(BigInt(r * 32 + c)) = ((r * 32 + c) & 0xFF).toByte
+    }
+    // 从 (row=2, col=4) 开始取 3 行 × 16 列子块
+    // cRowBytes = shape(0) * elemBytes = 16 * 1 = 16 ≡ 0 mod 16 ✔
+    val cmd = FbTestCmd(tag = 0xB1, op = "COPY", dimCount = 2,
+      shape = Seq(16, 3),                      // 16 cols × 3 rows
+      srcStride = Seq(16, 32),                 // dim0=16 bytes read, dim1=32 byte/row stride
+      dstStride = Seq(16, 16),                 // dst 紧凑：16 bytes/row
+      srcAddr = 0, dstAddr = 0x2000,
+      elemBytesLog2 = 0,
+      srcStartIdx = Seq(4, 2, 0, 0)            // col=4, row=2
+    )
+    val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
+    dones shouldBe Seq((0xB1, false))
+    // 验证：dst 应包含 src[row+2][col+4..col+19]
+    for (r <- 0 until 3; c <- 0 until 16) {
+      val expected = (((r + 2) * 32 + (c + 4)) & 0xFF).toByte
+      m(BigInt(0x2000 + r * 16 + c)) shouldBe expected
+    }
+  }
+
+  it should "2D sub-block crop with 4-byte elements (FP32)" in {
+    // 源：8×4 矩阵，FP32 (4 bytes/elem)，行 stride = 8*4 = 32 bytes
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    for (r <- 0 until 4; c <- 0 until 8) {
+      val v = (r * 8 + c) * 0x01010101 // 用重复字节模式填充便于验证
+      for (b <- 0 until 4) {
+        mem(BigInt(r * 32 + c * 4 + b)) = ((v >> (b * 8)) & 0xFF).toByte
+      }
+    }
+    // 从 (row=1, col=2) 取 4 cols × 2 rows 子块
+    // cRowBytes = shape(0) * elemBytes = 4 * 4 = 16 ≡ 0 mod 16 ✔
+    val cmd = FbTestCmd(tag = 0xB2, op = "COPY", dimCount = 2,
+      shape = Seq(4, 2),                       // 4 cols × 2 rows
+      srcStride = Seq(16, 32),                 // dim0=4*4=16 bytes read, dim1=32 byte/row stride
+      dstStride = Seq(16, 16),                 // dst 紧凑：4 elems * 4 bytes = 16 bytes/row
+      srcAddr = 0, dstAddr = 0x3000,
+      elemBytesLog2 = 2,                       // 4 bytes/elem
+      srcStartIdx = Seq(2, 1, 0, 0)           // col=2, row=1
+    )
+    val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
+    dones shouldBe Seq((0xB2, false))
+    // 验证：dst 应包含 row1..2, col2..5 的 FP32 数据
+    for (r <- 0 until 2; c <- 0 until 4) {
+      val srcR = r + 1; val srcC = c + 2
+      val v = (srcR * 8 + srcC) * 0x01010101
+      for (b <- 0 until 4) {
+        m(BigInt(0x3000 + r * 16 + c * 4 + b)) shouldBe ((v >> (b * 8)) & 0xFF).toByte
+      }
+    }
+  }
+
+  it should "3D sub-block crop: extract 16×2×2 from 32×4×4 tensor" in {
+    // 源：32×4×4 张量，1 byte/elem，总 512 字节
+    // stride: dim1=32 bytes (one row), dim2=128 bytes (one plane)
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    for (d2 <- 0 until 4; d1 <- 0 until 4; d0 <- 0 until 32) {
+      mem(BigInt(d2 * 128 + d1 * 32 + d0)) = ((d2 * 128 + d1 * 32 + d0) & 0xFF).toByte
+    }
+    // 从 (d0=2, d1=1, d2=1) 取 16×2×2 子块
+    // cRowBytes = shape(0) * 1 = 16 ≡ 0 mod 16 ✔
+    val cmd = FbTestCmd(tag = 0xB3, op = "COPY", dimCount = 3,
+      shape = Seq(16, 2, 2),                   // 16×2×2
+      srcStride = Seq(16, 32, 128),            // dim0=16 bytes read, dim1=32 stride, dim2=128 stride
+      dstStride = Seq(16, 16, 32),             // dst 紧凑：16 per row, 2 rows per plane
+      srcAddr = 0, dstAddr = 0x4000,
+      elemBytesLog2 = 0,
+      srcStartIdx = Seq(2, 1, 1, 0)            // d0从2开始, d1从1, d2从1
+    )
+    val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
+    dones shouldBe Seq((0xB3, false))
+    // 验证
+    for (d2 <- 0 until 2; d1 <- 0 until 2; d0 <- 0 until 16) {
+      val srcByte = (d2 + 1) * 128 + (d1 + 1) * 32 + (d0 + 2)
+      val expected = (srcByte & 0xFF).toByte
+      m(BigInt(0x4000 + d2 * 32 + d1 * 16 + d0)) shouldBe expected
+    }
+  }
+
+  it should "srcStartIdx all-zero fallback: identical to plain 2D strided copy" in {
+    // 与现有 2D strided copy 相同参数，显式设置 srcStartIdx 全 0
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val cols = 32; val rows = 4
+    for (r <- 0 until rows; c <- 0 until cols) {
+      mem(BigInt(r * 64 + c)) = ((r * cols + c) & 0xFF).toByte
+    }
+    val cmd = FbTestCmd(tag = 0xB4, op = "COPY", dimCount = 2,
+      shape = Seq(cols, rows),
+      srcStride = Seq(cols, 64),
+      dstStride = Seq(cols, cols),
+      srcAddr = 0, dstAddr = 0x2000,
+      elemBytesLog2 = 0,
+      srcStartIdx = Seq(0, 0, 0, 0)            // 显式全 0
+    )
+    val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
+    dones shouldBe Seq((0xB4, false))
+    for (r <- 0 until rows; c <- 0 until cols) {
+      m(BigInt(0x2000 + r * cols + c)) shouldBe (((r * cols + c) & 0xFF).toByte)
+    }
+  }
+
+  it should "TRANSPOSE + srcStartIdx: transpose 2×2 sub-block from 4×4 matrix" in {
+    // 源：4×4 矩阵，1 byte/elem
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    for (r <- 0 until 4; c <- 0 until 4) {
+      mem(BigInt(r * 16 + c)) = ((r * 4 + c) & 0xFF).toByte
+    }
+    // 从 (row=1, col=1) 取 2×2 子块并转置
+    // TRANSPOSE 模式：shape(0)=M(cols), shape(1)=N(rows)
+    // srcStride(1) = row stride in bytes
+    val cmd = FbTestCmd(tag = 0xB5, op = "TRANSPOSE", dimCount = 2,
+      shape = Seq(2, 2),                       // M=2 cols, N=2 rows
+      srcStride = Seq(2, 16),                  // dim0 unused info, dim1=16 byte row stride
+      dstStride = Seq(2, 0),                   // dstStride(0)=转置输出行步长(N=2 bytes), (1) ignored
+      srcAddr = 0, dstAddr = 0x5000,
+      elemBytesLog2 = 0,
+      srcStartIdx = Seq(1, 1, 0, 0)            // col=1, row=1
+    )
+    val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
+    dones shouldBe Seq((0xB5, false))
+    // 源子块 (row 1..2, col 1..2):
+    //   src[1][1]=5, src[1][2]=6
+    //   src[2][1]=9, src[2][2]=10
+    // 转置后 dst[col][row]:
+    //   dst[0][0]=5, dst[0][1]=9   (col=1 → dst row 0)
+    //   dst[1][0]=6, dst[1][1]=10  (col=2 → dst row 1)
+    m(BigInt(0x5000 + 0)) shouldBe 5.toByte   // dst[0][0] = src[1][1]
+    m(BigInt(0x5000 + 1)) shouldBe 9.toByte   // dst[0][1] = src[2][1]
+    m(BigInt(0x5000 + 2)) shouldBe 6.toByte   // dst[1][0] = src[1][2]
+    m(BigInt(0x5000 + 3)) shouldBe 10.toByte  // dst[1][1] = src[2][2]
   }
 }
 

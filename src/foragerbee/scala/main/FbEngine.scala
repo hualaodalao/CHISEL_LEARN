@@ -500,9 +500,20 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   // COPY/PERMUTE：地址计算
   // ==========================================================================
   val isPermute = if (supportsPermute) cmdReg.op === FbOp.PERMUTE else false.B
-  val srcRowAddrNormal = rowAddr(cmdReg.srcAddr, outerIdx, cmdReg.srcStride, None)
-  val srcRowAddrPerm   = rowAddr(cmdReg.srcAddr, outerIdx, cmdReg.srcStride, Some(cmdReg.permVec))
-  val srcRowAddr = Mux(isPermute, srcRowAddrPerm, srcRowAddrNormal)
+
+  // 源索引偏移向量：outerIdx + srcStartIdx（仅用于源地址计算）
+  val srcIdx = Wire(Vec(cfg.maxDims, UInt(16.W)))
+  for (d <- 0 until cfg.maxDims) {
+    srcIdx(d) := outerIdx(d) + cmdReg.srcStartIdx(d)
+  }
+  // dim0 起始偏移（字节）：strideSum 从 d=1 开始，dim0 需单独加偏移
+  val srcDim0Offset = (cmdReg.srcStartIdx(0) << cmdReg.elemBytesLog2).pad(wideW)
+
+  val srcRowAddrNormal = rowAddr(cmdReg.srcAddr, srcIdx, cmdReg.srcStride, None)
+  val srcRowAddrPerm   = rowAddr(cmdReg.srcAddr, srcIdx, cmdReg.srcStride, Some(cmdReg.permVec))
+  val srcRowAddrBase = Mux(isPermute, srcRowAddrPerm, srcRowAddrNormal)
+  // 加上 dim0 偏移（从子块起始列开始读取）
+  val srcRowAddr = (srcRowAddrBase.pad(wideW) +& srcDim0Offset)(addrW - 1, 0)
 
   // dstRowAddr：padActive 时使用 virtualRow + padBefore 偏移 + 外层维度贡献
   val dstRowAddrNormal = rowAddr(cmdReg.dstAddr, outerIdx, cmdReg.dstStride, None)
@@ -736,8 +747,9 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     val srcRowBeats = ((M * eb) +& (BB - 1).U) >> log2BB // 源行 beat 数（允许子 beat 行）
 
     // --- TRD —— 逐行读源行，beat 流喂入转置缓冲（FILL） ---
-    val srcRowIdx = rb * T.U + fillRow
-    val trRowAddr = (cmdReg.srcAddr.pad(wideW) +& (srcRowIdx * cmdReg.srcStride(1)).pad(wideW))(addrW - 1, 0)
+    val srcRowIdx = rb * T.U + fillRow + cmdReg.srcStartIdx(1)
+    val trDim0ByteOff = (cmdReg.srcStartIdx(0) << cmdReg.elemBytesLog2).pad(wideW)
+    val trRowAddr = (cmdReg.srcAddr.pad(wideW) +& (srcRowIdx * cmdReg.srcStride(1)).pad(wideW) +& trDim0ByteOff)(addrW - 1, 0)
     val trAddrCur = (trRowAddr.pad(wideW) +& (trBeatOff << log2BB).pad(wideW))(addrW - 1, 0)
     val trRemRow = srcRowBeats - trBeatOff
     val trSeg = trRemRow.min(cfg.maxBurstLen.U)

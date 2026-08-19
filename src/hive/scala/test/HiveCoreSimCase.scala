@@ -144,7 +144,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
       cBufferDepth = 2048,
       aW = 16,
       bW = 16,
-      cW = 32
+      cW = 40
     )
 
     val totalN = cfg.totalN     // 16

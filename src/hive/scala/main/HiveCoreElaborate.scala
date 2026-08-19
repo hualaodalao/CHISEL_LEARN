@@ -32,12 +32,12 @@ object HiveCoreElaborate extends App {
   val cfg = HiveCoreConfig(
     arrayN = 8,
     clusterM = 2,         // totalN = 16
-    aBufferDepth = 128,
-    bBufferDepth = 128,
-    cBufferDepth = 2048,
+    aBufferDepth = 32,
+    bBufferDepth = 32,
+    cBufferDepth = 32,
     aW = 16,
     bW = 16,
-    cW = 32
+    cW = 40  // 纯浮点延迟规格化仅需 40-bit（{sign(1),exp(8),mantissa(31)}），48 是整数 MAC 才需
   )
 
   val outputDir = "src/hive/verilog"

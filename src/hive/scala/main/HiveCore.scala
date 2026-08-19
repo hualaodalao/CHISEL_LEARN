@@ -70,8 +70,9 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   val scratchpad = Module(new HiveCoreScratchpad(cfg))
   // A 矩阵只读自主 DMA：bufWidth = 一整行 A（totalN*aEffW），深度 = aBufferDepth
   val aDma       = Module(new HiveCoreDmaRdOnly(cfg, bufWidth = cfg.totalN * cfg.aEffW, bufDepth = cfg.aBufferDepth))
-  // C 结果写回自主 DMA：bufWidth = 一整行 C（totalN*cEffW），storeGate 门控
-  val cDma       = Module(new HiveCoreDmaWrOnly(cfg, bufWidth = cfg.totalN * cfg.cEffW))
+  // C 结果写回自主 DMA：bufWidth = 一整行 C（totalN*cEffW），storeGate 门控；
+  // hasFp 传入 cfg.hasFp：含浮点时 cDma 内部对写出数据做 40→32 延迟规格化
+  val cDma       = Module(new HiveCoreDmaWrOnly(cfg, bufWidth = cfg.totalN * cfg.cEffW, hasFp = cfg.hasFp))
   // B 权重专用只读 DMA：bufWidth = 一整行权重（totalN*bW），深度 = bBufferDepth
   val bDma       = Module(new HiveCoreDmaRdOnly(cfg, bufWidth = cfg.totalN * cfg.bW, bufDepth = cfg.bBufferDepth))
   val executor   = Module(new HiveCoreExecutor2(cfg))
@@ -255,6 +256,11 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   executor.io.cPop.payload := scratchpad.io.cPop.payload
   executor.io.cPeekDone := cDma.io.doneBlock
   cDma.io.bufPop.valid   := scratchpad.io.cPop.valid && !executor.io.cPop.ready
+
+  // ==========================================================================
+  // C buffer pop → cDma 直连（fp32 延迟规格化已下沉至 HiveCoreDmaWrOnly 内部，
+  // 由 hasFp 编译期参数控制是否生成规格化硬件）
+  // ==========================================================================
   cDma.io.bufPop.payload := scratchpad.io.cPop.payload
   cDma.io.bufOccupancy   := scratchpad.io.cOccupancy
 

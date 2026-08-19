@@ -57,18 +57,18 @@
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
 // VCS coverage exclude_file
-module Hive_ram_128x256(	// src/main/scala/chisel3/util/Queue.scala:73:91
-  input  [6:0]   R0_addr,
+module Hive_ram_32x256(	// src/main/scala/chisel3/util/Queue.scala:73:91
+  input  [4:0]   R0_addr,
   input          R0_en,
                  R0_clk,
   output [255:0] R0_data,
-  input  [6:0]   W0_addr,
+  input  [4:0]   W0_addr,
   input          W0_en,
                  W0_clk,
   input  [255:0] W0_data
 );
 
-  reg [255:0] Memory[0:127];	// src/main/scala/chisel3/util/Queue.scala:73:91
+  reg [255:0] Memory[0:31];	// src/main/scala/chisel3/util/Queue.scala:73:91
   always @(posedge W0_clk) begin	// src/main/scala/chisel3/util/Queue.scala:73:91
     if (W0_en)	// src/main/scala/chisel3/util/Queue.scala:73:91
       Memory[W0_addr] <= W0_data;	// src/main/scala/chisel3/util/Queue.scala:73:91
@@ -78,11 +78,11 @@ module Hive_ram_128x256(	// src/main/scala/chisel3/util/Queue.scala:73:91
     initial begin	// src/main/scala/chisel3/util/Queue.scala:73:91
       `INIT_RANDOM_PROLOG_	// src/main/scala/chisel3/util/Queue.scala:73:91
       `ifdef RANDOMIZE_MEM_INIT	// src/main/scala/chisel3/util/Queue.scala:73:91
-        for (logic [7:0] i = 8'h0; i < 8'h80; i += 8'h1) begin
+        for (logic [5:0] i = 6'h0; i < 6'h20; i += 6'h1) begin
           for (logic [8:0] j = 9'h0; j < 9'h100; j += 9'h20) begin
             _RANDOM_MEM[j[7:0] +: 32] = `RANDOM;	// src/main/scala/chisel3/util/Queue.scala:73:91
           end
-          Memory[i[6:0]] = _RANDOM_MEM;	// src/main/scala/chisel3/util/Queue.scala:73:91
+          Memory[i[4:0]] = _RANDOM_MEM;	// src/main/scala/chisel3/util/Queue.scala:73:91
         end
       `endif // RANDOMIZE_MEM_INIT
     end // initial

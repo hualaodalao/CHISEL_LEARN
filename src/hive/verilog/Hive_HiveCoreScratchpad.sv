@@ -7,20 +7,20 @@ module Hive_HiveCoreScratchpad(	// src/hive/scala/main/HiveCoreScratchpad.scala:
   output         io_aPop_valid,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input          io_aPop_ready,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   output [255:0] io_aPop_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
-  output [7:0]   io_aOccupancy,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
+  output [5:0]   io_aOccupancy,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input          io_bPush_valid,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input  [255:0] io_bPush_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   output         io_bPop_valid,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input          io_bPop_ready,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   output [255:0] io_bPop_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
-  output [7:0]   io_bOccupancy,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
+  output [5:0]   io_bOccupancy,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input          io_cPush_valid,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   output         io_cPush_ready,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
-  input  [511:0] io_cPush_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
+  input  [639:0] io_cPush_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   output         io_cPop_valid,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input          io_cPop_ready,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
-  output [511:0] io_cPop_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
-  output [11:0]  io_cOccupancy,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
+  output [639:0] io_cPop_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
+  output [5:0]   io_cOccupancy,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input          io_flushA,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
                  io_flushB,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
                  io_flushC	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14

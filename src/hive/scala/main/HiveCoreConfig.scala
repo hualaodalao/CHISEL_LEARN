@@ -65,12 +65,19 @@ case class HiveCoreConfig(
   /** A 侧有效位宽 */
   val aEffW: Int = math.max(aW, bW)
 
-  /** C 累加器有效位宽（与 HiveComb 推导逻辑一致） */
+  /** 是否包含浮点格式（用于编译期条件化生成规格化硬件） */
+  val hasFp: Boolean = supportedFmts.contains(DataFormat.FP16) || supportedFmts.contains(DataFormat.BF16)
+
+  /** 是否包含整数格式（用于整数累加位宽约束校验） */
+  val hasInt: Boolean = supportedFmts.contains(DataFormat.INT8) || supportedFmts.contains(DataFormat.INT16)
+
+  /** C 累加器有效位宽（与 HiveComb 推导逻辑一致）。
+    * cW==0 自动推导：含浮点时至少 40（延迟规格化 {sign,exp8,mant31} 需要），
+    * 纯整数时取 autoAccW（aEffW+bW+log2Up(totalN)，累加防溢出）。 */
   val cEffW: Int = {
-    val hasFp  = supportedFmts.contains(DataFormat.FP16) || supportedFmts.contains(DataFormat.BF16)
     val autoAccW = aEffW + bW + log2Up(totalN)
     if (cW != 0) math.max(cW, bW)
-    else if (hasFp) math.max(32, autoAccW)
+    else if (hasFp) math.max(40, autoAccW)
     else autoAccW
   }
 
@@ -99,6 +106,12 @@ case class HiveCoreConfig(
   // cW == 0 表示自动推导（见 cEffW），此时跳过显式位宽比较
   require(cW == 0 || cW >= aW, s"HiveCoreConfig: cW($cW) 必须 >= aW($aW)")
   require(cW == 0 || cW >= bW, s"HiveCoreConfig: cW($cW) 必须 >= bW($bW)")
+  // 延迟规格化架构约束：含浮点格式时 cEffW 必须 >= 40，
+  // 以容纳 40-bit 延迟规格化格式 {sign(1), exp(8), mantissa(31)}。
+  // 纯浮点配置下 cW=40 即可（40 恰好满足），无需整数 MAC 的 48-bit。
+  if (hasFp) require(cEffW >= 40, s"HiveCoreConfig: 含浮点格式时 cEffW($cEffW) 必须 >= 40（延迟规格化需要）")
+  // 整数累加约束：含整数格式时 cEffW 必须 >= aW+bW，以容纳整数积累加防溢出
+  if (hasInt) require(cEffW >= aW + bW, s"HiveCoreConfig: 含整数格式时 cEffW($cEffW) 必须 >= aW+bW(${aW + bW})（整数累加防溢出需要）")
   require(arrayN >= 4, s"HiveCoreConfig: arrayN($arrayN) 必须 >= 4")
   require(clusterM >= 1, s"HiveCoreConfig: clusterM($clusterM) 必须 >= 1")
   require(aBufferDepth > 0, s"HiveCoreConfig: aBufferDepth($aBufferDepth) 必须 > 0")

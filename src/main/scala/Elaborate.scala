@@ -7,3 +7,21 @@ object Elaborate extends App {
     args = Array("--target-dir", "generated")
   )
 }
+
+object HiveMacFpLazyElaborate extends App {
+  val buildDir = "generated/macfp_lazy"
+  (new java.io.File(buildDir)).mkdirs()
+  ChiselStage.emitSystemVerilogFile(
+    gen = new HiveMacFpLazy,
+    args = Array("--target-dir", buildDir)
+  )
+}
+
+object HiveMacFpElaborate extends App {
+  val buildDir = "generated/macfp_current"
+  (new java.io.File(buildDir)).mkdirs()
+  ChiselStage.emitSystemVerilogFile(
+    gen = new HiveMacFp(32),
+    args = Array("--target-dir", buildDir)
+  )
+}

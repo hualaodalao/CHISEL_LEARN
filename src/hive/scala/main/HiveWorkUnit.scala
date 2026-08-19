@@ -13,7 +13,7 @@
   *   ├── HiveMacInt     : 整数 MAC（内部例化 HiveMulInt + HiveAddInt；
   *   │                    乘积 32→cEffW 符号扩展/截断后送加法）
   *   └── HiveMacFp      : 浮点 MAC（内部例化 HiveMulFp + HiveAddFp；
-  *                        乘积 32→cEffW 零扩展/截断后送加法）
+  *                        乘积 32→cW 零扩展/截断后送加法）
   *   （HiveMulInt/HiveMulFp/HiveAddInt/HiveAddFp 为 Mac 内部子模块，
   *     仍生成独立模块文件便于面积统计）
   *
@@ -165,35 +165,96 @@ class HiveMacInt(cW: Int) extends Module {
   io.sum := add.io.sum
 }
 
-/** HiveMacFp（浮点 MAC，纯算术单元）
-  * 内部例化 HiveMulFp + HiveAddFp：fp32 乘（rnd 舍入），32 位积适配到 cW 位
-  * （cW>32 零扩展 / cW==32 直通 / cW<32 截低位）后送加法器。
+/** HiveMacFp（浮点 MAC，延迟规格化版本）
+  * 累加路径跳过 LZC/左移（省面积），输出 40-bit 延迟规格化格式：
+  *   {sign(1), exp(8), mantissa(31)}
+  * 其中 mantissa 31-bit 不保证 MSB 在 bit30（允许 leading zeros），
+  * 规格化推迟到 DMA 写出时统一执行。
+  *
+  * 要求 cW >= 40，40-bit 结果放入 cW 位中（高位补零）。
   * 不做 fmt 门控：fmt 通路选择职责在 HiveWorkUnit 顶层。纯组合。
   */
 class HiveMacFp(cW: Int) extends Module {
+  require(cW >= 40, s"HiveMacFp: 延迟规格化需要 cW($cW) >= 40")
+
   val io = IO(new Bundle {
-    val a   = Input(UInt(32.W))
-    val b   = Input(UInt(32.W))
-    val c   = Input(UInt(cW.W))
+    val a   = Input(UInt(32.W))    // fp32 multiplicand
+    val b   = Input(UInt(32.W))    // fp32 multiplier
+    val c   = Input(UInt(cW.W))    // 累加器输入（低 40 bit 是延迟规格化格式）
     val rnd = Input(RoundingMode())
-    val sum = Output(UInt(cW.W))
+    val sum = Output(UInt(cW.W))   // 累加器输出（低 40 bit 是延迟规格化格式）
   })
-  val mul = Module(new HiveMulFp)
-  mul.io.a := io.a
-  mul.io.b := io.b
-  mul.io.rnd := io.rnd
 
-  // 乘积位宽适配：32 → cW（fp32 积：cW>32 零扩展）
-  private val prodCvt: UInt =
-    if (cW == 32) mul.io.prod
-    else if (cW > 32) Cat(0.U((cW - 32).W), mul.io.prod)
-    else mul.io.prod(cW - 1, 0)
+  // ==== 乘法：得到标准 fp32 乘积 ====
+  val prod32 = Fp32.mul(io.a, io.b, io.rnd)
 
-  val add = Module(new HiveAddFp(cW))
-  add.io.cReg := io.c
-  add.io.prod := prodCvt
-  add.io.rnd := io.rnd
-  io.sum := add.io.sum
+  // ==== 解包累加器 c (低 40 bit) ====
+  val cRaw  = io.c(39, 0)
+  val cSign = cRaw(39)
+  val cExp  = cRaw(38, 31)
+  val cMant = cRaw(30, 0)  // 31-bit，可能有 leading zeros
+  val cZero = (cExp === 0.U) && (cMant === 0.U)
+
+  // ==== 解包乘积 ====
+  val pSign = Fp32.sign(prod32)
+  val pExp  = Fp32.exp(prod32)
+  val pMant = Fp32.mant(prod32)
+  // 24-bit → 31-bit：隐含1 + 23bit mant + 7bit guard
+  val pMant31 = Cat(1.U(1.W), pMant, 0.U(7.W))
+  val pZero = (pExp === 0.U) && (pMant === 0.U)
+
+  // ==== 对齐 ====
+  val expDiffRaw = pExp.zext - cExp.zext  // 有符号 9-bit
+  val pGtC = expDiffRaw >= 0.S
+  val shiftAmt = Mux(pGtC,
+    Mux(expDiffRaw > 31.S, 31.U(5.W), expDiffRaw.asUInt(4, 0)),
+    Mux((-expDiffRaw) > 31.S, 31.U(5.W), (-expDiffRaw).asUInt(4, 0)))
+  val baseExp = Mux(pGtC, pExp, cExp)
+
+  // 对齐移位（谁小谁右移）
+  val pAligned = Mux(pGtC, pMant31, (pMant31 >> shiftAmt)(30, 0))
+  val cAligned = Mux(pGtC, (cMant >> shiftAmt)(30, 0), cMant)
+
+  // ==== 加/减法 ====
+  val effectSub = pSign ^ cSign
+  // 确定大小数：pGtC (expDiff>=0) 时 p 对齐后更大或相等
+  val pIsLarger = pGtC || (pAligned >= cAligned)
+  val largeM = Mux(pIsLarger, pAligned, cAligned)
+  val smallM = Mux(pIsLarger, cAligned, pAligned)
+  val sOut   = Mux(pIsLarger, pSign, cSign)
+
+  val addRes = largeM +& smallM  // 32-bit
+  val subRes = largeM - smallM   // 31-bit
+
+  // ==== 仅处理上溢，不做 LZC（延迟规格化核心：省面积） ====
+  val accMant = WireDefault(0.U(31.W))
+  val accExp  = WireDefault(0.U(8.W))
+
+  when(effectSub) {
+    // 减法：直接写回，不规格化
+    accMant := subRes(30, 0)
+    accExp  := baseExp
+  }.otherwise {
+    when(addRes(31)) {
+      // 加法进位：右移 1，指数 +1
+      accMant := addRes(31, 1)
+      accExp  := baseExp + 1.U
+    }.otherwise {
+      // 正常：直接写回
+      accMant := addRes(30, 0)
+      accExp  := baseExp
+    }
+  }
+
+  // ==== 零值处理 ====
+  val accRaw = Cat(sOut, accExp, accMant)  // 40-bit
+  val result40 = Mux(pZero, cRaw,
+    Mux(cZero, Cat(pSign, pExp, pMant31),
+      Mux(effectSub && (subRes === 0.U), 0.U(40.W), accRaw)))
+
+  // ==== 输出：40-bit 放入 cW 位中 ====
+  io.sum := (if (cW == 40) result40
+             else Cat(0.U((cW - 40).W), result40))
 }
 
 
@@ -216,7 +277,7 @@ class HiveWorkUnit(
   private val hasInt = supportedFmts.contains(DataFormat.INT8) || supportedFmts.contains(DataFormat.INT16)
 
   require(hasInt || hasFp, "HiveWorkUnit: supportedFmts 不能为空（至少含一种支持格式）")
-  if (hasFp)  require(cEffW >= 32,         s"HiveWorkUnit: 含浮点格式时 cEffW($cEffW) 必须 >= 32")
+  if (hasFp)  require(cEffW >= 40,         s"HiveWorkUnit: 含浮点格式时 cEffW($cEffW) 必须 >= 40（延迟规格化需要）")
   if (hasInt) require(cEffW >= aW + bW,    s"HiveWorkUnit: 含整数格式时 cEffW($cEffW) 必须 >= aW($aW) + bW($bW)")
 
   val io = IO(new Bundle {

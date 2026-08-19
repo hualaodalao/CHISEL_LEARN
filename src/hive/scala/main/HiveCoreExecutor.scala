@@ -52,7 +52,7 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
     // 此前的拆分端口（regM/regN/regK/regBAddr/regBStride/regFmt/regRnd 及
     // regAAddr/regCAddr/regAStride）均与 regFile 完全冗余（顶层驱动只是
     // 截位/补零/类型视图），已全部移除
-    val regFile = Input(HiveCoreRegs(cfg))
+    val regFile = Input(HiveCoreRegister(cfg))
 
     // A buffer 自主 DMA（RdOnly）：execute 单次启动全自主供数，
     // 本模块 A 侧无控制输出，仅占用量感知

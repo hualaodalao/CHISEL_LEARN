@@ -60,7 +60,7 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
     val err   = Output(Bool())                       // 错误标志
     val dmaExtRdIF = HiveCoreDMAExtReadOnlyIF(cfg, pushW)   // 外部只读通道 cmd(addr)/rsp(data)，与 bufPush 等宽直连
     val calcConfig = Input(HiveCoreExePreCalcConfig(cfg))  // 预计算的 tile 数与地址偏移
-    val regFile = Input(HiveCoreRegs(cfg))           // 基地址
+    val regFile = Input(HiveCoreRegister(cfg))           // 基地址
     val bufPush = master(Stream(UInt(pushW.W)))      // 向 buffer push 数据
     val bufPopFire = Input(Bool())
   })
@@ -279,8 +279,11 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   * @param cfg      HiveCore 配置
   * @param bufWidth buffer pop 数据位宽（默认 = cfg.cExtW；外部 writeData 与本口
   *                 等宽直连，每拍 pop 一个 beat）
+  * @param hasFp    是否含浮点格式（编译期）。为 true 时在写出前对每个 PE slice
+  *                 做 40→32 fp32 延迟规格化（LZC+左移）；为 false 时直接透传，
+  *                 不生成规格化硬件。默认取 cfg.hasFp。
   */
-class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0) extends Module {
+class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean = false) extends Module {
   val popW = if (bufWidth > 0) bufWidth else cfg.cExtW
 
   val io = IO(new Bundle {
@@ -293,7 +296,7 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0) extends Module {
     val err   = Output(Bool())                       // 错误标志
     val dmaExtWrIF = new HiveCoreDMAExtWriteOnlyIF(cfg, popW)
     val calcConfig = Input(HiveCoreExePreCalcConfig(cfg))  // 预计算的 tile 数与地址偏移
-    val regFile = Input(HiveCoreRegs(cfg))           // 仅使用 cAddr 基地址（loopMode 不影响 C 写回遍历）
+    val regFile = Input(HiveCoreRegister(cfg))           // 仅使用 cAddr 基地址（loopMode 不影响 C 写回遍历）
     val bufPop = slave(Stream(UInt(popW.W)))         // 从 C buffer pop 数据
     val bufOccupancy = Input(UInt(log2Up(cfg.cBufferDepth + 1).W))
   })
@@ -324,11 +327,35 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0) extends Module {
   val ostCredit = RegInit(0.U(log2Up(cfg.cBufferDepth + 1).W))
 
   // ==========================================================================
+  // C buffer pop → 写出侧 fp32 延迟规格化（延迟规格化架构核心）
+  // 对每个 PE 的 cEffW-bit slice 取低 40-bit 做 LZC+左移规格化为 fp32，
+  // 结果零扩展回 cEffW 位（保持外部接口位宽 popW 不变）。
+  // 仅在 hasFp 时生成规格化硬件；纯整数配置时直接透传（无硬件开销）。
+  // 纯组合逻辑，插在 bufPop 到 dmaExtWrIF.req.data 之间。
+  // ==========================================================================
+  val popDataFpNorm: UInt = if (hasFp) {
+    val normalizedSlices = (0 until cfg.totalN).map { i =>
+      val slice = io.bufPop.payload(cfg.cEffW * (i + 1) - 1, cfg.cEffW * i)
+      val raw40 = slice(39, 0)
+      val normalized32 = Fp32.fpNormalize40to32(raw40)
+      // 零扩展回 cEffW 位（hasFp 下 cEffW >= 40 > 32，恒走 Cat 分支）
+      if (cfg.cEffW == 32) normalized32
+      else Cat(0.U((cfg.cEffW - 32).W), normalized32)
+    }
+    Cat(normalizedSlices.reverse)
+  } else {
+    io.bufPop.payload
+  }
+
+  // ==========================================================================
   // 默认输出驱动
   // ==========================================================================
+  val isFloat = RegInit(false.B)
+  isFloat := io.regFile.isFloat
+    
   io.dmaExtWrIF.req.valid        := (state === sTRANSFER_M) & io.bufPop.valid
   io.dmaExtWrIF.req.payload.addr         := curAddr
-  io.dmaExtWrIF.req.payload.data         := io.bufPop.payload
+  io.dmaExtWrIF.req.payload.data         := Mux(isFloat, popDataFpNorm, io.bufPop.payload)
   io.dmaExtWrIF.rsp.ready        := true.B
   io.bufPop.ready                := (state === sTRANSFER_M) & io.dmaExtWrIF.req.ready
 

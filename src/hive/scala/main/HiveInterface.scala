@@ -137,14 +137,10 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
   // HiveCoreLoopMode 仅剩 MKN 单值=1bit），否则 asTypeOf 会因宽度不匹配报错
   def fmt = regs(7)(1, 0).asTypeOf(DataFormat())
   def rnd = regs(7)(4, 2).asTypeOf(RoundingMode())
-  def loopMode = regs(7)(5).asTypeOf(HiveCoreLoopMode())
+  def isFloat = fmt === DataFormat.BF16 | fmt === DataFormat.FP16
+  //def loopMode = regs(7)(5).asTypeOf(HiveCoreLoopMode())
 }
 object HiveCoreRegister {
-  def apply(cfg: HiveCoreConfig) = new HiveCoreRegister(cfg)
-}
-
-/** HiveCoreRegs：HiveCoreRegister 的别名，供 Executor/DMA 等模块引用。 */
-object HiveCoreRegs {
   def apply(cfg: HiveCoreConfig) = new HiveCoreRegister(cfg)
 }
 

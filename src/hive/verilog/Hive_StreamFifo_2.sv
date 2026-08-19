@@ -4,15 +4,15 @@ module Hive_StreamFifo_2(	// src/utils/Stream/Stream.scala:361:7
                  reset,	// src/utils/Stream/Stream.scala:361:7
                  io_push_valid,	// src/utils/Stream/Stream.scala:363:14
   output         io_push_ready,	// src/utils/Stream/Stream.scala:363:14
-  input  [511:0] io_push_payload,	// src/utils/Stream/Stream.scala:363:14
+  input  [639:0] io_push_payload,	// src/utils/Stream/Stream.scala:363:14
   output         io_pop_valid,	// src/utils/Stream/Stream.scala:363:14
   input          io_pop_ready,	// src/utils/Stream/Stream.scala:363:14
-  output [511:0] io_pop_payload,	// src/utils/Stream/Stream.scala:363:14
+  output [639:0] io_pop_payload,	// src/utils/Stream/Stream.scala:363:14
   input          io_flush,	// src/utils/Stream/Stream.scala:363:14
-  output [11:0]  io_occupancy	// src/utils/Stream/Stream.scala:363:14
+  output [5:0]   io_occupancy	// src/utils/Stream/Stream.scala:363:14
 );
 
-  Hive_Queue2048_UInt512 queue (	// src/utils/Stream/Stream.scala:371:21
+  Hive_Queue32_UInt640 queue (	// src/utils/Stream/Stream.scala:371:21
     .clock        (clock),
     .reset        (reset),
     .io_enq_ready (io_push_ready),

@@ -204,6 +204,8 @@ class FbChainController(cfg: ForagerBeeConfig) extends Module {
   // scatter/gather fields default to 0 (chain controller does not support SG descriptors in v1)
   injCmd.sgListAddr   := 0.U
   injCmd.sgEntryCount := 0.U
+  // srcStartIdx default to 0 (chain controller does not serialize this field in v1)
+  injCmd.srcStartIdx.foreach(_ := 0.U)
 
   // --- FSM 逻辑 ---
   switch(state) {

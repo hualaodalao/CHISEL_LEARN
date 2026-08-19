@@ -63,7 +63,7 @@ class HiveWorker(
   private val hasFp  = supportedFmts.exists(f => f == DataFormat.FP16 || f == DataFormat.BF16)
   private val hasInt = supportedFmts.exists(f => f == DataFormat.INT8  || f == DataFormat.INT16)
 
-  if (hasFp)  require(cEffW >= 32,          s"HiveWorker: 含浮点格式时 cEffW($cEffW) 必须 >= 32")
+  if (hasFp)  require(cEffW >= 40,          s"HiveWorker: 含浮点格式时 cEffW($cEffW) 必须 >= 40（延迟规格化需要）")
   if (hasInt) require(cEffW >= aEffW + bW,  s"HiveWorker: 含整数格式时 cEffW($cEffW) 必须 >= aEffW($aEffW) + bW($bW)")
 
   val io = IO(new Bundle {

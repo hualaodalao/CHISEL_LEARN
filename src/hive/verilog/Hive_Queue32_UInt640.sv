@@ -43,44 +43,44 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module Hive_Queue2048_UInt512(	// src/main/scala/chisel3/util/Queue.scala:60:7
+module Hive_Queue32_UInt640(	// src/main/scala/chisel3/util/Queue.scala:60:7
   input          clock,	// src/main/scala/chisel3/util/Queue.scala:60:7
                  reset,	// src/main/scala/chisel3/util/Queue.scala:60:7
   output         io_enq_ready,	// src/main/scala/chisel3/util/Queue.scala:72:14
   input          io_enq_valid,	// src/main/scala/chisel3/util/Queue.scala:72:14
-  input  [511:0] io_enq_bits,	// src/main/scala/chisel3/util/Queue.scala:72:14
+  input  [639:0] io_enq_bits,	// src/main/scala/chisel3/util/Queue.scala:72:14
   input          io_deq_ready,	// src/main/scala/chisel3/util/Queue.scala:72:14
   output         io_deq_valid,	// src/main/scala/chisel3/util/Queue.scala:72:14
-  output [511:0] io_deq_bits,	// src/main/scala/chisel3/util/Queue.scala:72:14
-  output [11:0]  io_count,	// src/main/scala/chisel3/util/Queue.scala:72:14
+  output [639:0] io_deq_bits,	// src/main/scala/chisel3/util/Queue.scala:72:14
+  output [5:0]   io_count,	// src/main/scala/chisel3/util/Queue.scala:72:14
   input          io_flush	// src/main/scala/chisel3/util/Queue.scala:72:14
 );
 
-  reg  [10:0] enq_ptr_value;	// src/main/scala/chisel3/util/Counter.scala:61:40
-  reg  [10:0] deq_ptr_value;	// src/main/scala/chisel3/util/Counter.scala:61:40
-  reg         maybe_full;	// src/main/scala/chisel3/util/Queue.scala:76:27
-  wire        ptr_match = enq_ptr_value == deq_ptr_value;	// src/main/scala/chisel3/util/Counter.scala:61:40, src/main/scala/chisel3/util/Queue.scala:77:33
-  wire        empty = ptr_match & ~maybe_full;	// src/main/scala/chisel3/util/Queue.scala:76:27, :77:33, :78:{25,28}
-  wire        full = ptr_match & maybe_full;	// src/main/scala/chisel3/util/Queue.scala:76:27, :77:33, :79:24
-  wire        do_enq = ~full & io_enq_valid;	// src/main/scala/chisel3/util/Queue.scala:79:24, :103:19, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+  reg  [4:0] enq_ptr_value;	// src/main/scala/chisel3/util/Counter.scala:61:40
+  reg  [4:0] deq_ptr_value;	// src/main/scala/chisel3/util/Counter.scala:61:40
+  reg        maybe_full;	// src/main/scala/chisel3/util/Queue.scala:76:27
+  wire       ptr_match = enq_ptr_value == deq_ptr_value;	// src/main/scala/chisel3/util/Counter.scala:61:40, src/main/scala/chisel3/util/Queue.scala:77:33
+  wire       empty = ptr_match & ~maybe_full;	// src/main/scala/chisel3/util/Queue.scala:76:27, :77:33, :78:{25,28}
+  wire       full = ptr_match & maybe_full;	// src/main/scala/chisel3/util/Queue.scala:76:27, :77:33, :79:24
+  wire       do_enq = ~full & io_enq_valid;	// src/main/scala/chisel3/util/Queue.scala:79:24, :103:19, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
   always @(posedge clock) begin	// src/main/scala/chisel3/util/Queue.scala:60:7
     if (reset) begin	// src/main/scala/chisel3/util/Queue.scala:60:7
-      enq_ptr_value <= 11'h0;	// src/main/scala/chisel3/util/Counter.scala:61:40
-      deq_ptr_value <= 11'h0;	// src/main/scala/chisel3/util/Counter.scala:61:40
+      enq_ptr_value <= 5'h0;	// src/main/scala/chisel3/util/Counter.scala:61:40
+      deq_ptr_value <= 5'h0;	// src/main/scala/chisel3/util/Counter.scala:61:40
       maybe_full <= 1'h0;	// src/main/scala/chisel3/util/Queue.scala:60:7, :76:27
     end
     else begin	// src/main/scala/chisel3/util/Queue.scala:60:7
       automatic logic do_deq;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
       do_deq = io_deq_ready & ~empty;	// src/main/scala/chisel3/util/Queue.scala:78:25, :102:19, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
       if (io_flush) begin	// src/main/scala/chisel3/util/Queue.scala:72:14
-        enq_ptr_value <= 11'h0;	// src/main/scala/chisel3/util/Counter.scala:61:40
-        deq_ptr_value <= 11'h0;	// src/main/scala/chisel3/util/Counter.scala:61:40
+        enq_ptr_value <= 5'h0;	// src/main/scala/chisel3/util/Counter.scala:61:40
+        deq_ptr_value <= 5'h0;	// src/main/scala/chisel3/util/Counter.scala:61:40
       end
       else begin	// src/main/scala/chisel3/util/Queue.scala:72:14
         if (do_enq)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-          enq_ptr_value <= enq_ptr_value + 11'h1;	// src/main/scala/chisel3/util/Counter.scala:61:40, :77:24
+          enq_ptr_value <= enq_ptr_value + 5'h1;	// src/main/scala/chisel3/util/Counter.scala:61:40, :77:24
         if (do_deq)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-          deq_ptr_value <= deq_ptr_value + 11'h1;	// src/main/scala/chisel3/util/Counter.scala:61:40, :77:24
+          deq_ptr_value <= deq_ptr_value + 5'h1;	// src/main/scala/chisel3/util/Counter.scala:61:40, :77:24
       end
       maybe_full <= ~io_flush & (do_enq == do_deq ? maybe_full : do_enq);	// src/main/scala/chisel3/util/Queue.scala:76:27, :93:{15,27}, :94:16, :96:15, :99:16, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
     end
@@ -96,16 +96,16 @@ module Hive_Queue2048_UInt512(	// src/main/scala/chisel3/util/Queue.scala:60:7
       `endif // INIT_RANDOM_PROLOG_
       `ifdef RANDOMIZE_REG_INIT	// src/main/scala/chisel3/util/Queue.scala:60:7
         _RANDOM[/*Zero width*/ 1'b0] = `RANDOM;	// src/main/scala/chisel3/util/Queue.scala:60:7
-        enq_ptr_value = _RANDOM[/*Zero width*/ 1'b0][10:0];	// src/main/scala/chisel3/util/Counter.scala:61:40, src/main/scala/chisel3/util/Queue.scala:60:7
-        deq_ptr_value = _RANDOM[/*Zero width*/ 1'b0][21:11];	// src/main/scala/chisel3/util/Counter.scala:61:40, src/main/scala/chisel3/util/Queue.scala:60:7
-        maybe_full = _RANDOM[/*Zero width*/ 1'b0][22];	// src/main/scala/chisel3/util/Counter.scala:61:40, src/main/scala/chisel3/util/Queue.scala:60:7, :76:27
+        enq_ptr_value = _RANDOM[/*Zero width*/ 1'b0][4:0];	// src/main/scala/chisel3/util/Counter.scala:61:40, src/main/scala/chisel3/util/Queue.scala:60:7
+        deq_ptr_value = _RANDOM[/*Zero width*/ 1'b0][9:5];	// src/main/scala/chisel3/util/Counter.scala:61:40, src/main/scala/chisel3/util/Queue.scala:60:7
+        maybe_full = _RANDOM[/*Zero width*/ 1'b0][10];	// src/main/scala/chisel3/util/Counter.scala:61:40, src/main/scala/chisel3/util/Queue.scala:60:7, :76:27
       `endif // RANDOMIZE_REG_INIT
     end // initial
     `ifdef FIRRTL_AFTER_INITIAL	// src/main/scala/chisel3/util/Queue.scala:60:7
       `FIRRTL_AFTER_INITIAL	// src/main/scala/chisel3/util/Queue.scala:60:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  Hive_ram_2048x512 ram_ext (	// src/main/scala/chisel3/util/Queue.scala:73:91
+  Hive_ram_32x640 ram_ext (	// src/main/scala/chisel3/util/Queue.scala:73:91
     .R0_addr (deq_ptr_value),	// src/main/scala/chisel3/util/Counter.scala:61:40
     .R0_en   (1'h1),	// src/main/scala/chisel3/util/Queue.scala:60:7
     .R0_clk  (clock),

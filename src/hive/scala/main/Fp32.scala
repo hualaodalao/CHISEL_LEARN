@@ -62,7 +62,9 @@ object Fp32 {
     Mux(aZero || bZero, 0.U(32.W), pack(sOut, eOut, mRounded))
   }
 
-  /** fp32 加法（简化版：正常数 + 零，不处理特殊值）
+  /** fp32 加法 — 单路径 P0+P2 架构
+    * P0: 消除冗余补码转换（确定大/小数后无符号加/减，仅 1 次操作）
+    * P2: 截断对齐移位（桶形移位器 clamp 到 25，超出部分收集为 sticky）
     * @param rnd 舍入模式
     */
   def add(a: UInt, b: UInt, rnd: RoundingMode.Type = RoundingMode.RNE): UInt = {
@@ -72,41 +74,105 @@ object Fp32 {
     val aZero = (eA === 0.U) && (mA === 0.U)
     val bZero = (eB === 0.U) && (mB === 0.U)
 
-    // 对齐指数：小指数向大指数对齐
-    val eMax = Mux(eA >= eB, eA, eB)
-    val shiftA = Mux(eA >= eB, 0.U(5.W), (eB - eA)(4, 0))
-    val shiftB = Mux(eB >= eA, 0.U(5.W), (eA - eB)(4, 0))
+    // 有效减法判断：异号为减法
+    val effectSub = sA ^ sB
 
-    // 25-bit mantissa (1 implicit + 23 + 1 guard)
-    val mA25 = Cat(1.U(1.W), mA, 0.U(1.W)) >> shiftA
-    val mB25 = Cat(1.U(1.W), mB, 0.U(1.W)) >> shiftB
+    // P0: 确定大/小操作数（先比指数，指数相同比尾数），结果符号 = 大数符号
+    val aGtB = (eA > eB) || ((eA === eB) && (mA >= mB))
+    val eLarge = Mux(aGtB, eA, eB)
+    val eSmall = Mux(aGtB, eB, eA)
+    val mLargeMant = Mux(aGtB, mA, mB) // 23-bit
+    val mSmallMant = Mux(aGtB, mB, mA) // 23-bit
+    val sOut = Mux(aGtB, sA, sB)
 
-    // 26-bit signed mantissa (1 guard + 25)
-    val mA26 = Cat(0.U(1.W), mA25).asSInt
-    val mB26 = Cat(0.U(1.W), mB25).asSInt
-    val mA_signed = Mux(sA, -mA26, mA26)
-    val mB_signed = Mux(sB, -mB26, mB26)
-    val mSum = mA_signed +& mB_signed // 27-bit SInt
+    // 指数差
+    val expDiff = eLarge - eSmall // 8-bit
 
-    val sOut = mSum(26)
-    val mAbs = Mux(mSum(26), (-mSum)(25, 0), mSum(25, 0))
+    // P2: 截断移位——桶形移位器只覆盖 0~25（5 级），超出全部进 sticky
+    val shiftAmt = Mux(expDiff > 25.U, 25.U(5.W), expDiff(4, 0))
 
-    // 简化规格化：找最高有效位
-    // leadingZero = 25 - floor(log2(mAbs))：左移 leadingZero 后前导 1 落在 bit 25，
-    // 而隐含 1 的标准位置为 bit 24，故指数修正为 eMax + 1 - leadingZero
-    // （旧实现 eMax - leadingZero 差 1，导致所有产生进位的加法结果指数偏小，
-    // 例如 1.0 + 1.0 输出 1.0 而非 2.0）
-    val leadingZero = PriorityEncoder(mAbs.asBools.reverse)
-    val mNorm = (mAbs << leadingZero)(24, 2) // 23-bit mantissa（去掉隐含 1）
-    val guardBit = (mAbs << leadingZero)(1) // 被截断的最高位
-    val mRounded = applyRounding(mNorm, guardBit, sOut, rnd)
-    val eOut = Mux(eMax + 1.U > leadingZero, eMax + 1.U - leadingZero, 0.U(8.W))
+    // 26-bit 工作格式: {overflow(1), implicit_1(1), mantissa(23), guard(1)}
+    val mLargeW = Cat(0.U(1.W), 1.U(1.W), mLargeMant, 0.U(1.W))
+    val mSmallW = Cat(0.U(1.W), 1.U(1.W), mSmallMant, 0.U(1.W))
 
-    val sumZero = (mAbs === 0.U)
+    // 桶形移位器对齐小操作数
+    val mSmallAligned = (mSmallW >> shiftAmt)(25, 0)
+    // Sticky: 移出位是否含 1
+    val stickyMask = (1.U(26.W) << shiftAmt) - 1.U
+    val sticky = Mux(expDiff > 25.U, true.B, (mSmallW & stickyMask).orR)
+
+    // P0: 无符号加/减（大 - 小 保证无借位）
+    val addResult = mLargeW +& mSmallAligned // 27-bit
+    val subResult = mLargeW - mSmallAligned  // 26-bit
+
+    // 规格化 + 舍入位提取
+    val resMant23 = WireDefault(0.U(23.W))
+    val resGuard  = WireDefault(false.B)
+    val resExp    = WireDefault(0.U(8.W))
+
+    when(effectSub) {
+      // 有效减法：LZC + 可变左移
+      val lzc = PriorityEncoder(Reverse(subResult))
+      val normed = (subResult << lzc)(25, 0)
+      resMant23 := normed(24, 2)
+      resGuard  := normed(1).asBool | normed(0).asBool | sticky
+      resExp    := Mux(eLarge + 1.U > lzc, (eLarge + 1.U - lzc)(7, 0), 0.U(8.W))
+    }.otherwise {
+      // 有效加法
+      when(addResult(25)) {
+        // 溢出 1 bit：隐含 1 上移到 bit 25，右移 1，指数 +1
+        resMant23 := addResult(24, 2)
+        resGuard  := addResult(1).asBool | addResult(0).asBool | sticky
+        resExp    := eLarge + 1.U
+      }.otherwise {
+        // 正常：隐含 1 在 bit 24
+        resMant23 := addResult(23, 1)
+        resGuard  := addResult(0).asBool | sticky
+        resExp    := eLarge
+      }
+    }
+
+    // 舍入
+    val mRounded = applyRounding(resMant23, resGuard, sOut, rnd)
+
+    // 结果为零：有效减法且尾数完全抵消
+    val resultIsZero = effectSub && (expDiff === 0.U) && (mLargeMant === mSmallMant)
+
+    // 边界处理
     Mux(aZero, b,
       Mux(bZero, a,
-        Mux(sumZero, 0.U(32.W),
-          pack(sOut, eOut, mRounded))))
+        Mux(resultIsZero, 0.U(32.W),
+          pack(sOut, resExp, mRounded))))
+  }
+
+  /** 40-bit 延迟规格化格式 → 32-bit fp32 规格化
+    * 输入格式：{sign(1), exp(8), mantissa(31)}，mantissa 可能有 leading zeros
+    * 输出：标准 IEEE-754 fp32（sign + 8-bit exp + 23-bit mant，隐含1已去除）
+    * 舍入固定为 RNE（DMA 写出时使用，简化实现）
+    */
+  def fpNormalize40to32(raw: UInt): UInt = {
+    val s    = raw(39)
+    val e    = raw(38, 31)
+    val m31  = raw(30, 0)
+    val isZero = (e === 0.U) && (m31 === 0.U)
+
+    // LZC + 左移规格化
+    val lzc = PriorityEncoder(Reverse(m31))
+    val normed = (m31 << lzc)(30, 0)
+
+    // 提取 23-bit mantissa (bit 30 是隐含 1，取 bit 29 down to 7)
+    val mant23 = normed(29, 7)
+    val guard  = normed(6)
+    val stickyBits = normed(5, 0).orR
+
+    // 简化舍入 (RNE: guard && (sticky || lsb) → +1，简化为 guard|sticky)
+    val roundUp = guard & (stickyBits | mant23(0))
+    val mRounded = Mux(roundUp, (mant23 +& 1.U)(22, 0), mant23)
+
+    // 指数修正：减去 leading zeros 数量
+    val eOut = Mux(e > lzc, (e - lzc)(7, 0), 0.U(8.W))
+
+    Mux(isZero, 0.U(32.W), Cat(s, eOut, mRounded))
   }
 
   /** 舍入逻辑（作用于 23-bit mantissa）

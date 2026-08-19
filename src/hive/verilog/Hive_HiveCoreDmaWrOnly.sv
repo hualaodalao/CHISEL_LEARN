@@ -43,156 +43,1741 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:283:7
-  input          clock,	// src/hive/scala/main/HiveCoreDma.scala:283:7
-                 reset,	// src/hive/scala/main/HiveCoreDma.scala:283:7
-                 io_start,	// src/hive/scala/main/HiveCoreDma.scala:286:14
-                 io_peekBlock,	// src/hive/scala/main/HiveCoreDma.scala:286:14
-  output         io_doneBlock,	// src/hive/scala/main/HiveCoreDma.scala:286:14
-                 io_busy,	// src/hive/scala/main/HiveCoreDma.scala:286:14
-                 io_err,	// src/hive/scala/main/HiveCoreDma.scala:286:14
-  input          io_dmaExtWrIF_rsp_valid,	// src/hive/scala/main/HiveCoreDma.scala:286:14
-                 io_dmaExtWrIF_rsp_payload_err,	// src/hive/scala/main/HiveCoreDma.scala:286:14
-  output         io_dmaExtWrIF_req_valid,	// src/hive/scala/main/HiveCoreDma.scala:286:14
-  input          io_dmaExtWrIF_req_ready,	// src/hive/scala/main/HiveCoreDma.scala:286:14
-  output [31:0]  io_dmaExtWrIF_req_payload_addr,	// src/hive/scala/main/HiveCoreDma.scala:286:14
-  output [511:0] io_dmaExtWrIF_req_payload_data,	// src/hive/scala/main/HiveCoreDma.scala:286:14
-  input  [15:0]  io_calcConfig_nTile,	// src/hive/scala/main/HiveCoreDma.scala:286:14
-  input  [31:0]  io_calcConfig_cRowAddressOffset,	// src/hive/scala/main/HiveCoreDma.scala:286:14
-                 io_regFile_regs_0,	// src/hive/scala/main/HiveCoreDma.scala:286:14
-                 io_regFile_regs_5,	// src/hive/scala/main/HiveCoreDma.scala:286:14
-  input          io_bufPop_valid,	// src/hive/scala/main/HiveCoreDma.scala:286:14
-  output         io_bufPop_ready,	// src/hive/scala/main/HiveCoreDma.scala:286:14
-  input  [511:0] io_bufPop_payload	// src/hive/scala/main/HiveCoreDma.scala:286:14
+module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:286:7
+  input          clock,	// src/hive/scala/main/HiveCoreDma.scala:286:7
+                 reset,	// src/hive/scala/main/HiveCoreDma.scala:286:7
+                 io_start,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+                 io_peekBlock,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+  output         io_doneBlock,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+                 io_busy,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+                 io_err,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+  input          io_dmaExtWrIF_rsp_valid,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+                 io_dmaExtWrIF_rsp_payload_err,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+  output         io_dmaExtWrIF_req_valid,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+  input          io_dmaExtWrIF_req_ready,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+  output [31:0]  io_dmaExtWrIF_req_payload_addr,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+  output [639:0] io_dmaExtWrIF_req_payload_data,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+  input  [15:0]  io_calcConfig_nTile,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+  input  [31:0]  io_calcConfig_cRowAddressOffset,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+                 io_regFile_regs_0,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+                 io_regFile_regs_5,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+                 io_regFile_regs_7,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+  input          io_bufPop_valid,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+  output         io_bufPop_ready,	// src/hive/scala/main/HiveCoreDma.scala:289:14
+  input  [639:0] io_bufPop_payload	// src/hive/scala/main/HiveCoreDma.scala:289:14
 );
 
-  reg  [2:0]  state;	// src/hive/scala/main/HiveCoreDma.scala:313:22
-  reg  [31:0] curAddr;	// src/hive/scala/main/HiveCoreDma.scala:318:24
-  reg  [31:0] colAddr;	// src/hive/scala/main/HiveCoreDma.scala:319:24
-  reg  [31:0] rowStep;	// src/hive/scala/main/HiveCoreDma.scala:320:24
-  reg  [15:0] lineCounter;	// src/hive/scala/main/HiveCoreDma.scala:321:28
-  reg  [15:0] nCnt;	// src/hive/scala/main/HiveCoreDma.scala:322:21
-  reg         errReg;	// src/hive/scala/main/HiveCoreDma.scala:323:23
-  reg  [11:0] ostCredit;	// src/hive/scala/main/HiveCoreDma.scala:324:26
-  wire        _io_bufPop_ready_T = state == 3'h2;	// src/hive/scala/main/HiveCoreDma.scala:283:7, :313:22, :329:44
-  wire        io_dmaExtWrIF_req_valid_0 = _io_bufPop_ready_T & io_bufPop_valid;	// src/hive/scala/main/HiveCoreDma.scala:329:{44,61}
-  wire        io_bufPop_ready_0 = _io_bufPop_ready_T & io_dmaExtWrIF_req_ready;	// src/hive/scala/main/HiveCoreDma.scala:329:44, :333:61
-  wire        _GEN = state == 3'h0;	// src/hive/scala/main/HiveCoreDma.scala:283:7, :313:22, :340:14
-  wire        _GEN_0 = state == 3'h1;	// src/hive/scala/main/HiveCoreDma.scala:283:7, :313:22, :359:17
-  wire        _GEN_1 = io_bufPop_valid & io_bufPop_ready_0;	// src/hive/scala/main/HiveCoreDma.scala:333:61, src/utils/Stream/Stream.scala:43:26
-  wire        _GEN_2 = {16'h0, lineCounter} == io_regFile_regs_0 - 32'h1;	// src/hive/scala/main/HiveCoreDma.scala:321:28, :392:{26,43}
-  wire        _GEN_3 = _GEN | _GEN_0;	// src/hive/scala/main/HiveCoreDma.scala:338:16, :340:14, :359:17
-  always @(posedge clock) begin	// src/hive/scala/main/HiveCoreDma.scala:283:7
-    if (reset) begin	// src/hive/scala/main/HiveCoreDma.scala:283:7
-      state <= 3'h0;	// src/hive/scala/main/HiveCoreDma.scala:283:7, :313:22
-      curAddr <= 32'h0;	// src/hive/scala/main/HiveCoreDma.scala:318:24
-      colAddr <= 32'h0;	// src/hive/scala/main/HiveCoreDma.scala:318:24, :319:24
-      rowStep <= 32'h0;	// src/hive/scala/main/HiveCoreDma.scala:318:24, :320:24
-      lineCounter <= 16'h0;	// src/hive/scala/main/HiveCoreDma.scala:321:28
-      nCnt <= 16'h0;	// src/hive/scala/main/HiveCoreDma.scala:322:21
-      errReg <= 1'h0;	// src/hive/scala/main/HiveCoreDma.scala:323:23
-      ostCredit <= 12'h0;	// src/hive/scala/main/HiveCoreDma.scala:324:26
+  reg  [2:0]   state;	// src/hive/scala/main/HiveCoreDma.scala:316:22
+  reg  [31:0]  curAddr;	// src/hive/scala/main/HiveCoreDma.scala:321:24
+  reg  [31:0]  colAddr;	// src/hive/scala/main/HiveCoreDma.scala:322:24
+  reg  [31:0]  rowStep;	// src/hive/scala/main/HiveCoreDma.scala:323:24
+  reg  [15:0]  lineCounter;	// src/hive/scala/main/HiveCoreDma.scala:324:28
+  reg  [15:0]  nCnt;	// src/hive/scala/main/HiveCoreDma.scala:325:21
+  reg          errReg;	// src/hive/scala/main/HiveCoreDma.scala:326:23
+  reg  [5:0]   ostCredit;	// src/hive/scala/main/HiveCoreDma.scala:327:26
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_9 =
+    {8'h0, io_bufPop_payload[15:8]} | {io_bufPop_payload[7:0], 8'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_19 =
+    {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_9[15:4] & 12'hF0F}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_9[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_29 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_19[15:2] & 14'h3333}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_19[13:0] & 14'h3333, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [14:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_39 =
+    _popDataFpNorm_normalizedSlices_normalized32_lzc_T_29[15:1] & 15'h5555
+    | {1'h0,
+       _popDataFpNorm_normalizedSlices_normalized32_lzc_T_29[12:0] & 13'h1555,
+       1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_50 =
+    {4'h0, io_bufPop_payload[23:20]} | {io_bufPop_payload[19:16], 4'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_60 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_50[7:2] & 6'h33}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_50[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_70 =
+    {1'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_60[7:1] & 7'h55}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_60[6:0] & 7'h55, 1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [4:0]   popDataFpNorm_normalizedSlices_normalized32_lzc =
+    io_bufPop_payload[30]
+      ? 5'h0
+      : io_bufPop_payload[29]
+          ? 5'h1
+          : io_bufPop_payload[28]
+              ? 5'h2
+              : io_bufPop_payload[27]
+                  ? 5'h3
+                  : io_bufPop_payload[26]
+                      ? 5'h4
+                      : io_bufPop_payload[25]
+                          ? 5'h5
+                          : io_bufPop_payload[24]
+                              ? 5'h6
+                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_70[0]
+                                  ? 5'h7
+                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_70[1]
+                                      ? 5'h8
+                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_70[2]
+                                          ? 5'h9
+                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_70[3]
+                                              ? 5'hA
+                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_70[4]
+                                                  ? 5'hB
+                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_70[5]
+                                                      ? 5'hC
+                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_70[6]
+                                                          ? 5'hD
+                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_70[7]
+                                                              ? 5'hE
+                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_39[0]
+                                                                  ? 5'hF
+                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_39[1]
+                                                                      ? 5'h10
+                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_39[2]
+                                                                          ? 5'h11
+                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_39[3]
+                                                                              ? 5'h12
+                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_39[4]
+                                                                                  ? 5'h13
+                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_39[5]
+                                                                                      ? 5'h14
+                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_39[6]
+                                                                                          ? 5'h15
+                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_39[7]
+                                                                                              ? 5'h16
+                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_39[8]
+                                                                                                  ? 5'h17
+                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_39[9]
+                                                                                                      ? 5'h18
+                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_39[10]
+                                                                                                          ? 5'h19
+                                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_39[11]
+                                                                                                              ? 5'h1A
+                                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_39[12]
+                                                                                                                  ? 5'h1B
+                                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_39[13]
+                                                                                                                      ? 5'h1C
+                                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_39[14]
+                                                                                                                          ? 5'h1D
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T =
+    {31'h0, io_bufPop_payload[30:0]} << popDataFpNorm_normalizedSlices_normalized32_lzc;	// src/hive/scala/main/Fp32.scala:156:19, :157:38, :161:23, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc};	// src/hive/scala/main/Fp32.scala:173:22, src/hive/scala/main/HiveCoreDma.scala:286:7, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_161 =
+    {8'h0, io_bufPop_payload[55:48]} | {io_bufPop_payload[47:40], 8'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_171 =
+    {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_161[15:4] & 12'hF0F}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_161[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_181 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_171[15:2] & 14'h3333}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_171[13:0] & 14'h3333, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [14:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_191 =
+    _popDataFpNorm_normalizedSlices_normalized32_lzc_T_181[15:1] & 15'h5555
+    | {1'h0,
+       _popDataFpNorm_normalizedSlices_normalized32_lzc_T_181[12:0] & 13'h1555,
+       1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_202 =
+    {4'h0, io_bufPop_payload[63:60]} | {io_bufPop_payload[59:56], 4'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_212 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_202[7:2] & 6'h33}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_202[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_222 =
+    {1'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_212[7:1] & 7'h55}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_212[6:0] & 7'h55, 1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [4:0]   popDataFpNorm_normalizedSlices_normalized32_lzc_1 =
+    io_bufPop_payload[70]
+      ? 5'h0
+      : io_bufPop_payload[69]
+          ? 5'h1
+          : io_bufPop_payload[68]
+              ? 5'h2
+              : io_bufPop_payload[67]
+                  ? 5'h3
+                  : io_bufPop_payload[66]
+                      ? 5'h4
+                      : io_bufPop_payload[65]
+                          ? 5'h5
+                          : io_bufPop_payload[64]
+                              ? 5'h6
+                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_222[0]
+                                  ? 5'h7
+                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_222[1]
+                                      ? 5'h8
+                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_222[2]
+                                          ? 5'h9
+                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_222[3]
+                                              ? 5'hA
+                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_222[4]
+                                                  ? 5'hB
+                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_222[5]
+                                                      ? 5'hC
+                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_222[6]
+                                                          ? 5'hD
+                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_222[7]
+                                                              ? 5'hE
+                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_191[0]
+                                                                  ? 5'hF
+                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_191[1]
+                                                                      ? 5'h10
+                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_191[2]
+                                                                          ? 5'h11
+                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_191[3]
+                                                                              ? 5'h12
+                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_191[4]
+                                                                                  ? 5'h13
+                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_191[5]
+                                                                                      ? 5'h14
+                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_191[6]
+                                                                                          ? 5'h15
+                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_191[7]
+                                                                                              ? 5'h16
+                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_191[8]
+                                                                                                  ? 5'h17
+                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_191[9]
+                                                                                                      ? 5'h18
+                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_191[10]
+                                                                                                          ? 5'h19
+                                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_191[11]
+                                                                                                              ? 5'h1A
+                                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_191[12]
+                                                                                                                  ? 5'h1B
+                                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_191[13]
+                                                                                                                      ? 5'h1C
+                                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_191[14]
+                                                                                                                          ? 5'h1D
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_1 =
+    {31'h0, io_bufPop_payload[70:40]}
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_1;	// src/hive/scala/main/Fp32.scala:156:19, :157:38, :161:23, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_0 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_1};	// src/hive/scala/main/Fp32.scala:173:22, src/hive/scala/main/HiveCoreDma.scala:286:7, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_313 =
+    {8'h0, io_bufPop_payload[95:88]} | {io_bufPop_payload[87:80], 8'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_323 =
+    {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_313[15:4] & 12'hF0F}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_313[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_333 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_323[15:2] & 14'h3333}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_323[13:0] & 14'h3333, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [14:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_343 =
+    _popDataFpNorm_normalizedSlices_normalized32_lzc_T_333[15:1] & 15'h5555
+    | {1'h0,
+       _popDataFpNorm_normalizedSlices_normalized32_lzc_T_333[12:0] & 13'h1555,
+       1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_354 =
+    {4'h0, io_bufPop_payload[103:100]} | {io_bufPop_payload[99:96], 4'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_364 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_354[7:2] & 6'h33}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_354[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_374 =
+    {1'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_364[7:1] & 7'h55}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_364[6:0] & 7'h55, 1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [4:0]   popDataFpNorm_normalizedSlices_normalized32_lzc_2 =
+    io_bufPop_payload[110]
+      ? 5'h0
+      : io_bufPop_payload[109]
+          ? 5'h1
+          : io_bufPop_payload[108]
+              ? 5'h2
+              : io_bufPop_payload[107]
+                  ? 5'h3
+                  : io_bufPop_payload[106]
+                      ? 5'h4
+                      : io_bufPop_payload[105]
+                          ? 5'h5
+                          : io_bufPop_payload[104]
+                              ? 5'h6
+                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_374[0]
+                                  ? 5'h7
+                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_374[1]
+                                      ? 5'h8
+                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_374[2]
+                                          ? 5'h9
+                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_374[3]
+                                              ? 5'hA
+                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_374[4]
+                                                  ? 5'hB
+                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_374[5]
+                                                      ? 5'hC
+                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_374[6]
+                                                          ? 5'hD
+                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_374[7]
+                                                              ? 5'hE
+                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_343[0]
+                                                                  ? 5'hF
+                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_343[1]
+                                                                      ? 5'h10
+                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_343[2]
+                                                                          ? 5'h11
+                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_343[3]
+                                                                              ? 5'h12
+                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_343[4]
+                                                                                  ? 5'h13
+                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_343[5]
+                                                                                      ? 5'h14
+                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_343[6]
+                                                                                          ? 5'h15
+                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_343[7]
+                                                                                              ? 5'h16
+                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_343[8]
+                                                                                                  ? 5'h17
+                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_343[9]
+                                                                                                      ? 5'h18
+                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_343[10]
+                                                                                                          ? 5'h19
+                                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_343[11]
+                                                                                                              ? 5'h1A
+                                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_343[12]
+                                                                                                                  ? 5'h1B
+                                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_343[13]
+                                                                                                                      ? 5'h1C
+                                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_343[14]
+                                                                                                                          ? 5'h1D
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_2 =
+    {31'h0, io_bufPop_payload[110:80]}
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_2;	// src/hive/scala/main/Fp32.scala:156:19, :157:38, :161:23, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_1 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_2};	// src/hive/scala/main/Fp32.scala:173:22, src/hive/scala/main/HiveCoreDma.scala:286:7, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_465 =
+    {8'h0, io_bufPop_payload[135:128]} | {io_bufPop_payload[127:120], 8'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_475 =
+    {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_465[15:4] & 12'hF0F}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_465[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_485 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_475[15:2] & 14'h3333}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_475[13:0] & 14'h3333, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [14:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_495 =
+    _popDataFpNorm_normalizedSlices_normalized32_lzc_T_485[15:1] & 15'h5555
+    | {1'h0,
+       _popDataFpNorm_normalizedSlices_normalized32_lzc_T_485[12:0] & 13'h1555,
+       1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_506 =
+    {4'h0, io_bufPop_payload[143:140]} | {io_bufPop_payload[139:136], 4'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_516 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_506[7:2] & 6'h33}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_506[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_526 =
+    {1'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_516[7:1] & 7'h55}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_516[6:0] & 7'h55, 1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [4:0]   popDataFpNorm_normalizedSlices_normalized32_lzc_3 =
+    io_bufPop_payload[150]
+      ? 5'h0
+      : io_bufPop_payload[149]
+          ? 5'h1
+          : io_bufPop_payload[148]
+              ? 5'h2
+              : io_bufPop_payload[147]
+                  ? 5'h3
+                  : io_bufPop_payload[146]
+                      ? 5'h4
+                      : io_bufPop_payload[145]
+                          ? 5'h5
+                          : io_bufPop_payload[144]
+                              ? 5'h6
+                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_526[0]
+                                  ? 5'h7
+                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_526[1]
+                                      ? 5'h8
+                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_526[2]
+                                          ? 5'h9
+                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_526[3]
+                                              ? 5'hA
+                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_526[4]
+                                                  ? 5'hB
+                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_526[5]
+                                                      ? 5'hC
+                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_526[6]
+                                                          ? 5'hD
+                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_526[7]
+                                                              ? 5'hE
+                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_495[0]
+                                                                  ? 5'hF
+                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_495[1]
+                                                                      ? 5'h10
+                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_495[2]
+                                                                          ? 5'h11
+                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_495[3]
+                                                                              ? 5'h12
+                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_495[4]
+                                                                                  ? 5'h13
+                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_495[5]
+                                                                                      ? 5'h14
+                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_495[6]
+                                                                                          ? 5'h15
+                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_495[7]
+                                                                                              ? 5'h16
+                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_495[8]
+                                                                                                  ? 5'h17
+                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_495[9]
+                                                                                                      ? 5'h18
+                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_495[10]
+                                                                                                          ? 5'h19
+                                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_495[11]
+                                                                                                              ? 5'h1A
+                                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_495[12]
+                                                                                                                  ? 5'h1B
+                                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_495[13]
+                                                                                                                      ? 5'h1C
+                                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_495[14]
+                                                                                                                          ? 5'h1D
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_3 =
+    {31'h0, io_bufPop_payload[150:120]}
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_3;	// src/hive/scala/main/Fp32.scala:156:19, :157:38, :161:23, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_2 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_3};	// src/hive/scala/main/Fp32.scala:173:22, src/hive/scala/main/HiveCoreDma.scala:286:7, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_617 =
+    {8'h0, io_bufPop_payload[175:168]} | {io_bufPop_payload[167:160], 8'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_627 =
+    {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_617[15:4] & 12'hF0F}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_617[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_637 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_627[15:2] & 14'h3333}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_627[13:0] & 14'h3333, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [14:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_647 =
+    _popDataFpNorm_normalizedSlices_normalized32_lzc_T_637[15:1] & 15'h5555
+    | {1'h0,
+       _popDataFpNorm_normalizedSlices_normalized32_lzc_T_637[12:0] & 13'h1555,
+       1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_658 =
+    {4'h0, io_bufPop_payload[183:180]} | {io_bufPop_payload[179:176], 4'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_668 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_658[7:2] & 6'h33}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_658[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_678 =
+    {1'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_668[7:1] & 7'h55}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_668[6:0] & 7'h55, 1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [4:0]   popDataFpNorm_normalizedSlices_normalized32_lzc_4 =
+    io_bufPop_payload[190]
+      ? 5'h0
+      : io_bufPop_payload[189]
+          ? 5'h1
+          : io_bufPop_payload[188]
+              ? 5'h2
+              : io_bufPop_payload[187]
+                  ? 5'h3
+                  : io_bufPop_payload[186]
+                      ? 5'h4
+                      : io_bufPop_payload[185]
+                          ? 5'h5
+                          : io_bufPop_payload[184]
+                              ? 5'h6
+                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_678[0]
+                                  ? 5'h7
+                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_678[1]
+                                      ? 5'h8
+                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_678[2]
+                                          ? 5'h9
+                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_678[3]
+                                              ? 5'hA
+                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_678[4]
+                                                  ? 5'hB
+                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_678[5]
+                                                      ? 5'hC
+                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_678[6]
+                                                          ? 5'hD
+                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_678[7]
+                                                              ? 5'hE
+                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_647[0]
+                                                                  ? 5'hF
+                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_647[1]
+                                                                      ? 5'h10
+                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_647[2]
+                                                                          ? 5'h11
+                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_647[3]
+                                                                              ? 5'h12
+                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_647[4]
+                                                                                  ? 5'h13
+                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_647[5]
+                                                                                      ? 5'h14
+                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_647[6]
+                                                                                          ? 5'h15
+                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_647[7]
+                                                                                              ? 5'h16
+                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_647[8]
+                                                                                                  ? 5'h17
+                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_647[9]
+                                                                                                      ? 5'h18
+                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_647[10]
+                                                                                                          ? 5'h19
+                                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_647[11]
+                                                                                                              ? 5'h1A
+                                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_647[12]
+                                                                                                                  ? 5'h1B
+                                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_647[13]
+                                                                                                                      ? 5'h1C
+                                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_647[14]
+                                                                                                                          ? 5'h1D
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_4 =
+    {31'h0, io_bufPop_payload[190:160]}
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_4;	// src/hive/scala/main/Fp32.scala:156:19, :157:38, :161:23, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_3 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_4};	// src/hive/scala/main/Fp32.scala:173:22, src/hive/scala/main/HiveCoreDma.scala:286:7, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_769 =
+    {8'h0, io_bufPop_payload[215:208]} | {io_bufPop_payload[207:200], 8'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_779 =
+    {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_769[15:4] & 12'hF0F}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_769[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_789 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_779[15:2] & 14'h3333}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_779[13:0] & 14'h3333, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [14:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_799 =
+    _popDataFpNorm_normalizedSlices_normalized32_lzc_T_789[15:1] & 15'h5555
+    | {1'h0,
+       _popDataFpNorm_normalizedSlices_normalized32_lzc_T_789[12:0] & 13'h1555,
+       1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_810 =
+    {4'h0, io_bufPop_payload[223:220]} | {io_bufPop_payload[219:216], 4'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_820 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_810[7:2] & 6'h33}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_810[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_830 =
+    {1'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_820[7:1] & 7'h55}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_820[6:0] & 7'h55, 1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [4:0]   popDataFpNorm_normalizedSlices_normalized32_lzc_5 =
+    io_bufPop_payload[230]
+      ? 5'h0
+      : io_bufPop_payload[229]
+          ? 5'h1
+          : io_bufPop_payload[228]
+              ? 5'h2
+              : io_bufPop_payload[227]
+                  ? 5'h3
+                  : io_bufPop_payload[226]
+                      ? 5'h4
+                      : io_bufPop_payload[225]
+                          ? 5'h5
+                          : io_bufPop_payload[224]
+                              ? 5'h6
+                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_830[0]
+                                  ? 5'h7
+                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_830[1]
+                                      ? 5'h8
+                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_830[2]
+                                          ? 5'h9
+                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_830[3]
+                                              ? 5'hA
+                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_830[4]
+                                                  ? 5'hB
+                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_830[5]
+                                                      ? 5'hC
+                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_830[6]
+                                                          ? 5'hD
+                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_830[7]
+                                                              ? 5'hE
+                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_799[0]
+                                                                  ? 5'hF
+                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_799[1]
+                                                                      ? 5'h10
+                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_799[2]
+                                                                          ? 5'h11
+                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_799[3]
+                                                                              ? 5'h12
+                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_799[4]
+                                                                                  ? 5'h13
+                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_799[5]
+                                                                                      ? 5'h14
+                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_799[6]
+                                                                                          ? 5'h15
+                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_799[7]
+                                                                                              ? 5'h16
+                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_799[8]
+                                                                                                  ? 5'h17
+                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_799[9]
+                                                                                                      ? 5'h18
+                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_799[10]
+                                                                                                          ? 5'h19
+                                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_799[11]
+                                                                                                              ? 5'h1A
+                                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_799[12]
+                                                                                                                  ? 5'h1B
+                                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_799[13]
+                                                                                                                      ? 5'h1C
+                                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_799[14]
+                                                                                                                          ? 5'h1D
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_5 =
+    {31'h0, io_bufPop_payload[230:200]}
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_5;	// src/hive/scala/main/Fp32.scala:156:19, :157:38, :161:23, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_4 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_5};	// src/hive/scala/main/Fp32.scala:173:22, src/hive/scala/main/HiveCoreDma.scala:286:7, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_921 =
+    {8'h0, io_bufPop_payload[255:248]} | {io_bufPop_payload[247:240], 8'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_931 =
+    {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_921[15:4] & 12'hF0F}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_921[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_941 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_931[15:2] & 14'h3333}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_931[13:0] & 14'h3333, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [14:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_951 =
+    _popDataFpNorm_normalizedSlices_normalized32_lzc_T_941[15:1] & 15'h5555
+    | {1'h0,
+       _popDataFpNorm_normalizedSlices_normalized32_lzc_T_941[12:0] & 13'h1555,
+       1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_962 =
+    {4'h0, io_bufPop_payload[263:260]} | {io_bufPop_payload[259:256], 4'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_972 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_962[7:2] & 6'h33}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_962[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_982 =
+    {1'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_972[7:1] & 7'h55}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_972[6:0] & 7'h55, 1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [4:0]   popDataFpNorm_normalizedSlices_normalized32_lzc_6 =
+    io_bufPop_payload[270]
+      ? 5'h0
+      : io_bufPop_payload[269]
+          ? 5'h1
+          : io_bufPop_payload[268]
+              ? 5'h2
+              : io_bufPop_payload[267]
+                  ? 5'h3
+                  : io_bufPop_payload[266]
+                      ? 5'h4
+                      : io_bufPop_payload[265]
+                          ? 5'h5
+                          : io_bufPop_payload[264]
+                              ? 5'h6
+                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_982[0]
+                                  ? 5'h7
+                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_982[1]
+                                      ? 5'h8
+                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_982[2]
+                                          ? 5'h9
+                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_982[3]
+                                              ? 5'hA
+                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_982[4]
+                                                  ? 5'hB
+                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_982[5]
+                                                      ? 5'hC
+                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_982[6]
+                                                          ? 5'hD
+                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_982[7]
+                                                              ? 5'hE
+                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_951[0]
+                                                                  ? 5'hF
+                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_951[1]
+                                                                      ? 5'h10
+                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_951[2]
+                                                                          ? 5'h11
+                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_951[3]
+                                                                              ? 5'h12
+                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_951[4]
+                                                                                  ? 5'h13
+                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_951[5]
+                                                                                      ? 5'h14
+                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_951[6]
+                                                                                          ? 5'h15
+                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_951[7]
+                                                                                              ? 5'h16
+                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_951[8]
+                                                                                                  ? 5'h17
+                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_951[9]
+                                                                                                      ? 5'h18
+                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_951[10]
+                                                                                                          ? 5'h19
+                                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_951[11]
+                                                                                                              ? 5'h1A
+                                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_951[12]
+                                                                                                                  ? 5'h1B
+                                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_951[13]
+                                                                                                                      ? 5'h1C
+                                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_951[14]
+                                                                                                                          ? 5'h1D
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_6 =
+    {31'h0, io_bufPop_payload[270:240]}
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_6;	// src/hive/scala/main/Fp32.scala:156:19, :157:38, :161:23, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_5 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_6};	// src/hive/scala/main/Fp32.scala:173:22, src/hive/scala/main/HiveCoreDma.scala:286:7, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1073 =
+    {8'h0, io_bufPop_payload[295:288]} | {io_bufPop_payload[287:280], 8'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1083 =
+    {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1073[15:4] & 12'hF0F}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1073[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1093 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1083[15:2] & 14'h3333}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1083[13:0] & 14'h3333, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [14:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1103 =
+    _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1093[15:1] & 15'h5555
+    | {1'h0,
+       _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1093[12:0] & 13'h1555,
+       1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1114 =
+    {4'h0, io_bufPop_payload[303:300]} | {io_bufPop_payload[299:296], 4'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1124 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1114[7:2] & 6'h33}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1114[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1134 =
+    {1'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1124[7:1] & 7'h55}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1124[6:0] & 7'h55, 1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [4:0]   popDataFpNorm_normalizedSlices_normalized32_lzc_7 =
+    io_bufPop_payload[310]
+      ? 5'h0
+      : io_bufPop_payload[309]
+          ? 5'h1
+          : io_bufPop_payload[308]
+              ? 5'h2
+              : io_bufPop_payload[307]
+                  ? 5'h3
+                  : io_bufPop_payload[306]
+                      ? 5'h4
+                      : io_bufPop_payload[305]
+                          ? 5'h5
+                          : io_bufPop_payload[304]
+                              ? 5'h6
+                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1134[0]
+                                  ? 5'h7
+                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1134[1]
+                                      ? 5'h8
+                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1134[2]
+                                          ? 5'h9
+                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1134[3]
+                                              ? 5'hA
+                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1134[4]
+                                                  ? 5'hB
+                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1134[5]
+                                                      ? 5'hC
+                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1134[6]
+                                                          ? 5'hD
+                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1134[7]
+                                                              ? 5'hE
+                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1103[0]
+                                                                  ? 5'hF
+                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1103[1]
+                                                                      ? 5'h10
+                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1103[2]
+                                                                          ? 5'h11
+                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1103[3]
+                                                                              ? 5'h12
+                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1103[4]
+                                                                                  ? 5'h13
+                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1103[5]
+                                                                                      ? 5'h14
+                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1103[6]
+                                                                                          ? 5'h15
+                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1103[7]
+                                                                                              ? 5'h16
+                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1103[8]
+                                                                                                  ? 5'h17
+                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1103[9]
+                                                                                                      ? 5'h18
+                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1103[10]
+                                                                                                          ? 5'h19
+                                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1103[11]
+                                                                                                              ? 5'h1A
+                                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1103[12]
+                                                                                                                  ? 5'h1B
+                                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1103[13]
+                                                                                                                      ? 5'h1C
+                                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1103[14]
+                                                                                                                          ? 5'h1D
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_7 =
+    {31'h0, io_bufPop_payload[310:280]}
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_7;	// src/hive/scala/main/Fp32.scala:156:19, :157:38, :161:23, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_6 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_7};	// src/hive/scala/main/Fp32.scala:173:22, src/hive/scala/main/HiveCoreDma.scala:286:7, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1225 =
+    {8'h0, io_bufPop_payload[335:328]} | {io_bufPop_payload[327:320], 8'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1235 =
+    {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1225[15:4] & 12'hF0F}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1225[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1245 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1235[15:2] & 14'h3333}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1235[13:0] & 14'h3333, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [14:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1255 =
+    _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1245[15:1] & 15'h5555
+    | {1'h0,
+       _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1245[12:0] & 13'h1555,
+       1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1266 =
+    {4'h0, io_bufPop_payload[343:340]} | {io_bufPop_payload[339:336], 4'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1276 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1266[7:2] & 6'h33}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1266[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1286 =
+    {1'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1276[7:1] & 7'h55}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1276[6:0] & 7'h55, 1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [4:0]   popDataFpNorm_normalizedSlices_normalized32_lzc_8 =
+    io_bufPop_payload[350]
+      ? 5'h0
+      : io_bufPop_payload[349]
+          ? 5'h1
+          : io_bufPop_payload[348]
+              ? 5'h2
+              : io_bufPop_payload[347]
+                  ? 5'h3
+                  : io_bufPop_payload[346]
+                      ? 5'h4
+                      : io_bufPop_payload[345]
+                          ? 5'h5
+                          : io_bufPop_payload[344]
+                              ? 5'h6
+                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1286[0]
+                                  ? 5'h7
+                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1286[1]
+                                      ? 5'h8
+                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1286[2]
+                                          ? 5'h9
+                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1286[3]
+                                              ? 5'hA
+                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1286[4]
+                                                  ? 5'hB
+                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1286[5]
+                                                      ? 5'hC
+                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1286[6]
+                                                          ? 5'hD
+                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1286[7]
+                                                              ? 5'hE
+                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1255[0]
+                                                                  ? 5'hF
+                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1255[1]
+                                                                      ? 5'h10
+                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1255[2]
+                                                                          ? 5'h11
+                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1255[3]
+                                                                              ? 5'h12
+                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1255[4]
+                                                                                  ? 5'h13
+                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1255[5]
+                                                                                      ? 5'h14
+                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1255[6]
+                                                                                          ? 5'h15
+                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1255[7]
+                                                                                              ? 5'h16
+                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1255[8]
+                                                                                                  ? 5'h17
+                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1255[9]
+                                                                                                      ? 5'h18
+                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1255[10]
+                                                                                                          ? 5'h19
+                                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1255[11]
+                                                                                                              ? 5'h1A
+                                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1255[12]
+                                                                                                                  ? 5'h1B
+                                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1255[13]
+                                                                                                                      ? 5'h1C
+                                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1255[14]
+                                                                                                                          ? 5'h1D
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_8 =
+    {31'h0, io_bufPop_payload[350:320]}
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_8;	// src/hive/scala/main/Fp32.scala:156:19, :157:38, :161:23, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_7 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_8};	// src/hive/scala/main/Fp32.scala:173:22, src/hive/scala/main/HiveCoreDma.scala:286:7, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1377 =
+    {8'h0, io_bufPop_payload[375:368]} | {io_bufPop_payload[367:360], 8'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1387 =
+    {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1377[15:4] & 12'hF0F}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1377[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1397 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1387[15:2] & 14'h3333}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1387[13:0] & 14'h3333, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [14:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1407 =
+    _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1397[15:1] & 15'h5555
+    | {1'h0,
+       _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1397[12:0] & 13'h1555,
+       1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1418 =
+    {4'h0, io_bufPop_payload[383:380]} | {io_bufPop_payload[379:376], 4'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1428 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1418[7:2] & 6'h33}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1418[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1438 =
+    {1'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1428[7:1] & 7'h55}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1428[6:0] & 7'h55, 1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [4:0]   popDataFpNorm_normalizedSlices_normalized32_lzc_9 =
+    io_bufPop_payload[390]
+      ? 5'h0
+      : io_bufPop_payload[389]
+          ? 5'h1
+          : io_bufPop_payload[388]
+              ? 5'h2
+              : io_bufPop_payload[387]
+                  ? 5'h3
+                  : io_bufPop_payload[386]
+                      ? 5'h4
+                      : io_bufPop_payload[385]
+                          ? 5'h5
+                          : io_bufPop_payload[384]
+                              ? 5'h6
+                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1438[0]
+                                  ? 5'h7
+                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1438[1]
+                                      ? 5'h8
+                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1438[2]
+                                          ? 5'h9
+                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1438[3]
+                                              ? 5'hA
+                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1438[4]
+                                                  ? 5'hB
+                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1438[5]
+                                                      ? 5'hC
+                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1438[6]
+                                                          ? 5'hD
+                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1438[7]
+                                                              ? 5'hE
+                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1407[0]
+                                                                  ? 5'hF
+                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1407[1]
+                                                                      ? 5'h10
+                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1407[2]
+                                                                          ? 5'h11
+                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1407[3]
+                                                                              ? 5'h12
+                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1407[4]
+                                                                                  ? 5'h13
+                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1407[5]
+                                                                                      ? 5'h14
+                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1407[6]
+                                                                                          ? 5'h15
+                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1407[7]
+                                                                                              ? 5'h16
+                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1407[8]
+                                                                                                  ? 5'h17
+                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1407[9]
+                                                                                                      ? 5'h18
+                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1407[10]
+                                                                                                          ? 5'h19
+                                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1407[11]
+                                                                                                              ? 5'h1A
+                                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1407[12]
+                                                                                                                  ? 5'h1B
+                                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1407[13]
+                                                                                                                      ? 5'h1C
+                                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1407[14]
+                                                                                                                          ? 5'h1D
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_9 =
+    {31'h0, io_bufPop_payload[390:360]}
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_9;	// src/hive/scala/main/Fp32.scala:156:19, :157:38, :161:23, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_8 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_9};	// src/hive/scala/main/Fp32.scala:173:22, src/hive/scala/main/HiveCoreDma.scala:286:7, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1529 =
+    {8'h0, io_bufPop_payload[415:408]} | {io_bufPop_payload[407:400], 8'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1539 =
+    {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1529[15:4] & 12'hF0F}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1529[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1549 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1539[15:2] & 14'h3333}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1539[13:0] & 14'h3333, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [14:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1559 =
+    _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1549[15:1] & 15'h5555
+    | {1'h0,
+       _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1549[12:0] & 13'h1555,
+       1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1570 =
+    {4'h0, io_bufPop_payload[423:420]} | {io_bufPop_payload[419:416], 4'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1580 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1570[7:2] & 6'h33}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1570[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1590 =
+    {1'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1580[7:1] & 7'h55}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1580[6:0] & 7'h55, 1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [4:0]   popDataFpNorm_normalizedSlices_normalized32_lzc_10 =
+    io_bufPop_payload[430]
+      ? 5'h0
+      : io_bufPop_payload[429]
+          ? 5'h1
+          : io_bufPop_payload[428]
+              ? 5'h2
+              : io_bufPop_payload[427]
+                  ? 5'h3
+                  : io_bufPop_payload[426]
+                      ? 5'h4
+                      : io_bufPop_payload[425]
+                          ? 5'h5
+                          : io_bufPop_payload[424]
+                              ? 5'h6
+                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1590[0]
+                                  ? 5'h7
+                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1590[1]
+                                      ? 5'h8
+                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1590[2]
+                                          ? 5'h9
+                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1590[3]
+                                              ? 5'hA
+                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1590[4]
+                                                  ? 5'hB
+                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1590[5]
+                                                      ? 5'hC
+                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1590[6]
+                                                          ? 5'hD
+                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1590[7]
+                                                              ? 5'hE
+                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1559[0]
+                                                                  ? 5'hF
+                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1559[1]
+                                                                      ? 5'h10
+                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1559[2]
+                                                                          ? 5'h11
+                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1559[3]
+                                                                              ? 5'h12
+                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1559[4]
+                                                                                  ? 5'h13
+                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1559[5]
+                                                                                      ? 5'h14
+                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1559[6]
+                                                                                          ? 5'h15
+                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1559[7]
+                                                                                              ? 5'h16
+                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1559[8]
+                                                                                                  ? 5'h17
+                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1559[9]
+                                                                                                      ? 5'h18
+                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1559[10]
+                                                                                                          ? 5'h19
+                                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1559[11]
+                                                                                                              ? 5'h1A
+                                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1559[12]
+                                                                                                                  ? 5'h1B
+                                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1559[13]
+                                                                                                                      ? 5'h1C
+                                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1559[14]
+                                                                                                                          ? 5'h1D
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_10 =
+    {31'h0, io_bufPop_payload[430:400]}
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_10;	// src/hive/scala/main/Fp32.scala:156:19, :157:38, :161:23, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_9 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_10};	// src/hive/scala/main/Fp32.scala:173:22, src/hive/scala/main/HiveCoreDma.scala:286:7, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1681 =
+    {8'h0, io_bufPop_payload[455:448]} | {io_bufPop_payload[447:440], 8'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1691 =
+    {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1681[15:4] & 12'hF0F}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1681[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1701 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1691[15:2] & 14'h3333}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1691[13:0] & 14'h3333, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [14:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1711 =
+    _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1701[15:1] & 15'h5555
+    | {1'h0,
+       _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1701[12:0] & 13'h1555,
+       1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1722 =
+    {4'h0, io_bufPop_payload[463:460]} | {io_bufPop_payload[459:456], 4'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1732 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1722[7:2] & 6'h33}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1722[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1742 =
+    {1'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1732[7:1] & 7'h55}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1732[6:0] & 7'h55, 1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [4:0]   popDataFpNorm_normalizedSlices_normalized32_lzc_11 =
+    io_bufPop_payload[470]
+      ? 5'h0
+      : io_bufPop_payload[469]
+          ? 5'h1
+          : io_bufPop_payload[468]
+              ? 5'h2
+              : io_bufPop_payload[467]
+                  ? 5'h3
+                  : io_bufPop_payload[466]
+                      ? 5'h4
+                      : io_bufPop_payload[465]
+                          ? 5'h5
+                          : io_bufPop_payload[464]
+                              ? 5'h6
+                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1742[0]
+                                  ? 5'h7
+                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1742[1]
+                                      ? 5'h8
+                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1742[2]
+                                          ? 5'h9
+                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1742[3]
+                                              ? 5'hA
+                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1742[4]
+                                                  ? 5'hB
+                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1742[5]
+                                                      ? 5'hC
+                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1742[6]
+                                                          ? 5'hD
+                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1742[7]
+                                                              ? 5'hE
+                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1711[0]
+                                                                  ? 5'hF
+                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1711[1]
+                                                                      ? 5'h10
+                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1711[2]
+                                                                          ? 5'h11
+                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1711[3]
+                                                                              ? 5'h12
+                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1711[4]
+                                                                                  ? 5'h13
+                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1711[5]
+                                                                                      ? 5'h14
+                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1711[6]
+                                                                                          ? 5'h15
+                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1711[7]
+                                                                                              ? 5'h16
+                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1711[8]
+                                                                                                  ? 5'h17
+                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1711[9]
+                                                                                                      ? 5'h18
+                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1711[10]
+                                                                                                          ? 5'h19
+                                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1711[11]
+                                                                                                              ? 5'h1A
+                                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1711[12]
+                                                                                                                  ? 5'h1B
+                                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1711[13]
+                                                                                                                      ? 5'h1C
+                                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1711[14]
+                                                                                                                          ? 5'h1D
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_11 =
+    {31'h0, io_bufPop_payload[470:440]}
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_11;	// src/hive/scala/main/Fp32.scala:156:19, :157:38, :161:23, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_10 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_11};	// src/hive/scala/main/Fp32.scala:173:22, src/hive/scala/main/HiveCoreDma.scala:286:7, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1833 =
+    {8'h0, io_bufPop_payload[495:488]} | {io_bufPop_payload[487:480], 8'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1843 =
+    {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1833[15:4] & 12'hF0F}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1833[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1853 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1843[15:2] & 14'h3333}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1843[13:0] & 14'h3333, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [14:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1863 =
+    _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1853[15:1] & 15'h5555
+    | {1'h0,
+       _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1853[12:0] & 13'h1555,
+       1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1874 =
+    {4'h0, io_bufPop_payload[503:500]} | {io_bufPop_payload[499:496], 4'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1884 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1874[7:2] & 6'h33}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1874[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1894 =
+    {1'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1884[7:1] & 7'h55}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1884[6:0] & 7'h55, 1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [4:0]   popDataFpNorm_normalizedSlices_normalized32_lzc_12 =
+    io_bufPop_payload[510]
+      ? 5'h0
+      : io_bufPop_payload[509]
+          ? 5'h1
+          : io_bufPop_payload[508]
+              ? 5'h2
+              : io_bufPop_payload[507]
+                  ? 5'h3
+                  : io_bufPop_payload[506]
+                      ? 5'h4
+                      : io_bufPop_payload[505]
+                          ? 5'h5
+                          : io_bufPop_payload[504]
+                              ? 5'h6
+                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1894[0]
+                                  ? 5'h7
+                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1894[1]
+                                      ? 5'h8
+                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1894[2]
+                                          ? 5'h9
+                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1894[3]
+                                              ? 5'hA
+                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1894[4]
+                                                  ? 5'hB
+                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1894[5]
+                                                      ? 5'hC
+                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1894[6]
+                                                          ? 5'hD
+                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1894[7]
+                                                              ? 5'hE
+                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1863[0]
+                                                                  ? 5'hF
+                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1863[1]
+                                                                      ? 5'h10
+                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1863[2]
+                                                                          ? 5'h11
+                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1863[3]
+                                                                              ? 5'h12
+                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1863[4]
+                                                                                  ? 5'h13
+                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1863[5]
+                                                                                      ? 5'h14
+                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1863[6]
+                                                                                          ? 5'h15
+                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1863[7]
+                                                                                              ? 5'h16
+                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1863[8]
+                                                                                                  ? 5'h17
+                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1863[9]
+                                                                                                      ? 5'h18
+                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1863[10]
+                                                                                                          ? 5'h19
+                                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1863[11]
+                                                                                                              ? 5'h1A
+                                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1863[12]
+                                                                                                                  ? 5'h1B
+                                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1863[13]
+                                                                                                                      ? 5'h1C
+                                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1863[14]
+                                                                                                                          ? 5'h1D
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_12 =
+    {31'h0, io_bufPop_payload[510:480]}
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_12;	// src/hive/scala/main/Fp32.scala:156:19, :157:38, :161:23, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_11 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_12};	// src/hive/scala/main/Fp32.scala:173:22, src/hive/scala/main/HiveCoreDma.scala:286:7, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1985 =
+    {8'h0, io_bufPop_payload[535:528]} | {io_bufPop_payload[527:520], 8'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1995 =
+    {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1985[15:4] & 12'hF0F}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1985[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2005 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1995[15:2] & 14'h3333}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1995[13:0] & 14'h3333, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [14:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2015 =
+    _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2005[15:1] & 15'h5555
+    | {1'h0,
+       _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2005[12:0] & 13'h1555,
+       1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2026 =
+    {4'h0, io_bufPop_payload[543:540]} | {io_bufPop_payload[539:536], 4'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2036 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2026[7:2] & 6'h33}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_2026[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2046 =
+    {1'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2036[7:1] & 7'h55}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_2036[6:0] & 7'h55, 1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [4:0]   popDataFpNorm_normalizedSlices_normalized32_lzc_13 =
+    io_bufPop_payload[550]
+      ? 5'h0
+      : io_bufPop_payload[549]
+          ? 5'h1
+          : io_bufPop_payload[548]
+              ? 5'h2
+              : io_bufPop_payload[547]
+                  ? 5'h3
+                  : io_bufPop_payload[546]
+                      ? 5'h4
+                      : io_bufPop_payload[545]
+                          ? 5'h5
+                          : io_bufPop_payload[544]
+                              ? 5'h6
+                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2046[0]
+                                  ? 5'h7
+                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2046[1]
+                                      ? 5'h8
+                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2046[2]
+                                          ? 5'h9
+                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2046[3]
+                                              ? 5'hA
+                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2046[4]
+                                                  ? 5'hB
+                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2046[5]
+                                                      ? 5'hC
+                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2046[6]
+                                                          ? 5'hD
+                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2046[7]
+                                                              ? 5'hE
+                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2015[0]
+                                                                  ? 5'hF
+                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2015[1]
+                                                                      ? 5'h10
+                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2015[2]
+                                                                          ? 5'h11
+                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2015[3]
+                                                                              ? 5'h12
+                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2015[4]
+                                                                                  ? 5'h13
+                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2015[5]
+                                                                                      ? 5'h14
+                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2015[6]
+                                                                                          ? 5'h15
+                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2015[7]
+                                                                                              ? 5'h16
+                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2015[8]
+                                                                                                  ? 5'h17
+                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2015[9]
+                                                                                                      ? 5'h18
+                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2015[10]
+                                                                                                          ? 5'h19
+                                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2015[11]
+                                                                                                              ? 5'h1A
+                                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2015[12]
+                                                                                                                  ? 5'h1B
+                                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2015[13]
+                                                                                                                      ? 5'h1C
+                                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2015[14]
+                                                                                                                          ? 5'h1D
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_13 =
+    {31'h0, io_bufPop_payload[550:520]}
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_13;	// src/hive/scala/main/Fp32.scala:156:19, :157:38, :161:23, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_12 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_13};	// src/hive/scala/main/Fp32.scala:173:22, src/hive/scala/main/HiveCoreDma.scala:286:7, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2137 =
+    {8'h0, io_bufPop_payload[575:568]} | {io_bufPop_payload[567:560], 8'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2147 =
+    {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2137[15:4] & 12'hF0F}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_2137[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2157 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2147[15:2] & 14'h3333}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_2147[13:0] & 14'h3333, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [14:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2167 =
+    _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2157[15:1] & 15'h5555
+    | {1'h0,
+       _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2157[12:0] & 13'h1555,
+       1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2178 =
+    {4'h0, io_bufPop_payload[583:580]} | {io_bufPop_payload[579:576], 4'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2188 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2178[7:2] & 6'h33}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_2178[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2198 =
+    {1'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2188[7:1] & 7'h55}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_2188[6:0] & 7'h55, 1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [4:0]   popDataFpNorm_normalizedSlices_normalized32_lzc_14 =
+    io_bufPop_payload[590]
+      ? 5'h0
+      : io_bufPop_payload[589]
+          ? 5'h1
+          : io_bufPop_payload[588]
+              ? 5'h2
+              : io_bufPop_payload[587]
+                  ? 5'h3
+                  : io_bufPop_payload[586]
+                      ? 5'h4
+                      : io_bufPop_payload[585]
+                          ? 5'h5
+                          : io_bufPop_payload[584]
+                              ? 5'h6
+                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2198[0]
+                                  ? 5'h7
+                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2198[1]
+                                      ? 5'h8
+                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2198[2]
+                                          ? 5'h9
+                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2198[3]
+                                              ? 5'hA
+                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2198[4]
+                                                  ? 5'hB
+                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2198[5]
+                                                      ? 5'hC
+                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2198[6]
+                                                          ? 5'hD
+                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2198[7]
+                                                              ? 5'hE
+                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2167[0]
+                                                                  ? 5'hF
+                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2167[1]
+                                                                      ? 5'h10
+                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2167[2]
+                                                                          ? 5'h11
+                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2167[3]
+                                                                              ? 5'h12
+                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2167[4]
+                                                                                  ? 5'h13
+                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2167[5]
+                                                                                      ? 5'h14
+                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2167[6]
+                                                                                          ? 5'h15
+                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2167[7]
+                                                                                              ? 5'h16
+                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2167[8]
+                                                                                                  ? 5'h17
+                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2167[9]
+                                                                                                      ? 5'h18
+                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2167[10]
+                                                                                                          ? 5'h19
+                                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2167[11]
+                                                                                                              ? 5'h1A
+                                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2167[12]
+                                                                                                                  ? 5'h1B
+                                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2167[13]
+                                                                                                                      ? 5'h1C
+                                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2167[14]
+                                                                                                                          ? 5'h1D
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_14 =
+    {31'h0, io_bufPop_payload[590:560]}
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_14;	// src/hive/scala/main/Fp32.scala:156:19, :157:38, :161:23, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_13 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_14};	// src/hive/scala/main/Fp32.scala:173:22, src/hive/scala/main/HiveCoreDma.scala:286:7, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2289 =
+    {8'h0, io_bufPop_payload[615:608]} | {io_bufPop_payload[607:600], 8'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2299 =
+    {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2289[15:4] & 12'hF0F}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_2289[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2309 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2299[15:2] & 14'h3333}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_2299[13:0] & 14'h3333, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [14:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2319 =
+    _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2309[15:1] & 15'h5555
+    | {1'h0,
+       _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2309[12:0] & 13'h1555,
+       1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2330 =
+    {4'h0, io_bufPop_payload[623:620]} | {io_bufPop_payload[619:616], 4'h0};	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2340 =
+    {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2330[7:2] & 6'h33}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_2330[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2350 =
+    {1'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2340[7:1] & 7'h55}
+    | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_2340[6:0] & 7'h55, 1'h0};	// src/hive/scala/main/Fp32.scala:160:38
+  wire [4:0]   popDataFpNorm_normalizedSlices_normalized32_lzc_15 =
+    io_bufPop_payload[630]
+      ? 5'h0
+      : io_bufPop_payload[629]
+          ? 5'h1
+          : io_bufPop_payload[628]
+              ? 5'h2
+              : io_bufPop_payload[627]
+                  ? 5'h3
+                  : io_bufPop_payload[626]
+                      ? 5'h4
+                      : io_bufPop_payload[625]
+                          ? 5'h5
+                          : io_bufPop_payload[624]
+                              ? 5'h6
+                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2350[0]
+                                  ? 5'h7
+                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2350[1]
+                                      ? 5'h8
+                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2350[2]
+                                          ? 5'h9
+                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2350[3]
+                                              ? 5'hA
+                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2350[4]
+                                                  ? 5'hB
+                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2350[5]
+                                                      ? 5'hC
+                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2350[6]
+                                                          ? 5'hD
+                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2350[7]
+                                                              ? 5'hE
+                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2319[0]
+                                                                  ? 5'hF
+                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2319[1]
+                                                                      ? 5'h10
+                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2319[2]
+                                                                          ? 5'h11
+                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2319[3]
+                                                                              ? 5'h12
+                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2319[4]
+                                                                                  ? 5'h13
+                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2319[5]
+                                                                                      ? 5'h14
+                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2319[6]
+                                                                                          ? 5'h15
+                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2319[7]
+                                                                                              ? 5'h16
+                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2319[8]
+                                                                                                  ? 5'h17
+                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2319[9]
+                                                                                                      ? 5'h18
+                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2319[10]
+                                                                                                          ? 5'h19
+                                                                                                          : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2319[11]
+                                                                                                              ? 5'h1A
+                                                                                                              : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2319[12]
+                                                                                                                  ? 5'h1B
+                                                                                                                  : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2319[13]
+                                                                                                                      ? 5'h1C
+                                                                                                                      : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2319[14]
+                                                                                                                          ? 5'h1D
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:156:19, :160:38, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_15 =
+    {31'h0, io_bufPop_payload[630:600]}
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_15;	// src/hive/scala/main/Fp32.scala:156:19, :157:38, :161:23, src/hive/scala/main/HiveCoreDma.scala:338:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_14 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_15};	// src/hive/scala/main/Fp32.scala:173:22, src/hive/scala/main/HiveCoreDma.scala:286:7, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [639:0] popDataFpNorm =
+    {8'h0,
+     io_bufPop_payload[638:631] == 8'h0 & io_bufPop_payload[630:600] == 31'h0
+       ? 32'h0
+       : {io_bufPop_payload[639],
+          io_bufPop_payload[638:631] > _GEN_14
+            ? io_bufPop_payload[638:631] - _GEN_14
+            : 8'h0,
+          _popDataFpNorm_normalizedSlices_normalized32_normed_T_15[6]
+          & ((|(_popDataFpNorm_normalizedSlices_normalized32_normed_T_15[5:0]))
+             | _popDataFpNorm_normalizedSlices_normalized32_normed_T_15[7])
+            ? _popDataFpNorm_normalizedSlices_normalized32_normed_T_15[29:7] + 23'h1
+            : _popDataFpNorm_normalizedSlices_normalized32_normed_T_15[29:7]},
+     8'h0,
+     io_bufPop_payload[598:591] == 8'h0 & io_bufPop_payload[590:560] == 31'h0
+       ? 32'h0
+       : {io_bufPop_payload[599],
+          io_bufPop_payload[598:591] > _GEN_13
+            ? io_bufPop_payload[598:591] - _GEN_13
+            : 8'h0,
+          _popDataFpNorm_normalizedSlices_normalized32_normed_T_14[6]
+          & ((|(_popDataFpNorm_normalizedSlices_normalized32_normed_T_14[5:0]))
+             | _popDataFpNorm_normalizedSlices_normalized32_normed_T_14[7])
+            ? _popDataFpNorm_normalizedSlices_normalized32_normed_T_14[29:7] + 23'h1
+            : _popDataFpNorm_normalizedSlices_normalized32_normed_T_14[29:7]},
+     8'h0,
+     io_bufPop_payload[558:551] == 8'h0 & io_bufPop_payload[550:520] == 31'h0
+       ? 32'h0
+       : {io_bufPop_payload[559],
+          io_bufPop_payload[558:551] > _GEN_12
+            ? io_bufPop_payload[558:551] - _GEN_12
+            : 8'h0,
+          _popDataFpNorm_normalizedSlices_normalized32_normed_T_13[6]
+          & ((|(_popDataFpNorm_normalizedSlices_normalized32_normed_T_13[5:0]))
+             | _popDataFpNorm_normalizedSlices_normalized32_normed_T_13[7])
+            ? _popDataFpNorm_normalizedSlices_normalized32_normed_T_13[29:7] + 23'h1
+            : _popDataFpNorm_normalizedSlices_normalized32_normed_T_13[29:7]},
+     8'h0,
+     io_bufPop_payload[518:511] == 8'h0 & io_bufPop_payload[510:480] == 31'h0
+       ? 32'h0
+       : {io_bufPop_payload[519],
+          io_bufPop_payload[518:511] > _GEN_11
+            ? io_bufPop_payload[518:511] - _GEN_11
+            : 8'h0,
+          _popDataFpNorm_normalizedSlices_normalized32_normed_T_12[6]
+          & ((|(_popDataFpNorm_normalizedSlices_normalized32_normed_T_12[5:0]))
+             | _popDataFpNorm_normalizedSlices_normalized32_normed_T_12[7])
+            ? _popDataFpNorm_normalizedSlices_normalized32_normed_T_12[29:7] + 23'h1
+            : _popDataFpNorm_normalizedSlices_normalized32_normed_T_12[29:7]},
+     8'h0,
+     io_bufPop_payload[478:471] == 8'h0 & io_bufPop_payload[470:440] == 31'h0
+       ? 32'h0
+       : {io_bufPop_payload[479],
+          io_bufPop_payload[478:471] > _GEN_10
+            ? io_bufPop_payload[478:471] - _GEN_10
+            : 8'h0,
+          _popDataFpNorm_normalizedSlices_normalized32_normed_T_11[6]
+          & ((|(_popDataFpNorm_normalizedSlices_normalized32_normed_T_11[5:0]))
+             | _popDataFpNorm_normalizedSlices_normalized32_normed_T_11[7])
+            ? _popDataFpNorm_normalizedSlices_normalized32_normed_T_11[29:7] + 23'h1
+            : _popDataFpNorm_normalizedSlices_normalized32_normed_T_11[29:7]},
+     8'h0,
+     io_bufPop_payload[438:431] == 8'h0 & io_bufPop_payload[430:400] == 31'h0
+       ? 32'h0
+       : {io_bufPop_payload[439],
+          io_bufPop_payload[438:431] > _GEN_9
+            ? io_bufPop_payload[438:431] - _GEN_9
+            : 8'h0,
+          _popDataFpNorm_normalizedSlices_normalized32_normed_T_10[6]
+          & ((|(_popDataFpNorm_normalizedSlices_normalized32_normed_T_10[5:0]))
+             | _popDataFpNorm_normalizedSlices_normalized32_normed_T_10[7])
+            ? _popDataFpNorm_normalizedSlices_normalized32_normed_T_10[29:7] + 23'h1
+            : _popDataFpNorm_normalizedSlices_normalized32_normed_T_10[29:7]},
+     8'h0,
+     io_bufPop_payload[398:391] == 8'h0 & io_bufPop_payload[390:360] == 31'h0
+       ? 32'h0
+       : {io_bufPop_payload[399],
+          io_bufPop_payload[398:391] > _GEN_8
+            ? io_bufPop_payload[398:391] - _GEN_8
+            : 8'h0,
+          _popDataFpNorm_normalizedSlices_normalized32_normed_T_9[6]
+          & ((|(_popDataFpNorm_normalizedSlices_normalized32_normed_T_9[5:0]))
+             | _popDataFpNorm_normalizedSlices_normalized32_normed_T_9[7])
+            ? _popDataFpNorm_normalizedSlices_normalized32_normed_T_9[29:7] + 23'h1
+            : _popDataFpNorm_normalizedSlices_normalized32_normed_T_9[29:7]},
+     8'h0,
+     io_bufPop_payload[358:351] == 8'h0 & io_bufPop_payload[350:320] == 31'h0
+       ? 32'h0
+       : {io_bufPop_payload[359],
+          io_bufPop_payload[358:351] > _GEN_7
+            ? io_bufPop_payload[358:351] - _GEN_7
+            : 8'h0,
+          _popDataFpNorm_normalizedSlices_normalized32_normed_T_8[6]
+          & ((|(_popDataFpNorm_normalizedSlices_normalized32_normed_T_8[5:0]))
+             | _popDataFpNorm_normalizedSlices_normalized32_normed_T_8[7])
+            ? _popDataFpNorm_normalizedSlices_normalized32_normed_T_8[29:7] + 23'h1
+            : _popDataFpNorm_normalizedSlices_normalized32_normed_T_8[29:7]},
+     8'h0,
+     io_bufPop_payload[318:311] == 8'h0 & io_bufPop_payload[310:280] == 31'h0
+       ? 32'h0
+       : {io_bufPop_payload[319],
+          io_bufPop_payload[318:311] > _GEN_6
+            ? io_bufPop_payload[318:311] - _GEN_6
+            : 8'h0,
+          _popDataFpNorm_normalizedSlices_normalized32_normed_T_7[6]
+          & ((|(_popDataFpNorm_normalizedSlices_normalized32_normed_T_7[5:0]))
+             | _popDataFpNorm_normalizedSlices_normalized32_normed_T_7[7])
+            ? _popDataFpNorm_normalizedSlices_normalized32_normed_T_7[29:7] + 23'h1
+            : _popDataFpNorm_normalizedSlices_normalized32_normed_T_7[29:7]},
+     8'h0,
+     io_bufPop_payload[278:271] == 8'h0 & io_bufPop_payload[270:240] == 31'h0
+       ? 32'h0
+       : {io_bufPop_payload[279],
+          io_bufPop_payload[278:271] > _GEN_5
+            ? io_bufPop_payload[278:271] - _GEN_5
+            : 8'h0,
+          _popDataFpNorm_normalizedSlices_normalized32_normed_T_6[6]
+          & ((|(_popDataFpNorm_normalizedSlices_normalized32_normed_T_6[5:0]))
+             | _popDataFpNorm_normalizedSlices_normalized32_normed_T_6[7])
+            ? _popDataFpNorm_normalizedSlices_normalized32_normed_T_6[29:7] + 23'h1
+            : _popDataFpNorm_normalizedSlices_normalized32_normed_T_6[29:7]},
+     8'h0,
+     io_bufPop_payload[238:231] == 8'h0 & io_bufPop_payload[230:200] == 31'h0
+       ? 32'h0
+       : {io_bufPop_payload[239],
+          io_bufPop_payload[238:231] > _GEN_4
+            ? io_bufPop_payload[238:231] - _GEN_4
+            : 8'h0,
+          _popDataFpNorm_normalizedSlices_normalized32_normed_T_5[6]
+          & ((|(_popDataFpNorm_normalizedSlices_normalized32_normed_T_5[5:0]))
+             | _popDataFpNorm_normalizedSlices_normalized32_normed_T_5[7])
+            ? _popDataFpNorm_normalizedSlices_normalized32_normed_T_5[29:7] + 23'h1
+            : _popDataFpNorm_normalizedSlices_normalized32_normed_T_5[29:7]},
+     8'h0,
+     io_bufPop_payload[198:191] == 8'h0 & io_bufPop_payload[190:160] == 31'h0
+       ? 32'h0
+       : {io_bufPop_payload[199],
+          io_bufPop_payload[198:191] > _GEN_3
+            ? io_bufPop_payload[198:191] - _GEN_3
+            : 8'h0,
+          _popDataFpNorm_normalizedSlices_normalized32_normed_T_4[6]
+          & ((|(_popDataFpNorm_normalizedSlices_normalized32_normed_T_4[5:0]))
+             | _popDataFpNorm_normalizedSlices_normalized32_normed_T_4[7])
+            ? _popDataFpNorm_normalizedSlices_normalized32_normed_T_4[29:7] + 23'h1
+            : _popDataFpNorm_normalizedSlices_normalized32_normed_T_4[29:7]},
+     8'h0,
+     io_bufPop_payload[158:151] == 8'h0 & io_bufPop_payload[150:120] == 31'h0
+       ? 32'h0
+       : {io_bufPop_payload[159],
+          io_bufPop_payload[158:151] > _GEN_2
+            ? io_bufPop_payload[158:151] - _GEN_2
+            : 8'h0,
+          _popDataFpNorm_normalizedSlices_normalized32_normed_T_3[6]
+          & ((|(_popDataFpNorm_normalizedSlices_normalized32_normed_T_3[5:0]))
+             | _popDataFpNorm_normalizedSlices_normalized32_normed_T_3[7])
+            ? _popDataFpNorm_normalizedSlices_normalized32_normed_T_3[29:7] + 23'h1
+            : _popDataFpNorm_normalizedSlices_normalized32_normed_T_3[29:7]},
+     8'h0,
+     io_bufPop_payload[118:111] == 8'h0 & io_bufPop_payload[110:80] == 31'h0
+       ? 32'h0
+       : {io_bufPop_payload[119],
+          io_bufPop_payload[118:111] > _GEN_1
+            ? io_bufPop_payload[118:111] - _GEN_1
+            : 8'h0,
+          _popDataFpNorm_normalizedSlices_normalized32_normed_T_2[6]
+          & ((|(_popDataFpNorm_normalizedSlices_normalized32_normed_T_2[5:0]))
+             | _popDataFpNorm_normalizedSlices_normalized32_normed_T_2[7])
+            ? _popDataFpNorm_normalizedSlices_normalized32_normed_T_2[29:7] + 23'h1
+            : _popDataFpNorm_normalizedSlices_normalized32_normed_T_2[29:7]},
+     8'h0,
+     io_bufPop_payload[78:71] == 8'h0 & io_bufPop_payload[70:40] == 31'h0
+       ? 32'h0
+       : {io_bufPop_payload[79],
+          io_bufPop_payload[78:71] > _GEN_0 ? io_bufPop_payload[78:71] - _GEN_0 : 8'h0,
+          _popDataFpNorm_normalizedSlices_normalized32_normed_T_1[6]
+          & ((|(_popDataFpNorm_normalizedSlices_normalized32_normed_T_1[5:0]))
+             | _popDataFpNorm_normalizedSlices_normalized32_normed_T_1[7])
+            ? _popDataFpNorm_normalizedSlices_normalized32_normed_T_1[29:7] + 23'h1
+            : _popDataFpNorm_normalizedSlices_normalized32_normed_T_1[29:7]},
+     8'h0,
+     io_bufPop_payload[38:31] == 8'h0 & io_bufPop_payload[30:0] == 31'h0
+       ? 32'h0
+       : {io_bufPop_payload[39],
+          io_bufPop_payload[38:31] > _GEN ? io_bufPop_payload[38:31] - _GEN : 8'h0,
+          _popDataFpNorm_normalizedSlices_normalized32_normed_T[6]
+          & ((|(_popDataFpNorm_normalizedSlices_normalized32_normed_T[5:0]))
+             | _popDataFpNorm_normalizedSlices_normalized32_normed_T[7])
+            ? _popDataFpNorm_normalizedSlices_normalized32_normed_T[29:7] + 23'h1
+            : _popDataFpNorm_normalizedSlices_normalized32_normed_T[29:7]}};	// src/hive/scala/main/Fp32.scala:154:19, :155:19, :156:19, :157:{21,30,38}, :161:{23,30}, :164:24, :165:24, :166:{28,35}, :169:{25,39,47}, :170:{23,41}, :173:{19,22,32}, :175:{8,31}, src/hive/scala/main/HiveCoreDma.scala:321:24, :338:36, :345:8
+  reg          isFloat;	// src/hive/scala/main/HiveCoreDma.scala:353:24
+  wire         _io_bufPop_ready_T = state == 3'h2;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :316:22, :356:44
+  wire         io_dmaExtWrIF_req_valid_0 = _io_bufPop_ready_T & io_bufPop_valid;	// src/hive/scala/main/HiveCoreDma.scala:356:{44,61}
+  wire         io_bufPop_ready_0 = _io_bufPop_ready_T & io_dmaExtWrIF_req_ready;	// src/hive/scala/main/HiveCoreDma.scala:356:44, :360:61
+  wire         _GEN_15 = state == 3'h0;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :316:22, :367:14
+  wire         _GEN_16 = state == 3'h1;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :316:22, :386:17
+  wire         _GEN_17 = io_bufPop_valid & io_bufPop_ready_0;	// src/hive/scala/main/HiveCoreDma.scala:360:61, src/utils/Stream/Stream.scala:43:26
+  wire         _GEN_18 = {16'h0, lineCounter} == io_regFile_regs_0 - 32'h1;	// src/hive/scala/main/HiveCoreDma.scala:324:28, :419:{26,43}
+  wire         _GEN_19 = _GEN_15 | _GEN_16;	// src/hive/scala/main/HiveCoreDma.scala:365:16, :367:14, :386:17
+  always @(posedge clock) begin	// src/hive/scala/main/HiveCoreDma.scala:286:7
+    if (reset) begin	// src/hive/scala/main/HiveCoreDma.scala:286:7
+      state <= 3'h0;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :316:22
+      curAddr <= 32'h0;	// src/hive/scala/main/HiveCoreDma.scala:321:24
+      colAddr <= 32'h0;	// src/hive/scala/main/HiveCoreDma.scala:321:24, :322:24
+      rowStep <= 32'h0;	// src/hive/scala/main/HiveCoreDma.scala:321:24, :323:24
+      lineCounter <= 16'h0;	// src/hive/scala/main/HiveCoreDma.scala:324:28
+      nCnt <= 16'h0;	// src/hive/scala/main/HiveCoreDma.scala:325:21
+      errReg <= 1'h0;	// src/hive/scala/main/HiveCoreDma.scala:326:23
+      ostCredit <= 6'h0;	// src/hive/scala/main/HiveCoreDma.scala:327:26
+      isFloat <= 1'h0;	// src/hive/scala/main/HiveCoreDma.scala:353:24
     end
-    else begin	// src/hive/scala/main/HiveCoreDma.scala:283:7
-      automatic logic _GEN_4 = _GEN & io_start;	// src/hive/scala/main/HiveCoreDma.scala:340:14, :352:31, :359:17, :367:22, :369:16
-      if (_GEN) begin	// src/hive/scala/main/HiveCoreDma.scala:340:14
-        if (io_start) begin	// src/hive/scala/main/HiveCoreDma.scala:286:14
-          state <= 3'h1;	// src/hive/scala/main/HiveCoreDma.scala:283:7, :313:22
-          curAddr <= io_regFile_regs_5;	// src/hive/scala/main/HiveCoreDma.scala:318:24
-          colAddr <= 32'h40;	// src/hive/scala/main/HiveCoreDma.scala:319:24
-          nCnt <= 16'h0;	// src/hive/scala/main/HiveCoreDma.scala:322:21
+    else begin	// src/hive/scala/main/HiveCoreDma.scala:286:7
+      automatic logic _GEN_20 = _GEN_15 & io_start;	// src/hive/scala/main/HiveCoreDma.scala:367:14, :379:31, :386:17, :394:22, :396:16
+      if (_GEN_15) begin	// src/hive/scala/main/HiveCoreDma.scala:367:14
+        if (io_start) begin	// src/hive/scala/main/HiveCoreDma.scala:289:14
+          state <= 3'h1;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :316:22
+          curAddr <= io_regFile_regs_5;	// src/hive/scala/main/HiveCoreDma.scala:321:24
+          colAddr <= 32'h50;	// src/hive/scala/main/HiveCoreDma.scala:322:24
+          nCnt <= 16'h0;	// src/hive/scala/main/HiveCoreDma.scala:325:21
         end
-        ostCredit <= 12'h0;	// src/hive/scala/main/HiveCoreDma.scala:324:26
+        ostCredit <= 6'h0;	// src/hive/scala/main/HiveCoreDma.scala:327:26
       end
-      else begin	// src/hive/scala/main/HiveCoreDma.scala:340:14
-        automatic logic _GEN_5;	// src/utils/Stream/Stream.scala:43:26
-        automatic logic _GEN_6;	// src/hive/scala/main/HiveCoreDma.scala:359:17
-        automatic logic _GEN_7;	// src/hive/scala/main/HiveCoreDma.scala:405:17
-        _GEN_5 = io_dmaExtWrIF_req_valid_0 & io_dmaExtWrIF_req_ready;	// src/hive/scala/main/HiveCoreDma.scala:329:61, src/utils/Stream/Stream.scala:43:26
-        _GEN_6 = state == 3'h3;	// src/hive/scala/main/HiveCoreDma.scala:283:7, :313:22, :359:17
-        _GEN_7 = nCnt == io_calcConfig_nTile - 16'h1;	// src/hive/scala/main/HiveCoreDma.scala:322:21, :405:{17,41}
-        if (_GEN_0) begin	// src/hive/scala/main/HiveCoreDma.scala:359:17
-          if (io_peekBlock)	// src/hive/scala/main/HiveCoreDma.scala:286:14
-            state <= 3'h2;	// src/hive/scala/main/HiveCoreDma.scala:283:7, :313:22
+      else begin	// src/hive/scala/main/HiveCoreDma.scala:367:14
+        automatic logic _GEN_21;	// src/utils/Stream/Stream.scala:43:26
+        automatic logic _GEN_22;	// src/hive/scala/main/HiveCoreDma.scala:386:17
+        automatic logic _GEN_23;	// src/hive/scala/main/HiveCoreDma.scala:432:17
+        _GEN_21 = io_dmaExtWrIF_req_valid_0 & io_dmaExtWrIF_req_ready;	// src/hive/scala/main/HiveCoreDma.scala:356:61, src/utils/Stream/Stream.scala:43:26
+        _GEN_22 = state == 3'h3;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :316:22, :386:17
+        _GEN_23 = nCnt == io_calcConfig_nTile - 16'h1;	// src/hive/scala/main/HiveCoreDma.scala:325:21, :432:{17,41}
+        if (_GEN_16) begin	// src/hive/scala/main/HiveCoreDma.scala:386:17
+          if (io_peekBlock)	// src/hive/scala/main/HiveCoreDma.scala:289:14
+            state <= 3'h2;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :316:22
         end
-        else if (_io_bufPop_ready_T) begin	// src/hive/scala/main/HiveCoreDma.scala:329:44
-          if (_GEN_1 & _GEN_2)	// src/hive/scala/main/HiveCoreDma.scala:313:22, :391:28, :392:{26,50}, :394:17, src/utils/Stream/Stream.scala:43:26
-            state <= 3'h3;	// src/hive/scala/main/HiveCoreDma.scala:283:7, :313:22
-          if (~_GEN_1 | _GEN_2) begin	// src/hive/scala/main/HiveCoreDma.scala:318:24, :321:28, :359:17, :391:28, :392:{26,50}, src/utils/Stream/Stream.scala:43:26
+        else if (_io_bufPop_ready_T) begin	// src/hive/scala/main/HiveCoreDma.scala:356:44
+          if (_GEN_17 & _GEN_18)	// src/hive/scala/main/HiveCoreDma.scala:316:22, :418:28, :419:{26,50}, :421:17, src/utils/Stream/Stream.scala:43:26
+            state <= 3'h3;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :316:22
+          if (~_GEN_17 | _GEN_18) begin	// src/hive/scala/main/HiveCoreDma.scala:321:24, :324:28, :386:17, :418:28, :419:{26,50}, src/utils/Stream/Stream.scala:43:26
           end
-          else	// src/hive/scala/main/HiveCoreDma.scala:318:24, :391:28, :392:50
-            curAddr <= curAddr + rowStep;	// src/hive/scala/main/HiveCoreDma.scala:318:24, :320:24, :398:30
+          else	// src/hive/scala/main/HiveCoreDma.scala:321:24, :418:28, :419:50
+            curAddr <= curAddr + rowStep;	// src/hive/scala/main/HiveCoreDma.scala:321:24, :323:24, :425:30
         end
-        else begin	// src/hive/scala/main/HiveCoreDma.scala:329:44
-          if (_GEN_6) begin	// src/hive/scala/main/HiveCoreDma.scala:359:17
-            if (_GEN_7)	// src/hive/scala/main/HiveCoreDma.scala:405:17
-              state <= 3'h4;	// src/hive/scala/main/HiveCoreDma.scala:283:7, :313:22
-            else if (io_peekBlock)	// src/hive/scala/main/HiveCoreDma.scala:286:14
-              state <= 3'h2;	// src/hive/scala/main/HiveCoreDma.scala:283:7, :313:22
+        else begin	// src/hive/scala/main/HiveCoreDma.scala:356:44
+          if (_GEN_22) begin	// src/hive/scala/main/HiveCoreDma.scala:386:17
+            if (_GEN_23)	// src/hive/scala/main/HiveCoreDma.scala:432:17
+              state <= 3'h4;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :316:22
+            else if (io_peekBlock)	// src/hive/scala/main/HiveCoreDma.scala:289:14
+              state <= 3'h2;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :316:22
           end
-          else if (state == 3'h4 & ostCredit == 12'h0)	// src/hive/scala/main/HiveCoreDma.scala:283:7, :313:22, :324:26, :359:17, :421:{22,31}, :423:15
-            state <= 3'h0;	// src/hive/scala/main/HiveCoreDma.scala:283:7, :313:22
-          if (~_GEN_6 | _GEN_7 | ~io_peekBlock) begin	// src/hive/scala/main/HiveCoreDma.scala:318:24, :322:21, :359:17, :405:{17,47}, :408:27
+          else if (state == 3'h4 & ostCredit == 6'h0)	// src/hive/scala/main/HiveCoreDma.scala:286:7, :316:22, :327:26, :386:17, :448:{22,31}, :450:15
+            state <= 3'h0;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :316:22
+          if (~_GEN_22 | _GEN_23 | ~io_peekBlock) begin	// src/hive/scala/main/HiveCoreDma.scala:321:24, :325:21, :386:17, :432:{17,47}, :435:27
           end
-          else	// src/hive/scala/main/HiveCoreDma.scala:318:24, :359:17, :405:47, :408:27
-            curAddr <= curAddr + colAddr;	// src/hive/scala/main/HiveCoreDma.scala:318:24, :319:24, :410:30
+          else	// src/hive/scala/main/HiveCoreDma.scala:321:24, :386:17, :432:47, :435:27
+            curAddr <= curAddr + colAddr;	// src/hive/scala/main/HiveCoreDma.scala:321:24, :322:24, :437:30
         end
-        if (_GEN_0 | _io_bufPop_ready_T | ~_GEN_6 | _GEN_7 | ~io_peekBlock) begin	// src/hive/scala/main/HiveCoreDma.scala:322:21, :329:44, :359:17, :405:{17,47}, :408:27
+        if (_GEN_16 | _io_bufPop_ready_T | ~_GEN_22 | _GEN_23 | ~io_peekBlock) begin	// src/hive/scala/main/HiveCoreDma.scala:325:21, :356:44, :386:17, :432:{17,47}, :435:27
         end
-        else begin	// src/hive/scala/main/HiveCoreDma.scala:322:21, :359:17, :405:47, :408:27
-          colAddr <= colAddr + 32'h40;	// src/hive/scala/main/HiveCoreDma.scala:319:24, :411:30
-          nCnt <= nCnt + 16'h1;	// src/hive/scala/main/HiveCoreDma.scala:322:21, :409:24
+        else begin	// src/hive/scala/main/HiveCoreDma.scala:325:21, :386:17, :432:47, :435:27
+          colAddr <= colAddr + 32'h50;	// src/hive/scala/main/HiveCoreDma.scala:322:24, :438:30
+          nCnt <= nCnt + 16'h1;	// src/hive/scala/main/HiveCoreDma.scala:325:21, :436:24
         end
-        if (~(_GEN_5 & io_dmaExtWrIF_rsp_valid)) begin	// src/hive/scala/main/HiveCoreDma.scala:343:33, src/utils/Stream/Stream.scala:43:26
-          if (io_dmaExtWrIF_rsp_valid)	// src/hive/scala/main/HiveCoreDma.scala:286:14
-            ostCredit <= ostCredit - 12'h1;	// src/hive/scala/main/HiveCoreDma.scala:324:26, :346:30
-          else if (_GEN_5)	// src/utils/Stream/Stream.scala:43:26
-            ostCredit <= ostCredit + 12'h1;	// src/hive/scala/main/HiveCoreDma.scala:324:26, :346:30, :348:30
+        if (~(_GEN_21 & io_dmaExtWrIF_rsp_valid)) begin	// src/hive/scala/main/HiveCoreDma.scala:370:33, src/utils/Stream/Stream.scala:43:26
+          if (io_dmaExtWrIF_rsp_valid)	// src/hive/scala/main/HiveCoreDma.scala:289:14
+            ostCredit <= ostCredit - 6'h1;	// src/hive/scala/main/HiveCoreDma.scala:327:26, :373:30
+          else if (_GEN_21)	// src/utils/Stream/Stream.scala:43:26
+            ostCredit <= ostCredit + 6'h1;	// src/hive/scala/main/HiveCoreDma.scala:327:26, :373:30, :375:30
         end
       end
-      if (_GEN_4)	// src/hive/scala/main/HiveCoreDma.scala:352:31, :359:17, :367:22, :369:16
-        rowStep <= io_calcConfig_cRowAddressOffset;	// src/hive/scala/main/HiveCoreDma.scala:320:24
-      if (_GEN_3 | ~_GEN_1) begin	// src/hive/scala/main/HiveCoreDma.scala:321:28, :338:16, :359:17, src/utils/Stream/Stream.scala:43:26
+      if (_GEN_20)	// src/hive/scala/main/HiveCoreDma.scala:379:31, :386:17, :394:22, :396:16
+        rowStep <= io_calcConfig_cRowAddressOffset;	// src/hive/scala/main/HiveCoreDma.scala:323:24
+      if (_GEN_19 | ~_GEN_17) begin	// src/hive/scala/main/HiveCoreDma.scala:324:28, :365:16, :386:17, src/utils/Stream/Stream.scala:43:26
       end
-      else	// src/hive/scala/main/HiveCoreDma.scala:321:28, :359:17
-        lineCounter <= _GEN_2 ? 16'h0 : lineCounter + 16'h1;	// src/hive/scala/main/HiveCoreDma.scala:321:28, :392:{26,50}, :393:23, :397:{23,38}
+      else	// src/hive/scala/main/HiveCoreDma.scala:324:28, :386:17
+        lineCounter <= _GEN_18 ? 16'h0 : lineCounter + 16'h1;	// src/hive/scala/main/HiveCoreDma.scala:324:28, :419:{26,50}, :420:23, :424:{23,38}
       errReg <=
-        ~_GEN_4 & (io_dmaExtWrIF_rsp_valid & io_dmaExtWrIF_rsp_payload_err | errReg);	// src/hive/scala/main/HiveCoreDma.scala:323:23, :352:31, :353:40, :354:14, :359:17, :367:22, :369:16
+        ~_GEN_20 & (io_dmaExtWrIF_rsp_valid & io_dmaExtWrIF_rsp_payload_err | errReg);	// src/hive/scala/main/HiveCoreDma.scala:326:23, :379:31, :380:40, :381:14, :386:17, :394:22, :396:16
+      isFloat <= io_regFile_regs_7[1:0] == 2'h1 | io_regFile_regs_7[1:0] == 2'h0;	// src/hive/scala/main/HiveCoreDma.scala:353:24, src/hive/scala/main/HiveInterface.scala:138:20, :140:{21,41,47}
     end
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// src/hive/scala/main/HiveCoreDma.scala:283:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveCoreDma.scala:283:7
-      `FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveCoreDma.scala:283:7
+  `ifdef ENABLE_INITIAL_REG_	// src/hive/scala/main/HiveCoreDma.scala:286:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveCoreDma.scala:286:7
+      `FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveCoreDma.scala:286:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/hive/scala/main/HiveCoreDma.scala:283:7
-      automatic logic [31:0] _RANDOM[0:4];	// src/hive/scala/main/HiveCoreDma.scala:283:7
-      `ifdef INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveCoreDma.scala:283:7
-        `INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveCoreDma.scala:283:7
+    initial begin	// src/hive/scala/main/HiveCoreDma.scala:286:7
+      automatic logic [31:0] _RANDOM[0:4];	// src/hive/scala/main/HiveCoreDma.scala:286:7
+      `ifdef INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveCoreDma.scala:286:7
+        `INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveCoreDma.scala:286:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/hive/scala/main/HiveCoreDma.scala:283:7
+      `ifdef RANDOMIZE_REG_INIT	// src/hive/scala/main/HiveCoreDma.scala:286:7
         for (logic [2:0] i = 3'h0; i < 3'h5; i += 3'h1) begin
-          _RANDOM[i] = `RANDOM;	// src/hive/scala/main/HiveCoreDma.scala:283:7
-        end	// src/hive/scala/main/HiveCoreDma.scala:283:7
-        state = _RANDOM[3'h0][2:0];	// src/hive/scala/main/HiveCoreDma.scala:283:7, :313:22
-        curAddr = {_RANDOM[3'h0][31:3], _RANDOM[3'h1][2:0]};	// src/hive/scala/main/HiveCoreDma.scala:283:7, :313:22, :318:24
-        colAddr = {_RANDOM[3'h1][31:3], _RANDOM[3'h2][2:0]};	// src/hive/scala/main/HiveCoreDma.scala:283:7, :318:24, :319:24
-        rowStep = {_RANDOM[3'h2][31:3], _RANDOM[3'h3][2:0]};	// src/hive/scala/main/HiveCoreDma.scala:283:7, :319:24, :320:24
-        lineCounter = _RANDOM[3'h3][18:3];	// src/hive/scala/main/HiveCoreDma.scala:283:7, :320:24, :321:28
-        nCnt = {_RANDOM[3'h3][31:19], _RANDOM[3'h4][2:0]};	// src/hive/scala/main/HiveCoreDma.scala:283:7, :320:24, :322:21
-        errReg = _RANDOM[3'h4][3];	// src/hive/scala/main/HiveCoreDma.scala:283:7, :322:21, :323:23
-        ostCredit = _RANDOM[3'h4][15:4];	// src/hive/scala/main/HiveCoreDma.scala:283:7, :322:21, :324:26
+          _RANDOM[i] = `RANDOM;	// src/hive/scala/main/HiveCoreDma.scala:286:7
+        end	// src/hive/scala/main/HiveCoreDma.scala:286:7
+        state = _RANDOM[3'h0][2:0];	// src/hive/scala/main/HiveCoreDma.scala:286:7, :316:22
+        curAddr = {_RANDOM[3'h0][31:3], _RANDOM[3'h1][2:0]};	// src/hive/scala/main/HiveCoreDma.scala:286:7, :316:22, :321:24
+        colAddr = {_RANDOM[3'h1][31:3], _RANDOM[3'h2][2:0]};	// src/hive/scala/main/HiveCoreDma.scala:286:7, :321:24, :322:24
+        rowStep = {_RANDOM[3'h2][31:3], _RANDOM[3'h3][2:0]};	// src/hive/scala/main/HiveCoreDma.scala:286:7, :322:24, :323:24
+        lineCounter = _RANDOM[3'h3][18:3];	// src/hive/scala/main/HiveCoreDma.scala:286:7, :323:24, :324:28
+        nCnt = {_RANDOM[3'h3][31:19], _RANDOM[3'h4][2:0]};	// src/hive/scala/main/HiveCoreDma.scala:286:7, :323:24, :325:21
+        errReg = _RANDOM[3'h4][3];	// src/hive/scala/main/HiveCoreDma.scala:286:7, :325:21, :326:23
+        ostCredit = _RANDOM[3'h4][9:4];	// src/hive/scala/main/HiveCoreDma.scala:286:7, :325:21, :327:26
+        isFloat = _RANDOM[3'h4][10];	// src/hive/scala/main/HiveCoreDma.scala:286:7, :325:21, :353:24
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveCoreDma.scala:283:7
-      `FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveCoreDma.scala:283:7
+    `ifdef FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveCoreDma.scala:286:7
+      `FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveCoreDma.scala:286:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_doneBlock = ~_GEN_3 & _GEN_1 & _GEN_2;	// src/hive/scala/main/HiveCoreDma.scala:283:7, :338:16, :359:17, :391:28, :392:{26,50}, src/utils/Stream/Stream.scala:43:26
-  assign io_busy = |state;	// src/hive/scala/main/HiveCoreDma.scala:283:7, :313:22, :336:20
-  assign io_err = errReg;	// src/hive/scala/main/HiveCoreDma.scala:283:7, :323:23
-  assign io_dmaExtWrIF_req_valid = io_dmaExtWrIF_req_valid_0;	// src/hive/scala/main/HiveCoreDma.scala:283:7, :329:61
-  assign io_dmaExtWrIF_req_payload_addr = curAddr;	// src/hive/scala/main/HiveCoreDma.scala:283:7, :318:24
-  assign io_dmaExtWrIF_req_payload_data = io_bufPop_payload;	// src/hive/scala/main/HiveCoreDma.scala:283:7
-  assign io_bufPop_ready = io_bufPop_ready_0;	// src/hive/scala/main/HiveCoreDma.scala:283:7, :333:61
+  assign io_doneBlock = ~_GEN_19 & _GEN_17 & _GEN_18;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :365:16, :386:17, :418:28, :419:{26,50}, src/utils/Stream/Stream.scala:43:26
+  assign io_busy = |state;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :316:22, :363:20
+  assign io_err = errReg;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :326:23
+  assign io_dmaExtWrIF_req_valid = io_dmaExtWrIF_req_valid_0;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :356:61
+  assign io_dmaExtWrIF_req_payload_addr = curAddr;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :321:24
+  assign io_dmaExtWrIF_req_payload_data = isFloat ? popDataFpNorm : io_bufPop_payload;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :345:8, :353:24, :358:48
+  assign io_bufPop_ready = io_bufPop_ready_0;	// src/hive/scala/main/HiveCoreDma.scala:286:7, :360:61
 endmodule
 

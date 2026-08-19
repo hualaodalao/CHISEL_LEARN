@@ -2,8 +2,8 @@
 module Hive_HiveMacInt(	// src/hive/scala/main/HiveWorkUnit.scala:145:7
   input  [15:0] io_a,	// src/hive/scala/main/HiveWorkUnit.scala:146:14
                 io_b,	// src/hive/scala/main/HiveWorkUnit.scala:146:14
-  input  [31:0] io_c,	// src/hive/scala/main/HiveWorkUnit.scala:146:14
-  output [31:0] io_sum	// src/hive/scala/main/HiveWorkUnit.scala:146:14
+  input  [39:0] io_c,	// src/hive/scala/main/HiveWorkUnit.scala:146:14
+  output [39:0] io_sum	// src/hive/scala/main/HiveWorkUnit.scala:146:14
 );
 
   wire [31:0] _mul_io_prod;	// src/hive/scala/main/HiveWorkUnit.scala:152:19
@@ -14,7 +14,7 @@ module Hive_HiveMacInt(	// src/hive/scala/main/HiveWorkUnit.scala:145:7
   );	// src/hive/scala/main/HiveWorkUnit.scala:152:19
   Hive_HiveAddInt add (	// src/hive/scala/main/HiveWorkUnit.scala:162:19
     .io_cReg (io_c),
-    .io_prod (_mul_io_prod),	// src/hive/scala/main/HiveWorkUnit.scala:152:19
+    .io_prod ({{8{_mul_io_prod[31]}}, _mul_io_prod}),	// src/hive/scala/main/HiveWorkUnit.scala:152:19, :159:{26,31,52}
     .io_sum  (io_sum)
   );	// src/hive/scala/main/HiveWorkUnit.scala:162:19
 endmodule

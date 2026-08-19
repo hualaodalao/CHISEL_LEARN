@@ -1,8 +1,8 @@
-Hive_ram_128x256.sv
-Hive_Queue128_UInt256.sv
+Hive_ram_32x256.sv
+Hive_Queue32_UInt256.sv
 Hive_StreamFifo.sv
-Hive_ram_2048x512.sv
-Hive_Queue2048_UInt512.sv
+Hive_ram_32x640.sv
+Hive_Queue32_UInt640.sv
 Hive_StreamFifo_2.sv
 Hive_HiveCoreScratchpad.sv
 Hive_HiveCoreDmaRdOnly.sv
@@ -14,8 +14,6 @@ Hive_HiveMulInt.sv
 Hive_HiveAddInt.sv
 Hive_HiveMacInt.sv
 Hive_HiveCvtOpFp.sv
-Hive_HiveMulFp.sv
-Hive_HiveAddFp.sv
 Hive_HiveMacFp.sv
 Hive_HiveWorkUnit.sv
 Hive_HiveWorker.sv
