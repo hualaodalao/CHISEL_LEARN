@@ -112,15 +112,16 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
     // ==========================================================================
   // 寄存器组定义
   // ==========================================================================
-  // 地址  名称
-  // 0x00  REG_M/N       M/N 维度
-  // 0x01  REG_K         K 维度
-  // 0x02  REG_A_ADDR    A 矩阵基地址
-  // 0x03  REG_B_ADDR    B 矩阵基地址
-  // 0x04  REG_C_ADDR    C 矩阵基地址
-  // 0x05  REG_A/B/C_STRIDE  A/B/C 行步长
-  // 0x06  REG_FMT_RND   [3:0]=fmt, [11:4]=rnd
-  // 0x07  REG_CONTROL   [0]=clear_done (写1清除)
+  // 地址  名称（与下方 regs 索引 defs 一一对应）
+  // 0x00  REG_M         M 维度
+  // 0x01  REG_N         N 维度
+  // 0x02  REG_K         K 维度
+  // 0x03  REG_A_ADDR    A 矩阵基地址
+  // 0x04  REG_B_ADDR    B 矩阵基地址
+  // 0x05  REG_C_ADDR    C 矩阵基地址
+  // 0x06  REG_A/B/C_STRIDE  A/B/C 行步长（[3:0]/[7:4]/[11:8]，各 4bit）
+  // 0x07  REG_CONTROL   [0]=clear_done (写1清除), [1:0]=fmt, [4:2]=rnd,
+  //                     [5]=loadWMode (0=垂直加载, 1=水平 loadW 加载)
   // 0x08  REG_STATUS    [0]=busy, [1]=done, [2]=err, [31:16]=progress (只读)
 
   val regs = Vec(cfg.registerNum, UInt(32.W))
@@ -139,6 +140,9 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
   def rnd = regs(7)(4, 2).asTypeOf(RoundingMode())
   def isFloat = fmt === DataFormat.BF16 | fmt === DataFormat.FP16
   //def loopMode = regs(7)(5).asTypeOf(HiveCoreLoopMode())
+  // 权重加载模式位：0=垂直加载（loadV 经 psum 口下沉，既有行为），
+  // 1=水平 loadW 加载（权重经 a 数据链水平移位 + 末拍广播锁存，B 内存转置存储）
+  def loadWMode = regs(7)(5)
 }
 object HiveCoreRegister {
   def apply(cfg: HiveCoreConfig) = new HiveCoreRegister(cfg)

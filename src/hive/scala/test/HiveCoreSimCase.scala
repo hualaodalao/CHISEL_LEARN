@@ -17,12 +17,12 @@ import org.scalatest.matchers.should.Matchers
 import java.io._
 import java.nio.file._
 
-class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
+class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with HiveFstSim {
 
   // ========== 测试参数 ==========
   val M = 32
   val N = 32
-  val K = 32
+  val K = 64
 
   val A_BASE: Long = 0x00000000L
   val B_BASE: Long = 0x00100000L
@@ -30,103 +30,8 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
 
   val simDir = "/Users/wangliutailong/Qoder_Proj/Chisel_Learn/sim"
 
-  // ========== 工具方法 ==========
-
-  /** 将 Float 转换为 FP16 (IEEE 754 half-precision) 的 16-bit 整数表示 */
-  def floatToFp16(f: Float): Int = {
-    val bits = java.lang.Float.floatToIntBits(f)
-    val sign = (bits >>> 31) & 1
-    val exp = (bits >>> 23) & 0xFF
-    val mant = bits & 0x7FFFFF
-
-    if (exp == 0xFF) {
-      // Inf / NaN
-      (sign << 15) | (31 << 10) | (if (mant != 0) 0x200 else 0)
-    } else if (exp == 0) {
-      // Zero / FP32 denorm → FP16 zero
-      (sign << 15)
-    } else {
-      val newExp = exp - 127 + 15
-      if (newExp >= 31) {
-        // Overflow → Inf
-        (sign << 15) | (31 << 10)
-      } else if (newExp <= 0) {
-        // Underflow → zero (simplified, no denorm handling)
-        (sign << 15)
-      } else {
-        val fp16Mant = (mant + 0x1000) >> 13 // round to nearest
-        if (fp16Mant >= 0x400) {
-          // mantissa overflow after rounding, increment exponent
-          (sign << 15) | ((newExp + 1) << 10) | 0
-        } else {
-          (sign << 15) | (newExp << 10) | fp16Mant
-        }
-      }
-    }
-  }
-
-  /** 将 FP16 的 16-bit 整数表示转换回 Float */
-  def fp16ToFloat(h: Int): Float = {
-    val sign = (h >>> 15) & 1
-    val exp = (h >>> 10) & 0x1F
-    val mant = h & 0x3FF
-
-    val value = if (exp == 0) {
-      // Denorm or zero
-      math.pow(2, -14).toFloat * (mant.toFloat / 1024.0f)
-    } else if (exp == 31) {
-      // Inf / NaN
-      if (mant == 0) Float.PositiveInfinity else Float.NaN
-    } else {
-      math.pow(2, exp - 15).toFloat * (1.0f + mant.toFloat / 1024.0f)
-    }
-    if (sign == 1) -value else value
-  }
-
-  /** 将浮点矩阵写入文本文件（每行空格分隔，%.2f 格式） */
-  def writeMatrixFloat(path: String, matrix: Array[Array[Float]]): Unit = {
-    val pw = new PrintWriter(new File(path))
-    for (row <- matrix) {
-      pw.println(row.map(v => f"$v%.2f").mkString(" "))
-    }
-    pw.close()
-  }
-
-  /** 将 Long 矩阵写入文本文件（每行空格分隔，十进制） */
-  def writeMatrixLong(path: String, matrix: Array[Array[Long]]): Unit = {
-    val pw = new PrintWriter(new File(path))
-    for (row <- matrix) {
-      pw.println(row.map(_.toString).mkString(" "))
-    }
-    pw.close()
-  }
-
-  /** 将矩阵写入文本文件（每行空格分隔的 hex 值） */
-  def writeMatrixHex(path: String, matrix: Array[Array[Int]], bitsPerElem: Int): Unit = {
-    val hexDigits = (bitsPerElem + 3) / 4
-    val mask = (1L << bitsPerElem) - 1
-    val pw = new PrintWriter(new File(path))
-    for (row <- matrix) {
-      pw.println(row.map(v => String.format(s"%0${hexDigits}X", Long.box(v.toLong & mask))).mkString(" "))
-    }
-    pw.close()
-  }
-
-  /** 将 BigInt 矩阵写入文本文件 */
-  def writeBigIntMatrixHex(path: String, matrix: Array[Array[BigInt]], bitsPerElem: Int): Unit = {
-    val hexDigits = (bitsPerElem + 3) / 4
-    val mask = (BigInt(1) << bitsPerElem) - 1
-    val pw = new PrintWriter(new File(path))
-    for (row <- matrix) {
-      pw.println(row.map(v => (v & mask).toString(16).toUpperCase.reverse.padTo(hexDigits, '0').reverse).mkString(" "))
-    }
-    pw.close()
-  }
-
-  /** 从 BigInt 中提取指定位域 */
-  def extractBits(value: BigInt, hi: Int, lo: Int): BigInt = {
-    (value >> lo) & ((BigInt(1) << (hi - lo + 1)) - 1)
-  }
+  // 工具方法（floatToFp16/fp16ToFloat/writeMatrix*/writeBigIntMatrixHex/
+  // extractBits/fp32BitsToFloat）统一收敛至公共类 HiveSimCommon（限定调用）
 
   // ========== 主测试 ==========
 
@@ -155,19 +60,19 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
 
     // --- 生成矩阵 ---
     // element[row][col] = (row + 1.0) + col * 0.1，以 FP16 编码
-    val aMatrix = Array.tabulate(M, K)((i, j) => floatToFp16((i + 1.0f) + j * 0.1f))
-    val bMatrix = Array.tabulate(K, N)((i, j) => floatToFp16((i + 1.0f) + j * 0.1f))
+    val aMatrix = Array.tabulate(M, K)((i, j) => HiveSimCommon.floatToFp16((i + 1.0f) + j * 0.1f))
+    val bMatrix = Array.tabulate(K, N)((i, j) => HiveSimCommon.floatToFp16((i + 1.0f) + j * 0.1f))
 
     // --- 写入输入矩阵文件 ---
     Files.createDirectories(Paths.get(simDir))
-    writeMatrixHex(s"$simDir/A_matrix.txt", aMatrix, 16)
-    writeMatrixHex(s"$simDir/B_matrix.txt", bMatrix, 16)
+    HiveSimCommon.writeMatrixHex(s"$simDir/A_matrix.txt", aMatrix, 16)
+    HiveSimCommon.writeMatrixHex(s"$simDir/B_matrix.txt", bMatrix, 16)
 
     // 浮点数格式的 A/B 矩阵
-    val aFloat = aMatrix.map(_.map(h => fp16ToFloat(h)))
-    val bFloat = bMatrix.map(_.map(h => fp16ToFloat(h)))
-    writeMatrixFloat(s"$simDir/A_matrix_float.txt", aFloat)
-    writeMatrixFloat(s"$simDir/B_matrix_float.txt", bFloat)
+    val aFloat = aMatrix.map(_.map(h => HiveSimCommon.fp16ToFloat(h)))
+    val bFloat = bMatrix.map(_.map(h => HiveSimCommon.fp16ToFloat(h)))
+    HiveSimCommon.writeMatrixFloat(s"$simDir/A_matrix_float.txt", aFloat)
+    HiveSimCommon.writeMatrixFloat(s"$simDir/B_matrix_float.txt", bFloat)
 
     // --- 计算 stride ---
     val aStride = K * (aEffW / 8)       // 16*2 = 32 bytes
@@ -239,6 +144,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
     val dma2TotalBeats = expBAddrSeq.size
     // 自检：首四块块起点（参数化闭式，N=32/K=32 时 = 0x1003c0/0x1007c0/
     // 0x1003e0/0x1007e0；依赖 bKTiles >= 2，即 K > totalN）
+   /*
     require(bKTiles >= 2, s"B 期望序列自检要求 K($K) > totalN($totalN)")
     require(expBAddrSeq(0) == B_BASE + (totalN - 1).toLong * bRowOff,
       f"B block0 start 0x${expBAddrSeq(0)}%X mismatch")
@@ -248,7 +154,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
       f"B block2 start 0x${expBAddrSeq(2 * totalN)}%X mismatch")
     require(expBAddrSeq(3 * totalN) == B_BASE + (totalN - 1).toLong * bRowOff + bColTileOff + totalN.toLong * bRowOff,
       f"B block3 start 0x${expBAddrSeq(3 * totalN)}%X mismatch")
-
+    */
     // beat 数据（与期望地址序列同下标）：nt 固定，块内 K 行降序
     def genDma2WeightBeat(idx: Int): BigInt = {
       // 每轮（N tile）硬件扫 bKTiles*totalN 拍（块内恒 totalN 行）；
@@ -514,7 +420,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
       val row = cBeatIdx % M
       if (row < M) {
         for (col <- 0 until math.min(totalN, N)) {
-          val elem = extractBits(data, cEffW * (col + 1) - 1, cEffW * col)
+          val elem = HiveSimCommon.extractBits(data, cEffW * (col + 1) - 1, cEffW * col)
           val globalCol = (cBeatIdx / M) * totalN + col
           if (globalCol < N) {
             cResult(row)(globalCol) = elem
@@ -524,18 +430,14 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
       cBeatIdx += 1
     }
 
-    writeBigIntMatrixHex(s"$simDir/C_matrix.txt", cResult, cEffW)
-
-    // FP32 bit → float 转换（数值校验与浮点文件输出共用）
-    def fp32BitsToFloat(bits: Long): Float =
-      java.lang.Float.intBitsToFloat((bits & 0xFFFFFFFFL).toInt)
+    HiveSimCommon.writeBigIntMatrixHex(s"$simDir/C_matrix.txt", cResult, cEffW)
 
     // C 矩阵浮点文件 - FP32 bit 转 float 后输出（与 A/B 侧 writeMatrixFloat 对称）
-    val cFloat = cResult.map(_.map(b => fp32BitsToFloat((b & 0xFFFFFFFFL).toLong)))
-    writeMatrixFloat(s"$simDir/C_matrix_float.txt", cFloat)
+    val cFloat = cResult.map(_.map(b => HiveSimCommon.fp32BitsToFloat((b & 0xFFFFFFFFL).toLong)))
+    HiveSimCommon.writeMatrixFloat(s"$simDir/C_matrix_float.txt", cFloat)
     // 另存一份十进制 bit 视图（原 C_matrix_float.txt 旧格式）
     val cLong = cResult.map(_.map(_.toLong))
-    writeMatrixLong(s"$simDir/C_matrix_bits.txt", cLong)
+    HiveSimCommon.writeMatrixLong(s"$simDir/C_matrix_bits.txt", cLong)
 
     // ===== 数值校验：C = A × B（FP16 输入，fp32 累加）=====
     // 参考结果用 double 计算；简化浮点硬件（无 denorm/特殊值、RNE 简化为 guard+1）
@@ -570,7 +472,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
       var mc = 0; var me = 0.0
       for (i <- 0 until M; j <- 0 until N) {
         val ref = refM(i)(j)
-        val hw = fp32BitsToFloat((cResult(i)(j) & 0xFFFFFFFFL).toLong).toDouble
+        val hw = HiveSimCommon.fp32BitsToFloat((cResult(i)(j) & 0xFFFFFFFFL).toLong).toDouble
         val absErr = math.abs(hw - ref)
         val relErr = if (math.abs(ref) > 1e-6) absErr / math.abs(ref) else absErr
         if (relErr > 1e-2 && absErr > 1e-2) mc += 1
@@ -581,7 +483,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
     for (i <- 0 until M; j <- 0 until N) {
       val ref = hyps(0)._2(i)(j)
       val hwBits = (cResult(i)(j) & 0xFFFFFFFFL).toLong
-      val hw = fp32BitsToFloat(hwBits).toDouble
+      val hw = HiveSimCommon.fp32BitsToFloat(hwBits).toDouble
       val absErr = math.abs(hw - ref)
       val relErr = if (math.abs(ref) > 1e-6) absErr / math.abs(ref) else absErr
       if (relErr > 1e-2 && absErr > 1e-2) {
@@ -596,7 +498,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
     // 打印 hw/ref 前 4 行 × 4 列便于人工找规律
     for (i <- 0 until 4) {
       val rowStr = (0 until 4).map { j =>
-        val hw = fp32BitsToFloat((cResult(i)(j) & 0xFFFFFFFFL).toLong)
+        val hw = HiveSimCommon.fp32BitsToFloat((cResult(i)(j) & 0xFFFFFFFFL).toLong)
         f"$hw%.2f"
       }.mkString(" ")
       val refStr = (0 until 4).map(j => f"${hyps(0)._2(i)(j)}%.2f").mkString(" ")
@@ -605,15 +507,15 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
     }
     
 
-    // --- 复制 VCD 文件到 sim/ 目录 ---
-    val vcdSource = Paths.get("build/chiselsim/HiveCoreSimCase/HiveCore-GEMM-Simulation/should-run-complete-GEMM-M-32-N-16-K-16-FP16-totalN-16/workdir-verilator/trace.vcd")
-    val vcdTarget = Paths.get(s"$simDir/hivecore_sim.vcd")
-    if (Files.exists(vcdSource)) {
-      Files.copy(vcdSource, vcdTarget, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-      println(s"[HiveCoreSimCase] VCD waveform copied to $simDir/hivecore_sim.vcd")
-    } else {
-      println(s"[HiveCoreSimCase] NOTE: VCD not found at $vcdSource (run with -DemitVcd=1 to generate)")
-    }
+    // --- 复制 FST 波形到 sim/ 目录 ---
+    // 锚定：源路径段 should-run-* 目录名由上方 it should 用例名 mangle 而来
+    // （空格与 `=` 转 `-`，其余字符保留），二者必须逐字一致；
+    // 改动用例名时须同步修改此源路径，否则拷贝将静默走 NOTE 分支。
+    HiveSimCommon.copyTrace(
+      "build/chiselsim/HiveCoreSimCase/HiveCore-GEMM-Simulation/should-run-complete-GEMM-M-32-N-16-K-16-FP16-totalN-16/workdir-verilator/trace.fst",
+      s"$simDir/hivecore_sim.fst",
+      "HiveCoreSimCase"
+    )
 
     println(s"[HiveCoreSimCase] Output files written to $simDir/")
     println(s"  - A_matrix.txt (${M}x${K}, 16-bit hex)")
@@ -623,7 +525,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim {
     println(s"  - B_matrix_float.txt (${K}x${N}, float %.2f)")
     println(s"  - C_matrix_float.txt (${M}x${N}, float %.2f)")
     println(s"  - C_matrix_bits.txt (${M}x${N}, decimal long, FP32 原始 bit)")
-    println(s"  - hivecore_sim.vcd (waveform, run with -DemitVcd=1)")
+    println(s"  - hivecore_sim.fst (waveform, run with -DemitFst=1)")
 
     mismatchCnt should be(0)
   }

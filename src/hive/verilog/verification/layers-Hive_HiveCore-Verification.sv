@@ -2,4 +2,5 @@
 `ifndef layers_Hive_HiveCore_Verification	// src/hive/scala/main/HiveCore.scala:21:7
   `define layers_Hive_HiveCore_Verification
   `include "layers-Hive_HiveCoreExecutor2-Verification.sv"	// src/hive/scala/main/HiveCore.scala:21:7
+  `include "layers-Hive_HiveComb-Verification.sv"	// src/hive/scala/main/HiveCore.scala:21:7
 `endif // not def layers_Hive_HiveCore_Verification

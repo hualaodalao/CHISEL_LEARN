@@ -83,12 +83,15 @@ class ForagerBee(cfg: ForagerBeeConfig = ForagerBeeConfig()) extends Module {
   val doneArbOut = StreamArbiterFactory().roundRobin.transactionLock.on(engines.map(_.io.done))
 
   // --- 链式描述符控制器集成 ---
+  val expander = Module(new FbTile2LinearExpander(cfg))
+
   if (cfg.enableChaining) {
     val chainCtrl = Module(new FbChainController(cfg))
     // io.cmd → chainCtrl.cmdIn
     chainCtrl.io.cmdIn << io.cmd
-    // chainCtrl.cmdOut → dispatcher
-    dispatcher.io.push << chainCtrl.io.cmdOut
+    // chainCtrl.cmdOut → expander → dispatcher
+    expander.io.in << chainCtrl.io.cmdOut
+    dispatcher.io.push << expander.io.out
     // engines done → chainCtrl.doneIn
     chainCtrl.io.doneIn << doneArbOut
     // chainCtrl.doneOut → io.done
@@ -96,8 +99,9 @@ class ForagerBee(cfg: ForagerBeeConfig = ForagerBeeConfig()) extends Module {
     // chainBus 连接
     io.chainBus.get <> chainCtrl.io.chainBus
   } else {
-    // 直连模式
-    dispatcher.io.push << io.cmd
+    // 直连模式：io.cmd → expander → dispatcher
+    expander.io.in << io.cmd
+    dispatcher.io.push << expander.io.out
     io.done << doneArbOut
   }
 

@@ -55,21 +55,35 @@ module Fb_FbChainController(	// src/foragerbee/scala/main/FbChainController.scal
                  io_cmdIn_payload_shape_1,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdIn_payload_shape_2,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdIn_payload_shape_3,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdIn_payload_shape_4,	// src/foragerbee/scala/main/FbChainController.scala:64:14
   input  [31:0]  io_cmdIn_payload_srcStride_0,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdIn_payload_srcStride_1,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdIn_payload_srcStride_2,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdIn_payload_srcStride_3,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdIn_payload_srcStride_4,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdIn_payload_dstStride_0,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdIn_payload_dstStride_1,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdIn_payload_dstStride_2,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdIn_payload_dstStride_3,	// src/foragerbee/scala/main/FbChainController.scala:64:14
-                 io_cmdIn_payload_srcAddr,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdIn_payload_dstStride_4,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+  input  [15:0]  io_cmdIn_payload_srcStartIdx_0,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdIn_payload_srcStartIdx_1,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdIn_payload_srcStartIdx_2,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdIn_payload_srcStartIdx_3,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdIn_payload_srcStartIdx_4,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdIn_payload_t2lMatCols,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdIn_payload_t2lTileRows,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdIn_payload_t2lTileCols,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdIn_payload_t2lNumTileRows,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdIn_payload_t2lNumTileCols,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+  input  [31:0]  io_cmdIn_payload_srcAddr,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdIn_payload_dstAddr,	// src/foragerbee/scala/main/FbChainController.scala:64:14
   input  [1:0]   io_cmdIn_payload_elemBytesLog2,	// src/foragerbee/scala/main/FbChainController.scala:64:14
   input  [2:0]   io_cmdIn_payload_permVec_0,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdIn_payload_permVec_1,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdIn_payload_permVec_2,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdIn_payload_permVec_3,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdIn_payload_permVec_4,	// src/foragerbee/scala/main/FbChainController.scala:64:14
   input  [15:0]  io_cmdIn_payload_padBefore_0,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdIn_payload_padBefore_1,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdIn_payload_padAfter_0,	// src/foragerbee/scala/main/FbChainController.scala:64:14
@@ -103,21 +117,35 @@ module Fb_FbChainController(	// src/foragerbee/scala/main/FbChainController.scal
                  io_cmdOut_payload_shape_1,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdOut_payload_shape_2,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdOut_payload_shape_3,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdOut_payload_shape_4,	// src/foragerbee/scala/main/FbChainController.scala:64:14
   output [31:0]  io_cmdOut_payload_srcStride_0,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdOut_payload_srcStride_1,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdOut_payload_srcStride_2,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdOut_payload_srcStride_3,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdOut_payload_srcStride_4,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdOut_payload_dstStride_0,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdOut_payload_dstStride_1,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdOut_payload_dstStride_2,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdOut_payload_dstStride_3,	// src/foragerbee/scala/main/FbChainController.scala:64:14
-                 io_cmdOut_payload_srcAddr,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdOut_payload_dstStride_4,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+  output [15:0]  io_cmdOut_payload_srcStartIdx_0,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdOut_payload_srcStartIdx_1,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdOut_payload_srcStartIdx_2,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdOut_payload_srcStartIdx_3,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdOut_payload_srcStartIdx_4,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdOut_payload_t2lMatCols,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdOut_payload_t2lTileRows,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdOut_payload_t2lTileCols,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdOut_payload_t2lNumTileRows,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdOut_payload_t2lNumTileCols,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+  output [31:0]  io_cmdOut_payload_srcAddr,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdOut_payload_dstAddr,	// src/foragerbee/scala/main/FbChainController.scala:64:14
   output [1:0]   io_cmdOut_payload_elemBytesLog2,	// src/foragerbee/scala/main/FbChainController.scala:64:14
   output [2:0]   io_cmdOut_payload_permVec_0,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdOut_payload_permVec_1,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdOut_payload_permVec_2,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdOut_payload_permVec_3,	// src/foragerbee/scala/main/FbChainController.scala:64:14
+                 io_cmdOut_payload_permVec_4,	// src/foragerbee/scala/main/FbChainController.scala:64:14
   output [15:0]  io_cmdOut_payload_padBefore_0,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdOut_payload_padBefore_1,	// src/foragerbee/scala/main/FbChainController.scala:64:14
                  io_cmdOut_payload_padAfter_0,	// src/foragerbee/scala/main/FbChainController.scala:64:14
@@ -169,33 +197,33 @@ module Fb_FbChainController(	// src/foragerbee/scala/main/FbChainController.scal
   reg  [255:0] descRegs_2;	// src/foragerbee/scala/main/FbChainController.scala:91:22
   reg  [1:0]   fetchCnt;	// src/foragerbee/scala/main/FbChainController.scala:92:26
   reg          fetchSent;	// src/foragerbee/scala/main/FbChainController.scala:93:26
-  wire         _GEN = state == 3'h0;	// src/foragerbee/scala/main/FbChainController.scala:83:22, :209:17
-  wire         _GEN_0 = state == 3'h1;	// src/foragerbee/scala/main/FbChainController.scala:83:22, :209:17, :227:22
-  wire         io_doneIn_ready_0 = _GEN ? io_doneOut_ready : _GEN_0;	// src/foragerbee/scala/main/FbChainController.scala:209:17, :220:34
-  wire         _GEN_1 = io_doneIn_valid & io_doneIn_ready_0;	// src/foragerbee/scala/main/FbChainController.scala:209:17, :220:34, src/utils/Stream/Stream.scala:43:26
-  wire         _GEN_2 = _GEN_0 & _GEN_1;	// src/foragerbee/scala/main/FbChainController.scala:88:29, :209:17, :237:28, :238:18, src/utils/Stream/Stream.scala:43:26
-  wire         _GEN_3 = nextDescAddr == 32'h0 | io_doneIn_payload_err;	// src/foragerbee/scala/main/FbChainController.scala:86:29, :239:{27,35}
-  wire         _GEN_4 = _GEN_0 & _GEN_1 & _GEN_3;	// src/foragerbee/scala/main/FbChainController.scala:111:22, :209:17, :237:28, :239:{35,61}, :242:39, src/utils/Stream/Stream.scala:43:26
-  wire         _GEN_5 = state == 3'h2;	// src/foragerbee/scala/main/FbChainController.scala:83:22, :209:17, :250:21
-  wire         _GEN_6 = _GEN | _GEN_0;	// src/foragerbee/scala/main/FbChainController.scala:114:31, :209:17
-  wire         io_chainBus_rd_valid_0 = ~_GEN_6 & _GEN_5 & ~fetchSent;	// src/foragerbee/scala/main/FbChainController.scala:93:26, :114:31, :209:17, :257:{12,24}
-  wire         _GEN_7 = _GEN_5 & ~fetchSent;	// src/foragerbee/scala/main/FbChainController.scala:93:26, :115:31, :209:17, :257:{12,24}, :259:37
-  wire         io_chainBus_rdData_ready_0 = ~_GEN_6 & _GEN_5;	// src/foragerbee/scala/main/FbChainController.scala:114:31, :117:31, :209:17
-  wire         _GEN_8 = state == 3'h3;	// src/foragerbee/scala/main/FbChainController.scala:83:22, :209:17, :272:17
-  wire         _GEN_9 = _GEN_0 | _GEN_5;	// src/foragerbee/scala/main/FbChainController.scala:106:21, :209:17
-  wire         io_cmdOut_valid_0 = _GEN ? io_cmdIn_valid : ~_GEN_9 & _GEN_8;	// src/foragerbee/scala/main/FbChainController.scala:106:21, :209:17, :212:25
-  wire         _GEN_10 = _GEN_9 | ~_GEN_8;	// src/foragerbee/scala/main/FbChainController.scala:106:21, :107:21, :209:17
+  wire         _GEN = state == 3'h0;	// src/foragerbee/scala/main/FbChainController.scala:83:22, :217:17
+  wire         _GEN_0 = state == 3'h1;	// src/foragerbee/scala/main/FbChainController.scala:83:22, :217:17, :235:22
+  wire         io_doneIn_ready_0 = _GEN ? io_doneOut_ready : _GEN_0;	// src/foragerbee/scala/main/FbChainController.scala:217:17, :228:34
+  wire         _GEN_1 = io_doneIn_valid & io_doneIn_ready_0;	// src/foragerbee/scala/main/FbChainController.scala:217:17, :228:34, src/utils/Stream/Stream.scala:43:26
+  wire         _GEN_2 = _GEN_0 & _GEN_1;	// src/foragerbee/scala/main/FbChainController.scala:88:29, :217:17, :245:28, :246:18, src/utils/Stream/Stream.scala:43:26
+  wire         _GEN_3 = nextDescAddr == 32'h0 | io_doneIn_payload_err;	// src/foragerbee/scala/main/FbChainController.scala:86:29, :247:{27,35}
+  wire         _GEN_4 = _GEN_0 & _GEN_1 & _GEN_3;	// src/foragerbee/scala/main/FbChainController.scala:111:22, :217:17, :245:28, :247:{35,61}, :250:39, src/utils/Stream/Stream.scala:43:26
+  wire         _GEN_5 = state == 3'h2;	// src/foragerbee/scala/main/FbChainController.scala:83:22, :217:17, :258:21
+  wire         _GEN_6 = _GEN | _GEN_0;	// src/foragerbee/scala/main/FbChainController.scala:114:31, :217:17
+  wire         io_chainBus_rd_valid_0 = ~_GEN_6 & _GEN_5 & ~fetchSent;	// src/foragerbee/scala/main/FbChainController.scala:93:26, :114:31, :217:17, :265:{12,24}
+  wire         _GEN_7 = _GEN_5 & ~fetchSent;	// src/foragerbee/scala/main/FbChainController.scala:93:26, :115:31, :217:17, :265:{12,24}, :267:37
+  wire         io_chainBus_rdData_ready_0 = ~_GEN_6 & _GEN_5;	// src/foragerbee/scala/main/FbChainController.scala:114:31, :117:31, :217:17
+  wire         _GEN_8 = state == 3'h3;	// src/foragerbee/scala/main/FbChainController.scala:83:22, :217:17, :280:17
+  wire         _GEN_9 = _GEN_0 | _GEN_5;	// src/foragerbee/scala/main/FbChainController.scala:106:21, :217:17
+  wire         io_cmdOut_valid_0 = _GEN ? io_cmdIn_valid : ~_GEN_9 & _GEN_8;	// src/foragerbee/scala/main/FbChainController.scala:106:21, :217:17, :220:25
+  wire         _GEN_10 = _GEN_9 | ~_GEN_8;	// src/foragerbee/scala/main/FbChainController.scala:106:21, :107:21, :217:17
   wire [7:0]   io_cmdOut_payload_tag_0 =
-    _GEN ? io_cmdIn_payload_tag : _GEN_10 ? 8'h0 : descRegs_0[9:2];	// src/foragerbee/scala/main/FbChainController.scala:91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_tag : _GEN_10 ? 8'h0 : descRegs_0[9:2];	// src/foragerbee/scala/main/FbChainController.scala:91:22, :107:21, :125:68, :217:17, :221:25
   wire [31:0]  io_cmdOut_payload_nextDescAddr_0 =
-    _GEN ? io_cmdIn_payload_nextDescAddr : _GEN_10 ? 32'h0 : descRegs_1[250:219];	// src/foragerbee/scala/main/FbChainController.scala:91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_nextDescAddr : _GEN_10 ? 32'h0 : descRegs_2[77:46];	// src/foragerbee/scala/main/FbChainController.scala:91:22, :107:21, :125:68, :217:17, :221:25
   wire         io_cmdOut_payload_chainMode_0 =
-    _GEN ? io_cmdIn_payload_chainMode : ~_GEN_9 & _GEN_8 & descRegs_1[251];	// src/foragerbee/scala/main/FbChainController.scala:91:22, :106:21, :107:21, :125:68, :209:17, :213:25, :280:25
+    _GEN ? io_cmdIn_payload_chainMode : ~_GEN_9 & _GEN_8 & descRegs_2[78];	// src/foragerbee/scala/main/FbChainController.scala:91:22, :106:21, :107:21, :125:68, :217:17, :221:25, :288:25
   always @(posedge clock) begin	// src/foragerbee/scala/main/FbChainController.scala:59:7
     automatic logic _GEN_11;	// src/utils/Stream/Stream.scala:43:26
-    automatic logic _GEN_12;	// src/foragerbee/scala/main/FbChainController.scala:91:22, :268:37, :269:28
-    _GEN_11 = io_chainBus_rdData_valid & io_chainBus_rdData_ready_0;	// src/foragerbee/scala/main/FbChainController.scala:117:31, :209:17, src/utils/Stream/Stream.scala:43:26
-    _GEN_12 = _GEN_11 & fetchCnt == 2'h2;	// src/foragerbee/scala/main/FbChainController.scala:91:22, :92:26, :268:37, :269:28, src/utils/Stream/Stream.scala:43:26
+    automatic logic _GEN_12;	// src/foragerbee/scala/main/FbChainController.scala:91:22, :276:37, :277:28
+    _GEN_11 = io_chainBus_rdData_valid & io_chainBus_rdData_ready_0;	// src/foragerbee/scala/main/FbChainController.scala:117:31, :217:17, src/utils/Stream/Stream.scala:43:26
+    _GEN_12 = _GEN_11 & fetchCnt == 2'h2;	// src/foragerbee/scala/main/FbChainController.scala:91:22, :92:26, :276:37, :277:28, src/utils/Stream/Stream.scala:43:26
     if (reset) begin	// src/foragerbee/scala/main/FbChainController.scala:59:7
       state <= 3'h0;	// src/foragerbee/scala/main/FbChainController.scala:83:22
       nextDescAddr <= 32'h0;	// src/foragerbee/scala/main/FbChainController.scala:86:29
@@ -206,65 +234,65 @@ module Fb_FbChainController(	// src/foragerbee/scala/main/FbChainController.scal
     end
     else begin	// src/foragerbee/scala/main/FbChainController.scala:59:7
       automatic logic _GEN_13;	// src/utils/Stream/Stream.scala:43:26
-      automatic logic _GEN_14;	// src/foragerbee/scala/main/FbChainController.scala:223:27
-      _GEN_13 = io_cmdOut_valid_0 & io_cmdOut_ready;	// src/foragerbee/scala/main/FbChainController.scala:209:17, :212:25, src/utils/Stream/Stream.scala:43:26
-      _GEN_14 = _GEN_13 & io_cmdOut_payload_chainMode_0;	// src/foragerbee/scala/main/FbChainController.scala:209:17, :213:25, :223:27, src/utils/Stream/Stream.scala:43:26
-      if (_GEN) begin	// src/foragerbee/scala/main/FbChainController.scala:209:17
-        if (_GEN_14) begin	// src/foragerbee/scala/main/FbChainController.scala:223:27
-          state <= 3'h1;	// src/foragerbee/scala/main/FbChainController.scala:83:22, :227:22
-          nextDescAddr <= io_cmdOut_payload_nextDescAddr_0;	// src/foragerbee/scala/main/FbChainController.scala:86:29, :209:17, :213:25
+      automatic logic _GEN_14;	// src/foragerbee/scala/main/FbChainController.scala:231:27
+      _GEN_13 = io_cmdOut_valid_0 & io_cmdOut_ready;	// src/foragerbee/scala/main/FbChainController.scala:217:17, :220:25, src/utils/Stream/Stream.scala:43:26
+      _GEN_14 = _GEN_13 & io_cmdOut_payload_chainMode_0;	// src/foragerbee/scala/main/FbChainController.scala:217:17, :221:25, :231:27, src/utils/Stream/Stream.scala:43:26
+      if (_GEN) begin	// src/foragerbee/scala/main/FbChainController.scala:217:17
+        if (_GEN_14) begin	// src/foragerbee/scala/main/FbChainController.scala:231:27
+          state <= 3'h1;	// src/foragerbee/scala/main/FbChainController.scala:83:22, :235:22
+          nextDescAddr <= io_cmdOut_payload_nextDescAddr_0;	// src/foragerbee/scala/main/FbChainController.scala:86:29, :217:17, :221:25
           chainLen <= 16'h1;	// src/foragerbee/scala/main/FbChainController.scala:88:29
         end
       end
-      else begin	// src/foragerbee/scala/main/FbChainController.scala:209:17
-        automatic logic _GEN_15;	// src/foragerbee/scala/main/FbChainController.scala:92:26, :237:28, :239:61
-        automatic logic _GEN_16;	// src/foragerbee/scala/main/FbChainController.scala:86:29, :209:17, :282:28, :284:22
-        _GEN_15 = ~_GEN_1 | _GEN_3;	// src/foragerbee/scala/main/FbChainController.scala:92:26, :237:28, :239:{35,61}, src/utils/Stream/Stream.scala:43:26
-        _GEN_16 = _GEN_8 & _GEN_13;	// src/foragerbee/scala/main/FbChainController.scala:86:29, :209:17, :282:28, :284:22, src/utils/Stream/Stream.scala:43:26
-        if (_GEN_0) begin	// src/foragerbee/scala/main/FbChainController.scala:209:17
+      else begin	// src/foragerbee/scala/main/FbChainController.scala:217:17
+        automatic logic _GEN_15;	// src/foragerbee/scala/main/FbChainController.scala:92:26, :245:28, :247:61
+        automatic logic _GEN_16;	// src/foragerbee/scala/main/FbChainController.scala:86:29, :217:17, :290:28, :292:22
+        _GEN_15 = ~_GEN_1 | _GEN_3;	// src/foragerbee/scala/main/FbChainController.scala:92:26, :245:28, :247:{35,61}, src/utils/Stream/Stream.scala:43:26
+        _GEN_16 = _GEN_8 & _GEN_13;	// src/foragerbee/scala/main/FbChainController.scala:86:29, :217:17, :290:28, :292:22, src/utils/Stream/Stream.scala:43:26
+        if (_GEN_0) begin	// src/foragerbee/scala/main/FbChainController.scala:217:17
           if (_GEN_1)	// src/utils/Stream/Stream.scala:43:26
-            state <= {1'h0, ~_GEN_3, 1'h0};	// src/foragerbee/scala/main/FbChainController.scala:83:22, :239:{35,61}, :245:17, :250:21
-          if (_GEN_15) begin	// src/foragerbee/scala/main/FbChainController.scala:92:26, :237:28, :239:61
+            state <= {1'h0, ~_GEN_3, 1'h0};	// src/foragerbee/scala/main/FbChainController.scala:83:22, :247:{35,61}, :253:17, :258:21
+          if (_GEN_15) begin	// src/foragerbee/scala/main/FbChainController.scala:92:26, :245:28, :247:61
           end
-          else	// src/foragerbee/scala/main/FbChainController.scala:92:26, :237:28, :239:61
+          else	// src/foragerbee/scala/main/FbChainController.scala:92:26, :245:28, :247:61
             fetchCnt <= 2'h0;	// src/foragerbee/scala/main/FbChainController.scala:92:26
         end
-        else begin	// src/foragerbee/scala/main/FbChainController.scala:209:17
-          if (_GEN_5) begin	// src/foragerbee/scala/main/FbChainController.scala:209:17
-            if (_GEN_12)	// src/foragerbee/scala/main/FbChainController.scala:91:22, :268:37, :269:28
-              state <= 3'h3;	// src/foragerbee/scala/main/FbChainController.scala:83:22, :272:17
+        else begin	// src/foragerbee/scala/main/FbChainController.scala:217:17
+          if (_GEN_5) begin	// src/foragerbee/scala/main/FbChainController.scala:217:17
+            if (_GEN_12)	// src/foragerbee/scala/main/FbChainController.scala:91:22, :276:37, :277:28
+              state <= 3'h3;	// src/foragerbee/scala/main/FbChainController.scala:83:22, :280:17
           end
-          else if (_GEN_16)	// src/foragerbee/scala/main/FbChainController.scala:86:29, :209:17, :282:28, :284:22
-            state <= 3'h1;	// src/foragerbee/scala/main/FbChainController.scala:83:22, :227:22
-          if (_GEN_5 & _GEN_11)	// src/foragerbee/scala/main/FbChainController.scala:92:26, :209:17, :268:37, :270:18, src/utils/Stream/Stream.scala:43:26
-            fetchCnt <= fetchCnt + 2'h1;	// src/foragerbee/scala/main/FbChainController.scala:92:26, :270:30
+          else if (_GEN_16)	// src/foragerbee/scala/main/FbChainController.scala:86:29, :217:17, :290:28, :292:22
+            state <= 3'h1;	// src/foragerbee/scala/main/FbChainController.scala:83:22, :235:22
+          if (_GEN_5 & _GEN_11)	// src/foragerbee/scala/main/FbChainController.scala:92:26, :217:17, :276:37, :278:18, src/utils/Stream/Stream.scala:43:26
+            fetchCnt <= fetchCnt + 2'h1;	// src/foragerbee/scala/main/FbChainController.scala:92:26, :278:30
         end
-        if (_GEN_9 | ~_GEN_16) begin	// src/foragerbee/scala/main/FbChainController.scala:86:29, :106:21, :209:17, :282:28, :284:22
+        if (_GEN_9 | ~_GEN_16) begin	// src/foragerbee/scala/main/FbChainController.scala:86:29, :106:21, :217:17, :290:28, :292:22
         end
-        else	// src/foragerbee/scala/main/FbChainController.scala:86:29, :209:17
-          nextDescAddr <= descRegs_1[250:219];	// src/foragerbee/scala/main/FbChainController.scala:86:29, :91:22, :125:68
-        if (_GEN_2)	// src/foragerbee/scala/main/FbChainController.scala:88:29, :209:17, :237:28, :238:18
-          chainLen <= chainLen + 16'h1;	// src/foragerbee/scala/main/FbChainController.scala:88:29, :238:30
+        else	// src/foragerbee/scala/main/FbChainController.scala:86:29, :217:17
+          nextDescAddr <= descRegs_2[77:46];	// src/foragerbee/scala/main/FbChainController.scala:86:29, :91:22, :125:68
+        if (_GEN_2)	// src/foragerbee/scala/main/FbChainController.scala:88:29, :217:17, :245:28, :246:18
+          chainLen <= chainLen + 16'h1;	// src/foragerbee/scala/main/FbChainController.scala:88:29, :246:30
         fetchSent <=
           _GEN_0
             ? _GEN_15 & fetchSent
             : _GEN_5 & ~fetchSent & io_chainBus_rd_valid_0 & io_chainBus_rd_ready
-              | fetchSent;	// src/foragerbee/scala/main/FbChainController.scala:92:26, :93:26, :114:31, :209:17, :237:28, :239:61, :257:{12,24}, :261:35, :262:21, src/utils/Stream/Stream.scala:43:26
+              | fetchSent;	// src/foragerbee/scala/main/FbChainController.scala:92:26, :93:26, :114:31, :217:17, :245:28, :247:61, :265:{12,24}, :269:35, :270:21, src/utils/Stream/Stream.scala:43:26
       end
-      if (_GEN & _GEN_14)	// src/foragerbee/scala/main/FbChainController.scala:87:29, :209:17, :223:{27,59}, :225:22
-        chainTag <= io_cmdOut_payload_tag_0;	// src/foragerbee/scala/main/FbChainController.scala:87:29, :209:17, :213:25
+      if (_GEN & _GEN_14)	// src/foragerbee/scala/main/FbChainController.scala:87:29, :217:17, :231:{27,59}, :233:22
+        chainTag <= io_cmdOut_payload_tag_0;	// src/foragerbee/scala/main/FbChainController.scala:87:29, :217:17, :221:25
     end
-    if (_GEN_6 | ~(_GEN_5 & _GEN_11 & fetchCnt == 2'h0)) begin	// src/foragerbee/scala/main/FbChainController.scala:91:22, :92:26, :114:31, :209:17, :268:37, :269:28, src/utils/Stream/Stream.scala:43:26
+    if (_GEN_6 | ~(_GEN_5 & _GEN_11 & fetchCnt == 2'h0)) begin	// src/foragerbee/scala/main/FbChainController.scala:91:22, :92:26, :114:31, :217:17, :276:37, :277:28, src/utils/Stream/Stream.scala:43:26
     end
-    else	// src/foragerbee/scala/main/FbChainController.scala:91:22, :209:17
+    else	// src/foragerbee/scala/main/FbChainController.scala:91:22, :217:17
       descRegs_0 <= io_chainBus_rdData_payload_data;	// src/foragerbee/scala/main/FbChainController.scala:91:22
-    if (_GEN_6 | ~(_GEN_5 & _GEN_11 & fetchCnt == 2'h1)) begin	// src/foragerbee/scala/main/FbChainController.scala:91:22, :92:26, :114:31, :209:17, :268:37, :269:28, src/utils/Stream/Stream.scala:43:26
+    if (_GEN_6 | ~(_GEN_5 & _GEN_11 & fetchCnt == 2'h1)) begin	// src/foragerbee/scala/main/FbChainController.scala:91:22, :92:26, :114:31, :217:17, :276:37, :277:28, src/utils/Stream/Stream.scala:43:26
     end
-    else	// src/foragerbee/scala/main/FbChainController.scala:91:22, :209:17
+    else	// src/foragerbee/scala/main/FbChainController.scala:91:22, :217:17
       descRegs_1 <= io_chainBus_rdData_payload_data;	// src/foragerbee/scala/main/FbChainController.scala:91:22
-    if (_GEN_6 | ~(_GEN_5 & _GEN_12)) begin	// src/foragerbee/scala/main/FbChainController.scala:91:22, :114:31, :209:17, :268:37, :269:28
+    if (_GEN_6 | ~(_GEN_5 & _GEN_12)) begin	// src/foragerbee/scala/main/FbChainController.scala:91:22, :114:31, :217:17, :276:37, :277:28
     end
-    else	// src/foragerbee/scala/main/FbChainController.scala:91:22, :209:17
+    else	// src/foragerbee/scala/main/FbChainController.scala:91:22, :217:17
       descRegs_2 <= io_chainBus_rdData_payload_data;	// src/foragerbee/scala/main/FbChainController.scala:91:22
   end // always @(posedge)
   `ifdef ENABLE_INITIAL_REG_	// src/foragerbee/scala/main/FbChainController.scala:59:7
@@ -322,99 +350,121 @@ module Fb_FbChainController(	// src/foragerbee/scala/main/FbChainController.scal
       `FIRRTL_AFTER_INITIAL	// src/foragerbee/scala/main/FbChainController.scala:59:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_cmdIn_ready = _GEN & io_cmdOut_ready;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :214:25
-  assign io_cmdOut_valid = io_cmdOut_valid_0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :212:25
+  assign io_cmdIn_ready = _GEN & io_cmdOut_ready;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :222:25
+  assign io_cmdOut_valid = io_cmdOut_valid_0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :220:25
   assign io_cmdOut_payload_op =
-    _GEN ? io_cmdIn_payload_op : _GEN_10 ? 3'h0 : {1'h0, descRegs_0[1:0]};	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :171:54, :209:17, :213:25
-  assign io_cmdOut_payload_tag = io_cmdOut_payload_tag_0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_op : _GEN_10 ? 3'h0 : {1'h0, descRegs_0[1:0]};	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :171:54, :217:17, :221:25
+  assign io_cmdOut_payload_tag = io_cmdOut_payload_tag_0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
   assign io_cmdOut_payload_dimCount =
-    _GEN ? io_cmdIn_payload_dimCount : _GEN_10 ? 3'h0 : descRegs_0[12:10];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_dimCount : _GEN_10 ? 3'h0 : descRegs_0[12:10];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_shape_0 =
-    _GEN ? io_cmdIn_payload_shape_0 : _GEN_10 ? 16'h0 : descRegs_0[28:13];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_shape_0 : _GEN_10 ? 16'h0 : descRegs_0[28:13];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_shape_1 =
-    _GEN ? io_cmdIn_payload_shape_1 : _GEN_10 ? 16'h0 : descRegs_0[44:29];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_shape_1 : _GEN_10 ? 16'h0 : descRegs_0[44:29];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_shape_2 =
-    _GEN ? io_cmdIn_payload_shape_2 : _GEN_10 ? 16'h0 : descRegs_0[60:45];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_shape_2 : _GEN_10 ? 16'h0 : descRegs_0[60:45];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_shape_3 =
-    _GEN ? io_cmdIn_payload_shape_3 : _GEN_10 ? 16'h0 : descRegs_0[76:61];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_shape_3 : _GEN_10 ? 16'h0 : descRegs_0[76:61];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
+  assign io_cmdOut_payload_shape_4 =
+    _GEN ? io_cmdIn_payload_shape_4 : _GEN_10 ? 16'h0 : descRegs_0[92:77];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_srcStride_0 =
-    _GEN ? io_cmdIn_payload_srcStride_0 : _GEN_10 ? 32'h0 : descRegs_0[108:77];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_srcStride_0 : _GEN_10 ? 32'h0 : descRegs_0[124:93];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_srcStride_1 =
-    _GEN ? io_cmdIn_payload_srcStride_1 : _GEN_10 ? 32'h0 : descRegs_0[140:109];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_srcStride_1 : _GEN_10 ? 32'h0 : descRegs_0[156:125];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_srcStride_2 =
-    _GEN ? io_cmdIn_payload_srcStride_2 : _GEN_10 ? 32'h0 : descRegs_0[172:141];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_srcStride_2 : _GEN_10 ? 32'h0 : descRegs_0[188:157];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_srcStride_3 =
-    _GEN ? io_cmdIn_payload_srcStride_3 : _GEN_10 ? 32'h0 : descRegs_0[204:173];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_srcStride_3 : _GEN_10 ? 32'h0 : descRegs_0[220:189];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
+  assign io_cmdOut_payload_srcStride_4 =
+    _GEN ? io_cmdIn_payload_srcStride_4 : _GEN_10 ? 32'h0 : descRegs_0[252:221];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_dstStride_0 =
-    _GEN ? io_cmdIn_payload_dstStride_0 : _GEN_10 ? 32'h0 : descRegs_0[236:205];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
-  assign io_cmdOut_payload_dstStride_1 =
     _GEN
-      ? io_cmdIn_payload_dstStride_1
-      : _GEN_10 ? 32'h0 : {descRegs_1[12:0], descRegs_0[255:237]};	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+      ? io_cmdIn_payload_dstStride_0
+      : _GEN_10 ? 32'h0 : {descRegs_1[28:0], descRegs_0[255:253]};	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
+  assign io_cmdOut_payload_dstStride_1 =
+    _GEN ? io_cmdIn_payload_dstStride_1 : _GEN_10 ? 32'h0 : descRegs_1[60:29];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_dstStride_2 =
-    _GEN ? io_cmdIn_payload_dstStride_2 : _GEN_10 ? 32'h0 : descRegs_1[44:13];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_dstStride_2 : _GEN_10 ? 32'h0 : descRegs_1[92:61];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_dstStride_3 =
-    _GEN ? io_cmdIn_payload_dstStride_3 : _GEN_10 ? 32'h0 : descRegs_1[76:45];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_dstStride_3 : _GEN_10 ? 32'h0 : descRegs_1[124:93];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
+  assign io_cmdOut_payload_dstStride_4 =
+    _GEN ? io_cmdIn_payload_dstStride_4 : _GEN_10 ? 32'h0 : descRegs_1[156:125];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
+  assign io_cmdOut_payload_srcStartIdx_0 = _GEN ? io_cmdIn_payload_srcStartIdx_0 : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_cmdOut_payload_srcStartIdx_1 = _GEN ? io_cmdIn_payload_srcStartIdx_1 : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_cmdOut_payload_srcStartIdx_2 = _GEN ? io_cmdIn_payload_srcStartIdx_2 : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_cmdOut_payload_srcStartIdx_3 = _GEN ? io_cmdIn_payload_srcStartIdx_3 : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_cmdOut_payload_srcStartIdx_4 = _GEN ? io_cmdIn_payload_srcStartIdx_4 : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_cmdOut_payload_t2lMatCols = _GEN ? io_cmdIn_payload_t2lMatCols : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_cmdOut_payload_t2lTileRows = _GEN ? io_cmdIn_payload_t2lTileRows : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_cmdOut_payload_t2lTileCols = _GEN ? io_cmdIn_payload_t2lTileCols : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_cmdOut_payload_t2lNumTileRows =
+    _GEN ? io_cmdIn_payload_t2lNumTileRows : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_cmdOut_payload_t2lNumTileCols =
+    _GEN ? io_cmdIn_payload_t2lNumTileCols : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
   assign io_cmdOut_payload_srcAddr =
-    _GEN ? io_cmdIn_payload_srcAddr : _GEN_10 ? 32'h0 : descRegs_1[108:77];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_srcAddr : _GEN_10 ? 32'h0 : descRegs_1[188:157];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_dstAddr =
-    _GEN ? io_cmdIn_payload_dstAddr : _GEN_10 ? 32'h0 : descRegs_1[140:109];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_dstAddr : _GEN_10 ? 32'h0 : descRegs_1[220:189];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_elemBytesLog2 =
-    _GEN ? io_cmdIn_payload_elemBytesLog2 : _GEN_10 ? 2'h0 : descRegs_1[142:141];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_elemBytesLog2 : _GEN_10 ? 2'h0 : descRegs_1[222:221];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_permVec_0 =
-    _GEN ? io_cmdIn_payload_permVec_0 : _GEN_10 ? 3'h0 : descRegs_1[145:143];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_permVec_0 : _GEN_10 ? 3'h0 : descRegs_1[225:223];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_permVec_1 =
-    _GEN ? io_cmdIn_payload_permVec_1 : _GEN_10 ? 3'h0 : descRegs_1[148:146];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_permVec_1 : _GEN_10 ? 3'h0 : descRegs_1[228:226];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_permVec_2 =
-    _GEN ? io_cmdIn_payload_permVec_2 : _GEN_10 ? 3'h0 : descRegs_1[151:149];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_permVec_2 : _GEN_10 ? 3'h0 : descRegs_1[231:229];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_permVec_3 =
-    _GEN ? io_cmdIn_payload_permVec_3 : _GEN_10 ? 3'h0 : descRegs_1[154:152];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_permVec_3 : _GEN_10 ? 3'h0 : descRegs_1[234:232];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
+  assign io_cmdOut_payload_permVec_4 =
+    _GEN ? io_cmdIn_payload_permVec_4 : _GEN_10 ? 3'h0 : descRegs_1[237:235];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_padBefore_0 =
-    _GEN ? io_cmdIn_payload_padBefore_0 : _GEN_10 ? 16'h0 : descRegs_1[170:155];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_padBefore_0 : _GEN_10 ? 16'h0 : descRegs_1[253:238];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_padBefore_1 =
-    _GEN ? io_cmdIn_payload_padBefore_1 : _GEN_10 ? 16'h0 : descRegs_1[186:171];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN
+      ? io_cmdIn_payload_padBefore_1
+      : _GEN_10 ? 16'h0 : {descRegs_2[13:0], descRegs_1[255:254]};	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_padAfter_0 =
-    _GEN ? io_cmdIn_payload_padAfter_0 : _GEN_10 ? 16'h0 : descRegs_1[202:187];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_padAfter_0 : _GEN_10 ? 16'h0 : descRegs_2[29:14];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_padAfter_1 =
-    _GEN ? io_cmdIn_payload_padAfter_1 : _GEN_10 ? 16'h0 : descRegs_1[218:203];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
-  assign io_cmdOut_payload_nextDescAddr = io_cmdOut_payload_nextDescAddr_0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :213:25
-  assign io_cmdOut_payload_chainMode = io_cmdOut_payload_chainMode_0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_padAfter_1 : _GEN_10 ? 16'h0 : descRegs_2[45:30];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
+  assign io_cmdOut_payload_nextDescAddr = io_cmdOut_payload_nextDescAddr_0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_cmdOut_payload_chainMode = io_cmdOut_payload_chainMode_0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
   assign io_cmdOut_payload_cvtEnable =
-    _GEN ? io_cmdIn_payload_cvtEnable : ~_GEN_9 & _GEN_8 & descRegs_1[252];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :106:21, :107:21, :125:68, :209:17, :213:25, :280:25
+    _GEN ? io_cmdIn_payload_cvtEnable : ~_GEN_9 & _GEN_8 & descRegs_2[79];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :106:21, :107:21, :125:68, :217:17, :221:25, :288:25
   assign io_cmdOut_payload_srcFmt =
-    _GEN ? io_cmdIn_payload_srcFmt : _GEN_10 ? 3'h0 : descRegs_1[255:253];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_srcFmt : _GEN_10 ? 3'h0 : descRegs_2[82:80];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_dstFmt =
-    _GEN ? io_cmdIn_payload_dstFmt : _GEN_10 ? 3'h0 : descRegs_2[2:0];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_dstFmt : _GEN_10 ? 3'h0 : descRegs_2[85:83];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_cvtScale =
-    _GEN ? io_cmdIn_payload_cvtScale : _GEN_10 ? 32'h0 : descRegs_2[34:3];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_cvtScale : _GEN_10 ? 32'h0 : descRegs_2[117:86];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
   assign io_cmdOut_payload_cvtZeroPoint =
-    _GEN ? io_cmdIn_payload_cvtZeroPoint : _GEN_10 ? 32'h0 : descRegs_2[66:35];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :209:17, :213:25
-  assign io_cmdOut_payload_im2colKernel_0 = _GEN ? io_cmdIn_payload_im2colKernel_0 : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :213:25
-  assign io_cmdOut_payload_im2colKernel_1 = _GEN ? io_cmdIn_payload_im2colKernel_1 : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :213:25
-  assign io_cmdOut_payload_im2colStride_0 = _GEN ? io_cmdIn_payload_im2colStride_0 : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :213:25
-  assign io_cmdOut_payload_im2colStride_1 = _GEN ? io_cmdIn_payload_im2colStride_1 : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :213:25
-  assign io_cmdOut_payload_im2colPad_0 = _GEN ? io_cmdIn_payload_im2colPad_0 : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :213:25
-  assign io_cmdOut_payload_im2colPad_1 = _GEN ? io_cmdIn_payload_im2colPad_1 : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_cvtZeroPoint : _GEN_10 ? 32'h0 : descRegs_2[149:118];	// src/foragerbee/scala/main/FbChainController.scala:59:7, :91:22, :107:21, :125:68, :217:17, :221:25
+  assign io_cmdOut_payload_im2colKernel_0 = _GEN ? io_cmdIn_payload_im2colKernel_0 : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_cmdOut_payload_im2colKernel_1 = _GEN ? io_cmdIn_payload_im2colKernel_1 : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_cmdOut_payload_im2colStride_0 = _GEN ? io_cmdIn_payload_im2colStride_0 : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_cmdOut_payload_im2colStride_1 = _GEN ? io_cmdIn_payload_im2colStride_1 : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_cmdOut_payload_im2colPad_0 = _GEN ? io_cmdIn_payload_im2colPad_0 : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_cmdOut_payload_im2colPad_1 = _GEN ? io_cmdIn_payload_im2colPad_1 : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
   assign io_cmdOut_payload_im2colDilation_0 =
-    _GEN ? io_cmdIn_payload_im2colDilation_0 : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_im2colDilation_0 : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
   assign io_cmdOut_payload_im2colDilation_1 =
-    _GEN ? io_cmdIn_payload_im2colDilation_1 : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_im2colDilation_1 : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
   assign io_cmdOut_payload_im2colInShape_0 =
-    _GEN ? io_cmdIn_payload_im2colInShape_0 : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_im2colInShape_0 : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
   assign io_cmdOut_payload_im2colInShape_1 =
-    _GEN ? io_cmdIn_payload_im2colInShape_1 : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :213:25
+    _GEN ? io_cmdIn_payload_im2colInShape_1 : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
   assign io_cmdOut_payload_im2colInShape_2 =
-    _GEN ? io_cmdIn_payload_im2colInShape_2 : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :213:25
-  assign io_cmdOut_payload_sgListAddr = _GEN ? io_cmdIn_payload_sgListAddr : 32'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :213:25
-  assign io_cmdOut_payload_sgEntryCount = _GEN ? io_cmdIn_payload_sgEntryCount : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :213:25
-  assign io_doneIn_ready = io_doneIn_ready_0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :209:17, :220:34
-  assign io_doneOut_valid = _GEN ? io_doneIn_valid : _GEN_2 & _GEN_3;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :88:29, :110:22, :209:17, :217:34, :237:28, :238:18, :239:{35,61}
-  assign io_doneOut_payload_tag = _GEN ? io_doneIn_payload_tag : _GEN_4 ? chainTag : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :87:29, :111:22, :209:17, :218:34, :237:28, :239:61, :242:39
-  assign io_doneOut_payload_err = (_GEN | _GEN_4) & io_doneIn_payload_err;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :111:22, :209:17, :218:34, :237:28, :239:61, :242:39, :243:39
-  assign io_doneOut_payload_chainLen = _GEN ? 16'h1 : _GEN_4 ? chainLen : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :88:29, :111:22, :209:17, :219:35, :237:28, :239:61, :242:39, :244:39
-  assign io_chainBus_rd_valid = io_chainBus_rd_valid_0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :114:31, :209:17, :257:24
-  assign io_chainBus_rd_payload_addr = _GEN_6 | ~_GEN_7 ? 32'h0 : nextDescAddr;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :86:29, :114:31, :115:31, :209:17, :257:24, :259:37
-  assign io_chainBus_rd_payload_len = _GEN_6 ? 8'h0 : {6'h0, _GEN_7, 1'h0};	// src/foragerbee/scala/main/FbChainController.scala:59:7, :114:31, :115:31, :116:31, :209:17, :257:24, :259:37, :260:37
-  assign io_chainBus_rdData_ready = io_chainBus_rdData_ready_0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :117:31, :209:17
+    _GEN ? io_cmdIn_payload_im2colInShape_2 : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_cmdOut_payload_sgListAddr = _GEN ? io_cmdIn_payload_sgListAddr : 32'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_cmdOut_payload_sgEntryCount = _GEN ? io_cmdIn_payload_sgEntryCount : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :221:25
+  assign io_doneIn_ready = io_doneIn_ready_0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :217:17, :228:34
+  assign io_doneOut_valid = _GEN ? io_doneIn_valid : _GEN_2 & _GEN_3;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :88:29, :110:22, :217:17, :225:34, :245:28, :246:18, :247:{35,61}
+  assign io_doneOut_payload_tag = _GEN ? io_doneIn_payload_tag : _GEN_4 ? chainTag : 8'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :87:29, :111:22, :217:17, :226:34, :245:28, :247:61, :250:39
+  assign io_doneOut_payload_err = (_GEN | _GEN_4) & io_doneIn_payload_err;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :111:22, :217:17, :226:34, :245:28, :247:61, :250:39, :251:39
+  assign io_doneOut_payload_chainLen = _GEN ? 16'h1 : _GEN_4 ? chainLen : 16'h0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :88:29, :111:22, :217:17, :227:35, :245:28, :247:61, :250:39, :252:39
+  assign io_chainBus_rd_valid = io_chainBus_rd_valid_0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :114:31, :217:17, :265:24
+  assign io_chainBus_rd_payload_addr = _GEN_6 | ~_GEN_7 ? 32'h0 : nextDescAddr;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :86:29, :114:31, :115:31, :217:17, :265:24, :267:37
+  assign io_chainBus_rd_payload_len = _GEN_6 ? 8'h0 : {6'h0, _GEN_7, 1'h0};	// src/foragerbee/scala/main/FbChainController.scala:59:7, :114:31, :115:31, :116:31, :217:17, :265:24, :267:37, :268:37
+  assign io_chainBus_rdData_ready = io_chainBus_rdData_ready_0;	// src/foragerbee/scala/main/FbChainController.scala:59:7, :117:31, :217:17
 endmodule
 

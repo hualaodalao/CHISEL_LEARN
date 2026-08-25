@@ -21,7 +21,7 @@ object HiveMacFpElaborate extends App {
   val buildDir = "generated/macfp_current"
   (new java.io.File(buildDir)).mkdirs()
   ChiselStage.emitSystemVerilogFile(
-    gen = new HiveMacFp(32),
+    gen = new HiveMacFp(40),
     args = Array("--target-dir", buildDir)
   )
 }

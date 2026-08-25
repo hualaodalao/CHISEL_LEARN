@@ -206,6 +206,12 @@ class FbChainController(cfg: ForagerBeeConfig) extends Module {
   injCmd.sgEntryCount := 0.U
   // srcStartIdx default to 0 (chain controller does not serialize this field in v1)
   injCmd.srcStartIdx.foreach(_ := 0.U)
+  // tile2linear fields default to 0 (chain controller does not support TILE2LINEAR descriptors in v1)
+  injCmd.t2lMatCols     := 0.U
+  injCmd.t2lTileRows    := 0.U
+  injCmd.t2lTileCols    := 0.U
+  injCmd.t2lNumTileRows := 0.U
+  injCmd.t2lNumTileCols := 0.U
 
   // --- FSM 逻辑 ---
   switch(state) {

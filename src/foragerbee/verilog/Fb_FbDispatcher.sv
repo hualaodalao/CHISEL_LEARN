@@ -55,21 +55,35 @@ module Fb_FbDispatcher(	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
                 io_push_payload_shape_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_push_payload_shape_2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_push_payload_shape_3,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_push_payload_shape_4,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
   input  [31:0] io_push_payload_srcStride_0,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_push_payload_srcStride_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_push_payload_srcStride_2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_push_payload_srcStride_3,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_push_payload_srcStride_4,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_push_payload_dstStride_0,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_push_payload_dstStride_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_push_payload_dstStride_2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_push_payload_dstStride_3,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
-                io_push_payload_srcAddr,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_push_payload_dstStride_4,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+  input  [15:0] io_push_payload_srcStartIdx_0,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_push_payload_srcStartIdx_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_push_payload_srcStartIdx_2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_push_payload_srcStartIdx_3,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_push_payload_srcStartIdx_4,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_push_payload_t2lMatCols,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_push_payload_t2lTileRows,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_push_payload_t2lTileCols,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_push_payload_t2lNumTileRows,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_push_payload_t2lNumTileCols,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+  input  [31:0] io_push_payload_srcAddr,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_push_payload_dstAddr,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
   input  [1:0]  io_push_payload_elemBytesLog2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
   input  [2:0]  io_push_payload_permVec_0,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_push_payload_permVec_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_push_payload_permVec_2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_push_payload_permVec_3,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_push_payload_permVec_4,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
   input  [15:0] io_push_payload_padBefore_0,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_push_payload_padBefore_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_push_payload_padAfter_0,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
@@ -104,21 +118,30 @@ module Fb_FbDispatcher(	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
                 io_pop_0_payload_shape_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_0_payload_shape_2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_0_payload_shape_3,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_pop_0_payload_shape_4,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
   output [31:0] io_pop_0_payload_srcStride_0,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_0_payload_srcStride_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_0_payload_srcStride_2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_0_payload_srcStride_3,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_pop_0_payload_srcStride_4,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_0_payload_dstStride_0,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_0_payload_dstStride_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_0_payload_dstStride_2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_0_payload_dstStride_3,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
-                io_pop_0_payload_srcAddr,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_pop_0_payload_dstStride_4,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+  output [15:0] io_pop_0_payload_srcStartIdx_0,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_pop_0_payload_srcStartIdx_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_pop_0_payload_srcStartIdx_2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_pop_0_payload_srcStartIdx_3,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_pop_0_payload_srcStartIdx_4,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+  output [31:0] io_pop_0_payload_srcAddr,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_0_payload_dstAddr,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
   output [1:0]  io_pop_0_payload_elemBytesLog2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
   output [2:0]  io_pop_0_payload_permVec_0,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_0_payload_permVec_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_0_payload_permVec_2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_0_payload_permVec_3,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_pop_0_payload_permVec_4,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
   output [15:0] io_pop_0_payload_padBefore_0,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_0_payload_padBefore_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_0_payload_padAfter_0,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
@@ -139,20 +162,29 @@ module Fb_FbDispatcher(	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
                 io_pop_1_payload_shape_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_1_payload_shape_2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_1_payload_shape_3,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_pop_1_payload_shape_4,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
   output [31:0] io_pop_1_payload_srcStride_0,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_1_payload_srcStride_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_1_payload_srcStride_2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_1_payload_srcStride_3,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_pop_1_payload_srcStride_4,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_1_payload_dstStride_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_1_payload_dstStride_2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_1_payload_dstStride_3,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
-                io_pop_1_payload_srcAddr,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_pop_1_payload_dstStride_4,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+  output [15:0] io_pop_1_payload_srcStartIdx_0,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_pop_1_payload_srcStartIdx_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_pop_1_payload_srcStartIdx_2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_pop_1_payload_srcStartIdx_3,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_pop_1_payload_srcStartIdx_4,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+  output [31:0] io_pop_1_payload_srcAddr,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_1_payload_dstAddr,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
   output [1:0]  io_pop_1_payload_elemBytesLog2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
   output [2:0]  io_pop_1_payload_permVec_0,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_1_payload_permVec_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_1_payload_permVec_2,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_1_payload_permVec_3,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
+                io_pop_1_payload_permVec_4,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
   output [15:0] io_pop_1_payload_padBefore_0,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_1_payload_padBefore_1,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
                 io_pop_1_payload_padAfter_0,	// src/foragerbee/scala/main/FbDispatcher.scala:31:14
@@ -189,13 +221,21 @@ module Fb_FbDispatcher(	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
   wire [15:0]      _fifo_io_pop_payload_shape_1;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
   wire [15:0]      _fifo_io_pop_payload_shape_2;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
   wire [15:0]      _fifo_io_pop_payload_shape_3;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
+  wire [15:0]      _fifo_io_pop_payload_shape_4;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
   wire [31:0]      _fifo_io_pop_payload_srcStride_0;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
   wire [31:0]      _fifo_io_pop_payload_srcStride_1;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
   wire [31:0]      _fifo_io_pop_payload_srcStride_2;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
   wire [31:0]      _fifo_io_pop_payload_srcStride_3;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
+  wire [31:0]      _fifo_io_pop_payload_srcStride_4;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
   wire [31:0]      _fifo_io_pop_payload_dstStride_1;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
   wire [31:0]      _fifo_io_pop_payload_dstStride_2;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
   wire [31:0]      _fifo_io_pop_payload_dstStride_3;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
+  wire [31:0]      _fifo_io_pop_payload_dstStride_4;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
+  wire [15:0]      _fifo_io_pop_payload_srcStartIdx_0;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
+  wire [15:0]      _fifo_io_pop_payload_srcStartIdx_1;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
+  wire [15:0]      _fifo_io_pop_payload_srcStartIdx_2;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
+  wire [15:0]      _fifo_io_pop_payload_srcStartIdx_3;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
+  wire [15:0]      _fifo_io_pop_payload_srcStartIdx_4;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
   wire [31:0]      _fifo_io_pop_payload_srcAddr;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
   wire [31:0]      _fifo_io_pop_payload_dstAddr;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
   wire [1:0]       _fifo_io_pop_payload_elemBytesLog2;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
@@ -203,6 +243,7 @@ module Fb_FbDispatcher(	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
   wire [2:0]       _fifo_io_pop_payload_permVec_1;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
   wire [2:0]       _fifo_io_pop_payload_permVec_2;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
   wire [2:0]       _fifo_io_pop_payload_permVec_3;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
+  wire [2:0]       _fifo_io_pop_payload_permVec_4;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
   wire [15:0]      _fifo_io_pop_payload_padBefore_0;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
   wire [15:0]      _fifo_io_pop_payload_padBefore_1;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
   wire [15:0]      _fifo_io_pop_payload_padAfter_0;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20
@@ -226,8 +267,12 @@ module Fb_FbDispatcher(	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
   reg              infValid_1;	// src/foragerbee/scala/main/FbDispatcher.scala:60:28
   wire [5:0]       eb = 6'h1 << _fifo_io_pop_payload_elemBytesLog2;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :89:21
   wire             isPermute = _fifo_io_pop_payload_op == 3'h2;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :93:26, :104:29
-  wire [3:0][31:0] _GEN =
-    {{_fifo_io_pop_payload_srcStride_3},
+  wire [7:0][31:0] _GEN =
+    {{_fifo_io_pop_payload_srcStride_0},
+     {_fifo_io_pop_payload_srcStride_0},
+     {_fifo_io_pop_payload_srcStride_0},
+     {_fifo_io_pop_payload_srcStride_4},
+     {_fifo_io_pop_payload_srcStride_3},
      {_fifo_io_pop_payload_srcStride_2},
      {_fifo_io_pop_payload_srcStride_1},
      {_fifo_io_pop_payload_srcStride_0}};	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :105:23
@@ -235,44 +280,53 @@ module Fb_FbDispatcher(	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
     _fifo_io_pop_payload_dimCount > 3'h2;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :104:29
   wire [31:0]      _GEN_0 = {16'h0, _fifo_io_pop_payload_shape_2 - 16'h1};	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :106:{36,43}
   wire [31:0]      _GEN_1 = {16'h0, _fifo_io_pop_payload_shape_3 - 16'h1};	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :106:{36,43}
-  wire [31:0]      _GEN_2 = {10'h0, {6'h0, _fifo_io_pop_payload_shape_0} * {16'h0, eb}};	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :89:21, :90:{33,42}, :111:57
-  wire             _GEN_3 =
+  wire             newSrcEnd_contributions_active_3 =
+    _fifo_io_pop_payload_dimCount > 3'h4;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :95:32, :104:29
+  wire [31:0]      _GEN_2 = {16'h0, _fifo_io_pop_payload_shape_4 - 16'h1};	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :106:{36,43}
+  wire [31:0]      _GEN_3 = {10'h0, {6'h0, _fifo_io_pop_payload_shape_0} * {16'h0, eb}};	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :89:21, :90:{33,42}, :111:57
+  wire             _GEN_4 =
     _fifo_io_pop_payload_op == 3'h4 | _fifo_io_pop_payload_op == 3'h5
     | _fifo_io_pop_payload_op == 3'h3;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :94:25, :95:{32,49,59}, :104:29, :116:8
   wire [31:0]      newSrcEnd =
-    _GEN_3
+    _GEN_4
       ? {16'h0, _fifo_io_pop_payload_shape_0} + _fifo_io_pop_payload_srcAddr
-      : _GEN_2 + _fifo_io_pop_payload_srcAddr
+      : _GEN_3 + _fifo_io_pop_payload_srcAddr
         + ((|(_fifo_io_pop_payload_dimCount[2:1]))
              ? {16'h0, _fifo_io_pop_payload_shape_1 - 16'h1}
                * (isPermute
-                    ? _GEN[_fifo_io_pop_payload_permVec_1[1:0]]
+                    ? _GEN[_fifo_io_pop_payload_permVec_1]
                     : _fifo_io_pop_payload_srcStride_1)
              : 32'h0)
         + (newSrcEnd_contributions_active_1
              ? _GEN_0
                * (isPermute
-                    ? _GEN[_fifo_io_pop_payload_permVec_2[1:0]]
+                    ? _GEN[_fifo_io_pop_payload_permVec_2]
                     : _fifo_io_pop_payload_srcStride_2)
              : 32'h0)
         + (_fifo_io_pop_payload_dimCount[2]
              ? _GEN_1
                * (isPermute
-                    ? _GEN[_fifo_io_pop_payload_permVec_3[1:0]]
+                    ? _GEN[_fifo_io_pop_payload_permVec_3]
                     : _fifo_io_pop_payload_srcStride_3)
-             : 32'h0);	// <stdin>:21027:79, :21035:81, :21043:81, src/foragerbee/scala/main/FbDispatcher.scala:50:20, :90:42, :93:26, :95:49, :104:29, :105:23, :106:{36,43}, :107:10, :110:48, :111:{37,45,57}, :113:{48,67}, :116:8
-  wire [63:0]      _GEN_4 =
+             : 32'h0)
+        + (newSrcEnd_contributions_active_3
+             ? _GEN_2
+               * (isPermute
+                    ? _GEN[_fifo_io_pop_payload_permVec_4]
+                    : _fifo_io_pop_payload_srcStride_4)
+             : 32'h0);	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :90:42, :93:26, :95:49, :104:29, :105:23, :106:{36,43}, :107:10, :110:48, :111:{37,45,57}, :113:{48,67}, :116:8
+  wire [63:0]      _GEN_5 =
     {_fifo_io_pop_payload_padBefore_0,
      _fifo_io_pop_payload_padAfter_0,
      _fifo_io_pop_payload_padBefore_1,
      _fifo_io_pop_payload_padAfter_1};	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :123:{33,41,60,68}, :124:{33,41,60}
   wire [31:0]      newDstEnd =
-    _GEN_3
+    _GEN_4
       ? {16'h0, _fifo_io_pop_payload_shape_1} + _fifo_io_pop_payload_dstAddr
       : _fifo_io_pop_payload_dstAddr
         + ((|(_fifo_io_pop_payload_dimCount[2:1]))
              ? {14'h0,
-                ((|_GEN_4)
+                ((|_GEN_5)
                    ? {1'h0,
                       {1'h0, _fifo_io_pop_payload_padBefore_1}
                         + {1'h0, _fifo_io_pop_payload_shape_1}}
@@ -286,14 +340,17 @@ module Fb_FbDispatcher(	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
         + (_fifo_io_pop_payload_dimCount[2]
              ? _GEN_1 * _fifo_io_pop_payload_dstStride_3
              : 32'h0)
-        + ((|_GEN_4)
+        + (newSrcEnd_contributions_active_3
+             ? _GEN_2 * _fifo_io_pop_payload_dstStride_4
+             : 32'h0)
+        + ((|_GEN_5)
              ? {8'h0,
                 {6'h0,
                  {1'h0,
                   {1'h0, _fifo_io_pop_payload_padBefore_0}
                     + {1'h0, _fifo_io_pop_payload_shape_0}}
                    + {2'h0, _fifo_io_pop_payload_padAfter_0}} * {18'h0, eb}}
-             : _GEN_2);	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :89:21, :90:{33,42}, :95:49, :104:29, :106:{36,43}, :111:57, :116:8, :123:{33,41,60,68}, :124:{33,41,60}, :125:{36,52}, :126:{36,52}, :130:{27,47,56}, :133:35, :134:{30,37}, :135:10, :138:48, :139:{37,45,57}, :141:{48,67}, :144:8
+             : _GEN_3);	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :89:21, :90:{33,42}, :95:49, :104:29, :106:{36,43}, :111:57, :116:8, :123:{33,41,60,68}, :124:{33,41,60}, :125:{36,52}, :126:{36,52}, :130:{27,47,56}, :133:35, :134:{30,37}, :135:10, :138:48, :139:{37,45,57}, :141:{48,67}, :144:8
   wire             capable_1 = _fifo_io_pop_payload_op != 3'h1;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :89:21, :163:28, :173:20
   wire             capable = _fifo_io_pop_payload_op != 3'h3;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :94:25, :104:29, :173:86
   wire             idle = ~io_chBusy_0 & ~infValid_0;	// src/foragerbee/scala/main/FbDispatcher.scala:60:28, :174:{16,30,33}
@@ -329,23 +386,23 @@ module Fb_FbDispatcher(	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
       infValid_1 <= 1'h0;	// src/foragerbee/scala/main/FbDispatcher.scala:60:28
     end
     else begin	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
-      automatic logic _GEN_5 = _fifo_io_pop_valid & fifo_io_pop_ready;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :196:21, :198:21, :204:23, src/utils/Stream/Stream.scala:43:26
-      automatic logic _GEN_6 = canDispatch & _GEN_5 & effectiveEligible[0];	// src/foragerbee/scala/main/FbDispatcher.scala:56:28, :182:30, :189:{30,46}, :198:21, :207:28, :208:36, src/main/scala/chisel3/util/OneHot.scala:48:45, src/utils/Stream/Stream.scala:43:26
-      automatic logic _GEN_7 = canDispatch & _GEN_5 & ~(effectiveEligible[0]);	// src/foragerbee/scala/main/FbDispatcher.scala:56:28, :182:30, :189:{30,46}, :198:21, :207:28, :208:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45, src/utils/Stream/Stream.scala:43:26
-      if (_GEN_6) begin	// src/foragerbee/scala/main/FbDispatcher.scala:56:28, :198:21, :207:28, :208:36
+      automatic logic _GEN_6 = _fifo_io_pop_valid & fifo_io_pop_ready;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :196:21, :198:21, :204:23, src/utils/Stream/Stream.scala:43:26
+      automatic logic _GEN_7 = canDispatch & _GEN_6 & effectiveEligible[0];	// src/foragerbee/scala/main/FbDispatcher.scala:56:28, :182:30, :189:{30,46}, :198:21, :207:28, :208:36, src/main/scala/chisel3/util/OneHot.scala:48:45, src/utils/Stream/Stream.scala:43:26
+      automatic logic _GEN_8 = canDispatch & _GEN_6 & ~(effectiveEligible[0]);	// src/foragerbee/scala/main/FbDispatcher.scala:56:28, :182:30, :189:{30,46}, :198:21, :207:28, :208:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45, src/utils/Stream/Stream.scala:43:26
+      if (_GEN_7) begin	// src/foragerbee/scala/main/FbDispatcher.scala:56:28, :198:21, :207:28, :208:36
         infSrcStart_0 <= _fifo_io_pop_payload_srcAddr;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :56:28
         infSrcEnd_0 <= newSrcEnd;	// src/foragerbee/scala/main/FbDispatcher.scala:57:28, :116:8
         infDstStart_0 <= _fifo_io_pop_payload_dstAddr;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :58:28
         infDstEnd_0 <= newDstEnd;	// src/foragerbee/scala/main/FbDispatcher.scala:59:28, :144:8
       end
-      if (_GEN_7) begin	// src/foragerbee/scala/main/FbDispatcher.scala:56:28, :198:21, :207:28, :208:36
+      if (_GEN_8) begin	// src/foragerbee/scala/main/FbDispatcher.scala:56:28, :198:21, :207:28, :208:36
         infSrcStart_1 <= _fifo_io_pop_payload_srcAddr;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :56:28
         infSrcEnd_1 <= newSrcEnd;	// src/foragerbee/scala/main/FbDispatcher.scala:57:28, :116:8
         infDstStart_1 <= _fifo_io_pop_payload_dstAddr;	// src/foragerbee/scala/main/FbDispatcher.scala:50:20, :58:28
         infDstEnd_1 <= newDstEnd;	// src/foragerbee/scala/main/FbDispatcher.scala:59:28, :144:8
       end
-      infValid_0 <= _GEN_6 | ~io_chDone_0 & infValid_0;	// src/foragerbee/scala/main/FbDispatcher.scala:56:28, :60:28, :64:24, :65:19, :198:21, :207:28, :208:36, :212:36
-      infValid_1 <= _GEN_7 | ~io_chDone_1 & infValid_1;	// src/foragerbee/scala/main/FbDispatcher.scala:56:28, :60:28, :64:24, :65:19, :198:21, :207:28, :208:36, :212:36
+      infValid_0 <= _GEN_7 | ~io_chDone_0 & infValid_0;	// src/foragerbee/scala/main/FbDispatcher.scala:56:28, :60:28, :64:24, :65:19, :198:21, :207:28, :208:36, :212:36
+      infValid_1 <= _GEN_8 | ~io_chDone_1 & infValid_1;	// src/foragerbee/scala/main/FbDispatcher.scala:56:28, :60:28, :64:24, :65:19, :198:21, :207:28, :208:36, :212:36
     end
   end // always @(posedge)
   `ifdef ENABLE_INITIAL_REG_	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
@@ -389,14 +446,27 @@ module Fb_FbDispatcher(	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
     .io_push_payload_shape_1          (io_push_payload_shape_1),
     .io_push_payload_shape_2          (io_push_payload_shape_2),
     .io_push_payload_shape_3          (io_push_payload_shape_3),
+    .io_push_payload_shape_4          (io_push_payload_shape_4),
     .io_push_payload_srcStride_0      (io_push_payload_srcStride_0),
     .io_push_payload_srcStride_1      (io_push_payload_srcStride_1),
     .io_push_payload_srcStride_2      (io_push_payload_srcStride_2),
     .io_push_payload_srcStride_3      (io_push_payload_srcStride_3),
+    .io_push_payload_srcStride_4      (io_push_payload_srcStride_4),
     .io_push_payload_dstStride_0      (io_push_payload_dstStride_0),
     .io_push_payload_dstStride_1      (io_push_payload_dstStride_1),
     .io_push_payload_dstStride_2      (io_push_payload_dstStride_2),
     .io_push_payload_dstStride_3      (io_push_payload_dstStride_3),
+    .io_push_payload_dstStride_4      (io_push_payload_dstStride_4),
+    .io_push_payload_srcStartIdx_0    (io_push_payload_srcStartIdx_0),
+    .io_push_payload_srcStartIdx_1    (io_push_payload_srcStartIdx_1),
+    .io_push_payload_srcStartIdx_2    (io_push_payload_srcStartIdx_2),
+    .io_push_payload_srcStartIdx_3    (io_push_payload_srcStartIdx_3),
+    .io_push_payload_srcStartIdx_4    (io_push_payload_srcStartIdx_4),
+    .io_push_payload_t2lMatCols       (io_push_payload_t2lMatCols),
+    .io_push_payload_t2lTileRows      (io_push_payload_t2lTileRows),
+    .io_push_payload_t2lTileCols      (io_push_payload_t2lTileCols),
+    .io_push_payload_t2lNumTileRows   (io_push_payload_t2lNumTileRows),
+    .io_push_payload_t2lNumTileCols   (io_push_payload_t2lNumTileCols),
     .io_push_payload_srcAddr          (io_push_payload_srcAddr),
     .io_push_payload_dstAddr          (io_push_payload_dstAddr),
     .io_push_payload_elemBytesLog2    (io_push_payload_elemBytesLog2),
@@ -404,6 +474,7 @@ module Fb_FbDispatcher(	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
     .io_push_payload_permVec_1        (io_push_payload_permVec_1),
     .io_push_payload_permVec_2        (io_push_payload_permVec_2),
     .io_push_payload_permVec_3        (io_push_payload_permVec_3),
+    .io_push_payload_permVec_4        (io_push_payload_permVec_4),
     .io_push_payload_padBefore_0      (io_push_payload_padBefore_0),
     .io_push_payload_padBefore_1      (io_push_payload_padBefore_1),
     .io_push_payload_padAfter_0       (io_push_payload_padAfter_0),
@@ -437,14 +508,22 @@ module Fb_FbDispatcher(	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
     .io_pop_payload_shape_1           (_fifo_io_pop_payload_shape_1),
     .io_pop_payload_shape_2           (_fifo_io_pop_payload_shape_2),
     .io_pop_payload_shape_3           (_fifo_io_pop_payload_shape_3),
+    .io_pop_payload_shape_4           (_fifo_io_pop_payload_shape_4),
     .io_pop_payload_srcStride_0       (_fifo_io_pop_payload_srcStride_0),
     .io_pop_payload_srcStride_1       (_fifo_io_pop_payload_srcStride_1),
     .io_pop_payload_srcStride_2       (_fifo_io_pop_payload_srcStride_2),
     .io_pop_payload_srcStride_3       (_fifo_io_pop_payload_srcStride_3),
+    .io_pop_payload_srcStride_4       (_fifo_io_pop_payload_srcStride_4),
     .io_pop_payload_dstStride_0       (io_pop_0_payload_dstStride_0),
     .io_pop_payload_dstStride_1       (_fifo_io_pop_payload_dstStride_1),
     .io_pop_payload_dstStride_2       (_fifo_io_pop_payload_dstStride_2),
     .io_pop_payload_dstStride_3       (_fifo_io_pop_payload_dstStride_3),
+    .io_pop_payload_dstStride_4       (_fifo_io_pop_payload_dstStride_4),
+    .io_pop_payload_srcStartIdx_0     (_fifo_io_pop_payload_srcStartIdx_0),
+    .io_pop_payload_srcStartIdx_1     (_fifo_io_pop_payload_srcStartIdx_1),
+    .io_pop_payload_srcStartIdx_2     (_fifo_io_pop_payload_srcStartIdx_2),
+    .io_pop_payload_srcStartIdx_3     (_fifo_io_pop_payload_srcStartIdx_3),
+    .io_pop_payload_srcStartIdx_4     (_fifo_io_pop_payload_srcStartIdx_4),
     .io_pop_payload_srcAddr           (_fifo_io_pop_payload_srcAddr),
     .io_pop_payload_dstAddr           (_fifo_io_pop_payload_dstAddr),
     .io_pop_payload_elemBytesLog2     (_fifo_io_pop_payload_elemBytesLog2),
@@ -452,6 +531,7 @@ module Fb_FbDispatcher(	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
     .io_pop_payload_permVec_1         (_fifo_io_pop_payload_permVec_1),
     .io_pop_payload_permVec_2         (_fifo_io_pop_payload_permVec_2),
     .io_pop_payload_permVec_3         (_fifo_io_pop_payload_permVec_3),
+    .io_pop_payload_permVec_4         (_fifo_io_pop_payload_permVec_4),
     .io_pop_payload_padBefore_0       (_fifo_io_pop_payload_padBefore_0),
     .io_pop_payload_padBefore_1       (_fifo_io_pop_payload_padBefore_1),
     .io_pop_payload_padAfter_0        (_fifo_io_pop_payload_padAfter_0),
@@ -484,13 +564,21 @@ module Fb_FbDispatcher(	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
   assign io_pop_0_payload_shape_1 = _fifo_io_pop_payload_shape_1;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_0_payload_shape_2 = _fifo_io_pop_payload_shape_2;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_0_payload_shape_3 = _fifo_io_pop_payload_shape_3;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_0_payload_shape_4 = _fifo_io_pop_payload_shape_4;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_0_payload_srcStride_0 = _fifo_io_pop_payload_srcStride_0;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_0_payload_srcStride_1 = _fifo_io_pop_payload_srcStride_1;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_0_payload_srcStride_2 = _fifo_io_pop_payload_srcStride_2;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_0_payload_srcStride_3 = _fifo_io_pop_payload_srcStride_3;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_0_payload_srcStride_4 = _fifo_io_pop_payload_srcStride_4;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_0_payload_dstStride_1 = _fifo_io_pop_payload_dstStride_1;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_0_payload_dstStride_2 = _fifo_io_pop_payload_dstStride_2;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_0_payload_dstStride_3 = _fifo_io_pop_payload_dstStride_3;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_0_payload_dstStride_4 = _fifo_io_pop_payload_dstStride_4;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_0_payload_srcStartIdx_0 = _fifo_io_pop_payload_srcStartIdx_0;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_0_payload_srcStartIdx_1 = _fifo_io_pop_payload_srcStartIdx_1;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_0_payload_srcStartIdx_2 = _fifo_io_pop_payload_srcStartIdx_2;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_0_payload_srcStartIdx_3 = _fifo_io_pop_payload_srcStartIdx_3;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_0_payload_srcStartIdx_4 = _fifo_io_pop_payload_srcStartIdx_4;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_0_payload_srcAddr = _fifo_io_pop_payload_srcAddr;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_0_payload_dstAddr = _fifo_io_pop_payload_dstAddr;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_0_payload_elemBytesLog2 = _fifo_io_pop_payload_elemBytesLog2;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
@@ -498,6 +586,7 @@ module Fb_FbDispatcher(	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
   assign io_pop_0_payload_permVec_1 = _fifo_io_pop_payload_permVec_1;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_0_payload_permVec_2 = _fifo_io_pop_payload_permVec_2;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_0_payload_permVec_3 = _fifo_io_pop_payload_permVec_3;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_0_payload_permVec_4 = _fifo_io_pop_payload_permVec_4;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_0_payload_padBefore_0 = _fifo_io_pop_payload_padBefore_0;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_0_payload_padBefore_1 = _fifo_io_pop_payload_padBefore_1;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_0_payload_padAfter_0 = _fifo_io_pop_payload_padAfter_0;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
@@ -517,13 +606,21 @@ module Fb_FbDispatcher(	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
   assign io_pop_1_payload_shape_1 = _fifo_io_pop_payload_shape_1;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_1_payload_shape_2 = _fifo_io_pop_payload_shape_2;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_1_payload_shape_3 = _fifo_io_pop_payload_shape_3;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_1_payload_shape_4 = _fifo_io_pop_payload_shape_4;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_1_payload_srcStride_0 = _fifo_io_pop_payload_srcStride_0;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_1_payload_srcStride_1 = _fifo_io_pop_payload_srcStride_1;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_1_payload_srcStride_2 = _fifo_io_pop_payload_srcStride_2;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_1_payload_srcStride_3 = _fifo_io_pop_payload_srcStride_3;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_1_payload_srcStride_4 = _fifo_io_pop_payload_srcStride_4;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_1_payload_dstStride_1 = _fifo_io_pop_payload_dstStride_1;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_1_payload_dstStride_2 = _fifo_io_pop_payload_dstStride_2;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_1_payload_dstStride_3 = _fifo_io_pop_payload_dstStride_3;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_1_payload_dstStride_4 = _fifo_io_pop_payload_dstStride_4;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_1_payload_srcStartIdx_0 = _fifo_io_pop_payload_srcStartIdx_0;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_1_payload_srcStartIdx_1 = _fifo_io_pop_payload_srcStartIdx_1;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_1_payload_srcStartIdx_2 = _fifo_io_pop_payload_srcStartIdx_2;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_1_payload_srcStartIdx_3 = _fifo_io_pop_payload_srcStartIdx_3;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_1_payload_srcStartIdx_4 = _fifo_io_pop_payload_srcStartIdx_4;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_1_payload_srcAddr = _fifo_io_pop_payload_srcAddr;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_1_payload_dstAddr = _fifo_io_pop_payload_dstAddr;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_1_payload_elemBytesLog2 = _fifo_io_pop_payload_elemBytesLog2;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
@@ -531,6 +628,7 @@ module Fb_FbDispatcher(	// src/foragerbee/scala/main/FbDispatcher.scala:30:7
   assign io_pop_1_payload_permVec_1 = _fifo_io_pop_payload_permVec_1;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_1_payload_permVec_2 = _fifo_io_pop_payload_permVec_2;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_1_payload_permVec_3 = _fifo_io_pop_payload_permVec_3;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
+  assign io_pop_1_payload_permVec_4 = _fifo_io_pop_payload_permVec_4;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_1_payload_padBefore_0 = _fifo_io_pop_payload_padBefore_0;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_1_payload_padBefore_1 = _fifo_io_pop_payload_padBefore_1;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20
   assign io_pop_1_payload_padAfter_0 = _fifo_io_pop_payload_padAfter_0;	// src/foragerbee/scala/main/FbDispatcher.scala:30:7, :50:20

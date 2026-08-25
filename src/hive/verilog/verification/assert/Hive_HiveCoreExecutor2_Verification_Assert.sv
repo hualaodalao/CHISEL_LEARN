@@ -17,22 +17,22 @@
     `define ASSERT_VERBOSE_COND_ 1
   `endif // ASSERT_VERBOSE_COND
 `endif // not def ASSERT_VERBOSE_COND_
-module Hive_HiveCoreExecutor2_Verification_Assert();	// src/hive/scala/main/HiveCoreExecutor.scala:229:15
-  `ifndef SYNTHESIS	// src/hive/scala/main/HiveCoreExecutor.scala:152:9
-    always @(posedge Hive_HiveCoreExecutor2.clock) begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :152:9
+module Hive_HiveCoreExecutor2_Verification_Assert();	// src/hive/scala/main/HiveCoreExecutor.scala:239:15
+  `ifndef SYNTHESIS	// src/hive/scala/main/HiveCoreExecutor.scala:160:9
+    always @(posedge Hive_HiveCoreExecutor2.clock) begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :160:9
       if (~Hive_HiveCoreExecutor2.reset & Hive_HiveCoreExecutor2.io_hiveValidOut
-          & Hive_HiveCoreExecutor2._layerCapture) begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :39:14, :152:{9,27,29}
-        if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:152:9
-          $error("Assertion failed: HiveCoreExecutor: cPush valid but C buffer not ready (pop-before-push invariant violated, partial sum lost)\n");	// src/hive/scala/main/HiveCoreExecutor.scala:152:9
-        if (`STOP_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:152:9
-          $fatal;	// src/hive/scala/main/HiveCoreExecutor.scala:152:9
+          & Hive_HiveCoreExecutor2._layerCapture) begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :39:14, :160:{9,27,29}
+        if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:160:9
+          $error("Assertion failed: HiveCoreExecutor: cPush valid but C buffer not ready (pop-before-push invariant violated, partial sum lost)\n");	// src/hive/scala/main/HiveCoreExecutor.scala:160:9
+        if (`STOP_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:160:9
+          $fatal;	// src/hive/scala/main/HiveCoreExecutor.scala:160:9
       end
       if (Hive_HiveCoreExecutor2._layerCapture_0 & Hive_HiveCoreExecutor2.io_execute
-          & ~Hive_HiveCoreExecutor2.reset & (|Hive_HiveCoreExecutor2.io_aOccupancy)) begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :39:14, :152:9, :195:17, :221:24, :229:{15,30}
-        if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:229:15
-          $error("Assertion failed: HiveCoreExecutor: A buffer not drained at execute pulse (previous run aDma push rows != executor consume rows)\n");	// src/hive/scala/main/HiveCoreExecutor.scala:229:15
-        if (`STOP_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:229:15
-          $fatal;	// src/hive/scala/main/HiveCoreExecutor.scala:229:15
+          & ~Hive_HiveCoreExecutor2.reset & (|Hive_HiveCoreExecutor2.io_aOccupancy)) begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :39:14, :160:9, :205:17, :231:24, :239:{15,30}
+        if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:239:15
+          $error("Assertion failed: HiveCoreExecutor: A buffer not drained at execute pulse (previous run aDma push rows != executor consume rows)\n");	// src/hive/scala/main/HiveCoreExecutor.scala:239:15
+        if (`STOP_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:239:15
+          $fatal;	// src/hive/scala/main/HiveCoreExecutor.scala:239:15
       end
     end // always @(posedge)
   `endif // not def SYNTHESIS

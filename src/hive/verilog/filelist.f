@@ -16,6 +16,7 @@ Hive_HiveMacInt.sv
 Hive_HiveCvtOpFp.sv
 Hive_HiveMacFp.sv
 Hive_HiveWorkUnit.sv
+verification/assert/Hive_HiveWorker_Verification_Assert.sv
 Hive_HiveWorker.sv
 Hive_HiveCell.sv
 Hive_HiveComb.sv

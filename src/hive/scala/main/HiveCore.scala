@@ -6,7 +6,7 @@
   *   - REG_READ: 读取 1 个寄存器
   *
   * 内部组件:
-  *   - Register File: 12 个 32-bit 配置/状态寄存器
+  *   - Register File: 9 个 32-bit 配置/状态寄存器（映射见下方寄存器组注释）
   *   - Executor: 自动 Tiling FSM
   *   - aDma (RdOnly): execute 单次启动自主扫描 A 矩阵 → A buffer（内建 nTile 轮次）
   *   - cDma (WrOnly): C buffer → 外部存储（storeGate 门控，末 K pass 开门）
@@ -41,21 +41,19 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   })
 
   // ==========================================================================
-  // 寄存器组定义
+  // 寄存器组定义（映射与 HiveInterface.scala HiveCoreRegister 一致，共 9 个）
   // ==========================================================================
   // 地址  名称
   // 0x00  REG_M         M 维度
   // 0x01  REG_N         N 维度
   // 0x02  REG_K         K 维度
-  // 0x03  REG_FMT_RND   [7:0]=fmt, [15:8]=rnd
-  // 0x04  REG_A_ADDR    A 矩阵基地址
-  // 0x05  REG_B_ADDR    B 矩阵基地址
-  // 0x06  REG_C_ADDR    C 矩阵基地址
-  // 0x07  REG_A_STRIDE  A 行步长
-  // 0x08  REG_B_STRIDE  B 行步长
-  // 0x09  REG_C_STRIDE  C 行步长
-  // 0x0A  REG_STATUS    [0]=busy, [1]=done, [2]=err, [31:16]=progress (只读)
-  // 0x0B  REG_CONTROL   [0]=clear_done (写1清除)
+  // 0x03  REG_A_ADDR    A 矩阵基地址
+  // 0x04  REG_B_ADDR    B 矩阵基地址
+  // 0x05  REG_C_ADDR    C 矩阵基地址
+  // 0x06  REG_A/B/C_STRIDE  A/B/C 行步长（[3:0]/[7:4]/[11:8]，各 4bit）
+  // 0x07  REG_CONTROL   [0]=clear_done (写1清除), [1:0]=fmt, [4:2]=rnd,
+  //                     [5]=loadWMode (0=垂直加载, 1=水平 loadW 加载)
+  // 0x08  REG_STATUS    [0]=busy, [1]=done, [2]=err, [31:16]=progress (只读)
 
   //val regFile = RegInit(VecInit(Seq.fill(12)(0.U(32.W))))
   val regFile = RegInit(0.U.asTypeOf(HiveCoreRegister(cfg)))
@@ -85,8 +83,12 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // （若用 Reg 锁存，start 当拍会采样到锁存前的旧值）。
   // 偏移语义与 Executor 的 aTileAddr/bTileAddr/cStoreAddr 保持一致（字节地址）：
   //   aRow = aStride（行步长）           aCol = totalN * (aEffW/8)（K tile 间列偏移）
-  //   bRow = bStride（沿 K 行步长）      bCol = totalN * (aEffW/8)（N tile 间列偏移，
-  //                                        与 Executor bTileAddr 用 aEffW/8 作元素字节宽一致）
+  //   bRow/bCol 双模式（regFile.loadWMode，regs(7)(5)）：
+  //     垂直加载（loadWMode=0，既有行为）：bRow = n*(bW/8)（沿 K 行步长），
+  //       bCol = totalN*(bW/8)（N tile 间列偏移）
+  //     水平 loadW 加载（loadWMode=1）：B 内存按 N×K 转置存储（行=n 列=k），
+  //       bRow = k*(bW/8)（转置行步长），bCol = totalN*k*(bW/8)
+  //       （轮间跳 = 跨 totalN 个转置行）
   //   cRow = cStride                     cCol = totalN * (cEffW/8)
   // ==========================================================================
   val executePulse = io.cmd.fire && io.cmd.payload.op === HiveCoreOp.EXECUTE
@@ -98,8 +100,9 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   calcConfig.aRowAddressOffset := regFile.k * (cfg.aW / 8).U
   calcConfig.aColTileAddressOffset := cfg.totalN.U * (cfg.aW / 8).U
   
-  calcConfig.bRowAddressOffset := regFile.n * (cfg.bW / 8).U
-  calcConfig.bColTileAddressOffset := cfg.totalN.U * (cfg.bW / 8).U
+  // bRow/bCol 双模式：Mux 默认分支（loadWMode=0）逐字等于垂直加载既有公式
+  calcConfig.bRowAddressOffset := Mux(regFile.loadWMode, regFile.k * (cfg.bW / 8).U, regFile.n * (cfg.bW / 8).U)
+  calcConfig.bColTileAddressOffset := Mux(regFile.loadWMode, cfg.totalN.U * regFile.k * (cfg.bW / 8).U, cfg.totalN.U * (cfg.bW / 8).U)
   
   calcConfig.cRowAddressOffset := regFile.n * (cfg.cW / 8).U
   calcConfig.cColTileAddressOffset := cfg.totalN.U * (cfg.cW / 8).U
@@ -286,6 +289,10 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   hiveComb.io.loadHIn  := executor.io.hiveLoadH
   hiveComb.io.loadVInLock  := executor.io.hiveLoadVLock
   hiveComb.io.loadVIn  := executor.io.hiveLoadV
+  // 水平 loadW 加载（可选模式）：垂直模式下 executor 输出恒 0，阵列侧
+  // 相关分支为死路，不加显式 mode 端口、靠信号活跃性自然二选一
+  hiveComb.io.loadWIn      := executor.io.hiveLoadW
+  hiveComb.io.loadWInLock  := executor.io.hiveLoadWLock
   hiveComb.io.validIn  := executor.io.hiveValidIn
   hiveComb.io.fmtIn    := regFile.fmt
   hiveComb.io.rndIn    := regFile.rnd

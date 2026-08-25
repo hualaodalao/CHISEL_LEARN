@@ -28,10 +28,16 @@
   *   rndIn   / rndOut   : 舍入模式选择，水平传播。
   *   clear              : psumReg 清零，标量广播。
   *
-  * 权重加载协议：
+  * 权重加载协议（双模式，靠 loadV/loadW 信号活跃性自然二选一）：
+  *   垂直模式（默认）：
   *   - loadHIn=true：锁存 fmt/rnd 配置（不动 wReg）
   *   - loadVIn=true：从 psumIn 低位锁存权重进 wReg，并透传 psumIn 使权重下沉
   *   - 典型用法：加载阶段同时拉高 loadH+loadV，psumIn 供权重，aIn 无需供数
+  *   水平 loadW 模式：
+  *   - 权重经 a 数据链水平加载：loadWIn 脉冲每拍使权重沿 a 链右移一列
+  *     （aLoadWReg 门控移位，停顿自然保持），末拍 loadWInLock 广播拍
+  *     从 aIn(bW-1,0) 锁存 wReg（对角线落位态唯一时刻）
+  *   - 两模式互斥（硬件断言守护），垂直模式下 loadW 信号组恒 0
   *
   * wReg / 配置锁存逻辑：
   *   loadV：wReg := psumIn 低位
@@ -82,6 +88,14 @@ class HiveWorker(
     val loadVIn  = Input(Bool())
     val loadVOut  = Output(Bool())
 
+    // 水平 loadW 加载（可选模式，与垂直加载二选一，靠信号活跃性自然选择）：
+    // loadWIn 沿 a 数据链方向逐列链传播（每脉冲权重右移一列，停顿保持）；
+    // loadWInLock 广播脉冲拍从 aIn 低位锁存 wReg（对角线落位态唯一时刻）。
+    // 垂直模式下该信号组恒 0，相关分支全部为死路（行为 bit-exact 不变）
+    val loadWIn     = Input(Bool())
+    val loadWOut    = Output(Bool())
+    val loadWInLock = Input(Bool())
+
     // 控制（水平传播：RegNext → 右侧 HiveWorker）
     val validIn  = Input(Bool())
     val validOut = Output(Bool())
@@ -102,6 +116,14 @@ class HiveWorker(
   val fmtInitActive = RegInit(false.B)
   val rndInitActive = RegInit(false.B)
 
+  // --- loadW 端口 WireDefault 兜底：既有测试（SystolicArrayTest 等）直接
+  // 例化本 PE 时不连接 loadW 口（invalid），兜底回落恒 0，保证垂直模式
+  // bit-exact；HiveCell 正常驱动时兜底被覆盖 ---
+  val loadWInSafe = WireDefault(false.B)
+  loadWInSafe := io.loadWIn
+  val loadWInLockSafe = WireDefault(false.B)
+  loadWInLockSafe := io.loadWInLock
+
   // --- 内部配置寄存器（无 RegInit，依赖显式初始化） ---
   val fmtReg = Reg(DataFormat())
   val rndReg = Reg(RoundingMode())
@@ -118,6 +140,13 @@ class HiveWorker(
   when(io.loadVInLock) {
     wReg := io.psumIn(bW - 1, 0)
   }
+  // 水平 loadW 模式并列分支（last-connect 覆盖）：loadWInLock 广播拍从 aIn
+  // 低位锁存权重。垂直模式 loadWInLock 恒 0，本分支为死路，wReg 行为不变
+  when(loadWInLockSafe) {
+    wReg := io.aIn(bW - 1, 0)
+  }
+  // 两种加载模式互斥：同一拍不允许 loadV 与 loadW 同时锁存
+  assert(!(io.loadVInLock && loadWInLockSafe), "HiveWorker: loadVInLock and loadWInLock asserted simultaneously (mutually exclusive load modes)")
   when(io.loadHIn) {
     fmtReg := io.fmtIn
     rndReg := io.rndIn
@@ -159,12 +188,26 @@ class HiveWorker(
   io.psumOut := psumReg
 
   // --- aOut：激活正常水平传播（权重不再经 a 链加载，去掉 loadH 分支）---
-  io.aOut := RegNext(io.aIn, 0.U)
+  val aReg = RegInit(0.U(aEffW.W))
+  when(io.clear) {
+    aReg := 0.U
+  }.elsewhen(io.loadWIn | io.validIn){
+    aReg := io.aIn
+  }
+  
+  io.aOut := aReg
+
 
   // --- 控制传播 ---
   io.validOut := RegNext(io.validIn, false.B)
   io.validOutV := RegNext(io.validInV, false.B)
   io.loadVOut  := RegNext(io.loadVIn, false.B)
+  // loadW 脉冲沿 a 数据链方向逐列链传播（与 aOut lockstep，1 拍/列）。
+  // lock 拍起截断传播：lock 拍各列 aIn 已处于对角线落位态（wReg 锁存采样
+  // aIn），lock 之后继续下传的尾脉冲会在 lock 已撤的深列重新置位 loadWWin
+  // （窗口永久重开，aOut 输出残留权重顶替计算期激活，实证 col>=2 全错且
+  // 行间相同），必须就地截断。下一加载窗口 lock=0 时自然恢复传播
+  io.loadWOut  := RegNext(loadWInSafe && !loadWInLockSafe, false.B)
   io.fmtOut   := RegNext(io.fmtIn, DataFormat.INT8)
   io.rndOut   := RegNext(io.rndIn, RoundingMode.RNE)
 }

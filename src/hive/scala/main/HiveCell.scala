@@ -69,9 +69,15 @@ class HiveCell(
     val loadHIn = Input(Bool())
     val loadVIn = Input(Bool())
     val loadVInLock = Input(Bool())
+    // 水平 loadW 加载（可选模式）：loadWInLock 全 PE 广播（仿 loadVInLock）；
+    // loadWIn per-row 沿 a 数据链方向（y）逐列链传播，与 aOut lockstep。
+    // 垂直模式下恒 0，不影响既有行为
+    val loadWIn = Input(Vec(n, Bool()))
+    val loadWInLock = Input(Bool())
 
     // 输出控制
     val loadVOut = Output(Vec(n, Bool()))
+    val loadWOut = Output(Vec(n, Bool()))  // per-row（每行 a 链末端）
     val validOut = Output(Vec(n, Bool()))  // per-row（计算阶段结果有效）
     val validOutV = Output(Vec(n, Bool()))
     val fmtOut   = Output(DataFormat())    // 标量
@@ -81,12 +87,23 @@ class HiveCell(
   // --- HiveWorker 网格 ---
   val pes = Seq.fill(n, n)(Module(new HiveWorker(aW, bW, cEffW, supportedFmts)))
 
+  // --- loadW 端口 WireDefault 兜底：既有测试（SystolicArrayTest 等）直接
+  // 例化本模块时不连接 loadW 口（invalid），兜底回落恒 0，保证垂直模式
+  // bit-exact；顶层 HiveComb 正常驱动时兜底被覆盖 ---
+  val loadWInSafe = WireDefault(VecInit(Seq.fill(n)(false.B)))
+  loadWInSafe := io.loadWIn
+  val loadWInLockSafe = WireDefault(false.B)
+  loadWInLockSafe := io.loadWInLock
+
   // --- 列连接块（水平传播）：控制信号直接广播，无 ShiftRegister ---
   for (x <- 0 until n) {
     for (y <- 0 until n) {
       pes(x)(y).io.loadHIn := io.loadHIn  
       pes(x)(y).io.clear   := io.clear      
       pes(x)(y).io.loadVInLock := io.loadVInLock
+      // loadWInLock 全 PE 广播（仿 loadVInLock；对角线落位态只存在于末拍
+      // beat 进入列 0 的绝对时刻，链传播锁存会使所有列锁到同一权重）
+      pes(x)(y).io.loadWInLock := loadWInLockSafe
 
       if (y == 0) {
         // valid 沿 x+y 二维传播：x==0 行首接 io.validIn，x>0 行首从上一 x 行
@@ -99,6 +116,8 @@ class HiveCell(
         pes(x)(y).io.rndIn   := io.rndIn
         pes(x)(y).io.validIn := io.validIn(x)
         pes(x)(y).io.aIn     := io.aIn(x)  // per-row 数据
+        // loadW 脉冲链 per-row 注入（水平 loadW 模式，与 a 链同向 lockstep）
+        pes(x)(y).io.loadWIn := loadWInSafe(x)
       } else {
         // 传播：从左侧 PE 获取（RegNext 链）
 
@@ -106,11 +125,14 @@ class HiveCell(
         pes(x)(y).io.rndIn   := pes(x)(y-1).io.rndOut
         pes(x)(y).io.validIn := pes(x)(y-1).io.validOut
         pes(x)(y).io.aIn     := pes(x)(y-1).io.aOut
+        // loadW 链沿 a 数据链方向（y）逐列传播，与 aOut lockstep
+        pes(x)(y).io.loadWIn := pes(x)(y-1).io.loadWOut
       }
 
       if (y == n-1) {
         io.validOut(x) := pes(x)(y).io.validOut  // per-row
         io.aOut(x)     := pes(x)(y).io.aOut      // per-row
+        io.loadWOut(x) := pes(x)(y).io.loadWOut  // per-row（a 链末端）
       }
     }
   }

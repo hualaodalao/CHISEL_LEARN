@@ -81,6 +81,9 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
     val hiveLoadH   = Output(Bool())
     val hiveLoadV   = Output(Bool())
     val hiveLoadVLock   = Output(Bool())
+    // 水平 loadW 加载（可选模式，regs(7)(5) 选择）：垂直模式下恒 0
+    val hiveLoadW       = Output(Bool())
+    val hiveLoadWLock   = Output(Bool())
     val hiveValidIn = Output(Bool())
     val hiveClear   = Output(Bool())
     val hiveCOut    = Input(Vec(cfg.totalN, UInt(cfg.cEffW.W)))
@@ -123,8 +126,13 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
 
   // 计算相关
   val tileInterCnt = RegInit(0.U(log2Up(cfg.totalN).W))
-  val drainNextCnt = RegInit(0.U(log2Up(cfg.totalN).W))
+  // drain 计数：位宽按水平 loadW 模式的最大 drain 值 2*(totalN-1)+1 取
+  // （log2Up(2*totalN)）；垂直模式计数值 totalN-1 仍在该位宽内，行为不变
+  val drainNextCnt = RegInit(0.U(log2Up(2 * cfg.totalN).W))
   val hasNext = RegInit(false.B)
+  // 水平 loadW 模式锁存（execute 拍采样 regs(7)(5)；垂直模式恒 false，
+  // 所有 loadWModeReg 门控分支均为死路）
+  val loadWModeReg = RegInit(false.B)
   
   // CBufferPipe
   val cStoreGateReg = RegInit(false.B)
@@ -170,6 +178,8 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   io.hiveLoadH   := false.B
   io.hiveLoadV   := false.B
   io.hiveLoadVLock   := false.B
+  io.hiveLoadW       := false.B
+  io.hiveLoadWLock   := false.B
   io.hiveValidIn := false.B
   io.hiveClear   := false.B
 
@@ -232,6 +242,12 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
         io.flushC := true.B
         state    := sLOAD_B
       }
+
+      // 水平 loadW 模式位锁存：独立 when（不改动上方原 execute 块）。
+      // regFile 在计算期间保持不变，execute 拍采样即为本次运行模式
+      when(io.execute) {
+        loadWModeReg := io.regFile.loadWMode
+      }
     }
 
 
@@ -256,6 +272,28 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
           tileInterCnt := totalN.U - 1.U
           state := sLOAD_A
           io.hiveLoadVLock := true.B
+        }
+      }
+
+      // --- 水平 loadW 模式覆盖块（last-connect；loadWModeReg=0 时整块死路，
+      //     上方垂直路径逐字保留、行为 bit-exact 不变）：
+      //     权重改经 hiveAIn 的 a 数据链水平加载（loadW 脉冲链移位 +
+      //     末拍 loadWLock 广播锁存），psumIn 保持 0，loadV 信号组压制为 0。
+      //     tileInterCnt/bPop.ready/loadH 计数与握手逻辑共用上方不改 ---
+      when(loadWModeReg) {
+        io.hiveLoadV     := false.B        // 压制垂直加载脉冲
+        io.hiveLoadW     := io.bPop.fire   // 水平移位脉冲：停顿自然暂停
+        io.hiveLoadVLock := false.B        // 压制垂直锁存
+        for (i <- 0 until cfg.totalN) {
+          // 权重经 a 口供数（bPop 的 totalN 个 bW 切片，aEffW > bW 时
+          // 高位自动补零）；psumIn 恢复默认 0（权重不再经 psum 口下沉）
+          io.hiveAIn(i)    := io.bPop.payload(cfg.bW * (i + 1) - 1, cfg.bW * i)
+          io.hivePsumIn(i) := 0.U
+        }
+        // 末拍 fire（tileInterCnt 计满）当拍发 loadWLock（对角线落位态
+        // 唯一时刻，必须与末拍 beat 进入列 0 的 fire 拍组合重合）
+        when(io.bPop.fire && tileInterCnt === 0.U) {
+          io.hiveLoadWLock := true.B
         }
       }
 
@@ -324,6 +362,11 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
           drainNextCnt := drainNextCnt - 1.U
         }.otherwise{
           drainNextCnt := totalN.U - 1.U
+          // 水平 loadW 模式 drain 重载（与 sNEXT_NK_TILE 初值一致；该值
+          // 会被下一 sNEXT_NK_TILE 重新赋值，此处保持一致性）
+          when(loadWModeReg) {
+            drainNextCnt := (2 * (totalN - 1) + 1).U
+          }
           hasNext := false.B
           state := sLOAD_B
         }

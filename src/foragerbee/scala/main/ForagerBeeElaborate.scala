@@ -23,7 +23,7 @@ object ForagerBeeElaborate extends App {
   val cfg = ForagerBeeConfig(
     numPorts = 2,
     queueDepth = 4,
-    maxDims = 4,
+    maxDims = 5,
     tileSize = 16,
     maxBurstLen = 64,
     dataWidth = 256,

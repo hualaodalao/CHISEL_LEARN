@@ -11,21 +11,35 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
                 io_push_payload_shape_1,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_shape_2,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_shape_3,	// src/utils/Stream/Stream.scala:363:14
+                io_push_payload_shape_4,	// src/utils/Stream/Stream.scala:363:14
   input  [31:0] io_push_payload_srcStride_0,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_srcStride_1,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_srcStride_2,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_srcStride_3,	// src/utils/Stream/Stream.scala:363:14
+                io_push_payload_srcStride_4,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_dstStride_0,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_dstStride_1,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_dstStride_2,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_dstStride_3,	// src/utils/Stream/Stream.scala:363:14
-                io_push_payload_srcAddr,	// src/utils/Stream/Stream.scala:363:14
+                io_push_payload_dstStride_4,	// src/utils/Stream/Stream.scala:363:14
+  input  [15:0] io_push_payload_srcStartIdx_0,	// src/utils/Stream/Stream.scala:363:14
+                io_push_payload_srcStartIdx_1,	// src/utils/Stream/Stream.scala:363:14
+                io_push_payload_srcStartIdx_2,	// src/utils/Stream/Stream.scala:363:14
+                io_push_payload_srcStartIdx_3,	// src/utils/Stream/Stream.scala:363:14
+                io_push_payload_srcStartIdx_4,	// src/utils/Stream/Stream.scala:363:14
+                io_push_payload_t2lMatCols,	// src/utils/Stream/Stream.scala:363:14
+                io_push_payload_t2lTileRows,	// src/utils/Stream/Stream.scala:363:14
+                io_push_payload_t2lTileCols,	// src/utils/Stream/Stream.scala:363:14
+                io_push_payload_t2lNumTileRows,	// src/utils/Stream/Stream.scala:363:14
+                io_push_payload_t2lNumTileCols,	// src/utils/Stream/Stream.scala:363:14
+  input  [31:0] io_push_payload_srcAddr,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_dstAddr,	// src/utils/Stream/Stream.scala:363:14
   input  [1:0]  io_push_payload_elemBytesLog2,	// src/utils/Stream/Stream.scala:363:14
   input  [2:0]  io_push_payload_permVec_0,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_permVec_1,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_permVec_2,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_permVec_3,	// src/utils/Stream/Stream.scala:363:14
+                io_push_payload_permVec_4,	// src/utils/Stream/Stream.scala:363:14
   input  [15:0] io_push_payload_padBefore_0,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_padBefore_1,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_padAfter_0,	// src/utils/Stream/Stream.scala:363:14
@@ -59,21 +73,30 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
                 io_pop_payload_shape_1,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_shape_2,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_shape_3,	// src/utils/Stream/Stream.scala:363:14
+                io_pop_payload_shape_4,	// src/utils/Stream/Stream.scala:363:14
   output [31:0] io_pop_payload_srcStride_0,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_srcStride_1,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_srcStride_2,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_srcStride_3,	// src/utils/Stream/Stream.scala:363:14
+                io_pop_payload_srcStride_4,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_dstStride_0,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_dstStride_1,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_dstStride_2,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_dstStride_3,	// src/utils/Stream/Stream.scala:363:14
-                io_pop_payload_srcAddr,	// src/utils/Stream/Stream.scala:363:14
+                io_pop_payload_dstStride_4,	// src/utils/Stream/Stream.scala:363:14
+  output [15:0] io_pop_payload_srcStartIdx_0,	// src/utils/Stream/Stream.scala:363:14
+                io_pop_payload_srcStartIdx_1,	// src/utils/Stream/Stream.scala:363:14
+                io_pop_payload_srcStartIdx_2,	// src/utils/Stream/Stream.scala:363:14
+                io_pop_payload_srcStartIdx_3,	// src/utils/Stream/Stream.scala:363:14
+                io_pop_payload_srcStartIdx_4,	// src/utils/Stream/Stream.scala:363:14
+  output [31:0] io_pop_payload_srcAddr,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_dstAddr,	// src/utils/Stream/Stream.scala:363:14
   output [1:0]  io_pop_payload_elemBytesLog2,	// src/utils/Stream/Stream.scala:363:14
   output [2:0]  io_pop_payload_permVec_0,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_permVec_1,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_permVec_2,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_permVec_3,	// src/utils/Stream/Stream.scala:363:14
+                io_pop_payload_permVec_4,	// src/utils/Stream/Stream.scala:363:14
   output [15:0] io_pop_payload_padBefore_0,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_padBefore_1,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_padAfter_0,	// src/utils/Stream/Stream.scala:363:14
@@ -111,14 +134,27 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
     .io_enq_bits_shape_1          (io_push_payload_shape_1),
     .io_enq_bits_shape_2          (io_push_payload_shape_2),
     .io_enq_bits_shape_3          (io_push_payload_shape_3),
+    .io_enq_bits_shape_4          (io_push_payload_shape_4),
     .io_enq_bits_srcStride_0      (io_push_payload_srcStride_0),
     .io_enq_bits_srcStride_1      (io_push_payload_srcStride_1),
     .io_enq_bits_srcStride_2      (io_push_payload_srcStride_2),
     .io_enq_bits_srcStride_3      (io_push_payload_srcStride_3),
+    .io_enq_bits_srcStride_4      (io_push_payload_srcStride_4),
     .io_enq_bits_dstStride_0      (io_push_payload_dstStride_0),
     .io_enq_bits_dstStride_1      (io_push_payload_dstStride_1),
     .io_enq_bits_dstStride_2      (io_push_payload_dstStride_2),
     .io_enq_bits_dstStride_3      (io_push_payload_dstStride_3),
+    .io_enq_bits_dstStride_4      (io_push_payload_dstStride_4),
+    .io_enq_bits_srcStartIdx_0    (io_push_payload_srcStartIdx_0),
+    .io_enq_bits_srcStartIdx_1    (io_push_payload_srcStartIdx_1),
+    .io_enq_bits_srcStartIdx_2    (io_push_payload_srcStartIdx_2),
+    .io_enq_bits_srcStartIdx_3    (io_push_payload_srcStartIdx_3),
+    .io_enq_bits_srcStartIdx_4    (io_push_payload_srcStartIdx_4),
+    .io_enq_bits_t2lMatCols       (io_push_payload_t2lMatCols),
+    .io_enq_bits_t2lTileRows      (io_push_payload_t2lTileRows),
+    .io_enq_bits_t2lTileCols      (io_push_payload_t2lTileCols),
+    .io_enq_bits_t2lNumTileRows   (io_push_payload_t2lNumTileRows),
+    .io_enq_bits_t2lNumTileCols   (io_push_payload_t2lNumTileCols),
     .io_enq_bits_srcAddr          (io_push_payload_srcAddr),
     .io_enq_bits_dstAddr          (io_push_payload_dstAddr),
     .io_enq_bits_elemBytesLog2    (io_push_payload_elemBytesLog2),
@@ -126,6 +162,7 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
     .io_enq_bits_permVec_1        (io_push_payload_permVec_1),
     .io_enq_bits_permVec_2        (io_push_payload_permVec_2),
     .io_enq_bits_permVec_3        (io_push_payload_permVec_3),
+    .io_enq_bits_permVec_4        (io_push_payload_permVec_4),
     .io_enq_bits_padBefore_0      (io_push_payload_padBefore_0),
     .io_enq_bits_padBefore_1      (io_push_payload_padBefore_1),
     .io_enq_bits_padAfter_0       (io_push_payload_padAfter_0),
@@ -159,14 +196,22 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
     .io_deq_bits_shape_1          (io_pop_payload_shape_1),
     .io_deq_bits_shape_2          (io_pop_payload_shape_2),
     .io_deq_bits_shape_3          (io_pop_payload_shape_3),
+    .io_deq_bits_shape_4          (io_pop_payload_shape_4),
     .io_deq_bits_srcStride_0      (io_pop_payload_srcStride_0),
     .io_deq_bits_srcStride_1      (io_pop_payload_srcStride_1),
     .io_deq_bits_srcStride_2      (io_pop_payload_srcStride_2),
     .io_deq_bits_srcStride_3      (io_pop_payload_srcStride_3),
+    .io_deq_bits_srcStride_4      (io_pop_payload_srcStride_4),
     .io_deq_bits_dstStride_0      (io_pop_payload_dstStride_0),
     .io_deq_bits_dstStride_1      (io_pop_payload_dstStride_1),
     .io_deq_bits_dstStride_2      (io_pop_payload_dstStride_2),
     .io_deq_bits_dstStride_3      (io_pop_payload_dstStride_3),
+    .io_deq_bits_dstStride_4      (io_pop_payload_dstStride_4),
+    .io_deq_bits_srcStartIdx_0    (io_pop_payload_srcStartIdx_0),
+    .io_deq_bits_srcStartIdx_1    (io_pop_payload_srcStartIdx_1),
+    .io_deq_bits_srcStartIdx_2    (io_pop_payload_srcStartIdx_2),
+    .io_deq_bits_srcStartIdx_3    (io_pop_payload_srcStartIdx_3),
+    .io_deq_bits_srcStartIdx_4    (io_pop_payload_srcStartIdx_4),
     .io_deq_bits_srcAddr          (io_pop_payload_srcAddr),
     .io_deq_bits_dstAddr          (io_pop_payload_dstAddr),
     .io_deq_bits_elemBytesLog2    (io_pop_payload_elemBytesLog2),
@@ -174,6 +219,7 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
     .io_deq_bits_permVec_1        (io_pop_payload_permVec_1),
     .io_deq_bits_permVec_2        (io_pop_payload_permVec_2),
     .io_deq_bits_permVec_3        (io_pop_payload_permVec_3),
+    .io_deq_bits_permVec_4        (io_pop_payload_permVec_4),
     .io_deq_bits_padBefore_0      (io_pop_payload_padBefore_0),
     .io_deq_bits_padBefore_1      (io_pop_payload_padBefore_1),
     .io_deq_bits_padAfter_0       (io_pop_payload_padAfter_0),

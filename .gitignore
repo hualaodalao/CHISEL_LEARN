@@ -15,9 +15,10 @@ project/project/target/
 # Generated output
 generated/
 
-# Build / simulation artifacts (verilator build products, VCD waveforms)
+# Build / simulation artifacts (verilator build products, VCD/FST waveforms)
 build/
 sim/*.vcd
+sim/*.fst
 
 # Qoder
 .qoder/

@@ -82,6 +82,11 @@ class HiveComb(
     val loadHIn = Input(Bool())   // 水平加载（标量）
     val loadVInLock = Input(Bool())   // 垂直加载（标量）
     val loadVIn = Input(Bool())   // 垂直加载（标量）
+    // 水平 loadW 加载（可选模式，与垂直加载靠信号活跃性自然二选一）：
+    // loadWInLock 广播全簇；loadWIn 沿 cj 方向 per-row 级联（与 a 链 lockstep）。
+    // 垂直模式下恒 0，不影响既有行为
+    val loadWIn = Input(Bool())
+    val loadWInLock = Input(Bool())
     val validIn = Input(Bool())   // 标量 validIn
     val fmtIn   = Input(DataFormat())
     val rndIn   = Input(RoundingMode())
@@ -96,6 +101,14 @@ class HiveComb(
   val arrays = Seq.fill(clusterM, clusterM)(
     Module(new HiveCell(arrayN, aW, bW, cEffW, supportedFmts))
   )
+
+  // --- loadW 端口 WireDefault 兜底：既有测试（SystolicArrayTest 等）直接
+  // 例化本模块时不连接 loadW 口（invalid），兜底回落恒 0，保证垂直模式
+  // bit-exact；顶层 HiveCore 正常驱动时兜底被覆盖 ---
+  val loadWInSafe = WireDefault(false.B)
+  loadWInSafe := io.loadWIn
+  val loadWInLockSafe = WireDefault(false.B)
+  loadWInLockSafe := io.loadWInLock
 
   // --- 全局 skew：每个子阵列行 (ci) 的 valid 延迟（跟踪行级错峰数据） ---
   // 外部供数已按「行 i 延迟 i 拍」错峰，数据波前到达全局 PE(x,y) 的时刻为
@@ -139,6 +152,12 @@ class HiveComb(
         }
       }
       aSkewedPerRow(i) := aSkewedShiftRegisters(delay - 1)
+      // 水平 loadW 模式加载旁路（last-connect 覆盖，与 bSkew 的 loadV 旁路同构；
+      // 垂直模式 loadWIn 恒 0，本分支为死路）：加载窗口内权重水平加载
+      // 无需 skew，各行同拍直连 io.aIn
+      when(loadWInSafe){
+        aSkewedPerRow(i) := io.aIn(i)
+      }
     }
   }
   //B skew
@@ -176,6 +195,8 @@ class HiveComb(
     arr.io.clear := io.clear
     arr.io.loadHIn := io.loadHIn
     arr.io.loadVInLock := io.loadVInLock
+    // loadWInLock 广播全簇（仿 loadVInLock；末拍对角线落位态的唯一时刻）
+    arr.io.loadWInLock := loadWInLockSafe
 
     // --- loadHIn/fmtIn/rndIn：loadH 广播（不再链式传播），fmt/rnd 仍逐列向右传播 ---
     if (cj == 0) {
@@ -195,10 +216,14 @@ class HiveComb(
         // 加载阶段本就不需要 skew，两种阶段统一为直连
         arr.io.validIn(r) := validSkewedPerRow(globalRow)
         arr.io.aIn(r) := aSkewedPerRow(globalRow)
+        // loadW 脉冲链注入（水平 loadW 模式）：首列簇各行同接顶层 loadWIn
+        arr.io.loadWIn(r) := loadWInSafe
       } else {
         // 非首列：从左侧子阵列获取
         arr.io.validIn(r) := arrays(ci)(cj-1).io.validOut(r)
         arr.io.aIn(r) := arrays(ci)(cj-1).io.aOut(r)
+        // loadW 链沿 cj 方向 per-row 级联（镜像 a 链，与 aOut lockstep）
+        arr.io.loadWIn(r) := arrays(ci)(cj-1).io.loadWOut(r)
       }
     }
 

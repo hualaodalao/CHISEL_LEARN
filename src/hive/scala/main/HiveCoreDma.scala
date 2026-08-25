@@ -157,7 +157,11 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
           colAddr   := io.calcConfig.bColTileAddressOffset + (cfg.totalN - 1).U * io.calcConfig.bRowAddressOffset
           rowStep   := io.calcConfig.bRowAddressOffset
           lineTarget  := cfg.totalN.U
-          bNextKTileAddressOffset := (cfg.totalN * 2 ).U * io.calcConfig.bRowAddressOffset //这里乘以2的原因是B矩阵是降序读取，那么下一个k维tile需要增加两个
+          // 双模式 kTile 跳转步长：Mux 默认分支（loadWMode=0）逐字等于垂直加载既有公式。
+          // 垂直：B 降序读取，下一 k 维 tile 需 +2*totalN*bRowOff（这里乘以 2 的原因是
+          // B 矩阵是降序读取）；水平 loadW：转置布局下 k 切片步进 + 降序回补 =
+          // totalN*(bRowOff + bW/8)
+          bNextKTileAddressOffset := Mux(io.regFile.loadWMode, cfg.totalN.U * (io.calcConfig.bRowAddressOffset + (cfg.bW / 8).U), (cfg.totalN * 2 ).U * io.calcConfig.bRowAddressOffset)
 
       }
       

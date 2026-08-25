@@ -48,7 +48,7 @@ case class ForagerBeeConfig(
     numPorts: Int = 2,
     queueDepth: Int = 8,
     dataQueueDepth: Int = -1,
-    maxDims: Int = 4,
+    maxDims: Int = 5,
     tileSize: Int = 8,
     maxBurstLen: Int = 64,
     dataWidth: Int = 128,
@@ -127,6 +127,9 @@ object FbOp extends ChiselEnum {
 
   /** 聚集：从多个非连续源地址（由描述符表指定）读取，线性写入连续目的缓冲区 */
   val GATHER = Value
+
+  /** Tile-to-Linear：将 2D 行主序矩阵按 tile 分块重排为线性输出（展开为 4D COPY） */
+  val TILE2LINEAR = Value
 }
 
 /** 数据格式枚举（用于搬运时原位格式转换） */
@@ -165,6 +168,21 @@ class FbCmd(cfg: ForagerBeeConfig) extends Bundle {
   /** 源张量各维起始索引（子块裁剪：从源张量的 srcStartIdx 位置开始读取）。
     * 默认全 0（等同于从原点开始），非裁剪场景不需要设置。 */
   val srcStartIdx = Vec(cfg.maxDims, UInt(16.W))
+
+  /** TILE2LINEAR：源矩阵列数 N（非 TILE2LINEAR 时忽略） */
+  val t2lMatCols = UInt(16.W)
+
+  /** TILE2LINEAR：tile 行数 Tm（非 TILE2LINEAR 时忽略） */
+  val t2lTileRows = UInt(16.W)
+
+  /** TILE2LINEAR：tile 列数 Tn（非 TILE2LINEAR 时忽略） */
+  val t2lTileCols = UInt(16.W)
+
+  /** TILE2LINEAR：行方向 tile 数 Mt = ceil(M/Tm)（非 TILE2LINEAR 时忽略） */
+  val t2lNumTileRows = UInt(16.W)
+
+  /** TILE2LINEAR：列方向 tile 数 Nt = ceil(N/Tn)（非 TILE2LINEAR 时忽略） */
+  val t2lNumTileCols = UInt(16.W)
 
   /** 源基址（须按 beat 对齐） */
   val srcAddr = UInt(cfg.addressWidth.W)
