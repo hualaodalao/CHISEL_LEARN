@@ -33,6 +33,16 @@ class HiveCoreScratchpad(cfg: HiveCoreConfig) extends Module {
     val flushA = Input(Bool())
     val flushB = Input(Bool())
     val flushC = Input(Bool())
+
+    // MX scale buffer（仅 hasMx 生成，非 MX 配置不暴露这些端口）：
+    //   - scaleA：每激活行一个 8-bit E8M0 scale（随激活流动）
+    //   - scaleB：每 K-块一个 totalN 向量（scaleRowW = totalN*8，权重驻留）
+    val scaleAPush  = if (cfg.hasMx) Some(slave(Stream(UInt(8.W))))            else None
+    val scaleAPop   = if (cfg.hasMx) Some(master(Stream(UInt(8.W))))           else None
+    val scaleBPush  = if (cfg.hasMx) Some(slave(Stream(UInt(cfg.scaleRowW.W))))  else None
+    val scaleBPop   = if (cfg.hasMx) Some(master(Stream(UInt(cfg.scaleRowW.W)))) else None
+    val flushScaleA = if (cfg.hasMx) Some(Input(Bool()))                       else None
+    val flushScaleB = if (cfg.hasMx) Some(Input(Bool()))                       else None
   })
 
   // ---- 实例化三个 StreamFifo ----
@@ -72,4 +82,26 @@ class HiveCoreScratchpad(cfg: HiveCoreConfig) extends Module {
   cFifo.io.flush        := io.flushC
   io.cOccupancy         := cFifo.io.occupancy
   io.cAvailability      := cFifo.io.availability
+
+  // ---- Scale buffer 连接（仅 hasMx；非 MX 配置不生成 FIFO/接线）----
+  if (cfg.hasMx) {
+    val scaleAFifo = Module(new StreamFifo(UInt(8.W), cfg.scaleBufferDepth))
+    val scaleBFifo = Module(new StreamFifo(UInt(cfg.scaleRowW.W), cfg.scaleBufferDepth))
+
+    scaleAFifo.io.push.valid   := io.scaleAPush.get.valid
+    scaleAFifo.io.push.payload := io.scaleAPush.get.payload
+    io.scaleAPush.get.ready    := scaleAFifo.io.push.ready
+    io.scaleAPop.get.valid     := scaleAFifo.io.pop.valid
+    io.scaleAPop.get.payload   := scaleAFifo.io.pop.payload
+    scaleAFifo.io.pop.ready     := io.scaleAPop.get.ready
+    scaleAFifo.io.flush         := io.flushScaleA.get
+
+    scaleBFifo.io.push.valid   := io.scaleBPush.get.valid
+    scaleBFifo.io.push.payload := io.scaleBPush.get.payload
+    io.scaleBPush.get.ready    := scaleBFifo.io.push.ready
+    io.scaleBPop.get.valid     := scaleBFifo.io.pop.valid
+    io.scaleBPop.get.payload   := scaleBFifo.io.pop.payload
+    scaleBFifo.io.pop.ready     := io.scaleBPop.get.ready
+    scaleBFifo.io.flush         := io.flushScaleB.get
+  }
 }

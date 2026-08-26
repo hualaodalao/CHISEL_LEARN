@@ -90,6 +90,11 @@ class HiveComb(
     val validIn = Input(Bool())   // 标量 validIn
     val fmtIn   = Input(DataFormat())
     val rndIn   = Input(RoundingMode())
+    // 权重格式（标量，镜像 fmtIn 逐列 cj 传播）
+    val bFmtIn  = Input(DataFormat())
+    // MX scale：scaleAIn per-row（与 aIn 同 skew，随激活链流动），scaleBIn per-column（列驻留）
+    val scaleAIn = Input(Vec(totalN, UInt(8.W)))
+    val scaleBIn = Input(Vec(totalN, UInt(8.W)))
 
     val clear   = Input(Bool())
 
@@ -160,6 +165,31 @@ class HiveComb(
       }
     }
   }
+  // scaleA skew：per-row，与 aSkewedPerRow 完全镜像（随激活链同 skew 流动）。
+  // P1 顶层 scaleAIn 恒 0，故此链输出恒 0，不影响非 MX 行为。
+  val scaleASkewedPerRow = WireInit(VecInit(Seq.fill(clusterM*arrayN)(0.U(8.W))))
+  dontTouch(scaleASkewedPerRow)
+  for(i <- 0 until clusterM*arrayN){
+    if(i == 0){
+      scaleASkewedPerRow(0) := io.scaleAIn(0)
+    }
+    else{
+      val delay = i
+      val scaleASkewedShiftRegisters = RegInit(VecInit(Seq.fill(delay)(0.U(8.W))))
+      when(shiftEnableIn){
+        scaleASkewedShiftRegisters(0) := io.scaleAIn(i)
+      }
+      for (j <- 1 until delay){
+        when(shiftEnableIn){
+          scaleASkewedShiftRegisters(j) := scaleASkewedShiftRegisters(j-1)
+        }
+      }
+      scaleASkewedPerRow(i) := scaleASkewedShiftRegisters(delay - 1)
+      when(loadWInSafe){
+        scaleASkewedPerRow(i) := io.scaleAIn(i)
+      }
+    }
+  }
   //B skew
   val bSkewedPerRow = WireInit(VecInit(Seq.fill(clusterM*arrayN)(0.U(cEffW.W))))
   dontTouch(bSkewedPerRow)
@@ -202,9 +232,11 @@ class HiveComb(
     if (cj == 0) {
       arr.io.fmtIn   := io.fmtIn
       arr.io.rndIn   := io.rndIn
+      arr.io.bFmtIn  := io.bFmtIn
     } else {
       arr.io.fmtIn   := arrays(ci)(cj - 1).io.fmtOut
       arr.io.rndIn   := arrays(ci)(cj - 1).io.rndOut
+      arr.io.bFmtIn  := arrays(ci)(cj - 1).io.bFmtOut
     }
 
     
@@ -216,12 +248,16 @@ class HiveComb(
         // 加载阶段本就不需要 skew，两种阶段统一为直连
         arr.io.validIn(r) := validSkewedPerRow(globalRow)
         arr.io.aIn(r) := aSkewedPerRow(globalRow)
+        // scaleA per-row 首列注入（与 aIn 同 skew）
+        arr.io.scaleAIn(r) := scaleASkewedPerRow(globalRow)
         // loadW 脉冲链注入（水平 loadW 模式）：首列簇各行同接顶层 loadWIn
         arr.io.loadWIn(r) := loadWInSafe
       } else {
         // 非首列：从左侧子阵列获取
         arr.io.validIn(r) := arrays(ci)(cj-1).io.validOut(r)
         arr.io.aIn(r) := arrays(ci)(cj-1).io.aOut(r)
+        // scaleA 链沿 cj 方向 per-row 级联（镜像 a 链，与 aOut lockstep）
+        arr.io.scaleAIn(r) := arrays(ci)(cj-1).io.scaleAOut(r)
         // loadW 链沿 cj 方向 per-row 级联（镜像 a 链，与 aOut lockstep）
         arr.io.loadWIn(r) := arrays(ci)(cj-1).io.loadWOut(r)
       }
@@ -230,6 +266,8 @@ class HiveComb(
     // --- psumIn：per-column，无条件直连（无 skew） ---
     for (c <- 0 until arrayN) {
       val globalCol = cj * arrayN + c
+      // scaleB 列驻留：per-column（globalCol）注入对应列的 HiveCell（内部再广播到列内各行）
+      arr.io.scaleBIn(c) := io.scaleBIn(globalCol)
       if (ci == 0) {
 
         // 首行：无条件直连 io.psumIn。

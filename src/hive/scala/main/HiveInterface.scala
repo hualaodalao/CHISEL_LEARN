@@ -120,9 +120,18 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
   // 0x04  REG_B_ADDR    B 矩阵基地址
   // 0x05  REG_C_ADDR    C 矩阵基地址
   // 0x06  REG_A/B/C_STRIDE  A/B/C 行步长（[3:0]/[7:4]/[11:8]，各 4bit）
-  // 0x07  REG_CONTROL   [0]=clear_done (写1清除), [1:0]=fmt, [4:2]=rnd,
-  //                     [5]=loadWMode (0=垂直加载, 1=水平 loadW 加载)
+  // 0x07  REG_CONTROL   位域编码（3-bit DataFormat 枚举）：
+  //         [0]    = clear_done (写1清除) — 与 aFmt[1:0] 复用低 2 位
+  //         [1:0]  = aFmt 低 2 位
+  //         [4:2]  = rnd (RoundingMode)
+  //         [5]    = loadWMode (0=垂直加载, 1=水平 loadW 加载)
+  //         [6]    = aFmt 高 1 位（拼接 [6],[1:0] 得完整 3-bit aFmt）
+  //         [7]    = bFmt 高 1 位（拼接 [7],[9:8] 得完整 3-bit bFmt）
+  //         [9:8]  = bFmt 低 2 位
+  //         [10]   = mixFmtEn (v1 恒 0：bFmt 跟随 aFmt)
   // 0x08  REG_STATUS    [0]=busy, [1]=done, [2]=err, [31:16]=progress (只读)
+  // 0x09  REG_SCALE_A_ADDR  scaleA 基地址
+  // 0x0A  REG_SCALE_B_ADDR  scaleB 基地址
 
   val regs = Vec(cfg.registerNum, UInt(32.W))
   def m   = regs(0)
@@ -134,15 +143,27 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
   def aStride = regs(6)(3, 0)
   def bStride = regs(6)(7, 4)
   def cStride = regs(6)(11, 8)
-  // 注意：位域宽度必须与枚举实际宽度一致（DataFormat=2bit, RoundingMode=3bit,
-  // HiveCoreLoopMode 仅剩 MKN 单值=1bit），否则 asTypeOf 会因宽度不匹配报错
-  def fmt = regs(7)(1, 0).asTypeOf(DataFormat())
+
+  // --- REG_CONTROL (0x07) 位域 ---
+  // aFmt: 3-bit = Cat(regs(7)(6), regs(7)(1,0))
+  def aFmt = Cat(regs(7)(6), regs(7)(1, 0)).asTypeOf(DataFormat())
+  // bFmt: 3-bit = Cat(regs(7)(7), regs(7)(9,8))
+  def bFmt = Cat(regs(7)(7), regs(7)(9, 8)).asTypeOf(DataFormat())
+  // mixFmtEn: v1 恒 0（bFmt 跟随 aFmt）
+  def mixFmtEn = regs(7)(10)
   def rnd = regs(7)(4, 2).asTypeOf(RoundingMode())
-  def isFloat = fmt === DataFormat.BF16 | fmt === DataFormat.FP16
-  //def loopMode = regs(7)(5).asTypeOf(HiveCoreLoopMode())
-  // 权重加载模式位：0=垂直加载（loadV 经 psum 口下沉，既有行为），
-  // 1=水平 loadW 加载（权重经 a 数据链水平移位 + 末拍广播锁存，B 内存转置存储）
+  // 权重加载模式位：0=垂直加载（loadV 经 psum 口下沉，既有行为，B内存非转置），
+  // 1=水平 loadW 加载（权重经 a 数据链水平移位 + 末拍广播锁存，B内存转置存储）
   def loadWMode = regs(7)(5)
+
+  // 兼容别名：旧代码通过 regFile.fmt 访问格式，等同 aFmt
+  def fmt = aFmt
+  // isFloat 判据：仅传统 FP16/BF16（MX 不走此路径，DMA 侧把 MX 当原始字节）
+  def isFloat = aFmt === DataFormat.BF16 || aFmt === DataFormat.FP16
+
+  // --- Scale 地址寄存器 (0x09 / 0x0A) ---
+  def scaleAAddr = regs(9)
+  def scaleBAddr = regs(10)
 }
 object HiveCoreRegister {
   def apply(cfg: HiveCoreConfig) = new HiveCoreRegister(cfg)

@@ -47,9 +47,14 @@ import chisel3.util._
   * @param bufDepth buffer 深度（决定 bufAvailability 位宽；默认 = aBufferDepth，
   *                 B 实例需传 bBufferDepth）
   */
-class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 0) extends Module {
+class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 0, isScale: Boolean = false) extends Module {
   val pushW = bufWidth 
   val availDepth = bufDepth
+  // isScale（编译期，仅 scaleB 实例传 true）：scaleB 每 K-块一个 totalN 向量，
+  // 与 B 的「每 kTile×totalN 行」遍历粒度不同，故走独立线性遍历——总 beat 数
+  // = nTile × kBlocks（kBlocks = kTile>>1，K%32==0 保证 kTile 偶数），消除按 B
+  // 过取的 ~totalN 倍冗余与 FIFO 错序。isScale=false 时下方所有分支为死路，
+  // A/B 遍历行为逐字 bit-exact 不变。
 
   val io = IO(new Bundle {
     val isA = Input(Bool())                          // 例化时 tie 死：true=A buffer, false=B buffer
@@ -146,6 +151,17 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
           lineTarget  := io.regFile.m
 
         }.otherwise {
+          if (isScale) {
+            // scaleB 线性遍历（仅 isScale=true 生成）：每 (nTile, K-块) 一个
+            // scaleRowW 向量，起始 = scaleBAddr（经顶层 regs(4) 重写），每 beat
+            // + scaleRowW/8 字节；lineTarget = 全部 beat 数 = nTile×(kTile>>1)。
+            // sNEXT_COL/降序/块跳转分支对本实例全为死路。
+            curAddr    := io.regFile.bAddr
+            colAddr    := 0.U
+            rowStep    := (cfg.scaleRowW / 8).U
+            lineTarget := io.calcConfig.nTile * (io.calcConfig.kTile >> 1)
+            bNextKTileAddressOffset := 0.U
+          } else {
           //B 矩阵是块内降序
           
           // B 矩阵：三级遍历「N 外 → kTile 中 → 块内行降序」。
@@ -162,6 +178,7 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
           // B 矩阵是降序读取）；水平 loadW：转置布局下 k 切片步进 + 降序回补 =
           // totalN*(bRowOff + bW/8)
           bNextKTileAddressOffset := Mux(io.regFile.loadWMode, cfg.totalN.U * (io.calcConfig.bRowAddressOffset + (cfg.bW / 8).U), (cfg.totalN * 2 ).U * io.calcConfig.bRowAddressOffset)
+          }
 
       }
       
@@ -174,7 +191,10 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
     is(sTRANSFER){
       when(io.dmaExtRdIF.req.fire){
           when(lineCounter === lineTarget - 1.U){
-            state := sNEXT_COL
+            // scaleB 线性遍历：所有 beat 发完直接 sDONE（无块间跳转）；
+            // A/B 走 sNEXT_COL 处理块/列跳转（isScale=false 逐字不变）
+            if (isScale) state := sDONE
+            else         state := sNEXT_COL
             lineCounter := 0.U
           }.otherwise{
             lineCounter := lineCounter + 1.U
@@ -182,7 +202,9 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
           when(io.isA){
             curAddr := curAddr + rowStep
           }.otherwise{
-            curAddr := curAddr - rowStep
+            // scaleB 线性递增；B 块内降序（isScale=false 逐字不变）
+            if (isScale) curAddr := curAddr + rowStep
+            else         curAddr := curAddr - rowStep
           }
       }
     }
@@ -286,8 +308,12 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   * @param hasFp    是否含浮点格式（编译期）。为 true 时在写出前对每个 PE slice
   *                 做 40→32 fp32 延迟规格化（LZC+左移）；为 false 时直接透传，
   *                 不生成规格化硬件。默认取 cfg.hasFp。
+  * @param hasMx    是否含 MX 格式（编译期）。MX 复用 HiveMacFp 40-bit 延迟格式，
+  *                 故与 hasFp 一样需 40→32 归一化。hasMx=true 时生成归一化硬件，
+  *                 并在运行时按 aFmt 是否 MX 追加选择归一化通路（isFloat||isMx）。
+  *                 hasMx=false 时本参数完全死路，选择逻辑逐字等于原 isFloat 分支。
   */
-class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean = false) extends Module {
+class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean = false, hasMx: Boolean = false) extends Module {
   val popW = if (bufWidth > 0) bufWidth else cfg.cExtW
 
   val io = IO(new Bundle {
@@ -337,7 +363,7 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
   // 仅在 hasFp 时生成规格化硬件；纯整数配置时直接透传（无硬件开销）。
   // 纯组合逻辑，插在 bufPop 到 dmaExtWrIF.req.data 之间。
   // ==========================================================================
-  val popDataFpNorm: UInt = if (hasFp) {
+  val popDataFpNorm: UInt = if (hasFp || hasMx) {
     val normalizedSlices = (0 until cfg.totalN).map { i =>
       val slice = io.bufPop.payload(cfg.cEffW * (i + 1) - 1, cfg.cEffW * i)
       val raw40 = slice(39, 0)
@@ -356,10 +382,17 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
   // ==========================================================================
   val isFloat = RegInit(false.B)
   isFloat := io.regFile.isFloat
-    
+  // 归一化通路选择：hasMx=false 时逐字等于原 isFloat（无额外寄存器/逻辑，bit-exact）；
+  // hasMx=true 时追加 isMx 项——MX 累加同样是 40-bit 延迟格式，须走 fpNormalize40to32。
+  val normSel: Bool = if (hasMx) {
+    val isMxReg = RegInit(false.B)
+    isMxReg := DataFormat.isMx(io.regFile.aFmt)
+    isFloat || isMxReg
+  } else isFloat
+
   io.dmaExtWrIF.req.valid        := (state === sTRANSFER_M) & io.bufPop.valid
   io.dmaExtWrIF.req.payload.addr         := curAddr
-  io.dmaExtWrIF.req.payload.data         := Mux(isFloat, popDataFpNorm, io.bufPop.payload)
+  io.dmaExtWrIF.req.payload.data         := Mux(normSel, popDataFpNorm, io.bufPop.payload)
   io.dmaExtWrIF.rsp.ready        := true.B
   io.bufPop.ready                := (state === sTRANSFER_M) & io.dmaExtWrIF.req.ready
 

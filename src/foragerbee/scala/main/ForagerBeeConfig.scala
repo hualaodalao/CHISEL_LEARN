@@ -130,6 +130,10 @@ object FbOp extends ChiselEnum {
 
   /** Tile-to-Linear：将 2D 行主序矩阵按 tile 分块重排为线性输出（展开为 4D COPY） */
   val TILE2LINEAR = Value
+
+  /** Linear-to-Tile：TILE2LINEAR 的逆操作，将线性连续缓冲按 tile 布局写回 2D 行主序矩阵
+    （展开为 4D COPY，与 TILE2LINEAR 数学对称，仅 src/dst stride 互换） */
+  val LINEAR2TILE = Value
 }
 
 /** 数据格式枚举（用于搬运时原位格式转换） */

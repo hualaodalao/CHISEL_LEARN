@@ -206,6 +206,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       case "SCATTER"      => FbOp.SCATTER
       case "GATHER"       => FbOp.GATHER
       case "TILE2LINEAR"  => FbOp.TILE2LINEAR
+      case "LINEAR2TILE"  => FbOp.LINEAR2TILE
       case _              => FbOp.COPY
     } else if (c.transpose) FbOp.TRANSPOSE else FbOp.COPY
     port.op.poke(actualOp)
@@ -2068,6 +2069,152 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     // 验证 TRANSPOSE
     for (j <- 0 until 8; i <- 0 until 8) {
       m(BigInt(0x30000 + j * 8 + i)) shouldBe (((i * 8 + j) & 0xFF).toByte)
+    }
+  }
+
+  // ===================== LINEAR2TILE 用例 =====================
+
+  /** LINEAR2TILE 参考模型：从线性 tile-row-major 缓冲读出，按 tile 布局写回 2D M×N 行主序大矩阵。
+    * 返回：输出字节序列的预期值（按行主序排列的 M×N 矩阵字节）
+    */
+  private def linear2tileRef(
+      srcMem: mutable.HashMap[BigInt, Byte],
+      srcBase: BigInt,
+      M: Int, N: Int, Tm: Int, Tn: Int, elemBytes: Int
+  ): mutable.HashMap[BigInt, Byte] = {
+    val Mt = M / Tm
+    val Nt = N / Tn
+    val result = mutable.HashMap.empty[BigInt, Byte]
+    var linearOff = 0
+    // 遍历顺序（外→内）：tile-row(tr) → tile-col(tc) → intra-row(ir) → intra-col(ic)
+    // 与 tile2linearRef 相同的遍历顺序，但方向相反：从线性源读、写到行主序目标
+    for (tr <- 0 until Mt; tc <- 0 until Nt; ir <- 0 until Tm; ic <- 0 until Tn) {
+      val row = tr * Tm + ir
+      val col = tc * Tn + ic
+      for (b <- 0 until elemBytes) {
+        val srcByte = srcMem.getOrElse(srcBase + linearOff, 0.toByte)
+        result(BigInt((row * N + col).toLong * elemBytes + b)) = srcByte
+        linearOff += 1
+      }
+    }
+    result
+  }
+
+  it should "LINEAR2TILE basic: 32×32 matrix, Tm=Tn=16, 1-byte elements" in {
+    val M = 32; val N = 32; val Tm = 16; val Tn = 16
+    val Mt = M / Tm; val Nt = N / Tn  // 2, 2
+    val elemBytes = 1; val elemBytesLog2 = 0
+    // Tn * e = 16 ≡ 0 mod 16(beatBytes) ✓
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    // 源：线性 tile-row-major 缓冲（M*N*elemBytes 字节）
+    val totalBytes = M * N * elemBytes
+    for (i <- 0 until totalBytes) {
+      mem(BigInt(i)) = ((i * 7 + 13) & 0xFF).toByte
+    }
+    val cmd = FbTestCmd(tag = 0x81, op = "LINEAR2TILE", dimCount = 1,
+      shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
+      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = elemBytesLog2,
+      t2lMatCols = N, t2lTileRows = Tm, t2lTileCols = Tn,
+      t2lNumTileRows = Mt, t2lNumTileCols = Nt)
+    val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem, maxCycles = 50000)
+    dones shouldBe Seq((0x81, false))
+    // 逐元素比对参考模型
+    val expected = linear2tileRef(mem, BigInt(0), M, N, Tm, Tn, elemBytes)
+    for ((offset, expByte) <- expected) {
+      withClue(s"linear2tile[offset=$offset]: ") {
+        m(BigInt(0x10000) + offset) shouldBe expByte
+      }
+    }
+  }
+
+  it should "LINEAR2TILE asymmetric tile: M=48, N=32, Tm=8, Tn=16 (Tm≠Tn, Mt≠Nt)" in {
+    val M = 48; val N = 32; val Tm = 8; val Tn = 16
+    val Mt = M / Tm; val Nt = N / Tn  // 6, 2
+    val elemBytes = 1; val elemBytesLog2 = 0
+    // Tn * e = 16 ≡ 0 mod 16 ✓
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val totalBytes = M * N * elemBytes
+    for (i <- 0 until totalBytes) {
+      mem(BigInt(i)) = (((i * 13 + 7) * 3) & 0xFF).toByte
+    }
+    val cmd = FbTestCmd(tag = 0x82, op = "LINEAR2TILE", dimCount = 1,
+      shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
+      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = elemBytesLog2,
+      t2lMatCols = N, t2lTileRows = Tm, t2lTileCols = Tn,
+      t2lNumTileRows = Mt, t2lNumTileCols = Nt)
+    val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem, maxCycles = 50000)
+    dones shouldBe Seq((0x82, false))
+    val expected = linear2tileRef(mem, BigInt(0), M, N, Tm, Tn, elemBytes)
+    for ((offset, expByte) <- expected) {
+      withClue(s"linear2tile asymmetric[offset=$offset]: ") {
+        m(BigInt(0x10000) + offset) shouldBe expByte
+      }
+    }
+  }
+
+  it should "LINEAR2TILE illegal: Tn=0 → done.err=true" in {
+    val cmd = FbTestCmd(tag = 0x83, op = "LINEAR2TILE", dimCount = 1,
+      shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
+      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = 0,
+      t2lMatCols = 32, t2lTileRows = 16, t2lTileCols = 0,
+      t2lNumTileRows = 2, t2lNumTileCols = 2)
+    val (dones, _) = runForagerBee(testCfg, Seq(cmd), mutable.HashMap.empty)
+    dones shouldBe Seq((0x83, true))
+  }
+
+  it should "LINEAR2TILE illegal: N=0 → done.err=true" in {
+    val cmd = FbTestCmd(tag = 0x84, op = "LINEAR2TILE", dimCount = 1,
+      shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
+      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = 0,
+      t2lMatCols = 0, t2lTileRows = 16, t2lTileCols = 16,
+      t2lNumTileRows = 2, t2lNumTileCols = 2)
+    val (dones, _) = runForagerBee(testCfg, Seq(cmd), mutable.HashMap.empty)
+    dones shouldBe Seq((0x84, true))
+  }
+
+  it should "LINEAR2TILE beat alignment violation: Tn*e not divisible by beatBytes → err" in {
+    // Tn=3, elemBytes=4 → dim0 row bytes = 3*4=12, not divisible by 16 → err
+    val cmd = FbTestCmd(tag = 0x85, op = "LINEAR2TILE", dimCount = 1,
+      shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
+      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = 2,
+      t2lMatCols = 12, t2lTileRows = 4, t2lTileCols = 3,
+      t2lNumTileRows = 2, t2lNumTileCols = 4)
+    val (dones, _) = runForagerBee(testCfg, Seq(cmd), mutable.HashMap.empty)
+    dones shouldBe Seq((0x85, true))
+  }
+
+  it should "LINEAR2TILE round-trip: TILE2LINEAR then LINEAR2TILE restores original matrix" in {
+    val M = 32; val N = 32; val Tm = 16; val Tn = 16
+    val Mt = M / Tm; val Nt = N / Tn  // 2, 2
+    val elemBytes = 1; val elemBytesLog2 = 0
+    // Tn * e = 16 ≡ 0 mod 16 ✓
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    // 准备行主序矩阵 A at 0x0000
+    for (r <- 0 until M; c <- 0 until N) {
+      mem(BigInt(r * N + c)) = ((r * N + c + 17) & 0xFF).toByte
+    }
+    // 第一步：TILE2LINEAR（src=0x0000 行主序矩阵 → dst=0x10000 线性缓冲）
+    val cmd1 = FbTestCmd(tag = 0x86, op = "TILE2LINEAR", dimCount = 1,
+      shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
+      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = elemBytesLog2,
+      t2lMatCols = N, t2lTileRows = Tm, t2lTileCols = Tn,
+      t2lNumTileRows = Mt, t2lNumTileCols = Nt)
+    val (dones1, m1) = runForagerBee(testCfg, Seq(cmd1), mem, maxCycles = 50000)
+    dones1 shouldBe Seq((0x86, false))
+    // 第二步：LINEAR2TILE（src=0x10000 线性缓冲 → dst=0x20000 行主序矩阵）
+    val cmd2 = FbTestCmd(tag = 0x87, op = "LINEAR2TILE", dimCount = 1,
+      shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
+      srcAddr = 0x10000, dstAddr = 0x20000, elemBytesLog2 = elemBytesLog2,
+      t2lMatCols = N, t2lTileRows = Tm, t2lTileCols = Tn,
+      t2lNumTileRows = Mt, t2lNumTileCols = Nt)
+    val (dones2, m2) = runForagerBee(testCfg, Seq(cmd2), m1, maxCycles = 50000)
+    dones2 shouldBe Seq((0x87, false))
+    // 验证 A' == A（原始矩阵 at 0x0000 vs 还原矩阵 at 0x20000）
+    for (r <- 0 until M; c <- 0 until N) {
+      val off = r * N + c
+      withClue(s"round-trip[$r][$c]: ") {
+        m2(BigInt(0x20000) + off) shouldBe m2(BigInt(off))
+      }
     }
   }
 }

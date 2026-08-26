@@ -105,6 +105,15 @@ class HiveWorker(
     // 格式（水平传播：RegNext → 右侧 HiveWorker）
     val fmtIn  = Input(DataFormat())
     val fmtOut = Output(DataFormat())
+    // 权重格式（水平传播：RegNext → 右侧 HiveWorker）。mixFmtEn=0 时由上层令
+    // bFmtIn 跟随 fmtIn，行为与旧单 fmt 路径 bit-exact
+    val bFmtIn  = Input(DataFormat())
+    val bFmtOut = Output(DataFormat())
+    // MX scale：scaleAIn 随激活流（与 aReg lockstep 沿 a 链右传），
+    // scaleBIn 列驻留（随权重/配置窗口锁存）。P1 仅建链，P2 才接入 MX MAC。
+    val scaleAIn  = Input(UInt(8.W))
+    val scaleAOut = Output(UInt(8.W))
+    val scaleBIn  = Input(UInt(8.W))
     // 舍入模式（水平传播：RegNext → 右侧 HiveWorker）
     val rndIn   = Input(RoundingMode())
     val rndOut  = Output(RoundingMode())
@@ -127,6 +136,13 @@ class HiveWorker(
   // --- 内部配置寄存器（无 RegInit，依赖显式初始化） ---
   val fmtReg = Reg(DataFormat())
   val rndReg = Reg(RoundingMode())
+  // 权重格式寄存器：与 fmtReg 对称，随 loadH 锁存 bFmtIn
+  val bFmtReg = Reg(DataFormat())
+  // scaleB 驻留寄存器：列驻留，随权重/配置窗口（loadH）锁存 scaleBIn（P2 才使用）
+  val scaleBReg = RegInit(0.U(8.W))
+  // scaleA 流动寄存器：与 aReg lockstep（声明在此以供 workUnit 引用，赋值逻辑
+  // 与 aReg 段并列，见下方 aOut 段旁）
+  val scaleAReg = RegInit(0.U(8.W))
 
   // 格式支持检测（基于 fmtReg） ---
   val fmtOk = supportedFmts.map(f => fmtReg === f).reduce(_ || _)
@@ -150,6 +166,18 @@ class HiveWorker(
   when(io.loadHIn) {
     fmtReg := io.fmtIn
     rndReg := io.rndIn
+    // 与 fmtReg/rndReg 对称，同一 loadH 窗口锁存权重格式
+    bFmtReg := io.bFmtIn
+  }
+  // scaleB 列驻留寄存器：必须与权重 wReg 严格同拍锁存（loadVInLock/loadWInLock
+  //   的 Lock 脉冲拍），而非随 loadHIn 全窗口逐拍跟踪。
+  //   反例：下一 K-块 sLOAD_B 起始拍 loadHIn 即拉高，scaleBReg 会提前切到新块值，
+  //   而 wReg 要到窗口末 Lock 拍才更新；此错拍窗口内，上一 K-块尚在阵列深层排空的
+  //   乘积尾（validIn 在飞脉冲）仍持旧权重却读到新块 scaleB → 高 (m+n) 对角错位，
+  //   且仅当相邻块 scale 不同才可见（等值 scale 下被掩盖，故 unit-scale 多 pass 通过）。
+  //   非 MX 路径 scaleBReg 不被 MAC 选用，锁存条件变更 bit-exact 无影响。
+  when(io.loadVInLock || loadWInLockSafe) {
+    scaleBReg := io.scaleBIn
   }
 
   // --- 首次 load 时标记初始化完成（配置随 loadH 锁存） ---
@@ -167,7 +195,14 @@ class HiveWorker(
   workUnit.io.a    := io.aIn(aW - 1, 0)
   workUnit.io.b    := wReg
   workUnit.io.cReg := io.psumIn
-  workUnit.io.fmt  := fmtReg
+  workUnit.io.aFmt := fmtReg
+  workUnit.io.bFmt := bFmtReg
+  // MAC 的 scaleA 必须与激活 MAC 输入 io.aIn 同拍（组合直连），而非 scaleAReg
+  //   （后者是已寄存、供 scaleAOut 右传的下一拍值）。用 scaleAReg 会使本 PE 的乘积
+  //   误用上一激活行的 scale（output row m 错用 row m-1 的 scaleA）。scaleAReg 段
+  //   本体保持不动，仅供水平传播 scaleAOut 使用。
+  workUnit.io.scaleA := io.scaleAIn
+  workUnit.io.scaleB := scaleBReg
   workUnit.io.rnd  := rndReg
 
   val psumReg = RegInit(0.U(cEffW.W))
@@ -197,6 +232,14 @@ class HiveWorker(
   
   io.aOut := aReg
 
+  // --- scaleAOut：scaleA 随激活流，与 aReg lockstep 并列（不改动上方 aReg 段本体）---
+  when(io.clear) {
+    scaleAReg := 0.U
+  }.elsewhen(io.loadWIn | io.validIn){
+    scaleAReg := io.scaleAIn
+  }
+  io.scaleAOut := scaleAReg
+
 
   // --- 控制传播 ---
   io.validOut := RegNext(io.validIn, false.B)
@@ -209,5 +252,6 @@ class HiveWorker(
   // 行间相同），必须就地截断。下一加载窗口 lock=0 时自然恢复传播
   io.loadWOut  := RegNext(loadWInSafe && !loadWInLockSafe, false.B)
   io.fmtOut   := RegNext(io.fmtIn, DataFormat.INT8)
+  io.bFmtOut  := RegNext(io.bFmtIn, DataFormat.INT8)
   io.rndOut   := RegNext(io.rndIn, RoundingMode.RNE)
 }

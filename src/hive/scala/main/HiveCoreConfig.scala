@@ -43,7 +43,8 @@ case class HiveCoreConfig(
     aBufferDepth: Int = 64, 
     bBufferDepth: Int = 64,
     cBufferDepth: Int = 64,
-    addrWidth: Int = 32
+    addrWidth: Int = 32,
+    scaleBufferDepth: Int = 64
 ) {
   /*
   //hive矩阵切分逻辑
@@ -71,13 +72,19 @@ case class HiveCoreConfig(
   /** 是否包含整数格式（用于整数累加位宽约束校验） */
   val hasInt: Boolean = supportedFmts.contains(DataFormat.INT8) || supportedFmts.contains(DataFormat.INT16)
 
+  /** 是否包含 MX 格式（MXFP8 E4M3 / E5M2） */
+  val hasMx: Boolean = supportedFmts.contains(DataFormat.MXE4M3) || supportedFmts.contains(DataFormat.MXE5M2)
+
+  /** Scale 行位宽：scaleB 每行 totalN 个 8-bit E8M0 scale 因子 */
+  val scaleRowW: Int = totalN * 8
+
   /** C 累加器有效位宽（与 HiveComb 推导逻辑一致）。
-    * cW==0 自动推导：含浮点时至少 40（延迟规格化 {sign,exp8,mant31} 需要），
+    * cW==0 自动推导：含浮点或 MX 时至少 40（延迟规格化 {sign,exp8,mant31} 需要），
     * 纯整数时取 autoAccW（aEffW+bW+log2Up(totalN)，累加防溢出）。 */
   val cEffW: Int = {
     val autoAccW = aEffW + bW + log2Up(totalN)
     if (cW != 0) math.max(cW, bW)
-    else if (hasFp) math.max(40, autoAccW)
+    else if (hasFp || hasMx) math.max(40, autoAccW)
     else autoAccW
   }
 
@@ -93,8 +100,8 @@ case class HiveCoreConfig(
   /** C 通道外部 DMA 数据位宽（= C buffer 行宽 totalN*cEffW） */
   val cExtW: Int = totalN * cEffW
 
-  val registerNumRW: Int = 8 
-  val registerNum: Int = 9
+  val registerNumRW: Int = 11
+  val registerNum: Int = 11
 
   //DMA
  
@@ -106,10 +113,10 @@ case class HiveCoreConfig(
   // cW == 0 表示自动推导（见 cEffW），此时跳过显式位宽比较
   require(cW == 0 || cW >= aW, s"HiveCoreConfig: cW($cW) 必须 >= aW($aW)")
   require(cW == 0 || cW >= bW, s"HiveCoreConfig: cW($cW) 必须 >= bW($bW)")
-  // 延迟规格化架构约束：含浮点格式时 cEffW 必须 >= 40，
+  // 延迟规格化架构约束：含浮点格式或 MX 格式时 cEffW 必须 >= 40，
   // 以容纳 40-bit 延迟规格化格式 {sign(1), exp(8), mantissa(31)}。
-  // 纯浮点配置下 cW=40 即可（40 恰好满足），无需整数 MAC 的 48-bit。
-  if (hasFp) require(cEffW >= 40, s"HiveCoreConfig: 含浮点格式时 cEffW($cEffW) 必须 >= 40（延迟规格化需要）")
+  // MX 复用延迟规格化 fp 累加器。
+  if (hasFp || hasMx) require(cEffW >= 40, s"HiveCoreConfig: 含浮点/MX 格式时 cEffW($cEffW) 必须 >= 40（延迟规格化需要）")
   // 整数累加约束：含整数格式时 cEffW 必须 >= aW+bW，以容纳整数积累加防溢出
   if (hasInt) require(cEffW >= aW + bW, s"HiveCoreConfig: 含整数格式时 cEffW($cEffW) 必须 >= aW+bW(${aW + bW})（整数累加防溢出需要）")
   require(arrayN >= 4, s"HiveCoreConfig: arrayN($arrayN) 必须 >= 4")

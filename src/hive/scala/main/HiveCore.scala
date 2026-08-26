@@ -37,6 +37,10 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     val dma1Ext = new HiveCoreDMAExtWriteOnlyIF(cfg, cfg.cExtW)
     // B 权重专用只读 DMA 外部通道（cmd: 读地址流; rsp: 读数据流，位宽 = bExtW）
     val dma2Ext = HiveCoreDMAExtReadOnlyIF(cfg, cfg.bExtW)
+    // MX scale 只读 DMA 外部通道（仅 hasMx 生成，非 MX 配置不暴露，避免破坏旧 harness）：
+    //   dma3Ext = scaleA（8-bit/行），dma4Ext = scaleB（scaleRowW = totalN*8/行）
+    val dma3Ext = if (cfg.hasMx) Some(HiveCoreDMAExtReadOnlyIF(cfg, 8))             else None
+    val dma4Ext = if (cfg.hasMx) Some(HiveCoreDMAExtReadOnlyIF(cfg, cfg.scaleRowW)) else None
     val status = Output(new HiveCoreStatus(cfg))
   })
 
@@ -70,11 +74,16 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   val aDma       = Module(new HiveCoreDmaRdOnly(cfg, bufWidth = cfg.totalN * cfg.aEffW, bufDepth = cfg.aBufferDepth))
   // C 结果写回自主 DMA：bufWidth = 一整行 C（totalN*cEffW），storeGate 门控；
   // hasFp 传入 cfg.hasFp：含浮点时 cDma 内部对写出数据做 40→32 延迟规格化
-  val cDma       = Module(new HiveCoreDmaWrOnly(cfg, bufWidth = cfg.totalN * cfg.cEffW, hasFp = cfg.hasFp))
+  val cDma       = Module(new HiveCoreDmaWrOnly(cfg, bufWidth = cfg.totalN * cfg.cEffW, hasFp = cfg.hasFp, hasMx = cfg.hasMx))
   // B 权重专用只读 DMA：bufWidth = 一整行权重（totalN*bW），深度 = bBufferDepth
   val bDma       = Module(new HiveCoreDmaRdOnly(cfg, bufWidth = cfg.totalN * cfg.bW, bufDepth = cfg.bBufferDepth))
   val executor   = Module(new HiveCoreExecutor2(cfg))
   val hiveComb   = Module(new HiveComb(cfg.arrayN, cfg.clusterM, cfg.aW, cfg.bW, cfg.cW, cfg.supportedFmts))
+  // P4.2: MX scale DMA 提到外层用 Option 持有（P3 接线块内改用 .get 引用），
+  //   以便下方 dmaErr 汇聚点引用其 io.err。非 MX 配置为 None（整块不例化），
+  //   汇聚式逐字不变、bit-exact。位宽/深度与 P3 块内原例化一致。
+  val scaleADmaOpt = if (cfg.hasMx) Some(Module(new HiveCoreDmaRdOnly(cfg, bufWidth = 8,               bufDepth = cfg.scaleBufferDepth))) else None
+  val scaleBDmaOpt = if (cfg.hasMx) Some(Module(new HiveCoreDmaRdOnly(cfg, bufWidth = cfg.scaleRowW,   bufDepth = cfg.scaleBufferDepth, isScale = true))) else None
 
   // ==========================================================================
   // calcConfig 生产者（喂给 bDma）：从 regFile 推导 tile 数与六个地址偏移。
@@ -162,7 +171,10 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     switch(cmd.op) {
       is(HiveCoreOp.REG_WRITE1) {
         val addr0 = cmd.reg0Addr(3, 0) 
-        when(cmd.reg0Addr < cfg.registerNumRW.U) { regFile.regs(addr0) := cmd.data0 }  // 0x00-0x07 可写
+        // P4.3: 写门控覆盖 0x00-0x07 + 0x09/0x0A（含 scale 地址），排斥 STATUS 0x08 只读。
+        //   registerNumRW=11 使 <registerNumRW 区间含 0x08，故显式 =/= 8.U 排除。
+        //   regs(8) 从不被读（0x08 读返回计算 statusReg），故该门控观测 bit-exact。
+        when(cmd.reg0Addr < cfg.registerNumRW.U && cmd.reg0Addr =/= 0x08.U) { regFile.regs(addr0) := cmd.data0 }
         when(cmd.reg0Addr === 0x07.U) {
               when(cmd.data0(0)) { doneFlag := false.B }  // clear_done
         }
@@ -174,9 +186,10 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
       }
       is(HiveCoreOp.REG_WRITE2){
         val addr0 = cmd.reg0Addr(3, 0) 
-        when(cmd.reg0Addr < cfg.registerNumRW.U) { regFile.regs(addr0) := cmd.data0 }  // 0x00-0x07 可写
+        // P4.3: 同 REG_WRITE1，覆盖 0x09/0x0A、排斥 STATUS 0x08（regs(8) 不被读，bit-exact）
+        when(cmd.reg0Addr < cfg.registerNumRW.U && cmd.reg0Addr =/= 0x08.U) { regFile.regs(addr0) := cmd.data0 }
         val addr1 = cmd.reg1Addr(3, 0) 
-        when(cmd.reg1Addr < cfg.registerNumRW.U) { regFile.regs(addr1) := cmd.data1 }  // 0x00-0x07 可写
+        when(cmd.reg1Addr < cfg.registerNumRW.U && cmd.reg1Addr =/= 0x08.U) { regFile.regs(addr1) := cmd.data1 }
         when(cmd.reg1Addr === 0x07.U) {  
           when(cmd.data1(0)) { doneFlag := false.B }  // clear_done
         }
@@ -205,8 +218,14 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
 
   // EXECUTE 完成时生成响应；err 汇聚 Executor 与三个自主 DMA 的错误标志。
   // Executor 异常路径（容量错/cPush 违约）经 sDONE 退出，io.done 照常脉冲，
-  // 此处 respErr 反映真实 err，软件栈收到带 err 标记的 resp 而非永久等待
-  val dmaErr = aDma.io.err || bDma.io.err || cDma.io.err
+  // 此处 respErr 反映真实 err，软件栈收到带 err 标记的 resp 而非永久等待。
+  // P4.2: MX 配置追加 scale DMA（scaleADma/scaleBDma）err；非 MX 配置为
+  //   else 分支，表达式逐字等于原式（无 scale DMA 生成），bit-exact。
+  val dmaErr = if (cfg.hasMx) {
+    aDma.io.err || bDma.io.err || cDma.io.err || scaleADmaOpt.get.io.err || scaleBDmaOpt.get.io.err
+  } else {
+    aDma.io.err || bDma.io.err || cDma.io.err
+  }
   when(executor.io.done) {
     doneFlag  := true.B
     respValid := true.B
@@ -214,6 +233,14 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     respDone  := true.B
     respErr   := executor.io.err || dmaErr
     errFlag   := executor.io.err || dmaErr
+  }
+
+  // P5.4: MX config-err（K%32≠0 / isMx(bFmt)&&!loadWMode）直接回 sIDLE、不发 done，
+  // 故上方 done 门控捕捉不到。追加 hasMx-gated 的 err 直连，使 STATUS.err 位可被
+  // 软件轮询。errState 只置不清，err 恒高直到下次 EXECUTE 复位。非 MX 配置此块
+  // 编译期不生成，errFlag 行为逐字等于原实现，bit-exact。
+  if (cfg.hasMx) {
+    when(executor.io.err) { errFlag := true.B }
   }
 
   // ==========================================================================
@@ -294,8 +321,27 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   hiveComb.io.loadWIn      := executor.io.hiveLoadW
   hiveComb.io.loadWInLock  := executor.io.hiveLoadWLock
   hiveComb.io.validIn  := executor.io.hiveValidIn
-  hiveComb.io.fmtIn    := regFile.fmt
+  hiveComb.io.fmtIn    := regFile.aFmt
+  // bFmt 跟随 aFmt（mixFmtEn=0），保证旧软件 bit-exact；MX 配置允许 mixFmtEn=1
+  // 以支持异构双 MX（aFmt=E4M3, bFmt=E5M2）
+  hiveComb.io.bFmtIn   := Mux(regFile.mixFmtEn, regFile.bFmt, regFile.aFmt)
   hiveComb.io.rndIn    := regFile.rnd
+  // 非 MX 配置：v1 禁止混合格式（mixFmtEn 必须为 0，bFmt 跟随 aFmt），断言保护旧行为。
+  // MX 配置（hasMx）：解禁 mixFmtEn 以支持异构 E4M3×E5M2；bFmtIn mux 已覆盖。
+  // 本 gate 为编译期，非 MX 配置断言逐字保留，bit-exact。
+  if (!cfg.hasMx) {
+    assert(!regFile.mixFmtEn, "v1: mixFmtEn must be 0")
+  }
+  // P3: scale 广播接线——MX 配置下由 Executor 的 scale 通道驱动（scaleB 每列
+  // 驻留向量、scaleA 沿激活链 skew 流动，替换 P1 顶层常量 0）；非 MX 配置保持
+  // 常量 0（scale 端口/DMA/FIFO 均不生成，行为 bit-exact）
+  if (cfg.hasMx) {
+    hiveComb.io.scaleAIn := executor.io.hiveScaleAIn.get
+    hiveComb.io.scaleBIn := executor.io.hiveScaleBIn.get
+  } else {
+    hiveComb.io.scaleAIn.foreach(_ := 0.U)
+    hiveComb.io.scaleBIn.foreach(_ := 0.U)
+  }
   hiveComb.io.clear    := executor.io.hiveClear
 
   executor.io.hiveCOut     := hiveComb.io.cOut
@@ -307,6 +353,66 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   scratchpad.io.flushA := executor.io.flushA
   scratchpad.io.flushB := executor.io.flushB
   scratchpad.io.flushC := executor.io.flushC
+
+  // ==========================================================================
+  // P3: MX Scale 通道（仅 hasMx 生成；非 MX 配置不例化 DMA/FIFO、不暴露 dma3/dma4）
+  //   - scaleADma/scaleBDma 复用 HiveCoreDmaRdOnly。基址经 regFile 视图重写：
+  //     DMA isA=true 内部读 regFile.aAddr → 重写 regs(3)=scaleAAddr；
+  //     isA=false 内部读 regFile.bAddr → 重写 regs(4)=scaleBAddr。
+  //   - 遍历/地址步长复用共享 calcConfig（镜像 A/B 的 K-块 tiling）。
+  //     * scaleADma（isA=true）行数天然镜像 aDma（m×kTile×nTile），与 Executor
+  //       每激活行 pop 的 scaleA 一一对应。
+  //     * scaleBDma（isA=false）复用 B 遍历；Executor 仅在 K-块起始 pop scaleB，
+  //       FIFO 反压自然节流上游。
+  //   - 【P5 交接】scale 元素 1-byte 粒度 + K-块（32）对齐的精确地址步长/行数
+  //     对账（尤其 scaleB 每 K-块一向量 vs B 每 kTile×totalN 行）留待 P5 数值
+  //     bring-up；本阶段建立端到端连通（scale 不再是常量 0）。MX 下随 executePulse
+  //     启动，非 MX 恒不启动（整块不生成）。
+  // ==========================================================================
+  if (cfg.hasMx) {
+    // scaleA DMA：isA=true，基址重写为 scaleAAddr
+    val scaleARegFile = WireInit(regFile)
+    scaleARegFile.regs(3) := regFile.scaleAAddr
+    val scaleADma = scaleADmaOpt.get  // P4.2: 引用外层 Option 持有的实例（原地例化已上提）
+    scaleADma.io.isA        := true.B
+    scaleADma.io.start      := executePulse
+    scaleADma.io.regFile    := scaleARegFile
+    scaleADma.io.calcConfig := calcConfig
+    io.dma3Ext.get <> scaleADma.io.dmaExtRdIF
+
+    // scaleB DMA：isA=false，基址重写为 scaleBAddr
+    val scaleBRegFile = WireInit(regFile)
+    scaleBRegFile.regs(4) := regFile.scaleBAddr
+    val scaleBDma = scaleBDmaOpt.get  // P4.2: 引用外层 Option 持有的实例（原地例化已上提）
+    scaleBDma.io.isA        := false.B
+    scaleBDma.io.start      := executePulse
+    scaleBDma.io.regFile    := scaleBRegFile
+    scaleBDma.io.calcConfig := calcConfig
+    io.dma4Ext.get <> scaleBDma.io.dmaExtRdIF
+
+    // scale DMA → scratchpad scale FIFO
+    scratchpad.io.scaleAPush.get.valid   := scaleADma.io.bufPush.valid
+    scratchpad.io.scaleAPush.get.payload := scaleADma.io.bufPush.payload
+    scaleADma.io.bufPush.ready           := scratchpad.io.scaleAPush.get.ready
+    scaleADma.io.bufPopFire              := scratchpad.io.scaleAPop.get.fire
+
+    scratchpad.io.scaleBPush.get.valid   := scaleBDma.io.bufPush.valid
+    scratchpad.io.scaleBPush.get.payload := scaleBDma.io.bufPush.payload
+    scaleBDma.io.bufPush.ready           := scratchpad.io.scaleBPush.get.ready
+    scaleBDma.io.bufPopFire              := scratchpad.io.scaleBPop.get.fire
+
+    // scale FIFO flush 跟随 A/B flush（execute 起始拍清空，与 aDma/bDma 同范式）
+    scratchpad.io.flushScaleA.get := executor.io.flushA
+    scratchpad.io.flushScaleB.get := executor.io.flushB
+
+    // scratchpad scale pop → Executor
+    executor.io.scaleAPop.get.valid   := scratchpad.io.scaleAPop.get.valid
+    executor.io.scaleAPop.get.payload := scratchpad.io.scaleAPop.get.payload
+    scratchpad.io.scaleAPop.get.ready := executor.io.scaleAPop.get.ready
+    executor.io.scaleBPop.get.valid   := scratchpad.io.scaleBPop.get.valid
+    executor.io.scaleBPop.get.payload := scratchpad.io.scaleBPop.get.payload
+    scratchpad.io.scaleBPop.get.ready := executor.io.scaleBPop.get.ready
+  }
 
   // ==========================================================================
   // Status 输出

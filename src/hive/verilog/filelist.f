@@ -20,4 +20,5 @@ verification/assert/Hive_HiveWorker_Verification_Assert.sv
 Hive_HiveWorker.sv
 Hive_HiveCell.sv
 Hive_HiveComb.sv
+verification/assert/Hive_HiveCore_Verification_Assert.sv
 Hive_HiveCore.sv

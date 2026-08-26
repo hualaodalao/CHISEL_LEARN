@@ -66,6 +66,11 @@ class HiveCell(
     val validInV = Input(Vec(n, Bool()))
     val fmtIn   = Input(DataFormat())    
     val rndIn   = Input(RoundingMode())
+    // 权重格式（标量，镜像 fmtIn 逐列传播）
+    val bFmtIn  = Input(DataFormat())
+    // MX scale：scaleAIn per-row（随激活链 y 方向流动），scaleBIn per-column（列驻留）
+    val scaleAIn = Input(Vec(n, UInt(8.W)))
+    val scaleBIn = Input(Vec(n, UInt(8.W)))
     val loadHIn = Input(Bool())
     val loadVIn = Input(Bool())
     val loadVInLock = Input(Bool())
@@ -82,6 +87,8 @@ class HiveCell(
     val validOutV = Output(Vec(n, Bool()))
     val fmtOut   = Output(DataFormat())    // 标量
     val rndOut   = Output(RoundingMode())  // 标量
+    val bFmtOut  = Output(DataFormat())    // 标量（镜像 fmtOut）
+    val scaleAOut = Output(Vec(n, UInt(8.W)))  // per-row（a 链末端 scaleA）
   })
 
   // --- HiveWorker 网格 ---
@@ -105,6 +112,9 @@ class HiveCell(
       // beat 进入列 0 的绝对时刻，链传播锁存会使所有列锁到同一权重）
       pes(x)(y).io.loadWInLock := loadWInLockSafe
 
+      // scaleB 列驻留：per-column（y）广播到该列所有行 PE（随 loadH 锁存进 scaleBReg）
+      pes(x)(y).io.scaleBIn := io.scaleBIn(y)
+
       if (y == 0) {
         // valid 沿 x+y 二维传播：x==0 行首接 io.validIn，x>0 行首从上一 x 行
         // 行首 PE 的 validOut 级联（仅 +1 拍），使 PE(x,y) 的 valid 相对
@@ -114,8 +124,11 @@ class HiveCell(
         // 若只在 y 方向传播并广播所有 x 行，cj>0 簇的 valid 会滞后数据 x 拍）
         pes(x)(y).io.fmtIn   := io.fmtIn
         pes(x)(y).io.rndIn   := io.rndIn
+        pes(x)(y).io.bFmtIn  := io.bFmtIn
         pes(x)(y).io.validIn := io.validIn(x)
         pes(x)(y).io.aIn     := io.aIn(x)  // per-row 数据
+        // scaleA per-row 随激活链首列注入
+        pes(x)(y).io.scaleAIn := io.scaleAIn(x)
         // loadW 脉冲链 per-row 注入（水平 loadW 模式，与 a 链同向 lockstep）
         pes(x)(y).io.loadWIn := loadWInSafe(x)
       } else {
@@ -123,8 +136,11 @@ class HiveCell(
 
         pes(x)(y).io.fmtIn   := pes(x)(y-1).io.fmtOut
         pes(x)(y).io.rndIn   := pes(x)(y-1).io.rndOut
+        pes(x)(y).io.bFmtIn  := pes(x)(y-1).io.bFmtOut
         pes(x)(y).io.validIn := pes(x)(y-1).io.validOut
         pes(x)(y).io.aIn     := pes(x)(y-1).io.aOut
+        // scaleA 链沿 a 数据链方向（y）逐列传播，与 aOut lockstep
+        pes(x)(y).io.scaleAIn := pes(x)(y-1).io.scaleAOut
         // loadW 链沿 a 数据链方向（y）逐列传播，与 aOut lockstep
         pes(x)(y).io.loadWIn := pes(x)(y-1).io.loadWOut
       }
@@ -132,6 +148,7 @@ class HiveCell(
       if (y == n-1) {
         io.validOut(x) := pes(x)(y).io.validOut  // per-row
         io.aOut(x)     := pes(x)(y).io.aOut      // per-row
+        io.scaleAOut(x) := pes(x)(y).io.scaleAOut // per-row（a 链末端）
         io.loadWOut(x) := pes(x)(y).io.loadWOut  // per-row（a 链末端）
       }
     }
@@ -140,6 +157,7 @@ class HiveCell(
   // 标量输出：取最后一行最后一列（所有行同值，任取一行即可）
   io.fmtOut   := pes(n-1)(n-1).io.fmtOut
   io.rndOut   := pes(n-1)(n-1).io.rndOut
+  io.bFmtOut  := pes(n-1)(n-1).io.bFmtOut
 
   // --- 行连接块（垂直传播）：psumIn/psumOut 沿 x 方向传播；
   //     loadV 广播到所有 PE ---

@@ -138,6 +138,81 @@ object HiveSimCommon {
       println(s"[$tag] NOTE: FST not found at $traceSource (run with -DemitFst=1 to generate)")
     }
   }
+
+  // ========== MX (MXFP8) 转换 helper ==========
+  // 逐字镜像 Fp32.mxToFp32（src/hive/scala/main/Fp32.scala L56-91）的数值语义，
+  // 作为 P5 MX 用例 golden GEMM 的软件参考模型。任何偏差都会导致 golden 与
+  // 硬件失配，故本实现必须与硬件同源同语义（subnormal→0、inf/nan/overflow→
+  // fp32Max 保号、underflow→0、normal=sign*2^(e+scale-bias-127)*(1+m/2^mantW)）。
+
+  /** MX 元素（8-bit）+ E8M0 scale（8-bit 纯指数，bias 127）→ Double。
+    * 与 Fp32.mxToFp32 完全一致：exp_fp32 = e + scale - bias（scale 的 127 与
+    * fp32 的 127 在 fp32Normal 里抵消）；saturate 到 fp32 max normal（0x7F7FFFFF）。
+    * @param nanNeedMantAllOne E4M3=true（e 全1 且 m 全1 才 NaN），E5M2=false（e 全1 即 inf/nan）
+    */
+  def mxToFloat(elem: Int, scaleByte: Int, expW: Int, mantW: Int, bias: Int,
+                nanNeedMantAllOne: Boolean): Double = {
+    require(1 + expW + mantW == 8, s"MX 元素必须为 8-bit：1+$expW+$mantW")
+    val b = elem & 0xFF
+    val s = (b >>> 7) & 1
+    val e = (b >>> mantW) & ((1 << expW) - 1)
+    val m = b & ((1 << mantW) - 1)
+    val sign = if (s == 1) -1.0 else 1.0
+    val eMax = (1 << expW) - 1
+    val isZero = (e == 0) && (m == 0)
+    val isSub  = (e == 0) && (m != 0)                       // subnormal → flush-to-zero
+    val isInfNan = if (nanNeedMantAllOne) (e == eMax && m == ((1 << mantW) - 1)) else (e == eMax)
+    val expSigned = e + (scaleByte & 0xFF) - bias           // = fp32 exp 字段
+    // fp32Max = intBitsToFloat(0x7F7FFFFF) ≈ 3.4028235e38（保号），与硬件 fp32Max 一致
+    val fp32Max = java.lang.Float.intBitsToFloat(0x7F7FFFFF).toDouble
+    if (isZero || isSub) 0.0
+    else if (isInfNan || expSigned > 254) sign * fp32Max
+    else if (expSigned < 1) 0.0
+    else sign * math.pow(2.0, (expSigned - 127).toDouble) * (1.0 + m.toDouble / (1 << mantW))
+  }
+
+  /** MX E4M3（exp4/mant3/bias7，NaN 需 exp&mant 全1）+ scale → Double */
+  def mxE4M3ToFloat(elem: Int, scaleByte: Int): Double =
+    mxToFloat(elem, scaleByte, expW = 4, mantW = 3, bias = 7,  nanNeedMantAllOne = true)
+
+  /** MX E5M2（exp5/mant2/bias15，inf/nan 为 exp 全1）+ scale → Double */
+  def mxE5M2ToFloat(elem: Int, scaleByte: Int): Double =
+    mxToFloat(elem, scaleByte, expW = 5, mantW = 2, bias = 15, nanNeedMantAllOne = false)
+
+  /** E8M0 scale 字节构造：factor = 2^exp，byte = 127 + exp（bias 127） */
+  def mxScaleByte(exp: Int): Int = 127 + exp
+
+  /** 暴力编码：在 [0,256) 内挑选「非 inf/nan」的 MX 字节，使 mxToFloat(byte, 127)
+    * （即 scale-free 内蕴值）最接近 f。返回的字节表示 f 的量化值；配合独立的
+    * E8M0 scale，真实值 = mxToFloat(byte, scaleByte)。inf/nan 编码被排除，
+    * 从而 B 权重经 loadW 走 a 链时也不会触发 HiveCvtOpMx 的 aFmt inf/nan 断言。
+    */
+  private def floatToMx(f: Double, expW: Int, mantW: Int, bias: Int,
+                        nanNeedMantAllOne: Boolean): Int = {
+    val eMax = (1 << expW) - 1
+    var best = 0
+    var bestErr = Double.MaxValue
+    var b = 0
+    while (b < 256) {
+      val e = (b >>> mantW) & ((1 << expW) - 1)
+      val m = b & ((1 << mantW) - 1)
+      val isInfNan = if (nanNeedMantAllOne) (e == eMax && m == ((1 << mantW) - 1)) else (e == eMax)
+      if (!isInfNan) {
+        val v = mxToFloat(b, 127, expW, mantW, bias, nanNeedMantAllOne)
+        val err = math.abs(v - f)
+        // 相等误差时偏好正号/较小幅值字节：确定性挑选，避免 ±0 抖动
+        if (err < bestErr) { bestErr = err; best = b }
+      }
+      b += 1
+    }
+    best
+  }
+
+  /** float → E4M3 元素字节（scale-free，即 scale=127；inf/nan 编码被排除） */
+  def floatToMxE4M3(f: Double): Int = floatToMx(f, expW = 4, mantW = 3, bias = 7,  nanNeedMantAllOne = true)
+
+  /** float → E5M2 元素字节（scale-free，即 scale=127；inf/nan 编码被排除） */
+  def floatToMxE5M2(f: Double): Int = floatToMx(f, expW = 5, mantW = 2, bias = 15, nanNeedMantAllOne = false)
 }
 
 /** ChiselSim FST 波形扩展 trait：与 ChiselSim 一起混入测试类。

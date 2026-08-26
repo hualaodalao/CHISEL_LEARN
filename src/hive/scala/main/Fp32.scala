@@ -31,6 +31,65 @@ object Fp32 {
     Mux(isZero, Cat(s, 0.U(31.W)), Cat(s, e8, m23))
   }
 
+  /** MX（microscaling）8-bit 元素 + E8M0 scale → fp32 通用转换核。
+    *
+    * E8M0 scale 是纯指数（bias=127），"乘 scale" 等价于对 fp32 的 exp 字段做加法：
+    *   true_exp = (elem_exp - elem_bias) + (scale - 127)
+    *   exp_fp32 = true_exp + 127 = elem_exp - elem_bias + scale
+    * 即 scale 几乎零成本并入指数，尾数不变。
+    *
+    * clamp / 特殊值（用户已定语义）：
+    *   - zero（exp==0 && mant==0）          → 输出 ±0（忽略 scale）
+    *   - subnormal（exp==0 && mant!=0）      → flush-to-zero，输出 ±0
+    *   - 下溢（exp_fp32 < 1）                → flush-to-zero，输出 ±0
+    *   - 上溢（exp_fp32 > 254）或 inf/nan    → saturate 到 fp32 max（保持 sign）
+    *   inf/nan 的 assert 守护放在调用方 HiveCvtOpMx（仅对被选中的格式断言，
+    *   避免另一路径组合逻辑的误报）
+    *
+    * @param x                 8-bit MX 元素（bit7=sign）
+    * @param scale             8-bit E8M0 scale（bias=127）
+    * @param expW/mantW/bias   元素指数位宽 / 尾数位宽 / 指数 bias
+    * @param nanNeedMantAllOne true=仅 exp 全1 且 mant 全1 视为特殊值（E4M3 NaN，
+    *                          exp 全1 且 mant 非全1 仍为正常最大数）；
+    *                          false=exp 全1 即特殊值（E5M2 inf/nan）
+    */
+  private def mxToFp32(x: UInt, scale: UInt, expW: Int, mantW: Int, bias: Int,
+                       nanNeedMantAllOne: Boolean): UInt = {
+    require(1 + expW + mantW == 8, s"MX 元素必须为 8-bit：1+$expW+$mantW")
+    val s = x(7)
+    val e = x(mantW + expW - 1, mantW)   // exp 字段（expW 位）
+    val m = x(mantW - 1, 0)              // mant 字段（mantW 位）
+
+    val isZero   = (e === 0.U) && (m === 0.U)
+    val isSub    = (e === 0.U) && (m =/= 0.U)                 // subnormal → flush-to-zero
+    val isInfNan = if (nanNeedMantAllOne) (e.andR && m.andR) else e.andR
+
+    // 尾数左对齐到 fp32 的 23-bit（高位放元素尾数，低位补零）
+    val m23 = Cat(m, 0.U((23 - mantW).W))
+
+    // exp_fp32 = e + scale - bias（有符号计算以检测上/下溢）
+    val expSum    = e +& scale                 // 无符号，最多 9 位
+    val expSigned = expSum.zext - bias.S       // 有符号
+    val underflow = expSigned < 1.S            // exp 字段 < 1 → flush-to-zero
+    val overflow  = expSigned > 254.S          // exp 字段 > 254 → saturate
+
+    val fp32Zero   = Cat(s, 0.U(31.W))
+    val fp32Max    = Cat(s, 0xFE.U(8.W), ((1 << 23) - 1).U(23.W))  // 保持 sign 的 fp32 max normal
+    val fp32Normal = Cat(s, expSigned.asUInt(7, 0), m23)
+
+    Mux(isZero || isSub, fp32Zero,
+      Mux(isInfNan || overflow, fp32Max,
+        Mux(underflow, fp32Zero, fp32Normal)))
+  }
+
+  /** MX E4M3（{sign(1),exp(4),mant(3)}，bias=7）+ E8M0 scale → fp32 */
+  def mxE4M3ToFp32(x: UInt, scale: UInt): UInt =
+    mxToFp32(x, scale, expW = 4, mantW = 3, bias = 7,  nanNeedMantAllOne = true)
+
+  /** MX E5M2（{sign(1),exp(5),mant(2)}，bias=15）+ E8M0 scale → fp32 */
+  def mxE5M2ToFp32(x: UInt, scale: UInt): UInt =
+    mxToFp32(x, scale, expW = 5, mantW = 2, bias = 15, nanNeedMantAllOne = false)
+
   /** fp32 乘法（简化版：正常数 + 零）
     * @param rnd 舍入模式（当前实现 RNE/RTZ，其余退化为 RTZ）
     */

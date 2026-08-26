@@ -1,9 +1,12 @@
-/** 数据格式枚举：HiveWorker 支持的四种输入/计算格式 */
+/** 数据格式枚举：HiveWorker 支持的输入/计算格式（3-bit，6 值） */
 
 import chisel3._
 
 object DataFormat extends ChiselEnum {
-  val FP16, BF16, INT16, INT8 = Value
+  val FP16, BF16, INT16, INT8, MXE4M3, MXE5M2 = Value
+
+  /** 判断给定格式是否为 MX 系列（E4M3 或 E5M2） */
+  def isMx(f: DataFormat.Type): Bool = f === MXE4M3 || f === MXE5M2
 }
 
 /** IEEE-754 舍入模式 */
