@@ -337,9 +337,12 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
       val feedBase = (cBufferReservedAtleastTotalN) & Mux(needPartialSum, cStoreGateReg === false.B, true.B)
       // MX：激活消费与 scaleA 严格 lockstep。scaleADma 可能比 aDma 晚一拍抵达，
       //   若在 scaleA FIFO 尚空时就消费首个激活行，会使全体 scaleA 应用错位一行
-      //   （row m 误用 row m-1 的 scale）。故 hasMx 时把 scaleAPop.valid 并入供数门控，
-      //   保证每个激活行 fire 当拍其对应 scale 已就位。非 MX 编译期恒为 feedBase，bit-exact。
-      val feed = if (cfg.hasMx) feedBase & io.scaleAPop.get.valid else feedBase
+      //   （row m 误用 row m-1 的 scale）。故运行期 isMx(aFmt) 时把 scaleAPop.valid
+      //   并入供数门控，保证每个激活行 fire 当拍其对应 scale 已就位。
+      //   【MX 必选】hasMx 编译期分支仅保留 Option 端口存在性；谓词改运行期：
+      //   isMx=false 运行时（非 MX 数据）门控项恒真，feed 逐拍等于 feedBase，
+      //   与无 MX 硬件时行为一致（非 MX 用例不驱动 dma3，FIFO 恒空也不死锁）。
+      val feed = if (cfg.hasMx) feedBase & (!DataFormat.isMx(io.regFile.aFmt) | io.scaleAPop.get.valid) else feedBase
 
       // ready 门控：供数满 m 行（mDone）后关断，防止排空窗口误消费
       // 下一 tile 数据；clear 准备拍关断，避免首拍 fire 累加被 clear

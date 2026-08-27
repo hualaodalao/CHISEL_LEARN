@@ -39,7 +39,7 @@ case class HiveCoreConfig(
     aW: Int = 16,
     bW: Int = 16,
     cW: Int = 0,
-    supportedFmts: Set[DataFormat.Type] = Set(DataFormat.FP16, DataFormat.BF16, DataFormat.INT16, DataFormat.INT8),
+    supportedFmts: Set[DataFormat.Type] = Set(DataFormat.FP16, DataFormat.BF16, DataFormat.INT16, DataFormat.INT8, DataFormat.MXE4M3, DataFormat.MXE5M2),
     aBufferDepth: Int = 64, 
     bBufferDepth: Int = 64,
     cBufferDepth: Int = 64,
@@ -126,6 +126,12 @@ case class HiveCoreConfig(
   require(cBufferDepth >= 2*totalN, s"HiveCoreConfig: cBufferDepth($cBufferDepth) 必须 > 2*totalN($totalN)")
   require(addrWidth > 0, s"HiveCoreConfig: addrWidth($addrWidth) 必须 > 0")
   require(addrWidth <= 32, s"HiveCoreConfig: addrWidth($addrWidth) 必须 <= 32")
+  require(scaleBufferDepth > 0, s"HiveCoreConfig: scaleBufferDepth($scaleBufferDepth) 必须 > 0（hasMx 时 scale FIFO 深度；非 MX 死路参数）")
+  // MX 阵列几何硬约束：32-K scale 块 = 连续两个 kTile pass，该等价关系仅在
+  // totalN==16 时成立（scaleBDma lineTarget=kTile>>1、executor curKTile(0) 偶拍
+  // pop 均硬编码此假设）；totalN≠16 的 hasMx 配置会静默数值错或挂死，故在
+  // elaboration 期直接拒绝。若未来支持其它 totalN，需同步重推上述两处节奏。
+  if (hasMx) require(totalN == 16, s"HiveCoreConfig: MX 要求 totalN==16（32-K scale 块 = 2 个 kTile），当前 totalN=$totalN")
 }
 
 

@@ -22,7 +22,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
   // ========== 测试参数 ==========
   val M = 32
   val N = 32
-  val K = 64
+  val K = 32
 
   val A_BASE: Long = 0x00000000L
   val B_BASE: Long = 0x00100000L

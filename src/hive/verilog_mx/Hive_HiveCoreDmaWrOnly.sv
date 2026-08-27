@@ -43,40 +43,40 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
-  input          clock,	// src/hive/scala/main/HiveCoreDma.scala:316:7
-                 reset,	// src/hive/scala/main/HiveCoreDma.scala:316:7
-                 io_start,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-                 io_peekBlock,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-  output         io_doneBlock,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-                 io_busy,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-                 io_err,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-  input          io_dmaExtWrIF_rsp_valid,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-                 io_dmaExtWrIF_rsp_payload_err,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-  output         io_dmaExtWrIF_req_valid,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-  input          io_dmaExtWrIF_req_ready,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-  output [31:0]  io_dmaExtWrIF_req_payload_addr,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-  output [639:0] io_dmaExtWrIF_req_payload_data,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-  input  [15:0]  io_calcConfig_nTile,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-  input  [31:0]  io_calcConfig_cRowAddressOffset,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-                 io_regFile_regs_0,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-                 io_regFile_regs_5,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-                 io_regFile_regs_7,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-  input          io_bufPop_valid,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-  output         io_bufPop_ready,	// src/hive/scala/main/HiveCoreDma.scala:319:14
-  input  [639:0] io_bufPop_payload	// src/hive/scala/main/HiveCoreDma.scala:319:14
+module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:370:7
+  input          clock,	// src/hive/scala/main/HiveCoreDma.scala:370:7
+                 reset,	// src/hive/scala/main/HiveCoreDma.scala:370:7
+                 io_start,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+                 io_peekBlock,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+  output         io_doneBlock,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+                 io_busy,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+                 io_err,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+  input          io_dmaExtWrIF_rsp_valid,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+                 io_dmaExtWrIF_rsp_payload_err,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+  output         io_dmaExtWrIF_req_valid,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+  input          io_dmaExtWrIF_req_ready,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+  output [31:0]  io_dmaExtWrIF_req_payload_addr,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+  output [639:0] io_dmaExtWrIF_req_payload_data,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+  input  [15:0]  io_calcConfig_nTile,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+  input  [31:0]  io_calcConfig_cRowAddressOffset,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+                 io_regFile_regs_0,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+                 io_regFile_regs_5,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+                 io_regFile_regs_7,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+  input          io_bufPop_valid,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+  output         io_bufPop_ready,	// src/hive/scala/main/HiveCoreDma.scala:373:14
+  input  [639:0] io_bufPop_payload	// src/hive/scala/main/HiveCoreDma.scala:373:14
 );
 
-  reg  [2:0]   state;	// src/hive/scala/main/HiveCoreDma.scala:346:22
-  reg  [31:0]  curAddr;	// src/hive/scala/main/HiveCoreDma.scala:351:24
-  reg  [31:0]  colAddr;	// src/hive/scala/main/HiveCoreDma.scala:352:24
-  reg  [31:0]  rowStep;	// src/hive/scala/main/HiveCoreDma.scala:353:24
-  reg  [15:0]  lineCounter;	// src/hive/scala/main/HiveCoreDma.scala:354:28
-  reg  [15:0]  nCnt;	// src/hive/scala/main/HiveCoreDma.scala:355:21
-  reg          errReg;	// src/hive/scala/main/HiveCoreDma.scala:356:23
-  reg  [11:0]  ostCredit;	// src/hive/scala/main/HiveCoreDma.scala:357:26
+  reg  [2:0]   state;	// src/hive/scala/main/HiveCoreDma.scala:400:22
+  reg  [31:0]  curAddr;	// src/hive/scala/main/HiveCoreDma.scala:405:24
+  reg  [31:0]  colAddr;	// src/hive/scala/main/HiveCoreDma.scala:406:24
+  reg  [31:0]  rowStep;	// src/hive/scala/main/HiveCoreDma.scala:407:24
+  reg  [15:0]  lineCounter;	// src/hive/scala/main/HiveCoreDma.scala:408:28
+  reg  [15:0]  nCnt;	// src/hive/scala/main/HiveCoreDma.scala:409:21
+  reg          errReg;	// src/hive/scala/main/HiveCoreDma.scala:410:23
+  reg  [11:0]  ostCredit;	// src/hive/scala/main/HiveCoreDma.scala:411:26
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_9 =
-    {8'h0, io_bufPop_payload[15:8]} | {io_bufPop_payload[7:0], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {8'h0, io_bufPop_payload[15:8]} | {io_bufPop_payload[7:0], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_19 =
     {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_9[15:4] & 12'hF0F}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_9[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -89,7 +89,7 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
        _popDataFpNorm_normalizedSlices_normalized32_lzc_T_29[12:0] & 13'h1555,
        1'h0};	// src/hive/scala/main/Fp32.scala:219:38
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_50 =
-    {4'h0, io_bufPop_payload[23:20]} | {io_bufPop_payload[19:16], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {4'h0, io_bufPop_payload[23:20]} | {io_bufPop_payload[19:16], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_60 =
     {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_50[7:2] & 6'h33}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_50[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -157,12 +157,12 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_39[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
   wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T =
-    {31'h0, io_bufPop_payload[30:0]} << popDataFpNorm_normalizedSlices_normalized32_lzc;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84
-  wire [7:0]   _GEN = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:316:7, src/main/scala/chisel3/util/Mux.scala:58:84
+    {31'h0, io_bufPop_payload[30:0]} << popDataFpNorm_normalizedSlices_normalized32_lzc;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:370:7, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_161 =
-    {8'h0, io_bufPop_payload[55:48]} | {io_bufPop_payload[47:40], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {8'h0, io_bufPop_payload[55:48]} | {io_bufPop_payload[47:40], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_171 =
     {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_161[15:4] & 12'hF0F}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_161[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -175,7 +175,7 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
        _popDataFpNorm_normalizedSlices_normalized32_lzc_T_181[12:0] & 13'h1555,
        1'h0};	// src/hive/scala/main/Fp32.scala:219:38
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_202 =
-    {4'h0, io_bufPop_payload[63:60]} | {io_bufPop_payload[59:56], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {4'h0, io_bufPop_payload[63:60]} | {io_bufPop_payload[59:56], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_212 =
     {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_202[7:2] & 6'h33}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_202[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -243,13 +243,13 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_191[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
   wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_1 =
     {31'h0, io_bufPop_payload[70:40]}
-    << popDataFpNorm_normalizedSlices_normalized32_lzc_1;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84
-  wire [7:0]   _GEN_0 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_1};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:316:7, src/main/scala/chisel3/util/Mux.scala:58:84
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_1;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_0 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_1};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:370:7, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_313 =
-    {8'h0, io_bufPop_payload[95:88]} | {io_bufPop_payload[87:80], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {8'h0, io_bufPop_payload[95:88]} | {io_bufPop_payload[87:80], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_323 =
     {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_313[15:4] & 12'hF0F}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_313[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -262,7 +262,7 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
        _popDataFpNorm_normalizedSlices_normalized32_lzc_T_333[12:0] & 13'h1555,
        1'h0};	// src/hive/scala/main/Fp32.scala:219:38
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_354 =
-    {4'h0, io_bufPop_payload[103:100]} | {io_bufPop_payload[99:96], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {4'h0, io_bufPop_payload[103:100]} | {io_bufPop_payload[99:96], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_364 =
     {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_354[7:2] & 6'h33}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_354[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -330,13 +330,13 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_343[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
   wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_2 =
     {31'h0, io_bufPop_payload[110:80]}
-    << popDataFpNorm_normalizedSlices_normalized32_lzc_2;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84
-  wire [7:0]   _GEN_1 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_2};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:316:7, src/main/scala/chisel3/util/Mux.scala:58:84
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_2;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_1 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_2};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:370:7, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_465 =
-    {8'h0, io_bufPop_payload[135:128]} | {io_bufPop_payload[127:120], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {8'h0, io_bufPop_payload[135:128]} | {io_bufPop_payload[127:120], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_475 =
     {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_465[15:4] & 12'hF0F}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_465[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -349,7 +349,7 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
        _popDataFpNorm_normalizedSlices_normalized32_lzc_T_485[12:0] & 13'h1555,
        1'h0};	// src/hive/scala/main/Fp32.scala:219:38
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_506 =
-    {4'h0, io_bufPop_payload[143:140]} | {io_bufPop_payload[139:136], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {4'h0, io_bufPop_payload[143:140]} | {io_bufPop_payload[139:136], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_516 =
     {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_506[7:2] & 6'h33}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_506[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -417,13 +417,13 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_495[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
   wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_3 =
     {31'h0, io_bufPop_payload[150:120]}
-    << popDataFpNorm_normalizedSlices_normalized32_lzc_3;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84
-  wire [7:0]   _GEN_2 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_3};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:316:7, src/main/scala/chisel3/util/Mux.scala:58:84
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_3;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_2 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_3};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:370:7, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_617 =
-    {8'h0, io_bufPop_payload[175:168]} | {io_bufPop_payload[167:160], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {8'h0, io_bufPop_payload[175:168]} | {io_bufPop_payload[167:160], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_627 =
     {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_617[15:4] & 12'hF0F}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_617[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -436,7 +436,7 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
        _popDataFpNorm_normalizedSlices_normalized32_lzc_T_637[12:0] & 13'h1555,
        1'h0};	// src/hive/scala/main/Fp32.scala:219:38
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_658 =
-    {4'h0, io_bufPop_payload[183:180]} | {io_bufPop_payload[179:176], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {4'h0, io_bufPop_payload[183:180]} | {io_bufPop_payload[179:176], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_668 =
     {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_658[7:2] & 6'h33}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_658[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -504,13 +504,13 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_647[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
   wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_4 =
     {31'h0, io_bufPop_payload[190:160]}
-    << popDataFpNorm_normalizedSlices_normalized32_lzc_4;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84
-  wire [7:0]   _GEN_3 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_4};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:316:7, src/main/scala/chisel3/util/Mux.scala:58:84
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_4;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_3 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_4};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:370:7, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_769 =
-    {8'h0, io_bufPop_payload[215:208]} | {io_bufPop_payload[207:200], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {8'h0, io_bufPop_payload[215:208]} | {io_bufPop_payload[207:200], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_779 =
     {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_769[15:4] & 12'hF0F}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_769[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -523,7 +523,7 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
        _popDataFpNorm_normalizedSlices_normalized32_lzc_T_789[12:0] & 13'h1555,
        1'h0};	// src/hive/scala/main/Fp32.scala:219:38
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_810 =
-    {4'h0, io_bufPop_payload[223:220]} | {io_bufPop_payload[219:216], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {4'h0, io_bufPop_payload[223:220]} | {io_bufPop_payload[219:216], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_820 =
     {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_810[7:2] & 6'h33}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_810[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -591,13 +591,13 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_799[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
   wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_5 =
     {31'h0, io_bufPop_payload[230:200]}
-    << popDataFpNorm_normalizedSlices_normalized32_lzc_5;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84
-  wire [7:0]   _GEN_4 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_5};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:316:7, src/main/scala/chisel3/util/Mux.scala:58:84
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_5;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_4 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_5};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:370:7, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_921 =
-    {8'h0, io_bufPop_payload[255:248]} | {io_bufPop_payload[247:240], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {8'h0, io_bufPop_payload[255:248]} | {io_bufPop_payload[247:240], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_931 =
     {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_921[15:4] & 12'hF0F}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_921[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -610,7 +610,7 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
        _popDataFpNorm_normalizedSlices_normalized32_lzc_T_941[12:0] & 13'h1555,
        1'h0};	// src/hive/scala/main/Fp32.scala:219:38
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_962 =
-    {4'h0, io_bufPop_payload[263:260]} | {io_bufPop_payload[259:256], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {4'h0, io_bufPop_payload[263:260]} | {io_bufPop_payload[259:256], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_972 =
     {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_962[7:2] & 6'h33}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_962[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -678,13 +678,13 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_951[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
   wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_6 =
     {31'h0, io_bufPop_payload[270:240]}
-    << popDataFpNorm_normalizedSlices_normalized32_lzc_6;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84
-  wire [7:0]   _GEN_5 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_6};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:316:7, src/main/scala/chisel3/util/Mux.scala:58:84
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_6;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_5 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_6};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:370:7, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1073 =
-    {8'h0, io_bufPop_payload[295:288]} | {io_bufPop_payload[287:280], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {8'h0, io_bufPop_payload[295:288]} | {io_bufPop_payload[287:280], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1083 =
     {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1073[15:4] & 12'hF0F}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1073[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -697,7 +697,7 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
        _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1093[12:0] & 13'h1555,
        1'h0};	// src/hive/scala/main/Fp32.scala:219:38
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1114 =
-    {4'h0, io_bufPop_payload[303:300]} | {io_bufPop_payload[299:296], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {4'h0, io_bufPop_payload[303:300]} | {io_bufPop_payload[299:296], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1124 =
     {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1114[7:2] & 6'h33}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1114[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -765,13 +765,13 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1103[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
   wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_7 =
     {31'h0, io_bufPop_payload[310:280]}
-    << popDataFpNorm_normalizedSlices_normalized32_lzc_7;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84
-  wire [7:0]   _GEN_6 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_7};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:316:7, src/main/scala/chisel3/util/Mux.scala:58:84
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_7;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_6 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_7};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:370:7, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1225 =
-    {8'h0, io_bufPop_payload[335:328]} | {io_bufPop_payload[327:320], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {8'h0, io_bufPop_payload[335:328]} | {io_bufPop_payload[327:320], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1235 =
     {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1225[15:4] & 12'hF0F}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1225[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -784,7 +784,7 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
        _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1245[12:0] & 13'h1555,
        1'h0};	// src/hive/scala/main/Fp32.scala:219:38
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1266 =
-    {4'h0, io_bufPop_payload[343:340]} | {io_bufPop_payload[339:336], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {4'h0, io_bufPop_payload[343:340]} | {io_bufPop_payload[339:336], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1276 =
     {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1266[7:2] & 6'h33}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1266[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -852,13 +852,13 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1255[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
   wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_8 =
     {31'h0, io_bufPop_payload[350:320]}
-    << popDataFpNorm_normalizedSlices_normalized32_lzc_8;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84
-  wire [7:0]   _GEN_7 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_8};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:316:7, src/main/scala/chisel3/util/Mux.scala:58:84
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_8;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_7 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_8};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:370:7, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1377 =
-    {8'h0, io_bufPop_payload[375:368]} | {io_bufPop_payload[367:360], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {8'h0, io_bufPop_payload[375:368]} | {io_bufPop_payload[367:360], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1387 =
     {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1377[15:4] & 12'hF0F}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1377[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -871,7 +871,7 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
        _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1397[12:0] & 13'h1555,
        1'h0};	// src/hive/scala/main/Fp32.scala:219:38
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1418 =
-    {4'h0, io_bufPop_payload[383:380]} | {io_bufPop_payload[379:376], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {4'h0, io_bufPop_payload[383:380]} | {io_bufPop_payload[379:376], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1428 =
     {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1418[7:2] & 6'h33}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1418[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -939,13 +939,13 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1407[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
   wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_9 =
     {31'h0, io_bufPop_payload[390:360]}
-    << popDataFpNorm_normalizedSlices_normalized32_lzc_9;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84
-  wire [7:0]   _GEN_8 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_9};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:316:7, src/main/scala/chisel3/util/Mux.scala:58:84
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_9;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_8 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_9};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:370:7, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1529 =
-    {8'h0, io_bufPop_payload[415:408]} | {io_bufPop_payload[407:400], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {8'h0, io_bufPop_payload[415:408]} | {io_bufPop_payload[407:400], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1539 =
     {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1529[15:4] & 12'hF0F}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1529[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -958,7 +958,7 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
        _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1549[12:0] & 13'h1555,
        1'h0};	// src/hive/scala/main/Fp32.scala:219:38
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1570 =
-    {4'h0, io_bufPop_payload[423:420]} | {io_bufPop_payload[419:416], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {4'h0, io_bufPop_payload[423:420]} | {io_bufPop_payload[419:416], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1580 =
     {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1570[7:2] & 6'h33}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1570[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -1026,13 +1026,13 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1559[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
   wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_10 =
     {31'h0, io_bufPop_payload[430:400]}
-    << popDataFpNorm_normalizedSlices_normalized32_lzc_10;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84
-  wire [7:0]   _GEN_9 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_10};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:316:7, src/main/scala/chisel3/util/Mux.scala:58:84
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_10;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_9 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_10};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:370:7, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1681 =
-    {8'h0, io_bufPop_payload[455:448]} | {io_bufPop_payload[447:440], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {8'h0, io_bufPop_payload[455:448]} | {io_bufPop_payload[447:440], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1691 =
     {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1681[15:4] & 12'hF0F}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1681[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -1045,7 +1045,7 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
        _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1701[12:0] & 13'h1555,
        1'h0};	// src/hive/scala/main/Fp32.scala:219:38
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1722 =
-    {4'h0, io_bufPop_payload[463:460]} | {io_bufPop_payload[459:456], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {4'h0, io_bufPop_payload[463:460]} | {io_bufPop_payload[459:456], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1732 =
     {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1722[7:2] & 6'h33}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1722[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -1113,13 +1113,13 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1711[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
   wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_11 =
     {31'h0, io_bufPop_payload[470:440]}
-    << popDataFpNorm_normalizedSlices_normalized32_lzc_11;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84
-  wire [7:0]   _GEN_10 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_11};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:316:7, src/main/scala/chisel3/util/Mux.scala:58:84
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_11;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_10 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_11};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:370:7, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1833 =
-    {8'h0, io_bufPop_payload[495:488]} | {io_bufPop_payload[487:480], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {8'h0, io_bufPop_payload[495:488]} | {io_bufPop_payload[487:480], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1843 =
     {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1833[15:4] & 12'hF0F}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1833[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -1132,7 +1132,7 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
        _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1853[12:0] & 13'h1555,
        1'h0};	// src/hive/scala/main/Fp32.scala:219:38
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1874 =
-    {4'h0, io_bufPop_payload[503:500]} | {io_bufPop_payload[499:496], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {4'h0, io_bufPop_payload[503:500]} | {io_bufPop_payload[499:496], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1884 =
     {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1874[7:2] & 6'h33}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1874[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -1200,13 +1200,13 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1863[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
   wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_12 =
     {31'h0, io_bufPop_payload[510:480]}
-    << popDataFpNorm_normalizedSlices_normalized32_lzc_12;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84
-  wire [7:0]   _GEN_11 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_12};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:316:7, src/main/scala/chisel3/util/Mux.scala:58:84
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_12;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_11 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_12};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:370:7, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1985 =
-    {8'h0, io_bufPop_payload[535:528]} | {io_bufPop_payload[527:520], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {8'h0, io_bufPop_payload[535:528]} | {io_bufPop_payload[527:520], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1995 =
     {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_1985[15:4] & 12'hF0F}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_1985[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -1219,7 +1219,7 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
        _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2005[12:0] & 13'h1555,
        1'h0};	// src/hive/scala/main/Fp32.scala:219:38
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2026 =
-    {4'h0, io_bufPop_payload[543:540]} | {io_bufPop_payload[539:536], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {4'h0, io_bufPop_payload[543:540]} | {io_bufPop_payload[539:536], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2036 =
     {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2026[7:2] & 6'h33}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_2026[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -1287,13 +1287,13 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2015[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
   wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_13 =
     {31'h0, io_bufPop_payload[550:520]}
-    << popDataFpNorm_normalizedSlices_normalized32_lzc_13;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84
-  wire [7:0]   _GEN_12 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_13};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:316:7, src/main/scala/chisel3/util/Mux.scala:58:84
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_13;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_12 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_13};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:370:7, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2137 =
-    {8'h0, io_bufPop_payload[575:568]} | {io_bufPop_payload[567:560], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {8'h0, io_bufPop_payload[575:568]} | {io_bufPop_payload[567:560], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2147 =
     {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2137[15:4] & 12'hF0F}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_2137[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -1306,7 +1306,7 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
        _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2157[12:0] & 13'h1555,
        1'h0};	// src/hive/scala/main/Fp32.scala:219:38
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2178 =
-    {4'h0, io_bufPop_payload[583:580]} | {io_bufPop_payload[579:576], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {4'h0, io_bufPop_payload[583:580]} | {io_bufPop_payload[579:576], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2188 =
     {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2178[7:2] & 6'h33}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_2178[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -1374,13 +1374,13 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2167[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
   wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_14 =
     {31'h0, io_bufPop_payload[590:560]}
-    << popDataFpNorm_normalizedSlices_normalized32_lzc_14;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84
-  wire [7:0]   _GEN_13 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_14};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:316:7, src/main/scala/chisel3/util/Mux.scala:58:84
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_14;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_13 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_14};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:370:7, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2289 =
-    {8'h0, io_bufPop_payload[615:608]} | {io_bufPop_payload[607:600], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {8'h0, io_bufPop_payload[615:608]} | {io_bufPop_payload[607:600], 8'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [15:0]  _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2299 =
     {4'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2289[15:4] & 12'hF0F}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_2289[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -1393,7 +1393,7 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
        _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2309[12:0] & 13'h1555,
        1'h0};	// src/hive/scala/main/Fp32.scala:219:38
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2330 =
-    {4'h0, io_bufPop_payload[623:620]} | {io_bufPop_payload[619:616], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36
+    {4'h0, io_bufPop_payload[623:620]} | {io_bufPop_payload[619:616], 4'h0};	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36
   wire [7:0]   _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2340 =
     {2'h0, _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2330[7:2] & 6'h33}
     | {_popDataFpNorm_normalizedSlices_normalized32_lzc_T_2330[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:219:38
@@ -1461,11 +1461,11 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _popDataFpNorm_normalizedSlices_normalized32_lzc_T_2319[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:215:19, :219:38, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
   wire [61:0]  _popDataFpNorm_normalizedSlices_normalized32_normed_T_15 =
     {31'h0, io_bufPop_payload[630:600]}
-    << popDataFpNorm_normalizedSlices_normalized32_lzc_15;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:368:36, src/main/scala/chisel3/util/Mux.scala:58:84
-  wire [7:0]   _GEN_14 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_15};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:316:7, src/main/scala/chisel3/util/Mux.scala:58:84
+    << popDataFpNorm_normalizedSlices_normalized32_lzc_15;	// src/hive/scala/main/Fp32.scala:215:19, :216:38, :220:23, src/hive/scala/main/HiveCoreDma.scala:422:36, src/main/scala/chisel3/util/Mux.scala:58:84
+  wire [7:0]   _GEN_14 = {3'h0, popDataFpNorm_normalizedSlices_normalized32_lzc_15};	// src/hive/scala/main/Fp32.scala:232:22, src/hive/scala/main/HiveCoreDma.scala:370:7, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [639:0] popDataFpNorm =
     {8'h0,
      io_bufPop_payload[638:631] == 8'h0 & io_bufPop_payload[630:600] == 31'h0
@@ -1654,140 +1654,140 @@ module Hive_HiveCoreDmaWrOnly(	// src/hive/scala/main/HiveCoreDma.scala:316:7
           & ((|(_popDataFpNorm_normalizedSlices_normalized32_normed_T[5:0]))
              | _popDataFpNorm_normalizedSlices_normalized32_normed_T[7])
             ? _popDataFpNorm_normalizedSlices_normalized32_normed_T[29:7] + 23'h1
-            : _popDataFpNorm_normalizedSlices_normalized32_normed_T[29:7]}};	// src/hive/scala/main/Fp32.scala:213:19, :214:19, :215:19, :216:{21,30,38}, :220:{23,30}, :223:24, :224:24, :225:{28,35}, :228:{25,39,47}, :229:{23,41}, :232:{19,22,32}, :234:{8,31}, src/hive/scala/main/HiveCoreDma.scala:351:24, :368:36, :375:8
-  reg          isFloat;	// src/hive/scala/main/HiveCoreDma.scala:383:24
-  reg          normSel_isMxReg;	// src/hive/scala/main/HiveCoreDma.scala:388:26
-  wire         _io_bufPop_ready_T = state == 3'h2;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :346:22, :393:44
-  wire         io_dmaExtWrIF_req_valid_0 = _io_bufPop_ready_T & io_bufPop_valid;	// src/hive/scala/main/HiveCoreDma.scala:393:{44,61}
-  wire         io_bufPop_ready_0 = _io_bufPop_ready_T & io_dmaExtWrIF_req_ready;	// src/hive/scala/main/HiveCoreDma.scala:393:44, :397:61
-  wire         _GEN_15 = state == 3'h0;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :346:22, :404:14
-  wire         _GEN_16 = state == 3'h1;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :346:22, :423:17
-  wire         _GEN_17 = io_bufPop_valid & io_bufPop_ready_0;	// src/hive/scala/main/HiveCoreDma.scala:397:61, src/utils/Stream/Stream.scala:43:26
-  wire         _GEN_18 = {16'h0, lineCounter} == io_regFile_regs_0 - 32'h1;	// src/hive/scala/main/HiveCoreDma.scala:354:28, :456:{26,43}
-  wire         _GEN_19 = _GEN_15 | _GEN_16;	// src/hive/scala/main/HiveCoreDma.scala:402:16, :404:14, :423:17
-  always @(posedge clock) begin	// src/hive/scala/main/HiveCoreDma.scala:316:7
-    if (reset) begin	// src/hive/scala/main/HiveCoreDma.scala:316:7
-      state <= 3'h0;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :346:22
-      curAddr <= 32'h0;	// src/hive/scala/main/HiveCoreDma.scala:351:24
-      colAddr <= 32'h0;	// src/hive/scala/main/HiveCoreDma.scala:351:24, :352:24
-      rowStep <= 32'h0;	// src/hive/scala/main/HiveCoreDma.scala:351:24, :353:24
-      lineCounter <= 16'h0;	// src/hive/scala/main/HiveCoreDma.scala:354:28
-      nCnt <= 16'h0;	// src/hive/scala/main/HiveCoreDma.scala:355:21
-      errReg <= 1'h0;	// src/hive/scala/main/HiveCoreDma.scala:356:23
-      ostCredit <= 12'h0;	// src/hive/scala/main/HiveCoreDma.scala:357:26
-      isFloat <= 1'h0;	// src/hive/scala/main/HiveCoreDma.scala:383:24
-      normSel_isMxReg <= 1'h0;	// src/hive/scala/main/HiveCoreDma.scala:388:26
+            : _popDataFpNorm_normalizedSlices_normalized32_normed_T[29:7]}};	// src/hive/scala/main/Fp32.scala:213:19, :214:19, :215:19, :216:{21,30,38}, :220:{23,30}, :223:24, :224:24, :225:{28,35}, :228:{25,39,47}, :229:{23,41}, :232:{19,22,32}, :234:{8,31}, src/hive/scala/main/HiveCoreDma.scala:405:24, :422:36, :429:8
+  reg          isFloat;	// src/hive/scala/main/HiveCoreDma.scala:437:24
+  reg          normSel_isMxReg;	// src/hive/scala/main/HiveCoreDma.scala:442:26
+  wire         _io_bufPop_ready_T = state == 3'h2;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :400:22, :447:44
+  wire         io_dmaExtWrIF_req_valid_0 = _io_bufPop_ready_T & io_bufPop_valid;	// src/hive/scala/main/HiveCoreDma.scala:447:{44,61}
+  wire         io_bufPop_ready_0 = _io_bufPop_ready_T & io_dmaExtWrIF_req_ready;	// src/hive/scala/main/HiveCoreDma.scala:447:44, :451:61
+  wire         _GEN_15 = state == 3'h0;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :400:22, :458:14
+  wire         _GEN_16 = state == 3'h1;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :400:22, :477:17
+  wire         _GEN_17 = io_bufPop_valid & io_bufPop_ready_0;	// src/hive/scala/main/HiveCoreDma.scala:451:61, src/utils/Stream/Stream.scala:43:26
+  wire         _GEN_18 = {16'h0, lineCounter} == io_regFile_regs_0 - 32'h1;	// src/hive/scala/main/HiveCoreDma.scala:408:28, :510:{26,43}
+  wire         _GEN_19 = _GEN_15 | _GEN_16;	// src/hive/scala/main/HiveCoreDma.scala:456:16, :458:14, :477:17
+  always @(posedge clock) begin	// src/hive/scala/main/HiveCoreDma.scala:370:7
+    if (reset) begin	// src/hive/scala/main/HiveCoreDma.scala:370:7
+      state <= 3'h0;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :400:22
+      curAddr <= 32'h0;	// src/hive/scala/main/HiveCoreDma.scala:405:24
+      colAddr <= 32'h0;	// src/hive/scala/main/HiveCoreDma.scala:405:24, :406:24
+      rowStep <= 32'h0;	// src/hive/scala/main/HiveCoreDma.scala:405:24, :407:24
+      lineCounter <= 16'h0;	// src/hive/scala/main/HiveCoreDma.scala:408:28
+      nCnt <= 16'h0;	// src/hive/scala/main/HiveCoreDma.scala:409:21
+      errReg <= 1'h0;	// src/hive/scala/main/HiveCoreDma.scala:410:23
+      ostCredit <= 12'h0;	// src/hive/scala/main/HiveCoreDma.scala:411:26
+      isFloat <= 1'h0;	// src/hive/scala/main/HiveCoreDma.scala:437:24
+      normSel_isMxReg <= 1'h0;	// src/hive/scala/main/HiveCoreDma.scala:442:26
     end
-    else begin	// src/hive/scala/main/HiveCoreDma.scala:316:7
+    else begin	// src/hive/scala/main/HiveCoreDma.scala:370:7
       automatic logic [2:0] _normSel_isMxReg_WIRE_1 =
         {io_regFile_regs_7[6], io_regFile_regs_7[1:0]};	// src/hive/scala/main/HiveInterface.scala:149:{17,25,37}
-      automatic logic       _GEN_20 = _GEN_15 & io_start;	// src/hive/scala/main/HiveCoreDma.scala:404:14, :416:31, :423:17, :431:22, :433:16
-      if (_GEN_15) begin	// src/hive/scala/main/HiveCoreDma.scala:404:14
-        if (io_start) begin	// src/hive/scala/main/HiveCoreDma.scala:319:14
-          state <= 3'h1;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :346:22
-          curAddr <= io_regFile_regs_5;	// src/hive/scala/main/HiveCoreDma.scala:351:24
-          colAddr <= 32'h50;	// src/hive/scala/main/HiveCoreDma.scala:352:24
-          nCnt <= 16'h0;	// src/hive/scala/main/HiveCoreDma.scala:355:21
+      automatic logic       _GEN_20 = _GEN_15 & io_start;	// src/hive/scala/main/HiveCoreDma.scala:458:14, :470:31, :477:17, :485:22, :487:16
+      if (_GEN_15) begin	// src/hive/scala/main/HiveCoreDma.scala:458:14
+        if (io_start) begin	// src/hive/scala/main/HiveCoreDma.scala:373:14
+          state <= 3'h1;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :400:22
+          curAddr <= io_regFile_regs_5;	// src/hive/scala/main/HiveCoreDma.scala:405:24
+          colAddr <= 32'h50;	// src/hive/scala/main/HiveCoreDma.scala:406:24
+          nCnt <= 16'h0;	// src/hive/scala/main/HiveCoreDma.scala:409:21
         end
-        ostCredit <= 12'h0;	// src/hive/scala/main/HiveCoreDma.scala:357:26
+        ostCredit <= 12'h0;	// src/hive/scala/main/HiveCoreDma.scala:411:26
       end
-      else begin	// src/hive/scala/main/HiveCoreDma.scala:404:14
+      else begin	// src/hive/scala/main/HiveCoreDma.scala:458:14
         automatic logic _GEN_21;	// src/utils/Stream/Stream.scala:43:26
-        automatic logic _GEN_22;	// src/hive/scala/main/HiveCoreDma.scala:423:17
-        automatic logic _GEN_23;	// src/hive/scala/main/HiveCoreDma.scala:469:17
-        _GEN_21 = io_dmaExtWrIF_req_valid_0 & io_dmaExtWrIF_req_ready;	// src/hive/scala/main/HiveCoreDma.scala:393:61, src/utils/Stream/Stream.scala:43:26
-        _GEN_22 = state == 3'h3;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :346:22, :423:17
-        _GEN_23 = nCnt == io_calcConfig_nTile - 16'h1;	// src/hive/scala/main/HiveCoreDma.scala:355:21, :469:{17,41}
-        if (_GEN_16) begin	// src/hive/scala/main/HiveCoreDma.scala:423:17
-          if (io_peekBlock)	// src/hive/scala/main/HiveCoreDma.scala:319:14
-            state <= 3'h2;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :346:22
+        automatic logic _GEN_22;	// src/hive/scala/main/HiveCoreDma.scala:477:17
+        automatic logic _GEN_23;	// src/hive/scala/main/HiveCoreDma.scala:523:17
+        _GEN_21 = io_dmaExtWrIF_req_valid_0 & io_dmaExtWrIF_req_ready;	// src/hive/scala/main/HiveCoreDma.scala:447:61, src/utils/Stream/Stream.scala:43:26
+        _GEN_22 = state == 3'h3;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :400:22, :477:17
+        _GEN_23 = nCnt == io_calcConfig_nTile - 16'h1;	// src/hive/scala/main/HiveCoreDma.scala:409:21, :523:{17,41}
+        if (_GEN_16) begin	// src/hive/scala/main/HiveCoreDma.scala:477:17
+          if (io_peekBlock)	// src/hive/scala/main/HiveCoreDma.scala:373:14
+            state <= 3'h2;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :400:22
         end
-        else if (_io_bufPop_ready_T) begin	// src/hive/scala/main/HiveCoreDma.scala:393:44
-          if (_GEN_17 & _GEN_18)	// src/hive/scala/main/HiveCoreDma.scala:346:22, :455:28, :456:{26,50}, :458:17, src/utils/Stream/Stream.scala:43:26
-            state <= 3'h3;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :346:22
-          if (~_GEN_17 | _GEN_18) begin	// src/hive/scala/main/HiveCoreDma.scala:351:24, :354:28, :423:17, :455:28, :456:{26,50}, src/utils/Stream/Stream.scala:43:26
+        else if (_io_bufPop_ready_T) begin	// src/hive/scala/main/HiveCoreDma.scala:447:44
+          if (_GEN_17 & _GEN_18)	// src/hive/scala/main/HiveCoreDma.scala:400:22, :509:28, :510:{26,50}, :512:17, src/utils/Stream/Stream.scala:43:26
+            state <= 3'h3;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :400:22
+          if (~_GEN_17 | _GEN_18) begin	// src/hive/scala/main/HiveCoreDma.scala:405:24, :408:28, :477:17, :509:28, :510:{26,50}, src/utils/Stream/Stream.scala:43:26
           end
-          else	// src/hive/scala/main/HiveCoreDma.scala:351:24, :455:28, :456:50
-            curAddr <= curAddr + rowStep;	// src/hive/scala/main/HiveCoreDma.scala:351:24, :353:24, :462:30
+          else	// src/hive/scala/main/HiveCoreDma.scala:405:24, :509:28, :510:50
+            curAddr <= curAddr + rowStep;	// src/hive/scala/main/HiveCoreDma.scala:405:24, :407:24, :516:30
         end
-        else begin	// src/hive/scala/main/HiveCoreDma.scala:393:44
-          if (_GEN_22) begin	// src/hive/scala/main/HiveCoreDma.scala:423:17
-            if (_GEN_23)	// src/hive/scala/main/HiveCoreDma.scala:469:17
-              state <= 3'h4;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :346:22
-            else if (io_peekBlock)	// src/hive/scala/main/HiveCoreDma.scala:319:14
-              state <= 3'h2;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :346:22
+        else begin	// src/hive/scala/main/HiveCoreDma.scala:447:44
+          if (_GEN_22) begin	// src/hive/scala/main/HiveCoreDma.scala:477:17
+            if (_GEN_23)	// src/hive/scala/main/HiveCoreDma.scala:523:17
+              state <= 3'h4;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :400:22
+            else if (io_peekBlock)	// src/hive/scala/main/HiveCoreDma.scala:373:14
+              state <= 3'h2;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :400:22
           end
-          else if (state == 3'h4 & ostCredit == 12'h0)	// src/hive/scala/main/HiveCoreDma.scala:316:7, :346:22, :357:26, :423:17, :485:{22,31}, :487:15
-            state <= 3'h0;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :346:22
-          if (~_GEN_22 | _GEN_23 | ~io_peekBlock) begin	// src/hive/scala/main/HiveCoreDma.scala:351:24, :355:21, :423:17, :469:{17,47}, :472:27
+          else if (state == 3'h4 & ostCredit == 12'h0)	// src/hive/scala/main/HiveCoreDma.scala:370:7, :400:22, :411:26, :477:17, :539:{22,31}, :541:15
+            state <= 3'h0;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :400:22
+          if (~_GEN_22 | _GEN_23 | ~io_peekBlock) begin	// src/hive/scala/main/HiveCoreDma.scala:405:24, :409:21, :477:17, :523:{17,47}, :526:27
           end
-          else	// src/hive/scala/main/HiveCoreDma.scala:351:24, :423:17, :469:47, :472:27
-            curAddr <= curAddr + colAddr;	// src/hive/scala/main/HiveCoreDma.scala:351:24, :352:24, :474:30
+          else	// src/hive/scala/main/HiveCoreDma.scala:405:24, :477:17, :523:47, :526:27
+            curAddr <= curAddr + colAddr;	// src/hive/scala/main/HiveCoreDma.scala:405:24, :406:24, :528:30
         end
-        if (_GEN_16 | _io_bufPop_ready_T | ~_GEN_22 | _GEN_23 | ~io_peekBlock) begin	// src/hive/scala/main/HiveCoreDma.scala:355:21, :393:44, :423:17, :469:{17,47}, :472:27
+        if (_GEN_16 | _io_bufPop_ready_T | ~_GEN_22 | _GEN_23 | ~io_peekBlock) begin	// src/hive/scala/main/HiveCoreDma.scala:409:21, :447:44, :477:17, :523:{17,47}, :526:27
         end
-        else begin	// src/hive/scala/main/HiveCoreDma.scala:355:21, :423:17, :469:47, :472:27
-          colAddr <= colAddr + 32'h50;	// src/hive/scala/main/HiveCoreDma.scala:352:24, :475:30
-          nCnt <= nCnt + 16'h1;	// src/hive/scala/main/HiveCoreDma.scala:355:21, :473:24
+        else begin	// src/hive/scala/main/HiveCoreDma.scala:409:21, :477:17, :523:47, :526:27
+          colAddr <= colAddr + 32'h50;	// src/hive/scala/main/HiveCoreDma.scala:406:24, :529:30
+          nCnt <= nCnt + 16'h1;	// src/hive/scala/main/HiveCoreDma.scala:409:21, :527:24
         end
-        if (~(_GEN_21 & io_dmaExtWrIF_rsp_valid)) begin	// src/hive/scala/main/HiveCoreDma.scala:407:33, src/utils/Stream/Stream.scala:43:26
-          if (io_dmaExtWrIF_rsp_valid)	// src/hive/scala/main/HiveCoreDma.scala:319:14
-            ostCredit <= ostCredit - 12'h1;	// src/hive/scala/main/HiveCoreDma.scala:357:26, :410:30
+        if (~(_GEN_21 & io_dmaExtWrIF_rsp_valid)) begin	// src/hive/scala/main/HiveCoreDma.scala:461:33, src/utils/Stream/Stream.scala:43:26
+          if (io_dmaExtWrIF_rsp_valid)	// src/hive/scala/main/HiveCoreDma.scala:373:14
+            ostCredit <= ostCredit - 12'h1;	// src/hive/scala/main/HiveCoreDma.scala:411:26, :464:30
           else if (_GEN_21)	// src/utils/Stream/Stream.scala:43:26
-            ostCredit <= ostCredit + 12'h1;	// src/hive/scala/main/HiveCoreDma.scala:357:26, :410:30, :412:30
+            ostCredit <= ostCredit + 12'h1;	// src/hive/scala/main/HiveCoreDma.scala:411:26, :464:30, :466:30
         end
       end
-      if (_GEN_20)	// src/hive/scala/main/HiveCoreDma.scala:416:31, :423:17, :431:22, :433:16
-        rowStep <= io_calcConfig_cRowAddressOffset;	// src/hive/scala/main/HiveCoreDma.scala:353:24
-      if (_GEN_19 | ~_GEN_17) begin	// src/hive/scala/main/HiveCoreDma.scala:354:28, :402:16, :423:17, src/utils/Stream/Stream.scala:43:26
+      if (_GEN_20)	// src/hive/scala/main/HiveCoreDma.scala:470:31, :477:17, :485:22, :487:16
+        rowStep <= io_calcConfig_cRowAddressOffset;	// src/hive/scala/main/HiveCoreDma.scala:407:24
+      if (_GEN_19 | ~_GEN_17) begin	// src/hive/scala/main/HiveCoreDma.scala:408:28, :456:16, :477:17, src/utils/Stream/Stream.scala:43:26
       end
-      else	// src/hive/scala/main/HiveCoreDma.scala:354:28, :423:17
-        lineCounter <= _GEN_18 ? 16'h0 : lineCounter + 16'h1;	// src/hive/scala/main/HiveCoreDma.scala:354:28, :456:{26,50}, :457:23, :461:{23,38}
+      else	// src/hive/scala/main/HiveCoreDma.scala:408:28, :477:17
+        lineCounter <= _GEN_18 ? 16'h0 : lineCounter + 16'h1;	// src/hive/scala/main/HiveCoreDma.scala:408:28, :510:{26,50}, :511:23, :515:{23,38}
       errReg <=
-        ~_GEN_20 & (io_dmaExtWrIF_rsp_valid & io_dmaExtWrIF_rsp_payload_err | errReg);	// src/hive/scala/main/HiveCoreDma.scala:356:23, :416:31, :417:40, :418:14, :423:17, :431:22, :433:16
+        ~_GEN_20 & (io_dmaExtWrIF_rsp_valid & io_dmaExtWrIF_rsp_payload_err | errReg);	// src/hive/scala/main/HiveCoreDma.scala:410:23, :470:31, :471:40, :472:14, :477:17, :485:22, :487:16
       isFloat <=
         {io_regFile_regs_7[6], io_regFile_regs_7[1:0]} == 3'h1
-        | {io_regFile_regs_7[6], io_regFile_regs_7[1:0]} == 3'h0;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :383:24, src/hive/scala/main/HiveInterface.scala:149:{17,25,37}, :162:{22,42,50}
+        | {io_regFile_regs_7[6], io_regFile_regs_7[1:0]} == 3'h0;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :437:24, src/hive/scala/main/HiveInterface.scala:149:{17,25,37}, :162:{22,42,50}
       normSel_isMxReg <=
-        _normSel_isMxReg_WIRE_1 == 3'h4 | _normSel_isMxReg_WIRE_1 == 3'h5;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :388:26, src/hive/scala/main/HiveEnum.scala:9:{42,53,58}, src/hive/scala/main/HiveInterface.scala:149:17
+        _normSel_isMxReg_WIRE_1 == 3'h4 | _normSel_isMxReg_WIRE_1 == 3'h5;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :442:26, src/hive/scala/main/HiveEnum.scala:9:{42,53,58}, src/hive/scala/main/HiveInterface.scala:149:17
     end
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// src/hive/scala/main/HiveCoreDma.scala:316:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveCoreDma.scala:316:7
-      `FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveCoreDma.scala:316:7
+  `ifdef ENABLE_INITIAL_REG_	// src/hive/scala/main/HiveCoreDma.scala:370:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveCoreDma.scala:370:7
+      `FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveCoreDma.scala:370:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/hive/scala/main/HiveCoreDma.scala:316:7
-      automatic logic [31:0] _RANDOM[0:4];	// src/hive/scala/main/HiveCoreDma.scala:316:7
-      `ifdef INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveCoreDma.scala:316:7
-        `INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveCoreDma.scala:316:7
+    initial begin	// src/hive/scala/main/HiveCoreDma.scala:370:7
+      automatic logic [31:0] _RANDOM[0:4];	// src/hive/scala/main/HiveCoreDma.scala:370:7
+      `ifdef INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveCoreDma.scala:370:7
+        `INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveCoreDma.scala:370:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/hive/scala/main/HiveCoreDma.scala:316:7
+      `ifdef RANDOMIZE_REG_INIT	// src/hive/scala/main/HiveCoreDma.scala:370:7
         for (logic [2:0] i = 3'h0; i < 3'h5; i += 3'h1) begin
-          _RANDOM[i] = `RANDOM;	// src/hive/scala/main/HiveCoreDma.scala:316:7
-        end	// src/hive/scala/main/HiveCoreDma.scala:316:7
-        state = _RANDOM[3'h0][2:0];	// src/hive/scala/main/HiveCoreDma.scala:316:7, :346:22
-        curAddr = {_RANDOM[3'h0][31:3], _RANDOM[3'h1][2:0]};	// src/hive/scala/main/HiveCoreDma.scala:316:7, :346:22, :351:24
-        colAddr = {_RANDOM[3'h1][31:3], _RANDOM[3'h2][2:0]};	// src/hive/scala/main/HiveCoreDma.scala:316:7, :351:24, :352:24
-        rowStep = {_RANDOM[3'h2][31:3], _RANDOM[3'h3][2:0]};	// src/hive/scala/main/HiveCoreDma.scala:316:7, :352:24, :353:24
-        lineCounter = _RANDOM[3'h3][18:3];	// src/hive/scala/main/HiveCoreDma.scala:316:7, :353:24, :354:28
-        nCnt = {_RANDOM[3'h3][31:19], _RANDOM[3'h4][2:0]};	// src/hive/scala/main/HiveCoreDma.scala:316:7, :353:24, :355:21
-        errReg = _RANDOM[3'h4][3];	// src/hive/scala/main/HiveCoreDma.scala:316:7, :355:21, :356:23
-        ostCredit = _RANDOM[3'h4][15:4];	// src/hive/scala/main/HiveCoreDma.scala:316:7, :355:21, :357:26
-        isFloat = _RANDOM[3'h4][16];	// src/hive/scala/main/HiveCoreDma.scala:316:7, :355:21, :383:24
-        normSel_isMxReg = _RANDOM[3'h4][17];	// src/hive/scala/main/HiveCoreDma.scala:316:7, :355:21, :388:26
+          _RANDOM[i] = `RANDOM;	// src/hive/scala/main/HiveCoreDma.scala:370:7
+        end	// src/hive/scala/main/HiveCoreDma.scala:370:7
+        state = _RANDOM[3'h0][2:0];	// src/hive/scala/main/HiveCoreDma.scala:370:7, :400:22
+        curAddr = {_RANDOM[3'h0][31:3], _RANDOM[3'h1][2:0]};	// src/hive/scala/main/HiveCoreDma.scala:370:7, :400:22, :405:24
+        colAddr = {_RANDOM[3'h1][31:3], _RANDOM[3'h2][2:0]};	// src/hive/scala/main/HiveCoreDma.scala:370:7, :405:24, :406:24
+        rowStep = {_RANDOM[3'h2][31:3], _RANDOM[3'h3][2:0]};	// src/hive/scala/main/HiveCoreDma.scala:370:7, :406:24, :407:24
+        lineCounter = _RANDOM[3'h3][18:3];	// src/hive/scala/main/HiveCoreDma.scala:370:7, :407:24, :408:28
+        nCnt = {_RANDOM[3'h3][31:19], _RANDOM[3'h4][2:0]};	// src/hive/scala/main/HiveCoreDma.scala:370:7, :407:24, :409:21
+        errReg = _RANDOM[3'h4][3];	// src/hive/scala/main/HiveCoreDma.scala:370:7, :409:21, :410:23
+        ostCredit = _RANDOM[3'h4][15:4];	// src/hive/scala/main/HiveCoreDma.scala:370:7, :409:21, :411:26
+        isFloat = _RANDOM[3'h4][16];	// src/hive/scala/main/HiveCoreDma.scala:370:7, :409:21, :437:24
+        normSel_isMxReg = _RANDOM[3'h4][17];	// src/hive/scala/main/HiveCoreDma.scala:370:7, :409:21, :442:26
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveCoreDma.scala:316:7
-      `FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveCoreDma.scala:316:7
+    `ifdef FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveCoreDma.scala:370:7
+      `FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveCoreDma.scala:370:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_doneBlock = ~_GEN_19 & _GEN_17 & _GEN_18;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :402:16, :423:17, :455:28, :456:{26,50}, src/utils/Stream/Stream.scala:43:26
-  assign io_busy = |state;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :346:22, :400:20
-  assign io_err = errReg;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :356:23
-  assign io_dmaExtWrIF_req_valid = io_dmaExtWrIF_req_valid_0;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :393:61
-  assign io_dmaExtWrIF_req_payload_addr = curAddr;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :351:24
+  assign io_doneBlock = ~_GEN_19 & _GEN_17 & _GEN_18;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :456:16, :477:17, :509:28, :510:{26,50}, src/utils/Stream/Stream.scala:43:26
+  assign io_busy = |state;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :400:22, :454:20
+  assign io_err = errReg;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :410:23
+  assign io_dmaExtWrIF_req_valid = io_dmaExtWrIF_req_valid_0;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :447:61
+  assign io_dmaExtWrIF_req_payload_addr = curAddr;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :405:24
   assign io_dmaExtWrIF_req_payload_data =
-    isFloat | normSel_isMxReg ? popDataFpNorm : io_bufPop_payload;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :375:8, :383:24, :388:26, :390:13, :395:48
-  assign io_bufPop_ready = io_bufPop_ready_0;	// src/hive/scala/main/HiveCoreDma.scala:316:7, :397:61
+    isFloat | normSel_isMxReg ? popDataFpNorm : io_bufPop_payload;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :429:8, :437:24, :442:26, :444:13, :449:48
+  assign io_bufPop_ready = io_bufPop_ready_0;	// src/hive/scala/main/HiveCoreDma.scala:370:7, :451:61
 endmodule
 

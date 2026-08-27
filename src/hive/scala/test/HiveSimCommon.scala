@@ -119,6 +119,8 @@ object HiveSimCommon {
 
   /** 将 ChiselSim 生成的 trace.fst 复制到目标路径（源存在则覆盖复制，
     * 否则仅打印 NOTE 不 fail，沿用 copyVcd 时代既有约定）。
+    * 硬门禁：源文件存在但为 0 字节时直接 fail（波形产物不完整即视为
+    * 仿真异常，不再仅靠流程约定）。
     * 运行方式：CPATH=/opt/homebrew/include LIBRARY_PATH=/opt/homebrew/lib \
     * sbt "testOnly *<Suite> -- -DemitFst=1"（-D 放 `--` 之后）。
     * FST 源位于 build/chiselsim/&lt;Suite&gt;/&lt;behavior&gt;/&lt;test&gt;/workdir-verilator/trace.fst
@@ -132,8 +134,10 @@ object HiveSimCommon {
     val src = Paths.get(traceSource)
     val tgt = Paths.get(traceTarget)
     if (Files.exists(src)) {
+      val srcSize = Files.size(src)
+      assert(srcSize > 0, s"[$tag] FST source is 0 bytes (empty trace): $traceSource")
       Files.copy(src, tgt, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-      println(s"[$tag] FST waveform copied to $traceTarget")
+      println(s"[$tag] FST waveform copied to $traceTarget ($srcSize bytes)")
     } else {
       println(s"[$tag] NOTE: FST not found at $traceSource (run with -DemitFst=1 to generate)")
     }

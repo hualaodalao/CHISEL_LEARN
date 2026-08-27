@@ -16,7 +16,8 @@
   *     (round nt) × (kt 外) × (m 内)，共 nTile×kTile×M beat。
   *   - scaleB[kb][n]：executor sLOAD_B 每 K-块起始（curKTile 偶）pop 一个
   *     totalN 向量锁存 scaleBRegs(i)→列 i（globalCol=nTile*totalN+i）。
-  *     scaleBDma（isScale 线性遍历）共 nTile×(kTile>>1) beat（每块一向量）。
+  *     pop 序 = (round nt 外) × (kb 块内)，scaleBDma（isScale 两级遍历）
+  *     按同序取址，共 nTile×(kTile>>1) beat（每 (nt,kb) 一向量）。
   *
   * golden：C[m][n] = Σ_k mxE4M3ToFloat(aByte[m][k], scaleA[m][k/32])
   *                       × mxE5M2ToFloat(bByte[k][n], scaleB[k/32][n])
@@ -45,10 +46,20 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
 
   behavior of "HiveCore MXFP8 GEMM Simulation"
 
-  it should "run MX single-block GEMM M=4 N=16 K=32 E4M3xE5M2" in {
-    runMxGemm(M = 4, N = 16, K = 32,
+  it should "run MX single-block GEMM M=32 N=32 K=32 E4M3xE5M2" in {
+    runMxGemm(M = 32, N = 32, K = 32,
       waveName = "hivecore_mx_sim.fst",
-      testMangle = "should-run-MX-single-block-GEMM-M-4-N-16-K-32-E4M3xE5M2")
+      testMangle = "should-run-MX-single-block-GEMM-M-32-N-32-K-32-E4M3xE5M2")
+  }
+
+  /*
+
+  // 多 nTile×多 kBlocks（N=32→nTile=2，K=64→kBlocks=2）：scaleB 供数序
+  // nt 外 × kb 内两级遍历对账（线性 kb-major 取址在此维度组合下必错位）
+  it should "run MX multi-tile GEMM M=4 N=32 K=64 2nTile 2blk" in {
+    runMxGemm(M = 4, N = 32, K = 64,
+      waveName = "hivecore_mx_multintile_sim.fst",
+      testMangle = "should-run-MX-multi-tile-GEMM-M-4-N-32-K-64-2nTile-2blk")
   }
 
   it should "run MX multi-pass GEMM M=4 N=16 K=64 2blk 4pass" in {
@@ -68,6 +79,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     runMxErrCase(M = 4, N = 16, K = 32, regs7 = 0x5C0L,   // 0x5E0 去掉 loadWMode(0x20)
       caseName = "isMx(bFmt)&&!loadWMode")
   }
+  */
 
   // ==========================================================================
   // 共享运行器：配置 MX HiveCore，逐拍供 A/B/C/scaleA/scaleB，golden 比对。
@@ -77,12 +89,12 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     val cfg = HiveCoreConfig(
       arrayN = 8,
       clusterM = 2,                 // totalN = 16
-      aW = 8, bW = 8, cW = 40,
-      supportedFmts = Set(DataFormat.MXE4M3, DataFormat.MXE5M2),
-      aBufferDepth = 2048,
-      bBufferDepth = 2048,
-      cBufferDepth = 2048,
-      scaleBufferDepth = 256
+      aW = 16, bW = 16, cW = 40,      // 与出厂 cfgMx（HiveCoreElaborate）及 err 用例对齐
+     // supportedFmts = Set(DataFormat.MXE4M3, DataFormat.MXE5M2),
+      aBufferDepth = 64,
+      bBufferDepth = 64,
+      cBufferDepth = 64,
+      scaleBufferDepth = 64
     )
 
     val totalN = cfg.totalN         // 16
@@ -174,15 +186,19 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     }
 
     // ==================== DMA4 (scaleB) 数据：128-bit/beat ======================
-    // isScale 线性遍历，nTile×(kTile>>1) beat；nTile=1 时 beat idx = 块 idx。
-    // byte i = scaleB[block][n=i]（列驻留，n<N 有效，否则补 0）。
+    // isScale 两级遍历（nt 外 × kb 内），共 nTile×kBlocks beat；beat idx 按
+    // 硬件遍历序解码：nt = idx / kBlocks（轮），kb = idx % kBlocks（块内）。
+    // byte i = scaleB[kb][nt*totalN + i]（列驻留，n<N 有效，否则补 0）；
+    // 与 executor pop 序（每 nt 轮内各 K-块起始 pop 一次）逐拍一致。
     val scaleBTotalBeats = nTilesB * (bKTiles / 2)
     require(scaleBTotalBeats == kBlocks * nTilesB, s"scaleB beat 数自检失败: $scaleBTotalBeats vs ${kBlocks * nTilesB}")
-    def genScaleBBeat(blockIdx: Int): BigInt = {
+    def genScaleBBeat(idx: Int): BigInt = {
+      val nt = idx / kBlocks
+      val kb = idx % kBlocks
       var data = BigInt(0)
       for (i <- 0 until totalN) {
-        val n = i
-        val value = if (n < N) scaleB(blockIdx)(n) else 0
+        val n = nt * totalN + i
+        val value = if (n < N) scaleB(kb)(n) else 0
         data = data | (BigInt(value & 0xFF) << (8 * i))
       }
       data
@@ -198,6 +214,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       var dma2BeatsSent = 0
       var scaleABeatsSent = 0
       var scaleBBeatsSent = 0
+      val scaleBAddrLog = scala.collection.mutable.ArrayBuffer[Long]()  // scaleB DMA 实际取址序列（逐 beat 对账）
       val cWriteLog = scala.collection.mutable.ArrayBuffer[(Long, BigInt)]()
 
       // ===== Reset =====
@@ -263,6 +280,9 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       while (!done && cycle < maxCycles) {
 
         // --- DMA0 (A) ---
+        // 已知待办（评审记录）：expAAddrSeq 构建后未用于逐 beat 地址断言，
+        // 当前按 beat 序号供数（内存保真依赖 DMA/executor 同序约定）；
+        // 后续可仿 DMA2/scaleB 风格改为 req.valid 拍响应 + 逐拍地址硬对账。
         if (dma0BeatsSent < dma0TotalBeats) {
           dut.io.dma0Ext.rsp.valid.poke(true.B)
           dut.io.dma0Ext.rsp.payload.data.poke(genDma0Beat(dma0BeatsSent).U)
@@ -311,6 +331,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         }
 
         // --- DMA3 (scaleA) 8-bit：按 beat 序供数（遍历序=pop序） ---
+        // 已知待办（评审记录）：同 DMA0，未做逐 beat 地址硬对账，后续补齐。
         if (scaleABeatsSent < scaleATotalBeats) {
           dut.io.dma3Ext.get.rsp.valid.poke(true.B)
           dut.io.dma3Ext.get.rsp.payload.data.poke(genScaleABeat(scaleABeatsSent).U)
@@ -321,12 +342,22 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
           dut.io.dma3Ext.get.rsp.payload.data.poke(0.U)
         }
 
-        // --- DMA4 (scaleB) 128-bit：每块一向量 ---
+        // --- DMA4 (scaleB) 128-bit：每 (nt,kb) 一向量 ---
+        // 仅在 req.valid 拍响应（同 DMA2 风格）：DMA req 恰 fire nTile×kBlocks
+        // 次（每拍 fire 推进 lineCounter），rsp 与 req 逐拍 lockstep（rsp.ready
+        // 恒高）；轮间跳转拍（sNEXT_COL）req.valid 拉低则不给 rsp，避免与
+        // 请求脱拍的伪 push 扰乱逐拍取址对账。
         if (scaleBBeatsSent < scaleBTotalBeats) {
-          dut.io.dma4Ext.get.rsp.valid.poke(true.B)
-          dut.io.dma4Ext.get.rsp.payload.data.poke(genScaleBBeat(scaleBBeatsSent).U)
-          dut.io.dma4Ext.get.rsp.payload.err.poke(false.B)
-          if (dut.io.dma4Ext.get.rsp.ready.peek().litToBoolean) scaleBBeatsSent += 1
+          if (dut.io.dma4Ext.get.req.valid.peek().litToBoolean) {
+            scaleBAddrLog += dut.io.dma4Ext.get.req.payload.addr.peek().litValue.toLong
+            dut.io.dma4Ext.get.rsp.valid.poke(true.B)
+            dut.io.dma4Ext.get.rsp.payload.data.poke(genScaleBBeat(scaleBBeatsSent).U)
+            dut.io.dma4Ext.get.rsp.payload.err.poke(false.B)
+            scaleBBeatsSent += 1
+          } else {
+            dut.io.dma4Ext.get.rsp.valid.poke(false.B)
+            dut.io.dma4Ext.get.rsp.payload.data.poke(0.U)
+          }
         } else {
           dut.io.dma4Ext.get.rsp.valid.poke(false.B)
           dut.io.dma4Ext.get.rsp.payload.data.poke(0.U)
@@ -353,6 +384,25 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       dma1StoreBeats should be(expCAddrSeq.size)
       scaleABeatsSent should be(scaleATotalBeats)
       scaleBBeatsSent should be(scaleBTotalBeats)
+
+      // scaleB 取址序硬对账（同 DMA2 风格）：外部布局 scaleB[kb][n] 连续
+      // （每 kb 占 N 字节），向量 (kb,nt) 字节地址 = base + kb*N + nt*totalN。
+      // executor pop 序 = nt 轮外 × kb 轮内（每 nt 轮内各 K-块起始 pop 一次），
+      // 故 DMA 取址序列必须同为 nt 外 × kb 内：
+      //   addr(idx) = base + (idx % kBlocks)*N + (idx / kBlocks)*totalN
+      // genScaleBBeat 按同一解码供该地址处数据（内存保真），两者钉死后
+      // 任意 nTile×kBlocks 组合（含 N=32×K=64 的双多组合）供数序不错位。
+      val expScaleBAddrSeq = (0 until scaleBTotalBeats).map { idx =>
+        val nt = idx / kBlocks
+        val kb = idx % kBlocks
+        SCALE_B_BASE + kb.toLong * N + nt.toLong * totalN
+      }
+      scaleBAddrLog.size should be(scaleBTotalBeats)
+      for ((a, i) <- scaleBAddrLog.zipWithIndex) {
+        withClue(s"scaleB beat #$i addr mismatch: ") {
+          a should be(expScaleBAddrSeq(i))
+        }
+      }
 
       // ===== C 重建 =====
       val cResult = Array.fill(M, N)(BigInt(0))

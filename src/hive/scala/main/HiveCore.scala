@@ -82,8 +82,8 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // P4.2: MX scale DMA 提到外层用 Option 持有（P3 接线块内改用 .get 引用），
   //   以便下方 dmaErr 汇聚点引用其 io.err。非 MX 配置为 None（整块不例化），
   //   汇聚式逐字不变、bit-exact。位宽/深度与 P3 块内原例化一致。
-  val scaleADmaOpt = if (cfg.hasMx) Some(Module(new HiveCoreDmaRdOnly(cfg, bufWidth = 8,               bufDepth = cfg.scaleBufferDepth))) else None
-  val scaleBDmaOpt = if (cfg.hasMx) Some(Module(new HiveCoreDmaRdOnly(cfg, bufWidth = cfg.scaleRowW,   bufDepth = cfg.scaleBufferDepth, isScale = true))) else None
+  val aDmaScale = if (cfg.hasMx) Some(Module(new HiveCoreDmaRdOnly(cfg, bufWidth = 8,               bufDepth = cfg.scaleBufferDepth))) else None
+  val bDmaScale = if (cfg.hasMx) Some(Module(new HiveCoreDmaRdOnly(cfg, bufWidth = cfg.scaleRowW,   bufDepth = cfg.scaleBufferDepth, isScale = true))) else None
 
   // ==========================================================================
   // calcConfig 生产者（喂给 bDma）：从 regFile 推导 tile 数与六个地址偏移。
@@ -222,7 +222,7 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // P4.2: MX 配置追加 scale DMA（scaleADma/scaleBDma）err；非 MX 配置为
   //   else 分支，表达式逐字等于原式（无 scale DMA 生成），bit-exact。
   val dmaErr = if (cfg.hasMx) {
-    aDma.io.err || bDma.io.err || cDma.io.err || scaleADmaOpt.get.io.err || scaleBDmaOpt.get.io.err
+    aDma.io.err || bDma.io.err || cDma.io.err || aDmaScale.get.io.err || bDmaScale.get.io.err
   } else {
     aDma.io.err || bDma.io.err || cDma.io.err
   }
@@ -364,18 +364,18 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   //       每激活行 pop 的 scaleA 一一对应。
   //     * scaleBDma（isA=false）复用 B 遍历；Executor 仅在 K-块起始 pop scaleB，
   //       FIFO 反压自然节流上游。
-  //   - 【P5 交接】scale 元素 1-byte 粒度 + K-块（32）对齐的精确地址步长/行数
-  //     对账（尤其 scaleB 每 K-块一向量 vs B 每 kTile×totalN 行）留待 P5 数值
-  //     bring-up；本阶段建立端到端连通（scale 不再是常量 0）。MX 下随 executePulse
-  //     启动，非 MX 恒不启动（整块不生成）。
+  //   - 【MX 必选】start 加运行期 isMx(regFile.aFmt) 门控：仅 MX 运行时启动；
+  //     非 MX 运行（fmt 非 MX 枚举）恒不启动，不向外部发请求（非 MX harness 不
+  //     驱动 dma3/dma4 也天然安全）。判据与 Executor err/scale 块同用 aFmt。
   // ==========================================================================
   if (cfg.hasMx) {
+    val mxRun = DataFormat.isMx(regFile.aFmt)
     // scaleA DMA：isA=true，基址重写为 scaleAAddr
     val scaleARegFile = WireInit(regFile)
     scaleARegFile.regs(3) := regFile.scaleAAddr
-    val scaleADma = scaleADmaOpt.get  // P4.2: 引用外层 Option 持有的实例（原地例化已上提）
+    val scaleADma = aDmaScale.get  // P4.2: 引用外层 Option 持有的实例（原地例化已上提）
     scaleADma.io.isA        := true.B
-    scaleADma.io.start      := executePulse
+    scaleADma.io.start      := executePulse & mxRun
     scaleADma.io.regFile    := scaleARegFile
     scaleADma.io.calcConfig := calcConfig
     io.dma3Ext.get <> scaleADma.io.dmaExtRdIF
@@ -383,9 +383,9 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     // scaleB DMA：isA=false，基址重写为 scaleBAddr
     val scaleBRegFile = WireInit(regFile)
     scaleBRegFile.regs(4) := regFile.scaleBAddr
-    val scaleBDma = scaleBDmaOpt.get  // P4.2: 引用外层 Option 持有的实例（原地例化已上提）
+    val scaleBDma = bDmaScale.get  // P4.2: 引用外层 Option 持有的实例（原地例化已上提）
     scaleBDma.io.isA        := false.B
-    scaleBDma.io.start      := executePulse
+    scaleBDma.io.start      := executePulse & mxRun
     scaleBDma.io.regFile    := scaleBRegFile
     scaleBDma.io.calcConfig := calcConfig
     io.dma4Ext.get <> scaleBDma.io.dmaExtRdIF

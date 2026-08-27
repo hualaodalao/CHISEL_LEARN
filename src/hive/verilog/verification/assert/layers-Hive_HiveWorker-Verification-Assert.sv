@@ -2,5 +2,6 @@
 `ifndef layers_Hive_HiveWorker_Verification_Assert	// src/hive/scala/main/HiveWorker.scala:60:7
   `define layers_Hive_HiveWorker_Verification_Assert
   `include "layers-Hive_HiveWorker-Verification.sv"	// src/hive/scala/main/HiveWorker.scala:60:7
+  `include "layers-Hive_HiveWorkUnit-Verification-Assert.sv"	// src/hive/scala/main/HiveWorker.scala:60:7
   bind Hive_HiveWorker Hive_HiveWorker_Verification_Assert verification_assert ();
 `endif // not def layers_Hive_HiveWorker_Verification_Assert

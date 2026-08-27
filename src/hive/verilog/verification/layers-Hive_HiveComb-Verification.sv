@@ -2,4 +2,7 @@
 `ifndef layers_Hive_HiveComb_Verification	// src/hive/scala/main/HiveComb.scala:52:7
   `define layers_Hive_HiveComb_Verification
   `include "layers-Hive_HiveCell-Verification.sv"	// src/hive/scala/main/HiveComb.scala:52:7
+  `include "layers-Hive_HiveCell_1-Verification.sv"	// src/hive/scala/main/HiveComb.scala:52:7
+  `include "layers-Hive_HiveCell_2-Verification.sv"	// src/hive/scala/main/HiveComb.scala:52:7
+  `include "layers-Hive_HiveCell_3-Verification.sv"	// src/hive/scala/main/HiveComb.scala:52:7
 `endif // not def layers_Hive_HiveComb_Verification

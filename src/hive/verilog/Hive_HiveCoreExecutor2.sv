@@ -74,6 +74,44 @@ module Hive_HiveCoreExecutor2(	// src/hive/scala/main/HiveCoreExecutor.scala:37:
   output         io_flushA,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
                  io_flushB,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
                  io_flushC,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+  input          io_scaleAPop_valid,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+  output         io_scaleAPop_ready,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+  input  [7:0]   io_scaleAPop_payload,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+  input          io_scaleBPop_valid,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+  output         io_scaleBPop_ready,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+  input  [127:0] io_scaleBPop_payload,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+  output [7:0]   io_hiveScaleAIn_0,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleAIn_1,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleAIn_2,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleAIn_3,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleAIn_4,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleAIn_5,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleAIn_6,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleAIn_7,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleAIn_8,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleAIn_9,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleAIn_10,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleAIn_11,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleAIn_12,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleAIn_13,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleAIn_14,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleAIn_15,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleBIn_0,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleBIn_1,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleBIn_2,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleBIn_3,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleBIn_4,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleBIn_5,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleBIn_6,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleBIn_7,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleBIn_8,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleBIn_9,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleBIn_10,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleBIn_11,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleBIn_12,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleBIn_13,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleBIn_14,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+                 io_hiveScaleBIn_15,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
   output [15:0]  io_hiveAIn_0,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
                  io_hiveAIn_1,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
                  io_hiveAIn_2,	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
@@ -149,138 +187,196 @@ module Hive_HiveCoreExecutor2(	// src/hive/scala/main/HiveCoreExecutor.scala:37:
   reg         cStoreGateRegNxt;	// src/hive/scala/main/HiveCoreExecutor.scala:149:33
   reg         cBufferReservedAtleastTotalN;	// src/hive/scala/main/HiveCoreExecutor.scala:150:45
   wire        _layerCapture = ~io_cPush_ready;	// src/hive/scala/main/HiveCoreExecutor.scala:170:29
-  wire        _layerCapture_0 = state == 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22, :215:17
+  wire        _layerCapture_0 = state == 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22, :215:17
   wire        io_flushC_0 = _layerCapture_0 & io_execute;	// src/hive/scala/main/HiveCoreExecutor.scala:184:13, :215:17, :241:24
-  wire        _GEN = state == 4'h1;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22, :215:17, :253:18
+  wire        _GEN = state == 4'h1;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22, :215:17
   wire        io_hiveLoadH_0 = ~_layerCapture_0 & _GEN;	// src/hive/scala/main/HiveCoreExecutor.scala:188:18, :215:17
   wire        _io_hiveLoadW_T = io_bPop_valid & io_hiveLoadH_0;	// src/hive/scala/main/HiveCoreExecutor.scala:188:18, :215:17, src/utils/Stream/Stream.scala:43:26
   wire        _GEN_0 = _GEN & loadWModeReg;	// src/hive/scala/main/HiveCoreExecutor.scala:145:29, :191:22, :215:17, :314:26, :316:26
   wire        _GEN_1 = _layerCapture_0 | ~_GEN_0;	// src/hive/scala/main/HiveCoreExecutor.scala:164:19, :191:22, :215:17, :314:26, :316:26
-  wire        _GEN_2 = state == 4'h2;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22, :215:17, :304:17
-  wire        feedBase = cBufferReservedAtleastTotalN & (~(|curKTile) | ~cStoreGateReg);	// src/hive/scala/main/HiveCoreExecutor.scala:129:21, :148:30, :150:45, :334:37, :337:{53,58,89}
+  wire        _GEN_2 = state == 4'h2;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22, :215:17
+  wire [2:0]  _feed_WIRE_1 = {io_regFile_regs_7[6], io_regFile_regs_7[1:0]};	// src/hive/scala/main/HiveInterface.scala:149:{17,25,37}
+  wire        feed =
+    cBufferReservedAtleastTotalN & (~(|curKTile) | ~cStoreGateReg)
+    & (~(_feed_WIRE_1 == 3'h4 | _feed_WIRE_1 == 3'h5) | io_scaleAPop_valid);	// src/hive/scala/main/HiveCoreExecutor.scala:129:21, :148:30, :150:45, :334:37, :337:{53,58,89}, :345:{42,45,79}, src/hive/scala/main/HiveEnum.scala:9:{42,53,58}, src/hive/scala/main/HiveInterface.scala:149:17
   wire        _GEN_3 = _layerCapture_0 | _GEN;	// src/hive/scala/main/HiveCoreExecutor.scala:180:18, :215:17
-  wire        io_aPop_ready_0 = ~_GEN_3 & _GEN_2 & feedBase;	// src/hive/scala/main/HiveCoreExecutor.scala:180:18, :215:17, :337:53, :347:21
-  wire        _io_hiveValidIn_T = io_aPop_valid & io_aPop_ready_0;	// src/hive/scala/main/HiveCoreExecutor.scala:180:18, :215:17, :347:21, src/utils/Stream/Stream.scala:43:26
-  wire        _GEN_4 = _GEN_2 & (|curKTile);	// src/hive/scala/main/HiveCoreExecutor.scala:129:21, :209:26, :215:17, :334:37, :354:29, :355:28
-  wire        _GEN_5 = state == 4'h3;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22, :215:17, :367:15
-  wire        _GEN_6 = state == 4'h4;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22, :215:17, :377:15
-  wire        _GEN_7 = ~io_hiveValidOut & ~io_dmaCBusy;	// src/hive/scala/main/HiveCoreExecutor.scala:413:{12,25,27}
+  wire        io_aPop_ready_0 = ~_GEN_3 & _GEN_2 & feed;	// src/hive/scala/main/HiveCoreExecutor.scala:180:18, :215:17, :337:53, :345:42, :350:21
+  wire        _io_hiveValidIn_T = io_aPop_valid & io_aPop_ready_0;	// src/hive/scala/main/HiveCoreExecutor.scala:180:18, :215:17, :350:21, src/utils/Stream/Stream.scala:43:26
+  wire        _GEN_4 = _GEN_2 & (|curKTile);	// src/hive/scala/main/HiveCoreExecutor.scala:129:21, :209:26, :215:17, :334:37, :357:29, :358:28
+  wire        _GEN_5 = state == 4'h3;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22, :215:17
+  wire        _GEN_6 = state == 4'h4;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22, :215:17
+  wire        _GEN_7 = ~io_hiveValidOut & ~io_dmaCBusy;	// src/hive/scala/main/HiveCoreExecutor.scala:416:{12,25,27}
+  wire [2:0]  _isMx_WIRE_1 = {io_regFile_regs_7[6], io_regFile_regs_7[1:0]};	// src/hive/scala/main/HiveInterface.scala:149:{17,25,37}
+  wire        isMx = _isMx_WIRE_1 == 3'h4 | _isMx_WIRE_1 == 3'h5;	// src/hive/scala/main/HiveEnum.scala:9:{42,53,58}, src/hive/scala/main/HiveInterface.scala:149:17
+  reg  [7:0]  scaleBRegs_0;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27
+  reg  [7:0]  scaleBRegs_1;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27
+  reg  [7:0]  scaleBRegs_2;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27
+  reg  [7:0]  scaleBRegs_3;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27
+  reg  [7:0]  scaleBRegs_4;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27
+  reg  [7:0]  scaleBRegs_5;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27
+  reg  [7:0]  scaleBRegs_6;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27
+  reg  [7:0]  scaleBRegs_7;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27
+  reg  [7:0]  scaleBRegs_8;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27
+  reg  [7:0]  scaleBRegs_9;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27
+  reg  [7:0]  scaleBRegs_10;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27
+  reg  [7:0]  scaleBRegs_11;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27
+  reg  [7:0]  scaleBRegs_12;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27
+  reg  [7:0]  scaleBRegs_13;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27
+  reg  [7:0]  scaleBRegs_14;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27
+  reg  [7:0]  scaleBRegs_15;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27
+  reg         scaleBPopped;	// src/hive/scala/main/HiveCoreExecutor.scala:445:31
+  wire        _GEN_8 = _GEN & ~(curKTile[0]) & ~scaleBPopped & io_scaleBPop_valid;	// src/hive/scala/main/HiveCoreExecutor.scala:129:21, :215:17, :445:31, :457:{30,41,45,53,56,70}
+  wire        _GEN_9 = isMx & _GEN_2;	// src/hive/scala/main/HiveCoreExecutor.scala:215:17, :448:28, :455:16, :465:31, :466:32, src/hive/scala/main/HiveEnum.scala:9:53
+  wire [7:0]  io_hiveScaleAIn_9_0 = _GEN_9 ? io_scaleAPop_payload : 8'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:448:28, :451:30, :455:16, :465:31, :466:32, :468:34
   always @(posedge clock) begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7
-    automatic logic _GEN_8;	// src/hive/scala/main/HiveCoreExecutor.scala:365:17
-    automatic logic _GEN_9;	// src/hive/scala/main/HiveCoreExecutor.scala:131:22, :215:17
-    automatic logic _GEN_10;	// src/hive/scala/main/HiveCoreExecutor.scala:374:21
-    automatic logic _GEN_11;	// src/hive/scala/main/HiveCoreExecutor.scala:381:23
-    _GEN_8 = {16'h0, curM} == io_regFile_regs_0 - 32'h1;	// src/hive/scala/main/HiveCoreExecutor.scala:134:17, :334:37, :365:{17,34}
-    _GEN_9 = _GEN | _GEN_2;	// src/hive/scala/main/HiveCoreExecutor.scala:131:22, :215:17
-    _GEN_10 = curKTile < kTiles;	// src/hive/scala/main/HiveCoreExecutor.scala:126:21, :129:21, :374:21
-    _GEN_11 = curNTile < nTiles;	// src/hive/scala/main/HiveCoreExecutor.scala:125:21, :128:21, :381:23
+    automatic logic _GEN_10;	// src/hive/scala/main/HiveCoreExecutor.scala:368:17
+    automatic logic _GEN_11;	// src/hive/scala/main/HiveCoreExecutor.scala:131:22, :215:17
+    automatic logic _GEN_12;	// src/hive/scala/main/HiveCoreExecutor.scala:377:21
+    automatic logic _GEN_13;	// src/hive/scala/main/HiveCoreExecutor.scala:384:23
+    automatic logic _GEN_14;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :455:16, :457:97, :459:25
+    _GEN_10 = {16'h0, curM} == io_regFile_regs_0 - 32'h1;	// src/hive/scala/main/HiveCoreExecutor.scala:134:17, :334:37, :368:{17,34}
+    _GEN_11 = _GEN | _GEN_2;	// src/hive/scala/main/HiveCoreExecutor.scala:131:22, :215:17
+    _GEN_12 = curKTile < kTiles;	// src/hive/scala/main/HiveCoreExecutor.scala:126:21, :129:21, :377:21
+    _GEN_13 = curNTile < nTiles;	// src/hive/scala/main/HiveCoreExecutor.scala:125:21, :128:21, :384:23
+    _GEN_14 = isMx & _GEN_8;	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :455:16, :457:{30,53,70,97}, :459:25, src/hive/scala/main/HiveEnum.scala:9:53
     if (reset) begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7
-      state <= 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22
+      state <= 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22
       errState <= 1'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:117:25
-      tileInterCnt <= 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:138:29
+      tileInterCnt <= 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :138:29
       drainNextCnt <= 5'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:141:29
       hasNext <= 1'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:117:25, :142:24
       loadWModeReg <= 1'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:117:25, :145:29
       cStoreGateReg <= 1'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:117:25, :148:30
       cStoreGateRegNxt <= 1'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:117:25, :149:33
       cBufferReservedAtleastTotalN <= 1'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:117:25, :150:45
+      scaleBPopped <= 1'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:117:25, :445:31
     end
     else begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7
-      automatic logic       _GEN_12;	// src/hive/scala/main/HiveCoreExecutor.scala:203:{25,42}
-      automatic logic       _GEN_13;	// src/hive/scala/main/HiveCoreExecutor.scala:141:29, :215:17, :396:20, :397:35
-      automatic logic [5:0] _GEN_14 = 6'h20 - io_cOccupancy;	// src/hive/scala/main/HiveCoreExecutor.scala:151:27
-      _GEN_12 = (|state) & io_hiveValidOut & _layerCapture;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22, :170:29, :176:20, :203:{25,42}
-      _GEN_13 = _GEN_6 & hasNext;	// src/hive/scala/main/HiveCoreExecutor.scala:141:29, :142:24, :215:17, :396:20, :397:35
+      automatic logic       _GEN_15;	// src/hive/scala/main/HiveCoreExecutor.scala:203:{25,42}
+      automatic logic       _GEN_16 = _layerCapture_0 & io_execute;	// src/hive/scala/main/HiveCoreExecutor.scala:145:29, :215:17, :258:24, :259:22
+      automatic logic [2:0] _isMxA_WIRE_1 =
+        {io_regFile_regs_7[6], io_regFile_regs_7[1:0]};	// src/hive/scala/main/HiveInterface.scala:149:{17,25,37}
+      automatic logic       _GEN_17;	// src/hive/scala/main/HiveCoreExecutor.scala:272:22
+      automatic logic [2:0] _GEN_18 = {io_regFile_regs_7[7], io_regFile_regs_7[9:8]};	// src/hive/scala/main/HiveInterface.scala:151:{17,25,37}
+      automatic logic       _GEN_19;	// src/hive/scala/main/HiveCoreExecutor.scala:276:49
+      automatic logic       _GEN_20;	// src/hive/scala/main/HiveCoreExecutor.scala:141:29, :215:17, :399:20, :400:35
+      automatic logic [5:0] _GEN_21 = 6'h20 - io_cOccupancy;	// src/hive/scala/main/HiveCoreExecutor.scala:151:27
+      _GEN_15 = (|state) & io_hiveValidOut & _layerCapture;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22, :170:29, :176:20, :203:{25,42}
+      _GEN_17 =
+        (_isMxA_WIRE_1 == 3'h4 | _isMxA_WIRE_1 == 3'h5) & (|(io_regFile_regs_2[4:0]));	// src/hive/scala/main/HiveCoreExecutor.scala:272:{22,37,44}, src/hive/scala/main/HiveEnum.scala:9:{42,53,58}, src/hive/scala/main/HiveInterface.scala:149:17
+      _GEN_19 = (_GEN_18 == 3'h4 | _GEN_18 == 3'h5) & ~(io_regFile_regs_7[5]);	// src/hive/scala/main/HiveCoreExecutor.scala:276:{49,52}, src/hive/scala/main/HiveEnum.scala:9:{42,53,58}, src/hive/scala/main/HiveInterface.scala:151:17, :157:26
+      _GEN_20 = _GEN_6 & hasNext;	// src/hive/scala/main/HiveCoreExecutor.scala:141:29, :142:24, :215:17, :399:20, :400:35
       if (_layerCapture_0) begin	// src/hive/scala/main/HiveCoreExecutor.scala:215:17
-        if (io_execute)	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
-          state <= 4'h1;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22, :253:18
-        else if (_GEN_12)	// src/hive/scala/main/HiveCoreExecutor.scala:203:{25,42}
-          state <= 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22
+        if (io_execute & (_GEN_19 | _GEN_17))	// src/hive/scala/main/HiveCoreExecutor.scala:241:24, :271:26, :272:{22,53}, :274:22, :276:{49,75}, :278:22
+          state <= 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22
+        else if (io_execute)	// src/hive/scala/main/HiveCoreExecutor.scala:39:14
+          state <= 4'h1;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22
+        else if (_GEN_15)	// src/hive/scala/main/HiveCoreExecutor.scala:203:{25,42}
+          state <= 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22
         tileInterCnt <= 4'hF;	// src/hive/scala/main/HiveCoreExecutor.scala:138:29
         drainNextCnt <= 5'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:141:29
       end
       else begin	// src/hive/scala/main/HiveCoreExecutor.scala:215:17
         if (_GEN) begin	// src/hive/scala/main/HiveCoreExecutor.scala:215:17
           if (~_io_hiveLoadW_T | (|tileInterCnt)) begin	// src/hive/scala/main/HiveCoreExecutor.scala:138:29, :203:62, :299:26, :300:{27,35}, src/utils/Stream/Stream.scala:43:26
-            if (_GEN_12)	// src/hive/scala/main/HiveCoreExecutor.scala:203:{25,42}
-              state <= 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22
+            if (_GEN_15)	// src/hive/scala/main/HiveCoreExecutor.scala:203:{25,42}
+              state <= 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22
           end
           else	// src/hive/scala/main/HiveCoreExecutor.scala:203:62, :299:26, :300:35
-            state <= 4'h2;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22, :304:17
+            state <= 4'h2;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22
         end
         else if (_GEN_2) begin	// src/hive/scala/main/HiveCoreExecutor.scala:215:17
-          if (_GEN_8)	// src/hive/scala/main/HiveCoreExecutor.scala:365:17
-            state <= 4'h3;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22, :367:15
-          else if (_GEN_12)	// src/hive/scala/main/HiveCoreExecutor.scala:203:{25,42}
-            state <= 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22
+          if (_GEN_10)	// src/hive/scala/main/HiveCoreExecutor.scala:368:17
+            state <= 4'h3;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22
+          else if (_GEN_15)	// src/hive/scala/main/HiveCoreExecutor.scala:203:{25,42}
+            state <= 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22
         end
         else if (_GEN_5)	// src/hive/scala/main/HiveCoreExecutor.scala:215:17
-          state <= 4'h4;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22, :377:15
+          state <= 4'h4;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22
         else if (_GEN_6) begin	// src/hive/scala/main/HiveCoreExecutor.scala:215:17
           if (hasNext) begin	// src/hive/scala/main/HiveCoreExecutor.scala:142:24
-            if (|drainNextCnt) begin	// src/hive/scala/main/HiveCoreExecutor.scala:141:29, :397:27
-              if (_GEN_12)	// src/hive/scala/main/HiveCoreExecutor.scala:203:{25,42}
-                state <= 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22
+            if (|drainNextCnt) begin	// src/hive/scala/main/HiveCoreExecutor.scala:141:29, :400:27
+              if (_GEN_15)	// src/hive/scala/main/HiveCoreExecutor.scala:203:{25,42}
+                state <= 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22
             end
-            else	// src/hive/scala/main/HiveCoreExecutor.scala:397:27
-              state <= 4'h1;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22, :253:18
+            else	// src/hive/scala/main/HiveCoreExecutor.scala:400:27
+              state <= 4'h1;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22
           end
-          else if (_GEN_7 | _GEN_12)	// src/hive/scala/main/HiveCoreExecutor.scala:116:22, :203:{25,42,62}, :205:14, :413:{25,41}, :415:15
-            state <= 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22
+          else if (_GEN_7 | _GEN_15)	// src/hive/scala/main/HiveCoreExecutor.scala:116:22, :203:{25,42,62}, :205:14, :416:{25,41}, :418:15
+            state <= 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22
         end
-        else if (_GEN_12)	// src/hive/scala/main/HiveCoreExecutor.scala:203:{25,42}
-          state <= 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:116:22
+        else if (_GEN_15)	// src/hive/scala/main/HiveCoreExecutor.scala:203:{25,42}
+          state <= 4'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22
         if (_GEN & _io_hiveLoadW_T)	// src/hive/scala/main/HiveCoreExecutor.scala:138:29, :215:17, :299:26, :300:35, src/utils/Stream/Stream.scala:43:26
           tileInterCnt <= (|tileInterCnt) ? tileInterCnt - 4'h1 : 4'hF;	// src/hive/scala/main/HiveCoreExecutor.scala:138:29, :300:{27,35}, :301:{24,40}, :303:24
-        if (~_GEN_9) begin	// src/hive/scala/main/HiveCoreExecutor.scala:131:22, :215:17
+        if (~_GEN_11) begin	// src/hive/scala/main/HiveCoreExecutor.scala:131:22, :215:17
           if (_GEN_5)	// src/hive/scala/main/HiveCoreExecutor.scala:215:17
             drainNextCnt <= 5'hF;	// src/hive/scala/main/HiveCoreExecutor.scala:141:29
-          else if (_GEN_13)	// src/hive/scala/main/HiveCoreExecutor.scala:141:29, :215:17, :396:20, :397:35
-            drainNextCnt <= (|drainNextCnt) ? drainNextCnt - 5'h1 : {loadWModeReg, 4'hF};	// src/hive/scala/main/HiveCoreExecutor.scala:141:29, :145:29, :397:{27,35}, :398:{24,40}, :400:24, :403:30, :404:26
+          else if (_GEN_20)	// src/hive/scala/main/HiveCoreExecutor.scala:141:29, :215:17, :399:20, :400:35
+            drainNextCnt <= (|drainNextCnt) ? drainNextCnt - 5'h1 : {loadWModeReg, 4'hF};	// src/hive/scala/main/HiveCoreExecutor.scala:141:29, :145:29, :400:{27,35}, :401:{24,40}, :403:24, :406:30, :407:26
         end
       end
-      errState <= _GEN_12 | errState;	// src/hive/scala/main/HiveCoreExecutor.scala:117:25, :203:{25,42,62}, :204:14
+      errState <= _GEN_16 ? _GEN_19 | _GEN_17 | _GEN_15 | errState : _GEN_15 | errState;	// src/hive/scala/main/HiveCoreExecutor.scala:117:25, :145:29, :203:{25,42,62}, :204:14, :215:17, :258:24, :259:22, :271:26, :272:{22,53}, :273:22, :276:{49,75}, :277:22
       hasNext <=
         ~_layerCapture_0
-        & (_GEN_9
+        & (_GEN_11
              ? hasNext
              : _GEN_5
-                 ? _GEN_10 | _GEN_11 | hasNext
-                 : (~_GEN_13 | (|drainNextCnt)) & hasNext);	// src/hive/scala/main/HiveCoreExecutor.scala:131:22, :141:29, :142:24, :188:18, :215:17, :226:15, :374:{21,30}, :376:17, :381:{23,32}, :383:19, :396:20, :397:{27,35}
-      if (_layerCapture_0 & io_execute)	// src/hive/scala/main/HiveCoreExecutor.scala:145:29, :215:17, :258:24, :259:22
+                 ? _GEN_12 | _GEN_13 | hasNext
+                 : (~_GEN_20 | (|drainNextCnt)) & hasNext);	// src/hive/scala/main/HiveCoreExecutor.scala:131:22, :141:29, :142:24, :188:18, :215:17, :226:15, :377:{21,30}, :379:17, :384:{23,32}, :386:19, :399:20, :400:{27,35}
+      if (_GEN_16)	// src/hive/scala/main/HiveCoreExecutor.scala:145:29, :215:17, :258:24, :259:22
         loadWModeReg <= io_regFile_regs_7[5];	// src/hive/scala/main/HiveCoreExecutor.scala:145:29, src/hive/scala/main/HiveInterface.scala:157:26
       cStoreGateReg <=
-        ~(_layerCapture_0 | _GEN_9) & _GEN_5 & ~_GEN_10 | ~io_cPeekDone & cStoreGateReg;	// src/hive/scala/main/HiveCoreExecutor.scala:131:22, :148:30, :159:21, :160:19, :215:17, :374:{21,30}, :380:23
+        ~(_layerCapture_0 | _GEN_11) & _GEN_5 & ~_GEN_12 | ~io_cPeekDone & cStoreGateReg;	// src/hive/scala/main/HiveCoreExecutor.scala:131:22, :148:30, :159:21, :160:19, :215:17, :377:{21,30}, :383:23
       cStoreGateRegNxt <= cStoreGateReg;	// src/hive/scala/main/HiveCoreExecutor.scala:148:30, :149:33
-      cBufferReservedAtleastTotalN <= |(_GEN_14[5:4]);	// src/hive/scala/main/HiveCoreExecutor.scala:150:45, :151:{27,43}
+      cBufferReservedAtleastTotalN <= |(_GEN_21[5:4]);	// src/hive/scala/main/HiveCoreExecutor.scala:150:45, :151:{27,43}
+      scaleBPopped <= ~(_GEN_5 | _layerCapture_0) & (_GEN_14 | scaleBPopped);	// src/hive/scala/main/HiveCoreExecutor.scala:215:17, :444:27, :445:31, :455:16, :457:97, :459:25, :462:22, :474:{34,54}, :475:20
     end
     if (_layerCapture_0) begin	// src/hive/scala/main/HiveCoreExecutor.scala:215:17
       automatic logic [15:0] _newNTiles_T_3 = io_regFile_regs_1[15:0] + 16'hF;	// src/hive/scala/main/HiveCoreExecutor.scala:231:{38,46,57}
       automatic logic [15:0] _newKTiles_T_3 = io_regFile_regs_2[15:0] + 16'hF;	// src/hive/scala/main/HiveCoreExecutor.scala:232:{38,46,57}
-      nTiles <= {4'h0, _newNTiles_T_3[15:4]} - 16'h1;	// src/hive/scala/main/HiveCoreExecutor.scala:125:21, :231:{46,57,64}, :233:31
-      kTiles <= {4'h0, _newKTiles_T_3[15:4]} - 16'h1;	// src/hive/scala/main/HiveCoreExecutor.scala:126:21, :232:{46,57,64}, :234:31
+      nTiles <= {4'h0, _newNTiles_T_3[15:4]} - 16'h1;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :125:21, :231:{46,57,64}, :233:31
+      kTiles <= {4'h0, _newKTiles_T_3[15:4]} - 16'h1;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :126:21, :232:{46,57,64}, :234:31
       curNTile <= 16'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:128:21, :334:37
       curKTile <= 16'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:129:21, :334:37
       doneTiles <= 16'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:131:22, :334:37
       curM <= 16'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:134:17, :334:37
     end
     else begin	// src/hive/scala/main/HiveCoreExecutor.scala:215:17
-      if (_GEN_9 | ~_GEN_5 | _GEN_10) begin	// src/hive/scala/main/HiveCoreExecutor.scala:128:21, :131:22, :215:17, :374:{21,30}
+      if (_GEN_11 | ~_GEN_5 | _GEN_12) begin	// src/hive/scala/main/HiveCoreExecutor.scala:128:21, :131:22, :215:17, :377:{21,30}
       end
-      else	// src/hive/scala/main/HiveCoreExecutor.scala:128:21, :215:17, :374:30
-        curNTile <= _GEN_11 ? curNTile + 16'h1 : 16'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:128:21, :334:37, :381:{23,32}, :382:{20,32}, :386:20
-      if (_GEN_9 | ~_GEN_5) begin	// src/hive/scala/main/HiveCoreExecutor.scala:131:22, :215:17
+      else	// src/hive/scala/main/HiveCoreExecutor.scala:128:21, :215:17, :377:30
+        curNTile <= _GEN_13 ? curNTile + 16'h1 : 16'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:128:21, :334:37, :384:{23,32}, :385:{20,32}, :389:20
+      if (_GEN_11 | ~_GEN_5) begin	// src/hive/scala/main/HiveCoreExecutor.scala:131:22, :215:17
       end
       else begin	// src/hive/scala/main/HiveCoreExecutor.scala:131:22, :215:17
-        curKTile <= _GEN_10 ? curKTile + 16'h1 : 16'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:129:21, :334:37, :374:{21,30}, :375:{18,30}, :379:18
-        doneTiles <= doneTiles + 16'h1;	// src/hive/scala/main/HiveCoreExecutor.scala:131:22, :372:30
+        curKTile <= _GEN_12 ? curKTile + 16'h1 : 16'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:129:21, :334:37, :377:{21,30}, :378:{18,30}, :382:18
+        doneTiles <= doneTiles + 16'h1;	// src/hive/scala/main/HiveCoreExecutor.scala:131:22, :375:30
       end
       if (_GEN | ~_GEN_2) begin	// src/hive/scala/main/HiveCoreExecutor.scala:134:17, :215:17
       end
-      else if (_GEN_8)	// src/hive/scala/main/HiveCoreExecutor.scala:365:17
+      else if (_GEN_10)	// src/hive/scala/main/HiveCoreExecutor.scala:368:17
         curM <= 16'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:134:17, :334:37
       else if (_io_hiveValidIn_T)	// src/utils/Stream/Stream.scala:43:26
-        curM <= curM + 16'h1;	// src/hive/scala/main/HiveCoreExecutor.scala:134:17, :360:22
+        curM <= curM + 16'h1;	// src/hive/scala/main/HiveCoreExecutor.scala:134:17, :363:22
+    end
+    if (_GEN_14) begin	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :455:16, :457:97, :459:25
+      scaleBRegs_0 <= io_scaleBPop_payload[7:0];	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :459:52
+      scaleBRegs_1 <= io_scaleBPop_payload[15:8];	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :459:52
+      scaleBRegs_2 <= io_scaleBPop_payload[23:16];	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :459:52
+      scaleBRegs_3 <= io_scaleBPop_payload[31:24];	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :459:52
+      scaleBRegs_4 <= io_scaleBPop_payload[39:32];	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :459:52
+      scaleBRegs_5 <= io_scaleBPop_payload[47:40];	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :459:52
+      scaleBRegs_6 <= io_scaleBPop_payload[55:48];	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :459:52
+      scaleBRegs_7 <= io_scaleBPop_payload[63:56];	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :459:52
+      scaleBRegs_8 <= io_scaleBPop_payload[71:64];	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :459:52
+      scaleBRegs_9 <= io_scaleBPop_payload[79:72];	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :459:52
+      scaleBRegs_10 <= io_scaleBPop_payload[87:80];	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :459:52
+      scaleBRegs_11 <= io_scaleBPop_payload[95:88];	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :459:52
+      scaleBRegs_12 <= io_scaleBPop_payload[103:96];	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :459:52
+      scaleBRegs_13 <= io_scaleBPop_payload[111:104];	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :459:52
+      scaleBRegs_14 <= io_scaleBPop_payload[119:112];	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :459:52
+      scaleBRegs_15 <= io_scaleBPop_payload[127:120];	// src/hive/scala/main/HiveCoreExecutor.scala:444:27, :459:52
     end
   end // always @(posedge)
   `ifdef ENABLE_INITIAL_REG_	// src/hive/scala/main/HiveCoreExecutor.scala:37:7
@@ -288,29 +384,46 @@ module Hive_HiveCoreExecutor2(	// src/hive/scala/main/HiveCoreExecutor.scala:37:
       `FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveCoreExecutor.scala:37:7
     `endif // FIRRTL_BEFORE_INITIAL
     initial begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7
-      automatic logic [31:0] _RANDOM[0:4];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7
+      automatic logic [31:0] _RANDOM[0:8];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7
       `ifdef INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveCoreExecutor.scala:37:7
         `INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveCoreExecutor.scala:37:7
       `endif // INIT_RANDOM_PROLOG_
       `ifdef RANDOMIZE_REG_INIT	// src/hive/scala/main/HiveCoreExecutor.scala:37:7
-        for (logic [2:0] i = 3'h0; i < 3'h5; i += 3'h1) begin
+        for (logic [3:0] i = 4'h0; i < 4'h9; i += 4'h1) begin
           _RANDOM[i] = `RANDOM;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7
         end	// src/hive/scala/main/HiveCoreExecutor.scala:37:7
-        state = _RANDOM[3'h0][3:0];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22
-        errState = _RANDOM[3'h0][4];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22, :117:25
-        nTiles = _RANDOM[3'h0][20:5];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22, :125:21
-        kTiles = {_RANDOM[3'h0][31:21], _RANDOM[3'h1][4:0]};	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22, :126:21
-        curNTile = _RANDOM[3'h1][20:5];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :126:21, :128:21
-        curKTile = {_RANDOM[3'h1][31:21], _RANDOM[3'h2][4:0]};	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :126:21, :129:21
-        doneTiles = _RANDOM[3'h2][20:5];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :129:21, :131:22
-        curM = {_RANDOM[3'h2][31:21], _RANDOM[3'h3][4:0]};	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :129:21, :134:17
-        tileInterCnt = _RANDOM[3'h3][24:21];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :134:17, :138:29
-        drainNextCnt = _RANDOM[3'h3][29:25];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :134:17, :141:29
-        hasNext = _RANDOM[3'h3][30];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :134:17, :142:24
-        loadWModeReg = _RANDOM[3'h3][31];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :134:17, :145:29
-        cStoreGateReg = _RANDOM[3'h4][0];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :148:30
-        cStoreGateRegNxt = _RANDOM[3'h4][1];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :148:30, :149:33
-        cBufferReservedAtleastTotalN = _RANDOM[3'h4][2];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :148:30, :150:45
+        state = _RANDOM[4'h0][3:0];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22
+        errState = _RANDOM[4'h0][4];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22, :117:25
+        nTiles = _RANDOM[4'h0][20:5];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22, :125:21
+        kTiles = {_RANDOM[4'h0][31:21], _RANDOM[4'h1][4:0]};	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22, :126:21
+        curNTile = _RANDOM[4'h1][20:5];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :126:21, :128:21
+        curKTile = {_RANDOM[4'h1][31:21], _RANDOM[4'h2][4:0]};	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :126:21, :129:21
+        doneTiles = _RANDOM[4'h2][20:5];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :129:21, :131:22
+        curM = {_RANDOM[4'h2][31:21], _RANDOM[4'h3][4:0]};	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :129:21, :134:17
+        tileInterCnt = _RANDOM[4'h3][24:21];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :134:17, :138:29
+        drainNextCnt = _RANDOM[4'h3][29:25];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :134:17, :141:29
+        hasNext = _RANDOM[4'h3][30];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :134:17, :142:24
+        loadWModeReg = _RANDOM[4'h3][31];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :134:17, :145:29
+        cStoreGateReg = _RANDOM[4'h4][0];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :148:30
+        cStoreGateRegNxt = _RANDOM[4'h4][1];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :148:30, :149:33
+        cBufferReservedAtleastTotalN = _RANDOM[4'h4][2];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :148:30, :150:45
+        scaleBRegs_0 = _RANDOM[4'h4][10:3];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :148:30, :444:27
+        scaleBRegs_1 = _RANDOM[4'h4][18:11];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :148:30, :444:27
+        scaleBRegs_2 = _RANDOM[4'h4][26:19];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :148:30, :444:27
+        scaleBRegs_3 = {_RANDOM[4'h4][31:27], _RANDOM[4'h5][2:0]};	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :148:30, :444:27
+        scaleBRegs_4 = _RANDOM[4'h5][10:3];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+        scaleBRegs_5 = _RANDOM[4'h5][18:11];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+        scaleBRegs_6 = _RANDOM[4'h5][26:19];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+        scaleBRegs_7 = {_RANDOM[4'h5][31:27], _RANDOM[4'h6][2:0]};	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+        scaleBRegs_8 = _RANDOM[4'h6][10:3];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+        scaleBRegs_9 = _RANDOM[4'h6][18:11];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+        scaleBRegs_10 = _RANDOM[4'h6][26:19];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+        scaleBRegs_11 = {_RANDOM[4'h6][31:27], _RANDOM[4'h7][2:0]};	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+        scaleBRegs_12 = _RANDOM[4'h7][10:3];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+        scaleBRegs_13 = _RANDOM[4'h7][18:11];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+        scaleBRegs_14 = _RANDOM[4'h7][26:19];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+        scaleBRegs_15 = {_RANDOM[4'h7][31:27], _RANDOM[4'h8][2:0]};	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+        scaleBPopped = _RANDOM[4'h8][3];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27, :445:31
       `endif // RANDOMIZE_REG_INIT
     end // initial
     `ifdef FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveCoreExecutor.scala:37:7
@@ -319,13 +432,13 @@ module Hive_HiveCoreExecutor2(	// src/hive/scala/main/HiveCoreExecutor.scala:37:
   `endif // ENABLE_INITIAL_REG_
   assign io_busy = |state;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :116:22, :176:20
   assign io_done =
-    ~(_layerCapture_0 | _GEN | _GEN_2 | _GEN_5) & _GEN_6 & ~hasNext & _GEN_7;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :142:24, :177:11, :215:17, :396:20, :413:{25,41}
+    ~(_layerCapture_0 | _GEN | _GEN_2 | _GEN_5) & _GEN_6 & ~hasNext & _GEN_7;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :142:24, :177:11, :215:17, :399:20, :416:{25,41}
   assign io_err = errState;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :117:25
   assign io_cStoreGate = cStoreGateReg;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :148:30
   assign io_cPeek = ~cStoreGateRegNxt & cStoreGateReg;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :148:30, :149:33, :158:{20,38}
-  assign io_aPop_ready = io_aPop_ready_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :180:18, :215:17, :347:21
+  assign io_aPop_ready = io_aPop_ready_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :180:18, :215:17, :350:21
   assign io_bPop_ready = io_hiveLoadH_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :188:18, :215:17
-  assign io_cPop_ready = ~_GEN_3 & _GEN_2 & feedBase & (|curKTile);	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :129:21, :180:18, :182:18, :215:17, :334:37, :337:53, :348:{21,29}
+  assign io_cPop_ready = ~_GEN_3 & _GEN_2 & feed & (|curKTile);	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :129:21, :180:18, :182:18, :215:17, :334:37, :337:53, :345:42, :351:{21,29}
   assign io_cPush_valid = io_hiveValidOut;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7
   assign io_cPush_payload =
     {io_hiveCOut_15,
@@ -347,6 +460,40 @@ module Hive_HiveCoreExecutor2(	// src/hive/scala/main/HiveCoreExecutor.scala:37:
   assign io_flushA = io_flushC_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :184:13, :215:17, :241:24
   assign io_flushB = io_flushC_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :184:13, :215:17, :241:24
   assign io_flushC = io_flushC_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :184:13, :215:17, :241:24
+  assign io_scaleAPop_ready = _GEN_9 & io_aPop_valid & io_aPop_ready_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :180:18, :215:17, :350:21, :448:28, :455:16, :465:31, :466:32, src/utils/Stream/Stream.scala:43:26
+  assign io_scaleBPop_ready = isMx & _GEN_8;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :449:28, :455:16, :457:{30,53,70,97}, src/hive/scala/main/HiveEnum.scala:9:53
+  assign io_hiveScaleAIn_0 = io_hiveScaleAIn_9_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :451:30, :455:16, :465:31, :468:34
+  assign io_hiveScaleAIn_1 = io_hiveScaleAIn_9_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :451:30, :455:16, :465:31, :468:34
+  assign io_hiveScaleAIn_2 = io_hiveScaleAIn_9_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :451:30, :455:16, :465:31, :468:34
+  assign io_hiveScaleAIn_3 = io_hiveScaleAIn_9_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :451:30, :455:16, :465:31, :468:34
+  assign io_hiveScaleAIn_4 = io_hiveScaleAIn_9_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :451:30, :455:16, :465:31, :468:34
+  assign io_hiveScaleAIn_5 = io_hiveScaleAIn_9_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :451:30, :455:16, :465:31, :468:34
+  assign io_hiveScaleAIn_6 = io_hiveScaleAIn_9_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :451:30, :455:16, :465:31, :468:34
+  assign io_hiveScaleAIn_7 = io_hiveScaleAIn_9_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :451:30, :455:16, :465:31, :468:34
+  assign io_hiveScaleAIn_8 = io_hiveScaleAIn_9_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :451:30, :455:16, :465:31, :468:34
+  assign io_hiveScaleAIn_9 = io_hiveScaleAIn_9_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :451:30, :455:16, :465:31, :468:34
+  assign io_hiveScaleAIn_10 = io_hiveScaleAIn_9_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :451:30, :455:16, :465:31, :468:34
+  assign io_hiveScaleAIn_11 = io_hiveScaleAIn_9_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :451:30, :455:16, :465:31, :468:34
+  assign io_hiveScaleAIn_12 = io_hiveScaleAIn_9_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :451:30, :455:16, :465:31, :468:34
+  assign io_hiveScaleAIn_13 = io_hiveScaleAIn_9_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :451:30, :455:16, :465:31, :468:34
+  assign io_hiveScaleAIn_14 = io_hiveScaleAIn_9_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :451:30, :455:16, :465:31, :468:34
+  assign io_hiveScaleAIn_15 = io_hiveScaleAIn_9_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :451:30, :455:16, :465:31, :468:34
+  assign io_hiveScaleBIn_0 = scaleBRegs_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+  assign io_hiveScaleBIn_1 = scaleBRegs_1;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+  assign io_hiveScaleBIn_2 = scaleBRegs_2;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+  assign io_hiveScaleBIn_3 = scaleBRegs_3;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+  assign io_hiveScaleBIn_4 = scaleBRegs_4;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+  assign io_hiveScaleBIn_5 = scaleBRegs_5;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+  assign io_hiveScaleBIn_6 = scaleBRegs_6;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+  assign io_hiveScaleBIn_7 = scaleBRegs_7;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+  assign io_hiveScaleBIn_8 = scaleBRegs_8;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+  assign io_hiveScaleBIn_9 = scaleBRegs_9;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+  assign io_hiveScaleBIn_10 = scaleBRegs_10;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+  assign io_hiveScaleBIn_11 = scaleBRegs_11;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+  assign io_hiveScaleBIn_12 = scaleBRegs_12;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+  assign io_hiveScaleBIn_13 = scaleBRegs_13;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+  assign io_hiveScaleBIn_14 = scaleBRegs_14;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
+  assign io_hiveScaleBIn_15 = scaleBRegs_15;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :444:27
   assign io_hiveAIn_0 = _GEN_1 ? io_aPop_payload[15:0] : io_bPop_payload[15:0];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :164:{19,37}, :215:17, :295:44
   assign io_hiveAIn_1 = _GEN_1 ? io_aPop_payload[31:16] : io_bPop_payload[31:16];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :164:{19,37}, :215:17, :295:44
   assign io_hiveAIn_2 = _GEN_1 ? io_aPop_payload[47:32] : io_bPop_payload[47:32];	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :164:{19,37}, :215:17, :295:44
@@ -368,97 +515,97 @@ module Hive_HiveCoreExecutor2(	// src/hive/scala/main/HiveCoreExecutor.scala:37:
       ? 40'h0
       : _GEN
           ? (loadWModeReg ? 40'h0 : {24'h0, io_bPop_payload[15:0]})
-          : _GEN_4 ? io_cPop_payload[39:0] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :354:29, :355:{28,46}
+          : _GEN_4 ? io_cPop_payload[39:0] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :357:29, :358:{28,46}
   assign io_hivePsumIn_1 =
     _layerCapture_0
       ? 40'h0
       : _GEN
           ? (loadWModeReg ? 40'h0 : {24'h0, io_bPop_payload[31:16]})
-          : _GEN_4 ? io_cPop_payload[79:40] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :354:29, :355:{28,46}
+          : _GEN_4 ? io_cPop_payload[79:40] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :357:29, :358:{28,46}
   assign io_hivePsumIn_2 =
     _layerCapture_0
       ? 40'h0
       : _GEN
           ? (loadWModeReg ? 40'h0 : {24'h0, io_bPop_payload[47:32]})
-          : _GEN_4 ? io_cPop_payload[119:80] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :354:29, :355:{28,46}
+          : _GEN_4 ? io_cPop_payload[119:80] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :357:29, :358:{28,46}
   assign io_hivePsumIn_3 =
     _layerCapture_0
       ? 40'h0
       : _GEN
           ? (loadWModeReg ? 40'h0 : {24'h0, io_bPop_payload[63:48]})
-          : _GEN_4 ? io_cPop_payload[159:120] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :354:29, :355:{28,46}
+          : _GEN_4 ? io_cPop_payload[159:120] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :357:29, :358:{28,46}
   assign io_hivePsumIn_4 =
     _layerCapture_0
       ? 40'h0
       : _GEN
           ? (loadWModeReg ? 40'h0 : {24'h0, io_bPop_payload[79:64]})
-          : _GEN_4 ? io_cPop_payload[199:160] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :354:29, :355:{28,46}
+          : _GEN_4 ? io_cPop_payload[199:160] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :357:29, :358:{28,46}
   assign io_hivePsumIn_5 =
     _layerCapture_0
       ? 40'h0
       : _GEN
           ? (loadWModeReg ? 40'h0 : {24'h0, io_bPop_payload[95:80]})
-          : _GEN_4 ? io_cPop_payload[239:200] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :354:29, :355:{28,46}
+          : _GEN_4 ? io_cPop_payload[239:200] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :357:29, :358:{28,46}
   assign io_hivePsumIn_6 =
     _layerCapture_0
       ? 40'h0
       : _GEN
           ? (loadWModeReg ? 40'h0 : {24'h0, io_bPop_payload[111:96]})
-          : _GEN_4 ? io_cPop_payload[279:240] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :354:29, :355:{28,46}
+          : _GEN_4 ? io_cPop_payload[279:240] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :357:29, :358:{28,46}
   assign io_hivePsumIn_7 =
     _layerCapture_0
       ? 40'h0
       : _GEN
           ? (loadWModeReg ? 40'h0 : {24'h0, io_bPop_payload[127:112]})
-          : _GEN_4 ? io_cPop_payload[319:280] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :354:29, :355:{28,46}
+          : _GEN_4 ? io_cPop_payload[319:280] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :357:29, :358:{28,46}
   assign io_hivePsumIn_8 =
     _layerCapture_0
       ? 40'h0
       : _GEN
           ? (loadWModeReg ? 40'h0 : {24'h0, io_bPop_payload[143:128]})
-          : _GEN_4 ? io_cPop_payload[359:320] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :354:29, :355:{28,46}
+          : _GEN_4 ? io_cPop_payload[359:320] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :357:29, :358:{28,46}
   assign io_hivePsumIn_9 =
     _layerCapture_0
       ? 40'h0
       : _GEN
           ? (loadWModeReg ? 40'h0 : {24'h0, io_bPop_payload[159:144]})
-          : _GEN_4 ? io_cPop_payload[399:360] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :354:29, :355:{28,46}
+          : _GEN_4 ? io_cPop_payload[399:360] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :357:29, :358:{28,46}
   assign io_hivePsumIn_10 =
     _layerCapture_0
       ? 40'h0
       : _GEN
           ? (loadWModeReg ? 40'h0 : {24'h0, io_bPop_payload[175:160]})
-          : _GEN_4 ? io_cPop_payload[439:400] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :354:29, :355:{28,46}
+          : _GEN_4 ? io_cPop_payload[439:400] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :357:29, :358:{28,46}
   assign io_hivePsumIn_11 =
     _layerCapture_0
       ? 40'h0
       : _GEN
           ? (loadWModeReg ? 40'h0 : {24'h0, io_bPop_payload[191:176]})
-          : _GEN_4 ? io_cPop_payload[479:440] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :354:29, :355:{28,46}
+          : _GEN_4 ? io_cPop_payload[479:440] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :357:29, :358:{28,46}
   assign io_hivePsumIn_12 =
     _layerCapture_0
       ? 40'h0
       : _GEN
           ? (loadWModeReg ? 40'h0 : {24'h0, io_bPop_payload[207:192]})
-          : _GEN_4 ? io_cPop_payload[519:480] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :354:29, :355:{28,46}
+          : _GEN_4 ? io_cPop_payload[519:480] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :357:29, :358:{28,46}
   assign io_hivePsumIn_13 =
     _layerCapture_0
       ? 40'h0
       : _GEN
           ? (loadWModeReg ? 40'h0 : {24'h0, io_bPop_payload[223:208]})
-          : _GEN_4 ? io_cPop_payload[559:520] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :354:29, :355:{28,46}
+          : _GEN_4 ? io_cPop_payload[559:520] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :357:29, :358:{28,46}
   assign io_hivePsumIn_14 =
     _layerCapture_0
       ? 40'h0
       : _GEN
           ? (loadWModeReg ? 40'h0 : {24'h0, io_bPop_payload[239:224]})
-          : _GEN_4 ? io_cPop_payload[599:560] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :354:29, :355:{28,46}
+          : _GEN_4 ? io_cPop_payload[599:560] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :357:29, :358:{28,46}
   assign io_hivePsumIn_15 =
     _layerCapture_0
       ? 40'h0
       : _GEN
           ? (loadWModeReg ? 40'h0 : {24'h0, io_bPop_payload[255:240]})
-          : _GEN_4 ? io_cPop_payload[639:600] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :354:29, :355:{28,46}
+          : _GEN_4 ? io_cPop_payload[639:600] : 40'h0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :209:26, :215:17, :295:{26,44}, :314:26, :322:28, :357:29, :358:{28,46}
   assign io_hiveLoadH = io_hiveLoadH_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :188:18, :215:17
   assign io_hiveLoadV = ~_layerCapture_0 & _GEN & ~loadWModeReg & _io_hiveLoadW_T;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :145:29, :188:18, :189:18, :215:17, :291:20, :314:26, :315:26, src/utils/Stream/Stream.scala:43:26
   assign io_hiveLoadVLock =
@@ -466,7 +613,7 @@ module Hive_HiveCoreExecutor2(	// src/hive/scala/main/HiveCoreExecutor.scala:37:
   assign io_hiveLoadW = ~_layerCapture_0 & _GEN_0 & _io_hiveLoadW_T;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :188:18, :191:22, :215:17, :314:26, :316:26, src/utils/Stream/Stream.scala:43:26
   assign io_hiveLoadWLock =
     ~_layerCapture_0 & _GEN_0 & _io_hiveLoadW_T & ~(|tileInterCnt);	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :117:25, :138:29, :152:34, :188:18, :190:22, :191:22, :192:22, :215:17, :300:{27,35}, :305:28, :314:26, :316:26, :326:{27,52}, src/utils/Stream/Stream.scala:43:26
-  assign io_hiveValidIn = ~_GEN_3 & _GEN_2 & _io_hiveValidIn_T;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :180:18, :193:18, :215:17, :351:22, src/utils/Stream/Stream.scala:43:26
+  assign io_hiveValidIn = ~_GEN_3 & _GEN_2 & _io_hiveValidIn_T;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :180:18, :193:18, :215:17, :354:22, src/utils/Stream/Stream.scala:43:26
   assign io_hiveClear = _layerCapture_0;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :215:17
   assign io_progress = doneTiles;	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :131:22
 endmodule

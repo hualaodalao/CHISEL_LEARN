@@ -17,8 +17,8 @@ generated/
 
 # Build / simulation artifacts (verilator build products, VCD/FST waveforms)
 build/
-sim/*.vcd
-sim/*.fst
+sim/**/*.vcd
+sim/**/*.fst
 
 # Qoder
 .qoder/

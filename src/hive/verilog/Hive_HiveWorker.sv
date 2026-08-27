@@ -65,6 +65,9 @@ module Hive_HiveWorker(	// src/hive/scala/main/HiveWorker.scala:60:7
   output [2:0]  io_fmtOut,	// src/hive/scala/main/HiveWorker.scala:75:14
   input  [2:0]  io_bFmtIn,	// src/hive/scala/main/HiveWorker.scala:75:14
   output [2:0]  io_bFmtOut,	// src/hive/scala/main/HiveWorker.scala:75:14
+  input  [7:0]  io_scaleAIn,	// src/hive/scala/main/HiveWorker.scala:75:14
+  output [7:0]  io_scaleAOut,	// src/hive/scala/main/HiveWorker.scala:75:14
+  input  [7:0]  io_scaleBIn,	// src/hive/scala/main/HiveWorker.scala:75:14
   input  [2:0]  io_rndIn,	// src/hive/scala/main/HiveWorker.scala:75:14
   output [2:0]  io_rndOut,	// src/hive/scala/main/HiveWorker.scala:75:14
   input         io_clear	// src/hive/scala/main/HiveWorker.scala:75:14
@@ -74,6 +77,8 @@ module Hive_HiveWorker(	// src/hive/scala/main/HiveWorker.scala:60:7
   reg  [2:0]  fmtReg;	// src/hive/scala/main/HiveWorker.scala:137:19
   reg  [2:0]  rndReg;	// src/hive/scala/main/HiveWorker.scala:138:19
   reg  [2:0]  bFmtReg;	// src/hive/scala/main/HiveWorker.scala:140:20
+  reg  [7:0]  scaleBReg;	// src/hive/scala/main/HiveWorker.scala:142:26
+  reg  [7:0]  scaleAReg;	// src/hive/scala/main/HiveWorker.scala:145:26
   reg  [15:0] wReg;	// src/hive/scala/main/HiveWorker.scala:151:21
   reg  [39:0] psumReg;	// src/hive/scala/main/HiveWorker.scala:208:24
   reg  [15:0] aReg;	// src/hive/scala/main/HiveWorker.scala:226:21
@@ -91,6 +96,8 @@ module Hive_HiveWorker(	// src/hive/scala/main/HiveWorker.scala:60:7
       bFmtReg <= io_bFmtIn;	// src/hive/scala/main/HiveWorker.scala:140:20
     end
     if (reset) begin	// src/hive/scala/main/HiveWorker.scala:60:7
+      scaleBReg <= 8'h0;	// src/hive/scala/main/HiveWorker.scala:142:26
+      scaleAReg <= 8'h0;	// src/hive/scala/main/HiveWorker.scala:145:26
       wReg <= 16'h0;	// src/hive/scala/main/HiveWorker.scala:151:21
       psumReg <= 40'h0;	// src/hive/scala/main/HiveWorker.scala:208:24
       aReg <= 16'h0;	// src/hive/scala/main/HiveWorker.scala:226:21
@@ -103,23 +110,29 @@ module Hive_HiveWorker(	// src/hive/scala/main/HiveWorker.scala:60:7
       io_rndOut_REG <= 3'h0;	// src/hive/scala/main/HiveWorker.scala:60:7, :256:25
     end
     else begin	// src/hive/scala/main/HiveWorker.scala:60:7
-      if (io_loadWInLock)	// src/hive/scala/main/HiveWorker.scala:75:14
-        wReg <= io_aIn;	// src/hive/scala/main/HiveWorker.scala:151:21
-      else if (io_loadVInLock)	// src/hive/scala/main/HiveWorker.scala:75:14
-        wReg <= io_psumIn[15:0];	// src/hive/scala/main/HiveWorker.scala:151:21, :157:22
+      if (io_loadVInLock | io_loadWInLock)	// src/hive/scala/main/HiveWorker.scala:179:23
+        scaleBReg <= io_scaleBIn;	// src/hive/scala/main/HiveWorker.scala:142:26
       if (io_clear) begin	// src/hive/scala/main/HiveWorker.scala:75:14
+        scaleAReg <= 8'h0;	// src/hive/scala/main/HiveWorker.scala:145:26
         psumReg <= 40'h0;	// src/hive/scala/main/HiveWorker.scala:208:24
         aReg <= 16'h0;	// src/hive/scala/main/HiveWorker.scala:226:21
       end
       else begin	// src/hive/scala/main/HiveWorker.scala:75:14
+        if (io_loadWIn | io_validIn) begin	// src/hive/scala/main/HiveWorker.scala:229:25
+          scaleAReg <= io_scaleAIn;	// src/hive/scala/main/HiveWorker.scala:145:26
+          aReg <= io_aIn;	// src/hive/scala/main/HiveWorker.scala:226:21
+        end
         if (io_loadVIn)	// src/hive/scala/main/HiveWorker.scala:75:14
           psumReg <= io_psumIn;	// src/hive/scala/main/HiveWorker.scala:208:24
         else if (io_validIn
-                 & (fmtReg == 3'h0 | fmtReg == 3'h1 | fmtReg == 3'h2 | fmtReg == 3'h3))	// src/hive/scala/main/HiveWorker.scala:60:7, :137:19, :148:{45,61}, :213:25
+                 & (fmtReg == 3'h5 | fmtReg == 3'h1 | fmtReg == 3'h4 | fmtReg == 3'h2
+                    | fmtReg == 3'h0 | fmtReg == 3'h3))	// src/hive/scala/main/HiveWorker.scala:60:7, :137:19, :148:{45,61}, :213:25
           psumReg <= _workUnit_io_sum;	// src/hive/scala/main/HiveWorker.scala:194:24, :208:24
-        if (io_loadWIn | io_validIn)	// src/hive/scala/main/HiveWorker.scala:229:25
-          aReg <= io_aIn;	// src/hive/scala/main/HiveWorker.scala:226:21
       end
+      if (io_loadWInLock)	// src/hive/scala/main/HiveWorker.scala:75:14
+        wReg <= io_aIn;	// src/hive/scala/main/HiveWorker.scala:151:21
+      else if (io_loadVInLock)	// src/hive/scala/main/HiveWorker.scala:75:14
+        wReg <= io_psumIn[15:0];	// src/hive/scala/main/HiveWorker.scala:151:21, :157:22
       io_validOut_REG <= io_validIn;	// src/hive/scala/main/HiveWorker.scala:245:25
       io_validOutV_REG <= io_validInV;	// src/hive/scala/main/HiveWorker.scala:246:26
       io_loadVOut_REG <= io_loadVIn;	// src/hive/scala/main/HiveWorker.scala:247:26
@@ -145,6 +158,8 @@ module Hive_HiveWorker(	// src/hive/scala/main/HiveWorker.scala:60:7
         fmtReg = _RANDOM[2'h0][4:2];	// src/hive/scala/main/HiveWorker.scala:60:7, :137:19
         rndReg = _RANDOM[2'h0][7:5];	// src/hive/scala/main/HiveWorker.scala:60:7, :137:19, :138:19
         bFmtReg = _RANDOM[2'h0][10:8];	// src/hive/scala/main/HiveWorker.scala:60:7, :137:19, :140:20
+        scaleBReg = _RANDOM[2'h0][18:11];	// src/hive/scala/main/HiveWorker.scala:60:7, :137:19, :142:26
+        scaleAReg = _RANDOM[2'h0][26:19];	// src/hive/scala/main/HiveWorker.scala:60:7, :137:19, :145:26
         wReg = {_RANDOM[2'h0][31:27], _RANDOM[2'h1][10:0]};	// src/hive/scala/main/HiveWorker.scala:60:7, :137:19, :151:21
         psumReg = {_RANDOM[2'h1][31:11], _RANDOM[2'h2][18:0]};	// src/hive/scala/main/HiveWorker.scala:60:7, :151:21, :208:24
         aReg = {_RANDOM[2'h2][31:19], _RANDOM[2'h3][2:0]};	// src/hive/scala/main/HiveWorker.scala:60:7, :208:24, :226:21
@@ -162,13 +177,17 @@ module Hive_HiveWorker(	// src/hive/scala/main/HiveWorker.scala:60:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
   Hive_HiveWorkUnit workUnit (	// src/hive/scala/main/HiveWorker.scala:194:24
-    .io_a    (io_aIn),
-    .io_b    (wReg),	// src/hive/scala/main/HiveWorker.scala:151:21
-    .io_cReg (io_psumIn),
-    .io_aFmt (fmtReg),	// src/hive/scala/main/HiveWorker.scala:137:19
-    .io_bFmt (bFmtReg),	// src/hive/scala/main/HiveWorker.scala:140:20
-    .io_rnd  (rndReg),	// src/hive/scala/main/HiveWorker.scala:138:19
-    .io_sum  (_workUnit_io_sum)
+    .clock     (clock),
+    .reset     (reset),
+    .io_a      (io_aIn),
+    .io_b      (wReg),	// src/hive/scala/main/HiveWorker.scala:151:21
+    .io_cReg   (io_psumIn),
+    .io_aFmt   (fmtReg),	// src/hive/scala/main/HiveWorker.scala:137:19
+    .io_bFmt   (bFmtReg),	// src/hive/scala/main/HiveWorker.scala:140:20
+    .io_scaleA (io_scaleAIn),
+    .io_scaleB (scaleBReg),	// src/hive/scala/main/HiveWorker.scala:142:26
+    .io_rnd    (rndReg),	// src/hive/scala/main/HiveWorker.scala:138:19
+    .io_sum    (_workUnit_io_sum)
   );	// src/hive/scala/main/HiveWorker.scala:194:24
   assign io_aOut = aReg;	// src/hive/scala/main/HiveWorker.scala:60:7, :226:21
   assign io_psumOut = psumReg;	// src/hive/scala/main/HiveWorker.scala:60:7, :208:24
@@ -178,6 +197,7 @@ module Hive_HiveWorker(	// src/hive/scala/main/HiveWorker.scala:60:7
   assign io_validOutV = io_validOutV_REG;	// src/hive/scala/main/HiveWorker.scala:60:7, :246:26
   assign io_fmtOut = io_fmtOut_REG;	// src/hive/scala/main/HiveWorker.scala:60:7, :254:25
   assign io_bFmtOut = io_bFmtOut_REG;	// src/hive/scala/main/HiveWorker.scala:60:7, :255:25
+  assign io_scaleAOut = scaleAReg;	// src/hive/scala/main/HiveWorker.scala:60:7, :145:26
   assign io_rndOut = io_rndOut_REG;	// src/hive/scala/main/HiveWorker.scala:60:7, :256:25
 endmodule
 
