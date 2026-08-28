@@ -7,10 +7,15 @@
   *                           顶层暴露 dma3/dma4 并例化 scaleA/scaleB DMA；但 scale 通路
   *                           由运行期 isMx(regFile.aFmt) 门控，非 MX 运行时不启动、行为与
   *                           无 MX 硬件逐拍一致。
-  *   - src/hive/verilog_mx/  MX 仿真对齐配置（aW=bW=8, cW=40，深度 2048/256，
+  *   - src/hive/verilog_mx/  MX 仿真对齐配置（aW=bW=16, cW=40，深度 2048/256，
   *                           supportedFmts 显式仅含 MX 双格式）。同样 hasMx=true。
-  *                           【注意】两套产物 hasMx 均为 true，差异点在 aW/bW（16 vs 8）
-  *                           与缓冲深度，而非 hasMx。
+  *                           【注意】两套产物 hasMx 均为 true 且 aW/bW 均为 16，
+  *                           差异退化为缓冲深度与 supportedFmts，而非 hasMx。
+  *
+  * 【对外破坏性变更（MXFP8 v2 SIMD 升级）】verilog_mx 产物 dma0/dma2 ext 数据位宽由
+  * 128 位 → 256 位（aExtW/bExtW = totalN*aEffW = 16×16）。基线 verilog/（本就 aW=16）
+  * 端口集不变，仅内部 MX 通路升级为 v2 SIMD（2 元素/拍：4 个 HiveCvtOpMx + 2 个
+  * HiveMacFp 级联，双 pass 拼块删除、pass 数减半、MX 算力翻倍）逻辑。
   *
   * P5.5 双配置发射：以同一入口分别 elaborate 两套配置，各自清理目录并打包独立
   * zip，互不覆盖。旧预期「非 MX 基线不暴露 dma3/dma4」随 MX 必选裁定作废。
@@ -51,13 +56,14 @@ object HiveCoreElaborate extends App {
     cW = 40  // 纯浮点延迟规格化仅需 40-bit（{sign(1),exp(8),mantissa(31)}），48 是整数 MAC 才需
   )
 
-  // MX 仿真对齐配置：与 HiveCoreSimCaseMxSpec 的 HiveCoreConfig 对齐（aW=bW=8, cW=40，
+  // MX 仿真对齐配置：与 HiveCoreSimCaseMxSpec 的 HiveCoreConfig 对齐（aW=bW=16, cW=40，
   // supportedFmts 显式仅含 MXE4M3/MXE5M2 → hasMx=true）。scale buffer 深度给足以匹配用例。
-  // 与基线的差异仅在 aW/bW 与缓冲深度（两者 hasMx 均真）。
+  // 与基线的差异仅在 supportedFmts 与缓冲深度（两者 hasMx 均真、aW/bW 均为 16）。
+  // aW/bW=16 满足新 require（hasMx ⇒ aW>=16 && bW>=16）：v2 SIMD 双元素/拍需要 16-bit lane。
   val cfgMx = HiveCoreConfig(
     arrayN = 8,
     clusterM = 2,         // totalN = 16
-    aW = 8, bW = 8, cW = 40,
+    aW = 16, bW = 16, cW = 40,
     supportedFmts = Set(DataFormat.MXE4M3, DataFormat.MXE5M2),
     aBufferDepth = 2048,
     bBufferDepth = 2048,

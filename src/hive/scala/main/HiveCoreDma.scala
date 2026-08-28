@@ -52,18 +52,11 @@ import chisel3.util._
   * @param bufDepth buffer 深度（决定 bufAvailability 位宽；默认 = aBufferDepth，
   *                 B 实例需传 bBufferDepth）
   */
-class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 0, isScale: Boolean = false) extends Module {
+class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 0) extends Module {
   val pushW = bufWidth 
   val availDepth = bufDepth
-  // isScale（编译期，仅 scaleB 实例传 true）：scaleB 每 (nTile, K-块) 一个
-  // totalN 向量，与 B 的「每 kTile×totalN 行」遍历粒度不同，故走独立两级
-  // 遍历「nt 轮外 × kb 块内」——总 beat 数 = nTile × kBlocks（kBlocks =
-  // kTile>>1，K%32==0 保证 kTile 偶数）。取址序与 executor pop 序（每 nt
-  // 轮内各 K-块起始 pop 一次）逐拍一致：外部布局 scaleB[kb][n] 连续（每
-  // kb 占 regFile.n 字节）下，块内 kb 步进 = regFile.n 字节，轮间跳回
-  // base + (nt+1)*totalN（sNEXT_COL 处理）。单纯线性取址在 nTile>1 且
-  // kBlocks>1 时为 kb-major 序、与 nt-major pop 序错位，故必须两级遍历。
-  // isScale=false 时下方所有分支为死路，A/B 遍历行为逐字 bit-exact 不变。
+  // MX scale 读搬运已拆分为独立模块 HiveCoreDmaScaleRd（scaleA/scaleB），
+  // 本模块回到纯 A/B 数据双模式。
 
   val io = IO(new Bundle {
     val isA = Input(Bool())                          // 例化时 tie 死：true=A buffer, false=B buffer
@@ -78,6 +71,10 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
     val bufPush = master(Stream(UInt(pushW.W)))      // 向 buffer push 数据
     val bufPopFire = Input(Bool())
   })
+
+  // MX v2 SIMD 运行期判据（与顶层 mxRun 同语义）：非 MX 配置（!cfg.hasMx）
+  // 编译期短路为 false，不生成比较逻辑，非 MX 路径 bit-exact。
+  private val mxRunDma: Bool = if (cfg.hasMx) DataFormat.isMx(io.regFile.aFmt) else false.B
 
   // ==========================================================================
   // FSM 状态编码
@@ -169,18 +166,7 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
         ostCredit   := bufDepth.U
       }.elsewhen(io.dmaExtRdIF.req.fire){
           when(lineCounter === lineTarget - 1.U){
-            // scaleB：一轮（kBlocks beat）发完按 nCnt 分流——末 nt 轮直接
-            // sDONE，否则 sNEXT_COL 轮间跳转；A/B 走 sNEXT_COL 处理块/列
-            // 跳转（isScale=false 逐字不变）
-            if (isScale) {
-              when(nCnt === io.calcConfig.nTile - 1.U) {
-                state := sDONE
-              }.otherwise {
-                state := sNEXT_COL
-              }
-            } else {
-              state := sNEXT_COL
-            }
+            state := sNEXT_COL
             lineCounter := 0.U
           }.otherwise{
             lineCounter := lineCounter + 1.U
@@ -188,9 +174,8 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
           when(io.isA){
             curAddr := curAddr + rowStep
           }.otherwise{
-            // scaleB 块内 kb 步进 +N 字节；B 块内降序（isScale=false 逐字不变）
-            if (isScale) curAddr := curAddr + rowStep
-            else         curAddr := curAddr - rowStep
+            // B 块内降序（权重下沉协议，见锁存块注释）
+            curAddr := curAddr - rowStep
           }
       }
     }
@@ -218,15 +203,6 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
         
         
       }.otherwise {
-        if (isScale) {
-          // scaleB 轮间跳转（nt 外）：下一 nt 轮基址 = bAddr + (nt+1)*totalN
-          // 字节（布局 scaleB[kb][n] 连续，nt 轮内向量的列窗右移 totalN）；
-          // colAddr 累计 nt 轮偏移供后续轮复用，块内 kb 步进在 sTRANSFER 完成
-          nCnt := nCnt + 1.U
-          colAddr := colAddr + cfg.totalN.U
-          curAddr := io.regFile.bAddr + colAddr + cfg.totalN.U
-          state := sTRANSFER
-        } else {
         when(kCnt === io.calcConfig.kTile - 1.U){
           when(nCnt === io.calcConfig.nTile - 1.U){
             state := sDONE
@@ -242,8 +218,6 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
             curAddr := curAddr + bNextKTileAddressOffset
             state := sTRANSFER
         }
-        }
- 
       }
     }
     
@@ -252,9 +226,12 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
     is(sDONE) {
       // start 重载（契约对齐）：修复「config-err 后卡 sDONE 等 credit」死锁链——
       // executor errState 不 pop → ostCredit 不返还 → 原实现永久等待；
-      // 现 start 拍同周期锁存新参数（上方 |io.start 锁存块）并复位 credit/计数
-      // 重启遍历（flush 不返还的 credit 在此恢复）
+      // 现 start 拍同周期锁存新参数（上方 |io.start 锁存块）并复位 credit/计数、
+      // 直达 sTRANSFER 重启遍历（flush 不返还的 credit 在此恢复）。
+      // last-connect 自洽：.elsewhen 分支的 state := sIDLE 在 start 拍不可达（when 优先）；
+      // 次拍以新参数/满 credit/零计数从 sTRANSFER 起跑（与 HiveCoreDmaScaleRd 同构）
       when(io.start) {
+        state       := sTRANSFER
         errReg      := false.B
         lineCounter := 0.U
         kCnt        := 0.U
@@ -278,30 +255,14 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
       // A 矩阵：三级遍历「nTile 外 → kTile 中 → M 内」。内层扫实际 M 行
       // （regFile.m，边界感知不含 padding 行），中层扫 kTile 个 K tile，
       // 外层共 nTile 轮（每轮结束 curAddr 复位回 aAddr）。Executor 每
-      // K pass 只消费实际 M 行，若按 mTile*totalN 扫描会把 padding 行混入 FIFO
+      // K pass 只消费实际 M 行，若按 mTile*totalN 扫描会把 padding 行混入 FIFO。
+      // 【既有 wart 留痕（v1 即存在，另立任务；仅注释，不改行为）】
       curAddr   := io.regFile.aAddr
       colAddr   := io.calcConfig.aColTileAddressOffset
       rowStep   := io.calcConfig.aRowAddressOffset
       lineTarget  := io.regFile.m
     }.otherwise {
-      if (isScale) {
-        // scaleB 两级遍历（仅 isScale=true 生成）：nt 轮外 × kb 块内，
-        // 每 (nTile, K-块) 一个 scaleRowW 向量，起始 = scaleBAddr（经顶层
-        // regs(10) 重写）。外部布局 scaleB[kb][n] 连续（每 kb 占 regFile.n
-        // 字节），故块内 kb 步进 = regFile.n 字节（rowStep）；lineTarget =
-        // 每轮 beat 数 = kBlocks = kTile>>1，共 nTile 轮；轮间跳转由
-        // sNEXT_COL 处理（colAddr 累计 nt 轮偏移，下一轮基址 = bAddr +
-        // (nt+1)*totalN）。与 executor pop 序（nt 轮内逐 K-块起始 pop）
-        // 逐拍同序；nTile=1 时退化为连续线性、单 tile 行为不变。
-        // 块内降序分支对本实例为死路。
-        curAddr    := io.regFile.bAddr
-        colAddr    := 0.U
-        rowStep    := io.regFile.n
-        lineTarget := io.calcConfig.kTile >> 1
-        nCnt       := 0.U
-        bNextKTileAddressOffset := 0.U
-      } else {
-        // B 矩阵：三级遍历「N 外 → kTile 中 → 块内行降序」。
+      // B 矩阵：三级遍历「N 外 → kTile 中 → 块内行降序」。
         // 权重下沉协议下 PE(x,y) 最终锁存「最后供数行 - x」，每个 kTile 块
         // 必须按 K 行降序供数（先读块内最高行），executor 顺序 pop 供数后
         // 才能使 PE(x,y).wReg = B[kTile*totalN + x][y]（正序落位，标准 GEMM）。
@@ -312,10 +273,20 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
         lineTarget  := cfg.totalN.U
         // 双模式 kTile 跳转步长：Mux 默认分支（loadWMode=0）逐字等于垂直加载既有公式。
         // 垂直：B 降序读取，下一 k 维 tile 需 +2*totalN*bRowOff（这里乘以 2 的原因是
-        // B 矩阵是降序读取）；水平 loadW：转置布局下 k 切片步进 + 降序回补 =
-        // totalN*(bRowOff + bW/8)
-        bNextKTileAddressOffset := Mux(io.regFile.loadWMode, cfg.totalN.U * (io.calcConfig.bRowAddressOffset + (cfg.bW / 8).U), (cfg.totalN * 2 ).U * io.calcConfig.bRowAddressOffset)
-      }
+        // B 矩阵是降序读取）。
+        // 水平 loadW 通用推导：块末拍后 curAddr 已越过块内最低行一拍（= start(kt)
+        //   - totalN*bRowOff，降序多减一拍），下一块起点 start(kt+1) = start(kt)
+        //   + kSliceStep（转置行内 k 窗口步进），故跳转量 = kSliceStep + totalN*bRowOff：
+        //   - 非 MX（1 元素/拍）：kSliceStep = totalN*(bW/8)（16 元素×元素字节）
+        //     → totalN*(bRowOff + bW/8)（原公式逐字保留）
+        //   - MX v2（2 元素/拍打包，1 字节/元素）：一个 kTile 窗口 = 32 元素 = 32 字节，
+        //     kSliceStep = 2*totalN 字节（行步长 bRowOff 已由 calcConfig 给为打包 K 字节）
+        //     → totalN*(bRowOff + 2)，其中 2 = kSliceStep/totalN（每 lane 2 字节）。
+        //   MX 运行必为 loadWMode=1（executor sIDLE 已校验），垂直分支对 MX 为死路。
+        bNextKTileAddressOffset := Mux(io.regFile.loadWMode,
+          Mux(mxRunDma, cfg.totalN.U * (io.calcConfig.bRowAddressOffset + 2.U),
+                      cfg.totalN.U * (io.calcConfig.bRowAddressOffset + (cfg.bW / 8).U)),
+          (cfg.totalN * 2 ).U * io.calcConfig.bRowAddressOffset)
     }
   }
 }

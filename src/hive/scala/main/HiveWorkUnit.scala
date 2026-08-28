@@ -82,6 +82,11 @@ class HiveCvtOpFp() extends Module {
   * 按 fmt 选择 E4M3→fp32 或 E5M2→fp32，输出 fp32（32 位）。scale 以指数加法并入。
   * inf/nan 断言在此按「被选中的格式」守护——两路转换恒被求值（Mux 双臂），
   * 断言若下放到 Fp32 会因未选中路径而误报，故置于本层且只看选中格式。
+  * 【消费有效门控已实施】断言受 consumeValid 门控：仅当本拍 MX 转换结果被真实消费
+  * （valid 由 HiveWorker 单行连入，条件 = MX 结果被真实消费的充要条件：
+  * io.validIn && fmtOk && isMx(fmtReg)）时才评估，空闲/加载/排空拍的垃圾输入不再
+  * 撞编码 $fatal 误报。端口本体恒存在，模块内以 WireDefault(false.B) 兜底，
+  * 未覆写时断言永不触发（宁漏报不误杀）。饱和数据通路一字不动。
   * 纯组合，面积占比分析时归入「类型转换」类。
   */
 class HiveCvtOpMx extends Module {
@@ -89,6 +94,8 @@ class HiveCvtOpMx extends Module {
     val in    = Input(UInt(8.W))
     val fmt   = Input(DataFormat())
     val scale = Input(UInt(8.W))
+    // 消费有效：本拍转换结果被下游真实消费时为真（仅门控下方断言，不入数据通路）
+    val consumeValid = Input(Bool())
     val out   = Output(UInt(32.W))
   })
   val isE5 = io.fmt === DataFormat.MXE5M2
@@ -101,7 +108,12 @@ class HiveCvtOpMx extends Module {
   val e4 = io.in(6, 3); val m4 = io.in(2, 0)
   val e5 = io.in(6, 2)
   val selInfNan = Mux(isE5, e5.andR, e4.andR && m4.andR)
-  assert(!selInfNan,
+  // 消费有效：consumeValid 由唯一父级（HiveWorker）恒驱动；WireDefault(false.B)
+  // 仅为构造期占位/防未驱动告警，运行期恒被下方端口连接覆写（Chisel Input 不可
+  // 内部驱动，只能经 := 端口值接入）
+  val consumeValidEff = WireDefault(false.B)
+  consumeValidEff := io.consumeValid
+  assert(!consumeValidEff || !selInfNan,
     "HiveCvtOpMx: MX element is inf/nan (saturated to fp32 max); indicates software-side anomaly")
 }
 
@@ -312,9 +324,10 @@ class HiveWorkUnit(
   if (hasFp)  require(cEffW >= 40,         s"HiveWorkUnit: 含浮点格式时 cEffW($cEffW) 必须 >= 40（延迟规格化需要）")
   if (hasInt) require(cEffW >= aW + bW,    s"HiveWorkUnit: 含整数格式时 cEffW($cEffW) 必须 >= aW($aW) + bW($bW)")
   // MX 复用 fp32 域延迟规格化累加器（不扩宽），故同样要求 cEffW>=40；
-  // 元素固定 8-bit，位于 a/b 低 8 位，故要求 aW/bW>=8
+  // v2 SIMD：16-bit lane 打包 2 个 8-bit 元素（低字节=偶 k、高字节=奇 k），
+  // 故要求 aW/bW>=16
   if (hasMx)  require(cEffW >= 40,         s"HiveWorkUnit: 含 MX 格式时 cEffW($cEffW) 必须 >= 40（复用 fp32 延迟规格化累加器）")
-  if (hasMx)  require(aW >= 8 && bW >= 8,  s"HiveWorkUnit: 含 MX 格式时 aW($aW)/bW($bW) 必须 >= 8（MX 元素占低 8 位）")
+  if (hasMx)  require(aW >= 16 && bW >= 16, s"HiveWorkUnit: 含 MX 格式时 aW($aW)/bW($bW) 必须 >= 16（SIMD 双元素/拍：16-bit lane 打包 2 个 8-bit 元素）")
 
   val io = IO(new Bundle {
     val a    = Input(UInt(aW.W))
@@ -326,8 +339,16 @@ class HiveWorkUnit(
     val scaleA = Input(UInt(8.W))
     val scaleB = Input(UInt(8.W))
     val rnd  = Input(RoundingMode())
+    // 消费有效门控（仅 hasMx 块内有意义）：透传给 4×HiveCvtOpMx 的 inf/nan 断言；
+    // 非 MX 配置下恒不被选用，行为零影响。由宿主（HiveWorker）单行连入。
+    val consumeValid = Input(Bool())
     val sum  = Output(UInt(cEffW.W))
   })
+
+  // 消费有效：consumeValid 由唯一父级（HiveWorker）恒驱动；WireDefault(false.B)
+  // 仅为构造期占位/防未驱动告警，运行期恒被下方端口连接覆写（非「未驱动兜底」路径）
+  private val consumeValidEff = WireDefault(false.B)
+  consumeValidEff := io.consumeValid
 
   // P2: scaleA/scaleB 在 hasMx 时经 MX 通路（HiveCvtOpMx）以指数加法并入 fp32；
   // hasMx=false 时二者为未使用输入端口（Chisel 允许悬空 Input，行为 bit-exact）
@@ -367,25 +388,47 @@ class HiveWorkUnit(
     macFp.io.sum
   } else 0.U(cEffW.W)
 
-  // --- MX 通路（hasMx 时生成：MX 操作数转换 ×2 + HiveMacFp 复用） ---
-  // MX 走 fp32 域：a/b 各取低 8 位经 HiveCvtOpMx（含 E8M0 scale 指数加法）转为
-  // fp32，再复用一份独立 HiveMacFp 实例做 fp32 域累加（不扩宽累加器）。
+  // --- MX 通路（hasMx 时生成：SIMD 双元素/拍，4×HiveCvtOpMx + 2×HiveMacFp 级联） ---
+  // v2 SIMD：16-bit lane 携带 2 个 8-bit 元素（低字节=偶 k=2j、高字节=奇 k=2j+1），
+  // 两元素同拍消费：a 偶/奇 + b 偶/奇共 4 个 HiveCvtOpMx（各含 E8M0 scale 指数加法，
+  // 同一 32-K 块内 scaleA/scaleB 共享，两半接同一 scale 合法），两个乘积由 2 个
+  // HiveMacFp 级联吸收：macEven 先加偶 k（低字节）→ sumEven，macOdd 再加奇 k（高字节）
+  // → sumMx。级联顺序必须低字节先加：等价于 v1 的 k 升序左结合累加，是逐 bit 等价前提。
   // 独立实例（而非复用 sumFp 的 MAC）以保持通路清晰、非 MX 逐 bit 不受影响。
   val sumMx: UInt = if (hasMx) {
-    val aCvt = Module(new HiveCvtOpMx)
-    aCvt.io.in    := io.a(7, 0)
-    aCvt.io.fmt   := io.aFmt
-    aCvt.io.scale := io.scaleA
-    val bCvt = Module(new HiveCvtOpMx)
-    bCvt.io.in    := io.b(7, 0)
-    bCvt.io.fmt   := io.bFmt
-    bCvt.io.scale := io.scaleB
-    val macMx = Module(new HiveMacFp(cEffW))
-    macMx.io.a   := aCvt.io.out
-    macMx.io.b   := bCvt.io.out
-    macMx.io.c   := io.cReg
-    macMx.io.rnd := io.rnd
-    macMx.io.sum
+    val aCvtLo = Module(new HiveCvtOpMx)
+    aCvtLo.io.in    := io.a(7, 0)
+    aCvtLo.io.fmt   := io.aFmt
+    aCvtLo.io.scale := io.scaleA
+    aCvtLo.io.consumeValid := consumeValidEff
+    val aCvtHi = Module(new HiveCvtOpMx)
+    aCvtHi.io.in    := io.a(15, 8)
+    aCvtHi.io.fmt   := io.aFmt
+    aCvtHi.io.scale := io.scaleA
+    aCvtHi.io.consumeValid := consumeValidEff
+    val bCvtLo = Module(new HiveCvtOpMx)
+    bCvtLo.io.in    := io.b(7, 0)
+    bCvtLo.io.fmt   := io.bFmt
+    bCvtLo.io.scale := io.scaleB
+    bCvtLo.io.consumeValid := consumeValidEff
+    val bCvtHi = Module(new HiveCvtOpMx)
+    bCvtHi.io.in    := io.b(15, 8)
+    bCvtHi.io.fmt   := io.bFmt
+    bCvtHi.io.scale := io.scaleB
+    bCvtHi.io.consumeValid := consumeValidEff
+    // macEven：偶 k（低字节）先加，累加器输入 = cReg → sumEven
+    val macEven = Module(new HiveMacFp(cEffW))
+    macEven.io.a   := aCvtLo.io.out
+    macEven.io.b   := bCvtLo.io.out
+    macEven.io.c   := io.cReg
+    macEven.io.rnd := io.rnd
+    // macOdd：奇 k（高字节）后加，累加器输入 = sumEven → sumMx（单一累加器语义）
+    val macOdd = Module(new HiveMacFp(cEffW))
+    macOdd.io.a   := aCvtHi.io.out
+    macOdd.io.b   := bCvtHi.io.out
+    macOdd.io.c   := macEven.io.sum
+    macOdd.io.rnd := io.rnd
+    macOdd.io.sum
   } else 0.U(cEffW.W)
 
   // --- 累加通路选择（整数/浮点/MX 按 fmt 分离） ---

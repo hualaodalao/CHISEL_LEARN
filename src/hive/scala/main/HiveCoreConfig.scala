@@ -127,11 +127,14 @@ case class HiveCoreConfig(
   require(addrWidth > 0, s"HiveCoreConfig: addrWidth($addrWidth) 必须 > 0")
   require(addrWidth <= 32, s"HiveCoreConfig: addrWidth($addrWidth) 必须 <= 32")
   require(scaleBufferDepth > 0, s"HiveCoreConfig: scaleBufferDepth($scaleBufferDepth) 必须 > 0（hasMx 时 scale FIFO 深度；非 MX 死路参数）")
-  // MX 阵列几何硬约束：32-K scale 块 = 连续两个 kTile pass，该等价关系仅在
-  // totalN==16 时成立（scaleBDma lineTarget=kTile>>1、executor curKTile(0) 偶拍
-  // pop 均硬编码此假设）；totalN≠16 的 hasMx 配置会静默数值错或挂死，故在
+  // MX 阵列几何硬约束：32-K scale 块 = 16 lane × 2 元素/拍 = 单 pass，该等价关系仅在
+  // totalN==16 时成立（scaleBDma lineTarget=kTile、executor 每 sLOAD_B 窗口 pop scaleB
+  // 均硬编码此假设）；totalN≠16 的 hasMx 配置会静默数值错或挂死，故在
   // elaboration 期直接拒绝。若未来支持其它 totalN，需同步重推上述两处节奏。
-  if (hasMx) require(totalN == 16, s"HiveCoreConfig: MX 要求 totalN==16（32-K scale 块 = 2 个 kTile），当前 totalN=$totalN")
+  if (hasMx) require(totalN == 16, s"HiveCoreConfig: MX 要求 totalN==16（32-K scale 块 = 单 pass = 16 lane × 2 元素），当前 totalN=$totalN")
+  // MX SIMD 双元素/拍：16-bit lane 打包 2 个 8-bit 元素（低字节=偶 k、高字节=奇 k），
+  // PE 内 4×HiveCvtOpMx + 2×HiveMacFp 级联，故 aW/bW 必须 >= 16。
+  if (hasMx) require(aW >= 16 && bW >= 16, s"HiveCoreConfig: MX SIMD 双元素/拍需要 aW/bW >= 16（16-bit lane 打包 2 元素），当前 aW=$aW bW=$bW")
 }
 
 

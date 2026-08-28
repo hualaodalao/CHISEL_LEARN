@@ -77,8 +77,8 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
 
     // MX scale 通道（仅 hasMx 生成，非 MX 配置不暴露）：
     //   - scaleAPop：每激活行 pop 一个 8-bit（随激活链 skew 流入阵列）
-    //   - scaleBPop：每 K-块起始 pop 一个 totalN 向量（scaleRowW），锁存广播、
-    //     两个 kTile pass 复用
+    //   - scaleBPop：每 sLOAD_B 窗口（每 kTile = 一个 32-K scale 块，单 pass）
+    //     pop 一个 totalN 向量（scaleRowW），锁存广播
     //   - hiveScaleAIn/hiveScaleBIn：广播到 HiveComb 的 scale 端口
     val scaleAPop    = if (cfg.hasMx) Some(slave(Stream(UInt(8.W))))             else None
     val scaleBPop    = if (cfg.hasMx) Some(slave(Stream(UInt(cfg.scaleRowW.W)))) else None
@@ -229,7 +229,9 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
         // 故 depthOfCBufferUsed 必须用本拍推导的 newMTiles/newKTiles 计算，
         // 否则会采样到未初始化寄存器的随机旧值，误触发容量错误回 idle
         val newNTiles = (io.regFile.n(15, 0) + totalN.U - 1.U) / totalN.U
-        val newKTiles = (io.regFile.k(15, 0) + totalN.U - 1.U) / totalN.U
+        // MX v2 SIMD：16 lane × 2 元素/拍 = 32 K 元素/拍，一个 32-K scale 块 = 单 pass，
+        // 故 kTile 数 = K/32（K%32==0 已在 sIDLE 校验）；非 MX 分支逐字等于原公式。
+        val newKTiles = Mux(DataFormat.isMx(io.regFile.aFmt), io.regFile.k(15, 0) / (totalN.U) / 2.U, (io.regFile.k(15, 0) + totalN.U - 1.U) / totalN.U)
         nTiles   := newNTiles - 1.U
         kTiles   := newKTiles - 1.U
         // 容量检查：C buffer 真实驻留量只有一组 partial sum（mTiles×totalN 行）。
@@ -239,6 +241,12 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
         tileInterCnt := totalN.U - 1.U
 
       when(io.execute) {
+        // Victor P1 修复：execute 起始拍先清除 errState（先清后置，last-connect）：
+        // 下方 P4.1 MX 校验置位块（代码序在后）同拍违约时可覆盖本清除，违约不漏；
+        // switch 前 cPush 违约置位块由 state=/=sIDLE 门控，与本拍不交叠。
+        // 违约后的下次合法 EXECUTE 拍 errState 清除 → io.err 拉低，
+        // 消除「一次错误后此后所有正常 EXECUTE 恒报假 err」。
+        errState := false.B
 
         // execute 起始拍清空 A/B buffer（RdOnly DMA 首个 push 至少晚一拍，安全）；
         // flushA 仅允许在此拍拉高：aDma 内建 nTile 轮次连续供数，任何
@@ -425,15 +433,15 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   }
 
   // ==========================================================================
-  // P3: MX scale 双 pass 逻辑（仅 hasMx 生成，置于 switch 之后 last-connect 覆盖）。
+  // P3: MX scale 单 pass 逻辑（仅 hasMx 生成，置于 switch 之后 last-connect 覆盖）。
   //   isMx=false 时全程不改动 FSM 主干（scale 端口独立、主干输出不被触碰），
   //   保证非 MX 路径逐行 bit-exact。isMx 判据用 regFile.aFmt（DataFormat.isMx）。
   //
-  //   scaleB（权重驻留）：16×16 阵列 + 单元素/拍 → 一个 32-K scale 块 = 连续两个
-  //     kTile pass（16+16）。每 K-块起始（curKTile 偶，curKTile(0)===0）pop 一次
-  //     totalN 向量锁存进 scaleBRegs 并广播到每列；奇数 kTile 复用锁存值不再 pop。
+  //   scaleB（权重驻留）：16×16 阵列 + SIMD 双元素/拍 → 一个 32-K scale 块 = 单
+  //     pass（16 lane × 2 元素 = 32）。每个 sLOAD_B 窗口（每 kTile）pop 一次
+  //     totalN 向量锁存进 scaleBRegs 并广播到每列。
   //     scaleBPopped 一次性标志防止同一 sLOAD_B 窗口多拍重复 pop；每 tile 转换
-  //     （sNEXT_NK_TILE/sIDLE）复位，使下一 K-块偶 kTile 再次 pop。
+  //     （sNEXT_NK_TILE/sIDLE）复位，使下一 kTile 再次 pop。
   //   scaleA（随激活流动）：计算阶段（sLOAD_A）每激活行 pop 一个 8-bit，广播到
   //     所有行（K-块内各 k 共享同一 scaleA），沿 HiveComb 内 scaleASkewedPerRow
   //     链与激活同 skew 流入阵列。pop 节奏与 aPop.fire lockstep（与 hiveAIn 供数
@@ -453,8 +461,9 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
     }
 
     when(isMx) {
-      // scaleB：K-块起始 pop 一次 totalN 向量锁存广播（奇数 kTile 复用）
-      when(state === sLOAD_B && curKTile(0) === 0.U && !scaleBPopped && io.scaleBPop.get.valid) {
+      // scaleB：单 pass 语义下每 sLOAD_B 窗口（每 kTile = 一个 32-K scale 块）
+      // pop 一次 totalN 向量锁存广播（!scaleBPopped 防同窗口多拍重复）
+      when(state === sLOAD_B && !scaleBPopped && io.scaleBPop.get.valid) {
         for (i <- 0 until cfg.totalN) {
           scaleBRegs(i) := io.scaleBPop.get.payload(8 * (i + 1) - 1, 8 * i)
         }
@@ -470,7 +479,7 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
       }
     }
 
-    // scaleBPopped 每 tile 转换/复位拍清零，使下一 K-块偶 kTile 再次 pop
+    // scaleBPopped 每 tile 转换/复位拍清零，使下一 kTile 窗口再次 pop
     when(state === sNEXT_NK_TILE || state === sIDLE) {
       scaleBPopped := false.B
     }

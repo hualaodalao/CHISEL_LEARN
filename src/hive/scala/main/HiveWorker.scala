@@ -204,6 +204,7 @@ class HiveWorker(
   workUnit.io.scaleA := io.scaleAIn
   workUnit.io.scaleB := scaleBReg
   workUnit.io.rnd  := rndReg
+  workUnit.io.consumeValid := io.validIn && fmtOk && DataFormat.isMx(fmtReg)
 
   val psumReg = RegInit(0.U(cEffW.W))
   when(io.clear) {

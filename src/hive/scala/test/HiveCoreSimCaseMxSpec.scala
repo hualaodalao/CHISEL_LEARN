@@ -1,7 +1,21 @@
-/** HiveCore MXFP8 双 MX（异构 E4M3 × E5M2）端到端数值仿真用例。
+/** HiveCore MXFP8 v2 SIMD 双 MX（异构 E4M3 × E5M2）端到端数值仿真用例。
+  *
+  * 【v2 SIMD 打包布局】16-bit lane 打包 2 个 8-bit MX 元素：低字节=偶 k=2j、
+  * 高字节=奇 k=2j+1；PE 内 4×HiveCvtOpMx + 2×HiveMacFp 级联（先偶后奇），
+  * 每拍每波前推进 32 个 K 元素 = 恰好一个 32-K scale 块 = 单 pass，
+  * 故 kTile 数 = K/32（scaleA 块下标 kb = kt）。外部 A/B 存储 1 字节/元素：
+  * 行步长 = K 字节（非 2K），k 窗口步进 = 32 字节（2×totalN）。
+  *
+  * 【v1 bit 锚守护】单块用例（M=N=K=32）加载金锚文件（在改动前 v1 代码上录制的
+  * C 写回 fp32 bits + 拍数），对硬件写回逐位相等断言；级联序（偶→奇、行升序）
+  * = v1 全局 k 升序左结合、每乘积同一舍入点，应逐 bit 相等。
+  * 【无锚用例留痕（Hank P1-B）】multi-tile（M=4/N=32/K=64）与 multi-pass（M=4/N=16/K=64）
+  * 两条用例无 v1 bit 锚：v1 代码已被 v2 直接替换、v1 硬件已不在工作区，无法补录锚；
+  * 该两条仅靠 1e-2 golden 容差守护（属降级守护）。若需升级回 bit 锚，须先在 git 历史
+  * 恢复 v1 代码补录锚文件至 sim/mx/ 后再接入 anchorPath。
   *
   * 结构与 HiveCoreSimCaseLoadWSpec 同构（loadW 水平加载 + 转置 B），差异：
-  *   - aW=bW=8（MX 元素 8-bit），cW=40（复用 fp32 延迟规格化累加器）
+  *   - aW=bW=16（16-bit lane 打包 2×8-bit 元素），cW=40（复用 fp32 延迟规格化累加器）
   *   - regs(7)=0x5E0：aFmt=MXE4M3(4)、bFmt=MXE5M2(5)、loadWMode=1、mixFmtEn=1、rnd=RNE
   *       aFmt = Cat(regs(7)(6),regs(7)(1,0)) = Cat(1,00) = 0b100 = 4 (E4M3)
   *       bFmt = Cat(regs(7)(7),regs(7)(9,8)) = Cat(1,01) = 0b101 = 5 (E5M2)
@@ -10,14 +24,15 @@
   *       dma3Ext = scaleA（8-bit/beat，随激活流动）
   *       dma4Ext = scaleB（scaleRowW=totalN*8=128-bit/beat，列驻留）
   *
-  * scale 路由模型（P5 最高风险点，逐拍对齐——见各 gen*Beat 注释）：
+  * scale 路由模型（逐拍对齐——见各 gen*Beat 注释）：
   *   - scaleA[m][kb]：executor sLOAD_A 每 aPop.fire pop 一个 8-bit 广播全行，
-  *     随激活链 skew 流入。DMA(isA=true) 遍历序 = executor pop 序 =
+  *     随激活链 skew 流入。scaleADma（HiveCoreDmaScaleRd，A 式三级遍历）遍历序 =
+  *     executor pop 序 =
   *     (round nt) × (kt 外) × (m 内)，共 nTile×kTile×M beat。
-  *   - scaleB[kb][n]：executor sLOAD_B 每 K-块起始（curKTile 偶）pop 一个
-  *     totalN 向量锁存 scaleBRegs(i)→列 i（globalCol=nTile*totalN+i）。
-  *     pop 序 = (round nt 外) × (kb 块内)，scaleBDma（isScale 两级遍历）
-  *     按同序取址，共 nTile×(kTile>>1) beat（每 (nt,kb) 一向量）。
+  *   - scaleB[kb][n]：executor 每个 sLOAD_B 窗口（每 kTile = 一个 32-K 块）
+  *     pop 一个 totalN 向量锁存 scaleBRegs(i)→列 i（globalCol=nTile*totalN+i）。
+  *     pop 序 = (round nt 外) × (kb=kt 块内)，scaleBDma（HiveCoreDmaScaleRd
+  *     isScaleB 两级遍历）按同序取址，共 nTile×kTile beat（每 (nt,kt) 一向量）。
   *
   * golden：C[m][n] = Σ_k mxE4M3ToFloat(aByte[m][k], scaleA[m][k/32])
   *                       × mxE5M2ToFloat(bByte[k][n], scaleB[k/32][n])
@@ -25,6 +40,10 @@
   * 逐 bit 相等，唯一偏差是 fp32 累加舍入（远小于 1e-2 容差）。
   *
   * 既有非 MX spec 一律零改动，非 MX 路径 bit-exact 由回归门禁守护。
+  * 【硬件侧消费有效门控已实施】HiveCvtOpMx inf/nan 断言已由 consumeValid 门控（见
+  * HiveWorkUnit/HiveWorker），空闲/加载/排空拍垃圾输入不再撞断言 $fatal，
+  * 本 suite 已恢复 ChiselSim 默认随机化（原测试侧 Randomization.uninitialized
+  * 零初值规避已移除）。
   */
 
 import chisel3._
@@ -35,6 +54,12 @@ import java.io._
 import java.nio.file._
 
 class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveFstSim {
+
+  // 【硬件侧门控已实施，测试侧规避已移除】HiveCvtOpMx inf/nan 断言现受
+  // consumeValid 消费有效门控（HiveWorkUnit/HiveWorker 单行连入，条件 =
+  // MX 结果被真实消费的充要条件），空闲/加载/排空拍的随机垃圾不再触发断言。
+  // 故本 suite 恢复 ChiselSim 默认随机化（不传 settings）——默认随机化下全绿
+  // 即证明硬件侧门控有效，且还原真实上电语义。
 
   val A_BASE:       Long = 0x00000000L
   val B_BASE:       Long = 0x00100000L
@@ -49,23 +74,29 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
   it should "run MX single-block GEMM M=32 N=32 K=32 E4M3xE5M2" in {
     runMxGemm(M = 32, N = 32, K = 32,
       waveName = "hivecore_mx_sim.fst",
-      testMangle = "should-run-MX-single-block-GEMM-M-32-N-32-K-32-E4M3xE5M2")
+      testMangle = "should-run-MX-single-block-GEMM-M-32-N-32-K-32-E4M3xE5M2",
+      anchorPath = Some(s"$simDir/v1_anchor_M32_N32_K32.txt"),
+      expCycleWindow = Some((150, 170)))
   }
 
-  /*
-
-  // 多 nTile×多 kBlocks（N=32→nTile=2，K=64→kBlocks=2）：scaleB 供数序
-  // nt 外 × kb 内两级遍历对账（线性 kb-major 取址在此维度组合下必错位）
+  // 多 nTile×多 kTiles（N=32→nTile=2，K=64→kTiles=2）：scaleB 供数序
+  // nt 外 × kb 内两级遍历对账（线性 kb-major 取址在此维度组合下必错位）；
+  // 多 kTile 同轮同时钉死 bNextKTileAddressOffset v2 公式 totalN*(bRowOff+2)。
+  // 【无 v1 bit 锚（Hank P1-B）】v1 代码已被 v2 直接替换、无法补录锚 →
+  // 本用例仅 1e-2 golden 容差守护（降级守护，详见文件头留痕段落）。
   it should "run MX multi-tile GEMM M=4 N=32 K=64 2nTile 2blk" in {
     runMxGemm(M = 4, N = 32, K = 64,
       waveName = "hivecore_mx_multintile_sim.fst",
       testMangle = "should-run-MX-multi-tile-GEMM-M-4-N-32-K-64-2nTile-2blk")
   }
 
-  it should "run MX multi-pass GEMM M=4 N=16 K=64 2blk 4pass" in {
+  // K=64→kTiles=2 顺序 pass（v2 单 pass/块，不再双 pass 拼块）
+  // 【无 v1 bit 锚（Hank P1-B）】v1 代码已被 v2 直接替换、无法补录锚 →
+  // 本用例仅 1e-2 golden 容差守护（降级守护，详见文件头留痕段落）。
+  it should "run MX multi-pass GEMM M=4 N=16 K=64 2blk 2pass" in {
     runMxGemm(M = 4, N = 16, K = 64,
       waveName = "hivecore_mx_multipass_sim.fst",
-      testMangle = "should-run-MX-multi-pass-GEMM-M-4-N-16-K-64-2blk-4pass")
+      testMangle = "should-run-MX-multi-pass-GEMM-M-4-N-16-K-64-2blk-2pass")
   }
 
   // P5.4 err 负向：MX config 违约直回 sIDLE、不发 done，STATUS.err 位可被软件轮询。
@@ -79,12 +110,12 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     runMxErrCase(M = 4, N = 16, K = 32, regs7 = 0x5C0L,   // 0x5E0 去掉 loadWMode(0x20)
       caseName = "isMx(bFmt)&&!loadWMode")
   }
-  */
 
   // ==========================================================================
   // 共享运行器：配置 MX HiveCore，逐拍供 A/B/C/scaleA/scaleB，golden 比对。
   // ==========================================================================
-  private def runMxGemm(M: Int, N: Int, K: Int, waveName: String, testMangle: String): Unit = {
+  private def runMxGemm(M: Int, N: Int, K: Int, waveName: String, testMangle: String,
+      anchorPath: Option[String] = None, expCycleWindow: Option[(Int, Int)] = None): Unit = {
 
     val cfg = HiveCoreConfig(
       arrayN = 8,
@@ -98,7 +129,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     )
 
     val totalN = cfg.totalN         // 16
-    val aEffW  = cfg.aEffW          // 8
+    val aEffW  = cfg.aEffW          // 16（v2：16-bit lane 打包 2×8-bit 元素）
     val cEffW  = cfg.cEffW          // 40
     require(K % 32 == 0, s"MX 用例 K($K) 必须 32 对齐")
     val kBlocks = K / 32            // scale 块数
@@ -118,39 +149,49 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
 
     Files.createDirectories(Paths.get(simDir))
 
-    // ==================== DMA0 (A buffer) 地址/数据（aW=8） ====================
-    val aKTiles = (K + totalN - 1) / totalN
+    // ==================== DMA0 (A buffer) 地址/数据（v2：16-bit lane 打包 2 元素） ==
+    // v2：kTile 数 = K/32（16 lane × 2 元素/拍 = 一个 32-K scale 块 = 单 pass）；
+    // 行步长 = K 字节（1 字节/元素打包）；k 窗口步进 aColOff = totalN*2 = 32 字节。
+    val aKTiles = K / 32
     val aNTiles = (N + totalN - 1) / totalN
-    val aRowOff = K.toLong * (cfg.aW / 8)            // = K
-    val aColOff = totalN.toLong * (aEffW / 8)        // = totalN
+    val aRowOff = K.toLong                          // 打包行步长 = K 字节
+    val aColOff = totalN.toLong * (cfg.aW / 8)      // = 2*totalN = 32 字节
     val expAAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
     for (_ <- 0 until aNTiles; kt <- 0 until aKTiles; m <- 0 until M)
       expAAddrSeq += A_BASE + m * aRowOff + kt * aColOff
     val dma0TotalBeats = expAAddrSeq.size
+    // lane i = {aByte[m][kt*32+2i+1] 高字节, aByte[m][kt*32+2i] 低字节}
+    // （低=偶 k，高=奇 k，与 PE 级联先偶后奇逐拍消费对齐）
     def genDma0Beat(idx: Int): BigInt = {
       val kt = (idx % (aKTiles * M)) / M
       val row = idx % M
       var data = BigInt(0)
       for (i <- 0 until totalN) {
-        val col = kt * totalN + i
-        val value = if (row < M && col < K) aByte(row)(col) else 0
-        data = data | (BigInt(value & 0xFF) << (i * aEffW))
+        val kEven = kt * 32 + 2 * i
+        val kOdd  = kEven + 1
+        val lo = if (row < M && kEven < K) aByte(row)(kEven) else 0
+        val hi = if (row < M && kOdd  < K) aByte(row)(kOdd)  else 0
+        data = data | (BigInt(((hi & 0xFF) << 8) | (lo & 0xFF)) << (i * aEffW))
       }
       data
     }
 
-    // ==================== DMA2 (B 权重) 地址/数据（转置闭式，bW=8） ==============
-    val bKTiles = (K + totalN - 1) / totalN
+    // ==================== DMA2 (B 权重) 地址/数据（转置闭式，v2 打包） ===========
+    // v2：kTile 数 = K/32；行步长 = K 字节；k 窗口步进 kSliceStep = 2*totalN = 32
+    // 字节；块间跳转（bNextKTileAddressOffset）= totalN*(bRowOff+2)，由逐 beat
+    // 地址硬断言钉死（多 kTile 用例覆盖）。
+    val bKTiles = K / 32
     val nTilesB = (N + totalN - 1) / totalN
-    val bRowOff = K.toLong * (cfg.bW / 8)            // = K
-    val bColTileOff = totalN.toLong * K * (cfg.bW / 8)
-    val kSliceStep = totalN.toLong * (cfg.bW / 8)    // = totalN
+    val bRowOff = K.toLong                          // 打包行步长 = K 字节
+    val bColTileOff = totalN.toLong * K             // 轮间跳 = totalN 个转置行 × K 字节
+    val kSliceStep = totalN.toLong * (cfg.bW / 8)   // = 2*totalN = 32 字节（k 窗口步进）
     val expBAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
     for (r <- 0 until nTilesB; kt <- 0 until bKTiles) {
       val blockStart = B_BASE + r.toLong * bColTileOff + (totalN - 1).toLong * bRowOff + kt.toLong * kSliceStep
       for (r2 <- 0 until totalN) expBAddrSeq += blockStart - r2 * bRowOff
     }
     val dma2TotalBeats = expBAddrSeq.size
+    // lane i = pack{bByte[kt*32+2i+1][n] 高, bByte[kt*32+2i][n] 低}；n 降序协议不变。
     def genDma2WeightBeat(idx: Int): BigInt = {
       val beatsPerRound = bKTiles * totalN
       val nTileIdx = idx / beatsPerRound
@@ -160,9 +201,11 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       val n = nTileIdx * totalN + (totalN - 1 - s)
       var data = BigInt(0)
       for (i <- 0 until totalN) {
-        val k = kt * totalN + i
-        val value = if (k < K && n < N) bByte(k)(n) else 0
-        data = data | (BigInt(value & 0xFF) << (i * cfg.bW))
+        val kEven = kt * 32 + 2 * i
+        val kOdd  = kEven + 1
+        val lo = if (kEven < K && n < N) bByte(kEven)(n) else 0
+        val hi = if (kOdd  < K && n < N) bByte(kOdd)(n)  else 0
+        data = data | (BigInt(((hi & 0xFF) << 8) | (lo & 0xFF)) << (i * cfg.bW))
       }
       data
     }
@@ -176,21 +219,22 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
 
     // ==================== DMA3 (scaleA) 数据：8-bit/beat ========================
     // 遍历序（isA=true）= executor pop 序 = (round nt)×(kt 外)×(m 内)。
-    // 每 beat = scaleA[m][kb]，kb = (kt*totalN)/32（kt 偶奇同块）。
+    // 每 beat = scaleA[m][kb]；v2 单 pass：一个 kTile = 一个 32-K scale 块 → kb = kt。
     val scaleATotalBeats = aNTiles * aKTiles * M
     def genScaleABeat(idx: Int): Int = {
       val kt = (idx % (aKTiles * M)) / M
       val m = idx % M
-      val kb = (kt * totalN) / 32
+      val kb = kt
       scaleA(m)(kb) & 0xFF
     }
 
     // ==================== DMA4 (scaleB) 数据：128-bit/beat ======================
-    // isScale 两级遍历（nt 外 × kb 内），共 nTile×kBlocks beat；beat idx 按
-    // 硬件遍历序解码：nt = idx / kBlocks（轮），kb = idx % kBlocks（块内）。
-    // byte i = scaleB[kb][nt*totalN + i]（列驻留，n<N 有效，否则补 0）；
-    // 与 executor pop 序（每 nt 轮内各 K-块起始 pop 一次）逐拍一致。
-    val scaleBTotalBeats = nTilesB * (bKTiles / 2)
+    // isScaleB 两级遍历（nt 外 × kb 内），共 nTile×kTile beat（v2：kTile=kBlocks，
+    // 不再 >>1）；beat idx 按硬件遍历序解码：nt = idx / kBlocks（轮），
+    // kb = idx % kBlocks（块内）。byte i = scaleB[kb][nt*totalN + i]
+    // （列驻留，n<N 有效，否则补 0）；与 executor pop 序（每 nt 轮内每 kTile/
+    // 32-K 块起始 pop 一次）逐拍一致。
+    val scaleBTotalBeats = nTilesB * bKTiles
     require(scaleBTotalBeats == kBlocks * nTilesB, s"scaleB beat 数自检失败: $scaleBTotalBeats vs ${kBlocks * nTilesB}")
     def genScaleBBeat(idx: Int): BigInt = {
       val nt = idx / kBlocks
@@ -385,6 +429,13 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       scaleABeatsSent should be(scaleATotalBeats)
       scaleBBeatsSent should be(scaleBTotalBeats)
 
+      // ===== 拍数断言（归档）：v2 单 pass 几何，单块用例应 ≈v1（281/282）减半 =====
+      expCycleWindow.foreach { case (lo, hi) =>
+        withClue(s"[MX] cycles=$cycle 超出预期窗口 [$lo,$hi]（v1 锚 281/282）: ") {
+          (cycle >= lo && cycle <= hi) should be(true)
+        }
+      }
+
       // scaleB 取址序硬对账（同 DMA2 风格）：外部布局 scaleB[kb][n] 连续
       // （每 kb 占 N 字节），向量 (kb,nt) 字节地址 = base + kb*N + nt*totalN。
       // executor pop 序 = nt 轮外 × kb 轮内（每 nt 轮内各 K-块起始 pop 一次），
@@ -419,7 +470,36 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         cBeatIdx += 1
       }
 
-      // ===== golden：C = Σ_k mxE4M3(a,scaleA)·mxE5M2(b,scaleB) =====
+      // ===== v1 bit 锚逐位相等断言（主门禁，仅单块用例传入锚文件） =====
+      // 锚在未改动 v1 代码上录制；v2 级联序（偶→奇、行升序）= v1 全局 k 升序
+      // 左结合、每乘积同一 Fp32.mul 舍入点 → 应逐 bit 相等；若偏差需定位到具体
+      // 舍入点，仅不可消除的对齐截断差异才可降级 ≤1 ulp 容差（预期不发生）。
+      anchorPath.foreach { path =>
+        // 锚缺失清晰报错（Hank P1-B）：anchorPath=Some 但文件不存在时，先给出可读的
+        // 失败提示（而非 Source.fromFile 的晦涩 FileNotFoundException 堆栈）
+        withClue(s"[MX-ANCHOR] v1 bit 锚文件缺失：$path —— 锚需在未改动 v1 代码上录制，" +
+          "v1 已被 v2 替换无法补录；请从 git 历史恢复 v1 录制后放回该路径：") {
+          Files.exists(Paths.get(path)) should be(true)
+        }
+        val anchorTokens = scala.io.Source.fromFile(path).getLines()
+          .filter(l => l.nonEmpty && !l.startsWith("#"))
+          .flatMap(_.trim.split("\\s+")).toArray
+        anchorTokens.length should be(M * N)
+        var anchorMismatch = 0
+        for (m <- 0 until M; n <- 0 until N) {
+          val hwBits = (cResult(m)(n) & 0xFFFFFFFFL).toLong
+          val anchorBits = java.lang.Long.parseLong(anchorTokens(m * N + n).stripPrefix("0x"), 16)
+          if (hwBits != anchorBits) {
+            if (anchorMismatch < 32)
+              println(f"[MX-ANCHOR] MISMATCH C($m,$n): hw=0x$hwBits%08X anchor=0x$anchorBits%08X")
+            anchorMismatch += 1
+          }
+        }
+        withClue("[MX-ANCHOR] v1 bit 锚逐位相等: ") { anchorMismatch should be(0) }
+        println(s"[MX-ANCHOR] bit-exact vs v1 anchor: ${M * N}/${M * N} elems")
+      }
+
+      // ===== golden：C = Σ_k mxE4M3(a,scaleA)·mxE5M2(b,scaleB)（二道防线，零改动） =====
       val ref = Array.tabulate(M, N) { (m, n) =>
         (0 until K).map { k =>
           val kb = k / 32
@@ -473,9 +553,10 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
   //   断言：err 位在若干拍内置位；done 位与 resp.done 全程不发射。
   // ==========================================================================
   private def runMxErrCase(M: Int, N: Int, K: Int, regs7: Long, caseName: String): Unit = {
+    // v2：hasMx 要求 aW/bW>=16（SIMD 双元素/拍）；err 在 sIDLE 拍触发，与位宽无关。
     val cfg = HiveCoreConfig(
       arrayN = 8, clusterM = 2,
-      aW = 8, bW = 8, cW = 40,
+      aW = 16, bW = 16, cW = 40,
       supportedFmts = Set(DataFormat.MXE4M3, DataFormat.MXE5M2),
       aBufferDepth = 2048, bBufferDepth = 2048, cBufferDepth = 2048,
       scaleBufferDepth = 256
@@ -564,6 +645,26 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         respDoneSeen should be(false)
         doneSeen should be(false)
         doneBit should be(BigInt(0))
+      }
+
+      // ===== Victor P1 验证：合法再 EXECUTE 后 err 位被清除 =====
+      // errState/errFlag 均在 execute 脉冲拍清除（同拍新违约次拍仍可再置位）。
+      // 此处改写全合法配置（K=32 对齐 + loadWMode=1）再发 EXECUTE，轮询
+      // STATUS.err 应连续拉低（不喂数据，运行停在等 B 供数，不影响 err 清除验证）。
+      sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x07, 32L, 0x5E0L)
+      dut.io.cmd.valid.poke(true.B)
+      dut.io.cmd.payload.op.poke(HiveCoreOp.EXECUTE)
+      dut.io.cmd.payload.reg0Addr.poke(0.U)
+      dut.io.cmd.payload.reg1Addr.poke(0.U)
+      dut.clock.step()
+      dut.io.cmd.valid.poke(false.B)
+      var errAfterReexec = false
+      for (_ <- 0 until 100) {
+        if (dut.io.status.err.peek().litToBoolean) errAfterReexec = true
+        dut.clock.step()
+      }
+      withClue(s"[$caseName] STATUS.err should be cleared after a legal re-EXECUTE: ") {
+        errAfterReexec should be(false)
       }
     }
   }

@@ -82,8 +82,11 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // P4.2: MX scale DMA 提到外层用 Option 持有（P3 接线块内改用 .get 引用），
   //   以便下方 dmaErr 汇聚点引用其 io.err。非 MX 配置为 None（整块不例化），
   //   汇聚式逐字不变、bit-exact。位宽/深度与 P3 块内原例化一致。
-  val aDmaScale = if (cfg.hasMx) Some(Module(new HiveCoreDmaRdOnly(cfg, bufWidth = 8,               bufDepth = cfg.scaleBufferDepth))) else None
-  val bDmaScale = if (cfg.hasMx) Some(Module(new HiveCoreDmaRdOnly(cfg, bufWidth = cfg.scaleRowW,   bufDepth = cfg.scaleBufferDepth, isScale = true))) else None
+  //   独立模块 HiveCoreDmaScaleRd：isScaleB=false 走 A 式三级遍历（scaleA），
+  //   isScaleB=true 走两级 nt×kb 遍历（scaleB），行为与原 HiveCoreDmaRdOnly
+  //   isScale 路径逐拍一致。
+  val aDmaScale = if (cfg.hasMx) Some(Module(new HiveCoreDmaScaleRd(cfg, isScaleB = false, bufWidth = 8,             bufDepth = cfg.scaleBufferDepth))) else None
+  val bDmaScale = if (cfg.hasMx) Some(Module(new HiveCoreDmaScaleRd(cfg, isScaleB = true,  bufWidth = cfg.scaleRowW, bufDepth = cfg.scaleBufferDepth))) else None
 
   // ==========================================================================
   // calcConfig 生产者（喂给 bDma）：从 regFile 推导 tile 数与六个地址偏移。
@@ -99,19 +102,34 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   //       bRow = k*(bW/8)（转置行步长），bCol = totalN*k*(bW/8)
   //       （轮间跳 = 跨 totalN 个转置行）
   //   cRow = cStride                     cCol = totalN * (cEffW/8)
+  //
+  // 【MX v2 SIMD】mxRun = cfg.hasMx && isMx(regFile.aFmt)（与 scale DMA start 门控同判据）：
+  //   16-bit lane 打包 2 个 8-bit 元素（1 字节/元素），行步长 = K 字节（非 K*(aW/8)），
+  //   一个 kTile pass 覆盖 32 K 元素（kTile 数 = K/32）；非 MX 运行逐字等于原公式。
   // ==========================================================================
   val executePulse = io.cmd.fire && io.cmd.payload.op === HiveCoreOp.EXECUTE
+  // MX 运行期判据：非 MX 配置（!cfg.hasMx）编译期短路为 false，不生成比较逻辑，bit-exact。
+  val mxRun: Bool = if (cfg.hasMx) DataFormat.isMx(regFile.aFmt) else false.B10
   val calcConfig = Wire(HiveCoreExePreCalcConfig(cfg))
   calcConfig.mTile := (regFile.m + cfg.totalN.U - 1.U) / cfg.totalN.U
   calcConfig.nTile := (regFile.n + cfg.totalN.U - 1.U) / cfg.totalN.U
-  calcConfig.kTile := (regFile.k + cfg.totalN.U - 1.U) / cfg.totalN.U
-  
-  calcConfig.aRowAddressOffset := regFile.k * (cfg.aW / 8).U
+  // MX：16 lane × 2 元素/拍 = 32 K 元素/拍，32-K scale 块 = 单 pass → kTile = K/32；
+  // 非 MX：逐字保留原 ceil(K/totalN) 公式。
+  calcConfig.kTile := Mux(mxRun, regFile.k / 32.U, (regFile.k + cfg.totalN.U - 1.U) / cfg.totalN.U)
+
+  // MX：打包行步长 = K 字节（每元素 1 字节）；非 MX：K * (aW/8) 逐字保留。
+  calcConfig.aRowAddressOffset := Mux(mxRun, regFile.k * 1.U, regFile.k * (cfg.aW / 8).U)
+  // aColTileAddressOffset = totalN*(aW/8) = 16 lane × 2 字节 = 32 字节：
+  // 打包后恰好等于单 kTile 的 k 窗口字节数，数值自动正确，公式不改。
   calcConfig.aColTileAddressOffset := cfg.totalN.U * (cfg.aW / 8).U
-  
-  // bRow/bCol 双模式：Mux 默认分支（loadWMode=0）逐字等于垂直加载既有公式
-  calcConfig.bRowAddressOffset := Mux(regFile.loadWMode, regFile.k * (cfg.bW / 8).U, regFile.n * (cfg.bW / 8).U)
-  calcConfig.bColTileAddressOffset := Mux(regFile.loadWMode, cfg.totalN.U * regFile.k * (cfg.bW / 8).U, cfg.totalN.U * (cfg.bW / 8).U)
+
+  // bRow/bCol 双模式：loadWMode=0 垂直分支逐字不动；loadWMode=1 分支按打包语义加 mxRun Mux
+  calcConfig.bRowAddressOffset := Mux(regFile.loadWMode,
+    Mux(mxRun, regFile.k * 1.U, regFile.k * (cfg.bW / 8).U),
+    regFile.n * (cfg.bW / 8).U)
+  calcConfig.bColTileAddressOffset := Mux(regFile.loadWMode,
+    Mux(mxRun, cfg.totalN.U * regFile.k * 1.U, cfg.totalN.U * regFile.k * (cfg.bW / 8).U),
+    cfg.totalN.U * (cfg.bW / 8).U)
   
   calcConfig.cRowAddressOffset := regFile.n * (cfg.cW / 8).U
   calcConfig.cColTileAddressOffset := cfg.totalN.U * (cfg.cW / 8).U
@@ -226,6 +244,14 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   } else {
     aDma.io.err || bDma.io.err || cDma.io.err
   }
+  // Victor P1 修复：execute 脉冲拍清除 errFlag（executor 的 errState 同拍同步清除，
+  // 见 HiveCoreExecutor sIDLE execute 块）。本清除置于下方两个置位块之前，
+  // last-connect 序保证同拍 done 路径的 errFlag 置位仍可覆盖本清除。
+  // 注意：execute 脉冲拍 executor.io.err 反映的是 errState「清除前」旧值（寄存器
+  // 同拍清除次拍才生效），故下方 hasMx 直连置位用 !executePulse 排除本拍，
+  // 否则合法再 EXECUTE 会被旧 err 立即回置、假 err 永久化。
+  when(executePulse) { errFlag := false.B }
+
   when(executor.io.done) {
     doneFlag  := true.B
     respValid := true.B
@@ -236,11 +262,13 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   }
 
   // P5.4: MX config-err（K%32≠0 / isMx(bFmt)&&!loadWMode）直接回 sIDLE、不发 done，
-  // 故上方 done 门控捕捉不到。追加 hasMx-gated 的 err 直连，使 STATUS.err 位可被
-  // 软件轮询。errState 只置不清，err 恒高直到下次 EXECUTE 复位。非 MX 配置此块
-  // 编译期不生成，errFlag 行为逐字等于原实现，bit-exact。
+  // 故上方 done 门控捕捉不到。追加 hasMx-gated 的 err 直连，使 STATUS.err 位可被软件轮询。
+  // 清除/置位语义（Victor P1）：errFlag 在 execute 脉冲拍被上方清除；同拍违约不会丢失——
+  // 新违约在脉冲拍置 errState（寄存器），次拍起经 io.err 由本直连正常锁存；
+  // 而脉冲拍 io.err 的高电平必为上次运行遗留的旧错（已被同拍清除），故用 !executePulse
+  // 排除，避免合法再 EXECUTE 被旧 err 回置。非 MX 配置此块编译期不生成，bit-exact。
   if (cfg.hasMx) {
-    when(executor.io.err) { errFlag := true.B }
+    when(executor.io.err && !executePulse) { errFlag := true.B }
   }
 
   // ==========================================================================
@@ -356,37 +384,37 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
 
   // ==========================================================================
   // P3: MX Scale 通道（仅 hasMx 生成；非 MX 配置不例化 DMA/FIFO、不暴露 dma3/dma4）
-  //   - scaleADma/scaleBDma 复用 HiveCoreDmaRdOnly。基址经 regFile 视图重写：
-  //     DMA isA=true 内部读 regFile.aAddr → 重写 regs(3)=scaleAAddr；
-  //     isA=false 内部读 regFile.bAddr → 重写 regs(4)=scaleBAddr。
-  //   - 遍历/地址步长复用共享 calcConfig（镜像 A/B 的 K-块 tiling）。
-  //     * scaleADma（isA=true）行数天然镜像 aDma（m×kTile×nTile），与 Executor
+  //   - scaleADma/scaleBDma 为独立模块 HiveCoreDmaScaleRd（从 HiveCoreDmaRdOnly
+  //     拆出，行为逐拍一致）。基址直连 scale 地址寄存器，不再需要
+  //     WireInit(regFile) 覆写 regs(3)/regs(4) 的伪装 hack：
+  //     scaleADma.baseAddr ← regFile.scaleAAddr（regs(9)），dim ← regFile.m；
+  //     scaleBDma.baseAddr ← regFile.scaleBAddr（regs(10)），dim ← regFile.n
+  //     （块内 kb 步进，运行期 N）。
+  //   - 遍历参数复用共享 calcConfig（nTile/kTile/aColTileAddressOffset/
+  //     aRowAddressOffset）。
+  //     * scaleADma 行数天然镜像 aDma（m×kTile×nTile），与 Executor
   //       每激活行 pop 的 scaleA 一一对应。
-  //     * scaleBDma（isA=false）复用 B 遍历；Executor 仅在 K-块起始 pop scaleB，
-  //       FIFO 反压自然节流上游。
+  //     * scaleBDma 两级遍历（nt 轮外 × kb 块内）；Executor 仅在 K-块起始
+  //       pop scaleB，FIFO 反压自然节流上游。
   //   - 【MX 必选】start 加运行期 isMx(regFile.aFmt) 门控：仅 MX 运行时启动；
   //     非 MX 运行（fmt 非 MX 枚举）恒不启动，不向外部发请求（非 MX harness 不
   //     驱动 dma3/dma4 也天然安全）。判据与 Executor err/scale 块同用 aFmt。
   // ==========================================================================
   if (cfg.hasMx) {
     val mxRun = DataFormat.isMx(regFile.aFmt)
-    // scaleA DMA：isA=true，基址重写为 scaleAAddr
-    val scaleARegFile = WireInit(regFile)
-    scaleARegFile.regs(3) := regFile.scaleAAddr
+    // scaleA DMA：A 式三级遍历，基址直连 scaleAAddr，内层行数 = m
     val scaleADma = aDmaScale.get  // P4.2: 引用外层 Option 持有的实例（原地例化已上提）
-    scaleADma.io.isA        := true.B
     scaleADma.io.start      := executePulse & mxRun
-    scaleADma.io.regFile    := scaleARegFile
+    scaleADma.io.baseAddr   := regFile.scaleAAddr
+    scaleADma.io.dim        := regFile.m
     scaleADma.io.calcConfig := calcConfig
     io.dma3Ext.get <> scaleADma.io.dmaExtRdIF
 
-    // scaleB DMA：isA=false，基址重写为 scaleBAddr
-    val scaleBRegFile = WireInit(regFile)
-    scaleBRegFile.regs(4) := regFile.scaleBAddr
+    // scaleB DMA：两级 nt×kb 遍历，基址直连 scaleBAddr，块内步进 = n
     val scaleBDma = bDmaScale.get  // P4.2: 引用外层 Option 持有的实例（原地例化已上提）
-    scaleBDma.io.isA        := false.B
     scaleBDma.io.start      := executePulse & mxRun
-    scaleBDma.io.regFile    := scaleBRegFile
+    scaleBDma.io.baseAddr   := regFile.scaleBAddr
+    scaleBDma.io.dim        := regFile.n
     scaleBDma.io.calcConfig := calcConfig
     io.dma4Ext.get <> scaleBDma.io.dmaExtRdIF
 
