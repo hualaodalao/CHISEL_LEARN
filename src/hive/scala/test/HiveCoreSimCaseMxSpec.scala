@@ -21,8 +21,8 @@
   *       bFmt = Cat(regs(7)(7),regs(7)(9,8)) = Cat(1,01) = 0b101 = 5 (E5M2)
   *       loadWMode=bit5=0x20, mixFmtEn=bit10=0x400 → 0x40|0x80|0x100|0x20|0x400 = 0x5E0
   *   - 新增两条 scale 只读 DMA 外部通道（仅 hasMx 暴露）：
-  *       dma3Ext = scaleA（8-bit/beat，随激活流动）
-  *       dma4Ext = scaleB（scaleRowW=totalN*8=128-bit/beat，列驻留）
+  *       dmaScaleA = scaleA（8-bit/beat，随激活流动）
+  *       dmaScaleB = scaleB（scaleRowW=totalN*8=128-bit/beat，列驻留）
   *
   * scale 路由模型（逐拍对齐——见各 gen*Beat 注释）：
   *   - scaleA[m][kb]：executor sLOAD_A 每 aPop.fire pop 一个 8-bit 广播全行，
@@ -149,7 +149,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
 
     Files.createDirectories(Paths.get(simDir))
 
-    // ==================== DMA0 (A buffer) 地址/数据（v2：16-bit lane 打包 2 元素） ==
+    // ==================== DMA-A (A buffer) 地址/数据（v2：16-bit lane 打包 2 元素） ==
     // v2：kTile 数 = K/32（16 lane × 2 元素/拍 = 一个 32-K scale 块 = 单 pass）；
     // 行步长 = K 字节（1 字节/元素打包）；k 窗口步进 aColOff = totalN*2 = 32 字节。
     val aKTiles = K / 32
@@ -159,10 +159,10 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     val expAAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
     for (_ <- 0 until aNTiles; kt <- 0 until aKTiles; m <- 0 until M)
       expAAddrSeq += A_BASE + m * aRowOff + kt * aColOff
-    val dma0TotalBeats = expAAddrSeq.size
+    val dmaATotalBeats = expAAddrSeq.size
     // lane i = {aByte[m][kt*32+2i+1] 高字节, aByte[m][kt*32+2i] 低字节}
     // （低=偶 k，高=奇 k，与 PE 级联先偶后奇逐拍消费对齐）
-    def genDma0Beat(idx: Int): BigInt = {
+    def genDmaABeat(idx: Int): BigInt = {
       val kt = (idx % (aKTiles * M)) / M
       val row = idx % M
       var data = BigInt(0)
@@ -176,7 +176,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       data
     }
 
-    // ==================== DMA2 (B 权重) 地址/数据（转置闭式，v2 打包） ===========
+    // ==================== DMA-B (B 权重) 地址/数据（转置闭式，v2 打包） ===========
     // v2：kTile 数 = K/32；行步长 = K 字节；k 窗口步进 kSliceStep = 2*totalN = 32
     // 字节；块间跳转（bNextKTileAddressOffset）= totalN*(bRowOff+2)，由逐 beat
     // 地址硬断言钉死（多 kTile 用例覆盖）。
@@ -190,9 +190,9 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       val blockStart = B_BASE + r.toLong * bColTileOff + (totalN - 1).toLong * bRowOff + kt.toLong * kSliceStep
       for (r2 <- 0 until totalN) expBAddrSeq += blockStart - r2 * bRowOff
     }
-    val dma2TotalBeats = expBAddrSeq.size
+    val dmaBTotalBeats = expBAddrSeq.size
     // lane i = pack{bByte[kt*32+2i+1][n] 高, bByte[kt*32+2i][n] 低}；n 降序协议不变。
-    def genDma2WeightBeat(idx: Int): BigInt = {
+    def genDmaBWeightBeat(idx: Int): BigInt = {
       val beatsPerRound = bKTiles * totalN
       val nTileIdx = idx / beatsPerRound
       val idxInRound = idx % beatsPerRound
@@ -210,14 +210,14 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       data
     }
 
-    // ==================== DMA1 (C store) 地址（cW=40） ==========================
+    // ==================== DMA-C (C store) 地址（cW=40） ==========================
     val cRowOff = N.toLong * (cfg.cW / 8)
     val cColOff = totalN.toLong * (cfg.cW / 8)
     val expCAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
     for (nt <- 0 until aNTiles; m <- 0 until M)
       expCAddrSeq += C_BASE + nt.toLong * (M - 1) * cRowOff + nt.toLong * (nt + 1) / 2 * cColOff + m * cRowOff
 
-    // ==================== DMA3 (scaleA) 数据：8-bit/beat ========================
+    // ==================== DMA-scaleA (scaleA) 数据：8-bit/beat ========================
     // 遍历序（isA=true）= executor pop 序 = (round nt)×(kt 外)×(m 内)。
     // 每 beat = scaleA[m][kb]；v2 单 pass：一个 kTile = 一个 32-K scale 块 → kb = kt。
     val scaleATotalBeats = aNTiles * aKTiles * M
@@ -228,7 +228,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       scaleA(m)(kb) & 0xFF
     }
 
-    // ==================== DMA4 (scaleB) 数据：128-bit/beat ======================
+    // ==================== DMA-scaleB (scaleB) 数据：128-bit/beat ======================
     // isScaleB 两级遍历（nt 外 × kb 内），共 nTile×kTile beat（v2：kTile=kBlocks，
     // 不再 >>1）；beat idx 按硬件遍历序解码：nt = idx / kBlocks（轮），
     // kb = idx % kBlocks（块内）。byte i = scaleB[kb][nt*totalN + i]
@@ -249,13 +249,13 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     }
 
     println(s"[MX] Starting: M=$M N=$N K=$K totalN=$totalN kBlocks=$kBlocks")
-    println(s"[MX] beats: dma0(A)=$dma0TotalBeats dma2(B)=$dma2TotalBeats C=${expCAddrSeq.size} scaleA=$scaleATotalBeats scaleB=$scaleBTotalBeats")
+    println(s"[MX] beats: dmaA(A)=$dmaATotalBeats dmaB(B)=$dmaBTotalBeats C=${expCAddrSeq.size} scaleA=$scaleATotalBeats scaleB=$scaleBTotalBeats")
 
     simulate(new HiveCore(cfg)) { dut =>
 
-      var dma0BeatsSent = 0
-      var dma1StoreBeats = 0
-      var dma2BeatsSent = 0
+      var dmaABeatsSent = 0
+      var dmaCStoreBeats = 0
+      var dmaBBeatsSent = 0
       var scaleABeatsSent = 0
       var scaleBBeatsSent = 0
       val scaleBAddrLog = scala.collection.mutable.ArrayBuffer[Long]()  // scaleB DMA 实际取址序列（逐 beat 对账）
@@ -265,25 +265,25 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       dut.reset.poke(true.B)
       dut.io.cmd.valid.poke(false.B)
       dut.io.resp.ready.poke(true.B)
-      dut.io.dma0Ext.req.ready.poke(true.B)
-      dut.io.dma0Ext.rsp.valid.poke(false.B)
-      dut.io.dma0Ext.rsp.payload.data.poke(0.U)
-      dut.io.dma0Ext.rsp.payload.err.poke(false.B)
-      dut.io.dma1Ext.req.ready.poke(true.B)
-      dut.io.dma1Ext.rsp.valid.poke(false.B)
-      dut.io.dma1Ext.rsp.payload.err.poke(false.B)
-      dut.io.dma2Ext.req.ready.poke(true.B)
-      dut.io.dma2Ext.rsp.valid.poke(false.B)
-      dut.io.dma2Ext.rsp.payload.data.poke(0.U)
-      dut.io.dma2Ext.rsp.payload.err.poke(false.B)
-      dut.io.dma3Ext.get.req.ready.poke(true.B)
-      dut.io.dma3Ext.get.rsp.valid.poke(false.B)
-      dut.io.dma3Ext.get.rsp.payload.data.poke(0.U)
-      dut.io.dma3Ext.get.rsp.payload.err.poke(false.B)
-      dut.io.dma4Ext.get.req.ready.poke(true.B)
-      dut.io.dma4Ext.get.rsp.valid.poke(false.B)
-      dut.io.dma4Ext.get.rsp.payload.data.poke(0.U)
-      dut.io.dma4Ext.get.rsp.payload.err.poke(false.B)
+      dut.io.dmaA.req.ready.poke(true.B)
+      dut.io.dmaA.rsp.valid.poke(false.B)
+      dut.io.dmaA.rsp.payload.data.poke(0.U)
+      dut.io.dmaA.rsp.payload.err.poke(false.B)
+      dut.io.dmaC.req.ready.poke(true.B)
+      dut.io.dmaC.rsp.valid.poke(false.B)
+      dut.io.dmaC.rsp.payload.err.poke(false.B)
+      dut.io.dmaB.req.ready.poke(true.B)
+      dut.io.dmaB.rsp.valid.poke(false.B)
+      dut.io.dmaB.rsp.payload.data.poke(0.U)
+      dut.io.dmaB.rsp.payload.err.poke(false.B)
+      dut.io.dmaScaleA.get.req.ready.poke(true.B)
+      dut.io.dmaScaleA.get.rsp.valid.poke(false.B)
+      dut.io.dmaScaleA.get.rsp.payload.data.poke(0.U)
+      dut.io.dmaScaleA.get.rsp.payload.err.poke(false.B)
+      dut.io.dmaScaleB.get.req.ready.poke(true.B)
+      dut.io.dmaScaleB.get.rsp.valid.poke(false.B)
+      dut.io.dmaScaleB.get.rsp.payload.data.poke(0.U)
+      dut.io.dmaScaleB.get.rsp.payload.err.poke(false.B)
       dut.clock.step(3)
       dut.reset.poke(false.B)
       dut.clock.step(2)
@@ -323,93 +323,93 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
 
       while (!done && cycle < maxCycles) {
 
-        // --- DMA0 (A) ---
+        // --- DMA-A (A) ---
         // 已知待办（评审记录）：expAAddrSeq 构建后未用于逐 beat 地址断言，
         // 当前按 beat 序号供数（内存保真依赖 DMA/executor 同序约定）；
-        // 后续可仿 DMA2/scaleB 风格改为 req.valid 拍响应 + 逐拍地址硬对账。
-        if (dma0BeatsSent < dma0TotalBeats) {
-          dut.io.dma0Ext.rsp.valid.poke(true.B)
-          dut.io.dma0Ext.rsp.payload.data.poke(genDma0Beat(dma0BeatsSent).U)
-          dut.io.dma0Ext.rsp.payload.err.poke(false.B)
-          if (dut.io.dma0Ext.rsp.ready.peek().litToBoolean) dma0BeatsSent += 1
+        // 后续可仿 DMA-B/scaleB 风格改为 req.valid 拍响应 + 逐拍地址硬对账。
+        if (dmaABeatsSent < dmaATotalBeats) {
+          dut.io.dmaA.rsp.valid.poke(true.B)
+          dut.io.dmaA.rsp.payload.data.poke(genDmaABeat(dmaABeatsSent).U)
+          dut.io.dmaA.rsp.payload.err.poke(false.B)
+          if (dut.io.dmaA.rsp.ready.peek().litToBoolean) dmaABeatsSent += 1
         } else {
-          dut.io.dma0Ext.rsp.valid.poke(false.B)
-          dut.io.dma0Ext.rsp.payload.data.poke(0.U)
+          dut.io.dmaA.rsp.valid.poke(false.B)
+          dut.io.dmaA.rsp.payload.data.poke(0.U)
         }
 
-        // --- DMA1 (C store) ---
-        dut.io.dma1Ext.req.ready.poke(true.B)
-        if (dut.io.dma1Ext.req.valid.peek().litToBoolean) {
-          val reqAddr = dut.io.dma1Ext.req.payload.addr.peek().litValue.toLong
-          if (dma1StoreBeats < expCAddrSeq.size) {
-            withClue(s"DMA1 store beat #$dma1StoreBeats addr mismatch: ") {
-              reqAddr should be(expCAddrSeq(dma1StoreBeats))
+        // --- DMA-C (C store) ---
+        dut.io.dmaC.req.ready.poke(true.B)
+        if (dut.io.dmaC.req.valid.peek().litToBoolean) {
+          val reqAddr = dut.io.dmaC.req.payload.addr.peek().litValue.toLong
+          if (dmaCStoreBeats < expCAddrSeq.size) {
+            withClue(s"DMA-C store beat #$dmaCStoreBeats addr mismatch: ") {
+              reqAddr should be(expCAddrSeq(dmaCStoreBeats))
             }
           }
-          val writeData = dut.io.dma1Ext.req.payload.data.peek().litValue
+          val writeData = dut.io.dmaC.req.payload.data.peek().litValue
           cWriteLog += ((reqAddr, writeData))
-          dma1StoreBeats += 1
-          dut.io.dma1Ext.rsp.valid.poke(true.B)
+          dmaCStoreBeats += 1
+          dut.io.dmaC.rsp.valid.poke(true.B)
         } else {
-          dut.io.dma1Ext.rsp.valid.poke(false.B)
+          dut.io.dmaC.rsp.valid.poke(false.B)
         }
 
-        // --- DMA2 (B 权重) 逐 beat 地址硬对账 ---
-        if (dma2BeatsSent < dma2TotalBeats) {
-          if (dut.io.dma2Ext.req.valid.peek().litToBoolean) {
-            val cmdAddr = dut.io.dma2Ext.req.payload.addr.peek().litValue.toLong
-            withClue(s"DMA2 weight beat #$dma2BeatsSent addr mismatch: ") {
-              cmdAddr should be(expBAddrSeq(dma2BeatsSent))
+        // --- DMA-B (B 权重) 逐 beat 地址硬对账 ---
+        if (dmaBBeatsSent < dmaBTotalBeats) {
+          if (dut.io.dmaB.req.valid.peek().litToBoolean) {
+            val cmdAddr = dut.io.dmaB.req.payload.addr.peek().litValue.toLong
+            withClue(s"DMA-B weight beat #$dmaBBeatsSent addr mismatch: ") {
+              cmdAddr should be(expBAddrSeq(dmaBBeatsSent))
             }
-            dut.io.dma2Ext.rsp.valid.poke(true.B)
-            dut.io.dma2Ext.rsp.payload.data.poke(genDma2WeightBeat(dma2BeatsSent).U)
-            dut.io.dma2Ext.rsp.payload.err.poke(false.B)
-            dma2BeatsSent += 1
+            dut.io.dmaB.rsp.valid.poke(true.B)
+            dut.io.dmaB.rsp.payload.data.poke(genDmaBWeightBeat(dmaBBeatsSent).U)
+            dut.io.dmaB.rsp.payload.err.poke(false.B)
+            dmaBBeatsSent += 1
           } else {
-            dut.io.dma2Ext.rsp.valid.poke(false.B)
-            dut.io.dma2Ext.rsp.payload.data.poke(0.U)
+            dut.io.dmaB.rsp.valid.poke(false.B)
+            dut.io.dmaB.rsp.payload.data.poke(0.U)
           }
         } else {
-          dut.io.dma2Ext.rsp.valid.poke(false.B)
-          dut.io.dma2Ext.rsp.payload.data.poke(0.U)
+          dut.io.dmaB.rsp.valid.poke(false.B)
+          dut.io.dmaB.rsp.payload.data.poke(0.U)
         }
 
-        // --- DMA3 (scaleA) 8-bit：按 beat 序供数（遍历序=pop序） ---
-        // 已知待办（评审记录）：同 DMA0，未做逐 beat 地址硬对账，后续补齐。
+        // --- DMA-scaleA (scaleA) 8-bit：按 beat 序供数（遍历序=pop序） ---
+        // 已知待办（评审记录）：同 DMA-A，未做逐 beat 地址硬对账，后续补齐。
         if (scaleABeatsSent < scaleATotalBeats) {
-          dut.io.dma3Ext.get.rsp.valid.poke(true.B)
-          dut.io.dma3Ext.get.rsp.payload.data.poke(genScaleABeat(scaleABeatsSent).U)
-          dut.io.dma3Ext.get.rsp.payload.err.poke(false.B)
-          if (dut.io.dma3Ext.get.rsp.ready.peek().litToBoolean) scaleABeatsSent += 1
+          dut.io.dmaScaleA.get.rsp.valid.poke(true.B)
+          dut.io.dmaScaleA.get.rsp.payload.data.poke(genScaleABeat(scaleABeatsSent).U)
+          dut.io.dmaScaleA.get.rsp.payload.err.poke(false.B)
+          if (dut.io.dmaScaleA.get.rsp.ready.peek().litToBoolean) scaleABeatsSent += 1
         } else {
-          dut.io.dma3Ext.get.rsp.valid.poke(false.B)
-          dut.io.dma3Ext.get.rsp.payload.data.poke(0.U)
+          dut.io.dmaScaleA.get.rsp.valid.poke(false.B)
+          dut.io.dmaScaleA.get.rsp.payload.data.poke(0.U)
         }
 
-        // --- DMA4 (scaleB) 128-bit：每 (nt,kb) 一向量 ---
-        // 仅在 req.valid 拍响应（同 DMA2 风格）：DMA req 恰 fire nTile×kBlocks
+        // --- DMA-scaleB (scaleB) 128-bit：每 (nt,kb) 一向量 ---
+        // 仅在 req.valid 拍响应（同 DMA-B 风格）：DMA req 恰 fire nTile×kBlocks
         // 次（每拍 fire 推进 lineCounter），rsp 与 req 逐拍 lockstep（rsp.ready
         // 恒高）；轮间跳转拍（sNEXT_COL）req.valid 拉低则不给 rsp，避免与
         // 请求脱拍的伪 push 扰乱逐拍取址对账。
         if (scaleBBeatsSent < scaleBTotalBeats) {
-          if (dut.io.dma4Ext.get.req.valid.peek().litToBoolean) {
-            scaleBAddrLog += dut.io.dma4Ext.get.req.payload.addr.peek().litValue.toLong
-            dut.io.dma4Ext.get.rsp.valid.poke(true.B)
-            dut.io.dma4Ext.get.rsp.payload.data.poke(genScaleBBeat(scaleBBeatsSent).U)
-            dut.io.dma4Ext.get.rsp.payload.err.poke(false.B)
+          if (dut.io.dmaScaleB.get.req.valid.peek().litToBoolean) {
+            scaleBAddrLog += dut.io.dmaScaleB.get.req.payload.addr.peek().litValue.toLong
+            dut.io.dmaScaleB.get.rsp.valid.poke(true.B)
+            dut.io.dmaScaleB.get.rsp.payload.data.poke(genScaleBBeat(scaleBBeatsSent).U)
+            dut.io.dmaScaleB.get.rsp.payload.err.poke(false.B)
             scaleBBeatsSent += 1
           } else {
-            dut.io.dma4Ext.get.rsp.valid.poke(false.B)
-            dut.io.dma4Ext.get.rsp.payload.data.poke(0.U)
+            dut.io.dmaScaleB.get.rsp.valid.poke(false.B)
+            dut.io.dmaScaleB.get.rsp.payload.data.poke(0.U)
           }
         } else {
-          dut.io.dma4Ext.get.rsp.valid.poke(false.B)
-          dut.io.dma4Ext.get.rsp.payload.data.poke(0.U)
+          dut.io.dmaScaleB.get.rsp.valid.poke(false.B)
+          dut.io.dmaScaleB.get.rsp.payload.data.poke(0.U)
         }
 
         // --- 完成检查 ---
         if (dut.io.resp.valid.peek().litToBoolean && dut.io.resp.payload.done.peek().litToBoolean) {
-          println(f"[MX cycle=$cycle%5d] EXECUTE complete! A=$dma0BeatsSent B=$dma2BeatsSent C=$dma1StoreBeats sA=$scaleABeatsSent sB=$scaleBBeatsSent")
+          println(f"[MX cycle=$cycle%5d] EXECUTE complete! A=$dmaABeatsSent B=$dmaBBeatsSent C=$dmaCStoreBeats sA=$scaleABeatsSent sB=$scaleBBeatsSent")
           dut.io.resp.payload.err.peek().litToBoolean should be(false)
           done = true
         }
@@ -418,14 +418,14 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         cycle += 1
       }
 
-      dut.io.dma1Ext.rsp.valid.poke(false.B)
+      dut.io.dmaC.rsp.valid.poke(false.B)
 
-      if (!done) println(s"[MX] WARNING: timeout at $maxCycles cycles (A=$dma0BeatsSent B=$dma2BeatsSent C=$dma1StoreBeats sA=$scaleABeatsSent sB=$scaleBBeatsSent)")
+      if (!done) println(s"[MX] WARNING: timeout at $maxCycles cycles (A=$dmaABeatsSent B=$dmaBBeatsSent C=$dmaCStoreBeats sA=$scaleABeatsSent sB=$scaleBBeatsSent)")
 
       done should be(true)
-      dma0BeatsSent should be(dma0TotalBeats)
-      dma2BeatsSent should be(dma2TotalBeats)
-      dma1StoreBeats should be(expCAddrSeq.size)
+      dmaABeatsSent should be(dmaATotalBeats)
+      dmaBBeatsSent should be(dmaBTotalBeats)
+      dmaCStoreBeats should be(expCAddrSeq.size)
       scaleABeatsSent should be(scaleATotalBeats)
       scaleBBeatsSent should be(scaleBTotalBeats)
 
@@ -436,7 +436,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         }
       }
 
-      // scaleB 取址序硬对账（同 DMA2 风格）：外部布局 scaleB[kb][n] 连续
+      // scaleB 取址序硬对账（同 DMA-B 风格）：外部布局 scaleB[kb][n] 连续
       // （每 kb 占 N 字节），向量 (kb,nt) 字节地址 = base + kb*N + nt*totalN。
       // executor pop 序 = nt 轮外 × kb 轮内（每 nt 轮内各 K-块起始 pop 一次），
       // 故 DMA 取址序列必须同为 nt 外 × kb 内：
@@ -567,16 +567,16 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       dut.reset.poke(true.B)
       dut.io.cmd.valid.poke(false.B)
       dut.io.resp.ready.poke(true.B)
-      dut.io.dma0Ext.req.ready.poke(true.B)
-      dut.io.dma0Ext.rsp.valid.poke(false.B)
-      dut.io.dma1Ext.req.ready.poke(true.B)
-      dut.io.dma1Ext.rsp.valid.poke(false.B)
-      dut.io.dma2Ext.req.ready.poke(true.B)
-      dut.io.dma2Ext.rsp.valid.poke(false.B)
-      dut.io.dma3Ext.get.req.ready.poke(true.B)
-      dut.io.dma3Ext.get.rsp.valid.poke(false.B)
-      dut.io.dma4Ext.get.req.ready.poke(true.B)
-      dut.io.dma4Ext.get.rsp.valid.poke(false.B)
+      dut.io.dmaA.req.ready.poke(true.B)
+      dut.io.dmaA.rsp.valid.poke(false.B)
+      dut.io.dmaC.req.ready.poke(true.B)
+      dut.io.dmaC.rsp.valid.poke(false.B)
+      dut.io.dmaB.req.ready.poke(true.B)
+      dut.io.dmaB.rsp.valid.poke(false.B)
+      dut.io.dmaScaleA.get.req.ready.poke(true.B)
+      dut.io.dmaScaleA.get.rsp.valid.poke(false.B)
+      dut.io.dmaScaleB.get.req.ready.poke(true.B)
+      dut.io.dmaScaleB.get.rsp.valid.poke(false.B)
       dut.clock.step(3)
       dut.reset.poke(false.B)
       dut.clock.step(2)

@@ -323,6 +323,31 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   * 运行模式：启动后完全自主运行——逐 tile 块连续写回，块间不做任何
   * 上游握手，直到所有 tile 块搬完后发一拍 done 脉冲回 IDLE。
   *
+  * 【P1 缩位写回（cfg.cBeatsPerRow>1，active）】总线位宽 < 行宽时行内拆多拍：
+  * bufPop 仍每行只 pop 一次（Executor 侧背压语义不变），行数据锁存后拆为
+  * cBeatsPerRow 拍、每拍 cElementsPerBeat 个元素密集打包（每元素取 40→32 规格化后
+  * 的 32-bit 结果，不再零扩展回 40 位槽；低列号在低位，尾拍高位零填充）；
+  * 拍内地址步进 = E×4 字节，行推进（lineCounter/curAddr/doneBlock/sNEXT_N）
+  * 只在末拍发生。编译期 if/else 分支：默认哨兵配置（cBeatsPerRow==1，legacy）
+  * 下功能行为与重构前一致（一拍一行），且不产生行锁存寄存器；注意该等价性
+  * 仅指 outFmt=00 的功能行为（写回数据/地址/时序），hasFp/hasMx 配置含
+  * HiveOutCvt 转换资源（面积/时序影响）。
+  *
+  * 【外部写通道契约】写回拍须按地址顺序提交（满宽拍零填充高位与 2B/4B 密集
+  * 行步进的正确性依赖保序写）；外部存储侧若乱序受理写拍，行内/行间布局无法保证。
+  *
+  * 【P2 精度转换（outFmt）】写回输出格式运行期可选：00=fp32（默认）/01=fp16/
+  * 10=bf16（regs(7)(12,11)，见 HiveCoreRegister.outFmt）。有效值同源判据：
+  *   outFmtEff = (isFloat || isMx) ? outFmt : fp32
+  * 非浮点运行强制走透传路径（整数累加值连 40→32 规格化都不做，与现状 bit-exact）。
+  * 浮点/MX 运行由 HiveOutCvt（纯组合）逐元素 40→32→{32|16}：
+  *   - legacy（cBeatsPerRow==1）：outFmtEff==fp32 时逐字等于现状（40→32 规格化后零扩展回 40 位槽）；
+  *     outFmtEff≠fp32 时一行密集 16-bit 元素放总线低位、高位零填充，仍按 1 拍/行发出。
+  *   - active：lineData 锁存密集行（fp32 时 totalN*32 位、fp16/bf16 时低 totalN*16 位有效），
+  *     拍段切分按运行期元素位宽（fp32=32/fp16=bf16=16）右移选段；拍内地址步进 = E×outElemBytes
+  *     （outElemBytes = fp32?4:2，与 HiveCore calcConfig cRow/cCol 同源）。cBeatsPerRow 与 E 不变：
+  *     拍数由元素数决定、与格式无关（单行数据位宽 ≤ 总线位宽时也不合并拍，契约已定）。
+  *
   * start 语义：io.start 在任意状态均可重新装载（复位计数/错误、重新锁存
   * 遍历参数、进入 sREQ_EXT），用于异常路径后的强制重启（同 RdOnly 说明）。
   * 安全性：脱离 sTRANSFER 时 bufPop.ready/writeData.valid 自然拉低，无协议违约。
@@ -340,6 +365,9 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   */
 class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean = false, hasMx: Boolean = false) extends Module {
   val popW = if (bufWidth > 0) bufWidth else cfg.cExtW
+  // 总线侧写回位宽：默认哨兵 = cExtW（legacy 一拍一行）；缩位时行内拆多拍。
+  // bufPop 侧仍为整行宽 popW：每行只 pop 一次，两个位宽自本模块起解耦。
+  val extW = cfg.cDmaExtWEff
 
   val io = IO(new Bundle {
     // 控制/状态（无 peek 握手：DMA 启动后自主搬完所有 tile）
@@ -349,7 +377,7 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
     val done  = Output(Bool())                       // 完成脉冲
     val busy  = Output(Bool())                       // 忙标志
     val err   = Output(Bool())                       // 错误标志
-    val dmaExtWrIF = new HiveCoreDMAExtWriteOnlyIF(cfg, popW)
+    val dmaExtWrIF = new HiveCoreDMAExtWriteOnlyIF(cfg, extW)
     val calcConfig = Input(HiveCoreExePreCalcConfig(cfg))  // 预计算的 tile 数与地址偏移
     val regFile = Input(HiveCoreRegister(cfg))           // 仅使用 cAddr 基地址（loopMode 不影响 C 写回遍历）
     val bufPop = slave(Stream(UInt(popW.W)))         // 从 C buffer pop 数据
@@ -379,7 +407,85 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
   val lineCounter = RegInit(0.U(cfg.mnkWidth.W))
   val nCnt = RegInit(0.U(cfg.mnkWidth.W))
   val errReg = RegInit(false.B)
-  val ostCredit = RegInit(0.U(log2Up(cfg.cBufferDepth + 1).W))
+  // credit 记账口径 = 「拍数」（修复留痕）：active 缩位下每行只 pop 一次但拆
+  // cBeatsPerRow 拍写出，最大在途拍数 = cBufferDepth × cBeatsPerRow；
+  // 旧口径 log2Up(cBufferDepth+1)（行数）在 active 多拍下发时可回绕，
+  // 致 sDONE 误判 ostCredit===0 提前放行，故按拍数口径拓宽。
+  val ostCredit = RegInit(0.U(log2Up(cfg.cBufferDepth * cfg.cBeatsPerRow + 1).W))
+
+  // ==========================================================================
+  // 归一化/转换通路选择（P2：先于 ActiveRowSplit 定义，供其引用）
+  // ==========================================================================
+  val isFloat = RegInit(false.B)
+  isFloat := io.regFile.isFloat
+  // 归一化通路选择：hasMx=false 时逐字等于原 isFloat（无额外寄存器/逻辑，bit-exact）；
+  // hasMx=true 时追加 isMx 项——MX 累加同样是 40-bit 延迟格式，须走 fpNormalize40to32。
+  val normSel: Bool = if (hasMx) {
+    val isMxReg = RegInit(false.B)
+    isMxReg := DataFormat.isMx(io.regFile.aFmt)
+    isFloat || isMxReg
+  } else isFloat
+
+  // --- P2 outFmt 运行期有效值（与 HiveCore.scala cOutFmtEff 同源，互指）：
+  // 浮点/MX 运行取 regFile.outFmt；整数运行强制 00（透传，不做精度转换）。
+  // outFmt 编码：00=fp32 01=fp16 10=bf16 11=reserved（行为同 00）。
+  val outFmtEff: UInt = if (hasFp || hasMx) Mux(normSel, io.regFile.outFmt, 0.U(2.W)) else 0.U(2.W)
+  // 16-bit 输出统一判据（与 HiveCore.cIsFmt16 同源、互指）：仅 01=fp16 / 10=bf16
+  // 走 16-bit 通路；11=reserved 回落 fp32 语义（同 00），兑现注释承诺（裁定修复：
+  // 旧判据「===0 才 fp32」致 11 误走 16-bit 输出 + 2B 步进）。
+  // 数据/地址选路一律用 isFmt16，不再直接比较 outFmtEff===0。
+  val isFmt16: Bool = outFmtEff === 1.U || outFmtEff === 2.U
+  // 输出元素字节数（拍内/行/列地址步进同源）：fp32=4B、fp16/bf16=2B
+  val outElemBytes: UInt = Mux(isFmt16, 2.U, 4.U)
+
+  // --- P2 精度转换模块（仅含浮点/MX 配置例化；纯整数配置不生成此硬件）。
+  // 输入直挂 bufPop payload（组合直通，锁存/发拍切割仍由下方行锁存承担，
+  // 发拍段绝不直切组合行数据，教训留痕见 ActiveRowSplit 注释）。
+  // rnd 复用 regFile.rnd（与阵列计算同舍入模式）。
+  val cvt: Option[HiveOutCvt] = if (hasFp || hasMx) {
+    val m = Module(new HiveOutCvt(cfg))
+    m.io.lineIn := io.bufPop.payload
+    m.io.outFmt := outFmtEff
+    m.io.rnd    := io.regFile.rnd
+    Some(m)
+  } else None
+
+  // ==========================================================================
+  // Active 缩位行拆分上下文（仅 cBeatsPerRow>1 时生成；默认哨兵配置不生成，
+  // legacy bit-exact 且零无谓寄存器）
+  // ==========================================================================
+  private class ActiveRowSplit {
+    // 行锁存：宽度 = 最大密集行宽（fp32: totalN*32）+ 有效位 + 拍计数。
+    // fp16/bf16 运行时仅低 totalN*16 位有效（denseLine 高位零填充后写入）。
+    val lineData  = Reg(UInt((cfg.totalN * 32).W))
+    val lineValid = RegInit(false.B)
+    val beatCnt   = RegInit(0.U(log2Up(cfg.cBeatsPerRow).W))
+    // 整数运行密集行（透传占位）：每元素取槽低 32 位、低列号在低位。
+    // 与 P1 整数分支（slice(31,0)）逐字一致：整数路径不做任何规格化。
+    private val intDenseLine: UInt = Cat((0 until cfg.totalN).reverse.map { i =>
+      io.bufPop.payload(cfg.cEffW * (i + 1) - 1, cfg.cEffW * i)(31, 0)
+    })
+    // P2 密集行数据源（纯组合直通，仅供锁存拍采样）：
+    //   浮点运行（normSel）→ HiveOutCvt 输出，运行期 outFmtEff 选 fp32 密集 / 16-bit 密集；
+    //     packed16 高位零填充到 totalN*32，保证 lineData 高位确定性为 0。
+    //   整数运行 → intDenseLine（强制透传，与现状 bit-exact）。
+    val denseLine: UInt = if (hasFp || hasMx) {
+      val packed16Pad = Cat(0.U((cfg.totalN * 16).W), cvt.get.io.packed16)
+      Mux(normSel,
+        Mux(isFmt16, packed16Pad, cvt.get.io.packed32),
+        intDenseLine)
+    } else intDenseLine
+    // 拍段切分（P2 运行期元素位宽）：第 beatCnt 拍段起始位 = beatCnt × E × elemW
+    // （每拍含 E 个元素，必须连元素数一起乘——漏乘 E 会让 beat1+ 段起点偏移 E-1 个元素，
+    // 曾导致 P1 缩位回归全线错位，修复留痕）；右移后取低 E*32 段。
+    // fp32 时逐字等价 P1 的按拍号固定位切段；fp16/bf16 时仅段低 E*16 位有效（上方总线拼接取用）。
+    // 发拍段必须切自锁存后的 lineData——若切自组合直通，发送拍期间
+    // FIFO 头部已前移到下一行，总线数据会整行错位（丢行 0 + 尾行垃圾）。
+    private val segBits = cfg.cElementsPerBeat * 32
+    private val elemW: UInt = Mux(isFmt16, 16.U(6.W), 32.U(6.W))
+    def beatData: UInt = (lineData >> (beatCnt * cfg.cElementsPerBeat.U * elemW))(segBits - 1, 0)
+  }
+  private val split: Option[ActiveRowSplit] = if (cfg.cBeatsPerRow > 1) Some(new ActiveRowSplit) else None
 
   // ==========================================================================
   // C buffer pop → 写出侧 fp32 延迟规格化（延迟规格化架构核心）
@@ -403,23 +509,68 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
   }
 
   // ==========================================================================
-  // 默认输出驱动
+  // 默认输出驱动（isFloat/normSel/outFmtEff 已上提至 ActiveRowSplit 之前，
+  // 供 denseLine/outElemBytes 同源引用）
   // ==========================================================================
-  val isFloat = RegInit(false.B)
-  isFloat := io.regFile.isFloat
-  // 归一化通路选择：hasMx=false 时逐字等于原 isFloat（无额外寄存器/逻辑，bit-exact）；
-  // hasMx=true 时追加 isMx 项——MX 累加同样是 40-bit 延迟格式，须走 fpNormalize40to32。
-  val normSel: Bool = if (hasMx) {
-    val isMxReg = RegInit(false.B)
-    isMxReg := DataFormat.isMx(io.regFile.aFmt)
-    isFloat || isMxReg
-  } else isFloat
-
-  io.dmaExtWrIF.req.valid        := (state === sTRANSFER_M) & io.bufPop.valid
-  io.dmaExtWrIF.req.payload.addr         := curAddr
-  io.dmaExtWrIF.req.payload.data         := Mux(normSel, popDataFpNorm, io.bufPop.payload)
   io.dmaExtWrIF.rsp.ready        := true.B
-  io.bufPop.ready                := (state === sTRANSFER_M) & io.dmaExtWrIF.req.ready
+
+  // ==========================================================================
+  // 写回握手分支（编译期二选一）：
+  //   legacy（cBeatsPerRow==1，默认哨兵）：一拍一行 ——
+  //     bufPop.fire 与 req 锁步；outFmtEff==fp32（默认）时数据 = normSel 选路结果（规格化后零扩展回 40 位槽，
+  //     逐字保留重构前实现）；P2 新增：outFmtEff≠fp32 时改发 HiveOutCvt 16-bit 密集行（低位对齐、高位零填充）。
+  //   active（cBeatsPerRow>1，显式缩位）：行锁存 + 行内多拍拆分（契约见类头注释）。
+  // 为何 legacy 保 40 位槽布局而 active 改密集：legacy 必须与出厂软件内存布局逐字一致（5B/元素），
+  // 金锚与既有测试零迁移；active 为新配置显式选用，密集打包省去零扩展槽、省总线带宽。
+  // ==========================================================================
+  if (cfg.cBeatsPerRow == 1) {
+    // P2 浮点通路数据：outFmtEff==fp32 → 现状 popDataFpNorm（默认 00 时逐字不变，回归 bit-exact 锚点）；
+    // outFmtEff≠fp32 → HiveOutCvt packed16 密集行零填充至总线宽（一行 1 拍：单行数据位宽 ≤ 总线位宽时
+    // 拍数不合并、仍按 1 拍发出，与 active 同契约）。
+    val fpWrData: UInt = if (hasFp || hasMx) {
+      val dense16 = Cat(0.U((cfg.cDmaExtWEff - cfg.totalN * 16).W), cvt.get.io.packed16)
+      Mux(isFmt16, dense16, popDataFpNorm)
+    } else popDataFpNorm
+    io.dmaExtWrIF.req.valid        := (state === sTRANSFER_M) & io.bufPop.valid
+    io.dmaExtWrIF.req.payload.addr         := curAddr
+    io.dmaExtWrIF.req.payload.data         := Mux(normSel, fpWrData, io.bufPop.payload)
+    io.bufPop.ready                := (state === sTRANSFER_M) & io.dmaExtWrIF.req.ready
+  } else {
+    val s = split.get
+    // 行锁存：锁存空才收新行 → 每行只 pop 一次（Executor 侧背压语义不变）
+    io.bufPop.ready := (state === sTRANSFER_M) & !s.lineValid
+    when((state === sTRANSFER_M) && io.bufPop.fire) {
+      s.lineData  := s.denseLine
+      s.lineValid := true.B
+      s.beatCnt   := 0.U
+    }
+
+    // 总线侧：锁存有数据即发拍；地址 = 行首址 + 拍号×拍内步进（E×outElemBytes，
+    // P2 运行期：fp32=4B / fp16=bf16=2B；行步进/列 tile 步进由 HiveCore calcConfig 同源提供）；
+    // curAddr 只在行边界更新，拍内用组合偏移，行/块跳转自动对齐、免维护拍地址寄存器。
+    // 数据：第 beatCnt 段 E 个元素放总线低位，其余高位零填充（尾拍同理）；
+    // fp16/bf16 取段低 E×16 位（段内元素按 16-bit 密集）。
+    val seg32 = s.beatData
+    val data32: UInt =
+      if (cfg.cDmaExtWEff == cfg.cElementsPerBeat * 32) seg32
+      else Cat(0.U((cfg.cDmaExtWEff - cfg.cElementsPerBeat * 32).W), seg32)
+    val data16: UInt = Cat(0.U((cfg.cDmaExtWEff - cfg.cElementsPerBeat * 16).W),
+                           seg32(cfg.cElementsPerBeat * 16 - 1, 0))
+    io.dmaExtWrIF.req.valid        := (state === sTRANSFER_M) & s.lineValid
+    io.dmaExtWrIF.req.payload.addr := curAddr + s.beatCnt * (cfg.cElementsPerBeat.U * outElemBytes)
+    io.dmaExtWrIF.req.payload.data := Mux(isFmt16, data16, data32)
+
+    // 拍推进：末拍清行锁存并回零拍计数（行推进动作在下方 switch sTRANSFER_M 分支）；
+    // bufPop.fire 与 req.fire 由 lineValid 互斥（锁存空/满二态），无同拍双写冲突。
+    when((state === sTRANSFER_M) && io.dmaExtWrIF.req.fire) {
+      when(s.beatCnt === (cfg.cBeatsPerRow - 1).U) {
+        s.lineValid := false.B
+        s.beatCnt   := 0.U
+      }.otherwise {
+        s.beatCnt := s.beatCnt + 1.U
+      }
+    }
+  }
 
   io.done := false.B
   io.busy := state =/= sIDLE
@@ -445,53 +596,100 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
   }
   
 
+  // ==========================================================================
+  // start 重载公共动作（任意状态生效，引用同文件 RdOnly 的 sTRANSFER/sDONE
+  // 重载同构实现）：回 sFIRST_PEEK、清 errReg/lineCounter/nCnt、重载
+  // curAddr/rowStep/colAddr；active 另清 lineValid/beatCnt（防异常路径残留
+  // 半行状态）。正常流程 start 仅出现在 sIDLE，其余状态的重载分支为死路、
+  // 行为不变；异常路径（Executor 回 idle 后下次 EXECUTE）可强制重启卡死状态。
+  // ==========================================================================
+  private def startReload(): Unit = {
+    state       := sFIRST_PEEK
+    errReg      := false.B
+    lineCounter := 0.U
+    // C 矩阵：固定「内 M 外 N」遍历（C buffer 为 FIFO，写回顺序 =
+    // Executor push 顺序，与 loopMode 无关）
+    curAddr := io.regFile.cAddr
+    // 内层沿实际 M 行（regFile.m，边界感知不含 padding），外层扫 nTile 个 N tile
+    rowStep := io.calcConfig.cRowAddressOffset
+    colAddr := io.calcConfig.cColTileAddressOffset
+    nCnt    := 0.U
+    // active：强制重启时同步清行锁存（正常流程回 sIDLE 前锁存已自然清空，
+    // 此处仅防异常路径残留半行状态；legacy 编译期不生成，行为不变）
+    if (cfg.cBeatsPerRow > 1) {
+      split.get.lineValid := false.B
+      split.get.beatCnt   := 0.U
+    }
+  }
+
   switch(state) {
 
-    // --- sIDLE: 等待 start（锁存逻辑在上方统一处理，本状态无动作） ---
+    // --- sIDLE: 等待 start ---
     is(sIDLE) { 
       // ==========================================================================
       // start 重新装载（任意状态生效，语义与安全性说明见 RdOnly 同构实现）：
       // Executor 异常回 idle 后下次 EXECUTE 必须能强制重启卡死的本 DMA
       // ==========================================================================
       when(io.start) {
-        state  := sFIRST_PEEK
-        errReg := false.B
-        // C 矩阵：固定「内 M 外 N」遍历（C buffer 为 FIFO，写回顺序 =
-        // Executor push 顺序，与 loopMode 无关）
-        curAddr := io.regFile.cAddr
-        // 内层沿实际 M 行（regFile.m，边界感知不含 padding），外层扫 nTile 个 N tile
-        // 与 Executor store 顺序一致：每个 N tile 写回所有实际 M 行
-        // （Executor 只 push 实际 M 行，若锁存 mTile*totalN 会永久等待挂死）
-        rowStep   := io.calcConfig.cRowAddressOffset
-        colAddr   := io.calcConfig.cColTileAddressOffset
-        nCnt      := 0.U
+        startReload()
       }
 
 
     }
     
     is(sFIRST_PEEK) {
-      when(io.peekBlock) {
+      // start 重载（契约对齐，同 RdOnly）：等 peek 拍收到 start → 重载回起点；
+      // 正常流程 start 不出现在本状态，分支死路、行为不变
+      when(io.start) {
+        startReload()
+      }.elsewhen(io.peekBlock) {
         state := sTRANSFER_M
       }
     }
 
     is(sTRANSFER_M){
-      when(io.bufPop.fire) {
-        when(lineCounter === io.regFile.m - 1.U) {
-          lineCounter := 0.U
-          state := sNEXT_N
-          io.doneBlock := true.B
-        }.otherwise {
-          lineCounter := lineCounter + 1.U
-          curAddr := curAddr + rowStep
+      // start 重载（契约对齐，同 RdOnly sTRANSFER）：搬运途中强制重启 →
+      // 同拍重载参数并回 sFIRST_PEEK（last-connect：上方拍推进/行锁存块
+      // 本拍若有赋值，均被 startReload 的 lineValid/beatCnt 覆盖）
+      when(io.start) {
+        startReload()
+      }.otherwise {
+        if (cfg.cBeatsPerRow == 1) {
+          // legacy（默认）：一拍一行，bufPop.fire 驱动行推进（逐字保留重构前实现）
+          when(io.bufPop.fire) {
+            when(lineCounter === io.regFile.m - 1.U) {
+              lineCounter := 0.U
+              state := sNEXT_N
+              io.doneBlock := true.B
+            }.otherwise {
+              lineCounter := lineCounter + 1.U
+              curAddr := curAddr + rowStep
+            }
+          }
+        } else {
+          // active：末拍（行内最后一拍）才做行推进，动作与 legacy bufPop.fire
+          // 分支逐字同义；拍计数/行锁存清除在上方拍推进 when 块处理。
+          when(io.dmaExtWrIF.req.fire && split.get.beatCnt === (cfg.cBeatsPerRow - 1).U) {
+            when(lineCounter === io.regFile.m - 1.U) {
+              lineCounter := 0.U
+              state := sNEXT_N
+              io.doneBlock := true.B
+            }.otherwise {
+              lineCounter := lineCounter + 1.U
+              curAddr := curAddr + rowStep
+            }
+          }
         }
       }
     }
 
 
     is(sNEXT_N) {
-      when(nCnt === io.calcConfig.nTile - 1.U){
+      // start 重载（契约对齐，同 RdOnly）：块间跳转拍强制重启 → 重载回起点；
+      // 下一拍若未重载也会被 sTRANSFER_M/sDONE 分支捕获（双保险）
+      when(io.start) {
+        startReload()
+      }.elsewhen(nCnt === io.calcConfig.nTile - 1.U){
         state := sDONE
       }.otherwise{
         when(io.peekBlock){
@@ -507,7 +705,13 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
  
     // --- sDONE: 发完成脉冲，回 IDLE ---
     is(sDONE) {
-      when(ostCredit === 0.U) {
+      // start 重载（契约对齐，同 RdOnly sDONE）：绕过 sIDLE 时 credit 归零
+      // 不执行，故重载另需 ostCredit := 0.U（last-connect 覆盖上方
+      // state=/=sIDLE 分支的同拍增减）；重启后以新写回拍重新累计在途。
+      when(io.start) {
+        startReload()
+        ostCredit := 0.U
+      }.elsewhen(ostCredit === 0.U) {
         io.done := true.B
         state := sIDLE
       }

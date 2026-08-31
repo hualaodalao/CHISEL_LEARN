@@ -226,10 +226,17 @@ object Fp32 {
 
     // 简化舍入 (RNE: guard && (sticky || lsb) → +1，简化为 guard|sticky)
     val roundUp = guard & (stickyBits | mant23(0))
-    val mRounded = Mux(roundUp, (mant23 +& 1.U)(22, 0), mant23)
+    // 舍入进位处理（修复留痕）：mant23 全 1（0x7FFFFF）且 roundUp 时，
+    // 旧实现直接截取 (mant23 +& 1)(22,0) 丢失第 23 位进位且指数未 +1，
+    // 结果差 2 倍。现进位时尾数归零、指数 +1。
+    val mSum      = mant23 +& roundUp        // 24-bit（bit23 = 尾数进位）
+    val mantCarry = mSum(23)
+    val mRounded  = mSum(22, 0)
 
-    // 指数修正：减去 leading zeros 数量
-    val eOut = Mux(e > lzc, (e - lzc)(7, 0), 0.U(8.W))
+    // 指数修正：减去 leading zeros 数量，再加舍入进位；
+    // 中间量用 9 位防溢出（255+1），最终截 8 位落 fp32 exp 字段
+    val eBase = Mux(e > lzc, e - lzc, 0.U(8.W))
+    val eOut  = (eBase +& mantCarry)(7, 0)
 
     Mux(isZero, 0.U(32.W), Cat(s, eOut, mRounded))
   }

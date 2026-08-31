@@ -1,9 +1,9 @@
 /** HiveCore 脉动阵列控制器的队列型缓冲系统。
   *
   * 包含三个独立的 FIFO 缓冲：
-  *   - A buffer：激活数据（DMA0 写入，Executor 读出）
+  *   - A buffer：激活数据（dmaA 写入，Executor 读出）
   *   - B buffer：权重数据（RdOnly DMA 自主扫描写入，Executor 读出，宽 totalN*bW）
-  *   - C buffer：结果缓冲（Executor 写入，DMA1 写回/Executor partial sum 读出）
+  *   - C buffer：结果缓冲（Executor 写入，dmaC 写回/Executor partial sum 读出）
   */
 
 import chisel3._
@@ -11,7 +11,7 @@ import chisel3.util._
 
 class HiveCoreScratchpad(cfg: HiveCoreConfig) extends Module {
   val io = IO(new Bundle {
-    // A buffer: DMA0写入, Executor读出
+    // A buffer: dmaA写入, Executor读出
     val aPush = slave(Stream(UInt((cfg.totalN * cfg.aEffW).W)))
     val aPop  = master(Stream(UInt((cfg.totalN * cfg.aEffW).W)))
     val aOccupancy    = Output(UInt(log2Up(cfg.aBufferDepth + 1).W))
@@ -23,7 +23,7 @@ class HiveCoreScratchpad(cfg: HiveCoreConfig) extends Module {
     val bOccupancy    = Output(UInt(log2Up(cfg.bBufferDepth + 1).W))
     val bAvailability = Output(UInt(log2Up(cfg.bBufferDepth + 1).W))
 
-    // C buffer: Executor写入(结果), DMA1/Executor读出
+    // C buffer: Executor写入(结果), dmaC/Executor读出
     val cPush = slave(Stream(UInt((cfg.totalN * cfg.cEffW).W)))
     val cPop  = master(Stream(UInt((cfg.totalN * cfg.cEffW).W)))
     val cOccupancy    = Output(UInt(log2Up(cfg.cBufferDepth + 1).W))

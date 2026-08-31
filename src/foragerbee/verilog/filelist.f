@@ -1,12 +1,13 @@
 Fb_ram_64x256.sv
 Fb_Queue64_UInt256.sv
 Fb_FbFormatConverter.sv
+Fb_FbMxQuantizer.sv
 Fb_FbTransposeBuffer.sv
 Fb_FbScatterGatherCtrl.sv
 Fb_FbEngine.sv
 Fb_FbIm2colAddrGen.sv
 Fb_FbEngine_1.sv
-Fb_ram_4x870.sv
+Fb_ram_4x905.sv
 Fb_Queue4_FbCmd.sv
 Fb_StreamFifo.sv
 Fb_FbDispatcher.sv

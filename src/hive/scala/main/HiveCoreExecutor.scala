@@ -349,7 +349,7 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
       //   并入供数门控，保证每个激活行 fire 当拍其对应 scale 已就位。
       //   【MX 必选】hasMx 编译期分支仅保留 Option 端口存在性；谓词改运行期：
       //   isMx=false 运行时（非 MX 数据）门控项恒真，feed 逐拍等于 feedBase，
-      //   与无 MX 硬件时行为一致（非 MX 用例不驱动 dma3，FIFO 恒空也不死锁）。
+      //   与无 MX 硬件时行为一致（非 MX 用例不驱动 dmaScaleA，FIFO 恒空也不死锁）。
       val feed = if (cfg.hasMx) feedBase & (!DataFormat.isMx(io.regFile.aFmt) | io.scaleAPop.get.valid) else feedBase
 
       // ready 门控：供数满 m 行（mDone）后关断，防止排空窗口误消费

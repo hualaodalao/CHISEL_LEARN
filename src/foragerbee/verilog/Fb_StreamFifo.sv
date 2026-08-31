@@ -64,6 +64,9 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
                 io_push_payload_im2colInShape_2,	// src/utils/Stream/Stream.scala:363:14
   input  [31:0] io_push_payload_sgListAddr,	// src/utils/Stream/Stream.scala:363:14
   input  [15:0] io_push_payload_sgEntryCount,	// src/utils/Stream/Stream.scala:363:14
+  input  [31:0] io_push_payload_scaleAddr,	// src/utils/Stream/Stream.scala:363:14
+  input  [1:0]  io_push_payload_scaleBlockSize,	// src/utils/Stream/Stream.scala:363:14
+  input         io_push_payload_mxQuantEn,	// src/utils/Stream/Stream.scala:363:14
   output        io_pop_valid,	// src/utils/Stream/Stream.scala:363:14
   input         io_pop_ready,	// src/utils/Stream/Stream.scala:363:14
   output [2:0]  io_pop_payload_op,	// src/utils/Stream/Stream.scala:363:14
@@ -119,6 +122,9 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
                 io_pop_payload_im2colInShape_2,	// src/utils/Stream/Stream.scala:363:14
   output [31:0] io_pop_payload_sgListAddr,	// src/utils/Stream/Stream.scala:363:14
   output [15:0] io_pop_payload_sgEntryCount,	// src/utils/Stream/Stream.scala:363:14
+  output [31:0] io_pop_payload_scaleAddr,	// src/utils/Stream/Stream.scala:363:14
+  output [1:0]  io_pop_payload_scaleBlockSize,	// src/utils/Stream/Stream.scala:363:14
+  output        io_pop_payload_mxQuantEn,	// src/utils/Stream/Stream.scala:363:14
   output [2:0]  io_occupancy	// src/utils/Stream/Stream.scala:363:14
 );
 
@@ -187,6 +193,9 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
     .io_enq_bits_im2colInShape_2  (io_push_payload_im2colInShape_2),
     .io_enq_bits_sgListAddr       (io_push_payload_sgListAddr),
     .io_enq_bits_sgEntryCount     (io_push_payload_sgEntryCount),
+    .io_enq_bits_scaleAddr        (io_push_payload_scaleAddr),
+    .io_enq_bits_scaleBlockSize   (io_push_payload_scaleBlockSize),
+    .io_enq_bits_mxQuantEn        (io_push_payload_mxQuantEn),
     .io_deq_ready                 (io_pop_ready),
     .io_deq_valid                 (io_pop_valid),
     .io_deq_bits_op               (io_pop_payload_op),
@@ -242,6 +251,9 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
     .io_deq_bits_im2colInShape_2  (io_pop_payload_im2colInShape_2),
     .io_deq_bits_sgListAddr       (io_pop_payload_sgListAddr),
     .io_deq_bits_sgEntryCount     (io_pop_payload_sgEntryCount),
+    .io_deq_bits_scaleAddr        (io_pop_payload_scaleAddr),
+    .io_deq_bits_scaleBlockSize   (io_pop_payload_scaleBlockSize),
+    .io_deq_bits_mxQuantEn        (io_pop_payload_mxQuantEn),
     .io_count                     (io_occupancy)
   );	// src/utils/Stream/Stream.scala:371:21
 endmodule

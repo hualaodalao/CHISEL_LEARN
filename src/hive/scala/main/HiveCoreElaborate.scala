@@ -4,7 +4,7 @@
   * 输出：
   *   - src/hive/verilog/     基线配置（FP16 数据通路：aW=bW=16, cW=40，深度 32）。
   *                           【MX 必选】默认 supportedFmts 含全部格式（含 MX）→ hasMx=true，
-  *                           顶层暴露 dma3/dma4 并例化 scaleA/scaleB DMA；但 scale 通路
+  *                           顶层暴露 dmaScaleA/dmaScaleB 并例化 scaleA/scaleB DMA；但 scale 通路
   *                           由运行期 isMx(regFile.aFmt) 门控，非 MX 运行时不启动、行为与
   *                           无 MX 硬件逐拍一致。
   *   - src/hive/verilog_mx/  MX 仿真对齐配置（aW=bW=16, cW=40，深度 2048/256，
@@ -12,13 +12,26 @@
   *                           【注意】两套产物 hasMx 均为 true 且 aW/bW 均为 16，
   *                           差异退化为缓冲深度与 supportedFmts，而非 hasMx。
   *
-  * 【对外破坏性变更（MXFP8 v2 SIMD 升级）】verilog_mx 产物 dma0/dma2 ext 数据位宽由
+  * 【对外破坏性变更（MXFP8 v2 SIMD 升级）】verilog_mx 产物 dmaA/dmaB 数据位宽由
   * 128 位 → 256 位（aExtW/bExtW = totalN*aEffW = 16×16）。基线 verilog/（本就 aW=16）
   * 端口集不变，仅内部 MX 通路升级为 v2 SIMD（2 元素/拍：4 个 HiveCvtOpMx + 2 个
   * HiveMacFp 级联，双 pass 拼块删除、pass 数减半、MX 算力翻倍）逻辑。
   *
+  * 【对外破坏性变更（顶层 DMA 端口语义命名）】顶层 DMA 端口由 dmaNExt 数字命名改为语义命名：
+  * dma0Ext → dmaA（A 激活读）、dma1Ext → dmaC（C 结果写回）、dma2Ext → dmaB（B 权重读）、
+  * dma3Ext → dmaScaleA、dma4Ext → dmaScaleB（仅 hasMx）。端口集内容、顺序、类型、位宽与
+  * Option 门控均不变，仅名字变化；下游集成需同步更新例化/连接名。
+  *
   * P5.5 双配置发射：以同一入口分别 elaborate 两套配置，各自清理目录并打包独立
-  * zip，互不覆盖。旧预期「非 MX 基线不暴露 dma3/dma4」随 MX 必选裁定作废。
+  * zip，互不覆盖。旧预期「非 MX 基线不暴露 dmaScaleA/dmaScaleB」随 MX 必选裁定作废。
+  *
+  * 【P1/P2 dmaC 写回重构留痕】本入口两套配置均不传 cDmaExtW（哨兵 0 → 满宽 cExtW，
+  * 一拍一行，dmaC 端口位宽保持 640，非破坏性）；新增参数 cDmaExtW（缩位）与运行期寄存器
+  * regs(7)(12,11)=outFmt（00=fp32 默认/01=fp16/10=bf16，精度转换模块 HiveOutCvt）需显式启用，
+  * 默认不写 outFmt 位时出厂产物行为与重构前 bit-exact。
+  * 【对外软件契约变更留痕】显式启用缩位/降精度（cDmaExtW≠0 或 outFmt≠00）时，
+  * C 写回内存布局由 5B/元素槽改为 4B（fp32）/2B（fp16/bf16）密集，属对外软件契约变更，
+  * 读结果软件需同步迁移（默认配置不受影响）。
   *
   * 流程（每个配置）：
   *   1. 清理输出目录
@@ -42,7 +55,7 @@ import scala.collection.JavaConverters._
 object HiveCoreElaborate extends App {
   // 基线配置：与 HiveCoreSimCase 的 HiveCoreConfig 构造参数原样一致。
   // 【MX 必选】不传 supportedFmts → 默认含全部格式（含 MX）→ hasMx=true，
-  // 产物含 dma3/dma4 与 scale DMA；非 MX 运行由运行期 isMx 门控隔离。
+  // 产物含 dmaScaleA/dmaScaleB 与 scale DMA；非 MX 运行由运行期 isMx 门控隔离。
   // 注意: DMA 的 bufAvailability 端口宽度由 aBufferDepth 决定（设计缺陷），
   // 因此 aBufferDepth 必须 >= cBufferDepth 以避免信号截断。
   val cfgBase = HiveCoreConfig(

@@ -5,7 +5,10 @@
   *     → COPY：数据 Queue 旁路缓冲 → [FbFormatConverter] → FbStreamBus 写（wr/wrResp）
   *     → TRANSPOSE（supportsTranspose=true）：FbTransposeBuffer → FbStreamBus 写
   *     → PERMUTE：同 COPY 路径，但源 stride 按 permVec 重映射
-  *     → Zero-Padding（COPY + padBefore/padAfter）：dim1 全零行 / dim0 行首尾零段直写 sZWRITE
+  *   → Zero-Padding（COPY + padBefore/padAfter）：dim1 全零行 / dim0 行首尾零段直写 sZWRITE
+  *   → MX 量化（COPY + mxQuantEn）：dataQueue → FbMxQuantizer → 量化数据写 wr，
+  *     scale 字节累积后于每段数据写完后经 sSWRITE 以 strb 部分写突发写到 scaleAddr
+  *     （与数据写串行，独占 wr/wrResp）
   *   全部完成后 done 回执（tag/err）。
   *
   * COPY FSM：
@@ -66,6 +69,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   val sZWRITE = 6.U(4.W) // Zero-Padding 写状态（发 AW + W 全零突发，不经 dataQueue）
   val sI2C    = 7.U(4.W) // im2col 主状态
   val sSG     = 8.U(4.W) // scatter/gather 主状态
+  val sSWRITE = 9.U(4.W) // MX 量化：E8M0 scale 累积字节写出状态
   val state = RegInit(sIDLE)
 
   // --- 命令锁存 ---
@@ -84,10 +88,14 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
 
   // --- 格式转换派生量 ---
   private val cvtActive = if (cfg.enableConversion) cmdReg.cvtEnable && (cmdReg.srcFmt =/= cmdReg.dstFmt) else false.B
+  // MX 编码 4/5 登记为 8-bit（MXE4M3/MXE5M2），保证量化压缩比推导正确：
+  //   FP16/BF16(16)→MX(8)：cvtCompress=true、cvtShift=1；FP32(32)→MX(8)：cvtShift=2
   private val srcEB = if (cfg.enableConversion) MuxLookup(cmdReg.srcFmt, 32.U(6.W))(Seq(
-    0.U -> 32.U, 1.U -> 16.U, 2.U -> 16.U, 3.U -> 8.U)) else 32.U(6.W)
+    0.U -> 32.U, 1.U -> 16.U, 2.U -> 16.U, 3.U -> 8.U,
+    4.U -> 8.U, 5.U -> 8.U)) else 32.U(6.W)
   private val dstEB = if (cfg.enableConversion) MuxLookup(cmdReg.dstFmt, 32.U(6.W))(Seq(
-    0.U -> 32.U, 1.U -> 16.U, 2.U -> 16.U, 3.U -> 8.U)) else 32.U(6.W)
+    0.U -> 32.U, 1.U -> 16.U, 2.U -> 16.U, 3.U -> 8.U,
+    4.U -> 8.U, 5.U -> 8.U)) else 32.U(6.W)
   private val cvtExpand = if (cfg.enableConversion) dstEB > srcEB else false.B
   private val cvtCompress = if (cfg.enableConversion) srcEB > dstEB else false.B
   private val cvtShift = if (cfg.enableConversion) {
@@ -125,11 +133,14 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
 
   // --- 格式转换模块（仅 enableConversion 时实例化）---
   val converter = if (cfg.enableConversion) Some(Module(new FbFormatConverter(cfg.dataWidth, cfg.converterPipeStages))) else None
-  // dstSegBeats: 写侧段 beat 数
+  // dstSegBeats: 写侧段 beat 数（MX 量化压缩比同 cvtCompress：FP16/BF16→FP8=2，FP32→FP8=4）
   val dstSegBeats = if (cfg.enableConversion) {
     Mux(!cvtActive, segBeats,
       Mux(cvtCompress, segBeats >> cvtShift, segBeats << cvtShift))
   } else segBeats
+
+  // --- MX 量化器（仅 enableConversion 时实例化；运行期由 mxQuantActive 门控）---
+  val mxQuantizer = if (cfg.enableConversion) Some(Module(new FbMxQuantizer(cfg.dataWidth))) else None
 
   // --- 转置缓冲（仅 supportsTranspose 时实例化） ---
   val transp = if (supportsTranspose) Some(Module(new FbTransposeBuffer(cfg))) else None
@@ -177,6 +188,15 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   val zawIssued = RegInit(false.B)         // sZWRITE AW 已发
   val padOuterDone = RegInit(false.B)      // dimCount>2 时所有外层维度切片已遍历完毕
   val padOuterAddrOff = RegInit(0.U(wideW.W)) // 当前外层切片的目的地址偏移 Σ(outerIdx(d)*dstStride(d)) for d∈[2,dimCount)
+
+  // --- MX 量化寄存器（scale 字节累积 + 行内字节游标 + scale 写出子状态）---
+  val mxQuantActive = if (cfg.enableConversion) cmdReg.mxQuantEn && cvtActive else false.B
+  val mxScaleAccum      = RegInit(VecInit(Seq.fill(BB)(0.U(8.W)))) // scale 字节累积（每段数据写完后经 sSWRITE 写出）
+  val mxScaleAccumCount = RegInit(0.U(log2Up(BB + 1).W))           // 累积字节计数（0..BB）
+  val mxScaleByteCur    = RegInit(0.U(20.W))                       // 行内已完成写出的 scale 字节游标
+  val mxScaleWrByte     = RegInit(0.U(log2Up(BB + 1).W))           // sSWRITE：本轮累积中已写字节数（跨 beat 拆分用）
+  val mxScaleAwIssued   = RegInit(false.B)                         // sSWRITE：当前单拍突发已发
+  val mxRowEndPending   = RegInit(false.B)                         // sSWRITE：本轮 scale 写完后需推进行（行末）
 
   // ==========================================================================
   // 地址与 AXI 通道辅助
@@ -230,6 +250,38 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     }
     if (contributions.isEmpty) 0.U(wideW.W)
     else contributions.reduce(_ +& _)
+  }
+
+  /** 当前数据行写完后的推进逻辑（sWRITE 与 sSWRITE 共用）：
+    * MX 量化行由 sSWRITE 调用（scale 已写出），非 MX 行由 sWRITE 直接调用 */
+  private def finishDataRow(): Unit = {
+    beatInRow := 0.U
+    if (cfg.enableConversion) { wBeatInRow := 0.U }
+    when(padActive) {
+      // Zero-Padding 模式：推进源计数器，然后处理阶段转移（MX 量化与 padding 互斥，此分支无 MX）
+      outerIdx := nxtIdx
+      when(outerCarry(cmdReg.dimCount)) {
+        padOuterDone := true.B
+      }
+      when(padAfterBytes0 > 0.U) {
+        // dim0 行尾 pad → sZWRITE phase 2
+        state := sZWRITE
+        zPhase := 2.U
+        zBeatInRow := 0.U
+        zawIssued := false.B
+      }.otherwise {
+        // 无行尾 pad → 直接推进 virtualRow
+        advanceToNextVirtualRow()
+      }
+    }.otherwise {
+      // 正常 COPY/PERMUTE：外层维度进位（含 MX 量化）
+      outerIdx := nxtIdx
+      when(outerCarry(cmdReg.dimCount)) {
+        state := sDONE
+      }.otherwise {
+        state := sREAD
+      }
+    }
   }
 
   /** Zero-Padding 推进到下一 virtualRow 的逻辑（从多处调用） */
@@ -297,7 +349,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   dataQueue.io.enq.bits := DontCare
   dataQueue.io.deq.ready := false.B
 
-  // 格式转换模块默认信号
+  // 格式转换模块默认信号（mxQuantActive 时数据通路改经量化器，此处保持静默）
   converter.foreach { c =>
     c.io.in.valid := false.B
     c.io.in.bits := DontCare
@@ -306,8 +358,22 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     c.io.cfg_dstFmt := cmdReg.dstFmt
     c.io.cfg_scale := cmdReg.cvtScale
     c.io.cfg_zeroPoint := cmdReg.cvtZeroPoint
-    c.io.cfg_enable := cmdReg.cvtEnable
+    c.io.cfg_enable := cmdReg.cvtEnable && !mxQuantActive
     c.io.flush := false.B
+  }
+
+  // MX 量化器默认信号（命令锁存后配置常驻；flush 于 sDONE 拉高）
+  mxQuantizer.foreach { q =>
+    q.io.in.valid := false.B
+    q.io.in.bits := DontCare
+    q.io.outData.ready := false.B
+    q.io.outScale.ready := false.B
+    q.io.cfg_srcFmt := cmdReg.srcFmt
+    q.io.cfg_dstFmt := cmdReg.dstFmt
+    // 块大小编码 → 实际值：0→16、1→32、2→64 个元素共享一个 E8M0 scale
+    q.io.cfg_blockSize := MuxLookup(cmdReg.scaleBlockSize, 32.U(7.W))(Seq(
+      0.U -> 16.U, 1.U -> 32.U, 2.U -> 64.U))
+    q.io.flush := false.B
   }
 
   // 转置缓冲默认驱动
@@ -412,7 +478,47 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     c.sgListAddr(log2BB - 1, 0) =/= 0.U
   }
 
-  val cBad = cBadBase || permBad || padBad || permPadBad || im2colBad || sgBad
+  // MX 量化校验（仅当 mxQuantEn 时生效）：
+  //   仅 COPY + cvtEnable；shape(0) 为 blockSize 整数倍；编码/格式/对齐合法；与 padding 互斥；
+  //   enableConversion 未开启时禁止使用（硬件无量化器）
+  val mxBlockSizeVal = MuxLookup(c.scaleBlockSize, 0.U(7.W))(Seq(
+    0.U -> 16.U, 1.U -> 32.U, 2.U -> 64.U))
+  val mxQuantBad = c.mxQuantEn && {
+    val shapeMisalign = c.scaleBlockSize > 2.U || c.shape(0) % mxBlockSizeVal =/= 0.U
+    // 每块读侧 beat 数：须 ≤ maxBurstLen 且 ≤ dataQueue 深度，
+    // 否则段长对齐后恒为 0（死锁）
+    val mxBlockBeatsCmd = (mxBlockSizeVal << c.elemBytesLog2) >> log2BB
+    val blockTooBig = mxBlockBeatsCmd > cfg.maxBurstLen.U ||
+      mxBlockBeatsCmd > cfg.resolvedDataQueueDepth.U
+    val scaleAddrUnaligned = c.scaleAddr(log2BB - 1, 0) =/= 0.U
+    val srcFmtBadMx = c.srcFmt =/= FbDataFmt.FP16 && c.srcFmt =/= FbDataFmt.BF16 &&
+      c.srcFmt =/= FbDataFmt.FP32
+    // srcFmt 与 elemBytesLog2 一致性：FP32→2(4B), FP16/BF16→1(2B)，
+    // 不一致会导致引擎块节拍数与量化器不匹配（死锁）
+    val srcFmtEbMismatch = (c.srcFmt === FbDataFmt.FP32 && c.elemBytesLog2 =/= 2.U) ||
+      ((c.srcFmt === FbDataFmt.FP16 || c.srcFmt === FbDataFmt.BF16) && c.elemBytesLog2 =/= 1.U)
+    val dstFmtBadMx = c.dstFmt =/= FbDataFmt.MXE4M3 && c.dstFmt =/= FbDataFmt.MXE5M2
+    val hasPadAny = c.padBefore(0) =/= 0.U || c.padAfter(0) =/= 0.U ||
+      c.padBefore(1) =/= 0.U || c.padAfter(1) =/= 0.U
+    !cfg.enableConversion.B ||
+    c.op =/= FbOp.COPY ||
+    !c.cvtEnable ||
+    c.scaleBlockSize > 2.U ||
+    shapeMisalign ||
+    blockTooBig ||
+    scaleAddrUnaligned ||
+    srcFmtBadMx ||
+    srcFmtEbMismatch ||
+    dstFmtBadMx ||
+    hasPadAny
+  }
+
+  // MX 编码不得进入非量化格式转换路径（仅量化器认识 MX 格式）
+  val mxNonQuantBad = cfg.enableConversion.B && c.cvtEnable && !c.mxQuantEn &&
+    ((c.srcFmt === FbDataFmt.MXE4M3 || c.srcFmt === FbDataFmt.MXE5M2) ||
+      (c.dstFmt === FbDataFmt.MXE4M3 || c.dstFmt === FbDataFmt.MXE5M2))
+
+  val cBad = cBadBase || permBad || padBad || permPadBad || im2colBad || sgBad || mxQuantBad || mxNonQuantBad
 
   // ==========================================================================
   // IDLE：接收命令、锁存、分流
@@ -444,6 +550,15 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     }.otherwise {
       padActive := false.B
       padOuterDone := false.B
+    }
+
+    // MX 量化参数复位（scale 累积器、字节游标与块内元素计数跨命令清零）
+    if (cfg.enableConversion) {
+      mxScaleAccumCount := 0.U
+      mxScaleByteCur := 0.U
+      mxScaleWrByte := 0.U
+      mxScaleAwIssued := false.B
+      mxRowEndPending := false.B
     }
 
     when(cBad) {
@@ -537,9 +652,20 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   val seg = if (cfg.enableConversion) {
     val raw = remRow.min(cfg.maxBurstLen.U).min(queueCredit)
     // 压缩时 seg 须为 compRatio 的倍数；扩展时 seg*ratio 须 <= maxBurstLen
-    Mux(!cvtActive, raw,
+    val cvtAligned = Mux(!cvtActive, raw,
       Mux(cvtCompress, (raw >> cvtShift) << cvtShift,
       Mux(cvtExpand, raw.min(cfg.maxBurstLen.U >> cvtShift), raw)))
+    // MX 量化：段长再对齐到每块读侧 beat 数（= blockSize × 源元素字节 / beatBytes）的倍数，
+    // 保证一个 burst 段不会把 scale 块切断（remRow 恒为整数块，对齐后不会为 0）
+    val mxBlockSizeReg = MuxLookup(cmdReg.scaleBlockSize, 32.U(7.W))(Seq(
+      0.U -> 16.U, 1.U -> 32.U, 2.U -> 64.U))
+    val mxBlockBeatsRaw = (mxBlockSizeReg << cmdReg.elemBytesLog2) >> log2BB
+    val mxBlockBeats = Mux(mxBlockBeatsRaw === 0.U, 1.U, mxBlockBeatsRaw)
+    // 段长上限另受限于每段产出 scale 字节数（= segBeats/mxBlockBeats）≤ BB，
+    // 保证段内 scale 累积寄存器（1 拍）不溢出（段末统一经 sSWRITE 写出）
+    val mxSegCap = BB.U * mxBlockBeats
+    val mxAligned = (cvtAligned.min(mxSegCap) / mxBlockBeats) * mxBlockBeats
+    Mux(mxQuantActive, mxAligned, cvtAligned)
   } else remRow.min(cfg.maxBurstLen.U).min(queueCredit)
 
   // --- 外层维度进位链：nxtIdx 为进位后的计数器，outerCarry(d) 表示低位全回卷 ---
@@ -591,18 +717,47 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   // ==========================================================================
   when(state === sWRITE) {
     if (cfg.enableConversion) {
-      val conv = converter.get
-      // 连接 dataQueue → converter
-      conv.io.in.valid := dataQueue.io.deq.valid
-      conv.io.in.bits := dataQueue.io.deq.bits
-      dataQueue.io.deq.ready := conv.io.in.ready
-      // 连接 converter → wr 通道
-      io.bus.wr.valid := conv.io.out.valid
-      io.bus.wr.payload.data := conv.io.out.bits
-      conv.io.out.ready := io.bus.wr.ready
-      // 信用归还：converter 消费 dataQueue 时归还
-      when(dataQueue.io.deq.fire) {
-        queueCredit := queueCredit + 1.U
+      when(mxQuantActive) {
+        // --- MX 量化路径：dataQueue → FbMxQuantizer → wr ---
+        val q = mxQuantizer.get
+        q.io.in.valid := dataQueue.io.deq.valid
+        q.io.in.bits := dataQueue.io.deq.bits
+        dataQueue.io.deq.ready := q.io.in.ready
+        // 量化数据 → wr 通道（dstSegBeats 已按压缩比折算）
+        io.bus.wr.valid := q.io.outData.valid
+        io.bus.wr.payload.data := q.io.outData.bits
+        q.io.outData.ready := io.bus.wr.ready
+        // scale 字节即时存入累积寄存器（每段数据写完后经 sSWRITE 写出）
+        q.io.outScale.ready := true.B
+        when(q.io.outScale.fire) {
+          mxScaleAccum(mxScaleAccumCount(log2Up(BB) - 1, 0)) := q.io.outScale.bits
+          mxScaleAccumCount := mxScaleAccumCount + 1.U
+        }
+        // 信用归还：量化器消费 dataQueue 时归还
+        when(dataQueue.io.deq.fire) {
+          queueCredit := queueCredit + 1.U
+        }
+      }.elsewhen(cmdReg.cvtEnable && (cmdReg.srcFmt =/= cmdReg.dstFmt)) {
+        val conv = converter.get
+        // 连接 dataQueue → converter
+        conv.io.in.valid := dataQueue.io.deq.valid
+        conv.io.in.bits := dataQueue.io.deq.bits
+        dataQueue.io.deq.ready := conv.io.in.ready
+        // 连接 converter → wr 通道
+        io.bus.wr.valid := conv.io.out.valid
+        io.bus.wr.payload.data := conv.io.out.bits
+        conv.io.out.ready := io.bus.wr.ready
+        // 信用归还：converter 消费 dataQueue 时归还
+        when(dataQueue.io.deq.fire) {
+          queueCredit := queueCredit + 1.U
+        }
+      }.otherwise {
+        io.bus.wr.valid := dataQueue.io.deq.valid
+        io.bus.wr.payload.data := dataQueue.io.deq.bits
+        dataQueue.io.deq.ready := io.bus.wr.ready
+        when(io.bus.wr.fire) {
+          queueCredit := queueCredit + 1.U
+        }
       }
     } else {
       io.bus.wr.valid := dataQueue.io.deq.valid
@@ -628,39 +783,80 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
       arIssued := false.B
       val nxtBeat = beatInRow + segBeats
       if (cfg.enableConversion) { wBeatInRow := wBeatInRow + dstSegBeats }
-      when(nxtBeat === beatsPerRow) {
-        // 本行写完
-        beatInRow := 0.U
-        if (cfg.enableConversion) { wBeatInRow := 0.U }
-        when(padActive) {
-          // Zero-Padding 模式：推进源计数器，然后处理阶段转移
-          outerIdx := nxtIdx
-          when(outerCarry(cmdReg.dimCount)) {
-            padOuterDone := true.B
-          }
-          when(padAfterBytes0 > 0.U) {
-            // dim0 行尾 pad → sZWRITE phase 2
-            state := sZWRITE
-            zPhase := 2.U
-            zBeatInRow := 0.U
-            zawIssued := false.B
-          }.otherwise {
-            // 无行尾 pad → 直接推进 virtualRow
-            advanceToNextVirtualRow()
-          }
+      val rowEndNow = nxtBeat === beatsPerRow
+      when(mxQuantActive) {
+        // MX 量化：本段数据写完后先经 sSWRITE 写出本段累积的 scale 字节
+        //（段长受限于每段 ≤ BB 字节，累积寄存器不溢出），再推进下一段/行；
+        // 行末标记由 mxRowEndPending 携带至 sSWRITE 完成后处理。
+        mxRowEndPending := rowEndNow
+        mxScaleAwIssued := false.B
+        when(rowEndNow) {
+          beatInRow := 0.U
+          if (cfg.enableConversion) { wBeatInRow := 0.U }
         }.otherwise {
-          // 正常 COPY/PERMUTE：外层维度进位
-          outerIdx := nxtIdx
-          when(outerCarry(cmdReg.dimCount)) {
-            state := sDONE
-          }.otherwise {
-            state := sREAD
-          }
+          beatInRow := nxtBeat
         }
+        state := sSWRITE
+      }.elsewhen(rowEndNow) {
+        // 行末：推进行/段/完成（非 MX 路径）
+        finishDataRow()
       }.otherwise {
         beatInRow := nxtBeat
         state := sREAD
       }
+    }
+  }
+
+  // ==========================================================================
+  // MX 量化：sSWRITE —— 写出本段累积的 E8M0 scale 字节（不经 dataQueue）
+  //   每次进入写空 mxScaleAccum（≤BB 字节，以字节游标 mxScaleByteCur 定位）；
+  //   跨 beat 时拆分为至多 2 个单拍突发，strb 标记有效字节区间（部分写）。
+  //   Scale 行地址 = scaleAddr + Σ(outerIdx(d) × dstStride(d))（d ∈ [1, dimCount)，
+  //   复用外层计数器）；每行 scale 字节数 = shape(0) / blockSize，行末残余以 strb 部分写。
+  //   与数据写串行复用 wr/wrResp：进入本状态时数据突发已收到 wrResp。
+  // ==========================================================================
+  when(state === sSWRITE) {
+    val scaleRowAddr = rowAddr(cmdReg.scaleAddr, outerIdx, cmdReg.dstStride, None)
+    // 当前待写字节在行内的位置与本突发写入字节数（本拍内不跨 2 个 beat）
+    val byteInRow = mxScaleByteCur +& mxScaleWrByte
+    val beatOff = byteInRow(log2BB - 1, 0)
+    val remAccum = mxScaleAccumCount - mxScaleWrByte
+    val cnt = Mux(remAccum >= (BB.U - beatOff), BB.U - beatOff, remAccum)
+    val scaleAddrCur = (scaleRowAddr.pad(wideW) +&
+      ((byteInRow >> log2BB) << log2BB).pad(wideW))(addrW - 1, 0)
+    // strb：本突发有效字节区间 [beatOff, beatOff+cnt)，其余字节不受影响（同拍两次写可合并）
+    val sStrb = ((((1.U(BB.W) << cnt) - 1.U) << beatOff))(BB - 1, 0)
+
+    // wr 通道：累积的 scale 字节自 mxScaleWrByte 起打包，单拍突发（len=0）
+    io.bus.wr.valid := !mxScaleAwIssued
+    io.bus.wr.payload.sof := true.B
+    io.bus.wr.payload.eof := true.B
+    io.bus.wr.payload.addr := scaleAddrCur
+    io.bus.wr.payload.len := 0.U
+    io.bus.wr.payload.data := mxScaleAccum.asUInt >> (mxScaleWrByte << 3.U)
+    io.bus.wr.payload.strb := sStrb
+    when(io.bus.wr.fire) { mxScaleAwIssued := true.B }
+
+    // wrResp 通道（与数据写串行：此时无在途数据突发）
+    io.bus.wrResp.ready := mxScaleAwIssued
+    when(io.bus.wrResp.fire) {
+      when(io.bus.wrResp.payload.err) { errReg := true.B }
+      mxScaleAwIssued := false.B
+      mxScaleWrByte := mxScaleWrByte + cnt
+      when(mxScaleWrByte + cnt >= mxScaleAccumCount) {
+        // 本轮累积全部写完：推进字节游标、清累积，再推进行/段或回 sREAD 继续下一段
+        mxScaleWrByte := 0.U
+        mxScaleAccumCount := 0.U
+        when(mxRowEndPending) {
+          mxScaleByteCur := 0.U
+          mxRowEndPending := false.B
+          finishDataRow()
+        }.otherwise {
+          mxScaleByteCur := mxScaleByteCur + mxScaleAccumCount
+          state := sREAD
+        }
+      }
+      // otherwise：跨 beat 残余，留在 sSWRITE 发下一单拍突发（同一累积内容续写）
     }
   }
 
@@ -1096,6 +1292,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   // ==========================================================================
   when(state === sDONE) {
     converter.foreach { c => c.io.flush := true.B }
+    mxQuantizer.foreach { q => q.io.flush := true.B }
     io.done.valid := true.B
     io.done.payload.tag := cmdReg.tag
     io.done.payload.err := errReg

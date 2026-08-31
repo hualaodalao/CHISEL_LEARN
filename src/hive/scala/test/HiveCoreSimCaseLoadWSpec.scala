@@ -6,7 +6,7 @@
   *   - 内存中 B 矩阵按 N×K 转置存储（行=n、列=k）：
   *       bRowOff     = K * (bW/8)            = 128（K=64）
   *       bColTileOff = totalN * K * (bW/8)   = 2048（K=64）
-  *   - dma2 期望地址闭式（两套跳转机制分别建模，不可压成单变量递增）：
+  *   - dmaB 期望地址闭式（两套跳转机制分别建模，不可压成单变量递增）：
   *       blockStart(r, kt) = B_BASE + r*bColTileOff + (totalN-1)*bRowOff
   *                           + kt*totalN*(bW/8)
   *     块内逐 beat -bRowOff（降序，为水平加载对角线落位服务）
@@ -84,7 +84,7 @@ class HiveCoreSimCaseLoadWSpec extends AnyFlatSpec with Matchers with ChiselSim 
 
     val cWriteLog = scala.collection.mutable.ArrayBuffer[(Long, BigInt)]()
 
-    // --- DMA0 (A buffer) 期望地址序列与数据：与垂直用例完全相同 ---
+    // --- DMA-A (A buffer) 期望地址序列与数据：与垂直用例完全相同 ---
     val aKTiles = (K + totalN - 1) / totalN
     val aNTiles = (N + totalN - 1) / totalN
     val aRowOff = K.toLong * (cfg.aW / 8)
@@ -92,8 +92,8 @@ class HiveCoreSimCaseLoadWSpec extends AnyFlatSpec with Matchers with ChiselSim 
     val expAAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
     for (_ <- 0 until aNTiles; kt <- 0 until aKTiles; m <- 0 until M)
       expAAddrSeq += A_BASE + m * aRowOff + kt * aColOff
-    val dma0TotalBeats = expAAddrSeq.size
-    def genDma0Beat(idx: Int): BigInt = {
+    val dmaATotalBeats = expAAddrSeq.size
+    def genDmaABeat(idx: Int): BigInt = {
       val kt = (idx % (aKTiles * M)) / M
       val row = idx % M
       var data = BigInt(0)
@@ -105,7 +105,7 @@ class HiveCoreSimCaseLoadWSpec extends AnyFlatSpec with Matchers with ChiselSim 
       data
     }
 
-    // --- DMA2 (B buffer) 期望地址序列：转置布局闭式 ---
+    // --- DMA-B (B buffer) 期望地址序列：转置布局闭式 ---
     // 硬件遍历结构两模式共用（初值形式、块内降序、两套跳转、终止判定），
     // 仅偏移公式随 loadWMode 切换：
     //   bRowOff     = regFile.k * (bW/8)          = K*(bW/8)   = 128（K=64）
@@ -128,7 +128,7 @@ class HiveCoreSimCaseLoadWSpec extends AnyFlatSpec with Matchers with ChiselSim 
       for (r2 <- 0 until totalN)
         expBAddrSeq += blockStart - r2 * bRowOff
     }
-    val dma2TotalBeats = expBAddrSeq.size
+    val dmaBTotalBeats = expBAddrSeq.size
     // 自检：首四块块起点（块 (r,kt) 位于序列下标 (r*bKTiles+kt)*totalN；
     // K=64/N=32/totalN=16 时 (r0,kt0)/(r0,kt1)/(r1,kt0)/(r1,kt1) =
     // 0x100780/0x1007A0/0x100F80/0x100FA0；依赖 bKTiles >= 2，即 K > totalN）
@@ -145,7 +145,7 @@ class HiveCoreSimCaseLoadWSpec extends AnyFlatSpec with Matchers with ChiselSim 
     // beat 数据（转置布局供数）：beat s → 转置行 n = r*totalN + (totalN-1-s)，
     // lane i = bMatrix(kt*totalN+i)(n)（逻辑 K×N 矩阵取值，与垂直用例的
     // 落位映射一致：PE(x,y).wReg = B[kTile*totalN+x][nTile*totalN+y]）
-    def genDma2WeightBeat(idx: Int): BigInt = {
+    def genDmaBWeightBeat(idx: Int): BigInt = {
       val beatsPerRound = bKTiles * totalN
       val nTileIdx = idx / beatsPerRound
       val idxInRound = idx % beatsPerRound
@@ -161,7 +161,7 @@ class HiveCoreSimCaseLoadWSpec extends AnyFlatSpec with Matchers with ChiselSim 
       data
     }
 
-    // --- DMA1 (C store) 期望地址序列：偏移公式与硬件 HiveCore calcConfig
+    // --- DMA-C (C store) 期望地址序列：偏移公式与硬件 HiveCore calcConfig
     // 逐字对齐（cRowAddressOffset := regFile.n*(cW/8)、cColTileAddressOffset
     // := totalN*(cW/8)）。注意不复用 4bit 截断的 cStride 寄存器值——硬件
     // 地址生成根本不消费 stride 寄存器，旧写法 cRowOff=(cStride&0xF)=0 会
@@ -192,25 +192,25 @@ class HiveCoreSimCaseLoadWSpec extends AnyFlatSpec with Matchers with ChiselSim 
 
     simulate(new HiveCore(cfg)) { dut =>
 
-      var dma0BeatsSent = 0
-      var dma1StoreBeats = 0
-      var dma2BeatsSent = 0
+      var dmaABeatsSent = 0
+      var dmaCStoreBeats = 0
+      var dmaBBeatsSent = 0
 
       // ===== Reset =====
       dut.reset.poke(true.B)
       dut.io.cmd.valid.poke(false.B)
       dut.io.resp.ready.poke(true.B)
-      dut.io.dma0Ext.req.ready.poke(true.B)
-      dut.io.dma0Ext.rsp.valid.poke(false.B)
-      dut.io.dma0Ext.rsp.payload.data.poke(0.U)
-      dut.io.dma0Ext.rsp.payload.err.poke(false.B)
-      dut.io.dma1Ext.req.ready.poke(true.B)
-      dut.io.dma1Ext.rsp.valid.poke(false.B)
-      dut.io.dma1Ext.rsp.payload.err.poke(false.B)
-      dut.io.dma2Ext.req.ready.poke(true.B)
-      dut.io.dma2Ext.rsp.valid.poke(false.B)
-      dut.io.dma2Ext.rsp.payload.data.poke(0.U)
-      dut.io.dma2Ext.rsp.payload.err.poke(false.B)
+      dut.io.dmaA.req.ready.poke(true.B)
+      dut.io.dmaA.rsp.valid.poke(false.B)
+      dut.io.dmaA.rsp.payload.data.poke(0.U)
+      dut.io.dmaA.rsp.payload.err.poke(false.B)
+      dut.io.dmaC.req.ready.poke(true.B)
+      dut.io.dmaC.rsp.valid.poke(false.B)
+      dut.io.dmaC.rsp.payload.err.poke(false.B)
+      dut.io.dmaB.req.ready.poke(true.B)
+      dut.io.dmaB.rsp.valid.poke(false.B)
+      dut.io.dmaB.rsp.payload.data.poke(0.U)
+      dut.io.dmaB.rsp.payload.err.poke(false.B)
       dut.clock.step(3)
       dut.reset.poke(false.B)
       dut.clock.step(2)
@@ -259,82 +259,82 @@ class HiveCoreSimCaseLoadWSpec extends AnyFlatSpec with Matchers with ChiselSim 
 
       while (!done && cycle < maxCycles) {
 
-        // --- DMA0 (A RdOnly) 响应逻辑（与垂直用例同构） ---
-        if (dma0BeatsSent < dma0TotalBeats) {
-          if (dut.io.dma0Ext.req.valid.peek().litToBoolean) {
-            val cmdAddr = dut.io.dma0Ext.req.payload.addr.peek().litValue.toLong
-            if (cmdAddr != expAAddrSeq(dma0BeatsSent) && dma0BeatsSent < 8)
-              println(f"[cycle=$cycle%6d] DMA0 A beat #$dma0BeatsSent addr MISMATCH: hw=0x$cmdAddr%X exp=0x${expAAddrSeq(dma0BeatsSent)}%X")
+        // --- DMA-A (A RdOnly) 响应逻辑（与垂直用例同构） ---
+        if (dmaABeatsSent < dmaATotalBeats) {
+          if (dut.io.dmaA.req.valid.peek().litToBoolean) {
+            val cmdAddr = dut.io.dmaA.req.payload.addr.peek().litValue.toLong
+            if (cmdAddr != expAAddrSeq(dmaABeatsSent) && dmaABeatsSent < 8)
+              println(f"[cycle=$cycle%6d] DMA-A A beat #$dmaABeatsSent addr MISMATCH: hw=0x$cmdAddr%X exp=0x${expAAddrSeq(dmaABeatsSent)}%X")
           }
-          dut.io.dma0Ext.rsp.valid.poke(true.B)
-          dut.io.dma0Ext.rsp.payload.data.poke(genDma0Beat(dma0BeatsSent).U)
-          dut.io.dma0Ext.rsp.payload.err.poke(false.B)
-          if (dut.io.dma0Ext.rsp.ready.peek().litToBoolean) {
-            if (dma0BeatsSent < 4)
-              println(f"[cycle=$cycle%6d] DMA0 A beat #$dma0BeatsSent delivered")
-            dma0BeatsSent += 1
+          dut.io.dmaA.rsp.valid.poke(true.B)
+          dut.io.dmaA.rsp.payload.data.poke(genDmaABeat(dmaABeatsSent).U)
+          dut.io.dmaA.rsp.payload.err.poke(false.B)
+          if (dut.io.dmaA.rsp.ready.peek().litToBoolean) {
+            if (dmaABeatsSent < 4)
+              println(f"[cycle=$cycle%6d] DMA-A A beat #$dmaABeatsSent delivered")
+            dmaABeatsSent += 1
           }
         } else {
-          dut.io.dma0Ext.rsp.valid.poke(false.B)
-          dut.io.dma0Ext.rsp.payload.data.poke(0.U)
-          dut.io.dma0Ext.rsp.payload.err.poke(false.B)
+          dut.io.dmaA.rsp.valid.poke(false.B)
+          dut.io.dmaA.rsp.payload.data.poke(0.U)
+          dut.io.dmaA.rsp.payload.err.poke(false.B)
         }
 
-        // --- DMA1 (C WrOnly) 响应逻辑（与垂直用例同构） ---
-        dut.io.dma1Ext.req.ready.poke(true.B)
-        dut.io.dma1Ext.rsp.valid.poke(false.B)
-        dut.io.dma1Ext.rsp.payload.err.poke(false.B)
+        // --- DMA-C (C WrOnly) 响应逻辑（与垂直用例同构） ---
+        dut.io.dmaC.req.ready.poke(true.B)
+        dut.io.dmaC.rsp.valid.poke(false.B)
+        dut.io.dmaC.rsp.payload.err.poke(false.B)
 
-        if (dut.io.dma1Ext.req.valid.peek().litToBoolean) {
-          val reqAddr = dut.io.dma1Ext.req.payload.addr.peek().litValue.toLong
-          // 逐 beat 地址硬对账（与 DMA2 同等待遇）：期望序列按硬件 calcConfig
+        if (dut.io.dmaC.req.valid.peek().litToBoolean) {
+          val reqAddr = dut.io.dmaC.req.payload.addr.peek().litValue.toLong
+          // 逐 beat 地址硬对账（与 DMA-B 同等待遇）：期望序列按硬件 calcConfig
           // 公式闭式推演，不符直接 fail，防止「按序供数掩盖地址公式 bug」
-          if (dma1StoreBeats < expCAddrSeq.size) {
-            withClue(s"DMA1 store beat #$dma1StoreBeats addr mismatch: ") {
-              reqAddr should be(expCAddrSeq(dma1StoreBeats))
+          if (dmaCStoreBeats < expCAddrSeq.size) {
+            withClue(s"DMA-C store beat #$dmaCStoreBeats addr mismatch: ") {
+              reqAddr should be(expCAddrSeq(dmaCStoreBeats))
             }
           }
-          if (dma1StoreBeats < 4)
-            println(f"[cycle=$cycle%6d] DMA1 store req addr=0x$reqAddr%08X")
-          val writeData = dut.io.dma1Ext.req.payload.data.peek().litValue
+          if (dmaCStoreBeats < 4)
+            println(f"[cycle=$cycle%6d] DMA-C store req addr=0x$reqAddr%08X")
+          val writeData = dut.io.dmaC.req.payload.data.peek().litValue
           cWriteLog += ((reqAddr, writeData))
-          dma1StoreBeats += 1
+          dmaCStoreBeats += 1
         }
 
-        if (dut.io.dma1Ext.req.valid.peek().litToBoolean) {
-          dut.io.dma1Ext.rsp.valid.poke(true.B)
+        if (dut.io.dmaC.req.valid.peek().litToBoolean) {
+          dut.io.dmaC.rsp.valid.poke(true.B)
         } else {
-          dut.io.dma1Ext.rsp.valid.poke(false.B)
+          dut.io.dmaC.rsp.valid.poke(false.B)
         }
 
-        // --- DMA2 (B 权重 RdOnly) 响应逻辑：逐 beat 地址硬对账（转置闭式） ---
-        if (dma2BeatsSent < dma2TotalBeats) {
-          if (dut.io.dma2Ext.req.valid.peek().litToBoolean) {
-            val cmdAddr = dut.io.dma2Ext.req.payload.addr.peek().litValue.toLong
-            withClue(s"DMA2 weight beat #$dma2BeatsSent addr mismatch: ") {
-              cmdAddr should be(expBAddrSeq(dma2BeatsSent))
+        // --- DMA-B (B 权重 RdOnly) 响应逻辑：逐 beat 地址硬对账（转置闭式） ---
+        if (dmaBBeatsSent < dmaBTotalBeats) {
+          if (dut.io.dmaB.req.valid.peek().litToBoolean) {
+            val cmdAddr = dut.io.dmaB.req.payload.addr.peek().litValue.toLong
+            withClue(s"DMA-B weight beat #$dmaBBeatsSent addr mismatch: ") {
+              cmdAddr should be(expBAddrSeq(dmaBBeatsSent))
             }
-            dut.io.dma2Ext.rsp.valid.poke(true.B)
-            dut.io.dma2Ext.rsp.payload.data.poke(genDma2WeightBeat(dma2BeatsSent).U)
-            dut.io.dma2Ext.rsp.payload.err.poke(false.B)
-            if (dma2BeatsSent < 4 || dma2BeatsSent == dma2TotalBeats - 1)
-              println(f"[cycle=$cycle%6d] DMA2 weight beat #$dma2BeatsSent addr=0x$cmdAddr%X delivered")
-            dma2BeatsSent += 1
+            dut.io.dmaB.rsp.valid.poke(true.B)
+            dut.io.dmaB.rsp.payload.data.poke(genDmaBWeightBeat(dmaBBeatsSent).U)
+            dut.io.dmaB.rsp.payload.err.poke(false.B)
+            if (dmaBBeatsSent < 4 || dmaBBeatsSent == dmaBTotalBeats - 1)
+              println(f"[cycle=$cycle%6d] DMA-B weight beat #$dmaBBeatsSent addr=0x$cmdAddr%X delivered")
+            dmaBBeatsSent += 1
           } else {
-            dut.io.dma2Ext.rsp.valid.poke(false.B)
-            dut.io.dma2Ext.rsp.payload.data.poke(0.U)
-            dut.io.dma2Ext.rsp.payload.err.poke(false.B)
+            dut.io.dmaB.rsp.valid.poke(false.B)
+            dut.io.dmaB.rsp.payload.data.poke(0.U)
+            dut.io.dmaB.rsp.payload.err.poke(false.B)
           }
         } else {
-          dut.io.dma2Ext.rsp.valid.poke(false.B)
-          dut.io.dma2Ext.rsp.payload.data.poke(0.U)
-          dut.io.dma2Ext.rsp.payload.err.poke(false.B)
+          dut.io.dmaB.rsp.valid.poke(false.B)
+          dut.io.dmaB.rsp.payload.data.poke(0.U)
+          dut.io.dmaB.rsp.payload.err.poke(false.B)
         }
 
         // --- 检查完成 ---
         if (dut.io.resp.valid.peek().litToBoolean) {
           if (dut.io.resp.payload.done.peek().litToBoolean) {
-            println(f"[cycle=$cycle%6d] EXECUTE complete! DMA0 beats=$dma0BeatsSent, C store beats=$dma1StoreBeats")
+            println(f"[cycle=$cycle%6d] EXECUTE complete! DMA-A beats=$dmaABeatsSent, C store beats=$dmaCStoreBeats")
             // 完成响应必须不带 err 标记：防止 FSM 异常提前退出（errState
             // 路径）被下游数值校验兜底掩盖
             dut.io.resp.payload.err.peek().litToBoolean should be(false)
@@ -348,26 +348,26 @@ class HiveCoreSimCaseLoadWSpec extends AnyFlatSpec with Matchers with ChiselSim 
           val progress = dut.io.status.progress.peek().litValue.toInt
           val busy = dut.io.status.busy.peek().litToBoolean
           val err = dut.io.status.err.peek().litToBoolean
-          println(f"[cycle=$cycle%6d] progress=$progress busy=$busy err=$err dma0Beats=$dma0BeatsSent storeBeats=$dma1StoreBeats dma2Beats=$dma2BeatsSent")
+          println(f"[cycle=$cycle%6d] progress=$progress busy=$busy err=$err dmaABeats=$dmaABeatsSent storeBeats=$dmaCStoreBeats dmaBBeats=$dmaBBeatsSent")
         }
 
         dut.clock.step()
         cycle += 1
       }
 
-      dut.io.dma1Ext.rsp.valid.poke(false.B)
+      dut.io.dmaC.rsp.valid.poke(false.B)
 
       if (!done) {
         println(s"[HiveCoreSimCaseLoadW] WARNING: Simulation timed out at $maxCycles cycles")
-        println(s"  DMA0 beats=$dma0BeatsSent/$dma0TotalBeats, store beats=$dma1StoreBeats, dma2 beats=$dma2BeatsSent/$dma2TotalBeats")
+        println(s"  DMA-A beats=$dmaABeatsSent/$dmaATotalBeats, store beats=$dmaCStoreBeats, dmaB beats=$dmaBBeatsSent/$dmaBTotalBeats")
       }
 
       done should be(true)
       // 三路 DMA 总 beat 数收口断言：捕获「多发 beat」失败模式（DMA 终止
       // 判定失误会多发/少发 beat，逐 beat 对账只能发现错序，发现不了超发）
-      dma2BeatsSent should be(dma2TotalBeats)
-      dma0BeatsSent should be(dma0TotalBeats)
-      dma1StoreBeats should be(expCAddrSeq.size)
+      dmaBBeatsSent should be(dmaBTotalBeats)
+      dmaABeatsSent should be(dmaATotalBeats)
+      dmaCStoreBeats should be(expCAddrSeq.size)
     }
 
     // ===== C 结果重建与数值校验（与垂直用例完全相同：C = A × B） =====
@@ -436,7 +436,7 @@ class HiveCoreSimCaseLoadWSpec extends AnyFlatSpec with Matchers with ChiselSim 
     // 改动用例名时须同步修改此源路径，否则拷贝将静默走 NOTE 分支。
     HiveSimCommon.copyTrace(
       "build/chiselsim/HiveCoreSimCaseLoadWSpec/HiveCore-LoadW-mode-GEMM-Simulation/should-run-loadW-mode-GEMM-M-32-N-32-K-64-FP16-totalN-16/workdir-verilator/trace.fst",
-      f"/${simDir}/hivecore_loadw_sim.fst",
+      s"$simDir/hivecore_loadw_sim.fst",
       "HiveCoreSimCaseLoadW"
     )
 

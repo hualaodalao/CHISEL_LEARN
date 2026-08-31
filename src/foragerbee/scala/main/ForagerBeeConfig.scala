@@ -142,6 +142,8 @@ object FbDataFmt {
   val FP16 = 1.U(3.W)
   val BF16 = 2.U(3.W)
   val INT8 = 3.U(3.W)
+  val MXE4M3 = 4.U(3.W) // MXFP8 E4M3 格式（{sign(1),exp(4),mant(3)}，bias=7，E8M0 共享 scale）
+  val MXE5M2 = 5.U(3.W) // MXFP8 E5M2 格式（{sign(1),exp(5),mant(2)}，bias=15，E8M0 共享 scale）
   val NONE = 7.U(3.W) // 不转换（bypass）
 }
 
@@ -250,6 +252,15 @@ class FbCmd(cfg: ForagerBeeConfig) extends Bundle {
 
   /** scatter/gather：描述符表条目数（1..65535） */
   val sgEntryCount = UInt(16.W)
+
+  /** MX 量化：scale 写出基址（须按 beat 对齐；非 MX 量化时忽略） */
+  val scaleAddr = UInt(cfg.addressWidth.W)
+
+  /** MX 量化：块大小编码（0→16、1→32、2→64 个元素共享一个 E8M0 scale） */
+  val scaleBlockSize = UInt(2.W)
+
+  /** MX 量化：使能标志（true 时数据通路经 FbMxQuantizer 量化为 MXFP8 + E8M0 scale） */
+  val mxQuantEn = Bool()
 }
 
 object FbCmd {

@@ -129,6 +129,11 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
   //         [7]    = bFmt 高 1 位（拼接 [7],[9:8] 得完整 3-bit bFmt）
   //         [9:8]  = bFmt 低 2 位
   //         [10]   = mixFmtEn (v1 恒 0：bFmt 跟随 aFmt)
+  //         [12:11] = outFmt (P2 dmaC 写回输出格式：00=fp32 默认 / 01=fp16 / 10=bf16 /
+  //                   11=reserved 行为同 00；仅浮点/MX 运行生效，整数运行强制透传，
+  //                   见 HiveCoreDmaWrOnly.outFmtEff；默认 0 → 既有软件不写该位行为不变。
+  //                   16-bit 输出为两级舍入链：40→32 固定简化 RNE 规格化 + 32→16 运行期 rnd，
+  //                   方向性模式与理想单级舍入可能存在末位差异)
   // 0x08  REG_STATUS    [0]=busy, [1]=done, [2]=err, [31:16]=progress (只读)
   // 0x09  REG_SCALE_A_ADDR  scaleA 基地址
   // 0x0A  REG_SCALE_B_ADDR  scaleB 基地址
@@ -151,6 +156,14 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
   def bFmt = Cat(regs(7)(7), regs(7)(9, 8)).asTypeOf(DataFormat())
   // mixFmtEn: v1 恒 0（bFmt 跟随 aFmt）
   def mixFmtEn = regs(7)(10)
+  // P2 dmaC 写回输出格式 outFmt：regs(7) bit(12,11)，编码表：
+  //   00=fp32（默认，行为同重构前）、01=fp16、10=bf16、11=reserved（行为同 00）。
+  //   运行期有效值 outFmtEff = (isFloat || isMx) ? outFmt : fp32（整数累加值不做精度转换），
+  //   判据在 HiveCoreDmaWrOnly 与 HiveCore（地址步进）同源定义、互指。
+  //   【舍入链声明】16-bit 输出为两级舍入链：40→32 固定简化 RNE 规格化（fpNormalize40to32）
+  //   + 32→16 运行期 rnd（HiveOutCvt roundUp16）；方向性模式（RDN/RUP/RMM）与
+  //   理想单级舍入可能存在末位差异（两级舍入累积），软件对拍须同链重建。
+  def outFmt = regs(7)(12, 11)
   def rnd = regs(7)(4, 2).asTypeOf(RoundingMode())
   // 权重加载模式位：0=垂直加载（loadV 经 psum 口下沉，既有行为，B内存非转置），
   // 1=水平 loadW 加载（权重经 a 数据链水平移位 + 末拍广播锁存，B内存转置存储）

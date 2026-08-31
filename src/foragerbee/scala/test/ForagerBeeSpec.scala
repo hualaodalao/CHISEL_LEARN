@@ -151,7 +151,11 @@ case class FbTestCmd(
     t2lTileRows: Int = 0,
     t2lTileCols: Int = 0,
     t2lNumTileRows: Int = 0,
-    t2lNumTileCols: Int = 0
+    t2lNumTileCols: Int = 0,
+    // MX 量化字段
+    scaleAddr: BigInt = 0,
+    scaleBlockSize: Int = 0,    // 编码：0→16, 1→32, 2→64 个元素共享一个 E8M0 scale
+    mxQuantEn: Boolean = false
 )
 
 class ForagerBeeSpec extends AnyFlatSpec with Matchers {
@@ -255,6 +259,10 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     port.t2lTileCols.poke(c.t2lTileCols.U)
     port.t2lNumTileRows.poke(c.t2lNumTileRows.U)
     port.t2lNumTileCols.poke(c.t2lNumTileCols.U)
+    // MX 量化字段
+    port.scaleAddr.poke(c.scaleAddr)
+    port.scaleBlockSize.poke(c.scaleBlockSize.U)
+    port.mxQuantEn.poke(c.mxQuantEn.B)
   }
 
   /** 跑一组命令直到全部 done（或超时 fail），返回 (done 列表, 内存终态)
@@ -2216,6 +2224,277 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
         m2(BigInt(0x20000) + off) shouldBe m2(BigInt(off))
       }
     }
+  }
+
+  // ===================== MX 量化（MXFP8）用例 =====================
+
+  // MX 量化配置：需 enableConversion（量化器仅在该开关下实例化）
+  private val mxqCfg = ForagerBeeConfig(
+    numPorts = 2, queueDepth = 4, maxDims = 5,
+    tileSize = 8, maxBurstLen = 16,
+    dataWidth = 128, addressWidth = 32,
+    enableConversion = true, converterPipeStages = 1
+  )
+
+  // --- 浮点编码辅助 ---
+  private def f32bits(v: Float): Int = java.lang.Float.floatToRawIntBits(v)
+
+  /** FP16 编码（RNE 舍入，与硬件输入准备一致） */
+  private def fp16Of(v: Float): Int = {
+    val b = f32bits(v)
+    val s = (b >>> 16) & 0x8000
+    val e = (b >>> 23) & 0xFF
+    val m = b & 0x7FFFFF
+    if (e == 255) { // inf/NaN
+      if (m != 0) s | 0x7E00 else s | 0x7C00
+    } else {
+      val e16 = e - 112
+      if (e16 >= 31) s | 0x7C00 // 上溢 → inf（测试输入避开舍入边界）
+      else if (e16 >= 1) { // 正常数：尾数 23→10 位 + RNE，进位时指数 +1（溢出到 inf）
+        val round = (m >>> 12) & 1
+        val sticky = if ((m & 0xFFF) != 0) 1 else 0
+        val lsb = (m >>> 13) & 1
+        val m10 = (m >>> 13) + (if (round == 1 && (sticky == 1 || lsb == 1)) 1 else 0)
+        if (m10 > 0x3FF) { if (e16 == 30) s | 0x7C00 else s | ((e16 + 1) << 10) }
+        else s | (e16 << 10) | m10
+      }
+      else if (e16 >= -10) { // 次正规：显式前导 1 右移后 RNE
+        val full = 0x400000 | m
+        val shift = 14 - e16
+        val round = (full >>> (shift - 1)) & 1
+        val sticky = if ((full & ((1 << (shift - 1)) - 1)) != 0) 1 else 0
+        var vq = full >>> shift
+        if (round == 1 && (sticky == 1 || (vq & 1) == 1)) vq += 1
+        s | (vq & 0x3FF)
+      } else s // 太小 → ±0（FTZ）
+    }
+  }
+
+  /** BF16 编码（截断尾数；测试输入均避开舍入边界） */
+  private def bf16Of(v: Float): Int = (f32bits(v) >>> 16) & 0xFFFF
+
+  private def putFp16(mem: mutable.HashMap[BigInt, Byte], base: BigInt, vals: Seq[Float]): Unit =
+    vals.zipWithIndex.foreach { case (v, i) =>
+      val h = fp16Of(v)
+      mem(base + 2 * i) = (h & 0xFF).toByte
+      mem(base + 2 * i + 1) = ((h >>> 8) & 0xFF).toByte
+    }
+
+  private def putBf16(mem: mutable.HashMap[BigInt, Byte], base: BigInt, vals: Seq[Float]): Unit =
+    vals.zipWithIndex.foreach { case (v, i) =>
+      val h = bf16Of(v)
+      mem(base + 2 * i) = (h & 0xFF).toByte
+      mem(base + 2 * i + 1) = ((h >>> 8) & 0xFF).toByte
+    }
+
+  private def putFp32(mem: mutable.HashMap[BigInt, Byte], base: BigInt, vals: Seq[Float]): Unit =
+    vals.zipWithIndex.foreach { case (v, i) =>
+      val b = f32bits(v)
+      for (k <- 0 until 4) mem(base + 4 * i + k) = ((b >>> (8 * k)) & 0xFF).toByte
+    }
+
+  /** FP16 (16 bits) → FP32 (32 bits)，与 FbMxQuantizer.fp16ToFp32 语义一致：
+    * 次正规保持为 fp32 次正规（量化阶段按零冲刷） */
+  private def fp16BitsToFp32Bits(x: Int): Int = {
+    val sign = x & 0x8000
+    val e = (x >>> 10) & 0x1F
+    val man = x & 0x3FF
+    if (e == 0) {
+      if (man == 0) sign << 16
+      else (sign << 16) | (man << 13) // fp32 次正规
+    } else if (e == 31) (sign << 16) | (0xFF << 23) | (man << 13)
+    else (sign << 16) | ((e + 112) << 23) | (man << 13)
+  }
+
+  /** MXFP8 量化参考模型（与 FbMxQuantizer 位级对齐）。
+    * elemsF32Bits：源元素的 fp32 位表示（FP16 需先经 fp16BitsToFp32Bits，BF16 左移 16 位）。
+    * dstFmt：4=MXE4M3、5=MXE5M2。返回 (量化字节列表, E8M0 scale 字节)。
+    * 语义：零/次正规不贡献 max_exp 且输出 ±0；scale = max(0, 127+max_exp) 低 8 位；
+    * 尾数截取 + RNE；下溢（new_exp≤0）FTZ；上溢/inf 饱和到最大正常数。 */
+  private def mxQuantizeRef(elemsF32Bits: Seq[Int], dstFmt: Int): (Seq[Int], Int) = {
+    val dstE4 = dstFmt == 4
+    val bias = if (dstE4) 7 else 15
+    val mantW = if (dstE4) 3 else 2
+    val maxNormExp = if (dstE4) 14 else 30
+    val satExp = if (dstE4) 14 else 30
+    val satMant = if (dstE4) 7 else 3
+    def satByte(sign: Int) = (sign << 7) | (satExp << mantW) | satMant
+
+    // 块内最大真指数（零/次正规/NaN 不贡献；无任何贡献 → -128 → scale=0）
+    val maxExp = elemsF32Bits.foldLeft(-128) { (acc, b) =>
+      val e = (b >>> 23) & 0xFF
+      val m = b & 0x7FFFFF
+      val contrib = (e != 0) && (e != 255 || m == 0)
+      if (contrib) math.max(acc, (if (e == 255) 127 else e - 127)) else acc
+    }
+    val scaleByte = { val s = maxExp + 127; if (s <= 0) 0 else s & 0xFF }
+
+    val bytes = elemsF32Bits.map { b =>
+      val sign = b >>> 31
+      val e = (b >>> 23) & 0xFF
+      val man = b & 0x7FFFFF
+      if (e == 0) sign << 7 // 零/次正规 → ±0（保号）
+      else {
+        val isNan = e == 255 && man != 0
+        val isInfNan = e == 255
+        val trueExp = e - 127
+        val newExp0 = trueExp - maxExp + bias
+        // 尾数截取 + RNE（guard/sticky/lsb，与硬件 mt/up/mr 同构）
+        val kept = man >>> (23 - mantW)
+        val guard = (man >>> (23 - mantW - 1)) & 1
+        val sticky = if ((man & ((1 << (23 - mantW - 1)) - 1)) != 0) 1 else 0
+        val roundUp = guard == 1 && (sticky == 1 || (kept & 1) == 1)
+        var mant = kept + (if (roundUp) 1 else 0)
+        var exp = newExp0
+        if (mant > (1 << mantW) - 1) { mant = 0; exp += 1 } // 进位 → 指数 +1、尾数清零
+        if (isNan && dstE4) (sign << 7) | 0x7F
+        else if (isNan || isInfNan || exp > maxNormExp) satByte(sign)
+        else if (exp <= 0) sign << 7 // 下溢 → FTZ（保号）
+        else (sign << 7) | (exp << mantW) | mant
+      }
+    }
+    (bytes, scaleByte)
+  }
+
+  it should "MX quantize FP16→MXE4M3 1D blockSize=32" in {
+    val n = 64
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    // 64 个 FP16：块 0 指数跨度大（验证 FTZ/饱和），块 1 覆盖舍入与负值；末元素为次正规（→±0）
+    val vals0 = Seq.tabulate(32)(i =>
+      if (i < 8) math.pow(2.0, 10 - i).toFloat else
+      if (i < 16) -math.pow(2.0, 10 - i).toFloat else
+      if (i < 24) (1.0 + i * 0.25).toFloat * 4.0f else
+      if (i == 31) 6.0e-8f else -(1.0 + i * 0.25).toFloat * 2.0f)
+    val vals1 = Seq.tabulate(32)(i =>
+      if (i % 7 == 0) 0.0f else ((i % 5) + 1).toFloat * (if (i % 3 == 0) -0.5f else 0.25f))
+    putFp16(mem, 0, vals0 ++ vals1)
+    val srcBits = (vals0 ++ vals1).map(v => fp16BitsToFp32Bits(fp16Of(v)))
+    val cmd = FbTestCmd(tag = 0x91, op = "COPY", dimCount = 1,
+      shape = Seq(n), srcStride = Seq(n * 2), dstStride = Seq(n),
+      srcAddr = 0, dstAddr = 0x1000, scaleAddr = 0x2000,
+      elemBytesLog2 = 1, cvtEnable = true, srcFmt = 1, dstFmt = 4,
+      mxQuantEn = true, scaleBlockSize = 1) // blockSize=32
+    val (dones, m) = runForagerBee(mxqCfg, Seq(cmd), mem, maxCycles = 10000)
+    dones shouldBe Seq((0x91, false))
+    // 量化数据：64 字节连续写于 0x1000
+    for (blk <- 0 until 2) {
+      val (expBytes, expScale) = mxQuantizeRef(srcBits.slice(blk * 32, blk * 32 + 32), 4)
+      for (j <- 0 until 32) {
+        withClue(s"blk$blk[$j]: ") {
+          (m.getOrElse(BigInt(0x1000 + blk * 32 + j), 0.toByte) & 0xFF) shouldBe expBytes(j)
+        }
+      }
+      withClue(s"scale[$blk]: ") {
+        (m.getOrElse(BigInt(0x2000 + blk), 0.toByte) & 0xFF) shouldBe expScale
+      }
+    }
+    // scale beat 内未写字节保持为 0（strb 部分写）
+    for (k <- 2 until 16) (m.getOrElse(BigInt(0x2000 + k), 0.toByte) & 0xFF) shouldBe 0
+  }
+
+  it should "MX quantize BF16→MXE5M2 2D blockSize=16" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val row0 = Seq.tabulate(32)(i => if (i < 16) (i + 1).toFloat else math.pow(2.0, 14 - (i - 16)).toFloat)
+    val row1 = Seq.tabulate(32)(i => if (i % 2 == 0) -(i / 2 + 1).toFloat / 8.0f else (i / 2 + 1).toFloat / 16.0f)
+    putBf16(mem, 0, row0)
+    putBf16(mem, 64, row1) // 行间距 64 字节（源含空隙，读出 32 字节/行）
+    val srcBits = (row0 ++ row1).map(v => bf16Of(v) << 16)
+    val cmd = FbTestCmd(tag = 0x92, op = "COPY", dimCount = 2,
+      shape = Seq(32, 2), srcStride = Seq(64, 64), dstStride = Seq(32, 32),
+      srcAddr = 0, dstAddr = 0x1000, scaleAddr = 0x3000,
+      elemBytesLog2 = 1, cvtEnable = true, srcFmt = 2, dstFmt = 5,
+      mxQuantEn = true, scaleBlockSize = 0) // blockSize=16
+    val (dones, m) = runForagerBee(mxqCfg, Seq(cmd), mem, maxCycles = 10000)
+    dones shouldBe Seq((0x92, false))
+    // 每行 32 元素 → 16 字节量化数据 + 2 个 scale 字节；行地址按 dstStride 步进
+    for (row <- 0 until 2) {
+      for (blk <- 0 until 2) {
+        val off = row * 32 + blk * 16
+        val (expBytes, expScale) = mxQuantizeRef(srcBits.slice(off, off + 16), 5)
+        for (j <- 0 until 16) {
+          withClue(s"row$row blk$blk[$j]: ") {
+            (m.getOrElse(BigInt(0x1000 + row * 32 + blk * 16 + j), 0.toByte) & 0xFF) shouldBe expBytes(j)
+          }
+        }
+        withClue(s"row$row scale[$blk]: ") {
+          (m.getOrElse(BigInt(0x3000 + row * 32 + blk), 0.toByte) & 0xFF) shouldBe expScale
+        }
+      }
+    }
+  }
+
+  it should "MX quantize FP32→MXE4M3 blockSize=64 (4:1 compression)" in {
+    val n = 64
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val vals = Seq.tabulate(n)(i =>
+      math.pow(2.0, 8 - i % 16).toFloat * (1.0f + (i % 8) * 0.0625f) * (if (i % 5 == 0) -1.0f else 1.0f))
+    putFp32(mem, 0, vals)
+    val srcBits = vals.map(f32bits)
+    val cmd = FbTestCmd(tag = 0x93, op = "COPY", dimCount = 1,
+      shape = Seq(n), srcStride = Seq(n * 4), dstStride = Seq(n),
+      srcAddr = 0, dstAddr = 0x2000, scaleAddr = 0x4000,
+      elemBytesLog2 = 2, cvtEnable = true, srcFmt = 0, dstFmt = 4,
+      mxQuantEn = true, scaleBlockSize = 2) // blockSize=64（每块 16 读 beat，恰好 ≤ maxBurstLen）
+    val (dones, m) = runForagerBee(mxqCfg, Seq(cmd), mem, maxCycles = 10000)
+    dones shouldBe Seq((0x93, false))
+    // 64 个 FP32（256 字节）→ 64 字节量化数据 + 1 字节 scale（4:1 压缩）
+    val (expBytes, expScale) = mxQuantizeRef(srcBits, 4)
+    for (j <- 0 until n) {
+      withClue(s"elem[$j]: ") {
+        (m.getOrElse(BigInt(0x2000 + j), 0.toByte) & 0xFF) shouldBe expBytes(j)
+      }
+    }
+    withClue("scale[0]: ") {
+      (m.getOrElse(BigInt(0x4000), 0.toByte) & 0xFF) shouldBe expScale
+    }
+  }
+
+  it should "MX quantize minimal shape(0)=blockSize" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val vals = Seq(1.0f, 0.5f, -1.5f, 0.75f, 2.0f, -2.5f, 3.0f, -4.0f,
+                   8.0f, 0.125f, -0.25f, 5.0f, 6.0f, 7.0f, 0.0f, -0.0f)
+    putFp16(mem, 0, vals)
+    val srcBits = vals.map(v => fp16BitsToFp32Bits(fp16Of(v)))
+    val cmd = FbTestCmd(tag = 0x94, op = "COPY", dimCount = 1,
+      shape = Seq(16), srcStride = Seq(32), dstStride = Seq(16),
+      srcAddr = 0, dstAddr = 0x1000, scaleAddr = 0x2000,
+      elemBytesLog2 = 1, cvtEnable = true, srcFmt = 1, dstFmt = 4,
+      mxQuantEn = true, scaleBlockSize = 0) // shape(0)=16=blockSize，恰一个块
+    val (dones, m) = runForagerBee(mxqCfg, Seq(cmd), mem, maxCycles = 10000)
+    dones shouldBe Seq((0x94, false))
+    val (expBytes, expScale) = mxQuantizeRef(srcBits, 4)
+    for (j <- 0 until 16) {
+      withClue(s"elem[$j]: ") {
+        (m.getOrElse(BigInt(0x1000 + j), 0.toByte) & 0xFF) shouldBe expBytes(j)
+      }
+    }
+    (m.getOrElse(BigInt(0x2000), 0.toByte) & 0xFF) shouldBe expScale
+  }
+
+  it should "MX quantize all-zero input → all-zero output, scale=0" in {
+    val n = 32
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    putFp16(mem, 0, Seq.fill(n)(0.0f))
+    val cmd = FbTestCmd(tag = 0x95, op = "COPY", dimCount = 1,
+      shape = Seq(n), srcStride = Seq(n * 2), dstStride = Seq(n),
+      srcAddr = 0, dstAddr = 0x1000, scaleAddr = 0x2000,
+      elemBytesLog2 = 1, cvtEnable = true, srcFmt = 1, dstFmt = 4,
+      mxQuantEn = true, scaleBlockSize = 1) // blockSize=32
+    val (dones, m) = runForagerBee(mxqCfg, Seq(cmd), mem, maxCycles = 10000)
+    dones shouldBe Seq((0x95, false))
+    for (j <- 0 until n) (m.getOrElse(BigInt(0x1000 + j), 0.toByte) & 0xFF) shouldBe 0
+    (m.getOrElse(BigInt(0x2000), 0.toByte) & 0xFF) shouldBe 0 // 全零块 → scale=0
+  }
+
+  it should "MX quantize cBad: shape not multiple of blockSize → done.err=true" in {
+    // shape(0)=48、blockSize=32 → 48 % 32 ≠ 0 → mxQuantBad
+    val cmd = FbTestCmd(tag = 0x96, op = "COPY", dimCount = 1,
+      shape = Seq(48), srcStride = Seq(96), dstStride = Seq(48),
+      srcAddr = 0, dstAddr = 0x1000, scaleAddr = 0x2000,
+      elemBytesLog2 = 1, cvtEnable = true, srcFmt = 1, dstFmt = 4,
+      mxQuantEn = true, scaleBlockSize = 1)
+    val (dones, _) = runForagerBee(mxqCfg, Seq(cmd), mutable.HashMap.empty)
+    dones shouldBe Seq((0x96, true))
   }
 }
 

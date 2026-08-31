@@ -212,6 +212,10 @@ class FbChainController(cfg: ForagerBeeConfig) extends Module {
   injCmd.t2lTileCols    := 0.U
   injCmd.t2lNumTileRows := 0.U
   injCmd.t2lNumTileCols := 0.U
+  // MX quantization fields default to 0 (chain controller does not support MX quant descriptors in v1)
+  injCmd.scaleAddr      := 0.U
+  injCmd.scaleBlockSize := 0.U
+  injCmd.mxQuantEn      := false.B
 
   // --- FSM 逻辑 ---
   switch(state) {

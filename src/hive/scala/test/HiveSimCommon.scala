@@ -217,6 +217,104 @@ object HiveSimCommon {
 
   /** float → E5M2 元素字节（scale-free，即 scale=127；inf/nan 编码被排除） */
   def floatToMxE5M2(f: Double): Int = floatToMx(f, expW = 5, mantW = 2, bias = 15, nanNeedMantAllOne = false)
+
+  // ========== P2 软件参考模型：40→32 规格化 + fp32→fp16/bf16 降精度 ==========
+  // 与 HiveOutCvt 硬件（roundUp16 / fp32ToFp16Rnd / fp32ToBf16Rnd）及
+  // Fp32.fpNormalize40to32 逐位同构，作为 HiveOutCvtSpec 与 outFmt 仿真用例的
+  // golden 对拍模型。rnd 编码与 RoundingMode ChiselEnum 同源：
+  //   0=RNE 1=RTZ 2=RDN 3=RUP 4=RMM
+
+  /** 32→16 截断进位判定（与硬件 roundUp16 逐位同构） */
+  def swRoundUp(rnd: Int, guard: Int, sticky: Int, lsb: Int, neg: Boolean): Boolean = rnd match {
+    case 0 => guard == 1 && (sticky == 1 || lsb == 1)   // RNE：严格 tie-to-even
+    case 1 => false                                     // RTZ：恒截断
+    case 2 => neg && (guard == 1 || sticky == 1)        // RDN：负数增大幅值
+    case 3 => !neg && (guard == 1 || sticky == 1)       // RUP：正数增大幅值
+    case 4 => guard == 1                                // RMM：ties to Max Magnitude，仅 tie（guard=1，不论 sticky）进位
+  }
+
+  /** fp32 bits → fp16 16-bit（与硬件 fp32ToFp16Rnd 逐位同构：
+    * 溢出饱和 ±65504、下溢/零 FTZ 保号、inf/nan 直接映射） */
+  def swFp32ToFp16(bits: Long, rnd: Int): Int = {
+    val b = bits & 0xFFFFFFFFL
+    val s = ((b >>> 31) & 1).toInt
+    val e = ((b >>> 23) & 0xFF).toInt
+    val m = (b & 0x7FFFFF).toInt
+    val signedZero = s << 15
+    val fp16Max = (s << 15) | (30 << 10) | 0x3FF        // ±65504
+    val fp16Inf = (s << 15) | (31 << 10)
+    val fp16Nan = (s << 15) | (31 << 10) | 0x200
+    if (e < 113) signedZero                             // 零/次正规/下溢 → FTZ（保号）
+    else if (e == 255) (if (m == 0) fp16Inf else fp16Nan)
+    else {
+      val mantTop = (m >>> 13) & 0x3FF
+      val guard = (m >>> 12) & 1
+      val sticky = if ((m & 0xFFF) != 0) 1 else 0
+      val up = if (swRoundUp(rnd, guard, sticky, mantTop & 1, s == 1)) 1 else 0
+      val manRnd = mantTop + up
+      val carry = manRnd >>> 10
+      val manFin = if (carry == 1) 0 else manRnd & 0x3FF
+      val overflow = e > 142 || (e == 142 && carry == 1)
+      if (overflow) fp16Max
+      else (s << 15) | (((e + carry - 112) & 0x1F) << 10) | manFin
+    }
+  }
+
+  /** fp32 bits → bf16 16-bit（与硬件 fp32ToBf16Rnd 逐位同构：
+    * 高 16 位直取 + 舍入进位；inf→inf、nan→规范 nan(0x7FA0|sign)） */
+  def swFp32ToBf16(bits: Long, rnd: Int): Int = {
+    val b = bits & 0xFFFFFFFFL
+    val s = ((b >>> 31) & 1).toInt
+    val e = ((b >>> 23) & 0xFF).toInt
+    val m = (b & 0x7FFFFF).toInt
+    if (e == 0) s << 15
+    else if (e == 255) {
+      if (m == 0) (s << 15) | 0x7F80                    // inf
+      else (s << 15) | 0x7FA0                           // 规范 nan（mant 非零）
+    } else {
+      val guard = ((b >>> 15) & 1).toInt
+      val sticky = if ((b & 0x7FFF) != 0) 1 else 0
+      val lsb = ((b >>> 16) & 1).toInt
+      val up = if (swRoundUp(rnd, guard, sticky, lsb, s == 1)) 1 else 0
+      (((b >>> 16).toInt) + up) & 0xFFFF
+    }
+  }
+
+  /** 40-bit 延迟规格化 {sign,exp8,mant31} → fp32 bits
+    * （Fp32.fpNormalize40to32 软件模型：LZC+左移、简化 RNE=guard&(sticky|lsb)、
+    *   e<=lzc 时指数饱和为 0、isZero(e==0&&m==0) 返回绝对 0） */
+  def swFpNormalize40to32(raw: BigInt): Long = {
+    val s = ((raw >> 39) & 1).toInt
+    val e = ((raw >> 31) & 0xFF).toInt
+    val m31 = raw & ((BigInt(1) << 31) - 1)
+    if (e == 0 && m31 == 0) return 0L                   // 硬件 isZero → 绝对 0（无符号）
+    val lzc = 30 - (m31.bitLength - 1)                  // PriorityEncoder(Reverse(m31))
+    val normed = (m31 << lzc) & ((BigInt(1) << 31) - 1)
+    val mant23 = ((normed >> 7) & ((BigInt(1) << 23) - 1)).toInt
+    val guard = ((normed >> 6) & 1).toInt
+    val sticky = if ((normed & 0x3F) != 0) 1 else 0
+    val roundUp = guard == 1 && (sticky == 1 || (mant23 & 1) == 1)
+    // 舍入进位与硬件同构（修复留痕）：mant23 全 1 且进位时尾数归零、指数 +1，
+    // 中间量 9 位防溢出、最终截 8 位（对应 Fp32.fpNormalize40to32 的 mantCarry/eOut）
+    val mSum = mant23 + (if (roundUp) 1 else 0)
+    val mantCarry = mSum >>> 23
+    val mRounded = mSum & 0x7FFFFF
+    val eBase = if (e > lzc) e - lzc else 0
+    val eOut = (eBase + mantCarry) & 0xFF
+    ((s.toLong << 31) | (eOut.toLong << 23) | mRounded.toLong) & 0xFFFFFFFFL
+  }
+
+  /** fp32 bits → 40-bit 延迟规格化槽（{sign,exp8,隐含1<<30,左移7 的 mant23}；
+    * e==0 的 ±0/次正规在 40 位域中归零——硬件 fpNormalize40to32 的 isZero 分支
+    * 返回绝对 0（不保号），软件模型同语义，故 -0.0 落槽后重建为 +0） */
+  def fp32BitsTo40(bits: Long): BigInt = {
+    val b = bits & 0xFFFFFFFFL
+    val s = (b >>> 31) & 1
+    val e = (b >>> 23) & 0xFF
+    val m = b & 0x7FFFFF
+    if (e == 0) BigInt(0)
+    else (BigInt(s) << 39) | (BigInt(e) << 31) | (BigInt(1) << 30) | (BigInt(m) << 7)
+  }
 }
 
 /** ChiselSim FST 波形扩展 trait：与 ChiselSim 一起混入测试类。

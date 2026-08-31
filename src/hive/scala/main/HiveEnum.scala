@@ -27,9 +27,9 @@ object HiveCoreOp extends ChiselEnum {
   val REG_WRITE1, REG_WRITE2, EXECUTE, REG_READ = Value
 }
 
-/** 循环顺序枚举：结构性重构后仅保留 MKN（N 外 K 内 M 最内，
-  * 与 Executor 固定的 weight-stationary N→K→M 遍历一致）。
-  * MNK 已移除；该枚举仅为兼容 regFile.loopMode 字段而保留单值。
+/** 循环顺序枚举：loopMode 位域已被 aFmt/bFmt/mixFmtEn/outFmt 重新占用，
+  * 本枚举仅防历史引用编译断裂（结构性重构后 Executor 固定 weight-stationary
+  * N→K→M 遍历，C 写回顺序 = push FIFO 序，均与 loopMode 无关）。
   */
 object HiveCoreLoopMode extends ChiselEnum {
   val MKN = Value

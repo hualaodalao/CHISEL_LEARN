@@ -108,7 +108,10 @@ module Fb_Queue4_FbCmd(	// src/main/scala/chisel3/util/Queue.scala:60:7
                 io_enq_bits_im2colInShape_2,	// src/main/scala/chisel3/util/Queue.scala:72:14
   input  [31:0] io_enq_bits_sgListAddr,	// src/main/scala/chisel3/util/Queue.scala:72:14
   input  [15:0] io_enq_bits_sgEntryCount,	// src/main/scala/chisel3/util/Queue.scala:72:14
-  input         io_deq_ready,	// src/main/scala/chisel3/util/Queue.scala:72:14
+  input  [31:0] io_enq_bits_scaleAddr,	// src/main/scala/chisel3/util/Queue.scala:72:14
+  input  [1:0]  io_enq_bits_scaleBlockSize,	// src/main/scala/chisel3/util/Queue.scala:72:14
+  input         io_enq_bits_mxQuantEn,	// src/main/scala/chisel3/util/Queue.scala:72:14
+                io_deq_ready,	// src/main/scala/chisel3/util/Queue.scala:72:14
   output        io_deq_valid,	// src/main/scala/chisel3/util/Queue.scala:72:14
   output [2:0]  io_deq_bits_op,	// src/main/scala/chisel3/util/Queue.scala:72:14
   output [7:0]  io_deq_bits_tag,	// src/main/scala/chisel3/util/Queue.scala:72:14
@@ -163,10 +166,13 @@ module Fb_Queue4_FbCmd(	// src/main/scala/chisel3/util/Queue.scala:60:7
                 io_deq_bits_im2colInShape_2,	// src/main/scala/chisel3/util/Queue.scala:72:14
   output [31:0] io_deq_bits_sgListAddr,	// src/main/scala/chisel3/util/Queue.scala:72:14
   output [15:0] io_deq_bits_sgEntryCount,	// src/main/scala/chisel3/util/Queue.scala:72:14
+  output [31:0] io_deq_bits_scaleAddr,	// src/main/scala/chisel3/util/Queue.scala:72:14
+  output [1:0]  io_deq_bits_scaleBlockSize,	// src/main/scala/chisel3/util/Queue.scala:72:14
+  output        io_deq_bits_mxQuantEn,	// src/main/scala/chisel3/util/Queue.scala:72:14
   output [2:0]  io_count	// src/main/scala/chisel3/util/Queue.scala:72:14
 );
 
-  wire [869:0] _ram_ext_R0_data;	// src/main/scala/chisel3/util/Queue.scala:73:91
+  wire [904:0] _ram_ext_R0_data;	// src/main/scala/chisel3/util/Queue.scala:73:91
   reg  [1:0]   enq_ptr_value;	// src/main/scala/chisel3/util/Counter.scala:61:40
   reg  [1:0]   deq_ptr_value;	// src/main/scala/chisel3/util/Counter.scala:61:40
   reg          maybe_full;	// src/main/scala/chisel3/util/Queue.scala:76:27
@@ -210,7 +216,7 @@ module Fb_Queue4_FbCmd(	// src/main/scala/chisel3/util/Queue.scala:60:7
       `FIRRTL_AFTER_INITIAL	// src/main/scala/chisel3/util/Queue.scala:60:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  Fb_ram_4x870 ram_ext (	// src/main/scala/chisel3/util/Queue.scala:73:91
+  Fb_ram_4x905 ram_ext (	// src/main/scala/chisel3/util/Queue.scala:73:91
     .R0_addr (deq_ptr_value),	// src/main/scala/chisel3/util/Counter.scala:61:40
     .R0_en   (1'h1),	// src/main/scala/chisel3/util/Queue.scala:60:7
     .R0_clk  (clock),
@@ -271,63 +277,69 @@ module Fb_Queue4_FbCmd(	// src/main/scala/chisel3/util/Queue.scala:60:7
         io_enq_bits_im2colInShape_1,
         io_enq_bits_im2colInShape_0,
         io_enq_bits_sgListAddr,
-        io_enq_bits_sgEntryCount})	// src/main/scala/chisel3/util/Queue.scala:73:91
+        io_enq_bits_sgEntryCount,
+        io_enq_bits_scaleAddr,
+        io_enq_bits_scaleBlockSize,
+        io_enq_bits_mxQuantEn})	// src/main/scala/chisel3/util/Queue.scala:73:91
   );	// src/main/scala/chisel3/util/Queue.scala:73:91
   assign io_enq_ready = ~full;	// src/main/scala/chisel3/util/Queue.scala:60:7, :79:24, :103:19
   assign io_deq_valid = ~empty;	// src/main/scala/chisel3/util/Queue.scala:60:7, :78:25, :102:19
-  assign io_deq_bits_op = _ram_ext_R0_data[869:867];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_tag = _ram_ext_R0_data[866:859];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_dimCount = _ram_ext_R0_data[858:856];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_shape_0 = _ram_ext_R0_data[791:776];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_shape_1 = _ram_ext_R0_data[807:792];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_shape_2 = _ram_ext_R0_data[823:808];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_shape_3 = _ram_ext_R0_data[839:824];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_shape_4 = _ram_ext_R0_data[855:840];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_srcStride_0 = _ram_ext_R0_data[647:616];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_srcStride_1 = _ram_ext_R0_data[679:648];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_srcStride_2 = _ram_ext_R0_data[711:680];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_srcStride_3 = _ram_ext_R0_data[743:712];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_srcStride_4 = _ram_ext_R0_data[775:744];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_dstStride_0 = _ram_ext_R0_data[487:456];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_dstStride_1 = _ram_ext_R0_data[519:488];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_dstStride_2 = _ram_ext_R0_data[551:520];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_dstStride_3 = _ram_ext_R0_data[583:552];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_dstStride_4 = _ram_ext_R0_data[615:584];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_srcStartIdx_0 = _ram_ext_R0_data[391:376];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_srcStartIdx_1 = _ram_ext_R0_data[407:392];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_srcStartIdx_2 = _ram_ext_R0_data[423:408];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_srcStartIdx_3 = _ram_ext_R0_data[439:424];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_srcStartIdx_4 = _ram_ext_R0_data[455:440];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_srcAddr = _ram_ext_R0_data[375:344];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_dstAddr = _ram_ext_R0_data[343:312];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_elemBytesLog2 = _ram_ext_R0_data[311:310];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_permVec_0 = _ram_ext_R0_data[297:295];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_permVec_1 = _ram_ext_R0_data[300:298];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_permVec_2 = _ram_ext_R0_data[303:301];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_permVec_3 = _ram_ext_R0_data[306:304];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_permVec_4 = _ram_ext_R0_data[309:307];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_padBefore_0 = _ram_ext_R0_data[278:263];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_padBefore_1 = _ram_ext_R0_data[294:279];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_padAfter_0 = _ram_ext_R0_data[246:231];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_padAfter_1 = _ram_ext_R0_data[262:247];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_cvtEnable = _ram_ext_R0_data[230];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_srcFmt = _ram_ext_R0_data[229:227];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_dstFmt = _ram_ext_R0_data[226:224];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_cvtScale = _ram_ext_R0_data[223:192];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_cvtZeroPoint = _ram_ext_R0_data[191:160];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_im2colKernel_0 = _ram_ext_R0_data[151:144];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_im2colKernel_1 = _ram_ext_R0_data[159:152];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_im2colStride_0 = _ram_ext_R0_data[135:128];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_im2colStride_1 = _ram_ext_R0_data[143:136];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_im2colPad_0 = _ram_ext_R0_data[119:112];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_im2colPad_1 = _ram_ext_R0_data[127:120];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_im2colDilation_0 = _ram_ext_R0_data[103:96];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_im2colDilation_1 = _ram_ext_R0_data[111:104];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_im2colInShape_0 = _ram_ext_R0_data[63:48];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_im2colInShape_1 = _ram_ext_R0_data[79:64];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_im2colInShape_2 = _ram_ext_R0_data[95:80];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_sgListAddr = _ram_ext_R0_data[47:16];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
-  assign io_deq_bits_sgEntryCount = _ram_ext_R0_data[15:0];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_op = _ram_ext_R0_data[904:902];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_tag = _ram_ext_R0_data[901:894];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_dimCount = _ram_ext_R0_data[893:891];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_shape_0 = _ram_ext_R0_data[826:811];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_shape_1 = _ram_ext_R0_data[842:827];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_shape_2 = _ram_ext_R0_data[858:843];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_shape_3 = _ram_ext_R0_data[874:859];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_shape_4 = _ram_ext_R0_data[890:875];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_srcStride_0 = _ram_ext_R0_data[682:651];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_srcStride_1 = _ram_ext_R0_data[714:683];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_srcStride_2 = _ram_ext_R0_data[746:715];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_srcStride_3 = _ram_ext_R0_data[778:747];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_srcStride_4 = _ram_ext_R0_data[810:779];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_dstStride_0 = _ram_ext_R0_data[522:491];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_dstStride_1 = _ram_ext_R0_data[554:523];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_dstStride_2 = _ram_ext_R0_data[586:555];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_dstStride_3 = _ram_ext_R0_data[618:587];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_dstStride_4 = _ram_ext_R0_data[650:619];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_srcStartIdx_0 = _ram_ext_R0_data[426:411];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_srcStartIdx_1 = _ram_ext_R0_data[442:427];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_srcStartIdx_2 = _ram_ext_R0_data[458:443];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_srcStartIdx_3 = _ram_ext_R0_data[474:459];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_srcStartIdx_4 = _ram_ext_R0_data[490:475];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_srcAddr = _ram_ext_R0_data[410:379];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_dstAddr = _ram_ext_R0_data[378:347];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_elemBytesLog2 = _ram_ext_R0_data[346:345];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_permVec_0 = _ram_ext_R0_data[332:330];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_permVec_1 = _ram_ext_R0_data[335:333];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_permVec_2 = _ram_ext_R0_data[338:336];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_permVec_3 = _ram_ext_R0_data[341:339];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_permVec_4 = _ram_ext_R0_data[344:342];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_padBefore_0 = _ram_ext_R0_data[313:298];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_padBefore_1 = _ram_ext_R0_data[329:314];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_padAfter_0 = _ram_ext_R0_data[281:266];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_padAfter_1 = _ram_ext_R0_data[297:282];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_cvtEnable = _ram_ext_R0_data[265];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_srcFmt = _ram_ext_R0_data[264:262];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_dstFmt = _ram_ext_R0_data[261:259];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_cvtScale = _ram_ext_R0_data[258:227];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_cvtZeroPoint = _ram_ext_R0_data[226:195];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_im2colKernel_0 = _ram_ext_R0_data[186:179];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_im2colKernel_1 = _ram_ext_R0_data[194:187];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_im2colStride_0 = _ram_ext_R0_data[170:163];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_im2colStride_1 = _ram_ext_R0_data[178:171];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_im2colPad_0 = _ram_ext_R0_data[154:147];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_im2colPad_1 = _ram_ext_R0_data[162:155];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_im2colDilation_0 = _ram_ext_R0_data[138:131];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_im2colDilation_1 = _ram_ext_R0_data[146:139];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_im2colInShape_0 = _ram_ext_R0_data[98:83];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_im2colInShape_1 = _ram_ext_R0_data[114:99];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_im2colInShape_2 = _ram_ext_R0_data[130:115];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_sgListAddr = _ram_ext_R0_data[82:51];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_sgEntryCount = _ram_ext_R0_data[50:35];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_scaleAddr = _ram_ext_R0_data[34:3];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_scaleBlockSize = _ram_ext_R0_data[2:1];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
+  assign io_deq_bits_mxQuantEn = _ram_ext_R0_data[0];	// src/main/scala/chisel3/util/Queue.scala:60:7, :73:91
   assign io_count = {full, enq_ptr_value - deq_ptr_value};	// src/main/scala/chisel3/util/Counter.scala:61:40, src/main/scala/chisel3/util/Queue.scala:60:7, :79:24, :126:32, :129:62
 endmodule
 

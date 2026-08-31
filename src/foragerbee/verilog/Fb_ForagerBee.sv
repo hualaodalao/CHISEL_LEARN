@@ -64,6 +64,9 @@ module Fb_ForagerBee(	// src/foragerbee/scala/main/ForagerBee.scala:34:7
                  io_cmd_payload_im2colInShape_2,	// src/foragerbee/scala/main/ForagerBee.scala:39:14
   input  [31:0]  io_cmd_payload_sgListAddr,	// src/foragerbee/scala/main/ForagerBee.scala:39:14
   input  [15:0]  io_cmd_payload_sgEntryCount,	// src/foragerbee/scala/main/ForagerBee.scala:39:14
+  input  [31:0]  io_cmd_payload_scaleAddr,	// src/foragerbee/scala/main/ForagerBee.scala:39:14
+  input  [1:0]   io_cmd_payload_scaleBlockSize,	// src/foragerbee/scala/main/ForagerBee.scala:39:14
+  input          io_cmd_payload_mxQuantEn,	// src/foragerbee/scala/main/ForagerBee.scala:39:14
   output [2:0]   io_occupancy,	// src/foragerbee/scala/main/ForagerBee.scala:39:14
   output         io_done_valid,	// src/foragerbee/scala/main/ForagerBee.scala:39:14
   input          io_done_ready,	// src/foragerbee/scala/main/ForagerBee.scala:39:14
@@ -197,6 +200,9 @@ module Fb_ForagerBee(	// src/foragerbee/scala/main/ForagerBee.scala:34:7
   wire [15:0] _chainCtrl_io_cmdOut_payload_im2colInShape_2;	// src/foragerbee/scala/main/ForagerBee.scala:89:27
   wire [31:0] _chainCtrl_io_cmdOut_payload_sgListAddr;	// src/foragerbee/scala/main/ForagerBee.scala:89:27
   wire [15:0] _chainCtrl_io_cmdOut_payload_sgEntryCount;	// src/foragerbee/scala/main/ForagerBee.scala:89:27
+  wire [31:0] _chainCtrl_io_cmdOut_payload_scaleAddr;	// src/foragerbee/scala/main/ForagerBee.scala:89:27
+  wire [1:0]  _chainCtrl_io_cmdOut_payload_scaleBlockSize;	// src/foragerbee/scala/main/ForagerBee.scala:89:27
+  wire        _chainCtrl_io_cmdOut_payload_mxQuantEn;	// src/foragerbee/scala/main/ForagerBee.scala:89:27
   wire        _chainCtrl_io_doneIn_ready;	// src/foragerbee/scala/main/ForagerBee.scala:89:27
   wire        _expander_io_in_ready;	// src/foragerbee/scala/main/ForagerBee.scala:86:24
   wire        _expander_io_out_valid;	// src/foragerbee/scala/main/ForagerBee.scala:86:24
@@ -260,6 +266,9 @@ module Fb_ForagerBee(	// src/foragerbee/scala/main/ForagerBee.scala:34:7
   wire [15:0] _expander_io_out_payload_im2colInShape_2;	// src/foragerbee/scala/main/ForagerBee.scala:86:24
   wire [31:0] _expander_io_out_payload_sgListAddr;	// src/foragerbee/scala/main/ForagerBee.scala:86:24
   wire [15:0] _expander_io_out_payload_sgEntryCount;	// src/foragerbee/scala/main/ForagerBee.scala:86:24
+  wire [31:0] _expander_io_out_payload_scaleAddr;	// src/foragerbee/scala/main/ForagerBee.scala:86:24
+  wire [1:0]  _expander_io_out_payload_scaleBlockSize;	// src/foragerbee/scala/main/ForagerBee.scala:86:24
+  wire        _expander_io_out_payload_mxQuantEn;	// src/foragerbee/scala/main/ForagerBee.scala:86:24
   wire        _doneArbOut_arbiter_io_inputs_0_ready;	// src/utils/Stream/Stream.scala:475:25
   wire        _doneArbOut_arbiter_io_inputs_1_ready;	// src/utils/Stream/Stream.scala:475:25
   wire        _doneArbOut_arbiter_io_output_valid;	// src/utils/Stream/Stream.scala:475:25
@@ -309,6 +318,9 @@ module Fb_ForagerBee(	// src/foragerbee/scala/main/ForagerBee.scala:34:7
   wire [31:0] _dispatcher_io_pop_0_payload_cvtZeroPoint;	// src/foragerbee/scala/main/ForagerBee.scala:71:26
   wire [31:0] _dispatcher_io_pop_0_payload_sgListAddr;	// src/foragerbee/scala/main/ForagerBee.scala:71:26
   wire [15:0] _dispatcher_io_pop_0_payload_sgEntryCount;	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+  wire [31:0] _dispatcher_io_pop_0_payload_scaleAddr;	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+  wire [1:0]  _dispatcher_io_pop_0_payload_scaleBlockSize;	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+  wire        _dispatcher_io_pop_0_payload_mxQuantEn;	// src/foragerbee/scala/main/ForagerBee.scala:71:26
   wire        _dispatcher_io_pop_1_valid;	// src/foragerbee/scala/main/ForagerBee.scala:71:26
   wire [2:0]  _dispatcher_io_pop_1_payload_op;	// src/foragerbee/scala/main/ForagerBee.scala:71:26
   wire [7:0]  _dispatcher_io_pop_1_payload_tag;	// src/foragerbee/scala/main/ForagerBee.scala:71:26
@@ -362,6 +374,9 @@ module Fb_ForagerBee(	// src/foragerbee/scala/main/ForagerBee.scala:34:7
   wire [15:0] _dispatcher_io_pop_1_payload_im2colInShape_2;	// src/foragerbee/scala/main/ForagerBee.scala:71:26
   wire [31:0] _dispatcher_io_pop_1_payload_sgListAddr;	// src/foragerbee/scala/main/ForagerBee.scala:71:26
   wire [15:0] _dispatcher_io_pop_1_payload_sgEntryCount;	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+  wire [31:0] _dispatcher_io_pop_1_payload_scaleAddr;	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+  wire [1:0]  _dispatcher_io_pop_1_payload_scaleBlockSize;	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+  wire        _dispatcher_io_pop_1_payload_mxQuantEn;	// src/foragerbee/scala/main/ForagerBee.scala:71:26
   wire        _engines_1_io_cmdIn_ready;	// src/foragerbee/scala/main/ForagerBee.scala:62:11
   wire        _engines_1_io_done_valid;	// src/foragerbee/scala/main/ForagerBee.scala:62:11
   wire [7:0]  _engines_1_io_done_payload_tag;	// src/foragerbee/scala/main/ForagerBee.scala:62:11
@@ -373,76 +388,79 @@ module Fb_ForagerBee(	// src/foragerbee/scala/main/ForagerBee.scala:34:7
   wire        _engines_0_io_done_payload_err;	// src/foragerbee/scala/main/ForagerBee.scala:62:11
   wire        _engines_0_io_busy;	// src/foragerbee/scala/main/ForagerBee.scala:62:11
   Fb_FbEngine engines_0 (	// src/foragerbee/scala/main/ForagerBee.scala:62:11
-    .clock                          (clock),
-    .reset                          (reset),
-    .io_cmdIn_valid                 (_dispatcher_io_pop_0_valid),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_ready                 (_engines_0_io_cmdIn_ready),
-    .io_cmdIn_payload_op            (_dispatcher_io_pop_0_payload_op),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_tag           (_dispatcher_io_pop_0_payload_tag),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_dimCount      (_dispatcher_io_pop_0_payload_dimCount),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_shape_0       (_dispatcher_io_pop_0_payload_shape_0),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_shape_1       (_dispatcher_io_pop_0_payload_shape_1),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_shape_2       (_dispatcher_io_pop_0_payload_shape_2),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_shape_3       (_dispatcher_io_pop_0_payload_shape_3),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_shape_4       (_dispatcher_io_pop_0_payload_shape_4),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_srcStride_0   (_dispatcher_io_pop_0_payload_srcStride_0),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_srcStride_1   (_dispatcher_io_pop_0_payload_srcStride_1),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_srcStride_2   (_dispatcher_io_pop_0_payload_srcStride_2),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_srcStride_3   (_dispatcher_io_pop_0_payload_srcStride_3),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_srcStride_4   (_dispatcher_io_pop_0_payload_srcStride_4),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_dstStride_0   (_dispatcher_io_pop_0_payload_dstStride_0),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_dstStride_1   (_dispatcher_io_pop_0_payload_dstStride_1),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_dstStride_2   (_dispatcher_io_pop_0_payload_dstStride_2),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_dstStride_3   (_dispatcher_io_pop_0_payload_dstStride_3),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_dstStride_4   (_dispatcher_io_pop_0_payload_dstStride_4),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_srcStartIdx_0 (_dispatcher_io_pop_0_payload_srcStartIdx_0),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_srcStartIdx_1 (_dispatcher_io_pop_0_payload_srcStartIdx_1),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_srcStartIdx_2 (_dispatcher_io_pop_0_payload_srcStartIdx_2),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_srcStartIdx_3 (_dispatcher_io_pop_0_payload_srcStartIdx_3),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_srcStartIdx_4 (_dispatcher_io_pop_0_payload_srcStartIdx_4),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_srcAddr       (_dispatcher_io_pop_0_payload_srcAddr),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_dstAddr       (_dispatcher_io_pop_0_payload_dstAddr),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_elemBytesLog2 (_dispatcher_io_pop_0_payload_elemBytesLog2),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_permVec_0     (_dispatcher_io_pop_0_payload_permVec_0),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_permVec_1     (_dispatcher_io_pop_0_payload_permVec_1),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_permVec_2     (_dispatcher_io_pop_0_payload_permVec_2),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_permVec_3     (_dispatcher_io_pop_0_payload_permVec_3),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_permVec_4     (_dispatcher_io_pop_0_payload_permVec_4),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_padBefore_0   (_dispatcher_io_pop_0_payload_padBefore_0),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_padBefore_1   (_dispatcher_io_pop_0_payload_padBefore_1),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_padAfter_0    (_dispatcher_io_pop_0_payload_padAfter_0),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_padAfter_1    (_dispatcher_io_pop_0_payload_padAfter_1),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_cvtEnable     (_dispatcher_io_pop_0_payload_cvtEnable),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_srcFmt        (_dispatcher_io_pop_0_payload_srcFmt),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_dstFmt        (_dispatcher_io_pop_0_payload_dstFmt),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_cvtScale      (_dispatcher_io_pop_0_payload_cvtScale),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_cvtZeroPoint  (_dispatcher_io_pop_0_payload_cvtZeroPoint),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_sgListAddr    (_dispatcher_io_pop_0_payload_sgListAddr),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_cmdIn_payload_sgEntryCount  (_dispatcher_io_pop_0_payload_sgEntryCount),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
-    .io_done_valid                  (_engines_0_io_done_valid),
-    .io_done_ready                  (_doneArbOut_arbiter_io_inputs_0_ready),	// src/utils/Stream/Stream.scala:475:25
-    .io_done_payload_tag            (_engines_0_io_done_payload_tag),
-    .io_done_payload_err            (_engines_0_io_done_payload_err),
-    .io_bus_wr_valid                (io_bus_0_wr_valid),
-    .io_bus_wr_ready                (io_bus_0_wr_ready),
-    .io_bus_wr_payload_addr         (io_bus_0_wr_payload_addr),
-    .io_bus_wr_payload_len          (io_bus_0_wr_payload_len),
-    .io_bus_wr_payload_data         (io_bus_0_wr_payload_data),
-    .io_bus_wr_payload_strb         (io_bus_0_wr_payload_strb),
-    .io_bus_wr_payload_sof          (io_bus_0_wr_payload_sof),
-    .io_bus_wr_payload_eof          (io_bus_0_wr_payload_eof),
-    .io_bus_wrResp_valid            (io_bus_0_wrResp_valid),
-    .io_bus_wrResp_ready            (io_bus_0_wrResp_ready),
-    .io_bus_wrResp_payload_err      (io_bus_0_wrResp_payload_err),
-    .io_bus_rd_valid                (io_bus_0_rd_valid),
-    .io_bus_rd_ready                (io_bus_0_rd_ready),
-    .io_bus_rd_payload_addr         (io_bus_0_rd_payload_addr),
-    .io_bus_rd_payload_len          (io_bus_0_rd_payload_len),
-    .io_bus_rdData_valid            (io_bus_0_rdData_valid),
-    .io_bus_rdData_ready            (io_bus_0_rdData_ready),
-    .io_bus_rdData_payload_data     (io_bus_0_rdData_payload_data),
-    .io_bus_rdData_payload_err      (io_bus_0_rdData_payload_err),
-    .io_busy                        (_engines_0_io_busy)
+    .clock                           (clock),
+    .reset                           (reset),
+    .io_cmdIn_valid                  (_dispatcher_io_pop_0_valid),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_ready                  (_engines_0_io_cmdIn_ready),
+    .io_cmdIn_payload_op             (_dispatcher_io_pop_0_payload_op),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_tag            (_dispatcher_io_pop_0_payload_tag),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_dimCount       (_dispatcher_io_pop_0_payload_dimCount),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_shape_0        (_dispatcher_io_pop_0_payload_shape_0),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_shape_1        (_dispatcher_io_pop_0_payload_shape_1),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_shape_2        (_dispatcher_io_pop_0_payload_shape_2),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_shape_3        (_dispatcher_io_pop_0_payload_shape_3),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_shape_4        (_dispatcher_io_pop_0_payload_shape_4),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_srcStride_0    (_dispatcher_io_pop_0_payload_srcStride_0),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_srcStride_1    (_dispatcher_io_pop_0_payload_srcStride_1),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_srcStride_2    (_dispatcher_io_pop_0_payload_srcStride_2),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_srcStride_3    (_dispatcher_io_pop_0_payload_srcStride_3),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_srcStride_4    (_dispatcher_io_pop_0_payload_srcStride_4),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_dstStride_0    (_dispatcher_io_pop_0_payload_dstStride_0),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_dstStride_1    (_dispatcher_io_pop_0_payload_dstStride_1),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_dstStride_2    (_dispatcher_io_pop_0_payload_dstStride_2),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_dstStride_3    (_dispatcher_io_pop_0_payload_dstStride_3),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_dstStride_4    (_dispatcher_io_pop_0_payload_dstStride_4),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_srcStartIdx_0  (_dispatcher_io_pop_0_payload_srcStartIdx_0),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_srcStartIdx_1  (_dispatcher_io_pop_0_payload_srcStartIdx_1),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_srcStartIdx_2  (_dispatcher_io_pop_0_payload_srcStartIdx_2),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_srcStartIdx_3  (_dispatcher_io_pop_0_payload_srcStartIdx_3),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_srcStartIdx_4  (_dispatcher_io_pop_0_payload_srcStartIdx_4),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_srcAddr        (_dispatcher_io_pop_0_payload_srcAddr),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_dstAddr        (_dispatcher_io_pop_0_payload_dstAddr),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_elemBytesLog2  (_dispatcher_io_pop_0_payload_elemBytesLog2),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_permVec_0      (_dispatcher_io_pop_0_payload_permVec_0),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_permVec_1      (_dispatcher_io_pop_0_payload_permVec_1),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_permVec_2      (_dispatcher_io_pop_0_payload_permVec_2),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_permVec_3      (_dispatcher_io_pop_0_payload_permVec_3),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_permVec_4      (_dispatcher_io_pop_0_payload_permVec_4),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_padBefore_0    (_dispatcher_io_pop_0_payload_padBefore_0),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_padBefore_1    (_dispatcher_io_pop_0_payload_padBefore_1),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_padAfter_0     (_dispatcher_io_pop_0_payload_padAfter_0),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_padAfter_1     (_dispatcher_io_pop_0_payload_padAfter_1),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_cvtEnable      (_dispatcher_io_pop_0_payload_cvtEnable),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_srcFmt         (_dispatcher_io_pop_0_payload_srcFmt),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_dstFmt         (_dispatcher_io_pop_0_payload_dstFmt),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_cvtScale       (_dispatcher_io_pop_0_payload_cvtScale),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_cvtZeroPoint   (_dispatcher_io_pop_0_payload_cvtZeroPoint),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_sgListAddr     (_dispatcher_io_pop_0_payload_sgListAddr),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_sgEntryCount   (_dispatcher_io_pop_0_payload_sgEntryCount),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_scaleAddr      (_dispatcher_io_pop_0_payload_scaleAddr),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_scaleBlockSize (_dispatcher_io_pop_0_payload_scaleBlockSize),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_mxQuantEn      (_dispatcher_io_pop_0_payload_mxQuantEn),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_done_valid                   (_engines_0_io_done_valid),
+    .io_done_ready                   (_doneArbOut_arbiter_io_inputs_0_ready),	// src/utils/Stream/Stream.scala:475:25
+    .io_done_payload_tag             (_engines_0_io_done_payload_tag),
+    .io_done_payload_err             (_engines_0_io_done_payload_err),
+    .io_bus_wr_valid                 (io_bus_0_wr_valid),
+    .io_bus_wr_ready                 (io_bus_0_wr_ready),
+    .io_bus_wr_payload_addr          (io_bus_0_wr_payload_addr),
+    .io_bus_wr_payload_len           (io_bus_0_wr_payload_len),
+    .io_bus_wr_payload_data          (io_bus_0_wr_payload_data),
+    .io_bus_wr_payload_strb          (io_bus_0_wr_payload_strb),
+    .io_bus_wr_payload_sof           (io_bus_0_wr_payload_sof),
+    .io_bus_wr_payload_eof           (io_bus_0_wr_payload_eof),
+    .io_bus_wrResp_valid             (io_bus_0_wrResp_valid),
+    .io_bus_wrResp_ready             (io_bus_0_wrResp_ready),
+    .io_bus_wrResp_payload_err       (io_bus_0_wrResp_payload_err),
+    .io_bus_rd_valid                 (io_bus_0_rd_valid),
+    .io_bus_rd_ready                 (io_bus_0_rd_ready),
+    .io_bus_rd_payload_addr          (io_bus_0_rd_payload_addr),
+    .io_bus_rd_payload_len           (io_bus_0_rd_payload_len),
+    .io_bus_rdData_valid             (io_bus_0_rdData_valid),
+    .io_bus_rdData_ready             (io_bus_0_rdData_ready),
+    .io_bus_rdData_payload_data      (io_bus_0_rdData_payload_data),
+    .io_bus_rdData_payload_err       (io_bus_0_rdData_payload_err),
+    .io_busy                         (_engines_0_io_busy)
   );	// src/foragerbee/scala/main/ForagerBee.scala:62:11
   Fb_FbEngine_1 engines_1 (	// src/foragerbee/scala/main/ForagerBee.scala:62:11
     .clock                             (clock),
@@ -501,6 +519,9 @@ module Fb_ForagerBee(	// src/foragerbee/scala/main/ForagerBee.scala:34:7
     .io_cmdIn_payload_im2colInShape_2  (_dispatcher_io_pop_1_payload_im2colInShape_2),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
     .io_cmdIn_payload_sgListAddr       (_dispatcher_io_pop_1_payload_sgListAddr),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
     .io_cmdIn_payload_sgEntryCount     (_dispatcher_io_pop_1_payload_sgEntryCount),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_scaleAddr        (_dispatcher_io_pop_1_payload_scaleAddr),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_scaleBlockSize   (_dispatcher_io_pop_1_payload_scaleBlockSize),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
+    .io_cmdIn_payload_mxQuantEn        (_dispatcher_io_pop_1_payload_mxQuantEn),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
     .io_done_valid                     (_engines_1_io_done_valid),
     .io_done_ready                     (_doneArbOut_arbiter_io_inputs_1_ready),	// src/utils/Stream/Stream.scala:475:25
     .io_done_payload_tag               (_engines_1_io_done_payload_tag),
@@ -510,6 +531,7 @@ module Fb_ForagerBee(	// src/foragerbee/scala/main/ForagerBee.scala:34:7
     .io_bus_wr_payload_addr            (io_bus_1_wr_payload_addr),
     .io_bus_wr_payload_len             (io_bus_1_wr_payload_len),
     .io_bus_wr_payload_data            (io_bus_1_wr_payload_data),
+    .io_bus_wr_payload_strb            (io_bus_1_wr_payload_strb),
     .io_bus_wr_payload_sof             (io_bus_1_wr_payload_sof),
     .io_bus_wr_payload_eof             (io_bus_1_wr_payload_eof),
     .io_bus_wrResp_valid               (io_bus_1_wrResp_valid),
@@ -590,6 +612,9 @@ module Fb_ForagerBee(	// src/foragerbee/scala/main/ForagerBee.scala:34:7
     .io_push_payload_im2colInShape_2   (_expander_io_out_payload_im2colInShape_2),	// src/foragerbee/scala/main/ForagerBee.scala:86:24
     .io_push_payload_sgListAddr        (_expander_io_out_payload_sgListAddr),	// src/foragerbee/scala/main/ForagerBee.scala:86:24
     .io_push_payload_sgEntryCount      (_expander_io_out_payload_sgEntryCount),	// src/foragerbee/scala/main/ForagerBee.scala:86:24
+    .io_push_payload_scaleAddr         (_expander_io_out_payload_scaleAddr),	// src/foragerbee/scala/main/ForagerBee.scala:86:24
+    .io_push_payload_scaleBlockSize    (_expander_io_out_payload_scaleBlockSize),	// src/foragerbee/scala/main/ForagerBee.scala:86:24
+    .io_push_payload_mxQuantEn         (_expander_io_out_payload_mxQuantEn),	// src/foragerbee/scala/main/ForagerBee.scala:86:24
     .io_occupancy                      (io_occupancy),
     .io_pop_0_valid                    (_dispatcher_io_pop_0_valid),
     .io_pop_0_ready                    (_engines_0_io_cmdIn_ready),	// src/foragerbee/scala/main/ForagerBee.scala:62:11
@@ -635,6 +660,9 @@ module Fb_ForagerBee(	// src/foragerbee/scala/main/ForagerBee.scala:34:7
     .io_pop_0_payload_cvtZeroPoint     (_dispatcher_io_pop_0_payload_cvtZeroPoint),
     .io_pop_0_payload_sgListAddr       (_dispatcher_io_pop_0_payload_sgListAddr),
     .io_pop_0_payload_sgEntryCount     (_dispatcher_io_pop_0_payload_sgEntryCount),
+    .io_pop_0_payload_scaleAddr        (_dispatcher_io_pop_0_payload_scaleAddr),
+    .io_pop_0_payload_scaleBlockSize   (_dispatcher_io_pop_0_payload_scaleBlockSize),
+    .io_pop_0_payload_mxQuantEn        (_dispatcher_io_pop_0_payload_mxQuantEn),
     .io_pop_1_valid                    (_dispatcher_io_pop_1_valid),
     .io_pop_1_ready                    (_engines_1_io_cmdIn_ready),	// src/foragerbee/scala/main/ForagerBee.scala:62:11
     .io_pop_1_payload_op               (_dispatcher_io_pop_1_payload_op),
@@ -689,6 +717,9 @@ module Fb_ForagerBee(	// src/foragerbee/scala/main/ForagerBee.scala:34:7
     .io_pop_1_payload_im2colInShape_2  (_dispatcher_io_pop_1_payload_im2colInShape_2),
     .io_pop_1_payload_sgListAddr       (_dispatcher_io_pop_1_payload_sgListAddr),
     .io_pop_1_payload_sgEntryCount     (_dispatcher_io_pop_1_payload_sgEntryCount),
+    .io_pop_1_payload_scaleAddr        (_dispatcher_io_pop_1_payload_scaleAddr),
+    .io_pop_1_payload_scaleBlockSize   (_dispatcher_io_pop_1_payload_scaleBlockSize),
+    .io_pop_1_payload_mxQuantEn        (_dispatcher_io_pop_1_payload_mxQuantEn),
     .io_chBusy_0                       (_engines_0_io_busy),	// src/foragerbee/scala/main/ForagerBee.scala:62:11
     .io_chBusy_1                       (_engines_1_io_busy),	// src/foragerbee/scala/main/ForagerBee.scala:62:11
     .io_chDone_0
@@ -775,6 +806,9 @@ module Fb_ForagerBee(	// src/foragerbee/scala/main/ForagerBee.scala:34:7
     .io_in_payload_im2colInShape_2   (_chainCtrl_io_cmdOut_payload_im2colInShape_2),	// src/foragerbee/scala/main/ForagerBee.scala:89:27
     .io_in_payload_sgListAddr        (_chainCtrl_io_cmdOut_payload_sgListAddr),	// src/foragerbee/scala/main/ForagerBee.scala:89:27
     .io_in_payload_sgEntryCount      (_chainCtrl_io_cmdOut_payload_sgEntryCount),	// src/foragerbee/scala/main/ForagerBee.scala:89:27
+    .io_in_payload_scaleAddr         (_chainCtrl_io_cmdOut_payload_scaleAddr),	// src/foragerbee/scala/main/ForagerBee.scala:89:27
+    .io_in_payload_scaleBlockSize    (_chainCtrl_io_cmdOut_payload_scaleBlockSize),	// src/foragerbee/scala/main/ForagerBee.scala:89:27
+    .io_in_payload_mxQuantEn         (_chainCtrl_io_cmdOut_payload_mxQuantEn),	// src/foragerbee/scala/main/ForagerBee.scala:89:27
     .io_out_valid                    (_expander_io_out_valid),
     .io_out_ready                    (_dispatcher_io_push_ready),	// src/foragerbee/scala/main/ForagerBee.scala:71:26
     .io_out_payload_op               (_expander_io_out_payload_op),
@@ -836,7 +870,10 @@ module Fb_ForagerBee(	// src/foragerbee/scala/main/ForagerBee.scala:34:7
     .io_out_payload_im2colInShape_1  (_expander_io_out_payload_im2colInShape_1),
     .io_out_payload_im2colInShape_2  (_expander_io_out_payload_im2colInShape_2),
     .io_out_payload_sgListAddr       (_expander_io_out_payload_sgListAddr),
-    .io_out_payload_sgEntryCount     (_expander_io_out_payload_sgEntryCount)
+    .io_out_payload_sgEntryCount     (_expander_io_out_payload_sgEntryCount),
+    .io_out_payload_scaleAddr        (_expander_io_out_payload_scaleAddr),
+    .io_out_payload_scaleBlockSize   (_expander_io_out_payload_scaleBlockSize),
+    .io_out_payload_mxQuantEn        (_expander_io_out_payload_mxQuantEn)
   );	// src/foragerbee/scala/main/ForagerBee.scala:86:24
   Fb_FbChainController chainCtrl (	// src/foragerbee/scala/main/ForagerBee.scala:89:27
     .clock                              (clock),
@@ -903,6 +940,9 @@ module Fb_ForagerBee(	// src/foragerbee/scala/main/ForagerBee.scala:34:7
     .io_cmdIn_payload_im2colInShape_2   (io_cmd_payload_im2colInShape_2),
     .io_cmdIn_payload_sgListAddr        (io_cmd_payload_sgListAddr),
     .io_cmdIn_payload_sgEntryCount      (io_cmd_payload_sgEntryCount),
+    .io_cmdIn_payload_scaleAddr         (io_cmd_payload_scaleAddr),
+    .io_cmdIn_payload_scaleBlockSize    (io_cmd_payload_scaleBlockSize),
+    .io_cmdIn_payload_mxQuantEn         (io_cmd_payload_mxQuantEn),
     .io_cmdOut_valid                    (_chainCtrl_io_cmdOut_valid),
     .io_cmdOut_ready                    (_expander_io_in_ready),	// src/foragerbee/scala/main/ForagerBee.scala:86:24
     .io_cmdOut_payload_op               (_chainCtrl_io_cmdOut_payload_op),
@@ -965,6 +1005,9 @@ module Fb_ForagerBee(	// src/foragerbee/scala/main/ForagerBee.scala:34:7
     .io_cmdOut_payload_im2colInShape_2  (_chainCtrl_io_cmdOut_payload_im2colInShape_2),
     .io_cmdOut_payload_sgListAddr       (_chainCtrl_io_cmdOut_payload_sgListAddr),
     .io_cmdOut_payload_sgEntryCount     (_chainCtrl_io_cmdOut_payload_sgEntryCount),
+    .io_cmdOut_payload_scaleAddr        (_chainCtrl_io_cmdOut_payload_scaleAddr),
+    .io_cmdOut_payload_scaleBlockSize   (_chainCtrl_io_cmdOut_payload_scaleBlockSize),
+    .io_cmdOut_payload_mxQuantEn        (_chainCtrl_io_cmdOut_payload_mxQuantEn),
     .io_doneIn_valid                    (_doneArbOut_arbiter_io_output_valid),	// src/utils/Stream/Stream.scala:475:25
     .io_doneIn_ready                    (_chainCtrl_io_doneIn_ready),
     .io_doneIn_payload_tag              (_doneArbOut_arbiter_io_output_payload_tag),	// src/utils/Stream/Stream.scala:475:25
@@ -983,7 +1026,6 @@ module Fb_ForagerBee(	// src/foragerbee/scala/main/ForagerBee.scala:34:7
     .io_chainBus_rdData_payload_data    (io_chainBus_rdData_payload_data)
   );	// src/foragerbee/scala/main/ForagerBee.scala:89:27
   assign io_busy = |{_engines_1_io_busy, _engines_0_io_busy};	// src/foragerbee/scala/main/ForagerBee.scala:34:7, :62:11, :108:{46,53}
-  assign io_bus_1_wr_payload_strb = 32'hFFFFFFFF;	// src/foragerbee/scala/main/ForagerBee.scala:34:7, :62:11
   assign io_chainBus_wr_valid = 1'h0;	// src/foragerbee/scala/main/ForagerBee.scala:34:7, :89:27
   assign io_chainBus_wr_payload_addr = 32'h0;	// src/foragerbee/scala/main/ForagerBee.scala:34:7, :89:27
   assign io_chainBus_wr_payload_len = 8'h0;	// src/foragerbee/scala/main/ForagerBee.scala:34:7, :89:27

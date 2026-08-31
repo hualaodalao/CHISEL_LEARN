@@ -52,27 +52,27 @@ class HiveCoreWeightMapProbeSpec extends AnyFlatSpec with Matchers with ChiselSi
     }
 
     simulate(new HiveCore(cfg)) { dut =>
-      var dma0Sent = 0; val dma0Total = 16   // A 常量供数，单 tile 16 beat
-      var dma1Done = 0
-      var dma2Sent = 0; val dma2Total = 16
+      var dmaASent = 0; val dmaATotal = 16   // A 常量供数，单 tile 16 beat
+      var dmaCDone = 0
+      var dmaBSent = 0; val dmaBTotal = 16
       val storeVals = scala.collection.mutable.ArrayBuffer[BigInt]()
 
       dut.reset.poke(true.B)
       dut.io.cmd.valid.poke(false.B)
       dut.io.resp.ready.poke(true.B)
       // A 只读通道：req 常就绪，rsp 初始无效
-      dut.io.dma0Ext.req.ready.poke(true.B)
-      dut.io.dma0Ext.rsp.valid.poke(false.B)
-      dut.io.dma0Ext.rsp.payload.data.poke(0.U)
-      dut.io.dma0Ext.rsp.payload.err.poke(false.B)
+      dut.io.dmaA.req.ready.poke(true.B)
+      dut.io.dmaA.rsp.valid.poke(false.B)
+      dut.io.dmaA.rsp.payload.data.poke(0.U)
+      dut.io.dmaA.rsp.payload.err.poke(false.B)
       // C 写回通道（req{addr,data}/rsp{err}）：req 不接收，rsp 无效
-      dut.io.dma1Ext.req.ready.poke(false.B)
-      dut.io.dma1Ext.rsp.valid.poke(false.B)
-      dut.io.dma1Ext.rsp.payload.err.poke(false.B)
-      dut.io.dma2Ext.req.ready.poke(true.B)
-      dut.io.dma2Ext.rsp.valid.poke(false.B)
-      dut.io.dma2Ext.rsp.payload.data.poke(0.U)
-      dut.io.dma2Ext.rsp.payload.err.poke(false.B)
+      dut.io.dmaC.req.ready.poke(false.B)
+      dut.io.dmaC.rsp.valid.poke(false.B)
+      dut.io.dmaC.rsp.payload.err.poke(false.B)
+      dut.io.dmaB.req.ready.poke(true.B)
+      dut.io.dmaB.rsp.valid.poke(false.B)
+      dut.io.dmaB.rsp.payload.data.poke(0.U)
+      dut.io.dmaB.rsp.payload.err.poke(false.B)
       dut.clock.step(3)
       dut.reset.poke(false.B)
       dut.clock.step(2)
@@ -106,30 +106,30 @@ class HiveCoreWeightMapProbeSpec extends AnyFlatSpec with Matchers with ChiselSi
       var done = false
       var cycle = 0
       while (!done && cycle < 5000) {
-        // dma0: A load（req/rsp 顺序流模型，常量供数）
-        if (dma0Sent < dma0Total) {
-          dut.io.dma0Ext.rsp.valid.poke(true.B)
-          dut.io.dma0Ext.rsp.payload.data.poke(aBeatVal.U)
-          dut.io.dma0Ext.rsp.payload.err.poke(false.B)
-          if (dut.io.dma0Ext.rsp.ready.peek().litToBoolean) dma0Sent += 1
+        // dmaA: A load（req/rsp 顺序流模型，常量供数）
+        if (dmaASent < dmaATotal) {
+          dut.io.dmaA.rsp.valid.poke(true.B)
+          dut.io.dmaA.rsp.payload.data.poke(aBeatVal.U)
+          dut.io.dmaA.rsp.payload.err.poke(false.B)
+          if (dut.io.dmaA.rsp.ready.peek().litToBoolean) dmaASent += 1
         } else {
-          dut.io.dma0Ext.rsp.valid.poke(false.B)
+          dut.io.dmaA.rsp.valid.poke(false.B)
         }
-        // dma1: C store（逐 beat req{addr,data} 流接收）
-        dut.io.dma1Ext.req.ready.poke(true.B)
-        dut.io.dma1Ext.rsp.valid.poke(false.B)
-        dut.io.dma1Ext.rsp.payload.err.poke(false.B)
-        if (dut.io.dma1Ext.req.valid.peek().litToBoolean) {
-          storeVals += dut.io.dma1Ext.req.payload.data.peek().litValue
-          dma1Done += 1
+        // dmaC: C store（逐 beat req{addr,data} 流接收）
+        dut.io.dmaC.req.ready.poke(true.B)
+        dut.io.dmaC.rsp.valid.poke(false.B)
+        dut.io.dmaC.rsp.payload.err.poke(false.B)
+        if (dut.io.dmaC.req.valid.peek().litToBoolean) {
+          storeVals += dut.io.dmaC.req.payload.data.peek().litValue
+          dmaCDone += 1
         }
-        // dma2: 位置 p 的权重行值为 p+1
-        if (dma2Sent < dma2Total) {
-          dut.io.dma2Ext.rsp.valid.poke(true.B)
-          dut.io.dma2Ext.rsp.payload.data.poke(bBeat(dma2Sent).U)
-          if (dut.io.dma2Ext.rsp.ready.peek().litToBoolean) dma2Sent += 1
+        // dmaB: 位置 p 的权重行值为 p+1
+        if (dmaBSent < dmaBTotal) {
+          dut.io.dmaB.rsp.valid.poke(true.B)
+          dut.io.dmaB.rsp.payload.data.poke(bBeat(dmaBSent).U)
+          if (dut.io.dmaB.rsp.ready.peek().litToBoolean) dmaBSent += 1
         } else {
-          dut.io.dma2Ext.rsp.valid.poke(false.B)
+          dut.io.dmaB.rsp.valid.poke(false.B)
         }
         if (dut.io.resp.valid.peek().litToBoolean && dut.io.resp.payload.done.peek().litToBoolean) {
           done = true
@@ -173,27 +173,27 @@ class HiveCoreWeightMapProbeSpec extends AnyFlatSpec with Matchers with ChiselSi
     }
 
     simulate(new HiveCore(cfg)) { dut =>
-      var dma0Sent = 0; val dma0Total = 16   // A 常量供数，单 tile 16 beat
-      var dma1Done = 0
-      var dma2Sent = 0; val dma2Total = 16
+      var dmaASent = 0; val dmaATotal = 16   // A 常量供数，单 tile 16 beat
+      var dmaCDone = 0
+      var dmaBSent = 0; val dmaBTotal = 16
       val storeVals = scala.collection.mutable.ArrayBuffer[BigInt]()
 
       dut.reset.poke(true.B)
       dut.io.cmd.valid.poke(false.B)
       dut.io.resp.ready.poke(true.B)
       // A 只读通道：req 常就绪，rsp 初始无效
-      dut.io.dma0Ext.req.ready.poke(true.B)
-      dut.io.dma0Ext.rsp.valid.poke(false.B)
-      dut.io.dma0Ext.rsp.payload.data.poke(0.U)
-      dut.io.dma0Ext.rsp.payload.err.poke(false.B)
+      dut.io.dmaA.req.ready.poke(true.B)
+      dut.io.dmaA.rsp.valid.poke(false.B)
+      dut.io.dmaA.rsp.payload.data.poke(0.U)
+      dut.io.dmaA.rsp.payload.err.poke(false.B)
       // C 写回通道（req{addr,data}/rsp{err}）：req 不接收，rsp 无效
-      dut.io.dma1Ext.req.ready.poke(false.B)
-      dut.io.dma1Ext.rsp.valid.poke(false.B)
-      dut.io.dma1Ext.rsp.payload.err.poke(false.B)
-      dut.io.dma2Ext.req.ready.poke(true.B)
-      dut.io.dma2Ext.rsp.valid.poke(false.B)
-      dut.io.dma2Ext.rsp.payload.data.poke(0.U)
-      dut.io.dma2Ext.rsp.payload.err.poke(false.B)
+      dut.io.dmaC.req.ready.poke(false.B)
+      dut.io.dmaC.rsp.valid.poke(false.B)
+      dut.io.dmaC.rsp.payload.err.poke(false.B)
+      dut.io.dmaB.req.ready.poke(true.B)
+      dut.io.dmaB.rsp.valid.poke(false.B)
+      dut.io.dmaB.rsp.payload.data.poke(0.U)
+      dut.io.dmaB.rsp.payload.err.poke(false.B)
       dut.clock.step(3)
       dut.reset.poke(false.B)
       dut.clock.step(2)
@@ -227,29 +227,29 @@ class HiveCoreWeightMapProbeSpec extends AnyFlatSpec with Matchers with ChiselSi
       var done = false
       var cycle = 0
       while (!done && cycle < 5000) {
-        // dma0: A load（req/rsp 顺序流模型，常量供数）
-        if (dma0Sent < dma0Total) {
-          dut.io.dma0Ext.rsp.valid.poke(true.B)
-          dut.io.dma0Ext.rsp.payload.data.poke(aBeatVal.U)
-          dut.io.dma0Ext.rsp.payload.err.poke(false.B)
-          if (dut.io.dma0Ext.rsp.ready.peek().litToBoolean) dma0Sent += 1
+        // dmaA: A load（req/rsp 顺序流模型，常量供数）
+        if (dmaASent < dmaATotal) {
+          dut.io.dmaA.rsp.valid.poke(true.B)
+          dut.io.dmaA.rsp.payload.data.poke(aBeatVal.U)
+          dut.io.dmaA.rsp.payload.err.poke(false.B)
+          if (dut.io.dmaA.rsp.ready.peek().litToBoolean) dmaASent += 1
         } else {
-          dut.io.dma0Ext.rsp.valid.poke(false.B)
+          dut.io.dmaA.rsp.valid.poke(false.B)
         }
-        // dma1: C store（逐 beat req{addr,data} 流接收）
-        dut.io.dma1Ext.req.ready.poke(true.B)
-        dut.io.dma1Ext.rsp.valid.poke(false.B)
-        dut.io.dma1Ext.rsp.payload.err.poke(false.B)
-        if (dut.io.dma1Ext.req.valid.peek().litToBoolean) {
-          storeVals += dut.io.dma1Ext.req.payload.data.peek().litValue
-          dma1Done += 1
+        // dmaC: C store（逐 beat req{addr,data} 流接收）
+        dut.io.dmaC.req.ready.poke(true.B)
+        dut.io.dmaC.rsp.valid.poke(false.B)
+        dut.io.dmaC.rsp.payload.err.poke(false.B)
+        if (dut.io.dmaC.req.valid.peek().litToBoolean) {
+          storeVals += dut.io.dmaC.req.payload.data.peek().litValue
+          dmaCDone += 1
         }
-        if (dma2Sent < dma2Total) {
-          dut.io.dma2Ext.rsp.valid.poke(true.B)
-          dut.io.dma2Ext.rsp.payload.data.poke(bBeat(dma2Sent).U)
-          if (dut.io.dma2Ext.rsp.ready.peek().litToBoolean) dma2Sent += 1
+        if (dmaBSent < dmaBTotal) {
+          dut.io.dmaB.rsp.valid.poke(true.B)
+          dut.io.dmaB.rsp.payload.data.poke(bBeat(dmaBSent).U)
+          if (dut.io.dmaB.rsp.ready.peek().litToBoolean) dmaBSent += 1
         } else {
-          dut.io.dma2Ext.rsp.valid.poke(false.B)
+          dut.io.dmaB.rsp.valid.poke(false.B)
         }
         if (dut.io.resp.valid.peek().litToBoolean && dut.io.resp.payload.done.peek().litToBoolean) {
           done = true
