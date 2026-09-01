@@ -164,6 +164,18 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // 打包后恰好等于单 kTile 的 k 窗口字节数，数值自动正确，公式不改。
   calcConfig.aColTileAddressOffset := cfg.totalN.U * (cfg.aW / 8).U
 
+  // --- scaleA 读通道专用地址偏移（仅 hasMx 生成真实逻辑；非 MX 配置驱 0 死值）：
+  // MXFP8 每 32 个 K 元素共享 1 个 E8M0 scale 字节，行步进 = K/32 字节（>> 5，整除由
+  // MX 运行期 K%32==0 校验保证）、块（kb）步进 = 1 字节。独立于 aRowAddressOffset/
+  // aColTileAddressOffset（A 数据 DMA 共用，禁动）。scale DMA 仅 mxRun 启动，非 MX 死路。
+  if (cfg.hasMx) {
+    calcConfig.scaleARowAddressOffset := regFile.k >> 5       // K/32 字节
+    calcConfig.scaleAColTileAddressOffset := 1.U              // kb 步进 1 字节
+  } else {
+    calcConfig.scaleARowAddressOffset := 0.U
+    calcConfig.scaleAColTileAddressOffset := 0.U
+  }
+
   // bRow/bCol 双模式：loadWMode=0 垂直分支逐字不动；loadWMode=1 分支按打包语义加 mxRun Mux
   calcConfig.bRowAddressOffset := Mux(regFile.loadWMode,
     Mux(mxRun, regFile.k * 1.U, regFile.k * (cfg.bW / 8).U),

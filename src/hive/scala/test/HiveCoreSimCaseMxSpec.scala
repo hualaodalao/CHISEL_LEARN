@@ -220,12 +220,20 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     // ==================== DMA-scaleA (scaleA) 数据：8-bit/beat ========================
     // 遍历序（isA=true）= executor pop 序 = (round nt)×(kt 外)×(m 内)。
     // 每 beat = scaleA[m][kb]；v2 单 pass：一个 kTile = 一个 32-K scale 块 → kb = kt。
-    val scaleATotalBeats = aNTiles * aKTiles * M
-    def genScaleABeat(idx: Int): Int = {
-      val kt = (idx % (aKTiles * M)) / M
-      val m = idx % M
-      val kb = kt
-      scaleA(m)(kb) & 0xFF
+    // 【修复（taskId=86）】地址独立从张量语义推导（与 QuantSpec 同源），不再镜像 A 数据：
+    //   外部布局 scaleA[m][kb] 连续（每行 K/32 字节），地址 = SCALE_A_BASE + m×(K/32) + kb×1。
+    val scaleARowOff = kBlocks.toLong             // 行步进 = K/32 字节
+    val scaleAColOff = 1L                         // 块（kb）步进 = 1 字节
+    val scaleATensorBytes = M.toLong * kBlocks    // 真实张量字节数 = M×(K/32)
+    val expScaleAAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
+    for (_ <- 0 until aNTiles; kt <- 0 until aKTiles; m <- 0 until M)
+      expScaleAAddrSeq += SCALE_A_BASE + m * scaleARowOff + kt * scaleAColOff
+    val scaleATotalBeats = expScaleAAddrSeq.size
+    def genScaleABeatByAddr(addr: Long): BigInt = {
+      val off = addr - SCALE_A_BASE
+      val m = (off / scaleARowOff).toInt
+      val kb = (off % scaleARowOff).toInt
+      BigInt(scaleA(m)(kb) & 0xFF)
     }
 
     // ==================== DMA-scaleB (scaleB) 数据：128-bit/beat ======================
@@ -374,13 +382,26 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
           dut.io.dmaB.rsp.payload.data.poke(0.U)
         }
 
-        // --- DMA-scaleA (scaleA) 8-bit：按 beat 序供数（遍历序=pop序） ---
-        // 已知待办（评审记录）：同 DMA-A，未做逐 beat 地址硬对账，后续补齐。
+        // --- DMA-scaleA (scaleA) 8-bit：req.valid 拍响应 + 逐拍地址硬对账（同 scaleB 风格） ---
+        // 【修复（taskId=86）】由按 beat 序供数（无地址对账）改为按地址响应 + 逐拍硬对账；
+        // 供数值不变（同序解码 m/kb 等价）。边界断言防地址足迹越出真实张量。
         if (scaleABeatsSent < scaleATotalBeats) {
-          dut.io.dmaScaleA.get.rsp.valid.poke(true.B)
-          dut.io.dmaScaleA.get.rsp.payload.data.poke(genScaleABeat(scaleABeatsSent).U)
-          dut.io.dmaScaleA.get.rsp.payload.err.poke(false.B)
-          if (dut.io.dmaScaleA.get.rsp.ready.peek().litToBoolean) scaleABeatsSent += 1
+          if (dut.io.dmaScaleA.get.req.valid.peek().litToBoolean) {
+            val cmdAddr = dut.io.dmaScaleA.get.req.payload.addr.peek().litValue.toLong
+            withClue(s"DMA-scaleA beat #$scaleABeatsSent addr mismatch: ") {
+              cmdAddr should be(expScaleAAddrSeq(scaleABeatsSent))
+            }
+            withClue(s"DMA-scaleA beat #$scaleABeatsSent addr out of tensor bounds: ") {
+              (cmdAddr >= SCALE_A_BASE && cmdAddr < SCALE_A_BASE + scaleATensorBytes) should be(true)
+            }
+            dut.io.dmaScaleA.get.rsp.valid.poke(true.B)
+            dut.io.dmaScaleA.get.rsp.payload.data.poke(genScaleABeatByAddr(cmdAddr).U)
+            dut.io.dmaScaleA.get.rsp.payload.err.poke(false.B)
+            scaleABeatsSent += 1
+          } else {
+            dut.io.dmaScaleA.get.rsp.valid.poke(false.B)
+            dut.io.dmaScaleA.get.rsp.payload.data.poke(0.U)
+          }
         } else {
           dut.io.dmaScaleA.get.rsp.valid.poke(false.B)
           dut.io.dmaScaleA.get.rsp.payload.data.poke(0.U)

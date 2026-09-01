@@ -44,6 +44,14 @@
   *     E8M0，行步进 = ceil(n/blk) 字节、列 tile 步进 = totalN/blk 字节，blk 由
   *     regs(7)(15,14) 解码）；读结果软件须按新布局反量化（默认配置不受影响）。
   *
+  * 【MX scale 输入通道外部内存布局契约（dmaScaleA/dmaScaleB，仅 hasMx，MX 运行时启用）】
+  *   - scaleA（regs(9) 基址，8-bit/元素）：布局 scaleA[m][kb] 行主序连续，每行 K/32 字节；
+  *     每 32 个 K 元素共享 1 个 E8M0 scale 字节。DMA 取址行步进 = K/32 字节（= regFile.k >> 5）、
+  *     块（kb）步进 = 1 字节；地址 = base + m×(K/32) + kb，足迹 ∈ [base, base + M×(K/32))。
+  *   - scaleB（regs(10) 基址，scaleRowW=totalN×8 bit/向量）：布局 scaleB[kb][n] kb-major 连续，
+  *     每 kb 占 regFile.n 字节；块内步进 = N 字节（逐 n 列），轮间跳回 base + (nt+1)×totalN 字节。
+  *     地址 = base + kb×N + nt×totalN。
+  *
   * 流程（每个配置）：
   *   1. 清理输出目录
   *   2. ChiselStage 生成 RTL + filelist 等

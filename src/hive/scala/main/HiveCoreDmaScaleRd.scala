@@ -194,7 +194,7 @@ class HiveCoreDmaScaleRd(cfg: HiveCoreConfig, isScaleB: Boolean, bufWidth: Int, 
         // （每轮结束 curAddr 复位回 base）
         when(kCnt === io.calcConfig.kTile - 1.U){
           curAddr := io.baseAddr
-          colAddr := io.calcConfig.aColTileAddressOffset
+          colAddr := io.calcConfig.scaleAColTileAddressOffset
           kCnt := 0.U
           when(nCnt === io.calcConfig.nTile - 1.U){
             state := sDONE
@@ -205,7 +205,7 @@ class HiveCoreDmaScaleRd(cfg: HiveCoreConfig, isScaleB: Boolean, bufWidth: Int, 
           
         }.otherwise{
           curAddr := io.baseAddr + colAddr
-          colAddr := colAddr + io.calcConfig.aColTileAddressOffset
+          colAddr := colAddr + io.calcConfig.scaleAColTileAddressOffset
           kCnt := kCnt + 1.U
           state := sTRANSFER
         }
@@ -266,14 +266,13 @@ class HiveCoreDmaScaleRd(cfg: HiveCoreConfig, isScaleB: Boolean, bufWidth: Int, 
       // scaleA：三级遍历「nTile 外 → kTile 中 → M 内」。内层扫实际 M 行
       // （regFile.m，边界感知不含 padding 行），中层扫 kTile 个 K tile，
       // 外层共 nTile 轮（每轮结束 curAddr 复位回 base）。
-      // 【既有 wart 留痕（v1 即存在，另立任务；仅注释，不改行为）】本实例取址公式
-      // 是 A 矩阵 tiling 公式的镜像（base + m*aRowOff + kt*aColOff），与真实
-      // scaleA 外部布局（scaleA[m][kb]，行步长 = kBlocks 字节）失配。测试侧按
-      // beat 序供数（见 MxSpec genScaleABeat）且未对该通道逐 beat 地址对账，
-      // 故数值路径不受影响；v2 未使该 wart 恶化，取址公式修正另立任务跟踪。
+      // 【修复（taskId=86）】取址公式改用 scaleA 专用步进（不再镜像 A 数据 tiling）：
+      // 行步进 = K/32 字节（scaleARowAddressOffset = regFile.k >> 5）、块（kb）步进 =
+      // 1 字节（scaleAColTileAddressOffset = 1）。对应真实外部布局 scaleA[m][kb]（每行
+      // K/32 字节），地址 = base + m×(K/32) + kb。遍历几何（nt→kt→m 三级、nt 轮复位）不变。
       curAddr    := io.baseAddr
-      colAddr    := io.calcConfig.aColTileAddressOffset
-      rowStep    := io.calcConfig.aRowAddressOffset
+      colAddr    := io.calcConfig.scaleAColTileAddressOffset
+      rowStep    := io.calcConfig.scaleARowAddressOffset
       lineTarget := io.dim
     }
   }

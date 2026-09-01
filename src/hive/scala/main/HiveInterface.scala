@@ -217,6 +217,13 @@ class HiveCoreExePreCalcConfig(cfg: HiveCoreConfig) extends Bundle {
   // blk = 8 << qBlockSize 运行期解码；非量化运行时本字段无消费者（死路）。
   val cScaleRowAddressOffset = UInt(cfg.addrWidth.W)
   val cScaleColTileAddressOffset = UInt(cfg.addrWidth.W)
+  // --- scaleA 读通道（dmaScaleA，isScaleB=false）专用地址偏移 ---
+  // MXFP8 每 32 个 K 元素共享 1 个 E8M0 scale 字节，外部布局 scaleA[m][kb] 连续
+  // （每行 K/32 字节）：行步进 = K/32 字节（= regFile.k >> 5）、块（kb）步进 = 1 字节。
+  // 独立于 A 数据通道的 aRowAddressOffset/aColTileAddressOffset（后者被 aDma 共用，禁动）。
+  // 仅 mxRun 启动时消费，非 MX 为死路。
+  val scaleARowAddressOffset = UInt(cfg.addrWidth.W)
+  val scaleAColTileAddressOffset = UInt(cfg.addrWidth.W)
 }
 object HiveCoreExePreCalcConfig {
   def apply(cfg: HiveCoreConfig) = new HiveCoreExePreCalcConfig(cfg)

@@ -32,6 +32,9 @@ class HiveCoreSimCaseQuantSpec extends AnyFlatSpec with Matchers with ChiselSim 
   val B_BASE: Long       = 0x00100000L
   val C_BASE: Long       = 0x00200000L
   val SCALE_C_BASE: Long = 0x00300000L
+  // typical 双 MX 异构用例专用：MX 输入侧 scale 基址（与 SCALE_C_BASE 不重叠）
+  val SCALE_A_BASE: Long = 0x00400000L
+  val SCALE_B_BASE: Long = 0x00500000L
 
   val simDir = "/Users/wangliutailong/Qoder_Proj/Chisel_Learn/sim"
 
@@ -49,6 +52,7 @@ class HiveCoreSimCaseQuantSpec extends AnyFlatSpec with Matchers with ChiselSim 
   //      fp32 布局 + 无 dmaCScale 拍 + 无 err；既有套件均无 outFmt=3 覆盖，
   //      故 011/111 两格一并补齐））
   // ==========================================================================
+ /*
   it should "run quant GEMM blk8 E4M3 full width RNE" in {
     runQuantGemm(outFmt3 = 4, blkSel = 0, rnd = 0, cDmaExtW = 0, M = 32, N = 32, K = 32,
       waveName = "quant_blk8_E4M3_full_RNE.fst",
@@ -98,6 +102,7 @@ class HiveCoreSimCaseQuantSpec extends AnyFlatSpec with Matchers with ChiselSim 
       testMangle = "should-fall-back-to-fp32-with-outFmt-011-reserved")
   }
 
+
   // ==========================================================================
   // 负向用例注册
   // ==========================================================================
@@ -110,6 +115,23 @@ class HiveCoreSimCaseQuantSpec extends AnyFlatSpec with Matchers with ChiselSim 
     // mxfp4（outFmt=110）+ N=17 奇数 → 行宽非整字节 → execute 拍 config-err
     runQuantErrCase(outFmt3 = 6, blkSel = 0, M = 4, N = 17, K = 32,
       caseName = "Quant-ERR-mxfp4-oddN")
+  }
+*/
+
+  // ==========================================================================
+  // typical 双 MX 异构用例（注册于上方用户 /* ... */ 注释块之外，独立分区）：
+  //   A=MXFP8 E4M3（K 轴 32-K 块共享 E8M0 scaleA）× B=MXFP8 E5M2（32-K 块 scaleB，
+  //   异构双 MX → mixFmtEn=1，MX 下 B 必须转置读取 → loadWMode=1）→
+  //   fp32 MAC（40-bit 延迟规格化累加）→ 40→32 规格化 → 量化写回 mxfp8 E4M3
+  //   blk16（outFmt3=4、blkSel=1），dmaC 数据 + dmaCScale scale 双通道
+  //   逐拍地址/数据硬对账 + swQuantBlock 同链对拍。
+  //   规模 M=32 N=32 K=64：K 覆盖 2 个 32-K scale 块（kTiles=2 多 pass）、
+  //   N 覆盖 2 个 nTile（scaleB nt 外×kb 内两级遍历非退化组合）。
+  // ==========================================================================
+  it should "run typical dual MX quant GEMM M=32 N=32 K=64 E4M3xE5M2 blk16" in {
+    runMxQuantGemm(M = 32, N = 32, K = 64,
+      waveName = "quant_mx_dual_E4M3xE5M2_blk16.fst",
+      testMangle = "should-run-typical-dual-MX-quant-GEMM-M-32-N-32-K-64-E4M3xE5M2-blk16")
   }
 
   // ==========================================================================
@@ -824,6 +846,527 @@ class HiveCoreSimCaseQuantSpec extends AnyFlatSpec with Matchers with ChiselSim 
       withClue(s"[$tag] dmaCScale must stay idle on reserved-outFmt fallback: ") {
         dmaCScaleReqSeen should be(0)
       }
+    }
+
+    // --- 复制 FST 波形（源路径段由 testMangle 逐字锚定 it should 用例名）---
+    HiveSimCommon.copyTrace(
+      s"build/chiselsim/HiveCoreSimCaseQuantSpec/HiveCore-Quant-GEMM-Simulation/$testMangle/workdir-verilator/trace.fst",
+      s"$simDir/$waveName",
+      tag
+    )
+  }
+
+  // ==========================================================================
+  // typical 双 MX 异构运行器：MX 计算通路（scaleA/scaleB 按 32-K 块，供数范式与
+  //   HiveCoreSimCaseMxSpec 同源）叠加 C 侧量化写回（blk16，双通道硬对账范式与
+  //   runQuantGemm 同源）。对拍参考链：E4M3×scaleA × E5M2×scaleB → fp32 MAC →
+  //   40→32 → swQuantBlock E4M3 blk16（MX MAC 语义与 MxSpec golden 同源：
+  //   mxToFloat 元素解码 + scale 指数加，勿另起漂移源）。
+  //   crafted 矩阵元素均为 2^-6 粒度小数（a：0.25 粒度→E4M3 精确；b：0.5 粒度→
+  //   E5M2 精确；scale 为 2^±1 幂），乘积/累加全程在 fp32 精确域内（|和|≤1024、
+  //   尾数跨度 < 24 bit），故 double 和→fp32 与硬件左结合累加链 bit-exact，
+  //   期望链可按 runQuantGemm 同式两级舍入重建。
+  //   假存储内存保真（历史教训）：全部读通道（A/B/scaleA/scaleB）仅在 req.valid 拍
+  //   响应，逐拍硬断言请求地址，数据按「该地址处真实内存内容」反解码供数；
+  //   写通道（dmaC/dmaCScale）逐拍地址+数据硬断言。
+  // ==========================================================================
+  private def runMxQuantGemm(M: Int, N: Int, K: Int,
+                             waveName: String, testMangle: String): Unit = {
+    val outFmt3 = 4   // 量化输出 mxfp8 E4M3
+    val blkSel  = 1   // qBlockSize：16 元素/块
+    val rnd     = 0   // RNE
+    val blk = 8 << blkSel
+    require(K % 32 == 0, s"MX 用例 K($K) 必须 32 对齐")
+    val kBlocks = K / 32
+    val tag = s"QuantMX-E4M3xE5M2-blk$blk-M$M-N$N-K$K"
+
+    val cfg = HiveCoreConfig(
+      arrayN = 8,
+      clusterM = 2,          // totalN = 16（MX 硬约束）
+      aBufferDepth = 2048,
+      bBufferDepth = 2048,
+      cBufferDepth = 2048,
+      scaleBufferDepth = 256,
+      aW = 16,
+      bW = 16,
+      cW = 40
+    )
+
+    val totalN = cfg.totalN
+    val aEffW  = cfg.aEffW
+    val elemE  = cfg.cElementsPerBeat   // cDmaExtW=0 → = totalN
+    val beatsPerRow = cfg.cBeatsPerRow  // = 1（满宽）
+    val nTiles = (N + totalN - 1) / totalN
+    val aKTiles = K / 32                // v2：kTile = 一个 32-K scale 块 = 单 pass
+    val nTilesB = nTiles
+    val bKTiles = K / 32
+
+    // --- 量化布局（与 HiveCore calcConfig 量化分支同源）：mxfp8 行步进 = n×1B、
+    // 列步进 = totalN×1B；scale 通道：行步进 = ceil(n/blk)、列步进 = totalN/blk ---
+    val cRowOff = N.toLong
+    val cColOff = totalN.toLong
+    val beatStep = elemE.toLong
+    val scaleRowOff = (N + blk - 1).toLong / blk
+    val scaleColOff = totalN.toLong / blk
+    val scaleBytesPerRow = scaleRowOff.toInt
+
+    // --- MX 输入数据（与 MxSpec 同构造）：scale 指数含正负、覆盖多块/列以暴露路由错位 ---
+    def scaleAExp(m: Int, kb: Int): Int = ((m + kb) % 3) - 1        // {-1,0,1}
+    def scaleBExp(kb: Int, n: Int): Int = ((n + 2 * kb) % 3) - 1    // {-1,0,1}
+    val scaleA = Array.tabulate(M, kBlocks)((m, kb) => HiveSimCommon.mxScaleByte(scaleAExp(m, kb)))
+    val scaleB = Array.tabulate(kBlocks, N)((kb, n) => HiveSimCommon.mxScaleByte(scaleBExp(kb, n)))
+    def aValF(m: Int, k: Int): Double = ((((m * 7 + k * 3) % 11) - 5).toDouble) * 0.25
+    def bValF(k: Int, n: Int): Double = ((((k * 5 + n * 2) % 9)  - 4).toDouble) * 0.5
+    val aByte = Array.tabulate(M, K)((m, k) => HiveSimCommon.floatToMxE4M3(aValF(m, k)))
+    val bByte = Array.tabulate(K, N)((k, n) => HiveSimCommon.floatToMxE5M2(bValF(k, n)))
+
+    // --- golden 累加（与 MxSpec 同源：mxToFloat 解码 + scale 指数加）；
+    // 2^-6 粒度小数在 fp32 累加全程精确 → double 和转 fp32 与硬件 bit-exact ---
+    def refSum(m: Int, gc: Int): Double =
+      (0 until K).map { k =>
+        val kb = k / 32
+        HiveSimCommon.mxE4M3ToFloat(aByte(m)(k), scaleA(m)(kb)) *
+          HiveSimCommon.mxE5M2ToFloat(bByte(k)(gc), scaleB(kb)(gc))
+      }.sum
+
+    // --- 期望链（与硬件两级舍入链同链重建）：40→32 规格化 → swQuantBlock ---
+    def expectedRow(nt: Int, m: Int): (Seq[Int], Seq[Int]) = {
+      val nEffTile = math.min(totalN, N - nt * totalN)
+      val normRow = (0 until totalN).map { lc =>
+        val gc = nt * totalN + lc
+        val sum = if (gc < N) refSum(m, gc) else 0.0
+        val fp32Bits = java.lang.Float.floatToRawIntBits(sum.toFloat) & 0xFFFFFFFFL
+        HiveSimCommon.swFpNormalize40to32(HiveSimCommon.fp32BitsTo40(fp32Bits))
+      }
+      HiveSimCommon.swQuantBlock(normRow, rnd, outFmt3, blkSel, nEffTile)
+    }
+
+    // --- DMA-A 期望地址（v2 打包：行步长 = K 字节、k 窗口步进 = 2×totalN 字节，
+    // 遍历序 nt 外 × kt 中 × m 内）与按地址反解码供数（内存保真） ---
+    val aRowOff = K.toLong
+    val aColOff = totalN.toLong * (cfg.aW / 8)
+    val expAAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
+    for (_ <- 0 until nTiles; kt <- 0 until aKTiles; m <- 0 until M)
+      expAAddrSeq += A_BASE + m * aRowOff + kt * aColOff
+    val dmaATotalBeats = expAAddrSeq.size
+    def genDmaABeatByAddr(addr: Long): BigInt = {
+      val off = addr - A_BASE
+      val m = (off / aRowOff).toInt
+      val kt = ((off % aRowOff) / aColOff).toInt
+      var data = BigInt(0)
+      for (i <- 0 until totalN) {
+        val kEven = kt * 32 + 2 * i
+        val kOdd = kEven + 1
+        val lo = if (m < M && kEven < K) aByte(m)(kEven) else 0
+        val hi = if (m < M && kOdd  < K) aByte(m)(kOdd)  else 0
+        data = data | (BigInt(((hi & 0xFF) << 8) | (lo & 0xFF)) << (i * aEffW))
+      }
+      data
+    }
+
+    // --- DMA-B 期望地址（转置存储：行 n 基址 = B_BASE + n×K 字节；遍历序与
+    // MxSpec 同：nt 轮 × kt 块内降序行）与按地址反解码供数 ---
+    val bRowOff = K.toLong
+    val bColTileOff = totalN.toLong * K
+    val kSliceStep = totalN.toLong * (cfg.bW / 8)
+    val expBAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
+    for (r <- 0 until nTilesB; kt <- 0 until bKTiles) {
+      val blockStart = B_BASE + r.toLong * bColTileOff +
+        (totalN - 1).toLong * bRowOff + kt.toLong * kSliceStep
+      for (r2 <- 0 until totalN)
+        expBAddrSeq += blockStart - r2 * bRowOff
+    }
+    val dmaBTotalBeats = expBAddrSeq.size
+    def genDmaBBeatByAddr(addr: Long): BigInt = {
+      // 转置布局下行 n 的地址 = B_BASE + n×K；地址低 K 字节内选 k 窗口（32 字节/窗）
+      val off = addr - B_BASE
+      val n = (off / bRowOff).toInt
+      val kt = ((off % bRowOff) / kSliceStep).toInt
+      var data = BigInt(0)
+      for (i <- 0 until totalN) {
+        val kEven = kt * 32 + 2 * i
+        val kOdd = kEven + 1
+        val lo = if (kEven < K && n < N) bByte(kEven)(n) else 0
+        val hi = if (kOdd  < K && n < N) bByte(kOdd)(n)  else 0
+        data = data | (BigInt(((hi & 0xFF) << 8) | (lo & 0xFF)) << (i * cfg.bW))
+      }
+      data
+    }
+
+    // --- DMA-scaleA 期望地址（独立从张量语义推导，不复用 A 数据步进）：外部布局
+    //   scaleA[m][kb] 连续（每行 K/32 字节），地址 = SCALE_A_BASE + m×(K/32) + kb×1；
+    //   遍历序仍为 A 式三级（nt 外 × kt 中 × m 内），与 HiveCoreDmaScaleRd isScaleB=false
+    //   逐拍同源；v2 单 pass → kb=kt。与按地址反解码供数 ---
+    val scaleARowOff = kBlocks.toLong             // 行步进 = K/32 字节
+    val scaleAColOff = 1L                         // 块（kb）步进 = 1 字节
+    val scaleATensorBytes = M.toLong * kBlocks    // 真实张量字节数 = M×(K/32)
+    val expScaleAAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
+    for (_ <- 0 until nTiles; kt <- 0 until aKTiles; m <- 0 until M)
+      expScaleAAddrSeq += SCALE_A_BASE + m * scaleARowOff + kt * scaleAColOff
+    val scaleATotalBeats = expScaleAAddrSeq.size
+    // 期望地址足迹边界自检：全部落在真实张量 [base, base+M×(K/32)) 内，
+    // 防止再次出现地址越出真实张量的自洽循环。
+    expScaleAAddrSeq.foreach { a =>
+      assert(a >= SCALE_A_BASE && a < SCALE_A_BASE + scaleATensorBytes,
+        s"[$tag] scaleA 期望地址 0x${a.toHexString} 越出张量区间 " +
+        s"[0x${SCALE_A_BASE.toHexString}, 0x${(SCALE_A_BASE + scaleATensorBytes).toHexString})")
+    }
+    def genScaleABeatByAddr(addr: Long): BigInt = {
+      val off = addr - SCALE_A_BASE
+      val m = (off / scaleARowOff).toInt
+      val kt = ((off % scaleARowOff) / scaleAColOff).toInt
+      BigInt(scaleA(m)(kt) & 0xFF)
+    }
+
+    // --- DMA-scaleB 期望地址（两级遍历：nt 外 × kb 内，addr = base + kb×N + nt×totalN，
+    // 与 HiveCoreDmaScaleRd isScaleB=true 取址公式逐拍同源）与按地址反解码供数 ---
+    val expScaleBAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
+    for (nt <- 0 until nTilesB; kb <- 0 until kBlocks)
+      expScaleBAddrSeq += SCALE_B_BASE + kb.toLong * N + nt.toLong * totalN
+    val scaleBTotalBeats = expScaleBAddrSeq.size
+    def genScaleBBeatByAddr(addr: Long): BigInt = {
+      val off = addr - SCALE_B_BASE
+      val kb = (off / N).toInt
+      val nt = ((off % N) / totalN).toInt
+      var data = BigInt(0)
+      for (i <- 0 until totalN) {
+        val n = nt * totalN + i
+        val value = if (n < N) scaleB(kb)(n) else 0
+        data = data | (BigInt(value & 0xFF) << (8 * i))
+      }
+      data
+    }
+
+    // --- DMA-C 数据通道期望地址：量化布局 + cDma sNEXT_N 三角累积跳转闭式（同 runQuantGemm）---
+    val expCAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
+    for (nt <- 0 until nTiles; m <- 0 until M; b <- 0 until beatsPerRow)
+      expCAddrSeq += C_BASE + nt.toLong * (M - 1) * cRowOff +
+        nt.toLong * (nt + 1) / 2 * cColOff + m * cRowOff + b * beatStep
+    val cWriteLog = scala.collection.mutable.ArrayBuffer[(Long, BigInt)]()
+    def expCDataBeat(beatIdx: Int): BigInt = {
+      val nt = beatIdx / (M * beatsPerRow)
+      val inBlock = beatIdx % (M * beatsPerRow)
+      val row = inBlock / beatsPerRow
+      val beatInRow = inBlock % beatsPerRow
+      val (codes, _) = expectedRow(nt, row)
+      var data = BigInt(0)
+      for (i <- 0 until elemE) {
+        val code = codes(beatInRow * elemE + i)
+        data = data | (BigInt(code & 0xFF) << (8 * i))
+      }
+      data
+    }
+
+    // --- DMA-CSCALE 期望地址（线性模型：base + nt×colOff + m×rowOff）与期望数据 ---
+    val expCScaleAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
+    for (nt <- 0 until nTiles; m <- 0 until M)
+      expCScaleAddrSeq += SCALE_C_BASE + nt * scaleColOff + m * scaleRowOff
+    val scaleWriteLog = scala.collection.mutable.ArrayBuffer[(Long, BigInt)]()
+    def expCScaleDataBeat(beatIdx: Int): BigInt = {
+      val nt = beatIdx / M
+      val row = beatIdx % M
+      val (_, scales) = expectedRow(nt, row)
+      var data = BigInt(0)
+      for ((s, g) <- scales.zipWithIndex if g < scaleBytesPerRow)
+        data = data | (BigInt(s & 0xFF) << (8 * g))
+      data
+    }
+
+    // 控制字：aFmt=MXE4M3(0b100)=bit6|bits(1,0)=00；bFmt=MXE5M2(0b101)=bit7|bits(9,8)=01；
+    // loadWMode=bit5（MX 下 B 必须转置读取）；mixFmtEn=bit10（异构双 MX）；
+    // outFmt3<<11；blkSel<<14；rnd=RNE=0 占 bits(4,2)。合成 = 0x65E0
+    val controlWord =
+      (1L << 6) | (1L << 7) | (1L << 8) | (1L << 5) | (1L << 10) |
+      ((outFmt3.toLong & 0x7) << 11) | ((blkSel.toLong & 0x3) << 14)
+    require(controlWord == 0x65E0L, s"控制字自检失败: 0x${controlWord.toHexString}")
+
+    println(s"[$tag] Starting: M=$M N=$N K=$K totalN=$totalN kBlocks=$kBlocks blk=$blk ctrl=0x${controlWord.toHexString}")
+    println(s"[$tag] beats: A=$dmaATotalBeats B=$dmaBTotalBeats sA=$scaleATotalBeats sB=$scaleBTotalBeats " +
+            s"C=${expCAddrSeq.size} CSCALE=${expCScaleAddrSeq.size}")
+
+    simulate(new HiveCore(cfg)) { dut =>
+
+      var dmaABeatsSent = 0
+      var dmaBBeatsSent = 0
+      var scaleABeatsSent = 0
+      var scaleBBeatsSent = 0
+      var dmaCStoreBeats = 0
+      var dmaCScaleBeats = 0
+
+      // ===== Reset（7 通道：A/B/C + scaleA/scaleB/cScale）=====
+      dut.reset.poke(true.B)
+      dut.io.cmd.valid.poke(false.B)
+      dut.io.resp.ready.poke(true.B)
+      dut.io.dmaA.req.ready.poke(true.B)
+      dut.io.dmaA.rsp.valid.poke(false.B)
+      dut.io.dmaA.rsp.payload.data.poke(0.U)
+      dut.io.dmaA.rsp.payload.err.poke(false.B)
+      dut.io.dmaC.req.ready.poke(true.B)
+      dut.io.dmaC.rsp.valid.poke(false.B)
+      dut.io.dmaC.rsp.payload.err.poke(false.B)
+      dut.io.dmaB.req.ready.poke(true.B)
+      dut.io.dmaB.rsp.valid.poke(false.B)
+      dut.io.dmaB.rsp.payload.data.poke(0.U)
+      dut.io.dmaB.rsp.payload.err.poke(false.B)
+      dut.io.dmaScaleA.get.req.ready.poke(true.B)
+      dut.io.dmaScaleA.get.rsp.valid.poke(false.B)
+      dut.io.dmaScaleA.get.rsp.payload.data.poke(0.U)
+      dut.io.dmaScaleA.get.rsp.payload.err.poke(false.B)
+      dut.io.dmaScaleB.get.req.ready.poke(true.B)
+      dut.io.dmaScaleB.get.rsp.valid.poke(false.B)
+      dut.io.dmaScaleB.get.rsp.payload.data.poke(0.U)
+      dut.io.dmaScaleB.get.rsp.payload.err.poke(false.B)
+      dut.io.dmaCScale.get.req.ready.poke(true.B)
+      dut.io.dmaCScale.get.rsp.valid.poke(false.B)
+      dut.io.dmaCScale.get.rsp.payload.err.poke(false.B)
+      dut.clock.step(3)
+      dut.reset.poke(false.B)
+      dut.clock.step(2)
+
+      def sendCmd(op: HiveCoreOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
+        dut.io.cmd.valid.poke(true.B)
+        dut.io.cmd.payload.op.poke(op)
+        dut.io.cmd.payload.reg0Addr.poke(reg0Addr.U)
+        dut.io.cmd.payload.reg1Addr.poke(reg1Addr.U)
+        dut.io.cmd.payload.data0.poke(data0.U)
+        dut.io.cmd.payload.data1.poke(data1.U)
+        dut.clock.step()
+        dut.io.cmd.valid.poke(false.B)
+        dut.clock.step(2)
+      }
+
+      // ===== 配置寄存器（双 MX 异构 + 量化输出；0x09/0x0A=scaleA/B 基址，0x0B=scaleC 基址）=====
+      sendCmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, M, N)
+      sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, K, A_BASE)
+      sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, B_BASE, C_BASE)
+      sendCmd(HiveCoreOp.REG_WRITE2, 0x06, 0x07, 0L, controlWord)
+      sendCmd(HiveCoreOp.REG_WRITE2, 0x09, 0x0A, SCALE_A_BASE, SCALE_B_BASE)
+      sendCmd(HiveCoreOp.REG_WRITE1, 0x0B, 0x00, SCALE_C_BASE, 0L)
+
+      // ===== EXECUTE =====
+      dut.io.cmd.valid.poke(true.B)
+      dut.io.cmd.payload.op.poke(HiveCoreOp.EXECUTE)
+      dut.io.cmd.payload.reg0Addr.poke(0.U)
+      dut.io.cmd.payload.reg1Addr.poke(0.U)
+      dut.io.cmd.payload.data0.poke(0.U)
+      dut.io.cmd.payload.data1.poke(0.U)
+      dut.clock.step()
+      dut.io.cmd.valid.poke(false.B)
+
+      var done = false
+      var cycle = 0
+      val maxCycles = 16000
+
+      while (!done && cycle < maxCycles) {
+
+        // --- DMA-A：req.valid 拍逐拍地址硬对账 + 按地址内存保真供数（同拍 lockstep）---
+        if (dmaABeatsSent < dmaATotalBeats) {
+          if (dut.io.dmaA.req.valid.peek().litToBoolean) {
+            val cmdAddr = dut.io.dmaA.req.payload.addr.peek().litValue.toLong
+            withClue(s"[$tag] DMA-A beat #$dmaABeatsSent addr mismatch: ") {
+              cmdAddr should be(expAAddrSeq(dmaABeatsSent))
+            }
+            dut.io.dmaA.rsp.valid.poke(true.B)
+            dut.io.dmaA.rsp.payload.data.poke(genDmaABeatByAddr(cmdAddr).U)
+            dut.io.dmaA.rsp.payload.err.poke(false.B)
+            dmaABeatsSent += 1
+          } else {
+            dut.io.dmaA.rsp.valid.poke(false.B)
+            dut.io.dmaA.rsp.payload.data.poke(0.U)
+            dut.io.dmaA.rsp.payload.err.poke(false.B)
+          }
+        } else {
+          dut.io.dmaA.rsp.valid.poke(false.B)
+          dut.io.dmaA.rsp.payload.data.poke(0.U)
+          dut.io.dmaA.rsp.payload.err.poke(false.B)
+        }
+
+        // --- DMA-B：req.valid 拍逐拍地址硬对账 + 按地址内存保真供数 ---
+        if (dmaBBeatsSent < dmaBTotalBeats) {
+          if (dut.io.dmaB.req.valid.peek().litToBoolean) {
+            val cmdAddr = dut.io.dmaB.req.payload.addr.peek().litValue.toLong
+            withClue(s"[$tag] DMA-B weight beat #$dmaBBeatsSent addr mismatch: ") {
+              cmdAddr should be(expBAddrSeq(dmaBBeatsSent))
+            }
+            dut.io.dmaB.rsp.valid.poke(true.B)
+            dut.io.dmaB.rsp.payload.data.poke(genDmaBBeatByAddr(cmdAddr).U)
+            dut.io.dmaB.rsp.payload.err.poke(false.B)
+            dmaBBeatsSent += 1
+          } else {
+            dut.io.dmaB.rsp.valid.poke(false.B)
+            dut.io.dmaB.rsp.payload.data.poke(0.U)
+            dut.io.dmaB.rsp.payload.err.poke(false.B)
+          }
+        } else {
+          dut.io.dmaB.rsp.valid.poke(false.B)
+          dut.io.dmaB.rsp.payload.data.poke(0.U)
+          dut.io.dmaB.rsp.payload.err.poke(false.B)
+        }
+
+        // --- DMA-scaleA：req.valid 拍逐拍地址硬对账 + 按地址供 8-bit scale ---
+        if (scaleABeatsSent < scaleATotalBeats) {
+          if (dut.io.dmaScaleA.get.req.valid.peek().litToBoolean) {
+            val cmdAddr = dut.io.dmaScaleA.get.req.payload.addr.peek().litValue.toLong
+            withClue(s"[$tag] DMA-scaleA beat #$scaleABeatsSent addr mismatch: ") {
+              cmdAddr should be(expScaleAAddrSeq(scaleABeatsSent))
+            }
+            withClue(s"[$tag] DMA-scaleA beat #$scaleABeatsSent addr out of tensor bounds: ") {
+              (cmdAddr >= SCALE_A_BASE && cmdAddr < SCALE_A_BASE + scaleATensorBytes) should be(true)
+            }
+            dut.io.dmaScaleA.get.rsp.valid.poke(true.B)
+            dut.io.dmaScaleA.get.rsp.payload.data.poke(genScaleABeatByAddr(cmdAddr).U)
+            dut.io.dmaScaleA.get.rsp.payload.err.poke(false.B)
+            scaleABeatsSent += 1
+          } else {
+            dut.io.dmaScaleA.get.rsp.valid.poke(false.B)
+            dut.io.dmaScaleA.get.rsp.payload.data.poke(0.U)
+            dut.io.dmaScaleA.get.rsp.payload.err.poke(false.B)
+          }
+        } else {
+          dut.io.dmaScaleA.get.rsp.valid.poke(false.B)
+          dut.io.dmaScaleA.get.rsp.payload.data.poke(0.U)
+          dut.io.dmaScaleA.get.rsp.payload.err.poke(false.B)
+        }
+
+        // --- DMA-scaleB：req.valid 拍逐拍地址硬对账 + 按地址供 128-bit 向量 ---
+        if (scaleBBeatsSent < scaleBTotalBeats) {
+          if (dut.io.dmaScaleB.get.req.valid.peek().litToBoolean) {
+            val cmdAddr = dut.io.dmaScaleB.get.req.payload.addr.peek().litValue.toLong
+            withClue(s"[$tag] DMA-scaleB beat #$scaleBBeatsSent addr mismatch: ") {
+              cmdAddr should be(expScaleBAddrSeq(scaleBBeatsSent))
+            }
+            dut.io.dmaScaleB.get.rsp.valid.poke(true.B)
+            dut.io.dmaScaleB.get.rsp.payload.data.poke(genScaleBBeatByAddr(cmdAddr).U)
+            dut.io.dmaScaleB.get.rsp.payload.err.poke(false.B)
+            scaleBBeatsSent += 1
+          } else {
+            dut.io.dmaScaleB.get.rsp.valid.poke(false.B)
+            dut.io.dmaScaleB.get.rsp.payload.data.poke(0.U)
+            dut.io.dmaScaleB.get.rsp.payload.err.poke(false.B)
+          }
+        } else {
+          dut.io.dmaScaleB.get.rsp.valid.poke(false.B)
+          dut.io.dmaScaleB.get.rsp.payload.data.poke(0.U)
+          dut.io.dmaScaleB.get.rsp.payload.err.poke(false.B)
+        }
+
+        // --- DMA-C 数据通道：逐拍地址硬对账 + 量化内容硬断言 ---
+        dut.io.dmaC.req.ready.poke(true.B)
+        if (dut.io.dmaC.req.valid.peek().litToBoolean) {
+          val reqAddr = dut.io.dmaC.req.payload.addr.peek().litValue.toLong
+          withClue(s"[$tag] DMA-C store beat #$dmaCStoreBeats addr mismatch: ") {
+            reqAddr should be(expCAddrSeq(dmaCStoreBeats))
+          }
+          val writeData = dut.io.dmaC.req.payload.data.peek().litValue
+          val expData = expCDataBeat(dmaCStoreBeats)
+          withClue(s"[$tag] DMA-C store beat #$dmaCStoreBeats data mismatch " +
+                   f"(hw=0x$writeData%X exp=0x$expData%X): ") {
+            writeData should be(expData)
+          }
+          cWriteLog += ((reqAddr, writeData))
+          dmaCStoreBeats += 1
+          dut.io.dmaC.rsp.valid.poke(true.B)
+        } else {
+          dut.io.dmaC.rsp.valid.poke(false.B)
+        }
+
+        // --- DMA-CSCALE 通道：逐拍地址硬对账 + scale 字节逐位硬断言 ---
+        dut.io.dmaCScale.get.req.ready.poke(true.B)
+        if (dut.io.dmaCScale.get.req.valid.peek().litToBoolean) {
+          val reqAddr = dut.io.dmaCScale.get.req.payload.addr.peek().litValue.toLong
+          withClue(s"[$tag] DMA-CSCALE beat #$dmaCScaleBeats addr mismatch: ") {
+            reqAddr should be(expCScaleAddrSeq(dmaCScaleBeats))
+          }
+          val writeData = dut.io.dmaCScale.get.req.payload.data.peek().litValue
+          val expData = expCScaleDataBeat(dmaCScaleBeats)
+          withClue(s"[$tag] DMA-CSCALE beat #$dmaCScaleBeats data mismatch " +
+                   f"(hw=0x$writeData%X exp=0x$expData%X): ") {
+            writeData should be(expData)
+          }
+          scaleWriteLog += ((reqAddr, writeData))
+          dmaCScaleBeats += 1
+          dut.io.dmaCScale.get.rsp.valid.poke(true.B)
+        } else {
+          dut.io.dmaCScale.get.rsp.valid.poke(false.B)
+        }
+
+        // --- 完成检查 ---
+        if (dut.io.resp.valid.peek().litToBoolean && dut.io.resp.payload.done.peek().litToBoolean) {
+          println(f"[$tag cycle=$cycle%5d] EXECUTE complete! A=$dmaABeatsSent B=$dmaBBeatsSent " +
+                  s"sA=$scaleABeatsSent sB=$scaleBBeatsSent C=$dmaCStoreBeats CSCALE=$dmaCScaleBeats")
+          dut.io.resp.payload.err.peek().litToBoolean should be(false)
+          done = true
+        }
+
+        dut.clock.step()
+        cycle += 1
+      }
+
+      dut.io.dmaC.rsp.valid.poke(false.B)
+      dut.io.dmaCScale.get.rsp.valid.poke(false.B)
+
+      if (!done) println(s"[$tag] WARNING: timeout at $maxCycles cycles " +
+        s"(A=$dmaABeatsSent B=$dmaBBeatsSent sA=$scaleABeatsSent sB=$scaleBBeatsSent " +
+        s"C=$dmaCStoreBeats CSCALE=$dmaCScaleBeats)")
+
+      done should be(true)
+      // 拍数硬断言（六通道）
+      dmaABeatsSent should be(dmaATotalBeats)
+      dmaBBeatsSent should be(dmaBTotalBeats)
+      scaleABeatsSent should be(scaleATotalBeats)
+      scaleBBeatsSent should be(scaleBTotalBeats)
+      dmaCStoreBeats should be(expCAddrSeq.size)
+      dmaCStoreBeats should be(nTiles * M * beatsPerRow)
+      dmaCScaleBeats should be(expCScaleAddrSeq.size)
+      dmaCScaleBeats should be(nTiles * M)
+
+      // ===== 容差交叉校验（第二视角）：量化输出反量化后与 golden 双精度参考对比；
+      // 冲刷界豁免沿用 runQuantGemm 范式（|ref| < 2^(scale-127) 冲刷 ±0 不判失）=====
+      val expW = 4; val mantW = 3; val bias = 7   // E4M3
+      def dequant(code: Int, scale: Int): Double = {
+        val sg = (code >> (expW + mantW)) & 1
+        val mag = code & ((1 << (expW + mantW)) - 1)
+        val e = mag >> mantW
+        val mm = mag & ((1 << mantW) - 1)
+        if (e == 0 || scale == 0) 0.0
+        else {
+          val v = (1.0 + mm.toDouble / (1 << mantW)) * math.pow(2, e - bias) * math.pow(2, scale - 127)
+          if (sg == 1) -v else v
+        }
+      }
+      var mismatchCnt = 0
+      var maxRelErr = 0.0
+      var beatIdx = 0
+      for ((_, data) <- cWriteLog) {
+        val nt = beatIdx / (M * beatsPerRow)
+        val inBlock = beatIdx % (M * beatsPerRow)
+        val row = inBlock / beatsPerRow
+        val beatInRow = inBlock % beatsPerRow
+        val scaleBeat = scaleWriteLog(nt * M + row)._2
+        for (i <- 0 until elemE) {
+          val globalCol = nt * totalN + beatInRow * elemE + i
+          if (globalCol < N) {
+            val code = ((data >> (8 * i)) & 0xFF).toInt
+            val localCol = globalCol - nt * totalN
+            val grp = localCol / 8   // scale 字节按 tile 内局部列分组（低块号低位）
+            val scale = ((scaleBeat >> (8 * grp)) & 0xFF).toInt
+            val hw = dequant(code, scale)
+            val ref = refSum(row, globalCol)
+            val absErr = math.abs(hw - ref)
+            val relErr = if (math.abs(ref) > 1e-6) absErr / math.abs(ref) else absErr
+            val flushBound = math.pow(2, scale - 127)
+            if (relErr > 0.5 && absErr > 1e-3 && absErr > flushBound + 1e-9) {
+              if (mismatchCnt < 5)
+                println(f"[$tag] DEQUANT MISMATCH C($row,$globalCol): hw=$hw%.6g ref=$ref%.6g code=0x$code%X scale=0x$scale%02X")
+              mismatchCnt += 1
+            }
+            if (relErr > maxRelErr) maxRelErr = relErr
+          }
+        }
+        beatIdx += 1
+      }
+      println(f"[$tag] Dequant cross-check: ${M * N} elems, mismatches=$mismatchCnt, maxRelErr=$maxRelErr%.2e")
+      mismatchCnt should be(0)
     }
 
     // --- 复制 FST 波形（源路径段由 testMangle 逐字锚定 it should 用例名）---
