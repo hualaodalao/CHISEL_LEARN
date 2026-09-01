@@ -25,3 +25,5 @@ sim/**/*.fst
 
 # OS
 .DS_Store
+
+。src/**/verilog*

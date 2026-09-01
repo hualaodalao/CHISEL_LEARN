@@ -30,7 +30,17 @@ class FbWriteBeat(dataWidth: Int, addressWidth: Int) extends Bundle {
   val eof  = Bool()
 }
 
-/** 写响应 payload */
+/** 写响应 payload
+  *
+  * 多 outstanding 协议契约（writeOutstandingDepth > 1）：
+  *   - 从设备必须容忍最多 writeOutstandingDepth 个写突发同时在途，
+  *     每个突发各返回恰好一次 wrResp。
+  *   - 直连模式（enableSharedWritePorts=false）：不要求响应顺序——
+  *     每引擎独享一条 wrResp 通道，引擎侧仅按在途计数回收，任意顺序均可。
+  *   - 共享仲裁模式（enableSharedWritePorts=true）：响应必须按突发发出顺序返回——
+  *     FbWrPortArbiter 按每端口归属 FIFO 队首路由响应（FbWriteResp 无 id 字段，
+  *     乱序响应需未来在响应协议加 ID）。
+  */
 class FbWriteResp extends Bundle {
   val err = Bool()
 }

@@ -71,12 +71,30 @@ class ForagerBee(cfg: ForagerBeeConfig = ForagerBeeConfig()) extends Module {
   val dispatcher = Module(new FbDispatcher(cfg))
   io.occupancy := dispatcher.io.occupancy
 
-  // 连接调度器与引擎
+  // 连接调度器与引擎（总线连接按 enableSharedWritePorts 分流，见下）
   for (p <- 0 until cfg.numPorts) {
     engines(p).io.cmdIn << dispatcher.io.pop(p)
     dispatcher.io.chBusy(p) := engines(p).io.busy
     dispatcher.io.chDone(p) := engines(p).io.done.fire
-    engines(p).io.bus <> io.bus(p)
+  }
+
+  // --- 总线连接：写端口共享仲裁 或 1:1 直连 ---
+  if (cfg.enableSharedWritePorts) {
+    // 读通道（rd/rdData）保持每引擎专用直连；
+    // 写通道（wr/wrResp）经 FbWrPortArbiter 交织分配到物理写端口。
+    val wrArb = Module(new FbWrPortArbiter(cfg))
+    for (p <- 0 until cfg.numPorts) {
+      io.bus(p).rd << engines(p).io.bus.rd
+      engines(p).io.bus.rdData << io.bus(p).rdData
+      wrArb.io.engWr(p) << engines(p).io.bus.wr
+      engines(p).io.bus.wrResp << wrArb.io.engWrResp(p)
+      io.bus(p).wr << wrArb.io.portWr(p)
+      wrArb.io.portWrResp(p) << io.bus(p).wrResp
+    }
+  } else {
+    for (p <- 0 until cfg.numPorts) {
+      engines(p).io.bus <> io.bus(p)
+    }
   }
 
   // --- 完成回执汇流 ---

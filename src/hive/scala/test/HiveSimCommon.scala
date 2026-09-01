@@ -315,6 +315,117 @@ object HiveSimCommon {
     if (e == 0) BigInt(0)
     else (BigInt(s) << 39) | (BigInt(e) << 31) | (BigInt(1) << 30) | (BigInt(m) << 7)
   }
+
+  // ========== P3a 软件参考模型：MX 量化（共享 E8M0 scale + 目标格式舍入） ==========
+  // 独立推导期望（不抄硬件实现结构）：量化语义由「块共享 scale 约束式」出发重建：
+  //   amax = 1.f × 2^(E-127)，约束 amax ≤ maxFinite × 2^(s-127)，其中
+  //   maxFinite = maxMantVal × 2^(maxCodeExp-bias)；展开得 s = E_eff + bias - maxCodeExp
+  //   （fp32 偏置指数已含 127，与 E8M0 bias 抵消）；元素侧 ÷2^(s-127) 即指数减。
+  // 舍入判定复用上方 swRoundUp（5 模式、RMM=guard，与硬件同源同链：
+  // 40→32 固定简化 RNE 规格化 + 量化运行期 rnd，两级舍入链）。
+  // fmt 编码与 outFmt 3-bit 同源：4=MXE4M3、5=MXE5M2、6=MXE2M1。
+
+  /** 量化格式参数表：(expW, mantW, bias, maxCodeExp, maxMant23, maxNormalExp,
+    * satCode, nanCode, nanToSat, fixNanCode)，由 OCP MX 字段定义独立推导：
+    *   E4M3：maxFinite=448=1.75×2^8，NaN 需 exp&mant 全1（0x7F），饱和 0x7E，
+    *         maxMantVal=1.75（mant 全1 是 NaN 不可用，尾数域比较门限=0.75→0x600000）；
+    *         舍入落 NaN 码改写为饱和。
+    *   E5M2：maxFinite=57344=1.75×2^15，exp 全1 为 inf/nan，饱和 0x7B，
+    *         nan 规范编码取 exp 全1 + 尾数高位置位（0x7E，同 fp16 规范 nan 取法）。
+    *   E2M1：maxFinite=6.0=1.5×2^2，无 inf/nan 编码（exp 全1 仍为正常数），
+    *         nan 输入裁定饱和（0x7），maxMantVal=1.5（尾数域比较门限=0.5→0x400000）。 */
+  private def quantFmtParams(fmt: Int): (Int, Int, Int, Int, Long, Int, Int, Int, Boolean, Boolean) = fmt match {
+    case 4 => (4, 3, 7,  15, 0x600000L, 15, 0x7E, 0x7F, false, true)
+    case 5 => (5, 2, 15, 30, 0x600000L, 30, 0x7B, 0x7E, false, false)
+    case 6 => (2, 1, 1,  3,  0x400000L, 3,  0x07, 0x07, true,  false)
+    case _ => throw new IllegalArgumentException(s"swQuantBlock: 非法量化格式 fmt=$fmt（需 4/5/6）")
+  }
+
+  /** 块共享 E8M0 scale：满足 amax ≤ maxFinite × 2^(s-127) 的最小指数。
+    * 全零块（含掩码后无有效元素）→ 0x00 哨兵；amax=inf → 254 钳制；
+    * s<1（块幅值极小）→ 钳制 1。 */
+  def swBlockScale(amaxBits: Long, maxCodeExp: Int, bias: Int, maxMant23: Long): Int = {
+    val amax = amaxBits & 0x7FFFFFFFL
+    if (amax == 0L) return 0                                  // 全零块哨兵（反量化侧门控）
+    val e = ((amax >>> 23) & 0xFF).toInt
+    if (e == 255) return 254                                  // amax 为 inf → 钳制 254
+    val m = amax & 0x7FFFFFL
+    val eEff = e + (if (m > maxMant23) 1 else 0)              // 1.f > maxMantVal → 指数提 1
+    val s = eEff + bias - maxCodeExp
+    if (s < 1) 1 else if (s > 254) 254 else s
+  }
+
+  /** 单元素量化：fp32 ÷ 2^(s-127)（指数减）→ 舍入到目标格式（边界表镜像反量化侧取逆）：
+    * 溢出饱和最大有限值（保号）、低于最小正规格化保号 ±0（无次正规）、
+    * inf→饱和、nan→目标编码（E2M1 无 nan 编码裁定饱和）、零→±0。 */
+  def swQuantElem(bits: Long, s: Int, rnd: Int, expW: Int, mantW: Int, bias: Int,
+                  maxNormalExp: Int, satCode: Int, nanCode: Int,
+                  nanToSat: Boolean, fixNanCode: Boolean): Int = {
+    val b = bits & 0xFFFFFFFFL
+    val sg = ((b >>> 31) & 1).toInt
+    val e = ((b >>> 23) & 0xFF).toInt
+    val m = (b & 0x7FFFFF).toInt
+    val tailBits = expW + mantW
+    val signPart = sg << tailBits
+    if (e == 0) return signPart                               // ±0 / fp32 次正规 → FTZ 保号 ±0
+    if (e == 255) {
+      if (m == 0) return signPart | satCode                   // inf → 饱和最大有限值（保号）
+      return signPart | (if (nanToSat) satCode else nanCode)  // nan → 目标编码（E2M1 裁定饱和）
+    }
+    val eTgt = e + bias - s                                   // ÷2^(s-127) ⟺ 目标偏置指数 = e + bias - s
+    if (eTgt < 1) return signPart                             // 低于最小正规格化 → ±0（无次正规产出）
+    val drop = 23 - mantW
+    val mantTop = (m >>> drop) & ((1 << mantW) - 1)
+    val guard = (m >>> (drop - 1)) & 1
+    val sticky = if ((m & ((1L << (drop - 1)) - 1)) != 0) 1 else 0
+    val up = if (swRoundUp(rnd, guard, sticky, mantTop & 1, sg == 1)) 1 else 0
+    var mRnd = mantTop + up
+    var eRnd = eTgt
+    if (mRnd >= (1 << mantW)) { mRnd = 0; eRnd += 1 }         // 尾数进位 → 指数 +1（同硬件 +&/carry 模式）
+    if (eRnd > maxNormalExp) return signPart | satCode        // 舍入后溢出 → 饱和（保号）
+    if (fixNanCode && eRnd == maxNormalExp && mRnd == (1 << mantW) - 1)
+      return signPart | satCode                               // 舍入落 NaN 码（仅 E4M3）→ 改写为饱和值 448
+    signPart | (eRnd << mantW) | mRnd
+  }
+
+  /** 整行量化参考：输入为已经 40→32 规格化的 fp32 bits 行（与硬件两级舍入链同链），
+    * 返回 (逐元素量化码, 每 8 元素组 1 字节的 scale 序列)。blkSel：0=8/1=16/2=32/3=64；
+    * 列 ≥ nEff 为 padding：不进 amax、元素码输出 0。 */
+  def swQuantBlock(normFp32s: Seq[Long], rnd: Int, fmt: Int, blkSel: Int, nEff: Int): (Seq[Int], Seq[Int]) = {
+    val (expW, mantW, bias, maxCodeExp, maxMant23, maxNormalExp, satCode, nanCode, nanToSat, fixNan) =
+      quantFmtParams(fmt)
+    val n = normFp32s.size
+    require(n % 8 == 0, s"swQuantBlock: 行元素数($n) 必须为 8 的整数倍")
+    // 幅值 = 符号位清零（非负 fp32 位模式无符号比较即幅值序）；padding 列掩 0 不进 amax
+    val mags = normFp32s.zipWithIndex.map { case (b, i) => if (i < nEff) (b & 0x7FFFFFFFL) else 0L }
+    def maxMag(s: Seq[Long]): Long = s.reduce((a, b) => if (a >= b) a else b)
+    val groups = mags.grouped(8).map(maxMag).toSeq            // 8 元素组 amax
+    def merge(s: Seq[Long]): Seq[Long] =
+      s.grouped(2).map(p => if (p.size == 2) maxMag(p) else p.head).toSeq
+    val l16 = merge(groups); val l32 = merge(l16); val l64 = merge(l32)
+    def amaxOf(i: Int): Long = blkSel match {
+      case 0 => groups(i / 8)
+      case 1 => l16(i / 16)
+      case 2 => l32(i / 32)
+      case _ => l64(i / 64)
+    }
+    def scaleOf(amax: Long): Int = swBlockScale(amax, maxCodeExp, bias, maxMant23)
+    val codes = normFp32s.zipWithIndex.map { case (b, i) =>
+      if (i >= nEff) 0                                        // padding 列输出 0（不参与量化）
+      else swQuantElem(b, scaleOf(amaxOf(i)), rnd,
+        expW, mantW, bias, maxNormalExp, satCode, nanCode, nanToSat, fixNan)
+    }
+    val scaleBytes = (0 until n / 8).map { g =>
+      val amax = blkSel match {
+        case 0 => groups(g)
+        case 1 => l16(g / 2)
+        case 2 => l32(g / 4)
+        case _ => l64(g / 8)
+      }
+      scaleOf(amax)
+    }
+    (codes, scaleBytes)
+  }
 }
 
 /** ChiselSim FST 波形扩展 trait：与 ChiselSim 一起混入测试类。

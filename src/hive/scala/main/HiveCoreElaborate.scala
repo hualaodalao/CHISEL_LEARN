@@ -27,11 +27,22 @@
   *
   * 【P1/P2 dmaC 写回重构留痕】本入口两套配置均不传 cDmaExtW（哨兵 0 → 满宽 cExtW，
   * 一拍一行，dmaC 端口位宽保持 640，非破坏性）；新增参数 cDmaExtW（缩位）与运行期寄存器
-  * regs(7)(12,11)=outFmt（00=fp32 默认/01=fp16/10=bf16，精度转换模块 HiveOutCvt）需显式启用，
-  * 默认不写 outFmt 位时出厂产物行为与重构前 bit-exact。
-  * 【对外软件契约变更留痕】显式启用缩位/降精度（cDmaExtW≠0 或 outFmt≠00）时，
+  * regs(7)(13,11)=outFmt（3-bit：000=fp32 默认/001=fp16/010=bf16/011=reserved 回落 000/
+  * 100..110=mxfp8-E4M3/E5M2、mxfp4-E2M1 量化/111=reserved 降级 000，精度转换模块 HiveOutCvt）
+  * 需显式启用，默认不写 outFmt 位时出厂产物行为与重构前 bit-exact。
+  * 【对外软件契约变更留痕】显式启用缩位/降精度（cDmaExtW≠0 或 outFmt≠000）时，
   * C 写回内存布局由 5B/元素槽改为 4B（fp32）/2B（fp16/bf16）密集，属对外软件契约变更，
   * 读结果软件需同步迁移（默认配置不受影响）。
+  *
+  * 【P3b MX 量化输出扩展留痕（声明区；重发射在验证阶段统一做，本阶段仅注释）】
+  *   - 【端口变更】两套产物（hasMx）新增 dmaCScale 写通道端口（7 信号：
+  *     rsp.valid/ready/err + req.valid/ready/addr/data，位宽 = cScaleRowW = totalN/8 字节），
+  *     顶层端口总数 47 → 54；非 MX 配置不暴露。dmaCScale 基址 = regs(11) cScaleAddr，
+  *     仅量化输出（regs(7)(13,11) 100=E4M3/101=E5M2/110=E2M1）运行时启动，非量化运行死路。
+  *   - 【对外软件契约变更】量化启用时 C 内存布局改为密集 1B/元素（mxfp8）或 0.5B/元素
+  *     （mxfp4，低列号低 nibble）+ 独立 scale 数组（cScaleAddr 基址，每 8 元素块 1 字节
+  *     E8M0，行步进 = ceil(n/blk) 字节、列 tile 步进 = totalN/blk 字节，blk 由
+  *     regs(7)(15,14) 解码）；读结果软件须按新布局反量化（默认配置不受影响）。
   *
   * 流程（每个配置）：
   *   1. 清理输出目录

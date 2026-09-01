@@ -43,6 +43,12 @@ class HiveCoreScratchpad(cfg: HiveCoreConfig) extends Module {
     val scaleBPop   = if (cfg.hasMx) Some(master(Stream(UInt(cfg.scaleRowW.W)))) else None
     val flushScaleA = if (cfg.hasMx) Some(Input(Bool()))                       else None
     val flushScaleB = if (cfg.hasMx) Some(Input(Bool()))                       else None
+    // P3b C 侧量化 scale 输出缓冲（仅 hasMx）：cDma（WrOnly）每量化行同拍
+    // push 一行 E8M0 块 scale（cScaleRowW = totalN/8 字节），dmaCScale（HiveCoreDmaScaleWr）
+    // 自主 pop 写外；FIFO 解耦两侧节奏。非量化运行（运行期 isQuant=0）无 push，死路。
+    val cScalePush  = if (cfg.hasMx) Some(slave(Stream(UInt(cfg.cScaleRowW.W)))) else None
+    val cScalePop   = if (cfg.hasMx) Some(master(Stream(UInt(cfg.cScaleRowW.W)))) else None
+    val flushScaleC = if (cfg.hasMx) Some(Input(Bool()))                         else None
   })
 
   // ---- 实例化三个 StreamFifo ----
@@ -103,5 +109,17 @@ class HiveCoreScratchpad(cfg: HiveCoreConfig) extends Module {
     io.scaleBPop.get.payload   := scaleBFifo.io.pop.payload
     scaleBFifo.io.pop.ready     := io.scaleBPop.get.ready
     scaleBFifo.io.flush         := io.flushScaleB.get
+
+    // P3b C 侧量化 scale FIFO：深度复用 scaleBufferDepth（与 scaleA/B 同参数源）；
+    // flush 跟随 C 通路清理语义（顶层接 executor.io.flushC，execute 起始拍清空，
+    // 与 C buffer 同范式；异常中断后残留行随下次 execute 一并清）
+    val cScaleFifo = Module(new StreamFifo(UInt(cfg.cScaleRowW.W), cfg.scaleBufferDepth))
+    cScaleFifo.io.push.valid   := io.cScalePush.get.valid
+    cScaleFifo.io.push.payload := io.cScalePush.get.payload
+    io.cScalePush.get.ready    := cScaleFifo.io.push.ready
+    io.cScalePop.get.valid     := cScaleFifo.io.pop.valid
+    io.cScalePop.get.payload   := cScaleFifo.io.pop.payload
+    cScaleFifo.io.pop.ready     := io.cScalePop.get.ready
+    cScaleFifo.io.flush         := io.flushScaleC.get
   }
 }

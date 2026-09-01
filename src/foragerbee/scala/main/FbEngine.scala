@@ -111,6 +111,11 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   val fillRow = RegInit(0.U(16.W)) // TRD：当前 tile 内已喂入的行数
   val drainCol = RegInit(0.U(16.W)) // TWR：当前 tile 内已写出的列数
 
+  // --- 非阻塞写（仅 writeOutstandingDepth > 1 时生成；=1 走现有阻塞式路径，不新增任何硬件） ---
+  private val nbWr = cfg.writeOutstandingDepth > 1
+  /** 在途写突发计数（EOF 拍 +1，wrResp 收回 -1）；阻塞路径下为常量 0 不产生硬件 */
+  val wrInFlight = if (nbWr) RegInit(0.U(log2Up(cfg.writeOutstandingDepth + 1).W)) else 0.U
+
   // --- 通道握手寄存器（全部显式复位，避免仿真初始 X 污染 when 条件） ---
   val arIssued = RegInit(false.B)
   val rRemain = RegInit(0.U(20.W))
@@ -348,6 +353,23 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   dataQueue.io.enq.valid := false.B
   dataQueue.io.enq.bits := DontCare
   dataQueue.io.deq.ready := false.B
+
+  // --- 非阻塞写：统一在途计数 + 统一响应汇（仅 nbWr 生成；depth=1 时此段不发射，
+  //   各状态 wrResp 处理保持原样）---
+  if (nbWr) {
+    val nbWrEofFire = io.bus.wr.fire && io.bus.wr.payload.eof
+    // 在途计数：写突发 EOF 拍 +1，响应收回拍 -1，同拍抵消
+    when(nbWrEofFire && io.bus.wrResp.fire) {
+      // +1/-1 同拍抵消，保持值
+    }.elsewhen(nbWrEofFire) {
+      wrInFlight := wrInFlight + 1.U
+    }.elsewhen(io.bus.wrResp.fire) {
+      wrInFlight := wrInFlight - 1.U
+    }
+    // 统一响应汇：只要有在途突发即回收响应；响应 err OR 入 errReg（替代 7 处分散处理）
+    io.bus.wrResp.ready := wrInFlight > 0.U
+    when(io.bus.wrResp.fire && io.bus.wrResp.payload.err) { errReg := true.B }
+  }
 
   // 格式转换模块默认信号（mxQuantActive 时数据通路改经量化器，此处保持静默）
   converter.foreach { c =>
@@ -706,6 +728,9 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
         state := sWRITE
         awIssued := false.B
         wRemain := dstSegBeats
+        // 读写解耦（非阻塞路径）：读数据收齐即清 arIssued，下一行读请求不再等写响应，
+        // 在途读请求数仍为 1（多读在途留作后续阶段）
+        if (nbWr) { arIssued := false.B }
       }.otherwise {
         rRemain := rRemain - 1.U
       }
@@ -776,33 +801,74 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
       wRemain := wRemain - 1.U
       when(!awIssued) { awIssued := true.B }
     }
-    // 写响应
-    io.bus.wrResp.ready := wRemain === 0.U && awIssued
-    when(io.bus.wrResp.fire) {
-      when(io.bus.wrResp.payload.err) { errReg := true.B }
-      arIssued := false.B
-      val nxtBeat = beatInRow + segBeats
-      if (cfg.enableConversion) { wBeatInRow := wBeatInRow + dstSegBeats }
-      val rowEndNow = nxtBeat === beatsPerRow
-      when(mxQuantActive) {
-        // MX 量化：本段数据写完后先经 sSWRITE 写出本段累积的 scale 字节
-        //（段长受限于每段 ≤ BB 字节，累积寄存器不溢出），再推进下一段/行；
-        // 行末标记由 mxRowEndPending 携带至 sSWRITE 完成后处理。
-        mxRowEndPending := rowEndNow
-        mxScaleAwIssued := false.B
-        when(rowEndNow) {
-          beatInRow := 0.U
-          if (cfg.enableConversion) { wBeatInRow := 0.U }
+    // 写响应 / 推进（非阻塞路径：推进前移到数据突发 EOF 拍，不等 wrResp）
+    if (nbWr) {
+      // SOF 发放门控：在途突发已满时不允许新突发开始发放（仅压住首拍，突发中途不受影响）
+      when(!awIssued && wrInFlight >= cfg.writeOutstandingDepth.U) {
+        io.bus.wr.valid := false.B
+        dataQueue.io.deq.ready := false.B
+        if (cfg.enableConversion) {
+          when(mxQuantActive) {
+            mxQuantizer.get.io.outData.ready := false.B
+          }.elsewhen(cmdReg.cvtEnable && (cmdReg.srcFmt =/= cmdReg.dstFmt)) {
+            converter.get.io.out.ready := false.B
+          }
+        }
+      }
+      // 推进触发：数据突发 EOF 拍（err 由统一响应汇 OR 入 errReg；arIssued 已在 sREAD 解耦）
+      when(io.bus.wr.fire && io.bus.wr.payload.eof) {
+        val nxtBeat = beatInRow + segBeats
+        if (cfg.enableConversion) { wBeatInRow := wBeatInRow + dstSegBeats }
+        val rowEndNow = nxtBeat === beatsPerRow
+        when(mxQuantActive) {
+          // MX 量化：sWRITE→sSWRITE 转换从“数据突发响应后”改为“数据突发 EOF 拍”，
+          // mxRowEndPending 语义不变
+          mxRowEndPending := rowEndNow
+          mxScaleAwIssued := false.B
+          when(rowEndNow) {
+            beatInRow := 0.U
+            if (cfg.enableConversion) { wBeatInRow := 0.U }
+          }.otherwise {
+            beatInRow := nxtBeat
+          }
+          state := sSWRITE
+        }.elsewhen(rowEndNow) {
+          // 行末：推进行/段/完成（非 MX 路径）
+          finishDataRow()
         }.otherwise {
           beatInRow := nxtBeat
+          state := sREAD
         }
-        state := sSWRITE
-      }.elsewhen(rowEndNow) {
-        // 行末：推进行/段/完成（非 MX 路径）
-        finishDataRow()
-      }.otherwise {
-        beatInRow := nxtBeat
-        state := sREAD
+      }
+    } else {
+      // 写响应（阻塞式路径逐字保持）
+      io.bus.wrResp.ready := wRemain === 0.U && awIssued
+      when(io.bus.wrResp.fire) {
+        when(io.bus.wrResp.payload.err) { errReg := true.B }
+        arIssued := false.B
+        val nxtBeat = beatInRow + segBeats
+        if (cfg.enableConversion) { wBeatInRow := wBeatInRow + dstSegBeats }
+        val rowEndNow = nxtBeat === beatsPerRow
+        when(mxQuantActive) {
+          // MX 量化：本段数据写完后先经 sSWRITE 写出本段累积的 scale 字节，
+          //（段长受限于每段 ≤ BB 字节，累积寄存器不溢出），再推进下一段/行；
+          // 行末标记由 mxRowEndPending 携带至 sSWRITE 完成后处理。
+          mxRowEndPending := rowEndNow
+          mxScaleAwIssued := false.B
+          when(rowEndNow) {
+            beatInRow := 0.U
+            if (cfg.enableConversion) { wBeatInRow := 0.U }
+          }.otherwise {
+            beatInRow := nxtBeat
+          }
+          state := sSWRITE
+        }.elsewhen(rowEndNow) {
+          // 行末：推进行/段/完成（非 MX 路径）
+          finishDataRow()
+        }.otherwise {
+          beatInRow := nxtBeat
+          state := sREAD
+        }
       }
     }
   }
@@ -837,26 +903,53 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     io.bus.wr.payload.strb := sStrb
     when(io.bus.wr.fire) { mxScaleAwIssued := true.B }
 
-    // wrResp 通道（与数据写串行：此时无在途数据突发）
-    io.bus.wrResp.ready := mxScaleAwIssued
-    when(io.bus.wrResp.fire) {
-      when(io.bus.wrResp.payload.err) { errReg := true.B }
-      mxScaleAwIssued := false.B
-      mxScaleWrByte := mxScaleWrByte + cnt
-      when(mxScaleWrByte + cnt >= mxScaleAccumCount) {
-        // 本轮累积全部写完：推进字节游标、清累积，再推进行/段或回 sREAD 继续下一段
-        mxScaleWrByte := 0.U
-        mxScaleAccumCount := 0.U
-        when(mxRowEndPending) {
-          mxScaleByteCur := 0.U
-          mxRowEndPending := false.B
-          finishDataRow()
-        }.otherwise {
-          mxScaleByteCur := mxScaleByteCur + mxScaleAccumCount
-          state := sREAD
-        }
+    if (nbWr) {
+      // 非阻塞：SOF 发放门控（单拍突发，首拍即 SOF）
+      when(!mxScaleAwIssued && wrInFlight >= cfg.writeOutstandingDepth.U) {
+        io.bus.wr.valid := false.B
       }
-      // otherwise：跨 beat 残余，留在 sSWRITE 发下一单拍突发（同一累积内容续写）
+      // 推进前移到单拍突发 wr.fire 拍（不等 wrResp；单拍突发 fire 当拍即消费，
+      // mxScaleAccum/mxScaleAccumCount 清零安全；后续可不等响应直接进入下一段读）
+      when(io.bus.wr.fire) {
+        mxScaleAwIssued := false.B
+        mxScaleWrByte := mxScaleWrByte + cnt
+        when(mxScaleWrByte + cnt >= mxScaleAccumCount) {
+          // 本轮累积全部写完：推进字节游标、清累积，再推进行/段或回 sREAD 继续下一段
+          mxScaleWrByte := 0.U
+          mxScaleAccumCount := 0.U
+          when(mxRowEndPending) {
+            mxScaleByteCur := 0.U
+            mxRowEndPending := false.B
+            finishDataRow()
+          }.otherwise {
+            mxScaleByteCur := mxScaleByteCur + mxScaleAccumCount
+            state := sREAD
+          }
+        }
+        // otherwise：跨 beat 残余，留在 sSWRITE 发下一单拍突发（同一累积内容续写）
+      }
+    } else {
+      // wrResp 通道（与数据写串行：此时无在途数据突发；阻塞式路径逐字保持）
+      io.bus.wrResp.ready := mxScaleAwIssued
+      when(io.bus.wrResp.fire) {
+        when(io.bus.wrResp.payload.err) { errReg := true.B }
+        mxScaleAwIssued := false.B
+        mxScaleWrByte := mxScaleWrByte + cnt
+        when(mxScaleWrByte + cnt >= mxScaleAccumCount) {
+          // 本轮累积全部写完：推进字节游标、清累积，再推进行/段或回 sREAD 继续下一段
+          mxScaleWrByte := 0.U
+          mxScaleAccumCount := 0.U
+          when(mxRowEndPending) {
+            mxScaleByteCur := 0.U
+            mxRowEndPending := false.B
+            finishDataRow()
+          }.otherwise {
+            mxScaleByteCur := mxScaleByteCur + mxScaleAccumCount
+            state := sREAD
+          }
+        }
+        // otherwise：跨 beat 残余，留在 sSWRITE 发下一单拍突发（同一累积内容续写）
+      }
     }
   }
 
@@ -905,28 +998,59 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
       }
     }
 
-    // wrResp 通道
-    io.bus.wrResp.ready := zRemain === 0.U && zawIssued
-    when(io.bus.wrResp.fire) {
-      when(io.bus.wrResp.payload.err) { errReg := true.B }
-      val nxtZBeat = zBeatInRow + zSegBeats
-      when(nxtZBeat >= zPhaseTotalBeats) {
-        // 当前阶段完成
-        when(isDim1PadRow) {
-          // dim1 全零行完成 → 推进 virtualRow
-          advanceToNextVirtualRow()
-        }.elsewhen(zPhase === 0.U) {
-          // dim0 行首 pad 完成 → 进入数据段 sREAD
-          state := sREAD
-          arIssued := false.B
+    if (nbWr) {
+      // 非阻塞：SOF 发放门控（仅压住新突发首拍）
+      when(!zawIssued && wrInFlight >= cfg.writeOutstandingDepth.U) {
+        io.bus.wr.valid := false.B
+      }
+      // 推进前移到零突发 EOF 拍；单拍突发（sof && eof 同拍）时 zSegBeats 尚未更新，
+      // 用当拍组合量 zSeg 代替（中途拍用已锁存的 zSegBeats）
+      when(io.bus.wr.fire && io.bus.wr.payload.eof) {
+        val nbZBurstBeats = Mux(zawIssued, zSegBeats, zSeg)
+        val nxtZBeat = zBeatInRow + nbZBurstBeats
+        when(nxtZBeat >= zPhaseTotalBeats) {
+          // 当前阶段完成
+          when(isDim1PadRow) {
+            // dim1 全零行完成 → 推进 virtualRow
+            advanceToNextVirtualRow()
+          }.elsewhen(zPhase === 0.U) {
+            // dim0 行首 pad 完成 → 进入数据段 sREAD
+            state := sREAD
+            arIssued := false.B
+          }.otherwise {
+            // dim0 行尾 pad（phase 2）完成 → 推进 virtualRow
+            advanceToNextVirtualRow()
+          }
         }.otherwise {
-          // dim0 行尾 pad（phase 2）完成 → 推进 virtualRow
-          advanceToNextVirtualRow()
+          // 当前阶段未完成，继续下一个突发
+          zBeatInRow := nxtZBeat
+          zawIssued := false.B
         }
-      }.otherwise {
-        // 当前阶段未完成，继续下一个突发
-        zBeatInRow := nxtZBeat
-        zawIssued := false.B
+      }
+    } else {
+      // wrResp 通道（阻塞式路径逐字保持）
+      io.bus.wrResp.ready := zRemain === 0.U && zawIssued
+      when(io.bus.wrResp.fire) {
+        when(io.bus.wrResp.payload.err) { errReg := true.B }
+        val nxtZBeat = zBeatInRow + zSegBeats
+        when(nxtZBeat >= zPhaseTotalBeats) {
+          // 当前阶段完成
+          when(isDim1PadRow) {
+            // dim1 全零行完成 → 推进 virtualRow
+            advanceToNextVirtualRow()
+          }.elsewhen(zPhase === 0.U) {
+            // dim0 行首 pad 完成 → 进入数据段 sREAD
+            state := sREAD
+            arIssued := false.B
+          }.otherwise {
+            // dim0 行尾 pad（phase 2）完成 → 推进 virtualRow
+            advanceToNextVirtualRow()
+          }
+        }.otherwise {
+          // 当前阶段未完成，继续下一个突发
+          zBeatInRow := nxtZBeat
+          zawIssued := false.B
+        }
       }
     }
   }
@@ -951,6 +1075,18 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     val trSeg = trRemRow.min(cfg.maxBurstLen.U)
 
     when(state === sTRD) {
+      if (nbWr) {
+        // 非阻塞：下一 tile 的 start 脉冲在此按 !busy 补发。
+        // sTWR 最后一列突发 EOF 拍 FbTransposeBuffer 正在同拍消费最后一个 drain beat，
+        // 其 sBDRAIN 分支按 last-connect 用 state := sBIDLE 覆盖 start 的 state := sBFILL，
+        // start 脉冲会被吞掉（缓冲停 sBIDLE → rd.valid 恒 0 → 多 tile 转置死锁），
+        // 故 nbWr 路径改为等缓冲真正空闲后在此补发。
+        // 首 tile 的 start 已在 sIDLE→sTRD 发出（缓冲已忙），该条件不会误触发。
+        when(!t.io.busy) {
+          t.io.start := true.B
+          driveTileParams(cmdReg, cb, rb) // cb/rb 已在上一拍 sTWR EOF 更新为新 tile 坐标
+        }
+      }
       io.bus.rd.valid := t.io.busy && !trArIssued
       issueRead(trAddrCur, trSeg - 1.U)
       when(io.bus.rd.fire) {
@@ -1012,34 +1148,68 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
           twWRemain := t.io.beatsPerCol - 1.U // 首拍已发，剩余 = total - 1
         }
       }
-      io.bus.wrResp.ready := twWRemain === 0.U && twAwIssued
-      when(io.bus.wrResp.fire) {
-        when(io.bus.wrResp.payload.err) { errReg := true.B }
-        when(twLastCol) {
-          twAwIssued := false.B
-          drainCol := 0.U
-          fillRow := 0.U
-          trArIssued := false.B
-          trBeatOff := 0.U
-          when(twLastRowBand) {
-            rb := 0.U
-            when(twLastColBand) {
-              state := sDONE
+      if (nbWr) {
+        // 非阻塞：SOF 发放门控（仅压住列突发首拍）
+        when(!twAwIssued && wrInFlight >= cfg.writeOutstandingDepth.U) {
+          io.bus.wr.valid := false.B
+        }
+        // 推进前移到列突发 EOF 拍（不等 wrResp）。
+        // 注意：下一 tile 的 start 脉冲不在此发出（会与缓冲 sBDRAIN 末拍的
+        // state := sBIDLE 冲突被吞），改由 sTRD 内按 !t.io.busy 补发。
+        when(io.bus.wr.fire && io.bus.wr.payload.eof) {
+          when(twLastCol) {
+            twAwIssued := false.B
+            drainCol := 0.U
+            fillRow := 0.U
+            trArIssued := false.B
+            trBeatOff := 0.U
+            when(twLastRowBand) {
+              rb := 0.U
+              when(twLastColBand) {
+                state := sDONE
+              }.otherwise {
+                cb := cb + 1.U
+                state := sTRD
+              }
             }.otherwise {
-              cb := cb + 1.U
+              rb := rb + 1.U
               state := sTRD
-              t.io.start := true.B
-              driveTileParams(cmdReg, cb + 1.U, 0.U)
             }
           }.otherwise {
-            rb := rb + 1.U
-            state := sTRD
-            t.io.start := true.B
-            driveTileParams(cmdReg, cb, rb + 1.U)
+            drainCol := drainCol + 1.U
+            twAwIssued := false.B
           }
-        }.otherwise {
-          drainCol := drainCol + 1.U
-          twAwIssued := false.B
+        }
+      } else {
+        io.bus.wrResp.ready := twWRemain === 0.U && twAwIssued
+        when(io.bus.wrResp.fire) {
+          when(io.bus.wrResp.payload.err) { errReg := true.B }
+          when(twLastCol) {
+            twAwIssued := false.B
+            drainCol := 0.U
+            fillRow := 0.U
+            trArIssued := false.B
+            trBeatOff := 0.U
+            when(twLastRowBand) {
+              rb := 0.U
+              when(twLastColBand) {
+                state := sDONE
+              }.otherwise {
+                cb := cb + 1.U
+                state := sTRD
+                t.io.start := true.B
+                driveTileParams(cmdReg, cb + 1.U, 0.U)
+              }
+            }.otherwise {
+              rb := rb + 1.U
+              state := sTRD
+              t.io.start := true.B
+              driveTileParams(cmdReg, cb, rb + 1.U)
+            }
+          }.otherwise {
+            drainCol := drainCol + 1.U
+            twAwIssued := false.B
+          }
         }
       }
     }
@@ -1128,13 +1298,27 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
               i2cWRemain := i2cWRemain - 1.U
               when(!i2cAwIssued) { i2cAwIssued := true.B }
             }
-            // 写响应
-            io.bus.wrResp.ready := i2cWRemain === 0.U && i2cAwIssued
-            when(io.bus.wrResp.fire) {
-              when(io.bus.wrResp.payload.err) { errReg := true.B }
-              // micro-row 完成，推进 addrGen
-              gen.io.advance := true.B
-              i2cPhase := 0.U
+            // 写响应 / 推进（非阻塞路径前移到 EOF 拍）
+            if (nbWr) {
+              // SOF 发放门控（仅压住首拍）
+              when(!i2cAwIssued && wrInFlight >= cfg.writeOutstandingDepth.U) {
+                io.bus.wr.valid := false.B
+                dataQueue.io.deq.ready := false.B
+                if (cfg.enableConversion) { converter.get.io.out.ready := false.B }
+              }
+              when(io.bus.wr.fire && io.bus.wr.payload.eof) {
+                // micro-row 完成，推进 addrGen
+                gen.io.advance := true.B
+                i2cPhase := 0.U
+              }
+            } else {
+              io.bus.wrResp.ready := i2cWRemain === 0.U && i2cAwIssued
+              when(io.bus.wrResp.fire) {
+                when(io.bus.wrResp.payload.err) { errReg := true.B }
+                // micro-row 完成，推进 addrGen
+                gen.io.advance := true.B
+                i2cPhase := 0.U
+              }
             }
           }
           is(3.U) { // 零写阶段
@@ -1149,11 +1333,22 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
               i2cWRemain := i2cWRemain - 1.U
               when(!i2cAwIssued) { i2cAwIssued := true.B }
             }
-            io.bus.wrResp.ready := i2cWRemain === 0.U && i2cAwIssued
-            when(io.bus.wrResp.fire) {
-              when(io.bus.wrResp.payload.err) { errReg := true.B }
-              gen.io.advance := true.B
-              i2cPhase := 0.U
+            if (nbWr) {
+              // SOF 发放门控（仅压住首拍）
+              when(!i2cAwIssued && wrInFlight >= cfg.writeOutstandingDepth.U) {
+                io.bus.wr.valid := false.B
+              }
+              when(io.bus.wr.fire && io.bus.wr.payload.eof) {
+                gen.io.advance := true.B
+                i2cPhase := 0.U
+              }
+            } else {
+              io.bus.wrResp.ready := i2cWRemain === 0.U && i2cAwIssued
+              when(io.bus.wrResp.fire) {
+                when(io.bus.wrResp.payload.err) { errReg := true.B }
+                gen.io.advance := true.B
+                i2cPhase := 0.U
+              }
             }
           }
         }
@@ -1259,26 +1454,53 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
               when(!sgAwIssued) { sgAwIssued := true.B }
             }
 
-            // 写响应
-            io.bus.wrResp.ready := sgWRemain === 0.U && sgAwIssued
-            when(io.bus.wrResp.fire) {
-              when(io.bus.wrResp.payload.err) { errReg := true.B }
-              // 更新线性偏移
-              sgLinearOffset := sgLinearOffset + (sgSegBeats << log2BB)
-              // 本段数据搬运完成
-              val remainAfterSeg = sgCurBeats - sgSegBeats
-              when(remainAfterSeg === 0.U) {
-                // 当前条目全部搬运完毕，advance 并回 phase 0
-                sg.io.advance := true.B
-                sgPhase := 0.U
-              }.otherwise {
-                // 还有剩余 beat，继续读下一段
-                sgCurBeats := remainAfterSeg
-                // 更新散列端地址偏移（下一段从上次结束位置开始）
-                sgCurAddr := sgCurAddr + (sgSegBeats << log2BB)
-                sgPhase := 1.U
-                sgArIssued := false.B
-                sgRRemain := 0.U
+            // 写响应 / 推进（非阻塞路径前移到 EOF 拍）
+            if (nbWr) {
+              // SOF 发放门控（仅压住首拍）
+              when(!sgAwIssued && wrInFlight >= cfg.writeOutstandingDepth.U) {
+                io.bus.wr.valid := false.B
+                dataQueue.io.deq.ready := false.B
+              }
+              when(io.bus.wr.fire && io.bus.wr.payload.eof) {
+                // 更新线性偏移
+                sgLinearOffset := sgLinearOffset + (sgSegBeats << log2BB)
+                // 本段数据搬运完成
+                val remainAfterSeg = sgCurBeats - sgSegBeats
+                when(remainAfterSeg === 0.U) {
+                  // 当前条目全部搬运完毕，advance 并回 phase 0
+                  sg.io.advance := true.B
+                  sgPhase := 0.U
+                }.otherwise {
+                  // 还有剩余 beat，继续读下一段
+                  sgCurBeats := remainAfterSeg
+                  // 更新散列端地址偏移（下一段从上次结束位置开始）
+                  sgCurAddr := sgCurAddr + (sgSegBeats << log2BB)
+                  sgPhase := 1.U
+                  sgArIssued := false.B
+                  sgRRemain := 0.U
+                }
+              }
+            } else {
+              io.bus.wrResp.ready := sgWRemain === 0.U && sgAwIssued
+              when(io.bus.wrResp.fire) {
+                when(io.bus.wrResp.payload.err) { errReg := true.B }
+                // 更新线性偏移
+                sgLinearOffset := sgLinearOffset + (sgSegBeats << log2BB)
+                // 本段数据搬运完成
+                val remainAfterSeg = sgCurBeats - sgSegBeats
+                when(remainAfterSeg === 0.U) {
+                  // 当前条目全部搬运完毕，advance 并回 phase 0
+                  sg.io.advance := true.B
+                  sgPhase := 0.U
+                }.otherwise {
+                  // 还有剩余 beat，继续读下一段
+                  sgCurBeats := remainAfterSeg
+                  // 更新散列端地址偏移（下一段从上次结束位置开始）
+                  sgCurAddr := sgCurAddr + (sgSegBeats << log2BB)
+                  sgPhase := 1.U
+                  sgArIssued := false.B
+                  sgRRemain := 0.U
+                }
               }
             }
           }
@@ -1293,7 +1515,13 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   when(state === sDONE) {
     converter.foreach { c => c.io.flush := true.B }
     mxQuantizer.foreach { q => q.io.flush := true.B }
-    io.done.valid := true.B
+    if (nbWr) {
+      // 非阻塞：done 排空门——必须等全部在途写响应收回后才发 done；
+      // 最后一个响应与 errReg 置位同拍，计数器下拍归零，done 不早发
+      io.done.valid := wrInFlight === 0.U
+    } else {
+      io.done.valid := true.B
+    }
     io.done.payload.tag := cmdReg.tag
     io.done.payload.err := errReg
     when(io.done.fire) {

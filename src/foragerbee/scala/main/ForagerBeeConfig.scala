@@ -43,6 +43,12 @@ import chisel3.util._
   * @param addressWidth      地址位宽（bit），必须 ≥ 12
   * @param channelTranspose  每通道是否支持转置（长度 = numPorts，默认全 true 向下兼容）
   * @param channelPermute   每通道是否支持 PERMUTE（长度 = numPorts，默认全 true 向下兼容）
+  * @param enableSharedWritePorts 写端口共享仲裁开关（true 时引擎写突发经 FbWrPortArbiter
+  *                          交织分配到物理写端口；默认 false 保持 1:1 直连）
+  * @param writeOutstandingDepth 写 outstanding 深度（≥1）。=1 时引擎与仲裁器走现有阻塞式写路径
+  *                          （编译期分支，RTL 逐字不变，零回归）；>1 时启用非阻塞写：
+  *                          引擎写突发在 EOF 拍即推进状态，不等 wrResp，最多允许该深度个
+  *                          在途写突发；不强制绑定 enableSharedWritePorts（直连模式同样受益）
   */
 case class ForagerBeeConfig(
     numPorts: Int = 2,
@@ -60,7 +66,9 @@ case class ForagerBeeConfig(
     enableConversion: Boolean = false,    // 编译时开关：是否启用格式转换
     converterPipeStages: Int = 1,         // 转换流水线深度（1=组合，2+=流水）
     channelIm2col: Seq[Boolean] = Seq.empty,  // 每通道是否支持 im2col（默认全 true）
-    channelScatterGather: Seq[Boolean] = Seq.empty  // 每通道是否支持 scatter/gather
+    channelScatterGather: Seq[Boolean] = Seq.empty,  // 每通道是否支持 scatter/gather
+    enableSharedWritePorts: Boolean = false,  // 编译时开关：写端口共享仲裁（默认关闭，保持每引擎 1:1 直连）
+    writeOutstandingDepth: Int = 1        // 写 outstanding 深度：=1 走现有阻塞式路径（零回归）；>1 启用非阻塞写
 ) {
   /** 实际数据 Queue 深度（-1 表示自动 = max(maxBurstLen, 4)） */
   val resolvedDataQueueDepth: Int =
@@ -98,6 +106,8 @@ case class ForagerBeeConfig(
     s"ForagerBeeConfig: channelIm2col 长度(${resolvedChannelIm2col.length}) 必须等于 numPorts($numPorts)")
   require(resolvedChannelScatterGather.length == numPorts,
     s"ForagerBeeConfig: channelScatterGather 长度(${resolvedChannelScatterGather.length}) 必须等于 numPorts($numPorts)")
+  require(writeOutstandingDepth >= 1,
+    s"ForagerBeeConfig: writeOutstandingDepth($writeOutstandingDepth) 必须 ≥ 1（=1 保持现有阻塞式写路径）")
 
   /** 每 beat 字节数 */
   def beatBytes: Int = dataWidth / 8

@@ -285,6 +285,31 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
             errState := true.B
             state    := sIDLE
           }
+          // P3b 量化输出配置校验（仅追加于本块，同模式置 errState 回 sIDLE；
+          // 顶层 errFlag 直连现成，不动）。
+          // 【评审裁定修复（P1-1/P2-2 同源合并）】校验门 = quantActive，与 WrOnly isQuant /
+          // HiveCore cQuantRun 同一判据源：
+          //   (1) 枚举白名单 outFmt∈{100,101,110}（原单比特 outFmt(2) 判据会让 111=reserved
+          //       命中量化校验/通路，与「111 降级 000」文档声明冲突）；
+          //   (2) 并入运行期格式门（isFloat || isMx(aFmt)），与 outFmtEff 有效值同语义：
+          //       整数运行 outFmtEff 强制 000 透传，写 outFmt=1xx 不再被误报 config-err
+          //       （原裸看寄存器位会假 err，与「整数强制透传」声明矛盾），且与既有校验
+          //       （K%32≠0 / bFmt loadW）均带格式门控的模式一致。
+          val quantActive = (io.regFile.outFmt === 4.U || io.regFile.outFmt === 5.U || io.regFile.outFmt === 6.U) &&
+            (io.regFile.isFloat || DataFormat.isMx(io.regFile.aFmt))
+          when(quantActive) {
+            val qBlk = 8.U(7.W) << io.regFile.qBlockSize   // blk 解码：8/16/32/64 元素/块
+            // (a) blk > totalN（N=16 时 blk=32/64 非法）或不整除 → config-err
+            when(qBlk > cfg.totalN.U || cfg.totalN.U % qBlk =/= 0.U) {
+              errState := true.B
+              state    := sIDLE
+            }
+            // (b) mxfp4（outFmt=110）半字节/元素，n 奇数时行宽非整字节 → config-err
+            when(io.regFile.outFmt === 6.U && io.regFile.n(0) === 1.U) {
+              errState := true.B
+              state    := sIDLE
+            }
+          }
         }
       }
     }

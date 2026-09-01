@@ -3,8 +3,10 @@
   * 功能仿真方案：
   *   - 测试内自带行为级 FbStreamBus slave 内存模型 [[FbStreamMemSlave]]：
   *     Scala 侧 HashMap[BigInt, Byte] 共享内存（多端口为同一内存的不同视图），
-  *     每拍 peek wr/rd 通道、poke rdData/wrResp 通道；仅支持单 outstanding
-  *     子集（与 ForagerBee v1 的发出行为匹配），可编程响应延迟（默认各 1 拍）。
+  *     每拍 peek wr/rd 通道、poke rdData/wrResp 通道；写响应为保序队列，
+  *     支持多 outstanding 写突发（与 writeOutstandingDepth>1 的非阻塞写匹配；
+  *     默认 writeDelay=1 时行为与单 outstanding 旧实现逐拍一致），
+  *     可编程响应延迟（默认各 1 拍），可选对指定突发注入响应错误。
   *   - 未读/未写地址读回 0；写按 wstrb 字节掩码落盘（支持非对齐转置写）。
   *   - chisel3.simulator 不自动断言 reset：仿真开始先驱动全部输入再显式复位 2 拍。
   *   - 主循环逐拍驱动：先跑各端口 slave 模型 → 注入命令 → 收集 done → step。
@@ -18,19 +20,22 @@ import org.scalatest.matchers.should.Matchers
 
 import scala.collection.mutable
 
-/** 行为级 FbStreamBus slave 内存模型（单 outstanding、字节粒度 mem）。
+/** 行为级 FbStreamBus slave 内存模型（多 outstanding 写响应队列、字节粒度 mem）。
   *
   * 端口方向（从 DUT master 视角）：
   *   - bus.rd:     DUT 驱动 valid/payload（读请求），test 驱动 ready
   *   - bus.rdData: test 驱动 valid/payload（读数据），DUT 驱动 ready
   *   - bus.wr:     DUT 驱动 valid/payload（写数据），test 驱动 ready
   *   - bus.wrResp: test 驱动 valid/payload（写响应），DUT 驱动 ready
+  *
+  * @param errOnBurst 对第 N 个写突发（按 EOF 接收顺序，0 起）的响应置 err=true；-1 不注入
   */
 class FbStreamMemSlave(
     mem: mutable.HashMap[BigInt, Byte],
     beatBytes: Int,
     readDelay: Int = 1,
-    writeDelay: Int = 1
+    writeDelay: Int = 1,
+    errOnBurst: Int = -1
 ) {
   // --- 读状态 ---
   private var rdActive = false
@@ -41,7 +46,13 @@ class FbStreamMemSlave(
 
   // --- 写状态 ---
   private var wrAddr = BigInt(0)
-  private var bWait = -1 // -1=idle, 0=send resp this step, >0=countdown
+  // 写响应队列：每个写突发（eof && fire）入队一个 (延迟倒计时, err 标志)；
+  // 队首为当前驱动的响应，按入队顺序发出（天然保序）。倒计时语义与旧单
+  // outstanding 实现一致：EOF 拍入队 max(1, writeDelay)，每拍 >0 递减，
+  // 归 0 后的下一拍起驱动 valid → 默认 writeDelay=1 时逐拍行为与旧实现完全一致。
+  private val bQueue = mutable.ListBuffer[(Int, Boolean)]()
+  private var eofCount = 0   // 已接受的写突发数（EOF 序号，供 errOnBurst 匹配）
+  var wrRespSent = 0         // 已握手发出的写响应数（供 done 排空校验）
 
   def readBeat(addr: BigInt): BigInt = {
     var v = BigInt(0)
@@ -99,21 +110,46 @@ class FbStreamMemSlave(
       }
       wrAddr += beatBytes
       if (eof) {
-        bWait = math.max(1, writeDelay)
+        bQueue += ((math.max(1, writeDelay), eofCount == errOnBurst))
+        eofCount += 1
       }
     }
 
     // === wrResp 通道（test slave 驱动 valid/payload，DUT master 驱动 ready）===
-    if (bWait == 0) {
+    if (bQueue.nonEmpty && bQueue.head._1 <= 0) {
+      // 队首倒计时归 0：驱动响应；fire 后出队处理下一个（保序）
       bus.wrResp.valid.poke(true.B)
-      bus.wrResp.payload.err.poke(false.B)
+      bus.wrResp.payload.err.poke(bQueue.head._2.B)
       if (bus.wrResp.ready.peek().litToBoolean) {
-        bWait = -1
+        bQueue.remove(0)
+        wrRespSent += 1
       }
     } else {
       bus.wrResp.valid.poke(false.B)
       bus.wrResp.payload.err.poke(false.B)
-      if (bWait > 0) bWait -= 1
+      if (bQueue.nonEmpty) {
+        val (w, e) = bQueue.head
+        bQueue(0) = (w - 1, e)
+      }
+    }
+  }
+}
+
+/** 带写突发计数的 [[FbStreamMemSlave]]：统计写通道接受的突发数（SOF 拍），
+  * 用于验证写端口共享仲裁的端口利用率（哪个物理端口承载了多少突发）。
+  */
+class FbWrCountingMemSlave(
+    mem: mutable.HashMap[BigInt, Byte],
+    beatBytes: Int,
+    readDelay: Int = 1,
+    writeDelay: Int = 1,
+    errOnBurst: Int = -1
+) extends FbStreamMemSlave(mem, beatBytes, readDelay, writeDelay, errOnBurst) {
+  var wrBursts = 0
+  override def step(bus: FbStreamBus): Unit = {
+    super.step(bus) // super 中 wr.ready 恒为 true，valid&&sof 即一次突发握手
+    if (bus.wr.valid.peek().litToBoolean && bus.wr.payload.sof.peek().litToBoolean) {
+      wrBursts += 1
     }
   }
 }
@@ -197,6 +233,8 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     an [IllegalArgumentException] should be thrownBy ForagerBeeConfig(numPorts = 2, channelTranspose = Seq(true))
     // channelPermute 长度不匹配
     an [IllegalArgumentException] should be thrownBy ForagerBeeConfig(numPorts = 2, channelPermute = Seq(true))
+    // writeOutstandingDepth 必须 ≥ 1（=0 非法）
+    an [IllegalArgumentException] should be thrownBy ForagerBeeConfig(writeOutstandingDepth = 0)
   }
 
   // ===================== 仿真辅助 =====================
@@ -266,17 +304,21 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   }
 
   /** 跑一组命令直到全部 done（或超时 fail），返回 (done 列表, 内存终态)
-    * 命令逐条注入：上一条被接受后再注入下一条 */
+    * 命令逐条注入：上一条被接受后再注入下一条。
+    * onDoneFire：每次 done.valid 拍回调，参数为当前周期号（供 done 时机校验） */
   private def runForagerBee(
       cfg: ForagerBeeConfig,
       cmds: Seq[FbTestCmd],
       prefill: mutable.HashMap[BigInt, Byte] = mutable.HashMap.empty,
-      maxCycles: Int = 30000
+      maxCycles: Int = 30000,
+      modelFactory: (mutable.HashMap[BigInt, Byte], Int) => FbStreamMemSlave =
+        (m, bb) => new FbStreamMemSlave(m, bb),
+      onDoneFire: Int => Unit = _ => ()
   ): (Seq[(Int, Boolean)], mutable.HashMap[BigInt, Byte]) = {
     val mem = prefill
     val dones = mutable.ArrayBuffer[(Int, Boolean)]() // (tag, err)
     simulate(new ForagerBee(cfg)) { dut =>
-      val models = Seq.fill(cfg.numPorts)(new FbStreamMemSlave(mem, cfg.beatBytes))
+      val models = Seq.fill(cfg.numPorts)(modelFactory(mem, cfg.beatBytes))
       val dummy = FbTestCmd()
       var cmdIdx = 0
 
@@ -301,6 +343,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
         dut.io.done.ready.poke(true.B)
         // 收集 done
         if (dut.io.done.valid.peek().litToBoolean) {
+          onDoneFire(cycle)
           dones += ((
             dut.io.done.payload.tag.peek().litValue.toInt,
             dut.io.done.payload.err.peek().litToBoolean
@@ -2495,6 +2538,371 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       mxQuantEn = true, scaleBlockSize = 1)
     val (dones, _) = runForagerBee(mxqCfg, Seq(cmd), mutable.HashMap.empty)
     dones shouldBe Seq((0x96, true))
+  }
+
+  // ===================== 写端口共享仲裁（enableSharedWritePorts） =====================
+
+  // 共享仲裁配置：与 testCfg 其余参数一致，仅开关打开（写突发经 FbWrPortArbiter 分配）
+  private val sharedWrCfg = testCfg.copy(enableSharedWritePorts = true)
+
+  it should "elaborate with enableSharedWritePorts=true (default numPorts=2)" in {
+    val v = ChiselStage.emitSystemVerilog(new ForagerBee(
+      ForagerBeeConfig(enableSharedWritePorts = true)))
+    v should include("module ForagerBee")
+  }
+
+  it should "elaborate with enableSharedWritePorts=false (default) without FbWrPortArbiter" in {
+    // 负向守卫：开关关闭时顶层保持 1:1 直连，仲裁器不应被例化/生成进 SV 文本
+    val v = ChiselStage.emitSystemVerilog(new ForagerBee(ForagerBeeConfig()))
+    v should not include "FbWrPortArbiter"
+  }
+
+  it should "elaborate enableSharedWritePorts=true with numPorts=1 (degenerate), 3 and 4" in {
+    for (p <- Seq(1, 3, 4)) {
+      val v = ChiselStage.emitSystemVerilog(new ForagerBee(
+        ForagerBeeConfig(numPorts = p, enableSharedWritePorts = true)))
+      v should include("module ForagerBee")
+    }
+  }
+
+  it should "shared wr arb: two engines write disjoint addresses concurrently, both ports used" in {
+    // 两条地址互不冲突的命令被调度器并发派发到两个引擎，
+    // 突发窗口重叠时仲裁器必须把它们分配到不同物理端口。
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val len = 256 // 16B/beat × 16 beat = 2 个突发（maxBurstLen=8）/引擎
+    fillPattern(mem, 0x0000, len, seed = 1)
+    fillPattern(mem, 0x2000, len, seed = 2)
+    val cmds = Seq(
+      FbTestCmd(tag = 0x5A, dimCount = 1,
+        shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
+        srcAddr = 0x0000, dstAddr = 0x1000),
+      FbTestCmd(tag = 0x6B, dimCount = 1,
+        shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
+        srcAddr = 0x2000, dstAddr = 0x3000)
+    )
+    val counters = Seq.fill(sharedWrCfg.numPorts)(
+      new FbWrCountingMemSlave(mem, sharedWrCfg.beatBytes))
+    var idx = 0
+    val (dones, m) = runForagerBee(sharedWrCfg, cmds, mem,
+      modelFactory = (_, _) => { val s = counters(idx); idx += 1; s })
+    dones.map(_._1).toSet shouldBe Set(0x5A, 0x6B)
+    dones.forall(!_._2) shouldBe true
+    // 数据正确性强断言：两条命令各自完整写出，互不串扰
+    for (i <- 0 until len) {
+      withClue(s"engine-A dst[$i]: ") { m(BigInt(0x1000) + i) shouldBe m(BigInt(0x0000) + i) }
+      withClue(s"engine-B dst[$i]: ") { m(BigInt(0x3000) + i) shouldBe m(BigInt(0x2000) + i) }
+    }
+    // 端口分配强断言：突发总数守恒且两个物理端口均被使用（并发窗口重叠时必然分端口）
+    val perPort = counters.map(_.wrBursts)
+    val expBurstsPerEng = len / (sharedWrCfg.beatBytes * sharedWrCfg.maxBurstLen)
+    withClue(s"per-port burst distribution $perPort: ") {
+      perPort.sum shouldBe expBurstsPerEng * 2
+      perPort.forall(_ > 0) shouldBe true
+    }
+  }
+
+  it should "shared wr arb: single engine multi-burst COPY stays functional (all bursts land, data correct)" in {
+    // 单引擎串行写模型：引擎逐突发等待 wrResp，端口在其下一 SOF 前总已释放，
+    // 突发全部落同一物理端口是预期行为（非本用例断言点）；
+    // 此处仅验证共享模式下功能正确：突发总数守恒 + 数据全量比对。
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val len = 512 // 32 beat → 4 个突发（maxBurstLen=8）
+    fillPattern(mem, 0, len, seed = 7)
+    val cmd = FbTestCmd(tag = 0x7C, dimCount = 1,
+      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
+      srcAddr = 0, dstAddr = 0x4000)
+    val counters = Seq.fill(sharedWrCfg.numPorts)(
+      new FbWrCountingMemSlave(mem, sharedWrCfg.beatBytes))
+    var idx = 0
+    val (dones, m) = runForagerBee(sharedWrCfg, Seq(cmd), mem,
+      modelFactory = (_, _) => { val s = counters(idx); idx += 1; s })
+    dones shouldBe Seq((0x7C, false))
+    for (i <- 0 until len) {
+      withClue(s"dst[$i]: ") { m(BigInt(0x4000) + i) shouldBe m(BigInt(i)) }
+    }
+    withClue(s"per-port burst distribution ${counters.map(_.wrBursts)}: ") {
+      counters.map(_.wrBursts).sum shouldBe len / (sharedWrCfg.beatBytes * sharedWrCfg.maxBurstLen)
+    }
+  }
+
+  it should "shared wr arb: round-robin fairness under repeated contention (2 engines x 2 serial cmds)" in {
+    // 公平性竞争复用：2 引擎各发 2 条串行命令（前一条完成后经命令队列续派下一条），
+    // 总突发数 4 > 物理端口数 2，每个引擎的第二个突发必然遭遇二次端口竞争；
+    // round-robin 保证突发在两端口间均衡分布。
+    val fairnessCfg = sharedWrCfg // testCfg.copy: numPorts=2, enableSharedWritePorts=true
+    val len = 128 // 8 beat → 1 个突发（maxBurstLen=8）/命令
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val srcBases = Seq(0x0000, 0x0100, 0x0200, 0x0300)
+    val dstBases = Seq(0x1000, 0x1100, 0x1200, 0x1300)
+    srcBases.zipWithIndex.foreach { case (b, i) => fillPattern(mem, b, len, seed = i) }
+    val cmds = srcBases.zip(dstBases).zipWithIndex.map { case ((s, d), i) =>
+      FbTestCmd(tag = 0xA0 + i, dimCount = 1,
+        shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
+        srcAddr = s, dstAddr = d)
+    }
+    val counters = Seq.fill(fairnessCfg.numPorts)(
+      new FbWrCountingMemSlave(mem, fairnessCfg.beatBytes))
+    var idx = 0
+    val (dones, m) = runForagerBee(fairnessCfg, cmds, mem,
+      modelFactory = (_, _) => { val s = counters(idx); idx += 1; s })
+    dones.map(_._1).toSet shouldBe Set(0xA0, 0xA1, 0xA2, 0xA3)
+    dones.forall(!_._2) shouldBe true
+    // 数据全量比对（强断言）：4 条命令各自完整写出，互不串扰
+    for (i <- 0 until 4; j <- 0 until len) {
+      withClue(s"cmd$i dst[$j]: ") { m(BigInt(dstBases(i)) + j) shouldBe m(BigInt(srcBases(i)) + j) }
+    }
+    // 端口均衡断言：总突发 4（> 端口数 2，产生二次竞争），两端口都 ≥ 1 且分布均衡（各 2）
+    val perPort = counters.map(_.wrBursts)
+    withClue(s"per-port burst distribution $perPort: ") {
+      perPort.sum shouldBe 4
+      perPort.forall(_ >= 1) shouldBe true
+      perPort.forall(_ == 2) shouldBe true
+    }
+  }
+
+  it should "shared wr arb: non-COPY traffic (2D TRANSPOSE) through shared write ports" in {
+    // 共享模式下的非 COPY 写流量：复用 8x8 INT8 TRANSPOSE 用例，仅开关打开；
+    // 验证经 FbTransposeBuffer 产生的写突发也能正确通过共享仲裁器。
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val n = 8
+    for (i <- 0 until n; j <- 0 until n) mem(BigInt(i * 16 + j)) = ((i * n + j) & 0xFF).toByte
+    val cmd = FbTestCmd(tag = 0x44, transpose = true, dimCount = 2,
+      shape = Seq(n, n), srcStride = Seq(n, 16), dstStride = Seq(n, 0),
+      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0)
+    val counters = Seq.fill(sharedWrCfg.numPorts)(
+      new FbWrCountingMemSlave(mem, sharedWrCfg.beatBytes))
+    var idx = 0
+    val (dones, m) = runForagerBee(sharedWrCfg, Seq(cmd), mem,
+      modelFactory = (_, _) => { val s = counters(idx); idx += 1; s })
+    dones shouldBe Seq((0x44, false))
+    for (j <- 0 until n; i <- 0 until n) {
+      m(BigInt(0x8000 + j * n + i)) shouldBe (((i * n + j) & 0xFF).toByte)
+    }
+    withClue(s"per-port burst distribution ${counters.map(_.wrBursts)}: ") {
+      counters.map(_.wrBursts).sum should be > 0
+    }
+  }
+
+  // ===================== 非阻塞写（writeOutstandingDepth > 1） =====================
+  // 本地仿真环境未就绪：仿真类用例作为环境修复后的基准保留；
+  // 配置验证/文本守卫类用例可在本地直接运行。
+
+  // 非阻塞写配置：与 testCfg 其余参数一致，仅提升写 outstanding 深度（启用 nbWr 编译期分支）
+  private val nbwrCfg = testCfg.copy(writeOutstandingDepth = 4)
+  private val nbwrSharedCfg = testCfg.copy(writeOutstandingDepth = 4, enableSharedWritePorts = true)
+  private val nbWrDelay = 8 // 大写响应延迟：迫使多个写突发同时在途（>1 拍间隔无法填满深度 4）
+  private val nbwrSlaveFactory: (mutable.HashMap[BigInt, Byte], Int) => FbStreamMemSlave =
+    (m, bb) => new FbStreamMemSlave(m, bb, writeDelay = nbWrDelay)
+
+  it should "nbwr: elaborate writeOutstandingDepth=4 (direct) and +enableSharedWritePorts=true" in {
+    val v1 = ChiselStage.emitSystemVerilog(new ForagerBee(nbwrCfg))
+    v1 should include("module ForagerBee")
+    v1 should include("wrInFlight") // 非阻塞路径应生成在途写计数器
+    val v2 = ChiselStage.emitSystemVerilog(new ForagerBee(nbwrSharedCfg))
+    v2 should include("module ForagerBee")
+    v2 should include("wrInFlight")
+    v2 should include("FbWrPortArbiter")
+  }
+
+  it should "nbwr: default config SV contains no wrInFlight (zero-regression guard)" in {
+    // 编译期分支零回归的测试层守卫：=1 时不新增任何非阻塞写硬件，
+    // wrInFlight 信号名不应出现在生成的 SystemVerilog 文本中。
+    val v = ChiselStage.emitSystemVerilog(new ForagerBee(ForagerBeeConfig()))
+    v should include("module ForagerBee")
+    v should not include "wrInFlight"
+    // 共享仲裁模式（=1 + enableSharedWritePorts）同样不应引入非阻塞写硬件：
+    // 仲裁器例化但仅走阻塞式路径（无 wrInFlight 信号）
+    val v2 = ChiselStage.emitSystemVerilog(new ForagerBee(ForagerBeeConfig(enableSharedWritePorts = true)))
+    v2 should include("FbWrPortArbiter")
+    v2 should not include "wrInFlight"
+  }
+
+  it should "nbwr: 1D COPY with writeDelay=8 completes and data correct" in {
+    // 256B = 16 beat → 2 个突发（maxBurstLen=8）；writeDelay=8 下第二个突发在
+    // 第一个响应返回前即发出，验证非阻塞写路径下的数据完整性。
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val len = 256
+    fillPattern(mem, 0, len)
+    val cmd = FbTestCmd(tag = 0x21, dimCount = 1,
+      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
+      srcAddr = 0, dstAddr = 0x1000)
+    val (dones, m) = runForagerBee(nbwrCfg, Seq(cmd), mem, maxCycles = 10000,
+      modelFactory = nbwrSlaveFactory)
+    dones shouldBe Seq((0x21, false))
+    for (i <- 0 until len) {
+      withClue(s"dst[$i]: ") { m(BigInt(0x1000) + i) shouldBe m(BigInt(i)) }
+    }
+  }
+
+  it should "nbwr: 2D TRANSPOSE with writeDelay=8 produces correct transposed data" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val n = 8
+    for (i <- 0 until n; j <- 0 until n) mem(BigInt(i * 16 + j)) = ((i * n + j) & 0xFF).toByte
+    val cmd = FbTestCmd(tag = 0x23, transpose = true, dimCount = 2,
+      shape = Seq(n, n), srcStride = Seq(n, 16), dstStride = Seq(n, 0),
+      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0)
+    val (dones, m) = runForagerBee(nbwrCfg, Seq(cmd), mem, maxCycles = 10000,
+      modelFactory = nbwrSlaveFactory)
+    dones shouldBe Seq((0x23, false))
+    for (j <- 0 until n; i <- 0 until n) {
+      withClue(s"dst[$j][$i]: ") {
+        m(BigInt(0x8000 + j * n + i)) shouldBe (((i * n + j) & 0xFF).toByte)
+      }
+    }
+  }
+
+  it should "nbwr: multi-tile 16x16 TRANSPOSE (tileSize=8, 4 tiles) with writeDelay=8 no deadlock" in {
+    // 多 tile 非阻塞转置回归：修复前下一 tile 的 start 脉冲在 sTWR 最后一列突发
+    // EOF 拍发出，与 FbTransposeBuffer 同拍消费的最后一个 drain beat 冲突（sBDRAIN
+    // 分支 last-connect 吞掉 start）→ 缓冲停 sBIDLE、rd.valid 恒 0 → 死锁。
+    // 修复后 start 改由 sTRD 内按 !busy 补发；本用例 4 个 tile 顺序流转，
+    // writeDelay=8 下多列写突发同时在途，验证不再死锁且数据正确。
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val n = 16 // tileSize=8 → 2×2 共 4 个 tile（M、N 均 > tileSize）
+    for (i <- 0 until n; j <- 0 until n) mem(BigInt(i * 16 + j)) = ((i * n + j) & 0xFF).toByte
+    val cmd = FbTestCmd(tag = 0x29, transpose = true, dimCount = 2,
+      shape = Seq(n, n), srcStride = Seq(n, 16), dstStride = Seq(16, 0),
+      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0)
+    val (dones, m) = runForagerBee(nbwrCfg, Seq(cmd), mem, maxCycles = 20000,
+      modelFactory = nbwrSlaveFactory)
+    dones shouldBe Seq((0x29, false))
+    for (j <- 0 until n; i <- 0 until n) {
+      withClue(s"dst[$j][$i]: ") {
+        m(BigInt(0x8000 + j * 16 + i)) shouldBe (((i * n + j) & 0xFF).toByte)
+      }
+    }
+  }
+
+  it should "nbwr: MX quantize FP16→MXE4M3 1D blockSize=32 with writeDelay=8" in {
+    // 复用既有 MX 量化用例的命令参数，仅叠加非阻塞写 + 大响应延迟；
+    // 量化数据突发与 scale 突发均为在途写（MX 特例路径同样受 wrInFlight 门控）。
+    val n = 64
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val vals0 = Seq.tabulate(32)(i =>
+      if (i < 8) math.pow(2.0, 10 - i).toFloat else
+      if (i < 16) -math.pow(2.0, 10 - i).toFloat else
+      if (i < 24) (1.0 + i * 0.25).toFloat * 4.0f else
+      if (i == 31) 6.0e-8f else -(1.0 + i * 0.25).toFloat * 2.0f)
+    val vals1 = Seq.tabulate(32)(i =>
+      if (i % 7 == 0) 0.0f else ((i % 5) + 1).toFloat * (if (i % 3 == 0) -0.5f else 0.25f))
+    putFp16(mem, 0, vals0 ++ vals1)
+    val srcBits = (vals0 ++ vals1).map(v => fp16BitsToFp32Bits(fp16Of(v)))
+    val cmd = FbTestCmd(tag = 0x24, op = "COPY", dimCount = 1,
+      shape = Seq(n), srcStride = Seq(n * 2), dstStride = Seq(n),
+      srcAddr = 0, dstAddr = 0x1000, scaleAddr = 0x2000,
+      elemBytesLog2 = 1, cvtEnable = true, srcFmt = 1, dstFmt = 4,
+      mxQuantEn = true, scaleBlockSize = 1) // blockSize=32
+    val nbMxCfg = mxqCfg.copy(writeOutstandingDepth = 4)
+    val (dones, m) = runForagerBee(nbMxCfg, Seq(cmd), mem, maxCycles = 10000,
+      modelFactory = nbwrSlaveFactory)
+    dones shouldBe Seq((0x24, false))
+    for (blk <- 0 until 2) {
+      val (expBytes, expScale) = mxQuantizeRef(srcBits.slice(blk * 32, blk * 32 + 32), 4)
+      for (j <- 0 until 32) {
+        withClue(s"blk$blk[$j]: ") {
+          (m.getOrElse(BigInt(0x1000 + blk * 32 + j), 0.toByte) & 0xFF) shouldBe expBytes(j)
+        }
+      }
+      withClue(s"scale[$blk]: ") {
+        (m.getOrElse(BigInt(0x2000 + blk), 0.toByte) & 0xFF) shouldBe expScale
+      }
+    }
+    for (k <- 2 until 16) (m.getOrElse(BigInt(0x2000 + k), 0.toByte) & 0xFF) shouldBe 0
+  }
+
+  it should "nbwr: done fires only after all write responses drained (writeDelay=8)" in {
+    // done 不早发：512B = 32 beat → 4 个突发，恰好填满深度 4；
+    // done.valid 拍回调时采样从设备已发出的响应数，必须等于总突发数。
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val len = 512
+    fillPattern(mem, 0, len)
+    val expBursts = len / (nbwrCfg.beatBytes * nbwrCfg.maxBurstLen)
+    val cmd = FbTestCmd(tag = 0x25, dimCount = 1,
+      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
+      srcAddr = 0, dstAddr = 0x2000)
+    val slaves = Seq.fill(nbwrCfg.numPorts)(
+      new FbStreamMemSlave(mem, nbwrCfg.beatBytes, writeDelay = nbWrDelay))
+    var idx = 0
+    var doneCycle = -1
+    var respAtDone = -1
+    val (dones, m) = runForagerBee(nbwrCfg, Seq(cmd), mem, maxCycles = 10000,
+      modelFactory = (_, _) => { val s = slaves(idx); idx += 1; s },
+      onDoneFire = c => if (doneCycle < 0) {
+        doneCycle = c
+        respAtDone = slaves.map(_.wrRespSent).sum
+      })
+    dones shouldBe Seq((0x25, false))
+    doneCycle should be >= 0
+    withClue(s"done@cyc$doneCycle: 已响应 $respAtDone / 应响应 $expBursts —— done 早于写响应排空: ") {
+      respAtDone shouldBe expBursts
+    }
+    for (i <- 0 until len) {
+      withClue(s"dst[$i]: ") { m(BigInt(0x2000) + i) shouldBe m(BigInt(i)) }
+    }
+  }
+
+  it should "nbwr: shared write ports + multi-outstanding, 2 engines concurrent with writeDelay=8" in {
+    // enableSharedWritePorts=true + depth=4 + 大延迟：2 引擎并发写不同地址，
+    // 验证数据正确 + 响应路由正确（无超时、无错误 done、突发总数守恒）。
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val len = 256 // 16 beat → 2 个突发/引擎，共 4 个在途写（恰填满深度 4）
+    fillPattern(mem, 0x0000, len, seed = 1)
+    fillPattern(mem, 0x2000, len, seed = 2)
+    val cmds = Seq(
+      FbTestCmd(tag = 0x26, dimCount = 1,
+        shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
+        srcAddr = 0x0000, dstAddr = 0x1000),
+      FbTestCmd(tag = 0x27, dimCount = 1,
+        shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
+        srcAddr = 0x2000, dstAddr = 0x3000)
+    )
+    val counters = Seq.fill(nbwrSharedCfg.numPorts)(
+      new FbWrCountingMemSlave(mem, nbwrSharedCfg.beatBytes, writeDelay = nbWrDelay))
+    var idx = 0
+    val (dones, m) = runForagerBee(nbwrSharedCfg, cmds, mem, maxCycles = 10000,
+      modelFactory = (_, _) => { val s = counters(idx); idx += 1; s })
+    dones.map(_._1).toSet shouldBe Set(0x26, 0x27)
+    dones.forall(!_._2) shouldBe true // 无错误 done（含超时前正常完成）
+    for (i <- 0 until len) {
+      withClue(s"engine-A dst[$i]: ") { m(BigInt(0x1000) + i) shouldBe m(BigInt(0x0000) + i) }
+      withClue(s"engine-B dst[$i]: ") { m(BigInt(0x3000) + i) shouldBe m(BigInt(0x2000) + i) }
+    }
+    val perPort = counters.map(_.wrBursts)
+    val expBurstsPerEng = len / (nbwrSharedCfg.beatBytes * nbwrSharedCfg.maxBurstLen)
+    withClue(s"per-port burst distribution $perPort: ") {
+      perPort.sum shouldBe expBurstsPerEng * 2 // 响应路由守恒：所有突发均被某个物理端口回收
+    }
+  }
+
+  it should "nbwr: err injected on burst response → done.err=true after all responses drained" in {
+    // 对第 2 个突发（EOF 序号 1）的响应注入 err：验证 done.err 在全部响应回收后置位，
+    // 且 err done 同样不早于写响应排空。
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val len = 256 // 2 个突发
+    fillPattern(mem, 0, len)
+    val expBursts = len / (nbwrCfg.beatBytes * nbwrCfg.maxBurstLen)
+    val cmd = FbTestCmd(tag = 0x28, dimCount = 1,
+      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
+      srcAddr = 0, dstAddr = 0x4000)
+    val slaves = Seq.fill(nbwrCfg.numPorts)(
+      new FbStreamMemSlave(mem, nbwrCfg.beatBytes, writeDelay = nbWrDelay, errOnBurst = 1))
+    var idx = 0
+    var doneCycle = -1
+    var respAtDone = -1
+    val (dones, m) = runForagerBee(nbwrCfg, Seq(cmd), mem, maxCycles = 10000,
+      modelFactory = (_, _) => { val s = slaves(idx); idx += 1; s },
+      onDoneFire = c => if (doneCycle < 0) {
+        doneCycle = c
+        respAtDone = slaves.map(_.wrRespSent).sum
+      })
+    dones shouldBe Seq((0x28, true)) // 全部响应回收后 done.err 置位
+    withClue(s"err done@cyc$doneCycle: 已响应 $respAtDone / 应响应 $expBursts: ") {
+      respAtDone shouldBe expBursts
+    }
+    // 写数据本身已落盘（响应错误不影响数据写入）
+    for (i <- 0 until len) {
+      withClue(s"dst[$i]: ") { m(BigInt(0x4000) + i) shouldBe m(BigInt(i)) }
+    }
   }
 }
 

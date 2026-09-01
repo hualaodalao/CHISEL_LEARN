@@ -84,6 +84,10 @@ case class HiveCoreConfig(
   /** Scale 行位宽：scaleB 每行 totalN 个 8-bit E8M0 scale 因子 */
   val scaleRowW: Int = totalN * 8
 
+  /** P3a C 侧量化 scale 行位宽：每 8 元素量化块一个 8-bit E8M0 scale 字节
+    * （HiveOutCvt.scaleRow 输出宽度，P3b dmaCScale 通道行宽同源） */
+  val cScaleRowW: Int = (totalN / 8) * 8
+
   /** C 累加器有效位宽（与 HiveComb 推导逻辑一致）。
     * cW==0 自动推导：含浮点或 MX 时至少 40（延迟规格化 {sign,exp8,mant31} 需要），
     * 纯整数时取 autoAccW（aEffW+bW+log2Up(totalN)，累加防溢出）。 */
@@ -116,8 +120,10 @@ case class HiveCoreConfig(
   /** C 写回每行拍数：1 = legacy 一拍一行；>1 = active 行内多拍拆分 */
   val cBeatsPerRow: Int = totalN / cElementsPerBeat
 
-  val registerNumRW: Int = 11
-  val registerNum: Int = 11
+  // P3a：新增 regs(11) = cScaleAddr（C 侧量化 scale 写回基地址），寄存器组 11 → 12。
+  // 旧软件只写 0x00..0x0A，新增寄存器默认 0 不影响既有行为。
+  val registerNumRW: Int = 12
+  val registerNum: Int = 12
 
   //DMA
  
@@ -161,6 +167,17 @@ case class HiveCoreConfig(
     else require(cDmaExtWEff >= cElementsPerBeat * 16,
       s"HiveCoreConfig: 浮点/MX 缩位配置要求 cDmaExtWEff($cDmaExtWEff) >= cElementsPerBeat*16(${cElementsPerBeat * 16})，否则 16-bit 密集发拍拼接位宽为负")
   }
+  // P3a MX 量化写回前提：mxfp4（E2M1）输出为半字节/元素，缩位多拍时拍内必须按
+  // 整字节打包（每拍元素数为偶数），否则拍段在半字节中间切开导致内存布局错位；
+  // legacy 满宽（cBeatsPerRow==1）豁免。量化判据门控在运行期，此处为编译期几何前提。
+  // 【显式声明（评审裁定留痕）】本 E 偶数约束对 hasMx 配置的全部缩位生效——
+  // 含量化（mxfp8/mxfp4）与非量化（fp16/bf16/fp32 输出）：只要 cBeatsPerRow>1，
+  // E=1/2（如 cDmaExtW=40/80）即被拒绝，而非仅限量化运行；下游配置缩位时不得假设
+  // 非量化输出可豁免本约束。
+  if (hasMx) require(cBeatsPerRow == 1 || cElementsPerBeat % 2 == 0,
+    s"HiveCoreConfig: hasMx 缩位配置（cBeatsPerRow>1）要求每拍元素数 cElementsPerBeat($cElementsPerBeat) 为偶数；" +
+    s"该约束覆盖 hasMx 配置的全部缩位（含量化 mxfp8/mxfp4 与非量化 fp16/bf16/fp32 输出）：" +
+    s"mxfp4 半字节须拍内整字节打包，非量化缩位同样受此几何前提约束（E=1/2 即被拒绝）")
   require(scaleBufferDepth > 0, s"HiveCoreConfig: scaleBufferDepth($scaleBufferDepth) 必须 > 0（hasMx 时 scale FIFO 深度；非 MX 死路参数）")
   // MX 阵列几何硬约束：32-K scale 块 = 16 lane × 2 元素/拍 = 单 pass，该等价关系仅在
   // totalN==16 时成立（scaleBDma lineTarget=kTile、executor 每 sLOAD_B 窗口 pop scaleB
