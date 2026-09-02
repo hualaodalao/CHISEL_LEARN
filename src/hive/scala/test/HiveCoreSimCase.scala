@@ -54,9 +54,10 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
 
     val totalN = cfg.totalN     // 16
     val aEffW  = cfg.aEffW      // 16
-    val cEffW  = cfg.cEffW      // 40（cW=40 显式传入，cEffW=max(cW,bW)，延迟规格化格式）
-    // 各 DMA 通道外部数据位宽（各自匹配 buffer 行宽）：
-    // aExtW = bExtW = 256（16*16），cExtW = 640（16*40，cW=40 时 cEffW=max(cW,bW)）
+    val cEffW  = cfg.cEffW      // 40（C buffer 行宽口径；写回经顶层 cvt 40→32 转换）
+    // P3 迁移：写回走新架构（cvt 行寄存器+格式转换 → cDma WrOnly 行内拆拍）；
+    // cDmaExtW 默认 256（P0 契约，只允许 2 的 N 次幂，旧 640 满宽与 5B/元素布局废止）：
+    // fp32 默认输出 = 每行 2 拍（拍内 8 元素、低列号在低位）、行步进 n*4、tile 步进 totalN*4
 
     // --- 生成矩阵 ---
     // element[row][col] = (row + 1.0) + col * 0.1，以 FP16 编码
@@ -99,6 +100,10 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
     val aRowOff = K.toLong * (cfg.aW / 8)             // = regFile.k*(aW/8)
     val aColOff = totalN.toLong * (aEffW / 8)
     val expAAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
+    // A 轮间行为（与硬件 RdOnly sNEXT_COL 同源）：每 nTile 轮末 curAddr 复位回
+    // aAddr（不带轮间列偏移），各轮地址序列完全重复；供数内容同样每轮重复。
+    // 供数/计数必须由 req.valid 拍驱动（rsp.ready 恒真，按它计数会把 sNEXT_COL/
+    // 启动空拍误计进来致下标错位）
     for (_ <- 0 until aNTiles; kt <- 0 until aKTiles; m <- 0 until M)
       expAAddrSeq += A_BASE + m * aRowOff + kt * aColOff
     val dmaATotalBeats = expAAddrSeq.size
@@ -155,7 +160,10 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
     require(expBAddrSeq(3 * totalN) == B_BASE + (totalN - 1).toLong * bRowOff + bColTileOff + totalN.toLong * bRowOff,
       f"B block3 start 0x${expBAddrSeq(3 * totalN)}%X mismatch")
     */
-    // beat 数据（与期望地址序列同下标）：nt 固定，块内 K 行降序
+    // beat 数据（与期望地址序列同下标）：nt 固定，块内 K 行降序。
+    // 外部 B 布局 = 硬件地址公式蕴含的行主序（行步进 n*(bW/8)、tile 间跳
+    // totalN*(bW/8)，恰好拼成 K 行×N 列连续布局）：beat 对应外存行 =
+    // kt*totalN + (rows-1-idxInBlock)，列 = nt tile 区间。
     def genDmaBWeightBeat(idx: Int): BigInt = {
       // 每轮（N tile）硬件扫 bKTiles*totalN 拍（块内恒 totalN 行）；
       // nTileIdx 决定供数列区间（col = nTileIdx*totalN + i），不可模掉轮信息
@@ -185,13 +193,11 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       data
     }
 
-    // --- DMA-C (C store) 期望地址序列：cDma 扫描 = nTile 外 → 实际 M 行内；
-    // addr = cAddr + mIdx*cRowOff + nt*cColOff（cRowOff=0），len 恒 1 ---
-    val cRowOff = (cStride & 0xF).toLong
-    val cColOff = totalN.toLong * (cEffW / 8)
-    val expCAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
-    for (nt <- 0 until aNTiles; m <- 0 until M)
-      expCAddrSeq += C_BASE + m * cRowOff + nt * cColOff
+    // --- DMA-C (C store) 期望地址序列（P3 密集布局，公共助手唯一推演源）：
+    // fp32 默认输出 256-bit 总线 → 2 拍/行（拍内步进 32B）；cRowOff=n*4、
+    // cColOff=totalN*4、三角累积闭式块间跳转（金锚），遍历序 nt 外 × m 中 × 行内拍内 ---
+    val expCAddrSeq = HiveSimCommon.cAddrSeqDense(
+      C_BASE, M, N, totalN, outFmt = 0, cfg.cDmaExtW)
 
     // --- 仿真 ---
     println(s"[HiveCoreSimCase] Starting simulation: M=$M, N=$N, K=$K, totalN=$totalN")
@@ -271,30 +277,32 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       // ===== 主仿真循环: DMA 响应 + 等待完成 =====
       var done = false
       var cycle = 0
-      //val maxCycles = 500000
-      val maxCycles = 5000
+      val maxCycles = 500000
 
       println("[HiveCoreSimCase] Entering DMA response loop...")
 
       while (!done && cycle < maxCycles) {
-        
         // --- DMA-A (A RdOnly) 响应逻辑 ---
-        // 地址寻址：cmd.valid 拍读 cmd.addr 与软件同公式期望对账，
-        // 不符直接 fail（防止按序供数掩盖地址公式 bug）；随后按同下标供行数据
+        // 地址寻址：req.valid 拍读 req.addr 与软件同公式期望硬对账，
+        // 不符直接 fail（防止按序供数掩盖地址公式 bug）；随后按同下标供行数据。
+        // 供数/计数由 req.valid 拍驱动（与 DMA-B 同模式：RdOnly rsp.ready 恒真，
+        // 若按 rsp.ready 计数会与 req 节奏脱钩）
         if (dmaABeatsSent < dmaATotalBeats) {
           if (dut.io.dmaA.req.valid.peek().litToBoolean) {
             val cmdAddr = dut.io.dmaA.req.payload.addr.peek().litValue.toLong
-            // [临时观察] DMA-A 期望序列仍按旧公式，先只打印 mismatch 不 fail
-            if (cmdAddr != expAAddrSeq(dmaABeatsSent) && dmaABeatsSent < 8)
-              println(f"[cycle=$cycle%6d] DMA-A A beat #$dmaABeatsSent addr MISMATCH: hw=0x$cmdAddr%X exp=0x${expAAddrSeq(dmaABeatsSent)}%X")
-          }
-          dut.io.dmaA.rsp.valid.poke(true.B)
-          dut.io.dmaA.rsp.payload.data.poke(genDmaABeat(dmaABeatsSent).U)
-          dut.io.dmaA.rsp.payload.err.poke(false.B)
-          if (dut.io.dmaA.rsp.ready.peek().litToBoolean) {
+            withClue(s"DMA-A beat #$dmaABeatsSent addr mismatch: ") {
+              cmdAddr should be(expAAddrSeq(dmaABeatsSent))
+            }
+            dut.io.dmaA.rsp.valid.poke(true.B)
+            dut.io.dmaA.rsp.payload.data.poke(genDmaABeat(dmaABeatsSent).U)
+            dut.io.dmaA.rsp.payload.err.poke(false.B)
             if (dmaABeatsSent < 4)
               println(f"[cycle=$cycle%6d] DMA-A A beat #$dmaABeatsSent delivered")
             dmaABeatsSent += 1
+          } else {
+            dut.io.dmaA.rsp.valid.poke(false.B)
+            dut.io.dmaA.rsp.payload.data.poke(0.U)
+            dut.io.dmaA.rsp.payload.err.poke(false.B)
           }
         } else {
           dut.io.dmaA.rsp.valid.poke(false.B)
@@ -304,17 +312,18 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
 
       
         // --- DMA-C (C WrOnly) 响应逻辑：逐 beat 接收 store ---
-        // cDma 逐 beat 发 req{addr,data}（新协议无 grant/len，一拍一行），
-        // req.ready 常开，req 拍校验地址后在 fire 拍记录 store 日志
+        // P3 新架构：cDma 逐 beat 发 req{addr,data}（无 len，行内按 beatsPerRowEff
+        // 拆拍、拍内地址步进 cBeatAddrStep），req.ready 常开，req 拍硬对账地址后记录
         dut.io.dmaC.req.ready.poke(true.B)
         dut.io.dmaC.rsp.valid.poke(false.B)
         dut.io.dmaC.rsp.payload.err.poke(false.B)
 
         if (dut.io.dmaC.req.valid.peek().litToBoolean) {
           val reqAddr = dut.io.dmaC.req.payload.addr.peek().litValue.toLong
-          // [临时观察] DMA-C 期望序列仍按旧公式，先只打印 mismatch 不 fail
-          if (dmaCStoreBeats < expCAddrSeq.size && reqAddr != expCAddrSeq(dmaCStoreBeats) && dmaCStoreBeats < 8)
-            println(f"[cycle=$cycle%6d] DMA-C store beat #$dmaCStoreBeats addr MISMATCH: hw=0x$reqAddr%X exp=0x${expCAddrSeq(dmaCStoreBeats)}%X")
+          // P3 迁移：临时观察升级为硬对账（期望序列已换密集布局公共助手）
+          withClue(s"DMA-C store beat #$dmaCStoreBeats addr mismatch: ") {
+            reqAddr should be(expCAddrSeq(dmaCStoreBeats))
+          }
           if (dmaCStoreBeats < 4)
             println(f"[cycle=$cycle%6d] DMA-C store req addr=0x$reqAddr%08X")
           val writeData = dut.io.dmaC.req.payload.data.peek().litValue
@@ -402,35 +411,22 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       }
 
       done should be(true)
-      // 地址寻址完整性：三路 DMA 的 beat 数均与期望序列一致
-      //dmaABeatsSent should be(dmaATotalBeats)
-      //dmaBBeatsSent should be(dmaBTotalBeats)
-      //dmaCStoreBeats should be(expCAddrSeq.size)
+      // 地址寻址完整性：三路 DMA 的 beat 数均与期望序列一致（P3 迁移恢复硬断言）
+      dmaABeatsSent should be(dmaATotalBeats)
+      dmaBBeatsSent should be(dmaBTotalBeats)
+      dmaCStoreBeats should be(expCAddrSeq.size)
     }
 
     // ===== 写入 C 结果文件 =====
     println(s"[HiveCoreSimCase] Writing C result: ${cWriteLog.size} beats captured")
 
-    val cResult = Array.fill(M, N)(BigInt(0))
+    val cWriteLogSeq: Seq[(Long, BigInt)] = cWriteLog.toSeq
+    // P3 公共解析器：256-bit 密集拍 → (row, col) 元素矩阵（fp32 = 32-bit bits，
+    // 2 拍/行、拍内 8 元素低列号在低位），地址对账已在仿真循环内硬断言完成
+    val cBits = HiveSimCommon.parseDenseCWriteLog(cWriteLogSeq, outFmt = 0, M, N, totalN, cfg.cDmaExtW)
+    val cResult = cBits.map(_.map(b => BigInt(b & 0xFFFFFFFFL)))
 
-    // 解析 C 写入日志: 每个 beat 512 bits = 16 × 32-bit 值
-    // 简单策略: 按顺序将 beats 映射到 C 矩阵行
-    var cBeatIdx = 0
-    for ((addr, data) <- cWriteLog) {
-      val row = cBeatIdx % M
-      if (row < M) {
-        for (col <- 0 until math.min(totalN, N)) {
-          val elem = HiveSimCommon.extractBits(data, cEffW * (col + 1) - 1, cEffW * col)
-          val globalCol = (cBeatIdx / M) * totalN + col
-          if (globalCol < N) {
-            cResult(row)(globalCol) = elem
-          }
-        }
-      }
-      cBeatIdx += 1
-    }
-
-    HiveSimCommon.writeBigIntMatrixHex(s"$simDir/C_matrix.txt", cResult, cEffW)
+    HiveSimCommon.writeBigIntMatrixHex(s"$simDir/C_matrix.txt", cResult, 32)
 
     // C 矩阵浮点文件 - FP32 bit 转 float 后输出（与 A/B 侧 writeMatrixFloat 对称）
     val cFloat = cResult.map(_.map(b => HiveSimCommon.fp32BitsToFloat((b & 0xFFFFFFFFL).toLong)))
@@ -520,7 +516,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
     println(s"[HiveCoreSimCase] Output files written to $simDir/")
     println(s"  - A_matrix.txt (${M}x${K}, 16-bit hex)")
     println(s"  - B_matrix.txt (${K}x${N}, 16-bit hex)")
-    println(s"  - C_matrix.txt (${M}x${N}, ${cEffW}-bit hex)")
+    println(s"  - C_matrix.txt (${M}x${N}, 32-bit hex)")
     println(s"  - A_matrix_float.txt (${M}x${K}, float %.2f)")
     println(s"  - B_matrix_float.txt (${K}x${N}, float %.2f)")
     println(s"  - C_matrix_float.txt (${M}x${N}, float %.2f)")
@@ -531,23 +527,25 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
   }
 
   // ==========================================================================
-  // P1 缩位写回（cDmaExtW）端到端仿真：active 路径（行锁存 + 行内多拍拆分）
-  // 断言：逐拍写地址序列（拍内步进 E*4、行步进 n*4、tile 跳转 totalN*4）、
-  // 拍数 = nTile*M*(totalN/E)、密集打包内容（低列号在低位、尾拍高位零填充）
-  // 与软件参考模型（double GEMM + fp32 容差）对拍。注意缩位使写回拍数变多，
-  // 沿用 cBufferDepth=2048 避免 cPush 满触发 errState。
+  // P1 缩位写回（cDmaExtW）端到端仿真：行内多拍拆分（新架构 256-bit 密集布局）
+  // 【P3 迁移留痕】旧哨兵配置 320/160 违反 P0 isPow2 require（非 2 幂位宽），
+  // 用例改按合法 2 幂位宽承载原语义：256（默认，fp32 = E8 每行 2 拍，与原用例名
+  // 行为一致）与 128（最深合法拆分，fp32 = E4 每行 4 拍；原 160 哨兵位宽废止）。
+  // 断言：逐拍写地址序列（拍内步进 32B、行步进 n*4、tile 跳转 totalN*4、三角累积闭式）、
+  // 拍数 = nTile×M×beatsPerRow、密集打包内容（低列号在低位；fp32 行 512bit 恒被 2 幂总线
+  // 整除、无尾拍填充）与软件参考模型（double GEMM + fp32 容差）对拍。
   // ==========================================================================
 
   it should "run shrunk C writeback E8 2beats per row" in {
-    // cExtW = totalN*cEffW = 16*40 = 640；半宽 320 → E=8、每行 2 拍
-    runShrunkGemm(cDmaExtW = 320,
+    // P3 迁移：原 320 哨兵违反 isPow2 → 改默认 256：fp32 每行 2 拍（E=8，与原用例名行为一致）
+    runShrunkGemm(cDmaExtW = 256,
       waveName = "hivecore_shrunk_e8_sim.fst",
       testMangle = "should-run-shrunk-C-writeback-E8-2beats-per-row")
   }
 
   it should "run shrunk C writeback E4 4beats per row" in {
-    // 1/4 宽 160 → E=4、每行 4 拍（缩位最深的 2 幂分档）
-    runShrunkGemm(cDmaExtW = 160,
+    // P3 迁移：原 160 哨兵违反 isPow2 废止 → 改最深合法拆分 128：fp32 每行 4 拍（E=4）
+    runShrunkGemm(cDmaExtW = 128,
       waveName = "hivecore_shrunk_e4_sim.fst",
       testMangle = "should-run-shrunk-C-writeback-E4-4beats-per-row")
   }
@@ -568,9 +566,11 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
 
     val totalN = cfg.totalN         // 16
     val aEffW  = cfg.aEffW          // 16
-    val cEffW  = cfg.cEffW          // 40（40-bit 延迟规格化累加器）
-    val elemE  = cfg.cElementsPerBeat
-    val beatsPerRow = cfg.cBeatsPerRow
+    val cEffW  = cfg.cEffW          // 40（C buffer 行宽口径，写回经顶层 cvt 40→32 转换）
+    // P3 迁移：拍数/元素数改用公共助手（运行期语义 = fp32 32-bit 元素口径，
+    // 与硬件 WrOnly beatsPerRowEff 同源），旧局部复刻哨兵语义已删。
+    val elemE  = cfg.cDmaExtW / 32
+    val beatsPerRow = HiveSimCommon.cBeatsPerRow(0, totalN, cfg.cDmaExtW)
     require(beatsPerRow > 1, s"缩位用例要求 cBeatsPerRow>1，当前=$beatsPerRow")
 
     // --- 生成矩阵（与主用例同源：FP16，element = (row+1) + col*0.1）---
@@ -585,7 +585,11 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
     val aRowOff = K.toLong * (cfg.aW / 8)
     val aColOff = totalN.toLong * (aEffW / 8)
     val expAAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
-    for (_ <- 0 until aNTiles; kt <- 0 until aKTiles; m <- 0 until M)
+    // A 轮间行为（与主用例/硬件 RdOnly sNEXT_COL 同源）：每 nTile 轮末 curAddr 复位回
+    // aAddr（不带轮间列偏移），各轮地址序列完全重复；供数内容同样每轮重复。
+    // 【P3 迁移更正】原稿误加 nt*aColOff 轮间偏移致 beat#64 起地址对账失败，
+    // 现与主用例同公式对齐（轮信息只体现在供数内容模掉轮号，地址不含轮项）。
+    for (nt <- 0 until aNTiles; kt <- 0 until aKTiles; m <- 0 until M)
       expAAddrSeq += A_BASE + m * aRowOff + kt * aColOff
     val dmaATotalBeats = expAAddrSeq.size
     def genDmaABeat(idx: Int): BigInt = {
@@ -640,16 +644,11 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       data
     }
 
-    // --- DMA-C（active 缩位）期望地址序列：nTile 外 → M 行中 → 行内 beat 内；
-    // active 布局 4B/元素：行步进 = n*4、列 tile 步进 = totalN*4、拍内步进 = E*4。
-    // 硬件 curAddr 为增量式（行步进只加到末行、块间跳增量式），跨 tile 累积项与
-    // MxSpec expCAddrSeq 同构：tile nt 起点 = C_BASE + nt*(M-1)*行步进 + nt*(nt+1)/2*列步进 ---
-    val cRowOffAct = N.toLong * 4
-    val cColOffAct = totalN.toLong * 4
-    val beatStep = elemE.toLong * 4
-    val expCAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
-    for (nt <- 0 until aNTiles; m <- 0 until M; b <- 0 until beatsPerRow)
-      expCAddrSeq += C_BASE + nt.toLong * (M - 1) * cRowOffAct + nt.toLong * (nt + 1) / 2 * cColOffAct + m * cRowOffAct + b * beatStep
+    // --- DMA-C 期望地址序列（P3 密集布局，公共助手唯一推演源）：
+    // fp32 32-bit 元素口径：行步进 = n*4、tile 步进 = totalN*4、拍内步进 = 32B，
+    // 三角累积闭式块间跳转（金锚），遍历序 nt 外 × m 中 × 行内拍内 ---
+    val expCAddrSeq = HiveSimCommon.cAddrSeqDense(
+      C_BASE, M, N, totalN, outFmt = 0, cfg.cDmaExtW)
     val cWriteLog = scala.collection.mutable.ArrayBuffer[(Long, BigInt)]()
 
     println(s"[Shrunk-$elemE] Starting: M=$M N=$N K=$K totalN=$totalN cDmaExtW=$cDmaExtW E=$elemE beatsPerRow=$beatsPerRow")
@@ -715,24 +714,30 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
 
       while (!done && cycle < maxCycles) {
 
-        // --- DMA-A（同主用例：按序供数，地址软对账）---
+        // --- DMA-A（同主用例：req.valid 拍地址硬对账 + 按同下标供数；
+        // 供数/计数由 req.valid 驱动，避免 rsp.ready 恒真致空拍误计）---
         if (dmaABeatsSent < dmaATotalBeats) {
           if (dut.io.dmaA.req.valid.peek().litToBoolean) {
             val cmdAddr = dut.io.dmaA.req.payload.addr.peek().litValue.toLong
-            if (cmdAddr != expAAddrSeq(dmaABeatsSent) && dmaABeatsSent < 8)
-              println(f"[cycle=$cycle%6d] DMA-A beat #$dmaABeatsSent addr MISMATCH: hw=0x$cmdAddr%X exp=0x${expAAddrSeq(dmaABeatsSent)}%X")
+            withClue(s"DMA-A beat #$dmaABeatsSent addr mismatch: ") {
+              cmdAddr should be(expAAddrSeq(dmaABeatsSent))
+            }
+            dut.io.dmaA.rsp.valid.poke(true.B)
+            dut.io.dmaA.rsp.payload.data.poke(genDmaABeat(dmaABeatsSent).U)
+            dut.io.dmaA.rsp.payload.err.poke(false.B)
+            dmaABeatsSent += 1
+          } else {
+            dut.io.dmaA.rsp.valid.poke(false.B)
+            dut.io.dmaA.rsp.payload.data.poke(0.U)
+            dut.io.dmaA.rsp.payload.err.poke(false.B)
           }
-          dut.io.dmaA.rsp.valid.poke(true.B)
-          dut.io.dmaA.rsp.payload.data.poke(genDmaABeat(dmaABeatsSent).U)
-          dut.io.dmaA.rsp.payload.err.poke(false.B)
-          if (dut.io.dmaA.rsp.ready.peek().litToBoolean) dmaABeatsSent += 1
         } else {
           dut.io.dmaA.rsp.valid.poke(false.B)
           dut.io.dmaA.rsp.payload.data.poke(0.U)
           dut.io.dmaA.rsp.payload.err.poke(false.B)
         }
 
-        // --- DMA-C（active 缩位）：逐拍写地址硬对账 + 密集打包内容记录 ---
+        // --- DMA-C：逐拍写地址硬对账 + 密集打包内容记录 ---
         dut.io.dmaC.req.ready.poke(true.B)
         if (dut.io.dmaC.req.valid.peek().litToBoolean) {
           val reqAddr = dut.io.dmaC.req.payload.addr.peek().litValue.toLong
@@ -740,7 +745,8 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
             reqAddr should be(expCAddrSeq(dmaCStoreBeats))
           }
           val writeData = dut.io.dmaC.req.payload.data.peek().litValue
-          // 打包契约：E×32-bit 密集段放总线低位，其余高位必须零填充（尾拍同理）
+          // 打包契约：E×32-bit 密集段放总线低位；fp32 行宽 512bit 被 2 幂总线整除，
+          // 每拍恰好满占用（无尾拍填充），高位越界部分天然为零（保留断言防回归）
           withClue(s"DMA-C shrunk store beat #$dmaCStoreBeats upper bits not zero-padded: ") {
             (writeData >> (elemE * 32)) should be(BigInt(0))
           }
@@ -795,23 +801,9 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       dmaCStoreBeats should be(expCAddrSeq.size)
       dmaCStoreBeats should be(aNTiles * M * beatsPerRow)
 
-      // ===== C 重建：遍历序 = nt 外 × m 中 × 行内 beat 内；
-      // 密集打包解码：元素 i 占 beat 的 [32*(i+1)-1 : 32*i]（低列号在低位），
-      // 全局列 = nt*totalN + beatInRow*E + i =====
-      val cResult = Array.fill(M, N)(BigInt(0))
-      var cBeatIdx = 0
-      for ((_, data) <- cWriteLog) {
-        val nt = cBeatIdx / (M * beatsPerRow)
-        val inBlock = cBeatIdx % (M * beatsPerRow)
-        val row = inBlock / beatsPerRow
-        val beatInRow = inBlock % beatsPerRow
-        for (i <- 0 until elemE) {
-          val globalCol = nt * totalN + beatInRow * elemE + i
-          if (globalCol < N)
-            cResult(row)(globalCol) = HiveSimCommon.extractBits(data, 32 * (i + 1) - 1, 32 * i)
-        }
-        cBeatIdx += 1
-      }
+      // ===== C 重建：P3 公共解析器（遍历序/拍内列位语义与硬件同源）=====
+      val cBits = HiveSimCommon.parseDenseCWriteLog(cWriteLog.toSeq, outFmt = 0, M, N, totalN, cfg.cDmaExtW)
+      val cResult = cBits.map(_.map(b => BigInt(b & 0xFFFFFFFFL)))
 
       // ===== 数值校验：C = A×B（FP16 输入，fp32 累加，经 40→32 规格化写出）=====
       // 参考结果用 double 计算，容差与主用例一致（相对 ≤1e-2 或绝对 ≤1e-2）
@@ -844,40 +836,46 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
   }
 
   // ==========================================================================
-  // P2 精度转换（outFmt）端到端仿真：regs(7) bit(12,11) 运行期选择写回格式。
+  // P2 精度转换（outFmt）端到端仿真：regs(7) 运行期选择写回格式（P0 扩 4-bit：
+  // Cat(bit16, bit[13:11])，低 3 位旧编码逐字兼容：1=fp16/2=bf16）。
   // 断言：逐拍写地址序列（行步进 n*outElemBytes、tile 跳转 totalN*outElemBytes、
-  // 拍内步进 E*outElemBytes）、拍数（拍数与格式无关，恒 totalN/E）、
+  // 拍内步进 = (cDmaExtW/16)×2B）、拍数 = ceil(totalN×16/cDmaExtW)、
   // 16-bit 密集打包内容与高位零填充；crafted 矩阵构造严格锚点：
   //   fp16：C[0][0]饱和+65504(0x7BFF)、C[1][0]饱和-65504(0xFBFF)、
   //         j=0 且 i>=4 均饱和（512×行和 > 65504）、row2 全零（A row2=0）、
   //         C[3][1]=32×0.0005×0.002=3.2e-5 < 2^-14 → FTZ 零；
   //   其余元素解码后与 double GEMM 容差对比（相对 ≤1e-2 或绝对 ≤1e-2）。
-  // outFmt 默认 00 等价性：既有主用例与缩位用例 regs(7)=0（不写 outFmt 位）
+  // 【P3 迁移留痕】旧哨兵 0（满宽）/320 违反 P0 isPow2 require：满宽语义由默认 256 承载（16-bit ×
+  // totalN=16 恰好 1 拍/行满占用）；原 320 的 E8 深拆分语义由 128（最深合法 2 幂、
+  // 16-bit 下 E=8 每行 2 拍）承载。
+  // outFmt 默认 0000 等价性：既有主用例与缩位用例 regs(7)=0（不写 outFmt 位）
   // 全绿，已证明默认行为与重构前逐字一致，不再单独设用例。
   // ==========================================================================
 
   it should "run fp16 out GEMM RNE full width" in {
-    runOutFmtGemm(outFmt = 1, rnd = 0, cDmaExtW = 0,
+    // P3 迁移：原 0 哨兵（满宽）废止 → 默认 256（16-bit 1 拍/行满占用）
+    runOutFmtGemm(outFmt = 1, rnd = 0, cDmaExtW = 256,
       waveName = "hivecore_outfmt_fp16_rne_sim.fst",
       testMangle = "should-run-fp16-out-GEMM-RNE-full-width")
   }
 
   it should "run fp16 out GEMM RTZ full width" in {
-    runOutFmtGemm(outFmt = 1, rnd = 1, cDmaExtW = 0,
+    runOutFmtGemm(outFmt = 1, rnd = 1, cDmaExtW = 256,
       waveName = "hivecore_outfmt_fp16_rtz_sim.fst",
       testMangle = "should-run-fp16-out-GEMM-RTZ-full-width")
   }
 
   it should "run bf16 out GEMM RNE full width" in {
-    runOutFmtGemm(outFmt = 2, rnd = 0, cDmaExtW = 0,
+    runOutFmtGemm(outFmt = 2, rnd = 0, cDmaExtW = 256,
       waveName = "hivecore_outfmt_bf16_rne_sim.fst",
       testMangle = "should-run-bf16-out-GEMM-RNE-full-width")
   }
 
   it should "run fp16 out GEMM RNE shrunk E8" in {
-    // 缩位 × 降精度组合：cDmaExtW=320（E=8、每行 2 拍）+ fp16 输出，
-    // 拍内步进 E×2B=16、行步进 N×2B=64、高位零填充断言 E×16 位以上全 0
-    runOutFmtGemm(outFmt = 1, rnd = 0, cDmaExtW = 320,
+    // P3 迁移：原 320 哨兵违反 isPow2 → 改 128（最深合法 2 幂）：16-bit 输出下
+    // E=8、每行 2 拍（与原用例名行为一致），拍内步进 16B、行步进 N×2B、
+    // 高位零填充断言保留（满占用时天然为零，防回归）
+    runOutFmtGemm(outFmt = 1, rnd = 0, cDmaExtW = 128,
       waveName = "hivecore_outfmt_fp16_rne_shrunk_e8_sim.fst",
       testMangle = "should-run-fp16-out-GEMM-RNE-shrunk-E8")
   }
@@ -885,16 +883,16 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
   it should "run fp16 out GEMM RUP full width" in {
     // 方向性舍入端到端（寄存器→转换模块完整链路）：fp16 + rnd=RUP，
     // 正数被截断位非零时向 +∞ 增大；期望由独立软件参考模型对拍（容差 1e-2）
-    runOutFmtGemm(outFmt = 1, rnd = 3, cDmaExtW = 0,
+    runOutFmtGemm(outFmt = 1, rnd = 3, cDmaExtW = 256,
       waveName = "hivecore_outfmt_fp16_rup_sim.fst",
       testMangle = "should-run-fp16-out-GEMM-RUP-full-width")
   }
 
   it should "run bf16 out GEMM RNE shrunk E8" in {
-    // 16-bit 打包 × 深拆分组合：bf16 输出 + cDmaExtW=320（E=8、每行 2 拍），
-    // 覆盖 packed16 选路 + active 拍段切割（段低 E×16 位有效）与 2B 密集步进；
+    // P3 迁移：原 320 哨兵违反 isPow2 → 改 128（16-bit 打包 × 深拆分组合：
+    // E=8、每行 2 拍），覆盖 packed16 选路 + 行内拍段切割（段低 E×16 位有效）与 2B 密集步进；
     // 期望由独立软件参考模型对拍（容差 1e-2）
-    runOutFmtGemm(outFmt = 2, rnd = 0, cDmaExtW = 320,
+    runOutFmtGemm(outFmt = 2, rnd = 0, cDmaExtW = 128,
       waveName = "hivecore_outfmt_bf16_rne_shrunk_e8_sim.fst",
       testMangle = "should-run-bf16-out-GEMM-RNE-shrunk-E8")
   }
@@ -902,9 +900,9 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
   private def runOutFmtGemm(outFmt: Int, rnd: Int, cDmaExtW: Int,
                             waveName: String, testMangle: String): Unit = {
     require(outFmt == 1 || outFmt == 2, s"本用例族仅支持 16-bit 输出（1=fp16/2=bf16），当前=$outFmt")
-    val tag = s"OutFmt-$outFmt-rnd$rnd-E${if (cDmaExtW == 0) "FULL" else cDmaExtW.toString}"
+    val tag = s"OutFmt-$outFmt-rnd$rnd-E$cDmaExtW"
 
-    // --- 配置（与主用例同参数；cDmaExtW=0 满宽 / 320 缩位半宽）---
+    // --- 配置（与主用例同参数；cDmaExtW ∈ {256, 128} 合法 2 幂位宽）---
     val cfg = HiveCoreConfig(
       arrayN = 8,
       clusterM = 2,         // totalN = 16
@@ -918,8 +916,10 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
 
     val totalN = cfg.totalN
     val aEffW  = cfg.aEffW
-    val elemE  = cfg.cElementsPerBeat
-    val beatsPerRow = cfg.cBeatsPerRow
+    // P3 迁移：拍数/元素数改用公共助手（16-bit 元素口径，与硬件 WrOnly 同源），
+    // 旧局部复刻哨兵语义已删。256 → 1 拍/行满占用；128 → E=8 每行 2 拍。
+    val elemE  = cfg.cDmaExtW / 16
+    val beatsPerRow = HiveSimCommon.cBeatsPerRow(outFmt, totalN, cfg.cDmaExtW)
     val outElemBytes = 2L                 // fp16/bf16 均 2B/元素（与 HiveCore.cOutElemBytes 同源语义）
     val outElemBits  = 16
 
@@ -947,7 +947,11 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
     val aRowOff = K.toLong * (cfg.aW / 8)
     val aColOff = totalN.toLong * (aEffW / 8)
     val expAAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
-    for (_ <- 0 until aNTiles; kt <- 0 until aKTiles; m <- 0 until M)
+    // A 轮间行为（与主用例/硬件 RdOnly sNEXT_COL 同源）：每 nTile 轮末 curAddr 复位回
+    // aAddr（不带轮间列偏移），各轮地址序列完全重复；供数内容同样每轮重复。
+    // 【P3 迁移更正】原稿误加 nt*aColOff 轮间偏移致 beat#64 起地址对账失败，
+    // 现与主用例同公式对齐（轮信息只体现在供数内容模掉轮号，地址不含轮项）。
+    for (nt <- 0 until aNTiles; kt <- 0 until aKTiles; m <- 0 until M)
       expAAddrSeq += A_BASE + m * aRowOff + kt * aColOff
     val dmaATotalBeats = expAAddrSeq.size
     def genDmaABeat(idx: Int): BigInt = {
@@ -1000,14 +1004,11 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       data
     }
 
-    // --- DMA-C 期望地址：运行期 outElemBytes 步进（与 HiveCore.cOutElemBytes 同源）；
-    // 满宽 16-bit 输出时 beatsPerRow=1 仍走 active 语义布局（2B/元素密集打包）---
-    val cRowOffAct = N.toLong * outElemBytes
-    val cColOffAct = totalN.toLong * outElemBytes
-    val beatStep = elemE.toLong * outElemBytes
-    val expCAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
-    for (nt <- 0 until aNTiles; m <- 0 until M; b <- 0 until beatsPerRow)
-      expCAddrSeq += C_BASE + nt.toLong * (M - 1) * cRowOffAct + nt.toLong * (nt + 1) / 2 * cColOffAct + m * cRowOffAct + b * beatStep
+    // --- DMA-C 期望地址序列（P3 密集布局，公共助手唯一推演源）：
+    // 16-bit 元素口径：行步进 = n×2B、tile 步进 = totalN×2B、拍内步进 = (cDmaExtW/16)×2B，
+    // 三角累积闭式块间跳转（金锚），遍历序 nt 外 × m 中 × 行内拍内 ---
+    val expCAddrSeq = HiveSimCommon.cAddrSeqDense(
+      C_BASE, M, N, totalN, outFmt, cfg.cDmaExtW)
     val cWriteLog = scala.collection.mutable.ArrayBuffer[(Long, BigInt)]()
 
     println(s"[$tag] Starting: M=$M N=$N K=$K totalN=$totalN cDmaExtW=$cDmaExtW E=$elemE beatsPerRow=$beatsPerRow outElemBytes=$outElemBytes")
@@ -1050,8 +1051,10 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       }
 
       // ===== 配置寄存器（FP16 输入 + rnd + outFmt 打包进 regs(7)：
-      // [4:2]=rnd、[12:11]=outFmt；aFmt=FP16(0) 不写即默认）=====
-      val controlWord = ((rnd.toLong & 0x7) << 2) | ((outFmt.toLong & 0x3) << 11)
+      // [4:2]=rnd、outFmt 4-bit = Cat(bit16, bit[13:11])（低 3 位旧编码逐字兼容，
+      // 整数族 8/9/10 需 bit16，本族 fp16/bf16 不涉）；aFmt=FP16(0) 不写即默认）=====
+      val controlWord = ((rnd.toLong & 0x7) << 2) |
+        ((outFmt.toLong & 0x7) << 11) | ((outFmt.toLong >> 3) << 16)
       sendCmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, M, N)
       sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, K, A_BASE)
       sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, B_BASE, C_BASE)
@@ -1073,17 +1076,23 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
 
       while (!done && cycle < maxCycles) {
 
-        // --- DMA-A（按序供数，地址软对账打印）---
+        // --- DMA-A（req.valid 拍地址硬对账 + 按同下标供数；
+        // 供数/计数由 req.valid 驱动，避免 rsp.ready 恒真致空拍误计）---
         if (dmaABeatsSent < dmaATotalBeats) {
           if (dut.io.dmaA.req.valid.peek().litToBoolean) {
             val cmdAddr = dut.io.dmaA.req.payload.addr.peek().litValue.toLong
-            if (cmdAddr != expAAddrSeq(dmaABeatsSent) && dmaABeatsSent < 8)
-              println(f"[$tag cycle=$cycle%6d] DMA-A beat #$dmaABeatsSent addr MISMATCH: hw=0x$cmdAddr%X exp=0x${expAAddrSeq(dmaABeatsSent)}%X")
+            withClue(s"[$tag] DMA-A beat #$dmaABeatsSent addr mismatch: ") {
+              cmdAddr should be(expAAddrSeq(dmaABeatsSent))
+            }
+            dut.io.dmaA.rsp.valid.poke(true.B)
+            dut.io.dmaA.rsp.payload.data.poke(genDmaABeat(dmaABeatsSent).U)
+            dut.io.dmaA.rsp.payload.err.poke(false.B)
+            dmaABeatsSent += 1
+          } else {
+            dut.io.dmaA.rsp.valid.poke(false.B)
+            dut.io.dmaA.rsp.payload.data.poke(0.U)
+            dut.io.dmaA.rsp.payload.err.poke(false.B)
           }
-          dut.io.dmaA.rsp.valid.poke(true.B)
-          dut.io.dmaA.rsp.payload.data.poke(genDmaABeat(dmaABeatsSent).U)
-          dut.io.dmaA.rsp.payload.err.poke(false.B)
-          if (dut.io.dmaA.rsp.ready.peek().litToBoolean) dmaABeatsSent += 1
         } else {
           dut.io.dmaA.rsp.valid.poke(false.B)
           dut.io.dmaA.rsp.payload.data.poke(0.U)
@@ -1098,7 +1107,8 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
             reqAddr should be(expCAddrSeq(dmaCStoreBeats))
           }
           val writeData = dut.io.dmaC.req.payload.data.peek().litValue
-          // 打包契约：E×16-bit 密集段放总线低位，其余高位必须零填充（尾拍同理）
+          // 打包契约：E×16-bit 密集段放总线低位；16-bit×totalN=256bit 被 2 幂总线整除，
+          // 每拍恰好满占用（无尾拍填充），高位越界部分天然为零（保留断言防回归）
           withClue(s"[$tag] DMA-C store beat #$dmaCStoreBeats upper bits not zero-padded: ") {
             (writeData >> (elemE * outElemBits)) should be(BigInt(0))
           }
@@ -1149,30 +1159,17 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       done should be(true)
       dmaABeatsSent should be(dmaATotalBeats)
       dmaBBeatsSent should be(dmaBTotalBeats)
-      // 拍数断言：拍数与输出格式无关，恒 nTile × M × beatsPerRow（每拍 E 元素）
+      // 拍数断言：恒 nTile × M × beatsPerRow（拍数由格式与总线位宽运行期解码）
       dmaCStoreBeats should be(expCAddrSeq.size)
       dmaCStoreBeats should be(aNTiles * M * beatsPerRow)
 
-      // ===== C 重建：遍历序 = nt 外 × m 中 × 行内 beat 内；
-      // 16-bit 密集解码：元素 i 占 beat 的 [16*(i+1)-1 : 16*i]（低列号在低位）=====
-      val cResult = Array.fill(M, N)(BigInt(0))
-      var cBeatIdx = 0
-      for ((_, data) <- cWriteLog) {
-        val nt = cBeatIdx / (M * beatsPerRow)
-        val inBlock = cBeatIdx % (M * beatsPerRow)
-        val row = inBlock / beatsPerRow
-        val beatInRow = inBlock % beatsPerRow
-        for (i <- 0 until elemE) {
-          val globalCol = nt * totalN + beatInRow * elemE + i
-          if (globalCol < N)
-            cResult(row)(globalCol) = HiveSimCommon.extractBits(data, outElemBits * (i + 1) - 1, outElemBits * i)
-        }
-        cBeatIdx += 1
-      }
+      // ===== C 重建：P3 公共解析器（遍历序/拍内列位语义与硬件同源）=====
+      val cBits = HiveSimCommon.parseDenseCWriteLog(cWriteLog.toSeq, outFmt, M, N, totalN, cfg.cDmaExtW)
+      val cResult = cBits.map(_.map(_ & 0xFFFFL))
 
       // ===== 数值校验：严格锚点 + 容差对拍（double GEMM 参考）=====
       // 解码：fp16 → fp16ToFloat；bf16 → 高 16 位左移重建 fp32 bits
-      def decodeElem(bits: BigInt): Double = {
+      def decodeElem(bits: Long): Double = {
         val v = bits.toInt & 0xFFFF
         if (outFmt == 1) HiveSimCommon.fp16ToFloat(v).toDouble
         else HiveSimCommon.fp32BitsToFloat((v.toLong << 16) & 0xFFFFFFFFL).toDouble
@@ -1196,7 +1193,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       var mismatchCnt = 0
       var maxRelErr = 0.0
       for (i <- 0 until M; j <- 0 until N) {
-        val hwBits = cResult(i)(j).toInt & 0xFFFF
+        val hwBits = (cResult(i)(j) & 0xFFFFL).toInt
         if (isStrict(i, j)) {
           withClue(s"[$tag] strict anchor C($i,$j) bits mismatch: ") {
             hwBits should be(strictExpect(i, j))

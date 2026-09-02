@@ -31,13 +31,13 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     // 对应通道位宽供数（A/B 读）/收数（C 写），否则数据对齐错乱。
     // A 矩阵只读 DMA 外部通道（cmd: 读地址流; rsp: 读数据流，位宽 = aExtW）
     val dmaA = HiveCoreDMAExtReadOnlyIF(cfg, cfg.aExtW)
-    // C 结果写回 DMA 外部通道（req/grant + writeData 逐 beat 流，位宽 = cDmaExtWEff）。
-    // 【P1 缩位写回】默认 cDmaExtW=0 哨兵 → cDmaExtWEff=cExtW（满宽一拍一行，
-    // legacy bit-exact，出厂端口位宽不变）；显式缩位时行内拆 totalN/E 拍、
-    // 每拍 E 个元素密集打包（低列号在低位，尾拍高位零填充）。
+    // C 结果写回 DMA 外部通道（req/grant + writeData 逐 beat 流，位宽 = cDmaExtW）。
+    // 【P0 契约】cDmaExtW 默认改 256（只允许 2 的 N 次幂，废弃旧 0 哨兵 → cExtW=640
+    // 满宽一拍一行与 5B/元素布局，废弃动作在 P2 落地）；窄总线行内拆多拍、密集打包由
+    // P2 WrOnly 重构实现，本阶段只立契约（仿真套件可能失败，属中间态预期）。
     // 握手语义：WrOnly DMA 为逐 beat req/grant，len 恒 1（旧 DmaEngine 的
     // 单 burst len=M 协议已废弃），外部集成方需逐拍 grant + writeData.ready
-    val dmaC = new HiveCoreDMAExtWriteOnlyIF(cfg, cfg.cDmaExtWEff)
+    val dmaC = new HiveCoreDMAExtWriteOnlyIF(cfg, cfg.cDmaExtW)  // P2-清理: 端口位宽直取新契约参数
     // B 权重专用只读 DMA 外部通道（cmd: 读地址流; rsp: 读数据流，位宽 = bExtW）
     val dmaB = HiveCoreDMAExtReadOnlyIF(cfg, cfg.bExtW)
     // MX scale 只读 DMA 外部通道（仅 hasMx 生成，非 MX 配置不暴露，避免破坏旧 harness）：
@@ -64,9 +64,10 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // 0x06  REG_A/B/C_STRIDE  A/B/C 行步长（[3:0]/[7:4]/[11:8]，各 4bit）
   // 0x07  REG_CONTROL   [0]=clear_done (写1清除), [1:0]=fmt, [4:2]=rnd,
   //                     [5]=loadWMode (0=垂直加载, 1=水平 loadW 加载),
-  //                     (13,11)=outFmt (P2/P3a dmaC 写回输出格式，3-bit：
-  //                     000=fp32 默认/001=fp16/010=bf16/011=reserved 回落 000/
-  //                     100/101/110=mxfp8-E4M3/E5M2、mxfp4-E2M1 量化/111=reserved 降级 000),
+  //                     (16)+(13,11)=outFmt (C 写回 dmaC 输出格式，P0 扩 4-bit：
+  //                     Cat(bit16,bit[13:11])，0xxx 低 3 位逐字不变（0000=fp32 默认/0001=fp16/
+  //                     0010=bf16/0011=reserved 回落/0100・0101・0110=mx-E4M3/E5M2、mxfp4-E2M1 量化/
+  //                     0111=reserved 降级），1000/1001/1010=int32/int16/int8，1011..1111 reserved),
   //                     (15,14)=qBlockSize (P3a 量化块大小：00=8/01=16/10=32/11=64 元素/块)
   // 0x08  REG_STATUS    [0]=busy, [1]=done, [2]=err, [31:16]=progress (只读)
   // 0x09  REG_SCALE_A_ADDR  scaleA 基地址
@@ -86,15 +87,23 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   val scratchpad = Module(new HiveCoreScratchpad(cfg))
   // A 矩阵只读自主 DMA：bufWidth = 一整行 A（totalN*aEffW），深度 = aBufferDepth
   val aDma       = Module(new HiveCoreDmaRdOnly(cfg, bufWidth = cfg.totalN * cfg.aEffW, bufDepth = cfg.aBufferDepth))
-  // C 结果写回自主 DMA：bufWidth = 一整行 C（totalN*cEffW，bufPop 侧恒为整行宽、
-  // 每行只 pop 一次，Executor 侧背压语义不变）；总线侧位宽由 cfg.cDmaExtWEff
-  // 决定（默认哨兵 = cExtW；缩位时 WrOnly 内部行锁存后拆多拍发出）；
-  // hasFp 传入 cfg.hasFp：含浮点时 cDma 内部对写出数据做 40→32 延迟规格化
+  // C 结果写回自主 DMA（P2 两段式：cvt = 转换+行寄存器，cDma = 多拍发射器）：
+  // bufPop 消费顶层 cvt.out 转换后密集行（宽 totalN×32，行粒度 fire 即锁存）；
+  // 总线侧位宽 = cfg.cDmaExtW（P0 契约，默认 256），行内多拍拆分由 WrOnly 运行期落地；
+  // bufWidth/hasFp/hasMx 为 P2 签名保留参数（语义已死：规格化/量化硬件随 cvt 上移顶层）。
   val cDma       = Module(new HiveCoreDmaWrOnly(cfg, bufWidth = cfg.totalN * cfg.cEffW, hasFp = cfg.hasFp, hasMx = cfg.hasMx))
   // B 权重专用只读 DMA：bufWidth = 一整行权重（totalN*bW），深度 = bBufferDepth
   val bDma       = Module(new HiveCoreDmaRdOnly(cfg, bufWidth = cfg.totalN * cfg.bW, bufDepth = cfg.bBufferDepth))
   val executor   = Module(new HiveCoreExecutor2(cfg))
-  val hiveComb   = Module(new HiveComb(cfg.arrayN, cfg.clusterM, cfg.aW, cfg.bW, cfg.cW, cfg.supportedFmts))
+  // P2 两段式（裁定 4）：精度转换+行寄存器上移顶层（全设计唯一行寄存器在 cvt 内，
+  // 原 WrOnly 内嵌例化已删）：in ← cPop mux（storeGate 窗口）、out → cDma.bufPop、
+  // scaleOut → 顶层深 2 cScaleFifo（仅 hasMx）。
+  val cvt        = Module(new HiveOutCvt(cfg))
+  // 【任务90 收敛】HiveComb 传 cfg.cEffW（而非原始 cfg.cW）：cW=0 自动推导时
+  // HiveComb 内部仅 max(32, autoAccW)（=36）会撞其「含浮点 >= 40」require；
+  // 顶层 cfg.cEffW 已含 >=40 分支，两者口径对齐。显式 cW 配置下 cEffW=max(cW,bW)，
+  // 行为不变（HiveComb 内部同式）。HiveComb 本体禁动，仅在例化边界对齐口径。
+  val hiveComb   = Module(new HiveComb(cfg.arrayN, cfg.clusterM, cfg.aW, cfg.bW, cfg.cEffW, cfg.supportedFmts))
   // P4.2: MX scale DMA 提到外层用 Option 持有（P3 接线块内改用 .get 引用），
   //   以便下方 dmaErr 汇聚点引用其 io.err。非 MX 配置为 None（整块不例化），
   //   汇聚式逐字不变、bit-exact。位宽/深度与 P3 块内原例化一致。
@@ -104,8 +113,9 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   val aDmaScale = if (cfg.hasMx) Some(Module(new HiveCoreDmaScaleRd(cfg, isScaleB = false, bufWidth = 8,             bufDepth = cfg.scaleBufferDepth))) else None
   val bDmaScale = if (cfg.hasMx) Some(Module(new HiveCoreDmaScaleRd(cfg, isScaleB = true,  bufWidth = cfg.scaleRowW, bufDepth = cfg.scaleBufferDepth))) else None
   // P3b C 侧量化 scale 写回 DMA（新端口集：start/done/busy/err + dmaCScale 写通道）：
-  // 仅 hasMx 例化；数据源 = scratchpad cScaleFifo（cDma 量化行锁步 push）。
-  // start 门控 = executePulse & cQuantRun（cQuantRun = cOutFmtEff∈{100,101,110} 枚举，与 WrOnly isQuant 同源）。
+  // 仅 hasMx 例化；数据源 = 顶层深 2 cScaleFifo（P2 裁定 5 上移，唯一 scale 缓冲，
+  // cvt.scaleOut 供数）。start 门控 = executePulse & cQuantRun（cQuantRun = 低 3 位∈{4,5,6}
+  // 且 bit16=0 枚举，与 cvt 量化支路同源）。
   val cDmaScale = if (cfg.hasMx) Some(Module(new HiveCoreDmaScaleWr(cfg))) else None
 
   // ==========================================================================
@@ -130,27 +140,26 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   val executePulse = io.cmd.fire && io.cmd.payload.op === HiveCoreOp.EXECUTE
   // MX 运行期判据：非 MX 配置（!cfg.hasMx）编译期短路为 false，不生成比较逻辑，bit-exact。
   val mxRun: Bool = if (cfg.hasMx) DataFormat.isMx(regFile.aFmt) else false.B
-  // P3a dmaC 写回输出格式运行期有效值（与 HiveCoreDmaWrOnly.outFmtEff 同源，互指）：
-  //   浮点/MX 运行取 regFile.outFmt（regs(7)(13,11)，3-bit：000=fp32/001=fp16/010=bf16/
-  //   100..110=MX 量化，量化分支的地址/字节数由 P3b 接入，本阶段仅位宽适配）；
-  //   整数运行强制 000（透传，不做精度转换）。读取时机：calcConfig 为组合直供，
-  // cDma 在 execute 拍/行边界采样，与 aFmt/k 等其他 regFile 字段同拍一致（执行期间不变）。
-  val cOutFmtEff: UInt = if (cfg.hasFp || cfg.hasMx)
-    Mux(regFile.isFloat || mxRun, regFile.outFmt, 0.U(3.W)) else 0.U(3.W)
-  // 16-bit 输出统一判据（与 WrOnly.isFmt16 同源、互指）：仅 001=fp16 / 010=bf16
-  // 走 16-bit 密集布局；011=reserved 回落 fp32 语义（同 000），与数据选路同源。
-  // P3a 扩 3-bit 后判据逐字不动（===1/===2 在 3-bit 下仍仅命中 001/010）。
-  val cIsFmt16: Bool = cOutFmtEff === 1.U || cOutFmtEff === 2.U
-  // P3b 量化输出判据（与 WrOnly isQuant/isFmt8/isFmt4 同源、互指，三处同一判据源）：
-  // 量化判据统一为枚举白名单 cQuantRun = cOutFmtEff∈{100,101,110}（评审裁定修复：
-  // 原单比特 cOutFmtEff(2) 判据会让 111=reserved 命中量化通路，与「111 降级 000」
-  // 文档声明冲突）；改枚举后 111/011 完整回落 fp32（地址 4B/5B 布局、cScaleDma 不启动，
-  // 本处 start 门 = executePulse & cQuantRun）；非 hasMx 配置编译期死 false。
+  // dmaC 写回输出格式运行期有效值——P2 判据单源化：cOutFmtEff = regFile.outFmt，
+  // 全设计唯一源（同时供 cvt.io.outFmt、cDma.io.outFmt 与下方布局/步进判据）。
+  // 废除旧「整数运行强制 000 透传」判据（outFmtEff=(isFloat||mxRun)?outFmt:000，两处删除）：
+  // 整数族编码 1000/1001/1010 直接生效，族合法性由 P0 Executor 格式族交叉校验接管（违者 config-err）。
+  val cOutFmtEff: UInt = regFile.outFmt
+  // 16-bit 输出判据：001=fp16 / 010=bf16 / 1001=int16；011/0111=reserved 回落 fp32 语义。
+  val cIsInt16: Bool = cOutFmtEff === 9.U
+  val cIsInt8: Bool = cOutFmtEff === 10.U
+  val cIsFmt16: Bool = cOutFmtEff === 1.U || cOutFmtEff === 2.U || cIsInt16
+  // P3b 量化输出判据（与 WrOnly io.outFmt 同源）：枚举白名单 cQuantRun = 低 3 位∈{4,5,6}
+  // 且 bit16=0（0100/0101/0110）；111/011/1100 等 reserved 完整回落（不命中量化通路）。
+  // 非 hasMx 配置编译期死 false。
   val cQuantRun: Bool = if (cfg.hasMx) (cOutFmtEff === 4.U || cOutFmtEff === 5.U || cOutFmtEff === 6.U) else false.B
   val cIsFmt8: Bool = if (cfg.hasMx) (cOutFmtEff === 4.U || cOutFmtEff === 5.U) else false.B
   val cIsFmt4: Bool = if (cfg.hasMx) (cOutFmtEff === 6.U) else false.B
-  // 输出元素字节数：fp32=4B、fp16/bf16=2B（与 WrOnly 拍内步进同源）
-  val cOutElemBytes: UInt = Mux(cIsFmt16, 2.U, 4.U)
+  // 输出元素字节数三档（运行期）：fp32/int32/reserved 回落=4B、fp16/bf16/int16=2B、
+  // mxfp8/int8=1B（mxfp4 半字节不走本式，地址/步进另用 n>>1 / totalN>>1 专用分支）。
+  val cOutElemBytes: UInt = MuxCase(4.U(3.W), Seq(
+    cIsFmt16 -> 2.U(3.W),
+    (cIsFmt8 || cIsInt8) -> 1.U(3.W)))
   val calcConfig = Wire(HiveCoreExePreCalcConfig(cfg))
   calcConfig.mTile := (regFile.m + cfg.totalN.U - 1.U) / cfg.totalN.U
   calcConfig.nTile := (regFile.n + cfg.totalN.U - 1.U) / cfg.totalN.U
@@ -185,46 +194,13 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     cfg.totalN.U * (cfg.bW / 8).U)
   
   // ==========================================================================
-  // C 写回地址布局分界（P1 缩位写回 + P2 运行期 outFmt 接入）：
-  //   legacy（cBeatsPerRow==1，默认哨兵配置）：满宽一拍一行、规格化后零扩展回
-  //     40-bit 槽 → 5 字节/元素内存布局，逐字保留原公式 n*(cW/8)、totalN*(cW/8)，
-  //     金锚与既有软件零迁移。P2：仅当 outFmtEff≠fp32（满宽降精度，active 语义）
-  //     时改走运行期 outElemBytes 密集布局；outFmtEff==fp32（默认）逐字保留 5B 公式。
-  //   active（cBeatsPerRow>1，显式缩位）：每拍 E 元素密集打包（不再零扩展回 40 位槽），
-  //     行步进 = n×outElemBytes、列 tile 步进 = totalN×outElemBytes（运行期）。
-  //   outElemBytes = fp32?4:2，判据与 WrOnly 侧 outFmtEff 同源（上方 cOutFmtEff/cIsFmt16，
-  //   与 mxRun 同款运行期门控模式），保证地址模型与打包契约一致。
-  //   16-bit 判据统一为 cIsFmt16（仅 01/10），11=reserved 回落 fp32 布局。
+  // C 写回地址布局（P2 裁定 8 单式化，取代原 cBeatsPerRowMax==1/>1 × hasMx 四分支）：
+  //   行步进 = n×cOutElemBytes，列 tile 步进 = totalN×cOutElemBytes（运行期三档 4/2/1B）；
+  //   mxfp4 半字节沿用专用分支 n>>1 / totalN>>1（n 偶由 Executor 校验保证）。
+  //   reserved 回落：非量化/非 16/非 8 编码（含 0000 fp32 与 1011..1111）自然落 4B 档。
   // ==========================================================================
-  if (cfg.cBeatsPerRow == 1) {
-    if (cfg.hasMx) {
-      // P3b 量化分支：mxfp8 行步进 = n×1B、列步进 = totalN×1B；
-      // mxfp4 行步进 = n>>1、列步进 = totalN>>1（半字节/元素；n 偶由 Executor 校验保证）。
-      // 非量化分支逐字保留原式（cIsFmt16 两级选路）。
-      val qRowStep = Mux(cIsFmt4, regFile.n >> 1, regFile.n * 1.U)
-      val qColStep = Mux(cIsFmt4, cfg.totalN.U >> 1, cfg.totalN.U * 1.U)
-      calcConfig.cRowAddressOffset := Mux(cQuantRun, qRowStep,
-        Mux(cIsFmt16, regFile.n * cOutElemBytes, regFile.n * (cfg.cW / 8).U))
-      calcConfig.cColTileAddressOffset := Mux(cQuantRun, qColStep,
-        Mux(cIsFmt16, cfg.totalN.U * cOutElemBytes, cfg.totalN.U * (cfg.cW / 8).U))
-    } else {
-      calcConfig.cRowAddressOffset := Mux(cIsFmt16,
-        regFile.n * cOutElemBytes, regFile.n * (cfg.cW / 8).U)
-      calcConfig.cColTileAddressOffset := Mux(cIsFmt16,
-        cfg.totalN.U * cOutElemBytes, cfg.totalN.U * (cfg.cW / 8).U)
-    }
-  } else {
-    if (cfg.hasMx) {
-      // P3b 量化分支（active）：同上判据与步进公式；非量化逐字保留原式。
-      val qRowStep = Mux(cIsFmt4, regFile.n >> 1, regFile.n * 1.U)
-      val qColStep = Mux(cIsFmt4, cfg.totalN.U >> 1, cfg.totalN.U * 1.U)
-      calcConfig.cRowAddressOffset := Mux(cQuantRun, qRowStep, regFile.n * cOutElemBytes)
-      calcConfig.cColTileAddressOffset := Mux(cQuantRun, qColStep, cfg.totalN.U * cOutElemBytes)
-    } else {
-      calcConfig.cRowAddressOffset := regFile.n * cOutElemBytes
-      calcConfig.cColTileAddressOffset := cfg.totalN.U * cOutElemBytes
-    }
-  }
+  calcConfig.cRowAddressOffset := Mux(cIsFmt4, regFile.n >> 1, regFile.n * cOutElemBytes)
+  calcConfig.cColTileAddressOffset := Mux(cIsFmt4, cfg.totalN.U >> 1, cfg.totalN.U * cOutElemBytes)
 
   // --- P3b C 侧量化 scale 地址偏移（仅 hasMx 生成真实逻辑；非 MX 配置驱 0 死值）：
   // blk 由 qBlockSize 运行期解码（移位实现：blk = 8 << qBlockSize，log2(blk) = 3+qBlockSize）；
@@ -238,6 +214,18 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     calcConfig.cScaleRowAddressOffset := 0.U
     calcConfig.cScaleColTileAddressOffset := 0.U
   }
+
+  // P0/P2 契约：cBeatAddrStep = (cDmaExtW/elemBits)×elemBytes（运行期，按 cOutFmtEff），
+  // 供 WrOnly 拍内地址 = curAddr + beatCnt×cBeatAddrStep 消费。
+  // 元素位宽档 = fp32/int32/reserved 回落→32、fp16/bf16/int16→16、mxfp8/int8→8、mxfp4→4，
+  // 与 cvt 选段、WrOnly 拍数解码、上方地址布局同源；移位实现避免运行期除法器。
+  // mxfp4 沿用半字节专用分支：每拍字节数 = cDmaExtW/8（64-bit 行 → 1 拍）。
+  private val cElemBitsLog2: UInt = MuxCase(5.U(3.W), Seq(
+    cIsFmt16 -> 4.U(3.W),
+    (cIsFmt8 || cIsInt8) -> 3.U(3.W),
+    cIsFmt4 -> 2.U(3.W)))
+  calcConfig.cBeatAddrStep := Mux(cIsFmt4, (cfg.cDmaExtW / 8).U,
+    (cfg.cDmaExtW.U >> cElemBitsLog2) * cOutElemBytes)
 
   // ==========================================================================
   // bDma 控制接线：execute 起始拍与 Executor 同步启动，自主扫完整个 B 矩阵
@@ -413,20 +401,81 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   executor.io.bOccupancy   := scratchpad.io.bOccupancy
 
   // ==========================================================================
-  // C buffer pop mux: cDma(store 写回) 或 Executor(partial sum 读取) 分时复用
+  // C buffer pop mux: cvt(store 写回链) 或 Executor(partial sum 读取) 分时复用。
+  // P2：mux 结构与 !executor.io.cPop.ready 优先门逐字保留，仅 ready 源从
+  // cDma.bufPop.ready 换为 cvt.io.in.ready（两段式：cvt 先行接收转换）。
+  // 【P3 修复：两段式超前预取防护（P3 定位，恢复 pop 行 = cDma 锁存行不变量）】
+  // cvt 行寄存器与 cDma 行锁存解耦后，store 排空末期 cvt 可凭 in.ready 先行
+  // fire 而 cDma 本拍无法锁存（行锁存被占）→ 从共享 C FIFO 超前多弹一行滞留，
+  // 后续行整体错位。修复 = 把 cDma.io.bufPop.ready 折入消费门：pop 当且仅当
+  // cDma 本拍能锁存。无组合环：两个 ready 均由寄存器态驱动（cvt.holdValid /
+  // WrOnly lineValid），valid 方向不构成回路。
+  //
+  // 【P3 修复 2 已撤销（P3 回归实证留痕）】原方案曾在此加块行计数器闸断「末行
+  // 锁存拍」消费（blkRowCnt/lastLineLatching），诊断假设为「块末单拍窗口超弹」；
+  // 但二分实验证明该门闸断的恰是末行本身的合法消费拍（该拍 cPop 载荷即末行数据，
+  // 并非第 m+1 行）→ cvt 与 cDma 消费节奏脱拍：量化运行时 scale 行与数据行失步、
+  // 大块用例数据通道中途停摆（M=32 实测 C=35/64 死锁、CSCALE 行序错位，
+  // MxSpec/QuantSpec 同形态复现）。撤销后 MxSpec multi-pass 单例即转绿。
+  // 原「512 处数值错行」观察由上方 bufPop.ready 折入修复单独覆盖。
   // ==========================================================================
-  scratchpad.io.cPop.ready := Mux(executor.io.cStoreGate, cDma.io.bufPop.ready, executor.io.cPop.ready)
+  // 【P3 修复 2（块末行窗口竞态防护：末行锁存后关收行门，重实版）】
+  // 历史：首版用顶层 blkRowCnt/lastLineLatching（cDma.bufPop.fire 口径）在「末行消费拍」
+  // 闸断 → 闸掉的恰是末行本身的合法消费拍（二分实证）被撤销；撤销后末行锁存后窗口
+  // 超弹回归（LoadWSpec/QuantSpec nt=1 块数据错位复现）。本版改用 WrOnly 内部收行计数
+  // blkRxCnt 导出的 blkRxFull：本块收满 m 行（末行已锁存）后关上游消费门，
+  // 不阻断末行本身；doneBlock 归零后自然重开。无组合环：计数为寄存器态。
+  private val blkRxFull = cDma.io.blkRxFull
+  // 【S-Ken4 评审项】blkRxFull 由 WrOnly bufPop.fire 口径记账，同拍直通竞态下晚一拍关门（P3 修复 3），
+  // 已被 blkLatchFull（cvt.in.fire 口径）完全替代为实际闸门源（见下方 cPop.ready 与 cvt.in.valid）。
+  // blkRxFull 保留为 WrOnly 内部统计输出，不再作为顶层闸门源，无硬件副作用。
+  // 【P3 修复 3（块边界同拍直通竞态：blkRxFull 晚一拍关门，Tina/任务90）】
+  // 根因（typical 双MX M=32 实证，DBG2/DBG3 对账）：cvt 背靠背直通时「释放行 m」与
+  // 「锁存行 m+1」发生在同一拍，而 blkRxFull 按 WrOnly bufPop.fire（=行释放）记账，
+  // 该拍寄存器态仍为 m-1 → 闸门大开，cvt 把下一块的首行锁存进来（实测：nt0 写回窗
+  // 口 cPop=33 拍，第 33 行 = nt1-kt0 partial row0）。双重损伤：①该行滞留 cvt 行寄存，
+  // 下一写回窗口作为 tile1 首行发出（tile1 beat0 = 量化后的 kt0-only partial）；
+  // ②回灌侧丢失该 partial 行 → nt1-kt1 回灌整体移一拍（POPR=63/64，POPR==PUSH[1:]），
+  // tile1 全段数据错。
+  // 修复：改按 cvt.in.fire（=行锁存）记账。cvt 行寄存器唯一一份，第 m 次锁存当拍
+  // holdValid 置真，下一次锁存必先等释放（≥1 拍后），届时计数已达 m → 闸已关，
+  // 无同拍竞态。blkLatchFull 为实际闸门源，blkRxFull 仅保留为 WrOnly 内部输出（见 S-Ken4）。
+  private val blkLatchCnt = RegInit(0.U(cfg.mnkWidth.W))
+  when(cvt.io.in.fire) { blkLatchCnt := blkLatchCnt + 1.U }
+  when(cDma.io.doneBlock || executePulse) { blkLatchCnt := 0.U }  // 块末/重启归零（last-connect）
+  private val blkLatchFull = blkLatchCnt === regFile.m
+  scratchpad.io.cPop.ready := Mux(executor.io.cStoreGate, cvt.io.in.ready && cDma.io.bufPop.ready && !blkLatchFull, executor.io.cPop.ready)
 
   executor.io.cPop.valid   := scratchpad.io.cPop.valid
   executor.io.cPop.payload := scratchpad.io.cPop.payload
   executor.io.cPeekDone := cDma.io.doneBlock
-  cDma.io.bufPop.valid   := scratchpad.io.cPop.valid && !executor.io.cPop.ready
 
   // ==========================================================================
-  // C buffer pop → cDma 直连（fp32 延迟规格化已下沉至 HiveCoreDmaWrOnly 内部，
-  // 由 hasFp 编译期参数控制是否生成规格化硬件）
+  // P2 转换链（裁定 4）：cPop → cvt.in（转换+行寄存器）→ cvt.out → cDma.bufPop。
+  // cvt.io.in.valid 追加 cStoreGate 门（关键接线决策）：store 窗口外 cPop.ready 被
+  // 路由给 Executor partial sum 读取，若无此门，cvt 会在 FIFO 不 pop 的拍自行
+  // fire 锁存「幻影行」（旧架构该门隐含在 cDma 状态门控内，两段式后必须显式化）。
   // ==========================================================================
-  cDma.io.bufPop.payload := scratchpad.io.cPop.payload
+  // 【P3 修复（同源双门）】in.valid 与上方 cPop.ready 必须同含
+  // cDma.io.bufPop.ready 与块满闸：否则 cvt.in.fire 与 FIFO pop 条件不一致，
+  // 仍会幻影锁存/块末超弹。块满闸用 blkLatchFull（按锁存口径，见上方 P3 修复 3）。
+  cvt.io.in.valid := scratchpad.io.cPop.valid && !executor.io.cPop.ready && executor.io.cStoreGate && cDma.io.bufPop.ready && !blkLatchFull
+  cvt.io.in.bits  := scratchpad.io.cPop.payload
+  cvt.io.outFmt   := cOutFmtEff          // 判据单源化（全设计唯一源）
+  cvt.io.rnd      := regFile.rnd
+  cvt.io.blkSel   := regFile.qBlockSize
+  // nEff = min(totalN, n − nCnt×totalN)：nCnt 由 cDma 新增输出口回供，顶层组合算；
+  // 位宽截段防 := 宽度不匹配（nCnt 上界 = nTile−1，减法无下溢）。
+  private val cNRemain = regFile.n - cDma.io.nCntOut * cfg.totalN.U
+  private val nEffW = log2Up(cfg.totalN + 1)
+  cvt.io.nEff := Mux(cNRemain >= cfg.totalN.U, cfg.totalN.U(nEffW - 1, 0), cNRemain(nEffW - 1, 0))
+
+  // cvt.out → cDma.bufPop（行粒度，fire 即锁存进 WrOnly 行寄存器）；
+  // out.ready 透传 WrOnly 末拍接受决定（行锁存空才收新行）。
+  cDma.io.bufPop.valid   := cvt.io.out.valid
+  cvt.io.out.ready       := cDma.io.bufPop.ready
+  cDma.io.bufPop.payload := cvt.io.out.bits
+  cDma.io.outFmt         := cOutFmtEff   // 拍数解码唯一判据源（与 cvt 同源）
   cDma.io.bufOccupancy   := scratchpad.io.cOccupancy
 
   // ==========================================================================
@@ -555,29 +604,40 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // ==========================================================================
   // P3b: C 侧量化 scale 写回通道（仅 hasMx 生成；非 MX 配置不例化/不接线）
   //   - cScaleDma（HiveCoreDmaScaleWr）：start = executePulse & cQuantRun
-  //     （cQuantRun = cOutFmtEff∈{100,101,110} 枚举，与 WrOnly isQuant 同源；非量化运行永不启动）；
-  //   - 数据流：cDma 量化行 pop 拍同拍 push scaleRow → cScaleFifo → cScaleDma 自主写外；
+  //     （非量化运行永不启动）；
+  //   - 数据流（P2 裁定 5）：cvt.scaleOut → 顶层深 2 cScaleFifo（唯一 scale 缓冲）
+  //     → cScaleDma 自主写外；
   //   - 完成序：executor.io.dmaCBusy 已 OR cScaleDma.busy（上方），drain 等 scale 写完；
   //   - err 进 dmaErr 汇聚（上方 hasMx 分支）。
   // ==========================================================================
   if (cfg.hasMx) {
     cDmaScale.get.io.start      := executePulse & cQuantRun
+    // 【C1 修复】abort：非量化运行 EXECUTE 拍强制 cDmaScale 回 sIDLE。解除 config-err 后
+    // cDmaScale 卡 sTRANSFER、busy 恒高、dmaCBusy OR 门封死后续非量化运行的死锁链。
+    // 量化运行（cQuantRun）拍 start 拉高，abort 无效（HiveCoreDmaScaleWr 内 abort&&!start 门控）。
+    cDmaScale.get.io.abort      := executePulse & !cQuantRun
     cDmaScale.get.io.baseAddr   := regFile.cScaleAddr
     cDmaScale.get.io.regFile    := regFile
     cDmaScale.get.io.calcConfig := calcConfig
     io.dmaCScale.get <> cDmaScale.get.io.dmaExtWrIF
 
-    // cDma.io.cScalePush → scratchpad cScaleFifo → cDmaScale.io.bufPop
-    scratchpad.io.cScalePush.get.valid   := cDma.io.cScalePush.get.valid
-    scratchpad.io.cScalePush.get.payload := cDma.io.cScalePush.get.payload
-    cDma.io.cScalePush.get.ready         := scratchpad.io.cScalePush.get.ready
+    // P2（裁定 5）：顶层深 2 cScaleFifo 是唯一 scale 缓冲（从 Scratchpad 上移，
+    // 深 64→2；原 cDma.cScalePush 锁步通路删除）：
+    //   cvt.scaleOut → cScaleFifo → cDmaScale.bufPop；flush 接 executor.flushC。
+    //   cvt 内已保证 out/scale 原子配对（scale 未就绪时进 dataDone 子态，out 不重发），
+    //   FIFO 满时自然反压 cvt。
+    val cScaleFifo = Module(new StreamFifo(UInt(cfg.cScaleRowW.W), 2))
+    cScaleFifo.io.push.valid   := cvt.io.scaleOut.valid
+    cScaleFifo.io.push.payload := cvt.io.scaleOut.bits
+    cvt.io.scaleOut.ready      := cScaleFifo.io.push.ready
+    cScaleFifo.io.flush        := executor.io.flushC
 
-    cDmaScale.get.io.bufPop.valid   := scratchpad.io.cScalePop.get.valid
-    cDmaScale.get.io.bufPop.payload := scratchpad.io.cScalePop.get.payload
-    scratchpad.io.cScalePop.get.ready := cDmaScale.get.io.bufPop.ready
-
-    // flush 跟随 C 通路：execute 起始拍与 flushC 同拍清空（与 C buffer 同范式）
-    scratchpad.io.flushScaleC.get := executor.io.flushC
+    cDmaScale.get.io.bufPop.valid   := cScaleFifo.io.pop.valid
+    cDmaScale.get.io.bufPop.payload := cScaleFifo.io.pop.payload
+    cScaleFifo.io.pop.ready         := cDmaScale.get.io.bufPop.ready
+  } else {
+    // 非 MX 配置：cvt 内部无量化支路，scaleOut.valid 恒 0，ready 恒高吸收。
+    cvt.io.scaleOut.ready := true.B
   }
 
   // ==========================================================================

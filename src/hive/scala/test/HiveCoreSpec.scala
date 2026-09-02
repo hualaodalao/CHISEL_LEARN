@@ -1,10 +1,12 @@
 import chisel3._
-import chisel3.simulator.EphemeralSimulator._
+import chisel3.simulator.scalatest._
 import _root_.circt.stage.ChiselStage
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-class HiveCoreSpec extends AnyFlatSpec with Matchers {
+// 【任务90 收敛】仿真用例由 EphemeralSimulator 迁至 ChiselSim：前者在当前环境下不生成
+// workdir-verilator/simulation-log.txt 导致 FileNotFoundException，后者经探针验证同配置全通。
+class HiveCoreSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   behavior of "HiveCore Module"
 
@@ -17,7 +19,10 @@ class HiveCoreSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "elaborate HiveCore with small config" in {
-    val cfg = HiveCoreConfig(arrayN = 4, clusterM = 1, aBufferDepth = 8, cBufferDepth = 8)
+    // 【任务90 收敛】P0 契约 require 族适配：hasMx 要求 totalN==16、HiveOutCvt 要求
+    // totalN 为 8 的整数倍，故小阵列取 4×2=8 并排除 MX；cDmaExtW 须落在 [64,256]。
+    val cfg = HiveCoreConfig(arrayN = 4, clusterM = 2, aBufferDepth = 16, cBufferDepth = 16,
+      supportedFmts = Set(DataFormat.FP16, DataFormat.INT8), cDmaExtW = 128)
     val v = ChiselStage.emitSystemVerilog(new HiveCore(cfg))
     v should include("module HiveCore")
   }
@@ -42,45 +47,41 @@ class HiveCoreSpec extends AnyFlatSpec with Matchers {
     v should include("module HiveCoreDmaWrOnly")
   }
 
-  // ===================== C 写回缩位（cDmaExtW）合法配置与 elaboration 冒烟 =====================
-  // P1：哨兵 0 = 满宽保持现状；合法缩位（cExtW/2、cExtW/4）派生量正确且可发射（active 路径）
+  // ===================== C 写回总线（cDmaExtW）合法配置与 elaboration 冒烟 =====================
+  // P0 契约：默认 256、只允许 2 的 N 次幂、[totalN*8, totalN*32]；旧哨兵/缩位派生量已删。
   it should "accept legal cDmaExtW shrink configs" in {
     val base = HiveCoreConfig()
-    // 哨兵 0：满宽一拍一行（出厂默认，非破坏）
-    base.cDmaExtWEff should be(base.cExtW)
-    base.cElementsPerBeat should be(base.totalN)
-    base.cBeatsPerRow should be(1)
-    // 半宽：E=8（8 元素/拍），每行 2 拍；缩位拍数变多的容量权衡由 cBufferDepth 吸收
-    val half = HiveCoreConfig(cDmaExtW = base.cExtW / 2)
-    half.cDmaExtWEff should be(base.cExtW / 2)
-    half.cElementsPerBeat should be(base.totalN / 2)
-    half.cBeatsPerRow should be(2)
-    // 1/4 宽：E=4，每行 4 拍
-    val quarter = HiveCoreConfig(cDmaExtW = base.cExtW / 4)
-    quarter.cElementsPerBeat should be(base.totalN / 4)
-    quarter.cBeatsPerRow should be(4)
+    // P3-清理: 旧哨兵派生量断言已废（cDmaExtWEff/cElementsPerBeat/cBeatsPerRow），
+    // 新契约派生量断言与断言语义由 P3 测试迁移重写；本处仅维持编译与新默认冒烟。
+    base.cDmaExtW should be(256)
+    base.cBeatsPerRowMax should be(base.totalN * 32 / 256)
+    // 新契约合法值：2 的 N 次幂且位于 [totalN*8, totalN*32]（totalN=16 → [128, 512]）
+    val half = HiveCoreConfig(cDmaExtW = 128)
+    half.cBeatsPerRowMax should be(half.totalN * 32 / 128)
+    val dbl = HiveCoreConfig(cDmaExtW = 512)
+    dbl.cBeatsPerRowMax should be(dbl.totalN * 32 / 512)
     // active 路径 elaboration 冒烟（行锁存 + 多拍拆分硬件可发射）。
     // 注：这里发射 WrOnly 模块而非顶层 HiveCore——默认 supportedFmts 下顶层的
-    // HiveComb 内部 cEffW 推导(36)<40 撞其自身 require，属既有失败（与本改动无关），
-    // 顶层发射由仿真套件（显式 cW=40）覆盖。
+    // HiveComb 内部 cEffW 推导(36)<40 撞其自身 require（C 写回重构本轮收紧，
+    // 非基线既有失败；顶层通过传 cfg.cEffW 规避），顶层发射由仿真套件（显式 cW=40）覆盖。
     val v = ChiselStage.emitSystemVerilog(new HiveCoreDmaWrOnly(half, bufWidth = half.totalN * half.cEffW, hasFp = half.hasFp, hasMx = half.hasMx))
     v should include("module HiveCoreDmaWrOnly")
-    val vq = ChiselStage.emitSystemVerilog(new HiveCoreDmaWrOnly(quarter, bufWidth = quarter.totalN * quarter.cEffW, hasFp = quarter.hasFp, hasMx = quarter.hasMx))
+    val vq = ChiselStage.emitSystemVerilog(new HiveCoreDmaWrOnly(dbl, bufWidth = dbl.totalN * dbl.cEffW, hasFp = dbl.hasFp, hasMx = dbl.hasMx))
     vq should include("module HiveCoreDmaWrOnly")
   }
 
-  // ===================== C 写回缩位（cDmaExtW）require 契约测试 =====================
-  // 非法缩位在 elaboration 期（case class 构造）即拒绝：非 cEffW 整数倍、
-  // 不整除 N、大于 cExtW、负值均抛 IllegalArgumentException。
+  // ===================== C 写回总线（cDmaExtW）require 契约测试 =====================
+  // P0 新契约非法值在 elaboration 期（case class 构造）即拒绝：非 2 幂、
+  // totalN*32 不整除、超出 [totalN*8, totalN*32]、负值均抛 IllegalArgumentException。
   it should "reject illegal cDmaExtW configs" in {
     val base = HiveCoreConfig()
-    // 非 cEffW 整数倍（100 % 40 != 0）：缩位必须按元素位宽拆拍
+    // 非 2 的 N 次幂（100）：新契约只允许 2 幂（同时拦截非整除）
     an[IllegalArgumentException] should be thrownBy HiveCoreConfig(cDmaExtW = 100)
-    // 不整除 N：E = 5，totalN(16) % 5 != 0 → 行内拆拍非整数拍，拒绝（用户需求「必须是 N 倍数所见」）
+    // 2 幂但 totalN*32(512) 不整除 → 拍数上界非整数，拒绝（8 元素/拍 × 40-bit 旧口径 320 同为非 2 幂拦截）
     an[IllegalArgumentException] should be thrownBy HiveCoreConfig(cDmaExtW = 5 * base.cEffW)
-    // 大于整行位宽 cExtW
-    an[IllegalArgumentException] should be thrownBy HiveCoreConfig(cDmaExtW = base.cExtW + base.cEffW)
-    // 负值（-40 % 40 == 0 能过首条，被 (0, cExtW] 范围条拦截）
+    // 大于上界 totalN*32（512）
+    an[IllegalArgumentException] should be thrownBy HiveCoreConfig(cDmaExtW = base.totalN * 32 * 2)
+    // 负值（被 isPow2 拦截）
     an[IllegalArgumentException] should be thrownBy HiveCoreConfig(cDmaExtW = -base.cEffW)
   }
 
@@ -93,7 +94,10 @@ class HiveCoreSpec extends AnyFlatSpec with Matchers {
   // ===================== Register Read/Write Tests =====================
 
   it should "write and read back registers" in {
-    val cfg = HiveCoreConfig(arrayN = 4, clusterM = 1, aBufferDepth = 4, cBufferDepth = 4)
+    // 【任务90 收敛】P0 契约适配：非 MX 格式集（免 totalN==16 约束与 scale 端口）、
+    // totalN 为 8 整数倍（4×2）、cBufferDepth ≥ 2*totalN、cDmaExtW=128 合法。
+    val cfg = HiveCoreConfig(arrayN = 4, clusterM = 2, aBufferDepth = 16, cBufferDepth = 16,
+      supportedFmts = Set(DataFormat.FP16), cDmaExtW = 128)
     simulate(new HiveCore(cfg)) { dut =>
       // Apply explicit reset
       dut.reset.poke(true.B)
@@ -174,7 +178,9 @@ class HiveCoreSpec extends AnyFlatSpec with Matchers {
   // ===================== Scratchpad Tests =====================
 
   it should "push and pop data through A buffer" in {
-    val cfg = HiveCoreConfig(arrayN = 4, clusterM = 1, aBufferDepth = 4, cBufferDepth = 4)
+    // 【任务90 收敛】P0 契约适配（同上：非 MX + totalN 8 整数倍 + cBufferDepth ≥ 2*totalN）
+    val cfg = HiveCoreConfig(arrayN = 4, clusterM = 2, aBufferDepth = 16, cBufferDepth = 16,
+      supportedFmts = Set(DataFormat.FP16), cDmaExtW = 128)
     simulate(new HiveCoreScratchpad(cfg)) { dut =>
       val dataWidth = cfg.totalN * cfg.aEffW
 

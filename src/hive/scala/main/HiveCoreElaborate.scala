@@ -25,14 +25,46 @@
   * P5.5 双配置发射：以同一入口分别 elaborate 两套配置，各自清理目录并打包独立
   * zip，互不覆盖。旧预期「非 MX 基线不暴露 dmaScaleA/dmaScaleB」随 MX 必选裁定作废。
   *
-  * 【P1/P2 dmaC 写回重构留痕】本入口两套配置均不传 cDmaExtW（哨兵 0 → 满宽 cExtW，
-  * 一拍一行，dmaC 端口位宽保持 640，非破坏性）；新增参数 cDmaExtW（缩位）与运行期寄存器
-  * regs(7)(13,11)=outFmt（3-bit：000=fp32 默认/001=fp16/010=bf16/011=reserved 回落 000/
-  * 100..110=mxfp8-E4M3/E5M2、mxfp4-E2M1 量化/111=reserved 降级 000，精度转换模块 HiveOutCvt）
-  * 需显式启用，默认不写 outFmt 位时出厂产物行为与重构前 bit-exact。
-  * 【对外软件契约变更留痕】显式启用缩位/降精度（cDmaExtW≠0 或 outFmt≠000）时，
-  * C 写回内存布局由 5B/元素槽改为 4B（fp32）/2B（fp16/bf16）密集，属对外软件契约变更，
-  * 读结果软件需同步迁移（默认配置不受影响）。
+  * 【P3 收敛留痕（任务90：dmaC 256 默认契约 + outFmt 4-bit，本次重发射产物已按此生成）】
+  *   1. 【对外破坏性】dmaC 写回数据位宽 640 → 256：两套配置均不传 cDmaExtW，
+  *      默认值由哨兵 0（满宽）改为 256；cDma 行粒度多拍发射（行内 256-bit 细分地址）。
+  *      cDmaExtW 契约：仅 2^N、区间 [totalN*8, totalN*32]、totalN*32 整除，违例构造期拒绝。
+  *   2. outFmt 寄存器扩为 4-bit = Cat(regs(7)(16), regs(7)(13,11))：低 3 位逐字兼容旧编码，
+  *      bit16 为整数族选择位，旧软件零迁移。
+  *   3. 新增整数族编码：1000/1001/1010 = int32/int16/int8（槽低位截取、行内密集低位优先、
+  *      有效段以上高位零填充）。
+  *   4. 整数运行必须显式写 outFmt：不写 outFmt 时 outFmt=0000（fp32 直出），族交叉校验
+  *      拦截非法组合（违者 config-err 拒绝启动）。
+  *   5. MX 运行 fp32 直出保留：MX 合法 outFmt ∈ {0,4,5,6}（0=fp32 直出为 P0 契约后受 v1
+  *      锚守护的合法路径；4/5/6 量化），否决「MX 强制量化」严格版。
+  *   6. 【对外软件契约废止】5B/元素槽旧布局废止：所有格式均密集行排（4B/2B/1B/0.5B 每元素），
+  *      拍内低列号低位、折行，读结果软件按新布局解析。
+  *   7. P3 主代码修复 5 项摘要：①HiveCore cPop.ready store 分支折入 cDma.bufPop.ready +
+  *      cvt.in.valid 追加 cStoreGate && cDma.bufPop.ready 门（防两段式幻影行）；②Executor
+  *      sNEXT_NK_TILE 门吞没竞态（等 cStoreGateReg 落门后推进、副作用移入通过分支）；
+  *      ③WrOnly 块末行窗口门控批准版（blkRxCnt 收行计数，blkRowCnt/lastLineLatching 变体
+  *      已删除）；④MX 校验放宽（outFmt ∈ {0,4,5,6}）；⑤HiveOutCvt scaleSent 锁存防 scale
+  *      重复 push 与假满死锁（释放判据放宽：scale 已交即可随 out.fire 释放）。
+  *      【S-Ken3 评审项】多 tile 写回由旧的并行流水改为串行推进（Executor sNEXT_NK_TILE
+  *      等 cStoreGate 落门），牲牲吐率换取 correctness-first 时序确定性，消除
+  *      两段式 cvt 无同步幕下的幻影行/块超弹竞态。
+  *
+  * 【数值核本轮变更留痕（W-Ken2 评审项）】以下两处为 C 写回重构期间的刻意数值修复，
+  * 非环境性/基线差异：
+  *   - Fp32.mul（HiveWorkUnit/HiveMacFpLazy 调用）：eAdj 指数补偿修正——原实现在
+  *     次正规乘数场景下指数偏差 1 位，修复后与 IEEE 754 单步乘积对齐。
+  *   - Fp32.add（HiveWorkUnit 调用）：桶形移位重写——原实现远路径对齐移位存在
+  *     sticky 位丢失缺陷，重写后 Far/Near 双路径与软件参考模型逐位一致。
+  * 两处均已通过 Fp32Test 单测 + 42 套件端到端位锚守护，后续任何触碰需重跑全量回归。
+  *
+  * 【「禁动区」精确界定（W-Ken3 评审项）】本文件及相关注释中的「禁动区」定义为
+  * 「C 写回重构 P0-P3 阶段未修改的模块/代码段」，不等同于「整个会话周期从未改动」：
+  *   - HiveComb、HiveWorker、HiveMacFp、HiveCvtOpMx 等 MAC/阵列本体在前序任务
+  *     （MX SIMD v2 / loadW 水平加载 / Fp32 数值修复）中已有重构，不在「禁动区」内。
+  *   - HiveCoreExecutor 的 sLOAD_A 离场门控（C2 修复）属评审发现的合法缺陷最小修复，
+  *     不改变「P0-P3 未修改」的禁动区界定。
+  *   - 禁动区典型包含：cDma sNEXT_N 三角累积地址模型、aDma/bDma RdOnly 主干遍历、
+  *     Scratchpad FIFO 行为。
   *
   * 【P3b MX 量化输出扩展留痕（声明区；重发射在验证阶段统一做，本阶段仅注释）】
   *   - 【端口变更】两套产物（hasMx）新增 dmaCScale 写通道端口（7 信号：

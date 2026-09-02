@@ -129,16 +129,25 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
   //         [7]    = bFmt 高 1 位（拼接 [7],[9:8] 得完整 3-bit bFmt）
   //         [9:8]  = bFmt 低 2 位
   //         [10]   = mixFmtEn (v1 恒 0：bFmt 跟随 aFmt)
-  //         [13:11] = outFmt (P3a dmaC 写回输出格式，3-bit 编码：
-  //                   000=fp32 默认 / 001=fp16 / 010=bf16 / 011=reserved 同 000 /
-  //                   100=mxfp8-E4M3 量化 / 101=mxfp8-E5M2 量化 / 110=mxfp4-E2M1 量化 /
-  //                   111=reserved 降级 000。兼容性：bit13=0 时旧软件语义逐字不变；
-  //                   仅浮点/MX 运行生效，整数运行强制透传，
-  //                   见 HiveCoreDmaWrOnly.outFmtEff；默认 0 → 既有软件不写该位行为不变。
+  //         [13:11]+[16] = outFmt (C 写回 dmaC 输出格式，P0 由 3-bit 扩为 4-bit：
+  //                   outFmt = Cat(bit16, bit[13:11])，4-bit 编码表：
+  //                   0xxx 低 3 位逐字不变：0000=fp32 默认 / 0001=fp16 / 0010=bf16 /
+  //                     0011=reserved 回落 fp32 / 0100=mxfp8-E4M3 量化 /
+  //                     0101=mxfp8-E5M2 量化 / 0110=mxfp4-E2M1 量化 /
+  //                     0111=reserved 降级 0000；
+  //                   1000=int32 / 1001=int16 / 1010=int8（P0 新增整数族：
+  //                     截断取低位、不饱和）；1011..1111 reserved（降级 0000，仅为 cvt 兆底；
+    //                     execute 拍先被族校验拦截——三族均无合法路径到达此段）。
+  //                   兼容性：outFmt 低 3 位在 bit16=0 时逐字兼容旧 3-bit 编码，
+  //                   其它位域已重打包（bit16 新增、qBlockSize 新增）；
+  //                   运行期格式族交叉校验（Executor 校验块）：fp 运行 ∈{0,1,2}
+  //                   （3/7 回落不报错）/ MX 运行 ∈{0,4,5,6}（0=fp32 直出，P0 前既有行为，
+  //                   MxSpec v1 fp32 锚赖以存在；4/5/6 量化）/ 整数运行 ∈{8,9,10}，
+  //                   违者 config-err（废除旧「整数强制透传 000」判据）。
   //                   16-bit 与量化输出均为两级舍入链：40→32 固定简化 RNE 规格化 +
   //                   降精度/量化运行期 rnd，方向性模式与理想单级舍入可能存在末位差异)
   //         [15:14] = qBlockSize (P3a 量化块大小：00=8 / 01=16 / 10=32 / 11=64 元素/块，
-  //                   块内元素共享一个 E8M0 scale；仅量化输出（outFmt 1xx）生效)
+  //                   块内元素共享一个 E8M0 scale；仅 outFmt ∈ {0b0100,0b0101,0b0110} 生效)
   // 0x08  REG_STATUS    [0]=busy, [1]=done, [2]=err, [31:16]=progress (只读)
   // 0x09  REG_SCALE_A_ADDR  scaleA 基地址
   // 0x0A  REG_SCALE_B_ADDR  scaleB 基地址
@@ -162,19 +171,28 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
   def bFmt = Cat(regs(7)(7), regs(7)(9, 8)).asTypeOf(DataFormat())
   // mixFmtEn: v1 恒 0（bFmt 跟随 aFmt）
   def mixFmtEn = regs(7)(10)
-  // P3a dmaC 写回输出格式 outFmt：regs(7) bit(13,11)，3-bit 编码表：
-  //   000=fp32（默认）、001=fp16、010=bf16、011=reserved（行为同 000）、
-  //   100=mxfp8-E4M3 量化、101=mxfp8-E5M2 量化、110=mxfp4-E2M1 量化、
-  //   111=reserved（降级 000）。
-  //   兼容性留痕：bit13=0 时（000..011）与原 2-bit 编码逐字等价（原 [12:11] 升级为
-  //   低 2 位），旧软件不写 bit13 行为逐拍不变；量化编码（1xx）共享 E8M0 块 scale，
-  //   量化语义（块 amax/全零块 0x00 哨兵/饱和与 inf-nan 映射）见 HiveOutCvt 类头注释。
-  //   运行期有效值 outFmtEff = (isFloat || isMx) ? outFmt : 000（整数累加值不做精度转换），
-  //   判据在 HiveCoreDmaWrOnly 与 HiveCore（地址步进）同源定义、互指。
+  // C 写回 dmaC 输出格式 outFmt（P0 扩 4-bit）：Cat(regs(7)(16), regs(7)(13,11))，4-bit 编码表：
+  //   0xxx 低 3 位逐字不变：0000=fp32（默认）、0001=fp16、0010=bf16、
+  //     0011=reserved（回落 0000）、0100=mxfp8-E4M3 量化、0101=mxfp8-E5M2 量化、
+  //     0110=mxfp4-E2M1 量化、0111=reserved（降级 0000）；
+  //   1000=int32、1001=int16、1010=int8（P0 新增整数族：每槽截断取低位、
+  //     不饱和——整数累加位宽由既有 require 防溢出）；
+  //   1011..1111 reserved（降级 0000，仅为 cvt 兆底；execute 拍先被族校验拦截，
+    //   三族均无合法路径到达此编码——与现行 0011/0111 reserved 不同）。
+  //   兼容性留痕：旧软件不写 bit16 时（0xxx）低 3 位语义逐拍不变（含 mxfp4 与
+  //   reserved 语义），零迁移；量化编码（0100/0101/0110）共享 E8M0 块 scale，
+  //   isQuant 判据 = 低 3 位 ∈ {4,5,6} 且 bit16=0；量化语义（块 amax/全零块 0x00 哨兵/
+  //   饱和与 inf-nan 映射）见 HiveOutCvt 类头注释。
+  //   【P0 族交叉校验】废除旧「整数强制透传 000」判据（outFmtEff=(isFloat||isMx)?outFmt:000）：
+  //   fp 运行（isFloat）outFmt ∈ {0,1,2}（reserved 0011/0111 保持回落语义不报错）；
+  //   MX 运行（isMx(aFmt)）∈ {0,4,5,6}（0000=fp32 非量化直出：P0 前既有硬件行为，
+  //   P3 校验放宽批准版保留——否决「MX 强制量化」严格版；4/5/6 为量化输出含 mxfp4=6）；
+  //   整数运行 ∈ {8,9,10}——违者 execute 拍置 errState（config-err，
+  //   显式报错而非静默错值，属有意设计的迁移引导）。校验在 HiveCoreExecutor sIDLE 校验块。
   //   【舍入链声明】16-bit 与量化输出均为两级舍入链：40→32 固定简化 RNE 规格化（fpNormalize40to32）
   //   + 降精度/量化运行期 rnd（HiveOutCvt roundUp16/roundUpN）；方向性模式（RDN/RUP/RMM）与
   //   理想单级舍入可能存在末位差异（两级舍入累积），软件对拍须同链重建。
-  def outFmt = regs(7)(13, 11)
+  def outFmt = Cat(regs(7)(16), regs(7)(13, 11))
   // P3a 量化块大小 qBlockSize：regs(7) bit(15,14)，00=8 / 01=16 / 10=32 / 11=64（元素/块）。
   // 块内元素共享一个 E8M0 scale（HiveOutCvt.blkSel 同源）；仅量化输出时生效，
   // 非量化运行写入无副作用。
@@ -224,6 +242,11 @@ class HiveCoreExePreCalcConfig(cfg: HiveCoreConfig) extends Bundle {
   // 仅 mxRun 启动时消费，非 MX 为死路。
   val scaleARowAddressOffset = UInt(cfg.addrWidth.W)
   val scaleAColTileAddressOffset = UInt(cfg.addrWidth.W)
+  // --- P0 C 写回重构：cDma 拍内地址步进（行内多拍拆分） ---
+  // cBeatAddrStep = (cDmaExtW/elemBits)×elemBytes（运行期：elemBits/elemBytes 由 outFmt
+  // 决定），供 P2 WrOnly 拍内地址 = curAddr + beatCnt×cBeatAddrStep 消费；
+  // P0 阶段只立契约（字段位宽/语义），无消费者，顶层暂占位驱 0。
+  val cBeatAddrStep = UInt(cfg.addrWidth.W)
 }
 object HiveCoreExePreCalcConfig {
   def apply(cfg: HiveCoreConfig) = new HiveCoreExePreCalcConfig(cfg)

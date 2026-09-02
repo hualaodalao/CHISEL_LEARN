@@ -70,6 +70,8 @@ class HiveComb(
   val cEffW: Int = accW
 
   // --- elaboration-time require ---
+  // 【破坏性变更留痕（C 写回重构本轮引入）】含 FP 族直接例化须显式 cW>=40，
+  // 否则构造期失败。顶层 HiveCore 通过传 cfg.cEffW（已含 >=40 分支）规避。
   if (hasFp)  require(cEffW >= 40,         s"含浮点格式时 cEffW($cEffW) 必须 >= 40（延迟规格化需要）")
   if (hasInt) require(cEffW >= aEffW + bW, s"含整数格式时 cEffW($cEffW) 必须 >= aEffW($aEffW) + bW($bW)")
 

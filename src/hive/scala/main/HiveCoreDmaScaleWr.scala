@@ -1,8 +1,9 @@
 /** HiveCoreDmaScaleWr — C 侧量化 scale 写回 DMA（P3b，dmaCScale 通道）。
   *
   * 职责：量化输出（outFmt 1xx）运行时，cDma（WrOnly）每写出一行量化密集行
-  * 即同拍产出一行 E8M0 块 scale（cvt.io.scaleRow，宽 cScaleRowW = totalN/8 字节），
-  * 经 Scratchpad cScaleFifo 缓冲后由本模块写到外部存储（基址 = regFile.cScaleAddr）。
+  * 即同拍产出一行 E8M0 块 scale（cvt.io.scaleOut，宽 cScaleRowW = totalN/8 字节），
+  * 经顶层深 2 cScaleFifo（P2 裁定 5：唯一 scale 缓冲，已从 Scratchpad 上移）缓冲后
+  * 由本模块写到外部存储（基址 = regFile.cScaleAddr）。
   *
   * 遍历几何（与 cDma 的 C 数据写回同序，保证 scale 行与量化数据行逐行对应）：
   *   内层沿 M 方向（实际 M 行 = regFile.m，每行一拍、地址 + cScaleRowAddressOffset
@@ -17,7 +18,7 @@
   *   每轮起始地址恒等于 baseAddr + nt*colTileOffset，无累积误差、易对账。
   *
   * 反压/在途记账（写通道简化版）：
-  *   - req 仅在 sTRANSFER 且 bufPop 有数据时发出，且被在途上限（cScaleFifo 深度）
+  *   - req 仅在 sTRANSFER 且 bufPop 有数据时发出，且被在途上限（顶层 cScaleFifo 深度 2）
   *     门控，防 rsp 延迟堆积超出计数位宽；
   *   - ostCredit 记在途写拍数（req.fire +1 / rsp.fire −1），sDONE 等 credit==0
   *     后发 done 脉冲回 sIDLE（写通道无回读数据，完成判据只看在途排空）。
@@ -29,13 +30,14 @@
   * 顶层 start 门控 = executePulse & cQuantRun（cQuantRun = outFmtEff∈{100,101,110} 枚举，
   * 与 WrOnly 量化判据同源），非量化运行本模块永不启动、不向外部发任何请求。
   *
-  * 【config-err 场景行为契约（评审留痕）】量化配置违约（blk>totalN/不整除、mxfp4
-  * 奇 n）时顶层 start 仍随 executePulse & cQuantRun 拉高（违约由 Executor 同拍置
-  * errState 拦截，start 门不感知），本模块照常进入 sTRANSFER；但 Executor 不进计算、
-  * cScaleFifo 恒空，本模块停留于 sTRANSFER（busy 恒高、done 不发），仅靠下次
-  * EXECUTE 的 start 重载恢复（重载分支复位计数/credit 并重锁存参数）。功能无害：
-  * FIFO 空时不发任何数据拍（负向用例已验证）。因此 io.done 不得在 config-err 场景
-  * 接入完成链（顶层完成序只经 executor.io.dmaCBusy OR 门，busy 高电不阻断 err 上报）。
+  * 【config-err 场景行为契约（评审留痕，C1 修复后更新）】量化配置违约
+  * （blk>totalN/不整除、mxfp4 奇 n）时顶层 start 仍随 executePulse & cQuantRun
+  * 拉高（违约由 Executor 同拍置 errState 拦截），本模块照常进入 sTRANSFER；但
+  * Executor 不进计算、cScaleFifo 恒空，本模块停留于 sTRANSFER（busy 恒高、done
+  * 不发）。恢复路径（C1 修复）：下次 EXECUTE 时若为量化运行（cQuantRun），start
+  * 重载恢复（既有路径）；若为非量化运行（!cQuantRun），顶层经 io.abort 强制回
+  * sIDLE（abort = executePulse & !cQuantRun），busy 归低，dmaCBusy OR 门解锁，
+  * 非量化运行正常进行。io.done 不得在 config-err 场景接入完成链。
   *
   * @param cfg HiveCore 配置（行宽固定 = cfg.cScaleRowW，每 8 元素块 1 字节）
   */
@@ -45,11 +47,17 @@ import chisel3.util._
 
 class HiveCoreDmaScaleWr(cfg: HiveCoreConfig) extends Module {
   private val rowW = cfg.cScaleRowW
-  private val depth = cfg.scaleBufferDepth
+  // P2（裁定 5）：唯一 scale 缓冲 = 顶层深 2 cScaleFifo（原 Scratchpad 内深度
+  // scaleBufferDepth 已删）；在途上限/credit 位宽随之收窄（log2Up(2+1)=2 bit）。
+  private val depth = 2
 
   val io = IO(new Bundle {
     // 控制/状态（无 peek 握手：cScaleFifo 解耦，启动后自主搬完所有行）
     val start = Input(Bool())                        // 启动脉冲（任意状态可重载）
+    // 【C1 修复】abort 输入：非量化运行 EXECUTE 拍强制回 sIDLE，解除 config-err 后
+    // busy 恒高死锁（顶层驱动 = executePulse & !cQuantRun）。与 start 互斥使用：
+    // start 拉高时 abort 无效（last-connect：start 路径覆盖 abort 路径）。
+    val abort = Input(Bool())                        // 非量化运行强制回 idle
     val done  = Output(Bool())                       // 完成脉冲
     val busy  = Output(Bool())                       // 忙标志
     val err   = Output(Bool())                       // 错误标志（rsp.err 锁存）
@@ -79,7 +87,7 @@ class HiveCoreDmaScaleWr(cfg: HiveCoreConfig) extends Module {
   val lineTarget  = RegInit(0.U(16.W))         // 内层行数 = regFile.m
   val lineCounter = RegInit(0.U(16.W))
   val nCnt = RegInit(0.U(cfg.mnkWidth.W))
-  val ostCredit = RegInit(0.U(log2Up(depth + 1).W))  // 在途写拍数
+  val ostCredit = RegInit(0.U(log2Up(depth + 1).W))  // 在途写拍数（上限 = 顶层 FIFO 深度 2）
   val errReg = RegInit(false.B)
 
   // ==========================================================================
@@ -202,5 +210,17 @@ class HiveCoreDmaScaleWr(cfg: HiveCoreConfig) extends Module {
     rowStep    := io.calcConfig.cScaleRowAddressOffset
     lineTarget := io.regFile.m
     nCnt       := 0.U
+  }
+
+  // 【C1 修复】abort：非量化运行 EXECUTE 拍强制回 sIDLE（解除 config-err 后
+  // cDmaScale 卡 sTRANSFER、busy 恒高、dmaCBusy OR 门封死后续运行的死锁链）。
+  // abort 仅在 !io.start 时生效（start 优先级更高：量化运行会拉 start）。
+  // 回 sIDLE 同拍清除 errReg/ostCredit/lineCounter/nCnt（与 start 重载同构）。
+  when(io.abort && !io.start) {
+    state       := sIDLE
+    errReg      := false.B
+    ostCredit   := 0.U
+    lineCounter := 0.U
+    nCnt        := 0.U
   }
 }

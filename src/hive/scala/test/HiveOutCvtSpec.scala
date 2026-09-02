@@ -1,15 +1,28 @@
-/** HiveOutCvt 单元测试（P2：精度转换模块对拍软件参考模型）。
+/** HiveOutCvt 单元测试（P1：握手化模块对拍软件参考模型）。
   *
   * 覆盖维度：
   *  - 位模式向量：±0、±1、1.5、-2.75、3.14159、1234.5678、0.001、65504/65520
   *    （饱和边界）、100000/-70000（溢出饱和）、2^-14 附近（下溢边界）、
   *    3e-5/1e-7（FTZ）、tie 舍入构造值、±inf、±NaN；
   *  - 5 种舍入模式 ×（fp16 / bf16）逐位对拍 HiveSimCommon.swFp32ToFp16/swFp32ToBf16；
-  *  - packed32 对拍 HiveSimCommon.swFpNormalize40to32（fp32 通路与现状内联
+  *  - out（fp32 选段）对拍 HiveSimCommon.swFpNormalize40to32（fp32 通路与现状内联
   *    规格化语义一致性）。
   *
+  * 【P1 握手化测试契约】所有用例经三 Stream 激励（替代旧纯组合 poke/peek）：
+  *  - driveRow：poke in.valid/in.bits 与 outFmt/rnd/blkSel/nEff，等 in.fire
+  *    （in.ready 拉起拍）后 step 一拍，行 + 配置锁存进行寄存器；
+  *  - recvRow：拉高 out.ready（量化行另拉 scaleOut.ready），等 out.valid 后
+  *    peek out.bits / scaleOut.bits，step 一拍提交 out.fire（量化行同拍
+  *    scaleOut.fire），断言量化行 scaleOut.valid 与 out.valid 同拍、
+  *    非量化行 scaleOut.valid 恒 0；
+  *  - 数值断言全部取自 out.bits 选段（低列号在低位）与 scaleOut.bits，
+  *    与握手化前 packed32/16/8/4/scaleRow 断言逐字等价。
+  *
   * 输入构造：fp32 bit → fp32BitsTo40 → 40-bit 槽（与硬件累加器落槽格式一致），
-  * 按 totalN 个一组 chunk poke lineIn。
+  * 按 totalN 个一组 chunk 经 in 送入。
+  *
+  * 【P1 新增用例】int32/int16/int8 截断单测（槽低位截取、高非零位丢弃验证）+
+  * out.ready 反压用例（行数据保持 + 行寄存器不被提前覆盖）。
   */
 
 import chisel3._
@@ -51,6 +64,64 @@ class HiveOutCvtSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveF
   private val rndLits: Seq[RoundingMode.Type] =
     Seq(RoundingMode.RNE, RoundingMode.RTZ, RoundingMode.RDN, RoundingMode.RUP, RoundingMode.RMM)
 
+  // ==========================================================================
+  // P1 握手激励公共函数
+  // ==========================================================================
+
+  /** fp32 bits 序列 → 一行 40 位槽（元素 0 在低位） */
+  private def buildLine(bitsSeq: Seq[Long]): BigInt = {
+    var line = BigInt(0)
+    for ((bits, i) <- bitsSeq.zipWithIndex) {
+      line |= HiveSimCommon.fp32BitsTo40(bits) << (cfg.cEffW * i)
+    }
+    line
+  }
+
+  /** 驱动一行进 in：poke 数据与全部配置输入，等 in.ready 后 step 一拍提交 in.fire
+    * （行 + 配置原子锁存）；结束时 deassert in.valid。 */
+  private def driveRow(dut: HiveOutCvt, line: BigInt, outFmt: Int, rnd: RoundingMode.Type,
+                       blkSel: Int = 0, nEff: Int = cfg.totalN): Unit = {
+    dut.io.in.valid.poke(true.B)
+    dut.io.in.bits.poke(line.U)
+    dut.io.outFmt.poke(outFmt.U)
+    dut.io.rnd.poke(rnd)
+    dut.io.blkSel.poke(blkSel.U)
+    dut.io.nEff.poke(nEff.U)
+    var guard = 0
+    while (!dut.io.in.ready.peek().litToBoolean) {
+      dut.clock.step()
+      guard += 1
+      assert(guard < 64, "driveRow: in.ready 长期未拉起（DUT 死锁）")
+    }
+    dut.clock.step()   // 本沿提交 in.fire → 行寄存器锁存
+    dut.io.in.valid.poke(false.B)
+  }
+
+  /** 消费一行：拉 out.ready（量化行另拉 scaleOut.ready），等 out.valid 后 peek
+    * out.bits（及量化行 scaleOut.bits），step 一拍提交 fire，随后撤 ready。
+    * 顺带断言握手契约：量化行 scaleOut.valid 与 out.valid 同拍；非量化行恒 0。 */
+  private def recvRow(dut: HiveOutCvt, quant: Boolean): (BigInt, BigInt) = {
+    dut.io.out.ready.poke(true.B)
+    if (quant) dut.io.scaleOut.ready.poke(true.B)
+    var guard = 0
+    while (!dut.io.out.valid.peek().litToBoolean) {
+      dut.clock.step()
+      guard += 1
+      assert(guard < 64, "recvRow: out.valid 长期未拉起（DUT 死锁）")
+    }
+    if (quant) {
+      assert(dut.io.scaleOut.valid.peek().litToBoolean, "量化行 scaleOut.valid 应与 out.valid 同拍")
+    } else {
+      assert(!dut.io.scaleOut.valid.peek().litToBoolean, "非量化行 scaleOut.valid 必须恒 0")
+    }
+    val data = dut.io.out.bits.peek().litValue
+    val scale = if (quant) dut.io.scaleOut.bits.peek().litValue else BigInt(0)
+    dut.clock.step()   // 本沿提交 out.fire（量化行同拍 scaleOut.fire）
+    dut.io.out.ready.poke(false.B)
+    if (quant) dut.io.scaleOut.ready.poke(false.B)
+    (data, scale)
+  }
+
   /** 单轮对拍：给定 outFmt（1=fp16，2=bf16）与 rnd（0..4），逐位对拍 */
   private def checkPacked16(outFmt: Int, rnd: Int): Unit = {
     val vec = testVectors
@@ -60,15 +131,10 @@ class HiveOutCvtSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveF
     var chunkIdx = 0
     simulate(new HiveOutCvt(cfg)) { dut =>
       for (chunk <- chunks) {
-        // 构造 lineIn：元素 0 在低位（槽 0 = bit[0..39]）
-        var line = BigInt(0)
-        for ((bits, i) <- chunk.zipWithIndex) {
-          line |= HiveSimCommon.fp32BitsTo40(bits) << (cfg.cEffW * i)
-        }
-        dut.io.lineIn.poke(line.U)
-        dut.io.outFmt.poke(outFmt.U)
-        dut.io.rnd.poke(rndLits(rnd))
-        val got = dut.io.packed16.peek().litValue
+        // 构造行：元素 0 在低位（槽 0 = bit[0..39]）
+        val line = buildLine(chunk)
+        driveRow(dut, line, outFmt, rndLits(rnd))
+        val (got, _) = recvRow(dut, quant = false)   // fp16/bf16 选段 = out 低 totalN×16 位
         for ((bits, i) <- chunk.zipWithIndex) {
           // 硬件管线：40 位槽 → 40→32 规格化（固定简化 RNE，零值归绝对 0 不保号）
           // → 32→16（rnd 5 模式），期望值必须同管线重建，不能直取原始 fp32 bits
@@ -94,20 +160,15 @@ class HiveOutCvtSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveF
     for (rnd <- 0 to 4) checkPacked16(outFmt = 2, rnd = rnd)
   }
 
-  it should "fp32 通路（packed32）与 fpNormalize40to32 软件模型逐位一致" in {
+  it should "fp32 通路（out 全宽选段）与 fpNormalize40to32 软件模型逐位一致" in {
     val vec = testVectors
     val padded = vec ++ Seq.fill((cfg.totalN - vec.size % cfg.totalN) % cfg.totalN)(0L)
     val chunks = padded.grouped(cfg.totalN).toSeq
     simulate(new HiveOutCvt(cfg)) { dut =>
       for (chunk <- chunks) {
-        var line = BigInt(0)
-        for ((bits, i) <- chunk.zipWithIndex) {
-          line |= HiveSimCommon.fp32BitsTo40(bits) << (cfg.cEffW * i)
-        }
-        dut.io.lineIn.poke(line.U)
-        dut.io.outFmt.poke(0.U)
-        dut.io.rnd.poke(RoundingMode.RNE)
-        val got = dut.io.packed32.peek().litValue
+        val line = buildLine(chunk)
+        driveRow(dut, line, outFmt = 0, rnd = RoundingMode.RNE)
+        val (got, _) = recvRow(dut, quant = false)
         for ((bits, i) <- chunk.zipWithIndex) {
           val expect = HiveSimCommon.swFpNormalize40to32(HiveSimCommon.fp32BitsTo40(bits))
           val actual = (got >> (32 * i)) & 0xFFFFFFFFL
@@ -122,10 +183,9 @@ class HiveOutCvtSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveF
   it should "饱和/溢出/FTZ 锚点值硬检查（fp16 RNE）" in {
     simulate(new HiveOutCvt(cfg)) { dut =>
       def pokeOne(bits: Long): Int = {
-        dut.io.lineIn.poke(HiveSimCommon.fp32BitsTo40(bits).U)
-        dut.io.outFmt.poke(1.U)
-        dut.io.rnd.poke(RoundingMode.RNE)
-        (dut.io.packed16.peek().litValue & 0xFFFF).toInt
+        driveRow(dut, HiveSimCommon.fp32BitsTo40(bits), outFmt = 1, rnd = RoundingMode.RNE)
+        val (got, _) = recvRow(dut, quant = false)
+        (got & 0xFFFF).toInt
       }
       pokeOne(floatToIntBits(100000.0f).toLong & 0xFFFFFFFFL) shouldBe 0x7BFF   // +65504 饱和
       pokeOne(floatToIntBits(-70000.0f).toLong & 0xFFFFFFFFL) shouldBe 0xFBFF   // -65504 饱和
@@ -139,11 +199,10 @@ class HiveOutCvtSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveF
 
   it should "fpNormalize40to32 舍入进位：尾数全 1 进位 → 指数 +1、尾数归零（独立期望值）" in {
     simulate(new HiveOutCvt(cfg)) { dut =>
-      dut.io.outFmt.poke(0.U)
-      dut.io.rnd.poke(RoundingMode.RNE)
       def pokeRaw40(raw: BigInt): BigInt = {
-        dut.io.lineIn.poke(raw.U)
-        dut.io.packed32.peek().litValue & BigInt(0xFFFFFFFFL)
+        driveRow(dut, raw, outFmt = 0, rnd = RoundingMode.RNE)
+        val (got, _) = recvRow(dut, quant = false)
+        got & BigInt(0xFFFFFFFFL)
       }
       // 构造 m31=0x7FFFFFFF（隐含 1 + 尾数位全 1）：lzc=0，规格化后
       // mant23=0x7FFFFF 全 1、guard=1、sticky=1 → 舍入必进位。
@@ -162,10 +221,9 @@ class HiveOutCvtSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveF
   it should "RMM tie/非 tie 定向用例：仅 tie（guard=1，不论 sticky）进位（独立期望值）" in {
     simulate(new HiveOutCvt(cfg)) { dut =>
       def pokeOne(bits: Long, outFmt: Int, rnd: RoundingMode.Type): Int = {
-        dut.io.lineIn.poke(HiveSimCommon.fp32BitsTo40(bits).U)
-        dut.io.outFmt.poke(outFmt.U)
-        dut.io.rnd.poke(rnd)
-        (dut.io.packed16.peek().litValue & 0xFFFF).toInt
+        driveRow(dut, HiveSimCommon.fp32BitsTo40(bits), outFmt, rnd)
+        val (got, _) = recvRow(dut, quant = false)
+        (got & 0xFFFF).toInt
       }
       // 构造值经 40→32 规格化无损（截断位均低于 bit7，guard/sticky 恒 0）。
       // fp16：保留 man(22,13)，guard=man(12)，sticky=man(11,0)
@@ -195,6 +253,8 @@ class HiveOutCvtSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveF
   // P3a 量化支路：5 种舍入 × {E4M3, E5M2, E2M1} × {blk=8, blk=16} 位级对拍 +
   // 饱和/全零块/FTZ/inf-nan/nEff 掩码锚点。期望值由 HiveSimCommon.swQuantBlock
   // 独立推导（同两级舍入链：40→32 固定简化 RNE + 量化运行期 rnd）。
+  // P1 握手化：元素码取自 out.bits 低位选段（mxfp8=低 totalN×8、mxfp4=低 totalN×4），
+  // scale 取自 scaleOut.bits；E2M1 用例 outFmt 输入改 4 位编码 0110（值 6，低 3 位语义不变）。
   // ============================================================================
 
   behavior of "HiveOutCvt 量化支路 (P3a: fp32 → MX 块共享 scale 量化)"
@@ -215,37 +275,28 @@ class HiveOutCvtSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveF
     }
   }
 
-  /** 单次 poke + 逐位对拍：元素码（packed8/packed4）+ scaleRow 全量比对。
+  /** 单次握手对拍：元素码（out 低位选段）+ scaleOut 全量比对。
     * fmt：4=E4M3 5=E5M2 6=E2M1；blkSel：0=8/1=16/2=32/3=64。 */
   private def pokeQuant(dut: HiveOutCvt, fmt: Int, rnd: Int, blkSel: Int, nEff: Int,
                         floats: Seq[Float], clueTag: String): Unit = {
     val bitsSeq = floats.map(f => floatToIntBits(f).toLong & 0xFFFFFFFFL)
-    var line = BigInt(0)
-    for ((bits, i) <- bitsSeq.zipWithIndex) {
-      line |= HiveSimCommon.fp32BitsTo40(bits) << (cfg.cEffW * i)
-    }
-    dut.io.lineIn.poke(line.U)
-    dut.io.outFmt.poke(fmt.U)
-    dut.io.blkSel.poke(blkSel.U)
-    dut.io.nEff.poke(nEff.U)
-    dut.io.rnd.poke(rndLits(rnd))
+    val line = buildLine(bitsSeq)
+    driveRow(dut, line, fmt, rndLits(rnd), blkSel, nEff)
+    val (gotRow, gotScale) = recvRow(dut, quant = true)
     // 同两级舍入链重建：40 位槽 → 40→32 固定简化 RNE 规格化 → 块量化期望
     val normSeq = bitsSeq.map(b => HiveSimCommon.swFpNormalize40to32(HiveSimCommon.fp32BitsTo40(b)))
     val (codes, scaleBytes) = HiveSimCommon.swQuantBlock(normSeq, rnd, fmt, blkSel, nEff)
     if (fmt == 6) {
-      val got4 = dut.io.packed4.peek().litValue
       for (i <- 0 until cfg.totalN) {
-        val actual = ((got4 >> (4 * i)) & 0xF).toInt
+        val actual = ((gotRow >> (4 * i)) & 0xF).toInt
         withClue(s"$clueTag elem=$i val=${floats(i)}: ") { actual shouldBe codes(i) }
       }
     } else {
-      val got8 = dut.io.packed8.peek().litValue
       for (i <- 0 until cfg.totalN) {
-        val actual = ((got8 >> (8 * i)) & 0xFF).toInt
+        val actual = ((gotRow >> (8 * i)) & 0xFF).toInt
         withClue(s"$clueTag elem=$i val=${floats(i)}: ") { actual shouldBe codes(i) }
       }
     }
-    val gotScale = dut.io.scaleRow.peek().litValue
     for (g <- 0 until cfg.totalN / 8) {
       val actual = ((gotScale >> (8 * g)) & 0xFF).toInt
       withClue(s"$clueTag scaleGroup=$g: ") { actual shouldBe scaleBytes(g) }
@@ -268,31 +319,20 @@ class HiveOutCvtSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveF
     // lsb=1 → RNE/RUP/RMM 进位 → 0x7E；RTZ/RDN 截断 → 0x7D。
     simulate(new HiveOutCvt(cfg)) { dut =>
       val floats = Seq(448.0f, 446.0f) ++ Seq.fill(cfg.totalN - 2)(0.0f)
-      def codeAt(rnd: Int, i: Int): Int = {
-        val bitsSeq = floats.map(f => floatToIntBits(f).toLong & 0xFFFFFFFFL)
-        var line = BigInt(0)
-        for ((bits, j) <- bitsSeq.zipWithIndex) line |= HiveSimCommon.fp32BitsTo40(bits) << (cfg.cEffW * j)
-        dut.io.lineIn.poke(line.U)
-        dut.io.outFmt.poke(4.U)
-        dut.io.blkSel.poke(0.U)
-        dut.io.nEff.poke(cfg.totalN.U)
-        dut.io.rnd.poke(rndLits(rnd))
-        ((dut.io.packed8.peek().litValue >> (8 * i)) & 0xFF).toInt
-      }
-      def scaleAt(rnd: Int): Int = {
-        val bitsSeq = floats.map(f => floatToIntBits(f).toLong & 0xFFFFFFFFL)
-        var line = BigInt(0)
-        for ((bits, j) <- bitsSeq.zipWithIndex) line |= HiveSimCommon.fp32BitsTo40(bits) << (cfg.cEffW * j)
-        dut.io.lineIn.poke(line.U)
-        dut.io.outFmt.poke(4.U)
-        dut.io.blkSel.poke(0.U)
-        dut.io.nEff.poke(cfg.totalN.U)
-        dut.io.rnd.poke(rndLits(rnd))
-        (dut.io.scaleRow.peek().litValue & 0xFF).toInt
+      val bitsSeq = floats.map(f => floatToIntBits(f).toLong & 0xFFFFFFFFL)
+      val line = buildLine(bitsSeq)
+      def runAt(rnd: Int): (BigInt, BigInt) = {
+        driveRow(dut, line, outFmt = 4, rnd = rndLits(rnd), blkSel = 0)
+        recvRow(dut, quant = true)
       }
       for (rnd <- 0 to 4) {
-        withClue(s"scale rnd=$rnd: ") { scaleAt(rnd) shouldBe 127 }
-        withClue(s"448 rnd=$rnd: ") { codeAt(rnd, 0) shouldBe 0x7E }
+        val (row, scale) = runAt(rnd)
+        withClue(s"scale rnd=$rnd: ") { (scale & 0xFF).toInt shouldBe 127 }
+        withClue(s"448 rnd=$rnd: ") { ((row >> 0) & 0xFF).toInt shouldBe 0x7E }
+      }
+      def codeAt(rnd: Int, i: Int): Int = {
+        val (row, _) = runAt(rnd)
+        ((row >> (8 * i)) & 0xFF).toInt
       }
       codeAt(0, 1) shouldBe 0x7E   // RNE：guard&sticky → 进位
       codeAt(1, 1) shouldBe 0x7D   // RTZ：恒截断
@@ -306,16 +346,9 @@ class HiveOutCvtSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveF
     simulate(new HiveOutCvt(cfg)) { dut =>
       def runRow(floats: Seq[Float], fmt: Int, blkSel: Int, rnd: Int): (BigInt, BigInt) = {
         val bitsSeq = floats.map(f => floatToIntBits(f).toLong & 0xFFFFFFFFL)
-        var line = BigInt(0)
-        for ((bits, j) <- bitsSeq.zipWithIndex) line |= HiveSimCommon.fp32BitsTo40(bits) << (cfg.cEffW * j)
-        dut.io.lineIn.poke(line.U)
-        dut.io.outFmt.poke(fmt.U)
-        dut.io.blkSel.poke(blkSel.U)
-        dut.io.nEff.poke(cfg.totalN.U)
-        dut.io.rnd.poke(rndLits(rnd))
-        val p8 = dut.io.packed8.peek().litValue
-        val sc = dut.io.scaleRow.peek().litValue
-        (p8, sc)
+        val line = buildLine(bitsSeq)
+        driveRow(dut, line, fmt, rndLits(rnd), blkSel)
+        recvRow(dut, quant = true)
       }
       // 全零块：两 8 元素组均全零 → scale 字节 0x00 哨兵、元素码全 ±0（独立期望）
       val (pz, sz) = runRow(Seq.fill(cfg.totalN)(0.0f), fmt = 4, blkSel = 0, rnd = 0)
@@ -336,23 +369,17 @@ class HiveOutCvtSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveF
       ((pi >> 16) & 0xFF).toInt shouldBe 0x00         // 3.0 相对 2^127 因子下溢 → +0
       (si & 0xFF).toInt shouldBe 254
       // nan 映射：E4M3 → 0x7F（exp&mant 全1）；E5M2 → 0x7E（exp 全1 规范尾数）；
-      // E2M1 无 nan 编码 → 裁定饱和 0x7（packed4 低 nibble 验证）
+      // E2M1 无 nan 编码 → 裁定饱和 0x7（out 低位选段低 nibble 验证）
       val nanRow = Seq(Float.NaN) ++ Seq.fill(cfg.totalN - 1)(0.0f)
       val (pn4, _) = runRow(nanRow, fmt = 4, blkSel = 0, rnd = 0)
       (pn4 & 0xFF).toInt shouldBe 0x7F
       val (pn5, _) = runRow(nanRow, fmt = 5, blkSel = 0, rnd = 0)
       (pn5 & 0xFF).toInt shouldBe 0x7E
-      // E2M1：看 packed4（低列号低 nibble）；同时块 amax=inf → scale=254
-      val bitsSeq = nanRow.map(f => floatToIntBits(f).toLong & 0xFFFFFFFFL)
-      var line = BigInt(0)
-      for ((bits, j) <- bitsSeq.zipWithIndex) line |= HiveSimCommon.fp32BitsTo40(bits) << (cfg.cEffW * j)
-      dut.io.lineIn.poke(line.U)
-      dut.io.outFmt.poke(6.U)
-      dut.io.blkSel.poke(0.U)
-      dut.io.nEff.poke(cfg.totalN.U)
-      dut.io.rnd.poke(RoundingMode.RNE)
-      (dut.io.packed4.peek().litValue & 0xF).toInt shouldBe 0x7
-      (dut.io.scaleRow.peek().litValue & 0xFF).toInt shouldBe 254
+      // E2M1（4-bit 编码 0110）：看 out 低 totalN×4 选段（低列号低 nibble）；
+      // 同时块 amax=inf → scale=254
+      val (pn2, sn2) = runRow(nanRow, fmt = 6, blkSel = 0, rnd = 0)
+      (pn2 & 0xF).toInt shouldBe 0x7
+      (sn2 & 0xFF).toInt shouldBe 254
     }
   }
 
@@ -375,17 +402,189 @@ class HiveOutCvtSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveF
     simulate(new HiveOutCvt(cfg)) { dut =>
       val floats = randomQuantFloats(seed = 77)
       val bitsSeq = floats.map(f => floatToIntBits(f).toLong & 0xFFFFFFFFL)
-      var line = BigInt(0)
-      for ((bits, j) <- bitsSeq.zipWithIndex) line |= HiveSimCommon.fp32BitsTo40(bits) << (cfg.cEffW * j)
-      dut.io.lineIn.poke(line.U)
-      dut.io.outFmt.poke(4.U)
-      dut.io.nEff.poke(cfg.totalN.U)
-      dut.io.rnd.poke(RoundingMode.RNE)
+      val line = buildLine(bitsSeq)
       for (blk <- Seq(2, 3)) {
-        dut.io.blkSel.poke(blk.U)
-        dut.io.packed8.peek()   // 可采样即通过（不断言值）
-        dut.io.scaleRow.peek()
+        driveRow(dut, line, outFmt = 4, rnd = RoundingMode.RNE, blkSel = blk)
+        recvRow(dut, quant = true)   // 可采样即通过（不断言值）
       }
+    }
+  }
+
+  // ============================================================================
+  // P1 新增：整数族截断支路（槽低位截取、不饱和）+ out.ready 反压（行保持）。
+  // ============================================================================
+
+  behavior of "HiveOutCvt 整数族与握手反压 (P1)"
+
+  it should "int32 截断：槽低 32 位直取（高非零位丢弃、不饱和）" in {
+    simulate(new HiveOutCvt(cfg)) { dut =>
+      // 每槽构造已知累加值：高 8 位（bit39..32）非零，验证截断取低 32 位
+      val slots = (0 until cfg.totalN).map(i => (BigInt(0xA5) << 32) | BigInt(0x12345678L + i))
+      var line = BigInt(0)
+      for ((v, i) <- slots.zipWithIndex) line |= v << (cfg.cEffW * i)
+      driveRow(dut, line, outFmt = 8, rnd = RoundingMode.RNE)   // 4-bit 编码 1000
+      val (got, _) = recvRow(dut, quant = false)
+      for (i <- 0 until cfg.totalN) {
+        val expect = slots(i) & 0xFFFFFFFFL
+        withClue(s"elem=$i: ") { ((got >> (32 * i)) & 0xFFFFFFFFL) shouldBe expect }
+      }
+    }
+  }
+
+  it should "int16 截断：槽低 16 位直取，有效段以上高位填零" in {
+    simulate(new HiveOutCvt(cfg)) { dut =>
+      // 每槽 bit39..16 非零（含超 16 位的高位），验证截断取低 16 位
+      val slots = (0 until cfg.totalN).map(i => (BigInt(0xA5B4C3) << 16) | BigInt(0xD2E1 + i))
+      var line = BigInt(0)
+      for ((v, i) <- slots.zipWithIndex) line |= v << (cfg.cEffW * i)
+      driveRow(dut, line, outFmt = 9, rnd = RoundingMode.RNE)   // 4-bit 编码 1001
+      val (got, _) = recvRow(dut, quant = false)
+      for (i <- 0 until cfg.totalN) {
+        val expect = slots(i) & 0xFFFF
+        withClue(s"elem=$i: ") { ((got >> (16 * i)) & 0xFFFF) shouldBe expect }
+      }
+      // 占用率契约：有效段仅低 totalN×16 位，高位必须零填充
+      (got >> (cfg.totalN * 16)) shouldBe BigInt(0)
+    }
+  }
+
+  it should "int8 截断：槽低 8 位直取，有效段以上高位填零" in {
+    simulate(new HiveOutCvt(cfg)) { dut =>
+      // 每槽 bit39..8 非零（含超 8 位的高位），验证截断取低 8 位
+      val slots = (0 until cfg.totalN).map(i => (BigInt("A5B4C3D2", 16) << 8) | BigInt(0xE1 + i))
+      var line = BigInt(0)
+      for ((v, i) <- slots.zipWithIndex) line |= v << (cfg.cEffW * i)
+      driveRow(dut, line, outFmt = 10, rnd = RoundingMode.RNE)  // 4-bit 编码 1010
+      val (got, _) = recvRow(dut, quant = false)
+      for (i <- 0 until cfg.totalN) {
+        val expect = slots(i) & 0xFF
+        withClue(s"elem=$i: ") { ((got >> (8 * i)) & 0xFF) shouldBe expect }
+      }
+      // 占用率契约：有效段仅低 totalN×8 位，高位必须零填充
+      (got >> (cfg.totalN * 8)) shouldBe BigInt(0)
+    }
+  }
+
+  it should "out.ready 反压：行数据保持、行寄存器不被新行提前覆盖" in {
+    simulate(new HiveOutCvt(cfg)) { dut =>
+      val bitsA = floatToIntBits(1.5f).toLong & 0xFFFFFFFFL
+      val bitsB = floatToIntBits(-2.75f).toLong & 0xFFFFFFFFL
+      val lineA = HiveSimCommon.fp32BitsTo40(bitsA)
+      val lineB = HiveSimCommon.fp32BitsTo40(bitsB)
+      // 期望经同链重建：40→32 固定简化 RNE + 32→16 RNE
+      val expA = HiveSimCommon.swFp32ToFp16(HiveSimCommon.swFpNormalize40to32(HiveSimCommon.fp32BitsTo40(bitsA)), 0)
+      val expB = HiveSimCommon.swFp32ToFp16(HiveSimCommon.swFpNormalize40to32(HiveSimCommon.fp32BitsTo40(bitsB)), 0)
+
+      // --- 行 A 锁存，out 侧反压（out.ready 延迟若干拍） ---
+      dut.io.out.ready.poke(false.B)
+      driveRow(dut, lineA, outFmt = 1, rnd = RoundingMode.RNE)
+      dut.io.out.valid.peek().litToBoolean shouldBe true
+      (dut.io.out.bits.peek().litValue & 0xFFFF).toInt shouldBe expA
+      // 反压保持 5 拍：行数据必须稳定不变
+      dut.clock.step(5)
+      dut.io.out.valid.peek().litToBoolean shouldBe true
+      (dut.io.out.bits.peek().litValue & 0xFFFF).toInt shouldBe expA
+
+      // --- 反压期间呈递新行 B：in.ready 必须为 0（行寄存器持 A），A 不被覆盖 ---
+      dut.io.in.valid.poke(true.B)
+      dut.io.in.bits.poke(lineB.U)
+      dut.io.outFmt.poke(1.U)
+      dut.io.rnd.poke(RoundingMode.RNE)
+      dut.io.in.ready.peek().litToBoolean shouldBe false
+      dut.clock.step(2)
+      dut.io.in.ready.peek().litToBoolean shouldBe false
+      (dut.io.out.bits.peek().litValue & 0xFFFF).toInt shouldBe expA   // 防提前覆盖
+
+      // --- 解除反压：本沿 A 提交（out.fire）且背靠背直通锁存 B ---
+      dut.io.out.ready.poke(true.B)
+      dut.clock.step()
+      dut.io.out.ready.poke(false.B)
+      dut.io.in.valid.poke(false.B)
+
+      // --- 行 B 输出正确（行序未乱、未丢行） ---
+      dut.io.out.valid.peek().litToBoolean shouldBe true
+      (dut.io.out.bits.peek().litValue & 0xFFFF).toInt shouldBe expB
+      dut.io.out.ready.poke(true.B)
+      dut.clock.step()
+      dut.io.out.ready.poke(false.B)
+      // B 提交后行寄存器空闲：in.ready 恢复
+      dut.io.in.ready.peek().litToBoolean shouldBe true
+      dut.io.out.valid.peek().litToBoolean shouldBe false
+    }
+  }
+
+  it should "量化多拍持有：out.ready 延迟 + scaleOut.ready 间歇，每行 scale 恰提交一次" in {
+    // 【P3 收敛新增（第 16 用例）】量化行双通道背压场景：
+    //  ① out.ready 延迟若干拍：行数据保持、元素码与软件模型一致；
+    //  ② out 先交付而 scaleOut.ready 压制：进入 dataDone 子态（out.valid 撤、
+    //     scaleOut.valid 保持，行不释放）；
+    //  ③ scaleOut.ready 间歇（每 3 拍拉起 1 拍）：每行 scale 恰交付一次（
+    //     scaleSent 锁存防重复 push），交付后行释放、in.ready 恢复，
+    //     后续间歇不得再现 valid（无假满/无错位）。
+    simulate(new HiveOutCvt(cfg)) { dut =>
+      dut.io.out.ready.poke(false.B)
+      dut.io.scaleOut.ready.poke(false.B)
+      var totalScaleFires = 0
+      for (rowIdx <- 0 until 4) {
+        val floats = randomQuantFloats(seed = 500 + rowIdx)
+        val bitsSeq = floats.map(f => floatToIntBits(f).toLong & 0xFFFFFFFFL)
+        val line = buildLine(bitsSeq)
+        // 同两级舍入链重建期望：40→32 固定简化 RNE + 块量化（E4M3 blk8 RNE）
+        val normSeq = bitsSeq.map(b => HiveSimCommon.swFpNormalize40to32(HiveSimCommon.fp32BitsTo40(b)))
+        val (codes, scaleBytes) = HiveSimCommon.swQuantBlock(normSeq, 0, 4, 0, cfg.totalN)
+        var expScale = BigInt(0)
+        for ((sb, g) <- scaleBytes.zipWithIndex) expScale |= BigInt(sb & 0xFF) << (8 * g)
+
+        // --- in.fire 锁存本行（out/scaleOut 均反压中） ---
+        driveRow(dut, line, outFmt = 4, rnd = RoundingMode.RNE, blkSel = 0)
+        dut.io.out.valid.peek().litToBoolean shouldBe true
+
+        // --- out.ready 延迟：保持反压 3 拍，行数据必须稳定且逐元素正确 ---
+        dut.clock.step(3)
+        dut.io.out.valid.peek().litToBoolean shouldBe true
+        val heldRow = dut.io.out.bits.peek().litValue
+        for (i <- 0 until cfg.totalN) {
+          withClue(s"row=$rowIdx held elem=$i: ") { ((heldRow >> (8 * i)) & 0xFF).toInt shouldBe codes(i) }
+        }
+
+        // --- 拉起 out.ready（scaleOut.ready 保持 0）：本沿 out.fire → dataDone 子态 ---
+        dut.io.out.ready.poke(true.B)
+        dut.clock.step()                       // 本沿提交 out.fire
+        dut.io.out.ready.poke(false.B)
+        dut.io.out.valid.peek().litToBoolean shouldBe false       // 数据已发
+        dut.io.scaleOut.valid.peek().litToBoolean shouldBe true   // scale 待交，持行不释放
+        // 压制 2 拍：行不得提前释放（in.ready 保持 0）
+        dut.clock.step(2)
+        dut.io.scaleOut.valid.peek().litToBoolean shouldBe true
+        dut.io.in.ready.peek().litToBoolean shouldBe false
+
+        // --- scaleOut.ready 间歇（每 3 拍拉起 1 拍）：计数 fire，恰一次 ---
+        var rowScaleFires = 0
+        var guard = 0
+        while (rowScaleFires < 1 && guard < 30) {
+          val readyNow = guard % 3 == 2
+          dut.io.scaleOut.ready.poke(readyNow.B)
+          if (readyNow && dut.io.scaleOut.valid.peek().litToBoolean) {
+            dut.io.scaleOut.bits.peek().litValue shouldBe expScale
+            rowScaleFires += 1                 // 本沿提交 scaleOut.fire
+          }
+          dut.clock.step()
+          guard += 1
+        }
+        dut.io.scaleOut.ready.poke(false.B)
+        withClue(s"row=$rowIdx scale fire 次数: ") { rowScaleFires shouldBe 1 }
+        totalScaleFires += rowScaleFires
+
+        // --- 释放后继续间歇 2 轮：不得重复交付（valid 恒 0），行寄存器空闲 ---
+        for (g <- 0 until 6) {
+          dut.io.scaleOut.ready.poke((g % 3 == 2).B)
+          dut.io.scaleOut.valid.peek().litToBoolean shouldBe false
+          dut.clock.step()
+        }
+        dut.io.scaleOut.ready.poke(false.B)
+        dut.io.in.ready.peek().litToBoolean shouldBe true
+      }
+      totalScaleFires shouldBe 4               // 4 行 scale fire 总数 = 行数（无重复、无丢失）
     }
   }
 }

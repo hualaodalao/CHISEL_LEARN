@@ -69,6 +69,8 @@ class HiveWorker(
   private val hasFp  = supportedFmts.exists(f => f == DataFormat.FP16 || f == DataFormat.BF16)
   private val hasInt = supportedFmts.exists(f => f == DataFormat.INT8  || f == DataFormat.INT16)
 
+  // 【破坏性变更留痕（C 写回重构本轮引入，与 HiveComb 同源）】含 FP 族直接例化须显式
+  // cW>=40，否则构造期失败。顶层经 HiveComb → HiveWorker 链传 cfg.cEffW 规避。
   if (hasFp)  require(cEffW >= 40,          s"HiveWorker: 含浮点格式时 cEffW($cEffW) 必须 >= 40（延迟规格化需要）")
   if (hasInt) require(cEffW >= aEffW + bW,  s"HiveWorker: 含整数格式时 cEffW($cEffW) 必须 >= aEffW($aEffW) + bW($bW)")
 

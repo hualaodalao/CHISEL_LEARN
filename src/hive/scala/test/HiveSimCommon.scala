@@ -316,6 +316,127 @@ object HiveSimCommon {
     else (BigInt(s) << 39) | (BigInt(e) << 31) | (BigInt(1) << 30) | (BigInt(m) << 7)
   }
 
+  // ========== P3 C 写回密集布局公共模型（256-bit 密集拍，四套件共用） ==========
+  // 与硬件 P0-P2 新架构逐拍同源（HiveCore calcConfig 单式 + HiveCoreDmaWrOnly
+  // 运行期拍数解码）：
+  //   元素位宽档（outFmt 4-bit）：fp32/int32/reserved 回落=32、fp16/bf16/int16=16、
+  //     mxfp8/int8=8、mxfp4=4；
+  //   beatsPerRow = ceil(totalN×elemBits/cDmaExtW)（256 默认 × totalN=16 下 ∈ {1,2}，
+  //     mxfp4 恒 1 拍低 64 位有效、半/四分之一占用高位零填充，禁止双行合拍）；
+  //   发拍数据 = 密集行 >> (beatCnt×cDmaExtW) 取低 cDmaExtW 位（拍内低列号在低位）；
+  //   地址：cRowOff = n×outElemBytes（mxfp4 = n>>1）、cColOff = totalN×outElemBytes
+  //     （mxfp4 = totalN>>1）、cBeatAddrStep = (cDmaExtW/elemBits)×elemBytes
+  //     （mxfp4 = cDmaExtW/8）；块间跳转沿用 cDma sNEXT_N 三角累积闭式（金锚背书）。
+  // 编码表（4-bit）：0=fp32 1=fp16 2=bf16 3=reserved 回落 4=mxE4M3 5=mxE5M2
+  //   6=mxfp4-E2M1 7=reserved 回落 8=int32 9=int16 10=int8 11..15=reserved 回落。
+
+  /** outFmt(4-bit) → 元素位宽（32/16/8/4），与硬件 MuxCase 同源 */
+  def cOutElemBits(outFmt: Int): Int = outFmt match {
+    case 1 | 2 | 9 => 16
+    case 4 | 5 | 10 => 8
+    case 6 => 4
+    case _ => 32   // fp32/int32/reserved 回落
+  }
+
+  /** outFmt → 输出元素字节数（地址步进档：4/2/1；mxfp4 返回 0 表示走半字节专用分支） */
+  def cOutElemBytes(outFmt: Int): Int = outFmt match {
+    case 1 | 2 | 9 => 2
+    case 4 | 5 | 10 => 1
+    case 6 => 0
+    case _ => 4
+  }
+
+  /** 每行拍数 = ceil(totalN×elemBits/cDmaExtW)，与 WrOnly beatsPerRowEff 同源 */
+  def cBeatsPerRow(outFmt: Int, totalN: Int, cDmaExtW: Int): Int =
+    (totalN * cOutElemBits(outFmt) + cDmaExtW - 1) / cDmaExtW
+
+  /** 拍内地址步进（字节），与顶层 calcConfig.cBeatAddrStep 同源：
+    * mxfp4 = cDmaExtW/8；其余 = (cDmaExtW/elemBits)×elemBytes */
+  def cBeatAddrStep(outFmt: Int, cDmaExtW: Int): Long =
+    if (outFmt == 6) (cDmaExtW / 8).toLong
+    else (cDmaExtW.toLong / cOutElemBits(outFmt)) * cOutElemBytes(outFmt)
+
+  /** C 写回期望地址序列（密集布局 + 拍内细分，四套件共用唯一推演源）：
+    * 遍历序 nt 外 × m 中 × 行内拍内；三角累积闭式（金锚，行级结构不动）：
+    *   addr(nt,m,b) = base + nt×(M−1)×cRowOff + nt×(nt+1)/2×cColOff
+    *                  + m×cRowOff + b×cBeatAddrStep */
+  def cAddrSeqDense(cBase: Long, m: Int, n: Int, totalN: Int, outFmt: Int,
+                    cDmaExtW: Int): Seq[Long] = {
+    val nTiles = (n + totalN - 1) / totalN
+    val beats = cBeatsPerRow(outFmt, totalN, cDmaExtW)
+    val (rowOff, colOff) =
+      if (outFmt == 6) ((n.toLong >> 1), (totalN.toLong >> 1))
+      else {
+        val eb = cOutElemBytes(outFmt).toLong
+        (n.toLong * eb, totalN.toLong * eb)
+      }
+    val step = cBeatAddrStep(outFmt, cDmaExtW)
+    val buf = scala.collection.mutable.ArrayBuffer[Long]()
+    for (nt <- 0 until nTiles; row <- 0 until m; b <- 0 until beats)
+      buf += cBase + nt.toLong * (m - 1) * rowOff +
+        nt.toLong * (nt + 1) / 2 * colOff + row * rowOff + b * step
+    buf.toSeq
+  }
+
+  /** 256-bit 密集拍 → cResult 元素矩阵公共解析器（四套件共用，杜绝复制粘贴共模错误）。
+    *
+    * 输入 = dmaC 写回日志（按硬件发出顺序 (addr, data)，顺序必为 nt 外 × m 中 ×
+    * 行内拍内；地址对账由各套件独立硬断言，本解析器只按序还原）。每拍按格式取
+    * elemBits 位元素、拍内低列号在低位；拍间/折行顺序还原为 (row, col) 矩阵：
+    *   globalCol = nt×totalN + beatInRow×(cDmaExtW/elemBits) + i
+    * mxfp4 取低 nibble（低列号低 nibble）；列 ≥ N（padding）不写。
+    * 返回原始元素位模式（fp32=32-bit bits、16-bit 族=16-bit、8-bit 族=量化码/字节、
+    * mxfp4=4-bit 码），数值解释归各套件既有对拍逻辑（v1 数值锚布局无关）。
+    */
+  def parseDenseCWriteLog(log: Seq[(Long, BigInt)], outFmt: Int, m: Int, n: Int,
+                          totalN: Int, cDmaExtW: Int): Array[Array[Long]] = {
+    val elemBits = cOutElemBits(outFmt)
+    val beatsPerRow = cBeatsPerRow(outFmt, totalN, cDmaExtW)
+    val elemsPerBeat = cDmaExtW / elemBits
+    val mask = (BigInt(1) << elemBits) - 1
+    val result = Array.fill(m, n)(0L)
+    var beatIdx = 0
+    for ((_, data) <- log) {
+      val nt = beatIdx / (m * beatsPerRow)
+      val inBlock = beatIdx % (m * beatsPerRow)
+      val row = inBlock / beatsPerRow
+      val beatInRow = inBlock % beatsPerRow
+      for (i <- 0 until elemsPerBeat) {
+        val globalCol = nt * totalN + beatInRow * elemsPerBeat + i
+        if (globalCol < n)
+          result(row)(globalCol) = ((data >> (elemBits * i)) & mask).toLong
+      }
+      beatIdx += 1
+    }
+    result
+  }
+
+  /** 密集行（宽 totalN×32，低列号在低位，无效高位段填零）→ 逐元素位模式序列。
+    * 供「期望数据硬断言」与「行级对拍」共用：按 outFmt 选段取低 totalN×elemBits 位。 */
+  def denseRowToElems(row: BigInt, outFmt: Int, totalN: Int): Seq[Long] = {
+    val elemBits = cOutElemBits(outFmt)
+    val mask = (BigInt(1) << elemBits) - 1
+    (0 until totalN).map(i => ((row >> (elemBits * i)) & mask).toLong)
+  }
+
+  /** 逐元素位模式序列 → 密集行（低列号在低位，高位零填充），与上一函数互逆 */
+  def elemsToDenseRow(elems: Seq[Long], outFmt: Int, totalN: Int): BigInt = {
+    val elemBits = cOutElemBits(outFmt)
+    val mask = (BigInt(1) << elemBits) - 1
+    var row = BigInt(0)
+    for (i <- 0 until totalN)
+      row |= (BigInt(elems(i) & mask.toLong) << (elemBits * i))
+    row
+  }
+
+  /** 期望发拍数据：密集行按总线位宽右移取段（与 WrOnly 发拍表达式逐字同源：
+    * data = lineData >> (beatCnt×cDmaExtW) 取低 cDmaExtW 位） */
+  def denseRowBeat(row: BigInt, beatInRow: Int, cDmaExtW: Int): BigInt =
+    (row >> (beatInRow * cDmaExtW)) & ((BigInt(1) << cDmaExtW) - 1)
+
+  /** fp32 bit 模式 → Float（数值对拍便捷函数，等价 fp32BitsToFloat） */
+  def bitsToFp32(bits: Long): Float = fp32BitsToFloat(bits)
+
   // ========== P3a 软件参考模型：MX 量化（共享 E8M0 scale + 目标格式舍入） ==========
   // 独立推导期望（不抄硬件实现结构）：量化语义由「块共享 scale 约束式」出发重建：
   //   amax = 1.f × 2^(E-127)，约束 amax ≤ maxFinite × 2^(s-127)，其中

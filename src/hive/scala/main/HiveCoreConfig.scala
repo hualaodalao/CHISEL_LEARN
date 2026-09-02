@@ -32,11 +32,11 @@ import chisel3.util._
   *                       即能容纳 partial sum/结果数据，否则 DMA 在
   *                       sREQ_EXT 状态会等待空间释放（不会死锁但会降低吞吐）。
   * @param addrWidth      地址位宽
-  * @param cDmaExtW       C 写回 DMA 外部总线位宽（缩位配置）。0 = 哨兵（保持现状：
-  *                       总线位宽 = cExtW 整行宽，一拍一行）；非 0 = 缩位写回，行内拆多拍，
-  *                       必须为 cEffW 整数倍且按元素数整除 totalN（见下方 require）。
-  *                       注意：缩位使每行写回拍数变为 totalN/E，C buffer 排空变慢，
-  *                       需同步增大 cBufferDepth，否则大 M 下可能触发 cPush 违约 err。
+  * @param cDmaExtW       C 写回 DMA 外部总线位宽（P0 契约：默认 256，只允许 2 的 N 次幂；
+  *                       废弃旧 0=640 满宽哨兵与 5B/元素 legacy 布局，废弃动作在 P2 落地）。
+  *                       总线位宽 < 转换后行宽时行内拆多拍输出，运行期拍数由 outFmt 决定
+  *                       （见 cBeatsPerRowMax 注释）；约束族：isPow2 /
+  *                       totalN*32 整除 / [totalN*8, totalN*32]（见下方 require）。
   */
 case class HiveCoreConfig(
     arrayN: Int = 8,
@@ -50,7 +50,7 @@ case class HiveCoreConfig(
     cBufferDepth: Int = 64,
     addrWidth: Int = 32,
     scaleBufferDepth: Int = 64,
-    cDmaExtW: Int = 0
+    cDmaExtW: Int = 256
 ) {
   /*
   //hive矩阵切分逻辑
@@ -110,15 +110,12 @@ case class HiveCoreConfig(
   /** C 通道外部 DMA 数据位宽（= C buffer 行宽 totalN*cEffW） */
   val cExtW: Int = totalN * cEffW
 
-  /** C 写回 DMA 外部总线有效位宽：哨兵 0 解析为 cExtW（出厂默认，一拍一行，
-    * 既有端口与软件布局零感知）；非 0 = 缩位写回（行内拆多拍发出） */
-  val cDmaExtWEff: Int = if (cDmaExtW == 0) cExtW else cDmaExtW
-
-  /** C 写回每拍元素数 E（= 缩位位宽 / 单元素位宽；满宽时 = totalN） */
-  val cElementsPerBeat: Int = cDmaExtWEff / cEffW
-
-  /** C 写回每行拍数：1 = legacy 一拍一行；>1 = active 行内多拍拆分 */
-  val cBeatsPerRow: Int = totalN / cElementsPerBeat
+  /** C 写回每行最大拍数上界（编译期）：= totalN*32/cDmaExtW，按最密 32-bit 元素口径
+    * 计算，仅供计数器/credit 位宽取上界（实际运行期拍数由 outFmt 决定，见下）。
+    * 运行期拍数（256 默认 × totalN=16）：fp32/int32 = 2 拍/行；fp16/bf16/int16 = 1 拍/行；
+    * mxfp8/int8 = 1 拍/行（半占用，高位零填充）；mxfp4 = 1 拍/行（四分之一占用，高位零填充）。
+    * 本期禁止「双行合拍」，占用率契约见重构计划裁定 9。 */
+  val cBeatsPerRowMax: Int = totalN * 32 / cDmaExtW
 
   // P3a：新增 regs(11) = cScaleAddr（C 侧量化 scale 写回基地址），寄存器组 11 → 12。
   // 旧软件只写 0x00..0x0A，新增寄存器默认 0 不影响既有行为。
@@ -148,36 +145,26 @@ case class HiveCoreConfig(
   require(cBufferDepth >= 2*totalN, s"HiveCoreConfig: cBufferDepth($cBufferDepth) 必须 > 2*totalN($totalN)")
   require(addrWidth > 0, s"HiveCoreConfig: addrWidth($addrWidth) 必须 > 0")
   require(addrWidth <= 32, s"HiveCoreConfig: addrWidth($addrWidth) 必须 <= 32")
-  // --- C 写回缩位（cDmaExtW）约束：哨兵 0 = 满宽 cExtW 保持现状，以下逐项豁免 ---
-  // 缩位按元素粒度拆拍：总线位宽必须是单元素位宽（cEffW）的整数倍，
-  // 否则一行无法按整元素切段（负值/0 以外的非法值在此一并拦截）
-  require(cDmaExtW == 0 || cDmaExtW % cEffW == 0, s"HiveCoreConfig: cDmaExtW($cDmaExtW) 必须是 cEffW($cEffW) 的整数倍（缩位按元素位宽拆拍）")
-  // 缩位只能在 (0, cExtW] 内取值：不得为负、不得超过整行位宽（等于 cExtW 等价满宽一拍一行）
-  require(cDmaExtW == 0 || (cDmaExtW > 0 && cDmaExtW <= cExtW), s"HiveCoreConfig: cDmaExtW($cDmaExtW) 必须位于 (0, cExtW($cExtW)]（0 为满宽哨兵）")
-  // 行内多拍拆分要求每拍元素数整除 N（拍数 = totalN/E 为整数）：
-  // 用户需求「必须是 N 倍数所见」在 elaboration 期强制，非 2 幂整除的 E 直接拒绝
-  require(cDmaExtW == 0 || totalN % cElementsPerBeat == 0, s"HiveCoreConfig: 每拍元素数 cElementsPerBeat($cElementsPerBeat) 必须整除 totalN($totalN)（行内拆拍必须为整数拍）")
-  // 缩位（cBeatsPerRow>1）每拍打包位宽下限防护：发拍时数据段按密集元素位宽拼接，
-  // 若总线位宽 < 每拍元素密集位宽，Cat(0.U((cDmaExtWEff - E*elemW).W), ...) 会
-  // elaboration 负位宽报错；提前在构造期用中文消息拦截（浮点配置最低按 16-bit
-  // 密集（fp16/bf16 输出），纯整数配置按 32-bit 密集（写回值低 32 位））
-  if (cBeatsPerRow > 1) {
-    if (!hasFp && !hasMx) require(cDmaExtWEff >= cElementsPerBeat * 32,
-      s"HiveCoreConfig: 纯整数缩位配置要求 cDmaExtWEff($cDmaExtWEff) >= cElementsPerBeat*32(${cElementsPerBeat * 32})，否则发拍数据拼接位宽为负")
-    else require(cDmaExtWEff >= cElementsPerBeat * 16,
-      s"HiveCoreConfig: 浮点/MX 缩位配置要求 cDmaExtWEff($cDmaExtWEff) >= cElementsPerBeat*16(${cElementsPerBeat * 16})，否则 16-bit 密集发拍拼接位宽为负")
-  }
-  // P3a MX 量化写回前提：mxfp4（E2M1）输出为半字节/元素，缩位多拍时拍内必须按
-  // 整字节打包（每拍元素数为偶数），否则拍段在半字节中间切开导致内存布局错位；
-  // legacy 满宽（cBeatsPerRow==1）豁免。量化判据门控在运行期，此处为编译期几何前提。
-  // 【显式声明（评审裁定留痕）】本 E 偶数约束对 hasMx 配置的全部缩位生效——
-  // 含量化（mxfp8/mxfp4）与非量化（fp16/bf16/fp32 输出）：只要 cBeatsPerRow>1，
-  // E=1/2（如 cDmaExtW=40/80）即被拒绝，而非仅限量化运行；下游配置缩位时不得假设
-  // 非量化输出可豁免本约束。
-  if (hasMx) require(cBeatsPerRow == 1 || cElementsPerBeat % 2 == 0,
-    s"HiveCoreConfig: hasMx 缩位配置（cBeatsPerRow>1）要求每拍元素数 cElementsPerBeat($cElementsPerBeat) 为偶数；" +
-    s"该约束覆盖 hasMx 配置的全部缩位（含量化 mxfp8/mxfp4 与非量化 fp16/bf16/fp32 输出）：" +
-    s"mxfp4 半字节须拍内整字节打包，非量化缩位同样受此几何前提约束（E=1/2 即被拒绝）")
+  // --- C 写回总线（cDmaExtW）契约 require 族（P0 重构：默认 256、只允许 2 的 N 次幂，
+  // 废弃旧 0=满宽哨兵与 5B/元素布局；窄总线拆拍与密集打包由 P2 落地，本阶段只立契约） ---
+  // 位宽只允许 2 的 N 次幂（用户裁定；同时拦截负值/0 等非法值）
+  require(isPow2(cDmaExtW), s"HiveCoreConfig: cDmaExtW($cDmaExtW) 必须是 2 的 N 次幂")
+  // 行拍数上界（最密 32-bit 元素口径 totalN*32/cDmaExtW）必须为整数：
+  // 计数器/credit 位宽按 cBeatsPerRowMax 取上界，非整除会使上界语义失效
+  require(totalN * 32 % cDmaExtW == 0, s"HiveCoreConfig: totalN*32(${totalN * 32}) 必须能被 cDmaExtW($cDmaExtW) 整除（行拍数上界为整数）")
+  // 取值区间 [totalN*8, totalN*32]：下限保证 8-bit 输出格式（mxfp8/int8）一行单拍可容，
+  // 上限保证 32-bit 输出格式（fp32/int32）拍数 ≥ 1（不超过整行最密位宽）
+  require(totalN * 8 <= cDmaExtW && cDmaExtW <= totalN * 32,
+    s"HiveCoreConfig: cDmaExtW($cDmaExtW) 必须位于 [totalN*8(${totalN * 8}), totalN*32(${totalN * 32})]（8-bit 格式单拍可容、拍数上界整数）")
+  // mxfp4 半字节几何前提（P0 保留、措辞适配新位宽族）：mxfp4（E2M1）输出为半字节/元素，
+  // 窄总线使一行需拆多拍（totalN*4 > cDmaExtW）时，每拍元素数（cDmaExtW/4）必须为偶数，
+  // 否则拍段在半字节中间切开导致内存布局错位；单拍整行（totalN*4 <= cDmaExtW，
+  // 256 默认 × totalN=16 天然成立）天然豁免。量化判据门控在运行期，此处为编译期几何前提。
+  // 【显式声明（评审裁定留痕）】本约束对 hasMx 配置的全部窄总线配置生效——含量化
+  // （mxfp8/mxfp4）与非量化输出；下游配置窄总线时不得假设非量化输出可豁免本约束。
+  if (hasMx) require(totalN * 4 <= cDmaExtW || (cDmaExtW / 4) % 2 == 0,
+    s"HiveCoreConfig: hasMx 窄总线配置要求 mxfp4 每拍元素数（cDmaExtW/4=${cDmaExtW / 4}）为偶数（拍内整字节打包），" +
+    s"该约束覆盖 hasMx 配置的全部窄总线（含量化与非量化输出），当前 cDmaExtW=$cDmaExtW")
   require(scaleBufferDepth > 0, s"HiveCoreConfig: scaleBufferDepth($scaleBufferDepth) 必须 > 0（hasMx 时 scale FIFO 深度；非 MX 死路参数）")
   // MX 阵列几何硬约束：32-K scale 块 = 16 lane × 2 元素/拍 = 单 pass，该等价关系仅在
   // totalN==16 时成立（scaleBDma lineTarget=kTile、executor 每 sLOAD_B 窗口 pop scaleB

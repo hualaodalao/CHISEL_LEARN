@@ -143,7 +143,8 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   // 水平 loadW 模式锁存（execute 拍采样 regs(7)(5)；垂直模式恒 false，
   // 所有 loadWModeReg 门控分支均为死路）
   val loadWModeReg = RegInit(false.B)
-  
+
+  // ==========================================================================
   // CBufferPipe
   val cStoreGateReg = RegInit(false.B)
   val cStoreGateRegNxt = RegInit(false.B)
@@ -287,15 +288,15 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
           }
           // P3b 量化输出配置校验（仅追加于本块，同模式置 errState 回 sIDLE；
           // 顶层 errFlag 直连现成，不动）。
-          // 【评审裁定修复（P1-1/P2-2 同源合并）】校验门 = quantActive，与 WrOnly isQuant /
+          // 【P0 契约（outFmt 扩 4-bit）】校验门 = quantActive，与 WrOnly isQuant /
           // HiveCore cQuantRun 同一判据源：
-          //   (1) 枚举白名单 outFmt∈{100,101,110}（原单比特 outFmt(2) 判据会让 111=reserved
-          //       命中量化校验/通路，与「111 降级 000」文档声明冲突）；
-          //   (2) 并入运行期格式门（isFloat || isMx(aFmt)），与 outFmtEff 有效值同语义：
-          //       整数运行 outFmtEff 强制 000 透传，写 outFmt=1xx 不再被误报 config-err
-          //       （原裸看寄存器位会假 err，与「整数强制透传」声明矛盾），且与既有校验
-          //       （K%32≠0 / bFmt loadW）均带格式门控的模式一致。
-          val quantActive = (io.regFile.outFmt === 4.U || io.regFile.outFmt === 5.U || io.regFile.outFmt === 6.U) &&
+          //   (1) isQuant 判据 = outFmt 低 3 位 ∈ {4,5,6}（100/101/110，含 mxfp4=110）
+          //       且 bit16（4-bit 值的 bit3）=0，与三处同源定义互指；
+          //       reserved 0111/1011..1111 不命中（回落 0000 语义不报错）；
+          //   (2) 并入运行期格式门（isFloat || isMx(aFmt)）：量化输出仅在浮点/MX 运行
+          //       生效（整数运行写量化编码由下方族交叉校验拦截）。
+          val quantActive = (io.regFile.outFmt(2, 0) === 4.U || io.regFile.outFmt(2, 0) === 5.U || io.regFile.outFmt(2, 0) === 6.U) &&
+            io.regFile.outFmt(3) === 0.U &&
             (io.regFile.isFloat || DataFormat.isMx(io.regFile.aFmt))
           when(quantActive) {
             val qBlk = 8.U(7.W) << io.regFile.qBlockSize   // blk 解码：8/16/32/64 元素/块
@@ -304,12 +305,45 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
               errState := true.B
               state    := sIDLE
             }
-            // (b) mxfp4（outFmt=110）半字节/元素，n 奇数时行宽非整字节 → config-err
+            // (b) mxfp4（outFmt=0110，4-bit 值 6）半字节/元素，n 奇数时行宽非整字节 → config-err
+            //     （P0 保留：outFmt 扩 4 位后 === 6.U 仍仅命中 0110，校验表达式用完整 4 位值）
             when(io.regFile.outFmt === 6.U && io.regFile.n(0) === 1.U) {
               errState := true.B
               state    := sIDLE
             }
           }
+        }
+      }
+
+      // P0（C 写回重构契约层）：运行期格式族交叉校验（config-err 范式，与上方
+      // K%32≠0 校验同块同模式：execute 拍违约置 errState 回 sIDLE，不进入计算）。
+      // outFmt 已扩 4-bit = Cat(regs(7)(16), regs(7)(13,11))，编码表见 HiveCoreRegister。
+      //   fp 运行（isFloat）：outFmt ∈ {0,1,2}；reserved 0011/0111 保持回落 0000 语义不报错；
+      //   MX 运行（isMx(aFmt)）：outFmt ∈ {0,4,5,6}（0000=fp32 非量化直出，P0 前
+      //     既有硬件行为，MxSpec v1 fp32 锚赖以存在；4/5/6 为 MX 量化输出含 mxfp4=6）；
+      //   整数运行（!isFloat && !isMx）：outFmt ∈ {8,9,10}（int32/int16/int8，
+      //     P0 新增，废除旧「整数强制透传 000」判据：旧整数软件不写 outFmt 得 0000=fp32
+      //     将被本校验显式拦截，属有意设计的迁移引导）。
+      // 校验表达式用完整 4 位值；位于 execute 块之后，last-connect 覆盖其 state := sLOAD_B，
+      // 与上方 cPush 违约兜底/ MX 校验同模式。非 hasMx 配置同样生效（fp/整数族不依赖 MX 硬件）。
+      when(io.execute) {
+        val outFmtVal = io.regFile.outFmt                    // 4-bit
+        val isMxRunX  = DataFormat.isMx(io.regFile.aFmt)
+        val fpFmtOk   = outFmtVal === 0.U || outFmtVal === 1.U || outFmtVal === 2.U ||
+                        outFmtVal === 3.U || outFmtVal === 7.U  // 3/7 reserved：回落 fp32 不报错
+        val mxFmtOk   = outFmtVal === 0.U || outFmtVal === 4.U || outFmtVal === 5.U || outFmtVal === 6.U
+        val intFmtOk  = outFmtVal === 8.U || outFmtVal === 9.U || outFmtVal === 10.U
+        when(io.regFile.isFloat && !fpFmtOk) {
+          errState := true.B
+          state    := sIDLE
+        }
+        when(isMxRunX && !mxFmtOk) {
+          errState := true.B
+          state    := sIDLE
+        }
+        when(!io.regFile.isFloat && !isMxRunX && !intFmtOk) {
+          errState := true.B
+          state    := sIDLE
         }
       }
     }
@@ -398,29 +432,43 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
 
       // 排空窗口结束（beatCnt 达 curM + 2*(totalN-1)）才离开计算状态，
       // 保证波前完整流过阵列、最后一行累加不被截断
-      when(curM === io.regFile.m - 1.U) {
+      // 【C2 修复】离场必须与 aPop.fire 原子门控：旧版仅 `when(curM === m-1)` 在
+      // m=1 时 curM(=0)===0 当拍即进入离场，未消费任何 A 数据的确定性死锁；
+      // m>1 时每 tile 末行未等待 fire 即跳离，少供一行。
+      when(io.aPop.fire && curM === io.regFile.m - 1.U) {
         curM := 0.U
         state := sNEXT_NK_TILE
       }
     }
 
     is(sNEXT_NK_TILE){
-      doneTiles := doneTiles + 1.U
-      drainNextCnt := cfg.totalN.U - 1.U
       when(curKTile < kTiles){
+        doneTiles := doneTiles + 1.U
+        drainNextCnt := cfg.totalN.U - 1.U
         curKTile := curKTile + 1.U
         hasNext := true.B
         state := sDRAIN
       }.otherwise{
-        curKTile := 0.U
-        cStoreGateReg := true.B
-        when(curNTile < nTiles){
-          curNTile := curNTile + 1.U
-          hasNext := true.B
-          state := sDRAIN
-        }.otherwise{
-          curNTile := 0.U
-          state := sDRAIN
+        // 【P3 修复：门吞没竞态】drain 与下一 tile 计算重叠流水：上一块 drain
+        // 未完（cStoreGateReg 仍高）时若在此拉门，赋值无上升沿（无事件），
+        // 随后上一块 doneBlock 落下共享寄存器 → 本块的门被永久吞掉，
+        // 结果永不写回（K=16 实验实证：nt1 门被吞 → cDma 停块 busy 恒真 →
+        // sDRAIN 死等死锁）。故停留本状态等上一块 doneBlock 落门（cPeekDone
+        // 清 cStoreGateReg）后再升门推进；doneTiles/drainNextCnt 等副作用移入
+        // 通过分支，防止停留拍重复计数。
+        when(cStoreGateReg === false.B){
+          doneTiles := doneTiles + 1.U
+          drainNextCnt := cfg.totalN.U - 1.U
+          curKTile := 0.U
+          cStoreGateReg := true.B
+          when(curNTile < nTiles){
+            curNTile := curNTile + 1.U
+            hasNext := true.B
+            state := sDRAIN
+          }.otherwise{
+            curNTile := 0.U
+            state := sDRAIN
+          }
         }
       }
     }

@@ -161,30 +161,24 @@ class HiveCoreSimCaseLoadWSpec extends AnyFlatSpec with Matchers with ChiselSim 
       data
     }
 
-    // --- DMA-C (C store) 期望地址序列：偏移公式与硬件 HiveCore calcConfig
-    // 逐字对齐（cRowAddressOffset := regFile.n*(cW/8)、cColTileAddressOffset
-    // := totalN*(cW/8)）。注意不复用 4bit 截断的 cStride 寄存器值——硬件
-    // 地址生成根本不消费 stride 寄存器，旧写法 cRowOff=(cStride&0xF)=0 会
-    // 使 nTile 内 32 个 M 行期望地址全部坍缩，对账形同虚设。
-    // 两套跳转机制分别建模（与 HiveCoreDmaWrOnly sTRANSFER_M/sNEXT_N 一致，
-    // 不可压成单变量递增 nt*cColOff）：
-    //   块内：每拍 + cRowOff（实际 M 行 regFile.m，末行不加步长）
-    //   轮间：curAddr += colAddr; colAddr += cColTileOff（colAddr 初值 =
-    //     cColTileOff，即首跳 +1 倍、次跳 +2 倍…）；且块内末行不加 rowStep，
-    //     残差 (M-1)*cRowOff 随 curAddr 累积进下一块起点
-    // 等价闭式：blockStart(nt) = C_BASE + nt*(M-1)*cRowOff
-    //                            + nt*(nt+1)/2*cColOff ---
-    val cRowOff = N.toLong * (cfg.cW / 8)
-    val cColOff = totalN.toLong * (cfg.cW / 8)
-    val expCAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
-    for (nt <- 0 until aNTiles; m <- 0 until M)
-      expCAddrSeq += C_BASE + nt.toLong * (M - 1) * cRowOff +
-        nt.toLong * (nt + 1) / 2 * cColOff + m * cRowOff
-    // 自检：前两块块起点（nt=0 → C_BASE；nt=1 → C_BASE+(M-1)*cRowOff+cColOff）
+    // --- DMA-C (C store) 期望地址序列（P3 迁移：密集布局公共推演源）：
+    // 三角累积闭式（金锚，行级结构不动）+ 拍内细分，与 HiveSimCommon.
+    // cAddrSeqDense 唯一推演源同源（四套件共用）。输出 outFmt=0（fp32），
+    // 256-bit 下 2 拍/行（拍内步进 32B）；行步进 = N×4B、列步进 = totalN×4B。
+    // 注意不复用 4bit 截断的 cStride 寄存器值——硬件地址生成根本不消费
+    // stride 寄存器。两套跳转机制分别建模（与 HiveCoreDmaWrOnly
+    // sTRANSFER_M/sNEXT_N 一致）：块内每拍 + cRowOff，轮间三角累积；
+    // 等价闭式：blockStart(nt) = C_BASE + nt*(M-1)*cRowOff + nt*(nt+1)/2*cColOff
+    val expCAddrSeq = HiveSimCommon.cAddrSeqDense(C_BASE, M, N, totalN, outFmt = 0, cfg.cDmaExtW)
+    val cBeatsPerRow = HiveSimCommon.cBeatsPerRow(outFmt = 0, totalN, cfg.cDmaExtW)  // = 2（256-bit fp32）
+    // 自检：前两块块起点（nt=0 → C_BASE；nt=1 → C_BASE+(M-1)*cRowOff+cColOff，
+    // 起点下标 = M×beatsPerRow，密集布局下按拍细分）
+    val cRowOffChk = N.toLong * 4
+    val cColOffChk = totalN.toLong * 4
     require(expCAddrSeq(0) == C_BASE,
       f"C block0 start 0x${expCAddrSeq(0)}%X mismatch")
-    require(expCAddrSeq(M) == C_BASE + (M - 1).toLong * cRowOff + cColOff,
-      f"C block1 start 0x${expCAddrSeq(M)}%X mismatch")
+    require(expCAddrSeq(M * cBeatsPerRow) == C_BASE + (M - 1).toLong * cRowOffChk + cColOffChk,
+      f"C block1 start 0x${expCAddrSeq(M * cBeatsPerRow)}%X mismatch")
 
     // --- 仿真 ---
     println(s"[HiveCoreSimCaseLoadW] Starting simulation: M=$M, N=$N, K=$K, totalN=$totalN (loadWMode=1)")
@@ -373,25 +367,14 @@ class HiveCoreSimCaseLoadWSpec extends AnyFlatSpec with Matchers with ChiselSim 
     // ===== C 结果重建与数值校验（与垂直用例完全相同：C = A × B） =====
     println(s"[HiveCoreSimCaseLoadW] Writing C result: ${cWriteLog.size} beats captured")
 
-    val cResult = Array.fill(M, N)(BigInt(0))
-    var cBeatIdx = 0
-    for ((addr, data) <- cWriteLog) {
-      val row = cBeatIdx % M
-      if (row < M) {
-        for (col <- 0 until math.min(totalN, N)) {
-          val elem = HiveSimCommon.extractBits(data, cEffW * (col + 1) - 1, cEffW * col)
-          val globalCol = (cBeatIdx / M) * totalN + col
-          if (globalCol < N) {
-            cResult(row)(globalCol) = elem
-          }
-        }
-      }
-      cBeatIdx += 1
-    }
+    // ===== C 重建（P3 迁移：密集拍公共解析器，256-bit 拍内 8 个 fp32 元素） =====
+    val cResult = HiveSimCommon.parseDenseCWriteLog(
+      cWriteLog.toSeq, outFmt = 0, m = M, n = N, totalN = totalN, cDmaExtW = cfg.cDmaExtW)
 
-    HiveSimCommon.writeBigIntMatrixHex(s"$simDir/C_matrix.txt", cResult, cEffW)
+    HiveSimCommon.writeBigIntMatrixHex(s"$simDir/C_matrix.txt",
+      cResult.map(_.map(v => BigInt(v & 0xFFFFFFFFL))), 32)
 
-    val cFloat = cResult.map(_.map(b => HiveSimCommon.fp32BitsToFloat((b & 0xFFFFFFFFL).toLong)))
+    val cFloat = cResult.map(_.map(b => HiveSimCommon.fp32BitsToFloat(b & 0xFFFFFFFFL)))
     HiveSimCommon.writeMatrixFloat(s"$simDir/C_matrix_float.txt", cFloat)
 
     // H0: C = A·B（落位映射与垂直模式一致，期望完全相同）
