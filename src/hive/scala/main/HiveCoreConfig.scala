@@ -34,7 +34,7 @@ import chisel3.util._
   * @param addrWidth      地址位宽
   * @param cDmaExtW       C 写回 DMA 外部总线位宽（P0 契约：默认 256，只允许 2 的 N 次幂；
   *                       废弃旧 0=640 满宽哨兵与 5B/元素 legacy 布局，废弃动作在 P2 落地）。
-  *                       总线位宽 < 转换后行宽时行内拆多拍输出，运行期拍数由 outFmt 决定
+  *                       总线位宽 < 转换后行宽时行内拆多拍输出，运行期拍数由 cFmt 决定
   *                       （见 cBeatsPerRowMax 注释）；约束族：isPow2 /
   *                       totalN*32 整除 / [totalN*8, totalN*32]（见下方 require）。
   */
@@ -70,7 +70,7 @@ case class HiveCoreConfig(
   val totalN: Int = arrayN * clusterM
 
   /** A 侧有效位宽 */
-  val aEffW: Int = math.max(aW, bW)
+  val aEffW: Int = aW
 
   /** 是否包含浮点格式（用于编译期条件化生成规格化硬件） */
   val hasFp: Boolean = supportedFmts.contains(DataFormat.FP16) || supportedFmts.contains(DataFormat.BF16)
@@ -80,9 +80,6 @@ case class HiveCoreConfig(
 
   /** 是否包含 MX 格式（MXFP8 E4M3 / E5M2） */
   val hasMx: Boolean = supportedFmts.contains(DataFormat.MXE4M3) || supportedFmts.contains(DataFormat.MXE5M2)
-
-  /** Scale 行位宽：scaleB 每行 totalN 个 8-bit E8M0 scale 因子 */
-  val scaleRowW: Int = totalN * 8
 
   /** P3a C 侧量化 scale 行位宽：每 8 元素量化块一个 8-bit E8M0 scale 字节
     * （HiveOutCvt.scaleRow 输出宽度，P3b dmaCScale 通道行宽同源） */
@@ -111,7 +108,7 @@ case class HiveCoreConfig(
   val cExtW: Int = totalN * cEffW
 
   /** C 写回每行最大拍数上界（编译期）：= totalN*32/cDmaExtW，按最密 32-bit 元素口径
-    * 计算，仅供计数器/credit 位宽取上界（实际运行期拍数由 outFmt 决定，见下）。
+    * 计算，仅供计数器/credit 位宽取上界（实际运行期拍数由 cFmt 决定，见下）。
     * 运行期拍数（256 默认 × totalN=16）：fp32/int32 = 2 拍/行；fp16/bf16/int16 = 1 拍/行；
     * mxfp8/int8 = 1 拍/行（半占用，高位零填充）；mxfp4 = 1 拍/行（四分之一占用，高位零填充）。
     * 本期禁止「双行合拍」，占用率契约见重构计划裁定 9。 */

@@ -30,10 +30,10 @@ module Hive_HiveCoreScratchpad(	// src/hive/scala/main/HiveCoreScratchpad.scala:
   input          io_scaleAPop_ready,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   output [7:0]   io_scaleAPop_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input          io_scaleBPush_valid,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
-  input  [127:0] io_scaleBPush_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
+  input  [7:0]   io_scaleBPush_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   output         io_scaleBPop_valid,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input          io_scaleBPop_ready,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
-  output [127:0] io_scaleBPop_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
+  output [7:0]   io_scaleBPop_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input          io_flushScaleA,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
                  io_flushScaleB	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
 );
@@ -82,7 +82,7 @@ module Hive_HiveCoreScratchpad(	// src/hive/scala/main/HiveCoreScratchpad.scala:
     .io_pop_payload  (io_scaleAPop_payload),
     .io_flush        (io_flushScaleA)
   );	// src/hive/scala/main/HiveCoreScratchpad.scala:90:28
-  Hive_StreamFifo_4 scaleBFifo (	// src/hive/scala/main/HiveCoreScratchpad.scala:91:28
+  Hive_StreamFifo_3 scaleBFifo (	// src/hive/scala/main/HiveCoreScratchpad.scala:91:28
     .clock           (clock),
     .reset           (reset),
     .io_push_valid   (io_scaleBPush_valid),

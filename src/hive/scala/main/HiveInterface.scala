@@ -27,7 +27,6 @@ class HiveCoreCmd extends Bundle {
 /** HiveCore 命令响应。 */
 class HiveCoreResp extends Bundle {
   val data = UInt(32.W)         // REG_READ 返回数据
-  val done = Bool()             // EXECUTE 完成标志
   val err  = Bool()             // 错误标志
 }
 
@@ -109,110 +108,92 @@ object HiveCoreStatus {
 }
 
 class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
-    // ==========================================================================
-  // 寄存器组定义
-  // ==========================================================================
-  // 地址  名称（与下方 regs 索引 defs 一一对应）
-  // 0x00  REG_M         M 维度
-  // 0x01  REG_N         N 维度
-  // 0x02  REG_K         K 维度
-  // 0x03  REG_A_ADDR    A 矩阵基地址
-  // 0x04  REG_B_ADDR    B 矩阵基地址
-  // 0x05  REG_C_ADDR    C 矩阵基地址
-  // 0x06  REG_A/B/C_STRIDE  A/B/C 行步长（[3:0]/[7:4]/[11:8]，各 4bit）
-  // 0x07  REG_CONTROL   位域编码（3-bit DataFormat 枚举）：
-  //         [0]    = clear_done (写1清除) — 与 aFmt[1:0] 复用低 2 位
-  //         [1:0]  = aFmt 低 2 位
-  //         [4:2]  = rnd (RoundingMode)
-  //         [5]    = loadWMode (0=垂直加载, 1=水平 loadW 加载)
-  //         [6]    = aFmt 高 1 位（拼接 [6],[1:0] 得完整 3-bit aFmt）
-  //         [7]    = bFmt 高 1 位（拼接 [7],[9:8] 得完整 3-bit bFmt）
-  //         [9:8]  = bFmt 低 2 位
-  //         [10]   = mixFmtEn (v1 恒 0：bFmt 跟随 aFmt)
-  //         [13:11]+[16] = outFmt (C 写回 dmaC 输出格式，P0 由 3-bit 扩为 4-bit：
-  //                   outFmt = Cat(bit16, bit[13:11])，4-bit 编码表：
-  //                   0xxx 低 3 位逐字不变：0000=fp32 默认 / 0001=fp16 / 0010=bf16 /
-  //                     0011=reserved 回落 fp32 / 0100=mxfp8-E4M3 量化 /
-  //                     0101=mxfp8-E5M2 量化 / 0110=mxfp4-E2M1 量化 /
-  //                     0111=reserved 降级 0000；
-  //                   1000=int32 / 1001=int16 / 1010=int8（P0 新增整数族：
-  //                     截断取低位、不饱和）；1011..1111 reserved（降级 0000，仅为 cvt 兆底；
-    //                     execute 拍先被族校验拦截——三族均无合法路径到达此段）。
-  //                   兼容性：outFmt 低 3 位在 bit16=0 时逐字兼容旧 3-bit 编码，
-  //                   其它位域已重打包（bit16 新增、qBlockSize 新增）；
-  //                   运行期格式族交叉校验（Executor 校验块）：fp 运行 ∈{0,1,2}
-  //                   （3/7 回落不报错）/ MX 运行 ∈{0,4,5,6}（0=fp32 直出，P0 前既有行为，
-  //                   MxSpec v1 fp32 锚赖以存在；4/5/6 量化）/ 整数运行 ∈{8,9,10}，
-  //                   违者 config-err（废除旧「整数强制透传 000」判据）。
-  //                   16-bit 与量化输出均为两级舍入链：40→32 固定简化 RNE 规格化 +
-  //                   降精度/量化运行期 rnd，方向性模式与理想单级舍入可能存在末位差异)
-  //         [15:14] = qBlockSize (P3a 量化块大小：00=8 / 01=16 / 10=32 / 11=64 元素/块，
-  //                   块内元素共享一个 E8M0 scale；仅 outFmt ∈ {0b0100,0b0101,0b0110} 生效)
-  // 0x08  REG_STATUS    [0]=busy, [1]=done, [2]=err, [31:16]=progress (只读)
-  // 0x09  REG_SCALE_A_ADDR  scaleA 基地址
-  // 0x0A  REG_SCALE_B_ADDR  scaleB 基地址
-  // 0x0B  REG_SCALE_C_ADDR  P3a C 侧量化 scale 行写回基地址（regs(11)，P3b dmaCScale 通道使用）
 
-  val regs = Vec(cfg.registerNum, UInt(32.W))
-  def m   = regs(0)
-  def n   = regs(1)
-  def k   = regs(2)
-  def aAddr = regs(3)
-  def bAddr = regs(4)
-  def cAddr = regs(5)
-  def aStride = regs(6)(3, 0)
-  def bStride = regs(6)(7, 4)
-  def cStride = regs(6)(11, 8)
+  val m = UInt(cfg.mnkWidth.W)
+  val n = UInt(cfg.mnkWidth.W)
+  val k = UInt(cfg.mnkWidth.W)
+  val aAddr = UInt(cfg.addrWidth.W)
+  val bAddr = UInt(cfg.addrWidth.W)
+  val cAddr = UInt(cfg.addrWidth.W)
 
-  // --- REG_CONTROL (0x07) 位域 ---
-  // aFmt: 3-bit = Cat(regs(7)(6), regs(7)(1,0))
-  def aFmt = Cat(regs(7)(6), regs(7)(1, 0)).asTypeOf(DataFormat())
-  // bFmt: 3-bit = Cat(regs(7)(7), regs(7)(9,8))
-  def bFmt = Cat(regs(7)(7), regs(7)(9, 8)).asTypeOf(DataFormat())
-  // mixFmtEn: v1 恒 0（bFmt 跟随 aFmt）
-  def mixFmtEn = regs(7)(10)
-  // C 写回 dmaC 输出格式 outFmt（P0 扩 4-bit）：Cat(regs(7)(16), regs(7)(13,11))，4-bit 编码表：
-  //   0xxx 低 3 位逐字不变：0000=fp32（默认）、0001=fp16、0010=bf16、
-  //     0011=reserved（回落 0000）、0100=mxfp8-E4M3 量化、0101=mxfp8-E5M2 量化、
-  //     0110=mxfp4-E2M1 量化、0111=reserved（降级 0000）；
-  //   1000=int32、1001=int16、1010=int8（P0 新增整数族：每槽截断取低位、
-  //     不饱和——整数累加位宽由既有 require 防溢出）；
-  //   1011..1111 reserved（降级 0000，仅为 cvt 兆底；execute 拍先被族校验拦截，
-    //   三族均无合法路径到达此编码——与现行 0011/0111 reserved 不同）。
-  //   兼容性留痕：旧软件不写 bit16 时（0xxx）低 3 位语义逐拍不变（含 mxfp4 与
-  //   reserved 语义），零迁移；量化编码（0100/0101/0110）共享 E8M0 块 scale，
-  //   isQuant 判据 = 低 3 位 ∈ {4,5,6} 且 bit16=0；量化语义（块 amax/全零块 0x00 哨兵/
-  //   饱和与 inf-nan 映射）见 HiveOutCvt 类头注释。
-  //   【P0 族交叉校验】废除旧「整数强制透传 000」判据（outFmtEff=(isFloat||isMx)?outFmt:000）：
-  //   fp 运行（isFloat）outFmt ∈ {0,1,2}（reserved 0011/0111 保持回落语义不报错）；
-  //   MX 运行（isMx(aFmt)）∈ {0,4,5,6}（0000=fp32 非量化直出：P0 前既有硬件行为，
-  //   P3 校验放宽批准版保留——否决「MX 强制量化」严格版；4/5/6 为量化输出含 mxfp4=6）；
-  //   整数运行 ∈ {8,9,10}——违者 execute 拍置 errState（config-err，
-  //   显式报错而非静默错值，属有意设计的迁移引导）。校验在 HiveCoreExecutor sIDLE 校验块。
-  //   【舍入链声明】16-bit 与量化输出均为两级舍入链：40→32 固定简化 RNE 规格化（fpNormalize40to32）
-  //   + 降精度/量化运行期 rnd（HiveOutCvt roundUp16/roundUpN）；方向性模式（RDN/RUP/RMM）与
-  //   理想单级舍入可能存在末位差异（两级舍入累积），软件对拍须同链重建。
-  def outFmt = Cat(regs(7)(16), regs(7)(13, 11))
-  // P3a 量化块大小 qBlockSize：regs(7) bit(15,14)，00=8 / 01=16 / 10=32 / 11=64（元素/块）。
-  // 块内元素共享一个 E8M0 scale（HiveOutCvt.blkSel 同源）；仅量化输出时生效，
-  // 非量化运行写入无副作用。
-  def qBlockSize = regs(7)(15, 14)
-  def rnd = regs(7)(4, 2).asTypeOf(RoundingMode())
-  // 权重加载模式位：0=垂直加载（loadV 经 psum 口下沉，既有行为，B内存非转置），
-  // 1=水平 loadW 加载（权重经 a 数据链水平移位 + 末拍广播锁存，B内存转置存储）
-  def loadWMode = regs(7)(5)
+  val aStride = UInt(4.W)
+  val bStride = UInt(4.W)
+  val cStride = UInt(4.W)
+  val aAddrMode = AddrMode()
+  val bAddrMode = AddrMode()
+  val cAddrMode = AddrMode()
+  val aMxBlockSize = MXBlockSize()
+  val bMxBlockSize = MXBlockSize()
+  val cMxBlockSize = MXBlockSize()
+  val loadWMode = Bool()
+  val aFmt = DataFormat()
+  val bFmt = DataFormat()
+  val cFmt = DataFormat()
+  val rnd = RoundingMode()
+  
+  val aScaleAddr = UInt(32.W)
+  val bScaleAddr = UInt(32.W)
+  val cScaleAddr = UInt(32.W)
+  
 
-  // 兼容别名：旧代码通过 regFile.fmt 访问格式，等同 aFmt
-  def fmt = aFmt
-  // isFloat 判据：仅传统 FP16/BF16（MX 不走此路径，DMA 侧把 MX 当原始字节）
-  def isFloat = aFmt === DataFormat.BF16 || aFmt === DataFormat.FP16
+  def wregs(addr: UInt, d: UInt) = {
+    switch(addr){
+      is(0.U) { m := d }
+      is(1.U) { n := d }
+      is(2.U) { k := d }
+      is(3.U) { aAddr := d }
+      is(4.U) { bAddr := d }
+      is(5.U) { cAddr := d }
+      is(6.U) { 
+        loadWMode := d(28)
+        cMxBlockSize := d(27, 26).asTypeOf(MXBlockSize())
+        bMxBlockSize := d(25, 24).asTypeOf(MXBlockSize())
+        aMxBlockSize := d(23, 22).asTypeOf(MXBlockSize())
+        cAddrMode := d(14).asTypeOf(AddrMode())
+        bAddrMode := d(13).asTypeOf(AddrMode())
+        aAddrMode := d(12).asTypeOf(AddrMode())
+        cStride := d(11, 8)        
+        bStride := d(7, 4)
+        aStride := d(3, 0)
+        }
+      is(7.U) {
+        rnd := d(13, 12).asTypeOf(RoundingMode())
+        cFmt := d(11, 8).asTypeOf(DataFormat())
+        bFmt := d(7, 4).asTypeOf(DataFormat())
+        aFmt := d(3, 0).asTypeOf(DataFormat())
+      }
+      is(8.U) { }
+      is(9.U) { aScaleAddr := d }
+      is(10.U) { bScaleAddr := d }
+      is(11.U) { cScaleAddr  := d }
+    }
+  }
 
-  // --- Scale 地址寄存器 (0x09 / 0x0A / 0x0B) ---
-  def scaleAAddr = regs(9)
-  def scaleBAddr = regs(10)
-  // P3a：C 侧量化 scale 行写回基地址（0x0B；P3b dmaCScale 通道地址模型同源，
-  // 行步进/列步进公式由 P3b 定义，本阶段仅占位寄存器）
-  def cScaleAddr = regs(11)
+  def rregs(addr: UInt) : UInt = {
+    val ret = Wire(UInt(32.W))
+    ret := 0.U
+    switch(addr) {
+      is(0.U) { ret := m }
+      is(1.U) { ret := n }
+      is(2.U) { ret := k }
+      is(3.U) { ret := aAddr }
+      is(4.U) { ret := bAddr }
+      is(5.U) { ret := cAddr }
+      is(6.U) { ret := Cat(0.U(3.W), loadWMode.asUInt, cMxBlockSize.asUInt, bMxBlockSize.asUInt, aMxBlockSize.asUInt, 0.U(8.W),cAddrMode.asUInt, bAddrMode.asUInt,aAddrMode.asUInt, cStride, bStride, aStride) }
+      
+      is(7.U) {
+        ret := Cat(0.U(18.W), rnd.asUInt, cFmt.asUInt, bFmt.asUInt, aFmt.asUInt)
+       }
+      is(8.U) { ret := 0.U }
+      is(9.U) { ret := aScaleAddr }
+      is(10.U) { ret := bScaleAddr }
+      is(11.U) { ret := cScaleAddr }
+    }
+    ret
+  }
+  
+  
+
 }
 object HiveCoreRegister {
   def apply(cfg: HiveCoreConfig) = new HiveCoreRegister(cfg)
@@ -222,6 +203,7 @@ class HiveCoreExePreCalcConfig(cfg: HiveCoreConfig) extends Bundle {
   val nTile = UInt(cfg.mnkWidth.W)
   val mTile = UInt(cfg.mnkWidth.W)    
   val kTile = UInt(cfg.mnkWidth.W)
+  val kTileB = UInt(cfg.mnkWidth.W)
 
   val aRowAddressOffset = UInt(cfg.addrWidth.W)
   val bRowAddressOffset = UInt(cfg.addrWidth.W)
@@ -229,24 +211,24 @@ class HiveCoreExePreCalcConfig(cfg: HiveCoreConfig) extends Bundle {
   val aColTileAddressOffset = UInt(cfg.addrWidth.W) 
   val cColTileAddressOffset = UInt(cfg.addrWidth.W) 
   val bColTileAddressOffset = UInt(cfg.addrWidth.W) 
-  // --- P3b C 侧量化 scale 写回（dmaCScale 通道）地址偏移 ---
-  // 行步进 = ceil(n/blk) 字节（每 M 行一个 scale 行，块粒度打包，运行期由顶层计算）；
-  // 列 tile 步进 = totalN/blk 字节（每个 N tile 覆盖 totalN 列 = totalN/blk 个块）。
-  // blk = 8 << qBlockSize 运行期解码；非量化运行时本字段无消费者（死路）。
-  val cScaleRowAddressOffset = UInt(cfg.addrWidth.W)
-  val cScaleColTileAddressOffset = UInt(cfg.addrWidth.W)
-  // --- scaleA 读通道（dmaScaleA，isScaleB=false）专用地址偏移 ---
-  // MXFP8 每 32 个 K 元素共享 1 个 E8M0 scale 字节，外部布局 scaleA[m][kb] 连续
-  // （每行 K/32 字节）：行步进 = K/32 字节（= regFile.k >> 5）、块（kb）步进 = 1 字节。
-  // 独立于 A 数据通道的 aRowAddressOffset/aColTileAddressOffset（后者被 aDma 共用，禁动）。
+
   // 仅 mxRun 启动时消费，非 MX 为死路。
   val scaleARowAddressOffset = UInt(cfg.addrWidth.W)
   val scaleAColTileAddressOffset = UInt(cfg.addrWidth.W)
+  val scaleBRowAddressOffset = UInt(cfg.addrWidth.W)
+  val scaleBColTileAddressOffset = UInt(cfg.addrWidth.W)
+  val scaleCRowAddressOffset = UInt(cfg.addrWidth.W)
+  val scaleCColTileAddressOffset = UInt(cfg.addrWidth.W)
   // --- P0 C 写回重构：cDma 拍内地址步进（行内多拍拆分） ---
   // cBeatAddrStep = (cDmaExtW/elemBits)×elemBytes（运行期：elemBits/elemBytes 由 outFmt
   // 决定），供 P2 WrOnly 拍内地址 = curAddr + beatCnt×cBeatAddrStep 消费；
   // P0 阶段只立契约（字段位宽/语义），无消费者，顶层暂占位驱 0。
   val cBeatAddrStep = UInt(cfg.addrWidth.W)
+  val cDmaBufBeatTar = UInt(4.W)
+  val cDmaDmaBeatTar = UInt(4.W)
+
+
+  
 }
 object HiveCoreExePreCalcConfig {
   def apply(cfg: HiveCoreConfig) = new HiveCoreExePreCalcConfig(cfg)

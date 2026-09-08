@@ -17,7 +17,7 @@ import org.scalatest.matchers.should.Matchers
 import java.io._
 import java.nio.file._
 
-class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with HiveFstSim {
+class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with HiveFstSim with HiveStatusPollApi {
 
   // ========== 测试参数 ==========
   val M = 32
@@ -197,13 +197,24 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
     // fp32 默认输出 256-bit 总线 → 2 拍/行（拍内步进 32B）；cRowOff=n*4、
     // cColOff=totalN*4、三角累积闭式块间跳转（金锚），遍历序 nt 外 × m 中 × 行内拍内 ---
     val expCAddrSeq = HiveSimCommon.cAddrSeqDense(
-      C_BASE, M, N, totalN, outFmt = 0, cfg.cDmaExtW)
+      C_BASE, M, N, totalN, outFmt = DataFormat.FP32, cfg.cDmaExtW)
 
     // --- 仿真 ---
     println(s"[HiveCoreSimCase] Starting simulation: M=$M, N=$N, K=$K, totalN=$totalN")
     println(s"[HiveCoreSimCase] Config: aEffW=$aEffW, cEffW=$cEffW, aExtW=${cfg.aExtW}, bExtW=${cfg.bExtW}, cExtW=${cfg.cExtW}")
     println(s"[HiveCoreSimCase] Strides: A=$aStride, B=$bStride, C=$cStride")
 
+    // 【任务102】mismatchCnt 声明上移至 try 外：断言位于 finally（copyTrace）之后，
+    // 需跨 try 作用域引用；声明无副作用，执行顺序与旧代码逐字一致。
+    var mismatchCnt = 0
+
+    // 【任务102】失败路径也 dump 波形（#94 已在 MxSpec 验证的 try/finally 范式）：
+    // 超时/块内断言（done/地址对账等）抛出异常时，旧代码 copyTrace 位于顺序路径
+    // 末段、永不执行 → sim/ 无波形可查。try 包住 simulate 与其后 C 重建
+    // （copyTrace 之前的全部顺序代码），copyTrace 移入 finally：无论 pass/fail
+    // 均转存，异常自然向上重抛保持 ScalaTest fail 语义；成功路径语句顺序与旧
+    // 代码逐字一致（后续 println 列表与 mismatchCnt 断言仍在转存之后）。
+    try {
     simulate(new HiveCore(cfg)) { dut =>
 
       // ===== DMA 通道状态 =====
@@ -275,8 +286,14 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       dut.io.cmd.valid.poke(false.B)
 
       // ===== 主仿真循环: DMA 响应 + 等待完成 =====
+      // 【任务101】EXECUTE 已改为立即返回响应（不代表完成），完成判定改为
+      // REG_READ(0x08) 轮询 STATUS（statusPollStep 跨拍状态机，见 HiveSimCommon）
       var done = false
       var cycle = 0
+      var pollSt = 0
+      var pollCool = 0
+      // 诊断留痕：最近一次轮询读到的 STATUS（timeout 时打印，定性 config-err）
+      var lastStatus: Option[HiveSimCommon.HiveStatusBits] = None
       val maxCycles = 500000
 
       println("[HiveCoreSimCase] Entering DMA response loop...")
@@ -375,13 +392,18 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
         }
 
 
-        // --- 检查完成 ---
-        if (dut.io.resp.valid.peek().litToBoolean) {
-          if (dut.io.resp.payload.done.peek().litToBoolean) {
-            println(f"[cycle=$cycle%6d] EXECUTE complete! DMA-A beats=$dmaABeatsSent, C store beats=$dmaCStoreBeats")
+        // --- 检查完成：STATUS 寄存器轮询（bit1=done 粘滞位、bit2=err）---
+        val (stNext, coolNext, statusOpt) = statusPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool)
+        pollSt = stNext
+        pollCool = coolNext
+        statusOpt.foreach { st =>
+          lastStatus = Some(st)
+          if (st.done) {
+            println(f"[cycle=$cycle%6d] EXECUTE complete (STATUS.done=1, err=${st.err}, progress=${st.progress})! " +
+                    s"DMA-A beats=$dmaABeatsSent, C store beats=$dmaCStoreBeats")
+            // 完成 STATUS 必须不带 err：防止 FSM 异常退出被下游数值校验兑底掩盖
+            st.err should be(false)
             done = true
-          } else if (cycle < 40) {
-            println(f"[cycle=$cycle%6d] resp valid (done=0, err=${dut.io.resp.payload.err.peek().litValue})")
           }
         }
 
@@ -401,6 +423,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       }
 
       dut.io.dmaC.rsp.valid.poke(false.B)
+      dut.io.cmd.valid.poke(false.B)   // 轮询命令用后拉低（防残留影响后续拍）
 
       if (!done) {
         println(s"[HiveCoreSimCase] WARNING: Simulation timed out at $maxCycles cycles")
@@ -408,6 +431,12 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
         val progress = dut.io.status.progress.peek().litValue.toInt
         val busy = dut.io.status.busy.peek().litToBoolean
         println(s"  Status: busy=$busy progress=$progress")
+        // 【任务101】诊断：打印轮询链路最后一次读到的 STATUS（轮询路径生效留痕；
+        // config-err（如 errCode=5 FP32 输入拦截）下 doneFlag/errFlag 均不置位，
+        // 只能靠 errCode/progress 定性硬件未启动根因）
+        lastStatus.foreach { st =>
+          println(f"  Last polled STATUS(0x08): busy=${st.busy} done=${st.done} err=${st.err} errCode=${st.errCode} progress=${st.progress}")
+        }
       }
 
       done should be(true)
@@ -423,7 +452,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
     val cWriteLogSeq: Seq[(Long, BigInt)] = cWriteLog.toSeq
     // P3 公共解析器：256-bit 密集拍 → (row, col) 元素矩阵（fp32 = 32-bit bits，
     // 2 拍/行、拍内 8 元素低列号在低位），地址对账已在仿真循环内硬断言完成
-    val cBits = HiveSimCommon.parseDenseCWriteLog(cWriteLogSeq, outFmt = 0, M, N, totalN, cfg.cDmaExtW)
+    val cBits = HiveSimCommon.parseDenseCWriteLog(cWriteLogSeq, outFmt = DataFormat.FP32, M, N, totalN, cfg.cDmaExtW)
     val cResult = cBits.map(_.map(b => BigInt(b & 0xFFFFFFFFL)))
 
     HiveSimCommon.writeBigIntMatrixHex(s"$simDir/C_matrix.txt", cResult, 32)
@@ -439,7 +468,6 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
     // 参考结果用 double 计算；简化浮点硬件（无 denorm/特殊值、RNE 简化为 guard+1）
     // 允许少量误差：相对误差 <= 1e-2 或绝对误差 <= 1e-2
 
-    var mismatchCnt = 0
     var maxRelErr = 0.0
     // 多假设比对：定位硬件结果的排列规律
     // H0: C = A·B（标准）
@@ -503,15 +531,20 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
     }
     
 
-    // --- 复制 FST 波形到 sim/ 目录 ---
-    // 锚定：源路径段 should-run-* 目录名由上方 it should 用例名 mangle 而来
-    // （空格与 `=` 转 `-`，其余字符保留），二者必须逐字一致；
-    // 改动用例名时须同步修改此源路径，否则拷贝将静默走 NOTE 分支。
-    HiveSimCommon.copyTrace(
-      "build/chiselsim/HiveCoreSimCase/HiveCore-GEMM-Simulation/should-run-complete-GEMM-M-32-N-16-K-16-FP16-totalN-16/workdir-verilator/trace.fst",
-      s"$simDir/hivecore_sim.fst",
-      "HiveCoreSimCase"
-    )
+    } finally {
+      // --- 复制 FST 波形到 sim/ 目录 ---
+      // 锚定：源路径段 should-run-* 目录名由上方 it should 用例名 mangle 而来
+      // （空格与 `=` 转 `-`，其余字符保留），二者必须逐字一致；
+      // 改动用例名时须同步修改此源路径，否则拷贝将静默走 NOTE 分支。
+      // FST 须在 simulate 块退出（verilator flush/close trace.fst）后再复制；
+      // 【任务102】置于 finally：超时/断言失败异常上抛后同样在此转存（Verilator
+      // 已对失败拍之前的周期持续写出 trace.fst，文件非空即可拷出供回放）。
+      HiveSimCommon.copyTrace(
+        "build/chiselsim/HiveCoreSimCase/HiveCore-GEMM-Simulation/should-run-complete-GEMM-M-32-N-16-K-16-FP16-totalN-16/workdir-verilator/trace.fst",
+        s"$simDir/hivecore_sim.fst",
+        "HiveCoreSimCase"
+      )
+    }
 
     println(s"[HiveCoreSimCase] Output files written to $simDir/")
     println(s"  - A_matrix.txt (${M}x${K}, 16-bit hex)")
@@ -570,7 +603,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
     // P3 迁移：拍数/元素数改用公共助手（运行期语义 = fp32 32-bit 元素口径，
     // 与硬件 WrOnly beatsPerRowEff 同源），旧局部复刻哨兵语义已删。
     val elemE  = cfg.cDmaExtW / 32
-    val beatsPerRow = HiveSimCommon.cBeatsPerRow(0, totalN, cfg.cDmaExtW)
+    val beatsPerRow = HiveSimCommon.cBeatsPerRow(DataFormat.FP32, totalN, cfg.cDmaExtW)
     require(beatsPerRow > 1, s"缩位用例要求 cBeatsPerRow>1，当前=$beatsPerRow")
 
     // --- 生成矩阵（与主用例同源：FP16，element = (row+1) + col*0.1）---
@@ -648,13 +681,17 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
     // fp32 32-bit 元素口径：行步进 = n*4、tile 步进 = totalN*4、拍内步进 = 32B，
     // 三角累积闭式块间跳转（金锚），遍历序 nt 外 × m 中 × 行内拍内 ---
     val expCAddrSeq = HiveSimCommon.cAddrSeqDense(
-      C_BASE, M, N, totalN, outFmt = 0, cfg.cDmaExtW)
+      C_BASE, M, N, totalN, outFmt = DataFormat.FP32, cfg.cDmaExtW)
     val cWriteLog = scala.collection.mutable.ArrayBuffer[(Long, BigInt)]()
 
     println(s"[Shrunk-$elemE] Starting: M=$M N=$N K=$K totalN=$totalN cDmaExtW=$cDmaExtW E=$elemE beatsPerRow=$beatsPerRow")
     println(s"[Shrunk-$elemE] beats: dmaA=$dmaATotalBeats dmaB=$dmaBTotalBeats C=${expCAddrSeq.size} (legacy 一拍一行时 C=${aNTiles * M})")
 
     // --- 仿真 ---
+    // 【任务102】失败路径也 dump 波形（#94 范式）：try 包 simulate，copyTrace 移入
+    // finally——超时/断言失败异常上抛时同样转存，成功路径转存时机（块退出后）
+    // 与旧代码完全一致。
+    try {
     simulate(new HiveCore(cfg)) { dut =>
 
       var dmaABeatsSent = 0
@@ -708,8 +745,11 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       dut.clock.step()
       dut.io.cmd.valid.poke(false.B)
 
+      // 【任务101】EXECUTE 立即响应语义：完成判定 = STATUS 轮询（statusPollStep）
       var done = false
       var cycle = 0
+      var pollSt = 0
+      var pollCool = 0
       val maxCycles = 8000
 
       while (!done && cycle < maxCycles) {
@@ -779,11 +819,16 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
           dut.io.dmaB.rsp.payload.err.poke(false.B)
         }
 
-        // --- 完成检查 ---
-        if (dut.io.resp.valid.peek().litToBoolean && dut.io.resp.payload.done.peek().litToBoolean) {
-          println(f"[Shrunk-$elemE cycle=$cycle%5d] EXECUTE complete! A=$dmaABeatsSent B=$dmaBBeatsSent C=$dmaCStoreBeats")
-          dut.io.resp.payload.err.peek().litToBoolean should be(false)
-          done = true
+        // --- 完成检查：STATUS 寄存器轮询（【任务101】EXECUTE 立即响应语义）---
+        val (stNext, coolNext, statusOpt) = statusPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool)
+        pollSt = stNext
+        pollCool = coolNext
+        statusOpt.foreach { st =>
+          if (st.done) {
+            println(f"[Shrunk-$elemE cycle=$cycle%5d] EXECUTE complete (STATUS.done=1, err=${st.err})! A=$dmaABeatsSent B=$dmaBBeatsSent C=$dmaCStoreBeats")
+            st.err should be(false)
+            done = true
+          }
         }
 
         dut.clock.step()
@@ -791,6 +836,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       }
 
       dut.io.dmaC.rsp.valid.poke(false.B)
+      dut.io.cmd.valid.poke(false.B)   // 轮询命令用后拉低（防残留影响后续拍）
 
       if (!done) println(s"[Shrunk-$elemE] WARNING: timeout at $maxCycles cycles (A=$dmaABeatsSent B=$dmaBBeatsSent C=$dmaCStoreBeats)")
 
@@ -802,7 +848,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       dmaCStoreBeats should be(aNTiles * M * beatsPerRow)
 
       // ===== C 重建：P3 公共解析器（遍历序/拍内列位语义与硬件同源）=====
-      val cBits = HiveSimCommon.parseDenseCWriteLog(cWriteLog.toSeq, outFmt = 0, M, N, totalN, cfg.cDmaExtW)
+      val cBits = HiveSimCommon.parseDenseCWriteLog(cWriteLog.toSeq, outFmt = DataFormat.FP32, M, N, totalN, cfg.cDmaExtW)
       val cResult = cBits.map(_.map(b => BigInt(b & 0xFFFFFFFFL)))
 
       // ===== 数值校验：C = A×B（FP16 输入，fp32 累加，经 40→32 规格化写出）=====
@@ -826,18 +872,22 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
 
       mismatchCnt should be(0)
     }
-
-    // --- 复制 FST 波形（源路径段由 testMangle 逐字锚定 it should 用例名）---
-    HiveSimCommon.copyTrace(
-      s"build/chiselsim/HiveCoreSimCase/HiveCore-GEMM-Simulation/$testMangle/workdir-verilator/trace.fst",
-      s"$simDir/$waveName",
-      s"Shrunk-$elemE"
-    )
+    } finally {
+      // --- 复制 FST 波形（源路径段由 testMangle 逐字锚定 it should 用例名）---
+      // FST 须在 simulate 块退出（verilator flush/close trace.fst）后再复制；
+      // 【任务102】置于 finally：超时/断言失败异常上抛后同样在此转存（Verilator
+      // 已对失败拍之前的周期持续写出 trace.fst，文件非空即可拷出供回放）。
+      HiveSimCommon.copyTrace(
+        s"build/chiselsim/HiveCoreSimCase/HiveCore-GEMM-Simulation/$testMangle/workdir-verilator/trace.fst",
+        s"$simDir/$waveName",
+        s"Shrunk-$elemE"
+      )
+    }
   }
 
   // ==========================================================================
-  // P2 精度转换（outFmt）端到端仿真：regs(7) 运行期选择写回格式（P0 扩 4-bit：
-  // Cat(bit16, bit[13:11])，低 3 位旧编码逐字兼容：1=fp16/2=bf16）。
+  // P2 精度转换（outFmt）端到端仿真：regs(7) 运行期选择写回格式（新 REG_CONTROL 布局：
+  // outFmt = regs(7)(10,8) 3-bit，1=fp16/2=bf16）。
   // 断言：逐拍写地址序列（行步进 n*outElemBytes、tile 跳转 totalN*outElemBytes、
   // 拍内步进 = (cDmaExtW/16)×2B）、拍数 = ceil(totalN×16/cDmaExtW)、
   // 16-bit 密集打包内容与高位零填充；crafted 矩阵构造严格锚点：
@@ -854,19 +904,19 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
 
   it should "run fp16 out GEMM RNE full width" in {
     // P3 迁移：原 0 哨兵（满宽）废止 → 默认 256（16-bit 1 拍/行满占用）
-    runOutFmtGemm(outFmt = 1, rnd = 0, cDmaExtW = 256,
+    runOutFmtGemm(outFmt = DataFormat.FP16, rnd = 0, cDmaExtW = 256,
       waveName = "hivecore_outfmt_fp16_rne_sim.fst",
       testMangle = "should-run-fp16-out-GEMM-RNE-full-width")
   }
 
   it should "run fp16 out GEMM RTZ full width" in {
-    runOutFmtGemm(outFmt = 1, rnd = 1, cDmaExtW = 256,
+    runOutFmtGemm(outFmt = DataFormat.FP16, rnd = 1, cDmaExtW = 256,
       waveName = "hivecore_outfmt_fp16_rtz_sim.fst",
       testMangle = "should-run-fp16-out-GEMM-RTZ-full-width")
   }
 
   it should "run bf16 out GEMM RNE full width" in {
-    runOutFmtGemm(outFmt = 2, rnd = 0, cDmaExtW = 256,
+    runOutFmtGemm(outFmt = DataFormat.BF16, rnd = 0, cDmaExtW = 256,
       waveName = "hivecore_outfmt_bf16_rne_sim.fst",
       testMangle = "should-run-bf16-out-GEMM-RNE-full-width")
   }
@@ -875,7 +925,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
     // P3 迁移：原 320 哨兵违反 isPow2 → 改 128（最深合法 2 幂）：16-bit 输出下
     // E=8、每行 2 拍（与原用例名行为一致），拍内步进 16B、行步进 N×2B、
     // 高位零填充断言保留（满占用时天然为零，防回归）
-    runOutFmtGemm(outFmt = 1, rnd = 0, cDmaExtW = 128,
+    runOutFmtGemm(outFmt = DataFormat.FP16, rnd = 0, cDmaExtW = 128,
       waveName = "hivecore_outfmt_fp16_rne_shrunk_e8_sim.fst",
       testMangle = "should-run-fp16-out-GEMM-RNE-shrunk-E8")
   }
@@ -883,7 +933,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
   it should "run fp16 out GEMM RUP full width" in {
     // 方向性舍入端到端（寄存器→转换模块完整链路）：fp16 + rnd=RUP，
     // 正数被截断位非零时向 +∞ 增大；期望由独立软件参考模型对拍（容差 1e-2）
-    runOutFmtGemm(outFmt = 1, rnd = 3, cDmaExtW = 256,
+    runOutFmtGemm(outFmt = DataFormat.FP16, rnd = 3, cDmaExtW = 256,
       waveName = "hivecore_outfmt_fp16_rup_sim.fst",
       testMangle = "should-run-fp16-out-GEMM-RUP-full-width")
   }
@@ -892,15 +942,16 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
     // P3 迁移：原 320 哨兵违反 isPow2 → 改 128（16-bit 打包 × 深拆分组合：
     // E=8、每行 2 拍），覆盖 packed16 选路 + 行内拍段切割（段低 E×16 位有效）与 2B 密集步进；
     // 期望由独立软件参考模型对拍（容差 1e-2）
-    runOutFmtGemm(outFmt = 2, rnd = 0, cDmaExtW = 128,
+    runOutFmtGemm(outFmt = DataFormat.BF16, rnd = 0, cDmaExtW = 128,
       waveName = "hivecore_outfmt_bf16_rne_shrunk_e8_sim.fst",
       testMangle = "should-run-bf16-out-GEMM-RNE-shrunk-E8")
   }
 
-  private def runOutFmtGemm(outFmt: Int, rnd: Int, cDmaExtW: Int,
+  private def runOutFmtGemm(outFmt: DataFormat.Type, rnd: Int, cDmaExtW: Int,
                             waveName: String, testMangle: String): Unit = {
-    require(outFmt == 1 || outFmt == 2, s"本用例族仅支持 16-bit 输出（1=fp16/2=bf16），当前=$outFmt")
-    val tag = s"OutFmt-$outFmt-rnd$rnd-E$cDmaExtW"
+    require(outFmt == DataFormat.FP16 || outFmt == DataFormat.BF16,
+      s"本用例族仅支持 16-bit 输出（FP16/BF16），当前=$outFmt")
+    val tag = s"OutFmt-${outFmt.litValue}-rnd$rnd-E$cDmaExtW"
 
     // --- 配置（与主用例同参数；cDmaExtW ∈ {256, 128} 合法 2 幂位宽）---
     val cfg = HiveCoreConfig(
@@ -1013,6 +1064,10 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
 
     println(s"[$tag] Starting: M=$M N=$N K=$K totalN=$totalN cDmaExtW=$cDmaExtW E=$elemE beatsPerRow=$beatsPerRow outElemBytes=$outElemBytes")
 
+    // 【任务102】失败路径也 dump 波形（#94 范式）：try 包 simulate，copyTrace 移入
+    // finally——超时/断言失败异常上抛时同样转存，成功路径转存时机（块退出后）
+    // 与旧代码完全一致。
+    try {
     simulate(new HiveCore(cfg)) { dut =>
 
       var dmaABeatsSent = 0
@@ -1050,11 +1105,11 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
         dut.clock.step(2)
       }
 
-      // ===== 配置寄存器（FP16 输入 + rnd + outFmt 打包进 regs(7)：
-      // [4:2]=rnd、outFmt 4-bit = Cat(bit16, bit[13:11])（低 3 位旧编码逐字兼容，
-      // 整数族 8/9/10 需 bit16，本族 fp16/bf16 不涉）；aFmt=FP16(0) 不写即默认）=====
-      val controlWord = ((rnd.toLong & 0x7) << 2) |
-        ((outFmt.toLong & 0x7) << 11) | ((outFmt.toLong >> 3) << 16)
+      // ===== 配置寄存器（FP16 输入 + rnd + outFmt 打包进 regs(7)（新 REG_CONTROL
+      // 布局）：[14:12]=rnd、[10:8]=outFmt（3-bit；本族 fp16/bf16 不涉位宽局限，
+      // 整数族 8/9/10 的 bit3 新布局无处安放）；aFmt=FP16(0) 不写即默认）=====
+      val controlWord = ((rnd.toLong & 0x7) << 12) |
+        ((outFmt.litValue.toLong & 0x7) << 8)
       sendCmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, M, N)
       sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, K, A_BASE)
       sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, B_BASE, C_BASE)
@@ -1070,8 +1125,11 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       dut.clock.step()
       dut.io.cmd.valid.poke(false.B)
 
+      // 【任务101】EXECUTE 立即响应语义：完成判定 = STATUS 轮询（statusPollStep）
       var done = false
       var cycle = 0
+      var pollSt = 0
+      var pollCool = 0
       val maxCycles = 8000
 
       while (!done && cycle < maxCycles) {
@@ -1141,11 +1199,16 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
           dut.io.dmaB.rsp.payload.err.poke(false.B)
         }
 
-        // --- 完成检查 ---
-        if (dut.io.resp.valid.peek().litToBoolean && dut.io.resp.payload.done.peek().litToBoolean) {
-          println(f"[$tag cycle=$cycle%5d] EXECUTE complete! A=$dmaABeatsSent B=$dmaBBeatsSent C=$dmaCStoreBeats")
-          dut.io.resp.payload.err.peek().litToBoolean should be(false)
-          done = true
+        // --- 完成检查：STATUS 寄存器轮询（【任务101】EXECUTE 立即响应语义）---
+        val (stNext, coolNext, statusOpt) = statusPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool)
+        pollSt = stNext
+        pollCool = coolNext
+        statusOpt.foreach { st =>
+          if (st.done) {
+            println(f"[$tag cycle=$cycle%5d] EXECUTE complete (STATUS.done=1, err=${st.err})! A=$dmaABeatsSent B=$dmaBBeatsSent C=$dmaCStoreBeats")
+            st.err should be(false)
+            done = true
+          }
         }
 
         dut.clock.step()
@@ -1153,6 +1216,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       }
 
       dut.io.dmaC.rsp.valid.poke(false.B)
+      dut.io.cmd.valid.poke(false.B)   // 轮询命令用后拉低（防残留影响后续拍）
 
       if (!done) println(s"[$tag] WARNING: timeout at $maxCycles cycles (A=$dmaABeatsSent B=$dmaBBeatsSent C=$dmaCStoreBeats)")
 
@@ -1171,7 +1235,7 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       // 解码：fp16 → fp16ToFloat；bf16 → 高 16 位左移重建 fp32 bits
       def decodeElem(bits: Long): Double = {
         val v = bits.toInt & 0xFFFF
-        if (outFmt == 1) HiveSimCommon.fp16ToFloat(v).toDouble
+        if (outFmt == DataFormat.FP16) HiveSimCommon.fp16ToFloat(v).toDouble
         else HiveSimCommon.fp32BitsToFloat((v.toLong << 16) & 0xFFFFFFFFL).toDouble
       }
       // fp16 严格锚点判定（bf16 无 65504/2^-14 边界，仅保零行锚点）；
@@ -1180,9 +1244,9 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       // 走容差对拍（曾误将 i>=4 全列饱和致 C(4,2) 失配，修正留痕）。
       def isStrict(i: Int, j: Int): Boolean = {
         if (i == 2) true                                        // 零行（fp16/bf16 均为 +0）
-        else if (outFmt == 1 && (i == 0 || i == 1) && j != 1) true  // ±256 行饱和（j==1 为正常值 ±16.384）
-        else if (outFmt == 1 && i >= 4 && j == 0) true          // 512 列大行和饱和（正）
-        else if (outFmt == 1 && i == 3 && j == 1) true          // FTZ 零（3.2e-5 < 2^-14）
+        else if (outFmt == DataFormat.FP16 && (i == 0 || i == 1) && j != 1) true  // ±256 行饱和（j==1 为正常值 ±16.384）
+        else if (outFmt == DataFormat.FP16 && i >= 4 && j == 0) true          // 512 列大行和饱和（正）
+        else if (outFmt == DataFormat.FP16 && i == 3 && j == 1) true          // FTZ 零（3.2e-5 < 2^-14）
         else false
       }
       def strictExpect(i: Int, j: Int): Int = {
@@ -1215,12 +1279,16 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
 
       mismatchCnt should be(0)
     }
-
-    // --- 复制 FST 波形（源路径段由 testMangle 逐字锚定 it should 用例名）---
-    HiveSimCommon.copyTrace(
-      s"build/chiselsim/HiveCoreSimCase/HiveCore-GEMM-Simulation/$testMangle/workdir-verilator/trace.fst",
-      s"$simDir/$waveName",
-      tag
-    )
+    } finally {
+      // --- 复制 FST 波形（源路径段由 testMangle 逐字锚定 it should 用例名）---
+      // FST 须在 simulate 块退出（verilator flush/close trace.fst）后再复制；
+      // 【任务102】置于 finally：超时/断言失败异常上抛后同样在此转存（Verilator
+      // 已对失败拍之前的周期持续写出 trace.fst，文件非空即可拷出供回放）。
+      HiveSimCommon.copyTrace(
+        s"build/chiselsim/HiveCoreSimCase/HiveCore-GEMM-Simulation/$testMangle/workdir-verilator/trace.fst",
+        s"$simDir/$waveName",
+        tag
+      )
+    }
   }
 }

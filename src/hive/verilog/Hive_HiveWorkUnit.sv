@@ -5,7 +5,7 @@ module Hive_HiveWorkUnit(	// src/hive/scala/main/HiveWorkUnit.scala:310:7
   input  [15:0] io_a,	// src/hive/scala/main/HiveWorkUnit.scala:332:14
                 io_b,	// src/hive/scala/main/HiveWorkUnit.scala:332:14
   input  [39:0] io_cReg,	// src/hive/scala/main/HiveWorkUnit.scala:332:14
-  input  [2:0]  io_aFmt,	// src/hive/scala/main/HiveWorkUnit.scala:332:14
+  input  [3:0]  io_aFmt,	// src/hive/scala/main/HiveWorkUnit.scala:332:14
                 io_bFmt,	// src/hive/scala/main/HiveWorkUnit.scala:332:14
   input  [7:0]  io_scaleA,	// src/hive/scala/main/HiveWorkUnit.scala:332:14
                 io_scaleB,	// src/hive/scala/main/HiveWorkUnit.scala:332:14
@@ -110,8 +110,8 @@ module Hive_HiveWorkUnit(	// src/hive/scala/main/HiveWorkUnit.scala:310:7
     .io_sum (_sumMx_macOdd_io_sum)
   );	// src/hive/scala/main/HiveWorkUnit.scala:426:24
   assign io_sum =
-    io_aFmt == 3'h4 | io_aFmt == 3'h5
+    io_aFmt == 4'h3 | io_aFmt == 4'h4 | io_aFmt == 4'h5
       ? _sumMx_macOdd_io_sum
-      : io_aFmt == 3'h3 | io_aFmt == 3'h2 ? _sumInt_macInt_io_sum : _sumFp_macFp_io_sum;	// src/hive/scala/main/HiveEnum.scala:9:{42,53,58}, src/hive/scala/main/HiveWorkUnit.scala:310:7, :365:24, :383:23, :426:24, :442:{27,47,58}, :443:10, :446:28
+      : io_aFmt == 4'h8 | io_aFmt == 4'h7 ? _sumInt_macInt_io_sum : _sumFp_macFp_io_sum;	// src/hive/scala/main/HiveEnum.scala:9:{42,53,58,69,74}, src/hive/scala/main/HiveWorkUnit.scala:310:7, :365:24, :383:23, :426:24, :442:{27,47,58}, :443:10, :446:28
 endmodule
 

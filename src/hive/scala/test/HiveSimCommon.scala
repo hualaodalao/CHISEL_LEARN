@@ -2,14 +2,46 @@
   * FP32 bit 解析与 FST 波形拷贝。由 HiveCoreSimCase 与
   * HiveCoreSimCaseLoadWSpec 共用（自两者逐字等价抽取，
   * 差异处以功能更全的一份为准）。
+  * 格式编码统一经 HiveEnum.DataFormat 枚举派生常量驱动（见 object 开头
+  * 常量区）；【任务104】fmt 相关公开 API 入参已由 Int 编码迁移为
+  * DataFormat.Type 枚举（避免枚举再改编号后调用点静默错位）；控制字
+  * 位域打包等仍需整型的场景由调用方以 fmt.litValue.toInt 收敛。
   */
 
+import chisel3._
 import chisel3.simulator.HasSimulator
 import chisel3.simulator.scalatest.HasCliOptions
 import java.io._
 import java.nio.file._
 
 object HiveSimCommon {
+
+  // ========== DataFormat 枚举派生常量（格式编码唯一源） ==========
+  // OutFormat/DataFormat 已合并为单一 DataFormat 枚举（src/hive/scala/main/
+  // HiveEnum.scala），成员声明即隐式 id 顺延：FP32=0 FP16=1 BF16=2 MXE4M3=3
+  // MXE5M2=4 MXE2M1=5 INT32=6 INT16=7 INT8=8 INT4=9。本 object 的全部格式
+  // 编码比较/分档均经此常量区驱动，不再出现裸数字。
+  private val FmtFp32   = DataFormat.FP32.litValue.toInt
+  private val FmtFp16   = DataFormat.FP16.litValue.toInt
+  private val FmtBf16   = DataFormat.BF16.litValue.toInt
+  private val FmtMxE4M3 = DataFormat.MXE4M3.litValue.toInt
+  private val FmtMxE5M2 = DataFormat.MXE5M2.litValue.toInt
+  private val FmtMxE2M1 = DataFormat.MXE2M1.litValue.toInt
+  private val FmtInt32  = DataFormat.INT32.litValue.toInt
+  private val FmtInt16  = DataFormat.INT16.litValue.toInt
+  private val FmtInt8   = DataFormat.INT8.litValue.toInt
+  private val FmtInt4   = DataFormat.INT4.litValue.toInt
+
+  // 格式族集合（Scala 级，与 HiveEnum 谓词语义对齐，用于元素位宽/字节分档）：
+  //   4B 族 = is4B = {FP32,INT32}；2B 族 = is2B ∪ {INT16}（INT16 输出同为
+  //     2B/元素，与 HiveOutCvt 选段 packedInt16 同档；is2B 谓词仅覆盖输入侧
+  //     浮点 2B 族）；1B 族 = is1B = {INT8,MXE4M3,MXE5M2}；
+  //     半字节族 = isHalfB = {INT4,MXE2M1}。
+  // 未知编码不在任何集合 → 默认臂 32-bit 档回落（原 reserved 默认臂语义不变）。
+  private val Fmt4B    = Set(FmtFp32, FmtInt32)
+  private val Fmt2B    = Set(FmtFp16, FmtBf16, FmtInt16)
+  private val Fmt1B    = Set(FmtInt8, FmtMxE4M3, FmtMxE5M2)
+  private val FmtHalfB = Set(FmtInt4, FmtMxE2M1)
 
   // ========== FP16 位模式转换 ==========
 
@@ -142,6 +174,42 @@ object HiveSimCommon {
       println(s"[$tag] NOTE: FST not found at $traceSource (run with -DemitFst=1 to generate)")
     }
   }
+
+  // ========== STATUS 寄存器轮询契约（EXECUTE 立即响应语义下的完成判定） ==========
+  // 【任务101】EXECUTE 命令已改为立即返回响应（respData=0、respErr=0，不代表完成），
+  // 测试侧完成判定统一改为 REG_READ 轮询 STATUS 寄存器：
+  //   - 读地址 0x08：HiveCore REG_READ 分支 Mux(addr === 0x08.U, statusReg, ...)
+  //     （addr 截 4 位，0x08 不变；读命令地址携带在 cmd.payload.reg0Addr）。
+  //   - statusReg 位布局（HiveCore.scala Cat(progress, 0.U(9.W), errCode, errFlag,
+  //     doneFlag, executor.io.busy)，高位在前）：
+  //       bit0=busy（executor 组合）
+  //       bit1=done（doneFlag 粘滞位：executor.io.done 拍置 1，写 regs(7) bit0=1 清除）
+  //       bit2=err（errFlag：executor.io.done 拍置 calcConfig.err||dmaErr，startPulse 拍清）
+  //       bit[6:3]=errCode（4-bit，calcConfig 锁存）
+  //       bit[15:7]=0（保留）
+  //       bit[31:16]=progress（16-bit，已完成 tile 数）
+  //   - cmd/resp 握手：cmd.ready = !respValid（上一响应未消费则反压）；cmd.fire
+  //     当拍写 respValid/respData 寄存器、次拍 resp.valid=1；resp.ready 恒高场景
+  //     下 fire 次拍恰好消费一次。
+
+  /** STATUS 寄存器 REG_READ 地址 */
+  val STATUS_REG_ADDR: Int = 0x08
+
+  /** 轮询周期（拍）：一轮 = 发起/等 fire（1~2 拍）+ 读拍 1 拍 + 冷却，减少命令流量 */
+  val POLL_PERIOD: Int = 16
+
+  /** STATUS 寄存器解码结果（位布局见上方注释） */
+  final case class HiveStatusBits(busy: Boolean, done: Boolean, err: Boolean,
+                                  errCode: Int, progress: Int)
+
+  /** REG_READ(0x08) 读回的 32-bit statusReg 解码（按 HiveCore.scala 当前位布局） */
+  def decodeStatus(data: BigInt): HiveStatusBits = HiveStatusBits(
+    busy = (data & 0x1L) != 0,
+    done = ((data >> 1) & 0x1L) != 0,
+    err = ((data >> 2) & 0x1L) != 0,
+    errCode = ((data >> 3) & 0xFL).toInt,
+    progress = ((data >> 16) & 0xFFFFL).toInt
+  )
 
   // ========== MX (MXFP8) 转换 helper ==========
   // 逐字镜像 Fp32.mxToFp32（src/hive/scala/main/Fp32.scala L56-91）的数值语义，
@@ -319,53 +387,63 @@ object HiveSimCommon {
   // ========== P3 C 写回密集布局公共模型（256-bit 密集拍，四套件共用） ==========
   // 与硬件 P0-P2 新架构逐拍同源（HiveCore calcConfig 单式 + HiveCoreDmaWrOnly
   // 运行期拍数解码）：
-  //   元素位宽档（outFmt 4-bit）：fp32/int32/reserved 回落=32、fp16/bf16/int16=16、
-  //     mxfp8/int8=8、mxfp4=4；
+  //   元素位宽档（DataFormat 编码，格式族集合见 object 开头常量区）：
+  //     FP32/INT32/未知回落=32、FP16/BF16/INT16=16、MXE4M3/MXE5M2/INT8=8、
+  //     MXE2M1/INT4=4（半字节族）；
   //   beatsPerRow = ceil(totalN×elemBits/cDmaExtW)（256 默认 × totalN=16 下 ∈ {1,2}，
-  //     mxfp4 恒 1 拍低 64 位有效、半/四分之一占用高位零填充，禁止双行合拍）；
+  //     半字节族恒 1 拍低 64 位有效、半/四分之一占用高位零填充，禁止双行合拍）；
   //   发拍数据 = 密集行 >> (beatCnt×cDmaExtW) 取低 cDmaExtW 位（拍内低列号在低位）；
-  //   地址：cRowOff = n×outElemBytes（mxfp4 = n>>1）、cColOff = totalN×outElemBytes
-  //     （mxfp4 = totalN>>1）、cBeatAddrStep = (cDmaExtW/elemBits)×elemBytes
-  //     （mxfp4 = cDmaExtW/8）；块间跳转沿用 cDma sNEXT_N 三角累积闭式（金锚背书）。
-  // 编码表（4-bit）：0=fp32 1=fp16 2=bf16 3=reserved 回落 4=mxE4M3 5=mxE5M2
-  //   6=mxfp4-E2M1 7=reserved 回落 8=int32 9=int16 10=int8 11..15=reserved 回落。
+  //   地址：cRowOff = n×outElemBytes（半字节族 = n>>1）、cColOff = totalN×outElemBytes
+  //     （半字节族 = totalN>>1）、cBeatAddrStep = (cDmaExtW/elemBits)×elemBytes
+  //     （半字节族 = cDmaExtW/8）；块间跳转沿用 cDma sNEXT_N 三角累积闭式（金锚背书）。
+  // 编码 = HiveEnum.DataFormat 枚举 litValue（OutFormat/DataFormat 已合并为单一
+  //   枚举，成员声明即隐式 id：0=FP32 1=FP16 2=BF16 3=MXE4M3 4=MXE5M2 5=MXE2M1
+  //   6=INT32 7=INT16 8=INT8 9=INT4）；未知编码不在任何格式族集合 → 32-bit 档回落。
 
-  /** outFmt(4-bit) → 元素位宽（32/16/8/4），与硬件 MuxCase 同源 */
-  def cOutElemBits(outFmt: Int): Int = outFmt match {
-    case 1 | 2 | 9 => 16
-    case 4 | 5 | 10 => 8
-    case 6 => 4
-    case _ => 32   // fp32/int32/reserved 回落
+  /** outFmt（DataFormat 枚举）→ 元素位宽（32/16/8/4），与硬件
+    * HiveCoreCalcConfig cWriteBytes 谓词链（is4B/is2B/is1B/otherwise）同源 */
+  def cOutElemBits(outFmt: DataFormat.Type): Int = {
+    val f = outFmt.litValue.toInt
+    if (Fmt4B.contains(f)) 32
+    else if (Fmt2B.contains(f)) 16
+    else if (Fmt1B.contains(f)) 8
+    else if (FmtHalfB.contains(f)) 4
+    else 32   // 未知编码回落（原 reserved 默认臂语义不变）
   }
 
-  /** outFmt → 输出元素字节数（地址步进档：4/2/1；mxfp4 返回 0 表示走半字节专用分支） */
-  def cOutElemBytes(outFmt: Int): Int = outFmt match {
-    case 1 | 2 | 9 => 2
-    case 4 | 5 | 10 => 1
-    case 6 => 0
-    case _ => 4
+  /** outFmt → 输出元素字节数（地址步进档：4/2/1；半字节族返回 0 表示走专用分支） */
+  def cOutElemBytes(outFmt: DataFormat.Type): Int = {
+    val f = outFmt.litValue.toInt
+    if (Fmt4B.contains(f)) 4
+    else if (Fmt2B.contains(f)) 2
+    else if (Fmt1B.contains(f)) 1
+    else if (FmtHalfB.contains(f)) 0
+    else 4      // 未知编码回落（原 reserved 默认臂语义不变）
   }
 
   /** 每行拍数 = ceil(totalN×elemBits/cDmaExtW)，与 WrOnly beatsPerRowEff 同源 */
-  def cBeatsPerRow(outFmt: Int, totalN: Int, cDmaExtW: Int): Int =
+  def cBeatsPerRow(outFmt: DataFormat.Type, totalN: Int, cDmaExtW: Int): Int =
     (totalN * cOutElemBits(outFmt) + cDmaExtW - 1) / cDmaExtW
 
   /** 拍内地址步进（字节），与顶层 calcConfig.cBeatAddrStep 同源：
-    * mxfp4 = cDmaExtW/8；其余 = (cDmaExtW/elemBits)×elemBytes */
-  def cBeatAddrStep(outFmt: Int, cDmaExtW: Int): Long =
-    if (outFmt == 6) (cDmaExtW / 8).toLong
+    * 半字节族（MXE2M1/INT4）= cDmaExtW/8；其余 = (cDmaExtW/elemBits)×elemBytes */
+  def cBeatAddrStep(outFmt: DataFormat.Type, cDmaExtW: Int): Long = {
+    val f = outFmt.litValue.toInt
+    if (FmtHalfB.contains(f)) (cDmaExtW / 8).toLong
     else (cDmaExtW.toLong / cOutElemBits(outFmt)) * cOutElemBytes(outFmt)
+  }
 
   /** C 写回期望地址序列（密集布局 + 拍内细分，四套件共用唯一推演源）：
     * 遍历序 nt 外 × m 中 × 行内拍内；三角累积闭式（金锚，行级结构不动）：
     *   addr(nt,m,b) = base + nt×(M−1)×cRowOff + nt×(nt+1)/2×cColOff
     *                  + m×cRowOff + b×cBeatAddrStep */
-  def cAddrSeqDense(cBase: Long, m: Int, n: Int, totalN: Int, outFmt: Int,
+  def cAddrSeqDense(cBase: Long, m: Int, n: Int, totalN: Int, outFmt: DataFormat.Type,
                     cDmaExtW: Int): Seq[Long] = {
+    val f = outFmt.litValue.toInt
     val nTiles = (n + totalN - 1) / totalN
     val beats = cBeatsPerRow(outFmt, totalN, cDmaExtW)
     val (rowOff, colOff) =
-      if (outFmt == 6) ((n.toLong >> 1), (totalN.toLong >> 1))
+      if (FmtHalfB.contains(f)) ((n.toLong >> 1), (totalN.toLong >> 1))
       else {
         val eb = cOutElemBytes(outFmt).toLong
         (n.toLong * eb, totalN.toLong * eb)
@@ -384,11 +462,11 @@ object HiveSimCommon {
     * 行内拍内；地址对账由各套件独立硬断言，本解析器只按序还原）。每拍按格式取
     * elemBits 位元素、拍内低列号在低位；拍间/折行顺序还原为 (row, col) 矩阵：
     *   globalCol = nt×totalN + beatInRow×(cDmaExtW/elemBits) + i
-    * mxfp4 取低 nibble（低列号低 nibble）；列 ≥ N（padding）不写。
+    * 半字节族（MXE2M1/INT4）取低 nibble（低列号低 nibble）；列 ≥ N（padding）不写。
     * 返回原始元素位模式（fp32=32-bit bits、16-bit 族=16-bit、8-bit 族=量化码/字节、
-    * mxfp4=4-bit 码），数值解释归各套件既有对拍逻辑（v1 数值锚布局无关）。
+    * 半字节族=4-bit 码），数值解释归各套件既有对拍逻辑（v1 数值锚布局无关）。
     */
-  def parseDenseCWriteLog(log: Seq[(Long, BigInt)], outFmt: Int, m: Int, n: Int,
+  def parseDenseCWriteLog(log: Seq[(Long, BigInt)], outFmt: DataFormat.Type, m: Int, n: Int,
                           totalN: Int, cDmaExtW: Int): Array[Array[Long]] = {
     val elemBits = cOutElemBits(outFmt)
     val beatsPerRow = cBeatsPerRow(outFmt, totalN, cDmaExtW)
@@ -413,14 +491,14 @@ object HiveSimCommon {
 
   /** 密集行（宽 totalN×32，低列号在低位，无效高位段填零）→ 逐元素位模式序列。
     * 供「期望数据硬断言」与「行级对拍」共用：按 outFmt 选段取低 totalN×elemBits 位。 */
-  def denseRowToElems(row: BigInt, outFmt: Int, totalN: Int): Seq[Long] = {
+  def denseRowToElems(row: BigInt, outFmt: DataFormat.Type, totalN: Int): Seq[Long] = {
     val elemBits = cOutElemBits(outFmt)
     val mask = (BigInt(1) << elemBits) - 1
     (0 until totalN).map(i => ((row >> (elemBits * i)) & mask).toLong)
   }
 
   /** 逐元素位模式序列 → 密集行（低列号在低位，高位零填充），与上一函数互逆 */
-  def elemsToDenseRow(elems: Seq[Long], outFmt: Int, totalN: Int): BigInt = {
+  def elemsToDenseRow(elems: Seq[Long], outFmt: DataFormat.Type, totalN: Int): BigInt = {
     val elemBits = cOutElemBits(outFmt)
     val mask = (BigInt(1) << elemBits) - 1
     var row = BigInt(0)
@@ -444,22 +522,28 @@ object HiveSimCommon {
   //   （fp32 偏置指数已含 127，与 E8M0 bias 抵消）；元素侧 ÷2^(s-127) 即指数减。
   // 舍入判定复用上方 swRoundUp（5 模式、RMM=guard，与硬件同源同链：
   // 40→32 固定简化 RNE 规格化 + 量化运行期 rnd，两级舍入链）。
-  // fmt 编码与 outFmt 3-bit 同源：4=MXE4M3、5=MXE5M2、6=MXE2M1。
+  // fmt 编码 = DataFormat 枚举 litValue，量化白名单 = isMx 族
+  // {MXE4M3, MXE5M2, MXE2M1}（与 HiveOutCvt isQuantFmt = DataFormat.isMx 同源）。
 
-  /** 量化格式参数表：(expW, mantW, bias, maxCodeExp, maxMant23, maxNormalExp,
-    * satCode, nanCode, nanToSat, fixNanCode)，由 OCP MX 字段定义独立推导：
+  /** 量化格式参数表：复用 HiveEnum.MxFormatParams 三单例（字段语义与边界数值
+    * 注释统一收敛于 HiveEnum.scala，逐字段镜像既有内联字面量；此处仅按 fmt
+    * 编码选表，杜绝双源漂移）：
     *   E4M3：maxFinite=448=1.75×2^8，NaN 需 exp&mant 全1（0x7F），饱和 0x7E，
     *         maxMantVal=1.75（mant 全1 是 NaN 不可用，尾数域比较门限=0.75→0x600000）；
     *         舍入落 NaN 码改写为饱和。
     *   E5M2：maxFinite=57344=1.75×2^15，exp 全1 为 inf/nan，饱和 0x7B，
     *         nan 规范编码取 exp 全1 + 尾数高位置位（0x7E，同 fp16 规范 nan 取法）。
     *   E2M1：maxFinite=6.0=1.5×2^2，无 inf/nan 编码（exp 全1 仍为正常数），
-    *         nan 输入裁定饱和（0x7），maxMantVal=1.5（尾数域比较门限=0.5→0x400000）。 */
-  private def quantFmtParams(fmt: Int): (Int, Int, Int, Int, Long, Int, Int, Int, Boolean, Boolean) = fmt match {
-    case 4 => (4, 3, 7,  15, 0x600000L, 15, 0x7E, 0x7F, false, true)
-    case 5 => (5, 2, 15, 30, 0x600000L, 30, 0x7B, 0x7E, false, false)
-    case 6 => (2, 1, 1,  3,  0x400000L, 3,  0x07, 0x07, true,  false)
-    case _ => throw new IllegalArgumentException(s"swQuantBlock: 非法量化格式 fmt=$fmt（需 4/5/6）")
+    *         nan 输入裁定饱和（0x7），maxMantVal=1.5（尾数域比较门限=0.5→0x400000）。
+    * maxNormalExp（swQuantElem 溢出判据）与 maxCodeExp 共用单字段（三格式取值
+    * 恰一致：E4M3=15/E5M2=30/E2M1=3，见 HiveEnum.MxFormatParams 注释）。 */
+  private def quantFmtParams(fmt: DataFormat.Type): MxFormatParams = fmt.litValue.toInt match {
+    case FmtMxE4M3 => MxFormatParams.E4M3
+    case FmtMxE5M2 => MxFormatParams.E5M2
+    case FmtMxE2M1 => MxFormatParams.E2M1
+    case _ => throw new IllegalArgumentException(
+      s"swQuantBlock: 非法量化格式 fmt=$fmt（需 MXE4M3/MXE5M2/MXE2M1 = " +
+        s"$FmtMxE4M3/$FmtMxE5M2/$FmtMxE2M1）")
   }
 
   /** 块共享 E8M0 scale：满足 amax ≤ maxFinite × 2^(s-127) 的最小指数。
@@ -512,9 +596,12 @@ object HiveSimCommon {
   /** 整行量化参考：输入为已经 40→32 规格化的 fp32 bits 行（与硬件两级舍入链同链），
     * 返回 (逐元素量化码, 每 8 元素组 1 字节的 scale 序列)。blkSel：0=8/1=16/2=32/3=64；
     * 列 ≥ nEff 为 padding：不进 amax、元素码输出 0。 */
-  def swQuantBlock(normFp32s: Seq[Long], rnd: Int, fmt: Int, blkSel: Int, nEff: Int): (Seq[Int], Seq[Int]) = {
+  def swQuantBlock(normFp32s: Seq[Long], rnd: Int, fmt: DataFormat.Type, blkSel: Int, nEff: Int): (Seq[Int], Seq[Int]) = {
+    val p = quantFmtParams(fmt)
+    // maxNormalExp 与 maxCodeExp 共用 MxFormatParams 单字段（三格式取值恰一致）
     val (expW, mantW, bias, maxCodeExp, maxMant23, maxNormalExp, satCode, nanCode, nanToSat, fixNan) =
-      quantFmtParams(fmt)
+      (p.expW, p.mantW, p.bias, p.maxCodeExp, p.maxMant23.toLong, p.maxCodeExp,
+        p.satCode, p.nanCode, p.nanToSat, p.fixNanCode)
     val n = normFp32s.size
     require(n % 8 == 0, s"swQuantBlock: 行元素数($n) 必须为 8 的整数倍")
     // 幅值 = 符号位清零（非负 fp32 位模式无符号比较即幅值序）；padding 列掩 0 不进 amax
@@ -546,6 +633,63 @@ object HiveSimCommon {
       scaleOf(amax)
     }
     (codes, scaleBytes)
+  }
+}
+
+/** STATUS 轮询 poke/peek 助手 trait：与 ChiselSim 一起混入测试类。
+  *
+  * poke/peek 语法经 PeekPokeAPI（ChiselSim 的父 trait）线性化共享——本 trait
+  * 同样 extends PeekPokeAPI，与 ChiselSim 混入同一 spec 时线性化合并为同一
+  * 实例，无隐式歧义。提供两类原语：
+  *   - pokeStatusRead：poke 一次 REG_READ(STATUS) 读命令（不 step、不管 fire，
+  *     供跨拍状态机发起拍使用）；
+  *   - statusPollStep：单拍轮询状态机推进（每主循环拍调用一次，函数式返回
+  *     新状态与本次读到的 STATUS——不额外 step，主循环的 DMA 供数 poke 每拍
+  *     由循环体照常维护，轮询不干扰供数节奏）。
+  * 状态机语义（三态）：
+  *   pollSt=0 发起/HOLD：poke 读命令；cmd.ready = !respValid（EXECUTE 立即
+  *     响应至多占线 1 拍），ready 拍即 fire → 次拍进入读拍；未 fire 则保持。
+  *   pollSt=1 读拍：cmd.valid 用后拉低；fire 次拍 resp.valid=1（锁存 fire 拍
+  *     statusReg 快照），resp.ready 恒高下恰好消费一次，返回解码结果。
+  *   pollSt=2 冷却：计数 POLL_PERIOD 拍后回发起态（减少命令流量）。
+  * done/err 均为粘滞位（新 EXECUTE 拍才清除），晚读不漏。
+  */
+trait HiveStatusPollApi extends chisel3.simulator.PeekPokeAPI {
+
+  /** poke 一次 REG_READ(STATUS) 读命令（全字段 poke，与 sendCmd 同范式） */
+  def pokeStatusRead(cmd: Stream[HiveCoreCmd]): Unit = {
+    cmd.valid.poke(true.B)
+    cmd.payload.op.poke(HiveCoreOp.REG_READ)
+    cmd.payload.reg0Addr.poke(HiveSimCommon.STATUS_REG_ADDR.U)
+    cmd.payload.reg1Addr.poke(0.U)
+    cmd.payload.data0.poke(0.U)
+    cmd.payload.data1.poke(0.U)
+  }
+
+  /** 单拍轮询状态机推进：返回 (新 pollSt, 新 pollCool, 本次读到的 STATUS)。
+    * 调用方在 DMA 主循环体内每拍调用一次（循环体末尾 step 前），状态变量
+    * pollSt/pollCool 由调用方持有。读到 STATUS 的拍返回 Some(...)，其余 None。 */
+  def statusPollStep(cmd: Stream[HiveCoreCmd],
+                     resp: Stream[HiveCoreResp],
+                     pollSt: Int, pollCool: Int): (Int, Int, Option[HiveSimCommon.HiveStatusBits]) = {
+    if (pollSt == 0) {
+      pokeStatusRead(cmd)
+      // cmd.ready = !respValid：EXECUTE 立即响应占线时本拍不 fire，
+      // cmd.valid 粘滞 1，下拍重复 poke（幂等）直至 fire
+      if (cmd.ready.peek().litToBoolean) (1, 0, None) else (0, 0, None)
+    } else if (pollSt == 1) {
+      // fire 已在上拍末边沿发生：本拍 resp.valid=1（respData 为 fire 拍锁存的
+      // statusReg 快照）；读后拉低 cmd.valid（用后拉低，防命令残留）
+      cmd.valid.poke(false.B)
+      if (resp.valid.peek().litToBoolean)
+        (2, HiveSimCommon.POLL_PERIOD,
+          Some(HiveSimCommon.decodeStatus(resp.payload.data.peek().litValue)))
+      else
+        (1, 0, None)
+    } else {
+      val cool = pollCool - 1
+      if (cool <= 0) (0, 0, None) else (2, cool, None)
+    }
   }
 }
 

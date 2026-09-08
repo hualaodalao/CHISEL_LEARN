@@ -17,15 +17,15 @@
     `define ASSERT_VERBOSE_COND_ 1
   `endif // ASSERT_VERBOSE_COND
 `endif // not def ASSERT_VERBOSE_COND_
-module Hive_HiveWorker_Verification_Assert();	// src/hive/scala/main/HiveWorker.scala:167:9
-  `ifndef SYNTHESIS	// src/hive/scala/main/HiveWorker.scala:167:9
-    always @(posedge Hive_HiveWorker.clock) begin	// src/hive/scala/main/HiveWorker.scala:60:7, :167:9
+module Hive_HiveWorker_Verification_Assert();	// src/hive/scala/main/HiveWorker.scala:172:9
+  `ifndef SYNTHESIS	// src/hive/scala/main/HiveWorker.scala:172:9
+    always @(posedge Hive_HiveWorker.clock) begin	// src/hive/scala/main/HiveWorker.scala:60:7, :172:9
       if (~Hive_HiveWorker.reset & Hive_HiveWorker.io_loadVInLock
-          & Hive_HiveWorker.io_loadWInLock) begin	// src/hive/scala/main/HiveWorker.scala:60:7, :77:14, :167:{9,27}
-        if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveWorker.scala:167:9
-          $error("Assertion failed: HiveWorker: loadVInLock and loadWInLock asserted simultaneously (mutually exclusive load modes)\n");	// src/hive/scala/main/HiveWorker.scala:167:9
-        if (`STOP_COND_)	// src/hive/scala/main/HiveWorker.scala:167:9
-          $fatal;	// src/hive/scala/main/HiveWorker.scala:167:9
+          & Hive_HiveWorker.io_loadWInLock) begin	// src/hive/scala/main/HiveWorker.scala:60:7, :77:14, :172:{9,27}
+        if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveWorker.scala:172:9
+          $error("Assertion failed: HiveWorker: loadVInLock and loadWInLock asserted simultaneously (mutually exclusive load modes)\n");	// src/hive/scala/main/HiveWorker.scala:172:9
+        if (`STOP_COND_)	// src/hive/scala/main/HiveWorker.scala:172:9
+          $fatal;	// src/hive/scala/main/HiveWorker.scala:172:9
       end
     end // always @(posedge)
   `endif // not def SYNTHESIS

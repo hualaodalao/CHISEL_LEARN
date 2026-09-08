@@ -147,7 +147,12 @@ class HiveWorker(
   val scaleAReg = RegInit(0.U(8.W))
 
   // 格式支持检测（基于 fmtReg） ---
-  val fmtOk = supportedFmts.map(f => fmtReg === f).reduce(_ || _)
+  // supportedFmts 是 Set，元素数 >=5 时 Scala 用 HashSet，其 map 出的 Set[Bool]
+  // 迭代顺序取决于每实例新建 Bool 节点的 identity hashCode，导致归约 OR 操作数
+  // 顺序逐实例不同；firtool 结构 dedup 不识别 OR 交换律等价 → 256 个同构 PE 被判
+  // 为 217 个不同模块。改为按 DataFormat 枚举稳定序号 litValue 排序后再归约，
+  // 使所有实例 OR 顺序一致（逻辑严格等价，仅消除 RTL 膨胀）。
+  val fmtOk = supportedFmts.toSeq.sortBy(_.litValue).map(f => fmtReg === f).reduce(_ || _)
 
   // --- 权重驻留寄存器 ---
   val wReg = RegInit(0.U(bW.W))

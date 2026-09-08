@@ -3,13 +3,13 @@ module Hive_HiveCvtOpMx(	// src/hive/scala/main/HiveWorkUnit.scala:92:7
   input         clock,	// src/hive/scala/main/HiveWorkUnit.scala:92:7
                 reset,	// src/hive/scala/main/HiveWorkUnit.scala:92:7
   input  [7:0]  io_in,	// src/hive/scala/main/HiveWorkUnit.scala:93:14
-  input  [2:0]  io_fmt,	// src/hive/scala/main/HiveWorkUnit.scala:93:14
+  input  [3:0]  io_fmt,	// src/hive/scala/main/HiveWorkUnit.scala:93:14
   input  [7:0]  io_scale,	// src/hive/scala/main/HiveWorkUnit.scala:93:14
   input         io_consumeValid,	// src/hive/scala/main/HiveWorkUnit.scala:93:14
   output [31:0] io_out	// src/hive/scala/main/HiveWorkUnit.scala:93:14
 );
 
-  wire       isE5_layerCapture = io_fmt == 3'h5;	// src/hive/scala/main/HiveWorkUnit.scala:101:21
+  wire       isE5_layerCapture = io_fmt == 4'h4;	// src/hive/scala/main/HiveWorkUnit.scala:101:21
   wire [4:0] e5_layerCapture = io_in[6:2];	// src/hive/scala/main/Fp32.scala:60:14
   wire       _io_out_isSub_T = e5_layerCapture == 5'h0;	// src/hive/scala/main/Fp32.scala:60:14, :63:23
   wire [8:0] _GEN = {1'h0, io_scale};	// src/hive/scala/main/Fp32.scala:71:23

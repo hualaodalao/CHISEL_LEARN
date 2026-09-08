@@ -39,8 +39,8 @@ class HiveCoreScratchpad(cfg: HiveCoreConfig) extends Module {
     //   - scaleB：每 K-块一个 totalN 向量（scaleRowW = totalN*8，权重驻留）
     val scaleAPush  = if (cfg.hasMx) Some(slave(Stream(UInt(8.W))))            else None
     val scaleAPop   = if (cfg.hasMx) Some(master(Stream(UInt(8.W))))           else None
-    val scaleBPush  = if (cfg.hasMx) Some(slave(Stream(UInt(cfg.scaleRowW.W))))  else None
-    val scaleBPop   = if (cfg.hasMx) Some(master(Stream(UInt(cfg.scaleRowW.W)))) else None
+    val scaleBPush  = if (cfg.hasMx) Some(slave(Stream(UInt(8.W))))  else None
+    val scaleBPop   = if (cfg.hasMx) Some(master(Stream(UInt(8.W)))) else None
     val flushScaleA = if (cfg.hasMx) Some(Input(Bool()))                       else None
     val flushScaleB = if (cfg.hasMx) Some(Input(Bool()))                       else None
     // P2（裁定 5）：C 侧量化 scale 缓冲已上移 HiveCore 顶层（深 2 cScaleFifo，唯一 scale 缓冲），
@@ -88,7 +88,7 @@ class HiveCoreScratchpad(cfg: HiveCoreConfig) extends Module {
   // ---- Scale buffer 连接（仅 hasMx；非 MX 配置不生成 FIFO/接线）----
   if (cfg.hasMx) {
     val scaleAFifo = Module(new StreamFifo(UInt(8.W), cfg.scaleBufferDepth))
-    val scaleBFifo = Module(new StreamFifo(UInt(cfg.scaleRowW.W), cfg.scaleBufferDepth))
+    val scaleBFifo = Module(new StreamFifo(UInt(8.W), cfg.scaleBufferDepth))
 
     scaleAFifo.io.push.valid   := io.scaleAPush.get.valid
     scaleAFifo.io.push.payload := io.scaleAPush.get.payload
