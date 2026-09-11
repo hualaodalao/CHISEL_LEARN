@@ -1,0 +1,50 @@
+[info] welcome to sbt 1.10.1 (Homebrew Java 17.0.19)
+[info] loading global plugins from /Users/wangliutailong/.sbt/1.0/plugins
+[info] loading settings for project chisel_learn-build-build-build from metals.sbt ...
+[info] loading project definition from /Users/wangliutailong/Qoder_Proj/Chisel_Learn/project/project/project
+[info] loading settings for project chisel_learn-build-build from metals.sbt ...
+[info] loading project definition from /Users/wangliutailong/Qoder_Proj/Chisel_Learn/project/project
+[info] loading settings for project chisel_learn-build from metals.sbt,plugins.sbt ...
+[info] loading project definition from /Users/wangliutailong/Qoder_Proj/Chisel_Learn/project
+[info] loading settings for project root from build.sbt ...
+[info] set current project to ChiselLearn (in build file:/Users/wangliutailong/Qoder_Proj/Chisel_Learn/)
+[info] compiling 1 Scala source to /Users/wangliutailong/Qoder_Proj/Chisel_Learn/target/scala-2.13/classes ...
+[warn] 89 feature warnings; re-run with -feature for details
+[warn] one warning found
+[info] done compiling
+[PARAM-DBG] ═══ #124 ② 护栏 G3：量化 C 输出 N=24 % cMxBlk=16 != 0（原 Section E【E3】区间）═══
+[PARAM-DBG] #122 四条件几何量：kTiles=1 mTiles=1 nTiles=2 beatsPerRow=1 triggers=false（必须 false）
+[PARAM-DBG] 金锚 scaleC 行偏移 rowOff = ceil(N/cMxBlk) = ceil(24/16) = 2（旧 HW FLOOR 会给 1，差 1 ⇒ 逐 mm 累积错位）
+[PARAM-DBG] 金锚 expCScaleAddrSeq 前 4 项 = 0x500000, 0x500002, 0x500004, 0x500006
+[PARAM-DBG] Section E 检测：当前配置未落入任何已知不可用区间 ✓
+[PARAM-DBG] ================= HiveCoreParamDebugSpec =================
+[PARAM-DBG] 生效参数: M=16 N=24 K=16 aFmt=DataFormat(1=FP16) bFmt=DataFormat(1=FP16) cFmt=DataFormat(3=MXE4M3) loadWMode=0 aMxBlk=32 bMxBlk=32 cMxBlk=16 addrMode=MAT rnd=0 seed=124003 strictAddr=true maxCycles=20000 regs6=0x06800000 regs7=0x00000311
+[PARAM-DBG] 几何: totalN=16 aKTiles=1 bKTiles=1 nTiles=2 beatsPerRow=1
+[warn] src/hive/scala/main/HiveInterface.scala 170:34: [W001] Casting non-literal UInt to RoundingMode. You can use RoundingMode.safe to cast without this warning.
+[warn]         rnd := d(14, 12).asTypeOf(RoundingMode())   // 【#120 C2】3-bit：bits[14:12]，支持全 5 种舍入（RNE/RTZ/RDN/RUP/RMM）
+[warn]                                  ^
+[warn] src/hive/scala/main/HiveInterface.scala 171:34: [W001] Casting non-literal UInt to DataFormat. You can use DataFormat.safe to cast without this warning.
+[warn]         cFmt := d(11, 8).asTypeOf(DataFormat())
+[warn]                                  ^
+[warn] src/hive/scala/main/HiveInterface.scala 172:33: [W001] Casting non-literal UInt to DataFormat. You can use DataFormat.safe to cast without this warning.
+[warn]         bFmt := d(7, 4).asTypeOf(DataFormat())
+[warn]                                 ^
+[warn] src/hive/scala/main/HiveInterface.scala 173:33: [W001] Casting non-literal UInt to DataFormat. You can use DataFormat.safe to cast without this warning.
+[warn]         aFmt := d(3, 0).asTypeOf(DataFormat())
+[warn]                                 ^
+[warn] There were 4 warning(s) during hardware elaboration.
+[PARAM-DBG] regs 已写入: regs6=0x06800000 regs7=0x00000311
+[DEBUG] FST waveform copied to sim/debug/param_guard124_3_scalec_ceil.fst (1204218 bytes)
+[info] HiveCoreParamDebugSpec:
+[info] HiveCore ParamDebug
+[info] - should guard #124-3: quantized C with N not divisible by cMxBlk exercises CEIL scaleC row offset *** FAILED ***
+[info]   dmaCScale beat#1 addr mismatch: 5242881 was not equal to 5242882 (HiveCoreParamDebugSpec.scala:1247)
+[info] Run completed in 15 seconds, 280 milliseconds.
+[info] Total number of tests run: 1
+[info] Suites: completed 1, aborted 0
+[info] Tests: succeeded 0, failed 1, canceled 0, ignored 0, pending 0
+[info] *** 1 TEST FAILED ***
+[error] Failed tests:
+[error] 	HiveCoreParamDebugSpec
+[error] (Test / testOnly) sbt.TestsFailedException: Tests unsuccessful
+[error] Total time: 18 s, completed 2026年9月11日 下午1:29:43

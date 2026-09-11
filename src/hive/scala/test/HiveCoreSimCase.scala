@@ -121,19 +121,34 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       data
     }
 
-    // --- DMA-B (B buffer) 期望地址序列（按新 RdOnly 硬件行为闭式推演） ---
-    // 硬件 B 路径（HiveCoreDma.scala）：外层共 nTile 轮（终止判定
-    // nCnt === calcConfig.nTile-1），每轮内 kTile 块，块内恒 totalN 行降序
-    // （lineTarget=totalN）。两套跳转机制：
-    //   轮内 kTile 跳转：curAddr += 2*totalN*bRowOff（跳转时刻 curAddr 已
-    //     多减一拍，等效块起点 + totalN*bRowOff）；
-    //   轮间 N tile 跳转：curAddr := bAddr + colAddr；colAddr += bColTileOff
-    //     （colAddr 初值 = bColTileOff + (totalN-1)*bRowOff，每轮一次）。
-    // 两套增量跳转的等价闭式：
+    // --- DMA-B (B buffer) 期望地址序列（按 HiveCoreDmaRdOnly 现行硬件行为闭式推演）---
+    // 【#136-KS8 订正：下方机制描述原文是 B5 修复【前】的旧机制，与代码已不符，现按
+    //   HiveCoreDmaRdOnly 的 lastBTileStartAddr 模型重写。原文另指「HiveCoreDma.scala」，
+    //   该文件已在 672fb37 拆分重构中分为 RdOnly/WrOnly/DmaScaleWr 三个模块，B 通道现属
+    //   HiveCoreDmaRdOnly.scala。】
+    // 硬件 B 路径（HiveCoreDmaRdOnly，本套件 loadWMode=0）：外层共 nTile 轮（终止判定
+    // nCnt === calcConfig.nTile-1），每轮内 kTile 块，块内恒 totalN 行【降序】
+    // （lineTarget = totalN）。
+    // 现行机制 = lastBTileStartAddr 模型（该寄存器恒存【当前块的降序起点】，即块内最高行
+    // 地址；因不做末拍多减，故无需旧码的 ×2 降序补偿）：
+    //   sIDLE 锁存    curAddr = lastBTileStartAddr = bAddr + (totalN-1)*bRowOff；
+    //                 colAddr = bColTileOff（仅 loadWMode=0 分支消费）
+    //   sTRANSFER     每 req.fire 拍 curAddr -= bRowOff（降序）
+    //   轮内切 k-tile lastBTileStartAddr += totalN*bRowOff
+    //                 （旧机制为 curAddr += 2*totalN*bRowOff，靠「末拍已多减一拍」凑出
+    //                  等效结果；现机制直接由块起点累加，无补偿项）
+    //   轮间切 n-tile lastBTileStartAddr = bAddr + colAddr + (totalN-1)*bRowOff；
+    //                 colAddr += bColTileOff
+    //                 （旧机制把降序起点项 (totalN-1)*bRowOff 藏在 colAddr 初值里，
+    //                  即 colAddr 初值 = bColTileOff + (totalN-1)*bRowOff；现机制把它
+    //                  显式写在跳转式里、colAddr 初值收窄为纯 bColTileOff，两者等价）
+    // 由此推出的闭式（与下方 for 循环逐项相同，亦与 #133 恢复的 4 条 require 一致）：
     //   blockStart(r, kt) = bAddr + r*bColTileOff + (totalN-1)*bRowOff
     //                       + kt*totalN*bRowOff
-    // 块内每拍 -bRowOff（偏移由 HiveCore calcConfig 新公式直接推导：
-    // bRowOff = regFile.n*(bW/8)；bColTileOff = totalN*(bW/8)）。
+    // 块内每拍 -bRowOff（偏移由 HiveCore calcConfig 公式直接推导：loadWMode=0 时
+    // bRowOff = regFile.n*(bW/8)【正比于 N，非 M】；bColTileOff = totalN*(bW/8)）。
+    // ★ loadWMode=1（MX 转置）走【另一支】跳转（切 k-tile 为 += bColTileOff、切 n-tile 为
+    //   += bColTileOff + (totalN-1)*bRowOff），闭式不同；本套件固定 loadWMode=0，勿套用。
     val bKTiles = (K + totalN - 1) / totalN
     val nTilesB = (N + totalN - 1) / totalN
     val bRowOff = N.toLong * (cfg.bW / 8)             // = regFile.n*(bW/8)
@@ -148,18 +163,25 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
     }
     val dmaBTotalBeats = expBAddrSeq.size
     // 自检：首四块块起点（参数化闭式，N=32/K=32 时 = 0x1003c0/0x1007c0/
-    // 0x1003e0/0x1007e0；依赖 bKTiles >= 2，即 K > totalN）
-   /*
-    require(bKTiles >= 2, s"B 期望序列自检要求 K($K) > totalN($totalN)")
-    require(expBAddrSeq(0) == B_BASE + (totalN - 1).toLong * bRowOff,
-      f"B block0 start 0x${expBAddrSeq(0)}%X mismatch")
-    require(expBAddrSeq(totalN) == B_BASE + (totalN - 1).toLong * bRowOff + totalN.toLong * bRowOff,
-      f"B block1 start 0x${expBAddrSeq(totalN)}%X mismatch")
-    require(expBAddrSeq(2 * totalN) == B_BASE + (totalN - 1).toLong * bRowOff + bColTileOff,
-      f"B block2 start 0x${expBAddrSeq(2 * totalN)}%X mismatch")
-    require(expBAddrSeq(3 * totalN) == B_BASE + (totalN - 1).toLong * bRowOff + bColTileOff + totalN.toLong * bRowOff,
-      f"B block3 start 0x${expBAddrSeq(3 * totalN)}%X mismatch")
-    */
+    // 0x1003e0/0x1007e0；依赖 bKTiles >= 2 且 nTilesB >= 2）。
+    // 【#133 P0-6 恢复并更新到当前模型】这 4 条 require 此前被整块注释掉（长期失效）。
+    // 复核结论：它们与当前 HiveCoreDmaRdOnly 的 lastBTileStartAddr 模型【一致】，但
+    // 下标写法隐含「bKTiles == 2」假设（用 2*totalN / 3*totalN 直接当 r=1 的块起点，
+    // 只在 bKTiles==2 时成立）。现改为按遍历序 (r 外 × kt 中 × 块内 totalN 行降序)
+    // 显式换算下标 blkIdx(r,kt)，对任意 bKTiles/nTilesB >= 2 都成立，并补 nTilesB 前置
+    // require。本用例 K=32/totalN=16 → bKTiles=2、N=32 → nTilesB=2，四条全部生效。
+    def blkIdx(r: Int, kt: Int): Int = (r * bKTiles + kt) * totalN
+    require(bKTiles >= 2, s"B 期望序列自检要求 K($K) > totalN($totalN)，当前 bKTiles=$bKTiles")
+    require(nTilesB >= 2, s"B 期望序列自检要求 N($N) > totalN($totalN)，当前 nTilesB=$nTilesB")
+    require(expBAddrSeq(blkIdx(0, 0)) == B_BASE + (totalN - 1).toLong * bRowOff,
+      f"B block(r=0,kt=0) start 0x${expBAddrSeq(blkIdx(0, 0))}%X mismatch")
+    require(expBAddrSeq(blkIdx(0, 1)) == B_BASE + (totalN - 1).toLong * bRowOff + totalN.toLong * bRowOff,
+      f"B block(r=0,kt=1) start 0x${expBAddrSeq(blkIdx(0, 1))}%X mismatch")
+    require(expBAddrSeq(blkIdx(1, 0)) == B_BASE + (totalN - 1).toLong * bRowOff + bColTileOff,
+      f"B block(r=1,kt=0) start 0x${expBAddrSeq(blkIdx(1, 0))}%X mismatch")
+    require(expBAddrSeq(blkIdx(1, 1)) == B_BASE + (totalN - 1).toLong * bRowOff + bColTileOff +
+      totalN.toLong * bRowOff,
+      f"B block(r=1,kt=1) start 0x${expBAddrSeq(blkIdx(1, 1))}%X mismatch")
     // beat 数据（与期望地址序列同下标）：nt 固定，块内 K 行降序。
     // 外部 B 布局 = 硬件地址公式蕴含的行主序（行步进 n*(bW/8)、tile 间跳
     // totalN*(bW/8)，恰好拼成 K 行×N 列连续布局）：beat 对应外存行 =
@@ -195,7 +217,9 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
 
     // --- DMA-C (C store) 期望地址序列（P3 密集布局，公共助手唯一推演源）：
     // fp32 默认输出 256-bit 总线 → 2 拍/行（拍内步进 32B）；cRowOff=n*4、
-    // cColOff=totalN*4、三角累积闭式块间跳转（金锚），遍历序 nt 外 × m 中 × 行内拍内 ---
+    // cColOff=totalN*4、块间跳转 = 张量语义绝对式 nt*cColOff（#133 订正：旧注
+    // 「三角累积闭式（金锚）」是对当时缺陷 RTL 的反向拟合，已废止），
+    // 遍历序 nt 外 × m 中 × 行内拍内 ---
     val expCAddrSeq = HiveSimCommon.cAddrSeqDense(
       C_BASE, M, N, totalN, outFmt = DataFormat.FP32, cfg.cDmaExtW)
 
@@ -272,7 +296,10 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
       sendCmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, M, N)          // REG_M, REG_N
       sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, K, A_BASE)     // REG_K, A_ADDR
       sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, B_BASE, C_BASE) // B_ADDR, C_ADDR
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x06, 0x07, stridePacked, 0) // 三个 stride 打包进 regs(6), FMT_RND=0(FP16+RNE)
+      // regs(7) 新 REG_CONTROL 布局：aFmt=bits[3:0]、bFmt=bits[7:4]、cFmt=bits[11:8]、
+      // rnd=bits[14:12]（3-bit，#120 C2）。data1=0x11 = aFmt=FP16(1) | bFmt=FP16(1)<<4 | cFmt=FP32(0) | rnd=RNE(0)，
+      // 逐字保持旧 data1=0（旧枚举 FP16=0、cFmt 默认 0000=fp32）的「FP16 输入 + fp32 输出」语义。
+      sendCmd(HiveCoreOp.REG_WRITE2, 0x06, 0x07, stridePacked, 0x11L) // 三个 stride 打包进 regs(6)
 
       // ===== 发送 EXECUTE =====
       println("[HiveCoreSimCase] Sending EXECUTE command...")
@@ -564,7 +591,8 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
   // 【P3 迁移留痕】旧哨兵配置 320/160 违反 P0 isPow2 require（非 2 幂位宽），
   // 用例改按合法 2 幂位宽承载原语义：256（默认，fp32 = E8 每行 2 拍，与原用例名
   // 行为一致）与 128（最深合法拆分，fp32 = E4 每行 4 拍；原 160 哨兵位宽废止）。
-  // 断言：逐拍写地址序列（拍内步进 32B、行步进 n*4、tile 跳转 totalN*4、三角累积闭式）、
+  // 断言：逐拍写地址序列（拍内步进 32B、行步进 n*4、tile 跳转 totalN*4；块间跳转为
+  // 张量语义绝对式 nt*cColOff，#133 订正旧注「三角累积闭式」）、
   // 拍数 = nTile×M×beatsPerRow、密集打包内容（低列号在低位；fp32 行 512bit 恒被 2 幂总线
   // 整除、无尾拍填充）与软件参考模型（double GEMM + fp32 容差）对拍。
   // ==========================================================================
@@ -679,7 +707,8 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
 
     // --- DMA-C 期望地址序列（P3 密集布局，公共助手唯一推演源）：
     // fp32 32-bit 元素口径：行步进 = n*4、tile 步进 = totalN*4、拍内步进 = 32B，
-    // 三角累积闭式块间跳转（金锚），遍历序 nt 外 × m 中 × 行内拍内 ---
+    // 块间跳转 = 张量语义绝对式 nt*cColOff（#133 订正：旧注「三角累积闭式（金锚）」
+    // 是对当时缺陷 RTL 的反向拟合，已废止），遍历序 nt 外 × m 中 × 行内拍内 ---
     val expCAddrSeq = HiveSimCommon.cAddrSeqDense(
       C_BASE, M, N, totalN, outFmt = DataFormat.FP32, cfg.cDmaExtW)
     val cWriteLog = scala.collection.mutable.ArrayBuffer[(Long, BigInt)]()
@@ -729,11 +758,12 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
         dut.clock.step(2)
       }
 
-      // ===== 配置寄存器（FP16 + RNE，regs(7)=0；缩位是编译期配置，无运行期寄存器）=====
+      // ===== 配置寄存器（FP16 输入 + fp32 输出 + RNE；缩位是编译期配置，无运行期寄存器）=====
+      // regs(7)=0x11：aFmt=FP16(1)@bits[3:0] | bFmt=FP16(1)@bits[7:4] | cFmt=FP32(0)@bits[11:8] | rnd=RNE(0)。
       sendCmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, M, N)
       sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, K, A_BASE)
       sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, B_BASE, C_BASE)
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x06, 0x07, 0L, 0L)
+      sendCmd(HiveCoreOp.REG_WRITE2, 0x06, 0x07, 0L, 0x11L)
 
       // ===== EXECUTE =====
       dut.io.cmd.valid.poke(true.B)
@@ -1057,7 +1087,8 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
 
     // --- DMA-C 期望地址序列（P3 密集布局，公共助手唯一推演源）：
     // 16-bit 元素口径：行步进 = n×2B、tile 步进 = totalN×2B、拍内步进 = (cDmaExtW/16)×2B，
-    // 三角累积闭式块间跳转（金锚），遍历序 nt 外 × m 中 × 行内拍内 ---
+    // 块间跳转 = 张量语义绝对式 nt*cColOff（#133 订正：旧注「三角累积闭式（金锚）」
+    // 是对当时缺陷 RTL 的反向拟合，已废止），遍历序 nt 外 × m 中 × 行内拍内 ---
     val expCAddrSeq = HiveSimCommon.cAddrSeqDense(
       C_BASE, M, N, totalN, outFmt, cfg.cDmaExtW)
     val cWriteLog = scala.collection.mutable.ArrayBuffer[(Long, BigInt)]()
@@ -1105,11 +1136,14 @@ class HiveCoreSimCase extends AnyFlatSpec with Matchers with ChiselSim with Hive
         dut.clock.step(2)
       }
 
-      // ===== 配置寄存器（FP16 输入 + rnd + outFmt 打包进 regs(7)（新 REG_CONTROL
-      // 布局）：[14:12]=rnd、[10:8]=outFmt（3-bit；本族 fp16/bf16 不涉位宽局限，
-      // 整数族 8/9/10 的 bit3 新布局无处安放）；aFmt=FP16(0) 不写即默认）=====
-      val controlWord = ((rnd.toLong & 0x7) << 12) |
-        ((outFmt.litValue.toLong & 0x7) << 8)
+      // ===== 配置寄存器（新 REG_CONTROL 布局）=====
+      // regs(7)：aFmt=bits[3:0]、bFmt=bits[7:4]、cFmt/outFmt=bits[11:8]（4-bit）、
+      // rnd=bits[14:12]（3-bit，#120 C2 扩位后支持全 5 种舍入 RNE/RTZ/RDN/RUP/RMM）。
+      // 本族固定 FP16 输入（新枚举 FP16=1）：aFmt=bFmt=1；outFmt∈{FP16=1,BF16=2} 落 cFmt。
+      val controlWord = (1L) |                       // aFmt = FP16(1)
+        (1L << 4) |                                  // bFmt = FP16(1)
+        ((outFmt.litValue.toLong & 0xF) << 8) |      // cFmt = outFmt（4-bit）
+        ((rnd.toLong & 0x7) << 12)                   // rnd（3-bit，#120 C2 扩位后支持 RMM=4）
       sendCmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, M, N)
       sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, K, A_BASE)
       sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, B_BASE, C_BASE)

@@ -18,7 +18,16 @@ class HiveCoreCmd extends Bundle {
   val reg1Addr = UInt(5.W)       // 寄存器地址
   val data0   = UInt(32.W)      // 写入数据 0
   val data1   = UInt(32.W)      // 写入数据 1
+  val pc      = UInt(32.W)
+  val tag     = UInt(8.W)
 }
+
+class HiveCoreRespForTracing extends Bundle {
+  val state = UInt(2.W) // 00 start 01 end 1x err
+  val pc = UInt(32.W)         // REG_READ 返回数据
+  val tag  = UInt(8.W)
+}
+
 
 // ============================================================================
 // 命令响应 Bundle
@@ -29,6 +38,7 @@ class HiveCoreResp extends Bundle {
   val data = UInt(32.W)         // REG_READ 返回数据
   val err  = Bool()             // 错误标志
 }
+
 
 // ============================================================================
 // DMA 外部通道接口
@@ -68,6 +78,7 @@ class HiveCoreDMAExtWriteOnlyIF(cfg: HiveCoreConfig, dataWidth: Int) extends Bun
   val req = Stream(new Bundle {
     val addr = UInt(cfg.addrWidth.W)
     val data = UInt(dataWidth.W)
+    val strb = UInt((dataWidth/8).W)
   })
 }
 
@@ -157,7 +168,7 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
         aStride := d(3, 0)
         }
       is(7.U) {
-        rnd := d(13, 12).asTypeOf(RoundingMode())
+        rnd := d(14, 12).asTypeOf(RoundingMode())   // 【#120 C2】3-bit：bits[14:12]，支持全 5 种舍入（RNE/RTZ/RDN/RUP/RMM）
         cFmt := d(11, 8).asTypeOf(DataFormat())
         bFmt := d(7, 4).asTypeOf(DataFormat())
         aFmt := d(3, 0).asTypeOf(DataFormat())
@@ -179,10 +190,10 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
       is(3.U) { ret := aAddr }
       is(4.U) { ret := bAddr }
       is(5.U) { ret := cAddr }
-      is(6.U) { ret := Cat(0.U(3.W), loadWMode.asUInt, cMxBlockSize.asUInt, bMxBlockSize.asUInt, aMxBlockSize.asUInt, 0.U(8.W),cAddrMode.asUInt, bAddrMode.asUInt,aAddrMode.asUInt, cStride, bStride, aStride) }
+      is(6.U) { ret := Cat(0.U(3.W), loadWMode.asUInt, cMxBlockSize.asUInt, bMxBlockSize.asUInt, aMxBlockSize.asUInt, 0.U(7.W),cAddrMode.asUInt, bAddrMode.asUInt,aAddrMode.asUInt, cStride, bStride, aStride) }  // 【#120 C1】间隙 8→7，总位宽 32-bit，严格镜像 wregs 位域
       
       is(7.U) {
-        ret := Cat(0.U(18.W), rnd.asUInt, cFmt.asUInt, bFmt.asUInt, aFmt.asUInt)
+        ret := Cat(0.U(17.W), rnd.asUInt, cFmt.asUInt, bFmt.asUInt, aFmt.asUInt)  // 【#120 C2】17+3+4+4+4=32，rnd 占 bits[14:12]
        }
       is(8.U) { ret := 0.U }
       is(9.U) { ret := aScaleAddr }

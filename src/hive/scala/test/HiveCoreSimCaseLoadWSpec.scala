@@ -162,18 +162,37 @@ class HiveCoreSimCaseLoadWSpec extends AnyFlatSpec with Matchers with ChiselSim 
     }
 
     // --- DMA-C (C store) 期望地址序列（P3 迁移：密集布局公共推演源）：
-    // 三角累积闭式（金锚，行级结构不动）+ 拍内细分，与 HiveSimCommon.
-    // cAddrSeqDense 唯一推演源同源（四套件共用）。输出 outFmt=FP16，
+    // 张量语义绝对式 base + nt×cColOff + m×cRowOff + b×cBeatAddrStep + 拍内细分，
+    // 由 HiveSimCommon.cAddrSeqDense 唯一推演源给出（四套件共用）。输出 outFmt=FP16，
     // 256-bit 下 1 拍/行（totalN=16 → 16×16=256 bit 恰满一拍）；行步进 = N×2B、
     // 列步进 = totalN×2B。
     // 注意不复用 4bit 截断的 cStride 寄存器值——硬件地址生成根本不消费
     // stride 寄存器。两套跳转机制分别建模（与 HiveCoreDmaWrOnly
-    // sTRANSFER_M/sNEXT_N 一致）：块内每拍 + cRowOff，轮间三角累积；
-    // 等价闭式：blockStart(nt) = C_BASE + nt*(M-1)*cRowOff + nt*(nt+1)/2*cColOff
+    // sTRANSFER_M/sNEXT_N 一致）：块内每行 + cRowOff，轮间 = 基址 + 轮偏移线性模型
+    // （curAddr := regFile.cAddr + colAddr）；等价闭式：blockStart(nt) = C_BASE + nt*cColOff。
+    // 【#133 订正】本段原写「轮间三角累积；等价闭式 blockStart(nt) = C_BASE +
+    // nt*(M-1)*cRowOff + nt*(nt+1)/2*cColOff（金锚，行级结构不动）」——那是把当时缺陷
+    // RTL（sNEXT_N 的 curAddr += colAddr 自增累加）的行为当成规范反向拟合，使 nTiles≥2
+    // 的逐拍地址硬断言恒真假绿，已废止。
     val expCAddrSeq = HiveSimCommon.cAddrSeqDense(C_BASE, M, N, totalN, outFmt = DataFormat.FP16, cfg.cDmaExtW)
     val cBeatsPerRow = HiveSimCommon.cBeatsPerRow(outFmt = DataFormat.FP16, totalN, cfg.cDmaExtW)  // = 1（256-bit fp16 满拍）
-    // 自检：前两块块起点（nt=0 → C_BASE；nt=1 → C_BASE+(M-1)*cRowOff+cColOff，
-    // 起点下标 = M×beatsPerRow，密集布局下按拍细分）
+    // 块起点自检（nt=0 → C_BASE；nt=1 → C_BASE+cColOff，起点下标 = M×beatsPerRow）
+    // 现已上移为 cAddrSeqDense 内部的 require 自证不变式，此处不再重复。
+    // 【#136-KS9 订正生效条数】原文称「nTiles≥2/≥3 两条」在本套件【只有 1 条生效】：
+    //   本套件 M=32、N=32 ⇒ nTiles = ceil(32/16) = 2，故只触发 nTiles>=2 那条
+    //   （nt=1 块首拍 = base + cColOff）；nTiles>=3 那条（nt=2 块首拍 = base + 2*cColOff）
+    //   的守卫不成立、【不执行】。nt=2 的二阶项覆盖由 HiveCoreDebugCase 组(f)
+    //   （N=48 ⇒ nTiles=3）承担 —— 那条才是能区分「三角式二阶项系数 nt(nt+1)/2=3」与
+    //   「绝对式系数 nt=2」的唯一活跃护栏，勿以为本套件也覆盖了它。
+    //   触发时机术语同 #136-KS1 订正：这两条 require 在【金锚构造期】即炸（Scala 测试体
+    //   求值、调用 cAddrSeqDense 之时，早于 simulate），既非 scalac 编译期亦非 Chisel
+    //   elaboration 期。
+    // 【#136-KS9 复核：删除原本地自检是正确的】原 L177-178 曾写
+    //   `expCAddrSeq(M*cBeatsPerRow) == C_BASE + (M-1)*cRowOff + cColOff`。该右式正是
+    //   【三角累积式在 nt=1、m=0、b=0 的值】（base + 1*(M-1)*rowOff + 1*2/2*colOff），
+    //   即被污染金锚的一部分：它与缺陷 RTL 逐字同源，用它自检等于「RTL 与镜像自比」，
+    //   恒真且会【反过来阻止】金锚改回绝对式。正确的 nt=1 不变式右式是 base + cColOff
+    //   （绝对式），已内置于 cAddrSeqDense 的 require，故此处删除而非改写。
 
 
     // --- 仿真 ---

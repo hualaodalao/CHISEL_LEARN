@@ -395,7 +395,9 @@ object HiveSimCommon {
   //   发拍数据 = 密集行 >> (beatCnt×cDmaExtW) 取低 cDmaExtW 位（拍内低列号在低位）；
   //   地址：cRowOff = n×outElemBytes（半字节族 = n>>1）、cColOff = totalN×outElemBytes
   //     （半字节族 = totalN>>1）、cBeatAddrStep = (cDmaExtW/elemBits)×elemBytes
-  //     （半字节族 = cDmaExtW/8）；块间跳转沿用 cDma sNEXT_N 三角累积闭式（金锚背书）。
+  //     （半字节族 = cDmaExtW/8）；块间跳转按张量语义绝对式 = nt×cColOff（#133：
+  //     旧「沿用 cDma sNEXT_N 三角累积闭式（金锚背书）」表述已废止——三角累积是当时
+  //     缺陷 RTL 的行为、金锚不得以其为拟合目标；RTL 与金锚现同为线性/绝对模型）。
   // 编码 = HiveEnum.DataFormat 枚举 litValue（OutFormat/DataFormat 已合并为单一
   //   枚举，成员声明即隐式 id：0=FP32 1=FP16 2=BF16 3=MXE4M3 4=MXE5M2 5=MXE2M1
   //   6=INT32 7=INT16 8=INT8 9=INT4）；未知编码不在任何格式族集合 → 32-bit 档回落。
@@ -425,8 +427,26 @@ object HiveSimCommon {
   def cBeatsPerRow(outFmt: DataFormat.Type, totalN: Int, cDmaExtW: Int): Int =
     (totalN * cOutElemBits(outFmt) + cDmaExtW - 1) / cDmaExtW
 
-  /** 拍内地址步进（字节），与顶层 calcConfig.cBeatAddrStep 同源：
-    * 半字节族（MXE2M1/INT4）= cDmaExtW/8；其余 = (cDmaExtW/elemBits)×elemBytes */
+  /** 拍内地址步进（字节）。
+    *
+    * 【#136-KS5 精确化订正：原「与顶层 calcConfig.cBeatAddrStep 同源」的无条件声明不成立】
+    *   金锚本式：半字节族 = cDmaExtW/8；其余 = (cDmaExtW/elemBits)×elemBytes。
+    *   RTL（HiveCoreCalcConfig）：cBeatAddrStep = if (cWriteBytes > cDmaBytes) cDmaBytes
+    *     else cWriteBytes，其中 cWriteBytes = totalN×cEb（半字节族 = totalN/2）、
+    *     cDmaBytes = cDmaExtW/8。
+    *   ★ 结论：在【beats>1 的全部档位】两式恒等；1B 与半字节族数值分歧，但该分歧
+    *     【可证明永不可观测】。不得据此「对齐」数值（对齐会在缩位档引入真错）。
+    *   证明：beats = ceil(totalN×elemBits / cDmaExtW) > 1 ⟺ totalN×elemBits > cDmaExtW
+    *     ⟺ cWriteBytes > cDmaBytes（cWriteBytes = totalN×elemBits/8、cDmaBytes =
+    *     cDmaExtW/8，同乘 8）。故 beats>1 时 RTL 取 cDmaBytes = cDmaExtW/8，而金锚在
+    *     整字节族满足 elemBits = 8×cEb，(cDmaExtW/elemBits)×cEb = cDmaExtW/8，两式相等。
+    *     反向：HiveCoreConfig 强制 cDmaExtW ∈ [totalN×8, totalN×32]，故 elemBits<=8 时
+    *     totalN×elemBits <= totalN×8 <= cDmaExtW ⇒ beats≡1 ⇒ 行内拍下标 b≡0 ⇒
+    *     b×step 项恒为 0，step 从不进入任何地址（数值分歧不可观测）。
+    *   分歧实例（仅记录，勿改）：cDmaExtW=256 的 1B 档金锚 32 vs RTL cWriteBytes=16；
+    *     cDmaExtW=512 的 2B 档金锚 64 vs RTL 32。cDmaExtW∈{128,512} 结论不变。
+    *   ★ 若将来放宽 cDmaExtW 下界（< totalN×8）或让 1B 族出现 beats>1，上述不可观测性
+    *     立即失效，本式必须与 RTL 同时重推 —— 届时【先改 RTL 再改金锚】，禁止反向拟合。 */
   def cBeatAddrStep(outFmt: DataFormat.Type, cDmaExtW: Int): Long = {
     val f = outFmt.litValue.toInt
     if (FmtHalfB.contains(f)) (cDmaExtW / 8).toLong
@@ -434,9 +454,28 @@ object HiveSimCommon {
   }
 
   /** C 写回期望地址序列（密集布局 + 拍内细分，四套件共用唯一推演源）：
-    * 遍历序 nt 外 × m 中 × 行内拍内；三角累积闭式（金锚，行级结构不动）：
-    *   addr(nt,m,b) = base + nt×(M−1)×cRowOff + nt×(nt+1)/2×cColOff
-    *                  + m×cRowOff + b×cBeatAddrStep */
+    * 遍历序 nt 外 × m 中 × 行内拍内；地址由【张量语义绝对式】推导：
+    *   addr(nt,m,b) = base + nt×cColOff + m×cRowOff + b×cBeatAddrStep
+    *
+    * 【规范性声明（#133，勿删）】本函数是金锚（oracle）：期望值只允许由 C 的张量语义
+    * 布局推导，【禁止】以 HiveCoreDmaWrOnly 的 RTL 行为为拟合目标。推导如下——
+    * C 为 M×N row-major，元素 cOutElemBytes 字节（半字节族两列打包一字节，故行/列
+    * 步进各减半）：addr(C[i][j]) = base + j×cEb + i×(N×cEb)。写回按 n-tile 分块，
+    * 第 nt 块的首列 j = nt×totalN ⇒ 块列偏移 = nt×cColOff（cColOff = totalN×cEb）；
+    * 块内第 m 行 i = m ⇒ 行偏移 = m×cRowOff（cRowOff = N×cEb）；行内第 b 拍再叠
+    * b×cBeatAddrStep。三项互不耦合、无轮间累积项。
+    *
+    * 【历史缺陷留痕（勿回退）】本式曾写成三角累积闭式
+    *   base + nt×(M−1)×cRowOff + nt×(nt+1)/2×cColOff + m×cRowOff + b×step
+    * —— 那是对当时缺陷 RTL（sNEXT_N 用 `curAddr := curAddr + colAddr` 自增累加）的
+    * 反向拟合，使所有 nTiles≥2 用例的 dmaC 逐拍地址硬断言退化为「RTL 与其镜像自比」
+    * 而恒真假绿（FP32/N=32 下 nt=1 首址手算得 base+0xFC0，正确值应为 base+0x40）。
+    * RTL 侧已改为 `curAddr := io.regFile.cAddr + colAddr`（基址 + 轮偏移线性模型，与
+    * HiveCoreDmaScaleWr 同构），本式随之回到张量语义绝对式。下方两条 require 是本式
+    * 的自证不变式：任何三角化回退都会在【金锚构造期】立刻炸掉（即 Scala 测试体求值、
+    * 调用本函数的时刻，早于 simulate；既非 scalac 编译期亦非 Chisel elaboration 期），
+    * 【不得注释掉】。其证伪边界（m==1 ∧ nTiles==2 的可证明盲区）见下方 require 段注释。
+    */
   def cAddrSeqDense(cBase: Long, m: Int, n: Int, totalN: Int, outFmt: DataFormat.Type,
                     cDmaExtW: Int): Seq[Long] = {
     val f = outFmt.litValue.toInt
@@ -451,8 +490,45 @@ object HiveSimCommon {
     val step = cBeatAddrStep(outFmt, cDmaExtW)
     val buf = scala.collection.mutable.ArrayBuffer[Long]()
     for (nt <- 0 until nTiles; row <- 0 until m; b <- 0 until beats)
-      buf += cBase + nt.toLong * (m - 1) * rowOff +
-        nt.toLong * (nt + 1) / 2 * colOff + row * rowOff + b * step
+      buf += cBase + nt * colOff + row * rowOff + b * step
+    // ---- 自证不变式（金锚构造期即炸，早于 simulate；严禁注释掉、严禁改成 assert 关掉）----
+    // 三角式的二阶项 nt×(nt−1)/2×cColOff 在 nt=1 恒为 0，故 nt=1 首拍对三角化回退
+    // 不敏感；必须同时钉住 nt=1 与 nt=2 两个块首拍，才能拦住「只修对第一轮」的假修复。
+    //
+    // 【#136-KS1 证伪边界：m==1 ∧ nTiles==2 是三角化回退的「可证明盲区」】
+    //   机理：三角式 = base + nt×(m−1)×rowOff + nt×(nt+1)/2×colOff + m×rowOff + b×step。
+    //   m==1 时一阶项 nt×(m−1)×rowOff 恒为 0；二阶项系数 nt×(nt+1)/2 在 nt=1 恰为 1，
+    //   与绝对式的 nt 系数在 nt=1 也恰为 1（两者仅在 nt>=2 才分歧：三角 3 vs 绝对 2）。
+    //   而 nTiles==2 ⇒ nt 只取 {0,1} ⇒ 两式产出【逐拍完全相同】的序列，不存在任何
+    //   可区分它们的不变式（provably blind，不是「暂未想到反例」）。
+    //   可达性：HiveDebugModel.validate 只要求 m>0，故 `-Dm=1 -Dn=32` 是合法配置。
+    //   ★ 声明：m==1 不在本护栏覆盖域内。要覆盖 nt=2 的二阶项必须同时满足 m>=2 且
+    //     nTiles>=3（永久护栏用例 = HiveCoreDebugCase 组(f)：m=32, N=48）。
+    //   ★ nt=2 那条 require 的守卫【不得】为了覆盖 m==1 而放宽到 nTiles>=2：其下标
+    //     buf(2*m*beats) 在 m==1 ∧ nTiles==2 时 = 2*beats，而序列长度恰为
+    //     nTiles*m*beats = 2*beats ⇒ IndexOutOfBoundsException，把「盲区」变成「崩溃」，
+    //     无任何诊断价值。
+    //   ★ m==1 情形改由 nt=1 那条的 `colOff > 0` 合取项兜底（下标安全性已核：
+    //     nTiles>=2 ⇒ 长度 nTiles*m*beats >= 2*m*beats > m*beats，恒在界内）。
+    // 【#136-CS1 报错文案中性化】原文案把成因锁死为「三角累积回退」。若将来改动的是
+    //   遍历序或下标口径（而非闭式本身），也会以同一文案报错、导致成因误标，故补中性提示。
+    if (nTiles >= 2)
+      require(buf(m * beats) == cBase + colOff && colOff > 0,
+        f"cAddrSeqDense 自证失败：nt=1 块首拍应为 base+cColOff=0x${cBase + colOff}%X，" +
+        f"实得 0x${buf(m * beats)}%X（m=$m n=$n totalN=$totalN outFmt=$outFmt beats=$beats " +
+        f"colOff=$colOff）" +
+        "——可能成因（逐条排除）：(a) 期望式已被三角累积回退污染（禁止以 RTL 行为为拟合目标）；" +
+        "(b) 遍历序/下标口径被改动，请核对循环头 nt 外 × row 中 × b 内 是否仍成立、" +
+        "以及块首拍下标 m*beats 是否仍等于一个 n-tile 块的拍数；" +
+        "(c) colOff<=0（布局派生退化，会让等式塌缩成 buf(m*beats)==base 的恒等式 → 假绿）")
+    if (nTiles >= 3)
+      require(buf(2 * m * beats) == cBase + 2 * colOff,
+        f"cAddrSeqDense 自证失败：nt=2 块首拍应为 base+2*cColOff=0x${cBase + 2 * colOff}%X，" +
+        f"实得 0x${buf(2 * m * beats)}%X（m=$m n=$n totalN=$totalN outFmt=$outFmt beats=$beats）" +
+        "——可能成因（逐条排除）：(a) 期望式已被三角累积回退污染（nt=2 才能暴露二阶项 " +
+        "nt*(nt+1)/2 与绝对式 nt 的分歧：3 vs 2），禁止以 RTL 行为为拟合目标；" +
+        "(b) 遍历序/下标口径被改动，请核对循环头 nt 外 × row 中 × b 内 是否仍成立、" +
+        "以及块首拍下标 2*m*beats 是否仍等于两个 n-tile 块的拍数")
     buf.toSeq
   }
 

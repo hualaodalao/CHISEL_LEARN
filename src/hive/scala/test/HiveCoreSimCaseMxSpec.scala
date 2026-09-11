@@ -296,7 +296,8 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
 
     // ==================== DMA-C (C store) 地址+数据（P3 迁移：密集布局 + fp32 直出硬对账） ====
     // 【任务90 收敛】outFmt=0（fp32 直出）：256-bit 下 2 拍/行，拍内地址步进 32B；
-    // 三角累积闭式 + 拍内细分，四套件共用唯一推演源。
+    // 块间跳转 = 张量语义绝对式 nt×cColOff + 拍内细分，四套件共用唯一推演源
+    // （#133 订正旧注「三角累积闭式」：那是把当时缺陷 RTL 的行为当规范）。
     // 【任务95】outFmt 参数化：量化族走 cAddrSeqDense 量化布局（mxfp8 行步进 N×1B、
     // mxfp4 N>>1；拍内步进 cBeatAddrStep 同源）；fp32 路径与原逐字一致。
     val expCAddrSeq = HiveSimCommon.cAddrSeqDense(C_BASE, M, N, totalN, outFmt, cfg.cDmaExtW)

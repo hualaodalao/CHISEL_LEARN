@@ -63,8 +63,12 @@
   *     （MX SIMD v2 / loadW 水平加载 / Fp32 数值修复）中已有重构，不在「禁动区」内。
   *   - HiveCoreExecutor 的 sLOAD_A 离场门控（C2 修复）属评审发现的合法缺陷最小修复，
   *     不改变「P0-P3 未修改」的禁动区界定。
-  *   - 禁动区典型包含：cDma sNEXT_N 三角累积地址模型、aDma/bDma RdOnly 主干遍历、
-  *     Scratchpad FIFO 行为。
+  *   - 禁动区典型包含：aDma/bDma RdOnly 主干遍历、Scratchpad FIFO 行为。
+  *     【#133 撤销】此处原把「cDma sNEXT_N 三角累积地址模型」列为禁动区典型项，
+  *     现已从清单移除：该三角累积是缺陷行为（nt≥1 块首址错，FP32/N=32 下实得
+  *     base+0xFC0、正确值 base+0x40），sNEXT_N 已改为「基址 + 轮偏移」线性模型
+  *     （curAddr := io.regFile.cAddr + colAddr），与 HiveCoreDmaScaleWr 同构。
+  *     教训：把缺陷行为写进「禁动区」清单会让它获得伪权威、阻断修复。
   *
   * 【P3b MX 量化输出扩展留痕（声明区；重发射在验证阶段统一做，本阶段仅注释）】
   *   - 【端口变更】两套产物（hasMx）新增 dmaCScale 写通道端口（7 信号：

@@ -75,10 +75,14 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
     val flushC = Output(Bool())
 
     // MX scale 通道（仅 hasMx 生成，非 MX 配置不暴露）：
-    //   - scaleAPop：每激活行 pop 一个 8-bit（随激活链 skew 流入阵列）
-    //   - scaleBPop：每 sLOAD_B 窗口（每 kTile = 一个 32-K scale 块，单 pass）
-    //     pop 一个 totalN 向量（scaleRowW），锁存广播
-    //   - hiveScaleAIn/hiveScaleBIn：广播到 HiveComb 的 scale 端口
+    //   - scaleAPop：类型 UInt(8.W)。每激活行 pop 一个 8-bit（随激活链 skew 流入
+    //     阵列，单 payload 广播全列——A 侧 scale 粒度本就是每激活行 1 字节，
+    //     见下方 scaleA 供数块 W5 注释）
+    //   - scaleBPop：类型 UInt(8.W)。每 sLOAD_B 窗口按列 pop totalN 次
+    //     （8-bit/拍/列，与 bPop 同拍 lockstep fire，beat b → 列 n=(totalN-1)-b），
+    //     逐拍暂存进 scaleBRegs（当前出厂配置 totalN=16，即 16 拍/窗口）
+    //   - hiveScaleAIn：单 payload 广播全列（skew 由 PE 侧 scaleAReg 逐拍右传对齐）
+    //   - hiveScaleBIn：按列并列驱动（非广播），末拍 lock 时 totalN 列同拍有效
     val scaleAPop    = if (cfg.hasMx) Some(slave(Stream(UInt(8.W))))             else None
     val scaleBPop    = if (cfg.hasMx) Some(slave(Stream(UInt(8.W)))) else None
     val hiveScaleAIn = if (cfg.hasMx) Some(Output(Vec(cfg.totalN, UInt(8.W))))   else None
@@ -143,23 +147,45 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   val loadWModeReg = RegInit(false.B)
 
   // ==========================================================================
-  // scaleBRegs —— MX 权重侧 per-column scale 暂存（16 列 × 8-bit）
+  // mxRunB —— 单一运行期 MX 判据（W1）：scaleB 写入门 / 末拍前递门 / 握手门
+  //   统一读此信号，取代此前「写入门/前递门用 isMx(bFmt)、握手门用 isMx(aFmt)」
+  //   的判据分裂。二者相等原本仅由 HiveCoreCalcConfig 的 errCode=3（aFmt/bFmt
+  //   同族 XOR 校验）跨模块间接保证，本文件内无本地防线；而 HiveCoreExecutor2
+  //   是可独立例化的公开模块（HiveCoreSpec 已单独 elaborate），任何绕过
+  //   CalcConfig 的直挂/单元激励在 aFmt=MX、bFmt=非MX 下会出现「握手门按 aFmt
+  //   逐拍 fire、lock 拍正常发出，但写入门按 bFmt 一次都不写 scaleBRegs」→ 锁入
+  //   未初始化/残留值 → 而 MAC 侧 sumMx（HiveWorkUnit io.sum Mux 判据源自 aFmt）
+  //   被选中并真实消费 → 静默数值错误。裁定：以 aFmt 为权威（与 MAC 消费门同源），
+  //   使「握手 fire ⇔ 写 scaleBRegs ⇔ 消费 sumMx」成为本文件内的结构恒等，
+  //   不再依赖任何跨模块校验——此即所需的本地防线。
+  val mxRunB = DataFormat.isMx(io.regFile.aFmt)
+
+  // ==========================================================================
+  // scaleBRegs —— MX 权重侧 per-column scale 暂存（totalN 列 × 8-bit；
+  //   当前出厂配置 totalN=16，即 16 列 × 8-bit）
   //
-  // 架构约束来源（移位链 + 单广播 lock）：MX 强制走水平 loadW 路径，权重
-  //   数据从阵列 y=0 注入后沿 a 移位链逐拍右移，16 拍形成"对角线落位态"，
-  //   直到末拍（第 16 拍）才由一个全局广播 lock 脉冲让 16 列同拍一次性锁存
-  //   wReg / scaleBReg（见 HiveWorker.loadWInLockSafe、HiveCell 全 PE 单广播、
-  //   HiveCoreExecutor 末拍 hiveLoadWLock）。
+  // 架构约束来源（移位链 + 单广播 lock）：MX 强制走水平 loadW 路径（强制点不在
+  //   本文件，而在 HiveCoreCalcConfig 的 errCode=4：MX 运行必须 loadWMode=1，
+  //   否则报错——S2 留痕），权重数据从阵列 y=0 注入后沿 a 移位链逐拍右移，
+  //   totalN 拍形成"对角线落位态"，直到末拍（第 totalN 拍）才由一个全局广播
+  //   lock 脉冲让 totalN 列同拍一次性锁存 wReg / scaleBReg（见
+  //   HiveWorker.loadWInLockSafe、HiveCell 全 PE 单广播、末拍 hiveLoadWLock）。
   // 而 scaleB DMA 通道 bufWidth=8：1 拍只供 1 字节 1 列，块内按 -rowStep 降序，
-  //   beat b 对应列 n = 15-b；恰好 tileInterCnt（初值 totalN-1，每 fire 拍递减）
-  //   == 目标列号 n。故 16 列的 scale 是跨 16 拍逐拍到达的，无法在末拍 lock 的
-  //   那一拍由单个 payload 广播呈现（旧实现把末拍列 0 的 scale 广播到全 16 列，
-  //   导致全列指数恒为列 0 的值 —— 单字节广播缺陷）。
+  //   beat b 对应列 n = (totalN-1)-b；恰好 tileInterCnt（初值 totalN-1，每 fire
+  //   拍递减）== 目标列号 n。故 totalN 列的 scale 是跨 totalN 拍逐拍到达的，
+  //   无法在末拍 lock 的那一拍由单个 payload 广播呈现（旧实现把末拍列 0 的
+  //   scale 广播到全 totalN 列，导致全列指数恒为列 0 的值 —— 单字节广播缺陷）。
   // 解决：本组寄存器把每拍到达的 scale 按列号暂存（scaleBRegs(tileInterCnt)），
-  //   末拍 lock 时 16 列并列呈现 scaleBRegs(n)，供 HiveComb 同拍锁存。
+  //   末拍 lock 时 totalN 列并列呈现 scaleBRegs(n)，供 HiveComb 同拍锁存。
+  // 复位（W2）：RegInit 全 0——本文件相邻控制寄存器（state/tileInterCnt/
+  //   drainNextCnt/hasNext/loadWModeReg/cStoreGateReg）均已 RegInit，PE 侧
+  //   HiveWorker.scaleBReg 亦为 RegInit(0)，scaleBRegs 曾是全链路唯一无确定
+  //   初值的 scale 状态元素（已发射 RTL 证实为 _RANDOM 初始化），会在非 MX 下给
+  //   hiveScaleBIn 网络引入 seed 相关非确定性、加重在途破损排查噪声，且过不了
+  //   4-state 仿真/门级 X-prop 检查。代价仅 totalN 个 FF 的复位端，已裁定可接受。
   // 仅 MX 配置生成（Option 门控），非 MX 路径不产生任何硬件，行为零回归。
   // ==========================================================================
-  val scaleBRegs = if (cfg.hasMx) Some(Reg(Vec(totalN, UInt(8.W)))) else None
+  val scaleBRegs = if (cfg.hasMx) Some(RegInit(VecInit(Seq.fill(totalN)(0.U(8.W))))) else None
 
   // ==========================================================================
   // CBufferPipe
@@ -178,6 +204,12 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
     cStoreGateReg := false.B
   }
   
+  // scaleA 供数（W5 留痕——请勿与 scaleB 对称化）：A 侧 scale 粒度是「每激活行
+  //   1 字节」，单个 scaleAPop.payload 广播到全 totalN 列本就正确——它随 a 数据
+  //   沿移位链 skew 流动、由 PE 侧 HiveWorker.scaleAReg 逐拍右传对齐各列，广播
+  //   语义与硬件一致。这与 scaleB「每列独立 8-bit、跨 totalN 拍暂存后并列呈现」
+  //   是两种不同粒度，scaleA 并非漏改的对称项；若照 scaleB 改成 per-column 并列
+  //   反而会破坏 skew 对齐、引入真 bug。故此处刻意保留单 payload 广播。
   for (i <- 0 until cfg.totalN) {
     io.hiveAIn(i) := io.aPop.payload(cfg.aEffW * (i+1)-1, cfg.aEffW * i)
     if(cfg.hasMx){
@@ -186,19 +218,16 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   }
 
   // scaleB 按列并列供数（取代旧的单字节全列广播）：
-  //   每列 n 呈现跨 16 拍逐拍暂存到 scaleBRegs(n) 的 scale，末拍 lock 时
-  //   16 列同时有效（架构约束见 scaleBRegs 声明处注释）。
-  //   非 MX 运行（isMx(bFmt)=false）不写 scaleBRegs，值不参与实际计算，
-  //   行为与改动前一致（旧广播仅在 MX scaleBPop fire 时才有意义）。
+  //   每列 n 呈现跨 totalN 拍逐拍暂存到 scaleBRegs(n) 的 scale，末拍 lock 时
+  //   totalN 列同时有效（架构约束见 scaleBRegs 声明处注释）。
+  //   非 MX 运行（mxRunB=false）不写 scaleBRegs（W2 后恒为复位 0），值不参与
+  //   实际计算，行为与改动前一致（旧广播仅在 MX scaleBPop fire 时才有意义）。
+  //   末拍列 0 的 off-by-one 组合前递已按 W3 搬进下方 sLOAD_B 的 when(loadWModeReg)
+  //   块内，与 hiveLoadWLock 复用同一谓词——此处只保留 totalN 列的基底赋值，
+  //   last-connect 保证前递拍覆盖列 0 基底。
   if(cfg.hasMx){
     for (n <- 0 until cfg.totalN) {
       io.hiveScaleBIn.get(n) := scaleBRegs.get(n)
-    }
-    // 关键 off-by-one 组合前递：末拍（tileInterCnt===0）scaleBRegs(0) 的写入
-    //   下一拍才生效，而 loadWLock 恰在本拍组合触发，故列 0 必须直接用当拍
-    //   scaleBPop.payload 前递，否则会锁到上一轮残留的旧寄存器值。
-    when(DataFormat.isMx(io.regFile.bFmt) && io.scaleBPop.get.fire && tileInterCnt === 0.U) {
-      io.hiveScaleBIn.get(0) := io.scaleBPop.get.payload
     }
   }
 
@@ -306,12 +335,33 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
       io.hiveLoadV := io.bPop.fire
 
       if(cfg.hasMx){
-        when(DataFormat.isMx(io.regFile.aFmt)){
+        // W1：握手门改读单一运行期判据 mxRunB（与写入门/前递门/MAC 消费门同源），
+        //   消除判据分裂。MX 运行时 scaleBPop 与 bPop 必须同拍 lockstep fire，
+        //   两侧 ready 均取 (bPop.valid & scaleBPop.valid)；非 MX 运行 scaleBPop
+        //   恒不 ready、bPop 自由 pop（scaleBRegs 不写、不参与计算）。
+        when(mxRunB){
           io.scaleBPop.get.ready := io.bPop.valid & io.scaleBPop.get.valid
           io.bPop.ready          := io.bPop.valid & io.scaleBPop.get.valid
         }.otherwise{
           io.scaleBPop.get.ready := false.B
           io.bPop.ready          := true.B
+        }
+        // W7 lockstep 不变量守护（仅 hasMx 生成、仅 mxRunB 运行期检查，避免非 MX
+        //   误触发）：「bPop 与 scaleBPop 同拍 fire」是列号映射
+        //   (scaleBRegs(tileInterCnt))、无残留、末拍前递同拍三项裁定的共同前提，
+        //   此前只是两行 ready 表达式的偶然恒等、无任何断言。一旦日后给某一侧加
+        //   skid/流水或解耦 ready，scaleBRegs(tileInterCnt) 会立刻静默错列
+        //   （症状与本次修掉的单字节广播一样难查）。
+        when(mxRunB) {
+          // (1) fire 异或守护：两侧必须同拍 fire
+          assert(!(io.bPop.fire ^ io.scaleBPop.get.fire),
+            "HiveCoreExecutor: MX scaleB lockstep violated - bPop.fire XOR scaleBPop.fire (must fire same cycle, else scaleBRegs column misaligns)")
+          // (2) lock 拍 scaleB valid 守护：末拍 loadWLock 组合触发时 scaleBPop
+          //     必须有效，否则列 0 前递读到无效 payload
+          when(loadWModeReg && io.bPop.fire && tileInterCnt === 0.U) {
+            assert(io.scaleBPop.get.valid,
+              "HiveCoreExecutor: MX lock beat scaleBPop not valid - column-0 forward would latch invalid payload")
+          }
         }
       }
       else{
@@ -335,12 +385,13 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
         }
       }
 
-      // MX scaleB 逐拍暂存：scaleBPop 与 bPop 同拍 fire，本拍 tileInterCnt
-      //   == 目标列号 n（beat b → n = 15-b，tileInterCnt 初值 15 递减）。
-      //   把当拍 1 字节 scale 写入对应列，供末拍 lock 时 16 列并列呈现。
-      //   isMx(bFmt) 门控：非 MX 运行不写，scaleBRegs 保持原值（不参与计算）。
+      // MX scaleB 逐拍暂存：scaleBPop 与 bPop 同拍 lockstep fire（W7 断言守护），
+      //   本拍 tileInterCnt == 目标列号 n（beat b → n = (totalN-1)-b，tileInterCnt
+      //   初值 totalN-1 递减）。把当拍 1 字节 scale 写入对应列，供末拍 lock 时
+      //   totalN 列并列呈现。mxRunB 门控（W1，与握手门/前递门/MAC 消费门同源）：
+      //   非 MX 运行不写，scaleBRegs 保持复位 0（不参与计算）。
       if(cfg.hasMx){
-        when(DataFormat.isMx(io.regFile.bFmt) && io.scaleBPop.get.fire) {
+        when(mxRunB && io.scaleBPop.get.fire) {
           scaleBRegs.get(tileInterCnt) := io.scaleBPop.get.payload
         }
       }
@@ -365,6 +416,26 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
         // 唯一时刻，必须与末拍 beat 进入列 0 的 fire 拍组合重合）
         when(io.bPop.fire && tileInterCnt === 0.U) {
           io.hiveLoadWLock := true.B
+          // W3 末拍列 0 off-by-one 组合前递：scaleBRegs(0) 的写入下一拍才生效，
+          //   而 loadWLock 恰在本拍组合触发，故列 0 必须直接用当拍
+          //   scaleBPop.payload 前递，否则锁到上一轮残留旧值。搬进本 when 块、
+          //   紧邻 hiveLoadWLock 并复用完全相同的谓词
+          //   (io.bPop.fire && tileInterCnt===0)，消除对「scaleBPop.ready 默认
+          //   false、只在 is(sLOAD_B) 拉高」这一隐式不变量的依赖——日后任何人放宽
+          //   该 ready（如为流水化在别状态允许 pop），前递也不会在计算期把 FIFO
+          //   payload 误怼到列 0。mxRunB 门控保证仅 MX 运行前递（W1 判据同源）；
+          //   lockstep 下 io.bPop.fire == io.scaleBPop.get.fire（W7 断言守护），
+          //   故复用 bPop.fire 谓词与旧用 scaleBPop.fire 等价。
+          // W3↔S2 取舍（已裁定采纳 W3）：前递搬进 when(loadWModeReg) 后只在水平
+          //   loadW 模式生效；此前位于模块顶层时对垂直模式 loadVLock 亦成立的
+          //   「模式无关健壮性」随之消失。代价可接受——MX 运行被 CalcConfig
+          //   errCode=4 强制 loadWMode=1，垂直 MX 既被上游报错拦截、也无任何用例
+          //   覆盖，故以结构安全（前递与 lock 结构同源）换取该未被使用的模式无关性。
+          if (cfg.hasMx) {
+            when(mxRunB) {
+              io.hiveScaleBIn.get(0) := io.scaleBPop.get.payload
+            }
+          }
         }
       }
 

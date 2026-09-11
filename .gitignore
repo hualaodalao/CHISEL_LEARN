@@ -15,9 +15,26 @@ project/project/target/
 # Generated output
 generated/
 
-# Build / simulation artifacts (verilator build products, VCD/FST waveforms)
-build/
+# Build / simulation artifacts — 全部为可再生产物（verilator 中间产物、chiselsim
+# 现场 elaborate、回归日志、基线快照、VCD/FST 波形），默认忽略。
+# 用 build/*（而非 build/）以便下方重新纳入一小撮【不可再生的取证/裁定记录】——
+# git 无法在「父目录被整体排除」时重新纳入其中文件，故排除只到直接子级为止。
+build/*
+# --- 取证 / 裁定记录：不可再生，#125 裁定为【应入库】---
+# 理由：因果实验日志与旧版源码快照是一次性破坏性实验（回退代码验证因果）的唯一证据、
+#       无法重跑复现；推迟项笔记与收口报告是后续审计的权威依据，丢失将致重复发现/重复推导。
+!build/124_arch/
+!build/124_causal_revert.log
+!build/124_causal_revert2.log
+!build/139_deferred_note.md
+!build/141_int_datapath_handoff.md
+!build/125_wrap_up_report.md
+# sim/ 下矩阵 I/O dump 与 FST 波形均为仿真可再生产物，忽略。
 sim/
+# FST/VCD 波形一律不入库（可再生、体积大、二进制噪声 diff）；显式全局兜底，防止未来在
+# sim/ 之外误提交波形。当前 3 个已被跟踪的 .fst 需 git rm --cached 方能真正脱离版本控制
+# （该动作 #125 只裁定不执行，已在收口报告中回报待批）。
+*.fst
 
 # Qoder
 .qoder/
@@ -25,4 +42,7 @@ sim/
 # OS
 .DS_Store
 
-。src/**/verilog*
+# 注：src/hive/verilog* 下的双产物（.sv + HiveCore_rtl.zip / HiveCore_mx_rtl.zip）是
+# 【有意入库的交付产物】（下游综合/交付直接取用），不得添加忽略规则。原 `.src/**/verilog*`
+# 一行因前导点从未匹配真实路径（git check-ignore 退出码 1、101 个 .sv 与 zip 全部 tracked）、
+# 且意图与仓库约定相反，属死配置，已由 #125 删除（沿用 #118 的 S3 裁定）。

@@ -36,7 +36,11 @@ class HiveCoreScratchpad(cfg: HiveCoreConfig) extends Module {
 
     // MX scale buffer（仅 hasMx 生成，非 MX 配置不暴露这些端口）：
     //   - scaleA：每激活行一个 8-bit E8M0 scale（随激活流动）
-    //   - scaleB：每 K-块一个 totalN 向量（scaleRowW = totalN*8，权重驻留）
+    //   - scaleB：端口 UInt(8.W)——每 sLOAD_B 窗口按列 pop totalN 次（8-bit/拍/
+    //     列，与 bPop 同拍 lockstep fire，beat b → 列 n=(totalN-1)-b），Executor
+    //     逐拍暂存进 scaleBRegs、末拍 lock 时 totalN 列并列呈现（非「每 K-块一个
+    //     totalN 向量 scaleRowW=totalN*8 广播」——旧描述与实际 UInt(8.W) 端口矛盾，
+    //     已更正；权重驻留语义不变）
     val scaleAPush  = if (cfg.hasMx) Some(slave(Stream(UInt(8.W))))            else None
     val scaleAPop   = if (cfg.hasMx) Some(master(Stream(UInt(8.W))))           else None
     val scaleBPush  = if (cfg.hasMx) Some(slave(Stream(UInt(8.W))))  else None

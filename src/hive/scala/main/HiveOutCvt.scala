@@ -14,26 +14,37 @@
   *     scaleOut.fire 后释放——行/量化的 scale 配对永不错位、不丢失。
   *     in.ready = 行寄存器空闲（未持行，或本拍恰为释放拍，支持背靠背直通）。
   *
-  * outFmt 编码（4-bit，与 HiveCoreRegister.outFmt = Cat(regs(7)(16), regs(7)(13,11)) 同源）：
-  *   0xxx = 旧 3-bit 编码逐字不变：0000=fp32（默认）/ 0001=fp16 / 0010=bf16 /
-  *     0011=reserved（回落 fp32）/ 0100=mxfp8-E4M3 量化 / 0101=mxfp8-E5M2 量化 /
-  *     0110=mxfp4-E2M1 量化 / 0111=reserved（回落 fp32）；
-  *   1000=int32 / 1001=int16 / 1010=int8（P1 新增整数族：每槽截断取低位、不饱和，
-  *     判据 = bit16=1 且低 3 位 ∈ {0,1,2}，与 P0 Executor 族交叉校验同源语义）；
-  *   1011..1111 reserved（回落 fp32，仅为 cvt 兆底；execute 拍先被族校验拦截，
-  *     三族均无合法路径到达此编码）。
-  *   兼容性：旧软件不写 bit16 时（0xxx）行为逐拍不变，零迁移。
-  *   量化判据（本模块 scaleOut.valid 门）= bit16=0 且低 3 位 ∈ {4,5,6}。
+  * outFmt 编码（4-bit；来源 = HiveCoreRegister.cFmt := regs(7)(11,8).asTypeOf(DataFormat())，
+  *   顶层 HiveCore 直连 cvt.io.outFmt := regFile.cFmt。编码定义已收敛至 HiveEnum.DataFormat
+  *   枚举：成员声明即隐式 id 顺延【无显式 Value(n)】，宽度 = 最大 id INT4(9) 的 bitLength = 4）：
+  *   0=FP32（默认臂）/ 1=FP16 / 2=BF16 / 3=mxfp8-E4M3 量化 / 4=mxfp8-E5M2 量化 /
+  *   5=mxfp4-E2M1 量化 / 6=INT32 / 7=INT16 / 8=INT8 / 9=INT4（#137 补入：整数族四档
+  *   同为「每槽截断取低位、不饱和、无舍入」，共用 int32Seq 单一数据源，无双源）；
+  *   10..15 reserved：枚举无对应成员 ⟹ MuxCase 全部谓词为假 ⟹ 落默认臂 fp32
+  *   （仅为 cvt 兜底；execute 拍先被族校验拦截，不参与任何量化选路，故不设枚举值）。
+  *   【废止留痕】旧「bit16=整数族选择位 + 低 3 位旧编码」布局（0xxx/1xxx 拆分、
+  *   1000=int32/1001=int16/1010=int8、量化判据 bit16=0 且低 3 位 ∈ {4,5,6}、
+  *   「旧软件不写 bit16 零迁移」）随 OutFormat/DataFormat 合并为单一 DataFormat 枚举
+  *   而整体作废：本模块已无任何位拆分判据，一律整值枚举比较。
+  *   量化判据（本模块 scaleOut.valid 门）= isQuantFmt = DataFormat.isMx(fmtReg)
+  *   = {MXE4M3(3), MXE5M2(4), MXE2M1(5)}。INT4 ∉ isMx ⟹ INT4 输出【无块 scale 语义】：
+  *   scaleOut.valid 恒 0、不产生 scaleC 行。INT4 与 MXE2M1 仅在打包宽度上对称
+  *   （HiveEnum.isHalfB = INT4 || MXE2M1 ⟹ CalcConfig 侧 8B/行、beats=1），
+  *   量化/scale 语义不共享——INT4 是定点截断档，不是量化档。
   *
   * out 密集行选段（低列号元素在低位，无效高位段填零）：
   *   fp32/int32 = 全 totalN×32；fp16/bf16/int16 = 低 totalN×16；
-  *   mxfp8/int8 = 低 totalN×8；mxfp4 = 低 totalN×4。
+  *   mxfp8/int8 = 低 totalN×8；mxfp4/int4 = 低 totalN×4
+  *   （lane i 落 nibble i = bits[4i+3:4i]，lane0 在最低位；与 mxfp4 臂同序）。
   *
   * 例化约束：含浮点或 MX（cfg.hasFp || cfg.hasMx）时要求 cEffW >= 40（延迟规格化
   * {sign,exp8,mant31} 槽约束）；纯整数配置仅走 int 支路（槽低位截取，不依赖 40 位槽），
-  * require 放宽为 cEffW >= 8（int8 截断下限），fp/量化数值云编译期置零不激励。
+  * require 放宽为 cEffW >= 8（int8 截断下限；#137 int4 仅需 4 位，被该下限天然覆盖，
+  * 未再放宽），fp/量化数值云编译期置零不激励。
   *
   * 【数值核（P1 零改动留痕）】以下转换语义与握手化前逐字一致：
+  * （#137 只新增 int4 选段臂 + isInt4Fmt 谓词，fp16/bf16/fp32/MX 量化数值核与
+  *  整数族既有三档 packedInt32/16/8 逐字未动；int4 语义派生见「整数族支路」区留痕。）
   *
   * fp16/bf16 通路：先 40→32 规格化（复用 Fp32.fpNormalize40to32），再 32→16
   * 降精度。边界语义对齐 FbFormatConverter（ForagerBee 已验证实现）：
@@ -76,7 +87,8 @@ import chisel3.util._
 class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   // 延迟规格化格式槽约束：40-bit {sign,exp8,mant31} 必须落在 cEffW 槽低位。
   // P1 按格式族条件化：含 fp/mx 时原 require 语义不变；纯整数配置仅走 int 支路（槽低位截取），
-  // 放宽为 cEffW >= 8（int8 截断下限；int32 支路对 <32 位槽零扩展后取低 32 位）。
+  // 放宽为 cEffW >= 8（int8 截断下限；int32 支路对 <32 位槽零扩展后取低 32 位；
+  // #137 int4 仅需 4 位，被该下限天然覆盖，未再放宽）。
   if (cfg.hasFp || cfg.hasMx) {
     require(cfg.cEffW >= 40, s"HiveOutCvt: cEffW(${cfg.cEffW}) 必须 >= 40（延迟规格化格式需要）")
   } else {
@@ -87,10 +99,10 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   require(cfg.totalN % 8 == 0, s"HiveOutCvt: totalN(${cfg.totalN}) 必须为 8 的整数倍（量化块按 8 元素组构建）")
   private val nGroups: Int = cfg.totalN / 8   // 8 元素组数（量化块基础粒度）
 
-  // outFmt 编码（4-bit，与 HiveCoreRegister.outFmt = Cat(regs(7)(16), regs(7)(13,11)) 同源）；
-  // 编码定义已收敛至 HiveEnum.DataFormat 枚举（显式 Value(n)，宽度 4-bit）：
-  // 低 3 位语义逐字不变（000..110 同旧，011/111 reserved 回落语义保持），
-  // 新增 1000/1001/1010 整数族；1011..1111 reserved 回落 fp32（仅为 cvt MuxCase
+  // outFmt 编码（4-bit；来源 = HiveCoreRegister.cFmt := regs(7)(11,8).asTypeOf(DataFormat())）；
+  // 编码定义已收敛至 HiveEnum.DataFormat 枚举（成员声明即隐式 id 顺延，无显式 Value(n)，
+  // 最大 id = INT4(9) ⟹ 宽度 4-bit）：0=FP32 1=FP16 2=BF16 3=MXE4M3 4=MXE5M2 5=MXE2M1
+  // 6=INT32 7=INT16 8=INT8 9=INT4；10..15 reserved 回落 fp32（枚举无成员，仅为 cvt MuxCase
   // 默认臂兜底；execute 拍先被族校验拦截，不参与任何量化选路，故不设枚举值）。
 
   val io = IO(new Bundle {
@@ -123,12 +135,19 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   // 释放判据同步放宽为「scale 已交即可随 out.fire 释放」（见下方 release）。
   private val scaleSent = RegInit(false.B)
 
-  // 格式族判据（与 P0 Executor 族交叉校验同源语义；整值枚举比较与旧位拆分判据 bit-exact 等价：
-  //   int 族 = INT32/INT16/INT8（旧 bit16=1 且低 3 位 ∈ {0,1,2} 即 4 位值 ∈ {8,9,10}）
-  //   量化族 = DataFormat.isQuant（旧 bit16=0 且低 3 位 ∈ {4,5,6} 即 4 位值 ∈ {4,5,6}））
+  // 格式族判据（一律整值枚举比较，无位拆分；与 HiveEnum 谓词同源）：
+  //   int 族（cvt 选段用）= INT32(6)/INT16(7)/INT8(8)/INT4(9)，INT4 由 #137 补入。
+  //     不引用 HiveEnum.isInt（= INT8||INT16||INT4，不含 INT32）作选段判据：本模块
+  //     需要四档各自独立选段宽度，逐值判定避免把 INT32 漏在族外。
+  //   量化族 = isQuantFmt = DataFormat.isMx(fmtReg) = {MXE4M3(3),MXE5M2(4),MXE2M1(5)}。
+  //     【门控核实留痕（#137 要求）】INT4 ∉ isMx ⟹ cFmt=INT4 时 isQuantFmt=false ⟹
+  //     io.scaleOut.valid = holdValid && isQuantFmt && ... 恒 0、release 判据退化为
+  //     仅 out.fire（非量化路径）⟹ INT4 行【不产生 scaleC】，与类头「无块 scale 语义」
+  //     一一对应；该门控为既有代码现状，#137 未新增任何 scale 分支。
   private val isInt32Fmt = fmtReg === DataFormat.INT32
   private val isInt16Fmt = fmtReg === DataFormat.INT16
   private val isInt8Fmt  = fmtReg === DataFormat.INT8
+  private val isInt4Fmt  = fmtReg === DataFormat.INT4
   private val isQuantFmt = DataFormat.isMx(fmtReg)
 
   // --- 握手：原子行提交（契约见类头） ---
@@ -312,9 +331,13 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   private val isQE4M3 = fmtReg === DataFormat.MXE4M3
   private val isQE5M2 = fmtReg === DataFormat.MXE5M2
   // E2M1 不单独判定：isQE4M3、isQE5M2 均为 false 时量化组合逻辑自然落入 E2M1 参数（q2Seq）。
-  // 0111=Reserved7：isQuantFmt=false（不在量化白名单 {4,5,6}），不引发量化输出，
-  // 走 fp32 默认臂，不产生 scale 输出——量化组合逻辑产出的值不被采样，
+  // 非量化编码（FP32/FP16/BF16/INT32/INT16/INT8/INT4 与 reserved 10..15）：isQuantFmt=false
+  // （不在量化白名单 isMx = {MXE4M3(3), MXE5M2(4), MXE2M1(5)}），不引发量化输出、不产生
+  // scale 输出（scaleOut.valid 恒 0）——量化组合逻辑产出的值不被 out.bits 的 MuxCase 采样，
   // 硬件行为与类头编码表一致。
+  // 【#137 校正留痕】旧文「0111=Reserved7 / 不在量化白名单 {4,5,6}」引用的是已废止的
+  // bit16 拆分编码布局（旧 4=E4M3 / 5=E5M2 / 6=E2M1、0111=reserved）；OutFormat/DataFormat
+  // 合并为单一枚举后编码为 3/4/5、reserved 为 10..15，判据一律整值 isMx 比较，无位拆分。
 
   // --- 块 amax：符号位清零取幅值（31-bit 无符号比较即 |fp32| 单调序）；
   // 列 ≥ nEff 的 padding 元素掩码为 0（不进 amax） ---
@@ -457,7 +480,27 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   // ==========================================================================
   // P1 整数族支路（纯组合，从行寄存器槽低位截取：截断取低位、不饱和；
   // 整数累加位宽由既有 require 防溢出）。对 <32 位槽先零扩展再取段，
-  // int16/int8 统一从 32 位扩展值取低 16/8 位（与 int32 同源、无双源）。
+  // int16/int8/int4 统一从 32 位扩展值取低 16/8/4 位（与 int32 同源、无双源）。
+  //
+  // 【#137 INT4 语义派生留痕：逐条对照 INT8 臂，零自创】
+  //   ① 数据源：INT8 臂用 int32Seq（槽低 32 位/零扩展）→ INT4 臂复用同一 int32Seq，
+  //      不新增取数路径（杜绝双源漂移）。
+  //   ② 舍入：INT8 臂【不调用】roundUp16/roundUpN，rndReg 完全不参与整数支路
+  //      → INT4 臂同样忽略 rnd（5 模式输出恒同，spec 有定向断言）。
+  //   ③ 饱和：INT8 臂 _(7,0) 硬截断，超范围值按二进制补码【绕回】而非钳位到
+  //      [-128,127]（类头「截断取低位、不饱和」）→ INT4 臂 _(3,0) 同构收窄：
+  //      超范围值绕回 mod 16，【不】钳位到 4-bit 有符号范围 [-8,7]。
+  //      裁定依据：钳位将是本仓从未存在的第三种语义（INT8/INT16/INT32 三档均无钳位），
+  //      且与金锚 HiveDebugModel.decodeElem 的 INT4 分支 sext(bits,4)（纯二补码符号
+  //      扩展、无饱和分支）冲突 ⟹ 依「不得自创语义」取截断绕回。
+  //   ④ 符号/负零：INT8 臂原样保留 bit7（二补码无负零，-0 ≡ 0x00）→ INT4 臂原样
+  //      保留 bit3（-0 ≡ 0x0）；两档均无符号扩展/符号特殊处理。
+  //   ⑤ nEff 掩码：INT8 臂【不掩码】（padding 列输出真实截断位，区别于量化支路
+  //      packed8/qSelSeq 的掩码语义）→ INT4 臂同样不掩码，保持整数族四档一致。
+  //   ⑥ lane→nibble 序：INT8 臂 Cat(int32Seq.reverse) ⟹ lane i 落 byte i（bits[8i+7:8i]）、
+  //      lane0 最低位 → INT4 臂同式 ⟹ lane i 落 nibble i（bits[4i+3:4i]）、lane0 最低位。
+  //      与 MXE2M1 臂 packed4 的逐字节组装（Cat(hi=elem(2p+1), lo=elem(2p))，外层 reverse）
+  //      位级等价：elem 2p 落低 nibble、elem 2p+1 落高 nibble ⟺ elem i 落 bits[4i+3:4i]。
   // ==========================================================================
   private val int32Seq: Seq[UInt] = (0 until cfg.totalN).map { i =>
     val slot = lineReg(cfg.cEffW * (i + 1) - 1, cfg.cEffW * i)
@@ -467,10 +510,13 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   private val packedInt32: UInt = Cat(int32Seq.reverse)
   private val packedInt16: UInt = Cat(int32Seq.reverse.map(_(15, 0)))
   private val packedInt8: UInt  = Cat(int32Seq.reverse.map(_(7, 0)))
+  // INT4：与 packedInt8 同形、位宽 8→4 同构收窄（语义派生见上方 ①..⑥ 留痕）
+  private val packedInt4: UInt  = Cat(int32Seq.reverse.map(_(3, 0)))
 
   // ==========================================================================
-  // out 密集行选段（契约见类头）：默认臂 = fp32（含 reserved 0011/0111/1011..1111
-  // 回落 fp32 语义）；量化/16/8/4/int 支路按选中格式落低位、高位零填充。
+  // out 密集行选段（契约见类头）：默认臂 = fp32，#137 起【仅】覆盖 reserved 编码
+  // 10..15（DataFormat 枚举无成员 ⟹ 九条谓词全假）；INT4(9) 已有专属臂，不再回落。
+  // 量化/16/8/4/int 支路按选中格式落低位、高位零填充（int4/mxfp4 同为 totalN×28 填零）。
   // ==========================================================================
   io.out.bits := MuxCase(packed32, Seq(
     (fmtReg === DataFormat.FP16)   -> Cat(0.U((cfg.totalN * 16).W), packed16),
@@ -480,7 +526,8 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
     (fmtReg === DataFormat.MXE2M1) -> Cat(0.U((cfg.totalN * 28).W), packed4),
     isInt32Fmt                    -> packedInt32,
     isInt16Fmt                    -> Cat(0.U((cfg.totalN * 16).W), packedInt16),
-    isInt8Fmt                     -> Cat(0.U((cfg.totalN * 24).W), packedInt8)
+    isInt8Fmt                     -> Cat(0.U((cfg.totalN * 24).W), packedInt8),
+    isInt4Fmt                     -> Cat(0.U((cfg.totalN * 28).W), packedInt4)
   ))
   // scaleOut：valid 门见上方握手块；数值 = scaleWire（持行期 lineReg 恒定，组合安全）
   io.scaleOut.bits := scaleWire

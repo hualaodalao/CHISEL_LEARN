@@ -23,12 +23,33 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   val io = IO(new Bundle {
     val cmd  = slave(Stream(new HiveCoreCmd))
     val resp = master(Stream(new HiveCoreResp))
+    val respForTracing = master(Flow(new HiveCoreRespForTracing))
     // ── 对外契约（破坏性变更声明，相对旧版统一 extDataWidth 接口）──
-    // 三通道 dmaExt 数据位宽不再由统一 extDataWidth 配置项决定，改为各通道
-    // 独立匹配自身 buffer 行宽：dmaA = aExtW、dmaC = cExtW、
-    // dmaB = bExtW。每个 beat 搬运一整行数据，模块内部不做任何
-    // 拆包/拼包（无 beat 内字段切分、无多 beat 组行），外部存储侧必须按
-    // 对应通道位宽供数（A/B 读）/收数（C 写），否则数据对齐错乱。
+    // 三通道 dmaExt 数据位宽不再由统一 extDataWidth 配置项决定，改为各通道独立取自身
+    // 总线宽度参数：dmaA = aExtW、dmaB = bExtW、dmaC = cDmaExtW（【#136-KW4 订正】
+    // 原文写「dmaC = cExtW」是伪权威：cExtW = totalN*cEffW 是 C buffer 的【行宽】
+    // （debug 配置 = 16*40 = 640），而 6 行后的端口声明实际传的是 cfg.cDmaExtW
+    // （默认 256，见 HiveCoreConfig 的 cDmaExtW require 族：2 的幂 ∧ ∈ [totalN*8,
+    // totalN*32] ∧ 整除 totalN*32）。两者在默认配置下 640 != 256，原文与代码直接矛盾。）
+    //
+    // 【拍粒度：读写两侧不对称，勿一概而论】
+    //   · A/B 读通道：每个 beat 搬运【一整行】，模块内部不做任何拆包/拼包
+    //     （无 beat 内字段切分、无多 beat 组行）。外部存储侧必须按 aExtW / bExtW 供数，
+    //     否则数据对齐错乱。
+    //   · C 写通道：【不成立】。一行 C 结果（totalN 个元素、每元素 elemBits 位）由
+    //     HiveCoreDmaWrOnly 在运行期按总线位宽拆成
+    //       beatsPerRowEff = ceil(totalN × elemBits / cDmaExtW)
+    //     个 beat 逐拍发出（拍内数据 = 锁存行右移 beatCnt*cDmaExtW 后取低 cDmaExtW 位，
+    //     见 HiveCoreDmaWrOnly 的 `req.payload.data := (io.bufPop.payload >> ...)`；
+    //     拍内地址 = curAddr + beatCnt × calcConfig.cBeatAddrStep）。elemBits 由 io.outFmt
+    //     运行期解码，故拍数是【运行期量】而非编译期常量；编译期只有上界
+    //     cfg.cBeatsPerRowMax = totalN*32/cDmaExtW。
+    //     默认配置实例：FP32 输出（elemBits=32）→ ceil(16*32/256) = 2 拍/行；
+    //     FP16/MXE4M3（elemBits=16/8）→ 1 拍/行。外部存储侧必须按 cDmaExtW 收数并
+    //     接受「一行 = 多拍」。
+    //   ★ 危害具体化（#134 影响面评审）：若照原文把 C 拍宽当成 cExtW/8 = 80 字节，
+    //     测试侧的 C 区边界守卫（HiveCoreDebugCase chkCRegion 的 beatBytes = cDmaExtW/8）
+    //     会对 nTiles=3 永久护栏用例立刻假红；正确拍宽是 cDmaExtW/8 = 32 字节。
     // A 矩阵只读 DMA 外部通道（cmd: 读地址流; rsp: 读数据流，位宽 = aExtW）
     val dmaA = HiveCoreDMAExtReadOnlyIF(cfg, cfg.aExtW)
     // C 结果写回 DMA 外部通道（req/grant + writeData 逐 beat 流，位宽 = cDmaExtW）。
@@ -47,7 +68,17 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     // P3b C 侧量化 scale 写回 DMA 外部通道（仅 hasMx 生成，非 MX 配置不暴露）：
     //   dmaCScale = 量化 C 输出的 E8M0 块 scale（cScaleRowW = totalN/8 字节/拍，
     //   有效字节 = ceil(n/blk)，高位零填充），基址 = regFile.cScaleAddr（regs(11)）
-    val dmaCScale = if (cfg.hasMx) Some(HiveCoreDMAExtWriteOnlyIF(cfg, 8)) else None
+    // 【裁定2 修复：还原 dmaCScale 端口位宽 = cfg.cScaleRowW（refactor-loss，同 IssueA/B5 类）】
+    //   git 取证 672fb37^ 原文为 HiveCoreDMAExtWriteOnlyIF(cfg, cfg.cScaleRowW)（=16-bit，
+    //   totalN=16 → 每行 2 个 8-元素组各 1 字节 E8M0）；672fb37 重构时被误改为硬编码 8。
+    //   内层 cDmaScale.io.dmaExtWrIF 行宽恒为 rowW=cScaleRowW=16（见 HiveCoreDmaScaleWr），
+    //   io.dmaCScale <> cDmaScale.io.dmaExtWrIF 在 8-bit 端口下把 cvt.scaleWire 的高字节
+    //   （第 2 个 8-元素组 scale）截断丢弃 → blk16 量化写回每行仅落低字节（实测
+    //   dualMX K=32 CSCALE beat#0 hw=0x7A vs 金锚 0x7A7A，数据码通道 bit-exact 全绿，
+    //   仅 scale 高字节丢失）。上方注释「cScaleRowW = totalN/8 字节/拍」与硬编码 8 自相
+    //   矛盾，佐证为误改。修复即还原 cScaleRowW，使端口位宽与内层写回行宽一致。
+    val dmaCScale = if (cfg.hasMx) Some(HiveCoreDMAExtWriteOnlyIF(cfg, cfg.cScaleRowW)) else None
+
     val status = Output(new HiveCoreStatus(cfg))
   })
 
@@ -119,15 +150,39 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // 采用组合逻辑：bDma 在 start（EXECUTE 脉冲）当拍采样，regFile 在计算期间
   // 保持不变，因此组合驱动即可保证采样到 execute 时刻的正确值
   // （若用 Reg 锁存，start 当拍会采样到锁存前的旧值）。
-  // 偏移语义与 Executor 的 aTileAddr/bTileAddr/cStoreAddr 保持一致（字节地址）：
-  //   aRow = aStride（行步长）           aCol = totalN * (aEffW/8)（K tile 间列偏移）
-  //   bRow/bCol 双模式（regFile.loadWMode，regs(7)(5)）：
-  //     垂直加载（loadWMode=0，既有行为）：bRow = n*(bW/8)（沿 K 行步长），
-  //       bCol = totalN*(bW/8)（N tile 间列偏移）
-  //     水平 loadW 加载（loadWMode=1）：B 内存按 N×K 转置存储（行=n 列=k），
-  //       bRow = k*(bW/8)（转置行步长），bCol = totalN*k*(bW/8)
-  //       （轮间跳 = 跨 totalN 个转置行）
-  //   cRow = cStride                     cCol = totalN * (cEffW/8)
+  // 偏移语义（字节地址）的实际消费者是三个 DMA 模块：HiveCoreDmaRdOnly（A/B 通道，
+  // aRow/aCol/bRow/bCol）与 HiveCoreDmaWrOnly（C 通道，cRow/cCol）。
+  // 【#133 死引用清理 / #136-RW1 去裸 token】此处原写「偏移语义与 Executor 侧的三个
+  // tile 首址别名（A tile 首址 / B tile 首址 / C 写回地址）保持一致」，但那三个别名在
+  // main 源码中【无任何定义】（全仓仅注释命中），Executor 也不消费任何地址偏移（它只发
+  // peekBlock/doneBlock 块协议与 start 脉冲），故删除该伪约定引用。
+  // 【#136-RW1 采纳选项 (b)】留痕文本改用【描述性表述】而不复述原名裸 token：这样未来
+  // 基于 grep 的死引用审计在 src/hive/scala/main/ 下 0 命中，无需读上下文去区分
+  // 「活引用」与「删除留痕」，也不会让审计工具把留痕误报为残留缺陷。
+  // --------------------------------------------------------------------------
+  // 偏移语义速查（字节地址；下列每条均以 HiveCoreCalcConfig 的【实际赋值式】为准，
+  // 本段只是索引，勿当独立权威。记 aEb/bEb/cEb = memElemBytes(aFmt/bFmt/cFmt)。）
+  // 【#124 附带订正（只改注释、零功能影响）】本段原有三处失真，均已按下述实况改写：
+  //   ✗旧「aRow = aStride」 ✗旧「cRow = cStride」 —— CalcConfig 全文【不消费任何 stride
+  //     寄存器】（grep Stride 在该文件 0 命中），行步进一律由 K/N × 元素字节数推出；
+  //   ✗旧「loadWMode=1: bCol = totalN*k*(bW/8)」 —— 那是更早已废弃的 Mux 分支式，
+  //     现行 RTL 只输出【单一】bColTileAddressOffset（不随 loadWMode 分流），
+  //     loadW=1 的轮间跳由 HiveCoreDmaRdOnly 的 lastBTileStartAddr 累加模型完成。
+  //   aRow = k * aEb                            （A 行主序 M×K，行步进沿 K）
+  //   aCol = totalN × elemsPerLane(aFmt) × aEb  （A 的 kTile 步进 = aKpb × aEb）
+  //   bRow/bCol 双模式（regFile.loadWMode，regs(6)(28)）：
+  //     bRow = (loadWMode ? k : n) * bEb        （loadW=0 沿 K 行、行长 N；
+  //                                                loadW=1 B 转置 N×K、行长 K）
+  //     bCol = totalN × elemsPerLane(bFmt) × bEb（【单一式、两支共用】：
+  //            loadW=0 时语义是 n-tile 步进（非 MX ⇒ elemsPerLane=1 ⇒ = totalN×bEb）；
+  //            loadW=1 时语义是 k-tile 步进（= bKpb×bEb）。两支持有的 elemsPerLane
+  //            天然互斥，因 loadW=0 恒非 MX（errCode4 拦 MX+loadW=0）。）
+  //   cRow = n * cEb（半字节档 cFmt 为 n>>1）   cCol = totalN * cEb（半字节档 totalN>>1）
+  //   ★ aCol/bCol 是【运行期量】（#124 ① 起）：MX8/FP16/BF16/INT16 → 32，INT8 → 16，
+  //     INT32 → 64，半字节族 → 0。672fb37 曾退化为 elaboration 期常数 totalN*(aW/8)
+  //     = totalN*(bW/8) = 32（aW/bW 是编译期位宽、出厂 16，与运行期格式无关）。
+  //   ★ scaleC 行步进 scaleCRowAddressOffset = CEIL(n / cMxBlk)（#124 ② 起；
+  //     672fb37 曾退化为 FLOOR）。scaleC 的 n-tile 步进保持 FLOOR(totalN / cMxBlk)。
   //
   // 【MX v2 SIMD】mxRun = cfg.hasMx && isMx(regFile.aFmt)（与 scale DMA start 门控同判据）：
   //   16-bit lane 打包 2 个 8-bit 元素（1 字节/元素），行步长 = K 字节（非 K*(aW/8)），
@@ -136,6 +191,34 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   val startPulse = io.cmd.fire && io.cmd.payload.op === HiveCoreOp.EXECUTE
   calcConfig.io.regFile := regFile
   calcConfig.io.startIn := startPulse
+
+
+  //For tracing
+  val tracingSt = RegInit(0.U(1.W))  
+  val tracingPcReg = Reg(UInt(32.W))
+  val tracingTagReg = Reg(UInt(8.W))
+  io.respForTracing.valid := false.B
+  io.respForTracing.payload.state := 0.U
+  io.respForTracing.payload.pc := tracingPcReg
+  io.respForTracing.payload.tag := tracingTagReg
+  when(tracingSt === 0.U){
+      when(startPulse){
+        tracingSt := 1.U
+        tracingPcReg := io.cmd.payload.pc
+        tracingTagReg := io.cmd.payload.tag
+        io.respForTracing.valid := true.B
+        io.respForTracing.payload.state := 0.U
+        io.respForTracing.payload.pc := io.cmd.payload.pc
+        io.respForTracing.payload.tag := io.cmd.payload.tag
+      }
+  }.otherwise{
+    io.respForTracing.valid := executor.io.done | calcConfig.io.errPluse
+    when(executor.io.done){
+      io.respForTracing.payload.state := 1.U
+    }.elsewhen(calcConfig.io.errPluse){
+      io.respForTracing.payload.state := 3.U
+    }
+  }
   
 
   // ==========================================================================
@@ -219,9 +302,10 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
         when(cmd.reg0Addr < cfg.registerNumRW.U && cmd.reg0Addr =/= 0x08.U) { 
           regFile.wregs(addr0, cmd.data0)
         }
-        when(cmd.reg0Addr === 0x07.U) {
-              when(cmd.data0(0)) { doneFlag := false.B }  // clear_done
-        }
+        // 【B1】移除 clear_done 残留：旧机制 `when(reg0Addr===0x07){when(data0(0)){doneFlag:=false}}`
+        //   在新 reg7 位域下 bit0 = aFmt[0]，写奇数 aFmt（FP16=1/MXE4M3=3/MXE2M1=5…）会
+        //   意外清除 doneFlag（确定性 bug）。doneFlag 现仅由 reset 与 executor.io.done 驱动，
+        //   语义为「本次上电以来是否完成过一次执行」，与 STATUS.done 粘滞契约一致。
         // 生成响应
         respValid := true.B
         respData  := 0.U
@@ -237,9 +321,7 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
         when(cmd.reg1Addr < cfg.registerNumRW.U && cmd.reg1Addr =/= 0x08.U) { 
           regFile.wregs(addr1, cmd.data1)
         }
-        when(cmd.reg1Addr === 0x07.U) {  
-          when(cmd.data1(0)) { doneFlag := false.B }  // clear_done
-        }
+        // 【B1】移除 clear_done 残留（REG_WRITE2 侧，同上：reg7 bit0 = aFmt[0] 冲突）
         // 生成响应
         respValid := true.B
         respData  := 0.U
@@ -281,7 +363,27 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // 注意：execute 脉冲拍 executor.io.err 反映的是 errState「清除前」旧值（寄存器
   // 同拍清除次拍才生效），故下方 hasMx 直连置位用 !executePulse 排除本拍，
   // 否则合法再 EXECUTE 会被旧 err 立即回置、假 err 永久化。
+  //
+  // 【B2 裁定：errFlag 语义 = "EXECUTE 时锁存报错"，非"写入即报错"】
+  //   问题：CalcConfig 拦截 startOut 时（配置违约）Executor 永不启动 → io.done 永不
+  //   触发 → 原实现 errFlag 仅在 done 拍赋值，配置错误对软件完全不可见（STATUS.err 恒 0）。
+  //   修复：新增 calcConfig.io.err → errFlag 直连置位路径，不依赖 executor.io.done。
+  //   语义选择理由（"EXECUTE 时锁存" 而非 "写入即报错"）：
+  //     - STATUS.err 的契约是「一次执行尝试的结果」，配置装配阶段（多次 REG_WRITE）
+  //       不应污染 STATUS；CalcConfig 已在 sIDLE 无条件清 err（见 HiveCoreCalcConfig），
+  //       故 calcConfig.io.err 是「本次 EXECUTE 进入 sC0 后的配置判决」而非「idle 期当前
+  //       配置是否合法」——直连不会在 EXECUTE 前的装配期误置 errFlag。
+  //   同拍优先级（显式处理与 startPulse 清除的竞争）：startPulse 清除 > 直连置位。
+  //     直连置位用 `&& !startPulse` 门排除执行拍本身，保证合法再 EXECUTE 不被上一轮
+  //     sticky err 在同拍立即回置（与上方 Victor P1 注释同一防假-err-永久化考量）。
+  //   sticky：errFlag 置位后保持到下一次 startPulse 才清（直连路径与 done 路径均不自动清）。
+  //   保留 executor.io.done 路径：捕获 DMA 运行期错误 dmaErr；且不破坏 MxSpec
+  //     runMxOutFmtErrCase 所依赖的「executor done 拍置 errFlag」时序（该路径原样保留）。
+  //   last-connect 序：startPulse 清 → 直连置（!startPulse 门）→ done 拍置（最终裁决，
+  //     executor 实际完成时以 done 拍表达式为准；配置违约时 done 不触发，直连置生效）。
   when(startPulse) { errFlag := false.B }
+
+  when(calcConfig.io.err && !startPulse) { errFlag := true.B }
 
   when(executor.io.done) {
     doneFlag  := true.B
@@ -342,7 +444,57 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // 大块用例数据通道中途停摆（M=32 实测 C=35/64 死锁、CSCALE 行序错位，
   // MxSpec/QuantSpec 同形态复现）。撤销后 MxSpec multi-pass 单例即转绿。
   // 原「512 处数值错行」观察由上方 bufPop.ready 折入修复单独覆盖。
-  scratchpad.io.cPop.ready := Mux(executor.io.cStoreGate, cvt.io.in.ready, executor.io.cPop.ready)
+  //
+  // ==========================================================================
+  // 【#122 主修复：恢复块满守卫 blkLatchCnt/blkLatchFull「同源双门」（refactor-loss）】
+  // --------------------------------------------------------------------------
+  // 取证：`git show 9d74335:src/hive/scala/main/HiveCore.scala` L443-446（计数器+闸门）
+  //   与 L462（in.valid 侧同源门）；`git log --all -S"blkLatch"` 只命中两个 commit：
+  //   9d74335 引入、672fb37（DMA 拆分重构）整体删除 —— 而描述它的注释（下方
+  //   「P3 修复（同源双门）」段）被原样留在代码里，形成「注释在、硬件不在」的失配。
+  //
+  // 根因机制：三方在 cDma.doneBlock 那一拍同时为高，而顶层已无任何块满守卫
+  //   → C FIFO 多弹一行「下一 n-tile 的 kt0 partial row0」：
+  //     ① cvt.io.in.ready 是组合的且含 io.out.fire → out.fire 同拍 in.ready 拉高（背靠背直通）；
+  //     ② executor.io.cStoreGate 是寄存器，由 cPeekDone(=cDma.doneBlock) 次拍才拉低 → 该拍仍高；
+  //     ③ cPop.valid 因多拍写回（beatsPerRow>1）使 store 排空慢于阵列生产 → 该拍 C FIFO 未排空。
+  //   双重损伤：(a) 该行滞留 cvt 行寄存，下一写回窗口作为 nt=1 的 row0 发出
+  //   （= 未经第二 pass 累加的裸部分和）；(b) 该行从 psum FIFO 缺失 → nt=1 的 kt1
+  //   回灌整体移一行（hw[m] = kt0[m] + kt1[m-1]）。数值指纹 bit-exact 512/512。
+  //   触发条件四条：kTiles>1 ∧ mTiles>1 ∧ beatsPerRow>1 ∧ nTiles>1
+  //   （nTiles>1 必要 —— C buffer 块粒度 == 一个 n-tile，块末即 nt 边界，超弹只损伤
+  //     「下一块」，单块无下一块；beatsPerRow>1 是【时序窗口条件】而非结构条件 ——
+  //     单拍写回时该拍 C FIFO 已空、③ 不成立，窗口不触发）。
+  //
+  // 【为何是 cvt.in.fire 口径而非 lineCounter 口径】口径必须是「按 cvt.io.in.fire 计数
+  //   到 regFile.m」，即末行锁存【之后】才关门。lineCounter===m-1 在末行锁存【之前】
+  //   即成立，据此关门闸掉的恰是末行本身的合法消费拍 → cvt 与 cDma 消费节奏脱拍，
+  //   实测 M=32 死锁（store beats 停在 C=35/64，见上方「P3 修复 2 已撤销」段与
+  //   HiveCoreDmaWrOnly 收行门控注释的同源说明）。改按 in.fire 计数则：cvt 行寄存器
+  //   全设计唯一一份，第 m 次锁存当拍 holdValid 置真，下一次锁存必先等释放（≥1 拍后），
+  //   届时计数已达 m、闸已关 → 既无同拍竞态、又不阻断末行。
+  //
+  // 【同源双门缺一不可】blkLatchFull 必须同时出现在 cPop.ready 与 cvt.in.valid 两处：
+  //   只门 cPop.ready 会让 cvt.in.fire 在 FIFO 不 pop 的拍幻影锁存同一行（重复行，
+  //   比原缺陷更糟）。这正是 9d74335 注释「同源双门」的含义。
+  //
+  // 【禁动区声明：不恢复 cDma.io.bufPop.ready 项】9d74335 原文 L447/L462 两处门内均含
+  //   `cDma.io.bufPop.ready`，但该信号语义在同一次重构中已变：
+  //     旧 = (state===sTRANSFER_M) & !lineValid & (blkRxCnt =/= m)
+  //     新 = (state===sTRANSFER_M) & io.dmaExtWrIF.req.ready & lastBeat
+  //   把新语义折入 cPop.ready 不是 loss 恢复而是发明新门控，须先经设计评审；且因果
+  //   干预实验已证明不加它也充分（failed 12→4、mismatch 509→0、六通道地址对账仍 0、
+  //   无死锁）。同理不恢复 WrOnly 的 blkRxCnt/blkRxFull（9d74335 的 S-Ken4 评审项已把
+  //   它降级为内部统计输出、由 blkLatchFull 完全替代为闸门源），也不恢复 lineData/
+  //   lineValid（行寄存职责已归 cvt，全设计唯一一份）。
+  // ==========================================================================
+  private val blkLatchCnt = RegInit(0.U(cfg.mnkWidth.W))
+  when(cvt.io.in.fire) { blkLatchCnt := blkLatchCnt + 1.U }
+  // 块末/重启归零（last-connect）。旧名 executePulse 已在 672fb37 重命名为 startPulse，
+  // 表达式与 9d74335 L445 逐字相同（仅信号改名）。
+  when(cDma.io.doneBlock || startPulse) { blkLatchCnt := 0.U }
+  private val blkLatchFull = blkLatchCnt === regFile.m
+  scratchpad.io.cPop.ready := Mux(executor.io.cStoreGate, cvt.io.in.ready && !blkLatchFull, executor.io.cPop.ready)
 
   executor.io.cPop.valid   := scratchpad.io.cPop.valid
   executor.io.cPop.payload := scratchpad.io.cPop.payload
@@ -357,7 +509,12 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // 【P3 修复（同源双门）】in.valid 与上方 cPop.ready 必须同含
   // cDma.io.bufPop.ready 与块满闸：否则 cvt.in.fire 与 FIFO pop 条件不一致，
   // 仍会幻影锁存/块末超弹。块满闸用 blkLatchFull（按锁存口径，见上方 P3 修复 3）。
-  cvt.io.in.valid := scratchpad.io.cPop.valid && executor.io.cStoreGate 
+  // 【#122 注】本段是 672fb37 删掉 blkLatch 硬件后【原样留下的注释】。现块满闸已按
+  //   9d74335 L462 恢复（下方 && !blkLatchFull）；`cDma.io.bufPop.ready` 一项【刻意不
+  //   恢复】—— 该信号语义在同一次重构中已变（旧 = !lineValid & blkRxCnt=/=m，
+  //   新 = req.ready & lastBeat），折入属发明新门控而非 loss 恢复，须先经设计评审；
+  //   因果干预已证明只恢复块满闸即充分。详见上方「#122 主修复」段的禁动区声明。
+  cvt.io.in.valid := scratchpad.io.cPop.valid && executor.io.cStoreGate && !blkLatchFull
   cvt.io.in.bits  := scratchpad.io.cPop.payload
   cvt.io.outFmt   := regFile.cFmt
   cvt.io.rnd      := regFile.rnd
@@ -445,8 +602,11 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   //     aRowAddressOffset）。
   //     * scaleADma 行数天然镜像 aDma（m×kTile×nTile），与 Executor
   //       每激活行 pop 的 scaleA 一一对应。
-  //     * scaleBDma 两级遍历（nt 轮外 × kb 块内）；Executor 仅在 K-块起始
-  //       pop scaleB，FIFO 反压自然节流上游。
+  //     * scaleBDma 两级遍历（nt 轮外 × kb 块内），bufWidth=8：每 sLOAD_B 窗口
+  //       按列供 totalN 拍（8-bit/拍/列）；Executor 与 bPop 同拍 lockstep pop
+  //       scaleB（beat b → 列 n=(totalN-1)-b），逐拍暂存进 scaleBRegs、末拍
+  //       lock 时 totalN 列并列呈现（非「每 K-块起始 pop 一个 totalN 向量广播」
+  //       ——旧描述已过期，scaleBPop 端口实为 UInt(8.W)）；FIFO 反压自然节流上游。
   //   - 【MX 必选】start 加运行期 isMx(regFile.aFmt) 门控：仅 MX 运行时启动；
   //     非 MX 运行（fmt 非 MX 枚举）恒不启动，不向外部发请求（非 MX harness 不
   //     驱动 dmaScaleA/dmaScaleB 也天然安全）。判据与 Executor err/scale 块同用 aFmt。

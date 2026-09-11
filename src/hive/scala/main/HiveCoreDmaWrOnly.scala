@@ -10,12 +10,16 @@
   *   = ceil(n/blk) 字节），外层扫 nTile 个 N tile（轮间跳 cScaleColTileAddressOffset
   *   = totalN/blk 字节）。
   *
-  * 【地址模型——「基址 + 轮偏移」线性模型（刻意不复制 cDma sNEXT_N 的三角累积）】
-  *   cDma 数据通道的块间跳转用「curAddr += colAddr; colAddr += offset」三角累积，
-  *   是已知遗留问题（禁动区）；本模块为新通道，直接采用线性模型：
+  * 【地址模型——「基址 + 轮偏移」线性模型（与 cDma sNEXT_N 现已同构）】
   *   colAddr 寄存器只存「下一轮的累计列偏移」，轮间跳转时
   *     curAddr := baseAddr + colAddr;  colAddr := colAddr + colTileOffset
   *   每轮起始地址恒等于 baseAddr + nt*colTileOffset，无累积误差、易对账。
+  *   【#133 撤销旧声明】本段原写「cDma 数据通道的块间跳转用 curAddr += colAddr
+  *   三角累积，是已知遗留问题（禁动区）；本模块为新通道，刻意不复制」——该声明已
+  *   过期：cDma（HiveCoreDmaWrOnly.sNEXT_N）已改为 `curAddr := io.regFile.cAddr +
+  *   colAddr`，两个 C 侧写通道现同为「基址 + 轮偏移」线性模型，不存在「禁动区」的
+  *   三角累积通道。历史教训留痕：当年正是「金锚按缺陷 RTL 反向拟合 + 头注释把它标成
+  *   禁动区」两件事互相背书，使该缺陷在所有 nTiles≥2 用例上假绿潜伏。
   *
   * 反压/在途记账（写通道简化版）：
   *   - req 仅在 sTRANSFER 且 bufPop 有数据时发出，且被在途上限（顶层 cScaleFifo 深度 2）
@@ -55,13 +59,101 @@ import chisel3.util._
   * C buffer 为严格 FIFO（上游顺序 = Executor push 顺序），写回顺序与 loopMode 无关。
   *   - 内层沿 M 方向（实际 M 行 regFile.m，边界感知不含 padding，
   *     每行地址 + cRowAddressOffset），外层扫 nTile 个 N tile
-  *     （块间跳 cColAddressOffset）
+  *     （块间跳 cColTileAddressOffset）
   *
-  * 地址模型（与 HiveCoreExecutor 的 cStoreAddr 约定一致，字节地址）：
-  *   C_tile_addr = regCAddr + mTileIdx*totalN*cRowOffset + nTileIdx*cColOffset
-  * 块间跳转采用「跳回起点再前移一个块」的三角累积增量式计算（金锚背书，行级不动）：
-  *   jump = blockOffset - (innerRows - 1) * rowStep
-  * 拍内地址 = curAddr + beatCnt × calcConfig.cBeatAddrStep（顶层单源运行期步进）。
+  * 地址模型（字节地址；只引用本设计实际存在的信号）：
+  *   第 nt 轮块首址 = io.regFile.cAddr + nt*calcConfig.cColTileAddressOffset
+  *   块内行首址     = 块首址 + lineCounter*calcConfig.cRowAddressOffset
+  *   拍内地址       = curAddr + beatCnt × calcConfig.cBeatAddrStep（顶层单源运行期步进）
+  * 块间跳转 = 「基址 + 轮偏移」线性模型（与同文件 HiveCoreDmaScaleWr 同构）：
+  *   sNEXT_N 拍执行 curAddr := io.regFile.cAddr + colAddr; colAddr := colAddr +
+  *   cColTileAddressOffset，其中 colAddr 锁存初值 = 1 轮偏移（见 startReload），
+  *   故第 nt 轮起始地址恒 = cAddr + nt*cColTileAddressOffset，无累积误差、易对账。
+  * 【#133 订正两条伪权威表述，勿恢复】
+  *   (1) 旧注「块间跳转采用『跳回起点再前移一个块』的三角累积增量式计算（金锚背书，
+  *       行级不动）：jump = blockOffset - (innerRows - 1) * rowStep」是更早提交的化石
+  *       公式、与本模块代码不符；「金锚背书」亦非权威——当时金锚
+  *       （HiveSimCommon.cAddrSeqDense）本身就是按缺陷 RTL 反向拟合出的三角累积闭式
+  *       base + nt*(m-1)*rowOff + nt*(nt+1)/2*colOff，与「curAddr := curAddr + colAddr」
+  *       逐字同源，两者互相背书使所有 nTiles≥2 用例的 dmaC 逐拍地址硬断言退化为
+  *       「RTL 与其镜像自比」而恒真假绿（FP32/N=32 下 nt=1 首址实得 base+0xFC0、
+  *       正确值 base+0x40）。金锚现已改回张量语义绝对式，RTL 与金锚独立推导后相等。
+  *   (2) 旧注「与 HiveCoreExecutor 侧的『C 写回地址别名』约定一致」——该别名在 main
+  *       源码中无任何定义（死引用，全仓仅两处注释命中），已删除；C 侧地址语义的唯一
+  *       实际来源是 regFile.cAddr 与 calcConfig 的 cRow/cColTile/cBeatAddrStep 三偏移。
+  *       【#136-RW1 采纳选项 (b)】本条留痕改用【描述性表述】、不复述原名裸 token，使
+  *       grep 式死引用审计在 src/hive/scala/main/ 下对该名字 0 命中，无需读上下文区分
+  *       「活引用」与「删除留痕」（同款处理见 HiveCore.scala 与 HiveCoreDmaRdOnly.scala
+  *       的 #133 死引用清理段）。
+  *
+  * 【#136-RW3 提交纪律留痕：#133 在 main 侧的触碰清单（实测 5 段注释 + 0 功能行）】
+  *   背景：本文件与 HiveCore.scala / HiveCoreDmaRdOnly.scala 在工作树里【同时承载他任务的
+  *   功能行】，故「#133 仅注释级」这一结论【无法由 git diff 自证】、只能靠任务标注推断。
+  *   为让后续能按任务拆 commit，此处逐段登记 #133 的 main 侧触碰点。下列行号是 #136 全部
+  *   编辑落地后的实测值；定位请以【文本锚点】为准，行号会随注释改动漂移（本会话已发生四次
+  *   锚点漂移，例如 #118 的 W6 锚点从 L446-449 漂到 L566-567）。
+  *   (1) HiveCoreDmaWrOnly.scala L17-22 ——【#133 撤销旧声明】撤销「cDma sNEXT_N 三角累积
+  *       属禁动区」的过期声明，改述为两个 C 侧写通道同为「基址 + 轮偏移」线性模型。
+  *       #136 未再改动此段。
+  *   (2) HiveCoreDmaWrOnly.scala L72-87 ——【#133 订正两条伪权威表述】其一撤销化石公式
+  *       jump = blockOffset - (innerRows-1)*rowStep 并说明金锚反向拟合的机理；其二删除
+  *       Executor 侧「C 写回地址别名」死引用。其中 L84-87 由 #136-RW1 追加（去裸 token）。
+  *   (3) HiveCore.scala L155-161 ——【#133 死引用清理】calcConfig 生产者注释里「与 Executor
+  *       侧三个 tile 首址别名保持一致」的伪约定删除留痕。其中 L159-161 由 #136-RW1 追加。
+  *   (4) HiveCoreDmaRdOnly.scala L70-78 ——【#133 死引用清理】A/B tile 首址别名死引用的删除
+  *       留痕。#133 当时只订正命名、未校验同块的化石公式，遗留问题由 #136-KW3 修：KW3 重写
+  *       其上方 L26-68（六条跳转分通道描述 + 两支闭式 + 化石公式撤销），L70-75 由 #136-RW1
+  *       追加去裸 token，L76-78 由 #136-KW3 追加信号名对照。
+  *   (5) HiveCoreElaborate.scala L67-71 ——【#133 撤销】把「cDma sNEXT_N 三角累积地址模型」
+  *       从「禁动区典型项」清单移除 + 教训留痕。#136 未再改动此段。
+  *   ★ 功能行归属：#133 在 main 侧的功能行改动数 = 【0】。本文件 sNEXT_N 分支的
+  *     `curAddr := io.regFile.cAddr + colAddr`（文本锚点定位）是【用户手工修复】、不属
+  *     #133；#133 只把金锚与注释改到与该修复一致。
+  *   注：#136 任务描述写「4 段注释」，实测为 5 段（漏计 HiveCoreElaborate.scala 那段），
+  *     差异已在 #136 报告第 (10) 项「与任务前提矛盾之处」明说。
+  *
+  * 【#136-RW3 拆 commit 建议：main 侧功能行按任务归属（注释级改动可单独成一 commit）】
+  *   HiveCore.scala：
+  *     · respForTracing 端口声明 + tracing FSM（tracingSt/tracingPcReg/tracingTagReg 与
+  *       io.respForTracing.valid/payload 全部驱动）        → tracing 任务
+  *     · dmaCScale 位宽由字面 8 还原为 cfg.cScaleRowW      → 裁定2
+  *     · 两处 `when(cmd.regXAddr === 0x07.U) { when(cmd.dataX(0)) { doneFlag := false.B } }`
+  *       的删除（clear_done 移除）                        → B1
+  *     · `when(calcConfig.io.err && !startPulse) { errFlag := true.B }` 直连 → B2
+  *     · blkLatchCnt/blkLatchFull 新增 + scratchpad.io.cPop.ready 与 cvt.io.in.valid 各加
+  *       `&& !blkLatchFull`（同源双门）                    → #122
+  *     · scaleB lockstep 注释（该段无功能行）              → #118
+  *   HiveCoreDmaRdOnly.scala：
+  *     · 删除 bNextKTileAddressOffset 死寄存器             → B5
+  *     · sIDLE 锁存与轮内切 k-tile 两处 B 地址改写（降序起点项 (totalN-1)*rowOffset +
+  *       lastBTileStartAddr 累加模型）                     → B5
+  *   HiveCoreDmaWrOnly.scala：
+  *     · sNEXT_N 的 `curAddr := curAddr + colAddr` → `curAddr := io.regFile.cAddr + colAddr`
+  *       （本文件唯一一对功能行改动）                      → 用户手工修复
+  *   HiveCoreElaborate.scala：非注释功能行 = 0
+  *
+  * 【#136-RW3 结论：回归数字不可归因于单一任务】#136 收尾实测（9 套件全量）：
+  *   Total 80 / Suites: completed 9, aborted 0 / succeeded 77, failed 3, canceled 0,
+  *   ignored 0。任务书给的基线是 76/73/3；差的 +4 全部来自【并行任务 #137】在 #136
+  *   会话期间给 HiveOutCvtSpec 追加的 4 个 INT4 用例（该套件 18→22，4 例全绿），
+  *   #136 自身新增用例数 = 【0】。
+  *   这恰好是本段结论最强的证据：该数字是【整棵未提交工作树的联合属性】—— 它同时
+  *   包含 tracing / 裁定2 / B1 / B2 / B5 / #122 / #118 / 用户 dmaC 修正 / #133 / #136 /
+  *   #137 的改动，甚至会在【你跑回归的过程中】被并行任务改掉。故【不可】把任何一组
+  *   数字归因于单一任务落地；按上述建议拆 commit 后，每个 commit 都必须重跑全量回归
+  *   重新取数，不得复用此处或任务书里的任何基线。
+  *
+  * 【#136-RW3 交接：既存红的判别指纹（勿再误归因于金锚族）】
+  *   #127 的两条红：下列三条【同时成立】⇒ 属 #127（量化数据路 / dmaCScale 反压），不属金锚：
+  *     (a) 失败信息是 `DMA-C store beat #0 data mismatch`（data 类，非 addr 类）；
+  *     (b) 同次运行 dmaC 逐拍地址对账【全绿】。QuantSpec 内的取证形式：地址硬对账
+  *         （`reqAddr should be(expCAddrSeq(...))`）与数据硬断言在同一拍内【先后相邻】，
+  *         失败落在后者 ⇒ 前者已通过；DebugCase 家族的取证形式则是打印
+  *         `地址对账不一致拍数=0`。两种形式等价，都表明缺陷不在地址生成侧。
+  *     (c) 失配值与 pre-fix baseline 同值（#133 改金锚前后不变）。
+  *   #118 的回归已给出这三项动态证据确证：仍恰为 2 条红、仍为 data 类、地址对账仍为 0。
+  *   另一条既存红 `errCode should be 2`（0 was not equal to 2）属 #124（CalcConfig 退化）。
+  *   三条红【不得】靠金锚侧修改消除；#133/#136 均未触碰它们，也不得让它们增减或变形。
   *
   * 运行期拍数（裁定 6）：beatsPerRowEff = ceil(totalN×elemBits/cDmaExtW)，由 io.outFmt
   *（顶层唯一源 cOutFmtEff）解码：256 默认 × totalN=16 下 fp32/int32=2 拍、
@@ -69,10 +161,27 @@ import chisel3.util._
   * 末拍推进单一判据：req.fire && beatCnt===beatsPerRowEff-1 → 行推进（行级结构不动，
   * 仅叠拍内偏移）；行/块跳转自动对齐、免维护拍地址寄存器。
   *
-  * 反压策略（与 RdOnly 对称）：
-  *   - bufPop.ready = sTRANSFER_M 且行锁存空（行粒度握手，每行只收一次）；
-  *     cvt 侧持行直到本模块末拍接受（out.ready 透传本模块内部决定）
-  *   - 数据在外部 writeData.ready 为高时才发拍，天然支持逐拍暂停
+  * 反压策略（【#136-KS6 订正】原文以已死的行寄存 lineValid/lineData 为口径，与代码不符）：
+  *   - 实际口径（唯一权威 = 本文件下方 `io.bufPop.ready := ...` 那一行）：
+  *       bufPop.ready = (state === sTRANSFER_M) & dmaExtWrIF.req.ready & lastBeat
+  *     即【组合直通 + 末拍弹出】：拍数据 = io.bufPop.payload >> (beatCnt×cDmaExtW) 取低
+  *     cDmaExtW 位，本模块【不自行锁存整行】；一行在全部 beatsPerRowEff 拍期间由上游
+  *     （顶层 cvt 的行寄存 → C FIFO）保持稳定不弹，只有末拍（lastBeat = beatCnt ===
+  *     calcConfig.cDmaBufBeatTar）且外部 req.ready 为高的那一拍才拉高 bufPop.ready 弹出
+  *     该行 ⇒ 仍是「行粒度握手、每行只收一次」，但收行时刻在【末拍】而非首拍。
+  *   - 原文「bufPop.ready = sTRANSFER_M 且行锁存空」描述的是已下线的 lineValid 二态锁存
+  *     模型（旧 HiveCoreDma.scala 时代）。拆分重构后行寄存职责已归顶层 cvt（全设计唯一
+  *     一份，见 HiveCore.scala 的 #122「禁动区声明：不恢复 lineData/lineValid」段），
+  *     本模块原有的 lineData/lineValid 死寄存器已由 #125 删除（清理段见下方 beatCnt 声明处）。
+  *   - 「与 RdOnly 对称」亦不成立：RdOnly 的信用计数 ostCredit 【参与 req.valid 门控】
+  *     （`req.valid := ostCredit =/= 0.U & state === sTRANSFER`），即由 buffer 余量决定
+  *     发不发 cmd；本模块的 req.valid = (state === sTRANSFER_M) & bufPop.valid、
+  *     bufPop.ready = (state === sTRANSFER_M) & req.ready & lastBeat，【两者都不含
+  *     ostCredit】——本模块的 ostCredit 只在 sDONE 用作「在途写拍已排空」的放行判据
+  *     （`.elsewhen(ostCredit === 0.U)` 才发 done）。同文件的 HiveCoreDmaScaleWr 又是
+  *     第三种口径（req.valid 含 `ostCredit =/= depth`），故三者互不对称，勿互相套用。
+  *   - 数据在外部 writeData.ready（= dmaExtWrIF.req.ready）为高时才发拍，天然支持逐拍
+  *     暂停（此条原文正确，保留）。
   *
   * 门控语义：storeGate 门控位于上游（顶层 cPop mux ready 源 + cvt.in.valid 门），
   * 本模块由 peekBlock/doneBlock 块协议与 Executor 同步；非末 K pass 期间不会收到行。
@@ -137,6 +246,40 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
 
   val state = RegInit(sIDLE)
 
+  // Internal IF
+  val dmaExtWrIF = Wire(new HiveCoreDMAExtWriteOnlyIF(cfg, extW))
+  val dmaCurStrb = Wire(UInt((cfg.cDmaExtW / 8).W))
+  val dmaMaxStrb = Wire(UInt((cfg.cDmaExtW / 8).W))
+  val dma2Strb = Wire(UInt((cfg.cDmaExtW / 8 / 2).W))
+  val dma4Strb = Wire(UInt((cfg.cDmaExtW / 8 / 4).W))
+  dmaMaxStrb := ((1L << (cfg.cDmaExtW / 8)) - 1L).U
+  dma2Strb := ((1L << (cfg.cDmaExtW / 8 / 2)) - 1L).U
+  dma4Strb := ((1L << (cfg.cDmaExtW / 8 / 4)) - 1L).U
+  io.dmaExtWrIF.req.valid := dmaExtWrIF.req.valid
+  io.dmaExtWrIF.req.payload.addr := dmaExtWrIF.req.payload.addr
+  dmaExtWrIF.req.ready := io.dmaExtWrIF.req.ready
+
+  //DMA 数据需要移位，目前全部把数据放到低位
+  val dmaBytes = cfg.cDmaExtW / 8
+  val addrShiftBytes = dmaExtWrIF.req.payload.addr(log2Up(cfg.cDmaExtW/8), 0) % dmaBytes.U
+  //Comment 遗留之后打开
+  //io.dmaExtWrIF.req.payload.data := dmaExtWrIF.req.payload.data << (addrShiftBytes << 3)
+  io.dmaExtWrIF.req.payload.data := dmaExtWrIF.req.payload.data
+  when(io.calcConfig.cDmaDmaBeatTar === 0.U) { //full
+    dmaCurStrb := dmaMaxStrb
+  }.elsewhen(io.calcConfig.cDmaDmaBeatTar === 1.U) { // 1/2
+    dmaCurStrb := dma2Strb
+  }.otherwise { // 1/4
+    dmaCurStrb := dma4Strb
+  }
+  io.dmaExtWrIF.req.payload.strb := dmaCurStrb << (addrShiftBytes)
+
+  //Unused tie
+  dmaExtWrIF.rsp.valid := false.B
+  dmaExtWrIF.rsp.ready := false.B
+  dmaExtWrIF.rsp.payload.err := false.B  
+  dmaExtWrIF.req.payload.strb := 0.U
+
   // ==========================================================================
   // 内部寄存器
   // ==========================================================================
@@ -154,11 +297,24 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
   val ostCredit = RegInit(0.U(log2Up((cfg.cBufferDepth + 2) * cfg.cBeatsPerRowMax + 1).W))
 
   // ==========================================================================
-  // 发拍行锁存（bufPop fire 拍锁存 cvt.out 整行；发拍段必须切自锁存值——
-  // 若切自组合直通，发送拍期间上游已前移到下一行，总线数据会整行错位）
+  // 【#136-KS6 死寄存器清理（#125 已执行删除）】
+  // 本段原标题为「发拍行锁存（bufPop fire 拍锁存 cvt.out 整行；发拍段必须切自锁存值——
+  // 若切自组合直通，发送拍期间上游已前移到下一行，总线数据会整行错位）」，所描述的机制
+  // 【已不在代码中】。原登记的两个死寄存器已由 #125 删除（不可达性论证：全文件均无任何
+  // 读取点，删除前后 elaboration 产物逐字一致）：
+  //   · lineData  = Reg(UInt(popW.W))  —— 曾【从未被赋值、从未被读取】，纯死寄存器，已删；
+  //   · lineValid = RegInit(false.B)   —— 曾仅在 startReload 内被写 false.B、【从未被读取】，
+  //                                       纯死寄存器，已删（连同 startReload 内那次死写入）；
+  //   · beatCnt   = RegInit(0.U(...))  —— 【活，保留】：参与 lastBeat 判据与拍内地址/数据偏移。
+  // 现行实际机制是【组合直通 + 末拍弹出】：发拍段直接切自 io.bufPop.payload（上游 =
+  // 顶层 cvt 行寄存 → C FIFO）；因为 bufPop.ready 只在 lastBeat 那一拍拉高，一行在其余
+  // beatsPerRowEff-1 拍期间由上游 FIFO 保持稳定不前移 —— 原标题担心的「整行错位」是由
+  // 【上游持稳】避免的，不是由本模块锁存避免的。
+  // 佐证：HiveCore.scala 的 #122「禁动区声明」明确写「不恢复 lineData/lineValid
+  // （行寄存职责已归 cvt，全设计唯一一份）」。
+  // ★ 请勿把 lineData/lineValid 接回数据路：那会造出第二份行锁存，重新引入
+  //   #122 主修复所消除的同拍竞态（cvt.in.ready 组合直通 ∧ cStoreGate 寄存 ∧ FIFO 未空）。
   // ==========================================================================
-  val lineData  = Reg(UInt(popW.W))
-  val lineValid = RegInit(false.B)
   val beatCnt   = RegInit(0.U(beatCntW.W))
 
   // ==========================================================================
@@ -177,7 +333,9 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
   // 原 TODO(P2) 临时接法（8+3 处）随本重构全部清除。
 
   // P2：ActiveRowSplit 已删除（裁定 4/6）——行寄存器职责归顶层 cvt（全设计唯一一份），
-  // 本模块仅保留上方 lineData/lineValid/beatCnt 发拍暂存；拍段切分按总线位宽固定切自锁存行。
+  // 【#136-KS6 订正 / #125】本模块【不再保留任何行锁存】：原有 lineData/lineValid 两个死
+  // 寄存器已由 #125 删除（见其声明处的 #136-KS6 清理段），此处只保留活的 beatCnt；拍段切分
+  // 是【组合直通】自 io.bufPop.payload 按总线位宽右移取段，行数据由上游 FIFO 在该行全部拍期间持稳。
   // P2：popDataFpNorm（40→32 延迟规格化）已删除——规格化下沉到 cvt 数值核（fpNormalize40to32），
   // 本模块收到的已是转换后密集行。
 
@@ -187,30 +345,13 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
   // ==========================================================================
   io.dmaExtWrIF.rsp.ready        := true.B
 
-  // ==========================================================================
-  // 写回握手（P2 两段式，裁定 4/6；取代原 legacy/active 编译期双分支与
-  // outFmtEff/isQuant/normSel 判据族）：
-  //   收行：bufPop.ready = sTRANSFER_M 且行锁存空 → 每行只收一次，
-  //         fire 拍原子锁存 cvt.out 整行（宽 totalN×32，已按 outFmt 选段、
-  //         高位由 cvt 填零，禁止双行合拍，裁定 9）。
-  //   发拍：锁存有数据即发拍，共 beatsPerRowEff 拍（运行期解码，见上）；
-  //         拍内地址 = curAddr + beatCnt × cBeatAddrStep（顶层单源），
-  //         数据 = 锁存行按总线位宽右移取段。curAddr 只在行边界更新，
-  //         行/块跳转自动对齐、免维护拍地址寄存器。
-  //   bufPop.fire 与 req.fire 由 lineValid 互斥（锁存空/满二态），无同拍双写。
-  // ==========================================================================
-  // 【块末行窗口竞态防护：末行锁存后关收行门（P3 定位）】块内收行计数：本块收满
-  // m 行（末行锁存完成）后关收行门，杜绝上游在末行之后超前预取不存在的第 m+1
-  // 行（波形实证：cPop=33/bufPopFire=32 对账，块错位/死锁两形态）。
-  // 门控判据必须用收行计数而非 lineCounter：lineCounter===m-1 在末行锁存前即成立，
-  // 直接关门会阻断末行接收（实测死锁：store beats 停在 (m-1)×beatsPerRow），
-  // 故按「末行锁存后关门」语义以 blkRxCnt 记账（P3 定位）。
-  io.bufPop.ready := (state === sTRANSFER_M) & io.dmaExtWrIF.req.ready & lastBeat
-  io.dmaExtWrIF.req.valid        := (state === sTRANSFER_M) & io.bufPop.valid
-  io.dmaExtWrIF.req.payload.addr := curAddr + beatCnt * io.calcConfig.cBeatAddrStep
-  io.dmaExtWrIF.req.payload.data := (io.bufPop.payload >> (beatCnt * cfg.cDmaExtW.U))(cfg.cDmaExtW - 1, 0)
 
-  // 拍推进：末拍清行锁存并回零拍计数（行推进动作在下方 switch sTRANSFER_M 分支）
+  io.bufPop.ready := (state === sTRANSFER_M) & io.dmaExtWrIF.req.ready & lastBeat
+  dmaExtWrIF.req.valid        := (state === sTRANSFER_M) & io.bufPop.valid
+  dmaExtWrIF.req.payload.addr := curAddr + beatCnt * io.calcConfig.cBeatAddrStep
+  dmaExtWrIF.req.payload.data := (io.bufPop.payload >> (beatCnt * cfg.cDmaExtW.U))(cfg.cDmaExtW - 1, 0)
+
+  // 拍推进：末拍回零拍计数（行推进动作在下方 switch sTRANSFER_M 分支；本模块无行锁存可清）
   when((state === sTRANSFER_M) && io.dmaExtWrIF.req.fire) {
     when(lastBeat) {
       beatCnt   := 0.U
@@ -246,8 +387,16 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
   // ==========================================================================
   // start 重载公共动作（任意状态生效，引用同文件 RdOnly 的 sTRANSFER/sDONE
   // 重载同构实现）：回 sFIRST_PEEK、清 errReg/lineCounter/nCnt、重载
-  // curAddr/rowStep/colAddr；active 另清 lineValid/beatCnt（防异常路径残留
-  // 半行状态）。正常流程 start 仅出现在 sIDLE，其余状态的重载分支为死路、
+  // curAddr/rowStep/colAddr、清 beatCnt。
+  // 【#136-KS6 订正 / #125】原文「active 另清 lineValid/beatCnt（防异常路径残留半行状态）」
+  //   两处不准：
+  //   (1)「active」是已删除的编译期双分支（legacy/active）术语；P2 两段式重构后
+  //       startReload 是【唯一】重载路径，不存在「active 另清」这一分支之别。
+  //   (2) 原文所指 lineValid 曾是【死寄存器】（全文件从未被读取），其在本函数内的
+  //       `:= false.B` 死写入无任何可观测效果，已由 #125 连同声明一并删除；本函数真正
+  //       有防护意义的清零只有 beatCnt := 0.U —— 它参与 lastBeat 判据与拍内地址/数据偏移，
+  //       残留会让重启后首行拍序错位（进而使收行时刻错拍）。
+  // 正常流程 start 仅出现在 sIDLE，其余状态的重载分支为死路、
   // 行为不变；异常路径（Executor 回 idle 后下次 EXECUTE）可强制重启卡死状态。
   // ==========================================================================
   private def startReload(): Unit = {
@@ -261,9 +410,12 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
     rowStep := io.calcConfig.cRowAddressOffset
     colAddr := io.calcConfig.cColTileAddressOffset
     nCnt    := 0.U
-    // 强制重启时同步清行锁存/拍计数（防异常路径残留半行状态；
-    // 正常流程回 sIDLE 前锁存已自然清空）
-    lineValid := false.B
+    // 强制重启时清拍计数（防异常路径残留半行状态；正常流程回 sIDLE 前 beatCnt 已自然归零）。
+    // 【#136-KS6 / #125】此处原有 `lineValid := false.B` 一行【死寄存器的死写入】（全文件
+    //   从未被读取），仅为与 672fb37 重构前的语句保持一一对应而留存，已由 #125 连同
+    //   lineValid 声明一并删除；勿据原注释「清行锁存」字样推断本模块仍有行锁存 ——
+    //   现行机制是【组合直通 + 末拍弹出】，行数据由上游（顶层 cvt 行寄存 → C FIFO）持稳，
+    //   见文件头「反压策略」段与 beatCnt 声明处的死寄存器清理段。
     beatCnt   := 0.U
   }
 
@@ -294,7 +446,7 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
         // 末拍（行内最后一拍）才做行推进（末拍推进单一判据，裁定 6；
         // 取代原按格式的 legacy/active/quant 多分支）；
         // 拍计数/行锁存清除在上方拍推进 when 块处理。
-        when(io.dmaExtWrIF.req.fire && lastBeat) {
+        when(dmaExtWrIF.req.fire && lastBeat) {
           when(lineCounter === io.regFile.m - 1.U) {
             lineCounter := 0.U
             state := sNEXT_N
@@ -313,7 +465,7 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
       }.otherwise{
         when(io.peekBlock){
           nCnt := nCnt + 1.U
-          curAddr := curAddr + colAddr
+          curAddr := io.regFile.cAddr + colAddr
           colAddr := colAddr + io.calcConfig.cColTileAddressOffset
           state := sTRANSFER_M
         }
@@ -409,6 +561,7 @@ class HiveCoreDmaScaleWr(cfg: HiveCoreConfig) extends Module {
   io.dmaExtWrIF.req.valid         := (state === sTRANSFER) & io.bufPop.valid & (ostCredit =/= depth.U)
   io.dmaExtWrIF.req.payload.addr  := curAddr
   io.dmaExtWrIF.req.payload.data  := io.bufPop.payload
+  io.dmaExtWrIF.req.payload.strb  := (1 << (rowW / 8) - 1).U
   io.bufPop.ready                 := (state === sTRANSFER) & io.dmaExtWrIF.req.ready
   io.dmaExtWrIF.rsp.ready         := true.B
 

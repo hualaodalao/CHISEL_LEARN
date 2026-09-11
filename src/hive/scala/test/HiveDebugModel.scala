@@ -22,7 +22,13 @@
   *   scaleB  : row-major N×(K/bBlk) 字节，byte = n*(K/bBlk) + kb（与硬件
   *             scaleBRowAddressOffset = K/bBlk 作为 n 向步进逐字对应）
   *   C       : 密集布局，地址序列直接复用 HiveSimCommon.cAddrSeqDense（四套件
-  *             共用唯一推演源，与 HiveCoreDmaWrOnly 三角累积闭式同源）
+  *             共用唯一推演源）。【#133 订正】此处原写「与 HiveCoreDmaWrOnly 三角
+  *             累积闭式同源」——那是把缺陷 RTL 的行为当规范（金锚反向拟合 RTL，
+  *             使 nTiles≥2 的 dmaC 逐拍地址断言恒真假绿）。正确口径与 A/B/scale
+  *             五通道一致：由【张量语义布局】绝对式推导 addr(C[i][j]) =
+  *             base + j×cEb + i×(N×cEb)，即块间跳转 = nt×cColOff，【不镜像 RTL】；
+  *             RTL 侧 HiveCoreDmaWrOnly.sNEXT_N 现亦为「基址 + 轮偏移」线性模型
+  *             （curAddr := io.regFile.cAddr + colAddr），两者独立推导后逐拍相等。
   */
 
 import chisel3._
@@ -64,6 +70,57 @@ object HiveDebugModel {
 
   /** 每拍推进的 K 元素数（= kTile 粒度）：MX8 = totalN*2，其余 = totalN */
   def kPerBeat(f: DataFormat.Type, totalN: Int): Int = totalN * elemsPerLane(f)
+
+  // ==========================================================================
+  // FTZ（flush-to-zero）阈值：由输出格式推导，镜像硬件下溢冲零语义（#128）
+  // ==========================================================================
+  // 【#128 金锚保真度修复 —— 设计意图取证结论：分支 A】硬件 HiveOutCvt 各输出支路
+  //   对 subnormal 是【显式 FTZ】（类头注释原文："低于最小正规格化 → flush-to-zero
+  //   （保号；本硬件族不产生目标格式次正规数）"）：
+  //     · fp32ToFp16Rnd：underflow = (exp < 113.U) → signedZero（113 = fp32 编码下的
+  //       2^-14，即 FP16 最小正规数）；
+  //     · quantElem（MX 支路）：underflow = (eTgt < 1.S) → signedZero，其中
+  //       eTgt = e + bias - s（s = 块 E8M0 scale），即目标偏置指数 < 1。
+  //   与 HiveSimCommon 软件镜像逐位同构：swFp32ToFp16 (e<113→signedZero)、
+  //   swQuantElem (eTgt<1→signPart)。SimCase golden 亦以 isStrict/strictExpect 手工
+  //   锚点建模同一 FTZ（C[3][1] 理想值 3.2e-5 < 2^-14 → 期望码 0x0000）。
+  //   金锚 compare() 旧版拿【未再编码的理想 fp32 golden】配 tolAbs=1e-6 比较，
+  //   subnormal 元素被误判失配（假红）—— 修复方式是对齐硬件 FTZ，【不放宽容差】。
+  //   下列阈值【全部由格式参数推导】，严禁硬编码字面量（本仓已确证 6 处「参数化量
+  //   退化为编译期常数」的 refactor-loss，不再加第 7 处）。
+
+  /** 浮点输出格式的指数域位宽（结构常量）。MX 族取自 MxFormatParams 单一真源，
+    * FP16/BF16/FP32 取自 IEEE-754 二元格式定义。非浮点格式抛错（无 FTZ 概念）。 */
+  def floatExpW(f: DataFormat.Type): Int =
+    if (f == DataFormat.FP32) 8
+    else if (f == DataFormat.BF16) 8
+    else if (f == DataFormat.FP16) 5
+    else if (f == DataFormat.MXE4M3) MxFormatParams.E4M3.expW
+    else if (f == DataFormat.MXE5M2) MxFormatParams.E5M2.expW
+    else if (f == DataFormat.MXE2M1) MxFormatParams.E2M1.expW
+    else throw new IllegalArgumentException(s"floatExpW: $f 非浮点输出格式，无 FTZ 阈值")
+
+  /** 浮点输出格式的偏置，由 expW 推导 = 2^(expW-1) - 1（IEEE 标准偏置，非字面量）。
+    * 交叉核对：MX 族此式取值与 MxFormatParams.bias 逐一相等
+    * （E4M3: 2^3-1=7、E5M2: 2^4-1=15、E2M1: 2^1-1=1）。 */
+  def floatBias(f: DataFormat.Type): Int = (1 << (floatExpW(f) - 1)) - 1
+
+  /** 浮点输出格式的最小正规格化数 = 2^(1 - bias)（FTZ 阈值的格式无关基）：
+    * |v| 非零且低于此值 → 硬件冲零（保号 ±0，无次正规产出）。
+    * 推导值：FP16=2^-14≈6.10e-5、BF16/FP32=2^-126≈1.18e-38、MXE4M3=2^-6=0.015625、
+    * MXE5M2=2^-14≈6.10e-5、MXE2M1=2^0=1.0。全部经 floatBias 推导，非硬编码字面量。 */
+  def minNormal(f: DataFormat.Type): Double = math.pow(2.0, 1.0 - floatBias(f))
+
+  /** FTZ 命中时期望的【保号零码】（#129 收紧：compare() bit-exact 判据的期望值）。
+    * 符号位位置由元素位宽推导（= cOutElemBits(f) - 1），负 ref → 置符号位、正 ref → 全零；
+    * 【零裸字面量】：本仓已确证 7 处「参数化量退化为编译期常数」的 refactor-loss，不加第 8 处。
+    * 各格式推导值（由 cOutElemBits 位宽自动得出，非硬编码）：
+    *   FP16/BF16(w16) → +0=0x0000 / -0=0x8000；FP32(w32) → 0x0 / 0x80000000；
+    *   MXE4M3/MXE5M2(w8) → 0x00 / 0x80；MXE2M1(w4) → 0x0 / 0x8。 */
+  def ftzSignedZeroCode(f: DataFormat.Type, refNeg: Boolean): Long = {
+    val w = HiveSimCommon.cOutElemBits(f)
+    if (refNeg) (1L << (w - 1)) else 0L
+  }
 
   // ==========================================================================
   // 参数解析（大小写不敏感；非法值给清晰报错）
@@ -149,9 +206,10 @@ object HiveDebugModel {
     def bMxBlk: Int = 8 << bMxBlkSel
     def cMxBlk: Int = 8 << cMxBlkSel
 
-    /** 控制字 regs(7)：rnd(13,12) | cFmt(11,8) | bFmt(7,4) | aFmt(3,0) */
+    /** 控制字 regs(7)：rnd(14,12) | cFmt(11,8) | bFmt(7,4) | aFmt(3,0)
+      * 【#120 C2】rnd 扩为 3-bit（bits[14:12]），支持全 5 种舍入模式（RNE/RTZ/RDN/RUP/RMM）。 */
     def controlWord7: Long =
-      ((rnd.toLong & 0x3) << 12) | ((cFmt.litValue.toLong & 0xF) << 8) |
+      ((rnd.toLong & 0x7) << 12) | ((cFmt.litValue.toLong & 0xF) << 8) |
         ((bFmt.litValue.toLong & 0xF) << 4) | (aFmt.litValue.toLong & 0xF)
 
     /** 控制字 regs(6)：loadWMode(28) | cMxBlk(27,26) | bMxBlk(25,24) | aMxBlk(23,22)
@@ -210,9 +268,11 @@ object HiveDebugModel {
         s"cMxBlk(${p.cMxBlk}) 必须 <= totalN($totalN) 且整除")
       if (p.cFmt == DataFormat.MXE2M1) require(p.n % 2 == 0, s"mxfp4 输出要求 N(${p.n}) 为偶数")
     }
-    require(p.addrModeSel == 0,
-      "addrMode=TILE 当前无硬件消费者（regs(6) bits(14,12) 已写入但 RTL 未接线），" +
-        "调试模型仅支持 MAT；如需 TILE 请先在 HiveCoreCalcConfig 落地该分支")
+    // 【#120 B2】addrMode=TILE 放宽：硬件全 RTL 零消费者（#123 审计确认 CalcConfig 与
+    //   两个 DMA 一次都没引用 regs(6) bits[14:12]），设置 TILE 不会改变实际 DMA 寻址行为。
+    //   内存镜像 buildMemory、golden 计算、六路期望地址序列全部仍按 MAT 语义生成，
+    //   不受 addrMode 取值影响。仅供寄存器级 debug 与回读对账。
+    //   原 require(p.addrModeSel == 0, ...) 已移除。
   }
 
   // ==========================================================================
@@ -329,7 +389,52 @@ object HiveDebugModel {
     val aColOff: Long = aKpb.toLong * aEb                      // A kTile 步进
     val bRowOff: Long = (if (p.loadWMode) p.k else p.n).toLong * bEb
     val bNTileOff: Long = if (p.loadWMode) totalN.toLong * bRowOff else totalN.toLong * bEb
-    val bKTileOff: Long = if (p.loadWMode) totalN.toLong * bEb else totalN.toLong * bRowOff
+    // 【#121 金锚修正（勿改回）：bKTileOff(loadW=1) 由 totalN*bEb 改为 bKpb*bEb。这是 672fb37
+    //  同批 6 处参数退化的第 6 处，也是唯一落在测试参考模型（本文件）而非 RTL 的一处；
+    //  【限定】硬件的 colTileOffset 在 MX 区间清白（下证），改此行是修正金锚自身，绝非
+    //  「为让用例转绿而调金锚掩盖硬件缺陷」。此清白结论【仅限 MX/FP16/BF16/INT16 区间】：
+    //  ★★【#124 ① 已修复，本段以下的「硬件仍是编译期常数」表述为【历史陈述】，勿再当现状读】
+    //  历史事实（672fb37 起、#124 ① 修复前）：硬件 bColTileAddressOffset 曾是编译期常数
+    //  totalN*(bW/8)（bW=16 恒=32、格式无关），而正确的 k-switch 步进应为运行期
+    //  totalN*elemsPerLane(bFmt)*memElemBytes(bFmt)；二者相等当且仅当
+    //  bW/8 == elemsPerLane*bEb —— MX8(2==2×1)✓、FP16/BF16/INT16(2==1×2)✓，但
+    //  INT8(需16)/INT32(需64) 硬件仍给 32 ✗。故当时 INT8/INT32 走 loadW=1 且 kTiles>1 时
+    //  kt≥1 的 B 地址全错，是【真 RTL 缺陷】，与本行金锚缺陷落在互补区间（MX 多 kTile
+    //  金锚错硬件对；INT8/INT32 多 kTile 金锚对硬件错；无配置同时出错，故两者长期互相
+    //  掩护未被发现）。该 RTL 缺陷不属 #121 范围（金锚只改一行），故当时另立任务。
+    //  ▸ 现状（#124 ① 修复后）：HiveCoreCalcConfig 已把 a/bColTileAddressOffset 改为
+    //    cfg.totalN.U * (elemsPerLaneOf(fmt) * memElemBytesOf(fmt))，与本行 bKpb*bEb
+    //    【逐字同式、全格式恒等】（半字节族 memElemBytes=0，两侧同为 0）。互补区间
+    //    已合并：MX 多 kTile 与 INT8/INT32 多 kTile 现在【金锚与硬件同时对】。
+    //    INT8 现值 16、INT32 现值 64，不再是 32。Section E【E2】据此撤下。
+    //  ▸ 本行【不动】的理由（#124 ① 未触碰此处）：#124 ① 改的是 RTL 侧赋值式，本行是
+    //    金锚侧闭式，两者本就同式，无需调整；#121 的修正值 bKpb*bEb 保持禁改。
+    //  ▸ 仍存在的残余偏差（#124 ① 未覆盖、已由 #139 承接）：loadW=1 时 RdOnly 的
+    //    lastBTileStartAddr 累加模型与本行闭式在 nt 维仍有 Δ_nt = nt*(kT*C − R)
+    //    （K 非 bKpb 整数倍且 nTiles≥2 时非零）。#124 ① 只归零了 kt 维分量。
+    //  ▸ 结构对称（同文件内部一致性）：A 侧数据 aColOff=aKpb*aEb、A 侧 scale
+    //    saColOff=aKpb/aMxBlk、B 侧 scale sbColOff=bKpb/bMxBlk —— 三处 kTile 步进一律用
+    //    kPerBeat；唯 B 侧数据 kTile 步进退化用 totalN，丢了 elemsPerLane 因子
+    //    （MX8 elemsPerLane=2，故 bKpb=2*totalN）。本行镜像 A 侧 aColOff 即可直接推出。
+    //  ▸ 四源交叉核对（kTile 步进 = bKpb*bEb，MX 下 = 2*totalN*1 = 32）：旧 HW
+    //    （672fb37^ HiveCoreDma MX loadW=1 k-switch = 2*totalN = 32）／#121 当时的 HW
+    //    （colTileOffset = totalN*(bW/8) = 32，MX 区间恰好同值）／MxSpec 金锚
+    //    （kSliceStep=32）／QuantSpec 金锚（kSliceStep=32）。
+    //    ★ #124 ① 后第四源：HW colTileOffset = totalN*elemsPerLane(bFmt)*memElemBytes(bFmt)
+    //      —— MX 下仍 = 32（四源继续一致），且 INT8/INT32 档由「HW 独错」变为四源同值。
+    //  ▸ 物理不重叠：MX 转置 B 行 n = K 连续字节（bEb=1），一个 kTile = bKpb = 32 元素 = 32
+    //    字节；旧值 totalN*bEb = 16 仅半个 kTile，kt≥1 起读会与前一 kTile 重叠
+    //    （kt0=[0,32)、kt1=[16,48)），物理不可能。
+    //  ▸ 巧合等价（长期隐形机制）：非 MX 下 bKpb == totalN（elemsPerLane=1），两公式数值
+    //    恒等，故退化只在 MX（bKpb=32≠totalN=16）且 kTiles>1（kt≥1 才乘 bKTileOff）时暴露
+    //    —— 这正是非 MX 与单 kTile 用例一直全绿、该错量长期无害的原因。
+    //  实测吻合：DebugCase d3（MX K=64）exp=0x1003D0（由 16 算）vs hw=0x1003E0（由 32 算），
+    //   差 +16 = 32−16，首现 dmaB beat#16（kt=1 块起点）；QuantSpec dualMX K=64（金锚 32）
+    //   B=64 拍逐拍全绿、零 DMA-B 失配，仅 C 数据路失配（属 #122/#118，与本行无关）。
+    //  不动项说明：loadW=0 分支（totalN*bRowOff）保留 —— loadW=0 恒非 MX（errCode4），
+    //   bKpb==totalN，属 B5 领域且 LoadWSpec 逐拍硬对账全绿；bNTileOff(loadW=1)=totalN*bRowOff
+    //   亦保留 —— 它是 n-tile（N 维）步进、非 kTile 步进，用 totalN 正确。
+    val bKTileOff: Long = if (p.loadWMode) bKpb.toLong * bEb else totalN.toLong * bRowOff
 
     val saRowOff: Long = (p.k / p.aMxBlk).toLong                // scaleA 行步进 = K/aBlk
     val saColOff: Long = (aKpb / p.aMxBlk).toLong               // scaleA kTile 步进
@@ -475,7 +580,18 @@ object HiveDebugModel {
     final case class CmpSummary(elems: Int, mismatch: Int, maxRelErr: Double,
                                 maxAbsErr: Double, details: Seq[String])
 
-    /** 硬件写回日志 → 逐元素与 golden 对比（数值容差；INT 输出走近似精确判据） */
+    /** 硬件写回日志 → 逐元素与 golden 对比（数值容差；INT 输出走近似精确判据）。
+      *
+      * 【#128 FTZ 感知 → #129 收紧为 bit-exact】当 `ref` 非零且落在输出格式的 subnormal 区
+      * （|ref| < minNormal(cFmt)，MX 量化在反量化域再乘块 scale 2^(s-127)），硬件会
+      * flush-to-zero。#128 曾令 refEff=0.0 再走原容差判据，遗留【屏蔽窗口】：refEff=0 ⟹
+      * relErr 退化为 absErr ⟹ fail=(absErr>tolRel)&&(absErr>tolAbs)，于是 hw 在 FTZ 区给出
+      * 小非零值（量化 tolRel=0.5 时 0.01、FP16 tolRel=1e-2 时 6.1e-5~1e-2 之间）或符号错误
+      * （-0.0 vs +0，absErr=0）均被【静默通过】—— #127 若症状落进 FTZ 区会被此工具藏掉。
+      * #129 改为：FTZ 命中时【对 hw 原始位做 bit-exact 断言】——必须恰为保号零码
+      * （ftzSignedZeroCode，符号位由格式位宽推导），任何非零码/符号不符即判失配。
+      * 【阈值推导（minNormal / MX 侧 ×2^(s-127)）保持 #128 不动；tolRel/tolAbs 一字未改】，
+      * 仅改「命中之后怎么判」。另加屏蔽面可观测性：打印被 FTZ 分支接管的元素计数。 */
     def compare(cWriteLog: Seq[(Long, BigInt)],
                 scaleWriteLog: Seq[(Long, BigInt)]): CmpSummary = {
       val hwBits = HiveSimCommon.parseDenseCWriteLog(cWriteLog, p.cFmt, p.m, p.n, totalN, cDmaExtW)
@@ -484,29 +600,61 @@ object HiveDebugModel {
       var mismatch = 0
       var maxRel = 0.0
       var maxAbs = 0.0
+      var ftzTakenOver = 0   // #129 屏蔽面可观测性：被 FTZ bit-exact 分支接管的元素计数
       val tolRel = if (quant) 0.5 else if (p.cFmt == DataFormat.BF16) 2e-2 else 1e-2
       val tolAbs = if (quant) 1e-3 else 1e-6
+      // 非 MX 浮点格式的 FTZ 阈值（真实值域，与 ref 同域）；INT 格式无 subnormal，不触发。
+      val ftzThreshFlat: Double = if (isIntFmt(p.cFmt)) 0.0 else minNormal(p.cFmt)
+      // 元素码位掩码（位宽由 cOutElemBits 推导，非硬编码；FTZ bit-exact 断言取 hw 原始位用）
+      val elemMask: Long = (1L << HiveSimCommon.cOutElemBits(p.cFmt)) - 1
       for (mm <- 0 until p.m; nn <- 0 until p.n) {
         val ref = goldenC(mm)(nn)
-        val hw: Double =
+        // MX 量化输出：本元素所属块的 E8M0 scale 字节（反量化与 FTZ 阈值缩放共用）
+        val mxScale: Int =
           if (quant) {
             val nt = nn / totalN
             val scaleBeat = if (scaleWriteLog.size > nt * p.m + mm) scaleWriteLog(nt * p.m + mm)._2 else BigInt(0)
             val grp = (nn - nt * totalN) / p.cMxBlk
-            val s = ((scaleBeat >> (8 * grp)) & 0xFF).toInt
-            dequant(hwBits(mm)(nn).toInt, s)
-          } else decodeElem(p.cFmt, hwBits(mm)(nn), 127)
-        val absErr = math.abs(hw - ref)
-        val relErr = if (math.abs(ref) > 1e-9) absErr / math.abs(ref) else absErr
-        if (relErr > maxRel) maxRel = relErr
-        if (absErr > maxAbs) maxAbs = absErr
-        val fail = if (isIntFmt(p.cFmt)) absErr > 0.5 else (relErr > tolRel && absErr > tolAbs)
-        if (fail) {
-          mismatch += 1
-          if (details.size < 32)
-            details += f"C($mm,$nn) hw=0x${hwBits(mm)(nn)}%X($hw%.6g) ref=$ref%.6g absErr=$absErr%.3e relErr=$relErr%.3e"
+            ((scaleBeat >> (8 * grp)) & 0xFF).toInt
+          } else 127
+        val hw: Double =
+          if (quant) dequant(hwBits(mm)(nn).toInt, mxScale)
+          else decodeElem(p.cFmt, hwBits(mm)(nn), 127)
+        // FTZ 阈值：MX = minNormal(cFmt)·2^(s-127)（镜像 swQuantElem 的 eTgt=e+bias-s<1
+        //   ⟺ |v| < 2^(1-bias)·2^(s-127)）；非 MX = minNormal(cFmt)。【#128 推导，未改】
+        val ftzThresh: Double =
+          if (quant) minNormal(p.cFmt) * math.pow(2.0, (mxScale - 127).toDouble)
+          else ftzThreshFlat
+        // #129 收紧：FTZ 命中（ref 非零且落 subnormal 区）改为对 hw 原始位做 bit-exact
+        //   保号零断言（不再令 refEff=0 走容差，堵住「hw 给小非零值 / 符号错」的屏蔽窗口）。
+        //   命中判据（含 ref != 0.0）与阈值推导保持 #128 不动，仅改「命中之后怎么判」。
+        val ftzHit = !isIntFmt(p.cFmt) && ref != 0.0 && math.abs(ref) < ftzThresh
+        if (ftzHit) {
+          ftzTakenOver += 1
+          val hwCode = hwBits(mm)(nn) & elemMask
+          val expCode = ftzSignedZeroCode(p.cFmt, ref < 0.0)
+          if (hwCode != expCode) {
+            mismatch += 1
+            if (details.size < 32)
+              details += f"C($mm,$nn) FTZ-bitexact-FAIL hw=0x${hwCode}%X exp=0x${expCode}%X(保号零) ref=$ref%.6g ftzThresh=$ftzThresh%.3e"
+          }
+        } else {
+          val absErr = math.abs(hw - ref)
+          val relErr = if (math.abs(ref) > 1e-9) absErr / math.abs(ref) else absErr
+          if (relErr > maxRel) maxRel = relErr
+          if (absErr > maxAbs) maxAbs = absErr
+          val fail = if (isIntFmt(p.cFmt)) absErr > 0.5 else (relErr > tolRel && absErr > tolAbs)
+          if (fail) {
+            mismatch += 1
+            if (details.size < 32)
+              details += f"C($mm,$nn) hw=0x${hwBits(mm)(nn)}%X($hw%.6g) ref=$ref%.6g absErr=$absErr%.3e relErr=$relErr%.3e"
+          }
         }
       }
+      // #129 屏蔽面可观测性：本次比较有多少元素走了 FTZ bit-exact 路径（按输出格式给）。
+      //   若某配置下该计数异常大，提示阈值推导可能有误或数据分布异常，须能被发现而非静默吞掉。
+      println(s"[$TAG] FTZ-bitexact 接管计数: cFmt=${p.cFmt} 命中=$ftzTakenOver / 总元素=${p.m * p.n}" +
+        s"（ftzThreshFlat=${"%.3e".format(ftzThreshFlat)}${if (quant) "；MX 侧按块 scale ×2^(s-127)" else ""}）")
       CmpSummary(p.m * p.n, mismatch, maxRel, maxAbs, details.toSeq)
     }
 
