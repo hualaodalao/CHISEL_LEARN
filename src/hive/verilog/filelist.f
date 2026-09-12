@@ -17,10 +17,11 @@ Hive_HiveCvtOpInt.sv
 Hive_HiveMulInt.sv
 Hive_HiveAddInt.sv
 Hive_HiveMacInt.sv
-Hive_HiveCvtOpFp.sv
 Hive_HiveMacFp.sv
+Hive_HiveCvtOpFp.sv
 verification/assert/Hive_HiveCvtOpMx_Verification_Assert.sv
 Hive_HiveCvtOpMx.sv
+Hive_HiveMacFpMx.sv
 Hive_HiveWorkUnit.sv
 verification/assert/Hive_HiveWorker_Verification_Assert.sv
 Hive_HiveWorker.sv

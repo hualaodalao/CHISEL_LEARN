@@ -139,6 +139,33 @@ object HiveCoreElaborate extends App {
     scaleBufferDepth = 256
   )
 
+  // 【Phase 4 打通里程碑】MXFP4(E2M1) 发射配置：在 cfgMx 基础上追加 DataFormat.MXE2M1，
+  // 使 hasMx4 = supportedFmts.contains(MXE2M1) = true，触发以下 additive 硬件分支：
+  //   · HiveWorkUnit 内 fp4 quad-lane 通路（8×HiveCvtOpMx + 4 级 HiveMacFpMx 左结合级联，
+  //     16-bit lane 打包 4 个 4-bit nibble：io.a(3,0)=k+0 … io.a(15,12)=k+3），运行期
+  //     Mux(isMx4(aFmt), quadResult, dualLaneMx()) 选择；
+  //   · HiveCoreCalcConfig：colTile 走 bits 口径（totalN×elemsPerLane×memElemBits/8=32）、
+  //     errCode7（fp4 输入强制 mxBlockSize=64，否则运行期拒绝）；
+  //   · HiveCoreExecutor2：kTile 分母泛化为 /elemsPerLane（fp4=4）。
+  // require 全部满足：totalN=8×2=16、aW=bW=16(>=16)、cEffW=max(40,16)=40(>=40)、
+  //   cDmaExtW=256 默认（isPow2、totalN*32=512 整除、[128,512] 区间、totalN*4=64<=256）、
+  //   cBufferDepth=2048>=2*totalN=32。
+  // fp4 mxBlockSize（aMxBlockSize/bMxBlockSize）= 64 是【运行期寄存器】(regs(6) bits(25,24)/(23,22)
+  //   =M64=3)，由仿真用例写入；此处配置层无该字段，仅靠 supportedFmts 含 MXE2M1 打开 hasMx4 通路。
+  // 【关键约束·零扰动基线】发往独立新目录 src/hive/verilog_mxfp4/，绝不覆盖 verilog/verilog_mx
+  //   两套回归锚点；cfgBase/cfgMx 的 supportedFmts 未变（不含 MXE2M1 ⟹ hasMx4=false），
+  //   其门控解析出的硬件结构逐位不变 ⟹ 两套基线 normalized-diff=0 不受本配置加入的扰动。
+  val cfgMxFp4 = HiveCoreConfig(
+    arrayN = 8,
+    clusterM = 2,         // totalN = 16
+    aW = 16, bW = 16, cW = 40,
+    supportedFmts = Set(DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1),
+    aBufferDepth = 2048,
+    bBufferDepth = 2048,
+    cBufferDepth = 2048,
+    scaleBufferDepth = 256
+  )
+
   /** 单配置发射：清理目录 → 生成 RTL → 递归打包 zip。 */
   def emit(cfg: HiveCoreConfig, outputDir: String, zipName: String): Unit = {
     val outDirPath = Path.of(outputDir)
@@ -203,4 +230,7 @@ object HiveCoreElaborate extends App {
   emit(cfgBase, "src/hive/verilog", "HiveCore_rtl.zip")
   // MX 配置：独立目录，含 scale DMA 端口/子模块。
   emit(cfgMx, "src/hive/verilog_mx", "HiveCore_mx_rtl.zip")
+  // 【Phase 4 打通里程碑】MXFP4 配置：独立新目录，含 fp4 quad-lane 通路（hasMx4=true）。
+  // 绝不覆盖上方 verilog/verilog_mx 两套回归锚点；三套配置各自清理并打包独立 zip。
+  emit(cfgMxFp4, "src/hive/verilog_mxfp4", "HiveCore_mxfp4_rtl.zip")
 }

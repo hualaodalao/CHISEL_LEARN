@@ -31,7 +31,7 @@ object Fp32 {
     Mux(isZero, Cat(s, 0.U(31.W)), Cat(s, e8, m23))
   }
 
-  /** MX（microscaling）8-bit 元素 + E8M0 scale → fp32 通用转换核。
+  /** MX（microscaling）元素 + E8M0 scale → fp32 通用转换核（fp8 / mxfp4 双档）。
     *
     * E8M0 scale 是纯指数（bias=127），"乘 scale" 等价于对 fp32 的 exp 字段做加法：
     *   true_exp = (elem_exp - elem_bias) + (scale - 127)
@@ -40,31 +40,50 @@ object Fp32 {
     *
     * clamp / 特殊值（用户已定语义）：
     *   - zero（exp==0 && mant==0）          → 输出 ±0（忽略 scale）
-    *   - subnormal（exp==0 && mant!=0）      → flush-to-zero，输出 ±0
+    *   - subnormal（exp==0 && mant!=0）      → 见 subnormalFtz：
+    *       true  （fp8 E4M3/E5M2）flush-to-zero，输出 ±0（既有行为，逐位不变）；
+    *       false （mxfp4 E2M1）    e=0/m=1 是【一等公民值 ±0.5】而非需 FTZ 的次正规，
+    *                               按 ±2^(e+scale-bias-127) 正常解码（详见下方 fp32Sub）
     *   - 下溢（exp_fp32 < 1）                → flush-to-zero，输出 ±0
     *   - 上溢（exp_fp32 > 254）或 inf/nan    → saturate 到 fp32 max（保持 sign）
     *   inf/nan 的 assert 守护放在调用方 HiveCvtOpMx（仅对被选中的格式断言，
     *   避免另一路径组合逻辑的误报）
     *
-    * @param x                 8-bit MX 元素（bit7=sign）
+    * 【编译期泛化不变量】noInfNan / subnormalFtz 均为 Scala 层 Boolean 形参，经 Scala `if`
+    * 在 elaboration 期展开，不生成任何运行期选择子。fp8 默认实参组合
+    * （noInfNan=false, subnormalFtz=true）下每个表达式与泛化前【逐字一致】
+    * （sign 位 x(expW+mantW) 在 expW+mantW==7 时即 x(7)），故 E4M3/E5M2 硬件 bit-exact 非回归。
+    *
+    * @param x                 MX 元素（fp8：8-bit，bit7=sign；mxfp4：8-bit 端口取低 4 位，
+    *                          bit3=sign，高 4 位由软件保证为 0）
     * @param scale             8-bit E8M0 scale（bias=127）
     * @param expW/mantW/bias   元素指数位宽 / 尾数位宽 / 指数 bias
     * @param nanNeedMantAllOne true=仅 exp 全1 且 mant 全1 视为特殊值（E4M3 NaN，
     *                          exp 全1 且 mant 非全1 仍为正常最大数）；
     *                          false=exp 全1 即特殊值（E5M2 inf/nan）
+    * @param noInfNan          编译期：true=该格式【无 inf/nan 编码】（mxfp4 E2M1：最大码
+    *                          0x7 = ±6.0 是最大有限值，若沿用 exp 全1 判据会被误当 inf/nan
+    *                          饱和）⟹ isInfNan 折叠为 false.B；false=保持原判据（fp8）
+    * @param subnormalFtz      编译期：true=exp==0&&mant!=0 flush-to-zero（fp8 既有行为）；
+    *                          false=按次正规真值解码（mxfp4 E2M1 的 ±0.5）
     */
   private def mxToFp32(x: UInt, scale: UInt, expW: Int, mantW: Int, bias: Int,
-                       nanNeedMantAllOne: Boolean): UInt = {
-    require(1 + expW + mantW == 8, s"MX 元素必须为 8-bit：1+$expW+$mantW")
-    val s = x(7)
+                       nanNeedMantAllOne: Boolean,
+                       noInfNan: Boolean = false,
+                       subnormalFtz: Boolean = true): UInt = {
+    require(1 + expW + mantW == 8 || 1 + expW + mantW == 4,
+      s"MX 元素必须为 8-bit（mxfp8）或 4-bit（mxfp4）：1+$expW+$mantW")
+    val s = x(expW + mantW)              // 符号位（fp8: x(7)；mxfp4 E2M1: x(3)）
     val e = x(mantW + expW - 1, mantW)   // exp 字段（expW 位）
     val m = x(mantW - 1, 0)              // mant 字段（mantW 位）
 
     val isZero   = (e === 0.U) && (m === 0.U)
-    val isSub    = (e === 0.U) && (m =/= 0.U)                 // subnormal → flush-to-zero
-    val isInfNan = if (nanNeedMantAllOne) (e.andR && m.andR) else e.andR
+    val isSub    = (e === 0.U) && (m =/= 0.U)                 // subnormal（见 subnormalFtz）
+    val isInfNan = if (noInfNan) false.B
+                   else if (nanNeedMantAllOne) (e.andR && m.andR) else e.andR
 
     // 尾数左对齐到 fp32 的 23-bit（高位放元素尾数，低位补零）
+    // mantW=1（E2M1）时 = Cat(m(1位), 0.U(22.W)) → 23 位，位宽自洽
     val m23 = Cat(m, 0.U((23 - mantW).W))
 
     // exp_fp32 = e + scale - bias（有符号计算以检测上/下溢）
@@ -77,9 +96,27 @@ object Fp32 {
     val fp32Max    = Cat(s, 0xFE.U(8.W), ((1 << 23) - 1).U(23.W))  // 保持 sign 的 fp32 max normal
     val fp32Normal = Cat(s, expSigned.asUInt(7, 0), m23)
 
-    Mux(isZero || isSub, fp32Zero,
-      Mux(isInfNan || overflow, fp32Max,
-        Mux(underflow, fp32Zero, fp32Normal)))
+    if (subnormalFtz) {
+      // fp8（E4M3/E5M2）原路径：表达式与泛化前逐字一致
+      Mux(isZero || isSub, fp32Zero,
+        Mux(isInfNan || overflow, fp32Max,
+          Mux(underflow, fp32Zero, fp32Normal)))
+    } else {
+      // mxfp4 E2M1（subnormalFtz=false）：e=0/m=1 解码为 ±0.5 × 2^(scale-127)。
+      //   通用推导：次正规真值 = m/2^mantW × 2^(1-bias) × 2^(scale-127)；mantW=1/m=1 时
+      //   = 2^(-bias) × 2^(scale-127) = 2^(scale-bias-127) ⟹ fp32 exp 字段 = scale-bias，
+      //   尾数 = 0（隐含 1.0）。而 e=0 时 expSigned = e+scale-bias = scale-bias，恰同值，
+      //   故 fp32Sub 复用 expSigned —— 与计划正文的中性特例 Cat(s,(scale-1),0)（bias=1）
+      //   逐位等价，且【无裸字面量】、天然继承下方 underflow/overflow clamp：
+      //   scale<2 时 expSigned<1 → ±0（正确 FTZ，避免裸 (scale-1) 在 scale=0 处 8-bit
+      //   绕回成 0xFF=±inf）；scale=255 时 expSigned=254 未越 254 上界 → 不饱和。
+      //   scale 对块内所有元素（含 e=0/m=1）生效，故通用式必须应用 scale（非 126 常量）。
+      val fp32Sub = Cat(s, expSigned.asUInt(7, 0), 0.U(23.W))
+      Mux(isZero, fp32Zero,
+        Mux(isInfNan || overflow, fp32Max,
+          Mux(underflow, fp32Zero,
+            Mux(isSub, fp32Sub, fp32Normal))))
+    }
   }
 
   /** MX E4M3（{sign(1),exp(4),mant(3)}，bias=7）+ E8M0 scale → fp32 */
@@ -89,6 +126,20 @@ object Fp32 {
   /** MX E5M2（{sign(1),exp(5),mant(2)}，bias=15）+ E8M0 scale → fp32 */
   def mxE5M2ToFp32(x: UInt, scale: UInt): UInt =
     mxToFp32(x, scale, expW = 5, mantW = 2, bias = 15, nanNeedMantAllOne = false)
+
+  /** MX E2M1（mxfp4，{sign(1),exp(2),mant(1)}）+ E8M0 scale → fp32。
+    * 幅值域 = {0, 0.5, 1, 1.5, 2, 3, 4, 6}（最大有限值 6.0 = 码 0x7）。
+    * 格式参数一律引 MxFormatParams.E2M1（禁裸字面量）：
+    *   - noInfNan=true：E2M1 无 inf/nan 编码，0x7 = ±6.0 必须按最大有限值解码；
+    *   - subnormalFtz=false：e=0/m=1 = ±0.5 是一等公民值，不得 flush-to-zero；
+    *   - nanNeedMantAllOne 在 noInfNan=true 下为 don't-care（isInfNan 已折叠 false.B），
+    *     传 false 与 E5M2 风格一致。
+    * x 为 8-bit 端口、仅低 4 位有效（高 4 位由软件保证为 0）。
+    */
+  def mxE2M1ToFp32(x: UInt, scale: UInt): UInt =
+    mxToFp32(x, scale, expW = MxFormatParams.E2M1.expW, mantW = MxFormatParams.E2M1.mantW,
+      bias = MxFormatParams.E2M1.bias, nanNeedMantAllOne = false,
+      noInfNan = true, subnormalFtz = false)
 
   /** fp32 乘法（简化版：正常数 + 零）
     * @param rnd 舍入模式（当前实现 RNE/RTZ，其余退化为 RTZ）

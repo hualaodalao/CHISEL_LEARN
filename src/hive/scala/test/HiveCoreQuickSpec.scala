@@ -19,6 +19,13 @@
   * HiveCoreCalcConfig 把 a/b/cMxBlockSize 三违约【合并】为单一 errMXLargerThanKLoadNum、errCode 恒置 0，故【errCode
   * 1 与 2 永不可达】（QuantSpec「blk32 over totalN」期望 2 实得 0 的红项根因，#124 禁动区）；且五个 when 平级
   * last-connect、后写覆盖前写 → 真实优先级 6>5>4>3>0（与 precheckConfigErr 的 0>1>2>3>4>5 相反、后者不含 6）。
+  * 【Fix-7 补充（仅 cfg.hasMx4=true 时存在）】fp4 打通在 errComb 裸块最末追加两个 hasMx4 门控分支，
+  * last-connect 使其优先级最高：MX4×MX8 混配→errCode3(Fix-4，暂复用 code3)、fp4 blk≠64→errCode7(Phase3)。
+  * 混配 when 置于 errCode7 之前、errCode6 之后 → hasMx4=true 完整真实优先级
+  * 7 > 3(MX4×MX8混配) > 6 > 5 > 4 > 3(isAMx^isBMx) > 0（两个 code3 判据互斥、同码，常简写 7>6>5>4>3>0）。
+  * QuickSpec 默认 cfg supportedFmts 不含 MXE2M1（hasMx4=false），这两支恒不 elaborate，优先级退回 6>5>4>3>0。
+  * 注：MX4×MX8 混配(W4A8)数学/OCP 合法，真数据通路支持列 v2；errCode3 是【运行期可诊断】守护（非永久拒绝，
+  * 将来支持只需删守护 when + 补 W4A8 数据通路，aFmt/bFmt 已是独立 4-bit 字段、软件接口无需重构）。
   *
   * ══ 历史缺陷留痕（#133 已修复，本段为知识保留，原「已知不可用区间」段已删）══
   * dmaC 写回地址曾在多 tile 边界出错（sNEXT_N 三角累积增量式）：nt≥1 块首址实得
@@ -108,7 +115,12 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
 
   // ══ ① 运行前配置体检：镜像 HiveCoreCalcConfig 的 errComb/errCodeComb 裸块（RTL 真实口径）══
   private def kLoadNum(f: DataFormat.Type): Int = if (isMx8(f)) cfg.totalN * 2 else cfg.totalN * 4  // 镜像 getKLoadNum
-  /** Some(code) = 硬件会在 EXECUTE 后直接置 STATUS.err、不进计算。优先级按 RTL 平级 when 的 last-connect 序 */
+  /** Some(code) = 硬件会在 EXECUTE 后直接置 STATUS.err、不进计算。优先级按 RTL 平级 when 的 last-connect 序
+    * （后写覆盖前写 → 源码越靠后优先级越高）。【Fix-7】本镜像现补全 fp4 专属 errCode（7 与
+    * MX4×MX8 的 3），均按 cfg.hasMx4 门控：QuickSpec 默认 cfg（supportedFmts 不含 MXE2M1）
+    * hasMx4=false → 这两支恒不触发，与硬件对该配置根本不 elaborate fp4 分支一致。
+    * 注：MX4×MX8 混配(W4A8)数学/OCP 合法但真数据通路支持列 v2；此处 Some(3) 镜像硬件 Fix-4 的
+    * 【运行期可诊断】守护 when（非永久拒绝），置于 errCode7 之前 → 优先级低于 7、高于 6/5/4/原3/0。 */
   private def hwErrCode(p: DebugParams): Option[Int] = {
     val aMx = isMxAny(p.aFmt); val bMx = isMxAny(p.bFmt); var e = Option.empty[Int]
     if ((aMx && p.aMxBlk > kLoadNum(p.aFmt)) || (bMx && p.bMxBlk > kLoadNum(p.bFmt)) ||
@@ -116,7 +128,15 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
     if (aMx != bMx) e = Some(3)
     if ((aMx || bMx) && !p.loadWMode) e = Some(4)
     if (p.aFmt == DataFormat.FP32 || p.bFmt == DataFormat.FP32) e = Some(5)
-    if (p.cFmt == DataFormat.MXE2M1 && (p.n & 1) == 1) e = Some(6); e
+    if (p.cFmt == DataFormat.MXE2M1 && (p.n & 1) == 1) e = Some(6)
+    // 【Fix-4 镜像】MX4×MX8 混配（isMx4(aFmt) ^ isMx4(bFmt)）→ code 3，hasMx4 门控。
+    //   置于 errCode7 之前 → 优先级低于 7、高于 6/5/4/原3/0（镜像硬件 last-connect 序）。
+    if (cfg.hasMx4 && (p.aFmt == DataFormat.MXE2M1) != (p.bFmt == DataFormat.MXE2M1)) e = Some(3)
+    // 【Fix-7】errCode7：fp4(E2M1) v1 强制 mxBlockSize=64，hasMx4 门控。写在【最后】
+    //   = last-connect 最高优先级（镜像硬件 errCode7 在 errComb 裸块最末）。
+    if (cfg.hasMx4 && ((p.aFmt == DataFormat.MXE2M1 && p.aMxBlk != 64) ||
+                       (p.bFmt == DataFormat.MXE2M1 && p.bMxBlk != 64))) e = Some(7)
+    e
   }
   /** 体检命中时的人类可读原因 + 建议值（取值全部由 cfg/枚举推导，不写死） */
   private def errExplain(p: DebugParams, c: Int): String = c match {
@@ -124,12 +144,16 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       s"bBlk=${p.bMxBlk}（上限 ${kLoadNum(p.bFmt)}）、cBlk=${p.cMxBlk}（上限 cNWriteNum=totalN=${cfg.totalN}）。 建议：输入侧 aBlk/bBlk " +
       s"取 ${kLoadNum(p.aFmt)}（= kPerBeat，一个 kTile 恰好一个 scale 块）；输出侧 cBlk 只能取 <= totalN 且整除 totalN 的值 → " +
       s"${blkToSel.keys.toSeq.sorted.filter(b => b <= cfg.totalN && cfg.totalN % b == 0).mkString(" 或 ")}（totalN=${cfg.totalN} 下 cBlk=32/64 必被拒）"
-    case 3 => s"输入侧 MX 与非 MX 混配 —— isMx(aFmt=${p.aFmt})=${isMxAny(p.aFmt)} XOR isMx(bFmt=${p.bFmt})=${isMxAny(p.bFmt)}。 v1 只允许双 MX" +
-      "（E4M3/E5M2 互组）或双非 MX 浮点（FP16/BF16 互组）：A=MX×B=非MX 数学不可实现，A=非MX×B=MX 需 executor 偶奇重排（v1 禁止留 v2）。" +
-      " 建议：aFmt/bFmt 改成同族；本约束不限制输出 cFmt"
+    case 3 => s"输入侧 MX 与非 MX 混配、或 MX4×MX8 混配 —— isMx(aFmt=${p.aFmt})=${isMxAny(p.aFmt)} XOR isMx(bFmt=${p.bFmt})=${isMxAny(p.bFmt)}；" +
+      s"isMx4(aFmt)=${p.aFmt == DataFormat.MXE2M1} XOR isMx4(bFmt)=${p.bFmt == DataFormat.MXE2M1}。 " +
+      "A=MX×B=非MX 数学不可实现（一侧有 scale、另一侧无）；MX4×MX8 混配属 v2 W4A8 路线、v1 暂不支持" +
+      "（数学/OCP 合法，但数据通路运行期选择子只看 aFmt 而 b 侧解码接 bFmt 会静默算错，故设 errCode 运行期可诊断守护，非永久拒绝）。 " +
+      "建议：aFmt/bFmt 改成同族（E4M3/E5M2 互组，或 fp4 E2M1×E2M1）或双非 MX 浮点；本约束不限制输出 cFmt"
     case 4 => s"MX 输入（aFmt=${p.aFmt}、bFmt=${p.bFmt}）必须 loadWMode=1（B 按 N×K 转置存放），当前为 0。 建议：loadW = Some(1) 或留 None 自动推导"
     case 5 => s"FP32 只能作【输出】格式、不能作 A/B 输入（aFmt=${p.aFmt}、bFmt=${p.bFmt}）。 建议：输入改用 FP16 或 BF16"
     case 6 => s"mxfp4(MXE2M1) 输出要求 N 为偶数（半字节打包），当前 N=${p.n}。 建议：N 改偶数，或 cFmt 换 MXE4M3/MXE5M2"
+    case 7 => s"fp4(E2M1) v1 强制 mxBlockSize=64（OCP-32 属 v2 per-half-pass）—— aFmt=${p.aFmt}/aBlk=${p.aMxBlk}、" +
+      s"bFmt=${p.bFmt}/bBlk=${p.bMxBlk}。 建议：fp4 输入侧 aBlk/bBlk 取 64（=1 kTile=1 pass=1 scale 块，保 Executor 单广播不变式）"
     case _ => "未知 errCode（不应发生）"
   }
   /** ② 打印体检结论 + 生效配置摘要 + 派生几何（一次打全，便于对着波形看） */
@@ -146,7 +170,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       case None => println(s"[$TAG] 体检结论：配置合法，硬件不会置 config-err → 走正向 golden 逐元素比对 ✓")
       case Some(c) => println(s"[$TAG] ★★★ 体检不通过：硬件将在 EXECUTE 后直接置 STATUS.err（errCode=$c），不进计算 ★★★\n" +
         s"[$TAG]   原因：${errExplain(p, c)}\n[$TAG]   处置：仍然继续跑（负向路径）并硬断言硬件确实以 errCode=$c 拒绝、留下波形") }
-    val model = precheckConfigErr(p, cfg.totalN)   // 金锚口径与 RTL 口径不一致时给出 #124 提示
+    val model = precheckConfigErr(p, cfg.totalN, cfg.hasMx4)   // 金锚口径与 RTL 口径不一致时给出 #124 提示
     if (model != predicted) println(s"[$TAG] 注：HiveDebugModel.precheckConfigErr 预测=$model 与本处 RTL 口径=$predicted 不一致" +
       "（#124：errCode 0/1/2 被 RTL 合并为 0，真实优先级是 6>5>4>3>0 的 last-connect 序）")
   }
@@ -162,7 +186,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   // ══ 主运行器：③ 镜像+golden → ④ 仿真+六通道收集式地址对账 → ⑤ 逐元素比对 → ⑥⑦ 波形/回读 → ⑧ 收尾 ══
   private def runQuick(p: DebugParams): Unit = {
     val predicted = hwErrCode(p)                     // ① 体检。负向路径不跑金锚 validate：硬件不进计算，
-    if (predicted.isEmpty) validate(p, cfg.totalN)   //   且 validate 的 require 会先于仿真抛掉、用户看不到 errCode
+    if (predicted.isEmpty) validate(p, cfg.totalN, cfg.hasMx4)   //   且 validate 的 require 会先于仿真抛掉、用户看不到 errCode
     val plan = new Plan(p, cfg); plan.prepare()      // ③ 内存镜像（loadW=1 时 B 为 N×K 转置，HiveDebugModel 已实现）
     printHealth(p, predicted, plan)                  // ② 摘要
     val maxCycles = if (isMxAny(p.cFmt)) math.max(p.maxCycles, 20000) else p.maxCycles

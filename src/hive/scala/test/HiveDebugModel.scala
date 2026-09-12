@@ -58,17 +58,34 @@ object HiveDebugModel {
   def isFloatFmt(f: DataFormat.Type): Boolean =
     f == DataFormat.FP32 || f == DataFormat.FP16 || f == DataFormat.BF16
 
-  /** 外部内存中每元素字节数（半字节族返回 0，调用方需拒绝） */
+  /** 外部内存中每元素字节数（半字节族返回 0：4-bit 元素不足 1 整字节）。
+    * 【Phase 3 说明】bytes 口径对亚字节族退化到 0，故几何/内存镜像一律改用下方
+    * memElemBits 的 bits 口径（bits/8）；本函数保留供整字节 storeElem 与语义查询。 */
   def memElemBytes(f: DataFormat.Type): Int =
     if (f == DataFormat.FP32 || f == DataFormat.INT32) 4
     else if (f == DataFormat.FP16 || f == DataFormat.BF16 || f == DataFormat.INT16) 2
     else if (f == DataFormat.INT8 || isMx8(f)) 1
-    else 0   // MXE2M1 / INT4：半字节，本调试模型不作为输入格式支持
+    else 0   // MXE2M1 / INT4：半字节，bytes 口径为 0（bits 口径见 memElemBits=4）
 
-  /** 每 16-bit lane 打包的元素数：MXFP8 SIMD 双元素/拍 = 2，其余 = 1 */
-  def elemsPerLane(f: DataFormat.Type): Int = if (isMx8(f)) 2 else 1
+  /** 外部内存中每元素【位宽】（Phase 3 新增，bits 口径几何的单一真源）。
+    * 与硬件 HiveCoreCalcConfig.memElemBitsOf 同源；字节对齐族 memElemBits=memElemBytes×8
+    * （恒等），亚字节族 MXE2M1/INT4=4（bytes 口径为 0，bits 口径给 4）。
+    * 地址偏移一律用 X×memElemBits/8：字节对齐族结果与旧 X×memElemBytes 逐值相等
+    * （memElemBits 是 8 的倍数，整除无损），fp4 则得到正确的半字节地址（k×4/8=k/2）。 */
+  def memElemBits(f: DataFormat.Type): Int =
+    if (f == DataFormat.FP32 || f == DataFormat.INT32) 32
+    else if (f == DataFormat.FP16 || f == DataFormat.BF16 || f == DataFormat.INT16) 16
+    else if (f == DataFormat.INT8 || isMx8(f)) 8
+    else 4   // MXE2M1 / INT4：半字节
 
-  /** 每拍推进的 K 元素数（= kTile 粒度）：MX8 = totalN*2，其余 = totalN */
+  /** 每 16-bit lane 打包的元素数：MXFP8 dual-lane=2、MXFP4 quad-lane=4、其余=1。
+    * 与硬件 DataFormat.elemsPerLane / HiveCoreCalcConfig.elemsPerLaneOf 同源。
+    * 【Phase 3 additive】新增 MXE2M1→4；对现有格式（MX8→2、其余→1）取值逐字不变，
+    * 故所有非 fp4 用例（DebugCase/ParamDebugSpec 现役格式）几何零变化。 */
+  def elemsPerLane(f: DataFormat.Type): Int =
+    if (f == DataFormat.MXE2M1) 4 else if (isMx8(f)) 2 else 1
+
+  /** 每拍推进的 K 元素数（= kTile 粒度）：MX8 = totalN*2、MXE2M1 = totalN*4、其余 = totalN */
   def kPerBeat(f: DataFormat.Type, totalN: Int): Int = totalN * elemsPerLane(f)
 
   // ==========================================================================
@@ -233,13 +250,28 @@ object HiveDebugModel {
   // 配置合法性预检（与 HiveCoreCalcConfig errCode 语义同源，用于分派负向路径）
   // ==========================================================================
 
-  /** 返回 Some(errCode) 表示硬件会在 EXECUTE 拍直接置 config-err（不进计算） */
-  def precheckConfigErr(p: DebugParams, totalN: Int): Option[Int] = {
+  /** 返回 Some(errCode) 表示硬件会在 EXECUTE 拍直接置 config-err（不进计算）。
+    * 【Fix-7】新增 hasMx4 入参（= cfg.hasMx4），用于门控 fp4 专属 errCode（7 与 MX4×MX8 的 3）：
+    *   hasMx4=false 时硬件根本不 elaborate errCode7 / 新 errCode3 分支，金锚亦不得返回。
+    * 优先级严格镜像硬件 last-connect 真值（后写覆盖前写，源码越靠后优先级越高）：
+    *   7(fp4 blk≠64) > 3(MX4×MX8 混配) > 6 > 5 > 4 > 3(isAMx^isBMx) > 0；本 if/else 链首即最高。
+    *   注：errCode 0/1/2 在本金锚仍分列（历史口径），硬件已合并为单一 0，属 #124 已知偏差。
+    *   注：MX4×MX8 混配(W4A8)数学/OCP 合法但真数据通路支持列 v2；此处 Some(3) 是【运行期可诊断】
+    *   守护的金锚镜像（非永久拒绝），与硬件 Fix-4 的 hasMx4 门控 when 同源、同 last-connect 序。 */
+  def precheckConfigErr(p: DebugParams, totalN: Int, hasMx4: Boolean = false): Option[Int] = {
     val aMx = isMxAny(p.aFmt)
     val bMx = isMxAny(p.bFmt)
     val aKLoad = if (isMx8(p.aFmt)) totalN * 2 else totalN * 4
     val bKLoad = if (isMx8(p.bFmt)) totalN * 2 else totalN * 4
-    if (aMx && p.aMxBlk > aKLoad) Some(0)
+    // 【Fix-7】errCode7 移到链首（最高优先级）并按 hasMx4 门控。fp4(E2M1) v1 强制 block=64
+    //   （=1 kTile=1 pass=1 scale 块，保 Executor 单广播不变式）。OCP block=32 属 v2（DEFERRED）。
+    if (hasMx4 && p.aFmt == DataFormat.MXE2M1 && p.aMxBlk != 64) Some(7)
+    else if (hasMx4 && p.bFmt == DataFormat.MXE2M1 && p.bMxBlk != 64) Some(7)
+    // 【Fix-8】MX4×MX8 混配 → Some(3)，与硬件 Fix-4 门控 + 优先级一致（7 > 本 3 > 其余）。
+    //   条件镜像硬件 isMx4(aFmt) ^ isMx4(bFmt)：a/b 必须同为 fp4(E2M1) 或同为 fp8(E4M3/E5M2)。
+    //   注：E4M3×E5M2 双 fp8 混配两侧 isMx4 均 false → 不触发（合法，保留现有 dual-MX8 用例）。
+    else if (hasMx4 && (p.aFmt == DataFormat.MXE2M1) != (p.bFmt == DataFormat.MXE2M1)) Some(3)
+    else if (aMx && p.aMxBlk > aKLoad) Some(0)
     else if (bMx && p.bMxBlk > bKLoad) Some(1)
     else if (isMxAny(p.cFmt) && p.cMxBlk > totalN) Some(2)
     else if (aMx != bMx) Some(3)
@@ -248,21 +280,50 @@ object HiveDebugModel {
     else None
   }
 
-  /** 运行前防呆：不支持的组合给清晰报错（harness 不得崩溃，故在 simulate 之前抛） */
-  def validate(p: DebugParams, totalN: Int): Unit = {
+  /** 运行前防呆：不支持的组合给清晰报错（harness 不得崩溃，故在 simulate 之前抛）
+    * 【Fix-8】hasMx4 入参（= cfg.hasMx4）门控 MX4×MX8 混配 require：hasMx4=false 时 fp4 输入
+    *   本身已被 Plan 的 cfg-aware 守卫（Fix-9）拦为"需 hasMx4"，此处不再重复拦混配（诊断更精确）；
+    *   hasMx4=true 时才拦混配，与硬件 Fix-4 门控 when 同源。 */
+  def validate(p: DebugParams, totalN: Int, hasMx4: Boolean = false): Unit = {
     require(p.m > 0 && p.n > 0 && p.k > 0, s"M/N/K 必须 > 0，当前 M=${p.m} N=${p.n} K=${p.k}")
-    require(memElemBytes(p.aFmt) > 0,
-      s"aFmt=${p.aFmt} 为半字节格式，调试模型不支持作为输入（请改用 mxe4m3/mxe5m2/fp16/bf16/int8/int16）")
-    require(memElemBytes(p.bFmt) > 0,
-      s"bFmt=${p.bFmt} 为半字节格式，调试模型不支持作为输入（请改用 mxe4m3/mxe5m2/fp16/bf16/int8/int16）")
+    // 【Phase 3】半字节输入拒绝范围收窄：原 `memElemBytes(aFmt)>0` 会把 INT4 与 MXE2M1
+    //   一并拒掉；现改为【仅拒 INT4】——MXE2M1(fp4) 已由 bits 口径几何 + decodeInElem +
+    //   nibble buildMemory 支持作为输入。对非 MXE2M1 格式判据取值【完全一致】
+    //   （INT4 仍拒、其余仍放行），非回归。
+    require(p.aFmt != DataFormat.INT4,
+      s"aFmt=${p.aFmt}：INT4 半字节整型调试模型不支持作为输入（fp4/MXE2M1 仅 hasMx4 硬件支持，见 Plan 内 cfg-aware 守卫；请改用 mxe4m3/mxe5m2/mxe2m1/fp16/bf16/int8/int16）")
+    require(p.bFmt != DataFormat.INT4,
+      s"bFmt=${p.bFmt}：INT4 半字节整型调试模型不支持作为输入（fp4/MXE2M1 仅 hasMx4 硬件支持，见 Plan 内 cfg-aware 守卫；请改用 mxe4m3/mxe5m2/mxe2m1/fp16/bf16/int8/int16）")
     require(p.rnd >= 0 && p.rnd <= 4, s"rnd=${p.rnd} 越界（0..4）")
     if (isMxAny(p.aFmt) || isMxAny(p.bFmt)) {
-      require(p.k % (totalN * 2) == 0,
-        s"MX 运行要求 K(${p.k}) 能被 kPerBeat=${totalN * 2} 整除（一个 kTile = 一个 32-K scale 块 = 单 pass）")
+      // 【Phase 3】kPerBeat 由硬编码 totalN*2（MX8）泛化为 kPerBeat(fmt)：
+      //   MX8→totalN*2（与旧式逐值相同）、MXE2M1→totalN*4。非 fp4 用例判据不变。
+      val kpb = kPerBeat(if (isMxAny(p.aFmt)) p.aFmt else p.bFmt, totalN)
+      require(p.k % kpb == 0,
+        s"MX 运行要求 K(${p.k}) 能被 kPerBeat=$kpb 整除（一个 kTile = 一个 scale 块 = 单 pass）")
       require(p.loadWMode, "MX 运行必须 loadWMode=1（B 转置存储，硬件 errCode 4 拦截）")
     }
     if (isMxAny(p.aFmt)) require(p.k % p.aMxBlk == 0, s"K(${p.k}) 必须被 aMxBlk(${p.aMxBlk}) 整除")
     if (isMxAny(p.bFmt)) require(p.k % p.bMxBlk == 0, s"K(${p.k}) 必须被 bMxBlk(${p.bMxBlk}) 整除")
+    // 【Fix-8】MX4×MX8 混配金锚守护（与硬件 HiveCoreCalcConfig errCode3(Fix-4) 同源，早抛早清晰）：
+    //   MX 输入要求 a/b 同为 fp4(E2M1) 或同为 fp8(E4M3/E5M2)。硬件运行期选择子只看 aFmt，
+    //   而 b 侧解码器接 io.bFmt，v1 混配会 lane 粒度与解码格式矛盾、静默算错。
+    //   ▸ hasMx4 门控：hasMx4=false 时 fp4 输入已被 Plan cfg-aware 守卫(Fix-9)拦为"需 hasMx4"，
+    //     不在此重复拦；hasMx4=true 时才拦混配，对应 precheckConfigErr 的 Some(3)（同门控）。
+    //   ▸ 定位：MX4×MX8(W4A8)数学/OCP 合法，真数据通路支持列 v2；本 require 是【运行期可诊断】
+    //     守护（非永久拒绝），将来支持只需删此 require + 硬件 Fix-4 的 when + 补 W4A8 数据通路。
+    //   ▸ E4M3×E5M2 双 fp8 混配两侧 (==MXE2M1) 均 false → 相等 → 不触发（合法，保留 dual-MX8 用例）。
+    if (hasMx4)
+      require(!(isMxAny(p.aFmt) && isMxAny(p.bFmt)) ||
+              (p.aFmt == DataFormat.MXE2M1) == (p.bFmt == DataFormat.MXE2M1),
+        s"MX4×MX8 混配 v1 暂不支持（W4A8 属 v2 路线）：a/b 须同为 fp4(E2M1) 或同为 fp8(E4M3/E5M2)，当前 aFmt=${p.aFmt} bFmt=${p.bFmt}")
+    // 【Phase 3】fp4 v1 强制 block=64（=1 kTile=1 pass=1 scale 块，保 Executor 单广播
+    //   不变式），与硬件 errCode 7 同源。OCP 规范允许 block=32，属 v2 per-half-pass 路线
+    //   （DEFERRED）。仅对 MXE2M1 生效，非 fp4 用例无影响。
+    if (p.aFmt == DataFormat.MXE2M1)
+      require(p.aMxBlk == 64, s"fp4(E2M1) v1 强制 aMxBlk=64（当前 ${p.aMxBlk}）；block=32 属 v2 per-half-pass 路线")
+    if (p.bFmt == DataFormat.MXE2M1)
+      require(p.bMxBlk == 64, s"fp4(E2M1) v1 强制 bMxBlk=64（当前 ${p.bMxBlk}）；block=32 属 v2 per-half-pass 路线")
     if (isMxAny(p.cFmt)) {
       require(p.cMxBlk <= totalN && totalN % p.cMxBlk == 0,
         s"cMxBlk(${p.cMxBlk}) 必须 <= totalN($totalN) 且整除")
@@ -290,6 +351,17 @@ object HiveDebugModel {
       var v = bits
       var i = 0
       while (i < bytes) { storeByte(addr + i, (v & 0xFF).toInt); v >>>= 8; i += 1 }
+    }
+
+    /** 【Phase 3 新增】写入一个亚字节元素（elemBits<8）到 byteAddr 的 bitOff 位处。
+      * 读-改-写：保留同字节内相邻元素位（邻 nibble），只覆盖 [bitOff, bitOff+elemBits)。
+      * 供 fp4(E2M1) lane=4 供数布局：一个 16-bit lane = 4 个 nibble = 4 个 K 元素，
+      * 元素 k 落 byte=k/2、nibble=(k%2)（低 nibble = 偶 k，小端 nibble 序）。 */
+    def storeSubByte(byteAddr: Long, bits: Long, bitOff: Int, elemBits: Int): Unit = {
+      val mask = (1 << elemBits) - 1                 // elemBits 位掩码（fp4: 0xF）
+      val frag = ((bits.toInt & mask) << bitOff) & 0xFF
+      val keep = loadByte(byteAddr) & ~(mask << bitOff) & 0xFF
+      storeByte(byteAddr, keep | frag)
     }
 
     /** 从 addr 起读 width 位（小端：addr 处字节 = bits[7:0]），供 DMA rsp 数据 */
@@ -325,6 +397,17 @@ object HiveDebugModel {
     else if (f == DataFormat.MXE4M3) HiveSimCommon.mxE4M3ToFloat((bits & 0xFFL).toInt, scaleByte)
     else if (f == DataFormat.MXE5M2) HiveSimCommon.mxE5M2ToFloat((bits & 0xFFL).toInt, scaleByte)
     else if (f == DataFormat.MXE2M1) {
+      // ★★【输出量化域】专用解码（dequant/compare/printRows 经 cFmt=MXE2M1 消费）★★
+      //   此处 e==0 → 0.0 的 flush 是【正确建模硬件输出侧 FTZ】，非 bug：
+      //   HiveOutCvt 对 E2M1 的 minNormal=2^(1-bias)=2^0=1.0，任何 |v|<1.0（含
+      //   e=0/m=1 的 ±0.5）在输出量化时被 flush-to-zero（见本文件 minNormal/compare
+      //   #129 FTZ bit-exact 判据）。硬件【从不】把 ±0.5 写进 E2M1 输出码流，故输出域
+      //   flush 与硬件逐位一致，HiveOutCvtSpec E2M1 blk8/blk16 绿测依赖此行为。
+      //   ▸ 【勿改此分支】：它服务「输出量化域」；fp4【输入】解码走下方
+      //     decodeInElem→decodeMxE2M1Input（±0.5 是一等公民输入值，不得 flush）。
+      //   ▸ 潜在语义细节（仅记录，无强证据不改动输出行为）：e==0&&scaleByte!=0 时
+      //     本可解出 ±0.5×2^(scale-127) 的 subnormal，但硬件输出 FTZ 后不存在该码，
+      //     故 flush 到 0 是与硬件对齐的正确选择。
       val c = (bits & 0xFL).toInt
       val sg = (c >> 3) & 1
       val e = (c >> 1) & 0x3
@@ -333,6 +416,25 @@ object HiveDebugModel {
               else (1.0 + mm.toDouble / 2) * math.pow(2, e - 1) * math.pow(2, scaleByte - 127)
       if (sg == 1) -v else v
     } else throw new IllegalArgumentException(s"decodeElem: 未知格式 $f")
+
+  /** 【输入解码域】MXFP4(E2M1) 元素 + 块 scale → Double（±0.5 是一等公民值，不 flush）。
+    * 与硬件 Fp32.mxE2M1ToFp32 逐位同源：委托 HiveSimCommon.mxE2M1ToFloat（其格式参数
+    * 一律引 MxFormatParams.E2M1：expW=2/mantW=1/bias=1、noInfNan=true、subnormalFtz=false，
+    * 经 HiveMxDecodeSpec 16×256 穷举验证与硬件 bit-exact）。
+    * ▸ 与 decodeElem 的 MXE2M1 分支【关键区别】：本函数 subnormalFtz=false，
+    *   e=0/m=1 解出 ±0.5×2^(scale-127)（对齐硬件输入解码 fp32Sub 路径）；
+    *   decodeElem 的 e==0→0 flush 是【输出量化域】语义，二者不可混用。 */
+  def decodeMxE2M1Input(bits: Long, scaleByte: Int): Double =
+    HiveSimCommon.mxE2M1ToFloat((bits & 0xFL).toInt, scaleByte)
+
+  /** 【输入解码域】统一入口：位模式 → Double（A/B 激励解码，golden 累加消费）。
+    * MXE2M1 走 decodeMxE2M1Input（±0.5 正确），其余格式【完全等价于 decodeElem】
+    * （逐字委托，非 fp4 用例数值零变化，保 DebugCase/ParamDebugSpec 非回归）。
+    * ▸ 域分离纪律：本函数【仅】用于输入解码（aVal/bVal）；输出量化域（dequant/
+    *   compare/printRows 经 cFmt）一律继续用 decodeElem，两域不得交叉。 */
+  def decodeInElem(f: DataFormat.Type, bits: Long, scaleByte: Int): Double =
+    if (f == DataFormat.MXE2M1) decodeMxE2M1Input(bits, scaleByte)
+    else decodeElem(f, bits, scaleByte)
 
   /** Double → 位模式（按格式量化；rnd 用于 bf16/fp16 舍入模式） */
   def encodeElem(f: DataFormat.Type, v: Double, rnd: Int): Long =
@@ -346,7 +448,28 @@ object HiveDebugModel {
     else if (f == DataFormat.INT4) (math.rint(v).toLong & 0xFL)
     else if (f == DataFormat.MXE4M3) (HiveSimCommon.floatToMxE4M3(v) & 0xFFL)
     else if (f == DataFormat.MXE5M2) (HiveSimCommon.floatToMxE5M2(v) & 0xFFL)
+    else if (f == DataFormat.MXE2M1) encodeMxE2M1(v)
     else throw new IllegalArgumentException(s"encodeElem: 格式 $f 不支持作为输入编码")
+
+  /** 【输入编码域】float → MXFP4(E2M1) 元素码（scale-free 内蕴值，scale=127）。
+    * 在 16 个合法 4-bit 码中暴力挑选【输入解码值】最接近 v 者：用 decodeMxE2M1Input
+    * （subnormalFtz=false）⟹ e=0/m=1 的 ±0.5 可被正确编码，与硬件输入解码域一致。
+    * ▸ 不复用 HiveSimCommon.floatToMx：其默认 subnormalFtz=true 会把 ±0.5 当 subnormal
+    *   flush，无法编码 E2M1 的一等公民值；本函数自包含（仅调用 decodeMxE2M1Input），
+    *   遵守「只加法依赖 HiveSimCommon、不修改之」的模型纪律。
+    * ▸ 相等误差偏好较小码（c 递增、严格 < 才替换）⟹ 确定性，避免 ±0 抖动。
+    * 仅低 4 位有效，高位为 0（与硬件/金锚同约定）。仅 MXE2M1 输入用例调用（additive）。 */
+  def encodeMxE2M1(v: Double): Long = {
+    var best = 0; var bestErr = Double.MaxValue
+    var c = 0
+    while (c < 16) {
+      val dv = decodeMxE2M1Input(c.toLong, 127)
+      val err = math.abs(dv - v)
+      if (err < bestErr) { bestErr = err; best = c }
+      c += 1
+    }
+    best.toLong & 0xFL
+  }
 
   /** golden 累加值 → 输出格式位模式（与硬件 cvt 两级舍入链同构） */
   def encodeOut(cFmt: DataFormat.Type, golden: Double, rnd: Int): Long = {
@@ -376,8 +499,25 @@ object HiveDebugModel {
     val totalN: Int = cfg.totalN
     val cDmaExtW: Int = cfg.cDmaExtW
 
+    // 【Fix-9】fp4 守卫下沉为 cfg-aware：validate 是 object 层（Plan(p,cfg) 之前）、DebugParams
+    //   无 supportedFmts/hasMx4 字段，模型无从感知 DUT 是否支持 fp4。若 HiveCoreDebugCase
+    //   （默认 supportedFmts、hasMx4=false）跑 -DaFmt=mxfp4，会建 fp4 金锚却撞 hasMx4=false 的 DUT
+    //   （E2M1 落 E4M3 臂误码、fmtOk=false、psumReg 停摆）→ 从清晰 fail-fast 退化为不可诊断的
+    //   静默失配。Plan 已持有 cfg，故在此早抛。DataFormat.isMx4 返回硬件 Bool，此处用纯 Scala ==。
+    if (p.aFmt == DataFormat.MXE2M1 || p.bFmt == DataFormat.MXE2M1)
+      require(cfg.hasMx4,
+        s"aFmt/bFmt=mxfp4(E2M1) 需硬件 supportedFmts 含 MXE2M1（当前 cfg.hasMx4=${cfg.hasMx4}）；" +
+        s"HiveCoreDebugCase 的 dbgCfg 用默认 supportedFmts 不含 fp4 → 请改用 mxe4m3/mxe5m2，" +
+        s"或换用 hasMx4=true 的 cfgMxFp4 配置（aFmt=${p.aFmt} bFmt=${p.bFmt}）")
+
     val aEb: Int = memElemBytes(p.aFmt)
     val bEb: Int = memElemBytes(p.bFmt)
+    // 【Phase 3】bits 口径几何单一真源（aEb/bEb 保留供整字节 storeElem 快路径）。
+    //   地址偏移一律用 X*aEbits/8：字节对齐族 aEbits 是 8 的倍数 ⟹ X*aEbits/8 == X*aEb
+    //   逐值恒等（现有 DebugCase/ParamDebugSpec 几何零变化）；fp4(aEbits=4) 得到正确的
+    //   半字节地址（k*4/8=k/2、aKpb*4/8=64*4/8=32），不再因 aEb=0 退化到 0。
+    val aEbits: Int = memElemBits(p.aFmt)
+    val bEbits: Int = memElemBits(p.bFmt)
     val aKpb: Int = kPerBeat(p.aFmt, totalN)      // A 每拍 K 元素数
     val bKpb: Int = kPerBeat(p.bFmt, totalN)
     val aKTiles: Int = if (isMxAny(p.aFmt)) p.k / aKpb else (p.k + totalN - 1) / totalN
@@ -385,10 +525,12 @@ object HiveDebugModel {
     val nTiles: Int = (p.n + totalN - 1) / totalN
 
     // ---- 期望地址偏移（张量语义推导，不镜像 HiveCoreCalcConfig 谓词链） ----
-    val aRowOff: Long = p.k.toLong * aEb                       // A 行步进
-    val aColOff: Long = aKpb.toLong * aEb                      // A kTile 步进
-    val bRowOff: Long = (if (p.loadWMode) p.k else p.n).toLong * bEb
-    val bNTileOff: Long = if (p.loadWMode) totalN.toLong * bRowOff else totalN.toLong * bEb
+    // 【Phase 3 bits 口径】下列 4 式由 X*aEb 改为 X*aEbits/8；字节对齐族逐值恒等，
+    //   fp4 additive 正确（与硬件 aRowAddressOffset 半字节档 k/2、aColTile fp4=32 对齐）。
+    val aRowOff: Long = p.k.toLong * aEbits / 8                 // A 行步进
+    val aColOff: Long = aKpb.toLong * aEbits / 8                // A kTile 步进
+    val bRowOff: Long = (if (p.loadWMode) p.k else p.n).toLong * bEbits / 8
+    val bNTileOff: Long = if (p.loadWMode) totalN.toLong * bRowOff else totalN.toLong * bEbits / 8
     // 【#121 金锚修正（勿改回）：bKTileOff(loadW=1) 由 totalN*bEb 改为 bKpb*bEb。这是 672fb37
     //  同批 6 处参数退化的第 6 处，也是唯一落在测试参考模型（本文件）而非 RTL 的一处；
     //  【限定】硬件的 colTileOffset 在 MX 区间清白（下证），改此行是修正金锚自身，绝非
@@ -434,7 +576,9 @@ object HiveDebugModel {
     //  不动项说明：loadW=0 分支（totalN*bRowOff）保留 —— loadW=0 恒非 MX（errCode4），
     //   bKpb==totalN，属 B5 领域且 LoadWSpec 逐拍硬对账全绿；bNTileOff(loadW=1)=totalN*bRowOff
     //   亦保留 —— 它是 n-tile（N 维）步进、非 kTile 步进，用 totalN 正确。
-    val bKTileOff: Long = if (p.loadWMode) bKpb.toLong * bEb else totalN.toLong * bRowOff
+    //  【Phase 3 bits 口径】bKpb*bEb → bKpb*bEbits/8：字节对齐族 bEbits/8==bEb ⟹
+    //   #121 修正值【逐值不变】（MX8: 32*8/8=32=bKpb*bEb），fp4 additive 得 64*4/8=32。
+    val bKTileOff: Long = if (p.loadWMode) bKpb.toLong * bEbits / 8 else totalN.toLong * bRowOff
 
     val saRowOff: Long = (p.k / p.aMxBlk).toLong                // scaleA 行步进 = K/aBlk
     val saColOff: Long = (aKpb / p.aMxBlk).toLong               // scaleA kTile 步进
@@ -524,8 +668,12 @@ object HiveDebugModel {
       if (!isMxAny(p.bFmt)) 127
       else scaleB(nn)((k / bKpb) * (bKpb / p.bMxBlk))
 
-    def aVal(mm: Int, k: Int): Double = decodeElem(p.aFmt, aCode(mm)(k), effScaleA(mm, k))
-    def bVal(k: Int, nn: Int): Double = decodeElem(p.bFmt, bCode(k)(nn), effScaleB(nn, k))
+    // 【Phase 3 域分离】输入解码走 decodeInElem：MXE2M1 → decodeMxE2M1Input（±0.5 一等
+    //   公民值，subnormalFtz=false，与硬件 Fp32.mxE2M1ToFp32 逐位同源）；其余格式完全
+    //   等价于原 decodeElem（非 fp4 用例 golden 数值零变化）。输出量化域（dequant/
+    //   compare/printRows）仍用 decodeElem，两域不交叉。
+    def aVal(mm: Int, k: Int): Double = decodeInElem(p.aFmt, aCode(mm)(k), effScaleA(mm, k))
+    def bVal(k: Int, nn: Int): Double = decodeInElem(p.bFmt, bCode(k)(nn), effScaleB(nn, k))
 
     /** 软件 golden：C(mm)(nn) = Σ_k aVal*bVal（Double 精度，容差对拍基准） */
     def golden(mm: Int, nn: Int): Double = {
@@ -542,14 +690,26 @@ object HiveDebugModel {
     // ==========================================================================
     def buildMemory(): ByteMemory = {
       val mem = new ByteMemory
-      for (mm <- 0 until p.m; k <- 0 until p.k)
-        mem.storeElem(A_BASE + mm * aRowOff + k * aEb, aCode(mm)(k), aEb)
+      // 【Phase 3】A: row-major M×K。字节对齐族（aEbits>=8）走整字节 storeElem，地址
+      //   表达式与改动前【逐字相同】（k*aEb == (k*aEbits)/8）⟹ 内存镜像逐字节不变；
+      //   亚字节族（fp4，aEbits=4）走 nibble 打包 storeSubByte（byte=k/2、nibble=(k%2)*4）。
+      for (mm <- 0 until p.m; k <- 0 until p.k) {
+        if (aEbits >= 8) mem.storeElem(A_BASE + mm * aRowOff + k * aEb, aCode(mm)(k), aEb)
+        else mem.storeSubByte(A_BASE + mm * aRowOff + (k.toLong * aEbits) / 8,
+          aCode(mm)(k), ((k * aEbits) % 8).toInt, aEbits)
+      }
       if (p.loadWMode) {   // B 转置：row-major N×K
-        for (nn <- 0 until p.n; k <- 0 until p.k)
-          mem.storeElem(B_BASE + nn * bRowOff + k * bEb, bCode(k)(nn), bEb)
+        for (nn <- 0 until p.n; k <- 0 until p.k) {
+          if (bEbits >= 8) mem.storeElem(B_BASE + nn * bRowOff + k * bEb, bCode(k)(nn), bEb)
+          else mem.storeSubByte(B_BASE + nn * bRowOff + (k.toLong * bEbits) / 8,
+            bCode(k)(nn), ((k * bEbits) % 8).toInt, bEbits)
+        }
       } else {             // B 非转置：row-major K×N
-        for (k <- 0 until p.k; nn <- 0 until p.n)
-          mem.storeElem(B_BASE + k * bRowOff + nn * bEb, bCode(k)(nn), bEb)
+        for (k <- 0 until p.k; nn <- 0 until p.n) {
+          if (bEbits >= 8) mem.storeElem(B_BASE + k * bRowOff + nn * bEb, bCode(k)(nn), bEb)
+          else mem.storeSubByte(B_BASE + k * bRowOff + (nn.toLong * bEbits) / 8,
+            bCode(k)(nn), ((nn * bEbits) % 8).toInt, bEbits)
+        }
       }
       if (isMxAny(p.aFmt))
         for (mm <- 0 until p.m; j <- 0 until saEntries)

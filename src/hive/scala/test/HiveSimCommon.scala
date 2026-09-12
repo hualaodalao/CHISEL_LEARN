@@ -211,36 +211,60 @@ object HiveSimCommon {
     progress = ((data >> 16) & 0xFFFFL).toInt
   )
 
-  // ========== MX (MXFP8) 转换 helper ==========
-  // 逐字镜像 Fp32.mxToFp32（src/hive/scala/main/Fp32.scala L56-91）的数值语义，
+  // ========== MX (MXFP8 / MXFP4) 转换 helper ==========
+  // 逐字镜像 Fp32.mxToFp32（src/hive/scala/main/Fp32.scala）的数值语义，
   // 作为 P5 MX 用例 golden GEMM 的软件参考模型。任何偏差都会导致 golden 与
   // 硬件失配，故本实现必须与硬件同源同语义（subnormal→0、inf/nan/overflow→
   // fp32Max 保号、underflow→0、normal=sign*2^(e+scale-bias-127)*(1+m/2^mantW)）。
+  // 【Phase 0 同批泛化】硬件侧新增 noInfNan/subnormalFtz 两个编译期形参以纳入
+  // mxfp4 E2M1，本金锚【同批】镜像同款泛化（同语义、同默认实参），禁止以 RTL
+  // 行为反推拟合；fp8 默认实参组合下每一分支与泛化前逐字一致。
 
-  /** MX 元素（8-bit）+ E8M0 scale（8-bit 纯指数，bias 127）→ Double。
+  /** MX 元素 + E8M0 scale（8-bit 纯指数，bias 127）→ Double。
     * 与 Fp32.mxToFp32 完全一致：exp_fp32 = e + scale - bias（scale 的 127 与
     * fp32 的 127 在 fp32Normal 里抵消）；saturate 到 fp32 max normal（0x7F7FFFFF）。
     * @param nanNeedMantAllOne E4M3=true（e 全1 且 m 全1 才 NaN），E5M2=false（e 全1 即 inf/nan）
+    * @param noInfNan     编译期：true=该格式【无 inf/nan 编码】（mxfp4 E2M1：最大码
+    *                     0x7 = ±6.0 是最大有限值）⟹ isInfNan 恒 false；false=保持原判据（fp8）
+    * @param subnormalFtz 编译期：true=e==0&&m!=0 flush-to-zero（fp8 既有行为）；
+    *                     false=e==0&&m!=0 按次正规真值 ±2^(scale-bias-127) 解码
+    *                     （E2M1 的 e=0/m=1 = ±0.5，一等公民值）
     */
   def mxToFloat(elem: Int, scaleByte: Int, expW: Int, mantW: Int, bias: Int,
-                nanNeedMantAllOne: Boolean): Double = {
-    require(1 + expW + mantW == 8, s"MX 元素必须为 8-bit：1+$expW+$mantW")
+                nanNeedMantAllOne: Boolean,
+                noInfNan: Boolean = false, subnormalFtz: Boolean = true): Double = {
+    require(1 + expW + mantW == 8 || 1 + expW + mantW == 4,
+      s"MX 元素必须为 8-bit（mxfp8）或 4-bit（mxfp4）：1+$expW+$mantW")
     val b = elem & 0xFF
-    val s = (b >>> 7) & 1
+    val s = (b >>> (expW + mantW)) & 1     // 符号位（fp8: bit7；mxfp4 E2M1: bit3）
     val e = (b >>> mantW) & ((1 << expW) - 1)
     val m = b & ((1 << mantW) - 1)
     val sign = if (s == 1) -1.0 else 1.0
     val eMax = (1 << expW) - 1
     val isZero = (e == 0) && (m == 0)
-    val isSub  = (e == 0) && (m != 0)                       // subnormal → flush-to-zero
-    val isInfNan = if (nanNeedMantAllOne) (e == eMax && m == ((1 << mantW) - 1)) else (e == eMax)
+    val isSub  = (e == 0) && (m != 0)                       // subnormal（见 subnormalFtz）
+    val isInfNan = if (noInfNan) false
+                   else if (nanNeedMantAllOne) (e == eMax && m == ((1 << mantW) - 1)) else (e == eMax)
     val expSigned = e + (scaleByte & 0xFF) - bias           // = fp32 exp 字段
     // fp32Max = intBitsToFloat(0x7F7FFFFF) ≈ 3.4028235e38（保号），与硬件 fp32Max 一致
     val fp32Max = java.lang.Float.intBitsToFloat(0x7F7FFFFF).toDouble
-    if (isZero || isSub) 0.0
-    else if (isInfNan || expSigned > 254) sign * fp32Max
-    else if (expSigned < 1) 0.0
-    else sign * math.pow(2.0, (expSigned - 127).toDouble) * (1.0 + m.toDouble / (1 << mantW))
+    if (subnormalFtz) {
+      // fp8（E4M3/E5M2）原路径：分支序与表达式与泛化前逐字一致
+      if (isZero || isSub) 0.0
+      else if (isInfNan || expSigned > 254) sign * fp32Max
+      else if (expSigned < 1) 0.0
+      else sign * math.pow(2.0, (expSigned - 127).toDouble) * (1.0 + m.toDouble / (1 << mantW))
+    } else {
+      // mxfp4 E2M1：isSub（e=0/m=1）解码为 ±2^(expSigned-127) = ±2^(scale-bias-127)
+      //   = ±0.5 × 2^(scale-127)（bias=1、mantW=1、m=1），尾数隐含 1.0 ⟹ 不乘 (1+m/2^mantW)。
+      //   与硬件 fp32Sub = Cat(s, expSigned(7,0), 0.U(23.W)) 同源：同享 expSigned<1 → ±0 的
+      //   underflow clamp（scale<2 时正确 FTZ，而非裸 (scale-1) 在 scale=0 绕回成 ±inf）。
+      if (isZero) 0.0
+      else if (isInfNan || expSigned > 254) sign * fp32Max
+      else if (expSigned < 1) 0.0
+      else if (isSub) sign * math.pow(2.0, (expSigned - 127).toDouble)
+      else sign * math.pow(2.0, (expSigned - 127).toDouble) * (1.0 + m.toDouble / (1 << mantW))
+    }
   }
 
   /** MX E4M3（exp4/mant3/bias7，NaN 需 exp&mant 全1）+ scale → Double */
@@ -250,6 +274,19 @@ object HiveSimCommon {
   /** MX E5M2（exp5/mant2/bias15，inf/nan 为 exp 全1）+ scale → Double */
   def mxE5M2ToFloat(elem: Int, scaleByte: Int): Double =
     mxToFloat(elem, scaleByte, expW = 5, mantW = 2, bias = 15, nanNeedMantAllOne = false)
+
+  /** MX E2M1（mxfp4，exp2/mant1/bias1）+ scale → Double。
+    * 【金锚纪律】与硬件 Fp32.mxE2M1ToFp32 同批泛化、逐位同源：格式参数一律引
+    * MxFormatParams.E2M1（禁裸字面量），noInfNan=true（无 inf/nan 编码，0x7=±6.0 为
+    * 最大有限值）、subnormalFtz=false（e=0/m=1 = ±0.5 是一等公民值，不得 FTZ）。
+    * 幅值域 = {0, ±0.5, ±1, ±1.5, ±2, ±3, ±4, ±6}；元素真值 = 幅值 × 2^(scale-127)。
+    * @param elem 元素码；仅低 4 位有效（bit3=sign），高 4 位由软件保证为 0（与硬件同约定）
+    */
+  def mxE2M1ToFloat(elem: Int, scaleByte: Int): Double =
+    mxToFloat(elem, scaleByte,
+      expW = MxFormatParams.E2M1.expW, mantW = MxFormatParams.E2M1.mantW,
+      bias = MxFormatParams.E2M1.bias, nanNeedMantAllOne = false,
+      noInfNan = true, subnormalFtz = false)
 
   /** E8M0 scale 字节构造：factor = 2^exp，byte = 127 + exp（bias 127） */
   def mxScaleByte(exp: Int): Int = 127 + exp

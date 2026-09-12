@@ -48,6 +48,27 @@ def getBlockSize(t: MXBlockSize.Type) : UInt = {
     ret
 }
 def getKLoadNum(t: DataFormat.Type) : UInt = {
+    // 【Phase 3 核对（勿「顺手统一」）】aKLoadNum/bKLoadNum = 一个 kTile（单 pass）
+    //   推进的 K 元素数。判据用 isMx8（非 isMx）：
+    //     · MXFP8(E4M3/E5M2)：dual-lane，每拍 totalN×2 = 32 K 元素 → totalN×2。
+    //     · 其余（含 MXFP4/E2M1）：落 else → totalN×4 = 64 K 元素。
+    //   ▸ fp4 恰好【巧合正确】：E2M1 非 isMx8，落 else 得 totalN×4 = 64，正是
+    //     quad-lane 的 kPerBeat（totalN × elemsPerLane(fp4)=4 = 64）。故本函数
+    //     【无需为 fp4 改动】，仅在此留痕确认。
+    //   ▸ ★严禁改写成 totalN×elemsPerLane(t)：非 MX 格式 elemsPerLane=1，会把
+    //     现役「非 MX → totalN×4」错改成 totalN×1，破坏 FP16/BF16/INT16/INT8 的
+    //     kTile 几何（违反 normalized-diff=0 硬门槛）。此处 isMx8 二分结构【禁改】。
+    // 【Fix-3 编译期恒等性自证（零 RTL，纯 Scala require，不发射任何硬件）】
+    //   本函数的 isMx8 二分把 MX8→totalN×2、其余(含 fp4)→totalN×4，其正确性【依赖】
+    //   elemsPerLane 单一真源取值 MXE2M1==4 / MX8==2（fp4 落 else 得 totalN×4 属「巧合正确」）。
+    //   一旦 elemsPerLaneLit 表变动而本函数未同步，elaboration 期即炸，强制修复。
+    //   门控 if(cfg.hasMx4)：基线 hasMx4=false 完全不评估，零影响。
+    if (cfg.hasMx4) {
+      require(DataFormat.elemsPerLaneLit(DataFormat.MXE2M1) == 4 &&
+              DataFormat.elemsPerLaneLit(DataFormat.MXE4M3) == 2 &&
+              DataFormat.elemsPerLaneLit(DataFormat.MXE5M2) == 2,
+        "getKLoadNum 的 isMx8 二分依赖 elemsPerLane(MXE2M1)==4/(MX8)==2；单一真源变动必须同步改本函数")
+    }
     val ret = Wire(UInt(8.W))
     when(DataFormat.isMx8(t)){
         ret := cfg.totalN.U  * 2.U
@@ -98,16 +119,34 @@ def memElemBytesOf(t: DataFormat.Type) : UInt = {
     ret
 }
 
-/** 每 16-bit lane 打包的元素数（MXFP8 SIMD 双元素/拍 = 2，其余 = 1）。
+/** 每 16-bit lane 打包的元素数（MXFP8 dual-lane=2、MXFP4 quad-lane=4、其余=1）。
   * 与金锚 HiveDebugModel.elemsPerLane 同源；kPerBeat = totalN × 本量。
-  * 判据用 isMx8（= MXE4M3|MXE5M2）而非 isMx：MXE2M1 属半字节族，
-  * memElemBytesOf 已给 0，不参与 lane 打包语义。 */
-def elemsPerLaneOf(t: DataFormat.Type) : UInt = {
-    val ret = Wire(UInt(2.W))
-    when(DataFormat.isMx8(t)){
-        ret := 2.U
+  * 【Phase 3】委托到 DataFormat.elemsPerLane 单一真源（Executor kTile 分母共用），
+  *   编译期门控 cfg.hasMx4：
+  *   · hasMx4=false（cfgBase/cfgMx 基线）：helper 走 else 支，逐字复刻原内联实现
+  *     「Wire(UInt(2.W)); isMx8?2:1」，重发射 normalized-diff=0；MXE2M1 不生成硬件。
+  *   · hasMx4=true（fp4 配置）：helper 走 3-bit 支，追加 isMx4→4。
+  * 判据仍锚 isMx8：MXE2M1 走独立 isMx4 分支（quad-lane=4），不混入 MX8 dual-lane。 */
+def elemsPerLaneOf(t: DataFormat.Type) : UInt = DataFormat.elemsPerLane(t, cfg.hasMx4)
+
+/** 外部内存每元素【位宽】（运行期解码，Phase 3 新增）。
+  * 与 memElemBytesOf 互补：字节对齐族 memElemBits = memElemBytes×8（恒等），
+  * 亚字节族 memElemBytes=0 但 memElemBits=4（MXE2M1/INT4）。
+  * colTile 偏移的 fp4 分支用 bits 口径 totalN×elemsPerLane×memElemBits/8 得到
+  * 正确的 16×4×4/8=32（bytes 口径因 memElemBytes=0 会退化到 0）。
+  * ★本函数仅在 if(cfg.hasMx4) 门控块内被调用；hasMx4=false 基线【从不 elaborate】
+  *   本 def（Scala 方法未被调用即不生成硬件），故对 normalized-diff=0 零影响。
+  * 分支序与 memElemBytesOf 逐字对齐（半字节→1B→2B(含INT16)→otherwise 4B）。 */
+def memElemBitsOf(t: DataFormat.Type) : UInt = {
+    val ret = Wire(UInt(6.W))
+    when(DataFormat.isHalfB(t)){
+        ret := 4.U
+    }.elsewhen(DataFormat.is1B(t)){
+        ret := 8.U
+    }.elsewhen(DataFormat.is2B(t) || t === DataFormat.INT16){
+        ret := 16.U
     }.otherwise{
-        ret := 1.U
+        ret := 32.U
     }
     ret
 }
@@ -129,9 +168,12 @@ cNWriteNum := cfg.totalN.U
 // 【#124 ①】colTile 偏移的两个运行期因子（A/B 各自解码，勿共用：aFmt/bFmt 可异构）。
 // 与本文件上方 aMxBlockSize/aKLoadNum 同一放置层（模块级无条件赋值的 Wire），
 // 使 sC0 分支内只做一次乘法，不在 when 里生成解码逻辑。
-val aLaneElems = WireInit(0.U(2.W))
+// 【Phase 3】laneElems 线宽随 cfg.hasMx4 门控：false→2-bit（与改动前逐字同宽，
+//   elemsPerLaneOf 亦返回 2-bit，normalized-diff=0）；true→3-bit（容纳 fp4 的 4）。
+val laneElemsW = if(cfg.hasMx4) 3 else 2
+val aLaneElems = WireInit(0.U(laneElemsW.W))
 val aElemBytes = WireInit(0.U(3.W))
-val bLaneElems = WireInit(0.U(2.W))
+val bLaneElems = WireInit(0.U(laneElemsW.W))
 val bElemBytes = WireInit(0.U(3.W))
 aLaneElems := elemsPerLaneOf(io.regFile.aFmt)
 aElemBytes := memElemBytesOf(io.regFile.aFmt)
@@ -171,6 +213,56 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     when(io.regFile.cFmt === DataFormat.MXE2M1 && io.regFile.n(0) === 1.U){
         errComb := true.B
         errCodeComb := 6.U
+    }
+
+    // ==========================================================================
+    // 【Fix-4 errCode 3（MX4×MX8 混配运行期可诊断守护）】aFmt/bFmt 分属 fp4(E2M1) 与
+    //   fp8(E4M3/E5M2) 时，HiveWorkUnit 的运行期选择子 Mux(isMx4(io.aFmt), quadResult,
+    //   dualLaneMx()) 只看 aFmt，而被选支路内 b 侧解码器接 io.bFmt → lane 粒度与解码格式
+    //   矛盾、v1 数据通路会静默算错。现有 errCode3（isAMx ^ isBMx，见上方裸块）因 isMx 已含
+    //   MXE2M1，MXE2M1×MXE4M3 两侧同 true → XOR=0 漏检。本 when 用 isMx4 异或【加强、不替换】
+    //   原 errCode3，暂复用 code 3（语义="v1 不支持的格式组合"）。
+    // ▸ 定位（用户 2026-09-12 最终裁定）：MX4×MX8 混合(W4A8)数学与 OCP 规范均【合法】，但真
+    //   数据通路支持列 v2 后续立项（与 per-half-pass/block=32 同源）。本守护是【运行期可诊断】
+    //   的 interim 状态——软件可读错误码、非静默错算、亦非"永久拒绝"：将来支持只需删本 when +
+    //   补 W4A8 数据通路（aFmt/bFmt 已是独立 4-bit 字段，寄存器/软件接口无需重构）。
+    // ▸ 门控：整块包在 if(cfg.hasMx4) 内——cfgBase/cfgMx 基线 hasMx4=false 完全不 elaborate，
+    //   现有 errCode 0/3/4/5/6 逐字不变，normalized-diff=0。
+    // ▸ 优先级（last-connect 后写覆盖前写，源码越靠后优先级越高）：本块【置于 6/5/4 之后、errCode7
+    //   门控之前】，故混配 code3 覆盖 6/5/4，最终真值序为
+    //   7 > 3(本块 MX4×MX8 混配) > 6 > 5 > 4 > 3(isAMx^isBMx) > 0。金锚（precheckConfigErr /
+    //   HiveCoreQuickSpec.hwErrCode）必须逐位镜像此序。
+    if(cfg.hasMx4){
+        when(DataFormat.isMx4(io.regFile.aFmt) ^ DataFormat.isMx4(io.regFile.bFmt)){
+            errComb := true.B
+            errCodeComb := 3.U
+        }
+    }
+
+    // ==========================================================================
+    // 【Phase 3 errCode 7】fp4(E2M1) 输入 scale 块决策：v1 强制 aMxBlockSize=64。
+    // --------------------------------------------------------------------------
+    // ▸ 背景：Phase 2 已建好 fp4 quad-lane 计算通路，其 scale 供给沿用 Executor 的
+    //   「单广播」不变式（scaleA 每 kTile 一个块 scale、整拍广播；见 Executor
+    //   scaleA 单广播 / scaleBRegs per-column 管线，本 Phase【零改动】）。fp4 一个
+    //   kTile = kPerBeat = totalN×elemsPerLane = 16×4 = 64 个 K 元素 = 单 pass。
+    //   要保「1 kTile = 1 scale 块 = 1 次广播」，块大小必须恰为 64。
+    // ▸ 决策：fp4 输入(isMx4) 且 aMxBlockSize≠64 → 直接拒绝（errCode 7）。这样
+    //   Executor 单广播管线无需为 fp4 引入 per-half-pass 细分，改动面最小。
+    // ▸ OCP 偏离声明：OCP MX 规范允许 MXFP4 block=32（甚至更小）。本 v1【偏离】
+    //   规范、只支持 block=64，是「以约束换 Executor 管线零改动」的显式取舍。
+    // ▸ v2 路线（DEFERRED）：per-half-pass scale——一个 64-K kTile 拆成 2 个 32-K
+    //   半 pass，各用独立 scale 块，需 Executor scaleA 从单广播升级为半 pass 双广播。
+    //   超出本次打通范围，列为独立后续项。
+    // ▸ 门控：整块包在 if(cfg.hasMx4) 内——cfgBase/cfgMx 基线 hasMx4=false，
+    //   本 when 完全不 elaborate，现有格式错误检查（errCode 0/3/4/5/6）逐字不变，
+    //   normalized-diff=0。errCode 7 此前未被占用（io.errCode 为 UInt(4.W)）。
+    if(cfg.hasMx4){
+        when((DataFormat.isMx4(io.regFile.aFmt) && aMxBlockSize =/= 64.U) ||
+             (DataFormat.isMx4(io.regFile.bFmt) && bMxBlockSize =/= 64.U)){
+            errComb := true.B
+            errCodeComb := 7.U
+        }
     }
 
 }
@@ -265,7 +357,23 @@ switch(state) {
   // ▸ 归零证明（A 侧）：RdOnly A 闭式与 nt 无关，唯一误差项 = kt × (C − aKpb×aEb)，
   //   代入新式后【恒为 0】（全格式、全 K）。#132 记录的 A 侧孪生缺陷
   //   （aFmt=INT8 时 hw 比语义值多 +16、INT32 时少 −32）由此消除。
-  calcConfig.aColTileAddressOffset := cfg.totalN.U * (aLaneElems * aElemBytes)
+  // ==========================================================================
+  // 【Phase 3 fp4 additive（现有格式零改动）】上方 bytes 口径对 MXE2M1 会退化到 0
+  //   （memElemBytes(halfB)=0）。仅在 if(cfg.hasMx4) 门控下改用 bits 口径：
+  //     aColTile = totalN × elemsPerLane(aFmt) × memElemBits(aFmt) / 8
+  //   fp4: 16 × 4 × 4 / 8 = 32（一个 kTile = 64 个 4-bit 元素 = 32 字节）✓。
+  //   恒等性：字节对齐族 memElemBits/8 == memElemBytes，故 bits 式与原 bytes 式
+  //   【全现有格式逐值恒等】（MX8=32/FP16=32/INT8=16/INT32=64）；差异仅在亚字节族
+  //   （MXE2M1 0→32、INT4 0→8），而这些格式在 hasMx4=false 基线【从不进入本支】。
+  //   else 支保留原 bytes 表达式【逐字不变】→ cfgBase/cfgMx normalized-diff=0。
+  //   ▸ INT8/INT32「破损区间」说明：本仓 colTile 自 #124 ① 起已是运行期 bytes 口径，
+  //     INT8=16/INT32=64 早已正确（见上恒等性证明），当前【无】INT8/INT32 破损需修；
+  //     计划正文所述「统一公式修复 INT8/INT32」为历史陈述，本 Phase 不触碰其数值。
+  if(cfg.hasMx4){
+    calcConfig.aColTileAddressOffset := cfg.totalN.U * (aLaneElems * memElemBitsOf(io.regFile.aFmt)) / 8.U
+  } else {
+    calcConfig.aColTileAddressOffset := cfg.totalN.U * (aLaneElems * aElemBytes)
+  }
 
   
 // B矩阵非转置 row major偏移计算
@@ -335,7 +443,18 @@ when(io.regFile.loadWMode === 0.U){
 // ▸ 反面警示（勿照搬）：旧 HiveCore.scala 曾用 Mux(loadWMode, totalN×k×(bW/8), …)
 //   这类「n-tile 周期语义」式子，与 lastBTileStartAddr FSM 的累加口径不兼容，
 //   严禁回退到那种写法；colTileOffset 必须保持单一运行期量、由消费者按语义解释。
-calcConfig.bColTileAddressOffset := cfg.totalN.U * (bLaneElems * bElemBytes)
+// ==========================================================================
+// 【Phase 3 fp4 additive（现有格式零改动），与上方 A 侧孪生同批】B 侧 bytes 口径对
+//   MXE2M1 同样退化到 0；仅在 if(cfg.hasMx4) 门控下改 bits 口径：
+//     bColTile = totalN × elemsPerLane(bFmt) × memElemBits(bFmt) / 8
+//   fp4(loadW=1，MX 强制): 16 × 4 × 4 / 8 = 32（一个 kTile = 64 个 4-bit = 32 字节）✓。
+//   恒等性同 A 侧：字节对齐族 memElemBits/8 == memElemBytes → 全现有格式逐值恒等
+//   （MX8=32/FP16=32/INT8=16/INT32=64）；else 支原 bytes 式逐字不变 → normalized-diff=0。
+if(cfg.hasMx4){
+  calcConfig.bColTileAddressOffset := cfg.totalN.U * (bLaneElems * memElemBitsOf(io.regFile.bFmt)) / 8.U
+} else {
+  calcConfig.bColTileAddressOffset := cfg.totalN.U * (bLaneElems * bElemBytes)
+}
 
 //C矩阵Row Major偏移计算
 // 【IssueA 修复：还原旧 HiveCore.scala 全函数语义（refactor loss，同 B4/B5 类）】

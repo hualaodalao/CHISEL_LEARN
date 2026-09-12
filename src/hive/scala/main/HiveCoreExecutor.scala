@@ -292,9 +292,33 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
         // 故 depthOfCBufferUsed 必须用本拍推导的 newMTiles/newKTiles 计算，
         // 否则会采样到未初始化寄存器的随机旧值，误触发容量错误回 idle
         val newNTiles = (io.regFile.n(15, 0) + totalN.U - 1.U) / totalN.U
-        // MX v2 SIMD：16 lane × 2 元素/拍 = 32 K 元素/拍，一个 32-K scale 块 = 单 pass，
-        // 故 kTile 数 = K/32（K%32==0 已在 sIDLE 校验）；非 MX 分支逐字等于原公式。
-        val newKTiles = Mux(DataFormat.isMx(io.regFile.aFmt), io.regFile.k(15, 0) / (totalN.U) / 2.U, (io.regFile.k(15, 0) + totalN.U - 1.U) / totalN.U)
+        // MX SIMD：kTile 数 = K / kPerBeat = K / (totalN × elemsPerLane)。
+        //   · MXFP8 dual-lane：16 lane × 2 元素/拍 = 32 K/拍，一个 32-K scale 块 = 单
+        //     pass → kTile = K/32（K%32==0 已在 sIDLE 校验）。
+        //   · MXFP4 quad-lane：16 lane × 4 元素/拍 = 64 K/拍 → kTile = K/64。
+        // 【Phase 3】MX 分母由裸常数 /2 泛化为 /elemsPerLane，【复用 HiveEnum
+        //   DataFormat.elemsPerLane 单一真源】（与 CalcConfig.elemsPerLaneOf 同定义）。
+        //   编译期门控 cfg.hasMx4：
+        //   · false（cfgBase/cfgMx 基线）：走 else 支 / (totalN.U) / 2.U —— 与改动前
+        //     【逐字同式】（常数除法，firtool 强度削减为移位），MX8 normalized-diff=0。
+        //   · true（fp4 配置）：走 elemsPerLane 运行期分母（MX8→2、MX4→4），仅非基线
+        //     配置生成变量除法器，不触碰基线 RTL。
+        //   非 MX 分支（Mux false-arm）逐字等于原公式，两配置下均不变。
+        // 【Fix-6 除法强度削减】hasMx4=true 分支原用运行期信号分母 elemsPerLane(aFmt,true)
+        //   （Wire(UInt(3.W))），firtool 无法削减 → 综合出 16×16 组合除法器，落在
+        //   sIDLE→kTiles 装载关键路径。elemsPerLane 取值域 {1,2,4} 全是 2 的幂，除法本可消除。
+        //   改为编译期常数分母：fp4(elemsPerLane=4) → k/(totalN×4)=k/64；fp8(elemsPerLane=2)
+        //   → k/(totalN×2)=k/32，与改动前运行期除法【逐位相同】（K%kPerBeat==0 已由 validate
+        //   保证整除，(k/totalN)/e == k/(totalN×e)），仅综合实现从除法器变移位。
+        //   ★ hasMx4=false 的 else 支 k/(totalN.U)/2.U 与非 MX 支【逐字节保留不动】
+        //   → verilog/verilog_mx 零变化；仅 verilog_mxfp4/Hive_HiveCoreExecutor2.sv 预期改变
+        //   （`/ {13'h0,` 除法器消失），由 #54 复验。
+        val newKTiles = Mux(DataFormat.isMx(io.regFile.aFmt),
+          if(cfg.hasMx4) Mux(DataFormat.isMx4(io.regFile.aFmt),
+                             io.regFile.k(15, 0) / (totalN.U * 4.U),   // fp4: K/64 → firtool 削减为移位
+                             io.regFile.k(15, 0) / (totalN.U * 2.U))   // fp8: K/32 → 移位（值与原 elemsPerLane=2 逐位相同）
+          else io.regFile.k(15, 0) / (totalN.U) / 2.U,
+          (io.regFile.k(15, 0) + totalN.U - 1.U) / totalN.U)
         nTiles   := newNTiles - 1.U
         kTiles   := newKTiles - 1.U
         // 容量检查：C buffer 真实驻留量只有一组 partial sum（mTiles×totalN 行）。

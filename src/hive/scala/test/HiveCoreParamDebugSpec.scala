@@ -1139,7 +1139,7 @@ class HiveCoreParamDebugSpec extends AnyFlatSpec with Matchers with ChiselSim
       g.nTiles should be(2)
     }
     withClue("G1 前提：必须不被 precheckConfigErr 判为 config-err（非 MX ⇒ 不触任何分支）：") {
-      precheckConfigErr(p, cfg.totalN) should be(None)
+      precheckConfigErr(p, cfg.totalN, cfg.hasMx4) should be(None)
     }
     // expectPass=false：把 C 数据断言的决定权取回本用例（理由见上方 ★ 断言口径）
     val r = runParamDebugCollect(p, expectPass = false)
@@ -1198,7 +1198,7 @@ class HiveCoreParamDebugSpec extends AnyFlatSpec with Matchers with ChiselSim
       g.kTiles should be(2)
     }
     withClue("G2 前提：非 MX + loadW=1 必须不被 precheckConfigErr 判为 config-err（errCode4 只拦 MX）：") {
-      precheckConfigErr(p, cfg.totalN) should be(None)
+      precheckConfigErr(p, cfg.totalN, cfg.hasMx4) should be(None)
     }
     // expectPass=false + 断言口径与 G1 完全一致（因果实验铁证与 INT8 lane 解包缺口的
     // 完整根因取证见 G1 scaladoc 的 ★★/★ 两段，此处不重复；G2 的独立价值是覆盖
@@ -1277,7 +1277,7 @@ class HiveCoreParamDebugSpec extends AnyFlatSpec with Matchers with ChiselSim
     }
     withClue("G3 前提：不得落入 #122（E1）区间：") { g.triggers should be(false) }
     withClue("G3 前提：必须不被 precheckConfigErr 判为 config-err（cMxBlk=16 ≤ totalN ⇒ 不触 errCode2）：") {
-      precheckConfigErr(p, cfg.totalN) should be(None)
+      precheckConfigErr(p, cfg.totalN, cfg.hasMx4) should be(None)
     }
     // expectPass=false：把 C 数据断言的决定权取回本用例（理由见上方 ★ 断言口径）
     val r = runParamDebugCollect(p, expectPass = false)
@@ -1309,7 +1309,7 @@ class HiveCoreParamDebugSpec extends AnyFlatSpec with Matchers with ChiselSim
     *   （自持有验证，不依赖任何硬件缺陷存续，见测试 6b）。 */
   private def runParamDebugCollect(p: DebugParams, expectPass: Boolean = true,
                                    injectFailure: Boolean = false): RunResult = {
-    validate(p, cfg.totalN)
+    validate(p, cfg.totalN, cfg.hasMx4)
     val plan = new Plan(p, cfg)
     plan.prepare()
 
@@ -1324,7 +1324,7 @@ class HiveCoreParamDebugSpec extends AnyFlatSpec with Matchers with ChiselSim
     if (p.addrModeSel != 0)
       println(s"[$TAG] ⚠ addrMode=TILE：当前无硬件消费者，不改变实际 DMA 寻址行为，仅供寄存器级 debug")
 
-    val cfgErr = precheckConfigErr(p, cfg.totalN)
+    val cfgErr = precheckConfigErr(p, cfg.totalN, cfg.hasMx4)
     cfgErr.foreach(c => println(s"[$TAG] 预检：该组合硬件应直接 config-err（errCode=$c），走负向路径"))
 
     val maxCycles = if (isMxAny(p.cFmt)) math.max(p.maxCycles, 20000) else p.maxCycles

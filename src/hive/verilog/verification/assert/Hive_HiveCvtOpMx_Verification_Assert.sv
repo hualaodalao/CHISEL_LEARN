@@ -17,19 +17,19 @@
     `define ASSERT_VERBOSE_COND_ 1
   `endif // ASSERT_VERBOSE_COND
 `endif // not def ASSERT_VERBOSE_COND_
-module Hive_HiveCvtOpMx_Verification_Assert();	// src/hive/scala/main/HiveWorkUnit.scala:116:9
-  `ifndef SYNTHESIS	// src/hive/scala/main/HiveWorkUnit.scala:116:9
-    always @(posedge Hive_HiveCvtOpMx.clock) begin	// src/hive/scala/main/HiveWorkUnit.scala:92:7, :116:9
+module Hive_HiveCvtOpMx_Verification_Assert();	// src/hive/scala/main/HiveWorkUnit.scala:139:9
+  `ifndef SYNTHESIS	// src/hive/scala/main/HiveWorkUnit.scala:139:9
+    always @(posedge Hive_HiveCvtOpMx.clock) begin	// src/hive/scala/main/HiveWorkUnit.scala:101:7, :139:9
       if (~Hive_HiveCvtOpMx.reset
           & ~(~Hive_HiveCvtOpMx.io_consumeValid
               | ~(Hive_HiveCvtOpMx.isE5_layerCapture
                     ? (&Hive_HiveCvtOpMx.e5_layerCapture)
                     : (&Hive_HiveCvtOpMx.e4_layerCapture)
-                      & (&Hive_HiveCvtOpMx.m4_layerCapture)))) begin	// src/hive/scala/main/Fp32.scala:60:14, :61:14, src/hive/scala/main/HiveWorkUnit.scala:92:7, :93:14, :101:21, :110:{22,32,41,46,52}, :116:{9,10,27,30}
-        if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveWorkUnit.scala:116:9
-          $error("Assertion failed: HiveCvtOpMx: MX element is inf/nan (saturated to fp32 max); indicates software-side anomaly\n");	// src/hive/scala/main/HiveWorkUnit.scala:116:9
-        if (`STOP_COND_)	// src/hive/scala/main/HiveWorkUnit.scala:116:9
-          $fatal;	// src/hive/scala/main/HiveWorkUnit.scala:116:9
+                      & (&Hive_HiveCvtOpMx.m4_layerCapture)))) begin	// src/hive/scala/main/Fp32.scala:77:14, :78:14, src/hive/scala/main/HiveWorkUnit.scala:101:7, :102:14, :110:21, :132:{8,18,27,32,38}, :139:{9,10,27,30}
+        if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveWorkUnit.scala:139:9
+          $error("Assertion failed: HiveCvtOpMx: MX element is inf/nan (saturated to fp32 max); indicates software-side anomaly\n");	// src/hive/scala/main/HiveWorkUnit.scala:139:9
+        if (`STOP_COND_)	// src/hive/scala/main/HiveWorkUnit.scala:139:9
+          $fatal;	// src/hive/scala/main/HiveWorkUnit.scala:139:9
       end
     end // always @(posedge)
   `endif // not def SYNTHESIS

@@ -615,7 +615,7 @@ class HiveCoreDebugCase extends AnyFlatSpec with Matchers with ChiselSim with Hi
 
     val cfg = dbgCfg
 
-    validate(p, cfg.totalN)
+    validate(p, cfg.totalN, cfg.hasMx4)
     val plan = new Plan(p, cfg)
     plan.prepare()
 
@@ -640,7 +640,7 @@ class HiveCoreDebugCase extends AnyFlatSpec with Matchers with ChiselSim with Hi
         s"scaleBColTileOff=${plan.sbColOff}")
     }
 
-    val cfgErr = precheckConfigErr(p, cfg.totalN)
+    val cfgErr = precheckConfigErr(p, cfg.totalN, cfg.hasMx4)
     cfgErr.foreach(c => println(s"[$tag] 预检：该组合硬件应直接 config-err（errCode=$c），走负向路径"))
 
     val maxCycles = if (isMxAny(p.cFmt)) math.max(p.maxCycles, 20000) else p.maxCycles

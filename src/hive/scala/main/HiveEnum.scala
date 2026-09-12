@@ -14,6 +14,49 @@ object DataFormat extends ChiselEnum {
   def is1B(f: DataFormat.Type): Bool = f === INT8 || f === MXE4M3 || f === MXE5M2
   def isHalfB(f: DataFormat.Type): Bool = f === INT4 || f === MXE2M1
   def isInt(f: DataFormat.Type): Bool = f === INT8 || f === INT16 || f === INT4
+
+  /** 每 16-bit lane 打包元素数的【纯 Scala 字面量单一真源】（MXE2M1=4、MX8=2、其余=1）。
+    * 本函数只做编译期 Int 计算、不生成任何硬件（零 RTL），供两处共用：
+    *   ① 下方运行期硬件版 elemsPerLane 的各 when/otherwise 分支字面量（.U 前的 Int 源）；
+    *   ② HiveCoreCalcConfig.getKLoadNum 的编译期恒等性自证 require。
+    * 由此「硬件字面量」与「自证口径」共用同一张表，杜绝双源漂移：改本表即同时改硬件与
+    * 触发 getKLoadNum 自证（若其 totalN×2 / totalN×4 二分未同步则 elaboration 期即炸）。 */
+  def elemsPerLaneLit(f: DataFormat.Type): Int =
+    if (f == MXE2M1) 4 else if (f == MXE4M3 || f == MXE5M2) 2 else 1
+
+  /** 每 16-bit lane 打包的元素数（硬件运行期解码，Phase 3 单一真源）。
+    * MXFP8(E4M3/E5M2) SIMD 双元素/拍 = 2；MXFP4(E2M1) quad-lane 四元素/拍 = 4；
+    * 其余 = 1。kPerBeat = totalN × 本量。各分支字面量取自 elemsPerLaneLit（纯 Scala 单一真源）。
+    *
+    * @param hasMx4 编译期门控（= cfg.hasMx4 = supportedFmts.contains(MXE2M1)）。
+    *   false（现役 cfgBase/cfgMx 基线）：仅生成 2-bit「isMx8?2:1」逻辑，与 Phase 3
+    *   之前 HiveCoreCalcConfig.elemsPerLaneOf 的内联实现【逐字同构】（同名 val ret、
+    *   同 when/otherwise 结构），保证重发射 normalized-diff=0——MXE2M1 分支完全不
+    *   生成硬件（elaboration 期 Scala if 展开，hasMx4=false 时 isMx4 逻辑不进入 IR）。
+    *   true（未来 fp4 配置）：扩为 3-bit，追加 isMx4→4 分支（4 需 3 bit 表示）。
+    * HiveCoreCalcConfig.elemsPerLaneOf 与 HiveCoreExecutor2 kTile 分母共用本定义
+    *   （勿另立裸常数），确保几何/执行两侧 elemsPerLane 口径唯一。 */
+  def elemsPerLane(f: DataFormat.Type, hasMx4: Boolean = false): UInt = {
+    if (hasMx4) {
+      val ret = Wire(UInt(3.W))
+      when(isMx4(f)){
+        ret := elemsPerLaneLit(MXE2M1).U
+      }.elsewhen(isMx8(f)){
+        ret := elemsPerLaneLit(MXE4M3).U
+      }.otherwise{
+        ret := elemsPerLaneLit(FP32).U
+      }
+      ret
+    } else {
+      val ret = Wire(UInt(2.W))
+      when(isMx8(f)){
+        ret := elemsPerLaneLit(MXE4M3).U
+      }.otherwise{
+        ret := elemsPerLaneLit(FP32).U
+      }
+      ret
+    }
+  }
 }
 
 /** MX 量化格式数值参数表（HiveOutCvt blockScale/quantElem 共用字段，

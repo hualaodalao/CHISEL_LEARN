@@ -78,8 +78,26 @@ case class HiveCoreConfig(
   /** 是否包含整数格式（用于整数累加位宽约束校验） */
   val hasInt: Boolean = supportedFmts.contains(DataFormat.INT8) || supportedFmts.contains(DataFormat.INT16)
 
-  /** 是否包含 MX 格式（MXFP8 E4M3 / E5M2） */
+  /** 是否包含 MX 格式（MXFP8 E4M3 / E5M2）——历史谓词，保留原义供既有外部引用
+    * （HiveCore 顶层 dmaScaleA/dmaScaleB 端口与 scale DMA 子模块生成门控等）。 */
   val hasMx: Boolean = supportedFmts.contains(DataFormat.MXE4M3) || supportedFmts.contains(DataFormat.MXE5M2)
+
+  /** Phase 1：MX 硬件生成谓词收敛。
+    *   - hasMx8 = MXFP8（E4M3/E5M2），与 hasMx 定义逐字相同（= 现 hasMx 语义）；
+    *   - hasMx4 = MXFP4（E2M1），与 HiveWorkUnit 内同名 private 谓词对齐。
+    * 凡「生成 MX 硬件」的判据由 hasMx 改为 (hasMx8 || hasMx4)（新增并列，false 分支逐字保留）。
+    * 【恒等性铁律】对任何不含 MXE2M1 的配置 hasMx4=false，故
+    *   hasMx8 || hasMx4 == hasMx8 == hasMx，取值完全不变 ⟹ 门控解析出的硬件结构逐位不变
+    *   （verilog/verilog_mx 两套基线 normalized-diff=0 的根本保证）。 */
+  val hasMx8: Boolean = hasMx  // 语义别名：MXFP8 生成判据，与历史 hasMx 同值，单一真源
+  val hasMx4: Boolean = supportedFmts.contains(DataFormat.MXE2M1)
+
+  // Phase 1 门控半收敛兜底(v1)：hasMx(=hasMx8) 仍是 scale DMA 端口/子模块、io.sum 路由、
+  // HiveOutCvt fp32 支路的唯一主开关；fp4-only 会静默丢弃 quad-lane 结果且无 scale 供数。
+  // 真·fp4-only 支持需全量迁移 hasMx→(hasMx8||hasMx4) 并解禁 io.sum 禁改区，属 v2 独立立项。
+  require(!hasMx4 || hasMx8,
+    s"HiveCoreConfig: MXFP4(E2M1) v1 必须与 MXFP8(E4M3/E5M2) 同时启用" +
+    s"（hasMx 仍是 scale DMA 端口与 io.sum 路由主开关，fp4-only 会静默算错），当前 supportedFmts=$supportedFmts")
 
   /** P3a C 侧量化 scale 行位宽：每 8 元素量化块一个 8-bit E8M0 scale 字节
     * （HiveOutCvt.scaleRow 输出宽度，P3b dmaCScale 通道行宽同源） */
@@ -87,11 +105,14 @@ case class HiveCoreConfig(
 
   /** C 累加器有效位宽（与 HiveComb 推导逻辑一致）。
     * cW==0 自动推导：含浮点或 MX 时至少 40（延迟规格化 {sign,exp8,mant31} 需要），
-    * 纯整数时取 autoAccW（aEffW+bW+log2Up(totalN)，累加防溢出）。 */
+    * 纯整数时取 autoAccW（aEffW+bW+log2Up(totalN)，累加防溢出）。
+    * Phase 1：MX 判据由 hasMx 收敛为 (hasMx8 || hasMx4)，使 fp4 quad-lane 复用同款
+    * 40-bit 延迟规格化累加器的配置在 cW==0 时也自洽推导出 cEffW>=40；对不含 MXE2M1
+    * 的配置 hasMx4=false，取值与 hasFp||hasMx 逐位相同（零 diff）。 */
   val cEffW: Int = {
     val autoAccW = aEffW + bW + log2Up(totalN)
     if (cW != 0) math.max(cW, bW)
-    else if (hasFp || hasMx) math.max(40, autoAccW)
+    else if (hasFp || hasMx8 || hasMx4) math.max(40, autoAccW)
     else autoAccW
   }
 
@@ -132,7 +153,9 @@ case class HiveCoreConfig(
   // 延迟规格化架构约束：含浮点格式或 MX 格式时 cEffW 必须 >= 40，
   // 以容纳 40-bit 延迟规格化格式 {sign(1), exp(8), mantissa(31)}。
   // MX 复用延迟规格化 fp 累加器。
-  if (hasFp || hasMx) require(cEffW >= 40, s"HiveCoreConfig: 含浮点/MX 格式时 cEffW($cEffW) 必须 >= 40（延迟规格化需要）")
+  // Phase 1：MX 判据 hasMx → (hasMx8 || hasMx4)；fp4 quad-lane 同样复用 40-bit 延迟规格化
+  // 累加器。对不含 MXE2M1 的配置 hasMx4=false ⟹ 判据取值与 hasFp||hasMx 逐位相同（零 diff）。
+  if (hasFp || hasMx8 || hasMx4) require(cEffW >= 40, s"HiveCoreConfig: 含浮点/MX 格式时 cEffW($cEffW) 必须 >= 40（延迟规格化需要）")
   // 整数累加约束：含整数格式时 cEffW 必须 >= aW+bW，以容纳整数积累加防溢出
   if (hasInt) require(cEffW >= aW + bW, s"HiveCoreConfig: 含整数格式时 cEffW($cEffW) 必须 >= aW+bW(${aW + bW})（整数累加防溢出需要）")
   require(arrayN >= 4, s"HiveCoreConfig: arrayN($arrayN) 必须 >= 4")
@@ -159,7 +182,9 @@ case class HiveCoreConfig(
   // 256 默认 × totalN=16 天然成立）天然豁免。量化判据门控在运行期，此处为编译期几何前提。
   // 【显式声明（评审裁定留痕）】本约束对 hasMx 配置的全部窄总线配置生效——含量化
   // （mxfp8/mxfp4）与非量化输出；下游配置窄总线时不得假设非量化输出可豁免本约束。
-  if (hasMx) require(totalN * 4 <= cDmaExtW || (cDmaExtW / 4) % 2 == 0,
+  // Phase 1：判据 hasMx → (hasMx8 || hasMx4)，覆盖仅含 mxfp4(E2M1) 的配置；对不含
+  // MXE2M1 的配置 hasMx4=false ⟹ 取值与 hasMx 逐位相同（零 diff）。
+  if (hasMx8 || hasMx4) require(totalN * 4 <= cDmaExtW || (cDmaExtW / 4) % 2 == 0,
     s"HiveCoreConfig: hasMx 窄总线配置要求 mxfp4 每拍元素数（cDmaExtW/4=${cDmaExtW / 4}）为偶数（拍内整字节打包），" +
     s"该约束覆盖 hasMx 配置的全部窄总线（含量化与非量化输出），当前 cDmaExtW=$cDmaExtW")
   require(scaleBufferDepth > 0, s"HiveCoreConfig: scaleBufferDepth($scaleBufferDepth) 必须 > 0（hasMx 时 scale FIFO 深度；非 MX 死路参数）")
@@ -167,10 +192,18 @@ case class HiveCoreConfig(
   // totalN==16 时成立（scaleBDma lineTarget=kTile、executor 每 sLOAD_B 窗口 pop scaleB
   // 均硬编码此假设）；totalN≠16 的 hasMx 配置会静默数值错或挂死，故在
   // elaboration 期直接拒绝。若未来支持其它 totalN，需同步重推上述两处节奏。
-  if (hasMx) require(totalN == 16, s"HiveCoreConfig: MX 要求 totalN==16（32-K scale 块 = 单 pass = 16 lane × 2 元素），当前 totalN=$totalN")
+  // Phase 1：判据 hasMx → (hasMx8 || hasMx4)。fp4 quad-lane 几何自洽性确认（仅判据/注释层面，
+  // 几何数值改动属 Phase 3）：totalN==16 时 fp4 每 lane 打包 4 个 4-bit 元素（elemBits=4），
+  // 16 lane × 4 elem = 64 K/pass，恰与 mxfp4 的 64-元素 scale 块（block=64）单 pass 对齐，
+  // 故 totalN==16 对 fp4 quad-lane 仍是自洽前提（与 fp8 dual-lane 的 16 lane×2 elem=32K/pass、
+  // block=32 单 pass 同构）。对不含 MXE2M1 的配置 hasMx4=false ⟹ 取值与 hasMx 逐位相同（零 diff）。
+  if (hasMx8 || hasMx4) require(totalN == 16, s"HiveCoreConfig: MX 要求 totalN==16（fp8：32-K 块=16 lane×2 元素；fp4：64-K 块=16 lane×4 元素，均单 pass），当前 totalN=$totalN")
   // MX SIMD 双元素/拍：16-bit lane 打包 2 个 8-bit 元素（低字节=偶 k、高字节=奇 k），
   // PE 内 4×HiveCvtOpMx + 2×HiveMacFp 级联，故 aW/bW 必须 >= 16。
-  if (hasMx) require(aW >= 16 && bW >= 16, s"HiveCoreConfig: MX SIMD 双元素/拍需要 aW/bW >= 16（16-bit lane 打包 2 元素），当前 aW=$aW bW=$bW")
+  // Phase 1：判据 hasMx → (hasMx8 || hasMx4)。fp4 quad-lane 同样要求 16-bit lane（打包 4 个
+  // 4-bit 元素：io.a(3,0)/(7,4)/(11,8)/(15,12)），故 aW/bW>=16 对 fp4 亦成立。对不含 MXE2M1
+  // 的配置 hasMx4=false ⟹ 取值与 hasMx 逐位相同（零 diff）。
+  if (hasMx8 || hasMx4) require(aW >= 16 && bW >= 16, s"HiveCoreConfig: MX SIMD 需要 aW/bW >= 16（fp8：16-bit lane 打包 2 元素；fp4：打包 4 元素），当前 aW=$aW bW=$bW")
 }
 
 
