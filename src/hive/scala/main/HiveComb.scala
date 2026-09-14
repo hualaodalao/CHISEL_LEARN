@@ -94,7 +94,22 @@ class HiveComb(
     val rndIn   = Input(RoundingMode())
     // 权重格式（标量，镜像 fmtIn 逐列 cj 传播）
     val bFmtIn  = Input(DataFormat())
-    // MX scale：scaleAIn per-row（与 aIn 同 skew，随激活链流动），scaleBIn per-column（列驻留）
+    // MX scale: BOTH scaleAIn and scaleBIn are per-row, i.e. indexed by the
+    // PE-grid row coordinate, which in this array is the K-lane axis (see the
+    // axis note above the sub-array hookup loop). Neither is per-column.
+    //   scaleAIn : rides the activation skew chain (scaleASkewedPerRow), so it
+    //              stays lockstep with aIn during the compute phase.
+    //   scaleBIn : fed straight from the top-level port, no skew chain. That is
+    //              correct, not an asymmetry bug: scaleBIn is only ever
+    //              consumed on the loadWLock beat, and during the whole loadW
+    //              window scaleASkewedPerRow is bypassed to a direct connection
+    //              as well (see `when(loadWInSafe)` in the scaleA skew block),
+    //              so on the phase that actually matters both sides have exactly
+    //              the same shape and the same per-column 1-cycle cascade depth.
+    // The previous wording at this spot ("scaleBIn per-column, column-resident")
+    // was stale: it described an abandoned wiring form that was already
+    // commented out below and never active. Removed together with that dead line
+    // in #146 after the port-chain ground-truth audit.
     val scaleAIn = Input(Vec(totalN, UInt(8.W)))
     val scaleBIn = Input(Vec(totalN, UInt(8.W)))
 
@@ -242,34 +257,71 @@ class HiveComb(
     }
 
     
-    // --- 激活数据 aIn：per-row，直连（skew 由外部 feeder 负责） ---
+    // --- Activation aIn and both MX scale feeds: per-row, left-to-right ---
+    // AXIS NOTE (#146 ground truth, do not "fix" this):
+    //   `globalLane` is the PE-grid ROW coordinate, and in this array the row
+    //   coordinate is the K-LANE axis -- NOT the weight-row / output-N axis.
+    //     * Compute phase: lane x carries the K elements of one activation beat,
+    //       and the output row m is encoded in the arrival time (row x is fed
+    //       skewed by x cycles), while the output column n_out is the PE column y.
+    //     * loadW phase (MX always uses it, guarded by CalcConfig errCode=4):
+    //       B is stored N-major, beat s carries row n_out = totalN-1-s, and lane
+    //       x of that beat is shifted right along the a-chain. On the loadWLock
+    //       beat PE(x,y) therefore holds B[n_out = y][k-lane x].
+    //   So: row coordinate x == K-lane axis, column coordinate y == output-N
+    //   axis. scaleAIn and scaleBIn are both indexed by x, which is exactly the
+    //   axis the Executor's idx = (lane*step)/blk byte select is derived from.
+    //   The former name `globalRow` was geometrically fine but read as "weight
+    //   row", which made the correct per-lane wiring look like a wrong-axis bug.
     for (r <- 0 until arrayN) {
-      val globalRow = ci * arrayN + r
+      val globalLane = ci * arrayN + r
       if (cj == 0) {
-        // 首列：直连顶层输入。计算阶段要求外部已按「行 i 延迟 i 拍」错峰供数；
-        // 加载阶段本就不需要 skew，两种阶段统一为直连
-        arr.io.validIn(r) := validSkewedPerRow(globalRow)
-        arr.io.aIn(r) := aSkewedPerRow(globalRow)
-        // scaleA per-row 首列注入（与 aIn 同 skew）
-        arr.io.scaleAIn(r) := scaleASkewedPerRow(globalRow)
-        // loadW 脉冲链注入（水平 loadW 模式）：首列簇各行同接顶层 loadWIn
+        // Left-most cluster column: connect straight to the top-level ports.
+        // During the compute phase the external feeder is required to supply
+        // row i delayed by i cycles; during the load phase no skew is needed.
+        // Both phases are therefore plain direct connections here.
+        arr.io.validIn(r) := validSkewedPerRow(globalLane)
+        arr.io.aIn(r) := aSkewedPerRow(globalLane)
+        // scaleA per-lane injection at the left edge (same skew as aIn)
+        arr.io.scaleAIn(r) := scaleASkewedPerRow(globalLane)
+        // loadW pulse chain injection (horizontal loadW mode): every row of the
+        // left-most cluster column takes the top-level loadWIn
         arr.io.loadWIn(r) := loadWInSafe
+        // scaleB per-lane injection at the left edge, straight (no skew chain).
+        // This is the SAME horizontal left-to-right topology as scaleAIn above,
+        // and it is correct: see the axis note and the io.scaleBIn port comment.
+        arr.io.scaleBIn(r) := io.scaleBIn(globalLane)
       } else {
-        // 非首列：从左侧子阵列获取
+        // Non left-most cluster column: take everything from the cluster on the
+        // left, so both scale chains cascade along cj exactly like the a chain.
         arr.io.validIn(r) := arrays(ci)(cj-1).io.validOut(r)
         arr.io.aIn(r) := arrays(ci)(cj-1).io.aOut(r)
-        // scaleA 链沿 cj 方向 per-row 级联（镜像 a 链，与 aOut lockstep）
+        // scaleA chain cascades per-lane along cj (mirrors the a chain, lockstep
+        // with aOut)
         arr.io.scaleAIn(r) := arrays(ci)(cj-1).io.scaleAOut(r)
-        // loadW 链沿 cj 方向 per-row 级联（镜像 a 链，与 aOut lockstep）
+        // loadW chain cascades per-lane along cj (mirrors the a chain, lockstep
+        // with aOut)
         arr.io.loadWIn(r) := arrays(ci)(cj-1).io.loadWOut(r)
+        // scaleB chain cascades per-lane along cj, 1 cycle per cluster column,
+        // same depth and same direction as the a chain (lockstep with aOut
+        // because loadWIn is high on every beat of the loadW window)
+        arr.io.scaleBIn(r) := arrays(ci)(cj-1).io.scaleBOut(r)
       }
     }
 
-    // --- psumIn：per-column，无条件直连（无 skew） ---
+    // --- psumIn: per-column, unconditional direct connection (no skew) ---
+    // `globalCol` here IS the output-N axis (PE column coordinate), which is the
+    // correct reading of "column" -- unlike the stale scaleB wording removed in
+    // #146. The abandoned per-column scaleB form
+    // (`arr.io.scaleBIn(c) := io.scaleBIn(globalCol)`) that used to sit here as a
+    // commented-out line has been DELETED: indexing scaleB by the column
+    // coordinate would make the scale byte depend on n_out instead of on the
+    // K-lane, i.e. it would transpose the block assignment. MX blocks are cut
+    // along K, so the byte index must be a function of the row/lane coordinate
+    // only. That dead line was the actual wrong-axis form; the live wiring above
+    // is the right one.
     for (c <- 0 until arrayN) {
       val globalCol = cj * arrayN + c
-      // scaleB 列驻留：per-column（globalCol）注入对应列的 HiveCell（内部再广播到列内各行）
-      arr.io.scaleBIn(c) := io.scaleBIn(globalCol)
       if (ci == 0) {
 
         // 首行：无条件直连 io.psumIn。

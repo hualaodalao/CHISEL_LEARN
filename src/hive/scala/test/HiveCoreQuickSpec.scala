@@ -17,13 +17,35 @@
   *
   * ══ errCode 实测更正（与常见 errCode 表不符，以 RTL 为准）══
   * HiveCoreCalcConfig 把 a/b/cMxBlockSize 三违约【合并】为单一 errMXLargerThanKLoadNum、errCode 恒置 0，故【errCode
-  * 1 与 2 永不可达】（QuantSpec「blk32 over totalN」期望 2 实得 0 的红项根因，#124 禁动区）；且五个 when 平级
-  * last-connect、后写覆盖前写 → 真实优先级 6>5>4>3>0（与 precheckConfigErr 的 0>1>2>3>4>5 相反、后者不含 6）。
-  * 【Fix-7 补充（仅 cfg.hasMx4=true 时存在）】fp4 打通在 errComb 裸块最末追加两个 hasMx4 门控分支，
-  * last-connect 使其优先级最高：MX4×MX8 混配→errCode3(Fix-4，暂复用 code3)、fp4 blk≠64→errCode7(Phase3)。
-  * 混配 when 置于 errCode7 之前、errCode6 之后 → hasMx4=true 完整真实优先级
-  * 7 > 3(MX4×MX8混配) > 6 > 5 > 4 > 3(isAMx^isBMx) > 0（两个 code3 判据互斥、同码，常简写 7>6>5>4>3>0）。
-  * QuickSpec 默认 cfg supportedFmts 不含 MXE2M1（hasMx4=false），这两支恒不 elaborate，优先级退回 6>5>4>3>0。
+  * 1 与 2 永不可达】（QuantSpec「blk32 over totalN」旧期望 2 实得 0 的红项根因，#124；已按 RTL 口径把该用例期望
+  * 改为 0）；且五个 when 平级 last-connect、后写覆盖前写 → 真实优先级 6>5>4>3>0。
+  * 【P0-2 去双源】金锚 errCode 镜像已收敛为单一真源 HiveDebugModel.hwErrCode（顺序 if 后写覆盖，逐位镜像 RTL）；
+  * QuickSpec.hwErrCode 与 HiveDebugModel.precheckConfigErr 均委托它，不再有"两份互不一致的软件镜像"。
+  * [Fix-7/P0-1, exists only when cfg.hasMx4=true] fp4 support appended two
+  * hasMx4-gated branches to the errComb block, both AFTER the fp8 branches, so
+  * last-connect gives them higher priority: MX4xMX8 mix -> errCode3 (Fix-4,
+  * code 3 reused), and fp4 K not divisible by kPerBeat(=64) -> errCode8 (P0-1).
+  * Source order (front to back): code8(K) -> mix code3, hence with hasMx4=true
+  * the full truth order is
+  *   3(MX4xMX8 mix) > 8(fp4 K not divisible) > 6 > 5 > 4 > 3(isAMx^isBMx) > 0
+  * (the two code3 predicates are mutually exclusive and share one code).
+  * (#146) A third branch used to sit last -- errCode7 "fp4 blk != 64". It has
+  * been DELETED: MXBlockSize was narrowed to the 2-level enum {sel=0 -> 16,
+  * sel=1 -> 32}, so `getBlockSize() =/= 64.U` was a TAUTOLOGY and every fp4 run
+  * was rejected at runtime unconditionally and silently (the golden model
+  * mirrored the same tautology, so RTL and anchor agreed and nothing ever went
+  * red). fp4 now accepts blk in {16, 32} exactly like fp8, errCode 8 is the only
+  * remaining fp4 geometry guard, and CODE 7 IS FREE. The standing allocation
+  * rule still holds: new checks are assigned from 7 upwards; codes 1/2 are never
+  * revived (the three blocksize violations are merged into a single errCode 0).
+  * (#150→#155) QuickSpec 的 cfg 现在【不再显式传 supportedFmts】，回落 HiveCoreConfig
+  * 默认集——因为 #155 MJ1 已把 MXE2M1 升格为【默认必选】，默认集本身就是 7 种格式。
+  * （#150 当时是显式写「默认 6 种 + MXE2M1」，那时默认集还不含 MXE2M1；见下方 cfg 的
+  * 论证注释与全字段对齐表。）⟹ hasMx4=true 保持不变，这两支【真的会 elaborate】，
+  * 完整优先级 3(mix) > 8 > 6 > 5 > 4 > 3(xor) > 0 对本 suite 生效。#150 之前 QuickSpec
+  * 用的默认 cfg 不含 MXE2M1（hasMx4=false），那两支恒不 elaborate、优先级退回 6>5>4>3>0；
+  * 实测（build/150_fp4_firstrun.log）打开后两支仍不【触发】——因为 fp4 主用例
+  * a/b 同为 MXE2M1（不混配）且 K=64 被 64 整除，体检结论仍是「配置合法」走正向比对。
   * 注：MX4×MX8 混配(W4A8)数学/OCP 合法，真数据通路支持列 v2；errCode3 是【运行期可诊断】守护（非永久拒绝，
   * 将来支持只需删守护 when + 补 W4A8 数据通路，aFmt/bFmt 已是独立 4-bit 字段、软件接口无需重构）。
   *
@@ -84,60 +106,321 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   //   要么已在 #131/#133 期间被改写掉、要么评审引用有误。上方速查表按裁定的【意图】
   //   （给出正确的 N 依赖性表述）落地，不针对任何现存错误原文。
   // ══════════════════════════════════════════════════════════════════════════
-  runCase(m = 32, n = 32, k = 32, aFmt = DataFormat.FP16, bFmt = DataFormat.FP16, cFmt = DataFormat.MXE4M3,
-          aBlk = 32, bBlk = 32, cBlk = 16, addrMode = AddrMode.MAT)
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE2M1, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.MXE2M1,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT)
 
-  /** 编译期配置与 HiveCoreDebugCase / HiveCoreParamDebugSpec 逐字一致（全格式；totalN=16；cDmaExtW 默认 256） */
+  /** 编译期配置（totalN=16；cDmaExtW 默认 256；缓冲深度 2048；scaleBufferDepth=64）。
+    * (#155 MJ1) supportedFmts 现在【不再显式传入】，回落 HiveCoreConfig 的默认集。
+    *   MXE2M1 现在是默认必选，不再需要显式加。
+    *   历史：#150 曾把它显式写成「默认 6 种 + MXE2M1」，因为当时默认集不含 MXE2M1、
+    *   hasMx4=false，fp4 硬件（quad-lane unpack、4x sigW=2 HiveMacFpMx、HiveCvtOpMx 的
+    *   isMx4 臂、bits-based colTileAddressOffset、errCode8、mix errCode3、kTiles=K/64）
+    *   在本 DUT 里【根本不存在】，用户手改的 fp4 主用例会被 HiveDebugModel 的 Fix-9
+    *   cfg-aware require 拦下。本轮 MXE2M1 升格为默认必选后，那段显式传参与默认集
+    *   【逐元素相同】，继续显式写等于维护一份会漂移的副本，故删除。
+    * 【全字段逐一对齐（改前 vs 改后，共 12 个字段）】
+    *   arrayN 8=8 / clusterM 2=2 / aW 16=16 / bW 16=16 / cW 40=40 /
+    *   supportedFmts {FP16,BF16,INT16,INT8,MXE4M3,MXE5M2,MXE2M1} == 默认集（逐元素相同）/
+    *   aBufferDepth 2048=2048 / bBufferDepth 2048=2048 / cBufferDepth 2048=2048 /
+    *   addrWidth 32=32（两侧都走默认）/ scaleBufferDepth 64=64（★未动，cfgMxFp4 才用 256）/
+    *   cDmaExtW 256=256（两侧都走默认）。
+    *   ⟹ 改前 cfg == 改后 cfg（case class 结构相等），派生量随之逐一相同：
+    *   totalN=16、hasFp=true、hasInt=true、hasMx=true、hasMx8=true、hasMx4=true、
+    *   c1Merge=hasFp&&hasMx=true、cEffW=40、cScaleRowW=8。DUT 逐位不变。
+    * 【为什么必须保持 hasFp/hasInt 为真（沿用 #150 的论证，仍然有效）】
+    *   - hasFp 掉假会删掉整条浮点通路，HiveWorkUnit 的 baseSel 退化为 (false,false) => io.cReg，
+    *     FP16 主用例会【静默】输出累加器输入而非乘加结果（不报错）。上方类头那句
+    *     「默认 M=N=K=32 FP16->FP16 逐位匹配 1024/1024」是用户每天要用的旋钮。
+    *   - c1Merge = hasFp && hasMx 掉假会让共享的 macShared:HiveMacFp 消失，fp8 dual-lane
+    *     MAC 结构随之改变，「对 fp8 additive / 数值恒等」的说法即告失效。
+    *   故本 cfg 绝不改用 HiveCoreElaborate.cfgMxFp4 那种 MX-only 三格式集。
+    * 【两条 require】require(!hasMx4 || hasMx8) 与本轮新增的 require(!hasMx8 || hasMx4)
+    *   合起来钉死 hasMx4 <=> hasMx8；本 cfg 两者皆真 ⟹ 都满足。 */
   private val cfg = HiveCoreConfig(arrayN = 8, clusterM = 2, aW = 16, bW = 16, cW = 40,
     aBufferDepth = 2048, bBufferDepth = 2048, cBufferDepth = 2048, scaleBufferDepth = 64)
-  private val rnd: RoundingMode.Type = RoundingMode.RNE   // 舍入模式（不在主签名里，要换就改这一行）
-  /** blk(用户面 Int) → MXBlockSize sel：表逐条由枚举成员构造，blk 取定义式 (8 << sel)，不写 sel 字面量（枚举重排也不错位） */
-  private val blkToSel: Map[Int, Int] = Seq(MXBlockSize.M8, MXBlockSize.M16, MXBlockSize.M32, MXBlockSize.M64)
-    .map(e => (8 << e.litValue.toInt) -> e.litValue.toInt).toMap
+  // 套件级舍入模式：★ 主用例与两条历史永久用例都不传 rnd ⟹ 全部取这里的 RNE（逐字不变）。
+  //   (#155 m3) 自本轮起它同时是 runCase 的 per-case `rnd` 形参的【默认值来源】；要单独换
+  //   某一条用例的舍入模式，请在那条 runCase 调用里传 `rnd = RoundingMode.RDN/RUP/...`，
+  //   不要再改这一行（改这一行会同时改动所有未显式传 rnd 的用例）。
+  // ★★【#155 实测踩坑，务必保留 def 不要改回 val】本文件里 ★ 主用例的 runCase 调用位于
+  //   第 109 行，而本声明位于其后（Scala 类体按书写顺序求值）。默认参数表达式是【在调用点
+  //   即时求值】的（编译器生成 runCase$default$N，在 :109 那一行就调用它），而 runCase 的
+  //   函数体是延迟到 `it should ... in {}` 执行时才跑。若这里写 `private val rnd`，则 :109
+  //   求值默认参数时该字段【尚未初始化 = null】，实测抛：
+  //     java.lang.NullPointerException: Cannot invoke
+  //       "chisel3.ChiselEnum$Type.litValue()" because "rnd$1" is null
+  //     at HiveCoreQuickSpec.$anonfun$runCase$2(HiveCoreQuickSpec.scala:194)
+  //   且只有 ★ 主用例（写在声明之前）会中招，#146/#151/#155 四条（写在声明之后）全绿 ⟹
+  //   这是一个极易被误判为「主用例坏了」的前向引用初始化序陷阱。改成 def 后没有存储字段、
+  //   不受类体求值顺序影响，调用即返回枚举成员（RoundingMode.RNE 是 object 成员，与本类
+  //   构造顺序无关），语义与「套件级常量」完全一致。
+  private def rnd: RoundingMode.Type = RoundingMode.RNE
+  /** blk(用户面 Int) → MXBlockSize sel：表逐条由枚举成员构造，blk 取定义式 (16 << sel)，不写 sel 字面量（枚举重排也不错位）。
+    * 【#144】MXBlockSize 已收窄为 {M16=0, M32=1}，故基档由 8 改 16：16<<0=16→sel0、16<<1=32→sel1，
+    *   与 HiveDebugModel.DebugParams.aMxBlk/bMxBlk/cMxBlk 的 16<<sel 反解码逐位对齐。 */
+  private val blkToSel: Map[Int, Int] = Seq(MXBlockSize.M16, MXBlockSize.M32)
+    .map(e => (16 << e.litValue.toInt) -> e.litValue.toInt).toMap
   private def selOf(w: String, blk: Int): Int = blkToSel.getOrElse(blk, throw new IllegalArgumentException(
     s"[$TAG] $w=$blk 非法：MX 块大小只能取 ${blkToSel.keys.toSeq.sorted.mkString(" / ")}"))
 
-  /** 唯一入口：注册一个 ScalaTest 用例。改顶部调用的参数、重跑即可。 */
+  /** 唯一入口：注册一个 ScalaTest 用例。改顶部调用的参数、重跑即可。
+    * (#155 m3) 新增 per-case `rnd` 形参，默认取套件级 `private def rnd`（RNE）。
+    *   ★测试名【不含 rnd】（`it should` 那行只由 m/n/k/三格式/三 blk/addrMode/caseTag 组成），
+    *   故加这个形参后既有三条用例的 ScalaTest 名【逐字不变】：不触碰 52 行归一化基线、
+    *   不触碰用户手改的 ★ 主用例行、也不会因改名而让 copyWave 的 testHint/工作目录漂移。
+    *   默认参数表达式 `= rnd` 求值于外层类作用域（Scala 把默认值编译成
+    *   `runCase$default$N` 方法，形参名在其中不可见）⟹ 它引用的是套件级成员而非形参自身。
+    *   ★但该默认值是在【调用点即时求值】的（不像函数体那样延迟到 `in {}` 执行时），而本文件
+    *   的 ★ 主用例写在套件级声明之前 ⟹ 套件级 `rnd` 必须是 `def` 而不能是 `val`，否则
+    *   主用例会拿到未初始化的 null 字段。详见下方 `private def rnd` 处的踩坑记录。 */
   def runCase(m: Int, n: Int, k: Int, aFmt: DataFormat.Type, bFmt: DataFormat.Type, cFmt: DataFormat.Type,
               aBlk: Int, bBlk: Int, cBlk: Int, addrMode: AddrMode.Type,
               loadW: Option[Int] = None,   // None = 按 isMx(aFmt)||isMx(bFmt) 自动推导（MX 强制 1，约束二）
               seed: Long = 1234L,          // 激励随机种子（固定可复现）
               strictAddr: Boolean = true,  // true = 地址对账失配判失败（仍是收集-后断言，一次看全所有失配点）
               maxCycles: Long = 20000L,    // 仿真拍数上限（量化输出内部再抬到 >= 20000）
-              wave: String = "sim/debug/quick.fst"): Unit = {
+              wave: String = "sim/debug/quick.fst",
+              // (#155 m3) per-case 舍入模式。默认 = 套件级 RNE（下方 `private def rnd`）。
+              //   进 DebugParams.rnd（litValue.toInt）⟹ 写入 regs(7) bits[14:12]，RTL 与金锚同源。
+              rnd: RoundingMode.Type = rnd,
+              // (#148) caseTag is appended to the ScalaTest test NAME. It exists for exactly one
+              //   reason: two runCase calls with identical (m,n,k,aFmt,bFmt,cFmt,blks,addrMode)
+              //   build the SAME test name, and ScalaTest rejects that while the suite is being
+              //   CONSTRUCTED -- org.scalatest.Engine.registerTest ends with
+              //     if (atomic.get.testsMap.keySet.contains(testName))
+              //       throw new DuplicateTestNameException(testName, ...)
+              //   (scalatest 3.2.19, Engine.scala:669-674). testName = getTestName(testText,
+              //   currentBranch) depends ONLY on the `it should "<text>"` string, so the collision
+              //   is decided before any require/simulate/compare ever runs. sbt prints it as
+              //     HiveCoreQuickSpec *** ABORTED ***
+              //       Duplicate test name: should run ... (blk 16/16/16, ...) (HiveCoreQuickSpec.scala:<the `it should` line>)
+              //     Total number of tests run: 0 / Suites: completed 0, aborted 1
+              //   i.e. ABORTED, not FAILED: an exception, not an assertion, and not a golden-model
+              //   disagreement. The same collision also lands on the svsim working directory, which
+              //   is derived from the test name (build/chiselsim/HiveCoreQuickSpec/should-run-M-32-
+              //   N-32-K-64-DataFormat-4-MXE5M2--x-...-blk-16-16-16--addrMode-AddrMode-0-MAT--), so
+              //   making the name unique repairs both layers with one change.
+              //   Default "" keeps the ★ primary call above at its exact historical title.
+              caseTag: String = ""): Unit = {
     val lw = loadW.getOrElse(if (isMxAny(aFmt) || isMxAny(bFmt)) 1 else 0)
-    it should s"run M=$m N=$n K=$k $aFmt x $bFmt -> $cFmt (blk $aBlk/$bBlk/$cBlk, addrMode=$addrMode)" in {
+    it should s"run M=$m N=$n K=$k $aFmt x $bFmt -> $cFmt (blk $aBlk/$bBlk/$cBlk, addrMode=$addrMode)$caseTag" in {
       runQuick(DebugParams(m = m, n = n, k = k, aFmt = aFmt, bFmt = bFmt, cFmt = cFmt, loadWMode = lw != 0,
         aMxBlkSel = selOf("aBlk", aBlk), bMxBlkSel = selOf("bBlk", bBlk), cMxBlkSel = selOf("cBlk", cBlk),
         addrModeSel = addrMode.litValue.toInt, rnd = rnd.litValue.toInt, seed = seed, strictAddr = strictAddr,
         maxCycles = maxCycles.toInt, waveTarget = wave, testHint = s"run-M-$m-N-$n-K-$k")) }
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // (#146) ADDITIONAL case -- blk=16 end-to-end. The ★★★ call above is the
+  // user's primary knob and is deliberately left untouched; this one is a
+  // permanent second registration (runCase is `it should ... in {}`, so calling
+  // it twice registers two independent ScalaTest cases).
+  // --------------------------------------------------------------------------
+  // WHY THIS CASE IS THE ONLY NET THAT CAN CATCH A SCALE-AXIS / BLOCK-MAPPING
+  // REGRESSION: with aBlk=bBlk=32 and fp8 (totalN=16, elemsPerLane=2) the
+  // Executor's byte select degenerates --
+  //   kPerBeat = totalN*2 = 32, numScalesPerBeat = kPerBeat/blk = 1,
+  //   idx = (lane*2)/32 = 0 for EVERY lane in 0..15
+  // -- so all 16 lanes take payload[7:0] and the (lane <-> K-block) mapping is
+  // unobservable: any permutation of the lane axis, and any wrong byte slot,
+  // produce exactly the same hardware behaviour. blk=16 gives
+  //   numScalesPerBeat = 32/16 = 2, idx = lane/8 -> {0 for lanes 0..7,
+  //                                                  1 for lanes 8..15}
+  // so the 32-bit scale word really has to carry two distinct E8M0 bytes and the
+  // lane->block assignment becomes falsifiable.
+  // SENSITIVITY REQUIREMENT (both sides): scaleA(mm)(j) / scaleB(nn)(j) are
+  // generated by HiveDebugModel.scaleExpA/scaleExpB, whose exponent varies with
+  // the block index j ((mm+j+seed%3)%3-1 and (nn+2j+seed%3)%3-1). With K=64 and
+  // blk=16 there are saEntries = sbEntries = 4 blocks per row, and blocks
+  // j=0,1,2 of any row get three DIFFERENT exponents in {-1,0,+1} -> feeding the
+  // wrong block to the wrong lane group changes the golden product and the case
+  // goes red. A side and B side are both covered (aBlk=bBlk=16).
+  // K CHOICE = 64, per the #146 4-byte alignment contract (derivation in
+  // src/hive/doc/problem.md and in HiveCoreCalcConfig next to
+  // scaleA/BRowAddressOffset): the scale row stride is K/blk bytes, and a 32-bit
+  // scale read must not straddle in a way software cannot guarantee, so
+  // K/blk must be a multiple of 4 -> blk=16 requires K % 64 == 0 (blk=32 would
+  // require K % 128 == 0). K=64 is the smallest legal value and also gives
+  // kTiles = K/kPerBeat = 2, so the multi-pass partial-sum path is exercised too.
+  // Geometric legality: aBlk=bBlk=16 <= kLoadNum(fp8)=32 (errCode 0), K%kPerBeat=0
+  // (validate), K%blk=0 (validate), cBlk=16 <= totalN=16 and 16%16=0.
+  // Formats mirror the primary call (MXE5M2 x MXE5M2 -> MXE4M3) on purpose: the
+  // ONLY changed dimensions are blk (32->16) and K (32->64), so a red here is
+  // attributable to the block/lane mapping and not to a format combination.
+  // ══════════════════════════════════════════════════════════════════════════
+  // (#148) caseTag added, and it is the ONLY thing changed here. The ★ primary call at the top of
+  //   this file was hand-edited by the user to exactly this geometry (M=N=32, K=64, blk 16/16/16,
+  //   MXE5M2 x MXE5M2 -> MXE4M3), so both runCase calls built the same test name and ScalaTest
+  //   aborted the whole suite at construction time (DuplicateTestNameException -- see the caseTag
+  //   comment inside runCase). Geometry, seed, formats and wave target are untouched, therefore the
+  //   #146 blk=16 net keeps exactly the sensitivity argued above.
+  //   REDUNDANCY NOTE (deliberately NOT acted on, only reported): while the primary call sits at this
+  //   geometry the two cases are bit-identical simulations (both use the default seed=1234), so this
+  //   second registration currently costs ~50 s plus one extra svsim working directory and adds no
+  //   new coverage. Merging the two was proposed to the leader instead of being done here, because
+  //   the primary call is the user's daily knob: if it is ever retuned back to blk=32, this permanent
+  //   registration is the only thing left that keeps the lane<->K-block mapping falsifiable
+  //   (#146 report section 1.4).
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE5M2, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.MXE4M3,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, wave = "sim/debug/quick_blk16.fst",
+          caseTag = " [#146 blk16 net]")
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // (#151 F2) THIRD permanent registration -- MXFP4 (E2M1) at K=128, blk 16/16/16.
+  // --------------------------------------------------------------------------
+  // WHY K=128 AND NOT K=64: the K=64 fp4 case (the user's ★ primary call above)
+  //   has kTiles = K/kPerBeat = 64/64 = 1, so alignment clause (S2) is satisfied
+  //   *vacuously* ("OR kTiles == 1"). K=128 gives kTiles = 2, which is the
+  //   smallest K where (S2) has to hold on its own merit (kTileStride % 4 == 0)
+  //   rather than by the kTiles==1 escape hatch. It is therefore the only case
+  //   in the 4-suite whitelist that exercises ALL THREE clauses non-degenerately.
+  // ALIGNMENT CONTRACT (S0)(S1)(S2) -- independent derivation for this geometry.
+  //   Source of truth: src/hive/doc/problem.md section "#146 · 裁定 4" and
+  //   HiveCoreCalcConfig.scaleXRowAddressOffset / scaleXColTileAddressOffset:
+  //     rowStride   = K / blk                      [bytes, scale tensor is dense]
+  //     kTileStride = kLoadNum / blk,  kLoadNum = getKLoadNum(fmt)
+  //                 = totalN * elemsPerLane(fmt) = 16 * 4 = 64   (MXFP4)
+  //     kTiles      = K / kLoadNum
+  //     addr(row,kt) = BASE + row*rowStride + kt*kTileStride, one 32-bit read
+  //   Substituting K=128, blk=16, fmt=MXE2M1 (a and b sides identically):
+  //     (S0) BASE % 4 == 0:  SA_BASE=0x00300000, SB_BASE=0x00400000 -> both %4==0  SATISFIED
+  //     (S1) rowStride % 4 == 0:  rowStride = 128/16 = 8,  8 % 4 == 0             SATISFIED
+  //          (equivalently K % (4*blk) == 0 -> 128 % 64 == 0; also exactly what
+  //           hardware errCode 8 already enforces for fp4, so (S1) can never be
+  //           violated by any fp4 config that gets past the config check)
+  //     (S2) kTileStride % 4 == 0:  kTileStride = 64/16 = 4,  4 % 4 == 0           SATISFIED
+  //          and this time NOT via the "OR kTiles==1" escape: kTiles = 128/64 = 2,
+  //          so kt=1 really does add 4 bytes -> every scale read address is
+  //          0,4,8,... i.e. 4-aligned for every (row,kt) pair.
+  //   ==> RESIDUAL: NONE. This is the first whitelist config with zero (S0)(S1)(S2)
+  //   residual. Contrast the #146 blk16 net above (MXE5M2, fp8): kTileStride =
+  //   32/16 = 2 -> (S2) is violated at kt=1 and, per problem.md ④, is UNSOLVABLE
+  //   for any MXFP8 K (that residual stays registered as an open item; it is not
+  //   touched here).
+  // GEOMETRIC LEGALITY (mirrors hwErrCode / validate, all derived not hard-coded):
+  //   aBlk=bBlk=16 <= kLoadNum(MXE2M1)=64  (errCode 0)
+  //   K % kLoadNum = 128 % 64 = 0          (errCode 8, fp4 divisibility)
+  //   K % blk = 128 % 16 = 0               (validate)
+  //   cBlk=16 <= totalN=16 and 16 % 16 = 0 (errCode 0 / cAddrSeqDense require)
+  //   N=32 even                            (errCode 6, mxfp4 nibble packing)
+  //   aFmt==bFmt==MXE2M1 -> no MX4xMX8 mix (errCode 3), loadW auto-derived = 1 (errCode 4)
+  // SENSITIVITY: with K=128 and blk=16 there are K/blk = 8 scale blocks per A row
+  //   (vs 4 at K=64), so scaleExpA/scaleExpB vary the exponent over 8 distinct
+  //   block indices instead of 4 -> the lane<->K-block mapping and the kTile axis
+  //   are both falsifiable across TWO kTiles rather than one.
+  // NOTHING ELSE CHANGED: M/N, formats, blks, addrMode, seed, rnd and cfg are
+  //   identical to the ★ primary fp4 call, so a red here is attributable to the
+  //   K axis (kTiles 1 -> 2) alone. The ★ primary call at the top of this file and
+  //   the #146 registration above are both left byte-for-byte untouched.
+  // ══════════════════════════════════════════════════════════════════════════
+  runCase(m = 32, n = 32, k = 128, aFmt = DataFormat.MXE2M1, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.MXE2M1,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, wave = "sim/debug/quick_k128_fp4.fst",
+          caseTag = " [#151 K128 fp4 blk16 S0S1S2]")
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // (#155 m3) FOURTH / FIFTH permanent registrations -- DIRECTED ROUNDING (RDN / RUP).
+  // --------------------------------------------------------------------------
+  // ★★★ READ THIS BEFORE DELETING THEM AS "REDUNDANT". A plain hw-vs-golden code
+  //   comparison CANNOT see the class of bug these two are registered for; the
+  //   only reason they are green today is that a THIRD, independent decision path
+  //   was added inside the golden model (#151 F4b), and that path only produces a
+  //   non-trivial verdict when the rounding mode is directed.
+  //
+  // THE DEFECT CLASS (why RNE, the default of every other case here, is blind):
+  //   For MXFP4 output (cFmt=MXE2M1) the quantizer must decide whether a value
+  //   that lands inside/below the smallest representable grid point collapses to
+  //   a SIGNED ZERO. Under RNE that decision is made by magnitude tie-breaking,
+  //   so hw and golden agree on the magnitude axis and any sign-side mistake is
+  //   masked by the fact that +0 and -0 both compare "zero". Under a DIRECTED
+  //   mode the collapse is one-sided by definition (RDN always rounds toward
+  //   -inf, RUP always toward +inf), so the sign of the produced zero is a real
+  //   function of the mode: RDN produces -0 and RUP produces +0 in regions where
+  //   the reference value has the OPPOSITE sign. That is exactly where a golden
+  //   model that derives its "is this a zero region" verdict from its own
+  //   expected-code sign bit (instead of from the fp64 reference sign) becomes
+  //   self-confirming: it computes the sign, then asks "does my sign match my
+  //   sign" and answers yes. #155 Ryan N1 changed that argument from `expNeg`
+  //   to `ref < 0.0` precisely to break the loop -- but the break is only
+  //   OBSERVABLE under directed rounding. Under RNE the two arguments coincide.
+  //
+  // EVIDENCE THAT hw-vs-golden IS NOT ENOUGH (measured, #151 F4b, this exact
+  //   geometry M=32 N=32 K=64 fp4 blk16 MAT seed=1234, rnd=2=RDN):
+  //     · BEFORE the fix, the analytic-zero-region path disagreed with the
+  //       expected-magnitude path on 54 elements out of 1024
+  //       (归零判据命中=195, 双路交叉自证不一致=54, first hit C(2,1) ref=-0.5
+  //       expScale=129 hwScale=129), and the run was STILL "mismatch=0/1024":
+  //       the hardware code histogram and the golden code histogram were
+  //       identical code-for-code. Nothing in a hw-vs-golden comparison was red.
+  //     · AFTER the fix: 归零判据命中=141 (195-141 = 54 exactly), 不一致=0,
+  //       TierA=1024 TierB=0, mismatch=0/1024.
+  //   So the ONLY thing that ever went red for this defect class was the
+  //   cross-check counter inside the golden model, and it only had teeth under
+  //   RDN. Keeping RDN/RUP resident is what keeps that counter exercised on
+  //   every regression run instead of only when someone remembers to flip rnd.
+  // RUP is registered as the mirror arm: it is the same one-sided collapse with
+  //   the sign inverted, so a fix that is accidentally asymmetric (e.g. only
+  //   handles -0) shows up there and not in RDN.
+  // MEASURED (build/155_quickspec_5tests.log, 5/5 green, this registration):
+  //   归零判据命中 = 144 (RNE, the ★ primary call) / 141 (RDN) / 131 (RUP);
+  //   双路交叉自证不一致 = 0 in all three; TierA=1024 TierB=0; mismatch=0/1024;
+  //   cycles=165; regs7=0x00000555 (RNE) / 0x00002555 (RDN) / 0x00003555 (RUP) --
+  //   bits[14:12] carry the mode, so the register readback alone proves the mode
+  //   reached the hardware; maxAbsErr = 1.163e+01 / 1.450e+01 / 1.544e+01.
+  //   The three 归零判据命中 counts being pairwise DIFFERENT is intended and is
+  //   the positive evidence that rnd actually reaches the golden quantizer (if a
+  //   future change silently drops the mode, all three collapse to one number).
+  //   RDN's 141 reproduces the #151 F4b post-fix figure exactly.
+  // WHAT IS AND IS NOT CHANGED vs the ★ primary fp4 call:
+  //   identical: M=32 N=32 K=64, MXE2M1 x MXE2M1 -> MXE2M1, blk 16/16/16,
+  //     addrMode=MAT, seed=1234, strictAddr=true, maxCycles, cfg (hasMx4=true).
+  //   changed: rnd (0=RNE -> 2=RDN / 3=RUP), wave target, caseTag.
+  //   ⟹ a red here is attributable to the rounding axis ALONE.
+  // GEOMETRIC LEGALITY: unchanged from the ★ primary call, which is itself
+  //   checked by hwErrCode / precheckConfigErr before every run -- rounding mode
+  //   is not an input to any of errCode 0/3/4/5/6/8, so the config verdict stays
+  //   "legal" and both cases take the positive golden-comparison path.
+  // rnd reaches BOTH sides from one source: DebugParams.rnd is written into
+  //   regs(7) bits[14:12] (hardware) and passed to the golden quantizer, so hw
+  //   and anchor cannot drift apart on the mode.
+  // caseTag is mandatory here: without it these two would build the SAME test
+  //   name as the ★ primary call (m/n/k/formats/blks/addrMode all equal) and
+  //   ScalaTest would abort the whole suite at construction time with
+  //   DuplicateTestNameException (see the caseTag comment inside runCase).
+  //   The tags below are distinct from each other and from " [#146 blk16 net]"
+  //   and " [#151 K128 fp4 blk16 S0S1S2]".
+  // ══════════════════════════════════════════════════════════════════════════
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE2M1, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.MXE2M1,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, wave = "sim/debug/quick_rdn_fp4.fst",
+          rnd = RoundingMode.RDN, caseTag = " [#155 RDN fp4 directed-round]")
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE2M1, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.MXE2M1,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, wave = "sim/debug/quick_rup_fp4.fst",
+          rnd = RoundingMode.RUP, caseTag = " [#155 RUP fp4 directed-round]")
+
   // ══ ① 运行前配置体检：镜像 HiveCoreCalcConfig 的 errComb/errCodeComb 裸块（RTL 真实口径）══
   private def kLoadNum(f: DataFormat.Type): Int = if (isMx8(f)) cfg.totalN * 2 else cfg.totalN * 4  // 镜像 getKLoadNum
-  /** Some(code) = 硬件会在 EXECUTE 后直接置 STATUS.err、不进计算。优先级按 RTL 平级 when 的 last-connect 序
-    * （后写覆盖前写 → 源码越靠后优先级越高）。【Fix-7】本镜像现补全 fp4 专属 errCode（7 与
-    * MX4×MX8 的 3），均按 cfg.hasMx4 门控：QuickSpec 默认 cfg（supportedFmts 不含 MXE2M1）
-    * hasMx4=false → 这两支恒不触发，与硬件对该配置根本不 elaborate fp4 分支一致。
-    * 注：MX4×MX8 混配(W4A8)数学/OCP 合法但真数据通路支持列 v2；此处 Some(3) 镜像硬件 Fix-4 的
-    * 【运行期可诊断】守护 when（非永久拒绝），置于 errCode7 之前 → 优先级低于 7、高于 6/5/4/原3/0。 */
-  private def hwErrCode(p: DebugParams): Option[Int] = {
-    val aMx = isMxAny(p.aFmt); val bMx = isMxAny(p.bFmt); var e = Option.empty[Int]
-    if ((aMx && p.aMxBlk > kLoadNum(p.aFmt)) || (bMx && p.bMxBlk > kLoadNum(p.bFmt)) ||
-        (isMxAny(p.cFmt) && p.cMxBlk > cfg.totalN)) e = Some(0)   // RTL 把三个 blk 违约合并成单一 errCode 0
-    if (aMx != bMx) e = Some(3)
-    if ((aMx || bMx) && !p.loadWMode) e = Some(4)
-    if (p.aFmt == DataFormat.FP32 || p.bFmt == DataFormat.FP32) e = Some(5)
-    if (p.cFmt == DataFormat.MXE2M1 && (p.n & 1) == 1) e = Some(6)
-    // 【Fix-4 镜像】MX4×MX8 混配（isMx4(aFmt) ^ isMx4(bFmt)）→ code 3，hasMx4 门控。
-    //   置于 errCode7 之前 → 优先级低于 7、高于 6/5/4/原3/0（镜像硬件 last-connect 序）。
-    if (cfg.hasMx4 && (p.aFmt == DataFormat.MXE2M1) != (p.bFmt == DataFormat.MXE2M1)) e = Some(3)
-    // 【Fix-7】errCode7：fp4(E2M1) v1 强制 mxBlockSize=64，hasMx4 门控。写在【最后】
-    //   = last-connect 最高优先级（镜像硬件 errCode7 在 errComb 裸块最末）。
-    if (cfg.hasMx4 && ((p.aFmt == DataFormat.MXE2M1 && p.aMxBlk != 64) ||
-                       (p.bFmt == DataFormat.MXE2M1 && p.bMxBlk != 64))) e = Some(7)
-    e
-  }
+  /** Some(code) = 硬件会在 EXECUTE 后直接置 STATUS.err、不进计算。
+    * 【P0-2 去双源】原本此处有一份 QuickSpec 私有的 hwErrCode 镜像，与 HiveDebugModel.precheckConfigErr
+    * 互不一致（后者分列 Some(0)/Some(1)/Some(2)、缺 errCode6、优先级 else-if 链首最高）。现已把权威
+    * 镜像提升为 HiveDebugModel.hwErrCode（单一真源，顺序 if 后写覆盖，逐位镜像 RTL last-connect 序），
+    * 本 def 与 precheckConfigErr 均委托它 ⟹ 两份镜像合一、永不再分叉。
+    * Truth order: 3(MX4xMX8 mix) > 8(fp4 K not divisible) > 6 > 5 > 4
+    *   > 3(isAMx^isBMx) > 0. (#146) The former leading `7(fp4 blk!=64)` term is
+    *   GONE -- errCode 7 was deleted in hardware and in HiveDebugModel.hwErrCode
+    *   (it had degenerated into a tautology once MXBlockSize became a 2-level
+    *   {16,32} enum), so code 7 is now free and is not explained below.
+    * (#150→#155) cfg 不再显式传 supportedFmts，但默认集已含 MXE2M1 ⟹ cfg.hasMx4=true
+    *   不变，混配3/8 两支【已 elaborate】（#150 之前的默认 cfg 下 hasMx4=false、
+    *   两支恒不 elaborate）；
+    *   但对本 suite 的【五个】用例仍全部【不触发】（#155 m3 起由 3 条增至 5 条）：
+    *     · fp4 主用例（K=64）与 #155 RDN / #155 RUP 两条（同为 K=64）：a/b 同为 MXE2M1
+    *       ⟹ 不混配（errCode3 假），K=64 被 kLoadNum=64 整除 ⟹ errCode8 假；
+    *     · #151 K128 fp4：a/b 同为 MXE2M1，K=128 % 64 = 0 ⟹ 两支同假；
+    *     · #146 fp8 永久用例：a/b 同为 MXE5M2 ⟹ 不混配，且 hasMx4 门下的 fp4 专属
+    *       errCode8 对 fp8 不适用。
+    *   舍入模式（rnd）不是 errCode 0/3/4/5/6/8 中任何一支的输入 ⟹ RDN/RUP 两条不会
+    *   把体检结论推向负向。实测五条体检结论均为「配置合法」→ 走正向 golden 比对。 */
+  private def hwErrCode(p: DebugParams): Option[Int] = HiveDebugModel.hwErrCode(p, cfg.totalN, cfg.hasMx4)
+
   /** 体检命中时的人类可读原因 + 建议值（取值全部由 cfg/枚举推导，不写死） */
   private def errExplain(p: DebugParams, c: Int): String = c match {
     case 0 => s"MX 块大小超过硬件单拍可装载的 K 元素数 —— aBlk=${p.aMxBlk}（上限 kLoadNum(aFmt=${p.aFmt})=${kLoadNum(p.aFmt)}）、" +
@@ -152,14 +435,27 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
     case 4 => s"MX 输入（aFmt=${p.aFmt}、bFmt=${p.bFmt}）必须 loadWMode=1（B 按 N×K 转置存放），当前为 0。 建议：loadW = Some(1) 或留 None 自动推导"
     case 5 => s"FP32 只能作【输出】格式、不能作 A/B 输入（aFmt=${p.aFmt}、bFmt=${p.bFmt}）。 建议：输入改用 FP16 或 BF16"
     case 6 => s"mxfp4(MXE2M1) 输出要求 N 为偶数（半字节打包），当前 N=${p.n}。 建议：N 改偶数，或 cFmt 换 MXE4M3/MXE5M2"
-    case 7 => s"fp4(E2M1) v1 强制 mxBlockSize=64（OCP-32 属 v2 per-half-pass）—— aFmt=${p.aFmt}/aBlk=${p.aMxBlk}、" +
-      s"bFmt=${p.bFmt}/bBlk=${p.bMxBlk}。 建议：fp4 输入侧 aBlk/bBlk 取 64（=1 kTile=1 pass=1 scale 块，保 Executor 单广播不变式）"
+    // (#146) case 7 removed together with the hardware errCode 7 branch it
+    //   explained ("fp4 forces mxBlockSize=64"). Code 7 can no longer be
+    //   produced by hwErrCode, so it now correctly falls through to the
+    //   `case _` arm below ("unknown errCode, should not happen"). Code 7 is
+    //   free for future allocation; do not re-add an explanation for it unless
+    //   a new hardware check really claims that code.
+    case 8 => s"fp4(E2M1) 输入要求 K 被 kPerBeat(=totalN×4=${cfg.totalN * 4}) 整除 —— 当前 K=${p.k}。 " +
+      s"不整除会让 Executor kTiles=K/${cfg.totalN * 4} 地板除静默丢尾（或 K<${cfg.totalN * 4} 时 16-bit 回绕跑飞）。 " +
+      s"建议：K 取 ${cfg.totalN * 4} 的整数倍（一个 kTile = 一个 64-K scale 块 = 单 pass）"
     case _ => "未知 errCode（不应发生）"
   }
   /** ② 打印体检结论 + 生效配置摘要 + 派生几何（一次打全，便于对着波形看） */
   private def printHealth(p: DebugParams, predicted: Option[Int], plan: Plan): Unit = {
     println(s"[$TAG] ═════════════ HiveCoreQuickSpec 配置体检 ═════════════")
-    println(s"[$TAG] 生效配置: ${p.banner} rnd=${rnd}(sel=${p.rnd}) strictAddr=${p.strictAddr}")
+    // (#155 m3) rnd 的打印源从套件级常量改为按 p.rnd 反查枚举成员：加入 per-case rnd 形参后，
+    //   这行必须反映【本用例实际生效】的舍入模式，否则 RDN/RUP 用例会打出
+    //   "rnd=RoundingMode(0=RNE)(sel=2)" 这种自相矛盾的行（诊断现场直接失真）。
+    //   对既有三条用例（p.rnd 全为 0）打印文本【逐字节不变】：
+    //   RoundingMode.all(0) 与 RoundingMode.RNE 是同一个枚举成员对象 ⟹ toString 相同
+    //   （实测均为 "RoundingMode(0=RNE)"）。
+    println(s"[$TAG] 生效配置: ${p.banner} rnd=${RoundingMode.all(p.rnd)}(sel=${p.rnd}) strictAddr=${p.strictAddr}")
     println(s"[$TAG] 派生几何: totalN=${cfg.totalN} cDmaExtW=${cfg.cDmaExtW} aExtW=${cfg.aExtW} bExtW=${cfg.bExtW} " +
       s"kTiles=${plan.aKTiles} mTiles=${(p.m + cfg.totalN - 1) / cfg.totalN} nTiles=${plan.nTiles} beatsPerRow=${plan.beatsPerRow}；" +
       s"期望 beat A=${plan.expAAddrSeq.size} B=${plan.expBAddrSeq.size} C=${plan.expCAddrSeq.size} sA=${plan.expScaleAAddrSeq.size} " +
@@ -246,9 +542,9 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           bS = rdCh("dmaB", bS, plan.expBAddrSeq, dut.io.dmaB.req.valid.peek().litToBoolean,
             dut.io.dmaB.req.payload.addr.peek().litValue.toLong, rdB, plan.beatAtB)
           saS = rdCh("dmaScaleA", saS, plan.expScaleAAddrSeq, dut.io.dmaScaleA.get.req.valid.peek().litToBoolean,
-            dut.io.dmaScaleA.get.req.payload.addr.peek().litValue.toLong, rdSA, plan.byteAt)
+            dut.io.dmaScaleA.get.req.payload.addr.peek().litValue.toLong, rdSA, plan.wordAt)
           sbS = rdCh("dmaScaleB", sbS, plan.expScaleBAddrSeq, dut.io.dmaScaleB.get.req.valid.peek().litToBoolean,
-            dut.io.dmaScaleB.get.req.payload.addr.peek().litValue.toLong, rdSB, plan.byteAt)
+            dut.io.dmaScaleB.get.req.payload.addr.peek().litValue.toLong, rdSB, plan.wordAt)
           /** 写通道统一驱动：req.valid 拍记录 (addr,data) + 地址对账（scaleC 传空序列即自动跳过对账） */
           def wrCh(ch: String, i: Int, exp: Seq[Long], on: Boolean, ad: => Long, da: => BigInt,
                    ack: Boolean => Unit, log: mutable.ArrayBuffer[(Long, BigInt)]): Int =

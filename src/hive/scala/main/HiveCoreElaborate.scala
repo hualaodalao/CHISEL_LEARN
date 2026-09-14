@@ -7,10 +7,21 @@
   *                           顶层暴露 dmaScaleA/dmaScaleB 并例化 scaleA/scaleB DMA；但 scale 通路
   *                           由运行期 isMx(regFile.aFmt) 门控，非 MX 运行时不启动、行为与
   *                           无 MX 硬件逐拍一致。
+  *                           (#155 MJ1) 默认集自本轮起含 7 种格式（追加 MXE2M1）⟹ hasMx4=true，
+  *                           本套产物同样长出 fp4 quad-lane 硬件（旧「不含 fp4」陈述已作废）。
   *   - src/hive/verilog_mx/  MX 仿真对齐配置（aW=bW=16, cW=40，深度 2048/256，
-  *                           supportedFmts 显式仅含 MX 双格式）。同样 hasMx=true。
-  *                           【注意】两套产物 hasMx 均为 true 且 aW/bW 均为 16，
-  *                           差异退化为缓冲深度与 supportedFmts，而非 hasMx。
+  *                           supportedFmts 显式为 MX-only 三格式 MXE4M3/MXE5M2/MXE2M1）。
+  *                           同样 hasMx=true 且 hasMx4=true。
+  *                           (#155 MJ1) 订正：原文写「supportedFmts 显式仅含 MX 双格式」「差异
+  *                           退化为缓冲深度与 supportedFmts」——前半句已作废（新 require
+  *                           (!hasMx8 || hasMx4) 强制 fp8-only 非法，故 cfgMx 必须含 MXE2M1）；
+  *                           后半句仍成立但内容变了：与基线的 supportedFmts 差异现在是
+  *                           「MX-only 三格式 vs 默认七格式」（⟹ 本套 hasFp=hasInt=false），
+  *                           加上缓冲深度差异。
+  *                           ★另：cfgMx 与 cfgMxFp4 现为全 12 字段相同 ⟹ verilog_mx 与
+  *                           verilog_mxfp4 是同一配置的重复交付面（本轮不删不合并，
+  *                           建议见 build/155 报告）。
+  *                           【注意】两套产物 hasMx 均为 true 且 aW/bW 均为 16。
   *
   * 【对外破坏性变更（MXFP8 v2 SIMD 升级）】verilog_mx 产物 dmaA/dmaB 数据位宽由
   * 128 位 → 256 位（aExtW/bExtW = totalN*aEffW = 16×16）。基线 verilog/（本就 aW=16）
@@ -72,7 +83,11 @@
   *
   * 【P3b MX 量化输出扩展留痕（声明区；重发射在验证阶段统一做，本阶段仅注释）】
   *   - 【端口变更】两套产物（hasMx）新增 dmaCScale 写通道端口（7 信号：
-  *     rsp.valid/ready/err + req.valid/ready/addr/data，位宽 = cScaleRowW = totalN/8 字节），
+  *     rsp.valid/ready/err + req.valid/ready/addr/data，位宽 = cScaleRowW
+  *     = (totalN/minBlockSize)*8 = totalN/2 **bit** = totalN/16 **字节**；totalN=16 时 8 bit。
+  *     (#155 MJ2) 订正：原文写「cScaleRowW = totalN/8 字节」，与实际相差 2 倍
+  *     （minBlockSize=16 而非 8；且原式漏了 bit/字节 量纲），
+  *     同类 2× 错另见 HiveCoreDmaWrOnly 类头与 HiveOutCvt scaleRow 注释，均已一并订正），
   *     顶层端口总数 47 → 54；非 MX 配置不暴露。dmaCScale 基址 = regs(11) cScaleAddr，
   *     仅量化输出（regs(7)(13,11) 100=E4M3/101=E5M2/110=E2M1）运行时启动，非量化运行死路。
   *   - 【对外软件契约变更】量化启用时 C 内存布局改为密集 1B/元素（mxfp8）或 0.5B/元素
@@ -125,14 +140,25 @@ object HiveCoreElaborate extends App {
   )
 
   // MX 仿真对齐配置：与 HiveCoreSimCaseMxSpec 的 HiveCoreConfig 对齐（aW=bW=16, cW=40，
-  // supportedFmts 显式仅含 MXE4M3/MXE5M2 → hasMx=true）。scale buffer 深度给足以匹配用例。
-  // 与基线的差异仅在 supportedFmts 与缓冲深度（两者 hasMx 均真、aW/bW 均为 16）。
+  // scale buffer 深度给足以匹配用例）。
+  // (#155 MJ1) 订正：原文写「supportedFmts 显式仅含 MXE4M3/MXE5M2」「与基线的差异仅在
+  //   supportedFmts 与缓冲深度」——两句自本轮起都不再成立。本轮把 MXE2M1 升格为 HiveCoreConfig
+  //   的默认必选，并新增 require(!hasMx8 || hasMx4)，故 cfgMx 必须显式追加 MXE2M1，否则
+  //   本 App 在【构造 val cfgMx 这一行】就抛 IllegalArgumentException，连带 cfgBase / cfgMxFp4
+  //   的发射全部无法进行（Scala object 体顺序求值，一个 val 抛 ⟹ 整个 emit 入口废掉）。
+  //   ⟹ 这不是可选的清理，是裁定 1.3「全仓构造点逐一对齐」的硬前提。
+  //   追加后 cfgMx 与 cfgMxFp4 的【全 12 个字段逐一相同】（case class == 为 true，含
+  //   scaleBufferDepth=256）⟹ verilog_mx 与 verilog_mxfp4 变成同一配置的重复交付面。
+  //   本轮【不删不合并】任何 cfg / emit 入口（需用户裁定），仅在 build/155 报告登记并给建议。
+  //   与 cfgBase 的差异现在只剩缓冲深度（32/32/32 vs 2048/2048/2048 与 scaleBufferDepth
+  //   64 vs 256），supportedFmts 已与 cfgBase 的默认集不同（cfgMx 是 MX-only 三格式，
+  //   cfgBase 是默认七格式）⟹ hasFp/hasInt 在 cfgMx 下为 false。
   // aW/bW=16 满足新 require（hasMx ⇒ aW>=16 && bW>=16）：v2 SIMD 双元素/拍需要 16-bit lane。
   val cfgMx = HiveCoreConfig(
     arrayN = 8,
     clusterM = 2,         // totalN = 16
     aW = 16, bW = 16, cW = 40,
-    supportedFmts = Set(DataFormat.MXE4M3, DataFormat.MXE5M2),
+    supportedFmts = Set(DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1),
     aBufferDepth = 2048,
     bBufferDepth = 2048,
     cBufferDepth = 2048,
@@ -144,17 +170,42 @@ object HiveCoreElaborate extends App {
   //   · HiveWorkUnit 内 fp4 quad-lane 通路（8×HiveCvtOpMx + 4 级 HiveMacFpMx 左结合级联，
   //     16-bit lane 打包 4 个 4-bit nibble：io.a(3,0)=k+0 … io.a(15,12)=k+3），运行期
   //     Mux(isMx4(aFmt), quadResult, dualLaneMx()) 选择；
-  //   · HiveCoreCalcConfig：colTile 走 bits 口径（totalN×elemsPerLane×memElemBits/8=32）、
-  //     errCode7（fp4 输入强制 mxBlockSize=64，否则运行期拒绝）；
+  //   · HiveCoreCalcConfig: colTile uses the bits-based formula
+  //     (totalN x elemsPerLane x memElemBits/8 = 32), plus the fp4-only runtime
+  //     guards errCode 8 (K not divisible by kPerBeat) and the Fix-4 mix
+  //     errCode 3 (isMx4(aFmt) ^ isMx4(bFmt)).
+  //     (#146) The former errCode 7 ("fp4 forces mxBlockSize=64") has been
+  //     DELETED: the MXBlockSize enum was narrowed to {M16=0, M32=1}, so its
+  //     `getBlockSize() =/= 64.U` predicate was a tautology that rejected every
+  //     fp4 run unconditionally and silently. fp4 now accepts blk in {16, 32}
+  //     exactly like fp8, and errCode 7 is free again.
   //   · HiveCoreExecutor2：kTile 分母泛化为 /elemsPerLane（fp4=4）。
   // require 全部满足：totalN=8×2=16、aW=bW=16(>=16)、cEffW=max(40,16)=40(>=40)、
   //   cDmaExtW=256 默认（isPow2、totalN*32=512 整除、[128,512] 区间、totalN*4=64<=256）、
   //   cBufferDepth=2048>=2*totalN=32。
-  // fp4 mxBlockSize（aMxBlockSize/bMxBlockSize）= 64 是【运行期寄存器】(regs(6) bits(25,24)/(23,22)
-  //   =M64=3)，由仿真用例写入；此处配置层无该字段，仅靠 supportedFmts 含 MXE2M1 打开 hasMx4 通路。
-  // 【关键约束·零扰动基线】发往独立新目录 src/hive/verilog_mxfp4/，绝不覆盖 verilog/verilog_mx
+  // fp4 mxBlockSize (aMxBlockSize/bMxBlockSize) is a RUNTIME register field
+  //   (regs(6) bits(25,24) / bits(23,22)), written by the simulation case; the
+  //   encodable values are only sel=0 -> 16 bytes and sel=1 -> 32 bytes (the
+  //   former 4-level 8/16/32/64 enum was narrowed to 2 levels, so "=M64=3" no
+  //   longer exists). The config layer has no such field; hasMx4 is opened
+  //   purely by supportedFmts containing MXE2M1.
+  // 【#155 MJ1：旧「关键约束·零扰动基线」契约已由用户主动作废】
+  //   旧契约原文：「发往独立新目录 src/hive/verilog_mxfp4/，绝不覆盖 verilog/verilog_mx
   //   两套回归锚点；cfgBase/cfgMx 的 supportedFmts 未变（不含 MXE2M1 ⟹ hasMx4=false），
-  //   其门控解析出的硬件结构逐位不变 ⟹ 两套基线 normalized-diff=0 不受本配置加入的扰动。
+  //   其门控解析出的硬件结构逐位不变 ⟹ 两套基线 normalized-diff=0 不受本配置加入的扰动。」
+  //   作废理由：本轮把 MXE2M1 升格为 HiveCoreConfig 的默认必选（cfgBase 走默认集 ⟹ 自动含
+  //   MXE2M1），cfgMx 亦按裁定 1.3 显式追加 MXE2M1 ⟹ 「cfgBase/cfgMx 的 supportedFmts 未变」
+  //   与「hasMx4=false」两个前提同时失效。
+  // 【仍然成立的部分】发往独立目录 src/hive/verilog_mxfp4/、绝不覆盖 verilog/verilog_mx
+  //   这条目录隔离约束【不变】（重发射时仍需三套并存以便对照）。
+  // 【新基线预期（供 #142 重发射时对照）】三套 cfg 现在 hasMx4 全为 true ⟹ fp4 支路一律
+  //   elaborate。预期非零 diff 的模块：Hive_HiveOutCvt.sv（q2Seq/packed4/次正规与深下溢臂
+  //   全部无门控）、Hive_HiveWorkUnit.sv 与 Hive_HiveMacFpMx.sv（fp4 quad-lane 通路 +
+  //   运行期 Mux(isMx4, quad, dualLane)）、HiveCoreCalcConfig 侧 elemsPerLane 2-bit→3-bit
+  //   与 errCode 8 / Fix-4 errCode 3 两支运行期守护。三套产物之间不再有 normalized-diff=0
+  //   关系；数值正确性改由 TB 侧金锚（OCP MX / IEEE-754 独立推导）+ 归一化 stdout 基线守护。
+  // ★cfgMx ≡ cfgMxFp4（全 12 字段逐一相同）⟹ verilog_mx 与 verilog_mxfp4 将是同一配置的
+  //   重复交付面。本轮不删不合并（需用户裁定），建议见 build/155 报告。
   val cfgMxFp4 = HiveCoreConfig(
     arrayN = 8,
     clusterM = 2,         // totalN = 16

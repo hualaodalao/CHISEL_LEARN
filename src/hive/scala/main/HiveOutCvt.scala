@@ -123,7 +123,7 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   private val lineReg   = RegInit(0.U((cfg.totalN * cfg.cEffW).W))      // 行数据寄存器（确定初值 0，仿真无 X）
   private val fmtReg    = RegInit(DataFormat.FP32)                      // 锁存 outFmt（默认 fp32；DataFormat.Type）
   private val rndReg    = RegInit(RoundingMode.RNE)                     // 锁存舍入模式
-  private val blkReg    = RegInit(MXBlockSize.M8)                             // 锁存量化块大小（默认 8）
+  private val blkReg    = RegInit(MXBlockSize.M16)                             // 锁存量化块大小（默认 16）
   private val nEffReg   = RegInit(cfg.totalN.U(log2Up(cfg.totalN + 1).W))  // 锁存有效列数（默认全行）
   // 量化行子态：out 已交付但 scaleOut 未提交（out.valid 撤、scaleOut.valid 保持）
   private val dataDone  = RegInit(false.B)
@@ -355,9 +355,7 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   private val amax32: Seq[UInt] = mergeMax(amax16)
   private val amax64: Seq[UInt] = mergeMax(amax32)
   // 第 i 列所属量化块的 amax（按 blkSel 选层；totalN=16 时 32/64 层退化为全行共享）
-  private def elemAmax(i: Int): UInt = Mux(blkReg === MXBlockSize.M8, groupAmax(i / 8),
-    Mux(blkReg === MXBlockSize.M16, amax16(i / 16),
-      Mux(blkReg === MXBlockSize.M32, amax32(i / 32), amax64(i / 64))))
+  private def elemAmax(i: Int): UInt = Mux(blkReg === MXBlockSize.M16, amax16(i / 16), amax32(i / 32))
 
   // --- E8M0 块共享 scale（推导见上方分区注释；纯指数域组合逻辑） ---
   private def blockScale(amax: UInt, p: MxFormatParams): UInt = {
@@ -384,7 +382,18 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   //        p.satCode 饱和（最大有限值）编码（不含符号位）；p.nanCode nan 映射编码；
   //        p.nanToSat nan 输入饱和处理（E2M1 无 nan 编码的裁定）；
   //        p.fixNanCode 舍入落入 NaN 编码时改写为饱和（仅 E4M3：exp 全1 mant 全1）
-  private def quantElem(x: UInt, s: UInt, rnd: RoundingMode.Type, p: MxFormatParams): UInt = {
+  // @param emitSub (#151 F4) 是否产出【次正规码】。这是 Scala 形参、在 elaborate 期求值：
+  //        emitSub=false（E4M3/E5M2 的例化点，即 q4Seq/q5Seq）时下方次正规臂的代码
+  //        【根本不进入 Chisel builder 上下文】——不是「生成了硬件但运行期不走」，而是
+  //        【一个门都不生成】，故这两路的电路与 #151 之前逐位相同。
+  //        emitSub=true 仅在 q2Seq（E2M1）例化点传入。理由：OCP MX 规范把 E2M1 的
+  //        e=0/m=1 定义为合法可编码值 ±0.5（次正规），而原实现把 eTgt<1 一律冲刷成
+  //        保号零 ⟹ 码 0x1/0x9 永不发射、16 个码里 2 个是死码，且 E2M1 的 minNormal=1.0
+  //        使冲刷阈值高达 amax/4（实测 45.5% 的 C 元素退化为 ±0）。E4M3/E5M2 的冲刷阈值
+  //        分别是 amax/2^14 与 amax/2^29，实际不触发，且其 OCP 次正规行为属独立待裁项，
+  //        本轮【不扩大范围】。
+  private def quantElem(x: UInt, s: UInt, rnd: RoundingMode.Type, p: MxFormatParams,
+                        emitSub: Boolean = false): UInt = {
     val sign = x(31)
     val e    = x(30, 23)
     val man  = x(22, 0)
@@ -411,17 +420,84 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
     // 指数减：÷ 2^(s-127) ⟺ 目标偏置指数 = e + bias - s（有符号比较防绕回）
     val eTgt   = (Cat(0.U(1.W), e).asSInt + p.bias.S) - Cat(0.U(1.W), s).asSInt
     val eRnd   = eTgt + Mux(mCarry, 1.S, 0.S)
-    val underflow = eTgt < 1.S                // 低于目标最小正规格化 → 保号 ±0（无次正规产出）
+    val underflow = eTgt < 1.S                // 低于目标最小正规格化（emitSub=true 时由次正规臂细化）
     val overflow  = eRnd > p.maxCodeExp.S     // 舍入后溢出 → 饱和到最大有限值（保号）
     // E4M3 专属修正：舍入落到 (exp 全1, mant 全1) = NaN 编码时改写为饱和值 0x7E（448），
     // 与「饱和到最大有限值」裁定一致（正常值域内不可能产出 NaN 编码）
     val nanFix = p.fixNanCode.B && (eRnd === p.maxCodeExp.S) && (manFin === ((1 << p.mantW) - 1).U(p.mantW.W))
     val normal = Cat(sign, eRnd.asUInt(p.expW - 1, 0), manFin)
 
-    Mux(isZero || underflow, signedZero,
-      Mux(isInf, satFull,                     // inf → 饱和最大有限值（目标格式无 inf 编码或裁定饱和）
-        Mux(isNan, Mux(p.nanToSat.B, satFull, nanFull),
-          Mux(overflow || nanFix, satFull, normal))))
+    // (#151 F4) 以下 Mux 链与改动前【逐字相同】，只是被命名为 normalPath 以便次正规臂复用。
+    //   emitSub=false 时它就是 quantElem 的返回值 ⟹ E4M3/E5M2 行为与电路零变化。
+    val normalPath =
+      Mux(isZero || underflow, signedZero,
+        Mux(isInf, satFull,                     // inf → 饱和最大有限值（目标格式无 inf 编码或裁定饱和）
+          Mux(isNan, Mux(p.nanToSat.B, satFull, nanFull),
+            Mux(overflow || nanFix, satFull, normal))))
+
+    if (!emitSub) normalPath
+    else {
+      // ====================================================================
+      // (#151 F4) OCP MX 次正规产出臂 —— 仅 E2M1 例化（emitSub=true）
+      // ====================================================================
+      // 推导（完整表格见 build/151 报告 §F4）：设 y = |x| / S，S = 2^(s-127)，则
+      //   y = 1.f × 2^(eTgt-1)，其中 eTgt = e + bias - s、f = 0.man（23 位）。
+      // E2M1（bias=1, mantW=1）的非负值集 = {0, 0.5, 1, 1.5, 2, 3, 4, 6}，其中
+      //   码 (e=0,m=1) = 0.m × 2^(1-bias) = 0.5 是【次正规】，OCP 认定为一等公民。
+      // 次正规区覆盖两个 binade：
+      //   eTgt = 0  → y ∈ [0.5, 1.0)  网格 {0.5, 1.0}   中点 0.75
+      //   eTgt = -1 → y ∈ [0.25, 0.5) 网格 {0,   0.5}   中点 0.25
+      //   eTgt ≤ -2 → y < 0.25       幅值对称模式(RNE/RTZ/RMM) → ±0；定向模式见下方 F4-b 臂
+      // 统一手法：把有效位 1.f 右移 shift = 1 - eTgt 位后按 mantW 位舍入 ——
+      //   shift=1: keep = 1(原隐含位), guard = man(22),    sticky = man(21,0).orR
+      //   shift=2: keep = 0,           guard = 1(原隐含位), sticky = man(22,0).orR
+      // 之后复用与正规臂【同一个】roundUpN ⟹ RNE/RTZ/RDN/RUP/RMM 五种模式自动一致，
+      // 无双源。进位（keep+up == 2）表示溢出到最小正规值 1.0 = 码 (e=1,m=0)。
+      // tie-to-even 自证：y=0.75 → keep=1,guard=1,sticky=0,lsb=1(奇) → up=1 → 码(1,0)=1.0（偶）✓
+      //                   y=0.25 → keep=0,guard=1,sticky=0,lsb=0(偶) → up=0 → 码(0,0)=0（偶）✓
+      require(p.expW == 2 && p.mantW == 1,
+        "quantElem(emitSub=true): the subnormal arm below is derived for E2M1 ONLY " +
+        "(its keep/guard/sticky shift amounts hard-code mantW==1 and a 2-binade subnormal " +
+        s"region). Got expW=${p.expW} mantW=${p.mantW}. Enabling subnormal output for " +
+        "E4M3/E5M2 needs its own derivation and is a separate, still-open decision.")
+      val isSh1     = eTgt === 0.S                       // shift=1；否则（subSel 为真时）shift=2
+      val subKeep   = Mux(isSh1, 1.U(1.W), 0.U(1.W))
+      val subGuard  = Mux(isSh1, man(22), 1.U(1.W))
+      val subSticky = Mux(isSh1, man(21, 0).orR, man.orR)
+      val subUp     = roundUpN(p.mantW, rnd, subGuard.asBool, subSticky, subKeep(0), sign)
+      val subRnd    = subKeep +& subUp                   // 2-bit，bit(1) = 进位到最小正规
+      val subCarry  = subRnd(1)
+      val subCode   = Cat(sign,
+                          Mux(subCarry, 1.U(p.expW.W), 0.U(p.expW.W)),
+                          Mux(subCarry, 0.U(p.mantW.W), subRnd(p.mantW - 1, 0)))
+      // 次正规臂仅在 eTgt ∈ {0,-1} 且非特殊值时接管；其余一律回落 normalPath
+      //（eTgt ≥ 1 走正规舍入，eTgt ≤ -2 走 underflow → 保号零）。
+      val subSel    = (isSh1 || eTgt === (-1).S) && !isZero && !isInf && !isNan
+      // ====================================================================
+      // (#151 F4-b) 定向舍入（RDN/RUP）在【深下溢】eTgt ≤ -2（y' < 0.25）时的进位臂
+      // ====================================================================
+      // 为什么需要：IEEE-754 roundTowardNegative / roundTowardPositive 的定义是「取不超过 /
+      //   不低于 x 的【最接近】可表示值」，它不是幅值截断。E2M1 的非零最小幅值是 0.5，故对
+      //   任意非零 x，只要定向把幅值推离零，结果就必须是 ±0.5 = 码 (e=0,m=1)，【不是】保号零：
+      //     RDN(2) 且 sign=1（x<0）→ -0.5·S      RUP(3) 且 sign=0（x>0）→ +0.5·S
+      //   normalPath 的 underflow 分支对这两个模式是【错的】：它把 y'<0.25 一律冲刷成 ±0，
+      //   等价于在该区间偷偷退化成 RTZ，违背定向舍入语义。这是 F4 放开 E2M1 次正规产出后
+      //   暴露出的存量缺陷（改前 E2M1 根本不产出任何次正规码，±0.5 恒为死码，缺陷不可见）。
+      // 为什么只影响 RDN/RUP：RNE/RTZ/RMM 三个【幅值对称】模式在 y' < 0.25 时归零是正确的
+      //   （RNE：0 比 0.5 更近；RTZ：截断；RMM：最近-ties-away，0 更近）⟹ dirAway 恒 false
+      //   ⟹ deepSel 恒 false ⟹ 这三个模式的码流与本臂加入前【逐位相同】。
+      // 残留（如实记录，不在本轮修）：isZero（e===0，含 fp32 输入次正规）仍一律 FTZ 保号零，
+      //   即「输入侧 fp32 次正规冲刷」是硬件族既有语义，与输出域次正规产出是两件事。
+      // 保护：本臂同样位于 emitSub=true 分支内，受上面 require(expW==2 && mantW==1) 约束
+      //   ⟹ E4M3/E5M2 elaboration 期就不进入本分支，一个门都不生成。
+      val dirAway: Bool = MuxLookup(rnd, false.B)(Seq(
+        RoundingMode.RDN -> sign,          // 向 -∞：仅负数增大幅值
+        RoundingMode.RUP -> !sign          // 向 +∞：仅正数增大幅值
+      ))
+      val deepSel   = dirAway && (eTgt < (-1).S) && !isZero && !isInf && !isNan
+      val deepCode  = Cat(sign, 0.U(p.expW.W), 1.U(p.mantW.W))   // ±minSubnormal = ±0.5
+      Mux(deepSel, deepCode, Mux(subSel, subCode, normalPath))
+    }
   }
 
   // 三格式各自例化（静态常量表，字面量收敛为 MxFormatParams 三单例，
@@ -429,14 +505,22 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   private val s4Elem: Seq[UInt] = (0 until cfg.totalN).map(i => blockScale(elemAmax(i), MxFormatParams.E4M3))
   private val s5Elem: Seq[UInt] = (0 until cfg.totalN).map(i => blockScale(elemAmax(i), MxFormatParams.E5M2))
   private val s2Elem: Seq[UInt] = (0 until cfg.totalN).map(i => blockScale(elemAmax(i), MxFormatParams.E2M1))
+  // (#151 F4) q4Seq / q5Seq 的实参列表【逐字未变】——不传 emitSub ⟹ 取默认 false ⟹
+  //   quantElem 内 `if (!emitSub) normalPath` 分支在 Scala/elaborate 期就选定，次正规臂的
+  //   每一行（isSh1/subKeep/subGuard/subSticky/subUp/subRnd/subCarry/subCode/subSel）
+  //   【根本不进入 Chisel builder 上下文】，一个门都不生成。这与「生成了硬件但运行期
+  //   Mux 不走」是两回事：后者会增加电路规模与关键路径，前者电路与 #151 之前逐位相同。
   private val q4Seq: Seq[UInt] = fp32Seq.zip(s4Elem).map { case (x, sc) =>
     quantElem(x, sc, rndReg, MxFormatParams.E4M3)
   }
   private val q5Seq: Seq[UInt] = fp32Seq.zip(s5Elem).map { case (x, sc) =>
     quantElem(x, sc, rndReg, MxFormatParams.E5M2)
   }
+  // (#151 F4) 唯一传 emitSub = true 的例化点：OCP MX 规范把 E2M1 的 (e=0,m=1) = ±0.5
+  //   定义为合法可编码值（次正规），原实现 eTgt<1 一律冲刷成保号零 ⟹ 码 0x1/0x9 永不
+  //   发射（16 码中 2 个死码），且 E2M1 minNormal=1.0 使冲刷阈值高达 amax/4。
   private val q2Seq: Seq[UInt] = fp32Seq.zip(s2Elem).map { case (x, sc) =>
-    quantElem(x, sc, rndReg, MxFormatParams.E2M1)
+    quantElem(x, sc, rndReg, MxFormatParams.E2M1, emitSub = true)
   }
   // outFmt 三选一 + nEff 掩码（列 ≥ nEff 的 padding 元素输出 0：不参与量化产出）
   private val qSelSeq: Seq[UInt] = (0 until cfg.totalN).map { i =>
@@ -452,8 +536,19 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
     Cat(hi, lo)
   })
 
-  // scaleRow：每 8 元素组 1 字节（低组号在低位），按 blkSel 共享同块 scale；
-  // cScaleRowW = nGroups*8，恰无未覆盖高位（更大阵列时未覆盖字节天然 0）
+  // scaleRow：硬件按【8 元素组】算 amax/scale（nGroups = totalN/8），低组号在低位，
+  // 再按 blkSel 把同块的组合并成同一个 scale 字节（fmtScalesAt 的 s16/s32 三级块界）。
+  // (#155 MJ2) 订正本行注释的 2× 错：原文写「cScaleRowW = nGroups*8，恰无未覆盖高位」，
+  //   两个说法都不成立：
+  //     · nGroups*8 = (totalN/8)*8 = totalN **bit** = scaleWire 的宽度（见下方 Cat），
+  //       而 cScaleRowW = (totalN/minBlockSize)*8 = totalN/2 **bit** = totalN/16 **字节**
+  //       （minBlockSize=16）。totalN=16 时 scaleWire=16 bit、cScaleRowW=8 bit ⟹ 差 2 倍。
+  //     · 故 io.scaleOut.bits := scaleWire 是【窄化截断】（16 bit → 8 bit），不是「恰无未覆盖
+  //       高位」。今天良性：nGroups=2 时 g∈{0,1}，s16 取 amax16(g/2)=amax16(0)、
+  //       s32 取 amax32(g/4)=amax32(0)，两字节恒同值 ⟹ 截掉的高字节与留下的低字节逐位相同
+  //       （Ryan §E.2 独立验证）。
+  //   ★爆点见 HiveCoreConfig 的 minBlockSize require：totalN>=32 且 cMxBlk=32 时相邻组不再
+  //     同值，2 倍重叠会静默损坏 C-scale 外部内存布局。
   private def fmtScalesAt(g: Int): Seq[UInt] = {
     // 三级块界各层 scale（同层各组 amax 已合并，字节值与 elemAmax 侧同源一致）
     val fmt8  = Mux(isQE4M3, blockScale(groupAmax(g), MxFormatParams.E4M3),
@@ -472,9 +567,7 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
     val s64 = Mux(isQE4M3, blockScale(amax64(g / 8), MxFormatParams.E4M3),
               Mux(isQE5M2, blockScale(amax64(g / 8), MxFormatParams.E5M2),
                            blockScale(amax64(g / 8), MxFormatParams.E2M1)))
-    Mux(blkReg === MXBlockSize.M8, s8,
-      Mux(blkReg === MXBlockSize.M16, s16,
-        Mux(blkReg === MXBlockSize.M32, s32, s64)))
+    Mux(blkReg === MXBlockSize.M16, s16, s32)
   })
 
   // ==========================================================================

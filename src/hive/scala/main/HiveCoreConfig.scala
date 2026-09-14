@@ -44,7 +44,13 @@ case class HiveCoreConfig(
     aW: Int = 16,
     bW: Int = 16,
     cW: Int = 0,
-    supportedFmts: Set[DataFormat.Type] = Set(DataFormat.FP16, DataFormat.BF16, DataFormat.INT16, DataFormat.INT8, DataFormat.MXE4M3, DataFormat.MXE5M2),
+    // (#155 MJ1) MXE2M1 升格为【默认必选】：用户设计律「有 mxfp8 就有 mxfp4，是必选项」。
+    //   默认集由 6 种（FP16/BF16/INT16/INT8/MXE4M3/MXE5M2）扩为 7 种（追加 MXE2M1）。
+    //   后果：所有【不显式传 supportedFmts】的 cfg（cfgBase、3 个 SimCase、LoadWSpec、MxSpec、
+    //   QuickSpec）hasMx4 由 false 翻 true ⟹ DUT 一律长出 fp4 quad-lane 硬件。这不是可选项：
+    //   下方新增 require(!hasMx8 || hasMx4) 会在 elaborate 前把 fp8-only 配置直接拦死，
+    //   故全仓每一个显式传 supportedFmts 的构造点都必须含 MXE2M1（对齐清单见 build/155 报告）。
+    supportedFmts: Set[DataFormat.Type] = Set(DataFormat.FP16, DataFormat.BF16, DataFormat.INT16, DataFormat.INT8, DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1),
     aBufferDepth: Int = 64, 
     bBufferDepth: Int = 64,
     cBufferDepth: Int = 64,
@@ -67,7 +73,9 @@ case class HiveCoreConfig(
   // --- 派生量 ---
 
   /** PE 总列数 */
-  val totalN: Int = arrayN * clusterM
+  val totalN: Int = arrayN * clusterM //fp16/int16 角度
+  val totalNx2: Int = totalN * 2
+  val totalNx4: Int = totalN * 4
 
   /** A 侧有效位宽 */
   val aEffW: Int = aW
@@ -76,19 +84,34 @@ case class HiveCoreConfig(
   val hasFp: Boolean = supportedFmts.contains(DataFormat.FP16) || supportedFmts.contains(DataFormat.BF16)
 
   /** 是否包含整数格式（用于整数累加位宽约束校验） */
-  val hasInt: Boolean = supportedFmts.contains(DataFormat.INT8) || supportedFmts.contains(DataFormat.INT16)
+  val hasInt: Boolean = supportedFmts.contains(DataFormat.INT4) || supportedFmts.contains(DataFormat.INT8) || supportedFmts.contains(DataFormat.INT16)
 
   /** 是否包含 MX 格式（MXFP8 E4M3 / E5M2）——历史谓词，保留原义供既有外部引用
     * （HiveCore 顶层 dmaScaleA/dmaScaleB 端口与 scale DMA 子模块生成门控等）。 */
-  val hasMx: Boolean = supportedFmts.contains(DataFormat.MXE4M3) || supportedFmts.contains(DataFormat.MXE5M2)
+  val hasMx: Boolean = supportedFmts.contains(DataFormat.MXE4M3) || supportedFmts.contains(DataFormat.MXE5M2) || supportedFmts.contains(DataFormat.MXE2M1)
 
   /** Phase 1：MX 硬件生成谓词收敛。
     *   - hasMx8 = MXFP8（E4M3/E5M2），与 hasMx 定义逐字相同（= 现 hasMx 语义）；
     *   - hasMx4 = MXFP4（E2M1），与 HiveWorkUnit 内同名 private 谓词对齐。
     * 凡「生成 MX 硬件」的判据由 hasMx 改为 (hasMx8 || hasMx4)（新增并列，false 分支逐字保留）。
-    * 【恒等性铁律】对任何不含 MXE2M1 的配置 hasMx4=false，故
-    *   hasMx8 || hasMx4 == hasMx8 == hasMx，取值完全不变 ⟹ 门控解析出的硬件结构逐位不变
-    *   （verilog/verilog_mx 两套基线 normalized-diff=0 的根本保证）。 */
+    * 【#155 MJ1：旧「恒等性铁律」契约已由用户主动作废】
+    *   旧契约原文：「对任何不含 MXE2M1 的配置 hasMx4=false，故 hasMx8||hasMx4 == hasMx8 == hasMx，
+    *   取值完全不变 ⟹ 门控解析出的硬件结构逐位不变（verilog/verilog_mx 两套基线
+    *   normalized-diff=0 的根本保证）」。该契约的前提是「存在不含 MXE2M1 的出厂配置」，
+    *   而本轮已把 MXE2M1 升格为默认必选、并用下方新增 require 强制「supportedFmts 含任一
+    *   MX 格式 ⟹ 必含 MXE2M1」（字面上与上方既有 require 合成 hasMx4 ⟺ hasMx8，但那条既有
+    *   require 实为恒真式，详见其下方注释），前提不再成立 ⟹ 契约作废。
+    * 【新基线预期（供 #142 重发射时对照）】三套发射产物（verilog / verilog_mx / verilog_mxfp4）
+    *   的 cfg 全部 hasMx4=true ⟹ fp4 支路一律 elaborate。预期非零 diff 的模块至少包含：
+    *     · Hive_HiveOutCvt.sv —— q2Seq / packed4 / 次正规与深下溢新臂全部【无门控】
+    *       （MJ1 取证：`grep 'supportedFmts|hasMx|isMx4|nGroups'` 在该文件只命中 :40/:92/:294/:297），
+    *       故只要 hasMx4=true，E2M1 输出支路的门数必然进网表；
+    *     · Hive_HiveWorkUnit.sv / Hive_HiveMacFpMx.sv —— fp4 quad-lane 通路
+    *       （8×HiveCvtOpMx + 4 级 HiveMacFpMx 左结合级联）与运行期 Mux(isMx4, quad, dualLane)；
+    *     · HiveCoreCalcConfig 的 elemsPerLane 由 2-bit 扩为 3-bit、errCode 8 / Fix-4 errCode 3
+    *       两支 fp4 运行期守护进入网表。
+    *   结论：三套产物的【结构】不再有 normalized-diff=0 关系；数值正确性改由 TB 侧金锚
+    *   （OCP MX / IEEE-754 独立推导）+ 归一化 stdout 基线（打印数字逐字节不变）守护。 */
   val hasMx8: Boolean = hasMx  // 语义别名：MXFP8 生成判据，与历史 hasMx 同值，单一真源
   val hasMx4: Boolean = supportedFmts.contains(DataFormat.MXE2M1)
 
@@ -99,9 +122,73 @@ case class HiveCoreConfig(
     s"HiveCoreConfig: MXFP4(E2M1) v1 必须与 MXFP8(E4M3/E5M2) 同时启用" +
     s"（hasMx 仍是 scale DMA 端口与 io.sum 路由主开关，fp4-only 会静默算错），当前 supportedFmts=$supportedFmts")
 
-  /** P3a C 侧量化 scale 行位宽：每 8 元素量化块一个 8-bit E8M0 scale 字节
-    * （HiveOutCvt.scaleRow 输出宽度，P3b dmaCScale 通道行宽同源） */
-  val cScaleRowW: Int = (totalN / 8) * 8
+  // (#155 MJ1) 用户设计律编码为编译期不变式：「有 mxfp8 就有 mxfp4，是必选项」。
+  //   本条与上方 require(!hasMx4 || hasMx8) 在字面上合起来等价于【hasMx4 ⟺ hasMx8】：
+  //     · MX 族要么全在（fp8 与 fp4 同时启用），要么全不在；不存在「只带 fp8」的合法配置。
+  //     · FP-only / INT-only / 无 MX 的配置：hasMx8=false 且 hasMx4=false ⟹ 两条 require
+  //       的前件均为假 ⟹ 都不触发，仍然合法（#155 已用探针实测：{FP16,BF16} /
+  //       {INT16,INT8,INT4} / 空集 三种非 MX 集全部构造成功，见 build/155 报告）。
+  //   ★【#155 实测校正】上方那条 require(!hasMx4 || hasMx8) 其实是【恒真式、从未生效】：
+  //     hasMx8 = hasMx = contains(MXE4M3) || contains(MXE5M2) || contains(MXE2M1)，
+  //     而 hasMx4 = contains(MXE2M1) ⟹ hasMx4=true 必然推出 hasMx8=true，前件恒成立。
+  //     探针实证：supportedFmts={MXE2M1}（fp4-only）构造【成功】、hasMx8=true、hasMx4=true，
+  //     即上方那条拦不住 fp4-only（其注释所称「fp4-only 会静默算错」的兜底并未生效）。
+  //     故本轮真正长牙的不变式是【本条】，其语义可精确改写为：
+  //         supportedFmts 含任一 MX 格式  ⟹  必含 MXE2M1
+  //     （比「有 mxfp8 就有 mxfp4」更强一档，且正是用户设计律的自然推广：MX 族不许残缺）。
+  //     上方那条【逐字保留不动】——保留其意图留痕与历史可追溯性；是否要把它改成真正拦得住
+  //     fp4-only 的判据（例如 require(!hasMx4 || (contains(MXE4M3) || contains(MXE5M2)))）
+  //     属独立事项，需用户裁定，本轮不动。
+  //     ⟹ 请勿因为「上方那条是恒真式」就顺手删掉本条：本条是唯一有牙的那条，删掉即回到
+  //       MJ1 的缺陷面（E2M1 输出支路无门控、三套重发射基线不可控）。
+  //   消息只用 ASCII（firtool 对非 ASCII 断言消息会发射失败）。
+  require(!hasMx8 || hasMx4,
+    "HiveCoreConfig: MXFP8(E4M3/E5M2) requires MXFP4(E2M1) -- per user design rule " +
+    "\"if mxfp8 is supported then mxfp4 is mandatory\". Together with the require above " +
+    "this pins hasMx4 <=> hasMx8 (the MX family is all-in or all-out; FP-only / INT-only / " +
+    "no-MX configs keep both false and stay legal). Current supportedFmts=" + supportedFmts)
+
+  /** P3a C 侧量化 scale 行位宽：每【minBlockSize=16】元素量化块一个 8-bit E8M0 scale 字节
+    * （HiveOutCvt.scaleRow 输出宽度，P3b dmaCScale 通道行宽同源）。
+    * (#155 MJ2) 订正本行注释的 2× 错：原文写「每 8 元素量化块一个字节」，与实际表达式
+    *   `(totalN / minBlockSize) * 8` 相差 2 倍（minBlockSize=16，不是 8）。实际量纲：
+    *     cScaleRowW = (totalN / 16) * 8  =  totalN/2  **bit**  =  totalN/16 **字节**。
+    *   totalN=16 时 ⟹ 8 bit = 1 字节/行。同类 2× 错另有三处，已一并订正：
+    *   HiveOutCvt.scala「cScaleRowW = nGroups*8」、HiveCoreElaborate.scala 与
+    *   HiveCoreDmaWrOnly.scala 的「cScaleRowW = totalN/8 字节」。 */
+  //DMA    
+  val minBlockSize = 16
+
+  // (#155 MJ2) 零 RTL 成本 / 零面积 / 零行为的编译期护栏：把 minBlockSize 与 MXBlockSize
+  //   枚举的【最小档】绑死。MXBlockSize = {M16=0, M32=1} ⟹ 最小档 = 16 << 0 = 16。
+  //   今天这条 require 是恒真式（16 == 16），故对 elaboration 结果零影响；它的价值在于
+  //   日后有人收窄/放宽 MXBlockSize 枚举（历史上它曾是 4 档 8/16/32/64）或改 minBlockSize 时
+  //   立刻在编译期炸，而不是让 cScaleRowW 静默变成 2× 错的端口宽度。
+  // 【为什么必须绑死】cScaleRowW 用的是【编译期常量】minBlockSize，而运行期实际块大小
+  //   cMxBlk 是寄存器字段（16<<blkSel，blkSel∈{0,1}）。二者只在 blkSel=0 时一致：
+  //     · blkSel=1（cMxBlk=32）时，一行 totalN 个元素只该产 totalN/32 个 scale 字节，
+  //       而端口物理宽度仍是 totalN/16 字节 ⟹ 契约前进量与端口宽度相差 2 倍。
+  //     · 今天 totalN=16 时良性（HiveOutCvt 内 nGroups=totalN/8 ⟹ scaleWire 宽 totalN bit，
+  //       :615 io.scaleOut.bits 目标宽 totalN/2 bit，截断掉的高位与低位同属 block16(0)、值相同，
+  //       Ryan §E.2 已独立验证无害）。
+  //     · 爆点：totalN >= 32 且 cMxBlk=32 ⟹ 2 倍重叠，后一拍首字节被前一拍次字节覆盖
+  //       ⟹ C-scale 外部内存布局【静默损坏】，且顶层 dmaCScale.req.payload.data 端口宽度
+  //       对下游 SoC 是 2× 错的。
+  // ★cMxBlk=32 需要 cScaleRowW 随 blkSel 可变（运行期 Mux 或多套行宽）；totalN>=32 之前
+  //   必须先解此耦合。此前唯一守护只在 TB 侧（HiveDebugModel 的 cMxBlk require），属测试期。
+  require(minBlockSize == (16 << MXBlockSize.all.map(_.litValue.toInt).min),
+    "HiveCoreConfig: minBlockSize (" + minBlockSize + ") must equal the smallest encodable " +
+    "MXBlockSize level (16 << " + MXBlockSize.all.map(_.litValue.toInt).min + "), because " +
+    "cScaleRowW = (totalN/minBlockSize)*8 is a COMPILE-TIME port width while the runtime " +
+    "block size cMxBlk = 16<<blkSel is a register field. cMxBlk=32 needs cScaleRowW to vary " +
+    "with blkSel; that coupling must be resolved before totalN>=32 (else the C-scale external " +
+    "memory layout is silently corrupted by 2x overlap).")
+
+  val cScaleRowW: Int = (totalN / minBlockSize) * 8
+  val maxScalePerCyele = totalNx4 / minBlockSize
+  val scaleAW: Int = 8 * maxScalePerCyele
+  val scaleBW: Int = 8 * maxScalePerCyele
+  
 
   /** C 累加器有效位宽（与 HiveComb 推导逻辑一致）。
     * cW==0 自动推导：含浮点或 MX 时至少 40（延迟规格化 {sign,exp8,mant31} 需要），
@@ -140,8 +227,7 @@ case class HiveCoreConfig(
   val registerNumRW: Int = 12
   val registerNum: Int = 12
 
-  //DMA
- 
+
 
   //MNK width
   val mnkWidth: Int = 16

@@ -333,9 +333,9 @@ module Hive_HiveCore(	// src/hive/scala/main/HiveCore.scala:21:7
       regFile_aAddrMode <= 1'h0;	// src/hive/scala/main/HiveCore.scala:109:24
       regFile_bAddrMode <= 1'h0;	// src/hive/scala/main/HiveCore.scala:109:24
       regFile_cAddrMode <= 1'h0;	// src/hive/scala/main/HiveCore.scala:109:24
-      regFile_aMxBlockSize <= 2'h0;	// <stdin>:240355:5, src/hive/scala/main/HiveCore.scala:109:24
-      regFile_bMxBlockSize <= 2'h0;	// <stdin>:240355:5, src/hive/scala/main/HiveCore.scala:109:24
-      regFile_cMxBlockSize <= 2'h0;	// <stdin>:240355:5, src/hive/scala/main/HiveCore.scala:109:24
+      regFile_aMxBlockSize <= 2'h0;	// <stdin>:240335:5, src/hive/scala/main/HiveCore.scala:109:24
+      regFile_bMxBlockSize <= 2'h0;	// <stdin>:240335:5, src/hive/scala/main/HiveCore.scala:109:24
+      regFile_cMxBlockSize <= 2'h0;	// <stdin>:240335:5, src/hive/scala/main/HiveCore.scala:109:24
       regFile_loadWMode <= 1'h0;	// src/hive/scala/main/HiveCore.scala:109:24
       regFile_aFmt <= 4'h0;	// src/hive/scala/main/HiveCore.scala:21:7, :109:24
       regFile_bFmt <= 4'h0;	// src/hive/scala/main/HiveCore.scala:21:7, :109:24
@@ -355,7 +355,7 @@ module Hive_HiveCore(	// src/hive/scala/main/HiveCore.scala:21:7
       automatic logic _GEN_0;	// src/hive/scala/main/HiveCore.scala:296:20
       automatic logic _GEN_1;	// src/hive/scala/main/HiveCore.scala:296:20
       automatic logic _GEN_2;	// src/hive/scala/main/HiveCore.scala:296:20
-      _GEN_0 = io_cmd_payload_op == 2'h0;	// <stdin>:240355:5, src/hive/scala/main/HiveCore.scala:296:20
+      _GEN_0 = io_cmd_payload_op == 2'h0;	// <stdin>:240335:5, src/hive/scala/main/HiveCore.scala:296:20
       _GEN_1 = io_cmd_payload_op == 2'h1;	// src/hive/scala/main/HiveCore.scala:296:20
       _GEN_2 = io_cmd_payload_op == 2'h2;	// src/hive/scala/main/HiveCore.scala:296:20
       if (_startPulse_T) begin	// src/utils/Stream/Stream.scala:43:26
@@ -1209,7 +1209,7 @@ module Hive_HiveCore(	// src/hive/scala/main/HiveCore.scala:21:7
   assign io_respForTracing_valid =
     tracingSt ? _executor_io_done | _calcConfig_io_errPluse : startPulse;	// src/hive/scala/main/HiveCore.scala:21:7, :128:26, :146:26, :191:32, :197:26, :204:26, :205:23, :215:{29,49}
   assign io_respForTracing_payload_state =
-    tracingSt ? (_executor_io_done ? 2'h1 : {2{_calcConfig_io_errPluse}}) : 2'h0;	// <stdin>:240355:5, src/hive/scala/main/HiveCore.scala:21:7, :128:26, :146:26, :197:26, :201:35, :204:26, :205:23, :216:27, :217:39, :218:39, :219:39
+    tracingSt ? (_executor_io_done ? 2'h1 : {2{_calcConfig_io_errPluse}}) : 2'h0;	// <stdin>:240335:5, src/hive/scala/main/HiveCore.scala:21:7, :128:26, :146:26, :197:26, :201:35, :204:26, :205:23, :216:27, :217:39, :218:39, :219:39
   assign io_respForTracing_payload_pc = _GEN ? io_cmd_payload_pc : tracingPcReg;	// src/hive/scala/main/HiveCore.scala:21:7, :197:26, :198:25, :204:26, :205:23, :206:19, :207:22
   assign io_respForTracing_payload_tag = _GEN ? io_cmd_payload_tag : tracingTagReg;	// src/hive/scala/main/HiveCore.scala:21:7, :197:26, :199:26, :204:26, :205:23, :206:19, :208:23
   assign io_dmaA_rsp_ready = 1'h1;	// src/hive/scala/main/HiveCore.scala:21:7

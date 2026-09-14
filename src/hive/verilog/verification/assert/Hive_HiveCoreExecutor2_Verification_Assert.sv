@@ -17,13 +17,13 @@
     `define ASSERT_VERBOSE_COND_ 1
   `endif // ASSERT_VERBOSE_COND
 `endif // not def ASSERT_VERBOSE_COND_
-module Hive_HiveCoreExecutor2_Verification_Assert();	// src/hive/scala/main/HiveCoreExecutor.scala:386:19
+module Hive_HiveCoreExecutor2_Verification_Assert();	// src/hive/scala/main/HiveCoreExecutor.scala:390:19
   `ifndef SYNTHESIS	// src/hive/scala/main/HiveCoreExecutor.scala:238:9
     always @(posedge Hive_HiveCoreExecutor2.clock) begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :238:9
-      automatic logic _GEN;	// src/hive/scala/main/HiveCoreExecutor.scala:278:17, :379:22
+      automatic logic _GEN;	// src/hive/scala/main/HiveCoreExecutor.scala:278:17, :383:22
       _GEN =
         Hive_HiveCoreExecutor2._layerCapture & Hive_HiveCoreExecutor2._layerCapture_1
-        & Hive_HiveCoreExecutor2.mxRunB_layerCapture;	// src/hive/scala/main/HiveCoreExecutor.scala:278:17, :379:22, src/hive/scala/main/HiveEnum.scala:9:69
+        & Hive_HiveCoreExecutor2.mxRunB_layerCapture;	// src/hive/scala/main/HiveCoreExecutor.scala:278:17, :383:22, src/hive/scala/main/HiveEnum.scala:9:69
       if (~Hive_HiveCoreExecutor2.reset & Hive_HiveCoreExecutor2.io_hiveValidOut
           & ~Hive_HiveCoreExecutor2.io_cPush_ready) begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :39:14, :238:{9,27,29}
         if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:238:9
@@ -32,29 +32,29 @@ module Hive_HiveCoreExecutor2_Verification_Assert();	// src/hive/scala/main/Hive
           $fatal;	// src/hive/scala/main/HiveCoreExecutor.scala:238:9
       end
       if (Hive_HiveCoreExecutor2._layerCapture_0 & Hive_HiveCoreExecutor2.io_execute
-          & ~Hive_HiveCoreExecutor2.reset & (|Hive_HiveCoreExecutor2.io_aOccupancy)) begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :39:14, :238:9, :278:17, :330:24, :337:{15,30}
-        if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:337:15
-          $error("Assertion failed: HiveCoreExecutor: A buffer not drained at execute pulse (previous run aDma push rows != executor consume rows)\n");	// src/hive/scala/main/HiveCoreExecutor.scala:337:15
-        if (`STOP_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:337:15
-          $fatal;	// src/hive/scala/main/HiveCoreExecutor.scala:337:15
+          & ~Hive_HiveCoreExecutor2.reset & (|Hive_HiveCoreExecutor2.io_aOccupancy)) begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :39:14, :238:9, :278:17, :334:24, :341:{15,30}
+        if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:341:15
+          $error("Assertion failed: HiveCoreExecutor: A buffer not drained at execute pulse (previous run aDma push rows != executor consume rows)\n");	// src/hive/scala/main/HiveCoreExecutor.scala:341:15
+        if (`STOP_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:341:15
+          $fatal;	// src/hive/scala/main/HiveCoreExecutor.scala:341:15
       end
       if (_GEN & ~Hive_HiveCoreExecutor2.reset
           & (Hive_HiveCoreExecutor2._io_hiveLoadW_T_layerCapture
              ^ Hive_HiveCoreExecutor2.io_scaleBPop_valid
-             & Hive_HiveCoreExecutor2.io_scaleBPop_ready_0)) begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :39:14, :238:9, :278:17, :379:22, :381:{17,33}, src/utils/Stream/Stream.scala:43:26
-        if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:381:17
-          $error("Assertion failed: HiveCoreExecutor: MX scaleB lockstep violated - bPop.fire XOR scaleBPop.fire (must fire same cycle, else scaleBRegs column misaligns)\n");	// src/hive/scala/main/HiveCoreExecutor.scala:381:17
-        if (`STOP_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:381:17
-          $fatal;	// src/hive/scala/main/HiveCoreExecutor.scala:381:17
+             & Hive_HiveCoreExecutor2.io_scaleBPop_ready_0)) begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :39:14, :238:9, :278:17, :383:22, :385:{17,33}, src/utils/Stream/Stream.scala:43:26
+        if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:385:17
+          $error("Assertion failed: HiveCoreExecutor: MX scaleB lockstep violated - bPop.fire XOR scaleBPop.fire (must fire same cycle, else scaleBRegs column misaligns)\n");	// src/hive/scala/main/HiveCoreExecutor.scala:385:17
+        if (`STOP_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:385:17
+          $fatal;	// src/hive/scala/main/HiveCoreExecutor.scala:385:17
       end
       if (_GEN & Hive_HiveCoreExecutor2.loadWModeReg
           & Hive_HiveCoreExecutor2._io_hiveLoadW_T_layerCapture
           & Hive_HiveCoreExecutor2.tileInterCnt == 4'h0 & ~Hive_HiveCoreExecutor2.reset
-          & ~Hive_HiveCoreExecutor2.io_scaleBPop_valid) begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :39:14, :140:29, :147:29, :238:9, :278:17, :379:22, :385:{29,45,61,70}, :386:19, src/utils/Stream/Stream.scala:43:26
-        if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:386:19
-          $error("Assertion failed: HiveCoreExecutor: MX lock beat scaleBPop not valid - column-0 forward would latch invalid payload\n");	// src/hive/scala/main/HiveCoreExecutor.scala:386:19
-        if (`STOP_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:386:19
-          $fatal;	// src/hive/scala/main/HiveCoreExecutor.scala:386:19
+          & ~Hive_HiveCoreExecutor2.io_scaleBPop_valid) begin	// src/hive/scala/main/HiveCoreExecutor.scala:37:7, :39:14, :140:29, :147:29, :238:9, :278:17, :383:22, :389:{29,45,61,70}, :390:19, src/utils/Stream/Stream.scala:43:26
+        if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:390:19
+          $error("Assertion failed: HiveCoreExecutor: MX lock beat scaleBPop not valid - column-0 forward would latch invalid payload\n");	// src/hive/scala/main/HiveCoreExecutor.scala:390:19
+        if (`STOP_COND_)	// src/hive/scala/main/HiveCoreExecutor.scala:390:19
+          $fatal;	// src/hive/scala/main/HiveCoreExecutor.scala:390:19
       end
     end // always @(posedge)
   `endif // not def SYNTHESIS

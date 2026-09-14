@@ -131,8 +131,6 @@ object AddrMode extends ChiselEnum {
 }
 
 object MXBlockSize extends ChiselEnum{
-  val M8 = Value(0.U)
-  val M16 = Value(1.U)
-  val M32 = Value(2.U)
-  val M64 = Value(3.U)
+  val M16 = Value(0.U)
+  val M32 = Value(1.U)
 }

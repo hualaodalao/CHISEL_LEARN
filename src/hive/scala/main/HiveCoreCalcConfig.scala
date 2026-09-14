@@ -36,14 +36,10 @@ io.errPluse := err & !errNext
 def getBlockSize(t: MXBlockSize.Type) : UInt = {
     //MXBlockSize
     val ret = Wire(UInt(8.W))
-    when(t === MXBlockSize.M64){
-        ret := 64.U
-    }.elsewhen(t === MXBlockSize.M32){
+    when(t === MXBlockSize.M32){
         ret := 32.U
-    }.elsewhen(t === MXBlockSize.M16){
-        ret := 16.U
     }.otherwise{
-        ret :=  8.U
+        ret :=  16.U
     }
     ret
 }
@@ -80,22 +76,6 @@ def getKLoadNum(t: DataFormat.Type) : UInt = {
     ret
 }
 
-// ==========================================================================
-// 【#124 ①】colTile（块间跳转）偏移的两个格式解码量 —— 运行期化的全部依据
-// --------------------------------------------------------------------------
-// 退化事实（672fb37 同批 6 处参数退化中的两处，A/B 孪生）：
-//   aColTileAddressOffset := cfg.totalN.U * (cfg.aW / 8).U
-//   bColTileAddressOffset := cfg.totalN.U * (cfg.bW / 8).U
-// 二者是【elaboration 期常数】：aW=bW=16 → 恒 = 32，与运行期写入的 aFmt/bFmt
-// 完全无关。而该偏移的物理语义是「一个 kTile（loadW=1）／一个 n-tile（loadW=0）
-// 在外部内存中跨过的字节数」，必然是运行期量。
-//
-// 权威式（三源印证，见调用点逐条留痕）：
-//   colTileOffset = totalN × elemsPerLane(fmt) × memElemBytes(fmt)
-//                 = kPerBeat(fmt) × memElemBytes(fmt)
-// 下面两个解码函数即该式的两个因子，表与优先级逐字镜像金锚
-// HiveDebugModel.elemsPerLane / memElemBytes（测试对账基准），零裸数字。
-// ==========================================================================
 
 /** 外部内存每元素字节数（运行期解码）。
   * 表与优先级逐字镜像金锚 HiveDebugModel.memElemBytes：
@@ -216,6 +196,45 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     }
 
     // ==========================================================================
+    // 【P0-1 errCode 8（fp4 K 整除运行期守护）】fp4(E2M1) 输入要求 K 被 kPerBeat 整除。
+    // --------------------------------------------------------------------------
+    // ▸ 真 bug 根因：Executor 的 kTiles = K / (totalN×elemsPerLane) 是【地板除】。fp4
+    //   kPerBeat = totalN×4 = 64，K 非 64 整除时（如 K=96）只累加 floor(96/64)=1 个 kTile
+    //   = 64 个 K，尾部 32 个 K【静默丢弃】、结果错但此前无任何 errCode（测试全绿假象）；
+    //   K<64 时 newKTiles=0 → kTiles:=newKTiles-1 回绕为 65535 → 65536 轮 pass 跑飞
+    //   （DMA 越界读）。此前唯一守护只在【测试侧金锚】HiveDebugModel.validate 的
+    //   require(k%kPerBeat==0)，硬件侧零守护（Executor 旧注释"已在 sIDLE 校验"不成立）。
+    // ▸ Decision: a dedicated code 8 was allocated so software can name the fp4
+    //   geometry violation precisely. (#146) The original wording here said
+    //   "code 8 instead of reusing code 7" -- that half of the rationale is now
+    //   obsolete, because errCode 7 (fp4 forced blk=64) has been DELETED (see
+    //   the removal note below). Code 8 is therefore the ONLY fp4 geometry guard
+    //   left, and code 7 is free again for future allocation.
+    //   errCode 8 itself was previously unused (problem.md item 6 had "reserved"
+    //   8 for the optional W4A8 mix diagnostic; that one was pushed to code 9).
+    // ▸ 判据：isMx4(aFmt) && (K % kPerBeat != 0)，kPerBeat = totalN×4（编译期常数，
+    //   totalN=16 时 = 64）。与金锚 HiveDebugModel.hwErrCode / kPerBeat(MXE2M1,totalN) 同源。
+    // ▸ 门控：整块包在 if(cfg.hasMx4) 内——cfgBase/cfgMx 基线 hasMx4=false 完全不 elaborate，
+    //   现有 errCode 0/3/4/5/6 逐字不变，normalized-diff=0。
+    // ▸ Priority (last-connect wins, later source line = higher priority): this
+    //   block sits AFTER errCode6 and BEFORE the Fix-4 MX4xMX8 mix code3 block,
+    //   so the mix code3 overrides this code8. (Both predicates can only fire
+    //   together for a mixed fp4/fp8 pair, which is rejected by the mix branch
+    //   anyway, so no live configuration is shadowed by this ordering.)
+    //   (#146) The former errCode7 block that used to sit last has been DELETED,
+    //   so nothing overrides this block from below any more. Final truth order:
+    //     3 (MX4xMX8 mix) > 8 (fp4 K not divisible) > 6 > 5 > 4
+    //       > 3 (isAMx ^ isBMx) > 0
+    //   Code 7 is now FREE (see the removal note below).
+    if(cfg.hasMx4){
+        when(DataFormat.isMx4(io.regFile.aFmt) &&
+             (io.regFile.k(15, 0) % (cfg.totalN * 4).U =/= 0.U)){
+            errComb := true.B
+            errCodeComb := 8.U
+        }
+    }
+
+    // ==========================================================================
     // 【Fix-4 errCode 3（MX4×MX8 混配运行期可诊断守护）】aFmt/bFmt 分属 fp4(E2M1) 与
     //   fp8(E4M3/E5M2) 时，HiveWorkUnit 的运行期选择子 Mux(isMx4(io.aFmt), quadResult,
     //   dualLaneMx()) 只看 aFmt，而被选支路内 b 侧解码器接 io.bFmt → lane 粒度与解码格式
@@ -228,10 +247,17 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //   补 W4A8 数据通路（aFmt/bFmt 已是独立 4-bit 字段，寄存器/软件接口无需重构）。
     // ▸ 门控：整块包在 if(cfg.hasMx4) 内——cfgBase/cfgMx 基线 hasMx4=false 完全不 elaborate，
     //   现有 errCode 0/3/4/5/6 逐字不变，normalized-diff=0。
-    // ▸ 优先级（last-connect 后写覆盖前写，源码越靠后优先级越高）：本块【置于 6/5/4 之后、errCode7
-    //   门控之前】，故混配 code3 覆盖 6/5/4，最终真值序为
-    //   7 > 3(本块 MX4×MX8 混配) > 6 > 5 > 4 > 3(isAMx^isBMx) > 0。金锚（precheckConfigErr /
-    //   HiveCoreQuickSpec.hwErrCode）必须逐位镜像此序。
+    // ▸ Priority (last-connect wins, later source line = higher priority): this
+    //   block sits AFTER code8(K divisibility), so the mix code3 overrides
+    //   8/6/5/4. (#146) It used to sit before an errCode7 block; that block has
+    //   been DELETED, so this is now the LAST branch of the chain and therefore
+    //   the highest-priority one. Final truth order:
+    //     3 (this block, MX4xMX8 mix) > 8 (fp4 K not divisible) > 6 > 5 > 4
+    //       > 3 (isAMx ^ isBMx) > 0
+    //   The golden model (HiveDebugModel.hwErrCode / precheckConfigErr, and
+    //   HiveCoreQuickSpec.hwErrCode which delegates to it) plus
+    //   HiveCoreQuickSpec.errExplain and src/hive/doc/problem.md must mirror
+    //   exactly this order.
     if(cfg.hasMx4){
         when(DataFormat.isMx4(io.regFile.aFmt) ^ DataFormat.isMx4(io.regFile.bFmt)){
             errComb := true.B
@@ -240,30 +266,35 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     }
 
     // ==========================================================================
-    // 【Phase 3 errCode 7】fp4(E2M1) 输入 scale 块决策：v1 强制 aMxBlockSize=64。
+    // 【#146 errCode 7 REMOVED】fp4(E2M1) no longer forces mxBlockSize = 64.
     // --------------------------------------------------------------------------
-    // ▸ 背景：Phase 2 已建好 fp4 quad-lane 计算通路，其 scale 供给沿用 Executor 的
-    //   「单广播」不变式（scaleA 每 kTile 一个块 scale、整拍广播；见 Executor
-    //   scaleA 单广播 / scaleBRegs per-column 管线，本 Phase【零改动】）。fp4 一个
-    //   kTile = kPerBeat = totalN×elemsPerLane = 16×4 = 64 个 K 元素 = 单 pass。
-    //   要保「1 kTile = 1 scale 块 = 1 次广播」，块大小必须恰为 64。
-    // ▸ 决策：fp4 输入(isMx4) 且 aMxBlockSize≠64 → 直接拒绝（errCode 7）。这样
-    //   Executor 单广播管线无需为 fp4 引入 per-half-pass 细分，改动面最小。
-    // ▸ OCP 偏离声明：OCP MX 规范允许 MXFP4 block=32（甚至更小）。本 v1【偏离】
-    //   规范、只支持 block=64，是「以约束换 Executor 管线零改动」的显式取舍。
-    // ▸ v2 路线（DEFERRED）：per-half-pass scale——一个 64-K kTile 拆成 2 个 32-K
-    //   半 pass，各用独立 scale 块，需 Executor scaleA 从单广播升级为半 pass 双广播。
-    //   超出本次打通范围，列为独立后续项。
-    // ▸ 门控：整块包在 if(cfg.hasMx4) 内——cfgBase/cfgMx 基线 hasMx4=false，
-    //   本 when 完全不 elaborate，现有格式错误检查（errCode 0/3/4/5/6）逐字不变，
-    //   normalized-diff=0。errCode 7 此前未被占用（io.errCode 为 UInt(4.W)）。
-    if(cfg.hasMx4){
-        when((DataFormat.isMx4(io.regFile.aFmt) && aMxBlockSize =/= 64.U) ||
-             (DataFormat.isMx4(io.regFile.bFmt) && bMxBlockSize =/= 64.U)){
-            errComb := true.B
-            errCodeComb := 7.U
-        }
-    }
+    // ▸ Why the block had to go: the blocksize field was narrowed to a 2-level
+    //   enum {sel=0 -> 16 bytes, sel=1 -> 32 bytes}, so getBlockSize() can only
+    //   ever return 16 or 32. The removed predicate compared it against 64.U,
+    //   i.e. `aMxBlockSize =/= 64.U` was a TAUTOLOGY. Combined with the isMx4
+    //   term this meant: any fp4 run was rejected at runtime, unconditionally,
+    //   and completely silently -- the golden model mirrored the same tautology,
+    //   so RTL and anchor agreed and no test ever went red. fp4 was therefore
+    //   permanently unusable while looking "covered".
+    // ▸ What replaces it: fp4 now supports blk in {16, 32} like fp8. errCode 8
+    //   (K not divisible by kPerBeat) stays as the ONLY fp4 geometry guard, and
+    //   it is a real guard: it can be satisfied, and violating it is detected.
+    // ▸ Code 7 is now FREE. The standing ruling on code allocation still holds:
+    //   any new check is assigned from 7 upwards, and codes 1/2 are never
+    //   revived (the three blocksize violations are merged into a single
+    //   errCode 0 by errMXLargerThanKLoadNum above, so 1/2 are unreachable).
+    // ▸ Truth order after the removal (last-connect wins, later source line =
+    //   higher priority). Only the relative order of the SURVIVING branches
+    //   matters and none of them was moved:
+    //     3 (MX4xMX8 mix, Fix-4) > 8 (fp4 K not divisible) > 6 > 5 > 4
+    //       > 3 (isAMx ^ isBMx) > 0
+    //   The golden model (HiveDebugModel.hwErrCode / precheckConfigErr, and
+    //   HiveCoreQuickSpec.hwErrCode which delegates to it) plus
+    //   HiveCoreQuickSpec.errExplain and src/hive/doc/problem.md must mirror
+    //   exactly this order.
+    // ▸ Gating note: the removed block lived inside `if(cfg.hasMx4)`, so for the
+    //   cfgBase/cfgMx baselines (hasMx4=false) it never elaborated at all and
+    //   their errCode 0/3/4/5/6/8 paths are literally unchanged.
 
 }
 
@@ -287,16 +318,21 @@ switch(state) {
     }
 
     is(sC0){
+      
+      
       when(errComb){
         err := errComb
         errCode := errCodeComb
       }
       
-        state := sC1
+      state := sC1
       calcConfig.mTile := (io.regFile.m + cfg.totalN.U - 1.U) / cfg.totalN.U
       calcConfig.nTile := (io.regFile.n + cfg.totalN.U - 1.U) / cfg.totalN.U
     
-  
+      calcConfig.isAX2 := DataFormat.is1B(io.regFile.aFmt)
+      calcConfig.isBX2 := DataFormat.is1B(io.regFile.bFmt)
+      calcConfig.isAX4 := DataFormat.isHalfB(io.regFile.aFmt)
+      calcConfig.isBX4 := DataFormat.isHalfB(io.regFile.bFmt)
 
     when(DataFormat.isMx(io.regFile.aFmt)){
         calcConfig.kTile := (io.regFile.k / aKLoadNum)
@@ -485,94 +521,85 @@ when(DataFormat.isHalfB(io.regFile.cFmt)){
   calcConfig.cColTileAddressOffset := cfg.totalN.U * 4.U
 }
 
+// ==========================================================================
+// (#146) MX SCALE READ ALIGNMENT CONTRACT -- full derivation (ASCII only).
+// --------------------------------------------------------------------------
+// This block is the SINGLE SOURCE of the two scale address strides consumed by
+// HiveCoreDmaRdOnly (scaleA tied isA=true, scaleB tied isA=false):
+//   rowStride   = scaleXRowAddressOffset     = K / blk          [bytes]
+//   kTileStride = scaleXColTileAddressOffset = kLoadNum / blk   [bytes]
+// with blk = 32 for MXBlockSize.M32, 16 for MXBlockSize.M16, and
+// kLoadNum = getKLoadNum(fmt) = totalN * elemsPerLane(fmt) = kPerBeat
+// (32 for MXFP8, 64 for MXFP4 at totalN=16).
+// The scale tensors are stored DENSELY, one E8M0 byte per MX block:
+//   scaleA at SA_BASE + mm*rowStride + j,  j in [0, K/blk)
+//   scaleB at SB_BASE + nn*rowStride + j   (N-major, same row stride)
+// and the DMA issues ONE 32-BIT read per beat at
+//   addr(row, kt) = BASE + row*rowStride + kt*kTileStride
+// That transfer touches bytes addr .. addr+3, while only the first
+// numScalesPerBeat = kPerBeat/blk of them are ever selected by the Executor byte
+// mux idx = (lane*elemsPerLane)/blk; the remaining bytes are don't-care (they may
+// even run past the end of the row / tensor for the last kTile of the last row).
+//
+// CONTRACT -- software must guarantee it, the hardware does NOT check it:
+// every scale read address must be 4-byte aligned. Since row and kt each run over
+// a contiguous range starting at 0, this holds for the WHOLE run exactly when
+//   (S0) BASE % 4 == 0                  (SA_BASE / SB_BASE come from software)
+//   (S1) rowStride   % 4 == 0   OR the row range is a single value (M==1 / N==1)
+//   (S2) kTileStride % 4 == 0   OR kTiles == 1  (i.e. K == kPerBeat)
+// Substituting rowStride = K/blk and kTileStride = kPerBeat/blk:
+//   (S1) <=> K % (4*blk) == 0 :  blk=16 -> K % 64 == 0 ; blk=32 -> K % 128 == 0
+//   (S2) <=> (kPerBeat/blk) % 4 == 0 :
+//          MXFP8 (kPerBeat=32): blk=32 -> 1 ; blk=16 -> 2  ==> NEVER 0 mod 4
+//          MXFP4 (kPerBeat=64): blk=32 -> 2 ; blk=16 -> 4  ==> only blk=16
+//
+// CONSEQUENCE (this is a derived finding, not a design choice):
+//   * MXFP4 + blk=16 is the ONLY non-degenerate combination satisfying the
+//     contract for arbitrary M/N/K: kTileStride = 4 (S2 ok), and errCode 8
+//     already forces K % 64 == 0, which is exactly K % (4*16) == 0 (S1 ok).
+//   * MXFP8 (blk=16 or blk=32) and MXFP4 + blk=32 CANNOT satisfy (S2) once
+//     kTiles > 1, because their kTileStride is 1 or 2 bytes. Their aligned subset
+//     is degenerate: kTiles == 1 (K == kPerBeat) AND a single row (M==1 / N==1).
+//   * This exposure is PRE-EXISTING, not introduced by enabling blk=16: the
+//     long-standing MXFP8 blk=32 baseline has kTileStride = 1 and
+//     rowStride = K/32, so e.g. K=32 gives rowStride = 1 and row 1 is read at an
+//     ODD address. A SoC that cannot perform unaligned 32-bit reads already
+//     breaks on today's green MXFP8 cases.
+//   * Hence one of three things must be true on the integration side: (a) the
+//     SoC memory / AXI path supports unaligned 32-bit reads; (b) the scale layout
+//     gains padding so both strides are multiples of 4; (c) the scale DMA issues
+//     narrow (8-bit) reads instead. (b) and (c) are OUT OF SCOPE by the #146
+//     ruling (do not change the scale tensor layout, do not add a packing state
+//     machine, do not change the scale DMA traversal), so NO hardware guard is
+//     added here. Registered as an open SoC-integration item in
+//     src/hive/doc/problem.md together with the guard options and their cost.
+// ==========================================================================
 //A矩阵 scale 偏移计算
-when(MXBlockSize.M64 === io.regFile.aMxBlockSize){
-    calcConfig.scaleARowAddressOffset     := io.regFile.k / 64.U
-    calcConfig.scaleAColTileAddressOffset := aKLoadNum / 64.U
-}.
-elsewhen(MXBlockSize.M32 === io.regFile.aMxBlockSize){
+when(MXBlockSize.M32 === io.regFile.aMxBlockSize){
     calcConfig.scaleARowAddressOffset     := io.regFile.k / 32.U
     calcConfig.scaleAColTileAddressOffset := aKLoadNum / 32.U
-}.
-elsewhen(MXBlockSize.M16 === io.regFile.aMxBlockSize){
+}.otherwise{
     calcConfig.scaleARowAddressOffset     := io.regFile.k / 16.U
     calcConfig.scaleAColTileAddressOffset := aKLoadNum / 16.U
-}.
-otherwise{
-    calcConfig.scaleARowAddressOffset     := io.regFile.k / 8.U
-    calcConfig.scaleAColTileAddressOffset := aKLoadNum / 8.U
 }
 //B矩阵 scale 偏移计算
-when(MXBlockSize.M64 === io.regFile.bMxBlockSize){
-    calcConfig.scaleBRowAddressOffset     := io.regFile.k / 64.U
-    calcConfig.scaleBColTileAddressOffset := bKLoadNum / 64.U
-}.
-elsewhen(MXBlockSize.M32 === io.regFile.bMxBlockSize){
+when(MXBlockSize.M32 === io.regFile.bMxBlockSize){
     calcConfig.scaleBRowAddressOffset     := io.regFile.k / 32.U
     calcConfig.scaleBColTileAddressOffset := bKLoadNum / 32.U
 }.
-elsewhen(MXBlockSize.M16 === io.regFile.bMxBlockSize){
+otherwise{
     calcConfig.scaleBRowAddressOffset     := io.regFile.k / 16.U
     calcConfig.scaleBColTileAddressOffset := bKLoadNum / 16.U
-}.
-otherwise{
-    calcConfig.scaleBRowAddressOffset     := io.regFile.k / 8.U
-    calcConfig.scaleBColTileAddressOffset := bKLoadNum / 8.U
 }
 //C矩阵 scale 偏移计算
 // ==========================================================================
-// 【#124 ② 修复：scaleCRowAddressOffset 由 FLOOR 改为 CEIL】
-// 旧式（672fb37 退化）：io.regFile.n / blk.U —— Chisel 无符号 `/` 即 FLOOR。
-// 新式：(io.regFile.n +& (blk-1).U) / blk.U = CEIL(n / blk)。
-//
-// ▸ 语义：C 的 scale 张量按「每 blk 个输出列共享一个 scale 字节」量化存储，
-//   一行 C 占用的 scale 条目数 = CEIL(n / blk)。用 FLOOR 时，只要 n % blk != 0
-//   就少算一条 ⇒ 行步进偏小 ⇒ m≥1 起所有 scale 行地址与前一行的尾部条目【静默
-//   重叠】（不报错、不越界，只是写歪），是最难发现的一类地址缺陷。
-// ▸ 权威侧原文（git 考古 672fb37^ src/hive/scala/main/HiveCore.scala）：
-//     val cBlkShift = regFile.qBlockSize +& 3.U          // log2(blk)
-//     val cBlkElems = 8.U << regFile.qBlockSize          // blk 元素数（8/16/32/64）
-//     calcConfig.cScaleRowAddressOffset :=
-//       (regFile.n + cBlkElems - 1.U) >> cBlkShift       // = CEIL  ← 退化前就是 ceil
-//     calcConfig.cScaleColTileAddressOffset :=
-//       cfg.totalN.U >> cBlkShift                        // = FLOOR ← 退化前就是 floor
-//   ⇒ 结论：FLOOR 是 672fb37 拆分重构时【新引入】的退化，不是设计意图。
-// ▸ 金锚印证（四处全为 CEIL，一律【不动】，本次只改 RTL）：
-//     HiveDebugModel.Plan.expCScaleAddrSeq : val rowOff = (p.n + p.cMxBlk - 1).toLong / p.cMxBlk
-//     HiveCoreSimCaseMxSpec   L324         : val scaleRowOff = (N + blk - 1).toLong / blk
-//     HiveCoreSimCaseQuantSpec L273 / L1099: 同式 (N + blk - 1).toLong / blk
-//   金锚与权威 RTL 原文双向一致 ⇒ 这是「RTL 单方面偏离」而非「金锚按坏 RTL 反推闭式」
-//   的假绿模式（#132/#133 在 dmaC 通道踩过该模式，故此处专门做双源核对）。
-// ▸ scaleCColTileAddressOffset 【保持 FLOOR 不动】：n-tile 步进 = 一个 n-tile
-//   （totalN 列）占用的 scale 条目数 = totalN / blk；validate 已强制
-//   cMxBlk <= totalN ∧ totalN % cMxBlk == 0，故此处 FLOOR ≡ CEIL，与金锚
-//   `val colOff = totalN.toLong / p.cMxBlk` 及权威原文 `>> cBlkShift` 三方一致。
-//   ★ 勿「顺手一起改成 ceil」——那会让本行偏离金锚、制造新的失配。
-// ▸ 位宽：n 为 mnkWidth=16 位，用 `+&` 扩到 17 位再除，彻底杜绝 n 接近 2^16 时
-//   `n + 63` 的回绕（权威原文用 `+` 不扩位，本处在数值全域严格不弱于原文）。
-//   目标 scaleCRowAddressOffset 为 addrWidth=32 位，零扩展无损。
-// ▸ 综合：`/` 的右操作数是 2 的幂字面量，Chisel 强度削减为移位，四分支仍是
-//   「4-way mux of shifts」，不生成组合除法器，时序/面积与旧式同量级。
-// ▸ 结构一致性（附带修正）：末分支由 `elsewhen(MXBlockSize.M8 === ...)` 改为
-//   `.otherwise`。MXBlockSize 是 2-bit ChiselEnum（M8=0/M16=1/M32=2/M64=3），
-//   M8 是前三支之后【唯一】剩余取值，故二者行为严格等价；改法只是与上方
-//   scaleA/scaleB 两块的写法对齐，并消除「四支全不命中 → 目标保留旧值」的
-//   结构性隐患（枚举越界时不再有未赋值路径）。
-when(MXBlockSize.M64 === io.regFile.cMxBlockSize){
-    calcConfig.scaleCRowAddressOffset     := (io.regFile.n +& 63.U) / 64.U
-    calcConfig.scaleCColTileAddressOffset := cfg.totalN.U / 64.U
-}.
-elsewhen(MXBlockSize.M32 === io.regFile.cMxBlockSize){
+when(MXBlockSize.M32 === io.regFile.cMxBlockSize){
     calcConfig.scaleCRowAddressOffset     := (io.regFile.n +& 31.U) / 32.U
     calcConfig.scaleCColTileAddressOffset := cfg.totalN.U / 32.U
 }.
-elsewhen(MXBlockSize.M16 === io.regFile.cMxBlockSize){
+otherwise{
     calcConfig.scaleCRowAddressOffset     := (io.regFile.n +& 15.U) / 16.U
     calcConfig.scaleCColTileAddressOffset := cfg.totalN.U / 16.U
-}.
-otherwise{
-    calcConfig.scaleCRowAddressOffset     := (io.regFile.n +& 7.U) / 8.U
-    calcConfig.scaleCColTileAddressOffset := cfg.totalN.U / 8.U
 }
 
 

@@ -675,10 +675,17 @@ object HiveSimCommon {
 
   /** 单元素量化：fp32 ÷ 2^(s-127)（指数减）→ 舍入到目标格式（边界表镜像反量化侧取逆）：
     * 溢出饱和最大有限值（保号）、低于最小正规格化保号 ±0（无次正规）、
-    * inf→饱和、nan→目标编码（E2M1 无 nan 编码裁定饱和）、零→±0。 */
+    * inf→饱和、nan→目标编码（E2M1 无 nan 编码裁定饱和）、零→±0。
+    *
+    * @param emitSub (#151 F4) 是否产出【次正规码】。true 仅在 fmt=MXE2M1 时由 swQuantBlock
+    *        传入，与 RTL 侧 HiveOutCvt.quantElem 的同名形参【一一对称】。
+    *        OCP MX 规范把 E2M1 的 (e=0,m=1) 定义为 0.m × 2^(1-bias) = ±0.5，是合法可编码值
+    *        （E2M1 值集 ±{0,0.5,1,1.5,2,3,4,6}）；原实现 eTgt<1 一律冲刷保号零 ⟹ 码 0x1/0x9
+    *        永不发射。E4M3/E5M2 是否同步放开属独立待裁项，本轮【不扩大范围】。 */
   def swQuantElem(bits: Long, s: Int, rnd: Int, expW: Int, mantW: Int, bias: Int,
                   maxNormalExp: Int, satCode: Int, nanCode: Int,
-                  nanToSat: Boolean, fixNanCode: Boolean): Int = {
+                  nanToSat: Boolean, fixNanCode: Boolean,
+                  emitSub: Boolean = false): Int = {
     val b = bits & 0xFFFFFFFFL
     val sg = ((b >>> 31) & 1).toInt
     val e = ((b >>> 23) & 0xFF).toInt
@@ -691,6 +698,56 @@ object HiveSimCommon {
       return signPart | (if (nanToSat) satCode else nanCode)  // nan → 目标编码（E2M1 裁定饱和）
     }
     val eTgt = e + bias - s                                   // ÷2^(s-127) ⟺ 目标偏置指数 = e + bias - s
+    // ----------------------------------------------------------------------
+    // (#151 F4) OCP MX 次正规产出臂（仅 E2M1）——与 RTL HiveOutCvt.quantElem 的
+    //   subKeep/subGuard/subSticky/subUp/subRnd/subCarry/subCode 逐行对称。
+    //   设 y = |x|/S = 1.f × 2^(eTgt-1)，f = 0.m（23 位）。次正规区覆盖两个 binade：
+    //     eTgt =  0 → y ∈ [0.5, 1.0)  网格 {0.5, 1.0}  中点 0.75   shift = 1
+    //     eTgt = -1 → y ∈ [0.25, 0.5) 网格 {0,   0.5}  中点 0.25   shift = 2
+    //     eTgt ≤ -2 → y < 0.25       幅值对称模式(RNE/RTZ/RMM) → ±0；定向模式见下方 F4-b 臂
+    //   shift=1: keep = 1(原隐含位), guard = m 的 bit22,   sticky = m 的 bit21..0 是否非零
+    //   shift=2: keep = 0,           guard = 1(原隐含位),  sticky = m 是否非零
+    //   进位（keep+up == 2）⟹ 溢出到最小正规值 1.0 = 码 (e=1, m=0)。
+    //   swRoundUp 与正规臂【同一函数】⟹ RNE/RTZ/RDN/RUP/RMM 五模式自动一致、无双源。
+    // ----------------------------------------------------------------------
+    if (emitSub && (eTgt == 0 || eTgt == -1)) {
+      require(expW == 2 && mantW == 1,
+        "swQuantElem(emitSub=true): the subnormal arm is derived for E2M1 ONLY " +
+        "(keep/guard/sticky shift amounts hard-code mantW==1 and a 2-binade subnormal " +
+        s"region). Got expW=$expW mantW=$mantW. Enabling subnormal output for E4M3/E5M2 " +
+        "needs its own derivation and is a separate, still-open decision.")
+      val isSh1  = eTgt == 0
+      val keep   = if (isSh1) 1 else 0
+      val guard  = if (isSh1) ((m >>> 22) & 1) else 1
+      val sticky = if (isSh1) (if ((m & 0x3FFFFF) != 0) 1 else 0) else (if (m != 0) 1 else 0)
+      val up     = if (swRoundUp(rnd, guard, sticky, keep & 1, sg == 1)) 1 else 0
+      val subRnd = keep + up
+      if (subRnd >= 2) return signPart | (1 << mantW)         // 进位 → 码 (e=1,m=0) = 1.0
+      return signPart | subRnd                                // 码 (e=0,m=subRnd)：0 → ±0，1 → ±0.5
+    }
+    // ----------------------------------------------------------------------
+    // (#151 F4-b) 定向舍入【深下溢】进位臂（仅 E2M1）——与 RTL HiveOutCvt.quantElem 的
+    //   dirAway/deepSel/deepCode 逐行对称。IEEE-754 roundTowardNegative/roundTowardPositive
+    //   的定义是「取不超过 / 不低于 x 的【最接近】可表示值」，它不是幅值截断 ⟹ 对任意非零 x，
+    //   只要定向把幅值推离零，结果就必须是最小非零可表示值 ±0.5 = 码 (e=0,m=1)，不是保号零：
+    //     RDN(2) 且 sg=1（x<0）→ -0.5·S      RUP(3) 且 sg=0（x>0）→ +0.5·S
+    //   RNE/RTZ/RMM 三个幅值对称模式在 y'<0.25 时归零是正确的（0 比 0.5 更近 / 截断 /
+    //   最近-ties-away）⟹ dirAway=false ⟹ 本臂不介入，码流与本臂加入前【逐位相同】。
+    //   注：此处 e==0(±0/fp32 次正规) 与 e==255(inf/nan) 已在上方提前返回 ⟹ 到达本臂的
+    //   必为非零有限 fp32 正规值，与 RTL 侧 !isZero && !isInf && !isNan 的守卫等价。
+    // ----------------------------------------------------------------------
+    if (emitSub && eTgt <= -2) {
+      require(expW == 2 && mantW == 1,
+        "swQuantElem(emitSub=true) deep-underflow directed-rounding arm: derived for E2M1 " +
+        "ONLY (min nonzero magnitude hard-coded as code (e=0,m=1)=0.5). Got expW=$expW " +
+        s"mantW=$mantW. Enabling subnormal output for E4M3/E5M2 is a separate open decision.")
+      val dirAway = rnd match {
+        case 2 => sg == 1        // RDN：向 -inf，仅负数被推离零
+        case 3 => sg == 0        // RUP：向 +inf，仅正数被推离零
+        case _ => false          // RNE(0)/RTZ(1)/RMM(4)：幅值对称，深下溢归零正确
+      }
+      if (dirAway) return signPart | 1                        // 码 (e=0,m=1) = ±0.5
+    }
     if (eTgt < 1) return signPart                             // 低于最小正规格化 → ±0（无次正规产出）
     val drop = 23 - mantW
     val mantTop = (m >>> drop) & ((1 << mantW) - 1)
@@ -707,7 +764,8 @@ object HiveSimCommon {
   }
 
   /** 整行量化参考：输入为已经 40→32 规格化的 fp32 bits 行（与硬件两级舍入链同链），
-    * 返回 (逐元素量化码, 每 8 元素组 1 字节的 scale 序列)。blkSel：0=8/1=16/2=32/3=64；
+    * 返回 (逐元素量化码, 每 8 元素组 1 字节的 scale 序列)。blkSel：0=16/1=32
+    * （【#144】MXBlockSize 收窄后新枚举 {M16=0, M32=1}；旧 0=8/1=16/2=32/3=64 已废）；
     * 列 ≥ nEff 为 padding：不进 amax、元素码输出 0。 */
   def swQuantBlock(normFp32s: Seq[Long], rnd: Int, fmt: DataFormat.Type, blkSel: Int, nEff: Int): (Seq[Int], Seq[Int]) = {
     val p = quantFmtParams(fmt)
@@ -724,24 +782,29 @@ object HiveSimCommon {
     def merge(s: Seq[Long]): Seq[Long] =
       s.grouped(2).map(p => if (p.size == 2) maxMag(p) else p.head).toSeq
     val l16 = merge(groups); val l32 = merge(l16); val l64 = merge(l32)
+    // 【#144】blkSel 新枚举：0→block16(l16)、1→block32(l32)。旧 0=8(groups)/3=64(l64) 档已随枚举删除；
+    //   groups/l64 仍保留供 merge 链构造（l16=merge(groups)），不再作为可选块档。
     def amaxOf(i: Int): Long = blkSel match {
-      case 0 => groups(i / 8)
-      case 1 => l16(i / 16)
-      case 2 => l32(i / 32)
-      case _ => l64(i / 64)
+      case 0 => l16(i / 16)
+      case _ => l32(i / 32)
     }
     def scaleOf(amax: Long): Int = swBlockScale(amax, maxCodeExp, bias, maxMant23)
+    // (#151 F4) 次正规产出开关：仅 MXE2M1 打开，与 RTL 侧 HiveOutCvt 中「q2Seq 是唯一传
+    //   emitSub=true 的例化点」严格对称。E4M3/E5M2 恒 false ⟹ 金锚这两路的码流与 #151
+    //   之前【逐位相同】。本行是 swQuantBlock 在 #151 的唯一新增；blkSel/amax 层级/
+    //   scaleBytes 分组/padding 掩码语义一字未动。
+    val emitSubFmt: Boolean = fmt.litValue.toInt == FmtMxE2M1
     val codes = normFp32s.zipWithIndex.map { case (b, i) =>
       if (i >= nEff) 0                                        // padding 列输出 0（不参与量化）
       else swQuantElem(b, scaleOf(amaxOf(i)), rnd,
-        expW, mantW, bias, maxNormalExp, satCode, nanCode, nanToSat, fixNan)
+        expW, mantW, bias, maxNormalExp, satCode, nanCode, nanToSat, fixNan,
+        emitSub = emitSubFmt)
     }
     val scaleBytes = (0 until n / 8).map { g =>
+      // 【#144】每 8 元素组 g 输出 1 字节 scale，取所属块的 amax：block16→l16(g/2)、block32→l32(g/4)。
       val amax = blkSel match {
-        case 0 => groups(g)
-        case 1 => l16(g / 2)
-        case 2 => l32(g / 4)
-        case _ => l64(g / 8)
+        case 0 => l16(g / 2)
+        case _ => l32(g / 4)
       }
       scaleOf(amax)
     }
@@ -851,4 +914,33 @@ trait HiveFstSim { this: HasCliOptions =>
         )
     )
   )
+}
+
+/** 始终开启 FST 波形的 trait（不依赖 -DemitFst flag）。
+  *
+  * 与 HiveFstSim 的差异：HiveFstSim 需显式传 -DemitFst=1 才 dump；本 trait
+  * 无条件 enableWavesAtTimeZero=true，仍注册 emitFst 键仅为命令行兼容。
+  *
+  * 迁移记录（taskId=143）：原定义于 HiveCoreParamDebugSpec.scala（该文件已被
+  * 用户删除），因 HiveCoreQuickSpec 仍依赖，逐字迁移至本公共文件；原文件
+  * HEAD 版本见 git show HEAD:src/hive/scala/test/HiveCoreParamDebugSpec.scala。
+  */
+trait HiveAlwaysFstSim { this: HasCliOptions =>
+  implicit val fstSimulator: HasSimulator =
+    HasSimulator.simulators.verilator(
+      verilatorSettings = svsim.verilator.Backend.CompilationSettings.default
+        .withTraceStyle(Some(
+          svsim.verilator.Backend.CompilationSettings
+            .TraceStyle(svsim.verilator.Backend.CompilationSettings.TraceKind.Fst())
+        ))
+    )
+  // 注册 emitFst 键（兼容），但无论是否传入都启用波形
+  private def enableWaves(options: svsim.CommonCompilationSettings) =
+    options.copy(simulationSettings = options.simulationSettings.copy(enableWavesAtTimeZero = true))
+  addOption(HasCliOptions.CliOption.flag(
+    name = "emitFst",
+    help = "FST waves are ALWAYS enabled in this spec (flag accepted for compatibility only)",
+    updateCommonSettings = enableWaves,
+    updateUnsetCommonSettings = enableWaves
+  ))
 }

@@ -1,7 +1,11 @@
 /** HiveCoreDmaScaleWr — C 侧量化 scale 写回 DMA（P3b，dmaCScale 通道）。
   *
   * 职责：量化输出（outFmt 1xx）运行时，cDma（WrOnly）每写出一行量化密集行
-  * 即同拍产出一行 E8M0 块 scale（cvt.io.scaleOut，宽 cScaleRowW = totalN/8 字节），
+  * 即同拍产出一行 E8M0 块 scale（cvt.io.scaleOut，宽 cScaleRowW
+  * = (totalN/minBlockSize)*8 = totalN/2 **bit** = totalN/16 **字节**；totalN=16 时 8 bit。
+  * (#155 MJ2) 订正：原文写「cScaleRowW = totalN/8 字节」，与实际相差 2 倍
+  * （minBlockSize=16 而非 8，且原式漏了 bit/字节 量纲）。同类 2× 错另见
+  * HiveCoreElaborate 的 P3b 端口变更留痕与 HiveOutCvt 的 scaleRow 注释，均已一并订正），
   * 经顶层深 2 cScaleFifo（P2 裁定 5：唯一 scale 缓冲，已从 Scratchpad 上移）缓冲后
   * 由本模块写到外部存储（基址 = regFile.cScaleAddr）。
   *

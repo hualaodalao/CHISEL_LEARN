@@ -111,11 +111,21 @@ class HiveWorker(
     // bFmtIn 跟随 fmtIn，行为与旧单 fmt 路径 bit-exact
     val bFmtIn  = Input(DataFormat())
     val bFmtOut = Output(DataFormat())
-    // MX scale：scaleAIn 随激活流（与 aReg lockstep 沿 a 链右传），
-    // scaleBIn 列驻留（随权重/配置窗口锁存）。P1 仅建链，P2 才接入 MX MAC。
+    // MX scale: scaleAIn flows with the activations (lockstep with aReg, shifted
+    // right along the a-chain) and is consumed COMBINATIONALLY by the MAC.
+    // scaleBIn also arrives per-lane from the left edge and shifts right along
+    // the very same a-chain; the difference is that it is CAPTURED into
+    // scaleBReg on the load lock beat and the MAC then reads that resident copy.
+    // That capture is the only sense in which scaleB is "resident" -- it is NOT
+    // column-resident and NOT indexed by the output-N axis. In this array the
+    // lane coordinate x is the K-lane axis and the column coordinate y is the
+    // output-N axis (see the axis note in HiveComb). Both chains are live and
+    // both feed the MX MAC; the former "P1 only builds the chain, P2 wires the
+    // MAC" note was stale and has been removed in #146.
     val scaleAIn  = Input(UInt(8.W))
     val scaleAOut = Output(UInt(8.W))
     val scaleBIn  = Input(UInt(8.W))
+    val scaleBOut  = Output(UInt(8.W))
     // 舍入模式（水平传播：RegNext → 右侧 HiveWorker）
     val rndIn   = Input(RoundingMode())
     val rndOut  = Output(RoundingMode())
@@ -140,10 +150,17 @@ class HiveWorker(
   val rndReg = Reg(RoundingMode())
   // 权重格式寄存器：与 fmtReg 对称，随 loadH 锁存 bFmtIn
   val bFmtReg = Reg(DataFormat())
-  // scaleB 驻留寄存器：列驻留，随权重/配置窗口（loadH）锁存 scaleBIn（P2 才使用）
+  // scaleB resident register: holds the E8M0 scale of this PE's K-lane for the
+  // whole weight-resident window. Latched on the load LOCK beat (loadVInLock or
+  // loadWInLockSafe), strictly together with wReg -- NOT on the loadHIn config
+  // window, and NOT per output column. Both halves of the former wording here
+  // ("column-resident, latched with loadH") were stale; see the latch block
+  // below for the counter-example that forced the lock-beat condition.
   val scaleBReg = RegInit(0.U(8.W))
-  // scaleA 流动寄存器：与 aReg lockstep（声明在此以供 workUnit 引用，赋值逻辑
-  // 与 aReg 段并列，见下方 aOut 段旁）
+  // scaleA flow register: lockstep with aReg (declared here so that the workUnit
+  // can reference it; the assignment sits next to the aReg block below). Note
+  // the MAC consumes io.scaleAIn combinationally, NOT scaleAReg; scaleAReg only
+  // drives the rightward scaleAOut propagation.
   val scaleAReg = RegInit(0.U(8.W))
 
   // 格式支持检测（基于 fmtReg） ---
@@ -176,7 +193,8 @@ class HiveWorker(
     // 与 fmtReg/rndReg 对称，同一 loadH 窗口锁存权重格式
     bFmtReg := io.bFmtIn
   }
-  // scaleB 列驻留寄存器：必须与权重 wReg 严格同拍锁存（loadVInLock/loadWInLock
+  // scaleB 驻留寄存器（按 K-lane 驻留、非按输出列驻留，见上方 scaleBReg 声明处）：
+  //   必须与权重 wReg 严格同拍锁存（loadVInLock/loadWInLock
   //   的 Lock 脉冲拍），而非随 loadHIn 全窗口逐拍跟踪。
   //   反例：下一 K-块 sLOAD_B 起始拍 loadHIn 即拉高，scaleBReg 会提前切到新块值，
   //   而 wReg 要到窗口末 Lock 拍才更新；此错拍窗口内，上一 K-块尚在阵列深层排空的
@@ -247,17 +265,12 @@ class HiveWorker(
     scaleAReg := io.scaleAIn
   }
   io.scaleAOut := scaleAReg
-
+  io.scaleBOut := RegNext(io.scaleBIn)
 
   // --- 控制传播 ---
   io.validOut := RegNext(io.validIn, false.B)
   io.validOutV := RegNext(io.validInV, false.B)
   io.loadVOut  := RegNext(io.loadVIn, false.B)
-  // loadW 脉冲沿 a 数据链方向逐列链传播（与 aOut lockstep，1 拍/列）。
-  // lock 拍起截断传播：lock 拍各列 aIn 已处于对角线落位态（wReg 锁存采样
-  // aIn），lock 之后继续下传的尾脉冲会在 lock 已撤的深列重新置位 loadWWin
-  // （窗口永久重开，aOut 输出残留权重顶替计算期激活，实证 col>=2 全错且
-  // 行间相同），必须就地截断。下一加载窗口 lock=0 时自然恢复传播
   io.loadWOut  := RegNext(loadWInSafe && !loadWInLockSafe, false.B)
   io.fmtOut   := RegNext(io.fmtIn, DataFormat.INT8)
   io.bFmtOut  := RegNext(io.bFmtIn, DataFormat.INT8)

@@ -68,7 +68,13 @@ class HiveCell(
     val rndIn   = Input(RoundingMode())
     // 权重格式（标量，镜像 fmtIn 逐列传播）
     val bFmtIn  = Input(DataFormat())
-    // MX scale：scaleAIn per-row（随激活链 y 方向流动），scaleBIn per-column（列驻留）
+    // MX scale: BOTH scaleAIn and scaleBIn are per-row, i.e. indexed by the PE
+    // grid row coordinate x. In this array x is the K-LANE axis (the a-chain and
+    // both scale chains flow along y, the psum/c chain flows along x; see the
+    // axis note in HiveComb). Both are injected at column y==0 and then shift
+    // right one column per cycle. The previous wording here ("scaleBIn
+    // per-column, column-resident") was stale and contradicted the wiring below;
+    // corrected in #146 after the port-chain ground-truth audit.
     val scaleAIn = Input(Vec(n, UInt(8.W)))
     val scaleBIn = Input(Vec(n, UInt(8.W)))
     val loadHIn = Input(Bool())
@@ -89,6 +95,7 @@ class HiveCell(
     val rndOut   = Output(RoundingMode())  // 标量
     val bFmtOut  = Output(DataFormat())    // 标量（镜像 fmtOut）
     val scaleAOut = Output(Vec(n, UInt(8.W)))  // per-row（a 链末端 scaleA）
+    val scaleBOut = Output(Vec(n, UInt(8.W)))  // per-row（b 链末端 scaleB）
   })
 
   // --- HiveWorker 网格 ---
@@ -112,8 +119,6 @@ class HiveCell(
       // beat 进入列 0 的绝对时刻，链传播锁存会使所有列锁到同一权重）
       pes(x)(y).io.loadWInLock := loadWInLockSafe
 
-      // scaleB 列驻留：per-column（y）广播到该列所有行 PE（随 loadH 锁存进 scaleBReg）
-      pes(x)(y).io.scaleBIn := io.scaleBIn(y)
 
       if (y == 0) {
         // valid 沿 x+y 二维传播：x==0 行首接 io.validIn，x>0 行首从上一 x 行
@@ -127,8 +132,12 @@ class HiveCell(
         pes(x)(y).io.bFmtIn  := io.bFmtIn
         pes(x)(y).io.validIn := io.validIn(x)
         pes(x)(y).io.aIn     := io.aIn(x)  // per-row 数据
-        // scaleA per-row 随激活链首列注入
+        // scaleA per-lane injection at the left edge, riding the activation skew
         pes(x)(y).io.scaleAIn := io.scaleAIn(x)
+        // scaleB per-lane injection at the left edge, using the SAME coordinate x
+        // as scaleA (x is the K-lane axis). Deliberately NOT indexed by y: that
+        // would be the wrong-axis form, see the axis note in HiveComb.
+        pes(x)(y).io.scaleBIn := io.scaleBIn(x)
         // loadW 脉冲链 per-row 注入（水平 loadW 模式，与 a 链同向 lockstep）
         pes(x)(y).io.loadWIn := loadWInSafe(x)
       } else {
@@ -139,8 +148,12 @@ class HiveCell(
         pes(x)(y).io.bFmtIn  := pes(x)(y-1).io.bFmtOut
         pes(x)(y).io.validIn := pes(x)(y-1).io.validOut
         pes(x)(y).io.aIn     := pes(x)(y-1).io.aOut
-        // scaleA 链沿 a 数据链方向（y）逐列传播，与 aOut lockstep
+        // scaleA chain propagates column by column along the a-chain direction
+        // (y), lockstep with aOut
         pes(x)(y).io.scaleAIn := pes(x)(y-1).io.scaleAOut
+        // scaleB chain propagates the same way: same direction (y), same depth
+        // (1 cycle per column) -- topologically identical to scaleA
+        pes(x)(y).io.scaleBIn := pes(x)(y-1).io.scaleBOut
         // loadW 链沿 a 数据链方向（y）逐列传播，与 aOut lockstep
         pes(x)(y).io.loadWIn := pes(x)(y-1).io.loadWOut
       }
@@ -149,6 +162,7 @@ class HiveCell(
         io.validOut(x) := pes(x)(y).io.validOut  // per-row
         io.aOut(x)     := pes(x)(y).io.aOut      // per-row
         io.scaleAOut(x) := pes(x)(y).io.scaleAOut // per-row（a 链末端）
+        io.scaleBOut(x) := pes(x)(y).io.scaleBOut // per-row（a 链末端）
         io.loadWOut(x) := pes(x)(y).io.loadWOut  // per-row（a 链末端）
       }
     }

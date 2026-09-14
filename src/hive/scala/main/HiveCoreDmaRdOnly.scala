@@ -152,9 +152,10 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
     val bufPopFire = Input(Bool())
   })
 
-  // MX v2 SIMD 运行期判据（与顶层 mxRun 同语义）：非 MX 配置（!cfg.hasMx）
-  // 编译期短路为 false，不生成比较逻辑，非 MX 路径 bit-exact。
-  private val mxRunDma: Bool = if (cfg.hasMx) DataFormat.isMx(io.regFile.aFmt) else false.B
+  // 【Ivy⑧ 死信号清理】原 private val mxRunDma（MX 运行期判据 = isMx(aFmt)）在本模块内
+  //   从未被任何逻辑消费（全仓 grep 仅此一处定义），firtool DCE 早已消除 ⟹ 删除定义 RTL
+  //   逐位不变（三套 verilog normalized-diff 由 Verify 复核）。problem.md ④ 对 mxRunDma 的
+  //   引用属 W4A8 根因分析的历史留痕（Executor 侧 mxRunB 仍在），保留不动。
 
   // ==========================================================================
   // FSM 状态编码

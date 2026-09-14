@@ -18,7 +18,7 @@
   * 内存布局约定（与硬件地址公式在 FP16/MX 族上逐字自洽）：
   *   A       : row-major M×K，元素 memElemBytes(aFmt) 字节，基址 A_BASE
   *   B       : loadWMode=0 → row-major K×N；loadWMode=1 → row-major N×K（转置）
-  *   scaleA  : row-major M×(K/aBlk) 字节（aBlk = 8<<aMxBlkSel）
+  *   scaleA  : row-major M×(K/aBlk) 字节（aBlk = 16<<aMxBlkSel；MXBlockSize 收窄后 sel=0→16、sel=1→32）
   *   scaleB  : row-major N×(K/bBlk) 字节，byte = n*(K/bBlk) + kb（与硬件
   *             scaleBRowAddressOffset = K/bBlk 作为 n 向步进逐字对应）
   *   C       : 密集布局，地址序列直接复用 HiveSimCommon.cAddrSeqDense（四套件
@@ -219,9 +219,14 @@ object HiveDebugModel {
       waveTarget: String,
       testHint: String) {
 
-    def aMxBlk: Int = 8 << aMxBlkSel
-    def bMxBlk: Int = 8 << bMxBlkSel
-    def cMxBlk: Int = 8 << cMxBlkSel
+    // 【#144 blk 解码跟随 MXBlockSize 枚举收窄】枚举已由 {M8=0,M16=1,M32=2,M64=3}（bytes=8<<sel）
+    //   收窄为 {M16=0,M32=1}，故 sel→bytes 的定义式相应改为 16<<sel：sel=0→16(M16)、sel=1→32(M32)。
+    //   由张量语义（新枚举基档 M16=16 元素、每 +1 档翻倍）推导，与 main 侧 getBlockSize 的
+    //   {M32→32, otherwise→16} 映射同源；旧 8<<sel 会把 sel=1 误解码为 16、sel=0 误解码为 8，
+    //   导致金锚 scale 地址步进/量化分组与硬件失同步（QuickSpec 假红根因）。
+    def aMxBlk: Int = 16 << aMxBlkSel
+    def bMxBlk: Int = 16 << bMxBlkSel
+    def cMxBlk: Int = 16 << cMxBlkSel
 
     /** 控制字 regs(7)：rnd(14,12) | cFmt(11,8) | bFmt(7,4) | aFmt(3,0)
       * 【#120 C2】rnd 扩为 3-bit（bits[14:12]），支持全 5 种舍入模式（RNE/RTZ/RDN/RUP/RMM）。 */
@@ -250,35 +255,57 @@ object HiveDebugModel {
   // 配置合法性预检（与 HiveCoreCalcConfig errCode 语义同源，用于分派负向路径）
   // ==========================================================================
 
-  /** 返回 Some(errCode) 表示硬件会在 EXECUTE 拍直接置 config-err（不进计算）。
-    * 【Fix-7】新增 hasMx4 入参（= cfg.hasMx4），用于门控 fp4 专属 errCode（7 与 MX4×MX8 的 3）：
-    *   hasMx4=false 时硬件根本不 elaborate errCode7 / 新 errCode3 分支，金锚亦不得返回。
-    * 优先级严格镜像硬件 last-connect 真值（后写覆盖前写，源码越靠后优先级越高）：
-    *   7(fp4 blk≠64) > 3(MX4×MX8 混配) > 6 > 5 > 4 > 3(isAMx^isBMx) > 0；本 if/else 链首即最高。
-    *   注：errCode 0/1/2 在本金锚仍分列（历史口径），硬件已合并为单一 0，属 #124 已知偏差。
-    *   注：MX4×MX8 混配(W4A8)数学/OCP 合法但真数据通路支持列 v2；此处 Some(3) 是【运行期可诊断】
-    *   守护的金锚镜像（非永久拒绝），与硬件 Fix-4 的 hasMx4 门控 when 同源、同 last-connect 序。 */
-  def precheckConfigErr(p: DebugParams, totalN: Int, hasMx4: Boolean = false): Option[Int] = {
-    val aMx = isMxAny(p.aFmt)
-    val bMx = isMxAny(p.bFmt)
-    val aKLoad = if (isMx8(p.aFmt)) totalN * 2 else totalN * 4
-    val bKLoad = if (isMx8(p.bFmt)) totalN * 2 else totalN * 4
-    // 【Fix-7】errCode7 移到链首（最高优先级）并按 hasMx4 门控。fp4(E2M1) v1 强制 block=64
-    //   （=1 kTile=1 pass=1 scale 块，保 Executor 单广播不变式）。OCP block=32 属 v2（DEFERRED）。
-    if (hasMx4 && p.aFmt == DataFormat.MXE2M1 && p.aMxBlk != 64) Some(7)
-    else if (hasMx4 && p.bFmt == DataFormat.MXE2M1 && p.bMxBlk != 64) Some(7)
-    // 【Fix-8】MX4×MX8 混配 → Some(3)，与硬件 Fix-4 门控 + 优先级一致（7 > 本 3 > 其余）。
-    //   条件镜像硬件 isMx4(aFmt) ^ isMx4(bFmt)：a/b 必须同为 fp4(E2M1) 或同为 fp8(E4M3/E5M2)。
-    //   注：E4M3×E5M2 双 fp8 混配两侧 isMx4 均 false → 不触发（合法，保留现有 dual-MX8 用例）。
-    else if (hasMx4 && (p.aFmt == DataFormat.MXE2M1) != (p.bFmt == DataFormat.MXE2M1)) Some(3)
-    else if (aMx && p.aMxBlk > aKLoad) Some(0)
-    else if (bMx && p.bMxBlk > bKLoad) Some(1)
-    else if (isMxAny(p.cFmt) && p.cMxBlk > totalN) Some(2)
-    else if (aMx != bMx) Some(3)
-    else if ((aMx || bMx) && !p.loadWMode) Some(4)
-    else if (p.aFmt == DataFormat.FP32 || p.bFmt == DataFormat.FP32) Some(5)
-    else None
+  /** 【单一真源 · P0-2 去双源】HiveCoreCalcConfig errComb 裸块的权威软件镜像。
+    * 原为 HiveCoreQuickSpec.hwErrCode（private），现提升为 HiveDebugModel 公共 def，令
+    * precheckConfigErr 与 QuickSpec 体检共用同一份镜像，消灭"两份互不一致的 errCode 软件镜像"。
+    *
+    * 逐位镜像硬件 last-connect 真值序（后写覆盖前写，源码越靠后优先级越高），用【顺序 if +
+    * 后写覆盖 e】编码该序（区别于旧 precheckConfigErr 的 else-if 链首最高）：
+    *   3(MX4xMX8 mix) > 8(fp4 K not divisible by kPerBeat) > 6 > 5 > 4 > 3(isAMx^isBMx) > 0.
+    *   (#146) The former leading `7(fp4 blk!=64)` term is GONE: errCode 7 was
+    *   deleted both in hardware and in this mirror, so code 7 is now free.
+    *   Codes 1/2 stay unreachable and are never revived.
+    * ▸ errCode 0/1/2：硬件把 a/b/cMxBlockSize 三违约【合并】为单一 errMXLargerThanKLoadNum→errCode 0，
+    *   故 1/2 永不可达（QuantSpec「blk32 over totalN」旧期望 2 实得 0 的红项根因，#124）；本镜像
+    *   合并为单一 Some(0)，与 RTL 一致。
+    * ▸ hasMx4 gating: the mix code3 and code8 branches only elaborate in hardware
+    *   when cfg.hasMx4=true; this mirror uses the same gate. (#146) The third
+    *   hasMx4-gated branch (code7) has been deleted.
+    * ▸ code8（P0-1）：fp4(E2M1) 要求 K 被 kPerBeat(=totalN×4=64) 整除，否则 Executor kTiles 地板除
+    *   静默丢尾（K=96）或 16-bit 回绕（K<64）；硬件 errCode8 运行期拒绝，金锚镜像之。 */
+  def hwErrCode(p: DebugParams, totalN: Int, hasMx4: Boolean = false): Option[Int] = {
+    def kLoadNum(f: DataFormat.Type): Int = if (isMx8(f)) totalN * 2 else totalN * 4  // 镜像 getKLoadNum
+    val aMx = isMxAny(p.aFmt); val bMx = isMxAny(p.bFmt); var e = Option.empty[Int]
+    if ((aMx && p.aMxBlk > kLoadNum(p.aFmt)) || (bMx && p.bMxBlk > kLoadNum(p.bFmt)) ||
+        (isMxAny(p.cFmt) && p.cMxBlk > totalN)) e = Some(0)   // RTL 把三个 blk 违约合并成单一 errCode 0
+    if (aMx != bMx) e = Some(3)
+    if ((aMx || bMx) && !p.loadWMode) e = Some(4)
+    if (p.aFmt == DataFormat.FP32 || p.bFmt == DataFormat.FP32) e = Some(5)
+    if (p.cFmt == DataFormat.MXE2M1 && (p.n & 1) == 1) e = Some(6)
+    // [P0-1] fp4(E2M1) K not divisible by kPerBeat -> code8. Placed BEFORE the
+    //   mix code3 below, i.e. lower priority, matching the hardware
+    //   last-connect order.
+    if (hasMx4 && p.aFmt == DataFormat.MXE2M1 && p.k % kPerBeat(DataFormat.MXE2M1, totalN) != 0) e = Some(8)
+    // [Fix-4 mirror] MX4xMX8 mix (isMx4(aFmt) ^ isMx4(bFmt)) -> code 3, gated by hasMx4.
+    if (hasMx4 && (p.aFmt == DataFormat.MXE2M1) != (p.bFmt == DataFormat.MXE2M1)) e = Some(3)
+    // (#146) errCode 7 REMOVED from the mirror. The hardware block it mirrored
+    //   (`isMx4(fmt) && getBlockSize(blkSel) =/= 64`) became a TAUTOLOGY once the
+    //   MXBlockSize enum was narrowed to {sel=0 -> 16, sel=1 -> 32}: no encodable
+    //   blocksize can ever equal 64, so every fp4 run was rejected at runtime,
+    //   unconditionally. Because this mirror carried the same tautology, RTL and
+    //   anchor agreed and no test ever went red -- fp4 was permanently unusable
+    //   while looking covered. fp4 now supports blk in {16, 32} like fp8; code 8
+    //   is the only fp4 geometry guard left; code 7 is FREE (new checks are
+    //   allocated from 7 upwards, codes 1/2 are never revived).
+    e
   }
+
+  /** 返回 Some(errCode) 表示硬件会在 EXECUTE 拍直接置 config-err（不进计算）。
+    * 【P0-2 去双源】改为委托权威单一真源 hwErrCode（原 else-if 分列 Some(0)/Some(1)/Some(2) 的
+    *   历史口径已废弃——硬件把三 blk 违约合并为单一 errCode 0，且旧链缺 errCode6、优先级与 RTL
+    *   不符，属 #124 已知偏差）。委托后 precheckConfigErr 与 QuickSpec 体检逐位一致。 */
+  def precheckConfigErr(p: DebugParams, totalN: Int, hasMx4: Boolean = false): Option[Int] =
+    hwErrCode(p, totalN, hasMx4)
 
   /** 运行前防呆：不支持的组合给清晰报错（harness 不得崩溃，故在 simulate 之前抛）
     * 【Fix-8】hasMx4 入参（= cfg.hasMx4）门控 MX4×MX8 混配 require：hasMx4=false 时 fp4 输入
@@ -317,13 +344,20 @@ object HiveDebugModel {
       require(!(isMxAny(p.aFmt) && isMxAny(p.bFmt)) ||
               (p.aFmt == DataFormat.MXE2M1) == (p.bFmt == DataFormat.MXE2M1),
         s"MX4×MX8 混配 v1 暂不支持（W4A8 属 v2 路线）：a/b 须同为 fp4(E2M1) 或同为 fp8(E4M3/E5M2)，当前 aFmt=${p.aFmt} bFmt=${p.bFmt}")
-    // 【Phase 3】fp4 v1 强制 block=64（=1 kTile=1 pass=1 scale 块，保 Executor 单广播
-    //   不变式），与硬件 errCode 7 同源。OCP 规范允许 block=32，属 v2 per-half-pass 路线
-    //   （DEFERRED）。仅对 MXE2M1 生效，非 fp4 用例无影响。
+    // (#146) fp4 no longer forces block=64. The hardware errCode 7 that this
+    //   require used to mirror has been DELETED: MXBlockSize is a 2-level enum
+    //   {sel=0 -> 16, sel=1 -> 32}, so "blk must be 64" was unsatisfiable and
+    //   every fp4 case was rejected before it could ever run. fp4 now accepts
+    //   blk in {16, 32} exactly like fp8, so the mirror guard becomes "blk must
+    //   be one of the two values the register field can actually encode" (K
+    //   divisibility is already required above). errCode 8 (K not divisible by
+    //   kPerBeat) remains the only fp4-specific hardware geometry guard.
     if (p.aFmt == DataFormat.MXE2M1)
-      require(p.aMxBlk == 64, s"fp4(E2M1) v1 强制 aMxBlk=64（当前 ${p.aMxBlk}）；block=32 属 v2 per-half-pass 路线")
+      require(p.aMxBlk == 16 || p.aMxBlk == 32,
+        s"fp4(E2M1) aMxBlk must be 16 or 32 (MXBlockSize is a 2-level enum {M16, M32}), got ${p.aMxBlk}")
     if (p.bFmt == DataFormat.MXE2M1)
-      require(p.bMxBlk == 64, s"fp4(E2M1) v1 强制 bMxBlk=64（当前 ${p.bMxBlk}）；block=32 属 v2 per-half-pass 路线")
+      require(p.bMxBlk == 16 || p.bMxBlk == 32,
+        s"fp4(E2M1) bMxBlk must be 16 or 32 (MXBlockSize is a 2-level enum {M16, M32}), got ${p.bMxBlk}")
     if (isMxAny(p.cFmt)) {
       require(p.cMxBlk <= totalN && totalN % p.cMxBlk == 0,
         s"cMxBlk(${p.cMxBlk}) 必须 <= totalN($totalN) 且整除")
@@ -500,10 +534,18 @@ object HiveDebugModel {
     val cDmaExtW: Int = cfg.cDmaExtW
 
     // 【Fix-9】fp4 守卫下沉为 cfg-aware：validate 是 object 层（Plan(p,cfg) 之前）、DebugParams
-    //   无 supportedFmts/hasMx4 字段，模型无从感知 DUT 是否支持 fp4。若 HiveCoreDebugCase
-    //   （默认 supportedFmts、hasMx4=false）跑 -DaFmt=mxfp4，会建 fp4 金锚却撞 hasMx4=false 的 DUT
-    //   （E2M1 落 E4M3 臂误码、fmtOk=false、psumReg 停摆）→ 从清晰 fail-fast 退化为不可诊断的
-    //   静默失配。Plan 已持有 cfg，故在此早抛。DataFormat.isMx4 返回硬件 Bool，此处用纯 Scala ==。
+    //   无 supportedFmts/hasMx4 字段，模型无从感知 DUT 是否支持 fp4。若某个 cfg 显式传入不含
+    //   MXE2M1 的 supportedFmts（hasMx4=false）却跑 aFmt/bFmt=mxfp4，会建 fp4 金锚却撞 hasMx4=false
+    //   的 DUT（E2M1 落 E4M3 臂误码、fmtOk=false、psumReg 停摆）→ 从清晰 fail-fast 退化为
+    //   不可诊断的静默失配。Plan 已持有 cfg，故在此早抛。DataFormat.isMx4 返回硬件 Bool，
+    //   此处用纯 Scala ==。
+    // (#155 MJ1) 订正：自本轮起 HiveCoreConfig 的【默认 supportedFmts 已含 MXE2M1】，且新增
+    //   require(!hasMx8 || hasMx4) 使 hasMx4 ⟺ hasMx8 ⟹ 「默认集不含 fp4」不再是真陈述，
+    //   本 require 在默认集下恒不触发；它现在的实际职责是拦住【显式传入 MX-only-fp8 子集】
+    //   这类人为构造的 cfg（这类 cfg 已被 HiveCoreConfig 的新 require 在更早处拦下，故此
+    //   require 退化为纵深防御的第二道）。下方 require 的消息原文【逐字保留不改】，以保持
+    //   用户上一轮报错现场的可追溯性；其中「HiveCoreDebugCase 的 dbgCfg 用默认 supportedFmts
+    //   不含 fp4」一句属历史陈述（该文件已在本仓 10 个 ` D` 已删测试之列，且默认集已变）。
     if (p.aFmt == DataFormat.MXE2M1 || p.bFmt == DataFormat.MXE2M1)
       require(cfg.hasMx4,
         s"aFmt/bFmt=mxfp4(E2M1) 需硬件 supportedFmts 含 MXE2M1（当前 cfg.hasMx4=${cfg.hasMx4}）；" +
@@ -660,13 +702,62 @@ object HiveDebugModel {
       if (isMxAny(p.bFmt)) Array.tabulate(p.n, sbEntries)((nn, j) => HiveSimCommon.mxScaleByte(scaleExpB(j, nn)))
       else Array.empty
 
-    /** 硬件实际消费的 scale：A 每 kTile 一个（广播），索引 = kt*(aKpb/aBlk) */
+    // ------------------------------------------------------------------------
+    // (#146) effScaleA / effScaleB -- the E8M0 scale that the OCP MX definition
+    //   assigns to one element. DERIVED FROM THE SPEC, NOT FITTED TO THE RTL.
+    // ------------------------------------------------------------------------
+    // SPEC: the K axis of every row is partitioned into contiguous blocks of
+    //   aMxBlk elements; block j owns [j*aMxBlk, (j+1)*aMxBlk) and carries the
+    //   single scale byte scaleA(mm)(j). Hence the scale of element (mm, k) is
+    //     scaleA(mm)(k / aMxBlk)                       (integer division)
+    //   which is total and in range because validate() requires K % aMxBlk == 0
+    //   and scaleA has exactly saEntries = K/aMxBlk columns. Same for B with
+    //   scaleB(nn)(k / bMxBlk) -- the B tensor is stored N-major but the block
+    //   partition is along K either way.
+    // OLD FORM (removed): scaleA(mm)((k/aKpb) * (aKpb/aMxBlk)), i.e. "the index of
+    //   the FIRST block of the kTile containing k" = ONE scale per kTile,
+    //   broadcast over the whole kTile. That is only correct under the invariant
+    //   aMxBlk == aKpb ("1 kTile = 1 scale block = single pass"), which the
+    //   deleted errCode 7 used to force for fp4 and which the fp8 blk=32 cases
+    //   satisfy by construction.
+    // EXACT DEGENERACY CONDITION: new == old for every k in [0, K)
+    //   IFF  aMxBlk == aKpb.
+    //   Proof. Write k = kt*aKpb + r with 0 <= r < aKpb. errCode 0 enforces
+    //   aMxBlk <= kLoadNum == aKpb and both are powers of two, so aMxBlk divides
+    //   aKpb; let q = aKpb/aMxBlk >= 1. Then old = kt*q and
+    //   new = (kt*aKpb + r)/aMxBlk = kt*q + r/aMxBlk. Equality for all r requires
+    //   r/aMxBlk == 0 for all r < aKpb, i.e. aKpb <= aMxBlk, i.e. q == 1.
+    //   (The corner aMxBlk > aKpb, unreachable past errCode 0, would give q = 0
+    //   hence old == 0 for all k while new grows -- unequal as well.)
+    // IMPACT ON THE EXISTING SUITE (per-case, not hand-waved):
+    //   fp8 (MXE4M3/MXE5M2), totalN=16 -> aKpb = bKpb = 32.
+    //     blk=32: aMxBlk == aKpb -> old == new IDENTICALLY -> every existing
+    //            blk=32 case keeps the exact same golden values. ZERO impact.
+    //     blk=16: q = 2, old = 2*floor(k/32) visits only EVEN block indices
+    //            (0, 2, 4, ...) and never the odd ones, i.e. the second half of
+    //            each kTile was silently given the first half's scale. The ANCHOR
+    //            was the wrong side; new = floor(k/16) is the spec value. This is
+    //            what makes an end-to-end blk=16 case possible at all.
+    //   fp4 (MXE2M1) -> aKpb = bKpb = 64. blk=32: q = 2, same even-block defect;
+    //     blk=16: q = 4, old visits only multiples of 4. Both fixed. (No fp4 suite
+    //     currently exists in the repo, so this is preventive.)
+    // INDEPENDENT CROSS-CHECK against the datapath (recorded for audit only; the
+    //   anchor above does NOT depend on it): lane i of kTile kt carries elements
+    //   k = kt*kPerBeat + i*step .. +step-1 with step = elemsPerLane. Because
+    //   blk >= step and blk divides kPerBeat, a lane never straddles a block
+    //   boundary, so its block index is
+    //     (kt*kPerBeat + i*step)/blk = kt*(kPerBeat/blk) + (i*step)/blk
+    //                                = kt*(kPerBeat/blk) + idx
+    //   where idx = (i*step)/blk is exactly the byte slot HiveCoreExecutor
+    //   selects out of the scale payload, and the DMA word read at
+    //   base + row*(K/blk) + kt*(kPerBeat/blk) puts block kt*(kPerBeat/blk)+j of
+    //   that row into byte j. Byte idx therefore is block k/blk -- the spec value.
     def effScaleA(mm: Int, k: Int): Int =
       if (!isMxAny(p.aFmt)) 127
-      else scaleA(mm)((k / aKpb) * (aKpb / p.aMxBlk))
+      else scaleA(mm)(k / p.aMxBlk)
     def effScaleB(nn: Int, k: Int): Int =
       if (!isMxAny(p.bFmt)) 127
-      else scaleB(nn)((k / bKpb) * (bKpb / p.bMxBlk))
+      else scaleB(nn)(k / p.bMxBlk)
 
     // 【Phase 3 域分离】输入解码走 decodeInElem：MXE2M1 → decodeMxE2M1Input（±0.5 一等
     //   公民值，subnormalFtz=false，与硬件 Fp32.mxE2M1ToFp32 逐位同源）；其余格式完全
@@ -684,6 +775,124 @@ object HiveDebugModel {
     }
 
     lazy val goldenC: Array[Array[Double]] = Array.tabulate(p.m, p.n)(golden)
+
+    // ========================================================================
+    // (#151 F4) 独立期望码链：张量语义 → OCP MX 规范 → 期望 E8M0 scale + 期望元素码
+    // ========================================================================
+    // 动机：原 compare() 的 FTZ 判据是【幅值阈值启发式】|ref| < minNormal(cFmt)·2^(s-127)，
+    //   它把「该冲刷成保号零」当成一个纯幅值条件。这在【不产出次正规】的格式（E4M3/E5M2/
+    //   FP16/BF16）上恰好精确（underflow 由 eTgt<1 在舍入【之前】判定 ⟹ y'<minNormal 与
+    //   模式无关），但在 E2M1 上【错 4 倍】：E2M1 minNormal=1.0，而 OCP 把 (e=0,m=1)=±0.5
+    //   认定为一等公民，真正的归零区是模式相关的（RNE y'<=0.25 / RTZ y'<0.5 / RMM y'<0.25 /
+    //   RUP-RDN 带符号只有严格零）。用 y'<1.0 当判据会把 (0.25S,0.5S) 这段【本该是 0.5S】
+    //   的元素继续当保号零做硬断言 ⟹ 修好的 RTL 反而变红，或为过而排除比对制造静默盲区。
+    // 手法：干掉阈值启发式，改由【金锚独立算出的期望码】决定 —— 期望码本身是保号零时才走
+    //   bit-exact 断言。期望 scale 由 OCP amax 规则从期望 C 行独立算出（复用 swQuantBlock，
+    //   与 HiveCoreSimCaseMxSpec.expectedQuantRow 同范式），【全程不读任何硬件写回值】。
+    // ========================================================================
+
+    /** (#151 F4) 累加精确性判定（纯张量语义，不读硬件）：fp64 顺序累加的【每一个乘积与
+      * 每一个部分和】是否都能被 fp32 无损表示。若全程精确，则任何累加顺序、任何结合性、
+      * 任何 >=32 位的中间精度都给出同一个数 ⟹ 金锚 fp64 值与硬件 fp40 累加树的值必然
+      * 相同 ⟹ 该元素的期望码可做【逐位】断言（Tier A）。否则金锚与硬件的差是合法的
+      * 累加舍入差，逐位断言就等于要求金锚去模拟 RTL 的累加树 —— 那正是「以 RTL 行为为
+      * 拟合目标」，违反金锚铁律，故退回容差比对（Tier B）。
+      * 典型：fp4(E2M1) 输入值集 ±{0,0.5,...,6} ⟹ 乘积是 0.25 的整数倍、|和| <= 64*36，
+      *   仅需 14 bit ⟹ 全程 fp32 精确 ⟹ Tier A 覆盖全部元素。
+      * 典型：E4M3×E5M2 值域达 448×57344 ⟹ 部分和一般不精确 ⟹ Tier B（行为与改前相同）。 */
+    def goldenExact(mm: Int, nn: Int): Boolean = {
+      def fp32Exact(v: Double): Boolean = v.toFloat.toDouble == v
+      var acc = 0.0
+      var k = 0
+      var ok = true
+      while (k < p.k) {
+        val prod = aVal(mm, k) * bVal(k, nn)
+        if (!fp32Exact(prod)) ok = false
+        acc += prod
+        if (!fp32Exact(acc)) ok = false
+        k += 1
+      }
+      ok
+    }
+
+    lazy val goldenCExact: Array[Array[Boolean]] = Array.tabulate(p.m, p.n)(goldenExact)
+
+    /** (#151 F4) 金锚 fp64 值 → fp32 bits → 40→32 规格化（与硬件两级舍入链【同链】）。 */
+    def goldenBits(mm: Int, nn: Int): Long = {
+      val fp32Bits = java.lang.Float.floatToRawIntBits(goldenC(mm)(nn).toFloat) & 0xFFFFFFFFL
+      HiveSimCommon.swFpNormalize40to32(HiveSimCommon.fp32BitsTo40(fp32Bits))
+    }
+
+    lazy val goldenCBits: Array[Array[Long]] = Array.tabulate(p.m, p.n)(goldenBits)
+
+    /** (#151 F4) 独立期望量化行：OCP amax 块 scale + 逐元素期望码（含 E2M1 次正规）。
+      * nt = n-tile 序号；列 >= nEffTile 为 padding，不进 amax、码输出 0（swQuantBlock 内建）。 */
+    def expQuantRow(nt: Int, mm: Int): (Seq[Int], Seq[Int]) = {
+      val nEffTile = math.min(totalN, p.n - nt * totalN)
+      val row = (0 until totalN).map { lc =>
+        val gc = nt * totalN + lc
+        if (gc < p.n) goldenCBits(mm)(gc) else 0L
+      }
+      HiveSimCommon.swQuantBlock(row, p.rnd, p.cFmt, p.cMxBlkSel, nEffTile)
+    }
+
+    /** 按 (nt*p.m + mm) 索引的期望量化行缓存（仅 MX 输出格式时构造）。 */
+    lazy val expQuant: Array[(Seq[Int], Seq[Int])] =
+      if (!isMxAny(p.cFmt)) Array.empty
+      else Array.tabulate(nTiles * p.m)(i => expQuantRow(i / p.m, i % p.m))
+
+    /** 元素 (mm,nn) 的期望 E8M0 scale 字节（OCP amax 独立算出，不读硬件）。 */
+    def expScaleAt(mm: Int, nn: Int): Int = {
+      val nt = nn / totalN
+      expQuant(nt * p.m + mm)._2((nn - nt * totalN) / 8)
+    }
+
+    /** 元素 (mm,nn) 的期望元素码（OCP 量化独立算出，不读硬件）。 */
+    def expCodeAt(mm: Int, nn: Int): Int = {
+      val nt = nn / totalN
+      expQuant(nt * p.m + mm)._1(nn - nt * totalN)
+    }
+
+    /** (#151 F4) MX 侧【模式相关归零区】解析判据 —— 直接由 OCP 网格与 swRoundUp/roundUp16
+      * 的五模式定义推出，是 expCode 判零的【第二条独立路径】，两者逐元素交叉自证。
+      *
+      * 设 y' = |ref| / 2^(s-127)。因 y' = 1.f × 2^(eTgt-bias)，E2M1(bias=1) 的次正规区
+      * 覆盖 eTgt ∈ {0,-1} ⟹ y' ∈ [0.25, 1.0)，网格 {0, 0.5, 1.0}：
+      *   eTgt=-1 → y' ∈ [0.25,0.5)：keep=0, guard=1(原隐含位), sticky=(f!=0), lsb=0
+      *   eTgt= 0 → y' ∈ [0.5,1.0) ：keep=1, guard=f 的最高位, sticky=其余, lsb=1
+      * 逐模式代入 swRoundUp：
+      *   RNE(0) guard&&(sticky||lsb)：eTgt=-1 时 up=sticky ⟹ y'=0.25(f=0,tie) up=0 → 0（偶）；
+      *            y'∈(0.25,0.5) up=1 → 0.5 ⟹ 归零区 y' <= 0.25
+      *   RTZ(1) 恒 false：eTgt=-1 → keep=0 → 0 ⟹ 归零区 y' < 0.5（整个 [0.25,0.5) 截断归 0）
+      *   RDN(2) neg&&(guard||sticky)：负数 eTgt=-1 → up=1（guard=1）→ -0.5，连 tie 点 0.25 也进位
+      *            ⟹ 负数归零区【只有严格零】；正数 up=0 → keep=0 → 0 ⟹ 正数归零区 y' < 0.5
+      *   RUP(3) !neg&&(guard||sticky)：与 RDN 符号对偶 ⟹ 正数只有严格零；负数 y' < 0.5
+      *   RMM(4) guard：eTgt=-1 → up=1（guard=1，不论 sticky）→ 0.5，tie 点 0.25 也进位（ties to
+      *            max magnitude）⟹ 归零区 y' < 0.25（严格）
+      * 【#151 F4-b 深下溢（eTgt ≤ -2 ⟹ y' < 0.25）的定向模式修正】上面 RDN/RUP 两行说的
+      *   「只有严格零」需要 F4-b 臂才成立：IEEE-754 roundTowardNegative/Positive 是「取不超过/
+      *   不低于 x 的最接近可表示值」，不是幅值截断，故对任意非零 x，只要定向把幅值推离零，
+      *   结果就必须是最小非零可表示值 ±0.5。原 underflow 分支把 y'<0.25 一律冲刷成 ±0，等价
+      *   于在该区间偷偷退化成 RTZ ⟹ 是存量缺陷（改前 E2M1 不产出任何次正规码，±0.5 恒为死码，
+      *   缺陷不可见）。F4-b 臂在 RTL(HiveOutCvt.quantElem dirAway/deepSel/deepCode) 与金锚
+      *   (swQuantElem 深下溢定向臂) 两侧对称补齐后，本表 RDN/RUP 两行才成立。
+      *   RNE/RTZ/RMM 幅值对称 ⟹ y'<0.25 归零本来就是正确的，F4-b 臂不介入（dirAway=false）。
+      * E4M3/E5M2（emitSub=false）：underflow 由 eTgt<1 在舍入【之前】判定 ⟹ 归零区
+      *   y' < minNormal(fmt) = 2^(1-bias)，【与舍入模式无关】（不存在把次正规舍入进位到
+      *   最小正规的路径）。这也说明原启发式在这两格式上本来就是精确的。 */
+    def analyticZeroRegionMx(refMag: Double, scaleByte: Int, rnd: Int, neg: Boolean): Boolean = {
+      if (refMag == 0.0) return true
+      if (p.cFmt != DataFormat.MXE2M1) return refMag < minNormal(p.cFmt) * math.pow(2.0, (scaleByte - 127).toDouble)
+      val yp = refMag / math.pow(2.0, (scaleByte - 127).toDouble)
+      rnd match {
+        case 0 => yp <= 0.25
+        case 1 => yp < 0.5
+        case 2 => if (neg) false else yp < 0.5
+        case 3 => if (neg) yp < 0.5 else false
+        case 4 => yp < 0.25
+        case _ => throw new IllegalArgumentException(s"analyticZeroRegionMx: rnd=$rnd out of 0..4")
+      }
+    }
 
     // ==========================================================================
     // 内存镜像构建
@@ -723,7 +932,44 @@ object HiveDebugModel {
     /** 按地址取 A/B beat（内存保真，绝不按 beat 序号发数） */
     def beatAtA(addr: Long): BigInt = mem.loadBits(addr, cfg.aExtW)
     def beatAtB(addr: Long): BigInt = mem.loadBits(addr, cfg.bExtW)
-    def byteAt(addr: Long): BigInt = BigInt(mem.loadByte(addr) & 0xFF)
+    // ------------------------------------------------------------------------
+    // (#146) Scale-channel read accessor: a 32-bit LITTLE-ENDIAN word at `addr`.
+    //   Replaces the former `byteAt(addr) = loadByte(addr) & 0xFF` (1 byte).
+    // ------------------------------------------------------------------------
+    // WHY: the scale read channels were widened to scaleAW = scaleBW =
+    //   totalNx4/minBlockSize*8 = 32 bit (#145), and HiveCoreExecutor selects a
+    //   per-lane byte out of that payload with
+    //     idx = (lane*elemsPerLane)/blk ;  payload >> (idx*8) & 0xFF
+    //   For blk = kPerBeat (fp8 blk=32, fp4 blk=64-if-it-existed) numScalesPerBeat
+    //   = kPerBeat/blk = 1, so idx is identically 0 and only payload[7:0] is ever
+    //   consumed -- one byte per beat was enough. For blk < kPerBeat (fp8 blk=16
+    //   -> numScalesPerBeat = 2; fp4 blk=16 -> 4; fp4 blk=32 -> 2) the higher byte
+    //   slots ARE consumed, so the model must place the neighbouring scale bytes of
+    //   the same tensor row into those slots.
+    // WHAT THE ADDRESS MEANS: the scale DMA issues a byte address
+    //     base + row*(K/blk) + kt*(kPerBeat/blk)
+    //   (HiveCoreCalcConfig scaleA/BRowAddressOffset = K/blk,
+    //    scaleA/BColTileAddressOffset = kLoadNum/blk) and the external memory
+    //   answers with 32 bits. A 32-bit read at byte address `a` returns
+    //   mem[a], mem[a+1], mem[a+2], mem[a+3] with mem[a] in bits[7:0] -- exactly
+    //   `loadBits(addr, 32)`, the same little-endian convention already used by
+    //   beatAtA/beatAtB. Byte slot j therefore carries scale block
+    //   kt*(kPerBeat/blk) + j of that row, which is what lane group
+    //   idx = j needs.
+    // PROOF THAT blk=32 (fp8) BEHAVIOUR IS UNCHANGED: with aBlk=bBlk=32 and fp8,
+    //   kPerBeat = totalN*2 = 32, so numScalesPerBeat = 32/32 = 1 and
+    //   idx = (lane*2)/32 = 0 for every lane in 0..totalN-1. The Executor thus
+    //   reads ONLY payload[7:0] = mem[addr], which is byte-identical to the old
+    //   `byteAt`. The three newly populated upper bytes are dead bits that no
+    //   consumer selects, so every existing blk=32 case is bit-for-bit unaffected.
+    //   (Same argument for any blk >= kPerBeat, i.e. whenever idx degenerates to 0.)
+    // NOTE: the upper bytes can legitimately run past the end of the scale row
+    //   (and even past the end of the tensor for the last kTile of the last row),
+    //   because only the first numScalesPerBeat bytes are selected. loadByte
+    //   returns 0 for unwritten addresses, so this is well defined here; on real
+    //   hardware it is the "32-bit read may cross the tensor end" concern that
+    //   src/hive/doc/problem.md registers under the #146 alignment contract.
+    def wordAt(addr: Long): BigInt = mem.loadBits(addr, 32)
 
     private var mem: ByteMemory = new ByteMemory
     def prepare(): ByteMemory = { mem = buildMemory(); mem }
@@ -750,8 +996,26 @@ object HiveDebugModel {
       * （-0.0 vs +0，absErr=0）均被【静默通过】—— #127 若症状落进 FTZ 区会被此工具藏掉。
       * #129 改为：FTZ 命中时【对 hw 原始位做 bit-exact 断言】——必须恰为保号零码
       * （ftzSignedZeroCode，符号位由格式位宽推导），任何非零码/符号不符即判失配。
-      * 【阈值推导（minNormal / MX 侧 ×2^(s-127)）保持 #128 不动；tolRel/tolAbs 一字未改】，
-      * 仅改「命中之后怎么判」。另加屏蔽面可观测性：打印被 FTZ 分支接管的元素计数。 */
+      *
+      * 【#151 F4：MX 侧判据从「幅值阈值启发式」换成「金锚独立期望码」】#129 的命中判据
+      * `|ref| < minNormal(cFmt)·2^(s-127)` 是一个纯幅值条件，它隐含假设「低于最小正规格化
+      * 就一定冲刷成零」。该假设对【不产出次正规】的格式成立（E4M3/E5M2 的 underflow 由
+      * eTgt<1 在舍入之前判定 ⟹ 归零区 y'<minNormal 且与舍入模式无关；FP16/BF16 同理），
+      * 但对 E2M1 【错 4 倍】：OCP MX 把 (e=0,m=1)=±0.5 定义为一等公民，E2M1 的真实归零区
+      * 是【模式相关】的（RNE y'<=0.25 / RTZ y'<0.5 / RMM y'<0.25 / RUP-RDN 带符号只有严格零，
+      * 完整推导见 analyticZeroRegionMx 与 build/151 报告 §F4）。沿用 y'<1.0 会把 (0.25S,0.5S)
+      * 这段【本该是 0.5S】的元素继续当保号零做硬断言 ⟹ 修好的 RTL 反而变红；或为过而把它们
+      * 排除比对 ⟹ 制造新的静默盲区。故本轮：
+      *   ① MX 侧判据改为 expCodeAt（由张量语义 + OCP amax 块 scale + swQuantElem 独立算出，
+      *      【不读任何硬件写回值】）——期望码本身是保号零时才走 bit-exact 断言；
+      *   ② 累加全程 fp32 精确的元素（goldenCExact）升级为【期望码逐位精确比对】(Tier A)；
+      *      不精确的元素退回容差比对 (Tier B)，因为要求金锚逐位复现硬件 fp40 累加树就等于
+      *      以 RTL 行为为拟合目标，违反金锚铁律；
+      *   ③ 双路交叉自证：期望码判零 与 模式相关解析归零区 必须逐元素一致，不一致即报
+      *      ZERO-CRITERION-CONTRADICTION（我对规范的理解或对金锚的实现有内部矛盾）；
+      *   ④ 旧启发式命中数仍统计但【不参与判定】，供报告给出同批次前后对照；
+      *   ⑤ 打印全码（8 幅值码 × 符号）发射计数表与 hw/exp/输入侧各自的未覆盖码集。
+      * 【非 MX 分支（FP32/FP16/BF16/INT）与 tolRel/tolAbs 一字未改】。 */
     def compare(cWriteLog: Seq[(Long, BigInt)],
                 scaleWriteLog: Seq[(Long, BigInt)]): CmpSummary = {
       val hwBits = HiveSimCommon.parseDenseCWriteLog(cWriteLog, p.cFmt, p.m, p.n, totalN, cDmaExtW)
@@ -760,16 +1024,51 @@ object HiveDebugModel {
       var mismatch = 0
       var maxRel = 0.0
       var maxAbs = 0.0
-      var ftzTakenOver = 0   // #129 屏蔽面可观测性：被 FTZ bit-exact 分支接管的元素计数
+      var ftzTakenOver = 0   // #129→#151：被「期望码=保号零」bit-exact 分支接管的元素计数
+      var tierA = 0          // (#151 F4) 期望码逐位精确比对（累加全程 fp32 精确）
+      var tierB = 0          // (#151 F4) 容差比对（累加不精确 ⟹ 金锚与硬件之差是合法舍入差）
+      var tierBZero = 0      // (#151 F4) Tier B 中走保号零 bit-exact 的元素数
+      var legacyHeurHits = 0 // (#151 F4) 旧幅值阈值启发式命中数：仅供前后对照，【不参与任何判定】
+      var crossCheckBad = 0  // (#151 F4) 期望码判零 vs 模式相关解析判零 的不一致数（内部矛盾探针）
+      // (#151 F4) 两套【对照口径】的误差统计。主口径 maxRel/maxAbs 覆盖全部元素（含归零元素，
+      //   故 E2M1 会取到 1.0 —— 期望码为 ±0 而 ref≠0 时 relErr 恒为 1.0，这是更诚实的统计，
+      //   不是回归）。另给：
+      //   ① legacy 口径 = 完全复刻 #129/#150 的排除集（|ref| < minNormal·2^(hwScale-127) 的元素
+      //      不进误差统计）⟹ 该数字与 #150 报告可直接对照，用于证明「改动只发生在 y'<1.0 区」；
+      //   ② nz 口径 = 只统计期望码非零的元素 ⟹ 反映可编码值域内的真实最坏量化误差。
+      var maxRelLegacy = 0.0
+      var maxAbsLegacy = 0.0
+      var maxRelNZ = 0.0
+      var maxAbsNZ = 0.0
+      // (#151 F4) E2M1 边界覆盖计数器：把每个元素的 y' = |ref| / 2^(expScale-127) 归入 OCP
+      //   网格的关键点/关键带，用来【如实界定】定向边界值是否真被随机激励打到。
+      //   y' 用【精确】== 比较：ref 是 0.25 的整数倍（fp4 乘积和，fp64 下精确），除以 2 的
+      //   整数幂在 IEEE-754 下无舍入 ⟹ yp 是精确值，不需要容差。
+      var bndZero = 0; var bndOp0_025 = 0; var bndP025 = 0; var bndOp025_05 = 0; var bndP050 = 0
+      var bndOp05_075 = 0; var bndP075 = 0; var bndOp075_1 = 0
+      var bndOp1_125 = 0; var bndP125 = 0; var bndOther = 0; var bndP100 = 0
+      // (#151 F4) 点级取证容器：key = 网格关键点/开区间标签，value = 去重后的
+      //   (符号, y', hw 码, 金锚期望码) 记录集合。仅 MXE2M1 填充。
+      val bndRec = mutable.LinkedHashMap.empty[String, mutable.LinkedHashSet[String]]
       val tolRel = if (quant) 0.5 else if (p.cFmt == DataFormat.BF16) 2e-2 else 1e-2
       val tolAbs = if (quant) 1e-3 else 1e-6
       // 非 MX 浮点格式的 FTZ 阈值（真实值域，与 ref 同域）；INT 格式无 subnormal，不触发。
+      // (#151 F4)【本行与其服务的非 MX 分支保持一字未改】：FP16/BF16 走 fp32ToFp16Rnd /
+      //   fp32ToBf16Rnd 独立通路，对 |x| < minNormal 一律 FTZ 保号零、【不做】「舍入到次正规」，
+      //   故其归零区就是 y' < minNormal 且与舍入模式无关 —— 与 E2M1 的次正规网格本质不同。
       val ftzThreshFlat: Double = if (isIntFmt(p.cFmt)) 0.0 else minNormal(p.cFmt)
       // 元素码位掩码（位宽由 cOutElemBits 推导，非硬编码；FTZ bit-exact 断言取 hw 原始位用）
       val elemMask: Long = (1L << HiveSimCommon.cOutElemBits(p.cFmt)) - 1
+      // (#151 F4) 全码发射计数所需的位宽/幅值域掩码
+      val elemBits: Int = HiveSimCommon.cOutElemBits(p.cFmt)
+      val magMask: Long = (1L << (elemBits - 1)) - 1
+      val nCodes: Int = 1 << elemBits
+      val hwHist  = Array.fill(nCodes)(0)   // 硬件实发码计数
+      val expHist = Array.fill(nCodes)(0)   // 金锚期望码计数（仅 MX 有意义）
       for (mm <- 0 until p.m; nn <- 0 until p.n) {
         val ref = goldenC(mm)(nn)
-        // MX 量化输出：本元素所属块的 E8M0 scale 字节（反量化与 FTZ 阈值缩放共用）
+        // MX 量化输出：本元素所属块的 E8M0 scale 字节（【仅】用于反量化与旧启发式对照；
+        //   (#151 F4) 判定不再依赖它 —— 判据换成金锚独立算出的 expScale/expCode）
         val mxScale: Int =
           if (quant) {
             val nt = nn / totalN
@@ -780,41 +1079,362 @@ object HiveDebugModel {
         val hw: Double =
           if (quant) dequant(hwBits(mm)(nn).toInt, mxScale)
           else decodeElem(p.cFmt, hwBits(mm)(nn), 127)
-        // FTZ 阈值：MX = minNormal(cFmt)·2^(s-127)（镜像 swQuantElem 的 eTgt=e+bias-s<1
-        //   ⟺ |v| < 2^(1-bias)·2^(s-127)）；非 MX = minNormal(cFmt)。【#128 推导，未改】
-        val ftzThresh: Double =
-          if (quant) minNormal(p.cFmt) * math.pow(2.0, (mxScale - 127).toDouble)
-          else ftzThreshFlat
-        // #129 收紧：FTZ 命中（ref 非零且落 subnormal 区）改为对 hw 原始位做 bit-exact
-        //   保号零断言（不再令 refEff=0 走容差，堵住「hw 给小非零值 / 符号错」的屏蔽窗口）。
-        //   命中判据（含 ref != 0.0）与阈值推导保持 #128 不动，仅改「命中之后怎么判」。
-        val ftzHit = !isIntFmt(p.cFmt) && ref != 0.0 && math.abs(ref) < ftzThresh
-        if (ftzHit) {
-          ftzTakenOver += 1
-          val hwCode = hwBits(mm)(nn) & elemMask
-          val expCode = ftzSignedZeroCode(p.cFmt, ref < 0.0)
-          if (hwCode != expCode) {
+        // (#151 F4) 误差统计在【所有】分支累积（主口径），另按 legacy / nz 两套对照口径分别累积
+        val hwCode: Long = hwBits(mm)(nn) & elemMask
+        hwHist(hwCode.toInt) += 1
+        val absErr = math.abs(hw - ref)
+        val relErr = if (math.abs(ref) > 1e-9) absErr / math.abs(ref) else absErr
+        if (relErr > maxRel) maxRel = relErr
+        if (absErr > maxAbs) maxAbs = absErr
+        // legacy 命中集 = 改前被排除在误差统计之外的元素集合，表达式与 #129/#150 【逐字相同】：
+        //   MX：|ref| < minNormal(cFmt)·2^(hwScale-127)；非 MX：|ref| < minNormal(cFmt)。
+        val legacyHit: Boolean =
+          if (quant) ref != 0.0 && math.abs(ref) < minNormal(p.cFmt) * math.pow(2.0, (mxScale - 127).toDouble)
+          else !isIntFmt(p.cFmt) && ref != 0.0 && math.abs(ref) < ftzThreshFlat
+        if (legacyHit) legacyHeurHits += 1
+        else {
+          if (relErr > maxRelLegacy) maxRelLegacy = relErr
+          if (absErr > maxAbsLegacy) maxAbsLegacy = absErr
+        }
+
+        if (quant) {
+          // ==================================================================
+          // (#151 F4) MX 输出：判据 = 金锚独立算出的【期望码】，不再是幅值阈值
+          // ==================================================================
+          val eCode  = expCodeAt(mm, nn)
+          val eScale = expScaleAt(mm, nn)
+          expHist(eCode) += 1
+          val expIsZero = (eCode.toLong & magMask) == 0L
+          val expNeg    = ((eCode >>> (elemBits - 1)) & 1) == 1
+          if (!expIsZero) {
+            if (relErr > maxRelNZ) maxRelNZ = relErr
+            if (absErr > maxAbsNZ) maxAbsNZ = absErr
+          }
+          // (#151 F4) E2M1 定向边界覆盖分类（y' = |ref|/2^(expScale-127)，精确比较）
+          if (p.cFmt == DataFormat.MXE2M1) {
+            val yp = math.abs(ref) / math.pow(2.0, (eScale - 127).toDouble)
+            if (yp == 0.0) bndZero += 1
+            else if (yp < 0.25) bndOp0_025 += 1
+            else if (yp == 0.25) bndP025 += 1
+            else if (yp > 0.25 && yp < 0.5) bndOp025_05 += 1
+            else if (yp == 0.5) bndP050 += 1
+            else if (yp > 0.5 && yp < 0.75) bndOp05_075 += 1
+            else if (yp == 0.75) bndP075 += 1
+            else if (yp > 0.75 && yp < 1.0) bndOp075_1 += 1
+            else if (yp == 1.0) bndP100 += 1
+            else if (yp > 1.0 && yp < 1.25) bndOp1_125 += 1
+            else if (yp == 1.25) bndP125 += 1
+            else bndOther += 1
+            // (#151 F4) 点级取证：把每个【网格关键点】与每个【开区间】上实测到的
+            //   (y', 符号, hw 码, 金锚期望码) 三元组收集起来打印 —— 这就是「RTL 新臂 vs
+            //   金锚」定向边界值验证表的原始数据，逐舍入模式各跑一次即得整表。
+            val sgn = if (ref < 0.0 || (ref == 0.0 && expNeg)) "-" else "+"
+            val rec = f"$sgn yp=$yp%.6g hw=0x${hwCode.toInt}%X exp=0x$eCode%X"
+            val keyOpt: Option[String] =
+              if (yp == 0.0) Some("y'=0")
+              else if (yp < 0.25) Some("band(0,0.25)")
+              else if (yp == 0.25) Some("y'=0.25")
+              else if (yp > 0.25 && yp < 0.5) Some("band(0.25,0.5)")
+              else if (yp == 0.5) Some("y'=0.5")
+              else if (yp > 0.5 && yp < 0.75) Some("band(0.5,0.75)")
+              else if (yp == 0.75) Some("y'=0.75")
+              else if (yp > 0.75 && yp < 1.0) Some("band(0.75,1.0)")
+              else if (yp == 1.0) Some("y'=1.0")
+              else if (yp > 1.0 && yp < 1.25) Some("band(1.0,1.25)")
+              else if (yp == 1.25) Some("y'=1.25")
+              else if (yp == 1.75) Some("y'=1.75")
+              else if (yp == 2.5) Some("y'=2.5")
+              else if (yp == 3.5) Some("y'=3.5")
+              else if (yp == 5.0) Some("y'=5.0")
+              else if (yp == 6.0) Some("y'=6.0")
+              else None
+            keyOpt.foreach { k =>
+              val st = bndRec.getOrElseUpdate(k, mutable.LinkedHashSet.empty[String])
+              // 开区间上 y' 取值很多，只保留 (符号,hw,exp) 的去重集合（丢弃具体 y'）以免刷屏；
+              //   关键点上 y' 唯一，保留完整记录。
+              st += (if (k.startsWith("band")) rec.replaceFirst("yp=[^ ]+ ", "") else rec)
+            }
+          }
+          // 双路交叉自证：①期望码幅值域是否为 0 ②OCP 网格 + 五模式解析归零区。
+          //   两条独立路径必须逐元素一致；不一致 = 我对规范的理解或对金锚的实现有内部矛盾。
+          // (#155 Ryan N1) 第三路径的符号实参从 expNeg（金锚期望码的符号位）改为 ref < 0.0
+          //   （fp64 参考值的符号）。理由：解析归零区本意是【不依赖金锚实现】的独立判据，
+          //   喂 expNeg 等于让第三路径在符号维度上与第二路径共享同一个来源，一旦金锚把符号
+          //   算错，两条路径会同错同绿。改喂 ref 的符号后，符号维度回到张量语义（真值）侧，
+          //   独立性提高。数值等价性：定向模式下 RDN 恒产 -0、RUP 恒产 +0 时 expNeg 与
+          //   ref<0.0 会不同，但那正是本探针要抓的情形（交叉自证不一致即失败）。
+          //   注：下一行 selfZero 仍用 expNeg —— 它比的是「金锚期望码 == 金锚保号零码」这条
+          //   金锚内部自洽性，属第二路径的自检，不在本条裁定的射程内，逐字不动。
+          val anaZero = analyticZeroRegionMx(math.abs(ref), eScale, p.rnd, ref < 0.0)
+          val selfZero = !expIsZero || eCode.toLong == ftzSignedZeroCode(p.cFmt, expNeg)
+          if (anaZero != expIsZero || !selfZero) {
+            crossCheckBad += 1
+            // (#151 F4) 矛盾【即失败】——给这条自证探针装上牙齿。理由：两条独立路径不一致，
+            //   要么是我对 OCP/IEEE 归零语义的理解错了，要么是金锚实现错了，两者都必须红；
+            //   只打印不失败等于探针是装饰品。实测这条牙齿真的咬到了东西：加 F4-b 定向深
+            //   下溢臂【之前】的 RDN 跑，本计数器 = 54（全是 y'<0.25 的负元素，RTL 与金锚
+            //   同时把非零负深下溢冲刷成 -0，而 IEEE roundTowardNegative 要求 -0.5）——
+            //   注意那时 hw 直方图与 exp 直方图【逐码相同】，纯 hw-vs-golden 比对完全看不出来，
+            //   正是这条独立解析路径把共模错误暴露出来的。
+            //   计数口径说明：同一元素若同时触发本条与下面的 CODE-BITEXACT-FAIL，mismatch 会
+            //   +2（>元素总数）。这只可能出现在【已经红】的跑里，不影响绿/红判定，如实记录。
             mismatch += 1
             if (details.size < 32)
-              details += f"C($mm,$nn) FTZ-bitexact-FAIL hw=0x${hwCode}%X exp=0x${expCode}%X(保号零) ref=$ref%.6g ftzThresh=$ftzThresh%.3e"
+              details += f"C($mm,$nn) ZERO-CRITERION-CONTRADICTION expCode=0x$eCode%X " +
+                f"isZero=$expIsZero analytic=$anaZero selfConsistent=$selfZero " +
+                f"ref=$ref%.6g expScale=$eScale hwScale=$mxScale rnd=${p.rnd}"
+          }
+          if (goldenCExact(mm)(nn)) {
+            // ---- Tier A：累加全程 fp32 精确 ⟹ 期望码可做【逐位】断言 ----
+            tierA += 1
+            if (expIsZero) ftzTakenOver += 1
+            if (hwCode.toInt != eCode) {
+              mismatch += 1
+              if (details.size < 32)
+                details += f"C($mm,$nn) CODE-BITEXACT-FAIL hw=0x$hwCode%X exp=0x$eCode%X " +
+                  f"ref=$ref%.6g hwVal=$hw%.6g expScale=$eScale hwScale=$mxScale " +
+                  f"absErr=$absErr%.3e relErr=$relErr%.3e"
+            }
+          } else {
+            // ---- Tier B：累加不精确 ⟹ 逐位断言等于要求金锚模拟 RTL 累加树（违反金锚铁律），
+            //      退回容差；但【归零判定】仍由期望码给出，不再用幅值阈值。 ----
+            tierB += 1
+            if (expIsZero) {
+              tierBZero += 1
+              ftzTakenOver += 1
+              val expZeroCode = ftzSignedZeroCode(p.cFmt, expNeg)
+              if (hwCode != expZeroCode) {
+                mismatch += 1
+                if (details.size < 32)
+                  details += f"C($mm,$nn) FTZ-bitexact-FAIL hw=0x$hwCode%X exp=0x$expZeroCode%X " +
+                    f"(signed-zero) ref=$ref%.6g expScale=$eScale hwScale=$mxScale rnd=${p.rnd}"
+              }
+            } else {
+              // quant ⟹ !isIntFmt(p.cFmt)，故改前 `if (isIntFmt) absErr>0.5 else …` 恒取 else 臂
+              val fail = relErr > tolRel && absErr > tolAbs
+              if (fail) {
+                mismatch += 1
+                if (details.size < 32)
+                  details += f"C($mm,$nn) hw=0x${hwBits(mm)(nn)}%X($hw%.6g) ref=$ref%.6g absErr=$absErr%.3e relErr=$relErr%.3e"
+              }
+            }
           }
         } else {
-          val absErr = math.abs(hw - ref)
-          val relErr = if (math.abs(ref) > 1e-9) absErr / math.abs(ref) else absErr
-          if (relErr > maxRel) maxRel = relErr
-          if (absErr > maxAbs) maxAbs = absErr
-          val fail = if (isIntFmt(p.cFmt)) absErr > 0.5 else (relErr > tolRel && absErr > tolAbs)
-          if (fail) {
-            mismatch += 1
-            if (details.size < 32)
-              details += f"C($mm,$nn) hw=0x${hwBits(mm)(nn)}%X($hw%.6g) ref=$ref%.6g absErr=$absErr%.3e relErr=$relErr%.3e"
+          // ==================================================================
+          // 非 MX 输出（FP32/FP16/BF16/INT）：以下判定与改前【逐字相同】
+          // ==================================================================
+          // (#151 F4) 与上方 legacyHit 同式（非 MX 分支的判据【逐字未变】，只是提到循环体
+          //   前部以便 legacy 对照口径共用同一个命中集）。
+          val ftzHit = legacyHit
+          if (ftzHit) {
+            ftzTakenOver += 1
+            val expCode = ftzSignedZeroCode(p.cFmt, ref < 0.0)
+            if (hwCode != expCode) {
+              mismatch += 1
+              if (details.size < 32)
+                // (#155 Nit n2) "(保号零)" ASCII 化为 "(signed-zero)"，与上方 MX 分支同一条
+                //   失败打印的措辞统一（该分支早已用 "(signed-zero)"）。理由：firtool 对
+                //   非 ASCII 断言/失败消息会发射失败，全仓失败消息一律 ASCII 是硬约束。
+                details += f"C($mm,$nn) FTZ-bitexact-FAIL hw=0x${hwCode}%X exp=0x${expCode}%X(signed-zero) ref=$ref%.6g ftzThresh=$ftzThreshFlat%.3e"
+            }
+          } else {
+            val fail = if (isIntFmt(p.cFmt)) absErr > 0.5 else (relErr > tolRel && absErr > tolAbs)
+            if (fail) {
+              mismatch += 1
+              if (details.size < 32)
+                details += f"C($mm,$nn) hw=0x${hwBits(mm)(nn)}%X($hw%.6g) ref=$ref%.6g absErr=$absErr%.3e relErr=$relErr%.3e"
+            }
           }
         }
       }
-      // #129 屏蔽面可观测性：本次比较有多少元素走了 FTZ bit-exact 路径（按输出格式给）。
-      //   若某配置下该计数异常大，提示阈值推导可能有误或数据分布异常，须能被发现而非静默吞掉。
+      // ======================================================================
+      // (#151 F3) C 侧块 scale 字节【值】硬断言 —— 逐块比对，任何一块不符即红
+      // ======================================================================
+      // 改前状态：compare() 只【读】硬件写回的 scale 字节（上方 mxScale）用来反量化与做旧
+      //   启发式对照，从未把它的【值】与任何独立期望值比过 ⟹ scale 通路只要「自洽」（硬件
+      //   写的 scale 与硬件写的码互相匹配）就能过，哪怕整条 amax→E8M0 编码链算错了也看不
+      //   出来。元素码那一侧本轮（F4）已换成期望码逐位比对，但期望码是用【金锚独立算出的】
+      //   expScale 量化的 ⟹ scale 值本身仍是盲区，本节补上。
+      // 【期望值来源：严格不读硬件】
+      //   张量语义 aVal/bVal（decodeInElem + effScaleA/B）→ fp64 顺序累加 goldenC → fp32
+      //     → swFpNormalize40to32（与硬件两级舍入链同链）→ swQuantBlock：按声明块大小分组
+      //     求 amax（padding 列掩 0 不进 amax）→ swBlockScale：OCP E8M0 规则
+      //     s = eEff + bias - maxCodeExp，钳到 [1,254]，amax==0 → 哨兵 0，amax==inf → 254。
+      //   全程没有任何一步读 cWriteLog / scaleWriteLog。
+      // 【beat 内字节数与「字节 ↔ 块」映射：由声明的 C-scale 内存布局契约独立确定】
+      //   本文件上方的 scale 地址序列 = SC_BASE + nt*colOff + mm*rowOff，其中
+      //     colOff = totalN / cMxBlk   （每拍前进的字节数 = 本 tile 内的块数）
+      //     rowOff = ceil(n / cMxBlk)  （每行字节数 = 全行的块数）
+      //   该地址序列被 MxSpec 逐拍硬对账（DMA-CSCALE addr）、且属既有禁动区 ⟹ 一个 beat
+      //   承载的 scale 字节数就是 colOff = totalN/cMxBlk，第 j 字节 ↔ 本 tile 内第 j 个
+      //   cMxBlk 元素块。这与 swQuantBlock 的「每 8 元素 1 字节」中间表示【粒度不同】：
+      //   后者是金锚内部粒度，块 j 对应它的第 j*(cMxBlk/8) 个字节。二者必须一致，故下面
+      //   额外断言「同一块内所有 8 元素组的金锚 scale 字节相等」（否则该映射不成立）。
+      //   注（如实留痕，不判定）：HiveOutCvt.scaleWire 按【每 8 元素 1 字节】生成 totalN/8
+      //   字节，而 io.scaleOut 位宽 = HiveCoreConfig.cScaleRowW = (totalN/minBlockSize)*8
+      //   = totalN/16 字节（minBlockSize=16）⟹ cMxBlk=16 时两者相等、无截断；cMxBlk=32
+      //   时物理 beat 宽度(totalN/16) 是契约前进量(totalN/32) 的 2 倍，多出的高字节会落进
+      //   下一 tile 的地址窗 —— 属潜在契约分歧，但当前 cfg 族 totalN 恒为 16 ⟹ cMxBlk=32
+      //   被上方 require(cMxBlk <= totalN) 拦掉、不可达。两个宽度都打印出来供人工核对。
+      var scaleBlkChecked = 0     // 比对过的 scale 块（= beat 内字节）总数 = nTiles*m*(totalN/cMxBlk)
+      var scaleBad = 0            // 值不符的块数（每个都 mismatch += 1 ⟹ 红）
+      var scaleBeatCountBad = 0   // scale beat 数与期望拍数不符（结构性失败）
+      var scaleBlkInconsist = 0   // 同一块内金锚各 8 元素组 scale 字节不等（映射前提被破坏）
+      val scaleExpHist = Array.fill(256)(0)
+      val scaleHwHist  = Array.fill(256)(0)
+      var scaleExpBeats = 0
+      var scaleBytesPerBeat = 0       // 契约：colOff = totalN/cMxBlk
+      var scalePhysBytesPerBeat = 0   // 物理：cScaleRowW/8 = totalN/minBlockSize(=16)
+      if (quant) {
+        scaleBytesPerBeat     = totalN / p.cMxBlk
+        scalePhysBytesPerBeat = totalN / 16
+        scaleExpBeats = nTiles * p.m
+        if (scaleWriteLog.size != scaleExpBeats) {
+          scaleBeatCountBad += 1
+          mismatch += 1
+          details += f"SCALE-BEAT-COUNT-FAIL exp=$scaleExpBeats got=${scaleWriteLog.size} " +
+            f"(nTiles=$nTiles m=${p.m})"
+        }
+        val per8 = p.cMxBlk / 8                       // 一个块内的 8 元素组数
+        for (nt <- 0 until nTiles; mm <- 0 until p.m) {
+          val idx = nt * p.m + mm
+          val (sAddr, sBeat) =
+            if (idx < scaleWriteLog.size) scaleWriteLog(idx) else (-1L, BigInt(0))
+          val expScales = expQuant(idx)._2            // 长度 = totalN/8（金锚 8 元素组粒度）
+          for (j <- 0 until scaleBytesPerBeat) {
+            val base8 = j * per8
+            val exp = expScales(base8)
+            // 映射前提自检：同一块内 per8 个金锚字节必须全等（块 amax 的定义要求）
+            for (t <- 1 until per8) if (expScales(base8 + t) != exp) scaleBlkInconsist += 1
+            val got = ((sBeat >> (8 * j)) & 0xFF).toInt
+            scaleBlkChecked += 1
+            scaleExpHist(exp) += 1
+            scaleHwHist(got) += 1
+            if (got != exp) {
+              scaleBad += 1
+              mismatch += 1
+              // ASCII only；精确到 n-tile / 行 / 块索引 / 块首元素全局列 / beat 地址 / 期望与实收字节值
+              if (details.size < 64)
+                details += f"SCALE-BYTE-FAIL tile=$nt row=$mm blk=$j " +
+                  f"elem0=${nt * totalN + j * p.cMxBlk} beatAddr=0x$sAddr%X " +
+                  f"exp=0x$exp%02X got=0x$got%02X (blkElems=${p.cMxBlk} blkSel=${p.cMxBlkSel} " +
+                  f"totalN=$totalN bytesPerBeat=$scaleBytesPerBeat)"
+            }
+          }
+        }
+        if (scaleBlkInconsist > 0) {
+          mismatch += 1
+          details += f"SCALE-BLK-INTERNAL-INCONSISTENT count=$scaleBlkInconsist " +
+            f"(golden per-8 scale bytes disagree inside one blk=${(p.cMxBlk)}; the " +
+            f"byte-to-block mapping used by this assertion is ill-defined)"
+        }
+      }
+      // #129 屏蔽面可观测性（#151 F4：MX 侧判据已换成期望码，计数含义随之精确化）。
       println(s"[$TAG] FTZ-bitexact 接管计数: cFmt=${p.cFmt} 命中=$ftzTakenOver / 总元素=${p.m * p.n}" +
         s"（ftzThreshFlat=${"%.3e".format(ftzThreshFlat)}${if (quant) "；MX 侧按块 scale ×2^(s-127)" else ""}）")
+      if (quant) {
+        // (#151 F4) 判定分层与双路交叉自证结果
+        println(s"[$TAG] (#151 F4) 判定分层: cFmt=${p.cFmt} rnd=${p.rnd} cMxBlk=${p.cMxBlk} " +
+          s"TierA(期望码逐位)=${tierA} TierB(容差)=${tierB}（其中保号零 bit-exact=${tierBZero}） " +
+          s"归零判据命中=${ftzTakenOver} 旧幅值阈值启发式命中=${legacyHeurHits}（仅对照，不判定） " +
+          s"双路交叉自证不一致=${crossCheckBad}")
+        // (#151 F3) C 侧 scale 字节【值】硬断言汇总。期望值来自 swQuantBlock/_2（OCP amax
+        //   规则独立算出，全程不读 cWriteLog/scaleWriteLog）；实收值来自 scaleWriteLog 的
+        //   beat 位切片。任何一字节不符都已 mismatch += 1 ⟹ 用例变红。
+        println(s"[$TAG] (#151 F3) C-scale 硬断言: beat 期望=$scaleExpBeats 实收=${scaleWriteLog.size}" +
+          s"（结构不符=$scaleBeatCountBad） beat 内字节 契约=$scaleBytesPerBeat 物理=$scalePhysBytesPerBeat" +
+          s" 逐块比对=$scaleBlkChecked 值不符=$scaleBad 块内金锚不一致=$scaleBlkInconsist")
+        // scale 字节直方图：只列非零项（256 桶太宽）。exp 与 hw 两侧必须逐桶相同，
+        //   这也是「scale 通路不只是自洽、而且与规范一致」的可观测证据。
+        def sHist(name: String, h: Array[Int]): String = {
+          val nz = h.zipWithIndex.filter(_._1 > 0)
+          s"$name: nonzero=${nz.size}/256 " + (if (nz.isEmpty) "(none)"
+            else nz.map { case (v, c) => f"0x$c%02X=$v" }.mkString(" "))
+        }
+        println(s"[$TAG]   ${sHist("exp scaleBytes", scaleExpHist)}")
+        println(s"[$TAG]   ${sHist("hw  scaleBytes", scaleHwHist)}")
+        val sUncExp = (0 until 256).filter(c => scaleExpHist(c) == 0)
+        val sUncHw  = (0 until 256).filter(c => scaleHwHist(c) == 0)
+        println(s"[$TAG]   exp uncovered=${sUncExp.size} bytes  hw uncovered=${sUncHw.size} bytes" +
+          s"（exp 侧未覆盖即本轮激励未打到的 E8M0 scale 码，与 §8 F5 同类，如实呈现）")
+        // (#151 F4) 三套误差口径。主口径含归零元素（E2M1 期望码=±0 而 ref≠0 ⟹ relErr=1.0，
+        //   这是统计口径变诚实，不是回归）；legacy 口径复刻 #129/#150 的排除集，用于证明
+        //   「本轮改动只发生在 y'<minNormal 区」；nz 口径只统计期望码非零的元素。
+        println(f"[$TAG] (#151 F4) 误差口径: 主(全元素) maxRel=$maxRel%.3e maxAbs=$maxAbs%.3e | " +
+          f"legacy(#129 排除集, 命中=$legacyHeurHits) maxRel=$maxRelLegacy%.3e maxAbs=$maxAbsLegacy%.3e | " +
+          f"nz(期望码非零) maxRel=$maxRelNZ%.3e maxAbs=$maxAbsNZ%.3e")
+        // (#151 F4) E2M1 定向边界覆盖（y' = |ref|/2^(expScale-127) 的关键点/关键带命中数）。
+        //   计数为 0 的点即【未被本次随机激励打到】，报告须如实写明，不得含糊成「已覆盖」。
+        if (p.cFmt == DataFormat.MXE2M1)
+          println(s"[$TAG] (#151 F4) E2M1 边界覆盖: y'=0:$bndZero  (0,0.25):$bndOp0_025  =0.25:$bndP025  (0.25,0.5):$bndOp025_05" +
+            s"  =0.5:$bndP050  (0.5,0.75):$bndOp05_075  =0.75:$bndP075  (0.75,1.0):$bndOp075_1" +
+            s"  =1.0:$bndP100  (1.0,1.25):$bndOp1_125  =1.25:$bndP125  其它:$bndOther")
+        // (#151 F4) 定向边界值验证表原始数据（RTL 新臂 vs 金锚期望码），按网格升序打印。
+        //   每个舍入模式各跑一次即得该模式整列；hw 与 exp 不一致时上面已计 mismatch。
+        //   注：order 里的 "y'=0.3" 是【故意列进去让它落到「未被激励」】的——E2M1 激励下
+        //   ref = Σ a·b 是 0.25 的整数倍、块 scale 是 2 的整数幂 ⟹ y' 必为二进有理数
+        //   （dyadic），而 0.3 = 3/10 非 dyadic ⟹ 精确 y'=0.3 在 fp4 激励下【不可达】。
+        //   开区间 (0.25,0.5) 由 band(0.25,0.5) 的实际命中数覆盖，如实呈现而非伪造。
+        if (p.cFmt == DataFormat.MXE2M1) {
+          val order = Seq("y'=0", "band(0,0.25)", "y'=0.25", "y'=0.3", "band(0.25,0.5)",
+            "y'=0.5", "band(0.5,0.75)",
+            "y'=0.75", "band(0.75,1.0)", "y'=1.0", "band(1.0,1.25)", "y'=1.25",
+            "y'=1.75", "y'=2.5", "y'=3.5", "y'=5.0", "y'=6.0")
+          println(s"[$TAG] (#151 F4) 定向边界值取证 rnd=${p.rnd}（hw=RTL 新臂实测，exp=金锚独立期望）")
+          order.foreach { k =>
+            bndRec.get(k).foreach { st =>
+              println(s"[$TAG]   $k -> ${st.toSeq.sorted.mkString(" | ")}")
+            }
+          }
+          val notHit = order.filterNot(bndRec.contains)
+          if (notHit.nonEmpty) println(s"[$TAG]   未被激励: ${notHit.mkString(" ")}")
+        }
+        // (#151 F4) 全码发射计数表：E2M1 elemBits=4 ⟹ 16 码全列；E4M3/E5M2 elemBits=8 ⟹ 只列非零项
+        def histLine(name: String, h: Array[Int]): String =
+          if (nCodes <= 16) s"$name: " + (0 until nCodes).map(c => f"0x$c%X=${h(c)}").mkString(" ")
+          else {
+            val nz = h.zipWithIndex.filter(_._1 > 0)
+            s"$name: nonzero=${nz.size}/$nCodes " + nz.map { case (v, c) => f"0x$c%02X=$v" }.mkString(" ")
+          }
+        def uncoveredLine(name: String, h: Array[Int]): String = {
+          val z = (0 until nCodes).filter(c => h(c) == 0)
+          val body =
+            if (nCodes <= 16) if (z.isEmpty) "(none)" else z.map(c => f"0x$c%X").mkString(" ")
+            else if (z.isEmpty) "(none)"
+            else s"${z.size} codes (first: ${z.take(8).map(c => f"0x$c%02X").mkString(" ")})"
+          s"$name uncovered: $body"
+        }
+        println(s"[$TAG] (#151 F4) 输出侧码覆盖率 elemBits=$elemBits")
+        println(s"[$TAG]   ${histLine("hw  emitted", hwHist)}")
+        println(s"[$TAG]   ${histLine("exp golden ", expHist)}")
+        println(s"[$TAG]   ${uncoveredLine("hw ", hwHist)}")
+        println(s"[$TAG]   ${uncoveredLine("exp", expHist)}")
+        // (#151 F4) 输入侧码覆盖率：本轮改的是【输出域】次正规；输入域 E2M1 的 ±0.5 本来就由
+        //   decodeMxE2M1Input（subnormalFtz=false）支持。列出实测覆盖以界定未覆盖码集。
+        def inHist(eb: Int, rows: Int, cols: Int, get: (Int, Int) => Long): Array[Int] = {
+          val h = Array.fill(1 << eb)(0)
+          val msk = (1 << eb) - 1
+          for (i <- 0 until rows; j <- 0 until cols) h((get(i, j).toInt) & msk) += 1
+          h
+        }
+        def inHistLine(name: String, eb: Int, h: Array[Int]): String = {
+          val n = 1 << eb
+          val body =
+            if (n <= 16) (0 until n).map(c => f"0x$c%X=${h(c)}").mkString(" ")
+            else h.zipWithIndex.filter(_._1 > 0).map { case (v, c) => f"0x$c%02X=$v" }.mkString(" ")
+          val z = (0 until n).filter(c => h(c) == 0)
+          val unc = if (n <= 16) z.map(c => f"0x$c%X").mkString(" ") else s"${z.size} codes"
+          s"$name elemBits=$eb $body | uncovered: ${if (unc.isEmpty) "(none)" else unc}"
+        }
+        if (isMxAny(p.aFmt)) {
+          val ha = inHist(aEbits, p.m, p.k, (i, j) => aCode(i)(j))
+          println(s"[$TAG]   ${inHistLine("in A", aEbits, ha)}")
+        }
+        if (isMxAny(p.bFmt)) {
+          val hb = inHist(bEbits, p.k, p.n, (i, j) => bCode(i)(j))
+          println(s"[$TAG]   ${inHistLine("in B", bEbits, hb)}")
+        }
+      }
       CmpSummary(p.m * p.n, mismatch, maxRel, maxAbs, details.toSeq)
     }
 

@@ -477,9 +477,13 @@ private object HiveMacLazyDownstream {
   */
 class HiveMacFpMx(cW: Int, sigW: Int = 4) extends Module {
   require(cW >= 40, s"HiveMacFpMx: 延迟规格化需要 cW($cW) >= 40")
-  // sigW 下界 4：必须 ≥ 1(隐含位) + 被支持 MX 格式的最大 mantW（E4M3 mantW=3 ⇒ sigW≥4），
-  // 否则 E4M3 尾数低位会被静默截断算错；上限 24 = 1 位隐含 + 23 位尾数（退化为满宽）。
-  require(sigW >= 4 && sigW <= 24, s"HiveMacFpMx: sigW($sigW) 需在 [4,24]（≥1+最大 MX mantW=3，否则 E4M3 尾数低位被静默截断）")
+  // sigW 下界：必须 ≥ 1(隐含位) + 被支持 MX 格式的 mantW，否则该格式尾数低位被静默截断算错。
+  //   · fp8 dual-lane（E4M3 mantW=3 / E5M2 mantW=2）⇒ sigW≥4，故 macOdd 仍 hardcode 默认 sigW=4；
+  //   · fp4 quad-lane（E2M1 mantW=1）⇒ 仅需 sigW≥2（Ivy④ 面积微优化：解码后尾数 m23=Cat(m,0^22)
+  //     仅 bit22 有效、mA(21..0) 恒 0，sigW=4 的乘法阵列 3/4 恒零浪费）。
+  //   放宽 bound 允许 sigW==2【不改 fp8 RTL】：fp8 路径恒用默认 sigW=4，绝不下探到 2（见调用点）。
+  //   上限 24 = 1 位隐含 + 23 位尾数（退化为满宽）。
+  require((sigW == 2 || sigW >= 4) && sigW <= 24, s"HiveMacFpMx: sigW($sigW) 需为 2（fp4/E2M1 专用）或落在 [4,24]（fp8 需 ≥1+mantW=3，否则尾数低位被静默截断）")
 
   val io = IO(new Bundle {
     val a   = Input(UInt(32.W))    // fp32 multiplicand（MX 转换后，尾数低位恒 0）
@@ -757,9 +761,14 @@ class HiveWorkUnit(
     // 共 8 个 HiveCvtOpMx(hasMx4=true)（a/b 各 4，含 E8M0 scale 指数加法；同一 64-K 块内 scale
     // 共享，a 侧 4 nibble 同接 scaleA、b 侧同接 scaleB 合法）。
     // MAC 级联 4 级、k 升序、低 sublane 先加（lane0=io.a(3,0) 先、lane3=io.a(15,12) 后），
-    // 左结合 ((((cReg + a0*b0) + a1*b1) + a2*b2) + a3*b3)，每级用 HiveMacFpMx(cEffW)（sigW=4，
-    // 零改动，已 bit-exact 覆盖 E2M1）。C1 共享【不】扩展到 quad-lane：4 个 MAC 全独立、不与
-    // FP 通路共享（共享/融合属 Phase 5）；c1Merge 定义与行为逐位不变（仍只服务 dual-lane）。
+    // 左结合 ((((cReg + a0*b0) + a1*b1) + a2*b2) + a3*b3)，每级用 HiveMacFpMx(cEffW, sigW=2)
+    // （【Ivy④ 面积微优化】E2M1 mantW=1，解码后尾数 m23=Cat(m,0^22) 仅 bit22 有效，
+    // sigW=2 与 sigW=4 对 1 位尾数 m∈{0,1} 逐位相等：sigW=4 给 (8+4m)(8+4m')<<40、
+    // sigW=2 给 (2+m)(2+m')<<44，因 (8+4m)(8+4m')=16·(2+m)(2+m') ⟹ 两者 = (2+m)(2+m')·2^44
+    // 完全相同；narrow 变体只在 hasMx4 分支 elaborate，绝不进 fp8-only 的 verilog/verilog_mx。
+    // 已由 HiveWorkUnitMxSpec fp4 语义 + HiveMxDecodeSpec 穷举实测 0 失配）。C1 共享【不】扩展到
+    // quad-lane：4 个 MAC 全独立、不与 FP 通路共享（共享/融合属 Phase 5）；c1Merge 定义与行为逐位
+    // 不变（仍只服务 dual-lane）。
     if (hasMx4) {
       val quadResult: UInt = {
         // --- a 侧 4 nibble 解码（同一 scaleA）---
@@ -805,22 +814,22 @@ class HiveWorkUnit(
         bQ3.io.scale := io.scaleB
         bQ3.io.consumeValid := consumeValidEff
         // --- 4 级 HiveMacFpMx 左结合级联（k 升序、低 sublane 先加）---
-        val qmac0 = Module(new HiveMacFpMx(cEffW))
+        val qmac0 = Module(new HiveMacFpMx(cEffW, sigW = 2))
         qmac0.io.a   := aQ0.io.out
         qmac0.io.b   := bQ0.io.out
         qmac0.io.c   := io.cReg
         qmac0.io.rnd := io.rnd
-        val qmac1 = Module(new HiveMacFpMx(cEffW))
+        val qmac1 = Module(new HiveMacFpMx(cEffW, sigW = 2))
         qmac1.io.a   := aQ1.io.out
         qmac1.io.b   := bQ1.io.out
         qmac1.io.c   := qmac0.io.sum
         qmac1.io.rnd := io.rnd
-        val qmac2 = Module(new HiveMacFpMx(cEffW))
+        val qmac2 = Module(new HiveMacFpMx(cEffW, sigW = 2))
         qmac2.io.a   := aQ2.io.out
         qmac2.io.b   := bQ2.io.out
         qmac2.io.c   := qmac1.io.sum
         qmac2.io.rnd := io.rnd
-        val qmac3 = Module(new HiveMacFpMx(cEffW))
+        val qmac3 = Module(new HiveMacFpMx(cEffW, sigW = 2))
         qmac3.io.a   := aQ3.io.out
         qmac3.io.b   := bQ3.io.out
         qmac3.io.c   := qmac2.io.sum
