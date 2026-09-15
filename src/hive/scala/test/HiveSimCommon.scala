@@ -122,7 +122,14 @@ object HiveSimCommon {
 
   /** 将矩阵写入文本文件（每行空格分隔的 hex 值） */
   def writeMatrixHex(path: String, matrix: Array[Array[Int]], bitsPerElem: Int): Unit = {
-    val hexDigits = (bitsPerElem + 3) / 4
+    // 【退化位宽守护，勿删】bitsPerElem<=0 时 (bitsPerElem+3)/4 == 0，下面那行会拼出格式串
+    //   "%00X"：java.util.Formatter 把 "00" 当成两个 '0' flag，抛
+    //   java.util.DuplicateFormatFlagsException: Flags = '0'（实测复现）。触发者是亚字节族
+    //   （MXE2M1/INT4）按 bytes 口径传 memElemBytes×8 = 0×8 = 0 的调用点，崩在【失败落盘】
+    //   路径上，会把真实失配原因整条盖掉、只剩一个看不出所以然的 Formatter 异常。
+    //   兜底为 1 位：bitsPerElem>=1 时 math.max(1, …) 是恒等变换 ⟹ 所有正常用例的
+    //   零填充位宽、大写 hex、空格分隔、行序【逐字不变】，本守护只消除崩溃、不改输出语义。
+    val hexDigits = math.max(1, (bitsPerElem + 3) / 4)
     val mask = (1L << bitsPerElem) - 1
     val pw = new PrintWriter(new File(path))
     for (row <- matrix) {
@@ -133,7 +140,11 @@ object HiveSimCommon {
 
   /** 将 BigInt 矩阵写入文本文件 */
   def writeBigIntMatrixHex(path: String, matrix: Array[Array[BigInt]], bitsPerElem: Int): Unit = {
-    val hexDigits = (bitsPerElem + 3) / 4
+    // 【退化位宽守护】与上方 writeMatrixHex 同源：亚字节族(MXE2M1/INT4) 按 bytes 口径传入时
+    //   bitsPerElem=0 ⟹ (bitsPerElem+3)/4=0。writeMatrixHex 会拼出非法格式串 "%00X" 抛
+    //   java.util.DuplicateFormatFlagsException；本函数走 padTo(hexDigits,'0')，hexDigits=0 则
+    //   退化为不补零（输出失去固定位宽）。兜底为 1 位：bitsPerElem>=1 时恒等、正常用例输出不变。
+    val hexDigits = math.max(1, (bitsPerElem + 3) / 4)
     val mask = (BigInt(1) << bitsPerElem) - 1
     val pw = new PrintWriter(new File(path))
     for (row <- matrix) {

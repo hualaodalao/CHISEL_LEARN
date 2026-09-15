@@ -9,7 +9,7 @@
   * 两个操作数学上完全对称，共用 shape=[Tn,Tm,Nt,Mt]，仅 src/dst stride 互换：
   *   tiled 大矩阵 stride = [e, N*e, Tn*e, Tm*N*e]
   *   线性连续     stride = [e, Tn*e, Tm*Tn*e, Nt*Tm*Tn*e]
-  * 其中 e = 1 << elemBytesLog2。
+  * 其中 e = 元素字节数（由 srcFmt 经 FbDataFmt.bytesOfCeil 单一真源派生）。
   *   - TILE2LINEAR：src = tiled 大矩阵，dst = 线性（大矩阵按 tile 取出→线性连续）
   *   - LINEAR2TILE：src = 线性，dst = tiled 大矩阵（线性连续读出→按 tile 布局写回）
   *
@@ -49,8 +49,9 @@ class FbTile2LinearExpander(cfg: ForagerBeeConfig) extends Module {
     val Mt = cmd.t2lNumTileRows.pad(addrW)
     val Nt = cmd.t2lNumTileCols.pad(addrW)
 
-    // e = 1 << elemBytesLog2（字节粒度）
-    val e = (1.U(addrW.W)) << cmd.elemBytesLog2
+    // e = 元素字节数（由 srcFmt 单一真源派生；INT4 亚字节已被引擎 subByteOpBad 校验拒于 TILE2LINEAR 路径外，
+    // 故此处 bytesOfCeil 恒为字节粒度）。保持纯组合，不流水化。
+    val e = FbDataFmt.bytesOfCeil(cmd.srcFmt).pad(addrW)
 
     // 中间乘积
     val Ne    = N * e          // N * e

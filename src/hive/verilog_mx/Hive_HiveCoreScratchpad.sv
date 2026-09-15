@@ -25,20 +25,20 @@ module Hive_HiveCoreScratchpad(	// src/hive/scala/main/HiveCoreScratchpad.scala:
                  io_flushB,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
                  io_flushC,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
                  io_scaleAPush_valid,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
-  input  [7:0]   io_scaleAPush_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
+  input  [31:0]  io_scaleAPush_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   output         io_scaleAPop_valid,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input          io_scaleAPop_ready,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
-  output [7:0]   io_scaleAPop_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
+  output [31:0]  io_scaleAPop_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input          io_scaleBPush_valid,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
-  input  [7:0]   io_scaleBPush_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
+  input  [31:0]  io_scaleBPush_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   output         io_scaleBPop_valid,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input          io_scaleBPop_ready,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
-  output [7:0]   io_scaleBPop_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
+  output [31:0]  io_scaleBPop_payload,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
   input          io_flushScaleA,	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
                  io_flushScaleB	// src/hive/scala/main/HiveCoreScratchpad.scala:13:14
 );
 
-  Hive_StreamFifo aFifo (	// src/hive/scala/main/HiveCoreScratchpad.scala:55:21
+  Hive_StreamFifo aFifo (	// src/hive/scala/main/HiveCoreScratchpad.scala:49:21
     .clock           (clock),
     .reset           (reset),
     .io_push_valid   (io_aPush_valid),
@@ -48,8 +48,8 @@ module Hive_HiveCoreScratchpad(	// src/hive/scala/main/HiveCoreScratchpad.scala:
     .io_pop_payload  (io_aPop_payload),
     .io_flush        (io_flushA),
     .io_occupancy    (io_aOccupancy)
-  );	// src/hive/scala/main/HiveCoreScratchpad.scala:55:21
-  Hive_StreamFifo bFifo (	// src/hive/scala/main/HiveCoreScratchpad.scala:56:21
+  );	// src/hive/scala/main/HiveCoreScratchpad.scala:49:21
+  Hive_StreamFifo bFifo (	// src/hive/scala/main/HiveCoreScratchpad.scala:50:21
     .clock           (clock),
     .reset           (reset),
     .io_push_valid   (io_bPush_valid),
@@ -59,8 +59,8 @@ module Hive_HiveCoreScratchpad(	// src/hive/scala/main/HiveCoreScratchpad.scala:
     .io_pop_payload  (io_bPop_payload),
     .io_flush        (io_flushB),
     .io_occupancy    (io_bOccupancy)
-  );	// src/hive/scala/main/HiveCoreScratchpad.scala:56:21
-  Hive_StreamFifo_2 cFifo (	// src/hive/scala/main/HiveCoreScratchpad.scala:57:21
+  );	// src/hive/scala/main/HiveCoreScratchpad.scala:50:21
+  Hive_StreamFifo_2 cFifo (	// src/hive/scala/main/HiveCoreScratchpad.scala:51:21
     .clock           (clock),
     .reset           (reset),
     .io_push_valid   (io_cPush_valid),
@@ -71,8 +71,8 @@ module Hive_HiveCoreScratchpad(	// src/hive/scala/main/HiveCoreScratchpad.scala:
     .io_pop_payload  (io_cPop_payload),
     .io_flush        (io_flushC),
     .io_occupancy    (io_cOccupancy)
-  );	// src/hive/scala/main/HiveCoreScratchpad.scala:57:21
-  Hive_StreamFifo_3 scaleAFifo (	// src/hive/scala/main/HiveCoreScratchpad.scala:94:28
+  );	// src/hive/scala/main/HiveCoreScratchpad.scala:51:21
+  Hive_StreamFifo_3 scaleAFifo (	// src/hive/scala/main/HiveCoreScratchpad.scala:88:28
     .clock           (clock),
     .reset           (reset),
     .io_push_valid   (io_scaleAPush_valid),
@@ -81,8 +81,8 @@ module Hive_HiveCoreScratchpad(	// src/hive/scala/main/HiveCoreScratchpad.scala:
     .io_pop_ready    (io_scaleAPop_ready),
     .io_pop_payload  (io_scaleAPop_payload),
     .io_flush        (io_flushScaleA)
-  );	// src/hive/scala/main/HiveCoreScratchpad.scala:94:28
-  Hive_StreamFifo_3 scaleBFifo (	// src/hive/scala/main/HiveCoreScratchpad.scala:95:28
+  );	// src/hive/scala/main/HiveCoreScratchpad.scala:88:28
+  Hive_StreamFifo_3 scaleBFifo (	// src/hive/scala/main/HiveCoreScratchpad.scala:89:28
     .clock           (clock),
     .reset           (reset),
     .io_push_valid   (io_scaleBPush_valid),
@@ -91,6 +91,6 @@ module Hive_HiveCoreScratchpad(	// src/hive/scala/main/HiveCoreScratchpad.scala:
     .io_pop_ready    (io_scaleBPop_ready),
     .io_pop_payload  (io_scaleBPop_payload),
     .io_flush        (io_flushScaleB)
-  );	// src/hive/scala/main/HiveCoreScratchpad.scala:95:28
+  );	// src/hive/scala/main/HiveCoreScratchpad.scala:89:28
 endmodule
 

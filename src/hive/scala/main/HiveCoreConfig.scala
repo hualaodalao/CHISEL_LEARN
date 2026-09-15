@@ -50,7 +50,7 @@ case class HiveCoreConfig(
     //   QuickSpec）hasMx4 由 false 翻 true ⟹ DUT 一律长出 fp4 quad-lane 硬件。这不是可选项：
     //   下方新增 require(!hasMx8 || hasMx4) 会在 elaborate 前把 fp8-only 配置直接拦死，
     //   故全仓每一个显式传 supportedFmts 的构造点都必须含 MXE2M1（对齐清单见 build/155 报告）。
-    supportedFmts: Set[DataFormat.Type] = Set(DataFormat.FP16, DataFormat.BF16, DataFormat.INT16, DataFormat.INT8, DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1),
+    supportedFmts: Set[DataFormat.Type] = Set(DataFormat.INT8, DataFormat.INT4, DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1),
     aBufferDepth: Int = 64, 
     bBufferDepth: Int = 64,
     cBufferDepth: Int = 64,

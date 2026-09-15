@@ -86,8 +86,8 @@ class FbDispatcher(cfg: ForagerBeeConfig) extends Module {
   private val addrW = cfg.addressWidth
   private val wideW = addrW + 20
 
-  val eb = 1.U(3.W) << cmd.elemBytesLog2
-  val dim0Bytes = (cmd.shape(0) * eb).pad(wideW)
+  // 元素粒度由 srcFmt（读侧）/dstFmt（写侧）单一真源派生（rowBytes ceil，天然处理 INT4）
+  val dim0Bytes = FbDataFmt.rowBytes(cmd.shape(0), cmd.srcFmt).pad(wideW)
 
   // --- PERMUTE 判定 ---
   val isPermute = cmd.op === FbOp.PERMUTE
@@ -127,7 +127,10 @@ class FbDispatcher(cfg: ForagerBeeConfig) extends Module {
 
   val newDstStart = cmd.dstAddr
   val newDstEnd = {
-    val dstDim0Bytes = Mux(hasPad, (outShape0 * eb).pad(wideW), dim0Bytes)
+    // dst 侧 bounding box 用 dstFmt 派生粒度（修复：此前误用 src eb，导致 cvt 命令 WAR/WAW 检测粒度错误）
+    val dstDim0Bytes = Mux(hasPad,
+      FbDataFmt.rowBytes(outShape0, cmd.dstFmt).pad(wideW),
+      FbDataFmt.rowBytes(cmd.shape(0), cmd.dstFmt).pad(wideW))
     val contributions = (1 until cfg.maxDims).map { d =>
       val active = d.U(3.W) < cmd.dimCount
       val shapeD = if (d == 1) Mux(hasPad, outShape1, cmd.shape(1)) else cmd.shape(d)

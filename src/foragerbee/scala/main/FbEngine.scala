@@ -76,31 +76,29 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   val cmdReg = Reg(new FbCmd(cfg))
   val errReg = RegInit(false.B)
 
-  // --- 派生量 ---
-  val eb = 1.U(3.W) << cmdReg.elemBytesLog2 // 元素字节数
+  // --- 派生量（全部为 cmdReg 输出的组合，单次共享 MuxLookup，不加额外锁存寄存器组） ---
   val M = cmdReg.shape(0) // 最内维元素数（转置的列数）
   val N = cmdReg.shape(1) // 转置的行数
+  val srcBits = FbDataFmt.elemBits(cmdReg.srcFmt)   // 源元素位宽（恒算，摘除 enableConversion guard）
+  val dstBits = FbDataFmt.elemBits(cmdReg.dstFmt)   // 目的元素位宽
+  val srcRowBytes = FbDataFmt.rowBytes(M, cmdReg.srcFmt) // 源行字节数（ceil，天然处理 INT4）
+  val srcEbLog2 = FbDataFmt.ebLog2Of(cmdReg.srcFmt) // 供 transpose/im2col 端口
 
   // --- COPY：嵌套维度计数器（dim0 展开为 beat，外层进位式递增） ---
   val outerIdx = RegInit(VecInit(Seq.fill(cfg.maxDims)(0.U(16.W))))
   val beatInRow = RegInit(0.U(20.W))
-  val beatsPerRow = (M * eb) >> log2BB // COPY 行 beat 数（约束为整数）
+  val beatsPerRow = srcRowBytes >> log2BB // COPY 行 beat 数（约束为整数）
 
   // --- 格式转换派生量 ---
-  private val cvtActive = if (cfg.enableConversion) cmdReg.cvtEnable && (cmdReg.srcFmt =/= cmdReg.dstFmt) else false.B
-  // MX 编码 4/5 登记为 8-bit（MXE4M3/MXE5M2），保证量化压缩比推导正确：
+  private val cvtActive = if (cfg.enableConversion) (cmdReg.srcFmt =/= cmdReg.dstFmt) else false.B
+  // 元素位宽取自单一真源 FbDataFmt.elemBits（FbDataFmt ChiselEnum，4-bit）：
+  // MX 编码 MXE4M3/MXE5M2 登记为 8-bit，保证量化压缩比推导正确：
   //   FP16/BF16(16)→MX(8)：cvtCompress=true、cvtShift=1；FP32(32)→MX(8)：cvtShift=2
-  private val srcEB = if (cfg.enableConversion) MuxLookup(cmdReg.srcFmt, 32.U(6.W))(Seq(
-    0.U -> 32.U, 1.U -> 16.U, 2.U -> 16.U, 3.U -> 8.U,
-    4.U -> 8.U, 5.U -> 8.U)) else 32.U(6.W)
-  private val dstEB = if (cfg.enableConversion) MuxLookup(cmdReg.dstFmt, 32.U(6.W))(Seq(
-    0.U -> 32.U, 1.U -> 16.U, 2.U -> 16.U, 3.U -> 8.U,
-    4.U -> 8.U, 5.U -> 8.U)) else 32.U(6.W)
-  private val cvtExpand = if (cfg.enableConversion) dstEB > srcEB else false.B
-  private val cvtCompress = if (cfg.enableConversion) srcEB > dstEB else false.B
+  private val cvtExpand = if (cfg.enableConversion) dstBits > srcBits else false.B
+  private val cvtCompress = if (cfg.enableConversion) srcBits > dstBits else false.B
   private val cvtShift = if (cfg.enableConversion) {
-    Mux((srcEB === 32.U && dstEB === 8.U) || (srcEB === 8.U && dstEB === 32.U), 2.U(2.W),
-    Mux(srcEB =/= dstEB, 1.U(2.W), 0.U(2.W)))
+    Mux((srcBits === 32.U && dstBits === 8.U) || (srcBits === 8.U && dstBits === 32.U), 2.U(2.W),
+    Mux(srcBits =/= dstBits, 1.U(2.W), 0.U(2.W)))
   } else 0.U(2.W)
   // 写侧 beat 计数器（格式转换时与读侧 beatInRow 独立推进）
   val wBeatInRow = if (cfg.enableConversion) RegInit(0.U(20.W)) else beatInRow
@@ -236,14 +234,14 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   /** 驱动转置缓冲 tile 参数（start 拉高当拍有效）——仅 supportsTranspose 时调用 */
   private def driveTileParams(src: FbCmd, bandCb: UInt, bandRb: UInt): Unit = {
     transp.foreach { t =>
-      val ebv = 1.U(3.W) << src.elemBytesLog2
+      val ebv = FbDataFmt.bytesOfCeil(src.srcFmt)
       val mRem = src.shape(0) - bandCb * T.U
       val nRem = src.shape(1) - bandRb * T.U
       t.io.tileRows := Mux(nRem >= T.U, T.U, nRem)
       t.io.tileCols := Mux(mRem >= T.U, T.U, mRem)
       t.io.colStart := bandCb * T.U
       t.io.beatsPerRow := ((src.shape(0) * ebv) +& (BB - 1).U) >> log2BB
-      t.io.elemBytesLog2 := src.elemBytesLog2
+      t.io.elemBytesLog2 := FbDataFmt.ebLog2Of(src.srcFmt)
     }
   }
 
@@ -380,7 +378,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     c.io.cfg_dstFmt := cmdReg.dstFmt
     c.io.cfg_scale := cmdReg.cvtScale
     c.io.cfg_zeroPoint := cmdReg.cvtZeroPoint
-    c.io.cfg_enable := cmdReg.cvtEnable && !mxQuantActive
+    c.io.cfg_enable := cvtActive && !mxQuantActive
     c.io.flush := false.B
   }
 
@@ -417,7 +415,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     gen.io.start := false.B
     gen.io.srcBase := cmdReg.srcAddr
     gen.io.dstBase := cmdReg.dstAddr
-    gen.io.elemBytesLog2 := cmdReg.elemBytesLog2
+    gen.io.elemBytesLog2 := srcEbLog2
     gen.io.kernel(0) := cmdReg.im2colKernel(0)
     gen.io.kernel(1) := cmdReg.im2colKernel(1)
     gen.io.stride(0) := cmdReg.im2colStride(0)
@@ -449,8 +447,8 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   // 非法命令检测（组合逻辑，作用于 cmdIn 上的候选命令）
   // ==========================================================================
   val c = io.cmdIn.payload
-  val cEb = 1.U(3.W) << c.elemBytesLog2
-  val cRowBytes = c.shape(0) * cEb
+  // 行字节数由 srcFmt 单一真源派生（ceil，天然处理 INT4 亚字节）
+  val cRowBytes = FbDataFmt.rowBytes(c.shape(0), c.srcFmt)
   val anyShapeZero = VecInit(
     (0 until cfg.maxDims).map(d => d.U(3.W) < c.dimCount && c.shape(d) === 0.U)
   ).asUInt.orR
@@ -459,7 +457,6 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     (c.op === FbOp.TRANSPOSE && c.dimCount =/= 2.U) ||
     (c.op === FbOp.TRANSPOSE && !supportsTranspose.B) ||
     (c.op === FbOp.PERMUTE && !supportsPermute.B) ||
-    c.elemBytesLog2 > 2.U ||
     anyShapeZero ||
     (c.op =/= FbOp.TRANSPOSE && cRowBytes(log2BB - 1, 0) =/= 0.U) ||
     c.srcAddr(log2BB - 1, 0) =/= 0.U ||
@@ -501,7 +498,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   }
 
   // MX 量化校验（仅当 mxQuantEn 时生效）：
-  //   仅 COPY + cvtEnable；shape(0) 为 blockSize 整数倍；编码/格式/对齐合法；与 padding 互斥；
+  //   仅 COPY + srcFmt≠dstFmt（转换激活）；shape(0) 为 blockSize 整数倍；编码/格式/对齐合法；与 padding 互斥；
   //   enableConversion 未开启时禁止使用（硬件无量化器）
   val mxBlockSizeVal = MuxLookup(c.scaleBlockSize, 0.U(7.W))(Seq(
     0.U -> 16.U, 1.U -> 32.U, 2.U -> 64.U))
@@ -509,38 +506,66 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     val shapeMisalign = c.scaleBlockSize > 2.U || c.shape(0) % mxBlockSizeVal =/= 0.U
     // 每块读侧 beat 数：须 ≤ maxBurstLen 且 ≤ dataQueue 深度，
     // 否则段长对齐后恒为 0（死锁）
-    val mxBlockBeatsCmd = (mxBlockSizeVal << c.elemBytesLog2) >> log2BB
+    val mxBlockBeatsCmd = FbDataFmt.rowBytes(mxBlockSizeVal, c.srcFmt) >> log2BB
     val blockTooBig = mxBlockBeatsCmd > cfg.maxBurstLen.U ||
       mxBlockBeatsCmd > cfg.resolvedDataQueueDepth.U
     val scaleAddrUnaligned = c.scaleAddr(log2BB - 1, 0) =/= 0.U
-    val srcFmtBadMx = c.srcFmt =/= FbDataFmt.FP16 && c.srcFmt =/= FbDataFmt.BF16 &&
-      c.srcFmt =/= FbDataFmt.FP32
-    // srcFmt 与 elemBytesLog2 一致性：FP32→2(4B), FP16/BF16→1(2B)，
-    // 不一致会导致引擎块节拍数与量化器不匹配（死锁）
-    val srcFmtEbMismatch = (c.srcFmt === FbDataFmt.FP32 && c.elemBytesLog2 =/= 2.U) ||
-      ((c.srcFmt === FbDataFmt.FP16 || c.srcFmt === FbDataFmt.BF16) && c.elemBytesLog2 =/= 1.U)
-    val dstFmtBadMx = c.dstFmt =/= FbDataFmt.MXE4M3 && c.dstFmt =/= FbDataFmt.MXE5M2
+    val srcFmtBadMx = !FbDataFmt.isFloat(c.srcFmt)
+    val dstFmtBadMx = !FbDataFmt.isMx(c.dstFmt)
     val hasPadAny = c.padBefore(0) =/= 0.U || c.padAfter(0) =/= 0.U ||
       c.padBefore(1) =/= 0.U || c.padAfter(1) =/= 0.U
     !cfg.enableConversion.B ||
     c.op =/= FbOp.COPY ||
-    !c.cvtEnable ||
     c.scaleBlockSize > 2.U ||
     shapeMisalign ||
     blockTooBig ||
     scaleAddrUnaligned ||
     srcFmtBadMx ||
-    srcFmtEbMismatch ||
     dstFmtBadMx ||
     hasPadAny
   }
 
   // MX 编码不得进入非量化格式转换路径（仅量化器认识 MX 格式）
-  val mxNonQuantBad = cfg.enableConversion.B && c.cvtEnable && !c.mxQuantEn &&
-    ((c.srcFmt === FbDataFmt.MXE4M3 || c.srcFmt === FbDataFmt.MXE5M2) ||
-      (c.dstFmt === FbDataFmt.MXE4M3 || c.dstFmt === FbDataFmt.MXE5M2))
+  // 语义收紧：cvtEnable=0 且 fmt=MX 的静默字节拷贝从此被拒
+  val mxNonQuantBad = cfg.enableConversion.B && !c.mxQuantEn &&
+    (FbDataFmt.isMx(c.srcFmt) || FbDataFmt.isMx(c.dstFmt))
 
-  val cBad = cBadBase || permBad || padBad || permPadBad || im2colBad || sgBad || mxQuantBad || mxNonQuantBad
+  // --- 阶段 A 新增校验 ---
+  // 格式编码合法性（无条件，不受 enableConversion 门控）
+  val fmtEncBad = !FbDataFmt.isLegal(c.srcFmt) || !FbDataFmt.isLegal(c.dstFmt)
+
+  // 转换格式组合校验（仅 enableConversion 时生成）：INT16/INT32/INT4 转换算术未实现，跨格式即拒
+  val cvtFmtBad = if (cfg.enableConversion) {
+    (c.srcFmt =/= c.dstFmt) && (
+      FbDataFmt.isSubByte(c.srcFmt) || FbDataFmt.isSubByte(c.dstFmt) ||
+      c.srcFmt === FbDataFmt.INT16 || c.dstFmt === FbDataFmt.INT16 ||
+      c.srcFmt === FbDataFmt.INT32 || c.dstFmt === FbDataFmt.INT32)
+  } else false.B
+
+  // 无转换器硬件时强制纯搬运契约（srcFmt==dstFmt）
+  val noCvtDiffBad = if (!cfg.enableConversion) c.srcFmt =/= c.dstFmt else false.B
+
+  // 亚字节格式（INT4）仅允许 COPY
+  val subByteOpBad = (FbDataFmt.isSubByte(c.srcFmt) || FbDataFmt.isSubByte(c.dstFmt)) && c.op =/= FbOp.COPY
+
+  // INT4 dim0 起始必须偶数保证字节对齐
+  val int4StartBad = FbDataFmt.isSubByte(c.srcFmt) && c.srcStartIdx(0)(0) =/= 0.U
+
+  // INT4 与 padding 互斥
+  val int4PadBad = (FbDataFmt.isSubByte(c.srcFmt) || FbDataFmt.isSubByte(c.dstFmt)) && {
+    c.padBefore(0) =/= 0.U || c.padAfter(0) =/= 0.U ||
+    c.padBefore(1) =/= 0.U || c.padAfter(1) =/= 0.U
+  }
+
+  // IM2COL + 格式转换时写侧 beat 上界校验（扩展 <<2 为最坏情况）
+  val i2cCvtBurstBad = if (cfg.enableConversion) {
+    val i2cKW = c.im2colKernel(1)
+    val microRowBeatsWorst = ((i2cKW * FbDataFmt.bytesOfCeil(c.srcFmt)).pad(20) +& (BB - 1).U(20.W)) >> log2BB
+    (c.op === FbOp.IM2COL) && (c.srcFmt =/= c.dstFmt) && ((microRowBeatsWorst << 2) > cfg.maxBurstLen.U)
+  } else false.B
+
+  val cBad = cBadBase || permBad || padBad || permPadBad || im2colBad || sgBad || mxQuantBad || mxNonQuantBad ||
+    fmtEncBad || cvtFmtBad || noCvtDiffBad || subByteOpBad || int4StartBad || int4PadBad || i2cCvtBurstBad
 
   // ==========================================================================
   // IDLE：接收命令、锁存、分流
@@ -563,9 +588,9 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     when(hasPad && !cBad) {
       virtualRow := 0.U
       outRowTotal := c.padBefore(1) +& c.shape(1) +& c.padAfter(1)
-      outColBytes := (c.padBefore(0) +& c.shape(0) +& c.padAfter(0)) * cEb
-      padBeforeBytes0 := (c.padBefore(0) * cEb) >> log2BB
-      padAfterBytes0 := (c.padAfter(0) * cEb) >> log2BB
+      outColBytes := (c.padBefore(0) +& c.shape(0) +& c.padAfter(0)) * FbDataFmt.bytesOfCeil(c.dstFmt)
+      padBeforeBytes0 := (c.padBefore(0) * FbDataFmt.bytesOfCeil(c.dstFmt)) >> log2BB
+      padAfterBytes0 := (c.padAfter(0) * FbDataFmt.bytesOfCeil(c.dstFmt)) >> log2BB
       zPhase := 0.U
       padOuterDone := false.B
       padOuterAddrOff := 0.U
@@ -615,7 +640,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
           state := sZWRITE
           zBeatInRow := 0.U
           zawIssued := false.B
-        }.elsewhen((c.padBefore(0) * cEb) >> log2BB =/= 0.U) {
+        }.elsewhen((c.padBefore(0) * FbDataFmt.bytesOfCeil(c.dstFmt)) >> log2BB =/= 0.U) {
           // 数据行，dim0 行首 pad
           state := sZWRITE
           zPhase := 0.U
@@ -644,7 +669,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     srcIdx(d) := outerIdx(d) + cmdReg.srcStartIdx(d)
   }
   // dim0 起始偏移（字节）：strideSum 从 d=1 开始，dim0 需单独加偏移
-  val srcDim0Offset = (cmdReg.srcStartIdx(0) << cmdReg.elemBytesLog2).pad(wideW)
+  val srcDim0Offset = FbDataFmt.rowBytes(cmdReg.srcStartIdx(0), cmdReg.srcFmt).pad(wideW)
 
   val srcRowAddrNormal = rowAddr(cmdReg.srcAddr, srcIdx, cmdReg.srcStride, None)
   val srcRowAddrPerm   = rowAddr(cmdReg.srcAddr, srcIdx, cmdReg.srcStride, Some(cmdReg.permVec))
@@ -656,7 +681,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   val dstRowAddrNormal = rowAddr(cmdReg.dstAddr, outerIdx, cmdReg.dstStride, None)
   val dstRowAddrPad = (cmdReg.dstAddr.pad(wideW) +&
     (virtualRow * cmdReg.dstStride(1)).pad(wideW) +&
-    (cmdReg.padBefore(0) * eb).pad(wideW) +&
+    (cmdReg.padBefore(0) * FbDataFmt.bytesOfCeil(cmdReg.dstFmt)).pad(wideW) +&
     padOuterAddrOff)(addrW - 1, 0)
   val dstRowAddr = Mux(padActive, dstRowAddrPad, dstRowAddrNormal)
 
@@ -681,7 +706,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     // 保证一个 burst 段不会把 scale 块切断（remRow 恒为整数块，对齐后不会为 0）
     val mxBlockSizeReg = MuxLookup(cmdReg.scaleBlockSize, 32.U(7.W))(Seq(
       0.U -> 16.U, 1.U -> 32.U, 2.U -> 64.U))
-    val mxBlockBeatsRaw = (mxBlockSizeReg << cmdReg.elemBytesLog2) >> log2BB
+    val mxBlockBeatsRaw = FbDataFmt.rowBytes(mxBlockSizeReg, cmdReg.srcFmt) >> log2BB
     val mxBlockBeats = Mux(mxBlockBeatsRaw === 0.U, 1.U, mxBlockBeatsRaw)
     // 段长上限另受限于每段产出 scale 字节数（= segBeats/mxBlockBeats）≤ BB，
     // 保证段内 scale 累积寄存器（1 拍）不溢出（段末统一经 sSWRITE 写出）
@@ -762,7 +787,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
         when(dataQueue.io.deq.fire) {
           queueCredit := queueCredit + 1.U
         }
-      }.elsewhen(cmdReg.cvtEnable && (cmdReg.srcFmt =/= cmdReg.dstFmt)) {
+      }.elsewhen(cvtActive) {
         val conv = converter.get
         // 连接 dataQueue → converter
         conv.io.in.valid := dataQueue.io.deq.valid
@@ -810,7 +835,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
         if (cfg.enableConversion) {
           when(mxQuantActive) {
             mxQuantizer.get.io.outData.ready := false.B
-          }.elsewhen(cmdReg.cvtEnable && (cmdReg.srcFmt =/= cmdReg.dstFmt)) {
+          }.elsewhen(cvtActive) {
             converter.get.io.out.ready := false.B
           }
         }
@@ -973,7 +998,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     val zRowBaseAddr = (cmdReg.dstAddr.pad(wideW) +&
       (virtualRow * cmdReg.dstStride(1)).pad(wideW) +&
       padOuterAddrOff)(addrW - 1, 0)
-    val zDim0PadAfterOff = (cmdReg.padBefore(0) +& cmdReg.shape(0)) * eb
+    val zDim0PadAfterOff = (cmdReg.padBefore(0) +& cmdReg.shape(0)) * FbDataFmt.bytesOfCeil(cmdReg.dstFmt)
     val zBaseOff = Mux(isDim1PadRow || zPhase === 0.U, 0.U(wideW.W), zDim0PadAfterOff.pad(wideW))
     val zDstAddr = (zRowBaseAddr.pad(wideW) +& zBaseOff +&
       (zBeatInRow << log2BB).pad(wideW))(addrW - 1, 0)
@@ -1064,11 +1089,11 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     // --- tile 派生量 ---
     val tileRowsCur = Mux(N - rb * T.U >= T.U, T.U, N - rb * T.U)
     val tileColsCur = Mux(M - cb * T.U >= T.U, T.U, M - cb * T.U)
-    val srcRowBeats = ((M * eb) +& (BB - 1).U) >> log2BB // 源行 beat 数（允许子 beat 行）
+    val srcRowBeats = (srcRowBytes +& (BB - 1).U) >> log2BB // 源行 beat 数（允许子 beat 行）
 
     // --- TRD —— 逐行读源行，beat 流喂入转置缓冲（FILL） ---
     val srcRowIdx = rb * T.U + fillRow + cmdReg.srcStartIdx(1)
-    val trDim0ByteOff = (cmdReg.srcStartIdx(0) << cmdReg.elemBytesLog2).pad(wideW)
+    val trDim0ByteOff = FbDataFmt.rowBytes(cmdReg.srcStartIdx(0), cmdReg.srcFmt).pad(wideW)
     val trRowAddr = (cmdReg.srcAddr.pad(wideW) +& (srcRowIdx * cmdReg.srcStride(1)).pad(wideW) +& trDim0ByteOff)(addrW - 1, 0)
     val trAddrCur = (trRowAddr.pad(wideW) +& (trBeatOff << log2BB).pad(wideW))(addrW - 1, 0)
     val trRemRow = srcRowBeats - trBeatOff
@@ -1122,7 +1147,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     val outRowIdx = cb * T.U + drainCol
     val twRawAddr = (cmdReg.dstAddr.pad(wideW)
       +& (outRowIdx * cmdReg.dstStride(0)).pad(wideW)
-      +& ((rb * T.U) * eb).pad(wideW))(addrW - 1, 0)
+      +& ((rb * T.U) * FbDataFmt.bytesOfCeil(cmdReg.srcFmt)).pad(wideW))(addrW - 1, 0)
     val twAlignedAddr = twRawAddr & ~((BB - 1).U(addrW.W))
 
     val twLastCol = drainCol + 1.U === tileColsCur
@@ -1223,7 +1248,13 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
 
     // micro-row beat 数计算：ceil(kW * elemBytes / beatBytes)
     val i2cKW = cmdReg.im2colKernel(1)
-    val i2cMicroRowBeats = ((i2cKW * eb).pad(20) +& (BB - 1).U(20.W)) >> log2BB
+    val i2cMicroRowBeats = ((i2cKW * FbDataFmt.bytesOfCeil(cmdReg.srcFmt)).pad(20) +& (BB - 1).U(20.W)) >> log2BB
+    // 写侧 beat 折算（镜像 COPY 路径 dstSegBeats：压缩右移 cvtShift、扩展左移 cvtShift；
+    // !cvtActive 时恒等 → enableConversion=false 配置常量折叠，RTL 逐字不变）
+    val i2cMicroRowDstBeats = Mux(!cvtActive, i2cMicroRowBeats,
+      Mux(cvtCompress, i2cMicroRowBeats >> cvtShift, i2cMicroRowBeats << cvtShift))
+    val i2cDstSegBeats = Mux(!cvtActive, i2cSegBeats,
+      Mux(cvtCompress, i2cSegBeats >> cvtShift, i2cSegBeats << cvtShift))
 
     when(state === sI2C) {
       // start 脉冲：进入 sI2C 的第一拍发出
@@ -1240,7 +1271,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
             when(gen.io.isPad) {
               i2cPhase := 3.U  // 零写
               i2cAwIssued := false.B
-              i2cWRemain := i2cMicroRowBeats
+              i2cWRemain := i2cMicroRowDstBeats
             }.otherwise {
               i2cPhase := 1.U  // 读
               i2cArIssued := false.B
@@ -1263,7 +1294,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
               when(i2cRRemain === 1.U) {
                 i2cPhase := 2.U
                 i2cAwIssued := false.B
-                i2cWRemain := i2cSegBeats
+                i2cWRemain := i2cDstSegBeats
               }.otherwise {
                 i2cRRemain := i2cRRemain - 1.U
               }
@@ -1292,7 +1323,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
             io.bus.wr.payload.sof := !i2cAwIssued
             io.bus.wr.payload.eof := i2cWRemain === 1.U
             io.bus.wr.payload.addr := gen.io.dstAddr
-            io.bus.wr.payload.len := i2cSegBeats - 1.U
+            io.bus.wr.payload.len := i2cDstSegBeats - 1.U
             io.bus.wr.payload.strb := ((BigInt(1) << BB) - 1).U(BB.W)
             when(io.bus.wr.fire) {
               i2cWRemain := i2cWRemain - 1.U
@@ -1326,7 +1357,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
             io.bus.wr.payload.sof := !i2cAwIssued
             io.bus.wr.payload.eof := i2cWRemain === 1.U
             io.bus.wr.payload.addr := gen.io.dstAddr
-            io.bus.wr.payload.len := i2cMicroRowBeats - 1.U
+            io.bus.wr.payload.len := i2cMicroRowDstBeats - 1.U
             io.bus.wr.payload.data := 0.U
             io.bus.wr.payload.strb := ((BigInt(1) << BB) - 1).U(BB.W)
             when(io.bus.wr.fire) {

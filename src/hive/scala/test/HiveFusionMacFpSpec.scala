@@ -4,8 +4,19 @@
   * 目标（铁律 2：双配置三角互证）
   * ══════════════════════════════════════════════════════════════════════════════
   * 用【同一个数学金锚】同时测两个编译期配置：
-  *   · 默认配置 hasFp=true  （supportedFmts = 全五格式，lane0 走宽阵列 FpMulFp16Bf16）
-  *   · 移除配置 hasFp=false （supportedFmts = {MXE4M3,MXE5M2,MXE2M1}，lane0 走窄乘法器 FpMulMx8）
+  *   · DEFAULT 配置 hasFp=true  （supportedFmts = 全五格式 FMTS_DEFAULT(:112)，lane0 走宽阵列 FpMulFp16Bf16）
+  *   · REMOVED 配置 hasFp=false （supportedFmts = FMTS_REMOVED(:114) = {MXE4M3,MXE5M2,MXE2M1}，
+  *                               lane0 走窄乘法器 FpMulMx8）
+  * ★【头注订正 · task#20(5)】原文写「默认配置 hasFp=true（全五格式）」——【该表述已陈旧】：
+  *   `HiveFusionMacFp` 的【类默认】supportedFmts 早已被「砍除 FP16/BF16」裁定收窄为 MX-only
+  *   {MXE4M3,MXE5M2,MXE2M1}（HiveFusionMacFp.scala:29-30），派生谓词 hasFp 由 :36 计算 ⟹
+  *   **类默认已收窄为 MX-only（hasFp=false）**，lane0 走窄乘法器 FpMulMx8，宽阵列 FpMulFp16Bf16 整块不生成。
+  *   本 spec 里的 "default"/rawDefault/satDefault 只是【历史命名】，指「显式传入全五格式那一档」，
+  *   与类默认值无关。8 个 `it should`（:345/:350/:357/:375/:380/:410/:435/:458）逐条核过：
+  *   其中 7 个经 runInSpec(:346/:351)、runSat(:376/:381) 或直接 simulate(:414/:438/:459)
+  *   **显式传 FMTS_DEFAULT / FMTS_REMOVED**；剩下 1 个（:357 三角互证收口）自身不例化 DUT，
+  *   只消费 :346/:351 已填充的 rawDefault/rawRemoved。**没有任何一个用例落到类默认值**
+  *   ⟹ 8/8 用例的激励与断言行为【保持不变】，本次订正纯属措辞纠偏、零功能影响。
   * 两配置在 in-spec 工作域都必须【逐位匹配金锚】⟹ 传递性证明：移除 == 默认 == 金锚，
   * bit-exact 成立；且金锚独立于任一配置（未被拟合）。本 spec 额外直接断言两配置的
   * raw lazy-40 输出逐位相等（最强证据：不仅 fp32 语义相等，内部延迟规格化位模式亦相等）。
@@ -379,5 +390,97 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
         "(expected per FpAdd.scala §9.1(c) / blueprint §6.2: magNarrow 2047 vs 1920)")
     }
     println("[HiveFusionMacFpSpec] ===== end divergence record (in-spec bit-exactness is unaffected) =====")
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // inf/nan 软件异常守护（Task #63 / R7）
+  //   · mx8 cvt 类（FpCvtMx8ToMid/FpCvtMx8ToFp32）新增 consumeValid 门控 assert，
+  //     守护源真 = HiveCvtOpMx（HiveWorkUnit.scala:139）。E2M1(fp4) 全 16 码有限 ⟹
+  //     三个 fp4 cvt 不加守护（不动）。
+  //   · 负向触发（E5M2 0x7C inf / E4M3 0x7F NaN）+ 不误伤（合法最大有限码）三 block 见下。
+  //
+  //   【断言触发机制 —— 实测确定，非照抄假设】
+  //     Chisel `assert` 经 firtool 生成 `$error` + `$fatal`（见 verilog_*/verification/assert/
+  //     *_Verification_Assert.sv）。在本项目 ChiselSim + Verilator 后端下，$fatal 触发时
+  //     【以可捕获的 Scala 异常浮现】：chisel3.simulator.Exceptions$AssertionFailed
+  //     （message="One or more assertions failed during Chiselsim simulation"，日志精确记录
+  //     触发的 assert 实例名与源文件），【不会】不可捕获地崩掉 test JVM。故 A/B 用例采用
+  //     intercept 捕获即 PASS（已用独立最小探针实跑验证后落地，探针已删除）。
+  // ════════════════════════════════════════════════════════════════════════════
+  it should "TRIGGER the inf/nan guard for the E5M2 inf code 0x7C with consumeValid=true" in {
+    // E5M2 0x7C = e5m2(0,31,0)：exp 全1 ⟹ isInfNanE5M2=true ⟹ selInfNan=true。
+    // consumeValid=true 打开守护门控 ⟹ assert 触发 ⟹ Verilator $fatal ⟹ 可捕获 AssertionFailed。
+    val ex = intercept[Exception] {
+      simulate(new HiveFusionMacFp(supportedFmts = FMTS_DEFAULT)) { dut =>
+        dut.reset.poke(true.B)
+        dut.io.aFmt.poke(DataFormat.MXE5M2); dut.io.bFmt.poke(DataFormat.MXE5M2)
+        dut.io.a.poke(0.U); dut.io.b.poke(0.U)
+        dut.io.scaleA.poke(127.U); dut.io.scaleB.poke(127.U)
+        dut.io.cReg.poke(0.U); dut.io.rnd.poke(RoundingMode.RNE); dut.io.consumeValid.poke(false.B)
+        dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
+        dut.io.aFmt.poke(DataFormat.MXE5M2); dut.io.bFmt.poke(DataFormat.MXE5M2)
+        dut.io.a.poke(mx8(e5m2(0, 31, 0), e5m2(0, 31, 0)).U)   // 0x7C inf/nan code
+        dut.io.b.poke(mx8(e5m2(0, 15, 0), e5m2(0, 15, 0)).U)   // 合法有限
+        dut.io.scaleA.poke(127.U); dut.io.scaleB.poke(127.U)
+        dut.io.cReg.poke(0.U); dut.io.rnd.poke(RoundingMode.RNE)
+        dut.io.consumeValid.poke(true.B)   // 守护门控打开
+        dut.clock.step(1)
+      }
+    }
+    // 必须是「断言失败」异常（守护真触发），而非其它无关异常
+    ex.getClass.getName should include ("AssertionFailed")
+    println(s"[HiveFusionMacFpSpec] E5M2 inf 0x7C TRIGGERED guard: caught ${ex.getClass.getName} PASS")
+  }
+
+  it should "TRIGGER the inf/nan guard for the E4M3 NaN code 0x7F with consumeValid=true" in {
+    // E4M3 0x7F = e4m3(0,15,7)：exp 全1 且 mant 全1 ⟹ isInfNanE4M3=true ⟹ selInfNan=true。
+    val ex = intercept[Exception] {
+      simulate(new HiveFusionMacFp(supportedFmts = FMTS_DEFAULT)) { dut =>
+        dut.reset.poke(true.B)
+        dut.io.aFmt.poke(DataFormat.MXE4M3); dut.io.bFmt.poke(DataFormat.MXE4M3)
+        dut.io.a.poke(0.U); dut.io.b.poke(0.U)
+        dut.io.scaleA.poke(127.U); dut.io.scaleB.poke(127.U)
+        dut.io.cReg.poke(0.U); dut.io.rnd.poke(RoundingMode.RNE); dut.io.consumeValid.poke(false.B)
+        dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
+        dut.io.aFmt.poke(DataFormat.MXE4M3); dut.io.bFmt.poke(DataFormat.MXE4M3)
+        dut.io.a.poke(mx8(e4m3(0, 15, 7), e4m3(0, 15, 7)).U)   // 0x7F NaN code
+        dut.io.b.poke(mx8(e4m3(0, 7, 0), e4m3(0, 7, 0)).U)     // 合法有限
+        dut.io.scaleA.poke(127.U); dut.io.scaleB.poke(127.U)
+        dut.io.cReg.poke(0.U); dut.io.rnd.poke(RoundingMode.RNE)
+        dut.io.consumeValid.poke(true.B)   // 守护门控打开
+        dut.clock.step(1)
+      }
+    }
+    ex.getClass.getName should include ("AssertionFailed")
+    println(s"[HiveFusionMacFpSpec] E4M3 NaN 0x7F TRIGGERED guard: caught ${ex.getClass.getName} PASS")
+  }
+
+  it should "NOT false-trigger the inf/nan guard for the largest legal finite E4M3 code 0x7E with consumeValid=true" in {
+    simulate(new HiveFusionMacFp(supportedFmts = FMTS_DEFAULT)) { dut =>
+      // 显式 reset（F1：fmt RegNext 复位 false；data 组合）
+      dut.reset.poke(true.B)
+      dut.io.aFmt.poke(DataFormat.MXE4M3); dut.io.bFmt.poke(DataFormat.MXE4M3)
+      dut.io.a.poke(0.U); dut.io.b.poke(0.U)
+      dut.io.scaleA.poke(127.U); dut.io.scaleB.poke(127.U)
+      dut.io.cReg.poke(0.U); dut.io.rnd.poke(RoundingMode.RNE); dut.io.consumeValid.poke(false.B)
+      dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
+
+      // E4M3 0x7E = e4m3(0,15,6)：e4 全1 但 m3=6(≠全1) ⟹ isInfNanE4M3=false ⟹ 合法有限 ±448
+      val legal = e4m3(0, 15, 6)
+      for (_ <- 0 until 4) {
+        dut.io.aFmt.poke(DataFormat.MXE4M3); dut.io.bFmt.poke(DataFormat.MXE4M3)
+        dut.io.a.poke(mx8(legal, legal).U)
+        dut.io.b.poke(mx8(e4m3(0, 7, 0), e4m3(0, 7, 0)).U)
+        dut.io.scaleA.poke(127.U); dut.io.scaleB.poke(127.U)
+        dut.io.cReg.poke(0.U); dut.io.rnd.poke(RoundingMode.RNE)
+        dut.io.consumeValid.poke(true.B)   // 守护门控打开：合法码仍须不触发
+        dut.clock.step(1)
+        val sumRaw = dut.io.sum.peek().litValue
+        val fp32 = HiveSimCommon.swFpNormalize40to32(sumRaw)
+        val isNaN = ((fp32 >>> 23) & 0xFF).toInt == 0xFF && (fp32 & 0x7FFFFF).toInt != 0
+        assert(!isNaN, f"[guard-legal] 合法码 0x7E 被误伤：输出 NaN fp32=0x$fp32%08X")
+      }
+      println("[HiveFusionMacFpSpec] guard NOT false-triggered for legal E4M3 0x7E (consumeValid=true) PASS")
+    }
   }
 }

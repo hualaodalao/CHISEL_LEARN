@@ -103,6 +103,8 @@ class FpCvtMx8ToMid extends Module {
     val in     = Input(UInt(8.W))   // 原始 8-bit MX 元素
     val scale  = Input(UInt(8.W))   // E8M0 scale
     val isE5M2 = Input(Bool())      // 格式选择: true=E5M2, false=E4M3
+    // 消费有效：仅门控下方 inf/nan 断言，不入数据通路
+    val consumeValid = Input(Bool())
     val sign   = Output(UInt(1.W))  // → FpMulMx8.io.aSign/bSign
     val exp    = Output(UInt(8.W))  // → FpMulMx8.io.aExp/bExp
     val mant   = Output(UInt(3.W))  // → FpMulMx8.io.aMant/bMant
@@ -162,6 +164,14 @@ class FpCvtMx8ToMid extends Module {
   io.sign := Mux(io.isE5M2, signE5M2, signE4M3)
   io.exp  := Mux(io.isE5M2, expE5M2, expE4M3)
   io.mant := Mux(io.isE5M2, mantE5M2, mantE4M3)
+
+  // ========== inf/nan 守护（与 HiveCvtOpMx 同源；E2M1 不经本路径） ==========
+  //   E5M2 exp 全1 → inf/nan；E4M3 exp 全1 且 mant 全1 → NaN
+  val selInfNan = Mux(io.isE5M2, isInfNanE5M2, isInfNanE4M3)
+  val consumeValidEff = WireDefault(false.B)
+  consumeValidEff := io.consumeValid
+  assert(!consumeValidEff || !selInfNan,
+    "FpCvtMx8ToMid: MX element is inf/nan (saturated to fp32 max); indicates software-side anomaly")
 }
 
 // ============================================================================
@@ -312,6 +322,8 @@ class FpCvtMx8ToFp32 extends Module {
     val in     = Input(UInt(8.W))   // 原始 8-bit MX 元素 (E4M3 或 E5M2)
     val scale  = Input(UInt(8.W))   // E8M0 scale
     val isE5M2 = Input(Bool())      // 格式选择: true=E5M2, false=E4M3
+    // 消费有效：仅门控下方 inf/nan 断言，不入数据通路
+    val consumeValid = Input(Bool())
     val out    = Output(UInt(32.W)) // 完整 fp32 → FpMulFp16Bf16.io.a/b
   })
 
@@ -373,6 +385,13 @@ class FpCvtMx8ToFp32 extends Module {
 
   // ========== 输出选择 ==========
   io.out := Mux(io.isE5M2, outE5M2, outE4M3)
+
+  // ========== inf/nan 守护（与 HiveCvtOpMx 同源；E2M1 不经本路径） ==========
+  val selInfNan = Mux(io.isE5M2, isInfNanE5M2, isInfNanE4M3)
+  val consumeValidEff = WireDefault(false.B)
+  consumeValidEff := io.consumeValid
+  assert(!consumeValidEff || !selInfNan,
+    "FpCvtMx8ToFp32: MX element is inf/nan (saturated to fp32 max); indicates software-side anomaly")
 }
 
 // ============================================================================

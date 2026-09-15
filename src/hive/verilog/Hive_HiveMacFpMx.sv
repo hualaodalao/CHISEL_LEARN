@@ -7,14 +7,14 @@ module Hive_HiveMacFpMx(	// src/hive/scala/main/HiveWorkUnit.scala:478:7
   output [39:0] io_sum	// src/hive/scala/main/HiveWorkUnit.scala:488:14
 );
 
-  wire [7:0]  _mProd_T = {5'h1, io_a[22:20]} * {5'h1, io_b[22:20]};	// src/hive/scala/main/HiveWorkUnit.scala:500:58, :501:58, :504:30, :505:30, :507:21
-  wire [8:0]  _eAdj_T_2 = {1'h0, io_a[30:23]} + {1'h0, io_b[30:23]} + {8'h0, _mProd_T[7]};	// src/hive/scala/main/HiveWorkUnit.scala:500:35, :501:35, :507:21, :509:17, :510:{19,30}
+  wire [3:0]  _mProd_T = {3'h1, io_a[22]} * {3'h1, io_b[22]};	// src/hive/scala/main/HiveWorkUnit.scala:500:58, :501:58, :504:30, :505:30, :507:21
+  wire [8:0]  _eAdj_T_2 = {1'h0, io_a[30:23]} + {1'h0, io_b[30:23]} + {8'h0, _mProd_T[3]};	// src/hive/scala/main/HiveWorkUnit.scala:500:35, :501:35, :507:21, :509:17, :510:{19,30}
   wire [31:0] prod32 =
     io_a[30:23] == 8'h0 & io_a[22:0] == 23'h0 | io_b[30:23] == 8'h0 & io_b[22:0] == 23'h0
       ? 32'h0
       : {io_a[31] ^ io_b[31],
          _eAdj_T_2 > 9'h7E ? _eAdj_T_2[7:0] - 8'h7F : 8'h0,
-         _mProd_T[7] ? {_mProd_T[6:0], 16'h0} : {_mProd_T[5:0], 17'h0}};	// src/hive/scala/main/HiveWorkUnit.scala:500:{16,35,58}, :501:{16,35,58}, :502:18, :507:21, :509:17, :510:{19,30}, :511:{17,23,39}, :513:{21,38,53}, :519:38, :521:{20,29,36}, :522:{20,29,36}, :523:{19,27,52}
+         _mProd_T[3] ? {_mProd_T[2:0], 20'h0} : {_mProd_T[1:0], 21'h0}};	// src/hive/scala/main/HiveWorkUnit.scala:500:{16,35,58}, :501:{16,35,58}, :502:18, :507:21, :509:17, :510:{19,30}, :511:{17,23,39}, :513:{21,38,53}, :519:38, :521:{20,29,36}, :522:{20,29,36}, :523:{19,27,52}
   wire [30:0] pMant31 = {1'h1, prod32[22:0], 7'h0};	// src/hive/scala/main/Fp32.scala:11:30, src/hive/scala/main/HiveWorkUnit.scala:383:24, :523:19
   wire [8:0]  _expDiffRaw_T_2 = {1'h0, prod32[30:23]} - {1'h0, io_c[38:31]};	// src/hive/scala/main/Fp32.scala:10:29, src/hive/scala/main/HiveWorkUnit.scala:374:23, :387:34, :523:19
   wire        pGtC = $signed(_expDiffRaw_T_2) > -9'sh1;	// src/hive/scala/main/HiveWorkUnit.scala:387:34, :388:29

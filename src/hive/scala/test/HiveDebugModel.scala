@@ -285,7 +285,7 @@ object HiveDebugModel {
     // [P0-1] fp4(E2M1) K not divisible by kPerBeat -> code8. Placed BEFORE the
     //   mix code3 below, i.e. lower priority, matching the hardware
     //   last-connect order.
-    if (hasMx4 && p.aFmt == DataFormat.MXE2M1 && p.k % kPerBeat(DataFormat.MXE2M1, totalN) != 0) e = Some(8)
+    if (hasMx4 && isMxAny(p.aFmt) && (p.k % kPerBeat(p.aFmt, totalN) != 0 || p.k == 0)) e = Some(8)
     // [Fix-4 mirror] MX4xMX8 mix (isMx4(aFmt) ^ isMx4(bFmt)) -> code 3, gated by hasMx4.
     if (hasMx4 && (p.aFmt == DataFormat.MXE2M1) != (p.bFmt == DataFormat.MXE2M1)) e = Some(3)
     // (#146) errCode 7 REMOVED from the mirror. The hardware block it mirrored
@@ -318,9 +318,9 @@ object HiveDebugModel {
     //   nibble buildMemory 支持作为输入。对非 MXE2M1 格式判据取值【完全一致】
     //   （INT4 仍拒、其余仍放行），非回归。
     require(p.aFmt != DataFormat.INT4,
-      s"aFmt=${p.aFmt}：INT4 半字节整型调试模型不支持作为输入（fp4/MXE2M1 仅 hasMx4 硬件支持，见 Plan 内 cfg-aware 守卫；请改用 mxe4m3/mxe5m2/mxe2m1/fp16/bf16/int8/int16）")
+      s"aFmt=${p.aFmt}：INT4 半字节整型调试模型不支持作为输入（fp4/MXE2M1 仅 hasMx4 硬件支持，见 Plan 内 cfg-aware 守卫；请改用 mxe4m3/mxe5m2/mxe2m1/int8）")
     require(p.bFmt != DataFormat.INT4,
-      s"bFmt=${p.bFmt}：INT4 半字节整型调试模型不支持作为输入（fp4/MXE2M1 仅 hasMx4 硬件支持，见 Plan 内 cfg-aware 守卫；请改用 mxe4m3/mxe5m2/mxe2m1/fp16/bf16/int8/int16）")
+      s"bFmt=${p.bFmt}：INT4 半字节整型调试模型不支持作为输入（fp4/MXE2M1 仅 hasMx4 硬件支持，见 Plan 内 cfg-aware 守卫；请改用 mxe4m3/mxe5m2/mxe2m1/int8）")
     require(p.rnd >= 0 && p.rnd <= 4, s"rnd=${p.rnd} 越界（0..4）")
     if (isMxAny(p.aFmt) || isMxAny(p.bFmt)) {
       // 【Phase 3】kPerBeat 由硬编码 totalN*2（MX8）泛化为 kPerBeat(fmt)：

@@ -39,21 +39,17 @@ class FbMxQuantizer(dataWidth: Int) extends Module {
     val outData = Decoupled(UInt(dataWidth.W))
     /** 输出2：E8M0 scale 字节（每 block 一个） */
     val outScale = Decoupled(UInt(8.W))
-    /** 配置：源数据格式（FbDataFmt：FP32/FP16/BF16） */
-    val cfg_srcFmt = Input(UInt(3.W))
-    /** 配置：目标格式（FbDataFmt：MXE4M3/MXE5M2） */
-    val cfg_dstFmt = Input(UInt(3.W))
+    /** 配置：源数据格式（[[FbDataFmt]]：FP32/FP16/BF16） */
+    val cfg_srcFmt = Input(FbDataFmt())
+    /** 配置：目标格式（[[FbDataFmt]]：MXE4M3/MXE5M2） */
+    val cfg_dstFmt = Input(FbDataFmt())
     /** 配置：块大小（实际值 16/32/64 个元素） */
     val cfg_blockSize = Input(UInt(7.W))
     /** 复位内部所有状态（命令结束/出错时拉高） */
     val flush = Input(Bool())
   })
 
-  // --- 格式常量（与 FbDataFmt 一致）---
-  private val FMT_FP32   = 0.U(3.W)
-  private val FMT_FP16   = 1.U(3.W)
-  private val FMT_BF16   = 2.U(3.W)
-  private val FMT_MXE4M3 = 4.U(3.W)
+  // 格式编码统一引用 FbDataFmt ChiselEnum（4-bit），本文件不再私藏 FMT_* 常量
 
   // --- 派生常量 ---
   private val bytesPerBeat = dataWidth / 8          // 输出每 beat 字节数（= 8-bit 元素数）
@@ -98,10 +94,10 @@ class FbMxQuantizer(dataWidth: Int) extends Module {
     val c32 = (e32 =/= 0.U) && (e32 =/= 255.U || m32 === 0.U)
     val x32 = Mux(e32 === 255.U, 127.S(9.W), e32.zext - 127.S)
 
-    val contrib = Mux(io.cfg_srcFmt === FMT_FP16, c16,
-                  Mux(io.cfg_srcFmt === FMT_BF16, cBf, c32 && isEven.B))
-    val expv    = Mux(io.cfg_srcFmt === FMT_FP16, x16,
-                  Mux(io.cfg_srcFmt === FMT_BF16, xBf, x32))
+    val contrib = Mux(io.cfg_srcFmt === FbDataFmt.FP16, c16,
+                  Mux(io.cfg_srcFmt === FbDataFmt.BF16, cBf, c32 && isEven.B))
+    val expv    = Mux(io.cfg_srcFmt === FbDataFmt.FP16, x16,
+                  Mux(io.cfg_srcFmt === FbDataFmt.BF16, xBf, x32))
     (contrib, expv)
   }
 
@@ -174,9 +170,9 @@ class FbMxQuantizer(dataWidth: Int) extends Module {
   val scaleReg   = RegInit(0.U(8.W))                      // E8M0 scale 锁存
 
   // --- 源格式相关派生量 ---
-  val isFp32Src    = io.cfg_srcFmt === FMT_FP32
+  val isFp32Src    = io.cfg_srcFmt === FbDataFmt.FP32
   val elemsPerBeat = Mux(isFp32Src, (dataWidth / 32).U(9.W), (dataWidth / 16).U(9.W))
-  val dstE4        = io.cfg_dstFmt === FMT_MXE4M3
+  val dstE4        = io.cfg_dstFmt === FbDataFmt.MXE4M3
 
   // --- 输出通道默认连接 ---
   io.outData.valid  := outDataValid
@@ -244,7 +240,7 @@ class FbMxQuantizer(dataWidth: Int) extends Module {
     val word    = blockBuf(bufIdx(beatIdx))
     val rawElem = word >> (pos << Mux(isFp32Src, 5.U(3.W), 4.U(3.W)))
     val f32Elem = Mux(isFp32Src, rawElem(31, 0),
-                  Mux(io.cfg_srcFmt === FMT_FP16, fp16ToFp32(rawElem(15, 0)),
+                  Mux(io.cfg_srcFmt === FbDataFmt.FP16, fp16ToFp32(rawElem(15, 0)),
                       Cat(rawElem(15, 0), 0.U(16.W))))  // BF16：低 16 位补零
 
     val qByte = quantizeElem(f32Elem, maxExp, dstE4)

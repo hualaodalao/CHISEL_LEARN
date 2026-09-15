@@ -22,10 +22,11 @@ module Hive_HiveCvtOpMx_Verification_Assert();	// src/hive/scala/main/HiveWorkUn
     always @(posedge Hive_HiveCvtOpMx.clock) begin	// src/hive/scala/main/HiveWorkUnit.scala:101:7, :139:9
       if (~Hive_HiveCvtOpMx.reset
           & ~(~Hive_HiveCvtOpMx.io_consumeValid
-              | ~(Hive_HiveCvtOpMx.isE5_layerCapture
-                    ? (&Hive_HiveCvtOpMx.e5_layerCapture)
-                    : (&Hive_HiveCvtOpMx.e4_layerCapture)
-                      & (&Hive_HiveCvtOpMx.m4_layerCapture)))) begin	// src/hive/scala/main/Fp32.scala:77:14, :78:14, src/hive/scala/main/HiveWorkUnit.scala:101:7, :102:14, :110:21, :132:{8,18,27,32,38}, :139:{9,10,27,30}
+              | ~(Hive_HiveCvtOpMx.io_fmt != 4'h5
+                  & (Hive_HiveCvtOpMx.isE5_layerCapture
+                       ? (&Hive_HiveCvtOpMx.e5_layerCapture)
+                       : (&Hive_HiveCvtOpMx.e4_layerCapture)
+                         & (&Hive_HiveCvtOpMx.m4_layerCapture))))) begin	// src/hive/scala/main/Fp32.scala:77:14, :78:14, src/hive/scala/main/HiveEnum.scala:11:43, src/hive/scala/main/HiveWorkUnit.scala:101:7, :102:14, :110:21, :130:{5,31,37,47,56,61,67}, :139:{9,10,27,30}
         if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveWorkUnit.scala:139:9
           $error("Assertion failed: HiveCvtOpMx: MX element is inf/nan (saturated to fp32 max); indicates software-side anomaly\n");	// src/hive/scala/main/HiveWorkUnit.scala:139:9
         if (`STOP_COND_)	// src/hive/scala/main/HiveWorkUnit.scala:139:9

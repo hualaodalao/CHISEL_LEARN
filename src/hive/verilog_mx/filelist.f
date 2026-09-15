@@ -1,11 +1,12 @@
+Hive_HiveCoreCalcConfig.sv
 Hive_ram_2048x256.sv
 Hive_Queue2048_UInt256.sv
 Hive_StreamFifo.sv
 Hive_ram_2048x640.sv
 Hive_Queue2048_UInt640.sv
 Hive_StreamFifo_2.sv
-Hive_ram_256x8.sv
-Hive_Queue256_UInt8.sv
+Hive_ram_256x32.sv
+Hive_Queue256_UInt32.sv
 Hive_StreamFifo_3.sv
 Hive_HiveCoreScratchpad.sv
 Hive_HiveCoreDmaRdOnly.sv
@@ -15,8 +16,9 @@ Hive_HiveCoreExecutor2.sv
 Hive_HiveOutCvt.sv
 verification/assert/Hive_HiveCvtOpMx_Verification_Assert.sv
 Hive_HiveCvtOpMx.sv
-Hive_HiveMacFp.sv
 Hive_HiveMacFpMx.sv
+Hive_HiveMacFp.sv
+Hive_HiveMacFpMx_4.sv
 Hive_HiveWorkUnit.sv
 verification/assert/Hive_HiveWorker_Verification_Assert.sv
 Hive_HiveWorker.sv
@@ -24,8 +26,7 @@ Hive_HiveCell.sv
 Hive_HiveComb.sv
 Hive_HiveCoreDmaRdOnly_2.sv
 Hive_HiveCoreDmaScaleWr.sv
-Hive_HiveCoreCalcConfig.sv
-Hive_ram_2x16.sv
-Hive_Queue2_UInt16.sv
+Hive_ram_2x8.sv
+Hive_Queue2_UInt8.sv
 Hive_StreamFifo_5.sv
 Hive_HiveCore.sv

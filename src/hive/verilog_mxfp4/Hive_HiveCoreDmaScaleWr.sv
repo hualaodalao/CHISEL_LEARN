@@ -43,166 +43,166 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module Hive_HiveCoreDmaScaleWr(	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
-  input         clock,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
-                reset,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
-                io_start,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-  output        io_busy,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-                io_err,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-  input         io_dmaExtWrIF_rsp_valid,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-                io_dmaExtWrIF_rsp_payload_err,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-  output        io_dmaExtWrIF_req_valid,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-  input         io_dmaExtWrIF_req_ready,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-  output [31:0] io_dmaExtWrIF_req_payload_addr,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-  output [15:0] io_dmaExtWrIF_req_payload_data,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-  input  [15:0] io_calcConfig_nTile,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-  input  [31:0] io_calcConfig_scaleCRowAddressOffset,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-                io_calcConfig_scaleCColTileAddressOffset,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-                io_baseAddr,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-  input  [15:0] io_regFile_m,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-  input         io_bufPop_valid,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-  output        io_bufPop_ready,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-  input  [15:0] io_bufPop_payload	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
+module Hive_HiveCoreDmaScaleWr(	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
+  input         clock,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
+                reset,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
+                io_start,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+  output        io_busy,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+                io_err,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+  input         io_dmaExtWrIF_rsp_valid,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+                io_dmaExtWrIF_rsp_payload_err,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+  output        io_dmaExtWrIF_req_valid,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+  input         io_dmaExtWrIF_req_ready,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+  output [31:0] io_dmaExtWrIF_req_payload_addr,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+  output [7:0]  io_dmaExtWrIF_req_payload_data,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+  input  [15:0] io_calcConfig_nTile,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+  input  [31:0] io_calcConfig_scaleCRowAddressOffset,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+                io_calcConfig_scaleCColTileAddressOffset,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+                io_baseAddr,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+  input  [15:0] io_regFile_m,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+  input         io_bufPop_valid,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+  output        io_bufPop_ready,	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+  input  [7:0]  io_bufPop_payload	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
 );
 
-  reg  [1:0]  state;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:522:22
-  reg  [31:0] curAddr;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:527:24
-  reg  [31:0] colAddr;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:528:24
-  reg  [31:0] rowStep;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:529:24
-  reg  [15:0] lineTarget;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:530:28
-  reg  [15:0] lineCounter;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:28
-  reg  [15:0] nCnt;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:532:21
-  reg  [1:0]  ostCredit;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:533:26
-  reg         errReg;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:534:23
-  wire        _io_bufPop_ready_T = state == 2'h1;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:522:22, :561:45
+  reg  [1:0]  state;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:526:22
+  reg  [31:0] curAddr;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:24
+  reg  [31:0] colAddr;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:532:24
+  reg  [31:0] rowStep;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:533:24
+  reg  [15:0] lineTarget;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:534:28
+  reg  [15:0] lineCounter;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:535:28
+  reg  [15:0] nCnt;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:536:21
+  reg  [1:0]  ostCredit;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:537:26
+  reg         errReg;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:538:23
+  wire        _io_bufPop_ready_T = state == 2'h1;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:526:22, :565:45
   wire        io_dmaExtWrIF_req_valid_0 =
-    _io_bufPop_ready_T & io_bufPop_valid & ostCredit != 2'h2;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:533:26, :561:{45,60,78,91}
-  always @(posedge clock) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
-    if (reset) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
-      state <= 2'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:522:22
-      curAddr <= 32'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:527:24
-      colAddr <= 32'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:527:24, :528:24
-      rowStep <= 32'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:527:24, :529:24
-      lineTarget <= 16'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:530:28
-      lineCounter <= 16'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:28
-      nCnt <= 16'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:532:21
-      ostCredit <= 2'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:533:26
-      errReg <= 1'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:534:23
+    _io_bufPop_ready_T & io_bufPop_valid & ostCredit != 2'h2;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:537:26, :565:{45,60,78,91}
+  always @(posedge clock) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
+    if (reset) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
+      state <= 2'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:526:22
+      curAddr <= 32'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:24
+      colAddr <= 32'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:24, :532:24
+      rowStep <= 32'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:24, :533:24
+      lineTarget <= 16'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:534:28
+      lineCounter <= 16'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:535:28
+      nCnt <= 16'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:536:21
+      ostCredit <= 2'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:537:26
+      errReg <= 1'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:538:23
     end
-    else begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
-      automatic logic            _GEN;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:539:14
+    else begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
+      automatic logic            _GEN;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:543:14
       automatic logic            _GEN_0;	// src/utils/Stream/Stream.scala:43:26
-      automatic logic            _GEN_1;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:534:23, :550:34, :551:43, :552:16
-      automatic logic            _GEN_2;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:539:25, :541:12, :550:34, :589:22, :590:21
-      automatic logic            _GEN_3;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:595:26
-      automatic logic            _GEN_4;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:572:17
-      automatic logic            _GEN_5;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:615:23
-      automatic logic [3:0][1:0] _GEN_6;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:522:22, :539:14, :561:45, :572:17, :579:41, :589:22, :609:22, :632:22
-      _GEN = state == 2'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:522:22, :539:14
-      _GEN_0 = io_dmaExtWrIF_req_valid_0 & io_dmaExtWrIF_req_ready;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:561:{60,78}, src/utils/Stream/Stream.scala:43:26
-      _GEN_1 = io_dmaExtWrIF_rsp_valid & io_dmaExtWrIF_rsp_payload_err | errReg;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:534:23, :550:34, :551:43, :552:16
-      _GEN_2 = io_start | _GEN;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:539:{14,25}, :541:12, :550:34, :589:22, :590:21
-      _GEN_3 = lineCounter == lineTarget - 16'h1;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:530:28, :531:28, :595:{26,41}
-      _GEN_4 = state == 2'h2;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:522:22, :561:91, :572:17
-      _GEN_5 = nCnt == io_calcConfig_nTile - 16'h1;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:532:21, :615:{23,47}
+      automatic logic            _GEN_1;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:538:23, :554:34, :555:43, :556:16
+      automatic logic            _GEN_2;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:543:25, :545:12, :554:34, :593:22, :594:21
+      automatic logic            _GEN_3;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:599:26
+      automatic logic            _GEN_4;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:576:17
+      automatic logic            _GEN_5;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:619:23
+      automatic logic [3:0][1:0] _GEN_6;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:526:22, :543:14, :565:45, :576:17, :583:41, :593:22, :613:22, :636:22
+      _GEN = state == 2'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:526:22, :543:14
+      _GEN_0 = io_dmaExtWrIF_req_valid_0 & io_dmaExtWrIF_req_ready;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:565:{60,78}, src/utils/Stream/Stream.scala:43:26
+      _GEN_1 = io_dmaExtWrIF_rsp_valid & io_dmaExtWrIF_rsp_payload_err | errReg;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:538:23, :554:34, :555:43, :556:16
+      _GEN_2 = io_start | _GEN;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:543:{14,25}, :545:12, :554:34, :593:22, :594:21
+      _GEN_3 = lineCounter == lineTarget - 16'h1;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:534:28, :535:28, :599:{26,41}
+      _GEN_4 = state == 2'h2;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:526:22, :565:91, :576:17
+      _GEN_5 = nCnt == io_calcConfig_nTile - 16'h1;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:536:21, :619:{23,47}
       _GEN_6 =
         {{io_start ? 2'h1 : ostCredit == 2'h0 ? 2'h0 : state},
          {io_start ? 2'h1 : {_GEN_5, 1'h1}},
          {io_start | ~(_GEN_0 & _GEN_3) ? state : 2'h2},
-         {io_start & _GEN ? 2'h1 : state}};	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:522:22, :533:26, :539:14, :561:{45,91}, :572:17, :579:{21,41}, :580:15, :589:22, :594:42, :595:{26,48}, :597:17, :609:22, :610:21, :615:{23,54}, :616:15, :623:17, :632:22, :633:21, :638:{28,37}, :640:15, src/utils/Stream/Stream.scala:43:26
-      state <= _GEN_6[state];	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:522:22, :539:14, :561:45, :572:17, :579:41, :589:22, :609:22, :632:22
-      if (_GEN_2) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:539:25, :541:12, :550:34, :589:22, :590:21
-        curAddr <= io_baseAddr;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:527:24
-        colAddr <= io_calcConfig_scaleCColTileAddressOffset;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:528:24
-        rowStep <= io_calcConfig_scaleCRowAddressOffset;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:529:24
-        lineTarget <= io_regFile_m;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:530:28
-        nCnt <= 16'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:532:21
+         {io_start & _GEN ? 2'h1 : state}};	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:526:22, :537:26, :543:14, :565:{45,91}, :576:17, :583:{21,41}, :584:15, :593:22, :598:42, :599:{26,48}, :601:17, :613:22, :614:21, :619:{23,54}, :620:15, :627:17, :636:22, :637:21, :642:{28,37}, :644:15, src/utils/Stream/Stream.scala:43:26
+      state <= _GEN_6[state];	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:526:22, :543:14, :565:45, :576:17, :583:41, :593:22, :613:22, :636:22
+      if (_GEN_2) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:543:25, :545:12, :554:34, :593:22, :594:21
+        curAddr <= io_baseAddr;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:24
+        colAddr <= io_calcConfig_scaleCColTileAddressOffset;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:532:24
+        rowStep <= io_calcConfig_scaleCRowAddressOffset;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:533:24
+        lineTarget <= io_regFile_m;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:534:28
+        nCnt <= 16'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:536:21
       end
-      else begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:539:25, :541:12, :550:34, :589:22, :590:21
-        automatic logic             _GEN_7;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:527:24, :609:22, :615:54, :621:17
-        automatic logic [3:0][15:0] _GEN_8;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:532:21, :539:14, :561:45, :572:17, :589:22, :609:22
-        _GEN_7 = io_start | _GEN_5;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:527:24, :609:22, :615:{23,54}, :621:17
-        if (~_GEN) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:539:14, :572:17, :575:14
-          if (_io_bufPop_ready_T) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:561:45
-            if (io_start | ~_GEN_0 | _GEN_3) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:527:24, :589:22, :594:42, :595:{26,48}, src/utils/Stream/Stream.scala:43:26
+      else begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:543:25, :545:12, :554:34, :593:22, :594:21
+        automatic logic             _GEN_7;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:24, :613:22, :619:54, :625:17
+        automatic logic [3:0][15:0] _GEN_8;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:536:21, :543:14, :565:45, :576:17, :593:22, :613:22
+        _GEN_7 = io_start | _GEN_5;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:24, :613:22, :619:{23,54}, :625:17
+        if (~_GEN) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:543:14, :576:17, :579:14
+          if (_io_bufPop_ready_T) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:565:45
+            if (io_start | ~_GEN_0 | _GEN_3) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:24, :593:22, :598:42, :599:{26,48}, src/utils/Stream/Stream.scala:43:26
             end
-            else	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:527:24, :589:22, :594:42, :595:48
-              curAddr <= curAddr + rowStep;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:527:24, :529:24, :600:30
+            else	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:24, :593:22, :598:42, :599:48
+              curAddr <= curAddr + rowStep;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:24, :533:24, :604:30
           end
-          else if (~_GEN_4 | _GEN_7) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:527:24, :572:17, :609:22, :615:54, :621:17
+          else if (~_GEN_4 | _GEN_7) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:24, :576:17, :613:22, :619:54, :625:17
           end
-          else	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:527:24, :572:17, :609:22
-            curAddr <= io_baseAddr + colAddr;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:527:24, :528:24, :621:32
+          else	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:24, :576:17, :613:22
+            curAddr <= io_baseAddr + colAddr;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:24, :532:24, :625:32
         end
-        if (_GEN | _io_bufPop_ready_T | ~_GEN_4 | _GEN_7) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:527:24, :528:24, :539:14, :561:45, :572:17, :609:22, :615:54, :621:17
+        if (_GEN | _io_bufPop_ready_T | ~_GEN_4 | _GEN_7) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:24, :532:24, :543:14, :565:45, :576:17, :613:22, :619:54, :625:17
         end
-        else	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:528:24, :572:17, :609:22
-          colAddr <= colAddr + io_calcConfig_scaleCColTileAddressOffset;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:528:24, :622:28
+        else	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:532:24, :576:17, :613:22
+          colAddr <= colAddr + io_calcConfig_scaleCColTileAddressOffset;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:532:24, :626:28
         _GEN_8 =
           {{(&state) & io_start ? 16'h0 : nCnt},
            {io_start ? 16'h0 : _GEN_5 ? nCnt : nCnt + 16'h1},
            {io_start ? 16'h0 : nCnt},
-           {nCnt}};	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:522:22, :531:28, :532:21, :539:14, :561:45, :572:17, :589:22, :592:21, :609:22, :613:21, :615:{23,54}, :620:{14,22}, :632:22, :635:21, :636:21
-        nCnt <= _GEN_8[state];	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:522:22, :532:21, :539:14, :561:45, :572:17, :589:22, :609:22
+           {nCnt}};	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:526:22, :535:28, :536:21, :543:14, :565:45, :576:17, :593:22, :596:21, :613:22, :617:21, :619:{23,54}, :624:{14,22}, :636:22, :639:21, :640:21
+        nCnt <= _GEN_8[state];	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:526:22, :536:21, :543:14, :565:45, :576:17, :593:22, :613:22
       end
-      if (_GEN)	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:539:14
-        lineCounter <= 16'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:28
-      else if (_io_bufPop_ready_T) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:561:45
-        if (io_start)	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-          lineCounter <= 16'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:28
+      if (_GEN)	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:543:14
+        lineCounter <= 16'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:535:28
+      else if (_io_bufPop_ready_T) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:565:45
+        if (io_start)	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+          lineCounter <= 16'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:535:28
         else if (_GEN_0)	// src/utils/Stream/Stream.scala:43:26
-          lineCounter <= _GEN_3 ? 16'h0 : lineCounter + 16'h1;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:28, :595:{26,48}, :596:23, :599:{23,38}
+          lineCounter <= _GEN_3 ? 16'h0 : lineCounter + 16'h1;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:535:28, :599:{26,48}, :600:23, :603:{23,38}
       end
-      else if ((_GEN_4 | (&state)) & io_start)	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:522:22, :531:28, :572:17, :609:22, :612:21, :632:22, :635:21
-        lineCounter <= 16'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:531:28
-      if (_GEN | (_io_bufPop_ready_T | _GEN_4 | (&state)) & io_start)	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:522:22, :539:{14,25}, :561:45, :572:17, :589:22, :593:21, :609:22, :632:22, :637:21
-        ostCredit <= 2'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:533:26
-      else if (~(_GEN_0 & io_dmaExtWrIF_rsp_valid)) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:543:33, src/utils/Stream/Stream.scala:43:26
+      else if ((_GEN_4 | (&state)) & io_start)	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:526:22, :535:28, :576:17, :613:22, :616:21, :636:22, :639:21
+        lineCounter <= 16'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:535:28
+      if (_GEN | (_io_bufPop_ready_T | _GEN_4 | (&state)) & io_start)	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:526:22, :543:{14,25}, :565:45, :576:17, :593:22, :597:21, :613:22, :636:22, :641:21
+        ostCredit <= 2'h0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:537:26
+      else if (~(_GEN_0 & io_dmaExtWrIF_rsp_valid)) begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:547:33, src/utils/Stream/Stream.scala:43:26
         if (_GEN_0)	// src/utils/Stream/Stream.scala:43:26
-          ostCredit <= ostCredit + 2'h1;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:533:26, :546:30
-        else if (io_dmaExtWrIF_rsp_valid)	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:501:14
-          ostCredit <= ostCredit - 2'h1;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:533:26, :548:30
+          ostCredit <= ostCredit + 2'h1;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:537:26, :550:30
+        else if (io_dmaExtWrIF_rsp_valid)	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:505:14
+          ostCredit <= ostCredit - 2'h1;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:537:26, :552:30
       end
       errReg <=
         ~_GEN
         & (_io_bufPop_ready_T | _GEN_4
              ? ~_GEN_2 & _GEN_1
-             : ~((&state) & _GEN_2) & _GEN_1);	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:522:22, :534:23, :539:{14,25}, :541:12, :550:34, :551:43, :552:16, :561:45, :572:17, :575:14, :589:22, :590:21, :632:22, :634:21
+             : ~((&state) & _GEN_2) & _GEN_1);	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:526:22, :538:23, :543:{14,25}, :545:12, :554:34, :555:43, :556:16, :565:45, :576:17, :579:14, :593:22, :594:21, :636:22, :638:21
     end
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
-      `FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
+  `ifdef ENABLE_INITIAL_REG_	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
+      `FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
-      automatic logic [31:0] _RANDOM[0:4];	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
-      `ifdef INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
-        `INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
+    initial begin	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
+      automatic logic [31:0] _RANDOM[0:4];	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
+      `ifdef INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
+        `INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
+      `ifdef RANDOMIZE_REG_INIT	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
         for (logic [2:0] i = 3'h0; i < 3'h5; i += 3'h1) begin
-          _RANDOM[i] = `RANDOM;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
-        end	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
-        state = _RANDOM[3'h0][1:0];	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7, :522:22
-        curAddr = {_RANDOM[3'h0][31:2], _RANDOM[3'h1][1:0]};	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7, :522:22, :527:24
-        colAddr = {_RANDOM[3'h1][31:2], _RANDOM[3'h2][1:0]};	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7, :527:24, :528:24
-        rowStep = {_RANDOM[3'h2][31:2], _RANDOM[3'h3][1:0]};	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7, :528:24, :529:24
-        lineTarget = _RANDOM[3'h3][17:2];	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7, :529:24, :530:28
-        lineCounter = {_RANDOM[3'h3][31:18], _RANDOM[3'h4][1:0]};	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7, :529:24, :531:28
-        nCnt = _RANDOM[3'h4][17:2];	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7, :531:28, :532:21
-        ostCredit = _RANDOM[3'h4][19:18];	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7, :531:28, :533:26
-        errReg = _RANDOM[3'h4][20];	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7, :531:28, :534:23
+          _RANDOM[i] = `RANDOM;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
+        end	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
+        state = _RANDOM[3'h0][1:0];	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7, :526:22
+        curAddr = {_RANDOM[3'h0][31:2], _RANDOM[3'h1][1:0]};	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7, :526:22, :531:24
+        colAddr = {_RANDOM[3'h1][31:2], _RANDOM[3'h2][1:0]};	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7, :531:24, :532:24
+        rowStep = {_RANDOM[3'h2][31:2], _RANDOM[3'h3][1:0]};	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7, :532:24, :533:24
+        lineTarget = _RANDOM[3'h3][17:2];	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7, :533:24, :534:28
+        lineCounter = {_RANDOM[3'h3][31:18], _RANDOM[3'h4][1:0]};	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7, :533:24, :535:28
+        nCnt = _RANDOM[3'h4][17:2];	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7, :535:28, :536:21
+        ostCredit = _RANDOM[3'h4][19:18];	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7, :535:28, :537:26
+        errReg = _RANDOM[3'h4][20];	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7, :535:28, :538:23
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
-      `FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
+    `ifdef FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
+      `FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_busy = |state;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7, :522:22, :569:20
-  assign io_err = errReg;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7, :534:23
-  assign io_dmaExtWrIF_req_valid = io_dmaExtWrIF_req_valid_0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7, :561:{60,78}
-  assign io_dmaExtWrIF_req_payload_addr = curAddr;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7, :527:24
-  assign io_dmaExtWrIF_req_payload_data = io_bufPop_payload;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7
-  assign io_bufPop_ready = _io_bufPop_ready_T & io_dmaExtWrIF_req_ready;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:495:7, :561:45, :565:60
+  assign io_busy = |state;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7, :526:22, :573:20
+  assign io_err = errReg;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7, :538:23
+  assign io_dmaExtWrIF_req_valid = io_dmaExtWrIF_req_valid_0;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7, :565:{60,78}
+  assign io_dmaExtWrIF_req_payload_addr = curAddr;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7, :531:24
+  assign io_dmaExtWrIF_req_payload_data = io_bufPop_payload;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7
+  assign io_bufPop_ready = _io_bufPop_ready_T & io_dmaExtWrIF_req_ready;	// src/hive/scala/main/HiveCoreDmaWrOnly.scala:499:7, :565:45, :569:60
 endmodule
 

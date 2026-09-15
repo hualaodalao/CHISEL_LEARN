@@ -50,7 +50,7 @@ module Hive_HiveCoreDmaRdOnly_2(	// src/hive/scala/main/HiveCoreDmaRdOnly.scala:
                 io_start,	// src/hive/scala/main/HiveCoreDmaRdOnly.scala:131:14
   output        io_err,	// src/hive/scala/main/HiveCoreDmaRdOnly.scala:131:14
   input         io_dmaExtRdIF_rsp_valid,	// src/hive/scala/main/HiveCoreDmaRdOnly.scala:131:14
-  input  [7:0]  io_dmaExtRdIF_rsp_payload_data,	// src/hive/scala/main/HiveCoreDmaRdOnly.scala:131:14
+  input  [31:0] io_dmaExtRdIF_rsp_payload_data,	// src/hive/scala/main/HiveCoreDmaRdOnly.scala:131:14
   input         io_dmaExtRdIF_rsp_payload_err,	// src/hive/scala/main/HiveCoreDmaRdOnly.scala:131:14
   output        io_dmaExtRdIF_req_valid,	// src/hive/scala/main/HiveCoreDmaRdOnly.scala:131:14
   input         io_dmaExtRdIF_req_ready,	// src/hive/scala/main/HiveCoreDmaRdOnly.scala:131:14
@@ -63,7 +63,7 @@ module Hive_HiveCoreDmaRdOnly_2(	// src/hive/scala/main/HiveCoreDmaRdOnly.scala:
   input  [31:0] io_reg_rowOffset,	// src/hive/scala/main/HiveCoreDmaRdOnly.scala:131:14
                 io_reg_colTileOffset,	// src/hive/scala/main/HiveCoreDmaRdOnly.scala:131:14
   output        io_bufPush_valid,	// src/hive/scala/main/HiveCoreDmaRdOnly.scala:131:14
-  output [7:0]  io_bufPush_payload,	// src/hive/scala/main/HiveCoreDmaRdOnly.scala:131:14
+  output [31:0] io_bufPush_payload,	// src/hive/scala/main/HiveCoreDmaRdOnly.scala:131:14
   input         io_bufPopFire	// src/hive/scala/main/HiveCoreDmaRdOnly.scala:131:14
 );
 

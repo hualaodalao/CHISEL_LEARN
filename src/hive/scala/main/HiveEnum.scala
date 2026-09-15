@@ -3,7 +3,7 @@
 import chisel3._
 
 object DataFormat extends ChiselEnum {
-  val FP32, FP16, BF16, MXE4M3, MXE5M2, MXE2M1,INT32, INT16, INT8, INT4 = Value
+  val FP32, FP16, BF16, MXE4M3, MXE5M2, MXE2M1, INT32, INT16, INT8, INT4 = Value
 
   /** 判断给定格式是否为 MX 系列（E4M3 或 E5M2） */
   def isMx(f: DataFormat.Type): Bool = f === MXE4M3 || f === MXE5M2 || f === MXE2M1

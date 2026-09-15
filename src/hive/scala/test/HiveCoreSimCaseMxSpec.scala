@@ -193,9 +193,16 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       clusterM = 2,                 // totalN = 16
       aW = 16, bW = 16, cW = 40,      // 与出厂 cfgMx（HiveCoreElaborate）及 err 用例对齐
       // (#155 MJ1) 不传 supportedFmts ⟹ 走 HiveCoreConfig 默认集，该默认集自本轮起
-      //   【已含 MXE2M1】（7 种格式）⟹ hasMx4=true，自动满足新 require(!hasMx8 || hasMx4)。
+      //   【已含 MXE2M1】⟹ hasMx4=true，自动满足新 require(!hasMx8 || hasMx4)。
       //   下面这行历史注释掉的 fp8-only 写法【不要取消注释】：MXE2M1 已是默认必选，
       //   显式传 fp8-only 集合会在 cfg 构造期直接抛 IllegalArgumentException。
+      // (#66 订正) 上行原写「（7 种格式）」已过时：默认集现为 5 种
+      //   {INT8, INT4, MXE4M3, MXE5M2, MXE2M1}——FP16/BF16/INT16 已被砍除，故
+      //   hasFp=false、hasInt 仍为 true、hasMx/hasMx8/hasMx4 仍全为 true。
+      //   本 suite 不受影响且实测 2/2 仍绿：用例是 MX 族【输入】+ FP16/FP32【输出】，
+      //   而 16-bit 输出走 HiveOutCvt/FpCvt 的 40→32→16 两级舍入链，【不依赖 hasFp】
+      //   （被砍的只是 FP16/BF16 作输入/计算格式）。hasMx4=true 这条本 suite 真正
+      //   依赖的谓词未变 ⟹ 上方 require 与全部地址/拍数推导逐字仍成立。
      // supportedFmts = Set(DataFormat.MXE4M3, DataFormat.MXE5M2),
       aBufferDepth = 64,
       bBufferDepth = 64,

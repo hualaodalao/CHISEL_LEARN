@@ -165,13 +165,11 @@ case class FbTestCmd(
     dstStride: Seq[BigInt] = Seq(16),
     srcAddr: BigInt = 0,
     dstAddr: BigInt = 0,
-    elemBytesLog2: Int = 0,
     permVec: Seq[Int] = Seq(),
     padBefore: Seq[Int] = Seq(0, 0),
     padAfter: Seq[Int] = Seq(0, 0),
-    cvtEnable: Boolean = false,
-    srcFmt: Int = 7,      // FbDataFmt: 0=FP32, 1=FP16, 2=BF16, 3=INT8, 7=NONE
-    dstFmt: Int = 7,
+    srcFmt: Int = 3,      // FbDataFmt(ChiselEnum,4-bit)：0=FP32,1=FP16,2=BF16,3=INT8,4=MXE4M3,5=MXE5M2,8=INT32,9=INT16,10=INT4（编码6/7已废弃非法）
+    dstFmt: Int = 3,
     cvtScale: BigInt = 0,
     cvtZeroPoint: BigInt = 0,
     im2colKernel: Seq[Int] = Seq(0, 0),
@@ -266,10 +264,8 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     }
     port.srcAddr.poke(c.srcAddr)
     port.dstAddr.poke(c.dstAddr)
-    port.elemBytesLog2.poke(c.elemBytesLog2.U)
-    port.cvtEnable.poke(c.cvtEnable.B)
-    port.srcFmt.poke(c.srcFmt.U)
-    port.dstFmt.poke(c.dstFmt.U)
+    port.srcFmt.poke(BigInt(c.srcFmt))   // FbDataFmt ChiselEnum（4-bit）按编码值 poke
+    port.dstFmt.poke(BigInt(c.dstFmt))
     port.cvtScale.poke(c.cvtScale)
     port.cvtZeroPoint.poke(c.cvtZeroPoint)
     port.nextDescAddr.poke(0.U)
@@ -450,7 +446,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     for (i <- 0 until n; j <- 0 until n) mem(BigInt(i * 16 + j)) = ((i * n + j) & 0xFF).toByte
     val cmd = FbTestCmd(tag = 0x44, transpose = true, dimCount = 2,
       shape = Seq(n, n), srcStride = Seq(n, 16), dstStride = Seq(n, 0),
-      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0)
+      srcAddr = 0, dstAddr = 0x8000)
     val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
     dones shouldBe Seq((0x44, false))
     for (j <- 0 until n; i <- 0 until n) {
@@ -468,7 +464,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     }
     val cmd = FbTestCmd(tag = 0x55, transpose = true, dimCount = 2,
       shape = Seq(n, n), srcStride = Seq(n * eb, 16), dstStride = Seq(n * eb, 0),
-      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 1)
+      srcAddr = 0, dstAddr = 0x8000, srcFmt = 9, dstFmt = 9)
     val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
     dones shouldBe Seq((0x55, false))
     for (j <- 0 until n; i <- 0 until n) {
@@ -482,7 +478,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     for (i <- 0 until nRows; j <- 0 until mCols) mem(BigInt(i * 16 + j)) = ((i * mCols + j) & 0xFF).toByte
     val cmd = FbTestCmd(tag = 0x66, transpose = true, dimCount = 2,
       shape = Seq(mCols, nRows), srcStride = Seq(mCols, 16), dstStride = Seq(16, 0),
-      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0)
+      srcAddr = 0, dstAddr = 0x8000)
     val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
     dones shouldBe Seq((0x66, false))
     for (j <- 0 until mCols; i <- 0 until nRows) {
@@ -496,7 +492,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     for (i <- 0 until n; j <- 0 until n) mem(BigInt(i * 16 + j)) = ((i * n + j) & 0xFF).toByte
     val cmd = FbTestCmd(tag = 0x77, transpose = true, dimCount = 2,
       shape = Seq(n, n), srcStride = Seq(n, 16), dstStride = Seq(16, 0),
-      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0)
+      srcAddr = 0, dstAddr = 0x8000)
     val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
     dones shouldBe Seq((0x77, false))
     for (j <- 0 until n; i <- 0 until n) {
@@ -517,7 +513,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     }
     val cmd = FbTestCmd(tag = 0xAA, transpose = true, dimCount = 2,
       shape = Seq(mCols, nRows), srcStride = Seq(mCols, 128), dstStride = Seq(16, 0),
-      srcAddr = 0, dstAddr = 0xB000, elemBytesLog2 = 0)
+      srcAddr = 0, dstAddr = 0xB000)
     val (dones, m) = runForagerBee(segCfg, Seq(cmd), mem)
     dones shouldBe Seq((0xAA, false))
     for (j <- 0 until mCols; i <- 0 until nRows) {
@@ -688,7 +684,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     for (i <- 0 until n; j <- 0 until n) mem(BigInt(i * 16 + j)) = ((i * n + j) & 0xFF).toByte
     val cmd = FbTestCmd(tag = 0xCC, transpose = true, dimCount = 2,
       shape = Seq(n, n), srcStride = Seq(n, 16), dstStride = Seq(n, 0),
-      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0)
+      srcAddr = 0, dstAddr = 0x8000)
     val (dones, m) = runForagerBee(capCfg, Seq(cmd), mem)
     dones shouldBe Seq((0xCC, false))
     for (j <- 0 until n; i <- 0 until n) {
@@ -844,7 +840,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "PERMUTE 2D: simple row-col swap (elaboration smoke)" in {
     val mem = mutable.HashMap.empty[BigInt, Byte]
     fillPattern(mem, 0, 32, seed = 77)
-    val cmd = FbTestCmd(tag = 0x81, op = "PERMUTE", dimCount = 2, elemBytesLog2 = 2,
+    val cmd = FbTestCmd(tag = 0x81, op = "PERMUTE", dimCount = 2, srcFmt = 8, dstFmt = 8,
       shape = Seq(4, 2), permVec = Seq(1, 0),
       srcStride = Seq(16, 16), dstStride = Seq(16, 16),
       srcAddr = 0, dstAddr = 0x2000)
@@ -855,7 +851,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "PERMUTE 3D: swap dim1 and dim2 (shape=[4,3,4])" in {
     val mem = mutable.HashMap.empty[BigInt, Byte]
     fillPattern(mem, 0, 4 * 3 * 4 * 4, seed = 88)
-    val cmd = FbTestCmd(tag = 0x82, op = "PERMUTE", dimCount = 3, elemBytesLog2 = 2,
+    val cmd = FbTestCmd(tag = 0x82, op = "PERMUTE", dimCount = 3, srcFmt = 8, dstFmt = 8,
       shape = Seq(4, 3, 4), permVec = Seq(0, 2, 1),
       srcStride = Seq(16, 16, 48), dstStride = Seq(16, 16, 48),
       srcAddr = 0, dstAddr = 0x3000)
@@ -866,7 +862,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "PERMUTE 5D: complex permutation (maxDims=5)" in {
     val mem = mutable.HashMap.empty[BigInt, Byte]
     fillPattern(mem, 0, 4 * 2 * 2 * 2 * 3 * 4, seed = 99)
-    val cmd = FbTestCmd(tag = 0x83, op = "PERMUTE", dimCount = 5, elemBytesLog2 = 2,
+    val cmd = FbTestCmd(tag = 0x83, op = "PERMUTE", dimCount = 5, srcFmt = 8, dstFmt = 8,
       shape = Seq(4, 2, 2, 2, 3), permVec = Seq(0, 4, 2, 3, 1),
       srcStride = Seq(16, 16, 32, 64, 128),
       dstStride = Seq(16, 16, 32, 64, 128),
@@ -876,7 +872,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "PERMUTE illegal permVec (value >= dimCount) → err" in {
-    val cmd = FbTestCmd(tag = 0x84, op = "PERMUTE", dimCount = 2, elemBytesLog2 = 2,
+    val cmd = FbTestCmd(tag = 0x84, op = "PERMUTE", dimCount = 2, srcFmt = 8, dstFmt = 8,
       shape = Seq(4, 2), permVec = Seq(1, 5),
       srcStride = Seq(16, 16), dstStride = Seq(16, 16),
       srcAddr = 0, dstAddr = 0x5000)
@@ -895,7 +891,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "Zero-Padding 1D: dim0 padding (dimCount=2 shape(1)=1)" in {
     val mem = mutable.HashMap.empty[BigInt, Byte]
     fillPattern(mem, 0, 16, seed = 11)
-    val cmd = FbTestCmd(tag = 0x85, op = "COPY", dimCount = 2, elemBytesLog2 = 0,
+    val cmd = FbTestCmd(tag = 0x85, op = "COPY", dimCount = 2, 
       shape = Seq(16, 1),
       srcStride = Seq(16, 16), dstStride = Seq(48, 48),
       srcAddr = 0, dstAddr = 0x6000,
@@ -907,7 +903,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "Zero-Padding 2D: dim0+dim1 padding (shape=[16,4])" in {
     val mem = mutable.HashMap.empty[BigInt, Byte]
     fillPattern(mem, 0, 16 * 4, seed = 22)
-    val cmd = FbTestCmd(tag = 0x86, op = "COPY", dimCount = 2, elemBytesLog2 = 0,
+    val cmd = FbTestCmd(tag = 0x86, op = "COPY", dimCount = 2, 
       shape = Seq(16, 4),
       srcStride = Seq(16, 16), dstStride = Seq(48, 48),
       srcAddr = 0, dstAddr = 0x7000,
@@ -922,7 +918,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     fillPattern(mem, 0, d0 * d1 * d2, seed = 87)
     val outCols = 16 + d0 + 16
     val outRows = 1 + d1 + 1
-    val cmd = FbTestCmd(tag = 0x87, op = "COPY", dimCount = 3, elemBytesLog2 = 0,
+    val cmd = FbTestCmd(tag = 0x87, op = "COPY", dimCount = 3, 
       shape = Seq(d0, d1, d2),
       srcStride = Seq(d0, d0, d0 * d1), dstStride = Seq(outCols, outCols, outCols * outRows),
       srcAddr = 0, dstAddr = 0x8000,
@@ -943,7 +939,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     val outRows = padB1 + d1 + padA1
     val dstRowStride = outCols
     val dstSliceStride = dstRowStride * outRows
-    val cmd = FbTestCmd(tag = 0x90, op = "COPY", dimCount = 3, elemBytesLog2 = 0,
+    val cmd = FbTestCmd(tag = 0x90, op = "COPY", dimCount = 3, 
       shape = Seq(d0, d1, d2),
       srcStride = Seq(d0, srcRowStride, srcSliceStride),
       dstStride = Seq(outCols, dstRowStride, dstSliceStride),
@@ -972,7 +968,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "Zero-Padding + non-COPY op (PERMUTE) → err" in {
-    val cmd = FbTestCmd(tag = 0x88, op = "PERMUTE", dimCount = 2, elemBytesLog2 = 2,
+    val cmd = FbTestCmd(tag = 0x88, op = "PERMUTE", dimCount = 2, srcFmt = 8, dstFmt = 8,
       shape = Seq(4, 2), permVec = Seq(1, 0),
       srcStride = Seq(16, 16), dstStride = Seq(16, 16),
       srcAddr = 0, dstAddr = 0x9000,
@@ -985,7 +981,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     val mem = mutable.HashMap.empty[BigInt, Byte]
     val cols = 32; val rows = 4
     for (r <- 0 until rows; c <- 0 until cols) mem(BigInt(r * 32 + c)) = ((r * cols + c) & 0xFF).toByte
-    val cmd = FbTestCmd(tag = 0x89, op = "COPY", dimCount = 2, elemBytesLog2 = 0,
+    val cmd = FbTestCmd(tag = 0x89, op = "COPY", dimCount = 2, 
       shape = Seq(cols, rows),
       srcStride = Seq(cols, cols), dstStride = Seq(cols, cols),
       srcAddr = 0, dstAddr = 0xA000,
@@ -1018,13 +1014,13 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     for (i <- 0 until n; j <- 0 until n) mem(BigInt(i * 16 + j)) = ((i * n + j) & 0xFF).toByte
     val cmd = FbTestCmd(tag = 0xC0, transpose = true, dimCount = 2,
       shape = Seq(n, n), srcStride = Seq(n, 16), dstStride = Seq(n, 0),
-      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0)
+      srcAddr = 0, dstAddr = 0x8000)
     val (dones, _) = runForagerBee(copyOnlyCfg, Seq(cmd), mem)
     dones shouldBe Seq((0xC0, true))
   }
 
   it should "copy-only DMA rejects PERMUTE with err=true" in {
-    val cmd = FbTestCmd(tag = 0xC1, op = "PERMUTE", dimCount = 2, elemBytesLog2 = 2,
+    val cmd = FbTestCmd(tag = 0xC1, op = "PERMUTE", dimCount = 2, srcFmt = 8, dstFmt = 8,
       shape = Seq(4, 2), permVec = Seq(1, 0),
       srcStride = Seq(16, 16), dstStride = Seq(16, 16),
       srcAddr = 0, dstAddr = 0x2000)
@@ -1059,8 +1055,8 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     val cmds = Seq(
       FbTestCmd(tag = 0xD1, transpose = true, dimCount = 2,
         shape = Seq(n, n), srcStride = Seq(n, 16), dstStride = Seq(n, 0),
-        srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0),
-      FbTestCmd(tag = 0xD2, op = "PERMUTE", dimCount = 2, elemBytesLog2 = 2,
+        srcAddr = 0, dstAddr = 0x8000),
+      FbTestCmd(tag = 0xD2, op = "PERMUTE", dimCount = 2, srcFmt = 8, dstFmt = 8,
         shape = Seq(4, 2), permVec = Seq(1, 0),
         srcStride = Seq(16, 16), dstStride = Seq(16, 16),
         srcAddr = 0x3000, dstAddr = 0x4000)
@@ -1096,15 +1092,13 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       dstStride: Seq[BigInt],
       srcAddr: BigInt,
       dstAddr: BigInt,
-      elemBytesLog2: Int,
       permVec: Seq[Int] = Seq(),
       padBefore: Seq[Int] = Seq(0, 0),
       padAfter: Seq[Int] = Seq(0, 0),
       nextDescAddr: BigInt = 0,
       chainMode: Boolean = true,
-      cvtEnable: Boolean = false,
-      srcFmt: Int = 7,
-      dstFmt: Int = 7,
+      srcFmt: Int = 3,
+      dstFmt: Int = 3,
       cvtScale: BigInt = 0,
       cvtZeroPoint: BigInt = 0
   ): Seq[BigInt] = {
@@ -1129,15 +1123,13 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     for (d <- 0 until maxDims) pack(dstStride.lift(d).getOrElse(BigInt(0)), addrW) // dstStride
     pack(srcAddr, addrW)          // srcAddr
     pack(dstAddr, addrW)          // dstAddr
-    pack(BigInt(elemBytesLog2), 2) // elemBytesLog2
     for (d <- 0 until maxDims) pack(BigInt(permVec.lift(d).getOrElse(0)), 3)       // permVec
     for (d <- 0 until 2) pack(BigInt(padBefore.lift(d).getOrElse(0)), 16)          // padBefore
     for (d <- 0 until 2) pack(BigInt(padAfter.lift(d).getOrElse(0)), 16)           // padAfter
     pack(nextDescAddr, addrW)     // nextDescAddr
     pack(if (chainMode) BigInt(1) else BigInt(0), 1) // chainMode
-    pack(if (cvtEnable) BigInt(1) else BigInt(0), 1) // cvtEnable
-    pack(BigInt(srcFmt), 3)       // srcFmt
-    pack(BigInt(dstFmt), 3)       // dstFmt
+    pack(BigInt(srcFmt), FbDataFmt.getWidth)  // srcFmt（FbDataFmt ChiselEnum，4-bit）
+    pack(BigInt(dstFmt), FbDataFmt.getWidth)  // dstFmt（FbDataFmt ChiselEnum，4-bit）
     pack(cvtScale, 32)            // cvtScale
     pack(cvtZeroPoint, 32)        // cvtZeroPoint
 
@@ -1282,7 +1274,6 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       dstStride: Seq[BigInt] = Seq(16),
       srcAddr: BigInt = 0,
       dstAddr: BigInt = 0,
-      elemBytesLog2: Int = 0,
       permVec: Seq[Int] = Seq(),
       padBefore: Seq[Int] = Seq(0, 0),
       padAfter: Seq[Int] = Seq(0, 0),
@@ -1290,7 +1281,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       nextDescAddr: BigInt = 0
   ) {
     def toFbTestCmd: FbTestCmd = FbTestCmd(tag, transpose, op, dimCount, shape, srcStride, dstStride,
-      srcAddr, dstAddr, elemBytesLog2, permVec, padBefore, padAfter)
+      srcAddr, dstAddr, permVec, padBefore, padAfter)
   }
 
   it should "chain: elaborate with enableChaining=true" in {
@@ -1333,7 +1324,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       op = 0, tag = 0x51, dimCount = 1,
       shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
       srcAddr = BigInt(0x2000), dstAddr = BigInt(0x3000),
-      elemBytesLog2 = 0,
+      
       nextDescAddr = 0, chainMode = true
     )
     writeDescToMem(chainMem, desc1Addr, desc1Beats, chainCfg.beatBytes)
@@ -1383,14 +1374,14 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     enableConversion = true, converterPipeStages = 1
   )
 
-  it should "format conversion: cvtEnable=false regression (plain COPY unchanged)" in {
+  it should "format conversion: srcFmt==dstFmt regression (plain COPY unchanged)" in {
     val mem = mutable.HashMap.empty[BigInt, Byte]
     val len = 64
     fillPattern(mem, 0, len)
     val cmd = FbTestCmd(tag = 0xF0, dimCount = 1,
       shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
       srcAddr = 0, dstAddr = 0x1000,
-      cvtEnable = false, srcFmt = 7, dstFmt = 7)
+      srcFmt = 3, dstFmt = 3)
     val (dones, m) = runForagerBee(cvtCfg, Seq(cmd), mem)
     dones shouldBe Seq((0xF0, false))
     for (i <- 0 until len) m(BigInt(0x1000) + i) shouldBe m(BigInt(i))
@@ -1407,10 +1398,10 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     }
     // 8 FP32 elements = 32 bytes = 2 beats of 128-bit
     // After FP32→FP16: 8 FP16 elements = 16 bytes = 1 beat
-    val cmd = FbTestCmd(tag = 0xF1, dimCount = 1, elemBytesLog2 = 2,
+    val cmd = FbTestCmd(tag = 0xF1, dimCount = 1, 
       shape = Seq(8), srcStride = Seq(32), dstStride = Seq(16),
       srcAddr = 0, dstAddr = 0x2000,
-      cvtEnable = true, srcFmt = 0, dstFmt = 1) // FP32→FP16
+      srcFmt = 0, dstFmt = 1) // FP32→FP16
     val (dones, m) = runForagerBee(cvtCfg, Seq(cmd), mem, maxCycles = 5000)
     dones shouldBe Seq((0xF1, false))
     // Verify FP16 values: 1.0h=0x3C00, 2.0h=0x4000, 3.0h=0x4200, 4.0h=0x4400
@@ -1431,10 +1422,10 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       mem(BigInt(i * 2 + b)) = ((fp16Vals(i) >> (b * 8)) & 0xFF).toByte
     }
     // 8 FP16 = 16 bytes = 1 beat. After FP16→FP32: 8 FP32 = 32 bytes = 2 beats
-    val cmd = FbTestCmd(tag = 0xF2, dimCount = 1, elemBytesLog2 = 1,
+    val cmd = FbTestCmd(tag = 0xF2, dimCount = 1, 
       shape = Seq(8), srcStride = Seq(16), dstStride = Seq(32),
       srcAddr = 0, dstAddr = 0x3000,
-      cvtEnable = true, srcFmt = 1, dstFmt = 0) // FP16→FP32
+      srcFmt = 1, dstFmt = 0) // FP16→FP32
     val (dones, m) = runForagerBee(cvtCfg, Seq(cmd), mem, maxCycles = 5000)
     dones shouldBe Seq((0xF2, false))
     // Verify FP32 1.0 = 0x3F800000
@@ -1452,10 +1443,10 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     for (i <- bf16Vals.indices; b <- 0 until 2) {
       mem(BigInt(i * 2 + b)) = ((bf16Vals(i) >> (b * 8)) & 0xFF).toByte
     }
-    val cmd = FbTestCmd(tag = 0xF3, dimCount = 1, elemBytesLog2 = 1,
+    val cmd = FbTestCmd(tag = 0xF3, dimCount = 1, 
       shape = Seq(8), srcStride = Seq(16), dstStride = Seq(32),
       srcAddr = 0, dstAddr = 0x4000,
-      cvtEnable = true, srcFmt = 2, dstFmt = 0) // BF16→FP32
+      srcFmt = 2, dstFmt = 0) // BF16→FP32
     val (dones, m) = runForagerBee(cvtCfg, Seq(cmd), mem, maxCycles = 5000)
     dones shouldBe Seq((0xF3, false))
     // BF16→FP32: just pad 16 zeros. BF16 0x3F80 → FP32 0x3F800000
@@ -1473,10 +1464,10 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       mem(BigInt(i * 2 + b)) = ((fp16Vals(i) >> (b * 8)) & 0xFF).toByte
     }
     // FP16→BF16: same element width (16 bits), so 1:1 ratio, beat count unchanged
-    val cmd = FbTestCmd(tag = 0xF4, dimCount = 1, elemBytesLog2 = 1,
+    val cmd = FbTestCmd(tag = 0xF4, dimCount = 1, 
       shape = Seq(8), srcStride = Seq(16), dstStride = Seq(16),
       srcAddr = 0, dstAddr = 0x5000,
-      cvtEnable = true, srcFmt = 1, dstFmt = 2) // FP16→BF16
+      srcFmt = 1, dstFmt = 2) // FP16→BF16
     val (dones, m) = runForagerBee(cvtCfg, Seq(cmd), mem, maxCycles = 5000)
     dones shouldBe Seq((0xF4, false))
     // FP16 1.0 (0x3C00) → FP32 0x3F800000 → BF16 0x3F80
@@ -1532,15 +1523,30 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     lo | (hi << 8)
   }
 
+  /** Scala 侧格式编码→字节数映射（镜像 FbDataFmt.bytesOfCeil，用于纯 Scala bbox/地址计算） */
+  private def fbFmtBytes(f: Int): Int = f match {
+    case 0 => 4   // FP32
+    case 1 => 2   // FP16
+    case 2 => 2   // BF16
+    case 3 => 1   // INT8
+    case 4 => 1   // MXE4M3
+    case 5 => 1   // MXE5M2
+    case 8 => 4   // INT32
+    case 9 => 2   // INT16
+    case 10 => 1  // INT4（ceil 字节）
+    case _ => 4
+  }
+
   /** 构造 im2col FbTestCmd
-    * shape(0) = srcBboxBytes, shape(1) = dstBboxBytes（用于冲突检测 bbox） */
+    * shape(0) = srcBboxBytes, shape(1) = dstBboxBytes（用于冲突检测 bbox）
+    * 元素粒度由 srcFmt/dstFmt 派生（elemBytesLog2 字段已删除） */
   private def mkIm2colCmd(
       tag: Int, C: Int, H: Int, W: Int,
       kH: Int, kW: Int, sH: Int, sW: Int,
       pH: Int, pW: Int, dH: Int, dW: Int,
-      elemBytesLog2: Int, srcAddr: BigInt, dstAddr: BigInt
+      srcFmt: Int, dstFmt: Int, srcAddr: BigInt, dstAddr: BigInt
   ): FbTestCmd = {
-    val elemBytes = 1 << elemBytesLog2
+    val elemBytes = fbFmtBytes(srcFmt)
     val outH = (H + 2 * pH - dH * (kH - 1) - 1) / sH + 1
     val outW = (W + 2 * pW - dW * (kW - 1) - 1) / sW + 1
     val srcBbox = C * H * W * elemBytes
@@ -1550,7 +1556,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       shape = Seq(srcBbox, dstBbox),
       srcStride = Seq(srcBbox), dstStride = Seq(dstBbox),
       srcAddr = srcAddr, dstAddr = dstAddr,
-      elemBytesLog2 = elemBytesLog2,
+      srcFmt = srcFmt, dstFmt = dstFmt,
       im2colKernel = Seq(kH, kW),
       im2colStride = Seq(sH, sW),
       im2colPad = Seq(pH, pW),
@@ -1562,13 +1568,12 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "im2col: basic 1x5x5 kernel3x3 stride1 no padding" in {
     val iC = 1; val iH = 5; val iW = 5
     val (kH, kW, sH, sW, pH, pW, dH, dW) = (3, 3, 1, 1, 0, 0, 1, 1)
-    val elemBytesLog2 = 1
     val featureMap = (0 until iC * iH * iW).toSeq
     val expected = computeIm2col(featureMap, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW)
 
     val mem = mutable.HashMap.empty[BigInt, Byte]
     writeElems16(mem, BigInt(0), featureMap)
-    val cmd = mkIm2colCmd(0x10, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW, elemBytesLog2,
+    val cmd = mkIm2colCmd(0x10, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW, 9, 9,
       srcAddr = 0, dstAddr = 0x10000)
     val (dones, m) = runForagerBee(i2cCfg, Seq(cmd), mem, maxCycles = 50000)
     dones shouldBe Seq((0x10, false))
@@ -1583,13 +1588,12 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "im2col: vertical padding 1x4x6 kernel3x3 stride1 pH=1 pW=0" in {
     val iC = 1; val iH = 4; val iW = 6
     val (kH, kW, sH, sW, pH, pW, dH, dW) = (3, 3, 1, 1, 1, 0, 1, 1)
-    val elemBytesLog2 = 1
     val featureMap = (0 until iC * iH * iW).map(i => (i * 7 + 3) & 0xFFFF)
     val expected = computeIm2col(featureMap, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW)
 
     val mem = mutable.HashMap.empty[BigInt, Byte]
     writeElems16(mem, BigInt(0), featureMap)
-    val cmd = mkIm2colCmd(0x11, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW, elemBytesLog2,
+    val cmd = mkIm2colCmd(0x11, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW, 9, 9,
       srcAddr = 0, dstAddr = 0x10000)
     val (dones, m) = runForagerBee(i2cCfg, Seq(cmd), mem, maxCycles = 50000)
     dones shouldBe Seq((0x11, false))
@@ -1605,13 +1609,12 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "im2col: stride2 1x8x8 kernel3x3" in {
     val iC = 1; val iH = 8; val iW = 8
     val (kH, kW, sH, sW, pH, pW, dH, dW) = (3, 3, 2, 2, 0, 0, 1, 1)
-    val elemBytesLog2 = 1
     val featureMap = (0 until iC * iH * iW).map(i => (i * 13 + 5) & 0xFFFF)
     val expected = computeIm2col(featureMap, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW)
 
     val mem = mutable.HashMap.empty[BigInt, Byte]
     writeElems16(mem, BigInt(0), featureMap)
-    val cmd = mkIm2colCmd(0x12, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW, elemBytesLog2,
+    val cmd = mkIm2colCmd(0x12, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW, 9, 9,
       srcAddr = 0, dstAddr = 0x10000)
     val (dones, m) = runForagerBee(i2cCfg, Seq(cmd), mem, maxCycles = 50000)
     dones shouldBe Seq((0x12, false))
@@ -1626,13 +1629,12 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "im2col: multi-channel C=3 H=6 W=6 kernel3x3 stride1" in {
     val iC = 3; val iH = 6; val iW = 6
     val (kH, kW, sH, sW, pH, pW, dH, dW) = (3, 3, 1, 1, 0, 0, 1, 1)
-    val elemBytesLog2 = 1
     val featureMap = (0 until iC * iH * iW).map(i => (i * 11 + 7) & 0xFFFF)
     val expected = computeIm2col(featureMap, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW)
 
     val mem = mutable.HashMap.empty[BigInt, Byte]
     writeElems16(mem, BigInt(0), featureMap)
-    val cmd = mkIm2colCmd(0x13, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW, elemBytesLog2,
+    val cmd = mkIm2colCmd(0x13, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW, 9, 9,
       srcAddr = 0, dstAddr = 0x10000)
     val (dones, m) = runForagerBee(i2cCfg, Seq(cmd), mem, maxCycles = 100000)
     dones shouldBe Seq((0x13, false))
@@ -1651,7 +1653,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       dataWidth = 32, addressWidth = 32,
       channelIm2col = Seq(false)
     )
-    val cmd = mkIm2colCmd(0x14, 1, 4, 4, 3, 3, 1, 1, 0, 0, 1, 1, 1,
+    val cmd = mkIm2colCmd(0x14, 1, 4, 4, 3, 3, 1, 1, 0, 0, 1, 1, 9, 9,
       srcAddr = 0, dstAddr = 0x10000)
     val (dones, _) = runForagerBee(noI2cCfg, Seq(cmd), mutable.HashMap.empty)
     dones shouldBe Seq((0x14, true))
@@ -1661,7 +1663,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     val cmd = FbTestCmd(
       tag = 0x15, op = "IM2COL", dimCount = 1,
       shape = Seq(32, 32), srcStride = Seq(32), dstStride = Seq(32),
-      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = 1,
+      srcAddr = 0, dstAddr = 0x10000, srcFmt = 9, dstFmt = 9,
       im2colKernel = Seq(0, 3), im2colStride = Seq(1, 1),
       im2colPad = Seq(0, 0), im2colDilation = Seq(1, 1),
       im2colInShape = Seq(1, 4, 4)
@@ -1707,7 +1709,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     val totalBytes = blockLen * 3
     val cmd = FbTestCmd(tag = 0xA0, op = "GATHER", dimCount = 1,
       shape = Seq(totalBytes), srcStride = Seq(totalBytes), dstStride = Seq(totalBytes),
-      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0,
+      srcAddr = 0, dstAddr = 0x8000, 
       sgListAddr = listAddr, sgEntryCount = 3)
     val (dones, m) = runForagerBee(sgCfg, Seq(cmd), mem, maxCycles = 10000)
     dones shouldBe Seq((0xA0, false))
@@ -1734,7 +1736,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     // 命令：SCATTER，srcAddr=0x1000
     val cmd = FbTestCmd(tag = 0xA1, op = "SCATTER", dimCount = 1,
       shape = Seq(totalBytes), srcStride = Seq(totalBytes), dstStride = Seq(totalBytes),
-      srcAddr = 0x1000, dstAddr = 0, elemBytesLog2 = 0,
+      srcAddr = 0x1000, dstAddr = 0, 
       sgListAddr = listAddr, sgEntryCount = 3)
     val (dones, m) = runForagerBee(sgCfg, Seq(cmd), mem, maxCycles = 10000)
     dones shouldBe Seq((0xA1, false))
@@ -1763,7 +1765,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     // 命令：shape(0) 必须是 beatBytes 整数倍 → 112 % 16 = 0 ✓
     val cmd = FbTestCmd(tag = 0xA2, op = "GATHER", dimCount = 1,
       shape = Seq(totalBytes), srcStride = Seq(totalBytes), dstStride = Seq(totalBytes),
-      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0,
+      srcAddr = 0, dstAddr = 0x8000, 
       sgListAddr = listAddr, sgEntryCount = 3)
     val (dones, m) = runForagerBee(sgCfg, Seq(cmd), mem, maxCycles = 10000)
     dones shouldBe Seq((0xA2, false))
@@ -1791,7 +1793,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     )
     val cmd = FbTestCmd(tag = 0xA3, op = "SCATTER", dimCount = 1,
       shape = Seq(96), srcStride = Seq(96), dstStride = Seq(96),
-      srcAddr = 0, dstAddr = 0, elemBytesLog2 = 0,
+      srcAddr = 0, dstAddr = 0, 
       sgListAddr = BigInt(0x5000), sgEntryCount = 3)
     val (dones, _) = runForagerBee(noSgCfg, Seq(cmd), mutable.HashMap.empty)
     dones shouldBe Seq((0xA3, true))
@@ -1800,7 +1802,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "GATHER rejected when sgEntryCount=0 → done.err=true" in {
     val cmd = FbTestCmd(tag = 0xA4, op = "GATHER", dimCount = 1,
       shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
-      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0,
+      srcAddr = 0, dstAddr = 0x8000, 
       sgListAddr = BigInt(0x5000), sgEntryCount = 0)
     val (dones, _) = runForagerBee(sgCfg, Seq(cmd), mutable.HashMap.empty)
     dones shouldBe Seq((0xA4, true))
@@ -1821,7 +1823,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       srcStride = Seq(16, 32),                 // dim0=16 bytes read, dim1=32 byte/row stride
       dstStride = Seq(16, 16),                 // dst 紧凑：16 bytes/row
       srcAddr = 0, dstAddr = 0x2000,
-      elemBytesLog2 = 0,
+      
       srcStartIdx = Seq(4, 2, 0, 0)            // col=4, row=2
     )
     val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
@@ -1849,7 +1851,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       srcStride = Seq(16, 32),                 // dim0=4*4=16 bytes read, dim1=32 byte/row stride
       dstStride = Seq(16, 16),                 // dst 紧凑：4 elems * 4 bytes = 16 bytes/row
       srcAddr = 0, dstAddr = 0x3000,
-      elemBytesLog2 = 2,                       // 4 bytes/elem
+      srcFmt = 0, dstFmt = 0,                  // FP32：4 bytes/elem（子块语义明确 FP32）
       srcStartIdx = Seq(2, 1, 0, 0)           // col=2, row=1
     )
     val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
@@ -1878,7 +1880,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       srcStride = Seq(16, 32, 128),            // dim0=16 bytes read, dim1=32 stride, dim2=128 stride
       dstStride = Seq(16, 16, 32),             // dst 紧凑：16 per row, 2 rows per plane
       srcAddr = 0, dstAddr = 0x4000,
-      elemBytesLog2 = 0,
+      
       srcStartIdx = Seq(2, 1, 1, 0)            // d0从2开始, d1从1, d2从1
     )
     val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
@@ -1903,7 +1905,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       srcStride = Seq(cols, 64),
       dstStride = Seq(cols, cols),
       srcAddr = 0, dstAddr = 0x2000,
-      elemBytesLog2 = 0,
+      
       srcStartIdx = Seq(0, 0, 0, 0)            // 显式全 0
     )
     val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
@@ -1927,7 +1929,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       srcStride = Seq(2, 16),                  // dim0 unused info, dim1=16 byte row stride
       dstStride = Seq(2, 0),                   // dstStride(0)=转置输出行步长(N=2 bytes), (1) ignored
       srcAddr = 0, dstAddr = 0x5000,
-      elemBytesLog2 = 0,
+      
       srcStartIdx = Seq(1, 1, 0, 0, 0)            // col=1, row=1
     )
     val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
@@ -1973,7 +1975,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "TILE2LINEAR basic: 32×32 matrix, Tm=Tn=16, 1-byte elements" in {
     val M = 32; val N = 32; val Tm = 16; val Tn = 16
     val Mt = M / Tm; val Nt = N / Tn  // 2, 2
-    val elemBytes = 1; val elemBytesLog2 = 0
+    val elemBytes = 1
     // Tn * e = 16 ≡ 0 mod 16(beatBytes) ✓
     val mem = mutable.HashMap.empty[BigInt, Byte]
     for (r <- 0 until M; c <- 0 until N) {
@@ -1981,7 +1983,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     }
     val cmd = FbTestCmd(tag = 0x71, op = "TILE2LINEAR", dimCount = 1,
       shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
-      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = elemBytesLog2,
+      srcAddr = 0, dstAddr = 0x10000,
       t2lMatCols = N, t2lTileRows = Tm, t2lTileCols = Tn,
       t2lNumTileRows = Mt, t2lNumTileCols = Nt)
     val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem, maxCycles = 50000)
@@ -1998,7 +2000,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "TILE2LINEAR asymmetric tile: M=48, N=32, Tm=8, Tn=16 (Tm≠Tn, Mt≠Nt)" in {
     val M = 48; val N = 32; val Tm = 8; val Tn = 16
     val Mt = M / Tm; val Nt = N / Tn  // 6, 2
-    val elemBytes = 1; val elemBytesLog2 = 0
+    val elemBytes = 1
     // Tn * e = 16 ≡ 0 mod 16 ✓
     val mem = mutable.HashMap.empty[BigInt, Byte]
     for (r <- 0 until M; c <- 0 until N) {
@@ -2006,7 +2008,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     }
     val cmd = FbTestCmd(tag = 0x72, op = "TILE2LINEAR", dimCount = 1,
       shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
-      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = elemBytesLog2,
+      srcAddr = 0, dstAddr = 0x10000,
       t2lMatCols = N, t2lTileRows = Tm, t2lTileCols = Tn,
       t2lNumTileRows = Mt, t2lNumTileCols = Nt)
     val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem, maxCycles = 50000)
@@ -2022,7 +2024,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "TILE2LINEAR illegal: Tn=0 → done.err=true" in {
     val cmd = FbTestCmd(tag = 0x73, op = "TILE2LINEAR", dimCount = 1,
       shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
-      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = 0,
+      srcAddr = 0, dstAddr = 0x10000, 
       t2lMatCols = 32, t2lTileRows = 16, t2lTileCols = 0,
       t2lNumTileRows = 2, t2lNumTileCols = 2)
     val (dones, _) = runForagerBee(testCfg, Seq(cmd), mutable.HashMap.empty)
@@ -2032,7 +2034,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "TILE2LINEAR illegal: Mt=0 → done.err=true" in {
     val cmd = FbTestCmd(tag = 0x74, op = "TILE2LINEAR", dimCount = 1,
       shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
-      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = 0,
+      srcAddr = 0, dstAddr = 0x10000, 
       t2lMatCols = 32, t2lTileRows = 16, t2lTileCols = 16,
       t2lNumTileRows = 0, t2lNumTileCols = 2)
     val (dones, _) = runForagerBee(testCfg, Seq(cmd), mutable.HashMap.empty)
@@ -2043,7 +2045,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     // Tn=3, elemBytes=4 → dim0 row bytes = 3*4=12, not divisible by 16 → cBad → err
     val cmd = FbTestCmd(tag = 0x75, op = "TILE2LINEAR", dimCount = 1,
       shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
-      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = 2,
+      srcAddr = 0, dstAddr = 0x10000, srcFmt = 8, dstFmt = 8,
       t2lMatCols = 12, t2lTileRows = 4, t2lTileCols = 3,
       t2lNumTileRows = 2, t2lNumTileCols = 4)
     val (dones, _) = runForagerBee(testCfg, Seq(cmd), mutable.HashMap.empty)
@@ -2093,7 +2095,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       // TILE2LINEAR: 16×16 → linear (Tn*e=16 ≡ 0 mod 16 ✓)
       FbTestCmd(tag = 0x76, op = "TILE2LINEAR", dimCount = 1,
         shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
-        srcAddr = 0, dstAddr = 0x20000, elemBytesLog2 = 0,
+        srcAddr = 0, dstAddr = 0x20000, 
         t2lMatCols = N, t2lTileRows = Tm, t2lTileCols = Tn,
         t2lNumTileRows = Mt, t2lNumTileCols = Nt),
       // COPY: 64 bytes non-conflicting
@@ -2103,7 +2105,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       // TRANSPOSE: 8×8 INT8 non-conflicting
       FbTestCmd(tag = 0x78, op = "TRANSPOSE", dimCount = 2,
         shape = Seq(8, 8), srcStride = Seq(8, 16), dstStride = Seq(8, 0),
-        srcAddr = 0x8000, dstAddr = 0x30000, elemBytesLog2 = 0)
+        srcAddr = 0x8000, dstAddr = 0x30000)
     )
     val (dones, m) = runForagerBee(testCfg, cmds, mem, maxCycles = 50000)
     dones.map(_._1).toSet shouldBe Set(0x76, 0x77, 0x78)
@@ -2154,7 +2156,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "LINEAR2TILE basic: 32×32 matrix, Tm=Tn=16, 1-byte elements" in {
     val M = 32; val N = 32; val Tm = 16; val Tn = 16
     val Mt = M / Tm; val Nt = N / Tn  // 2, 2
-    val elemBytes = 1; val elemBytesLog2 = 0
+    val elemBytes = 1
     // Tn * e = 16 ≡ 0 mod 16(beatBytes) ✓
     val mem = mutable.HashMap.empty[BigInt, Byte]
     // 源：线性 tile-row-major 缓冲（M*N*elemBytes 字节）
@@ -2164,7 +2166,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     }
     val cmd = FbTestCmd(tag = 0x81, op = "LINEAR2TILE", dimCount = 1,
       shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
-      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = elemBytesLog2,
+      srcAddr = 0, dstAddr = 0x10000,
       t2lMatCols = N, t2lTileRows = Tm, t2lTileCols = Tn,
       t2lNumTileRows = Mt, t2lNumTileCols = Nt)
     val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem, maxCycles = 50000)
@@ -2181,7 +2183,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "LINEAR2TILE asymmetric tile: M=48, N=32, Tm=8, Tn=16 (Tm≠Tn, Mt≠Nt)" in {
     val M = 48; val N = 32; val Tm = 8; val Tn = 16
     val Mt = M / Tm; val Nt = N / Tn  // 6, 2
-    val elemBytes = 1; val elemBytesLog2 = 0
+    val elemBytes = 1
     // Tn * e = 16 ≡ 0 mod 16 ✓
     val mem = mutable.HashMap.empty[BigInt, Byte]
     val totalBytes = M * N * elemBytes
@@ -2190,7 +2192,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     }
     val cmd = FbTestCmd(tag = 0x82, op = "LINEAR2TILE", dimCount = 1,
       shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
-      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = elemBytesLog2,
+      srcAddr = 0, dstAddr = 0x10000,
       t2lMatCols = N, t2lTileRows = Tm, t2lTileCols = Tn,
       t2lNumTileRows = Mt, t2lNumTileCols = Nt)
     val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem, maxCycles = 50000)
@@ -2206,7 +2208,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "LINEAR2TILE illegal: Tn=0 → done.err=true" in {
     val cmd = FbTestCmd(tag = 0x83, op = "LINEAR2TILE", dimCount = 1,
       shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
-      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = 0,
+      srcAddr = 0, dstAddr = 0x10000, 
       t2lMatCols = 32, t2lTileRows = 16, t2lTileCols = 0,
       t2lNumTileRows = 2, t2lNumTileCols = 2)
     val (dones, _) = runForagerBee(testCfg, Seq(cmd), mutable.HashMap.empty)
@@ -2216,7 +2218,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "LINEAR2TILE illegal: N=0 → done.err=true" in {
     val cmd = FbTestCmd(tag = 0x84, op = "LINEAR2TILE", dimCount = 1,
       shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
-      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = 0,
+      srcAddr = 0, dstAddr = 0x10000, 
       t2lMatCols = 0, t2lTileRows = 16, t2lTileCols = 16,
       t2lNumTileRows = 2, t2lNumTileCols = 2)
     val (dones, _) = runForagerBee(testCfg, Seq(cmd), mutable.HashMap.empty)
@@ -2227,7 +2229,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     // Tn=3, elemBytes=4 → dim0 row bytes = 3*4=12, not divisible by 16 → err
     val cmd = FbTestCmd(tag = 0x85, op = "LINEAR2TILE", dimCount = 1,
       shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
-      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = 2,
+      srcAddr = 0, dstAddr = 0x10000, srcFmt = 8, dstFmt = 8,
       t2lMatCols = 12, t2lTileRows = 4, t2lTileCols = 3,
       t2lNumTileRows = 2, t2lNumTileCols = 4)
     val (dones, _) = runForagerBee(testCfg, Seq(cmd), mutable.HashMap.empty)
@@ -2237,7 +2239,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   it should "LINEAR2TILE round-trip: TILE2LINEAR then LINEAR2TILE restores original matrix" in {
     val M = 32; val N = 32; val Tm = 16; val Tn = 16
     val Mt = M / Tm; val Nt = N / Tn  // 2, 2
-    val elemBytes = 1; val elemBytesLog2 = 0
+    val elemBytes = 1
     // Tn * e = 16 ≡ 0 mod 16 ✓
     val mem = mutable.HashMap.empty[BigInt, Byte]
     // 准备行主序矩阵 A at 0x0000
@@ -2247,7 +2249,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     // 第一步：TILE2LINEAR（src=0x0000 行主序矩阵 → dst=0x10000 线性缓冲）
     val cmd1 = FbTestCmd(tag = 0x86, op = "TILE2LINEAR", dimCount = 1,
       shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
-      srcAddr = 0, dstAddr = 0x10000, elemBytesLog2 = elemBytesLog2,
+      srcAddr = 0, dstAddr = 0x10000,
       t2lMatCols = N, t2lTileRows = Tm, t2lTileCols = Tn,
       t2lNumTileRows = Mt, t2lNumTileCols = Nt)
     val (dones1, m1) = runForagerBee(testCfg, Seq(cmd1), mem, maxCycles = 50000)
@@ -2255,7 +2257,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     // 第二步：LINEAR2TILE（src=0x10000 线性缓冲 → dst=0x20000 行主序矩阵）
     val cmd2 = FbTestCmd(tag = 0x87, op = "LINEAR2TILE", dimCount = 1,
       shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
-      srcAddr = 0x10000, dstAddr = 0x20000, elemBytesLog2 = elemBytesLog2,
+      srcAddr = 0x10000, dstAddr = 0x20000,
       t2lMatCols = N, t2lTileRows = Tm, t2lTileCols = Tn,
       t2lNumTileRows = Mt, t2lNumTileCols = Nt)
     val (dones2, m2) = runForagerBee(testCfg, Seq(cmd2), m1, maxCycles = 50000)
@@ -2415,7 +2417,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     val cmd = FbTestCmd(tag = 0x91, op = "COPY", dimCount = 1,
       shape = Seq(n), srcStride = Seq(n * 2), dstStride = Seq(n),
       srcAddr = 0, dstAddr = 0x1000, scaleAddr = 0x2000,
-      elemBytesLog2 = 1, cvtEnable = true, srcFmt = 1, dstFmt = 4,
+      srcFmt = 1, dstFmt = 4,
       mxQuantEn = true, scaleBlockSize = 1) // blockSize=32
     val (dones, m) = runForagerBee(mxqCfg, Seq(cmd), mem, maxCycles = 10000)
     dones shouldBe Seq((0x91, false))
@@ -2445,7 +2447,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     val cmd = FbTestCmd(tag = 0x92, op = "COPY", dimCount = 2,
       shape = Seq(32, 2), srcStride = Seq(64, 64), dstStride = Seq(32, 32),
       srcAddr = 0, dstAddr = 0x1000, scaleAddr = 0x3000,
-      elemBytesLog2 = 1, cvtEnable = true, srcFmt = 2, dstFmt = 5,
+      srcFmt = 2, dstFmt = 5,
       mxQuantEn = true, scaleBlockSize = 0) // blockSize=16
     val (dones, m) = runForagerBee(mxqCfg, Seq(cmd), mem, maxCycles = 10000)
     dones shouldBe Seq((0x92, false))
@@ -2476,7 +2478,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     val cmd = FbTestCmd(tag = 0x93, op = "COPY", dimCount = 1,
       shape = Seq(n), srcStride = Seq(n * 4), dstStride = Seq(n),
       srcAddr = 0, dstAddr = 0x2000, scaleAddr = 0x4000,
-      elemBytesLog2 = 2, cvtEnable = true, srcFmt = 0, dstFmt = 4,
+      srcFmt = 0, dstFmt = 4,
       mxQuantEn = true, scaleBlockSize = 2) // blockSize=64（每块 16 读 beat，恰好 ≤ maxBurstLen）
     val (dones, m) = runForagerBee(mxqCfg, Seq(cmd), mem, maxCycles = 10000)
     dones shouldBe Seq((0x93, false))
@@ -2501,7 +2503,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     val cmd = FbTestCmd(tag = 0x94, op = "COPY", dimCount = 1,
       shape = Seq(16), srcStride = Seq(32), dstStride = Seq(16),
       srcAddr = 0, dstAddr = 0x1000, scaleAddr = 0x2000,
-      elemBytesLog2 = 1, cvtEnable = true, srcFmt = 1, dstFmt = 4,
+      srcFmt = 1, dstFmt = 4,
       mxQuantEn = true, scaleBlockSize = 0) // shape(0)=16=blockSize，恰一个块
     val (dones, m) = runForagerBee(mxqCfg, Seq(cmd), mem, maxCycles = 10000)
     dones shouldBe Seq((0x94, false))
@@ -2521,7 +2523,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     val cmd = FbTestCmd(tag = 0x95, op = "COPY", dimCount = 1,
       shape = Seq(n), srcStride = Seq(n * 2), dstStride = Seq(n),
       srcAddr = 0, dstAddr = 0x1000, scaleAddr = 0x2000,
-      elemBytesLog2 = 1, cvtEnable = true, srcFmt = 1, dstFmt = 4,
+      srcFmt = 1, dstFmt = 4,
       mxQuantEn = true, scaleBlockSize = 1) // blockSize=32
     val (dones, m) = runForagerBee(mxqCfg, Seq(cmd), mem, maxCycles = 10000)
     dones shouldBe Seq((0x95, false))
@@ -2534,7 +2536,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     val cmd = FbTestCmd(tag = 0x96, op = "COPY", dimCount = 1,
       shape = Seq(48), srcStride = Seq(96), dstStride = Seq(48),
       srcAddr = 0, dstAddr = 0x1000, scaleAddr = 0x2000,
-      elemBytesLog2 = 1, cvtEnable = true, srcFmt = 1, dstFmt = 4,
+      srcFmt = 1, dstFmt = 4,
       mxQuantEn = true, scaleBlockSize = 1)
     val (dones, _) = runForagerBee(mxqCfg, Seq(cmd), mutable.HashMap.empty)
     dones shouldBe Seq((0x96, true))
@@ -2668,7 +2670,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     for (i <- 0 until n; j <- 0 until n) mem(BigInt(i * 16 + j)) = ((i * n + j) & 0xFF).toByte
     val cmd = FbTestCmd(tag = 0x44, transpose = true, dimCount = 2,
       shape = Seq(n, n), srcStride = Seq(n, 16), dstStride = Seq(n, 0),
-      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0)
+      srcAddr = 0, dstAddr = 0x8000)
     val counters = Seq.fill(sharedWrCfg.numPorts)(
       new FbWrCountingMemSlave(mem, sharedWrCfg.beatBytes))
     var idx = 0
@@ -2740,7 +2742,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     for (i <- 0 until n; j <- 0 until n) mem(BigInt(i * 16 + j)) = ((i * n + j) & 0xFF).toByte
     val cmd = FbTestCmd(tag = 0x23, transpose = true, dimCount = 2,
       shape = Seq(n, n), srcStride = Seq(n, 16), dstStride = Seq(n, 0),
-      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0)
+      srcAddr = 0, dstAddr = 0x8000)
     val (dones, m) = runForagerBee(nbwrCfg, Seq(cmd), mem, maxCycles = 10000,
       modelFactory = nbwrSlaveFactory)
     dones shouldBe Seq((0x23, false))
@@ -2762,7 +2764,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     for (i <- 0 until n; j <- 0 until n) mem(BigInt(i * 16 + j)) = ((i * n + j) & 0xFF).toByte
     val cmd = FbTestCmd(tag = 0x29, transpose = true, dimCount = 2,
       shape = Seq(n, n), srcStride = Seq(n, 16), dstStride = Seq(16, 0),
-      srcAddr = 0, dstAddr = 0x8000, elemBytesLog2 = 0)
+      srcAddr = 0, dstAddr = 0x8000)
     val (dones, m) = runForagerBee(nbwrCfg, Seq(cmd), mem, maxCycles = 20000,
       modelFactory = nbwrSlaveFactory)
     dones shouldBe Seq((0x29, false))
@@ -2790,7 +2792,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     val cmd = FbTestCmd(tag = 0x24, op = "COPY", dimCount = 1,
       shape = Seq(n), srcStride = Seq(n * 2), dstStride = Seq(n),
       srcAddr = 0, dstAddr = 0x1000, scaleAddr = 0x2000,
-      elemBytesLog2 = 1, cvtEnable = true, srcFmt = 1, dstFmt = 4,
+      srcFmt = 1, dstFmt = 4,
       mxQuantEn = true, scaleBlockSize = 1) // blockSize=32
     val nbMxCfg = mxqCfg.copy(writeOutstandingDepth = 4)
     val (dones, m) = runForagerBee(nbMxCfg, Seq(cmd), mem, maxCycles = 10000,
@@ -2902,6 +2904,213 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     // 写数据本身已落盘（响应错误不影响数据写入）
     for (i <- 0 until len) {
       withClue(s"dst[$i]: ") { m(BigInt(0x4000) + i) shouldBe m(BigInt(i)) }
+    }
+  }
+
+  // ===================== 阶段 E：描述符布局一致性（纯 Scala，无需仿真） =====================
+
+  // 该用例不经 simulate，直接在 Scala 侧运行：验证 serializeDescriptor（软件打包）与
+  // FbDescLayout（硬件 extract 偏移单一真源）逐字段一致——守住 v2 布局契约。
+  it should "descriptor layout: serializeDescriptor packing matches FbDescLayout offsets (pure Scala)" in {
+    val cfg = ForagerBeeConfig(
+      numPorts = 1, maxDims = 4, dataWidth = 128, addressWidth = 32, enableChaining = true)
+    val shp = Seq(16, 8, 4)
+    val ss = Seq(BigInt(64), BigInt(256), BigInt(1024))
+    val ds = Seq(BigInt(32), BigInt(128), BigInt(512))
+    val pv = Seq(2, 0, 1)
+    val beats = serializeDescriptor(cfg,
+      op = 1, tag = 0xAB, dimCount = 3,
+      shape = shp, srcStride = ss, dstStride = ds,
+      srcAddr = BigInt(0x1000), dstAddr = BigInt(0x2000),
+      permVec = pv, padBefore = Seq(3, 5), padAfter = Seq(7, 9),
+      nextDescAddr = BigInt(0x3000), chainMode = true,
+      srcFmt = 8, dstFmt = 1, cvtScale = BigInt(0x12345678), cvtZeroPoint = BigInt(0x09ABCDEF))
+    // 由 beat 序列（little-endian beat 拼接）重组完整 bit 向量
+    var bits = BigInt(0)
+    for ((b, i) <- beats.zipWithIndex) bits |= b << (i * cfg.dataWidth)
+    val o = FbDescLayout.offsets(cfg)
+    def slice(off: Int, w: Int): BigInt = (bits >> off) & ((BigInt(1) << w) - 1)
+
+    slice(o.offOp, FbDescLayout.opBits) shouldBe BigInt(1)
+    slice(o.offTag, FbDescLayout.tagBits) shouldBe BigInt(0xAB)
+    slice(o.offDimCount, FbDescLayout.dimCountBits) shouldBe BigInt(3)
+    for (d <- 0 until cfg.maxDims) {
+      slice(o.offShape + d * 16, 16) shouldBe BigInt(shp.lift(d).getOrElse(0))
+      slice(o.offSrcStride + d * cfg.addressWidth, cfg.addressWidth) shouldBe ss.lift(d).getOrElse(BigInt(0))
+      slice(o.offDstStride + d * cfg.addressWidth, cfg.addressWidth) shouldBe ds.lift(d).getOrElse(BigInt(0))
+      slice(o.offPermVec + d * 3, 3) shouldBe BigInt(pv.lift(d).getOrElse(0))
+    }
+    slice(o.offSrcAddr, cfg.addressWidth) shouldBe BigInt(0x1000)
+    slice(o.offDstAddr, cfg.addressWidth) shouldBe BigInt(0x2000)
+    slice(o.offPadBefore, 16) shouldBe BigInt(3)
+    slice(o.offPadBefore + 16, 16) shouldBe BigInt(5)
+    slice(o.offPadAfter, 16) shouldBe BigInt(7)
+    slice(o.offPadAfter + 16, 16) shouldBe BigInt(9)
+    slice(o.offNextDescAddr, cfg.addressWidth) shouldBe BigInt(0x3000)
+    slice(o.offChainMode, FbDescLayout.chainModeBits) shouldBe BigInt(1)
+    slice(o.offSrcFmt, FbDescLayout.srcFmtBits) shouldBe BigInt(8)
+    slice(o.offDstFmt, FbDescLayout.dstFmtBits) shouldBe BigInt(1)
+    slice(o.offCvtScale, FbDescLayout.cvtScaleBits) shouldBe BigInt(0x12345678)
+    slice(o.offCvtZeroPoint, FbDescLayout.cvtZeroPointBits) shouldBe BigInt(0x09ABCDEF)
+    // 布局自检：偏移末端 == totalBits；descBeats 覆盖 totalBits 且与产出一致
+    o.end shouldBe FbDescLayout.totalBits(cfg)
+    FbDescLayout.descBeats(cfg) shouldBe beats.length
+  }
+
+  // ===================== 阶段 E：格式派生校验用例（非法编码 / INT4 约束 / 未实现转换 / MX 回归） =====================
+  // 注：非法枚举编码（6/15）经 pokeCmdPayload 的 port.srcFmt.poke(BigInt(v)) 注入。
+  //     若 ChiselSim 的 enum 检查拒绝越界字面量，改用 raw bits 旁路 port.srcFmt.poke(6.U(4.W))
+  //     （计划已注明；EDR 仿真环境恢复后实测确认）。
+
+  // 非法格式编码（6=历史废弃、15=未定义）→ fmtEncBad（无条件，不受 enableConversion 门控）
+  for (badFmt <- Seq(6, 15)) {
+    it should s"reject illegal srcFmt encoding ($badFmt) with err done" in {
+      val cmd = FbTestCmd(tag = 0xB0 + badFmt, op = "COPY", dimCount = 1,
+        shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
+        srcAddr = 0, dstAddr = 0x1000, srcFmt = badFmt, dstFmt = badFmt)
+      val (dones, _) = runForagerBee(testCfg, Seq(cmd), mutable.HashMap.empty)
+      dones shouldBe Seq((cmd.tag, true))
+    }
+  }
+
+  // INT4 奇数 shape(0)：行字节 ceil(33*4/8)=17 非整 beat → cBadBase 行对齐拒绝
+  it should "reject INT4 with odd shape(0) (row not beat-aligned) with err done" in {
+    val cmd = FbTestCmd(tag = 0xB1, op = "COPY", dimCount = 1,
+      shape = Seq(33), srcStride = Seq(17), dstStride = Seq(17),
+      srcAddr = 0, dstAddr = 0x1000, srcFmt = 10, dstFmt = 10)
+    val (dones, _) = runForagerBee(testCfg, Seq(cmd), mutable.HashMap.empty)
+    dones shouldBe Seq((0xB1, true))
+  }
+
+  // INT4 + TRANSPOSE → subByteOpBad（亚字节格式仅允许 COPY）
+  it should "reject INT4 with TRANSPOSE (sub-byte only allows COPY) with err done" in {
+    val cmd = FbTestCmd(tag = 0xB2, op = "TRANSPOSE", dimCount = 2,
+      shape = Seq(32, 32), srcStride = Seq(16, 512), dstStride = Seq(16, 512),
+      srcAddr = 0, dstAddr = 0x2000, srcFmt = 10, dstFmt = 10)
+    val (dones, _) = runForagerBee(testCfg, Seq(cmd), mutable.HashMap.empty)
+    dones shouldBe Seq((0xB2, true))
+  }
+
+  // INT4 + padding → int4PadBad（互斥）
+  it should "reject INT4 with padding (mutually exclusive) with err done" in {
+    val cmd = FbTestCmd(tag = 0xB3, op = "COPY", dimCount = 1,
+      shape = Seq(32), srcStride = Seq(16), dstStride = Seq(16),
+      srcAddr = 0, dstAddr = 0x1000, padBefore = Seq(1, 0),
+      srcFmt = 10, dstFmt = 10)
+    val (dones, _) = runForagerBee(testCfg, Seq(cmd), mutable.HashMap.empty)
+    dones shouldBe Seq((0xB3, true))
+  }
+
+  // INT4 COPY 正例：shape(0)=32 → 16B=1 beat（beatBytes=16），纯搬运 srcFmt==dstFmt → 数据正确
+  it should "INT4 COPY positive: shape(0)=32 (16B=1 beat) transfers correctly" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    fillPattern(mem, 0, 16)
+    val cmd = FbTestCmd(tag = 0xB4, op = "COPY", dimCount = 1,
+      shape = Seq(32), srcStride = Seq(16), dstStride = Seq(16),
+      srcAddr = 0, dstAddr = 0x1000, srcFmt = 10, dstFmt = 10)
+    val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
+    dones shouldBe Seq((0xB4, false))
+    for (i <- 0 until 16) m(BigInt(0x1000) + i) shouldBe m(BigInt(i))
+  }
+
+  // INT16→FP16（跨格式且 INT16 转换算术未实现）→ cvtFmtBad（需 enableConversion）
+  it should "reject INT16→FP16 conversion (unimplemented arithmetic) with err done" in {
+    val cmd = FbTestCmd(tag = 0xB5, op = "COPY", dimCount = 1,
+      shape = Seq(8), srcStride = Seq(16), dstStride = Seq(16),
+      srcAddr = 0, dstAddr = 0x1000, srcFmt = 9, dstFmt = 1)
+    val (dones, _) = runForagerBee(cvtCfg, Seq(cmd), mutable.HashMap.empty)
+    dones shouldBe Seq((0xB5, true))
+  }
+
+  // mxQuantEn + 非 float srcFmt（INT8）→ mxQuantBad.srcFmtBadMx（回归守护）
+  it should "reject MX quantize with non-float srcFmt (INT8) with err done" in {
+    val cmd = FbTestCmd(tag = 0xB7, op = "COPY", dimCount = 1,
+      shape = Seq(32), srcStride = Seq(32), dstStride = Seq(32),
+      srcAddr = 0, dstAddr = 0x1000, scaleAddr = 0x2000,
+      srcFmt = 3, dstFmt = 4, mxQuantEn = true, scaleBlockSize = 1)
+    val (dones, _) = runForagerBee(mxqCfg, Seq(cmd), mutable.HashMap.empty)
+    dones shouldBe Seq((0xB7, true))
+  }
+
+  // ===================== 阶段 D：IM2COL / padding 写侧 beat 折算用例 =====================
+  // 仿真环境（EDR）恢复后运行；此处先落编译。折算核心断言：done.err=false（beat 数不匹配会死锁/超时）。
+
+  // IM2COL + 格式转换配置：channelIm2col + enableConversion，dataWidth=32（beatBytes=4）
+  private val i2cCvtCfg = ForagerBeeConfig(
+    numPorts = 1, queueDepth = 4, maxDims = 4,
+    tileSize = 8, maxBurstLen = 64,
+    dataWidth = 32, addressWidth = 32,
+    channelIm2col = Seq(true),
+    enableConversion = true, converterPipeStages = 1
+  )
+
+  // IM2COL FP16→FP32 扩展：micro-row 源 4 FP16=8B=2 beats，目的 4 FP32=16B=4 beats（=源×2）
+  it should "im2col folding: FP16→FP32 expansion, dst beats = src × 2 (micro-row)" in {
+    val iC = 1; val iH = 1; val iW = 4
+    val (kH, kW, sH, sW, pH, pW, dH, dW) = (1, 4, 1, 1, 0, 0, 1, 1)
+    val srcVals = Seq(1.0f, 2.0f, 3.0f, 4.0f)
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    putFp16(mem, BigInt(0), srcVals)
+    val srcBits = srcVals.map(fp16Of)
+    val expected = computeIm2col(srcBits, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW)
+    val cmd = mkIm2colCmd(0xA1, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW, 1, 0,
+      srcAddr = 0, dstAddr = 0x20000)
+    val (dones, m) = runForagerBee(i2cCvtCfg, Seq(cmd), mem, maxCycles = 50000)
+    dones shouldBe Seq((0xA1, false))
+    // 目的端每元素 FP32（4B）：4 元素 = 16B = 4 beats（源 2 beats << cvtShift(1)）
+    for ((e, i) <- expected.zipWithIndex) {
+      val f32 = fp16BitsToFp32Bits(e)
+      for (b <- 0 until 4) {
+        withClue(s"dst FP32[$i] byte$b: ") {
+          (m.getOrElse(BigInt(0x20000 + i * 4 + b), 0.toByte) & 0xFF) shouldBe ((f32 >>> (8 * b)) & 0xFF)
+        }
+      }
+    }
+  }
+
+  // IM2COL FP32→FP16 压缩：micro-row 源 4 FP32=16B=4 beats，目的 4 FP16=8B=2 beats（=源/2）
+  it should "im2col folding: FP32→FP16 compression, dst beats = src / 2 (micro-row)" in {
+    val iC = 1; val iH = 1; val iW = 4
+    val (kH, kW, sH, sW, pH, pW, dH, dW) = (1, 4, 1, 1, 0, 0, 1, 1)
+    val srcVals = Seq(1.0f, 2.0f, 3.0f, 4.0f)
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    putFp32(mem, BigInt(0), srcVals)
+    val srcBits = srcVals.map(f32bits)
+    val expected = computeIm2col(srcBits, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW)
+    val cmd = mkIm2colCmd(0xA2, iC, iH, iW, kH, kW, sH, sW, pH, pW, dH, dW, 0, 1,
+      srcAddr = 0, dstAddr = 0x20000)
+    val (dones, m) = runForagerBee(i2cCvtCfg, Seq(cmd), mem, maxCycles = 50000)
+    dones shouldBe Seq((0xA2, false))
+    // 目的端每元素 FP16（2B）：4 元素 = 8B = 2 beats（源 4 beats >> cvtShift(1)）
+    for ((e, i) <- expected.zipWithIndex) {
+      val h = fp16Of(java.lang.Float.intBitsToFloat(e))
+      withClue(s"dst FP16[$i]: ") { readElem16(m, BigInt(0x20000 + i * 2)) shouldBe h }
+    }
+  }
+
+  // padding + FP32→FP16 压缩：输出列宽按 dst 粒度（FP16=2B），padBefore(0)=8 → 16B=1 beat 零 pad
+  it should "padding folding: FP32→FP16 compression, output column width by dst granularity" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val row0 = Seq(1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f)
+    val row1 = Seq(1.5f, 2.5f, 3.5f, 4.5f, 5.5f, 6.5f, 7.5f, 8.5f)
+    putFp32(mem, BigInt(0), row0)   // 32 bytes
+    putFp32(mem, BigInt(32), row1)  // 32 bytes
+    val cmd = FbTestCmd(tag = 0xA3, op = "COPY", dimCount = 2,
+      shape = Seq(8, 2), srcStride = Seq(32, 32), dstStride = Seq(32, 32),
+      srcAddr = 0, dstAddr = 0x2000,
+      padBefore = Seq(8, 0), padAfter = Seq(0, 0),
+      srcFmt = 0, dstFmt = 1) // FP32→FP16 压缩
+    val (dones, m) = runForagerBee(cvtCfg, Seq(cmd), mem, maxCycles = 10000)
+    dones shouldBe Seq((0xA3, false))
+    // 每输出行 = 8 FP16 零 pad(16B) + 8 FP16 数据(16B) = 32B（列宽按 dstFmt=FP16 粒度）
+    for ((row, r) <- Seq(row0, row1).zipWithIndex) {
+      val rowBase = BigInt(0x2000 + r * 32)
+      for (p <- 0 until 16) {
+        withClue(s"row$r pad[$p]: ") { (m.getOrElse(rowBase + p, (-1).toByte) & 0xFF) shouldBe 0 }
+      }
+      for ((v, i) <- row.zipWithIndex) {
+        withClue(s"row$r data[$i]: ") { readElem16(m, rowBase + 16 + i * 2) shouldBe fp16Of(v) }
+      }
     }
   }
 }

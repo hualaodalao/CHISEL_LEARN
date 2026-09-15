@@ -8,7 +8,8 @@
   *     转置 tile 尺寸/突发上限/数据位宽/地址位宽/通道转置能力/
   *     链式描述符开关/格式转换开关），全部 compile-time 可配置并 require 校验。
   *   - [[FbOp]]：操作码枚举（COPY / TRANSPOSE / PERMUTE）。
-  *   - [[FbDataFmt]]：数据格式枚举（FP32 / FP16 / BF16 / INT8 / NONE）。
+  *   - [[FbDataFmt]]：数据格式 ChiselEnum（4-bit：FP32/FP16/BF16/INT8/MXE4M3/MXE5M2/NONE，
+  *     外加 4-bit 扩容新增的 INT32/INT16/INT4；既有编码为软件可见契约，永不重排）。
   *   - [[FbCmd]]：命令描述符（统一 dims 组：shape + srcStride + dstStride + 链式 + 格式转换）。
   *   - [[FbDone]]：完成回执（tag + err + chainLen）。
   *
@@ -18,7 +19,9 @@
   *     （COPY 时 dim0 被展开为连续 INCR 突发，stride(0) 仅作信息字段；
   *     TRANSPOSE 时 dstStride(0) 用作转置输出行之间的字节步长）。
   *   - 当前行地址 = base + Σ(idx(i) × stride(i))，i ∈ [1, dimCount)。
-  *   - elemBytesLog2：元素粒度 0→1B、1→2B、2→4B（v1 仅支持 1/2/4 字节元素）。
+  *   - 元素粒度由 srcFmt（读侧）/dstFmt（写侧）经 FbDataFmt.rowBytes/bytesOfCeil 单一真源派生。
+  *   - **纯搬运契约：srcFmt==dstFmt**（历史 cvtEnable=0 且 fmt 不等的静默纯拷贝已删除；
+  *     转换激活派生为 srcFmt =/= dstFmt，enableConversion=false 时强制 srcFmt==dstFmt）。
   *
   * v1 对齐约束（软件必须保证，硬件对基址与 COPY 行长做运行时检查）：
   *   - 所有行起始地址（srcAddr/dstAddr 基址）按 beat（dataWidth/8 字节）对齐；
@@ -146,16 +149,109 @@ object FbOp extends ChiselEnum {
   val LINEAR2TILE = Value
 }
 
-/** 数据格式枚举（用于搬运时原位格式转换） */
-object FbDataFmt {
-  val FP32 = 0.U(3.W)
-  val FP16 = 1.U(3.W)
-  val BF16 = 2.U(3.W)
-  val INT8 = 3.U(3.W)
-  val MXE4M3 = 4.U(3.W) // MXFP8 E4M3 格式（{sign(1),exp(4),mant(3)}，bias=7，E8M0 共享 scale）
-  val MXE5M2 = 5.U(3.W) // MXFP8 E5M2 格式（{sign(1),exp(5),mant(2)}，bias=15，E8M0 共享 scale）
-  val NONE = 7.U(3.W) // 不转换（bypass）
+/** 数据格式枚举（用于搬运时原位格式转换与 MX 量化），ChiselEnum、4-bit，与 [[FbOp]] 风格统一。
+  *
+  * 编码即软件可见契约（描述符 srcFmt/dstFmt 字段、链式描述符打包、测试激励均按此编码），
+  * 既有编码 **永不重排、永不复用**：
+  * {{{
+  *   0 = FP32     1 = FP16     2 = BF16     3 = INT8
+  *   4 = MXE4M3   5 = MXE5M2   6 = （历史空位，保留）   7 =（历史 NONE，已删除，永久保留不复用）
+  *   8 = INT32    9 = INT16   10 = INT4    ← 4-bit 扩容新增（转换算术尚未实现，仅占位编码）
+  * }}}
+  * ChiselEnum 要求字面值严格递增，故成员声明顺序即编码顺序；每个成员显式给出
+  * `Value(n.U(4.W))`，既锁死 4-bit 宽度，也让编码契约在源码中自解释。
+  */
+object FbDataFmt extends ChiselEnum {
+
+  /** IEEE-754 单精度（1+8+23，bias=127，4 字节/元素） */
+  val FP32 = Value(0.U(4.W))
+
+  /** IEEE-754 半精度（1+5+10，bias=15，2 字节/元素） */
+  val FP16 = Value(1.U(4.W))
+
+  /** bfloat16（1+8+7，bias=127，2 字节/元素） */
+  val BF16 = Value(2.U(4.W))
+
+  /** 有符号 8-bit 整数（2's complement，1 字节/元素，量化 scale/zeroPoint 见 FbCmd） */
+  val INT8 = Value(3.U(4.W))
+
+  /** MXFP8 E4M3（{sign(1),exp(4),mant(3)}，bias=7，E8M0 共享 scale，1 字节/元素） */
+  val MXE4M3 = Value(4.U(4.W))
+
+  /** MXFP8 E5M2（{sign(1),exp(5),mant(2)}，bias=15，E8M0 共享 scale，1 字节/元素） */
+  val MXE5M2 = Value(5.U(4.W))
+
+  // 编码 6：历史空位，保留不复用（避免与既有软件/波形约定冲突）
+  // 编码 7：历史 NONE（bypass 哨兵），已删除，永久保留不复用
+
+  /** 有符号 32-bit 整数（4 字节/元素）——编码已占位，转换算术待后续任务实现 */
+  val INT32 = Value(8.U(4.W))
+
+  /** 有符号 16-bit 整数（2 字节/元素）——编码已占位，转换算术待后续任务实现 */
+  val INT16 = Value(9.U(4.W))
+
+  /** 有符号 4-bit 整数（半字节/元素）——编码已占位，转换算术待后续任务实现 */
+  val INT4 = Value(10.U(4.W))
+
+  /** 编码契约自检（elaboration 期）：任何重排/插入/位宽漂移都在生成 RTL 之前抛异常，
+    * 杜绝「硬件悄悄改了软件可见编码」这类难以定位的兼容性事故。 */
+  require(
+    FP32.litValue == 0 && FP16.litValue == 1 && BF16.litValue == 2 && INT8.litValue == 3 &&
+      MXE4M3.litValue == 4 && MXE5M2.litValue == 5 &&
+      INT32.litValue == 8 && INT16.litValue == 9 && INT4.litValue == 10 &&
+      all.size <= 16 && getWidth == 4,
+    s"FbDataFmt: 编码契约被破坏（须保持 4-bit 宽度与既有编码 0/1/2/3/4/5），当前 = $this")
+
+  /** 是否浮点族（FP32 / FP16 / BF16） */
+  def isFloat(f: FbDataFmt.Type): Bool = f === FP32 || f === FP16 || f === BF16
+
+  /** 是否整数族（INT8 / INT16 / INT32 / INT4） */
+  def isInt(f: FbDataFmt.Type): Bool = f === INT8 || f === INT16 || f === INT32 || f === INT4
+
+  /** 是否 MX 族（MXE4M3 / MXE5M2，仅量化器认识） */
+  def isMx(f: FbDataFmt.Type): Bool = f === MXE4M3 || f === MXE5M2
+
+  /** 元素位宽（bit）的【单一真源】：格式编码 → 位宽的运行期硬件解码。
+    * 引擎（读写侧 beat/压缩扩展比推导）与格式转换器（Rate Adapter）共用本表，
+    * 杜绝各模块私自定义 FMT_* 常量与位宽表造成的双源漂移。
+    * 未定义编码 → 32（保守默认，硬件上由 fmtEncBad 校验拒绝）。 */
+  def elemBits(f: FbDataFmt.Type): UInt = MuxLookup(f, 32.U(6.W))(Seq(
+    FP32 -> 32.U(6.W), INT32 -> 32.U(6.W),
+    FP16 -> 16.U(6.W), BF16 -> 16.U(6.W), INT16 -> 16.U(6.W),
+    INT8 -> 8.U(6.W), MXE4M3 -> 8.U(6.W), MXE5M2 -> 8.U(6.W),
+    INT4 -> 4.U(6.W)
+  ))
+
+  /** 编码是否合法（拒绝 6/7/11-15 等保留或未定义值）。
+    * NONE 删除后 all 不含编码 7，合法集合 = {0,1,2,3,4,5,8,9,10}。 */
+  def isLegal(f: FbDataFmt.Type): Bool = {
+    val legal = Seq(FP32, FP16, BF16, INT8, MXE4M3, MXE5M2, INT32, INT16, INT4)
+    VecInit(legal.map(f === _)).asUInt.orR
+  }
+
+  /** 是否亚字节格式（INT4：4-bit 元素，需特殊对齐处理） */
+  def isSubByte(f: FbDataFmt.Type): Bool = f === INT4
+
+  /** 元素字节数（向上取整）：INT4→1，其余 elemBits>>3。3-bit 宽度足够（最大 4）。 */
+  def bytesOfCeil(f: FbDataFmt.Type): UInt = {
+    Mux(f === INT4, 1.U(3.W), (elemBits(f) >> 3)(2, 0))
+  }
+
+  /** elemBytesLog2 派生：INT8/MXE4M3/MXE5M2→0，FP16/BF16/INT16→1，FP32/INT32→2。
+    * 仅字节粒度格式有意义，INT4 由校验挡在调用路径外。 */
+  def ebLog2Of(f: FbDataFmt.Type): UInt = MuxLookup(f, 0.U(2.W))(Seq(
+    FP16 -> 1.U(2.W), BF16 -> 1.U(2.W), INT16 -> 1.U(2.W),
+    FP32 -> 2.U(2.W), INT32 -> 2.U(2.W)
+  ))
+
+  /** 行字节数（ceil）：shape0 × elemBits / 8，天然处理 INT4 亚字节。
+    * 返回位宽 = shape0.getWidth + 6（足以容纳最大 elemBits=32 的乘积 + 7 的 ceil 余量）。 */
+  def rowBytes(shape0: UInt, f: FbDataFmt.Type): UInt = {
+    val w = shape0.getWidth + 6
+    ((shape0 * elemBits(f)).pad(w) +& 7.U) >> 3
+  }
 }
+
 
 /** DMA 命令描述符（统一 dims 组，1D/2D/ND 共用一套字段）。
   *
@@ -164,7 +260,7 @@ object FbDataFmt {
 class FbCmd(cfg: ForagerBeeConfig) extends Bundle {
 
   /** 操作码（COPY / TRANSPOSE） */
-  val op = FbOp()
+  val op = FbOp() //reserve 4b
 
   /** 软件自定义标签，原样随 done 回执返回 */
   val tag = UInt(8.W)
@@ -173,7 +269,7 @@ class FbCmd(cfg: ForagerBeeConfig) extends Bundle {
   val dimCount = UInt(3.W)
 
   /** 每维元素数（dim0 为最内维；未用维度填 0） */
-  val shape = Vec(cfg.maxDims, UInt(16.W))
+  val shape = Vec(cfg.maxDims, UInt(16.W)) //max 5*16
 
   /** 源字节步长（stride(0) = 最内维行连续字节数，信息字段） */
   val srcStride = Vec(cfg.maxDims, UInt(cfg.addressWidth.W))
@@ -206,9 +302,6 @@ class FbCmd(cfg: ForagerBeeConfig) extends Bundle {
   /** 目的基址（须按 beat 对齐） */
   val dstAddr = UInt(cfg.addressWidth.W)
 
-  /** 元素粒度 log2：0→1B、1→2B、2→4B（>2 非法） */
-  val elemBytesLog2 = UInt(2.W)
-
   /** PERMUTE 维度映射向量：输出第 d 维对应源张量的第 permVec(d) 维。
     * 非 PERMUTE 操作时忽略（默认全 0）。每项 3bit 足以索引最多 5 维。 */
   val permVec = Vec(cfg.maxDims, UInt(3.W))
@@ -227,14 +320,11 @@ class FbCmd(cfg: ForagerBeeConfig) extends Bundle {
   /** 链式描述符：是否为链模式（true 时 done 由 ChainController 管理） */
   val chainMode = Bool()
 
-  /** 格式转换：是否启用搬运时原位格式转换 */
-  val cvtEnable = Bool()
+  /** 格式转换：源数据格式（[[FbDataFmt]] ChiselEnum，4-bit） */
+  val srcFmt = FbDataFmt()
 
-  /** 格式转换：源数据格式（FbDataFmt 枚举） */
-  val srcFmt = UInt(3.W)
-
-  /** 格式转换：目标数据格式（FbDataFmt 枚举） */
-  val dstFmt = UInt(3.W)
+  /** 格式转换：目标数据格式（[[FbDataFmt]] ChiselEnum，4-bit） */
+  val dstFmt = FbDataFmt()
 
   /** 格式转换：量化 scale（IEEE-754 FP32 编码） */
   val cvtScale = UInt(32.W)
@@ -275,6 +365,23 @@ class FbCmd(cfg: ForagerBeeConfig) extends Bundle {
 
 object FbCmd {
   def apply(cfg: ForagerBeeConfig): FbCmd = new FbCmd(cfg)
+}
+
+
+/** 共享（压缩）描述符载体：3 个 32-bit 双字，用于多通道共享同一份命令编码的场景。
+  *
+  * 注意：历史上本类漏写 `extends Bundle`，成员 `UInt(32.W)` 因此只是普通 Scala 求值、
+  * 并非硬件类型，一旦被实例化即抛 Builder 异常（且拼写为 FbShareedCmd）。此处修正为
+  * 正规 Bundle 并订正拼写；当前无模块引用，保留作为后续共享描述符通路的占位定义。
+  */
+class FbSharedCmd extends Bundle {
+  val DW0 = UInt(32.W)
+  val DW1 = UInt(32.W)
+  val DW2 = UInt(32.W)
+}
+
+object FbSharedCmd {
+  def apply(): FbSharedCmd = new FbSharedCmd
 }
 
 /** DMA 完成回执。

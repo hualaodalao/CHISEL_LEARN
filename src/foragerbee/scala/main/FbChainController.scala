@@ -13,38 +13,75 @@
 import chisel3._
 import chisel3.util._
 
-/** 描述符内存布局：定义 FbCmd 各字段在描述符 beat 序列中的 bit 偏移。
+/** 描述符内存布局：定义 FbCmd 各字段在描述符 beat 序列中的 bit 偏移（单一真源）。
   * 字段按 FbCmd 声明顺序紧密排列，末尾追加 nextDescAddr。
+  *
+  * srcFmt/dstFmt 随 [[FbDataFmt]] 扩为 ChiselEnum(4-bit) 而由 3-bit 拓宽到 4-bit。
+  *
+  * **v2 布局（破坏性变更，与 v1 二进制不兼容）**：已删除 elemBytesLog2(2-bit) 与
+  * cvtEnable(1-bit) 两个字段——元素粒度改由 srcFmt/dstFmt 单一真源派生、转换激活
+  * 派生为 srcFmt =/= dstFmt。删字段后其后所有字段的 bit 偏移连锁前移，totalBits
+  * 相应缩减；软件侧描述符打包必须按 v2 布局重新生成（见测试 serializeDescriptor）。
+  *
+  * 已知限制（本次不改动）：opBits 仍为 2，而 [[FbOp]] 已是 8 个成员的 3-bit 枚举，
+  * 故链式描述符目前只能编码 COPY/TRANSPOSE/PERMUTE(0..2)；扩展 op 宽度需同步
+  * 软件打包与本文两处 opBits 常量。
   */
 object FbDescLayout {
-  def totalBits(cfg: ForagerBeeConfig): Int = {
-    val addrW = cfg.addressWidth
-    val maxDims = cfg.maxDims
-    // op: 2bit (ChiselEnum COPY/TRANSPOSE/PERMUTE -> 2 bits enough for 3 values)
-    val opBits = 2
-    val tagBits = 8
-    val dimCountBits = 3
-    val shapeBits = maxDims * 16
-    val srcStrideBits = maxDims * addrW
-    val dstStrideBits = maxDims * addrW
-    val srcAddrBits = addrW
-    val dstAddrBits = addrW
-    val elemBytesLog2Bits = 2
-    val permVecBits = maxDims * 3
-    val padBeforeBits = 2 * 16
-    val padAfterBits = 2 * 16
-    val nextDescAddrBits = addrW
-    val chainModeBits = 1
-    val cvtEnableBits = 1
-    val srcFmtBits = 3
-    val dstFmtBits = 3
-    val cvtScaleBits = 32
-    val cvtZeroPointBits = 32
+  // --- 各字段位宽常量（纯 Scala，编译期可求值） ---
+  val opBits = 2
+  val tagBits = 8
+  val dimCountBits = 3
+  def shapeBits(cfg: ForagerBeeConfig): Int = cfg.maxDims * 16
+  def srcStrideBits(cfg: ForagerBeeConfig): Int = cfg.maxDims * cfg.addressWidth
+  def dstStrideBits(cfg: ForagerBeeConfig): Int = cfg.maxDims * cfg.addressWidth
+  def srcAddrBits(cfg: ForagerBeeConfig): Int = cfg.addressWidth
+  def dstAddrBits(cfg: ForagerBeeConfig): Int = cfg.addressWidth
+  def permVecBits(cfg: ForagerBeeConfig): Int = cfg.maxDims * 3
+  val padBeforeBits = 2 * 16
+  val padAfterBits = 2 * 16
+  def nextDescAddrBits(cfg: ForagerBeeConfig): Int = cfg.addressWidth
+  val chainModeBits = 1
+  val srcFmtBits = FbDataFmt.getWidth
+  val dstFmtBits = FbDataFmt.getWidth
+  val cvtScaleBits = 32
+  val cvtZeroPointBits = 32
 
-    opBits + tagBits + dimCountBits + shapeBits + srcStrideBits + dstStrideBits +
-      srcAddrBits + dstAddrBits + elemBytesLog2Bits + permVecBits +
-      padBeforeBits + padAfterBits + nextDescAddrBits + chainModeBits +
-      cvtEnableBits + srcFmtBits + dstFmtBits + cvtScaleBits + cvtZeroPointBits
+  /** 所有字段偏移（纯 Scala case class，FbChainController 与 Spec 共同消费） */
+  case class Offsets(cfg: ForagerBeeConfig) {
+    val offOp: Int = 0
+    val offTag: Int = offOp + opBits
+    val offDimCount: Int = offTag + tagBits
+    val offShape: Int = offDimCount + dimCountBits
+    val offSrcStride: Int = offShape + shapeBits(cfg)
+    val offDstStride: Int = offSrcStride + srcStrideBits(cfg)
+    val offSrcAddr: Int = offDstStride + dstStrideBits(cfg)
+    val offDstAddr: Int = offSrcAddr + srcAddrBits(cfg)
+    val offPermVec: Int = offDstAddr + dstAddrBits(cfg)
+    val offPadBefore: Int = offPermVec + permVecBits(cfg)
+    val offPadAfter: Int = offPadBefore + padBeforeBits
+    val offNextDescAddr: Int = offPadAfter + padAfterBits
+    val offChainMode: Int = offNextDescAddr + nextDescAddrBits(cfg)
+    val offSrcFmt: Int = offChainMode + chainModeBits
+    val offDstFmt: Int = offSrcFmt + srcFmtBits
+    val offCvtScale: Int = offDstFmt + dstFmtBits
+    val offCvtZeroPoint: Int = offCvtScale + cvtScaleBits
+    val end: Int = offCvtZeroPoint + cvtZeroPointBits
+  }
+
+  /** 获取指定配置的偏移表（elaboration 期自检：字段宽度之和 == totalBits） */
+  def offsets(cfg: ForagerBeeConfig): Offsets = {
+    val o = new Offsets(cfg)
+    require(o.end == totalBits(cfg),
+      s"FbDescLayout: 字段宽度之和(${o.end}) != totalBits(${totalBits(cfg)})，布局计算有误")
+    o
+  }
+
+  def totalBits(cfg: ForagerBeeConfig): Int = {
+    opBits + tagBits + dimCountBits + shapeBits(cfg) + srcStrideBits(cfg) + dstStrideBits(cfg) +
+      srcAddrBits(cfg) + dstAddrBits(cfg) + permVecBits(cfg) +
+      padBeforeBits + padAfterBits + nextDescAddrBits(cfg) + chainModeBits +
+      srcFmtBits + dstFmtBits + cvtScaleBits + cvtZeroPointBits
   }
 
   def descBeats(cfg: ForagerBeeConfig): Int = {
@@ -124,73 +161,34 @@ class FbChainController(cfg: ForagerBeeConfig) extends Module {
   // 从 bit 向量中按顺序提取各字段
   private def extract(offset: Int, width: Int): UInt = descBitsWire(offset + width - 1, offset)
 
-  // 计算各字段偏移
-  private val opBits = 2
-  private val tagBits = 8
-  private val dimCountBits = 3
-  private val shapeBits = cfg.maxDims * 16
-  private val srcStrideBits = cfg.maxDims * addrW
-  private val dstStrideBits = cfg.maxDims * addrW
-  private val srcAddrBits = addrW
-  private val dstAddrBits = addrW
-  private val elemBytesLog2Bits = 2
-  private val permVecBits = cfg.maxDims * 3
-  private val padBeforeBits = 2 * 16
-  private val padAfterBits = 2 * 16
-  private val nextDescAddrBits = addrW
-  private val chainModeBits = 1
-  private val cvtEnableBits = 1
-  private val srcFmtBits = 3
-  private val dstFmtBits = 3
-  private val cvtScaleBits = 32
-  private val cvtZeroPointBits = 32
-
-  private var off = 0
-  private val offOp = off; off += opBits
-  private val offTag = off; off += tagBits
-  private val offDimCount = off; off += dimCountBits
-  private val offShape = off; off += shapeBits
-  private val offSrcStride = off; off += srcStrideBits
-  private val offDstStride = off; off += dstStrideBits
-  private val offSrcAddr = off; off += srcAddrBits
-  private val offDstAddr = off; off += dstAddrBits
-  private val offElemBytesLog2 = off; off += elemBytesLog2Bits
-  private val offPermVec = off; off += permVecBits
-  private val offPadBefore = off; off += padBeforeBits
-  private val offPadAfter = off; off += padAfterBits
-  private val offNextDescAddr = off; off += nextDescAddrBits
-  private val offChainMode = off; off += chainModeBits
-  private val offCvtEnable = off; off += cvtEnableBits
-  private val offSrcFmt = off; off += srcFmtBits
-  private val offDstFmt = off; off += dstFmtBits
-  private val offCvtScale = off; off += cvtScaleBits
-  private val offCvtZeroPoint = off; off += cvtZeroPointBits
+  // 偏移单一真源：从 FbDescLayout 获取（elaboration 期自检宽度一致性）
+  private val lo = FbDescLayout.offsets(cfg)
 
   // 组装注入 cmd
   val injCmd = Wire(new FbCmd(cfg))
-  injCmd.op        := extract(offOp, opBits).asTypeOf(FbOp())
-  injCmd.tag       := extract(offTag, tagBits)
-  injCmd.dimCount  := extract(offDimCount, dimCountBits)
+  injCmd.op        := extract(lo.offOp, FbDescLayout.opBits).asTypeOf(FbOp())
+  injCmd.tag       := extract(lo.offTag, FbDescLayout.tagBits)
+  injCmd.dimCount  := extract(lo.offDimCount, FbDescLayout.dimCountBits)
   for (d <- 0 until cfg.maxDims) {
-    injCmd.shape(d)     := extract(offShape + d * 16, 16)
-    injCmd.srcStride(d) := extract(offSrcStride + d * addrW, addrW)
-    injCmd.dstStride(d) := extract(offDstStride + d * addrW, addrW)
-    injCmd.permVec(d)   := extract(offPermVec + d * 3, 3)
+    injCmd.shape(d)     := extract(lo.offShape + d * 16, 16)
+    injCmd.srcStride(d) := extract(lo.offSrcStride + d * addrW, addrW)
+    injCmd.dstStride(d) := extract(lo.offDstStride + d * addrW, addrW)
+    injCmd.permVec(d)   := extract(lo.offPermVec + d * 3, 3)
   }
-  injCmd.srcAddr       := extract(offSrcAddr, addrW)
-  injCmd.dstAddr       := extract(offDstAddr, addrW)
-  injCmd.elemBytesLog2 := extract(offElemBytesLog2, elemBytesLog2Bits)
+  injCmd.srcAddr       := extract(lo.offSrcAddr, addrW)
+  injCmd.dstAddr       := extract(lo.offDstAddr, addrW)
   for (d <- 0 until 2) {
-    injCmd.padBefore(d) := extract(offPadBefore + d * 16, 16)
-    injCmd.padAfter(d)  := extract(offPadAfter + d * 16, 16)
+    injCmd.padBefore(d) := extract(lo.offPadBefore + d * 16, 16)
+    injCmd.padAfter(d)  := extract(lo.offPadAfter + d * 16, 16)
   }
-  injCmd.nextDescAddr  := extract(offNextDescAddr, nextDescAddrBits)
-  injCmd.chainMode     := extract(offChainMode, chainModeBits).asBool
-  injCmd.cvtEnable     := extract(offCvtEnable, cvtEnableBits).asBool
-  injCmd.srcFmt        := extract(offSrcFmt, srcFmtBits)
-  injCmd.dstFmt        := extract(offDstFmt, dstFmtBits)
-  injCmd.cvtScale      := extract(offCvtScale, cvtScaleBits)
-  injCmd.cvtZeroPoint  := extract(offCvtZeroPoint, cvtZeroPointBits)
+  injCmd.nextDescAddr  := extract(lo.offNextDescAddr, addrW)
+  injCmd.chainMode     := extract(lo.offChainMode, FbDescLayout.chainModeBits).asBool
+  // srcFmt/dstFmt：4-bit UInt → FbDataFmt ChiselEnum（枚举非满编码，故抑制 unsafe-cast 告警；
+  // 未定义编码由引擎 cBad 校验与转换器 default 分支兜住）
+  injCmd.srcFmt        := suppressEnumCastWarning { extract(lo.offSrcFmt, FbDescLayout.srcFmtBits).asTypeOf(FbDataFmt()) }
+  injCmd.dstFmt        := suppressEnumCastWarning { extract(lo.offDstFmt, FbDescLayout.dstFmtBits).asTypeOf(FbDataFmt()) }
+  injCmd.cvtScale      := extract(lo.offCvtScale, FbDescLayout.cvtScaleBits)
+  injCmd.cvtZeroPoint  := extract(lo.offCvtZeroPoint, FbDescLayout.cvtZeroPointBits)
   // im2col fields default to 0 (chain controller does not support im2col descriptors in v1)
   for (d <- 0 until 2) {
     injCmd.im2colKernel(d)   := 0.U

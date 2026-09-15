@@ -20,6 +20,119 @@ module Hive_HiveWorkUnit(	// src/hive/scala/main/HiveWorkUnit.scala:546:7
   wire [31:0] _sumMx_bCvtLo_io_out;	// src/hive/scala/main/HiveWorkUnit.scala:701:24
   wire [31:0] _sumMx_aCvtHi_io_out;	// src/hive/scala/main/HiveWorkUnit.scala:696:24
   wire [31:0] _sumMx_aCvtLo_io_out;	// src/hive/scala/main/HiveWorkUnit.scala:691:24
+  wire [39:0] _sumMx_quadResult_qmac3_io_sum;	// src/hive/scala/main/HiveWorkUnit.scala:832:27
+  wire [39:0] _sumMx_quadResult_qmac2_io_sum;	// src/hive/scala/main/HiveWorkUnit.scala:827:27
+  wire [39:0] _sumMx_quadResult_qmac1_io_sum;	// src/hive/scala/main/HiveWorkUnit.scala:822:27
+  wire [39:0] _sumMx_quadResult_qmac0_io_sum;	// src/hive/scala/main/HiveWorkUnit.scala:817:27
+  wire [31:0] _sumMx_quadResult_bQ3_io_out;	// src/hive/scala/main/HiveWorkUnit.scala:811:25
+  wire [31:0] _sumMx_quadResult_bQ2_io_out;	// src/hive/scala/main/HiveWorkUnit.scala:806:25
+  wire [31:0] _sumMx_quadResult_bQ1_io_out;	// src/hive/scala/main/HiveWorkUnit.scala:801:25
+  wire [31:0] _sumMx_quadResult_bQ0_io_out;	// src/hive/scala/main/HiveWorkUnit.scala:796:25
+  wire [31:0] _sumMx_quadResult_aQ3_io_out;	// src/hive/scala/main/HiveWorkUnit.scala:790:25
+  wire [31:0] _sumMx_quadResult_aQ2_io_out;	// src/hive/scala/main/HiveWorkUnit.scala:785:25
+  wire [31:0] _sumMx_quadResult_aQ1_io_out;	// src/hive/scala/main/HiveWorkUnit.scala:780:25
+  wire [31:0] _sumMx_quadResult_aQ0_io_out;	// src/hive/scala/main/HiveWorkUnit.scala:775:25
+  wire        _io_sum_T_3 = io_aFmt == 4'h5;	// src/hive/scala/main/HiveEnum.scala:11:43
+  Hive_HiveCvtOpMx sumMx_quadResult_aQ0 (	// src/hive/scala/main/HiveWorkUnit.scala:775:25
+    .clock           (clock),
+    .reset           (reset),
+    .io_in           ({4'h0, io_a[3:0]}),	// src/hive/scala/main/HiveWorkUnit.scala:776:{22,29}
+    .io_fmt          (io_aFmt),
+    .io_scale        (io_scaleA),
+    .io_consumeValid (io_consumeValid),
+    .io_out          (_sumMx_quadResult_aQ0_io_out)
+  );	// src/hive/scala/main/HiveWorkUnit.scala:775:25
+  Hive_HiveCvtOpMx sumMx_quadResult_aQ1 (	// src/hive/scala/main/HiveWorkUnit.scala:780:25
+    .clock           (clock),
+    .reset           (reset),
+    .io_in           ({4'h0, io_a[7:4]}),	// src/hive/scala/main/HiveWorkUnit.scala:776:22, :781:{22,29}
+    .io_fmt          (io_aFmt),
+    .io_scale        (io_scaleA),
+    .io_consumeValid (io_consumeValid),
+    .io_out          (_sumMx_quadResult_aQ1_io_out)
+  );	// src/hive/scala/main/HiveWorkUnit.scala:780:25
+  Hive_HiveCvtOpMx sumMx_quadResult_aQ2 (	// src/hive/scala/main/HiveWorkUnit.scala:785:25
+    .clock           (clock),
+    .reset           (reset),
+    .io_in           ({4'h0, io_a[11:8]}),	// src/hive/scala/main/HiveWorkUnit.scala:776:22, :786:{22,29}
+    .io_fmt          (io_aFmt),
+    .io_scale        (io_scaleA),
+    .io_consumeValid (io_consumeValid),
+    .io_out          (_sumMx_quadResult_aQ2_io_out)
+  );	// src/hive/scala/main/HiveWorkUnit.scala:785:25
+  Hive_HiveCvtOpMx sumMx_quadResult_aQ3 (	// src/hive/scala/main/HiveWorkUnit.scala:790:25
+    .clock           (clock),
+    .reset           (reset),
+    .io_in           ({4'h0, io_a[15:12]}),	// src/hive/scala/main/HiveWorkUnit.scala:776:22, :791:{22,29}
+    .io_fmt          (io_aFmt),
+    .io_scale        (io_scaleA),
+    .io_consumeValid (io_consumeValid),
+    .io_out          (_sumMx_quadResult_aQ3_io_out)
+  );	// src/hive/scala/main/HiveWorkUnit.scala:790:25
+  Hive_HiveCvtOpMx sumMx_quadResult_bQ0 (	// src/hive/scala/main/HiveWorkUnit.scala:796:25
+    .clock           (clock),
+    .reset           (reset),
+    .io_in           ({4'h0, io_b[3:0]}),	// src/hive/scala/main/HiveWorkUnit.scala:776:22, :797:{22,29}
+    .io_fmt          (io_bFmt),
+    .io_scale        (io_scaleB),
+    .io_consumeValid (io_consumeValid),
+    .io_out          (_sumMx_quadResult_bQ0_io_out)
+  );	// src/hive/scala/main/HiveWorkUnit.scala:796:25
+  Hive_HiveCvtOpMx sumMx_quadResult_bQ1 (	// src/hive/scala/main/HiveWorkUnit.scala:801:25
+    .clock           (clock),
+    .reset           (reset),
+    .io_in           ({4'h0, io_b[7:4]}),	// src/hive/scala/main/HiveWorkUnit.scala:776:22, :802:{22,29}
+    .io_fmt          (io_bFmt),
+    .io_scale        (io_scaleB),
+    .io_consumeValid (io_consumeValid),
+    .io_out          (_sumMx_quadResult_bQ1_io_out)
+  );	// src/hive/scala/main/HiveWorkUnit.scala:801:25
+  Hive_HiveCvtOpMx sumMx_quadResult_bQ2 (	// src/hive/scala/main/HiveWorkUnit.scala:806:25
+    .clock           (clock),
+    .reset           (reset),
+    .io_in           ({4'h0, io_b[11:8]}),	// src/hive/scala/main/HiveWorkUnit.scala:776:22, :807:{22,29}
+    .io_fmt          (io_bFmt),
+    .io_scale        (io_scaleB),
+    .io_consumeValid (io_consumeValid),
+    .io_out          (_sumMx_quadResult_bQ2_io_out)
+  );	// src/hive/scala/main/HiveWorkUnit.scala:806:25
+  Hive_HiveCvtOpMx sumMx_quadResult_bQ3 (	// src/hive/scala/main/HiveWorkUnit.scala:811:25
+    .clock           (clock),
+    .reset           (reset),
+    .io_in           ({4'h0, io_b[15:12]}),	// src/hive/scala/main/HiveWorkUnit.scala:776:22, :812:{22,29}
+    .io_fmt          (io_bFmt),
+    .io_scale        (io_scaleB),
+    .io_consumeValid (io_consumeValid),
+    .io_out          (_sumMx_quadResult_bQ3_io_out)
+  );	// src/hive/scala/main/HiveWorkUnit.scala:811:25
+  Hive_HiveMacFpMx sumMx_quadResult_qmac0 (	// src/hive/scala/main/HiveWorkUnit.scala:817:27
+    .io_a   (_sumMx_quadResult_aQ0_io_out),	// src/hive/scala/main/HiveWorkUnit.scala:775:25
+    .io_b   (_sumMx_quadResult_bQ0_io_out),	// src/hive/scala/main/HiveWorkUnit.scala:796:25
+    .io_c   (io_cReg),
+    .io_rnd (io_rnd),
+    .io_sum (_sumMx_quadResult_qmac0_io_sum)
+  );	// src/hive/scala/main/HiveWorkUnit.scala:817:27
+  Hive_HiveMacFpMx sumMx_quadResult_qmac1 (	// src/hive/scala/main/HiveWorkUnit.scala:822:27
+    .io_a   (_sumMx_quadResult_aQ1_io_out),	// src/hive/scala/main/HiveWorkUnit.scala:780:25
+    .io_b   (_sumMx_quadResult_bQ1_io_out),	// src/hive/scala/main/HiveWorkUnit.scala:801:25
+    .io_c   (_sumMx_quadResult_qmac0_io_sum),	// src/hive/scala/main/HiveWorkUnit.scala:817:27
+    .io_rnd (io_rnd),
+    .io_sum (_sumMx_quadResult_qmac1_io_sum)
+  );	// src/hive/scala/main/HiveWorkUnit.scala:822:27
+  Hive_HiveMacFpMx sumMx_quadResult_qmac2 (	// src/hive/scala/main/HiveWorkUnit.scala:827:27
+    .io_a   (_sumMx_quadResult_aQ2_io_out),	// src/hive/scala/main/HiveWorkUnit.scala:785:25
+    .io_b   (_sumMx_quadResult_bQ2_io_out),	// src/hive/scala/main/HiveWorkUnit.scala:806:25
+    .io_c   (_sumMx_quadResult_qmac1_io_sum),	// src/hive/scala/main/HiveWorkUnit.scala:822:27
+    .io_rnd (io_rnd),
+    .io_sum (_sumMx_quadResult_qmac2_io_sum)
+  );	// src/hive/scala/main/HiveWorkUnit.scala:827:27
+  Hive_HiveMacFpMx sumMx_quadResult_qmac3 (	// src/hive/scala/main/HiveWorkUnit.scala:832:27
+    .io_a   (_sumMx_quadResult_aQ3_io_out),	// src/hive/scala/main/HiveWorkUnit.scala:790:25
+    .io_b   (_sumMx_quadResult_bQ3_io_out),	// src/hive/scala/main/HiveWorkUnit.scala:811:25
+    .io_c   (_sumMx_quadResult_qmac2_io_sum),	// src/hive/scala/main/HiveWorkUnit.scala:827:27
+    .io_rnd (io_rnd),
+    .io_sum (_sumMx_quadResult_qmac3_io_sum)
+  );	// src/hive/scala/main/HiveWorkUnit.scala:832:27
   Hive_HiveCvtOpMx sumMx_aCvtLo (	// src/hive/scala/main/HiveWorkUnit.scala:691:24
     .clock           (clock),
     .reset           (reset),
@@ -63,7 +176,7 @@ module Hive_HiveWorkUnit(	// src/hive/scala/main/HiveWorkUnit.scala:546:7
     .io_rnd (io_rnd),
     .io_sum (_sumMx_macEven_io_sum)
   );	// src/hive/scala/main/HiveWorkUnit.scala:733:27
-  Hive_HiveMacFpMx sumMx_macOdd (	// src/hive/scala/main/HiveWorkUnit.scala:742:26
+  Hive_HiveMacFpMx_4 sumMx_macOdd (	// src/hive/scala/main/HiveWorkUnit.scala:742:26
     .io_a   (_sumMx_aCvtHi_io_out),	// src/hive/scala/main/HiveWorkUnit.scala:696:24
     .io_b   (_sumMx_bCvtHi_io_out),	// src/hive/scala/main/HiveWorkUnit.scala:706:24
     .io_c   (_sumMx_macEven_io_sum),	// src/hive/scala/main/HiveWorkUnit.scala:733:27
@@ -71,6 +184,8 @@ module Hive_HiveWorkUnit(	// src/hive/scala/main/HiveWorkUnit.scala:546:7
     .io_sum (_sumMx_macOdd_io_sum)
   );	// src/hive/scala/main/HiveWorkUnit.scala:742:26
   assign io_sum =
-    io_aFmt == 4'h3 | io_aFmt == 4'h4 | io_aFmt == 4'h5 ? _sumMx_macOdd_io_sum : io_cReg;	// src/hive/scala/main/HiveEnum.scala:9:{42,53,58,69,74}, src/hive/scala/main/HiveWorkUnit.scala:546:7, :742:26, :859:28
+    io_aFmt == 4'h3 | io_aFmt == 4'h4 | _io_sum_T_3
+      ? (_io_sum_T_3 ? _sumMx_quadResult_qmac3_io_sum : _sumMx_macOdd_io_sum)
+      : io_cReg;	// src/hive/scala/main/HiveEnum.scala:9:{42,53,58,69}, :11:43, src/hive/scala/main/HiveWorkUnit.scala:546:7, :742:26, :832:27, :840:10, :859:28
 endmodule
 

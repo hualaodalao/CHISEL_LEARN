@@ -190,9 +190,14 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
         errComb := true.B
         errCodeComb := 5.U
     }
-    when(io.regFile.cFmt === DataFormat.MXE2M1 && io.regFile.n(0) === 1.U){
+    //when(io.regFile.cFmt === DataFormat.MXE2M1 && io.regFile.n(0) === 1.U){
+    //    errComb := true.B
+    //    errCodeComb := 6.U
+    //}
+    //容量不够
+    when(io.regFile.m > (cfg.cBufferDepth - cfg.totalN).U){
         errComb := true.B
-        errCodeComb := 6.U
+        errCodeComb := 7.U
     }
 
     // ==========================================================================
@@ -226,14 +231,22 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //     3 (MX4xMX8 mix) > 8 (fp4 K not divisible) > 6 > 5 > 4
     //       > 3 (isAMx ^ isBMx) > 0
     //   Code 7 is now FREE (see the removal note below).
+    if(cfg.hasMx){
+        when(DataFormat.isMx8(io.regFile.aFmt) &&
+             ((io.regFile.k(15, 0) % (cfg.totalN * 2).U =/= 0.U) ||
+              (io.regFile.k(15, 0) === 0.U))){
+            errComb := true.B
+            errCodeComb := 8.U
+        }
+    }    
     if(cfg.hasMx4){
         when(DataFormat.isMx4(io.regFile.aFmt) &&
-             (io.regFile.k(15, 0) % (cfg.totalN * 4).U =/= 0.U)){
+             ((io.regFile.k(15, 0) % (cfg.totalN * 4).U =/= 0.U) ||
+              (io.regFile.k(15, 0) === 0.U))){
             errComb := true.B
             errCodeComb := 8.U
         }
     }
-
     // ==========================================================================
     // 【Fix-4 errCode 3（MX4×MX8 混配运行期可诊断守护）】aFmt/bFmt 分属 fp4(E2M1) 与
     //   fp8(E4M3/E5M2) 时，HiveWorkUnit 的运行期选择子 Mux(isMx4(io.aFmt), quadResult,

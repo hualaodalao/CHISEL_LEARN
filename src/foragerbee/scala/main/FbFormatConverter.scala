@@ -8,6 +8,11 @@
   *   - FP16↔BF16：经 FP32 中转，纯位操作
   *   - FP32↔INT8：shift-based 量化/反量化（scale 低 5 位作 shift 量）
   *   - INT8↔FP16/BF16：经 FP32 中转
+  *
+  * 格式编码统一引用 [[FbDataFmt]] ChiselEnum（4-bit），本文件不再私藏任何 FMT_* 常量；
+  * 元素位宽同样取自单一真源 [[FbDataFmt.elemBits]]。
+  * 尚未实现算术的格式（INT32/INT16/INT4、MX 族、NONE）一律落入 MuxLookup 的 default
+  * 分支按 FP32 位宽直通（passthrough），不产生错误硬件行为；其转换路径由后续任务补齐。
   */
 
 import chisel3._
@@ -19,29 +24,18 @@ class FbFormatConverter(dataWidth: Int, pipeStages: Int = 1) extends Module {
   val io = IO(new Bundle {
     val in        = Flipped(Decoupled(UInt(dataWidth.W)))
     val out       = Decoupled(UInt(dataWidth.W))
-    val cfg_srcFmt    = Input(UInt(3.W))
-    val cfg_dstFmt    = Input(UInt(3.W))
+    val cfg_srcFmt    = Input(FbDataFmt())
+    val cfg_dstFmt    = Input(FbDataFmt())
     val cfg_scale     = Input(UInt(32.W))
     val cfg_zeroPoint = Input(UInt(32.W))
     val cfg_enable    = Input(Bool())
     val flush         = Input(Bool())
   })
 
-  // --- Format constants (matching FbDataFmt) ---
-  private val FMT_FP32 = 0.U(3.W)
-  private val FMT_FP16 = 1.U(3.W)
-  private val FMT_BF16 = 2.U(3.W)
-  private val FMT_INT8 = 3.U(3.W)
-
   // --- Derived constants ---
   private val maxElems = dataWidth / 8  // max elements per beat (INT8 case)
   private val halfW    = dataWidth / 2
   private val quarterW = dataWidth / 4
-
-  // --- Element bit width from format ---
-  private def elemBitsOf(fmt: UInt): UInt = MuxLookup(fmt, 32.U(6.W))(Seq(
-    FMT_FP32 -> 32.U, FMT_FP16 -> 16.U, FMT_BF16 -> 16.U, FMT_INT8 -> 8.U
-  ))
 
   // --- Effective bypass: disabled OR same-format ---
   private val effectiveBypass = !io.cfg_enable || (io.cfg_srcFmt === io.cfg_dstFmt)
@@ -163,9 +157,9 @@ class FbFormatConverter(dataWidth: Int, pipeStages: Int = 1) extends Module {
   // Main conversion logic: unpack → convert via FP32 intermediate → pack
   // ==========================================================================
 
-  // Determine elements per beat for source format
-  val srcElemBits = elemBitsOf(io.cfg_srcFmt)
-  val dstElemBits = elemBitsOf(io.cfg_dstFmt)
+  // Determine elements per beat for source format（位宽表来自单一真源 FbDataFmt.elemBits）
+  val srcElemBits = FbDataFmt.elemBits(io.cfg_srcFmt)
+  val dstElemBits = FbDataFmt.elemBits(io.cfg_dstFmt)
 
   // Compute conversion ratio (only 1, 2, 4 possible)
   val isCompression = srcElemBits > dstElemBits
@@ -180,6 +174,7 @@ class FbFormatConverter(dataWidth: Int, pipeStages: Int = 1) extends Module {
                   1.U(3.W))))
 
   // --- Step 1: Extract source elements and convert each to FP32 intermediate ---
+  // default = raw32（未实现的源格式按 FP32 原样直通）
   val fp32Vec = Wire(Vec(maxElems, UInt(32.W)))
   for (i <- 0 until maxElems) {
     val raw32 = if (i < dataWidth / 32) io.in.bits((i + 1) * 32 - 1, i * 32) else 0.U(32.W)
@@ -187,21 +182,22 @@ class FbFormatConverter(dataWidth: Int, pipeStages: Int = 1) extends Module {
     val raw8  = io.in.bits((i + 1) * 8 - 1, i * 8)
 
     fp32Vec(i) := MuxLookup(io.cfg_srcFmt, raw32)(Seq(
-      FMT_FP32 -> raw32,
-      FMT_FP16 -> fp16ToFp32(raw16),
-      FMT_BF16 -> bf16ToFp32(raw16),
-      FMT_INT8 -> int8ToFp32(raw8, io.cfg_scale, io.cfg_zeroPoint)
+      FbDataFmt.FP32 -> raw32,
+      FbDataFmt.FP16 -> fp16ToFp32(raw16),
+      FbDataFmt.BF16 -> bf16ToFp32(raw16),
+      FbDataFmt.INT8 -> int8ToFp32(raw8, io.cfg_scale, io.cfg_zeroPoint)
     ))
   }
 
   // --- Step 2: Convert each FP32 intermediate to destination format ---
+  // default = fp32Vec(i)（未实现的目标格式按 FP32 原样直通）
   val dstVec = Wire(Vec(maxElems, UInt(32.W)))
   for (i <- 0 until maxElems) {
     dstVec(i) := MuxLookup(io.cfg_dstFmt, fp32Vec(i))(Seq(
-      FMT_FP32 -> fp32Vec(i),
-      FMT_FP16 -> fp32ToFp16(fp32Vec(i)).pad(32),
-      FMT_BF16 -> fp32ToBf16(fp32Vec(i)).pad(32),
-      FMT_INT8 -> fp32ToInt8(fp32Vec(i), io.cfg_scale, io.cfg_zeroPoint).pad(32)
+      FbDataFmt.FP32 -> fp32Vec(i),
+      FbDataFmt.FP16 -> fp32ToFp16(fp32Vec(i)).pad(32),
+      FbDataFmt.BF16 -> fp32ToBf16(fp32Vec(i)).pad(32),
+      FbDataFmt.INT8 -> fp32ToInt8(fp32Vec(i), io.cfg_scale, io.cfg_zeroPoint).pad(32)
     ))
   }
 
@@ -214,13 +210,14 @@ class FbFormatConverter(dataWidth: Int, pipeStages: Int = 1) extends Module {
   // Select packed data based on dst format
   // Width of valid data per input beat = srcElemsPerBeat * dstElemBits
   // For expansion: valid > dataWidth; for compression: valid < dataWidth
+  // default = packedAt32（未实现的目标格式按 32-bit 粒度打包直通）
   private val maxExpandBits = maxElems * 32 // 512 for dataWidth=128
   val convertedWide = Wire(UInt(maxExpandBits.W))
   convertedWide := MuxLookup(io.cfg_dstFmt, packedAt32)(Seq(
-    FMT_FP32 -> packedAt32,
-    FMT_FP16 -> packedAt16.pad(maxExpandBits),
-    FMT_BF16 -> packedAt16.pad(maxExpandBits),
-    FMT_INT8 -> packedAt8.pad(maxExpandBits)
+    FbDataFmt.FP32 -> packedAt32,
+    FbDataFmt.FP16 -> packedAt16.pad(maxExpandBits),
+    FbDataFmt.BF16 -> packedAt16.pad(maxExpandBits),
+    FbDataFmt.INT8 -> packedAt8.pad(maxExpandBits)
   ))
 
   // ==========================================================================
