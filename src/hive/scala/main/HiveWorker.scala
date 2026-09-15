@@ -8,7 +8,7 @@
   * @param aW            激活位宽（默认 16）
   * @param bW            权重位宽（默认 16）
   * @param cW            累加器/部分和位宽（默认 48）
-  * @param supportedFmts 本 HiveWorker 支持的数据格式集合（默认全部四种）。
+  * @param supportedFmts 本 HiveWorker 支持的数据格式集合（默认 {INT8,INT4,MXE4M3,MXE5M2,MXE2M1}）。
   *                      仅为支持的格式生成 MAC 硬件；运行时 fmtReg 不在 supportedFmts 中则
   *                      不执行累加，psumReg 保持。
   *
@@ -61,13 +61,14 @@ class HiveWorker(
   aW: Int = 16,
   bW: Int = 16,
   cW: Int = 48,
-  supportedFmts: Set[DataFormat.Type] = Set(DataFormat.FP16, DataFormat.BF16, DataFormat.INT16, DataFormat.INT8)
+  supportedFmts: Set[DataFormat.Type] = Set(DataFormat.INT8, DataFormat.INT4, DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1)
 ) extends Module {
   val aEffW: Int = math.max(aW, bW)
   val cEffW: Int = math.max(cW, bW)
 
   private val hasFp  = supportedFmts.exists(f => f == DataFormat.FP16 || f == DataFormat.BF16)
-  private val hasInt = supportedFmts.exists(f => f == DataFormat.INT8  || f == DataFormat.INT16)
+  // 【Phase 3 INT 生态同步】整数族收敛为 {INT8, INT4}（INT16 已弃用），与 HiveCoreConfig.hasInt 同口径。
+  private val hasInt = supportedFmts.exists(f => f == DataFormat.INT8  || f == DataFormat.INT4)
 
   // 【破坏性变更留痕（C 写回重构本轮引入，与 HiveComb 同源）】含 FP 族直接例化须显式
   // cW>=40，否则构造期失败。顶层经 HiveComb → HiveWorker 链传 cfg.cEffW 规避。

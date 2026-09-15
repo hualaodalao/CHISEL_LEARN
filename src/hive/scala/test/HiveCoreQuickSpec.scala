@@ -119,7 +119,8 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
     *   MXE2M1 现在是默认必选，不再需要显式加。
     *   历史：#150 曾把它显式写成「默认 6 种 + MXE2M1」，因为当时默认集不含 MXE2M1、
     *   hasMx4=false，fp4 硬件（quad-lane unpack、4x sigW=2 HiveMacFpMx、HiveCvtOpMx 的
-    *   isMx4 臂、bits-based colTileAddressOffset、errCode8、mix errCode3、kTiles=K/64）
+    *   isMx4 臂——HiveMacFpMx/HiveCvtOpMx 均为原 HiveWorkUnit.scala 子模块、已随 FusionMac
+    *   重构删除；bits-based colTileAddressOffset、errCode8、mix errCode3、kTiles=K/64）
     *   在本 DUT 里【根本不存在】，用户手改的 fp4 主用例会被 HiveDebugModel 的 Fix-9
     *   cfg-aware require 拦下。本轮 MXE2M1 升格为默认必选后，那段显式传参与默认集
     *   【逐元素相同】，继续显式写等于维护一份会漂移的副本，故删除。
@@ -136,7 +137,8 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
     *   - hasFp 掉假会删掉整条浮点通路，HiveWorkUnit 的 baseSel 退化为 (false,false) => io.cReg，
     *     FP16 主用例会【静默】输出累加器输入而非乘加结果（不报错）。上方类头那句
     *     「默认 M=N=K=32 FP16->FP16 逐位匹配 1024/1024」是用户每天要用的旋钮。
-    *   - c1Merge = hasFp && hasMx 掉假会让共享的 macShared:HiveMacFp 消失，fp8 dual-lane
+    *   - c1Merge = hasFp && hasMx 掉假会让共享的 macShared:HiveMacFp（原 HiveWorkUnit.scala
+    *     子模块，已随 FusionMac 重构删除）消失，fp8 dual-lane
     *     MAC 结构随之改变，「对 fp8 additive / 数值恒等」的说法即告失效。
     *   故本 cfg 绝不改用 HiveCoreElaborate.cfgMxFp4 那种 MX-only 三格式集。
     * 【(#66) 订正：上方这段论证的【前提已被现实推翻】，原文按仓库惯例保留不删，但结论不再适用】

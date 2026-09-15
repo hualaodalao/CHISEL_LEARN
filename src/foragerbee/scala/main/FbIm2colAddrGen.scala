@@ -19,7 +19,11 @@ class FbIm2colAddrGen(addressWidth: Int) extends Module {
     val start        = Input(Bool())                   // 开始脉冲（一拍有效）
     val srcBase      = Input(UInt(addressWidth.W))
     val dstBase      = Input(UInt(addressWidth.W))
-    val elemBytesLog2 = Input(UInt(2.W))
+    // 读/写侧元素粒度分离（M2）：srcAddr 按源格式推进、dstAddr/dstOffset 按目的格式推进，
+    // 使格式转换（srcFmt≠dstFmt）时源/目的地址步进各自自洽。INT4 亚字节已被引擎校验拒于
+    // IM2COL 路径外，故两侧 ebLog2 恒为字节粒度。
+    val srcElemBytesLog2 = Input(UInt(2.W))
+    val dstElemBytesLog2 = Input(UInt(2.W))
     val kernel       = Input(Vec(2, UInt(8.W)))        // (kH, kW)
     val stride       = Input(Vec(2, UInt(8.W)))        // (sH, sW)
     val pad          = Input(Vec(2, UInt(8.W)))        // (pH, pW)
@@ -53,7 +57,8 @@ class FbIm2colAddrGen(addressWidth: Int) extends Module {
   val W    = RegInit(0.U(16.W))
   val outH = RegInit(0.U(16.W))
   val outW = RegInit(0.U(16.W))
-  val elemBytes = RegInit(0.U(4.W))
+  val srcElemBytes = RegInit(0.U(4.W))
+  val dstElemBytes = RegInit(0.U(4.W))
 
   val srcBaseReg = RegInit(0.U(addressWidth.W))
   val dstBaseReg = RegInit(0.U(addressWidth.W))
@@ -90,7 +95,8 @@ class FbIm2colAddrGen(addressWidth: Int) extends Module {
     C  := io.inShape(0)
     H  := io.inShape(1)
     W  := io.inShape(2)
-    elemBytes := 1.U(4.W) << io.elemBytesLog2
+    srcElemBytes := 1.U(4.W) << io.srcElemBytesLog2
+    dstElemBytes := 1.U(4.W) << io.dstElemBytesLog2
     srcBaseReg := io.srcBase
     dstBaseReg := io.dstBase
 
@@ -153,8 +159,8 @@ class FbIm2colAddrGen(addressWidth: Int) extends Module {
       cntKh := cntKh + 1.U
     }
 
-    // dstOffset 线性递增
-    dstOffset := dstOffset + kW * elemBytes
+    // dstOffset 线性递增（按目的格式粒度，M2）
+    dstOffset := dstOffset + kW * dstElemBytes
   }
 
   // ==========================================================================
@@ -185,7 +191,7 @@ class FbIm2colAddrGen(addressWidth: Int) extends Module {
   val flatIdx = (cntC.pad(addressWidth) * H.pad(addressWidth) * W.pad(addressWidth)) +
                 (ihVal(15, 0).pad(addressWidth) * W.pad(addressWidth)) +
                 iwVal(15, 0).pad(addressWidth)
-  io.srcAddr := srcBaseReg + flatIdx * elemBytes.pad(addressWidth)
+  io.srcAddr := srcBaseReg + flatIdx * srcElemBytes.pad(addressWidth)
 
   // 目的地址（线性递增）
   io.dstAddr := dstBaseReg + dstOffset

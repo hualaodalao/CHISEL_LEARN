@@ -28,7 +28,8 @@
   *   [38:31] : exponent（8-bit，biased-127，不做规格化）
   *   [30:0]  : mantissa（31-bit，可能有 leading zeros — 延迟规格化核心，省 LZC 面积）
   *
-  * 累加逻辑逐字复制自 HiveMacLazyDownstream / HiveMacFp 的下游部分：
+  * 累加逻辑逐字复制自原 HiveWorkUnit.scala 中 HiveMacLazyDownstream / HiveMacFp 的下游部分
+  * （二者已随 FusionMac 重构删除，此处为其唯一现存真源）：
   *   解包 cIn → 解包 prod32 → 指数对齐（桶形移位）→ 加减 → 上溢处理 → 零值旁路 → 输出。
   * 不做 LZC（规格化推迟到 fpNormalize40to32），故减法后 mantissa 可能有前导零。
   */
@@ -52,7 +53,7 @@ class FpAdd(cEffW: Int = 40) extends Module {
 
   // =========================================================================
   // 私有 lazyAdd：将 fp32 乘积累加到 lazy-40 累加器上
-  // 逻辑精确复制自 HiveMacLazyDownstream.apply（HiveWorkUnit.scala L370-441）
+  // 逻辑精确复制自原 HiveWorkUnit.scala 中 HiveMacLazyDownstream.apply（原 L370-441，已随 FusionMac 重构删除）
   // P4 面积优化：共享对齐移位器（−1×31-bit 桶形移位/实例）+ 合并加减法器（−1×31-bit 减法/实例）
   // P5 面积优化：删除 pZero/cZero 两个 40-bit 旁路 mux（−2×40-bit 3:1 mux/实例），
   //    改用 pMant31 AND-mask 归零（31×AND2 ≈ 32GE）使常规路径自然产生等价结果。

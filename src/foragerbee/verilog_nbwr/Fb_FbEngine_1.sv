@@ -127,8 +127,8 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
   output         io_busy	// src/foragerbee/scala/main/FbEngine.scala:47:14
 );
 
-  wire             io_bus_wr_valid_0;	// src/foragerbee/scala/main/FbEngine.scala:1259:26, :1396:25, :1406:43
-  wire             io_bus_wr_payload_eof_0;	// src/foragerbee/scala/main/FbEngine.scala:1259:26, :1396:25, :1406:43
+  wire             io_bus_wr_valid_0;	// src/foragerbee/scala/main/FbEngine.scala:1307:26, :1460:25, :1470:43
+  wire             io_bus_wr_payload_eof_0;	// src/foragerbee/scala/main/FbEngine.scala:1307:26, :1460:25, :1470:43
   wire             _sgCtrl_io_fetchRd_valid;	// src/foragerbee/scala/main/FbEngine.scala:156:44
   wire [31:0]      _sgCtrl_io_fetchRd_payload_addr;	// src/foragerbee/scala/main/FbEngine.scala:156:44
   wire             _sgCtrl_io_fetchRdData_ready;	// src/foragerbee/scala/main/FbEngine.scala:156:44
@@ -211,7 +211,7 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
           ? 6'h8
           : cmdReg_srcFmt == 4'h9 | cmdReg_srcFmt == 4'h2 | cmdReg_srcFmt == 4'h1
               ? 6'h10
-              : 6'h20;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :76:19, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66
+              : 6'h20;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :76:19, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66
   wire [5:0]       dstBits =
     cmdReg_dstFmt == 4'hA
       ? 6'h4
@@ -219,7 +219,7 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
           ? 6'h8
           : cmdReg_dstFmt == 4'h9 | cmdReg_dstFmt == 4'h2 | cmdReg_dstFmt == 4'h1
               ? 6'h10
-              : 6'h20;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :76:19, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66
+              : 6'h20;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :76:19, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66
   wire [22:0]      _srcRowBytes_T_20 =
     {1'h0,
      {6'h0, cmdReg_shape_0}
@@ -230,19 +230,19 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
                 ? 6'h8
                 : cmdReg_srcFmt == 4'h9 | cmdReg_srcFmt == 4'h2 | cmdReg_srcFmt == 4'h1
                     ? 6'h10
-                    : 6'h20}} + 23'h7;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :76:19, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :251:{14,36}
+                    : 6'h20}} + 23'h7;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :76:19, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :255:{14,36}
   reg  [15:0]      outerIdx_1;	// src/foragerbee/scala/main/FbEngine.scala:88:25
   reg  [15:0]      outerIdx_2;	// src/foragerbee/scala/main/FbEngine.scala:88:25
   reg  [15:0]      outerIdx_3;	// src/foragerbee/scala/main/FbEngine.scala:88:25
   reg  [15:0]      outerIdx_4;	// src/foragerbee/scala/main/FbEngine.scala:88:25
   reg  [19:0]      beatInRow;	// src/foragerbee/scala/main/FbEngine.scala:89:26
   wire             cvtActive = cmdReg_srcFmt != cmdReg_dstFmt;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :93:68
-  wire             cvtCompress = srcBits > dstBits;	// src/foragerbee/scala/main/FbEngine.scala:98:63, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66
+  wire             cvtCompress = srcBits > dstBits;	// src/foragerbee/scala/main/FbEngine.scala:98:63, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66
   wire [1:0]       cvtShift =
     srcBits[5:2] == 4'h8 & dstBits[5:2] == 4'h2 | srcBits[5:2] == 4'h2
     & dstBits[5:2] == 4'h8
       ? 2'h2
-      : {1'h0, srcBits != dstBits};	// src/foragerbee/scala/main/FbEngine.scala:100:{8,18,27,38,47,59,67,78}, :101:{8,17}, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :242:65
+      : {1'h0, srcBits != dstBits};	// src/foragerbee/scala/main/FbEngine.scala:100:{8,18,27,38,47,59,67,78}, :101:{8,17}, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :246:65
   reg  [19:0]      wBeatInRow;	// src/foragerbee/scala/main/FbEngine.scala:104:53
   reg  [2:0]       wrInFlight;	// src/foragerbee/scala/main/FbEngine.scala:115:37
   reg              arIssued;	// src/foragerbee/scala/main/FbEngine.scala:118:25
@@ -334,10 +334,10 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
     {32'h0, outerIdx_3} * {16'h0, cmdReg_dstStride_3};	// src/foragerbee/scala/main/FbEngine.scala:76:19, :88:25, :252:32
   wire [47:0]      _scaleRowAddr_contributions_T_3 =
     {32'h0, outerIdx_4} * {16'h0, cmdReg_dstStride_4};	// src/foragerbee/scala/main/FbEngine.scala:76:19, :88:25, :252:32
-  wire             _nbWrEofFire_T = io_bus_wr_valid_0 & io_bus_wr_ready;	// src/foragerbee/scala/main/FbEngine.scala:1259:26, :1396:25, :1406:43, src/utils/Stream/Stream.scala:43:26
+  wire             _nbWrEofFire_T = io_bus_wr_valid_0 & io_bus_wr_ready;	// src/foragerbee/scala/main/FbEngine.scala:1307:26, :1460:25, :1470:43, src/utils/Stream/Stream.scala:43:26
   wire             _GEN_1 = cmdReg_scaleBlockSize == 2'h1 | (|cmdReg_scaleBlockSize);	// src/foragerbee/scala/main/FbEngine.scala:76:19, :394:70
-  wire             _seg_mxBlockSizeReg_T_4 = cmdReg_scaleBlockSize == 2'h2;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :394:70, src/foragerbee/scala/main/ForagerBeeConfig.scala:242:65
-  wire             io_cmdIn_ready_0 = state == 4'h0;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :576:27
+  wire             _seg_mxBlockSizeReg_T_4 = cmdReg_scaleBlockSize == 2'h2;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :394:70, src/foragerbee/scala/main/ForagerBeeConfig.scala:246:65
+  wire             io_cmdIn_ready_0 = state == 4'h0;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :618:27
   wire [22:0]      _srcDim0Offset_T_20 =
     {1'h0,
      {6'h0, cmdReg_srcStartIdx_0}
@@ -348,11 +348,11 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
                 ? 6'h8
                 : cmdReg_srcFmt == 4'h9 | cmdReg_srcFmt == 4'h2 | cmdReg_srcFmt == 4'h1
                     ? 6'h10
-                    : 6'h20}} + 23'h7;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :76:19, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :251:{14,36}
-  wire [31:0]      _GEN_2 = {16'h0, outerIdx_1 + cmdReg_srcStartIdx_1};	// src/foragerbee/scala/main/FbEngine.scala:76:19, :88:25, :218:17, :669:30
-  wire [31:0]      _GEN_3 = {16'h0, outerIdx_2 + cmdReg_srcStartIdx_2};	// src/foragerbee/scala/main/FbEngine.scala:76:19, :88:25, :218:17, :669:30
-  wire [31:0]      _GEN_4 = {16'h0, outerIdx_3 + cmdReg_srcStartIdx_3};	// src/foragerbee/scala/main/FbEngine.scala:76:19, :88:25, :218:17, :669:30
-  wire [31:0]      _GEN_5 = {16'h0, outerIdx_4 + cmdReg_srcStartIdx_4};	// src/foragerbee/scala/main/FbEngine.scala:76:19, :88:25, :218:17, :669:30
+                    : 6'h20}} + 23'h7;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :76:19, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :255:{14,36}
+  wire [31:0]      _GEN_2 = {16'h0, outerIdx_1 + cmdReg_srcStartIdx_1};	// src/foragerbee/scala/main/FbEngine.scala:76:19, :88:25, :218:17, :711:30
+  wire [31:0]      _GEN_3 = {16'h0, outerIdx_2 + cmdReg_srcStartIdx_2};	// src/foragerbee/scala/main/FbEngine.scala:76:19, :88:25, :218:17, :711:30
+  wire [31:0]      _GEN_4 = {16'h0, outerIdx_3 + cmdReg_srcStartIdx_3};	// src/foragerbee/scala/main/FbEngine.scala:76:19, :88:25, :218:17, :711:30
+  wire [31:0]      _GEN_5 = {16'h0, outerIdx_4 + cmdReg_srcStartIdx_4};	// src/foragerbee/scala/main/FbEngine.scala:76:19, :88:25, :218:17, :711:30
   wire [7:0][31:0] _GEN_6 =
     {{cmdReg_srcStride_0},
      {cmdReg_srcStride_0},
@@ -365,20 +365,20 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
   wire [31:0]      _GEN_7 =
     _scaleRowAddr_contributions_T_3[31:0] + _scaleRowAddr_contributions_T_2[31:0]
     + _scaleRowAddr_contributions_T_1[31:0] + {16'h0, outerIdx_1} * cmdReg_dstStride_1;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :88:25, :218:{17,25}, :220:30, :252:32
-  wire [31:0]      _GEN_8 = {16'h0, virtualRow} * cmdReg_dstStride_1 + cmdReg_dstAddr;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :182:27, :226:14, :682:50, :683:{17,43}
-  wire             _zDim0PadAfterOff_T_1 = cmdReg_dstFmt == 4'hA;	// src/foragerbee/scala/main/FbEngine.scala:76:19, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :237:11
-  wire [19:0]      _GEN_9 = {5'h0, _srcRowBytes_T_20[22:8]};	// src/foragerbee/scala/main/FbEngine.scala:90:33, :698:28, src/foragerbee/scala/main/ForagerBeeConfig.scala:251:{36,44}
-  wire [19:0]      _remRow_T = _GEN_9 - beatInRow;	// src/foragerbee/scala/main/FbEngine.scala:89:26, :698:28
-  wire [19:0]      _seg_raw_T_1 = _remRow_T < 20'h40 ? _remRow_T : 20'h40;	// src/foragerbee/scala/main/FbEngine.scala:698:28, :700:25
-  wire [19:0]      _GEN_10 = {13'h0, queueCredit};	// src/foragerbee/scala/main/FbEngine.scala:135:28, :700:48
-  wire [19:0]      seg_raw = _seg_raw_T_1 < _GEN_10 ? _seg_raw_T_1 : _GEN_10;	// src/foragerbee/scala/main/FbEngine.scala:700:{25,48}
-  wire [19:0]      _GEN_11 = {13'h0, 7'h40 >> cvtShift};	// src/foragerbee/scala/main/FbEngine.scala:100:8, :135:28, :704:{29,48}
+  wire [31:0]      _GEN_8 = {16'h0, virtualRow} * cmdReg_dstStride_1 + cmdReg_dstAddr;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :182:27, :226:14, :724:50, :725:{17,43}
+  wire             _zDim0PadAfterOff_T_1 = cmdReg_dstFmt == 4'hA;	// src/foragerbee/scala/main/FbEngine.scala:76:19, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :241:11
+  wire [19:0]      _GEN_9 = {5'h0, _srcRowBytes_T_20[22:8]};	// src/foragerbee/scala/main/FbEngine.scala:90:33, :740:28, src/foragerbee/scala/main/ForagerBeeConfig.scala:255:{36,44}
+  wire [19:0]      _remRow_T = _GEN_9 - beatInRow;	// src/foragerbee/scala/main/FbEngine.scala:89:26, :740:28
+  wire [19:0]      _seg_raw_T_1 = _remRow_T < 20'h40 ? _remRow_T : 20'h40;	// src/foragerbee/scala/main/FbEngine.scala:740:28, :742:25
+  wire [19:0]      _GEN_10 = {13'h0, queueCredit};	// src/foragerbee/scala/main/FbEngine.scala:135:28, :742:48
+  wire [19:0]      seg_raw = _seg_raw_T_1 < _GEN_10 ? _seg_raw_T_1 : _GEN_10;	// src/foragerbee/scala/main/FbEngine.scala:742:{25,48}
+  wire [19:0]      _GEN_11 = {13'h0, 7'h40 >> cvtShift};	// src/foragerbee/scala/main/FbEngine.scala:100:8, :135:28, :746:{29,48}
   wire [22:0]      seg_cvtAligned =
     _i2cDstSegBeats_T
       ? {3'h0, seg_raw}
       : cvtCompress
           ? {3'h0, seg_raw >> _GEN} << _GEN_0
-          : {3'h0, dstBits <= srcBits | seg_raw < _GEN_11 ? seg_raw : _GEN_11};	// src/foragerbee/scala/main/FbEngine.scala:93:68, :97:61, :98:63, :141:9, :142:{33,55}, :700:48, :702:25, :703:{10,29,42}, :704:{10,29}, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66
+          : {3'h0, dstBits <= srcBits | seg_raw < _GEN_11 ? seg_raw : _GEN_11};	// src/foragerbee/scala/main/FbEngine.scala:93:68, :97:61, :98:63, :141:9, :142:{33,55}, :742:48, :744:25, :745:{10,29,42}, :746:{10,29}, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66
   wire [13:0]      _seg_mxBlockBeatsRaw_T_20 =
     {1'h0,
      {6'h0, _seg_mxBlockSizeReg_T_4 ? 7'h40 : _GEN_1 ? 7'h20 : 7'h10}
@@ -389,31 +389,31 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
                 ? 6'h8
                 : cmdReg_srcFmt == 4'h9 | cmdReg_srcFmt == 4'h2 | cmdReg_srcFmt == 4'h1
                     ? 6'h10
-                    : 6'h20}} + 14'h7;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :76:19, :135:28, :394:70, :707:69, :915:37, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :251:{14,36}
+                    : 6'h20}} + 14'h7;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :76:19, :135:28, :394:70, :749:69, :957:37, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :255:{14,36}
   wire [5:0]       seg_mxBlockBeats =
-    _seg_mxBlockBeatsRaw_T_20[13:8] == 6'h0 ? 6'h1 : _seg_mxBlockBeatsRaw_T_20[13:8];	// src/foragerbee/scala/main/FbEngine.scala:40:7, :709:77, :710:{27,44}, src/foragerbee/scala/main/ForagerBeeConfig.scala:251:{36,44}
-  wire [22:0]      _GEN_12 = {12'h0, seg_mxBlockBeats, 5'h0};	// src/foragerbee/scala/main/FbEngine.scala:710:27, :714:36
+    _seg_mxBlockBeatsRaw_T_20[13:8] == 6'h0 ? 6'h1 : _seg_mxBlockBeatsRaw_T_20[13:8];	// src/foragerbee/scala/main/FbEngine.scala:40:7, :751:77, :752:{27,44}, src/foragerbee/scala/main/ForagerBeeConfig.scala:255:{36,44}
+  wire [22:0]      _GEN_12 = {12'h0, seg_mxBlockBeats, 5'h0};	// src/foragerbee/scala/main/FbEngine.scala:752:27, :756:36
   wire [28:0]      seg =
     mxQuantActive
       ? {6'h0,
          (seg_cvtAligned < _GEN_12 ? seg_cvtAligned : _GEN_12)
            / {17'h0, seg_mxBlockBeats}} * {23'h0, seg_mxBlockBeats}
-      : {6'h0, seg_cvtAligned};	// src/foragerbee/scala/main/FbEngine.scala:40:7, :196:66, :702:25, :710:27, :714:{36,47,63}, :715:8
-  wire             _GEN_13 = state == 4'h1;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :736:14, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66
-  wire             _GEN_14 = state == 4'h2;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :768:14
-  wire             mxQuantizer_io_outScale_ready = _GEN_14 & mxQuantActive;	// src/foragerbee/scala/main/FbEngine.scala:196:66, :390:25, :768:{14,26}, :770:27
-  wire             _GEN_15 = cmdReg_srcFmt == cmdReg_dstFmt;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :93:68, :374:19, :790:29, :793:26
-  wire             _GEN_16 = mxQuantActive | _GEN_15;	// src/foragerbee/scala/main/FbEngine.scala:93:68, :196:66, :374:19, :770:27, :790:29, :793:26
-  wire             _GEN_17 = ~awIssued & wrInFlight[2];	// src/foragerbee/scala/main/FbEngine.scala:115:37, :120:25, :820:30, :832:{22,36}
-  wire             _GEN_18 = _nbWrEofFire_T & io_bus_wr_payload_eof_0;	// src/foragerbee/scala/main/FbEngine.scala:844:27, :1259:26, :1396:25, :1406:43, src/utils/Stream/Stream.scala:43:26
+      : {6'h0, seg_cvtAligned};	// src/foragerbee/scala/main/FbEngine.scala:40:7, :196:66, :744:25, :752:27, :756:{36,47,63}, :757:8
+  wire             _GEN_13 = state == 4'h1;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :778:14, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66
+  wire             _GEN_14 = state == 4'h2;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :810:14
+  wire             mxQuantizer_io_outScale_ready = _GEN_14 & mxQuantActive;	// src/foragerbee/scala/main/FbEngine.scala:196:66, :390:25, :810:{14,26}, :812:27
+  wire             _GEN_15 = cmdReg_srcFmt == cmdReg_dstFmt;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :93:68, :374:19, :832:29, :835:26
+  wire             _GEN_16 = mxQuantActive | _GEN_15;	// src/foragerbee/scala/main/FbEngine.scala:93:68, :196:66, :374:19, :812:27, :832:29, :835:26
+  wire             _GEN_17 = ~awIssued & wrInFlight[2];	// src/foragerbee/scala/main/FbEngine.scala:115:37, :120:25, :862:30, :874:{22,36}
+  wire             _GEN_18 = _nbWrEofFire_T & io_bus_wr_payload_eof_0;	// src/foragerbee/scala/main/FbEngine.scala:886:27, :1307:26, :1460:25, :1470:43, src/utils/Stream/Stream.scala:43:26
   wire [16:0]      _GEN_19 = {1'h0, cmdReg_padBefore_1};	// src/foragerbee/scala/main/FbEngine.scala:76:19, :318:40
   wire [16:0]      _GEN_20 = {1'h0, cmdReg_shape_1};	// src/foragerbee/scala/main/FbEngine.scala:76:19, :318:40
-  wire             _GEN_21 = state == 4'h9;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :909:14, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66
-  wire [20:0]      byteInRow = {1'h0, mxScaleByteCur} + {15'h0, mxScaleWrByte};	// src/foragerbee/scala/main/FbEngine.scala:199:34, :200:34, :638:29, :912:36
-  wire [5:0]       _remAccum_T = mxScaleAccumCount - mxScaleWrByte;	// src/foragerbee/scala/main/FbEngine.scala:198:34, :200:34, :914:38
-  wire [5:0]       _cnt_T_3 = 6'h20 - {1'h0, byteInRow[4:0]};	// src/foragerbee/scala/main/FbEngine.scala:40:7, :912:36, :913:28, :915:37
-  wire [5:0]       cnt = _remAccum_T >= _cnt_T_3 ? _cnt_T_3 : _remAccum_T;	// src/foragerbee/scala/main/FbEngine.scala:914:38, :915:{18,28,37}
-  wire [125:0]     _sStrb_T_3 = {31'h0, (95'h1 << cnt) - 95'h1} << byteInRow[4:0];	// src/foragerbee/scala/main/FbEngine.scala:226:14, :682:50, :683:{43,51}, :684:69, :912:36, :913:28, :915:18, :919:{31,39,46}
+  wire             _GEN_21 = state == 4'h9;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :951:14, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66
+  wire [20:0]      byteInRow = {1'h0, mxScaleByteCur} + {15'h0, mxScaleWrByte};	// src/foragerbee/scala/main/FbEngine.scala:199:34, :200:34, :680:29, :954:36
+  wire [5:0]       _remAccum_T = mxScaleAccumCount - mxScaleWrByte;	// src/foragerbee/scala/main/FbEngine.scala:198:34, :200:34, :956:38
+  wire [5:0]       _cnt_T_3 = 6'h20 - {1'h0, byteInRow[4:0]};	// src/foragerbee/scala/main/FbEngine.scala:40:7, :954:36, :955:28, :957:37
+  wire [5:0]       cnt = _remAccum_T >= _cnt_T_3 ? _cnt_T_3 : _remAccum_T;	// src/foragerbee/scala/main/FbEngine.scala:956:38, :957:{18,28,37}
+  wire [125:0]     _sStrb_T_3 = {31'h0, (95'h1 << cnt) - 95'h1} << byteInRow[4:0];	// src/foragerbee/scala/main/FbEngine.scala:226:14, :724:50, :725:{43,51}, :726:69, :954:36, :955:28, :957:18, :961:{31,39,46}
   wire [255:0]     _GEN_22 =
     _GEN_21
       ? {mxScaleAccum_31,
@@ -450,25 +450,27 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
          mxScaleAccum_0} >> {247'h0, mxScaleWrByte, 3'h0}
       : mxQuantActive
           ? _mxQuantizer_io_outData_bits
-          : _GEN_15 ? _dataQueue_io_deq_bits : _converter_io_out_bits;	// src/foragerbee/scala/main/FbEngine.scala:93:68, :130:25, :138:56, :146:58, :196:66, :197:34, :200:34, :374:19, :768:26, :770:27, :778:32, :790:29, :793:26, :798:32, :806:32, :909:{14,27}, :927:{28,44,51}
-  wire             _GEN_23 = state == 4'h6;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :640:17, :984:14
-  wire [16:0]      _nextIsDim1Pad_T_10 = _GEN_19 + _GEN_20;	// src/foragerbee/scala/main/FbEngine.scala:318:40, :987:42
+          : _GEN_15 ? _dataQueue_io_deq_bits : _converter_io_out_bits;	// src/foragerbee/scala/main/FbEngine.scala:93:68, :130:25, :138:56, :146:58, :196:66, :197:34, :200:34, :374:19, :810:26, :812:27, :820:32, :832:29, :835:26, :840:32, :848:32, :951:{14,27}, :969:{28,44,51}
+  wire             _GEN_23 = state == 4'h6;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :682:17, :1026:14
+  wire [16:0]      _nextIsDim1Pad_T_10 = _GEN_19 + _GEN_20;	// src/foragerbee/scala/main/FbEngine.scala:318:40, :1029:42
   wire             isDim1PadRow =
-    virtualRow < cmdReg_padBefore_1 | {1'h0, virtualRow} >= _nextIsDim1Pad_T_10;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :182:27, :292:29, :986:{35,57}, :987:{18,42}
-  wire             _zBaseOff_T = zPhase == 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:187:23, :992:18
+    virtualRow < cmdReg_padBefore_1 | {1'h0, virtualRow} >= _nextIsDim1Pad_T_10;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :182:27, :292:29, :1028:{35,57}, :1029:{18,42}
+  wire             _zBaseOff_T = zPhase == 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:187:23, :1034:18
   wire [19:0]      zPhaseTotalBeats =
     isDim1PadRow
       ? {5'h0, outColBytes[19:5]}
-      : _zBaseOff_T ? padBeforeBytes0 : padAfterBytes0;	// src/foragerbee/scala/main/FbEngine.scala:184:28, :185:32, :186:31, :986:57, :990:31, :991:19, :992:{10,18}
-  wire [19:0]      _zRemBeats_T = zPhaseTotalBeats - zBeatInRow;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :990:31, :995:38
-  wire [19:0]      zSeg = _zRemBeats_T < 20'h40 ? _zRemBeats_T : 20'h40;	// src/foragerbee/scala/main/FbEngine.scala:700:25, :995:38, :1007:29
-  wire             _GEN_24 = _GEN_23 ? ~zawIssued : _GEN_21 | ~awIssued;	// src/foragerbee/scala/main/FbEngine.scala:120:25, :191:26, :768:26, :820:30, :909:{14,27}, :923:27, :984:{14,27}, :1011:{27,30}
+      : _zBaseOff_T ? padBeforeBytes0 : padAfterBytes0;	// src/foragerbee/scala/main/FbEngine.scala:184:28, :185:32, :186:31, :1028:57, :1032:31, :1033:19, :1034:{10,18}
+  wire [19:0]      _zRemBeats_T = zPhaseTotalBeats - zBeatInRow;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :1032:31, :1037:38
+  wire [19:0]      zSeg = _zRemBeats_T < 20'h40 ? _zRemBeats_T : 20'h40;	// src/foragerbee/scala/main/FbEngine.scala:742:25, :1037:38, :1049:29
+  wire             _GEN_24 = _GEN_23 ? ~zawIssued : _GEN_21 | ~awIssued;	// src/foragerbee/scala/main/FbEngine.scala:120:25, :191:26, :810:26, :862:30, :951:{14,27}, :965:27, :1026:{14,27}, :1053:{27,30}
   wire             _GEN_25 =
-    _GEN_23 ? (zawIssued ? zRemain == 20'h1 : zSeg == 20'h1) : _GEN_21 | wRemain == 20'h1;	// src/foragerbee/scala/main/FbEngine.scala:121:24, :189:24, :191:26, :752:20, :768:26, :821:38, :909:{14,27}, :924:27, :984:{14,27}, :1007:29, :1012:{27,33,51,68}
-  wire [19:0]      _zRemain_T_2 = zSeg - 20'h1;	// src/foragerbee/scala/main/FbEngine.scala:1007:29, :1014:35
+    _GEN_23 ? (zawIssued ? zRemain == 20'h1 : zSeg == 20'h1) : _GEN_21 | wRemain == 20'h1;	// src/foragerbee/scala/main/FbEngine.scala:121:24, :189:24, :191:26, :794:20, :810:26, :863:38, :951:{14,27}, :966:27, :1026:{14,27}, :1049:29, :1054:{27,33,51,68}
+  wire [19:0]      _zRemain_T_2 = zSeg - 20'h1;	// src/foragerbee/scala/main/FbEngine.scala:1049:29, :1056:35
   wire [7:0]       _GEN_26 =
-    _GEN_23 ? _zRemain_T_2[7:0] : _GEN_21 ? 8'h0 : dstSegBeats[7:0] - 8'h1;	// src/foragerbee/scala/main/FbEngine.scala:141:8, :768:26, :823:42, :909:{14,27}, :926:27, :984:{14,27}, :1014:{27,35}
-  wire             _GEN_27 =
+    _GEN_23 ? _zRemain_T_2[7:0] : _GEN_21 ? 8'h0 : dstSegBeats[7:0] - 8'h1;	// src/foragerbee/scala/main/FbEngine.scala:141:8, :810:26, :865:42, :951:{14,27}, :968:27, :1026:{14,27}, :1056:{27,35}
+  wire [255:0]     _GEN_27 = _GEN_23 ? 256'h0 : _GEN_22;	// src/foragerbee/scala/main/FbEngine.scala:810:26, :951:27, :969:28, :1026:{14,27}, :1057:28
+  wire             _GEN_28 = _GEN_23 | ~_GEN_21;	// src/foragerbee/scala/main/FbEngine.scala:951:{14,27}, :1026:{14,27}, :1058:28
+  wire             _GEN_29 =
     _GEN_23
       ? ~(~zawIssued & wrInFlight[2]) & ~(zawIssued & zRemain == 20'h0)
       : _GEN_21
@@ -476,7 +478,7 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
           : _GEN_14 & ~_GEN_17
             & (mxQuantActive
                  ? _mxQuantizer_io_outData_valid
-                 : _GEN_15 ? _dataQueue_io_deq_valid : _converter_io_out_valid);	// src/foragerbee/scala/main/FbEngine.scala:93:68, :115:37, :130:25, :138:56, :146:58, :189:24, :191:26, :196:66, :201:34, :269:27, :343:19, :374:19, :768:{14,26}, :770:27, :777:25, :790:29, :793:26, :797:25, :805:25, :832:{22,36,68}, :833:25, :909:{14,27}, :922:{21,24}, :933:{29,75}, :934:25, :984:{14,27}, :1010:{21,24,36,47}, :1011:30, :1028:{23,69}, :1029:25
+                 : _GEN_15 ? _dataQueue_io_deq_valid : _converter_io_out_valid);	// src/foragerbee/scala/main/FbEngine.scala:93:68, :115:37, :130:25, :138:56, :146:58, :189:24, :191:26, :196:66, :201:34, :269:27, :343:19, :374:19, :810:{14,26}, :812:27, :819:25, :832:29, :835:26, :839:25, :847:25, :874:{22,36,68}, :875:25, :951:{14,27}, :964:{21,24}, :975:{29,75}, :976:25, :1026:{14,27}, :1052:{21,24,36,47}, :1053:30, :1070:{23,69}, :1071:25
   wire [20:0]      _i2cMicroRowBeats_T_25 =
     {10'h0,
      {3'h0, cmdReg_im2colKernel_1}
@@ -490,30 +492,29 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
                     : cmdReg_srcFmt == 4'h9 | cmdReg_srcFmt == 4'h2
                       | cmdReg_srcFmt == 4'h1
                         ? 3'h2
-                        : 3'h4}} + 21'h1F;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :563:{76,81}, :1251:{36,79,84}, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :237:{8,11}
-  wire [18:0]      _GEN_28 = {3'h0, _i2cMicroRowBeats_T_25[20:5]};	// src/foragerbee/scala/main/FbEngine.scala:1251:{79,84,105}, :1255:71
+                        : 3'h4}} + 21'h1F;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :565:{76,81}, :1293:{36,79,84}, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :241:{8,11}
+  wire [18:0]      _GEN_30 = {3'h0, _i2cMicroRowBeats_T_25[20:5] >> cvtShift};	// src/foragerbee/scala/main/FbEngine.scala:100:8, :1293:{79,84,105}, :1299:{70,83}
+  wire [18:0]      _GEN_31 = {17'h0, cvtShift};	// src/foragerbee/scala/main/FbEngine.scala:100:8, :1299:83
+  wire [18:0]      _GEN_32 = {3'h0, _i2cMicroRowBeats_T_25[20:5]};	// src/foragerbee/scala/main/FbEngine.scala:1293:{79,84,105}, :1299:38
+  wire [18:0]      i2cMicroRowBeatsAligned = cvtCompress ? _GEN_30 << _GEN_31 : _GEN_32;	// src/foragerbee/scala/main/FbEngine.scala:98:63, :1299:{38,83}
   wire [18:0]      i2cMicroRowDstBeats =
+    _i2cDstSegBeats_T ? _GEN_32 : cvtCompress ? _GEN_30 : _GEN_32 << _GEN_31;	// src/foragerbee/scala/main/FbEngine.scala:93:68, :98:63, :141:9, :1299:{38,83}, :1302:34, :1303:{10,71}
+  wire [22:0]      _GEN_33 = {3'h0, i2cSegBeats};	// src/foragerbee/scala/main/FbEngine.scala:164:28, :1305:61
+  wire [22:0]      i2cDstSegBeats =
     _i2cDstSegBeats_T
-      ? _GEN_28
-      : cvtCompress
-          ? {3'h0, _i2cMicroRowBeats_T_25[20:5] >> cvtShift}
-          : _GEN_28 << cvtShift;	// src/foragerbee/scala/main/FbEngine.scala:93:68, :98:63, :100:8, :141:9, :1251:{79,84,105}, :1254:34, :1255:{10,41,71}
-  wire [22:0]      _i2cDstSegBeats_T_2 = {3'h0, i2cSegBeats} << _GEN_0;	// src/foragerbee/scala/main/FbEngine.scala:142:55, :164:28, :1257:61
-  wire [19:0]      i2cDstSegBeats =
-    _i2cDstSegBeats_T
-      ? i2cSegBeats
-      : cvtCompress ? i2cSegBeats >> _GEN : _i2cDstSegBeats_T_2[19:0];	// src/foragerbee/scala/main/FbEngine.scala:93:68, :98:63, :141:9, :142:33, :164:28, :1256:29, :1257:{10,36,61}
-  wire             _GEN_29 = state == 4'h7;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :623:13, :1259:16
-  wire             _GEN_30 = i2cPhase == 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:159:28, :1269:26
-  wire             _GEN_31 = i2cPhase == 2'h1;	// src/foragerbee/scala/main/FbEngine.scala:159:28, :1269:26
-  wire             _GEN_32 =
-    ~_GEN_29 | _im2colGen_io_done | ~_im2colGen_io_valid | _GEN_30 | ~_GEN_31;	// src/foragerbee/scala/main/FbEngine.scala:152:50, :736:25, :1259:{16,26}, :1266:25, :1268:32, :1269:26
-  wire             _GEN_33 =
-    _GEN_32
+      ? _GEN_33
+      : cvtCompress ? {3'h0, i2cSegBeats >> _GEN} : _GEN_33 << _GEN_0;	// src/foragerbee/scala/main/FbEngine.scala:93:68, :98:63, :141:9, :142:{33,55}, :164:28, :1304:29, :1305:{10,36,61}
+  wire             _GEN_34 = state == 4'h7;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :665:13, :1307:16
+  wire             _GEN_35 = i2cPhase == 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:159:28, :1317:26
+  wire             _GEN_36 = i2cPhase == 2'h1;	// src/foragerbee/scala/main/FbEngine.scala:159:28, :1317:26
+  wire             _GEN_37 =
+    ~_GEN_34 | _im2colGen_io_done | ~_im2colGen_io_valid | _GEN_35 | ~_GEN_36;	// src/foragerbee/scala/main/FbEngine.scala:152:50, :778:25, :1307:{16,26}, :1314:25, :1316:32, :1317:26
+  wire             _GEN_38 =
+    _GEN_37
       ? _GEN_13 & ~arIssued & (|queueCredit) & (|seg)
-      : ~i2cArIssued & (|queueCredit);	// src/foragerbee/scala/main/FbEngine.scala:118:25, :135:28, :160:28, :341:19, :715:8, :736:{14,25}, :738:{21,24,34,49,55,62}, :1259:26, :1266:25, :1268:32, :1269:26, :1281:{32,45,60}
-  wire [31:0]      _GEN_34 =
-    _GEN_32
+      : ~i2cArIssued & (|queueCredit) & (|i2cMicroRowBeatsAligned);	// src/foragerbee/scala/main/FbEngine.scala:118:25, :135:28, :160:28, :341:19, :757:8, :778:{14,25}, :780:{21,24,34,49,55,62}, :1299:38, :1307:26, :1314:25, :1316:32, :1317:26, :1331:{32,45,60,66,93}
+  wire [31:0]      _GEN_39 =
+    _GEN_37
       ? {7'h0, beatInRow, 5'h0} + {12'h0, _srcDim0Offset_T_20[22:3]}
         + (cmdReg_op == 3'h2
              ? _GEN_5 * _GEN_6[cmdReg_permVec_4] + _GEN_4 * _GEN_6[cmdReg_permVec_3]
@@ -521,104 +522,110 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
                + cmdReg_srcAddr
              : _GEN_5 * cmdReg_srcStride_4 + _GEN_4 * cmdReg_srcStride_3 + _GEN_3
                * cmdReg_srcStride_2 + _GEN_2 * cmdReg_srcStride_1 + cmdReg_srcAddr)
-      : _im2colGen_io_srcAddr;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :89:26, :152:50, :218:{17,25}, :220:30, :226:{14,22}, :664:50, :672:83, :676:27, :678:{39,47}, :689:{35,43,60}, :736:25, :1259:26, :1266:25, :1268:32, :1269:26, src/foragerbee/scala/main/ForagerBeeConfig.scala:251:{36,44}
-  wire [7:0]       _GEN_35 =
-    _GEN_32 ? seg[7:0] - 8'h1 : _i2cMicroRowBeats_T_25[12:5] - 8'h1;	// src/foragerbee/scala/main/FbEngine.scala:715:8, :736:25, :739:31, :1251:{79,84}, :1259:26, :1266:25, :1268:32, :1269:26, :1282:56
-  wire             _GEN_36 = _GEN_31 | _GEN_13;	// src/foragerbee/scala/main/FbEngine.scala:347:23, :736:{14,25}, :747:25, :1269:26, :1289:33
-  wire             _GEN_37 =
-    ~_GEN_29 | _im2colGen_io_done | ~_im2colGen_io_valid | _GEN_30;	// src/foragerbee/scala/main/FbEngine.scala:152:50, :736:25, :1259:{16,26}, :1266:25, :1268:32, :1269:26
-  wire             _GEN_38 =
-    _GEN_37 ? _GEN_13 & _dataQueue_io_enq_ready : _GEN_36 & _dataQueue_io_enq_ready;	// src/foragerbee/scala/main/FbEngine.scala:130:25, :347:23, :736:{14,25}, :747:25, :1259:26, :1266:25, :1268:32, :1269:26, :1289:33
-  wire             _GEN_39 = i2cPhase == 2'h2;	// src/foragerbee/scala/main/FbEngine.scala:159:28, :1269:26, src/foragerbee/scala/main/ForagerBeeConfig.scala:242:65
-  wire             _GEN_40 = _GEN_14 & ~_GEN_16;	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :768:{14,26}, :770:27, :790:29, :793:26
-  wire             _GEN_41 = _GEN_30 | _GEN_31;	// src/foragerbee/scala/main/FbEngine.scala:768:26, :1269:26
+      : _im2colGen_io_srcAddr;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :89:26, :152:50, :218:{17,25}, :220:30, :226:{14,22}, :706:50, :714:83, :718:27, :720:{39,47}, :731:{35,43,60}, :778:25, :1307:26, :1314:25, :1316:32, :1317:26, src/foragerbee/scala/main/ForagerBeeConfig.scala:255:{36,44}
+  wire [7:0]       _GEN_40 =
+    _GEN_37 ? seg[7:0] - 8'h1 : i2cMicroRowBeatsAligned[7:0] - 8'h1;	// src/foragerbee/scala/main/FbEngine.scala:757:8, :778:25, :781:31, :1299:38, :1307:26, :1314:25, :1316:32, :1317:26, :1332:63
+  wire             _GEN_41 = _GEN_36 | _GEN_13;	// src/foragerbee/scala/main/FbEngine.scala:347:23, :778:{14,25}, :789:25, :1317:26, :1339:33
   wire             _GEN_42 =
-    ~_GEN_29 | _im2colGen_io_done | ~_im2colGen_io_valid | _GEN_41;	// src/foragerbee/scala/main/FbEngine.scala:152:50, :736:25, :768:26, :1259:{16,26}, :1266:25, :1268:32, :1269:26
-  wire             _GEN_43 = ~i2cAwIssued & wrInFlight[2];	// src/foragerbee/scala/main/FbEngine.scala:115:37, :162:28, :832:36, :1323:38, :1335:33
-  wire             _GEN_44 =
-    ~_GEN_29 | _im2colGen_io_done | ~_im2colGen_io_valid | _GEN_41 | ~_GEN_39;	// src/foragerbee/scala/main/FbEngine.scala:152:50, :736:25, :768:26, :1259:{16,26}, :1266:25, :1268:32, :1269:26
-  wire             _GEN_45 = (&i2cPhase) | _GEN_23;	// src/foragerbee/scala/main/FbEngine.scala:159:28, :909:27, :984:{14,27}, :1015:28, :1269:26, :1361:36
-  wire             _GEN_46 = state == 4'h8;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :1396:16
-  wire             _GEN_47 = _GEN_46 & ~sgStarted;	// src/foragerbee/scala/main/FbEngine.scala:178:31, :436:20, :1396:{16,25}, :1398:{12,24}, :1400:24
-  wire             _GEN_48 = sgPhase == 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:168:31, :1406:34
-  wire             _GEN_49 = _sgCtrl_io_done & _GEN_48;	// src/foragerbee/scala/main/FbEngine.scala:156:44, :1406:{23,34}
-  wire             _GEN_50 = sgPhase == 2'h1;	// src/foragerbee/scala/main/FbEngine.scala:168:31, :1409:25
-  wire [6:0]       _sgRemBeats_T = sgCurBeats - sgRRemain;	// src/foragerbee/scala/main/FbEngine.scala:171:27, :173:27, :1439:41
-  wire [6:0]       _sgSeg_T_1 = _sgRemBeats_T[6] ? 7'h40 : _sgRemBeats_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1439:41, :1440:39
-  wire [6:0]       sgSeg = _sgSeg_T_1 < queueCredit ? _sgSeg_T_1 : queueCredit;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1440:{39,62}
-  wire             _GEN_51 = ~_GEN_46 | _GEN_49;	// src/foragerbee/scala/main/FbEngine.scala:1259:26, :1396:{16,25}, :1406:{23,43}
+    ~_GEN_34 | _im2colGen_io_done | ~_im2colGen_io_valid | _GEN_35;	// src/foragerbee/scala/main/FbEngine.scala:152:50, :778:25, :1307:{16,26}, :1314:25, :1316:32, :1317:26
+  wire             _GEN_43 =
+    _GEN_42 ? _GEN_13 & _dataQueue_io_enq_ready : _GEN_41 & _dataQueue_io_enq_ready;	// src/foragerbee/scala/main/FbEngine.scala:130:25, :347:23, :778:{14,25}, :789:25, :1307:26, :1314:25, :1316:32, :1317:26, :1339:33
+  wire             _GEN_44 = i2cPhase == 2'h2;	// src/foragerbee/scala/main/FbEngine.scala:159:28, :1317:26, src/foragerbee/scala/main/ForagerBeeConfig.scala:246:65
+  wire             _GEN_45 = i2cDstSegBeats == 23'h0;	// src/foragerbee/scala/main/FbEngine.scala:756:63, :1304:29, :1357:33
+  wire             _GEN_46 = _GEN_14 & ~_GEN_16;	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :810:{14,26}, :812:27, :832:29, :835:26
+  wire             _GEN_47 = _GEN_35 | _GEN_36;	// src/foragerbee/scala/main/FbEngine.scala:810:26, :1317:26
+  wire             _GEN_48 = ~i2cAwIssued & wrInFlight[2];	// src/foragerbee/scala/main/FbEngine.scala:115:37, :162:28, :874:36, :1380:40, :1392:35
+  wire             _GEN_49 =
+    ~_GEN_34 | _im2colGen_io_done | ~_im2colGen_io_valid | _GEN_47 | ~_GEN_44 | _GEN_45;	// src/foragerbee/scala/main/FbEngine.scala:152:50, :778:25, :810:26, :1307:{16,26}, :1314:25, :1316:32, :1317:26, :1357:{33,42}
+  wire             _GEN_50 = i2cMicroRowDstBeats == 19'h0;	// src/foragerbee/scala/main/FbEngine.scala:794:20, :1302:34, :1415:38
+  wire             _GEN_51 = ~(&i2cPhase) | _GEN_50;	// src/foragerbee/scala/main/FbEngine.scala:159:28, :1026:27, :1317:26, :1415:{38,47}
+  wire             _GEN_52 =
+    ~_GEN_34 | _im2colGen_io_done | ~_im2colGen_io_valid | _GEN_47;	// src/foragerbee/scala/main/FbEngine.scala:152:50, :778:25, :810:26, :1026:27, :1307:{16,26}, :1314:25, :1316:32, :1317:26
+  wire             _GEN_53 = (&i2cPhase) & ~_GEN_50;	// src/foragerbee/scala/main/FbEngine.scala:159:28, :951:27, :1026:27, :1057:28, :1317:26, :1415:{38,47}, :1424:38
+  wire             _GEN_54 = state == 4'h8;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :1460:16
+  wire             _GEN_55 = _GEN_54 & ~sgStarted;	// src/foragerbee/scala/main/FbEngine.scala:178:31, :438:20, :1460:{16,25}, :1462:{12,24}, :1464:24
+  wire             _GEN_56 = sgPhase == 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:168:31, :1470:34
+  wire             _GEN_57 = _sgCtrl_io_done & _GEN_56;	// src/foragerbee/scala/main/FbEngine.scala:156:44, :1470:{23,34}
+  wire             _GEN_58 = sgPhase == 2'h1;	// src/foragerbee/scala/main/FbEngine.scala:168:31, :1473:25
+  wire [6:0]       _sgRemBeats_T = sgCurBeats - sgRRemain;	// src/foragerbee/scala/main/FbEngine.scala:171:27, :173:27, :1503:41
+  wire [6:0]       _sgSeg_T_1 = _sgRemBeats_T[6] ? 7'h40 : _sgRemBeats_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1503:41, :1504:39
+  wire [6:0]       sgSeg = _sgSeg_T_1 < queueCredit ? _sgSeg_T_1 : queueCredit;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1504:{39,62}
+  wire             _GEN_59 = ~_GEN_54 | _GEN_57;	// src/foragerbee/scala/main/FbEngine.scala:1307:26, :1460:{16,25}, :1470:{23,43}
   wire             io_bus_rd_valid_0 =
-    _GEN_51
-      ? _GEN_33
-      : _GEN_48
-          ? _sgCtrl_io_fetchRd_valid
-          : _GEN_50 ? ~sgArIssued & (|queueCredit) & (|sgSeg) : _GEN_33;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :156:44, :172:31, :736:25, :1259:26, :1266:25, :1396:25, :1406:{34,43}, :1409:25, :1412:29, :1440:62, :1442:{29,32,44,59,65,74}
-  wire             _GEN_52 = _GEN_49 | _GEN_48;	// src/foragerbee/scala/main/FbEngine.scala:177:31, :1406:{23,34,43}, :1409:25
-  wire             io_bus_rdData_ready_0 =
-    _GEN_51
+    _GEN_59
       ? _GEN_38
-      : _GEN_48
+      : _GEN_56
+          ? _sgCtrl_io_fetchRd_valid
+          : _GEN_58 ? ~sgArIssued & (|queueCredit) & (|sgSeg) : _GEN_38;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :156:44, :172:31, :778:25, :1307:26, :1314:25, :1460:25, :1470:{34,43}, :1473:25, :1476:29, :1504:62, :1506:{29,32,44,59,65,74}
+  wire             _GEN_60 = _GEN_57 | _GEN_56;	// src/foragerbee/scala/main/FbEngine.scala:177:31, :1470:{23,34,43}, :1473:25
+  wire             io_bus_rdData_ready_0 =
+    _GEN_59
+      ? _GEN_43
+      : _GEN_56
           ? _sgCtrl_io_fetchRdData_ready
-          : _GEN_50 ? _dataQueue_io_enq_ready : _GEN_38;	// src/foragerbee/scala/main/FbEngine.scala:130:25, :156:44, :736:25, :1259:26, :1266:25, :1396:25, :1406:{34,43}, :1409:25, :1419:33, :1452:33
-  wire             _GEN_53 = sgPhase == 2'h2;	// src/foragerbee/scala/main/FbEngine.scala:168:31, :1409:25, src/foragerbee/scala/main/ForagerBeeConfig.scala:242:65
-  wire             _GEN_54 = _GEN_49 | _GEN_48 | _GEN_50;	// src/foragerbee/scala/main/FbEngine.scala:1259:26, :1406:{23,34,43}, :1409:25
-  wire             _GEN_55 = ~_GEN_46 | _GEN_54 | ~_GEN_53;	// src/foragerbee/scala/main/FbEngine.scala:1259:26, :1396:{16,25}, :1406:43, :1409:25
+          : _GEN_58 ? _dataQueue_io_enq_ready : _GEN_43;	// src/foragerbee/scala/main/FbEngine.scala:130:25, :156:44, :778:25, :1307:26, :1314:25, :1460:25, :1470:{34,43}, :1473:25, :1483:33, :1516:33
+  wire             _GEN_61 = sgPhase == 2'h2;	// src/foragerbee/scala/main/FbEngine.scala:168:31, :1473:25, src/foragerbee/scala/main/ForagerBeeConfig.scala:246:65
+  wire             _GEN_62 = _GEN_57 | _GEN_56 | _GEN_58;	// src/foragerbee/scala/main/FbEngine.scala:1307:26, :1470:{23,34,43}, :1473:25
+  wire             _GEN_63 = ~_GEN_54 | _GEN_62 | ~_GEN_61;	// src/foragerbee/scala/main/FbEngine.scala:1307:26, :1460:{16,25}, :1470:43, :1473:25
   assign io_bus_wr_payload_eof_0 =
-    _GEN_55
-      ? (_GEN_42
+    _GEN_63
+      ? (_GEN_52
            ? _GEN_25
-           : _GEN_39 ? i2cWRemain == 20'h1 : (&i2cPhase) ? i2cWRemain == 20'h1 : _GEN_25)
-      : sgWRemain == 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:159:28, :163:28, :175:27, :752:20, :768:26, :909:27, :984:27, :1012:27, :1259:26, :1266:25, :1268:32, :1269:26, :1324:{35,49}, :1358:{35,49}, :1396:25, :1406:43, :1409:25, :1478:48
-  wire             _GEN_56 = ~sgAwIssued & wrInFlight[2];	// src/foragerbee/scala/main/FbEngine.scala:115:37, :174:31, :832:36, :1477:38, :1491:32
+           : _GEN_44
+               ? (_GEN_45 ? _GEN_25 : i2cWRemain == 20'h1)
+               : _GEN_51 ? _GEN_25 : i2cWRemain == 20'h1)
+      : sgWRemain == 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:163:28, :175:27, :794:20, :951:27, :1026:27, :1054:27, :1307:26, :1314:25, :1316:32, :1317:26, :1357:{33,42}, :1381:{37,51}, :1415:47, :1421:51, :1460:25, :1470:43, :1473:25, :1542:48
+  wire             _GEN_64 = ~sgAwIssued & wrInFlight[2];	// src/foragerbee/scala/main/FbEngine.scala:115:37, :174:31, :874:36, :1541:38, :1555:32
   assign io_bus_wr_valid_0 =
-    _GEN_55
-      ? (_GEN_42
-           ? _GEN_27
-           : _GEN_39
-               ? ~_GEN_43 & _converter_io_out_valid
-               : (&i2cPhase) ? ~(~i2cAwIssued & wrInFlight[2]) : _GEN_27)
-      : ~_GEN_56 & _dataQueue_io_deq_valid;	// src/foragerbee/scala/main/FbEngine.scala:77:23, :115:37, :130:25, :138:56, :159:28, :162:28, :363:32, :768:26, :832:36, :909:27, :984:27, :1028:69, :1259:26, :1266:25, :1268:32, :1269:26, :1309:31, :1335:{33,79}, :1336:33, :1356:29, :1357:38, :1369:{33,79}, :1370:33, :1396:25, :1406:43, :1409:25, :1474:29, :1491:{32,78}, :1492:33
+    _GEN_63
+      ? (_GEN_52
+           ? _GEN_29
+           : _GEN_44
+               ? (_GEN_45 ? _GEN_29 : ~_GEN_48 & _converter_io_out_valid)
+               : _GEN_51 ? _GEN_29 : ~(~i2cAwIssued & wrInFlight[2]))
+      : ~_GEN_64 & _dataQueue_io_deq_valid;	// src/foragerbee/scala/main/FbEngine.scala:77:23, :115:37, :130:25, :138:56, :162:28, :363:32, :874:36, :951:27, :1026:27, :1070:69, :1307:26, :1314:25, :1316:32, :1317:26, :1357:{33,42}, :1366:33, :1392:{35,81}, :1393:35, :1415:47, :1419:31, :1420:40, :1432:{35,81}, :1433:35, :1460:25, :1470:43, :1473:25, :1538:29, :1555:{32,78}, :1556:33
   wire             dataQueue_io_deq_ready =
-    _GEN_55
-      ? (_GEN_44
+    _GEN_63
+      ? (_GEN_49
            ? _GEN_14 & ~_GEN_17
              & (mxQuantActive
                   ? _mxQuantizer_io_in_ready
                   : _GEN_15 ? io_bus_wr_ready : _converter_io_in_ready)
-           : ~_GEN_43 & _converter_io_in_ready)
-      : ~_GEN_56 & io_bus_wr_ready;	// src/foragerbee/scala/main/FbEngine.scala:93:68, :138:56, :146:58, :196:66, :353:26, :374:19, :768:{14,26}, :770:27, :775:32, :790:29, :793:26, :795:32, :807:32, :832:{22,68}, :833:25, :834:32, :1259:26, :1266:25, :1268:32, :1269:26, :1308:38, :1309:31, :1335:{33,79}, :1336:33, :1337:40, :1396:25, :1406:43, :1409:25, :1474:29, :1476:36, :1491:{32,78}, :1492:33, :1493:40
-  wire             _GEN_57 = _GEN_53 & _GEN_18;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :844:27, :1409:25, :1495:61, :1497:32
-  wire [19:0]      _remainAfterSeg_T = {13'h0, sgCurBeats} - sgSegBeats;	// src/foragerbee/scala/main/FbEngine.scala:171:27, :177:31, :1499:49
-  wire             _GEN_58 = _remainAfterSeg_T == 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:269:27, :1499:49, :1500:37
-  wire             converter_io_flush = state == 4'h5;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :1546:14, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66
-  wire             io_done_valid_0 = converter_io_flush & wrInFlight == 3'h0;	// src/foragerbee/scala/main/FbEngine.scala:115:37, :349:17, :1546:{14,25}, :1552:{21,35}
+           : ~_GEN_48 & _converter_io_in_ready)
+      : ~_GEN_64 & io_bus_wr_ready;	// src/foragerbee/scala/main/FbEngine.scala:93:68, :138:56, :146:58, :196:66, :353:26, :374:19, :810:{14,26}, :812:27, :817:32, :832:29, :835:26, :837:32, :849:32, :874:{22,68}, :875:25, :876:32, :1307:26, :1314:25, :1316:32, :1317:26, :1357:42, :1365:40, :1366:33, :1392:{35,81}, :1393:35, :1394:42, :1460:25, :1470:43, :1473:25, :1538:29, :1540:36, :1555:{32,78}, :1556:33, :1557:40
+  wire             _GEN_65 = _GEN_61 & _GEN_18;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :886:27, :1473:25, :1559:61, :1561:32
+  wire [19:0]      _remainAfterSeg_T = {13'h0, sgCurBeats} - sgSegBeats;	// src/foragerbee/scala/main/FbEngine.scala:171:27, :177:31, :1563:49
+  wire             _GEN_66 = _remainAfterSeg_T == 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:269:27, :1563:49, :1564:37
+  wire             converter_io_flush = state == 4'h5;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :1610:14, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66
+  wire             io_done_valid_0 = converter_io_flush & wrInFlight == 3'h0;	// src/foragerbee/scala/main/FbEngine.scala:115:37, :349:17, :1610:{14,25}, :1616:{21,35}
   always @(posedge clock) begin	// src/foragerbee/scala/main/FbEngine.scala:40:7
-    automatic logic        _permBad_checks_T_4 = io_cmdIn_payload_dimCount > 3'h2;	// src/foragerbee/scala/main/FbEngine.scala:453:45
-    automatic logic        _permBad_checks_T_8 = io_cmdIn_payload_dimCount > 3'h4;	// src/foragerbee/scala/main/FbEngine.scala:453:45
-    automatic logic        _cBadBase_T_9 = io_cmdIn_payload_op == 3'h1;	// src/foragerbee/scala/main/FbEngine.scala:457:11
-    automatic logic        _permPadBad_T = io_cmdIn_payload_op == 3'h2;	// src/foragerbee/scala/main/FbEngine.scala:459:11
-    automatic logic [63:0] _GEN_59;	// src/foragerbee/scala/main/FbEngine.scala:475:{36,44,61,69}, :476:{22,30,47}
-    automatic logic        _i2cCvtBurstBad_T;	// src/foragerbee/scala/main/FbEngine.scala:487:25
-    automatic logic        _sgBad_T = io_cmdIn_payload_op == 3'h4;	// src/foragerbee/scala/main/FbEngine.scala:494:21
-    automatic logic        _sgIsGather_T;	// src/foragerbee/scala/main/FbEngine.scala:494:46
-    automatic logic        _fmtEncBad_WIRE_0 = io_cmdIn_payload_srcFmt == 4'h0;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:206:44
-    automatic logic        _fmtEncBad_WIRE_1 = io_cmdIn_payload_srcFmt == 4'h1;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:206:58, :218:66
-    automatic logic        _fmtEncBad_WIRE_2 = io_cmdIn_payload_srcFmt == 4'h2;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:206:72
-    automatic logic        _fmtEncBad_WIRE_1_4 = io_cmdIn_payload_dstFmt == 4'h4;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:212:41, :218:66
-    automatic logic        _fmtEncBad_WIRE_1_5 = io_cmdIn_payload_dstFmt == 4'h5;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:212:57, :218:66
-    automatic logic        _fmtEncBad_WIRE_4 = io_cmdIn_payload_srcFmt == 4'h4;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:212:41, :218:66
-    automatic logic        _fmtEncBad_WIRE_5 = io_cmdIn_payload_srcFmt == 4'h5;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:212:57, :218:66
-    automatic logic        _fmtEncBad_WIRE_6 = io_cmdIn_payload_srcFmt == 4'h8;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:229:25
-    automatic logic        _fmtEncBad_WIRE_7 = io_cmdIn_payload_srcFmt == 4'h9;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :229:25
-    automatic logic        _fmtEncBad_WIRE_8 = io_cmdIn_payload_srcFmt == 4'hA;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :229:25
-    automatic logic        _fmtEncBad_WIRE_1_6 = io_cmdIn_payload_dstFmt == 4'h8;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:229:25
-    automatic logic        _fmtEncBad_WIRE_1_7 = io_cmdIn_payload_dstFmt == 4'h9;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :229:25
-    automatic logic        _fmtEncBad_WIRE_1_8;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:229:25
-    automatic logic        _i2cCvtBurstBad_T_1 =
-      io_cmdIn_payload_srcFmt != io_cmdIn_payload_dstFmt;	// src/foragerbee/scala/main/FbEngine.scala:539:15
-    automatic logic [20:0] _i2cCvtBurstBad_microRowBeatsWorst_T_25 =
+    automatic logic        _permBad_checks_T_4 = io_cmdIn_payload_dimCount > 3'h2;	// src/foragerbee/scala/main/FbEngine.scala:455:45
+    automatic logic        _permBad_checks_T_8 = io_cmdIn_payload_dimCount > 3'h4;	// src/foragerbee/scala/main/FbEngine.scala:455:45
+    automatic logic        _cBadBase_T_9 = io_cmdIn_payload_op == 3'h1;	// src/foragerbee/scala/main/FbEngine.scala:459:11
+    automatic logic        _permPadBad_T = io_cmdIn_payload_op == 3'h2;	// src/foragerbee/scala/main/FbEngine.scala:461:11
+    automatic logic [63:0] _GEN_67;	// src/foragerbee/scala/main/FbEngine.scala:477:{36,44,61,69}, :478:{22,30,47}
+    automatic logic        _cvtOpBad_T_4;	// src/foragerbee/scala/main/FbEngine.scala:489:25
+    automatic logic        _sgBad_T = io_cmdIn_payload_op == 3'h4;	// src/foragerbee/scala/main/FbEngine.scala:496:21
+    automatic logic        _sgIsGather_T;	// src/foragerbee/scala/main/FbEngine.scala:496:46
+    automatic logic        _fmtEncBad_WIRE_0 = io_cmdIn_payload_srcFmt == 4'h0;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:210:44
+    automatic logic        _fmtEncBad_WIRE_1 = io_cmdIn_payload_srcFmt == 4'h1;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:210:58, :222:66
+    automatic logic        _fmtEncBad_WIRE_2 = io_cmdIn_payload_srcFmt == 4'h2;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:210:72
+    automatic logic        _fmtEncBad_WIRE_1_4 = io_cmdIn_payload_dstFmt == 4'h4;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:216:41, :222:66
+    automatic logic        _fmtEncBad_WIRE_1_5 = io_cmdIn_payload_dstFmt == 4'h5;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:216:57, :222:66
+    automatic logic        _fmtEncBad_WIRE_4 = io_cmdIn_payload_srcFmt == 4'h4;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:216:41, :222:66
+    automatic logic        _fmtEncBad_WIRE_5 = io_cmdIn_payload_srcFmt == 4'h5;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:216:57, :222:66
+    automatic logic        _fmtEncBad_WIRE_6 = io_cmdIn_payload_srcFmt == 4'h8;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:233:25
+    automatic logic        _fmtEncBad_WIRE_7 = io_cmdIn_payload_srcFmt == 4'h9;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :233:25
+    automatic logic        _fmtEncBad_WIRE_8 = io_cmdIn_payload_srcFmt == 4'hA;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :233:25
+    automatic logic        _fmtEncBad_WIRE_1_6 = io_cmdIn_payload_dstFmt == 4'h8;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:233:25
+    automatic logic        _fmtEncBad_WIRE_1_7 = io_cmdIn_payload_dstFmt == 4'h9;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :233:25
+    automatic logic        _fmtEncBad_WIRE_1_8;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:233:25
+    automatic logic        _cvtOpBad_T =
+      io_cmdIn_payload_srcFmt != io_cmdIn_payload_dstFmt;	// src/foragerbee/scala/main/FbEngine.scala:541:15
+    automatic logic [10:0] _GEN_68 = {3'h0, io_cmdIn_payload_im2colKernel_1};	// src/foragerbee/scala/main/FbEngine.scala:565:38
+    automatic logic [20:0] _i2cCvtAlignBad_microRowBeatsCmd_T_25 =
       {10'h0,
-       {3'h0, io_cmdIn_payload_im2colKernel_1}
+       _GEN_68
          * {8'h0,
             _fmtEncBad_WIRE_8
               ? 3'h1
@@ -630,7 +637,51 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
                       : io_cmdIn_payload_srcFmt == 4'h9 | io_cmdIn_payload_srcFmt == 4'h2
                         | io_cmdIn_payload_srcFmt == 4'h1
                           ? 3'h2
-                          : 3'h4}} + 21'h1F;	// src/foragerbee/scala/main/FbEngine.scala:563:{38,76,81}, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :229:25, :237:8
+                          : 3'h4}} + 21'h1F;	// src/foragerbee/scala/main/FbEngine.scala:565:{38,76,81}, :574:{36,74,79}, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :233:25, :241:8
+    automatic logic [5:0]  i2cCvtAlignBad_cSrcBits =
+      io_cmdIn_payload_srcFmt == 4'hA
+        ? 6'h4
+        : io_cmdIn_payload_srcFmt == 4'h5 | io_cmdIn_payload_srcFmt == 4'h4
+          | io_cmdIn_payload_srcFmt == 4'h3
+            ? 6'h8
+            : io_cmdIn_payload_srcFmt == 4'h9 | io_cmdIn_payload_srcFmt == 4'h2
+              | io_cmdIn_payload_srcFmt == 4'h1
+                ? 6'h10
+                : 6'h20;	// src/foragerbee/scala/main/FbEngine.scala:40:7, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66
+    automatic logic [5:0]  i2cCvtAlignBad_cDstBits =
+      io_cmdIn_payload_dstFmt == 4'hA
+        ? 6'h4
+        : io_cmdIn_payload_dstFmt == 4'h5 | io_cmdIn_payload_dstFmt == 4'h4
+          | io_cmdIn_payload_dstFmt == 4'h3
+            ? 6'h8
+            : io_cmdIn_payload_dstFmt == 4'h9 | io_cmdIn_payload_dstFmt == 4'h2
+              | io_cmdIn_payload_dstFmt == 4'h1
+                ? 6'h10
+                : 6'h20;	// src/foragerbee/scala/main/FbEngine.scala:40:7, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66
+    automatic logic [1:0]  i2cCvtAlignBad_cShift =
+      i2cCvtAlignBad_cSrcBits[5:2] == 4'h8 & i2cCvtAlignBad_cDstBits[5:2] == 4'h2
+      | i2cCvtAlignBad_cSrcBits[5:2] == 4'h2 & i2cCvtAlignBad_cDstBits[5:2] == 4'h8
+        ? 2'h2
+        : {1'h0, i2cCvtAlignBad_cSrcBits != i2cCvtAlignBad_cDstBits};	// src/foragerbee/scala/main/FbEngine.scala:578:{21,32,41,53,62,75,83,95}, :579:{10,20}, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :246:65
+    automatic logic [15:0] i2cCvtAlignBad_folded =
+      _i2cCvtAlignBad_microRowBeatsCmd_T_25[20:5] >> i2cCvtAlignBad_cShift;	// src/foragerbee/scala/main/FbEngine.scala:574:{74,79,100}, :578:21, :580:35
+    automatic logic        _hasPad_T_7;	// src/foragerbee/scala/main/FbEngine.scala:593:55
+    automatic logic [4:0]  _GEN_69;	// src/foragerbee/scala/main/FbEngine.scala:602:38
+    automatic logic [20:0] _i2cCvtBurstBad_microRowBeatsWorst_T_25 =
+      {10'h0,
+       _GEN_68
+         * {8'h0,
+            _fmtEncBad_WIRE_8
+              ? 3'h1
+              : io_cmdIn_payload_srcFmt == 4'hA
+                  ? 3'h0
+                  : io_cmdIn_payload_srcFmt == 4'h5 | io_cmdIn_payload_srcFmt == 4'h4
+                    | io_cmdIn_payload_srcFmt == 4'h3
+                      ? 3'h1
+                      : io_cmdIn_payload_srcFmt == 4'h9 | io_cmdIn_payload_srcFmt == 4'h2
+                        | io_cmdIn_payload_srcFmt == 4'h1
+                          ? 3'h2
+                          : 3'h4}} + 21'h1F;	// src/foragerbee/scala/main/FbEngine.scala:565:{38,76,81}, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :233:25, :241:8
     automatic logic [15:0] _mxQuantBad_shapeMisalign_T_1 =
       io_cmdIn_payload_shape_0
       % {9'h0,
@@ -638,7 +689,7 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
            ? 7'h40
            : io_cmdIn_payload_scaleBlockSize == 2'h1
                ? 7'h20
-               : {2'h0, io_cmdIn_payload_scaleBlockSize == 2'h0, 4'h0}};	// src/foragerbee/scala/main/FbEngine.scala:135:28, :503:61, :506:62, :915:37, src/foragerbee/scala/main/ForagerBeeConfig.scala:242:65
+               : {2'h0, io_cmdIn_payload_scaleBlockSize == 2'h0, 4'h0}};	// src/foragerbee/scala/main/FbEngine.scala:135:28, :505:61, :508:62, :957:37, src/foragerbee/scala/main/ForagerBeeConfig.scala:246:65
     automatic logic [7:0]  _cRowBytes_T_20 =
       io_cmdIn_payload_shape_0[7:0]
       * {2'h0,
@@ -650,26 +701,40 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
                : io_cmdIn_payload_srcFmt == 4'h9 | io_cmdIn_payload_srcFmt == 4'h2
                  | io_cmdIn_payload_srcFmt == 4'h1
                    ? 6'h10
-                   : 6'h20} + 8'h7;	// src/foragerbee/scala/main/FbEngine.scala:40:7, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :251:{14,36}
-    automatic logic        cBad;	// src/foragerbee/scala/main/FbEngine.scala:535:48, :567:{23,34,44,58,71,80,94,111}, :568:{15,44,60,76,90}
-    automatic logic        _GEN_60;	// src/foragerbee/scala/main/FbEngine.scala:577:24, src/utils/Stream/Stream.scala:43:26
-    automatic logic        _GEN_61;	// src/foragerbee/scala/main/FbEngine.scala:626:39
-    automatic logic        _GEN_62;	// src/foragerbee/scala/main/FbEngine.scala:168:31, :577:42, :611:16, :613:64, :622:58, :626:82
-    automatic logic        _GEN_63;	// src/utils/Stream/Stream.scala:43:26
-    automatic logic        _GEN_64;	// src/utils/Stream/Stream.scala:43:26
-    automatic logic        _GEN_65;	// src/foragerbee/scala/main/FbEngine.scala:1457:30
-    automatic logic        _GEN_66;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :1455:38, :1457:39, :1459:25
-    automatic logic        _GEN_67;	// src/foragerbee/scala/main/FbEngine.scala:1259:26, :1396:25, :1406:43
-    automatic logic [31:0] _GEN_68;	// src/foragerbee/scala/main/FbEngine.scala:1497:50
-    automatic logic        _GEN_69;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :1409:25, :1495:61, :1500:46
-    _GEN_59 =
+                   : 6'h20} + 8'h7;	// src/foragerbee/scala/main/FbEngine.scala:40:7, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :255:{14,36}
+    automatic logic        cBad;	// src/foragerbee/scala/main/FbEngine.scala:537:48, :607:{23,34,44,58,71,80,94,111}, :608:{15,44,60,76,90,108}, :609:{20,36,48}
+    automatic logic        _GEN_70;	// src/foragerbee/scala/main/FbEngine.scala:619:24, src/utils/Stream/Stream.scala:43:26
+    automatic logic        _GEN_71;	// src/foragerbee/scala/main/FbEngine.scala:668:39
+    automatic logic        _GEN_72;	// src/foragerbee/scala/main/FbEngine.scala:168:31, :619:42, :653:16, :655:64, :664:58, :668:82
+    automatic logic        _GEN_73;	// src/utils/Stream/Stream.scala:43:26
+    automatic logic        _GEN_74;	// src/utils/Stream/Stream.scala:43:26
+    automatic logic        _GEN_75;	// src/foragerbee/scala/main/FbEngine.scala:1521:30
+    automatic logic        _GEN_76;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :1519:38, :1521:39, :1523:25
+    automatic logic        _GEN_77;	// src/foragerbee/scala/main/FbEngine.scala:1307:26, :1460:25, :1470:43
+    automatic logic [31:0] _GEN_78;	// src/foragerbee/scala/main/FbEngine.scala:1561:50
+    automatic logic        _GEN_79;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :1473:25, :1559:61, :1564:46
+    _GEN_67 =
       {io_cmdIn_payload_padBefore_0,
        io_cmdIn_payload_padAfter_0,
        io_cmdIn_payload_padBefore_1,
-       io_cmdIn_payload_padAfter_1};	// src/foragerbee/scala/main/FbEngine.scala:475:{36,44,61,69}, :476:{22,30,47}
-    _i2cCvtBurstBad_T = io_cmdIn_payload_op == 3'h3;	// src/foragerbee/scala/main/FbEngine.scala:487:25
-    _sgIsGather_T = io_cmdIn_payload_op == 3'h5;	// src/foragerbee/scala/main/FbEngine.scala:456:16, :494:46
-    _fmtEncBad_WIRE_1_8 = io_cmdIn_payload_dstFmt == 4'hA;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :229:25
+       io_cmdIn_payload_padAfter_1};	// src/foragerbee/scala/main/FbEngine.scala:477:{36,44,61,69}, :478:{22,30,47}
+    _cvtOpBad_T_4 = io_cmdIn_payload_op == 3'h3;	// src/foragerbee/scala/main/FbEngine.scala:489:25
+    _sgIsGather_T = io_cmdIn_payload_op == 3'h5;	// src/foragerbee/scala/main/FbEngine.scala:458:16, :496:46
+    _fmtEncBad_WIRE_1_8 = io_cmdIn_payload_dstFmt == 4'hA;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :233:25
+    _hasPad_T_7 = io_cmdIn_payload_op == 3'h0;	// src/foragerbee/scala/main/FbEngine.scala:593:55
+    _GEN_69 =
+      {2'h0,
+       _fmtEncBad_WIRE_1_8
+         ? 3'h1
+         : io_cmdIn_payload_dstFmt == 4'hA
+             ? 3'h0
+             : io_cmdIn_payload_dstFmt == 4'h5 | io_cmdIn_payload_dstFmt == 4'h4
+               | io_cmdIn_payload_dstFmt == 4'h3
+                 ? 3'h1
+                 : io_cmdIn_payload_dstFmt == 4'h9 | io_cmdIn_payload_dstFmt == 4'h2
+                   | io_cmdIn_payload_dstFmt == 4'h1
+                     ? 3'h2
+                     : 3'h4};	// src/foragerbee/scala/main/FbEngine.scala:602:38, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :233:25, :241:8
     cBad =
       (|{(|{io_cmdIn_payload_dimCount == 3'h0 | io_cmdIn_payload_dimCount > 3'h5
               | _cBadBase_T_9 & io_cmdIn_payload_dimCount != 3'h2 | _cBadBase_T_9,
@@ -688,8 +753,8 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
            (|(io_cmdIn_payload_dimCount[2:1]))
              & io_cmdIn_payload_permVec_1 >= io_cmdIn_payload_dimCount,
            (|io_cmdIn_payload_dimCount)
-             & io_cmdIn_payload_permVec_0 >= io_cmdIn_payload_dimCount}) | (|_GEN_59)
-      & (|io_cmdIn_payload_op) | _permPadBad_T & (|_GEN_59) | _i2cCvtBurstBad_T
+             & io_cmdIn_payload_permVec_0 >= io_cmdIn_payload_dimCount}) | (|_GEN_67)
+      & (|io_cmdIn_payload_op) | _permPadBad_T & (|_GEN_67) | _cvtOpBad_T_4
       & (io_cmdIn_payload_im2colKernel_0 == 8'h0 | io_cmdIn_payload_im2colKernel_1 == 8'h0
          | io_cmdIn_payload_im2colStride_0 == 8'h0
          | io_cmdIn_payload_im2colStride_1 == 8'h0) | (_sgBad_T | _sgIsGather_T)
@@ -724,24 +789,31 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
          io_cmdIn_payload_dstFmt == 4'h3,
          io_cmdIn_payload_dstFmt == 4'h2,
          io_cmdIn_payload_dstFmt == 4'h1,
-         io_cmdIn_payload_dstFmt == 4'h0} == 9'h0 | _i2cCvtBurstBad_T_1
+         io_cmdIn_payload_dstFmt == 4'h0} == 9'h0 | _cvtOpBad_T
       & (_fmtEncBad_WIRE_8 | _fmtEncBad_WIRE_1_8 | _fmtEncBad_WIRE_7 | _fmtEncBad_WIRE_1_7
          | _fmtEncBad_WIRE_6 | _fmtEncBad_WIRE_1_6)
       | (_fmtEncBad_WIRE_8 | _fmtEncBad_WIRE_1_8) & (|io_cmdIn_payload_op)
       | _fmtEncBad_WIRE_8 & io_cmdIn_payload_srcStartIdx_0[0]
-      | (_fmtEncBad_WIRE_8 | _fmtEncBad_WIRE_1_8) & (|_GEN_59) | _i2cCvtBurstBad_T
-      & _i2cCvtBurstBad_T_1
-      & {_i2cCvtBurstBad_microRowBeatsWorst_T_25[20:5], 2'h0} > 18'h40;	// src/foragerbee/scala/main/FbEngine.scala:453:{45,58,72}, :454:12, :455:{29,37}, :456:{16,32}, :457:{11,30,44,53}, :459:{11,51}, :460:18, :461:{11,30,42,58,67}, :462:{14,30,38}, :463:{14,30}, :466:41, :468:{29,45}, :470:{21,28}, :475:{36,44,61,69}, :476:{22,30,47}, :477:{15,23}, :481:44, :482:{28,53}, :483:28, :487:{25,42}, :489:{23,31,52,60}, :490:{23,31,52}, :494:{21,38,46,63}, :496:{20,28}, :497:{17,33}, :505:32, :506:{42,48,62,79}, :512:{41,57}, :513:23, :514:23, :515:{44,69}, :516:30, :518:24, :519:28, :521:17, :522:24, :523:17, :524:17, :530:{49,62}, :531:31, :535:48, :539:{15,29}, :540:{37,70}, :541:{36,68}, :542:36, :549:{53,87}, :552:{52,71}, :555:{51,85}, :556:{28,53}, :557:28, :563:{76,81,102}, :564:{28,55,79,85}, :567:{23,34,44,58,71,80,94,111}, :568:{15,44,60,76,90}, src/foragerbee/scala/main/ForagerBeeConfig.scala:206:{44,53,58,67,72}, :212:{41,52,57}, :218:66, :229:{25,33,40}, :251:{36,44}
-    _GEN_60 = io_cmdIn_ready_0 & io_cmdIn_valid;	// src/foragerbee/scala/main/FbEngine.scala:576:27, :577:24, src/utils/Stream/Stream.scala:43:26
-    _GEN_61 = _sgBad_T | _sgIsGather_T;	// src/foragerbee/scala/main/FbEngine.scala:494:{21,46}, :626:39
-    _GEN_62 = ~_GEN_60 | cBad | _i2cCvtBurstBad_T | ~_GEN_61;	// src/foragerbee/scala/main/FbEngine.scala:168:31, :192:29, :487:25, :535:48, :567:{23,34,44,58,71,80,94,111}, :568:{15,44,60,76,90}, :577:{24,42}, :588:27, :611:16, :613:64, :622:58, :626:{39,82}, src/utils/Stream/Stream.scala:43:26
-    _GEN_63 = io_bus_rd_valid_0 & io_bus_rd_ready;	// src/foragerbee/scala/main/FbEngine.scala:1259:26, :1396:25, :1406:43, src/utils/Stream/Stream.scala:43:26
-    _GEN_64 = io_bus_rdData_valid & io_bus_rdData_ready_0;	// src/foragerbee/scala/main/FbEngine.scala:1259:26, :1396:25, :1406:43, src/utils/Stream/Stream.scala:43:26
-    _GEN_65 = sgRRemain == 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:173:27, :1457:30
-    _GEN_66 = _GEN_64 & _GEN_65;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :1455:38, :1457:{30,39}, :1459:25, src/utils/Stream/Stream.scala:43:26
-    _GEN_67 = ~_GEN_46 | _GEN_52;	// src/foragerbee/scala/main/FbEngine.scala:177:31, :1259:26, :1396:{16,25}, :1406:43, :1409:25
-    _GEN_68 = {7'h0, sgSegBeats, 5'h0};	// src/foragerbee/scala/main/FbEngine.scala:177:31, :1497:50
-    _GEN_69 = ~_GEN_57 | _GEN_58;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :1406:43, :1409:25, :1495:61, :1497:32, :1500:{37,46}
+      | (_fmtEncBad_WIRE_8 | _fmtEncBad_WIRE_1_8) & (|_GEN_67) | _cvtOpBad_T_4
+      & _cvtOpBad_T & {_i2cCvtBurstBad_microRowBeatsWorst_T_25[20:5], 2'h0} > 18'h40
+      | _cvtOpBad_T_4 & _cvtOpBad_T & i2cCvtAlignBad_cSrcBits > i2cCvtAlignBad_cDstBits
+      & ({3'h0, i2cCvtAlignBad_folded}
+         << i2cCvtAlignBad_cShift != {3'h0, _i2cCvtAlignBad_microRowBeatsCmd_T_25[20:5]}
+         | i2cCvtAlignBad_folded == 16'h0) | (_fmtEncBad_WIRE_8 | _fmtEncBad_WIRE_1_8)
+      & io_cmdIn_payload_shape_0[0] | _cvtOpBad_T & ~io_cmdIn_payload_mxQuantEn
+      & ~(_hasPad_T_7 | _cvtOpBad_T_4) | (|_GEN_67)
+      & (|{io_cmdIn_payload_padBefore_0[4:0] * _GEN_69,
+           io_cmdIn_payload_padAfter_0[4:0] * _GEN_69});	// src/foragerbee/scala/main/FbEngine.scala:455:{45,58,72}, :456:12, :457:{29,37}, :458:{16,32}, :459:{11,30,44,53}, :461:{11,51}, :462:18, :463:{11,30,42,58,67}, :464:{14,30,38}, :465:{14,30}, :468:41, :470:{29,45}, :472:{21,28}, :477:{36,44,61,69}, :478:{22,30,47}, :479:{15,23}, :483:44, :484:{28,53}, :485:28, :489:{25,42}, :491:{23,31,52,60}, :492:{23,31,52}, :496:{21,38,46,63}, :498:{20,28}, :499:{17,33}, :507:32, :508:{42,48,62,79}, :514:{41,57}, :515:23, :516:23, :517:{44,69}, :518:30, :520:24, :521:28, :523:17, :524:24, :525:17, :526:17, :532:{49,62}, :533:31, :537:48, :541:{15,29}, :542:{37,70}, :543:{36,68}, :544:36, :551:{53,87}, :554:{52,71}, :557:{51,85}, :558:{28,53}, :559:28, :565:{76,81,102}, :566:{28,55,79,85}, :574:{74,79,100}, :577:30, :578:21, :580:35, :581:{31,42}, :582:{28,55,68,84,94}, :587:{53,87,100}, :593:{29,45,48,55,69}, :599:{44,69}, :600:30, :602:38, :603:36, :604:{15,46,54,83}, :607:{23,34,44,58,71,80,94,111}, :608:{15,44,60,76,90,108}, :609:{20,36,48}, src/foragerbee/scala/main/ForagerBeeConfig.scala:210:{44,53,58,67,72}, :216:{41,52,57}, :222:66, :233:{25,33,40}, :255:{36,44}
+    _GEN_70 = io_cmdIn_ready_0 & io_cmdIn_valid;	// src/foragerbee/scala/main/FbEngine.scala:618:27, :619:24, src/utils/Stream/Stream.scala:43:26
+    _GEN_71 = _sgBad_T | _sgIsGather_T;	// src/foragerbee/scala/main/FbEngine.scala:496:{21,46}, :668:39
+    _GEN_72 = ~_GEN_70 | cBad | _cvtOpBad_T_4 | ~_GEN_71;	// src/foragerbee/scala/main/FbEngine.scala:168:31, :192:29, :489:25, :537:48, :607:{23,34,44,58,71,80,94,111}, :608:{15,44,60,76,90,108}, :609:{20,36,48}, :619:{24,42}, :630:27, :653:16, :655:64, :664:58, :668:{39,82}, src/utils/Stream/Stream.scala:43:26
+    _GEN_73 = io_bus_rd_valid_0 & io_bus_rd_ready;	// src/foragerbee/scala/main/FbEngine.scala:1307:26, :1460:25, :1470:43, src/utils/Stream/Stream.scala:43:26
+    _GEN_74 = io_bus_rdData_valid & io_bus_rdData_ready_0;	// src/foragerbee/scala/main/FbEngine.scala:1307:26, :1460:25, :1470:43, src/utils/Stream/Stream.scala:43:26
+    _GEN_75 = sgRRemain == 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:173:27, :1521:30
+    _GEN_76 = _GEN_74 & _GEN_75;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :1519:38, :1521:{30,39}, :1523:25, src/utils/Stream/Stream.scala:43:26
+    _GEN_77 = ~_GEN_54 | _GEN_60;	// src/foragerbee/scala/main/FbEngine.scala:177:31, :1307:26, :1460:{16,25}, :1470:43, :1473:25
+    _GEN_78 = {7'h0, sgSegBeats, 5'h0};	// src/foragerbee/scala/main/FbEngine.scala:177:31, :1561:50
+    _GEN_79 = ~_GEN_65 | _GEN_66;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :1470:43, :1473:25, :1559:61, :1561:32, :1564:{37,46}
     if (reset) begin	// src/foragerbee/scala/main/FbEngine.scala:40:7
       state <= 4'h0;	// src/foragerbee/scala/main/FbEngine.scala:73:22
       errReg <= 1'h0;	// src/foragerbee/scala/main/FbEngine.scala:77:23
@@ -823,129 +895,129 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
       mxRowEndPending <= 1'h0;	// src/foragerbee/scala/main/FbEngine.scala:202:34
     end
     else begin	// src/foragerbee/scala/main/FbEngine.scala:40:7
-      automatic logic [1:0]  _GEN_70 = '{1'h0, 1'h0};	// src/foragerbee/scala/main/FbEngine.scala:266:41
+      automatic logic [1:0]  _GEN_80 = '{1'h0, 1'h0};	// src/foragerbee/scala/main/FbEngine.scala:266:41
       automatic logic        active_1;	// src/foragerbee/scala/main/FbEngine.scala:251:29
       automatic logic        active_3;	// src/foragerbee/scala/main/FbEngine.scala:251:29
       automatic logic        nbWrEofFire;	// src/foragerbee/scala/main/FbEngine.scala:358:38
-      automatic logic        _GEN_71;	// src/utils/Stream/Stream.scala:43:26
-      automatic logic        hasPad;	// src/foragerbee/scala/main/FbEngine.scala:574:54
-      automatic logic        _GEN_72;	// src/foragerbee/scala/main/FbEngine.scala:369:59, :577:42, :579:12
-      automatic logic        _GEN_73;	// src/foragerbee/scala/main/FbEngine.scala:588:17
-      automatic logic        _GEN_74;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :577:42, :588:27, :589:18
-      automatic logic [18:0] _GEN_75;	// src/foragerbee/scala/main/FbEngine.scala:592:42
-      automatic logic        _GEN_76;	// src/foragerbee/scala/main/FbEngine.scala:159:28, :577:42, :611:16, :613:64
-      automatic logic        _GEN_77;	// src/foragerbee/scala/main/FbEngine.scala:172:31, :577:42, :611:16
-      automatic logic        _GEN_78;	// src/foragerbee/scala/main/FbEngine.scala:174:31, :577:42, :611:16
-      automatic logic [18:0] _GEN_79;	// src/foragerbee/scala/main/FbEngine.scala:643:36
-      automatic logic        _GEN_80;	// src/foragerbee/scala/main/FbEngine.scala:588:27, :611:16, :613:64, :622:58, :626:82, :636:20
-      automatic logic        _GEN_81;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :636:20, :638:36, :641:22, :643:90, :647:22
-      automatic logic        _GEN_82;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
-      automatic logic        _GEN_83;	// src/foragerbee/scala/main/FbEngine.scala:191:26, :577:42, :611:16
-      automatic logic        _GEN_84;	// src/foragerbee/scala/main/FbEngine.scala:118:25, :577:42, :611:16
-      automatic logic [15:0] _nxtIdx_1_T;	// src/foragerbee/scala/main/FbEngine.scala:726:28
-      automatic logic        wrap;	// src/foragerbee/scala/main/FbEngine.scala:726:34
-      automatic logic        outerCarry_2;	// src/foragerbee/scala/main/FbEngine.scala:727:50
-      automatic logic [15:0] _nxtIdx_2_T;	// src/foragerbee/scala/main/FbEngine.scala:726:28
-      automatic logic        wrap_1;	// src/foragerbee/scala/main/FbEngine.scala:726:34
-      automatic logic        _outerCarry_3_T;	// src/foragerbee/scala/main/FbEngine.scala:727:40
-      automatic logic        outerCarry_3;	// src/foragerbee/scala/main/FbEngine.scala:727:50
-      automatic logic [15:0] _nxtIdx_3_T;	// src/foragerbee/scala/main/FbEngine.scala:726:28
-      automatic logic        wrap_2;	// src/foragerbee/scala/main/FbEngine.scala:726:34
-      automatic logic        _outerCarry_4_T;	// src/foragerbee/scala/main/FbEngine.scala:727:40
-      automatic logic        outerCarry_4;	// src/foragerbee/scala/main/FbEngine.scala:727:50
-      automatic logic [15:0] _nxtIdx_4_T;	// src/foragerbee/scala/main/FbEngine.scala:726:28
-      automatic logic        wrap_3;	// src/foragerbee/scala/main/FbEngine.scala:726:34
-      automatic logic        _outerCarry_5_T;	// src/foragerbee/scala/main/FbEngine.scala:727:40
-      automatic logic        _GEN_85;	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-      automatic logic [6:0]  _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:745:34
-      automatic logic        _GEN_86;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :750:30, :751:{39,48}
-      automatic logic        _GEN_87;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :736:25, :750:30, :751:{39,48}
-      automatic logic        _GEN_88;	// src/foragerbee/scala/main/FbEngine.scala:752:20
-      automatic logic        _GEN_89;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :750:30, :752:29, :753:15
-      automatic logic        _GEN_90;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :736:25, :750:30, :752:29, :753:15
-      automatic logic        _GEN_91;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :736:25, :750:30
-      automatic logic        _GEN_92;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      automatic logic        _GEN_93;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      automatic logic [6:0]  _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:788:38
-      automatic logic [6:0]  _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:802:38
-      automatic logic [6:0]  _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:809:38
-      automatic logic [19:0] _nxtBeat_T;	// src/foragerbee/scala/main/FbEngine.scala:845:33
-      automatic logic        rowEndNow;	// src/foragerbee/scala/main/FbEngine.scala:847:33
-      automatic logic        _GEN_94;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29
-      automatic logic [7:0]  _GEN_95;	// src/foragerbee/scala/main/FbEngine.scala:266:41
-      automatic logic        _GEN_96;	// src/foragerbee/scala/main/FbEngine.scala:266:41
-      automatic logic        _GEN_97;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :266:41, :267:22, :577:42
+      automatic logic        _GEN_81;	// src/utils/Stream/Stream.scala:43:26
+      automatic logic [18:0] _GEN_82;	// src/foragerbee/scala/main/FbEngine.scala:602:38
+      automatic logic        hasPad;	// src/foragerbee/scala/main/FbEngine.scala:616:54
+      automatic logic        _GEN_83;	// src/foragerbee/scala/main/FbEngine.scala:369:59, :619:42, :621:12
+      automatic logic        _GEN_84;	// src/foragerbee/scala/main/FbEngine.scala:630:17
+      automatic logic        _GEN_85;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :619:42, :630:27, :631:18
+      automatic logic        _GEN_86;	// src/foragerbee/scala/main/FbEngine.scala:159:28, :619:42, :653:16, :655:64
+      automatic logic        _GEN_87;	// src/foragerbee/scala/main/FbEngine.scala:172:31, :619:42, :653:16
+      automatic logic        _GEN_88;	// src/foragerbee/scala/main/FbEngine.scala:174:31, :619:42, :653:16
+      automatic logic [18:0] _GEN_89;	// src/foragerbee/scala/main/FbEngine.scala:685:36
+      automatic logic        _GEN_90;	// src/foragerbee/scala/main/FbEngine.scala:630:27, :653:16, :655:64, :664:58, :668:82, :678:20
+      automatic logic        _GEN_91;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :678:20, :680:36, :683:22, :685:90, :689:22
+      automatic logic        _GEN_92;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
+      automatic logic        _GEN_93;	// src/foragerbee/scala/main/FbEngine.scala:191:26, :619:42, :653:16
+      automatic logic        _GEN_94;	// src/foragerbee/scala/main/FbEngine.scala:118:25, :619:42, :653:16
+      automatic logic [15:0] _nxtIdx_1_T;	// src/foragerbee/scala/main/FbEngine.scala:768:28
+      automatic logic        wrap;	// src/foragerbee/scala/main/FbEngine.scala:768:34
+      automatic logic        outerCarry_2;	// src/foragerbee/scala/main/FbEngine.scala:769:50
+      automatic logic [15:0] _nxtIdx_2_T;	// src/foragerbee/scala/main/FbEngine.scala:768:28
+      automatic logic        wrap_1;	// src/foragerbee/scala/main/FbEngine.scala:768:34
+      automatic logic        _outerCarry_3_T;	// src/foragerbee/scala/main/FbEngine.scala:769:40
+      automatic logic        outerCarry_3;	// src/foragerbee/scala/main/FbEngine.scala:769:50
+      automatic logic [15:0] _nxtIdx_3_T;	// src/foragerbee/scala/main/FbEngine.scala:768:28
+      automatic logic        wrap_2;	// src/foragerbee/scala/main/FbEngine.scala:768:34
+      automatic logic        _outerCarry_4_T;	// src/foragerbee/scala/main/FbEngine.scala:769:40
+      automatic logic        outerCarry_4;	// src/foragerbee/scala/main/FbEngine.scala:769:50
+      automatic logic [15:0] _nxtIdx_4_T;	// src/foragerbee/scala/main/FbEngine.scala:768:28
+      automatic logic        wrap_3;	// src/foragerbee/scala/main/FbEngine.scala:768:34
+      automatic logic        _outerCarry_5_T;	// src/foragerbee/scala/main/FbEngine.scala:769:40
+      automatic logic        _GEN_95;	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+      automatic logic [6:0]  _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:787:34
+      automatic logic        _GEN_96;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :792:30, :793:{39,48}
+      automatic logic        _GEN_97;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :778:25, :792:30, :793:{39,48}
+      automatic logic        _GEN_98;	// src/foragerbee/scala/main/FbEngine.scala:794:20
+      automatic logic        _GEN_99;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :792:30, :794:29, :795:15
+      automatic logic        _GEN_100;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :778:25, :792:30, :794:29, :795:15
+      automatic logic        _GEN_101;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :778:25, :792:30
+      automatic logic        _GEN_102;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      automatic logic        _GEN_103;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      automatic logic [6:0]  _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:830:38
+      automatic logic [6:0]  _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:844:38
+      automatic logic [6:0]  _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:851:38
+      automatic logic [19:0] _nxtBeat_T;	// src/foragerbee/scala/main/FbEngine.scala:887:33
+      automatic logic        rowEndNow;	// src/foragerbee/scala/main/FbEngine.scala:889:33
+      automatic logic        _GEN_104;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29
+      automatic logic [7:0]  _GEN_105;	// src/foragerbee/scala/main/FbEngine.scala:266:41
+      automatic logic        _GEN_106;	// src/foragerbee/scala/main/FbEngine.scala:266:41
+      automatic logic        _GEN_107;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :266:41, :267:22, :619:42
       automatic logic [15:0] _nextVR_T;	// src/foragerbee/scala/main/FbEngine.scala:292:29
-      automatic logic        _GEN_98;	// src/foragerbee/scala/main/FbEngine.scala:294:17
-      automatic logic        _GEN_99;	// src/foragerbee/scala/main/FbEngine.scala:295:25
-      automatic logic [15:0] _GEN_100;	// src/foragerbee/scala/main/FbEngine.scala:293:16, :294:33, :295:52
-      automatic logic        _GEN_101;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :577:42, :860:31
-      automatic logic        _GEN_102;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :577:42, :768:26, :844:53, :848:29, :860:31
-      automatic logic        _GEN_103;	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :306:43, :577:42
-      automatic logic        _GEN_104;	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
-      automatic logic        _GEN_105;	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
-      automatic logic        _GEN_106;	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :577:42
-      automatic logic        _GEN_107;	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :306:43, :313:20, :736:25
+      automatic logic        _GEN_108;	// src/foragerbee/scala/main/FbEngine.scala:294:17
+      automatic logic        _GEN_109;	// src/foragerbee/scala/main/FbEngine.scala:295:25
+      automatic logic [15:0] _GEN_110;	// src/foragerbee/scala/main/FbEngine.scala:293:16, :294:33, :295:52
+      automatic logic        _GEN_111;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :619:42, :902:31
+      automatic logic        _GEN_112;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :619:42, :810:26, :886:53, :890:29, :902:31
+      automatic logic        _GEN_113;	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :306:43, :619:42
+      automatic logic        _GEN_114;	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
+      automatic logic        _GEN_115;	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
+      automatic logic        _GEN_116;	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :619:42
+      automatic logic        _GEN_117;	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :306:43, :313:20, :778:25
       automatic logic        nextIsDim1Pad;	// src/foragerbee/scala/main/FbEngine.scala:317:56
-      automatic logic        _GEN_108;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-      automatic logic        _GEN_109;	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
-      automatic logic        _GEN_110;	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
-      automatic logic        _GEN_111;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29
-      automatic logic        _GEN_112;	// src/foragerbee/scala/main/FbEngine.scala:736:25, :768:26, :844:53, :848:29
-      automatic logic        _GEN_113 = _GEN_21 & _nbWrEofFire_T;	// src/foragerbee/scala/main/FbEngine.scala:768:26, :909:{14,27}, :929:26, :938:28, :939:25, src/utils/Stream/Stream.scala:43:26
-      automatic logic [5:0]  _mxScaleWrByte_T;	// src/foragerbee/scala/main/FbEngine.scala:940:40
-      automatic logic        _GEN_114;	// src/foragerbee/scala/main/FbEngine.scala:941:34
-      automatic logic        _GEN_115;	// src/foragerbee/scala/main/FbEngine.scala:768:26, :909:27, :938:28, :941:56, :944:29
-      automatic logic        _GEN_116;	// src/foragerbee/scala/main/FbEngine.scala:768:26, :909:27, :938:28, :941:56, :945:33, :947:29
+      automatic logic        _GEN_118;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+      automatic logic        _GEN_119;	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
+      automatic logic        _GEN_120;	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
+      automatic logic        _GEN_121;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29
+      automatic logic        _GEN_122;	// src/foragerbee/scala/main/FbEngine.scala:778:25, :810:26, :886:53, :890:29
+      automatic logic        _GEN_123 = _GEN_21 & _nbWrEofFire_T;	// src/foragerbee/scala/main/FbEngine.scala:810:26, :951:{14,27}, :971:26, :980:28, :981:25, src/utils/Stream/Stream.scala:43:26
+      automatic logic [5:0]  _mxScaleWrByte_T;	// src/foragerbee/scala/main/FbEngine.scala:982:40
+      automatic logic        _GEN_124;	// src/foragerbee/scala/main/FbEngine.scala:983:34
+      automatic logic        _GEN_125;	// src/foragerbee/scala/main/FbEngine.scala:810:26, :951:27, :980:28, :983:56, :986:29
+      automatic logic        _GEN_126;	// src/foragerbee/scala/main/FbEngine.scala:810:26, :951:27, :980:28, :983:56, :987:33, :989:29
       automatic logic [15:0] _nextVR_T_1;	// src/foragerbee/scala/main/FbEngine.scala:292:29
-      automatic logic        _GEN_117;	// src/foragerbee/scala/main/FbEngine.scala:294:17
-      automatic logic [15:0] _GEN_118;	// src/foragerbee/scala/main/FbEngine.scala:293:16, :294:33, :295:52
-      automatic logic        _GEN_119;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :768:26, :909:27, :938:28, :941:56, :945:33
-      automatic logic        _GEN_120;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :768:26, :909:27, :938:28, :941:56, :945:33
-      automatic logic        _GEN_121;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :294:33, :577:42, :768:26, :844:53, :848:29, :909:27, :938:28, :941:56, :945:33
-      automatic logic        _GEN_122;	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :306:43, :768:26
+      automatic logic        _GEN_127;	// src/foragerbee/scala/main/FbEngine.scala:294:17
+      automatic logic [15:0] _GEN_128;	// src/foragerbee/scala/main/FbEngine.scala:293:16, :294:33, :295:52
+      automatic logic        _GEN_129;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :810:26, :951:27, :980:28, :983:56, :987:33
+      automatic logic        _GEN_130;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :810:26, :951:27, :980:28, :983:56, :987:33
+      automatic logic        _GEN_131;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :294:33, :619:42, :810:26, :886:53, :890:29, :951:27, :980:28, :983:56, :987:33
+      automatic logic        _GEN_132;	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :306:43, :810:26
       automatic logic        nextIsDim1Pad_1;	// src/foragerbee/scala/main/FbEngine.scala:317:56
-      automatic logic        _GEN_123;	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :768:26
-      automatic logic        _GEN_124;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :768:26, :909:27, :938:28, :941:56, :945:33
-      automatic logic        _GEN_125;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :768:26, :909:27, :938:28, :941:56, :945:33
-      automatic logic        _GEN_126;	// src/foragerbee/scala/main/FbEngine.scala:909:27, :1017:26, :1019:24, :1020:19
-      automatic logic        _GEN_127;	// src/foragerbee/scala/main/FbEngine.scala:909:27, :1017:26, :1019:24, :1020:19
-      automatic logic [19:0] _nxtZBeat_T;	// src/foragerbee/scala/main/FbEngine.scala:1035:35
-      automatic logic        _GEN_128;	// src/foragerbee/scala/main/FbEngine.scala:1036:23
+      automatic logic        _GEN_133;	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :810:26
+      automatic logic        _GEN_134;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :810:26, :951:27, :980:28, :983:56, :987:33
+      automatic logic        _GEN_135;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :810:26, :951:27, :980:28, :983:56, :987:33
+      automatic logic        _GEN_136;	// src/foragerbee/scala/main/FbEngine.scala:951:27, :1059:26, :1061:24, :1062:19
+      automatic logic        _GEN_137;	// src/foragerbee/scala/main/FbEngine.scala:951:27, :1059:26, :1061:24, :1062:19
+      automatic logic [19:0] _nxtZBeat_T;	// src/foragerbee/scala/main/FbEngine.scala:1077:35
+      automatic logic        _GEN_138;	// src/foragerbee/scala/main/FbEngine.scala:1078:23
       automatic logic [15:0] _nextVR_T_2;	// src/foragerbee/scala/main/FbEngine.scala:292:29
-      automatic logic        _GEN_129;	// src/foragerbee/scala/main/FbEngine.scala:294:17
-      automatic logic        _GEN_130;	// src/foragerbee/scala/main/FbEngine.scala:293:16, :294:33, :295:52
-      automatic logic        _GEN_131;	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :1017:26
-      automatic logic        _GEN_132;	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :306:43, :313:20, :909:27
+      automatic logic        _GEN_139;	// src/foragerbee/scala/main/FbEngine.scala:294:17
+      automatic logic        _GEN_140;	// src/foragerbee/scala/main/FbEngine.scala:293:16, :294:33, :295:52
+      automatic logic        _GEN_141;	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :1059:26
+      automatic logic        _GEN_142;	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :306:43, :313:20, :951:27
       automatic logic        nextIsDim1Pad_2;	// src/foragerbee/scala/main/FbEngine.scala:317:56
-      automatic logic        _GEN_133;	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :909:27
+      automatic logic        _GEN_143;	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :951:27
       automatic logic [15:0] _nextVR_T_3;	// src/foragerbee/scala/main/FbEngine.scala:292:29
-      automatic logic        _GEN_134;	// src/foragerbee/scala/main/FbEngine.scala:294:17
-      automatic logic        _GEN_135;	// src/foragerbee/scala/main/FbEngine.scala:909:27, :984:27, :1033:53, :1036:44, :1038:30
+      automatic logic        _GEN_144;	// src/foragerbee/scala/main/FbEngine.scala:294:17
+      automatic logic        _GEN_145;	// src/foragerbee/scala/main/FbEngine.scala:951:27, :1026:27, :1075:53, :1078:44, :1080:30
       automatic logic        nextIsDim1Pad_3;	// src/foragerbee/scala/main/FbEngine.scala:317:56
-      automatic logic        _GEN_136;	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :909:27
-      automatic logic        _GEN_137;	// src/foragerbee/scala/main/FbEngine.scala:160:28, :1269:26, :1283:34, :1284:27
-      automatic logic        _GEN_138;	// src/foragerbee/scala/main/FbEngine.scala:160:28, :1259:26, :1266:25, :1268:32
-      automatic logic [19:0] _GEN_139;	// src/foragerbee/scala/main/FbEngine.scala:1285:26
-      automatic logic [6:0]  _queueCredit_T_8;	// src/foragerbee/scala/main/FbEngine.scala:1287:42
-      automatic logic        _GEN_140;	// src/foragerbee/scala/main/FbEngine.scala:1294:31
-      automatic logic        _GEN_141;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :1292:38, :1294:40, :1295:26
-      automatic logic [6:0]  _queueCredit_T_10;	// src/foragerbee/scala/main/FbEngine.scala:1313:44
-      automatic logic        _GEN_142;	// src/foragerbee/scala/main/FbEngine.scala:768:26, :1269:26, :1312:43, :1313:29
+      automatic logic        _GEN_146;	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :951:27
+      automatic logic [19:0] _GEN_147;	// src/foragerbee/scala/main/FbEngine.scala:1332:63
+      automatic logic        _GEN_148;	// src/foragerbee/scala/main/FbEngine.scala:160:28, :1317:26, :1333:34, :1334:27
+      automatic logic        _GEN_149;	// src/foragerbee/scala/main/FbEngine.scala:160:28, :1307:26, :1314:25, :1316:32
+      automatic logic [6:0]  _queueCredit_T_8;	// src/foragerbee/scala/main/FbEngine.scala:1337:42
+      automatic logic        _GEN_150;	// src/foragerbee/scala/main/FbEngine.scala:1344:31
+      automatic logic        _GEN_151;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :1342:38, :1344:40, :1345:26
+      automatic logic [6:0]  _queueCredit_T_10;	// src/foragerbee/scala/main/FbEngine.scala:1370:46
+      automatic logic        _GEN_152;	// src/foragerbee/scala/main/FbEngine.scala:810:26, :1317:26, :1357:42, :1369:45
       active_1 = cmdReg_dimCount > 3'h2;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :251:29
       active_3 = cmdReg_dimCount > 3'h4;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :251:29
-      nbWrEofFire = _nbWrEofFire_T & io_bus_wr_payload_eof_0;	// src/foragerbee/scala/main/FbEngine.scala:358:38, :1259:26, :1396:25, :1406:43, src/utils/Stream/Stream.scala:43:26
-      _GEN_71 = io_bus_wrResp_valid & (|wrInFlight);	// src/foragerbee/scala/main/FbEngine.scala:115:37, :368:39, src/utils/Stream/Stream.scala:43:26
-      hasPad = (|_GEN_59) & io_cmdIn_payload_op == 3'h0;	// src/foragerbee/scala/main/FbEngine.scala:475:{36,44,61,69}, :476:{22,30,47}, :573:{40,65}, :574:{28,54,62}
-      _GEN_72 = _GEN_60 ? cBad : _GEN_71 & io_bus_wrResp_payload_err | errReg;	// src/foragerbee/scala/main/FbEngine.scala:77:23, :369:{29,59,68}, :535:48, :567:{23,34,44,58,71,80,94,111}, :568:{15,44,60,76,90}, :577:{24,42}, :579:12, src/utils/Stream/Stream.scala:43:26
-      _GEN_73 = hasPad & ~cBad;	// src/foragerbee/scala/main/FbEngine.scala:535:48, :567:{23,34,44,58,71,80,94,111}, :568:{15,44,60,76,90}, :574:54, :587:28, :588:17
-      _GEN_74 = _GEN_60 & _GEN_73;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :577:{24,42}, :588:{17,27}, :589:18, src/utils/Stream/Stream.scala:43:26
-      _GEN_75 = {3'h0, io_cmdIn_payload_padBefore_0};	// src/foragerbee/scala/main/FbEngine.scala:592:42
-      _GEN_76 = ~_GEN_60 | cBad | ~_i2cCvtBurstBad_T;	// src/foragerbee/scala/main/FbEngine.scala:159:28, :192:29, :487:25, :535:48, :567:{23,34,44,58,71,80,94,111}, :568:{15,44,60,76,90}, :577:{24,42}, :588:27, :611:16, :613:64, src/utils/Stream/Stream.scala:43:26
-      _GEN_77 = _GEN_62 & sgArIssued;	// src/foragerbee/scala/main/FbEngine.scala:168:31, :172:31, :577:42, :611:16, :613:64, :622:58, :626:82
-      _GEN_78 = _GEN_62 & sgAwIssued;	// src/foragerbee/scala/main/FbEngine.scala:168:31, :174:31, :577:42, :611:16, :613:64, :622:58, :626:82
-      _GEN_79 =
-        _GEN_75
+      nbWrEofFire = _nbWrEofFire_T & io_bus_wr_payload_eof_0;	// src/foragerbee/scala/main/FbEngine.scala:358:38, :1307:26, :1460:25, :1470:43, src/utils/Stream/Stream.scala:43:26
+      _GEN_81 = io_bus_wrResp_valid & (|wrInFlight);	// src/foragerbee/scala/main/FbEngine.scala:115:37, :368:39, src/utils/Stream/Stream.scala:43:26
+      _GEN_82 = {3'h0, io_cmdIn_payload_padBefore_0};	// src/foragerbee/scala/main/FbEngine.scala:602:38
+      hasPad = (|_GEN_67) & _hasPad_T_7;	// src/foragerbee/scala/main/FbEngine.scala:477:{36,44,61,69}, :478:{22,30,47}, :593:55, :615:{40,65}, :616:{28,54}
+      _GEN_83 = _GEN_70 ? cBad : _GEN_81 & io_bus_wrResp_payload_err | errReg;	// src/foragerbee/scala/main/FbEngine.scala:77:23, :369:{29,59,68}, :537:48, :607:{23,34,44,58,71,80,94,111}, :608:{15,44,60,76,90,108}, :609:{20,36,48}, :619:{24,42}, :621:12, src/utils/Stream/Stream.scala:43:26
+      _GEN_84 = hasPad & ~cBad;	// src/foragerbee/scala/main/FbEngine.scala:537:48, :607:{23,34,44,58,71,80,94,111}, :608:{15,44,60,76,90,108}, :609:{20,36,48}, :616:54, :629:28, :630:17
+      _GEN_85 = _GEN_70 & _GEN_84;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :619:{24,42}, :630:{17,27}, :631:18, src/utils/Stream/Stream.scala:43:26
+      _GEN_86 = ~_GEN_70 | cBad | ~_cvtOpBad_T_4;	// src/foragerbee/scala/main/FbEngine.scala:159:28, :192:29, :489:25, :537:48, :607:{23,34,44,58,71,80,94,111}, :608:{15,44,60,76,90,108}, :609:{20,36,48}, :619:{24,42}, :630:27, :653:16, :655:64, src/utils/Stream/Stream.scala:43:26
+      _GEN_87 = _GEN_72 & sgArIssued;	// src/foragerbee/scala/main/FbEngine.scala:168:31, :172:31, :619:42, :653:16, :655:64, :664:58, :668:82
+      _GEN_88 = _GEN_72 & sgAwIssued;	// src/foragerbee/scala/main/FbEngine.scala:168:31, :174:31, :619:42, :653:16, :655:64, :664:58, :668:82
+      _GEN_89 =
+        _GEN_82
         * {16'h0,
            _fmtEncBad_WIRE_1_8
              ? 3'h1
@@ -957,146 +1029,148 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
                      : io_cmdIn_payload_dstFmt == 4'h9 | io_cmdIn_payload_dstFmt == 4'h2
                        | io_cmdIn_payload_dstFmt == 4'h1
                          ? 3'h2
-                         : 3'h4};	// src/foragerbee/scala/main/FbEngine.scala:592:42, :643:36, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :229:25, :237:8
-      _GEN_80 = cBad | _i2cCvtBurstBad_T | _GEN_61;	// src/foragerbee/scala/main/FbEngine.scala:487:25, :535:48, :567:{23,34,44,58,71,80,94,111}, :568:{15,44,60,76,90}, :588:27, :611:16, :613:64, :622:58, :626:{39,82}, :636:20
-      _GEN_81 = hasPad & (|{|io_cmdIn_payload_padBefore_1, _GEN_79[18:5]});	// src/foragerbee/scala/main/FbEngine.scala:188:27, :574:54, :636:20, :638:{29,36}, :641:22, :643:{36,71,81,90}, :647:22
-      _GEN_82 = ~_GEN_60 | _GEN_80 | ~_GEN_81;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :192:29, :577:{24,42}, :588:27, :611:16, :613:64, :622:58, :626:82, :636:20, :638:36, :641:22, :643:90, :647:22, src/utils/Stream/Stream.scala:43:26
-      _GEN_83 = _GEN_82 & zawIssued;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :191:26, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
-      _GEN_84 = (~_GEN_60 | cBad | _i2cCvtBurstBad_T | _GEN_61 | _GEN_81) & arIssued;	// src/foragerbee/scala/main/FbEngine.scala:118:25, :188:27, :192:29, :487:25, :535:48, :567:{23,34,44,58,71,80,94,111}, :568:{15,44,60,76,90}, :577:{24,42}, :588:27, :611:16, :613:64, :622:58, :626:{39,82}, :636:20, :638:36, :641:22, :643:90, :647:22, :652:20, :656:18, src/utils/Stream/Stream.scala:43:26
-      _nxtIdx_1_T = outerIdx_1 + 16'h1;	// src/foragerbee/scala/main/FbEngine.scala:88:25, :726:28
-      wrap = _nxtIdx_1_T == cmdReg_shape_1;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :726:{28,34}
-      outerCarry_2 = (|(cmdReg_dimCount[2:1])) & wrap;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :725:27, :726:34, :727:50
-      _nxtIdx_2_T = outerIdx_2 + 16'h1;	// src/foragerbee/scala/main/FbEngine.scala:88:25, :726:28
-      wrap_1 = _nxtIdx_2_T == cmdReg_shape_2;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :726:{28,34}
-      _outerCarry_3_T = outerCarry_2 & active_1;	// src/foragerbee/scala/main/FbEngine.scala:251:29, :727:{40,50}
-      outerCarry_3 = _outerCarry_3_T & wrap_1;	// src/foragerbee/scala/main/FbEngine.scala:726:34, :727:{40,50}
-      _nxtIdx_3_T = outerIdx_3 + 16'h1;	// src/foragerbee/scala/main/FbEngine.scala:88:25, :726:28
-      wrap_2 = _nxtIdx_3_T == cmdReg_shape_3;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :726:{28,34}
-      _outerCarry_4_T = outerCarry_3 & cmdReg_dimCount[2];	// src/foragerbee/scala/main/FbEngine.scala:76:19, :251:29, :727:{40,50}
-      outerCarry_4 = _outerCarry_4_T & wrap_2;	// src/foragerbee/scala/main/FbEngine.scala:726:34, :727:{40,50}
-      _nxtIdx_4_T = outerIdx_4 + 16'h1;	// src/foragerbee/scala/main/FbEngine.scala:88:25, :726:28
-      wrap_3 = _nxtIdx_4_T == cmdReg_shape_4;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :726:{28,34}
-      _outerCarry_5_T = outerCarry_4 & active_3;	// src/foragerbee/scala/main/FbEngine.scala:251:29, :727:{40,50}
-      _GEN_85 = _GEN_13 & _GEN_63;	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:{14,25}, :740:26, :743:16, src/utils/Stream/Stream.scala:43:26
-      _queueCredit_T = queueCredit - seg[6:0];	// src/foragerbee/scala/main/FbEngine.scala:135:28, :715:8, :739:31, :745:34
-      _GEN_86 = _GEN_64 & io_bus_rdData_payload_err;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :750:30, :751:{39,48}, src/utils/Stream/Stream.scala:43:26
-      _GEN_87 = _GEN_13 & _GEN_86;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :736:{14,25}, :750:30, :751:{39,48}
-      _GEN_88 = rRemain == 20'h1;	// src/foragerbee/scala/main/FbEngine.scala:119:24, :752:20
-      _GEN_89 = _GEN_64 & _GEN_88;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :750:30, :752:{20,29}, :753:15, src/utils/Stream/Stream.scala:43:26
-      _GEN_90 = _GEN_13 & _GEN_89;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :736:{14,25}, :750:30, :752:29, :753:15
-      _GEN_91 = _GEN_13 ? ~_GEN_89 & (_GEN_63 | _GEN_84) : _GEN_84;	// src/foragerbee/scala/main/FbEngine.scala:118:25, :577:42, :611:16, :736:{14,25}, :740:26, :741:16, :750:30, :752:29, :753:15, :758:30, src/utils/Stream/Stream.scala:43:26
-      _GEN_92 = mxQuantizer_io_outScale_ready & _mxQuantizer_io_outScale_valid;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :390:25, :768:26, :770:27, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      _GEN_93 = dataQueue_io_deq_ready & _dataQueue_io_deq_valid;	// src/foragerbee/scala/main/FbEngine.scala:130:25, :1259:26, :1396:25, :1406:43, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      _queueCredit_T_2 = queueCredit + 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :788:38
-      _queueCredit_T_4 = queueCredit + 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :802:38
-      _queueCredit_T_6 = queueCredit + 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :809:38
-      _nxtBeat_T = beatInRow + segBeats;	// src/foragerbee/scala/main/FbEngine.scala:89:26, :122:25, :845:33
-      rowEndNow = _nxtBeat_T == _GEN_9;	// src/foragerbee/scala/main/FbEngine.scala:698:28, :845:33, :847:33
-      _GEN_94 = _GEN_14 & _GEN_18;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:{14,26}, :844:{27,53}, :848:29
-      _GEN_95 =
-        {_GEN_70,
+                         : 3'h4};	// src/foragerbee/scala/main/FbEngine.scala:602:38, :685:36, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :233:25, :241:8
+      _GEN_90 = cBad | _cvtOpBad_T_4 | _GEN_71;	// src/foragerbee/scala/main/FbEngine.scala:489:25, :537:48, :607:{23,34,44,58,71,80,94,111}, :608:{15,44,60,76,90,108}, :609:{20,36,48}, :630:27, :653:16, :655:64, :664:58, :668:{39,82}, :678:20
+      _GEN_91 = hasPad & (|{|io_cmdIn_payload_padBefore_1, _GEN_89[18:5]});	// src/foragerbee/scala/main/FbEngine.scala:188:27, :616:54, :678:20, :680:{29,36}, :683:22, :685:{36,71,81,90}, :689:22
+      _GEN_92 = ~_GEN_70 | _GEN_90 | ~_GEN_91;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :192:29, :619:{24,42}, :630:27, :653:16, :655:64, :664:58, :668:82, :678:20, :680:36, :683:22, :685:90, :689:22, src/utils/Stream/Stream.scala:43:26
+      _GEN_93 = _GEN_92 & zawIssued;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :191:26, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
+      _GEN_94 = (~_GEN_70 | cBad | _cvtOpBad_T_4 | _GEN_71 | _GEN_91) & arIssued;	// src/foragerbee/scala/main/FbEngine.scala:118:25, :188:27, :192:29, :489:25, :537:48, :607:{23,34,44,58,71,80,94,111}, :608:{15,44,60,76,90,108}, :609:{20,36,48}, :619:{24,42}, :630:27, :653:16, :655:64, :664:58, :668:{39,82}, :678:20, :680:36, :683:22, :685:90, :689:22, :694:20, :698:18, src/utils/Stream/Stream.scala:43:26
+      _nxtIdx_1_T = outerIdx_1 + 16'h1;	// src/foragerbee/scala/main/FbEngine.scala:88:25, :768:28
+      wrap = _nxtIdx_1_T == cmdReg_shape_1;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :768:{28,34}
+      outerCarry_2 = (|(cmdReg_dimCount[2:1])) & wrap;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :767:27, :768:34, :769:50
+      _nxtIdx_2_T = outerIdx_2 + 16'h1;	// src/foragerbee/scala/main/FbEngine.scala:88:25, :768:28
+      wrap_1 = _nxtIdx_2_T == cmdReg_shape_2;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :768:{28,34}
+      _outerCarry_3_T = outerCarry_2 & active_1;	// src/foragerbee/scala/main/FbEngine.scala:251:29, :769:{40,50}
+      outerCarry_3 = _outerCarry_3_T & wrap_1;	// src/foragerbee/scala/main/FbEngine.scala:768:34, :769:{40,50}
+      _nxtIdx_3_T = outerIdx_3 + 16'h1;	// src/foragerbee/scala/main/FbEngine.scala:88:25, :768:28
+      wrap_2 = _nxtIdx_3_T == cmdReg_shape_3;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :768:{28,34}
+      _outerCarry_4_T = outerCarry_3 & cmdReg_dimCount[2];	// src/foragerbee/scala/main/FbEngine.scala:76:19, :251:29, :769:{40,50}
+      outerCarry_4 = _outerCarry_4_T & wrap_2;	// src/foragerbee/scala/main/FbEngine.scala:768:34, :769:{40,50}
+      _nxtIdx_4_T = outerIdx_4 + 16'h1;	// src/foragerbee/scala/main/FbEngine.scala:88:25, :768:28
+      wrap_3 = _nxtIdx_4_T == cmdReg_shape_4;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :768:{28,34}
+      _outerCarry_5_T = outerCarry_4 & active_3;	// src/foragerbee/scala/main/FbEngine.scala:251:29, :769:{40,50}
+      _GEN_95 = _GEN_13 & _GEN_73;	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:{14,25}, :782:26, :785:16, src/utils/Stream/Stream.scala:43:26
+      _queueCredit_T = queueCredit - seg[6:0];	// src/foragerbee/scala/main/FbEngine.scala:135:28, :757:8, :781:31, :787:34
+      _GEN_96 = _GEN_74 & io_bus_rdData_payload_err;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :792:30, :793:{39,48}, src/utils/Stream/Stream.scala:43:26
+      _GEN_97 = _GEN_13 & _GEN_96;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :778:{14,25}, :792:30, :793:{39,48}
+      _GEN_98 = rRemain == 20'h1;	// src/foragerbee/scala/main/FbEngine.scala:119:24, :794:20
+      _GEN_99 = _GEN_74 & _GEN_98;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :792:30, :794:{20,29}, :795:15, src/utils/Stream/Stream.scala:43:26
+      _GEN_100 = _GEN_13 & _GEN_99;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :778:{14,25}, :792:30, :794:29, :795:15
+      _GEN_101 = _GEN_13 ? ~_GEN_99 & (_GEN_73 | _GEN_94) : _GEN_94;	// src/foragerbee/scala/main/FbEngine.scala:118:25, :619:42, :653:16, :778:{14,25}, :782:26, :783:16, :792:30, :794:29, :795:15, :800:30, src/utils/Stream/Stream.scala:43:26
+      _GEN_102 = mxQuantizer_io_outScale_ready & _mxQuantizer_io_outScale_valid;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :390:25, :810:26, :812:27, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      _GEN_103 = dataQueue_io_deq_ready & _dataQueue_io_deq_valid;	// src/foragerbee/scala/main/FbEngine.scala:130:25, :1307:26, :1460:25, :1470:43, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      _queueCredit_T_2 = queueCredit + 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :830:38
+      _queueCredit_T_4 = queueCredit + 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :844:38
+      _queueCredit_T_6 = queueCredit + 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :851:38
+      _nxtBeat_T = beatInRow + segBeats;	// src/foragerbee/scala/main/FbEngine.scala:89:26, :122:25, :887:33
+      rowEndNow = _nxtBeat_T == _GEN_9;	// src/foragerbee/scala/main/FbEngine.scala:740:28, :887:33, :889:33
+      _GEN_104 = _GEN_14 & _GEN_18;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:{14,26}, :886:{27,53}, :890:29
+      _GEN_105 =
+        {_GEN_80,
          {{_outerCarry_5_T & wrap_3},
           {outerCarry_4},
           {outerCarry_3},
           {outerCarry_2},
           {1'h1},
-          {1'h0}}};	// src/foragerbee/scala/main/FbEngine.scala:266:41, :726:34, :727:{40,50}
-      _GEN_96 = _GEN_95[cmdReg_dimCount];	// src/foragerbee/scala/main/FbEngine.scala:76:19, :266:41
-      _GEN_97 = padActive & _GEN_96;	// src/foragerbee/scala/main/FbEngine.scala:181:26, :263:21, :266:41, :267:22, :577:42
+          {1'h0}}};	// src/foragerbee/scala/main/FbEngine.scala:266:41, :768:34, :769:{40,50}
+      _GEN_106 = _GEN_105[cmdReg_dimCount];	// src/foragerbee/scala/main/FbEngine.scala:76:19, :266:41
+      _GEN_107 = padActive & _GEN_106;	// src/foragerbee/scala/main/FbEngine.scala:181:26, :263:21, :266:41, :267:22, :619:42
       _nextVR_T = virtualRow + 16'h1;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :292:29
-      _GEN_98 = _nextVR_T >= outRowTotal;	// src/foragerbee/scala/main/FbEngine.scala:183:28, :292:29, :294:17
-      _GEN_99 = padOuterDone | cmdReg_dimCount < 3'h3;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :192:29, :295:{25,44}
-      _GEN_100 = ~_GEN_98 | _GEN_99 ? _nextVR_T : 16'h0;	// src/foragerbee/scala/main/FbEngine.scala:292:29, :293:16, :294:{17,33}, :295:{25,52}
-      _GEN_101 = rowEndNow & padActive;	// src/foragerbee/scala/main/FbEngine.scala:181:26, :263:21, :269:34, :577:42, :847:33, :860:31
-      _GEN_102 = ~_GEN_94 | mxQuantActive | ~_GEN_101 | (|padAfterBytes0);	// src/foragerbee/scala/main/FbEngine.scala:186:31, :196:66, :263:21, :269:{27,34}, :577:42, :768:26, :844:53, :848:29, :860:31
-      _GEN_103 = _GEN_99 | (|cmdReg_padBefore_1);	// src/foragerbee/scala/main/FbEngine.scala:76:19, :295:{25,52}, :302:{34,41}, :306:43, :577:42
-      _GEN_104 = (|cmdReg_padBefore_1) | (|padBeforeBytes0);	// src/foragerbee/scala/main/FbEngine.scala:76:19, :185:32, :302:{34,41}, :304:22, :306:{36,43}, :309:22, :577:42
-      _GEN_105 = _GEN_104 | ~_GEN_82;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :302:41, :304:22, :306:43, :309:22, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
-      _GEN_106 = _GEN_99 | ~_GEN_104;	// src/foragerbee/scala/main/FbEngine.scala:295:{25,52}, :302:41, :304:22, :305:21, :306:43, :309:22, :310:21, :577:42
-      _GEN_107 = _GEN_99 | _GEN_104;	// src/foragerbee/scala/main/FbEngine.scala:295:{25,52}, :302:41, :304:22, :306:43, :309:22, :313:20, :577:42, :736:25
+      _GEN_108 = _nextVR_T >= outRowTotal;	// src/foragerbee/scala/main/FbEngine.scala:183:28, :292:29, :294:17
+      _GEN_109 = padOuterDone | cmdReg_dimCount < 3'h3;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :192:29, :295:{25,44}
+      _GEN_110 = ~_GEN_108 | _GEN_109 ? _nextVR_T : 16'h0;	// src/foragerbee/scala/main/FbEngine.scala:292:29, :293:16, :294:{17,33}, :295:{25,52}
+      _GEN_111 = rowEndNow & padActive;	// src/foragerbee/scala/main/FbEngine.scala:181:26, :263:21, :269:34, :619:42, :889:33, :902:31
+      _GEN_112 = ~_GEN_104 | mxQuantActive | ~_GEN_111 | (|padAfterBytes0);	// src/foragerbee/scala/main/FbEngine.scala:186:31, :196:66, :263:21, :269:{27,34}, :619:42, :810:26, :886:53, :890:29, :902:31
+      _GEN_113 = _GEN_109 | (|cmdReg_padBefore_1);	// src/foragerbee/scala/main/FbEngine.scala:76:19, :295:{25,52}, :302:{34,41}, :306:43, :619:42
+      _GEN_114 = (|cmdReg_padBefore_1) | (|padBeforeBytes0);	// src/foragerbee/scala/main/FbEngine.scala:76:19, :185:32, :302:{34,41}, :304:22, :306:{36,43}, :309:22, :619:42
+      _GEN_115 = _GEN_114 | ~_GEN_92;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :302:41, :304:22, :306:43, :309:22, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
+      _GEN_116 = _GEN_109 | ~_GEN_114;	// src/foragerbee/scala/main/FbEngine.scala:295:{25,52}, :302:41, :304:22, :305:21, :306:43, :309:22, :310:21, :619:42
+      _GEN_117 = _GEN_109 | _GEN_114;	// src/foragerbee/scala/main/FbEngine.scala:295:{25,52}, :302:41, :304:22, :306:43, :309:22, :313:20, :619:42, :778:25
       nextIsDim1Pad =
         _nextVR_T < cmdReg_padBefore_1 | {1'h0, _nextVR_T} >= _GEN_19 + _GEN_20;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :292:29, :317:{34,56}, :318:{16,40}
-      _GEN_108 = ~_GEN_94 | mxQuantActive | ~_GEN_101;	// src/foragerbee/scala/main/FbEngine.scala:196:66, :263:21, :269:34, :577:42, :768:26, :844:53, :848:29, :860:31
-      _GEN_109 = nextIsDim1Pad | (|padBeforeBytes0);	// src/foragerbee/scala/main/FbEngine.scala:185:32, :306:36, :317:56, :319:27, :321:20, :324:37, :327:22, :577:42
-      _GEN_110 = _GEN_109 | ~_GEN_82;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :302:41, :304:22, :306:43, :309:22, :319:27, :321:20, :324:37, :327:22, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
-      _GEN_111 =
-        _GEN_108
-          ? _GEN_83
-          : ~(|padAfterBytes0) & (_GEN_98 ? _GEN_106 & _GEN_83 : ~_GEN_109 & _GEN_83);	// src/foragerbee/scala/main/FbEngine.scala:186:31, :191:26, :269:{27,34}, :274:19, :294:{17,33}, :295:52, :302:41, :319:27, :321:20, :322:19, :324:37, :327:22, :328:21, :577:42, :611:16, :768:26, :844:53, :848:29, :860:31
-      _GEN_112 = _GEN_102 ? _GEN_91 : _GEN_98 ? _GEN_107 & _GEN_91 : _GEN_109 & _GEN_91;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :294:{17,33}, :295:52, :302:41, :306:43, :313:20, :319:27, :321:20, :324:37, :327:22, :331:20, :577:42, :736:25, :750:30, :768:26, :844:53, :848:29, :860:31
-      _mxScaleWrByte_T = mxScaleWrByte + cnt;	// src/foragerbee/scala/main/FbEngine.scala:200:34, :915:18, :940:40
-      _GEN_114 = _mxScaleWrByte_T >= mxScaleAccumCount;	// src/foragerbee/scala/main/FbEngine.scala:198:34, :940:40, :941:34
-      _GEN_115 = _GEN_21 & _nbWrEofFire_T & _GEN_114;	// src/foragerbee/scala/main/FbEngine.scala:768:26, :909:{14,27}, :938:28, :941:{34,56}, :944:29, src/utils/Stream/Stream.scala:43:26
-      _GEN_116 = _GEN_21 & _nbWrEofFire_T & _GEN_114 & mxRowEndPending;	// src/foragerbee/scala/main/FbEngine.scala:202:34, :768:26, :909:{14,27}, :938:28, :941:{34,56}, :945:33, :947:29, src/utils/Stream/Stream.scala:43:26
-      _nextVR_T_1 = virtualRow + 16'h1;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :292:29
-      _GEN_117 = _nextVR_T_1 >= outRowTotal;	// src/foragerbee/scala/main/FbEngine.scala:183:28, :292:29, :294:17
-      _GEN_118 = ~_GEN_117 | _GEN_99 ? _nextVR_T_1 : 16'h0;	// src/foragerbee/scala/main/FbEngine.scala:292:29, :293:16, :294:{17,33}, :295:{25,52}
-      _GEN_119 = _GEN_21 & _nbWrEofFire_T & _GEN_114 & mxRowEndPending & padActive;	// src/foragerbee/scala/main/FbEngine.scala:181:26, :202:34, :263:21, :269:34, :768:26, :909:{14,27}, :938:28, :941:{34,56}, :945:33, src/utils/Stream/Stream.scala:43:26
-      _GEN_120 = ~_GEN_119 | (|padAfterBytes0);	// src/foragerbee/scala/main/FbEngine.scala:186:31, :263:21, :269:{27,34}, :768:26, :909:27, :938:28, :941:56, :945:33
+      _GEN_118 = ~_GEN_104 | mxQuantActive | ~_GEN_111;	// src/foragerbee/scala/main/FbEngine.scala:196:66, :263:21, :269:34, :619:42, :810:26, :886:53, :890:29, :902:31
+      _GEN_119 = nextIsDim1Pad | (|padBeforeBytes0);	// src/foragerbee/scala/main/FbEngine.scala:185:32, :306:36, :317:56, :319:27, :321:20, :324:37, :327:22, :619:42
+      _GEN_120 = _GEN_119 | ~_GEN_92;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :302:41, :304:22, :306:43, :309:22, :319:27, :321:20, :324:37, :327:22, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
       _GEN_121 =
-        (~_GEN_119 | (|padAfterBytes0) | ~_GEN_117 | _GEN_99)
-        & (~_GEN_94 | mxQuantActive | ~_GEN_101 | (|padAfterBytes0) | ~_GEN_98 | _GEN_99);	// src/foragerbee/scala/main/FbEngine.scala:186:31, :196:66, :263:21, :269:{27,34}, :293:16, :294:{17,33}, :295:{25,52}, :300:25, :577:42, :768:26, :844:53, :848:29, :860:31, :909:27, :938:28, :941:56, :945:33
-      _GEN_122 = _GEN_103 | ~(|padBeforeBytes0);	// src/foragerbee/scala/main/FbEngine.scala:185:32, :295:52, :302:41, :306:{36,43}, :577:42, :768:26
+        _GEN_118
+          ? _GEN_93
+          : ~(|padAfterBytes0) & (_GEN_108 ? _GEN_116 & _GEN_93 : ~_GEN_119 & _GEN_93);	// src/foragerbee/scala/main/FbEngine.scala:186:31, :191:26, :269:{27,34}, :274:19, :294:{17,33}, :295:52, :302:41, :319:27, :321:20, :322:19, :324:37, :327:22, :328:21, :619:42, :653:16, :810:26, :886:53, :890:29, :902:31
+      _GEN_122 =
+        _GEN_112 ? _GEN_101 : _GEN_108 ? _GEN_117 & _GEN_101 : _GEN_119 & _GEN_101;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :294:{17,33}, :295:52, :302:41, :306:43, :313:20, :319:27, :321:20, :324:37, :327:22, :331:20, :619:42, :778:25, :792:30, :810:26, :886:53, :890:29, :902:31
+      _mxScaleWrByte_T = mxScaleWrByte + cnt;	// src/foragerbee/scala/main/FbEngine.scala:200:34, :957:18, :982:40
+      _GEN_124 = _mxScaleWrByte_T >= mxScaleAccumCount;	// src/foragerbee/scala/main/FbEngine.scala:198:34, :982:40, :983:34
+      _GEN_125 = _GEN_21 & _nbWrEofFire_T & _GEN_124;	// src/foragerbee/scala/main/FbEngine.scala:810:26, :951:{14,27}, :980:28, :983:{34,56}, :986:29, src/utils/Stream/Stream.scala:43:26
+      _GEN_126 = _GEN_21 & _nbWrEofFire_T & _GEN_124 & mxRowEndPending;	// src/foragerbee/scala/main/FbEngine.scala:202:34, :810:26, :951:{14,27}, :980:28, :983:{34,56}, :987:33, :989:29, src/utils/Stream/Stream.scala:43:26
+      _nextVR_T_1 = virtualRow + 16'h1;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :292:29
+      _GEN_127 = _nextVR_T_1 >= outRowTotal;	// src/foragerbee/scala/main/FbEngine.scala:183:28, :292:29, :294:17
+      _GEN_128 = ~_GEN_127 | _GEN_109 ? _nextVR_T_1 : 16'h0;	// src/foragerbee/scala/main/FbEngine.scala:292:29, :293:16, :294:{17,33}, :295:{25,52}
+      _GEN_129 = _GEN_21 & _nbWrEofFire_T & _GEN_124 & mxRowEndPending & padActive;	// src/foragerbee/scala/main/FbEngine.scala:181:26, :202:34, :263:21, :269:34, :810:26, :951:{14,27}, :980:28, :983:{34,56}, :987:33, src/utils/Stream/Stream.scala:43:26
+      _GEN_130 = ~_GEN_129 | (|padAfterBytes0);	// src/foragerbee/scala/main/FbEngine.scala:186:31, :263:21, :269:{27,34}, :810:26, :951:27, :980:28, :983:56, :987:33
+      _GEN_131 =
+        (~_GEN_129 | (|padAfterBytes0) | ~_GEN_127 | _GEN_109)
+        & (~_GEN_104 | mxQuantActive | ~_GEN_111 | (|padAfterBytes0) | ~_GEN_108
+           | _GEN_109);	// src/foragerbee/scala/main/FbEngine.scala:186:31, :196:66, :263:21, :269:{27,34}, :293:16, :294:{17,33}, :295:{25,52}, :300:25, :619:42, :810:26, :886:53, :890:29, :902:31, :951:27, :980:28, :983:56, :987:33
+      _GEN_132 = _GEN_113 | ~(|padBeforeBytes0);	// src/foragerbee/scala/main/FbEngine.scala:185:32, :295:52, :302:41, :306:{36,43}, :619:42, :810:26
       nextIsDim1Pad_1 =
         _nextVR_T_1 < cmdReg_padBefore_1 | {1'h0, _nextVR_T_1} >= _GEN_19 + _GEN_20;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :292:29, :317:{34,56}, :318:{16,40}
-      _GEN_123 = nextIsDim1Pad_1 | (|padBeforeBytes0);	// src/foragerbee/scala/main/FbEngine.scala:185:32, :306:36, :317:56, :319:27, :321:20, :324:37, :327:22, :768:26
-      _GEN_124 =
-        _GEN_119
-          ? ~(|padAfterBytes0) & (_GEN_117 ? _GEN_106 & _GEN_111 : ~_GEN_123 & _GEN_111)
-          : _GEN_111;	// src/foragerbee/scala/main/FbEngine.scala:186:31, :263:21, :269:{27,34}, :274:19, :294:{17,33}, :295:52, :302:41, :319:27, :321:20, :322:19, :324:37, :327:22, :328:21, :577:42, :768:26, :844:53, :848:29, :909:27, :938:28, :941:56, :945:33
-      _GEN_125 =
-        _GEN_120 ? _GEN_112 : _GEN_117 ? _GEN_107 & _GEN_112 : _GEN_123 & _GEN_112;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :294:{17,33}, :295:52, :302:41, :306:43, :313:20, :319:27, :321:20, :324:37, :327:22, :331:20, :736:25, :768:26, :844:53, :848:29, :909:27, :938:28, :941:56, :945:33
-      _GEN_126 = _nbWrEofFire_T & ~zawIssued;	// src/foragerbee/scala/main/FbEngine.scala:191:26, :909:27, :1011:30, :1017:26, :1019:24, :1020:19, src/utils/Stream/Stream.scala:43:26
-      _GEN_127 = _GEN_126 | _GEN_124;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :768:26, :909:27, :938:28, :941:56, :945:33, :1017:26, :1019:24, :1020:19
-      _nxtZBeat_T = zBeatInRow + (zawIssued ? zSegBeats : zSeg);	// src/foragerbee/scala/main/FbEngine.scala:188:27, :190:26, :191:26, :1007:29, :1034:32, :1035:35
-      _GEN_128 = _nxtZBeat_T >= zPhaseTotalBeats;	// src/foragerbee/scala/main/FbEngine.scala:990:31, :1035:35, :1036:23
+      _GEN_133 = nextIsDim1Pad_1 | (|padBeforeBytes0);	// src/foragerbee/scala/main/FbEngine.scala:185:32, :306:36, :317:56, :319:27, :321:20, :324:37, :327:22, :810:26
+      _GEN_134 =
+        _GEN_129
+          ? ~(|padAfterBytes0) & (_GEN_127 ? _GEN_116 & _GEN_121 : ~_GEN_133 & _GEN_121)
+          : _GEN_121;	// src/foragerbee/scala/main/FbEngine.scala:186:31, :263:21, :269:{27,34}, :274:19, :294:{17,33}, :295:52, :302:41, :319:27, :321:20, :322:19, :324:37, :327:22, :328:21, :619:42, :810:26, :886:53, :890:29, :951:27, :980:28, :983:56, :987:33
+      _GEN_135 =
+        _GEN_130 ? _GEN_122 : _GEN_127 ? _GEN_117 & _GEN_122 : _GEN_133 & _GEN_122;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :294:{17,33}, :295:52, :302:41, :306:43, :313:20, :319:27, :321:20, :324:37, :327:22, :331:20, :778:25, :810:26, :886:53, :890:29, :951:27, :980:28, :983:56, :987:33
+      _GEN_136 = _nbWrEofFire_T & ~zawIssued;	// src/foragerbee/scala/main/FbEngine.scala:191:26, :951:27, :1053:30, :1059:26, :1061:24, :1062:19, src/utils/Stream/Stream.scala:43:26
+      _GEN_137 = _GEN_136 | _GEN_134;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :810:26, :951:27, :980:28, :983:56, :987:33, :1059:26, :1061:24, :1062:19
+      _nxtZBeat_T = zBeatInRow + (zawIssued ? zSegBeats : zSeg);	// src/foragerbee/scala/main/FbEngine.scala:188:27, :190:26, :191:26, :1049:29, :1076:32, :1077:35
+      _GEN_138 = _nxtZBeat_T >= zPhaseTotalBeats;	// src/foragerbee/scala/main/FbEngine.scala:1032:31, :1077:35, :1078:23
       _nextVR_T_2 = virtualRow + 16'h1;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :292:29
-      _GEN_129 = _nextVR_T_2 >= outRowTotal;	// src/foragerbee/scala/main/FbEngine.scala:183:28, :292:29, :294:17
-      _GEN_130 = ~_GEN_129 | _GEN_99;	// src/foragerbee/scala/main/FbEngine.scala:293:16, :294:{17,33}, :295:{25,52}
-      _GEN_131 = _GEN_106 & _GEN_127;	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :577:42, :909:27, :1017:26, :1019:24, :1020:19
-      _GEN_132 = _GEN_107 & _GEN_125;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :295:52, :302:41, :306:43, :313:20, :736:25, :768:26, :909:27, :938:28, :941:56, :945:33
+      _GEN_139 = _nextVR_T_2 >= outRowTotal;	// src/foragerbee/scala/main/FbEngine.scala:183:28, :292:29, :294:17
+      _GEN_140 = ~_GEN_139 | _GEN_109;	// src/foragerbee/scala/main/FbEngine.scala:293:16, :294:{17,33}, :295:{25,52}
+      _GEN_141 = _GEN_116 & _GEN_137;	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :619:42, :951:27, :1059:26, :1061:24, :1062:19
+      _GEN_142 = _GEN_117 & _GEN_135;	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :295:52, :302:41, :306:43, :313:20, :778:25, :810:26, :951:27, :980:28, :983:56, :987:33
       nextIsDim1Pad_2 =
-        _nextVR_T_2 < cmdReg_padBefore_1 | {1'h0, _nextVR_T_2} >= _nextIsDim1Pad_T_10;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :292:29, :317:{34,56}, :318:16, :987:42
-      _GEN_133 = nextIsDim1Pad_2 | (|padBeforeBytes0);	// src/foragerbee/scala/main/FbEngine.scala:185:32, :306:36, :317:56, :319:27, :321:20, :324:37, :327:22, :909:27
+        _nextVR_T_2 < cmdReg_padBefore_1 | {1'h0, _nextVR_T_2} >= _nextIsDim1Pad_T_10;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :292:29, :317:{34,56}, :318:16, :1029:42
+      _GEN_143 = nextIsDim1Pad_2 | (|padBeforeBytes0);	// src/foragerbee/scala/main/FbEngine.scala:185:32, :306:36, :317:56, :319:27, :321:20, :324:37, :327:22, :951:27
       _nextVR_T_3 = virtualRow + 16'h1;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :292:29
-      _GEN_134 = _nextVR_T_3 >= outRowTotal;	// src/foragerbee/scala/main/FbEngine.scala:183:28, :292:29, :294:17
-      _GEN_135 = _GEN_23 & _GEN_18 & _GEN_128;	// src/foragerbee/scala/main/FbEngine.scala:844:27, :909:27, :984:{14,27}, :1033:53, :1036:{23,44}, :1038:30
+      _GEN_144 = _nextVR_T_3 >= outRowTotal;	// src/foragerbee/scala/main/FbEngine.scala:183:28, :292:29, :294:17
+      _GEN_145 = _GEN_23 & _GEN_18 & _GEN_138;	// src/foragerbee/scala/main/FbEngine.scala:886:27, :951:27, :1026:{14,27}, :1075:53, :1078:{23,44}, :1080:30
       nextIsDim1Pad_3 =
-        _nextVR_T_3 < cmdReg_padBefore_1 | {1'h0, _nextVR_T_3} >= _nextIsDim1Pad_T_10;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :292:29, :317:{34,56}, :318:16, :987:42
-      _GEN_136 = nextIsDim1Pad_3 | (|padBeforeBytes0);	// src/foragerbee/scala/main/FbEngine.scala:185:32, :306:36, :317:56, :319:27, :321:20, :324:37, :327:22, :909:27
-      _GEN_137 = _GEN_31 & _GEN_63;	// src/foragerbee/scala/main/FbEngine.scala:160:28, :1269:26, :1283:34, :1284:27, src/utils/Stream/Stream.scala:43:26
-      _GEN_138 = ~_GEN_29 | _im2colGen_io_done | ~_im2colGen_io_valid;	// src/foragerbee/scala/main/FbEngine.scala:152:50, :160:28, :736:25, :1259:{16,26}, :1266:25, :1268:32, :1269:26
-      _GEN_139 = {4'h0, _i2cMicroRowBeats_T_25[20:5]};	// src/foragerbee/scala/main/FbEngine.scala:1251:{79,84,105}, :1285:26
-      _queueCredit_T_8 = queueCredit - _i2cMicroRowBeats_T_25[11:5];	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1251:{79,84}, :1282:56, :1287:42
-      _GEN_140 = i2cRRemain == 20'h1;	// src/foragerbee/scala/main/FbEngine.scala:161:28, :752:20, :1294:31
-      _GEN_141 = _GEN_64 & _GEN_140;	// src/foragerbee/scala/main/FbEngine.scala:577:42, :1292:38, :1294:{31,40}, :1295:26, src/utils/Stream/Stream.scala:43:26
-      _queueCredit_T_10 = queueCredit + 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1313:44
-      _GEN_142 = _GEN_39 & _GEN_93;	// src/foragerbee/scala/main/FbEngine.scala:768:26, :1269:26, :1312:43, :1313:29, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      if (converter_io_flush & io_done_valid_0 & io_done_ready)	// src/foragerbee/scala/main/FbEngine.scala:349:17, :1396:25, :1546:{14,25}, :1552:21, :1558:24, :1559:13, src/utils/Stream/Stream.scala:43:26
+        _nextVR_T_3 < cmdReg_padBefore_1 | {1'h0, _nextVR_T_3} >= _nextIsDim1Pad_T_10;	// src/foragerbee/scala/main/FbEngine.scala:76:19, :292:29, :317:{34,56}, :318:16, :1029:42
+      _GEN_146 = nextIsDim1Pad_3 | (|padBeforeBytes0);	// src/foragerbee/scala/main/FbEngine.scala:185:32, :306:36, :317:56, :319:27, :321:20, :324:37, :327:22, :951:27
+      _GEN_147 = {1'h0, i2cMicroRowBeatsAligned};	// src/foragerbee/scala/main/FbEngine.scala:1299:38, :1332:63
+      _GEN_148 = _GEN_36 & _GEN_73;	// src/foragerbee/scala/main/FbEngine.scala:160:28, :1317:26, :1333:34, :1334:27, src/utils/Stream/Stream.scala:43:26
+      _GEN_149 = ~_GEN_34 | _im2colGen_io_done | ~_im2colGen_io_valid;	// src/foragerbee/scala/main/FbEngine.scala:152:50, :160:28, :778:25, :1307:{16,26}, :1314:25, :1316:32, :1317:26
+      _queueCredit_T_8 = queueCredit - i2cMicroRowBeatsAligned[6:0];	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1299:38, :1332:63, :1337:42
+      _GEN_150 = i2cRRemain == 20'h1;	// src/foragerbee/scala/main/FbEngine.scala:161:28, :794:20, :1344:31
+      _GEN_151 = _GEN_74 & _GEN_150;	// src/foragerbee/scala/main/FbEngine.scala:619:42, :1342:38, :1344:{31,40}, :1345:26, src/utils/Stream/Stream.scala:43:26
+      _queueCredit_T_10 = queueCredit + 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1370:46
+      _GEN_152 = ~_GEN_44 | _GEN_45 | ~_GEN_103;	// src/foragerbee/scala/main/FbEngine.scala:93:68, :810:26, :832:29, :843:37, :850:30, :1317:26, :1357:{33,42}, :1369:45, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (converter_io_flush & io_done_valid_0 & io_done_ready)	// src/foragerbee/scala/main/FbEngine.scala:349:17, :1460:25, :1610:{14,25}, :1616:21, :1622:24, :1623:13, src/utils/Stream/Stream.scala:43:26
         state <= 4'h0;	// src/foragerbee/scala/main/FbEngine.scala:73:22
-      else if (_GEN_46 & _GEN_49 | _GEN_29 & _im2colGen_io_done)	// src/foragerbee/scala/main/FbEngine.scala:152:50, :984:27, :1259:{16,26}, :1266:25, :1267:15, :1396:{16,25}, :1406:{23,43}, :1407:15
-        state <= 4'h5;	// src/foragerbee/scala/main/FbEngine.scala:73:22, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66
-      else begin	// src/foragerbee/scala/main/FbEngine.scala:984:27, :1259:26, :1266:25, :1267:15, :1396:25, :1406:43, :1407:15
-        automatic logic [3:0] _GEN_143;	// src/foragerbee/scala/main/FbEngine.scala:295:52, :296:15, :302:41
-        _GEN_143 = _GEN_99 ? 4'h5 : _GEN_104 ? 4'h6 : 4'h1;	// src/foragerbee/scala/main/FbEngine.scala:295:{25,52}, :296:15, :302:41, :303:17, :304:22, :306:43, :307:17, :309:22, :312:17, :577:42, :640:17, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66
-        if (_GEN_135)	// src/foragerbee/scala/main/FbEngine.scala:909:27, :984:27, :1033:53, :1036:44, :1038:30
+      else if (_GEN_54 & _GEN_57 | _GEN_34 & _im2colGen_io_done)	// src/foragerbee/scala/main/FbEngine.scala:152:50, :1026:27, :1307:{16,26}, :1314:25, :1315:15, :1460:{16,25}, :1470:{23,43}, :1471:15
+        state <= 4'h5;	// src/foragerbee/scala/main/FbEngine.scala:73:22, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66
+      else begin	// src/foragerbee/scala/main/FbEngine.scala:1026:27, :1307:26, :1314:25, :1315:15, :1460:25, :1470:43, :1471:15
+        automatic logic [3:0] _GEN_153;	// src/foragerbee/scala/main/FbEngine.scala:295:52, :296:15, :302:41
+        _GEN_153 = _GEN_109 ? 4'h5 : _GEN_114 ? 4'h6 : 4'h1;	// src/foragerbee/scala/main/FbEngine.scala:295:{25,52}, :296:15, :302:41, :303:17, :304:22, :306:43, :307:17, :309:22, :312:17, :619:42, :682:17, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66
+        if (_GEN_145)	// src/foragerbee/scala/main/FbEngine.scala:951:27, :1026:27, :1075:53, :1078:44, :1080:30
           state <=
             isDim1PadRow
-              ? (_GEN_129 ? _GEN_143 : _GEN_133 ? 4'h6 : 4'h1)
-              : _zBaseOff_T ? 4'h1 : _GEN_134 ? _GEN_143 : _GEN_136 ? 4'h6 : 4'h1;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :294:{17,33}, :295:52, :296:15, :302:41, :319:27, :320:15, :321:20, :324:37, :325:17, :327:22, :330:17, :640:17, :909:27, :986:57, :992:18, :1038:30, :1041:38, :1043:19, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66
-        else begin	// src/foragerbee/scala/main/FbEngine.scala:909:27, :984:27, :1033:53, :1036:44, :1038:30
-          automatic logic [3:0] _GEN_144;	// src/foragerbee/scala/main/FbEngine.scala:282:41, :283:15, :285:15
-          _GEN_144 = {1'h0, _GEN_96, 2'h1};	// src/foragerbee/scala/main/FbEngine.scala:266:41, :282:41, :283:15, :285:15
-          if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:768:26, :909:27, :938:28, :941:56, :944:29
+              ? (_GEN_139 ? _GEN_153 : _GEN_143 ? 4'h6 : 4'h1)
+              : _zBaseOff_T ? 4'h1 : _GEN_144 ? _GEN_153 : _GEN_146 ? 4'h6 : 4'h1;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :294:{17,33}, :295:52, :296:15, :302:41, :319:27, :320:15, :321:20, :324:37, :325:17, :327:22, :330:17, :682:17, :951:27, :1028:57, :1034:18, :1080:30, :1083:38, :1085:19, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66
+        else begin	// src/foragerbee/scala/main/FbEngine.scala:951:27, :1026:27, :1075:53, :1078:44, :1080:30
+          automatic logic [3:0] _GEN_154;	// src/foragerbee/scala/main/FbEngine.scala:282:41, :283:15, :285:15
+          _GEN_154 = {1'h0, _GEN_106, 2'h1};	// src/foragerbee/scala/main/FbEngine.scala:266:41, :282:41, :283:15, :285:15
+          if (_GEN_125)	// src/foragerbee/scala/main/FbEngine.scala:810:26, :951:27, :980:28, :983:56, :986:29
             state <=
               mxRowEndPending
                 ? (padActive
                      ? ((|padAfterBytes0)
                           ? 4'h6
-                          : _GEN_117 ? _GEN_143 : _GEN_123 ? 4'h6 : 4'h1)
-                     : _GEN_144)
-                : 4'h1;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :181:26, :186:31, :202:34, :263:21, :269:{27,34}, :271:15, :282:41, :283:15, :285:15, :294:{17,33}, :295:52, :296:15, :302:41, :319:27, :320:15, :321:20, :324:37, :325:17, :327:22, :330:17, :640:17, :768:26, :945:33, :951:19, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66
-          else if (_GEN_94)	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29
+                          : _GEN_127 ? _GEN_153 : _GEN_133 ? 4'h6 : 4'h1)
+                     : _GEN_154)
+                : 4'h1;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :181:26, :186:31, :202:34, :263:21, :269:{27,34}, :271:15, :282:41, :283:15, :285:15, :294:{17,33}, :295:52, :296:15, :302:41, :319:27, :320:15, :321:20, :324:37, :325:17, :327:22, :330:17, :682:17, :810:26, :987:33, :993:19, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66
+          else if (_GEN_104)	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29
             state <=
               mxQuantActive
                 ? 4'h9
@@ -1104,522 +1178,530 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
                     ? (padActive
                          ? ((|padAfterBytes0)
                               ? 4'h6
-                              : _GEN_98 ? _GEN_143 : _GEN_109 ? 4'h6 : 4'h1)
-                         : _GEN_144)
-                    : 4'h1;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :181:26, :186:31, :196:66, :263:21, :269:{27,34}, :271:15, :282:41, :283:15, :285:15, :294:{17,33}, :295:52, :296:15, :302:41, :319:27, :320:15, :321:20, :324:37, :325:17, :327:22, :330:17, :577:42, :640:17, :847:33, :848:29, :859:17, :860:31, :865:17, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66
-          else if (_GEN_90)	// src/foragerbee/scala/main/FbEngine.scala:577:42, :736:25, :750:30, :752:29, :753:15
+                              : _GEN_108 ? _GEN_153 : _GEN_119 ? 4'h6 : 4'h1)
+                         : _GEN_154)
+                    : 4'h1;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :181:26, :186:31, :196:66, :263:21, :269:{27,34}, :271:15, :282:41, :283:15, :285:15, :294:{17,33}, :295:52, :296:15, :302:41, :319:27, :320:15, :321:20, :324:37, :325:17, :327:22, :330:17, :619:42, :682:17, :889:33, :890:29, :901:17, :902:31, :907:17, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66
+          else if (_GEN_100)	// src/foragerbee/scala/main/FbEngine.scala:619:42, :778:25, :792:30, :794:29, :795:15
             state <= 4'h2;	// src/foragerbee/scala/main/FbEngine.scala:73:22
-          else if (_GEN_60)	// src/foragerbee/scala/main/FbEngine.scala:577:24, src/utils/Stream/Stream.scala:43:26
+          else if (_GEN_70)	// src/foragerbee/scala/main/FbEngine.scala:619:24, src/utils/Stream/Stream.scala:43:26
             state <=
-              cBad
-                ? 4'h5
-                : _i2cCvtBurstBad_T ? 4'h7 : _GEN_61 ? 4'h8 : _GEN_81 ? 4'h6 : 4'h1;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :188:27, :487:25, :535:48, :567:{23,34,44,58,71,80,94,111}, :568:{15,44,60,76,90}, :611:16, :612:13, :613:64, :622:58, :623:13, :626:{39,82}, :627:13, :636:20, :638:36, :640:17, :641:22, :643:90, :645:17, :647:22, :651:17, :655:15, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66
+              cBad ? 4'h5 : _cvtOpBad_T_4 ? 4'h7 : _GEN_71 ? 4'h8 : _GEN_91 ? 4'h6 : 4'h1;	// src/foragerbee/scala/main/FbEngine.scala:73:22, :188:27, :489:25, :537:48, :607:{23,34,44,58,71,80,94,111}, :608:{15,44,60,76,90,108}, :609:{20,36,48}, :653:16, :654:13, :655:64, :664:58, :665:13, :668:{39,82}, :669:13, :678:20, :680:36, :682:17, :683:22, :685:90, :687:17, :689:22, :693:17, :697:15, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66
         end
       end
       errReg <=
-        _GEN_46 & ~_GEN_52 & _GEN_50 & _GEN_86
-        | (~_GEN_29 | _im2colGen_io_done | ~_im2colGen_io_valid | _GEN_30
-           | ~(_GEN_31 & _GEN_64)
-             ? _GEN_87 | _GEN_72
-             : io_bus_rdData_payload_err | _GEN_87 | _GEN_72);	// src/foragerbee/scala/main/FbEngine.scala:77:23, :152:50, :177:31, :369:59, :577:42, :579:12, :736:25, :750:30, :751:{39,48}, :1259:{16,26}, :1266:25, :1268:32, :1269:26, :1292:38, :1293:{47,56}, :1396:{16,25}, :1406:43, :1409:25, :1455:38, :1456:{47,56}, src/utils/Stream/Stream.scala:43:26
-      if (_GEN_116 | ~(~_GEN_94 | mxQuantActive | ~rowEndNow)) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66, :263:21, :577:42, :768:26, :844:53, :847:33, :848:29, :860:31, :909:27, :938:28, :941:56, :945:33, :947:29
-        if (|(cmdReg_dimCount[2:1]))	// src/foragerbee/scala/main/FbEngine.scala:76:19, :725:27
-          outerIdx_1 <= wrap ? 16'h0 : _nxtIdx_1_T;	// src/foragerbee/scala/main/FbEngine.scala:88:25, :726:{28,34}, :729:23
-        if (_outerCarry_3_T)	// src/foragerbee/scala/main/FbEngine.scala:727:40
-          outerIdx_2 <= wrap_1 ? 16'h0 : _nxtIdx_2_T;	// src/foragerbee/scala/main/FbEngine.scala:88:25, :726:{28,34}, :729:23
-        if (_outerCarry_4_T)	// src/foragerbee/scala/main/FbEngine.scala:727:40
-          outerIdx_3 <= wrap_2 ? 16'h0 : _nxtIdx_3_T;	// src/foragerbee/scala/main/FbEngine.scala:88:25, :726:{28,34}, :729:23
-        if (_outerCarry_5_T)	// src/foragerbee/scala/main/FbEngine.scala:727:40
-          outerIdx_4 <= wrap_3 ? 16'h0 : _nxtIdx_4_T;	// src/foragerbee/scala/main/FbEngine.scala:88:25, :726:{28,34}, :729:23
+        _GEN_54 & ~_GEN_60 & _GEN_58 & _GEN_96
+        | (~_GEN_34 | _im2colGen_io_done | ~_im2colGen_io_valid | _GEN_35
+           | ~(_GEN_36 & _GEN_74)
+             ? _GEN_97 | _GEN_83
+             : io_bus_rdData_payload_err | _GEN_97 | _GEN_83);	// src/foragerbee/scala/main/FbEngine.scala:77:23, :152:50, :177:31, :369:59, :619:42, :621:12, :778:25, :792:30, :793:{39,48}, :1307:{16,26}, :1314:25, :1316:32, :1317:26, :1342:38, :1343:{47,56}, :1460:{16,25}, :1470:43, :1473:25, :1519:38, :1520:{47,56}, src/utils/Stream/Stream.scala:43:26
+      if (_GEN_126 | ~(~_GEN_104 | mxQuantActive | ~rowEndNow)) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66, :263:21, :619:42, :810:26, :886:53, :889:33, :890:29, :902:31, :951:27, :980:28, :983:56, :987:33, :989:29
+        if (|(cmdReg_dimCount[2:1]))	// src/foragerbee/scala/main/FbEngine.scala:76:19, :767:27
+          outerIdx_1 <= wrap ? 16'h0 : _nxtIdx_1_T;	// src/foragerbee/scala/main/FbEngine.scala:88:25, :768:{28,34}, :771:23
+        if (_outerCarry_3_T)	// src/foragerbee/scala/main/FbEngine.scala:769:40
+          outerIdx_2 <= wrap_1 ? 16'h0 : _nxtIdx_2_T;	// src/foragerbee/scala/main/FbEngine.scala:88:25, :768:{28,34}, :771:23
+        if (_outerCarry_4_T)	// src/foragerbee/scala/main/FbEngine.scala:769:40
+          outerIdx_3 <= wrap_2 ? 16'h0 : _nxtIdx_3_T;	// src/foragerbee/scala/main/FbEngine.scala:88:25, :768:{28,34}, :771:23
+        if (_outerCarry_5_T)	// src/foragerbee/scala/main/FbEngine.scala:769:40
+          outerIdx_4 <= wrap_3 ? 16'h0 : _nxtIdx_4_T;	// src/foragerbee/scala/main/FbEngine.scala:88:25, :768:{28,34}, :771:23
       end
-      else if (_GEN_60) begin	// src/foragerbee/scala/main/FbEngine.scala:577:24, src/utils/Stream/Stream.scala:43:26
+      else if (_GEN_70) begin	// src/foragerbee/scala/main/FbEngine.scala:619:24, src/utils/Stream/Stream.scala:43:26
         outerIdx_1 <= 16'h0;	// src/foragerbee/scala/main/FbEngine.scala:88:25
         outerIdx_2 <= 16'h0;	// src/foragerbee/scala/main/FbEngine.scala:88:25
         outerIdx_3 <= 16'h0;	// src/foragerbee/scala/main/FbEngine.scala:88:25
         outerIdx_4 <= 16'h0;	// src/foragerbee/scala/main/FbEngine.scala:88:25
       end
-      if (_GEN_116) begin	// src/foragerbee/scala/main/FbEngine.scala:768:26, :909:27, :938:28, :941:56, :945:33, :947:29
+      if (_GEN_126) begin	// src/foragerbee/scala/main/FbEngine.scala:810:26, :951:27, :980:28, :983:56, :987:33, :989:29
         beatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:89:26, :269:27
         wBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:104:53, :269:27
       end
-      else if (_GEN_94) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29
-        beatInRow <= rowEndNow ? 20'h0 : _nxtBeat_T;	// src/foragerbee/scala/main/FbEngine.scala:89:26, :269:27, :845:33, :847:33, :853:27, :854:23, :857:23
-        wBeatInRow <= rowEndNow ? 20'h0 : wBeatInRow + dstSegBeats;	// src/foragerbee/scala/main/FbEngine.scala:104:53, :141:8, :269:27, :846:{48,62}, :847:33, :853:27, :855:52
+      else if (_GEN_104) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29
+        beatInRow <= rowEndNow ? 20'h0 : _nxtBeat_T;	// src/foragerbee/scala/main/FbEngine.scala:89:26, :269:27, :887:33, :889:33, :895:27, :896:23, :899:23
+        wBeatInRow <= rowEndNow ? 20'h0 : wBeatInRow + dstSegBeats;	// src/foragerbee/scala/main/FbEngine.scala:104:53, :141:8, :269:27, :888:{48,62}, :889:33, :895:27, :897:52
       end
-      else if (_GEN_60) begin	// src/foragerbee/scala/main/FbEngine.scala:577:24, src/utils/Stream/Stream.scala:43:26
+      else if (_GEN_70) begin	// src/foragerbee/scala/main/FbEngine.scala:619:24, src/utils/Stream/Stream.scala:43:26
         beatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:89:26, :269:27
         wBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:104:53, :269:27
       end
-      if (~(nbWrEofFire & _GEN_71)) begin	// src/foragerbee/scala/main/FbEngine.scala:358:38, :360:22, src/utils/Stream/Stream.scala:43:26
+      if (~(nbWrEofFire & _GEN_81)) begin	// src/foragerbee/scala/main/FbEngine.scala:358:38, :360:22, src/utils/Stream/Stream.scala:43:26
         if (nbWrEofFire)	// src/foragerbee/scala/main/FbEngine.scala:358:38
           wrInFlight <= wrInFlight + 3'h1;	// src/foragerbee/scala/main/FbEngine.scala:115:37, :363:32
-        else if (_GEN_71)	// src/utils/Stream/Stream.scala:43:26
+        else if (_GEN_81)	// src/utils/Stream/Stream.scala:43:26
           wrInFlight <= wrInFlight - 3'h1;	// src/foragerbee/scala/main/FbEngine.scala:115:37, :365:32
       end
       arIssued <=
-        _GEN_135
+        _GEN_145
           ? (isDim1PadRow
-               ? (_GEN_129 ? _GEN_132 : _GEN_133 & _GEN_125)
-               : ~_zBaseOff_T & (_GEN_134 ? _GEN_132 : _GEN_136 & _GEN_125))
-          : _GEN_125;	// src/foragerbee/scala/main/FbEngine.scala:118:25, :263:21, :269:34, :294:{17,33}, :295:52, :302:41, :306:43, :313:20, :319:27, :321:20, :324:37, :327:22, :331:20, :768:26, :909:27, :938:28, :941:56, :945:33, :984:27, :986:57, :992:18, :1033:53, :1036:44, :1038:30, :1041:38, :1044:22
-      if (_GEN_13) begin	// src/foragerbee/scala/main/FbEngine.scala:736:14
-        if (~_GEN_64 | _GEN_88) begin	// src/foragerbee/scala/main/FbEngine.scala:740:26, :750:30, :752:{20,29}, src/utils/Stream/Stream.scala:43:26
-          if (_GEN_63)	// src/utils/Stream/Stream.scala:43:26
-            rRemain <= seg[19:0];	// src/foragerbee/scala/main/FbEngine.scala:119:24, :715:8, :742:15
+               ? (_GEN_139 ? _GEN_142 : _GEN_143 & _GEN_135)
+               : ~_zBaseOff_T & (_GEN_144 ? _GEN_142 : _GEN_146 & _GEN_135))
+          : _GEN_135;	// src/foragerbee/scala/main/FbEngine.scala:118:25, :263:21, :269:34, :294:{17,33}, :295:52, :302:41, :306:43, :313:20, :319:27, :321:20, :324:37, :327:22, :331:20, :810:26, :951:27, :980:28, :983:56, :987:33, :1026:27, :1028:57, :1034:18, :1075:53, :1078:44, :1080:30, :1083:38, :1086:22
+      if (_GEN_13) begin	// src/foragerbee/scala/main/FbEngine.scala:778:14
+        if (~_GEN_74 | _GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:782:26, :792:30, :794:{20,29}, src/utils/Stream/Stream.scala:43:26
+          if (_GEN_73)	// src/utils/Stream/Stream.scala:43:26
+            rRemain <= seg[19:0];	// src/foragerbee/scala/main/FbEngine.scala:119:24, :757:8, :784:15
         end
-        else	// src/foragerbee/scala/main/FbEngine.scala:740:26, :750:30, :752:29
-          rRemain <= rRemain - 20'h1;	// src/foragerbee/scala/main/FbEngine.scala:119:24, :760:28
+        else	// src/foragerbee/scala/main/FbEngine.scala:782:26, :792:30, :794:29
+          rRemain <= rRemain - 20'h1;	// src/foragerbee/scala/main/FbEngine.scala:119:24, :802:28
       end
-      awIssued <= _GEN_14 & _nbWrEofFire_T & ~awIssued | ~_GEN_90 & awIssued;	// src/foragerbee/scala/main/FbEngine.scala:120:25, :577:42, :736:25, :750:30, :752:29, :753:15, :754:18, :768:{14,26}, :820:30, :825:26, :827:{23,34}, src/utils/Stream/Stream.scala:43:26
-      if (_GEN_14 & _nbWrEofFire_T)	// src/foragerbee/scala/main/FbEngine.scala:736:25, :768:{14,26}, :825:26, :826:15, src/utils/Stream/Stream.scala:43:26
-        wRemain <= wRemain - 20'h1;	// src/foragerbee/scala/main/FbEngine.scala:121:24, :826:26
-      else if (_GEN_90)	// src/foragerbee/scala/main/FbEngine.scala:577:42, :736:25, :750:30, :752:29, :753:15
+      awIssued <= _GEN_14 & _nbWrEofFire_T & ~awIssued | ~_GEN_100 & awIssued;	// src/foragerbee/scala/main/FbEngine.scala:120:25, :619:42, :778:25, :792:30, :794:29, :795:15, :796:18, :810:{14,26}, :862:30, :867:26, :869:{23,34}, src/utils/Stream/Stream.scala:43:26
+      if (_GEN_14 & _nbWrEofFire_T)	// src/foragerbee/scala/main/FbEngine.scala:778:25, :810:{14,26}, :867:26, :868:15, src/utils/Stream/Stream.scala:43:26
+        wRemain <= wRemain - 20'h1;	// src/foragerbee/scala/main/FbEngine.scala:121:24, :868:26
+      else if (_GEN_100)	// src/foragerbee/scala/main/FbEngine.scala:619:42, :778:25, :792:30, :794:29, :795:15
         wRemain <= dstSegBeats;	// src/foragerbee/scala/main/FbEngine.scala:121:24, :141:8
-      if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-        segBeats <= seg[19:0];	// src/foragerbee/scala/main/FbEngine.scala:122:25, :715:8, :742:15
-      if (_GEN_67) begin	// src/foragerbee/scala/main/FbEngine.scala:1259:26, :1396:25, :1406:43
-        if (_GEN_37) begin	// src/foragerbee/scala/main/FbEngine.scala:736:25, :768:26, :1259:26, :1266:25, :1268:32, :1269:26
-          if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:768:14
+      if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+        segBeats <= seg[19:0];	// src/foragerbee/scala/main/FbEngine.scala:122:25, :757:8, :784:15
+      if (_GEN_77) begin	// src/foragerbee/scala/main/FbEngine.scala:1307:26, :1460:25, :1470:43
+        if (_GEN_42) begin	// src/foragerbee/scala/main/FbEngine.scala:778:25, :810:26, :1307:26, :1314:25, :1316:32, :1317:26
+          if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:810:14
             if (mxQuantActive) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66
-              if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-                queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :788:38
-              else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+              if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+                queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :830:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
             end
-            else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :790:29, :793:26
+            else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :832:29, :835:26
               if (_nbWrEofFire_T)	// src/utils/Stream/Stream.scala:43:26
-                queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :809:38
-              else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+                queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :851:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
             end
-            else if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-              queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :802:38
-            else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+            else if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+              queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :844:38
+            else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
           end
-          else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+          else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
         end
-        else if (_GEN_31) begin	// src/foragerbee/scala/main/FbEngine.scala:1269:26
-          if (_GEN_63)	// src/utils/Stream/Stream.scala:43:26
-            queueCredit <= _queueCredit_T_8;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1287:42
-          else if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:768:14
+        else if (_GEN_36) begin	// src/foragerbee/scala/main/FbEngine.scala:1317:26
+          if (_GEN_73)	// src/utils/Stream/Stream.scala:43:26
+            queueCredit <= _queueCredit_T_8;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1337:42
+          else if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:810:14
             if (mxQuantActive) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66
-              if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-                queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :788:38
-              else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+              if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+                queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :830:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
             end
-            else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :790:29, :793:26
+            else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :832:29, :835:26
               if (_nbWrEofFire_T)	// src/utils/Stream/Stream.scala:43:26
-                queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :809:38
-              else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+                queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :851:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
             end
-            else if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-              queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :802:38
-            else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+            else if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+              queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :844:38
+            else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
           end
-          else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+          else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
         end
-        else if (_GEN_142)	// src/foragerbee/scala/main/FbEngine.scala:768:26, :1269:26, :1312:43, :1313:29
-          queueCredit <= _queueCredit_T_10;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1313:44
-        else if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:768:14
-          if (mxQuantActive) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66
-            if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-              queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :788:38
-            else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+        else if (_GEN_152) begin	// src/foragerbee/scala/main/FbEngine.scala:810:26, :1317:26, :1357:42, :1369:45
+          if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:810:14
+            if (mxQuantActive) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66
+              if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+                queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :830:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
+            end
+            else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :832:29, :835:26
+              if (_nbWrEofFire_T)	// src/utils/Stream/Stream.scala:43:26
+                queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :851:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
+            end
+            else if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+              queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :844:38
+            else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
           end
-          else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :790:29, :793:26
-            if (_nbWrEofFire_T)	// src/utils/Stream/Stream.scala:43:26
-              queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :809:38
-            else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
-          end
-          else if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-            queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :802:38
-          else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+          else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
         end
-        else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-          queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+        else	// src/foragerbee/scala/main/FbEngine.scala:810:26, :1317:26, :1357:42, :1369:45
+          queueCredit <= _queueCredit_T_10;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1370:46
       end
-      else if (_GEN_50) begin	// src/foragerbee/scala/main/FbEngine.scala:1409:25
-        if (_GEN_63)	// src/utils/Stream/Stream.scala:43:26
-          queueCredit <= queueCredit - sgSeg;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1440:62, :1448:42
-        else if (_GEN_37) begin	// src/foragerbee/scala/main/FbEngine.scala:736:25, :768:26, :1259:26, :1266:25, :1268:32, :1269:26
-          if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:768:14
+      else if (_GEN_58) begin	// src/foragerbee/scala/main/FbEngine.scala:1473:25
+        if (_GEN_73)	// src/utils/Stream/Stream.scala:43:26
+          queueCredit <= queueCredit - sgSeg;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1504:62, :1512:42
+        else if (_GEN_42) begin	// src/foragerbee/scala/main/FbEngine.scala:778:25, :810:26, :1307:26, :1314:25, :1316:32, :1317:26
+          if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:810:14
             if (mxQuantActive) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66
-              if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-                queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :788:38
-              else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+              if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+                queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :830:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
             end
-            else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :790:29, :793:26
+            else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :832:29, :835:26
               if (_nbWrEofFire_T)	// src/utils/Stream/Stream.scala:43:26
-                queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :809:38
-              else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+                queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :851:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
             end
-            else if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-              queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :802:38
-            else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+            else if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+              queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :844:38
+            else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
           end
-          else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+          else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
         end
-        else if (_GEN_31) begin	// src/foragerbee/scala/main/FbEngine.scala:1269:26
-          if (_GEN_63)	// src/utils/Stream/Stream.scala:43:26
-            queueCredit <= _queueCredit_T_8;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1287:42
-          else if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:768:14
+        else if (_GEN_36) begin	// src/foragerbee/scala/main/FbEngine.scala:1317:26
+          if (_GEN_73)	// src/utils/Stream/Stream.scala:43:26
+            queueCredit <= _queueCredit_T_8;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1337:42
+          else if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:810:14
             if (mxQuantActive) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66
-              if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-                queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :788:38
-              else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+              if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+                queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :830:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
             end
-            else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :790:29, :793:26
+            else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :832:29, :835:26
               if (_nbWrEofFire_T)	// src/utils/Stream/Stream.scala:43:26
-                queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :809:38
-              else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+                queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :851:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
             end
-            else if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-              queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :802:38
-            else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+            else if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+              queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :844:38
+            else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
           end
-          else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+          else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
         end
-        else if (_GEN_142)	// src/foragerbee/scala/main/FbEngine.scala:768:26, :1269:26, :1312:43, :1313:29
-          queueCredit <= _queueCredit_T_10;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1313:44
-        else if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:768:14
-          if (mxQuantActive) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66
-            if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-              queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :788:38
-            else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+        else if (_GEN_152) begin	// src/foragerbee/scala/main/FbEngine.scala:810:26, :1317:26, :1357:42, :1369:45
+          if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:810:14
+            if (mxQuantActive) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66
+              if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+                queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :830:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
+            end
+            else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :832:29, :835:26
+              if (_nbWrEofFire_T)	// src/utils/Stream/Stream.scala:43:26
+                queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :851:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
+            end
+            else if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+              queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :844:38
+            else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
           end
-          else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :790:29, :793:26
-            if (_nbWrEofFire_T)	// src/utils/Stream/Stream.scala:43:26
-              queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :809:38
-            else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
-          end
-          else if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-            queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :802:38
-          else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+          else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
         end
-        else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-          queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+        else	// src/foragerbee/scala/main/FbEngine.scala:810:26, :1317:26, :1357:42, :1369:45
+          queueCredit <= _queueCredit_T_10;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1370:46
       end
-      else if (_GEN_53) begin	// src/foragerbee/scala/main/FbEngine.scala:1409:25
+      else if (_GEN_61) begin	// src/foragerbee/scala/main/FbEngine.scala:1473:25
         if (_nbWrEofFire_T)	// src/utils/Stream/Stream.scala:43:26
-          queueCredit <= queueCredit + 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1483:42
-        else if (_GEN_138) begin	// src/foragerbee/scala/main/FbEngine.scala:160:28, :768:26, :1259:26, :1266:25, :1268:32
-          if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:768:14
+          queueCredit <= queueCredit + 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1547:42
+        else if (_GEN_149) begin	// src/foragerbee/scala/main/FbEngine.scala:160:28, :810:26, :1307:26, :1314:25, :1316:32
+          if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:810:14
             if (mxQuantActive) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66
-              if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-                queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :788:38
-              else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+              if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+                queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :830:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
             end
-            else if (_GEN_15 | ~_GEN_93) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :790:29, :793:26, :801:37, :808:30, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-              if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+            else if (_GEN_15 | ~_GEN_103) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :832:29, :835:26, :843:37, :850:30, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+              if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
             end
-            else	// src/foragerbee/scala/main/FbEngine.scala:93:68, :790:29, :801:37, :808:30
-              queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :802:38
+            else	// src/foragerbee/scala/main/FbEngine.scala:93:68, :832:29, :843:37, :850:30
+              queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :844:38
           end
-          else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+          else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
         end
-        else if (_GEN_30) begin	// src/foragerbee/scala/main/FbEngine.scala:1269:26
-          if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:768:14
+        else if (_GEN_35) begin	// src/foragerbee/scala/main/FbEngine.scala:1317:26
+          if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:810:14
             if (mxQuantActive) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66
-              if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-                queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :788:38
-              else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+              if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+                queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :830:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
             end
-            else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :790:29, :793:26
+            else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :832:29, :835:26
               if (_nbWrEofFire_T)	// src/utils/Stream/Stream.scala:43:26
-                queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :809:38
-              else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+                queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :851:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
             end
-            else if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-              queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :802:38
-            else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+            else if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+              queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :844:38
+            else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
           end
-          else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+          else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
         end
-        else if (_GEN_31) begin	// src/foragerbee/scala/main/FbEngine.scala:1269:26
-          if (_GEN_63)	// src/utils/Stream/Stream.scala:43:26
-            queueCredit <= _queueCredit_T_8;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1287:42
-          else if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:768:14
+        else if (_GEN_36) begin	// src/foragerbee/scala/main/FbEngine.scala:1317:26
+          if (_GEN_73)	// src/utils/Stream/Stream.scala:43:26
+            queueCredit <= _queueCredit_T_8;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1337:42
+          else if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:810:14
             if (mxQuantActive) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66
-              if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-                queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :788:38
-              else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+              if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+                queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :830:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
             end
-            else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :790:29, :793:26
+            else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :832:29, :835:26
               if (_nbWrEofFire_T)	// src/utils/Stream/Stream.scala:43:26
-                queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :809:38
-              else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+                queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :851:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
             end
-            else if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-              queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :802:38
-            else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+            else if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+              queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :844:38
+            else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
           end
-          else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+          else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
         end
-        else if (_GEN_142)	// src/foragerbee/scala/main/FbEngine.scala:768:26, :1269:26, :1312:43, :1313:29
-          queueCredit <= _queueCredit_T_10;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1313:44
-        else if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:768:14
+        else if (_GEN_152) begin	// src/foragerbee/scala/main/FbEngine.scala:810:26, :1317:26, :1357:42, :1369:45
+          if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:810:14
+            if (mxQuantActive) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66
+              if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+                queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :830:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
+            end
+            else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :832:29, :835:26
+              if (_nbWrEofFire_T)	// src/utils/Stream/Stream.scala:43:26
+                queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :851:38
+              else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+                queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
+            end
+            else if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+              queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :844:38
+            else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
+          end
+          else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
+        end
+        else	// src/foragerbee/scala/main/FbEngine.scala:810:26, :1317:26, :1357:42, :1369:45
+          queueCredit <= _queueCredit_T_10;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1370:46
+      end
+      else if (_GEN_42) begin	// src/foragerbee/scala/main/FbEngine.scala:778:25, :810:26, :1307:26, :1314:25, :1316:32, :1317:26
+        if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:810:14
           if (mxQuantActive) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66
-            if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-              queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :788:38
-            else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+            if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+              queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :830:38
+            else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
           end
-          else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :790:29, :793:26
+          else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :832:29, :835:26
             if (_nbWrEofFire_T)	// src/utils/Stream/Stream.scala:43:26
-              queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :809:38
-            else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+              queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :851:38
+            else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
           end
-          else if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-            queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :802:38
-          else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+          else if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+            queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :844:38
+          else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
         end
-        else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-          queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+        else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+          queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
       end
-      else if (_GEN_37) begin	// src/foragerbee/scala/main/FbEngine.scala:736:25, :768:26, :1259:26, :1266:25, :1268:32, :1269:26
-        if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:768:14
+      else if (_GEN_36) begin	// src/foragerbee/scala/main/FbEngine.scala:1317:26
+        if (_GEN_73)	// src/utils/Stream/Stream.scala:43:26
+          queueCredit <= _queueCredit_T_8;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1337:42
+        else if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:810:14
           if (mxQuantActive) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66
-            if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-              queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :788:38
-            else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+            if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+              queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :830:38
+            else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
           end
-          else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :790:29, :793:26
+          else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :832:29, :835:26
             if (_nbWrEofFire_T)	// src/utils/Stream/Stream.scala:43:26
-              queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :809:38
-            else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+              queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :851:38
+            else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
           end
-          else if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-            queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :802:38
-          else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+          else if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+            queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :844:38
+          else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
         end
-        else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-          queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+        else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+          queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
       end
-      else if (_GEN_31) begin	// src/foragerbee/scala/main/FbEngine.scala:1269:26
-        if (_GEN_63)	// src/utils/Stream/Stream.scala:43:26
-          queueCredit <= _queueCredit_T_8;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1287:42
-        else if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:768:14
+      else if (_GEN_152) begin	// src/foragerbee/scala/main/FbEngine.scala:810:26, :1317:26, :1357:42, :1369:45
+        if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:810:14
           if (mxQuantActive) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66
-            if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-              queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :788:38
-            else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+            if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+              queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :830:38
+            else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
           end
-          else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :790:29, :793:26
+          else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :832:29, :835:26
             if (_nbWrEofFire_T)	// src/utils/Stream/Stream.scala:43:26
-              queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :809:38
-            else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+              queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :851:38
+            else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+              queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
           end
-          else if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-            queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :802:38
-          else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+          else if (_GEN_103)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+            queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :844:38
+          else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
         end
-        else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-          queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+        else if (_GEN_95)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :778:25, :782:26, :785:16
+          queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :787:34
       end
-      else if (_GEN_142)	// src/foragerbee/scala/main/FbEngine.scala:768:26, :1269:26, :1312:43, :1313:29
-        queueCredit <= _queueCredit_T_10;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1313:44
-      else if (_GEN_14) begin	// src/foragerbee/scala/main/FbEngine.scala:768:14
-        if (mxQuantActive) begin	// src/foragerbee/scala/main/FbEngine.scala:196:66
-          if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-            queueCredit <= _queueCredit_T_2;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :788:38
-          else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
+      else	// src/foragerbee/scala/main/FbEngine.scala:810:26, :1317:26, :1357:42, :1369:45
+        queueCredit <= _queueCredit_T_10;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :1370:46
+      if (_GEN_149) begin	// src/foragerbee/scala/main/FbEngine.scala:160:28, :1307:26, :1314:25, :1316:32
+        if (_GEN_86) begin	// src/foragerbee/scala/main/FbEngine.scala:159:28, :619:42, :653:16, :655:64
         end
-        else if (_GEN_15) begin	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :790:29, :793:26
-          if (_nbWrEofFire_T)	// src/utils/Stream/Stream.scala:43:26
-            queueCredit <= _queueCredit_T_6;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :809:38
-          else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-            queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
-        end
-        else if (_GEN_93)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-          queueCredit <= _queueCredit_T_4;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :802:38
-        else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-          queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
-      end
-      else if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:122:25, :736:25, :740:26, :743:16
-        queueCredit <= _queueCredit_T;	// src/foragerbee/scala/main/FbEngine.scala:135:28, :745:34
-      if (_GEN_138) begin	// src/foragerbee/scala/main/FbEngine.scala:160:28, :1259:26, :1266:25, :1268:32
-        if (_GEN_76) begin	// src/foragerbee/scala/main/FbEngine.scala:159:28, :577:42, :611:16, :613:64
-        end
-        else	// src/foragerbee/scala/main/FbEngine.scala:159:28, :577:42, :611:16, :613:64
+        else	// src/foragerbee/scala/main/FbEngine.scala:159:28, :619:42, :653:16, :655:64
           i2cPhase <= 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:159:28
       end
-      else begin	// src/foragerbee/scala/main/FbEngine.scala:160:28, :1259:26, :1266:25, :1268:32
-        if (_GEN_30)	// src/foragerbee/scala/main/FbEngine.scala:1269:26
-          i2cPhase <= {_im2colGen_io_isPad, 1'h1};	// src/foragerbee/scala/main/FbEngine.scala:152:50, :159:28, :1271:32, :1272:24, :1276:24
-        else if (_GEN_31) begin	// src/foragerbee/scala/main/FbEngine.scala:1269:26
-          if (_GEN_141)	// src/foragerbee/scala/main/FbEngine.scala:577:42, :1292:38, :1294:40, :1295:26
-            i2cPhase <= 2'h2;	// src/foragerbee/scala/main/FbEngine.scala:159:28, src/foragerbee/scala/main/ForagerBeeConfig.scala:242:65
-          else if (_GEN_76) begin	// src/foragerbee/scala/main/FbEngine.scala:159:28, :577:42, :611:16, :613:64
+      else begin	// src/foragerbee/scala/main/FbEngine.scala:160:28, :1307:26, :1314:25, :1316:32
+        if (_GEN_35)	// src/foragerbee/scala/main/FbEngine.scala:1317:26
+          i2cPhase <= {_im2colGen_io_isPad, 1'h1};	// src/foragerbee/scala/main/FbEngine.scala:152:50, :159:28, :1319:32, :1320:24, :1324:24
+        else if (_GEN_36) begin	// src/foragerbee/scala/main/FbEngine.scala:1317:26
+          if (_GEN_151)	// src/foragerbee/scala/main/FbEngine.scala:619:42, :1342:38, :1344:40, :1345:26
+            i2cPhase <= 2'h2;	// src/foragerbee/scala/main/FbEngine.scala:159:28, src/foragerbee/scala/main/ForagerBeeConfig.scala:246:65
+          else if (_GEN_86) begin	// src/foragerbee/scala/main/FbEngine.scala:159:28, :619:42, :653:16, :655:64
           end
-          else	// src/foragerbee/scala/main/FbEngine.scala:159:28, :577:42, :611:16, :613:64
+          else	// src/foragerbee/scala/main/FbEngine.scala:159:28, :619:42, :653:16, :655:64
             i2cPhase <= 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:159:28
         end
-        else if (_GEN_39 ? _GEN_18 | ~_GEN_76 : (&i2cPhase) & _GEN_18 | ~_GEN_76)	// src/foragerbee/scala/main/FbEngine.scala:159:28, :577:42, :611:16, :613:64, :844:27, :1269:26, :1340:61, :1343:26, :1372:61, :1374:26
+        else if (_GEN_44
+                   ? _GEN_45 | _GEN_18 | ~_GEN_86
+                   : (&i2cPhase) & (_GEN_50 | _GEN_18) | ~_GEN_86)	// src/foragerbee/scala/main/FbEngine.scala:159:28, :619:42, :653:16, :655:64, :886:27, :1317:26, :1357:{33,42}, :1359:24, :1397:63, :1400:28, :1415:{38,47}, :1417:24, :1435:63, :1437:28
           i2cPhase <= 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:159:28
         i2cArIssued <=
-          _GEN_30 ? _im2colGen_io_isPad & i2cArIssued : _GEN_137 | i2cArIssued;	// src/foragerbee/scala/main/FbEngine.scala:152:50, :160:28, :1269:26, :1271:32, :1277:27, :1283:34, :1284:27
+          _GEN_35 ? _im2colGen_io_isPad & i2cArIssued : _GEN_148 | i2cArIssued;	// src/foragerbee/scala/main/FbEngine.scala:152:50, :160:28, :1317:26, :1319:32, :1325:27, :1333:34, :1334:27
       end
-      if (_GEN_32) begin	// src/foragerbee/scala/main/FbEngine.scala:161:28, :736:25, :1259:26, :1266:25, :1268:32, :1269:26
+      if (_GEN_37) begin	// src/foragerbee/scala/main/FbEngine.scala:161:28, :778:25, :1307:26, :1314:25, :1316:32, :1317:26
       end
-      else if (~_GEN_64 | _GEN_140) begin	// src/foragerbee/scala/main/FbEngine.scala:740:26, :750:30, :752:29, :1283:34, :1292:38, :1294:{31,40}, src/utils/Stream/Stream.scala:43:26
-        if (_GEN_63)	// src/utils/Stream/Stream.scala:43:26
-          i2cRRemain <= _GEN_139;	// src/foragerbee/scala/main/FbEngine.scala:161:28, :1285:26
+      else if (~_GEN_74 | _GEN_150) begin	// src/foragerbee/scala/main/FbEngine.scala:782:26, :792:30, :794:29, :1333:34, :1342:38, :1344:{31,40}, src/utils/Stream/Stream.scala:43:26
+        if (_GEN_73)	// src/utils/Stream/Stream.scala:43:26
+          i2cRRemain <= _GEN_147;	// src/foragerbee/scala/main/FbEngine.scala:161:28, :1332:63
       end
-      else	// src/foragerbee/scala/main/FbEngine.scala:1283:34, :1292:38, :1294:40
-        i2cRRemain <= i2cRRemain - 20'h1;	// src/foragerbee/scala/main/FbEngine.scala:161:28, :1299:42
-      if (_GEN_138) begin	// src/foragerbee/scala/main/FbEngine.scala:160:28, :163:28, :1259:26, :1266:25, :1268:32
+      else	// src/foragerbee/scala/main/FbEngine.scala:1333:34, :1342:38, :1344:40
+        i2cRRemain <= i2cRRemain - 20'h1;	// src/foragerbee/scala/main/FbEngine.scala:161:28, :1349:42
+      if (_GEN_149) begin	// src/foragerbee/scala/main/FbEngine.scala:160:28, :163:28, :1307:26, :1314:25, :1316:32
       end
-      else begin	// src/foragerbee/scala/main/FbEngine.scala:163:28, :1259:26, :1266:25, :1268:32
-        automatic logic [3:0]       _GEN_145;	// src/foragerbee/scala/main/FbEngine.scala:1269:26, :1271:32, :1292:38, :1328:34
-        automatic logic [3:0][19:0] _GEN_146;	// src/foragerbee/scala/main/FbEngine.scala:1269:26, :1271:32, :1292:38, :1328:34
-        _GEN_145 =
-          {{(&i2cPhase) & _nbWrEofFire_T & ~i2cAwIssued | i2cAwIssued},
-           {_nbWrEofFire_T & ~i2cAwIssued | i2cAwIssued},
-           {~_GEN_141 & i2cAwIssued},
-           {~_im2colGen_io_isPad & i2cAwIssued}};	// src/foragerbee/scala/main/FbEngine.scala:152:50, :159:28, :162:28, :577:42, :1269:26, :1271:32, :1273:27, :1292:38, :1294:40, :1295:26, :1296:29, :1323:38, :1328:34, :1330:{34,48}, :1357:38, :1363:34, :1365:{34,48}, src/utils/Stream/Stream.scala:43:26
-        i2cAwIssued <= _GEN_145[i2cPhase];	// src/foragerbee/scala/main/FbEngine.scala:159:28, :162:28, :1269:26, :1271:32, :1292:38, :1328:34
-        _GEN_146 =
-          {{(&i2cPhase) & _nbWrEofFire_T ? i2cWRemain - 20'h1 : i2cWRemain},
-           {_nbWrEofFire_T ? i2cWRemain - 20'h1 : i2cWRemain},
-           {_GEN_141 ? i2cDstSegBeats : i2cWRemain},
-           {_im2colGen_io_isPad ? {1'h0, i2cMicroRowDstBeats} : i2cWRemain}};	// src/foragerbee/scala/main/FbEngine.scala:152:50, :159:28, :163:28, :577:42, :1254:34, :1256:29, :1269:26, :1271:32, :1274:26, :1292:38, :1294:40, :1295:26, :1297:28, :1328:34, :1329:{26,40}, :1363:34, :1364:{26,40}, src/utils/Stream/Stream.scala:43:26
-        i2cWRemain <= _GEN_146[i2cPhase];	// src/foragerbee/scala/main/FbEngine.scala:159:28, :163:28, :1269:26, :1271:32, :1292:38, :1328:34
+      else begin	// src/foragerbee/scala/main/FbEngine.scala:163:28, :1307:26, :1314:25, :1316:32
+        automatic logic [3:0]       _GEN_155;	// src/foragerbee/scala/main/FbEngine.scala:1317:26, :1319:32, :1342:38, :1357:42
+        automatic logic [3:0][19:0] _GEN_156;	// src/foragerbee/scala/main/FbEngine.scala:1317:26, :1319:32, :1342:38, :1357:42
+        _GEN_155 =
+          {{(&i2cPhase) & ~_GEN_50 & _nbWrEofFire_T & ~i2cAwIssued | i2cAwIssued},
+           {~_GEN_45 & _nbWrEofFire_T & ~i2cAwIssued | i2cAwIssued},
+           {~_GEN_151 & i2cAwIssued},
+           {~_im2colGen_io_isPad & i2cAwIssued}};	// src/foragerbee/scala/main/FbEngine.scala:152:50, :159:28, :162:28, :619:42, :810:26, :1026:27, :1317:26, :1319:32, :1321:27, :1342:38, :1344:40, :1345:26, :1346:29, :1357:{33,42}, :1363:34, :1380:40, :1385:36, :1387:{36,50}, :1415:{38,47}, :1420:40, :1424:38, :1426:36, :1428:{36,50}, src/utils/Stream/Stream.scala:43:26
+        i2cAwIssued <= _GEN_155[i2cPhase];	// src/foragerbee/scala/main/FbEngine.scala:159:28, :162:28, :1317:26, :1319:32, :1342:38, :1357:42
+        _GEN_156 =
+          {{~(&i2cPhase) | _GEN_50 | ~_nbWrEofFire_T ? i2cWRemain : i2cWRemain - 20'h1},
+           {_GEN_45 | ~_nbWrEofFire_T ? i2cWRemain : i2cWRemain - 20'h1},
+           {_GEN_151 ? i2cDstSegBeats[19:0] : i2cWRemain},
+           {_im2colGen_io_isPad ? {1'h0, i2cMicroRowDstBeats} : i2cWRemain}};	// src/foragerbee/scala/main/FbEngine.scala:152:50, :159:28, :163:28, :619:42, :1026:27, :1302:34, :1304:29, :1317:26, :1319:32, :1322:26, :1342:38, :1344:40, :1345:26, :1347:28, :1357:{33,42}, :1385:36, :1386:42, :1415:{38,47}, :1426:36, :1427:42, src/utils/Stream/Stream.scala:43:26
+        i2cWRemain <= _GEN_156[i2cPhase];	// src/foragerbee/scala/main/FbEngine.scala:159:28, :163:28, :1317:26, :1319:32, :1342:38, :1357:42
       end
-      if (~_GEN_29 | _im2colGen_io_done | ~_im2colGen_io_valid | _GEN_30
-          | ~_GEN_137) begin	// src/foragerbee/scala/main/FbEngine.scala:152:50, :160:28, :164:28, :736:25, :1259:{16,26}, :1266:25, :1268:32, :1269:26, :1283:34, :1284:27
+      if (~_GEN_34 | _im2colGen_io_done | ~_im2colGen_io_valid | _GEN_35
+          | ~_GEN_148) begin	// src/foragerbee/scala/main/FbEngine.scala:152:50, :160:28, :164:28, :778:25, :1307:{16,26}, :1314:25, :1316:32, :1317:26, :1333:34, :1334:27
       end
-      else	// src/foragerbee/scala/main/FbEngine.scala:164:28, :1259:26, :1266:25, :1268:32, :1269:26
-        i2cSegBeats <= _GEN_139;	// src/foragerbee/scala/main/FbEngine.scala:164:28, :1285:26
-      i2cStarted <= _GEN_29 & ~i2cStarted | _GEN_76 & i2cStarted;	// src/foragerbee/scala/main/FbEngine.scala:159:28, :165:28, :577:42, :611:16, :613:64, :1259:{16,26}, :1261:{12,25}, :1263:20
-      if (_GEN_51) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :1259:26, :1396:25, :1406:43
-        if (_GEN_62) begin	// src/foragerbee/scala/main/FbEngine.scala:168:31, :577:42, :611:16, :613:64, :622:58, :626:82
+      else	// src/foragerbee/scala/main/FbEngine.scala:164:28, :1307:26, :1314:25, :1316:32, :1317:26
+        i2cSegBeats <= _GEN_147;	// src/foragerbee/scala/main/FbEngine.scala:164:28, :1332:63
+      i2cStarted <= _GEN_34 & ~i2cStarted | _GEN_86 & i2cStarted;	// src/foragerbee/scala/main/FbEngine.scala:159:28, :165:28, :619:42, :653:16, :655:64, :1307:{16,26}, :1309:{12,25}, :1311:20
+      if (_GEN_59) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :1307:26, :1460:25, :1470:43
+        if (_GEN_72) begin	// src/foragerbee/scala/main/FbEngine.scala:168:31, :619:42, :653:16, :655:64, :664:58, :668:82
         end
-        else	// src/foragerbee/scala/main/FbEngine.scala:168:31, :577:42, :611:16, :613:64, :622:58, :626:82
+        else	// src/foragerbee/scala/main/FbEngine.scala:168:31, :619:42, :653:16, :655:64, :664:58, :668:82
           sgPhase <= 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:168:31
       end
-      else if (_GEN_48) begin	// src/foragerbee/scala/main/FbEngine.scala:1406:34
+      else if (_GEN_56) begin	// src/foragerbee/scala/main/FbEngine.scala:1470:34
         if (_sgCtrl_io_valid)	// src/foragerbee/scala/main/FbEngine.scala:156:44
           sgPhase <= 2'h1;	// src/foragerbee/scala/main/FbEngine.scala:168:31
-        else if (_GEN_62) begin	// src/foragerbee/scala/main/FbEngine.scala:168:31, :577:42, :611:16, :613:64, :622:58, :626:82
+        else if (_GEN_72) begin	// src/foragerbee/scala/main/FbEngine.scala:168:31, :619:42, :653:16, :655:64, :664:58, :668:82
         end
-        else	// src/foragerbee/scala/main/FbEngine.scala:168:31, :577:42, :611:16, :613:64, :622:58, :626:82
+        else	// src/foragerbee/scala/main/FbEngine.scala:168:31, :619:42, :653:16, :655:64, :664:58, :668:82
           sgPhase <= 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:168:31
       end
-      else if (_GEN_50) begin	// src/foragerbee/scala/main/FbEngine.scala:1409:25
-        if (_GEN_66)	// src/foragerbee/scala/main/FbEngine.scala:577:42, :1455:38, :1457:39, :1459:25
-          sgPhase <= 2'h2;	// src/foragerbee/scala/main/FbEngine.scala:168:31, src/foragerbee/scala/main/ForagerBeeConfig.scala:242:65
-        else if (_GEN_62) begin	// src/foragerbee/scala/main/FbEngine.scala:168:31, :577:42, :611:16, :613:64, :622:58, :626:82
+      else if (_GEN_58) begin	// src/foragerbee/scala/main/FbEngine.scala:1473:25
+        if (_GEN_76)	// src/foragerbee/scala/main/FbEngine.scala:619:42, :1519:38, :1521:39, :1523:25
+          sgPhase <= 2'h2;	// src/foragerbee/scala/main/FbEngine.scala:168:31, src/foragerbee/scala/main/ForagerBeeConfig.scala:246:65
+        else if (_GEN_72) begin	// src/foragerbee/scala/main/FbEngine.scala:168:31, :619:42, :653:16, :655:64, :664:58, :668:82
         end
-        else	// src/foragerbee/scala/main/FbEngine.scala:168:31, :577:42, :611:16, :613:64, :622:58, :626:82
+        else	// src/foragerbee/scala/main/FbEngine.scala:168:31, :619:42, :653:16, :655:64, :664:58, :668:82
           sgPhase <= 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:168:31
       end
-      else if (_GEN_57)	// src/foragerbee/scala/main/FbEngine.scala:577:42, :1409:25, :1495:61, :1497:32
-        sgPhase <= {1'h0, ~_GEN_58};	// src/foragerbee/scala/main/FbEngine.scala:168:31, :1500:{37,46}, :1503:27, :1509:27
-      else if (_GEN_62) begin	// src/foragerbee/scala/main/FbEngine.scala:168:31, :577:42, :611:16, :613:64, :622:58, :626:82
+      else if (_GEN_65)	// src/foragerbee/scala/main/FbEngine.scala:619:42, :1473:25, :1559:61, :1561:32
+        sgPhase <= {1'h0, ~_GEN_66};	// src/foragerbee/scala/main/FbEngine.scala:168:31, :1564:{37,46}, :1567:27, :1573:27
+      else if (_GEN_72) begin	// src/foragerbee/scala/main/FbEngine.scala:168:31, :619:42, :653:16, :655:64, :664:58, :668:82
       end
-      else	// src/foragerbee/scala/main/FbEngine.scala:168:31, :577:42, :611:16, :613:64, :622:58, :626:82
+      else	// src/foragerbee/scala/main/FbEngine.scala:168:31, :619:42, :653:16, :655:64, :664:58, :668:82
         sgPhase <= 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:168:31
-      if (~_GEN_46 | _GEN_54 | ~_GEN_57) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :1259:26, :1396:{16,25}, :1406:43, :1409:25, :1495:61, :1497:32
-        if (_GEN_62) begin	// src/foragerbee/scala/main/FbEngine.scala:168:31, :169:31, :577:42, :611:16, :613:64, :622:58, :626:82
+      if (~_GEN_54 | _GEN_62 | ~_GEN_65) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :1307:26, :1460:{16,25}, :1470:43, :1473:25, :1559:61, :1561:32
+        if (_GEN_72) begin	// src/foragerbee/scala/main/FbEngine.scala:168:31, :169:31, :619:42, :653:16, :655:64, :664:58, :668:82
         end
-        else	// src/foragerbee/scala/main/FbEngine.scala:169:31, :577:42, :611:16, :613:64, :622:58, :626:82
+        else	// src/foragerbee/scala/main/FbEngine.scala:169:31, :619:42, :653:16, :655:64, :664:58, :668:82
           sgLinearOffset <= 32'h0;	// src/foragerbee/scala/main/FbEngine.scala:169:31
       end
-      else	// src/foragerbee/scala/main/FbEngine.scala:577:42, :1396:25, :1406:43, :1409:25
-        sgLinearOffset <= sgLinearOffset + _GEN_68;	// src/foragerbee/scala/main/FbEngine.scala:169:31, :1497:50
+      else	// src/foragerbee/scala/main/FbEngine.scala:619:42, :1460:25, :1470:43, :1473:25
+        sgLinearOffset <= sgLinearOffset + _GEN_78;	// src/foragerbee/scala/main/FbEngine.scala:169:31, :1561:50
       sgArIssued <=
-        _GEN_51
-          ? _GEN_77
-          : _GEN_48
-              ? ~_sgCtrl_io_valid & _GEN_77
-              : _GEN_50 ? _GEN_63 | _GEN_77 : _GEN_69 & _GEN_77;	// src/foragerbee/scala/main/FbEngine.scala:156:44, :172:31, :577:42, :611:16, :1259:26, :1396:25, :1406:{34,43}, :1409:25, :1422:31, :1428:26, :1444:34, :1445:26, :1495:61, :1500:46, src/utils/Stream/Stream.scala:43:26
+        _GEN_59
+          ? _GEN_87
+          : _GEN_56
+              ? ~_sgCtrl_io_valid & _GEN_87
+              : _GEN_58 ? _GEN_73 | _GEN_87 : _GEN_79 & _GEN_87;	// src/foragerbee/scala/main/FbEngine.scala:156:44, :172:31, :619:42, :653:16, :1307:26, :1460:25, :1470:{34,43}, :1473:25, :1486:31, :1492:26, :1508:34, :1509:26, :1559:61, :1564:46, src/utils/Stream/Stream.scala:43:26
       sgAwIssued <=
-        _GEN_67
-          ? _GEN_78
-          : _GEN_50
-              ? ~_GEN_66 & _GEN_78
-              : _GEN_53 & _nbWrEofFire_T & ~sgAwIssued | _GEN_78;	// src/foragerbee/scala/main/FbEngine.scala:174:31, :577:42, :611:16, :1259:26, :1396:25, :1406:43, :1409:25, :1455:38, :1457:39, :1459:25, :1460:28, :1477:38, :1482:34, :1485:{33,46}, src/utils/Stream/Stream.scala:43:26
-      if (~_GEN_46 | _GEN_52 | ~(_GEN_50 & _GEN_63)) begin	// src/foragerbee/scala/main/FbEngine.scala:177:31, :1259:26, :1396:{16,25}, :1406:43, :1409:25, :1444:34, :1447:26, src/utils/Stream/Stream.scala:43:26
+        _GEN_77
+          ? _GEN_88
+          : _GEN_58
+              ? ~_GEN_76 & _GEN_88
+              : _GEN_61 & _nbWrEofFire_T & ~sgAwIssued | _GEN_88;	// src/foragerbee/scala/main/FbEngine.scala:174:31, :619:42, :653:16, :1307:26, :1460:25, :1470:43, :1473:25, :1519:38, :1521:39, :1523:25, :1524:28, :1541:38, :1546:34, :1549:{33,46}, src/utils/Stream/Stream.scala:43:26
+      if (~_GEN_54 | _GEN_60 | ~(_GEN_58 & _GEN_73)) begin	// src/foragerbee/scala/main/FbEngine.scala:177:31, :1307:26, :1460:{16,25}, :1470:43, :1473:25, :1508:34, :1511:26, src/utils/Stream/Stream.scala:43:26
       end
-      else	// src/foragerbee/scala/main/FbEngine.scala:177:31, :1396:25, :1406:43, :1409:25
-        sgSegBeats <= {13'h0, sgSeg};	// src/foragerbee/scala/main/FbEngine.scala:177:31, :1440:62, :1447:26
-      sgStarted <= _GEN_47 | _GEN_62 & sgStarted;	// src/foragerbee/scala/main/FbEngine.scala:168:31, :178:31, :436:20, :577:42, :611:16, :613:64, :622:58, :626:82, :1396:25, :1398:24, :1400:24, :1402:19
-      if (_GEN_60)	// src/foragerbee/scala/main/FbEngine.scala:577:24, src/utils/Stream/Stream.scala:43:26
-        padActive <= _GEN_73 & hasPad & ~cBad;	// src/foragerbee/scala/main/FbEngine.scala:181:26, :535:48, :567:{23,34,44,58,71,80,94,111}, :568:{15,44,60,76,90}, :574:54, :587:{15,25,28}, :588:{17,27}, :598:17
-      if (_GEN_135) begin	// src/foragerbee/scala/main/FbEngine.scala:909:27, :984:27, :1033:53, :1036:44, :1038:30
-        if (isDim1PadRow)	// src/foragerbee/scala/main/FbEngine.scala:986:57
-          virtualRow <= _GEN_130 ? _nextVR_T_2 : 16'h0;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :292:29, :293:16, :294:33, :295:52
-        else if (_zBaseOff_T) begin	// src/foragerbee/scala/main/FbEngine.scala:992:18
-          if (_GEN_120) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :768:26, :909:27, :938:28, :941:56, :945:33
-            if (_GEN_102) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :577:42, :768:26, :844:53, :848:29, :860:31
-              if (_GEN_74)	// src/foragerbee/scala/main/FbEngine.scala:182:27, :577:42, :588:27, :589:18
+      else	// src/foragerbee/scala/main/FbEngine.scala:177:31, :1460:25, :1470:43, :1473:25
+        sgSegBeats <= {13'h0, sgSeg};	// src/foragerbee/scala/main/FbEngine.scala:177:31, :1504:62, :1511:26
+      sgStarted <= _GEN_55 | _GEN_72 & sgStarted;	// src/foragerbee/scala/main/FbEngine.scala:168:31, :178:31, :438:20, :619:42, :653:16, :655:64, :664:58, :668:82, :1460:25, :1462:24, :1464:24, :1466:19
+      if (_GEN_70)	// src/foragerbee/scala/main/FbEngine.scala:619:24, src/utils/Stream/Stream.scala:43:26
+        padActive <= _GEN_84 & hasPad & ~cBad;	// src/foragerbee/scala/main/FbEngine.scala:181:26, :537:48, :607:{23,34,44,58,71,80,94,111}, :608:{15,44,60,76,90,108}, :609:{20,36,48}, :616:54, :629:{15,25,28}, :630:{17,27}, :640:17
+      if (_GEN_145) begin	// src/foragerbee/scala/main/FbEngine.scala:951:27, :1026:27, :1075:53, :1078:44, :1080:30
+        if (isDim1PadRow)	// src/foragerbee/scala/main/FbEngine.scala:1028:57
+          virtualRow <= _GEN_140 ? _nextVR_T_2 : 16'h0;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :292:29, :293:16, :294:33, :295:52
+        else if (_zBaseOff_T) begin	// src/foragerbee/scala/main/FbEngine.scala:1034:18
+          if (_GEN_130) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :810:26, :951:27, :980:28, :983:56, :987:33
+            if (_GEN_112) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :619:42, :810:26, :886:53, :890:29, :902:31
+              if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:182:27, :619:42, :630:27, :631:18
                 virtualRow <= 16'h0;	// src/foragerbee/scala/main/FbEngine.scala:182:27
             end
-            else	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :577:42, :768:26, :844:53, :848:29, :860:31
-              virtualRow <= _GEN_100;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :293:16, :294:33, :295:52
+            else	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :619:42, :810:26, :886:53, :890:29, :902:31
+              virtualRow <= _GEN_110;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :293:16, :294:33, :295:52
           end
-          else	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :768:26, :909:27, :938:28, :941:56, :945:33
-            virtualRow <= _GEN_118;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :293:16, :294:33, :295:52
+          else	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :810:26, :951:27, :980:28, :983:56, :987:33
+            virtualRow <= _GEN_128;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :293:16, :294:33, :295:52
         end
-        else	// src/foragerbee/scala/main/FbEngine.scala:992:18
-          virtualRow <= ~_GEN_134 | _GEN_99 ? _nextVR_T_3 : 16'h0;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :292:29, :293:16, :294:{17,33}, :295:{25,52}
+        else	// src/foragerbee/scala/main/FbEngine.scala:1034:18
+          virtualRow <= ~_GEN_144 | _GEN_109 ? _nextVR_T_3 : 16'h0;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :292:29, :293:16, :294:{17,33}, :295:{25,52}
       end
-      else if (_GEN_120) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :768:26, :909:27, :938:28, :941:56, :945:33
-        if (_GEN_102) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :577:42, :768:26, :844:53, :848:29, :860:31
-          if (_GEN_74)	// src/foragerbee/scala/main/FbEngine.scala:182:27, :577:42, :588:27, :589:18
+      else if (_GEN_130) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :810:26, :951:27, :980:28, :983:56, :987:33
+        if (_GEN_112) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :619:42, :810:26, :886:53, :890:29, :902:31
+          if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:182:27, :619:42, :630:27, :631:18
             virtualRow <= 16'h0;	// src/foragerbee/scala/main/FbEngine.scala:182:27
         end
-        else	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :577:42, :768:26, :844:53, :848:29, :860:31
-          virtualRow <= _GEN_100;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :293:16, :294:33, :295:52
+        else	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :619:42, :810:26, :886:53, :890:29, :902:31
+          virtualRow <= _GEN_110;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :293:16, :294:33, :295:52
       end
-      else	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :768:26, :909:27, :938:28, :941:56, :945:33
-        virtualRow <= _GEN_118;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :293:16, :294:33, :295:52
-      if (_GEN_74) begin	// src/foragerbee/scala/main/FbEngine.scala:182:27, :577:42, :588:27, :589:18
-        automatic logic [18:0] _padBeforeBytes0_T_23;	// src/foragerbee/scala/main/FbEngine.scala:592:42
-        automatic logic [18:0] _padAfterBytes0_T_23;	// src/foragerbee/scala/main/FbEngine.scala:593:40
+      else	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :810:26, :951:27, :980:28, :983:56, :987:33
+        virtualRow <= _GEN_128;	// src/foragerbee/scala/main/FbEngine.scala:182:27, :293:16, :294:33, :295:52
+      if (_GEN_85) begin	// src/foragerbee/scala/main/FbEngine.scala:182:27, :619:42, :630:27, :631:18
+        automatic logic [18:0] _padBeforeBytes0_T_23;	// src/foragerbee/scala/main/FbEngine.scala:634:42
+        automatic logic [18:0] _padAfterBytes0_T_23;	// src/foragerbee/scala/main/FbEngine.scala:635:40
         outRowTotal <=
           io_cmdIn_payload_padBefore_1 + io_cmdIn_payload_shape_1
-          + io_cmdIn_payload_padAfter_1;	// src/foragerbee/scala/main/FbEngine.scala:183:28, :590:{37,51}
+          + io_cmdIn_payload_padAfter_1;	// src/foragerbee/scala/main/FbEngine.scala:183:28, :632:{37,51}
         outColBytes <=
           {2'h0,
            {1'h0, {1'h0, io_cmdIn_payload_padBefore_0} + {1'h0, io_cmdIn_payload_shape_0}}
@@ -1635,9 +1717,9 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
                        : io_cmdIn_payload_dstFmt == 4'h9 | io_cmdIn_payload_dstFmt == 4'h2
                          | io_cmdIn_payload_dstFmt == 4'h1
                            ? 3'h2
-                           : 3'h4};	// src/foragerbee/scala/main/FbEngine.scala:184:28, :591:{38,52,70}, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :229:25, :237:8
+                           : 3'h4};	// src/foragerbee/scala/main/FbEngine.scala:184:28, :633:{38,52,70}, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :233:25, :241:8
         _padBeforeBytes0_T_23 =
-          _GEN_75
+          _GEN_82
           * {16'h0,
              _fmtEncBad_WIRE_1_8
                ? 3'h1
@@ -1649,8 +1731,8 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
                        : io_cmdIn_payload_dstFmt == 4'h9 | io_cmdIn_payload_dstFmt == 4'h2
                          | io_cmdIn_payload_dstFmt == 4'h1
                            ? 3'h2
-                           : 3'h4};	// src/foragerbee/scala/main/FbEngine.scala:592:42, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :229:25, :237:8
-        padBeforeBytes0 <= {6'h0, _padBeforeBytes0_T_23[18:5]};	// src/foragerbee/scala/main/FbEngine.scala:40:7, :185:32, :592:{23,42,77}
+                           : 3'h4};	// src/foragerbee/scala/main/FbEngine.scala:602:38, :634:42, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :233:25, :241:8
+        padBeforeBytes0 <= {6'h0, _padBeforeBytes0_T_23[18:5]};	// src/foragerbee/scala/main/FbEngine.scala:40:7, :185:32, :634:{23,42,77}
         _padAfterBytes0_T_23 =
           {3'h0, io_cmdIn_payload_padAfter_0}
           * {16'h0,
@@ -1664,631 +1746,631 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
                        : io_cmdIn_payload_dstFmt == 4'h9 | io_cmdIn_payload_dstFmt == 4'h2
                          | io_cmdIn_payload_dstFmt == 4'h1
                            ? 3'h2
-                           : 3'h4};	// src/foragerbee/scala/main/FbEngine.scala:593:40, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :229:25, :237:8
-        padAfterBytes0 <= {6'h0, _padAfterBytes0_T_23[18:5]};	// src/foragerbee/scala/main/FbEngine.scala:40:7, :186:31, :593:{22,40,75}
+                           : 3'h4};	// src/foragerbee/scala/main/FbEngine.scala:603:36, :635:40, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :233:25, :241:8
+        padAfterBytes0 <= {6'h0, _padAfterBytes0_T_23[18:5]};	// src/foragerbee/scala/main/FbEngine.scala:40:7, :186:31, :635:{22,40,75}
       end
-      if (~_GEN_135
+      if (~_GEN_145
           | (isDim1PadRow
-               ? (_GEN_129 ? _GEN_122 : nextIsDim1Pad_2 | ~(|padBeforeBytes0))
+               ? (_GEN_139 ? _GEN_132 : nextIsDim1Pad_2 | ~(|padBeforeBytes0))
                : _zBaseOff_T
-                 | (_GEN_134 ? _GEN_122 : nextIsDim1Pad_3 | ~(|padBeforeBytes0)))) begin	// src/foragerbee/scala/main/FbEngine.scala:185:32, :294:{17,33}, :295:52, :302:41, :306:{36,43}, :317:56, :319:27, :324:37, :768:26, :909:27, :984:27, :986:57, :992:18, :1033:53, :1036:44, :1038:30, :1041:38
-        automatic logic _GEN_147;	// src/foragerbee/scala/main/FbEngine.scala:187:23, :577:42, :611:16
-        automatic logic _GEN_148;	// src/foragerbee/scala/main/FbEngine.scala:294:33, :295:52, :302:41, :306:43, :319:27, :324:37, :577:42
-        _GEN_147 =
-          _GEN_60
-          & (~_GEN_80 & hasPad & ~(|io_cmdIn_payload_padBefore_1) & (|(_GEN_79[18:5]))
-             | _GEN_73);	// src/foragerbee/scala/main/FbEngine.scala:187:23, :574:54, :577:{24,42}, :588:{17,27}, :594:14, :611:16, :613:64, :622:58, :626:82, :636:20, :638:{29,36}, :643:{36,71,81,90}, :646:18, src/utils/Stream/Stream.scala:43:26
-        _GEN_148 =
-          _GEN_98
-            ? ~_GEN_103 & (|padBeforeBytes0) | _GEN_147
-            : ~nextIsDim1Pad & (|padBeforeBytes0) | _GEN_147;	// src/foragerbee/scala/main/FbEngine.scala:185:32, :187:23, :294:{17,33}, :295:52, :302:41, :306:{36,43}, :308:18, :317:56, :319:27, :324:37, :577:42, :611:16
-        if (_GEN_119) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :768:26, :909:27, :938:28, :941:56, :945:33
+                 | (_GEN_144 ? _GEN_132 : nextIsDim1Pad_3 | ~(|padBeforeBytes0)))) begin	// src/foragerbee/scala/main/FbEngine.scala:185:32, :294:{17,33}, :295:52, :302:41, :306:{36,43}, :317:56, :319:27, :324:37, :810:26, :951:27, :1026:27, :1028:57, :1034:18, :1075:53, :1078:44, :1080:30, :1083:38
+        automatic logic _GEN_157;	// src/foragerbee/scala/main/FbEngine.scala:187:23, :619:42, :653:16
+        automatic logic _GEN_158;	// src/foragerbee/scala/main/FbEngine.scala:294:33, :295:52, :302:41, :306:43, :319:27, :324:37, :619:42
+        _GEN_157 =
+          _GEN_70
+          & (~_GEN_90 & hasPad & ~(|io_cmdIn_payload_padBefore_1) & (|(_GEN_89[18:5]))
+             | _GEN_84);	// src/foragerbee/scala/main/FbEngine.scala:187:23, :616:54, :619:{24,42}, :630:{17,27}, :636:14, :653:16, :655:64, :664:58, :668:82, :678:20, :680:{29,36}, :685:{36,71,81,90}, :688:18, src/utils/Stream/Stream.scala:43:26
+        _GEN_158 =
+          _GEN_108
+            ? ~_GEN_113 & (|padBeforeBytes0) | _GEN_157
+            : ~nextIsDim1Pad & (|padBeforeBytes0) | _GEN_157;	// src/foragerbee/scala/main/FbEngine.scala:185:32, :187:23, :294:{17,33}, :295:52, :302:41, :306:{36,43}, :308:18, :317:56, :319:27, :324:37, :619:42, :653:16
+        if (_GEN_129) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :810:26, :951:27, :980:28, :983:56, :987:33
           if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
-            zPhase <= 2'h2;	// src/foragerbee/scala/main/FbEngine.scala:187:23, src/foragerbee/scala/main/ForagerBeeConfig.scala:242:65
-          else if (_GEN_117 ? _GEN_122 : nextIsDim1Pad_1 | ~(|padBeforeBytes0)) begin	// src/foragerbee/scala/main/FbEngine.scala:185:32, :294:{17,33}, :295:52, :302:41, :306:{36,43}, :317:56, :319:27, :324:37, :768:26
-            if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-              if (_GEN_147)	// src/foragerbee/scala/main/FbEngine.scala:187:23, :577:42, :611:16
+            zPhase <= 2'h2;	// src/foragerbee/scala/main/FbEngine.scala:187:23, src/foragerbee/scala/main/ForagerBeeConfig.scala:246:65
+          else if (_GEN_127 ? _GEN_132 : nextIsDim1Pad_1 | ~(|padBeforeBytes0)) begin	// src/foragerbee/scala/main/FbEngine.scala:185:32, :294:{17,33}, :295:52, :302:41, :306:{36,43}, :317:56, :319:27, :324:37, :810:26
+            if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+              if (_GEN_157)	// src/foragerbee/scala/main/FbEngine.scala:187:23, :619:42, :653:16
                 zPhase <= 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:187:23
             end
             else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
-              zPhase <= 2'h2;	// src/foragerbee/scala/main/FbEngine.scala:187:23, src/foragerbee/scala/main/ForagerBeeConfig.scala:242:65
-            else if (_GEN_148)	// src/foragerbee/scala/main/FbEngine.scala:294:33, :295:52, :302:41, :306:43, :319:27, :324:37, :577:42
+              zPhase <= 2'h2;	// src/foragerbee/scala/main/FbEngine.scala:187:23, src/foragerbee/scala/main/ForagerBeeConfig.scala:246:65
+            else if (_GEN_158)	// src/foragerbee/scala/main/FbEngine.scala:294:33, :295:52, :302:41, :306:43, :319:27, :324:37, :619:42
               zPhase <= 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:187:23
           end
-          else	// src/foragerbee/scala/main/FbEngine.scala:294:33, :295:52, :302:41, :306:43, :319:27, :324:37, :768:26
+          else	// src/foragerbee/scala/main/FbEngine.scala:294:33, :295:52, :302:41, :306:43, :319:27, :324:37, :810:26
             zPhase <= 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:187:23
         end
-        else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-          if (_GEN_147)	// src/foragerbee/scala/main/FbEngine.scala:187:23, :577:42, :611:16
+        else if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+          if (_GEN_157)	// src/foragerbee/scala/main/FbEngine.scala:187:23, :619:42, :653:16
             zPhase <= 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:187:23
         end
         else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
-          zPhase <= 2'h2;	// src/foragerbee/scala/main/FbEngine.scala:187:23, src/foragerbee/scala/main/ForagerBeeConfig.scala:242:65
-        else if (_GEN_148)	// src/foragerbee/scala/main/FbEngine.scala:294:33, :295:52, :302:41, :306:43, :319:27, :324:37, :577:42
+          zPhase <= 2'h2;	// src/foragerbee/scala/main/FbEngine.scala:187:23, src/foragerbee/scala/main/ForagerBeeConfig.scala:246:65
+        else if (_GEN_158)	// src/foragerbee/scala/main/FbEngine.scala:294:33, :295:52, :302:41, :306:43, :319:27, :324:37, :619:42
           zPhase <= 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:187:23
       end
-      else	// src/foragerbee/scala/main/FbEngine.scala:909:27, :984:27, :1033:53, :1036:44, :1038:30
+      else	// src/foragerbee/scala/main/FbEngine.scala:951:27, :1026:27, :1075:53, :1078:44, :1080:30
         zPhase <= 2'h0;	// src/foragerbee/scala/main/FbEngine.scala:187:23
-      if (_GEN_23 & _GEN_18) begin	// src/foragerbee/scala/main/FbEngine.scala:844:27, :909:27, :984:{14,27}, :1033:53, :1036:44
-        if (_GEN_128) begin	// src/foragerbee/scala/main/FbEngine.scala:1036:23
-          if (isDim1PadRow) begin	// src/foragerbee/scala/main/FbEngine.scala:986:57
-            if (_GEN_129) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-              if (_GEN_106) begin	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :577:42, :909:27
-                if (_GEN_119) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :768:26, :909:27, :938:28, :941:56, :945:33
+      if (_GEN_23 & _GEN_18) begin	// src/foragerbee/scala/main/FbEngine.scala:886:27, :951:27, :1026:{14,27}, :1075:53, :1078:44
+        if (_GEN_138) begin	// src/foragerbee/scala/main/FbEngine.scala:1078:23
+          if (isDim1PadRow) begin	// src/foragerbee/scala/main/FbEngine.scala:1028:57
+            if (_GEN_139) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+              if (_GEN_116) begin	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :619:42, :951:27
+                if (_GEN_129) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :810:26, :951:27, :980:28, :983:56, :987:33
                   if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-                  else if (_GEN_117) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-                    if (_GEN_106) begin	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :577:42, :768:26
-                      if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-                        if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                  else if (_GEN_127) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+                    if (_GEN_116) begin	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :619:42, :810:26
+                      if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+                        if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                         end
-                        else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                        else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                           zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                       end
                       else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
                         zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-                      else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-                        if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-                          if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                      else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+                        if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+                          if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                           end
-                          else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                          else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                             zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                         end
-                        else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+                        else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
                           zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                       end
-                      else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+                      else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
                         zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                     end
-                    else	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :768:26
+                    else	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :810:26
                       zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                   end
-                  else if (_GEN_123)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :768:26
+                  else if (_GEN_133)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :810:26
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-                  else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-                    if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                  else if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+                    if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                     end
-                    else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                    else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                       zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                   end
                   else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-                  else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-                    if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-                      if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                  else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+                    if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+                      if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                       end
-                      else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                      else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                         zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                     end
-                    else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+                    else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
                       zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                   end
-                  else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+                  else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                 end
-                else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-                  if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                else if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+                  if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                   end
-                  else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                  else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                 end
                 else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-                else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-                  if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-                    if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+                  if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+                    if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                     end
-                    else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                    else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                       zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                   end
-                  else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+                  else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                 end
-                else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+                else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
               end
-              else	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :909:27
+              else	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :951:27
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
             end
-            else if (_GEN_133)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :909:27
+            else if (_GEN_143)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :951:27
               zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-            else if (_GEN_119) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :768:26, :909:27, :938:28, :941:56, :945:33
+            else if (_GEN_129) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :810:26, :951:27, :980:28, :983:56, :987:33
               if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-              else if (_GEN_117) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-                if (_GEN_106) begin	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :577:42, :768:26
-                  if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-                    if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+              else if (_GEN_127) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+                if (_GEN_116) begin	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :619:42, :810:26
+                  if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+                    if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                     end
-                    else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                    else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                       zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                   end
                   else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-                  else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-                    if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-                      if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                  else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+                    if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+                      if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                       end
-                      else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                      else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                         zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                     end
-                    else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+                    else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
                       zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                   end
-                  else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+                  else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                 end
-                else	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :768:26
+                else	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :810:26
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
               end
-              else if (_GEN_123)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :768:26
+              else if (_GEN_133)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :810:26
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-              else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-                if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+              else if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+                if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                 end
-                else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
               end
               else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-              else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-                if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-                  if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+              else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+                if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+                  if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                   end
-                  else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                  else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                 end
-                else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+                else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
               end
-              else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+              else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
             end
-            else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-              if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+            else if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+              if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
               end
-              else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+              else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
             end
             else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
               zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-            else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-              if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-                if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+            else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+              if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+                if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                 end
-                else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
               end
-              else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+              else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
             end
-            else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+            else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
               zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
           end
-          else if (_zBaseOff_T) begin	// src/foragerbee/scala/main/FbEngine.scala:992:18
-            if (_GEN_119) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :768:26, :909:27, :938:28, :941:56, :945:33
+          else if (_zBaseOff_T) begin	// src/foragerbee/scala/main/FbEngine.scala:1034:18
+            if (_GEN_129) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :810:26, :951:27, :980:28, :983:56, :987:33
               if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-              else if (_GEN_117) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-                if (_GEN_106) begin	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :577:42, :768:26
-                  if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-                    if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+              else if (_GEN_127) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+                if (_GEN_116) begin	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :619:42, :810:26
+                  if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+                    if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                     end
-                    else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                    else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                       zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                   end
                   else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-                  else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-                    if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-                      if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                  else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+                    if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+                      if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                       end
-                      else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                      else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                         zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                     end
-                    else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+                    else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
                       zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                   end
-                  else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+                  else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                 end
-                else	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :768:26
+                else	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :810:26
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
               end
-              else if (_GEN_123)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :768:26
+              else if (_GEN_133)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :810:26
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-              else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-                if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+              else if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+                if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                 end
-                else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
               end
               else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-              else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-                if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-                  if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+              else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+                if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+                  if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                   end
-                  else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                  else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                 end
-                else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+                else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
               end
-              else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+              else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
             end
-            else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-              if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+            else if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+              if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
               end
-              else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+              else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
             end
             else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
               zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-            else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-              if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-                if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+            else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+              if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+                if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                 end
-                else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
               end
-              else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+              else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
             end
-            else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+            else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
               zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
           end
-          else if (_GEN_134) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-            if (_GEN_106) begin	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :577:42, :909:27
-              if (_GEN_119) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :768:26, :909:27, :938:28, :941:56, :945:33
+          else if (_GEN_144) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+            if (_GEN_116) begin	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :619:42, :951:27
+              if (_GEN_129) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :810:26, :951:27, :980:28, :983:56, :987:33
                 if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-                else if (_GEN_117) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-                  if (_GEN_106) begin	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :577:42, :768:26
-                    if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-                      if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                else if (_GEN_127) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+                  if (_GEN_116) begin	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :619:42, :810:26
+                    if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+                      if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                       end
-                      else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                      else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                         zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                     end
                     else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
                       zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-                    else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-                      if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-                        if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                    else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+                      if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+                        if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                         end
-                        else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                        else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                           zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                       end
-                      else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+                      else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
                         zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                     end
-                    else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+                    else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
                       zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                   end
-                  else	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :768:26
+                  else	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :810:26
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                 end
-                else if (_GEN_123)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :768:26
+                else if (_GEN_133)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :810:26
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-                else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-                  if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                else if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+                  if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                   end
-                  else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                  else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                 end
                 else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-                else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-                  if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-                    if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+                  if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+                    if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                     end
-                    else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                    else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                       zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                   end
-                  else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+                  else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                 end
-                else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+                else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
               end
-              else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-                if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+              else if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+                if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                 end
-                else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
               end
               else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-              else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-                if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-                  if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+              else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+                if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+                  if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                   end
-                  else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                  else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                 end
-                else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+                else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
               end
-              else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+              else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
             end
-            else	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :909:27
+            else	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :951:27
               zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
           end
-          else if (_GEN_136)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :909:27
+          else if (_GEN_146)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :951:27
             zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-          else if (_GEN_119) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :768:26, :909:27, :938:28, :941:56, :945:33
+          else if (_GEN_129) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :810:26, :951:27, :980:28, :983:56, :987:33
             if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
               zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-            else if (_GEN_117) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-              if (_GEN_106) begin	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :577:42, :768:26
-                if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-                  if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+            else if (_GEN_127) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+              if (_GEN_116) begin	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :619:42, :810:26
+                if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+                  if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                   end
-                  else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                  else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                 end
                 else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-                else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-                  if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-                    if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+                  if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+                    if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                     end
-                    else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                    else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                       zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                   end
-                  else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+                  else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
                     zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
                 end
-                else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+                else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
               end
-              else	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :768:26
+              else	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :810:26
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
             end
-            else if (_GEN_123)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :768:26
+            else if (_GEN_133)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :810:26
               zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-            else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-              if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+            else if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+              if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
               end
-              else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+              else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
             end
             else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
               zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-            else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-              if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-                if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+            else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+              if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+                if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                 end
-                else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
               end
-              else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+              else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
             end
-            else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+            else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
               zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
           end
-          else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-            if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+          else if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+            if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
             end
-            else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+            else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
               zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
           end
           else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
             zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-          else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-            if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-              if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+          else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+            if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+              if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
               end
-              else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+              else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
             end
-            else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+            else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
               zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
           end
-          else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+          else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
             zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
         end
-        else	// src/foragerbee/scala/main/FbEngine.scala:1036:23
-          zBeatInRow <= _nxtZBeat_T;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :1035:35
+        else	// src/foragerbee/scala/main/FbEngine.scala:1078:23
+          zBeatInRow <= _nxtZBeat_T;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :1077:35
       end
-      else if (_GEN_119) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :768:26, :909:27, :938:28, :941:56, :945:33
+      else if (_GEN_129) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :810:26, :951:27, :980:28, :983:56, :987:33
         if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
           zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-        else if (_GEN_117) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-          if (_GEN_106) begin	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :577:42, :768:26
-            if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-              if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+        else if (_GEN_127) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+          if (_GEN_116) begin	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :619:42, :810:26
+            if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+              if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
               end
-              else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+              else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
             end
             else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
               zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-            else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-              if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-                if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+            else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+              if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+                if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                 end
-                else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+                else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
                   zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
               end
-              else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+              else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
                 zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
             end
-            else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+            else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
               zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
           end
-          else	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :768:26
+          else	// src/foragerbee/scala/main/FbEngine.scala:295:52, :302:41, :810:26
             zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
         end
-        else if (_GEN_123)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :768:26
+        else if (_GEN_133)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :810:26
           zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-        else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-          if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+        else if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+          if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
           end
-          else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+          else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
             zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
         end
         else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
           zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-        else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-          if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-            if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+        else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+          if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+            if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
             end
-            else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+            else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
               zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
           end
-          else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+          else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
             zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
         end
-        else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+        else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
           zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
       end
-      else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:577:42, :768:26, :844:53, :848:29, :860:31
-        if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+      else if (_GEN_118) begin	// src/foragerbee/scala/main/FbEngine.scala:619:42, :810:26, :886:53, :890:29, :902:31
+        if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
         end
-        else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+        else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
           zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
       end
       else if (|padAfterBytes0)	// src/foragerbee/scala/main/FbEngine.scala:186:31, :269:27
         zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-      else if (_GEN_98) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
-        if (_GEN_99) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
-          if (_GEN_82) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+      else if (_GEN_108) begin	// src/foragerbee/scala/main/FbEngine.scala:294:17
+        if (_GEN_109) begin	// src/foragerbee/scala/main/FbEngine.scala:295:25
+          if (_GEN_92) begin	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
           end
-          else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :577:42, :611:16, :613:64, :622:58, :626:82, :636:20
+          else	// src/foragerbee/scala/main/FbEngine.scala:188:27, :619:42, :653:16, :655:64, :664:58, :668:82, :678:20
             zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
         end
-        else if (_GEN_105)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :577:42
+        else if (_GEN_115)	// src/foragerbee/scala/main/FbEngine.scala:302:41, :304:22, :306:43, :309:22, :619:42
           zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
       end
-      else if (_GEN_110)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :577:42
+      else if (_GEN_120)	// src/foragerbee/scala/main/FbEngine.scala:319:27, :321:20, :324:37, :327:22, :619:42
         zBeatInRow <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:188:27, :269:27
-      if (_GEN_23 & _nbWrEofFire_T)	// src/foragerbee/scala/main/FbEngine.scala:189:24, :984:{14,27}, :1017:26, :1019:24, src/utils/Stream/Stream.scala:43:26
-        zRemain <= zawIssued ? zRemain - 20'h1 : _zRemain_T_2;	// src/foragerbee/scala/main/FbEngine.scala:189:24, :191:26, :1014:35, :1018:{15,26}, :1019:24, :1021:17
-      if (_GEN_23 & _GEN_126)	// src/foragerbee/scala/main/FbEngine.scala:190:26, :909:27, :984:{14,27}, :1017:26, :1019:24, :1020:19, :1022:19
-        zSegBeats <= zSeg;	// src/foragerbee/scala/main/FbEngine.scala:190:26, :1007:29
+      if (_GEN_23 & _nbWrEofFire_T)	// src/foragerbee/scala/main/FbEngine.scala:189:24, :1026:{14,27}, :1059:26, :1061:24, src/utils/Stream/Stream.scala:43:26
+        zRemain <= zawIssued ? zRemain - 20'h1 : _zRemain_T_2;	// src/foragerbee/scala/main/FbEngine.scala:189:24, :191:26, :1056:35, :1060:{15,26}, :1061:24, :1063:17
+      if (_GEN_23 & _GEN_136)	// src/foragerbee/scala/main/FbEngine.scala:190:26, :951:27, :1026:{14,27}, :1059:26, :1061:24, :1062:19, :1064:19
+        zSegBeats <= zSeg;	// src/foragerbee/scala/main/FbEngine.scala:190:26, :1049:29
       zawIssued <=
         _GEN_23
           ? (_GEN_18
-               ? _GEN_128
+               ? _GEN_138
                  & (isDim1PadRow
-                      ? (_GEN_129 ? _GEN_131 : ~_GEN_133 & _GEN_127)
+                      ? (_GEN_139 ? _GEN_141 : ~_GEN_143 & _GEN_137)
                       : _zBaseOff_T
-                          ? _GEN_127
-                          : _GEN_134 ? _GEN_131 : ~_GEN_136 & _GEN_127)
-               : _GEN_127)
-          : _GEN_124;	// src/foragerbee/scala/main/FbEngine.scala:191:26, :263:21, :269:34, :294:{17,33}, :295:52, :302:41, :319:27, :321:20, :322:19, :324:37, :327:22, :328:21, :768:26, :844:27, :909:27, :938:28, :941:56, :945:33, :984:{14,27}, :986:57, :992:18, :1017:26, :1019:24, :1020:19, :1033:53, :1036:{23,44}, :1038:30, :1041:38, :1052:21
+                          ? _GEN_137
+                          : _GEN_144 ? _GEN_141 : ~_GEN_146 & _GEN_137)
+               : _GEN_137)
+          : _GEN_134;	// src/foragerbee/scala/main/FbEngine.scala:191:26, :263:21, :269:34, :294:{17,33}, :295:52, :302:41, :319:27, :321:20, :322:19, :324:37, :327:22, :328:21, :810:26, :886:27, :951:27, :980:28, :983:56, :987:33, :1026:{14,27}, :1028:57, :1034:18, :1059:26, :1061:24, :1062:19, :1075:53, :1078:{23,44}, :1080:30, :1083:38, :1094:21
       padOuterDone <=
-        _GEN_21 & _nbWrEofFire_T & _GEN_114 & mxRowEndPending & _GEN_97 | _GEN_94
-        & ~mxQuantActive & rowEndNow & _GEN_97 | ~_GEN_60 & padOuterDone;	// src/foragerbee/scala/main/FbEngine.scala:192:29, :196:66, :202:34, :263:21, :266:41, :267:22, :577:{24,42}, :588:27, :768:26, :844:53, :847:33, :848:29, :860:31, :909:{14,27}, :938:28, :941:{34,56}, :945:33, src/utils/Stream/Stream.scala:43:26
-      if (_GEN_135
+        _GEN_21 & _nbWrEofFire_T & _GEN_124 & mxRowEndPending & _GEN_107 | _GEN_104
+        & ~mxQuantActive & rowEndNow & _GEN_107 | ~_GEN_70 & padOuterDone;	// src/foragerbee/scala/main/FbEngine.scala:192:29, :196:66, :202:34, :263:21, :266:41, :267:22, :619:{24,42}, :630:27, :810:26, :886:53, :889:33, :890:29, :902:31, :951:{14,27}, :980:28, :983:{34,56}, :987:33, src/utils/Stream/Stream.scala:43:26
+      if (_GEN_145
             ? (isDim1PadRow
-                 ? _GEN_130 & _GEN_121
-                 : (_zBaseOff_T | ~_GEN_134 | _GEN_99) & _GEN_121)
-            : _GEN_121) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :293:16, :294:{17,33}, :295:{25,52}, :300:25, :577:42, :768:26, :844:53, :848:29, :909:27, :938:28, :941:56, :945:33, :984:27, :986:57, :992:18, :1033:53, :1036:44, :1038:30, :1041:38
-        if (_GEN_74)	// src/foragerbee/scala/main/FbEngine.scala:182:27, :577:42, :588:27, :589:18
+                 ? _GEN_140 & _GEN_131
+                 : (_zBaseOff_T | ~_GEN_144 | _GEN_109) & _GEN_131)
+            : _GEN_131) begin	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :293:16, :294:{17,33}, :295:{25,52}, :300:25, :619:42, :810:26, :886:53, :890:29, :951:27, :980:28, :983:56, :987:33, :1026:27, :1028:57, :1034:18, :1075:53, :1078:44, :1080:30, :1083:38
+        if (_GEN_85)	// src/foragerbee/scala/main/FbEngine.scala:182:27, :619:42, :630:27, :631:18
           padOuterAddrOff <= 52'h0;	// src/foragerbee/scala/main/FbEngine.scala:193:32
       end
-      else	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :294:33, :768:26, :909:27, :938:28, :941:56, :945:33, :984:27, :1033:53, :1036:44, :1038:30, :1041:38
+      else	// src/foragerbee/scala/main/FbEngine.scala:263:21, :269:34, :294:33, :810:26, :951:27, :980:28, :983:56, :987:33, :1026:27, :1075:53, :1078:44, :1080:30, :1083:38
         padOuterAddrOff <=
           (active_1 ? {4'h0, _scaleRowAddr_contributions_T_1} : 52'h0)
           + (cmdReg_dimCount[2] ? {4'h0, _scaleRowAddr_contributions_T_2} : 52'h0)
           + (active_3 ? {4'h0, _scaleRowAddr_contributions_T_3} : 52'h0);	// src/foragerbee/scala/main/FbEngine.scala:76:19, :193:32, :251:29, :252:{10,32,58}, :255:33
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h0)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h0)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_0 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h1)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h1)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_1 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h2)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h2)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_2 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h3)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h3)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_3 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h4)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h4)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_4 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h5)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h5)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_5 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h6)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h6)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_6 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h7)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h7)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_7 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h8)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h8)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_8 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h9)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h9)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_9 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'hA)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'hA)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_10 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'hB)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'hB)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_11 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'hC)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'hC)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_12 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'hD)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'hD)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_13 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'hE)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'hE)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_14 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'hF)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'hF)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_15 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h10)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h10)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_16 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h11)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h11)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_17 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h12)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h12)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_18 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h13)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h13)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_19 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h14)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h14)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_20 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h15)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h15)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_21 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h16)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h16)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_22 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h17)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h17)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_23 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h18)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h18)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_24 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h19)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h19)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_25 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h1A)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h1A)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_26 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h1B)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h1B)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_27 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h1C)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h1C)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_28 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h1D)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h1D)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_29 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & mxScaleAccumCount[4:0] == 5'h1E)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & mxScaleAccumCount[4:0] == 5'h1E)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_30 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_14 & mxQuantActive & _GEN_92 & (&(mxScaleAccumCount[4:0])))	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :768:{14,26}, :770:27, :782:34, :783:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_14 & mxQuantActive & _GEN_102 & (&(mxScaleAccumCount[4:0])))	// src/foragerbee/scala/main/FbEngine.scala:196:66, :197:34, :198:34, :810:{14,26}, :812:27, :824:34, :825:{41,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
         mxScaleAccum_31 <= _mxQuantizer_io_outScale_bits;	// src/foragerbee/scala/main/FbEngine.scala:146:58, :197:34
-      if (_GEN_115) begin	// src/foragerbee/scala/main/FbEngine.scala:768:26, :909:27, :938:28, :941:56, :944:29
+      if (_GEN_125) begin	// src/foragerbee/scala/main/FbEngine.scala:810:26, :951:27, :980:28, :983:56, :986:29
         mxScaleAccumCount <= 6'h0;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :198:34
         mxScaleByteCur <=
-          mxRowEndPending ? 20'h0 : mxScaleByteCur + {14'h0, mxScaleAccumCount};	// src/foragerbee/scala/main/FbEngine.scala:198:34, :199:34, :202:34, :269:27, :945:33, :946:28, :950:{28,46}
+          mxRowEndPending ? 20'h0 : mxScaleByteCur + {14'h0, mxScaleAccumCount};	// src/foragerbee/scala/main/FbEngine.scala:198:34, :199:34, :202:34, :269:27, :987:33, :988:28, :992:{28,46}
       end
-      else begin	// src/foragerbee/scala/main/FbEngine.scala:768:26, :909:27, :938:28, :941:56, :944:29
-        if (_GEN_14 & mxQuantActive & _GEN_92)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :577:42, :768:{14,26}, :770:27, :782:34, :784:29, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-          mxScaleAccumCount <= mxScaleAccumCount + 6'h1;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :198:34, :784:50
-        else if (_GEN_60)	// src/foragerbee/scala/main/FbEngine.scala:577:24, src/utils/Stream/Stream.scala:43:26
+      else begin	// src/foragerbee/scala/main/FbEngine.scala:810:26, :951:27, :980:28, :983:56, :986:29
+        if (_GEN_14 & mxQuantActive & _GEN_102)	// src/foragerbee/scala/main/FbEngine.scala:196:66, :619:42, :810:{14,26}, :812:27, :824:34, :826:29, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+          mxScaleAccumCount <= mxScaleAccumCount + 6'h1;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :198:34, :826:50
+        else if (_GEN_70)	// src/foragerbee/scala/main/FbEngine.scala:619:24, src/utils/Stream/Stream.scala:43:26
           mxScaleAccumCount <= 6'h0;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :198:34
-        if (_GEN_60)	// src/foragerbee/scala/main/FbEngine.scala:577:24, src/utils/Stream/Stream.scala:43:26
+        if (_GEN_70)	// src/foragerbee/scala/main/FbEngine.scala:619:24, src/utils/Stream/Stream.scala:43:26
           mxScaleByteCur <= 20'h0;	// src/foragerbee/scala/main/FbEngine.scala:199:34, :269:27
       end
-      if (_GEN_113)	// src/foragerbee/scala/main/FbEngine.scala:768:26, :909:27, :929:26, :938:28, :939:25
-        mxScaleWrByte <= _GEN_114 ? 6'h0 : _mxScaleWrByte_T;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :200:34, :940:{23,40}, :941:{34,56}, :943:25
-      else if (_GEN_60)	// src/foragerbee/scala/main/FbEngine.scala:577:24, src/utils/Stream/Stream.scala:43:26
+      if (_GEN_123)	// src/foragerbee/scala/main/FbEngine.scala:810:26, :951:27, :971:26, :980:28, :981:25
+        mxScaleWrByte <= _GEN_124 ? 6'h0 : _mxScaleWrByte_T;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :200:34, :982:{23,40}, :983:{34,56}, :985:25
+      else if (_GEN_70)	// src/foragerbee/scala/main/FbEngine.scala:619:24, src/utils/Stream/Stream.scala:43:26
         mxScaleWrByte <= 6'h0;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :200:34
       mxScaleAwIssued <=
-        ~_GEN_113
-        & (_GEN_94
-             ? ~(mxQuantActive | _GEN_60) & mxScaleAwIssued
-             : ~_GEN_60 & mxScaleAwIssued);	// src/foragerbee/scala/main/FbEngine.scala:192:29, :196:66, :201:34, :577:{24,42}, :588:27, :607:23, :768:26, :844:53, :848:29, :852:27, :909:27, :929:26, :938:28, :939:25, src/utils/Stream/Stream.scala:43:26
+        ~_GEN_123
+        & (_GEN_104
+             ? ~(mxQuantActive | _GEN_70) & mxScaleAwIssued
+             : ~_GEN_70 & mxScaleAwIssued);	// src/foragerbee/scala/main/FbEngine.scala:192:29, :196:66, :201:34, :619:{24,42}, :630:27, :649:23, :810:26, :886:53, :890:29, :894:27, :951:27, :971:26, :980:28, :981:25, src/utils/Stream/Stream.scala:43:26
       mxRowEndPending <=
-        ~_GEN_116
-        & (_GEN_14 & _GEN_18 & mxQuantActive ? rowEndNow : ~_GEN_60 & mxRowEndPending);	// src/foragerbee/scala/main/FbEngine.scala:192:29, :196:66, :202:34, :577:{24,42}, :588:27, :608:23, :768:{14,26}, :844:{27,53}, :847:33, :848:29, :851:27, :909:27, :938:28, :941:56, :945:33, :947:29, src/utils/Stream/Stream.scala:43:26
+        ~_GEN_126
+        & (_GEN_14 & _GEN_18 & mxQuantActive ? rowEndNow : ~_GEN_70 & mxRowEndPending);	// src/foragerbee/scala/main/FbEngine.scala:192:29, :196:66, :202:34, :619:{24,42}, :630:27, :650:23, :810:{14,26}, :886:{27,53}, :889:33, :890:29, :893:27, :951:27, :980:28, :983:56, :987:33, :989:29, src/utils/Stream/Stream.scala:43:26
     end
-    if (_GEN_60) begin	// src/foragerbee/scala/main/FbEngine.scala:577:24, src/utils/Stream/Stream.scala:43:26
+    if (_GEN_70) begin	// src/foragerbee/scala/main/FbEngine.scala:619:24, src/utils/Stream/Stream.scala:43:26
       cmdReg_op <= io_cmdIn_payload_op;	// src/foragerbee/scala/main/FbEngine.scala:76:19
       cmdReg_tag <= io_cmdIn_payload_tag;	// src/foragerbee/scala/main/FbEngine.scala:76:19
       cmdReg_dimCount <= io_cmdIn_payload_dimCount;	// src/foragerbee/scala/main/FbEngine.scala:76:19
@@ -2340,48 +2422,48 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
       cmdReg_scaleBlockSize <= io_cmdIn_payload_scaleBlockSize;	// src/foragerbee/scala/main/FbEngine.scala:76:19
       cmdReg_mxQuantEn <= io_cmdIn_payload_mxQuantEn;	// src/foragerbee/scala/main/FbEngine.scala:76:19
     end
-    if (_GEN_51) begin	// src/foragerbee/scala/main/FbEngine.scala:173:27, :1259:26, :1396:25, :1406:43
+    if (_GEN_59) begin	// src/foragerbee/scala/main/FbEngine.scala:173:27, :1307:26, :1460:25, :1470:43
     end
-    else if (_GEN_48) begin	// src/foragerbee/scala/main/FbEngine.scala:1406:34
+    else if (_GEN_56) begin	// src/foragerbee/scala/main/FbEngine.scala:1470:34
       if (_sgCtrl_io_valid) begin	// src/foragerbee/scala/main/FbEngine.scala:156:44
-        automatic logic [11:0] _lenBeats_T = _sgCtrl_io_curLen[11:0] + 12'h1F;	// src/foragerbee/scala/main/FbEngine.scala:156:44, :1425:44
+        automatic logic [11:0] _lenBeats_T = _sgCtrl_io_curLen[11:0] + 12'h1F;	// src/foragerbee/scala/main/FbEngine.scala:156:44, :1489:44
         sgCurAddr <= _sgCtrl_io_curAddr;	// src/foragerbee/scala/main/FbEngine.scala:156:44, :170:27
-        sgCurBeats <= _lenBeats_T[11:5];	// src/foragerbee/scala/main/FbEngine.scala:171:27, :1425:{44,59}, :1426:26
+        sgCurBeats <= _lenBeats_T[11:5];	// src/foragerbee/scala/main/FbEngine.scala:171:27, :1489:{44,59}, :1490:26
         sgRRemain <= 7'h0;	// src/foragerbee/scala/main/FbEngine.scala:173:27
       end
     end
-    else begin	// src/foragerbee/scala/main/FbEngine.scala:1406:34
-      if (_GEN_50 | ~_GEN_57 | _GEN_58) begin	// src/foragerbee/scala/main/FbEngine.scala:171:27, :577:42, :1406:43, :1409:25, :1495:61, :1497:32, :1500:{37,46}
+    else begin	// src/foragerbee/scala/main/FbEngine.scala:1470:34
+      if (_GEN_58 | ~_GEN_65 | _GEN_66) begin	// src/foragerbee/scala/main/FbEngine.scala:171:27, :619:42, :1470:43, :1473:25, :1559:61, :1561:32, :1564:{37,46}
       end
-      else begin	// src/foragerbee/scala/main/FbEngine.scala:171:27, :1409:25, :1495:61, :1500:46
-        sgCurAddr <= sgCurAddr + _GEN_68;	// src/foragerbee/scala/main/FbEngine.scala:170:27, :1497:50, :1508:42
-        sgCurBeats <= _remainAfterSeg_T[6:0];	// src/foragerbee/scala/main/FbEngine.scala:171:27, :1499:49, :1506:30
+      else begin	// src/foragerbee/scala/main/FbEngine.scala:171:27, :1473:25, :1559:61, :1564:46
+        sgCurAddr <= sgCurAddr + _GEN_78;	// src/foragerbee/scala/main/FbEngine.scala:170:27, :1561:50, :1572:42
+        sgCurBeats <= _remainAfterSeg_T[6:0];	// src/foragerbee/scala/main/FbEngine.scala:171:27, :1563:49, :1570:30
       end
-      if (_GEN_50) begin	// src/foragerbee/scala/main/FbEngine.scala:1409:25
-        if (~_GEN_64 | _GEN_65) begin	// src/foragerbee/scala/main/FbEngine.scala:740:26, :750:30, :752:29, :1444:34, :1455:38, :1457:{30,39}, src/utils/Stream/Stream.scala:43:26
-          if (_GEN_63)	// src/utils/Stream/Stream.scala:43:26
-            sgRRemain <= sgSeg;	// src/foragerbee/scala/main/FbEngine.scala:173:27, :1440:62
+      if (_GEN_58) begin	// src/foragerbee/scala/main/FbEngine.scala:1473:25
+        if (~_GEN_74 | _GEN_75) begin	// src/foragerbee/scala/main/FbEngine.scala:782:26, :792:30, :794:29, :1508:34, :1519:38, :1521:{30,39}, src/utils/Stream/Stream.scala:43:26
+          if (_GEN_73)	// src/utils/Stream/Stream.scala:43:26
+            sgRRemain <= sgSeg;	// src/foragerbee/scala/main/FbEngine.scala:173:27, :1504:62
         end
-        else	// src/foragerbee/scala/main/FbEngine.scala:1444:34, :1455:38, :1457:39
-          sgRRemain <= sgRRemain - 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:173:27, :1463:40
+        else	// src/foragerbee/scala/main/FbEngine.scala:1508:34, :1519:38, :1521:39
+          sgRRemain <= sgRRemain - 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:173:27, :1527:40
       end
-      else if (_GEN_69) begin	// src/foragerbee/scala/main/FbEngine.scala:173:27, :577:42, :1409:25, :1495:61, :1500:46
+      else if (_GEN_79) begin	// src/foragerbee/scala/main/FbEngine.scala:173:27, :619:42, :1473:25, :1559:61, :1564:46
       end
-      else	// src/foragerbee/scala/main/FbEngine.scala:173:27, :1409:25, :1495:61, :1500:46
+      else	// src/foragerbee/scala/main/FbEngine.scala:173:27, :1473:25, :1559:61, :1564:46
         sgRRemain <= 7'h0;	// src/foragerbee/scala/main/FbEngine.scala:173:27
     end
-    if (_GEN_67) begin	// src/foragerbee/scala/main/FbEngine.scala:175:27, :1259:26, :1396:25, :1406:43
+    if (_GEN_77) begin	// src/foragerbee/scala/main/FbEngine.scala:175:27, :1307:26, :1460:25, :1470:43
     end
-    else if (_GEN_50) begin	// src/foragerbee/scala/main/FbEngine.scala:1409:25
-      if (_GEN_66)	// src/foragerbee/scala/main/FbEngine.scala:577:42, :1455:38, :1457:39, :1459:25
-        sgWRemain <= sgSegBeats[6:0];	// src/foragerbee/scala/main/FbEngine.scala:175:27, :177:31, :1461:27
+    else if (_GEN_58) begin	// src/foragerbee/scala/main/FbEngine.scala:1473:25
+      if (_GEN_76)	// src/foragerbee/scala/main/FbEngine.scala:619:42, :1519:38, :1521:39, :1523:25
+        sgWRemain <= sgSegBeats[6:0];	// src/foragerbee/scala/main/FbEngine.scala:175:27, :177:31, :1525:27
     end
-    else if (_GEN_53 & _nbWrEofFire_T)	// src/foragerbee/scala/main/FbEngine.scala:175:27, :1409:25, :1482:34, :1484:25, src/utils/Stream/Stream.scala:43:26
-      sgWRemain <= sgWRemain - 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:175:27, :1484:38
-    if (_GEN_62) begin	// src/foragerbee/scala/main/FbEngine.scala:168:31, :176:27, :577:42, :611:16, :613:64, :622:58, :626:82
+    else if (_GEN_61 & _nbWrEofFire_T)	// src/foragerbee/scala/main/FbEngine.scala:175:27, :1473:25, :1546:34, :1548:25, src/utils/Stream/Stream.scala:43:26
+      sgWRemain <= sgWRemain - 7'h1;	// src/foragerbee/scala/main/FbEngine.scala:175:27, :1548:38
+    if (_GEN_72) begin	// src/foragerbee/scala/main/FbEngine.scala:168:31, :176:27, :619:42, :653:16, :655:64, :664:58, :668:82
     end
-    else	// src/foragerbee/scala/main/FbEngine.scala:176:27, :577:42, :611:16, :613:64, :622:58, :626:82
-      sgIsGather <= _sgIsGather_T;	// src/foragerbee/scala/main/FbEngine.scala:176:27, :494:46
+    else	// src/foragerbee/scala/main/FbEngine.scala:176:27, :619:42, :653:16, :655:64, :664:58, :668:82
+      sgIsGather <= _sgIsGather_T;	// src/foragerbee/scala/main/FbEngine.scala:176:27, :496:46
   end // always @(posedge)
   `ifdef ENABLE_INITIAL_REG_	// src/foragerbee/scala/main/FbEngine.scala:40:7
     `ifdef FIRRTL_BEFORE_INITIAL	// src/foragerbee/scala/main/FbEngine.scala:40:7
@@ -2540,11 +2622,11 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
     .reset        (reset),
     .io_enq_ready (_dataQueue_io_enq_ready),
     .io_enq_valid
-      (~_GEN_46 | _GEN_52 | ~_GEN_50
-         ? (_GEN_37 ? _GEN_13 & io_bus_rdData_valid : _GEN_36 & io_bus_rdData_valid)
-         : io_bus_rdData_valid),	// src/foragerbee/scala/main/FbEngine.scala:177:31, :347:23, :351:26, :736:{14,25}, :747:25, :748:28, :1259:26, :1266:25, :1268:32, :1269:26, :1289:33, :1290:36, :1396:{16,25}, :1406:43, :1409:25
+      (~_GEN_54 | _GEN_60 | ~_GEN_58
+         ? (_GEN_42 ? _GEN_13 & io_bus_rdData_valid : _GEN_41 & io_bus_rdData_valid)
+         : io_bus_rdData_valid),	// src/foragerbee/scala/main/FbEngine.scala:177:31, :347:23, :351:26, :778:{14,25}, :789:25, :790:28, :1307:26, :1314:25, :1316:32, :1317:26, :1339:33, :1340:36, :1460:{16,25}, :1470:43, :1473:25
     .io_enq_bits  (io_bus_rdData_payload_data),
-    .io_deq_ready (dataQueue_io_deq_ready),	// src/foragerbee/scala/main/FbEngine.scala:1259:26, :1396:25, :1406:43
+    .io_deq_ready (dataQueue_io_deq_ready),	// src/foragerbee/scala/main/FbEngine.scala:1307:26, :1460:25, :1470:43
     .io_deq_valid (_dataQueue_io_deq_valid),
     .io_deq_bits  (_dataQueue_io_deq_bits)
   );	// src/foragerbee/scala/main/FbEngine.scala:130:25
@@ -2553,14 +2635,14 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
     .reset            (reset),
     .io_in_ready      (_converter_io_in_ready),
     .io_in_valid
-      (_GEN_42
-         ? _GEN_40 & _dataQueue_io_deq_valid
-         : (_GEN_39 | _GEN_40) & _dataQueue_io_deq_valid),	// src/foragerbee/scala/main/FbEngine.scala:93:68, :130:25, :374:19, :768:26, :770:27, :790:29, :793:26, :1259:26, :1266:25, :1268:32, :1269:26, :1306:32
+      (~_GEN_34 | _im2colGen_io_done | ~_im2colGen_io_valid | _GEN_47 | ~_GEN_44
+         ? _GEN_46 & _dataQueue_io_deq_valid
+         : (~_GEN_45 | _GEN_46) & _dataQueue_io_deq_valid),	// src/foragerbee/scala/main/FbEngine.scala:93:68, :130:25, :152:50, :374:19, :778:25, :810:26, :812:27, :832:29, :835:26, :1307:{16,26}, :1314:25, :1316:32, :1317:26, :1357:{33,42}, :1363:34
     .io_in_bits       (_dataQueue_io_deq_bits),	// src/foragerbee/scala/main/FbEngine.scala:130:25
     .io_out_ready
-      (_GEN_44
+      (_GEN_49
          ? _GEN_14 & (~_GEN_17 | _GEN_16) & ~_GEN_16 & io_bus_wr_ready
-         : ~_GEN_43 & io_bus_wr_ready),	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :376:20, :768:{14,26}, :770:27, :790:29, :793:26, :799:27, :832:{22,68}, :833:25, :836:31, :1259:26, :1266:25, :1268:32, :1269:26, :1309:31, :1311:33, :1335:{33,79}, :1336:33, :1338:72
+         : ~_GEN_48 & io_bus_wr_ready),	// src/foragerbee/scala/main/FbEngine.scala:93:68, :374:19, :376:20, :810:{14,26}, :812:27, :832:29, :835:26, :841:27, :874:{22,68}, :875:25, :878:31, :1307:26, :1314:25, :1316:32, :1317:26, :1357:42, :1366:33, :1368:35, :1392:{35,81}, :1393:35, :1395:74
     .io_out_valid     (_converter_io_out_valid),
     .io_out_bits      (_converter_io_out_bits),
     .io_cfg_srcFmt    (cmdReg_srcFmt),	// src/foragerbee/scala/main/FbEngine.scala:76:19
@@ -2568,82 +2650,86 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
     .io_cfg_scale     (cmdReg_cvtScale),	// src/foragerbee/scala/main/FbEngine.scala:76:19
     .io_cfg_zeroPoint (cmdReg_cvtZeroPoint),	// src/foragerbee/scala/main/FbEngine.scala:76:19
     .io_cfg_enable    (cvtActive & ~mxQuantActive),	// src/foragerbee/scala/main/FbEngine.scala:93:68, :196:66, :381:{34,37}
-    .io_flush         (converter_io_flush)	// src/foragerbee/scala/main/FbEngine.scala:1546:14
+    .io_flush         (converter_io_flush)	// src/foragerbee/scala/main/FbEngine.scala:1610:14
   );	// src/foragerbee/scala/main/FbEngine.scala:138:56
   Fb_FbMxQuantizer mxQuantizer (	// src/foragerbee/scala/main/FbEngine.scala:146:58
     .clock             (clock),
     .reset             (reset),
     .io_in_ready       (_mxQuantizer_io_in_ready),
-    .io_in_valid       (_GEN_14 & mxQuantActive & _dataQueue_io_deq_valid),	// src/foragerbee/scala/main/FbEngine.scala:130:25, :196:66, :387:19, :768:{14,26}, :770:27, :773:23
+    .io_in_valid       (_GEN_14 & mxQuantActive & _dataQueue_io_deq_valid),	// src/foragerbee/scala/main/FbEngine.scala:130:25, :196:66, :387:19, :810:{14,26}, :812:27, :815:23
     .io_in_bits        (_dataQueue_io_deq_bits),	// src/foragerbee/scala/main/FbEngine.scala:130:25
-    .io_outData_ready  (_GEN_14 & ~_GEN_17 & mxQuantActive & io_bus_wr_ready),	// src/foragerbee/scala/main/FbEngine.scala:196:66, :389:24, :768:{14,26}, :770:27, :779:28, :832:{22,68}, :833:25, :836:31
+    .io_outData_ready  (_GEN_14 & ~_GEN_17 & mxQuantActive & io_bus_wr_ready),	// src/foragerbee/scala/main/FbEngine.scala:196:66, :389:24, :810:{14,26}, :812:27, :821:28, :874:{22,68}, :875:25, :878:31
     .io_outData_valid  (_mxQuantizer_io_outData_valid),
     .io_outData_bits   (_mxQuantizer_io_outData_bits),
-    .io_outScale_ready (mxQuantizer_io_outScale_ready),	// src/foragerbee/scala/main/FbEngine.scala:390:25, :768:26, :770:27
+    .io_outScale_ready (mxQuantizer_io_outScale_ready),	// src/foragerbee/scala/main/FbEngine.scala:390:25, :810:26, :812:27
     .io_outScale_valid (_mxQuantizer_io_outScale_valid),
     .io_outScale_bits  (_mxQuantizer_io_outScale_bits),
     .io_cfg_srcFmt     (cmdReg_srcFmt),	// src/foragerbee/scala/main/FbEngine.scala:76:19
     .io_cfg_dstFmt     (cmdReg_dstFmt),	// src/foragerbee/scala/main/FbEngine.scala:76:19
-    .io_cfg_blockSize  (_seg_mxBlockSizeReg_T_4 ? 7'h40 : _GEN_1 ? 7'h20 : 7'h10),	// src/foragerbee/scala/main/FbEngine.scala:135:28, :394:70, :915:37
-    .io_flush          (converter_io_flush)	// src/foragerbee/scala/main/FbEngine.scala:1546:14
+    .io_cfg_blockSize  (_seg_mxBlockSizeReg_T_4 ? 7'h40 : _GEN_1 ? 7'h20 : 7'h10),	// src/foragerbee/scala/main/FbEngine.scala:135:28, :394:70, :957:37
+    .io_flush          (converter_io_flush)	// src/foragerbee/scala/main/FbEngine.scala:1610:14
   );	// src/foragerbee/scala/main/FbEngine.scala:146:58
   Fb_FbIm2colAddrGen im2colGen (	// src/foragerbee/scala/main/FbEngine.scala:152:50
-    .clock            (clock),
-    .reset            (reset),
-    .io_start         (_GEN_29 & ~i2cStarted),	// src/foragerbee/scala/main/FbEngine.scala:165:28, :415:18, :1259:{16,26}, :1261:{12,25}
-    .io_srcBase       (cmdReg_srcAddr),	// src/foragerbee/scala/main/FbEngine.scala:76:19
-    .io_dstBase       (cmdReg_dstAddr),	// src/foragerbee/scala/main/FbEngine.scala:76:19
-    .io_elemBytesLog2
+    .clock               (clock),
+    .reset               (reset),
+    .io_start            (_GEN_34 & ~i2cStarted),	// src/foragerbee/scala/main/FbEngine.scala:165:28, :415:18, :1307:{16,26}, :1309:{12,25}
+    .io_srcBase          (cmdReg_srcAddr),	// src/foragerbee/scala/main/FbEngine.scala:76:19
+    .io_dstBase          (cmdReg_dstAddr),	// src/foragerbee/scala/main/FbEngine.scala:76:19
+    .io_srcElemBytesLog2
       (cmdReg_srcFmt == 4'h8 | cmdReg_srcFmt == 4'h0
          ? 2'h2
-         : {1'h0, cmdReg_srcFmt == 4'h9 | cmdReg_srcFmt == 4'h2 | cmdReg_srcFmt == 4'h1}),	// src/foragerbee/scala/main/FbEngine.scala:76:19, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :242:65
-    .io_kernel_0      (cmdReg_im2colKernel_0),	// src/foragerbee/scala/main/FbEngine.scala:76:19
-    .io_kernel_1      (cmdReg_im2colKernel_1),	// src/foragerbee/scala/main/FbEngine.scala:76:19
-    .io_stride_0      (cmdReg_im2colStride_0),	// src/foragerbee/scala/main/FbEngine.scala:76:19
-    .io_stride_1      (cmdReg_im2colStride_1),	// src/foragerbee/scala/main/FbEngine.scala:76:19
-    .io_pad_0         (cmdReg_im2colPad_0),	// src/foragerbee/scala/main/FbEngine.scala:76:19
-    .io_pad_1         (cmdReg_im2colPad_1),	// src/foragerbee/scala/main/FbEngine.scala:76:19
-    .io_dilation_0    (cmdReg_im2colDilation_0),	// src/foragerbee/scala/main/FbEngine.scala:76:19
-    .io_dilation_1    (cmdReg_im2colDilation_1),	// src/foragerbee/scala/main/FbEngine.scala:76:19
-    .io_inShape_0     (cmdReg_im2colInShape_0),	// src/foragerbee/scala/main/FbEngine.scala:76:19
-    .io_inShape_1     (cmdReg_im2colInShape_1),	// src/foragerbee/scala/main/FbEngine.scala:76:19
-    .io_inShape_2     (cmdReg_im2colInShape_2),	// src/foragerbee/scala/main/FbEngine.scala:76:19
-    .io_valid         (_im2colGen_io_valid),
+         : {1'h0, cmdReg_srcFmt == 4'h9 | cmdReg_srcFmt == 4'h2 | cmdReg_srcFmt == 4'h1}),	// src/foragerbee/scala/main/FbEngine.scala:76:19, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :246:65
+    .io_dstElemBytesLog2
+      (cmdReg_dstFmt == 4'h8 | cmdReg_dstFmt == 4'h0
+         ? 2'h2
+         : {1'h0, cmdReg_dstFmt == 4'h9 | cmdReg_dstFmt == 4'h2 | cmdReg_dstFmt == 4'h1}),	// src/foragerbee/scala/main/FbEngine.scala:76:19, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :246:65
+    .io_kernel_0         (cmdReg_im2colKernel_0),	// src/foragerbee/scala/main/FbEngine.scala:76:19
+    .io_kernel_1         (cmdReg_im2colKernel_1),	// src/foragerbee/scala/main/FbEngine.scala:76:19
+    .io_stride_0         (cmdReg_im2colStride_0),	// src/foragerbee/scala/main/FbEngine.scala:76:19
+    .io_stride_1         (cmdReg_im2colStride_1),	// src/foragerbee/scala/main/FbEngine.scala:76:19
+    .io_pad_0            (cmdReg_im2colPad_0),	// src/foragerbee/scala/main/FbEngine.scala:76:19
+    .io_pad_1            (cmdReg_im2colPad_1),	// src/foragerbee/scala/main/FbEngine.scala:76:19
+    .io_dilation_0       (cmdReg_im2colDilation_0),	// src/foragerbee/scala/main/FbEngine.scala:76:19
+    .io_dilation_1       (cmdReg_im2colDilation_1),	// src/foragerbee/scala/main/FbEngine.scala:76:19
+    .io_inShape_0        (cmdReg_im2colInShape_0),	// src/foragerbee/scala/main/FbEngine.scala:76:19
+    .io_inShape_1        (cmdReg_im2colInShape_1),	// src/foragerbee/scala/main/FbEngine.scala:76:19
+    .io_inShape_2        (cmdReg_im2colInShape_2),	// src/foragerbee/scala/main/FbEngine.scala:76:19
+    .io_valid            (_im2colGen_io_valid),
     .io_advance
-      (_GEN_29 & ~_im2colGen_io_done & _im2colGen_io_valid & ~_GEN_41
-       & (_GEN_39 | (&i2cPhase)) & _GEN_18),	// src/foragerbee/scala/main/FbEngine.scala:152:50, :159:28, :430:20, :768:26, :844:27, :1259:{16,26}, :1266:25, :1268:32, :1269:26, :1340:61
-    .io_srcAddr       (_im2colGen_io_srcAddr),
-    .io_dstAddr       (_im2colGen_io_dstAddr),
-    .io_isPad         (_im2colGen_io_isPad),
-    .io_done          (_im2colGen_io_done)
+      (_GEN_34 & ~_im2colGen_io_done & _im2colGen_io_valid & ~_GEN_47
+       & (_GEN_44 ? _GEN_45 | _GEN_18 : (&i2cPhase) & (_GEN_50 | _GEN_18))),	// src/foragerbee/scala/main/FbEngine.scala:152:50, :159:28, :432:20, :810:26, :886:27, :1307:{16,26}, :1314:25, :1316:32, :1317:26, :1357:{33,42}, :1358:30, :1397:63, :1415:{38,47}, :1416:30, :1435:63
+    .io_srcAddr          (_im2colGen_io_srcAddr),
+    .io_dstAddr          (_im2colGen_io_dstAddr),
+    .io_isPad            (_im2colGen_io_isPad),
+    .io_done             (_im2colGen_io_done)
   );	// src/foragerbee/scala/main/FbEngine.scala:152:50
   Fb_FbScatterGatherCtrl sgCtrl (	// src/foragerbee/scala/main/FbEngine.scala:156:44
     .clock                       (clock),
     .reset                       (reset),
-    .io_start                    (_GEN_46 & ~sgStarted),	// src/foragerbee/scala/main/FbEngine.scala:178:31, :435:17, :1396:{16,25}, :1398:{12,24}
-    .io_listAddr                 (_GEN_47 ? cmdReg_sgListAddr : 32'h0),	// src/foragerbee/scala/main/FbEngine.scala:76:19, :436:20, :1396:25, :1398:24, :1400:24
-    .io_entryCount               (_GEN_47 ? cmdReg_sgEntryCount : 16'h0),	// src/foragerbee/scala/main/FbEngine.scala:76:19, :436:20, :437:22, :1396:25, :1398:24, :1400:24, :1401:26
+    .io_start                    (_GEN_54 & ~sgStarted),	// src/foragerbee/scala/main/FbEngine.scala:178:31, :437:17, :1460:{16,25}, :1462:{12,24}
+    .io_listAddr                 (_GEN_55 ? cmdReg_sgListAddr : 32'h0),	// src/foragerbee/scala/main/FbEngine.scala:76:19, :438:20, :1460:25, :1462:24, :1464:24
+    .io_entryCount               (_GEN_55 ? cmdReg_sgEntryCount : 16'h0),	// src/foragerbee/scala/main/FbEngine.scala:76:19, :438:20, :439:22, :1460:25, :1462:24, :1464:24, :1465:26
     .io_fetchRd_valid            (_sgCtrl_io_fetchRd_valid),
-    .io_fetchRd_ready            (_GEN_46 & ~_GEN_49 & _GEN_48 & io_bus_rd_ready),	// src/foragerbee/scala/main/FbEngine.scala:439:25, :1396:{16,25}, :1406:{23,34,43}, :1409:25, :1414:33
+    .io_fetchRd_ready            (_GEN_54 & ~_GEN_57 & _GEN_56 & io_bus_rd_ready),	// src/foragerbee/scala/main/FbEngine.scala:441:25, :1460:{16,25}, :1470:{23,34,43}, :1473:25, :1478:33
     .io_fetchRd_payload_addr     (_sgCtrl_io_fetchRd_payload_addr),
-    .io_fetchRdData_valid        (_GEN_46 & ~_GEN_49 & _GEN_48 & io_bus_rdData_valid),	// src/foragerbee/scala/main/FbEngine.scala:439:25, :440:29, :1396:{16,25}, :1406:{23,34,43}, :1409:25, :1417:37
+    .io_fetchRdData_valid        (_GEN_54 & ~_GEN_57 & _GEN_56 & io_bus_rdData_valid),	// src/foragerbee/scala/main/FbEngine.scala:441:25, :442:29, :1460:{16,25}, :1470:{23,34,43}, :1473:25, :1481:37
     .io_fetchRdData_ready        (_sgCtrl_io_fetchRdData_ready),
     .io_fetchRdData_payload_data (io_bus_rdData_payload_data),
     .io_valid                    (_sgCtrl_io_valid),
-    .io_advance                  (_GEN_46 & ~_GEN_54 & _GEN_57 & _GEN_58),	// src/foragerbee/scala/main/FbEngine.scala:438:19, :577:42, :984:27, :1259:26, :1266:25, :1396:{16,25}, :1406:43, :1409:25, :1481:36, :1495:61, :1497:32, :1500:{37,46}
+    .io_advance                  (_GEN_54 & ~_GEN_62 & _GEN_65 & _GEN_66),	// src/foragerbee/scala/main/FbEngine.scala:440:19, :619:42, :1026:27, :1307:26, :1314:25, :1460:{16,25}, :1470:43, :1473:25, :1545:36, :1559:61, :1561:32, :1564:{37,46}
     .io_curAddr                  (_sgCtrl_io_curAddr),
     .io_curLen                   (_sgCtrl_io_curLen),
     .io_done                     (_sgCtrl_io_done)
   );	// src/foragerbee/scala/main/FbEngine.scala:156:44
-  assign io_cmdIn_ready = io_cmdIn_ready_0;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :576:27
-  assign io_done_valid = io_done_valid_0;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :349:17, :1546:25, :1552:21
+  assign io_cmdIn_ready = io_cmdIn_ready_0;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :618:27
+  assign io_done_valid = io_done_valid_0;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :349:17, :1610:25, :1616:21
   assign io_done_payload_tag = cmdReg_tag;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :76:19
   assign io_done_payload_err = errReg;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :77:23
-  assign io_bus_wr_valid = io_bus_wr_valid_0;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :1259:26, :1396:25, :1406:43
+  assign io_bus_wr_valid = io_bus_wr_valid_0;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :1307:26, :1460:25, :1470:43
   assign io_bus_wr_payload_addr =
-    _GEN_55
-      ? (~_GEN_29 | _im2colGen_io_done | ~_im2colGen_io_valid | _GEN_41
-         | ~(_GEN_39 | (&i2cPhase))
+    _GEN_63
+      ? (~_GEN_34 | _im2colGen_io_done | ~_im2colGen_io_valid | _GEN_47
+         | (_GEN_44 ? _GEN_45 : _GEN_51)
            ? (_GEN_23
                 ? {7'h0, zBeatInRow, 5'h0} + _GEN_8 + padOuterAddrOff[31:0]
                   + (isDim1PadRow | _zBaseOff_T
@@ -2683,46 +2769,50 @@ module Fb_FbEngine_1(	// src/foragerbee/scala/main/FbEngine.scala:40:7
                                                  : 3'h4}} + _GEN_8 + padOuterAddrOff[31:0]
                            : _GEN_7 + cmdReg_dstAddr))
            : _im2colGen_io_dstAddr)
-      : sgIsGather ? sgLinearOffset + cmdReg_dstAddr : sgCurAddr;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :76:19, :104:53, :152:50, :159:28, :169:31, :170:27, :176:27, :181:26, :188:27, :193:32, :218:25, :220:30, :226:{14,22}, :682:50, :683:{43,51}, :684:{26,69,77}, :686:23, :690:35, :694:{28,46}, :736:25, :768:26, :909:{14,27}, :912:36, :916:{41,49}, :917:{19,44}, :925:28, :984:{14,27}, :986:57, :992:18, :998:51, :999:{45,53}, :1001:{49,69}, :1002:{23,37,90}, :1003:{37,45,57}, :1004:33, :1013:28, :1259:{16,26}, :1266:25, :1268:32, :1269:26, :1325:36, :1359:36, :1396:25, :1406:43, :1409:25, :1469:29, :1470:{42,63}, src/foragerbee/scala/main/ForagerBeeConfig.scala:218:66, :237:{8,11}
+      : sgIsGather ? sgLinearOffset + cmdReg_dstAddr : sgCurAddr;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :76:19, :104:53, :152:50, :169:31, :170:27, :176:27, :181:26, :188:27, :193:32, :218:25, :220:30, :226:{14,22}, :724:50, :725:{43,51}, :726:{26,69,77}, :728:23, :732:35, :736:{28,46}, :778:25, :810:26, :951:{14,27}, :954:36, :958:{41,49}, :959:{19,44}, :967:28, :1026:{14,27}, :1028:57, :1034:18, :1040:51, :1041:{45,53}, :1043:{49,69}, :1044:{23,37,90}, :1045:{37,45,57}, :1046:33, :1055:28, :1307:{16,26}, :1314:25, :1316:32, :1317:26, :1357:{33,42}, :1382:38, :1415:47, :1460:25, :1470:43, :1473:25, :1533:29, :1534:{42,63}, src/foragerbee/scala/main/ForagerBeeConfig.scala:222:66, :241:{8,11}
   assign io_bus_wr_payload_len =
-    _GEN_55
-      ? (_GEN_42
+    _GEN_63
+      ? (_GEN_52
            ? _GEN_26
-           : _GEN_39
-               ? i2cDstSegBeats[7:0] - 8'h1
-               : (&i2cPhase) ? i2cMicroRowDstBeats[7:0] - 8'h1 : _GEN_26)
-      : sgSegBeats[7:0] - 8'h1;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :159:28, :177:31, :768:26, :909:27, :984:27, :1014:27, :1254:34, :1256:29, :1259:26, :1266:25, :1268:32, :1269:26, :1274:26, :1326:{35,53}, :1360:{35,58}, :1396:25, :1406:43, :1409:25, :1480:49
+           : _GEN_44
+               ? (_GEN_45 ? _GEN_26 : i2cDstSegBeats[7:0] - 8'h1)
+               : _GEN_51 ? _GEN_26 : i2cMicroRowDstBeats[7:0] - 8'h1)
+      : sgSegBeats[7:0] - 8'h1;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :177:31, :951:27, :1026:27, :1056:27, :1302:34, :1304:29, :1307:26, :1314:25, :1316:32, :1317:26, :1322:26, :1357:{33,42}, :1383:{37,55}, :1415:47, :1423:60, :1460:25, :1470:43, :1473:25, :1544:49
   assign io_bus_wr_payload_data =
-    _GEN_55
-      ? (_GEN_42
-           ? (_GEN_23 ? 256'h0 : _GEN_22)
-           : _GEN_39 ? _converter_io_out_bits : _GEN_45 ? 256'h0 : _GEN_22)
-      : _dataQueue_io_deq_bits;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :130:25, :138:56, :768:26, :909:27, :927:28, :984:{14,27}, :1015:28, :1259:26, :1266:25, :1268:32, :1269:26, :1310:38, :1361:36, :1396:25, :1406:43, :1409:25
+    _GEN_63
+      ? (_GEN_52
+           ? _GEN_27
+           : _GEN_44
+               ? (_GEN_45 ? _GEN_27 : _converter_io_out_bits)
+               : _GEN_53 | _GEN_23 ? 256'h0 : _GEN_22)
+      : _dataQueue_io_deq_bits;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :130:25, :138:56, :810:26, :951:27, :969:28, :1026:{14,27}, :1057:28, :1307:26, :1314:25, :1316:32, :1317:26, :1357:{33,42}, :1367:40, :1415:47, :1424:38, :1460:25, :1470:43, :1473:25
   assign io_bus_wr_payload_strb =
-    _GEN_46 & ~_GEN_54 & _GEN_53
-    | (_GEN_42 ? _GEN_23 | ~_GEN_21 : _GEN_39 | _GEN_45 | ~_GEN_21)
+    _GEN_54 & ~_GEN_62 & _GEN_61
+    | (_GEN_52 ? _GEN_28 : _GEN_44 ? ~_GEN_45 | _GEN_28 : _GEN_53 | _GEN_28)
       ? 32'hFFFFFFFF
-      : _sStrb_T_3[31:0];	// src/foragerbee/scala/main/FbEngine.scala:40:7, :768:26, :824:28, :909:{14,27}, :919:{46,58}, :984:{14,27}, :1015:28, :1016:28, :1259:26, :1266:25, :1268:32, :1269:26, :1327:36, :1361:36, :1362:36, :1396:{16,25}, :1406:43, :1409:25, :1481:36
+      : _sStrb_T_3[31:0];	// src/foragerbee/scala/main/FbEngine.scala:40:7, :810:26, :866:28, :951:27, :961:{46,58}, :1026:27, :1057:28, :1058:28, :1307:26, :1314:25, :1316:32, :1317:26, :1357:{33,42}, :1363:34, :1384:38, :1415:47, :1424:38, :1425:38, :1460:{16,25}, :1470:43, :1473:25, :1545:36
   assign io_bus_wr_payload_sof =
-    _GEN_55
-      ? (_GEN_42
+    _GEN_63
+      ? (_GEN_52
            ? _GEN_24
-           : _GEN_39 ? ~i2cAwIssued : (&i2cPhase) ? ~i2cAwIssued : _GEN_24)
-      : ~sgAwIssued;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :159:28, :162:28, :174:31, :768:26, :909:27, :984:27, :1011:27, :1259:26, :1266:25, :1268:32, :1269:26, :1323:{35,38}, :1357:{35,38}, :1396:25, :1406:43, :1409:25, :1477:38
-  assign io_bus_wr_payload_eof = io_bus_wr_payload_eof_0;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :1259:26, :1396:25, :1406:43
+           : _GEN_44
+               ? (_GEN_45 ? _GEN_24 : ~i2cAwIssued)
+               : _GEN_51 ? _GEN_24 : ~i2cAwIssued)
+      : ~sgAwIssued;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :162:28, :174:31, :951:27, :1026:27, :1053:27, :1307:26, :1314:25, :1316:32, :1317:26, :1357:{33,42}, :1380:{37,40}, :1415:47, :1420:40, :1460:25, :1470:43, :1473:25, :1541:38
+  assign io_bus_wr_payload_eof = io_bus_wr_payload_eof_0;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :1307:26, :1460:25, :1470:43
   assign io_bus_wrResp_ready = |wrInFlight;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :115:37, :368:39
-  assign io_bus_rd_valid = io_bus_rd_valid_0;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :1259:26, :1396:25, :1406:43
+  assign io_bus_rd_valid = io_bus_rd_valid_0;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :1307:26, :1460:25, :1470:43
   assign io_bus_rd_payload_addr =
-    _GEN_51
-      ? _GEN_34
-      : _GEN_48
+    _GEN_59
+      ? _GEN_39
+      : _GEN_56
           ? _sgCtrl_io_fetchRd_payload_addr
-          : _GEN_50
+          : _GEN_58
               ? (sgIsGather ? sgCurAddr : sgLinearOffset + cmdReg_srcAddr)
-              : _GEN_34;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :76:19, :156:44, :169:31, :170:27, :176:27, :226:14, :230:28, :736:25, :1259:26, :1266:25, :1396:25, :1406:{34,43}, :1409:25, :1413:31, :1434:29, :1436:{42,63}
+              : _GEN_39;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :76:19, :156:44, :169:31, :170:27, :176:27, :226:14, :230:28, :778:25, :1307:26, :1314:25, :1460:25, :1470:{34,43}, :1473:25, :1477:31, :1498:29, :1500:{42,63}
   assign io_bus_rd_payload_len =
-    _GEN_51 ? _GEN_35 : _GEN_48 ? 8'h0 : _GEN_50 ? {1'h0, sgSeg - 7'h1} : _GEN_35;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :231:27, :736:25, :1259:26, :1266:25, :1396:25, :1406:{34,43}, :1409:25, :1413:31, :1440:62, :1443:37
-  assign io_bus_rdData_ready = io_bus_rdData_ready_0;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :1259:26, :1396:25, :1406:43
-  assign io_busy = |state;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :73:22, :444:20
+    _GEN_59 ? _GEN_40 : _GEN_56 ? 8'h0 : _GEN_58 ? {1'h0, sgSeg - 7'h1} : _GEN_40;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :231:27, :778:25, :1307:26, :1314:25, :1460:25, :1470:{34,43}, :1473:25, :1477:31, :1504:62, :1507:37
+  assign io_bus_rdData_ready = io_bus_rdData_ready_0;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :1307:26, :1460:25, :1470:43
+  assign io_busy = |state;	// src/foragerbee/scala/main/FbEngine.scala:40:7, :73:22, :446:20
 endmodule
 

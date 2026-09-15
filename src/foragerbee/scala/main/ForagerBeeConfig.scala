@@ -8,8 +8,9 @@
   *     转置 tile 尺寸/突发上限/数据位宽/地址位宽/通道转置能力/
   *     链式描述符开关/格式转换开关），全部 compile-time 可配置并 require 校验。
   *   - [[FbOp]]：操作码枚举（COPY / TRANSPOSE / PERMUTE）。
-  *   - [[FbDataFmt]]：数据格式 ChiselEnum（4-bit：FP32/FP16/BF16/INT8/MXE4M3/MXE5M2/NONE，
-  *     外加 4-bit 扩容新增的 INT32/INT16/INT4；既有编码为软件可见契约，永不重排）。
+  *   - [[FbDataFmt]]：数据格式 ChiselEnum（4-bit：FP32/FP16/BF16/INT8/MXE4M3/MXE5M2
+  *     + 4-bit 扩容新增的 INT32/INT16/INT4；编码 6/7/11-15 非法，由引擎 fmtEncBad 拒绝；
+  *     既有编码为软件可见契约，永不重排）。
   *   - [[FbCmd]]：命令描述符（统一 dims 组：shape + srcStride + dstStride + 链式 + 格式转换）。
   *   - [[FbDone]]：完成回执（tag + err + chainLen）。
   *
@@ -22,8 +23,17 @@
   *   - 元素粒度由 srcFmt（读侧）/dstFmt（写侧）经 FbDataFmt.rowBytes/bytesOfCeil 单一真源派生。
   *   - **纯搬运契约：srcFmt==dstFmt**（历史 cvtEnable=0 且 fmt 不等的静默纯拷贝已删除；
   *     转换激活派生为 srcFmt =/= dstFmt，enableConversion=false 时强制 srcFmt==dstFmt）。
+  *   - **MX↔MX 纯字节拷贝被拒**：srcFmt==dstFmt 且均为 MX 族（MXE4M3/MXE5M2）时，在
+  *     enableConversion=true 配置下被 mxQuantBad（srcFmtBadMx：MX 量化要求 srcFmt 为 float）拒绝；
+  *     如需搬运 MX 裸字节，请用 INT8 编码承载（1 字节/元素等宽，纯搬运 srcFmt==dstFmt=INT8）。
+  *     enableConversion=false 的构建中无量化器，MX 编码退化为 1 字节/元素的裸格式，
+  *     srcFmt==dstFmt==MXE4M3/MXE5M2 是合法的纯字节拷贝。
+  *   - **MX 量化激活由 dstFmt 派生**：`isMx(dstFmt)` 即进入 FbMxQuantizer 通路
+  *     （要求 srcFmt 为 float、op=COPY、shape(0) 为 scaleBlockSize 解码值的整数倍、
+  *     scaleAddr 按 beat 对齐、无 padding），不再有独立的「MX 量化使能」开关字段；
+  *     srcFmt 为 MX 而 dstFmt 非 MX（反量化）无硬件支持，由 mxNonQuantBad 拒绝。
   *
-  * v1 对齐约束（软件必须保证，硬件对基址与 COPY 行长做运行时检查）：
+  * 对齐约束（软件必须保证，硬件对基址与 COPY 行长做运行时检查）：
   *   - 所有行起始地址（srcAddr/dstAddr 基址）按 beat（dataWidth/8 字节）对齐；
   *   - COPY：最内维行字节数 shape(0)×elemBytes 必须为整 beat 倍数；
   *   - TRANSPOSE：源行允许子 beat（自动按 ceil 取整读取并做元素级提取），
@@ -326,11 +336,8 @@ class FbCmd(cfg: ForagerBeeConfig) extends Bundle {
   /** 格式转换：目标数据格式（[[FbDataFmt]] ChiselEnum，4-bit） */
   val dstFmt = FbDataFmt()
 
-  /** 格式转换：量化 scale（IEEE-754 FP32 编码） */
-  val cvtScale = UInt(32.W)
-
-  /** 格式转换：量化 zero_point（IEEE-754 FP32 编码） */
-  val cvtZeroPoint = UInt(32.W)
+  // 注：量化参数 cvtScale/cvtZeroPoint 已从命令字段移至 ForagerBee 顶层 IO
+  // （全局供给、所有通道与所有命令共享），命令描述符不再携带，详见 ForagerBee.io.cvt*。
 
   /** im2col：卷积核尺寸 (kH, kW)，非 IM2COL 时忽略 */
   val im2colKernel = Vec(2, UInt(8.W))
@@ -358,9 +365,6 @@ class FbCmd(cfg: ForagerBeeConfig) extends Bundle {
 
   /** MX 量化：块大小编码（0→16、1→32、2→64 个元素共享一个 E8M0 scale） */
   val scaleBlockSize = UInt(2.W)
-
-  /** MX 量化：使能标志（true 时数据通路经 FbMxQuantizer 量化为 MXFP8 + E8M0 scale） */
-  val mxQuantEn = Bool()
 }
 
 object FbCmd {

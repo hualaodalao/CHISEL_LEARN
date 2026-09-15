@@ -83,8 +83,14 @@ case class HiveCoreConfig(
   /** 是否包含浮点格式（用于编译期条件化生成规格化硬件） */
   val hasFp: Boolean = supportedFmts.contains(DataFormat.FP16) || supportedFmts.contains(DataFormat.BF16)
 
-  /** 是否包含整数格式（用于整数累加位宽约束校验） */
-  val hasInt: Boolean = supportedFmts.contains(DataFormat.INT4) || supportedFmts.contains(DataFormat.INT8) || supportedFmts.contains(DataFormat.INT16)
+  /** 是否包含整数格式（用于整数累加位宽约束校验）。
+    * 【Phase 3 INT 生态同步】用户已裁定弃用 INT16，整数族收敛为 {INT8, INT4}；
+    *   删去 INT16 判据，避免含 INT16 的历史集合误触发整数硬件生成。 */
+  val hasInt: Boolean = supportedFmts.contains(DataFormat.INT8) || supportedFmts.contains(DataFormat.INT4)
+
+  /** 是否包含 INT4（半字节整型，quad-lane 打包=4）。与 hasMx4 并列，供 laneElemsW 线宽
+    * 与 colTileAddressOffset 的 bits 口径门控使用（亚字节族需 3-bit laneElems 与 bits 几何）。 */
+  val hasInt4: Boolean = supportedFmts.contains(DataFormat.INT4)
 
   /** 是否包含 MX 格式（MXFP8 E4M3 / E5M2）——历史谓词，保留原义供既有外部引用
     * （HiveCore 顶层 dmaScaleA/dmaScaleB 端口与 scale DMA 子模块生成门控等）。 */
@@ -106,8 +112,9 @@ case class HiveCoreConfig(
     *     · Hive_HiveOutCvt.sv —— q2Seq / packed4 / 次正规与深下溢新臂全部【无门控】
     *       （MJ1 取证：`grep 'supportedFmts|hasMx|isMx4|nGroups'` 在该文件只命中 :40/:92/:294/:297），
     *       故只要 hasMx4=true，E2M1 输出支路的门数必然进网表；
-    *     · Hive_HiveWorkUnit.sv / Hive_HiveMacFpMx.sv —— fp4 quad-lane 通路
-    *       （8×HiveCvtOpMx + 4 级 HiveMacFpMx 左结合级联）与运行期 Mux(isMx4, quad, dualLane)；
+    *     · Hive_HiveWorkUnit.sv —— fp4 quad-lane 通路 + 运行期 Mux(isMx4, quad, dualLane)
+    *       （原并列的 Hive_HiveMacFpMx.sv、8×HiveCvtOpMx + 4 级 HiveMacFpMx 左结合级联
+    *       均已随 FusionMac 重构删除，通路并入 Hive_HiveFusionMacFp.sv）；
     *     · HiveCoreCalcConfig 的 elemsPerLane 由 2-bit 扩为 3-bit、errCode 8 / Fix-4 errCode 3
     *       两支 fp4 运行期守护进入网表。
     *   结论：三套产物的【结构】不再有 normalized-diff=0 关系；数值正确性改由 TB 侧金锚
@@ -285,7 +292,8 @@ case class HiveCoreConfig(
   // block=32 单 pass 同构）。对不含 MXE2M1 的配置 hasMx4=false ⟹ 取值与 hasMx 逐位相同（零 diff）。
   if (hasMx8 || hasMx4) require(totalN == 16, s"HiveCoreConfig: MX 要求 totalN==16（fp8：32-K 块=16 lane×2 元素；fp4：64-K 块=16 lane×4 元素，均单 pass），当前 totalN=$totalN")
   // MX SIMD 双元素/拍：16-bit lane 打包 2 个 8-bit 元素（低字节=偶 k、高字节=奇 k），
-  // PE 内 4×HiveCvtOpMx + 2×HiveMacFp 级联，故 aW/bW 必须 >= 16。
+  // PE 内 4×HiveCvtOpMx + 2×HiveMacFp 级联（二者均为原 HiveWorkUnit.scala 子模块、已随
+  // FusionMac 重构删除，功能并入 FpCvt/FpMul/FpAdd → HiveFusionMacFp），故 aW/bW 必须 >= 16。
   // Phase 1：判据 hasMx → (hasMx8 || hasMx4)。fp4 quad-lane 同样要求 16-bit lane（打包 4 个
   // 4-bit 元素：io.a(3,0)/(7,4)/(11,8)/(15,12)），故 aW/bW>=16 对 fp4 亦成立。对不含 MXE2M1
   // 的配置 hasMx4=false ⟹ 取值与 hasMx 逐位相同（零 diff）。

@@ -46,8 +46,9 @@ object Fp32 {
     *                               按 ±2^(e+scale-bias-127) 正常解码（详见下方 fp32Sub）
     *   - 下溢（exp_fp32 < 1）                → flush-to-zero，输出 ±0
     *   - 上溢（exp_fp32 > 254）或 inf/nan    → saturate 到 fp32 max（保持 sign）
-    *   inf/nan 的 assert 守护放在调用方 HiveCvtOpMx（仅对被选中的格式断言，
-    *   避免另一路径组合逻辑的误报）
+    *   inf/nan 的 assert 守护放在调用方（原为 HiveWorkUnit.scala 中的 HiveCvtOpMx，已随
+    *   FusionMac 重构删除；现由 FpCvt.scala 的 FpCvtMx8ToMid / FpCvtMx8ToFp32 承接），
+    *   仅对被选中的格式断言，避免另一路径组合逻辑的误报
     *
     * 【编译期泛化不变量】noInfNan / subnormalFtz 均为 Scala 层 Boolean 形参，经 Scala `if`
     * 在 elaboration 期展开，不生成任何运行期选择子。fp8 默认实参组合

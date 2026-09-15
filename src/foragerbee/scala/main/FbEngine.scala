@@ -6,7 +6,7 @@
   *     → TRANSPOSE（supportsTranspose=true）：FbTransposeBuffer → FbStreamBus 写
   *     → PERMUTE：同 COPY 路径，但源 stride 按 permVec 重映射
   *   → Zero-Padding（COPY + padBefore/padAfter）：dim1 全零行 / dim0 行首尾零段直写 sZWRITE
-  *   → MX 量化（COPY + mxQuantEn）：dataQueue → FbMxQuantizer → 量化数据写 wr，
+  *   → MX 量化（COPY + isMx(dstFmt)，量化激活由 dstFmt 派生）：dataQueue → FbMxQuantizer → 量化数据写 wr，
   *     scale 字节累积后于每段数据写完后经 sSWRITE 以 strb 部分写突发写到 scaleAddr
   *     （与数据写串行，独占 wr/wrResp）
   *   全部完成后 done 回执（tag/err）。
@@ -54,6 +54,19 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
 
     /** DMA 读写口（FbStreamBus master） */
     val bus = master(new FbStreamBus(cfg.dataWidth, cfg.addressWidth))
+
+    /** 格式转换量化 scale（仅 cfg.enableConversion 时存在；由顶层全局供给，非命令字段）。
+      *
+      * 实际语义（与 [[FbFormatConverter]] 实现一致，**不是 IEEE-754 FP32**）：
+      * 仅低 5 bit `scale(4,0)` 被消费，作为 2 的幂移位量（q = round(v / 2^shift)）；
+      * 高 27 bit 被忽略，集成方应置 0。故只支持 2 的幂 scale。 */
+    val cvtScale = if (cfg.enableConversion) Some(Input(UInt(32.W))) else None
+
+    /** 格式转换量化 zero point（仅 cfg.enableConversion 时存在；由顶层全局供给，非命令字段）。
+      *
+      * 实际语义：仅低 8 bit `zeroPoint(7,0)` 被消费，按**有符号整数**解释（−128..127）；
+      * 高 24 bit 被忽略，集成方应置 0。 */
+    val cvtZeroPoint = if (cfg.enableConversion) Some(Input(UInt(32.W))) else None
 
     /** 引擎非空闲 */
     val busy = Output(Bool())
@@ -193,7 +206,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   val padOuterAddrOff = RegInit(0.U(wideW.W)) // 当前外层切片的目的地址偏移 Σ(outerIdx(d)*dstStride(d)) for d∈[2,dimCount)
 
   // --- MX 量化寄存器（scale 字节累积 + 行内字节游标 + scale 写出子状态）---
-  val mxQuantActive = if (cfg.enableConversion) cmdReg.mxQuantEn && cvtActive else false.B
+  val mxQuantActive = if (cfg.enableConversion) FbDataFmt.isMx(cmdReg.dstFmt) else false.B
   val mxScaleAccum      = RegInit(VecInit(Seq.fill(BB)(0.U(8.W)))) // scale 字节累积（每段数据写完后经 sSWRITE 写出）
   val mxScaleAccumCount = RegInit(0.U(log2Up(BB + 1).W))           // 累积字节计数（0..BB）
   val mxScaleByteCur    = RegInit(0.U(20.W))                       // 行内已完成写出的 scale 字节游标
@@ -376,8 +389,11 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     c.io.out.ready := false.B
     c.io.cfg_srcFmt := cmdReg.srcFmt
     c.io.cfg_dstFmt := cmdReg.dstFmt
-    c.io.cfg_scale := cmdReg.cvtScale
-    c.io.cfg_zeroPoint := cmdReg.cvtZeroPoint
+    // 量化参数改由顶层 IO 全局供给（原 FbCmd.cvtScale/cvtZeroPoint 已删除）。
+    // io.cvtScale/io.cvtZeroPoint 与 converter 同为 cfg.enableConversion 编译期门控，
+    // 故此 foreach 内两个 Option 恒为 Some，.get 静态安全。
+    c.io.cfg_scale := io.cvtScale.get
+    c.io.cfg_zeroPoint := io.cvtZeroPoint.get
     c.io.cfg_enable := cvtActive && !mxQuantActive
     c.io.flush := false.B
   }
@@ -415,7 +431,9 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     gen.io.start := false.B
     gen.io.srcBase := cmdReg.srcAddr
     gen.io.dstBase := cmdReg.dstAddr
-    gen.io.elemBytesLog2 := srcEbLog2
+    // M2：读侧粒度按 srcFmt、写侧粒度按 dstFmt（INT4 已被 subByteOpBad 拒于 IM2COL 外，安全）
+    gen.io.srcElemBytesLog2 := srcEbLog2
+    gen.io.dstElemBytesLog2 := FbDataFmt.ebLog2Of(cmdReg.dstFmt)
     gen.io.kernel(0) := cmdReg.im2colKernel(0)
     gen.io.kernel(1) := cmdReg.im2colKernel(1)
     gen.io.stride(0) := cmdReg.im2colStride(0)
@@ -497,13 +515,21 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     c.sgListAddr(log2BB - 1, 0) =/= 0.U
   }
 
-  // MX 量化校验（仅当 mxQuantEn 时生效）：
-  //   仅 COPY + srcFmt≠dstFmt（转换激活）；shape(0) 为 blockSize 整数倍；编码/格式/对齐合法；与 padding 互斥；
-  //   enableConversion 未开启时禁止使用（硬件无量化器）
-  val mxBlockSizeVal = MuxLookup(c.scaleBlockSize, 0.U(7.W))(Seq(
+  // MX 量化校验（仅当 isMx(dstFmt) 时生效；量化激活由 dstFmt 派生，无独立开关字段）：
+  //   enableConversion 必须开启（硬件无量化器则禁用）；仅 COPY；scaleBlockSize 编码合法（≤2）；
+  //   shape(0) 为 blockSize 整数倍；每块 beat 数不超上限；scaleAddr beat 对齐；
+  //   srcFmt 必须为 float（isFloat ⇒ 必不等于 MX dstFmt，故转换恒激活）；与 padding 互斥。
+  //
+  // 注：MuxLookup 的 default 取 16（而非 0）——非法编码（scaleBlockSize>2）已由下方
+  // scaleBlockBadEncoding 独立且前置地判为 err，default 分支的取值对判决结果无影响；
+  // 取非 0 值可彻底消除 `shape(0) % 0` 这条硬件上无短路的除零路径及其冗余逻辑。
+  val mxBlockSizeVal = MuxLookup(c.scaleBlockSize, 16.U(7.W))(Seq(
     0.U -> 16.U, 1.U -> 32.U, 2.U -> 64.U))
-  val mxQuantBad = c.mxQuantEn && {
-    val shapeMisalign = c.scaleBlockSize > 2.U || c.shape(0) % mxBlockSizeVal =/= 0.U
+  val mxQuantBad = FbDataFmt.isMx(c.dstFmt) && {
+    // scaleBlockSize 编码非法（仅 0/1/2 合法）。此项独立前置：既保证 shapeMisalign 的除数
+    // 在后续求值时恒为 {16,32,64}，也避免与 shapeMisalign 重复列举同一判据
+    val scaleBlockBadEncoding = c.scaleBlockSize > 2.U
+    val shapeMisalign = c.shape(0) % mxBlockSizeVal =/= 0.U
     // 每块读侧 beat 数：须 ≤ maxBurstLen 且 ≤ dataQueue 深度，
     // 否则段长对齐后恒为 0（死锁）
     val mxBlockBeatsCmd = FbDataFmt.rowBytes(mxBlockSizeVal, c.srcFmt) >> log2BB
@@ -511,12 +537,14 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
       mxBlockBeatsCmd > cfg.resolvedDataQueueDepth.U
     val scaleAddrUnaligned = c.scaleAddr(log2BB - 1, 0) =/= 0.U
     val srcFmtBadMx = !FbDataFmt.isFloat(c.srcFmt)
+    // dstFmtBadMx 在本触发条件下恒为 false（前置已是 isMx(c.dstFmt)），保留以维持
+    // 校验项的自文档化完整性；综合器会常量折叠，不产生逻辑
     val dstFmtBadMx = !FbDataFmt.isMx(c.dstFmt)
     val hasPadAny = c.padBefore(0) =/= 0.U || c.padAfter(0) =/= 0.U ||
       c.padBefore(1) =/= 0.U || c.padAfter(1) =/= 0.U
     !cfg.enableConversion.B ||
     c.op =/= FbOp.COPY ||
-    c.scaleBlockSize > 2.U ||
+    scaleBlockBadEncoding ||
     shapeMisalign ||
     blockTooBig ||
     scaleAddrUnaligned ||
@@ -525,10 +553,12 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     hasPadAny
   }
 
-  // MX 编码不得进入非量化格式转换路径（仅量化器认识 MX 格式）
-  // 语义收紧：cvtEnable=0 且 fmt=MX 的静默字节拷贝从此被拒
-  val mxNonQuantBad = cfg.enableConversion.B && !c.mxQuantEn &&
-    (FbDataFmt.isMx(c.srcFmt) || FbDataFmt.isMx(c.dstFmt))
+  // MX 源格式不得进入非量化路径：硬件无反量化器（MX→FP/INT 的 scale 还原通路不存在），
+  // 故 srcFmt 为 MX 族时一律拒绝——无论 dstFmt 是否也是 MX（MX↔MX 由 mxQuantBad.srcFmtBadMx 与本项共同拒绝）。
+  // dstFmt 为 MX 已由 isMx(dstFmt) 隐含激活量化（走 FbMxQuantizer），不再属于「非量化裸拷贝」，
+  // 因此本项不再检查 dstFmt。enableConversion=false 的构建中 MX 退化为 1 字节/元素裸格式，
+  // srcFmt==dstFmt==MX 是合法纯拷贝，故保留 cfg.enableConversion 编译期门控。
+  val mxNonQuantBad = cfg.enableConversion.B && FbDataFmt.isMx(c.srcFmt)
 
   // --- 阶段 A 新增校验 ---
   // 格式编码合法性（无条件，不受 enableConversion 门控）
@@ -564,8 +594,48 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     (c.op === FbOp.IM2COL) && (c.srcFmt =/= c.dstFmt) && ((microRowBeatsWorst << 2) > cfg.maxBurstLen.U)
   } else false.B
 
+  // M1 层3：IM2COL 压缩方向对齐下界校验。压缩时 micro-row 源 beat 数必须为 2^cvtShift 整数倍
+  // 且折算后 ≥1，否则读侧对齐会截尾（语义变化）或折算为 0（wr.len 下溢/死锁）→ 拒绝。
+  // 扩展方向沿用 i2cCvtBurstBad 上界；非转换（srcFmt==dstFmt）不涉及。
+  val i2cCvtAlignBad = if (cfg.enableConversion) {
+    val i2cKW = c.im2colKernel(1)
+    val microRowBeatsCmd = ((i2cKW * FbDataFmt.bytesOfCeil(c.srcFmt)).pad(20) +& (BB - 1).U(20.W)) >> log2BB
+    val cSrcBits = FbDataFmt.elemBits(c.srcFmt)
+    val cDstBits = FbDataFmt.elemBits(c.dstFmt)
+    val cCompress = cSrcBits > cDstBits
+    val cShift = Mux((cSrcBits === 32.U && cDstBits === 8.U) || (cSrcBits === 8.U && cDstBits === 32.U), 2.U(2.W),
+      Mux(cSrcBits =/= cDstBits, 1.U(2.W), 0.U(2.W)))
+    val folded = microRowBeatsCmd >> cShift
+    val notMultiple = (folded << cShift) =/= microRowBeatsCmd
+    (c.op === FbOp.IM2COL) && (c.srcFmt =/= c.dstFmt) && cCompress && (notMultiple || folded === 0.U)
+  } else false.B
+
+  // S1：INT4 亚字节 dim0 元素数必须偶数（奇数时 ceil 半字节泄漏，多搬 1 个 garbage nibble；
+  // 例：shape(0)=31 → ceil(31*4/8)=16B 恰整 beat，cBadBase 行对齐漏网，本校验兜住）
+  val int4ShapeBad = (FbDataFmt.isSubByte(c.srcFmt) || FbDataFmt.isSubByte(c.dstFmt)) && c.shape(0)(0) =/= 0.U
+
+  // S2：TRANSPOSE/PERMUTE/SCATTER/GATHER 不经 converter，srcFmt≠dstFmt 时静默不转换且 dst 偏移
+  // 粒度错 → 拒绝（仅 COPY/IM2COL 支持转换；isMx(dstFmt) 的量化通路走量化器，另由 mxQuantBad 校验）。
+  // PERMUTE dst 侧地址粒度未验证，保守收紧一并拒绝。
+  val cvtOpBad = if (cfg.enableConversion) {
+    (c.srcFmt =/= c.dstFmt) && !FbDataFmt.isMx(c.dstFmt) && !(c.op === FbOp.COPY || c.op === FbOp.IM2COL)
+  } else false.B
+
+  // N6：padding beat 对齐校验。dim0 前/后 pad 的字节数（按 dst 粒度）必须为整 beat 倍数，
+  // 否则 padBeforeBytes0/padAfterBytes0 的 >>log2BB floor 会丢子 beat 余量、数据重叠错位。
+  val padAlignBad = {
+    val hasPadAny = c.padBefore(0) =/= 0.U || c.padAfter(0) =/= 0.U ||
+      c.padBefore(1) =/= 0.U || c.padAfter(1) =/= 0.U
+    val dstEb = FbDataFmt.bytesOfCeil(c.dstFmt)
+    val beforeBytes = c.padBefore(0) * dstEb
+    val afterBytes = c.padAfter(0) * dstEb
+    hasPadAny && (beforeBytes(log2BB - 1, 0) =/= 0.U || afterBytes(log2BB - 1, 0) =/= 0.U)
+  }
+
   val cBad = cBadBase || permBad || padBad || permPadBad || im2colBad || sgBad || mxQuantBad || mxNonQuantBad ||
-    fmtEncBad || cvtFmtBad || noCvtDiffBad || subByteOpBad || int4StartBad || int4PadBad || i2cCvtBurstBad
+    fmtEncBad || cvtFmtBad || noCvtDiffBad || subByteOpBad || int4StartBad || int4PadBad || i2cCvtBurstBad ||
+    i2cCvtAlignBad || int4ShapeBad || cvtOpBad || padAlignBad
+
 
   // ==========================================================================
   // IDLE：接收命令、锁存、分流
@@ -1249,6 +1319,12 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     // micro-row beat 数计算：ceil(kW * elemBytes / beatBytes)
     val i2cKW = cmdReg.im2colKernel(1)
     val i2cMicroRowBeats = ((i2cKW * FbDataFmt.bytesOfCeil(cmdReg.srcFmt)).pad(20) +& (BB - 1).U(20.W)) >> log2BB
+    // M1 层1 读侧压缩对齐：镜像 COPY 路径 seg 压缩对齐（(raw >> cvtShift) << cvtShift），
+    // 压缩时把 micro-row 源 beat 数向下对齐到 compRatio(=2^cvtShift) 倍数，保证读入 beat 数与
+    // converter 完整吐出严格自洽、不留半包滞留。非整除组合已被 i2cCvtAlignBad 校验拒绝，故对齐
+    // 公式实际只在整除时生效（恒等）；扩展/非转换方向恒等，enableConversion=false 时常量折叠，
+    // RTL 逐字不变。issueRead/i2cRRemain/i2cSegBeats/queueCredit 全部改用对齐版本。
+    val i2cMicroRowBeatsAligned = Mux(cvtCompress, (i2cMicroRowBeats >> cvtShift) << cvtShift, i2cMicroRowBeats)
     // 写侧 beat 折算（镜像 COPY 路径 dstSegBeats：压缩右移 cvtShift、扩展左移 cvtShift；
     // !cvtActive 时恒等 → enableConversion=false 配置常量折叠，RTL 逐字不变）
     val i2cMicroRowDstBeats = Mux(!cvtActive, i2cMicroRowBeats,
@@ -1278,13 +1354,15 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
             }
           }
           is(1.U) { // 读阶段
-            io.bus.rd.valid := !i2cArIssued && queueCredit > 0.U
-            issueRead(gen.io.srcAddr, i2cMicroRowBeats - 1.U)
+            // M1 层1：读 beat 数改用压缩对齐版本；镜像 COPY 的 `seg > 0.U` 零段门控
+            //（非整除/折算为 0 的组合已被 i2cCvtAlignBad 校验拒绝，此处为防御性冗余）
+            io.bus.rd.valid := !i2cArIssued && queueCredit > 0.U && i2cMicroRowBeatsAligned > 0.U
+            issueRead(gen.io.srcAddr, i2cMicroRowBeatsAligned - 1.U)
             when(io.bus.rd.fire) {
               i2cArIssued := true.B
-              i2cRRemain := i2cMicroRowBeats
-              i2cSegBeats := i2cMicroRowBeats
-              queueCredit := queueCredit - i2cMicroRowBeats
+              i2cRRemain := i2cMicroRowBeatsAligned
+              i2cSegBeats := i2cMicroRowBeatsAligned
+              queueCredit := queueCredit - i2cMicroRowBeatsAligned
             }
             io.bus.rdData.ready := dataQueue.io.enq.ready
             dataQueue.io.enq.valid := io.bus.rdData.valid
@@ -1301,84 +1379,98 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
             }
           }
           is(2.U) { // 写阶段
-            if (cfg.enableConversion) {
-              val conv = converter.get
-              conv.io.in.valid := dataQueue.io.deq.valid
-              conv.io.in.bits := dataQueue.io.deq.bits
-              dataQueue.io.deq.ready := conv.io.in.ready
-              io.bus.wr.valid := conv.io.out.valid
-              io.bus.wr.payload.data := conv.io.out.bits
-              conv.io.out.ready := io.bus.wr.ready
-              when(dataQueue.io.deq.fire) {
-                queueCredit := queueCredit + 1.U
+            // M1 层2 零段保护：dst beat 数为 0 时不发写突发，直接 advance 跳过写阶段
+            //（镜像 COPY 路径 seg>0 保护；压缩折算为 0 的组合已被 i2cCvtAlignBad 拒绝，此为防御性冗余，
+            //  避免 wr.len=0-1=255 下溢、eof 永假的死锁）
+            when(i2cDstSegBeats === 0.U) {
+              gen.io.advance := true.B
+              i2cPhase := 0.U
+            }.otherwise {
+              if (cfg.enableConversion) {
+                val conv = converter.get
+                conv.io.in.valid := dataQueue.io.deq.valid
+                conv.io.in.bits := dataQueue.io.deq.bits
+                dataQueue.io.deq.ready := conv.io.in.ready
+                io.bus.wr.valid := conv.io.out.valid
+                io.bus.wr.payload.data := conv.io.out.bits
+                conv.io.out.ready := io.bus.wr.ready
+                when(dataQueue.io.deq.fire) {
+                  queueCredit := queueCredit + 1.U
+                }
+              } else {
+                io.bus.wr.valid := dataQueue.io.deq.valid
+                io.bus.wr.payload.data := dataQueue.io.deq.bits
+                dataQueue.io.deq.ready := io.bus.wr.ready
+                when(io.bus.wr.fire) {
+                  queueCredit := queueCredit + 1.U
+                }
               }
-            } else {
-              io.bus.wr.valid := dataQueue.io.deq.valid
-              io.bus.wr.payload.data := dataQueue.io.deq.bits
-              dataQueue.io.deq.ready := io.bus.wr.ready
+              io.bus.wr.payload.sof := !i2cAwIssued
+              io.bus.wr.payload.eof := i2cWRemain === 1.U
+              io.bus.wr.payload.addr := gen.io.dstAddr
+              io.bus.wr.payload.len := i2cDstSegBeats - 1.U
+              io.bus.wr.payload.strb := ((BigInt(1) << BB) - 1).U(BB.W)
               when(io.bus.wr.fire) {
-                queueCredit := queueCredit + 1.U
+                i2cWRemain := i2cWRemain - 1.U
+                when(!i2cAwIssued) { i2cAwIssued := true.B }
               }
-            }
-            io.bus.wr.payload.sof := !i2cAwIssued
-            io.bus.wr.payload.eof := i2cWRemain === 1.U
-            io.bus.wr.payload.addr := gen.io.dstAddr
-            io.bus.wr.payload.len := i2cDstSegBeats - 1.U
-            io.bus.wr.payload.strb := ((BigInt(1) << BB) - 1).U(BB.W)
-            when(io.bus.wr.fire) {
-              i2cWRemain := i2cWRemain - 1.U
-              when(!i2cAwIssued) { i2cAwIssued := true.B }
-            }
-            // 写响应 / 推进（非阻塞路径前移到 EOF 拍）
-            if (nbWr) {
-              // SOF 发放门控（仅压住首拍）
-              when(!i2cAwIssued && wrInFlight >= cfg.writeOutstandingDepth.U) {
-                io.bus.wr.valid := false.B
-                dataQueue.io.deq.ready := false.B
-                if (cfg.enableConversion) { converter.get.io.out.ready := false.B }
-              }
-              when(io.bus.wr.fire && io.bus.wr.payload.eof) {
-                // micro-row 完成，推进 addrGen
-                gen.io.advance := true.B
-                i2cPhase := 0.U
-              }
-            } else {
-              io.bus.wrResp.ready := i2cWRemain === 0.U && i2cAwIssued
-              when(io.bus.wrResp.fire) {
-                when(io.bus.wrResp.payload.err) { errReg := true.B }
-                // micro-row 完成，推进 addrGen
-                gen.io.advance := true.B
-                i2cPhase := 0.U
+              // 写响应 / 推进（非阻塞路径前移到 EOF 拍）
+              if (nbWr) {
+                // SOF 发放门控（仅压住首拍）
+                when(!i2cAwIssued && wrInFlight >= cfg.writeOutstandingDepth.U) {
+                  io.bus.wr.valid := false.B
+                  dataQueue.io.deq.ready := false.B
+                  if (cfg.enableConversion) { converter.get.io.out.ready := false.B }
+                }
+                when(io.bus.wr.fire && io.bus.wr.payload.eof) {
+                  // micro-row 完成，推进 addrGen
+                  gen.io.advance := true.B
+                  i2cPhase := 0.U
+                }
+              } else {
+                io.bus.wrResp.ready := i2cWRemain === 0.U && i2cAwIssued
+                when(io.bus.wrResp.fire) {
+                  when(io.bus.wrResp.payload.err) { errReg := true.B }
+                  // micro-row 完成，推进 addrGen
+                  gen.io.advance := true.B
+                  i2cPhase := 0.U
+                }
               }
             }
           }
           is(3.U) { // 零写阶段
-            io.bus.wr.valid := true.B
-            io.bus.wr.payload.sof := !i2cAwIssued
-            io.bus.wr.payload.eof := i2cWRemain === 1.U
-            io.bus.wr.payload.addr := gen.io.dstAddr
-            io.bus.wr.payload.len := i2cMicroRowDstBeats - 1.U
-            io.bus.wr.payload.data := 0.U
-            io.bus.wr.payload.strb := ((BigInt(1) << BB) - 1).U(BB.W)
-            when(io.bus.wr.fire) {
-              i2cWRemain := i2cWRemain - 1.U
-              when(!i2cAwIssued) { i2cAwIssued := true.B }
-            }
-            if (nbWr) {
-              // SOF 发放门控（仅压住首拍）
-              when(!i2cAwIssued && wrInFlight >= cfg.writeOutstandingDepth.U) {
-                io.bus.wr.valid := false.B
+            // M1 层2 零段保护：dst beat 数为 0 时不发零写突发，直接 advance（避免无限零写冲毁内存）
+            when(i2cMicroRowDstBeats === 0.U) {
+              gen.io.advance := true.B
+              i2cPhase := 0.U
+            }.otherwise {
+              io.bus.wr.valid := true.B
+              io.bus.wr.payload.sof := !i2cAwIssued
+              io.bus.wr.payload.eof := i2cWRemain === 1.U
+              io.bus.wr.payload.addr := gen.io.dstAddr
+              io.bus.wr.payload.len := i2cMicroRowDstBeats - 1.U
+              io.bus.wr.payload.data := 0.U
+              io.bus.wr.payload.strb := ((BigInt(1) << BB) - 1).U(BB.W)
+              when(io.bus.wr.fire) {
+                i2cWRemain := i2cWRemain - 1.U
+                when(!i2cAwIssued) { i2cAwIssued := true.B }
               }
-              when(io.bus.wr.fire && io.bus.wr.payload.eof) {
-                gen.io.advance := true.B
-                i2cPhase := 0.U
-              }
-            } else {
-              io.bus.wrResp.ready := i2cWRemain === 0.U && i2cAwIssued
-              when(io.bus.wrResp.fire) {
-                when(io.bus.wrResp.payload.err) { errReg := true.B }
-                gen.io.advance := true.B
-                i2cPhase := 0.U
+              if (nbWr) {
+                // SOF 发放门控（仅压住首拍）
+                when(!i2cAwIssued && wrInFlight >= cfg.writeOutstandingDepth.U) {
+                  io.bus.wr.valid := false.B
+                }
+                when(io.bus.wr.fire && io.bus.wr.payload.eof) {
+                  gen.io.advance := true.B
+                  i2cPhase := 0.U
+                }
+              } else {
+                io.bus.wrResp.ready := i2cWRemain === 0.U && i2cAwIssued
+                when(io.bus.wrResp.fire) {
+                  when(io.bus.wrResp.payload.err) { errReg := true.B }
+                  gen.io.advance := true.B
+                  i2cPhase := 0.U
+                }
               }
             }
           }

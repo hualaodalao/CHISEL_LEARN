@@ -305,7 +305,8 @@ object HiveSimCommon {
   /** 暴力编码：在 [0,256) 内挑选「非 inf/nan」的 MX 字节，使 mxToFloat(byte, 127)
     * （即 scale-free 内蕴值）最接近 f。返回的字节表示 f 的量化值；配合独立的
     * E8M0 scale，真实值 = mxToFloat(byte, scaleByte)。inf/nan 编码被排除，
-    * 从而 B 权重经 loadW 走 a 链时也不会触发 HiveCvtOpMx 的 aFmt inf/nan 断言。
+    * 从而 B 权重经 loadW 走 a 链时也不会触发 MX 转换（原 HiveCvtOpMx，已随 FusionMac
+    * 重构删除、现由 FpCvt 的 mx8 cvt 承接）的 aFmt inf/nan 断言。
     */
   private def floatToMx(f: Double, expW: Int, mantW: Int, bias: Int,
                         nanNeedMantAllOne: Boolean): Int = {

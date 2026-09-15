@@ -55,6 +55,23 @@ class ForagerBee(cfg: ForagerBeeConfig = ForagerBeeConfig()) extends Module {
 
     /** 链式描述符独立读总线（仅 enableChaining 时存在） */
     val chainBus = if (cfg.enableChaining) Some(master(new FbStreamBus(cfg.dataWidth, cfg.addressWidth))) else None
+
+    /** 格式转换量化 scale（仅 enableConversion 时存在）。
+      *
+      * 全局供给：所有通道、所有命令共享同一组量化参数（不再是 [[FbCmd]] 字段），
+      * 穿透路径 ForagerBee.io → FbEngine.io → FbFormatConverter.io.cfg_scale。
+      *
+      * 实际语义（与 [[FbFormatConverter]] 实现一致，**不是 IEEE-754 FP32**）：
+      * 仅低 5 bit `cvtScale(4,0)` 被消费，作为 2 的幂移位量（q = round(v / 2^shift)）；
+      * 高 27 bit 被忽略，集成方应置 0。故当前只支持 2 的幂 scale。
+      * enableConversion=false 的 copy-only 构建不声明该端口（避免无用输入引脚）。 */
+    val cvtScale = if (cfg.enableConversion) Some(Input(UInt(32.W))) else None
+
+    /** 格式转换量化 zero point（仅 enableConversion 时存在）。
+      *
+      * 实际语义：仅低 8 bit `cvtZeroPoint(7,0)` 被消费，按**有符号整数**解释（−128..127）；
+      * 高 24 bit 被忽略，集成方应置 0。 */
+    val cvtZeroPoint = if (cfg.enableConversion) Some(Input(UInt(32.W))) else None
   })
 
   // --- 执行层：每通道一个引擎（按 channelTranspose/channelPermute/channelIm2col/channelScatterGather 决定是否含转置缓冲、PERMUTE、IM2COL 及 SG 支持） ---
@@ -65,6 +82,15 @@ class ForagerBee(cfg: ForagerBeeConfig = ForagerBeeConfig()) extends Module {
       supportsIm2col = cfg.resolvedChannelIm2col(p),
       supportsScatterGather = cfg.resolvedChannelScatterGather(p)
     ))
+  }
+
+  // --- 全局量化参数分发：numPorts 个引擎共享同一组 cvtScale/cvtZeroPoint ---
+  // 顶层端口与引擎侧端口同为 cfg.enableConversion 编译期门控，Option 真值一致，.get 静态安全
+  if (cfg.enableConversion) {
+    for (p <- 0 until cfg.numPorts) {
+      engines(p).io.cvtScale.get     := io.cvtScale.get
+      engines(p).io.cvtZeroPoint.get := io.cvtZeroPoint.get
+    }
   }
 
   // --- 调度层：单队列 + 冲突检查 + 通道选择 ---

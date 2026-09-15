@@ -44,29 +44,30 @@ def getBlockSize(t: MXBlockSize.Type) : UInt = {
     ret
 }
 def getKLoadNum(t: DataFormat.Type) : UInt = {
-    // 【Phase 3 核对（勿「顺手统一」）】aKLoadNum/bKLoadNum = 一个 kTile（单 pass）
-    //   推进的 K 元素数。判据用 isMx8（非 isMx）：
-    //     · MXFP8(E4M3/E5M2)：dual-lane，每拍 totalN×2 = 32 K 元素 → totalN×2。
-    //     · 其余（含 MXFP4/E2M1）：落 else → totalN×4 = 64 K 元素。
-    //   ▸ fp4 恰好【巧合正确】：E2M1 非 isMx8，落 else 得 totalN×4 = 64，正是
-    //     quad-lane 的 kPerBeat（totalN × elemsPerLane(fp4)=4 = 64）。故本函数
-    //     【无需为 fp4 改动】，仅在此留痕确认。
-    //   ▸ ★严禁改写成 totalN×elemsPerLane(t)：非 MX 格式 elemsPerLane=1，会把
-    //     现役「非 MX → totalN×4」错改成 totalN×1，破坏 FP16/BF16/INT16/INT8 的
-    //     kTile 几何（违反 normalized-diff=0 硬门槛）。此处 isMx8 二分结构【禁改】。
-    // 【Fix-3 编译期恒等性自证（零 RTL，纯 Scala require，不发射任何硬件）】
-    //   本函数的 isMx8 二分把 MX8→totalN×2、其余(含 fp4)→totalN×4，其正确性【依赖】
-    //   elemsPerLane 单一真源取值 MXE2M1==4 / MX8==2（fp4 落 else 得 totalN×4 属「巧合正确」）。
-    //   一旦 elemsPerLaneLit 表变动而本函数未同步，elaboration 期即炸，强制修复。
-    //   门控 if(cfg.hasMx4)：基线 hasMx4=false 完全不评估，零影响。
-    if (cfg.hasMx4) {
+    // 【Phase 3 INT 生态同步】aKLoadNum/bKLoadNum = 一个 kTile（单 pass）推进的 K 元素数
+    //   = kPerBeat = totalN × elemsPerLane(t)。判据由 isMx8 泛化为 is1B（={INT8,MXE4M3,MXE5M2}）：
+    //     · 单字节族（INT8 / MXFP8 E4M3/E5M2）：dual-lane，每拍 totalN×2 K 元素 → totalN×2。
+    //     · 其余（含半字节族 INT4/MXE2M1 quad-lane，及非打包格式）：落 else → totalN×4。
+    //   ▸ INT4/MXE2M1 quad-lane：落 else 得 totalN×4 = kPerBeat（totalN × elemsPerLane=4）✓。
+    //   ▸ 非打包格式（FP16/BF16/INT32）落 else 得 totalN×4，但其 kTile 在下游走 ceil(k/totalN)
+    //     路径（CalcConfig.kTile / Executor.newKTiles 的 otherwise 支），本函数返回值对这些格式
+    //     不参与 kTile 几何，故 else=totalN×4 属无害兜底。
+    // 【编译期恒等性自证（零 RTL，纯 Scala require，不发射任何硬件）】
+    //   本函数的 is1B 二分把 {INT8,MX8}→totalN×2、其余(含 INT4/MXE2M1)→totalN×4，其正确性
+    //   【依赖】elemsPerLaneLit 单一真源取值 INT4/MXE2M1==4、INT8/MX8==2。一旦该表变动而本函数
+    //   未同步，elaboration 期即炸，强制修复。门控 if(cfg.hasMx4 || cfg.hasInt4)：无亚字节格式
+    //   的配置完全不评估，零影响。
+    if (cfg.hasMx4 || cfg.hasInt4) {
       require(DataFormat.elemsPerLaneLit(DataFormat.MXE2M1) == 4 &&
+              DataFormat.elemsPerLaneLit(DataFormat.INT4) == 4 &&
               DataFormat.elemsPerLaneLit(DataFormat.MXE4M3) == 2 &&
-              DataFormat.elemsPerLaneLit(DataFormat.MXE5M2) == 2,
-        "getKLoadNum 的 isMx8 二分依赖 elemsPerLane(MXE2M1)==4/(MX8)==2；单一真源变动必须同步改本函数")
+              DataFormat.elemsPerLaneLit(DataFormat.MXE5M2) == 2 &&
+              DataFormat.elemsPerLaneLit(DataFormat.INT8) == 2,
+        "getKLoadNum is1B split relies on elemsPerLane: INT4/MXE2M1==4 and INT8/MX8==2; " +
+        "if the elemsPerLaneLit single-source table changes, this function must be updated too")
     }
     val ret = Wire(UInt(8.W))
-    when(DataFormat.isMx8(t)){
+    when(DataFormat.is1B(t)){
         ret := cfg.totalN.U  * 2.U
     }.otherwise{
         ret := cfg.totalN.U  * 4.U
@@ -150,7 +151,9 @@ cNWriteNum := cfg.totalN.U
 // 使 sC0 分支内只做一次乘法，不在 when 里生成解码逻辑。
 // 【Phase 3】laneElems 线宽随 cfg.hasMx4 门控：false→2-bit（与改动前逐字同宽，
 //   elemsPerLaneOf 亦返回 2-bit，normalized-diff=0）；true→3-bit（容纳 fp4 的 4）。
-val laneElemsW = if(cfg.hasMx4) 3 else 2
+// 【Phase 3 INT 生态同步】laneElems 线宽门控扩展：任一亚字节格式（MXE2M1 或 INT4）
+//   在场即需 3-bit 容纳打包数 4；否则 2-bit 足够（打包数 ≤2）。
+val laneElemsW = if(cfg.hasMx4 || cfg.hasInt4) 3 else 2
 val aLaneElems = WireInit(0.U(laneElemsW.W))
 val aElemBytes = WireInit(0.U(3.W))
 val bLaneElems = WireInit(0.U(laneElemsW.W))
@@ -241,6 +244,26 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     }    
     if(cfg.hasMx4){
         when(DataFormat.isMx4(io.regFile.aFmt) &&
+             ((io.regFile.k(15, 0) % (cfg.totalN * 4).U =/= 0.U) ||
+              (io.regFile.k(15, 0) === 0.U))){
+            errComb := true.B
+            errCodeComb := 8.U
+        }
+    }
+    // ==========================================================================
+    // 【Phase 3 INT 生态同步 · errCode 8（INT8/INT4 K 整除运行期守护）】与上方 MX 两块同构：
+    //   INT8 dual-lane kPerBeat=totalN×2、INT4 quad-lane kPerBeat=totalN×4；K 非整除时
+    //   Executor kTiles 地板除静默丢尾（或 K<kPerBeat 时 16-bit 回绕跑飞），故运行期拒绝。
+    //   门控 if(cfg.hasInt)：不含整数格式的配置完全不 elaborate。位于 errCode6 之后、
+    //   Fix-4 mix code3 之前，保持 last-connect 优先级序（3 mix > 8 K整除 > 6 > 5 > 4 > 3 > 0）。
+    if(cfg.hasInt){
+        when(io.regFile.aFmt === DataFormat.INT8 &&
+             ((io.regFile.k(15, 0) % (cfg.totalN * 2).U =/= 0.U) ||
+              (io.regFile.k(15, 0) === 0.U))){
+            errComb := true.B
+            errCodeComb := 8.U
+        }
+        when(io.regFile.aFmt === DataFormat.INT4 &&
              ((io.regFile.k(15, 0) % (cfg.totalN * 4).U =/= 0.U) ||
               (io.regFile.k(15, 0) === 0.U))){
             errComb := true.B
@@ -347,7 +370,11 @@ switch(state) {
       calcConfig.isAX4 := DataFormat.isHalfB(io.regFile.aFmt)
       calcConfig.isBX4 := DataFormat.isHalfB(io.regFile.bFmt)
 
-    when(DataFormat.isMx(io.regFile.aFmt)){
+    // 【Phase 3 INT 生态同步】kTile 分母判据由 isMx 泛化为「打包格式」= is1B || isHalfB
+    //   （={INT8,MXE4M3,MXE5M2} ∪ {INT4,MXE2M1}，已完整覆盖全部 MX）。打包格式每拍推进
+    //   aKLoadNum=kPerBeat 个 K 元素，故 kTile = k / aKLoadNum（地板除，与 Executor newKTiles 同源）；
+    //   非打包格式（FP16/BF16/INT32 等）每拍 totalN 个 K，走 ceil(k/totalN) 旧路径不变。
+    when(DataFormat.is1B(io.regFile.aFmt) || DataFormat.isHalfB(io.regFile.aFmt)){
         calcConfig.kTile := (io.regFile.k / aKLoadNum)
     }.
     otherwise{
@@ -418,7 +445,7 @@ switch(state) {
   //   ▸ INT8/INT32「破损区间」说明：本仓 colTile 自 #124 ① 起已是运行期 bytes 口径，
   //     INT8=16/INT32=64 早已正确（见上恒等性证明），当前【无】INT8/INT32 破损需修；
   //     计划正文所述「统一公式修复 INT8/INT32」为历史陈述，本 Phase 不触碰其数值。
-  if(cfg.hasMx4){
+  if(cfg.hasMx4 || cfg.hasInt4){
     calcConfig.aColTileAddressOffset := cfg.totalN.U * (aLaneElems * memElemBitsOf(io.regFile.aFmt)) / 8.U
   } else {
     calcConfig.aColTileAddressOffset := cfg.totalN.U * (aLaneElems * aElemBytes)
@@ -499,7 +526,7 @@ when(io.regFile.loadWMode === 0.U){
 //   fp4(loadW=1，MX 强制): 16 × 4 × 4 / 8 = 32（一个 kTile = 64 个 4-bit = 32 字节）✓。
 //   恒等性同 A 侧：字节对齐族 memElemBits/8 == memElemBytes → 全现有格式逐值恒等
 //   （MX8=32/FP16=32/INT8=16/INT32=64）；else 支原 bytes 式逐字不变 → normalized-diff=0。
-if(cfg.hasMx4){
+if(cfg.hasMx4 || cfg.hasInt4){
   calcConfig.bColTileAddressOffset := cfg.totalN.U * (bLaneElems * memElemBitsOf(io.regFile.bFmt)) / 8.U
 } else {
   calcConfig.bColTileAddressOffset := cfg.totalN.U * (bLaneElems * bElemBytes)

@@ -18,14 +18,24 @@ import chisel3.util._
   *
   * srcFmt/dstFmt 随 [[FbDataFmt]] 扩为 ChiselEnum(4-bit) 而由 3-bit 拓宽到 4-bit。
   *
-  * **v2 布局（破坏性变更，与 v1 二进制不兼容）**：已删除 elemBytesLog2(2-bit) 与
-  * cvtEnable(1-bit) 两个字段——元素粒度改由 srcFmt/dstFmt 单一真源派生、转换激活
-  * 派生为 srcFmt =/= dstFmt。删字段后其后所有字段的 bit 偏移连锁前移，totalBits
-  * 相应缩减；软件侧描述符打包必须按 v2 布局重新生成（见测试 serializeDescriptor）。
+  * **v3 布局（破坏性变更，与 v2/v1 二进制不兼容）**：已删除 cvtScale(32-bit) 与
+  * cvtZeroPoint(32-bit) 两个字段——量化参数改由 ForagerBee 顶层 IO 全局供给
+  * （`io.cvtScale`/`io.cvtZeroPoint`，仅 enableConversion 时存在），不再随每条命令/描述符携带。
+  * totalBits 相应缩减 64 bit：maxDims=5 时 661→597，maxDims=4 时 578→514；
+  * 软件侧描述符打包必须按 v3 布局重新生成（见测试 serializeDescriptor）。
+  *
+  * 历史：**v2** 已删除 elemBytesLog2(2-bit) 与 cvtEnable(1-bit)——元素粒度改由
+  * srcFmt/dstFmt 单一真源派生、转换激活派生为 srcFmt =/= dstFmt。
   *
   * 已知限制（本次不改动）：opBits 仍为 2，而 [[FbOp]] 已是 8 个成员的 3-bit 枚举，
   * 故链式描述符目前只能编码 COPY/TRANSPOSE/PERMUTE(0..2)；扩展 op 宽度需同步
   * 软件打包与本文两处 opBits 常量。
+  *
+  * **已知限制：链式描述符不支持 MX 量化**。布局不序列化 scaleAddr/scaleBlockSize，
+  * 而 MX 量化激活已由 dstFmt 派生（isMx(dstFmt)），若直接放行会向物理地址 0x0 发出
+  * E8M0 scale 写突发（内存破坏）。故 FbChainController 在 injCmd 组装末尾做「入口自守」：
+  * isMx(dstFmt) 时强制 dimCount=0，由引擎 cBadBase 拒绝并回 err done。如需链式 MX 量化，
+  * 须先扩展描述符布局（新增 scaleAddr/scaleBlockSize 字段）再解除该自守。
   */
 object FbDescLayout {
   // --- 各字段位宽常量（纯 Scala，编译期可求值） ---
@@ -44,8 +54,6 @@ object FbDescLayout {
   val chainModeBits = 1
   val srcFmtBits = FbDataFmt.getWidth
   val dstFmtBits = FbDataFmt.getWidth
-  val cvtScaleBits = 32
-  val cvtZeroPointBits = 32
 
   /** 所有字段偏移（纯 Scala case class，FbChainController 与 Spec 共同消费） */
   case class Offsets(cfg: ForagerBeeConfig) {
@@ -64,9 +72,8 @@ object FbDescLayout {
     val offChainMode: Int = offNextDescAddr + nextDescAddrBits(cfg)
     val offSrcFmt: Int = offChainMode + chainModeBits
     val offDstFmt: Int = offSrcFmt + srcFmtBits
-    val offCvtScale: Int = offDstFmt + dstFmtBits
-    val offCvtZeroPoint: Int = offCvtScale + cvtScaleBits
-    val end: Int = offCvtZeroPoint + cvtZeroPointBits
+    /** v3：dstFmt 为最后一个序列化字段（cvtScale/cvtZeroPoint 已上移到顶层 IO） */
+    val end: Int = offDstFmt + dstFmtBits
   }
 
   /** 获取指定配置的偏移表（elaboration 期自检：字段宽度之和 == totalBits） */
@@ -81,7 +88,7 @@ object FbDescLayout {
     opBits + tagBits + dimCountBits + shapeBits(cfg) + srcStrideBits(cfg) + dstStrideBits(cfg) +
       srcAddrBits(cfg) + dstAddrBits(cfg) + permVecBits(cfg) +
       padBeforeBits + padAfterBits + nextDescAddrBits(cfg) + chainModeBits +
-      srcFmtBits + dstFmtBits + cvtScaleBits + cvtZeroPointBits
+      srcFmtBits + dstFmtBits
   }
 
   def descBeats(cfg: ForagerBeeConfig): Int = {
@@ -166,7 +173,7 @@ class FbChainController(cfg: ForagerBeeConfig) extends Module {
 
   // 组装注入 cmd
   val injCmd = Wire(new FbCmd(cfg))
-  injCmd.op        := extract(lo.offOp, FbDescLayout.opBits).asTypeOf(FbOp())
+  injCmd.op        := suppressEnumCastWarning { extract(lo.offOp, FbDescLayout.opBits).pad(FbOp.getWidth).asTypeOf(FbOp()) }
   injCmd.tag       := extract(lo.offTag, FbDescLayout.tagBits)
   injCmd.dimCount  := extract(lo.offDimCount, FbDescLayout.dimCountBits)
   for (d <- 0 until cfg.maxDims) {
@@ -187,8 +194,7 @@ class FbChainController(cfg: ForagerBeeConfig) extends Module {
   // 未定义编码由引擎 cBad 校验与转换器 default 分支兜住）
   injCmd.srcFmt        := suppressEnumCastWarning { extract(lo.offSrcFmt, FbDescLayout.srcFmtBits).asTypeOf(FbDataFmt()) }
   injCmd.dstFmt        := suppressEnumCastWarning { extract(lo.offDstFmt, FbDescLayout.dstFmtBits).asTypeOf(FbDataFmt()) }
-  injCmd.cvtScale      := extract(lo.offCvtScale, FbDescLayout.cvtScaleBits)
-  injCmd.cvtZeroPoint  := extract(lo.offCvtZeroPoint, FbDescLayout.cvtZeroPointBits)
+  // v3：量化参数 cvtScale/cvtZeroPoint 不再序列化于描述符（改由 ForagerBee 顶层 IO 全局供给）
   // im2col fields default to 0 (chain controller does not support im2col descriptors in v1)
   for (d <- 0 until 2) {
     injCmd.im2colKernel(d)   := 0.U
@@ -210,10 +216,21 @@ class FbChainController(cfg: ForagerBeeConfig) extends Module {
   injCmd.t2lTileCols    := 0.U
   injCmd.t2lNumTileRows := 0.U
   injCmd.t2lNumTileCols := 0.U
-  // MX quantization fields default to 0 (chain controller does not support MX quant descriptors in v1)
+  // MX quantization fields default to 0：链式描述符不序列化 scaleAddr/scaleBlockSize，
+  // 故 MX 量化在链式模式下不支持（见下方入口自守）；如需链式 MX 量化须先扩展描述符布局。
   injCmd.scaleAddr      := 0.U
   injCmd.scaleBlockSize := 0.U
-  injCmd.mxQuantEn      := false.B
+
+  // --- 入口自守（安全关键）：链式描述符携带 isMx(dstFmt) 时强制 dimCount=0，让引擎报 err ---
+  // 量化激活已派生为 isMx(dstFmt)（原「MX 量化使能」开关字段已删除），而链式描述符不携带
+  // scaleAddr/scaleBlockSize（上方硬连线为 0）。若不拦截，带 MX dstFmt 的链式描述符会真的
+  // 走量化通路，并向物理地址 0x0 发出 E8M0 scale 的 strb 部分写突发（len=0 单拍）——内存破坏。
+  // 沿用 FbTile2LinearExpander 的「入口自守」模式：dimCount=0 → 引擎 cBadBase 拒绝并回 err done。
+  // 注意：dstFmt 是描述符 extract 出来的运行期值，本判断是组合逻辑而非 Scala 编译期判断；
+  // 依赖 Wire 的 last-connect 语义覆盖前面 injCmd.dimCount 的 extract 赋值。
+  when(FbDataFmt.isMx(injCmd.dstFmt)) {
+    injCmd.dimCount := 0.U
+  }
 
   // --- FSM 逻辑 ---
   switch(state) {

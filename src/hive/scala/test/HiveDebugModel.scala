@@ -78,14 +78,17 @@ object HiveDebugModel {
     else if (f == DataFormat.INT8 || isMx8(f)) 8
     else 4   // MXE2M1 / INT4：半字节
 
-  /** 每 16-bit lane 打包的元素数：MXFP8 dual-lane=2、MXFP4 quad-lane=4、其余=1。
-    * 与硬件 DataFormat.elemsPerLane / HiveCoreCalcConfig.elemsPerLaneOf 同源。
-    * 【Phase 3 additive】新增 MXE2M1→4；对现有格式（MX8→2、其余→1）取值逐字不变，
-    * 故所有非 fp4 用例（DebugCase/ParamDebugSpec 现役格式）几何零变化。 */
+  /** 每 16-bit lane 打包的元素数：单字节族（INT8/MXE4M3/MXE5M2）dual-lane=2、
+    * 半字节族（INT4/MXE2M1）quad-lane=4、其余=1。
+    * 与硬件 DataFormat.elemsPerLane / elemsPerLaneLit / HiveCoreCalcConfig.elemsPerLaneOf 同源。
+    * 【Phase 3 INT 生态同步】判据由「MXE2M1→4 / isMx8→2」泛化为 isHalfB/is1B 集合语义，
+    * 使 INT4→4、INT8→2 与 MXE2M1→4、MX8→2 共用同一张打包表；对现有 MX/FP 格式取值逐字不变。 */
   def elemsPerLane(f: DataFormat.Type): Int =
-    if (f == DataFormat.MXE2M1) 4 else if (isMx8(f)) 2 else 1
+    if (f == DataFormat.MXE2M1 || f == DataFormat.INT4) 4
+    else if (isMx8(f) || f == DataFormat.INT8) 2
+    else 1
 
-  /** 每拍推进的 K 元素数（= kTile 粒度）：MX8 = totalN*2、MXE2M1 = totalN*4、其余 = totalN */
+  /** 每拍推进的 K 元素数（= kTile 粒度）：INT8/MX8 = totalN*2、INT4/MXE2M1 = totalN*4、其余 = totalN */
   def kPerBeat(f: DataFormat.Type, totalN: Int): Int = totalN * elemsPerLane(f)
 
   // ==========================================================================
@@ -274,7 +277,7 @@ object HiveDebugModel {
     * ▸ code8（P0-1）：fp4(E2M1) 要求 K 被 kPerBeat(=totalN×4=64) 整除，否则 Executor kTiles 地板除
     *   静默丢尾（K=96）或 16-bit 回绕（K<64）；硬件 errCode8 运行期拒绝，金锚镜像之。 */
   def hwErrCode(p: DebugParams, totalN: Int, hasMx4: Boolean = false): Option[Int] = {
-    def kLoadNum(f: DataFormat.Type): Int = if (isMx8(f)) totalN * 2 else totalN * 4  // 镜像 getKLoadNum
+    def kLoadNum(f: DataFormat.Type): Int = if (isMx8(f) || f == DataFormat.INT8) totalN * 2 else totalN * 4  // 镜像 getKLoadNum（is1B 语义）
     val aMx = isMxAny(p.aFmt); val bMx = isMxAny(p.bFmt); var e = Option.empty[Int]
     if ((aMx && p.aMxBlk > kLoadNum(p.aFmt)) || (bMx && p.bMxBlk > kLoadNum(p.bFmt)) ||
         (isMxAny(p.cFmt) && p.cMxBlk > totalN)) e = Some(0)   // RTL 把三个 blk 违约合并成单一 errCode 0
@@ -285,7 +288,13 @@ object HiveDebugModel {
     // [P0-1] fp4(E2M1) K not divisible by kPerBeat -> code8. Placed BEFORE the
     //   mix code3 below, i.e. lower priority, matching the hardware
     //   last-connect order.
-    if (hasMx4 && isMxAny(p.aFmt) && (p.k % kPerBeat(p.aFmt, totalN) != 0 || p.k == 0)) e = Some(8)
+    // [Phase 3 INT 生态同步] errCode 8 守护扩展到 INT8/INT4：与硬件 HiveCoreCalcConfig
+    //   的 if(cfg.hasInt) 块同构（INT8 kPerBeat=totalN*2、INT4 kPerBeat=totalN*4，均由
+    //   kPerBeat(fmt,totalN) 单一真源给出）。MX 部分仍由 hasMx4 门控；INT 部分不设门控——
+    //   aFmt 为 INT8/INT4 即隐含 cfg.hasInt（默认 supportedFmts 含二者），镜像与 RTL 一致。
+    val aPackedInt = p.aFmt == DataFormat.INT8 || p.aFmt == DataFormat.INT4
+    if (((hasMx4 && isMxAny(p.aFmt)) || aPackedInt) &&
+        (p.k % kPerBeat(p.aFmt, totalN) != 0 || p.k == 0)) e = Some(8)
     // [Fix-4 mirror] MX4xMX8 mix (isMx4(aFmt) ^ isMx4(bFmt)) -> code 3, gated by hasMx4.
     if (hasMx4 && (p.aFmt == DataFormat.MXE2M1) != (p.bFmt == DataFormat.MXE2M1)) e = Some(3)
     // (#146) errCode 7 REMOVED from the mirror. The hardware block it mirrored
@@ -313,14 +322,9 @@ object HiveDebugModel {
     *   hasMx4=true 时才拦混配，与硬件 Fix-4 门控 when 同源。 */
   def validate(p: DebugParams, totalN: Int, hasMx4: Boolean = false): Unit = {
     require(p.m > 0 && p.n > 0 && p.k > 0, s"M/N/K 必须 > 0，当前 M=${p.m} N=${p.n} K=${p.k}")
-    // 【Phase 3】半字节输入拒绝范围收窄：原 `memElemBytes(aFmt)>0` 会把 INT4 与 MXE2M1
-    //   一并拒掉；现改为【仅拒 INT4】——MXE2M1(fp4) 已由 bits 口径几何 + decodeInElem +
-    //   nibble buildMemory 支持作为输入。对非 MXE2M1 格式判据取值【完全一致】
-    //   （INT4 仍拒、其余仍放行），非回归。
-    require(p.aFmt != DataFormat.INT4,
-      s"aFmt=${p.aFmt}：INT4 半字节整型调试模型不支持作为输入（fp4/MXE2M1 仅 hasMx4 硬件支持，见 Plan 内 cfg-aware 守卫；请改用 mxe4m3/mxe5m2/mxe2m1/int8）")
-    require(p.bFmt != DataFormat.INT4,
-      s"bFmt=${p.bFmt}：INT4 半字节整型调试模型不支持作为输入（fp4/MXE2M1 仅 hasMx4 硬件支持，见 Plan 内 cfg-aware 守卫；请改用 mxe4m3/mxe5m2/mxe2m1/int8）")
+    // 【Phase 3 INT 生态同步】解禁 INT4 输入：原两条 require(aFmt/bFmt != INT4) 已删除。
+    //   INT4 现由 bits 口径几何（memElemBits=4）+ decodeInElem sext(_,4) + nibble buildMemory
+    //   完整支持作为输入格式（quad-lane 打包=4），与 MXE2M1 同构。
     require(p.rnd >= 0 && p.rnd <= 4, s"rnd=${p.rnd} 越界（0..4）")
     if (isMxAny(p.aFmt) || isMxAny(p.bFmt)) {
       // 【Phase 3】kPerBeat 由硬编码 totalN*2（MX8）泛化为 kPerBeat(fmt)：
@@ -562,8 +566,11 @@ object HiveDebugModel {
     val bEbits: Int = memElemBits(p.bFmt)
     val aKpb: Int = kPerBeat(p.aFmt, totalN)      // A 每拍 K 元素数
     val bKpb: Int = kPerBeat(p.bFmt, totalN)
-    val aKTiles: Int = if (isMxAny(p.aFmt)) p.k / aKpb else (p.k + totalN - 1) / totalN
-    val bKTiles: Int = if (isMxAny(p.bFmt)) p.k / bKpb else (p.k + totalN - 1) / totalN
+    // 【Phase 3 INT 生态同步】kTiles 判据由 isMxAny 泛化为「打包格式」（含 INT8/INT4）：
+    //   打包格式每拍推进 kPerBeat 个 K → kTiles = k / kPerBeat（地板除）；非打包格式 ceil(k/totalN)。
+    //   与硬件 HiveCoreCalcConfig.kTile / HiveCoreExecutor.newKTiles 同源。
+    val aKTiles: Int = if (isMxAny(p.aFmt) || p.aFmt == DataFormat.INT8 || p.aFmt == DataFormat.INT4) p.k / aKpb else (p.k + totalN - 1) / totalN
+    val bKTiles: Int = if (isMxAny(p.bFmt) || p.bFmt == DataFormat.INT8 || p.bFmt == DataFormat.INT4) p.k / bKpb else (p.k + totalN - 1) / totalN
     val nTiles: Int = (p.n + totalN - 1) / totalN
 
     // ---- 期望地址偏移（张量语义推导，不镜像 HiveCoreCalcConfig 谓词链） ----
@@ -1062,7 +1069,13 @@ object HiveDebugModel {
       // (#151 F4) 全码发射计数所需的位宽/幅值域掩码
       val elemBits: Int = HiveSimCommon.cOutElemBits(p.cFmt)
       val magMask: Long = (1L << (elemBits - 1)) - 1
-      val nCodes: Int = 1 << elemBits
+      // (#73) elemBits>=32 (FP32/INT32 output) guard: Scala Int shift is mod-32, so
+      //   `1 << 32` wraps to `1 << 0` = 1, and a real 2^32-entry histogram is memory-infeasible
+      //   anyway. The histograms are only READ inside the `if (quant)` reporting block below
+      //   (MX formats => elemBits in {4,8}), so skipping the tally for wide formats leaves the
+      //   per-element compare verdicts untouched and removes the ArrayIndexOutOfBoundsException.
+      val histEnabled: Boolean = elemBits < 32
+      val nCodes: Int = if (histEnabled) 1 << elemBits else 0
       val hwHist  = Array.fill(nCodes)(0)   // 硬件实发码计数
       val expHist = Array.fill(nCodes)(0)   // 金锚期望码计数（仅 MX 有意义）
       for (mm <- 0 until p.m; nn <- 0 until p.n) {
@@ -1081,7 +1094,7 @@ object HiveDebugModel {
           else decodeElem(p.cFmt, hwBits(mm)(nn), 127)
         // (#151 F4) 误差统计在【所有】分支累积（主口径），另按 legacy / nz 两套对照口径分别累积
         val hwCode: Long = hwBits(mm)(nn) & elemMask
-        hwHist(hwCode.toInt) += 1
+        if (histEnabled) hwHist(hwCode.toInt) += 1   // (#73) skip tally for elemBits>=32
         val absErr = math.abs(hw - ref)
         val relErr = if (math.abs(ref) > 1e-9) absErr / math.abs(ref) else absErr
         if (relErr > maxRel) maxRel = relErr

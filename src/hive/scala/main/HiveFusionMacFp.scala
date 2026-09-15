@@ -88,7 +88,8 @@ class HiveFusionMacFp(
     val scaleA = Input(UInt(8.W))
     val scaleB = Input(UInt(8.W))
     val rnd  = Input(RoundingMode())
-    // 消费有效门控（仅 hasMx 块内有意义）：透传给 4×HiveCvtOpMx 的 inf/nan 断言；
+    // 消费有效门控（仅 hasMx 块内有意义）：透传给 MX8 转换模块（FpCvtMx8ToMid/FpCvtMx8ToFp32，
+    // 原为 HiveWorkUnit.scala 中的 4×HiveCvtOpMx、已随 FusionMac 重构删除）的 inf/nan 断言；
     // 非 MX 配置下恒不被选用，行为零影响。由宿主（HiveWorker）单行连入。
     val consumeValid = Input(Bool())
     val sum  = Output(UInt(cEffW.W))

@@ -355,7 +355,7 @@ module Fb_FbChainController(	// src/foragerbee/scala/main/FbChainController.scal
   assign io_cmdIn_ready = _GEN & io_cmdOut_ready;	// src/foragerbee/scala/main/FbChainController.scala:96:7, :219:17, :224:25
   assign io_cmdOut_valid = io_cmdOut_valid_0;	// src/foragerbee/scala/main/FbChainController.scala:96:7, :219:17, :222:25
   assign io_cmdOut_payload_op =
-    _GEN ? io_cmdIn_payload_op : _GEN_10 ? 3'h0 : {1'h0, descRegs_0[1:0]};	// src/foragerbee/scala/main/FbChainController.scala:96:7, :128:22, :144:21, :162:68, :169:70, :219:17, :223:25
+    _GEN ? io_cmdIn_payload_op : _GEN_10 ? 3'h0 : {1'h0, descRegs_0[1:0]};	// src/foragerbee/scala/main/FbChainController.scala:96:7, :128:22, :144:21, :162:68, :169:91, :219:17, :223:25
   assign io_cmdOut_payload_tag = io_cmdOut_payload_tag_0;	// src/foragerbee/scala/main/FbChainController.scala:96:7, :219:17, :223:25
   assign io_cmdOut_payload_dimCount =
     _GEN ? io_cmdIn_payload_dimCount : _GEN_10 ? 3'h0 : descRegs_0[12:10];	// src/foragerbee/scala/main/FbChainController.scala:96:7, :128:22, :144:21, :162:68, :219:17, :223:25

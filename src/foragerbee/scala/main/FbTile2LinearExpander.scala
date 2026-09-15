@@ -14,6 +14,9 @@
   *   - LINEAR2TILE：src = 线性，dst = tiled 大矩阵（线性连续读出→按 tile 布局写回）
   *
   * 非法参数保护：Tn/Tm/Nt/Mt/N 任一为 0 时，置 dimCount := 0（触发引擎 cBad 报错）。
+  * 入口自守（M3）：INT4 亚字节或 srcFmt≠dstFmt 的 T2L/L2T 命令同样置 dimCount := 0 拒绝——
+  *   因本模块在引擎上游且会把 op 改写为 COPY，引擎的 subByteOpBad/cvtOpBad 无法回溯识别，
+  *   故格式合法性必须由本模块入口保证（同时使单粒度 stride e 的 srcFmt==dstFmt 不变式成立）。
   *
   * @param cfg ForagerBee 配置
   */
@@ -49,8 +52,11 @@ class FbTile2LinearExpander(cfg: ForagerBeeConfig) extends Module {
     val Mt = cmd.t2lNumTileRows.pad(addrW)
     val Nt = cmd.t2lNumTileCols.pad(addrW)
 
-    // e = 元素字节数（由 srcFmt 单一真源派生；INT4 亚字节已被引擎 subByteOpBad 校验拒于 TILE2LINEAR 路径外，
-    // 故此处 bytesOfCeil 恒为字节粒度）。保持纯组合，不流水化。
+    // e = 元素字节数（由 srcFmt 单一真源派生）。
+    // 不变式（M3/N4）：本模块入口自守（见下方 dimCount:=0 保护）拒绝「INT4 亚字节」与
+    // 「srcFmt≠dstFmt」的 T2L/L2T 命令，故此处 e 恒为字节粒度、且 srcFmt==dstFmt 使单粒度 e
+    // 对读/写两侧同时成立——无需拆 eSrc/eDst（引擎 subByteOpBad 在 expander 下游、op 已被
+    // 改写为 COPY，无法覆盖 T2L/L2T，故必须由本模块入口自守）。保持纯组合，不流水化。
     val e = FbDataFmt.bytesOfCeil(cmd.srcFmt).pad(addrW)
 
     // 中间乘积
@@ -92,6 +98,15 @@ class FbTile2LinearExpander(cfg: ForagerBeeConfig) extends Module {
     // 非法参数保护：任一为 0 则置 dimCount=0 → 引擎报 err（两个 op 共用）
     when(cmd.t2lMatCols === 0.U || cmd.t2lTileCols === 0.U || cmd.t2lTileRows === 0.U ||
          cmd.t2lNumTileCols === 0.U || cmd.t2lNumTileRows === 0.U) {
+      io.out.payload.dimCount := 0.U
+    }
+
+    // M3 入口自守：T2L/L2T 的 stride 只有单粒度 e（srcFmt 派生），且 expander 在引擎上游、
+    // op 改写为 COPY 后引擎 subByteOpBad/cvtOpBad 均无法回溯识别原始 T2L/L2T，故必须由本模块
+    // 拒绝：① INT4 亚字节（e 会翻倍、地址静默错）；② srcFmt≠dstFmt（单粒度 e 不支持跨格式）。
+    // 走非法参数通道（dimCount:=0）复用引擎 cBadBase 报 err。
+    when(FbDataFmt.isSubByte(cmd.srcFmt) || FbDataFmt.isSubByte(cmd.dstFmt) ||
+         (cmd.srcFmt =/= cmd.dstFmt)) {
       io.out.payload.dimCount := 0.U
     }
   }

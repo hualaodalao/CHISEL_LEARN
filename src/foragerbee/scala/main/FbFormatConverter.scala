@@ -11,8 +11,9 @@
   *
   * 格式编码统一引用 [[FbDataFmt]] ChiselEnum（4-bit），本文件不再私藏任何 FMT_* 常量；
   * 元素位宽同样取自单一真源 [[FbDataFmt.elemBits]]。
-  * 尚未实现算术的格式（INT32/INT16/INT4、MX 族、NONE）一律落入 MuxLookup 的 default
+  * 尚未实现算术的格式（INT32/INT16/INT4、MX 族）一律落入 MuxLookup 的 default
   * 分支按 FP32 位宽直通（passthrough），不产生错误硬件行为；其转换路径由后续任务补齐。
+  * 非法编码（6/7/11-15）由引擎 fmtEncBad 前置拒绝，不会到达本模块。
   */
 
 import chisel3._

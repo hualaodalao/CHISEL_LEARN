@@ -291,11 +291,15 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
         // 故 depthOfCBufferUsed 必须用本拍推导的 newMTiles/newKTiles 计算，
         // 否则会采样到未初始化寄存器的随机旧值，误触发容量错误回 idle
         val newNTiles = (io.regFile.n(15, 0) + totalN.U - 1.U) / totalN.U
-        val newKTiles = Mux(DataFormat.isMx(io.regFile.aFmt),
-          if(cfg.hasMx4) Mux(DataFormat.isMx4(io.regFile.aFmt),
-                             io.regFile.k(15, 0) / (totalN.U * 4.U),   // fp4: K/64 → firtool 削减为移位
-                             io.regFile.k(15, 0) / (totalN.U * 2.U))   // fp8: K/32 → 移位（值与原 elemsPerLane=2 逐位相同）
-          else io.regFile.k(15, 0) / (totalN.U) / 2.U,
+        // 【Phase 3 INT 生态同步】kTiles 分母判据由 isMx 泛化为「打包格式」= is1B || isHalfB
+        //   （含 INT8/INT4 与全部 MX）。半字节族（INT4/MXE2M1）kPerBeat=totalN×4 → K/(totalN×4)；
+        //   单字节族（INT8/MXE4M3/MXE5M2）kPerBeat=totalN×2 → K/(totalN×2)；非打包格式走 ceil(K/totalN)。
+        //   与 HiveCoreCalcConfig.kTile 及金锚 HiveDebugModel.aKTiles/bKTiles 同源，不再由 hasMx4 门控。
+        val isPackedA = DataFormat.is1B(io.regFile.aFmt) || DataFormat.isHalfB(io.regFile.aFmt)
+        val newKTiles = Mux(isPackedA,
+          Mux(DataFormat.isHalfB(io.regFile.aFmt),
+              io.regFile.k(15, 0) / (totalN.U * 4.U),   // INT4 / MXE2M1: K/(totalN*4)
+              io.regFile.k(15, 0) / (totalN.U * 2.U)),  // INT8 / MX8:    K/(totalN*2)
           (io.regFile.k(15, 0) + totalN.U - 1.U) / totalN.U)
         nTiles   := newNTiles - 1.U
         kTiles   := newKTiles - 1.U

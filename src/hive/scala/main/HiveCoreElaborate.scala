@@ -26,7 +26,8 @@
   * 【对外破坏性变更（MXFP8 v2 SIMD 升级）】verilog_mx 产物 dmaA/dmaB 数据位宽由
   * 128 位 → 256 位（aExtW/bExtW = totalN*aEffW = 16×16）。基线 verilog/（本就 aW=16）
   * 端口集不变，仅内部 MX 通路升级为 v2 SIMD（2 元素/拍：4 个 HiveCvtOpMx + 2 个
-  * HiveMacFp 级联，双 pass 拼块删除、pass 数减半、MX 算力翻倍）逻辑。
+  * HiveMacFp 级联——二者均为原 HiveWorkUnit.scala 子模块、已随 FusionMac 重构删除，
+  * 功能并入 FpCvt/FpMul/FpAdd；双 pass 拼块删除、pass 数减半、MX 算力翻倍）逻辑。
   *
   * 【对外破坏性变更（顶层 DMA 端口语义命名）】顶层 DMA 端口由 dmaNExt 数字命名改为语义命名：
   * dma0Ext → dmaA（A 激活读）、dma1Ext → dmaC（C 结果写回）、dma2Ext → dmaB（B 权重读）、
@@ -70,8 +71,9 @@
   *
   * 【「禁动区」精确界定（W-Ken3 评审项）】本文件及相关注释中的「禁动区」定义为
   * 「C 写回重构 P0-P3 阶段未修改的模块/代码段」，不等同于「整个会话周期从未改动」：
-  *   - HiveComb、HiveWorker、HiveMacFp、HiveCvtOpMx 等 MAC/阵列本体在前序任务
-  *     （MX SIMD v2 / loadW 水平加载 / Fp32 数值修复）中已有重构，不在「禁动区」内。
+  *   - HiveComb、HiveWorker 等 MAC/阵列本体在前序任务
+  *     （MX SIMD v2 / loadW 水平加载 / Fp32 数值修复）中已有重构，不在「禁动区」内
+  *     （当时并列的 HiveMacFp、HiveCvtOpMx 已随 FusionMac 重构删除）。
   *   - HiveCoreExecutor 的 sLOAD_A 离场门控（C2 修复）属评审发现的合法缺陷最小修复，
   *     不改变「P0-P3 未修改」的禁动区界定。
   *   - 禁动区典型包含：aDma/bDma RdOnly 主干遍历、Scratchpad FIFO 行为。
@@ -167,7 +169,9 @@ object HiveCoreElaborate extends App {
 
   // 【Phase 4 打通里程碑】MXFP4(E2M1) 发射配置：在 cfgMx 基础上追加 DataFormat.MXE2M1，
   // 使 hasMx4 = supportedFmts.contains(MXE2M1) = true，触发以下 additive 硬件分支：
-  //   · HiveWorkUnit 内 fp4 quad-lane 通路（8×HiveCvtOpMx + 4 级 HiveMacFpMx 左结合级联，
+  //   · HiveWorkUnit 内 fp4 quad-lane 通路（8×HiveCvtOpMx + 4 级 HiveMacFpMx 左结合级联
+  //     ——二者均为原 HiveWorkUnit.scala 子模块、已随 FusionMac 重构删除，功能并入
+  //     FpCvt/FpMul/FpAdd → HiveFusionMacFp；
   //     16-bit lane 打包 4 个 4-bit nibble：io.a(3,0)=k+0 … io.a(15,12)=k+3），运行期
   //     Mux(isMx4(aFmt), quadResult, dualLaneMx()) 选择；
   //   · HiveCoreCalcConfig: colTile uses the bits-based formula
@@ -200,8 +204,9 @@ object HiveCoreElaborate extends App {
   //   这条目录隔离约束【不变】（重发射时仍需三套并存以便对照）。
   // 【新基线预期（供 #142 重发射时对照）】三套 cfg 现在 hasMx4 全为 true ⟹ fp4 支路一律
   //   elaborate。预期非零 diff 的模块：Hive_HiveOutCvt.sv（q2Seq/packed4/次正规与深下溢臂
-  //   全部无门控）、Hive_HiveWorkUnit.sv 与 Hive_HiveMacFpMx.sv（fp4 quad-lane 通路 +
-  //   运行期 Mux(isMx4, quad, dualLane)）、HiveCoreCalcConfig 侧 elemsPerLane 2-bit→3-bit
+  //   全部无门控）、Hive_HiveWorkUnit.sv（fp4 quad-lane 通路 + 运行期 Mux(isMx4, quad, dualLane)；
+  //   原并列预期的 Hive_HiveMacFpMx.sv 因 HiveMacFpMx 已随 FusionMac 重构删除而不再产出，
+  //   该通路并入 Hive_HiveFusionMacFp.sv）、HiveCoreCalcConfig 侧 elemsPerLane 2-bit→3-bit
   //   与 errCode 8 / Fix-4 errCode 3 两支运行期守护。三套产物之间不再有 normalized-diff=0
   //   关系；数值正确性改由 TB 侧金锚（OCP MX / IEEE-754 独立推导）+ 归一化 stdout 基线守护。
   // ★cfgMx ≡ cfgMxFp4（全 12 字段逐一相同）⟹ verilog_mx 与 verilog_mxfp4 将是同一配置的

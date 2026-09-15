@@ -1,7 +1,8 @@
 /** HiveCore MXFP8 v2 SIMD 双 MX（异构 E4M3 × E5M2）端到端数值仿真用例。
   *
   * 【v2 SIMD 打包布局】16-bit lane 打包 2 个 8-bit MX 元素：低字节=偶 k=2j、
-  * 高字节=奇 k=2j+1；PE 内 4×HiveCvtOpMx + 2×HiveMacFp 级联（先偶后奇），
+  * 高字节=奇 k=2j+1；PE 内 4×HiveCvtOpMx + 2×HiveMacFp 级联（先偶后奇；二者均为原
+  * HiveWorkUnit.scala 子模块、已随 FusionMac 重构删除，功能并入 FpCvt/FpMul/FpAdd → HiveFusionMacFp），
   * 每拍每波前推进 32 个 K 元素 = 恰好一个 32-K scale 块 = 单 pass，
   * 故 kTile 数 = K/32（scaleA 块下标 kb = kt）。外部 A/B 存储 1 字节/元素：
   * 行步长 = K 字节（非 2K），k 窗口步进 = 32 字节（2×totalN）。
@@ -57,8 +58,9 @@
   * 逐 bit 相等，唯一偏差是 fp32 累加舍入（远小于 1e-2 容差）。
   *
   * 既有非 MX spec 一律零改动，非 MX 路径 bit-exact 由回归门禁守护。
-  * 【硬件侧消费有效门控已实施】HiveCvtOpMx inf/nan 断言已由 consumeValid 门控（见
-  * HiveWorkUnit/HiveWorker），空闲/加载/排空拍垃圾输入不再撞断言 $fatal，
+  * 【硬件侧消费有效门控已实施】MX inf/nan 断言（原 HiveCvtOpMx，已随 FusionMac 重构删除、
+  * 现由 FpCvt 的 mx8 cvt 承接）已由 consumeValid 门控（见
+  * HiveFusionMacFp/HiveWorker），空闲/加载/排空拍垃圾输入不再撞断言 $fatal，
   * 本 suite 已恢复 ChiselSim 默认随机化（原测试侧 Randomization.uninitialized
   * 零初值规避已移除）。
   */
@@ -80,8 +82,9 @@ import java.nio.file._
 
 class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveFstSim with HiveStatusPollApi {
 
-  // 【硬件侧门控已实施，测试侧规避已移除】HiveCvtOpMx inf/nan 断言现受
-  // consumeValid 消费有效门控（HiveWorkUnit/HiveWorker 单行连入，条件 =
+  // 【硬件侧门控已实施，测试侧规避已移除】MX inf/nan 断言（原 HiveCvtOpMx，已随 FusionMac
+  // 重构删除、现由 FpCvt 的 mx8 cvt 承接）现受
+  // consumeValid 消费有效门控（HiveFusionMacFp/HiveWorker 单行连入，条件 =
   // MX 结果被真实消费的充要条件），空闲/加载/排空拍的随机垃圾不再触发断言。
   // 故本 suite 恢复 ChiselSim 默认随机化（不传 settings）——默认随机化下全绿
   // 即证明硬件侧门控有效，且还原真实上电语义。

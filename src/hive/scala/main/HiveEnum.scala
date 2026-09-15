@@ -21,8 +21,12 @@ object DataFormat extends ChiselEnum {
     *   ② HiveCoreCalcConfig.getKLoadNum 的编译期恒等性自证 require。
     * 由此「硬件字面量」与「自证口径」共用同一张表，杜绝双源漂移：改本表即同时改硬件与
     * 触发 getKLoadNum 自证（若其 totalN×2 / totalN×4 二分未同步则 elaboration 期即炸）。 */
+  /** 【Phase 3 INT 生态同步】半字节族（INT4/MXE2M1）→4、单字节族（INT8/MXE4M3/MXE5M2）→2、
+    * 其余→1。与运行期谓词 isHalfB/is1B 的集合成员逐字同构（isHalfB={INT4,MXE2M1}、
+    * is1B={INT8,MXE4M3,MXE5M2}），使 INT8/INT4 与 MX8/MX4 共用同一张打包表，杜绝双源漂移。
+    * 注：isHalfB/is1B 返回硬件 Bool，本函数是纯 Scala Int 计算，故此处用 Scala == 显式列举。 */
   def elemsPerLaneLit(f: DataFormat.Type): Int =
-    if (f == MXE2M1) 4 else if (f == MXE4M3 || f == MXE5M2) 2 else 1
+    if (f == INT4 || f == MXE2M1) 4 else if (f == INT8 || f == MXE4M3 || f == MXE5M2) 2 else 1
 
   /** 每 16-bit lane 打包的元素数（硬件运行期解码，Phase 3 单一真源）。
     * MXFP8(E4M3/E5M2) SIMD 双元素/拍 = 2；MXFP4(E2M1) quad-lane 四元素/拍 = 4；
@@ -37,25 +41,19 @@ object DataFormat extends ChiselEnum {
     * HiveCoreCalcConfig.elemsPerLaneOf 与 HiveCoreExecutor2 kTile 分母共用本定义
     *   （勿另立裸常数），确保几何/执行两侧 elemsPerLane 口径唯一。 */
   def elemsPerLane(f: DataFormat.Type, hasMx4: Boolean = false): UInt = {
-    if (hasMx4) {
-      val ret = Wire(UInt(3.W))
-      when(isMx4(f)){
-        ret := elemsPerLaneLit(MXE2M1).U
-      }.elsewhen(isMx8(f)){
-        ret := elemsPerLaneLit(MXE4M3).U
-      }.otherwise{
-        ret := elemsPerLaneLit(FP32).U
-      }
-      ret
-    } else {
-      val ret = Wire(UInt(2.W))
-      when(isMx8(f)){
-        ret := elemsPerLaneLit(MXE4M3).U
-      }.otherwise{
-        ret := elemsPerLaneLit(FP32).U
-      }
-      ret
+    // 【Phase 3 INT 生态同步】位宽固定 3-bit（容纳 1/2/4），不再由 hasMx4 门控；
+    //   判据由 isMx4/isMx8 泛化为 isHalfB/is1B，使 INT4→4、INT8→2 与 MXE2M1→4、
+    //   MXE4M3/MXE5M2→2 共用同一张运行期解码表（与 elemsPerLaneLit 单一真源同构）。
+    //   hasMx4 形参保留以兼容调用方签名（HiveCoreCalcConfig.elemsPerLaneOf），但不再决定 Wire 位宽。
+    val ret = Wire(UInt(3.W))
+    when(isHalfB(f)){
+      ret := elemsPerLaneLit(MXE2M1).U
+    }.elsewhen(is1B(f)){
+      ret := elemsPerLaneLit(MXE4M3).U
+    }.otherwise{
+      ret := elemsPerLaneLit(FP32).U
     }
+    ret
   }
 }
 

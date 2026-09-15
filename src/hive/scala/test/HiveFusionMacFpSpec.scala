@@ -395,7 +395,7 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
   // ════════════════════════════════════════════════════════════════════════════
   // inf/nan 软件异常守护（Task #63 / R7）
   //   · mx8 cvt 类（FpCvtMx8ToMid/FpCvtMx8ToFp32）新增 consumeValid 门控 assert，
-  //     守护源真 = HiveCvtOpMx（HiveWorkUnit.scala:139）。E2M1(fp4) 全 16 码有限 ⟹
+  //     守护源真 = 原 HiveWorkUnit.scala 中的 HiveCvtOpMx（已随 FusionMac 重构删除）。E2M1(fp4) 全 16 码有限 ⟹
   //     三个 fp4 cvt 不加守护（不动）。
   //   · 负向触发（E5M2 0x7C inf / E4M3 0x7F NaN）+ 不误伤（合法最大有限码）三 block 见下。
   //
