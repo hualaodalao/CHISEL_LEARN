@@ -182,7 +182,8 @@ object FbDataFmt extends ChiselEnum {
   /** bfloat16（1+8+7，bias=127，2 字节/元素） */
   val BF16 = Value(2.U(4.W))
 
-  /** 有符号 8-bit 整数（2's complement，1 字节/元素，量化 scale/zeroPoint 见 FbCmd） */
+  /** 有符号 8-bit 整数（2's complement，1 字节/元素；量化 scale/zeroPoint 自 v3 起由
+    * ForagerBee 顶层 IO 全局供给，见 [[ForagerBee]] io.cvtScale/io.cvtZeroPoint，不再随命令携带） */
   val INT8 = Value(3.U(4.W))
 
   /** MXFP8 E4M3（{sign(1),exp(4),mant(3)}，bias=7，E8M0 共享 scale，1 字节/元素） */

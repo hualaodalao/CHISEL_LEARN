@@ -57,6 +57,10 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
 
     /** 格式转换量化 scale（仅 cfg.enableConversion 时存在；由顶层全局供给，非命令字段）。
       *
+      * **全局活线、无快照**：该 Input 未寄存，组合直连本引擎 FbFormatConverter.cfg_scale；
+      * 引擎内 cmdReg 只快照命令字段，不快照量化参数，故命令在飞期间顶层改动 cvtScale 会即时
+      * 改变转换结果（不报 err）。软件更新前须排空（顶层 io.busy=0 且 io.occupancy=0）。
+      *
       * 实际语义（与 [[FbFormatConverter]] 实现一致，**不是 IEEE-754 FP32**）：
       * 仅低 5 bit `scale(4,0)` 被消费，作为 2 的幂移位量（q = round(v / 2^shift)）；
       * 高 27 bit 被忽略，集成方应置 0。故只支持 2 的幂 scale。 */
@@ -516,16 +520,20 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   }
 
   // MX 量化校验（仅当 isMx(dstFmt) 时生效；量化激活由 dstFmt 派生，无独立开关字段）：
-  //   enableConversion 必须开启（硬件无量化器则禁用）；仅 COPY；scaleBlockSize 编码合法（≤2）；
+  //   仅 COPY；scaleBlockSize 编码合法（≤2）；
   //   shape(0) 为 blockSize 整数倍；每块 beat 数不超上限；scaleAddr beat 对齐；
   //   srcFmt 必须为 float（isFloat ⇒ 必不等于 MX dstFmt，故转换恒激活）；与 padding 互斥。
+  // 整组校验受 cfg.enableConversion 编译期门控：无量化器的构建中 MX 退化为
+  // 1 字节/元素裸格式，srcFmt==dstFmt==MX 是合法纯拷贝（另见 mxNonQuantBad 注释），
+  // 故本项在 enableConversion=false 时恒为 false.B，不得以运行期 !cfg.xxx.B 形态
+  // 进入 OR 列表（否则门控反向：开关关闭时判据恒真，误拒合法裸拷贝）。
   //
   // 注：MuxLookup 的 default 取 16（而非 0）——非法编码（scaleBlockSize>2）已由下方
   // scaleBlockBadEncoding 独立且前置地判为 err，default 分支的取值对判决结果无影响；
   // 取非 0 值可彻底消除 `shape(0) % 0` 这条硬件上无短路的除零路径及其冗余逻辑。
   val mxBlockSizeVal = MuxLookup(c.scaleBlockSize, 16.U(7.W))(Seq(
     0.U -> 16.U, 1.U -> 32.U, 2.U -> 64.U))
-  val mxQuantBad = FbDataFmt.isMx(c.dstFmt) && {
+  val mxQuantBad = if (cfg.enableConversion) FbDataFmt.isMx(c.dstFmt) && {
     // scaleBlockSize 编码非法（仅 0/1/2 合法）。此项独立前置：既保证 shapeMisalign 的除数
     // 在后续求值时恒为 {16,32,64}，也避免与 shapeMisalign 重复列举同一判据
     val scaleBlockBadEncoding = c.scaleBlockSize > 2.U
@@ -542,7 +550,6 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     val dstFmtBadMx = !FbDataFmt.isMx(c.dstFmt)
     val hasPadAny = c.padBefore(0) =/= 0.U || c.padAfter(0) =/= 0.U ||
       c.padBefore(1) =/= 0.U || c.padAfter(1) =/= 0.U
-    !cfg.enableConversion.B ||
     c.op =/= FbOp.COPY ||
     scaleBlockBadEncoding ||
     shapeMisalign ||
@@ -551,7 +558,7 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     srcFmtBadMx ||
     dstFmtBadMx ||
     hasPadAny
-  }
+  } else false.B
 
   // MX 源格式不得进入非量化路径：硬件无反量化器（MX→FP/INT 的 scale 还原通路不存在），
   // 故 srcFmt 为 MX 族时一律拒绝——无论 dstFmt 是否也是 MX（MX↔MX 由 mxQuantBad.srcFmtBadMx 与本项共同拒绝）。

@@ -285,7 +285,7 @@ module Hive_HiveFusionMacFp(	// src/hive/scala/main/HiveFusionMacFp.scala:39:7
     .io_exp   (_cvtL0Fp4ToMx8MidB_io_exp),
     .io_mant  (_cvtL0Fp4ToMx8MidB_io_mant)
   );	// src/hive/scala/main/HiveFusionMacFp.scala:247:35
-  Hive_FpAdd fpAdd (	// src/hive/scala/main/HiveFusionMacFp.scala:317:23
+  Hive_FpAddNarrow fpAddNarrow (	// src/hive/scala/main/HiveFusionMacFp.scala:311:29
     .io_is4x      (isMx4),	// src/hive/scala/main/HiveFusionMacFp.scala:107:22
     .io_is2x      (isMx8),	// src/hive/scala/main/HiveFusionMacFp.scala:108:22
     .io_cReg      (io_cReg),
@@ -294,6 +294,6 @@ module Hive_HiveFusionMacFp(	// src/hive/scala/main/HiveFusionMacFp.scala:39:7
     .io_prodFp4_0 (aIsMx2M1 ? _fp4Mul0_io_prod : 32'h0),	// src/hive/scala/main/HiveFusionMacFp.scala:101:25, :209:23, :284:15, :285:15
     .io_prodFp4_1 (aIsMx2M1 ? _fp4Mul1_io_prod : 32'h0),	// src/hive/scala/main/HiveFusionMacFp.scala:101:25, :224:23, :284:15, :286:15
     .io_sum       (io_sum)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:317:23
+  );	// src/hive/scala/main/HiveFusionMacFp.scala:311:29
 endmodule
 

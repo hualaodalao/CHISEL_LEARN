@@ -57,36 +57,36 @@
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
 // VCS coverage exclude_file
-module Fb_ram_4x904(	// src/main/scala/chisel3/util/Queue.scala:73:91
+module Fb_ram_4x839(	// src/main/scala/chisel3/util/Queue.scala:73:91
   input  [1:0]   R0_addr,
   input          R0_en,
                  R0_clk,
-  output [903:0] R0_data,
+  output [838:0] R0_data,
   input  [1:0]   W0_addr,
   input          W0_en,
                  W0_clk,
-  input  [903:0] W0_data
+  input  [838:0] W0_data
 );
 
-  reg [903:0] Memory[0:3];	// src/main/scala/chisel3/util/Queue.scala:73:91
+  reg [838:0] Memory[0:3];	// src/main/scala/chisel3/util/Queue.scala:73:91
   always @(posedge W0_clk) begin	// src/main/scala/chisel3/util/Queue.scala:73:91
     if (W0_en)	// src/main/scala/chisel3/util/Queue.scala:73:91
       Memory[W0_addr] <= W0_data;	// src/main/scala/chisel3/util/Queue.scala:73:91
   end // always @(posedge)
   `ifdef ENABLE_INITIAL_MEM_	// src/main/scala/chisel3/util/Queue.scala:73:91
-    reg [927:0] _RANDOM_MEM;	// src/main/scala/chisel3/util/Queue.scala:73:91
+    reg [863:0] _RANDOM_MEM;	// src/main/scala/chisel3/util/Queue.scala:73:91
     initial begin	// src/main/scala/chisel3/util/Queue.scala:73:91
       `INIT_RANDOM_PROLOG_	// src/main/scala/chisel3/util/Queue.scala:73:91
       `ifdef RANDOMIZE_MEM_INIT	// src/main/scala/chisel3/util/Queue.scala:73:91
         for (logic [2:0] i = 3'h0; i < 3'h4; i += 3'h1) begin
-          for (logic [9:0] j = 10'h0; j < 10'h3A0; j += 10'h20) begin
+          for (logic [9:0] j = 10'h0; j < 10'h360; j += 10'h20) begin
             _RANDOM_MEM[j +: 32] = `RANDOM;	// src/main/scala/chisel3/util/Queue.scala:73:91
           end
-          Memory[i[1:0]] = _RANDOM_MEM[903:0];	// src/main/scala/chisel3/util/Queue.scala:73:91
+          Memory[i[1:0]] = _RANDOM_MEM[838:0];	// src/main/scala/chisel3/util/Queue.scala:73:91
         end
       `endif // RANDOMIZE_MEM_INIT
     end // initial
   `endif // ENABLE_INITIAL_MEM_
-  assign R0_data = R0_en ? Memory[R0_addr] : 904'bx;	// src/main/scala/chisel3/util/Queue.scala:73:91
+  assign R0_data = R0_en ? Memory[R0_addr] : 839'bx;	// src/main/scala/chisel3/util/Queue.scala:73:91
 endmodule
 

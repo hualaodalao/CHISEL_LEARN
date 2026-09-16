@@ -7,7 +7,7 @@ Fb_FbScatterGatherCtrl.sv
 Fb_FbEngine.sv
 Fb_FbIm2colAddrGen.sv
 Fb_FbEngine_1.sv
-Fb_ram_4x904.sv
+Fb_ram_4x839.sv
 Fb_Queue4_FbCmd.sv
 Fb_StreamFifo.sv
 Fb_FbDispatcher.sv

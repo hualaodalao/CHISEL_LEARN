@@ -26,6 +26,23 @@
   *   done      : 完成回执（master Stream(FbDone)：tag 原样返回、err）
   *   busy      : 任一引擎非空闲
   *   bus       : numPorts 个 FbStreamBus master 读写口
+  *   cvtScale / cvtZeroPoint：全局量化参数（仅 enableConversion=true 构建存在，所有通道与
+  *               所有命令共享，改动前须排空——见下「量化参数活线约束」）
+  *
+  * **量化参数活线约束（软件必读，SHOULD-FIX 5）**：
+  * cvtScale/cvtZeroPoint 语义已从 v2 的「随命令锁存（cmdReg 在 sIDLE 快照）」变为「全局活线」
+  * ——顶层 Input 未寄存，组合直连各引擎 FbFormatConverter.cfg_scale/cfg_zeroPoint。由此：
+  *   1. **静默期约束**：命令排队/在途期间改动这两个引脚会即时改变已派发（乃至已入队未派发）
+  *      命令的 INT8↔float 转换结果，且**不报 err**（静默数据漂移）；最多 queueDepth+numPorts
+  *      条命令在飞。**更新前必须 `io.busy=0` 且 `io.occupancy=0`**（两信号均已在顶层暴露）。
+  *   2. **tie-off**：不用转换时置 `32'h0`；高位（scale[31:5] / zp[31:8]）被忽略，应置 0；
+  *      悬空/未驱动时 4-state 仿真为 X、硅上不定值，且不触发 err（无 assume 兜底）。
+  *   3. **能力回退**：「ch0 用 scale A、ch1 用 scale B 并发转换」不再可表达，必须排空→改引脚→重发。
+  *   4. **影响面界定**：**MX 量化器不消费 cvtScale**（FbMxQuantizer 只有 cfg_srcFmt/cfg_dstFmt/
+  *      cfg_blockSize，E8M0 scale 由块内 running-max 自算），故本约束只波及 INT8↔float 转换负载。
+  *   5. enableConversion=false 的 copy-only 构建**不存在**该端口。
+  *   6. 后续可选演进：恢复 per-command 快照语义（每引擎 2×32-bit 寄存器，代价 numPorts×64 flop）
+  *      或引入 CSR 寄存器接口；本轮按用户裁定只做顶层 IO 直供。
   */
 
 import chisel3._
@@ -60,6 +77,8 @@ class ForagerBee(cfg: ForagerBeeConfig = ForagerBeeConfig()) extends Module {
       *
       * 全局供给：所有通道、所有命令共享同一组量化参数（不再是 [[FbCmd]] 字段），
       * 穿透路径 ForagerBee.io → FbEngine.io → FbFormatConverter.io.cfg_scale。
+      * **活线、无快照**：该 Input 未寄存，组合直连 converter；命令在飞期间改动会静默改变
+      * 转换结果（不报 err）。更新前须 io.busy=0 且 io.occupancy=0（详见类 docstring 活线约束）。
       *
       * 实际语义（与 [[FbFormatConverter]] 实现一致，**不是 IEEE-754 FP32**）：
       * 仅低 5 bit `cvtScale(4,0)` 被消费，作为 2 的幂移位量（q = round(v / 2^shift)）；

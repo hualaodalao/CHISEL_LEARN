@@ -3559,6 +3559,119 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     }
   }
 
+  // S4-c（MUST-FIX 2）：RAW src×in-flight scale —— 新命令的读区落在 in-flight MX 命令的 scale
+  // 侧信道写区间内（FbDispatcher 约 L221）。改动前该判据缺失 ⟹ 新命令被并行派发、在 cmd1 尚未
+  // 写完 scale beat 时抢读该区间（读到 0 而非 E8M0 scale 终值），done 顺序亦反转为 (cmd2, cmd1)。
+  //   cmd1: FP16→MXE4M3 64 元素，src [0x0000,0x0080)、dst [0x4000,0x4040)、scale [0x8000,0x8010)
+  //   cmd2: INT8 纯拷贝 16 字节，src [0x8000,0x8010)（= cmd1 scale 区）、dst [0x9000,0x9010)
+  //   cmd2.src×cmd1.{src,dst} 不重叠；cmd2 非 MX ⟹ WAR/WAW 均不触发；唯一冲突 = cmd2.src × cmd1.scale（RAW）
+  it should "dispatcher scale bbox: plain COPY src reading in-flight MX scale region serializes (RAW src-vs-scale)" in {
+    val vals1 = Seq.tabulate(64)(i => math.pow(2.0, 10 - (i % 8)).toFloat) // 两块 maxExp=10 ⟹ scale=137
+    def mkMem(): mutable.HashMap[BigInt, Byte] = {
+      val mm = mutable.HashMap.empty[BigInt, Byte]
+      putFp16(mm, BigInt(0x000), vals1)
+      mm
+    }
+    val cmd1 = FbTestCmd(tag = 0xE8, op = "COPY", dimCount = 1,
+      shape = Seq(64), srcStride = Seq(128), dstStride = Seq(64),
+      srcAddr = 0x000, dstAddr = 0x4000, scaleAddr = 0x8000,
+      srcFmt = 1, dstFmt = 4, scaleBlockSize = 1)
+    val cmd2 = FbTestCmd(tag = 0xE9, op = "COPY", dimCount = 1,
+      shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
+      srcAddr = 0x8000, dstAddr = 0x9000, srcFmt = 3, dstFmt = 3)
+
+    // 自校准基线：cmd2 单独运行的完成周期
+    val (_, soloCyc, _) = runCollectCycles(mxqCfg, Seq(cmd2), mkMem())
+    soloCyc.size shouldBe 1
+    val solo = soloCyc.head
+
+    val (dones, cyc, m) = runCollectCycles(mxqCfg, Seq(cmd1, cmd2), mkMem())
+    // 有序断言：串行化 ⟹ cmd1（慢，含量化器+sSWRITE）先 done、cmd2 后 done；
+    // 并行时 cmd2（1 beat 纯拷贝）远快于 cmd1 ⟹ 顺序反转为 (0xE9,0xE8) —— 本断言即检出点
+    dones shouldBe Seq((0xE8, false), (0xE9, false))
+    cyc.size shouldBe 2
+    withClue(s"done 周期 cmd1=${cyc(0)} cmd2=${cyc(1)}（差 ${cyc(1) - cyc(0)}），cmd2 单独运行=$solo：" +
+      "scale 区未纳入 RAW 时两命令并行派发、周期差塌缩：") {
+      (cyc(1) - cyc(0)) should be >= (solo / 2)
+    }
+    // cmd1 写入的两个 E8M0 scale 字节（block0/block1）
+    val bits1 = vals1.map(v => fp16BitsToFp32Bits(fp16Of(v)))
+    val (_, sc1a) = mxQuantizeRef(bits1.slice(0, 32), 4)
+    val (_, sc1b) = mxQuantizeRef(bits1.slice(32, 64), 4)
+    // 关键字节互异：scale 终值必须非 0，否则与「并行抢读到未写区间（0）」不可区分 ⟹ 断言零检出力
+    withClue(s"cmd1 scale=($sc1a,$sc1b) 应非 0（否则 RAW 抢读 0 与串行读终值不可区分）：") {
+      (sc1a != 0 && sc1b != 0) shouldBe true
+    }
+    // 逐字节主防线：串行化 ⟹ cmd2 读到的必是 cmd1 写完的 scale 终值（并行抢读则为 0）
+    withClue(s"cmd2 dst[0] @0x9000 应为 cmd1 scale 终值 $sc1a（并行抢读则为 0）: ") {
+      (m.getOrElse(BigInt(0x9000), 0.toByte) & 0xFF) shouldBe sc1a
+    }
+    withClue(s"cmd2 dst[1] @0x9001 应为 cmd1 scale 终值 $sc1b: ") {
+      (m.getOrElse(BigInt(0x9001), 0.toByte) & 0xFF) shouldBe sc1b
+    }
+    // scale beat 内 [0x8002,0x8010) 未被 cmd1 的 strb 部分写覆盖 ⟹ cmd2 拷出应为 0
+    for (k <- 2 until 16) {
+      withClue(f"cmd2 dst[$k] @0x${0x9000 + k}%04X（scale strb 未覆盖区应为 0）: ") {
+        (m.getOrElse(BigInt(0x9000 + k), 0.toByte) & 0xFF) shouldBe 0
+      }
+    }
+  }
+
+  // S4-d（MUST-FIX 2）：WAR new scale×in-flight src —— 新 MX 命令的 scale 写区落在 in-flight
+  // 纯拷贝命令的读区内（FbDispatcher 约 L224）。改动前该判据缺失 ⟹ 两命令并行，cmd2 的 scale
+  // strb 写会覆盖 cmd1 尚未读到的源 beat，污染 cmd1 搬运结果；且 cmd2（小命令）先完成 ⟹ 顺序反转。
+  //   cmd1: INT8 纯拷贝 256 字节（长命令），src [0x0200,0x0300)、dst [0x4000,0x4100)
+  //   cmd2: FP16→MXE4M3 16 元素（短命令），src [0x0000,0x0020)、dst [0x5000,0x5010)、scale [0x0280,0x0290)
+  //   scaleAddr=0x280 落在 cmd1 源区中段（偏移 128）；cmd2.{src,dst}×cmd1.{src,dst} 不重叠；
+  //   cmd1 非 MX ⟹ RAW/WAW 均不触发；唯一冲突 = cmd2.scale × cmd1.src（WAR）
+  it should "dispatcher scale bbox: new MX scale region vs in-flight COPY src serializes (WAR scale-vs-src)" in {
+    val vals2 = Seq.tabulate(16)(i => math.pow(2.0, 5 - (i % 8)).toFloat) // maxExp=5 ⟹ scale=132
+    def origSrc(k: Int): Int = (k * 7 + 34) & 0xFF // fillPattern(seed=1) 在源区偏移 k 的原值
+    def mkMem(): mutable.HashMap[BigInt, Byte] = {
+      val mm = mutable.HashMap.empty[BigInt, Byte]
+      putFp16(mm, BigInt(0x000), vals2)
+      fillPattern(mm, BigInt(0x200), 256, seed = 1) // cmd1 源区
+      mm
+    }
+    val cmd1 = FbTestCmd(tag = 0xEA, op = "COPY", dimCount = 1,
+      shape = Seq(256), srcStride = Seq(256), dstStride = Seq(256),
+      srcAddr = 0x200, dstAddr = 0x4000, srcFmt = 3, dstFmt = 3)
+    val cmd2 = FbTestCmd(tag = 0xEB, op = "COPY", dimCount = 1,
+      shape = Seq(16), srcStride = Seq(32), dstStride = Seq(16),
+      srcAddr = 0x000, dstAddr = 0x5000, scaleAddr = 0x280,
+      srcFmt = 1, dstFmt = 4, scaleBlockSize = 0)
+
+    val (_, soloCyc, _) = runCollectCycles(mxqCfg, Seq(cmd2), mkMem())
+    soloCyc.size shouldBe 1
+    val solo = soloCyc.head
+
+    val (dones, cyc, m) = runCollectCycles(mxqCfg, Seq(cmd1, cmd2), mkMem())
+    // 串行化 ⟹ cmd1 先 done、cmd2 后 done；并行时 cmd2（16 元素量化）远快于 cmd1（256 字节）
+    // ⟹ 顺序反转为 (0xEB,0xEA) —— 本断言即检出点
+    dones shouldBe Seq((0xEA, false), (0xEB, false))
+    withClue(s"done 周期 cmd1=${cyc(0)} cmd2=${cyc(1)}（差 ${cyc(1) - cyc(0)}），cmd2 单独运行=$solo：") {
+      (cyc(1) - cyc(0)) should be >= (solo / 2)
+    }
+    // cmd2 写入 0x280 的 E8M0 scale 终值
+    val bits2 = vals2.map(v => fp16BitsToFp32Bits(fp16Of(v)))
+    val (_, sc2) = mxQuantizeRef(bits2, 4)
+    // 关键字节互异：cmd1 源区被 scale 覆盖处（偏移 128）的原值必须与 sc2 不同，
+    // 否则「并行时 cmd2 覆盖 cmd1 源」不会改变 cmd1.dst ⟹ WAR 数据断言零检出力
+    withClue(s"cmd1 src[128]=${origSrc(128)} 应与 cmd2 scale=$sc2 互异：") {
+      (origSrc(128) != sc2) shouldBe true
+    }
+    // 逐字节主防线：串行化 ⟹ cmd1 在 cmd2 覆盖源区之前已读完整源 ⟹ cmd1.dst 必逐字节等于源区原值
+    for (k <- 0 until 256) {
+      withClue(f"cmd1 dst[$k] @0x${0x4000 + k}%04X（并行时被 cmd2 的 scale 写污染源区，尤以 k=128 最敏感）: ") {
+        (m.getOrElse(BigInt(0x4000 + k), 0.toByte) & 0xFF) shouldBe origSrc(k)
+      }
+    }
+    // 命令结束后 cmd2 的 scale 已覆盖源区偏移 128（印证 WAR 确为真冲突：scale 落点就在 cmd1 源区内）
+    withClue(s"源区 0x280 终态应为 cmd2 scale $sc2: ") {
+      (m.getOrElse(BigInt(0x280), 0.toByte) & 0xFF) shouldBe sc2
+    }
+  }
+
   // ===================== mxNonQuantBad / MX 裸拷贝边界（改动 1 回归）=====================
 
   // mxNonQuantBad 收紧为「srcFmt 为 MX 族即拒」（硬件无反量化器）。该判据此前无测试覆盖。
@@ -3588,6 +3701,33 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     dones shouldBe Seq((0xB9, true))
     for (a <- 0x1000 until 0x1020) {
       withClue(f"err 命令不应写 @0x$a%04X: ") {
+        (m.getOrElse(BigInt(a), 0.toByte) & 0xFF) shouldBe 0
+      }
+    }
+  }
+
+  // CONSIDER-1：dstFmt=MXE4M3 + scaleBlockSize=3（非法编码，仅 0/1/2 合法）⟹ scaleBlockBadEncoding。
+  // 该判据由改动⑤从 shapeMisalign 中抽出为独立前置项；此前 Spec 中 scaleBlockSize 仅取 0/1/2、
+  // 从未激活该判据。若被后续重构静默合并回 shapeMisalign（除数回落为默认 16 后 shape(0)=32 整除
+  // ⟹ 漏判为合法），本用例即红。其余参数均合法（srcFmt=FP16 为 float、shape(0)=32 为默认 blockSize=16
+  // 整数倍、scaleAddr beat 对齐、op=COPY、无 padding）⟹ 唯一触发项是 scaleBlockBadEncoding。
+  it should "reject MX quantize with illegal scaleBlockSize=3 (scaleBlockBadEncoding) with err done" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    putFp16(mem, BigInt(0x0), Seq.tabulate(32)(i => (i + 1).toFloat))
+    val cmd = FbTestCmd(tag = 0xBC, op = "COPY", dimCount = 1,
+      shape = Seq(32), srcStride = Seq(64), dstStride = Seq(32),
+      srcAddr = 0x0, dstAddr = 0x1000, scaleAddr = 0x2000,
+      srcFmt = 1, dstFmt = 4, scaleBlockSize = 3)
+    val (dones, m) = runForagerBee(mxqCfg, Seq(cmd), mem)
+    dones shouldBe Seq((0xBC, true))
+    // cBad ⟹ FSM 直接 IDLE→DONE，dst 与 scale 区均不得产生任何写
+    for (a <- 0x1000 until 0x1040) {
+      withClue(f"err 命令不应写 dst @0x$a%04X: ") {
+        (m.getOrElse(BigInt(a), 0.toByte) & 0xFF) shouldBe 0
+      }
+    }
+    for (a <- 0x2000 until 0x2010) {
+      withClue(f"err 命令不应写 scale @0x$a%04X: ") {
         (m.getOrElse(BigInt(a), 0.toByte) & 0xFF) shouldBe 0
       }
     }
@@ -3676,6 +3816,134 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     }
   }
 
+  // MUST-FIX 1 正例：enableChaining=true + enableConversion=false（chainCfg）下，链式描述符携带
+  // srcFmt==dstFmt==MXE4M3 必须是合法纯字节拷贝（copy-only 构建中 MX 退化为 1 字节/元素裸格式）。
+  // 改动前入口自守无条件生成 ⟹ 注入的 MX 描述符被 dimCount=0 误拒并截断整条链（err=true、dst 全 0）；
+  // 改动后自守受 cfg.enableConversion 门控 ⟹ copy-only 构建不生成，链式 MX 裸拷贝放行、整条链无 err，
+  // 与经 io.cmd 直连路径（sPASS 原样透传）行为对称。这是此前无任何用例覆盖的 false+chain+MX 组合。
+  it should "chain: allow MX->MX plain byte copy descriptor when enableConversion=false" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val chainMem = mutable.HashMap.empty[BigInt, Byte]
+    fillPattern(mem, 0x1000, 32, seed = 11)  // 首命令源区（INT8 纯拷贝）
+    fillPattern(mem, 0x3000, 32, seed = 22)  // 注入描述符源区（MX 裸字节）
+
+    // 描述符（v3 布局）：COPY + srcFmt=MXE4M3(4)、dstFmt=MXE4M3(4) —— copy-only 构建下为合法裸拷贝
+    val descAddr = BigInt(0x10000)
+    val descBeats = serializeDescriptor(chainCfg,
+      op = 0, tag = 0x65, dimCount = 1,
+      shape = Seq(32), srcStride = Seq(32), dstStride = Seq(32),
+      srcAddr = BigInt(0x3000), dstAddr = BigInt(0x5000),
+      nextDescAddr = 0, chainMode = true,
+      srcFmt = 4, dstFmt = 4)
+    writeDescToMem(chainMem, descAddr, descBeats, chainCfg.beatBytes)
+
+    // 首命令：INT8 纯拷贝（chainMode=true，指向上述 MX 描述符）
+    val cmd = FbTestCmdChain(tag = 0x64, dimCount = 1,
+      shape = Seq(32), srcStride = Seq(32), dstStride = Seq(32),
+      srcAddr = 0x1000, dstAddr = 0x2000,
+      chainMode = true, nextDescAddr = descAddr)
+
+    val (dones, m) = runForagerBeeChain(chainCfg, Seq(cmd), mem, chainMem)
+    // 入口自守受 enableConversion 门控 ⟹ copy-only 构建不生成 ⟹ MX 描述符放行、整条链无 err、chainLen=2
+    //（改动前该 MX 描述符被 dimCount=0 误拒 ⟹ err=true，本断言即红）
+    dones shouldBe Seq((0x64, false, 2))
+    // 首命令搬运正确
+    for (i <- 0 until 32) {
+      withClue(s"首命令 dst[$i] @0x${0x2000 + i}%04X: ") {
+        (m.getOrElse(BigInt(0x2000 + i), 0.toByte) & 0xFF) shouldBe
+          (m.getOrElse(BigInt(0x1000 + i), 0.toByte) & 0xFF)
+      }
+    }
+    // 注入的 MX 裸拷贝描述符逐字节搬运正确（改动前被误拒 ⟹ dst 全 0）
+    for (i <- 0 until 32) {
+      withClue(s"MX 描述符 dst[$i] @0x${0x5000 + i}%04X（改动前被 dimCount=0 误拒则全 0）: ") {
+        (m.getOrElse(BigInt(0x5000 + i), 0.toByte) & 0xFF) shouldBe
+          (m.getOrElse(BigInt(0x3000 + i), 0.toByte) & 0xFF)
+      }
+    }
+    // copy-only 构建无量化器 ⟹ 物理地址 0x0 附近不得有任何 scale 写
+    for (i <- 0 until 16) {
+      withClue(f"copy-only 构建不应写 0x0 区 @0x$i%04X: ") {
+        (m.getOrElse(BigInt(i), 0.toByte) & 0xFF) shouldBe 0
+      }
+    }
+  }
+
+  // ===================== 顶层 IO 量化参数穿透链的非默认值动态覆盖（SHOULD-FIX 3）=====================
+
+  // SHOULD-FIX 3a：既有全部用例 pokeCvtGlobal 恒为 (0,0)，若分发循环误写为只接 engines(0)、
+  // 或 cfg_scale/cfg_zeroPoint 被接反，测试仍全绿。本用例经 ForagerBee.io.cvtScale/cvtZeroPoint
+  // 显式驱动非零值，按 FbFormatConverter.int8ToFp32 实际算术逐元素断言。
+  // 期望值推导（INT8→FP32 反量化，dispCvtCfg）：shift=scale(4,0)=2、zp=zeroPoint(7,0)=3；
+  //   elem i：srcByte b_i ⟹ diff=b_i-3（选 b_i≥8 保证 diff≥0，规避硬件对负 diff 的 32-bit 符号扩展语义）
+  //   ⟹ shifted=diff<<2 ⟹ FP32=float(shifted)（整数 <2^24 精确可表示）。
+  //   接反（scale↔zp）会算成 (b_i-2)<<5，与期望不同 ⟹ 断言即检出；(0,0) 会算成 b_i，亦不同。
+  it should "drive non-zero cvtScale/cvtZeroPoint through top IO: INT8->FP32 dequant per-element" in {
+    val srcBytes = (0 until 16).map(i => 8 + i * 2) // 8,10,...,38（互异、正数、均 > zp=3）
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    srcBytes.zipWithIndex.foreach { case (b, i) => mem(BigInt(i)) = b.toByte }
+    val cmd = FbTestCmd(tag = 0xF0, op = "COPY", dimCount = 1,
+      shape = Seq(16), srcStride = Seq(16), dstStride = Seq(64),
+      srcAddr = 0x0, dstAddr = 0x2000, srcFmt = 3, dstFmt = 0)
+    val (dones, m) = runForagerBee(dispCvtCfg, Seq(cmd), mem, cvtScale = 2, cvtZeroPoint = 3)
+    dones shouldBe Seq((0xF0, false))
+    // 逐元素：FP32((b-3)<<2) 小端 4 字节
+    for (i <- 0 until 16) {
+      val shifted = (srcBytes(i) - 3) << 2
+      val expBits = f32bits(shifted.toFloat)
+      for (k <- 0 until 4) {
+        withClue(f"dst elem$i byte$k @0x${0x2000 + 4 * i + k}%04X（期望 FP32($shifted)）: ") {
+          (m.getOrElse(BigInt(0x2000 + 4 * i + k), 0.toByte) & 0xFF) shouldBe ((expBits >>> (8 * k)) & 0xFF)
+        }
+      }
+    }
+    // 检出力自检：非零 (scale,zp) 结果必须与 (0,0) 及接反 (scale↔zp) 均不同，否则上面断言零检出力
+    val expCorrect = srcBytes.map(b => f32bits(((b - 3) << 2).toFloat))
+    val expZero    = srcBytes.map(b => f32bits(b.toFloat))                 // (0,0)：value=b
+    val expSwapped = srcBytes.map(b => f32bits(((b - 2) << 5).toFloat))     // 接反：shift=5、zp=2
+    withClue("非零量化参数结果应与 (0,0) 不同：") { expCorrect should not be expZero }
+    withClue("非零量化参数结果应与接反 (scale↔zp) 不同：") { expCorrect should not be expSwapped }
+  }
+
+  // SHOULD-FIX 3b：锁定「量化参数分发到全部引擎」而非只接 engines(0)。numPorts=2 下先发一条长命令
+  // 占住 channel 0，迫使转换命令落到 channel 1；若分发循环只接 engines(0)，ch1 的 converter 读到
+  // 未驱动/0 的 cfg_scale ⟹ 反量化结果退化为 (b-0)<<0=b，与期望 (b-3)<<2 不同 ⟹ 断言即检出。
+  it should "deliver global cvtScale/cvtZeroPoint to channel 1 (not only engines(0))" in {
+    val srcBytes = (0 until 16).map(i => 8 + i * 2)
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    srcBytes.zipWithIndex.foreach { case (b, i) => mem(BigInt(i)) = b.toByte }
+    fillPattern(mem, 0x8000, 256, seed = 5) // cmd0 源区（长命令，占住 ch0）
+    // cmd0：256 字节 INT8 纯拷贝（16 beat），先派发占住 channel 0
+    val cmd0 = FbTestCmd(tag = 0xF1, op = "COPY", dimCount = 1,
+      shape = Seq(256), srcStride = Seq(256), dstStride = Seq(256),
+      srcAddr = 0x8000, dstAddr = 0xC000, srcFmt = 3, dstFmt = 3)
+    // cmd1：INT8→FP32 转换，地址与 cmd0 完全不相交 ⟹ ch0 忙时并行派发到 channel 1
+    val cmd1 = FbTestCmd(tag = 0xF2, op = "COPY", dimCount = 1,
+      shape = Seq(16), srcStride = Seq(16), dstStride = Seq(64),
+      srcAddr = 0x0, dstAddr = 0x2000, srcFmt = 3, dstFmt = 0)
+    val (dones, m) = runForagerBee(dispCvtCfg, Seq(cmd0, cmd1), mem,
+      maxCycles = 50000, cvtScale = 2, cvtZeroPoint = 3)
+    // 两命令并行派发（地址不相交）⟹ done 先后由 roundRobin 仲裁不定，用 toSet
+    dones.toSet shouldBe Set((0xF1, false), (0xF2, false))
+    // cmd1 落 channel 1：其 dst 必按全局 (scale=2,zp=3) 反量化 —— 只接 engines(0) 时此处退化即红
+    for (i <- 0 until 16) {
+      val shifted = (srcBytes(i) - 3) << 2
+      val expBits = f32bits(shifted.toFloat)
+      for (k <- 0 until 4) {
+        withClue(f"ch1 dst elem$i byte$k @0x${0x2000 + 4 * i + k}%04X（期望 FP32($shifted)）: ") {
+          (m.getOrElse(BigInt(0x2000 + 4 * i + k), 0.toByte) & 0xFF) shouldBe ((expBits >>> (8 * k)) & 0xFF)
+        }
+      }
+    }
+    // cmd0 纯拷贝完整性（占位命令本身也须正确）
+    for (i <- 0 until 256) {
+      withClue(f"cmd0 dst[$i] @0x${0xC000 + i}%04X: ") {
+        (m.getOrElse(BigInt(0xC000 + i), 0.toByte) & 0xFF) shouldBe
+          (m.getOrElse(BigInt(0x8000 + i), 0.toByte) & 0xFF)
+      }
+    }
+  }
+
   // 非仿真冒烟：链式+转换双开（出厂 RTL 组合）与 MX 量化多通道组合均可发射。
   // 这两条覆盖本次新增逻辑的 elaboration 面：FbChainController 的 isMx(dstFmt) 入口自守、
   // FbDispatcher 的 scale 第三区间（仅 enableConversion 时生成）、FbEngine 的 mxQuantActive 派生。
@@ -3695,6 +3963,11 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     v should include("module ForagerBee")
     v should not include ("cvtScale")
     v should not include ("cvtZeroPoint")
+    // CONSIDER-2：copy-only 构建不得实例化量化器/转换器模块。出厂四套 RTL 全为 enableConversion=true，
+    // 本批唯一真正改变行为的 false 构建从未发射为交付产物 ⟹ 在 elaborate 层锁定其结构裁剪。
+    // （未驱动这些模块时 Chisel 不发射对应 `module`，故模块名字符串不应出现）
+    v should not include ("FbMxQuantizer")
+    v should not include ("FbFormatConverter")
   }
 }
 

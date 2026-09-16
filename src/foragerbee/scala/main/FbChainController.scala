@@ -18,11 +18,16 @@ import chisel3.util._
   *
   * srcFmt/dstFmt 随 [[FbDataFmt]] 扩为 ChiselEnum(4-bit) 而由 3-bit 拓宽到 4-bit。
   *
-  * **v3 布局（破坏性变更，与 v2/v1 二进制不兼容）**：已删除 cvtScale(32-bit) 与
+  * **v3 布局（单向二进制不兼容，方向务必看清）**：仅从描述符**尾部**删除 cvtScale(32-bit) 与
   * cvtZeroPoint(32-bit) 两个字段——量化参数改由 ForagerBee 顶层 IO 全局供给
   * （`io.cvtScale`/`io.cvtZeroPoint`，仅 enableConversion 时存在），不再随每条命令/描述符携带。
-  * totalBits 相应缩减 64 bit：maxDims=5 时 661→597，maxDims=4 时 578→514；
-  * 软件侧描述符打包必须按 v3 布局重新生成（见测试 serializeDescriptor）。
+  * 所有保留字段的 bit 偏移与 v2 逐一相同，dstFmt 成为末字段，故 **v2 打包的描述符镜像在 v3
+  * 硬件下仍可正确解码**（descBeats 6→5 只是少取尾部一拍）——旧镜像无需重打。
+  * totalBits 相应缩减 64 bit：maxDims=5 时 661→597，maxDims=4 时 578→514。
+  * **真正被破坏的方向**：(a) v3 镜像跑在 v2 硬件（v2 会多读一拍尾部量化字段）；
+  * (b) 任何按 totalBits/descBeats 计算**槽位间距或缓冲尺寸**的软件（dw=128+maxDims=5 时
+  * descBeats 6→5，每描述符少 1 拍读延迟属正向；出厂 dw=256 时 3→3 不变）。
+  * 生成 v3 新镜像的软件侧打包见测试 serializeDescriptor。
   *
   * 历史：**v2** 已删除 elemBytesLog2(2-bit) 与 cvtEnable(1-bit)——元素粒度改由
   * srcFmt/dstFmt 单一真源派生、转换激活派生为 srcFmt =/= dstFmt。
@@ -31,11 +36,16 @@ import chisel3.util._
   * 故链式描述符目前只能编码 COPY/TRANSPOSE/PERMUTE(0..2)；扩展 op 宽度需同步
   * 软件打包与本文两处 opBits 常量。
   *
-  * **已知限制：链式描述符不支持 MX 量化**。布局不序列化 scaleAddr/scaleBlockSize，
-  * 而 MX 量化激活已由 dstFmt 派生（isMx(dstFmt)），若直接放行会向物理地址 0x0 发出
-  * E8M0 scale 写突发（内存破坏）。故 FbChainController 在 injCmd 组装末尾做「入口自守」：
-  * isMx(dstFmt) 时强制 dimCount=0，由引擎 cBadBase 拒绝并回 err done。如需链式 MX 量化，
+  * **已知限制：链式描述符不支持 MX 量化（仅 enableConversion=true 构建）**。该构建下布局不序列化
+  * scaleAddr/scaleBlockSize，而 MX 量化激活已由 dstFmt 派生（isMx(dstFmt)），若直接放行会向物理
+  * 地址 0x0 发出 E8M0 scale 写突发（内存破坏）。故 FbChainController 在 injCmd 组装末尾做「入口自守」：
+  * isMx(dstFmt) 时强制 dimCount=0，由引擎 cBadBase 拒绝并回 err done（该自守仅 enableConversion=true
+  * 时生成，且会截断整条链——见 FSM sWAIT_DONE 对 doneIn.err 的处理）。如需链式 MX 量化，
   * 须先扩展描述符布局（新增 scaleAddr/scaleBlockSize 字段）再解除该自守。
+  *
+  * **enableConversion=false 的 copy-only 构建不适用上述限制**：该构建无量化器与 sSWRITE 通路，
+  * MX 编码退化为 1 字节/元素裸格式，srcFmt==dstFmt==MXE4M3/MXE5M2 是**合法纯字节拷贝**，
+  * 入口自守不生成，链式 MX 裸拷贝与经 io.cmd 直连路径行为一致（见 ForagerBeeConfig 契约）。
   */
 object FbDescLayout {
   // --- 各字段位宽常量（纯 Scala，编译期可求值） ---
@@ -216,20 +226,29 @@ class FbChainController(cfg: ForagerBeeConfig) extends Module {
   injCmd.t2lTileCols    := 0.U
   injCmd.t2lNumTileRows := 0.U
   injCmd.t2lNumTileCols := 0.U
-  // MX quantization fields default to 0：链式描述符不序列化 scaleAddr/scaleBlockSize，
-  // 故 MX 量化在链式模式下不支持（见下方入口自守）；如需链式 MX 量化须先扩展描述符布局。
+  // MX quantization fields default to 0：链式描述符不序列化 scaleAddr/scaleBlockSize。
+  // 仅在 enableConversion=true 构建中存在量化通路，故 MX dstFmt 需入口自守（见下）；
+  // enableConversion=false 的 copy-only 构建无量化器，MX 退化为 1 字节/元素裸格式，纯拷贝合法。
   injCmd.scaleAddr      := 0.U
   injCmd.scaleBlockSize := 0.U
 
-  // --- 入口自守（安全关键）：链式描述符携带 isMx(dstFmt) 时强制 dimCount=0，让引擎报 err ---
+  // --- 入口自守（安全关键，仅 enableConversion=true 构建）：链式描述符携带 isMx(dstFmt) 时
+  // 强制 dimCount=0，让引擎报 err ---
   // 量化激活已派生为 isMx(dstFmt)（原「MX 量化使能」开关字段已删除），而链式描述符不携带
   // scaleAddr/scaleBlockSize（上方硬连线为 0）。若不拦截，带 MX dstFmt 的链式描述符会真的
   // 走量化通路，并向物理地址 0x0 发出 E8M0 scale 的 strb 部分写突发（len=0 单拍）——内存破坏。
   // 沿用 FbTile2LinearExpander 的「入口自守」模式：dimCount=0 → 引擎 cBadBase 拒绝并回 err done。
   // 注意：dstFmt 是描述符 extract 出来的运行期值，本判断是组合逻辑而非 Scala 编译期判断；
   // 依赖 Wire 的 last-connect 语义覆盖前面 injCmd.dimCount 的 extract 赋值。
-  when(FbDataFmt.isMx(injCmd.dstFmt)) {
-    injCmd.dimCount := 0.U
+  //
+  // **门控理由**：该内存破坏风险只在 enableConversion=true 时成立——copy-only 构建根本没有
+  // 量化器与 sSWRITE 通路。按 ForagerBeeConfig/repowiki 契约，enableConversion=false 构建中
+  // MX 编码退化为 1 字节/元素裸格式，srcFmt==dstFmt==MXE4M3/MXE5M2 是**合法纯字节拷贝**，
+  // 且应与经 io.cmd 直连（sPASS 原样透传）路径行为一致。故自守仅在 enableConversion=true 生成。
+  if (cfg.enableConversion) {
+    when(FbDataFmt.isMx(injCmd.dstFmt)) {
+      injCmd.dimCount := 0.U
+    }
   }
 
   // --- FSM 逻辑 ---

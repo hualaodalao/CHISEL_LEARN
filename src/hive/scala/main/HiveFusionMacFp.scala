@@ -42,7 +42,7 @@ class HiveFusionMacFp(
   cW: Int = 40,
   supportedFmts: Set[DataFormat.Type] =
     Set(DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1),
-  useNarrowAdd: Boolean = false,
+  useNarrowAdd: Boolean = true,
   narrowW: Int = FpAddNarrow.DefaultW
 ) extends Module {
 
