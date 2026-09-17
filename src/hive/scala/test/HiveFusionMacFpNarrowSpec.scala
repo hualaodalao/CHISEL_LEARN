@@ -706,9 +706,11 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
       rtlDefault should include("FpMulMx8")
     }
     // 反证（判别有判别力、非恒真）：显式传全五格式 ⟹ hasFp=true ⟹ 宽阵列必须出现。
+    //   ★task#30 A2：pin useNarrowAdd=false（类默认已改为 true；全五格式 + narrow 会撞护栏 require，
+    //   而本反证段意图是验宽阵列出现与否，与加法器选型正交）。
     val rtlFull5 = _root_.circt.stage.ChiselStage.emitSystemVerilog(
       new HiveFusionMacFp(supportedFmts = Set(DataFormat.FP16, DataFormat.BF16,
-        DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1)))
+        DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1), useNarrowAdd = false))
     withClue("全五格式（hasFp=true）本应例化宽阵列 FpMulFp16Bf16（否则上方 not include 判据无意义）：") {
       rtlFull5 should include("FpMulFp16Bf16")
     }

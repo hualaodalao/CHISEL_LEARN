@@ -9,14 +9,15 @@
   *     全零块 → scale=0），随后逐元素回读并量化：
   *       new_exp_biased = true_exp - max_exp + dst_bias
   *     尾数截取到目标位宽（E4M3:3-bit / E5M2:2-bit）+ RNE 舍入；
-  *     下溢 → flush-to-zero；上溢/inf → 饱和到格式最大正常数；
+  *     下溢/上溢判定均在 RNE 进位之后（用 newExpF）：下溢 → flush-to-zero；
+  *     上溢/inf → 饱和到格式最大正常数；
   *     NaN → E4M3 输出 NaN 编码（0x7F|sign），E5M2 饱和到最大正常数。
   *   阶段 3（sDRAIN）：等待 outData 残余 beat 与 outScale 全部握手完成，
   *     复位内部状态回到收集态。
   *
   * 特殊值语义（与 Fp32.mxToFp32 反量化路径对称）：
   *   - 零 / 次正规输入        → 输出 ±0（次正规先归一化为 fp32 次正规后统一按零处理）
-  *   - 下溢（new_exp ≤ 0）    → flush-to-zero（保号）
+  *   - 下溢（RNE 进位后 new_exp ≤ 0）→ flush-to-zero（保号）；进位后 new_exp=1 则输出最小正规数
   *   - E4M3 最大正常数        → exp=1110, mant=111（448），exp=1111 保留给 NaN
   *   - E5M2 最大正常数        → exp=11110, mant=11（57344）
   *
@@ -130,10 +131,17 @@ class FbMxQuantizer(dataWidth: Int) extends Module {
     val c5  = mr5(2)
 
     val carry   = Mux(dstE4, c4, c5)
-    val newExpF = newExpS + carry.asSInt
+    // 进位必须以 +1 加到指数上：Bool.zext 零扩展为 SInt（true→+1）。
+    // 切勿用 carry.asSInt——Bool.asSInt 是 1-bit 有符号数，true 会被解释为 −1，
+    // 导致舍入进位反而使指数减 1（newExpF=newExpS−1），进位跨越下溢边界时误冲刷、
+    // 且正常进位时指数字段少 1，量化结果整体偏小。
+    val newExpF = newExpS + carry.zext
 
-    // --- 边界判定 ---
-    val underflow = newExpS <= 0.S                                    // 下溢 → FTZ
+    // --- 边界判定（underflow/overflow/normByte 三者一致使用 RNE 进位后的 newExpF）---
+    // underflow 必须用进位后指数：newExpS=0 且尾数 RNE 进位时 newExpF=1，正确结果是目标格式的
+    // 最小正规数（E4M3: exp=1,mant=0 = 2^-6；E5M2: exp=1,mant=0 = 2^-14），若按 newExpS 判定
+    // 会被误冲刷成保号零。同时该判据保证走 normByte 时 newExpF ≥ 1 恒为正，位选不会截断出错码。
+    val underflow = newExpF <= 0.S                                    // 下溢 → FTZ
     val overflow  = newExpF > Mux(dstE4, 14.S(9.W), 30.S(9.W))        // 上溢 → 饱和
     val satByte   = Mux(dstE4, Cat(sign, "b1110".U(4.W), "b111".U(3.W)),   // E4M3 max=448
                              Cat(sign, "b11110".U(5.W), "b11".U(2.W)))     // E5M2 max=57344
@@ -268,6 +276,13 @@ class FbMxQuantizer(dataWidth: Int) extends Module {
     }
     when(io.outData.fire) {
       outDataValid := false.B
+    }
+    // scale 字节必须与 outData 一样做“单拍握手即撤销”：block 填满时 scaleValid 置真，
+    // 而下游（FbEngine sWRITE）在整个量化阶段恒置 outScale.ready=true。若仅在 sDRAIN 清零，
+    // 则整个 sQUANT 阶段 outScale 每拍都 fire，同一 scale 被反复累积、索引回绕后覆盖前序 block，
+    // 最终只保留最后一个 block 的 scale。此处在 fire 当拍即撤销 valid，保证每 block 只发一次。
+    when(io.outScale.fire) {
+      scaleValid := false.B
     }
   }
 

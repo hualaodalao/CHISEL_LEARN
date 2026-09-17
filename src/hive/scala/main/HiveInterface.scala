@@ -145,7 +145,8 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
   val aScaleAddr = UInt(32.W)
   val bScaleAddr = UInt(32.W)
   val cScaleAddr = UInt(32.W)
-  
+  val warmup = Bool()
+  val warmdown = Bool()
 
   def wregs(addr: UInt, d: UInt) = {
     switch(addr){

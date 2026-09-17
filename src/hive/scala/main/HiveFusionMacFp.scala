@@ -23,13 +23,13 @@ import scala.collection.JavaConverters._
 //     五槽累加器接线逐字不动（对齐项目铁律「编译期 if 不门控运行期」+ HiveEnum.scala:32-35）。
 //
 // 【task#18 B: useNarrowAdd 编译期选择累加器】
-//   false(默认) → 例化 FpAdd（已验证 bit-exact 累加器基线）。
-//     ★【措辞修约 · task#25 E2，取代原「恢复已验证回归」】本参数【只】承诺：累加器接线不变、
-//       仍例化 bit-exact 的 FpAdd（五槽 wiring 逐字不动）。它【不】宣称「整条默认路径的 RTL 与 HEAD
-//       逐位一致」——因为本模块还捆绑了用户有意加入的 consumeValid / inf-nan 守护改动（透传给
+//   true(默认)  → 例化 FpAddNarrow（L2 窄窗口五槽 CSA 树，精度契约见 FpAddNarrow.scala 头注）★task#28 起为类默认(:45)
+//   false       → 例化 FpAdd（已验证 bit-exact 累加器基线）——已非默认，须【显式 pin】useNarrowAdd=false 才走此路。
+//     ★【措辞修约 · task#25 E2，取代原「恢复已验证回归」；★task#36 前提同步：默认路径现为 FpAddNarrow】本参数【只】承诺：
+//       useNarrowAdd=false 时累加器接线不变、仍例化 bit-exact 的 FpAdd（五槽 wiring 逐字不动）。它【不】宣称「整条
+//       datapath 的 RTL 与 HEAD 逐位一致」——因为本模块还捆绑了用户有意加入的 consumeValid / inf-nan 守护改动（透传给
 //       FpCvtMx8ToMid），使前端 cvt 与 HEAD 有别。故 useNarrowAdd=false 只锁定【累加器】这一处，
 //       不等于锁定整条 datapath（详见 Q2 裁定：consumeValid 守护属 fusionMac 改动、与 narrow 无硬依赖）。
-//   true        → 例化 FpAddNarrow（L2 窄窗口五槽 CSA 树，精度契约见 FpAddNarrow.scala 头注）
 //   两者 I/O port-compatible（task#16 实测核对：8 端口方向/名称/位宽全同）⟹ 共享 wiring helper。
 //   护栏：require(!useNarrowAdd || supportedFmts ⊆ {MXE4M3,MXE5M2,MXE2M1}) —— FpAddNarrow 仅支持 MX-only。
 //   narrowW: Int = FpAddNarrow.DefaultW (19)：窗口宽度参数化保留，便于后续 A/B 综合对照扫 W。
@@ -307,13 +307,13 @@ class HiveFusionMacFp(
     io.sum    := sum
   }
   if (useNarrowAdd) {
-    // L2 窄窗口累加器（MX-only；精度契约 = 三段式误差界，见 FpAddNarrow.scala 头注）
+    // 默认路径（useNarrowAdd=true，★task#28 起为类默认）：L2 窄窗口累加器（MX-only；精度契约 = 三段式误差界，见 FpAddNarrow.scala 头注）
     val fpAddNarrow = Module(new FpAddNarrow(cEffW, narrowW))
     connectFiveSlotAdder(fpAddNarrow.io.cReg, fpAddNarrow.io.is4x, fpAddNarrow.io.is2x,
       fpAddNarrow.io.prodFp16, fpAddNarrow.io.prodFp8,
       fpAddNarrow.io.prodFp4_0, fpAddNarrow.io.prodFp4_1, fpAddNarrow.io.sum)
   } else {
-    // 默认：已验证 bit-exact 基线
+    // useNarrowAdd=false 分支（须显式 pin，★task#28 起已非默认）：回退已验证 bit-exact 基线 FpAdd
     val fpAdd = Module(new FpAdd(cEffW))
     connectFiveSlotAdder(fpAdd.io.cReg, fpAdd.io.is4x, fpAdd.io.is2x,
       fpAdd.io.prodFp16, fpAdd.io.prodFp8,
@@ -325,7 +325,7 @@ class HiveFusionMacFp(
 
 object HiveFusionMacFpElaborate extends App {
   // 发射配置（对齐 HiveCoreElaborate.scala:166-168「绝不覆盖回归锚点」约定，见蓝图 §2.4/§7）：
-  //   · A 类默认配置（MX-only, useNarrowAdd=false ⟹ FpAdd）→ src/hive/verilog_fusionfp_mxonly/  ★task#25 C2 改目录
+  //   · A 类默认配置（MX-only, useNarrowAdd=true ⟹ FpAddNarrow）→ src/hive/verilog_fusionfp_mxonly/  ★task#25 C2 改目录; task#28 注释订正
   //   · B nofp16 配置（显式 MX-only, useNarrowAdd=false）  → src/hive/verilog_fusionfp_nofp16/
   //   · C narrow 配置（MX-only, useNarrowAdd=true ⟹ FpAddNarrow）
   //                                                       → src/hive/verilog_fusionfp_narrow/  ★task#18 C 新增
@@ -371,13 +371,15 @@ object HiveFusionMacFpElaborate extends App {
   }
   private val MXONLY = Set(DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1)
 
-  // --- 配置 A：类默认（MX-only, useNarrowAdd=false ⟹ FpAdd 基线，含 consumeValid 守护）---
+  // --- 配置 A：类默认（MX-only, useNarrowAdd=true ⟹ FpAddNarrow，含 consumeValid 守护）---
   //   ★task#25 C2：发到 verilog_fusionfp_mxonly（新目录），【绝不】写 verilog_fusionfp（HEAD 全五格式锚点）。
+  //   ★task#28 注释订正：类默认已从 useNarrowAdd=false 改为 true ⟹ 此配置现例化 FpAddNarrow。
   emit(new HiveFusionMacFp(), "src/hive/verilog_fusionfp_mxonly",
-       "config A: class default MX-only (useNarrowAdd=false -> FpAdd)")
+       "config A: class default MX-only (useNarrowAdd=true -> FpAddNarrow)")
 
-  // --- 配置 B：显式 MX-only（hasFp=false）+ FpAdd ⟹ lane0 走窄乘法器，删宽阵列 ---
-  emit(new HiveFusionMacFp(supportedFmts = MXONLY), "src/hive/verilog_fusionfp_nofp16",
+  // --- 配置 B：显式 MX-only（hasFp=false）+ useNarrowAdd=false ⟹ FpAdd 基线，lane0 走窄乘法器，删宽阵列 ---
+  //   ★task#28：显式传 useNarrowAdd=false（类默认已改为 true），保持本配置文档语义与 verilog_fusionfp_nofp16/ 既有产物一致。
+  emit(new HiveFusionMacFp(supportedFmts = MXONLY, useNarrowAdd = false), "src/hive/verilog_fusionfp_nofp16",
        "config B: nofp16 (hasFp=false, useNarrowAdd=false -> FpAdd)")
 
   // --- 配置 C：MX-only + useNarrowAdd=true ⟹ 例化 FpAddNarrow（L2 窄窗口）★task#18 C 新增 ---

@@ -11,8 +11,8 @@
   *     端口兼容 ≠ 语义等价：两者的数值契约不同（FpAdd = 逐位 bit-exact；本模块 = 三段式误差契约，
   *     见下方），饱和域行为也曾分歧（原钳 255 → fp32 NaN，task#18 A 项已修为钳 254 对齐 FpAdd）。
   *     只有在"A 项修复 + 接受误差契约"两个前提下才谈得上真正 drop-in。
-  * · 接入方式（task#18 B 项）：HiveFusionMacFp 新增编译期参数 `useNarrowAdd: Boolean = false`
-  *   —— **默认 false ⟹ 例化 FpAdd（已验证 bit-exact 基线）**；true ⟹ 例化本模块。
+  * · 接入方式（task#18 B 项；★task#28 起类默认已翻转为 true）：HiveFusionMacFp 编译期参数 `useNarrowAdd: Boolean = true`
+  *   —— **默认 true ⟹ 例化本模块（FpAddNarrow）**；须【显式 pin】false ⟹ 回退 FpAdd（已验证 bit-exact 基线）。
   *   护栏 `require(!useNarrowAdd || !hasFp)`：本模块只支持 MX-only（fp16-only 模式是 don't-care）。
   * · 适用域 = 【MX-only】融合 MAC（mxfp8 E4M3/E5M2 + mxfp4 E2M1，上游已去掉 fp16/bf16）。
   *   fp16/bf16 满宽乘积（24-bit 有效尾数）在窄窗口下会丢低 (24−W) 位 ⟹ 本模块【不为 fp16-only

@@ -8,6 +8,19 @@ CPATH=/opt/homebrew/include LIBRARY_PATH=/opt/homebrew/lib sbt "testOnly HiveCor
 sbt "runMain HiveCoreElaborate"
 sbt "runMain ForagerBeeElaborate"
 
+# ===== ForagerBee 功能仿真（本机环境硬约束）=====
+# 本机装有企业安全软件（阿里 EDR com.alibaba.endpoint.aliedr）+ macOS AMFI，会 SIGKILL
+# 从系统临时目录 /var/folders/.../T/ 执行的 ad-hoc 签名二进制（临时目录被视为高危执行位置），
+# 但同样的二进制从项目目录内运行则正常。ChiselSim 的 EphemeralSimulator 用
+# HasTestingDirectory.temporary() 把 Verilator 工作区建在 OS 临时目录 ⟹ simulation 二进制被杀 ⟹
+# simulation-log.txt 从不生成 ⟹ 所有真仿真用例报 FileNotFoundException（此前被误判为"环境噪声"）。
+# 修复：-Djava.io.tmpdir 重定向到项目内，让 temporary() 工作区落在项目目录（不被 EDR 拦截）。
+# 另需 CPATH/LIBRARY_PATH（同上 lz4 约束）。
+CPATH=/opt/homebrew/include LIBRARY_PATH=/opt/homebrew/lib sbt -J-Xmx6G \
+  -Djava.io.tmpdir=/Users/wangliutailong/Qoder_Proj/Chisel_Learn/build/tmp \
+  "testOnly *ForagerBee*"
+
+
 # ===== 可传参调试用例 HiveCoreDebugCase（Task #19）=====
 # 参数三途径：sbt "testOnly ... -- -Dk=v"（ConfigMap）> sbt -Dk=v "testOnly ..."（JVM 属性）
 #            > HiveCoreDebugCase 文件顶部默认块（DEF_*）

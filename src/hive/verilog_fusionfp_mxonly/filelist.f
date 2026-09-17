@@ -4,5 +4,5 @@ Hive_FpCvtMx8ToMid.sv
 Hive_FpCvtMx4ToMx8Mid.sv
 Hive_FpMulMx4.sv
 Hive_FpCvtMx4ToMid.sv
-Hive_FpAdd.sv
+Hive_FpAddNarrow.sv
 Hive_HiveFusionMacFp.sv

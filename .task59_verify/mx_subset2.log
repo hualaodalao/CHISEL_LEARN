@@ -1,0 +1,33 @@
+[info] welcome to sbt 1.10.1 (Homebrew Java 17.0.19)
+[info] loading global plugins from /Users/wangliutailong/.sbt/1.0/plugins
+[info] loading settings for project chisel_learn-build-build-build from metals.sbt ...
+[info] loading project definition from /Users/wangliutailong/Qoder_Proj/Chisel_Learn/project/project/project
+[info] loading settings for project chisel_learn-build-build from metals.sbt ...
+[info] loading project definition from /Users/wangliutailong/Qoder_Proj/Chisel_Learn/project/project
+[info] loading settings for project chisel_learn-build from metals.sbt,plugins.sbt ...
+[info] loading project definition from /Users/wangliutailong/Qoder_Proj/Chisel_Learn/project
+[info] loading settings for project root from build.sbt ...
+[info] set current project to ChiselLearn (in build file:/Users/wangliutailong/Qoder_Proj/Chisel_Learn/)
+[info] ForagerBeeSpec:
+[info] ForagerBee (NPU DMA)
+[info] - should MX quantize FP16→MXE4M3 1D blockSize=32 *** FAILED ***
+[info]   blk0[27]: 128 was not equal to 136 (ForagerBeeSpec.scala:2440)
+[info] - should MX quantize BF16→MXE5M2 2D blockSize=16 *** FAILED ***
+[info]   row0 blk0[14]: 52 was not equal to 60 (ForagerBeeSpec.scala:2472)
+[info] - should MX quantize FP32→MXE4M3 blockSize=64 (4:1 compression)
+[info] - should MX quantize minimal shape(0)=blockSize
+[info] - should MX quantize all-zero input → all-zero output, scale=0
+[info] - should MX quantize cBad: shape not multiple of blockSize → done.err=true
+[info] - should nbwr: MX quantize FP16→MXE4M3 1D blockSize=32 with writeDelay=8 *** FAILED ***
+[info]   blk0[27]: 128 was not equal to 136 (ForagerBeeSpec.scala:2816)
+[info] - should reject MX quantize with non-float srcFmt (INT8) with err done
+[info] - should reject MX quantize with illegal scaleBlockSize=3 (scaleBlockBadEncoding) with err done
+[info] Run completed in 35 seconds, 235 milliseconds.
+[info] Total number of tests run: 9
+[info] Suites: completed 1, aborted 0
+[info] Tests: succeeded 6, failed 3, canceled 0, ignored 0, pending 0
+[info] *** 3 TESTS FAILED ***
+[error] Failed tests:
+[error] 	ForagerBeeSpec
+[error] (Test / testOnly) sbt.TestsFailedException: Tests unsuccessful
+[error] Total time: 36 s, completed 2026年9月16日 下午6:12:11
