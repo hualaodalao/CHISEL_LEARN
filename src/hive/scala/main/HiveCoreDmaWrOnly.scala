@@ -162,6 +162,10 @@ import chisel3.util._
   * 运行期拍数（裁定 6）：beatsPerRowEff = ceil(totalN×elemBits/cDmaExtW)，由 io.outFmt
   *（顶层唯一源 cOutFmtEff）解码：256 默认 × totalN=16 下 fp32/int32=2 拍、
   * fp16/bf16/int16/mxfp8/int8/mxfp4=1 拍（半/四分之一占用高位零填充，禁止双行合拍）。
+  * ★(#169-S2) 本句「占用高位零填充」描述的是【内部 wire dmaExtWrIF.req.payload.data】
+  *   （见下方 `dmaExtWrIF.req.payload.data := (io.bufPop.payload >> ...)` 那一行，该层确实
+  *   仍是「数据在低位、高位零填充」，#166 未改它）；【对外端口 io.dmaExtWrIF.req.payload.data】
+  *   自 #166 起已按 addrShiftBytes 同源左移到它在总线字内应在的 byte lane，对外【不再是低位口径】。
   * 末拍推进单一判据：req.fire && beatCnt===beatsPerRowEff-1 → 行推进（行级结构不动，
   * 仅叠拍内偏移）；行/块跳转自动对齐、免维护拍地址寄存器。
   *
@@ -169,7 +173,8 @@ import chisel3.util._
   *   - 实际口径（唯一权威 = 本文件下方 `io.bufPop.ready := ...` 那一行）：
   *       bufPop.ready = (state === sTRANSFER_M) & dmaExtWrIF.req.ready & lastBeat
   *     即【组合直通 + 末拍弹出】：拍数据 = io.bufPop.payload >> (beatCnt×cDmaExtW) 取低
-  *     cDmaExtW 位，本模块【不自行锁存整行】；一行在全部 beatsPerRowEff 拍期间由上游
+  *     cDmaExtW 位（★#169-S2：内部 wire 口径，对外端口的 lane 移位见下方 addrShiftBytes
+  *     那一行），本模块【不自行锁存整行】；一行在全部 beatsPerRowEff 拍期间由上游
   *     （顶层 cvt 的行寄存 → C FIFO）保持稳定不弹，只有末拍（lastBeat = beatCnt ===
   *     calcConfig.cDmaBufBeatTar）且外部 req.ready 为高的那一拍才拉高 bufPop.ready 弹出
   *     该行 ⇒ 仍是「行粒度握手、每行只收一次」，但收行时刻在【末拍】而非首拍。
@@ -196,6 +201,11 @@ import chisel3.util._
   * 上游握手，直到所有 tile 块搬完后发一拍 done 脉冲回 IDLE。
   *
   * 【外部写通道契约】写回拍须按地址顺序提交（半占用拍零填充高位与密集行步进的正确性依赖保序写）；外部存储侧若乱序受理写拍，行内/行间布局无法保证。
+  *   ★(#166/#169-S2) 上述「半占用拍零填充高位」是【内部 wire dmaExtWrIF.req.payload.data】
+  *     口径（下方 `(io.bufPop.payload >> (beatCnt * cfg.cDmaExtW.U))(cfg.cDmaExtW - 1, 0)`
+  *     那一行）；【对外端口 io.dmaExtWrIF.req.payload.data】已在 addrShiftBytes 那一行按本拍
+  *     地址的 byte lane 偏移【同源左移】就位，与 strb 行逐拍同源 ⟹ 对外【不再是低位口径】。
+  *     下游若忽略 wstrb、按「行数据在总线字低位」整字落盘，将在 off≠0 的拍上错位（#168-S3）。
   *
   * 【P2 两段式分工（裁定 4/6）】精度转换与行寄存器归顶层 HiveOutCvt（握手模块），
   * 本模块只消费转换后密集行（bufPop，宽 totalN×32，按 outFmt 选段、高位已由 cvt 填零）
@@ -263,12 +273,93 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
   io.dmaExtWrIF.req.payload.addr := dmaExtWrIF.req.payload.addr
   dmaExtWrIF.req.ready := io.dmaExtWrIF.req.ready
 
-  //DMA 数据需要移位，目前全部把数据放到低位
+  // 【#166 契约描述（订正原「DMA 数据需要移位，目前全部把数据放到低位」自陈缺陷注释）】
+  // AXI byte lane 契约：wstrb 第 i 位选通 wdata[8i+7:8i]，故 data 与 strb 必须做【同源】
+  //   移位——两者共用下面同一个 addrShiftBytes 表达式（= addr mod dmaBytes，即本拍数据在
+  //   总线字内的起始 byte lane 偏移），data 侧再 ×8 由 byte 单位换成 bit 单位。
+  // 旧代码只移 strb（下方 strb 行一直是正确的）、data 直连总线字低位，导致选通位与实际
+  //   数据字节错位：strb 命中的 lane 上取到的是别的列的数据，未命中的 lane 上反而压着
+  //   有效数据。已按 #165 裁定的方案 A 修复。
+  // 位宽验算（勿删）：addrShiftBytes = addr(log2Up(dmaBytes)-1, 0) = addr(4,0)（dmaBytes=32）
+  //   是【显式 5-bit 切片】，值域 0..dmaBytes-1 = 0..31 由【类型系统】保证，【无需取模】；
+  //   `addrShiftBytes << 3` 是 UInt << Int 静态移位 → 8-bit（最大值 31×8=248）；
+  //   `data << 8-bit UInt` 是动态移位 → Chisel 层结果展宽到 cDmaExtW + (2^8 - 1) = 511 bit，
+  //   故【必须】显式 (cDmaExtW-1, 0) 截回总线位宽。
+  //   ★实测取证（#169 重发射后 src/hive/verilog*/Hive_HiveCoreDmaWrOnly.sv:78-80）：
+  //     firtool 【并未】对该移位做已知位收敛，网表中间量就是 `wire [510:0]`（511-bit），
+  //     移位量以 `{503'h0, addr[4:0], 3'h0}` 的 511-bit 拼接形式给出。评审 build/168-S4
+  //     预期的「≈287-bit = 256+31」【不成立】——那是「firtool 会利用低 3 位恒 0」的推测，
+  //     实际未发生（本注释旧版也拄了该推测，已订正）。真正的位宽收益在【S1 前后对比】：
+  //       · strb 中间 wire：改前 `wire [94:0]`（= 32 + 2^6-1，addrShiftBytes 为 6-bit）
+  //                       → 改后 `wire [62:0]`（= 32 + 2^5-1，5-bit）——【网表实测】；
+  //       · data 移位中间 wire：改前【无】（data 裸截取）→ 改后 511-bit；若走「只删
+  //         取模不改切片」的陷阱路径则会到 256 + 2^9-1 = 【767-bit】（511 vs 767 才是 S1 收益）。
+  //
+  // 【#169-S1 改写留痕 —— 订正 #166 写入此处的错误论断（评审 build/168 W1/S1）】
+  //   本行历史上曾写作：
+  //       addr(log2Up(cfg.cDmaExtW/8), 0) % dmaBytes.U          // = addr(5,0) % 32
+  //   该切片是【6-bit】= addr mod 64、值域【0..63】，其中【取模是承重的】：
+  //   addr(5,0) % 32 == addr(4,0)，取模的唯一作用就是【丢掉 bit 5】。
+  //   #166 的注释却把它写成「addr(5,0) 已覆盖全域（值域 0..31），% dmaBytes.U 为冗余但无害，
+  //   保留以维持与 strb 侧逐字同源」——「值域 0..31」这个结论恰恰是取模造成的，却被反过来
+  //   当成「取模冗余」的论据，自相矛盾（build/165:145-148、build/166:82-83 与 §7.2-3 同错，
+  //   三处均已追加更正段；#167 独立复核未抓出）。
+  //   ★若照那条注释【只删取模、不改切片】，addrShiftBytes ∈ [0,63]，则 off>=32 时：
+  //       · strb：dmaCurStrb(32-bit) << off 被 32-bit sink 截 ⟹ strb = 0；
+  //       · data：off*8 >= 256 ⟹ (cDmaExtW-1,0) 窗口内全 0；
+  //     即 strb 与 data【双双归零】⟹ 外部内存一个字节都不写、且不报 err（静默全丢）。
+  //   机器级证据：陈旧产物 src/hive/verilog_mx/Hive_HiveCoreDmaWrOnly.sv:82 的 firtool 输出
+  //     是 `<< _dmaExtWrIF_req_payload_addr_T_1[4:0]`（而非 [5:0]）——综合器把 %32 收敛成
+  //     「丢掉 bit 5」，这正是「取模在做实际工作」的证据（网表看不到 % 不代表源码可删）。
+  //   现改写为显式 5-bit 切片，陷阱从根上消除：既不需要取模，也不再需要「勿删」警示。
+  //   恒等性依据：require(isPow2(cDmaExtW)) 已由 HiveCoreConfig.scala:291 强制（#169 追加注释前
+  //     该行在 :265，评审 build/168 引用的就是旧行号）⟹ dmaBytes
+  //     恒为 2 的幂 ⟹ addr mod dmaBytes ≡ addr(log2Up(dmaBytes)-1, 0)，二者【逐值恒等】。
+  //   下标安全性：totalN >= 4（arrayN>=4、clusterM>=1）且 require(totalN*8 <= cDmaExtW)
+  //     ⟹ dmaBytes >= 4 ⟹ log2Up(dmaBytes)-1 >= 1；addrWidth 默认 32 >= log2Up(dmaBytes)，
+  //     切片不越界（地址空间小于一个总线字的退化配置不在支持范围）。
+  //   （build/165_wrdma_strb_wdata_analysis.md:328 的实施风险表原本已建议「用 .tail(1) 或
+  //     明确 addr(4,0)」，#166 未采纳反而改写成「冗余」——本轮才落地该建议。）
+  //
+  // 【#169-W2 订正：(cDmaExtW-1,0) 截回所丢弃的高位，其可达性是【两条独立路径】】
+  //   丢弃条件 = laneOffset + lanes > dmaBytes（lanes 由 cDmaDmaBeatTar 三档决定 ∈ {8,16,32}）。
+  //   #166 的注释只写了 (b) 并断言「当前不可达」，漏了 (a)：
+  //   (a) cAddr % dmaBytes ≠ 0 —— off = addr mod dmaBytes 直接来自【运行期寄存器 cAddr】，
+  //       与 N/totalN/cFmt【无关】。fp32/int32 输出下 cWriteBytes = totalN*32/8 = 64 >
+  //       dmaBytes = 32 ⟹ cBeatAddrStep = 32、2 拍/行、cDmaDmaBeatTar = 0 ⟹ lanes = 32
+  //       （满档），此时【任何 off > 0】都触发截断：每拍静默丢 off 字节、STATUS.err 不置位
+  //       （例：基址余 8 的 64 字节行会少写 16 字节，外部内存保留旧值）。
+  //       ★本路径现由【errCode 10】显式报错（HiveCoreCalcConfig 的「C write-back address
+  //         alignment guard」分支），不再静默；软件对齐契约 W0/W1/W2 见 HiveCoreCalcConfig
+  //         的 C WRITE-BACK ALIGNMENT CONTRACT 段（#169-W2）。
+  //   (b) N 非 totalN 整数倍 ⟹ rowOff 不是 cWriteBytes 整数倍，属既有「strb 档位不按 N 尾数
+  //       细化」缺陷族，#166/#169 范围外，未在此处掩盖；仿真期由 TB 侧 STRB-OVERFLOW 判据
+  //       （HiveSimCommon.auditCBeatLanes）可见，硬件侧【仍无 errCode】。
+  // 时序：addrShiftBytes 是 req.payload.addr 的纯组合函数，本行是纯组合桶形移位
+  //   （byte 粒度 5 级 mux2），无新增时序元件、无 latch；与 strb 行共用同一源表达式 ⟹ 天然同源。
+  //
+  // ==========================================================================
+  // 【#169-W10 跨文件隐式契约（勿破）】本模块对同一条总线字有【两套互相独立】的
+  //   地址→数据映射，二者必须保持【互补】，否则 data 与 strb 会一起对准错误的字节
+  //   （「同源」这层不会破——两行共用下面同一个 addrShiftBytes；破的是它们共同对准的位置）：
+  //   (1) 拍内分段，用【编译期常量】cDmaExtW：
+  //         dmaExtWrIF.req.payload.data := (io.bufPop.payload >> (beatCnt * cfg.cDmaExtW.U))(...)
+  //   (2) lane 偏移，用【运行期寄存器】：
+  //         addr = curAddr + beatCnt * io.calcConfig.cBeatAddrStep
+  //       （见下方 dmaExtWrIF.req.payload.addr 那一行），cBeatAddrStep 由
+  //       HiveCoreCalcConfig.scala 的 cWriteBytes/cBeatAddrStep 派生段运行期算出。
+  //   今天的互补性由该派生式保证：
+  //     cWriteBytes >  cDmaBytes ⟹ cBeatAddrStep = cDmaBytes (= cDmaExtW/8) 且多拍；
+  //     cWriteBytes <= cDmaBytes ⟹ cDmaBufBeatTar = 0 ⟹ beatCnt ≡ 0，(1) 恒为 0 偏移。
+  //   ★二者【无 require / 断言绑定】。改 cBeatAddrStep 公式（含「双行合拍」一类提案）
+  //     必须同步复核 (1) 与 (2)。反向交叉引用见 HiveCoreCalcConfig 的
+  //     「#169 W10 REVERSE CROSS-REFERENCE」段。TB 侧若要机器可检，须用【纯张量语义】
+  //     不变式（同行相邻两拍 addr 差 = cDmaExtW/8），不得从同一条派生链取值，否则共模失效。
+  // ==========================================================================
   val dmaBytes = cfg.cDmaExtW / 8
-  val addrShiftBytes = dmaExtWrIF.req.payload.addr(log2Up(cfg.cDmaExtW/8), 0) % dmaBytes.U
-  //Comment 遗留之后打开
-  //io.dmaExtWrIF.req.payload.data := dmaExtWrIF.req.payload.data << (addrShiftBytes << 3)
-  io.dmaExtWrIF.req.payload.data := dmaExtWrIF.req.payload.data
+  // #169-S1：显式切片（值域 0..dmaBytes-1 由类型系统保证；详见上方改写留痕）
+  val addrShiftBytes = dmaExtWrIF.req.payload.addr(log2Up(dmaBytes) - 1, 0)
+  io.dmaExtWrIF.req.payload.data := (dmaExtWrIF.req.payload.data << (addrShiftBytes << 3))(cfg.cDmaExtW - 1, 0)
   when(io.calcConfig.cDmaDmaBeatTar === 0.U) { //full
     dmaCurStrb := dmaMaxStrb
   }.elsewhen(io.calcConfig.cDmaDmaBeatTar === 1.U) { // 1/2
@@ -565,6 +656,26 @@ class HiveCoreDmaScaleWr(cfg: HiveCoreConfig) extends Module {
   io.dmaExtWrIF.req.valid         := (state === sTRANSFER) & io.bufPop.valid & (ostCredit =/= depth.U)
   io.dmaExtWrIF.req.payload.addr  := curAddr
   io.dmaExtWrIF.req.payload.data  := io.bufPop.payload
+  // ==========================================================================
+  // 【#169-W3 登记（只登记不修）：下一行 strb 常量是【Scala 运算符优先级缺陷】
+  //   现状：`(1 << (rowW / 8) - 1).U`。Scala 中运算符优先级由【首字符】决定，`+ -`
+  //   的优先级【高于】`< >`，故它解析为 `1 << ((rowW / 8) - 1)`，【不是】
+  //   `(1 << (rowW / 8)) - 1`。配合 rowW = cfg.cScaleRowW = (totalN/minBlockSize)*8
+  //   = totalN/2 **bit**：
+  //     | totalN | rowW | rowW/8 (字节) | 应为满档 strb | 实得 1<<(rowW/8-1) | 结论 |
+  //     |  16（当前全部配置） |  8 | 1 | 0b1 = 1 | 1<<0 = 1 | 巧合正确 |
+  //     |  32                | 16 | 2 | 0b11 = 3 | 1<<1 = 2 = 0b10 | 【错】lane0 不写 |
+  //     |  64                | 32 | 4 | 0b1111 = 15 | 1<<3 = 8 = 0b00001000 | 【错】只写 lane3 |
+  //   ★登记为「totalN >= 32 之前必修」（修它属功能变更，需单独裁定，#169 未动）；
+  //     修法 = 补括号 `(1 << (rowW / 8)) - 1`。交叉引用已登记在 HiveCoreConfig.scala
+  //     的 minBlockSize/cScaleRowW 解耦清单（require(minBlockSize == ...) 上方那段）。
+  //   ★同时订正【scaleC 豁免于 #166 lane 契约的理由】：依据是【端口宽度 = 1 字节
+  //     （rowW = 8 bit @ totalN=16）⟹ lane 窗口退化为单 lane、移位恒为 0】，
+  //     【不是】「其 strb 为常量满档」——后者仅 rowW=8 时巧合成立（见上表）。
+  //     旧理由已扩散到 HiveSimCommon.scala:604、HiveCoreSimCaseIntSpec.scala:134 与
+  //     build/166 §7.2-6（test 侧两处由 #170 订正，build/166 已追加更正段）。
+  //     ⟹ totalN 提到 32 之前必须先修本行括号，并把 scaleC 纳入 lane 审计。
+  // ==========================================================================
   io.dmaExtWrIF.req.payload.strb  := (1 << (rowW / 8) - 1).U
   io.bufPop.ready                 := (state === sTRANSFER) & io.dmaExtWrIF.req.ready
   io.dmaExtWrIF.rsp.ready         := true.B

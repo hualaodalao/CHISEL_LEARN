@@ -63,8 +63,10 @@ OCP MX 规范允许 A/B 采用**不同 MX 元素类型**，且共享同一 E8M0 
   errCodeComb:=3.U }`（Fix-4，暂复用 code 3="v1 不支持的格式组合"）。**【#146 真值序更新】**
   该 when 原置于 errCode7 之前，现 errCode7 分支已整块删除 ⟹ 它成为 when 链的**最后一个分支**，
   即 last-connect 的**最高优先级**。`hasMx4=true` 的完整真值序为：
-  `3(MX4×MX8 混配) > 8(fp4 K 非 kPerBeat 整除) > 6 > 5 > 4 > 3(isAMx^isBMx) > 0`
-  （原表述的最前项 `7(fp4 blk≠64)` 已不存在；码位 7 现为**空闲**）。
+  `3(MX4×MX8 混配) > 11(int/非int 跨界) > 8(K 非整除) > 10(cAddr 对齐) > 7(容量, RTL-only) > 5 > 4 > 3(isAMx^isBMx) > 0`
+  （原表述的最前项 `7(fp4 blk≠64)` 已不存在；但码位 7 并非空闲——容量守护
+  `m > cBufferDepth - totalN` 仍驱动 `errCodeComb := 7.U`，三套网表均为活逻辑。
+  权威码位表见 :93-94，后续新校验从 12 起分配（11 已 LIVE：int/非int 跨界，#177/#178）。）
 - 金锚：`HiveDebugModel.validate` 加 hasMx4 门控同族 require（Fix-8）+ `precheckConfigErr` 混配
   `Some(3)` + `HiveCoreQuickSpec.hwErrCode`/`errExplain` 镜像（Fix-7）。测试：`HiveFp4GeometrySpec`
   case5 MXE2M1×MXE4M3 → errCode3（Fix-11）。**【#146 留痕】** `HiveFp4GeometrySpec` 与
@@ -90,10 +92,10 @@ OCP MX 规范允许 A/B 采用**不同 MX 元素类型**，且共享同一 E8M0 
 复用 code 3），提升可诊断性——软件可区分"A=MX×B=非MX 的非法混配(3)"与"MX4×MX8 的 v2 待支持
 混配"。**【占用变更 · P0-1】** 原此处预留的 **errCode 8 现已被 P0-1「fp4 K 非 kPerBeat 整除」守护
 占用**（见下节），故 W4A8 混配的独立诊断码**顺延至 errCode 9**（仍未实现）。errCode 字段为
-STATUS(0x08) bits[6:3]（4-bit，取值 0..15；**【#146】当前占用 0/3/4/5/6/8，码位 7 已空闲**），
-**7 与 9 均可安全新分配**。既有分配裁定继续有效：**新校验从 7 起分配、绝不复用 1/2** —— errCode 1/2
-因 a/b/cMxBlockSize 三违约被 `errMXLargerThanKLoadNum` 合并为单一 code 0 而**永不可达**，不要去恢复。
-本次按用户裁定 MX4×MX8 混配**仍暂复用 code 3**，独立码 9 列为 v2 可选增强。
+STATUS(0x08) bits[6:3]（4-bit，取值 0..15；**【#177/#178】当前占用 0/3/4/5/6/7/8/10/11，码位 1/2 FROZEN、
+9 预留 v2 W4A8、12-15 可新分配**），后续新校验从 12 起分配。既有分配裁定继续有效：**绝不复用
+1/2** —— errCode 1/2 因 a/b/cMxBlockSize 三违约被 `errMXLargerThanKLoadNum` 合并为单一 code 0 而
+**永不可达**，不要去恢复。本次按用户裁定 MX4×MX8 混配**仍暂复用 code 3**，独立码 9 列为 v2 可选增强。
 
 ---
 
@@ -112,7 +114,7 @@ fp4 的 `kPerBeat = totalN×4 = 64`：
 `when(isMx4(aFmt) && (k(15,0) % (totalN×4) != 0)) { errComb:=true; errCodeComb:=8 }`。
 分配**独立诊断码 8**，令软件精确定位 fp4 的"K 非整除"几何违约。**【#146 更新】** 原句"（而非复用
 code7），令软件区分 blk≠64(7) 与 K 非整除(8) 两类 fp4 几何违约"已失效：errCode 7 分支已整块删除，
-code 8 现为**唯一**的 fp4 几何守护，码位 7 空闲。
+code 8 现为**唯一**的 fp4 几何守护。码位 7 并非空闲：容量守护 (m > cBufferDepth - totalN) 仍驱动 errCodeComb := 7.U，三套网表均为活逻辑（权威码位表见 :93-94）。
 hasMx4=false 基线不 elaborate → verilog/verilog_mx normalized-diff=0。顶层负向用例原见
 `HiveCoreSimCaseMxFp4Spec`（fp4 K=96 → STATUS.err=1/errCode=8/done=false/dmaC 零写回）。
 **【#146 留痕】** 该套件文件已不在仓库，code8 目前**无执行者**；且原文的 `blk=64` 已不可编码
@@ -120,8 +122,10 @@ hasMx4=false 基线不 elaborate → verilog/verilog_mx normalized-diff=0。顶�
 
 **③ 放置与真值序（last-connect 后写覆盖前写，源码越靠后优先级越高）：** code8 的 when 置于
 errCode6 之后、Fix-4 混配 code3 之前 ⟹ 混配 code3 覆盖 code8。
-**【#146 最终真值序】** errCode7 分支已整块删除，混配 code3 成为 when 链尾（= 最高优先级）：
-`3(MX4×MX8 混配) > 8(fp4 K 非整除) > 6 > 5 > 4 > 3(isAMx^isBMx) > 0`。
+**【#169/#170 最终真值序】** errCode 10（cAddr 对齐）新增，置 code6 与 code8 之间；混配 code3 仍为 when
+链尾（= 最高优先级）：
+`3(MX4×MX8 混配) > 11(int/非int 跨界) > 8(K 非整除) > 10(cAddr 对齐) > 7(容量，RTL-only) > 5 > 4 > 3(isAMx^isBMx) > 0`。
+注：code 6（fp4 N 奇数）在 RTL 注释但金锚仍镜像，属既有分歧（见 #169 报告）。
 **无遮蔽论证**（取代原"既有 HiveFp4GeometrySpec case5/case2·6 用例 K 均为 64"的实证口径 —— 该套件
 已不在仓库）：code8 要求 `isMx4(aFmt)`，混配 code3 要求 `isMx4(aFmt) ^ isMx4(bFmt)`；两者同时成立
 ⟺ `aFmt=fp4 且 bFmt=fp8`，而这一组合本就被混配分支以 code 3 拒绝（v1 不支持 W4A8）⟹ 被 code3
@@ -155,6 +159,40 @@ QuantSpec「blk32 over totalN」期望由 2 改为 0（红1 转绿）。
 > 影响面：`HiveCoreSimCase` / `HiveCoreSimCaseLoadWSpec` / `HiveCoreSimCaseMxSpec` 三个 suite 均不含
 > fp4 用例、也不引用 errCode 7 / `hwErrCode` / `errExplain`，故本次删除对它们**零影响**；
 > `hasMx4=false` 的两套发射基线（verilog / verilog_mx）本来就不 elaborate 该分支 ⟹ 结构逐位不变。
+
+---
+
+### 【#169/#170 · errCode 10】cAddr 非 dmaBytes 对齐的运行期守护
+
+**① 背景：** 写回 DMA 的 AXI byte-lane 契约要求 `wstrb[i]` 选通 `wdata[8i+7:8i]`。硬件一次写拍
+覆盖 `dmaBytes = cDmaExtW/8` 个连续字节 lane，起始于 `addr mod dmaBytes`。若地址未对齐到
+dmaBytes，则移位后的 strb+data 对会跨越总线字边界，**静默丢失字节**。在 fp32/int32 满档
+（4B×16=64B > dmaBytes=32B）下任何 off>0 都会导致尾部数据丢失。
+
+**② 判据（由寄存器契约独立推导，非拟合 RTL）：**
+```
+dmaBytes    = cDmaExtW / 8       (= 256/8 = 32)
+cAlignBitsW = min(log2Up(dmaBytes), 32) = 5
+守护：cAddr[cAlignBitsW-1:0] =/= 0  ⟹  errCode = 10
+等价：cAddr % 32 != 0
+```
+**无门控** —— 三套配置（hasMx4=true/false、hasInt=true）全部 elaborate。
+
+**③ 放置与优先级（last-connect 后写覆盖 = 源码越靠后优先级越高）：**
+code10 的 `when` 置于 errCode6 之后、code8 之前 ⟹ code8 覆盖 code10，code10 覆盖 code6/7。
+最终真值序（高→低）：
+`3(MX4×MX8 mix) > 11(int/非int 跨界) > 8(K 非整除) > 10(cAddr 对齐) > 7(容量) > 5 > 4 > 3(isAMx^isBMx) > 0`
+
+**④ 三处镜像已同步：**
+- 硬件 `HiveCoreCalcConfig.scala`（#169 实施，三套 verilog 已重发射）
+- 金锚 `HiveDebugModel.hwErrCode` + `precheckConfigErr`（#170 同步）
+- `HiveCoreQuickSpec.errExplain` case10（#170 同步）
+- 本 problem.md 真值序与码位占用表（本节）
+
+**⑤ 负向用例：** `HiveCoreSimCaseIntSpec` 新增 `errCode 10 (cAddr misaligned)` 用例，以
+C_BASE+8（= 0x200008，0x08 mod 32 = 8 ≠ 0）触发守护，断言 err=1/errCode=10/done=false/cWrites=0。
+
+**⑥ 码位占用更新：** errCode 10 不占用 9（已预留 v2 W4A8 混配独立诊断码）。errCode 11 已被 #177 占用（int/非int 跨界守护）。后续新校验从 12 起分配。
 
 ---
 
@@ -248,6 +286,16 @@ DMA 每拍在该地址发**一次 32-bit 读**：`addr(row, kt) = BASE + row*row
 > **推荐**：短期取 **G1 + 集成侧确认 (a)**；若 SoC 确认**不支持**非对齐读，则必须走 **G3**
 > （布局 padding），因为它同时解决 `rowStride` 与 `kTileStride` 两个残差，且不回退 #145。
 > **G2 单独实施不可行**（会把现役 MXFP8 全判非法），只能作为 G3 的**配套**守护。
+
+> **【#178 订正 · G2 码位口径已陈旧】** 上表 G2 原文写「从**空闲的 7** 起分配」是 #140 当时的
+> 判断，**现已不成立**：码位 7 由容量守护 `m > cBufferDepth - totalN` 驱动，三套网表均为
+> **LIVE 活逻辑，不得重分配**。当前权威口径（见 :95-96 码位表）：
+> - **占用中（LIVE，不得重分配）**：0 / 3 / 4 / 5 / 6 / **7** / 8 / 10 / **11**
+> - **1 / 2 = FROZEN**：三违约被 `errMXLargerThanKLoadNum` 合并为单一 code 0 ⟹ 永不可达，绝不复用
+> - **9 = 已预留**：v2 W4A8（MX4×MX8 混配）独立诊断码
+> - **11 = 已占用**：int/非int 跨界守护（#177 RTL + #178 test 侧落地）
+> - **可新分配 = 12-15**，即 G2 若将来实施，新码应从 **12** 起（不是 7、也不是 11）。
+> G2 的其余判断（「单独实施不可行、须作为 G3 配套」）不受本次订正影响，继续有效。
 
 
 

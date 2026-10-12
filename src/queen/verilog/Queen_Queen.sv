@@ -43,52 +43,70 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module Queen_Queen(	// src/queen/scala/main/Queen.scala:6:7
-  input         clock,	// src/queen/scala/main/Queen.scala:6:7
-                reset,	// src/queen/scala/main/Queen.scala:6:7
-  output        io_req_ready,	// src/queen/scala/main/Queen.scala:7:16
-  input         io_req_valid,	// src/queen/scala/main/Queen.scala:7:16
-  input  [31:0] io_req_bits_isa,	// src/queen/scala/main/Queen.scala:7:16
-                io_req_bits_rs1,	// src/queen/scala/main/Queen.scala:7:16
-                io_req_bits_rs2,	// src/queen/scala/main/Queen.scala:7:16
-                io_req_bits_pc,	// src/queen/scala/main/Queen.scala:7:16
-  input         io_rsp_ready,	// src/queen/scala/main/Queen.scala:7:16
-  output        io_rsp_valid,	// src/queen/scala/main/Queen.scala:7:16
-  output [31:0] io_rsp_bits_rd	// src/queen/scala/main/Queen.scala:7:16
+module Queen_Queen(	// src/queen/scala/main/Queen.scala:8:7
+  input         clock,	// src/queen/scala/main/Queen.scala:8:7
+                reset,	// src/queen/scala/main/Queen.scala:8:7
+  output        io_req_ready,	// src/queen/scala/main/Queen.scala:9:16
+  input         io_req_valid,	// src/queen/scala/main/Queen.scala:9:16
+  input  [1:0]  io_req_bits_dsaT,	// src/queen/scala/main/Queen.scala:9:16
+  input  [2:0]  io_req_bits_funct3,	// src/queen/scala/main/Queen.scala:9:16
+  input  [4:0]  io_req_bits_rs1Addr,	// src/queen/scala/main/Queen.scala:9:16
+                io_req_bits_rs2Addr,	// src/queen/scala/main/Queen.scala:9:16
+  input  [9:0]  io_req_bits_rdAddr,	// src/queen/scala/main/Queen.scala:9:16
+  input  [31:0] io_req_bits_rs1,	// src/queen/scala/main/Queen.scala:9:16
+                io_req_bits_rs2,	// src/queen/scala/main/Queen.scala:9:16
+                io_req_bits_pc,	// src/queen/scala/main/Queen.scala:9:16
+  input  [9:0]  io_req_bits_tag,	// src/queen/scala/main/Queen.scala:9:16
+  input         io_rsp_ready,	// src/queen/scala/main/Queen.scala:9:16
+  output        io_rsp_valid,	// src/queen/scala/main/Queen.scala:9:16
+  output [31:0] io_rsp_bits_rd	// src/queen/scala/main/Queen.scala:9:16
 );
 
-  reg         io_rsp_valid_REG;	// src/queen/scala/main/Queen.scala:10:28
-  reg  [31:0] io_rsp_bits_rd_REG;	// src/queen/scala/main/Queen.scala:11:30
-  wire        is_r_type = io_req_bits_isa[6] & io_req_bits_isa[5] & ~(io_req_bits_isa[7]);	// src/queen/scala/main/QueenInterface.scala:26:25, :27:{29,33,46,50,52,64}
-  wire        is_r_type_1 =
-    io_req_bits_isa[6] & io_req_bits_isa[5] & ~(io_req_bits_isa[7]);	// src/queen/scala/main/QueenInterface.scala:26:25, :27:{29,33,46,50,52,64}
-  always @(posedge clock) begin	// src/queen/scala/main/Queen.scala:6:7
-    io_rsp_valid_REG <= io_req_valid;	// src/queen/scala/main/Queen.scala:10:28
-    io_rsp_bits_rd_REG <= io_req_bits_rs1;	// src/queen/scala/main/Queen.scala:11:30
+  reg         io_rsp_valid_REG;	// src/queen/scala/main/Queen.scala:12:28
+  reg  [31:0] io_rsp_bits_rd_REG;	// src/queen/scala/main/Queen.scala:13:30
+  wire        decoder1_D_isSche = ~(|io_req_bits_dsaT);	// src/queen/scala/main/QueenInterface.scala:67:24, :79:25
+  wire        decoder1_D_isGemm = io_req_bits_dsaT == 2'h1;	// src/queen/scala/main/Queen.scala:8:7, src/queen/scala/main/QueenInterface.scala:68:24, :80:25
+  wire        decoder1_D_isDma = io_req_bits_dsaT == 2'h2 | (&io_req_bits_dsaT);	// src/queen/scala/main/Queen.scala:8:7, src/queen/scala/main/QueenInterface.scala:69:23, :81:{25,38,48}
+  wire        decoder1_D_is2rs = io_req_bits_funct3[1:0] == 2'h0;	// src/queen/scala/main/Queen.scala:8:7, src/queen/scala/main/QueenInterface.scala:70:23, :82:{26,32}
+  wire        decoder1_D_is1rs = io_req_bits_funct3[1:0] == 2'h1;	// src/queen/scala/main/Queen.scala:8:7, src/queen/scala/main/QueenInterface.scala:71:23, :82:26, :83:32
+  wire        decoder1_D_hasTag = decoder1_D_is1rs;	// src/queen/scala/main/QueenInterface.scala:71:23, :73:24
+  wire        decoder1_D_is1rd =
+    io_req_bits_funct3[1:0] == 2'h2 | (&(io_req_bits_funct3[1:0]));	// src/queen/scala/main/Queen.scala:8:7, src/queen/scala/main/QueenInterface.scala:72:23, :82:26, :84:{32,45,62}
+  wire        decoder2_D_isSche = ~(|io_req_bits_dsaT);	// src/queen/scala/main/QueenInterface.scala:67:24, :79:25
+  wire        decoder2_D_isGemm = io_req_bits_dsaT == 2'h1;	// src/queen/scala/main/Queen.scala:8:7, src/queen/scala/main/QueenInterface.scala:68:24, :80:25
+  wire        decoder2_D_isDma = io_req_bits_dsaT == 2'h2 | (&io_req_bits_dsaT);	// src/queen/scala/main/Queen.scala:8:7, src/queen/scala/main/QueenInterface.scala:69:23, :81:{25,38,48}
+  wire        decoder2_D_is2rs = io_req_bits_funct3[1:0] == 2'h0;	// src/queen/scala/main/Queen.scala:8:7, src/queen/scala/main/QueenInterface.scala:70:23, :82:{26,32}
+  wire        decoder2_D_is1rs = io_req_bits_funct3[1:0] == 2'h1;	// src/queen/scala/main/Queen.scala:8:7, src/queen/scala/main/QueenInterface.scala:71:23, :82:26, :83:32
+  wire        decoder2_D_hasTag = decoder2_D_is1rs;	// src/queen/scala/main/QueenInterface.scala:71:23, :73:24
+  wire        decoder2_D_is1rd =
+    io_req_bits_funct3[1:0] == 2'h2 | (&(io_req_bits_funct3[1:0]));	// src/queen/scala/main/Queen.scala:8:7, src/queen/scala/main/QueenInterface.scala:72:23, :82:26, :84:{32,45,62}
+  always @(posedge clock) begin	// src/queen/scala/main/Queen.scala:8:7
+    io_rsp_valid_REG <= io_req_valid;	// src/queen/scala/main/Queen.scala:12:28
+    io_rsp_bits_rd_REG <= io_req_bits_rs1;	// src/queen/scala/main/Queen.scala:13:30
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// src/queen/scala/main/Queen.scala:6:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/Queen.scala:6:7
-      `FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/Queen.scala:6:7
+  `ifdef ENABLE_INITIAL_REG_	// src/queen/scala/main/Queen.scala:8:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/Queen.scala:8:7
+      `FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/Queen.scala:8:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/queen/scala/main/Queen.scala:6:7
-      automatic logic [31:0] _RANDOM[0:1];	// src/queen/scala/main/Queen.scala:6:7
-      `ifdef INIT_RANDOM_PROLOG_	// src/queen/scala/main/Queen.scala:6:7
-        `INIT_RANDOM_PROLOG_	// src/queen/scala/main/Queen.scala:6:7
+    initial begin	// src/queen/scala/main/Queen.scala:8:7
+      automatic logic [31:0] _RANDOM[0:1];	// src/queen/scala/main/Queen.scala:8:7
+      `ifdef INIT_RANDOM_PROLOG_	// src/queen/scala/main/Queen.scala:8:7
+        `INIT_RANDOM_PROLOG_	// src/queen/scala/main/Queen.scala:8:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/queen/scala/main/Queen.scala:6:7
+      `ifdef RANDOMIZE_REG_INIT	// src/queen/scala/main/Queen.scala:8:7
         for (logic [1:0] i = 2'h0; i < 2'h2; i += 2'h1) begin
-          _RANDOM[i[0]] = `RANDOM;	// src/queen/scala/main/Queen.scala:6:7
-        end	// src/queen/scala/main/Queen.scala:6:7
-        io_rsp_valid_REG = _RANDOM[1'h0][0];	// src/queen/scala/main/Queen.scala:6:7, :10:28
-        io_rsp_bits_rd_REG = {_RANDOM[1'h0][31:1], _RANDOM[1'h1][0]};	// src/queen/scala/main/Queen.scala:6:7, :10:28, :11:30
+          _RANDOM[i[0]] = `RANDOM;	// src/queen/scala/main/Queen.scala:8:7
+        end	// src/queen/scala/main/Queen.scala:8:7
+        io_rsp_valid_REG = _RANDOM[1'h0][0];	// src/queen/scala/main/Queen.scala:8:7, :12:28
+        io_rsp_bits_rd_REG = {_RANDOM[1'h0][31:1], _RANDOM[1'h1][0]};	// src/queen/scala/main/Queen.scala:8:7, :12:28, :13:30
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/queen/scala/main/Queen.scala:6:7
-      `FIRRTL_AFTER_INITIAL	// src/queen/scala/main/Queen.scala:6:7
+    `ifdef FIRRTL_AFTER_INITIAL	// src/queen/scala/main/Queen.scala:8:7
+      `FIRRTL_AFTER_INITIAL	// src/queen/scala/main/Queen.scala:8:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_req_ready = 1'h1;	// src/queen/scala/main/Queen.scala:6:7
-  assign io_rsp_valid = io_rsp_valid_REG;	// src/queen/scala/main/Queen.scala:6:7, :10:28
-  assign io_rsp_bits_rd = io_rsp_bits_rd_REG;	// src/queen/scala/main/Queen.scala:6:7, :11:30
+  assign io_req_ready = 1'h1;	// src/queen/scala/main/Queen.scala:8:7
+  assign io_rsp_valid = io_rsp_valid_REG;	// src/queen/scala/main/Queen.scala:8:7, :12:28
+  assign io_rsp_bits_rd = io_rsp_bits_rd_REG;	// src/queen/scala/main/Queen.scala:8:7, :13:30
 endmodule
 

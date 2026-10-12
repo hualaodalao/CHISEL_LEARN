@@ -37,7 +37,8 @@
   * ■ 刻意保留未动的部分
   *   · 类骨架 / imports / 下方 vals（M、N、K、三个 BASE、simDir）/ behavior of：
   *     suite 身份与将来重写用例的起点，不含 FP16 语义。
-  *   · 下方原有 loadW 架构文档（regs(6)(28)=1、B 按 N×K 转置、bRowOff/bColTileOff、
+  *   · 下方原有 loadW 架构文档（regs(6)(28)=1【(#164) 现为 reg5[28]，见下方订正段】、
+  *     B 按 N×K 转置、bRowOff/bColTileOff、
   *     blockStart 闭式、块内逐 beat -bRowOff 降序）：【与数据格式无关】，按仍支持
   *     格式（INT8/INT4/MX 族）重写 loadW 用例时逐条仍适用，故原样保留。
   *   · HiveSimCommon 的 FP16/BF16 位转换 helper：公共基础设施，仍被
@@ -55,8 +56,19 @@
   *
   * 以下为原有 suite 文档（loadW 模式机制，与格式无关，原样保留）：
   *
+  * ★(#164) 寄存器布局已重排，重写用例时【不要】直接拷下方历史文本里的寄存器号：
+  *   旧 reg1=n / reg2=k 已合并为 reg1 = n|k<<16（读回 Cat(k,n)）；旧 reg3/4/5=a/b/cAddr
+  *   已下移为 reg2/3/4；旧 reg6（loadWMode/三 MxBlk/三 addrMode/三 stride）+ 旧 reg7
+  *   （rnd/三 fmt）已合并为单一 reg5，其中 loadWMode 仍在 bit28（即下方「regs(6)(28)=1」
+  *   现应读作「reg5[28]=1」）；旧 reg6/reg7 槽位已删除（main 侧 wregs/rregs 无 is(6)/is(7)
+  *   分支 ⟹ 写为 no-op、读回 0）。reg0=m、reg8=STATUS、reg9/0A/0B=三 scale 基址不变。
+  *   新 reg5 完整位域见 HiveDebugModel.controlWord5 的契约注释；aStride/bStride/cStride
+  *   三字段已被 main 侧注释删除。
+  *   ★本 suite 当前【零活跃注册用例】（已核实，见 #164 报告）⟹ 无活代码需要适配。
+  *
   * 与垂直模式 HiveCoreSimCase 完全同构的回归门禁，唯一差异：
   *   - regs(6)(28) = 1（loadWMode=1，新 REG_CONTROL 布局）：权重经 bPop → hiveAIn 的 a 数据链
+  *     【(#164) 订正：该位现为 reg5[28]，旧 reg6 槽位已删除】
   *     水平加载（loadW 脉冲链移位 + 末拍 loadWInLock 广播锁存）
   *   - 内存中 B 矩阵按 N×K 转置存储（行=n、列=k）：
   *       bRowOff     = K * (bW/8)            = 128（K=64）

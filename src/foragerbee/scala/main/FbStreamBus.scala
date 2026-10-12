@@ -28,6 +28,7 @@ class FbWriteBeat(dataWidth: Int, addressWidth: Int) extends Bundle {
   val strb = UInt((dataWidth / 8).W)
   val sof  = Bool()
   val eof  = Bool()
+  val atomic = Bool()
 }
 
 /** 写响应 payload

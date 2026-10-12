@@ -183,6 +183,16 @@ object HiveCoreElaborate extends App {
   //     `getBlockSize() =/= 64.U` predicate was a tautology that rejected every
   //     fp4 run unconditionally and silently. fp4 now accepts blk in {16, 32}
   //     exactly like fp8, and errCode 7 is free again.
+  //     (#177) CORRECTION: "errCode 7 is free again" is WRONG for the current source.
+  //     The capacity guard (m > cBufferDepth - totalN) still drives errCodeComb := 7.U
+  //     and is LIVE in all three emitted netlists (git evidence: commit 1ea3464).
+  //     Code 7 must NOT be reallocated. Additionally, errCode 11 (int/non-int format
+  //     cross-boundary guard, V5-only XOR) is now taken by #177.
+  //     Authoritative code space: 0/3/4/5/7/8/10/11 LIVE; 1/2 FROZEN; 6 dead-in-RTL
+  //     but mirrored by golden model; 9 reserved by problem.md. Next available: 12.
+  //     Authoritative priority order (last-connect, high to low):
+  //       3 (MX4xMX8 mix) > 11 (int/non-int cross) > 8 (K not divisible)
+  //         > 10 (cAddr alignment) > 7 (capacity) > 5 > 4 > 3 (isAMx^isBMx) > 0
   //   · HiveCoreExecutor2：kTile 分母泛化为 /elemsPerLane（fp4=4）。
   // require 全部满足：totalN=8×2=16、aW=bW=16(>=16)、cEffW=max(40,16)=40(>=40)、
   //   cDmaExtW=256 默认（isPow2、totalN*32=512 整除、[128,512] 区间、totalN*4=64<=256）、
@@ -207,7 +217,16 @@ object HiveCoreElaborate extends App {
   //   全部无门控）、Hive_HiveWorkUnit.sv（fp4 quad-lane 通路 + 运行期 Mux(isMx4, quad, dualLane)；
   //   原并列预期的 Hive_HiveMacFpMx.sv 因 HiveMacFpMx 已随 FusionMac 重构删除而不再产出，
   //   该通路并入 Hive_HiveFusionMacFp.sv）、HiveCoreCalcConfig 侧 elemsPerLane 2-bit→3-bit
-  //   与 errCode 8 / Fix-4 errCode 3 两支运行期守护。三套产物之间不再有 normalized-diff=0
+  //   与 errCode 8 / Fix-4 errCode 3 两支运行期守护、以及 (#169-W2-3) errCode 10
+  //   （cAddr 非 dmaBytes 对齐守护，【无门控】⟹ 三套配置全部 elaborate）、
+  //   以及 Hive_HiveCoreDmaWrOnly.sv —— (#166) wdata 与 wstrb 同源移位：
+  //     `io_dmaExtWrIF_req_payload_data` 由裸截取 `_..._data_T_1[255:0]` 变为以 addr[4:0]
+  //     （#169-S1 后为显式 5-bit 切片）为控制的 byte-lane 左移；预期该 assign 的 RHS 与
+  //     strb 侧共享【同一个 addr 派生 wire】（同源性可在网表层面核对）。
+  //     ★此项属【数据通路语义变更】，【不是】注释级 diff。#169 之前三套产物均由 #166
+  //       之前的源码发射 ⟹ 产物里的 wdata 仍是缺陷行为（strb 移位、data 不移位）而源码已修，
+  //       该静默分歧已由 #169 重发射三套产物消除（指纹对照见 build/169_main_side_wrapup.md）。
+  //   三套产物之间不再有 normalized-diff=0
   //   关系；数值正确性改由 TB 侧金锚（OCP MX / IEEE-754 独立推导）+ 归一化 stdout 基线守护。
   // ★cfgMx ≡ cfgMxFp4（全 12 字段逐一相同）⟹ verilog_mx 与 verilog_mxfp4 将是同一配置的
   //   重复交付面。本轮不删不合并（需用户裁定），建议见 build/155 报告。

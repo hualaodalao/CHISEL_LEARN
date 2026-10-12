@@ -9,6 +9,7 @@
   *   3. INT4 single kTile  (K=64, loadWMode=1)
   *   4. INT4 multi kTile   (K=128, loadWMode=1)
   *   5. INT8 K not divisible (K=24 -> errCode 8 negative case)
+  *   6. INT8 cAddr misaligned (C_BASE+8 -> errCode 10 negative case) [#170-W5-2]
   *
   * Output format: INT32 (direct truncation of 40-bit accumulator lower 32 bits;
   * no rounding, no FTZ; golden = exact integer sum).
@@ -96,6 +97,18 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
   }
 
   // ==========================================================================
+  // (#170-W5-2) Negative case: cAddr misaligned -> errCode 10
+  // ==========================================================================
+
+  it should "reject INT8 cAddr misaligned with errCode 10 (cAddr%32!=0)" in {
+    runIntErrCase(m = 32, n = 16, k = 32,
+      aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT32,
+      loadWMode = true, expectedErrCode = 10,
+      hint = "int8-errCAddrMisalign",
+      cAddr = C_BASE + 8)   // 0x200008: 8 mod 32 = 8 != 0 -> triggers errCode 10
+  }
+
+  // ==========================================================================
   // Shared runner: positive INT GEMM
   // ==========================================================================
   private def runIntGemm(m: Int, n: Int, k: Int,
@@ -130,7 +143,12 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
     println(s"[$TAG] Expected beats: A=${plan.expAAddrSeq.size} B=${plan.expBAddrSeq.size} " +
       s"C=${plan.expCAddrSeq.size} sA=${plan.expScaleAAddrSeq.size} sB=${plan.expScaleBAddrSeq.size}")
 
-    val cLog = mutable.ArrayBuffer[(Long, BigInt)]()
+    // 【#166】cLog 升为 (addr,data,strb) 三元组，以支持 lane 级逐字节对账；
+    //   sLog（scaleC）保持二元组 -- (#170-W3) scaleC 通道端口宽度 = 1 字节
+    //   (rowW = cScaleRowW = totalN/2 bits; totalN=16 gives rowW=8 bits=1 byte),
+    //   故 lane 窗口退化为单 lane、移位恒 0、strb 恒 0xFF。契约并非「豁免」而是
+    //   在单 lane 端口上平凡退化，结构上不可能出现 data/strb 错位。
+    val cLog = mutable.ArrayBuffer[HiveSimCommon.CWriteBeat]()
     val sLog = mutable.ArrayBuffer[(Long, BigInt)]()
     val addrBad = mutable.ArrayBuffer[String]()
     var addrBadCnt = 0
@@ -163,6 +181,16 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
           if (on) { val a = ad; chk(ch, i, a, exp); log += ((a, da)); ack(true); i + 1 }
           else { ack(false); i }
 
+        // ---- (#166) dmaC write channel driver: additionally peek wstrb so the lane-level
+        //      byte-wise audit (HiveSimCommon.auditCBeatLanes) gets the strobe bits. The old
+        //      path never peeked strb, which is exactly why "strb shifted but wdata not"
+        //      stayed invisible on the TB side. ----
+        def wrChC(ch: String, i: Int, exp: Seq[Long], on: Boolean, ad: => Long, da: => BigInt,
+                  st: => BigInt, ack: Boolean => Unit,
+                  log: mutable.ArrayBuffer[HiveSimCommon.CWriteBeat]): Int =
+          if (on) { val a = ad; chk(ch, i, a, exp); log += ((a, da, st)); ack(true); i + 1 }
+          else { ack(false); i }
+
         // ---- Reset ----
         Seq(dut.io.dmaA.rsp, dut.io.dmaB.rsp).foreach { r =>
           r.valid.poke(false.B); r.payload.data.poke(0.U); r.payload.err.poke(false.B) }
@@ -186,15 +214,19 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
         }
 
         // ---- Configure registers ----
-        cmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, m, n)
-        cmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, k, A_BASE)
-        cmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, B_BASE, C_BASE)
-        cmd(HiveCoreOp.REG_WRITE2, 0x06, 0x07, p.controlWord6, p.controlWord7)
+        // (#164) 寄存器重排后的新写序列（槽位由 12 个压到 8 个有效 = 0..5, 8..11）：
+        //   reg0=m、reg1=n|k<<16（旧 reg2=k 已并入 reg1 高 16 位，读回 Cat(k,n)）、
+        //   reg2/3/4 = a/b/cAddr（旧 reg3/4/5）、reg5 = 控制字（旧 reg6+reg7 合并）。
+        //   ★旧 `cmd(REG_WRITE2, 0x06, 0x07, p.controlWord6, p.controlWord7)` 已删：main 侧
+        //   wregs 无 is(6)/is(7) 分支 ⟹ 写为 no-op、reg5 保持复位 0（aFmt/bFmt/cFmt 全 FP32）
+        //   ⟹ errCode 5 抢跑，且 a/b/cAddr 会被错位写到 reg3/4/5（reg5 被当成 cAddr）。
+        cmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, m, n.toLong | (k.toLong << 16))
+        cmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
+        cmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, p.controlWord5)
         cmd(HiveCoreOp.REG_WRITE2, 0x09, 0x0A, SA_BASE, SB_BASE)
         cmd(HiveCoreOp.REG_WRITE1, 0x0B, 0x00, SC_BASE, 0L)
 
-        println(s"[$TAG] regs: controlWord6=0x${p.controlWord6.toHexString} " +
-          s"controlWord7=0x${p.controlWord7.toHexString}")
+        println(s"[$TAG] regs: reg5(controlWord5)=0x${p.controlWord5.toHexString}")
 
         // ---- EXECUTE ----
         dut.io.cmd.valid.poke(true.B)
@@ -240,10 +272,11 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
             dut.io.dmaScaleB.get.req.valid.peek().litToBoolean,
             dut.io.dmaScaleB.get.req.payload.addr.peek().litValue.toLong, rdSB, plan.wordAt)
           // DMA-C write
-          cB = wrCh("dmaC", cB, plan.expCAddrSeq,
+          cB = wrChC("dmaC", cB, plan.expCAddrSeq,
             dut.io.dmaC.req.valid.peek().litToBoolean,
             dut.io.dmaC.req.payload.addr.peek().litValue.toLong,
             dut.io.dmaC.req.payload.data.peek().litValue,
+            dut.io.dmaC.req.payload.strb.peek().litValue,
             v => dut.io.dmaC.rsp.valid.poke(v.B), cLog)
           // DMA-CScale write (should be idle for INT32 output)
           csB = wrCh("dmaCScale", csB, Seq.empty,
@@ -277,8 +310,18 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
         //      is now fixed (#73: elemBits>=32 skips the histogram tally); this local
         //      path is kept for its INT exact-match semantics. ----
         if (done && !errSeen) {
-          val hwBits = HiveSimCommon.parseDenseCWriteLog(
-            cLog.toSeq, p.cFmt, m, n, totalN, cfg.cDmaExtW)
+          // 【#166 口径升级：strb 逐字节校验】解析走 Checked 变体，同时跑 lane 级审计
+          //   （addr↔strb 双向对账、未选通 lane 零填充核查、BEAT-COUNT），违规直接
+          //   计入 mismatchCnt ⟹ lane 级契约缺陷不再静默放行。期望拍数取金锚
+          //   plan.expCAddrSeq.size（张量语义侧推导），不取硬件实收拍数。
+          val parsed = HiveSimCommon.parseDenseCWriteLogChecked(
+            cLog.toSeq, p.cFmt, m, n, totalN, cfg.cDmaExtW,
+            expBeats = Some(plan.expCAddrSeq.size), expElems = Some(m * n))
+          val hwBits = parsed.matrix
+          println(s"[$TAG] (#166 LANE) ${parsed.laneSummary}")
+          parsed.violations.take(16).foreach(v => println(s"[$TAG]   [#166 LANE] $v"))
+          // (#170-W7) Separate element mismatch from lane violations (single unit each)
+          val laneViolations = parsed.violationCount
           var mismatchCnt = 0
           var maxAbsErr = 0.0
           val details = mutable.ArrayBuffer[String]()
@@ -295,9 +338,9 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
                   f"hwBits=0x${hwBits(mm)(nn)}%X"
             }
           }
-          println(f"[$TAG] Compare: mismatch=$mismatchCnt/${m * n} maxAbsErr=$maxAbsErr%.3e")
+          println(f"[$TAG] Compare: elemMismatch=$mismatchCnt/${m * n} laneViolations=$laneViolations maxAbsErr=$maxAbsErr%.3e")
           details.foreach(d => println(s"[$TAG]   MISMATCH $d"))
-          cmpMismatch = mismatchCnt
+          cmpMismatch = mismatchCnt + laneViolations
           cmpElems = m * n
         }
       }
@@ -329,7 +372,8 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
   // ==========================================================================
   private def runIntErrCase(m: Int, n: Int, k: Int,
       aFmt: DataFormat.Type, bFmt: DataFormat.Type, cFmt: DataFormat.Type,
-      loadWMode: Boolean, expectedErrCode: Int, hint: String): Unit = {
+      loadWMode: Boolean, expectedErrCode: Int, hint: String,
+      cAddr: Long = C_BASE): Unit = {
 
     val p = DebugParams(
       m = m, n = n, k = k,
@@ -342,7 +386,7 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
     )
 
     // Pre-flight: confirm hwErrCode predicts the expected code
-    val predicted = hwErrCode(p, cfg.totalN, cfg.hasMx4)
+    val predicted = hwErrCode(p, cfg.totalN, cfg.hasMx4, cAddr, cfg.cDmaExtW)
     require(predicted == Some(expectedErrCode),
       s"[$TAG] hwErrCode predicted $predicted but expected Some($expectedErrCode); params: ${p.banner}")
 
@@ -379,10 +423,13 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
         }
 
         // ---- Configure registers (same illegal config) ----
-        cmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, m, n)
-        cmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, k, A_BASE)
-        cmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, B_BASE, C_BASE)
-        cmd(HiveCoreOp.REG_WRITE2, 0x06, 0x07, p.controlWord6, p.controlWord7)
+        // (#164) 与 runIntGemm 同构的新写序列：reg1=n|k<<16、reg2/3/4=a/b/cAddr、reg5=控制字；
+        //   旧写 reg6/reg7 那条已删（新布局下为 no-op）。本负向用例期望 errCode=8
+        //   （K 非 kPerBeat 整除 / K=0）；若控制字写不进 reg5，aFmt/bFmt 会退化为 FP32
+        //   ⟹ errCode 5 抢跑（优先级 6>5>4>3>0 的 last-connect 序），归因全失。
+        cmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, m, n.toLong | (k.toLong << 16))
+        cmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
+        cmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, cAddr, p.controlWord5)
         cmd(HiveCoreOp.REG_WRITE2, 0x09, 0x0A, SA_BASE, SB_BASE)
         cmd(HiveCoreOp.REG_WRITE1, 0x0B, 0x00, SC_BASE, 0L)
 

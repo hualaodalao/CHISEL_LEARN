@@ -220,7 +220,22 @@ object HiveDebugModel {
       strictAddr: Boolean,
       maxCycles: Int,
       waveTarget: String,
-      testHint: String) {
+      testHint: String,
+      // (#164) 新 reg5 的 bits[21]/[20]。放在参数表【末尾并带默认值】，故全部既有构造点
+      //   （QuickSpec.runCase、IntSpec.runIntGemm、IntSpec.runIntErrCase，三处都用具名实参）
+      //   零改动即可继续编译。
+      // ★默认 false 的等价性论证（不是「大概没影响」，是可核实的三条）：
+      //   ① 打包式里这两位是 `if (warmup) 1L<<21 else 0L` ⟹ 默认下恒为 0，与排布迁移前
+      //      （reg6/reg7 里根本没有这两位）产出的控制字【逐位相同】；
+      //   ② main 侧【无任何硬件消费者】：`grep -rn "warmup\|warmdown" src/hive/scala/main/`
+      //      只命中 HiveInterface.scala 的字段声明(:148-149)、reg5 写接线(:163-164) 与
+      //      读回 Cat(:193-194) 三类共 6 行，没有第七处 ⟹ 这两位不进任何计算/地址/errCode
+      //      逻辑，硬件行为与「字段不存在」完全一致；
+      //   ③ 金锚侧除 controlWord5 的打包外【不读】这两个字段（validate/hwErrCode/Plan 均
+      //      未引用）⟹ 期望地址序列、期望码、归零判据全部不受影响。
+      //   本轮按裁定【不新增用例】，加字段只为让金锚控制字与寄存器契约同形。
+      warmup: Boolean = false,
+      warmdown: Boolean = false) {
 
     // 【#144 blk 解码跟随 MXBlockSize 枚举收窄】枚举已由 {M8=0,M16=1,M32=2,M64=3}（bytes=8<<sel）
     //   收窄为 {M16=0,M32=1}，故 sel→bytes 的定义式相应改为 16<<sel：sel=0→16(M16)、sel=1→32(M32)。
@@ -231,27 +246,54 @@ object HiveDebugModel {
     def bMxBlk: Int = 16 << bMxBlkSel
     def cMxBlk: Int = 16 << cMxBlkSel
 
-    /** 控制字 regs(7)：rnd(14,12) | cFmt(11,8) | bFmt(7,4) | aFmt(3,0)
-      * 【#120 C2】rnd 扩为 3-bit（bits[14:12]），支持全 5 种舍入模式（RNE/RTZ/RDN/RUP/RMM）。 */
-    def controlWord7: Long =
-      ((rnd.toLong & 0x7) << 12) | ((cFmt.litValue.toLong & 0xF) << 8) |
-        ((bFmt.litValue.toLong & 0xF) << 4) | (aFmt.litValue.toLong & 0xF)
-
-    /** 控制字 regs(6)：loadWMode(28) | cMxBlk(27,26) | bMxBlk(25,24) | aMxBlk(23,22)
-      * | cAddrMode(14) | bAddrMode(13) | aAddrMode(12) | strides(11,0)=0 */
-    def controlWord6: Long =
+    /** (#164) 单一控制字 **reg5** —— 取代原 controlWord6(旧 regs6) + controlWord7(旧 regs7) 两条。
+      *
+      * ★金锚铁律：下列位域【由寄存器契约独立推导】，逐位取自 HiveInterface.scala 的
+      *   `wregs` `is(5.U)` 分支（写侧，:158-172）并与 `rregs` `is(5.U)` 的 Cat（读侧，
+      *   :189-197）交叉核对，**不是**以 RTL 读回值反推拟合。两侧已核实逐位镜像：
+      *     [31:29] 保留 0     | [28]    loadWMode    | [27]    保留 0
+      *     [26]    cMxBlk     | [25]    保留 0       | [24]    bMxBlk
+      *     [23]    保留 0     | [22]    aMxBlk       | [21]    warmup
+      *     [20]    warmdown   | [19]    保留 0       | [18:16] rnd
+      *     [15]    保留 0     | [14]    cAddrMode    | [13]    bAddrMode
+      *     [12]    aAddrMode  | [11:8]  cFmt         | [7:4]   bFmt      | [3:0] aFmt
+      *   Cat 总宽核算：3+1+1+1+1+1+1+1+1+1+1+3+1+1+1+1+4+4+4 = **32** = `ret` 声明宽度 ✓
+      *   （各枚举宽度：DataFormat 10 值→4-bit、RoundingMode 5 值→3-bit、AddrMode 2 值→1-bit、
+      *     MXBlockSize {M16=Value(0.U),M32=Value(1.U)}→1-bit）
+      *
+      * ★迁移要点（旧 → 新）：
+      *   · rnd：旧 regs7 bits[14:12]（<<12）→ 新 reg5 bits[18:16]（**<<16**）；
+      *   · cFmt/bFmt/aFmt：【域内位置不变】(11:8)/(7:4)/(3:0)，只是宿主寄存器 regs7 → reg5；
+      *   · loadWMode / 三个 MxBlk / 三个 addrMode：位号不变(28/26/24/22/14/13/12)，宿主 regs6 → reg5；
+      *   · warmup(21) / warmdown(20)：新增，默认 0（等价性见上方字段注释）；
+      *   · aStride/bStride/cStride：已被 main 侧【注释删除】（HiveInterface:130-132），
+      *     故旧文档串里的 `strides(11,0)=0` 一并删除 —— bits[11:0] 现在整段是三个 4-bit fmt 域。
+      * 注：三个 MxBlk 的掩码沿用 `& 0x3`（未收窄为 `& 0x1`）。对 sel∈{0,1}（MXBlockSize 收窄后
+      *   的【全部】合法取值；QuickSpec.blkToSel 由枚举成员构造、MxSpec 有 require(blkSel 0..1)
+      *   前置防呆）两种掩码产出【逐位相同】⟹ 零行为变化。sel>=2 在旧代码下同样是错的
+      *   （金锚 aMxBlk=16<<2=64 不在枚举内），属既存遗留，本轮不扩大范围，已在报告登记。 */
+    def controlWord5: Long =
       (if (loadWMode) 1L << 28 else 0L) |
         ((cMxBlkSel.toLong & 0x3) << 26) | ((bMxBlkSel.toLong & 0x3) << 24) |
         ((aMxBlkSel.toLong & 0x3) << 22) |
+        (if (warmup)   1L << 21 else 0L) |
+        (if (warmdown) 1L << 20 else 0L) |
+        ((rnd.toLong & 0x7) << 16) |
         ((addrModeSel.toLong & 0x1) << 14) | ((addrModeSel.toLong & 0x1) << 13) |
-        ((addrModeSel.toLong & 0x1) << 12)
+        ((addrModeSel.toLong & 0x1) << 12) |
+        ((cFmt.litValue.toLong & 0xF) << 8) |
+        ((bFmt.litValue.toLong & 0xF) << 4) | (aFmt.litValue.toLong & 0xF)
 
     /** 生效参数一览（启动时打印） */
     def banner: String =
       s"M=$m N=$n K=$k aFmt=$aFmt bFmt=$bFmt cFmt=$cFmt loadWMode=${if (loadWMode) 1 else 0} " +
         s"aMxBlk=$aMxBlk bMxBlk=$bMxBlk cMxBlk=$cMxBlk addrMode=${if (addrModeSel == 0) "MAT" else "TILE"} " +
         s"rnd=$rnd seed=$seed strictAddr=$strictAddr maxCycles=$maxCycles " +
-        f"regs6=0x${controlWord6}%08X regs7=0x${controlWord7}%08X"
+        f"reg5=0x${controlWord5}%08X"
+      // (#164) 本行是【已打印到 stdout】的（QuickSpec.printHealth :294 `生效配置: ${p.banner}`）。
+      //   按任务书只做 `regs6=0x… regs7=0x…` → `reg5=0x…` 的最小替换，【不】把 warmup/warmdown
+      //   加进 banner：两者默认恒 0、本轮无用例置位，加进来只会给归一化基线多添一处待归因的
+      //   文本差异。日后若注册 warmup/warmdown 用例，再按需把它们加回本行。
   }
 
   // ==========================================================================
@@ -264,10 +306,18 @@ object HiveDebugModel {
     *
     * 逐位镜像硬件 last-connect 真值序（后写覆盖前写，源码越靠后优先级越高），用【顺序 if +
     * 后写覆盖 e】编码该序（区别于旧 precheckConfigErr 的 else-if 链首最高）：
-    *   3(MX4xMX8 mix) > 8(fp4 K not divisible by kPerBeat) > 6 > 5 > 4 > 3(isAMx^isBMx) > 0.
-    *   (#146) The former leading `7(fp4 blk!=64)` term is GONE: errCode 7 was
-    *   deleted both in hardware and in this mirror, so code 7 is now free.
-    *   Codes 1/2 stay unreachable and are never revived.
+    *   3(MX4xMX8 mix) > 8(K not divisible) > 10(cAddr alignment) > 7(capacity, RTL-only)
+    *     > 5 > 4 > 3(isAMx^isBMx) > 0.
+    *   (#178 UPDATE) errCode 11 (int/non-int cross-boundary) inserted after code-8,
+    *   before Fix-4. Full order: 3(Fix-4) > 11 > 8 > 10 > 7 > 5 > 4 > 3(xor) > 0.
+    *   Note: code 6 (MXE2M1 output N odd) is commented out in RTL but still mirrored
+    *   by this golden model -- known divergence (see #169 report).
+    *   (#146) The former `7(fp4 blk!=64)` branch was DELETED (tautology after
+    *   MXBlockSize narrowed to {16,32}). However code 7 is NOT free: the CAPACITY
+    *   guard (m > cBufferDepth - totalN) still drives errCodeComb := 7.U and is LIVE
+    *   in all three emitted netlists. New checks must be allocated from 12 upwards
+    *   (11 is now LIVE: int/non-int cross-boundary, #177/#178)
+    *   (see problem.md:93-94). Codes 1/2 stay unreachable and are never revived.
     * ▸ errCode 0/1/2：硬件把 a/b/cMxBlockSize 三违约【合并】为单一 errMXLargerThanKLoadNum→errCode 0，
     *   故 1/2 永不可达（QuantSpec「blk32 over totalN」旧期望 2 实得 0 的红项根因，#124）；本镜像
     *   合并为单一 Some(0)，与 RTL 一致。
@@ -276,7 +326,8 @@ object HiveDebugModel {
     *   hasMx4-gated branch (code7) has been deleted.
     * ▸ code8（P0-1）：fp4(E2M1) 要求 K 被 kPerBeat(=totalN×4=64) 整除，否则 Executor kTiles 地板除
     *   静默丢尾（K=96）或 16-bit 回绕（K<64）；硬件 errCode8 运行期拒绝，金锚镜像之。 */
-  def hwErrCode(p: DebugParams, totalN: Int, hasMx4: Boolean = false): Option[Int] = {
+  def hwErrCode(p: DebugParams, totalN: Int, hasMx4: Boolean = false,
+                 cAddr: Long = C_BASE, cDmaExtW: Int = 256): Option[Int] = {
     def kLoadNum(f: DataFormat.Type): Int = if (isMx8(f) || f == DataFormat.INT8) totalN * 2 else totalN * 4  // 镜像 getKLoadNum（is1B 语义）
     val aMx = isMxAny(p.aFmt); val bMx = isMxAny(p.bFmt); var e = Option.empty[Int]
     if ((aMx && p.aMxBlk > kLoadNum(p.aFmt)) || (bMx && p.bMxBlk > kLoadNum(p.bFmt)) ||
@@ -285,6 +336,17 @@ object HiveDebugModel {
     if ((aMx || bMx) && !p.loadWMode) e = Some(4)
     if (p.aFmt == DataFormat.FP32 || p.bFmt == DataFormat.FP32) e = Some(5)
     if (p.cFmt == DataFormat.MXE2M1 && (p.n & 1) == 1) e = Some(6)
+    // (#169/#170) errCode 10: cAddr not aligned to dmaBytes (= cDmaExtW/8).
+    //   Derived independently from AXI byte-lane contract: wstrb[i] selects
+    //   wdata[8i+7:8i]; a DMA write beat covers dmaBytes consecutive byte lanes
+    //   starting at addr mod dmaBytes. If addr mod dmaBytes != 0, the shifted
+    //   strb+data pair would cross a bus-word boundary, silently losing bytes.
+    //   Guard: cAddr % dmaBytes == 0 (equivalently cAddr[log2Up(dmaBytes)-1:0] == 0).
+    //   Priority: 8 > 10 > 7 > 5 > 4 > 3 > 0 (per #169 netlist-verified order).
+    //   (#178 UPDATE) Full: 3(Fix-4) > 11 > 8 > 10 > 7 > 5 > 4 > 3(xor) > 0.
+    //   In this last-wins chain, 10 is placed AFTER 6 and BEFORE 8.
+    locally { val dmaBytes = cDmaExtW / 8
+      if (dmaBytes > 0 && (cAddr % dmaBytes) != 0) e = Some(10) }
     // [P0-1] fp4(E2M1) K not divisible by kPerBeat -> code8. Placed BEFORE the
     //   mix code3 below, i.e. lower priority, matching the hardware
     //   last-connect order.
@@ -295,6 +357,16 @@ object HiveDebugModel {
     val aPackedInt = p.aFmt == DataFormat.INT8 || p.aFmt == DataFormat.INT4
     if (((hasMx4 && isMxAny(p.aFmt)) || aPackedInt) &&
         (p.k % kPerBeat(p.aFmt, totalN) != 0 || p.k == 0)) e = Some(8)
+    // (#178) errCode 11: int/non-int cross-boundary guard (V5-only XOR).
+    //   Derived independently from register contract semantics:
+    //   cIsIntOut = cFmt is an integer output format (INT8/INT16/INT4/INT32)
+    //   runIsInt  = aFmt is NOT float (FP32/FP16/BF16) AND NOT MX (E4M3/E5M2/E2M1)
+    //               -> aFmt is integer or reserved encoding
+    //   Guard: runIsInt XOR cIsIntOut -> errCode 11 (no cfg gating).
+    //   Placed AFTER code-8, BEFORE Fix-4 code3: priority 3(Fix-4) > 11 > 8.
+    val cIsIntOut = isIntFmt(p.cFmt)
+    val runIsInt = !isFloatFmt(p.aFmt) && !isMxAny(p.aFmt)
+    if (runIsInt != cIsIntOut) e = Some(11)
     // [Fix-4 mirror] MX4xMX8 mix (isMx4(aFmt) ^ isMx4(bFmt)) -> code 3, gated by hasMx4.
     if (hasMx4 && (p.aFmt == DataFormat.MXE2M1) != (p.bFmt == DataFormat.MXE2M1)) e = Some(3)
     // (#146) errCode 7 REMOVED from the mirror. The hardware block it mirrored
@@ -304,8 +376,11 @@ object HiveDebugModel {
     //   unconditionally. Because this mirror carried the same tautology, RTL and
     //   anchor agreed and no test ever went red -- fp4 was permanently unusable
     //   while looking covered. fp4 now supports blk in {16, 32} like fp8; code 8
-    //   is the only fp4 geometry guard left; code 7 is FREE (new checks are
-    //   allocated from 7 upwards, codes 1/2 are never revived).
+    //   is the only fp4 geometry guard left. Code 7 is NOT free: the CAPACITY guard
+    //   (m > cBufferDepth - totalN) still drives errCodeComb := 7.U and is LIVE in
+    //   all three emitted netlists. New checks are allocated from 12 upwards
+    //   (11 is now LIVE: int/non-int cross-boundary, #177/#178);
+    //   (see problem.md:93-94); codes 1/2 are never revived.
     e
   }
 
@@ -313,8 +388,9 @@ object HiveDebugModel {
     * 【P0-2 去双源】改为委托权威单一真源 hwErrCode（原 else-if 分列 Some(0)/Some(1)/Some(2) 的
     *   历史口径已废弃——硬件把三 blk 违约合并为单一 errCode 0，且旧链缺 errCode6、优先级与 RTL
     *   不符，属 #124 已知偏差）。委托后 precheckConfigErr 与 QuickSpec 体检逐位一致。 */
-  def precheckConfigErr(p: DebugParams, totalN: Int, hasMx4: Boolean = false): Option[Int] =
-    hwErrCode(p, totalN, hasMx4)
+  def precheckConfigErr(p: DebugParams, totalN: Int, hasMx4: Boolean = false,
+                         cAddr: Long = C_BASE, cDmaExtW: Int = 256): Option[Int] =
+    hwErrCode(p, totalN, hasMx4, cAddr, cDmaExtW)
 
   /** 运行前防呆：不支持的组合给清晰报错（harness 不得崩溃，故在 simulate 之前抛）
     * 【Fix-8】hasMx4 入参（= cfg.hasMx4）门控 MX4×MX8 混配 require：hasMx4=false 时 fp4 输入
@@ -368,7 +444,8 @@ object HiveDebugModel {
       if (p.cFmt == DataFormat.MXE2M1) require(p.n % 2 == 0, s"mxfp4 输出要求 N(${p.n}) 为偶数")
     }
     // 【#120 B2】addrMode=TILE 放宽：硬件全 RTL 零消费者（#123 审计确认 CalcConfig 与
-    //   两个 DMA 一次都没引用 regs(6) bits[14:12]），设置 TILE 不会改变实际 DMA 寻址行为。
+    //   两个 DMA 一次都没引用 addrMode 位域；(#164) 宿主由旧 regs(6) bits[14:12] 迁到
+    //   reg5 bits[14:12]，位号不变、依旧零消费者），设置 TILE 不会改变实际 DMA 寻址行为。
     //   内存镜像 buildMemory、golden 计算、六路期望地址序列全部仍按 MAT 语义生成，
     //   不受 addrMode 取值影响。仅供寄存器级 debug 与回读对账。
     //   原 require(p.addrModeSel == 0, ...) 已移除。
@@ -990,8 +1067,8 @@ object HiveDebugModel {
     /** MX 量化输出的反量化（码 + 每 8 元素组 1 字节 E8M0 scale） */
     def dequant(code: Int, scale: Int): Double = decodeElem(p.cFmt, code.toLong, scale)
 
-    final case class CmpSummary(elems: Int, mismatch: Int, maxRelErr: Double,
-                                maxAbsErr: Double, details: Seq[String])
+    final case class CmpSummary(elems: Int, mismatch: Int, laneViolations: Int,
+                                maxRelErr: Double, maxAbsErr: Double, details: Seq[String])
 
     /** 硬件写回日志 → 逐元素与 golden 对比（数值容差；INT 输出走近似精确判据）。
       *
@@ -1023,11 +1100,31 @@ object HiveDebugModel {
       *   ④ 旧启发式命中数仍统计但【不参与判定】，供报告给出同批次前后对照；
       *   ⑤ 打印全码（8 幅值码 × 符号）发射计数表与 hw/exp/输入侧各自的未覆盖码集。
       * 【非 MX 分支（FP32/FP16/BF16/INT）与 tolRel/tolAbs 一字未改】。 */
-    def compare(cWriteLog: Seq[(Long, BigInt)],
+    def compare(cWriteLog: Seq[HiveSimCommon.CWriteBeat],
                 scaleWriteLog: Seq[(Long, BigInt)]): CmpSummary = {
-      val hwBits = HiveSimCommon.parseDenseCWriteLog(cWriteLog, p.cFmt, p.m, p.n, totalN, cDmaExtW)
-      val quant = isMxAny(p.cFmt)
+      // 【#166 口径升级：strb 逐字节校验】入参由 (addr,data) 二元组升为 (addr,data,strb)
+      //   三元组；解析走 Checked 变体，同时跑 lane 级审计（addr↔strb 双向对账、未选通
+      //   lane 零填充核查、BEAT-COUNT）。违规逐条折入 mismatch 与 details ⟹ lane 级缺陷
+      //   不再静默放行（旧口径下「strb 已移位、wdata 未同源移位」能恒真假绿，就是因为
+      //   TB 与 RTL 同时假设数据在总线字低位）。
+      //   期望拍数取金锚 expCAddrSeq.size（张量语义侧推导），不取硬件实收拍数。
+      val parsed = HiveSimCommon.parseDenseCWriteLogChecked(
+        cWriteLog, p.cFmt, p.m, p.n, totalN, cDmaExtW, expBeats = Some(expCAddrSeq.size),
+        expElems = Some(p.m * p.n))
+      val hwBits = parsed.matrix
+      println(s"[$TAG] (#166 LANE) ${parsed.laneSummary}")
       val details = mutable.ArrayBuffer.empty[String]
+      // lane 级违规排在 details 最前（定位时优先看到契约级错，再看元素级数值错）
+      parsed.violations.take(16).foreach { v =>
+        println(s"[$TAG]   [#166 LANE] $v")
+        details += s"[#166 LANE] $v"
+      }
+      val quant = isMxAny(p.cFmt)
+      // (#170-W7) mismatch counts ELEMENT-level failures only; laneViolations is separate.
+      //   Previously mismatch started at parsed.violationCount, mixing contract message
+      //   count (unitless) with element mismatch count (elements) -- the ratio 951/1024
+      //   was semantically invalid and could exceed 1.
+      val laneViolations = parsed.violationCount
       var mismatch = 0
       var maxRel = 0.0
       var maxAbs = 0.0
@@ -1448,11 +1545,11 @@ object HiveDebugModel {
           println(s"[$TAG]   ${inHistLine("in B", bEbits, hb)}")
         }
       }
-      CmpSummary(p.m * p.n, mismatch, maxRel, maxAbs, details.toSeq)
+      CmpSummary(p.m * p.n, mismatch, laneViolations, maxRel, maxAbs, details.toSeq)
     }
 
-    /** 打印 hw/ref 前若干行，便于人工定位 */
-    def printRows(cWriteLog: Seq[(Long, BigInt)], rows: Int): Unit = {
+    /** 打印 hw/ref 前若干行，便于人工定位（【#166】入参同步升为三元组口径） */
+    def printRows(cWriteLog: Seq[HiveSimCommon.CWriteBeat], rows: Int): Unit = {
       val hwBits = HiveSimCommon.parseDenseCWriteLog(cWriteLog, p.cFmt, p.m, p.n, totalN, cDmaExtW)
       for (mm <- 0 until math.min(p.m, rows)) {
         val hwStr = (0 until math.min(p.n, 16)).map { nn =>

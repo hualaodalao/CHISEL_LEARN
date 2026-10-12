@@ -366,6 +366,15 @@ class FbCmd(cfg: ForagerBeeConfig) extends Bundle {
 
   /** MX 量化：块大小编码（0→16、1→32、2→64 个元素共享一个 E8M0 scale） */
   val scaleBlockSize = UInt(2.W)
+
+  /** Atomic 标志写使能：置位后，本 DMA 命令**成功完成（errReg=0）**时额外发出一拍
+    * atomic 类型写突发（[[FbWriteBeat]].atomic=true），向 atomicStoreAddr 写入 32-bit 值 1，
+    * 供下游以轮询方式感知「本命令已搬运完毕」。命令出错（errReg=1）时不发。 */
+  val atomicEnable = Bool()
+
+  /** Atomic 标志写目的地址（**必须 4B 对齐**，低 2 位恒 0；非对齐由引擎 atomicAddrBad 拒绝）。
+    * 硬件按 beat 对齐发出单拍突发，strb 精确点亮目标 4 字节，data 把 32'h1 放到对应字 lane。 */
+  val atomicStoreAddr = UInt(cfg.addressWidth.W)
 }
 
 object FbCmd {

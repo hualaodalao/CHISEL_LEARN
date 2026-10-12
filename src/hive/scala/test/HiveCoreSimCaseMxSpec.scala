@@ -7,34 +7,39 @@
   * 故 kTile 数 = K/32（scaleA 块下标 kb = kt）。外部 A/B 存储 1 字节/元素：
   * 行步长 = K 字节（非 2K），k 窗口步进 = 32 字节（2×totalN）。
   *
-  * 【v1 bit 锚守护（任务90 收敛：fp32 直出 + 逐位守护）】单块用例（M=N=K=32）金锚文件
-  * 逐位不变（零改动，sim/mx/v1_anchor_M32_N32_K32.txt）。fp32 直出（outFmt=0）为合法
-  * 受守护路径（P0 契约后保留）：格式族交叉校验批准版（【任务98】扩族）= MX 运行
-  * outFmt ∈ {0,1,2,4,5,6}（0000=fp32 非量化直出，P0 前既有硬件行为；【任务98】
-  * 新增 0001/0010=fp16/bf16 降精度直出——cvt 40→32→16 两级舍入链、2B/元素密集
-  * 布局，锚守护仅 fp32 位对账生效，16-bit 路径以 DMA-C 逐拍硬断言+解码容差守护；
-  * 4/5/6 为 MX 量化输出；「MX 强制量化」严格版已否决）。
-  * 本套件主守护 = fp32 输出逐位相等断言（锚 bits vs 硬件 fp32 bits，同链重建：
-  * 40→32 固定简化 RNE 规格化）；P3 迁移仅换解析器与密集地址序列（256-bit 密集拍、
-  * 2 拍/行），数值链与锚录制条件逐字一致。无 dmaCScale 请求（非量化运行死路，
-  * 附加断言守护）。
-  * 【无锚用例留痕（Hank P1-B）】multi-tile（M=4/N=32/K=64）与 multi-pass（M=4/N=16/K=64）
-  * 两条用例无 v1 bit 锚：v1 代码已被 v2 直接替换、v1 硬件已不在工作区，无法补录锚；
-  * 该两条仅靠 1e-2 golden 容差守护（属降级守护）。若需升级回 bit 锚，须先在 git 历史
-  * 恢复 v1 代码补录锚文件至 sim/mx/ 后再接入 anchorPath。
+  * 【守护策略（#175 方案A）】本套件所有用例的数值正确性由运行期独立推导的双精度
+  * golden 承担，不落盘任何锚文件。主守护 = #166 AXI byte-lane 审计（硬断言零违规）
+  * + 双精度 golden 容差交叉（fp32 输出：1e-2 相对容差，唯一偏差源为 fp32 累加舍入；
+  * fp16/bf16 输出：同链 40→32→16 两级舍入后逐位硬断言）。MX 运行合法输出族 =
+  * outFmt ∈ {0,1,2,3,4,5}（0=fp32 非量化直出，1/2=fp16/bf16 降精度直出，
+  * 3/4/5=MXE4M3/MXE5M2/MXE2M1 量化输出）。fp32 直出为 HiveOutCvt.fmtReg 复位
+  * 默认值与 MuxCase 默认臂，无任何硬件级拒绝路径。无 dmaCScale 请求（非量化运行
+  * 死路，附加断言守护）。
+  * 【历史说明】原 v1 bit 锚（sim/mx/v1_anchor_M32_N32_K32.txt）已被 owner 删除
+  * （双重违规：持久金锚放在只允许临时仿真产物的 sim/ 下、且被 git add -f 越过
+  * .gitignore 强行跟踪；全仓从未有过 writer，不可再生）。相关代码引用已全部清除。
   *
   * 结构与 HiveCoreSimCaseLoadWSpec 同构（loadW 水平加载 + 转置 B），差异：
   *   - aW=bW=16（16-bit lane 打包 2×8-bit 元素），cW=40（复用 fp32 延迟规格化累加器）
-  *   - regs(7)=0x43 + regs(6)(28)=1：aFmt=MXE4M3(3)、bFmt=MXE5M2(4)、loadWMode=1、rnd=RNE
-  *       aFmt = regs(7)(2,0) = 3 (MXE4M3，#97 DataFormat 重编号后值)
-  *       bFmt = regs(7)(6,4) = 4 (MXE5M2) → 3 | 4<<4 = 0x43
-  *       loadWMode = regs(6)(28)（从旧 regs(7) bit5 迁出；mixFmtEn 位已删除）
+  *   - (#164) 寄存器重排后：控制字全部收敛到 reg5 单寄存器（旧 regs(6)+regs(7) 已删除）：
+  *       reg5 = 0x11400043 + (rnd<<16) + (outFmt<<8)
+  *       aFmt = reg5[3:0]   = 3 (MXE4M3，#97 DataFormat 重编号后值)
+  *       bFmt = reg5[7:4]   = 4 (MXE5M2) → 3 | 4<<4 = 0x43（域内位置与旧 regs(7) 相同）
+  *       cFmt = reg5[11:8]  = outFmt（fp32 直出时为 0）
+  *       rnd  = reg5[18:16]（旧 regs(7)[14:12]，#164 移位 <<12 → <<16）
+  *       loadWMode = reg5[28]（旧 regs(6)[28]，位号不变）；aMxBlk/bMxBlk = reg5[22]/[24]；
+  *       cMxBlk = reg5[26]；warmup/warmdown = reg5[21]/[20]（#164 新增，本 suite 不置位）
   *     (#155 MJ3) 订正：原文写 regs(7)=0x65 且「aFmt=5(MXE4M3)、bFmt=6(MXE5M2)…DataFormat
   *       重编号后值」——自相矛盾：重编号后 MXE4M3=3、MXE5M2=4，而 5/6 是重编号【前】的旧值
   *       （新编号下 5=MXE2M1、6=INT32）。runMxGemm 的构造式一直写 0x43L，故本文档行是陈旧
   *       陈述而非代码缺陷。同一陈旧字面量另见 runMxGemm 的控制字自检（已随 fp32 锚用例订正）
-  *       与 runMxErrCase / runMxOutFmtErrCase 内的 0x65L（负向运行器，无调用点 / 当前不可达，
-  *       本轮只登记不改：改它会同时改变这两条负向用例实际下发的 aFmt/bFmt，属语义变更）。
+  *       与 runMxErrCase 内的 0x65L（负向运行器，无调用点，本轮只登记不改）。
+  *       (#178 订正) runMxOutFmtErrCase 的 0x65L 已改为 0x43L（与 runMxGemm 同源），
+  *       并注册了真触达负向用例（outFmt=INT32 → errCode 11），本函数现已可达。
+  *       (#178 补充订正) 上行对 runMxErrCase 的陈述【本身也已陈旧】：#164 已把它的
+  *       形参 `regs7` 改名为 `ctl5: Long`（完整 reg5 控制字由调用方传入），函数体内
+  *       【不含任何 0x65L 字面量】；且它至今【无调用点】。全文件现存 0x65 只出现在
+  *       历史说明注释里，活代码已零残留 ⟹ 该项登记可结案。
   *   - 新增两条 scale 只读 DMA 外部通道（仅 hasMx 暴露）：
   *       dmaScaleA = scaleA（8-bit/beat，随激活流动）
   *       dmaScaleB = scaleB（【任务109】端口收窄为 8-bit/beat，逐字节，HiveCoreDmaRdOnly
@@ -94,7 +99,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
   val C_BASE:       Long = 0x00200000L
   val SCALE_A_BASE: Long = 0x00300000L
   val SCALE_B_BASE: Long = 0x00400000L
-  // 【任务95】量化输出（outFmt∈{4,5,6}）scale 写回基址（regs 0x0B），与 scaleA/B 基址不重叠
+  // 【任务95】量化输出（outFmt∈{3,4,5}；#178 订正：原写 {4,5,6} 为 #97 重编号前陈旧值）scale 写回基址（regs 0x0B），与 scaleA/B 基址不重叠
   val SCALE_C_BASE: Long = 0x00500000L
 
   val simDir = "/Users/wangliutailong/Qoder_Proj/Chisel_Learn/sim/mx"
@@ -105,9 +110,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     runMxGemm(M = 32, N = 32, K = 32,
       waveName = "hivecore_mx_sim.fst",
       testMangle = "should-run-MX-single-block-GEMM-M-32-N-32-K-32-E4M3xE5M2",
-      // 【任务90 收敛】v1 锚录于 fp32 输出；目标态恢复 fp32 直出 + 逐位守护。
       // fp32 256-bit 下 2 拍/行，窗口按新拍数几何归档（放宽不放松断言）。
-      anchorPath = Some(s"$simDir/v1_anchor_M32_N32_K32.txt"),
       //outFmt = DataFormat.MXE4M3, 
       outFmt = DataFormat.FP16, 
       blkSel = 0,   // 【#144】原 blkSel=1（旧枚举=block16）→ 新枚举 block16=sel0；本用例 outFmt=FP16 非量化，blkSel 不参与结果，仅保持声明块=16 的原意且 ≤ totalN
@@ -115,66 +118,64 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
   }
 
   // ==========================================================================
-  // (#155 MJ3) SECOND permanent registration -- outFmt = FP32 direct output.
+  // (#175) SECOND registration -- outFmt = FP32 direct output.
   // --------------------------------------------------------------------------
-  // WHY THIS CASE EXISTS: the v1 gold anchor sim/mx/v1_anchor_M32_N32_K32.txt is
-  //   a recording of 1024 fp32 BIT PATTERNS (the header says so verbatim:
-  //   "per-element fp32 bits (lower 32b of 40-bit normalized store), row-major").
-  //   The anchor guard inside runMxGemm is gated on `outFmt == DataFormat.FP32`
-  //   (see the "【任务98】锚守护仅 outFmt=0 生效" block), because a 16-bit fp16
-  //   pattern cannot be compared against a 32-bit recording. The live case above
-  //   runs outFmt=FP16, so with only that case registered:
-  //     · the anchor-existence assertion (Files.exists) never executes,
-  //     · the anchor token-count assertion (length == M*N) never executes,
-  //     · the bit-exact anchorMismatch == 0 assertion never executes,
-  //     · parseDenseCWriteLog is still called but its result `hwBits` is DEAD.
-  //   i.e. the anchor file was being carried in the repository, referenced by a
-  //   live call site (anchorPath = Some(...)), and yet guarding NOTHING. This
-  //   registration is what gives those three assertions teeth again.
-  // WHAT IS DELIBERATELY NOT CHANGED: the live FP16 case above is untouched
-  //   byte-for-byte (geometry, waveName, testMangle, outFmt, blkSel, window).
-  //   Both cases share the same anchorPath and the same M/N/K, so they are a
-  //   matched pair: same stimulus, same expected tensor, two output encodings --
-  //   FP16 exercises the 40->32->16 rounding chain against the golden model,
-  //   FP32 exercises the 40->32 normalization against the RECORDED v1 bits.
-  // ANCHOR PROVENANCE / DRIFT POLICY: the anchor was recorded on unmodified v1
-  //   code (file header) with cycles_to_done=282, A/B/C/sA/sB bases identical to
-  //   the constants above, aFmt=MXE4M3 & bFmt=MXE5M2 (still what runMxGemm
-  //   generates: floatToMxE4M3 / floatToMxE5M2), and the same deterministic
-  //   scaleAExp/scaleBExp/aValF/bValF stimulus. Its recorded regs7 (0x5E0) is a
-  //   v1 REG_CONTROL layout that no longer exists (mixFmtEn has been deleted,
-  //   loadWMode moved to regs(6)(28)) -- the guard compares C DATA bits only, so
-  //   the register-layout difference is not a comparison input.
-  //   If this case goes red on anchorMismatch, that means cross-version NUMERICAL
-  //   layout drift. Per #155 裁定 2 the required response is to attribute it
-  //   element-by-element and report it truthfully. FORBIDDEN responses: editing
-  //   the anchor file, or loosening the comparison (e.g. switching to a tolerance
-  //   or dropping the gate). A red here is an acceptable, informative outcome.
-  // expCycleWindow = (120, 800): the SAME window the live case already uses, and
-  //   its own comment records that it was archived for the fp32 2-beats-per-row
-  //   geometry ("fp32 256-bit 下 2 拍/行，窗口按新拍数几何归档"). It therefore
-  //   belongs to this case by derivation, not by fitting: the anchor's recorded
-  //   cycles_to_done=282 sits inside it with margin on both sides.
+  // Same stimulus (M=N=K=32, E4M3xE5M2) as the FP16 case above, exercising the
+  // 40->32 normalization path against the runtime-derived double-precision golden
+  // (1e-2 relative tolerance). Primary numerical guard = golden cross-check.
+  // Test name retains "v1-anchor" as historical nomenclature (testMangle/waveName
+  // coupling at :1082/:1086); the anchor file itself has been removed per owner
+  // decision (#175). FP32 output remains fully supported hardware (HiveOutCvt
+  // fmtReg default + MuxCase default arm).
+  // expCycleWindow = (120, 800): derived from fp32 2-beats-per-row geometry.
   // blkSel = 0: outFmt=FP32 is NOT quantized (isQuant=false), so blkSel does not
-  //   enter the result; 0 keeps the declared block at 16 (<= totalN) exactly as
-  //   the live case does, and keeps controlWord6 identical between the two cases.
+  //   enter the result; 0 keeps the declared block at 16 (<= totalN).
   // ==========================================================================
   it should "run MX single-block GEMM M=32 N=32 K=32 E4M3xE5M2 fp32 v1-anchor" in {
     runMxGemm(M = 32, N = 32, K = 32,
       waveName = "hivecore_mx_sim_fp32_anchor.fst",
       testMangle = "should-run-MX-single-block-GEMM-M-32-N-32-K-32-E4M3xE5M2-fp32-v1-anchor",
-      anchorPath = Some(s"$simDir/v1_anchor_M32_N32_K32.txt"),
       outFmt = DataFormat.FP32,
       blkSel = 0,
       expCycleWindow = Some((120, 800)))
+  }
+
+  // ==========================================================================
+  // (#178) THIRD registration -- negative case: outFmt = INT32 triggers errCode 11.
+  // --------------------------------------------------------------------------
+  // Same MX stimulus (M=N=K=32, E4M3xE5M2) but with an integer output format.
+  // INT32 is NOT in the MX legal output family {0,1,2,3,4,5}, so runMxGemm
+  // dispatches to runMxOutFmtErrCase. The hardware errCode 11 (int/non-int
+  // cross-boundary XOR) fires because:
+  //   runIsInt(aFmt=MXE4M3) = false (MX input -> not integer runtime)
+  //   cIsIntOut(cFmt=INT32) = true  (INT32 is integer output)
+  //   false XOR true = true -> errCode 11
+  // Exhaustive exclusion of higher-priority codes:
+  //   Fix-4 code3: isMx4(E4M3)=false, isMx4(E5M2)=false -> false!=false = NO
+  //   code8: K=32, kPerBeat(MXE4M3,16)=32, 32%32=0 -> NO
+  //   code10: C_BASE=0x200000, 0x200000%32=0 -> NO
+  //   code7: m=32, cBufferDepth=2048, 32>2048-16=2032? NO
+  //   code5: aFmt=MXE4M3!=FP32, bFmt=MXE5M2!=FP32 -> NO
+  //   code4: loadWMode=1 -> NO
+  //   code3(xor): isMx(E4M3)=true, isMx(E5M2)=true -> true^true=false -> NO
+  //   code0: aMxBlk=16<=kLoadNum=32, bMxBlk=16<=32, cFmt not MX -> NO
+  // Therefore errCode 11 is the ONLY code that fires.
+  // ==========================================================================
+  it should "reject MX E4M3xE5M2 outFmt INT32 errCode 11" in {
+    runMxGemm(M = 32, N = 32, K = 32,
+      waveName = "hivecore_mx_sim_errcode11.fst",
+      testMangle = "should-reject-MX-E4M3xE5M2-outFmt-INT32-errCode-11",
+      outFmt = DataFormat.INT32,
+      blkSel = 0,
+      expCycleWindow = None)
   }
 
   
   // ==========================================================================
   // 共享运行器：配置 MX HiveCore，逐拍供 A/B/C/scaleA/scaleB，golden 比对。
   // 【任务95】outFmt 参数化（4-bit 编码，见 HiveEnum DataFormat 枚举）：
-  //   - outFmt ∈ {0,4,5,6}（MX 合法族）：0=fp32 直出（锚+golden 双守护，默认）；
-  //     4/5/6=量化输出——期望链 40→32 规格化 → swQuantBlock（码+块 scale），
+  //   - outFmt ∈ {0,1,2,3,4,5}（MX 合法族）：0=fp32 直出（锚+golden 双守护，默认）；
+  //     1/2=fp16/bf16 降精度直出；3/4/5=量化输出——期望链 40→32 规格化 → swQuantBlock（码+块 scale），
   //     dmaC 密集码 + dmaCScale 块 scale 双通道逐拍地址/数据硬对账，
   //     另按 scale 反量化做容差交叉（第二视角，冲刷界豁免）；
   //   - 其余编码（MX 非法族）：Executor 族交叉校验 execute 拍 config-err →
@@ -183,11 +184,13 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
   //     且整除——硬件同校验 config-err，此处前置 require 防呆）；
   //   - rnd：运行期舍入（0=RNE/1=RTZ/2=RDN/3=RUP/4=RMM，量化末级用）；
   //   - cScaleBackpressure：dmaCScale req.ready 每 3 拍关 1 拍（量化防丢拍验证）。
-  //   默认参数（outFmt=0/blkSel=0/rnd=0）regs(7) 是纯 0x43（= MXE4M3(3)|MXE5M2(4)<<4；
-  //   (#155 MJ3) 订正：原文写 0x65，为 #97 重编号前的陈旧值）；loadWMode 在 regs(6)(28)。
+  //   默认参数（outFmt=0/blkSel=0/rnd=0）下 (#164) reg5 = 0x11400043：低 12 位 = 0x43
+  //   （= MXE4M3(3)|MXE5M2(4)<<4；(#155 MJ3) 订正：原文写 0x65，为 #97 重编号前的陈旧值），
+  //   loadWMode 在 reg5[28]、aMxBlk/bMxBlk 在 reg5[22]/[24]（三者均为 sel=1=M32 与 loadWMode=1）。
+  //   （#164 前：loadWMode/MxBlk 在 regs(6)、格式字在 regs(7)，现已合并。）
   // ==========================================================================
   private def runMxGemm(M: Int, N: Int, K: Int, waveName: String, testMangle: String,
-      anchorPath: Option[String] = None, expCycleWindow: Option[(Int, Int)] = None,
+      expCycleWindow: Option[(Int, Int)] = None,
       outFmt: DataFormat.Type = DataFormat.FP32, blkSel: Int = 0, rnd: Int = 0,
       cScaleBackpressure: Boolean = false): Unit = {
 
@@ -223,19 +226,18 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     val isQuant = outFmt == DataFormat.MXE4M3 || outFmt == DataFormat.MXE5M2 || outFmt == DataFormat.MXE2M1
     // 【任务98】fp16/bf16 合法化：MX 输入运行允许降精度直出（cvt 两级舍入链
     // 40→32 规格化 + 32→16 rnd 降精度、2B/元素密集布局），与 Executor mxFmtOk
-    // 白名单同步扩为 {0,1,2,4,5,6}；int 族与 reserved 仍走负向 runMxOutFmtErrCase
-    // （硬件 errCode 6 拒绝，负向语义自洽）。
+    // 白名单同步扩为 {0,1,2,3,4,5}；int 族与 reserved 仍走负向 runMxOutFmtErrCase
+    // （硬件 errCode 11 拒绝，负向语义自洽；#178 订正：原写 errCode 6 为陈旧值）。
     // anchor 忽略语义：v1 锚是 fp32 位录制，fp16/bf16 位模式不可对账 → 锚守护
     // 仅 outFmt=0 生效（下方锚块门控）；用户注释掉的 anchor 守卫 require 保持注释态。
     val isFp16Out = outFmt == DataFormat.FP16 || outFmt == DataFormat.BF16
-    val mxFmtOk = outFmt == DataFormat.FP32 || isFp16Out || isQuant   // MX 运行合法族 {0,1,2,4,5,6}
+    val mxFmtOk = outFmt == DataFormat.FP32 || isFp16Out || isQuant   // MX 运行合法族 {0,1,2,3,4,5}
     val outFmtInt = outFmt.litValue.toInt  // 枚举 → 4-bit 整型编码（控制字位域打包专用；【任务104】HiveSimCommon 已枚举化，地址/拍数/量化调用直传 outFmt）
     val blk = 16 << blkSel   // 【#144】新枚举 {M16=0,M32=1} → blk=16<<blkSel（旧 8<<blkSel 已废）
     // 【任务97】原 Int 范围校验（outFmt 0..15）随类型化作废：DataFormat 枚举已约束
     // 合法值域 0..10；枚举无法表达 11..15 未定义码（本文件无 11..15 使用）。
     require(blkSel >= 0 && blkSel <= 1, s"blkSel($blkSel) must be 0..1 (block 16/32)")
     require(rnd >= 0 && rnd <= 4, s"rnd($rnd) 必须 0..4（RNE/RTZ/RDN/RUP/RMM）")
-    //require(anchorPath.isEmpty || outFmt == DataFormat.FP32,"v1 锚为 fp32 bits 录制，锚守护仅 outFmt=0（fp32 直出）路径可用")
     if (isQuant) {
       require(blk <= totalN && totalN % blk == 0,
         s"量化块 blk($blk) 必须 ≤ totalN($totalN) 且整除（硬件同校验 config-err）")
@@ -243,16 +245,16 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         s"mxfp4 半字节/元素，N($N) 必须偶数（行宽整字节，硬件同校验 config-err）")
     }
     require(!cScaleBackpressure || isQuant,
-      "cScaleBackpressure（dmaCScale 间歇反压）仅量化运行（outFmt∈{4,5,6}）有意义")
+      "cScaleBackpressure（dmaCScale 间歇反压）仅量化运行（outFmt∈{3,4,5}）有意义")
     // 【任务90 收敛：fp32 直出为合法受守护路径（P0 契约后保留）】格式族交叉校验批准版 =
-    // MX 运行 outFmt ∈ {0,4,5,6}（0000=fp32 非量化直出；「MX 强制量化」严格版已否决）。
+    // MX 运行 outFmt ∈ {0,1,2,3,4,5}（0000=fp32 非量化直出；「MX 强制量化」严格版已否决）。
     // v1 锚录于 fp32 输出 → 本套件恢复 fp32 直出 + 逐位守护；P3 迁移仅换解析器与密集地址序列。
     val beatsPerRow = HiveSimCommon.cBeatsPerRow(outFmt, totalN, cfg.cDmaExtW)  // fp32 2 拍/行；【任务98】fp16/bf16 与量化族 1 拍/行（2B/元素，totalN*16=256 恰满拍）
 
     println(s"debug0 mxFmtOk=$mxFmtOk")
     if (!mxFmtOk) {
       // 【任务95→98】MX 非法 outFmt（int 族/reserved）：整数输出对 MX 输入无意义，
-      // Executor errCode 6 拒绝（fp16/bf16 已合法化改走 E2E）→ 无数值期望可对，
+      // Executor errCode 11 拒绝（#178 订正：原写 errCode 6 为陈旧值；fp16/bf16 已合法化改走 E2E）→ 无数值期望可对，
       // 分派族交叉闸门负向运行器（同 runMxErrCase 轮询范式），语义自洽。
       runMxOutFmtErrCase(M, N, K, outFmt, waveName, testMangle)
       return
@@ -387,12 +389,17 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         else if (isFp16Out) expectedFp16Row(nt, row)   // 【任务98】fp16/bf16 16-bit 位模式（与 cvt 逐位同构）
         else expectedFp32Row(nt, row)
       val denseRow = HiveSimCommon.elemsToDenseRow(elemRow, outFmt, totalN = totalN)
-      HiveSimCommon.denseRowBeat(denseRow, beatInRow, cfg.cDmaExtW)
+      // 【#166】lane 偏移由【金锚期望地址】expCAddrSeq(beatIdx) 推出，【不读硬件实收
+      //   addr】——后者会把期望值退化成 RTL 的镜像，违反金锚铁律（#133 同类教训）。
+      //   推导链：addr mod dmaBytes = 本拍在总线字内的起始 byte lane（AXI 契约），
+      //   denseRowBeat 再把密集段左移同样多的 lane ⟹ 与 main 侧 wdata/wstrb 同源移位一致。
+      val laneOff = HiveSimCommon.cLaneOffset(expCAddrSeq(beatIdx), cfg.cDmaExtW)
+      HiveSimCommon.denseRowBeat(denseRow, beatInRow, cfg.cDmaExtW, laneOff)
     }
 
     // ==================== DMA-CSCALE：按 isQuant 分派 ====
     // 【任务90 收敛】fp32 直出非量化运行 → 该通道为死路，仅保留「全程零请求」负向守护。
-    // 【任务95】量化运行（outFmt∈{4,5,6}）→ 双通道写回：地址线性模型
+    // 【任务95】量化运行（outFmt∈{3,4,5}）→ 双通道写回：地址线性模型
     //   base + nt×(totalN/blk) + m×ceil(N/blk)（与 HiveCoreDmaScaleWr 同源），
     //   数据 = 每 8 元素组 1 字节 E8M0 scale（scaleBytesPerRow = ceil(N/blk) 字节）；
     //   主循环逐拍地址/数据硬对账（runMxQuantGemm 同范式，W-Adam2 背压可选）。
@@ -446,9 +453,9 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     // rowStep/colTileOff 直取 calcConfig 的 scaleB 偏移（与硬件同源，HiveCoreCalcConfig
     //   L199-214）：scaleBRowAddressOffset = K/blkB、scaleBColTileAddressOffset =
     //   bKLoadNum/blkB；blkB 由 regFile.bMxBlockSize 决定（【#144】MXBlockSize 收窄后
-    //   controlWord6 bits(25,24)=1=M32 → blkB=32，见下方 controlWord6 打包），
+    //   (#164) reg5[24]=1=M32 → blkB=32，见下方 controlWord5 打包），
     //   bKLoadNum = getKLoadNum(bFmt=MXE5M2, mx8) = totalN*2 = 32。
-    val blkB = 16 << 1                                 // bMxBlockSize=1(新枚举 M32) → 32（controlWord6 硬编码 1L<<24）
+    val blkB = 16 << 1                                 // bMxBlockSize=1(新枚举 M32) → 32（(#164) reg5[24] 硬编码 1L<<24）
     val bKLoadNum = totalN * 2                         // bFmt 为 mx8 → totalN*2 = 32
     val scaleBRowOff     = (K / blkB).toLong           // = calcConfig.scaleBRowAddressOffset
     val scaleBColTileOff = (bKLoadNum / blkB).toLong   // = calcConfig.scaleBColTileAddressOffset
@@ -504,7 +511,9 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       // 非量化 = 「全程零请求」负向计数（【任务90 收敛】守护不变）。
       var dmaCScaleReqs = 0
       val scaleBAddrLog = scala.collection.mutable.ArrayBuffer[Long]()  // scaleB DMA 实际取址序列（逐 beat 对账）
-      val cWriteLog = scala.collection.mutable.ArrayBuffer[(Long, BigInt)]()
+      // 【#166】dmaC 写回日志升为 (addr,data,strb) 三元组：旧口径从不 peek strb，
+      //   使「strb 已移位、wdata 未同源移位」在 TB 侧长期不可见。
+      val cWriteLog = scala.collection.mutable.ArrayBuffer[HiveSimCommon.CWriteBeat]()
       // 【任务95】dmaCScale 实际写回序列（量化 dequant 交叉第二视角用，非量化恒空）
       val scaleWriteLog = scala.collection.mutable.ArrayBuffer[(Long, BigInt)]()
 
@@ -551,10 +560,17 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       }
 
       // ===== 配置寄存器（【任务90 收敛】fp32 直出默认；【任务95】outFmt 参数化叠加） =====
-      // MX 基础位 E4M3×E5M2（新 REG_CONTROL 布局：aFmt→bits(2,0)、bFmt→bits(6,4)）；
-      // loadWMode=1 迁至 regs(6)(28)（data0 = 1<<28，MX 下缺省即 errCode 4）。
-      // 按参数叠加位域（REG_CONTROL 同源）：rnd→bits(14,12)（默认 RNE=0 不置位）、
-      // outFmt→bits(10,8)、blkSel→controlWord6 bits(27,26)。
+      // (#164) 寄存器重排：旧 regs(6)（loadWMode + 三 MxBlk + 三 addrMode + 三 stride）与
+      //   旧 regs(7)（rnd + 三 fmt）已合并为单一 reg5，旧 reg6/reg7 在 main 侧 wregs 里
+      //   无 is(6)/is(7) 分支 ⟹ 写为 no-op、读回 0（Chisel switch 无 otherwise 即 no-op）。
+      // MX 基础位 E4M3×E5M2：aFmt → reg5[3:0]、bFmt → reg5[7:4]（域内位置与旧 regs(7) 相同）；
+      // loadWMode=1 在 reg5[28]（MX 下缺省即 errCode 4）；aMxBlk/bMxBlk = reg5[22]/[24]。
+      // 按参数叠加位域（与 HiveInterface.wregs is(5.U) 同源）：rnd → reg5[18:16]（★#164：旧 <<12
+      //   → 新 <<16；默认 RNE=0 不置位）、outFmt(cFmt) → reg5[11:8]、blkSel(cMxBlk) → reg5[26]。
+      // ★(#164 裁定 4) outFmtInt 的掩码由 `& 0x7` 修为 `& 0xF`：DataFormat 是 4-bit 域（枚举 10 值），
+      //   3-bit 掩码会把 INT8(8)→0=FP32、INT4(9)→1=FP16 静默截断，而 FP32/FP16 恰好落在 MX
+      //   输入的【合法】输出族 {0,1,2,3,4,5} 里 ⟹ 负向用例 runMxOutFmtErrCase 会被静默变成
+      //   正向（硬件不置 err）。金锚 HiveDebugModel.controlWord5 一直用 `& 0xF`，本处为既存缺陷。
       // ★(#155 MJ3) 订正本段注释与下方自检的陈旧字面量 0x65：
       //   0x65 = 5 | 6<<4 是【#97 之前】的 DataFormat 编号（MXE4M3=5、MXE5M2=6）。
       //   #97 把枚举重编号为 FP32=0/FP16=1/BF16=2/MXE4M3=3/MXE5M2=4/MXE2M1=5/INT32=6/…，
@@ -580,24 +596,39 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       //   sel=1(新枚举 M32=32)，保持「MX 输入 scale 块 = 32」的原意不变（金锚 kBlocks=K/32、
       //   kb=k/32、lane 打包 kt*32 全部按 block=32 推导）。旧 sel=2 在新枚举下越界，硬件
       //   getBlockSize(2) 落 otherwise→16，会使 scaleA/scaleB 行步进 K/16 与金锚 K/32 失配。
-      val controlWord6 = (1L << 28) | ((blkSel.toLong & 0x3) << 26) | ((1L & 0x3) << 24) | ((1L & 0x3) << 22)
-      val controlWord =
-        0x43L | ((rnd.toLong & 0x7) << 12) |
-        ((outFmtInt.toLong & 0x7) << 8)
+      // (#164) 合并后的单一控制字 reg5：位域由 HiveInterface.wregs 的 is(5.U) 分支逐位推导，
+      //   与金锚 HiveDebugModel.controlWord5 同形（warmup[21]/warmdown[20] 本轮不置位，恒 0）。
+      //   三个 MxBlk 的 `& 0x3` 掩码沿用旧写法（域实际宽 1 bit）：sel∈{0,1} 下与 `& 0x1` 逐位
+      //   相同 ⟹ 零行为变化；属既存遗留，本轮不改（已在报告登记）。
+      val controlWord5 =
+        (1L << 28) |                                 // loadWMode   reg5[28]
+        ((blkSel.toLong & 0x3) << 26) |              // cMxBlk      reg5[26]
+        ((1L & 0x3) << 24) |                         // bMxBlk      reg5[24] = sel1 = M32
+        ((1L & 0x3) << 22) |                         // aMxBlk      reg5[22] = sel1 = M32
+        ((rnd.toLong & 0x7) << 16) |                 // rnd         reg5[18:16]（旧 <<12）
+        ((outFmtInt.toLong & 0xF) << 8) |            // cFmt        reg5[11:8]（★掩码 0x7→0xF）
+        0x43L                                        // bFmt=MXE5M2(4)<<4 | aFmt=MXE4M3(3)
       if (outFmt == DataFormat.FP32 && blkSel == 0 && rnd == 0) {
-        // (#155 MJ3) 期望基础位 = 枚举反解码（MXE4M3 于 bits(2,0)、MXE5M2 于 bits(6,4)），
+        // (#155 MJ3) 期望基础位 = 枚举反解码（MXE4M3 于 reg5[3:0]、MXE5M2 于 reg5[7:4]），
         //   取代陈旧字面量 0x65L（#97 前编号）；fp32 直出 + blkSel=0 + rnd=RNE 时
-        //   outFmt/rnd 两个位域均为 0 ⟹ 期望值就等于该基础位本身。
+        //   outFmt/rnd/blkSel 三个位域均为 0 ⟹ 期望值 = 基础位 | 固定的 loadWMode 与
+        //   a/bMxBlk 三个结构位（三者不随用例参数变，属本 runner 的硬编码契约）。
+        //   (#164) 旧写法只校 controlWord7（不含 loadWMode/MxBlk）；合并后本自检覆盖面
+        //   【扩大】到 reg5 全字，断言强度不降反升，且期望值仍由枚举反解码而非 RTL 拟合。
         val expCtlBase = DataFormat.MXE4M3.litValue.toInt | (DataFormat.MXE5M2.litValue.toInt << 4)
-        require(controlWord == expCtlBase.toLong,
-          s"控制字自检失败: 0x${controlWord.toHexString} (expected 0x${expCtlBase.toHexString}" +
-          s" = MXE4M3(${DataFormat.MXE4M3.litValue.toInt}) | MXE5M2(${DataFormat.MXE5M2.litValue.toInt})<<4)")
+        val expCtl5 = (1L << 28) | (1L << 24) | (1L << 22) | expCtlBase.toLong
+        require(controlWord5 == expCtl5,
+          s"reg5 control-word self-check failed: got 0x${controlWord5.toHexString} expected " +
+          s"0x${expCtl5.toHexString} = loadWMode(1<<28) | bMxBlk(1<<24) | aMxBlk(1<<22) | " +
+          s"MXE4M3(${DataFormat.MXE4M3.litValue.toInt}) | MXE5M2(${DataFormat.MXE5M2.litValue.toInt})<<4")
       }
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, M, N)
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, K, A_BASE)
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, B_BASE, C_BASE)
-      println(s"debug1 controlWord6=0x${controlWord6.toHexString} controlWord7=0x${controlWord.toHexString}")
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x06, 0x07, controlWord6, controlWord) // data0: regs(6)(28)=loadWMode=1
+      // (#164) 新写序列：reg0=m、reg1=n|k<<16（旧 reg2=k 已并入 reg1 高 16 位）、
+      //   reg2/3/4 = a/b/cAddr（旧 reg3/4/5）、reg5 = 控制字（旧 reg6+reg7）。
+      //   ★旧 reg6/reg7 那条 sendCmd 已删除：写它们在新布局下是 no-op，留着只会误导。
+      sendCmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, M, N.toLong | (K.toLong << 16))
+      sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
+      sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, controlWord5)
+      println(s"debug1 controlWord5=0x${controlWord5.toHexString}")
       sendCmd(HiveCoreOp.REG_WRITE2, 0x09, 0x0A, SCALE_A_BASE, SCALE_B_BASE)
       // 【任务95】量化运行补写 0x0B cScaleAddr（ScaleWr 写通道基址源，QuantSpec
       // 同范式）；非量化运行该基址不被使用，保持不写（【任务90 收敛】语义零变化）。
@@ -648,24 +679,37 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
           dut.io.dmaA.rsp.payload.err.poke(false.B)
         }
 
-        // --- DMA-C (C store)：逐拍地址硬对账 + fp32 内容硬断言（主守护） ---
+        // --- DMA-C (C store)：逐拍地址硬对账 + 【#166】strb 逐字节 lane 级硬对账 +
+        //     lane 偏移后的完整拍数据硬断言（主守护） ---
         dut.io.dmaC.req.ready.poke(true.B)
         if (dut.io.dmaC.req.valid.peek().litToBoolean) {
           val reqAddr = dut.io.dmaC.req.payload.addr.peek().litValue.toLong
+          val writeData = dut.io.dmaC.req.payload.data.peek().litValue
+          val writeStrb = dut.io.dmaC.req.payload.strb.peek().litValue
           if (dmaCStoreBeats < expCAddrSeq.size) {
             withClue(s"DMA-C store beat #$dmaCStoreBeats addr mismatch: ") {
               reqAddr should be(expCAddrSeq(dmaCStoreBeats))
             }
-          }
-          val writeData = dut.io.dmaC.req.payload.data.peek().litValue
-          if (dmaCStoreBeats < expCAddrSeq.size) {
             val expData = expCDataBeat(dmaCStoreBeats)
             withClue(s"DMA-C store beat #$dmaCStoreBeats data mismatch " +
                      f"(hw=0x$writeData%X exp=0x$expData%X): ") {
               writeData should be(expData)
             }
+            // 【#166】AXI byte lane 逐字节审计：① addr↔strb 双向对账（addr 推出期望
+            //   lane 窗口，strb 必须逐位一致，不一致报错而不静默放行）；② 未选通 lane
+            //   不做数据断言，但必须为 0；③ 选通命中的 lane 逐字节与金锚 expData 比对。
+            val laneBeatInRow = (dmaCStoreBeats % (M * beatsPerRow)) % beatsPerRow
+            val laneBad = HiveSimCommon.auditCBeatLanes(
+              dmaCStoreBeats, reqAddr, writeData, writeStrb, outFmt, totalN, cfg.cDmaExtW,
+              laneBeatInRow, Some(expData))
+            laneBad.take(8).foreach(v => println(s"[MX]   [#166 LANE] $v"))
+            withClue(s"DMA-C store beat #$dmaCStoreBeats AXI byte-lane audit " +
+                     f"(addr=0x$reqAddr%X strb=0x$writeStrb%X expStrb=" +
+                     f"0x${HiveSimCommon.cExpStrb(expCAddrSeq(dmaCStoreBeats), outFmt, totalN, cfg.cDmaExtW, laneBeatInRow)}%X): ") {
+              laneBad should be(Seq.empty[String])
+            }
           }
-          cWriteLog += ((reqAddr, writeData))
+          cWriteLog += ((reqAddr, writeData, writeStrb))
           dmaCStoreBeats += 1
           dut.io.dmaC.rsp.valid.poke(true.B)
         } else {
@@ -836,7 +880,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       // ===== 【任务90 收敛】v1 锚逐位守护：密集拍解析 → 硬件 fp32 bits == 锚 bits =====
       // fp32 直出为合法受守护路径（P0 契约后保留）：锚录于 v1 的 REG_CONTROL 布局
       //   （锚文件头原文 regs7=0x5E0、含已删除的 mixFmtEn 位），当前布局的基础位是
-      //   0x43 = MXE4M3(3) | MXE5M2(4)<<4（#97 重编号后），loadWMode=regs(6)(28)。
+      //   0x43 = MXE4M3(3) | MXE5M2(4)<<4（#97 重编号后），(#164) loadWMode 在 reg5[28]。
       //   (#155 MJ3) 订正：原文写「锚录于 regs7=0x65」，0x65 既不是锚录制值（0x5E0）
       //   也不是当前值（0x43），是 #97 前编号的陈旧中间态。锚守护只比 C 数据位，
       //   寄存器布局差异不是比对输入 ⟹ 该订正不改变任何断言语义。
@@ -844,34 +888,21 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       //   仅换解析器（parseDenseCWriteLog）与密集地址序列。
       // 【任务95】解析位宽随 outFmt 参数化（量化行返回逐元素码位模式；量化分支
       // 不消费 hwBits，交叉校验直接读 cWriteLog/scaleWriteLog）。
-      val hwBits = HiveSimCommon.parseDenseCWriteLog(cWriteLog.toSeq, outFmt, M, N, totalN, cfg.cDmaExtW)
-      // 【任务98】锚守护仅 outFmt=0（fp32 直出）生效：v1 锚是 fp32 位录制，fp16/bf16
-      // 的 16-bit 位模式不可与锚对账 → 路径忽略 anchorPath（主守护 = 上方 DMA-C
-      // 逐拍数据硬断言 + 下方解码容差交叉）。
-      if (outFmt == DataFormat.FP32) anchorPath.foreach { path =>
-        // 锚缺失清晰报错（Hank P1-B）：anchorPath=Some 但文件不存在时，先给出可读的失败提示
-        withClue(s"[MX-ANCHOR] v1 锚文件缺失：$path —— 请从 git 历史恢复录制后放回该路径：") {
-          Files.exists(Paths.get(path)) should be(true)
-        }
-        val anchorTokens = scala.io.Source.fromFile(path).getLines()
-          .filter(l => l.nonEmpty && !l.startsWith("#"))
-          .flatMap(_.trim.split("\\s+")).toArray
-        anchorTokens.length should be(M * N)
-        var anchorMismatch = 0
-        for (m <- 0 until M; n <- 0 until N) {
-          val anchorBits = java.lang.Long.parseLong(anchorTokens(m * N + n).stripPrefix("0x"), 16)
-          val hw = hwBits(m)(n)
-          if (hw != anchorBits) {
-            if (anchorMismatch < 32)
-              println(f"[MX-ANCHOR] MISMATCH C($m,$n): hw=0x$hw%08X anchor=0x$anchorBits%08X")
-            anchorMismatch += 1
-          }
-        }
-        withClue("[MX-ANCHOR] v1 锚逐位守护: ") { anchorMismatch should be(0) }
-        println(s"[MX-ANCHOR] bit-exact guard vs v1 anchor: ${M * N}/${M * N} elems")
+      // 【#166】解析改走 Checked 变体：除了矩阵还原，额外拿到全拍 lane 级审计汇总
+      //   （addr↔strb 双向对账 + 未选通 lane 零填充 + BEAT-COUNT）并硬断言零违规。
+      //   期望拍数取金锚 expCAddrSeq.size（张量语义侧），不取硬件实收拍数。
+      val parsedC = HiveSimCommon.parseDenseCWriteLogChecked(
+        cWriteLog.toSeq, outFmt, M, N, totalN, cfg.cDmaExtW,
+        expBeats = Some(expCAddrSeq.size), expElems = Some(M * N))
+      val hwBits = parsedC.matrix
+      println(s"[MX] (#166 LANE) ${parsedC.laneSummary}")
+      parsedC.violations.take(16).foreach(v => println(s"[MX]   [#166 LANE] $v"))
+      withClue("[MX] (#166) AXI byte-lane audit over all dmaC store beats " +
+               "(addr<->strb cross-check + unselected-lane zero-fill + beat count): ") {
+        parsedC.violations should be(Seq.empty[String])
       }
 
-      // ===== 容差交叉（二道防线，【任务95】按 isQuant 分派） =====
+      // ===== 容差交叉（【任务95】按 isQuant 分派） =====
       if (isQuant) {
         // 量化：写回码按块 scale 反量化后 vs 双精度 golden（runMxQuantGemm 范式移植）；
         // 冲刷界豁免（|ref| < 2^(scale-127) 冲刷 ±0 不判失），判失条件
@@ -908,20 +939,28 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         }
         var mismatchCnt = 0
         var maxRelErr = 0.0
+        var compared = 0   // (#170-W11) count of elements actually compared
         var beatIdx = 0
         val elemsPerBeat = cfg.cDmaExtW / elemBitsX
-        for ((_, data) <- cWriteLog) {
+        for ((_hwAddr, data, strb) <- cWriteLog) {
           val nt = beatIdx / (M * beatsPerRow)
           val inBlock = beatIdx % (M * beatsPerRow)
           val row = inBlock / beatsPerRow
           val beatInRow = inBlock % beatsPerRow
           val scaleBeat = scaleWriteLog(nt * M + row)._2
+          // (#170-W11) Use golden expCAddrSeq(beatIdx) instead of hardware-received addr
+          //   for lane offset derivation. This eliminates the scenario where the new strb
+          //   gating could cause the branch to silently pass with zero comparisons.
+          val laneOff = HiveSimCommon.cLaneOffset(expCAddrSeq(beatIdx), cfg.cDmaExtW)
+          val aligned = data >> (laneOff * 8)
           for (i <- 0 until elemsPerBeat) {
             val globalCol = nt * totalN + beatInRow * elemsPerBeat + i
             // 密集布局列归属边界（任务90 收敛）：拍内超出 tile 宽（totalN）的
             // 高半区是零填充，不得计入列空间。
-            if (globalCol < N && globalCol < (nt + 1) * totalN) {
-              val code = ((data >> (elemBitsX * i)) & ((1 << elemBitsX) - 1)).toInt
+            if (globalCol < N && globalCol < (nt + 1) * totalN &&
+                strb.testBit(laneOff + (elemBitsX * i) / 8)) {
+              compared += 1
+              val code = ((aligned >> (elemBitsX * i)) & ((1 << elemBitsX) - 1)).toInt
               val localCol = globalCol - nt * totalN
               val grp = localCol / 8   // scale 字节按 tile 内局部列分组（低块号低位）
               val scale = ((scaleBeat >> (8 * grp)) & 0xFF).toInt
@@ -940,7 +979,11 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
           }
           beatIdx += 1
         }
-        println(f"[MX] quant outFmt=$outFmtInt dequant cross-check: ${M * N} elems, mismatches=$mismatchCnt, maxRelErr=$maxRelErr%.2e")
+        println(f"[MX] quant outFmt=$outFmtInt dequant cross-check: compared=$compared/${M * N}, mismatches=$mismatchCnt, maxRelErr=$maxRelErr%.2e")
+        withClue("[MX] (#170-W11) dequant cross-check must compare at least one element " +
+                 "(guards against strb-gating making this branch vacuously pass): ") {
+          compared should be > (0)
+        }
         mismatchCnt should be(0)
       } else if (isFp16Out) {
         // ===== 【任务98】fp16/bf16 解码容差交叉：硬件 16-bit 值 vs 双精度 golden =====
@@ -980,8 +1023,12 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
 
         mismatchCnt should be(0)
       } else {
-        // ===== golden 容差交叉：硬件 fp32 值 vs 双精度 golden，1e-2 容差 =====
-        // fp32 直出唯一偏差源 = fp32 累加舍入（远小于 1e-2），容差仅兼容该随机误差。
+        // ===== PRIMARY GUARD (#175): fp32 output vs double-precision golden =====
+        // Derivation: refSum(m,n) = sum_k mxToFloat(a,sA)*mxToFloat(b,sB) in IEEE-754
+        // double (53-bit mantissa), fully independent of RTL. Hardware deviation source:
+        // fp32 accumulation rounding (24-bit mantissa, K=32 terms), bounded well below
+        // 1e-2 relative error. Covers ALL M*N elements. Tolerance = 1e-2 relative.
+        val fp32GoldenTol = 1e-2
         val hwVal = Array.tabulate(M, N) { (m, n) => HiveSimCommon.fp32BitsToFloat(hwBits(m)(n)).toDouble }
         val ref = Array.tabulate(M, N) { (m, n) => refSum(m, n) }
         var mismatchCnt = 0
@@ -991,22 +1038,25 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
           val hw = hwVal(m)(n)
           val absErr = math.abs(hw - r)
           val relErr = if (math.abs(r) > 1e-6) absErr / math.abs(r) else absErr
-          if (relErr > 1e-2 && absErr > 1e-6) {
+          if (relErr > fp32GoldenTol && absErr > 1e-6) {
             if (mismatchCnt < 64)
-              println(f"[MX] MISMATCH C($m,$n): hw=$hw%.6g ref=$r%.6g relErr=$relErr%.3f")
+              println(f"[MX-FP32-PRIMARY] MISMATCH C($m,$n): hw=$hw%.6g ref=$r%.6g relErr=$relErr%.3f")
             mismatchCnt += 1
           }
           if (relErr > maxRelErr) maxRelErr = relErr
         }
-        println(f"[MX] fp32 cross-check: ${M * N} elems, mismatches=$mismatchCnt, maxRelErr=$maxRelErr%.2e")
+        println(f"[MX-FP32-PRIMARY] golden cross-check: ${M * N} elems, mismatches=$mismatchCnt, maxRelErr=$maxRelErr%.2e, tol=$fp32GoldenTol%.0e")
         for (m <- 0 until math.min(M, 4)) {
           val hwStr = (0 until N).map(n => f"${hwVal(m)(n)}%.3f").mkString(" ")
           val refStr = (0 until N).map(n => f"${ref(m)(n)}%.3f").mkString(" ")
-          println(s"[MX] hw  row$m: $hwStr")
-          println(s"[MX] ref row$m: $refStr")
+          println(s"[MX-FP32-PRIMARY] hw  row$m: $hwStr")
+          println(s"[MX-FP32-PRIMARY] ref row$m: $refStr")
         }
 
-        mismatchCnt should be(0)
+        withClue(f"[MX-FP32-PRIMARY] double-precision golden cross-check (tol=$fp32GoldenTol%.0e rel, " +
+                 f"${M * N} elems, maxRelErr=$maxRelErr%.2e): ") {
+          mismatchCnt should be(0)
+        }
       }
     }
     } finally {
@@ -1030,7 +1080,11 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
   //   故软件通过 REG_READ 0x08 读 statusReg bit[2]=err 即可观测。
   //   断言：err 位在若干拍内置位；done 位与 resp.done 全程不发射。
   // ==========================================================================
-  private def runMxErrCase(M: Int, N: Int, K: Int, regs7: Long, caseName: String): Unit = {
+  // (#164) 形参 `regs7` 改名 `ctl5`：旧语义是「只传格式字（写 reg7），reg6 硬编码 0」；
+  //   新语义是「传【完整】的 reg5 控制字」（loadWMode/MxBlk/rnd/addrMode/fmt 全在一个字里）。
+  //   本 def 目前【无调用点】（历史用例已删），故改名与语义变更无下游影响；按任务书
+  //   【不删函数、保持结构】，只把它与新排布对齐，以免日后重新接入时踩 no-op 陷阱。
+  private def runMxErrCase(M: Int, N: Int, K: Int, ctl5: Long, caseName: String): Unit = {
     // v2：hasMx 要求 aW/bW>=16（SIMD 双元素/拍）；err 在 sIDLE 拍触发，与位宽无关。
     // (#155 MJ1) supportedFmts 追加 MXE2M1：HiveCoreConfig 新增 require(!hasMx8 || hasMx4)
     //   （用户设计律「有 mxfp8 就有 mxfp4，是必选项」）⟹ 原先这个 fp8-only 集合会在
@@ -1079,10 +1133,11 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         dut.clock.step(2)
       }
 
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, M, N)
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, K, A_BASE)
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, B_BASE, C_BASE)
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x06, 0x07, 0L, regs7)
+      // (#164) 新写序列：reg0=m、reg1=n|k<<16、reg2/3/4=a/b/cAddr、reg5=控制字（旧 reg6+reg7）。
+      //   ★旧 `sendCmd(REG_WRITE2, 0x06, 0x07, 0L, regs7)` 已删：reg6/reg7 在新布局下写为 no-op。
+      sendCmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, M, N.toLong | (K.toLong << 16))
+      sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
+      sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, ctl5)
       sendCmd(HiveCoreOp.REG_WRITE2, 0x09, 0x0A, SCALE_A_BASE, SCALE_B_BASE)
 
       // EXECUTE（违约配置：executor 在 sIDLE 拍置 errState 回 sIDLE，不发 done）
@@ -1132,12 +1187,23 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
 
       // ===== Victor P1 验证：合法再 EXECUTE 后 err 位被清除 =====
       // errState/errFlag 均在 execute 脉冲拍清除（同拍新违约次拍仍可再置位）。
-      // 【任务90 收敛】格式族交叉校验批准版 = MX 运行 outFmt ∈ {0,4,5,6}：fp32 直出
-      // （0000）为合法受守护路径，故合法再配置 = 纯 0x65（无需补写量化 outFmt）。
-      // 注意：新布局 loadWMode 已迁至 regs(6)(28)，本命令未重写 regs(6)——若此前
-      // regs(6)(28)=0，再 EXECUTE 仍会触发 errCode 4（留待用户调试验证清 err 路径）。
+      // 【任务90 收敛】格式族交叉校验批准版 = MX 运行 outFmt ∈ {0,1,2,3,4,5}：fp32 直出
+      // （reg5[11:8]=0000）为合法受守护路径 ⟹ 合法再配置 = aFmt/bFmt 合法 + loadWMode=1。
+      // ★(#164) 旧写法 `sendCmd(REG_WRITE2, 0x02, 0x07, 32L, 0x65L)` 在新排布下【语义完全失效】：
+      //   reg2 现在是 aAddr（会被覆写成 32，DMA 基址直接烂掉）、reg7 已删除（写为 no-op，
+      //   aFmt/bFmt 根本不会被改）⟹ 重写为「只写 reg5 = 合法控制字」，不触碰 reg2。
+      //   K 也无需重写：新布局 K 在 reg1[31:16]，开头那条 REG_WRITE2 已写好。
+      // ★(#164) 与旧写法的第二处差异（更强，不是放宽）：旧注释自己承认「若此前 regs(6)(28)=0，
+      //   再 EXECUTE 仍会触发 errCode 4」——本 runner 开头正是写 reg6=0（loadWMode=0），
+      //   故旧的清 err 断言在 MX 输入下【必然被 errCode 4 打红】。新的 legalCtl5 显式置
+      //   bit28=1，清 err 路径才真正可达。另：旧字面量 0x65L 在 #97 重编号下解为
+      //   aFmt=5(MXE2M1)、bFmt=6(INT32)，MX×INT 混配本身就非法 ⟹ 它也不是「合法控制字」；
+      //   改用枚举反解码的 MXE4M3×MXE5M2（=0x43，与 runMxGemm 的激励同源，#155 MJ3 口径）。
       // 轮询 STATUS.err 应连续拉低（不喂数据，运行停在等 B 供数，不影响 err 清除验证）。
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x07, 32L, 0x65L)
+      val legalCtl5 = (1L << 28) |                                 // loadWMode=1（MX 输入强制）
+        (DataFormat.MXE4M3.litValue.toLong & 0xF) |                // aFmt reg5[3:0]
+        ((DataFormat.MXE5M2.litValue.toLong & 0xF) << 4)           // bFmt reg5[7:4]；cFmt[11:8]=0=fp32 直出
+      sendCmd(HiveCoreOp.REG_WRITE1, 0x05, 0x00, legalCtl5, 0L)
       dut.io.cmd.valid.poke(true.B)
       dut.io.cmd.payload.op.poke(HiveCoreOp.EXECUTE)
       dut.io.cmd.payload.reg0Addr.poke(0.U)
@@ -1156,13 +1222,13 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
   }
 
   // ==========================================================================
-  // 【任务95】MX 非法 outFmt 族交叉负向运行器（fp16/bf16/int 族/reserved 编码）：
-  //   Executor P0 族交叉校验（mxFmtOk={0,4,5,6}）在 EXECUTE 拍置 errState 回
+  // 【任务95】MX 非法 outFmt 族交叉负向运行器（int 族/reserved 编码）：
+  //   CalcConfig errCode 11 族交叉校验（mxFmtOk={0,1,2,3,4,5}）在 EXECUTE 拍置 errState 回
   //   sIDLE（不进计算、不发 done）。断言：STATUS.err 置位（statusReg bit[2] 可
   //   软件轮询）、done 全程不发射、dmaC/dmaCScale 无任何写请求拍
   //   （dmaA/dmaB 的 start = executePulse 无条件启动，允许其读请求出现——与
-  //   QuantSpec runQuantErrCase 同口径）；合法再 EXECUTE（纯 0x5E0 fp32）后
-  //   err 位被清除（Victor P1 同范式）。结构仿 runMxErrCase，尾部 try/finally
+  //   QuantSpec runQuantErrCase 同口径）；合法再 EXECUTE（(#164) reg5 = loadWMode|MXE4M3|
+  //   MXE5M2<<4，cFmt=0 即 fp32 直出）后 err 位被清除（Victor P1 同范式）。结构仿 runMxErrCase，尾部 try/finally
   //   转存 FST（【任务94】范式，失败路径同样转存）。
   // ==========================================================================
   private def runMxOutFmtErrCase(M: Int, N: Int, K: Int, outFmt: DataFormat.Type,
@@ -1171,21 +1237,30 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     // 经 outFmtInt（litValue.toInt）收敛，保持原 Int 语义（caseName 数字、位域打包）。
     val outFmtInt = outFmt.litValue.toInt
     val caseName = s"MX-outFmt${outFmtInt}-family-cross"
-    // 控制字：MX 基础 0x65（E4M3×E5M2，新 REG_CONTROL 布局）+ 违约 outFmt 位域
-    // （<<8；3-bit 位宽下 int 族 bit3 丢弃、8/9/10 截为 0/1/2——是否仍属违约族
-    // 由 Executor 新校验决定，留待用户调试）；blkSel/rnd 位不写（K=32 对齐、
-    // 【#144】reg6 缺省 sel=0 → 新枚举 block=16 ≤ totalN 合法，唯一违约项 = outFmt 族交叉，err 归因隔离）；
-    // loadWMode=1 改由 sendCmd data0 = 1<<28 承载（否则 errCode 4 抢跑）。
-    val controlWord =
-      0x65L | ((outFmtInt.toLong & 0x7) << 8)
+    // 控制字：MX 基础 0x43（E4M3×E5M2，#97 重编号后 reg5 布局）+ 违约 outFmt 位域
+    // （<<8）；blkSel/rnd 位不写（K=32 对齐、【#144】缺省 sel=0 → 新枚举 block=16
+    // ≤ totalN 合法，唯一违约项 = outFmt 族交叉，err 归因隔离）；
+    // (#164) loadWMode=1 与格式字现同居 reg5，故 1<<28 直接并进本控制字（旧写法是由
+    //   sendCmd(REG_WRITE2, 0x06, 0x07, 1L<<28, controlWord) 分两个寄存器承载）。
+    // ★(#164 裁定 4) outFmt 掩码 `& 0x7` → `& 0xF`：DataFormat 是 4-bit 域，3-bit 掩码会把
+    //   INT8(8)→0=FP32、INT4(9)→1=FP16 静默截断；而 FP32/FP16 恰好属于 MX 输入的【合法】
+    //   输出族 {0,1,2,3,4,5} ⟹ 本负向 runner 会被静默变成正向（硬件根本不置 err，
+    //   下方 `errSeen should be(true)` 直接打红）。旧注释「8/9/10 截为 0/1/2——是否仍属违约族
+    //   由 Executor 新校验决定，留待用户调试」的待调项，本次按裁定定为【不截断】。
+    // ★(#178) 基础字面量 0x65L → 0x43L：0x65 在 #97 重编号下解为 aFmt=5(MXE2M1)、
+    //   bFmt=6(INT32)，是 MX×INT 混配（触发 errCode 3 而非 11）。现改为 0x43 =
+    //   aFmt=3(MXE4M3) | bFmt=4(MXE5M2)<<4，与 runMxGemm 激励同源，确保唯一违约项
+    //   = outFmt 族交叉（errCode 11），不抢跑 errCode 3/4/5/8。
+    //   独立核算：reg5[3:0]=MXE4M3=3, reg5[7:4]=MXE5M2=4 → (4<<4)|3 = 0x43 ✓
+    val controlWord5 =
+      (1L << 28) | 0x43L | ((outFmtInt.toLong & 0xF) << 8)
     // (#155 MJ1) supportedFmts 追加 MXE2M1：HiveCoreConfig 新增 require(!hasMx8 || hasMx4)
     //   ⟹ 原先这个 fp8-only 集合会在【cfg 构造这一行】抛 IllegalArgumentException。
-    //   本 def 是【活代码】：runMxGemm 在 outFmt 不属合法族 {0,1,2,4,5,6} 时分派到此处
-    //   （现役用例 outFmt=FP16、#155 新增锚用例 outFmt=FP32，都在合法族内 ⟹ 当前不可达，
-    //   但一旦有人注册 int 族 outFmt 用例就会走到）。追加后与 cfgMx/cfgMxFp4 全 12 字段相同。
-    //   对断言零影响：断言只看 STATUS.err 位 / done 位 / dmaC 与 dmaCScale 零写请求拍 /
-    //   合法再 EXECUTE 后 err 被清除，均不绑定具体 errCode；违约项仍是唯一的 outFmt 族交叉
-    //   （aFmt/bFmt 仍是 fp8 E4M3×E5M2 ⟹ isMx4 两臂均假 ⟹ fp4 专属守护不抢跑）。
+    //   本 def 是【活代码】：runMxGemm 在 outFmt 不属合法族 {0,1,2,3,4,5} 时分派到此处
+    //   （现役用例 outFmt=FP16、#155 新增锚用例 outFmt=FP32，都在合法族内；
+    //   #178 新增负向用例 outFmt=INT32 不在合法族内 ⟹ 本函数现已可达）。追加后与 cfgMx/cfgMxFp4 全 12 字段相同。
+    //   (#178) 断言现绑定 errCode=11（叠加式变强，不放宽既有断言）；违约项仍是唯一的
+    //   outFmt 族交叉（aFmt/bFmt = E4M3×E5M2 ⟹ isMx4 两臂均假 ⟹ fp4 专属守护不抢跑）。
     val cfg = HiveCoreConfig(
       arrayN = 8, clusterM = 2,
       aW = 16, bW = 16, cW = 40,
@@ -1228,10 +1303,13 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
           dut.clock.step(2)
         }
 
-        sendCmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, M, N)
-        sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, K, A_BASE)
-        sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, B_BASE, C_BASE)
-        sendCmd(HiveCoreOp.REG_WRITE2, 0x06, 0x07, 1L << 28, controlWord) // data0: regs(6)(28)=loadWMode=1（保持 err 归因 = outFmt 族交叉）
+        // (#164) 新写序列：reg0=m、reg1=n|k<<16、reg2/3/4=a/b/cAddr、reg5=控制字。
+        //   ★旧 `sendCmd(REG_WRITE2, 0x06, 0x07, 1L << 28, controlWord)` 已删：reg6/reg7 在新
+        //   布局下写为 no-op ⟹ loadWMode 与格式字都写不进去，reg5 保持复位 0
+        //   （= aFmt/bFmt/cFmt 全 FP32）⟹ errCode 5 抢跑、且 err 归因不再是 outFmt 族交叉。
+        sendCmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, M, N.toLong | (K.toLong << 16))
+        sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
+        sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, controlWord5) // reg5[28]=loadWMode=1（保持 err 归因 = outFmt 族交叉）
         sendCmd(HiveCoreOp.REG_WRITE2, 0x09, 0x0A, SCALE_A_BASE, SCALE_B_BASE)
 
         // EXECUTE（违约 outFmt：executor 在 execute 拍置 errState 回 sIDLE，不发 done）
@@ -1274,7 +1352,10 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         }
         val errBit  = (statusVal >> 2) & 1
         val doneBit = (statusVal >> 1) & 1
-        println(f"[$caseName] ctrl=0x$controlWord%05X status=0x$statusVal%08X errBit=$errBit doneBit=$doneBit " +
+        val errCodeField = ((statusVal >> 3) & 0xF).toInt   // (#178) statusReg bits[6:3] = errCode
+        // (#164) ctrl 打印随 controlWord → controlWord5 重命名；格式宽由 %05X（旧 reg7 只有
+        //   低 15 位有效）改为 %08X（reg5 是完整 32-bit 字，含 bit28 loadWMode）。
+        println(f"[$caseName] reg5=0x$controlWord5%08X status=0x$statusVal%08X errBit=$errBit doneBit=$doneBit errCode=$errCodeField " +
                 s"errSeen=$errSeen doneSeen=$doneSeen " +
                 s"dmaCReq=$dmaCReqSeen dmaCScaleReq=$dmaCScaleReqSeen")
 
@@ -1288,12 +1369,27 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
           dmaCReqSeen should be(0)
           dmaCScaleReqSeen should be(0)
         }
+        // (#178) Additive assertion: bind errCode to 11 (int/non-int cross-boundary).
+        //   Strengthens the runner from "err is set" to "err is set WITH the correct code".
+        //   Does NOT relax any existing assertion above.
+        withClue(s"[$caseName] errCode should be 11 (int/non-int cross-boundary): ") {
+          errCodeField should be(11)
+        }
 
-        // ===== 合法再 EXECUTE 清 err 验证（fp32 直出 = MX 合法族 {0,4,5,6}） =====
+        // ===== 合法再 EXECUTE 清 err 验证（fp32 直出 = MX 合法族 {0,1,2,3,4,5}） =====
         // 不喂数据，运行停在等 B 供数，不影响 err 清除验证。
-        // 注意：新布局 loadWMode 在 regs(6)(28)，本命令未重写 regs(6)（此前 data0
-        // 已置 bit28，无残留风险）。
-        sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x07, 32L, 0x65L)
+        // ★(#164) 旧写法 `sendCmd(REG_WRITE2, 0x02, 0x07, 32L, 0x65L)` 在新排布下【语义完全失效】：
+        //   reg2 现在是 aAddr（会被覆写成 32）、reg7 已删除（写为 no-op，违约的 outFmt 仍在
+        //   reg5[11:8] 里没被清掉）⟹ err 永不会被清，下方断言必红。重写为「只写 reg5 =
+        //   合法控制字（cFmt[11:8]=0 即 fp32 直出 + loadWMode=1 + 合法 aFmt/bFmt）」，
+        //   不触碰 reg2（aAddr）；K 也无需重写（新布局 K 在 reg1[31:16]，开头已写好）。
+        //   期望值由 DataFormat 枚举【反解码推导】，不写死 0x43/0x65/0x5E0 任何字面量
+        //   （#155 MJ3 口径）。注：本 runner 开头已置 bit28=1，但重写成显式包含 bit28 的
+        //   完整字比「依赖无残留」更强（旧注释也只是在赌「此前 data0 已置 bit28」）。
+        val legalCtl5 = (1L << 28) |                                 // loadWMode=1（MX 输入强制）
+          (DataFormat.MXE4M3.litValue.toLong & 0xF) |                // aFmt reg5[3:0]
+          ((DataFormat.MXE5M2.litValue.toLong & 0xF) << 4)           // bFmt reg5[7:4]；cFmt[11:8]=0=fp32 直出
+        sendCmd(HiveCoreOp.REG_WRITE1, 0x05, 0x00, legalCtl5, 0L)
         dut.io.cmd.valid.poke(true.B)
         dut.io.cmd.payload.op.poke(HiveCoreOp.EXECUTE)
         dut.io.cmd.payload.reg0Addr.poke(0.U)

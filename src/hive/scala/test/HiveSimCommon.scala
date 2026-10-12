@@ -194,7 +194,13 @@ object HiveSimCommon {
   //   - statusReg 位布局（HiveCore.scala Cat(progress, 0.U(9.W), errCode, errFlag,
   //     doneFlag, executor.io.busy)，高位在前）：
   //       bit0=busy（executor 组合）
-  //       bit1=done（doneFlag 粘滞位：executor.io.done 拍置 1，写 regs(7) bit0=1 清除）
+  //       bit1=done（doneFlag 粘滞位：executor.io.done 拍置 1，仅由 reset 清除）
+  //         (#164 核实) 原注「写 regs(7) bit0=1 清除」已失效：该 clear_done 机制被
+  //         HiveCore.scala 【B1】移除（旧机制下 reg7 bit0 = aFmt[0]，写奇数 aFmt 会意外
+  //         清 done，属确定性 bug）；#164 寄存器重排后 reg7 整个槽位也已删除。
+  //         ★本行只是陈旧注释：STATUS 位布局本身取自 HiveCore.scala 的 statusReg Cat，
+  //         与 #164 的寄存器重排正交 ⟹ STATUS_REG_ADDR=0x08、decodeStatus、statusPollStep
+  //         均已核实【无需修改】。
   //       bit2=err（errFlag：executor.io.done 拍置 calcConfig.err||dmaErr，startPulse 拍清）
   //       bit[6:3]=errCode（4-bit，calcConfig 锁存）
   //       bit[15:7]=0（保留）
@@ -581,38 +587,258 @@ object HiveSimCommon {
     buf.toSeq
   }
 
+  // ========== (#166) AXI byte lane 契约：C 写回逐拍 (addr, data, strb) lane 级审计 ==========
+  // 【为何需要】旧 TB 口径把 dmaC 写回日志记成 (addr, data) 二元组、且解析器【完全忽略
+  //   addr】：data 一律按「laneOffset=0」解释。这正是 main 侧「strb 已按 addrShiftBytes 左移、
+  //   wdata 直连低位未同源移位」缺陷能长期潜伏的原因 —— TB 与 RTL 犯了同一个错（都假设
+  //   数据在总线字低位），于是互相背书、恒真假绿。
+  // 【新口径】① 日志升级为 (addr, data, strb) 三元组；② addr 推出期望 lane 窗口，与 strb 做
+  //   【双向】对账（addr→strb 期望、strb→addr 一致性，不符即报错而不静默放行）；③ 元素级
+  //   解析先按 laneOffset 反移位、再按 strb 逐字节门控：只有被选通的 lane 参与数据比对，
+  //   未选通 lane 不做数据断言但【必须为 0】（依据见 auditCBeatLanes 第 (3) 条）。
+  // 【金锚铁律】本段全部期望值（cLaneOffset / cLanesPerBeat / cExpStrb）均由【张量语义 +
+  //   AXI byte lane 契约】独立推导，不读 RTL 的 cDmaDmaBeatTar 档位、不以 RTL 行为为拟合目标。
+
+  /** dmaC write-back single-beat log triple: (addr, data, strb). [#166] Old format was
+    * (addr, data) pair -- strb was never visible to TB; the triple promotes strb to
+    * first-class citizen, enabling lane-level cross-check.
+    * scaleC channel (dmaCScale) is NOT in this contract's scope: its port width = 1 byte
+    * (rowW = cScaleRowW = totalN/2 bits => totalN=16 gives rowW=8 bits=1 byte) => the
+    * lane window degenerates to a single lane, shift is always 0, data/strb mismatch is
+    * structurally impossible. It is not "exempt from the contract" -- the contract
+    * trivially degenerates on a single-lane port. (#170-W3: corrected from the old
+    * rationale "strb is constant full-select" which was factually wrong for totalN>=32.) */
+  type CWriteBeat = (Long, BigInt, BigInt)
+
+  /** 总线字字节数 = 一个 beat 覆盖的 byte lane 数 */
+  def cDmaBytes(cDmaExtW: Int): Int = cDmaExtW / 8
+
+  /** 本拍在总线字内的起始 byte lane 偏移 = addr mod dmaBytes（AXI 契约，纯地址推导，
+    * 与 main 侧 addrShiftBytes 同式但独立书写：金锚不得引用 RTL 中间量） */
+  def cLaneOffset(addr: Long, cDmaExtW: Int): Int =
+    (addr % cDmaBytes(cDmaExtW)).toInt
+
+  /** 本拍【应当】被选通的 byte lane 数（张量语义推导）：
+    *   一个 n-tile 行共占 cWriteBytes = ceil(totalN×elemBits/8) 字节；
+    *   行内第 beatInRow 拍覆盖字节区间 [beatInRow×dmaBytes, cWriteBytes) ∩ 一个总线字
+    *   ⟹ lanes = clamp(cWriteBytes - beatInRow×dmaBytes, 0, dmaBytes)。
+    * 单拍满档（beats=1）与 beats>1 的均分档均与上式一致；beatInRow 默认 0。
+    * 【备注】若将来出现 cWriteBytes 不是 dmaBytes 整数倍的配置（当前 totalN∈{16,32} ×
+    *   elemBits∈{4,8,16,32} 下 cWriteBytes∈{8,16,32,64,128}，永不部分占用），本式会给出
+    *   比 RTL 固定档位更窄的末拍 lanes ⟹ 报 STRB-MISMATCH，那是【既有「strb 档位不按
+    *   N 尾数细化」缺陷族的真阳性】，不得反向拟合金锚去迁就它。 */
+  def cLanesPerBeat(outFmt: DataFormat.Type, totalN: Int, cDmaExtW: Int,
+                    beatInRow: Int = 0): Int = {
+    val nb = cDmaBytes(cDmaExtW)
+    val cWriteBytes = (totalN * cOutElemBits(outFmt) + 7) / 8
+    math.max(0, math.min(cWriteBytes - beatInRow * nb, nb))
+  }
+
+  /** 由 addr（+ 拍内序号）推出的期望 strb：从 laneOffset 起连续 lanes 位置 1，其余置 0。
+    * 这就是 AXI byte lane 契约的完整形式表达：wstrb 第 i 位 ↔ wdata[8i+7:8i]。 */
+  def cExpStrb(addr: Long, outFmt: DataFormat.Type, totalN: Int, cDmaExtW: Int,
+               beatInRow: Int = 0): BigInt = {
+    val nb = cDmaBytes(cDmaExtW)
+    val off = cLaneOffset(addr, cDmaExtW)
+    val lanes = cLanesPerBeat(outFmt, totalN, cDmaExtW, beatInRow)
+    (((BigInt(1) << lanes) - 1) << off) & ((BigInt(1) << nb) - 1)
+  }
+
+  /** Single-beat lane-level audit. Returns violation messages (empty = all green).
+    * All messages are ASCII English.
+    *
+    * PRECONDITION (W9): The caller MUST independently hard-assert that `addr` equals
+    *   the golden-anchor expected address for this beat index (e.g. via expCAddrSeq).
+    *   This function derives lane offsets from the supplied `addr`; if addr itself is
+    *   wrong, the derived expectations are meaningless. The function does NOT validate
+    *   addr correctness -- that is the caller's obligation.
+    *
+    * Four violation kinds (each with its RTL-independent derivation):
+    *  (1) STRB-OVERFLOW: laneOffset + lanes > dmaBytes => strb left-shift truncated
+    *      by bus-word width, data high bits pushed out. This beat necessarily loses
+    *      data. Belongs to the existing "strb granularity does not refine by N
+    *      remainder" defect family (#166 scope-out), but must not silently pass.
+    *      (W8) OVERFLOW takes priority over MISMATCH -- they are mutually exclusive:
+    *      when overflow occurs, the expected strb is itself unrepresentable in
+    *      dmaBytes bits, so MISMATCH is a tautological consequence, not independent
+    *      information.
+    *  (2) STRB-MISMATCH: addr-derived expected lane window differs from actual strb
+    *      bit-by-bit. Bidirectional cross-check: catches both "strb not shifted"
+    *      (lanes stuck at lane0) and "strb shifted by wrong amount".
+    *      Only reported when OVERFLOW does NOT fire (W8 mutual exclusion).
+    *  (3) UNSEL-NONZERO: non-zero byte on an unselected lane. Derivation (tensor
+    *      semantics, not RTL fitting): dense row carries only low totalN*elemBits
+    *      bits of data, everything above is zero-fill (elemsToDenseRow contract,
+    *      i.e. the four-suite shared golden row model); left-shift by laneOffset
+    *      pads low bits with zero => byte lanes outside the selected window are
+    *      always 0. This is a falsifiable semantic inference, not RTL fitting.
+    *      Per task spec: unselected lanes are NOT data-asserted (no golden content
+    *      comparison), but ARE confirmed zero.
+    *  (4) SEL-BYTE-MISMATCH: only active when caller provides golden expected data
+    *      (expData); compares selected byte lanes byte-by-byte. Unselected lanes
+    *      do not participate.
+    * Each kind reports at most capPerKind detail messages per beat (prevents log
+    * explosion); excess is summarized by count.
+    *
+    * NOTE (W8): `violationCount` (the size of the returned Seq) serves ONLY as a
+    *   red/green threshold, NOT as a quantitative metric of "how many independent
+    *   defects exist". A single misconfigured beat can produce multiple messages
+    *   across kinds; conversely, OVERFLOW suppresses MISMATCH to avoid double-count. */
+  def auditCBeatLanes(beatIdx: Int, addr: Long, data: BigInt, strb: BigInt,
+                      outFmt: DataFormat.Type, totalN: Int, cDmaExtW: Int,
+                      beatInRow: Int = 0, expData: Option[BigInt] = None,
+                      capPerKind: Int = 4): Seq[String] = {
+    val nb = cDmaBytes(cDmaExtW)
+    val off = cLaneOffset(addr, cDmaExtW)
+    val lanes = cLanesPerBeat(outFmt, totalN, cDmaExtW, beatInRow)
+    val exp = cExpStrb(addr, outFmt, totalN, cDmaExtW, beatInRow)
+    val bad = scala.collection.mutable.ArrayBuffer[String]()
+    if (off + lanes > nb)
+      bad += f"STRB-OVERFLOW beat#$beatIdx addr=0x$addr%X laneOff=$off lanes=$lanes dmaBytes=$nb"
+    else if (strb != exp)
+      bad += f"STRB-MISMATCH beat#$beatIdx addr=0x$addr%X laneOff=$off lanes=$lanes " +
+             f"beatInRow=$beatInRow strb=0x$strb%X exp=0x$exp%X"
+    var nUnsel = 0; var nSel = 0
+    for (b <- 0 until nb) {
+      val sel = strb.testBit(b)
+      val hwB = (data >> (8 * b)) & 0xFF
+      if (!sel) {
+        if (hwB != 0) {
+          nUnsel += 1
+          if (nUnsel <= capPerKind)
+            bad += f"UNSEL-NONZERO beat#$beatIdx addr=0x$addr%X lane=$b byte=0x$hwB%02X strb=0x$strb%X"
+        }
+      } else expData.foreach { e =>
+        val exB = (e >> (8 * b)) & 0xFF
+        if (hwB != exB) {
+          nSel += 1
+          if (nSel <= capPerKind)
+            bad += f"SEL-BYTE-MISMATCH beat#$beatIdx addr=0x$addr%X lane=$b hw=0x$hwB%02X exp=0x$exB%02X"
+        }
+      }
+    }
+    if (nUnsel > capPerKind) bad += s"UNSEL-NONZERO beat#$beatIdx total=$nUnsel lanes (only first $capPerKind listed)"
+    if (nSel > capPerKind) bad += s"SEL-BYTE-MISMATCH beat#$beatIdx total=$nSel lanes (only first $capPerKind listed)"
+    bad.toSeq
+  }
+
+  /** (#166) 密集拍解析 + lane 级审计的汇总结果。
+    * @param matrix        还原出的 m×n 元素位模式矩阵（仅选通 lane 写入）
+    * @param violations    全部 lane 级违规消息（空 = 全绿）
+    * @param beats         实收拍数
+    * @param lanesSelected 被 strb 选通的 byte lane 总数（参与数据比对）
+    * @param lanesExempt   未选通的 byte lane 总数（不做数据断言，但已校验其为 0）
+    * @param elemsWritten  实际写入矩阵的元素数
+    * @param elemsUnsel    因 strb 未选通而豁免的元素数（#166 前会被当成有效数据误写）
+    * @param elemsPad      因 globalCol >= n（列 padding）而豁免的元素数 */
+  final case class DenseCParse(matrix: Array[Array[Long]], violations: Seq[String],
+                               beats: Int, lanesSelected: Int, lanesExempt: Int,
+                               elemsWritten: Int, elemsUnsel: Int, elemsPad: Int) {
+    /** lane 级违规条数（供调用方直接折入 mismatch 计数） */
+    def violationCount: Int = violations.size
+    /** 一行式统计摘要（英文 ASCII，供各 suite println） */
+    def laneSummary: String =
+      s"beats=$beats lanesSel=$lanesSelected lanesExempt=$lanesExempt " +
+      s"elemsWritten=$elemsWritten elemsUnselExempt=$elemsUnsel elemsPadExempt=$elemsPad " +
+      s"laneViolations=$violationCount"
+  }
+
   /** 256-bit 密集拍 → cResult 元素矩阵公共解析器（四套件共用，杜绝复制粘贴共模错误）。
     *
-    * 输入 = dmaC 写回日志（按硬件发出顺序 (addr, data)，顺序必为 nt 外 × m 中 ×
-    * 行内拍内；地址对账由各套件独立硬断言，本解析器只按序还原）。每拍按格式取
-    * elemBits 位元素、拍内低列号在低位；拍间/折行顺序还原为 (row, col) 矩阵：
-    *   globalCol = nt×totalN + beatInRow×(cDmaExtW/elemBits) + i
-    * 半字节族（MXE2M1/INT4）取低 nibble（低列号低 nibble）；列 ≥ N（padding）不写。
+    * 【#166 升级：strb 逐字节校验口径】输入 = dmaC 写回日志三元组 (addr, data, strb)，
+    * 按硬件发出顺序（必为 nt 外 × m 中 × 行内拍内）。每拍处理三步：
+    *   ① lane 级审计 auditCBeatLanes（addr↔strb 双向对账 + 未选通 lane 零填充核查，
+    *     expDataAt 给出时再加选通 lane 的逐字节数据比对）；
+    *   ② 【反移位】aligned = data >> (laneOffset×8)，把本拍数据还原成「laneOffset=0」口径
+    *     的密集段 —— 这正是 main 侧左移的逆运算，使元素提取下标与金锚 denseRowBeat 同口径；
+    *   ③ 【strb 门控】元素 i 的基字节 lane（绝对）= laneOffset + (elemBits×i)/8；该 lane 未被
+    *     选通 ⟹ 本拍不承载该元素，【跳过不写】（计入 elemsUnsel）。
+    * 列映射仍为 globalCol = nt×totalN + beatInRow×(cDmaExtW/elemBits) + i；半字节族
+    * （MXE2M1/INT4）取低 nibble（低列号低 nibble）；列 ≥ N（padding）不写。
     * 返回原始元素位模式（fp32=32-bit bits、16-bit 族=16-bit、8-bit 族=量化码/字节、
     * 半字节族=4-bit 码），数值解释归各套件既有对拍逻辑（v1 数值锚布局无关）。
-    */
-  def parseDenseCWriteLog(log: Seq[(Long, BigInt)], outFmt: DataFormat.Type, m: Int, n: Int,
-                          totalN: Int, cDmaExtW: Int): Array[Array[Long]] = {
+    *
+    * 【附带修掉的潜伏粗糙】旧实现只按 `globalCol < n` 门控、不按 tile 边界门控：
+    * MXE2M1（elemsPerBeat=64 > totalN=16）下 nt=0 那拍的 i=16..31 会写到属于 nt=1 的列，
+    * 靠后续 nt=1 的拍覆盖而侥幸正确。新的 strb 门控（lanes=8 ⟹ 仅 i=0..15 被选通）
+    * 从语义上直接拦掉了越 tile 写入。
+    *
+    * @param expBeats  Expected beat count (= nTiles*m*beatsPerRow); checked as BEAT-COUNT
+    * @param expElems  (#170-W6) Expected number of elements written to the matrix (= m*n
+    *                  for a fully covered dense output). When provided and elemsWritten
+    *                  does not match, an ELEMS-WRITTEN violation is appended. This closes
+    *                  the gap where #166 treated elemsWritten as diagnostic-only while
+    *                  build/166 cited it as evidence against "fewer writes -> green".
+    * @param expDataAt Golden expected data function (beatIdx -> expected data with lane
+    *                  offset already applied); enables selected-lane byte-wise comparison
+    *
+    * PRECONDITION (W9): The `addr` field of each CWriteBeat in `log` MUST have been
+    *   independently hard-asserted against the golden expected address sequence (e.g.
+    *   expCAddrSeq) by the caller BEFORE or ALONGSIDE calling this function. The internal
+    *   reverse-shift `data >> (laneOffset * 8)` derives laneOffset from addr; if addr is
+    *   wrong, the entire element extraction is silently corrupted.
+    *
+    * Row-internal beat index (beatInRow) is derived internally from beatIdx
+    * (% (m*beatsPerRow) then % beatsPerRow), consistent with caller traversal order. */
+  def parseDenseCWriteLogChecked(log: Seq[CWriteBeat], outFmt: DataFormat.Type, m: Int, n: Int,
+                                 totalN: Int, cDmaExtW: Int, expBeats: Option[Int] = None,
+                                 expDataAt: Option[Int => BigInt] = None,
+                                 expElems: Option[Int] = None): DenseCParse = {
     val elemBits = cOutElemBits(outFmt)
     val beatsPerRow = cBeatsPerRow(outFmt, totalN, cDmaExtW)
     val elemsPerBeat = cDmaExtW / elemBits
+    val nb = cDmaBytes(cDmaExtW)
     val mask = (BigInt(1) << elemBits) - 1
+    val nTiles = (n + totalN - 1) / totalN
     val result = Array.fill(m, n)(0L)
+    val bad = scala.collection.mutable.ArrayBuffer[String]()
+    var lanesSel = 0; var lanesEx = 0
+    var elemsW = 0; var elemsUnsel = 0; var elemsPad = 0
     var beatIdx = 0
-    for ((_, data) <- log) {
-      val nt = beatIdx / (m * beatsPerRow)
+    for ((addr, data, strb) <- log) {
       val inBlock = beatIdx % (m * beatsPerRow)
-      val row = inBlock / beatsPerRow
       val beatInRow = inBlock % beatsPerRow
+      bad ++= auditCBeatLanes(beatIdx, addr, data, strb, outFmt, totalN, cDmaExtW,
+                              beatInRow, expDataAt.map(f => f(beatIdx)))
+      val off = cLaneOffset(addr, cDmaExtW)
+      for (b <- 0 until nb) if (strb.testBit(b)) lanesSel += 1 else lanesEx += 1
+      // ② 反移位：与 main 侧 `data << (addrShiftBytes << 3)` 互逆
+      val aligned = data >> (off * 8)
+      val nt = beatIdx / (m * beatsPerRow)
+      val row = inBlock / beatsPerRow
       for (i <- 0 until elemsPerBeat) {
         val globalCol = nt * totalN + beatInRow * elemsPerBeat + i
-        if (globalCol < n)
-          result(row)(globalCol) = ((data >> (elemBits * i)) & mask).toLong
+        // ③ strb 门控：元素 i 的基字节 lane（绝对下标）
+        val sel = strb.testBit(off + (elemBits * i) / 8)
+        if (!sel) elemsUnsel += 1
+        else if (globalCol < n) {
+          result(row)(globalCol) = ((aligned >> (elemBits * i)) & mask).toLong
+          elemsW += 1
+        } else elemsPad += 1
       }
       beatIdx += 1
     }
-    result
+    expBeats.foreach { eb =>
+      if (log.size != eb)
+        bad += s"BEAT-COUNT hw=${log.size} exp=$eb (nTiles=$nTiles m=$m beatsPerRow=$beatsPerRow)"
+    }
+    // (#170-W6) Element count assertion: elemsWritten must equal m*n for a fully
+    //   covered dense output. Catches "fewer writes -> green" (e.g. strb gating
+    //   silently skipping elements that should have been written).
+    expElems.foreach { ee =>
+      if (elemsW != ee)
+        bad += s"ELEMS-WRITTEN hw=$elemsW exp=$ee (m=$m n=$n; elemsUnsel=$elemsUnsel elemsPad=$elemsPad)"
+    }
+    DenseCParse(result, bad.toSeq, log.size, lanesSel, lanesEx, elemsW, elemsUnsel, elemsPad)
   }
+
+  /** 兼容口径：只要矩阵、不要审计汇总。
+    * 【#166 注意】本函数仍会跑完整 lane 审计（内部走 Checked）但【丢弃违规消息】。
+    * 新代码请直接用 parseDenseCWriteLogChecked 并把 violations 折入失败判定，
+    * 否则 lane 级缺陷会重蹈「静默放行」覆辙。 */
+  def parseDenseCWriteLog(log: Seq[CWriteBeat], outFmt: DataFormat.Type, m: Int, n: Int,
+                          totalN: Int, cDmaExtW: Int): Array[Array[Long]] =
+    parseDenseCWriteLogChecked(log, outFmt, m, n, totalN, cDmaExtW).matrix
 
   /** 密集行（宽 totalN×32，低列号在低位，无效高位段填零）→ 逐元素位模式序列。
     * 供「期望数据硬断言」与「行级对拍」共用：按 outFmt 选段取低 totalN×elemBits 位。 */
@@ -632,10 +858,21 @@ object HiveSimCommon {
     row
   }
 
-  /** 期望发拍数据：密集行按总线位宽右移取段（与 WrOnly 发拍表达式逐字同源：
-    * data = lineData >> (beatCnt×cDmaExtW) 取低 cDmaExtW 位） */
-  def denseRowBeat(row: BigInt, beatInRow: Int, cDmaExtW: Int): BigInt =
-    (row >> (beatInRow * cDmaExtW)) & ((BigInt(1) << cDmaExtW) - 1)
+  /** 期望发拍数据（【#166】已引入按地址的 lane 偏移语义）：
+    *   ① 密集行按总线位宽右移取段（与 WrOnly 发拍表达式同源：
+    *      seg = lineData >> (beatCnt×cDmaExtW) 取低 cDmaExtW 位）；
+    *   ② 再按 laneOffsetBytes ×8 左移，把本拍数据放到它在总线字内【应在的 byte lane】上
+    *      —— 与 main 侧 `data << (addrShiftBytes << 3)` 及 strb `<< addrShiftBytes` 同源。
+    * 中间量位宽：seg 为 cDmaExtW 位，左移最多 (dmaBytes-1)×8 = cDmaExtW-8 位 ⟹ 展宽到
+    *   2×cDmaExtW-8 位，故末尾显式 & 掩码截回 cDmaExtW 位（与 RTL 的 (cDmaExtW-1,0) 同义）。
+    * 【laneOffsetBytes 必须由金锚期望地址推出】调用方应传
+    *   HiveSimCommon.cLaneOffset(expCAddrSeq(beatIdx), cDmaExtW)，【不得】传硬件实收 addr
+    *   —— 后者会把金锚退化成 RTL 的镜像（金锚铁律）。 */
+  def denseRowBeat(row: BigInt, beatInRow: Int, cDmaExtW: Int, laneOffsetBytes: Int): BigInt = {
+    val wMask = (BigInt(1) << cDmaExtW) - 1
+    val seg = (row >> (beatInRow * cDmaExtW)) & wMask
+    (seg << (laneOffsetBytes * 8)) & wMask
+  }
 
   /** fp32 bit 模式 → Float（数值对拍便捷函数，等价 fp32BitsToFloat） */
   def bitsToFp32(bits: Long): Float = fp32BitsToFloat(bits)

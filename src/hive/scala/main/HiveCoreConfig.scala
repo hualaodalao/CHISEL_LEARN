@@ -22,7 +22,7 @@ import chisel3.util._
   * @param clusterM       cluster 数量（≥1）
   * @param aW             A 矩阵元素位宽
   * @param bW             B 矩阵元素位宽
-  * @param cW             C 累加器位宽（0 = 自动推导）
+  * @param cW             C 累加器位宽（0 = 自动推导）errCode
   * @param supportedFmts  支持的数据格式集合
   * @param aBufferDepth   A 缓冲深度
   * @param bBufferDepth   B（权重）缓冲深度（独立 B buffer，宽度 totalN*bW，
@@ -116,7 +116,18 @@ case class HiveCoreConfig(
     *       （原并列的 Hive_HiveMacFpMx.sv、8×HiveCvtOpMx + 4 级 HiveMacFpMx 左结合级联
     *       均已随 FusionMac 重构删除，通路并入 Hive_HiveFusionMacFp.sv）；
     *     · HiveCoreCalcConfig 的 elemsPerLane 由 2-bit 扩为 3-bit、errCode 8 / Fix-4 errCode 3
-    *       两支 fp4 运行期守护进入网表。
+    *       两支 fp4 运行期守护进入网表；
+    *       (#169-W2-3) 另新增 errCode 10（cAddr 非 dmaBytes 对齐守护），【无门控】
+    *       ⟹ 三套配置全部 elaborate 该分支；
+    *     · Hive_HiveCoreDmaWrOnly.sv —— (#166) wdata 与 wstrb 同源移位：
+    *       `io_dmaExtWrIF_req_payload_data` 由裸截取 `_..._data_T_1[255:0]` 变为
+    *       以 addr[4:0]（#169-S1 后为显式 5-bit 切片）为控制的 byte-lane 左移；
+    *       预期该 assign 的 RHS 与 strb 侧共享【同一个 addr 派生 wire】（同源性可在
+    *       网表层面核对）。
+    *       ★此项属【数据通路语义变更】，【不是】注释级 diff。#169 之前三套产物均由
+    *         #166 之前的源码发射 ⟹ 产物里的 wdata 仍是缺陷行为（strb 移位、data 不移位），
+    *         而源码已修 —— 该静默分歧已由 #169 重发射三套产物消除（指纹对照见
+    *         build/169_main_side_wrapup.md）。
     *   结论：三套产物的【结构】不再有 normalized-diff=0 关系；数值正确性改由 TB 侧金锚
     *   （OCP MX / IEEE-754 独立推导）+ 归一化 stdout 基线（打印数字逐字节不变）守护。 */
   val hasMx8: Boolean = hasMx  // 语义别名：MXFP8 生成判据，与历史 hasMx 同值，单一真源
@@ -183,6 +194,21 @@ case class HiveCoreConfig(
   //       对下游 SoC 是 2× 错的。
   // ★cMxBlk=32 需要 cScaleRowW 随 blkSel 可变（运行期 Mux 或多套行宽）；totalN>=32 之前
   //   必须先解此耦合。此前唯一守护只在 TB 侧（HiveDebugModel 的 cMxBlk require），属测试期。
+  //
+  // 【#169-W3 交叉引用：本「totalN>=32 之前必解耦」清单新增第二项】
+  //   · HiveCoreDmaWrOnly.scala 的 HiveCoreDmaScaleWr 内
+  //       io.dmaExtWrIF.req.payload.strb := (1 << (rowW / 8) - 1).U
+  //     是【Scala 运算符优先级缺陷】：`+ -` 优先级高于 `< >` ⟹ 实际算的是
+  //     `1 << ((rowW/8) - 1)`，不是 `(1 << (rowW/8)) - 1`。rowW = cScaleRowW = totalN/2 bit：
+  //       totalN=16 ⟹ rowW/8=1 ⟹ 1<<0 = 1 = 满档（【巧合正确】，故今天不暴露）；
+  //       totalN=32 ⟹ rowW/8=2 ⟹ 1<<1 = 2 = 0b10（【错】：lane0 不写、lane1 写）；
+  //       totalN=64 ⟹ rowW/8=4 ⟹ 1<<3 = 8 = 0b00001000（【错】：只写 lane3）。
+  //     ⟹ 【totalN>=32 之前必修】（修法 = 补括号），且修后需把 scaleC 通道纳入 lane 审计。
+  //     ★#169 只登记不修（修它属功能变更，需单独裁定）；详细登记见该行的 #169-W3 注释块。
+  //   · 连带订正：scaleC 之所以豁免于 #166 的 lane 移位契约，依据是【端口宽度 = 1 字节
+  //     ⟹ lane 窗口退化为单 lane、移位恒为 0】，【不是】旧文档所称「其 strb 为常量满档」
+  //     （后者仅 rowW=8 时巧合成立）。旧理由的三处扩散：HiveSimCommon.scala:604 与
+  //     HiveCoreSimCaseIntSpec.scala:134（test 侧，#170 订正）、build/166 §7.2-6（已追加更正段）。
   require(minBlockSize == (16 << MXBlockSize.all.map(_.litValue.toInt).min),
     "HiveCoreConfig: minBlockSize (" + minBlockSize + ") must equal the smallest encodable " +
     "MXBlockSize level (16 << " + MXBlockSize.all.map(_.litValue.toInt).min + "), because " +
@@ -235,6 +261,7 @@ case class HiveCoreConfig(
   val registerNum: Int = 12
 
 
+  val queueAdapterBufferDepth: Int = 18
 
   //MNK width
   val mnkWidth: Int = 16

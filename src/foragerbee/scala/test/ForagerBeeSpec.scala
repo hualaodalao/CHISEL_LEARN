@@ -154,6 +154,38 @@ class FbWrCountingMemSlave(
   }
 }
 
+/** 记录写通道每一拍（addr/len/data/strb/sof/eof/atomic）的 [[FbStreamMemSlave]]，
+  * 用于定向验证 atomic 标志写拍。所有实例共享同一 captured 缓冲（多端口时只有承载写
+  * 的那个端口会追加）。wr.ready 由 super 恒置 true，故 valid 即 fire，可当拍捕获。
+  */
+class FbBeatCapturingMemSlave(
+    mem: mutable.HashMap[BigInt, Byte],
+    beatBytes: Int,
+    captured: mutable.ArrayBuffer[FbBeatCapturingMemSlave.Beat],
+    readDelay: Int = 1,
+    writeDelay: Int = 1,
+    errOnBurst: Int = -1
+) extends FbStreamMemSlave(mem, beatBytes, readDelay, writeDelay, errOnBurst) {
+  override def step(bus: FbStreamBus): Unit = {
+    super.step(bus)
+    if (bus.wr.valid.peek().litToBoolean) {
+      captured += FbBeatCapturingMemSlave.Beat(
+        addr = bus.wr.payload.addr.peek().litValue,
+        len = bus.wr.payload.len.peek().litValue,
+        data = bus.wr.payload.data.peek().litValue,
+        strb = bus.wr.payload.strb.peek().litValue,
+        sof = bus.wr.payload.sof.peek().litToBoolean,
+        eof = bus.wr.payload.eof.peek().litToBoolean,
+        atomic = bus.wr.payload.atomic.peek().litToBoolean
+      )
+    }
+  }
+}
+
+object FbBeatCapturingMemSlave {
+  case class Beat(addr: BigInt, len: BigInt, data: BigInt, strb: BigInt, sof: Boolean, eof: Boolean, atomic: Boolean)
+}
+
 /** 测试用命令描述（poke 到 FbCmd 端口） */
 case class FbTestCmd(
     tag: Int = 0,
@@ -188,7 +220,10 @@ case class FbTestCmd(
     t2lNumTileCols: Int = 0,
     // MX 量化字段（量化激活由 dstFmt 派生：dstFmt∈{4,5} 即激活，无独立开关）
     scaleAddr: BigInt = 0,
-    scaleBlockSize: Int = 0     // 编码：0→16, 1→32, 2→64 个元素共享一个 E8M0 scale
+    scaleBlockSize: Int = 0,     // 编码：0→16, 1→32, 2→64 个元素共享一个 E8M0 scale
+    // Atomic 标志写（命令成功完成后额外发一拍 atomic 写，向 atomicStoreAddr 写 32-bit 值 1）
+    atomicEnable: Boolean = false,
+    atomicStoreAddr: BigInt = 0  // 必须 4B 对齐（低 2 位为 0），否则被 atomicAddrBad 拒绝
 )
 
 class ForagerBeeSpec extends AnyFlatSpec with Matchers {
@@ -294,6 +329,9 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     // MX 量化字段（量化激活由 dstFmt 派生，无独立开关端口）
     port.scaleAddr.poke(c.scaleAddr)
     port.scaleBlockSize.poke(c.scaleBlockSize.U)
+    // Atomic 标志写字段
+    port.atomicEnable.poke(c.atomicEnable.B)
+    port.atomicStoreAddr.poke(c.atomicStoreAddr)
   }
 
   /** 驱动顶层全局量化参数端口（`ForagerBee.io.cvtScale/cvtZeroPoint`，仅 enableConversion 时存在）。
@@ -447,6 +485,101 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       val v = ((i3 * 100 + i2 * 30 + i1 * 7 + c * 3 + 5) & 0xFF).toByte
       m(BigInt(0x5000 + i3 * 64 + i2 * 32 + i1 * 16 + c)) shouldBe v
     }
+  }
+
+  // ===================== Atomic 标志写用例 =====================
+
+  it should "atomic store: COPY + atomicEnable writes 32-bit 1 at 4B-aligned (non-beat-aligned) addr after done" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val len = 64 // 4 beats @ BB=16
+    fillPattern(mem, 0, len)
+    // atomicStoreAddr = 0x2004：4B 对齐但非 beat 对齐（byteOff = 0x2004 & 0xF = 4）
+    val atomicAddr = BigInt(0x2004)
+    val cmd = FbTestCmd(tag = 0xA1, dimCount = 1,
+      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
+      srcAddr = 0, dstAddr = 0x1000,
+      atomicEnable = true, atomicStoreAddr = atomicAddr)
+    val captured = mutable.ArrayBuffer.empty[FbBeatCapturingMemSlave.Beat]
+    val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem,
+      modelFactory = (mm, bb) => new FbBeatCapturingMemSlave(mm, bb, captured))
+    dones shouldBe Seq((0xA1, false))
+
+    // 数据搬运本身正确
+    for (i <- 0 until len) m(BigInt(0x1000) + i) shouldBe m(BigInt(i))
+
+    // 恰有一拍 atomic 写，且为最后一个写 beat
+    val atomicBeats = captured.filter(_.atomic)
+    atomicBeats.size shouldBe 1
+    val ab = atomicBeats.head
+    captured.last.atomic shouldBe true
+    // 所有数据 beat 的 atomic 必须为 false（不悬空）
+    captured.filterNot(_.atomic).size shouldBe (captured.size - 1)
+
+    // byte-lane shift 断言：beat 对齐地址 / len=0 / sof=eof=1 / strb=0xF<<byteOff / data=1<<(byteOff*8)
+    val byteOff = 4
+    ab.addr shouldBe BigInt(0x2000)          // beat 对齐（清掉低 4 位）
+    ab.len shouldBe BigInt(0)
+    ab.sof shouldBe true
+    ab.eof shouldBe true
+    ab.strb shouldBe (BigInt(0xF) << byteOff) // 0xF0
+    ab.data shouldBe (BigInt(1) << (byteOff * 8)) // 0x1_0000_0000
+
+    // 内存终态：atomicStoreAddr 处 32-bit 字 = 1，同 beat 其余字节不受影响
+    readLe(m, atomicAddr, 4) shouldBe BigInt(1)
+    for (l <- 0 until 4) m.getOrElse(BigInt(0x2000) + l, 0.toByte) shouldBe 0.toByte // byteOff 前 4 字节未写
+    for (l <- 8 until 16) m.getOrElse(BigInt(0x2000) + l, 0.toByte) shouldBe 0.toByte // byteOff 后字节未写
+  }
+
+  it should "atomic store: byteOff=0 (beat-aligned addr) puts 32-bit 1 at lane 0" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val len = 32
+    fillPattern(mem, 0, len)
+    val atomicAddr = BigInt(0x3000) // beat 对齐，byteOff = 0
+    val cmd = FbTestCmd(tag = 0xA2, dimCount = 1,
+      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
+      srcAddr = 0, dstAddr = 0x1000,
+      atomicEnable = true, atomicStoreAddr = atomicAddr)
+    val captured = mutable.ArrayBuffer.empty[FbBeatCapturingMemSlave.Beat]
+    val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem,
+      modelFactory = (mm, bb) => new FbBeatCapturingMemSlave(mm, bb, captured))
+    dones shouldBe Seq((0xA2, false))
+    val ab = captured.filter(_.atomic)
+    ab.size shouldBe 1
+    ab.head.addr shouldBe BigInt(0x3000)
+    ab.head.strb shouldBe BigInt(0xF)
+    ab.head.data shouldBe BigInt(1)
+    readLe(m, atomicAddr, 4) shouldBe BigInt(1)
+  }
+
+  it should "atomic store: unaligned atomicStoreAddr (low 2 bits != 0) is rejected with err and no atomic beat" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val len = 32
+    fillPattern(mem, 0, len)
+    val cmd = FbTestCmd(tag = 0xA3, dimCount = 1,
+      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
+      srcAddr = 0, dstAddr = 0x1000,
+      atomicEnable = true, atomicStoreAddr = BigInt(0x2002)) // 低 2 位 = 2，非 4B 对齐
+    val captured = mutable.ArrayBuffer.empty[FbBeatCapturingMemSlave.Beat]
+    val (dones, _) = runForagerBee(testCfg, Seq(cmd), mem,
+      modelFactory = (mm, bb) => new FbBeatCapturingMemSlave(mm, bb, captured))
+    dones shouldBe Seq((0xA3, true)) // atomicAddrBad → cBad → errReg
+    captured.exists(_.atomic) shouldBe false // 命令被拒，无任何写 beat
+  }
+
+  it should "atomic store: write error during COPY suppresses the atomic flag write (errReg gating)" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val len = 32
+    fillPattern(mem, 0, len)
+    val cmd = FbTestCmd(tag = 0xA4, dimCount = 1,
+      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
+      srcAddr = 0, dstAddr = 0x1000,
+      atomicEnable = true, atomicStoreAddr = BigInt(0x4000))
+    val captured = mutable.ArrayBuffer.empty[FbBeatCapturingMemSlave.Beat]
+    // errOnBurst=0：对第一个（数据）写突发注入 err 响应 → errReg 置位 → atomic 被抑制
+    val (dones, _) = runForagerBee(testCfg, Seq(cmd), mem,
+      modelFactory = (mm, bb) => new FbBeatCapturingMemSlave(mm, bb, captured, errOnBurst = 0))
+    dones shouldBe Seq((0xA4, true))
+    captured.exists(_.atomic) shouldBe false // 出错时不发「值=1」成功标志写
   }
 
   // ===================== TRANSPOSE 用例 =====================
@@ -2916,6 +3049,104 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     for (i <- 0 until len) {
       withClue(s"dst[$i]: ") { m(BigInt(0x4000) + i) shouldBe m(BigInt(i)) }
     }
+  }
+
+  // ===================== 非阻塞写 atomic 标志写（writeOutstandingDepth=4） =====================
+  // 任务11 High-issue 回归：非阻塞路径 atomic 发射门控由 wrInFlight<depth 收紧为 wrInFlight===0，
+  // 确保全部数据写响应排空、errReg 达终态后再判定是否发 atomic（出错不发 atomic）。
+  // 复用 FbBeatCapturingMemSlave 捕获写 beat，writeDelay=8 迫使多突发同时在途。
+
+  it should "nbwr atomic: COPY + atomicEnable emits atomic only after all data responses drained (writeDelay=8)" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val len = 256 // 16 beat → 2 突发（maxBurstLen=8）
+    fillPattern(mem, 0, len)
+    val atomicAddr = BigInt(0x6008) // 4B 对齐、非 beat 对齐（byteOff = 8）
+    val expDataBursts = len / (nbwrCfg.beatBytes * nbwrCfg.maxBurstLen) // 2
+    val cmd = FbTestCmd(tag = 0xB1, dimCount = 1,
+      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
+      srcAddr = 0, dstAddr = 0x1000,
+      atomicEnable = true, atomicStoreAddr = atomicAddr)
+    val captured = mutable.ArrayBuffer.empty[FbBeatCapturingMemSlave.Beat]
+    val slaves = Seq.fill(nbwrCfg.numPorts)(
+      new FbBeatCapturingMemSlave(mem, nbwrCfg.beatBytes, captured, writeDelay = nbWrDelay))
+    var idx = 0
+    var respAtDone = -1
+    val (dones, m) = runForagerBee(nbwrCfg, Seq(cmd), mem, maxCycles = 10000,
+      modelFactory = (_, _) => { val s = slaves(idx); idx += 1; s },
+      onDoneFire = _ => if (respAtDone < 0) respAtDone = slaves.map(_.wrRespSent).sum)
+    dones shouldBe Seq((0xB1, false))
+    // 数据搬运正确
+    for (i <- 0 until len) m(BigInt(0x1000) + i) shouldBe m(BigInt(i))
+    // 恰一拍 atomic，且为最后一个写 beat（在所有数据 beat 之后）
+    val atomicBeats = captured.filter(_.atomic)
+    atomicBeats.size shouldBe 1
+    captured.last.atomic shouldBe true
+    captured.count(!_.atomic) shouldBe (expDataBursts * nbwrCfg.maxBurstLen) // 16 数据拍
+    val ab = atomicBeats.head
+    val byteOff = 8
+    ab.addr shouldBe BigInt(0x6000)              // beat 对齐
+    ab.len shouldBe BigInt(0)
+    ab.sof shouldBe true
+    ab.eof shouldBe true
+    ab.strb shouldBe (BigInt(0xF) << byteOff)     // 0xF00
+    ab.data shouldBe (BigInt(1) << (byteOff * 8)) // 1<<64
+    readLe(m, atomicAddr, 4) shouldBe BigInt(1)
+    // done 前所有写响应（2 数据突发 + 1 atomic 突发）均已排空
+    respAtDone shouldBe (expDataBursts + 1)
+  }
+
+  it should "nbwr atomic: data write err returned after sDONE entry suppresses atomic (High-issue regression, writeDelay=8)" in {
+    // 复现 Mark 指出的 High issue 场景：单段 COPY 的 EOF fire 后即进入 sDONE（wrInFlight=1），
+    // 此时 err 响应尚未返回（writeDelay=8）。旧门控 wrInFlight<depth 会让 atomic 立即 fire，
+    // 随后 err 响应回来已无法撤回 → 违反「出错不发 atomic」。修复后 wrInFlight===0 门控
+    // 迫使 atomic 等到 err 响应排空、errReg 终态后再判定，atomicNeeded=false → atomic 被抑制。
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val len = 64 // 4 beat → 1 突发（EOF 即进 sDONE，err 响应延迟 8 拍返回）
+    fillPattern(mem, 0, len)
+    val cmd = FbTestCmd(tag = 0xB2, dimCount = 1,
+      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
+      srcAddr = 0, dstAddr = 0x1000,
+      atomicEnable = true, atomicStoreAddr = BigInt(0x7000))
+    val captured = mutable.ArrayBuffer.empty[FbBeatCapturingMemSlave.Beat]
+    // errOnBurst=0：对第一个（数据）突发响应注入 err
+    val slaves = Seq.fill(nbwrCfg.numPorts)(
+      new FbBeatCapturingMemSlave(mem, nbwrCfg.beatBytes, captured, writeDelay = nbWrDelay, errOnBurst = 0))
+    var idx = 0
+    val (dones, _) = runForagerBee(nbwrCfg, Seq(cmd), mem, maxCycles = 10000,
+      modelFactory = (_, _) => { val s = slaves(idx); idx += 1; s })
+    dones shouldBe Seq((0xB2, true))            // err 终态
+    captured.exists(_.atomic) shouldBe false     // atomic 被抑制，未发出
+  }
+
+  it should "nbwr atomic: 4-burst COPY saturating depth=4 + atomicEnable, no deadlock, atomic emitted (writeDelay=8)" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val len = 512 // 32 beat → 4 突发，恰好填满深度 4
+    fillPattern(mem, 0, len)
+    val expDataBursts = len / (nbwrCfg.beatBytes * nbwrCfg.maxBurstLen) // 4
+    val atomicAddr = BigInt(0x9004) // byteOff = 4
+    val cmd = FbTestCmd(tag = 0xB3, dimCount = 1,
+      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
+      srcAddr = 0, dstAddr = 0x1000,
+      atomicEnable = true, atomicStoreAddr = atomicAddr)
+    val captured = mutable.ArrayBuffer.empty[FbBeatCapturingMemSlave.Beat]
+    val slaves = Seq.fill(nbwrCfg.numPorts)(
+      new FbBeatCapturingMemSlave(mem, nbwrCfg.beatBytes, captured, writeDelay = nbWrDelay))
+    var idx = 0
+    val (dones, m) = runForagerBee(nbwrCfg, Seq(cmd), mem, maxCycles = 20000,
+      modelFactory = (_, _) => { val s = slaves(idx); idx += 1; s })
+    dones shouldBe Seq((0xB3, false))
+    for (i <- 0 until len) m(BigInt(0x1000) + i) shouldBe m(BigInt(i))
+    val atomicBeats = captured.filter(_.atomic)
+    atomicBeats.size shouldBe 1
+    captured.last.atomic shouldBe true
+    val ab = atomicBeats.head
+    val byteOff = 4
+    ab.addr shouldBe BigInt(0x9000)
+    ab.strb shouldBe (BigInt(0xF) << byteOff)     // 0xF0
+    ab.data shouldBe (BigInt(1) << (byteOff * 8)) // 1<<32
+    readLe(m, atomicAddr, 4) shouldBe BigInt(1)
+    // SOF 门控不死锁：4 数据突发 + 1 atomic 突发的响应全部收回（done 能到达即证明无死锁）
+    slaves.map(_.wrRespSent).sum shouldBe (expDataBursts + 1)
   }
 
   // ===================== 阶段 E：描述符布局一致性（纯 Scala，无需仿真） =====================

@@ -93,6 +93,12 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   val cmdReg = Reg(new FbCmd(cfg))
   val errReg = RegInit(false.B)
 
+  // --- Atomic 标志写子阶段（在 sDONE 内局部化，命令加载时清零）---
+  // atomicIssued：atomic 写突发已被 wr 通道接受（sof&&eof 单拍，fire 即完成发射）
+  // atomicRespDone：atomic 写响应已回收（仅阻塞模式消费；非阻塞模式由 wrInFlight 排空门兜住）
+  val atomicIssued   = RegInit(false.B)
+  val atomicRespDone = RegInit(false.B)
+
   // --- 派生量（全部为 cmdReg 输出的组合，单次共享 MuxLookup，不加额外锁存寄存器组） ---
   val M = cmdReg.shape(0) // 最内维元素数（转置的列数）
   val N = cmdReg.shape(1) // 转置的行数
@@ -359,6 +365,9 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   io.bus.rd.payload := DontCare
   io.bus.wr.valid := false.B
   io.bus.wr.payload := DontCare
+  // 所有正常写 beat 显式清 atomic（不依赖 DontCare，避免 atomic 位悬空）；
+  // 仅 sDONE 的 atomic 标志写那一拍覆盖为 true（last-connect）。
+  io.bus.wr.payload.atomic := false.B
   // 所有 slave Stream：ready=false
   io.bus.wrResp.ready := false.B
   io.bus.rdData.ready := false.B
@@ -639,9 +648,14 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
     hasPadAny && (beforeBytes(log2BB - 1, 0) =/= 0.U || afterBytes(log2BB - 1, 0) =/= 0.U)
   }
 
+  // Atomic 标志写：atomicStoreAddr 必须 4B 对齐（低 2 位恒 0）。与现有 beat 对齐检查区分：
+  // beat 对齐要求低 log2BB 位为 0（更严），atomic 写只要求 4B 对齐（写入一个 32-bit 字），
+  // beat 内定位由 strb/data 的 byte-lane shift 完成。仅当 atomicEnable 时校验，走既有 err 路径。
+  val atomicAddrBad = c.atomicEnable && c.atomicStoreAddr(1, 0) =/= 0.U
+
   val cBad = cBadBase || permBad || padBad || permPadBad || im2colBad || sgBad || mxQuantBad || mxNonQuantBad ||
     fmtEncBad || cvtFmtBad || noCvtDiffBad || subByteOpBad || int4StartBad || int4PadBad || i2cCvtBurstBad ||
-    i2cCvtAlignBad || int4ShapeBad || cvtOpBad || padAlignBad
+    i2cCvtAlignBad || int4ShapeBad || cvtOpBad || padAlignBad || atomicAddrBad
 
 
   // ==========================================================================
@@ -654,6 +668,9 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   when(state === sIDLE && io.cmdIn.fire) {
     cmdReg := c
     errReg := cBad
+    // Atomic 子阶段标志复位（每条命令独立）
+    atomicIssued := false.B
+    atomicRespDone := false.B
     outerIdx.foreach(_ := 0.U)
     beatInRow := 0.U
     if (cfg.enableConversion) { wBeatInRow := 0.U }
@@ -1645,13 +1662,66 @@ class FbEngine(cfg: ForagerBeeConfig, supportsTranspose: Boolean = true, support
   when(state === sDONE) {
     converter.foreach { c => c.io.flush := true.B }
     mxQuantizer.foreach { q => q.io.flush := true.B }
-    if (nbWr) {
-      // 非阻塞：done 排空门——必须等全部在途写响应收回后才发 done；
-      // 最后一个响应与 errReg 置位同拍，计数器下拍归零，done 不早发
-      io.done.valid := wrInFlight === 0.U
-    } else {
-      io.done.valid := true.B
+
+    // --- Atomic 标志写子阶段（仅命令成功完成时：atomicEnable && !errReg）---
+    // 在 sDONE 内局部化：所有 state := sDONE 转移点无需改动；进入 sDONE 后先发一拍
+    // 独立单拍写突发（sof=eof=1,len=0,atomic=1），把 32-bit 值 1 写到 atomicStoreAddr 指定的
+    // 4B 对齐字位置，strb 只点亮那 4 个字节。byte-lane 定位复用 sSWRITE 的对齐模式（左移放置）。
+    val atomicNeeded = cmdReg.atomicEnable && !errReg
+    // beat 内字节偏移（4B 对齐 ⟹ 低 2 位恒 0，byteOff ∈ {0,4,8,...}）
+    val aByteOff = cmdReg.atomicStoreAddr(log2BB - 1, 0)
+    // beat 对齐地址（清掉低 log2BB 位，与 twAlignedAddr 同风格）
+    val aAddr = cmdReg.atomicStoreAddr & ~((BB - 1).U(addrW.W))
+    // strb：4 个连续字节使能左移到 byteOff（写入值是一个 32-bit 字）
+    val aStrb = ((0xF.U(BB.W) << aByteOff))(BB - 1, 0)
+    // data：32-bit 值 1 左移到对应 byte lane
+    val aData = 1.U(cfg.dataWidth.W) << (aByteOff << 3.U)
+
+    def driveAtomicBeat(): Unit = {
+      io.bus.wr.valid := true.B
+      io.bus.wr.payload.sof := true.B
+      io.bus.wr.payload.eof := true.B
+      io.bus.wr.payload.addr := aAddr
+      io.bus.wr.payload.len := 0.U
+      io.bus.wr.payload.data := aData
+      io.bus.wr.payload.strb := aStrb
+      io.bus.wr.payload.atomic := true.B
     }
+
+    if (nbWr) {
+      // 非阻塞：atomic 单拍突发计入 wrInFlight。发射门控收紧为 **wrInFlight === 0**——
+      // 必须等全部数据写响应排空后才发 atomic。原因：atomicNeeded = atomicEnable && !errReg
+      // 依赖 errReg 的终态，而进入 sDONE 时数据写响应可能尚未全部返回、errReg 未达终态；
+      // 若用 wrInFlight < depth 门控，atomic 可能在某个数据写随后返回 err=true 之前就已 fire，
+      // 而 atomic 写一旦发出不可撤回，违反「出错不发 atomic」规格。故等 wrInFlight===0（所有
+      // 数据响应已回收、errReg 已终态）再发，代价仅为 atomic 增加 1-2 拍排空延迟，语义正确。
+      // 统一响应汇（文件顶部）负责回收 atomic 自身的 wrResp 并把 err OR 入 errReg。
+      when(atomicNeeded && !atomicIssued && wrInFlight === 0.U) {
+        driveAtomicBeat()
+        when(io.bus.wr.fire) { atomicIssued := true.B }
+      }
+      // done 排空门：必须等 atomic 突发已发射（atomicIssued）且全部在途写响应收回
+      // （wrInFlight===0，含 atomic 这一拍）后才发 done，保证 done 不早于 atomic 写响应回来。
+      io.done.valid := (!atomicNeeded || atomicIssued) && wrInFlight === 0.U
+    } else {
+      // 阻塞：发 atomic 单拍突发，随后本引擎显式消费其 wrResp（此时无在途数据突发，
+      // 阻塞路径的各写状态均在收到自身 wrResp 后才转入 sDONE）。
+      when(atomicNeeded && !atomicIssued) {
+        driveAtomicBeat()
+        when(io.bus.wr.fire) { atomicIssued := true.B }
+      }
+      when(atomicNeeded && atomicIssued && !atomicRespDone) {
+        io.bus.wrResp.ready := true.B
+        when(io.bus.wrResp.fire) {
+          // atomic 写响应 err 与正常写错误处理一致：OR 进 errReg
+          when(io.bus.wrResp.payload.err) { errReg := true.B }
+          atomicRespDone := true.B
+        }
+      }
+      // done 仅在 atomic 阶段完成（响应回收）后拉高；未使能/出错时行为与现状一致（直接发 done）
+      io.done.valid := !atomicNeeded || atomicRespDone
+    }
+
     io.done.payload.tag := cmdReg.tag
     io.done.payload.err := errReg
     when(io.done.fire) {

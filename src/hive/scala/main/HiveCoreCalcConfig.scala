@@ -204,6 +204,91 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     }
 
     // ==========================================================================
+    // (#169 W2-3) errCode 10 -- C WRITE-BACK ADDRESS ALIGNMENT GUARD.
+    // --------------------------------------------------------------------------
+    // ▸ Why: HiveCoreDmaWrOnly puts every C beat onto the external bus word with an
+    //   AXI byte-lane shift  off = addr mod dmaBytes  (dmaBytes = cDmaExtW/8 = 32),
+    //   and BOTH wdata and wstrb are truncated back to the bus word (#166). `off`
+    //   derives straight from the RUNTIME register cAddr, so a misaligned C base
+    //   address is independent of N / totalN / cFmt. With fp32/int32 output
+    //   cWriteBytes = totalN*32/8 = 64 > dmaBytes = 32  ==>  cBeatAddrStep = 32,
+    //   2 beats/row, cDmaDmaBeatTar = 0  ==>  lanes = 32 (FULL strb), and then ANY
+    //   off > 0 pushes `off` bytes past lane 31: they are SILENTLY DROPPED on every
+    //   beat, external memory keeps its old value, STATUS.err stays 0 and done still
+    //   fires (e.g. a base address 8 mod 32 loses 16 of the 64 bytes of each row).
+    //   Before this guard the only net was the TB-side STRB-OVERFLOW criterion
+    //   (HiveSimCommon.auditCBeatLanes): simulation-only, and never executed because
+    //   every registered case uses a 32B-aligned C_BASE.
+    // ▸ Predicate: the low log2Up(dmaBytes) bits of cAddr must all be zero. dmaBytes is
+    //   a power of two because HiveCoreConfig requires isPow2(cDmaExtW), so this is an
+    //   exact "cAddr % dmaBytes == 0" test written as a bit slice -- no modulo cell,
+    //   same reasoning as the #169-S1 explicit-slice rewrite in HiveCoreDmaWrOnly.
+    //   math.min() clamps the slice for the degenerate addrWidth < log2Up(dmaBytes)
+    //   config (address space smaller than one bus word), which is out of support.
+    // ▸ Code allocation -- exhaustive enumeration of the CURRENT SOURCE, not of the
+    //   docs (src/hive/doc/problem.md:93 "codes in use 0/3/4/5/6/8, slot 7 is free"
+    //   is STALE on both 6 and 7):
+    //     0  blocksize violations merged (errMXLargerThanKLoadNum)      LIVE
+    //     1  merged into 0, unreachable, never revived                   FROZEN
+    //     2  merged into 0, unreachable, never revived                   FROZEN
+    //     3  isAMx ^ isBMx  AND  Fix-4 MX4xMX8 mix                       LIVE (x2)
+    //     4  isMx && loadWMode == 0                                      LIVE
+    //     5  aFmt == FP32 || bFmt == FP32                                LIVE
+    //     6  cFmt==MXE2M1 && n odd -- COMMENTED OUT in RTL, but STILL MIRRORED by the
+    //        golden model (HiveDebugModel.hwErrCode)  ==> NOT free: allocating it would
+    //        give one code two meanings. Pre-existing RTL<->anchor divergence, listed as
+    //        a #170 (test-side) sync item.
+    //     7  capacity: m > cBufferDepth - totalN -- LIVE in RTL. The #146 removal note
+    //        below only deleted the *fp4 blk != 64* code-7 block; this capacity block
+    //        survived and still drives code 7  ==> NOT free (and it is NOT mirrored by
+    //        the golden model either -- second pre-existing divergence, #170 item).
+    //     8  K not divisible by kPerBeat (MX / MX4 / INT)                LIVE
+    //     9  RESERVED by src/hive/doc/problem.md:89-96 for the v2 optional W4A8
+    //        (MX4xMX8 mix) independent diagnostic  ==> not free without editing that
+    //        doc, which is outside the #169 edit scope.
+    //     10 <== THIS GUARD: the lowest code that conflicts with nothing anywhere
+    //        (RTL, golden-model mirror, or doc reservation). It also honours the
+    //        standing ruling "new checks are allocated from 7 upwards; codes 1/2 are
+    //        never revived". errCode is UInt(4.W), range 0..15, so 10 fits.
+    //     11 int/non-int format cross-boundary guard (V5-only XOR)         LIVE
+    // ▸ Priority (last-connect wins, later source line = higher priority): this block
+    //   sits AFTER code 5 and AFTER code 7 (capacity), and BEFORE the code-8 blocks,
+    //   so the Fix-4 mix code3 branch STAYS the last -- and therefore highest-priority
+    //   -- branch of the chain (comments in this file, in problem.md and in the golden
+    //   model all assert that, and they are outside the #169 edit scope).
+    //   Final truth order:  3 (MX4xMX8 mix) > 8 (K not divisible)
+    //     > 10 (cAddr alignment) > 7 (capacity) > 5 > 4 > 3 (isAMx ^ isBMx) > 0
+    //     [code 6 is dead in RTL]
+    //   (#177) UPDATE -- order above is superseded: errCode 11 (int/non-int cross-boundary)
+    //     inserted between code 8 and Fix-4 code 3. New authoritative order:
+    //       3 (MX4xMX8 mix) > 11 (int/non-int cross) > 8 (K not divisible)
+    //         > 10 (cAddr alignment) > 7 (capacity) > 5 > 4 > 3 (isAMx^isBMx) > 0
+    //   Why 10 outranks 7: both are pure software-config faults caught before execution
+    //   (err blocks startOut), but a misaligned cAddr is the one whose symptom is SILENT
+    //   byte loss in external memory, i.e. the harder one to diagnose, so it wins the
+    //   report. The golden model (HiveDebugModel.hwErrCode / precheckConfigErr),
+    //   HiveCoreQuickSpec.errExplain and src/hive/doc/problem.md must mirror exactly
+    //   this order -- handed to #170 as a same-source sync item.
+    // ▸ Gating: NONE. Unlike code 8 / Fix-4 code 3 this branch is not wrapped in
+    //   if(cfg.hasMx) / if(cfg.hasMx4) / if(cfg.hasInt): the fault is a property of the
+    //   C base address and applies to every output format, so all three emitted configs
+    //   (verilog / verilog_mx / verilog_mxfp4) grow it.
+    // ▸ Deliberately conservative scope: the true harm condition is
+    //   `off + lanes > dmaBytes`, and `off` also accumulates from cRowAddressOffset /
+    //   cColTileAddressOffset (contract clauses W1/W2, see the C WRITE-BACK ALIGNMENT
+    //   CONTRACT next to the cWriteBytes derivation below). AXI does permit unaligned
+    //   transfers when wstrb is honoured and off + lanes <= dmaBytes, so guarding W0
+    //   alone forecloses a legal-but-fragile subset BY DESIGN: W0 is the clause software
+    //   can always satisfy at zero cost and the one that turns a FULL-lane beat into
+    //   silent byte loss. W1/W2 remain software obligations (no hardware guard).
+    // ==========================================================================
+    val cAlignBitsW = math.min(log2Up(cfg.cDmaExtW / 8), cfg.addrWidth)
+    when(io.regFile.cAddr(cAlignBitsW - 1, 0) =/= 0.U){
+        errComb := true.B
+        errCodeComb := 10.U
+    }
+
+    // ==========================================================================
     // 【P0-1 errCode 8（fp4 K 整除运行期守护）】fp4(E2M1) 输入要求 K 被 kPerBeat 整除。
     // --------------------------------------------------------------------------
     // ▸ 真 bug 根因：Executor 的 kTiles = K / (totalN×elemsPerLane) 是【地板除】。fp4
@@ -234,6 +319,16 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //     3 (MX4xMX8 mix) > 8 (fp4 K not divisible) > 6 > 5 > 4
     //       > 3 (isAMx ^ isBMx) > 0
     //   Code 7 is now FREE (see the removal note below).
+    //   (#169) UPDATE -- the "Final truth order" just above is STALE in two places:
+    //     (a) code 6 is COMMENTED OUT in RTL (it survives only inside the golden-model
+    //         mirror), so it can no longer appear in an RTL priority chain;
+    //     (b) the capacity code-7 guard `m > cBufferDepth - totalN` is LIVE in RTL and
+    //         was never listed here. #146 deleted only the *fp4 blk != 64* code-7
+    //         block, so "Code 7 is now FREE" does not hold for the current source.
+    //     Authoritative order (full per-code enumeration in the errCode-10 block above):
+    //       3 (MX4xMX8 mix) > 8 (K not divisible) > 10 (cAddr alignment)
+    //         > 7 (capacity) > 5 > 4 > 3 (isAMx ^ isBMx) > 0
+    //     (#177) UPDATE: now superseded by  3 > 11 > 8 > 10 > 7 > 5 > 4 > 3 > 0.
     if(cfg.hasMx){
         when(DataFormat.isMx8(io.regFile.aFmt) &&
              ((io.regFile.k(15, 0) % (cfg.totalN * 2).U =/= 0.U) ||
@@ -254,8 +349,11 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     // 【Phase 3 INT 生态同步 · errCode 8（INT8/INT4 K 整除运行期守护）】与上方 MX 两块同构：
     //   INT8 dual-lane kPerBeat=totalN×2、INT4 quad-lane kPerBeat=totalN×4；K 非整除时
     //   Executor kTiles 地板除静默丢尾（或 K<kPerBeat 时 16-bit 回绕跑飞），故运行期拒绝。
-    //   门控 if(cfg.hasInt)：不含整数格式的配置完全不 elaborate。位于 errCode6 之后、
-    //   Fix-4 mix code3 之前，保持 last-connect 优先级序（3 mix > 8 K整除 > 6 > 5 > 4 > 3 > 0）。
+    //   门控 if(cfg.hasInt)：不含整数格式的配置完全不 elaborate。位于 errCode10 之后、
+    //   errCode11 与 Fix-4 mix code3 之前。
+    //   (#177) CORRECTED authoritative last-connect priority order:
+    //     3 (MX4xMX8 mix) > 11 (int/non-int cross) > 8 (K not divisible) > 10 (cAddr)
+    //       > 7 (capacity) > 5 > 4 > 3 (isAMx^isBMx) > 0
     if(cfg.hasInt){
         when(io.regFile.aFmt === DataFormat.INT8 &&
              ((io.regFile.k(15, 0) % (cfg.totalN * 2).U =/= 0.U) ||
@@ -270,6 +368,70 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
             errCodeComb := 8.U
         }
     }
+    // ==========================================================================
+    // (#177) errCode 11 -- INT / NON-INT FORMAT CROSS-BOUNDARY GUARD (V5-only XOR).
+    // --------------------------------------------------------------------------
+    // ▸ Why: HiveOutCvt has two mutually exclusive output paths:
+    //     fp32Seq = Fp32.fpNormalize40to32(slot(39,0))  -- {sign,exp8,mant31} delayed normalization
+    //     int32Seq = slot(31,0)                          -- raw accumulator bits
+    //   The path selector depends on cFmt ONLY. When the COMPUTE format (aFmt) is
+    //   integer but cFmt selects the fp32 path (or vice versa), the hardware silently
+    //   produces a semantically WRONG bit pattern with no detectable error. This is
+    //   the "hardware teeth" identified by #140 item 4 and confirmed by #176 ss3.7.
+    // ▸ Predicate (symbolic, zero bare numbers, per the #177 contract):
+    //     cIsIntOut = DataFormat.isInt(cFmt) || cFmt === DataFormat.INT32   -- {INT8,INT16,INT4,INT32}
+    //     runIsInt  = !DataFormat.is2B(aFmt) && aFmt =/= DataFormat.FP32 && !DataFormat.isMx(aFmt)
+    //     V5err     = runIsInt ^ cIsIntOut
+    //   Equivalently: error iff (integer compute + non-integer output) OR
+    //                         (non-integer compute + integer output).
+    // ▸ Note on DataFormat.isInt including INT16: INT16 is deprecated from supportedFmts
+    //   but cFmt is a raw 4-bit register field (software CAN write 7). HiveOutCvt's
+    //   packedInt16 path exists and is semantically correct (int32Seq truncated to 16b),
+    //   so allowing cFmt=INT16 when runIsInt is harmless -- NOT a silent corruption.
+    //   (See #176 ss10 item 4.)
+    // ▸ Historical provenance: the original "V5 format legality check" lived in
+    //   HiveCoreExecutor.scala:329-348 (pre-672fb37). Commit 672fb37 ("debug mx")
+    //   deleted it during the errComb migration to CalcConfig. The old literal set
+    //   (intFmtOk={8,9,10}, fpFmtOk={0,1,2,3,4,5,6,7}) used the OBSOLETE P0 outFmt
+    //   encoding (Cat(regs(7)(16), regs(7)(13,11))) and is INVALID under the current
+    //   DataFormat enum. The new symbolic predicate above is semantically equivalent to
+    //   the ONLY part that had hardware teeth (cross-boundary), and correctly ignores
+    //   the intra-family restrictions that were "pure over-strictness" (#140 item 4).
+    // ▸ #140 item 5 (restore V2 "isMx(aFmt) && k(4,0)=/=0"): NOT RESTORED. Rationale:
+    //   errCode 8's four blocks already STRICTLY SUBSUME V2's two branches -- the MX8
+    //   block is literally equivalent (k % (totalN*2) != 0 subsumes k(4,0) != 0 when
+    //   totalN=16) and additionally catches k==0; the MX4 block k%64!=0 subsumes k%32!=0.
+    //   Moreover errCode 8 uses parameterized (cfg.totalN*N).U while V2 used the bare
+    //   slice k(4,0) hardcoding totalN=16. Restoring V2 would be PURE REDUNDANCY.
+    //   Consequently #124 report Section E item E5 ("V2 is lost") is MOOT -- the
+    //   protection it describes is already provided by errCode 8 with strictly wider
+    //   coverage. E5 should be annotated as superseded-by-errCode-8.
+    // ▸ #140 item 6 (two err path convergence): DIFFICULTY NO LONGER EXISTS. Evidence:
+    //   err/errCode registers have exactly 3 write points in the entire file --
+    //   :465-466 (sIDLE clear), :476-477 (sC0 latch from errComb/errCodeComb),
+    //   :912-913 (sDONE clear). ALL three source their values from the single
+    //   errComb/errCodeComb wire pair. There is no "register direct write" path
+    //   co-existing with a "combinational logic" path; the 672fb37 migration already
+    //   unified them. This item is CLOSED with no action required.
+    // ▸ Priority (last-connect wins, later source line = higher priority): this block
+    //   sits AFTER errCode 8 (all four sub-blocks: MX8/MX4/INT8/INT4) and BEFORE the
+    //   Fix-4 MX4xMX8 mix code3 block. Therefore:
+    //     Fix-4 code3 > 11 > 8 > 10 > 7 > 5 > 4 > 3(isAMx^isBMx) > 0
+    //   which matches the target order specified by the user.
+    //   (#177) Authoritative truth order (supersedes all previous enumerations):
+    //     3 (MX4xMX8 mix, Fix-4) > 11 (int/non-int cross-boundary) > 8 (K not divisible)
+    //       > 10 (cAddr alignment) > 7 (capacity) > 5 > 4 > 3 (isAMx^isBMx) > 0
+    // ▸ Gating: NONE. The cross-boundary condition is format-family-generic and applies
+    //   to every emitted configuration (same policy as errCode 10, per #169 precedent).
+    //   All three netlists (verilog / verilog_mx / verilog_mxfp4) will grow this logic.
+    // ==========================================================================
+    val cIsIntOut = DataFormat.isInt(io.regFile.cFmt) || io.regFile.cFmt === DataFormat.INT32
+    val runIsInt  = !DataFormat.is2B(io.regFile.aFmt) && io.regFile.aFmt =/= DataFormat.FP32 && !DataFormat.isMx(io.regFile.aFmt)
+    when(runIsInt ^ cIsIntOut){
+        errComb := true.B
+        errCodeComb := 11.U
+    }
+
     // ==========================================================================
     // 【Fix-4 errCode 3（MX4×MX8 混配运行期可诊断守护）】aFmt/bFmt 分属 fp4(E2M1) 与
     //   fp8(E4M3/E5M2) 时，HiveWorkUnit 的运行期选择子 Mux(isMx4(io.aFmt), quadResult,
@@ -294,6 +456,21 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //   HiveCoreQuickSpec.hwErrCode which delegates to it) plus
     //   HiveCoreQuickSpec.errExplain and src/hive/doc/problem.md must mirror
     //   exactly this order.
+    //   (#169) UPDATE -- the order printed above is STALE: code 6 is commented out in
+    //   RTL, the LIVE capacity code-7 block is unlisted, and #169 inserted the new
+    //   errCode 10 (cAddr alignment) between code 8 and code 7. The claim "this is now
+    //   the LAST branch of the chain and therefore the highest-priority one" REMAINS
+    //   TRUE: #169 deliberately placed the errCode-10 block ABOVE the code-8 blocks so
+    //   as not to disturb it (that claim is asserted in three places -- this file,
+    //   problem.md and the golden model -- none of which #169 may rewrite).
+    //   Authoritative order:
+    //     3 (this block, MX4xMX8 mix) > 8 (K not divisible) > 10 (cAddr alignment)
+    //       > 7 (capacity) > 5 > 4 > 3 (isAMx ^ isBMx) > 0
+    //   (#177) UPDATE: errCode 11 (int/non-int cross-boundary) now sits between code 8
+    //   and this Fix-4 block. This block REMAINS the last/highest-priority branch.
+    //   New authoritative order:
+    //     3 (this block) > 11 (int/non-int cross) > 8 (K not divisible)
+    //       > 10 (cAddr alignment) > 7 (capacity) > 5 > 4 > 3 (isAMx^isBMx) > 0
     if(cfg.hasMx4){
         when(DataFormat.isMx4(io.regFile.aFmt) ^ DataFormat.isMx4(io.regFile.bFmt)){
             errComb := true.B
@@ -331,6 +508,30 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     // ▸ Gating note: the removed block lived inside `if(cfg.hasMx4)`, so for the
     //   cfgBase/cfgMx baselines (hasMx4=false) it never elaborated at all and
     //   their errCode 0/3/4/5/6/8 paths are literally unchanged.
+    // ▸ (#169) UPDATE -- this removal note is STALE in two places; corrected here:
+    //   (a) "Code 7 is now FREE" is WRONG for the current source. #146 deleted only
+    //       the *fp4 forces blk=64* code-7 block. The capacity guard
+    //       `when(io.regFile.m > (cfg.cBufferDepth - cfg.totalN).U)` further up still
+    //       drives `errCodeComb := 7.U`, so 7 is LIVE and must NOT be reallocated.
+    //       Git evidence: commit 1ea3464 rewrote the old `cFmt==MXE2M1 && n(0)` code-6
+    //       block into the capacity code-7 block; a later edit re-added code 6 as the
+    //       commented-out lines that sit right above the capacity guard.
+    //   (b) the truth order quoted above is stale on 6 (dead in RTL, mirrored only by
+    //       the golden model) and omits the LIVE 7.
+    //   Authoritative order as of #169:
+    //     3 (MX4xMX8 mix) > 8 (K not divisible) > 10 (cAddr alignment)
+    //       > 7 (capacity) > 5 > 4 > 3 (isAMx ^ isBMx) > 0
+    //   Code 6 stays dead in RTL but is still mirrored by HiveDebugModel.hwErrCode --
+    //   a pre-existing RTL<->anchor divergence handed to #170 (test side).
+    //   New allocations must start at 11 from now on: 10 is taken by #169, 9 is
+    //   reserved by problem.md:89-96, 6/7/8 are live-or-mirrored, 1/2 stay frozen.
+    //   (#177) UPDATE: errCode 11 is NOW TAKEN (int/non-int cross-boundary guard).
+    //   Authoritative order as of #177:
+    //     3 (MX4xMX8 mix) > 11 (int/non-int cross) > 8 (K not divisible)
+    //       > 10 (cAddr alignment) > 7 (capacity) > 5 > 4 > 3 (isAMx^isBMx) > 0
+    //   Next available code: 12. Code 7 is LIVE (capacity guard) and must NOT be
+    //   reallocated. Codes 1/2 stay FROZEN; code 6 is dead in RTL but mirrored
+    //   by golden model; code 9 is reserved by problem.md.
 
 }
 
@@ -643,6 +844,112 @@ otherwise{
 }
 
 
+// ==========================================================================
+// (#169 W2) C WRITE-BACK ALIGNMENT CONTRACT -- full derivation (ASCII only).
+// --------------------------------------------------------------------------
+// Written in the same style as the (#146) MX SCALE READ ALIGNMENT CONTRACT
+// above, because the two are the same kind of object: a property of the
+// RUNTIME address stream that the hardware only partially enforces.
+//
+// This block is the SINGLE SOURCE of the five quantities that HiveCoreDmaWrOnly
+// consumes to place a C beat on the external bus word:
+//   cWriteBytes     bytes of one dense output row  (totalN * elemBytes(cFmt))
+//   cDmaBytes       = cDmaExtW/8 = dmaBytes, the bus word size in bytes (32)
+//   cBeatAddrStep   address increment between two beats of the SAME row
+//   cDmaBufBeatTar  last beat index inside a row   (beats/row - 1)
+//   cDmaDmaBeatTar  lane-occupancy selector: 0 -> full, 1 -> 1/2, else -> 1/4
+//
+// The write address of beat (nt, row, beat) is, in HiveCoreDmaWrOnly:
+//   addr = cAddr + nt*cColTileAddressOffset + row*cRowAddressOffset
+//                + beat*cBeatAddrStep
+// and HiveCoreDmaWrOnly shifts BOTH wdata and wstrb left by
+//   off = addr mod dmaBytes            (#169-S1: addr(log2Up(dmaBytes)-1,0))
+// before truncating them back to the bus word. The number of asserted strb
+// bits is  lanes = dmaBytes >> cDmaDmaBeatTar.
+//
+// HARM CONDITION (derived, not chosen):  off + lanes > dmaBytes.
+//   The top (off + lanes - dmaBytes) bytes fall outside the (cDmaExtW-1,0)
+//   slice on wdata and outside the dmaBytes-wide strb sink, so they are
+//   SILENTLY DROPPED: external memory keeps its previous value, STATUS.err
+//   stays 0, done still pulses. That is the #168-W2 finding.
+//
+// Per-format table at totalN=16 / cDmaExtW=256 (dmaBytes=32). Note that the
+// beat term NEVER contributes to off: in the cWriteBytes > cDmaBytes branch
+// cBeatAddrStep = cDmaBytes (a multiple of dmaBytes), and in the other branch
+// cDmaBufBeatTar = 0 so beatCnt is identically 0.
+//   cFmt class      cWriteBytes  beats/row  lanes  cRowAddrOff  cColTileAddrOff  slack=dmaBytes-lanes
+//   half-byte        8            1          8     n>>1          8               24
+//   (INT4/MXE2M1)
+//   1-byte          16            1         16     n*1          16               16
+//   (INT8/MXFP8)
+//   2-byte          32            1         32     n*2          32                0
+//   (FP16/BF16/INT16)
+//   4-byte          64            2         32     n*4          64                0
+//   (FP32/INT32/reserved)
+//
+// CONTRACT -- three independent clauses, each sufficient on its own to keep
+// off == 0 for the WHOLE run (and therefore to make off + lanes > dmaBytes
+// unreachable):
+//   (W0) cAddr % dmaBytes == 0
+//        >>> The hardware DOES check this one: errCode 10
+//        ("C write-back address alignment guard", in the Error config check
+//        block above). It blocks startOut, so a violating run never launches.
+//        This is the clause #169 promoted from a silent fault to an error.
+//   (W1) cRowAddressOffset % dmaBytes == 0   OR the row range is a single
+//        value (M == 1).
+//        >>> NOT checked by hardware -- software obligation.
+//        At totalN=16/dmaBytes=32 this reads: 4-byte class -> n % 8 == 0;
+//        2-byte -> n % 16 == 0; 1-byte -> n % 32 == 0; half-byte -> n % 64 == 0.
+//   (W2) cColTileAddressOffset % dmaBytes == 0   OR nTile == 1.
+//        >>> NOT checked by hardware -- software obligation.
+//        The 2-byte and 4-byte classes satisfy it identically (32 and 64 are
+//        both multiples of dmaBytes). The 1-byte class (16) and the half-byte
+//        class (8) DO NOT, so a multi-n-tile run in those formats relies on the
+//        slack column instead: lanes=16 tolerates off <= 16, lanes=8 tolerates
+//        off <= 24. AXI permits that (wstrb is honoured), so it is legal but
+//        fragile -- a format/stride change that shrinks the slack to 0 turns it
+//        into silent byte loss without any RTL edit.
+//
+// WHY ONLY W0 IS GUARDED BY HARDWARE: see the errCode-10 block. In short, W0 is
+//   (a) the clause software can always satisfy at zero cost, (b) the one whose
+//   violation is format-independent and therefore reachable in the 2-byte and
+//   4-byte classes where slack == 0, and (c) cheap to test as a pure bit slice
+//   on a register. W1/W2 depend on M / nTile, which are only known inside the
+//   traversal, so guarding them would need per-beat arithmetic rather than a
+//   config-time predicate.
+//
+// SEPARATE, UNGUARDED PATH (do not conflate with W0/W1/W2): when N is not a
+//   multiple of totalN the LAST beat of a row asserts more lanes than the row
+//   still has bytes, i.e. `lanes` overshoots the valid data. off is unaffected,
+//   so this is the other half of the #168-W2 finding. It is visible in
+//   simulation via the TB-side STRB-OVERFLOW criterion
+//   (HiveSimCommon.auditCBeatLanes) but has NO hardware errCode; it belongs to
+//   the pre-existing "strb granularity is not refined by the N tail" family.
+// ==========================================================================
+// (#169 W10) REVERSE CROSS-REFERENCE -- implicit cross-file contract.
+// --------------------------------------------------------------------------
+// The derivation below (cWriteBytes -> cBeatAddrStep / cDmaBufBeatTar /
+// cDmaDmaBeatTar) is one half of an IMPLICIT contract with HiveCoreDmaWrOnly,
+// which maps the same bus word twice, through two INDEPENDENT paths:
+//   (1) intra-beat segmentation, using the COMPILE-TIME constant cDmaExtW:
+//         dmaExtWrIF.req.payload.data :=
+//           (io.bufPop.payload >> (beatCnt * cfg.cDmaExtW.U))(cfg.cDmaExtW-1, 0)
+//   (2) byte-lane offset, using the RUNTIME register cBeatAddrStep derived here:
+//         dmaExtWrIF.req.payload.addr := curAddr + beatCnt * io.calcConfig.cBeatAddrStep
+//         off = addr(log2Up(dmaBytes)-1, 0)
+// They are complementary ONLY because of the shape of the derivation below:
+//   cWriteBytes >  cDmaBytes => cBeatAddrStep = cDmaBytes (= cDmaExtW/8), so
+//                               path (2) advances exactly one bus word per beat
+//                               while path (1) advances one bus word per beat;
+//   cWriteBytes <= cDmaBytes => cDmaBufBeatTar = 0 => beatCnt == 0, so path (1)
+//                               is a constant zero shift and path (2) alone
+//                               carries the row.
+// There is NO require / assertion binding the two. Editing the cBeatAddrStep or
+// cDmaBufBeatTar formula below -- including any "pack two rows into one beat"
+// proposal -- MUST re-verify both paths in HiveCoreDmaWrOnly. See the
+// "#169-W10 跨文件隐式契约（勿破）" block there (just above its addrShiftBytes
+// definition) for the forward half of this cross-reference.
+// ==========================================================================
   val cWriteBytes = Wire(UInt((8.W)))
   val cDmaBytes = Wire(UInt((8.W)))
   cDmaBytes := cfg.cDmaExtW.U / 8.U

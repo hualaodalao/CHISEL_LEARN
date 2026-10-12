@@ -1,6 +1,7 @@
 
 import chisel3._
 import chisel3.util._
+import chisel3.dontTouch
 
 // ============================================================================
 // 命令 Bundle
@@ -119,6 +120,8 @@ object HiveCoreStatus {
 }
 
 class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
+  //占用DW0高位编码
+  //val cmdType = UInt(4.W);dontTouch(cmdType)
 
   val m = UInt(cfg.mnkWidth.W)
   val n = UInt(cfg.mnkWidth.W)
@@ -127,9 +130,9 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
   val bAddr = UInt(cfg.addrWidth.W)
   val cAddr = UInt(cfg.addrWidth.W)
 
-  val aStride = UInt(4.W)
-  val bStride = UInt(4.W)
-  val cStride = UInt(4.W)
+  //val aStride = UInt(4.W)
+  //val bStride = UInt(4.W)
+  //val cStride = UInt(4.W)
   val aAddrMode = AddrMode()
   val bAddrMode = AddrMode()
   val cAddrMode = AddrMode()
@@ -150,26 +153,22 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
 
   def wregs(addr: UInt, d: UInt) = {
     switch(addr){
-      is(0.U) { m := d }
-      is(1.U) { n := d }
-      is(2.U) { k := d }
-      is(3.U) { aAddr := d }
-      is(4.U) { bAddr := d }
-      is(5.U) { cAddr := d }
-      is(6.U) { 
+      is(0.U) { m := d(15,0) }
+      is(1.U) { n := d(15,0); k := d(31,16) }
+      is(2.U) { aAddr := d }
+      is(3.U) { bAddr := d }
+      is(4.U) { cAddr := d }
+      is(5.U) { 
         loadWMode := d(28)
         cMxBlockSize := d(26).asTypeOf(MXBlockSize())
         bMxBlockSize := d(24).asTypeOf(MXBlockSize())
         aMxBlockSize := d(22).asTypeOf(MXBlockSize())
+        warmup       := d(21)
+        warmdown     := d(20)
+        rnd          := d(18,16).asTypeOf(RoundingMode())
         cAddrMode := d(14).asTypeOf(AddrMode())
         bAddrMode := d(13).asTypeOf(AddrMode())
         aAddrMode := d(12).asTypeOf(AddrMode())
-        cStride := d(11, 8)        
-        bStride := d(7, 4)
-        aStride := d(3, 0)
-        }
-      is(7.U) {
-        rnd := d(14, 12).asTypeOf(RoundingMode())   // 【#120 C2】3-bit：bits[14:12]，支持全 5 种舍入（RNE/RTZ/RDN/RUP/RMM）
         cFmt := d(11, 8).asTypeOf(DataFormat())
         bFmt := d(7, 4).asTypeOf(DataFormat())
         aFmt := d(3, 0).asTypeOf(DataFormat())
@@ -185,17 +184,20 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
     val ret = Wire(UInt(32.W))
     ret := 0.U
     switch(addr) {
-      is(0.U) { ret := m }
-      is(1.U) { ret := n }
-      is(2.U) { ret := k }
-      is(3.U) { ret := aAddr }
-      is(4.U) { ret := bAddr }
-      is(5.U) { ret := cAddr }
-      is(6.U) { ret := Cat(0.U(3.W), loadWMode.asUInt,0.U(1.W),cMxBlockSize.asUInt, 0.U(1.W),bMxBlockSize.asUInt, 0.U(1.W),aMxBlockSize.asUInt, 0.U(7.W),cAddrMode.asUInt, bAddrMode.asUInt,aAddrMode.asUInt, cStride, bStride, aStride) }  // 【#120 C1】间隙 8→7，总位宽 32-bit，严格镜像 wregs 位域
-      
-      is(7.U) {
-        ret := Cat(0.U(17.W), rnd.asUInt, cFmt.asUInt, bFmt.asUInt, aFmt.asUInt)  // 【#120 C2】17+3+4+4+4=32，rnd 占 bits[14:12]
-       }
+      is(0.U) { ret := Cat(0.U(16.W),m) }
+      is(1.U) { ret := Cat(k,n) }
+      is(2.U) { ret := aAddr }
+      is(3.U) { ret := bAddr }
+      is(4.U) { ret := cAddr }
+      is(5.U) { ret := Cat(0.U(3.W), loadWMode.asUInt,
+      0.U(1.W),cMxBlockSize.asUInt, 
+      0.U(1.W),bMxBlockSize.asUInt,
+      0.U(1.W),aMxBlockSize.asUInt,
+      warmup.asUInt,
+      warmdown.asUInt,
+      0.U(1.W), rnd.asUInt,
+      0.U(1.W), cAddrMode.asUInt, bAddrMode.asUInt,aAddrMode.asUInt, 
+      cFmt.asUInt, bFmt.asUInt, aFmt.asUInt) }  // 【#120 C1】间隙 8→7，总位宽 32-bit，严格镜像 wregs 位域
       is(8.U) { ret := 0.U }
       is(9.U) { ret := aScaleAddr }
       is(10.U) { ret := bScaleAddr }

@@ -154,6 +154,7 @@ class FbChainController(cfg: ForagerBeeConfig) extends Module {
   io.chainBus.wr.payload.strb := 0.U
   io.chainBus.wr.payload.sof  := false.B
   io.chainBus.wr.payload.eof  := false.B
+  io.chainBus.wr.payload.atomic := false.B
   io.chainBus.wrResp.ready := false.B
 
   // --- 默认输出 ---
@@ -231,6 +232,13 @@ class FbChainController(cfg: ForagerBeeConfig) extends Module {
   // enableConversion=false 的 copy-only 构建无量化器，MX 退化为 1 字节/元素裸格式，纯拷贝合法。
   injCmd.scaleAddr      := 0.U
   injCmd.scaleBlockSize := 0.U
+  // atomic 字段默认 0：**链式命令暂不支持 atomic 标志写**。
+  // v3 描述符布局（FbDescLayout）为软件可见契约、totalBits/descBeats 已被锁定表固定，
+  // 与 im2col/sg/tile2linear/scaleAddr 同策略，链式描述符不序列化 atomicEnable/atomicStoreAddr，
+  // 硬连线为 0 —— 描述符注入的命令不会触发 DMA 完成后的 atomic 写。
+  // （注：链首那条经 io.cmd 直连、sPASS 原样透传的命令仍可携带 atomic，因其不经 injCmd。）
+  injCmd.atomicEnable    := false.B
+  injCmd.atomicStoreAddr := 0.U
 
   // --- 入口自守（安全关键，仅 enableConversion=true 构建）：链式描述符携带 isMx(dstFmt) 时
   // 强制 dimCount=0，让引擎报 err ---

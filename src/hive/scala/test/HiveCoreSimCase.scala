@@ -70,10 +70,21 @@
   * 以下为原有 suite 文档：所述 FSM 流程与 DMA 地址对账机制【与数据格式无关】，
   * 按仍支持格式重写用例时仍然逐条适用，故原样保留。
   *
+  * ★(#164) 寄存器布局已重排，重写用例时【不要】直接拷上方历史文本里的寄存器号：
+  *   旧 reg1=n / reg2=k 已合并为 reg1 = n|k<<16（读回 Cat(k,n)）；旧 reg3/4/5=a/b/cAddr
+  *   已下移为 reg2/3/4；旧 reg6（loadWMode/三 MxBlk/三 addrMode/三 stride）+ 旧 reg7
+  *   （rnd/三 fmt）已合并为单一 reg5；旧 reg6/reg7 槽位已删除（main 侧 wregs/rregs 无
+  *   is(6)/is(7) 分支 ⟹ 写为 no-op、读回 0）。reg0=m、reg8=STATUS、reg9/0A/0B=三 scale
+  *   基址不变。新 reg5 完整位域见 HiveDebugModel.controlWord5 的契约注释。
+  *   aStride/bStride/cStride 三个字段已被 main 侧注释删除（HiveInterface.scala）。
+  *   ★本 suite 当前【零活跃注册用例】（已核实，见 #164 报告）⟹ 无活代码需要适配，
+  *   本段仅为防止日后重写时沿用旧排布。
+  *
   * 验证 FSM 完整流程：寄存器配置 → EXECUTE → DMA 加载/存储 → 完成
   * 外部存储器由测试 Memory Model 模拟（地址寻址）：
-  *   - 软件侧按与硬件相同的地址公式（stride 寄存器仅 4bit，本用例退化
-  *     为 0）逐 beat 推导期望地址；dmaA/dmaB 响应时先读 cmd.addr 与
+  *   - 软件侧按与硬件相同的地址公式（(#164) stride 寄存器已被 main 侧注释删除，
+  *     旧文本「stride 寄存器仅 4bit，本用例退化为 0」已失效；地址步进全部由
+  *     几何参数推导）逐 beat 推导期望地址；dmaA/dmaB 响应时先读 cmd.addr 与
   *     期望对账（未知/不符地址直接报错），再供对应行数据，防止
   *     「按序供数掩盖地址公式 bug」
   *   - dmaC 逐 beat 校验写地址/len 后记录，C 矩阵重建同时依赖
