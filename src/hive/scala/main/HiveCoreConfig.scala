@@ -195,16 +195,19 @@ case class HiveCoreConfig(
   // ★cMxBlk=32 需要 cScaleRowW 随 blkSel 可变（运行期 Mux 或多套行宽）；totalN>=32 之前
   //   必须先解此耦合。此前唯一守护只在 TB 侧（HiveDebugModel 的 cMxBlk require），属测试期。
   //
-  // 【#169-W3 交叉引用：本「totalN>=32 之前必解耦」清单新增第二项】
+  // 【#169-W3 交叉引用：本「totalN>=32 之前必解耦」清单第二项（strb 括号）已修复（本次）】
   //   · HiveCoreDmaWrOnly.scala 的 HiveCoreDmaScaleWr 内
   //       io.dmaExtWrIF.req.payload.strb := (1 << (rowW / 8) - 1).U
-  //     是【Scala 运算符优先级缺陷】：`+ -` 优先级高于 `< >` ⟹ 实际算的是
+  //     曾是【Scala 运算符优先级缺陷】：`+ -` 优先级高于 `< >` ⟹ 实际算的是
   //     `1 << ((rowW/8) - 1)`，不是 `(1 << (rowW/8)) - 1`。rowW = cScaleRowW = totalN/2 bit：
   //       totalN=16 ⟹ rowW/8=1 ⟹ 1<<0 = 1 = 满档（【巧合正确】，故今天不暴露）；
   //       totalN=32 ⟹ rowW/8=2 ⟹ 1<<1 = 2 = 0b10（【错】：lane0 不写、lane1 写）；
   //       totalN=64 ⟹ rowW/8=4 ⟹ 1<<3 = 8 = 0b00001000（【错】：只写 lane3）。
-  //     ⟹ 【totalN>=32 之前必修】（修法 = 补括号），且修后需把 scaleC 通道纳入 lane 审计。
-  //     ★#169 只登记不修（修它属功能变更，需单独裁定）；详细登记见该行的 #169-W3 注释块。
+  //     ★#169 当时只登记不修（修它属功能变更，需单独裁定）；用户已裁定，本次已修复
+  //     （补括号为 `((1 << (rowW / 8)) - 1).U`）。当前配置 totalN=16 下新旧公式同值（1）
+  //     ⟹ 网表级 no-op，三套 verilog 重发射逐字节零 diff；详细登记与取证见该行
+  //     （HiveCoreDmaWrOnly.scala）的 #169-W3 注释块与 build/w3_strb_precedence_fix.md。
+  //     ⟹ totalN 提到 32 时剩余待办 = 把 scaleC 通道纳入 lane 审计 + 本侧 cScaleRowW 解耦。
   //   · 连带订正：scaleC 之所以豁免于 #166 的 lane 移位契约，依据是【端口宽度 = 1 字节
   //     ⟹ lane 窗口退化为单 lane、移位恒为 0】，【不是】旧文档所称「其 strb 为常量满档」
   //     （后者仅 rowW=8 时巧合成立）。旧理由的三处扩散：HiveSimCommon.scala:604 与

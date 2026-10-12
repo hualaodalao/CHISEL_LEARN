@@ -7,7 +7,8 @@ module Hive_StreamFifo_3(	// src/utils/Stream/Stream.scala:361:7
   output        io_pop_valid,	// src/utils/Stream/Stream.scala:363:14
   input         io_pop_ready,	// src/utils/Stream/Stream.scala:363:14
   output [31:0] io_pop_payload,	// src/utils/Stream/Stream.scala:363:14
-  input         io_flush	// src/utils/Stream/Stream.scala:363:14
+  input         io_flush,	// src/utils/Stream/Stream.scala:363:14
+  output [6:0]  io_occupancy	// src/utils/Stream/Stream.scala:363:14
 );
 
   Hive_Queue64_UInt32 queue (	// src/utils/Stream/Stream.scala:371:21
@@ -18,6 +19,7 @@ module Hive_StreamFifo_3(	// src/utils/Stream/Stream.scala:361:7
     .io_deq_ready (io_pop_ready),
     .io_deq_valid (io_pop_valid),
     .io_deq_bits  (io_pop_payload),
+    .io_count     (io_occupancy),
     .io_flush     (io_flush)
   );	// src/utils/Stream/Stream.scala:371:21
 endmodule

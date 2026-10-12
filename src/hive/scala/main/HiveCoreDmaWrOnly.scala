@@ -657,8 +657,8 @@ class HiveCoreDmaScaleWr(cfg: HiveCoreConfig) extends Module {
   io.dmaExtWrIF.req.payload.addr  := curAddr
   io.dmaExtWrIF.req.payload.data  := io.bufPop.payload
   // ==========================================================================
-  // 【#169-W3 登记（只登记不修）：下一行 strb 常量是【Scala 运算符优先级缺陷】
-  //   现状：`(1 << (rowW / 8) - 1).U`。Scala 中运算符优先级由【首字符】决定，`+ -`
+  // 【#169-W3 登记 → 已修复（本次，补括号）：下一行 strb 常量曾是【Scala 运算符优先级缺陷】
+  //   原状：`(1 << (rowW / 8) - 1).U`。Scala 中运算符优先级由【首字符】决定，`+ -`
   //   的优先级【高于】`< >`，故它解析为 `1 << ((rowW / 8) - 1)`，【不是】
   //   `(1 << (rowW / 8)) - 1`。配合 rowW = cfg.cScaleRowW = (totalN/minBlockSize)*8
   //   = totalN/2 **bit**：
@@ -666,17 +666,21 @@ class HiveCoreDmaScaleWr(cfg: HiveCoreConfig) extends Module {
   //     |  16（当前全部配置） |  8 | 1 | 0b1 = 1 | 1<<0 = 1 | 巧合正确 |
   //     |  32                | 16 | 2 | 0b11 = 3 | 1<<1 = 2 = 0b10 | 【错】lane0 不写 |
   //     |  64                | 32 | 4 | 0b1111 = 15 | 1<<3 = 8 = 0b00001000 | 【错】只写 lane3 |
-  //   ★登记为「totalN >= 32 之前必修」（修它属功能变更，需单独裁定，#169 未动）；
-  //     修法 = 补括号 `(1 << (rowW / 8)) - 1`。交叉引用已登记在 HiveCoreConfig.scala
-  //     的 minBlockSize/cScaleRowW 解耦清单（require(minBlockSize == ...) 上方那段）。
+  //   ★#169 当时只登记不修（修它属功能变更，需单独裁定）；用户已裁定，本次已修复：
+  //     下一行现为 `((1 << (rowW / 8)) - 1).U`。当前配置 totalN=16 ⟹ rowW/8=1，
+  //     新旧公式都算 1 ⟹ 纯编译期字面量求值、网表级 no-op ⟹ 重发射三套 verilog
+  //     产物逐字节零 diff（取证见 build/w3_strb_precedence_fix.md）。
+  //     交叉引用见 HiveCoreConfig.scala 的 minBlockSize/cScaleRowW 解耦清单
+  //     （require(minBlockSize == ...) 上方那段）。
   //   ★同时订正【scaleC 豁免于 #166 lane 契约的理由】：依据是【端口宽度 = 1 字节
   //     （rowW = 8 bit @ totalN=16）⟹ lane 窗口退化为单 lane、移位恒为 0】，
   //     【不是】「其 strb 为常量满档」——后者仅 rowW=8 时巧合成立（见上表）。
   //     旧理由已扩散到 HiveSimCommon.scala:604、HiveCoreSimCaseIntSpec.scala:134 与
   //     build/166 §7.2-6（test 侧两处由 #170 订正，build/166 已追加更正段）。
-  //     ⟹ totalN 提到 32 之前必须先修本行括号，并把 scaleC 纳入 lane 审计。
+  //     ⟹ 本行括号已修；totalN 提到 32 时剩余待办 = 把 scaleC 纳入 lane 审计
+  //     + Config 侧 cScaleRowW 解耦。
   // ==========================================================================
-  io.dmaExtWrIF.req.payload.strb  := (1 << (rowW / 8) - 1).U
+  io.dmaExtWrIF.req.payload.strb  := ((1 << (rowW / 8)) - 1).U
   io.bufPop.ready                 := (state === sTRANSFER) & io.dmaExtWrIF.req.ready
   io.dmaExtWrIF.rsp.ready         := true.B
 

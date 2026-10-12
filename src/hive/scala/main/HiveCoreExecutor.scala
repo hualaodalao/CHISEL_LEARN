@@ -77,6 +77,8 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
     // MX scale 通道（仅 hasMx 生成，非 MX 配置不暴露）：
     val scaleAPop    = if (cfg.hasMx) Some(slave(Stream(UInt(cfg.scaleAW.W))))             else None
     val scaleBPop    = if (cfg.hasMx) Some(slave(Stream(UInt(cfg.scaleBW.W)))) else None
+    // 【P0-1 gather】scaleB FIFO 占用量输入：loadW 预取窗口门控用（sDRAIN→sLOAD_B）
+    val scaleBOcc    = if (cfg.hasMx) Some(Input(UInt(log2Up(cfg.scaleBufferDepth + 1).W))) else None
     val hiveScaleAIn = if (cfg.hasMx) Some(Output(Vec(cfg.totalN, UInt(8.W))))   else None
     val hiveScaleBIn = if (cfg.hasMx) Some(Output(Vec(cfg.totalN, UInt(8.W))))   else None
 
@@ -320,7 +322,14 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
         io.flushA := true.B
         io.flushB := true.B
         io.flushC := true.B
-        state    := sLOAD_B
+        // 【P0-1/P0-2 gather 门控】gather 读使非对齐逻辑拍变为 2 物理读/拍，
+        // 供数速率可低至 0.5 字/拍；而 loadW 预取窗口要求窗口内 bPop 严格逐拍
+        // （loadW 脉冲链/scaleB 移位链按拍位移，供数断拍破坏权重对角线与 scaleB
+        // 空间对齐）。故【所有运行】不直入 sLOAD_B，统一经 sDRAIN 门控：等
+        // B FIFO 占用 ≥ totalN（MX 运行另加 scaleB FIFO ≥ totalN）再进窗口。
+        // 对齐快路径下 DMA 供数不慢于消费，门控仅在启动期短暂等待，行为不变。
+        hasNext  := true.B
+        state    := sDRAIN
       }
 
       // 水平 loadW 模式位锁存：独立 when（不改动上方原 execute 块）。
@@ -552,7 +561,13 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
       when(hasNext){
         when(drainNextCnt =/= 0.U){
           drainNextCnt := drainNextCnt - 1.U
-        }.otherwise{
+        }.elsewhen(io.bOccupancy >= cfg.totalN.U && (!mxRunB || io.scaleBOcc.get >= cfg.totalN.U)){
+          // 【P0-1/P0-2 gather 门控】进入 sLOAD_B 预取窗口的充要预蓄条件：
+          //   ① B FIFO ≥ totalN：窗口内 bPop 逐拍消费 16 拍，最坏供数 2 拍/字
+          //     （全非对齐），缺口 ≤ 8 字，totalN=16 字预蓄保证窗口内永不落空；
+          //   ② MX 运行另需 scaleB FIFO ≥ totalN（scaleB 与 bPop lockstep 同拍消费，
+          //     同样逐拍不可断）。满足后窗口内 pop 严格逐拍 ⟹ loadW 脉冲链与
+          //     scaleB 移位链的空间对齐不被破坏。
           drainNextCnt := totalN.U - 1.U
           // 水平 loadW 模式 drain 重载（与 sNEXT_NK_TILE 初值一致；该值
           // 会被下一 sNEXT_NK_TILE 重新赋值，此处保持一致性）

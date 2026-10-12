@@ -235,7 +235,12 @@ object HiveDebugModel {
       //      未引用）⟹ 期望地址序列、期望码、归零判据全部不受影响。
       //   本轮按裁定【不新增用例】，加字段只为让金锚控制字与寄存器契约同形。
       warmup: Boolean = false,
-      warmdown: Boolean = false) {
+      warmdown: Boolean = false,
+      // 【P0-2 gather 非对齐用例】A/B 基址参数化（默认对齐基址 = 既有常量）。
+      //   放在末尾带默认值 ⟹ 全部既有构造点零改动。gather 读使非对齐基址合法：
+      //   DMA 发对齐多发读 + 内部移位重组，金锚序列/内存映像随基址平移。
+      aBase: Long = A_BASE,
+      bBase: Long = B_BASE) {
 
     // 【#144 blk 解码跟随 MXBlockSize 枚举收窄】枚举已由 {M8=0,M16=1,M32=2,M64=3}（bytes=8<<sel）
     //   收窄为 {M16=0,M32=1}，故 sel→bytes 的定义式相应改为 16<<sel：sel=0→16(M16)、sel=1→32(M32)。
@@ -722,22 +727,33 @@ object HiveDebugModel {
         for (nt <- 0 until nTiles; mm <- 0 until p.m) yield SC_BASE + nt * colOff + mm * rowOff
       } else Seq.empty
 
-    // ---- A 期望地址序列：nt 外 × kt 中 × m 内（与 RdOnly isA=true 同序） ----
+    // ---- 【P0-1/P0-2 gather 物理序列】读 DMA 对非对齐逻辑拍发【对齐多发读】：
+    //   逻辑拍地址 L（portBytes 字节负载）的物理读序列由对齐契约独立推导——
+    //   外部读按 portBytes 对齐取字，覆盖 [L, L+portBytes) 需读：
+    //     off = L mod portBytes == 0 : [L]（快路径，单读）
+    //     off != 0                   : [L-off, L-off+portBytes]（两个对齐字，DMA 内部移位重组）
+    //   与 RTL 实现无关（契约级推导）；A/B portBytes=32（256-bit），scale portBytes=4（32-bit）。
+    def gatherPhys(addr: Long, portBytes: Long): Seq[Long] = {
+      val off = addr % portBytes
+      if (off == 0) Seq(addr) else Seq(addr - off, addr - off + portBytes)
+    }
+
+    // ---- A 期望地址序列：nt 外 × kt 中 × m 内（与 RdOnly isA=true 同序）→ gather 物理序列 ----
     val expAAddrSeq: Seq[Long] = {
       val buf = mutable.ArrayBuffer.empty[Long]
       for (_ <- 0 until nTiles; kt <- 0 until aKTiles; mm <- 0 until p.m)
-        buf += A_BASE + mm * aRowOff + kt * aColOff
-      buf.toSeq
+        buf += p.aBase + mm * aRowOff + kt * aColOff
+      buf.toSeq.flatMap(gatherPhys(_, 32L))
     }
 
-    // ---- B 期望地址序列：nt 外 × kt 中 × 块内 totalN 行降序 ----
+    // ---- B 期望地址序列：nt 外 × kt 中 × 块内 totalN 行降序 → gather 物理序列 ----
     val expBAddrSeq: Seq[Long] = {
       val buf = mutable.ArrayBuffer.empty[Long]
       for (r <- 0 until nTiles; kt <- 0 until bKTiles) {
-        val blockStart = B_BASE + r * bNTileOff + (totalN - 1) * bRowOff + kt * bKTileOff
+        val blockStart = p.bBase + r * bNTileOff + (totalN - 1) * bRowOff + kt * bKTileOff
         for (s <- 0 until totalN) buf += blockStart - s * bRowOff
       }
-      buf.toSeq
+      buf.toSeq.flatMap(gatherPhys(_, 32L))
     }
 
     val expScaleAAddrSeq: Seq[Long] = {
@@ -745,7 +761,7 @@ object HiveDebugModel {
       if (isMxAny(p.aFmt))
         for (_ <- 0 until nTiles; kt <- 0 until aKTiles; mm <- 0 until p.m)
           buf += SA_BASE + mm * saRowOff + kt * saColOff
-      buf.toSeq
+      buf.toSeq.flatMap(gatherPhys(_, 4L))
     }
 
     val expScaleBAddrSeq: Seq[Long] = {
@@ -755,7 +771,7 @@ object HiveDebugModel {
           val blockStart = SB_BASE + r * (totalN * sbRowOff) + (totalN - 1) * sbRowOff + kt * sbColOff
           for (s <- 0 until totalN) buf += blockStart - s * sbRowOff
         }
-      buf.toSeq
+      buf.toSeq.flatMap(gatherPhys(_, 4L))
     }
 
     // ==========================================================================
@@ -986,21 +1002,22 @@ object HiveDebugModel {
       // 【Phase 3】A: row-major M×K。字节对齐族（aEbits>=8）走整字节 storeElem，地址
       //   表达式与改动前【逐字相同】（k*aEb == (k*aEbits)/8）⟹ 内存镜像逐字节不变；
       //   亚字节族（fp4，aEbits=4）走 nibble 打包 storeSubByte（byte=k/2、nibble=(k%2)*4）。
+      // 【P0-2】基址取 p.aBase/p.bBase（默认 = A_BASE/B_BASE；非对齐 gather 用例可偏移）。
       for (mm <- 0 until p.m; k <- 0 until p.k) {
-        if (aEbits >= 8) mem.storeElem(A_BASE + mm * aRowOff + k * aEb, aCode(mm)(k), aEb)
-        else mem.storeSubByte(A_BASE + mm * aRowOff + (k.toLong * aEbits) / 8,
+        if (aEbits >= 8) mem.storeElem(p.aBase + mm * aRowOff + k * aEb, aCode(mm)(k), aEb)
+        else mem.storeSubByte(p.aBase + mm * aRowOff + (k.toLong * aEbits) / 8,
           aCode(mm)(k), ((k * aEbits) % 8).toInt, aEbits)
       }
       if (p.loadWMode) {   // B 转置：row-major N×K
         for (nn <- 0 until p.n; k <- 0 until p.k) {
-          if (bEbits >= 8) mem.storeElem(B_BASE + nn * bRowOff + k * bEb, bCode(k)(nn), bEb)
-          else mem.storeSubByte(B_BASE + nn * bRowOff + (k.toLong * bEbits) / 8,
+          if (bEbits >= 8) mem.storeElem(p.bBase + nn * bRowOff + k * bEb, bCode(k)(nn), bEb)
+          else mem.storeSubByte(p.bBase + nn * bRowOff + (k.toLong * bEbits) / 8,
             bCode(k)(nn), ((k * bEbits) % 8).toInt, bEbits)
         }
       } else {             // B 非转置：row-major K×N
         for (k <- 0 until p.k; nn <- 0 until p.n) {
-          if (bEbits >= 8) mem.storeElem(B_BASE + k * bRowOff + nn * bEb, bCode(k)(nn), bEb)
-          else mem.storeSubByte(B_BASE + k * bRowOff + (nn.toLong * bEbits) / 8,
+          if (bEbits >= 8) mem.storeElem(p.bBase + k * bRowOff + nn * bEb, bCode(k)(nn), bEb)
+          else mem.storeSubByte(p.bBase + k * bRowOff + (nn.toLong * bEbits) / 8,
             bCode(k)(nn), ((nn * bEbits) % 8).toInt, bEbits)
         }
       }

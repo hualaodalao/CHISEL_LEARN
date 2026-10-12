@@ -5,6 +5,10 @@
   *   - EXECUTE: 触发矩阵计算
   *   - REG_READ: 读取 1 个寄存器
   *
+  * 中断输出（P0-3）:
+  *   - irq: 电平中断。本次 EXECUTE 完成（done）或出错（err）后置位，
+  *     下一次 EXECUTE（startPulse）清零；软件以下一次 EXECUTE 作为中断确认。
+  *
   * 内部组件:
   *   - Register File: 12 个 32-bit 配置/状态寄存器（映射见下方寄存器组注释）
   *   - Executor: 自动 Tiling FSM
@@ -32,6 +36,8 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     val dmaCScale = if (cfg.hasMx) Some(HiveCoreDMAExtWriteOnlyIF(cfg, cfg.cScaleRowW)) else None
 
     val status = Output(new HiveCoreStatus(cfg))
+    // 电平中断：本次 EXECUTE 完成（done）或出错（err）后置位，下一次 EXECUTE 清除。
+    val irq = Output(Bool())
   })
 
   // ==========================================================================
@@ -63,6 +69,10 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // 状态寄存器辅助
   val doneFlag = RegInit(false.B)
   val errFlag  = RegInit(false.B)
+  // 【P0-3 irq】doneFlag 是「上电以来是否完成过」的粘滞位（仅 reset 清），直接驱动 irq
+  //   会在首次完成后永久拉高 ⟹ 另设 doneSinceStart：本次 EXECUTE 以来是否完成，
+  //   startPulse（下一次 EXECUTE）清零，与 errFlag 的清除时机一致。
+  val doneSinceStart = RegInit(false.B)
 
   // ==========================================================================
   // 子模块例化
@@ -250,12 +260,13 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     aDma.io.err || bDma.io.err || cDma.io.err
   }
 
-  when(startPulse) { errFlag := false.B }
+  when(startPulse) { errFlag := false.B; doneSinceStart := false.B }
 
   when(calcConfig.io.err && !startPulse) { errFlag := true.B }
 
   when(executor.io.done) {
     doneFlag  := true.B
+    doneSinceStart := true.B
     errFlag   := calcConfig.io.err || dmaErr
   }
 
@@ -443,6 +454,8 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     executor.io.scaleBPop.get.valid   := scratchpad.io.scaleBPop.get.valid
     executor.io.scaleBPop.get.payload := scratchpad.io.scaleBPop.get.payload
     scratchpad.io.scaleBPop.get.ready := executor.io.scaleBPop.get.ready
+    // 【P0-1 gather】scaleB FIFO 占用量 → Executor loadW 预取窗口门控
+    executor.io.scaleBOcc.get         := scratchpad.io.scaleBOccupancy.get
   }
 
   // ==========================================================================
@@ -483,4 +496,8 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   io.status.aOccupancy := scratchpad.io.aOccupancy
   io.status.bOccupancy := scratchpad.io.bOccupancy
   io.status.cOccupancy := scratchpad.io.cOccupancy
+  // 【P0-3 irq】电平中断 = 本次 EXECUTE 以来（完成 ∪ 出错）。errFlag 已含配置错
+  //   （startOut 封锁、无 done）与 DMA/完成错（done 拍定值）；doneSinceStart 覆盖
+  //   无错完成。两者都在 startPulse 清零 ⟹ 软件以下一次 EXECUTE 作为中断确认/清除。
+  io.irq               := doneSinceStart || errFlag
 }

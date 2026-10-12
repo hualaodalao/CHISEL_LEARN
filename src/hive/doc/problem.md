@@ -1,5 +1,12 @@
 1. 在16*16 fp16算力矩阵下，当前运行a/b的blocksize如果是16是不对的，因为一行理论是两个scale系数，但是当前仍然是只读一个，TB也认为是对的需要修改。 （暂定不支持，后续修改）
-2. 目前仅在cdma的写侧加入的strb以及数据shift，后续需要继续修改adma/bdma，同时需要拓宽scale dma读写的位宽以支持一次读多个scale
+2. ~~目前仅在cdma的写侧加入的strb以及数据shift，后续需要继续修改adma/bdma，同时需要拓宽scale dma读写的位宽以支持一次读多个scale~~
+   【已完成（2026-10-12，P0-1/P0-2）】读侧（adma/bdma/scaleA/scaleB，共享 HiveCoreDmaRdOnly）
+   实现 gather 非对齐读：非对齐逻辑拍拆为对齐多发读 + 内部字节移位重组（用户裁定：
+   端口位宽不变、软件布局不变、不加对齐 errCode 守护）。scale 读位宽已拓宽为 32-bit。
+   配套：loadW 预取窗口按拍消费，Executor 在 sLOAD_B 入口按 B/scaleB FIFO 占用 ≥ totalN
+   门控（gather 供数最慢 2 拍/字，防窗口内断拍破坏 loadW 对角线）。
+   覆盖用例：QuickSpec/MxSpec 非对齐 scale（off∈{0,1,2,3}）+ IntSpec 非对齐 A/B 基址
+   （off=3/11，256-bit 合并）+ 全部对齐快路径用例保持逐拍恒等。
 3. fp8乘法优化，当前fp16乘法和两个fp8乘法全是独立的3个乘法器。 工作1: 其中一个fp8复用fp16乘法。 工作2: 另一个fp8乘法器不需要更高精度乘法。 之后支持fp4的话继续融合
 
 ---

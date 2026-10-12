@@ -421,23 +421,39 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       data
     }
 
-    // ==================== DMA-scaleA (scaleA) 数据：8-bit/beat ========================
+    // ==================== DMA-scaleA (scaleA) 数据：32-bit/beat ========================
     // 遍历序（isA=true）= executor pop 序 = (round nt)×(kt 外)×(m 内)。
-    // 每 beat = scaleA[m][kb]；v2 单 pass：一个 kTile = 一个 32-K scale 块 → kb = kt。
+    // 每逻辑 beat = scaleA[m][kb]；v2 单 pass：一个 kTile = 一个 32-K scale 块 → kb = kt。
     // 【修复（taskId=86）】地址独立从张量语义推导（与 QuantSpec 同源），不再镜像 A 数据：
     //   外部布局 scaleA[m][kb] 连续（每行 K/32 字节），地址 = SCALE_A_BASE + m×(K/32) + kb×1。
+    // 【P0-1 gather】scale 端口 = 32-bit（4B 对齐量子）。读 DMA 对非对齐逻辑拍发
+    //   【对齐多发读】：物理序列 = off==0 → [L]；off!=0 → [L-off, L-off+4]（DMA 内部
+    //   右移 off 字节重组，见 HiveCoreDmaRdOnly gather 段）。期望序列按此契约展开为
+    //   物理序列；供数按【物理地址】返回完整 4 字节对齐字（张量字节映像，越界补 0），
+    //   绝不只发 byte0 —— 重组取的是对齐字的第 off 字节。
+    def gatherPhys4(addr: Long): Seq[Long] = {
+      val off = addr % 4
+      if (off == 0) Seq(addr) else Seq(addr - off, addr - off + 4)
+    }
     val scaleARowOff = kBlocks.toLong             // 行步进 = K/32 字节
     val scaleAColOff = 1L                         // 块（kb）步进 = 1 字节
     val scaleATensorBytes = M.toLong * kBlocks    // 真实张量字节数 = M×(K/32)
     val expScaleAAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
     for (_ <- 0 until aNTiles; kt <- 0 until aKTiles; m <- 0 until M)
       expScaleAAddrSeq += SCALE_A_BASE + m * scaleARowOff + kt * scaleAColOff
-    val scaleATotalBeats = expScaleAAddrSeq.size
-    def genScaleABeatByAddr(addr: Long): BigInt = {
-      val off = addr - SCALE_A_BASE
-      val m = (off / scaleARowOff).toInt
-      val kb = (off % scaleARowOff).toInt
-      BigInt(scaleA(m)(kb) & 0xFF)
+    val expScaleAPhysSeq = expScaleAAddrSeq.toSeq.flatMap(gatherPhys4)
+    val scaleATotalBeats = expScaleAPhysSeq.size
+    def genScaleAWordByAddr(addr: Long): BigInt = {
+      var w = BigInt(0)
+      for (b <- 0 until 4) {
+        val off = addr + b - SCALE_A_BASE
+        if (off >= 0 && off < scaleATensorBytes) {
+          val m = (off / scaleARowOff).toInt
+          val kb = (off % scaleARowOff).toInt
+          w |= BigInt(scaleA(m)(kb) & 0xFF) << (8 * b)
+        }
+      }
+      w
     }
 
     // ==================== DMA-scaleB (scaleB) 数据：8-bit/beat ======================
@@ -472,7 +488,9 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         (totalN - 1).toLong * scaleBRowOff + kt.toLong * scaleBColTileOff
       for (r2 <- 0 until totalN) expScaleBAddrSeq += blockStart - r2.toLong * scaleBRowOff
     }
-    val scaleBTotalBeats = expScaleBAddrSeq.size       // = nTile*kTile*totalN
+    // 【P0-1 gather】同 scaleA：逻辑序列按 4B 对齐契约展开为物理序列（总 beat 增加）
+    val expScaleBPhysSeq = expScaleBAddrSeq.toSeq.flatMap(gatherPhys4)
+    val scaleBTotalBeats = expScaleBPhysSeq.size       // 逻辑 = nTile*kTile*totalN，物理 = +gather 额外读
     // scale 内存映像（内存保真）：【#61 修复】scaleB 按【n-major】组织。硬件 scaleB DMA
     //   （HiveCoreDmaRdOnly isA=false, loadWMode=1）逐 beat 地址 = base + n×kBlocks + kb
     //   （n=全局列、kb=kTile=scale 块号；与 scaleA 的 m×kBlocks+kb 对称），故 byte(n×kBlocks+kb)=scaleB[kb][n]。
@@ -481,14 +499,19 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     //   RTL 与金锚均正确。与 HiveCoreSimCaseMxFp4Spec 头部注释 + genScaleBBeatByAddr n-major 范式对齐（三 runner 一致）。
     //   按 req.addr 从映像取字节返回（越界补 0），绝不按 beat 序号顺序发数（历史教训：按序发数会掩盖供数序错位）。
     val scaleBTensorBytes = kBlocks.toLong * N
-    def genScaleBBeatByAddr(addr: Long): BigInt = {
-      val off = addr - SCALE_B_BASE
-      if (off < 0 || off >= scaleBTensorBytes) BigInt(0)
-      else {
-        val n  = (off / kBlocks).toInt               // n-major：off = n×kBlocks + kb
-        val kb = (off % kBlocks).toInt
-        BigInt(scaleB(kb)(n) & 0xFF)
+    // 【P0-1 gather】供完整 4 字节对齐字（张量字节映像 n-major，越界补 0）：DMA 对非对齐
+    //   逻辑拍读对齐字后右移 off 字节重组，取的是对齐字第 off 字节，故不能只发 byte0。
+    def genScaleBWordByAddr(addr: Long): BigInt = {
+      var w = BigInt(0)
+      for (b <- 0 until 4) {
+        val off = addr + b - SCALE_B_BASE
+        if (off >= 0 && off < scaleBTensorBytes) {
+          val n  = (off / kBlocks).toInt             // n-major：off = n×kBlocks + kb
+          val kb = (off % kBlocks).toInt
+          w |= BigInt(scaleB(kb)(n) & 0xFF) << (8 * b)
+        }
       }
+      w
     }
 
     println(s"[MX] Starting: M=$M N=$N K=$K totalN=$totalN kBlocks=$kBlocks")
@@ -769,13 +792,17 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
           if (dut.io.dmaScaleA.get.req.valid.peek().litToBoolean) {
             val cmdAddr = dut.io.dmaScaleA.get.req.payload.addr.peek().litValue.toLong
             withClue(s"DMA-scaleA beat #$scaleABeatsSent addr mismatch: ") {
-              cmdAddr should be(expScaleAAddrSeq(scaleABeatsSent))
+              cmdAddr should be(expScaleAPhysSeq(scaleABeatsSent))
             }
-            withClue(s"DMA-scaleA beat #$scaleABeatsSent addr out of tensor bounds: ") {
-              (cmdAddr >= SCALE_A_BASE && cmdAddr < SCALE_A_BASE + scaleATensorBytes) should be(true)
+            // 【P0-1 gather】物理读是 4B 对齐字。合法窗口由契约推导：逻辑负载 [L, L+4)
+            // （L ∈ 张量）⟹ lo 最小 = BASE&~3；hi 最大 = 张量末字节所在对齐字 + 1 字
+            // （末拍 hi 字可合法越尾 ≤3 字节，越界字节供 0，与旧 TB 语义一致）。
+            withClue(s"DMA-scaleA beat #$scaleABeatsSent addr out of gather window: ") {
+              (cmdAddr % 4 == 0 && cmdAddr >= (SCALE_A_BASE & ~3L) &&
+                cmdAddr <= (((SCALE_A_BASE + scaleATensorBytes - 1) & ~3L) + 4)) should be(true)
             }
             dut.io.dmaScaleA.get.rsp.valid.poke(true.B)
-            dut.io.dmaScaleA.get.rsp.payload.data.poke(genScaleABeatByAddr(cmdAddr).U)
+            dut.io.dmaScaleA.get.rsp.payload.data.poke(genScaleAWordByAddr(cmdAddr).U)
             dut.io.dmaScaleA.get.rsp.payload.err.poke(false.B)
             scaleABeatsSent += 1
           } else {
@@ -787,26 +814,26 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
           dut.io.dmaScaleA.get.rsp.payload.data.poke(0.U)
         }
 
-        // --- DMA-scaleB (scaleB) 8-bit（【任务109】端口收窄适配）：req.valid 拍逐拍
-        // 地址硬对账 + 按地址内存保真供 1 字节（与 scaleA 同风格，不再 poke 128-bit 向量）。
-        // rsp.valid 仅在 req.valid 拍拉高；计数按 req 拍推进（该 DMA rsp.ready 恒高，
-        // 按 rsp.ready 计数会把启动空拍误计进来）；轮间跳转拍 req.valid 拉低则不给 rsp。
+        // --- DMA-scaleB (scaleB) 32-bit：req.valid 拍逐拍地址硬对账 + 按地址内存保真供
+        // 【P0-1 gather】完整 4 字节对齐字。rsp.valid 仅在 req.valid 拍拉高；计数按 req 拍
+        // 推进（该 DMA rsp.ready 恒高，按 rsp.ready 计数会把启动空拍误计进来）；轮间跳转拍
+        // req.valid 拉低则不给 rsp。物理序列 = 逻辑序列按 4B 对齐契约 gather 展开。
         if (scaleBBeatsSent < scaleBTotalBeats) {
           if (dut.io.dmaScaleB.get.req.valid.peek().litToBoolean) {
             val cmdAddr = dut.io.dmaScaleB.get.req.payload.addr.peek().litValue.toLong
             withClue(s"DMA-scaleB beat #$scaleBBeatsSent addr mismatch: ") {
-              cmdAddr should be(expScaleBAddrSeq(scaleBBeatsSent))
+              cmdAddr should be(expScaleBPhysSeq(scaleBBeatsSent))
             }
-            val scaleByte = genScaleBBeatByAddr(cmdAddr)
-            // 【任务109】poke 前位宽自检：dmaScaleB 端口为 8-bit，供数超宽会让 svsim
+            val scaleWord = genScaleBWordByAddr(cmdAddr)
+            // poke 前位宽自检：dmaScaleB 端口为 32-bit（scaleBW），供数超宽会让 svsim
             // Verilator harness 直接 exit(EXIT_FAILURE) 且不刷盘 FST（波形静默消失）；
             // 提前用可读断言拦截，今后任何位宽不匹配都能看到波形与清晰错误。
-            withClue(s"DMA-scaleB beat #$scaleBBeatsSent data exceeds 8-bit port width: ") {
-              (scaleByte >= BigInt(0) && scaleByte <= BigInt(0xFF)) should be(true)
+            withClue(s"DMA-scaleB beat #$scaleBBeatsSent data exceeds 32-bit port width: ") {
+              (scaleWord >= BigInt(0) && scaleWord <= BigInt(0xFFFFFFFFL)) should be(true)
             }
             scaleBAddrLog += cmdAddr
             dut.io.dmaScaleB.get.rsp.valid.poke(true.B)
-            dut.io.dmaScaleB.get.rsp.payload.data.poke(scaleByte.U)
+            dut.io.dmaScaleB.get.rsp.payload.data.poke(scaleWord.U)
             dut.io.dmaScaleB.get.rsp.payload.err.poke(false.B)
             scaleBBeatsSent += 1
           } else {

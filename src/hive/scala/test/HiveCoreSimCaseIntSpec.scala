@@ -86,6 +86,20 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
   }
 
   // ==========================================================================
+  // 【P0-2 gather】非对齐 A/B 基址：读 DMA 对齐多发读 + 内部字节移位重组的
+  //   端到端数据通路证明。aBase off=3、bBase off=11（不同偏移量覆盖不同合并
+  //   移位档）；行步长 K=32B 对齐 ⟹ 每拍均非对齐、全走 gather 慢路径。
+  //   cAddr 保持 32B 对齐（errCode 10 守护不触发）；全量逐元素对拍验证 merge。
+  // ==========================================================================
+  it should "run INT8 gather M=32 N=16 K=32 loadW=1 with misaligned A/B bases" in {
+    runIntGemm(m = 32, n = 16, k = 32,
+      aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT32,
+      loadWMode = true, seed = 46L,
+      hint = "int8-gather-misaligned-bases",
+      aBase = A_BASE + 3, bBase = B_BASE + 11)
+  }
+
+  // ==========================================================================
   // Negative case: K not divisible by kPerBeat -> errCode 8
   // ==========================================================================
 
@@ -113,7 +127,8 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
   // ==========================================================================
   private def runIntGemm(m: Int, n: Int, k: Int,
       aFmt: DataFormat.Type, bFmt: DataFormat.Type, cFmt: DataFormat.Type,
-      loadWMode: Boolean, seed: Long, hint: String): Unit = {
+      loadWMode: Boolean, seed: Long, hint: String,
+      aBase: Long = A_BASE, bBase: Long = B_BASE): Unit = {
 
     val p = DebugParams(
       m = m, n = n, k = k,
@@ -122,7 +137,8 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
       aMxBlkSel = 0, bMxBlkSel = 0, cMxBlkSel = 0,
       addrModeSel = 0, rnd = 0, seed = seed,
       strictAddr = true, maxCycles = 16000,
-      waveTarget = s"sim/int/$hint.fst", testHint = hint
+      waveTarget = s"sim/int/$hint.fst", testHint = hint,
+      aBase = aBase, bBase = bBase
     )
 
     // Pre-flight: errCode check (should be None for valid INT configs)
@@ -221,7 +237,7 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
         //   wregs 无 is(6)/is(7) 分支 ⟹ 写为 no-op、reg5 保持复位 0（aFmt/bFmt/cFmt 全 FP32）
         //   ⟹ errCode 5 抢跑，且 a/b/cAddr 会被错位写到 reg3/4/5（reg5 被当成 cAddr）。
         cmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, m, n.toLong | (k.toLong << 16))
-        cmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
+        cmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, p.aBase, p.bBase)
         cmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, p.controlWord5)
         cmd(HiveCoreOp.REG_WRITE2, 0x09, 0x0A, SA_BASE, SB_BASE)
         cmd(HiveCoreOp.REG_WRITE1, 0x0B, 0x00, SC_BASE, 0L)

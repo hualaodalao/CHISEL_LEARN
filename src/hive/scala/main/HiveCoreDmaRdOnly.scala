@@ -188,9 +188,73 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   val ERR_FIFO = 2.U(2.W)
   val errState = RegInit(0.U(2.W))
 
+  // ==========================================================================
+  // 【P0-1/P0-2 gather 读】非对齐逻辑拍的「对齐多发读 + 字节移位重组」
+  //   裁定（2026-10-12）：外部读端口按 portBytes = pushW/8 字节对齐取数；
+  //   逻辑拍地址 L 非对齐时，DMA 自发读 [L-off, L-off+portBytes] 两个对齐字，
+  //   内部拼出 memory[L .. L+portBytes)（off = L 的字节偏移）。端口位宽、软件
+  //   张量布局、buffer 每逻辑拍恰收 1 push 的契约全部不变；不新增 errCode 守护。
+  //
+  //   机制 = drain-then-gather：对齐拍保持原流水（credit 门控多拍在途）；遇到
+  //   非对齐拍先等在途读全部返回（inflCnt===0），再串行发 lo/hi 两读并重组。
+  //   gPhase: 0=idle（对齐拍自由流水）/ 1=lo 已发、等 lo rsp / 2=发 hi 读 /
+  //           3=hi 已发、等 hi rsp（hi rsp 拍合并 push，回 0）。
+  //   credit 记账口径 = 每【逻辑拍】一次：只在逻辑拍最后一个物理读 fire 时 -1
+  //   （对齐拍 = 其 req.fire；非对齐拍 = hi 读 req.fire；lo 读不扣 credit）。
+  //   快路径恒等：全对齐激励下 gPhase 恒 0、req/push/credit/推进逐拍同原实现。
+  // ==========================================================================
+  val portBytes = pushW / 8
+  val offBits   = log2Up(portBytes)
+  val inflCnt = RegInit(0.U(log2Up(bufDepth + 2).W))  // 在途物理读计数（饱和递减防 flush 后陈旧 rsp 下溢）
+  val gPhase  = RegInit(0.U(2.W))
+  val loReg   = Reg(UInt(pushW.W))                     // 非对齐拍 lo 字暂存
+  val offReg  = Reg(UInt(offBits.W))                   // 非对齐拍字节偏移（合并移位量）
+
+  val byteOff     = curAddr(offBits - 1, 0)
+  val unaligned   = byteOff =/= 0.U
+  val alignedBase = curAddr & ~((portBytes - 1).U(cfg.addrWidth.W))
+  // 逻辑拍「末物理读」fire：对齐拍 = req.fire；非对齐拍 = hi 读 fire（gPhase===2）。
+  // lo 读 fire（gPhase===0 && unaligned）不算 ⟹ lineCounter/curAddr/credit 均按逻辑拍推进。
+  val finalReqFire = io.dmaExtRdIF.req.fire && !(gPhase === 0.U && unaligned)
+  // hi 字与 lo 字拼接后右移 off 字节，截回 pushW：= memory[L .. L+portBytes)
+  val mergedData = (Cat(io.dmaExtRdIF.rsp.payload.data, loReg) >> (offReg << 3))(pushW - 1, 0)
+
+  // gPhase 推进（lo 发→lo 收→hi 发→hi 收）。★TB/AXI 可能零延迟应答（req.fire 同拍
+  // rsp.fire）：lo/hi 各有同拍捷径（loSameCycle 0→2、hiSameCycle 2→0），否则 lo 字会被
+  // 误当整拍 push 且 phase1 永等不到 rsp 而死锁。
+  val loSameCycle = io.dmaExtRdIF.req.fire && io.dmaExtRdIF.rsp.fire && gPhase === 0.U && unaligned
+  val hiSameCycle = io.dmaExtRdIF.req.fire && io.dmaExtRdIF.rsp.fire && gPhase === 2.U
+  when(loSameCycle) {
+    gPhase := 2.U
+    offReg := byteOff
+    loReg  := io.dmaExtRdIF.rsp.payload.data
+  }.elsewhen(io.dmaExtRdIF.req.fire && gPhase === 0.U && unaligned) {
+    gPhase := 1.U
+    offReg := byteOff
+  }.elsewhen(io.dmaExtRdIF.rsp.fire && gPhase === 1.U) {
+    gPhase := 2.U
+    loReg  := io.dmaExtRdIF.rsp.payload.data
+  }.elsewhen(hiSameCycle) {
+    gPhase := 0.U
+  }.elsewhen(io.dmaExtRdIF.req.fire && gPhase === 2.U) {
+    gPhase := 3.U
+  }.elsewhen(io.dmaExtRdIF.rsp.fire && gPhase === 3.U) {
+    gPhase := 0.U
+  }
+
+  // 在途物理读计数：req.fire +1 / rsp.fire -1（饱和递减）
+  when(io.dmaExtRdIF.req.fire && io.dmaExtRdIF.rsp.fire) {
+  }.elsewhen(io.dmaExtRdIF.req.fire) {
+    inflCnt := inflCnt + 1.U
+  }.elsewhen(io.dmaExtRdIF.rsp.fire && inflCnt =/= 0.U) {
+    inflCnt := inflCnt - 1.U
+  }
+
   when(state === sIDLE){
     ostCredit := bufDepth.U
     errReg := false.B
+    gPhase  := 0.U
+    inflCnt := 0.U
   }.otherwise{
     when(io.dmaExtRdIF.rsp.fire){
       when(io.dmaExtRdIF.rsp.payload.err){
@@ -199,24 +263,41 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
       }
     }
 
-    when(io.dmaExtRdIF.req.fire & io.bufPopFire){
-    }.elsewhen(io.dmaExtRdIF.req.fire){
+    when(finalReqFire & io.bufPopFire){
+    }.elsewhen(finalReqFire){
       ostCredit := ostCredit - 1.U
     }.elsewhen(io.bufPopFire){
       ostCredit := ostCredit + 1.U
     }
-    
+
   }
 
   // ==========================================================================
   // 默认输出驱动
   // ==========================================================================
-  io.dmaExtRdIF.req.valid       := ostCredit =/= 0.U & state === sTRANSFER
-  io.dmaExtRdIF.req.payload.addr := curAddr
+  // gPhase=0：对齐拍凭 credit 自由发；非对齐拍须先 drain（inflCnt===0）且预占
+  //   1 credit（hi 读将扣）。gPhase=2：发 hi 读（credit 已在起拍预占，不再查）。
+  //   gPhase=1/3：等 rsp，不发。
+  io.dmaExtRdIF.req.valid       := state === sTRANSFER && (
+    (gPhase === 0.U && ostCredit =/= 0.U && (!unaligned || inflCnt === 0.U)) ||
+    (gPhase === 2.U)
+  )
+  io.dmaExtRdIF.req.payload.addr := MuxCase(curAddr, Seq(
+    (gPhase === 0.U && unaligned) -> alignedBase,               // lo 读：对齐化
+    (gPhase === 2.U)              -> (alignedBase + portBytes.U) // hi 读：下一对齐字
+  ))
   io.dmaExtRdIF.rsp.ready       := true.B //buffer永远能push的时候dma才会发请求
 
-  io.bufPush.valid   := io.dmaExtRdIF.rsp.valid
-  io.bufPush.payload := io.dmaExtRdIF.rsp.payload.data
+  // push 口径：
+  //   phase0 的 rsp = 对齐拍（同拍对齐 req 的应答，或 drain 前遗留的在途对齐读）→ 直 push；
+  //     但 phase0 且本拍 req.fire 的是 lo 读（unaligned）时，该 rsp 是 lo 字 → 进 loReg 不 push
+  //   phase1 的 rsp = 延迟返回的 lo 字 → 不 push
+  //   phase2 同拍 hi 应答（hiSameCycle）/ phase3 的 rsp = hi 字 → 与 loReg 合并 push
+  val alignedRspPush = io.dmaExtRdIF.rsp.valid && gPhase === 0.U &&
+    !(io.dmaExtRdIF.req.fire && unaligned)
+  io.bufPush.valid   := alignedRspPush || hiSameCycle ||
+    (io.dmaExtRdIF.rsp.valid && gPhase === 3.U)
+  io.bufPush.payload := Mux(gPhase === 3.U || hiSameCycle, mergedData, io.dmaExtRdIF.rsp.payload.data)
 
   io.done := false.B
   io.busy := state =/= sIDLE
@@ -261,7 +342,9 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
         kCnt        := 0.U
         nCnt        := 0.U
         ostCredit   := bufDepth.U
-      }.elsewhen(io.dmaExtRdIF.req.fire){
+        gPhase      := 0.U
+        inflCnt     := 0.U
+      }.elsewhen(finalReqFire){
           when(lineCounter === lineTarget - 1.U){
             state := sNEXT_COL
             lineCounter := 0.U
@@ -382,6 +465,8 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
         kCnt        := 0.U
         nCnt        := 0.U
         ostCredit   := bufDepth.U
+        gPhase      := 0.U
+        inflCnt     := 0.U
       }.elsewhen(ostCredit === bufDepth.U){
         io.done := true.B
         state := sIDLE

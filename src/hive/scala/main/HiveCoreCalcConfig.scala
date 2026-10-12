@@ -765,6 +765,18 @@ when(DataFormat.isHalfB(io.regFile.cFmt)){
 // ==========================================================================
 // (#146) MX SCALE READ ALIGNMENT CONTRACT -- full derivation (ASCII only).
 // --------------------------------------------------------------------------
+// 【P0-1 UPDATE (2026-10-12, gather)】This software-alignment contract is
+// SUPERSEDED for the read path: HiveCoreDmaRdOnly now implements GATHER reads --
+// a misaligned logical beat at L is served by aligned physical reads
+// [L-off, L-off+4) (off = L mod 4) and an internal byte-shift merge, so scale
+// reads no longer require 4-byte alignment and NO errCode guards it. The
+// derivation below is kept as the historical record of WHY the dense layout
+// violates alignment (kTileStride = 1/2 bytes for MXFP8) and of the former
+// software obligation; it also remains the source of the two stride formulas.
+// One HARDWARE-SIDE obligation was added in exchange: the loadW preload window
+// pops scaleB strictly one-per-cycle, so HiveCoreExecutor gates sLOAD_B entry on
+// scaleB/B FIFO occupancy >= totalN (gather supply can drop to 1 word / 2 cycles).
+// --------------------------------------------------------------------------
 // This block is the SINGLE SOURCE of the two scale address strides consumed by
 // HiveCoreDmaRdOnly (scaleA tied isA=true, scaleB tied isA=false):
 //   rowStride   = scaleXRowAddressOffset     = K / blk          [bytes]
