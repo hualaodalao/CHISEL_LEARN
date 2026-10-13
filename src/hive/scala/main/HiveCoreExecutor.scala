@@ -222,7 +222,14 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   // ==========================================================================
   if(cfg.hasMx){
     val block = Mux(io.regFile.bMxBlockSize === MXBlockSize.M16, 16.U, 32.U)
-    val step = Mux(io.calcConfig.isBX2, 2.U, 4.U)
+    // 【P1-2 W4A8 展开路】混配（isMx8(aFmt)&&isMx4(bFmt)，与 HiveCore.w4a8Mix 同式）时
+    //   bFmt 寄存器仍为 E2M1（源侧地址口径不变）⟹ isBX2=false，但 BDMA 已把每个 fp4
+    //   源字展开成 2 个 fp8 阵列拍 ⟹ 阵列侧每 lane 每拍恒推进 2 个 K 元素、与纯 MX8
+    //   同构 ⟹ step=2。scaleBPop payload 已由 scaleBDma 展开器半字对齐（奇条 =
+    //   payload>>splitShift），本环按基线 fp8 语义切片。非 hasMx4 配置无此支路（零 diff）。
+    val step = if (cfg.hasMx4)
+      Mux(io.calcConfig.isBX2 || (DataFormat.isMx8(io.regFile.aFmt) && DataFormat.isMx4(io.regFile.bFmt)), 2.U, 4.U)
+    else Mux(io.calcConfig.isBX2, 2.U, 4.U)
 
     for (lane <- 0 until cfg.totalN) {
       val idx = (lane.U * step) / block

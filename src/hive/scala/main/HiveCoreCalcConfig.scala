@@ -344,6 +344,17 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
             errComb := true.B
             errCodeComb := 8.U
         }
+        // 【P1-2 W4A8 展开路 · errCode 8（混配源字粒度守护）】A=MX8×B=MX4 时 B 侧
+        //   kt 轮次 = fp4 源字数 = K/(totalN*4)（每源字 64 nibble，push 侧展开为 2 个
+        //   fp8 阵列拍）。K 非整除 ⟹ bKTile 地板除静默丢尾（源字粒度 64，比 A 侧
+        //   pass 粒度 32 更粗；K=96 这类过上方 isMx8(aFmt) 块的 K%32 检查却仍丢尾字），
+        //   故须独立守护。位于 isMx4(aFmt) 块之后（同为 code 8，last-connect 无碍）。
+        when(DataFormat.isMx8(io.regFile.aFmt) && DataFormat.isMx4(io.regFile.bFmt) &&
+             ((io.regFile.k(15, 0) % (cfg.totalN * 4).U =/= 0.U) ||
+              (io.regFile.k(15, 0) === 0.U))){
+            errComb := true.B
+            errCodeComb := 8.U
+        }
     }
     // ==========================================================================
     // 【Phase 3 INT 生态同步 · errCode 8（INT8/INT4 K 整除运行期守护）】与上方 MX 两块同构：
@@ -471,8 +482,13 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //   New authoritative order:
     //     3 (this block) > 11 (int/non-int cross) > 8 (K not divisible)
     //       > 10 (cAddr alignment) > 7 (capacity) > 5 > 4 > 3 (isAMx^isBMx) > 0
+    //   【P1-2 UPDATE · 收窄】原判据为 isMx4(aFmt) ^ isMx4(bFmt)（双向混配皆拒）。
+    //   W4A8（A=MX8 × B=MX4）已由 fp4→fp8 push 侧展开路落地（见 HiveCore.w4a8Mix），
+    //   正向混配合法化；本块收窄为只拒反向混配（A=MX4 × B=MX8，数据通路未支持，
+    //   理由与原文同：quad/dual lane 选择子只看 aFmt，反向混配会 lane 粒度与解码
+    //   格式矛盾、静默算错）。MX-vs-nonMX 裸 errCode3 块（isAMx^isBMx）不受影响。
     if(cfg.hasMx4){
-        when(DataFormat.isMx4(io.regFile.aFmt) ^ DataFormat.isMx4(io.regFile.bFmt)){
+        when(DataFormat.isMx4(io.regFile.aFmt) && !DataFormat.isMx4(io.regFile.bFmt)){
             errComb := true.B
             errCodeComb := 3.U
         }

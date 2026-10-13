@@ -150,6 +150,16 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
     
     val bufPush = master(Stream(UInt(pushW.W)))      // 向 buffer push 数据
     val bufPopFire = Input(Bool())
+    // 【P1-2 W4A8 展开路】push 侧 1→2 字级展开器（仅 hasMx4 配置生成端口；非 hasMx4
+    //   配置无端口、既有代码逐字不变 = anchor 零 diff）。expand=1 时每个逻辑拍的 rsp
+    //   字（含 gather 合并字）先推偶拍 = expEven(expWord)、再推奇拍 = expOdd(expWord)，
+    //   一字占 2 个 buffer 槽位；expand=0 走 when-otherwise 旁支，逐字等于基线直推。
+    //   变换函数由顶层组合供给（B 数据通道 = E2M1 nibble→E4M3 LUT 展开，scaleB 通道 =
+    //   奇条半字对齐右移）；expSrc = 内部锁字寄存器的组合直出。
+    val expand  = if (cfg.hasMx4) Some(Input(Bool())) else None
+    val expSrc  = if (cfg.hasMx4) Some(Output(UInt(pushW.W))) else None
+    val expEven = if (cfg.hasMx4) Some(Input(UInt(pushW.W))) else None
+    val expOdd  = if (cfg.hasMx4) Some(Input(UInt(pushW.W))) else None
   })
 
   // 【Ivy⑧ 死信号清理】原 private val mxRunDma（MX 运行期判据 = isMx(aFmt)）在本模块内
@@ -250,6 +260,24 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
     inflCnt := inflCnt - 1.U
   }
 
+  // ==========================================================================
+  // 【P1-2 W4A8 · hasMx4 only】push 侧展开器寄存器（详见 IO expand 端口注释）。
+  //   捕获无覆写冲突的证明：expand=1 时 req 侧串行门（单在途 inflCnt===0 且
+  //   expBusy=0 才发新读；credit 按 2 槽/字预留）⟹ 两字 rsp 脉冲间隔 ≥ 展开
+  //   2 拍 + 1 拍，capture 拍 expBusy 必为 0。start 重载拍随 credit/gPhase 一同
+  //   清空（残字不得跨 run 泄漏，与 FIFO flush 同拍）。
+  // ==========================================================================
+  val expBusy  = if (cfg.hasMx4) Some(RegInit(false.B)) else None
+  val expPhase = if (cfg.hasMx4) Some(RegInit(false.B)) else None
+  val expWord  = if (cfg.hasMx4) Some(Reg(UInt(pushW.W))) else None
+  if (cfg.hasMx4) {
+    io.expSrc.get := expWord.get
+    when(io.start) {
+      expBusy.get  := false.B
+      expPhase.get := false.B
+    }
+  }
+
   when(state === sIDLE){
     ostCredit := bufDepth.U
     errReg := false.B
@@ -263,11 +291,27 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
       }
     }
 
-    when(finalReqFire & io.bufPopFire){
-    }.elsewhen(finalReqFire){
-      ostCredit := ostCredit - 1.U
-    }.elsewhen(io.bufPopFire){
-      ostCredit := ostCredit + 1.U
+    if (cfg.hasMx4) {
+      // 【P1-2 W4A8】expand 模式下同一逻辑拍占 2 槽（扣 2）、pop 各返 1
+      //   ⟹ credit 不变式仍 =「剩余可用槽位」，FIFO 恒不溢出，且 sDONE 的
+      //   done 判据（ostCredit===bufDepth 即全部弹出归还）仍然成立（2 扣 2 返配平）。
+      //   expand=0 三支与基线逐字等价（Mux(false)=1 死路）。
+      when(finalReqFire & io.bufPopFire){
+        when(io.expand.get){
+          ostCredit := ostCredit - 1.U   // -2+1
+        }
+      }.elsewhen(finalReqFire){
+        ostCredit := ostCredit - Mux(io.expand.get, 2.U, 1.U)
+      }.elsewhen(io.bufPopFire){
+        ostCredit := ostCredit + 1.U
+      }
+    } else {
+      when(finalReqFire & io.bufPopFire){
+      }.elsewhen(finalReqFire){
+        ostCredit := ostCredit - 1.U
+      }.elsewhen(io.bufPopFire){
+        ostCredit := ostCredit + 1.U
+      }
     }
 
   }
@@ -278,8 +322,19 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   // gPhase=0：对齐拍凭 credit 自由发；非对齐拍须先 drain（inflCnt===0）且预占
   //   1 credit（hi 读将扣）。gPhase=2：发 hi 读（credit 已在起拍预占，不再查）。
   //   gPhase=1/3：等 rsp，不发。
+  // 【P1-2 W4A8 · hasMx4】expand=1 两改：① 对齐流水按 2 槽/字预留（ostCredit>=2）；
+  //   ② 展开拍串行化：expBusy 或已有在途读时不发 gPhase=0 新读 ⟹ 每字 rsp 脉冲到达
+  //   时 expBusy 必 0（capture 无覆写）。hi 读（gPhase=2）不设门：其合并 push 是
+  //   本字唯一 pulse，前一字的展开 2 拍因 credit 预留槽位恒可得 ready、必已排空。
+  //   expand=0 时两门约等于恒真/恒credit（Mux 死路选择），基线行为逐字保持。
+  private val expCreditOk = if (cfg.hasMx4)
+    Mux(io.expand.get, ostCredit >= 2.U, ostCredit =/= 0.U)
+  else ostCredit =/= 0.U
+  private val expPathFree = if (cfg.hasMx4)
+    !(io.expand.get && (expBusy.get || inflCnt =/= 0.U))
+  else true.B
   io.dmaExtRdIF.req.valid       := state === sTRANSFER && (
-    (gPhase === 0.U && ostCredit =/= 0.U && (!unaligned || inflCnt === 0.U)) ||
+    (gPhase === 0.U && expCreditOk && (!unaligned || inflCnt === 0.U) && expPathFree) ||
     (gPhase === 2.U)
   )
   io.dmaExtRdIF.req.payload.addr := MuxCase(curAddr, Seq(
@@ -295,9 +350,40 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   //   phase2 同拍 hi 应答（hiSameCycle）/ phase3 的 rsp = hi 字 → 与 loReg 合并 push
   val alignedRspPush = io.dmaExtRdIF.rsp.valid && gPhase === 0.U &&
     !(io.dmaExtRdIF.req.fire && unaligned)
-  io.bufPush.valid   := alignedRspPush || hiSameCycle ||
-    (io.dmaExtRdIF.rsp.valid && gPhase === 3.U)
-  io.bufPush.payload := Mux(gPhase === 3.U || hiSameCycle, mergedData, io.dmaExtRdIF.rsp.payload.data)
+  if (cfg.hasMx4) {
+    val rspPushPulse = alignedRspPush || hiSameCycle ||
+      (io.dmaExtRdIF.rsp.valid && gPhase === 3.U)
+    val rspPushData  = Mux(gPhase === 3.U || hiSameCycle, mergedData, io.dmaExtRdIF.rsp.payload.data)
+    when(io.expand.get) {
+      // 【P1-2 W4A8 展开路】1→2：偶拍（低半 K 展开）→ 奇拍（高半），2 cycles/字。
+      //   capture 拍 expBusy 必 0（req 侧串行门保证，见上）；push 侧槽位已由
+      //   credit 2/字预留 ⟹ ready 恒可得、恰 2 拍排空。较基线多 1 拍寄存延迟
+      //   （pulse 拍捕获、次拍起推），消费端占用门不受影响。
+      io.bufPush.valid   := expBusy.get
+      io.bufPush.payload := Mux(expPhase.get, io.expOdd.get, io.expEven.get)
+      when(io.bufPush.fire) {
+        when(expPhase.get) {
+          expBusy.get  := false.B
+          expPhase.get := false.B
+        }.otherwise {
+          expPhase.get := true.B
+        }
+      }
+      when(rspPushPulse && !expBusy.get) {
+        expWord.get  := rspPushData
+        expBusy.get  := true.B
+        expPhase.get := false.B
+      }
+    }.otherwise {
+      io.bufPush.valid   := alignedRspPush || hiSameCycle ||
+        (io.dmaExtRdIF.rsp.valid && gPhase === 3.U)
+      io.bufPush.payload := Mux(gPhase === 3.U || hiSameCycle, mergedData, io.dmaExtRdIF.rsp.payload.data)
+    }
+  } else {
+    io.bufPush.valid   := alignedRspPush || hiSameCycle ||
+      (io.dmaExtRdIF.rsp.valid && gPhase === 3.U)
+    io.bufPush.payload := Mux(gPhase === 3.U || hiSameCycle, mergedData, io.dmaExtRdIF.rsp.payload.data)
+  }
 
   io.done := false.B
   io.busy := state =/= sIDLE

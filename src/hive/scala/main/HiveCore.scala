@@ -124,17 +124,61 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   
 
   // ==========================================================================
+  // 【P1-2 W4A8 展开路】A=MX8 × B=MX4 单向混配谓词（顶层单一真源）：push 侧展开器
+  //   使能、阵列侧 bFmt 重映射、kt 轮次折半三处共用。反向混配（A=MX4×B=MX8）由
+  //   CalcConfig errCode3 拒绝，运行期不可达。非 hasMx4 配置不生成这些信号（零 diff）。
+  // ==========================================================================
+  private val w4a8Mix = if (cfg.hasMx4)
+    DataFormat.isMx8(regFile.aFmt) && DataFormat.isMx4(regFile.bFmt)
+  else false.B
+
+  // 【P1-2 W4A8 展开路】B 侧 kt 轮次 = fp4 源字数 = K/64 = kTile(A)/2：每个源字
+  //   （256b = 64 个 E2M1 nibble）由 bDma push 侧展开为 2 个 fp8 阵列拍，读侧地址
+  //   步进/数据量与纯 fp4 运行逐位相同；阵列 pass 数（Executor kTile）不变。
+  //   errCode8 已守护混配 K%(totalN*4)==0，地板除精确无余。纯格式 kTile 原值逐字不变。
+  private val bKTile = if (cfg.hasMx4)
+    Mux(w4a8Mix, calcConfig.io.calcConfig.kTile >> 1, calcConfig.io.calcConfig.kTile)
+  else calcConfig.io.calcConfig.kTile
+
+  // 【P1-2 W4A8 展开路】E2M1 nibble → E4M3 字节精确加宽（7-bit 幅值码 + 符号直通）：
+  //   fp4 全部 8 个值 {0,±0.5,±1,±1.5,±2,±3,±4,±6} 在 E4M3 中精确可表示（零精度
+  //   损失、永不产生 inf/NaN），故混配时阵列按已验证的 MX8×MX8 基线解码即可。
+  //   输出比特布局与 bufPush payload 口径一致：元素 k ↔ 第 k 个 nibble（bit 4k+3:4k）
+  //   → 目标拍 byte k（bit 8k+7:8k），lane 切片（16b/lane）与 A 侧 stride-2 天然对齐。
+  private def fp4WordToMx8Beat(src: UInt, hiHalf: Boolean): UInt = {
+    val lut = VecInit(Seq(0x00, 0x30, 0x38, 0x3C, 0x40, 0x44, 0x48, 0x4C).map(_.U(7.W)))
+    val base = if (hiHalf) src.getWidth / 8 else 0
+    val bytes = Seq.tabulate(src.getWidth / 8) { j =>
+      val nib = src(4 * (base + j) + 3, 4 * (base + j))
+      Cat(nib(3), lut(nib(2, 0)))
+    }
+    Cat(bytes.reverse)
+  }
+
+  // ==========================================================================
   // bDma 控制接线：execute 起始拍与 Executor 同步启动，自主扫完整个 B 矩阵
   // ==========================================================================
   bDma.io.isA         := false.B
   bDma.io.start       := calcConfig.io.startOut
   bDma.io.regFile     := regFile
   bDma.io.reg_baseAddr := regFile.bAddr
-  bDma.io.reg_kTile := calcConfig.io.calcConfig.kTile
+  bDma.io.reg_kTile := bKTile
   bDma.io.reg_mTile := calcConfig.io.calcConfig.mTile
   bDma.io.reg_nTile := calcConfig.io.calcConfig.nTile
   bDma.io.reg_rowOffset := calcConfig.io.calcConfig.bRowAddressOffset
   bDma.io.reg_colTileOffset := calcConfig.io.calcConfig.bColTileAddressOffset
+
+  if (cfg.hasMx4) {
+    // 【P1-2 W4A8 展开路】bDma push 侧展开器连线：偶拍 = 低 32 元素（nibble 0..31）
+    //   的 E4M3 展开，奇拍 = 高 32 元素（nibble 32..63）。A 侧激活本身即 MX8、
+    //   不展开（expand 恒 0，DMA 内 when-otherwise 走基线支路）。
+    bDma.io.expand.get := w4a8Mix
+    bDma.io.expEven.get := fp4WordToMx8Beat(bDma.io.expSrc.get, hiHalf = false)
+    bDma.io.expOdd.get  := fp4WordToMx8Beat(bDma.io.expSrc.get, hiHalf = true)
+    aDma.io.expand.get := false.B
+    aDma.io.expEven.get := 0.U
+    aDma.io.expOdd.get := 0.U
+  }
 
   
   val reg_baseAddr = Input(UInt(cfg.addrWidth.W))
@@ -372,7 +416,11 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   hiveComb.io.fmtIn    := regFile.aFmt
   // bFmt 跟随 aFmt（mixFmtEn=0），保证旧软件 bit-exact；MX 配置允许 mixFmtEn=1
   // 以支持异构双 MX（aFmt=E4M3, bFmt=E5M2）
-  hiveComb.io.bFmtIn   := regFile.bFmt
+  // 【P1-2 W4A8 展开路】混配时阵列侧 bFmt 重映射为 MXE4M3：权重已由 bDma push 侧
+  //   逐 nibble 展开成 E4M3 ⟹ 阵列解码（含 FusionMac isMx4 双条件、fp8Mul 支路）
+  //   整体走已验证的 MX8×MX8 基线，阵列/Cell/Worker/MAC 零改动。非 hasMx4 配置
+  //   无 Mux、逐字不变（零 diff）。
+  hiveComb.io.bFmtIn := (if (cfg.hasMx4) Mux(w4a8Mix, DataFormat.MXE4M3, regFile.bFmt) else regFile.bFmt)
   hiveComb.io.rndIn    := regFile.rnd
 
   // P3: scale wiring -- under an MX config both scale vectors are driven by the
@@ -425,7 +473,8 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     scaleBDma.io.start      := calcConfig.io.startOut & DataFormat.isMx(regFile.bFmt)
     scaleBDma.io.regFile    := regFile
     scaleBDma.io.reg_baseAddr := regFile.bScaleAddr
-    scaleBDma.io.reg_kTile := calcConfig.io.calcConfig.kTile
+    // 【P1-2 W4A8】scaleB 与 bPop lockstep：kt 轮次同取 B 侧 bKTile（源字数，见上方定义）
+    scaleBDma.io.reg_kTile := bKTile
     scaleBDma.io.reg_mTile := calcConfig.io.calcConfig.mTile
     scaleBDma.io.reg_nTile := calcConfig.io.calcConfig.nTile
     scaleBDma.io.reg_rowOffset := calcConfig.io.calcConfig.scaleBRowAddressOffset
@@ -442,6 +491,24 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     scratchpad.io.scaleBPush.get.payload := scaleBDma.io.bufPush.payload
     scaleBDma.io.bufPush.ready           := scratchpad.io.scaleBPush.get.ready
     scaleBDma.io.bufPopFire              := scratchpad.io.scaleBPop.get.fire
+
+    if (cfg.hasMx4) {
+      // 【P1-2 W4A8 展开路】scaleBDma push 侧 1→2 拆分（与 bDma 数据展开同节奏、
+      //   lockstep 恢复）：一个源字 payload 覆盖 64 个 fp4 的全部 scale 字节
+      //   （blk16=4B、blk32=2B），展开成 2 个阵列拍各占半字 —— 偶条 = 原 payload
+      //   （低半：k0..31 的字节），奇条 = payload >> splitShift（blk16→16 位对齐
+      //   byte2/3、blk32→8 位对齐 byte1），与 Executor feed 环 step=2 的 lane 切片
+      //   口径配套（见 HiveCoreExecutor B scale feed 循环）。展开器在 DMA 内部，
+      //   本文件 push/FIFO 连线保持逐字原样。scaleADma 不展开（expand 恒 0）。
+      scaleBDma.io.expand.get := w4a8Mix
+      scaleBDma.io.expEven.get := scaleBDma.io.expSrc.get
+      scaleBDma.io.expOdd.get := Mux(regFile.bMxBlockSize === MXBlockSize.M16,
+        (scaleBDma.io.expSrc.get >> 16).pad(cfg.scaleBW),
+        (scaleBDma.io.expSrc.get >> 8).pad(cfg.scaleBW))
+      scaleADma.io.expand.get := false.B
+      scaleADma.io.expEven.get := 0.U
+      scaleADma.io.expOdd.get := 0.U
+    }
 
     // scale FIFO flush 跟随 A/B flush（execute 起始拍清空，与 aDma/bDma 同范式）
     scratchpad.io.flushScaleA.get := executor.io.flushA

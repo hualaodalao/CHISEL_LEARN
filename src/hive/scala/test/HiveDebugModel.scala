@@ -362,6 +362,14 @@ object HiveDebugModel {
     val aPackedInt = p.aFmt == DataFormat.INT8 || p.aFmt == DataFormat.INT4
     if (((hasMx4 && isMxAny(p.aFmt)) || aPackedInt) &&
         (p.k % kPerBeat(p.aFmt, totalN) != 0 || p.k == 0)) e = Some(8)
+    // [P1-2 W4A8 mirror] 混配（a=fp8 × b=fp4）另有【源字粒度】守护：B 侧 kt 轮次 =
+    //   fp4 源字数 = K/kPerBeat(fp4)=K/64（每源字 64 nibble，BDMA push 侧展开为 2 个
+    //   fp8 阵列拍），K 非整除 ⟹ bKTile 地板除静默丢尾字。与硬件 HiveCoreCalcConfig
+    //   混配 errCode8 块同式（由张量布局独立推导：源字是 B 读取的原子单位）。
+    //   置于 aFmt 块之后（同为 code 8，last-wins 无碍，与 RTL 两支同码一致）。
+    if (hasMx4 && (p.aFmt == DataFormat.MXE4M3 || p.aFmt == DataFormat.MXE5M2) &&
+        p.bFmt == DataFormat.MXE2M1 &&
+        (p.k % kPerBeat(DataFormat.MXE2M1, totalN) != 0 || p.k == 0)) e = Some(8)
     // (#178) errCode 11: int/non-int cross-boundary guard (V5-only XOR).
     //   Derived independently from register contract semantics:
     //   cIsIntOut = cFmt is an integer output format (INT8/INT16/INT4/INT32)
@@ -372,8 +380,10 @@ object HiveDebugModel {
     val cIsIntOut = isIntFmt(p.cFmt)
     val runIsInt = !isFloatFmt(p.aFmt) && !isMxAny(p.aFmt)
     if (runIsInt != cIsIntOut) e = Some(11)
-    // [Fix-4 mirror] MX4xMX8 mix (isMx4(aFmt) ^ isMx4(bFmt)) -> code 3, gated by hasMx4.
-    if (hasMx4 && (p.aFmt == DataFormat.MXE2M1) != (p.bFmt == DataFormat.MXE2M1)) e = Some(3)
+    // [Fix-4 mirror · P1-2 收窄] 原 isMx4(aFmt)^isMx4(bFmt) 双向混配皆拒；W4A8
+    //   （A=MX8×B=MX4）经 fp4→fp8 push 侧展开路合法化，本镜像与 RTL 收窄块同式，
+    //   只拒反向（A=MX4×B=MX8，lane 选择子只看 aFmt，反向混配静默算错）。
+    if (hasMx4 && p.aFmt == DataFormat.MXE2M1 && p.bFmt != DataFormat.MXE2M1) e = Some(3)
     // (#146) errCode 7 REMOVED from the mirror. The hardware block it mirrored
     //   (`isMx4(fmt) && getBlockSize(blkSel) =/= 64`) became a TAUTOLOGY once the
     //   MXBlockSize enum was narrowed to {sel=0 -> 16, sel=1 -> 32}: no encodable
@@ -410,25 +420,33 @@ object HiveDebugModel {
     if (isMxAny(p.aFmt) || isMxAny(p.bFmt)) {
       // 【Phase 3】kPerBeat 由硬编码 totalN*2（MX8）泛化为 kPerBeat(fmt)：
       //   MX8→totalN*2（与旧式逐值相同）、MXE2M1→totalN*4。非 fp4 用例判据不变。
-      val kpb = kPerBeat(if (isMxAny(p.aFmt)) p.aFmt else p.bFmt, totalN)
+      // 【P1-2 W4A8】MX8×MX4 混配时两侧各自有整除要求（MX8 kpb=32、fp4 源节拍 kpb=64），
+      //   取 math.max 即同时约束两侧；单侧 MX 时与旧式逐值相同。
+      val kpb = if (isMxAny(p.aFmt) && isMxAny(p.bFmt))
+        math.max(kPerBeat(p.aFmt, totalN), kPerBeat(p.bFmt, totalN))
+      else kPerBeat(if (isMxAny(p.aFmt)) p.aFmt else p.bFmt, totalN)
       require(p.k % kpb == 0,
         s"MX 运行要求 K(${p.k}) 能被 kPerBeat=$kpb 整除（一个 kTile = 一个 scale 块 = 单 pass）")
       require(p.loadWMode, "MX 运行必须 loadWMode=1（B 转置存储，硬件 errCode 4 拦截）")
     }
     if (isMxAny(p.aFmt)) require(p.k % p.aMxBlk == 0, s"K(${p.k}) 必须被 aMxBlk(${p.aMxBlk}) 整除")
     if (isMxAny(p.bFmt)) require(p.k % p.bMxBlk == 0, s"K(${p.k}) 必须被 bMxBlk(${p.bMxBlk}) 整除")
-    // 【Fix-8】MX4×MX8 混配金锚守护（与硬件 HiveCoreCalcConfig errCode3(Fix-4) 同源，早抛早清晰）：
-    //   MX 输入要求 a/b 同为 fp4(E2M1) 或同为 fp8(E4M3/E5M2)。硬件运行期选择子只看 aFmt，
-    //   而 b 侧解码器接 io.bFmt，v1 混配会 lane 粒度与解码格式矛盾、静默算错。
+    // 【Fix-8】MX 混配金锚守护（与硬件 HiveCoreCalcConfig errCode3(Fix-4) 同源，早抛早清晰）：
     //   ▸ hasMx4 门控：hasMx4=false 时 fp4 输入已被 Plan cfg-aware 守卫(Fix-9)拦为"需 hasMx4"，
     //     不在此重复拦；hasMx4=true 时才拦混配，对应 precheckConfigErr 的 Some(3)（同门控）。
-    //   ▸ 定位：MX4×MX8(W4A8)数学/OCP 合法，真数据通路支持列 v2；本 require 是【运行期可诊断】
-    //     守护（非永久拒绝），将来支持只需删此 require + 硬件 Fix-4 的 when + 补 W4A8 数据通路。
+    //   【P1-2 W4A8 UPDATE】正向混配 MX8(A)×MX4(B) 已解禁：走 fp4→fp8 DMA 展开路
+    //     （B 侧 DMA 把 E2M1 nibble 经 LUT 展开成 E4M3 码字，阵列按 baseline MX8×MX8 跑），
+    //     硬件侧对应 errCode8（K 必须整 fp4 节拍）而非 errCode3。
+    //   ▸ 反向混配 MX4(A)×MX8(B) 仍拦：lane 粒度选择子只看 aFmt，B 侧展开路不适用，
+    //     硬件 Fix-4 已收窄为该反向分支，对应 precheckConfigErr 的 Some(3)。
     //   ▸ E4M3×E5M2 双 fp8 混配两侧 (==MXE2M1) 均 false → 相等 → 不触发（合法，保留 dual-MX8 用例）。
     if (hasMx4)
       require(!(isMxAny(p.aFmt) && isMxAny(p.bFmt)) ||
-              (p.aFmt == DataFormat.MXE2M1) == (p.bFmt == DataFormat.MXE2M1),
-        s"MX4×MX8 混配 v1 暂不支持（W4A8 属 v2 路线）：a/b 须同为 fp4(E2M1) 或同为 fp8(E4M3/E5M2)，当前 aFmt=${p.aFmt} bFmt=${p.bFmt}")
+              (p.aFmt == DataFormat.MXE2M1) == (p.bFmt == DataFormat.MXE2M1) ||
+              ((p.aFmt == DataFormat.MXE4M3 || p.aFmt == DataFormat.MXE5M2) && p.bFmt == DataFormat.MXE2M1),
+        s"MX mixed format unsupported: reverse mix (A=MX4 x B=MX8) is rejected by HW errCode 3; " +
+        s"a/b must be both fp4(E2M1), both fp8(E4M3/E5M2), or forward mix A=fp8 x B=fp4 (W4A8), " +
+        s"current aFmt=${p.aFmt} bFmt=${p.bFmt}")
     // (#146) fp4 no longer forces block=64. The hardware errCode 7 that this
     //   require used to mirror has been DELETED: MXBlockSize is a 2-level enum
     //   {sel=0 -> 16, sel=1 -> 32}, so "blk must be 64" was unsatisfiable and
