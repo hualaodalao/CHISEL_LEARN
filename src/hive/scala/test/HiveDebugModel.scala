@@ -362,14 +362,16 @@ object HiveDebugModel {
     val aPackedInt = p.aFmt == DataFormat.INT8 || p.aFmt == DataFormat.INT4
     if (((hasMx4 && isMxAny(p.aFmt)) || aPackedInt) &&
         (p.k % kPerBeat(p.aFmt, totalN) != 0 || p.k == 0)) e = Some(8)
-    // [P1-2 W4A8 mirror] 混配（a=fp8 × b=fp4）另有【源字粒度】守护：B 侧 kt 轮次 =
-    //   fp4 源字数 = K/kPerBeat(fp4)=K/64（每源字 64 nibble，BDMA push 侧展开为 2 个
-    //   fp8 阵列拍），K 非整除 ⟹ bKTile 地板除静默丢尾字。与硬件 HiveCoreCalcConfig
-    //   混配 errCode8 块同式（由张量布局独立推导：源字是 B 读取的原子单位）。
-    //   置于 aFmt 块之后（同为 code 8，last-wins 无碍，与 RTL 两支同码一致）。
+    // [P1-2 W4A8 订正 mirror] 混配（a=fp8 × b=fp4）走 stretch 单读契约，两条守护与
+    //   硬件 HiveCoreCalcConfig 混配 errCode8 块同式（由张量布局独立推导）：
+    //   ① K%64：窗口粒度虽 32，K%64==32（kTile 奇数）会使末窗口 32B 单读越出张量
+    //      界 16B，故不放宽；② bAddr%32：半字拍片契约（L mod 32 ∈ {0,16}）与读严格
+    //      落张量界内的前提（portBytes=totalN*bW/8=32）。置于 aFmt 块之后（同为
+    //      code 8，last-wins 无碍，与 RTL 两支同码一致）。
     if (hasMx4 && (p.aFmt == DataFormat.MXE4M3 || p.aFmt == DataFormat.MXE5M2) &&
         p.bFmt == DataFormat.MXE2M1 &&
-        (p.k % kPerBeat(DataFormat.MXE2M1, totalN) != 0 || p.k == 0)) e = Some(8)
+        (p.k % kPerBeat(DataFormat.MXE2M1, totalN) != 0 || p.k == 0 ||
+         p.bBase % 32L != 0)) e = Some(8)
     // (#178) errCode 11: int/non-int cross-boundary guard (V5-only XOR).
     //   Derived independently from register contract semantics:
     //   cIsIntOut = cFmt is an integer output format (INT8/INT16/INT4/INT32)
@@ -381,8 +383,8 @@ object HiveDebugModel {
     val runIsInt = !isFloatFmt(p.aFmt) && !isMxAny(p.aFmt)
     if (runIsInt != cIsIntOut) e = Some(11)
     // [Fix-4 mirror · P1-2 收窄] 原 isMx4(aFmt)^isMx4(bFmt) 双向混配皆拒；W4A8
-    //   （A=MX8×B=MX4）经 fp4→fp8 push 侧展开路合法化，本镜像与 RTL 收窄块同式，
-    //   只拒反向（A=MX4×B=MX8，lane 选择子只看 aFmt，反向混配静默算错）。
+    //   （A=MX8×B=MX4）经 B DMA stretch（半字拍片 + LUT 加宽）合法化，本镜像与
+    //   RTL 收窄块同式，只拒反向（A=MX4×B=MX8，lane 选择子只看 aFmt，反向混配静默算错）。
     if (hasMx4 && p.aFmt == DataFormat.MXE2M1 && p.bFmt != DataFormat.MXE2M1) e = Some(3)
     // (#146) errCode 7 REMOVED from the mirror. The hardware block it mirrored
     //   (`isMx4(fmt) && getBlockSize(blkSel) =/= 64`) became a TAUTOLOGY once the
@@ -428,15 +430,21 @@ object HiveDebugModel {
       require(p.k % kpb == 0,
         s"MX 运行要求 K(${p.k}) 能被 kPerBeat=$kpb 整除（一个 kTile = 一个 scale 块 = 单 pass）")
       require(p.loadWMode, "MX 运行必须 loadWMode=1（B 转置存储，硬件 errCode 4 拦截）")
+      // 【P1-2 W4A8 订正】混配 stretch 单读契约：bAddr 须 32B 对齐（硬件 errCode8
+      //   镜像；金锚早抛早清晰，precheckConfigErr 同式）。
+      if (isMx8(p.aFmt) && p.bFmt == DataFormat.MXE2M1)
+        require(p.bBase % 32 == 0,
+          s"W4A8 混配要求 bAddr 32B 对齐（stretch 半字拍片单读契约，硬件 errCode 8），当前 bBase=0x${p.bBase.toHexString}")
     }
     if (isMxAny(p.aFmt)) require(p.k % p.aMxBlk == 0, s"K(${p.k}) 必须被 aMxBlk(${p.aMxBlk}) 整除")
     if (isMxAny(p.bFmt)) require(p.k % p.bMxBlk == 0, s"K(${p.k}) 必须被 bMxBlk(${p.bMxBlk}) 整除")
     // 【Fix-8】MX 混配金锚守护（与硬件 HiveCoreCalcConfig errCode3(Fix-4) 同源，早抛早清晰）：
     //   ▸ hasMx4 门控：hasMx4=false 时 fp4 输入已被 Plan cfg-aware 守卫(Fix-9)拦为"需 hasMx4"，
     //     不在此重复拦；hasMx4=true 时才拦混配，对应 precheckConfigErr 的 Some(3)（同门控）。
-    //   【P1-2 W4A8 UPDATE】正向混配 MX8(A)×MX4(B) 已解禁：走 fp4→fp8 DMA 展开路
-    //     （B 侧 DMA 把 E2M1 nibble 经 LUT 展开成 E4M3 码字，阵列按 baseline MX8×MX8 跑），
-    //     硬件侧对应 errCode8（K 必须整 fp4 节拍）而非 errCode3。
+    //   【P1-2 W4A8 UPDATE】正向混配 MX8(A)×MX4(B) 已解禁：走 B DMA stretch 路
+    //     （16B fp4 半字拍片 32B 对齐单读 + 顶层 LUT 把 E2M1 nibble 精确加宽成
+    //     E4M3 码字，阵列按 baseline MX8×MX8 跑），硬件侧对应 errCode8
+    //     （K%64 与 bAddr%32 守护）而非 errCode3。
     //   ▸ 反向混配 MX4(A)×MX8(B) 仍拦：lane 粒度选择子只看 aFmt，B 侧展开路不适用，
     //     硬件 Fix-4 已收窄为该反向分支，对应 precheckConfigErr 的 Some(3)。
     //   ▸ E4M3×E5M2 双 fp8 混配两侧 (==MXE2M1) 均 false → 相等 → 不触发（合法，保留 dual-MX8 用例）。
@@ -765,13 +773,29 @@ object HiveDebugModel {
     }
 
     // ---- B 期望地址序列：nt 外 × kt 中 × 块内 totalN 行降序 → gather 物理序列 ----
+    // 【P1-2 W4A8 订正】混配（A=fp8×B=fp4）改【阵列窗口口径】：窗口数 = K/32（A 侧
+    //   aKpb 口径），窗口 w 覆盖行内字节 [16w,16w+16)（32 个 fp4 = 一个阵列 K 窗口的
+    //   一行），块内 totalN 行降序（与 loadW 窗口消费序一致）。物理读 = stretch 单
+    //   对齐读 [L&~31, +32)（半字片由 DMA 内半字选择，非 gather 两读）；该单读契约
+    //   由 errCode8 混配守护（K%64 且 bAddr%32）保证末拍读不越张量界（金锚由张量
+    //   语义独立推导，非镜像 RTL）。纯格式（含纯 fp4 的源字口径 K/64）保持原式。
+    val isW4A8 = isMx8(p.aFmt) && p.bFmt == DataFormat.MXE2M1
     val expBAddrSeq: Seq[Long] = {
       val buf = mutable.ArrayBuffer.empty[Long]
-      for (r <- 0 until nTiles; kt <- 0 until bKTiles) {
-        val blockStart = p.bBase + r * bNTileOff + (totalN - 1) * bRowOff + kt * bKTileOff
-        for (s <- 0 until totalN) buf += blockStart - s * bRowOff
+      if (isW4A8) {
+        val bKTileOffMix = aKpb.toLong * bEbits / 8                 // 混配 k 窗口步进 = 16B
+        for (r <- 0 until nTiles; w <- 0 until (p.k / aKpb)) {
+          val blockStart = p.bBase + r * bNTileOff + (totalN - 1) * bRowOff + w * bKTileOffMix
+          for (s <- 0 until totalN) buf += blockStart - s * bRowOff
+        }
+        buf.toSeq.map(addr => addr - addr % 32L)
+      } else {
+        for (r <- 0 until nTiles; kt <- 0 until bKTiles) {
+          val blockStart = p.bBase + r * bNTileOff + (totalN - 1) * bRowOff + kt * bKTileOff
+          for (s <- 0 until totalN) buf += blockStart - s * bRowOff
+        }
+        buf.toSeq.flatMap(gatherPhys(_, 32L))
       }
-      buf.toSeq.flatMap(gatherPhys(_, 32L))
     }
 
     val expScaleAAddrSeq: Seq[Long] = {
@@ -782,9 +806,20 @@ object HiveDebugModel {
       buf.toSeq.flatMap(gatherPhys(_, 4L))
     }
 
+    // 【P1-2 W4A8 订正】混配 scaleB 期望序列改【阵列窗口口径】：窗口数 = K/32，窗口
+    //   w 的 32-K 块 = blk16 的 {2w,2w+1} / blk32 的 {w} ⟹ kTile 步进 = aKpb/bMxBlk
+    //   （blk16→2B、blk32→1B，相邻窗口读相邻 scale 字），块内 totalN 行降序，非对齐
+    //   交 P0-1 gather（与 RTL scaleBColTileAddressOffset 混配覆盖独立同式推导）。
+    //   纯格式保持原式（sbColOff = bKpb/blk）。
     val expScaleBAddrSeq: Seq[Long] = {
       val buf = mutable.ArrayBuffer.empty[Long]
-      if (isMxAny(p.bFmt))
+      if (isW4A8) {
+        val sbColOffMix = (aKpb / p.bMxBlk).toLong
+        for (r <- 0 until nTiles; w <- 0 until (p.k / aKpb)) {
+          val blockStart = SB_BASE + r * (totalN * sbRowOff) + (totalN - 1) * sbRowOff + w * sbColOffMix
+          for (s <- 0 until totalN) buf += blockStart - s * sbRowOff
+        }
+      } else if (isMxAny(p.bFmt))
         for (r <- 0 until nTiles; kt <- 0 until bKTiles) {
           val blockStart = SB_BASE + r * (totalN * sbRowOff) + (totalN - 1) * sbRowOff + kt * sbColOff
           for (s <- 0 until totalN) buf += blockStart - s * sbRowOff

@@ -125,20 +125,23 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT)
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 【P1-2 W4A8】A=MX8 × B=MX4 正向混配（fp4→fp8 push 侧展开路）四用例。
-  //   金锚按张量语义独立推导（bFmt=MXE2M1 ⟹ B 内存镜像/scale 排布与纯 fp4 运行
-  //   逐字相同；展开只发生在 B DMA push 侧，阵列按已验证 MX8×MX8 基线跑），
-  //   硬件 errCode 守护见 HiveCoreCalcConfig（正向混配 K%(totalN*4) → 8，反向混配 → 3）。
-  //   命名带 caseTag ⟹ ScalaTest 名互不撞车（DuplicateTestNameException 防护，见 runCase 注释）。
+  // 【P1-2 W4A8 订正（2026-10-13）】A=MX8 × B=MX4 正向混配五用例。B DMA 走 stretch：
+  //   逻辑拍 = 16B fp4 半字片（一个阵列 K 窗口的一行）→ 32B 对齐单读 → DMA 内半字
+  //   选择 → LUT 精确加宽成 E4M3 阵列拍；scaleBDma 全量 kTile 窗口、每拍一个相邻
+  //   scale 字（blk16 时含源块 {2w,2w+1} 字节对）。金锚按张量语义独立推导（窗口
+  //   口径序列见 HiveDebugModel expBAddrSeq/expScaleBAddrSeq 混配分支）；硬件守护见
+  //   HiveCoreCalcConfig（混配 K%64 或 bAddr%32 → errCode 8，反向混配 → 3）。
+  //   命名带 caseTag ⟹ ScalaTest 名互不撞车（DuplicateTestNameException 防护）。
   // ══════════════════════════════════════════════════════════════════════════
   // ① 正向混配 K=64：aBlk=32（=A 侧 kPerBeat，1 scale/kTile）、bBlk=16
-  //   （fp4 每 64-K 源字 4 个 scale 字节，奇条 = payload>>16 ⟹ 展开切片可观测）。
+  //   （窗口 w 的 scale 字含源块 {2w,2w+1} 字节对 ⟹ Executor idx=lane/8 双字节
+  //   切片可观测；K=64 ⟹ kTile=2 偶数、末窗读恰落张量界内）。
   runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.FP32,
           aBlk = 32, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT,
           wave = "sim/debug/quick_w4a8_blk16.fst", caseTag = " [P1-2 W4A8 E4M3xE2M1 blk32/16]")
 
-  // ② 正向混配 K=128：两 kt 轮 + bBlk=32（每源字 2 个 scale 字节，奇条 = payload>>8），
-  //   覆盖多 kTile 源字折半（bKTile=kTile>>1）与 scaleB lockstep。
+  // ② 正向混配 K=128：多 kTile 轮（kTile=4，覆盖 k/n 双切换）+ bBlk=32
+  //   （每窗口 1 个 scale 字节，idx 恒 0，检验单字节路径）。
   runCase(m = 32, n = 32, k = 128, aFmt = DataFormat.MXE5M2, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.FP32,
           aBlk = 32, bBlk = 32, cBlk = 16, addrMode = AddrMode.MAT,
           wave = "sim/debug/quick_w4a8_blk32.fst", caseTag = " [P1-2 W4A8 E5M2xE2M1 K128 blk32/32]")
@@ -148,29 +151,17 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT,
           wave = "sim/debug/quick_w4a8_rev_err3.fst", caseTag = " [P1-2 W4A8 neg reverse-mix errCode3]")
 
-  // ④ 负向：正向混配 K=32（过 A 侧 MX8 K%32 检查，但 fp4 源字粒度 64 地板除丢尾）
-  //   → errCode 8（新增混配源字粒度守护）。
+  // ④ 负向：正向混配 K=32（窗口粒度 32 过 A 侧 MX8 检查，但 K%64 守护仍拒——
+  //   kTile=1 奇数会使末窗 32B 单读越出张量界 16B）→ errCode 8。
   runCase(m = 32, n = 32, k = 32, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.FP32,
           aBlk = 32, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT,
           wave = "sim/debug/quick_w4a8_k32_err8.fst", caseTag = " [P1-2 W4A8 neg K32 errCode8]")
 
-  // TEMP DEBUG PROBE CASE (delete after diagnosis)
+  // ⑤ 负向：正向混配 bAddr 未 32B 对齐（stretch 半字拍片单读契约被破坏——
+  //   奇半字拍的 32B 单读将越出张量界）→ errCode 8（订正新增守护）。
   runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.FP32,
-          aBlk = 32, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, seed = 99999L,
-          wave = "sim/debug/quick_probe.fst", caseTag = " [PROBE]")
-  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.FP32,
-          aBlk = 32, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, seed = 99997L,
-          wave = "sim/debug/quick_probe3.fst", caseTag = " [PROBE3]")
-  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.FP32,
-          aBlk = 32, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, seed = 99996L,
-          wave = "sim/debug/quick_probe4.fst", caseTag = " [PROBE4]")
-  // TEMP PROBE5: pure fp4xfp4 blk16 ground truth (baseline path, no expansion)
-  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE2M1, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.FP32,
-          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, seed = 99995L,
-          wave = "sim/debug/quick_probe5.fst", caseTag = " [PROBE5]")
-  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.FP32,
-          aBlk = 32, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, seed = 99994L,
-          wave = "sim/debug/quick_probe6.fst", caseTag = " [PROBE6]")
+          aBlk = 32, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, bBase = B_BASE + 16,
+          wave = "sim/debug/quick_w4a8_baddr_err8.fst", caseTag = " [P1-2 W4A8 neg bAddr misalign errCode8]")
 
   /** 编译期配置（totalN=16；cDmaExtW 默认 256；缓冲深度 2048；scaleBufferDepth=64）。
     * (#155 MJ1) supportedFmts 现在【不再显式传入】，回落 HiveCoreConfig 的默认集。
@@ -265,6 +256,10 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
               //   进 DebugParams.rnd（litValue.toInt）⟹ 写入 reg5 bits[18:16]（(#164) 前为 regs(7)
               //   bits[14:12]），RTL 与金锚同源。
               rnd: RoundingMode.Type = rnd,
+              // 【P1-2 W4A8】per-case B 张量基址（进 reg3=bAddr）。默认 = HiveDebugModel.B_BASE；
+              //   仅负例 ⑤ 用它造 bAddr%32!=0 的失配。★测试名【不含 bBase】⟹ 既有用例名逐字不变
+              //   （B_BASE 是 object HiveDebugModel 的 val，无 #155 那种类体前向引用初始化序陷阱）。
+              bBase: Long = B_BASE,
               // (#148) caseTag is appended to the ScalaTest test NAME. It exists for exactly one
               //   reason: two runCase calls with identical (m,n,k,aFmt,bFmt,cFmt,blks,addrMode)
               //   build the SAME test name, and ScalaTest rejects that while the suite is being
@@ -289,7 +284,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       runQuick(DebugParams(m = m, n = n, k = k, aFmt = aFmt, bFmt = bFmt, cFmt = cFmt, loadWMode = lw != 0,
         aMxBlkSel = selOf("aBlk", aBlk), bMxBlkSel = selOf("bBlk", bBlk), cMxBlkSel = selOf("cBlk", cBlk),
         addrModeSel = addrMode.litValue.toInt, rnd = rnd.litValue.toInt, seed = seed, strictAddr = strictAddr,
-        maxCycles = maxCycles.toInt, waveTarget = wave, testHint = s"run-M-$m-N-$n-K-$k")) }
+        maxCycles = maxCycles.toInt, waveTarget = wave, testHint = s"run-M-$m-N-$n-K-$k", bBase = bBase)) }
   }
 
 
@@ -333,7 +328,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       s"isMx4(aFmt)=${p.aFmt == DataFormat.MXE2M1} AND NOT isMx4(bFmt)=${p.bFmt == DataFormat.MXE2M1}（Fix-4 收窄后只拒反向混配）。 " +
       "A=MX×B=非MX 数学不可实现（一侧有 scale、另一侧无）；反向混配 A=MX4×B=MX8 数据通路未支持" +
       "（quad/dual lane 选择子只看 aFmt，b 侧解码接 bFmt 会静默算错，故设 errCode 运行期可诊断守护，非永久拒绝）。 " +
-      "【P1-2 W4A8】正向混配 A=MX8×B=MX4 已合法（fp4→fp8 push 侧展开路，K 整除守护见 errCode 8），不再触发本码。 " +
+      "【P1-2 W4A8】正向混配 A=MX8×B=MX4 已合法（B DMA stretch：16B 半字拍片 + LUT 加宽 E4M3；K/bAddr 守护见 errCode 8），不再触发本码。 " +
       "建议：aFmt/bFmt 改成同族（E4M3/E5M2 互组，或 fp4 E2M1×E2M1）、正向混配、或双非 MX 浮点；本约束不限制输出 cFmt"
     case 4 => s"MX 输入（aFmt=${p.aFmt}、bFmt=${p.bFmt}）必须 loadWMode=1（B 按 N×K 转置存放），当前为 0。 建议：loadW = Some(1) 或留 None 自动推导"
     case 5 => s"FP32 只能作【输出】格式、不能作 A/B 输入（aFmt=${p.aFmt}、bFmt=${p.bFmt}）。 建议：输入改用受支持的输入格式 INT8/INT4/MXE4M3/MXE5M2/MXE2M1（FP16/BF16 已从 supportedFmts 砍除，不能再作输入）"
@@ -405,21 +400,6 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
     val predicted = hwErrCode(p)                     // ① 体检。负向路径不跑金锚 validate：硬件不进计算，
     if (predicted.isEmpty) validate(p, cfg.totalN, cfg.hasMx4)   //   且 validate 的 require 会先于仿真抛掉、用户看不到 errCode
     val plan = new Plan(p, cfg)
-    // TEMP DEBUG PROBE (delete after diagnosis): seed=99999 -> B codes forced
-    if (p.seed == 99999L) { for (kk <- plan.bCode.indices; nn <- plan.bCode(kk).indices) plan.bCode(kk)(nn) = 1L }
-    if (p.seed == 99998L) { for (kk <- plan.bCode.indices; nn <- plan.bCode(kk).indices) plan.bCode(kk)(nn) = (kk % 2).toLong }
-    if (p.seed == 99997L) {
-      for (kk <- plan.bCode.indices; nn <- plan.bCode(kk).indices) plan.bCode(kk)(nn) = 1L
-      for (mm <- plan.aCode.indices; kk <- plan.aCode(mm).indices) plan.aCode(mm)(kk) = 0x30L
-    }
-    // TEMP PROBE4: random stimulus, B-side scale forced uniform, A-side scale kept varying
-    if (p.seed == 99996L) for (nn <- plan.scaleB.indices; j <- plan.scaleB(nn).indices) plan.scaleB(nn)(j) = 127
-    // TEMP PROBE6: B-side scale ramp INDEPENDENT of entry j (= 1 per n row, K=32 window)
-    if (p.seed == 99994L) {
-      for (kk <- plan.bCode.indices; nn <- plan.bCode(kk).indices) plan.bCode(kk)(nn) = 1L
-      for (mm <- plan.aCode.indices; kk <- plan.aCode(mm).indices) plan.aCode(mm)(kk) = 0x30L
-      for (nn <- plan.scaleB.indices; j <- plan.scaleB(nn).indices) plan.scaleB(nn)(j) = 127 + (nn % 5) - 2
-    }
     plan.prepare()      // ③ 内存镜像（loadW=1 时 B 为 N×K 转置，HiveDebugModel 已实现）
     printHealth(p, predicted, plan)                  // ② 摘要
     val maxCycles = if (isMxAny(p.cFmt)) math.max(p.maxCycles, 20000) else p.maxCycles
@@ -465,7 +445,9 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
         //      ★旧 reg6/reg7 已删除：main 侧 wregs 无 is(6)/is(7) 分支 ⟹ 写为 no-op、读回 0。
         //        故本处【不再有】写 reg6/reg7 那一条，回读对账也从 readReg(0x06)/(0x07) 迁到 readReg(0x05)。 ----
         cmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, p.m, p.n.toLong | (p.k.toLong << 16))
-        cmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
+        // 【P1-2 W4A8】基址改取 p.aBase/p.bBase（与 Plan.prepare 内存镜像同源，DebugParams
+        //   默认即 A_BASE/B_BASE ⟹ 既有用例写入值逐位不变）；负例 ⑤ 借此把 bAddr%32!=0 送进守护。
+        cmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, p.aBase, p.bBase)
         cmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, p.controlWord5)
         cmd(HiveCoreOp.REG_WRITE2, 0x09, 0x0A, SA_BASE, SB_BASE); cmd(HiveCoreOp.REG_WRITE1, 0x0B, 0x00, SC_BASE, 0L)
         // ⑦ addrMode / 格式字回读对账：addrMode 无硬件消费者，只能靠回读证明「确实写进去了」
@@ -481,7 +463,6 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
         dut.io.cmd.payload.reg0Addr.poke(0.U); dut.io.cmd.payload.reg1Addr.poke(0.U)
         dut.io.cmd.payload.data0.poke(0.U); dut.io.cmd.payload.data1.poke(0.U); dut.clock.step(); dut.io.cmd.valid.poke(false.B)
         var aS = 0; var bS = 0; var saS = 0; var sbS = 0; var cB = 0; var csB = 0; var pollSt = 0; var pollCool = 0
-        val sbPL = mutable.ArrayBuffer[String]()  // TEMP DEBUG PROBE (delete)
         def rdA(v: Boolean, d: BigInt): Unit = { dut.io.dmaA.rsp.valid.poke(v.B); dut.io.dmaA.rsp.payload.data.poke(d.U) }
         def rdB(v: Boolean, d: BigInt): Unit = { dut.io.dmaB.rsp.valid.poke(v.B); dut.io.dmaB.rsp.payload.data.poke(d.U) }
         def rdSA(v: Boolean, d: BigInt): Unit = { dut.io.dmaScaleA.get.rsp.valid.poke(v.B); dut.io.dmaScaleA.get.rsp.payload.data.poke(d.U) }
@@ -531,16 +512,6 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           println(s"[$TAG] 负向路径：体检预测 errCode=${predicted.get}，实测 err=$errSeen errCode=$errCode done=$done → ${if (passed) "符合预测 ✓" else "与预测不符 ✗"}") }
         else if (!done) println(s"[$TAG] 超时：$maxCycles 拍内未观测到 STATUS.done")
         else { val c = plan.compare(cLog.toSeq, sLog.toSeq); cmp = Some(c)
-          // TEMP DEBUG PROBE (delete): full decoded HW row dump for probe seeds
-          if (p.seed >= 99994L) {
-            val hm = HiveSimCommon.parseDenseCWriteLogChecked(cLog.toSeq, p.cFmt, p.m, p.n,
-              cfg.totalN, cfg.cDmaExtW).matrix
-            for (mm <- 0 until 4) println(s"[$TAG] HWROW $mm: " + (0 until 32).map(cc =>
-              java.lang.Float.intBitsToFloat(hm(mm)(cc).toInt).formatted("%.4f")).mkString(" "))
-            for (mm <- 0 until 4) println(s"[$TAG] REFROW $mm: " + (0 until 32).map(cc =>
-              f"${plan.goldenC(mm)(cc)}%.4f").mkString(" "))
-            sbPL.foreach(s => println(s"[$TAG] SPOP $s"))   // TEMP DEBUG PROBE (delete)
-          }
           println(f"[$TAG] C compare: elemMismatch=${c.mismatch}/${c.elems} laneViolations=${c.laneViolations} " +
             f"maxRelErr=${c.maxRelErr}%.3e maxAbsErr=${c.maxAbsErr}%.3e")
           c.details.zipWithIndex.foreach { case (s, i) => println(s"[$TAG]   ${if (i == 0) "first mismatch" else "MISMATCH"} $s") }

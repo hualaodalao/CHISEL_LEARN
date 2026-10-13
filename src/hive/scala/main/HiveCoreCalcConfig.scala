@@ -146,6 +146,15 @@ bKLoadNum := getKLoadNum(io.regFile.bFmt)
 cMxBlockSize := getBlockSize(io.regFile.cMxBlockSize)
 cNWriteNum := cfg.totalN.U
 
+// 【P1-2 W4A8 订正（2026-10-13）】A=MX8×B=MX4 正向混配谓词（与 HiveCore.w4a8Mix
+//   同式；hasMx4 门控，非 MX4 配置恒 false、不生成消费逻辑）。下方 bColTile/
+//   scaleBColTile 两处【阵列窗口口径】覆盖共用：混配下 B/scaleB 的 kTile 步进按
+//   A 侧 aKLoadNum=32 元素窗口推导（bDma stretch 半字片 16B、scaleB 相邻字
+//   aKLoadNum/blk 字节），而非 fp4 源字口径 bKLoadNum=64。
+private val w4a8Mix = if (cfg.hasMx4)
+  DataFormat.isMx8(io.regFile.aFmt) && DataFormat.isMx4(io.regFile.bFmt)
+else false.B
+
 // 【#124 ①】colTile 偏移的两个运行期因子（A/B 各自解码，勿共用：aFmt/bFmt 可异构）。
 // 与本文件上方 aMxBlockSize/aKLoadNum 同一放置层（模块级无条件赋值的 Wire），
 // 使 sC0 分支内只做一次乘法，不在 when 里生成解码逻辑。
@@ -344,14 +353,17 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
             errComb := true.B
             errCodeComb := 8.U
         }
-        // 【P1-2 W4A8 展开路 · errCode 8（混配源字粒度守护）】A=MX8×B=MX4 时 B 侧
-        //   kt 轮次 = fp4 源字数 = K/(totalN*4)（每源字 64 nibble，push 侧展开为 2 个
-        //   fp8 阵列拍）。K 非整除 ⟹ bKTile 地板除静默丢尾（源字粒度 64，比 A 侧
-        //   pass 粒度 32 更粗；K=96 这类过上方 isMx8(aFmt) 块的 K%32 检查却仍丢尾字），
-        //   故须独立守护。位于 isMx4(aFmt) 块之后（同为 code 8，last-connect 无碍）。
+        // 【P1-2 W4A8 订正 · errCode 8（混配 stretch 单读契约守护）】A=MX8×B=MX4 时
+        //   B DMA 走 stretch：逻辑拍 = 16B 半字片、物理读 = 32B 对齐单读（不走
+        //   gather 两读）。两条守护（2026-10-13 裁定，较初版 plan 不放宽）：
+        //   ① K%(totalN*4)==0：窗口粒度虽是 32，K%64==32（kTile 奇数）会使末窗口的
+        //      32B 单读越出张量界 16B（对齐化向后越），故保持源粒度 64 不放宽；
+        //   ② bAddr%32==0：半字拍片契约（L mod 32 ∈ {0,16}）与「读严格落张量界内」
+        //      的前提，与 errCode10 的 cAddr%dmaBytes 同式（portBytes=totalN*bW/8）。
         when(DataFormat.isMx8(io.regFile.aFmt) && DataFormat.isMx4(io.regFile.bFmt) &&
              ((io.regFile.k(15, 0) % (cfg.totalN * 4).U =/= 0.U) ||
-              (io.regFile.k(15, 0) === 0.U))){
+              (io.regFile.k(15, 0) === 0.U) ||
+              ((io.regFile.bAddr % (cfg.totalN * cfg.bW / 8).U) =/= 0.U))){
             errComb := true.B
             errCodeComb := 8.U
         }
@@ -745,6 +757,14 @@ when(io.regFile.loadWMode === 0.U){
 //   （MX8=32/FP16=32/INT8=16/INT32=64）；else 支原 bytes 式逐字不变 → normalized-diff=0。
 if(cfg.hasMx4 || cfg.hasInt4){
   calcConfig.bColTileAddressOffset := cfg.totalN.U * (bLaneElems * memElemBitsOf(io.regFile.bFmt)) / 8.U
+  if (cfg.hasMx4) {
+    // 【P1-2 W4A8 订正】混配 bDma stretch：k 窗口步进 = aKLoadNum(32) 个 K 元素 ×
+    //   0.5B = 16B（半字片），取 A=MX8 阵列窗口口径而非 fp4 源字口径（64 元素 32B）。
+    //   非混配（纯 fp4/纯 fp8/INT4）last-connect 不到、逐值不变。
+    when(w4a8Mix) {
+      calcConfig.bColTileAddressOffset := aKLoadNum * memElemBitsOf(io.regFile.bFmt) / 8.U
+    }
+  }
 } else {
   calcConfig.bColTileAddressOffset := cfg.totalN.U * (bLaneElems * bElemBytes)
 }
@@ -859,6 +879,16 @@ when(MXBlockSize.M32 === io.regFile.bMxBlockSize){
 otherwise{
     calcConfig.scaleBRowAddressOffset     := io.regFile.k / 16.U
     calcConfig.scaleBColTileAddressOffset := bKLoadNum / 16.U
+}
+// 【P1-2 W4A8 订正】混配 scaleB kTile 步进 = 阵列窗口口径 aKLoadNum/blk（blk16→2B、
+//   blk32→1B；窗口 w 覆盖 K 块 {2w,2w+1}(blk16) / {w}(blk32)，相邻窗口读相邻 scale
+//   字），取代 fp4 源字口径 bKLoadNum/blk（64/blk）。非混配逐值不变；非对齐读由
+//   P0-1 gather 吸收，无新增守护。
+if (cfg.hasMx4) {
+  when(w4a8Mix) {
+    calcConfig.scaleBColTileAddressOffset :=
+      aKLoadNum / Mux(io.regFile.bMxBlockSize === MXBlockSize.M32, 32.U, 16.U)
+  }
 }
 //C矩阵 scale 偏移计算
 // ==========================================================================

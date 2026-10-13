@@ -124,32 +124,33 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   
 
   // ==========================================================================
-  // 【P1-2 W4A8 展开路】A=MX8 × B=MX4 单向混配谓词（顶层单一真源）：push 侧展开器
-  //   使能、阵列侧 bFmt 重映射、kt 轮次折半三处共用。反向混配（A=MX4×B=MX8）由
-  //   CalcConfig errCode3 拒绝，运行期不可达。非 hasMx4 配置不生成这些信号（零 diff）。
+  // 【P1-2 W4A8 展开路】A=MX8 × B=MX4 单向混配谓词（顶层单一真源）：bDma stretch
+  //   使能、阵列侧 bFmt 重映射两处共用。反向混配（A=MX4×B=MX8）由 CalcConfig
+  //   errCode3 拒绝，运行期不可达。非 hasMx4 配置不生成这些信号（零 diff）。
   // ==========================================================================
   private val w4a8Mix = if (cfg.hasMx4)
     DataFormat.isMx8(regFile.aFmt) && DataFormat.isMx4(regFile.bFmt)
   else false.B
 
-  // 【P1-2 W4A8 展开路】B 侧 kt 轮次 = fp4 源字数 = K/64 = kTile(A)/2：每个源字
-  //   （256b = 64 个 E2M1 nibble）由 bDma push 侧展开为 2 个 fp8 阵列拍，读侧地址
-  //   步进/数据量与纯 fp4 运行逐位相同；阵列 pass 数（Executor kTile）不变。
-  //   errCode8 已守护混配 K%(totalN*4)==0，地板除精确无余。纯格式 kTile 原值逐字不变。
-  private val bKTile = if (cfg.hasMx4)
-    Mux(w4a8Mix, calcConfig.io.calcConfig.kTile >> 1, calcConfig.io.calcConfig.kTile)
-  else calcConfig.io.calcConfig.kTile
+  // 【P1-2 W4A8 订正（2026-10-13）】混配下 B/scaleB 两 DMA 的 kt 轮次一律取【全量
+  //   calcConfig.kTile = K/aKLoadNum = K/32（A=MX8 口径 = 阵列 K 窗口数）】：bDma 每窗口
+  //   每行读一个 16B 半字片（stretch 模式，见 HiveCoreDmaRdOnly），scaleBDma 每窗口
+  //   每行读一个相邻 scale 字 —— 与 fp8×fp8 基线同窗口数、同拍数、同节奏。初版
+  //   「源字数 K/64 折半（bKTile）+ push 连推 2 拍」已被证伪废弃：一个 fp4 源字
+  //   （64K）跨 2 个 loadW 窗口，连推产生行交错序（PROBE4 权重错序、PROBE6 列对
+  //   共享 scale），bKTile 寄存器随之删除。纯 fp4×fp4（aFmt=E2M1）时 kTile 本身
+  //   = K/64 = 源字数，纯 fp8 亦同值，均逐拍不变。
 
-  // 【P1-2 W4A8 展开路】E2M1 nibble → E4M3 字节精确加宽（7-bit 幅值码 + 符号直通）：
+  // 【P1-2 W4A8 订正】E2M1 nibble → E4M3 字节精确加宽（7-bit 幅值码 + 符号直通）：
   //   fp4 全部 8 个值 {0,±0.5,±1,±1.5,±2,±3,±4,±6} 在 E4M3 中精确可表示（零精度
   //   损失、永不产生 inf/NaN），故混配时阵列按已验证的 MX8×MX8 基线解码即可。
-  //   输出比特布局与 bufPush payload 口径一致：元素 k ↔ 第 k 个 nibble（bit 4k+3:4k）
-  //   → 目标拍 byte k（bit 8k+7:8k），lane 切片（16b/lane）与 A 侧 stride-2 天然对齐。
-  private def fp4WordToMx8Beat(src: UInt, hiHalf: Boolean): UInt = {
+  //   输入 = bDma stretch 半字片（16B = 32 个 nibble，小端：元素 j ↔ bit 4j+3:4j），
+  //   输出 = 32 字节阵列拍（byte j ↔ bit 8j+7:8j），lane 切片（16B/lane）与 A 侧
+  //   stride-2 天然对齐。
+  private def fp4SliceToMx8Beat(src: UInt): UInt = {
     val lut = VecInit(Seq(0x00, 0x30, 0x38, 0x3C, 0x40, 0x44, 0x48, 0x4C).map(_.U(7.W)))
-    val base = if (hiHalf) src.getWidth / 8 else 0
-    val bytes = Seq.tabulate(src.getWidth / 8) { j =>
-      val nib = src(4 * (base + j) + 3, 4 * (base + j))
+    val bytes = Seq.tabulate(src.getWidth / 4) { j =>
+      val nib = src(4 * j + 3, 4 * j)
       Cat(nib(3), lut(nib(2, 0)))
     }
     Cat(bytes.reverse)
@@ -162,22 +163,21 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   bDma.io.start       := calcConfig.io.startOut
   bDma.io.regFile     := regFile
   bDma.io.reg_baseAddr := regFile.bAddr
-  bDma.io.reg_kTile := bKTile
+  bDma.io.reg_kTile := calcConfig.io.calcConfig.kTile
   bDma.io.reg_mTile := calcConfig.io.calcConfig.mTile
   bDma.io.reg_nTile := calcConfig.io.calcConfig.nTile
   bDma.io.reg_rowOffset := calcConfig.io.calcConfig.bRowAddressOffset
   bDma.io.reg_colTileOffset := calcConfig.io.calcConfig.bColTileAddressOffset
 
   if (cfg.hasMx4) {
-    // 【P1-2 W4A8 展开路】bDma push 侧展开器连线：偶拍 = 低 32 元素（nibble 0..31）
-    //   的 E4M3 展开，奇拍 = 高 32 元素（nibble 32..63）。A 侧激活本身即 MX8、
-    //   不展开（expand 恒 0，DMA 内 when-otherwise 走基线支路）。
-    bDma.io.expand.get := w4a8Mix
-    bDma.io.expEven.get := fp4WordToMx8Beat(bDma.io.expSrc.get, hiHalf = false)
-    bDma.io.expOdd.get  := fp4WordToMx8Beat(bDma.io.expSrc.get, hiHalf = true)
-    aDma.io.expand.get := false.B
-    aDma.io.expEven.get := 0.U
-    aDma.io.expOdd.get := 0.U
+    // 【P1-2 W4A8 订正】bDma stretch 连线：混配时逻辑拍 = 16B fp4 半字片（一个阵列
+    //   K 窗口的一行），物理读 32B 对齐单读、半字选择在 DMA 内 sel FIFO、E2M1→E4M3
+    //   LUT 加宽组合在此处闭环。A 侧激活本身即 MX8、不 stretch（恒 0，DMA 内
+    //   Mux 死路 = 基线支路）。
+    bDma.io.stretch.get := w4a8Mix
+    bDma.io.stretchBeat.get := fp4SliceToMx8Beat(bDma.io.stretchSrc.get)
+    aDma.io.stretch.get := false.B
+    aDma.io.stretchBeat.get := 0.U
   }
 
   
@@ -473,8 +473,11 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     scaleBDma.io.start      := calcConfig.io.startOut & DataFormat.isMx(regFile.bFmt)
     scaleBDma.io.regFile    := regFile
     scaleBDma.io.reg_baseAddr := regFile.bScaleAddr
-    // 【P1-2 W4A8】scaleB 与 bPop lockstep：kt 轮次同取 B 侧 bKTile（源字数，见上方定义）
-    scaleBDma.io.reg_kTile := bKTile
+    // 【P1-2 W4A8 订正】scaleB kt 轮次 = 全量 kTile（阵列 K 窗口数，与 bPop 逐拍
+    //   lockstep：每窗口 16 行 × 每行一个相邻 scale 字）；kTile 步进
+    //   scaleBColTileAddressOffset 混配取 aKLoadNum/blk（CalcConfig 订正），非对齐
+    //   读交 P0-1 gather，DMA 零特判、零展开。
+    scaleBDma.io.reg_kTile := calcConfig.io.calcConfig.kTile
     scaleBDma.io.reg_mTile := calcConfig.io.calcConfig.mTile
     scaleBDma.io.reg_nTile := calcConfig.io.calcConfig.nTile
     scaleBDma.io.reg_rowOffset := calcConfig.io.calcConfig.scaleBRowAddressOffset
@@ -493,21 +496,14 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     scaleBDma.io.bufPopFire              := scratchpad.io.scaleBPop.get.fire
 
     if (cfg.hasMx4) {
-      // 【P1-2 W4A8 展开路】scaleBDma push 侧 1→2 拆分（与 bDma 数据展开同节奏、
-      //   lockstep 恢复）：一个源字 payload 覆盖 64 个 fp4 的全部 scale 字节
-      //   （blk16=4B、blk32=2B），展开成 2 个阵列拍各占半字 —— 偶条 = 原 payload
-      //   （低半：k0..31 的字节），奇条 = payload >> splitShift（blk16→16 位对齐
-      //   byte2/3、blk32→8 位对齐 byte1），与 Executor feed 环 step=2 的 lane 切片
-      //   口径配套（见 HiveCoreExecutor B scale feed 循环）。展开器在 DMA 内部，
-      //   本文件 push/FIFO 连线保持逐字原样。scaleADma 不展开（expand 恒 0）。
-      scaleBDma.io.expand.get := w4a8Mix
-      scaleBDma.io.expEven.get := scaleBDma.io.expSrc.get
-      scaleBDma.io.expOdd.get := Mux(regFile.bMxBlockSize === MXBlockSize.M16,
-        (scaleBDma.io.expSrc.get >> 16).pad(cfg.scaleBW),
-        (scaleBDma.io.expSrc.get >> 8).pad(cfg.scaleBW))
-      scaleADma.io.expand.get := false.B
-      scaleADma.io.expEven.get := 0.U
-      scaleADma.io.expOdd.get := 0.U
+      // 【P1-2 W4A8 订正】scaleBDma 不 stretch：读侧节奏与 fp8 基线同构（每阵列拍
+      //   pop 一个内存相邻 scale 字；blk16 时窗口 w 的字含源块 {2w,2w+1} 的
+      //   byte0/1、blk32 时 byte0 = 块 w，由 Executor feed 环 idx=(lane*2)/blk 动态
+      //   切片）。scaleADma 同恒 0。
+      scaleBDma.io.stretch.get := false.B
+      scaleBDma.io.stretchBeat.get := 0.U
+      scaleADma.io.stretch.get := false.B
+      scaleADma.io.stretchBeat.get := 0.U
     }
 
     // scale FIFO flush 跟随 A/B flush（execute 起始拍清空，与 aDma/bDma 同范式）

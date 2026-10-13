@@ -222,11 +222,14 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   // ==========================================================================
   if(cfg.hasMx){
     val block = Mux(io.regFile.bMxBlockSize === MXBlockSize.M16, 16.U, 32.U)
-    // 【P1-2 W4A8 展开路】混配（isMx8(aFmt)&&isMx4(bFmt)，与 HiveCore.w4a8Mix 同式）时
-    //   bFmt 寄存器仍为 E2M1（源侧地址口径不变）⟹ isBX2=false，但 BDMA 已把每个 fp4
-    //   源字展开成 2 个 fp8 阵列拍 ⟹ 阵列侧每 lane 每拍恒推进 2 个 K 元素、与纯 MX8
-    //   同构 ⟹ step=2。scaleBPop payload 已由 scaleBDma 展开器半字对齐（奇条 =
-    //   payload>>splitShift），本环按基线 fp8 语义切片。非 hasMx4 配置无此支路（零 diff）。
+    // 【P1-2 W4A8 stretch 订正（2026-10-13）】混配（isMx8(aFmt)&&isMx4(bFmt)，与 HiveCore.w4a8Mix
+    //   同式）时 bFmt 寄存器仍为 E2M1 ⟹ isBX2=false，但 B DMA 走 stretch：每个阵列拍恒推进
+    //   32 个 K 元素（fp8 口径）⟹ 每 lane 每拍 2 个 K、与纯 MX8 同构 ⟹ step=2。
+    //   scaleB 侧【无展开】：scaleBDma 取全量 kTile 窗口（reg_kTile=calcConfig.kTile），
+    //   每阵列拍 pop 一个相邻 32b 内存字——blk32 时 byte0=块 w；blk16 时该字 = 源块
+    //   {2w,2w+1} 的字节对（byte0/byte1）。本环按基线 fp8 语义切片 idx=(lane*2)/blk
+    //   即得正确字节（blk16: lane0-7→byte0、lane8-15→byte1；blk32: 恒 byte0）。
+    //   非混配时 scaleBPop 字内字节排布与基线一致，此环切片式不变。非 hasMx4 配置无此支路（零 diff）。
     val step = if (cfg.hasMx4)
       Mux(io.calcConfig.isBX2 || (DataFormat.isMx8(io.regFile.aFmt) && DataFormat.isMx4(io.regFile.bFmt)), 2.U, 4.U)
     else Mux(io.calcConfig.isBX2, 2.U, 4.U)

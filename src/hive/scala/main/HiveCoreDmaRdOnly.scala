@@ -150,16 +150,21 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
     
     val bufPush = master(Stream(UInt(pushW.W)))      // 向 buffer push 数据
     val bufPopFire = Input(Bool())
-    // 【P1-2 W4A8 展开路】push 侧 1→2 字级展开器（仅 hasMx4 配置生成端口；非 hasMx4
-    //   配置无端口、既有代码逐字不变 = anchor 零 diff）。expand=1 时每个逻辑拍的 rsp
-    //   字（含 gather 合并字）先推偶拍 = expEven(expWord)、再推奇拍 = expOdd(expWord)，
-    //   一字占 2 个 buffer 槽位；expand=0 走 when-otherwise 旁支，逐字等于基线直推。
-    //   变换函数由顶层组合供给（B 数据通道 = E2M1 nibble→E4M3 LUT 展开，scaleB 通道 =
-    //   奇条半字对齐右移）；expSrc = 内部锁字寄存器的组合直出。
-    val expand  = if (cfg.hasMx4) Some(Input(Bool())) else None
-    val expSrc  = if (cfg.hasMx4) Some(Output(UInt(pushW.W))) else None
-    val expEven = if (cfg.hasMx4) Some(Input(UInt(pushW.W))) else None
-    val expOdd  = if (cfg.hasMx4) Some(Input(UInt(pushW.W))) else None
+    // 【P1-2 W4A8 订正（2026-10-13）】push 侧「半字切片 + 精确加宽」stretch 模式（仅
+    //   hasMx4 配置生成端口；非 hasMx4 配置无端口、既有代码逐字不变 = anchor 零 diff）。
+    //   stretch=1 时逻辑拍 = portBytes/2 字节半字（W4A8 混配 B 通道：16B = 32 个 fp4 =
+    //   一个阵列 K 窗口的一行），物理读恒为 1 次对齐读 [L&~(portBytes-1), +portBytes)，
+    //   本模块按「随在途读配对的半字位 FIFO」选 rsp 低/高半字输出到 stretchSrc，顶层
+    //   组合加宽（E2M1 nibble→E4M3 LUT）成整拍经 stretchBeat 推入 buffer —— 1 读 1 推、
+    //   每拍 1 槽，credit/节拍与 fp8 基线逐拍同构；gather 机构在本模式旁路（半字选择
+    //   取代 lo/hi 两读）。订正史：初版「1 源字读→push 连推 2 拍」展开器已被证伪废弃
+    //   （源字 64K 跨 2 个 loadW 窗口，连推产生行交错序，PROBE4/PROBE6 实测权重与
+    //   scale 双错位），expBusy/expPhase/expWord/2 槽 credit/expPathFree 串行门随本
+    //   订正一并删除；单读契约由 CalcConfig 混配 errCode8（K%64 且 bAddr%32）保证
+    //   末拍读不越张量界。
+    val stretch      = if (cfg.hasMx4) Some(Input(Bool())) else None
+    val stretchSrc   = if (cfg.hasMx4) Some(Output(UInt(math.max(1, pushW / 2).W))) else None
+    val stretchBeat  = if (cfg.hasMx4) Some(Input(UInt(pushW.W))) else None
   })
 
   // 【Ivy⑧ 死信号清理】原 private val mxRunDma（MX 运行期判据 = isMx(aFmt)）在本模块内
@@ -221,7 +226,9 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   val offReg  = Reg(UInt(offBits.W))                   // 非对齐拍字节偏移（合并移位量）
 
   val byteOff     = curAddr(offBits - 1, 0)
-  val unaligned   = byteOff =/= 0.U
+  // 【P1-2 W4A8 订正】stretch 模式旁路 gather 判定：逻辑拍是半字片（L mod portBytes
+  //   ∈ {0, portBytes/2}），奇片拍不走 lo/hi 两读机构，由半字位选择取代（见 sel FIFO）。
+  val unaligned   = if (cfg.hasMx4) byteOff =/= 0.U && !io.stretch.get else byteOff =/= 0.U
   val alignedBase = curAddr & ~((portBytes - 1).U(cfg.addrWidth.W))
   // 逻辑拍「末物理读」fire：对齐拍 = req.fire；非对齐拍 = hi 读 fire（gPhase===2）。
   // lo 读 fire（gPhase===0 && unaligned）不算 ⟹ lineCounter/curAddr/credit 均按逻辑拍推进。
@@ -261,20 +268,49 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   }
 
   // ==========================================================================
-  // 【P1-2 W4A8 · hasMx4 only】push 侧展开器寄存器（详见 IO expand 端口注释）。
-  //   捕获无覆写冲突的证明：expand=1 时 req 侧串行门（单在途 inflCnt===0 且
-  //   expBusy=0 才发新读；credit 按 2 槽/字预留）⟹ 两字 rsp 脉冲间隔 ≥ 展开
-  //   2 拍 + 1 拍，capture 拍 expBusy 必为 0。start 重载拍随 credit/gPhase 一同
-  //   清空（残字不得跨 run 泄漏，与 FIFO flush 同拍）。
+  // 【P1-2 W4A8 订正 · hasMx4 only】stretch 半字选择 FIFO（1-bit × depth 环形）。
+  //   req.fire 拍压入本逻辑拍 L 的半字位 curAddr(offBits-1)（16B 拍片契约下
+  //   L mod portBytes ∈ {0, portBytes/2}），rsp 返回拍弹出选 rsp 低/高半字。
+  //   rsp 与 req 同序（与 gather lo/hi 同前提）；depth ≥ 最大在途读数（credit
+  //   1/拍门控 ⟹ 在途 ≤ bufDepth，队满不可达）。TB 零延迟应答（req.fire 同拍
+  //   rsp.fire 且队空）走旁路直取本拍 enq 位。start 重载拍 selCnt 清零（残位
+  //   不跨 run 泄漏，与 credit/gPhase/inflCnt 同拍复位口径一致）。
   // ==========================================================================
-  val expBusy  = if (cfg.hasMx4) Some(RegInit(false.B)) else None
-  val expPhase = if (cfg.hasMx4) Some(RegInit(false.B)) else None
-  val expWord  = if (cfg.hasMx4) Some(Reg(UInt(pushW.W))) else None
+  private val selDepth = math.max(1, bufDepth)
+  private val selBits = if (cfg.hasMx4) Some(RegInit(VecInit(Seq.fill(selDepth)(false.B)))) else None
+  private val selHead = if (cfg.hasMx4) Some(RegInit(0.U(log2Up(selDepth).W))) else None
+  private val selTail = if (cfg.hasMx4) Some(RegInit(0.U(log2Up(selDepth).W))) else None
+  private val selCnt  = if (cfg.hasMx4) Some(RegInit(0.U(log2Up(bufDepth + 1).W))) else None
   if (cfg.hasMx4) {
-    io.expSrc.get := expWord.get
+    val selEnqFire = io.dmaExtRdIF.req.fire && io.stretch.get
+    // 零延迟应答且队空：本拍 rsp 即本拍 req 的应答，半字位直取当前 curAddr，不入队
+    val selBypass  = selEnqFire && io.dmaExtRdIF.rsp.fire && selCnt.get === 0.U
+    val selStore   = selEnqFire && !selBypass
+    val selDeqFire = io.dmaExtRdIF.rsp.fire && io.stretch.get && selCnt.get =/= 0.U
+    // 半字位真源：旁路（零延迟应答且队空）取本拍请求地址的半字位；否则取队头位。
+    //   ★外层 Mux 两臂都必须是「按位选出的 rsp 半字」——初版误把 1-bit 半字位本身放进
+    //   Mux 臂，Chisel 将其零扩成 128'h0/1 ⟹ 旁路拍 stretchSrc 退化为「元素0=LUT(halfbit)、
+    //   其余全 0」（实测 PROBE4：全列恒 0.5 = 唯一存活乘积 A[m][32]×0.5，窗口0 全零拍）。
+    val selBit = Mux(selBypass, curAddr(offBits - 1), selBits.get(selTail.get))
+    io.stretchSrc.get := Mux(selBit,
+      io.dmaExtRdIF.rsp.payload.data(pushW - 1, pushW / 2),
+      io.dmaExtRdIF.rsp.payload.data(pushW / 2 - 1, 0))
     when(io.start) {
-      expBusy.get  := false.B
-      expPhase.get := false.B
+      selCnt.get := 0.U
+    }.elsewhen(selStore && selDeqFire) {
+      // 同拍一进一出（新请求入队 + 旧在途应答出队）：响应属 selTail 旧请求、新请求的
+      //   半字位须写 selHead ⟹ head/tail 各推进一格、cnt 不变。漏判此角会使新位丢失
+      //   且下一响应复用已消费的 tail 位（真实带延迟内存可达；零延迟 TB 恒走 bypass 不可达）。
+      selBits.get(selHead.get) := curAddr(offBits - 1)
+      selHead.get := Mux(selHead.get === (selDepth - 1).U, 0.U, selHead.get + 1.U)
+      selTail.get := Mux(selTail.get === (selDepth - 1).U, 0.U, selTail.get + 1.U)
+    }.elsewhen(selStore) {
+      selBits.get(selHead.get) := curAddr(offBits - 1)
+      selHead.get := Mux(selHead.get === (selDepth - 1).U, 0.U, selHead.get + 1.U)
+      selCnt.get  := selCnt.get + 1.U
+    }.elsewhen(selDeqFire) {
+      selTail.get := Mux(selTail.get === (selDepth - 1).U, 0.U, selTail.get + 1.U)
+      selCnt.get  := selCnt.get - 1.U
     }
   }
 
@@ -291,27 +327,13 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
       }
     }
 
-    if (cfg.hasMx4) {
-      // 【P1-2 W4A8】expand 模式下同一逻辑拍占 2 槽（扣 2）、pop 各返 1
-      //   ⟹ credit 不变式仍 =「剩余可用槽位」，FIFO 恒不溢出，且 sDONE 的
-      //   done 判据（ostCredit===bufDepth 即全部弹出归还）仍然成立（2 扣 2 返配平）。
-      //   expand=0 三支与基线逐字等价（Mux(false)=1 死路）。
-      when(finalReqFire & io.bufPopFire){
-        when(io.expand.get){
-          ostCredit := ostCredit - 1.U   // -2+1
-        }
-      }.elsewhen(finalReqFire){
-        ostCredit := ostCredit - Mux(io.expand.get, 2.U, 1.U)
-      }.elsewhen(io.bufPopFire){
-        ostCredit := ostCredit + 1.U
-      }
-    } else {
-      when(finalReqFire & io.bufPopFire){
-      }.elsewhen(finalReqFire){
-        ostCredit := ostCredit - 1.U
-      }.elsewhen(io.bufPopFire){
-        ostCredit := ostCredit + 1.U
-      }
+    // 【P1-2 W4A8 订正】stretch 模式 1 读 1 推、1 槽/拍 ⟹ credit 记账回基线单一式
+    //   （初版 2 槽/字预留块已随连推方案一并废弃）。
+    when(finalReqFire & io.bufPopFire){
+    }.elsewhen(finalReqFire){
+      ostCredit := ostCredit - 1.U
+    }.elsewhen(io.bufPopFire){
+      ostCredit := ostCredit + 1.U
     }
 
   }
@@ -322,22 +344,17 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   // gPhase=0：对齐拍凭 credit 自由发；非对齐拍须先 drain（inflCnt===0）且预占
   //   1 credit（hi 读将扣）。gPhase=2：发 hi 读（credit 已在起拍预占，不再查）。
   //   gPhase=1/3：等 rsp，不发。
-  // 【P1-2 W4A8 · hasMx4】expand=1 两改：① 对齐流水按 2 槽/字预留（ostCredit>=2）；
-  //   ② 展开拍串行化：expBusy 或已有在途读时不发 gPhase=0 新读 ⟹ 每字 rsp 脉冲到达
-  //   时 expBusy 必 0（capture 无覆写）。hi 读（gPhase=2）不设门：其合并 push 是
-  //   本字唯一 pulse，前一字的展开 2 拍因 credit 预留槽位恒可得 ready、必已排空。
-  //   expand=0 时两门约等于恒真/恒credit（Mux 死路选择），基线行为逐字保持。
-  private val expCreditOk = if (cfg.hasMx4)
-    Mux(io.expand.get, ostCredit >= 2.U, ostCredit =/= 0.U)
-  else ostCredit =/= 0.U
-  private val expPathFree = if (cfg.hasMx4)
-    !(io.expand.get && (expBusy.get || inflCnt =/= 0.U))
-  else true.B
+  // 【P1-2 W4A8 订正】stretch=1 时请求门控即基线（1 读 1 槽/拍，无串行化门）；
+  //   gather lo/hi 机构被 unaligned 覆盖旁路（见 unaligned 定义），gPhase 恒 0。
   io.dmaExtRdIF.req.valid       := state === sTRANSFER && (
-    (gPhase === 0.U && expCreditOk && (!unaligned || inflCnt === 0.U) && expPathFree) ||
+    (gPhase === 0.U && ostCredit =/= 0.U && (!unaligned || inflCnt === 0.U)) ||
     (gPhase === 2.U)
   )
-  io.dmaExtRdIF.req.payload.addr := MuxCase(curAddr, Seq(
+  // 【P1-2 W4A8 订正】stretch 默认臂取 alignedBase：奇半字拍（L mod portBytes =
+  //   portBytes/2）的对齐单读即 [L-off, +portBytes)，想要的半字由 sel FIFO 选择，
+  //   不走 lo/hi 两读；偶半字拍 alignedBase == curAddr，与基线逐值相同。
+  private val reqAddrDefault = if (cfg.hasMx4) Mux(io.stretch.get, alignedBase, curAddr) else curAddr
+  io.dmaExtRdIF.req.payload.addr := MuxCase(reqAddrDefault, Seq(
     (gPhase === 0.U && unaligned) -> alignedBase,               // lo 读：对齐化
     (gPhase === 2.U)              -> (alignedBase + portBytes.U) // hi 读：下一对齐字
   ))
@@ -351,29 +368,12 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
   val alignedRspPush = io.dmaExtRdIF.rsp.valid && gPhase === 0.U &&
     !(io.dmaExtRdIF.req.fire && unaligned)
   if (cfg.hasMx4) {
-    val rspPushPulse = alignedRspPush || hiSameCycle ||
-      (io.dmaExtRdIF.rsp.valid && gPhase === 3.U)
-    val rspPushData  = Mux(gPhase === 3.U || hiSameCycle, mergedData, io.dmaExtRdIF.rsp.payload.data)
-    when(io.expand.get) {
-      // 【P1-2 W4A8 展开路】1→2：偶拍（低半 K 展开）→ 奇拍（高半），2 cycles/字。
-      //   capture 拍 expBusy 必 0（req 侧串行门保证，见上）；push 侧槽位已由
-      //   credit 2/字预留 ⟹ ready 恒可得、恰 2 拍排空。较基线多 1 拍寄存延迟
-      //   （pulse 拍捕获、次拍起推），消费端占用门不受影响。
-      io.bufPush.valid   := expBusy.get
-      io.bufPush.payload := Mux(expPhase.get, io.expOdd.get, io.expEven.get)
-      when(io.bufPush.fire) {
-        when(expPhase.get) {
-          expBusy.get  := false.B
-          expPhase.get := false.B
-        }.otherwise {
-          expPhase.get := true.B
-        }
-      }
-      when(rspPushPulse && !expBusy.get) {
-        expWord.get  := rspPushData
-        expBusy.get  := true.B
-        expPhase.get := false.B
-      }
+    when(io.stretch.get) {
+      // 【P1-2 W4A8 订正】stretch：gPhase 恒 0、无 gather ⟹ push 脉冲 = alignedRspPush
+      //   （= rsp.valid），payload = 顶层组合加宽后的整拍（E2M1 半字片 → E4M3 阵列拍）。
+      //   1 读 1 推、每拍 1 槽，较基线零额外拍延迟，消费端占用门不受影响。
+      io.bufPush.valid   := alignedRspPush
+      io.bufPush.payload := io.stretchBeat.get
     }.otherwise {
       io.bufPush.valid   := alignedRspPush || hiSameCycle ||
         (io.dmaExtRdIF.rsp.valid && gPhase === 3.U)
