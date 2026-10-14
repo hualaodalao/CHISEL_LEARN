@@ -82,6 +82,14 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
     val hiveScaleAIn = if (cfg.hasMx) Some(Output(Vec(cfg.totalN, UInt(8.W))))   else None
     val hiveScaleBIn = if (cfg.hasMx) Some(Output(Vec(cfg.totalN, UInt(8.W))))   else None
 
+    // 【P0 epilogue-1 fused bias】bias 取数握手（仅 hasMx 生成，与 dmaScaleA 端口同门控）：
+    //   biasIn = 16×32b 字流（每 N-tile 一组，收集齐置 biasLoaded）；biasFetchReq/Nt =
+    //   取数触发脉冲（sIDLE-execute 发 nt=0，sNEXT_NK_TILE 推进发 nt=curNTile+1），
+    //   由顶层 HiveCore 的 bias 取数器消费（盗用 dmaScaleA 端口供数）。
+    val biasIn       = if (cfg.hasMx) Some(slave(Stream(UInt(32.W))))    else None
+    val biasFetchReq = if (cfg.hasMx) Some(Output(Bool()))               else None
+    val biasFetchNt  = if (cfg.hasMx) Some(Output(UInt(cfg.mnkWidth.W))) else None
+
     // HiveComb 驱动
     val hiveAIn     = Output(Vec(cfg.totalN, UInt(cfg.aEffW.W)))
     val hivePsumIn  = Output(Vec(cfg.totalN, UInt(cfg.cEffW.W)))
@@ -242,6 +250,53 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
     }
   }
 
+  // ==========================================================================
+  // 【P0 epilogue-1 fused bias】bias 收集寄存器、32b→cEffW 基底转换与收集 FSM 外壳
+  // --------------------------------------------------------------------------
+  // 基底注入方案（零加法器）：bias 取代 sLOAD_A pass-0 的 psum 零基底，沿既有
+  // psum 逐列链进入阵列累加（C[m][n] = bias[n] + Σ A×B）。HiveComb 的 psumIn 是
+  // 输出-N 轴【逐列】注入、psum 沿 K-lane 链向下累加（见 HiveComb 行连接块），
+  // 故 biasRegs(i) 即输出列 nt*totalN+i 的 bias；bias 是列常量，经 bSkew 链的
+  // 逐列延迟不改变取值。K>totalN 的后续 pass 仍走 cPop 回灌（bias 已烧进
+  // pass-0 的 partial sum），阵列/MAC/OutCvt/cDma 全零改动。
+  // ==========================================================================
+  private val biasRegs   = if (cfg.hasMx) Some(RegInit(VecInit(Seq.fill(cfg.totalN)(0.U(32.W))))) else None
+  private val biasLoaded = if (cfg.hasMx) Some(RegInit(false.B)) else None
+  private val biasCnt    = if (cfg.hasMx) Some(RegInit(0.U(log2Up(cfg.totalN).W))) else None
+
+  /** fp32 → lazy40 累加基底：位级镜像金锚权威 HiveSimCommon.fp32BitsTo40 ——
+    * e==0（含全部 subnormal）→ 绝对 0；否则 {s, e, 隐含 1, m, 0^(cEffW-33)}，
+    * 在 cEffW 内右侧对齐、高位补零（cEffW=40 时即权威式 {s<<39|e<<31|1<<30|m<<7}）。 */
+  private def fp32ToLazy40(x: UInt): UInt = {
+    require(cfg.cEffW >= 40, s"HiveCoreExecutor fp32ToLazy40 requires cEffW(${cfg.cEffW}) >= 40 (lazy fp32 accumulator)")
+    val e = x(30, 23)
+    Mux(e === 0.U, 0.U(cfg.cEffW.W), Cat(x(31), e, 1.U(1.W), x(22, 0), 0.U((cfg.cEffW - 33).W)))
+  }
+
+  /** bias 32b 字 → cEffW 累加基底：INT 运行（runIsInt，与 HiveCoreCalcConfig
+    * errCode11 判据逐字同式）按 INT32 符号扩展；fp/MX 运行按 fp32 → lazy40。
+    * errCode11 已在 EXECUTE 拒绝跨界组合 ⟹ 运行期实际到达的支路与 cFmt 语义一致。 */
+  private def biasLazy(i: Int): UInt = {
+    val runIsInt = !DataFormat.is2B(io.regFile.aFmt) && io.regFile.aFmt =/= DataFormat.FP32 && !DataFormat.isMx(io.regFile.aFmt)
+    val w = biasRegs.get(i)
+    Mux(runIsInt, Cat(Fill(cfg.cEffW - 32, w(31)), w), fp32ToLazy40(w))
+  }
+
+  if (cfg.hasMx) {
+    // bias 收集：16 字齐 → biasLoaded 置位（sLOAD_A 供数门控放行）。ready 与状态
+    //   无关：取数器只由本模块自己的触发脉冲启动，biasOn=0 或已收齐时无供给源。
+    io.biasIn.get.ready := io.regFile.biasOn && !biasLoaded.get
+    when(io.biasIn.get.fire) {
+      biasRegs.get(biasCnt.get) := io.biasIn.get.payload
+      when(biasCnt.get === (cfg.totalN - 1).U) {
+        biasLoaded.get := true.B
+        biasCnt.get := 0.U
+      }.otherwise {
+        biasCnt.get := biasCnt.get + 1.U
+      }
+    }
+  }
+
 
   //C push 直接push
   io.cPush.valid := io.hiveValidOut
@@ -261,6 +316,8 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   if(cfg.hasMx){
     io.scaleAPop.get.ready := false.B
     io.scaleBPop.get.ready := false.B
+    io.biasFetchReq.get := false.B
+    io.biasFetchNt.get := 0.U
   }
 
   io.flushA := false.B
@@ -346,6 +403,18 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
       // regFile 在计算期间保持不变，execute 拍采样即为本次运行模式
       when(io.execute) {
         loadWModeReg := io.regFile.loadWMode
+      }
+
+      // 【P0 epilogue-1】bias 首拍取数触发（独立 when，同 loadWModeReg 范式）：
+      //   请求 nt=0 的 16 字 bias；下一 N-tile 的重取见 sNEXT_NK_TILE。
+      //   biasLoaded/biasCnt 同拍清零，sLOAD_A 供数门控待收齐放行
+      if (cfg.hasMx) {
+        when(io.execute && io.regFile.biasOn) {
+          io.biasFetchReq.get := true.B
+          io.biasFetchNt.get := 0.U
+          biasLoaded.get := false.B
+          biasCnt.get := 0.U
+        }
       }
 
     }
@@ -479,7 +548,11 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
       val needPartialSum = curKTile > 0.U
 
       //当需要paritalsum的时候必须占用c口buffer的读出口，因此需要等到CDMA已经将cbuffer搬空让出读口权限
-      val feedBase = (cBufferReservedAtleastTotalN) & Mux(needPartialSum, cStoreGateReg === false.B, true.B)
+      // 【P0 epilogue-1】biasOn 且未收齐时挂起供数（取数器盗用 dmaScaleA 端口需
+      //   ≤17+drain 拍；sDRAIN+sLOAD_B 预取窗口通常已覆盖，本门控为兜底）：
+      //   aPop/scaleA 均可反压，挂起安全；biasOn=0 时门控项恒真、逐位不变
+      val feedBase = (cBufferReservedAtleastTotalN) & Mux(needPartialSum, cStoreGateReg === false.B, true.B) &
+        (if (cfg.hasMx) !(io.regFile.biasOn && !biasLoaded.get) else true.B)
       // MX：激活消费与 scaleA 严格 lockstep。scaleADma 可能比 aDma 晚一拍抵达，
       //   若在 scaleA FIFO 尚空时就消费首个激活行，会使全体 scaleA 应用错位一行
       //   （row m 误用 row m-1 的 scale）。故运行期 isMx(aFmt) 时把 scaleAPop.valid
@@ -514,6 +587,17 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
       for(i <- 0 until cfg.totalN){
         when(needPartialSum){
           io.hivePsumIn(i) := io.cPop.payload(cfg.cEffW * (i + 1) - 1, cfg.cEffW * i)
+        }
+      }
+
+      // 【P0 epilogue-1】pass-0 基底注入：bias 取代零基底经既有 psum 逐列链下发
+      //   （与 needPartialSum 回灌支路互斥：pass-0 注 bias、后续 pass 回灌 partial sum，
+      //   bias 已烧进 pass-0 结果）；biasOn=0 时本 when 恒假、hivePsumIn 保持默认 0
+      if (cfg.hasMx) {
+        when(!needPartialSum && io.regFile.biasOn) {
+          for (i <- 0 until cfg.totalN) {
+            io.hivePsumIn(i) := biasLazy(i)
+          }
         }
       }
 
@@ -556,6 +640,17 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
             curNTile := curNTile + 1.U
             hasNext := true.B
             state := sDRAIN
+            // 【P0 epilogue-1】下一 N-tile 的 bias 重取（同拍 curNTile+1，取数器
+            //   以 nt=curNTile+1 的新 tile 序号计算地址）；k 推进分支不取——
+            //   同一 N-tile 的 biasRegs 跨全部 K pass 与 M 行驻留复用
+            if (cfg.hasMx) {
+              when(io.regFile.biasOn) {
+                io.biasFetchReq.get := true.B
+                io.biasFetchNt.get := curNTile + 1.U
+                biasLoaded.get := false.B
+                biasCnt.get := 0.U
+              }
+            }
           }.otherwise{
             curNTile := 0.U
             state := sDRAIN

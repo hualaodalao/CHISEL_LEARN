@@ -260,8 +260,10 @@ case class HiveCoreConfig(
 
   // P3a：新增 regs(11) = cScaleAddr（C 侧量化 scale 写回基地址），寄存器组 11 → 12。
   // 旧软件只写 0x00..0x0A，新增寄存器默认 0 不影响既有行为。
-  val registerNumRW: Int = 12
-  val registerNum: Int = 12
+  // 【P0 epilogue-1 fused bias】新增 regs(12) = biasAddr（0x0C，biasOn=reg5[30] 使能），
+  //   寄存器组 12 → 13；写门控 <registerNumRW 自动放行 0x0C（addr 截 4 位 0x0C 仍在界内）。
+  val registerNumRW: Int = 13
+  val registerNum: Int = 13
 
 
   val queueAdapterBufferDepth: Int = 18

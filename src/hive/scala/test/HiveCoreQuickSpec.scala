@@ -34,6 +34,12 @@
   * Fix-4. Source order: ...code8(K) -> code11(cross) -> mix code3. Full truth order:
   *   3(Fix-4) > 11(cross-boundary) > 8(K) > 10(cAddr) > 7(capacity) > 5 > 4 > 3(xor) > 0
   * (the two code3 predicates are mutually exclusive and share one code).
+  * (P0 epilogue-1 UPDATE) errCode 12 (biasAddr misalignment) inserted after code-10,
+  * before code-8. Full truth order:
+  *   3(Fix-4) > 11(cross) > 8(K) > 12(biasAddr align) > 10(cAddr) > 7(capacity) > 5 > 4 > 3(xor) > 0.
+  * The RTL also carries a !hasMx && biasOn -> 12 defensive arm (no dmaScaleA port on
+  * such netlists would hang the bias fetch forever); all three emitted netlists have
+  * hasMx=true so that arm is dead code and is NOT mirrored by the golden model.
   * Note: code 6 (MXE2M1 output N odd) is commented out in RTL but still mirrored
   * by the golden model -- known divergence (see #169 report).
   * (#146) A third branch used to sit last -- errCode7 "fp4 blk != 64". It has
@@ -44,8 +50,9 @@
   * red). fp4 now accepts blk in {16, 32} exactly like fp8, errCode 8 is the only
   * remaining fp4 geometry guard. CODE 7 IS NOT FREE: the CAPACITY guard
   * (m > cBufferDepth - totalN) still drives errCodeComb := 7.U and is LIVE in all
-  * three emitted netlists. New checks are allocated from 12 upwards (code 9 is
-  * reserved for v2 W4A8, code 11 is LIVE: int/non-int cross-boundary #177/#178);
+  * three emitted netlists. New checks are allocated from 13 upwards (code 9 is
+  * reserved for v2 W4A8; 11 is LIVE: int/non-int cross-boundary #177/#178; 12 is
+  * LIVE: biasAddr misalignment P0 epilogue-1);
   * codes 1/2 are never revived.
   * (#150→#155) QuickSpec 的 cfg 现在【不再显式传 supportedFmts】，回落 HiveCoreConfig
   * 默认集——因为 #155 MJ1 已把 MXE2M1 升格为【默认必选】，默认集本身就是 7 种格式。
@@ -163,6 +170,44 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           aBlk = 32, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, bBase = B_BASE + 16,
           wave = "sim/debug/quick_w4a8_baddr_err8.fst", caseTag = " [P1-2 W4A8 neg bAddr misalign errCode8]")
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // 【P0 epilogue-1 fused bias（2026-10-14）】基底注入四用例：C = bias(N) + A·B。
+  //   硬件：reg5[30]=biasOn + reg12=biasAddr；bias 取数盗用 dmaScaleA 端口（顶层
+  //   drain-then-steal 仲裁），executor sLOAD_A 的 pass-0 psum 零基底换 biasLazy
+  //   （INT 运行 sext32、fp/MX 运行 fp32→lazy40），零新增加法器。金锚：golden 起始
+  //   累加值 = biasVal(nn)（HiveDebugModel，独立 biasRng 激励流，既有用例零漂移）。
+  //   TB：dmaScaleA 通道改全量服务 + 跑后双流拆分对账（bias 与 scaleA 共端口交错）。
+  //   n=32 ⟹ nTiles=2：每条正向用例都覆盖「execute 取 nt=0」与「sNEXT_NK_TILE 推进
+  //   取 nt=1」两个取数时机（biasRegs 跨 K pass/M 行驻留复用）。
+  // ══════════════════════════════════════════════════════════════════════════
+  // ⑥ INT8×INT8 + bias → INT32：INT 路基底注入（sext32 进 40b psum 链）；dmaScaleA
+  //   端口全程只有 bias 流量（INT 运行 scaleA DMA 不启动）——拆分对账退化为 bias 单流，
+  //   同时验证「无 MX 输入时端口盗用不惊扰任何 scale 通路」。loadW=1 与 IntSpec 同范式。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          biasOn = true, wave = "sim/debug/quick_bias_int8.fst", caseTag = " [P0-ep1 bias INT8xINT8->INT32]")
+
+  // ⑦ MX8×MX8 + bias → FP32：fp 路 fp32→lazy40 基底 + 【关键仲裁用例】——dmaScaleA 端口
+  //   上 scaleA（lockstep 预取）与 bias（每 N-tile 16 字）真实交错，双流拆分对账逐拍
+  //   验证 drain-then-steal 不丢 scaleA 请求、不误路由 rsp。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE5M2, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT,
+          biasOn = true, wave = "sim/debug/quick_bias_mx_fp32.fst", caseTag = " [P0-ep1 bias MXE5M2xFP32]")
+
+  // ⑧ MX8×MX8 + bias → 量化输出 E4M3：bias 烧进累加器后再走 amax→E8M0 量化链——
+  //   期望 scale/期望码（OCP 独立推导）与 C 写回比对全部含 bias，dmaCScale 通道同步覆盖。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE5M2, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.MXE4M3,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT,
+          biasOn = true, wave = "sim/debug/quick_bias_mx_quant.fst", caseTag = " [P0-ep1 bias MXE5M2xE4M3 quant]")
+
+  // ⑨ 负向：biasBase 非 4B 对齐（BIAS_BASE+2）→ errCode 12（对齐臂，last-connect 序
+  //   8 > 12 > 10；本例其余配置合法 ⟹ 只命中 12）。硬件须在 EXECUTE 后直接拒绝、
+  //   不进计算（负向路径不跑 validate，绕过金锚 require）。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE5M2, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT,
+          biasOn = true, biasBase = BIAS_BASE + 2,
+          wave = "sim/debug/quick_bias_err12.fst", caseTag = " [P0-ep1 neg biasAddr misalign errCode12]")
+
   /** 编译期配置（totalN=16；cDmaExtW 默认 256；缓冲深度 2048；scaleBufferDepth=64）。
     * (#155 MJ1) supportedFmts 现在【不再显式传入】，回落 HiveCoreConfig 的默认集。
     *   MXE2M1 现在是默认必选，不再需要显式加。
@@ -260,6 +305,14 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
               //   仅负例 ⑤ 用它造 bAddr%32!=0 的失配。★测试名【不含 bBase】⟹ 既有用例名逐字不变
               //   （B_BASE 是 object HiveDebugModel 的 val，无 #155 那种类体前向引用初始化序陷阱）。
               bBase: Long = B_BASE,
+              // 【P0 epilogue-1】fused bias 开关与 bias 向量基址（进 reg5[30]=biasOn / reg12=biasAddr）。
+              //   biasOn=true：金锚 golden 起始累加值 = biasVal(nn)，硬件 pass-0 psum 基底注入
+              //   （sLOAD_A 零填充位换 bias，零新增加法器）；TB 侧 dmaScaleA 通道改「全量服务 +
+              //   跑后双流拆分对账」（bias 与 scaleA 共端口，drain-then-steal 交错）。★测试名
+              //   【不含 bias 参数】⟹ 既有用例名逐字不变；bias 用例须带 caseTag 区名
+              //   （与 W4A8 #148 同一 DuplicateTestNameException 防撞车纪律）。
+              biasOn: Boolean = false,
+              biasBase: Long = BIAS_BASE,
               // (#148) caseTag is appended to the ScalaTest test NAME. It exists for exactly one
               //   reason: two runCase calls with identical (m,n,k,aFmt,bFmt,cFmt,blks,addrMode)
               //   build the SAME test name, and ScalaTest rejects that while the suite is being
@@ -284,7 +337,8 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       runQuick(DebugParams(m = m, n = n, k = k, aFmt = aFmt, bFmt = bFmt, cFmt = cFmt, loadWMode = lw != 0,
         aMxBlkSel = selOf("aBlk", aBlk), bMxBlkSel = selOf("bBlk", bBlk), cMxBlkSel = selOf("cBlk", cBlk),
         addrModeSel = addrMode.litValue.toInt, rnd = rnd.litValue.toInt, seed = seed, strictAddr = strictAddr,
-        maxCycles = maxCycles.toInt, waveTarget = wave, testHint = s"run-M-$m-N-$n-K-$k", bBase = bBase)) }
+        maxCycles = maxCycles.toInt, waveTarget = wave, testHint = s"run-M-$m-N-$n-K-$k", bBase = bBase,
+        biasOn = biasOn, biasBase = biasBase)) }
   }
 
 
@@ -354,6 +408,13 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       "crossing this boundary produces semantically wrong output bits. " +
       "Suggestion: use integer output (INT32/INT8/INT4) with integer input, " +
       "or float/MX output (FP32/FP16/BF16/MX*) with float/MX input."
+    // 【P0 epilogue-1】errCode 12: biasAddr 非 4B 对齐（reg12）。bias 取数走 dmaScaleA 端口
+    //   逐字（4B）读，biasAddr[1:0]≠0 时每个字都跨界半个字，注入值静默错位 → 运行期拒绝。
+    //   优先级 8 > 12 > 10（last-connect 序，置于 code-10 之后 code-8 之前）。
+    case 12 => s"biasOn=1 requires biasAddr (reg12) 4-byte aligned: biasBase=0x${p.biasBase.toHexString}, " +
+      s"biasBase % 4 = ${p.biasBase % 4}. The bias fetch drives word (4B) reads directly on the dmaScaleA " +
+      "port; a misaligned base makes every word read cross a word boundary and silently corrupts the " +
+      "injected psum base. Suggestion: keep biasBase a multiple of 4 (default BIAS_BASE is aligned)."
     case _ => s"Unrecognized errCode $c -- not registered in errExplain (possibly a new code not yet synced)"
   }
   /** ② 打印体检结论 + 生效配置摘要 + 派生几何（一次打全，便于对着波形看） */
@@ -369,7 +430,8 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
     println(s"[$TAG] 派生几何: totalN=${cfg.totalN} cDmaExtW=${cfg.cDmaExtW} aExtW=${cfg.aExtW} bExtW=${cfg.bExtW} " +
       s"kTiles=${plan.aKTiles} mTiles=${(p.m + cfg.totalN - 1) / cfg.totalN} nTiles=${plan.nTiles} beatsPerRow=${plan.beatsPerRow}；" +
       s"期望 beat A=${plan.expAAddrSeq.size} B=${plan.expBAddrSeq.size} C=${plan.expCAddrSeq.size} sA=${plan.expScaleAAddrSeq.size} " +
-      s"sB=${plan.expScaleBAddrSeq.size} sC=${plan.expCScaleAddrSeq.size}；内存镜像字节=${plan.memByteCount}")
+      s"sB=${plan.expScaleBAddrSeq.size} sC=${plan.expCScaleAddrSeq.size}" +
+      (if (p.biasOn) s" bias=${plan.expBiasAddrSeq.size}" else "") + s"；内存镜像字节=${plan.memByteCount}")
     if (p.addrModeSel != AddrMode.MAT.litValue.toInt) println(s"[$TAG] ⚠ addrMode=TILE 已写入 reg5[14:12] 并回读对账通过；" +
       "当前 RTL 无消费者，不影响数值结果（内存镜像 / golden / 六路期望地址一律按 MAT 语义生成）")
     predicted match {
@@ -450,6 +512,8 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
         cmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, p.aBase, p.bBase)
         cmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, p.controlWord5)
         cmd(HiveCoreOp.REG_WRITE2, 0x09, 0x0A, SA_BASE, SB_BASE); cmd(HiveCoreOp.REG_WRITE1, 0x0B, 0x00, SC_BASE, 0L)
+        // 【P0 epilogue-1】reg12 = biasAddr（biasOn=false 时不写：硬件默认 0、该通路整体不激活）。
+        if (p.biasOn) cmd(HiveCoreOp.REG_WRITE1, 0x0C, 0x00, p.biasBase, 0L)
         // ⑦ addrMode / 格式字回读对账：addrMode 无硬件消费者，只能靠回读证明「确实写进去了」
         //   (#164) 重排后控制字全部收敛到 reg5 单寄存器 ⟹ 一次回读即可覆盖 loadWMode/三 MxBlk/
         //   warmup/warmdown/rnd/三 addrMode/三 fmt 共 19 个位域；断言强度【不降反升】（旧写法
@@ -457,12 +521,23 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
         val rb5 = readReg(0x05).toLong
         regRbOk = rb5 == p.controlWord5
         regRbMsg = f"reg5 wr=0x${p.controlWord5}%08X rd=0x$rb5%08X (addrMode at reg5[14:12], rnd at reg5[18:16])"
+        // 【P0 epilogue-1】reg12（biasAddr）回读对账（biasOn 时）：biasOn 位本身已由上方 reg5
+        //   bit30 覆盖（controlWord5 含 bit30 ⟹ rb5 对账即含 biasOn），此处只补 biasAddr 槽位。
+        if (p.biasOn) {
+          val rb12 = readReg(0x0C).toLong
+          val rb12Ok = rb12 == (p.biasBase & 0xFFFFFFFFL)
+          regRbOk = regRbOk && rb12Ok
+          regRbMsg += f"; reg12 wr=0x${p.biasBase & 0xFFFFFFFFL}%08X rd=0x$rb12%08X" }
         println(s"[$TAG] 寄存器回读对账：$regRbMsg → ${if (regRbOk) "一致 ✓" else "不一致 ✗"}")
         // ---- EXECUTE ----
         dut.io.cmd.valid.poke(true.B); dut.io.cmd.payload.op.poke(HiveCoreOp.EXECUTE)
         dut.io.cmd.payload.reg0Addr.poke(0.U); dut.io.cmd.payload.reg1Addr.poke(0.U)
         dut.io.cmd.payload.data0.poke(0.U); dut.io.cmd.payload.data1.poke(0.U); dut.clock.step(); dut.io.cmd.valid.poke(false.B)
         var aS = 0; var bS = 0; var saS = 0; var sbS = 0; var cB = 0; var csB = 0; var pollSt = 0; var pollCool = 0
+        // 【P0 epilogue-1】dmaScaleA 通道地址全量记录：biasOn 时该端口被 drain-then-steal 仲裁
+        //   复用（bias FSM 与 scaleA DMA 交错发请求，交错序取决于硬件 FSM 时序，金锚不模拟），
+        //   逐拍位置对账不再成立 ⟹ 改为跑后按地址域拆流对账（见 while 循环后的 seqCmp）。
+        val saAddrLog = mutable.ArrayBuffer[Long]()
         def rdA(v: Boolean, d: BigInt): Unit = { dut.io.dmaA.rsp.valid.poke(v.B); dut.io.dmaA.rsp.payload.data.poke(d.U) }
         def rdB(v: Boolean, d: BigInt): Unit = { dut.io.dmaB.rsp.valid.poke(v.B); dut.io.dmaB.rsp.payload.data.poke(d.U) }
         def rdSA(v: Boolean, d: BigInt): Unit = { dut.io.dmaScaleA.get.rsp.valid.poke(v.B); dut.io.dmaScaleA.get.rsp.payload.data.poke(d.U) }
@@ -472,8 +547,15 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
             dut.io.dmaA.req.payload.addr.peek().litValue.toLong, rdA, plan.beatAtA)
           bS = rdCh("dmaB", bS, plan.expBAddrSeq, dut.io.dmaB.req.valid.peek().litToBoolean,
             dut.io.dmaB.req.payload.addr.peek().litValue.toLong, rdB, plan.beatAtB)
-          saS = rdCh("dmaScaleA", saS, plan.expScaleAAddrSeq, dut.io.dmaScaleA.get.req.valid.peek().litToBoolean,
-            dut.io.dmaScaleA.get.req.payload.addr.peek().litValue.toLong, rdSA, plan.wordAt)
+          // 【P0 epilogue-1】dmaScaleA 服务口径改造：①供数仍是「req.valid 拍按请求地址从内存
+          //   镜像取数」的同一铁律（wordAt），但【不再】以「超期望拍数」静默断供——bias 流量
+          //   与 scaleA 流量共用本端口，期望拍数按通道分列，超拍/错拍改由跑后拆流对账逐拍
+          //   暴露（比旧口径更严：旧 rdCh 超出 exp.size 的请求直接吞掉不报）。biasOn=false
+          //   时记录流 ≡ scaleA 流，跑后整流对账与旧逐拍对账等价（含拍数短缺/超出的暴露）。
+          if (dut.io.dmaScaleA.get.req.valid.peek().litToBoolean) {
+            val saAddr = dut.io.dmaScaleA.get.req.payload.addr.peek().litValue.toLong
+            saAddrLog += saAddr; rdSA(true, plan.wordAt(saAddr)); saS += 1
+          } else rdSA(false, BigInt(0))
           sbS = rdCh("dmaScaleB", sbS, plan.expScaleBAddrSeq, dut.io.dmaScaleB.get.req.valid.peek().litToBoolean,
             dut.io.dmaScaleB.get.req.payload.addr.peek().litValue.toLong, rdSB, plan.wordAt)
           /** 写通道统一驱动：req.valid 拍记录 (addr,data) + 地址对账（scaleC 传空序列即自动跳过对账） */
@@ -503,8 +585,30 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           dut.clock.step(); cycle += 1
         }
         dut.io.dmaC.rsp.valid.poke(false.B); dut.io.dmaCScale.get.rsp.valid.poke(false.B); dut.io.cmd.valid.poke(false.B)
+        // 【P0 epilogue-1】dmaScaleA 跑后双流拆分对账（仅正向路径：负向路径硬件不进计算、
+        //   无期望流量，只报实收请求数）。bias 域 [biasBase, biasBase+nTiles*totalN*4) 内的
+        //   请求归 bias 流，其余归 scaleA 流（两域不相交：BIAS_BASE 与 SA_BASE 独立段）；各自
+        //   与 expBiasAddrSeq/expScaleAAddrSeq 保序逐拍比对，失配进 addrBad/addrBadCnt（与其
+        //   余通道同一收集-后断言管线）。biasOn=false 时不拆流、整流对账（与旧逐拍口径等价，
+        //   且额外暴露拍数短缺/超出的结构性失配——旧 rdCh 超出 exp.size 的请求静默吞掉不报）。
+        val saBiasHw: Seq[Long] = {
+          val lo = p.biasBase; val hi = p.biasBase + plan.nTiles.toLong * cfg.totalN * 4
+          if (p.biasOn) saAddrLog.toSeq.filter(a => a >= lo && a < hi) else Seq.empty }
+        val saScaleHw: Seq[Long] = if (p.biasOn) saAddrLog.toSeq.filterNot(saBiasHw.contains) else saAddrLog.toSeq
+        def seqCmp(ch: String, hw: Seq[Long], exp: Seq[Long]): Unit = {
+          val n = math.max(hw.size, exp.size); var i = 0
+          while (i < n) {
+            val h = if (i < hw.size) hw(i) else -1L; val e = if (i < exp.size) exp(i) else -1L
+            if (h != e) { addrBadCnt += 1
+              if (addrBad.size < 16) addrBad += f"$ch beat#$i hw=${if (h < 0) "MISSING" else f"0x$h%X"} exp=${if (e < 0) "MISSING" else f"0x$e%X"}" }
+            i += 1 } }
+        if (predicted.isEmpty) {
+          seqCmp("dmaScaleA/scaleA", saScaleHw, plan.expScaleAAddrSeq)
+          if (p.biasOn) seqCmp("dmaScaleA/bias", saBiasHw, plan.expBiasAddrSeq) }
         println(s"[$TAG] 运行结束: cycles=$cycle/$maxCycles done=$done err=$errSeen(errCode=$errCode)；beat A=$aS/${plan.expAAddrSeq.size} " +
-          s"B=$bS/${plan.expBAddrSeq.size} C=$cB/${plan.expCAddrSeq.size} sA=$saS/${plan.expScaleAAddrSeq.size} sB=$sbS/${plan.expScaleBAddrSeq.size} sC=$csB/${plan.expCScaleAddrSeq.size}")
+          s"B=$bS/${plan.expBAddrSeq.size} C=$cB/${plan.expCAddrSeq.size} sA=${saScaleHw.size}/${plan.expScaleAAddrSeq.size}" +
+          (if (p.biasOn) s" bias=${saBiasHw.size}/${plan.expBiasAddrSeq.size}" else "") +
+          s" sB=$sbS/${plan.expScaleBAddrSeq.size} sC=$csB/${plan.expCScaleAddrSeq.size}")
         println(s"[$TAG] 六通道地址对账不一致拍数=$addrBadCnt（strictAddr=${p.strictAddr}）")
         addrBad.foreach(s => println(s"[$TAG]   ADDR-DIFF $s"))
         // ⑤ golden 逐元素比对；负向路径下硬件根本不该进计算，只核对 errCode

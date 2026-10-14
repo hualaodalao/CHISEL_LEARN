@@ -44,6 +44,7 @@ object HiveDebugModel {
   val SA_BASE: Long = 0x00300000L   // scaleA
   val SB_BASE: Long = 0x00400000L   // scaleB
   val SC_BASE: Long = 0x00500000L   // scaleC（量化输出写回）
+  val BIAS_BASE: Long = 0x00600000L // 【P0 epilogue-1】bias 向量基址（nTiles*totalN 个 4B 字）
 
   val TAG = "DEBUG"
 
@@ -240,7 +241,14 @@ object HiveDebugModel {
       //   放在末尾带默认值 ⟹ 全部既有构造点零改动。gather 读使非对齐基址合法：
       //   DMA 发对齐多发读 + 内部移位重组，金锚序列/内存映像随基址平移。
       aBase: Long = A_BASE,
-      bBase: Long = B_BASE) {
+      bBase: Long = B_BASE,
+      // 【P0 epilogue-1 fused bias】基底注入开关与 bias 向量基址（reg5[30] / reg12）。
+      //   默认 false/BIAS_BASE ⟹ 全部既有构造点与既有用例零改动。biasOn=true 时：
+      //   C(mm,nn) = bias(nn) + Σ_k aVal*bVal；bias 向量共 nTiles*totalN 个 4B 字
+      //   （第 nt 个 N-tile 的 16 个字供 pass-0 psum 基底注入）。biasBase 须 4B 对齐
+      //   （validate require；硬件 errCode12 拦截，负向用例经 predicted 路径绕过 validate）。
+      biasOn: Boolean = false,
+      biasBase: Long = BIAS_BASE) {
 
     // 【#144 blk 解码跟随 MXBlockSize 枚举收窄】枚举已由 {M8=0,M16=1,M32=2,M64=3}（bytes=8<<sel）
     //   收窄为 {M16=0,M32=1}，故 sel→bytes 的定义式相应改为 16<<sel：sel=0→16(M16)、sel=1→32(M32)。
@@ -256,15 +264,18 @@ object HiveDebugModel {
       * ★金锚铁律：下列位域【由寄存器契约独立推导】，逐位取自 HiveInterface.scala 的
       *   `wregs` `is(5.U)` 分支（写侧，:158-172）并与 `rregs` `is(5.U)` 的 Cat（读侧，
       *   :189-197）交叉核对，**不是**以 RTL 读回值反推拟合。两侧已核实逐位镜像：
-      *     [31:29] 保留 0     | [28]    loadWMode    | [27]    保留 0
+      *     [31]    保留 0     | [30]    biasOn      | [29]    保留 0
+      *     [28]    loadWMode  | [27]    保留 0
       *     [26]    cMxBlk     | [25]    保留 0       | [24]    bMxBlk
       *     [23]    保留 0     | [22]    aMxBlk       | [21]    warmup
       *     [20]    warmdown   | [19]    保留 0       | [18:16] rnd
       *     [15]    保留 0     | [14]    cAddrMode    | [13]    bAddrMode
       *     [12]    aAddrMode  | [11:8]  cFmt         | [7:4]   bFmt      | [3:0] aFmt
-      *   Cat 总宽核算：3+1+1+1+1+1+1+1+1+1+1+3+1+1+1+1+4+4+4 = **32** = `ret` 声明宽度 ✓
+      *   Cat 总宽核算：1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+3+1+1+1+1+4+4+4 = **32** = `ret` 声明宽度 ✓
       *   （各枚举宽度：DataFormat 10 值→4-bit、RoundingMode 5 值→3-bit、AddrMode 2 值→1-bit、
       *     MXBlockSize {M16=Value(0.U),M32=Value(1.U)}→1-bit）
+      *   【P0 epilogue-1】[30]=biasOn：main 侧 wregs `biasOn := d(30)`、rregs Cat 前缀
+      *     `0.U(1.W), biasOn.asUInt, 0.U(1.W)`（[31]=0,[30]=biasOn,[29]=0），金锚逐位镜像。
       *
       * ★迁移要点（旧 → 新）：
       *   · rnd：旧 regs7 bits[14:12]（<<12）→ 新 reg5 bits[18:16]（**<<16**）；
@@ -278,6 +289,7 @@ object HiveDebugModel {
       *   前置防呆）两种掩码产出【逐位相同】⟹ 零行为变化。sel>=2 在旧代码下同样是错的
       *   （金锚 aMxBlk=16<<2=64 不在枚举内），属既存遗留，本轮不扩大范围，已在报告登记。 */
     def controlWord5: Long =
+      (if (biasOn) 1L << 30 else 0L) |
       (if (loadWMode) 1L << 28 else 0L) |
         ((cMxBlkSel.toLong & 0x3) << 26) | ((bMxBlkSel.toLong & 0x3) << 24) |
         ((aMxBlkSel.toLong & 0x3) << 22) |
@@ -294,7 +306,10 @@ object HiveDebugModel {
       s"M=$m N=$n K=$k aFmt=$aFmt bFmt=$bFmt cFmt=$cFmt loadWMode=${if (loadWMode) 1 else 0} " +
         s"aMxBlk=$aMxBlk bMxBlk=$bMxBlk cMxBlk=$cMxBlk addrMode=${if (addrModeSel == 0) "MAT" else "TILE"} " +
         s"rnd=$rnd seed=$seed strictAddr=$strictAddr maxCycles=$maxCycles " +
-        f"reg5=0x${controlWord5}%08X"
+        f"reg5=0x${controlWord5}%08X" +
+        // 【P0 epilogue-1】bias 状态只在启用时进 banner（对齐 warmup/warmdown 的最小文本漂移
+        //   先例：既有用例打印逐字不变）。
+        (if (biasOn) f" biasOn=1 biasBase=0x${biasBase}%08X" else "")
       // (#164) 本行是【已打印到 stdout】的（QuickSpec.printHealth :294 `生效配置: ${p.banner}`）。
       //   按任务书只做 `regs6=0x… regs7=0x…` → `reg5=0x…` 的最小替换，【不】把 warmup/warmdown
       //   加进 banner：两者默认恒 0、本轮无用例置位，加进来只会给归一化基线多添一处待归因的
@@ -315,13 +330,16 @@ object HiveDebugModel {
     *     > 5 > 4 > 3(isAMx^isBMx) > 0.
     *   (#178 UPDATE) errCode 11 (int/non-int cross-boundary) inserted after code-8,
     *   before Fix-4. Full order: 3(Fix-4) > 11 > 8 > 10 > 7 > 5 > 4 > 3(xor) > 0.
+    *   (#P0-epilogue-1 UPDATE) errCode 12 (biasAddr misalignment) inserted after
+    *   code-10, before code-8. Full order: 3(Fix-4) > 11 > 8 > 12 > 10 > 7 > 5 > 4 > 3(xor) > 0.
     *   Note: code 6 (MXE2M1 output N odd) is commented out in RTL but still mirrored
     *   by this golden model -- known divergence (see #169 report).
     *   (#146) The former `7(fp4 blk!=64)` branch was DELETED (tautology after
     *   MXBlockSize narrowed to {16,32}). However code 7 is NOT free: the CAPACITY
     *   guard (m > cBufferDepth - totalN) still drives errCodeComb := 7.U and is LIVE
-    *   in all three emitted netlists. New checks must be allocated from 12 upwards
-    *   (11 is now LIVE: int/non-int cross-boundary, #177/#178)
+    *   in all three emitted netlists. New checks must be allocated from 13 upwards
+    *   (11 is LIVE: int/non-int cross-boundary, #177/#178; 12 is LIVE: biasAddr
+    *   misalignment, P0 epilogue-1)
     *   (see problem.md:93-94). Codes 1/2 stay unreachable and are never revived.
     * ▸ errCode 0/1/2：硬件把 a/b/cMxBlockSize 三违约【合并】为单一 errMXLargerThanKLoadNum→errCode 0，
     *   故 1/2 永不可达（QuantSpec「blk32 over totalN」旧期望 2 实得 0 的红项根因，#124）；本镜像
@@ -349,9 +367,20 @@ object HiveDebugModel {
     //   Guard: cAddr % dmaBytes == 0 (equivalently cAddr[log2Up(dmaBytes)-1:0] == 0).
     //   Priority: 8 > 10 > 7 > 5 > 4 > 3 > 0 (per #169 netlist-verified order).
     //   (#178 UPDATE) Full: 3(Fix-4) > 11 > 8 > 10 > 7 > 5 > 4 > 3(xor) > 0.
+    //   (P0 epilogue-1 UPDATE) Full: 3(Fix-4) > 11 > 8 > 12 > 10 > 7 > 5 > 4 > 3(xor) > 0.
     //   In this last-wins chain, 10 is placed AFTER 6 and BEFORE 8.
     locally { val dmaBytes = cDmaExtW / 8
       if (dmaBytes > 0 && (cAddr % dmaBytes) != 0) e = Some(10) }
+    // 【P0 epilogue-1】errCode 12: biasAddr 非 4B 对齐。由寄存器契约独立推导：bias 取值走
+    //   dmaScaleA 端口逐字（4B）读，biasReqAddr = biasAddr + nt*totalN*4 + i*4，端口按字节
+    //   地址发单字读 ⟹ biasAddr[1:0]≠0 时每次读都会跨界半个字（TB wordAt 按 4B 对齐取数，
+    //   硬件侧 hivePsumIn 注入值静默错位）。守护：biasOn && biasAddr%4!=0 → 12。
+    //   位置：置于 code-10 之后、code-8 之前，镜像 HiveCoreCalcConfig last-connect 真值序
+    //   3(Fix-4) > 11 > 8 > 12 > 10 > 7 > 5 > 4 > 3(xor) > 0。
+    //   注：RTL 另有 !hasMx && biasOn → 12 的防呆臂（无 dmaScaleA 端口的网表上 bias 会永久
+    //   stall，须运行期拒绝）；三个已发射网表 hasMx 均为 true，该臂为死路，本镜像【不】含它
+    //   （与 code-7 capacity 臂同为 RTL-only 先例）。
+    if (p.biasOn && p.biasBase % 4L != 0) e = Some(12)
     // [P0-1] fp4(E2M1) K not divisible by kPerBeat -> code8. Placed BEFORE the
     //   mix code3 below, i.e. lower priority, matching the hardware
     //   last-connect order.
@@ -474,6 +503,11 @@ object HiveDebugModel {
         s"cMxBlk(${p.cMxBlk}) 必须 <= totalN($totalN) 且整除")
       if (p.cFmt == DataFormat.MXE2M1) require(p.n % 2 == 0, s"mxfp4 输出要求 N(${p.n}) 为偶数")
     }
+    // 【P0 epilogue-1】bias 向量 4B 对齐防呆（硬件 errCode12 拦截；金锚早抛早清晰，
+    //   负向用例经 predicted 路径绕过本 require，不影响 errCode12 对拍）。
+    if (p.biasOn)
+      require(p.biasBase % 4 == 0,
+        s"biasOn 要求 biasBase 4B 对齐（dmaScaleA 端口逐字读，硬件 errCode 12），当前 biasBase=0x${p.biasBase.toHexString}")
     // 【#120 B2】addrMode=TILE 放宽：硬件全 RTL 零消费者（#123 审计确认 CalcConfig 与
     //   两个 DMA 一次都没引用 addrMode 位域；(#164) 宿主由旧 regs(6) bits[14:12] 迁到
     //   reg5 bits[14:12]，位号不变、依旧零消费者），设置 TILE 不会改变实际 DMA 寻址行为。
@@ -806,6 +840,18 @@ object HiveDebugModel {
       buf.toSeq.flatMap(gatherPhys(_, 4L))
     }
 
+    // 【P0 epilogue-1】bias 期望读地址序列：每个 N-tile 一次、tile 内 totalN 个连续 4B
+    //   字（i = nt*totalN + lane）。注意与 expScaleAAddrSeq 不同——【无 gatherPhys 变换】：
+    //   bias 取数不走 HiveCoreDmaRdOnly 模块，是 HiveCore 顶层 bias FSM 直接驱动 dmaScaleA
+    //   端口的裸地址（biasReqAddr 原样出端口），对齐性由 errCode12 前置保证。两流共用
+    //   同一端口（drain-then-steal 仲裁：bias FETCH 前先把 scaleA 在途请求排空）⟹ TB 侧
+    //   须按地址域拆流对账（bias 域 [biasBase, biasBase+nTiles*totalN*4) vs SA_BASE 域）。
+    val expBiasAddrSeq: Seq[Long] =
+      if (p.biasOn)
+        for (nt <- 0 until nTiles; i <- 0 until totalN)
+          yield p.biasBase + (nt.toLong * totalN + i.toLong) * 4
+      else Seq.empty
+
     // 【P1-2 W4A8 订正】混配 scaleB 期望序列改【阵列窗口口径】：窗口数 = K/32，窗口
     //   w 的 32-K 块 = blk16 的 {2w,2w+1} / blk32 的 {w} ⟹ kTile 步进 = aKpb/bMxBlk
     //   （blk16→2B、blk32→1B，相邻窗口读相邻 scale 字），块内 totalN 行降序，非对齐
@@ -839,6 +885,35 @@ object HiveDebugModel {
 
     val aCode: Array[Array[Long]] = Array.tabulate(p.m, p.k)((_, _) => encodeElem(p.aFmt, nextVal(p.aFmt), p.rnd))
     val bCode: Array[Array[Long]] = Array.tabulate(p.k, p.n)((_, _) => encodeElem(p.bFmt, nextVal(p.bFmt), p.rnd))
+
+    // ------------------------------------------------------------------------
+    // 【P0 epilogue-1 fused bias】bias 向量激励与张量语义值。
+    // 独立 rng 实例（种子异或盐值）：aCode/bCode/scaleA/scaleB 激励流与既有用例
+    //   【逐位相同】——新增扰动只进 bias，既有绿用例的 golden 与内存镜像零漂移。
+    // 长度 nTiles*totalN 个 4B 字：第 nt 个 tile 的 totalN 个字 = 输出列
+    //   nt*totalN+i 的基底（硬件每 N-tile 取 16 字，pass-0 psum 基底注入）。
+    // 值域设计（两族统一取 (rng.nextInt(33)-16)/8 栅格 = ±2.0 步进 0.125 的二进有理数）：
+    //   fp/MX 运行存 fp32 位模式 —— 该栅格 fp32 精确可表示、|v|>=0.125 或 0，永不落入
+    //   subnormal ⟹ ① goldenExact 的 fp32 精确性判定链不被 bias 破坏（Tier A 判定成立）；
+    //   ② 硬件 fp32→lazy40 转换（规格化数精确、e=0 冲刷 0）无损往返，金锚/硬件同值。
+    //   INT 运行（runIsInt 镜像硬件谓词 !isFloatFmt && !isMxAny，errCode11 保证此时
+    //   cFmt 必为整数族）存 INT32 补码小整数 —— 镜像硬件 INT32 符号扩展到 40bit psum 注入。
+    // ------------------------------------------------------------------------
+    private val biasRng = new java.util.Random(p.seed ^ 0x5AB1A5L)
+    private val biasRunIsInt = !isFloatFmt(p.aFmt) && !isMxAny(p.aFmt)
+    /** biasCode(i)：第 i 个 bias 字的 4B 位模式（i = nt*totalN + lane），fp32 bits 或 INT32 补码 */
+    val biasCode: Array[Long] =
+      if (!p.biasOn) Array.empty
+      else Array.tabulate(nTiles * totalN) { _ =>
+        val v = biasRng.nextInt(33) - 16
+        if (biasRunIsInt) v.toLong
+        else (java.lang.Float.floatToRawIntBits(v.toFloat / 8.0f).toLong & 0xFFFFFFFFL)
+      }
+    /** biasVal(nn)：输出列 nn 的基底张量语义值（golden 累加初值） */
+    def biasVal(nn: Int): Double =
+      if (!p.biasOn) 0.0
+      else if (biasRunIsInt) biasCode(nn).toDouble
+      else java.lang.Float.intBitsToFloat(biasCode(nn).toInt)
 
     /** scale 指数 {-1,0,1}（确定性、含正负、跨块跨列变化以暴露路由错位） */
     def scaleExpA(mm: Int, j: Int): Int = ((mm + j + (p.seed % 3).toInt) % 3) - 1
@@ -919,9 +994,11 @@ object HiveDebugModel {
     def aVal(mm: Int, k: Int): Double = decodeInElem(p.aFmt, aCode(mm)(k), effScaleA(mm, k))
     def bVal(k: Int, nn: Int): Double = decodeInElem(p.bFmt, bCode(k)(nn), effScaleB(nn, k))
 
-    /** 软件 golden：C(mm)(nn) = Σ_k aVal*bVal（Double 精度，容差对拍基准） */
+    /** 软件 golden：C(mm)(nn) = bias(nn) + Σ_k aVal*bVal（Double 精度，容差对拍基准）。
+      * 【P0 epilogue-1】biasOn 时累加初值 = biasVal(nn)（张量语义 C = bias + A·B；
+      *   硬件侧 = pass-0 psum 基底注入，二者同构）。 */
     def golden(mm: Int, nn: Int): Double = {
-      var acc = 0.0
+      var acc = if (p.biasOn) biasVal(nn) else 0.0
       var k = 0
       while (k < p.k) { acc += aVal(mm, k) * bVal(k, nn); k += 1 }
       acc
@@ -952,12 +1029,16 @@ object HiveDebugModel {
       * 拟合目标」，违反金锚铁律，故退回容差比对（Tier B）。
       * 典型：fp4(E2M1) 输入值集 ±{0,0.5,...,6} ⟹ 乘积是 0.25 的整数倍、|和| <= 64*36，
       *   仅需 14 bit ⟹ 全程 fp32 精确 ⟹ Tier A 覆盖全部元素。
-      * 典型：E4M3×E5M2 值域达 448×57344 ⟹ 部分和一般不精确 ⟹ Tier B（行为与改前相同）。 */
+      * 典型：E4M3×E5M2 值域达 448×57344 ⟹ 部分和一般不精确 ⟹ Tier B（行为与改前相同）。
+      * 【P0 epilogue-1】biasOn 时累加链【起点】换成 biasVal(nn)：初值也须 fp32 精确
+      *   （激励栅格已保证：fp32 位模式即金锚值，无 subnormal），判定论证不变——
+      *   起点与全链皆精确 ⟹ 任何累加顺序给同一个数 ⟹ Tier A 逐位断言仍成立。 */
     def goldenExact(mm: Int, nn: Int): Boolean = {
       def fp32Exact(v: Double): Boolean = v.toFloat.toDouble == v
-      var acc = 0.0
+      var acc = if (p.biasOn) biasVal(nn) else 0.0
       var k = 0
       var ok = true
+      if (p.biasOn && !fp32Exact(acc)) ok = false
       while (k < p.k) {
         val prod = aVal(mm, k) * bVal(k, nn)
         if (!fp32Exact(prod)) ok = false
@@ -1080,6 +1161,11 @@ object HiveDebugModel {
       if (isMxAny(p.bFmt))
         for (nn <- 0 until p.n; j <- 0 until sbEntries)
           mem.storeByte(SB_BASE + nn * sbRowOff + j, scaleB(nn)(j))
+      // 【P0 epilogue-1】bias 向量镜像：nTiles*totalN 个 4B 字，地址 = biasBase + i*4
+      //   （i = nt*totalN + lane），与硬件 biasReqAddr = biasAddr + nt*totalN*4 + i*4 同式。
+      if (p.biasOn)
+        for (i <- 0 until nTiles * totalN)
+          mem.storeElem(p.biasBase + i.toLong * 4, biasCode(i), 4)
       mem
     }
 

@@ -292,6 +292,11 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     }
   }
 
+  // 【P0 epilogue-1 fused bias】bias 取数 rsp.err 锁存寄存器：dmaScaleA 端口被 bias
+  //   取数器盗用期间的读错误（scaleADma 自身的 rsp.err 锁存看不到这些拍）。声明先于
+  //   dmaErr 汇聚（Scala 求值序），赋值在 P3 scale 通道的端口仲裁块内；startPulse 清零。
+  private val biasRspErr = if (cfg.hasMx) Some(RegInit(false.B)) else None
+
   // EXECUTE 完成时生成响应；err 汇聚 Executor 与三个自主 DMA 的错误标志。
   // Executor 异常路径（容量错/cPush 违约）经 sDONE 退出，io.done 照常脉冲，
   // 此处 respErr 反映真实 err，软件栈收到带 err 标记的 resp 而非永久等待。
@@ -299,12 +304,16 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   //   else 分支，表达式逐字等于原式（无 scale DMA 生成），bit-exact。
   val dmaErr = if (cfg.hasMx) {
     aDma.io.err || bDma.io.err || cDma.io.err || aDmaScale.get.io.err || bDmaScale.get.io.err ||
-      cDmaScale.get.io.err  // P3b 追加 dmaCScale 通道错误（rsp.err 锁存）
+      cDmaScale.get.io.err ||  // P3b 追加 dmaCScale 通道错误（rsp.err 锁存）
+      biasRspErr.get           // P0 epilogue-1 追加 bias 取数通道错误（dmaScaleA 盗用期）
   } else {
     aDma.io.err || bDma.io.err || cDma.io.err
   }
 
-  when(startPulse) { errFlag := false.B; doneSinceStart := false.B }
+  when(startPulse) {
+    errFlag := false.B; doneSinceStart := false.B
+    if (cfg.hasMx) biasRspErr.get := false.B  // P0 epilogue-1：bias 读错误随新 run 清零
+  }
 
   when(calcConfig.io.err && !startPulse) { errFlag := true.B }
 
@@ -465,7 +474,84 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     scaleADma.io.reg_nTile := calcConfig.io.calcConfig.nTile
     scaleADma.io.reg_rowOffset := calcConfig.io.calcConfig.scaleARowAddressOffset
     scaleADma.io.reg_colTileOffset := calcConfig.io.calcConfig.scaleAColTileAddressOffset
-    io.dmaScaleA.get <> scaleADma.io.dmaExtRdIF
+
+    // ==========================================================================
+    // 【P0 epilogue-1 fused bias】dmaScaleA 端口仲裁：bias 取数器 drain-then-steal
+    // --------------------------------------------------------------------------
+    // Executor 每逢 execute（nt=0）与 N-tile 推进发 biasFetchReq 脉冲；本取数器
+    // WAIT 态先把端口在途读排空（计数 req.fire−rsp.fire，同拍双 fire 净零；scaleA
+    // RdOnly 的 req 可被 ready=0 完全反压、curAddr/credit 原地保持，断点续传无损），
+    // 再串行发 16 个 4B 读（biasAddr + nt*totalN*4 + 4*i），rsp 流入 executor.biasIn，
+    // 16 字收齐回 IDLE、端口归还。非 MX 格式运行（isMx(aFmt)=0）时 scaleADma 不启动、
+    // 端口天然空闲；MX 运行时 sDRAIN/sLOAD_B 预取窗口（≥31 拍）覆盖取数时长，
+    // executor sLOAD_A 的 !biasLoaded 供数门控为兜底。biasSteal=0（IDLE）时 req/rsp
+    // 两侧逐项直连、与原 `<>` 连接逐位等价 ⟹ 既有用例零 diff。
+    // ==========================================================================
+    val sBiasFIDLE  = 0.U(2.W)
+    val sBiasFWAIT  = 1.U(2.W)
+    val sBiasFFETCH = 2.U(2.W)
+    val biasFState  = RegInit(sBiasFIDLE)
+    val biasFNt     = RegInit(0.U(cfg.mnkWidth.W))
+    val biasFSent   = RegInit(0.U(log2Up(cfg.totalN + 1).W))   // 已发请求数 0..totalN
+    val biasFRcvd   = RegInit(0.U(log2Up(cfg.totalN + 1).W))   // 已收响应数 0..totalN
+    val biasPortInfl = RegInit(0.U(log2Up(cfg.scaleBufferDepth + 2).W))
+
+    val biasPortReq = io.dmaScaleA.get.req
+    val biasPortRsp = io.dmaScaleA.get.rsp
+    val biasDmaReq  = scaleADma.io.dmaExtRdIF.req
+    val biasDmaRsp  = scaleADma.io.dmaExtRdIF.rsp
+
+    val biasSteal = biasFState =/= sBiasFIDLE
+    val rspToBias = biasFState === sBiasFFETCH
+    val biasReqValid = biasFState === sBiasFFETCH && biasFSent < cfg.totalN.U
+    val biasReqAddr  = regFile.biasAddr + biasFNt * (cfg.totalN * 4).U + biasFSent * 4.U
+
+    biasPortReq.valid := Mux(biasSteal, biasReqValid, biasDmaReq.valid)
+    biasPortReq.payload.addr := Mux(biasSteal, biasReqAddr, biasDmaReq.payload.addr)
+    biasDmaReq.ready := biasPortReq.ready && !biasSteal
+
+    // rsp 路由：FETCH 期间端口全部在途读均属 bias（WAIT 已排空 + scaleADma 被反压无法
+    //   发新请求）；WAIT/IDLE 期归还 scaleADma（含排空期未返回的旧读）
+    biasDmaRsp.valid := biasPortRsp.valid && !rspToBias
+    biasDmaRsp.payload := biasPortRsp.payload
+    executor.io.biasIn.get.valid := biasPortRsp.valid && rspToBias
+    executor.io.biasIn.get.payload := biasPortRsp.payload.data
+    biasPortRsp.ready := Mux(rspToBias, executor.io.biasIn.get.ready, biasDmaRsp.ready)
+
+    // 端口在途计数（区别于 RdOnly inflCnt 的 when/elsewhen 式：同拍 req.fire+rsp.fire
+    //   必须净零，否则 WAIT 会因漏减一拍而多等；饱和递减防陈旧 rsp 下溢）
+    when(biasPortReq.fire && !biasPortRsp.fire) {
+      biasPortInfl := biasPortInfl + 1.U
+    }.elsewhen(!biasPortReq.fire && biasPortRsp.fire && biasPortInfl =/= 0.U) {
+      biasPortInfl := biasPortInfl - 1.U
+    }
+    when(rspToBias && biasPortRsp.fire && biasPortRsp.payload.err) {
+      biasRspErr.get := true.B
+    }
+
+    // 取数器重入守卫：上一轮取数未回 IDLE 时新脉冲到达 = bias 字流会交错错序
+    assert(!(executor.io.biasFetchReq.get && biasFState =/= sBiasFIDLE),
+      "HiveCoreExecutor bias fetch request while previous bias fetch still in flight")
+
+    switch(biasFState) {
+      is(sBiasFIDLE) {
+        when(executor.io.biasFetchReq.get) {
+          biasFNt    := executor.io.biasFetchNt.get
+          biasFSent  := 0.U
+          biasFRcvd  := 0.U
+          biasFState := sBiasFWAIT
+        }
+      }
+      is(sBiasFWAIT) {
+        when(biasPortInfl === 0.U) { biasFState := sBiasFFETCH }
+      }
+      is(sBiasFFETCH) {
+        when(biasPortReq.fire) { biasFSent := biasFSent + 1.U }
+        when(executor.io.biasIn.get.fire) { biasFRcvd := biasFRcvd + 1.U }
+        when(biasFRcvd === cfg.totalN.U) { biasFState := sBiasFIDLE }
+      }
+    }
+
 
     // scaleB DMA：两级 nt×kb 遍历，基址直连 scaleBAddr，块内步进 = n
     val scaleBDma = bDmaScale.get  // P4.2: 引用外层 Option 持有的实例（原地例化已上提）

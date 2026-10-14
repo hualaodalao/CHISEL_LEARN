@@ -32,4 +32,5 @@ Hive_HiveCoreDmaScaleWr.sv
 Hive_ram_2x8.sv
 Hive_Queue2_UInt8.sv
 Hive_StreamFifo_5.sv
+verification/assert/Hive_HiveCore_Verification_Assert.sv
 Hive_HiveCore.sv

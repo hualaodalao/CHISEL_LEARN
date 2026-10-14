@@ -150,6 +150,10 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
   val cScaleAddr = UInt(32.W)
   val warmup = Bool()
   val warmdown = Bool()
+  // 【P0 epilogue-1 fused bias】reg12 = bias 基地址（0x0C）；reg5 bit30 = biasOn
+  //   显式使能（写侧见 wregs is(5.U) 的 d(30)，读侧见 rregs is(5.U) Cat 的 bit30）。
+  val biasOn = Bool()
+  val biasAddr = UInt(cfg.addrWidth.W)
 
   def wregs(addr: UInt, d: UInt) = {
     switch(addr){
@@ -158,7 +162,8 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
       is(2.U) { aAddr := d }
       is(3.U) { bAddr := d }
       is(4.U) { cAddr := d }
-      is(5.U) { 
+      is(5.U) {
+        biasOn := d(30)
         loadWMode := d(28)
         cMxBlockSize := d(26).asTypeOf(MXBlockSize())
         bMxBlockSize := d(24).asTypeOf(MXBlockSize())
@@ -177,6 +182,7 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
       is(9.U) { aScaleAddr := d }
       is(10.U) { bScaleAddr := d }
       is(11.U) { cScaleAddr  := d }
+      is(12.U) { biasAddr    := d }
     }
   }
 
@@ -189,7 +195,8 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
       is(2.U) { ret := aAddr }
       is(3.U) { ret := bAddr }
       is(4.U) { ret := cAddr }
-      is(5.U) { ret := Cat(0.U(3.W), loadWMode.asUInt,
+      is(5.U) { ret := Cat(0.U(1.W), biasOn.asUInt,
+      0.U(1.W), loadWMode.asUInt,
       0.U(1.W),cMxBlockSize.asUInt, 
       0.U(1.W),bMxBlockSize.asUInt,
       0.U(1.W),aMxBlockSize.asUInt,
@@ -197,11 +204,12 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
       warmdown.asUInt,
       0.U(1.W), rnd.asUInt,
       0.U(1.W), cAddrMode.asUInt, bAddrMode.asUInt,aAddrMode.asUInt, 
-      cFmt.asUInt, bFmt.asUInt, aFmt.asUInt) }  // 【#120 C1】间隙 8→7，总位宽 32-bit，严格镜像 wregs 位域
+      cFmt.asUInt, bFmt.asUInt, aFmt.asUInt) }  // 【#120 C1】间隙 8→7，总位宽 32-bit，严格镜像 wregs 位域；【P0 epilogue-1】[31:29] 0,0,biasOn(30) 取代原整体 0（bit30 镜像 wregs 的 d(30)）
       is(8.U) { ret := 0.U }
       is(9.U) { ret := aScaleAddr }
       is(10.U) { ret := bScaleAddr }
       is(11.U) { ret := cScaleAddr }
+      is(12.U) { ret := biasAddr }
     }
     ret
   }

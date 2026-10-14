@@ -298,6 +298,33 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     }
 
     // ==========================================================================
+    // 【P0 epilogue-1 errCode 12（fused bias 基址对齐 + 无取数机构守护）】
+    // --------------------------------------------------------------------------
+    // ▸ 对齐臂：bias 取数复用 dmaScaleA 32b 只读端口（drain-then-steal 仲裁见
+    //   HiveCore 顶层），单字读契约要求 biasAddr 4B 对齐（端口位宽 32b = 4 字节）；
+    //   非对齐地址在通用互连下会截丢字节/越界，运行期拒绝（判据与 errCode10 的
+    //   cAddr%dmaBytes 同式，粒度换成 32b 端口）。
+    // ▸ 第二臂（!hasMx，RTL-only）：bias 取数器随 dmaScaleA 端口一起只在 hasMx
+    //   配置生成，无 MX 配置下 biasOn 无处取数、会永久卡死 Executor 的 sLOAD_A
+    //   供数门控，故运行期直接拒绝。金锚 hwErrCode 不镜像该臂（同 errCode7
+    //   capacity 臂先例：QuickSpec 现役 cfg 恒 hasMx=true，负向用例不可达）。
+    // ▸ Priority (last-connect wins): 本块物理位置在 errCode10 之后、code8 块
+    //   之前 ⟹ 真值序 3(Fix-4) > 11 > 8 > 12 > 10 > 7 > 5 > 4 > 3(xor) > 0。
+    // ▸ Gating: 对齐臂无门控（biasAddr 是地址性质、与格式无关，三个发射配置
+    //   全部生成）；!hasMx 臂按编译期配置门控。
+    // ==========================================================================
+    when(io.regFile.biasOn && io.regFile.biasAddr(1, 0) =/= 0.U){
+        errComb := true.B
+        errCodeComb := 12.U
+    }
+    if(!cfg.hasMx){
+        when(io.regFile.biasOn){
+            errComb := true.B
+            errCodeComb := 12.U
+        }
+    }
+
+    // ==========================================================================
     // 【P0-1 errCode 8（fp4 K 整除运行期守护）】fp4(E2M1) 输入要求 K 被 kPerBeat 整除。
     // --------------------------------------------------------------------------
     // ▸ 真 bug 根因：Executor 的 kTiles = K / (totalN×elemsPerLane) 是【地板除】。fp4
