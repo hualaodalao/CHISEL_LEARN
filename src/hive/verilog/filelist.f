@@ -13,6 +13,7 @@ Hive_HiveCoreDmaRdOnly.sv
 Hive_HiveCoreDmaWrOnly.sv
 verification/assert/Hive_HiveCoreExecutor2_Verification_Assert.sv
 Hive_HiveCoreExecutor2.sv
+Hive_HiveRequant.sv
 Hive_HiveOutCvt.sv
 Hive_FpMulMx8.sv
 verification/assert/Hive_FpCvtMx8ToMid_Verification_Assert.sv

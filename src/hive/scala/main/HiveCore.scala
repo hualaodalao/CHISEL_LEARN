@@ -296,6 +296,8 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   //   取数器盗用期间的读错误（scaleADma 自身的 rsp.err 锁存看不到这些拍）。声明先于
   //   dmaErr 汇聚（Scala 求值序），赋值在 P3 scale 通道的端口仲裁块内；startPulse 清零。
   private val biasRspErr = if (cfg.hasMx) Some(RegInit(false.B)) else None
+  // 【P0 epilogue-2 fused requant】rqM 取数（两相取数器的 M 相）rsp.err 锁存，同 biasRspErr 范式
+  private val rqMRspErr = if (cfg.hasMx) Some(RegInit(false.B)) else None
 
   // EXECUTE 完成时生成响应；err 汇聚 Executor 与三个自主 DMA 的错误标志。
   // Executor 异常路径（容量错/cPush 违约）经 sDONE 退出，io.done 照常脉冲，
@@ -305,7 +307,8 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   val dmaErr = if (cfg.hasMx) {
     aDma.io.err || bDma.io.err || cDma.io.err || aDmaScale.get.io.err || bDmaScale.get.io.err ||
       cDmaScale.get.io.err ||  // P3b 追加 dmaCScale 通道错误（rsp.err 锁存）
-      biasRspErr.get           // P0 epilogue-1 追加 bias 取数通道错误（dmaScaleA 盗用期）
+      biasRspErr.get ||        // P0 epilogue-1 追加 bias 取数通道错误（dmaScaleA 盗用期）
+      rqMRspErr.get            // P0 epilogue-2 追加 rqM 取数通道错误（M 相盗用期）
   } else {
     aDma.io.err || bDma.io.err || cDma.io.err
   }
@@ -313,6 +316,7 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   when(startPulse) {
     errFlag := false.B; doneSinceStart := false.B
     if (cfg.hasMx) biasRspErr.get := false.B  // P0 epilogue-1：bias 读错误随新 run 清零
+    if (cfg.hasMx) rqMRspErr.get := false.B  // P0 epilogue-2：rqM 读错误随新 run 清零
   }
 
   when(calcConfig.io.err && !startPulse) { errFlag := true.B }
@@ -384,6 +388,21 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   private val cNRemain = regFile.n - cDma.io.nCntOut * cfg.totalN.U
   private val nEffW = log2Up(cfg.totalN + 1)
   cvt.io.nEff := Mux(cNRemain >= cfg.totalN.U, cfg.totalN.U(nEffW - 1, 0), cNRemain(nEffW - 1, 0))
+
+  // 【P0 epilogue-2 fused requant】requant 接线（cvt 侧端口仅 hasInt 生成；rqM 取自
+  //   Executor 收集寄存器 rqMOut——仅 hasMx 供给，纯 INT 无 MX 的假想配置下 requantOn
+  //   已被 errCode13 的 !hasMx 臂运行期拒绝，恒 0 输入无害；标量直读 regFile：
+  //   requantOn=reg5[29]、reluOn=reg5[15]、shift/zp=reg14）。cvt 在 in.fire 拍随行
+  //   锁存——同一 N-tile 的全部行在该 tile 的 rqM 重取触发（sNEXT_NK_TILE，晚于
+  //   doneBlock=末行已过 cvt）之前完成锁存，跨 tile 不串值。
+  if (cfg.hasInt) {
+    cvt.io.rqM.get := (if (cfg.hasMx) executor.io.rqMOut.get
+                       else VecInit(Seq.fill(cfg.totalN)(0.U(32.W))))
+    cvt.io.rqEn.get := regFile.requantOn
+    cvt.io.rqShift.get := regFile.rqShift
+    cvt.io.rqZp.get := regFile.rqZp
+    cvt.io.reluOn.get := regFile.reluOn
+  }
 
   // cvt.out → cDma.bufPop（行粒度，fire 即锁存进 WrOnly 行寄存器）；
   // out.ready 透传 WrOnly 末拍接受决定（行锁存空才收新行）。
@@ -476,25 +495,32 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     scaleADma.io.reg_colTileOffset := calcConfig.io.calcConfig.scaleAColTileAddressOffset
 
     // ==========================================================================
-    // 【P0 epilogue-1 fused bias】dmaScaleA 端口仲裁：bias 取数器 drain-then-steal
+    // 【P0 epilogue-1/2】dmaScaleA 端口仲裁：epilogue 取数器（bias + rqM 两相）drain-then-steal
     // --------------------------------------------------------------------------
-    // Executor 每逢 execute（nt=0）与 N-tile 推进发 biasFetchReq 脉冲；本取数器
-    // WAIT 态先把端口在途读排空（计数 req.fire−rsp.fire，同拍双 fire 净零；scaleA
-    // RdOnly 的 req 可被 ready=0 完全反压、curAddr/credit 原地保持，断点续传无损），
-    // 再串行发 16 个 4B 读（biasAddr + nt*totalN*4 + 4*i），rsp 流入 executor.biasIn，
-    // 16 字收齐回 IDLE、端口归还。非 MX 格式运行（isMx(aFmt)=0）时 scaleADma 不启动、
-    // 端口天然空闲；MX 运行时 sDRAIN/sLOAD_B 预取窗口（≥31 拍）覆盖取数时长，
-    // executor sLOAD_A 的 !biasLoaded 供数门控为兜底。biasSteal=0（IDLE）时 req/rsp
-    // 两侧逐项直连、与原 `<>` 连接逐位等价 ⟹ 既有用例零 diff。
+    // Executor 每逢 execute（nt=0）与 N-tile 推进同拍发 biasFetchReq / rqMFetchReq 脉冲
+    // （各自被 biasOn / requantOn 门控，两脉冲可同拍或只来其一）；本取数器 WAIT 态先把
+    // 端口在途读排空（计数 req.fire−rsp.fire，同拍双 fire 净零；scaleA RdOnly 的 req 可被
+    // ready=0 完全反压、curAddr/credit 原地保持，断点续传无损），再按锁存的相使能【连续】
+    // 串行发 16 个 4B 读：先 BIAS 相（biasAddr + nt*totalN*4 + 4*i → executor.biasIn），
+    // 后 M 相（rqMBase + nt*totalN*4 + 4*i → executor.rqMIn），两相间不回 WAIT（端口
+    // 在途读在 BIAS 相收齐时已归零）。全相完成回 IDLE、端口归还。非 MX 格式运行
+    // （isMx(aFmt)=0）时 scaleADma 不启动、端口天然空闲；MX 运行时 sDRAIN/sLOAD_B 预取
+    // 窗口（≥31 拍）覆盖取数时长，executor sLOAD_A 的 !biasLoaded/!rqMLoaded 供数门控
+    // 为兜底。steal=0（IDLE）时 req/rsp 两侧逐项直连、与原 `<>` 连接逐位等价 ⟹ 既有用例
+    // 零 diff。
     // ==========================================================================
-    val sBiasFIDLE  = 0.U(2.W)
-    val sBiasFWAIT  = 1.U(2.W)
-    val sBiasFFETCH = 2.U(2.W)
+    val sBiasFIDLE    = 0.U(2.W)
+    val sBiasFWAIT    = 1.U(2.W)
+    val sBiasFFETCH   = 2.U(2.W)
+    val sBiasFFETCH_M = 3.U(2.W)
     val biasFState  = RegInit(sBiasFIDLE)
     val biasFNt     = RegInit(0.U(cfg.mnkWidth.W))
-    val biasFSent   = RegInit(0.U(log2Up(cfg.totalN + 1).W))   // 已发请求数 0..totalN
-    val biasFRcvd   = RegInit(0.U(log2Up(cfg.totalN + 1).W))   // 已收响应数 0..totalN
+    val biasFSent   = RegInit(0.U(log2Up(cfg.totalN + 1).W))   // 已发请求数 0..totalN（两相共用，相位切换清零）
+    val biasFRcvd   = RegInit(0.U(log2Up(cfg.totalN + 1).W))   // 已收响应数 0..totalN（同上）
     val biasPortInfl = RegInit(0.U(log2Up(cfg.scaleBufferDepth + 2).W))
+    // 相使能（IDLE 请求拍锁存）：本轮取数含 BIAS 相 / 含 M 相
+    val biasFPhaseBias = RegInit(false.B)
+    val biasFPhaseM    = RegInit(false.B)
 
     val biasPortReq = io.dmaScaleA.get.req
     val biasPortRsp = io.dmaScaleA.get.rsp
@@ -503,20 +529,25 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
 
     val biasSteal = biasFState =/= sBiasFIDLE
     val rspToBias = biasFState === sBiasFFETCH
-    val biasReqValid = biasFState === sBiasFFETCH && biasFSent < cfg.totalN.U
+    val rspToM    = biasFState === sBiasFFETCH_M
+    val epilReqValid = (biasFState === sBiasFFETCH || biasFState === sBiasFFETCH_M) && biasFSent < cfg.totalN.U
     val biasReqAddr  = regFile.biasAddr + biasFNt * (cfg.totalN * 4).U + biasFSent * 4.U
+    val rqMReqAddr   = regFile.rqMBase  + biasFNt * (cfg.totalN * 4).U + biasFSent * 4.U
 
-    biasPortReq.valid := Mux(biasSteal, biasReqValid, biasDmaReq.valid)
-    biasPortReq.payload.addr := Mux(biasSteal, biasReqAddr, biasDmaReq.payload.addr)
+    biasPortReq.valid := Mux(biasSteal, epilReqValid, biasDmaReq.valid)
+    biasPortReq.payload.addr := Mux(biasSteal, Mux(biasFState === sBiasFFETCH, biasReqAddr, rqMReqAddr), biasDmaReq.payload.addr)
     biasDmaReq.ready := biasPortReq.ready && !biasSteal
 
-    // rsp 路由：FETCH 期间端口全部在途读均属 bias（WAIT 已排空 + scaleADma 被反压无法
-    //   发新请求）；WAIT/IDLE 期归还 scaleADma（含排空期未返回的旧读）
-    biasDmaRsp.valid := biasPortRsp.valid && !rspToBias
+    // rsp 路由：FETCH/FETCH_M 期间端口全部在途读均属取数器（WAIT 已排空 + scaleADma
+    //   被反压无法发新请求）；WAIT/IDLE 期归还 scaleADma（含排空期未返回的旧读）
+    biasDmaRsp.valid := biasPortRsp.valid && !rspToBias && !rspToM
     biasDmaRsp.payload := biasPortRsp.payload
     executor.io.biasIn.get.valid := biasPortRsp.valid && rspToBias
     executor.io.biasIn.get.payload := biasPortRsp.payload.data
-    biasPortRsp.ready := Mux(rspToBias, executor.io.biasIn.get.ready, biasDmaRsp.ready)
+    executor.io.rqMIn.get.valid := biasPortRsp.valid && rspToM
+    executor.io.rqMIn.get.payload := biasPortRsp.payload.data
+    biasPortRsp.ready := Mux(rspToBias, executor.io.biasIn.get.ready,
+                          Mux(rspToM, executor.io.rqMIn.get.ready, biasDmaRsp.ready))
 
     // 端口在途计数（区别于 RdOnly inflCnt 的 when/elsewhen 式：同拍 req.fire+rsp.fire
     //   必须净零，否则 WAIT 会因漏减一拍而多等；饱和递减防陈旧 rsp 下溢）
@@ -528,26 +559,42 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     when(rspToBias && biasPortRsp.fire && biasPortRsp.payload.err) {
       biasRspErr.get := true.B
     }
+    when(rspToM && biasPortRsp.fire && biasPortRsp.payload.err) {
+      rqMRspErr.get := true.B
+    }
 
-    // 取数器重入守卫：上一轮取数未回 IDLE 时新脉冲到达 = bias 字流会交错错序
-    assert(!(executor.io.biasFetchReq.get && biasFState =/= sBiasFIDLE),
-      "HiveCoreExecutor bias fetch request while previous bias fetch still in flight")
+    // 取数器重入守卫：上一轮取数未回 IDLE 时新脉冲到达 = bias/rqM 字流会交错错序
+    assert(!((executor.io.biasFetchReq.get || executor.io.rqMFetchReq.get) && biasFState =/= sBiasFIDLE),
+      "HiveCoreExecutor epilogue fetch request while previous bias/rqM fetch still in flight")
 
     switch(biasFState) {
       is(sBiasFIDLE) {
-        when(executor.io.biasFetchReq.get) {
-          biasFNt    := executor.io.biasFetchNt.get
-          biasFSent  := 0.U
-          biasFRcvd  := 0.U
-          biasFState := sBiasFWAIT
+        when(executor.io.biasFetchReq.get || executor.io.rqMFetchReq.get) {
+          biasFNt       := Mux(executor.io.biasFetchReq.get, executor.io.biasFetchNt.get, executor.io.rqMFetchNt.get)
+          biasFSent     := 0.U
+          biasFRcvd     := 0.U
+          biasFPhaseBias := executor.io.biasFetchReq.get
+          biasFPhaseM    := executor.io.rqMFetchReq.get
+          biasFState    := sBiasFWAIT
         }
       }
       is(sBiasFWAIT) {
-        when(biasPortInfl === 0.U) { biasFState := sBiasFFETCH }
+        when(biasPortInfl === 0.U) {
+          biasFState := Mux(biasFPhaseBias, sBiasFFETCH, sBiasFFETCH_M)
+        }
       }
       is(sBiasFFETCH) {
         when(biasPortReq.fire) { biasFSent := biasFSent + 1.U }
         when(executor.io.biasIn.get.fire) { biasFRcvd := biasFRcvd + 1.U }
+        when(biasFRcvd === cfg.totalN.U) {
+          biasFSent := 0.U
+          biasFRcvd := 0.U
+          biasFState := Mux(biasFPhaseM, sBiasFFETCH_M, sBiasFIDLE)
+        }
+      }
+      is(sBiasFFETCH_M) {
+        when(biasPortReq.fire) { biasFSent := biasFSent + 1.U }
+        when(executor.io.rqMIn.get.fire) { biasFRcvd := biasFRcvd + 1.U }
         when(biasFRcvd === cfg.totalN.U) { biasFState := sBiasFIDLE }
       }
     }

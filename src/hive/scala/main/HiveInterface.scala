@@ -154,6 +154,15 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
   //   显式使能（写侧见 wregs is(5.U) 的 d(30)，读侧见 rregs is(5.U) Cat 的 bit30）。
   val biasOn = Bool()
   val biasAddr = UInt(cfg.addrWidth.W)
+  // 【P0 epilogue-2 fused requant】模式位归控制字：reg5 bit29 = requantOn、bit15 = reluOn
+  //   （reluOn 不耦合 INT/浮点格式选择，与 biasOn 同为模式位）。参数归参数寄存器：
+  //   reg13(0x0D) = rqMBase（per-channel int32 乘子向量基址，N 轴同构 bias）；
+  //   reg14(0x0E) = [31:16]zp(int16 per-tensor) + [15:6] reserved 0 + [5:0]shift(uint6 per-tensor)。
+  val requantOn = Bool()
+  val reluOn = Bool()
+  val rqMBase = UInt(cfg.addrWidth.W)
+  val rqShift = UInt(6.W)
+  val rqZp = SInt(16.W)
 
   def wregs(addr: UInt, d: UInt) = {
     switch(addr){
@@ -164,6 +173,7 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
       is(4.U) { cAddr := d }
       is(5.U) {
         biasOn := d(30)
+        requantOn := d(29)
         loadWMode := d(28)
         cMxBlockSize := d(26).asTypeOf(MXBlockSize())
         bMxBlockSize := d(24).asTypeOf(MXBlockSize())
@@ -171,6 +181,7 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
         warmup       := d(21)
         warmdown     := d(20)
         rnd          := d(18,16).asTypeOf(RoundingMode())
+        reluOn       := d(15)
         cAddrMode := d(14).asTypeOf(AddrMode())
         bAddrMode := d(13).asTypeOf(AddrMode())
         aAddrMode := d(12).asTypeOf(AddrMode())
@@ -183,6 +194,8 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
       is(10.U) { bScaleAddr := d }
       is(11.U) { cScaleAddr  := d }
       is(12.U) { biasAddr    := d }
+      is(13.U) { rqMBase     := d }
+      is(14.U) { rqZp := d(31,16).asSInt; rqShift := d(5,0) }
     }
   }
 
@@ -196,20 +209,22 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
       is(3.U) { ret := bAddr }
       is(4.U) { ret := cAddr }
       is(5.U) { ret := Cat(0.U(1.W), biasOn.asUInt,
-      0.U(1.W), loadWMode.asUInt,
-      0.U(1.W),cMxBlockSize.asUInt, 
+      requantOn.asUInt, loadWMode.asUInt,
+      0.U(1.W),cMxBlockSize.asUInt,
       0.U(1.W),bMxBlockSize.asUInt,
       0.U(1.W),aMxBlockSize.asUInt,
       warmup.asUInt,
       warmdown.asUInt,
       0.U(1.W), rnd.asUInt,
-      0.U(1.W), cAddrMode.asUInt, bAddrMode.asUInt,aAddrMode.asUInt, 
-      cFmt.asUInt, bFmt.asUInt, aFmt.asUInt) }  // 【#120 C1】间隙 8→7，总位宽 32-bit，严格镜像 wregs 位域；【P0 epilogue-1】[31:29] 0,0,biasOn(30) 取代原整体 0（bit30 镜像 wregs 的 d(30)）
+      reluOn.asUInt, cAddrMode.asUInt, bAddrMode.asUInt,aAddrMode.asUInt,
+      cFmt.asUInt, bFmt.asUInt, aFmt.asUInt) }  // 【#120 C1】间隙 8→7，总位宽 32-bit，严格镜像 wregs 位域；【P0 epilogue-1】bit30=biasOn；【P0 epilogue-2】bit29=requantOn、bit15=reluOn（两处取代原 0 填充，位宽不变）
       is(8.U) { ret := 0.U }
       is(9.U) { ret := aScaleAddr }
       is(10.U) { ret := bScaleAddr }
       is(11.U) { ret := cScaleAddr }
       is(12.U) { ret := biasAddr }
+      is(13.U) { ret := rqMBase }
+      is(14.U) { ret := Cat(rqZp.asUInt, 0.U(10.W), rqShift) }  // [31:16]zp + [15:6]0 + [5:0]shift，镜像 wregs is(14.U)
     }
     ret
   }

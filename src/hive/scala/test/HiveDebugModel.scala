@@ -45,6 +45,7 @@ object HiveDebugModel {
   val SB_BASE: Long = 0x00400000L   // scaleB
   val SC_BASE: Long = 0x00500000L   // scaleC（量化输出写回）
   val BIAS_BASE: Long = 0x00600000L // 【P0 epilogue-1】bias 向量基址（nTiles*totalN 个 4B 字）
+  val RQM_BASE: Long  = 0x00700000L // 【P0 epilogue-2】requant M 向量基址（nTiles*totalN 个 4B 字）
 
   val TAG = "DEBUG"
 
@@ -248,7 +249,20 @@ object HiveDebugModel {
       //   （第 nt 个 N-tile 的 16 个字供 pass-0 psum 基底注入）。biasBase 须 4B 对齐
       //   （validate require；硬件 errCode12 拦截，负向用例经 predicted 路径绕过 validate）。
       biasOn: Boolean = false,
-      biasBase: Long = BIAS_BASE) {
+      biasBase: Long = BIAS_BASE,
+      // 【P0 epilogue-2 fused requant】requant/ReLU 开关与参数（reg5[29]=requantOn、
+      //   reg5[15]=reluOn、reg13=rqMBase、reg14=[31:16]zp+[5:0]shift）。默认全关 ⟹
+      //   全部既有构造点与既有用例零改动。requantOn=true 时输出链 =
+      //   sat_fmt(round_half_up(acc×M[nn] >> shift) + zp)，acc 已含 bias 基底与 ReLU
+      //   clamp（reluOn=true 且 INT 输出时负槽置 0）；M 为 per-channel int32（N 轴，
+      //   nTiles*totalN 个 4B 字），shift/zp 为 per-tensor 标量。合法输出档仅
+      //   INT8/INT4（硬件 errCode13 拦截；负向用例经 predicted 路径绕过 validate）。
+      //   ★测试名【不含 requant 参数】⟹ 既有用例名逐字不变；requant 用例须带 caseTag 区名。
+      requantOn: Boolean = false,
+      reluOn: Boolean = false,
+      rqMBase: Long = RQM_BASE,
+      rqShift: Int = 0,
+      rqZp: Int = 0) {
 
     // 【#144 blk 解码跟随 MXBlockSize 枚举收窄】枚举已由 {M8=0,M16=1,M32=2,M64=3}（bytes=8<<sel）
     //   收窄为 {M16=0,M32=1}，故 sel→bytes 的定义式相应改为 16<<sel：sel=0→16(M16)、sel=1→32(M32)。
@@ -276,6 +290,8 @@ object HiveDebugModel {
       *     MXBlockSize {M16=Value(0.U),M32=Value(1.U)}→1-bit）
       *   【P0 epilogue-1】[30]=biasOn：main 侧 wregs `biasOn := d(30)`、rregs Cat 前缀
       *     `0.U(1.W), biasOn.asUInt, 0.U(1.W)`（[31]=0,[30]=biasOn,[29]=0），金锚逐位镜像。
+      *   【P0 epilogue-2】[29]=requantOn、[15]=reluOn（取代两处 0 填充，总位宽不变）：
+      *     main 侧 wregs `requantOn := d(29)`、`reluOn := d(15)`，金锚逐位镜像。
       *
       * ★迁移要点（旧 → 新）：
       *   · rnd：旧 regs7 bits[14:12]（<<12）→ 新 reg5 bits[18:16]（**<<16**）；
@@ -290,16 +306,23 @@ object HiveDebugModel {
       *   （金锚 aMxBlk=16<<2=64 不在枚举内），属既存遗留，本轮不扩大范围，已在报告登记。 */
     def controlWord5: Long =
       (if (biasOn) 1L << 30 else 0L) |
+      (if (requantOn) 1L << 29 else 0L) |
       (if (loadWMode) 1L << 28 else 0L) |
         ((cMxBlkSel.toLong & 0x3) << 26) | ((bMxBlkSel.toLong & 0x3) << 24) |
         ((aMxBlkSel.toLong & 0x3) << 22) |
         (if (warmup)   1L << 21 else 0L) |
         (if (warmdown) 1L << 20 else 0L) |
         ((rnd.toLong & 0x7) << 16) |
+        (if (reluOn)   1L << 15 else 0L) |
         ((addrModeSel.toLong & 0x1) << 14) | ((addrModeSel.toLong & 0x1) << 13) |
         ((addrModeSel.toLong & 0x1) << 12) |
         ((cFmt.litValue.toLong & 0xF) << 8) |
         ((bFmt.litValue.toLong & 0xF) << 4) | (aFmt.litValue.toLong & 0xF)
+
+    /** 【P0 epilogue-2】reg14 打包：[31:16]zp（int16 二补码位型）| [15:6] 保留 0 |
+      *   [5:0]shift。由寄存器契约独立推导（镜像 HiveInterface.wregs is(14.U)），非读回拟合。 */
+    def controlWord14: Long =
+      ((rqZp.toLong & 0xFFFFL) << 16) | (rqShift.toLong & 0x3FL)
 
     /** 生效参数一览（启动时打印） */
     def banner: String =
@@ -309,7 +332,9 @@ object HiveDebugModel {
         f"reg5=0x${controlWord5}%08X" +
         // 【P0 epilogue-1】bias 状态只在启用时进 banner（对齐 warmup/warmdown 的最小文本漂移
         //   先例：既有用例打印逐字不变）。
-        (if (biasOn) f" biasOn=1 biasBase=0x${biasBase}%08X" else "")
+        (if (biasOn) f" biasOn=1 biasBase=0x${biasBase}%08X" else "") +
+        // 【P0 epilogue-2】requant/ReLU 状态只在启用时进 banner（同一最小漂移先例）。
+        (if (requantOn) f" requantOn=1 reluOn=${if (reluOn) 1 else 0} rqMBase=0x${rqMBase}%08X shift=$rqShift zp=$rqZp" else "")
       // (#164) 本行是【已打印到 stdout】的（QuickSpec.printHealth :294 `生效配置: ${p.banner}`）。
       //   按任务书只做 `regs6=0x… regs7=0x…` → `reg5=0x…` 的最小替换，【不】把 warmup/warmdown
       //   加进 banner：两者默认恒 0、本轮无用例置位，加进来只会给归一化基线多添一处待归因的
@@ -381,6 +406,18 @@ object HiveDebugModel {
     //   stall，须运行期拒绝）；三个已发射网表 hasMx 均为 true，该臂为死路，本镜像【不】含它
     //   （与 code-7 capacity 臂同为 RTL-only 先例）。
     if (p.biasOn && p.biasBase % 4L != 0) e = Some(12)
+    // 【P0 epilogue-2】errCode 13: requant 配置违约（两臂，均无门控）。由寄存器/模块
+    //   契约独立推导：① requantOn && cFmt ∉ {INT8,INT4}——requant 链只定义了两档
+    //   饱和语义（HiveRequant），其它输出格式无从落码；② requantOn && rqMBase%4!=0
+    //   ——M 向量取数复用 dmaScaleA 32b 端口逐字读（与 bias 同一取数器两相连续），
+    //   非 4B 对齐地址跨界半个字、注入乘子静默错位。位置：置于 code-12 之后、
+    //   code-8 之前，镜像 HiveCoreCalcConfig last-connect 真值序
+    //   3(Fix-4) > 11 > 8 > 13 > 12 > 10 > 7 > 5 > 4 > 3(xor) > 0。
+    //   注：RTL 另有 !hasMx && requantOn → 13 的防呆臂（无 dmaScaleA 端口网表上
+    //   requant 会永久 stall）；三个已发射网表 hasMx 均为 true，该臂为死路，
+    //   本镜像【不】含它（与 code-7/code-12 的 RTL-only 臂同先例）。
+    if (p.requantOn && !(p.cFmt == DataFormat.INT8 || p.cFmt == DataFormat.INT4)) e = Some(13)
+    if (p.requantOn && p.rqMBase % 4L != 0) e = Some(13)
     // [P0-1] fp4(E2M1) K not divisible by kPerBeat -> code8. Placed BEFORE the
     //   mix code3 below, i.e. lower priority, matching the hardware
     //   last-connect order.
@@ -508,6 +545,22 @@ object HiveDebugModel {
     if (p.biasOn)
       require(p.biasBase % 4 == 0,
         s"biasOn 要求 biasBase 4B 对齐（dmaScaleA 端口逐字读，硬件 errCode 12），当前 biasBase=0x${p.biasBase.toHexString}")
+    // 【P0 epilogue-2】requant 参数防呆（硬件 errCode13 拦截；负向用例经 predicted
+    //   路径绕过本 require，不影响 errCode13 对拍）。
+    if (p.requantOn) {
+      require(p.cFmt == DataFormat.INT8 || p.cFmt == DataFormat.INT4,
+        s"requantOn 要求 cFmt 为 INT8/INT4（requant 链仅两档饱和语义，硬件 errCode 13），当前 cFmt=${p.cFmt}")
+      require(p.rqMBase % 4 == 0,
+        s"requantOn 要求 rqMBase 4B 对齐（dmaScaleA 端口逐字读，硬件 errCode 13），当前 rqMBase=0x${p.rqMBase.toHexString}")
+      // requant 只定义在纯整数输入链上：errCode13 把 cFmt 钉到 INT8/INT4（整数族输出），
+      //   errCode11（runIsInt XOR cIsIntOut）随即强制输入侧同为整数族 —— 两码合起来
+      //   架构上排除 MX/FP 输入的 requant 配置。金锚 requant 链（Long 整数算术）也
+      //   仅在 acc 为精确整数时有定义，故在此提前拦截（负向用例走 predicted 路径不受影响）。
+      require(!isFloatFmt(p.aFmt) && !isMxAny(p.aFmt) && !isFloatFmt(p.bFmt) && !isMxAny(p.bFmt),
+        s"requantOn 要求 A/B 输入均为整数族（errCode11 XOR 约束 + requant 整数累加链定义域），当前 aFmt=${p.aFmt} bFmt=${p.bFmt}")
+    }
+    require(p.rqShift >= 0 && p.rqShift <= 63, s"rqShift=${p.rqShift} 越界（6-bit，0..63）")
+    require(p.rqZp >= -32768 && p.rqZp <= 32767, s"rqZp=${p.rqZp} 越界（int16）")
     // 【#120 B2】addrMode=TILE 放宽：硬件全 RTL 零消费者（#123 审计确认 CalcConfig 与
     //   两个 DMA 一次都没引用 addrMode 位域；(#164) 宿主由旧 regs(6) bits[14:12] 迁到
     //   reg5 bits[14:12]，位号不变、依旧零消费者），设置 TILE 不会改变实际 DMA 寻址行为。
@@ -852,6 +905,17 @@ object HiveDebugModel {
           yield p.biasBase + (nt.toLong * totalN + i.toLong) * 4
       else Seq.empty
 
+    // 【P0 epilogue-2】rqM 期望读地址序列：与 bias 同式（同样【无 gatherPhys 变换】）——
+    //   M 取数由顶层两阶段 epilogue FSM 的 FETCH_M 相驱动 dmaScaleA 端口裸地址
+    //   （rqMReqAddr = rqMBase + nt*totalN*4 + i*4），对齐性由 errCode13 前置保证。
+    //   三流共用一端口（WAIT 态先排空在途请求再进 FETCH 相）⟹ TB 侧须按地址域拆三流
+    //   对账（bias 域 / rqM 域 / SA_BASE 域）。
+    val expRqMAddrSeq: Seq[Long] =
+      if (p.requantOn)
+        for (nt <- 0 until nTiles; i <- 0 until totalN)
+          yield p.rqMBase + (nt.toLong * totalN + i.toLong) * 4
+      else Seq.empty
+
     // 【P1-2 W4A8 订正】混配 scaleB 期望序列改【阵列窗口口径】：窗口数 = K/32，窗口
     //   w 的 32-K 块 = blk16 的 {2w,2w+1} / blk32 的 {w} ⟹ kTile 步进 = aKpb/bMxBlk
     //   （blk16→2B、blk32→1B，相邻窗口读相邻 scale 字），块内 totalN 行降序，非对齐
@@ -914,6 +978,44 @@ object HiveDebugModel {
       if (!p.biasOn) 0.0
       else if (biasRunIsInt) biasCode(nn).toDouble
       else java.lang.Float.intBitsToFloat(biasCode(nn).toInt)
+
+    // ------------------------------------------------------------------------
+    // 【P0 epilogue-2 fused requant】rqM per-channel 乘子向量激励。
+    // 独立 rng 实例（种子异或新盐值，与 biasRng 同范式）：扰动只进 rqM，既有用例的
+    //   golden 与内存镜像零漂移。长度 nTiles*totalN 个 4B 字（i = nt*totalN + lane，
+    //   与 bias 同构布局）。
+    // 值域设计（定向覆盖饱和角点；M 为有符号 int32，硬件 HiveRequant io.m.asSInt）：
+    //   lane%6==0 → 0x40000000（2^30 巨乘子）：|acc|>=1 时任何 shift<=17 全饱和，
+    //      覆盖 sat_hi(+127/+7) 与负积 sat_lo(-128/-8) 两侧角点；
+    //   lane%6==1 → 0（零乘子）：y ≡ clamp(round(0>>s)+zp) = clamp(zp)，覆盖纯 zp 路径
+    //      （round-half-up 加数 (0>>(s-1))+1>>1 恒为 0，shift 任意值不变号）；
+    //   lane%6==2 → 1..251 小正乘子：|acc*M| <= ~9e5，小 shift(1..8) 商落值域内，
+    //      覆盖正/负积上的 round-half-up 舍入（+1<<(s-1) 进位边界）；
+    //   lane%6==3 → 0x30000000：又一巨乘子 lane（跨 tile 组合下标不同，防 0 臂与
+    //      硬件 rqMRegs 收集序偶合全同）；
+    //   lane%6==4 → (1..15)<<20 中乘子：中移位档（shift 10..25）混饱和/在域；
+    //   lane%6==5 → reluOn 时取小正乘子，否则取小负乘子：ReLU 用例全 lane M>=0
+    //      （裁定等价式 f(max(acc,0))=max(f(acc),f(0)) 依赖 M>=0 单调；负乘子会把
+    //      ReLU 后的非负 acc 映成负商，破坏 ReLU 语义）；非 ReLU 用例覆盖符号乘法。
+    // ------------------------------------------------------------------------
+    private val rqMRng = new java.util.Random(p.seed ^ 0x2E9A17L)
+    /** rqMCode(i)：第 i 个 rqM 4B 字的位模式（有符号 int32 二补码，i = nt*totalN + lane） */
+    val rqMCode: Array[Long] =
+      if (!p.requantOn) Array.empty
+      else Array.tabulate(nTiles * totalN) { i =>
+        (i % totalN) % 6 match {
+          case 0 => 0x40000000L
+          case 1 => 0L
+          case 2 => (rqMRng.nextInt(251) + 1).toLong
+          case 3 => 0x30000000L
+          case 4 => (rqMRng.nextInt(15) + 1).toLong << 20
+          case _ => if (p.reluOn) (rqMRng.nextInt(251) + 1).toLong
+                    else -(rqMRng.nextInt(251) + 1).toLong
+        }
+      }
+    /** rqMVal(nn)：输出列 nn 的有符号 int32 乘子（golden requant 链用；硬件侧
+      * rqMRegs 收集的是 UInt(32) 原始字、HiveRequant 内 asSInt —— 值域同源） */
+    def rqMVal(nn: Int): Long = (rqMCode(nn) << 32) >> 32
 
     /** scale 指数 {-1,0,1}（确定性、含正负、跨块跨列变化以暴露路由错位） */
     def scaleExpA(mm: Int, j: Int): Int = ((mm + j + (p.seed % 3).toInt) % 3) - 1
@@ -1004,7 +1106,41 @@ object HiveDebugModel {
       acc
     }
 
-    lazy val goldenC: Array[Array[Double]] = Array.tabulate(p.m, p.n)(golden)
+    lazy val goldenC: Array[Array[Double]] = {
+      val raw = Array.tabulate(p.m, p.n)(golden)
+      // 【P0 epilogue-2】ReLU 消费域 = INT 族输出（裁定）：硬件 clamp 落在 int32Seq
+      //   源级，仅 INT 各档臂与 requant 链消费；fp/MX 输出对 reluOn 是零消费者位
+      //   （addrMode=TILE 先例）⟹ 金锚 clamp 门控 = reluOn && isIntFmt(cFmt)（与硬件
+      //   消费条件逐位一致）。INT 输入运行的累加器是精确整数 ⟹ Double 域 max(·,0)
+      //   与硬件 32-bit 槽 clamp 等价（errCode11 XOR 保证 INT 输出 ⟺ INT 输入）。
+      val reluActive = p.reluOn && isIntFmt(p.cFmt)
+      if (!p.requantOn && !reluActive) raw
+      else Array.tabulate(p.m, p.n) { (mm, nn) =>
+        val v = raw(mm)(nn)
+        if (!p.requantOn) { if (reluActive && v < 0.0) 0.0 else v }
+        else {
+          // requantOn：golden 即【量化后输出整数】y = sat_fmt(round_half_up(relu(acc)
+          //   × M[nn] >> shift) + zp)。纯契约推导（不读任何硬件写回）：acc = 纯 INT 链
+          //   精确整数累加器（validate 已拦非 INT 输入；此处 require 兜底精确整数性
+          //   —— aVal/bVal/biasVal 均为小整数，fp64 乘加精确）；链序与裁定契约一致：
+          //   reluOn → 负槽置 0 → ×M[nn]（Long 符号乘）→ shift>0 时 +1<<(shift-1) 后
+          //   算术右移 1（round-half-up 右移拆解式；shift=0 直通不移位）→ +zp →
+          //   饱和 INT8[-128,127]/INT4[-8,7]（仅 requant 模式饱和，非 requant 整数
+          //   截断绕回裁定不变）。此后 compare 走非 MX 分支（isIntFmt → absErr>0.5），
+          //   hw = decodeElem 恢复码值 ⟹ 期望即逐位断言（差非 0 必红）。
+          require(v == math.floor(v) && math.abs(v) < (1L << 31).toDouble,
+            s"requant golden: 累加器须为 int32 域内精确整数（纯 INT 输入链），C($mm,$nn)=$v")
+          var acc = v.toLong
+          if (p.reluOn && acc < 0L) acc = 0L
+          val prod = acc * rqMVal(nn)
+          val q = if (p.rqShift > 0) ((prod >> (p.rqShift - 1)) + 1L) >> 1 else prod
+          val qz = q + p.rqZp.toLong
+          val lo = if (p.cFmt == DataFormat.INT4) -8L else -128L
+          val hi = if (p.cFmt == DataFormat.INT4) 7L else 127L
+          (if (qz < lo) lo else if (qz > hi) hi else qz).toDouble
+        }
+      }
+    }
 
     // ========================================================================
     // (#151 F4) 独立期望码链：张量语义 → OCP MX 规范 → 期望 E8M0 scale + 期望元素码
@@ -1166,6 +1302,12 @@ object HiveDebugModel {
       if (p.biasOn)
         for (i <- 0 until nTiles * totalN)
           mem.storeElem(p.biasBase + i.toLong * 4, biasCode(i), 4)
+      // 【P0 epilogue-2】rqM 向量镜像：nTiles*totalN 个 4B 字，地址 = rqMBase + i*4，
+      //   与硬件 rqMReqAddr = rqMBase + nt*totalN*4 + i*4 同式；负 M 以 int32 二补码
+      //   低 32 位落盘（storeElem 小端逐字节截断）。
+      if (p.requantOn)
+        for (i <- 0 until nTiles * totalN)
+          mem.storeElem(p.rqMBase + i.toLong * 4, rqMCode(i), 4)
       mem
     }
 

@@ -113,6 +113,15 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
     val nEff     = Input(UInt(log2Up(cfg.totalN + 1).W))     // 有效列数（≥ nEff 列 = padding）
     val out      = Decoupled(UInt((cfg.totalN * 32).W))      // master：密集行（按 outFmt 选段，高位填零）
     val scaleOut = Decoupled(UInt(cfg.cScaleRowW.W))         // master：量化 E8M0 scale 行（非量化行 valid 恒 0）
+    // 【P0 epilogue-2 fused requant/ReLU】输入（仅 hasInt 生成：requant 计算硬件按
+    //   INT 族门控，MX-only 配置端口/逻辑逐位不变）：rqM = per-channel 乘子向量
+    //   （in.fire 拍随行锁存——N-tile 边界的 M 重载可能落在 cvt 持行窗口内，必须随行
+    //   快照）；rqEn/rqShift/rqZp/reluOn = 标量配置（同拍锁存）。
+    val rqM     = if (cfg.hasInt) Some(Input(Vec(cfg.totalN, UInt(32.W)))) else None
+    val rqEn    = if (cfg.hasInt) Some(Input(Bool()))                       else None
+    val rqShift = if (cfg.hasInt) Some(Input(UInt(6.W)))                    else None
+    val rqZp    = if (cfg.hasInt) Some(Input(SInt(16.W)))                   else None
+    val reluOn  = if (cfg.hasInt) Some(Input(Bool()))                       else None
   })
 
   // ==========================================================================
@@ -134,6 +143,14 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   // cDmaScale 按行计数提前「假满」停摆 → FIFO 塞满 → 释放条件永假 → 全链死锁。
   // 释放判据同步放宽为「scale 已交即可随 out.fire 释放」（见下方 release）。
   private val scaleSent = RegInit(false.B)
+
+  // 【P0 epilogue-2 fused requant/ReLU】配置随行锁存（同 fmtReg/rndReg 范式，
+  //   in.fire 拍原子提交；持行期间顶层 rqMRegs 可能被下一 N-tile 重载覆盖）
+  private val rqMReg     = if (cfg.hasInt) Some(RegInit(VecInit(Seq.fill(cfg.totalN)(0.U(32.W))))) else None
+  private val rqEnReg    = if (cfg.hasInt) Some(RegInit(false.B))   else None
+  private val rqShiftReg = if (cfg.hasInt) Some(RegInit(0.U(6.W)))  else None
+  private val rqZpReg    = if (cfg.hasInt) Some(RegInit(0.S(16.W))) else None
+  private val reluReg    = if (cfg.hasInt) Some(RegInit(false.B))   else None
 
   // 格式族判据（一律整值枚举比较，无位拆分；与 HiveEnum 谓词同源）：
   //   int 族（cvt 选段用）= INT32(6)/INT16(7)/INT8(8)/INT4(9)，INT4 由 #137 补入。
@@ -185,6 +202,13 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
     nEffReg   := io.nEff
     holdValid := true.B
     scaleSent := false.B                              // 新行载入清零（任务90 裁定：行级原子性）
+    if (cfg.hasInt) {                                 // P0 epilogue-2：requant/ReLU 配置随行原子提交
+      rqMReg.get     := io.rqM.get
+      rqEnReg.get    := io.rqEn.get
+      rqShiftReg.get := io.rqShift.get
+      rqZpReg.get    := io.rqZp.get
+      reluReg.get    := io.reluOn.get
+    }
   }
 
   // ==========================================================================
@@ -586,6 +610,10 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   //      裁定依据：钳位将是本仓从未存在的第三种语义（INT8/INT16/INT32 三档均无钳位），
   //      且与金锚 HiveDebugModel.decodeElem 的 INT4 分支 sext(bits,4)（纯二补码符号
   //      扩展、无饱和分支）冲突 ⟹ 依「不得自创语义」取截断绕回。
+  //      【P0 epilogue-2 例外留痕】上款「不饱和」契约的适用域 = 【非 requant 模式】；
+  //      requantOn=1 时 INT8/INT4 臂改选 HiveRequant 的饱和码行（half-up 舍入 +
+  //      per-channel M + per-tensor shift/zp + 保号饱和，语义见 HiveRequant 类头），
+  //      非 requant 行为逐字不变。
   //   ④ 符号/负零：INT8 臂原样保留 bit7（二补码无负零，-0 ≡ 0x00）→ INT4 臂原样
   //      保留 bit3（-0 ≡ 0x0）；两档均无符号扩展/符号特殊处理。
   //   ⑤ nEff 掩码：INT8 臂【不掩码】（padding 列输出真实截断位，区别于量化支路
@@ -594,11 +622,19 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   //      lane0 最低位 → INT4 臂同式 ⟹ lane i 落 nibble i（bits[4i+3:4i]）、lane0 最低位。
   //      与 MXE2M1 臂 packed4 的逐字节组装（Cat(hi=elem(2p+1), lo=elem(2p))，外层 reverse）
   //      位级等价：elem 2p 落低 nibble、elem 2p+1 落高 nibble ⟺ elem i 落 bits[4i+3:4i]。
+  //
+  // 【P0 epilogue-2 fused ReLU】ReLU 效应域 = INT 族专属（用户裁定），源级 clamp：
+  //   reluReg 为真时负槽置 0，覆盖 INT32/16/8/4 四档与 requant 链（全部消费同一
+  //   int32Seq 数据源）。等价性留痕：requant 链对 acc 单调（M 为正乘子、half-up/
+  //   饱和均保序）⟹ f(max(acc,0)) = max(f(acc), f(0)) = max(f(acc), 量化(zp+M×0)>>s)，
+  //   源级 clamp 后 requant 无需二次下界处理。fp32Seq/MX 量化支路零门控（reluOn ∧
+  //   fp/MX 输出 = 无消费者位，addrMode=TILE 先例）；reluOn=0 时 Mux 恒落 raw 侧、
+  //   逐位不变。仅 hasInt 配置生成 clamp（MX-only 配置 INT 臂运行期不可达）。
   // ==========================================================================
   private val int32Seq: Seq[UInt] = (0 until cfg.totalN).map { i =>
     val slot = lineReg(cfg.cEffW * (i + 1) - 1, cfg.cEffW * i)
-    if (cfg.cEffW >= 32) slot(31, 0)
-    else Cat(0.U((32 - cfg.cEffW).W), slot)
+    val raw  = if (cfg.cEffW >= 32) slot(31, 0) else Cat(0.U((32 - cfg.cEffW).W), slot)
+    if (cfg.hasInt) Mux(reluReg.get && raw.asSInt < 0.S, 0.U(32.W), raw) else raw
   }
   private val packedInt32: UInt = Cat(int32Seq.reverse)
   private val packedInt16: UInt = Cat(int32Seq.reverse.map(_(15, 0)))
@@ -607,10 +643,35 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   private val packedInt4: UInt  = Cat(int32Seq.reverse.map(_(3, 0)))
 
   // ==========================================================================
+  // 【P0 epilogue-2 fused requant】数值核 = 独立模块 HiveRequant（totalN-lane 并行
+  //   纯组合；用户裁定「该功能涉及多个计算，独立出一个模块」）：acc 取 ReLU clamp
+  //   后的 int32Seq（单一数据源），M/shift/zp 取随行锁存值，isInt4 由 fmtReg 决定；
+  //   输出 = INT8/INT4 饱和码行（half-up 舍入 + per-channel M + per-tensor shift/zp）。
+  //   仅 hasInt 配置例化；requantOn=0 时 rqEnReg=0，out.bits 的 INT8/INT4 臂落
+  //   packedInt8/packedInt4 侧，与既有行为逐位相同。
+  // ==========================================================================
+  private val requantMod = if (cfg.hasInt) Some(Module(new HiveRequant(cfg))) else None
+  if (cfg.hasInt) {
+    requantMod.get.io.acc    := VecInit(int32Seq)
+    requantMod.get.io.m      := rqMReg.get
+    requantMod.get.io.shift  := rqShiftReg.get
+    requantMod.get.io.zp     := rqZpReg.get
+    requantMod.get.io.isInt4 := isInt4Fmt
+  }
+
+  // ==========================================================================
   // out 密集行选段（契约见类头）：默认臂 = fp32，#137 起【仅】覆盖 reserved 编码
   // 10..15（DataFormat 枚举无成员 ⟹ 九条谓词全假）；INT4(9) 已有专属臂，不再回落。
   // 量化/16/8/4/int 支路按选中格式落低位、高位零填充（int4/mxfp4 同为 totalN×28 填零）。
+  // 【P0 epilogue-2】INT8/INT4 臂追加 requant 选通：rqEnReg=1 时改选 HiveRequant 输出
+  //   （饱和码行，高位已零填充），否则落既有截断臂（非 requant 语义逐字不变）。
   // ==========================================================================
+  private val int8Arm = if (cfg.hasInt)
+    Mux(rqEnReg.get, requantMod.get.io.out, Cat(0.U((cfg.totalN * 24).W), packedInt8))
+  else Cat(0.U((cfg.totalN * 24).W), packedInt8)
+  private val int4Arm = if (cfg.hasInt)
+    Mux(rqEnReg.get, requantMod.get.io.out, Cat(0.U((cfg.totalN * 28).W), packedInt4))
+  else Cat(0.U((cfg.totalN * 28).W), packedInt4)
   io.out.bits := MuxCase(packed32, Seq(
     (fmtReg === DataFormat.FP16)   -> Cat(0.U((cfg.totalN * 16).W), packed16),
     (fmtReg === DataFormat.BF16)   -> Cat(0.U((cfg.totalN * 16).W), packed16),
@@ -619,8 +680,8 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
     (fmtReg === DataFormat.MXE2M1) -> Cat(0.U((cfg.totalN * 28).W), packed4),
     isInt32Fmt                    -> packedInt32,
     isInt16Fmt                    -> Cat(0.U((cfg.totalN * 16).W), packedInt16),
-    isInt8Fmt                     -> Cat(0.U((cfg.totalN * 24).W), packedInt8),
-    isInt4Fmt                     -> Cat(0.U((cfg.totalN * 28).W), packedInt4)
+    isInt8Fmt                     -> int8Arm,
+    isInt4Fmt                     -> int4Arm
   ))
   // scaleOut：valid 门见上方握手块；数值 = scaleWire（持行期 lineReg 恒定，组合安全）
   io.scaleOut.bits := scaleWire

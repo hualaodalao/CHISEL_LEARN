@@ -58,32 +58,74 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
   output [511:0] io_out_bits,	// src/hive/scala/main/HiveOutCvt.scala:108:14
   input          io_scaleOut_ready,	// src/hive/scala/main/HiveOutCvt.scala:108:14
   output         io_scaleOut_valid,	// src/hive/scala/main/HiveOutCvt.scala:108:14
-  output [7:0]   io_scaleOut_bits	// src/hive/scala/main/HiveOutCvt.scala:108:14
+  output [7:0]   io_scaleOut_bits,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+  input  [31:0]  io_rqM_0,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+                 io_rqM_1,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+                 io_rqM_2,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+                 io_rqM_3,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+                 io_rqM_4,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+                 io_rqM_5,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+                 io_rqM_6,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+                 io_rqM_7,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+                 io_rqM_8,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+                 io_rqM_9,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+                 io_rqM_10,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+                 io_rqM_11,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+                 io_rqM_12,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+                 io_rqM_13,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+                 io_rqM_14,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+                 io_rqM_15,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+  input          io_rqEn,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+  input  [5:0]   io_rqShift,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+  input  [15:0]  io_rqZp,	// src/hive/scala/main/HiveOutCvt.scala:108:14
+  input          io_reluOn	// src/hive/scala/main/HiveOutCvt.scala:108:14
 );
 
-  wire         io_scaleOut_valid_0;	// src/hive/scala/main/HiveOutCvt.scala:168:{34,48,62}
-  wire         io_out_valid_0;	// src/hive/scala/main/HiveOutCvt.scala:160:34
-  reg          holdValid;	// src/hive/scala/main/HiveOutCvt.scala:122:34
-  reg  [639:0] lineReg;	// src/hive/scala/main/HiveOutCvt.scala:123:34
-  reg  [3:0]   fmtReg;	// src/hive/scala/main/HiveOutCvt.scala:124:34
-  reg  [2:0]   rndReg;	// src/hive/scala/main/HiveOutCvt.scala:125:34
-  reg          blkReg;	// src/hive/scala/main/HiveOutCvt.scala:126:34
-  reg  [4:0]   nEffReg;	// src/hive/scala/main/HiveOutCvt.scala:127:34
-  reg          dataDone;	// src/hive/scala/main/HiveOutCvt.scala:129:34
-  reg          scaleSent;	// src/hive/scala/main/HiveOutCvt.scala:136:34
-  wire         isQE4M3 = fmtReg == 4'h3;	// src/hive/scala/main/HiveEnum.scala:9:42, src/hive/scala/main/HiveOutCvt.scala:124:34
-  wire         isQE5M2 = fmtReg == 4'h4;	// src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:124:34
-  wire         _io_out_bits_T_8 = fmtReg == 4'h5;	// src/hive/scala/main/HiveEnum.scala:9:74, src/hive/scala/main/HiveOutCvt.scala:124:34
+  wire         io_scaleOut_valid_0;	// src/hive/scala/main/HiveOutCvt.scala:185:{34,48,62}
+  wire         io_out_valid_0;	// src/hive/scala/main/HiveOutCvt.scala:177:34
+  wire [511:0] _requantMod_io_out;	// src/hive/scala/main/HiveOutCvt.scala:653:55
+  reg          holdValid;	// src/hive/scala/main/HiveOutCvt.scala:131:34
+  reg  [639:0] lineReg;	// src/hive/scala/main/HiveOutCvt.scala:132:34
+  reg  [3:0]   fmtReg;	// src/hive/scala/main/HiveOutCvt.scala:133:34
+  reg  [2:0]   rndReg;	// src/hive/scala/main/HiveOutCvt.scala:134:34
+  reg          blkReg;	// src/hive/scala/main/HiveOutCvt.scala:135:34
+  reg  [4:0]   nEffReg;	// src/hive/scala/main/HiveOutCvt.scala:136:34
+  reg          dataDone;	// src/hive/scala/main/HiveOutCvt.scala:138:34
+  reg          scaleSent;	// src/hive/scala/main/HiveOutCvt.scala:145:34
+  reg  [31:0]  rqMReg_0;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+  reg  [31:0]  rqMReg_1;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+  reg  [31:0]  rqMReg_2;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+  reg  [31:0]  rqMReg_3;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+  reg  [31:0]  rqMReg_4;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+  reg  [31:0]  rqMReg_5;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+  reg  [31:0]  rqMReg_6;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+  reg  [31:0]  rqMReg_7;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+  reg  [31:0]  rqMReg_8;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+  reg  [31:0]  rqMReg_9;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+  reg  [31:0]  rqMReg_10;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+  reg  [31:0]  rqMReg_11;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+  reg  [31:0]  rqMReg_12;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+  reg  [31:0]  rqMReg_13;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+  reg  [31:0]  rqMReg_14;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+  reg  [31:0]  rqMReg_15;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+  reg          rqEnReg;	// src/hive/scala/main/HiveOutCvt.scala:150:56
+  reg  [5:0]   rqShiftReg;	// src/hive/scala/main/HiveOutCvt.scala:151:56
+  reg  [15:0]  rqZpReg;	// src/hive/scala/main/HiveOutCvt.scala:152:56
+  reg          reluReg;	// src/hive/scala/main/HiveOutCvt.scala:153:56
+  wire         isInt4Fmt = fmtReg == 4'h9;	// src/hive/scala/main/HiveOutCvt.scala:133:34, :167:35
+  wire         isQE4M3 = fmtReg == 4'h3;	// src/hive/scala/main/HiveEnum.scala:9:42, src/hive/scala/main/HiveOutCvt.scala:133:34
+  wire         isQE5M2 = fmtReg == 4'h4;	// src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:133:34
+  wire         _io_out_bits_T_8 = fmtReg == 4'h5;	// src/hive/scala/main/HiveEnum.scala:9:74, src/hive/scala/main/HiveOutCvt.scala:133:34
   wire         isQuantFmt = isQE4M3 | isQE5M2 | _io_out_bits_T_8;	// src/hive/scala/main/HiveEnum.scala:9:{42,53,58,69,74}
-  wire         _release_T = io_out_ready & io_out_valid_0;	// src/hive/scala/main/HiveOutCvt.scala:160:34, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-  wire         _release_T_6 = io_scaleOut_ready & io_scaleOut_valid_0;	// src/hive/scala/main/HiveOutCvt.scala:168:{34,48,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+  wire         _release_T = io_out_ready & io_out_valid_0;	// src/hive/scala/main/HiveOutCvt.scala:177:34, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+  wire         _release_T_6 = io_scaleOut_ready & io_scaleOut_valid_0;	// src/hive/scala/main/HiveOutCvt.scala:185:{34,48,62}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
   wire         release_0 =
-    _release_T & (~isQuantFmt | scaleSent | _release_T_6) | dataDone & _release_T_6;	// src/hive/scala/main/HiveEnum.scala:9:{53,69}, src/hive/scala/main/HiveOutCvt.scala:129:34, :136:34, :157:{38,42,54,67,89}, :158:35, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-  wire         io_in_ready_0 = ~holdValid | release_0;	// src/hive/scala/main/HiveOutCvt.scala:122:34, :157:89, :159:{24,35}
-  assign io_out_valid_0 = holdValid & ~dataDone;	// src/hive/scala/main/HiveOutCvt.scala:122:34, :129:34, :160:{34,37}
+    _release_T & (~isQuantFmt | scaleSent | _release_T_6) | dataDone & _release_T_6;	// src/hive/scala/main/HiveEnum.scala:9:{53,69}, src/hive/scala/main/HiveOutCvt.scala:138:34, :145:34, :174:{38,42,54,67,89}, :175:35, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+  wire         io_in_ready_0 = ~holdValid | release_0;	// src/hive/scala/main/HiveOutCvt.scala:131:34, :174:89, :176:{24,35}
+  assign io_out_valid_0 = holdValid & ~dataDone;	// src/hive/scala/main/HiveOutCvt.scala:131:34, :138:34, :177:{34,37}
   assign io_scaleOut_valid_0 =
-    holdValid & isQuantFmt & ~scaleSent & (dataDone | io_out_ready);	// src/hive/scala/main/HiveEnum.scala:9:{53,69}, src/hive/scala/main/HiveOutCvt.scala:122:34, :129:34, :136:34, :168:{34,48,51,62,75}
-  wire [15:0]  _fp32Seq_lzc_T_9 = {8'h0, lineReg[15:8]} | {lineReg[7:0], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+    holdValid & isQuantFmt & ~scaleSent & (dataDone | io_out_ready);	// src/hive/scala/main/HiveEnum.scala:9:{53,69}, src/hive/scala/main/HiveOutCvt.scala:131:34, :138:34, :145:34, :185:{34,48,51,62,75}
+  wire [15:0]  _fp32Seq_lzc_T_9 = {8'h0, lineReg[15:8]} | {lineReg[7:0], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [15:0]  _fp32Seq_lzc_T_19 =
     {4'h0, _fp32Seq_lzc_T_9[15:4] & 12'hF0F} | {_fp32Seq_lzc_T_9[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [15:0]  _fp32Seq_lzc_T_29 =
@@ -91,7 +133,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
     | {_fp32Seq_lzc_T_19[13:0] & 14'h3333, 2'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [14:0]  _fp32Seq_lzc_T_39 =
     _fp32Seq_lzc_T_29[15:1] & 15'h5555 | {1'h0, _fp32Seq_lzc_T_29[12:0] & 13'h1555, 1'h0};	// src/hive/scala/main/Fp32.scala:271:38
-  wire [7:0]   _fp32Seq_lzc_T_50 = {4'h0, lineReg[23:20]} | {lineReg[19:16], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+  wire [7:0]   _fp32Seq_lzc_T_50 = {4'h0, lineReg[23:20]} | {lineReg[19:16], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [7:0]   _fp32Seq_lzc_T_60 =
     {2'h0, _fp32Seq_lzc_T_50[7:2] & 6'h33} | {_fp32Seq_lzc_T_50[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [7:0]   _fp32Seq_lzc_T_70 =
@@ -157,8 +199,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _fp32Seq_lzc_T_39[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :299:26, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
-  wire [61:0]  _fp32Seq_normed_T = {31'h0, lineReg[30:0]} << fp32Seq_lzc;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8, src/main/scala/chisel3/util/Mux.scala:58:84
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:13, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _fp32Seq_normed_T = {31'h0, lineReg[30:0]} << fp32Seq_lzc;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:8, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [23:0]  fp32Seq_mSum =
     {1'h0, _fp32Seq_normed_T[29:7]}
     + {23'h0,
@@ -170,8 +212,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
       : {lineReg[39],
          (lineReg[38:31] > _GEN ? lineReg[38:31] - _GEN : 8'h0)
            + {7'h0, fp32Seq_mSum[23]},
-         fp32Seq_mSum[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8
-  wire [15:0]  _fp32Seq_lzc_T_161 = {8'h0, lineReg[55:48]} | {lineReg[47:40], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+         fp32Seq_mSum[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :323:26, :369:8
+  wire [15:0]  _fp32Seq_lzc_T_161 = {8'h0, lineReg[55:48]} | {lineReg[47:40], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [15:0]  _fp32Seq_lzc_T_171 =
     {4'h0, _fp32Seq_lzc_T_161[15:4] & 12'hF0F}
     | {_fp32Seq_lzc_T_161[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:271:38
@@ -181,7 +223,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
   wire [14:0]  _fp32Seq_lzc_T_191 =
     _fp32Seq_lzc_T_181[15:1] & 15'h5555
     | {1'h0, _fp32Seq_lzc_T_181[12:0] & 13'h1555, 1'h0};	// src/hive/scala/main/Fp32.scala:271:38
-  wire [7:0]   _fp32Seq_lzc_T_202 = {4'h0, lineReg[63:60]} | {lineReg[59:56], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+  wire [7:0]   _fp32Seq_lzc_T_202 = {4'h0, lineReg[63:60]} | {lineReg[59:56], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [7:0]   _fp32Seq_lzc_T_212 =
     {2'h0, _fp32Seq_lzc_T_202[7:2] & 6'h33} | {_fp32Seq_lzc_T_202[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [7:0]   _fp32Seq_lzc_T_222 =
@@ -247,8 +289,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _fp32Seq_lzc_T_191[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :299:26, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
-  wire [61:0]  _fp32Seq_normed_T_1 = {31'h0, lineReg[70:40]} << fp32Seq_lzc_1;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8, src/main/scala/chisel3/util/Mux.scala:58:84
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:13, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _fp32Seq_normed_T_1 = {31'h0, lineReg[70:40]} << fp32Seq_lzc_1;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:8, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [23:0]  fp32Seq_mSum_1 =
     {1'h0, _fp32Seq_normed_T_1[29:7]}
     + {23'h0,
@@ -260,8 +302,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
       : {lineReg[79],
          (lineReg[78:71] > _GEN_0 ? lineReg[78:71] - _GEN_0 : 8'h0)
            + {7'h0, fp32Seq_mSum_1[23]},
-         fp32Seq_mSum_1[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8
-  wire [15:0]  _fp32Seq_lzc_T_313 = {8'h0, lineReg[95:88]} | {lineReg[87:80], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+         fp32Seq_mSum_1[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :323:26, :369:8
+  wire [15:0]  _fp32Seq_lzc_T_313 = {8'h0, lineReg[95:88]} | {lineReg[87:80], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [15:0]  _fp32Seq_lzc_T_323 =
     {4'h0, _fp32Seq_lzc_T_313[15:4] & 12'hF0F}
     | {_fp32Seq_lzc_T_313[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:271:38
@@ -271,7 +313,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
   wire [14:0]  _fp32Seq_lzc_T_343 =
     _fp32Seq_lzc_T_333[15:1] & 15'h5555
     | {1'h0, _fp32Seq_lzc_T_333[12:0] & 13'h1555, 1'h0};	// src/hive/scala/main/Fp32.scala:271:38
-  wire [7:0]   _fp32Seq_lzc_T_354 = {4'h0, lineReg[103:100]} | {lineReg[99:96], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+  wire [7:0]   _fp32Seq_lzc_T_354 = {4'h0, lineReg[103:100]} | {lineReg[99:96], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [7:0]   _fp32Seq_lzc_T_364 =
     {2'h0, _fp32Seq_lzc_T_354[7:2] & 6'h33} | {_fp32Seq_lzc_T_354[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [7:0]   _fp32Seq_lzc_T_374 =
@@ -337,8 +379,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _fp32Seq_lzc_T_343[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :299:26, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
-  wire [61:0]  _fp32Seq_normed_T_2 = {31'h0, lineReg[110:80]} << fp32Seq_lzc_2;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8, src/main/scala/chisel3/util/Mux.scala:58:84
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:13, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _fp32Seq_normed_T_2 = {31'h0, lineReg[110:80]} << fp32Seq_lzc_2;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:8, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [23:0]  fp32Seq_mSum_2 =
     {1'h0, _fp32Seq_normed_T_2[29:7]}
     + {23'h0,
@@ -350,8 +392,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
       : {lineReg[119],
          (lineReg[118:111] > _GEN_1 ? lineReg[118:111] - _GEN_1 : 8'h0)
            + {7'h0, fp32Seq_mSum_2[23]},
-         fp32Seq_mSum_2[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8
-  wire [15:0]  _fp32Seq_lzc_T_465 = {8'h0, lineReg[135:128]} | {lineReg[127:120], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+         fp32Seq_mSum_2[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :323:26, :369:8
+  wire [15:0]  _fp32Seq_lzc_T_465 = {8'h0, lineReg[135:128]} | {lineReg[127:120], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [15:0]  _fp32Seq_lzc_T_475 =
     {4'h0, _fp32Seq_lzc_T_465[15:4] & 12'hF0F}
     | {_fp32Seq_lzc_T_465[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:271:38
@@ -361,7 +403,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
   wire [14:0]  _fp32Seq_lzc_T_495 =
     _fp32Seq_lzc_T_485[15:1] & 15'h5555
     | {1'h0, _fp32Seq_lzc_T_485[12:0] & 13'h1555, 1'h0};	// src/hive/scala/main/Fp32.scala:271:38
-  wire [7:0]   _fp32Seq_lzc_T_506 = {4'h0, lineReg[143:140]} | {lineReg[139:136], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+  wire [7:0]   _fp32Seq_lzc_T_506 = {4'h0, lineReg[143:140]} | {lineReg[139:136], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [7:0]   _fp32Seq_lzc_T_516 =
     {2'h0, _fp32Seq_lzc_T_506[7:2] & 6'h33} | {_fp32Seq_lzc_T_506[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [7:0]   _fp32Seq_lzc_T_526 =
@@ -427,8 +469,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _fp32Seq_lzc_T_495[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :299:26, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
-  wire [61:0]  _fp32Seq_normed_T_3 = {31'h0, lineReg[150:120]} << fp32Seq_lzc_3;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8, src/main/scala/chisel3/util/Mux.scala:58:84
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:13, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _fp32Seq_normed_T_3 = {31'h0, lineReg[150:120]} << fp32Seq_lzc_3;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:8, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [23:0]  fp32Seq_mSum_3 =
     {1'h0, _fp32Seq_normed_T_3[29:7]}
     + {23'h0,
@@ -440,8 +482,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
       : {lineReg[159],
          (lineReg[158:151] > _GEN_2 ? lineReg[158:151] - _GEN_2 : 8'h0)
            + {7'h0, fp32Seq_mSum_3[23]},
-         fp32Seq_mSum_3[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8
-  wire [15:0]  _fp32Seq_lzc_T_617 = {8'h0, lineReg[175:168]} | {lineReg[167:160], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+         fp32Seq_mSum_3[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :323:26, :369:8
+  wire [15:0]  _fp32Seq_lzc_T_617 = {8'h0, lineReg[175:168]} | {lineReg[167:160], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [15:0]  _fp32Seq_lzc_T_627 =
     {4'h0, _fp32Seq_lzc_T_617[15:4] & 12'hF0F}
     | {_fp32Seq_lzc_T_617[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:271:38
@@ -451,7 +493,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
   wire [14:0]  _fp32Seq_lzc_T_647 =
     _fp32Seq_lzc_T_637[15:1] & 15'h5555
     | {1'h0, _fp32Seq_lzc_T_637[12:0] & 13'h1555, 1'h0};	// src/hive/scala/main/Fp32.scala:271:38
-  wire [7:0]   _fp32Seq_lzc_T_658 = {4'h0, lineReg[183:180]} | {lineReg[179:176], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+  wire [7:0]   _fp32Seq_lzc_T_658 = {4'h0, lineReg[183:180]} | {lineReg[179:176], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [7:0]   _fp32Seq_lzc_T_668 =
     {2'h0, _fp32Seq_lzc_T_658[7:2] & 6'h33} | {_fp32Seq_lzc_T_658[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [7:0]   _fp32Seq_lzc_T_678 =
@@ -517,8 +559,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _fp32Seq_lzc_T_647[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :299:26, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
-  wire [61:0]  _fp32Seq_normed_T_4 = {31'h0, lineReg[190:160]} << fp32Seq_lzc_4;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8, src/main/scala/chisel3/util/Mux.scala:58:84
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:13, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _fp32Seq_normed_T_4 = {31'h0, lineReg[190:160]} << fp32Seq_lzc_4;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:8, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [23:0]  fp32Seq_mSum_4 =
     {1'h0, _fp32Seq_normed_T_4[29:7]}
     + {23'h0,
@@ -530,8 +572,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
       : {lineReg[199],
          (lineReg[198:191] > _GEN_3 ? lineReg[198:191] - _GEN_3 : 8'h0)
            + {7'h0, fp32Seq_mSum_4[23]},
-         fp32Seq_mSum_4[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8
-  wire [15:0]  _fp32Seq_lzc_T_769 = {8'h0, lineReg[215:208]} | {lineReg[207:200], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+         fp32Seq_mSum_4[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :323:26, :369:8
+  wire [15:0]  _fp32Seq_lzc_T_769 = {8'h0, lineReg[215:208]} | {lineReg[207:200], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [15:0]  _fp32Seq_lzc_T_779 =
     {4'h0, _fp32Seq_lzc_T_769[15:4] & 12'hF0F}
     | {_fp32Seq_lzc_T_769[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:271:38
@@ -541,7 +583,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
   wire [14:0]  _fp32Seq_lzc_T_799 =
     _fp32Seq_lzc_T_789[15:1] & 15'h5555
     | {1'h0, _fp32Seq_lzc_T_789[12:0] & 13'h1555, 1'h0};	// src/hive/scala/main/Fp32.scala:271:38
-  wire [7:0]   _fp32Seq_lzc_T_810 = {4'h0, lineReg[223:220]} | {lineReg[219:216], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+  wire [7:0]   _fp32Seq_lzc_T_810 = {4'h0, lineReg[223:220]} | {lineReg[219:216], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [7:0]   _fp32Seq_lzc_T_820 =
     {2'h0, _fp32Seq_lzc_T_810[7:2] & 6'h33} | {_fp32Seq_lzc_T_810[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [7:0]   _fp32Seq_lzc_T_830 =
@@ -607,8 +649,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _fp32Seq_lzc_T_799[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :299:26, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
-  wire [61:0]  _fp32Seq_normed_T_5 = {31'h0, lineReg[230:200]} << fp32Seq_lzc_5;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8, src/main/scala/chisel3/util/Mux.scala:58:84
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:13, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _fp32Seq_normed_T_5 = {31'h0, lineReg[230:200]} << fp32Seq_lzc_5;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:8, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [23:0]  fp32Seq_mSum_5 =
     {1'h0, _fp32Seq_normed_T_5[29:7]}
     + {23'h0,
@@ -620,8 +662,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
       : {lineReg[239],
          (lineReg[238:231] > _GEN_4 ? lineReg[238:231] - _GEN_4 : 8'h0)
            + {7'h0, fp32Seq_mSum_5[23]},
-         fp32Seq_mSum_5[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8
-  wire [15:0]  _fp32Seq_lzc_T_921 = {8'h0, lineReg[255:248]} | {lineReg[247:240], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+         fp32Seq_mSum_5[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :323:26, :369:8
+  wire [15:0]  _fp32Seq_lzc_T_921 = {8'h0, lineReg[255:248]} | {lineReg[247:240], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [15:0]  _fp32Seq_lzc_T_931 =
     {4'h0, _fp32Seq_lzc_T_921[15:4] & 12'hF0F}
     | {_fp32Seq_lzc_T_921[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:271:38
@@ -631,7 +673,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
   wire [14:0]  _fp32Seq_lzc_T_951 =
     _fp32Seq_lzc_T_941[15:1] & 15'h5555
     | {1'h0, _fp32Seq_lzc_T_941[12:0] & 13'h1555, 1'h0};	// src/hive/scala/main/Fp32.scala:271:38
-  wire [7:0]   _fp32Seq_lzc_T_962 = {4'h0, lineReg[263:260]} | {lineReg[259:256], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+  wire [7:0]   _fp32Seq_lzc_T_962 = {4'h0, lineReg[263:260]} | {lineReg[259:256], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [7:0]   _fp32Seq_lzc_T_972 =
     {2'h0, _fp32Seq_lzc_T_962[7:2] & 6'h33} | {_fp32Seq_lzc_T_962[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [7:0]   _fp32Seq_lzc_T_982 =
@@ -697,8 +739,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _fp32Seq_lzc_T_951[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :299:26, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
-  wire [61:0]  _fp32Seq_normed_T_6 = {31'h0, lineReg[270:240]} << fp32Seq_lzc_6;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8, src/main/scala/chisel3/util/Mux.scala:58:84
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:13, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _fp32Seq_normed_T_6 = {31'h0, lineReg[270:240]} << fp32Seq_lzc_6;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:8, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [23:0]  fp32Seq_mSum_6 =
     {1'h0, _fp32Seq_normed_T_6[29:7]}
     + {23'h0,
@@ -710,8 +752,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
       : {lineReg[279],
          (lineReg[278:271] > _GEN_5 ? lineReg[278:271] - _GEN_5 : 8'h0)
            + {7'h0, fp32Seq_mSum_6[23]},
-         fp32Seq_mSum_6[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8
-  wire [15:0]  _fp32Seq_lzc_T_1073 = {8'h0, lineReg[295:288]} | {lineReg[287:280], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+         fp32Seq_mSum_6[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :323:26, :369:8
+  wire [15:0]  _fp32Seq_lzc_T_1073 = {8'h0, lineReg[295:288]} | {lineReg[287:280], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [15:0]  _fp32Seq_lzc_T_1083 =
     {4'h0, _fp32Seq_lzc_T_1073[15:4] & 12'hF0F}
     | {_fp32Seq_lzc_T_1073[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:271:38
@@ -721,7 +763,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
   wire [14:0]  _fp32Seq_lzc_T_1103 =
     _fp32Seq_lzc_T_1093[15:1] & 15'h5555
     | {1'h0, _fp32Seq_lzc_T_1093[12:0] & 13'h1555, 1'h0};	// src/hive/scala/main/Fp32.scala:271:38
-  wire [7:0]   _fp32Seq_lzc_T_1114 = {4'h0, lineReg[303:300]} | {lineReg[299:296], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+  wire [7:0]   _fp32Seq_lzc_T_1114 = {4'h0, lineReg[303:300]} | {lineReg[299:296], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [7:0]   _fp32Seq_lzc_T_1124 =
     {2'h0, _fp32Seq_lzc_T_1114[7:2] & 6'h33} | {_fp32Seq_lzc_T_1114[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [7:0]   _fp32Seq_lzc_T_1134 =
@@ -787,8 +829,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _fp32Seq_lzc_T_1103[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :299:26, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
-  wire [61:0]  _fp32Seq_normed_T_7 = {31'h0, lineReg[310:280]} << fp32Seq_lzc_7;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8, src/main/scala/chisel3/util/Mux.scala:58:84
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:13, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _fp32Seq_normed_T_7 = {31'h0, lineReg[310:280]} << fp32Seq_lzc_7;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:8, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [23:0]  fp32Seq_mSum_7 =
     {1'h0, _fp32Seq_normed_T_7[29:7]}
     + {23'h0,
@@ -800,8 +842,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
       : {lineReg[319],
          (lineReg[318:311] > _GEN_6 ? lineReg[318:311] - _GEN_6 : 8'h0)
            + {7'h0, fp32Seq_mSum_7[23]},
-         fp32Seq_mSum_7[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8
-  wire [15:0]  _fp32Seq_lzc_T_1225 = {8'h0, lineReg[335:328]} | {lineReg[327:320], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+         fp32Seq_mSum_7[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :323:26, :369:8
+  wire [15:0]  _fp32Seq_lzc_T_1225 = {8'h0, lineReg[335:328]} | {lineReg[327:320], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [15:0]  _fp32Seq_lzc_T_1235 =
     {4'h0, _fp32Seq_lzc_T_1225[15:4] & 12'hF0F}
     | {_fp32Seq_lzc_T_1225[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:271:38
@@ -811,7 +853,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
   wire [14:0]  _fp32Seq_lzc_T_1255 =
     _fp32Seq_lzc_T_1245[15:1] & 15'h5555
     | {1'h0, _fp32Seq_lzc_T_1245[12:0] & 13'h1555, 1'h0};	// src/hive/scala/main/Fp32.scala:271:38
-  wire [7:0]   _fp32Seq_lzc_T_1266 = {4'h0, lineReg[343:340]} | {lineReg[339:336], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+  wire [7:0]   _fp32Seq_lzc_T_1266 = {4'h0, lineReg[343:340]} | {lineReg[339:336], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [7:0]   _fp32Seq_lzc_T_1276 =
     {2'h0, _fp32Seq_lzc_T_1266[7:2] & 6'h33} | {_fp32Seq_lzc_T_1266[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [7:0]   _fp32Seq_lzc_T_1286 =
@@ -877,8 +919,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _fp32Seq_lzc_T_1255[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :299:26, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
-  wire [61:0]  _fp32Seq_normed_T_8 = {31'h0, lineReg[350:320]} << fp32Seq_lzc_8;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8, src/main/scala/chisel3/util/Mux.scala:58:84
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:13, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _fp32Seq_normed_T_8 = {31'h0, lineReg[350:320]} << fp32Seq_lzc_8;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:8, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [23:0]  fp32Seq_mSum_8 =
     {1'h0, _fp32Seq_normed_T_8[29:7]}
     + {23'h0,
@@ -890,8 +932,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
       : {lineReg[359],
          (lineReg[358:351] > _GEN_7 ? lineReg[358:351] - _GEN_7 : 8'h0)
            + {7'h0, fp32Seq_mSum_8[23]},
-         fp32Seq_mSum_8[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8
-  wire [15:0]  _fp32Seq_lzc_T_1377 = {8'h0, lineReg[375:368]} | {lineReg[367:360], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+         fp32Seq_mSum_8[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :323:26, :369:8
+  wire [15:0]  _fp32Seq_lzc_T_1377 = {8'h0, lineReg[375:368]} | {lineReg[367:360], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [15:0]  _fp32Seq_lzc_T_1387 =
     {4'h0, _fp32Seq_lzc_T_1377[15:4] & 12'hF0F}
     | {_fp32Seq_lzc_T_1377[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:271:38
@@ -901,7 +943,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
   wire [14:0]  _fp32Seq_lzc_T_1407 =
     _fp32Seq_lzc_T_1397[15:1] & 15'h5555
     | {1'h0, _fp32Seq_lzc_T_1397[12:0] & 13'h1555, 1'h0};	// src/hive/scala/main/Fp32.scala:271:38
-  wire [7:0]   _fp32Seq_lzc_T_1418 = {4'h0, lineReg[383:380]} | {lineReg[379:376], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+  wire [7:0]   _fp32Seq_lzc_T_1418 = {4'h0, lineReg[383:380]} | {lineReg[379:376], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [7:0]   _fp32Seq_lzc_T_1428 =
     {2'h0, _fp32Seq_lzc_T_1418[7:2] & 6'h33} | {_fp32Seq_lzc_T_1418[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [7:0]   _fp32Seq_lzc_T_1438 =
@@ -967,8 +1009,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _fp32Seq_lzc_T_1407[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :299:26, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
-  wire [61:0]  _fp32Seq_normed_T_9 = {31'h0, lineReg[390:360]} << fp32Seq_lzc_9;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8, src/main/scala/chisel3/util/Mux.scala:58:84
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:13, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _fp32Seq_normed_T_9 = {31'h0, lineReg[390:360]} << fp32Seq_lzc_9;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:8, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [23:0]  fp32Seq_mSum_9 =
     {1'h0, _fp32Seq_normed_T_9[29:7]}
     + {23'h0,
@@ -980,8 +1022,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
       : {lineReg[399],
          (lineReg[398:391] > _GEN_8 ? lineReg[398:391] - _GEN_8 : 8'h0)
            + {7'h0, fp32Seq_mSum_9[23]},
-         fp32Seq_mSum_9[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8
-  wire [15:0]  _fp32Seq_lzc_T_1529 = {8'h0, lineReg[415:408]} | {lineReg[407:400], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+         fp32Seq_mSum_9[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :323:26, :369:8
+  wire [15:0]  _fp32Seq_lzc_T_1529 = {8'h0, lineReg[415:408]} | {lineReg[407:400], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [15:0]  _fp32Seq_lzc_T_1539 =
     {4'h0, _fp32Seq_lzc_T_1529[15:4] & 12'hF0F}
     | {_fp32Seq_lzc_T_1529[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:271:38
@@ -991,7 +1033,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
   wire [14:0]  _fp32Seq_lzc_T_1559 =
     _fp32Seq_lzc_T_1549[15:1] & 15'h5555
     | {1'h0, _fp32Seq_lzc_T_1549[12:0] & 13'h1555, 1'h0};	// src/hive/scala/main/Fp32.scala:271:38
-  wire [7:0]   _fp32Seq_lzc_T_1570 = {4'h0, lineReg[423:420]} | {lineReg[419:416], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+  wire [7:0]   _fp32Seq_lzc_T_1570 = {4'h0, lineReg[423:420]} | {lineReg[419:416], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [7:0]   _fp32Seq_lzc_T_1580 =
     {2'h0, _fp32Seq_lzc_T_1570[7:2] & 6'h33} | {_fp32Seq_lzc_T_1570[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [7:0]   _fp32Seq_lzc_T_1590 =
@@ -1057,8 +1099,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _fp32Seq_lzc_T_1559[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :299:26, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
-  wire [61:0]  _fp32Seq_normed_T_10 = {31'h0, lineReg[430:400]} << fp32Seq_lzc_10;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8, src/main/scala/chisel3/util/Mux.scala:58:84
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:13, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _fp32Seq_normed_T_10 = {31'h0, lineReg[430:400]} << fp32Seq_lzc_10;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:8, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [23:0]  fp32Seq_mSum_10 =
     {1'h0, _fp32Seq_normed_T_10[29:7]}
     + {23'h0,
@@ -1071,8 +1113,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
       : {lineReg[439],
          (lineReg[438:431] > _GEN_9 ? lineReg[438:431] - _GEN_9 : 8'h0)
            + {7'h0, fp32Seq_mSum_10[23]},
-         fp32Seq_mSum_10[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8
-  wire [15:0]  _fp32Seq_lzc_T_1681 = {8'h0, lineReg[455:448]} | {lineReg[447:440], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+         fp32Seq_mSum_10[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :323:26, :369:8
+  wire [15:0]  _fp32Seq_lzc_T_1681 = {8'h0, lineReg[455:448]} | {lineReg[447:440], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [15:0]  _fp32Seq_lzc_T_1691 =
     {4'h0, _fp32Seq_lzc_T_1681[15:4] & 12'hF0F}
     | {_fp32Seq_lzc_T_1681[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:271:38
@@ -1082,7 +1124,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
   wire [14:0]  _fp32Seq_lzc_T_1711 =
     _fp32Seq_lzc_T_1701[15:1] & 15'h5555
     | {1'h0, _fp32Seq_lzc_T_1701[12:0] & 13'h1555, 1'h0};	// src/hive/scala/main/Fp32.scala:271:38
-  wire [7:0]   _fp32Seq_lzc_T_1722 = {4'h0, lineReg[463:460]} | {lineReg[459:456], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+  wire [7:0]   _fp32Seq_lzc_T_1722 = {4'h0, lineReg[463:460]} | {lineReg[459:456], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [7:0]   _fp32Seq_lzc_T_1732 =
     {2'h0, _fp32Seq_lzc_T_1722[7:2] & 6'h33} | {_fp32Seq_lzc_T_1722[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [7:0]   _fp32Seq_lzc_T_1742 =
@@ -1148,8 +1190,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _fp32Seq_lzc_T_1711[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :299:26, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
-  wire [61:0]  _fp32Seq_normed_T_11 = {31'h0, lineReg[470:440]} << fp32Seq_lzc_11;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8, src/main/scala/chisel3/util/Mux.scala:58:84
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:13, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _fp32Seq_normed_T_11 = {31'h0, lineReg[470:440]} << fp32Seq_lzc_11;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:8, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [23:0]  fp32Seq_mSum_11 =
     {1'h0, _fp32Seq_normed_T_11[29:7]}
     + {23'h0,
@@ -1162,8 +1204,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
       : {lineReg[479],
          (lineReg[478:471] > _GEN_10 ? lineReg[478:471] - _GEN_10 : 8'h0)
            + {7'h0, fp32Seq_mSum_11[23]},
-         fp32Seq_mSum_11[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8
-  wire [15:0]  _fp32Seq_lzc_T_1833 = {8'h0, lineReg[495:488]} | {lineReg[487:480], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+         fp32Seq_mSum_11[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :323:26, :369:8
+  wire [15:0]  _fp32Seq_lzc_T_1833 = {8'h0, lineReg[495:488]} | {lineReg[487:480], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [15:0]  _fp32Seq_lzc_T_1843 =
     {4'h0, _fp32Seq_lzc_T_1833[15:4] & 12'hF0F}
     | {_fp32Seq_lzc_T_1833[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:271:38
@@ -1173,7 +1215,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
   wire [14:0]  _fp32Seq_lzc_T_1863 =
     _fp32Seq_lzc_T_1853[15:1] & 15'h5555
     | {1'h0, _fp32Seq_lzc_T_1853[12:0] & 13'h1555, 1'h0};	// src/hive/scala/main/Fp32.scala:271:38
-  wire [7:0]   _fp32Seq_lzc_T_1874 = {4'h0, lineReg[503:500]} | {lineReg[499:496], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+  wire [7:0]   _fp32Seq_lzc_T_1874 = {4'h0, lineReg[503:500]} | {lineReg[499:496], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [7:0]   _fp32Seq_lzc_T_1884 =
     {2'h0, _fp32Seq_lzc_T_1874[7:2] & 6'h33} | {_fp32Seq_lzc_T_1874[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [7:0]   _fp32Seq_lzc_T_1894 =
@@ -1239,8 +1281,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _fp32Seq_lzc_T_1863[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :299:26, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
-  wire [61:0]  _fp32Seq_normed_T_12 = {31'h0, lineReg[510:480]} << fp32Seq_lzc_12;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8, src/main/scala/chisel3/util/Mux.scala:58:84
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:13, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _fp32Seq_normed_T_12 = {31'h0, lineReg[510:480]} << fp32Seq_lzc_12;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:8, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [23:0]  fp32Seq_mSum_12 =
     {1'h0, _fp32Seq_normed_T_12[29:7]}
     + {23'h0,
@@ -1253,8 +1295,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
       : {lineReg[519],
          (lineReg[518:511] > _GEN_11 ? lineReg[518:511] - _GEN_11 : 8'h0)
            + {7'h0, fp32Seq_mSum_12[23]},
-         fp32Seq_mSum_12[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8
-  wire [15:0]  _fp32Seq_lzc_T_1985 = {8'h0, lineReg[535:528]} | {lineReg[527:520], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+         fp32Seq_mSum_12[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :323:26, :369:8
+  wire [15:0]  _fp32Seq_lzc_T_1985 = {8'h0, lineReg[535:528]} | {lineReg[527:520], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [15:0]  _fp32Seq_lzc_T_1995 =
     {4'h0, _fp32Seq_lzc_T_1985[15:4] & 12'hF0F}
     | {_fp32Seq_lzc_T_1985[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:271:38
@@ -1264,7 +1306,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
   wire [14:0]  _fp32Seq_lzc_T_2015 =
     _fp32Seq_lzc_T_2005[15:1] & 15'h5555
     | {1'h0, _fp32Seq_lzc_T_2005[12:0] & 13'h1555, 1'h0};	// src/hive/scala/main/Fp32.scala:271:38
-  wire [7:0]   _fp32Seq_lzc_T_2026 = {4'h0, lineReg[543:540]} | {lineReg[539:536], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+  wire [7:0]   _fp32Seq_lzc_T_2026 = {4'h0, lineReg[543:540]} | {lineReg[539:536], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [7:0]   _fp32Seq_lzc_T_2036 =
     {2'h0, _fp32Seq_lzc_T_2026[7:2] & 6'h33} | {_fp32Seq_lzc_T_2026[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [7:0]   _fp32Seq_lzc_T_2046 =
@@ -1330,8 +1372,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _fp32Seq_lzc_T_2015[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :299:26, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
-  wire [61:0]  _fp32Seq_normed_T_13 = {31'h0, lineReg[550:520]} << fp32Seq_lzc_13;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8, src/main/scala/chisel3/util/Mux.scala:58:84
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:13, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _fp32Seq_normed_T_13 = {31'h0, lineReg[550:520]} << fp32Seq_lzc_13;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:8, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [23:0]  fp32Seq_mSum_13 =
     {1'h0, _fp32Seq_normed_T_13[29:7]}
     + {23'h0,
@@ -1344,8 +1386,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
       : {lineReg[559],
          (lineReg[558:551] > _GEN_12 ? lineReg[558:551] - _GEN_12 : 8'h0)
            + {7'h0, fp32Seq_mSum_13[23]},
-         fp32Seq_mSum_13[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8
-  wire [15:0]  _fp32Seq_lzc_T_2137 = {8'h0, lineReg[575:568]} | {lineReg[567:560], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+         fp32Seq_mSum_13[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :323:26, :369:8
+  wire [15:0]  _fp32Seq_lzc_T_2137 = {8'h0, lineReg[575:568]} | {lineReg[567:560], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [15:0]  _fp32Seq_lzc_T_2147 =
     {4'h0, _fp32Seq_lzc_T_2137[15:4] & 12'hF0F}
     | {_fp32Seq_lzc_T_2137[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:271:38
@@ -1355,7 +1397,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
   wire [14:0]  _fp32Seq_lzc_T_2167 =
     _fp32Seq_lzc_T_2157[15:1] & 15'h5555
     | {1'h0, _fp32Seq_lzc_T_2157[12:0] & 13'h1555, 1'h0};	// src/hive/scala/main/Fp32.scala:271:38
-  wire [7:0]   _fp32Seq_lzc_T_2178 = {4'h0, lineReg[583:580]} | {lineReg[579:576], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+  wire [7:0]   _fp32Seq_lzc_T_2178 = {4'h0, lineReg[583:580]} | {lineReg[579:576], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [7:0]   _fp32Seq_lzc_T_2188 =
     {2'h0, _fp32Seq_lzc_T_2178[7:2] & 6'h33} | {_fp32Seq_lzc_T_2178[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [7:0]   _fp32Seq_lzc_T_2198 =
@@ -1421,8 +1463,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _fp32Seq_lzc_T_2167[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :299:26, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
-  wire [61:0]  _fp32Seq_normed_T_14 = {31'h0, lineReg[590:560]} << fp32Seq_lzc_14;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8, src/main/scala/chisel3/util/Mux.scala:58:84
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:13, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _fp32Seq_normed_T_14 = {31'h0, lineReg[590:560]} << fp32Seq_lzc_14;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:8, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [23:0]  fp32Seq_mSum_14 =
     {1'h0, _fp32Seq_normed_T_14[29:7]}
     + {23'h0,
@@ -1435,8 +1477,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
       : {lineReg[599],
          (lineReg[598:591] > _GEN_13 ? lineReg[598:591] - _GEN_13 : 8'h0)
            + {7'h0, fp32Seq_mSum_14[23]},
-         fp32Seq_mSum_14[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8
-  wire [15:0]  _fp32Seq_lzc_T_2289 = {8'h0, lineReg[615:608]} | {lineReg[607:600], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+         fp32Seq_mSum_14[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :323:26, :369:8
+  wire [15:0]  _fp32Seq_lzc_T_2289 = {8'h0, lineReg[615:608]} | {lineReg[607:600], 8'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [15:0]  _fp32Seq_lzc_T_2299 =
     {4'h0, _fp32Seq_lzc_T_2289[15:4] & 12'hF0F}
     | {_fp32Seq_lzc_T_2289[11:0] & 12'hF0F, 4'h0};	// src/hive/scala/main/Fp32.scala:271:38
@@ -1446,7 +1488,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
   wire [14:0]  _fp32Seq_lzc_T_2319 =
     _fp32Seq_lzc_T_2309[15:1] & 15'h5555
     | {1'h0, _fp32Seq_lzc_T_2309[12:0] & 13'h1555, 1'h0};	// src/hive/scala/main/Fp32.scala:271:38
-  wire [7:0]   _fp32Seq_lzc_T_2330 = {4'h0, lineReg[623:620]} | {lineReg[619:616], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26
+  wire [7:0]   _fp32Seq_lzc_T_2330 = {4'h0, lineReg[623:620]} | {lineReg[619:616], 4'h0};	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26
   wire [7:0]   _fp32Seq_lzc_T_2340 =
     {2'h0, _fp32Seq_lzc_T_2330[7:2] & 6'h33} | {_fp32Seq_lzc_T_2330[5:0] & 6'h33, 2'h0};	// src/hive/scala/main/Fp32.scala:271:38
   wire [7:0]   _fp32Seq_lzc_T_2350 =
@@ -1512,8 +1554,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                                                                                                       ? 5'h1C
                                                                                                                       : _fp32Seq_lzc_T_2319[14]
                                                                                                                           ? 5'h1D
-                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :299:26, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
-  wire [61:0]  _fp32Seq_normed_T_15 = {31'h0, lineReg[630:600]} << fp32Seq_lzc_15;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8, src/main/scala/chisel3/util/Mux.scala:58:84
+                                                                                                                          : 5'h1E;	// src/hive/scala/main/Fp32.scala:267:19, :271:38, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:13, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+  wire [61:0]  _fp32Seq_normed_T_15 = {31'h0, lineReg[630:600]} << fp32Seq_lzc_15;	// src/hive/scala/main/Fp32.scala:267:19, :272:23, src/hive/scala/main/HiveOutCvt.scala:132:34, :323:26, :369:8, src/main/scala/chisel3/util/Mux.scala:58:84
   wire [23:0]  fp32Seq_mSum_15 =
     {1'h0, _fp32Seq_normed_T_15[29:7]}
     + {23'h0,
@@ -1526,8 +1568,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
       : {lineReg[639],
          (lineReg[638:631] > _GEN_14 ? lineReg[638:631] - _GEN_14 : 8'h0)
            + {7'h0, fp32Seq_mSum_15[23]},
-         fp32Seq_mSum_15[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:123:34, :299:26, :345:8
-  wire         _GEN_15 = rndReg != 3'h1;	// src/hive/scala/main/HiveOutCvt.scala:125:34, :203:45
+         fp32Seq_mSum_15[22:0]};	// src/hive/scala/main/Fp32.scala:265:19, :266:19, :267:19, :268:{21,30,38}, :284:28, :285:25, :286:25, :290:{20,23,32}, :291:24, :293:{8,31}, src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :323:26, :369:8
+  wire         _GEN_15 = rndReg != 3'h1;	// src/hive/scala/main/HiveOutCvt.scala:134:34, :227:45
   wire [10:0]  fp16Seq_manRnd =
     {1'h0, fp32Seq_0[22:13]}
     + {10'h0,
@@ -1537,7 +1579,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_0[31]) & (|(fp32Seq_0[12:0]))
              : rndReg == 3'h2
                  ? fp32Seq_0[31] & (|(fp32Seq_0[12:0]))
-                 : _GEN_15 & fp32Seq_0[12] & ((|(fp32Seq_0[11:0])) | fp32Seq_0[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :237:24, :242:22, :243:22, :244:{22,30}, :245:56, :246:27, :424:26
+                 : _GEN_15 & fp32Seq_0[12] & ((|(fp32Seq_0[11:0])) | fp32Seq_0[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :261:24, :266:22, :267:22, :268:{22,30}, :269:56, :270:27, :448:26
   wire [10:0]  fp16Seq_manRnd_1 =
     {1'h0, fp32Seq_1[22:13]}
     + {10'h0,
@@ -1547,7 +1589,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_1[31]) & (|(fp32Seq_1[12:0]))
              : rndReg == 3'h2
                  ? fp32Seq_1[31] & (|(fp32Seq_1[12:0]))
-                 : _GEN_15 & fp32Seq_1[12] & ((|(fp32Seq_1[11:0])) | fp32Seq_1[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :237:24, :242:22, :243:22, :244:{22,30}, :245:56, :246:27, :424:26
+                 : _GEN_15 & fp32Seq_1[12] & ((|(fp32Seq_1[11:0])) | fp32Seq_1[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :261:24, :266:22, :267:22, :268:{22,30}, :269:56, :270:27, :448:26
   wire [10:0]  fp16Seq_manRnd_2 =
     {1'h0, fp32Seq_2[22:13]}
     + {10'h0,
@@ -1557,7 +1599,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_2[31]) & (|(fp32Seq_2[12:0]))
              : rndReg == 3'h2
                  ? fp32Seq_2[31] & (|(fp32Seq_2[12:0]))
-                 : _GEN_15 & fp32Seq_2[12] & ((|(fp32Seq_2[11:0])) | fp32Seq_2[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :237:24, :242:22, :243:22, :244:{22,30}, :245:56, :246:27, :424:26
+                 : _GEN_15 & fp32Seq_2[12] & ((|(fp32Seq_2[11:0])) | fp32Seq_2[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :261:24, :266:22, :267:22, :268:{22,30}, :269:56, :270:27, :448:26
   wire [10:0]  fp16Seq_manRnd_3 =
     {1'h0, fp32Seq_3[22:13]}
     + {10'h0,
@@ -1567,7 +1609,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_3[31]) & (|(fp32Seq_3[12:0]))
              : rndReg == 3'h2
                  ? fp32Seq_3[31] & (|(fp32Seq_3[12:0]))
-                 : _GEN_15 & fp32Seq_3[12] & ((|(fp32Seq_3[11:0])) | fp32Seq_3[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :237:24, :242:22, :243:22, :244:{22,30}, :245:56, :246:27, :424:26
+                 : _GEN_15 & fp32Seq_3[12] & ((|(fp32Seq_3[11:0])) | fp32Seq_3[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :261:24, :266:22, :267:22, :268:{22,30}, :269:56, :270:27, :448:26
   wire [10:0]  fp16Seq_manRnd_4 =
     {1'h0, fp32Seq_4[22:13]}
     + {10'h0,
@@ -1577,7 +1619,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_4[31]) & (|(fp32Seq_4[12:0]))
              : rndReg == 3'h2
                  ? fp32Seq_4[31] & (|(fp32Seq_4[12:0]))
-                 : _GEN_15 & fp32Seq_4[12] & ((|(fp32Seq_4[11:0])) | fp32Seq_4[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :237:24, :242:22, :243:22, :244:{22,30}, :245:56, :246:27, :424:26
+                 : _GEN_15 & fp32Seq_4[12] & ((|(fp32Seq_4[11:0])) | fp32Seq_4[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :261:24, :266:22, :267:22, :268:{22,30}, :269:56, :270:27, :448:26
   wire [10:0]  fp16Seq_manRnd_5 =
     {1'h0, fp32Seq_5[22:13]}
     + {10'h0,
@@ -1587,7 +1629,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_5[31]) & (|(fp32Seq_5[12:0]))
              : rndReg == 3'h2
                  ? fp32Seq_5[31] & (|(fp32Seq_5[12:0]))
-                 : _GEN_15 & fp32Seq_5[12] & ((|(fp32Seq_5[11:0])) | fp32Seq_5[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :237:24, :242:22, :243:22, :244:{22,30}, :245:56, :246:27, :424:26
+                 : _GEN_15 & fp32Seq_5[12] & ((|(fp32Seq_5[11:0])) | fp32Seq_5[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :261:24, :266:22, :267:22, :268:{22,30}, :269:56, :270:27, :448:26
   wire [10:0]  fp16Seq_manRnd_6 =
     {1'h0, fp32Seq_6[22:13]}
     + {10'h0,
@@ -1597,7 +1639,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_6[31]) & (|(fp32Seq_6[12:0]))
              : rndReg == 3'h2
                  ? fp32Seq_6[31] & (|(fp32Seq_6[12:0]))
-                 : _GEN_15 & fp32Seq_6[12] & ((|(fp32Seq_6[11:0])) | fp32Seq_6[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :237:24, :242:22, :243:22, :244:{22,30}, :245:56, :246:27, :424:26
+                 : _GEN_15 & fp32Seq_6[12] & ((|(fp32Seq_6[11:0])) | fp32Seq_6[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :261:24, :266:22, :267:22, :268:{22,30}, :269:56, :270:27, :448:26
   wire [10:0]  fp16Seq_manRnd_7 =
     {1'h0, fp32Seq_7[22:13]}
     + {10'h0,
@@ -1607,7 +1649,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_7[31]) & (|(fp32Seq_7[12:0]))
              : rndReg == 3'h2
                  ? fp32Seq_7[31] & (|(fp32Seq_7[12:0]))
-                 : _GEN_15 & fp32Seq_7[12] & ((|(fp32Seq_7[11:0])) | fp32Seq_7[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :237:24, :242:22, :243:22, :244:{22,30}, :245:56, :246:27, :424:26
+                 : _GEN_15 & fp32Seq_7[12] & ((|(fp32Seq_7[11:0])) | fp32Seq_7[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :261:24, :266:22, :267:22, :268:{22,30}, :269:56, :270:27, :448:26
   wire [10:0]  fp16Seq_manRnd_8 =
     {1'h0, fp32Seq_8[22:13]}
     + {10'h0,
@@ -1617,7 +1659,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_8[31]) & (|(fp32Seq_8[12:0]))
              : rndReg == 3'h2
                  ? fp32Seq_8[31] & (|(fp32Seq_8[12:0]))
-                 : _GEN_15 & fp32Seq_8[12] & ((|(fp32Seq_8[11:0])) | fp32Seq_8[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :237:24, :242:22, :243:22, :244:{22,30}, :245:56, :246:27, :424:26
+                 : _GEN_15 & fp32Seq_8[12] & ((|(fp32Seq_8[11:0])) | fp32Seq_8[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :261:24, :266:22, :267:22, :268:{22,30}, :269:56, :270:27, :448:26
   wire [10:0]  fp16Seq_manRnd_9 =
     {1'h0, fp32Seq_9[22:13]}
     + {10'h0,
@@ -1627,7 +1669,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_9[31]) & (|(fp32Seq_9[12:0]))
              : rndReg == 3'h2
                  ? fp32Seq_9[31] & (|(fp32Seq_9[12:0]))
-                 : _GEN_15 & fp32Seq_9[12] & ((|(fp32Seq_9[11:0])) | fp32Seq_9[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :237:24, :242:22, :243:22, :244:{22,30}, :245:56, :246:27, :424:26
+                 : _GEN_15 & fp32Seq_9[12] & ((|(fp32Seq_9[11:0])) | fp32Seq_9[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :261:24, :266:22, :267:22, :268:{22,30}, :269:56, :270:27, :448:26
   wire [10:0]  fp16Seq_manRnd_10 =
     {1'h0, fp32Seq_10[22:13]}
     + {10'h0,
@@ -1637,7 +1679,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_10[31]) & (|(fp32Seq_10[12:0]))
              : rndReg == 3'h2
                  ? fp32Seq_10[31] & (|(fp32Seq_10[12:0]))
-                 : _GEN_15 & fp32Seq_10[12] & ((|(fp32Seq_10[11:0])) | fp32Seq_10[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :237:24, :242:22, :243:22, :244:{22,30}, :245:56, :246:27, :424:26
+                 : _GEN_15 & fp32Seq_10[12] & ((|(fp32Seq_10[11:0])) | fp32Seq_10[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :261:24, :266:22, :267:22, :268:{22,30}, :269:56, :270:27, :448:26
   wire [10:0]  fp16Seq_manRnd_11 =
     {1'h0, fp32Seq_11[22:13]}
     + {10'h0,
@@ -1647,7 +1689,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_11[31]) & (|(fp32Seq_11[12:0]))
              : rndReg == 3'h2
                  ? fp32Seq_11[31] & (|(fp32Seq_11[12:0]))
-                 : _GEN_15 & fp32Seq_11[12] & ((|(fp32Seq_11[11:0])) | fp32Seq_11[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :237:24, :242:22, :243:22, :244:{22,30}, :245:56, :246:27, :424:26
+                 : _GEN_15 & fp32Seq_11[12] & ((|(fp32Seq_11[11:0])) | fp32Seq_11[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :261:24, :266:22, :267:22, :268:{22,30}, :269:56, :270:27, :448:26
   wire [10:0]  fp16Seq_manRnd_12 =
     {1'h0, fp32Seq_12[22:13]}
     + {10'h0,
@@ -1657,7 +1699,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_12[31]) & (|(fp32Seq_12[12:0]))
              : rndReg == 3'h2
                  ? fp32Seq_12[31] & (|(fp32Seq_12[12:0]))
-                 : _GEN_15 & fp32Seq_12[12] & ((|(fp32Seq_12[11:0])) | fp32Seq_12[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :237:24, :242:22, :243:22, :244:{22,30}, :245:56, :246:27, :424:26
+                 : _GEN_15 & fp32Seq_12[12] & ((|(fp32Seq_12[11:0])) | fp32Seq_12[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :261:24, :266:22, :267:22, :268:{22,30}, :269:56, :270:27, :448:26
   wire [10:0]  fp16Seq_manRnd_13 =
     {1'h0, fp32Seq_13[22:13]}
     + {10'h0,
@@ -1667,7 +1709,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_13[31]) & (|(fp32Seq_13[12:0]))
              : rndReg == 3'h2
                  ? fp32Seq_13[31] & (|(fp32Seq_13[12:0]))
-                 : _GEN_15 & fp32Seq_13[12] & ((|(fp32Seq_13[11:0])) | fp32Seq_13[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :237:24, :242:22, :243:22, :244:{22,30}, :245:56, :246:27, :424:26
+                 : _GEN_15 & fp32Seq_13[12] & ((|(fp32Seq_13[11:0])) | fp32Seq_13[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :261:24, :266:22, :267:22, :268:{22,30}, :269:56, :270:27, :448:26
   wire [10:0]  fp16Seq_manRnd_14 =
     {1'h0, fp32Seq_14[22:13]}
     + {10'h0,
@@ -1677,7 +1719,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_14[31]) & (|(fp32Seq_14[12:0]))
              : rndReg == 3'h2
                  ? fp32Seq_14[31] & (|(fp32Seq_14[12:0]))
-                 : _GEN_15 & fp32Seq_14[12] & ((|(fp32Seq_14[11:0])) | fp32Seq_14[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :237:24, :242:22, :243:22, :244:{22,30}, :245:56, :246:27, :424:26
+                 : _GEN_15 & fp32Seq_14[12] & ((|(fp32Seq_14[11:0])) | fp32Seq_14[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :261:24, :266:22, :267:22, :268:{22,30}, :269:56, :270:27, :448:26
   wire [10:0]  fp16Seq_manRnd_15 =
     {1'h0, fp32Seq_15[22:13]}
     + {10'h0,
@@ -1687,8 +1729,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_15[31]) & (|(fp32Seq_15[12:0]))
              : rndReg == 3'h2
                  ? fp32Seq_15[31] & (|(fp32Seq_15[12:0]))
-                 : _GEN_15 & fp32Seq_15[12] & ((|(fp32Seq_15[11:0])) | fp32Seq_15[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :237:24, :242:22, :243:22, :244:{22,30}, :245:56, :246:27, :424:26
-  wire         _io_out_bits_T = fmtReg == 4'h1;	// src/hive/scala/main/HiveOutCvt.scala:124:34, :311:43
+                 : _GEN_15 & fp32Seq_15[12] & ((|(fp32Seq_15[11:0])) | fp32Seq_15[13])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :261:24, :266:22, :267:22, :268:{22,30}, :269:56, :270:27, :448:26
+  wire         _io_out_bits_T = fmtReg == 4'h1;	// src/hive/scala/main/HiveOutCvt.scala:133:34, :335:43
   wire [255:0] _packed16_T_1 =
     {fp32Seq_15[31],
      ~(|(fp32Seq_15[30:23])) | fp32Seq_15[30:23] < 8'h71
@@ -1880,7 +1922,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                : fp32Seq_0[30:23] > 8'h8E | fp32Seq_0[30:23] == 8'h8E & fp16Seq_manRnd[10]
                    ? 15'h7BFF
                    : {fp32Seq_0[27:23] + {4'h0, fp16Seq_manRnd[10]} - 5'h10,
-                      fp16Seq_manRnd[10] ? 10'h0 : fp16Seq_manRnd[9:0]}};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:229:17, :230:17, :231:17, :234:25, :235:{26,37,45}, :236:{37,45}, :237:24, :246:27, :247:25, :248:{22,47}, :251:{26,35,44,55}, :254:25, :256:{8,16}, :257:10, :258:12, :259:14, :260:{16,28,37}, :311:67
+                      fp16Seq_manRnd[10] ? 10'h0 : fp16Seq_manRnd[9:0]}};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:253:17, :254:17, :255:17, :258:25, :259:{26,37,45}, :260:{37,45}, :261:24, :270:27, :271:25, :272:{22,47}, :275:{26,35,44,55}, :278:25, :280:{8,16}, :281:10, :282:12, :283:14, :284:{16,28,37}, :335:67
   wire [255:0] _packed16_T_2 =
     {(|(fp32Seq_15[30:23]))
        ? ((&(fp32Seq_15[30:23])) & ~(|(fp32Seq_15[22:0]))
@@ -2137,342 +2179,342 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                ? fp32Seq_0[31] & (|(fp32Seq_0[15:0]))
                                : _GEN_15 & fp32Seq_0[15]
                                  & ((|(fp32Seq_0[14:0])) | fp32Seq_0[16])})
-       : {fp32Seq_0[31], 15'h0}};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :230:17, :231:17, :234:25, :235:45, :275:{23,34,42}, :276:{34,42}, :277:22, :278:22, :281:20, :282:{20,28}, :283:50, :285:{8,20}, :286:10, :287:12, :288:{13,22}, :311:89, :424:26
-  wire [30:0]  magSeq_0 = (|nEffReg) ? fp32Seq_0[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:127:34, :345:{8,13,34}
-  wire [30:0]  magSeq_1 = (|(nEffReg[4:1])) ? fp32Seq_1[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:127:34, :345:{8,13,34}
-  wire         _packed4_lo_T_6 = nEffReg > 5'h2;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :127:34, :345:13
-  wire [30:0]  magSeq_2 = _packed4_lo_T_6 ? fp32Seq_2[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:345:{8,13,34}
-  wire [30:0]  magSeq_3 = (|(nEffReg[4:2])) ? fp32Seq_3[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:127:34, :345:{8,13,34}
-  wire         _packed4_lo_T_5 = nEffReg > 5'h4;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :127:34, :345:13
-  wire [30:0]  magSeq_4 = _packed4_lo_T_5 ? fp32Seq_4[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:345:{8,13,34}
-  wire         _packed4_hi_T_5 = nEffReg > 5'h5;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :127:34, :345:13
-  wire [30:0]  magSeq_5 = _packed4_hi_T_5 ? fp32Seq_5[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:345:{8,13,34}
-  wire         _packed4_lo_T_4 = nEffReg > 5'h6;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :127:34, :345:13
-  wire [30:0]  magSeq_6 = _packed4_lo_T_4 ? fp32Seq_6[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:345:{8,13,34}
-  wire [30:0]  magSeq_7 = (|(nEffReg[4:3])) ? fp32Seq_7[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:127:34, :345:{8,13,34}
-  wire         _packed4_lo_T_3 = nEffReg > 5'h8;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :127:34, :345:13
-  wire [30:0]  magSeq_8 = _packed4_lo_T_3 ? fp32Seq_8[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:345:{8,13,34}
-  wire         _packed4_hi_T_3 = nEffReg > 5'h9;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :127:34, :345:13
-  wire [30:0]  magSeq_9 = _packed4_hi_T_3 ? fp32Seq_9[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:345:{8,13,34}
-  wire         _packed4_lo_T_2 = nEffReg > 5'hA;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :127:34, :345:13
-  wire [30:0]  magSeq_10 = _packed4_lo_T_2 ? fp32Seq_10[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:345:{8,13,34}
-  wire         _packed4_hi_T_2 = nEffReg > 5'hB;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :127:34, :345:13
-  wire [30:0]  magSeq_11 = _packed4_hi_T_2 ? fp32Seq_11[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:345:{8,13,34}
-  wire         _packed4_lo_T_1 = nEffReg > 5'hC;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :127:34, :345:13
-  wire [30:0]  magSeq_12 = _packed4_lo_T_1 ? fp32Seq_12[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:345:{8,13,34}
-  wire         _packed4_hi_T_1 = nEffReg > 5'hD;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :127:34, :345:13
-  wire [30:0]  magSeq_13 = _packed4_hi_T_1 ? fp32Seq_13[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:345:{8,13,34}
-  wire         _packed4_lo_T = nEffReg > 5'hE;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :127:34, :345:13
-  wire [30:0]  magSeq_14 = _packed4_lo_T ? fp32Seq_14[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:345:{8,13,34}
-  wire [30:0]  magSeq_15 = nEffReg[4] ? fp32Seq_15[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:127:34, :345:{8,13,34}
-  wire [30:0]  _groupAmax_T_1 = magSeq_0 >= magSeq_1 ? magSeq_0 : magSeq_1;	// src/hive/scala/main/HiveOutCvt.scala:345:8, :350:{56,59}
-  wire [30:0]  _groupAmax_T_3 = _groupAmax_T_1 >= magSeq_2 ? _groupAmax_T_1 : magSeq_2;	// src/hive/scala/main/HiveOutCvt.scala:345:8, :350:{56,59}
-  wire [30:0]  _groupAmax_T_5 = _groupAmax_T_3 >= magSeq_3 ? _groupAmax_T_3 : magSeq_3;	// src/hive/scala/main/HiveOutCvt.scala:345:8, :350:{56,59}
-  wire [30:0]  _groupAmax_T_7 = _groupAmax_T_5 >= magSeq_4 ? _groupAmax_T_5 : magSeq_4;	// src/hive/scala/main/HiveOutCvt.scala:345:8, :350:{56,59}
-  wire [30:0]  _groupAmax_T_9 = _groupAmax_T_7 >= magSeq_5 ? _groupAmax_T_7 : magSeq_5;	// src/hive/scala/main/HiveOutCvt.scala:345:8, :350:{56,59}
-  wire [30:0]  _groupAmax_T_11 = _groupAmax_T_9 >= magSeq_6 ? _groupAmax_T_9 : magSeq_6;	// src/hive/scala/main/HiveOutCvt.scala:345:8, :350:{56,59}
-  wire [30:0]  groupAmax_0 = _groupAmax_T_11 >= magSeq_7 ? _groupAmax_T_11 : magSeq_7;	// src/hive/scala/main/HiveOutCvt.scala:345:8, :350:{56,59}
-  wire [30:0]  _groupAmax_T_14 = magSeq_8 >= magSeq_9 ? magSeq_8 : magSeq_9;	// src/hive/scala/main/HiveOutCvt.scala:345:8, :350:{56,59}
+       : {fp32Seq_0[31], 15'h0}};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :254:17, :255:17, :258:25, :259:45, :299:{23,34,42}, :300:{34,42}, :301:22, :302:22, :305:20, :306:{20,28}, :307:50, :309:{8,20}, :310:10, :311:12, :312:{13,22}, :335:89, :448:26
+  wire [30:0]  magSeq_0 = (|nEffReg) ? fp32Seq_0[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:136:34, :369:{8,13,34}
+  wire [30:0]  magSeq_1 = (|(nEffReg[4:1])) ? fp32Seq_1[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:136:34, :369:{8,13,34}
+  wire         _packed4_lo_T_6 = nEffReg > 5'h2;	// src/hive/scala/main/HiveOutCvt.scala:136:34, :369:13
+  wire [30:0]  magSeq_2 = _packed4_lo_T_6 ? fp32Seq_2[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:369:{8,13,34}
+  wire [30:0]  magSeq_3 = (|(nEffReg[4:2])) ? fp32Seq_3[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:136:34, :369:{8,13,34}
+  wire         _packed4_lo_T_5 = nEffReg > 5'h4;	// src/hive/scala/main/HiveOutCvt.scala:136:34, :369:13
+  wire [30:0]  magSeq_4 = _packed4_lo_T_5 ? fp32Seq_4[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:369:{8,13,34}
+  wire         _packed4_hi_T_5 = nEffReg > 5'h5;	// src/hive/scala/main/HiveOutCvt.scala:136:34, :369:13
+  wire [30:0]  magSeq_5 = _packed4_hi_T_5 ? fp32Seq_5[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:369:{8,13,34}
+  wire         _packed4_lo_T_4 = nEffReg > 5'h6;	// src/hive/scala/main/HiveOutCvt.scala:136:34, :369:13
+  wire [30:0]  magSeq_6 = _packed4_lo_T_4 ? fp32Seq_6[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:369:{8,13,34}
+  wire [30:0]  magSeq_7 = (|(nEffReg[4:3])) ? fp32Seq_7[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:136:34, :369:{8,13,34}
+  wire         _packed4_lo_T_3 = nEffReg > 5'h8;	// src/hive/scala/main/HiveOutCvt.scala:136:34, :369:13
+  wire [30:0]  magSeq_8 = _packed4_lo_T_3 ? fp32Seq_8[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:369:{8,13,34}
+  wire         _packed4_hi_T_3 = nEffReg > 5'h9;	// src/hive/scala/main/HiveOutCvt.scala:136:34, :369:13
+  wire [30:0]  magSeq_9 = _packed4_hi_T_3 ? fp32Seq_9[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:369:{8,13,34}
+  wire         _packed4_lo_T_2 = nEffReg > 5'hA;	// src/hive/scala/main/HiveOutCvt.scala:136:34, :369:13
+  wire [30:0]  magSeq_10 = _packed4_lo_T_2 ? fp32Seq_10[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:369:{8,13,34}
+  wire         _packed4_hi_T_2 = nEffReg > 5'hB;	// src/hive/scala/main/HiveOutCvt.scala:136:34, :369:13
+  wire [30:0]  magSeq_11 = _packed4_hi_T_2 ? fp32Seq_11[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:369:{8,13,34}
+  wire         _packed4_lo_T_1 = nEffReg > 5'hC;	// src/hive/scala/main/HiveOutCvt.scala:136:34, :369:13
+  wire [30:0]  magSeq_12 = _packed4_lo_T_1 ? fp32Seq_12[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:369:{8,13,34}
+  wire         _packed4_hi_T_1 = nEffReg > 5'hD;	// src/hive/scala/main/HiveOutCvt.scala:136:34, :369:13
+  wire [30:0]  magSeq_13 = _packed4_hi_T_1 ? fp32Seq_13[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:369:{8,13,34}
+  wire         _packed4_lo_T = nEffReg > 5'hE;	// src/hive/scala/main/HiveOutCvt.scala:136:34, :369:13
+  wire [30:0]  magSeq_14 = _packed4_lo_T ? fp32Seq_14[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:369:{8,13,34}
+  wire [30:0]  magSeq_15 = nEffReg[4] ? fp32Seq_15[30:0] : 31'h0;	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:136:34, :369:{8,13,34}
+  wire [30:0]  _groupAmax_T_1 = magSeq_0 >= magSeq_1 ? magSeq_0 : magSeq_1;	// src/hive/scala/main/HiveOutCvt.scala:369:8, :374:{56,59}
+  wire [30:0]  _groupAmax_T_3 = _groupAmax_T_1 >= magSeq_2 ? _groupAmax_T_1 : magSeq_2;	// src/hive/scala/main/HiveOutCvt.scala:369:8, :374:{56,59}
+  wire [30:0]  _groupAmax_T_5 = _groupAmax_T_3 >= magSeq_3 ? _groupAmax_T_3 : magSeq_3;	// src/hive/scala/main/HiveOutCvt.scala:369:8, :374:{56,59}
+  wire [30:0]  _groupAmax_T_7 = _groupAmax_T_5 >= magSeq_4 ? _groupAmax_T_5 : magSeq_4;	// src/hive/scala/main/HiveOutCvt.scala:369:8, :374:{56,59}
+  wire [30:0]  _groupAmax_T_9 = _groupAmax_T_7 >= magSeq_5 ? _groupAmax_T_7 : magSeq_5;	// src/hive/scala/main/HiveOutCvt.scala:369:8, :374:{56,59}
+  wire [30:0]  _groupAmax_T_11 = _groupAmax_T_9 >= magSeq_6 ? _groupAmax_T_9 : magSeq_6;	// src/hive/scala/main/HiveOutCvt.scala:369:8, :374:{56,59}
+  wire [30:0]  groupAmax_0 = _groupAmax_T_11 >= magSeq_7 ? _groupAmax_T_11 : magSeq_7;	// src/hive/scala/main/HiveOutCvt.scala:369:8, :374:{56,59}
+  wire [30:0]  _groupAmax_T_14 = magSeq_8 >= magSeq_9 ? magSeq_8 : magSeq_9;	// src/hive/scala/main/HiveOutCvt.scala:369:8, :374:{56,59}
   wire [30:0]  _groupAmax_T_16 =
-    _groupAmax_T_14 >= magSeq_10 ? _groupAmax_T_14 : magSeq_10;	// src/hive/scala/main/HiveOutCvt.scala:345:8, :350:{56,59}
+    _groupAmax_T_14 >= magSeq_10 ? _groupAmax_T_14 : magSeq_10;	// src/hive/scala/main/HiveOutCvt.scala:369:8, :374:{56,59}
   wire [30:0]  _groupAmax_T_18 =
-    _groupAmax_T_16 >= magSeq_11 ? _groupAmax_T_16 : magSeq_11;	// src/hive/scala/main/HiveOutCvt.scala:345:8, :350:{56,59}
+    _groupAmax_T_16 >= magSeq_11 ? _groupAmax_T_16 : magSeq_11;	// src/hive/scala/main/HiveOutCvt.scala:369:8, :374:{56,59}
   wire [30:0]  _groupAmax_T_20 =
-    _groupAmax_T_18 >= magSeq_12 ? _groupAmax_T_18 : magSeq_12;	// src/hive/scala/main/HiveOutCvt.scala:345:8, :350:{56,59}
+    _groupAmax_T_18 >= magSeq_12 ? _groupAmax_T_18 : magSeq_12;	// src/hive/scala/main/HiveOutCvt.scala:369:8, :374:{56,59}
   wire [30:0]  _groupAmax_T_22 =
-    _groupAmax_T_20 >= magSeq_13 ? _groupAmax_T_20 : magSeq_13;	// src/hive/scala/main/HiveOutCvt.scala:345:8, :350:{56,59}
+    _groupAmax_T_20 >= magSeq_13 ? _groupAmax_T_20 : magSeq_13;	// src/hive/scala/main/HiveOutCvt.scala:369:8, :374:{56,59}
   wire [30:0]  _groupAmax_T_24 =
-    _groupAmax_T_22 >= magSeq_14 ? _groupAmax_T_22 : magSeq_14;	// src/hive/scala/main/HiveOutCvt.scala:345:8, :350:{56,59}
-  wire [30:0]  groupAmax_1 = _groupAmax_T_24 >= magSeq_15 ? _groupAmax_T_24 : magSeq_15;	// src/hive/scala/main/HiveOutCvt.scala:345:8, :350:{56,59}
-  wire [30:0]  amax16_0 = groupAmax_0 >= groupAmax_1 ? groupAmax_0 : groupAmax_1;	// src/hive/scala/main/HiveOutCvt.scala:350:56, :353:{47,53}
+    _groupAmax_T_22 >= magSeq_14 ? _groupAmax_T_22 : magSeq_14;	// src/hive/scala/main/HiveOutCvt.scala:369:8, :374:{56,59}
+  wire [30:0]  groupAmax_1 = _groupAmax_T_24 >= magSeq_15 ? _groupAmax_T_24 : magSeq_15;	// src/hive/scala/main/HiveOutCvt.scala:369:8, :374:{56,59}
+  wire [30:0]  amax16_0 = groupAmax_0 >= groupAmax_1 ? groupAmax_0 : groupAmax_1;	// src/hive/scala/main/HiveOutCvt.scala:374:56, :377:{47,53}
   wire [9:0]   _GEN_16 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s4Elem_sDiff_T = _GEN_16 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s4Elem_sDiff_T = _GEN_16 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_17 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s4Elem_sDiff_T_1 = _GEN_17 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s4Elem_sDiff_T_1 = _GEN_17 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_18 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s4Elem_sDiff_T_2 = _GEN_18 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s4Elem_sDiff_T_2 = _GEN_18 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_19 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s4Elem_sDiff_T_3 = _GEN_19 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s4Elem_sDiff_T_3 = _GEN_19 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_20 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s4Elem_sDiff_T_4 = _GEN_20 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s4Elem_sDiff_T_4 = _GEN_20 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_21 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s4Elem_sDiff_T_5 = _GEN_21 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s4Elem_sDiff_T_5 = _GEN_21 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_22 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s4Elem_sDiff_T_6 = _GEN_22 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s4Elem_sDiff_T_6 = _GEN_22 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_23 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s4Elem_sDiff_T_7 = _GEN_23 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s4Elem_sDiff_T_7 = _GEN_23 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_24 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s4Elem_sDiff_T_8 = _GEN_24 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s4Elem_sDiff_T_8 = _GEN_24 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_25 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s4Elem_sDiff_T_9 = _GEN_25 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s4Elem_sDiff_T_9 = _GEN_25 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_26 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s4Elem_sDiff_T_10 = _GEN_26 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s4Elem_sDiff_T_10 = _GEN_26 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_27 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s4Elem_sDiff_T_11 = _GEN_27 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s4Elem_sDiff_T_11 = _GEN_27 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_28 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s4Elem_sDiff_T_12 = _GEN_28 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s4Elem_sDiff_T_12 = _GEN_28 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_29 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s4Elem_sDiff_T_13 = _GEN_29 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s4Elem_sDiff_T_13 = _GEN_29 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_30 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s4Elem_sDiff_T_14 = _GEN_30 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s4Elem_sDiff_T_14 = _GEN_30 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_31 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s4Elem_sDiff_T_15 = _GEN_31 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s4Elem_sDiff_T_15 = _GEN_31 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_32 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s5Elem_sDiff_T = _GEN_32 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s5Elem_sDiff_T = _GEN_32 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_33 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s5Elem_sDiff_T_1 = _GEN_33 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s5Elem_sDiff_T_1 = _GEN_33 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_34 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s5Elem_sDiff_T_2 = _GEN_34 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s5Elem_sDiff_T_2 = _GEN_34 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_35 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s5Elem_sDiff_T_3 = _GEN_35 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s5Elem_sDiff_T_3 = _GEN_35 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_36 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s5Elem_sDiff_T_4 = _GEN_36 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s5Elem_sDiff_T_4 = _GEN_36 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_37 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s5Elem_sDiff_T_5 = _GEN_37 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s5Elem_sDiff_T_5 = _GEN_37 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_38 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s5Elem_sDiff_T_6 = _GEN_38 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s5Elem_sDiff_T_6 = _GEN_38 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_39 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s5Elem_sDiff_T_7 = _GEN_39 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s5Elem_sDiff_T_7 = _GEN_39 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_40 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s5Elem_sDiff_T_8 = _GEN_40 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s5Elem_sDiff_T_8 = _GEN_40 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_41 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s5Elem_sDiff_T_9 = _GEN_41 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s5Elem_sDiff_T_9 = _GEN_41 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_42 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s5Elem_sDiff_T_10 = _GEN_42 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s5Elem_sDiff_T_10 = _GEN_42 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_43 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s5Elem_sDiff_T_11 = _GEN_43 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s5Elem_sDiff_T_11 = _GEN_43 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_44 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s5Elem_sDiff_T_12 = _GEN_44 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s5Elem_sDiff_T_12 = _GEN_44 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_45 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s5Elem_sDiff_T_13 = _GEN_45 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s5Elem_sDiff_T_13 = _GEN_45 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_46 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s5Elem_sDiff_T_14 = _GEN_46 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s5Elem_sDiff_T_14 = _GEN_46 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_47 =
     {1'h0,
      amax16_0[22:0] > 23'h600000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s5Elem_sDiff_T_15 = _GEN_47 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s5Elem_sDiff_T_15 = _GEN_47 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_48 =
     {1'h0,
      amax16_0[22:0] > 23'h400000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s2Elem_sDiff_T = _GEN_48 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s2Elem_sDiff_T = _GEN_48 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_49 =
     {1'h0,
      amax16_0[22:0] > 23'h400000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s2Elem_sDiff_T_1 = _GEN_49 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s2Elem_sDiff_T_1 = _GEN_49 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_50 =
     {1'h0,
      amax16_0[22:0] > 23'h400000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s2Elem_sDiff_T_2 = _GEN_50 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s2Elem_sDiff_T_2 = _GEN_50 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_51 =
     {1'h0,
      amax16_0[22:0] > 23'h400000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s2Elem_sDiff_T_3 = _GEN_51 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s2Elem_sDiff_T_3 = _GEN_51 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_52 =
     {1'h0,
      amax16_0[22:0] > 23'h400000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s2Elem_sDiff_T_4 = _GEN_52 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s2Elem_sDiff_T_4 = _GEN_52 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_53 =
     {1'h0,
      amax16_0[22:0] > 23'h400000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s2Elem_sDiff_T_5 = _GEN_53 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s2Elem_sDiff_T_5 = _GEN_53 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_54 =
     {1'h0,
      amax16_0[22:0] > 23'h400000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s2Elem_sDiff_T_6 = _GEN_54 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s2Elem_sDiff_T_6 = _GEN_54 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_55 =
     {1'h0,
      amax16_0[22:0] > 23'h400000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s2Elem_sDiff_T_7 = _GEN_55 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s2Elem_sDiff_T_7 = _GEN_55 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_56 =
     {1'h0,
      amax16_0[22:0] > 23'h400000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s2Elem_sDiff_T_8 = _GEN_56 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s2Elem_sDiff_T_8 = _GEN_56 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_57 =
     {1'h0,
      amax16_0[22:0] > 23'h400000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s2Elem_sDiff_T_9 = _GEN_57 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s2Elem_sDiff_T_9 = _GEN_57 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_58 =
     {1'h0,
      amax16_0[22:0] > 23'h400000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s2Elem_sDiff_T_10 = _GEN_58 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s2Elem_sDiff_T_10 = _GEN_58 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_59 =
     {1'h0,
      amax16_0[22:0] > 23'h400000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s2Elem_sDiff_T_11 = _GEN_59 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s2Elem_sDiff_T_11 = _GEN_59 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_60 =
     {1'h0,
      amax16_0[22:0] > 23'h400000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s2Elem_sDiff_T_12 = _GEN_60 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s2Elem_sDiff_T_12 = _GEN_60 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_61 =
     {1'h0,
      amax16_0[22:0] > 23'h400000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s2Elem_sDiff_T_13 = _GEN_61 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s2Elem_sDiff_T_13 = _GEN_61 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_62 =
     {1'h0,
      amax16_0[22:0] > 23'h400000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s2Elem_sDiff_T_14 = _GEN_62 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s2Elem_sDiff_T_14 = _GEN_62 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_63 =
     {1'h0,
      amax16_0[22:0] > 23'h400000
        ? {1'h0, amax16_0[30:23]} + 9'h1
-       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _s2Elem_sDiff_T_15 = _GEN_63 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+       : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _s2Elem_sDiff_T_15 = _GEN_63 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [3:0]   q4Seq_manRnd =
     {1'h0, fp32Seq_0[22:20]}
     + {3'h0,
@@ -2482,9 +2524,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_0[31]) & (|(fp32Seq_0[19:0]))
              : rndReg == 3'h2
                  ? fp32Seq_0[31] & (|(fp32Seq_0[19:0]))
-                 : _GEN_15 & fp32Seq_0[19] & ((|(fp32Seq_0[18:0])) | fp32Seq_0[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
-  wire [2:0]   q4Seq_manFin = q4Seq_manRnd[3] ? 3'h0 : q4Seq_manRnd[2:0];	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :418:{22,53}
-  wire [8:0]   _GEN_64 = {1'h0, fp32Seq_0[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :421:43
+                 : _GEN_15 & fp32Seq_0[19] & ((|(fp32Seq_0[18:0])) | fp32Seq_0[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
+  wire [2:0]   q4Seq_manFin = q4Seq_manRnd[3] ? 3'h0 : q4Seq_manRnd[2:0];	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :442:{22,53}
+  wire [8:0]   _GEN_64 = {1'h0, fp32Seq_0[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :445:43
   wire [8:0]   _q4Seq_eTgt_T_7 =
     _GEN_64 + 9'h7
     - {1'h0,
@@ -2494,8 +2536,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_16 + 10'h7 < 10'h10
                   ? 8'h1
                   : _s4Elem_sDiff_T > 10'hFE ? 8'hFE : _s4Elem_sDiff_T[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q4Seq_eRnd_T_1 = _q4Seq_eTgt_T_7 + {8'h0, q4Seq_manRnd[3]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q4Seq_eRnd_T_1 = _q4Seq_eTgt_T_7 + {8'h0, q4Seq_manRnd[3]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [3:0]   q4Seq_manRnd_1 =
     {1'h0, fp32Seq_1[22:20]}
     + {3'h0,
@@ -2505,9 +2547,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_1[31]) & (|(fp32Seq_1[19:0]))
              : rndReg == 3'h2
                  ? fp32Seq_1[31] & (|(fp32Seq_1[19:0]))
-                 : _GEN_15 & fp32Seq_1[19] & ((|(fp32Seq_1[18:0])) | fp32Seq_1[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
-  wire [2:0]   q4Seq_manFin_1 = q4Seq_manRnd_1[3] ? 3'h0 : q4Seq_manRnd_1[2:0];	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :418:{22,53}
-  wire [8:0]   _GEN_65 = {1'h0, fp32Seq_1[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :421:43
+                 : _GEN_15 & fp32Seq_1[19] & ((|(fp32Seq_1[18:0])) | fp32Seq_1[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
+  wire [2:0]   q4Seq_manFin_1 = q4Seq_manRnd_1[3] ? 3'h0 : q4Seq_manRnd_1[2:0];	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :442:{22,53}
+  wire [8:0]   _GEN_65 = {1'h0, fp32Seq_1[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :445:43
   wire [8:0]   _q4Seq_eTgt_T_16 =
     _GEN_65 + 9'h7
     - {1'h0,
@@ -2517,8 +2559,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_17 + 10'h7 < 10'h10
                   ? 8'h1
                   : _s4Elem_sDiff_T_1 > 10'hFE ? 8'hFE : _s4Elem_sDiff_T_1[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q4Seq_eRnd_T_4 = _q4Seq_eTgt_T_16 + {8'h0, q4Seq_manRnd_1[3]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q4Seq_eRnd_T_4 = _q4Seq_eTgt_T_16 + {8'h0, q4Seq_manRnd_1[3]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [3:0]   q4Seq_manRnd_2 =
     {1'h0, fp32Seq_2[22:20]}
     + {3'h0,
@@ -2528,9 +2570,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_2[31]) & (|(fp32Seq_2[19:0]))
              : rndReg == 3'h2
                  ? fp32Seq_2[31] & (|(fp32Seq_2[19:0]))
-                 : _GEN_15 & fp32Seq_2[19] & ((|(fp32Seq_2[18:0])) | fp32Seq_2[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
-  wire [2:0]   q4Seq_manFin_2 = q4Seq_manRnd_2[3] ? 3'h0 : q4Seq_manRnd_2[2:0];	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :418:{22,53}
-  wire [8:0]   _GEN_66 = {1'h0, fp32Seq_2[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :421:43
+                 : _GEN_15 & fp32Seq_2[19] & ((|(fp32Seq_2[18:0])) | fp32Seq_2[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
+  wire [2:0]   q4Seq_manFin_2 = q4Seq_manRnd_2[3] ? 3'h0 : q4Seq_manRnd_2[2:0];	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :442:{22,53}
+  wire [8:0]   _GEN_66 = {1'h0, fp32Seq_2[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :445:43
   wire [8:0]   _q4Seq_eTgt_T_25 =
     _GEN_66 + 9'h7
     - {1'h0,
@@ -2540,8 +2582,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_18 + 10'h7 < 10'h10
                   ? 8'h1
                   : _s4Elem_sDiff_T_2 > 10'hFE ? 8'hFE : _s4Elem_sDiff_T_2[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q4Seq_eRnd_T_7 = _q4Seq_eTgt_T_25 + {8'h0, q4Seq_manRnd_2[3]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q4Seq_eRnd_T_7 = _q4Seq_eTgt_T_25 + {8'h0, q4Seq_manRnd_2[3]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [3:0]   q4Seq_manRnd_3 =
     {1'h0, fp32Seq_3[22:20]}
     + {3'h0,
@@ -2551,9 +2593,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_3[31]) & (|(fp32Seq_3[19:0]))
              : rndReg == 3'h2
                  ? fp32Seq_3[31] & (|(fp32Seq_3[19:0]))
-                 : _GEN_15 & fp32Seq_3[19] & ((|(fp32Seq_3[18:0])) | fp32Seq_3[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
-  wire [2:0]   q4Seq_manFin_3 = q4Seq_manRnd_3[3] ? 3'h0 : q4Seq_manRnd_3[2:0];	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :418:{22,53}
-  wire [8:0]   _GEN_67 = {1'h0, fp32Seq_3[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :421:43
+                 : _GEN_15 & fp32Seq_3[19] & ((|(fp32Seq_3[18:0])) | fp32Seq_3[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
+  wire [2:0]   q4Seq_manFin_3 = q4Seq_manRnd_3[3] ? 3'h0 : q4Seq_manRnd_3[2:0];	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :442:{22,53}
+  wire [8:0]   _GEN_67 = {1'h0, fp32Seq_3[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :445:43
   wire [8:0]   _q4Seq_eTgt_T_34 =
     _GEN_67 + 9'h7
     - {1'h0,
@@ -2563,8 +2605,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_19 + 10'h7 < 10'h10
                   ? 8'h1
                   : _s4Elem_sDiff_T_3 > 10'hFE ? 8'hFE : _s4Elem_sDiff_T_3[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q4Seq_eRnd_T_10 = _q4Seq_eTgt_T_34 + {8'h0, q4Seq_manRnd_3[3]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q4Seq_eRnd_T_10 = _q4Seq_eTgt_T_34 + {8'h0, q4Seq_manRnd_3[3]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [3:0]   q4Seq_manRnd_4 =
     {1'h0, fp32Seq_4[22:20]}
     + {3'h0,
@@ -2574,9 +2616,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_4[31]) & (|(fp32Seq_4[19:0]))
              : rndReg == 3'h2
                  ? fp32Seq_4[31] & (|(fp32Seq_4[19:0]))
-                 : _GEN_15 & fp32Seq_4[19] & ((|(fp32Seq_4[18:0])) | fp32Seq_4[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
-  wire [2:0]   q4Seq_manFin_4 = q4Seq_manRnd_4[3] ? 3'h0 : q4Seq_manRnd_4[2:0];	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :418:{22,53}
-  wire [8:0]   _GEN_68 = {1'h0, fp32Seq_4[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :421:43
+                 : _GEN_15 & fp32Seq_4[19] & ((|(fp32Seq_4[18:0])) | fp32Seq_4[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
+  wire [2:0]   q4Seq_manFin_4 = q4Seq_manRnd_4[3] ? 3'h0 : q4Seq_manRnd_4[2:0];	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :442:{22,53}
+  wire [8:0]   _GEN_68 = {1'h0, fp32Seq_4[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :445:43
   wire [8:0]   _q4Seq_eTgt_T_43 =
     _GEN_68 + 9'h7
     - {1'h0,
@@ -2586,8 +2628,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_20 + 10'h7 < 10'h10
                   ? 8'h1
                   : _s4Elem_sDiff_T_4 > 10'hFE ? 8'hFE : _s4Elem_sDiff_T_4[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q4Seq_eRnd_T_13 = _q4Seq_eTgt_T_43 + {8'h0, q4Seq_manRnd_4[3]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q4Seq_eRnd_T_13 = _q4Seq_eTgt_T_43 + {8'h0, q4Seq_manRnd_4[3]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [3:0]   q4Seq_manRnd_5 =
     {1'h0, fp32Seq_5[22:20]}
     + {3'h0,
@@ -2597,9 +2639,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_5[31]) & (|(fp32Seq_5[19:0]))
              : rndReg == 3'h2
                  ? fp32Seq_5[31] & (|(fp32Seq_5[19:0]))
-                 : _GEN_15 & fp32Seq_5[19] & ((|(fp32Seq_5[18:0])) | fp32Seq_5[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
-  wire [2:0]   q4Seq_manFin_5 = q4Seq_manRnd_5[3] ? 3'h0 : q4Seq_manRnd_5[2:0];	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :418:{22,53}
-  wire [8:0]   _GEN_69 = {1'h0, fp32Seq_5[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :421:43
+                 : _GEN_15 & fp32Seq_5[19] & ((|(fp32Seq_5[18:0])) | fp32Seq_5[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
+  wire [2:0]   q4Seq_manFin_5 = q4Seq_manRnd_5[3] ? 3'h0 : q4Seq_manRnd_5[2:0];	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :442:{22,53}
+  wire [8:0]   _GEN_69 = {1'h0, fp32Seq_5[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :445:43
   wire [8:0]   _q4Seq_eTgt_T_52 =
     _GEN_69 + 9'h7
     - {1'h0,
@@ -2609,8 +2651,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_21 + 10'h7 < 10'h10
                   ? 8'h1
                   : _s4Elem_sDiff_T_5 > 10'hFE ? 8'hFE : _s4Elem_sDiff_T_5[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q4Seq_eRnd_T_16 = _q4Seq_eTgt_T_52 + {8'h0, q4Seq_manRnd_5[3]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q4Seq_eRnd_T_16 = _q4Seq_eTgt_T_52 + {8'h0, q4Seq_manRnd_5[3]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [3:0]   q4Seq_manRnd_6 =
     {1'h0, fp32Seq_6[22:20]}
     + {3'h0,
@@ -2620,9 +2662,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_6[31]) & (|(fp32Seq_6[19:0]))
              : rndReg == 3'h2
                  ? fp32Seq_6[31] & (|(fp32Seq_6[19:0]))
-                 : _GEN_15 & fp32Seq_6[19] & ((|(fp32Seq_6[18:0])) | fp32Seq_6[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
-  wire [2:0]   q4Seq_manFin_6 = q4Seq_manRnd_6[3] ? 3'h0 : q4Seq_manRnd_6[2:0];	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :418:{22,53}
-  wire [8:0]   _GEN_70 = {1'h0, fp32Seq_6[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :421:43
+                 : _GEN_15 & fp32Seq_6[19] & ((|(fp32Seq_6[18:0])) | fp32Seq_6[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
+  wire [2:0]   q4Seq_manFin_6 = q4Seq_manRnd_6[3] ? 3'h0 : q4Seq_manRnd_6[2:0];	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :442:{22,53}
+  wire [8:0]   _GEN_70 = {1'h0, fp32Seq_6[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :445:43
   wire [8:0]   _q4Seq_eTgt_T_61 =
     _GEN_70 + 9'h7
     - {1'h0,
@@ -2632,8 +2674,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_22 + 10'h7 < 10'h10
                   ? 8'h1
                   : _s4Elem_sDiff_T_6 > 10'hFE ? 8'hFE : _s4Elem_sDiff_T_6[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q4Seq_eRnd_T_19 = _q4Seq_eTgt_T_61 + {8'h0, q4Seq_manRnd_6[3]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q4Seq_eRnd_T_19 = _q4Seq_eTgt_T_61 + {8'h0, q4Seq_manRnd_6[3]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [3:0]   q4Seq_manRnd_7 =
     {1'h0, fp32Seq_7[22:20]}
     + {3'h0,
@@ -2643,9 +2685,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_7[31]) & (|(fp32Seq_7[19:0]))
              : rndReg == 3'h2
                  ? fp32Seq_7[31] & (|(fp32Seq_7[19:0]))
-                 : _GEN_15 & fp32Seq_7[19] & ((|(fp32Seq_7[18:0])) | fp32Seq_7[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
-  wire [2:0]   q4Seq_manFin_7 = q4Seq_manRnd_7[3] ? 3'h0 : q4Seq_manRnd_7[2:0];	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :418:{22,53}
-  wire [8:0]   _GEN_71 = {1'h0, fp32Seq_7[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :421:43
+                 : _GEN_15 & fp32Seq_7[19] & ((|(fp32Seq_7[18:0])) | fp32Seq_7[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
+  wire [2:0]   q4Seq_manFin_7 = q4Seq_manRnd_7[3] ? 3'h0 : q4Seq_manRnd_7[2:0];	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :442:{22,53}
+  wire [8:0]   _GEN_71 = {1'h0, fp32Seq_7[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :445:43
   wire [8:0]   _q4Seq_eTgt_T_70 =
     _GEN_71 + 9'h7
     - {1'h0,
@@ -2655,8 +2697,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_23 + 10'h7 < 10'h10
                   ? 8'h1
                   : _s4Elem_sDiff_T_7 > 10'hFE ? 8'hFE : _s4Elem_sDiff_T_7[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q4Seq_eRnd_T_22 = _q4Seq_eTgt_T_70 + {8'h0, q4Seq_manRnd_7[3]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q4Seq_eRnd_T_22 = _q4Seq_eTgt_T_70 + {8'h0, q4Seq_manRnd_7[3]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [3:0]   q4Seq_manRnd_8 =
     {1'h0, fp32Seq_8[22:20]}
     + {3'h0,
@@ -2666,9 +2708,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_8[31]) & (|(fp32Seq_8[19:0]))
              : rndReg == 3'h2
                  ? fp32Seq_8[31] & (|(fp32Seq_8[19:0]))
-                 : _GEN_15 & fp32Seq_8[19] & ((|(fp32Seq_8[18:0])) | fp32Seq_8[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
-  wire [2:0]   q4Seq_manFin_8 = q4Seq_manRnd_8[3] ? 3'h0 : q4Seq_manRnd_8[2:0];	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :418:{22,53}
-  wire [8:0]   _GEN_72 = {1'h0, fp32Seq_8[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :421:43
+                 : _GEN_15 & fp32Seq_8[19] & ((|(fp32Seq_8[18:0])) | fp32Seq_8[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
+  wire [2:0]   q4Seq_manFin_8 = q4Seq_manRnd_8[3] ? 3'h0 : q4Seq_manRnd_8[2:0];	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :442:{22,53}
+  wire [8:0]   _GEN_72 = {1'h0, fp32Seq_8[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :445:43
   wire [8:0]   _q4Seq_eTgt_T_79 =
     _GEN_72 + 9'h7
     - {1'h0,
@@ -2678,8 +2720,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_24 + 10'h7 < 10'h10
                   ? 8'h1
                   : _s4Elem_sDiff_T_8 > 10'hFE ? 8'hFE : _s4Elem_sDiff_T_8[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q4Seq_eRnd_T_25 = _q4Seq_eTgt_T_79 + {8'h0, q4Seq_manRnd_8[3]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q4Seq_eRnd_T_25 = _q4Seq_eTgt_T_79 + {8'h0, q4Seq_manRnd_8[3]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [3:0]   q4Seq_manRnd_9 =
     {1'h0, fp32Seq_9[22:20]}
     + {3'h0,
@@ -2689,9 +2731,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_9[31]) & (|(fp32Seq_9[19:0]))
              : rndReg == 3'h2
                  ? fp32Seq_9[31] & (|(fp32Seq_9[19:0]))
-                 : _GEN_15 & fp32Seq_9[19] & ((|(fp32Seq_9[18:0])) | fp32Seq_9[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
-  wire [2:0]   q4Seq_manFin_9 = q4Seq_manRnd_9[3] ? 3'h0 : q4Seq_manRnd_9[2:0];	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :418:{22,53}
-  wire [8:0]   _GEN_73 = {1'h0, fp32Seq_9[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :421:43
+                 : _GEN_15 & fp32Seq_9[19] & ((|(fp32Seq_9[18:0])) | fp32Seq_9[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
+  wire [2:0]   q4Seq_manFin_9 = q4Seq_manRnd_9[3] ? 3'h0 : q4Seq_manRnd_9[2:0];	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :442:{22,53}
+  wire [8:0]   _GEN_73 = {1'h0, fp32Seq_9[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :445:43
   wire [8:0]   _q4Seq_eTgt_T_88 =
     _GEN_73 + 9'h7
     - {1'h0,
@@ -2701,8 +2743,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_25 + 10'h7 < 10'h10
                   ? 8'h1
                   : _s4Elem_sDiff_T_9 > 10'hFE ? 8'hFE : _s4Elem_sDiff_T_9[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q4Seq_eRnd_T_28 = _q4Seq_eTgt_T_88 + {8'h0, q4Seq_manRnd_9[3]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q4Seq_eRnd_T_28 = _q4Seq_eTgt_T_88 + {8'h0, q4Seq_manRnd_9[3]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [3:0]   q4Seq_manRnd_10 =
     {1'h0, fp32Seq_10[22:20]}
     + {3'h0,
@@ -2712,9 +2754,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_10[31]) & (|(fp32Seq_10[19:0]))
              : rndReg == 3'h2
                  ? fp32Seq_10[31] & (|(fp32Seq_10[19:0]))
-                 : _GEN_15 & fp32Seq_10[19] & ((|(fp32Seq_10[18:0])) | fp32Seq_10[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
-  wire [2:0]   q4Seq_manFin_10 = q4Seq_manRnd_10[3] ? 3'h0 : q4Seq_manRnd_10[2:0];	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :418:{22,53}
-  wire [8:0]   _GEN_74 = {1'h0, fp32Seq_10[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :421:43
+                 : _GEN_15 & fp32Seq_10[19] & ((|(fp32Seq_10[18:0])) | fp32Seq_10[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
+  wire [2:0]   q4Seq_manFin_10 = q4Seq_manRnd_10[3] ? 3'h0 : q4Seq_manRnd_10[2:0];	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :442:{22,53}
+  wire [8:0]   _GEN_74 = {1'h0, fp32Seq_10[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :445:43
   wire [8:0]   _q4Seq_eTgt_T_97 =
     _GEN_74 + 9'h7
     - {1'h0,
@@ -2724,8 +2766,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_26 + 10'h7 < 10'h10
                   ? 8'h1
                   : _s4Elem_sDiff_T_10 > 10'hFE ? 8'hFE : _s4Elem_sDiff_T_10[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q4Seq_eRnd_T_31 = _q4Seq_eTgt_T_97 + {8'h0, q4Seq_manRnd_10[3]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q4Seq_eRnd_T_31 = _q4Seq_eTgt_T_97 + {8'h0, q4Seq_manRnd_10[3]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [3:0]   q4Seq_manRnd_11 =
     {1'h0, fp32Seq_11[22:20]}
     + {3'h0,
@@ -2735,9 +2777,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_11[31]) & (|(fp32Seq_11[19:0]))
              : rndReg == 3'h2
                  ? fp32Seq_11[31] & (|(fp32Seq_11[19:0]))
-                 : _GEN_15 & fp32Seq_11[19] & ((|(fp32Seq_11[18:0])) | fp32Seq_11[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
-  wire [2:0]   q4Seq_manFin_11 = q4Seq_manRnd_11[3] ? 3'h0 : q4Seq_manRnd_11[2:0];	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :418:{22,53}
-  wire [8:0]   _GEN_75 = {1'h0, fp32Seq_11[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :421:43
+                 : _GEN_15 & fp32Seq_11[19] & ((|(fp32Seq_11[18:0])) | fp32Seq_11[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
+  wire [2:0]   q4Seq_manFin_11 = q4Seq_manRnd_11[3] ? 3'h0 : q4Seq_manRnd_11[2:0];	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :442:{22,53}
+  wire [8:0]   _GEN_75 = {1'h0, fp32Seq_11[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :445:43
   wire [8:0]   _q4Seq_eTgt_T_106 =
     _GEN_75 + 9'h7
     - {1'h0,
@@ -2747,8 +2789,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_27 + 10'h7 < 10'h10
                   ? 8'h1
                   : _s4Elem_sDiff_T_11 > 10'hFE ? 8'hFE : _s4Elem_sDiff_T_11[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q4Seq_eRnd_T_34 = _q4Seq_eTgt_T_106 + {8'h0, q4Seq_manRnd_11[3]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q4Seq_eRnd_T_34 = _q4Seq_eTgt_T_106 + {8'h0, q4Seq_manRnd_11[3]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [3:0]   q4Seq_manRnd_12 =
     {1'h0, fp32Seq_12[22:20]}
     + {3'h0,
@@ -2758,9 +2800,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_12[31]) & (|(fp32Seq_12[19:0]))
              : rndReg == 3'h2
                  ? fp32Seq_12[31] & (|(fp32Seq_12[19:0]))
-                 : _GEN_15 & fp32Seq_12[19] & ((|(fp32Seq_12[18:0])) | fp32Seq_12[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
-  wire [2:0]   q4Seq_manFin_12 = q4Seq_manRnd_12[3] ? 3'h0 : q4Seq_manRnd_12[2:0];	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :418:{22,53}
-  wire [8:0]   _GEN_76 = {1'h0, fp32Seq_12[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :421:43
+                 : _GEN_15 & fp32Seq_12[19] & ((|(fp32Seq_12[18:0])) | fp32Seq_12[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
+  wire [2:0]   q4Seq_manFin_12 = q4Seq_manRnd_12[3] ? 3'h0 : q4Seq_manRnd_12[2:0];	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :442:{22,53}
+  wire [8:0]   _GEN_76 = {1'h0, fp32Seq_12[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :445:43
   wire [8:0]   _q4Seq_eTgt_T_115 =
     _GEN_76 + 9'h7
     - {1'h0,
@@ -2770,8 +2812,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_28 + 10'h7 < 10'h10
                   ? 8'h1
                   : _s4Elem_sDiff_T_12 > 10'hFE ? 8'hFE : _s4Elem_sDiff_T_12[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q4Seq_eRnd_T_37 = _q4Seq_eTgt_T_115 + {8'h0, q4Seq_manRnd_12[3]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q4Seq_eRnd_T_37 = _q4Seq_eTgt_T_115 + {8'h0, q4Seq_manRnd_12[3]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [3:0]   q4Seq_manRnd_13 =
     {1'h0, fp32Seq_13[22:20]}
     + {3'h0,
@@ -2781,9 +2823,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_13[31]) & (|(fp32Seq_13[19:0]))
              : rndReg == 3'h2
                  ? fp32Seq_13[31] & (|(fp32Seq_13[19:0]))
-                 : _GEN_15 & fp32Seq_13[19] & ((|(fp32Seq_13[18:0])) | fp32Seq_13[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
-  wire [2:0]   q4Seq_manFin_13 = q4Seq_manRnd_13[3] ? 3'h0 : q4Seq_manRnd_13[2:0];	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :418:{22,53}
-  wire [8:0]   _GEN_77 = {1'h0, fp32Seq_13[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :421:43
+                 : _GEN_15 & fp32Seq_13[19] & ((|(fp32Seq_13[18:0])) | fp32Seq_13[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
+  wire [2:0]   q4Seq_manFin_13 = q4Seq_manRnd_13[3] ? 3'h0 : q4Seq_manRnd_13[2:0];	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :442:{22,53}
+  wire [8:0]   _GEN_77 = {1'h0, fp32Seq_13[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :445:43
   wire [8:0]   _q4Seq_eTgt_T_124 =
     _GEN_77 + 9'h7
     - {1'h0,
@@ -2793,8 +2835,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_29 + 10'h7 < 10'h10
                   ? 8'h1
                   : _s4Elem_sDiff_T_13 > 10'hFE ? 8'hFE : _s4Elem_sDiff_T_13[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q4Seq_eRnd_T_40 = _q4Seq_eTgt_T_124 + {8'h0, q4Seq_manRnd_13[3]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q4Seq_eRnd_T_40 = _q4Seq_eTgt_T_124 + {8'h0, q4Seq_manRnd_13[3]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [3:0]   q4Seq_manRnd_14 =
     {1'h0, fp32Seq_14[22:20]}
     + {3'h0,
@@ -2804,9 +2846,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_14[31]) & (|(fp32Seq_14[19:0]))
              : rndReg == 3'h2
                  ? fp32Seq_14[31] & (|(fp32Seq_14[19:0]))
-                 : _GEN_15 & fp32Seq_14[19] & ((|(fp32Seq_14[18:0])) | fp32Seq_14[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
-  wire [2:0]   q4Seq_manFin_14 = q4Seq_manRnd_14[3] ? 3'h0 : q4Seq_manRnd_14[2:0];	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :418:{22,53}
-  wire [8:0]   _GEN_78 = {1'h0, fp32Seq_14[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :421:43
+                 : _GEN_15 & fp32Seq_14[19] & ((|(fp32Seq_14[18:0])) | fp32Seq_14[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
+  wire [2:0]   q4Seq_manFin_14 = q4Seq_manRnd_14[3] ? 3'h0 : q4Seq_manRnd_14[2:0];	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :442:{22,53}
+  wire [8:0]   _GEN_78 = {1'h0, fp32Seq_14[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :445:43
   wire [8:0]   _q4Seq_eTgt_T_133 =
     _GEN_78 + 9'h7
     - {1'h0,
@@ -2816,8 +2858,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_30 + 10'h7 < 10'h10
                   ? 8'h1
                   : _s4Elem_sDiff_T_14 > 10'hFE ? 8'hFE : _s4Elem_sDiff_T_14[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q4Seq_eRnd_T_43 = _q4Seq_eTgt_T_133 + {8'h0, q4Seq_manRnd_14[3]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q4Seq_eRnd_T_43 = _q4Seq_eTgt_T_133 + {8'h0, q4Seq_manRnd_14[3]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [3:0]   q4Seq_manRnd_15 =
     {1'h0, fp32Seq_15[22:20]}
     + {3'h0,
@@ -2827,9 +2869,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_15[31]) & (|(fp32Seq_15[19:0]))
              : rndReg == 3'h2
                  ? fp32Seq_15[31] & (|(fp32Seq_15[19:0]))
-                 : _GEN_15 & fp32Seq_15[19] & ((|(fp32Seq_15[18:0])) | fp32Seq_15[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
-  wire [2:0]   q4Seq_manFin_15 = q4Seq_manRnd_15[3] ? 3'h0 : q4Seq_manRnd_15[2:0];	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :418:{22,53}
-  wire [8:0]   _GEN_79 = {1'h0, fp32Seq_15[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :421:43
+                 : _GEN_15 & fp32Seq_15[19] & ((|(fp32Seq_15[18:0])) | fp32Seq_15[20])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
+  wire [2:0]   q4Seq_manFin_15 = q4Seq_manRnd_15[3] ? 3'h0 : q4Seq_manRnd_15[2:0];	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :442:{22,53}
+  wire [8:0]   _GEN_79 = {1'h0, fp32Seq_15[30:23]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :445:43
   wire [8:0]   _q4Seq_eTgt_T_142 =
     _GEN_79 + 9'h7
     - {1'h0,
@@ -2839,8 +2881,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_31 + 10'h7 < 10'h10
                   ? 8'h1
                   : _s4Elem_sDiff_T_15 > 10'hFE ? 8'hFE : _s4Elem_sDiff_T_15[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q4Seq_eRnd_T_46 = _q4Seq_eTgt_T_142 + {8'h0, q4Seq_manRnd_15[3]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q4Seq_eRnd_T_46 = _q4Seq_eTgt_T_142 + {8'h0, q4Seq_manRnd_15[3]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [2:0]   q5Seq_manRnd =
     {1'h0, fp32Seq_0[22:21]}
     + {2'h0,
@@ -2850,7 +2892,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_0[31]) & (|(fp32Seq_0[20:0]))
              : rndReg == 3'h2
                  ? fp32Seq_0[31] & (|(fp32Seq_0[20:0]))
-                 : _GEN_15 & fp32Seq_0[20] & ((|(fp32Seq_0[19:0])) | fp32Seq_0[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_0[20] & ((|(fp32Seq_0[19:0])) | fp32Seq_0[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
   wire [8:0]   _q5Seq_eTgt_T_7 =
     _GEN_64 + 9'hF
     - {1'h0,
@@ -2860,8 +2902,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_32 + 10'hF < 10'h1F
                   ? 8'h1
                   : _s5Elem_sDiff_T > 10'hFE ? 8'hFE : _s5Elem_sDiff_T[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q5Seq_eRnd_T_1 = _q5Seq_eTgt_T_7 + {8'h0, q5Seq_manRnd[2]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q5Seq_eRnd_T_1 = _q5Seq_eTgt_T_7 + {8'h0, q5Seq_manRnd[2]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [2:0]   q5Seq_manRnd_1 =
     {1'h0, fp32Seq_1[22:21]}
     + {2'h0,
@@ -2871,7 +2913,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_1[31]) & (|(fp32Seq_1[20:0]))
              : rndReg == 3'h2
                  ? fp32Seq_1[31] & (|(fp32Seq_1[20:0]))
-                 : _GEN_15 & fp32Seq_1[20] & ((|(fp32Seq_1[19:0])) | fp32Seq_1[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_1[20] & ((|(fp32Seq_1[19:0])) | fp32Seq_1[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
   wire [8:0]   _q5Seq_eTgt_T_16 =
     _GEN_65 + 9'hF
     - {1'h0,
@@ -2881,8 +2923,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_33 + 10'hF < 10'h1F
                   ? 8'h1
                   : _s5Elem_sDiff_T_1 > 10'hFE ? 8'hFE : _s5Elem_sDiff_T_1[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q5Seq_eRnd_T_4 = _q5Seq_eTgt_T_16 + {8'h0, q5Seq_manRnd_1[2]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q5Seq_eRnd_T_4 = _q5Seq_eTgt_T_16 + {8'h0, q5Seq_manRnd_1[2]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [2:0]   q5Seq_manRnd_2 =
     {1'h0, fp32Seq_2[22:21]}
     + {2'h0,
@@ -2892,7 +2934,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_2[31]) & (|(fp32Seq_2[20:0]))
              : rndReg == 3'h2
                  ? fp32Seq_2[31] & (|(fp32Seq_2[20:0]))
-                 : _GEN_15 & fp32Seq_2[20] & ((|(fp32Seq_2[19:0])) | fp32Seq_2[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_2[20] & ((|(fp32Seq_2[19:0])) | fp32Seq_2[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
   wire [8:0]   _q5Seq_eTgt_T_25 =
     _GEN_66 + 9'hF
     - {1'h0,
@@ -2902,8 +2944,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_34 + 10'hF < 10'h1F
                   ? 8'h1
                   : _s5Elem_sDiff_T_2 > 10'hFE ? 8'hFE : _s5Elem_sDiff_T_2[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q5Seq_eRnd_T_7 = _q5Seq_eTgt_T_25 + {8'h0, q5Seq_manRnd_2[2]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q5Seq_eRnd_T_7 = _q5Seq_eTgt_T_25 + {8'h0, q5Seq_manRnd_2[2]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [2:0]   q5Seq_manRnd_3 =
     {1'h0, fp32Seq_3[22:21]}
     + {2'h0,
@@ -2913,7 +2955,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_3[31]) & (|(fp32Seq_3[20:0]))
              : rndReg == 3'h2
                  ? fp32Seq_3[31] & (|(fp32Seq_3[20:0]))
-                 : _GEN_15 & fp32Seq_3[20] & ((|(fp32Seq_3[19:0])) | fp32Seq_3[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_3[20] & ((|(fp32Seq_3[19:0])) | fp32Seq_3[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
   wire [8:0]   _q5Seq_eTgt_T_34 =
     _GEN_67 + 9'hF
     - {1'h0,
@@ -2923,8 +2965,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_35 + 10'hF < 10'h1F
                   ? 8'h1
                   : _s5Elem_sDiff_T_3 > 10'hFE ? 8'hFE : _s5Elem_sDiff_T_3[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q5Seq_eRnd_T_10 = _q5Seq_eTgt_T_34 + {8'h0, q5Seq_manRnd_3[2]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q5Seq_eRnd_T_10 = _q5Seq_eTgt_T_34 + {8'h0, q5Seq_manRnd_3[2]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [2:0]   q5Seq_manRnd_4 =
     {1'h0, fp32Seq_4[22:21]}
     + {2'h0,
@@ -2934,7 +2976,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_4[31]) & (|(fp32Seq_4[20:0]))
              : rndReg == 3'h2
                  ? fp32Seq_4[31] & (|(fp32Seq_4[20:0]))
-                 : _GEN_15 & fp32Seq_4[20] & ((|(fp32Seq_4[19:0])) | fp32Seq_4[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_4[20] & ((|(fp32Seq_4[19:0])) | fp32Seq_4[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
   wire [8:0]   _q5Seq_eTgt_T_43 =
     _GEN_68 + 9'hF
     - {1'h0,
@@ -2944,8 +2986,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_36 + 10'hF < 10'h1F
                   ? 8'h1
                   : _s5Elem_sDiff_T_4 > 10'hFE ? 8'hFE : _s5Elem_sDiff_T_4[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q5Seq_eRnd_T_13 = _q5Seq_eTgt_T_43 + {8'h0, q5Seq_manRnd_4[2]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q5Seq_eRnd_T_13 = _q5Seq_eTgt_T_43 + {8'h0, q5Seq_manRnd_4[2]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [2:0]   q5Seq_manRnd_5 =
     {1'h0, fp32Seq_5[22:21]}
     + {2'h0,
@@ -2955,7 +2997,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_5[31]) & (|(fp32Seq_5[20:0]))
              : rndReg == 3'h2
                  ? fp32Seq_5[31] & (|(fp32Seq_5[20:0]))
-                 : _GEN_15 & fp32Seq_5[20] & ((|(fp32Seq_5[19:0])) | fp32Seq_5[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_5[20] & ((|(fp32Seq_5[19:0])) | fp32Seq_5[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
   wire [8:0]   _q5Seq_eTgt_T_52 =
     _GEN_69 + 9'hF
     - {1'h0,
@@ -2965,8 +3007,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_37 + 10'hF < 10'h1F
                   ? 8'h1
                   : _s5Elem_sDiff_T_5 > 10'hFE ? 8'hFE : _s5Elem_sDiff_T_5[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q5Seq_eRnd_T_16 = _q5Seq_eTgt_T_52 + {8'h0, q5Seq_manRnd_5[2]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q5Seq_eRnd_T_16 = _q5Seq_eTgt_T_52 + {8'h0, q5Seq_manRnd_5[2]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [2:0]   q5Seq_manRnd_6 =
     {1'h0, fp32Seq_6[22:21]}
     + {2'h0,
@@ -2976,7 +3018,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_6[31]) & (|(fp32Seq_6[20:0]))
              : rndReg == 3'h2
                  ? fp32Seq_6[31] & (|(fp32Seq_6[20:0]))
-                 : _GEN_15 & fp32Seq_6[20] & ((|(fp32Seq_6[19:0])) | fp32Seq_6[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_6[20] & ((|(fp32Seq_6[19:0])) | fp32Seq_6[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
   wire [8:0]   _q5Seq_eTgt_T_61 =
     _GEN_70 + 9'hF
     - {1'h0,
@@ -2986,8 +3028,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_38 + 10'hF < 10'h1F
                   ? 8'h1
                   : _s5Elem_sDiff_T_6 > 10'hFE ? 8'hFE : _s5Elem_sDiff_T_6[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q5Seq_eRnd_T_19 = _q5Seq_eTgt_T_61 + {8'h0, q5Seq_manRnd_6[2]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q5Seq_eRnd_T_19 = _q5Seq_eTgt_T_61 + {8'h0, q5Seq_manRnd_6[2]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [2:0]   q5Seq_manRnd_7 =
     {1'h0, fp32Seq_7[22:21]}
     + {2'h0,
@@ -2997,7 +3039,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_7[31]) & (|(fp32Seq_7[20:0]))
              : rndReg == 3'h2
                  ? fp32Seq_7[31] & (|(fp32Seq_7[20:0]))
-                 : _GEN_15 & fp32Seq_7[20] & ((|(fp32Seq_7[19:0])) | fp32Seq_7[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_7[20] & ((|(fp32Seq_7[19:0])) | fp32Seq_7[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
   wire [8:0]   _q5Seq_eTgt_T_70 =
     _GEN_71 + 9'hF
     - {1'h0,
@@ -3007,8 +3049,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_39 + 10'hF < 10'h1F
                   ? 8'h1
                   : _s5Elem_sDiff_T_7 > 10'hFE ? 8'hFE : _s5Elem_sDiff_T_7[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q5Seq_eRnd_T_22 = _q5Seq_eTgt_T_70 + {8'h0, q5Seq_manRnd_7[2]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q5Seq_eRnd_T_22 = _q5Seq_eTgt_T_70 + {8'h0, q5Seq_manRnd_7[2]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [2:0]   q5Seq_manRnd_8 =
     {1'h0, fp32Seq_8[22:21]}
     + {2'h0,
@@ -3018,7 +3060,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_8[31]) & (|(fp32Seq_8[20:0]))
              : rndReg == 3'h2
                  ? fp32Seq_8[31] & (|(fp32Seq_8[20:0]))
-                 : _GEN_15 & fp32Seq_8[20] & ((|(fp32Seq_8[19:0])) | fp32Seq_8[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_8[20] & ((|(fp32Seq_8[19:0])) | fp32Seq_8[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
   wire [8:0]   _q5Seq_eTgt_T_79 =
     _GEN_72 + 9'hF
     - {1'h0,
@@ -3028,8 +3070,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_40 + 10'hF < 10'h1F
                   ? 8'h1
                   : _s5Elem_sDiff_T_8 > 10'hFE ? 8'hFE : _s5Elem_sDiff_T_8[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q5Seq_eRnd_T_25 = _q5Seq_eTgt_T_79 + {8'h0, q5Seq_manRnd_8[2]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q5Seq_eRnd_T_25 = _q5Seq_eTgt_T_79 + {8'h0, q5Seq_manRnd_8[2]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [2:0]   q5Seq_manRnd_9 =
     {1'h0, fp32Seq_9[22:21]}
     + {2'h0,
@@ -3039,7 +3081,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_9[31]) & (|(fp32Seq_9[20:0]))
              : rndReg == 3'h2
                  ? fp32Seq_9[31] & (|(fp32Seq_9[20:0]))
-                 : _GEN_15 & fp32Seq_9[20] & ((|(fp32Seq_9[19:0])) | fp32Seq_9[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_9[20] & ((|(fp32Seq_9[19:0])) | fp32Seq_9[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
   wire [8:0]   _q5Seq_eTgt_T_88 =
     _GEN_73 + 9'hF
     - {1'h0,
@@ -3049,8 +3091,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_41 + 10'hF < 10'h1F
                   ? 8'h1
                   : _s5Elem_sDiff_T_9 > 10'hFE ? 8'hFE : _s5Elem_sDiff_T_9[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q5Seq_eRnd_T_28 = _q5Seq_eTgt_T_88 + {8'h0, q5Seq_manRnd_9[2]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q5Seq_eRnd_T_28 = _q5Seq_eTgt_T_88 + {8'h0, q5Seq_manRnd_9[2]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [2:0]   q5Seq_manRnd_10 =
     {1'h0, fp32Seq_10[22:21]}
     + {2'h0,
@@ -3060,7 +3102,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_10[31]) & (|(fp32Seq_10[20:0]))
              : rndReg == 3'h2
                  ? fp32Seq_10[31] & (|(fp32Seq_10[20:0]))
-                 : _GEN_15 & fp32Seq_10[20] & ((|(fp32Seq_10[19:0])) | fp32Seq_10[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_10[20] & ((|(fp32Seq_10[19:0])) | fp32Seq_10[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
   wire [8:0]   _q5Seq_eTgt_T_97 =
     _GEN_74 + 9'hF
     - {1'h0,
@@ -3070,8 +3112,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_42 + 10'hF < 10'h1F
                   ? 8'h1
                   : _s5Elem_sDiff_T_10 > 10'hFE ? 8'hFE : _s5Elem_sDiff_T_10[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q5Seq_eRnd_T_31 = _q5Seq_eTgt_T_97 + {8'h0, q5Seq_manRnd_10[2]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q5Seq_eRnd_T_31 = _q5Seq_eTgt_T_97 + {8'h0, q5Seq_manRnd_10[2]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [2:0]   q5Seq_manRnd_11 =
     {1'h0, fp32Seq_11[22:21]}
     + {2'h0,
@@ -3081,7 +3123,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_11[31]) & (|(fp32Seq_11[20:0]))
              : rndReg == 3'h2
                  ? fp32Seq_11[31] & (|(fp32Seq_11[20:0]))
-                 : _GEN_15 & fp32Seq_11[20] & ((|(fp32Seq_11[19:0])) | fp32Seq_11[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_11[20] & ((|(fp32Seq_11[19:0])) | fp32Seq_11[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
   wire [8:0]   _q5Seq_eTgt_T_106 =
     _GEN_75 + 9'hF
     - {1'h0,
@@ -3091,8 +3133,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_43 + 10'hF < 10'h1F
                   ? 8'h1
                   : _s5Elem_sDiff_T_11 > 10'hFE ? 8'hFE : _s5Elem_sDiff_T_11[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q5Seq_eRnd_T_34 = _q5Seq_eTgt_T_106 + {8'h0, q5Seq_manRnd_11[2]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q5Seq_eRnd_T_34 = _q5Seq_eTgt_T_106 + {8'h0, q5Seq_manRnd_11[2]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [2:0]   q5Seq_manRnd_12 =
     {1'h0, fp32Seq_12[22:21]}
     + {2'h0,
@@ -3102,7 +3144,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_12[31]) & (|(fp32Seq_12[20:0]))
              : rndReg == 3'h2
                  ? fp32Seq_12[31] & (|(fp32Seq_12[20:0]))
-                 : _GEN_15 & fp32Seq_12[20] & ((|(fp32Seq_12[19:0])) | fp32Seq_12[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_12[20] & ((|(fp32Seq_12[19:0])) | fp32Seq_12[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
   wire [8:0]   _q5Seq_eTgt_T_115 =
     _GEN_76 + 9'hF
     - {1'h0,
@@ -3112,8 +3154,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_44 + 10'hF < 10'h1F
                   ? 8'h1
                   : _s5Elem_sDiff_T_12 > 10'hFE ? 8'hFE : _s5Elem_sDiff_T_12[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q5Seq_eRnd_T_37 = _q5Seq_eTgt_T_115 + {8'h0, q5Seq_manRnd_12[2]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q5Seq_eRnd_T_37 = _q5Seq_eTgt_T_115 + {8'h0, q5Seq_manRnd_12[2]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [2:0]   q5Seq_manRnd_13 =
     {1'h0, fp32Seq_13[22:21]}
     + {2'h0,
@@ -3123,7 +3165,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_13[31]) & (|(fp32Seq_13[20:0]))
              : rndReg == 3'h2
                  ? fp32Seq_13[31] & (|(fp32Seq_13[20:0]))
-                 : _GEN_15 & fp32Seq_13[20] & ((|(fp32Seq_13[19:0])) | fp32Seq_13[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_13[20] & ((|(fp32Seq_13[19:0])) | fp32Seq_13[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
   wire [8:0]   _q5Seq_eTgt_T_124 =
     _GEN_77 + 9'hF
     - {1'h0,
@@ -3133,8 +3175,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_45 + 10'hF < 10'h1F
                   ? 8'h1
                   : _s5Elem_sDiff_T_13 > 10'hFE ? 8'hFE : _s5Elem_sDiff_T_13[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q5Seq_eRnd_T_40 = _q5Seq_eTgt_T_124 + {8'h0, q5Seq_manRnd_13[2]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q5Seq_eRnd_T_40 = _q5Seq_eTgt_T_124 + {8'h0, q5Seq_manRnd_13[2]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [2:0]   q5Seq_manRnd_14 =
     {1'h0, fp32Seq_14[22:21]}
     + {2'h0,
@@ -3144,7 +3186,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_14[31]) & (|(fp32Seq_14[20:0]))
              : rndReg == 3'h2
                  ? fp32Seq_14[31] & (|(fp32Seq_14[20:0]))
-                 : _GEN_15 & fp32Seq_14[20] & ((|(fp32Seq_14[19:0])) | fp32Seq_14[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_14[20] & ((|(fp32Seq_14[19:0])) | fp32Seq_14[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
   wire [8:0]   _q5Seq_eTgt_T_133 =
     _GEN_78 + 9'hF
     - {1'h0,
@@ -3154,8 +3196,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_46 + 10'hF < 10'h1F
                   ? 8'h1
                   : _s5Elem_sDiff_T_14 > 10'hFE ? 8'hFE : _s5Elem_sDiff_T_14[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q5Seq_eRnd_T_43 = _q5Seq_eTgt_T_133 + {8'h0, q5Seq_manRnd_14[2]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q5Seq_eRnd_T_43 = _q5Seq_eTgt_T_133 + {8'h0, q5Seq_manRnd_14[2]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
   wire [2:0]   q5Seq_manRnd_15 =
     {1'h0, fp32Seq_15[22:21]}
     + {2'h0,
@@ -3165,7 +3207,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_15[31]) & (|(fp32Seq_15[20:0]))
              : rndReg == 3'h2
                  ? fp32Seq_15[31] & (|(fp32Seq_15[20:0]))
-                 : _GEN_15 & fp32Seq_15[20] & ((|(fp32Seq_15[19:0])) | fp32Seq_15[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :415:64, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_15[20] & ((|(fp32Seq_15[19:0])) | fp32Seq_15[21])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :439:64, :440:27, :448:26
   wire [8:0]   _q5Seq_eTgt_T_142 =
     _GEN_79 + 9'hF
     - {1'h0,
@@ -3175,10 +3217,10 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_47 + 10'hF < 10'h1F
                   ? 8'h1
                   : _s5Elem_sDiff_T_15 > 10'hFE ? 8'hFE : _s5Elem_sDiff_T_15[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q5Seq_eRnd_T_46 = _q5Seq_eTgt_T_142 + {8'h0, q5Seq_manRnd_15[2]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
-  wire         q2Seq_isInf = (&(fp32Seq_0[30:23])) & ~(|(fp32Seq_0[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :235:45, :406:{21,32,40}
-  wire         q2Seq_isNan = (&(fp32Seq_0[30:23])) & (|(fp32Seq_0[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :406:21, :407:{32,40}
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q5Seq_eRnd_T_46 = _q5Seq_eTgt_T_142 + {8'h0, q5Seq_manRnd_15[2]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
+  wire         q2Seq_isInf = (&(fp32Seq_0[30:23])) & ~(|(fp32Seq_0[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :259:45, :430:{21,32,40}
+  wire         q2Seq_isNan = (&(fp32Seq_0[30:23])) & (|(fp32Seq_0[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :430:21, :431:{32,40}
   wire [1:0]   q2Seq_manRnd =
     {1'h0, fp32Seq_0[22]}
     + {1'h0,
@@ -3188,7 +3230,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_0[31]) & (|(fp32Seq_0[21:0]))
              : rndReg == 3'h2
                  ? fp32Seq_0[31] & (|(fp32Seq_0[21:0]))
-                 : _GEN_15 & fp32Seq_0[21] & ((|(fp32Seq_0[20:0])) | fp32Seq_0[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_0[21] & ((|(fp32Seq_0[20:0])) | fp32Seq_0[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :440:27, :448:26
   wire [8:0]   _q2Seq_eTgt_T_7 =
     _GEN_64 + 9'h1
     - {1'h0,
@@ -3198,13 +3240,13 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_48 + 10'h1 < 10'h4
                   ? 8'h1
                   : _s2Elem_sDiff_T > 10'hFE ? 8'hFE : _s2Elem_sDiff_T[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q2Seq_eRnd_T_1 = _q2Seq_eTgt_T_7 + {8'h0, q2Seq_manRnd[1]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
-  wire         q2Seq_isSh1 = _q2Seq_eTgt_T_7 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :421:55, :463:28
-  wire         q2Seq_subGuard = ~q2Seq_isSh1 | fp32Seq_0[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :412:22, :421:55, :463:28, :465:26
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q2Seq_eRnd_T_1 = _q2Seq_eTgt_T_7 + {8'h0, q2Seq_manRnd[1]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
+  wire         q2Seq_isSh1 = _q2Seq_eTgt_T_7 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :445:55, :487:28
+  wire         q2Seq_subGuard = ~q2Seq_isSh1 | fp32Seq_0[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :436:22, :445:55, :487:28, :489:26
   wire         q2Seq_subSticky =
-    q2Seq_isSh1 ? (|(fp32Seq_0[21:0])) : (|(fp32Seq_0[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :421:55, :463:28, :466:{26,37,45,54}
-  wire         q2Seq_subUp_truncNZ = q2Seq_subGuard | q2Seq_subSticky;	// src/hive/scala/main/HiveOutCvt.scala:202:25, :465:26, :466:26
+    q2Seq_isSh1 ? (|(fp32Seq_0[21:0])) : (|(fp32Seq_0[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :445:55, :487:28, :490:{26,37,45,54}
+  wire         q2Seq_subUp_truncNZ = q2Seq_subGuard | q2Seq_subSticky;	// src/hive/scala/main/HiveOutCvt.scala:226:25, :489:26, :490:26
   wire [1:0]   q2Seq_subRnd =
     {1'h0, q2Seq_isSh1}
     + {1'h0,
@@ -3214,7 +3256,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_0[31]) & q2Seq_subUp_truncNZ
              : rndReg == 3'h2
                  ? fp32Seq_0[31] & q2Seq_subUp_truncNZ
-                 : _GEN_15 & q2Seq_subGuard & (q2Seq_subSticky | q2Seq_isSh1)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :421:55, :424:26, :463:28, :465:26, :466:26, :468:31
+                 : _GEN_15 & q2Seq_subGuard & (q2Seq_subSticky | q2Seq_isSh1)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :445:55, :448:26, :487:28, :489:26, :490:26, :492:31
   wire [2:0]   _GEN_80 =
     (rndReg == 3'h3 ? ~(fp32Seq_0[31]) : rndReg == 3'h2 & fp32Seq_0[31])
     & $signed(_q2Seq_eTgt_T_7) < -9'sh1 & (|(fp32Seq_0[30:23])) & ~q2Seq_isInf
@@ -3227,9 +3269,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               ? 3'h0
               : q2Seq_isInf | q2Seq_isNan | $signed(_q2Seq_eRnd_T_1) > 9'sh3
                   ? 3'h7
-                  : {_q2Seq_eRnd_T_1[1:0], ~(q2Seq_manRnd[1]) & q2Seq_manRnd[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:125:34, :148:35, :203:45, :206:28, :229:17, :230:17, :405:20, :406:32, :407:32, :416:27, :417:25, :418:{22,53}, :421:55, :422:23, :423:26, :424:26, :428:{21,39}, :433:{10,18}, :434:12, :435:14, :436:16, :463:28, :468:31, :469:29, :470:26, :472:{30,63}, :475:{30,38,50,61,64,71,74}, :493:50, :497:{31,40,50,61,71}, :499:{10,33}
-  wire         q2Seq_isInf_1 = (&(fp32Seq_1[30:23])) & ~(|(fp32Seq_1[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :235:45, :406:{21,32,40}
-  wire         q2Seq_isNan_1 = (&(fp32Seq_1[30:23])) & (|(fp32Seq_1[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :406:21, :407:{32,40}
+                  : {_q2Seq_eRnd_T_1[1:0], ~(q2Seq_manRnd[1]) & q2Seq_manRnd[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:134:34, :165:35, :227:45, :230:28, :253:17, :254:17, :429:20, :430:32, :431:32, :440:27, :441:25, :442:{22,53}, :445:55, :446:23, :447:26, :448:26, :452:{21,39}, :457:{10,18}, :458:12, :459:14, :460:16, :487:28, :492:31, :493:29, :494:26, :496:{30,63}, :499:{30,38,50,61,64,71,74}, :517:50, :521:{31,40,50,61,71}, :523:{10,33}
+  wire         q2Seq_isInf_1 = (&(fp32Seq_1[30:23])) & ~(|(fp32Seq_1[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :259:45, :430:{21,32,40}
+  wire         q2Seq_isNan_1 = (&(fp32Seq_1[30:23])) & (|(fp32Seq_1[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :430:21, :431:{32,40}
   wire [1:0]   q2Seq_manRnd_1 =
     {1'h0, fp32Seq_1[22]}
     + {1'h0,
@@ -3239,7 +3281,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_1[31]) & (|(fp32Seq_1[21:0]))
              : rndReg == 3'h2
                  ? fp32Seq_1[31] & (|(fp32Seq_1[21:0]))
-                 : _GEN_15 & fp32Seq_1[21] & ((|(fp32Seq_1[20:0])) | fp32Seq_1[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_1[21] & ((|(fp32Seq_1[20:0])) | fp32Seq_1[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :440:27, :448:26
   wire [8:0]   _q2Seq_eTgt_T_16 =
     _GEN_65 + 9'h1
     - {1'h0,
@@ -3249,13 +3291,13 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_49 + 10'h1 < 10'h4
                   ? 8'h1
                   : _s2Elem_sDiff_T_1 > 10'hFE ? 8'hFE : _s2Elem_sDiff_T_1[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q2Seq_eRnd_T_4 = _q2Seq_eTgt_T_16 + {8'h0, q2Seq_manRnd_1[1]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
-  wire         q2Seq_isSh1_1 = _q2Seq_eTgt_T_16 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :421:55, :463:28
-  wire         q2Seq_subGuard_1 = ~q2Seq_isSh1_1 | fp32Seq_1[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :412:22, :421:55, :463:28, :465:26
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q2Seq_eRnd_T_4 = _q2Seq_eTgt_T_16 + {8'h0, q2Seq_manRnd_1[1]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
+  wire         q2Seq_isSh1_1 = _q2Seq_eTgt_T_16 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :445:55, :487:28
+  wire         q2Seq_subGuard_1 = ~q2Seq_isSh1_1 | fp32Seq_1[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :436:22, :445:55, :487:28, :489:26
   wire         q2Seq_subSticky_1 =
-    q2Seq_isSh1_1 ? (|(fp32Seq_1[21:0])) : (|(fp32Seq_1[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :421:55, :463:28, :466:{26,37,45,54}
-  wire         q2Seq_subUp_truncNZ_1 = q2Seq_subGuard_1 | q2Seq_subSticky_1;	// src/hive/scala/main/HiveOutCvt.scala:202:25, :465:26, :466:26
+    q2Seq_isSh1_1 ? (|(fp32Seq_1[21:0])) : (|(fp32Seq_1[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :445:55, :487:28, :490:{26,37,45,54}
+  wire         q2Seq_subUp_truncNZ_1 = q2Seq_subGuard_1 | q2Seq_subSticky_1;	// src/hive/scala/main/HiveOutCvt.scala:226:25, :489:26, :490:26
   wire [1:0]   q2Seq_subRnd_1 =
     {1'h0, q2Seq_isSh1_1}
     + {1'h0,
@@ -3265,7 +3307,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_1[31]) & q2Seq_subUp_truncNZ_1
              : rndReg == 3'h2
                  ? fp32Seq_1[31] & q2Seq_subUp_truncNZ_1
-                 : _GEN_15 & q2Seq_subGuard_1 & (q2Seq_subSticky_1 | q2Seq_isSh1_1)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :421:55, :424:26, :463:28, :465:26, :466:26, :468:31
+                 : _GEN_15 & q2Seq_subGuard_1 & (q2Seq_subSticky_1 | q2Seq_isSh1_1)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :445:55, :448:26, :487:28, :489:26, :490:26, :492:31
   wire [2:0]   _GEN_81 =
     (rndReg == 3'h3 ? ~(fp32Seq_1[31]) : rndReg == 3'h2 & fp32Seq_1[31])
     & $signed(_q2Seq_eTgt_T_16) < -9'sh1 & (|(fp32Seq_1[30:23])) & ~q2Seq_isInf_1
@@ -3278,9 +3320,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               ? 3'h0
               : q2Seq_isInf_1 | q2Seq_isNan_1 | $signed(_q2Seq_eRnd_T_4) > 9'sh3
                   ? 3'h7
-                  : {_q2Seq_eRnd_T_4[1:0], ~(q2Seq_manRnd_1[1]) & q2Seq_manRnd_1[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:125:34, :148:35, :203:45, :206:28, :229:17, :230:17, :405:20, :406:32, :407:32, :416:27, :417:25, :418:{22,53}, :421:55, :422:23, :423:26, :424:26, :428:{21,39}, :433:{10,18}, :434:12, :435:14, :436:16, :463:28, :468:31, :469:29, :470:26, :472:{30,63}, :475:{30,38,50,61,64,71,74}, :493:50, :497:{31,40,50,61,71}, :499:{10,33}
-  wire         q2Seq_isInf_2 = (&(fp32Seq_2[30:23])) & ~(|(fp32Seq_2[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :235:45, :406:{21,32,40}
-  wire         q2Seq_isNan_2 = (&(fp32Seq_2[30:23])) & (|(fp32Seq_2[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :406:21, :407:{32,40}
+                  : {_q2Seq_eRnd_T_4[1:0], ~(q2Seq_manRnd_1[1]) & q2Seq_manRnd_1[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:134:34, :165:35, :227:45, :230:28, :253:17, :254:17, :429:20, :430:32, :431:32, :440:27, :441:25, :442:{22,53}, :445:55, :446:23, :447:26, :448:26, :452:{21,39}, :457:{10,18}, :458:12, :459:14, :460:16, :487:28, :492:31, :493:29, :494:26, :496:{30,63}, :499:{30,38,50,61,64,71,74}, :517:50, :521:{31,40,50,61,71}, :523:{10,33}
+  wire         q2Seq_isInf_2 = (&(fp32Seq_2[30:23])) & ~(|(fp32Seq_2[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :259:45, :430:{21,32,40}
+  wire         q2Seq_isNan_2 = (&(fp32Seq_2[30:23])) & (|(fp32Seq_2[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :430:21, :431:{32,40}
   wire [1:0]   q2Seq_manRnd_2 =
     {1'h0, fp32Seq_2[22]}
     + {1'h0,
@@ -3290,7 +3332,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_2[31]) & (|(fp32Seq_2[21:0]))
              : rndReg == 3'h2
                  ? fp32Seq_2[31] & (|(fp32Seq_2[21:0]))
-                 : _GEN_15 & fp32Seq_2[21] & ((|(fp32Seq_2[20:0])) | fp32Seq_2[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_2[21] & ((|(fp32Seq_2[20:0])) | fp32Seq_2[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :440:27, :448:26
   wire [8:0]   _q2Seq_eTgt_T_25 =
     _GEN_66 + 9'h1
     - {1'h0,
@@ -3300,13 +3342,13 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_50 + 10'h1 < 10'h4
                   ? 8'h1
                   : _s2Elem_sDiff_T_2 > 10'hFE ? 8'hFE : _s2Elem_sDiff_T_2[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q2Seq_eRnd_T_7 = _q2Seq_eTgt_T_25 + {8'h0, q2Seq_manRnd_2[1]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
-  wire         q2Seq_isSh1_2 = _q2Seq_eTgt_T_25 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :421:55, :463:28
-  wire         q2Seq_subGuard_2 = ~q2Seq_isSh1_2 | fp32Seq_2[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :412:22, :421:55, :463:28, :465:26
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q2Seq_eRnd_T_7 = _q2Seq_eTgt_T_25 + {8'h0, q2Seq_manRnd_2[1]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
+  wire         q2Seq_isSh1_2 = _q2Seq_eTgt_T_25 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :445:55, :487:28
+  wire         q2Seq_subGuard_2 = ~q2Seq_isSh1_2 | fp32Seq_2[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :436:22, :445:55, :487:28, :489:26
   wire         q2Seq_subSticky_2 =
-    q2Seq_isSh1_2 ? (|(fp32Seq_2[21:0])) : (|(fp32Seq_2[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :421:55, :463:28, :466:{26,37,45,54}
-  wire         q2Seq_subUp_truncNZ_2 = q2Seq_subGuard_2 | q2Seq_subSticky_2;	// src/hive/scala/main/HiveOutCvt.scala:202:25, :465:26, :466:26
+    q2Seq_isSh1_2 ? (|(fp32Seq_2[21:0])) : (|(fp32Seq_2[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :445:55, :487:28, :490:{26,37,45,54}
+  wire         q2Seq_subUp_truncNZ_2 = q2Seq_subGuard_2 | q2Seq_subSticky_2;	// src/hive/scala/main/HiveOutCvt.scala:226:25, :489:26, :490:26
   wire [1:0]   q2Seq_subRnd_2 =
     {1'h0, q2Seq_isSh1_2}
     + {1'h0,
@@ -3316,7 +3358,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_2[31]) & q2Seq_subUp_truncNZ_2
              : rndReg == 3'h2
                  ? fp32Seq_2[31] & q2Seq_subUp_truncNZ_2
-                 : _GEN_15 & q2Seq_subGuard_2 & (q2Seq_subSticky_2 | q2Seq_isSh1_2)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :421:55, :424:26, :463:28, :465:26, :466:26, :468:31
+                 : _GEN_15 & q2Seq_subGuard_2 & (q2Seq_subSticky_2 | q2Seq_isSh1_2)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :445:55, :448:26, :487:28, :489:26, :490:26, :492:31
   wire [2:0]   _GEN_82 =
     (rndReg == 3'h3 ? ~(fp32Seq_2[31]) : rndReg == 3'h2 & fp32Seq_2[31])
     & $signed(_q2Seq_eTgt_T_25) < -9'sh1 & (|(fp32Seq_2[30:23])) & ~q2Seq_isInf_2
@@ -3329,9 +3371,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               ? 3'h0
               : q2Seq_isInf_2 | q2Seq_isNan_2 | $signed(_q2Seq_eRnd_T_7) > 9'sh3
                   ? 3'h7
-                  : {_q2Seq_eRnd_T_7[1:0], ~(q2Seq_manRnd_2[1]) & q2Seq_manRnd_2[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:125:34, :148:35, :203:45, :206:28, :229:17, :230:17, :405:20, :406:32, :407:32, :416:27, :417:25, :418:{22,53}, :421:55, :422:23, :423:26, :424:26, :428:{21,39}, :433:{10,18}, :434:12, :435:14, :436:16, :463:28, :468:31, :469:29, :470:26, :472:{30,63}, :475:{30,38,50,61,64,71,74}, :493:50, :497:{31,40,50,61,71}, :499:{10,33}
-  wire         q2Seq_isInf_3 = (&(fp32Seq_3[30:23])) & ~(|(fp32Seq_3[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :235:45, :406:{21,32,40}
-  wire         q2Seq_isNan_3 = (&(fp32Seq_3[30:23])) & (|(fp32Seq_3[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :406:21, :407:{32,40}
+                  : {_q2Seq_eRnd_T_7[1:0], ~(q2Seq_manRnd_2[1]) & q2Seq_manRnd_2[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:134:34, :165:35, :227:45, :230:28, :253:17, :254:17, :429:20, :430:32, :431:32, :440:27, :441:25, :442:{22,53}, :445:55, :446:23, :447:26, :448:26, :452:{21,39}, :457:{10,18}, :458:12, :459:14, :460:16, :487:28, :492:31, :493:29, :494:26, :496:{30,63}, :499:{30,38,50,61,64,71,74}, :517:50, :521:{31,40,50,61,71}, :523:{10,33}
+  wire         q2Seq_isInf_3 = (&(fp32Seq_3[30:23])) & ~(|(fp32Seq_3[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :259:45, :430:{21,32,40}
+  wire         q2Seq_isNan_3 = (&(fp32Seq_3[30:23])) & (|(fp32Seq_3[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :430:21, :431:{32,40}
   wire [1:0]   q2Seq_manRnd_3 =
     {1'h0, fp32Seq_3[22]}
     + {1'h0,
@@ -3341,7 +3383,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_3[31]) & (|(fp32Seq_3[21:0]))
              : rndReg == 3'h2
                  ? fp32Seq_3[31] & (|(fp32Seq_3[21:0]))
-                 : _GEN_15 & fp32Seq_3[21] & ((|(fp32Seq_3[20:0])) | fp32Seq_3[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_3[21] & ((|(fp32Seq_3[20:0])) | fp32Seq_3[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :440:27, :448:26
   wire [8:0]   _q2Seq_eTgt_T_34 =
     _GEN_67 + 9'h1
     - {1'h0,
@@ -3351,13 +3393,13 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_51 + 10'h1 < 10'h4
                   ? 8'h1
                   : _s2Elem_sDiff_T_3 > 10'hFE ? 8'hFE : _s2Elem_sDiff_T_3[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q2Seq_eRnd_T_10 = _q2Seq_eTgt_T_34 + {8'h0, q2Seq_manRnd_3[1]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
-  wire         q2Seq_isSh1_3 = _q2Seq_eTgt_T_34 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :421:55, :463:28
-  wire         q2Seq_subGuard_3 = ~q2Seq_isSh1_3 | fp32Seq_3[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :412:22, :421:55, :463:28, :465:26
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q2Seq_eRnd_T_10 = _q2Seq_eTgt_T_34 + {8'h0, q2Seq_manRnd_3[1]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
+  wire         q2Seq_isSh1_3 = _q2Seq_eTgt_T_34 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :445:55, :487:28
+  wire         q2Seq_subGuard_3 = ~q2Seq_isSh1_3 | fp32Seq_3[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :436:22, :445:55, :487:28, :489:26
   wire         q2Seq_subSticky_3 =
-    q2Seq_isSh1_3 ? (|(fp32Seq_3[21:0])) : (|(fp32Seq_3[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :421:55, :463:28, :466:{26,37,45,54}
-  wire         q2Seq_subUp_truncNZ_3 = q2Seq_subGuard_3 | q2Seq_subSticky_3;	// src/hive/scala/main/HiveOutCvt.scala:202:25, :465:26, :466:26
+    q2Seq_isSh1_3 ? (|(fp32Seq_3[21:0])) : (|(fp32Seq_3[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :445:55, :487:28, :490:{26,37,45,54}
+  wire         q2Seq_subUp_truncNZ_3 = q2Seq_subGuard_3 | q2Seq_subSticky_3;	// src/hive/scala/main/HiveOutCvt.scala:226:25, :489:26, :490:26
   wire [1:0]   q2Seq_subRnd_3 =
     {1'h0, q2Seq_isSh1_3}
     + {1'h0,
@@ -3367,7 +3409,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_3[31]) & q2Seq_subUp_truncNZ_3
              : rndReg == 3'h2
                  ? fp32Seq_3[31] & q2Seq_subUp_truncNZ_3
-                 : _GEN_15 & q2Seq_subGuard_3 & (q2Seq_subSticky_3 | q2Seq_isSh1_3)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :421:55, :424:26, :463:28, :465:26, :466:26, :468:31
+                 : _GEN_15 & q2Seq_subGuard_3 & (q2Seq_subSticky_3 | q2Seq_isSh1_3)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :445:55, :448:26, :487:28, :489:26, :490:26, :492:31
   wire [2:0]   _GEN_83 =
     (rndReg == 3'h3 ? ~(fp32Seq_3[31]) : rndReg == 3'h2 & fp32Seq_3[31])
     & $signed(_q2Seq_eTgt_T_34) < -9'sh1 & (|(fp32Seq_3[30:23])) & ~q2Seq_isInf_3
@@ -3380,9 +3422,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               ? 3'h0
               : q2Seq_isInf_3 | q2Seq_isNan_3 | $signed(_q2Seq_eRnd_T_10) > 9'sh3
                   ? 3'h7
-                  : {_q2Seq_eRnd_T_10[1:0], ~(q2Seq_manRnd_3[1]) & q2Seq_manRnd_3[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:125:34, :148:35, :203:45, :206:28, :229:17, :230:17, :405:20, :406:32, :407:32, :416:27, :417:25, :418:{22,53}, :421:55, :422:23, :423:26, :424:26, :428:{21,39}, :433:{10,18}, :434:12, :435:14, :436:16, :463:28, :468:31, :469:29, :470:26, :472:{30,63}, :475:{30,38,50,61,64,71,74}, :493:50, :497:{31,40,50,61,71}, :499:{10,33}
-  wire         q2Seq_isInf_4 = (&(fp32Seq_4[30:23])) & ~(|(fp32Seq_4[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :235:45, :406:{21,32,40}
-  wire         q2Seq_isNan_4 = (&(fp32Seq_4[30:23])) & (|(fp32Seq_4[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :406:21, :407:{32,40}
+                  : {_q2Seq_eRnd_T_10[1:0], ~(q2Seq_manRnd_3[1]) & q2Seq_manRnd_3[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:134:34, :165:35, :227:45, :230:28, :253:17, :254:17, :429:20, :430:32, :431:32, :440:27, :441:25, :442:{22,53}, :445:55, :446:23, :447:26, :448:26, :452:{21,39}, :457:{10,18}, :458:12, :459:14, :460:16, :487:28, :492:31, :493:29, :494:26, :496:{30,63}, :499:{30,38,50,61,64,71,74}, :517:50, :521:{31,40,50,61,71}, :523:{10,33}
+  wire         q2Seq_isInf_4 = (&(fp32Seq_4[30:23])) & ~(|(fp32Seq_4[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :259:45, :430:{21,32,40}
+  wire         q2Seq_isNan_4 = (&(fp32Seq_4[30:23])) & (|(fp32Seq_4[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :430:21, :431:{32,40}
   wire [1:0]   q2Seq_manRnd_4 =
     {1'h0, fp32Seq_4[22]}
     + {1'h0,
@@ -3392,7 +3434,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_4[31]) & (|(fp32Seq_4[21:0]))
              : rndReg == 3'h2
                  ? fp32Seq_4[31] & (|(fp32Seq_4[21:0]))
-                 : _GEN_15 & fp32Seq_4[21] & ((|(fp32Seq_4[20:0])) | fp32Seq_4[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_4[21] & ((|(fp32Seq_4[20:0])) | fp32Seq_4[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :440:27, :448:26
   wire [8:0]   _q2Seq_eTgt_T_43 =
     _GEN_68 + 9'h1
     - {1'h0,
@@ -3402,13 +3444,13 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_52 + 10'h1 < 10'h4
                   ? 8'h1
                   : _s2Elem_sDiff_T_4 > 10'hFE ? 8'hFE : _s2Elem_sDiff_T_4[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q2Seq_eRnd_T_13 = _q2Seq_eTgt_T_43 + {8'h0, q2Seq_manRnd_4[1]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
-  wire         q2Seq_isSh1_4 = _q2Seq_eTgt_T_43 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :421:55, :463:28
-  wire         q2Seq_subGuard_4 = ~q2Seq_isSh1_4 | fp32Seq_4[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :412:22, :421:55, :463:28, :465:26
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q2Seq_eRnd_T_13 = _q2Seq_eTgt_T_43 + {8'h0, q2Seq_manRnd_4[1]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
+  wire         q2Seq_isSh1_4 = _q2Seq_eTgt_T_43 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :445:55, :487:28
+  wire         q2Seq_subGuard_4 = ~q2Seq_isSh1_4 | fp32Seq_4[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :436:22, :445:55, :487:28, :489:26
   wire         q2Seq_subSticky_4 =
-    q2Seq_isSh1_4 ? (|(fp32Seq_4[21:0])) : (|(fp32Seq_4[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :421:55, :463:28, :466:{26,37,45,54}
-  wire         q2Seq_subUp_truncNZ_4 = q2Seq_subGuard_4 | q2Seq_subSticky_4;	// src/hive/scala/main/HiveOutCvt.scala:202:25, :465:26, :466:26
+    q2Seq_isSh1_4 ? (|(fp32Seq_4[21:0])) : (|(fp32Seq_4[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :445:55, :487:28, :490:{26,37,45,54}
+  wire         q2Seq_subUp_truncNZ_4 = q2Seq_subGuard_4 | q2Seq_subSticky_4;	// src/hive/scala/main/HiveOutCvt.scala:226:25, :489:26, :490:26
   wire [1:0]   q2Seq_subRnd_4 =
     {1'h0, q2Seq_isSh1_4}
     + {1'h0,
@@ -3418,7 +3460,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_4[31]) & q2Seq_subUp_truncNZ_4
              : rndReg == 3'h2
                  ? fp32Seq_4[31] & q2Seq_subUp_truncNZ_4
-                 : _GEN_15 & q2Seq_subGuard_4 & (q2Seq_subSticky_4 | q2Seq_isSh1_4)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :421:55, :424:26, :463:28, :465:26, :466:26, :468:31
+                 : _GEN_15 & q2Seq_subGuard_4 & (q2Seq_subSticky_4 | q2Seq_isSh1_4)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :445:55, :448:26, :487:28, :489:26, :490:26, :492:31
   wire [2:0]   _GEN_84 =
     (rndReg == 3'h3 ? ~(fp32Seq_4[31]) : rndReg == 3'h2 & fp32Seq_4[31])
     & $signed(_q2Seq_eTgt_T_43) < -9'sh1 & (|(fp32Seq_4[30:23])) & ~q2Seq_isInf_4
@@ -3431,9 +3473,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               ? 3'h0
               : q2Seq_isInf_4 | q2Seq_isNan_4 | $signed(_q2Seq_eRnd_T_13) > 9'sh3
                   ? 3'h7
-                  : {_q2Seq_eRnd_T_13[1:0], ~(q2Seq_manRnd_4[1]) & q2Seq_manRnd_4[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:125:34, :148:35, :203:45, :206:28, :229:17, :230:17, :405:20, :406:32, :407:32, :416:27, :417:25, :418:{22,53}, :421:55, :422:23, :423:26, :424:26, :428:{21,39}, :433:{10,18}, :434:12, :435:14, :436:16, :463:28, :468:31, :469:29, :470:26, :472:{30,63}, :475:{30,38,50,61,64,71,74}, :493:50, :497:{31,40,50,61,71}, :499:{10,33}
-  wire         q2Seq_isInf_5 = (&(fp32Seq_5[30:23])) & ~(|(fp32Seq_5[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :235:45, :406:{21,32,40}
-  wire         q2Seq_isNan_5 = (&(fp32Seq_5[30:23])) & (|(fp32Seq_5[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :406:21, :407:{32,40}
+                  : {_q2Seq_eRnd_T_13[1:0], ~(q2Seq_manRnd_4[1]) & q2Seq_manRnd_4[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:134:34, :165:35, :227:45, :230:28, :253:17, :254:17, :429:20, :430:32, :431:32, :440:27, :441:25, :442:{22,53}, :445:55, :446:23, :447:26, :448:26, :452:{21,39}, :457:{10,18}, :458:12, :459:14, :460:16, :487:28, :492:31, :493:29, :494:26, :496:{30,63}, :499:{30,38,50,61,64,71,74}, :517:50, :521:{31,40,50,61,71}, :523:{10,33}
+  wire         q2Seq_isInf_5 = (&(fp32Seq_5[30:23])) & ~(|(fp32Seq_5[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :259:45, :430:{21,32,40}
+  wire         q2Seq_isNan_5 = (&(fp32Seq_5[30:23])) & (|(fp32Seq_5[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :430:21, :431:{32,40}
   wire [1:0]   q2Seq_manRnd_5 =
     {1'h0, fp32Seq_5[22]}
     + {1'h0,
@@ -3443,7 +3485,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_5[31]) & (|(fp32Seq_5[21:0]))
              : rndReg == 3'h2
                  ? fp32Seq_5[31] & (|(fp32Seq_5[21:0]))
-                 : _GEN_15 & fp32Seq_5[21] & ((|(fp32Seq_5[20:0])) | fp32Seq_5[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_5[21] & ((|(fp32Seq_5[20:0])) | fp32Seq_5[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :440:27, :448:26
   wire [8:0]   _q2Seq_eTgt_T_52 =
     _GEN_69 + 9'h1
     - {1'h0,
@@ -3453,13 +3495,13 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_53 + 10'h1 < 10'h4
                   ? 8'h1
                   : _s2Elem_sDiff_T_5 > 10'hFE ? 8'hFE : _s2Elem_sDiff_T_5[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q2Seq_eRnd_T_16 = _q2Seq_eTgt_T_52 + {8'h0, q2Seq_manRnd_5[1]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
-  wire         q2Seq_isSh1_5 = _q2Seq_eTgt_T_52 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :421:55, :463:28
-  wire         q2Seq_subGuard_5 = ~q2Seq_isSh1_5 | fp32Seq_5[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :412:22, :421:55, :463:28, :465:26
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q2Seq_eRnd_T_16 = _q2Seq_eTgt_T_52 + {8'h0, q2Seq_manRnd_5[1]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
+  wire         q2Seq_isSh1_5 = _q2Seq_eTgt_T_52 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :445:55, :487:28
+  wire         q2Seq_subGuard_5 = ~q2Seq_isSh1_5 | fp32Seq_5[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :436:22, :445:55, :487:28, :489:26
   wire         q2Seq_subSticky_5 =
-    q2Seq_isSh1_5 ? (|(fp32Seq_5[21:0])) : (|(fp32Seq_5[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :421:55, :463:28, :466:{26,37,45,54}
-  wire         q2Seq_subUp_truncNZ_5 = q2Seq_subGuard_5 | q2Seq_subSticky_5;	// src/hive/scala/main/HiveOutCvt.scala:202:25, :465:26, :466:26
+    q2Seq_isSh1_5 ? (|(fp32Seq_5[21:0])) : (|(fp32Seq_5[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :445:55, :487:28, :490:{26,37,45,54}
+  wire         q2Seq_subUp_truncNZ_5 = q2Seq_subGuard_5 | q2Seq_subSticky_5;	// src/hive/scala/main/HiveOutCvt.scala:226:25, :489:26, :490:26
   wire [1:0]   q2Seq_subRnd_5 =
     {1'h0, q2Seq_isSh1_5}
     + {1'h0,
@@ -3469,7 +3511,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_5[31]) & q2Seq_subUp_truncNZ_5
              : rndReg == 3'h2
                  ? fp32Seq_5[31] & q2Seq_subUp_truncNZ_5
-                 : _GEN_15 & q2Seq_subGuard_5 & (q2Seq_subSticky_5 | q2Seq_isSh1_5)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :421:55, :424:26, :463:28, :465:26, :466:26, :468:31
+                 : _GEN_15 & q2Seq_subGuard_5 & (q2Seq_subSticky_5 | q2Seq_isSh1_5)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :445:55, :448:26, :487:28, :489:26, :490:26, :492:31
   wire [2:0]   _GEN_85 =
     (rndReg == 3'h3 ? ~(fp32Seq_5[31]) : rndReg == 3'h2 & fp32Seq_5[31])
     & $signed(_q2Seq_eTgt_T_52) < -9'sh1 & (|(fp32Seq_5[30:23])) & ~q2Seq_isInf_5
@@ -3482,9 +3524,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               ? 3'h0
               : q2Seq_isInf_5 | q2Seq_isNan_5 | $signed(_q2Seq_eRnd_T_16) > 9'sh3
                   ? 3'h7
-                  : {_q2Seq_eRnd_T_16[1:0], ~(q2Seq_manRnd_5[1]) & q2Seq_manRnd_5[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:125:34, :148:35, :203:45, :206:28, :229:17, :230:17, :405:20, :406:32, :407:32, :416:27, :417:25, :418:{22,53}, :421:55, :422:23, :423:26, :424:26, :428:{21,39}, :433:{10,18}, :434:12, :435:14, :436:16, :463:28, :468:31, :469:29, :470:26, :472:{30,63}, :475:{30,38,50,61,64,71,74}, :493:50, :497:{31,40,50,61,71}, :499:{10,33}
-  wire         q2Seq_isInf_6 = (&(fp32Seq_6[30:23])) & ~(|(fp32Seq_6[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :235:45, :406:{21,32,40}
-  wire         q2Seq_isNan_6 = (&(fp32Seq_6[30:23])) & (|(fp32Seq_6[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :406:21, :407:{32,40}
+                  : {_q2Seq_eRnd_T_16[1:0], ~(q2Seq_manRnd_5[1]) & q2Seq_manRnd_5[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:134:34, :165:35, :227:45, :230:28, :253:17, :254:17, :429:20, :430:32, :431:32, :440:27, :441:25, :442:{22,53}, :445:55, :446:23, :447:26, :448:26, :452:{21,39}, :457:{10,18}, :458:12, :459:14, :460:16, :487:28, :492:31, :493:29, :494:26, :496:{30,63}, :499:{30,38,50,61,64,71,74}, :517:50, :521:{31,40,50,61,71}, :523:{10,33}
+  wire         q2Seq_isInf_6 = (&(fp32Seq_6[30:23])) & ~(|(fp32Seq_6[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :259:45, :430:{21,32,40}
+  wire         q2Seq_isNan_6 = (&(fp32Seq_6[30:23])) & (|(fp32Seq_6[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :430:21, :431:{32,40}
   wire [1:0]   q2Seq_manRnd_6 =
     {1'h0, fp32Seq_6[22]}
     + {1'h0,
@@ -3494,7 +3536,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_6[31]) & (|(fp32Seq_6[21:0]))
              : rndReg == 3'h2
                  ? fp32Seq_6[31] & (|(fp32Seq_6[21:0]))
-                 : _GEN_15 & fp32Seq_6[21] & ((|(fp32Seq_6[20:0])) | fp32Seq_6[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_6[21] & ((|(fp32Seq_6[20:0])) | fp32Seq_6[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :440:27, :448:26
   wire [8:0]   _q2Seq_eTgt_T_61 =
     _GEN_70 + 9'h1
     - {1'h0,
@@ -3504,13 +3546,13 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_54 + 10'h1 < 10'h4
                   ? 8'h1
                   : _s2Elem_sDiff_T_6 > 10'hFE ? 8'hFE : _s2Elem_sDiff_T_6[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q2Seq_eRnd_T_19 = _q2Seq_eTgt_T_61 + {8'h0, q2Seq_manRnd_6[1]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
-  wire         q2Seq_isSh1_6 = _q2Seq_eTgt_T_61 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :421:55, :463:28
-  wire         q2Seq_subGuard_6 = ~q2Seq_isSh1_6 | fp32Seq_6[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :412:22, :421:55, :463:28, :465:26
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q2Seq_eRnd_T_19 = _q2Seq_eTgt_T_61 + {8'h0, q2Seq_manRnd_6[1]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
+  wire         q2Seq_isSh1_6 = _q2Seq_eTgt_T_61 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :445:55, :487:28
+  wire         q2Seq_subGuard_6 = ~q2Seq_isSh1_6 | fp32Seq_6[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :436:22, :445:55, :487:28, :489:26
   wire         q2Seq_subSticky_6 =
-    q2Seq_isSh1_6 ? (|(fp32Seq_6[21:0])) : (|(fp32Seq_6[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :421:55, :463:28, :466:{26,37,45,54}
-  wire         q2Seq_subUp_truncNZ_6 = q2Seq_subGuard_6 | q2Seq_subSticky_6;	// src/hive/scala/main/HiveOutCvt.scala:202:25, :465:26, :466:26
+    q2Seq_isSh1_6 ? (|(fp32Seq_6[21:0])) : (|(fp32Seq_6[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :445:55, :487:28, :490:{26,37,45,54}
+  wire         q2Seq_subUp_truncNZ_6 = q2Seq_subGuard_6 | q2Seq_subSticky_6;	// src/hive/scala/main/HiveOutCvt.scala:226:25, :489:26, :490:26
   wire [1:0]   q2Seq_subRnd_6 =
     {1'h0, q2Seq_isSh1_6}
     + {1'h0,
@@ -3520,7 +3562,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_6[31]) & q2Seq_subUp_truncNZ_6
              : rndReg == 3'h2
                  ? fp32Seq_6[31] & q2Seq_subUp_truncNZ_6
-                 : _GEN_15 & q2Seq_subGuard_6 & (q2Seq_subSticky_6 | q2Seq_isSh1_6)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :421:55, :424:26, :463:28, :465:26, :466:26, :468:31
+                 : _GEN_15 & q2Seq_subGuard_6 & (q2Seq_subSticky_6 | q2Seq_isSh1_6)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :445:55, :448:26, :487:28, :489:26, :490:26, :492:31
   wire [2:0]   _GEN_86 =
     (rndReg == 3'h3 ? ~(fp32Seq_6[31]) : rndReg == 3'h2 & fp32Seq_6[31])
     & $signed(_q2Seq_eTgt_T_61) < -9'sh1 & (|(fp32Seq_6[30:23])) & ~q2Seq_isInf_6
@@ -3533,9 +3575,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               ? 3'h0
               : q2Seq_isInf_6 | q2Seq_isNan_6 | $signed(_q2Seq_eRnd_T_19) > 9'sh3
                   ? 3'h7
-                  : {_q2Seq_eRnd_T_19[1:0], ~(q2Seq_manRnd_6[1]) & q2Seq_manRnd_6[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:125:34, :148:35, :203:45, :206:28, :229:17, :230:17, :405:20, :406:32, :407:32, :416:27, :417:25, :418:{22,53}, :421:55, :422:23, :423:26, :424:26, :428:{21,39}, :433:{10,18}, :434:12, :435:14, :436:16, :463:28, :468:31, :469:29, :470:26, :472:{30,63}, :475:{30,38,50,61,64,71,74}, :493:50, :497:{31,40,50,61,71}, :499:{10,33}
-  wire         q2Seq_isInf_7 = (&(fp32Seq_7[30:23])) & ~(|(fp32Seq_7[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :235:45, :406:{21,32,40}
-  wire         q2Seq_isNan_7 = (&(fp32Seq_7[30:23])) & (|(fp32Seq_7[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :406:21, :407:{32,40}
+                  : {_q2Seq_eRnd_T_19[1:0], ~(q2Seq_manRnd_6[1]) & q2Seq_manRnd_6[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:134:34, :165:35, :227:45, :230:28, :253:17, :254:17, :429:20, :430:32, :431:32, :440:27, :441:25, :442:{22,53}, :445:55, :446:23, :447:26, :448:26, :452:{21,39}, :457:{10,18}, :458:12, :459:14, :460:16, :487:28, :492:31, :493:29, :494:26, :496:{30,63}, :499:{30,38,50,61,64,71,74}, :517:50, :521:{31,40,50,61,71}, :523:{10,33}
+  wire         q2Seq_isInf_7 = (&(fp32Seq_7[30:23])) & ~(|(fp32Seq_7[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :259:45, :430:{21,32,40}
+  wire         q2Seq_isNan_7 = (&(fp32Seq_7[30:23])) & (|(fp32Seq_7[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :430:21, :431:{32,40}
   wire [1:0]   q2Seq_manRnd_7 =
     {1'h0, fp32Seq_7[22]}
     + {1'h0,
@@ -3545,7 +3587,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_7[31]) & (|(fp32Seq_7[21:0]))
              : rndReg == 3'h2
                  ? fp32Seq_7[31] & (|(fp32Seq_7[21:0]))
-                 : _GEN_15 & fp32Seq_7[21] & ((|(fp32Seq_7[20:0])) | fp32Seq_7[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_7[21] & ((|(fp32Seq_7[20:0])) | fp32Seq_7[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :440:27, :448:26
   wire [8:0]   _q2Seq_eTgt_T_70 =
     _GEN_71 + 9'h1
     - {1'h0,
@@ -3555,13 +3597,13 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_55 + 10'h1 < 10'h4
                   ? 8'h1
                   : _s2Elem_sDiff_T_7 > 10'hFE ? 8'hFE : _s2Elem_sDiff_T_7[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q2Seq_eRnd_T_22 = _q2Seq_eTgt_T_70 + {8'h0, q2Seq_manRnd_7[1]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
-  wire         q2Seq_isSh1_7 = _q2Seq_eTgt_T_70 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :421:55, :463:28
-  wire         q2Seq_subGuard_7 = ~q2Seq_isSh1_7 | fp32Seq_7[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :412:22, :421:55, :463:28, :465:26
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q2Seq_eRnd_T_22 = _q2Seq_eTgt_T_70 + {8'h0, q2Seq_manRnd_7[1]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
+  wire         q2Seq_isSh1_7 = _q2Seq_eTgt_T_70 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :445:55, :487:28
+  wire         q2Seq_subGuard_7 = ~q2Seq_isSh1_7 | fp32Seq_7[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :436:22, :445:55, :487:28, :489:26
   wire         q2Seq_subSticky_7 =
-    q2Seq_isSh1_7 ? (|(fp32Seq_7[21:0])) : (|(fp32Seq_7[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :421:55, :463:28, :466:{26,37,45,54}
-  wire         q2Seq_subUp_truncNZ_7 = q2Seq_subGuard_7 | q2Seq_subSticky_7;	// src/hive/scala/main/HiveOutCvt.scala:202:25, :465:26, :466:26
+    q2Seq_isSh1_7 ? (|(fp32Seq_7[21:0])) : (|(fp32Seq_7[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :445:55, :487:28, :490:{26,37,45,54}
+  wire         q2Seq_subUp_truncNZ_7 = q2Seq_subGuard_7 | q2Seq_subSticky_7;	// src/hive/scala/main/HiveOutCvt.scala:226:25, :489:26, :490:26
   wire [1:0]   q2Seq_subRnd_7 =
     {1'h0, q2Seq_isSh1_7}
     + {1'h0,
@@ -3571,7 +3613,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_7[31]) & q2Seq_subUp_truncNZ_7
              : rndReg == 3'h2
                  ? fp32Seq_7[31] & q2Seq_subUp_truncNZ_7
-                 : _GEN_15 & q2Seq_subGuard_7 & (q2Seq_subSticky_7 | q2Seq_isSh1_7)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :421:55, :424:26, :463:28, :465:26, :466:26, :468:31
+                 : _GEN_15 & q2Seq_subGuard_7 & (q2Seq_subSticky_7 | q2Seq_isSh1_7)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :445:55, :448:26, :487:28, :489:26, :490:26, :492:31
   wire [2:0]   _GEN_87 =
     (rndReg == 3'h3 ? ~(fp32Seq_7[31]) : rndReg == 3'h2 & fp32Seq_7[31])
     & $signed(_q2Seq_eTgt_T_70) < -9'sh1 & (|(fp32Seq_7[30:23])) & ~q2Seq_isInf_7
@@ -3584,9 +3626,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               ? 3'h0
               : q2Seq_isInf_7 | q2Seq_isNan_7 | $signed(_q2Seq_eRnd_T_22) > 9'sh3
                   ? 3'h7
-                  : {_q2Seq_eRnd_T_22[1:0], ~(q2Seq_manRnd_7[1]) & q2Seq_manRnd_7[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:125:34, :148:35, :203:45, :206:28, :229:17, :230:17, :405:20, :406:32, :407:32, :416:27, :417:25, :418:{22,53}, :421:55, :422:23, :423:26, :424:26, :428:{21,39}, :433:{10,18}, :434:12, :435:14, :436:16, :463:28, :468:31, :469:29, :470:26, :472:{30,63}, :475:{30,38,50,61,64,71,74}, :493:50, :497:{31,40,50,61,71}, :499:{10,33}
-  wire         q2Seq_isInf_8 = (&(fp32Seq_8[30:23])) & ~(|(fp32Seq_8[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :235:45, :406:{21,32,40}
-  wire         q2Seq_isNan_8 = (&(fp32Seq_8[30:23])) & (|(fp32Seq_8[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :406:21, :407:{32,40}
+                  : {_q2Seq_eRnd_T_22[1:0], ~(q2Seq_manRnd_7[1]) & q2Seq_manRnd_7[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:134:34, :165:35, :227:45, :230:28, :253:17, :254:17, :429:20, :430:32, :431:32, :440:27, :441:25, :442:{22,53}, :445:55, :446:23, :447:26, :448:26, :452:{21,39}, :457:{10,18}, :458:12, :459:14, :460:16, :487:28, :492:31, :493:29, :494:26, :496:{30,63}, :499:{30,38,50,61,64,71,74}, :517:50, :521:{31,40,50,61,71}, :523:{10,33}
+  wire         q2Seq_isInf_8 = (&(fp32Seq_8[30:23])) & ~(|(fp32Seq_8[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :259:45, :430:{21,32,40}
+  wire         q2Seq_isNan_8 = (&(fp32Seq_8[30:23])) & (|(fp32Seq_8[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :430:21, :431:{32,40}
   wire [1:0]   q2Seq_manRnd_8 =
     {1'h0, fp32Seq_8[22]}
     + {1'h0,
@@ -3596,7 +3638,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_8[31]) & (|(fp32Seq_8[21:0]))
              : rndReg == 3'h2
                  ? fp32Seq_8[31] & (|(fp32Seq_8[21:0]))
-                 : _GEN_15 & fp32Seq_8[21] & ((|(fp32Seq_8[20:0])) | fp32Seq_8[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_8[21] & ((|(fp32Seq_8[20:0])) | fp32Seq_8[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :440:27, :448:26
   wire [8:0]   _q2Seq_eTgt_T_79 =
     _GEN_72 + 9'h1
     - {1'h0,
@@ -3606,13 +3648,13 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_56 + 10'h1 < 10'h4
                   ? 8'h1
                   : _s2Elem_sDiff_T_8 > 10'hFE ? 8'hFE : _s2Elem_sDiff_T_8[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q2Seq_eRnd_T_25 = _q2Seq_eTgt_T_79 + {8'h0, q2Seq_manRnd_8[1]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
-  wire         q2Seq_isSh1_8 = _q2Seq_eTgt_T_79 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :421:55, :463:28
-  wire         q2Seq_subGuard_8 = ~q2Seq_isSh1_8 | fp32Seq_8[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :412:22, :421:55, :463:28, :465:26
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q2Seq_eRnd_T_25 = _q2Seq_eTgt_T_79 + {8'h0, q2Seq_manRnd_8[1]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
+  wire         q2Seq_isSh1_8 = _q2Seq_eTgt_T_79 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :445:55, :487:28
+  wire         q2Seq_subGuard_8 = ~q2Seq_isSh1_8 | fp32Seq_8[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :436:22, :445:55, :487:28, :489:26
   wire         q2Seq_subSticky_8 =
-    q2Seq_isSh1_8 ? (|(fp32Seq_8[21:0])) : (|(fp32Seq_8[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :421:55, :463:28, :466:{26,37,45,54}
-  wire         q2Seq_subUp_truncNZ_8 = q2Seq_subGuard_8 | q2Seq_subSticky_8;	// src/hive/scala/main/HiveOutCvt.scala:202:25, :465:26, :466:26
+    q2Seq_isSh1_8 ? (|(fp32Seq_8[21:0])) : (|(fp32Seq_8[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :445:55, :487:28, :490:{26,37,45,54}
+  wire         q2Seq_subUp_truncNZ_8 = q2Seq_subGuard_8 | q2Seq_subSticky_8;	// src/hive/scala/main/HiveOutCvt.scala:226:25, :489:26, :490:26
   wire [1:0]   q2Seq_subRnd_8 =
     {1'h0, q2Seq_isSh1_8}
     + {1'h0,
@@ -3622,7 +3664,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_8[31]) & q2Seq_subUp_truncNZ_8
              : rndReg == 3'h2
                  ? fp32Seq_8[31] & q2Seq_subUp_truncNZ_8
-                 : _GEN_15 & q2Seq_subGuard_8 & (q2Seq_subSticky_8 | q2Seq_isSh1_8)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :421:55, :424:26, :463:28, :465:26, :466:26, :468:31
+                 : _GEN_15 & q2Seq_subGuard_8 & (q2Seq_subSticky_8 | q2Seq_isSh1_8)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :445:55, :448:26, :487:28, :489:26, :490:26, :492:31
   wire [2:0]   _GEN_88 =
     (rndReg == 3'h3 ? ~(fp32Seq_8[31]) : rndReg == 3'h2 & fp32Seq_8[31])
     & $signed(_q2Seq_eTgt_T_79) < -9'sh1 & (|(fp32Seq_8[30:23])) & ~q2Seq_isInf_8
@@ -3635,9 +3677,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               ? 3'h0
               : q2Seq_isInf_8 | q2Seq_isNan_8 | $signed(_q2Seq_eRnd_T_25) > 9'sh3
                   ? 3'h7
-                  : {_q2Seq_eRnd_T_25[1:0], ~(q2Seq_manRnd_8[1]) & q2Seq_manRnd_8[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:125:34, :148:35, :203:45, :206:28, :229:17, :230:17, :405:20, :406:32, :407:32, :416:27, :417:25, :418:{22,53}, :421:55, :422:23, :423:26, :424:26, :428:{21,39}, :433:{10,18}, :434:12, :435:14, :436:16, :463:28, :468:31, :469:29, :470:26, :472:{30,63}, :475:{30,38,50,61,64,71,74}, :493:50, :497:{31,40,50,61,71}, :499:{10,33}
-  wire         q2Seq_isInf_9 = (&(fp32Seq_9[30:23])) & ~(|(fp32Seq_9[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :235:45, :406:{21,32,40}
-  wire         q2Seq_isNan_9 = (&(fp32Seq_9[30:23])) & (|(fp32Seq_9[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :406:21, :407:{32,40}
+                  : {_q2Seq_eRnd_T_25[1:0], ~(q2Seq_manRnd_8[1]) & q2Seq_manRnd_8[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:134:34, :165:35, :227:45, :230:28, :253:17, :254:17, :429:20, :430:32, :431:32, :440:27, :441:25, :442:{22,53}, :445:55, :446:23, :447:26, :448:26, :452:{21,39}, :457:{10,18}, :458:12, :459:14, :460:16, :487:28, :492:31, :493:29, :494:26, :496:{30,63}, :499:{30,38,50,61,64,71,74}, :517:50, :521:{31,40,50,61,71}, :523:{10,33}
+  wire         q2Seq_isInf_9 = (&(fp32Seq_9[30:23])) & ~(|(fp32Seq_9[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :259:45, :430:{21,32,40}
+  wire         q2Seq_isNan_9 = (&(fp32Seq_9[30:23])) & (|(fp32Seq_9[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :430:21, :431:{32,40}
   wire [1:0]   q2Seq_manRnd_9 =
     {1'h0, fp32Seq_9[22]}
     + {1'h0,
@@ -3647,7 +3689,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_9[31]) & (|(fp32Seq_9[21:0]))
              : rndReg == 3'h2
                  ? fp32Seq_9[31] & (|(fp32Seq_9[21:0]))
-                 : _GEN_15 & fp32Seq_9[21] & ((|(fp32Seq_9[20:0])) | fp32Seq_9[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_9[21] & ((|(fp32Seq_9[20:0])) | fp32Seq_9[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :440:27, :448:26
   wire [8:0]   _q2Seq_eTgt_T_88 =
     _GEN_73 + 9'h1
     - {1'h0,
@@ -3657,13 +3699,13 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_57 + 10'h1 < 10'h4
                   ? 8'h1
                   : _s2Elem_sDiff_T_9 > 10'hFE ? 8'hFE : _s2Elem_sDiff_T_9[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q2Seq_eRnd_T_28 = _q2Seq_eTgt_T_88 + {8'h0, q2Seq_manRnd_9[1]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
-  wire         q2Seq_isSh1_9 = _q2Seq_eTgt_T_88 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :421:55, :463:28
-  wire         q2Seq_subGuard_9 = ~q2Seq_isSh1_9 | fp32Seq_9[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :412:22, :421:55, :463:28, :465:26
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q2Seq_eRnd_T_28 = _q2Seq_eTgt_T_88 + {8'h0, q2Seq_manRnd_9[1]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
+  wire         q2Seq_isSh1_9 = _q2Seq_eTgt_T_88 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :445:55, :487:28
+  wire         q2Seq_subGuard_9 = ~q2Seq_isSh1_9 | fp32Seq_9[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :436:22, :445:55, :487:28, :489:26
   wire         q2Seq_subSticky_9 =
-    q2Seq_isSh1_9 ? (|(fp32Seq_9[21:0])) : (|(fp32Seq_9[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :421:55, :463:28, :466:{26,37,45,54}
-  wire         q2Seq_subUp_truncNZ_9 = q2Seq_subGuard_9 | q2Seq_subSticky_9;	// src/hive/scala/main/HiveOutCvt.scala:202:25, :465:26, :466:26
+    q2Seq_isSh1_9 ? (|(fp32Seq_9[21:0])) : (|(fp32Seq_9[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :445:55, :487:28, :490:{26,37,45,54}
+  wire         q2Seq_subUp_truncNZ_9 = q2Seq_subGuard_9 | q2Seq_subSticky_9;	// src/hive/scala/main/HiveOutCvt.scala:226:25, :489:26, :490:26
   wire [1:0]   q2Seq_subRnd_9 =
     {1'h0, q2Seq_isSh1_9}
     + {1'h0,
@@ -3673,7 +3715,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_9[31]) & q2Seq_subUp_truncNZ_9
              : rndReg == 3'h2
                  ? fp32Seq_9[31] & q2Seq_subUp_truncNZ_9
-                 : _GEN_15 & q2Seq_subGuard_9 & (q2Seq_subSticky_9 | q2Seq_isSh1_9)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :421:55, :424:26, :463:28, :465:26, :466:26, :468:31
+                 : _GEN_15 & q2Seq_subGuard_9 & (q2Seq_subSticky_9 | q2Seq_isSh1_9)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :445:55, :448:26, :487:28, :489:26, :490:26, :492:31
   wire [2:0]   _GEN_89 =
     (rndReg == 3'h3 ? ~(fp32Seq_9[31]) : rndReg == 3'h2 & fp32Seq_9[31])
     & $signed(_q2Seq_eTgt_T_88) < -9'sh1 & (|(fp32Seq_9[30:23])) & ~q2Seq_isInf_9
@@ -3686,9 +3728,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               ? 3'h0
               : q2Seq_isInf_9 | q2Seq_isNan_9 | $signed(_q2Seq_eRnd_T_28) > 9'sh3
                   ? 3'h7
-                  : {_q2Seq_eRnd_T_28[1:0], ~(q2Seq_manRnd_9[1]) & q2Seq_manRnd_9[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:125:34, :148:35, :203:45, :206:28, :229:17, :230:17, :405:20, :406:32, :407:32, :416:27, :417:25, :418:{22,53}, :421:55, :422:23, :423:26, :424:26, :428:{21,39}, :433:{10,18}, :434:12, :435:14, :436:16, :463:28, :468:31, :469:29, :470:26, :472:{30,63}, :475:{30,38,50,61,64,71,74}, :493:50, :497:{31,40,50,61,71}, :499:{10,33}
-  wire         q2Seq_isInf_10 = (&(fp32Seq_10[30:23])) & ~(|(fp32Seq_10[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :235:45, :406:{21,32,40}
-  wire         q2Seq_isNan_10 = (&(fp32Seq_10[30:23])) & (|(fp32Seq_10[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :406:21, :407:{32,40}
+                  : {_q2Seq_eRnd_T_28[1:0], ~(q2Seq_manRnd_9[1]) & q2Seq_manRnd_9[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:134:34, :165:35, :227:45, :230:28, :253:17, :254:17, :429:20, :430:32, :431:32, :440:27, :441:25, :442:{22,53}, :445:55, :446:23, :447:26, :448:26, :452:{21,39}, :457:{10,18}, :458:12, :459:14, :460:16, :487:28, :492:31, :493:29, :494:26, :496:{30,63}, :499:{30,38,50,61,64,71,74}, :517:50, :521:{31,40,50,61,71}, :523:{10,33}
+  wire         q2Seq_isInf_10 = (&(fp32Seq_10[30:23])) & ~(|(fp32Seq_10[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :259:45, :430:{21,32,40}
+  wire         q2Seq_isNan_10 = (&(fp32Seq_10[30:23])) & (|(fp32Seq_10[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :430:21, :431:{32,40}
   wire [1:0]   q2Seq_manRnd_10 =
     {1'h0, fp32Seq_10[22]}
     + {1'h0,
@@ -3698,7 +3740,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_10[31]) & (|(fp32Seq_10[21:0]))
              : rndReg == 3'h2
                  ? fp32Seq_10[31] & (|(fp32Seq_10[21:0]))
-                 : _GEN_15 & fp32Seq_10[21] & ((|(fp32Seq_10[20:0])) | fp32Seq_10[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_10[21] & ((|(fp32Seq_10[20:0])) | fp32Seq_10[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :440:27, :448:26
   wire [8:0]   _q2Seq_eTgt_T_97 =
     _GEN_74 + 9'h1
     - {1'h0,
@@ -3708,13 +3750,13 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_58 + 10'h1 < 10'h4
                   ? 8'h1
                   : _s2Elem_sDiff_T_10 > 10'hFE ? 8'hFE : _s2Elem_sDiff_T_10[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q2Seq_eRnd_T_31 = _q2Seq_eTgt_T_97 + {8'h0, q2Seq_manRnd_10[1]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
-  wire         q2Seq_isSh1_10 = _q2Seq_eTgt_T_97 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :421:55, :463:28
-  wire         q2Seq_subGuard_10 = ~q2Seq_isSh1_10 | fp32Seq_10[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :412:22, :421:55, :463:28, :465:26
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q2Seq_eRnd_T_31 = _q2Seq_eTgt_T_97 + {8'h0, q2Seq_manRnd_10[1]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
+  wire         q2Seq_isSh1_10 = _q2Seq_eTgt_T_97 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :445:55, :487:28
+  wire         q2Seq_subGuard_10 = ~q2Seq_isSh1_10 | fp32Seq_10[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :436:22, :445:55, :487:28, :489:26
   wire         q2Seq_subSticky_10 =
-    q2Seq_isSh1_10 ? (|(fp32Seq_10[21:0])) : (|(fp32Seq_10[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :421:55, :463:28, :466:{26,37,45,54}
-  wire         q2Seq_subUp_truncNZ_10 = q2Seq_subGuard_10 | q2Seq_subSticky_10;	// src/hive/scala/main/HiveOutCvt.scala:202:25, :465:26, :466:26
+    q2Seq_isSh1_10 ? (|(fp32Seq_10[21:0])) : (|(fp32Seq_10[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :445:55, :487:28, :490:{26,37,45,54}
+  wire         q2Seq_subUp_truncNZ_10 = q2Seq_subGuard_10 | q2Seq_subSticky_10;	// src/hive/scala/main/HiveOutCvt.scala:226:25, :489:26, :490:26
   wire [1:0]   q2Seq_subRnd_10 =
     {1'h0, q2Seq_isSh1_10}
     + {1'h0,
@@ -3724,7 +3766,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_10[31]) & q2Seq_subUp_truncNZ_10
              : rndReg == 3'h2
                  ? fp32Seq_10[31] & q2Seq_subUp_truncNZ_10
-                 : _GEN_15 & q2Seq_subGuard_10 & (q2Seq_subSticky_10 | q2Seq_isSh1_10)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :421:55, :424:26, :463:28, :465:26, :466:26, :468:31
+                 : _GEN_15 & q2Seq_subGuard_10 & (q2Seq_subSticky_10 | q2Seq_isSh1_10)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :445:55, :448:26, :487:28, :489:26, :490:26, :492:31
   wire [2:0]   _GEN_90 =
     (rndReg == 3'h3 ? ~(fp32Seq_10[31]) : rndReg == 3'h2 & fp32Seq_10[31])
     & $signed(_q2Seq_eTgt_T_97) < -9'sh1 & (|(fp32Seq_10[30:23])) & ~q2Seq_isInf_10
@@ -3737,9 +3779,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               ? 3'h0
               : q2Seq_isInf_10 | q2Seq_isNan_10 | $signed(_q2Seq_eRnd_T_31) > 9'sh3
                   ? 3'h7
-                  : {_q2Seq_eRnd_T_31[1:0], ~(q2Seq_manRnd_10[1]) & q2Seq_manRnd_10[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:125:34, :148:35, :203:45, :206:28, :229:17, :230:17, :405:20, :406:32, :407:32, :416:27, :417:25, :418:{22,53}, :421:55, :422:23, :423:26, :424:26, :428:{21,39}, :433:{10,18}, :434:12, :435:14, :436:16, :463:28, :468:31, :469:29, :470:26, :472:{30,63}, :475:{30,38,50,61,64,71,74}, :493:50, :497:{31,40,50,61,71}, :499:{10,33}
-  wire         q2Seq_isInf_11 = (&(fp32Seq_11[30:23])) & ~(|(fp32Seq_11[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :235:45, :406:{21,32,40}
-  wire         q2Seq_isNan_11 = (&(fp32Seq_11[30:23])) & (|(fp32Seq_11[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :406:21, :407:{32,40}
+                  : {_q2Seq_eRnd_T_31[1:0], ~(q2Seq_manRnd_10[1]) & q2Seq_manRnd_10[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:134:34, :165:35, :227:45, :230:28, :253:17, :254:17, :429:20, :430:32, :431:32, :440:27, :441:25, :442:{22,53}, :445:55, :446:23, :447:26, :448:26, :452:{21,39}, :457:{10,18}, :458:12, :459:14, :460:16, :487:28, :492:31, :493:29, :494:26, :496:{30,63}, :499:{30,38,50,61,64,71,74}, :517:50, :521:{31,40,50,61,71}, :523:{10,33}
+  wire         q2Seq_isInf_11 = (&(fp32Seq_11[30:23])) & ~(|(fp32Seq_11[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :259:45, :430:{21,32,40}
+  wire         q2Seq_isNan_11 = (&(fp32Seq_11[30:23])) & (|(fp32Seq_11[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :430:21, :431:{32,40}
   wire [1:0]   q2Seq_manRnd_11 =
     {1'h0, fp32Seq_11[22]}
     + {1'h0,
@@ -3749,7 +3791,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_11[31]) & (|(fp32Seq_11[21:0]))
              : rndReg == 3'h2
                  ? fp32Seq_11[31] & (|(fp32Seq_11[21:0]))
-                 : _GEN_15 & fp32Seq_11[21] & ((|(fp32Seq_11[20:0])) | fp32Seq_11[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_11[21] & ((|(fp32Seq_11[20:0])) | fp32Seq_11[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :440:27, :448:26
   wire [8:0]   _q2Seq_eTgt_T_106 =
     _GEN_75 + 9'h1
     - {1'h0,
@@ -3759,13 +3801,13 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_59 + 10'h1 < 10'h4
                   ? 8'h1
                   : _s2Elem_sDiff_T_11 > 10'hFE ? 8'hFE : _s2Elem_sDiff_T_11[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q2Seq_eRnd_T_34 = _q2Seq_eTgt_T_106 + {8'h0, q2Seq_manRnd_11[1]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
-  wire         q2Seq_isSh1_11 = _q2Seq_eTgt_T_106 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :421:55, :463:28
-  wire         q2Seq_subGuard_11 = ~q2Seq_isSh1_11 | fp32Seq_11[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :412:22, :421:55, :463:28, :465:26
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q2Seq_eRnd_T_34 = _q2Seq_eTgt_T_106 + {8'h0, q2Seq_manRnd_11[1]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
+  wire         q2Seq_isSh1_11 = _q2Seq_eTgt_T_106 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :445:55, :487:28
+  wire         q2Seq_subGuard_11 = ~q2Seq_isSh1_11 | fp32Seq_11[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :436:22, :445:55, :487:28, :489:26
   wire         q2Seq_subSticky_11 =
-    q2Seq_isSh1_11 ? (|(fp32Seq_11[21:0])) : (|(fp32Seq_11[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :421:55, :463:28, :466:{26,37,45,54}
-  wire         q2Seq_subUp_truncNZ_11 = q2Seq_subGuard_11 | q2Seq_subSticky_11;	// src/hive/scala/main/HiveOutCvt.scala:202:25, :465:26, :466:26
+    q2Seq_isSh1_11 ? (|(fp32Seq_11[21:0])) : (|(fp32Seq_11[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :445:55, :487:28, :490:{26,37,45,54}
+  wire         q2Seq_subUp_truncNZ_11 = q2Seq_subGuard_11 | q2Seq_subSticky_11;	// src/hive/scala/main/HiveOutCvt.scala:226:25, :489:26, :490:26
   wire [1:0]   q2Seq_subRnd_11 =
     {1'h0, q2Seq_isSh1_11}
     + {1'h0,
@@ -3775,7 +3817,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_11[31]) & q2Seq_subUp_truncNZ_11
              : rndReg == 3'h2
                  ? fp32Seq_11[31] & q2Seq_subUp_truncNZ_11
-                 : _GEN_15 & q2Seq_subGuard_11 & (q2Seq_subSticky_11 | q2Seq_isSh1_11)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :421:55, :424:26, :463:28, :465:26, :466:26, :468:31
+                 : _GEN_15 & q2Seq_subGuard_11 & (q2Seq_subSticky_11 | q2Seq_isSh1_11)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :445:55, :448:26, :487:28, :489:26, :490:26, :492:31
   wire [2:0]   _GEN_91 =
     (rndReg == 3'h3 ? ~(fp32Seq_11[31]) : rndReg == 3'h2 & fp32Seq_11[31])
     & $signed(_q2Seq_eTgt_T_106) < -9'sh1 & (|(fp32Seq_11[30:23])) & ~q2Seq_isInf_11
@@ -3788,9 +3830,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               ? 3'h0
               : q2Seq_isInf_11 | q2Seq_isNan_11 | $signed(_q2Seq_eRnd_T_34) > 9'sh3
                   ? 3'h7
-                  : {_q2Seq_eRnd_T_34[1:0], ~(q2Seq_manRnd_11[1]) & q2Seq_manRnd_11[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:125:34, :148:35, :203:45, :206:28, :229:17, :230:17, :405:20, :406:32, :407:32, :416:27, :417:25, :418:{22,53}, :421:55, :422:23, :423:26, :424:26, :428:{21,39}, :433:{10,18}, :434:12, :435:14, :436:16, :463:28, :468:31, :469:29, :470:26, :472:{30,63}, :475:{30,38,50,61,64,71,74}, :493:50, :497:{31,40,50,61,71}, :499:{10,33}
-  wire         q2Seq_isInf_12 = (&(fp32Seq_12[30:23])) & ~(|(fp32Seq_12[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :235:45, :406:{21,32,40}
-  wire         q2Seq_isNan_12 = (&(fp32Seq_12[30:23])) & (|(fp32Seq_12[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :406:21, :407:{32,40}
+                  : {_q2Seq_eRnd_T_34[1:0], ~(q2Seq_manRnd_11[1]) & q2Seq_manRnd_11[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:134:34, :165:35, :227:45, :230:28, :253:17, :254:17, :429:20, :430:32, :431:32, :440:27, :441:25, :442:{22,53}, :445:55, :446:23, :447:26, :448:26, :452:{21,39}, :457:{10,18}, :458:12, :459:14, :460:16, :487:28, :492:31, :493:29, :494:26, :496:{30,63}, :499:{30,38,50,61,64,71,74}, :517:50, :521:{31,40,50,61,71}, :523:{10,33}
+  wire         q2Seq_isInf_12 = (&(fp32Seq_12[30:23])) & ~(|(fp32Seq_12[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :259:45, :430:{21,32,40}
+  wire         q2Seq_isNan_12 = (&(fp32Seq_12[30:23])) & (|(fp32Seq_12[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :430:21, :431:{32,40}
   wire [1:0]   q2Seq_manRnd_12 =
     {1'h0, fp32Seq_12[22]}
     + {1'h0,
@@ -3800,7 +3842,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_12[31]) & (|(fp32Seq_12[21:0]))
              : rndReg == 3'h2
                  ? fp32Seq_12[31] & (|(fp32Seq_12[21:0]))
-                 : _GEN_15 & fp32Seq_12[21] & ((|(fp32Seq_12[20:0])) | fp32Seq_12[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_12[21] & ((|(fp32Seq_12[20:0])) | fp32Seq_12[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :440:27, :448:26
   wire [8:0]   _q2Seq_eTgt_T_115 =
     _GEN_76 + 9'h1
     - {1'h0,
@@ -3810,13 +3852,13 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_60 + 10'h1 < 10'h4
                   ? 8'h1
                   : _s2Elem_sDiff_T_12 > 10'hFE ? 8'hFE : _s2Elem_sDiff_T_12[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q2Seq_eRnd_T_37 = _q2Seq_eTgt_T_115 + {8'h0, q2Seq_manRnd_12[1]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
-  wire         q2Seq_isSh1_12 = _q2Seq_eTgt_T_115 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :421:55, :463:28
-  wire         q2Seq_subGuard_12 = ~q2Seq_isSh1_12 | fp32Seq_12[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :412:22, :421:55, :463:28, :465:26
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q2Seq_eRnd_T_37 = _q2Seq_eTgt_T_115 + {8'h0, q2Seq_manRnd_12[1]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
+  wire         q2Seq_isSh1_12 = _q2Seq_eTgt_T_115 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :445:55, :487:28
+  wire         q2Seq_subGuard_12 = ~q2Seq_isSh1_12 | fp32Seq_12[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :436:22, :445:55, :487:28, :489:26
   wire         q2Seq_subSticky_12 =
-    q2Seq_isSh1_12 ? (|(fp32Seq_12[21:0])) : (|(fp32Seq_12[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :421:55, :463:28, :466:{26,37,45,54}
-  wire         q2Seq_subUp_truncNZ_12 = q2Seq_subGuard_12 | q2Seq_subSticky_12;	// src/hive/scala/main/HiveOutCvt.scala:202:25, :465:26, :466:26
+    q2Seq_isSh1_12 ? (|(fp32Seq_12[21:0])) : (|(fp32Seq_12[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :445:55, :487:28, :490:{26,37,45,54}
+  wire         q2Seq_subUp_truncNZ_12 = q2Seq_subGuard_12 | q2Seq_subSticky_12;	// src/hive/scala/main/HiveOutCvt.scala:226:25, :489:26, :490:26
   wire [1:0]   q2Seq_subRnd_12 =
     {1'h0, q2Seq_isSh1_12}
     + {1'h0,
@@ -3826,7 +3868,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_12[31]) & q2Seq_subUp_truncNZ_12
              : rndReg == 3'h2
                  ? fp32Seq_12[31] & q2Seq_subUp_truncNZ_12
-                 : _GEN_15 & q2Seq_subGuard_12 & (q2Seq_subSticky_12 | q2Seq_isSh1_12)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :421:55, :424:26, :463:28, :465:26, :466:26, :468:31
+                 : _GEN_15 & q2Seq_subGuard_12 & (q2Seq_subSticky_12 | q2Seq_isSh1_12)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :445:55, :448:26, :487:28, :489:26, :490:26, :492:31
   wire [2:0]   _GEN_92 =
     (rndReg == 3'h3 ? ~(fp32Seq_12[31]) : rndReg == 3'h2 & fp32Seq_12[31])
     & $signed(_q2Seq_eTgt_T_115) < -9'sh1 & (|(fp32Seq_12[30:23])) & ~q2Seq_isInf_12
@@ -3839,9 +3881,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               ? 3'h0
               : q2Seq_isInf_12 | q2Seq_isNan_12 | $signed(_q2Seq_eRnd_T_37) > 9'sh3
                   ? 3'h7
-                  : {_q2Seq_eRnd_T_37[1:0], ~(q2Seq_manRnd_12[1]) & q2Seq_manRnd_12[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:125:34, :148:35, :203:45, :206:28, :229:17, :230:17, :405:20, :406:32, :407:32, :416:27, :417:25, :418:{22,53}, :421:55, :422:23, :423:26, :424:26, :428:{21,39}, :433:{10,18}, :434:12, :435:14, :436:16, :463:28, :468:31, :469:29, :470:26, :472:{30,63}, :475:{30,38,50,61,64,71,74}, :493:50, :497:{31,40,50,61,71}, :499:{10,33}
-  wire         q2Seq_isInf_13 = (&(fp32Seq_13[30:23])) & ~(|(fp32Seq_13[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :235:45, :406:{21,32,40}
-  wire         q2Seq_isNan_13 = (&(fp32Seq_13[30:23])) & (|(fp32Seq_13[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :406:21, :407:{32,40}
+                  : {_q2Seq_eRnd_T_37[1:0], ~(q2Seq_manRnd_12[1]) & q2Seq_manRnd_12[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:134:34, :165:35, :227:45, :230:28, :253:17, :254:17, :429:20, :430:32, :431:32, :440:27, :441:25, :442:{22,53}, :445:55, :446:23, :447:26, :448:26, :452:{21,39}, :457:{10,18}, :458:12, :459:14, :460:16, :487:28, :492:31, :493:29, :494:26, :496:{30,63}, :499:{30,38,50,61,64,71,74}, :517:50, :521:{31,40,50,61,71}, :523:{10,33}
+  wire         q2Seq_isInf_13 = (&(fp32Seq_13[30:23])) & ~(|(fp32Seq_13[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :259:45, :430:{21,32,40}
+  wire         q2Seq_isNan_13 = (&(fp32Seq_13[30:23])) & (|(fp32Seq_13[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :430:21, :431:{32,40}
   wire [1:0]   q2Seq_manRnd_13 =
     {1'h0, fp32Seq_13[22]}
     + {1'h0,
@@ -3851,7 +3893,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_13[31]) & (|(fp32Seq_13[21:0]))
              : rndReg == 3'h2
                  ? fp32Seq_13[31] & (|(fp32Seq_13[21:0]))
-                 : _GEN_15 & fp32Seq_13[21] & ((|(fp32Seq_13[20:0])) | fp32Seq_13[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_13[21] & ((|(fp32Seq_13[20:0])) | fp32Seq_13[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :440:27, :448:26
   wire [8:0]   _q2Seq_eTgt_T_124 =
     _GEN_77 + 9'h1
     - {1'h0,
@@ -3861,13 +3903,13 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_61 + 10'h1 < 10'h4
                   ? 8'h1
                   : _s2Elem_sDiff_T_13 > 10'hFE ? 8'hFE : _s2Elem_sDiff_T_13[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q2Seq_eRnd_T_40 = _q2Seq_eTgt_T_124 + {8'h0, q2Seq_manRnd_13[1]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
-  wire         q2Seq_isSh1_13 = _q2Seq_eTgt_T_124 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :421:55, :463:28
-  wire         q2Seq_subGuard_13 = ~q2Seq_isSh1_13 | fp32Seq_13[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :412:22, :421:55, :463:28, :465:26
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q2Seq_eRnd_T_40 = _q2Seq_eTgt_T_124 + {8'h0, q2Seq_manRnd_13[1]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
+  wire         q2Seq_isSh1_13 = _q2Seq_eTgt_T_124 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :445:55, :487:28
+  wire         q2Seq_subGuard_13 = ~q2Seq_isSh1_13 | fp32Seq_13[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :436:22, :445:55, :487:28, :489:26
   wire         q2Seq_subSticky_13 =
-    q2Seq_isSh1_13 ? (|(fp32Seq_13[21:0])) : (|(fp32Seq_13[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :421:55, :463:28, :466:{26,37,45,54}
-  wire         q2Seq_subUp_truncNZ_13 = q2Seq_subGuard_13 | q2Seq_subSticky_13;	// src/hive/scala/main/HiveOutCvt.scala:202:25, :465:26, :466:26
+    q2Seq_isSh1_13 ? (|(fp32Seq_13[21:0])) : (|(fp32Seq_13[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :445:55, :487:28, :490:{26,37,45,54}
+  wire         q2Seq_subUp_truncNZ_13 = q2Seq_subGuard_13 | q2Seq_subSticky_13;	// src/hive/scala/main/HiveOutCvt.scala:226:25, :489:26, :490:26
   wire [1:0]   q2Seq_subRnd_13 =
     {1'h0, q2Seq_isSh1_13}
     + {1'h0,
@@ -3877,7 +3919,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_13[31]) & q2Seq_subUp_truncNZ_13
              : rndReg == 3'h2
                  ? fp32Seq_13[31] & q2Seq_subUp_truncNZ_13
-                 : _GEN_15 & q2Seq_subGuard_13 & (q2Seq_subSticky_13 | q2Seq_isSh1_13)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :421:55, :424:26, :463:28, :465:26, :466:26, :468:31
+                 : _GEN_15 & q2Seq_subGuard_13 & (q2Seq_subSticky_13 | q2Seq_isSh1_13)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :445:55, :448:26, :487:28, :489:26, :490:26, :492:31
   wire [2:0]   _GEN_93 =
     (rndReg == 3'h3 ? ~(fp32Seq_13[31]) : rndReg == 3'h2 & fp32Seq_13[31])
     & $signed(_q2Seq_eTgt_T_124) < -9'sh1 & (|(fp32Seq_13[30:23])) & ~q2Seq_isInf_13
@@ -3890,9 +3932,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               ? 3'h0
               : q2Seq_isInf_13 | q2Seq_isNan_13 | $signed(_q2Seq_eRnd_T_40) > 9'sh3
                   ? 3'h7
-                  : {_q2Seq_eRnd_T_40[1:0], ~(q2Seq_manRnd_13[1]) & q2Seq_manRnd_13[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:125:34, :148:35, :203:45, :206:28, :229:17, :230:17, :405:20, :406:32, :407:32, :416:27, :417:25, :418:{22,53}, :421:55, :422:23, :423:26, :424:26, :428:{21,39}, :433:{10,18}, :434:12, :435:14, :436:16, :463:28, :468:31, :469:29, :470:26, :472:{30,63}, :475:{30,38,50,61,64,71,74}, :493:50, :497:{31,40,50,61,71}, :499:{10,33}
-  wire         q2Seq_isInf_14 = (&(fp32Seq_14[30:23])) & ~(|(fp32Seq_14[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :235:45, :406:{21,32,40}
-  wire         q2Seq_isNan_14 = (&(fp32Seq_14[30:23])) & (|(fp32Seq_14[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :406:21, :407:{32,40}
+                  : {_q2Seq_eRnd_T_40[1:0], ~(q2Seq_manRnd_13[1]) & q2Seq_manRnd_13[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:134:34, :165:35, :227:45, :230:28, :253:17, :254:17, :429:20, :430:32, :431:32, :440:27, :441:25, :442:{22,53}, :445:55, :446:23, :447:26, :448:26, :452:{21,39}, :457:{10,18}, :458:12, :459:14, :460:16, :487:28, :492:31, :493:29, :494:26, :496:{30,63}, :499:{30,38,50,61,64,71,74}, :517:50, :521:{31,40,50,61,71}, :523:{10,33}
+  wire         q2Seq_isInf_14 = (&(fp32Seq_14[30:23])) & ~(|(fp32Seq_14[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :259:45, :430:{21,32,40}
+  wire         q2Seq_isNan_14 = (&(fp32Seq_14[30:23])) & (|(fp32Seq_14[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :430:21, :431:{32,40}
   wire [1:0]   q2Seq_manRnd_14 =
     {1'h0, fp32Seq_14[22]}
     + {1'h0,
@@ -3902,7 +3944,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_14[31]) & (|(fp32Seq_14[21:0]))
              : rndReg == 3'h2
                  ? fp32Seq_14[31] & (|(fp32Seq_14[21:0]))
-                 : _GEN_15 & fp32Seq_14[21] & ((|(fp32Seq_14[20:0])) | fp32Seq_14[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_14[21] & ((|(fp32Seq_14[20:0])) | fp32Seq_14[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :440:27, :448:26
   wire [8:0]   _q2Seq_eTgt_T_133 =
     _GEN_78 + 9'h1
     - {1'h0,
@@ -3912,13 +3954,13 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_62 + 10'h1 < 10'h4
                   ? 8'h1
                   : _s2Elem_sDiff_T_14 > 10'hFE ? 8'hFE : _s2Elem_sDiff_T_14[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q2Seq_eRnd_T_43 = _q2Seq_eTgt_T_133 + {8'h0, q2Seq_manRnd_14[1]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
-  wire         q2Seq_isSh1_14 = _q2Seq_eTgt_T_133 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :421:55, :463:28
-  wire         q2Seq_subGuard_14 = ~q2Seq_isSh1_14 | fp32Seq_14[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :412:22, :421:55, :463:28, :465:26
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q2Seq_eRnd_T_43 = _q2Seq_eTgt_T_133 + {8'h0, q2Seq_manRnd_14[1]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
+  wire         q2Seq_isSh1_14 = _q2Seq_eTgt_T_133 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :445:55, :487:28
+  wire         q2Seq_subGuard_14 = ~q2Seq_isSh1_14 | fp32Seq_14[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :436:22, :445:55, :487:28, :489:26
   wire         q2Seq_subSticky_14 =
-    q2Seq_isSh1_14 ? (|(fp32Seq_14[21:0])) : (|(fp32Seq_14[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :421:55, :463:28, :466:{26,37,45,54}
-  wire         q2Seq_subUp_truncNZ_14 = q2Seq_subGuard_14 | q2Seq_subSticky_14;	// src/hive/scala/main/HiveOutCvt.scala:202:25, :465:26, :466:26
+    q2Seq_isSh1_14 ? (|(fp32Seq_14[21:0])) : (|(fp32Seq_14[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :445:55, :487:28, :490:{26,37,45,54}
+  wire         q2Seq_subUp_truncNZ_14 = q2Seq_subGuard_14 | q2Seq_subSticky_14;	// src/hive/scala/main/HiveOutCvt.scala:226:25, :489:26, :490:26
   wire [1:0]   q2Seq_subRnd_14 =
     {1'h0, q2Seq_isSh1_14}
     + {1'h0,
@@ -3928,7 +3970,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_14[31]) & q2Seq_subUp_truncNZ_14
              : rndReg == 3'h2
                  ? fp32Seq_14[31] & q2Seq_subUp_truncNZ_14
-                 : _GEN_15 & q2Seq_subGuard_14 & (q2Seq_subSticky_14 | q2Seq_isSh1_14)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :421:55, :424:26, :463:28, :465:26, :466:26, :468:31
+                 : _GEN_15 & q2Seq_subGuard_14 & (q2Seq_subSticky_14 | q2Seq_isSh1_14)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :445:55, :448:26, :487:28, :489:26, :490:26, :492:31
   wire [2:0]   _GEN_94 =
     (rndReg == 3'h3 ? ~(fp32Seq_14[31]) : rndReg == 3'h2 & fp32Seq_14[31])
     & $signed(_q2Seq_eTgt_T_133) < -9'sh1 & (|(fp32Seq_14[30:23])) & ~q2Seq_isInf_14
@@ -3941,9 +3983,9 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               ? 3'h0
               : q2Seq_isInf_14 | q2Seq_isNan_14 | $signed(_q2Seq_eRnd_T_43) > 9'sh3
                   ? 3'h7
-                  : {_q2Seq_eRnd_T_43[1:0], ~(q2Seq_manRnd_14[1]) & q2Seq_manRnd_14[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:125:34, :148:35, :203:45, :206:28, :229:17, :230:17, :405:20, :406:32, :407:32, :416:27, :417:25, :418:{22,53}, :421:55, :422:23, :423:26, :424:26, :428:{21,39}, :433:{10,18}, :434:12, :435:14, :436:16, :463:28, :468:31, :469:29, :470:26, :472:{30,63}, :475:{30,38,50,61,64,71,74}, :493:50, :497:{31,40,50,61,71}, :499:{10,33}
-  wire         q2Seq_isInf_15 = (&(fp32Seq_15[30:23])) & ~(|(fp32Seq_15[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :235:45, :406:{21,32,40}
-  wire         q2Seq_isNan_15 = (&(fp32Seq_15[30:23])) & (|(fp32Seq_15[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:230:17, :231:17, :406:21, :407:{32,40}
+                  : {_q2Seq_eRnd_T_43[1:0], ~(q2Seq_manRnd_14[1]) & q2Seq_manRnd_14[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:134:34, :165:35, :227:45, :230:28, :253:17, :254:17, :429:20, :430:32, :431:32, :440:27, :441:25, :442:{22,53}, :445:55, :446:23, :447:26, :448:26, :452:{21,39}, :457:{10,18}, :458:12, :459:14, :460:16, :487:28, :492:31, :493:29, :494:26, :496:{30,63}, :499:{30,38,50,61,64,71,74}, :517:50, :521:{31,40,50,61,71}, :523:{10,33}
+  wire         q2Seq_isInf_15 = (&(fp32Seq_15[30:23])) & ~(|(fp32Seq_15[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :259:45, :430:{21,32,40}
+  wire         q2Seq_isNan_15 = (&(fp32Seq_15[30:23])) & (|(fp32Seq_15[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:254:17, :255:17, :430:21, :431:{32,40}
   wire [1:0]   q2Seq_manRnd_15 =
     {1'h0, fp32Seq_15[22]}
     + {1'h0,
@@ -3953,7 +3995,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_15[31]) & (|(fp32Seq_15[21:0]))
              : rndReg == 3'h2
                  ? fp32Seq_15[31] & (|(fp32Seq_15[21:0]))
-                 : _GEN_15 & fp32Seq_15[21] & ((|(fp32Seq_15[20:0])) | fp32Seq_15[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :231:17, :412:22, :413:22, :414:{22,36}, :416:27, :424:26
+                 : _GEN_15 & fp32Seq_15[21] & ((|(fp32Seq_15[20:0])) | fp32Seq_15[22])};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :255:17, :436:22, :437:22, :438:{22,36}, :440:27, :448:26
   wire [8:0]   _q2Seq_eTgt_T_142 =
     _GEN_79 + 9'h1
     - {1'h0,
@@ -3963,13 +4005,13 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               : _GEN_63 + 10'h1 < 10'h4
                   ? 8'h1
                   : _s2Elem_sDiff_T_15 > 10'hFE ? 8'hFE : _s2Elem_sDiff_T_15[7:0])
-         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :421:{43,55}
-  wire [8:0]   _q2Seq_eRnd_T_46 = _q2Seq_eTgt_T_142 + {8'h0, q2Seq_manRnd_15[1]};	// src/hive/scala/main/HiveOutCvt.scala:416:27, :417:25, :421:55, :422:23
-  wire         q2Seq_isSh1_15 = _q2Seq_eTgt_T_142 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :421:55, :463:28
-  wire         q2Seq_subGuard_15 = ~q2Seq_isSh1_15 | fp32Seq_15[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :412:22, :421:55, :463:28, :465:26
+         : 8'h0};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :445:{43,55}
+  wire [8:0]   _q2Seq_eRnd_T_46 = _q2Seq_eTgt_T_142 + {8'h0, q2Seq_manRnd_15[1]};	// src/hive/scala/main/HiveOutCvt.scala:440:27, :441:25, :445:55, :446:23
+  wire         q2Seq_isSh1_15 = _q2Seq_eTgt_T_142 == 9'h0;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :445:55, :487:28
+  wire         q2Seq_subGuard_15 = ~q2Seq_isSh1_15 | fp32Seq_15[22];	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :436:22, :445:55, :487:28, :489:26
   wire         q2Seq_subSticky_15 =
-    q2Seq_isSh1_15 ? (|(fp32Seq_15[21:0])) : (|(fp32Seq_15[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:231:17, :421:55, :463:28, :466:{26,37,45,54}
-  wire         q2Seq_subUp_truncNZ_15 = q2Seq_subGuard_15 | q2Seq_subSticky_15;	// src/hive/scala/main/HiveOutCvt.scala:202:25, :465:26, :466:26
+    q2Seq_isSh1_15 ? (|(fp32Seq_15[21:0])) : (|(fp32Seq_15[22:0]));	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:255:17, :445:55, :487:28, :490:{26,37,45,54}
+  wire         q2Seq_subUp_truncNZ_15 = q2Seq_subGuard_15 | q2Seq_subSticky_15;	// src/hive/scala/main/HiveOutCvt.scala:226:25, :489:26, :490:26
   wire [1:0]   q2Seq_subRnd_15 =
     {1'h0, q2Seq_isSh1_15}
     + {1'h0,
@@ -3979,7 +4021,7 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
              ? ~(fp32Seq_15[31]) & q2Seq_subUp_truncNZ_15
              : rndReg == 3'h2
                  ? fp32Seq_15[31] & q2Seq_subUp_truncNZ_15
-                 : _GEN_15 & q2Seq_subGuard_15 & (q2Seq_subSticky_15 | q2Seq_isSh1_15)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:125:34, :202:25, :203:{26,37,45}, :205:33, :206:{28,34}, :229:17, :421:55, :424:26, :463:28, :465:26, :466:26, :468:31
+                 : _GEN_15 & q2Seq_subGuard_15 & (q2Seq_subSticky_15 | q2Seq_isSh1_15)};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:58, src/hive/scala/main/HiveOutCvt.scala:134:34, :226:25, :227:{26,37,45}, :229:33, :230:{28,34}, :253:17, :445:55, :448:26, :487:28, :489:26, :490:26, :492:31
   wire [2:0]   _GEN_95 =
     (rndReg == 3'h3 ? ~(fp32Seq_15[31]) : rndReg == 3'h2 & fp32Seq_15[31])
     & $signed(_q2Seq_eTgt_T_142) < -9'sh1 & (|(fp32Seq_15[30:23])) & ~q2Seq_isInf_15
@@ -3992,26 +4034,58 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
               ? 3'h0
               : q2Seq_isInf_15 | q2Seq_isNan_15 | $signed(_q2Seq_eRnd_T_46) > 9'sh3
                   ? 3'h7
-                  : {_q2Seq_eRnd_T_46[1:0], ~(q2Seq_manRnd_15[1]) & q2Seq_manRnd_15[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:125:34, :148:35, :203:45, :206:28, :229:17, :230:17, :405:20, :406:32, :407:32, :416:27, :417:25, :418:{22,53}, :421:55, :422:23, :423:26, :424:26, :428:{21,39}, :433:{10,18}, :434:12, :435:14, :436:16, :463:28, :468:31, :469:29, :470:26, :472:{30,63}, :475:{30,38,50,61,64,71,74}, :493:50, :497:{31,40,50,61,71}, :499:{10,33}
-  wire [8:0]   _GEN_96 = {1'h0, amax16_0[30:23]};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :368:35
+                  : {_q2Seq_eRnd_T_46[1:0], ~(q2Seq_manRnd_15[1]) & q2Seq_manRnd_15[0]};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveOutCvt.scala:134:34, :165:35, :227:45, :230:28, :253:17, :254:17, :429:20, :430:32, :431:32, :440:27, :441:25, :442:{22,53}, :445:55, :446:23, :447:26, :448:26, :452:{21,39}, :457:{10,18}, :458:12, :459:14, :460:16, :487:28, :492:31, :493:29, :494:26, :496:{30,63}, :499:{30,38,50,61,64,71,74}, :517:50, :521:{31,40,50,61,71}, :523:{10,33}
+  wire [8:0]   _GEN_96 = {1'h0, amax16_0[30:23]};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :392:35
   wire [9:0]   _GEN_97 =
-    {1'h0, amax16_0[22:0] > 23'h600000 ? _GEN_96 + 9'h1 : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _scaleWire_s16_sDiff_T_3 = _GEN_97 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+    {1'h0, amax16_0[22:0] > 23'h600000 ? _GEN_96 + 9'h1 : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _scaleWire_s16_sDiff_T_3 = _GEN_97 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_98 =
-    {1'h0, amax16_0[22:0] > 23'h600000 ? _GEN_96 + 9'h1 : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _scaleWire_s16_sDiff_T_4 = _GEN_98 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+    {1'h0, amax16_0[22:0] > 23'h600000 ? _GEN_96 + 9'h1 : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _scaleWire_s16_sDiff_T_4 = _GEN_98 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_99 =
-    {1'h0, amax16_0[22:0] > 23'h400000 ? _GEN_96 + 9'h1 : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _scaleWire_s16_sDiff_T_5 = _GEN_99 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+    {1'h0, amax16_0[22:0] > 23'h400000 ? _GEN_96 + 9'h1 : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _scaleWire_s16_sDiff_T_5 = _GEN_99 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_100 =
-    {1'h0, amax16_0[22:0] > 23'h600000 ? _GEN_96 + 9'h1 : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _scaleWire_s32_sDiff_T_3 = _GEN_100 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+    {1'h0, amax16_0[22:0] > 23'h600000 ? _GEN_96 + 9'h1 : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _scaleWire_s32_sDiff_T_3 = _GEN_100 - 10'h8;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_101 =
-    {1'h0, amax16_0[22:0] > 23'h600000 ? _GEN_96 + 9'h1 : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _scaleWire_s32_sDiff_T_4 = _GEN_101 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+    {1'h0, amax16_0[22:0] > 23'h600000 ? _GEN_96 + 9'h1 : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _scaleWire_s32_sDiff_T_4 = _GEN_101 - 10'hF;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
   wire [9:0]   _GEN_102 =
-    {1'h0, amax16_0[22:0] > 23'h400000 ? _GEN_96 + 9'h1 : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:353:47, :362:21, :363:21, :367:26, :368:{19,35,46}, :369:22
-  wire [9:0]   _scaleWire_s32_sDiff_T_5 = _GEN_102 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:369:22, :370:22
+    {1'h0, amax16_0[22:0] > 23'h400000 ? _GEN_96 + 9'h1 : {1'h0, amax16_0[30:23]}};	// src/hive/scala/main/HiveOutCvt.scala:377:47, :386:21, :387:21, :391:26, :392:{19,35,46}, :393:22
+  wire [9:0]   _scaleWire_s32_sDiff_T_5 = _GEN_102 - 10'h2;	// src/hive/scala/main/HiveOutCvt.scala:393:22, :394:22
+  wire [31:0]  int32Seq_0 =
+    reluReg & $signed(lineReg[31:0]) < 32'sh0 ? 32'h0 : lineReg[31:0];	// src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :153:56, :323:26, :636:41, :637:{24,37,51}
+  wire [31:0]  int32Seq_1 =
+    reluReg & $signed(lineReg[71:40]) < 32'sh0 ? 32'h0 : lineReg[71:40];	// src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :153:56, :323:26, :636:41, :637:{24,37,51}
+  wire [31:0]  int32Seq_2 =
+    reluReg & $signed(lineReg[111:80]) < 32'sh0 ? 32'h0 : lineReg[111:80];	// src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :153:56, :323:26, :636:41, :637:{24,37,51}
+  wire [31:0]  int32Seq_3 =
+    reluReg & $signed(lineReg[151:120]) < 32'sh0 ? 32'h0 : lineReg[151:120];	// src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :153:56, :323:26, :636:41, :637:{24,37,51}
+  wire [31:0]  int32Seq_4 =
+    reluReg & $signed(lineReg[191:160]) < 32'sh0 ? 32'h0 : lineReg[191:160];	// src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :153:56, :323:26, :636:41, :637:{24,37,51}
+  wire [31:0]  int32Seq_5 =
+    reluReg & $signed(lineReg[231:200]) < 32'sh0 ? 32'h0 : lineReg[231:200];	// src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :153:56, :323:26, :636:41, :637:{24,37,51}
+  wire [31:0]  int32Seq_6 =
+    reluReg & $signed(lineReg[271:240]) < 32'sh0 ? 32'h0 : lineReg[271:240];	// src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :153:56, :323:26, :636:41, :637:{24,37,51}
+  wire [31:0]  int32Seq_7 =
+    reluReg & $signed(lineReg[311:280]) < 32'sh0 ? 32'h0 : lineReg[311:280];	// src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :153:56, :323:26, :636:41, :637:{24,37,51}
+  wire [31:0]  int32Seq_8 =
+    reluReg & $signed(lineReg[351:320]) < 32'sh0 ? 32'h0 : lineReg[351:320];	// src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :153:56, :323:26, :636:41, :637:{24,37,51}
+  wire [31:0]  int32Seq_9 =
+    reluReg & $signed(lineReg[391:360]) < 32'sh0 ? 32'h0 : lineReg[391:360];	// src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :153:56, :323:26, :636:41, :637:{24,37,51}
+  wire [31:0]  int32Seq_10 =
+    reluReg & $signed(lineReg[431:400]) < 32'sh0 ? 32'h0 : lineReg[431:400];	// src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :153:56, :323:26, :636:41, :637:{24,37,51}
+  wire [31:0]  int32Seq_11 =
+    reluReg & $signed(lineReg[471:440]) < 32'sh0 ? 32'h0 : lineReg[471:440];	// src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :153:56, :323:26, :636:41, :637:{24,37,51}
+  wire [31:0]  int32Seq_12 =
+    reluReg & $signed(lineReg[511:480]) < 32'sh0 ? 32'h0 : lineReg[511:480];	// src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :153:56, :323:26, :636:41, :637:{24,37,51}
+  wire [31:0]  int32Seq_13 =
+    reluReg & $signed(lineReg[551:520]) < 32'sh0 ? 32'h0 : lineReg[551:520];	// src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :153:56, :323:26, :636:41, :637:{24,37,51}
+  wire [31:0]  int32Seq_14 =
+    reluReg & $signed(lineReg[591:560]) < 32'sh0 ? 32'h0 : lineReg[591:560];	// src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :153:56, :323:26, :636:41, :637:{24,37,51}
+  wire [31:0]  int32Seq_15 =
+    reluReg & $signed(lineReg[631:600]) < 32'sh0 ? 32'h0 : lineReg[631:600];	// src/hive/scala/main/HiveOutCvt.scala:132:34, :149:64, :153:56, :323:26, :636:41, :637:{24,37,51}
   wire [511:0] _io_out_bits_T_7 =
     {384'h0,
      nEffReg[4]
@@ -4445,30 +4519,70 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                  : {_q5Seq_eRnd_T_1[4:0],
                                     q5Seq_manRnd[2] ? 2'h0 : q5Seq_manRnd[1:0]}}
                 : {4'h0, fp32Seq_0[31], _GEN_80})
-       : 8'h0};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:{42,58}, src/hive/scala/main/HiveOutCvt.scala:127:34, :229:17, :230:17, :231:17, :234:25, :235:45, :345:13, :402:25, :403:25, :405:20, :406:{21,32,40}, :407:{32,40}, :416:27, :417:25, :418:{22,53}, :421:55, :422:23, :423:26, :424:26, :427:{42,62,73}, :428:{21,39}, :433:{10,18}, :434:12, :435:14, :436:{16,26}, :499:10, :527:{19,42}, :528:8, :617:42
+       : 8'h0};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:{42,58}, src/hive/scala/main/HiveOutCvt.scala:136:34, :253:17, :254:17, :255:17, :258:25, :259:45, :369:13, :426:25, :427:25, :429:20, :430:{21,32,40}, :431:{32,40}, :440:27, :441:25, :442:{22,53}, :445:55, :446:23, :447:26, :448:26, :451:{42,62,73}, :452:{21,39}, :457:{10,18}, :458:12, :459:14, :460:{16,26}, :523:10, :551:{19,42}, :552:8, :670:48, :678:42
   always @(posedge clock) begin	// src/hive/scala/main/HiveOutCvt.scala:87:7
     if (reset) begin	// src/hive/scala/main/HiveOutCvt.scala:87:7
-      holdValid <= 1'h0;	// src/hive/scala/main/HiveOutCvt.scala:122:34
-      lineReg <= 640'h0;	// src/hive/scala/main/HiveOutCvt.scala:123:34
-      fmtReg <= 4'h0;	// src/hive/scala/main/HiveOutCvt.scala:124:34
-      rndReg <= 3'h0;	// src/hive/scala/main/HiveOutCvt.scala:125:34
-      blkReg <= 1'h0;	// src/hive/scala/main/HiveOutCvt.scala:126:34
-      nEffReg <= 5'h10;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :127:34
-      dataDone <= 1'h0;	// src/hive/scala/main/HiveOutCvt.scala:129:34
-      scaleSent <= 1'h0;	// src/hive/scala/main/HiveOutCvt.scala:136:34
+      holdValid <= 1'h0;	// src/hive/scala/main/HiveOutCvt.scala:131:34
+      lineReg <= 640'h0;	// src/hive/scala/main/HiveOutCvt.scala:132:34
+      fmtReg <= 4'h0;	// src/hive/scala/main/HiveOutCvt.scala:133:34
+      rndReg <= 3'h0;	// src/hive/scala/main/HiveOutCvt.scala:134:34
+      blkReg <= 1'h0;	// src/hive/scala/main/HiveOutCvt.scala:135:34
+      nEffReg <= 5'h10;	// src/hive/scala/main/HiveOutCvt.scala:136:34
+      dataDone <= 1'h0;	// src/hive/scala/main/HiveOutCvt.scala:138:34
+      scaleSent <= 1'h0;	// src/hive/scala/main/HiveOutCvt.scala:145:34
+      rqMReg_0 <= 32'h0;	// src/hive/scala/main/HiveOutCvt.scala:149:{56,64}
+      rqMReg_1 <= 32'h0;	// src/hive/scala/main/HiveOutCvt.scala:149:{56,64}
+      rqMReg_2 <= 32'h0;	// src/hive/scala/main/HiveOutCvt.scala:149:{56,64}
+      rqMReg_3 <= 32'h0;	// src/hive/scala/main/HiveOutCvt.scala:149:{56,64}
+      rqMReg_4 <= 32'h0;	// src/hive/scala/main/HiveOutCvt.scala:149:{56,64}
+      rqMReg_5 <= 32'h0;	// src/hive/scala/main/HiveOutCvt.scala:149:{56,64}
+      rqMReg_6 <= 32'h0;	// src/hive/scala/main/HiveOutCvt.scala:149:{56,64}
+      rqMReg_7 <= 32'h0;	// src/hive/scala/main/HiveOutCvt.scala:149:{56,64}
+      rqMReg_8 <= 32'h0;	// src/hive/scala/main/HiveOutCvt.scala:149:{56,64}
+      rqMReg_9 <= 32'h0;	// src/hive/scala/main/HiveOutCvt.scala:149:{56,64}
+      rqMReg_10 <= 32'h0;	// src/hive/scala/main/HiveOutCvt.scala:149:{56,64}
+      rqMReg_11 <= 32'h0;	// src/hive/scala/main/HiveOutCvt.scala:149:{56,64}
+      rqMReg_12 <= 32'h0;	// src/hive/scala/main/HiveOutCvt.scala:149:{56,64}
+      rqMReg_13 <= 32'h0;	// src/hive/scala/main/HiveOutCvt.scala:149:{56,64}
+      rqMReg_14 <= 32'h0;	// src/hive/scala/main/HiveOutCvt.scala:149:{56,64}
+      rqMReg_15 <= 32'h0;	// src/hive/scala/main/HiveOutCvt.scala:149:{56,64}
+      rqEnReg <= 1'h0;	// src/hive/scala/main/HiveOutCvt.scala:150:56
+      rqShiftReg <= 6'h0;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :151:56
+      rqZpReg <= 16'h0;	// src/hive/scala/main/HiveOutCvt.scala:152:56
+      reluReg <= 1'h0;	// src/hive/scala/main/HiveOutCvt.scala:153:56
     end
     else begin	// src/hive/scala/main/HiveOutCvt.scala:87:7
-      automatic logic _GEN_103 = io_in_ready_0 & io_in_valid;	// src/hive/scala/main/HiveOutCvt.scala:159:35, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      holdValid <= _GEN_103 | ~release_0 & holdValid;	// src/hive/scala/main/HiveOutCvt.scala:122:34, :157:89, :175:17, :176:15, :180:20, :186:15, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      automatic logic _GEN_103 = io_in_ready_0 & io_in_valid;	// src/hive/scala/main/HiveOutCvt.scala:176:35, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      holdValid <= _GEN_103 | ~release_0 & holdValid;	// src/hive/scala/main/HiveOutCvt.scala:131:34, :174:89, :192:17, :193:15, :197:20, :203:15, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
       if (_GEN_103) begin	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-        lineReg <= io_in_bits;	// src/hive/scala/main/HiveOutCvt.scala:123:34
-        fmtReg <= io_outFmt;	// src/hive/scala/main/HiveOutCvt.scala:124:34
-        rndReg <= io_rnd;	// src/hive/scala/main/HiveOutCvt.scala:125:34
-        blkReg <= io_blkSel;	// src/hive/scala/main/HiveOutCvt.scala:126:34
-        nEffReg <= io_nEff;	// src/hive/scala/main/HiveOutCvt.scala:127:34
+        lineReg <= io_in_bits;	// src/hive/scala/main/HiveOutCvt.scala:132:34
+        fmtReg <= io_outFmt;	// src/hive/scala/main/HiveOutCvt.scala:133:34
+        rndReg <= io_rnd;	// src/hive/scala/main/HiveOutCvt.scala:134:34
+        blkReg <= io_blkSel;	// src/hive/scala/main/HiveOutCvt.scala:135:34
+        nEffReg <= io_nEff;	// src/hive/scala/main/HiveOutCvt.scala:136:34
+        rqMReg_0 <= io_rqM_0;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+        rqMReg_1 <= io_rqM_1;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+        rqMReg_2 <= io_rqM_2;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+        rqMReg_3 <= io_rqM_3;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+        rqMReg_4 <= io_rqM_4;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+        rqMReg_5 <= io_rqM_5;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+        rqMReg_6 <= io_rqM_6;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+        rqMReg_7 <= io_rqM_7;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+        rqMReg_8 <= io_rqM_8;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+        rqMReg_9 <= io_rqM_9;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+        rqMReg_10 <= io_rqM_10;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+        rqMReg_11 <= io_rqM_11;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+        rqMReg_12 <= io_rqM_12;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+        rqMReg_13 <= io_rqM_13;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+        rqMReg_14 <= io_rqM_14;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+        rqMReg_15 <= io_rqM_15;	// src/hive/scala/main/HiveOutCvt.scala:149:56
+        rqEnReg <= io_rqEn;	// src/hive/scala/main/HiveOutCvt.scala:150:56
+        rqShiftReg <= io_rqShift;	// src/hive/scala/main/HiveOutCvt.scala:151:56
+        rqZpReg <= io_rqZp;	// src/hive/scala/main/HiveOutCvt.scala:152:56
+        reluReg <= io_reluOn;	// src/hive/scala/main/HiveOutCvt.scala:153:56
       end
-      dataDone <= ~release_0 & (_release_T & isQuantFmt & ~_release_T_6 | dataDone);	// src/hive/scala/main/HiveEnum.scala:9:{53,69}, src/hive/scala/main/HiveOutCvt.scala:122:34, :129:34, :157:89, :172:{20,34,37,56}, :173:14, :175:17, :176:15, :177:15, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      scaleSent <= ~(_GEN_103 | release_0) & (_release_T_6 | scaleSent);	// src/hive/scala/main/HiveOutCvt.scala:136:34, :157:89, :169:26, :170:15, :175:17, :178:15, :180:20, :187:15, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      dataDone <= ~release_0 & (_release_T & isQuantFmt & ~_release_T_6 | dataDone);	// src/hive/scala/main/HiveEnum.scala:9:{53,69}, src/hive/scala/main/HiveOutCvt.scala:131:34, :138:34, :174:89, :189:{20,34,37,56}, :190:14, :192:17, :193:15, :194:15, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      scaleSent <= ~(_GEN_103 | release_0) & (_release_T_6 | scaleSent);	// src/hive/scala/main/HiveOutCvt.scala:145:34, :174:89, :186:26, :187:15, :192:17, :195:15, :197:20, :204:15, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
     end
   end // always @(posedge)
   `ifdef ENABLE_INITIAL_REG_	// src/hive/scala/main/HiveOutCvt.scala:87:7
@@ -4476,51 +4590,109 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
       `FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveOutCvt.scala:87:7
     `endif // FIRRTL_BEFORE_INITIAL
     initial begin	// src/hive/scala/main/HiveOutCvt.scala:87:7
-      automatic logic [31:0] _RANDOM[0:20];	// src/hive/scala/main/HiveOutCvt.scala:87:7
+      automatic logic [31:0] _RANDOM[0:37];	// src/hive/scala/main/HiveOutCvt.scala:87:7
       `ifdef INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveOutCvt.scala:87:7
         `INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveOutCvt.scala:87:7
       `endif // INIT_RANDOM_PROLOG_
       `ifdef RANDOMIZE_REG_INIT	// src/hive/scala/main/HiveOutCvt.scala:87:7
-        for (logic [4:0] i = 5'h0; i < 5'h15; i += 5'h1) begin
+        for (logic [5:0] i = 6'h0; i < 6'h26; i += 6'h1) begin
           _RANDOM[i] = `RANDOM;	// src/hive/scala/main/HiveOutCvt.scala:87:7
         end	// src/hive/scala/main/HiveOutCvt.scala:87:7
-        holdValid = _RANDOM[5'h0][0];	// src/hive/scala/main/HiveOutCvt.scala:87:7, :122:34
+        holdValid = _RANDOM[6'h0][0];	// src/hive/scala/main/HiveOutCvt.scala:87:7, :131:34
         lineReg =
-          {_RANDOM[5'h0][31:1],
-           _RANDOM[5'h1],
-           _RANDOM[5'h2],
-           _RANDOM[5'h3],
-           _RANDOM[5'h4],
-           _RANDOM[5'h5],
-           _RANDOM[5'h6],
-           _RANDOM[5'h7],
-           _RANDOM[5'h8],
-           _RANDOM[5'h9],
-           _RANDOM[5'hA],
-           _RANDOM[5'hB],
-           _RANDOM[5'hC],
-           _RANDOM[5'hD],
-           _RANDOM[5'hE],
-           _RANDOM[5'hF],
-           _RANDOM[5'h10],
-           _RANDOM[5'h11],
-           _RANDOM[5'h12],
-           _RANDOM[5'h13],
-           _RANDOM[5'h14][0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :122:34, :123:34
-        fmtReg = _RANDOM[5'h14][4:1];	// src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :124:34
-        rndReg = _RANDOM[5'h14][7:5];	// src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :125:34
-        blkReg = _RANDOM[5'h14][8];	// src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :126:34
-        nEffReg = _RANDOM[5'h14][13:9];	// src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :127:34
-        dataDone = _RANDOM[5'h14][14];	// src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :129:34
-        scaleSent = _RANDOM[5'h14][15];	// src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :136:34
+          {_RANDOM[6'h0][31:1],
+           _RANDOM[6'h1],
+           _RANDOM[6'h2],
+           _RANDOM[6'h3],
+           _RANDOM[6'h4],
+           _RANDOM[6'h5],
+           _RANDOM[6'h6],
+           _RANDOM[6'h7],
+           _RANDOM[6'h8],
+           _RANDOM[6'h9],
+           _RANDOM[6'hA],
+           _RANDOM[6'hB],
+           _RANDOM[6'hC],
+           _RANDOM[6'hD],
+           _RANDOM[6'hE],
+           _RANDOM[6'hF],
+           _RANDOM[6'h10],
+           _RANDOM[6'h11],
+           _RANDOM[6'h12],
+           _RANDOM[6'h13],
+           _RANDOM[6'h14][0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :131:34, :132:34
+        fmtReg = _RANDOM[6'h14][4:1];	// src/hive/scala/main/HiveOutCvt.scala:87:7, :132:34, :133:34
+        rndReg = _RANDOM[6'h14][7:5];	// src/hive/scala/main/HiveOutCvt.scala:87:7, :132:34, :134:34
+        blkReg = _RANDOM[6'h14][8];	// src/hive/scala/main/HiveOutCvt.scala:87:7, :132:34, :135:34
+        nEffReg = _RANDOM[6'h14][13:9];	// src/hive/scala/main/HiveOutCvt.scala:87:7, :132:34, :136:34
+        dataDone = _RANDOM[6'h14][14];	// src/hive/scala/main/HiveOutCvt.scala:87:7, :132:34, :138:34
+        scaleSent = _RANDOM[6'h14][15];	// src/hive/scala/main/HiveOutCvt.scala:87:7, :132:34, :145:34
+        rqMReg_0 = {_RANDOM[6'h14][31:16], _RANDOM[6'h15][15:0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :132:34, :149:56
+        rqMReg_1 = {_RANDOM[6'h15][31:16], _RANDOM[6'h16][15:0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56
+        rqMReg_2 = {_RANDOM[6'h16][31:16], _RANDOM[6'h17][15:0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56
+        rqMReg_3 = {_RANDOM[6'h17][31:16], _RANDOM[6'h18][15:0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56
+        rqMReg_4 = {_RANDOM[6'h18][31:16], _RANDOM[6'h19][15:0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56
+        rqMReg_5 = {_RANDOM[6'h19][31:16], _RANDOM[6'h1A][15:0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56
+        rqMReg_6 = {_RANDOM[6'h1A][31:16], _RANDOM[6'h1B][15:0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56
+        rqMReg_7 = {_RANDOM[6'h1B][31:16], _RANDOM[6'h1C][15:0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56
+        rqMReg_8 = {_RANDOM[6'h1C][31:16], _RANDOM[6'h1D][15:0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56
+        rqMReg_9 = {_RANDOM[6'h1D][31:16], _RANDOM[6'h1E][15:0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56
+        rqMReg_10 = {_RANDOM[6'h1E][31:16], _RANDOM[6'h1F][15:0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56
+        rqMReg_11 = {_RANDOM[6'h1F][31:16], _RANDOM[6'h20][15:0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56
+        rqMReg_12 = {_RANDOM[6'h20][31:16], _RANDOM[6'h21][15:0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56
+        rqMReg_13 = {_RANDOM[6'h21][31:16], _RANDOM[6'h22][15:0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56
+        rqMReg_14 = {_RANDOM[6'h22][31:16], _RANDOM[6'h23][15:0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56
+        rqMReg_15 = {_RANDOM[6'h23][31:16], _RANDOM[6'h24][15:0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56
+        rqEnReg = _RANDOM[6'h24][16];	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56, :150:56
+        rqShiftReg = _RANDOM[6'h24][22:17];	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56, :151:56
+        rqZpReg = {_RANDOM[6'h24][31:23], _RANDOM[6'h25][6:0]};	// src/hive/scala/main/HiveOutCvt.scala:87:7, :149:56, :152:56
+        reluReg = _RANDOM[6'h25][7];	// src/hive/scala/main/HiveOutCvt.scala:87:7, :152:56, :153:56
       `endif // RANDOMIZE_REG_INIT
     end // initial
     `ifdef FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveOutCvt.scala:87:7
       `FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveOutCvt.scala:87:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_in_ready = io_in_ready_0;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :159:35
-  assign io_out_valid = io_out_valid_0;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :160:34
+  Hive_HiveRequant requantMod (	// src/hive/scala/main/HiveOutCvt.scala:653:55
+    .io_acc_0  (int32Seq_0),	// src/hive/scala/main/HiveOutCvt.scala:637:24
+    .io_acc_1  (int32Seq_1),	// src/hive/scala/main/HiveOutCvt.scala:637:24
+    .io_acc_2  (int32Seq_2),	// src/hive/scala/main/HiveOutCvt.scala:637:24
+    .io_acc_3  (int32Seq_3),	// src/hive/scala/main/HiveOutCvt.scala:637:24
+    .io_acc_4  (int32Seq_4),	// src/hive/scala/main/HiveOutCvt.scala:637:24
+    .io_acc_5  (int32Seq_5),	// src/hive/scala/main/HiveOutCvt.scala:637:24
+    .io_acc_6  (int32Seq_6),	// src/hive/scala/main/HiveOutCvt.scala:637:24
+    .io_acc_7  (int32Seq_7),	// src/hive/scala/main/HiveOutCvt.scala:637:24
+    .io_acc_8  (int32Seq_8),	// src/hive/scala/main/HiveOutCvt.scala:637:24
+    .io_acc_9  (int32Seq_9),	// src/hive/scala/main/HiveOutCvt.scala:637:24
+    .io_acc_10 (int32Seq_10),	// src/hive/scala/main/HiveOutCvt.scala:637:24
+    .io_acc_11 (int32Seq_11),	// src/hive/scala/main/HiveOutCvt.scala:637:24
+    .io_acc_12 (int32Seq_12),	// src/hive/scala/main/HiveOutCvt.scala:637:24
+    .io_acc_13 (int32Seq_13),	// src/hive/scala/main/HiveOutCvt.scala:637:24
+    .io_acc_14 (int32Seq_14),	// src/hive/scala/main/HiveOutCvt.scala:637:24
+    .io_acc_15 (int32Seq_15),	// src/hive/scala/main/HiveOutCvt.scala:637:24
+    .io_m_0    (rqMReg_0),	// src/hive/scala/main/HiveOutCvt.scala:149:56
+    .io_m_1    (rqMReg_1),	// src/hive/scala/main/HiveOutCvt.scala:149:56
+    .io_m_2    (rqMReg_2),	// src/hive/scala/main/HiveOutCvt.scala:149:56
+    .io_m_3    (rqMReg_3),	// src/hive/scala/main/HiveOutCvt.scala:149:56
+    .io_m_4    (rqMReg_4),	// src/hive/scala/main/HiveOutCvt.scala:149:56
+    .io_m_5    (rqMReg_5),	// src/hive/scala/main/HiveOutCvt.scala:149:56
+    .io_m_6    (rqMReg_6),	// src/hive/scala/main/HiveOutCvt.scala:149:56
+    .io_m_7    (rqMReg_7),	// src/hive/scala/main/HiveOutCvt.scala:149:56
+    .io_m_8    (rqMReg_8),	// src/hive/scala/main/HiveOutCvt.scala:149:56
+    .io_m_9    (rqMReg_9),	// src/hive/scala/main/HiveOutCvt.scala:149:56
+    .io_m_10   (rqMReg_10),	// src/hive/scala/main/HiveOutCvt.scala:149:56
+    .io_m_11   (rqMReg_11),	// src/hive/scala/main/HiveOutCvt.scala:149:56
+    .io_m_12   (rqMReg_12),	// src/hive/scala/main/HiveOutCvt.scala:149:56
+    .io_m_13   (rqMReg_13),	// src/hive/scala/main/HiveOutCvt.scala:149:56
+    .io_m_14   (rqMReg_14),	// src/hive/scala/main/HiveOutCvt.scala:149:56
+    .io_m_15   (rqMReg_15),	// src/hive/scala/main/HiveOutCvt.scala:149:56
+    .io_shift  (rqShiftReg),	// src/hive/scala/main/HiveOutCvt.scala:151:56
+    .io_zp     (rqZpReg),	// src/hive/scala/main/HiveOutCvt.scala:152:56
+    .io_isInt4 (isInt4Fmt),	// src/hive/scala/main/HiveOutCvt.scala:167:35
+    .io_out    (_requantMod_io_out)
+  );	// src/hive/scala/main/HiveOutCvt.scala:653:55
+  assign io_in_ready = io_in_ready_0;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :176:35
+  assign io_out_valid = io_out_valid_0;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :177:34
   assign io_out_bits =
     _io_out_bits_T | fmtReg == 4'h2
       ? {256'h0, _io_out_bits_T ? _packed16_T_1 : _packed16_T_2}
@@ -4545,76 +4717,80 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                  (|(nEffReg[4:1])) ? {fp32Seq_1[31], _GEN_81} : 4'h0,
                  (|nEffReg) ? {fp32Seq_0[31], _GEN_80} : 4'h0}
               : fmtReg == 4'h6
-                  ? {lineReg[631:600],
-                     lineReg[591:560],
-                     lineReg[551:520],
-                     lineReg[511:480],
-                     lineReg[471:440],
-                     lineReg[431:400],
-                     lineReg[391:360],
-                     lineReg[351:320],
-                     lineReg[311:280],
-                     lineReg[271:240],
-                     lineReg[231:200],
-                     lineReg[191:160],
-                     lineReg[151:120],
-                     lineReg[111:80],
-                     lineReg[71:40],
-                     lineReg[31:0]}
+                  ? {int32Seq_15,
+                     int32Seq_14,
+                     int32Seq_13,
+                     int32Seq_12,
+                     int32Seq_11,
+                     int32Seq_10,
+                     int32Seq_9,
+                     int32Seq_8,
+                     int32Seq_7,
+                     int32Seq_6,
+                     int32Seq_5,
+                     int32Seq_4,
+                     int32Seq_3,
+                     int32Seq_2,
+                     int32Seq_1,
+                     int32Seq_0}
                   : fmtReg == 4'h7
                       ? {256'h0,
-                         lineReg[615:600],
-                         lineReg[575:560],
-                         lineReg[535:520],
-                         lineReg[495:480],
-                         lineReg[455:440],
-                         lineReg[415:400],
-                         lineReg[375:360],
-                         lineReg[335:320],
-                         lineReg[295:280],
-                         lineReg[255:240],
-                         lineReg[215:200],
-                         lineReg[175:160],
-                         lineReg[135:120],
-                         lineReg[95:80],
-                         lineReg[55:40],
-                         lineReg[15:0]}
+                         int32Seq_15[15:0],
+                         int32Seq_14[15:0],
+                         int32Seq_13[15:0],
+                         int32Seq_12[15:0],
+                         int32Seq_11[15:0],
+                         int32Seq_10[15:0],
+                         int32Seq_9[15:0],
+                         int32Seq_8[15:0],
+                         int32Seq_7[15:0],
+                         int32Seq_6[15:0],
+                         int32Seq_5[15:0],
+                         int32Seq_4[15:0],
+                         int32Seq_3[15:0],
+                         int32Seq_2[15:0],
+                         int32Seq_1[15:0],
+                         int32Seq_0[15:0]}
                       : fmtReg == 4'h8
-                          ? {384'h0,
-                             lineReg[607:600],
-                             lineReg[567:560],
-                             lineReg[527:520],
-                             lineReg[487:480],
-                             lineReg[447:440],
-                             lineReg[407:400],
-                             lineReg[367:360],
-                             lineReg[327:320],
-                             lineReg[287:280],
-                             lineReg[247:240],
-                             lineReg[207:200],
-                             lineReg[167:160],
-                             lineReg[127:120],
-                             lineReg[87:80],
-                             lineReg[47:40],
-                             lineReg[7:0]}
-                          : fmtReg == 4'h9
-                              ? {448'h0,
-                                 lineReg[603:600],
-                                 lineReg[563:560],
-                                 lineReg[523:520],
-                                 lineReg[483:480],
-                                 lineReg[443:440],
-                                 lineReg[403:400],
-                                 lineReg[363:360],
-                                 lineReg[323:320],
-                                 lineReg[283:280],
-                                 lineReg[243:240],
-                                 lineReg[203:200],
-                                 lineReg[163:160],
-                                 lineReg[123:120],
-                                 lineReg[83:80],
-                                 lineReg[43:40],
-                                 lineReg[3:0]}
+                          ? (rqEnReg
+                               ? _requantMod_io_out
+                               : {384'h0,
+                                  int32Seq_15[7:0],
+                                  int32Seq_14[7:0],
+                                  int32Seq_13[7:0],
+                                  int32Seq_12[7:0],
+                                  int32Seq_11[7:0],
+                                  int32Seq_10[7:0],
+                                  int32Seq_9[7:0],
+                                  int32Seq_8[7:0],
+                                  int32Seq_7[7:0],
+                                  int32Seq_6[7:0],
+                                  int32Seq_5[7:0],
+                                  int32Seq_4[7:0],
+                                  int32Seq_3[7:0],
+                                  int32Seq_2[7:0],
+                                  int32Seq_1[7:0],
+                                  int32Seq_0[7:0]})
+                          : isInt4Fmt
+                              ? (rqEnReg
+                                   ? _requantMod_io_out
+                                   : {448'h0,
+                                      int32Seq_15[3:0],
+                                      int32Seq_14[3:0],
+                                      int32Seq_13[3:0],
+                                      int32Seq_12[3:0],
+                                      int32Seq_11[3:0],
+                                      int32Seq_10[3:0],
+                                      int32Seq_9[3:0],
+                                      int32Seq_8[3:0],
+                                      int32Seq_7[3:0],
+                                      int32Seq_6[3:0],
+                                      int32Seq_5[3:0],
+                                      int32Seq_4[3:0],
+                                      int32Seq_3[3:0],
+                                      int32Seq_2[3:0],
+                                      int32Seq_1[3:0],
+                                      int32Seq_0[3:0]})
                               : {fp32Seq_15,
                                  fp32Seq_14,
                                  fp32Seq_13,
@@ -4630,8 +4806,8 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                                  fp32Seq_3,
                                  fp32Seq_2,
                                  fp32Seq_1,
-                                 fp32Seq_0};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:{42,58,74}, src/hive/scala/main/HiveOutCvt.scala:87:7, :123:34, :124:34, :127:34, :147:35, :148:35, :149:35, :150:35, :229:17, :299:26, :310:35, :311:{35,43,67,89}, :345:13, :499:10, :534:17, :535:17, :600:30, :603:38, :604:61, :605:61, :607:61, :615:42, :616:13, :617:42, :619:42, :621:41, :622:41, :623:41, src/main/scala/chisel3/util/Mux.scala:130:16
-  assign io_scaleOut_valid = io_scaleOut_valid_0;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :168:{34,48,62}
+                                 fp32Seq_0};	// src/hive/scala/main/Fp32.scala:293:8, src/hive/scala/main/HiveEnum.scala:9:{42,58,74}, src/hive/scala/main/HiveOutCvt.scala:87:7, :133:34, :136:34, :150:56, :164:35, :165:35, :166:35, :167:35, :253:17, :334:35, :335:{35,43,67,89}, :369:13, :523:10, :558:17, :559:17, :637:24, :639:38, :640:61, :641:61, :643:61, :653:55, :670:{8,48}, :673:{8,48}, :676:42, :677:13, :678:42, :680:42, :682:41, src/main/scala/chisel3/util/Mux.scala:130:16
+  assign io_scaleOut_valid = io_scaleOut_valid_0;	// src/hive/scala/main/HiveOutCvt.scala:87:7, :185:{34,48,62}
   assign io_scaleOut_bits =
     (|amax16_0)
       ? (blkReg
@@ -4681,6 +4857,6 @@ module Hive_HiveOutCvt(	// src/hive/scala/main/HiveOutCvt.scala:87:7
                            : _scaleWire_s16_sDiff_T_5 > 10'hFE
                                ? 8'hFE
                                : _scaleWire_s16_sDiff_T_5[7:0])
-      : 8'h0;	// src/hive/scala/main/HiveEnum.scala:9:{42,58}, src/hive/scala/main/HiveOutCvt.scala:87:7, :126:34, :353:47, :362:21, :364:26, :365:26, :369:22, :370:22, :371:23, :372:8, :373:10, :374:12, :375:{14,21,47}, :561:18, :562:18, :564:18, :565:18, :570:8
+      : 8'h0;	// src/hive/scala/main/HiveEnum.scala:9:{42,58}, src/hive/scala/main/HiveOutCvt.scala:87:7, :135:34, :377:47, :386:21, :388:26, :389:26, :393:22, :394:22, :395:23, :396:8, :397:10, :398:12, :399:{14,21,47}, :585:18, :586:18, :588:18, :589:18, :594:8
 endmodule
 

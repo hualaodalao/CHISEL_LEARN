@@ -90,6 +90,16 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
     val biasFetchReq = if (cfg.hasMx) Some(Output(Bool()))               else None
     val biasFetchNt  = if (cfg.hasMx) Some(Output(UInt(cfg.mnkWidth.W))) else None
 
+    // 【P0 epilogue-2 fused requant】rqM 取数握手（仅 hasMx 生成，与 bias 同一 dmaScaleA
+    //   端口、顶层两相连续取数）：rqMIn = 16×32b 字流（每 N-tile 一组，收集齐置
+    //   rqMLoaded）；rqMFetchReq/Nt 同 biasFetchReq/Nt 范式。rqMOut = 已收集的
+    //   per-channel M 向量（寄存器直出，顶层接线至 HiveOutCvt 的 requant 通路；
+    //   hasInt 门控在例化侧，本模块只按 hasMx 供给）。
+    val rqMIn       = if (cfg.hasMx) Some(slave(Stream(UInt(32.W))))    else None
+    val rqMFetchReq = if (cfg.hasMx) Some(Output(Bool()))               else None
+    val rqMFetchNt  = if (cfg.hasMx) Some(Output(UInt(cfg.mnkWidth.W))) else None
+    val rqMOut      = if (cfg.hasMx) Some(Output(Vec(cfg.totalN, UInt(32.W)))) else None
+
     // HiveComb 驱动
     val hiveAIn     = Output(Vec(cfg.totalN, UInt(cfg.aEffW.W)))
     val hivePsumIn  = Output(Vec(cfg.totalN, UInt(cfg.cEffW.W)))
@@ -190,8 +200,8 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   when(io.cPeekDone){
     cStoreGateReg := false.B
   }
+
   
- 
   //A口供数
   for (i <- 0 until cfg.totalN) {
     io.hiveAIn(i) := io.aPop.payload(cfg.aEffW * (i+1)-1, cfg.aEffW * i)
@@ -264,6 +274,41 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   private val biasLoaded = if (cfg.hasMx) Some(RegInit(false.B)) else None
   private val biasCnt    = if (cfg.hasMx) Some(RegInit(0.U(log2Up(cfg.totalN).W))) else None
 
+  // 【P0 epilogue-2 fused requant】rqM 收集寄存器（与 bias 同构；M 向量不进阵列、
+  //   经 rqMOut 顶层接线至 HiveOutCvt 例化的 HiveRequant，故无 lazy 转换）
+  private val rqMRegs   = if (cfg.hasMx) Some(RegInit(VecInit(Seq.fill(cfg.totalN)(0.U(32.W))))) else None
+  private val rqMLoaded = if (cfg.hasMx) Some(RegInit(false.B)) else None
+  private val rqMCnt    = if (cfg.hasMx) Some(RegInit(0.U(log2Up(cfg.totalN).W))) else None
+  // 【P0 epilogue-2 修复】rqM 暂存-提交双缓冲：M 的消费者在 HiveOutCvt in.fire
+  //   （C 写回窗口末尾——行经 scratchpad 深缓冲晚到），而重取触发在 sNEXT_NK_TILE
+  //   （窗口开门拍）。若字流直接原地重载 rqMRegs，取数会逐 lane 覆盖仍在本块 C
+  //   排空路径上的行将要锁存的 M（实测 tile0 末行锁到 tile1 的 M，2/1024 元素
+  //   失配；「低 lane 先被污染」的签名即逐 lane 顺序覆盖）。修复：字流先落
+  //   staging，rqMRegs 仅在提交点整组更新。提交不变式（三款保证）：
+  //   ① cvt.in.fire 仅发生在 cStoreGate 高电平窗口内（顶层 cvt.in.valid 门控），
+  //      cPeekDone（doneBlock）恰为窗口边界 ⟹ 提交点两侧的 cvt fire 分别看到
+  //      旧/新 M，不存在中间态；
+  //   ② feedBase 的 rqMLoaded 门控保证目标 tile 的行在 M 收齐前不进阵列 ⟹
+  //      staging 收齐必早于该 tile 任何行过 cvt ⟹「取数慢于本块 drain」的微例
+  //      下迟到提交仍落在下一窗口开门之前；
+  //   ③ 取数触发点/地址序列与修复前逐拍一致（sIDLE 发 nt=0、sNEXT_NK_TILE 发
+  //      nt=curNTile+1），顶层两相取数器与 TB 地址金锚零改动。
+  private val rqMStaging     = if (cfg.hasMx) Some(RegInit(VecInit(Seq.fill(cfg.totalN)(0.U(32.W))))) else None
+  private val rqMCommitArmed = if (cfg.hasMx) Some(RegInit(false.B)) else None
+  // 【P0 epilogue-2 修复】rqM staging 提交点：每个 C 块 doneBlock（cvt 消费窗口
+  //   边界）布防，rqMLoaded（= staging 收齐）即整组提交 rqMRegs。微例下取数
+  //   晚于 doneBlock 时布防保持至收齐拍——由不变式②该提交仍早于目标 tile 任何
+  //   行过 cvt。requantOn=0 时 rqMLoaded 恒 0（无字流），布防不触发提交。
+  //   （本块必须位于上述寄存器声明之后——class 体自上而下执行，Chisel when 块
+  //   在 Scala 求值期即建图，先引用后声明会 NPE。）
+  if (cfg.hasMx) {
+    when(io.cPeekDone) { rqMCommitArmed.get := true.B }
+    when(rqMCommitArmed.get && rqMLoaded.get) {
+      rqMRegs.get := rqMStaging.get
+      rqMCommitArmed.get := false.B
+    }
+  }
+
   /** fp32 → lazy40 累加基底：位级镜像金锚权威 HiveSimCommon.fp32BitsTo40 ——
     * e==0（含全部 subnormal）→ 绝对 0；否则 {s, e, 隐含 1, m, 0^(cEffW-33)}，
     * 在 cEffW 内右侧对齐、高位补零（cEffW=40 时即权威式 {s<<39|e<<31|1<<30|m<<7}）。 */
@@ -295,6 +340,22 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
         biasCnt.get := biasCnt.get + 1.U
       }
     }
+
+    // 【P0 epilogue-2】rqM 收集：字流落【staging 暂存】而非 rqMRegs（16 字齐 →
+    //   rqMLoaded 置位 = staging 收齐，sLOAD_A 供数门控待收齐放行；rqMRegs 的
+    //   更新只在提交点整组进行，见 rqMStaging 声明处不变式）。requantOn=0 时
+    //   ready 恒 0、零行为扰动。
+    io.rqMIn.get.ready := io.regFile.requantOn && !rqMLoaded.get
+    when(io.rqMIn.get.fire) {
+      rqMStaging.get(rqMCnt.get) := io.rqMIn.get.payload
+      when(rqMCnt.get === (cfg.totalN - 1).U) {
+        rqMLoaded.get := true.B
+        rqMCnt.get := 0.U
+      }.otherwise {
+        rqMCnt.get := rqMCnt.get + 1.U
+      }
+    }
+    io.rqMOut.get := rqMRegs.get
   }
 
 
@@ -318,6 +379,8 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
     io.scaleBPop.get.ready := false.B
     io.biasFetchReq.get := false.B
     io.biasFetchNt.get := 0.U
+    io.rqMFetchReq.get := false.B
+    io.rqMFetchNt.get := 0.U
   }
 
   io.flushA := false.B
@@ -414,6 +477,17 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
           io.biasFetchNt.get := 0.U
           biasLoaded.get := false.B
           biasCnt.get := 0.U
+        }
+        // 【P0 epilogue-2】rqM 首拍取数触发：与 bias 同拍发（顶层两相取数器
+        //   先 BIAS 相后 M 相连续供数，无双 drain）；requantOn=0 时零行为扰动。
+        //   首块无 doneBlock 前驱 ⟹ execute 拍同步布防提交（staging 收齐即提交，
+        //   由不变式②早于首行过 cvt；否则 rqMRegs 残留上一 job 末 tile 的 M）
+        when(io.execute && io.regFile.requantOn) {
+          io.rqMFetchReq.get := true.B
+          io.rqMFetchNt.get := 0.U
+          rqMLoaded.get := false.B
+          rqMCnt.get := 0.U
+          rqMCommitArmed.get := true.B
         }
       }
 
@@ -551,8 +625,11 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
       // 【P0 epilogue-1】biasOn 且未收齐时挂起供数（取数器盗用 dmaScaleA 端口需
       //   ≤17+drain 拍；sDRAIN+sLOAD_B 预取窗口通常已覆盖，本门控为兜底）：
       //   aPop/scaleA 均可反压，挂起安全；biasOn=0 时门控项恒真、逐位不变
+      // 【P0 epilogue-2】requantOn 且 M 向量未收齐时同式挂起（两相取数在 bias 相
+      //   之后还需 16 拍；requantOn=0 时门控项恒真、逐位不变）
       val feedBase = (cBufferReservedAtleastTotalN) & Mux(needPartialSum, cStoreGateReg === false.B, true.B) &
-        (if (cfg.hasMx) !(io.regFile.biasOn && !biasLoaded.get) else true.B)
+        (if (cfg.hasMx) !(io.regFile.biasOn && !biasLoaded.get) else true.B) &
+        (if (cfg.hasMx) !(io.regFile.requantOn && !rqMLoaded.get) else true.B)
       // MX：激活消费与 scaleA 严格 lockstep。scaleADma 可能比 aDma 晚一拍抵达，
       //   若在 scaleA FIFO 尚空时就消费首个激活行，会使全体 scaleA 应用错位一行
       //   （row m 误用 row m-1 的 scale）。故运行期 isMx(aFmt) 时把 scaleAPop.valid
@@ -649,6 +726,15 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
                 io.biasFetchNt.get := curNTile + 1.U
                 biasLoaded.get := false.B
                 biasCnt.get := 0.U
+              }
+              // 【P0 epilogue-2】下一 N-tile 的 rqM 重取（字流落 staging，rqMRegs
+              //   在本块 doneBlock 提交点整组更新——见 rqMStaging 声明处不变式；
+              //   requantOn=0 时零行为扰动）
+              when(io.regFile.requantOn) {
+                io.rqMFetchReq.get := true.B
+                io.rqMFetchNt.get := curNTile + 1.U
+                rqMLoaded.get := false.B
+                rqMCnt.get := 0.U
               }
             }
           }.otherwise{

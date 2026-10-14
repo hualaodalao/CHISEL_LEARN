@@ -325,6 +325,40 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     }
 
     // ==========================================================================
+    // 【P0 epilogue-2 errCode 13（fused requant 合法输出格式 + rqMBase 对齐 + 无取数机构守护）】
+    // --------------------------------------------------------------------------
+    // ▸ 格式臂（无门控）：requant 链只定义了 INT8/INT4 两档饱和语义（TFLite 端侧
+    //   后量化范式），requantOn && cFmt ∉ {INT8, INT4} 属配置错误，运行期拒绝
+    //   （饱和/打包通路按 fmt 位宽选择，其它格式无从落码）。无门控 ⟹ 三个发射
+    //   配置全部生成；MX-only 配置（hasInt=false）下 requantOn+INT 输出本会先被
+    //   优先级更高的 errCode 11（int/non-int 跨界）截走，本臂仍可被 requantOn+
+    //   非法浮点输出（如 FP32）单独触发 —— 保持无门控是刻意的。
+    // ▸ 对齐臂（无门控）：rqM 向量取数复用 dmaScaleA 32b 只读端口（与 bias 同一
+    //   drain-then-steal 仲裁，两相连续取数），单字读契约要求 rqMBase 4B 对齐；
+    //   判据与 errCode12 的 biasAddr(1,0) 同式。
+    // ▸ 第三臂（!hasMx，RTL-only）：rqM 取数器随 dmaScaleA 端口一起只在 hasMx
+    //   配置生成，无 MX 配置下 requantOn 无处取数、会永久卡死 Executor 供数门控，
+    //   运行期直接拒绝。金锚 hwErrCode 不镜像该臂（同 errCode7/12 先例：QuickSpec
+    //   现役 cfg 恒 hasMx=true，负向用例不可达）。
+    // ▸ Priority (last-connect wins): 本块物理位置在 errCode12 块之后、code8 块
+    //   之前 ⟹ 真值序 3(Fix-4) > 11 > 8 > 13 > 12 > 10 > 7 > 5 > 4 > 3(xor) > 0。
+    // ==========================================================================
+    when(io.regFile.requantOn && !(io.regFile.cFmt === DataFormat.INT8 || io.regFile.cFmt === DataFormat.INT4)){
+        errComb := true.B
+        errCodeComb := 13.U
+    }
+    when(io.regFile.requantOn && io.regFile.rqMBase(1, 0) =/= 0.U){
+        errComb := true.B
+        errCodeComb := 13.U
+    }
+    if(!cfg.hasMx){
+        when(io.regFile.requantOn){
+            errComb := true.B
+            errCodeComb := 13.U
+        }
+    }
+
+    // ==========================================================================
     // 【P0-1 errCode 8（fp4 K 整除运行期守护）】fp4(E2M1) 输入要求 K 被 kPerBeat 整除。
     // --------------------------------------------------------------------------
     // ▸ 真 bug 根因：Executor 的 kTiles = K / (totalN×elemsPerLane) 是【地板除】。fp4

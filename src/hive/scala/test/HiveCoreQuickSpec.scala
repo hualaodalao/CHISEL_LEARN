@@ -208,6 +208,67 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           biasOn = true, biasBase = BIAS_BASE + 2,
           wave = "sim/debug/quick_bias_err12.fst", caseTag = " [P0-ep1 neg biasAddr misalign errCode12]")
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // 【P0 epilogue-2 fused requant（2026-10-14）】量化整数 epilogue 六用例：
+  //   y = sat_fmt(round_half_up(relu(acc) × M[n] >> shift) + zp)，acc 含 epilogue-1
+  //   bias 基底（同累加器域）。硬件：reg5[29]=requantOn、reg5[15]=reluOn、reg13=rqMBase、
+  //   reg14=[31:16]zp+[5:0]shift；计算独立成 HiveRequant 模块（16-lane 并行，用户裁定），
+  //   OutCvt int32Seq 源级 ReLU clamp（INT 族专属消费域）。M 取数复用 dmaScaleA 端口
+  //   （顶层两阶段 epilogue FSM：WAIT 排空 → FETCH_BIAS → FETCH_M 连续盗用，无二次排空），
+  //   TB 侧按地址域拆三流对账。金锚：HiveDebugModel goldenC requant 链（Long 整数算术、
+  //   契约独立推导）+ 独立 rqMRng 激励（定向饱和角点：巨乘子/零/小正/中/小负乘子 lane 混合）。
+  //   ★ INT8/INT4【输出】为仓内首例（1B/半字节族 C 写回 + strb 收窄 + FpCvt 旁路全走新档）。
+  // ══════════════════════════════════════════════════════════════════════════
+  // ⑩ INT8×INT8 + bias + requant → INT8：epilogue-1×epilogue-2 全叠加。shift=17/zp=5：
+  //   小正乘子 lane（|acc·M|≤~9e5≈2^19.8）商落 [-128,127] 值域内（round-half-up 进位
+  //   边界 + zp 正偏移可见），巨乘子 lane（2^30/0x30000000）全饱和 ±128，零乘子 lane
+  //   输出 clamp(zp)=5。dmaScaleA 端口 bias+rqM 双流连续取数（FETCH→FETCH_M 无重排空）。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT8,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          biasOn = true, requantOn = true, rqShift = 17, rqZp = 5,
+          wave = "sim/debug/quick_rq_int8_bias.fst", caseTag = " [P0-ep2 requant INT8xINT8+bias->INT8]")
+
+  // ⑪ INT8×INT8 + requant + ReLU → INT8：shift=13/zp=0（ReLU 语义干净：M≥0 lane 全取
+  //   正小乘子）。负累加器 clamp 到 0 可观测（典型 |acc·M|>>13 ∈ [0,110] 值域内、负值
+  //   仅来自负 acc ⟹ clamp 前后差值直接进输出码），巨乘子 lane 饱和 +127。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT8,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          requantOn = true, reluOn = true, rqShift = 13, rqZp = 0,
+          wave = "sim/debug/quick_rq_relu_int8.fst", caseTag = " [P0-ep2 requant+relu INT8xINT8->INT8]")
+
+  // ⑫ INT8×INT8 + requant → INT4：窄饱和域 [-8,7] + 负 zp（-3，覆盖 zp 符号位通路）。
+  //   shift=17：小正乘子 lane 商落 [-8,7] 内/贴边（±8/±7 饱和角点密集命中），巨乘子
+  //   lane 双侧饱和，零乘子 lane 输出 clamp(-3)=-3。INT4 半字节打包（与 MXE2M1 输出
+  //   同 4-bit 打包机制，但值域换成饱和后的 requant 码）。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT4,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          requantOn = true, rqShift = 17, rqZp = -3,
+          wave = "sim/debug/quick_rq_int4.fst", caseTag = " [P0-ep2 requant INT8xINT8->INT4]")
+
+  // ⑬ 负向：requantOn ∧ cFmt=FP32（∉{INT8,INT4}）→ errCode 13 第一臂。配置取 MX 输入
+  //   （runIsInt=false = cIsIntOut=false）避开 errCode 11 先命中；K=64/kPerBeat=32 整除
+  //   避开 8；rqMBase 对齐避开 13 第二臂 ⟹ 只命中 13。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE5M2, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT,
+          requantOn = true, rqShift = 17, rqZp = 5,
+          wave = "sim/debug/quick_rq_err13_fmt.fst", caseTag = " [P0-ep2 neg cFmt non-INT errCode13]")
+
+  // ⑭ 负向：rqMBase 非 4B 对齐（RQM_BASE+2）→ errCode 13 第二臂（对齐臂）。INT8×INT8→INT8
+  //   合法配置（cFmt∈{INT8,INT4} 避开 13 第一臂、runIsInt=cIsIntOut 避开 11、K=64 整除
+  //   避开 8）⟹ 只命中 13。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT8,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          requantOn = true, rqMBase = RQM_BASE + 2, rqShift = 17, rqZp = 5,
+          wave = "sim/debug/quick_rq_err13_align.fst", caseTag = " [P0-ep2 neg rqMBase misalign errCode13]")
+
+  // ⑮ ReLU-only（requantOn=0）：INT 族源级 clamp 的非 requant 消费臂 —— INT32 输出全宽
+  //   32-bit 落码，负累加器 clamp 0 直接可见；无 requant/M/bias/DMA 取数副作用
+  //   （dmaScaleA 端口全程静默），纯验证 reluOn 乘 INT 输出档的 clamp 数据通路。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          reluOn = true,
+          wave = "sim/debug/quick_relu_int32.fst", caseTag = " [P0-ep2 relu-only INT8xINT8->INT32]")
+
   /** 编译期配置（totalN=16；cDmaExtW 默认 256；缓冲深度 2048；scaleBufferDepth=64）。
     * (#155 MJ1) supportedFmts 现在【不再显式传入】，回落 HiveCoreConfig 的默认集。
     *   MXE2M1 现在是默认必选，不再需要显式加。
@@ -313,6 +374,19 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
               //   （与 W4A8 #148 同一 DuplicateTestNameException 防撞车纪律）。
               biasOn: Boolean = false,
               biasBase: Long = BIAS_BASE,
+              // 【P0 epilogue-2】fused requant / ReLU 开关与参数（进 reg5[29]=requantOn /
+              //   reg5[15]=reluOn / reg13=rqMBase / reg14=[31:16]zp+[5:0]shift）。
+              //   requantOn=true：golden = 量化后整数 sat(round_half_up(relu(acc)×M>>s)+zp)
+              //   （HiveDebugModel goldenC requant 链，独立 rqMRng 激励流，既有用例零漂移）；
+              //   硬件 HiveRequant 独立模块 16-lane 并行。reluOn 单独开启（不 requant）也
+              //   消费于 INT 族输出（int32Seq 源级 clamp）。TB：dmaScaleA 通道拆【三】流
+              //   对账（bias / rqM / scaleA）。★测试名【不含 requant 参数】⟹ 既有用例名
+              //   逐字不变；requant 用例须带 caseTag（DuplicateTestNameException 防撞车纪律）。
+              requantOn: Boolean = false,
+              reluOn: Boolean = false,
+              rqMBase: Long = RQM_BASE,
+              rqShift: Int = 0,
+              rqZp: Int = 0,
               // (#148) caseTag is appended to the ScalaTest test NAME. It exists for exactly one
               //   reason: two runCase calls with identical (m,n,k,aFmt,bFmt,cFmt,blks,addrMode)
               //   build the SAME test name, and ScalaTest rejects that while the suite is being
@@ -338,7 +412,8 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
         aMxBlkSel = selOf("aBlk", aBlk), bMxBlkSel = selOf("bBlk", bBlk), cMxBlkSel = selOf("cBlk", cBlk),
         addrModeSel = addrMode.litValue.toInt, rnd = rnd.litValue.toInt, seed = seed, strictAddr = strictAddr,
         maxCycles = maxCycles.toInt, waveTarget = wave, testHint = s"run-M-$m-N-$n-K-$k", bBase = bBase,
-        biasOn = biasOn, biasBase = biasBase)) }
+        biasOn = biasOn, biasBase = biasBase,
+        requantOn = requantOn, reluOn = reluOn, rqMBase = rqMBase, rqShift = rqShift, rqZp = rqZp)) }
   }
 
 
@@ -415,6 +490,24 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       s"biasBase % 4 = ${p.biasBase % 4}. The bias fetch drives word (4B) reads directly on the dmaScaleA " +
       "port; a misaligned base makes every word read cross a word boundary and silently corrupts the " +
       "injected psum base. Suggestion: keep biasBase a multiple of 4 (default BIAS_BASE is aligned)."
+    // 【P0 epilogue-2】errCode 13: requant 配置违约（两臂，均无门控）。优先级 8 > 13 > 12 > 10
+    //   （last-connect 序，置于 code-12 之后 code-8 之前）。
+    case 13 =>
+      val fmtArm = p.requantOn && !(p.cFmt == DataFormat.INT8 || p.cFmt == DataFormat.INT4)
+      val alignArm = p.requantOn && p.rqMBase % 4L != 0
+      (fmtArm, alignArm) match {
+        case (true, _) =>
+          s"requantOn=1 requires cFmt INT8/INT4: cFmt=${p.cFmt}. The requant chain (HiveRequant) only " +
+            "defines two saturation domains (INT8 [-128,127] / INT4 [-8,7]); other output formats have " +
+            "no defined encoding for the requanted value. Suggestion: set cFmt = INT8 or INT4, or clear " +
+            "requantOn (reg5[29])."
+        case _ =>
+          s"requantOn=1 requires rqMBase (reg13) 4-byte aligned: rqMBase=0x${p.rqMBase.toHexString}, " +
+            s"rqMBase % 4 = ${p.rqMBase % 4}. The M-vector fetch reuses the dmaScaleA 32-bit port word " +
+            "reads (same two-phase fetcher as bias); a misaligned base makes every word read cross a " +
+            "word boundary and silently corrupts the per-channel multipliers. " +
+            "Suggestion: keep rqMBase a multiple of 4 (default RQM_BASE is aligned)."
+      }
     case _ => s"Unrecognized errCode $c -- not registered in errExplain (possibly a new code not yet synced)"
   }
   /** ② 打印体检结论 + 生效配置摘要 + 派生几何（一次打全，便于对着波形看） */
@@ -431,9 +524,14 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       s"kTiles=${plan.aKTiles} mTiles=${(p.m + cfg.totalN - 1) / cfg.totalN} nTiles=${plan.nTiles} beatsPerRow=${plan.beatsPerRow}；" +
       s"期望 beat A=${plan.expAAddrSeq.size} B=${plan.expBAddrSeq.size} C=${plan.expCAddrSeq.size} sA=${plan.expScaleAAddrSeq.size} " +
       s"sB=${plan.expScaleBAddrSeq.size} sC=${plan.expCScaleAddrSeq.size}" +
-      (if (p.biasOn) s" bias=${plan.expBiasAddrSeq.size}" else "") + s"；内存镜像字节=${plan.memByteCount}")
+      (if (p.biasOn) s" bias=${plan.expBiasAddrSeq.size}" else "") +
+      (if (p.requantOn) s" rqM=${plan.expRqMAddrSeq.size}" else "") + s"；内存镜像字节=${plan.memByteCount}")
     if (p.addrModeSel != AddrMode.MAT.litValue.toInt) println(s"[$TAG] ⚠ addrMode=TILE 已写入 reg5[14:12] 并回读对账通过；" +
       "当前 RTL 无消费者，不影响数值结果（内存镜像 / golden / 六路期望地址一律按 MAT 语义生成）")
+    // 【P0 epilogue-2】reluOn 消费域 = INT 族输出（int32Seq 源级 clamp）；fp/MX 输出对它是
+    //   零消费者位（addrMode=TILE 先例）——如实提示，不判失败。
+    if (p.reluOn && !isIntFmt(p.cFmt)) println(s"[$TAG] ⚠ reluOn=1 但 cFmt=${p.cFmt} 非 INT 族输出：clamp 无消费者，" +
+      "数值结果与 reluOn=0 逐位相同（金锚同口径不 clamp）")
     predicted match {
       case None => println(s"[$TAG] 体检结论：配置合法，硬件不会置 config-err → 走正向 golden 逐元素比对 ✓")
       case Some(c) => println(s"[$TAG] ★★★ 体检不通过：硬件将在 EXECUTE 后直接置 STATUS.err（errCode=$c），不进计算 ★★★\n" +
@@ -514,6 +612,11 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
         cmd(HiveCoreOp.REG_WRITE2, 0x09, 0x0A, SA_BASE, SB_BASE); cmd(HiveCoreOp.REG_WRITE1, 0x0B, 0x00, SC_BASE, 0L)
         // 【P0 epilogue-1】reg12 = biasAddr（biasOn=false 时不写：硬件默认 0、该通路整体不激活）。
         if (p.biasOn) cmd(HiveCoreOp.REG_WRITE1, 0x0C, 0x00, p.biasBase, 0L)
+        // 【P0 epilogue-2】reg13 = rqMBase、reg14 = [31:16]zp + [5:0]shift（requantOn=false 时
+        //   不写，与 reg12 同范式；reluOn 位在 reg5[15] 已随控制字写入，无独立槽位）。
+        if (p.requantOn) {
+          cmd(HiveCoreOp.REG_WRITE1, 0x0D, 0x00, p.rqMBase, 0L)
+          cmd(HiveCoreOp.REG_WRITE1, 0x0E, 0x00, p.controlWord14, 0L) }
         // ⑦ addrMode / 格式字回读对账：addrMode 无硬件消费者，只能靠回读证明「确实写进去了」
         //   (#164) 重排后控制字全部收敛到 reg5 单寄存器 ⟹ 一次回读即可覆盖 loadWMode/三 MxBlk/
         //   warmup/warmdown/rnd/三 addrMode/三 fmt 共 19 个位域；断言强度【不降反升】（旧写法
@@ -528,6 +631,17 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           val rb12Ok = rb12 == (p.biasBase & 0xFFFFFFFFL)
           regRbOk = regRbOk && rb12Ok
           regRbMsg += f"; reg12 wr=0x${p.biasBase & 0xFFFFFFFFL}%08X rd=0x$rb12%08X" }
+        // 【P0 epilogue-2】reg13/reg14 回读对账（requantOn 时）：requantOn/reluOn 位本身已由
+        //   reg5（controlWord5 含 bit29/bit15 ⟹ rb5 对账即含两位）覆盖，此处补 rqMBase 与
+        //   zp/shift 槽位；reg14 回读 = Cat(rqZp.asUInt, 10'b0, rqShift)，负 zp 以补码位型对账。
+        if (p.requantOn) {
+          val rb13 = readReg(0x0D).toLong
+          val rb14 = readReg(0x0E).toLong
+          val rb13Ok = rb13 == (p.rqMBase & 0xFFFFFFFFL)
+          val rb14Ok = rb14 == (p.controlWord14 & 0xFFFFFFFFL)
+          regRbOk = regRbOk && rb13Ok && rb14Ok
+          regRbMsg += f"; reg13 wr=0x${p.rqMBase & 0xFFFFFFFFL}%08X rd=0x$rb13%08X; " +
+            f"reg14 wr=0x${p.controlWord14 & 0xFFFFFFFFL}%08X rd=0x$rb14%08X" }
         println(s"[$TAG] 寄存器回读对账：$regRbMsg → ${if (regRbOk) "一致 ✓" else "不一致 ✗"}")
         // ---- EXECUTE ----
         dut.io.cmd.valid.poke(true.B); dut.io.cmd.payload.op.poke(HiveCoreOp.EXECUTE)
@@ -585,16 +699,23 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           dut.clock.step(); cycle += 1
         }
         dut.io.dmaC.rsp.valid.poke(false.B); dut.io.dmaCScale.get.rsp.valid.poke(false.B); dut.io.cmd.valid.poke(false.B)
-        // 【P0 epilogue-1】dmaScaleA 跑后双流拆分对账（仅正向路径：负向路径硬件不进计算、
-        //   无期望流量，只报实收请求数）。bias 域 [biasBase, biasBase+nTiles*totalN*4) 内的
-        //   请求归 bias 流，其余归 scaleA 流（两域不相交：BIAS_BASE 与 SA_BASE 独立段）；各自
-        //   与 expBiasAddrSeq/expScaleAAddrSeq 保序逐拍比对，失配进 addrBad/addrBadCnt（与其
-        //   余通道同一收集-后断言管线）。biasOn=false 时不拆流、整流对账（与旧逐拍口径等价，
-        //   且额外暴露拍数短缺/超出的结构性失配——旧 rdCh 超出 exp.size 的请求静默吞掉不报）。
+        // 【P0 epilogue-1/2】dmaScaleA 跑后拆流对账（仅正向路径：负向路径硬件不进计算、
+        //   无期望流量，只报实收请求数）。bias 域 [biasBase, biasBase+nTiles*totalN*4) 与
+        //   rqM 域 [rqMBase, rqMBase+nTiles*totalN*4) 内的请求分别归 bias/rqM 流，其余归
+        //   scaleA 流（三域两两不相交：SA_BASE/BIAS_BASE/RQM_BASE 独立 64KB 段）；各自与
+        //   expBiasAddrSeq/expRqMAddrSeq/expScaleAAddrSeq 保序逐拍比对，失配进
+        //   addrBad/addrBadCnt（与其余通道同一收集-后断言管线）。biasOn=requantOn=false 时
+        //   不拆流、整流对账（与旧逐拍口径等价，且额外暴露拍数短缺/超出的结构性失配——
+        //   旧 rdCh 超出 exp.size 的请求静默吞掉不报）。
         val saBiasHw: Seq[Long] = {
           val lo = p.biasBase; val hi = p.biasBase + plan.nTiles.toLong * cfg.totalN * 4
           if (p.biasOn) saAddrLog.toSeq.filter(a => a >= lo && a < hi) else Seq.empty }
-        val saScaleHw: Seq[Long] = if (p.biasOn) saAddrLog.toSeq.filterNot(saBiasHw.contains) else saAddrLog.toSeq
+        val saRqMHw: Seq[Long] = {
+          val lo = p.rqMBase; val hi = p.rqMBase + plan.nTiles.toLong * cfg.totalN * 4
+          if (p.requantOn) saAddrLog.toSeq.filter(a => a >= lo && a < hi) else Seq.empty }
+        val saScaleHw: Seq[Long] =
+          if (p.biasOn || p.requantOn) saAddrLog.toSeq.filterNot(a => saBiasHw.contains(a) || saRqMHw.contains(a))
+          else saAddrLog.toSeq
         def seqCmp(ch: String, hw: Seq[Long], exp: Seq[Long]): Unit = {
           val n = math.max(hw.size, exp.size); var i = 0
           while (i < n) {
@@ -604,10 +725,12 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
             i += 1 } }
         if (predicted.isEmpty) {
           seqCmp("dmaScaleA/scaleA", saScaleHw, plan.expScaleAAddrSeq)
-          if (p.biasOn) seqCmp("dmaScaleA/bias", saBiasHw, plan.expBiasAddrSeq) }
+          if (p.biasOn) seqCmp("dmaScaleA/bias", saBiasHw, plan.expBiasAddrSeq)
+          if (p.requantOn) seqCmp("dmaScaleA/rqM", saRqMHw, plan.expRqMAddrSeq) }
         println(s"[$TAG] 运行结束: cycles=$cycle/$maxCycles done=$done err=$errSeen(errCode=$errCode)；beat A=$aS/${plan.expAAddrSeq.size} " +
           s"B=$bS/${plan.expBAddrSeq.size} C=$cB/${plan.expCAddrSeq.size} sA=${saScaleHw.size}/${plan.expScaleAAddrSeq.size}" +
           (if (p.biasOn) s" bias=${saBiasHw.size}/${plan.expBiasAddrSeq.size}" else "") +
+          (if (p.requantOn) s" rqM=${saRqMHw.size}/${plan.expRqMAddrSeq.size}" else "") +
           s" sB=$sbS/${plan.expScaleBAddrSeq.size} sC=$csB/${plan.expCScaleAddrSeq.size}")
         println(s"[$TAG] 六通道地址对账不一致拍数=$addrBadCnt（strictAddr=${p.strictAddr}）")
         addrBad.foreach(s => println(s"[$TAG]   ADDR-DIFF $s"))
