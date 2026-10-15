@@ -50,7 +50,7 @@ case class HiveCoreConfig(
     //   QuickSpec）hasMx4 由 false 翻 true ⟹ DUT 一律长出 fp4 quad-lane 硬件。这不是可选项：
     //   下方新增 require(!hasMx8 || hasMx4) 会在 elaborate 前把 fp8-only 配置直接拦死，
     //   故全仓每一个显式传 supportedFmts 的构造点都必须含 MXE2M1（对齐清单见 build/155 报告）。
-    supportedFmts: Set[DataFormat.Type] = Set(DataFormat.INT8, DataFormat.INT4, DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1),
+    supportedFmts: Set[DataFormat.Type] = Set(DataFormat.INT8, DataFormat.INT4, DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1, DataFormat.FP8E4M3, DataFormat.FP8E5M2),
     aBufferDepth: Int = 64, 
     bBufferDepth: Int = 64,
     cBufferDepth: Int = 64,
@@ -165,6 +165,24 @@ case class HiveCoreConfig(
     "\"if mxfp8 is supported then mxfp4 is mandatory\". Together with the require above " +
     "this pins hasMx4 <=> hasMx8 (the MX family is all-in or all-out; FP-only / INT-only / " +
     "no-MX configs keep both false and stay legal). Current supportedFmts=" + supportedFmts)
+
+  /** 【P2 纯 FP8】是否包含非 MX 纯 FP8 格式（FP8E4M3/FP8E5M2，per-tensor scale、
+    * 无块 scale 字节）。运行语义 = HiveCore 顶层把阵列侧 fmt remap 回 MX8 基线
+    * + Executor scale 注入点恒 127（E8M0 2^0 恒等乘），scale DMA 三通道因
+    * isMx=false 不启动、零流量。remap/127 注入/errCode FP8 各臂均以本谓词做
+    * 编译期门控：不含 FP8 的配置（如 MX-only 三格式集）相关硬件零 elaborate、
+    * 网表逐字节不变。 */
+  val hasFp8: Boolean =
+    supportedFmts.contains(DataFormat.FP8E4M3) || supportedFmts.contains(DataFormat.FP8E5M2)
+
+  // 【P2 纯 FP8】remap 路硬前提：纯 FP8 运行的阵列侧数据通路 100% 复用 MX8×MX8 基线
+  //   （FusionMacFp 解码谓词喂 remap 后的 MXE4M3/E5M2），故 FP8 支持蕴含 MX 硬件存在。
+  //   FP8-only（无 MX 格式）配置会在运行期静默算错（阵列侧无 MX 支路可 remap），
+  //   编译期直接拒绝。与 MX 族「全有或全无」两条 require 同风格。
+  require(!hasFp8 || hasMx,
+    "HiveCoreConfig: pure-FP8(FP8E4M3/FP8E5M2) v1 rides the MX8 datapath via fmt remap " +
+    "(array sees MXE4M3/E5M2 with scale tied to 127), so FP8 requires the MX family in " +
+    "supportedFmts. FP8-only configs would compute silently wrong. Current supportedFmts=" + supportedFmts)
 
   /** P3a C 侧量化 scale 行位宽：每【minBlockSize=16】元素量化块一个 8-bit E8M0 scale 字节
     * （HiveOutCvt.scaleRow 输出宽度，P3b dmaCScale 通道行宽同源）。

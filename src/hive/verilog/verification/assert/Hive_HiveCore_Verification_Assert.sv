@@ -17,15 +17,15 @@
     `define ASSERT_VERBOSE_COND_ 1
   `endif // ASSERT_VERBOSE_COND
 `endif // not def ASSERT_VERBOSE_COND_
-module Hive_HiveCore_Verification_Assert();	// src/hive/scala/main/HiveCore.scala:594:11
-  `ifndef SYNTHESIS	// src/hive/scala/main/HiveCore.scala:594:11
-    always @(posedge Hive_HiveCore.clock) begin	// src/hive/scala/main/HiveCore.scala:25:7, :594:11
+module Hive_HiveCore_Verification_Assert();	// src/hive/scala/main/HiveCore.scala:621:11
+  `ifndef SYNTHESIS	// src/hive/scala/main/HiveCore.scala:621:11
+    always @(posedge Hive_HiveCore.clock) begin	// src/hive/scala/main/HiveCore.scala:25:7, :621:11
       if (~Hive_HiveCore.reset & Hive_HiveCore._layerCapture
-          & Hive_HiveCore.biasSteal_layerCapture) begin	// src/hive/scala/main/HiveCore.scala:25:7, :557:32, :594:{11,44,76}
-        if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveCore.scala:594:11
-          $error("Assertion failed: HiveCoreExecutor epilogue fetch request while previous bias/rqM fetch still in flight\n");	// src/hive/scala/main/HiveCore.scala:594:11
-        if (`STOP_COND_)	// src/hive/scala/main/HiveCore.scala:594:11
-          $fatal;	// src/hive/scala/main/HiveCore.scala:594:11
+          & Hive_HiveCore.biasSteal_layerCapture) begin	// src/hive/scala/main/HiveCore.scala:25:7, :584:32, :621:{11,44,76}
+        if (`ASSERT_VERBOSE_COND_)	// src/hive/scala/main/HiveCore.scala:621:11
+          $error("Assertion failed: HiveCoreExecutor epilogue fetch request while previous bias/rqM fetch still in flight\n");	// src/hive/scala/main/HiveCore.scala:621:11
+        if (`STOP_COND_)	// src/hive/scala/main/HiveCore.scala:621:11
+          $fatal;	// src/hive/scala/main/HiveCore.scala:621:11
       end
     end // always @(posedge)
   `endif // not def SYNTHESIS

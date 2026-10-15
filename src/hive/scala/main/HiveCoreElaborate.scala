@@ -155,6 +155,22 @@ object HiveCoreElaborate extends App {
   //   与 cfgBase 的差异现在只剩缓冲深度（32/32/32 vs 2048/2048/2048 与 scaleBufferDepth
   //   64 vs 256），supportedFmts 已与 cfgBase 的默认集不同（cfgMx 是 MX-only 三格式，
   //   cfgBase 是默认七格式）⟹ hasFp/hasInt 在 cfgMx 下为 false。
+  //   【P2 纯 FP8订正】上方「默认七格式」按 #155 时口径=旧 7 格式（含 FP16/BF16/INT16，
+  //   #66 后曾收窄为 5）；P2 起默认集复为 7 种但成员 = {INT8,INT4,MXE4M3,MXE5M2,MXE2M1,
+  //   FP8E4M3,FP8E5M2} ⟹ cfgBase hasFp8=true（FP8 remap/127 注入/errCode 臂 elaborate），
+  //   cfgMx/cfgMxFp4 显式三格式 hasFp8=false。
+  //   【P2 重发射审计实测（2026-10-15，勿按「零结构 diff」预期复检）】MX-only 两套
+  //   并非零结构 diff：① DataFormat.is1B 是【非门控枚举谓词】，FP8 两码点无条件进表
+  //   ⟹ getKLoadNum/colTileOffset/cWriteBytes 等消费链在全部三套网表长出 2 个比较项；
+  //   ② runIsInt 三处 lockstep（CalcConfig errCode11 / Executor biasLazy / 金锚
+  //   biasRunIsInt）的 !isFp8 项刻意【不门控】以保持三副本逐字同式 ⟹ 同样全三套生效。
+  //   两项在 MX-only 配置上均不可达（aFmt/bFmt/cFmt=10/11 是该配置的非法软件输入，
+  //   与在 MX-only 配置写 FP16 同类）。实测 diff 面积：cfgBase 7 文件（HiveCore remap
+  //   两处真结构 / CalcConfig errCode 三臂真结构 / Executor2 127 注入 32 处真结构 /
+  //   Worker fmtOk+2 比较器真结构 / WorkUnit 纯定位漂移 / 2 assert 绑定 / zip）；
+  //   verilog_mx 与 verilog_mxfp4 各 5 文件（HiveCore 纯漂移——remap/127 零 elaborate
+  //   已实证：8'h7F 注入 0 命中 vs cfgBase 32 命中；CalcConfig/Executor2 为上述
+  //   ①②良性结构小diff；2 assert；zip）。
   // aW/bW=16 满足新 require（hasMx ⇒ aW>=16 && bW>=16）：v2 SIMD 双元素/拍需要 16-bit lane。
   val cfgMx = HiveCoreConfig(
     arrayN = 8,

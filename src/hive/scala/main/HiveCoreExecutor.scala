@@ -184,6 +184,15 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   //   comment on the "B scale feed" loop below.
   val mxRunB = DataFormat.isMx(io.regFile.aFmt)
 
+  // 【P2 纯 FP8】运行期纯 FP8 判据（aFmt 权威，与 mxRunB 同源同风格）：驱动 scaleA/
+  //   scaleB 两注入点的 127 恒等注入。纯 FP8 运行时 isMx(aFmt)=false ⟹ mxRunB=false
+  //   （scale FIFO 恒空、不消费、供数不等 scale），而阵列侧 fmt 已被 HiveCore remap
+  //   成 MXE4M3/E5M2 ⟹ MAC 走 MX8 支路并真实消费 scale ⟹ scale 字节必须组合直供
+  //   127（E8M0 2^0=1.0 恒等乘，FpCvt 的 exp_fp32 = e + 127 - bias 数学上即纯 FP8
+  //   解码）。errCode3 新臂保证 aFmt=FP8 时 bFmt 必同为 FP8，单一 aFmt 判据完备。
+  //   if(cfg.hasFp8) 门控：不含 FP8 的配置不生成此信号（零 diff）。
+  val fp8Run = if (cfg.hasFp8) DataFormat.isFp8(io.regFile.aFmt) else false.B
+
    // ==========================================================================
   // CBufferPipe
   val cStoreGateReg = RegInit(false.B)
@@ -211,7 +220,12 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
       val idx = (i.U * step) / block
       // Chisel 的 UInt.apply(hi, lo) 只接受 Int/BigInt 字面量，不支持运行期动态位选；
       // 「取第 idx 个 8-bit scale 字节」的等价唯一形态 = 右移 idx*8 后取低 8 位。
-      io.hiveScaleAIn.get(i) := (io.scaleAPop.get.payload >> (idx * 8.U))(7, 0)
+      // 【P2 纯 FP8】fp8Run 时注入点恒 127（恒等乘）：scaleA FIFO 不启动（isMx=false）
+      //   且 MX MAC 真实消费此字节，不能读空 FIFO 的陈旧 payload。★两臂均显式
+      //   8-bit（127.U(8.W)）：裸 127.U 推 7-bit，Mux 静默零扩属本项目已三次踩坑的
+      //   形态（见 chisel-mux-vecinit-pad 记忆）。
+      val scaleAByte = (io.scaleAPop.get.payload >> (idx * 8.U))(7, 0)
+      io.hiveScaleAIn.get(i) := (if (cfg.hasFp8) Mux(fp8Run, 127.U(8.W), scaleAByte) else scaleAByte)
     }
   }
 
@@ -256,7 +270,10 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
       val idx = (lane.U * step) / block
       // Same as the A side: dynamic byte select is expressed as "shift right by
       // idx*8 then take the low 8 bits" (Chisel apply(hi,lo) is literal-only).
-      io.hiveScaleBIn.get(lane) := (io.scaleBPop.get.payload >> (idx * 8.U))(7, 0)
+      // 【P2 纯 FP8】同 A 侧：fp8Run 时恒 127 恒等注入（scaleB FIFO 不启动、
+      //   阵列侧 remap 后的 MX8 MAC 真实消费；两臂显式 8-bit 防 Mux 零扩）。
+      val scaleBByte = (io.scaleBPop.get.payload >> (idx * 8.U))(7, 0)
+      io.hiveScaleBIn.get(lane) := (if (cfg.hasFp8) Mux(fp8Run, 127.U(8.W), scaleBByte) else scaleBByte)
     }
   }
 
@@ -320,9 +337,13 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
 
   /** bias 32b 字 → cEffW 累加基底：INT 运行（runIsInt，与 HiveCoreCalcConfig
     * errCode11 判据逐字同式）按 INT32 符号扩展；fp/MX 运行按 fp32 → lazy40。
-    * errCode11 已在 EXECUTE 拒绝跨界组合 ⟹ 运行期实际到达的支路与 cFmt 语义一致。 */
+    * errCode11 已在 EXECUTE 拒绝跨界组合 ⟹ 运行期实际到达的支路与 cFmt 语义一致。
+    * 【P2 纯 FP8】runIsInt 补 !isFp8：FP8E4M3/E5M2 不属 is2B/FP32/isMx 任一谓词，
+    *   不补则纯 FP8 运行被误判 INT 族 ⟹ bias 域错走 sext32（正确为 fp32→lazy40）。
+    *   与 CalcConfig errCode11 的 runIsInt 修复逐字同式。 */
   private def biasLazy(i: Int): UInt = {
-    val runIsInt = !DataFormat.is2B(io.regFile.aFmt) && io.regFile.aFmt =/= DataFormat.FP32 && !DataFormat.isMx(io.regFile.aFmt)
+    val runIsInt = !DataFormat.is2B(io.regFile.aFmt) && io.regFile.aFmt =/= DataFormat.FP32 &&
+      !DataFormat.isMx(io.regFile.aFmt) && !DataFormat.isFp8(io.regFile.aFmt)
     val w = biasRegs.get(i)
     Mux(runIsInt, Cat(Fill(cfg.cEffW - 32, w(31)), w), fp32ToLazy40(w))
   }

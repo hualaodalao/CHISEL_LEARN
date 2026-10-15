@@ -87,7 +87,8 @@ module Hive_HiveWorker(	// src/hive/scala/main/HiveWorker.scala:60:7
   wire        _workUnit_io_consumeValid_T =
     io_validIn
     & (_workUnit_io_consumeValid_T_1 | _workUnit_io_consumeValid_T_2
-       | _workUnit_io_consumeValid_T_4 | fmtReg == 4'h8 | fmtReg == 4'h9);	// src/hive/scala/main/HiveWorker.scala:150:19, :173:{70,86}, :233:42
+       | _workUnit_io_consumeValid_T_4 | fmtReg == 4'h8 | fmtReg == 4'h9 | fmtReg == 4'hA
+       | fmtReg == 4'hB);	// src/hive/scala/main/HiveWorker.scala:150:19, :173:{70,86}, :233:42
   reg  [39:0] psumReg;	// src/hive/scala/main/HiveWorker.scala:235:24
   reg  [15:0] aReg;	// src/hive/scala/main/HiveWorker.scala:253:21
   reg  [7:0]  io_scaleBOut_REG;	// src/hive/scala/main/HiveWorker.scala:269:26

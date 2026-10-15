@@ -209,6 +209,8 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       //   而 16-bit 输出走 HiveOutCvt/FpCvt 的 40→32→16 两级舍入链，【不依赖 hasFp】
       //   （被砍的只是 FP16/BF16 作输入/计算格式）。hasMx4=true 这条本 suite 真正
       //   依赖的谓词未变 ⟹ 上方 require 与全部地址/拍数推导逐字仍成立。
+      // 【P2 纯 FP8 订正】默认集现为 7 种（+FP8E4M3/FP8E5M2 ⟹ hasFp8=true，remap/
+      //   127 注入/errCode FP8 臂 elaborate）；MX 用例不触发 FP8 臂，行为零变化。
      // supportedFmts = Set(DataFormat.MXE4M3, DataFormat.MXE5M2),
       aBufferDepth = 64,
       bBufferDepth = 64,

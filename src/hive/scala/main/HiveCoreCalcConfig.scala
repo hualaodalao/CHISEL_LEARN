@@ -57,13 +57,15 @@ def getKLoadNum(t: DataFormat.Type) : UInt = {
     //   【依赖】elemsPerLaneLit 单一真源取值 INT4/MXE2M1==4、INT8/MX8==2。一旦该表变动而本函数
     //   未同步，elaboration 期即炸，强制修复。门控 if(cfg.hasMx4 || cfg.hasInt4)：无亚字节格式
     //   的配置完全不评估，零影响。
-    if (cfg.hasMx4 || cfg.hasInt4) {
+    if (cfg.hasMx4 || cfg.hasInt4 || cfg.hasFp8) {
       require(DataFormat.elemsPerLaneLit(DataFormat.MXE2M1) == 4 &&
               DataFormat.elemsPerLaneLit(DataFormat.INT4) == 4 &&
               DataFormat.elemsPerLaneLit(DataFormat.MXE4M3) == 2 &&
               DataFormat.elemsPerLaneLit(DataFormat.MXE5M2) == 2 &&
-              DataFormat.elemsPerLaneLit(DataFormat.INT8) == 2,
-        "getKLoadNum is1B split relies on elemsPerLane: INT4/MXE2M1==4 and INT8/MX8==2; " +
+              DataFormat.elemsPerLaneLit(DataFormat.INT8) == 2 &&
+              DataFormat.elemsPerLaneLit(DataFormat.FP8E4M3) == 2 &&
+              DataFormat.elemsPerLaneLit(DataFormat.FP8E5M2) == 2,
+        "getKLoadNum is1B split relies on elemsPerLane: INT4/MXE2M1==4 and INT8/MX8/pure-FP8==2; " +
         "if the elemsPerLaneLit single-source table changes, this function must be updated too")
     }
     val ret = Wire(UInt(8.W))
@@ -207,6 +209,18 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     when(isMx & io.regFile.loadWMode === 0.U){
         errComb := true.B
         errCodeComb := 4.U
+    }
+    // 【P2 纯 FP8 · errCode 4 扩展】纯 FP8 运行强制 loadWMode=1（保守裁定，镜像 MX8）：
+    //   阵列侧经 HiveCore.fp8FmtRemap 后跑的就是 MX8×MX8 数据通路，MX8 的全部
+    //   run-mode 约束（B 转置布局 + loadW 窗口语义）原样继承；loadW=0 的垂直
+    //   装载 × FusionMacFp 组合未经验证，不首发。门控 if(cfg.hasFp8)：不含 FP8
+    //   的配置零 elaborate（零 diff）。复用 code 4 语义（isMx 系 loadW 违约）。
+    //   优先级：本块紧随 isMx code4 块之后、code5 之前，同码互不覆盖。
+    if (cfg.hasFp8) {
+        when(DataFormat.isFp8(io.regFile.aFmt) & io.regFile.loadWMode === 0.U){
+            errComb := true.B
+            errCodeComb := 4.U
+        }
     }
     when(io.regFile.aFmt === DataFormat.FP32 | io.regFile.bFmt === DataFormat.FP32){
         errComb := true.B
@@ -417,6 +431,20 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
             errCodeComb := 8.U
         }
     }    
+    // 【P2 纯 FP8 · errCode 8（纯 FP8 K 整除运行期守护）】与上方 MX8 臂逐条同构：
+    //   FP8E4M3/E5M2 dual-lane kPerBeat=totalN×2（elemsPerLaneLit 单一真源），
+    //   K 非整除时 Executor kTiles 地板除静默丢尾，运行期拒绝。aFmt 判据完备：
+    //   aFmt=FP8×bFmt 非 FP8 的组合已被链尾 code3 新臂以更高优先级截走。
+    //   门控 if(cfg.hasFp8)：不含 FP8 的配置零 elaborate（零 diff）。
+    if(cfg.hasFp8){
+        when(DataFormat.isFp8(io.regFile.aFmt) &&
+             ((io.regFile.k(15, 0) % (cfg.totalN * 2).U =/= 0.U) ||
+              (io.regFile.k(15, 0) === 0.U))){
+            errComb := true.B
+            errCodeComb := 8.U
+        }
+    }
+
     if(cfg.hasMx4){
         when(DataFormat.isMx4(io.regFile.aFmt) &&
              ((io.regFile.k(15, 0) % (cfg.totalN * 4).U =/= 0.U) ||
@@ -541,8 +569,13 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //   to every emitted configuration (same policy as errCode 10, per #169 precedent).
     //   All three netlists (verilog / verilog_mx / verilog_mxfp4) will grow this logic.
     // ==========================================================================
+    // 【P2 纯 FP8】runIsInt 补 !isFp8：FP8E4M3/E5M2 不属 is2B/FP32/isMx 任一谓词，
+    //   不补则纯 FP8 运行被误判 INT 族 ⟹ ① fp32 输出假报 errCode11（合法组合被拒）、
+    //   ② INT 输出漏报（fp 累加被静默按 int 语义截断）。与 Executor.biasLazy 的
+    //   runIsInt 修复逐字同式（两处与 errCode11 判据三方同源契约保持）。
     val cIsIntOut = DataFormat.isInt(io.regFile.cFmt) || io.regFile.cFmt === DataFormat.INT32
-    val runIsInt  = !DataFormat.is2B(io.regFile.aFmt) && io.regFile.aFmt =/= DataFormat.FP32 && !DataFormat.isMx(io.regFile.aFmt)
+    val runIsInt  = !DataFormat.is2B(io.regFile.aFmt) && io.regFile.aFmt =/= DataFormat.FP32 &&
+      !DataFormat.isMx(io.regFile.aFmt) && !DataFormat.isFp8(io.regFile.aFmt)
     when(runIsInt ^ cIsIntOut){
         errComb := true.B
         errCodeComb := 11.U
@@ -614,6 +647,36 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //     > 8 > 13 > 12 > 10 > 7 > 5 > 4 > 3 (isAMx^isBMx) > 0。
     if(cfg.hasInt){
         when(io.regFile.aFmt === DataFormat.INT4 && io.regFile.bFmt === DataFormat.INT8){
+            errComb := true.B
+            errCodeComb := 3.U
+        }
+    }
+
+    // ==========================================================================
+    // 【P2 纯 FP8 · errCode 3 新臂（FP8 跨族混配 + FP8 输出编码拒绝）】链尾最高
+    //   优先级（镜像 Fix-4/INT 反向混配臂的处置），复用 code 3 语义「v1 不支持的
+    //   格式组合」。两臂均为【真漏洞封堵】，非保守收紧：
+    //   ① isFp8(aFmt) ^ isFp8(bFmt)：FP8×{INT8/INT4/FP16/BF16} 混跑时现有
+    //      0/3/4/5/11 全部不命中——FP8 非族成员（isMx=false ⟹ isAMx^isBMx 不触发；
+    //      修复后的 runIsInt=false ⟹ errCode11 不触发）⟹ Executor 把阵列侧 remap 成
+    //      MX8 而 B 侧解码落 FusionMacFp 的 fp4 支路（aIsMx5M2/aIsMx4M3 均 false），
+    //      r1/r2/r3 乘积槽全零 + scaleB 注入 127 与 B 实际格式矛盾，静默算错。
+    //      FP8×MX8 侧已由既有裸 errCode3（isAMx^isBMx）覆盖（isMx(FP8)=false）。
+    //      纯 FP8×FP8（含 E4M3×E5M2 异构双 FP8）合法放行。
+    //   ② isFp8(cFmt)：输出侧 FP8 编码不支持——HiveOutCvt 的量化输出路径是 MX
+    //      块 scale 语义（dmaCScale 每 16/32 元素块写 E8M0 字节），per-tensor 纯
+    //      FP8 输出无对应通路，未拒绝会静默落 fp32 直出支路（语义错位）。
+    //      合法输出集与 MX 运行相同：fp32 直出（cFmt=FP32）或 MX 量化
+    //      （cFmt ∈ {MXE4M3,MXE5M2,MXE2M1}，块 scale 由累加器独立计算、与输入
+    //      格式无关，机制上自然流通）。
+    //   门控 if(cfg.hasFp8)：不含 FP8 的配置零 elaborate（零 diff）。
+    //   Priority (last-connect)：本块位于 INT 反向混配臂之后、为链上最高优先级
+    //   ——FP8 异配覆盖 errCode 8/11/13/12/10 等一切低码。真值序更新：
+    //     3 (MX4xMX8 / INT4xINT8 / FP8 异配 / FP8 输出) > 11 > 8 > 13 > 12
+    //       > 10 > 7 > 5 > 4 > 3 (isAMx^isBMx) > 0。
+    if(cfg.hasFp8){
+        when((DataFormat.isFp8(io.regFile.aFmt) ^ DataFormat.isFp8(io.regFile.bFmt)) ||
+             DataFormat.isFp8(io.regFile.cFmt)){
             errComb := true.B
             errCodeComb := 3.U
         }

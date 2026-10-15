@@ -3,15 +3,21 @@
 import chisel3._
 
 object DataFormat extends ChiselEnum {
-  val FP32, FP16, BF16, MXE4M3, MXE5M2, MXE2M1, INT32, INT16, INT8, INT4 = Value
+  val FP32, FP16, BF16, MXE4M3, MXE5M2, MXE2M1, INT32, INT16, INT8, INT4, FP8E4M3, FP8E5M2 = Value
 
   /** 判断给定格式是否为 MX 系列（E4M3 或 E5M2） */
   def isMx(f: DataFormat.Type): Bool = f === MXE4M3 || f === MXE5M2 || f === MXE2M1
-  def isMx8(f: DataFormat.Type): Bool = f === MXE4M3 || f === MXE5M2 
+  def isMx8(f: DataFormat.Type): Bool = f === MXE4M3 || f === MXE5M2
   def isMx4(f: DataFormat.Type): Bool = f === MXE2M1
+  /** 【P2 纯 FP8】非 MX 纯 FP8（per-tensor scale，元素编码与 MX8 同为 E4M3/E5M2、
+    * 无块 scale 字节）。运行语义 = 阵列侧 remap 回 MX8 基线 + scale 注入点恒 127
+    * （E8M0 2^0=1.0 恒等乘，见 HiveCore.fp8FmtRemap / Executor 127 注入）。
+    * ★isMx/isMx8/isMx4 均【不含】本族：scale DMA 启动门控（isMx 白送不启动、零
+    * 流量）、mxRunB 握手、errCode isAMx^isBMx 跨族拒绝全部依赖这一成员关系。 */
+  def isFp8(f: DataFormat.Type): Bool = f === FP8E4M3 || f === FP8E5M2
   def is4B(f: DataFormat.Type): Bool = f === FP32 || f === INT32
-  def is2B(f: DataFormat.Type): Bool = f === FP16 || f === BF16 
-  def is1B(f: DataFormat.Type): Bool = f === INT8 || f === MXE4M3 || f === MXE5M2
+  def is2B(f: DataFormat.Type): Bool = f === FP16 || f === BF16
+  def is1B(f: DataFormat.Type): Bool = f === INT8 || f === MXE4M3 || f === MXE5M2 || f === FP8E4M3 || f === FP8E5M2
   def isHalfB(f: DataFormat.Type): Bool = f === INT4 || f === MXE2M1
   def isInt(f: DataFormat.Type): Bool = f === INT8 || f === INT16 || f === INT4
 
@@ -21,12 +27,15 @@ object DataFormat extends ChiselEnum {
     *   ② HiveCoreCalcConfig.getKLoadNum 的编译期恒等性自证 require。
     * 由此「硬件字面量」与「自证口径」共用同一张表，杜绝双源漂移：改本表即同时改硬件与
     * 触发 getKLoadNum 自证（若其 totalN×2 / totalN×4 二分未同步则 elaboration 期即炸）。 */
-  /** 【Phase 3 INT 生态同步】半字节族（INT4/MXE2M1）→4、单字节族（INT8/MXE4M3/MXE5M2）→2、
-    * 其余→1。与运行期谓词 isHalfB/is1B 的集合成员逐字同构（isHalfB={INT4,MXE2M1}、
-    * is1B={INT8,MXE4M3,MXE5M2}），使 INT8/INT4 与 MX8/MX4 共用同一张打包表，杜绝双源漂移。
+  /** 【Phase 3 INT 生态同步】半字节族（INT4/MXE2M1）→4、单字节族（INT8/MXE4M3/MXE5M2/
+    * FP8E4M3/FP8E5M2）→2、其余→1。与运行期谓词 isHalfB/is1B 的集合成员逐字同构
+    * （isHalfB={INT4,MXE2M1}、is1B={INT8,MXE4M3,MXE5M2,FP8E4M3,FP8E5M2}），使
+    * INT8/INT4 与 MX8/MX4/纯FP8 共用同一张打包表，杜绝双源漂移。
     * 注：isHalfB/is1B 返回硬件 Bool，本函数是纯 Scala Int 计算，故此处用 Scala == 显式列举。 */
   def elemsPerLaneLit(f: DataFormat.Type): Int =
-    if (f == INT4 || f == MXE2M1) 4 else if (f == INT8 || f == MXE4M3 || f == MXE5M2) 2 else 1
+    if (f == INT4 || f == MXE2M1) 4
+    else if (f == INT8 || f == MXE4M3 || f == MXE5M2 || f == FP8E4M3 || f == FP8E5M2) 2
+    else 1
 
   /** 每 16-bit lane 打包的元素数（硬件运行期解码，Phase 3 单一真源）。
     * MXFP8(E4M3/E5M2) SIMD 双元素/拍 = 2；MXFP4(E2M1) quad-lane 四元素/拍 = 4；

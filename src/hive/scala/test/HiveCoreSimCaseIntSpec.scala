@@ -46,7 +46,8 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
   private val cfg = HiveCoreConfig(
     arrayN = 8, clusterM = 2,       // totalN = 16
     aW = 16, bW = 16, cW = 40,
-    // Default supportedFmts = {INT8, INT4, MXE4M3, MXE5M2, MXE2M1}
+    // Default supportedFmts = {INT8, INT4, MXE4M3, MXE5M2, MXE2M1, FP8E4M3, FP8E5M2}
+    //   (P2 起 +纯 FP8 两值 ⟹ hasFp8=true；INT 用例不触发 FP8 臂，行为零变化)
     aBufferDepth = 2048, bBufferDepth = 2048, cBufferDepth = 2048,
     scaleBufferDepth = 64
   )

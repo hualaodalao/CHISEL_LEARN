@@ -55,6 +55,10 @@ object HiveDebugModel {
 
   def isMx8(f: DataFormat.Type): Boolean = f == DataFormat.MXE4M3 || f == DataFormat.MXE5M2
   def isMxAny(f: DataFormat.Type): Boolean = isMx8(f) || f == DataFormat.MXE2M1
+  /** 【P2 纯 FP8】非 MX 纯 FP8（镜像硬件 DataFormat.isFp8）：元素编码与 MX8 同为
+    * E4M3/E5M2，但无块 scale 字节 ⟹ isMxAny/isMx8 均【不含】本族——scale 数组、
+    * expScale 地址序列、effScale（恒 127）全部依赖这一成员关系自动走「无 scale」支路。 */
+  def isFp8Fmt(f: DataFormat.Type): Boolean = f == DataFormat.FP8E4M3 || f == DataFormat.FP8E5M2
   def isIntFmt(f: DataFormat.Type): Boolean =
     f == DataFormat.INT32 || f == DataFormat.INT16 || f == DataFormat.INT8 || f == DataFormat.INT4
   def isFloatFmt(f: DataFormat.Type): Boolean =
@@ -66,7 +70,7 @@ object HiveDebugModel {
   def memElemBytes(f: DataFormat.Type): Int =
     if (f == DataFormat.FP32 || f == DataFormat.INT32) 4
     else if (f == DataFormat.FP16 || f == DataFormat.BF16 || f == DataFormat.INT16) 2
-    else if (f == DataFormat.INT8 || isMx8(f)) 1
+    else if (f == DataFormat.INT8 || isMx8(f) || isFp8Fmt(f)) 1
     else 0   // MXE2M1 / INT4：半字节，bytes 口径为 0（bits 口径见 memElemBits=4）
 
   /** 外部内存中每元素【位宽】（Phase 3 新增，bits 口径几何的单一真源）。
@@ -77,7 +81,7 @@ object HiveDebugModel {
   def memElemBits(f: DataFormat.Type): Int =
     if (f == DataFormat.FP32 || f == DataFormat.INT32) 32
     else if (f == DataFormat.FP16 || f == DataFormat.BF16 || f == DataFormat.INT16) 16
-    else if (f == DataFormat.INT8 || isMx8(f)) 8
+    else if (f == DataFormat.INT8 || isMx8(f) || isFp8Fmt(f)) 8
     else 4   // MXE2M1 / INT4：半字节
 
   /** 每 16-bit lane 打包的元素数：单字节族（INT8/MXE4M3/MXE5M2）dual-lane=2、
@@ -87,7 +91,7 @@ object HiveDebugModel {
     * 使 INT4→4、INT8→2 与 MXE2M1→4、MX8→2 共用同一张打包表；对现有 MX/FP 格式取值逐字不变。 */
   def elemsPerLane(f: DataFormat.Type): Int =
     if (f == DataFormat.MXE2M1 || f == DataFormat.INT4) 4
-    else if (isMx8(f) || f == DataFormat.INT8) 2
+    else if (isMx8(f) || f == DataFormat.INT8 || isFp8Fmt(f)) 2
     else 1
 
   /** 每拍推进的 K 元素数（= kTile 粒度）：INT8/MX8 = totalN*2、INT4/MXE2M1 = totalN*4、其余 = totalN */
@@ -376,12 +380,16 @@ object HiveDebugModel {
     *   静默丢尾（K=96）或 16-bit 回绕（K<64）；硬件 errCode8 运行期拒绝，金锚镜像之。 */
   def hwErrCode(p: DebugParams, totalN: Int, hasMx4: Boolean = false,
                  cAddr: Long = C_BASE, cDmaExtW: Int = 256): Option[Int] = {
-    def kLoadNum(f: DataFormat.Type): Int = if (isMx8(f) || f == DataFormat.INT8) totalN * 2 else totalN * 4  // 镜像 getKLoadNum（is1B 语义）
+    def kLoadNum(f: DataFormat.Type): Int = if (isMx8(f) || f == DataFormat.INT8 || isFp8Fmt(f)) totalN * 2 else totalN * 4  // 镜像 getKLoadNum（is1B 语义）
     val aMx = isMxAny(p.aFmt); val bMx = isMxAny(p.bFmt); var e = Option.empty[Int]
     if ((aMx && p.aMxBlk > kLoadNum(p.aFmt)) || (bMx && p.bMxBlk > kLoadNum(p.bFmt)) ||
         (isMxAny(p.cFmt) && p.cMxBlk > totalN)) e = Some(0)   // RTL 把三个 blk 违约合并成单一 errCode 0
     if (aMx != bMx) e = Some(3)
     if ((aMx || bMx) && !p.loadWMode) e = Some(4)
+    // [P2 纯 FP8 mirror] errCode 4: 纯 FP8 强制 loadWMode=1（镜像硬件 if(cfg.hasFp8)
+    //   扩展臂——阵列侧 remap 走 MX8 数据通路，MX8 的 run-mode 约束原样继承）。
+    //   无门控：aFmt=FP8 隐含 cfg.hasFp8（默认 supportedFmts 含 FP8 两值）。
+    if (isFp8Fmt(p.aFmt) && !p.loadWMode) e = Some(4)
     if (p.aFmt == DataFormat.FP32 || p.bFmt == DataFormat.FP32) e = Some(5)
     if (p.cFmt == DataFormat.MXE2M1 && (p.n & 1) == 1) e = Some(6)
     // (#169/#170) errCode 10: cAddr not aligned to dmaBytes (= cDmaExtW/8).
@@ -428,6 +436,9 @@ object HiveDebugModel {
     val aPackedInt = p.aFmt == DataFormat.INT8 || p.aFmt == DataFormat.INT4
     if (((hasMx4 && isMxAny(p.aFmt)) || aPackedInt) &&
         (p.k % kPerBeat(p.aFmt, totalN) != 0 || p.k == 0)) e = Some(8)
+    // [P2 纯 FP8 mirror] errCode 8: 纯 FP8 K 整除守护（kPerBeat=totalN×2，镜像硬件
+    //   if(cfg.hasFp8) 臂）。置于 aPackedInt 块之后（同 code 8，last-wins 无碍）。
+    if (isFp8Fmt(p.aFmt) && (p.k % kPerBeat(p.aFmt, totalN) != 0 || p.k == 0)) e = Some(8)
     // [P1-2 W4A8 订正 mirror] 混配（a=fp8 × b=fp4）走 stretch 单读契约，两条守护与
     //   硬件 HiveCoreCalcConfig 混配 errCode8 块同式（由张量布局独立推导）：
     //   ① K%64：窗口粒度虽 32，K%64==32（kTile 奇数）会使末窗口 32B 单读越出张量
@@ -455,11 +466,13 @@ object HiveDebugModel {
     //   Derived independently from register contract semantics:
     //   cIsIntOut = cFmt is an integer output format (INT8/INT16/INT4/INT32)
     //   runIsInt  = aFmt is NOT float (FP32/FP16/BF16) AND NOT MX (E4M3/E5M2/E2M1)
+    //               AND NOT pure-FP8 (P2: FP8E4M3/E5M2 属 fp 累加族，不补则
+    //               FP8 输入 + fp32 输出假报 11、FP8 输入 + INT 输出漏报)
     //               -> aFmt is integer or reserved encoding
     //   Guard: runIsInt XOR cIsIntOut -> errCode 11 (no cfg gating).
     //   Placed AFTER code-8, BEFORE Fix-4 code3: priority 3(Fix-4) > 11 > 8.
     val cIsIntOut = isIntFmt(p.cFmt)
-    val runIsInt = !isFloatFmt(p.aFmt) && !isMxAny(p.aFmt)
+    val runIsInt = !isFloatFmt(p.aFmt) && !isMxAny(p.aFmt) && !isFp8Fmt(p.aFmt)
     if (runIsInt != cIsIntOut) e = Some(11)
     // [Fix-4 mirror · P1-2 收窄] 原 isMx4(aFmt)^isMx4(bFmt) 双向混配皆拒；W4A8
     //   （A=MX8×B=MX4）经 B DMA stretch（半字拍片 + LUT 加宽）合法化，本镜像与
@@ -472,6 +485,13 @@ object HiveDebugModel {
     //   链尾 = 最高优先级，覆盖 8/11/13/12/10 等一切低码）。无门控：aFmt=INT4 隐含
     //   cfg.hasInt。
     if (p.aFmt == DataFormat.INT4 && p.bFmt == DataFormat.INT8) e = Some(3)
+    // [P2 纯 FP8 mirror] 链尾两臂（镜像硬件 if(cfg.hasFp8) 块，最高优先级）：
+    //   ① isFp8Fmt(aFmt) XOR isFp8Fmt(bFmt)：FP8×{INT/FP16/...} 跨族混配——硬件侧
+    //      remap 只改 FP8 码点，异侧格式解码落错支路（FusionMacFp 谓词不命中），
+    //      静默算错，运行期拒绝；FP8×MX8 由既有 aMx!=bMx 臂覆盖（isMxAny(FP8)=false）。
+    //   ② isFp8Fmt(cFmt)：FP8 输出编码无通路（HiveOutCvt 量化输出是 MX 块 scale
+    //      语义），未拒会静默落 fp32 直出支路。合法输出 = fp32 或 MX 量化。
+    if (isFp8Fmt(p.aFmt) != isFp8Fmt(p.bFmt) || isFp8Fmt(p.cFmt)) e = Some(3)
     // (#146) errCode 7 REMOVED from the mirror. The hardware block it mirrored
     //   (`isMx4(fmt) && getBlockSize(blkSel) =/= 64`) became a TAUTOLOGY once the
     //   MXBlockSize enum was narrowed to {sel=0 -> 16, sel=1 -> 32}: no encodable
@@ -524,6 +544,17 @@ object HiveDebugModel {
     }
     if (isMxAny(p.aFmt)) require(p.k % p.aMxBlk == 0, s"K(${p.k}) 必须被 aMxBlk(${p.aMxBlk}) 整除")
     if (isMxAny(p.bFmt)) require(p.k % p.bMxBlk == 0, s"K(${p.k}) 必须被 bMxBlk(${p.bMxBlk}) 整除")
+    // 【P2 纯 FP8】金锚防呆（镜像硬件 errCode 8/4/3 三臂；负向用例经 predicted
+    //   路径绕过本块，不影响 errCode 对拍）：① K 被 kPerBeat=totalN×2 整除；
+    //   ② loadWMode=1（阵列侧 remap 走 MX8 数据通路，run-mode 约束继承）；
+    //   ③ a/b 两侧同为 FP8（跨族混配硬件 errCode3 拒绝）。
+    if (isFp8Fmt(p.aFmt) || isFp8Fmt(p.bFmt)) {
+      require(p.k % kPerBeat(p.aFmt, totalN) == 0,
+        s"纯 FP8 运行要求 K(${p.k}) 被 kPerBeat=${kPerBeat(p.aFmt, totalN)} 整除（硬件 errCode 8）")
+      require(p.loadWMode, "纯 FP8 运行必须 loadWMode=1（阵列侧走 MX8 remap 数据通路，硬件 errCode 4 拦截）")
+      require(isFp8Fmt(p.aFmt) == isFp8Fmt(p.bFmt),
+        s"FP8 跨族混配不支持（硬件 errCode 3 拦截），当前 aFmt=${p.aFmt} bFmt=${p.bFmt}")
+    }
     // 【P1-2 INT W4A8】INT 混配（a=INT8 × b=INT4）stretch 单读契约防呆（与 MX W4A8
     //   同款，金锚早抛早清晰）：① K 被 INT4 源字粒度 kPerBeat=totalN*4 整除（kTile
     //   奇数时末窗口 32B 单读越张量界 16B）；② bAddr 32B 对齐（半字拍片契约
@@ -663,6 +694,12 @@ object HiveDebugModel {
     else if (f == DataFormat.INT4) sext(bits, 4).toDouble
     else if (f == DataFormat.MXE4M3) HiveSimCommon.mxE4M3ToFloat((bits & 0xFFL).toInt, scaleByte)
     else if (f == DataFormat.MXE5M2) HiveSimCommon.mxE5M2ToFloat((bits & 0xFFL).toInt, scaleByte)
+    // 【P2 纯 FP8】输入解码域：元素码 = 裸 E4M3/E5M2，scale 恒 127（effScale 对
+    //   !isMxAny 返回 127）⟹ mxE4M3ToFloat(bits, 127) = 无 scale 纯解码，与硬件
+    //   「remap 成 MX8 + scale 注入 127」的恒等乘语义逐位一致。cFmt=FP8 已被
+    //   errCode3 拒绝，本臂仅输入解码会走到。
+    else if (f == DataFormat.FP8E4M3) HiveSimCommon.mxE4M3ToFloat((bits & 0xFFL).toInt, scaleByte)
+    else if (f == DataFormat.FP8E5M2) HiveSimCommon.mxE5M2ToFloat((bits & 0xFFL).toInt, scaleByte)
     else if (f == DataFormat.MXE2M1) {
       // ★★【输出量化域】专用解码（dequant/compare/printRows 经 cFmt=MXE2M1 消费）★★
       //   此处 e==0 → 0.0 的 flush 是【正确建模硬件输出侧 FTZ】，非 bug：
@@ -715,6 +752,10 @@ object HiveDebugModel {
     else if (f == DataFormat.INT4) (math.rint(v).toLong & 0xFL)
     else if (f == DataFormat.MXE4M3) (HiveSimCommon.floatToMxE4M3(v) & 0xFFL)
     else if (f == DataFormat.MXE5M2) (HiveSimCommon.floatToMxE5M2(v) & 0xFFL)
+    // 【P2 纯 FP8】编码与 MX8 元素码同一函数（无 scale 参与）：per-tensor scale 由
+    //   软件在量化 pre-pass 中折进权重，硬件侧恒等（127）。
+    else if (f == DataFormat.FP8E4M3) (HiveSimCommon.floatToMxE4M3(v) & 0xFFL)
+    else if (f == DataFormat.FP8E5M2) (HiveSimCommon.floatToMxE5M2(v) & 0xFFL)
     else if (f == DataFormat.MXE2M1) encodeMxE2M1(v)
     else throw new IllegalArgumentException(s"encodeElem: 格式 $f 不支持作为输入编码")
 
@@ -785,6 +826,15 @@ object HiveDebugModel {
         s"HiveCoreDebugCase 的 dbgCfg 用默认 supportedFmts 不含 fp4 → 请改用 mxe4m3/mxe5m2，" +
         s"或换用 hasMx4=true 的 cfgMxFp4 配置（aFmt=${p.aFmt} bFmt=${p.bFmt}）")
 
+    // 【P2 纯 FP8】cfg-aware 守卫（镜像上方 Fix-9 范式）：FP8 输入需 cfg.hasFp8=true。
+    //   默认集已含 FP8 两值 ⟹ 默认下恒不触发；拦显式传入不含 FP8 的 supportedFmts
+    //   却跑 FP8 用例的人为构造 cfg（HiveCoreConfig 的 require(!hasFp8||hasMx) 已在
+    //   更早处拦 FP8-only，本条为纵深防御第二道）。
+    if (isFp8Fmt(p.aFmt) || isFp8Fmt(p.bFmt))
+      require(cfg.hasFp8,
+        s"aFmt/bFmt=纯FP8(FP8E4M3/FP8E5M2) 需硬件 supportedFmts 含 FP8（当前 cfg.hasFp8=${cfg.hasFp8}）" +
+        s"（aFmt=${p.aFmt} bFmt=${p.bFmt}）")
+
     val aEb: Int = memElemBytes(p.aFmt)
     val bEb: Int = memElemBytes(p.bFmt)
     // 【Phase 3】bits 口径几何单一真源（aEb/bEb 保留供整字节 storeElem 快路径）。
@@ -798,8 +848,10 @@ object HiveDebugModel {
     // 【Phase 3 INT 生态同步】kTiles 判据由 isMxAny 泛化为「打包格式」（含 INT8/INT4）：
     //   打包格式每拍推进 kPerBeat 个 K → kTiles = k / kPerBeat（地板除）；非打包格式 ceil(k/totalN)。
     //   与硬件 HiveCoreCalcConfig.kTile / HiveCoreExecutor.newKTiles 同源。
-    val aKTiles: Int = if (isMxAny(p.aFmt) || p.aFmt == DataFormat.INT8 || p.aFmt == DataFormat.INT4) p.k / aKpb else (p.k + totalN - 1) / totalN
-    val bKTiles: Int = if (isMxAny(p.bFmt) || p.bFmt == DataFormat.INT8 || p.bFmt == DataFormat.INT4) p.k / bKpb else (p.k + totalN - 1) / totalN
+    // 【P2 纯 FP8】FP8 同为打包格式（elemsPerLane=2 ⟹ kPerBeat=totalN×2，errCode8 已
+    //   强制 K 整除，地板除无尾损失），加入判据；非 FP8 不受影响。
+    val aKTiles: Int = if (isMxAny(p.aFmt) || p.aFmt == DataFormat.INT8 || p.aFmt == DataFormat.INT4 || isFp8Fmt(p.aFmt)) p.k / aKpb else (p.k + totalN - 1) / totalN
+    val bKTiles: Int = if (isMxAny(p.bFmt) || p.bFmt == DataFormat.INT8 || p.bFmt == DataFormat.INT4 || isFp8Fmt(p.bFmt)) p.k / bKpb else (p.k + totalN - 1) / totalN
     val nTiles: Int = (p.n + totalN - 1) / totalN
 
     // ---- 期望地址偏移（张量语义推导，不镜像 HiveCoreCalcConfig 谓词链） ----
@@ -1004,7 +1056,9 @@ object HiveDebugModel {
     //   cFmt 必为整数族）存 INT32 补码小整数 —— 镜像硬件 INT32 符号扩展到 40bit psum 注入。
     // ------------------------------------------------------------------------
     private val biasRng = new java.util.Random(p.seed ^ 0x5AB1A5L)
-    private val biasRunIsInt = !isFloatFmt(p.aFmt) && !isMxAny(p.aFmt)
+    // 【P2 纯 FP8】补 !isFp8Fmt：纯 FP8 属 fp 累加族（bias 走 fp32→lazy40 域），
+    //   与硬件 Executor.biasLazy 的 runIsInt 修复同式；不补则 biasCode 错存 INT32 补码。
+    private val biasRunIsInt = !isFloatFmt(p.aFmt) && !isMxAny(p.aFmt) && !isFp8Fmt(p.aFmt)
     /** biasCode(i)：第 i 个 bias 字的 4B 位模式（i = nt*totalN + lane），fp32 bits 或 INT32 补码 */
     val biasCode: Array[Long] =
       if (!p.biasOn) Array.empty
@@ -1874,11 +1928,11 @@ object HiveDebugModel {
           val unc = if (n <= 16) z.map(c => f"0x$c%X").mkString(" ") else s"${z.size} codes"
           s"$name elemBits=$eb $body | uncovered: ${if (unc.isEmpty) "(none)" else unc}"
         }
-        if (isMxAny(p.aFmt)) {
+        if (isMxAny(p.aFmt) || isFp8Fmt(p.aFmt)) {
           val ha = inHist(aEbits, p.m, p.k, (i, j) => aCode(i)(j))
           println(s"[$TAG]   ${inHistLine("in A", aEbits, ha)}")
         }
-        if (isMxAny(p.bFmt)) {
+        if (isMxAny(p.bFmt) || isFp8Fmt(p.bFmt)) {
           val hb = inHist(bEbits, p.k, p.n, (i, j) => bCode(i)(j))
           println(s"[$TAG]   ${inHistLine("in B", bEbits, hb)}")
         }

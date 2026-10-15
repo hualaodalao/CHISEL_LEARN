@@ -19,8 +19,11 @@ object HiveSimCommon {
   // ========== DataFormat 枚举派生常量（格式编码唯一源） ==========
   // OutFormat/DataFormat 已合并为单一 DataFormat 枚举（src/hive/scala/main/
   // HiveEnum.scala），成员声明即隐式 id 顺延：FP32=0 FP16=1 BF16=2 MXE4M3=3
-  // MXE5M2=4 MXE2M1=5 INT32=6 INT16=7 INT8=8 INT4=9。本 object 的全部格式
-  // 编码比较/分档均经此常量区驱动，不再出现裸数字。
+  // MXE5M2=4 MXE2M1=5 INT32=6 INT16=7 INT8=8 INT4=9 FP8E4M3=10 FP8E5M2=11。
+  // 【P2 纯 FP8】FP8 两码点不进下方任何 Fmt 分档集合：本组集合服务【输出格式】
+  // 域（cOutElemBits 等），而 cFmt=FP8 被硬件 errCode3 链尾臂运行期拒绝 ⟹
+  // 该域永不合法接收 FP8，落默认臂（32-bit 档）即原 reserved 语义。本 object 的全部
+  // 格式编码比较/分档均经此常量区驱动，不再出现裸数字。
   private val FmtFp32   = DataFormat.FP32.litValue.toInt
   private val FmtFp16   = DataFormat.FP16.litValue.toInt
   private val FmtBf16   = DataFormat.BF16.litValue.toInt

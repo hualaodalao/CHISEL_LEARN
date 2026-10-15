@@ -322,6 +322,82 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(0),
           wave = "sim/debug/quick_intw4a8_loadw0_err8.fst", caseTag = " [P1-2 INT W4A8 neg loadW0 errCode8]")
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // 【P2 纯 FP8（2026-10-15）】非 MX 纯 FP8 档（per-tensor scale）九用例。
+  //   硬件路线 = remap：HiveCore 把 FP8E4M3/FP8E5M2 重映射成 MXE4M3/MXE5M2 喂阵列
+  //   （FusionMacFp/WorkUnit/Worker 零改动，自动走已验证的 MX8×MX8 基线），
+  //   HiveCoreExecutor 在 scaleA/scaleB 注入点恒注入 127（E8M0 2^0=1.0 恒等）——
+  //   per-tensor scale 由软件量化 pre-pass 折进权重，硬件不取 scale DMA（FP8 不在
+  //   isMxAny ⟹ scale DMA start 门控自动不启动，scaleA/B 数组与期望地址序列金锚侧
+  //   自动退空）。几何：FP8 进 is1B 族（elemsPerLane=2 ⟹ kPerBeat=totalN×2=32、
+  //   双 lane 打包、bColTile 运行期步进 32B 全自动）。
+  //   ★ loadW 必须显式 Some(1)：None 按 isMxAny 自动推导为 0 → errCode4（FP8 强制
+  //     转置布局，保守裁定 A：镜像 MX8 run-mode 约束）。
+  // ══════════════════════════════════════════════════════════════════════════
+  // ㉒ 正向基线：FP8E4M3×FP8E4M3 K=64 → FP32。kTile=2（多 K 窗口轮转）+ nTiles=2
+  //    （nt 切换）；金锚 = MX 模型 scale≡127（effScale 对 !isMxAny 恒 127，解码/
+  //    golden 全复用 MX 元素编解码函数）。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.FP8E4M3, bFmt = DataFormat.FP8E4M3, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          wave = "sim/debug/quick_fp8_e4m3.fst", caseTag = " [P2 FP8 E4M3xE4M3->FP32]")
+
+  // ㉓ 正向异构：FP8E4M3×FP8E5M2 K=64 → FP32。两侧 remap 独立解码（E4M3 乘积精度
+  //    × E5M2 宽动态域），验证 remap 对两种 FP8 码点的独立处理（FP8 族内互组合法，
+  //    类比 MX 的 E4M3×E5M2 互组用例）。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.FP8E4M3, bFmt = DataFormat.FP8E5M2, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          wave = "sim/debug/quick_fp8_hetero.fst", caseTag = " [P2 FP8 E4M3xE5M2->FP32]")
+
+  // ㉔ 正向 + bias → FP32：fp 路 bias 基底注入（fp32→lazy40，biasRunIsInt 对 FP8
+  //    取 false）。dmaScaleA 端口全程只有 bias 流量（FP8 非 MX ⟹ scaleA DMA 不启动）
+  //    ——与用例 ⑥ 同范式，验证「无 MX 输入时端口盗用不惊扰 scale 通路」在 FP8 下
+  //    同样成立（跑后拆流对账 scaleA 流 = 空）。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.FP8E5M2, bFmt = DataFormat.FP8E5M2, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          biasOn = true, wave = "sim/debug/quick_fp8_bias.fst", caseTag = " [P2 FP8 E5M2xE5M2+bias->FP32]")
+
+  // ㉕ 正向量化输出：FP8E4M3×FP8E4M3 → MXE4M3 块量化输出（blk16）。「非 MX 输入 →
+  //    MX 量化输出」合法（约束一：C 侧量化消费 fp32 累加器）——amax→E8M0→E4M3 全链
+  //    + dmaCScale 通道流量；FP8 输入 × MX 输出的组合首例。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.FP8E4M3, bFmt = DataFormat.FP8E4M3, cFmt = DataFormat.MXE4M3,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          wave = "sim/debug/quick_fp8_quant.fst", caseTag = " [P2 FP8 E4M3xE4M3->MXE4M3 quant]")
+
+  // ㉖ 负向：K=48（% kPerBeat=32 ≠ 0）→ errCode 8。FP8 双 lane 每拍推进 32 个 K，
+  //    Executor kTiles 地板除静默丢尾（kTile=1.5），运行期拒绝。
+  runCase(m = 32, n = 32, k = 48, aFmt = DataFormat.FP8E4M3, bFmt = DataFormat.FP8E4M3, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          wave = "sim/debug/quick_fp8_k48_err8.fst", caseTag = " [P2 FP8 neg K48 errCode8]")
+
+  // ㉗ 负向：loadW=0 → errCode 4（FP8 专属臂，hasFp8 门控）：FP8 remap 走 MX8 数据
+  //    通路，run-mode 约束（B 转置存放）继承。None 自动推导对 FP8 会取 0（isMxAny
+  //    不含 FP8），本例显式 Some(0) 构造。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.FP8E4M3, bFmt = DataFormat.FP8E4M3, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(0),
+          wave = "sim/debug/quick_fp8_loadw0_err4.fst", caseTag = " [P2 FP8 neg loadW0 errCode4]")
+
+  // ㉘ 负向：FP8×INT8 跨族混配 → errCode 3（链尾 FP8 XOR 臂）：remap 只改 FP8 码点，
+  //    INT8 侧解码落 INT 支路，FusionMacFp 谓词不命中会静默算错——真实硬件空洞，
+  //    本臂为 P2 新增的密封守护。K=64 整除（避 8）、loadW=1（避 4）、cFmt=FP32
+  //    （runIsInt=false=cIsIntOut，避 11）⟹ 只命中链尾 XOR 臂。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.FP8E4M3, bFmt = DataFormat.INT8, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          wave = "sim/debug/quick_fp8_x_int8_err3.fst", caseTag = " [P2 FP8 neg cross-family FP8xINT8 errCode3]")
+
+  // ㉙ 负向：cFmt=FP8E4M3 输出 → errCode 3（链尾 cFmt 臂）：FP8 输出编码无通路
+  //    （OutCvt 量化输出是 MX 块 scale 语义；未拒会静默落 fp32 直出支路、写出
+  //    错误位宽）。合法输出 = FP32 或 MX 量化。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.FP8E4M3, bFmt = DataFormat.FP8E4M3, cFmt = DataFormat.FP8E4M3,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          wave = "sim/debug/quick_fp8_out_err3.fst", caseTag = " [P2 FP8 neg cFmt FP8 errCode3]")
+
+  // ㉚ 负向：FP8 输入 + INT32 输出 → errCode 11（跨界臂）：runIsInt 对 FP8 取 false
+  //    （fp 累加族，不补 !isFp8Fmt 会把 FP8 误判为整数族）XOR cIsIntOut(INT32)=true。
+  //    FP8 输入的合法输出 = FP32 或 MX 量化（fp 族），INT 输出须配 INT 输入。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.FP8E4M3, bFmt = DataFormat.FP8E4M3, cFmt = DataFormat.INT32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          wave = "sim/debug/quick_fp8_int32out_err11.fst", caseTag = " [P2 FP8 neg INT32 output errCode11]")
+
   /** 编译期配置（totalN=16；cDmaExtW 默认 256；缓冲深度 2048；scaleBufferDepth=64）。
     * (#155 MJ1) supportedFmts 现在【不再显式传入】，回落 HiveCoreConfig 的默认集。
     *   MXE2M1 现在是默认必选，不再需要显式加。
@@ -471,7 +547,10 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
 
 
   // ══ ① 运行前配置体检：镜像 HiveCoreCalcConfig 的 errComb/errCodeComb 裸块（RTL 真实口径）══
-  private def kLoadNum(f: DataFormat.Type): Int = if (isMx8(f)) cfg.totalN * 2 else cfg.totalN * 4  // 镜像 getKLoadNum
+  // 【P2 纯 FP8 订正】kLoadNum 补 INT8/FP8 两臂（is1B 语义，与 HiveDebugModel:383 同源）——
+  //   本 def 只用于 errExplain 的提示文本，但 INT/FP8 负例命中 8/4 时旧式会打印错误的
+  //   kLoadNum/建议值，诊断现场失真。
+  private def kLoadNum(f: DataFormat.Type): Int = if (isMx8(f) || f == DataFormat.INT8 || isFp8Fmt(f)) cfg.totalN * 2 else cfg.totalN * 4  // 镜像 getKLoadNum
   /** Some(code) = 硬件会在 EXECUTE 后直接置 STATUS.err、不进计算。
     * 【P0-2 去双源】原本此处有一份 QuickSpec 私有的 hwErrCode 镜像，与 HiveDebugModel.precheckConfigErr
     * 互不一致（后者分列 Some(0)/Some(1)/Some(2)、缺 errCode6、优先级 else-if 链首最高）。现已把权威
@@ -513,8 +592,11 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       "【P1-2 W4A8】正向混配 A=MX8×B=MX4 已合法（B DMA stretch：16B 半字拍片 + LUT 加宽 E4M3；K/bAddr 守护见 errCode 8），不再触发本码。 " +
       "【P1-2 INT W4A8】正向混配 A=INT8×B=INT4 已合法（同款 stretch：16B 半字拍片 + 符号扩展 INT8）；" +
       "【反向】混配 A=INT4×B=INT8 仍拒（B 每行窗口切片 64B 超拍宽 32B 两倍、须 push 连推 2 拍，几何不可达），本码最高优先级覆盖。 " +
-      "建议：aFmt/bFmt 改成同族（E4M3/E5M2 互组，或 fp4 E2M1×E2M1）、正向混配、或双非 MX 浮点；本约束不限制输出 cFmt"
-    case 4 => s"MX 输入（aFmt=${p.aFmt}、bFmt=${p.bFmt}）必须 loadWMode=1（B 按 N×K 转置存放），当前为 0。 建议：loadW = Some(1) 或留 None 自动推导"
+      "【P2 纯 FP8】FP8 跨族混配（isFp8(aFmt) XOR isFp8(bFmt)，如 FP8×INT8——remap 只改 FP8 码点、异侧解码落错支路静默算错）" +
+      "与 FP8 输出编码（cFmt=FP8E4M3/E5M2——OutCvt 量化输出是 MX 块 scale 语义、FP8 输出无通路，会静默落 fp32 直出支路）" +
+      "同由链尾 errCode3 臂拒绝（最高优先级）。 " +
+      "建议：aFmt/bFmt 改成同族（E4M3/E5M2 互组，或 fp4 E2M1×E2M1）、正向混配、或双非 MX 浮点；本约束不限制输出 cFmt（但 cFmt 不得为 FP8）"
+    case 4 => s"MX 输入（aFmt=${p.aFmt}、bFmt=${p.bFmt}）或纯 FP8 输入（aFmt=${p.aFmt}）必须 loadWMode=1（B 按 N×K 转置存放；FP8 阵列侧 remap 走 MX8 数据通路、run-mode 约束继承），当前为 0。 建议：loadW = Some(1) 或留 None 自动推导（FP8 不在 isMxAny 内，None 会自动取 0，须显式 Some(1)）"
     case 5 => s"FP32 只能作【输出】格式、不能作 A/B 输入（aFmt=${p.aFmt}、bFmt=${p.bFmt}）。 建议：输入改用受支持的输入格式 INT8/INT4/MXE4M3/MXE5M2/MXE2M1（FP16/BF16 已从 supportedFmts 砍除，不能再作输入）"
     case 6 => s"mxfp4(MXE2M1) 输出要求 N 为偶数（半字节打包），当前 N=${p.n}。 建议：N 改偶数，或 cFmt 换 MXE4M3/MXE5M2"
     // (#146) The original case 7 ("fp4 forces mxBlockSize=64") was removed with

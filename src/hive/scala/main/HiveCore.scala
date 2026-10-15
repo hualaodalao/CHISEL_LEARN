@@ -142,6 +142,21 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     regFile.aFmt === DataFormat.INT8 && regFile.bFmt === DataFormat.INT4
   else false.B
 
+  // ==========================================================================
+  // 【P2 纯 FP8】FP8E4M3/FP8E5M2 → MXE4M3/MXE5M2 阵列侧格式重映射（顶层单一真源）：
+  //   纯 FP8 的元素编码与 MX8 完全相同（E4M3/E5M2 裸码），差别仅在无块 scale 字节
+  //   ⟹ 阵列/MAC/Cell/Worker 零改动、整体走已验证的 MX8×MX8 基线，唯一运行语义
+  //   差异 = Executor scale 注入点恒 127（E8M0 2^0=1.0 恒等乘，见 HiveCoreExecutor
+  //   hiveScaleAIn/hiveScaleBIn 的 Mux）。本函数对非 FP8 值恒等（remap 只改写
+  //   FP8E4M3/FP8E5M2 两个码点），故 a/b 两侧共用。调用点仅两处（hiveComb.io.fmtIn /
+  //   .bFmtIn），均 if(cfg.hasFp8) 门控：不含 FP8 的配置零 Mux、逐字不变（零 diff）。
+  //   ★混配谓词互斥性：w4a8Mix/intW4a8Mix 与 FP8 互斥（aFmt=FP8×bFmt=MX4/INT4 由
+  //   CalcConfig errCode3 新臂运行期拒绝），remap 对 MX4/INT8 值恒等，嵌套安全。
+  // ==========================================================================
+  private def fp8FmtRemap(f: DataFormat.Type): DataFormat.Type =
+    Mux(f === DataFormat.FP8E5M2, DataFormat.MXE5M2,
+      Mux(f === DataFormat.FP8E4M3, DataFormat.MXE4M3, f))
+
   // 【P1-2 W4A8 订正（2026-10-13）】混配下 B/scaleB 两 DMA 的 kt 轮次一律取【全量
   //   calcConfig.kTile = K/aKLoadNum = K/32（A=MX8 口径 = 阵列 K 窗口数）】：bDma 每窗口
   //   每行读一个 16B 半字片（stretch 模式，见 HiveCoreDmaRdOnly），scaleBDma 每窗口
@@ -462,7 +477,12 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   hiveComb.io.loadWIn      := executor.io.hiveLoadW
   hiveComb.io.loadWInLock  := executor.io.hiveLoadWLock
   hiveComb.io.validIn  := executor.io.hiveValidIn
-  hiveComb.io.fmtIn    := regFile.aFmt
+  // 【P2 纯 FP8】a 侧同款 remap：纯 FP8 运行时阵列看到 MXE4M3/MXE5M2（FusionMacFp
+  //   解码、WorkUnit isMx 路由、Worker fmtOk/consumeValid 全部自动走 MX8 基线），
+  //   Executor 的 mxRunB 读 raw regFile（isMx(FP8)=false）走非 MX 握手支路——供数
+  //   不等 scale FIFO、scale DMA 不启动（零流量），127 由注入点组合直供。
+  //   if(cfg.hasFp8) 门控：不含 FP8 的配置逐字不变（零 diff）。
+  hiveComb.io.fmtIn := (if (cfg.hasFp8) fp8FmtRemap(regFile.aFmt) else regFile.aFmt)
   // bFmt 跟随 aFmt（mixFmtEn=0），保证旧软件 bit-exact；MX 配置允许 mixFmtEn=1
   // 以支持异构双 MX（aFmt=E4M3, bFmt=E5M2）
   // 【P1-2 W4A8 展开路】混配时阵列侧 bFmt 重映射为 MXE4M3：权重已由 bDma push 侧
@@ -473,9 +493,16 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   //   展开成 INT8 ⟹ 阵列解码走已验证的 INT8×INT8 双 lane 基线（FusionMacInt
   //   lane0/1 按位解码，lane2/3 的 aIsInt4&bIsInt4 双条件自然旁路为零），
   //   阵列/Cell/Worker/MAC 零改动。两混配谓词互斥，嵌套 Mux 无歧义。
-  hiveComb.io.bFmtIn := (if (cfg.hasMx4)
-    Mux(w4a8Mix, DataFormat.MXE4M3, Mux(intW4a8Mix, DataFormat.INT8, regFile.bFmt))
-  else regFile.bFmt)
+  // 【P2 纯 FP8】remap 施加于整条既有链【之外】（fp8FmtRemap 对混配产物
+  //   MXE4M3/INT8 恒等）：aFmt=FP8 时 bFmt 必同为 FP8（异配由 errCode3 拒绝），
+  //   b 侧 remap 后阵列跑 MX8×MX8；E4M3×E5M2 异构双 FP8 与 MX 的异构双 MX
+  //   同构（remap 分别落 E4M3/E5M2）。
+  hiveComb.io.bFmtIn := {
+    val bFmtChain = (if (cfg.hasMx4)
+      Mux(w4a8Mix, DataFormat.MXE4M3, Mux(intW4a8Mix, DataFormat.INT8, regFile.bFmt))
+    else regFile.bFmt)
+    if (cfg.hasFp8) fp8FmtRemap(bFmtChain) else bFmtChain
+  }
   hiveComb.io.rndIn    := regFile.rnd
 
   // P3: scale wiring -- under an MX config both scale vectors are driven by the

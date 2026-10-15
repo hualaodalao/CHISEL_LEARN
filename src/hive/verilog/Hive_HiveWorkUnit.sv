@@ -44,6 +44,6 @@ module Hive_HiveWorkUnit(	// src/hive/scala/main/HiveWorkUnit.scala:42:7
       ? _sumFpMx_fusionFp_io_sum
       : io_aFmt == 4'h8 | io_aFmt == 4'h7 | io_aFmt == 4'h9
           ? _sumInt_fusionInt_io_sum
-          : io_cReg;	// src/hive/scala/main/HiveEnum.scala:9:{42,53,58,69,74}, :16:{43,52,57,67,72}, src/hive/scala/main/HiveWorkUnit.scala:42:7, :95:26, :115:27, :137:20, :138:28
+          : io_cReg;	// src/hive/scala/main/HiveEnum.scala:9:{42,53,58,69,74}, :22:{43,52,57,67,72}, src/hive/scala/main/HiveWorkUnit.scala:42:7, :95:26, :115:27, :137:20, :138:28
 endmodule
 
