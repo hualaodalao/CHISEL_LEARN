@@ -269,6 +269,59 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           reluOn = true,
           wave = "sim/debug/quick_relu_int32.fst", caseTag = " [P0-ep2 relu-only INT8xINT8->INT32]")
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // 【P1-2 INT W4A8（2026-10-14）】A=INT8 × B=INT4 正向混配六用例。与 MX W4A8
+  //   同款 B DMA stretch 路：逻辑拍 = 16B INT4 半字片（32 nibble = 一个阵列 K 窗口的
+  //   一行）→ 32B 对齐单读 → DMA 内半字选择 → 顶层符号扩展 Cat(Fill(4,nib(3)),nib(2,0))
+  //   成 32B INT8 阵列拍（bFmtIn 重映射 INT4→INT8 ⟹ MAC 走纯 INT8 双 lane 基线，零
+  //   阵列改动）；无 scale 通路（INT 族不取 scale，dmaScaleB 全程静默）。金锚按张量
+  //   语义独立推导（HiveDebugModel expBAddrSeq 混配分支：窗口步进 aKpb×4/8=16B、
+  //   K/aKpb 个窗口 × totalN 行降序、物理读 = 对齐单读）；硬件守护见
+  //   HiveCoreCalcConfig（混配 loadW=0 / K%64 / bAddr%32 → errCode 8，反向混配 → 3）。
+  // ══════════════════════════════════════════════════════════════════════════
+  // ⑯ 正向混配 K=64 → INT32：kTile=2（多窗口轮转）+ nTiles=2（nt 切换）。
+  //    ★ loadW 必须显式 Some(1)：None 对 INT 格式自动推导为 0，混配下触发
+  //    errCode 8 loadW 臂（stretch 是转置布局专属机制）。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.INT8, bFmt = DataFormat.INT4, cFmt = DataFormat.INT32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          wave = "sim/debug/quick_intw4a8_k64.fst", caseTag = " [P1-2 INT W4A8 INT8xINT4->INT32]")
+
+  // ⑰ 正向混配 + bias + requant → INT8：epilogue-1×epilogue-2 全叠加在混配累加器上
+  //    （acc 含 bias 基底，rqShift/rqZp 与 ⑩ 同参数对照）；dmaScaleA 端口 bias+rqM
+  //    双流连续取数与纯 INT 用例同范式，混配下端口无 scaleA 流量（INT 输入）。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.INT8, bFmt = DataFormat.INT4, cFmt = DataFormat.INT8,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          biasOn = true, requantOn = true, rqShift = 17, rqZp = 5,
+          wave = "sim/debug/quick_intw4a8_rq.fst", caseTag = " [P1-2 INT W4A8 requant INT8xINT4+bias->INT8]")
+
+  // ⑱ 负向：反向混配 A=INT4 × B=INT8 → errCode 3（K 窗口 = aKLoadNum=64 元素，
+  //    B 每行窗口切片 64B 超拍宽 32B 两倍、须 push 连推 2 拍——几何不可达（MX 侧
+  //    PROBE4/PROBE6 已证伪的同型机构）；与 MX 反向混配 Fix-4 同处置、链尾最高
+  //    优先级，覆盖 8/11 等一切低码）。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.INT4, bFmt = DataFormat.INT8, cFmt = DataFormat.INT32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          wave = "sim/debug/quick_intw4a8_rev_err3.fst", caseTag = " [P1-2 INT W4A8 neg reverse-mix errCode3]")
+
+  // ⑲ 负向：正向混配 K=32（过 aFmt=INT8 纯格式 K%32 检查，但混配 K%64 守护仍拒——
+  //    kTile=1 奇数会使末窗口 32B 单读越出张量界 16B）→ errCode 8。
+  runCase(m = 32, n = 32, k = 32, aFmt = DataFormat.INT8, bFmt = DataFormat.INT4, cFmt = DataFormat.INT32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          wave = "sim/debug/quick_intw4a8_k32_err8.fst", caseTag = " [P1-2 INT W4A8 neg K32 errCode8]")
+
+  // ⑳ 负向：正向混配 bAddr 未 32B 对齐（B_BASE+16）→ errCode 8（半字拍片单读契约，
+  //    L mod 32 ∉ {0,16} 时奇半字拍的 32B 单读越出张量界）。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.INT8, bFmt = DataFormat.INT4, cFmt = DataFormat.INT32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), bBase = B_BASE + 16,
+          wave = "sim/debug/quick_intw4a8_baddr_err8.fst", caseTag = " [P1-2 INT W4A8 neg bAddr misalign errCode8]")
+
+  // ㉑ 负向：正向混配 loadW=0 → errCode 8（loadW 臂，INT 专属）：stretch 半字切片
+  //    取转置布局一行内连续 32 个 K 元素，loadW=0 的 K×N 行主序里同列 K 元素跨行
+  //    步进、几何不可达。纯 INT8/INT4 两种布局均合法（errCode4 不扩 INT 裁定），
+  //    本臂仅混配命中；K/bAddr 均合法 ⟹ 只命中 loadW 臂。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.INT8, bFmt = DataFormat.INT4, cFmt = DataFormat.INT32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(0),
+          wave = "sim/debug/quick_intw4a8_loadw0_err8.fst", caseTag = " [P1-2 INT W4A8 neg loadW0 errCode8]")
+
   /** 编译期配置（totalN=16；cDmaExtW 默认 256；缓冲深度 2048；scaleBufferDepth=64）。
     * (#155 MJ1) supportedFmts 现在【不再显式传入】，回落 HiveCoreConfig 的默认集。
     *   MXE2M1 现在是默认必选，不再需要显式加。
@@ -458,6 +511,8 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       "A=MX×B=非MX 数学不可实现（一侧有 scale、另一侧无）；反向混配 A=MX4×B=MX8 数据通路未支持" +
       "（quad/dual lane 选择子只看 aFmt，b 侧解码接 bFmt 会静默算错，故设 errCode 运行期可诊断守护，非永久拒绝）。 " +
       "【P1-2 W4A8】正向混配 A=MX8×B=MX4 已合法（B DMA stretch：16B 半字拍片 + LUT 加宽 E4M3；K/bAddr 守护见 errCode 8），不再触发本码。 " +
+      "【P1-2 INT W4A8】正向混配 A=INT8×B=INT4 已合法（同款 stretch：16B 半字拍片 + 符号扩展 INT8）；" +
+      "【反向】混配 A=INT4×B=INT8 仍拒（B 每行窗口切片 64B 超拍宽 32B 两倍、须 push 连推 2 拍，几何不可达），本码最高优先级覆盖。 " +
       "建议：aFmt/bFmt 改成同族（E4M3/E5M2 互组，或 fp4 E2M1×E2M1）、正向混配、或双非 MX 浮点；本约束不限制输出 cFmt"
     case 4 => s"MX 输入（aFmt=${p.aFmt}、bFmt=${p.bFmt}）必须 loadWMode=1（B 按 N×K 转置存放），当前为 0。 建议：loadW = Some(1) 或留 None 自动推导"
     case 5 => s"FP32 只能作【输出】格式、不能作 A/B 输入（aFmt=${p.aFmt}、bFmt=${p.bFmt}）。 建议：输入改用受支持的输入格式 INT8/INT4/MXE4M3/MXE5M2/MXE2M1（FP16/BF16 已从 supportedFmts 砍除，不能再作输入）"
@@ -470,6 +525,8 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
     case 8 => s"fp4(E2M1) 输入要求 K 被 kPerBeat(=totalN×4=${cfg.totalN * 4}) 整除 —— 当前 K=${p.k}、aFmt=${p.aFmt}、bFmt=${p.bFmt}。 " +
       s"触发支路：aFmt=MX4（阵列 pass 粒度=${cfg.totalN * 4}）、aFmt=MX8 × bFmt=MX4 混配（B 侧 fp4 源字粒度=${cfg.totalN * 4}，" +
       s"比 A 侧 ${cfg.totalN * 2} 更粗，bKTile 地板除丢尾）、或对应 INT8/INT4 支路。 " +
+      s"【P1-2 INT W4A8】混配 A=INT8×B=INT4 另要求 loadW=1（stretch 半字切片取转置布局一行内连续 K 元素，" +
+      s"loadW=0 的 K×N 行主序几何不可达；纯 INT 两种布局均合法）+ bAddr 32B 对齐（半字拍片单读契约）。 " +
       s"不整除会让 Executor kTiles 地板除静默丢尾（或 K<kPerBeat 时 16-bit 回绕跑飞）。 " +
       s"建议：K 取 ${cfg.totalN * 4} 的整数倍（一个 kTile = 一个 64-K scale 块 = 单 pass）"
     case 10 => s"C base address not ${cfg.cDmaExtW / 8}-byte aligned (cAddr % dmaBytes != 0). " +

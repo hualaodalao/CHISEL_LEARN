@@ -116,11 +116,12 @@ module Hive_HiveCoreCalcConfig(	// src/hive/scala/main/HiveCoreCalcConfig.scala:
     automatic logic            _calcConfig_aColTileAddressOffset_T_4;	// src/hive/scala/main/HiveEnum.scala:14:56
     automatic logic            _calcConfig_aColTileAddressOffset_T_6;	// src/hive/scala/main/HiveEnum.scala:14:72
     automatic logic [7:0]      aKLoadNum;	// src/hive/scala/main/HiveCoreCalcConfig.scala:70:29, :71:13, :73:13
-    automatic logic            _calcConfig_bColTileAddressOffset_T_19;	// src/hive/scala/main/HiveEnum.scala:14:42
-    automatic logic            _calcConfig_bColTileAddressOffset_T_20;	// src/hive/scala/main/HiveEnum.scala:14:56
-    automatic logic            _calcConfig_bColTileAddressOffset_T_22;	// src/hive/scala/main/HiveEnum.scala:14:72
+    automatic logic            _calcConfig_bColTileAddressOffset_T_34;	// src/hive/scala/main/HiveEnum.scala:14:42
+    automatic logic            _calcConfig_bColTileAddressOffset_T_35;	// src/hive/scala/main/HiveEnum.scala:14:56
+    automatic logic            _calcConfig_bColTileAddressOffset_T_37;	// src/hive/scala/main/HiveEnum.scala:14:72
     automatic logic [7:0]      bKLoadNum;	// src/hive/scala/main/HiveCoreCalcConfig.scala:70:29, :71:13, :73:13
-    automatic logic            _calcConfig_bColTileAddressOffset_T_17;	// src/hive/scala/main/HiveEnum.scala:11:43
+    automatic logic            _calcConfig_bColTileAddressOffset_T_32;	// src/hive/scala/main/HiveEnum.scala:11:43
+    automatic logic            _calcConfig_bColTileAddressOffset_T_31;	// src/hive/scala/main/HiveCoreCalcConfig.scala:165:58
     automatic logic            _calcConfig_aColTileAddressOffset_T;	// src/hive/scala/main/HiveEnum.scala:15:45
     automatic logic            _calcConfig_aColTileAddressOffset_T_1;	// src/hive/scala/main/HiveEnum.scala:15:59
     automatic logic            isAMx;	// src/hive/scala/main/HiveEnum.scala:9:{53,69}
@@ -128,38 +129,40 @@ module Hive_HiveCoreCalcConfig(	// src/hive/scala/main/HiveCoreCalcConfig.scala:
     automatic logic            _errMXLargerThanKLoadNum_T_16;	// src/hive/scala/main/HiveEnum.scala:9:42
     automatic logic            _errMXLargerThanKLoadNum_T_17;	// src/hive/scala/main/HiveEnum.scala:9:58
     automatic logic            _errMXLargerThanKLoadNum_T_19;	// src/hive/scala/main/HiveEnum.scala:9:74
-    automatic logic            _GEN;	// src/hive/scala/main/HiveCoreCalcConfig.scala:192:16
-    automatic logic            _GEN_0;	// src/hive/scala/main/HiveCoreCalcConfig.scala:197:15
-    automatic logic            _GEN_1;	// src/hive/scala/main/HiveCoreCalcConfig.scala:201:26
-    automatic logic            _GEN_2;	// src/hive/scala/main/HiveCoreCalcConfig.scala:201:64
-    automatic logic            _GEN_3;	// src/hive/scala/main/HiveCoreCalcConfig.scala:201:46
-    automatic logic            _GEN_4 = io_regFile_m > 16'h10;	// src/hive/scala/main/HiveCoreCalcConfig.scala:210:23
-    automatic logic            _GEN_5 = io_regFile_biasOn & (|(io_regFile_biasAddr[1:0]));	// src/hive/scala/main/HiveCoreCalcConfig.scala:316:{28,50,57}
-    automatic logic            _cIsIntOut_T;	// src/hive/scala/main/HiveCoreCalcConfig.scala:346:52
-    automatic logic            _cIsIntOut_T_3;	// src/hive/scala/main/HiveCoreCalcConfig.scala:346:91
-    automatic logic            _GEN_6;	// src/hive/scala/main/HiveCoreCalcConfig.scala:346:31
+    automatic logic            _GEN;	// src/hive/scala/main/HiveCoreCalcConfig.scala:202:16
+    automatic logic            _GEN_0;	// src/hive/scala/main/HiveCoreCalcConfig.scala:207:15
+    automatic logic            _GEN_1;	// src/hive/scala/main/HiveCoreCalcConfig.scala:211:26
+    automatic logic            _GEN_2;	// src/hive/scala/main/HiveCoreCalcConfig.scala:211:64
+    automatic logic            _GEN_3;	// src/hive/scala/main/HiveCoreCalcConfig.scala:211:46
+    automatic logic            _GEN_4 = io_regFile_m > 16'h10;	// src/hive/scala/main/HiveCoreCalcConfig.scala:220:23
+    automatic logic            _GEN_5 = io_regFile_biasOn & (|(io_regFile_biasAddr[1:0]));	// src/hive/scala/main/HiveCoreCalcConfig.scala:326:{28,50,57}
+    automatic logic            _cIsIntOut_T;	// src/hive/scala/main/HiveCoreCalcConfig.scala:356:52
+    automatic logic            _cIsIntOut_T_3;	// src/hive/scala/main/HiveCoreCalcConfig.scala:356:91
+    automatic logic            _GEN_6;	// src/hive/scala/main/HiveCoreCalcConfig.scala:356:31
     automatic logic            _GEN_7 =
-      io_regFile_requantOn & (|(io_regFile_rqMBase[1:0]));	// src/hive/scala/main/HiveCoreCalcConfig.scala:350:{31,52,59}
+      io_regFile_requantOn & (|(io_regFile_rqMBase[1:0]));	// src/hive/scala/main/HiveCoreCalcConfig.scala:360:{31,52,59}
     automatic logic            _GEN_8;	// src/hive/scala/main/HiveEnum.scala:10:54
-    automatic logic            _GEN_9 = io_regFile_k == 16'h0;	// src/hive/scala/main/HiveCoreCalcConfig.scala:405:36
-    automatic logic            _GEN_10 = (|(io_regFile_k[4:0])) | _GEN_9;	// src/hive/scala/main/HiveCoreCalcConfig.scala:404:{36,57,66}, :405:36
-    automatic logic            _GEN_11;	// src/hive/scala/main/HiveCoreCalcConfig.scala:403:48
-    automatic logic            _GEN_12 = (|(io_regFile_k[5:0])) | _GEN_9;	// src/hive/scala/main/HiveCoreCalcConfig.scala:405:36, :412:{36,57,66}
-    automatic logic            _GEN_13;	// src/hive/scala/main/HiveCoreCalcConfig.scala:411:48
-    automatic logic            _GEN_14;	// src/hive/scala/main/HiveCoreCalcConfig.scala:424:{48,85}
-    automatic logic            _GEN_15;	// src/hive/scala/main/HiveCoreCalcConfig.scala:442:50
-    automatic logic            _GEN_16;	// src/hive/scala/main/HiveCoreCalcConfig.scala:448:50
+    automatic logic            _GEN_9 = io_regFile_k == 16'h0;	// src/hive/scala/main/HiveCoreCalcConfig.scala:415:36
+    automatic logic            _GEN_10 = (|(io_regFile_k[4:0])) | _GEN_9;	// src/hive/scala/main/HiveCoreCalcConfig.scala:414:{36,57,66}, :415:36
+    automatic logic            _GEN_11;	// src/hive/scala/main/HiveCoreCalcConfig.scala:413:48
+    automatic logic            _GEN_12 = (|(io_regFile_k[5:0])) | _GEN_9;	// src/hive/scala/main/HiveCoreCalcConfig.scala:415:36, :422:{36,57,66}
+    automatic logic            _GEN_13;	// src/hive/scala/main/HiveCoreCalcConfig.scala:421:48
+    automatic logic            _GEN_14;	// src/hive/scala/main/HiveCoreCalcConfig.scala:434:{48,85}
+    automatic logic            _GEN_15;	// src/hive/scala/main/HiveCoreCalcConfig.scala:452:50
+    automatic logic            _GEN_16;	// src/hive/scala/main/HiveCoreCalcConfig.scala:458:50
+    automatic logic            _GEN_17;	// src/hive/scala/main/HiveCoreCalcConfig.scala:478:{50,89}
     automatic logic            _cIsIntOut_T_1;	// src/hive/scala/main/HiveEnum.scala:16:57
     automatic logic            _calcConfig_aColTileAddressOffset_T_8;	// src/hive/scala/main/HiveEnum.scala:13:42
     automatic logic            _calcConfig_aColTileAddressOffset_T_9;	// src/hive/scala/main/HiveEnum.scala:13:56
-    automatic logic            _GEN_17;	// src/hive/scala/main/HiveCoreCalcConfig.scala:514:19
-    automatic logic            _GEN_18;	// src/hive/scala/main/HiveCoreCalcConfig.scala:564:48
-    automatic logic            errComb;	// src/hive/scala/main/HiveCoreCalcConfig.scala:184:98, :185:68, :187:34, :192:24, :193:17, :197:46, :198:17, :201:84, :202:17, :210:59, :211:17, :295:55, :296:17, :316:65, :317:17, :346:112, :347:17, :350:67, :351:17, :405:46, :406:21, :413:46, :414:21, :427:75, :428:21, :444:46, :445:21, :450:46, :451:21, :514:31, :515:17, :564:86, :565:21
-    automatic logic            _GEN_19;	// src/hive/scala/main/HiveCoreCalcConfig.scala:629:15
-    automatic logic            _GEN_20;	// src/hive/scala/main/HiveCoreCalcConfig.scala:629:15
-    automatic logic            _GEN_21;	// src/hive/scala/main/HiveCoreCalcConfig.scala:17:22, :629:15, :1115:26, :1116:17
-    automatic logic            _GEN_22;	// src/hive/scala/main/HiveCoreCalcConfig.scala:17:22, :629:15
-    automatic logic [3:0][3:0] _GEN_23;	// src/hive/scala/main/HiveCoreCalcConfig.scala:19:22, :629:15, :640:15, :649:20
+    automatic logic            _GEN_18;	// src/hive/scala/main/HiveCoreCalcConfig.scala:546:19
+    automatic logic            _GEN_19;	// src/hive/scala/main/HiveCoreCalcConfig.scala:596:48
+    automatic logic            _GEN_20;	// src/hive/scala/main/HiveCoreCalcConfig.scala:616:50
+    automatic logic            errComb;	// src/hive/scala/main/HiveCoreCalcConfig.scala:194:98, :195:68, :197:34, :202:24, :203:17, :207:46, :208:17, :211:84, :212:17, :220:59, :221:17, :305:55, :306:17, :326:65, :327:17, :356:112, :357:17, :360:67, :361:17, :415:46, :416:21, :423:46, :424:21, :437:75, :438:21, :454:46, :455:21, :460:46, :461:21, :482:73, :483:21, :546:31, :547:17, :596:86, :597:21, :616:89, :617:21
+    automatic logic            _GEN_21;	// src/hive/scala/main/HiveCoreCalcConfig.scala:681:15
+    automatic logic            _GEN_22;	// src/hive/scala/main/HiveCoreCalcConfig.scala:681:15
+    automatic logic            _GEN_23;	// src/hive/scala/main/HiveCoreCalcConfig.scala:17:22, :681:15, :1176:26, :1177:17
+    automatic logic            _GEN_24;	// src/hive/scala/main/HiveCoreCalcConfig.scala:17:22, :681:15
+    automatic logic [3:0][3:0] _GEN_25;	// src/hive/scala/main/HiveCoreCalcConfig.scala:19:22, :681:15, :692:15, :701:20
     _calcConfig_aColTileAddressOffset_T_3 = io_regFile_aFmt == 4'h8;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:14:42
     _calcConfig_aColTileAddressOffset_T_4 = io_regFile_aFmt == 4'h3;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:14:56
     _calcConfig_aColTileAddressOffset_T_6 = io_regFile_aFmt == 4'h4;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:14:72
@@ -167,90 +170,97 @@ module Hive_HiveCoreCalcConfig(	// src/hive/scala/main/HiveCoreCalcConfig.scala:
       _calcConfig_aColTileAddressOffset_T_3 | _calcConfig_aColTileAddressOffset_T_4
       | _calcConfig_aColTileAddressOffset_T_6
         ? 8'h20
-        : 8'h40;	// src/hive/scala/main/HiveCoreCalcConfig.scala:70:29, :71:13, :73:13, :930:56, src/hive/scala/main/HiveEnum.scala:14:{42,51,56,67,72}
-    _calcConfig_bColTileAddressOffset_T_19 = io_regFile_bFmt == 4'h8;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:14:42
-    _calcConfig_bColTileAddressOffset_T_20 = io_regFile_bFmt == 4'h3;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:14:56
-    _calcConfig_bColTileAddressOffset_T_22 = io_regFile_bFmt == 4'h4;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:14:72
+        : 8'h40;	// src/hive/scala/main/HiveCoreCalcConfig.scala:70:29, :71:13, :73:13, :991:56, src/hive/scala/main/HiveEnum.scala:14:{42,51,56,67,72}
+    _calcConfig_bColTileAddressOffset_T_34 = io_regFile_bFmt == 4'h8;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:14:42
+    _calcConfig_bColTileAddressOffset_T_35 = io_regFile_bFmt == 4'h3;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:14:56
+    _calcConfig_bColTileAddressOffset_T_37 = io_regFile_bFmt == 4'h4;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:14:72
     bKLoadNum =
-      _calcConfig_bColTileAddressOffset_T_19 | _calcConfig_bColTileAddressOffset_T_20
-      | _calcConfig_bColTileAddressOffset_T_22
+      _calcConfig_bColTileAddressOffset_T_34 | _calcConfig_bColTileAddressOffset_T_35
+      | _calcConfig_bColTileAddressOffset_T_37
         ? 8'h20
-        : 8'h40;	// src/hive/scala/main/HiveCoreCalcConfig.scala:70:29, :71:13, :73:13, :930:56, src/hive/scala/main/HiveEnum.scala:14:{42,51,56,67,72}
-    _calcConfig_bColTileAddressOffset_T_17 = io_regFile_bFmt == 4'h5;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:11:43
+        : 8'h40;	// src/hive/scala/main/HiveCoreCalcConfig.scala:70:29, :71:13, :73:13, :991:56, src/hive/scala/main/HiveEnum.scala:14:{42,51,56,67,72}
+    _calcConfig_bColTileAddressOffset_T_32 = io_regFile_bFmt == 4'h5;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:11:43
+    _calcConfig_bColTileAddressOffset_T_31 = io_regFile_bFmt == 4'h9;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :165:58
     _calcConfig_aColTileAddressOffset_T = io_regFile_aFmt == 4'h9;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:15:45
     _calcConfig_aColTileAddressOffset_T_1 = io_regFile_aFmt == 4'h5;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:15:59
     isAMx =
       _calcConfig_aColTileAddressOffset_T_4 | _calcConfig_aColTileAddressOffset_T_6
       | _calcConfig_aColTileAddressOffset_T_1;	// src/hive/scala/main/HiveEnum.scala:9:{53,69}, :14:{56,72}, :15:59
     isBMx =
-      _calcConfig_bColTileAddressOffset_T_20 | _calcConfig_bColTileAddressOffset_T_22
-      | _calcConfig_bColTileAddressOffset_T_17;	// src/hive/scala/main/HiveEnum.scala:9:{53,69}, :11:43, :14:{56,72}
+      _calcConfig_bColTileAddressOffset_T_35 | _calcConfig_bColTileAddressOffset_T_37
+      | _calcConfig_bColTileAddressOffset_T_32;	// src/hive/scala/main/HiveEnum.scala:9:{53,69}, :11:43, :14:{56,72}
     _errMXLargerThanKLoadNum_T_16 = io_regFile_cFmt == 4'h3;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:9:42
     _errMXLargerThanKLoadNum_T_17 = io_regFile_cFmt == 4'h4;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:9:58
     _errMXLargerThanKLoadNum_T_19 = io_regFile_cFmt == 4'h5;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:9:74
-    _GEN = isAMx ^ isBMx;	// src/hive/scala/main/HiveCoreCalcConfig.scala:192:16, src/hive/scala/main/HiveEnum.scala:9:{53,69}
-    _GEN_0 = (isAMx | isBMx) & ~io_regFile_loadWMode;	// src/hive/scala/main/HiveCoreCalcConfig.scala:182:22, :197:{15,38}, src/hive/scala/main/HiveEnum.scala:9:{53,69}
-    _GEN_1 = io_regFile_aFmt == 4'h0;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :201:26
-    _GEN_2 = io_regFile_bFmt == 4'h0;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :201:64
-    _GEN_3 = _GEN_1 | _GEN_2;	// src/hive/scala/main/HiveCoreCalcConfig.scala:201:{26,46,64}
-    _cIsIntOut_T = io_regFile_cFmt == 4'h8;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :346:52
-    _cIsIntOut_T_3 = io_regFile_cFmt == 4'h9;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :346:91
-    _GEN_6 = io_regFile_requantOn & ~(_cIsIntOut_T | _cIsIntOut_T_3);	// src/hive/scala/main/HiveCoreCalcConfig.scala:346:{31,34,52,72,91}
+    _GEN = isAMx ^ isBMx;	// src/hive/scala/main/HiveCoreCalcConfig.scala:202:16, src/hive/scala/main/HiveEnum.scala:9:{53,69}
+    _GEN_0 = (isAMx | isBMx) & ~io_regFile_loadWMode;	// src/hive/scala/main/HiveCoreCalcConfig.scala:192:22, :207:{15,38}, src/hive/scala/main/HiveEnum.scala:9:{53,69}
+    _GEN_1 = io_regFile_aFmt == 4'h0;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :211:26
+    _GEN_2 = io_regFile_bFmt == 4'h0;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :211:64
+    _GEN_3 = _GEN_1 | _GEN_2;	// src/hive/scala/main/HiveCoreCalcConfig.scala:211:{26,46,64}
+    _cIsIntOut_T = io_regFile_cFmt == 4'h8;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :356:52
+    _cIsIntOut_T_3 = io_regFile_cFmt == 4'h9;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :356:91
+    _GEN_6 = io_regFile_requantOn & ~(_cIsIntOut_T | _cIsIntOut_T_3);	// src/hive/scala/main/HiveCoreCalcConfig.scala:356:{31,34,52,72,91}
     _GEN_8 =
       _calcConfig_aColTileAddressOffset_T_4 | _calcConfig_aColTileAddressOffset_T_6;	// src/hive/scala/main/HiveEnum.scala:10:54, :14:{56,72}
-    _GEN_11 = _GEN_8 & _GEN_10;	// src/hive/scala/main/HiveCoreCalcConfig.scala:403:48, :404:66, src/hive/scala/main/HiveEnum.scala:10:54
-    _GEN_13 = _calcConfig_aColTileAddressOffset_T_1 & _GEN_12;	// src/hive/scala/main/HiveCoreCalcConfig.scala:411:48, :412:66, src/hive/scala/main/HiveEnum.scala:15:59
+    _GEN_11 = _GEN_8 & _GEN_10;	// src/hive/scala/main/HiveCoreCalcConfig.scala:413:48, :414:66, src/hive/scala/main/HiveEnum.scala:10:54
+    _GEN_13 = _calcConfig_aColTileAddressOffset_T_1 & _GEN_12;	// src/hive/scala/main/HiveCoreCalcConfig.scala:421:48, :422:66, src/hive/scala/main/HiveEnum.scala:15:59
     _GEN_14 =
-      _GEN_8 & _calcConfig_bColTileAddressOffset_T_17
-      & (|{_GEN_12, io_regFile_bAddr[4:0]});	// src/hive/scala/main/HiveCoreCalcConfig.scala:412:66, :424:{48,85}, :426:45, :427:{34,65}, src/hive/scala/main/HiveEnum.scala:10:54, :11:43
-    _GEN_15 = _calcConfig_aColTileAddressOffset_T_3 & _GEN_10;	// src/hive/scala/main/HiveCoreCalcConfig.scala:404:66, :442:50, src/hive/scala/main/HiveEnum.scala:14:42
-    _GEN_16 = _calcConfig_aColTileAddressOffset_T & _GEN_12;	// src/hive/scala/main/HiveCoreCalcConfig.scala:412:66, :448:50, src/hive/scala/main/HiveEnum.scala:15:45
+      _GEN_8 & _calcConfig_bColTileAddressOffset_T_32
+      & (|{_GEN_12, io_regFile_bAddr[4:0]});	// src/hive/scala/main/HiveCoreCalcConfig.scala:422:66, :434:{48,85}, :436:45, :437:{34,65}, src/hive/scala/main/HiveEnum.scala:10:54, :11:43
+    _GEN_15 = _calcConfig_aColTileAddressOffset_T_3 & _GEN_10;	// src/hive/scala/main/HiveCoreCalcConfig.scala:414:66, :452:50, src/hive/scala/main/HiveEnum.scala:14:42
+    _GEN_16 = _calcConfig_aColTileAddressOffset_T & _GEN_12;	// src/hive/scala/main/HiveCoreCalcConfig.scala:422:66, :458:50, src/hive/scala/main/HiveEnum.scala:15:45
+    _GEN_17 =
+      _calcConfig_aColTileAddressOffset_T_3 & _calcConfig_bColTileAddressOffset_T_31
+      & (|{(|{~io_regFile_loadWMode, io_regFile_k[5:0]}) | _GEN_9,
+           io_regFile_bAddr[4:0]});	// src/hive/scala/main/HiveCoreCalcConfig.scala:165:58, :207:38, :415:36, :422:36, :437:34, :478:{50,89}, :479:44, :480:{58,66}, :481:45, :482:64, src/hive/scala/main/HiveEnum.scala:14:42
     _cIsIntOut_T_1 = io_regFile_cFmt == 4'h7;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:16:57
     _calcConfig_aColTileAddressOffset_T_8 = io_regFile_aFmt == 4'h1;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:13:42
     _calcConfig_aColTileAddressOffset_T_9 = io_regFile_aFmt == 4'h2;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:13:56
-    _GEN_17 =
+    _GEN_18 =
       ~(_calcConfig_aColTileAddressOffset_T_8 | _calcConfig_aColTileAddressOffset_T_9)
       & (|io_regFile_aFmt)
       & ~(_calcConfig_aColTileAddressOffset_T_4 | _calcConfig_aColTileAddressOffset_T_6
           | _calcConfig_aColTileAddressOffset_T_1)
-      ^ (_cIsIntOut_T | _cIsIntOut_T_1 | _cIsIntOut_T_3 | io_regFile_cFmt == 4'h6);	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :346:{52,91}, :512:{55,74}, :513:{21,55,74,94,97}, :514:19, src/hive/scala/main/HiveEnum.scala:9:{53,69}, :13:{42,51,56}, :14:{56,72}, :15:59, :16:{52,57,67}
-    _GEN_18 = _calcConfig_aColTileAddressOffset_T_1 & io_regFile_bFmt != 4'h5;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :564:{48,51}, src/hive/scala/main/HiveEnum.scala:11:43, :15:59
+      ^ (_cIsIntOut_T | _cIsIntOut_T_1 | _cIsIntOut_T_3 | io_regFile_cFmt == 4'h6);	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :356:{52,91}, :544:{55,74}, :545:{21,55,74,94,97}, :546:19, src/hive/scala/main/HiveEnum.scala:9:{53,69}, :13:{42,51,56}, :14:{56,72}, :15:59, :16:{52,57,67}
+    _GEN_19 = _calcConfig_aColTileAddressOffset_T_1 & io_regFile_bFmt != 4'h5;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :596:{48,51}, src/hive/scala/main/HiveEnum.scala:11:43, :15:59
+    _GEN_20 =
+      _calcConfig_aColTileAddressOffset_T & _calcConfig_bColTileAddressOffset_T_34;	// src/hive/scala/main/HiveCoreCalcConfig.scala:616:50, src/hive/scala/main/HiveEnum.scala:14:42, :15:45
     errComb =
-      _GEN_18 | _GEN_17 | _GEN_16 | _GEN_15 | _GEN_14 | _GEN_13 | _GEN_11 | _GEN_7
-      | _GEN_6 | _GEN_5 | (|(io_regFile_cAddr[4:0])) | _GEN_4 | _GEN_3 | _GEN_0 | _GEN
-      | (io_regFile_aMxBlockSize ? 8'h20 : 8'h10) > aKLoadNum
+      _GEN_20 | _GEN_19 | _GEN_18 | _GEN_17 | _GEN_16 | _GEN_15 | _GEN_14 | _GEN_13
+      | _GEN_11 | _GEN_7 | _GEN_6 | _GEN_5 | (|(io_regFile_cAddr[4:0])) | _GEN_4 | _GEN_3
+      | _GEN_0 | _GEN | (io_regFile_aMxBlockSize ? 8'h20 : 8'h10) > aKLoadNum
       & (_calcConfig_aColTileAddressOffset_T_4 | _calcConfig_aColTileAddressOffset_T_6
          | _calcConfig_aColTileAddressOffset_T_1)
       | (io_regFile_bMxBlockSize ? 8'h20 : 8'h10) > bKLoadNum
-      & (_calcConfig_bColTileAddressOffset_T_20 | _calcConfig_bColTileAddressOffset_T_22
-         | _calcConfig_bColTileAddressOffset_T_17)
+      & (_calcConfig_bColTileAddressOffset_T_35 | _calcConfig_bColTileAddressOffset_T_37
+         | _calcConfig_bColTileAddressOffset_T_32)
       | (io_regFile_cMxBlockSize ? 8'h20 : 8'h10) > 8'h10
       & (_errMXLargerThanKLoadNum_T_16 | _errMXLargerThanKLoadNum_T_17
-         | _errMXLargerThanKLoadNum_T_19);	// src/hive/scala/main/HiveCoreCalcConfig.scala:39:32, :40:13, :42:13, :70:29, :71:13, :73:13, :184:{50,63,98}, :185:{20,33,68}, :186:{20,34}, :187:34, :192:{16,24}, :193:17, :197:{15,46}, :198:17, :201:{46,84}, :202:17, :210:{23,59}, :211:17, :295:{26,47,55}, :296:17, :316:{28,65}, :317:17, :346:{31,112}, :347:17, :350:{31,67}, :351:17, :403:48, :405:46, :406:21, :411:48, :413:46, :414:21, :424:{48,85}, :427:75, :428:21, :442:50, :444:46, :445:21, :448:50, :450:46, :451:21, :514:{19,31}, :515:17, :564:{48,86}, :565:21, :930:56, :933:56, src/hive/scala/main/HiveEnum.scala:9:{42,53,58,69,74}, :11:43, :14:{56,72}, :15:59
-    _GEN_19 = state == 2'h0;	// src/hive/scala/main/HiveCoreCalcConfig.scala:28:24, :629:15
-    _GEN_20 = state == 2'h1;	// src/hive/scala/main/HiveCoreCalcConfig.scala:28:24, :629:15, :642:15
-    _GEN_21 = (&state) & io_startIn;	// src/hive/scala/main/HiveCoreCalcConfig.scala:17:22, :28:24, :629:15, :1115:26, :1116:17
-    _GEN_22 = state == 2'h2 | ~_GEN_21;	// src/hive/scala/main/HiveCoreCalcConfig.scala:17:22, :28:24, :71:30, :629:15, :1115:26, :1116:17
+         | _errMXLargerThanKLoadNum_T_19);	// src/hive/scala/main/HiveCoreCalcConfig.scala:39:32, :40:13, :42:13, :70:29, :71:13, :73:13, :194:{50,63,98}, :195:{20,33,68}, :196:{20,34}, :197:34, :202:{16,24}, :203:17, :207:{15,46}, :208:17, :211:{46,84}, :212:17, :220:{23,59}, :221:17, :305:{26,47,55}, :306:17, :326:{28,65}, :327:17, :356:{31,112}, :357:17, :360:{31,67}, :361:17, :413:48, :415:46, :416:21, :421:48, :423:46, :424:21, :434:{48,85}, :437:75, :438:21, :452:50, :454:46, :455:21, :458:50, :460:46, :461:21, :478:{50,89}, :482:73, :483:21, :546:{19,31}, :547:17, :596:{48,86}, :597:21, :616:{50,89}, :617:21, :991:56, :994:56, src/hive/scala/main/HiveEnum.scala:9:{42,53,58,69,74}, :11:43, :14:{56,72}, :15:59
+    _GEN_21 = state == 2'h0;	// src/hive/scala/main/HiveCoreCalcConfig.scala:28:24, :681:15
+    _GEN_22 = state == 2'h1;	// src/hive/scala/main/HiveCoreCalcConfig.scala:28:24, :681:15, :694:15
+    _GEN_23 = (&state) & io_startIn;	// src/hive/scala/main/HiveCoreCalcConfig.scala:17:22, :28:24, :681:15, :1176:26, :1177:17
+    _GEN_24 = state == 2'h2 | ~_GEN_23;	// src/hive/scala/main/HiveCoreCalcConfig.scala:17:22, :28:24, :71:30, :681:15, :1176:26, :1177:17
     if (reset) begin	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7
       err <= 1'h0;	// src/hive/scala/main/HiveCoreCalcConfig.scala:17:22
       state <= 2'h0;	// src/hive/scala/main/HiveCoreCalcConfig.scala:28:24
     end
     else begin	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7
-      automatic logic [3:0][1:0] _GEN_24;	// src/hive/scala/main/HiveCoreCalcConfig.scala:629:15, :641:24, :654:13, :1106:15
-      err <= ~_GEN_19 & (_GEN_20 ? (errComb ? errComb : err) : _GEN_22 & err);	// src/hive/scala/main/HiveCoreCalcConfig.scala:17:22, :184:98, :185:68, :187:34, :192:24, :193:17, :197:46, :198:17, :201:84, :202:17, :210:59, :211:17, :295:55, :296:17, :316:65, :317:17, :346:112, :347:17, :350:67, :351:17, :405:46, :406:21, :413:46, :414:21, :427:75, :428:21, :444:46, :445:21, :450:46, :451:21, :514:31, :515:17, :564:86, :565:21, :629:15, :639:11, :649:20, :650:13
-      _GEN_24 = {{_GEN_21 ? 2'h1 : state}, {2'h3}, {2'h2}, {io_startIn ? 2'h1 : state}};	// src/hive/scala/main/HiveCoreCalcConfig.scala:17:22, :28:24, :71:30, :629:15, :641:24, :642:15, :654:13, :1106:15, :1115:26, :1116:17, :1118:19, src/hive/scala/main/HiveEnum.scala:14:56
-      state <= _GEN_24[state];	// src/hive/scala/main/HiveCoreCalcConfig.scala:28:24, :629:15, :641:24, :654:13, :1106:15
+      automatic logic [3:0][1:0] _GEN_26;	// src/hive/scala/main/HiveCoreCalcConfig.scala:681:15, :693:24, :706:13, :1167:15
+      err <= ~_GEN_21 & (_GEN_22 ? (errComb ? errComb : err) : _GEN_24 & err);	// src/hive/scala/main/HiveCoreCalcConfig.scala:17:22, :194:98, :195:68, :197:34, :202:24, :203:17, :207:46, :208:17, :211:84, :212:17, :220:59, :221:17, :305:55, :306:17, :326:65, :327:17, :356:112, :357:17, :360:67, :361:17, :415:46, :416:21, :423:46, :424:21, :437:75, :438:21, :454:46, :455:21, :460:46, :461:21, :482:73, :483:21, :546:31, :547:17, :596:86, :597:21, :616:89, :617:21, :681:15, :691:11, :701:20, :702:13
+      _GEN_26 = {{_GEN_23 ? 2'h1 : state}, {2'h3}, {2'h2}, {io_startIn ? 2'h1 : state}};	// src/hive/scala/main/HiveCoreCalcConfig.scala:17:22, :28:24, :71:30, :681:15, :693:24, :694:15, :706:13, :1167:15, :1176:26, :1177:17, :1179:19, src/hive/scala/main/HiveEnum.scala:14:56
+      state <= _GEN_26[state];	// src/hive/scala/main/HiveCoreCalcConfig.scala:28:24, :681:15, :693:24, :706:13, :1167:15
     end
     errNext <= err;	// src/hive/scala/main/HiveCoreCalcConfig.scala:17:22, :18:26
-    _GEN_23 =
-      {{_GEN_22 ? errCode : 4'h0},
+    _GEN_25 =
+      {{_GEN_24 ? errCode : 4'h0},
        {errCode},
        {errComb
-          ? (_GEN_18
+          ? (_GEN_20 | _GEN_19
                ? 4'h3
-               : _GEN_17
+               : _GEN_18
                    ? 4'hB
-                   : _GEN_16 | _GEN_15 | _GEN_14 | _GEN_13 | _GEN_11
+                   : _GEN_17 | _GEN_16 | _GEN_15 | _GEN_14 | _GEN_13 | _GEN_11
                        ? 4'h8
                        : _GEN_7 | _GEN_6
                            ? 4'hD
@@ -264,79 +274,80 @@ module Hive_HiveCoreCalcConfig(	// src/hive/scala/main/HiveCoreCalcConfig.scala:
                                            ? 4'h5
                                            : _GEN_0 ? 4'h4 : _GEN ? 4'h3 : 4'h0)
           : errCode},
-       {4'h0}};	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :17:22, :19:22, :184:98, :185:68, :187:34, :192:{16,24}, :193:17, :194:21, :197:{15,46}, :198:17, :199:21, :201:{46,84}, :202:17, :203:21, :210:{23,59}, :211:17, :212:21, :295:{26,47,55}, :296:17, :297:21, :316:{28,65}, :317:17, :318:21, :346:{31,112}, :347:17, :348:21, :350:{31,67}, :351:17, :352:21, :403:48, :405:46, :406:21, :407:25, :411:48, :413:46, :414:21, :415:25, :424:{48,85}, :427:75, :428:21, :429:25, :442:50, :444:46, :445:21, :446:25, :448:50, :450:46, :451:21, :452:25, :514:{19,31}, :515:17, :516:21, :564:{48,86}, :565:21, :566:25, :629:15, :640:15, :649:20, :651:17
-    errCode <= _GEN_23[state];	// src/hive/scala/main/HiveCoreCalcConfig.scala:19:22, :28:24, :629:15, :640:15, :649:20
-    if (_GEN_19 | ~_GEN_20) begin	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :629:15
+       {4'h0}};	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :17:22, :19:22, :194:98, :195:68, :197:34, :202:{16,24}, :203:17, :204:21, :207:{15,46}, :208:17, :209:21, :211:{46,84}, :212:17, :213:21, :220:{23,59}, :221:17, :222:21, :305:{26,47,55}, :306:17, :307:21, :326:{28,65}, :327:17, :328:21, :356:{31,112}, :357:17, :358:21, :360:{31,67}, :361:17, :362:21, :413:48, :415:46, :416:21, :417:25, :421:48, :423:46, :424:21, :425:25, :434:{48,85}, :437:75, :438:21, :439:25, :452:50, :454:46, :455:21, :456:25, :458:50, :460:46, :461:21, :462:25, :478:{50,89}, :482:73, :483:21, :484:25, :546:{19,31}, :547:17, :548:21, :596:{48,86}, :597:21, :598:25, :616:{50,89}, :617:21, :618:25, :681:15, :692:15, :701:20, :703:17
+    errCode <= _GEN_25[state];	// src/hive/scala/main/HiveCoreCalcConfig.scala:19:22, :28:24, :681:15, :692:15, :701:20
+    if (_GEN_21 | ~_GEN_22) begin	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :681:15
     end
-    else begin	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :629:15
+    else begin	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :681:15
       automatic logic        w4a8Mix;	// src/hive/scala/main/HiveCoreCalcConfig.scala:155:37
-      automatic logic        _calcConfig_bColTileAddressOffset_T_16 =
-        io_regFile_bFmt == 4'h9;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, src/hive/scala/main/HiveEnum.scala:15:45
-      automatic logic [16:0] _GEN_25 = {1'h0, io_regFile_n};	// src/hive/scala/main/HiveCoreCalcConfig.scala:656:41
-      automatic logic        _GEN_26;	// src/hive/scala/main/HiveEnum.scala:14:{51,67}
-      automatic logic [31:0] _GEN_27 = {14'h0, io_regFile_k, 2'h0};	// src/hive/scala/main/HiveCoreCalcConfig.scala:689:34
-      automatic logic [31:0] _GEN_28 = {15'h0, io_regFile_k, 1'h0};	// src/hive/scala/main/HiveCoreCalcConfig.scala:691:34
-      automatic logic [31:0] _GEN_29 = {16'h0, io_regFile_k};	// src/hive/scala/main/HiveCoreCalcConfig.scala:693:34
-      automatic logic [31:0] _GEN_30 = {17'h0, io_regFile_k[15:1]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:695:{34,50}
-      automatic logic        _GEN_31;	// src/hive/scala/main/HiveEnum.scala:12:51
-      automatic logic [31:0] _GEN_32 = {14'h0, io_regFile_n, 2'h0};	// src/hive/scala/main/HiveCoreCalcConfig.scala:755:34
-      automatic logic        _GEN_33 =
-        io_regFile_bFmt == 4'h1 | io_regFile_bFmt == 4'h2 | io_regFile_bFmt == 4'h7;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :756:{47,66}, src/hive/scala/main/HiveEnum.scala:13:{42,51,56}
-      automatic logic [31:0] _GEN_34 = {15'h0, io_regFile_n, 1'h0};	// src/hive/scala/main/HiveCoreCalcConfig.scala:757:34
-      automatic logic        _GEN_35;	// src/hive/scala/main/HiveEnum.scala:14:{51,67}
-      automatic logic [31:0] _GEN_36 = {16'h0, io_regFile_n};	// src/hive/scala/main/HiveCoreCalcConfig.scala:759:34
-      automatic logic        _GEN_37;	// src/hive/scala/main/HiveEnum.scala:15:54
-      automatic logic        _GEN_38;	// src/hive/scala/main/HiveEnum.scala:14:{51,67}
-      automatic logic        _GEN_39;	// src/hive/scala/main/HiveCoreCalcConfig.scala:853:45, src/hive/scala/main/HiveEnum.scala:13:51
-      automatic logic [31:0] _GEN_40 = {21'h0, io_regFile_k[15:5]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:929:{43,59}
-      automatic logic [31:0] _GEN_41 = {20'h0, io_regFile_k[15:4]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:932:{43,59}
-      automatic logic [7:0]  cWriteBytes;	// src/hive/scala/main/HiveCoreCalcConfig.scala:1082:44, :1083:17, :1084:47
-      automatic logic        _GEN_42;	// src/hive/scala/main/HiveCoreCalcConfig.scala:1092:20
-      automatic logic [15:0] _calcConfig_nTile_T_2 = io_regFile_n + 16'hF;	// src/hive/scala/main/HiveCoreCalcConfig.scala:656:{41,56}
-      automatic logic [15:0] _calcConfig_kTile_T_3 = io_regFile_k + 16'hF;	// src/hive/scala/main/HiveCoreCalcConfig.scala:671:{44,59}
-      automatic logic [13:0] _calcConfig_bColTileAddressOffset_T_29;	// src/hive/scala/main/HiveCoreCalcConfig.scala:826:53
-      automatic logic [16:0] _calcConfig_scaleCRowAddressOffset_T_2 = _GEN_25 + 17'hF;	// src/hive/scala/main/HiveCoreCalcConfig.scala:656:41, :961:60
-      automatic logic [16:0] _calcConfig_scaleCRowAddressOffset_T = _GEN_25 + 17'h1F;	// src/hive/scala/main/HiveCoreCalcConfig.scala:656:41, :957:60
-      automatic logic [7:0]  _calcConfig_cDmaDmaBeatTar_T;	// src/hive/scala/main/HiveCoreCalcConfig.scala:1099:44
+      automatic logic [16:0] _GEN_27 = {1'h0, io_regFile_n};	// src/hive/scala/main/HiveCoreCalcConfig.scala:708:41
+      automatic logic        _GEN_28;	// src/hive/scala/main/HiveEnum.scala:14:{51,67}
+      automatic logic [31:0] _GEN_29 = {14'h0, io_regFile_k, 2'h0};	// src/hive/scala/main/HiveCoreCalcConfig.scala:741:34
+      automatic logic [31:0] _GEN_30 = {15'h0, io_regFile_k, 1'h0};	// src/hive/scala/main/HiveCoreCalcConfig.scala:743:34
+      automatic logic [31:0] _GEN_31 = {16'h0, io_regFile_k};	// src/hive/scala/main/HiveCoreCalcConfig.scala:745:34
+      automatic logic [31:0] _GEN_32 = {17'h0, io_regFile_k[15:1]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:747:{34,50}
+      automatic logic        _GEN_33;	// src/hive/scala/main/HiveEnum.scala:12:51
+      automatic logic [31:0] _GEN_34 = {14'h0, io_regFile_n, 2'h0};	// src/hive/scala/main/HiveCoreCalcConfig.scala:807:34
+      automatic logic        _GEN_35 =
+        io_regFile_bFmt == 4'h1 | io_regFile_bFmt == 4'h2 | io_regFile_bFmt == 4'h7;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :808:{47,66}, src/hive/scala/main/HiveEnum.scala:13:{42,51,56}
+      automatic logic [31:0] _GEN_36 = {15'h0, io_regFile_n, 1'h0};	// src/hive/scala/main/HiveCoreCalcConfig.scala:809:34
+      automatic logic        _GEN_37;	// src/hive/scala/main/HiveEnum.scala:14:{51,67}
+      automatic logic [31:0] _GEN_38 = {16'h0, io_regFile_n};	// src/hive/scala/main/HiveCoreCalcConfig.scala:811:34
+      automatic logic [13:0] _GEN_39;	// src/hive/scala/main/HiveCoreCalcConfig.scala:878:53
+      automatic logic        _GEN_40;	// src/hive/scala/main/HiveEnum.scala:15:54
+      automatic logic        _GEN_41;	// src/hive/scala/main/HiveEnum.scala:14:{51,67}
+      automatic logic        _GEN_42;	// src/hive/scala/main/HiveCoreCalcConfig.scala:914:45, src/hive/scala/main/HiveEnum.scala:13:51
+      automatic logic [31:0] _GEN_43 = {21'h0, io_regFile_k[15:5]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:990:{43,59}
+      automatic logic [31:0] _GEN_44 = {20'h0, io_regFile_k[15:4]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:993:{43,59}
+      automatic logic [7:0]  cWriteBytes;	// src/hive/scala/main/HiveCoreCalcConfig.scala:1143:44, :1144:17, :1145:47
+      automatic logic        _GEN_45;	// src/hive/scala/main/HiveCoreCalcConfig.scala:1153:20
+      automatic logic [15:0] _calcConfig_nTile_T_2 = io_regFile_n + 16'hF;	// src/hive/scala/main/HiveCoreCalcConfig.scala:708:{41,56}
+      automatic logic [15:0] _calcConfig_kTile_T_3 = io_regFile_k + 16'hF;	// src/hive/scala/main/HiveCoreCalcConfig.scala:723:{44,59}
+      automatic logic [13:0] _calcConfig_bColTileAddressOffset_T_44;	// src/hive/scala/main/HiveCoreCalcConfig.scala:886:55
+      automatic logic [13:0] _calcConfig_bColTileAddressOffset_T_29;	// src/hive/scala/main/HiveCoreCalcConfig.scala:878:53
+      automatic logic [16:0] _calcConfig_scaleCRowAddressOffset_T_2 = _GEN_27 + 17'hF;	// src/hive/scala/main/HiveCoreCalcConfig.scala:708:41, :1022:60
+      automatic logic [16:0] _calcConfig_scaleCRowAddressOffset_T = _GEN_27 + 17'h1F;	// src/hive/scala/main/HiveCoreCalcConfig.scala:708:41, :1018:60
+      automatic logic [7:0]  _calcConfig_cDmaDmaBeatTar_T;	// src/hive/scala/main/HiveCoreCalcConfig.scala:1160:44
       w4a8Mix =
         (_calcConfig_aColTileAddressOffset_T_4 | _calcConfig_aColTileAddressOffset_T_6)
-        & _calcConfig_bColTileAddressOffset_T_17;	// src/hive/scala/main/HiveCoreCalcConfig.scala:155:37, src/hive/scala/main/HiveEnum.scala:10:54, :11:43, :14:{56,72}
-      _GEN_26 =
+        & _calcConfig_bColTileAddressOffset_T_32;	// src/hive/scala/main/HiveCoreCalcConfig.scala:155:37, src/hive/scala/main/HiveEnum.scala:10:54, :11:43, :14:{56,72}
+      _GEN_28 =
         _calcConfig_aColTileAddressOffset_T_3 | _calcConfig_aColTileAddressOffset_T_4
         | _calcConfig_aColTileAddressOffset_T_6;	// src/hive/scala/main/HiveEnum.scala:14:{42,51,56,67,72}
-      _GEN_31 = _GEN_2 | io_regFile_bFmt == 4'h6;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :201:64, src/hive/scala/main/HiveEnum.scala:12:{51,56}
-      _GEN_35 =
-        _calcConfig_bColTileAddressOffset_T_19 | _calcConfig_bColTileAddressOffset_T_20
-        | _calcConfig_bColTileAddressOffset_T_22;	// src/hive/scala/main/HiveEnum.scala:14:{42,51,56,67,72}
-      _GEN_37 = _cIsIntOut_T_3 | _errMXLargerThanKLoadNum_T_19;	// src/hive/scala/main/HiveCoreCalcConfig.scala:346:91, src/hive/scala/main/HiveEnum.scala:9:74, :15:54
-      _GEN_38 =
-        _cIsIntOut_T | _errMXLargerThanKLoadNum_T_16 | _errMXLargerThanKLoadNum_T_17;	// src/hive/scala/main/HiveCoreCalcConfig.scala:346:52, src/hive/scala/main/HiveEnum.scala:9:{42,58}, :14:{51,67}
-      _GEN_39 = io_regFile_cFmt == 4'h1 | io_regFile_cFmt == 4'h2 | _cIsIntOut_T_1;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :853:45, src/hive/scala/main/HiveEnum.scala:13:{42,51,56}, :16:57
-      cWriteBytes = _GEN_37 ? 8'h8 : _GEN_38 ? 8'h10 : _GEN_39 ? 8'h20 : 8'h40;	// src/hive/scala/main/HiveCoreCalcConfig.scala:853:45, :930:56, :933:56, :1082:44, :1083:17, :1084:47, :1085:17, :1086:87, :1087:17, :1089:17, src/hive/scala/main/HiveEnum.scala:13:51, :14:{51,67}, :15:54
-      _GEN_42 = cWriteBytes > 8'h20;	// src/hive/scala/main/HiveCoreCalcConfig.scala:930:56, :1082:44, :1083:17, :1084:47, :1092:20
-      calcConfig_nTile <= {4'h0, _calcConfig_nTile_T_2[15:4]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :20:25, :656:{41,56,63}
+      _GEN_33 = _GEN_2 | io_regFile_bFmt == 4'h6;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :211:64, src/hive/scala/main/HiveEnum.scala:12:{51,56}
+      _GEN_37 =
+        _calcConfig_bColTileAddressOffset_T_34 | _calcConfig_bColTileAddressOffset_T_35
+        | _calcConfig_bColTileAddressOffset_T_37;	// src/hive/scala/main/HiveEnum.scala:14:{42,51,56,67,72}
+      _GEN_39 = {6'h0, aKLoadNum};	// src/hive/scala/main/HiveCoreCalcConfig.scala:70:29, :71:13, :73:13, :878:53
+      _GEN_40 = _cIsIntOut_T_3 | _errMXLargerThanKLoadNum_T_19;	// src/hive/scala/main/HiveCoreCalcConfig.scala:356:91, src/hive/scala/main/HiveEnum.scala:9:74, :15:54
+      _GEN_41 =
+        _cIsIntOut_T | _errMXLargerThanKLoadNum_T_16 | _errMXLargerThanKLoadNum_T_17;	// src/hive/scala/main/HiveCoreCalcConfig.scala:356:52, src/hive/scala/main/HiveEnum.scala:9:{42,58}, :14:{51,67}
+      _GEN_42 = io_regFile_cFmt == 4'h1 | io_regFile_cFmt == 4'h2 | _cIsIntOut_T_1;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :914:45, src/hive/scala/main/HiveEnum.scala:13:{42,51,56}, :16:57
+      cWriteBytes = _GEN_40 ? 8'h8 : _GEN_41 ? 8'h10 : _GEN_42 ? 8'h20 : 8'h40;	// src/hive/scala/main/HiveCoreCalcConfig.scala:914:45, :991:56, :994:56, :1143:44, :1144:17, :1145:47, :1146:17, :1147:87, :1148:17, :1150:17, src/hive/scala/main/HiveEnum.scala:13:51, :14:{51,67}, :15:54
+      _GEN_45 = cWriteBytes > 8'h20;	// src/hive/scala/main/HiveCoreCalcConfig.scala:991:56, :1143:44, :1144:17, :1145:47, :1153:20
+      calcConfig_nTile <= {4'h0, _calcConfig_nTile_T_2[15:4]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :20:25, :708:{41,56,63}
       calcConfig_kTile <=
-        _GEN_26 | _calcConfig_aColTileAddressOffset_T
+        _GEN_28 | _calcConfig_aColTileAddressOffset_T
         | _calcConfig_aColTileAddressOffset_T_1
           ? io_regFile_k / {8'h0, aKLoadNum}
-          : {4'h0, _calcConfig_kTile_T_3[15:4]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :20:25, :70:29, :71:13, :73:13, :667:{43,82}, :668:{26,43}, :671:{26,44,59,66}, src/hive/scala/main/HiveEnum.scala:14:{51,67}, :15:{45,54,59}
+          : {4'h0, _calcConfig_kTile_T_3[15:4]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :20:25, :70:29, :71:13, :73:13, :479:44, :480:58, :719:{43,82}, :720:{26,43}, :723:{26,44,59,66}, src/hive/scala/main/HiveEnum.scala:14:{51,67}, :15:{45,54,59}
       calcConfig_aRowAddressOffset <=
         _GEN_1 | io_regFile_aFmt == 4'h6
-          ? _GEN_27
+          ? _GEN_29
           : _calcConfig_aColTileAddressOffset_T_8 | _calcConfig_aColTileAddressOffset_T_9
             | io_regFile_aFmt == 4'h7
-              ? _GEN_28
-              : _GEN_26 ? _GEN_29 : _GEN_30;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :20:25, :201:26, :688:41, :689:34, :690:{47,66,87}, :691:34, :692:47, :693:34, :695:34, src/hive/scala/main/HiveEnum.scala:12:{51,56}, :13:{42,51,56}, :14:{51,67}
+              ? _GEN_30
+              : _GEN_28 ? _GEN_31 : _GEN_32;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :20:25, :211:26, :740:41, :741:34, :742:{47,66,87}, :743:34, :744:47, :745:34, :747:34, src/hive/scala/main/HiveEnum.scala:12:{51,56}, :13:{42,51,56}, :14:{51,67}
       calcConfig_bRowAddressOffset <=
         io_regFile_loadWMode
-          ? (_GEN_31 ? _GEN_27 : _GEN_33 ? _GEN_28 : _GEN_35 ? _GEN_29 : _GEN_30)
-          : _GEN_31
-              ? _GEN_32
-              : _GEN_33 ? _GEN_34 : _GEN_35 ? _GEN_36 : {17'h0, io_regFile_n[15:1]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :689:34, :691:34, :693:34, :695:34, :753:35, :754:41, :755:34, :756:{47,87}, :757:34, :758:47, :759:34, :761:{34,50}, :765:41, :766:34, :767:87, :768:34, :769:47, :770:34, :772:34, src/hive/scala/main/HiveEnum.scala:12:51, :13:51, :14:{51,67}
+          ? (_GEN_33 ? _GEN_29 : _GEN_35 ? _GEN_30 : _GEN_37 ? _GEN_31 : _GEN_32)
+          : _GEN_33
+              ? _GEN_34
+              : _GEN_35 ? _GEN_36 : _GEN_37 ? _GEN_38 : {17'h0, io_regFile_n[15:1]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :741:34, :743:34, :745:34, :747:34, :805:35, :806:41, :807:34, :808:{47,87}, :809:34, :810:47, :811:34, :813:{34,50}, :817:41, :818:34, :819:87, :820:34, :821:47, :822:34, :824:34, src/hive/scala/main/HiveEnum.scala:12:51, :13:51, :14:{51,67}
       calcConfig_cRowAddressOffset <=
-        _GEN_37
+        _GEN_40
           ? {17'h0, io_regFile_n[15:1]}
-          : _GEN_38 ? _GEN_36 : _GEN_39 ? _GEN_34 : _GEN_32;	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :755:34, :757:34, :759:34, :847:42, :848:{32,48}, :850:45, :851:32, :853:{45,85}, :854:32, :858:32, src/hive/scala/main/HiveEnum.scala:13:51, :14:{51,67}, :15:54
+          : _GEN_41 ? _GEN_38 : _GEN_42 ? _GEN_36 : _GEN_34;	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :807:34, :809:34, :811:34, :908:42, :909:{32,48}, :911:45, :912:32, :914:{45,85}, :915:32, :919:32, src/hive/scala/main/HiveEnum.scala:13:51, :14:{51,67}, :15:54
       calcConfig_aColTileAddressOffset <=
         {22'h0,
          {6'h0,
@@ -358,72 +369,87 @@ module Hive_HiveCoreCalcConfig(	// src/hive/scala/main/HiveCoreCalcConfig.scala:
                       | _calcConfig_aColTileAddressOffset_T_9 | io_regFile_aFmt == 4'h7
                         ? 6'h10
                         : 6'h20},
-         1'h0};	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :20:25, :40:13, :123:32, :124:13, :125:35, :126:13, :127:{35,40,61}, :128:13, :130:13, :739:{38,68}, src/hive/scala/main/HiveEnum.scala:13:{42,51,56}, :14:{42,51,56,67,72}, :15:{45,54,59}, :49:21, :50:11, :51:24, :52:11, :54:11
+         1'h0};	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :20:25, :40:13, :123:32, :124:13, :125:35, :126:13, :127:{35,40,61}, :128:13, :130:13, :791:{38,68}, src/hive/scala/main/HiveEnum.scala:13:{42,51,56}, :14:{42,51,56,67,72}, :15:{45,54,59}, :49:21, :50:11, :51:24, :52:11, :54:11
       calcConfig_cColTileAddressOffset <=
-        _GEN_37 ? 32'h8 : _GEN_38 ? 32'h10 : _GEN_39 ? 32'h20 : 32'h40;	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :427:34, :847:42, :849:36, :850:45, :852:36, :853:{45,85}, :855:36, :859:36, src/hive/scala/main/HiveEnum.scala:13:51, :14:{51,67}, :15:54
-      _calcConfig_bColTileAddressOffset_T_29 =
-        {6'h0, aKLoadNum}
+        _GEN_40 ? 32'h8 : _GEN_41 ? 32'h10 : _GEN_42 ? 32'h20 : 32'h40;	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :437:34, :908:42, :910:36, :911:45, :913:36, :914:{45,85}, :916:36, :920:36, src/hive/scala/main/HiveEnum.scala:13:51, :14:{51,67}, :15:54
+      _calcConfig_bColTileAddressOffset_T_44 =
+        _GEN_39
         * {8'h0,
-           _calcConfig_bColTileAddressOffset_T_16 | _calcConfig_bColTileAddressOffset_T_17
+           _calcConfig_bColTileAddressOffset_T_31 | _calcConfig_bColTileAddressOffset_T_32
              ? 6'h4
-             : _calcConfig_bColTileAddressOffset_T_19
-               | _calcConfig_bColTileAddressOffset_T_20
-               | _calcConfig_bColTileAddressOffset_T_22
+             : _calcConfig_bColTileAddressOffset_T_34
+               | _calcConfig_bColTileAddressOffset_T_35
+               | _calcConfig_bColTileAddressOffset_T_37
                  ? 6'h8
                  : io_regFile_bFmt == 4'h1 | io_regFile_bFmt == 4'h2
                    | io_regFile_bFmt == 4'h7
                      ? 6'h10
-                     : 6'h20};	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :40:13, :70:29, :71:13, :73:13, :123:32, :124:13, :125:35, :126:13, :127:{35,40,61}, :128:13, :130:13, :668:43, :826:53, src/hive/scala/main/HiveEnum.scala:11:43, :13:{42,51,56}, :14:{42,51,56,67,72}, :15:{45,54}
+                     : 6'h20};	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :40:13, :123:32, :124:13, :125:35, :126:13, :127:{35,40,61}, :128:13, :130:13, :165:58, :479:44, :480:58, :878:53, :886:55, src/hive/scala/main/HiveEnum.scala:11:43, :13:{42,51,56}, :14:{42,51,56,67,72}, :15:54
+      _calcConfig_bColTileAddressOffset_T_29 =
+        _GEN_39
+        * {8'h0,
+           _calcConfig_bColTileAddressOffset_T_31 | _calcConfig_bColTileAddressOffset_T_32
+             ? 6'h4
+             : _calcConfig_bColTileAddressOffset_T_34
+               | _calcConfig_bColTileAddressOffset_T_35
+               | _calcConfig_bColTileAddressOffset_T_37
+                 ? 6'h8
+                 : io_regFile_bFmt == 4'h1 | io_regFile_bFmt == 4'h2
+                   | io_regFile_bFmt == 4'h7
+                     ? 6'h10
+                     : 6'h20};	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :40:13, :123:32, :124:13, :125:35, :126:13, :127:{35,40,61}, :128:13, :130:13, :165:58, :479:44, :480:58, :878:53, src/hive/scala/main/HiveEnum.scala:11:43, :13:{42,51,56}, :14:{42,51,56,67,72}, :15:54
       calcConfig_bColTileAddressOffset <=
-        w4a8Mix
-          ? {21'h0, _calcConfig_bColTileAddressOffset_T_29[13:3]}
-          : {22'h0,
-             {6'h0,
-              _calcConfig_bColTileAddressOffset_T_16
-              | _calcConfig_bColTileAddressOffset_T_17
-                ? 3'h4
-                : _calcConfig_bColTileAddressOffset_T_19
-                  | _calcConfig_bColTileAddressOffset_T_20
-                  | _calcConfig_bColTileAddressOffset_T_22
-                    ? 3'h2
-                    : 3'h1}
-               * {3'h0,
-                  _calcConfig_bColTileAddressOffset_T_16
-                  | _calcConfig_bColTileAddressOffset_T_17
-                    ? 6'h4
-                    : _calcConfig_bColTileAddressOffset_T_19
-                      | _calcConfig_bColTileAddressOffset_T_20
-                      | _calcConfig_bColTileAddressOffset_T_22
-                        ? 6'h8
-                        : io_regFile_bFmt == 4'h1 | io_regFile_bFmt == 4'h2
-                          | io_regFile_bFmt == 4'h7
-                            ? 6'h10
-                            : 6'h20},
-             1'h0};	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :20:25, :40:13, :123:32, :124:13, :125:35, :126:13, :127:{35,40,61}, :128:13, :130:13, :155:37, :820:{36,66}, :825:19, :826:{40,53,86}, src/hive/scala/main/HiveEnum.scala:11:43, :13:{42,51,56}, :14:{42,51,56,67,72}, :15:{45,54}, :49:21, :50:11, :51:24, :52:11, :54:11
-      calcConfig_scaleARowAddressOffset <= io_regFile_aMxBlockSize ? _GEN_40 : _GEN_41;	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :928:50, :929:43, :932:43
+        _calcConfig_aColTileAddressOffset_T_3 & _calcConfig_bColTileAddressOffset_T_31
+          ? {21'h0, _calcConfig_bColTileAddressOffset_T_44[13:3]}
+          : w4a8Mix
+              ? {21'h0, _calcConfig_bColTileAddressOffset_T_29[13:3]}
+              : {22'h0,
+                 {6'h0,
+                  _calcConfig_bColTileAddressOffset_T_31
+                  | _calcConfig_bColTileAddressOffset_T_32
+                    ? 3'h4
+                    : _calcConfig_bColTileAddressOffset_T_34
+                      | _calcConfig_bColTileAddressOffset_T_35
+                      | _calcConfig_bColTileAddressOffset_T_37
+                        ? 3'h2
+                        : 3'h1}
+                   * {3'h0,
+                      _calcConfig_bColTileAddressOffset_T_31
+                      | _calcConfig_bColTileAddressOffset_T_32
+                        ? 6'h4
+                        : _calcConfig_bColTileAddressOffset_T_34
+                          | _calcConfig_bColTileAddressOffset_T_35
+                          | _calcConfig_bColTileAddressOffset_T_37
+                            ? 6'h8
+                            : io_regFile_bFmt == 4'h1 | io_regFile_bFmt == 4'h2
+                              | io_regFile_bFmt == 4'h7
+                                ? 6'h10
+                                : 6'h20},
+                 1'h0};	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :20:25, :40:13, :123:32, :124:13, :125:35, :126:13, :127:{35,40,61}, :128:13, :130:13, :155:37, :165:{39,58}, :872:{36,66}, :877:19, :878:{40,53,86}, :885:24, :886:{42,55,88}, src/hive/scala/main/HiveEnum.scala:11:43, :13:{42,51,56}, :14:{42,51,56,67,72}, :15:54, :49:21, :50:11, :51:24, :52:11, :54:11
+      calcConfig_scaleARowAddressOffset <= io_regFile_aMxBlockSize ? _GEN_43 : _GEN_44;	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :989:50, :990:43, :993:43
       calcConfig_scaleAColTileAddressOffset <=
-        io_regFile_aMxBlockSize ? {29'h0, aKLoadNum[7:5]} : {28'h0, aKLoadNum[7:4]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :70:29, :71:13, :73:13, :928:50, :930:{43,56}, :933:{43,56}
-      calcConfig_scaleBRowAddressOffset <= io_regFile_bMxBlockSize ? _GEN_40 : _GEN_41;	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :929:43, :932:43, :936:50, :937:43, :941:43
+        io_regFile_aMxBlockSize ? {29'h0, aKLoadNum[7:5]} : {28'h0, aKLoadNum[7:4]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :70:29, :71:13, :73:13, :989:50, :991:{43,56}, :994:{43,56}
+      calcConfig_scaleBRowAddressOffset <= io_regFile_bMxBlockSize ? _GEN_43 : _GEN_44;	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :990:43, :993:43, :997:50, :998:43, :1002:43
       calcConfig_scaleBColTileAddressOffset <=
         w4a8Mix
           ? {24'h0, aKLoadNum / {2'h0, io_regFile_bMxBlockSize ? 6'h20 : 6'h10}}
-          : io_regFile_bMxBlockSize ? {29'h0, bKLoadNum[7:5]} : {28'h0, bKLoadNum[7:4]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :40:13, :70:29, :71:13, :73:13, :155:37, :930:43, :936:50, :938:{43,56}, :942:{43,56}, :949:17, :950:43, :951:{17,22}
+          : io_regFile_bMxBlockSize ? {29'h0, bKLoadNum[7:5]} : {28'h0, bKLoadNum[7:4]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :40:13, :70:29, :71:13, :73:13, :155:37, :991:43, :997:50, :999:{43,56}, :1003:{43,56}, :1010:17, :1011:43, :1012:{17,22}
       calcConfig_scaleCRowAddressOffset <=
         io_regFile_cMxBlockSize
           ? {20'h0, _calcConfig_scaleCRowAddressOffset_T[16:5]}
-          : {19'h0, _calcConfig_scaleCRowAddressOffset_T_2[16:4]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :956:50, :957:{43,60,69}, :961:{43,60,69}
-      calcConfig_scaleCColTileAddressOffset <= {31'h0, ~io_regFile_cMxBlockSize};	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :956:50, :958:43, :962:43
-      calcConfig_cBeatAddrStep <= _GEN_42 ? 32'h20 : {24'h0, cWriteBytes};	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :427:34, :930:43, :1082:44, :1083:17, :1084:47, :1092:{20,33}, :1093:30, :1097:30
-      calcConfig_cDmaBufBeatTar <= _GEN_42 ? {1'h0, cWriteBytes[7:5]} - 4'h1 : 4'h0;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :20:25, :1082:44, :1083:17, :1084:47, :1092:{20,33}, :1094:{31,46,58}, :1098:31
-      _calcConfig_cDmaDmaBeatTar_T = 8'h20 / cWriteBytes;	// src/hive/scala/main/HiveCoreCalcConfig.scala:930:56, :1082:44, :1083:17, :1084:47, :1099:44
+          : {19'h0, _calcConfig_scaleCRowAddressOffset_T_2[16:4]};	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :1017:50, :1018:{43,60,69}, :1022:{43,60,69}
+      calcConfig_scaleCColTileAddressOffset <= {31'h0, ~io_regFile_cMxBlockSize};	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :1017:50, :1019:43, :1023:43
+      calcConfig_cBeatAddrStep <= _GEN_45 ? 32'h20 : {24'h0, cWriteBytes};	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, :437:34, :991:43, :1143:44, :1144:17, :1145:47, :1153:{20,33}, :1154:30, :1158:30
+      calcConfig_cDmaBufBeatTar <= _GEN_45 ? {1'h0, cWriteBytes[7:5]} - 4'h1 : 4'h0;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :20:25, :1143:44, :1144:17, :1145:47, :1153:{20,33}, :1155:{31,46,58}, :1159:31
+      _calcConfig_cDmaDmaBeatTar_T = 8'h20 / cWriteBytes;	// src/hive/scala/main/HiveCoreCalcConfig.scala:991:56, :1143:44, :1144:17, :1145:47, :1160:44
       calcConfig_cDmaDmaBeatTar <=
-        _GEN_42 ? 4'h0 : _calcConfig_cDmaDmaBeatTar_T[3:0] - 4'h1;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :20:25, :1092:{20,33}, :1095:31, :1099:{31,44,58}
+        _GEN_45 ? 4'h0 : _calcConfig_cDmaDmaBeatTar_T[3:0] - 4'h1;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :20:25, :1153:{20,33}, :1156:31, :1160:{31,44,58}
       calcConfig_isAX2 <=
         _calcConfig_aColTileAddressOffset_T_3 | _calcConfig_aColTileAddressOffset_T_4
         | _calcConfig_aColTileAddressOffset_T_6;	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, src/hive/scala/main/HiveEnum.scala:14:{42,51,56,67,72}
       calcConfig_isBX2 <=
-        _calcConfig_bColTileAddressOffset_T_19 | _calcConfig_bColTileAddressOffset_T_20
-        | _calcConfig_bColTileAddressOffset_T_22;	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, src/hive/scala/main/HiveEnum.scala:14:{42,51,56,67,72}
+        _calcConfig_bColTileAddressOffset_T_34 | _calcConfig_bColTileAddressOffset_T_35
+        | _calcConfig_bColTileAddressOffset_T_37;	// src/hive/scala/main/HiveCoreCalcConfig.scala:20:25, src/hive/scala/main/HiveEnum.scala:14:{42,51,56,67,72}
     end
   end // always @(posedge)
   `ifdef ENABLE_INITIAL_REG_	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7
@@ -468,7 +494,7 @@ module Hive_HiveCoreCalcConfig(	// src/hive/scala/main/HiveCoreCalcConfig.scala:
       `FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_startOut = state == 2'h2 & ~err;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :17:22, :28:24, :71:30, :1124:{22,30,33}
+  assign io_startOut = state == 2'h2 & ~err;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :17:22, :28:24, :71:30, :1185:{22,30,33}
   assign io_err = err;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :17:22
   assign io_errPluse = err & ~errNext;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :17:22, :18:26, :33:{20,22}
   assign io_errCode = errCode;	// src/hive/scala/main/HiveCoreCalcConfig.scala:5:7, :19:22

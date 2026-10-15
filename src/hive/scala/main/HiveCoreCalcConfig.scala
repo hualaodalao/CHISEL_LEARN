@@ -155,6 +155,16 @@ private val w4a8Mix = if (cfg.hasMx4)
   DataFormat.isMx8(io.regFile.aFmt) && DataFormat.isMx4(io.regFile.bFmt)
 else false.B
 
+// 【INT W4A8】A=INT8×B=INT4 正向混配谓词（与 HiveCore.intW4a8Mix 同式；门控
+//   hasInt&&hasMx4：bDma stretch 端口仅 hasMx4 配置生成，且不存在 INT-only 配置）。
+//   下方 bColTile【阵列窗口口径】覆盖共用：混配下 B 的 kTile 步进按 A 侧
+//   aKLoadNum=32 元素窗口推导（stretch 半字片 16B），而非 INT4 源字口径
+//   bKLoadNum=64（与 MX 混配 w4a8Mix 覆盖同构；scaleB 无 INT 对应臂——INT 无
+//   scale 通道）。
+private val intW4a8Mix = if (cfg.hasInt && cfg.hasMx4)
+  io.regFile.aFmt === DataFormat.INT8 && io.regFile.bFmt === DataFormat.INT4
+else false.B
+
 // 【#124 ①】colTile 偏移的两个运行期因子（A/B 各自解码，勿共用：aFmt/bFmt 可异构）。
 // 与本文件上方 aMxBlockSize/aKLoadNum 同一放置层（模块级无条件赋值的 Wire），
 // 使 sC0 分支内只做一次乘法，不在 when 里生成解码逻辑。
@@ -451,6 +461,28 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
             errComb := true.B
             errCodeComb := 8.U
         }
+        // 【INT W4A8 · errCode 8（混配 stretch 单读契约守护）】A=INT8×B=INT4 与上方
+        //   MX 混配臂（isMx8&&isMx4）逐条同构：B DMA 走 stretch（逻辑拍 = 16B 半字片、
+        //   物理读 = 32B 对齐单读，不走 gather 两读）。三条守护：
+        //   ⓪ loadWMode=1（INT 专属臂）：stretch 半字切片取「转置布局中一行内连续
+        //      32 个 K 元素」——loadW=0 的 K×N 行主序布局里同列 K 元素跨行步进
+        //      bRowOff，32 连续 nibble 是 32 个 N 元素而非 K 窗口，几何不可达
+        //      （且混配 bColTile 覆盖会破坏 loadW=0 的 n-tile 语义）。纯 INT8/INT4
+        //      不受影响（本臂仅混配命中；裁定：errCode4 不扩 INT，纯 INT 两种
+        //      loadW 布局均合法）；
+        //   ① K%(totalN*4)==0：kTile 奇数（K%64==32）时末窗口 32B 单读越出张量界 16B
+        //      （对齐化向后越），保持源粒度 64 不放宽（kTile 本身 = K/32 为 aFmt=INT8
+        //      口径，本臂是比 aFmt===INT8 臂更严的混配专属约束）；
+        //   ② bAddr%32==0：半字拍片契约（L mod 32 ∈ {0,16}）与「读严格落张量界内」的
+        //      前提，与 errCode10 的 cAddr%dmaBytes 同式（portBytes=totalN*bW/8）。
+        when(io.regFile.aFmt === DataFormat.INT8 && io.regFile.bFmt === DataFormat.INT4 &&
+             (io.regFile.loadWMode === 0.U ||
+              (io.regFile.k(15, 0) % (cfg.totalN * 4).U) =/= 0.U ||
+              (io.regFile.k(15, 0) === 0.U) ||
+              (io.regFile.bAddr % (cfg.totalN * cfg.bW / 8).U) =/= 0.U)){
+            errComb := true.B
+            errCodeComb := 8.U
+        }
     }
     // ==========================================================================
     // (#177) errCode 11 -- INT / NON-INT FORMAT CROSS-BOUNDARY GUARD (V5-only XOR).
@@ -562,6 +594,26 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //   格式矛盾、静默算错）。MX-vs-nonMX 裸 errCode3 块（isAMx^isBMx）不受影响。
     if(cfg.hasMx4){
         when(DataFormat.isMx4(io.regFile.aFmt) && !DataFormat.isMx4(io.regFile.bFmt)){
+            errComb := true.B
+            errCodeComb := 3.U
+        }
+    }
+
+    // ==========================================================================
+    // 【INT W4A8 · errCode 3（INT4×INT8 反向混配拒绝）】与上方 Fix-4 MX 反向混配臂
+    //   同构：正向（A=INT8×B=INT4）已由 bDma stretch 展开路落地（HiveCore.intW4a8Mix，
+    //   B 半字片 16B 经 int4SliceToInt8Beat sext 加宽成 32B INT8 阵列拍）；反向
+    //   （A=INT4×B=INT8）K 窗口 = aKLoadNum=64 个元素，B 每行窗口切片 = 64 个
+    //   INT8 = 64B，超出 B 拍宽（totalN*bW/8=32B）两倍，须 B 侧 push 连推 2 拍——
+    //   同型机构已在 MX 侧被 PROBE4/PROBE6 证伪（源字跨窗口产生行交错序），几何
+    //   不可达，运行期拒绝、复用 code 3 语义「v1 不支持的格式组合」。
+    // ▸ 门控：整块包在 if(cfg.hasInt) 内——不含整数格式的配置完全不 elaborate。
+    // ▸ Priority (last-connect wins)：本块位于 Fix-4 code3 之后，为链上最高优先级
+    //   ——反向混配覆盖 errCode 8/11/13/12/10 等一切低码（与 Fix-4 对 MX 反向的
+    //   处置一致）。真值序：3 (MX4xMX8 / INT4xINT8 反向混配，两臂谓词互斥) > 11
+    //     > 8 > 13 > 12 > 10 > 7 > 5 > 4 > 3 (isAMx^isBMx) > 0。
+    if(cfg.hasInt){
+        when(io.regFile.aFmt === DataFormat.INT4 && io.regFile.bFmt === DataFormat.INT8){
             errComb := true.B
             errCodeComb := 3.U
         }
@@ -824,6 +876,15 @@ if(cfg.hasMx4 || cfg.hasInt4){
     //   非混配（纯 fp4/纯 fp8/INT4）last-connect 不到、逐值不变。
     when(w4a8Mix) {
       calcConfig.bColTileAddressOffset := aKLoadNum * memElemBitsOf(io.regFile.bFmt) / 8.U
+    }
+    // 【INT W4A8】INT8×INT4 混配同款覆盖：k 窗口步进 = aKLoadNum(32) 个 K 元素 ×
+    //   0.5B = 16B（半字片），取 A=INT8 阵列窗口口径而非 INT4 源字口径（64 元素
+    //   32B）。非混配 last-connect 不到、逐值不变；if(cfg.hasInt) 门控 ⟹ 非 INT
+    //   配置（如 MX-only）不生成、零 diff。scaleB 无 INT 对应覆盖（INT 无 scale 通道）。
+    if (cfg.hasInt) {
+      when(intW4a8Mix) {
+        calcConfig.bColTileAddressOffset := aKLoadNum * memElemBitsOf(io.regFile.bFmt) / 8.U
+      }
     }
   }
 } else {

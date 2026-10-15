@@ -132,6 +132,16 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     DataFormat.isMx8(regFile.aFmt) && DataFormat.isMx4(regFile.bFmt)
   else false.B
 
+  // 【INT W4A8】A=INT8 × B=INT4 单向混配谓词（与 w4a8Mix 同式；门控 hasInt&&hasMx4：
+  //   bDma stretch 端口仅 hasMx4 配置生成，且用户裁定不存在 INT-only 配置——全集下
+  //   hasInt ⟹ 含 MXE2M1）。bDma stretch 使能、stretchBeat 加宽选择、阵列侧 bFmt
+  //   重映射三处共用。反向混配（A=INT4×B=INT8）由 CalcConfig errCode3 拒绝（运行期
+  //   不可达）：一个 K 窗口 = 64 个 INT8 权重 = 64B，超出 B 拍宽（totalN*bW/8=32B）
+  //   两倍，几何不可达。
+  private val intW4a8Mix = if (cfg.hasInt && cfg.hasMx4)
+    regFile.aFmt === DataFormat.INT8 && regFile.bFmt === DataFormat.INT4
+  else false.B
+
   // 【P1-2 W4A8 订正（2026-10-13）】混配下 B/scaleB 两 DMA 的 kt 轮次一律取【全量
   //   calcConfig.kTile = K/aKLoadNum = K/32（A=MX8 口径 = 阵列 K 窗口数）】：bDma 每窗口
   //   每行读一个 16B 半字片（stretch 模式，见 HiveCoreDmaRdOnly），scaleBDma 每窗口
@@ -156,6 +166,21 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     Cat(bytes.reverse)
   }
 
+  // 【INT W4A8】INT4 nibble → INT8 字节符号扩展加宽：二补码 nibble 直接 sext 至
+  //   8-bit，数值逐值精确、无需 LUT。输入/输出拍型与 fp4SliceToMx8Beat 完全同构
+  //   （16B 半字片 32 个 nibble 小端 ↔ 32 字节阵列拍），两混配谓词互斥、stretchBeat
+  //   处 Mux 二选一。★Cat 位宽必须凑足 8（Fill(5)+nib(2,0)）：初版 Fill(4) 只拼出
+  //   7-bit 字节 ⟹ 整拍 224 位，Mux 两臂 224/256 不等宽被 Chisel 静默零扩成
+  //   「7-bit 字段错位打包 + 高 32 位全零」的乱码拍（fp4 版靠 7-bit LUT + 1-bit
+  //   符号天然凑 8 位故无此坑）——两臂等宽是 stretchBeat Mux 的硬约束。
+  private def int4SliceToInt8Beat(src: UInt): UInt = {
+    val bytes = Seq.tabulate(src.getWidth / 4) { j =>
+      val nib = src(4 * j + 3, 4 * j)
+      Cat(Fill(5, nib(3)), nib(2, 0))
+    }
+    Cat(bytes.reverse)
+  }
+
   // ==========================================================================
   // bDma 控制接线：execute 起始拍与 Executor 同步启动，自主扫完整个 B 矩阵
   // ==========================================================================
@@ -174,22 +199,18 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     //   K 窗口的一行），物理读 32B 对齐单读、半字选择在 DMA 内 sel FIFO、E2M1→E4M3
     //   LUT 加宽组合在此处闭环。A 侧激活本身即 MX8、不 stretch（恒 0，DMA 内
     //   Mux 死路 = 基线支路）。
-    bDma.io.stretch.get := w4a8Mix
-    bDma.io.stretchBeat.get := fp4SliceToMx8Beat(bDma.io.stretchSrc.get)
+    // 【INT W4A8】stretch 使能扩为两混配谓词之或（互斥：aFmt 不能同时为 MX8 与
+    //   INT8）；加宽函数按谓词 Mux 二选一——MX8×MX4 走 E2M1→E4M3 LUT、INT8×INT4
+    //   走 INT4→INT8 sext。非 hasInt 配置 intW4a8Mix 恒 false.B，常量折叠后与
+    //   P1-2 基线逐位相同。
+    bDma.io.stretch.get := w4a8Mix || intW4a8Mix
+    bDma.io.stretchBeat.get := Mux(intW4a8Mix,
+      int4SliceToInt8Beat(bDma.io.stretchSrc.get),
+      fp4SliceToMx8Beat(bDma.io.stretchSrc.get))
     aDma.io.stretch.get := false.B
     aDma.io.stretchBeat.get := 0.U
   }
 
-  
-  val reg_baseAddr = Input(UInt(cfg.addrWidth.W))
-    val reg_kTile = Input(UInt(cfg.mnkWidth.W))
-    val reg_mTile = Input(UInt(cfg.mnkWidth.W))
-    val reg_nTile = Input(UInt(cfg.mnkWidth.W))
-    val reg_rowOffset = Input(UInt(cfg.addrWidth.W))
-    val reg_colTileOffset = Input(UInt(cfg.addrWidth.W))
-    
-  
-  
   // bDma.io.done/busy 目前无消费者（err 参与 dmaErr 汇聚），留空部分 FIRRTL 会优化掉
   // 外部只读通道直连顶层 dmaB
   io.dmaB <> bDma.io.dmaExtRdIF
@@ -448,7 +469,13 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   //   逐 nibble 展开成 E4M3 ⟹ 阵列解码（含 FusionMac isMx4 双条件、fp8Mul 支路）
   //   整体走已验证的 MX8×MX8 基线，阵列/Cell/Worker/MAC 零改动。非 hasMx4 配置
   //   无 Mux、逐字不变（零 diff）。
-  hiveComb.io.bFmtIn := (if (cfg.hasMx4) Mux(w4a8Mix, DataFormat.MXE4M3, regFile.bFmt) else regFile.bFmt)
+  // 【INT W4A8】INT8×INT4 混配同款重映射为 INT8：权重已由 push 侧逐 nibble sext
+  //   展开成 INT8 ⟹ 阵列解码走已验证的 INT8×INT8 双 lane 基线（FusionMacInt
+  //   lane0/1 按位解码，lane2/3 的 aIsInt4&bIsInt4 双条件自然旁路为零），
+  //   阵列/Cell/Worker/MAC 零改动。两混配谓词互斥，嵌套 Mux 无歧义。
+  hiveComb.io.bFmtIn := (if (cfg.hasMx4)
+    Mux(w4a8Mix, DataFormat.MXE4M3, Mux(intW4a8Mix, DataFormat.INT8, regFile.bFmt))
+  else regFile.bFmt)
   hiveComb.io.rndIn    := regFile.rnd
 
   // P3: scale wiring -- under an MX config both scale vectors are driven by the

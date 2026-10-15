@@ -86,6 +86,20 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
   }
 
   // ==========================================================================
+  // 【P1-2 INT W4A8】A=INT8 × B=INT4 正向混配：B DMA stretch（16B 半字片 32B 对齐
+  //   单读 + 顶层符号扩展成 INT8 阵列拍），bFmtIn 重映射 INT4→INT8，MAC 走纯 INT8
+  //   双 lane 基线（零阵列改动）；无 scale 通路。K=64 ⟹ kTile=2（aKpb=32 阵列窗口
+  //   口径，多窗口轮转）。金锚 expBAddrSeq 混配分支（HiveDebugModel）：窗口步进
+  //   aKpb×4/8=16B、K/aKpb 窗口 × totalN 行降序、物理读 = 对齐单读。
+  // ==========================================================================
+  it should "run INT8 x INT4 mixed W4A8 M=32 N=16 K=64 loadW=1" in {
+    runIntGemm(m = 32, n = 16, k = 64,
+      aFmt = DataFormat.INT8, bFmt = DataFormat.INT4, cFmt = DataFormat.INT32,
+      loadWMode = true, seed = 47L,
+      hint = "int8xint4-w4a8-loadW1")
+  }
+
+  // ==========================================================================
   // 【P0-2 gather】非对齐 A/B 基址：读 DMA 对齐多发读 + 内部字节移位重组的
   //   端到端数据通路证明。aBase off=3、bBase off=11（不同偏移量覆盖不同合并
   //   移位档）；行步长 K=32B 对齐 ⟹ 每拍均非对齐、全走 gather 慢路径。
@@ -108,6 +122,20 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
       aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT32,
       loadWMode = false, expectedErrCode = 8,
       hint = "int8-errK24")
+  }
+
+  // ==========================================================================
+  // 【P1-2 INT W4A8】Negative: reverse mix (A=INT4 × B=INT8) -> errCode 3.
+  //   K 窗口 = aKLoadNum=64 元素，B 每行窗口切片 = 64B 超拍宽 32B 两倍、须 push
+  //   连推 2 拍——几何不可达（MX 侧 PROBE4/PROBE6 已证伪的同型机构）；与 MX 反向
+  //   混配 Fix-4 同处置、链尾最高优先级。K=64 过 aFmt=INT4 纯格式 K%64 检查 ⟹ 只
+  //   命中反向混配臂。
+  // ==========================================================================
+  it should "reject INT4 x INT8 reverse mix with errCode 3" in {
+    runIntErrCase(m = 32, n = 16, k = 64,
+      aFmt = DataFormat.INT4, bFmt = DataFormat.INT8, cFmt = DataFormat.INT32,
+      loadWMode = true, expectedErrCode = 3,
+      hint = "int4xint8-rev-err3")
   }
 
   // ==========================================================================
