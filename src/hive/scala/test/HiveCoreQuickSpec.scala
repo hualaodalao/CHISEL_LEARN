@@ -710,6 +710,10 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
     val cLog = mutable.ArrayBuffer[HiveSimCommon.CWriteBeat](); val sLog = mutable.ArrayBuffer[(Long, BigInt)]()
     val addrBad = mutable.ArrayBuffer[String](); var addrBadCnt = 0; var cycle = 0; var regRbMsg = ""; var passed = false
     var regRbOk = false; var done = false; var errSeen = false; var errCode = -1; var cmp: Option[plan.CmpSummary] = None
+    // 【perf 端口】perf 采样累加器（与上方运行态变量同作用域，供跑后打印与硬断言）
+    val perfNames = Seq("dmaA", "dmaB", "dmaC", "scaleA", "scaleB", "scaleC",
+      "array", "stallA", "stallB", "epilogue", "busy")
+    val perfCnt = Array.fill(perfNames.size)(0)
     try {
       simulate(new HiveCore(cfg)) { dut =>
         // ④ 地址对账只收集不抛（strictAddr 决定跑完后是否判失败），一次能看到全部失配点
@@ -787,6 +791,15 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
         dut.io.cmd.payload.reg0Addr.poke(0.U); dut.io.cmd.payload.reg1Addr.poke(0.U)
         dut.io.cmd.payload.data0.poke(0.U); dut.io.cmd.payload.data1.poke(0.U); dut.clock.step(); dut.io.cmd.valid.poke(false.B)
         var aS = 0; var bS = 0; var saS = 0; var sbS = 0; var cB = 0; var csB = 0; var pollSt = 0; var pollCool = 0
+        // 【perf 端口】TB 代行外部 PMU：主循环逐拍采样 io.perf 各电平累加，跑后打印
+        //   占空比（可观测性验证 + 合理性粗检；采样窗 = EXECUTE 起至 done/err/超时）
+        def perfPeek: Seq[Boolean] = Seq(
+          dut.io.perf.dmaA.peek().litToBoolean, dut.io.perf.dmaB.peek().litToBoolean,
+          dut.io.perf.dmaC.peek().litToBoolean, dut.io.perf.scaleA.peek().litToBoolean,
+          dut.io.perf.scaleB.peek().litToBoolean, dut.io.perf.scaleC.peek().litToBoolean,
+          dut.io.perf.array.peek().litToBoolean, dut.io.perf.stallA.peek().litToBoolean,
+          dut.io.perf.stallB.peek().litToBoolean, dut.io.perf.epilogue.peek().litToBoolean,
+          dut.io.perf.busy.peek().litToBoolean)
         // 【P0 epilogue-1】dmaScaleA 通道地址全量记录：biasOn 时该端口被 drain-then-steal 仲裁
         //   复用（bias FSM 与 scaleA DMA 交错发请求，交错序取决于硬件 FSM 时序，金锚不模拟），
         //   逐拍位置对账不再成立 ⟹ 改为跑后按地址域拆流对账（见 while 循环后的 seqCmp）。
@@ -835,6 +848,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           st.foreach { s =>
             if (s.err) { errSeen = true; errCode = s.errCode; println(f"[$TAG cycle=$cycle%5d] STATUS.err=1 errCode=${s.errCode}") }
             else if (s.done) { done = true; println(f"[$TAG cycle=$cycle%5d] STATUS.done=1 A=$aS B=$bS C=$cB sA=$saS sB=$sbS sC=$csB") } }
+          perfPeek.zipWithIndex.foreach { case (b, i) => if (b) perfCnt(i) += 1 }
           dut.clock.step(); cycle += 1
         }
         dut.io.dmaC.rsp.valid.poke(false.B); dut.io.dmaCScale.get.rsp.valid.poke(false.B); dut.io.cmd.valid.poke(false.B)
@@ -873,6 +887,9 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           s" sB=$sbS/${plan.expScaleBAddrSeq.size} sC=$csB/${plan.expCScaleAddrSeq.size}")
         println(s"[$TAG] 六通道地址对账不一致拍数=$addrBadCnt（strictAddr=${p.strictAddr}）")
         addrBad.foreach(s => println(s"[$TAG]   ADDR-DIFF $s"))
+        // 【perf 端口】跑后 PMU 汇报：各观测电平的采样拍数与占空比（分母 = 主循环拍数 cycle）
+        println(s"[$TAG] perf 采样(cycles=$cycle)：" + perfNames.zip(perfCnt).map { case (n, c) =>
+          f"$n=$c%5d(${c * 100.0 / math.max(cycle, 1)}%.1f%%)" }.mkString(" "))
         // ⑤ golden 逐元素比对；负向路径下硬件根本不该进计算，只核对 errCode
         if (predicted.isDefined) { passed = errSeen && errCode == predicted.get && !done && regRbOk
           println(s"[$TAG] 负向路径：体检预测 errCode=${predicted.get}，实测 err=$errSeen errCode=$errCode done=$done → ${if (passed) "符合预测 ✓" else "与预测不符 ✗"}") }
@@ -909,6 +926,11 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       withClue(s"[$TAG] C element-level golden compare (no tolerance relaxation, no anchor change): ") {
         cmp.map(_.mismatch) should be(Some(0)) }
       withClue(s"[$TAG] C lane-level AXI byte-lane audit (laneViolations): ") {
-        cmp.map(_.laneViolations) should be(Some(0)) } }
+        cmp.map(_.laneViolations) should be(Some(0)) }
+      // 【perf 端口】正向路径合理性硬断言：done 已观测 ⟹ busy 与 array 采样必非零
+      //   （否则 io.perf 接线断裂/采错位，PMU 侧将全量失真）
+      withClue(s"[$TAG] perf 端口合理性（正向路径 busy/array 采样须非零）：") {
+        perfCnt(perfNames.indexOf("busy")) should be > 0
+        perfCnt(perfNames.indexOf("array")) should be > 0 } }
   }
 }

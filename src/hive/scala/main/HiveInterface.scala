@@ -119,6 +119,39 @@ object HiveCoreStatus {
   def apply(cfg: HiveCoreConfig) = new HiveCoreStatus(cfg)
 }
 
+/** HiveCore 性能观测信号组（【perf 端口】纯组合电平、无内部计数状态；计数/统计
+  * 由外部 PMU 按拍采样完成——本模块不内建 perf counter，用户裁定）。
+  *
+  * - dmaA/B/C、scaleA/B/C：各 DMA 通道请求有效拍（物理通道口径：scaleA 含
+  *   bias/rqM 取数盗用拍；成因分解可外部结合 epilogue 交叉采样）
+  * - array：阵列有效计算拍（hiveValidIn）
+  * - stallA：供数相（sLOAD_A）阵列空闲拍——aPop 未 fire（含 A/scaleA 供数
+  *   不足、bias/rqM 未收齐、C 写回占用读口等全部挂起成因）
+  * - stallB：权重供数等待（loadW 窗口 bPop 停拍 ∨ sDRAIN 预蓄等待拍），双缓冲/
+  *   预取深度决策依据
+  * - epilogue：epilogue 子系统活动拍（bias/rqM 取数 ∨ cvt 转换/量化管线占用；
+  *   C 写回通道活动另由 dmaC/scaleC 观测）
+  * - busy：总忙碌电平（= status.busy，作分母对齐）
+  *
+  * 非 MX 配置下 scaleA/B/C 恒 false（端口形状跨配置保持稳定）。
+  */
+class HiveCorePerf extends Bundle {
+  val dmaA = Bool()
+  val dmaB = Bool()
+  val dmaC = Bool()
+  val scaleA = Bool()
+  val scaleB = Bool()
+  val scaleC = Bool()
+  val array = Bool()
+  val stallA = Bool()
+  val stallB = Bool()
+  val epilogue = Bool()
+  val busy = Bool()
+}
+object HiveCorePerf {
+  def apply() = new HiveCorePerf()
+}
+
 class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
   //占用DW0高位编码
   //val cmdType = UInt(4.W);dontTouch(cmdType)

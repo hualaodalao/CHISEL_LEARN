@@ -116,6 +116,16 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
 
     // 进度
     val progress = Output(UInt(16.W))
+
+    // 【perf 观测端口】供数等待探针（纯组合、无状态）：顶层 io.perf 直通，
+    //   由外部 PMU 按拍采样（本模块不内建计数器）
+    val perf = Output(new Bundle {
+      // 供数相（sLOAD_A）阵列空闲拍（aPop 未 fire，含 A/scaleA 供数不足、
+      // bias/rqM 未收齐、C 写回占用读口等全部挂起成因）
+      val stallA = Bool()
+      // 权重供数等待：loadW 窗口 bPop 停拍 ∨ sDRAIN 预蓄等待拍
+      val stallB = Bool()
+    })
   })
 
   // ==========================================================================
@@ -801,8 +811,19 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
 
     }
 
-    
   }
+
+  // ==========================================================================
+  // 【perf 观测探针】（纯组合、无状态）：bWindowReady 与 sDRAIN→sLOAD_B 转移条件
+  //   同源。stallB 的 sDRAIN 项仅计 drain 计数归零后的纯等待拍（drainNextCnt
+  //   倒数拍为固定流水排空，不计）；loadW 窗口内 bPop 停拍在 P0-1/P0-2 预蓄
+  //   门控下稳态应为 0，非零即预取不变量被破坏或 B 口供数持续低于 0.5 字/拍。
+  // ==========================================================================
+  val bWindowReady = io.bOccupancy >= cfg.totalN.U &&
+    (if (cfg.hasMx) (!mxRunB || io.scaleBOcc.get >= cfg.totalN.U) else true.B)
+  io.perf.stallA := state === sLOAD_A && !io.aPop.fire
+  io.perf.stallB := (state === sLOAD_B && !io.bPop.fire) ||
+    (state === sDRAIN && hasNext && drainNextCnt === 0.U && !bWindowReady)
 
 
 }

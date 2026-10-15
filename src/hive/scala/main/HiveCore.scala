@@ -38,6 +38,9 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     val status = Output(new HiveCoreStatus(cfg))
     // 电平中断：本次 EXECUTE 完成（done）或出错（err）后置位，下一次 EXECUTE 清除。
     val irq = Output(Bool())
+    // 【perf 观测端口】性能观测信号组（纯组合电平、无内部计数；外部 PMU 按拍采样，
+    //   信号语义见 HiveInterface.scala HiveCorePerf）
+    val perf = Output(new HiveCorePerf)
   })
 
   // ==========================================================================
@@ -533,6 +536,11 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   scratchpad.io.flushB := executor.io.flushB
   scratchpad.io.flushC := executor.io.flushC
 
+  // 【perf 端口】bias/rqM 取数器活动观测线（默认 0；hasMx 块内由取数器 FSM 驱动。
+  //   声明上提至类级是因 biasFState/sBiasFIDLE 作用域限于 hasMx 块内）
+  val perfBiasFetchActive = Wire(Bool())
+  perfBiasFetchActive := false.B
+
   // ==========================================================================
   // P3: MX Scale 通道（仅 hasMx 生成；非 MX 配置不例化 DMA/FIFO、不暴露 dmaScaleA/dmaScaleB）
    if (cfg.hasMx) {
@@ -653,6 +661,9 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
       }
     }
 
+    // 【perf 端口】取数器活动拍（WAIT 排空拍亦计入——端口等待属取数成本）
+    perfBiasFetchActive := biasFState =/= sBiasFIDLE
+
 
     // scaleB DMA：两级 nt×kb 遍历，基址直连 scaleBAddr，块内步进 = n
     val scaleBDma = bDmaScale.get  // P4.2: 引用外层 Option 持有的实例（原地例化已上提）
@@ -750,4 +761,23 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   //   （startOut 封锁、无 done）与 DMA/完成错（done 拍定值）；doneSinceStart 覆盖
   //   无错完成。两者都在 startPulse 清零 ⟹ 软件以下一次 EXECUTE 作为中断确认/清除。
   io.irq               := doneSinceStart || errFlag
+
+  // ==========================================================================
+  // 【perf 观测端口】纯组合直连既有信号（零新状态、零新时序路径）；计数由外部
+  //   PMU 按拍采样完成。dmaX/scaleX 为物理通道口径（scaleA 含 bias/rqM 取数
+  //   盗用拍）；array/busy/stallA/stallB/epilogue 语义见 HiveCorePerf 注释。
+  // ==========================================================================
+  io.perf.dmaA   := io.dmaA.req.valid
+  io.perf.dmaB   := io.dmaB.req.valid
+  io.perf.dmaC   := io.dmaC.req.valid
+  io.perf.scaleA := (if (cfg.hasMx) io.dmaScaleA.get.req.valid else false.B)
+  io.perf.scaleB := (if (cfg.hasMx) io.dmaScaleB.get.req.valid else false.B)
+  io.perf.scaleC := (if (cfg.hasMx) io.dmaCScale.get.req.valid else false.B)
+  io.perf.array  := executor.io.hiveValidIn
+  io.perf.stallA := executor.io.perf.stallA
+  io.perf.stallB := executor.io.perf.stallB
+  // epilogue 活动拍 = bias/rqM 取数 ∨ cvt 管线占用（in.fire 收行 / out.valid 持行
+  //   交付 / scaleOut.valid 量化 scale 行）；C 写回通道活动另由 dmaC/scaleC 观测
+  io.perf.epilogue := perfBiasFetchActive || cvt.io.in.fire || cvt.io.out.valid || cvt.io.scaleOut.valid
+  io.perf.busy   := executor.io.busy
 }
