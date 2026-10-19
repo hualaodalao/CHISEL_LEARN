@@ -46,33 +46,93 @@
 
 ## :warning: Queen Scheduler+Tracing Tag指令扩展 custom-0(7'b0001011) funct3 (2'b11) 
 **type(2'b10) cmd(4'b0000)**
-该指令为queen scheduler fence指令，fence指令为强制前序所有通过shceduler的指令执行完毕且所有dsa设备进入idle状态，fence指令无val需求
+该指令为queen scheduler fence指令，fence指令为强制前序所有通过shceduler的指令执行完毕且所有dsa设备进入idle状态，fence指令无val需求。fence指令为scheduler派发任务前执行，即scheduler前端派发任务给DSA之前
 | Field       | Bits    | Name | Description     |
 | :---        | :--- |    :----   |          :--- |
 | inst[31:30] |2bits  | type    | 固定为2‘b10  |
-| inst[29:14] |16bits | val     | cmd携带命令   |    
+| inst[29:29] |1bits | vpuIdle     | fence直到vpu idle  |    
+| inst[28:28] |1bits | dmaIdle     | fence直到dma idle  |    
+| inst[27:27] |1bits | gemmIdle    | fence直到gemm idle  |    
+| inst[26:14] |13bits | rsv     | rsv  |    
 | inst[13:12] |2bits  | func3   | 该类型固定为2'b11 |
 | inst[11:8]  |4bits  | cmd     | 该类型固定为4‘b0000|
 | inst[7:7]   |1bits  | macroeop| macro eop标记 |
 | inst[6:0]   |7bits  | opcode  | custom-0，固定为0001011 |
 ---
 **type(2'b10) cmd(4'b0001)**
-该指令为queen scheduler wait指令，wait指令为等待预期的事件状态
+该指令为queen scheduler wait event指令，wait指令为等待预期的事件状态，wait指令给到DSA的cmd fifo，在cmd fifo最终派发处执行wait。 
+Note：hwLock锁申请由custom-0 "funct3 2’b01" 扩展读取scheduler寄存器来实现
 | Field       | Bits    | Name | Description     |
 | :---        | :--- |    :----   |          :--- |
 | inst[31:30] |2bits  | type    | 固定为2‘b10  |
-| inst[29:14] |16bits | val     | cmd携带命令的payload值   |    
+| inst[29:28] |2bits  | dsaType | 00: gemm 01: dma 10:vpu 11:dma |
+| inst[27:27] |1bits  | vpuIdleLock | 等待vpu idle事件|
+| inst[26:26] |1bits  | dmaIdleLock | 等待dma idle事件|
+| inst[25:25] |1bits  | gemmIdleLock | 等待gemm idle事件|
+| inst[24:16] |8bits  | lock1-8   | 等待lock1-8硬件idle， bit enable|
+| inst[15:14] |2bits  | rsv    | rsv|
 | inst[13:12] |2bits  | func3   | 该类型固定为2'b11 |
 | inst[11:8]  |4bits  | cmd     | 该类型固定为4‘b0001 |
 | inst[7:7]   |1bits  | macroEop    | macro eop标记 |
 | inst[6:0]   |7bits  | opcode  | custom-0，固定为0001011 |
 
-wait指令为等待事件，需要携带val指定等待资源：
- - val(xxxxxxxxxxxx0000) : 等待gemm执行进入idle
- - val(xxxxxxxxxxxx0001) ：等待dma执行进入idle
- - val(xxxxxxxxxxxx0010) : 等待rvv进入idle
- - val(xxxxxxxxxxxx1zzz) : 等待硬同步资源锁z释放，z当前为最多8个硬件锁资源
 ---
+**type(2'b10) cmd(4'b0010)**
+该指令为queen scheduler wait timeline指令，wait timeline为等待事件次数，wait指令给到DSA的cmd fifo，在cmd fifo最终派发处执行wait
+| Field       | Bits    | Name | Description     |
+| :---        | :--- |    :----   |          :--- |
+| inst[31:30] |2bits  | type    | 固定为2‘b10  |
+| inst[29:28] |2bits  | dsaType | 00: gemm 01: dma 10:vpu 11:dma |
+| inst[27:26] |2bits  | waitDsaType | 00: gemm 01: dma 10:vpu 11:dma |
+| inst[25:25] |1bits  | indexExtEn   | index 24bit扩展使能，如该bit为1则包含下一个marco inst为高16bit index|
+| inst[24:16] |8bits  | indexVal   | 等待的Index值|
+| inst[15:14] |2bits  | rsv    | rsv|
+| inst[13:12] |2bits  | func3   | 该类型固定为2'b11 |
+| inst[11:8]  |4bits  | cmd     | 该类型固定为4‘b0010 |
+| inst[7:7]   |1bits  | macroEop    | macro eop标记 |
+| inst[6:0]   |7bits  | opcode  | custom-0，固定为0001011 |
+
+高位index扩展marco
+| Field       | Bits    | Name | Description     |
+| :---        | :--- |    :----   |          :--- |
+| inst[31:30] |2bits  | type    | 固定为2‘b10  |
+| inst[29:14] |16bits  | indexValHi16    | 高16bit index|
+| inst[13:12] |2bits  | func3   | 该类型固定为2'b11 |
+| inst[11:8]  |4bits  | cmd     | 该类型固定为4‘b0010 |
+| inst[7:7]   |1bits  | macroEop    | macro eop标记 |
+| inst[6:0]   |7bits  | opcode  | custom-0，固定为0001011 
+
+---
+**type(2'b10) cmd(4'b0011)**
+该指令为queen scheduler set timeline指令。 当dstType为非hwLock时，用于set/clr dsa timeline寄存器
+| Field       | Bits    | Name | Description     |
+| :---        | :--- |    :----   |          :--- |
+| inst[31:30] |2bits  | type    | 固定为2‘b10  |
+| inst[29:28] |2bits  | dstType | 00: gemm 01: dma 10:vpu 11:hwLock|
+| inst[27:25] |3bits  | rsv | rsv｜
+| inst[24:16] |8bits  | setVal   | |
+| inst[14:14] |1bits  | set     | 当dstType为非hwLockRs时，如果set为1，则表示最近一笔执行完毕后给同步资源加一个setVal，如果set为0则直接clr同步index值，适用于wait timeline
+| inst[13:12] |2bits  | func3   | 该类型固定为2'b11 |
+| inst[11:8]  |4bits  | cmd     | 该类型固定为4‘b0001 |
+| inst[7:7]   |1bits  | macroEop    | macro eop标记 |
+| inst[6:0]   |7bits  | opcode  | custom-0，固定为0001011 |
+
+当dstType为hwLock时，该指令为hwLock锁释放（最多时8个锁）
+| Field       | Bits    | Name | Description     |
+| :---        | :--- |    :----   |          :--- |
+| inst[31:30] |2bits  | type    | 固定为2‘b10  |
+| inst[29:28] |2bits  | dstType | 00: gemm 01: dma 10:vpu 11:hwLock|
+| inst[27:25] |3bits  | rsv | rsv｜
+| inst[24:16] |8bits  | clrMask   | 释放8个hwLock锁 bitmask|
+| inst[15:14] |2bits  | rsv     | rsv ｜
+| inst[13:12] |2bits  | func3   | 该类型固定为2'b11 |
+| inst[11:8]  |4bits  | cmd     | 该类型固定为4‘b0001 |
+| inst[7:7]   |1bits  | macroEop    | macro eop标记 |
+| inst[6:0]   |7bits  | opcode  | custom-0，固定为0001011 |
+---
+
+
+
 
 **type(2'b10) cmd(4'b0010)**
 该指令为queen scheduler pooling cmp fence指令, 从内存中读出一个数字如果与cmp值相等则继续执行否则fence后续指令继续pooling，硬件默认每8 cycle 发起一个读命令
