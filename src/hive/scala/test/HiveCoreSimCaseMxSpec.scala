@@ -99,7 +99,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
   val C_BASE:       Long = 0x00200000L
   val SCALE_A_BASE: Long = 0x00300000L
   val SCALE_B_BASE: Long = 0x00400000L
-  // 【任务95】量化输出（outFmt∈{3,4,5}；#178 订正：原写 {4,5,6} 为 #97 重编号前陈旧值）scale 写回基址（regs 0x0B），与 scaleA/B 基址不重叠
+  // 量化输出（outFmt∈{3,4,5}）scale 写回基址（ScaleC 索引 8），与 scaleA/B 基址不重叠
   val SCALE_C_BASE: Long = 0x00500000L
 
   val simDir = "/Users/wangliutailong/Qoder_Proj/Chisel_Learn/sim/mx"
@@ -573,15 +573,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       dut.clock.step(2)
 
       def sendCmd(op: HiveCoreOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
-        dut.io.cmd.valid.poke(true.B)
-        dut.io.cmd.payload.op.poke(op)
-        dut.io.cmd.payload.reg0Addr.poke(reg0Addr.U)
-        dut.io.cmd.payload.reg1Addr.poke(reg1Addr.U)
-        dut.io.cmd.payload.data0.poke(data0.U)
-        dut.io.cmd.payload.data1.poke(data1.U)
-        dut.clock.step()
-        dut.io.cmd.valid.poke(false.B)
-        dut.clock.step(2)
+        transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
       }
 
       // ===== 配置寄存器（【任务90 收敛】fp32 直出默认；【任务95】outFmt 参数化叠加） =====
@@ -654,22 +646,15 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
       sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, controlWord5)
       println(s"debug1 controlWord5=0x${controlWord5.toHexString}")
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x09, 0x0A, SCALE_A_BASE, SCALE_B_BASE)
-      // 【任务95】量化运行补写 0x0B cScaleAddr（ScaleWr 写通道基址源，QuantSpec
+      sendCmd(HiveCoreOp.REG_WRITE2, HiveSimCommon.SCALE_A_REG_ADDR, HiveSimCommon.SCALE_B_REG_ADDR, SCALE_A_BASE, SCALE_B_BASE)
+      // 【任务95】量化运行补写 0x08 cScaleAddr（ScaleWr 写通道基址源，QuantSpec
       // 同范式）；非量化运行该基址不被使用，保持不写（【任务90 收敛】语义零变化）。
-      if (isQuant) sendCmd(HiveCoreOp.REG_WRITE1, 0x0B, 0x00, SCALE_C_BASE, 0L)
+      if (isQuant) sendCmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.SCALE_C_REG_ADDR, 0x00, SCALE_C_BASE, 0L)
 
-      // ===== EXECUTE =====
-      dut.io.cmd.valid.poke(true.B)
-      dut.io.cmd.payload.op.poke(HiveCoreOp.EXECUTE)
-      dut.io.cmd.payload.reg0Addr.poke(0.U)
-      dut.io.cmd.payload.reg1Addr.poke(0.U)
-      dut.io.cmd.payload.data0.poke(0.U)
-      dut.io.cmd.payload.data1.poke(0.U)
-      dut.clock.step()
-      dut.io.cmd.valid.poke(false.B)
+      prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
+      launchStart(dut.clock, dut.io.cmd)
 
-      // 【任务101】EXECUTE 立即响应语义：完成判定 = STATUS 轮询（statusPollStep）
+      // 完成判定只读 IRQ_RAW.done；STATUS 仅报告 busy/inFlight/progress。
       var done = false
       var cycle = 0
       var pollSt = 0
@@ -847,16 +832,12 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
           dut.io.dmaScaleB.get.rsp.payload.data.poke(0.U)
         }
 
-        // --- 完成检查：STATUS 寄存器轮询（bit1=done 粘滞位、bit2=err）---
-        val (stNext, coolNext, statusOpt) = statusPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool)
+        val (stNext, coolNext, irqOpt) = irqPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool)
         pollSt = stNext
         pollCool = coolNext
-        statusOpt.foreach { st =>
-          if (st.done) {
-            println(f"[MX cycle=$cycle%5d] EXECUTE complete (STATUS.done=1, err=${st.err})! A=$dmaABeatsSent B=$dmaBBeatsSent C=$dmaCStoreBeats sA=$scaleABeatsSent sB=$scaleBBeatsSent")
-            st.err should be(false)
-            done = true
-          }
+        irqOpt.foreach { st =>
+          withClue(f"[MX] IRQ_RAW=0x${st.raw}%X: ") { st.anyError should be(false) }
+          if (st.done) done = true
         }
 
         dut.clock.step()
@@ -870,6 +851,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       if (!done) println(s"[MX] WARNING: timeout at $maxCycles cycles (A=$dmaABeatsSent B=$dmaBBeatsSent C=$dmaCStoreBeats sA=$scaleABeatsSent sB=$scaleBBeatsSent)")
 
       done should be(true)
+      dut.io.status.inFlight.expect(false.B)
       // 拍数硬断言（六通道）
       dmaABeatsSent should be(dmaATotalBeats)
       dmaBBeatsSent should be(dmaBTotalBeats)
@@ -1102,13 +1084,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     }
   }
 
-  // ==========================================================================
-  // P5.4 err 负向运行器：写入违约 MX 配置 + EXECUTE，轮询 STATUS(0x08).err 位。
-  //   config-err 在 executor sIDLE 拍直接置 errState 并回 sIDLE（不进入计算、
-  //   不发 done）；HiveCore hasMx-gated 追加 errFlag 直连（HiveCore.scala P5.4），
-  //   故软件通过 REG_READ 0x08 读 statusReg bit[2]=err 即可观测。
-  //   断言：err 位在若干拍内置位；done 位与 resp.done 全程不发射。
-  // ==========================================================================
+  // 配置错误只置 IRQ_RAW[1]；合法 START 保留旧 pending，须显式 W1C 清除。
   // (#164) 形参 `regs7` 改名 `ctl5`：旧语义是「只传格式字（写 reg7），reg6 硬编码 0」；
   //   新语义是「传【完整】的 reg5 控制字」（loadWMode/MxBlk/rnd/addrMode/fmt 全在一个字里）。
   //   本 def 目前【无调用点】（历史用例已删），故改名与语义变更无下游影响；按任务书
@@ -1151,15 +1127,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       dut.clock.step(2)
 
       def sendCmd(op: HiveCoreOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
-        dut.io.cmd.valid.poke(true.B)
-        dut.io.cmd.payload.op.poke(op)
-        dut.io.cmd.payload.reg0Addr.poke(reg0Addr.U)
-        dut.io.cmd.payload.reg1Addr.poke(reg1Addr.U)
-        dut.io.cmd.payload.data0.poke(data0.U)
-        dut.io.cmd.payload.data1.poke(data1.U)
-        dut.clock.step()
-        dut.io.cmd.valid.poke(false.B)
-        dut.clock.step(2)
+        transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
       }
 
       // (#164) 新写序列：reg0=m、reg1=n|k<<16、reg2/3/4=a/b/cAddr、reg5=控制字（旧 reg6+reg7）。
@@ -1167,99 +1135,30 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       sendCmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, M, N.toLong | (K.toLong << 16))
       sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
       sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, ctl5)
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x09, 0x0A, SCALE_A_BASE, SCALE_B_BASE)
+      sendCmd(HiveCoreOp.REG_WRITE2, HiveSimCommon.SCALE_A_REG_ADDR, HiveSimCommon.SCALE_B_REG_ADDR, SCALE_A_BASE, SCALE_B_BASE)
 
-      // EXECUTE（违约配置：executor 在 sIDLE 拍置 errState 回 sIDLE，不发 done）
-      dut.io.cmd.valid.poke(true.B)
-      dut.io.cmd.payload.op.poke(HiveCoreOp.EXECUTE)
-      dut.io.cmd.payload.reg0Addr.poke(0.U)
-      dut.io.cmd.payload.reg1Addr.poke(0.U)
-      dut.clock.step()
-      dut.io.cmd.valid.poke(false.B)
+      prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
+      launchStart(dut.clock, dut.io.cmd)
+      dut.clock.step(200)
+      val raw = readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR)
+      withClue(s"[$caseName] config error only in IRQ_RAW: ") { raw should be(BigInt(2)) }
+      dut.io.status.inFlight.expect(false.B)
 
-      // ---- 轮询 STATUS(0x08)：期望 err 置位、done 全程不发 ----
-      // 【任务101】EXECUTE 立即响应语义：resp bundle 已无 done 字段，完成判定
-      // 统一走 STATUS 轮询（io.status 端口 + 尾部 REG_READ 0x08 对账）
-      var errSeen = false
-      var doneSeen = false
-      for (_ <- 0 until 200) {
-        if (dut.io.status.done.peek().litToBoolean) doneSeen = true
-        if (dut.io.status.err.peek().litToBoolean) errSeen = true
-        dut.clock.step()
-      }
-
-      // REG_READ 0x08 → statusReg bit[2]=err，bit[1]=done（软件轮询路径对账）
-      dut.io.cmd.valid.poke(true.B)
-      dut.io.cmd.payload.op.poke(HiveCoreOp.REG_READ)
-      dut.io.cmd.payload.reg0Addr.poke(0x08.U)
-      dut.clock.step()
-      dut.io.cmd.valid.poke(false.B)
-      var statusVal = BigInt(0)
-      var got = false
-      for (_ <- 0 until 8 if !got) {
-        if (dut.io.resp.valid.peek().litToBoolean) {
-          statusVal = dut.io.resp.payload.data.peek().litValue
-          got = true
-        }
-        dut.clock.step()
-      }
-      val errBit  = (statusVal >> 2) & 1
-      val doneBit = (statusVal >> 1) & 1
-      println(f"[MX-ERR $caseName] status=0x$statusVal%08X errBit=$errBit doneBit=$doneBit  errSeen=$errSeen doneSeen=$doneSeen")
-
-      withClue(s"[$caseName] STATUS.err should be set: ") { errSeen should be(true) }
-      withClue(s"[$caseName] STATUS(0x08) bit[2] err should be 1: ") { errBit should be(BigInt(1)) }
-      withClue(s"[$caseName] done must NOT be asserted (config-err returns to sIDLE without done): ") {
-        doneSeen should be(false)
-        doneBit should be(BigInt(0))
-      }
-
-      // ===== Victor P1 验证：合法再 EXECUTE 后 err 位被清除 =====
-      // errState/errFlag 均在 execute 脉冲拍清除（同拍新违约次拍仍可再置位）。
-      // 【任务90 收敛】格式族交叉校验批准版 = MX 运行 outFmt ∈ {0,1,2,3,4,5}：fp32 直出
-      // （reg5[11:8]=0000）为合法受守护路径 ⟹ 合法再配置 = aFmt/bFmt 合法 + loadWMode=1。
-      // ★(#164) 旧写法 `sendCmd(REG_WRITE2, 0x02, 0x07, 32L, 0x65L)` 在新排布下【语义完全失效】：
-      //   reg2 现在是 aAddr（会被覆写成 32，DMA 基址直接烂掉）、reg7 已删除（写为 no-op，
-      //   aFmt/bFmt 根本不会被改）⟹ 重写为「只写 reg5 = 合法控制字」，不触碰 reg2。
-      //   K 也无需重写：新布局 K 在 reg1[31:16]，开头那条 REG_WRITE2 已写好。
-      // ★(#164) 与旧写法的第二处差异（更强，不是放宽）：旧注释自己承认「若此前 regs(6)(28)=0，
-      //   再 EXECUTE 仍会触发 errCode 4」——本 runner 开头正是写 reg6=0（loadWMode=0），
-      //   故旧的清 err 断言在 MX 输入下【必然被 errCode 4 打红】。新的 legalCtl5 显式置
-      //   bit28=1，清 err 路径才真正可达。另：旧字面量 0x65L 在 #97 重编号下解为
-      //   aFmt=5(MXE2M1)、bFmt=6(INT32)，MX×INT 混配本身就非法 ⟹ 它也不是「合法控制字」；
-      //   改用枚举反解码的 MXE4M3×MXE5M2（=0x43，与 runMxGemm 的激励同源，#155 MJ3 口径）。
-      // 轮询 STATUS.err 应连续拉低（不喂数据，运行停在等 B 供数，不影响 err 清除验证）。
-      val legalCtl5 = (1L << 28) |                                 // loadWMode=1（MX 输入强制）
-        (DataFormat.MXE4M3.litValue.toLong & 0xF) |                // aFmt reg5[3:0]
-        ((DataFormat.MXE5M2.litValue.toLong & 0xF) << 4)           // bFmt reg5[7:4]；cFmt[11:8]=0=fp32 直出
+      val legalCtl5 = (1L << 28) |
+        DataFormat.MXE4M3.litValue.toLong | (DataFormat.MXE5M2.litValue.toLong << 4)
       sendCmd(HiveCoreOp.REG_WRITE1, 0x05, 0x00, legalCtl5, 0L)
-      dut.io.cmd.valid.poke(true.B)
-      dut.io.cmd.payload.op.poke(HiveCoreOp.EXECUTE)
-      dut.io.cmd.payload.reg0Addr.poke(0.U)
-      dut.io.cmd.payload.reg1Addr.poke(0.U)
-      dut.clock.step()
-      dut.io.cmd.valid.poke(false.B)
-      var errAfterReexec = false
-      for (_ <- 0 until 100) {
-        if (dut.io.status.err.peek().litToBoolean) errAfterReexec = true
-        dut.clock.step()
-      }
-      withClue(s"[$caseName] STATUS.err should be cleared after a legal re-EXECUTE: ") {
-        errAfterReexec should be(false)
-      }
+      // START 不清 pending；合法重启后旧 configError 仍记录，须显式 W1C。
+      launchStart(dut.clock, dut.io.cmd)
+      dut.clock.step(100)
+      readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(raw)
+      sendCmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.IRQ_CLEAR_REG_ADDR, 0, 2L, 0L)
+      readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(0))
+      readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(0))
+      dut.io.status.inFlight.expect(true.B)
     }
   }
 
-  // ==========================================================================
-  // 【任务95】MX 非法 outFmt 族交叉负向运行器（int 族/reserved 编码）：
-  //   CalcConfig errCode 11 族交叉校验（mxFmtOk={0,1,2,3,4,5}）在 EXECUTE 拍置 errState 回
-  //   sIDLE（不进计算、不发 done）。断言：STATUS.err 置位（statusReg bit[2] 可
-  //   软件轮询）、done 全程不发射、dmaC/dmaCScale 无任何写请求拍
-  //   （dmaA/dmaB 的 start = executePulse 无条件启动，允许其读请求出现——与
-  //   QuantSpec runQuantErrCase 同口径）；合法再 EXECUTE（(#164) reg5 = loadWMode|MXE4M3|
-  //   MXE5M2<<4，cFmt=0 即 fp32 直出）后 err 位被清除（Victor P1 同范式）。结构仿 runMxErrCase，尾部 try/finally
-  //   转存 FST（【任务94】范式，失败路径同样转存）。
-  // ==========================================================================
+  // MX 整数输出违约应仅记录配置错误码 11，且不产生 C/ScaleC 写请求。
   private def runMxOutFmtErrCase(M: Int, N: Int, K: Int, outFmt: DataFormat.Type,
                                  waveName: String, testMangle: String): Unit = {
     // 【任务97】outFmt 类型化为 DataFormat.Type：caseName/控制字位域消费整型编码，
@@ -1321,15 +1220,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         dut.clock.step(2)
 
         def sendCmd(op: HiveCoreOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
-          dut.io.cmd.valid.poke(true.B)
-          dut.io.cmd.payload.op.poke(op)
-          dut.io.cmd.payload.reg0Addr.poke(reg0Addr.U)
-          dut.io.cmd.payload.reg1Addr.poke(reg1Addr.U)
-          dut.io.cmd.payload.data0.poke(data0.U)
-          dut.io.cmd.payload.data1.poke(data1.U)
-          dut.clock.step()
-          dut.io.cmd.valid.poke(false.B)
-          dut.clock.step(2)
+          transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
         }
 
         // (#164) 新写序列：reg0=m、reg1=n|k<<16、reg2/3/4=a/b/cAddr、reg5=控制字。
@@ -1339,100 +1230,43 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         sendCmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, M, N.toLong | (K.toLong << 16))
         sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
         sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, controlWord5) // reg5[28]=loadWMode=1（保持 err 归因 = outFmt 族交叉）
-        sendCmd(HiveCoreOp.REG_WRITE2, 0x09, 0x0A, SCALE_A_BASE, SCALE_B_BASE)
+        sendCmd(HiveCoreOp.REG_WRITE2, HiveSimCommon.SCALE_A_REG_ADDR, HiveSimCommon.SCALE_B_REG_ADDR, SCALE_A_BASE, SCALE_B_BASE)
 
-        // EXECUTE（违约 outFmt：executor 在 execute 拍置 errState 回 sIDLE，不发 done）
-        dut.io.cmd.valid.poke(true.B)
-        dut.io.cmd.payload.op.poke(HiveCoreOp.EXECUTE)
-        dut.io.cmd.payload.reg0Addr.poke(0.U)
-        dut.io.cmd.payload.reg1Addr.poke(0.U)
-        dut.clock.step()
-        dut.io.cmd.valid.poke(false.B)
-
-        // ---- 轮询 STATUS(0x08)：期望 err 置位、done 全程不发、dmaC/dmaCScale 零请求 ----
-        // 【任务101】EXECUTE 立即响应语义：resp bundle 已无 done 字段，完成判定
-        // 统一走 STATUS 轮询（io.status 端口 + 尾部 REG_READ 0x08 对账）
-        var errSeen = false
-        var doneSeen = false
-        var dmaCReqSeen = 0
-        var dmaCScaleReqSeen = 0
+        prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
+        launchStart(dut.clock, dut.io.cmd)
+        var pollSt = 0; var pollCool = 0
+        var dmaCReqSeen = 0; var dmaCScaleReqSeen = 0
+        var raw = BigInt(0)
         for (_ <- 0 until 200) {
-          if (dut.io.status.done.peek().litToBoolean) doneSeen = true
-          if (dut.io.status.err.peek().litToBoolean) errSeen = true
+          val (st, cool, irq) = irqPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool)
+          pollSt = st; pollCool = cool
+          irq.foreach(i => raw = i.raw)
           if (dut.io.dmaC.req.valid.peek().litToBoolean) dmaCReqSeen += 1
           if (dut.io.dmaCScale.get.req.valid.peek().litToBoolean) dmaCScaleReqSeen += 1
           dut.clock.step()
         }
-
-        // REG_READ 0x08 → statusReg bit[2]=err，bit[1]=done（软件轮询路径对账）
-        dut.io.cmd.valid.poke(true.B)
-        dut.io.cmd.payload.op.poke(HiveCoreOp.REG_READ)
-        dut.io.cmd.payload.reg0Addr.poke(0x08.U)
-        dut.clock.step()
+        // 结束轮询时先排空可能在途的读响应，再做同步寄存器读取。
         dut.io.cmd.valid.poke(false.B)
-        var statusVal = BigInt(0)
-        var got = false
-        for (_ <- 0 until 8 if !got) {
-          if (dut.io.resp.valid.peek().litToBoolean) {
-            statusVal = dut.io.resp.payload.data.peek().litValue
-            got = true
-          }
-          dut.clock.step()
-        }
-        val errBit  = (statusVal >> 2) & 1
-        val doneBit = (statusVal >> 1) & 1
-        val errCodeField = ((statusVal >> 3) & 0xF).toInt   // (#178) statusReg bits[6:3] = errCode
-        // (#164) ctrl 打印随 controlWord → controlWord5 重命名；格式宽由 %05X（旧 reg7 只有
-        //   低 15 位有效）改为 %08X（reg5 是完整 32-bit 字，含 bit28 loadWMode）。
-        println(f"[$caseName] reg5=0x$controlWord5%08X status=0x$statusVal%08X errBit=$errBit doneBit=$doneBit errCode=$errCodeField " +
-                s"errSeen=$errSeen doneSeen=$doneSeen " +
-                s"dmaCReq=$dmaCReqSeen dmaCScaleReq=$dmaCScaleReqSeen")
+        dut.clock.step(2)
+        withClue(s"[$caseName] configError only, no done/DMA errors: ") { raw should be(BigInt(2)) }
+        readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
+        readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(11))
+        dut.io.status.inFlight.expect(false.B)
+        dmaCReqSeen should be(0)
+        dmaCScaleReqSeen should be(0)
 
-        withClue(s"[$caseName] STATUS.err should be set: ") { errSeen should be(true) }
-        withClue(s"[$caseName] STATUS(0x08) bit[2] err should be 1: ") { errBit should be(BigInt(1)) }
-        withClue(s"[$caseName] done must NOT be asserted (config-err returns to sIDLE without done): ") {
-          doneSeen should be(false)
-          doneBit should be(BigInt(0))
-        }
-        withClue(s"[$caseName] no write beats must be produced on dmaC/dmaCScale: ") {
-          dmaCReqSeen should be(0)
-          dmaCScaleReqSeen should be(0)
-        }
-        // (#178) Additive assertion: bind errCode to 11 (int/non-int cross-boundary).
-        //   Strengthens the runner from "err is set" to "err is set WITH the correct code".
-        //   Does NOT relax any existing assertion above.
-        withClue(s"[$caseName] errCode should be 11 (int/non-int cross-boundary): ") {
-          errCodeField should be(11)
-        }
-
-        // ===== 合法再 EXECUTE 清 err 验证（fp32 直出 = MX 合法族 {0,1,2,3,4,5}） =====
-        // 不喂数据，运行停在等 B 供数，不影响 err 清除验证。
-        // ★(#164) 旧写法 `sendCmd(REG_WRITE2, 0x02, 0x07, 32L, 0x65L)` 在新排布下【语义完全失效】：
-        //   reg2 现在是 aAddr（会被覆写成 32）、reg7 已删除（写为 no-op，违约的 outFmt 仍在
-        //   reg5[11:8] 里没被清掉）⟹ err 永不会被清，下方断言必红。重写为「只写 reg5 =
-        //   合法控制字（cFmt[11:8]=0 即 fp32 直出 + loadWMode=1 + 合法 aFmt/bFmt）」，
-        //   不触碰 reg2（aAddr）；K 也无需重写（新布局 K 在 reg1[31:16]，开头已写好）。
-        //   期望值由 DataFormat 枚举【反解码推导】，不写死 0x43/0x65/0x5E0 任何字面量
-        //   （#155 MJ3 口径）。注：本 runner 开头已置 bit28=1，但重写成显式包含 bit28 的
-        //   完整字比「依赖无残留」更强（旧注释也只是在赌「此前 data0 已置 bit28」）。
-        val legalCtl5 = (1L << 28) |                                 // loadWMode=1（MX 输入强制）
-          (DataFormat.MXE4M3.litValue.toLong & 0xF) |                // aFmt reg5[3:0]
-          ((DataFormat.MXE5M2.litValue.toLong & 0xF) << 4)           // bFmt reg5[7:4]；cFmt[11:8]=0=fp32 直出
+        val legalCtl5 = (1L << 28) |
+          DataFormat.MXE4M3.litValue.toLong | (DataFormat.MXE5M2.litValue.toLong << 4)
         sendCmd(HiveCoreOp.REG_WRITE1, 0x05, 0x00, legalCtl5, 0L)
-        dut.io.cmd.valid.poke(true.B)
-        dut.io.cmd.payload.op.poke(HiveCoreOp.EXECUTE)
-        dut.io.cmd.payload.reg0Addr.poke(0.U)
-        dut.io.cmd.payload.reg1Addr.poke(0.U)
-        dut.clock.step()
-        dut.io.cmd.valid.poke(false.B)
-        var errAfterReexec = false
-        for (_ <- 0 until 100) {
-          if (dut.io.status.err.peek().litToBoolean) errAfterReexec = true
-          dut.clock.step()
-        }
-        withClue(s"[$caseName] STATUS.err should be cleared after a legal re-EXECUTE: ") {
-          errAfterReexec should be(false)
-        }
+        launchStart(dut.clock, dut.io.cmd)
+        dut.clock.step(100)
+        // 合法 START 不清此前配置错误，也不自动清首次 code。
+        readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
+        readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(11))
+        sendCmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.IRQ_CLEAR_REG_ADDR, 0, 2L, 0L)
+        readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(0))
+        readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(0))
+        dut.io.status.inFlight.expect(true.B)
       }
     } finally {
       HiveSimCommon.copyTrace(

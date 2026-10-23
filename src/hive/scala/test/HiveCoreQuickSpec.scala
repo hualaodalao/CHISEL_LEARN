@@ -172,7 +172,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
 
   // ══════════════════════════════════════════════════════════════════════════
   // 【P0 epilogue-1 fused bias（2026-10-14）】基底注入四用例：C = bias(N) + A·B。
-  //   硬件：reg5[30]=biasOn + reg12=biasAddr；bias 取数盗用 dmaScaleA 端口（顶层
+  //   硬件：reg5[30]=biasOn + reg9=biasAddr；bias 取数盗用 dmaScaleA 端口（顶层
   //   drain-then-steal 仲裁），executor sLOAD_A 的 pass-0 psum 零基底换 biasLazy
   //   （INT 运行 sext32、fp/MX 运行 fp32→lazy40），零新增加法器。金锚：golden 起始
   //   累加值 = biasVal(nn)（HiveDebugModel，独立 biasRng 激励流，既有用例零漂移）。
@@ -211,8 +211,8 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   // ══════════════════════════════════════════════════════════════════════════
   // 【P0 epilogue-2 fused requant（2026-10-14）】量化整数 epilogue 六用例：
   //   y = sat_fmt(round_half_up(relu(acc) × M[n] >> shift) + zp)，acc 含 epilogue-1
-  //   bias 基底（同累加器域）。硬件：reg5[29]=requantOn、reg5[15]=reluOn、reg13=rqMBase、
-  //   reg14=[31:16]zp+[5:0]shift；计算独立成 HiveRequant 模块（16-lane 并行，用户裁定），
+  //   bias 基底（同累加器域）。硬件：reg5[29]=requantOn、reg5[15]=reluOn、reg10=rqMBase、
+  //   reg11=[31:16]zp+[5:0]shift；计算独立成 HiveRequant 模块（16-lane 并行，用户裁定），
   //   OutCvt int32Seq 源级 ReLU clamp（INT 族专属消费域）。M 取数复用 dmaScaleA 端口
   //   （顶层两阶段 epilogue FSM：WAIT 排空 → FETCH_BIAS → FETCH_M 连续盗用，无二次排空），
   //   TB 侧按地址域拆三流对账。金锚：HiveDebugModel goldenC requant 链（Long 整数算术、
@@ -434,7 +434,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
     *   即上方「hasFp 掉假会…」所预言的后果不是假想，而是已实测发生：
     *   HiveCoreSimCase（9 条 FP16 输入用例）与 HiveCoreSimCaseLoadWSpec（1 条）
     *   全部静默输出 C 全零而变红（hw=0.000000 / maxRelErr=1.00e+00 /
-    *   strict anchor 0 was not equal to 31743，STATUS.err 不置位），这两个 suite 的
+    *   strict anchor 0 was not equal to 31743，IRQ_RAW error 不置位），这两个 suite 的
     *   FP16 用例已在 #66 整批移除（详见各自文件头的「#66 移除记录」）。
     *   本 suite 之所以【不受影响、仍绿】：现役唯一用例（见上方 runCase）早已不是
     *   FP16 输入，而是 MXE2M1×MXE2M1 → BF16【输出】；16-bit 输出走 HiveOutCvt/FpCvt
@@ -495,7 +495,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
               //   仅负例 ⑤ 用它造 bAddr%32!=0 的失配。★测试名【不含 bBase】⟹ 既有用例名逐字不变
               //   （B_BASE 是 object HiveDebugModel 的 val，无 #155 那种类体前向引用初始化序陷阱）。
               bBase: Long = B_BASE,
-              // 【P0 epilogue-1】fused bias 开关与 bias 向量基址（进 reg5[30]=biasOn / reg12=biasAddr）。
+              // 【P0 epilogue-1】fused bias 开关与 bias 向量基址（进 reg5[30]=biasOn / reg9=biasAddr）。
               //   biasOn=true：金锚 golden 起始累加值 = biasVal(nn)，硬件 pass-0 psum 基底注入
               //   （sLOAD_A 零填充位换 bias，零新增加法器）；TB 侧 dmaScaleA 通道改「全量服务 +
               //   跑后双流拆分对账」（bias 与 scaleA 共端口，drain-then-steal 交错）。★测试名
@@ -504,7 +504,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
               biasOn: Boolean = false,
               biasBase: Long = BIAS_BASE,
               // 【P0 epilogue-2】fused requant / ReLU 开关与参数（进 reg5[29]=requantOn /
-              //   reg5[15]=reluOn / reg13=rqMBase / reg14=[31:16]zp+[5:0]shift）。
+              //   reg5[15]=reluOn / reg10=rqMBase / reg11=[31:16]zp+[5:0]shift）。
               //   requantOn=true：golden = 量化后整数 sat(round_half_up(relu(acc)×M>>s)+zp)
               //   （HiveDebugModel goldenC requant 链，独立 rqMRng 激励流，既有用例零漂移）；
               //   硬件 HiveRequant 独立模块 16-lane 并行。reluOn 单独开启（不 requant）也
@@ -551,7 +551,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   //   本 def 只用于 errExplain 的提示文本，但 INT/FP8 负例命中 8/4 时旧式会打印错误的
   //   kLoadNum/建议值，诊断现场失真。
   private def kLoadNum(f: DataFormat.Type): Int = if (isMx8(f) || f == DataFormat.INT8 || isFp8Fmt(f)) cfg.totalN * 2 else cfg.totalN * 4  // 镜像 getKLoadNum
-  /** Some(code) = 硬件会在 EXECUTE 后直接置 STATUS.err、不进计算。
+  /** Some(code) = 硬件会在 START 后直接置 IRQ_RAW error、不进计算。
     * 【P0-2 去双源】原本此处有一份 QuickSpec 私有的 hwErrCode 镜像，与 HiveDebugModel.precheckConfigErr
     * 互不一致（后者分列 Some(0)/Some(1)/Some(2)、缺 errCode6、优先级 else-if 链首最高）。现已把权威
     * 镜像提升为 HiveDebugModel.hwErrCode（单一真源，顺序 if 后写覆盖，逐位镜像 RTL last-connect 序），
@@ -622,10 +622,10 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       "crossing this boundary produces semantically wrong output bits. " +
       "Suggestion: use integer output (INT32/INT8/INT4) with integer input, " +
       "or float/MX output (FP32/FP16/BF16/MX*) with float/MX input."
-    // 【P0 epilogue-1】errCode 12: biasAddr 非 4B 对齐（reg12）。bias 取数走 dmaScaleA 端口
+    // 【P0 epilogue-1】errCode 12: biasAddr 非 4B 对齐（reg9）。bias 取数走 dmaScaleA 端口
     //   逐字（4B）读，biasAddr[1:0]≠0 时每个字都跨界半个字，注入值静默错位 → 运行期拒绝。
     //   优先级 8 > 12 > 10（last-connect 序，置于 code-10 之后 code-8 之前）。
-    case 12 => s"biasOn=1 requires biasAddr (reg12) 4-byte aligned: biasBase=0x${p.biasBase.toHexString}, " +
+    case 12 => s"biasOn=1 requires biasAddr (reg9) 4-byte aligned: biasBase=0x${p.biasBase.toHexString}, " +
       s"biasBase % 4 = ${p.biasBase % 4}. The bias fetch drives word (4B) reads directly on the dmaScaleA " +
       "port; a misaligned base makes every word read cross a word boundary and silently corrupts the " +
       "injected psum base. Suggestion: keep biasBase a multiple of 4 (default BIAS_BASE is aligned)."
@@ -641,7 +641,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
             "no defined encoding for the requanted value. Suggestion: set cFmt = INT8 or INT4, or clear " +
             "requantOn (reg5[29])."
         case _ =>
-          s"requantOn=1 requires rqMBase (reg13) 4-byte aligned: rqMBase=0x${p.rqMBase.toHexString}, " +
+          s"requantOn=1 requires rqMBase (reg10) 4-byte aligned: rqMBase=0x${p.rqMBase.toHexString}, " +
             s"rqMBase % 4 = ${p.rqMBase % 4}. The M-vector fetch reuses the dmaScaleA 32-bit port word " +
             "reads (same two-phase fetcher as bias); a misaligned base makes every word read cross a " +
             "word boundary and silently corrupts the per-channel multipliers. " +
@@ -673,7 +673,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       "数值结果与 reluOn=0 逐位相同（金锚同口径不 clamp）")
     predicted match {
       case None => println(s"[$TAG] 体检结论：配置合法，硬件不会置 config-err → 走正向 golden 逐元素比对 ✓")
-      case Some(c) => println(s"[$TAG] ★★★ 体检不通过：硬件将在 EXECUTE 后直接置 STATUS.err（errCode=$c），不进计算 ★★★\n" +
+      case Some(c) => println(s"[$TAG] ★★★ 体检不通过：硬件将在 START 后直接置 IRQ_RAW error（errCode=$c），不进计算 ★★★\n" +
         s"[$TAG]   原因：${errExplain(p, c)}\n[$TAG]   处置：仍然继续跑（负向路径）并硬断言硬件确实以 errCode=$c 拒绝、留下波形") }
     val model = precheckConfigErr(p, cfg.totalN, cfg.hasMx4)   // 金锚口径与 RTL 口径不一致时给出 #124 提示
     if (model != predicted) println(s"[$TAG] 注：HiveDebugModel.precheckConfigErr 预测=$model 与本处 RTL 口径=$predicted 不一致" +
@@ -733,33 +733,26 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           dut.io.dmaCScale.get.req).foreach(_.ready.poke(true.B))
         dut.io.resp.ready.poke(true.B); dut.io.cmd.valid.poke(false.B)
         dut.reset.poke(true.B); dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
-        // ---- 命令通道 helper：REG_WRITE1/2 写寄存器；REG_READ 回读（tail=回读时 resp.data 的 peek 时机）----
-        def cmd(op: HiveCoreOp.Type, r0: Int, r1: Int, d0: Long, d1: Long, tail: Int = 2): Unit = {
-          dut.io.cmd.valid.poke(true.B); dut.io.cmd.payload.op.poke(op)
-          dut.io.cmd.payload.reg0Addr.poke(r0.U); dut.io.cmd.payload.reg1Addr.poke(r1.U)
-          dut.io.cmd.payload.data0.poke(d0.U); dut.io.cmd.payload.data1.poke(d1.U)
-          dut.clock.step(); dut.io.cmd.valid.poke(false.B); dut.clock.step(tail) }
-        def readReg(a: Int): BigInt = { cmd(HiveCoreOp.REG_READ, a, 0, 0L, 0L, tail = 1)
-          val d = dut.io.resp.payload.data.peek().litValue; dut.clock.step(); d }
-        // ---- 配置寄存器（(#164) 新排布：槽位由 12 个压到 8 个有效 = 0..5, 8..11）：
-        //      reg0=m  reg1=n|k<<16（低 16 位 n、高 16 位 k，读回 Cat(k,n)）
-        //      reg2=aAddr  reg3=bAddr  reg4=cAddr  reg5=控制字（见 HiveDebugModel.controlWord5）
-        //      reg8=STATUS 只读  reg9/0A=scaleA/B 基址  regB=scaleC 基址
-        //      ★旧 reg6/reg7 已删除：main 侧 wregs 无 is(6)/is(7) 分支 ⟹ 写为 no-op、读回 0。
-        //        故本处【不再有】写 reg6/reg7 那一条，回读对账也从 readReg(0x06)/(0x07) 迁到 readReg(0x05)。 ----
+        // ---- 命令 helper：等待真实 fire/response，再消费响应 ----
+        def cmd(op: HiveCoreOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
+          transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
+        }
+        def readReg(a: Int): BigInt = readRegister(dut.clock, dut.io.cmd, dut.io.resp, a)
+        // 配置索引 0..11 紧排：M/NK/A/B/C/CONTROL/ScaleA/ScaleB/ScaleC/Bias/RqM/RqParam。
+        // STATUS 独立移到 0x1E，IRQ 寄存器为 0x30..0x34。
         cmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, p.m, p.n.toLong | (p.k.toLong << 16))
         // 【P1-2 W4A8】基址改取 p.aBase/p.bBase（与 Plan.prepare 内存镜像同源，DebugParams
         //   默认即 A_BASE/B_BASE ⟹ 既有用例写入值逐位不变）；负例 ⑤ 借此把 bAddr%32!=0 送进守护。
         cmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, p.aBase, p.bBase)
         cmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, p.controlWord5)
-        cmd(HiveCoreOp.REG_WRITE2, 0x09, 0x0A, SA_BASE, SB_BASE); cmd(HiveCoreOp.REG_WRITE1, 0x0B, 0x00, SC_BASE, 0L)
-        // 【P0 epilogue-1】reg12 = biasAddr（biasOn=false 时不写：硬件默认 0、该通路整体不激活）。
-        if (p.biasOn) cmd(HiveCoreOp.REG_WRITE1, 0x0C, 0x00, p.biasBase, 0L)
-        // 【P0 epilogue-2】reg13 = rqMBase、reg14 = [31:16]zp + [5:0]shift（requantOn=false 时
-        //   不写，与 reg12 同范式；reluOn 位在 reg5[15] 已随控制字写入，无独立槽位）。
+        cmd(HiveCoreOp.REG_WRITE2, HiveSimCommon.SCALE_A_REG_ADDR, HiveSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE); cmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
+        // 【P0 epilogue-1】reg9 = biasAddr（biasOn=false 时不写：硬件默认 0、该通路整体不激活）。
+        if (p.biasOn) cmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.BIAS_REG_ADDR, 0x00, p.biasBase, 0L)
+        // 【P0 epilogue-2】reg10 = rqMBase、reg11 = [31:16]zp + [5:0]shift（requantOn=false 时
+        //   不写，与 reg9 同范式；reluOn 位在 reg5[15] 已随控制字写入，无独立槽位）。
         if (p.requantOn) {
-          cmd(HiveCoreOp.REG_WRITE1, 0x0D, 0x00, p.rqMBase, 0L)
-          cmd(HiveCoreOp.REG_WRITE1, 0x0E, 0x00, p.controlWord14, 0L) }
+          cmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.RQM_REG_ADDR, 0x00, p.rqMBase, 0L)
+          cmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.RQ_PARAM_REG_ADDR, 0x00, p.controlWord14, 0L) }
         // ⑦ addrMode / 格式字回读对账：addrMode 无硬件消费者，只能靠回读证明「确实写进去了」
         //   (#164) 重排后控制字全部收敛到 reg5 单寄存器 ⟹ 一次回读即可覆盖 loadWMode/三 MxBlk/
         //   warmup/warmdown/rnd/三 addrMode/三 fmt 共 19 个位域；断言强度【不降反升】（旧写法
@@ -767,29 +760,28 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
         val rb5 = readReg(0x05).toLong
         regRbOk = rb5 == p.controlWord5
         regRbMsg = f"reg5 wr=0x${p.controlWord5}%08X rd=0x$rb5%08X (addrMode at reg5[14:12], rnd at reg5[18:16])"
-        // 【P0 epilogue-1】reg12（biasAddr）回读对账（biasOn 时）：biasOn 位本身已由上方 reg5
+        // 【P0 epilogue-1】reg9（biasAddr）回读对账（biasOn 时）：biasOn 位本身已由上方 reg5
         //   bit30 覆盖（controlWord5 含 bit30 ⟹ rb5 对账即含 biasOn），此处只补 biasAddr 槽位。
         if (p.biasOn) {
-          val rb12 = readReg(0x0C).toLong
+          val rb12 = readReg(HiveSimCommon.BIAS_REG_ADDR).toLong
           val rb12Ok = rb12 == (p.biasBase & 0xFFFFFFFFL)
           regRbOk = regRbOk && rb12Ok
-          regRbMsg += f"; reg12 wr=0x${p.biasBase & 0xFFFFFFFFL}%08X rd=0x$rb12%08X" }
-        // 【P0 epilogue-2】reg13/reg14 回读对账（requantOn 时）：requantOn/reluOn 位本身已由
+          regRbMsg += f"; reg9 wr=0x${p.biasBase & 0xFFFFFFFFL}%08X rd=0x$rb12%08X" }
+        // 【P0 epilogue-2】reg10/reg11 回读对账（requantOn 时）：requantOn/reluOn 位本身已由
         //   reg5（controlWord5 含 bit29/bit15 ⟹ rb5 对账即含两位）覆盖，此处补 rqMBase 与
-        //   zp/shift 槽位；reg14 回读 = Cat(rqZp.asUInt, 10'b0, rqShift)，负 zp 以补码位型对账。
+        //   zp/shift 槽位；reg11 回读 = Cat(rqZp.asUInt, 10'b0, rqShift)，负 zp 以补码位型对账。
         if (p.requantOn) {
-          val rb13 = readReg(0x0D).toLong
-          val rb14 = readReg(0x0E).toLong
+          val rb13 = readReg(HiveSimCommon.RQM_REG_ADDR).toLong
+          val rb14 = readReg(HiveSimCommon.RQ_PARAM_REG_ADDR).toLong
           val rb13Ok = rb13 == (p.rqMBase & 0xFFFFFFFFL)
           val rb14Ok = rb14 == (p.controlWord14 & 0xFFFFFFFFL)
           regRbOk = regRbOk && rb13Ok && rb14Ok
-          regRbMsg += f"; reg13 wr=0x${p.rqMBase & 0xFFFFFFFFL}%08X rd=0x$rb13%08X; " +
-            f"reg14 wr=0x${p.controlWord14 & 0xFFFFFFFFL}%08X rd=0x$rb14%08X" }
+          regRbMsg += f"; reg10 wr=0x${p.rqMBase & 0xFFFFFFFFL}%08X rd=0x$rb13%08X; " +
+            f"reg11 wr=0x${p.controlWord14 & 0xFFFFFFFFL}%08X rd=0x$rb14%08X" }
         println(s"[$TAG] 寄存器回读对账：$regRbMsg → ${if (regRbOk) "一致 ✓" else "不一致 ✗"}")
-        // ---- EXECUTE ----
-        dut.io.cmd.valid.poke(true.B); dut.io.cmd.payload.op.poke(HiveCoreOp.EXECUTE)
-        dut.io.cmd.payload.reg0Addr.poke(0.U); dut.io.cmd.payload.reg1Addr.poke(0.U)
-        dut.io.cmd.payload.data0.poke(0.U); dut.io.cmd.payload.data1.poke(0.U); dut.clock.step(); dut.io.cmd.valid.poke(false.B)
+        // START 不清历史中断；每次任务显式 W1C 清 RAW 并 unmask。
+        prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
+        launchStart(dut.clock, dut.io.cmd)
         var aS = 0; var bS = 0; var saS = 0; var sbS = 0; var cB = 0; var csB = 0; var pollSt = 0; var pollCool = 0
         // 【perf 端口】TB 代行外部 PMU：主循环逐拍采样 io.perf 各电平累加，跑后打印
         //   占空比（可观测性验证 + 合理性粗检；采样窗 = EXECUTE 起至 done/err/超时）
@@ -843,15 +835,20 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           csB = wrCh("dmaCScale", csB, if (isMxAny(p.cFmt)) plan.expCScaleAddrSeq else Seq.empty,
             dut.io.dmaCScale.get.req.valid.peek().litToBoolean, dut.io.dmaCScale.get.req.payload.addr.peek().litValue.toLong,
             dut.io.dmaCScale.get.req.payload.data.peek().litValue, v => dut.io.dmaCScale.get.rsp.valid.poke(v.B), sLog)
-          // STATUS(reg8) 轮询：bit0=busy bit1=done bit2=err bits[6:3]=errCode bits[31:16]=progress
-          val (ps, pc, st) = statusPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool); pollSt = ps; pollCool = pc
+          val (ps, pc, st) = irqPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool); pollSt = ps; pollCool = pc
           st.foreach { s =>
-            if (s.err) { errSeen = true; errCode = s.errCode; println(f"[$TAG cycle=$cycle%5d] STATUS.err=1 errCode=${s.errCode}") }
-            else if (s.done) { done = true; println(f"[$TAG cycle=$cycle%5d] STATUS.done=1 A=$aS B=$bS C=$cB sA=$saS sB=$sbS sC=$csB") } }
+            errSeen = s.anyError
+            done = s.done
+          }
           perfPeek.zipWithIndex.foreach { case (b, i) => if (b) perfCnt(i) += 1 }
           dut.clock.step(); cycle += 1
         }
         dut.io.dmaC.rsp.valid.poke(false.B); dut.io.dmaCScale.get.rsp.valid.poke(false.B); dut.io.cmd.valid.poke(false.B)
+        if (errSeen) errCode = readReg(HiveSimCommon.ERROR_CODE_REG_ADDR).toInt
+        if (predicted.isDefined && errSeen) {
+          readReg(HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
+          dut.io.status.inFlight.expect(false.B)
+        } else if (done && !errSeen) dut.io.status.inFlight.expect(false.B)
         // 【P0 epilogue-1/2】dmaScaleA 跑后拆流对账（仅正向路径：负向路径硬件不进计算、
         //   无期望流量，只报实收请求数）。bias 域 [biasBase, biasBase+nTiles*totalN*4) 与
         //   rqM 域 [rqMBase, rqMBase+nTiles*totalN*4) 内的请求分别归 bias/rqM 流，其余归
@@ -893,7 +890,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
         // ⑤ golden 逐元素比对；负向路径下硬件根本不该进计算，只核对 errCode
         if (predicted.isDefined) { passed = errSeen && errCode == predicted.get && !done && regRbOk
           println(s"[$TAG] 负向路径：体检预测 errCode=${predicted.get}，实测 err=$errSeen errCode=$errCode done=$done → ${if (passed) "符合预测 ✓" else "与预测不符 ✗"}") }
-        else if (!done) println(s"[$TAG] 超时：$maxCycles 拍内未观测到 STATUS.done")
+        else if (!done) println(s"[$TAG] 超时：$maxCycles 拍内未观测到 IRQ_RAW.done")
         else { val c = plan.compare(cLog.toSeq, sLog.toSeq); cmp = Some(c)
           println(f"[$TAG] C compare: elemMismatch=${c.mismatch}/${c.elems} laneViolations=${c.laneViolations} " +
             f"maxRelErr=${c.maxRelErr}%.3e maxAbsErr=${c.maxAbsErr}%.3e")
@@ -920,7 +917,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       withClue(s"[$TAG] 体检预测硬件应以 errCode=${predicted.get} 拒绝（RTL 把 blk 三违约合并为 0，见文件头更正段）：") {
         (errSeen, errCode, done) should be((true, predicted.get, false)) }
     else {
-      withClue(s"[$TAG] 正向路径不应出现 STATUS.err、须在 maxCycles=$maxCycles 内观测到 done：") { (errSeen, done) should be((false, true)) }
+      withClue(s"[$TAG] 正向路径不应出现 IRQ_RAW error、须在 maxCycles=$maxCycles 内观测到 done：") { (errSeen, done) should be((false, true)) }
       withClue(s"[$TAG] 六通道逐拍地址对账（语义模型 vs 硬件）：") {
         if (p.strictAddr) addrBadCnt should be(0) else println(s"[$TAG] strictAddr=false → 失配 $addrBadCnt 拍只报告不判失败") }
       withClue(s"[$TAG] C element-level golden compare (no tolerance relaxation, no anchor change): ") {

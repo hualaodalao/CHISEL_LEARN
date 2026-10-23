@@ -247,7 +247,7 @@ object HiveDebugModel {
       //   DMA 发对齐多发读 + 内部移位重组，金锚序列/内存映像随基址平移。
       aBase: Long = A_BASE,
       bBase: Long = B_BASE,
-      // 【P0 epilogue-1 fused bias】基底注入开关与 bias 向量基址（reg5[30] / reg12）。
+      // 【P0 epilogue-1 fused bias】基底注入开关与 bias 向量基址（reg5[30] / reg9）。
       //   默认 false/BIAS_BASE ⟹ 全部既有构造点与既有用例零改动。biasOn=true 时：
       //   C(mm,nn) = bias(nn) + Σ_k aVal*bVal；bias 向量共 nTiles*totalN 个 4B 字
       //   （第 nt 个 N-tile 的 16 个字供 pass-0 psum 基底注入）。biasBase 须 4B 对齐
@@ -255,7 +255,7 @@ object HiveDebugModel {
       biasOn: Boolean = false,
       biasBase: Long = BIAS_BASE,
       // 【P0 epilogue-2 fused requant】requant/ReLU 开关与参数（reg5[29]=requantOn、
-      //   reg5[15]=reluOn、reg13=rqMBase、reg14=[31:16]zp+[5:0]shift）。默认全关 ⟹
+      //   reg5[15]=reluOn、reg10=rqMBase、reg11=[31:16]zp+[5:0]shift）。默认全关 ⟹
       //   全部既有构造点与既有用例零改动。requantOn=true 时输出链 =
       //   sat_fmt(round_half_up(acc×M[nn] >> shift) + zp)，acc 已含 bias 基底与 ReLU
       //   clamp（reluOn=true 且 INT 输出时负槽置 0）；M 为 per-channel int32（N 轴，
@@ -323,8 +323,7 @@ object HiveDebugModel {
         ((cFmt.litValue.toLong & 0xF) << 8) |
         ((bFmt.litValue.toLong & 0xF) << 4) | (aFmt.litValue.toLong & 0xF)
 
-    /** 【P0 epilogue-2】reg14 打包：[31:16]zp（int16 二补码位型）| [15:6] 保留 0 |
-      *   [5:0]shift。由寄存器契约独立推导（镜像 HiveInterface.wregs is(14.U)），非读回拟合。 */
+    /** RQ_PARAM：[31:16]zp（int16 二补码）| [15:6]保留0 | [5:0]shift，按寄存器契约打包。 */
     def controlWord14: Long =
       ((rqZp.toLong & 0xFFFFL) << 16) | (rqShift.toLong & 0x3FL)
 

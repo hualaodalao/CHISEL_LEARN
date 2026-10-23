@@ -276,15 +276,8 @@ case class HiveCoreConfig(
     * 本期禁止「双行合拍」，占用率契约见重构计划裁定 9。 */
   val cBeatsPerRowMax: Int = totalN * 32 / cDmaExtW
 
-  // P3a：新增 regs(11) = cScaleAddr（C 侧量化 scale 写回基地址），寄存器组 11 → 12。
-  // 旧软件只写 0x00..0x0A，新增寄存器默认 0 不影响既有行为。
-  // 【P0 epilogue-1 fused bias】新增 regs(12) = biasAddr（0x0C，biasOn=reg5[30] 使能），
-  //   寄存器组 12 → 13；写门控 <registerNumRW 自动放行 0x0C（addr 截 4 位 0x0C 仍在界内）。
-  // 【P0 epilogue-2 fused requant】新增 regs(13) = rqMBase（0x0D，per-channel M 向量基址，
-  //   requantOn=reg5[29] 使能）、regs(14) = [31:16]zp+[5:0]shift（0x0E，per-tensor 标量，
-  //   reluOn=reg5[15] 使能），寄存器组 13 → 15。
-  val registerNumRW: Int = 15
-  val registerNum: Int = 15
+  val registerNumRW: Int = 12
+  val registerNum: Int = 64
 
 
   val queueAdapterBufferDepth: Int = 18

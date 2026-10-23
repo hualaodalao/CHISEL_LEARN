@@ -115,9 +115,8 @@ object RoundingMode extends ChiselEnum {
 // 操作码枚举（仅 3 种命令）
 // ============================================================================
 
-/** HiveCore 操作码：寄存器写、执行、寄存器读。 */
 object HiveCoreOp extends ChiselEnum {
-  val REG_WRITE1, REG_WRITE2, EXECUTE, REG_READ = Value
+  val REG_WRITE1, REG_WRITE2, REG_READ = Value
 }
 
 /** 循环顺序枚举：loopMode 位域已被 aFmt/bFmt/mixFmtEn/outFmt 重新占用，

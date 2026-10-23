@@ -1,24 +1,3 @@
-/** HiveCore — 脉动阵列加速器顶层集成模块（寄存器配置 + 一键执行架构）
-  *
-  * 外部接口极简，仅 3 种命令:
-  *   - REG_WRITE: 写入 2 个 32-bit 寄存器
-  *   - EXECUTE: 触发矩阵计算
-  *   - REG_READ: 读取 1 个寄存器
-  *
-  * 中断输出（P0-3）:
-  *   - irq: 电平中断。本次 EXECUTE 完成（done）或出错（err）后置位，
-  *     下一次 EXECUTE（startPulse）清零；软件以下一次 EXECUTE 作为中断确认。
-  *
-  * 内部组件:
-  *   - Register File: 12 个 32-bit 配置/状态寄存器（映射见下方寄存器组注释）
-  *   - Executor: 自动 Tiling FSM
-  *   - aDma (RdOnly): execute 单次启动自主扫描 A 矩阵 → A buffer（内建 nTile 轮次）
-  *   - cDma (WrOnly): C buffer → 外部存储（storeGate 门控，末 K pass 开门）
-  *   - bDma (RdOnly): 自主扫描整个 B 矩阵 → 独立 B buffer（权重专用）
-  *   - Scratchpad: A buffer + B buffer + C buffer
-  *   - HiveComb: 脉动阵列组合逻辑
-  */
-
 import chisel3._
 import chisel3.util._
 
@@ -36,46 +15,16 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     val dmaCScale = if (cfg.hasMx) Some(HiveCoreDMAExtWriteOnlyIF(cfg, cfg.cScaleRowW)) else None
 
     val status = Output(new HiveCoreStatus(cfg))
-    // 电平中断：本次 EXECUTE 完成（done）或出错（err）后置位，下一次 EXECUTE 清除。
     val irq = Output(Bool())
     // 【perf 观测端口】性能观测信号组（纯组合电平、无内部计数；外部 PMU 按拍采样，
     //   信号语义见 HiveInterface.scala HiveCorePerf）
     val perf = Output(new HiveCorePerf)
   })
 
-  // ==========================================================================
-  // 寄存器组定义（映射与 HiveInterface.scala HiveCoreRegister 一致，共 12 个）
-  // ==========================================================================
-  // 地址  名称
-  // 0x00  REG_M         M 维度
-  // 0x01  REG_N         N 维度
-  // 0x02  REG_K         K 维度
-  // 0x03  REG_A_ADDR    A 矩阵基地址
-  // 0x04  REG_B_ADDR    B 矩阵基地址
-  // 0x05  REG_C_ADDR    C 矩阵基地址
-  // 0x06  REG_A/B/C_STRIDE  A/B/C 行步长（[3:0]/[7:4]/[11:8]，各 4bit）
-  // 0x07  REG_CONTROL   [0]=clear_done (写1清除), [1:0]=fmt, [4:2]=rnd,
-  //                     [5]=loadWMode (0=垂直加载, 1=水平 loadW 加载),
-  //                     (16)+(13,11)=cFmt (C 写回 dmaC 输出格式，P0 扩 4-bit：
-  //                     Cat(bit16,bit[13:11])，0xxx 低 3 位逐字不变（0000=fp32 默认/0001=fp16/
-  //                     0010=bf16/0011=reserved 回落/0100・0101・0110=mx-E4M3/E5M2、mxfp4-E2M1 量化/
-  //                     0111=reserved 降级），1000/1001/1010=int32/int16/int8，1011..1111 reserved),
-  //                     (15,14)=qBlockSize (P3a 量化块大小：00=8/01=16/10=32/11=64 元素/块)
-  // 0x08  REG_STATUS    [0]=busy, [1]=done, [2]=err, [31:16]=progress (只读)
-  // 0x09  REG_SCALE_A_ADDR  scaleA 基地址
-  // 0x0A  REG_SCALE_B_ADDR  scaleB 基地址
-  // 0x0B  REG_SCALE_C_ADDR  P3a C 侧量化 scale 行写回基地址（P3b dmaCScale 通道使用）
-
-  //val regFile = RegInit(VecInit(Seq.fill(12)(0.U(32.W))))
-  val regFile = RegInit(0.U.asTypeOf(HiveCoreRegister(cfg)))
-
-  // 状态寄存器辅助
-  val doneFlag = RegInit(false.B)
-  val errFlag  = RegInit(false.B)
-  // 【P0-3 irq】doneFlag 是「上电以来是否完成过」的粘滞位（仅 reset 清），直接驱动 irq
-  //   会在首次完成后永久拉高 ⟹ 另设 doneSinceStart：本次 EXECUTE 以来是否完成，
-  //   startPulse（下一次 EXECUTE）清零，与 errFlag 的清除时机一致。
-  val doneSinceStart = RegInit(false.B)
+  val regIf = Module(new HiveCoreRegIf(cfg))
+  regIf.io.cmd <> io.cmd
+  io.resp <> regIf.io.resp
+  val regFile = regIf.io.regFile
 
   // ==========================================================================
   // 子模块例化
@@ -93,9 +42,22 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   val cDmaScale = if (cfg.hasMx) Some(Module(new HiveCoreDmaScaleWr(cfg))) else None
 
 
-  val startPulse = io.cmd.fire && io.cmd.payload.op === HiveCoreOp.EXECUTE
+  val startPulse = regIf.io.start
   calcConfig.io.regFile := regFile
   calcConfig.io.startIn := startPulse
+  regIf.io.busy := executor.io.busy
+  regIf.io.progress := executor.io.progress
+  regIf.io.done := executor.io.done
+  regIf.io.configError := calcConfig.io.errPluse
+  regIf.io.configErrorCode := calcConfig.io.errCode
+  regIf.io.dmaErrors := VecInit(Seq.fill(8)(false.B))
+  regIf.io.dmaErrors(0) := io.dmaA.rsp.fire && io.dmaA.rsp.payload.err
+  regIf.io.dmaErrors(1) := io.dmaB.rsp.fire && io.dmaB.rsp.payload.err
+  regIf.io.dmaErrors(2) := io.dmaC.rsp.fire && io.dmaC.rsp.payload.err
+  if (cfg.hasMx) {
+    regIf.io.dmaErrors(4) := io.dmaScaleB.get.rsp.fire && io.dmaScaleB.get.rsp.payload.err
+    regIf.io.dmaErrors(5) := io.dmaCScale.get.rsp.fire && io.dmaCScale.get.rsp.payload.err
+  }
 
 
   //For tracing
@@ -109,12 +71,12 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   when(tracingSt === 0.U){
       when(startPulse){
         tracingSt := 1.U
-        tracingPcReg := io.cmd.payload.pc
-        tracingTagReg := io.cmd.payload.tag
+        tracingPcReg := regIf.io.startPc
+        tracingTagReg := regIf.io.startTag
         io.respForTracing.valid := true.B
         io.respForTracing.payload.state := 0.U
-        io.respForTracing.payload.pc := io.cmd.payload.pc
-        io.respForTracing.payload.tag := io.cmd.payload.tag
+        io.respForTracing.payload.pc := regIf.io.startPc
+        io.respForTracing.payload.tag := regIf.io.startTag
       }
   }.otherwise{
     io.respForTracing.valid := executor.io.done | calcConfig.io.errPluse
@@ -229,7 +191,6 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     aDma.io.stretchBeat.get := 0.U
   }
 
-  // bDma.io.done/busy 目前无消费者（err 参与 dmaErr 汇聚），留空部分 FIRRTL 会优化掉
   // 外部只读通道直连顶层 dmaB
   io.dmaB <> bDma.io.dmaExtRdIF
 
@@ -260,111 +221,6 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   cDma.io.calcConfig  := calcConfig.io.calcConfig
   io.dmaC <> cDma.io.dmaExtWrIF
 
-  // ==========================================================================
-  // 命令处理逻辑
-  // ==========================================================================
-  val respValid = RegInit(false.B)
-  val respData  = RegInit(0.U(32.W))
-  val respErr   = RegInit(false.B)
-
-  io.cmd.ready := !respValid  // 上一个响应未被取走时反压
-  io.resp.valid       := respValid
-  io.resp.payload.data := respData
-  io.resp.payload.err  := respErr
-
-  when(io.resp.fire) {
-    respValid := false.B
-  }
-
-  when(io.cmd.fire) {
-    val cmd = io.cmd.payload
-    switch(cmd.op) {
-      is(HiveCoreOp.REG_WRITE1) {
-        val addr0 = cmd.reg0Addr(3, 0) 
-        // P4.3: 写门控覆盖 0x00-0x07 + 0x09/0x0A/0x0B（含 scale 地址），排斥 STATUS 0x08 只读。
-        //   registerNumRW=12 使 <registerNumRW 区间含 0x08，故显式 =/= 8.U 排除。
-        //   regs(8) 从不被读（0x08 读返回计算 statusReg），故该门控观测 bit-exact。
-        when(cmd.reg0Addr < cfg.registerNumRW.U && cmd.reg0Addr =/= 0x08.U) { 
-          regFile.wregs(addr0, cmd.data0)
-        }
-        // 【B1】移除 clear_done 残留：旧机制 `when(reg0Addr===0x07){when(data0(0)){doneFlag:=false}}`
-        //   在新 reg7 位域下 bit0 = aFmt[0]，写奇数 aFmt（FP16=1/MXE4M3=3/MXE2M1=5…）会
-        //   意外清除 doneFlag（确定性 bug）。doneFlag 现仅由 reset 与 executor.io.done 驱动，
-        //   语义为「本次上电以来是否完成过一次执行」，与 STATUS.done 粘滞契约一致。
-        // 生成响应
-        respValid := true.B
-        respData  := 0.U
-        respErr   := false.B
-      }
-      is(HiveCoreOp.REG_WRITE2){
-        val addr0 = cmd.reg0Addr(3, 0) 
-        // P4.3: 同 REG_WRITE1，覆盖 0x09/0x0A/0x0B、排斥 STATUS 0x08（regs(8) 不被读，bit-exact）
-        when(cmd.reg0Addr < cfg.registerNumRW.U && cmd.reg0Addr =/= 0x08.U) {
-           regFile.wregs(addr0, cmd.data0)
-        }
-        val addr1 = cmd.reg1Addr(3, 0) 
-        when(cmd.reg1Addr < cfg.registerNumRW.U && cmd.reg1Addr =/= 0x08.U) { 
-          regFile.wregs(addr1, cmd.data1)
-        }
-        // 【B1】移除 clear_done 残留（REG_WRITE2 侧，同上：reg7 bit0 = aFmt[0] 冲突）
-        // 生成响应
-        respValid := true.B
-        respData  := 0.U
-        respErr   := false.B
-      }
-      is(HiveCoreOp.REG_READ) {
-        // 读取寄存器（addr 截 4 位与写路径 addr0/addr1 同源；寄存器组 ≤16，
-        // 动态索引语义与截断前一致，仅消除位宽超宽告警）
-        val addr = cmd.reg0Addr(3, 0)
-        val statusReg = Cat(executor.io.progress, 0.U(9.W), calcConfig.io.errCode, errFlag, doneFlag, executor.io.busy)
-        val readVal = Mux(addr === 0x08.U, statusReg, regFile.rregs(addr))
-        respValid := true.B
-        respData  := readVal
-        respErr   := false.B
-      }
-      is(HiveCoreOp.EXECUTE) {
-        // 不需要立即回响应, 等完成后回
-        respValid := true.B
-        respData  := 0.U
-        respErr   := false.B
-      }
-    }
-  }
-
-  // 【P0 epilogue-1 fused bias】bias 取数 rsp.err 锁存寄存器：dmaScaleA 端口被 bias
-  //   取数器盗用期间的读错误（scaleADma 自身的 rsp.err 锁存看不到这些拍）。声明先于
-  //   dmaErr 汇聚（Scala 求值序），赋值在 P3 scale 通道的端口仲裁块内；startPulse 清零。
-  private val biasRspErr = if (cfg.hasMx) Some(RegInit(false.B)) else None
-  // 【P0 epilogue-2 fused requant】rqM 取数（两相取数器的 M 相）rsp.err 锁存，同 biasRspErr 范式
-  private val rqMRspErr = if (cfg.hasMx) Some(RegInit(false.B)) else None
-
-  // EXECUTE 完成时生成响应；err 汇聚 Executor 与三个自主 DMA 的错误标志。
-  // Executor 异常路径（容量错/cPush 违约）经 sDONE 退出，io.done 照常脉冲，
-  // 此处 respErr 反映真实 err，软件栈收到带 err 标记的 resp 而非永久等待。
-  // P4.2: MX 配置追加 scale DMA（scaleADma/scaleBDma）err；非 MX 配置为
-  //   else 分支，表达式逐字等于原式（无 scale DMA 生成），bit-exact。
-  val dmaErr = if (cfg.hasMx) {
-    aDma.io.err || bDma.io.err || cDma.io.err || aDmaScale.get.io.err || bDmaScale.get.io.err ||
-      cDmaScale.get.io.err ||  // P3b 追加 dmaCScale 通道错误（rsp.err 锁存）
-      biasRspErr.get ||        // P0 epilogue-1 追加 bias 取数通道错误（dmaScaleA 盗用期）
-      rqMRspErr.get            // P0 epilogue-2 追加 rqM 取数通道错误（M 相盗用期）
-  } else {
-    aDma.io.err || bDma.io.err || cDma.io.err
-  }
-
-  when(startPulse) {
-    errFlag := false.B; doneSinceStart := false.B
-    if (cfg.hasMx) biasRspErr.get := false.B  // P0 epilogue-1：bias 读错误随新 run 清零
-    if (cfg.hasMx) rqMRspErr.get := false.B  // P0 epilogue-2：rqM 读错误随新 run 清零
-  }
-
-  when(calcConfig.io.err && !startPulse) { errFlag := true.B }
-
-  when(executor.io.done) {
-    doneFlag  := true.B
-    doneSinceStart := true.B
-    errFlag   := calcConfig.io.err || dmaErr
-  }
 
 
 
@@ -431,7 +287,7 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // 【P0 epilogue-2 fused requant】requant 接线（cvt 侧端口仅 hasInt 生成；rqM 取自
   //   Executor 收集寄存器 rqMOut——仅 hasMx 供给，纯 INT 无 MX 的假想配置下 requantOn
   //   已被 errCode13 的 !hasMx 臂运行期拒绝，恒 0 输入无害；标量直读 regFile：
-  //   requantOn=reg5[29]、reluOn=reg5[15]、shift/zp=reg14）。cvt 在 in.fire 拍随行
+  //   requantOn=reg5[29]、reluOn=reg5[15]、shift/zp=RQ_PARAM）。cvt 在 in.fire 拍随行
   //   锁存——同一 N-tile 的全部行在该 tile 的 rqM 重取触发（sNEXT_NK_TILE，晚于
   //   doneBlock=末行已过 cvt）之前完成锁存，跨 tile 不串值。
   if (cfg.hasInt) {
@@ -618,12 +474,10 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
     }.elsewhen(!biasPortReq.fire && biasPortRsp.fire && biasPortInfl =/= 0.U) {
       biasPortInfl := biasPortInfl - 1.U
     }
-    when(rspToBias && biasPortRsp.fire && biasPortRsp.payload.err) {
-      biasRspErr.get := true.B
-    }
-    when(rspToM && biasPortRsp.fire && biasPortRsp.payload.err) {
-      rqMRspErr.get := true.B
-    }
+    val scalePortError = biasPortRsp.fire && biasPortRsp.payload.err
+    regIf.io.dmaErrors(3) := scalePortError && !rspToBias && !rspToM
+    regIf.io.dmaErrors(6) := scalePortError && rspToBias
+    regIf.io.dmaErrors(7) := scalePortError && rspToM
 
     // 取数器重入守卫：上一轮取数未回 IDLE 时新脉冲到达 = bias/rqM 字流会交错错序
     assert(!((executor.io.biasFetchReq.get || executor.io.rqMFetchReq.get) && biasFState =/= sBiasFIDLE),
@@ -751,16 +605,12 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // Status 输出
   // ==========================================================================
   io.status.busy       := executor.io.busy
-  io.status.done       := doneFlag
-  io.status.err        := errFlag
+  io.status.inFlight   := regIf.io.inFlight
   io.status.progress   := executor.io.progress
   io.status.aOccupancy := scratchpad.io.aOccupancy
   io.status.bOccupancy := scratchpad.io.bOccupancy
   io.status.cOccupancy := scratchpad.io.cOccupancy
-  // 【P0-3 irq】电平中断 = 本次 EXECUTE 以来（完成 ∪ 出错）。errFlag 已含配置错
-  //   （startOut 封锁、无 done）与 DMA/完成错（done 拍定值）；doneSinceStart 覆盖
-  //   无错完成。两者都在 startPulse 清零 ⟹ 软件以下一次 EXECUTE 作为中断确认/清除。
-  io.irq               := doneSinceStart || errFlag
+  io.irq               := regIf.io.irq
 
   // ==========================================================================
   // 【perf 观测端口】纯组合直连既有信号（零新状态、零新时序路径）；计数由外部

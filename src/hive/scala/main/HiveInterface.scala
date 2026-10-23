@@ -7,16 +7,10 @@ import chisel3.dontTouch
 // 命令 Bundle
 // ============================================================================
 
-/** HiveCore 命令描述符。
-  *
-  * REG_WRITE: 一次写入 regAddr 和 regAddr+1 两个寄存器
-  * EXECUTE: 触发 GEMM 计算（data0/data1/regAddr 无用）
-  * REG_READ: 读取 regAddr 对应的寄存器
-  */
 class HiveCoreCmd extends Bundle {
   val op      = HiveCoreOp()    // 操作码
-  val reg0Addr = UInt(5.W)       // 寄存器地址
-  val reg1Addr = UInt(5.W)       // 寄存器地址
+  val reg0Addr = UInt(6.W)       // 寄存器索引
+  val reg1Addr = UInt(6.W)       // 寄存器索引
   val data0   = UInt(32.W)      // 写入数据 0
   val data1   = UInt(32.W)      // 写入数据 1
   val pc      = UInt(32.W)
@@ -97,11 +91,7 @@ class HiveCoreStatus(cfg: HiveCoreConfig) extends Bundle {
   /** 忙标志 */
   val busy = Bool()
 
-  /** 完成标志 */
-  val done = Bool()
-
-  /** 错误标志 */
-  val err = Bool()
+  val inFlight = Bool()
 
   /** 当前进度（已完成的 tile 数） */
   val progress = UInt(16.W)
@@ -183,84 +173,14 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
   val cScaleAddr = UInt(32.W)
   val warmup = Bool()
   val warmdown = Bool()
-  // 【P0 epilogue-1 fused bias】reg12 = bias 基地址（0x0C）；reg5 bit30 = biasOn
-  //   显式使能（写侧见 wregs is(5.U) 的 d(30)，读侧见 rregs is(5.U) Cat 的 bit30）。
   val biasOn = Bool()
   val biasAddr = UInt(cfg.addrWidth.W)
-  // 【P0 epilogue-2 fused requant】模式位归控制字：reg5 bit29 = requantOn、bit15 = reluOn
-  //   （reluOn 不耦合 INT/浮点格式选择，与 biasOn 同为模式位）。参数归参数寄存器：
-  //   reg13(0x0D) = rqMBase（per-channel int32 乘子向量基址，N 轴同构 bias）；
-  //   reg14(0x0E) = [31:16]zp(int16 per-tensor) + [15:6] reserved 0 + [5:0]shift(uint6 per-tensor)。
   val requantOn = Bool()
   val reluOn = Bool()
   val rqMBase = UInt(cfg.addrWidth.W)
   val rqShift = UInt(6.W)
   val rqZp = SInt(16.W)
 
-  def wregs(addr: UInt, d: UInt) = {
-    switch(addr){
-      is(0.U) { m := d(15,0) }
-      is(1.U) { n := d(15,0); k := d(31,16) }
-      is(2.U) { aAddr := d }
-      is(3.U) { bAddr := d }
-      is(4.U) { cAddr := d }
-      is(5.U) {
-        biasOn := d(30)
-        requantOn := d(29)
-        loadWMode := d(28)
-        cMxBlockSize := d(26).asTypeOf(MXBlockSize())
-        bMxBlockSize := d(24).asTypeOf(MXBlockSize())
-        aMxBlockSize := d(22).asTypeOf(MXBlockSize())
-        warmup       := d(21)
-        warmdown     := d(20)
-        rnd          := d(18,16).asTypeOf(RoundingMode())
-        reluOn       := d(15)
-        cAddrMode := d(14).asTypeOf(AddrMode())
-        bAddrMode := d(13).asTypeOf(AddrMode())
-        aAddrMode := d(12).asTypeOf(AddrMode())
-        cFmt := d(11, 8).asTypeOf(DataFormat())
-        bFmt := d(7, 4).asTypeOf(DataFormat())
-        aFmt := d(3, 0).asTypeOf(DataFormat())
-      }
-      is(8.U) { }
-      is(9.U) { aScaleAddr := d }
-      is(10.U) { bScaleAddr := d }
-      is(11.U) { cScaleAddr  := d }
-      is(12.U) { biasAddr    := d }
-      is(13.U) { rqMBase     := d }
-      is(14.U) { rqZp := d(31,16).asSInt; rqShift := d(5,0) }
-    }
-  }
-
-  def rregs(addr: UInt) : UInt = {
-    val ret = Wire(UInt(32.W))
-    ret := 0.U
-    switch(addr) {
-      is(0.U) { ret := Cat(0.U(16.W),m) }
-      is(1.U) { ret := Cat(k,n) }
-      is(2.U) { ret := aAddr }
-      is(3.U) { ret := bAddr }
-      is(4.U) { ret := cAddr }
-      is(5.U) { ret := Cat(0.U(1.W), biasOn.asUInt,
-      requantOn.asUInt, loadWMode.asUInt,
-      0.U(1.W),cMxBlockSize.asUInt,
-      0.U(1.W),bMxBlockSize.asUInt,
-      0.U(1.W),aMxBlockSize.asUInt,
-      warmup.asUInt,
-      warmdown.asUInt,
-      0.U(1.W), rnd.asUInt,
-      reluOn.asUInt, cAddrMode.asUInt, bAddrMode.asUInt,aAddrMode.asUInt,
-      cFmt.asUInt, bFmt.asUInt, aFmt.asUInt) }  // 【#120 C1】间隙 8→7，总位宽 32-bit，严格镜像 wregs 位域；【P0 epilogue-1】bit30=biasOn；【P0 epilogue-2】bit29=requantOn、bit15=reluOn（两处取代原 0 填充，位宽不变）
-      is(8.U) { ret := 0.U }
-      is(9.U) { ret := aScaleAddr }
-      is(10.U) { ret := bScaleAddr }
-      is(11.U) { ret := cScaleAddr }
-      is(12.U) { ret := biasAddr }
-      is(13.U) { ret := rqMBase }
-      is(14.U) { ret := Cat(rqZp.asUInt, 0.U(10.W), rqShift) }  // [31:16]zp + [15:6]0 + [5:0]shift，镜像 wregs is(14.U)
-    }
-    ret
-  }
   
   
 

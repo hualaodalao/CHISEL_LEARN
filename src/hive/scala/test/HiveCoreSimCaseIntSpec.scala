@@ -252,33 +252,21 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
 
         // ---- Command helper ----
         def cmd(op: HiveCoreOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
-          dut.io.cmd.valid.poke(true.B); dut.io.cmd.payload.op.poke(op)
-          dut.io.cmd.payload.reg0Addr.poke(r0.U); dut.io.cmd.payload.reg1Addr.poke(r1.U)
-          dut.io.cmd.payload.data0.poke(d0.U); dut.io.cmd.payload.data1.poke(d1.U)
-          dut.clock.step(); dut.io.cmd.valid.poke(false.B); dut.clock.step(2)
+          transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
         }
 
         // ---- Configure registers ----
-        // (#164) 寄存器重排后的新写序列（槽位由 12 个压到 8 个有效 = 0..5, 8..11）：
-        //   reg0=m、reg1=n|k<<16（旧 reg2=k 已并入 reg1 高 16 位，读回 Cat(k,n)）、
-        //   reg2/3/4 = a/b/cAddr（旧 reg3/4/5）、reg5 = 控制字（旧 reg6+reg7 合并）。
-        //   ★旧 `cmd(REG_WRITE2, 0x06, 0x07, p.controlWord6, p.controlWord7)` 已删：main 侧
-        //   wregs 无 is(6)/is(7) 分支 ⟹ 写为 no-op、reg5 保持复位 0（aFmt/bFmt/cFmt 全 FP32）
-        //   ⟹ errCode 5 抢跑，且 a/b/cAddr 会被错位写到 reg3/4/5（reg5 被当成 cAddr）。
+        // 配置索引 0..11 紧排：M/NK/A/B/C/CONTROL/ScaleA/ScaleB/ScaleC/Bias/RqM/RqParam。
         cmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, m, n.toLong | (k.toLong << 16))
         cmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, p.aBase, p.bBase)
         cmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, p.controlWord5)
-        cmd(HiveCoreOp.REG_WRITE2, 0x09, 0x0A, SA_BASE, SB_BASE)
-        cmd(HiveCoreOp.REG_WRITE1, 0x0B, 0x00, SC_BASE, 0L)
+        cmd(HiveCoreOp.REG_WRITE2, HiveSimCommon.SCALE_A_REG_ADDR, HiveSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE)
+        cmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
 
         println(s"[$TAG] regs: reg5(controlWord5)=0x${p.controlWord5.toHexString}")
 
-        // ---- EXECUTE ----
-        dut.io.cmd.valid.poke(true.B)
-        dut.io.cmd.payload.op.poke(HiveCoreOp.EXECUTE)
-        dut.io.cmd.payload.reg0Addr.poke(0.U); dut.io.cmd.payload.reg1Addr.poke(0.U)
-        dut.io.cmd.payload.data0.poke(0.U); dut.io.cmd.payload.data1.poke(0.U)
-        dut.clock.step(); dut.io.cmd.valid.poke(false.B)
+        prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
+        launchStart(dut.clock, dut.io.cmd)
 
         // ---- Main simulation loop ----
         var aS = 0; var bS = 0; var saS = 0; var sbS = 0; var cB = 0; var csB = 0
@@ -330,21 +318,17 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
             dut.io.dmaCScale.get.req.payload.data.peek().litValue,
             v => dut.io.dmaCScale.get.rsp.valid.poke(v.B), sLog)
 
-          // STATUS poll
-          val (ps, pc, st) = statusPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool)
+          val (ps, pc, st) = irqPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool)
           pollSt = ps; pollCool = pc
-          st.foreach { s =>
-            if (s.err) { errSeen = true; errCode = s.errCode
-              println(f"[$TAG cycle=$cycle%5d] STATUS.err=1 errCode=${s.errCode}") }
-            else if (s.done) { done = true
-              println(f"[$TAG cycle=$cycle%5d] STATUS.done=1 A=$aS B=$bS C=$cB sA=$saS sB=$sbS") }
-          }
+          st.foreach { s => errSeen = s.anyError; done = s.done }
           dut.clock.step(); cycle += 1
         }
 
         dut.io.dmaC.rsp.valid.poke(false.B)
         dut.io.dmaCScale.get.rsp.valid.poke(false.B)
         dut.io.cmd.valid.poke(false.B)
+        if (errSeen) errCode = readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR).toInt
+        if (done && !errSeen) dut.io.status.inFlight.expect(false.B)
 
         println(s"[$TAG] Done: cycles=$cycle done=$done err=$errSeen; " +
           s"beats A=$aS/${plan.expAAddrSeq.size} B=$bS/${plan.expBAddrSeq.size} " +
@@ -394,10 +378,10 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
     }
 
     // ---- Assertions (after waveform is saved) ----
-    withClue(s"[$TAG] Should complete without STATUS.err: ") {
+    withClue(s"[$TAG] Should complete without IRQ_RAW error: ") {
       errSeen should be(false)
     }
-    withClue(s"[$TAG] Should reach STATUS.done within ${p.maxCycles} cycles: ") {
+    withClue(s"[$TAG] Should reach IRQ_RAW.done within ${p.maxCycles} cycles: ") {
       done should be(true)
     }
     withClue(s"[$TAG] Six-channel address check (semantic model vs hardware): ") {
@@ -461,29 +445,19 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
 
         // ---- Command helper ----
         def cmd(op: HiveCoreOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
-          dut.io.cmd.valid.poke(true.B); dut.io.cmd.payload.op.poke(op)
-          dut.io.cmd.payload.reg0Addr.poke(r0.U); dut.io.cmd.payload.reg1Addr.poke(r1.U)
-          dut.io.cmd.payload.data0.poke(d0.U); dut.io.cmd.payload.data1.poke(d1.U)
-          dut.clock.step(); dut.io.cmd.valid.poke(false.B); dut.clock.step(2)
+          transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
         }
 
         // ---- Configure registers (same illegal config) ----
-        // (#164) 与 runIntGemm 同构的新写序列：reg1=n|k<<16、reg2/3/4=a/b/cAddr、reg5=控制字；
-        //   旧写 reg6/reg7 那条已删（新布局下为 no-op）。本负向用例期望 errCode=8
-        //   （K 非 kPerBeat 整除 / K=0）；若控制字写不进 reg5，aFmt/bFmt 会退化为 FP32
-        //   ⟹ errCode 5 抢跑（优先级 6>5>4>3>0 的 last-connect 序），归因全失。
+        // 与正向运行器同一配置布局，只改变受测配置违约项。
         cmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, m, n.toLong | (k.toLong << 16))
         cmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
         cmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, cAddr, p.controlWord5)
-        cmd(HiveCoreOp.REG_WRITE2, 0x09, 0x0A, SA_BASE, SB_BASE)
-        cmd(HiveCoreOp.REG_WRITE1, 0x0B, 0x00, SC_BASE, 0L)
+        cmd(HiveCoreOp.REG_WRITE2, HiveSimCommon.SCALE_A_REG_ADDR, HiveSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE)
+        cmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
 
-        // ---- EXECUTE ----
-        dut.io.cmd.valid.poke(true.B)
-        dut.io.cmd.payload.op.poke(HiveCoreOp.EXECUTE)
-        dut.io.cmd.payload.reg0Addr.poke(0.U); dut.io.cmd.payload.reg1Addr.poke(0.U)
-        dut.io.cmd.payload.data0.poke(0.U); dut.io.cmd.payload.data1.poke(0.U)
-        dut.clock.step(); dut.io.cmd.valid.poke(false.B)
+        prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
+        launchStart(dut.clock, dut.io.cmd)
 
         // ---- Poll for err (no data feeding; hardware should reject immediately) ----
         var pollSt = 0; var pollCool = 0
@@ -498,17 +472,14 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
           // Count any dmaC write requests (should be zero)
           if (dut.io.dmaC.req.valid.peek().litToBoolean) cWrites += 1
 
-          val (ps, pc, st) = statusPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool)
+          val (ps, pc, st) = irqPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool)
           pollSt = ps; pollCool = pc
-          st.foreach { s =>
-            if (s.err) { errSeen = true; errCode = s.errCode
-              println(f"[$TAG cycle=$cycle%5d] STATUS.err=1 errCode=${s.errCode}") }
-            else if (s.done) { done = true
-              println(f"[$TAG cycle=$cycle%5d] STATUS.done=1 (unexpected!)") }
-          }
+          st.foreach { s => errSeen = s.configError; done = s.done }
           dut.clock.step(); cycle += 1
         }
         dut.io.cmd.valid.poke(false.B)
+        errCode = readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR).toInt
+        dut.io.status.inFlight.expect(false.B)
         println(s"[$TAG] ErrCase end: cycles=$cycle err=$errSeen errCode=$errCode done=$done cWrites=$cWrites")
       }
     } finally {
@@ -516,7 +487,7 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
     }
 
     // ---- Assertions ----
-    withClue(s"[$TAG] Hardware should set STATUS.err for illegal K: ") {
+    withClue(s"[$TAG] Hardware should set IRQ_RAW error for illegal K: ") {
       errSeen should be(true)
     }
     withClue(s"[$TAG] errCode should be $expectedErrCode: ") {

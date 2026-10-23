@@ -189,47 +189,43 @@ object HiveSimCommon {
     }
   }
 
-  // ========== STATUS 寄存器轮询契约（EXECUTE 立即响应语义下的完成判定） ==========
-  // 【任务101】EXECUTE 命令已改为立即返回响应（respData=0、respErr=0，不代表完成），
-  // 测试侧完成判定统一改为 REG_READ 轮询 STATUS 寄存器：
-  //   - 读地址 0x08：HiveCore REG_READ 分支 Mux(addr === 0x08.U, statusReg, ...)
-  //     （addr 截 4 位，0x08 不变；读命令地址携带在 cmd.payload.reg0Addr）。
-  //   - statusReg 位布局（HiveCore.scala Cat(progress, 0.U(9.W), errCode, errFlag,
-  //     doneFlag, executor.io.busy)，高位在前）：
-  //       bit0=busy（executor 组合）
-  //       bit1=done（doneFlag 粘滞位：executor.io.done 拍置 1，仅由 reset 清除）
-  //         (#164 核实) 原注「写 regs(7) bit0=1 清除」已失效：该 clear_done 机制被
-  //         HiveCore.scala 【B1】移除（旧机制下 reg7 bit0 = aFmt[0]，写奇数 aFmt 会意外
-  //         清 done，属确定性 bug）；#164 寄存器重排后 reg7 整个槽位也已删除。
-  //         ★本行只是陈旧注释：STATUS 位布局本身取自 HiveCore.scala 的 statusReg Cat，
-  //         与 #164 的寄存器重排正交 ⟹ STATUS_REG_ADDR=0x08、decodeStatus、statusPollStep
-  //         均已核实【无需修改】。
-  //       bit2=err（errFlag：executor.io.done 拍置 calcConfig.err||dmaErr，startPulse 拍清）
-  //       bit[6:3]=errCode（4-bit，calcConfig 锁存）
-  //       bit[15:7]=0（保留）
-  //       bit[31:16]=progress（16-bit，已完成 tile 数）
-  //   - cmd/resp 握手：cmd.ready = !respValid（上一响应未消费则反压）；cmd.fire
-  //     当拍写 respValid/respData 寄存器、次拍 resp.valid=1；resp.ready 恒高场景
-  //     下 fire 次拍恰好消费一次。
-
-  /** STATUS 寄存器 REG_READ 地址 */
-  val STATUS_REG_ADDR: Int = 0x08
-
-  /** 轮询周期（拍）：一轮 = 发起/等 fire（1~2 拍）+ 读拍 1 拍 + 冷却，减少命令流量 */
+  // 寄存器地址与解码由接口契约定义，STATUS 不再承载完成/错误信息。
+  val M_REG_ADDR = 0x00
+  val NK_REG_ADDR = 0x01
+  val A_REG_ADDR = 0x02
+  val B_REG_ADDR = 0x03
+  val C_REG_ADDR = 0x04
+  val CONTROL_REG_ADDR = 0x05
+  val SCALE_A_REG_ADDR = 0x06
+  val SCALE_B_REG_ADDR = 0x07
+  val SCALE_C_REG_ADDR = 0x08
+  val BIAS_REG_ADDR = 0x09
+  val RQM_REG_ADDR = 0x0A
+  val RQ_PARAM_REG_ADDR = 0x0B
+  val START_REG_ADDR = 0x10
+  val STATUS_REG_ADDR = 0x1E
+  val IRQ_RAW_REG_ADDR = 0x30
+  val IRQ_MASK_REG_ADDR = 0x31
+  val IRQ_MASKED_REG_ADDR = 0x32
+  val IRQ_CLEAR_REG_ADDR = 0x33
+  val ERROR_CODE_REG_ADDR = 0x34
+  val IRQ_ALL = 0x3FF
   val POLL_PERIOD: Int = 16
 
-  /** STATUS 寄存器解码结果（位布局见上方注释） */
-  final case class HiveStatusBits(busy: Boolean, done: Boolean, err: Boolean,
-                                  errCode: Int, progress: Int)
-
-  /** REG_READ(0x08) 读回的 32-bit statusReg 解码（按 HiveCore.scala 当前位布局） */
+  final case class HiveStatusBits(busy: Boolean, inFlight: Boolean, progress: Int)
   def decodeStatus(data: BigInt): HiveStatusBits = HiveStatusBits(
-    busy = (data & 0x1L) != 0,
-    done = ((data >> 1) & 0x1L) != 0,
-    err = ((data >> 2) & 0x1L) != 0,
-    errCode = ((data >> 3) & 0xFL).toInt,
-    progress = ((data >> 16) & 0xFFFFL).toInt
+    busy = data.testBit(0), inFlight = data.testBit(2),
+    progress = ((data >> 16) & 0xFFFF).toInt
   )
+
+  /** IRQ_RAW 独立解码；config code 必须另读 ERROR_CODE，不拼接伪 STATUS。 */
+  final case class HiveIrqBits(raw: BigInt) {
+    def done: Boolean = raw.testBit(0)
+    def configError: Boolean = raw.testBit(1)
+    def dmaErrors: BigInt = (raw >> 2) & 0xFF
+    def anyError: Boolean = (raw & 0x3FE) != 0
+  }
+  def decodeIrq(data: BigInt): HiveIrqBits = HiveIrqBits(data)
 
   // ========== MX (MXFP8 / MXFP4) 转换 helper ==========
   // 逐字镜像 Fp32.mxToFp32（src/hive/scala/main/Fp32.scala）的数值语义，
@@ -1064,60 +1060,96 @@ object HiveSimCommon {
   }
 }
 
-/** STATUS 轮询 poke/peek 助手 trait：与 ChiselSim 一起混入测试类。
-  *
-  * poke/peek 语法经 PeekPokeAPI（ChiselSim 的父 trait）线性化共享——本 trait
-  * 同样 extends PeekPokeAPI，与 ChiselSim 混入同一 spec 时线性化合并为同一
-  * 实例，无隐式歧义。提供两类原语：
-  *   - pokeStatusRead：poke 一次 REG_READ(STATUS) 读命令（不 step、不管 fire，
-  *     供跨拍状态机发起拍使用）；
-  *   - statusPollStep：单拍轮询状态机推进（每主循环拍调用一次，函数式返回
-  *     新状态与本次读到的 STATUS——不额外 step，主循环的 DMA 供数 poke 每拍
-  *     由循环体照常维护，轮询不干扰供数节奏）。
-  * 状态机语义（三态）：
-  *   pollSt=0 发起/HOLD：poke 读命令；cmd.ready = !respValid（EXECUTE 立即
-  *     响应至多占线 1 拍），ready 拍即 fire → 次拍进入读拍；未 fire 则保持。
-  *   pollSt=1 读拍：cmd.valid 用后拉低；fire 次拍 resp.valid=1（锁存 fire 拍
-  *     statusReg 快照），resp.ready 恒高下恰好消费一次，返回解码结果。
-  *   pollSt=2 冷却：计数 POLL_PERIOD 拍后回发起态（减少命令流量）。
-  * done/err 均为粘滞位（新 EXECUTE 拍才清除），晚读不漏。
+/** 命令握手及无额外 step 的轮询助手。DMA 主循环可独立轮询 STATUS 或 IRQ_RAW。
+  * START 不清 RAW：每次任务先 W1C 清除，再取消 mask，然后发 START。
   */
 trait HiveStatusPollApi extends chisel3.simulator.PeekPokeAPI {
-
-  /** poke 一次 REG_READ(STATUS) 读命令（全字段 poke，与 sendCmd 同范式） */
-  def pokeStatusRead(cmd: Stream[HiveCoreCmd]): Unit = {
+  def pokeRegCommand(cmd: Stream[HiveCoreCmd], op: HiveCoreOp.Type,
+                     r0: Int, r1: Int = 0, d0: BigInt = 0, d1: BigInt = 0,
+                     pc: BigInt = 0, tag: Int = 0): Unit = {
     cmd.valid.poke(true.B)
-    cmd.payload.op.poke(HiveCoreOp.REG_READ)
-    cmd.payload.reg0Addr.poke(HiveSimCommon.STATUS_REG_ADDR.U)
-    cmd.payload.reg1Addr.poke(0.U)
-    cmd.payload.data0.poke(0.U)
-    cmd.payload.data1.poke(0.U)
+    cmd.payload.op.poke(op)
+    cmd.payload.reg0Addr.poke(r0.U)
+    cmd.payload.reg1Addr.poke(r1.U)
+    cmd.payload.data0.poke(d0.U)
+    cmd.payload.data1.poke(d1.U)
+    cmd.payload.pc.poke(pc.U)
+    cmd.payload.tag.poke(tag.U)
   }
 
-  /** 单拍轮询状态机推进：返回 (新 pollSt, 新 pollCool, 本次读到的 STATUS)。
-    * 调用方在 DMA 主循环体内每拍调用一次（循环体末尾 step 前），状态变量
-    * pollSt/pollCool 由调用方持有。读到 STATUS 的拍返回 Some(...)，其余 None。 */
-  def statusPollStep(cmd: Stream[HiveCoreCmd],
-                     resp: Stream[HiveCoreResp],
-                     pollSt: Int, pollCool: Int): (Int, Int, Option[HiveSimCommon.HiveStatusBits]) = {
+  /** 完整事务：采样有效响应后才消费，避免读回落在 resp.fire 后一拍。 */
+  def transactReg(clock: Clock, cmd: Stream[HiveCoreCmd], resp: Stream[HiveCoreResp],
+                  op: HiveCoreOp.Type, r0: Int, r1: Int = 0,
+                  d0: BigInt = 0, d1: BigInt = 0, expectedErr: Boolean = false): BigInt = {
+    resp.ready.poke(true.B)
+    pokeRegCommand(cmd, op, r0, r1, d0, d1)
+    var waited = 0
+    while (!cmd.ready.peek().litToBoolean && waited < 100) { clock.step(); waited += 1 }
+    assert(cmd.ready.peek().litToBoolean, "command handshake timeout")
+    clock.step()
+    cmd.valid.poke(false.B)
+    waited = 0
+    while (!resp.valid.peek().litToBoolean && waited < 100) { clock.step(); waited += 1 }
+    assert(resp.valid.peek().litToBoolean, "response timeout")
+    assert(resp.payload.err.peek().litToBoolean == expectedErr, s"unexpected response error at address $r0")
+    val data = resp.payload.data.peek().litValue
+    clock.step()
+    data
+  }
+
+  def readRegister(clock: Clock, cmd: Stream[HiveCoreCmd], resp: Stream[HiveCoreResp], addr: Int): BigInt =
+    transactReg(clock, cmd, resp, HiveCoreOp.REG_READ, addr)
+
+  def prepareStart(clock: Clock, cmd: Stream[HiveCoreCmd], resp: Stream[HiveCoreResp]): Unit = {
+    transactReg(clock, cmd, resp, HiveCoreOp.REG_WRITE1, HiveSimCommon.IRQ_CLEAR_REG_ADDR,
+      d0 = HiveSimCommon.IRQ_ALL)
+    transactReg(clock, cmd, resp, HiveCoreOp.REG_WRITE1, HiveSimCommon.IRQ_MASK_REG_ADDR, d0 = 0)
+  }
+
+  /** 只走到 START 写 fire，后续拍由 DMA 主循环服务，避免漏掉首个 DMA 请求。 */
+  def launchStart(clock: Clock, cmd: Stream[HiveCoreCmd]): Unit = {
+    pokeRegCommand(cmd, HiveCoreOp.REG_WRITE1, HiveSimCommon.START_REG_ADDR, d0 = 1)
+    var waited = 0
+    while (!cmd.ready.peek().litToBoolean && waited < 100) { clock.step(); waited += 1 }
+    assert(cmd.ready.peek().litToBoolean, "START handshake timeout")
+    clock.step()
+    cmd.valid.poke(false.B)
+  }
+
+  def pokeStatusRead(cmd: Stream[HiveCoreCmd]): Unit =
+    pokeRegCommand(cmd, HiveCoreOp.REG_READ, HiveSimCommon.STATUS_REG_ADDR)
+
+  def pokeIrqRead(cmd: Stream[HiveCoreCmd]): Unit =
+    pokeRegCommand(cmd, HiveCoreOp.REG_READ, HiveSimCommon.IRQ_RAW_REG_ADDR)
+
+  private def pollRegisterStep(cmd: Stream[HiveCoreCmd], resp: Stream[HiveCoreResp],
+                               pollSt: Int, pollCool: Int, addr: Int): (Int, Int, Option[BigInt]) = {
     if (pollSt == 0) {
-      pokeStatusRead(cmd)
-      // cmd.ready = !respValid：EXECUTE 立即响应占线时本拍不 fire，
-      // cmd.valid 粘滞 1，下拍重复 poke（幂等）直至 fire
+      pokeRegCommand(cmd, HiveCoreOp.REG_READ, addr)
       if (cmd.ready.peek().litToBoolean) (1, 0, None) else (0, 0, None)
     } else if (pollSt == 1) {
-      // fire 已在上拍末边沿发生：本拍 resp.valid=1（respData 为 fire 拍锁存的
-      // statusReg 快照）；读后拉低 cmd.valid（用后拉低，防命令残留）
       cmd.valid.poke(false.B)
-      if (resp.valid.peek().litToBoolean)
-        (2, HiveSimCommon.POLL_PERIOD,
-          Some(HiveSimCommon.decodeStatus(resp.payload.data.peek().litValue)))
-      else
-        (1, 0, None)
+      if (resp.valid.peek().litToBoolean) {
+        assert(!resp.payload.err.peek().litToBoolean, s"poll read failed at address $addr")
+        (2, HiveSimCommon.POLL_PERIOD, Some(resp.payload.data.peek().litValue))
+      } else (1, 0, None)
     } else {
+      cmd.valid.poke(false.B)
       val cool = pollCool - 1
       if (cool <= 0) (0, 0, None) else (2, cool, None)
     }
+  }
+
+  def statusPollStep(cmd: Stream[HiveCoreCmd], resp: Stream[HiveCoreResp],
+                     pollSt: Int, pollCool: Int): (Int, Int, Option[HiveSimCommon.HiveStatusBits]) = {
+    val (st, cool, data) = pollRegisterStep(cmd, resp, pollSt, pollCool, HiveSimCommon.STATUS_REG_ADDR)
+    (st, cool, data.map(HiveSimCommon.decodeStatus))
+  }
+
+  def irqPollStep(cmd: Stream[HiveCoreCmd], resp: Stream[HiveCoreResp],
+                  pollSt: Int, pollCool: Int): (Int, Int, Option[HiveSimCommon.HiveIrqBits]) = {
+    val (st, cool, data) = pollRegisterStep(cmd, resp, pollSt, pollCool, HiveSimCommon.IRQ_RAW_REG_ADDR)
+    (st, cool, data.map(HiveSimCommon.decodeIrq))
   }
 }
 
