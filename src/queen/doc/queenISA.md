@@ -13,7 +13,7 @@ Queen 面向四个对等端点：
 | `2'b10` | VPU | 向量计算 DSA |
 | `2'b11` | SCHED | 共享同步资源、polling、atomic 和状态配置 |
 
-VPU 不归 Scheduler 调度或管理。Scheduler 只调度 GEMM 和 DMA，并提供 timeline、event/hwLock 等共享同步资源，以及 polling、atomic 等服务。SCHED endpoint 表示 Queen Scheduler 本身。
+VPU 不归 Scheduler 调度或管理。Scheduler 只调度 GEMM 和 DMA，并提供 timeline、event/hwLock 等共享同步资源，以及 polling、atomic 等服务。SCHED endpoint 表示 Queen Scheduler 本身。Scalar Core decoder 根据 endpoint 直接分流：VPU 目标指令直接送入 VPU 前端，不进入 Queen；GEMM、DMA 和 SCHED 目标指令送入 Queen。
 
 - `FENCE` 在 GEMM/DMA 命令队列中等待目标设备 idle；目标为 SCHED 时，在 Queen 派发处等待所选 GEMM/DMA idle。Scheduler fence 不包含 VPU。
 - `WAIT_EVENT/WAIT_TIMELINE` 携带 target endpoint：GEMM/DMA 在其命令队列处等待，VPU 在其后端派发队列处等待，SCHED 在 Queen 派发给 DSA 之前等待。
@@ -44,7 +44,7 @@ VPU 不归 Scheduler 调度或管理。Scheduler 只调度 GEMM 和 DMA，并提
 
 每个 DSA 端点维护 command-building 配置影子寄存器。配置寄存器之间不存在写入先后依赖，软件可以按任意顺序写入。
 
-- CPU 顺序发送 Queen 指令；Queen 前端接受时锁存指令及 GPR 操作数值。除 `QRD` 外，前端入队成功即满足退休条件。
+- CPU 顺序发送 Queen ISA 指令；Scalar Core decoder 先按 endpoint 选择 Queen 或 VPU 前端。指令握手时，对应前端锁存指令和 PC、预留完整请求 entry，所需 GPR 操作数按 CPU 接口约定在下一周期返回并锁存到该 entry。除 `QRD` 外，前端入队成功即满足退休条件。
 - 后端按目标端点的指令顺序处理配置写入，不得让 `macroEop` 越过此前的配置指令。
 - 普通 `QWR1/QWR2` 只更新目标端点的配置影子寄存器。
 - 同一寄存器被重复写入时，以最后一笔按序处理的值为准。
@@ -360,7 +360,7 @@ aux        = 0
 
 - `endpoint=GEMM`：进入 GEMM 队列，在 GEMM 实际派发点记录。
 - `endpoint=DMA`：进入 DMA 队列，在 DMA 实际派发点记录。
-- `endpoint=VPU`：直接进入 VPU 队列，在 VPU 实际派发点记录，不经过 Scheduler。
+- `endpoint=VPU`：由 Scalar Core decoder 直接送入 VPU 队列，在 VPU 实际派发点记录，不进入 Queen。
 - `endpoint=SCHED`：进入 Scheduler 队列，在 Scheduler 实际执行点记录。
 
 ---
@@ -511,8 +511,8 @@ COUNT、PENDING 的读取以及 ACK、ENABLE 的写入必须能够在 Scheduler 
 
 ### 16.1 CPU 请求与退休
 
-- CPU 顺序发出 Queen 请求，Queen 在请求握手时锁存指令、PC 和源 GPR 值，后续执行不再读取 CPU GPR。
-- 除 `QRD` 外，`QWR1/QWR2/QCTRL` 都是异步操作，给到 Scheduler/对应前端接收队列并成功入队后即可退休。VPU 指令由其独立前端接收，不表示由 Scheduler 管理 VPU。
+- CPU 顺序发出 Queen ISA 请求，Scalar Core decoder 按 endpoint 路由到 Queen 或 VPU 前端。请求握手时，对应前端锁存指令和 PC，并为完整请求及所需源操作数预留 entry；CPU 在约定的下一周期返回源 GPR 值，接收前端将其锁存到对应 entry，后续执行不再读取 CPU GPR。
+- 除 `QRD` 外，`QWR1/QWR2/QCTRL` 都是异步操作，给到对应前端接收队列并成功入队后即可退休。VPU 目标指令由 Scalar Core decoder 直接送入 VPU 独立前端，不进入 Queen，也不表示由 Scheduler 管理 VPU。
 - 带 `macroEop` 的配置写也在前端入队后退休，不等待后端应用配置、生成快照、触发执行或设备 idle。
 - fence/wait/polling 指令同样在前端入队后退休，其等待/比较条件在对应后端执行；`notify=1` 不改变退休规则。CPU 可继续发送后续指令，直至前端队列背压。
 - 带 notify 的指令成功完成时，端点发出一次 pulse，Scheduler 在采样周期更新对应 COUNT/pending，不存在通知 valid/ready 握手，也不等待 CPU 中断处理。
