@@ -209,7 +209,7 @@ object HiveSimCommon {
   val IRQ_MASKED_REG_ADDR = 0x32
   val IRQ_CLEAR_REG_ADDR = 0x33
   val ERROR_CODE_REG_ADDR = 0x34
-  val IRQ_ALL = 0x3FF
+  val IRQ_ALL = 0x7FF
   val POLL_PERIOD: Int = 16
 
   final case class HiveStatusBits(busy: Boolean, inFlight: Boolean, progress: Int)
@@ -223,7 +223,8 @@ object HiveSimCommon {
     def done: Boolean = raw.testBit(0)
     def configError: Boolean = raw.testBit(1)
     def dmaErrors: BigInt = (raw >> 2) & 0xFF
-    def anyError: Boolean = (raw & 0x3FE) != 0
+    def writeConflict: Boolean = raw.testBit(10)
+    def anyError: Boolean = (raw & 0x7FE) != 0
   }
   def decodeIrq(data: BigInt): HiveIrqBits = HiveIrqBits(data)
 

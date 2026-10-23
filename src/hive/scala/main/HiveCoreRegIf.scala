@@ -25,7 +25,7 @@ object HiveCoreRegAddr {
 
 class HiveCoreRegIf(cfg: HiveCoreConfig) extends Module {
   val io = IO(new Bundle {
-    val cmd = slave(Stream(new HiveCoreCmd))
+    val cmd = Vec(4, slave(Stream(new HiveCoreCmd)))
     val resp = master(Stream(new HiveCoreResp))
     val regFile = Output(new HiveCoreRegister(cfg))
     val start = Output(Bool())
@@ -46,8 +46,8 @@ class HiveCoreRegIf(cfg: HiveCoreConfig) extends Module {
   val startPending = RegInit(false.B)
   val startPc = RegInit(0.U(32.W))
   val startTag = RegInit(0.U(8.W))
-  val irqRaw = RegInit(0.U(10.W))
-  val irqMask = RegInit("h3ff".U(10.W))
+  val irqRaw = RegInit(0.U(11.W))
+  val irqMask = RegInit("h7ff".U(11.W))
   val errorCode = RegInit(0.U(4.W))
   val irqMasked = irqRaw & ~irqMask
 
@@ -93,7 +93,7 @@ class HiveCoreRegIf(cfg: HiveCoreConfig) extends Module {
         regFile.rqShift := data(5, 0)
         regFile.rqZp := data(31, 16).asSInt
       }
-      is(HiveCoreRegAddr.IrqMask.U) { irqMask := data(9, 0) }
+      is(HiveCoreRegAddr.IrqMask.U) { irqMask := data(10, 0) }
     }
   }
 
@@ -136,46 +136,87 @@ class HiveCoreRegIf(cfg: HiveCoreConfig) extends Module {
     readOnly || (inFlight && needsIdle)
   }
 
-  val respValid = RegInit(false.B)
-  val respData = RegInit(0.U(32.W))
-  val respErr = RegInit(false.B)
-  io.cmd.ready := !respValid
-  io.resp.valid := respValid
-  io.resp.payload.data := respData
-  io.resp.payload.err := respErr
-  when(io.resp.fire) { respValid := false.B }
+  val respPending = RegInit(VecInit(Seq.fill(4)(false.B)))
+  val readPending = RegInit(VecInit(Seq.fill(4)(false.B)))
+  val respData = RegInit(VecInit(Seq.fill(4)(0.U(32.W))))
+  val respErr = RegInit(VecInit(Seq.fill(4)(false.B)))
+  val respLane = PriorityEncoder(respPending.asUInt)
+  val acceptBatch = !readPending.asUInt.orR && !respPending.asUInt.orR
+  io.cmd.foreach(_.ready := acceptBatch)
+  io.resp.valid := respPending.asUInt.orR
+  io.resp.payload.data := respData(respLane)
+  io.resp.payload.err := respErr(respLane)
+  io.resp.payload.laneId := respLane
+  when(io.resp.fire) {
+    respPending(respLane) := false.B
+    readPending(respLane) := false.B
+  }
 
-  val cmd = io.cmd.payload
-  val write1 = cmd.op === HiveCoreOp.REG_WRITE1
-  val write2 = cmd.op === HiveCoreOp.REG_WRITE2
-  val read = cmd.op === HiveCoreOp.REG_READ
-  val rejected = rejectWrite(cmd.reg0Addr, cmd.data0) ||
-    (write2 && rejectWrite(cmd.reg1Addr, cmd.data1))
-  val acceptedWrite = io.cmd.fire && (write1 || write2) && !rejected
-  val clear0 = Mux(acceptedWrite && cmd.reg0Addr === HiveCoreRegAddr.IrqClear.U, cmd.data0(9, 0), 0.U(10.W))
-  val clear1 = Mux(acceptedWrite && write2 && cmd.reg1Addr === HiveCoreRegAddr.IrqClear.U, cmd.data1(9, 0), 0.U(10.W))
-  val clearBits = clear0 | clear1
-  val newEvents = Cat(io.dmaErrors.asUInt, io.configError, io.done)
+  val acceptedWrites = Wire(Vec(4, Bool()))
+  for (lane <- 0 until 4) {
+    val stream = io.cmd(lane)
+    val cmd = stream.payload
+    val write1 = cmd.op === HiveCoreOp.REG_WRITE1
+    val write2 = cmd.op === HiveCoreOp.REG_WRITE2
+    val read = cmd.op === HiveCoreOp.REG_READ
+    val rejected = rejectWrite(cmd.reg0Addr, cmd.data0) ||
+      (write2 && rejectWrite(cmd.reg1Addr, cmd.data1))
+    acceptedWrites(lane) := stream.fire && (write1 || write2) && !rejected
+    when(stream.fire) {
+      respPending(lane) := true.B
+      readPending(lane) := read
+      respData(lane) := Mux(read, readRegister(cmd.reg0Addr), 0.U)
+      respErr(lane) := !read && (!(write1 || write2) || rejected)
+    }
+  }
+
+  def hasWriteTarget(addr: UInt, data: UInt): Bool = {
+    addr <= HiveCoreRegAddr.RqParam.U || addr === HiveCoreRegAddr.IrqMask.U ||
+      addr === HiveCoreRegAddr.IrqClear.U || (addr === HiveCoreRegAddr.Start.U && data.orR)
+  }
+
+  val writeTargets = (0 until 4).map { lane =>
+    val cmd = io.cmd(lane).payload
+    Seq(
+      (acceptedWrites(lane) && hasWriteTarget(cmd.reg0Addr, cmd.data0), cmd.reg0Addr),
+      (acceptedWrites(lane) && cmd.op === HiveCoreOp.REG_WRITE2 &&
+        hasWriteTarget(cmd.reg1Addr, cmd.data1), cmd.reg1Addr))
+  }
+  val conflicts = for {
+    low <- 0 until 4
+    high <- low + 1 until 4
+    (lowValid, lowAddr) <- writeTargets(low)
+    (highValid, highAddr) <- writeTargets(high)
+  } yield lowValid && highValid && lowAddr === highAddr
+  val writeConflict = conflicts.reduce(_ || _)
+
+  val clearBits = WireDefault(0.U(11.W))
+  for (lane <- 0 until 4) {
+    val cmd = io.cmd(lane).payload
+    val write2 = cmd.op === HiveCoreOp.REG_WRITE2
+    when(acceptedWrites(lane)) {
+      writeRegister(cmd.reg0Addr, cmd.data0)
+      when(write2) { writeRegister(cmd.reg1Addr, cmd.data1) }
+      val clear0 = cmd.reg0Addr === HiveCoreRegAddr.IrqClear.U
+      val clear1 = write2 && cmd.reg1Addr === HiveCoreRegAddr.IrqClear.U
+      when(clear0 || clear1) {
+        clearBits := Mux(clear0, cmd.data0(10, 0), 0.U(11.W)) |
+          Mux(clear1, cmd.data1(10, 0), 0.U(11.W))
+      }
+      val trigger0 = cmd.reg0Addr === HiveCoreRegAddr.Start.U && cmd.data0.orR
+      val trigger1 = write2 && cmd.reg1Addr === HiveCoreRegAddr.Start.U && cmd.data1.orR
+      when(trigger0 || trigger1) {
+        startPending := true.B
+        startPc := cmd.pc
+        startTag := cmd.tag
+        inFlight := true.B
+      }
+    }
+  }
+
+  val newEvents = Cat(writeConflict, io.dmaErrors.asUInt, io.configError, io.done)
   irqRaw := (irqRaw & ~clearBits) | newEvents
   when(clearBits(1)) { errorCode := 0.U }
   when(io.configError && (!irqRaw(1) || clearBits(1))) { errorCode := io.configErrorCode }
-
-  when(io.cmd.fire) {
-    respValid := true.B
-    respData := Mux(read, readRegister(cmd.reg0Addr), 0.U)
-    respErr := !read && (!(write1 || write2) || rejected)
-  }
-  when(acceptedWrite) {
-    writeRegister(cmd.reg0Addr, cmd.data0)
-    when(write2) { writeRegister(cmd.reg1Addr, cmd.data1) }
-    val trigger0 = cmd.reg0Addr === HiveCoreRegAddr.Start.U && cmd.data0.orR
-    val trigger1 = write2 && cmd.reg1Addr === HiveCoreRegAddr.Start.U && cmd.data1.orR
-    when(trigger0 || trigger1) {
-      startPending := true.B
-      startPc := cmd.pc
-      startTag := cmd.tag
-      inFlight := true.B
-    }
-  }
   when(io.done || io.configError) { inFlight := false.B }
 }

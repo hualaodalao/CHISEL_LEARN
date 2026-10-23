@@ -53,6 +53,7 @@ class FbStreamMemSlave(
   private val bQueue = mutable.ListBuffer[(Int, Boolean)]()
   private var eofCount = 0   // 已接受的写突发数（EOF 序号，供 errOnBurst 匹配）
   var wrRespSent = 0         // 已握手发出的写响应数（供 done 排空校验）
+  def pendingWriteResponses: Int = bQueue.size
 
   def readBeat(addr: BigInt): BigInt = {
     var v = BigInt(0)
@@ -154,38 +155,6 @@ class FbWrCountingMemSlave(
   }
 }
 
-/** 记录写通道每一拍（addr/len/data/strb/sof/eof/atomic）的 [[FbStreamMemSlave]]，
-  * 用于定向验证 atomic 标志写拍。所有实例共享同一 captured 缓冲（多端口时只有承载写
-  * 的那个端口会追加）。wr.ready 由 super 恒置 true，故 valid 即 fire，可当拍捕获。
-  */
-class FbBeatCapturingMemSlave(
-    mem: mutable.HashMap[BigInt, Byte],
-    beatBytes: Int,
-    captured: mutable.ArrayBuffer[FbBeatCapturingMemSlave.Beat],
-    readDelay: Int = 1,
-    writeDelay: Int = 1,
-    errOnBurst: Int = -1
-) extends FbStreamMemSlave(mem, beatBytes, readDelay, writeDelay, errOnBurst) {
-  override def step(bus: FbStreamBus): Unit = {
-    super.step(bus)
-    if (bus.wr.valid.peek().litToBoolean) {
-      captured += FbBeatCapturingMemSlave.Beat(
-        addr = bus.wr.payload.addr.peek().litValue,
-        len = bus.wr.payload.len.peek().litValue,
-        data = bus.wr.payload.data.peek().litValue,
-        strb = bus.wr.payload.strb.peek().litValue,
-        sof = bus.wr.payload.sof.peek().litToBoolean,
-        eof = bus.wr.payload.eof.peek().litToBoolean,
-        atomic = bus.wr.payload.atomic.peek().litToBoolean
-      )
-    }
-  }
-}
-
-object FbBeatCapturingMemSlave {
-  case class Beat(addr: BigInt, len: BigInt, data: BigInt, strb: BigInt, sof: Boolean, eof: Boolean, atomic: Boolean)
-}
-
 /** 测试用命令描述（poke 到 FbCmd 端口） */
 case class FbTestCmd(
     tag: Int = 0,
@@ -200,10 +169,9 @@ case class FbTestCmd(
     permVec: Seq[Int] = Seq(),
     padBefore: Seq[Int] = Seq(0, 0),
     padAfter: Seq[Int] = Seq(0, 0),
+    padValue: BigInt = 0,
     srcFmt: Int = 3,      // FbDataFmt(ChiselEnum,4-bit)：0=FP32,1=FP16,2=BF16,3=INT8,4=MXE4M3,5=MXE5M2,8=INT32,9=INT16,10=INT4（编码6/7已废弃非法）
     dstFmt: Int = 3,
-    // 注：cvtScale/cvtZeroPoint 已从命令字段移至 ForagerBee 顶层 IO（全局供给），
-    //     由 runForagerBee 的 cvtScale/cvtZeroPoint 形参驱动，不再是 FbTestCmd 成员
     im2colKernel: Seq[Int] = Seq(0, 0),
     im2colStride: Seq[Int] = Seq(0, 0),
     im2colPad: Seq[Int] = Seq(0, 0),
@@ -220,11 +188,13 @@ case class FbTestCmd(
     t2lNumTileCols: Int = 0,
     // MX 量化字段（量化激活由 dstFmt 派生：dstFmt∈{4,5} 即激活，无独立开关）
     scaleAddr: BigInt = 0,
-    scaleBlockSize: Int = 0,     // 编码：0→16, 1→32, 2→64 个元素共享一个 E8M0 scale
-    // Atomic 标志写（命令成功完成后额外发一拍 atomic 写，向 atomicStoreAddr 写 32-bit 值 1）
-    atomicEnable: Boolean = false,
-    atomicStoreAddr: BigInt = 0  // 必须 4B 对齐（低 2 位为 0），否则被 atomicAddrBad 拒绝
+    scaleBlockSize: Int = 0     // 编码：0→16, 1→32, 2→64 个元素共享一个 E8M0 scale
 )
+
+class FbTransposeCompletionHarness(cfg: ForagerBeeConfig) extends FbEngine(cfg) {
+  val readFinishing = IO(Output(Bool()))
+  readFinishing := trReading && reader.io.done
+}
 
 class ForagerBeeSpec extends AnyFlatSpec with Matchers {
 
@@ -298,11 +268,9 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     }
     port.srcAddr.poke(c.srcAddr)
     port.dstAddr.poke(c.dstAddr)
+    port.padValue.poke(c.padValue.U(32.W))
     port.srcFmt.poke(BigInt(c.srcFmt))   // FbDataFmt ChiselEnum（4-bit）按编码值 poke
     port.dstFmt.poke(BigInt(c.dstFmt))
-    // cvtScale/cvtZeroPoint 已上移为顶层 IO，由 pokeCvtGlobal 驱动（见下）
-    port.nextDescAddr.poke(0.U)
-    port.chainMode.poke(false.B)
     // im2col fields
     for (d <- 0 until 2) {
       port.im2colKernel(d).poke(c.im2colKernel.lift(d).getOrElse(0).U)
@@ -329,25 +297,12 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     // MX 量化字段（量化激活由 dstFmt 派生，无独立开关端口）
     port.scaleAddr.poke(c.scaleAddr)
     port.scaleBlockSize.poke(c.scaleBlockSize.U)
-    // Atomic 标志写字段
-    port.atomicEnable.poke(c.atomicEnable.B)
-    port.atomicStoreAddr.poke(c.atomicStoreAddr)
   }
 
-  /** 驱动顶层全局量化参数端口（`ForagerBee.io.cvtScale/cvtZeroPoint`，仅 enableConversion 时存在）。
-    *
-    * 显式 poke 而非依赖仿真器对未驱动 Input 的默认值：不同后端语义不一致
-    * （2-state 后端初值为 0，4-state 后端可能为 X 并污染 converter 的移位量/ZP 解码），
-    * 显式 poke 保证跨后端确定性，也与「所有功能转换用例原本用默认 0」保持等价。 */
-  private def pokeCvtGlobal(dut: ForagerBee, scale: BigInt, zp: BigInt): Unit = {
-    dut.io.cvtScale.foreach(_.poke(scale))
-    dut.io.cvtZeroPoint.foreach(_.poke(zp))
-  }
-
-  /** 跑一组命令直到全部 done（或超时 fail），返回 (done 列表, 内存终态)
+  /** 跑一组命令直到全部 done 握手（或超时 fail），返回 (done 列表, 内存终态)
     * 命令逐条注入：上一条被接受后再注入下一条。
-    * onDoneFire：每次 done.valid 拍回调，参数为当前周期号（供 done 时机校验）
-    * cvtScale/cvtZeroPoint：顶层全局量化参数（原 FbCmd 字段，已上移为 IO；默认 0 与迁移前等价） */
+    * onDoneFire：每次 done 握手回调，参数为当前周期号（供 done 时机校验）。
+    * doneReady：可编程回执反压；onCycle：采样当拍 IO，供 idle/稳定性校验。 */
   private def runForagerBee(
       cfg: ForagerBeeConfig,
       cmds: Seq[FbTestCmd],
@@ -356,24 +311,25 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       modelFactory: (mutable.HashMap[BigInt, Byte], Int) => FbStreamMemSlave =
         (m, bb) => new FbStreamMemSlave(m, bb),
       onDoneFire: Int => Unit = _ => (),
-      cvtScale: BigInt = 0,
-      cvtZeroPoint: BigInt = 0
+      doneReady: Int => Boolean = _ => true,
+      onCycle: (ForagerBee, Int) => Unit = (_, _) => ()
   ): (Seq[(Int, Boolean)], mutable.HashMap[BigInt, Byte]) = {
     val mem = prefill
     val dones = mutable.ArrayBuffer[(Int, Boolean)]() // (tag, err)
-    simulate(new ForagerBee(cfg)) { dut =>
+    implicit val testingDirectory: chisel3.testing.HasTestingDirectory = chisel3.testing.HasTestingDirectory.timestamp
+    (new chisel3.simulator.ChiselSim {}).simulateRaw(new ForagerBee(cfg)) { dut =>
       val models = Seq.fill(cfg.numPorts)(modelFactory(mem, cfg.beatBytes))
       val dummy = FbTestCmd()
       var cmdIdx = 0
 
       // 初始化后显式复位
       pokeCmdPayload(dut.io.cmd.payload, cmds.headOption.getOrElse(dummy))
-      pokeCvtGlobal(dut, cvtScale, cvtZeroPoint)
       dut.io.cmd.valid.poke(false.B)
       dut.io.done.ready.poke(true.B)
       dut.reset.poke(true.B)
       dut.clock.step(2)
       dut.reset.poke(false.B)
+      assert(dut.io.idle.peek().litToBoolean, "复位后无命令时 idle 应为 true")
 
       var cycle = 0
       while (dones.size < cmds.size && cycle < maxCycles) {
@@ -385,9 +341,10 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
         } else {
           dut.io.cmd.valid.poke(false.B)
         }
-        dut.io.done.ready.poke(true.B)
-        // 收集 done
-        if (dut.io.done.valid.peek().litToBoolean) {
+        dut.io.done.ready.poke(doneReady(cycle).B)
+        onCycle(dut, cycle)
+        // 仅在 done 握手时收集，反压期间不重复计数。
+        if (dut.io.done.valid.peek().litToBoolean && dut.io.done.ready.peek().litToBoolean) {
           onDoneFire(cycle)
           dones += ((
             dut.io.done.payload.tag.peek().litValue.toInt,
@@ -410,6 +367,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
         dut.clock.step()
       }
       assert(!dut.io.busy.peek().litToBoolean, "全部命令完成后 busy 应回落")
+      assert(dut.io.idle.peek().litToBoolean, "全部命令及回执排空后 idle 应为 true")
     }
     (dones.toSeq, mem)
   }
@@ -485,101 +443,6 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       val v = ((i3 * 100 + i2 * 30 + i1 * 7 + c * 3 + 5) & 0xFF).toByte
       m(BigInt(0x5000 + i3 * 64 + i2 * 32 + i1 * 16 + c)) shouldBe v
     }
-  }
-
-  // ===================== Atomic 标志写用例 =====================
-
-  it should "atomic store: COPY + atomicEnable writes 32-bit 1 at 4B-aligned (non-beat-aligned) addr after done" in {
-    val mem = mutable.HashMap.empty[BigInt, Byte]
-    val len = 64 // 4 beats @ BB=16
-    fillPattern(mem, 0, len)
-    // atomicStoreAddr = 0x2004：4B 对齐但非 beat 对齐（byteOff = 0x2004 & 0xF = 4）
-    val atomicAddr = BigInt(0x2004)
-    val cmd = FbTestCmd(tag = 0xA1, dimCount = 1,
-      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
-      srcAddr = 0, dstAddr = 0x1000,
-      atomicEnable = true, atomicStoreAddr = atomicAddr)
-    val captured = mutable.ArrayBuffer.empty[FbBeatCapturingMemSlave.Beat]
-    val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem,
-      modelFactory = (mm, bb) => new FbBeatCapturingMemSlave(mm, bb, captured))
-    dones shouldBe Seq((0xA1, false))
-
-    // 数据搬运本身正确
-    for (i <- 0 until len) m(BigInt(0x1000) + i) shouldBe m(BigInt(i))
-
-    // 恰有一拍 atomic 写，且为最后一个写 beat
-    val atomicBeats = captured.filter(_.atomic)
-    atomicBeats.size shouldBe 1
-    val ab = atomicBeats.head
-    captured.last.atomic shouldBe true
-    // 所有数据 beat 的 atomic 必须为 false（不悬空）
-    captured.filterNot(_.atomic).size shouldBe (captured.size - 1)
-
-    // byte-lane shift 断言：beat 对齐地址 / len=0 / sof=eof=1 / strb=0xF<<byteOff / data=1<<(byteOff*8)
-    val byteOff = 4
-    ab.addr shouldBe BigInt(0x2000)          // beat 对齐（清掉低 4 位）
-    ab.len shouldBe BigInt(0)
-    ab.sof shouldBe true
-    ab.eof shouldBe true
-    ab.strb shouldBe (BigInt(0xF) << byteOff) // 0xF0
-    ab.data shouldBe (BigInt(1) << (byteOff * 8)) // 0x1_0000_0000
-
-    // 内存终态：atomicStoreAddr 处 32-bit 字 = 1，同 beat 其余字节不受影响
-    readLe(m, atomicAddr, 4) shouldBe BigInt(1)
-    for (l <- 0 until 4) m.getOrElse(BigInt(0x2000) + l, 0.toByte) shouldBe 0.toByte // byteOff 前 4 字节未写
-    for (l <- 8 until 16) m.getOrElse(BigInt(0x2000) + l, 0.toByte) shouldBe 0.toByte // byteOff 后字节未写
-  }
-
-  it should "atomic store: byteOff=0 (beat-aligned addr) puts 32-bit 1 at lane 0" in {
-    val mem = mutable.HashMap.empty[BigInt, Byte]
-    val len = 32
-    fillPattern(mem, 0, len)
-    val atomicAddr = BigInt(0x3000) // beat 对齐，byteOff = 0
-    val cmd = FbTestCmd(tag = 0xA2, dimCount = 1,
-      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
-      srcAddr = 0, dstAddr = 0x1000,
-      atomicEnable = true, atomicStoreAddr = atomicAddr)
-    val captured = mutable.ArrayBuffer.empty[FbBeatCapturingMemSlave.Beat]
-    val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem,
-      modelFactory = (mm, bb) => new FbBeatCapturingMemSlave(mm, bb, captured))
-    dones shouldBe Seq((0xA2, false))
-    val ab = captured.filter(_.atomic)
-    ab.size shouldBe 1
-    ab.head.addr shouldBe BigInt(0x3000)
-    ab.head.strb shouldBe BigInt(0xF)
-    ab.head.data shouldBe BigInt(1)
-    readLe(m, atomicAddr, 4) shouldBe BigInt(1)
-  }
-
-  it should "atomic store: unaligned atomicStoreAddr (low 2 bits != 0) is rejected with err and no atomic beat" in {
-    val mem = mutable.HashMap.empty[BigInt, Byte]
-    val len = 32
-    fillPattern(mem, 0, len)
-    val cmd = FbTestCmd(tag = 0xA3, dimCount = 1,
-      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
-      srcAddr = 0, dstAddr = 0x1000,
-      atomicEnable = true, atomicStoreAddr = BigInt(0x2002)) // 低 2 位 = 2，非 4B 对齐
-    val captured = mutable.ArrayBuffer.empty[FbBeatCapturingMemSlave.Beat]
-    val (dones, _) = runForagerBee(testCfg, Seq(cmd), mem,
-      modelFactory = (mm, bb) => new FbBeatCapturingMemSlave(mm, bb, captured))
-    dones shouldBe Seq((0xA3, true)) // atomicAddrBad → cBad → errReg
-    captured.exists(_.atomic) shouldBe false // 命令被拒，无任何写 beat
-  }
-
-  it should "atomic store: write error during COPY suppresses the atomic flag write (errReg gating)" in {
-    val mem = mutable.HashMap.empty[BigInt, Byte]
-    val len = 32
-    fillPattern(mem, 0, len)
-    val cmd = FbTestCmd(tag = 0xA4, dimCount = 1,
-      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
-      srcAddr = 0, dstAddr = 0x1000,
-      atomicEnable = true, atomicStoreAddr = BigInt(0x4000))
-    val captured = mutable.ArrayBuffer.empty[FbBeatCapturingMemSlave.Beat]
-    // errOnBurst=0：对第一个（数据）写突发注入 err 响应 → errReg 置位 → atomic 被抑制
-    val (dones, _) = runForagerBee(testCfg, Seq(cmd), mem,
-      modelFactory = (mm, bb) => new FbBeatCapturingMemSlave(mm, bb, captured, errOnBurst = 0))
-    dones shouldBe Seq((0xA4, true))
-    captured.exists(_.atomic) shouldBe false // 出错时不发「值=1」成功标志写
   }
 
   // ===================== TRANSPOSE 用例 =====================
@@ -707,16 +570,36 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     for (i <- 0 until 32) m(BigInt(0x2000) + i) shouldBe m(BigInt(i))
   }
 
+  it should "recover a transpose buffer after destination overflow" in {
+    val cfg = testCfg.copy(numPorts = 1, addressWidth = 12, tileSize = 4)
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    fillPattern(mem, 0x100, 16)
+    val base = FbTestCmd(transpose = true, dimCount = 2, shape = Seq(4, 4),
+      srcStride = Seq(4, 4), dstStride = Seq(4, 0), srcAddr = 0x100)
+    val (dones, m) = runForagerBee(cfg,
+      Seq(base.copy(tag = 1, dstAddr = 0xfff), base.copy(tag = 2, dstAddr = 0x200)), mem)
+    dones shouldBe Seq((1, true), (2, false))
+    for (r <- 0 until 4; c <- 0 until 4)
+      m(BigInt(0x200 + c * 4 + r)) shouldBe m(BigInt(0x100 + r * 4 + c))
+  }
+
+  it should "preserve the carry in outer dimension crop indices" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    fillPattern(mem, 65535 * 4, 8)
+    val cmd = FbTestCmd(tag = 1, dimCount = 3, shape = Seq(4, 1, 2),
+      srcStride = Seq(4, 4, 4), dstStride = Seq(4, 4, 4),
+      srcStartIdx = Seq(0, 0, 65535), srcAddr = 0, dstAddr = 0x80000)
+    val (dones, m) = runForagerBee(testCfg.copy(numPorts = 1), Seq(cmd), mem)
+    dones shouldBe Seq((1, false))
+    for (i <- 0 until 8) m(BigInt(0x80000 + i)) shouldBe m(BigInt(65535 * 4 + i))
+  }
+
   private val illegalCmdCases: Seq[(String, FbTestCmd)] = Seq(
     ("dimCount=0", FbTestCmd(tag = 0xD0, dimCount = 0,
       shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
       srcAddr = 0, dstAddr = 0x1000)),
-    ("基址非对齐", FbTestCmd(tag = 0xD1, dimCount = 1,
-      shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
-      srcAddr = BigInt(3), dstAddr = 0x1000)),
-    ("COPY 行长非整 beat", FbTestCmd(tag = 0xD2, dimCount = 1,
-      shape = Seq(8), srcStride = Seq(8), dstStride = Seq(8),
-      srcAddr = 0, dstAddr = 0x1000))
+    ("dim1 padding without dim1", FbTestCmd(tag = 0xD3, dimCount = 1,
+      shape = Seq(16), padBefore = Seq(0, 1), srcAddr = 0, dstAddr = 0x1000))
   )
 
   for ((name, cmd) <- illegalCmdCases) {
@@ -724,6 +607,26 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       val (dones, m) = runForagerBee(testCfg, Seq(cmd), mutable.HashMap.empty)
       dones shouldBe Seq((cmd.tag, true))
       for (a <- BigInt(0x1000) until BigInt(0x1100)) m.get(a) shouldBe None
+    }
+  }
+
+  // 原基址非对齐/短行拒绝用例现为合法 COPY，并检查目标边界的字节掩码。
+  for ((name, src, len, tag) <- Seq(
+    ("unaligned source", BigInt(3), 16, 0xD1),
+    ("short row", BigInt(0), 8, 0xD2)
+  )) {
+    it should s"COPY accepts $name without overwriting adjacent bytes" in {
+      val mem = mutable.HashMap.empty[BigInt, Byte]
+      val dst = BigInt(0x1000)
+      fillPattern(mem, src, len)
+      for (a <- dst - BB until dst + len + BB) mem(a) = 0xA5.toByte
+      val cmd = FbTestCmd(tag = tag, shape = Seq(len),
+        srcStride = Seq(len), dstStride = Seq(len), srcAddr = src, dstAddr = dst)
+      val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
+      dones shouldBe Seq((tag, false))
+      for (i <- 0 until len) m(dst + i) shouldBe m(src + i)
+      for (a <- dst - BB until dst) m(a) shouldBe 0xA5.toByte
+      for (a <- dst + len until dst + len + BB) m(a) shouldBe 0xA5.toByte
     }
   }
 
@@ -930,7 +833,8 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     val cmd = FbTestCmd(tag = 0xC1, dimCount = 1,
       shape = Seq(256), srcStride = Seq(256), dstStride = Seq(256),
       srcAddr = 0, dstAddr = 0x1000)
-    simulate(new ForagerBee(testCfg)) { dut =>
+    implicit val testingDirectory: chisel3.testing.HasTestingDirectory = chisel3.testing.HasTestingDirectory.timestamp
+    (new chisel3.simulator.ChiselSim {}).simulateRaw(new ForagerBee(testCfg)) { dut =>
       val models = Seq.fill(testCfg.numPorts)(new FbStreamMemSlave(mem, testCfg.beatBytes))
       pokeCmdPayload(dut.io.cmd.payload, cmd)
       dut.io.cmd.valid.poke(false.B)
@@ -1213,302 +1117,6 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     }
   }
 
-  // ===================== 链式描述符 (Chaining) 用例 =====================
-
-  private val chainCfg = ForagerBeeConfig(
-    numPorts = 1, queueDepth = 4, maxDims = 4,
-    tileSize = 8, maxBurstLen = 8,
-    dataWidth = 128, addressWidth = 32,
-    enableChaining = true
-  )
-  private val chainBB = chainCfg.beatBytes // 16
-
-  /** 将 FbCmd 字段值序列化为描述符 beat 序列（Seq[BigInt]，每元素 dataWidth 位）。
-    * 字段布局遵循 FbDescLayout（v3）的声明顺序：dstFmt 为最后一个字段，
-    * cvtScale/cvtZeroPoint 已上移为顶层 IO、不再序列化。
-    */
-  private def serializeDescriptor(
-      cfg: ForagerBeeConfig,
-      op: Int,         // 0=COPY,1=TRANSPOSE,2=PERMUTE
-      tag: Int,
-      dimCount: Int,
-      shape: Seq[Int],
-      srcStride: Seq[BigInt],
-      dstStride: Seq[BigInt],
-      srcAddr: BigInt,
-      dstAddr: BigInt,
-      permVec: Seq[Int] = Seq(),
-      padBefore: Seq[Int] = Seq(0, 0),
-      padAfter: Seq[Int] = Seq(0, 0),
-      nextDescAddr: BigInt = 0,
-      chainMode: Boolean = true,
-      srcFmt: Int = 3,
-      dstFmt: Int = 3
-  ): Seq[BigInt] = {
-    val addrW = cfg.addressWidth
-    val maxDims = cfg.maxDims
-    val dataWidth = cfg.dataWidth
-
-    // Build bit vector by packing fields in order
-    var bits = BigInt(0)
-    var offset = 0
-
-    def pack(value: BigInt, width: Int): Unit = {
-      bits |= (value & ((BigInt(1) << width) - 1)) << offset
-      offset += width
-    }
-
-    pack(BigInt(op), 2)           // op
-    pack(BigInt(tag), 8)          // tag
-    pack(BigInt(dimCount), 3)     // dimCount
-    for (d <- 0 until maxDims) pack(BigInt(shape.lift(d).getOrElse(0)), 16)        // shape
-    for (d <- 0 until maxDims) pack(srcStride.lift(d).getOrElse(BigInt(0)), addrW) // srcStride
-    for (d <- 0 until maxDims) pack(dstStride.lift(d).getOrElse(BigInt(0)), addrW) // dstStride
-    pack(srcAddr, addrW)          // srcAddr
-    pack(dstAddr, addrW)          // dstAddr
-    for (d <- 0 until maxDims) pack(BigInt(permVec.lift(d).getOrElse(0)), 3)       // permVec
-    for (d <- 0 until 2) pack(BigInt(padBefore.lift(d).getOrElse(0)), 16)          // padBefore
-    for (d <- 0 until 2) pack(BigInt(padAfter.lift(d).getOrElse(0)), 16)           // padAfter
-    pack(nextDescAddr, addrW)     // nextDescAddr
-    pack(if (chainMode) BigInt(1) else BigInt(0), 1) // chainMode
-    pack(BigInt(srcFmt), FbDataFmt.getWidth)  // srcFmt（FbDataFmt ChiselEnum，4-bit）
-    pack(BigInt(dstFmt), FbDataFmt.getWidth)  // dstFmt（FbDataFmt ChiselEnum，4-bit）—— v3 最后一个字段
-
-    // Split into beats
-    val descBeats = FbDescLayout.descBeats(cfg)
-    val result = (0 until descBeats).map { i =>
-      (bits >> (i * dataWidth)) & ((BigInt(1) << dataWidth) - 1)
-    }
-    result
-  }
-
-  /** 将描述符 beat 序列写入内存（little-endian） */
-  private def writeDescToMem(mem: mutable.HashMap[BigInt, Byte], baseAddr: BigInt, beats: Seq[BigInt], beatBytes: Int): Unit = {
-    for ((beat, i) <- beats.zipWithIndex) {
-      for (b <- 0 until beatBytes) {
-        mem(baseAddr + i * beatBytes + b) = ((beat >> (8 * b)) & 0xFF).toByte
-      }
-    }
-  }
-
-  /** 链式描述符仿真：包含 ChainBusSlave 处理 chainBus 读请求 */
-  private def runForagerBeeChain(
-      cfg: ForagerBeeConfig,
-      cmds: Seq[FbTestCmdChain],
-      prefill: mutable.HashMap[BigInt, Byte] = mutable.HashMap.empty,
-      chainMem: mutable.HashMap[BigInt, Byte] = mutable.HashMap.empty,
-      maxCycles: Int = 50000,
-      cvtScale: BigInt = 0,
-      cvtZeroPoint: BigInt = 0
-  ): (Seq[(Int, Boolean, Int)], mutable.HashMap[BigInt, Byte]) = {
-    // returns (tag, err, chainLen)
-    val mem = prefill
-    val dones = mutable.ArrayBuffer[(Int, Boolean, Int)]()
-    simulate(new ForagerBee(cfg)) { dut =>
-      val models = Seq.fill(cfg.numPorts)(new FbStreamMemSlave(mem, cfg.beatBytes))
-      // ChainBusSlave state
-      val chainBus = dut.io.chainBus.get
-      var chainRdActive = false
-      var chainRdAddr = BigInt(0)
-      var chainRdRemain = 0
-      var chainRdBeatIdx = 0
-
-      val dummy = FbTestCmdChain()
-      var cmdIdx = 0
-
-      // 初始化
-      pokeCmdPayload(dut.io.cmd.payload, cmds.headOption.getOrElse(dummy).toFbTestCmd)
-      pokeCvtGlobal(dut, cvtScale, cvtZeroPoint)
-      dut.io.cmd.valid.poke(false.B)
-      dut.io.cmd.payload.chainMode.poke(false.B)
-      dut.io.cmd.payload.nextDescAddr.poke(0.U)
-      dut.io.done.ready.poke(true.B)
-      dut.reset.poke(true.B)
-      // chainBus 初始化
-      chainBus.rd.ready.poke(true.B)
-      chainBus.rdData.valid.poke(false.B)
-      chainBus.rdData.payload.data.poke(0.U)
-      chainBus.rdData.payload.sof.poke(false.B)
-      chainBus.rdData.payload.eof.poke(false.B)
-      chainBus.rdData.payload.err.poke(false.B)
-      chainBus.wr.ready.poke(true.B)
-      chainBus.wrResp.valid.poke(false.B)
-      chainBus.wrResp.payload.err.poke(false.B)
-      dut.clock.step(2)
-      dut.reset.poke(false.B)
-
-      var cycle = 0
-      while (dones.size < cmds.size && cycle < maxCycles) {
-        // Engine bus slaves
-        for (p <- 0 until cfg.numPorts) models(p).step(dut.io.bus(p))
-
-        // === ChainBus Slave ===
-        chainBus.rd.ready.poke((!chainRdActive).B)
-        if (!chainRdActive && chainBus.rd.valid.peek().litToBoolean) {
-          chainRdAddr = chainBus.rd.payload.addr.peek().litValue
-          chainRdRemain = chainBus.rd.payload.len.peek().litValue.toInt + 1
-          chainRdBeatIdx = 0
-          chainRdActive = true
-        }
-        if (chainRdActive && chainRdRemain > 0) {
-          chainBus.rdData.valid.poke(true.B)
-          // Read from chainMem
-          var beatVal = BigInt(0)
-          for (b <- 0 until cfg.beatBytes) {
-            beatVal |= BigInt(chainMem.getOrElse(chainRdAddr + b, 0.toByte) & 0xFF) << (8 * b)
-          }
-          chainBus.rdData.payload.data.poke(beatVal)
-          chainBus.rdData.payload.sof.poke((chainRdBeatIdx == 0).B)
-          chainBus.rdData.payload.eof.poke((chainRdRemain == 1).B)
-          chainBus.rdData.payload.err.poke(false.B)
-          if (chainBus.rdData.ready.peek().litToBoolean) {
-            chainRdAddr += cfg.beatBytes
-            chainRdBeatIdx += 1
-            chainRdRemain -= 1
-            if (chainRdRemain == 0) chainRdActive = false
-          }
-        } else {
-          chainBus.rdData.valid.poke(false.B)
-          chainBus.rdData.payload.data.poke(0.U)
-          chainBus.rdData.payload.sof.poke(false.B)
-          chainBus.rdData.payload.eof.poke(false.B)
-          chainBus.rdData.payload.err.poke(false.B)
-        }
-        chainBus.wrResp.valid.poke(false.B)
-        chainBus.wrResp.payload.err.poke(false.B)
-
-        // 注入命令
-        if (cmdIdx < cmds.size) {
-          pokeCmdPayload(dut.io.cmd.payload, cmds(cmdIdx).toFbTestCmd)
-          // 需要额外 poke chainMode 和 nextDescAddr
-          dut.io.cmd.payload.chainMode.poke(cmds(cmdIdx).chainMode.B)
-          dut.io.cmd.payload.nextDescAddr.poke(cmds(cmdIdx).nextDescAddr)
-          dut.io.cmd.valid.poke(true.B)
-        } else {
-          dut.io.cmd.valid.poke(false.B)
-        }
-        dut.io.done.ready.poke(true.B)
-
-        // 收集 done
-        if (dut.io.done.valid.peek().litToBoolean) {
-          dones += ((
-            dut.io.done.payload.tag.peek().litValue.toInt,
-            dut.io.done.payload.err.peek().litToBoolean,
-            dut.io.done.payload.chainLen.peek().litValue.toInt
-          ))
-        }
-        // 命令 fire → 推进指针
-        if (cmdIdx < cmds.size && dut.io.cmd.ready.peek().litToBoolean) cmdIdx += 1
-        dut.clock.step()
-        cycle += 1
-      }
-      assert(dones.size == cmds.size, s"Chain 测试超时：$maxCycles 拍内仅收到 ${dones.size}/${cmds.size} 个 done")
-    }
-    (dones.toSeq, mem)
-  }
-
-  /** 扩展的测试命令（支持链模式字段） */
-  case class FbTestCmdChain(
-      tag: Int = 0,
-      transpose: Boolean = false,
-      op: String = "",
-      dimCount: Int = 1,
-      shape: Seq[Int] = Seq(16),
-      srcStride: Seq[BigInt] = Seq(16),
-      dstStride: Seq[BigInt] = Seq(16),
-      srcAddr: BigInt = 0,
-      dstAddr: BigInt = 0,
-      permVec: Seq[Int] = Seq(),
-      padBefore: Seq[Int] = Seq(0, 0),
-      padAfter: Seq[Int] = Seq(0, 0),
-      chainMode: Boolean = false,
-      nextDescAddr: BigInt = 0
-  ) {
-    def toFbTestCmd: FbTestCmd = FbTestCmd(tag, transpose, op, dimCount, shape, srcStride, dstStride,
-      srcAddr, dstAddr, permVec, padBefore, padAfter)
-  }
-
-  it should "chain: elaborate with enableChaining=true" in {
-    val v = _root_.circt.stage.ChiselStage.emitSystemVerilog(new ForagerBee(chainCfg))
-    v should include("module ForagerBee")
-  }
-
-  it should "chain: single descriptor (chainMode=true, nextDescAddr=0) behaves like normal COPY" in {
-    val mem = mutable.HashMap.empty[BigInt, Byte]
-    val chainMem = mutable.HashMap.empty[BigInt, Byte]
-    val len = 64
-    fillPattern(mem, 0, len)
-
-    val cmd = FbTestCmdChain(tag = 0x50, dimCount = 1,
-      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
-      srcAddr = 0, dstAddr = 0x1000,
-      chainMode = true, nextDescAddr = 0)
-
-    val (dones, m) = runForagerBeeChain(chainCfg, Seq(cmd), mem, chainMem)
-    dones.size shouldBe 1
-    dones(0)._1 shouldBe 0x50
-    dones(0)._2 shouldBe false
-    dones(0)._3 shouldBe 1  // chainLen=1 (only one descriptor, nextAddr=0)
-    for (i <- 0 until len) m(BigInt(0x1000) + i) shouldBe m(BigInt(i))
-  }
-
-  it should "chain: 2-node chain executes both descriptors and reports chainLen=2" in {
-    val mem = mutable.HashMap.empty[BigInt, Byte]
-    val chainMem = mutable.HashMap.empty[BigInt, Byte]
-    val len = 64
-    // Source data for first COPY: 0→0x1000
-    fillPattern(mem, 0, len, seed = 10)
-    // Source data for second COPY: 0x2000→0x3000
-    fillPattern(mem, 0x2000, len, seed = 20)
-
-    // Descriptor 1 at address 0x10000 in chainMem:
-    // COPY 0x2000→0x3000, nextDescAddr=0 (end of chain)
-    val desc1Addr = BigInt(0x10000)
-    val desc1Beats = serializeDescriptor(chainCfg,
-      op = 0, tag = 0x51, dimCount = 1,
-      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
-      srcAddr = BigInt(0x2000), dstAddr = BigInt(0x3000),
-      
-      nextDescAddr = 0, chainMode = true
-    )
-    writeDescToMem(chainMem, desc1Addr, desc1Beats, chainCfg.beatBytes)
-
-    // Initial command: COPY 0→0x1000, chainMode=true, nextDescAddr=desc1Addr
-    val cmd = FbTestCmdChain(tag = 0x51, dimCount = 1,
-      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
-      srcAddr = 0, dstAddr = 0x1000,
-      chainMode = true, nextDescAddr = desc1Addr)
-
-    val (dones, m) = runForagerBeeChain(chainCfg, Seq(cmd), mem, chainMem)
-    dones.size shouldBe 1
-    dones(0)._1 shouldBe 0x51
-    dones(0)._2 shouldBe false
-    dones(0)._3 shouldBe 2  // chainLen=2
-    // Verify first COPY
-    for (i <- 0 until len) m(BigInt(0x1000) + i) shouldBe m(BigInt(i))
-    // Verify second COPY
-    for (i <- 0 until len) m(BigInt(0x3000) + i) shouldBe m(BigInt(0x2000) + i)
-  }
-
-  it should "chain: chainMode=false passes through without chaining" in {
-    val mem = mutable.HashMap.empty[BigInt, Byte]
-    val chainMem = mutable.HashMap.empty[BigInt, Byte]
-    val len = 64
-    fillPattern(mem, 0, len, seed = 30)
-
-    val cmd = FbTestCmdChain(tag = 0x52, dimCount = 1,
-      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
-      srcAddr = 0, dstAddr = 0x1000,
-      chainMode = false, nextDescAddr = 0)
-
-    val (dones, m) = runForagerBeeChain(chainCfg, Seq(cmd), mem, chainMem)
-    dones.size shouldBe 1
-    dones(0)._1 shouldBe 0x52
-    dones(0)._2 shouldBe false
-    dones(0)._3 shouldBe 1  // non-chain → chainLen=1
-    for (i <- 0 until len) m(BigInt(0x1000) + i) shouldBe m(BigInt(i))
-  }
-
   // ===================== 格式转换 (Format Conversion) 用例 =====================
 
   private val cvtCfg = ForagerBeeConfig(
@@ -1694,7 +1302,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     val outH = (H + 2 * pH - dH * (kH - 1) - 1) / sH + 1
     val outW = (W + 2 * pW - dW * (kW - 1) - 1) / sW + 1
     val srcBbox = C * H * W * elemBytes
-    val dstBbox = C * kH * kW * outH * outW * elemBytes
+    val dstBbox = C * kH * kW * outH * outW * fbFmtBytes(dstFmt)
     FbTestCmd(
       tag = tag, op = "IM2COL", dimCount = 1,
       shape = Seq(srcBbox, dstBbox),
@@ -2185,15 +1793,21 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     dones shouldBe Seq((0x74, true))
   }
 
-  it should "TILE2LINEAR beat alignment violation: Tn*e not divisible by beatBytes → err" in {
-    // Tn=3, elemBytes=4 → dim0 row bytes = 3*4=12, not divisible by 16 → cBad → err
+  it should "TILE2LINEAR accepts 12-byte micro-rows (Tn=3, INT32)" in {
+    val M = 8; val N = 12; val Tm = 4; val Tn = 3; val eb = 4
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    fillPattern(mem, 0, M * N * eb)
+    val expected = tile2linearRef(mem, BigInt(0), M, N, Tm, Tn, eb)
     val cmd = FbTestCmd(tag = 0x75, op = "TILE2LINEAR", dimCount = 1,
       shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
       srcAddr = 0, dstAddr = 0x10000, srcFmt = 8, dstFmt = 8,
-      t2lMatCols = 12, t2lTileRows = 4, t2lTileCols = 3,
-      t2lNumTileRows = 2, t2lNumTileCols = 4)
-    val (dones, _) = runForagerBee(testCfg, Seq(cmd), mutable.HashMap.empty)
-    dones shouldBe Seq((0x75, true))
+      t2lMatCols = N, t2lTileRows = Tm, t2lTileCols = Tn,
+      t2lNumTileRows = M / Tm, t2lNumTileCols = N / Tn)
+    val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
+    dones shouldBe Seq((0x75, false))
+    for (i <- expected.indices) {
+      withClue(s"short tile2linear[$i]: ") { m(BigInt(0x10000) + i) shouldBe expected(i) }
+    }
   }
 
   it should "5D COPY: dimCount=5 strided tensor (maxDims=5 extension)" in {
@@ -2369,15 +1983,21 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     dones shouldBe Seq((0x84, true))
   }
 
-  it should "LINEAR2TILE beat alignment violation: Tn*e not divisible by beatBytes → err" in {
-    // Tn=3, elemBytes=4 → dim0 row bytes = 3*4=12, not divisible by 16 → err
+  it should "LINEAR2TILE accepts 12-byte micro-rows (Tn=3, INT32)" in {
+    val M = 8; val N = 12; val Tm = 4; val Tn = 3; val eb = 4
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    fillPattern(mem, 0, M * N * eb)
+    val expected = linear2tileRef(mem, BigInt(0), M, N, Tm, Tn, eb)
     val cmd = FbTestCmd(tag = 0x85, op = "LINEAR2TILE", dimCount = 1,
       shape = Seq(16), srcStride = Seq(16), dstStride = Seq(16),
       srcAddr = 0, dstAddr = 0x10000, srcFmt = 8, dstFmt = 8,
-      t2lMatCols = 12, t2lTileRows = 4, t2lTileCols = 3,
-      t2lNumTileRows = 2, t2lNumTileCols = 4)
-    val (dones, _) = runForagerBee(testCfg, Seq(cmd), mutable.HashMap.empty)
-    dones shouldBe Seq((0x85, true))
+      t2lMatCols = N, t2lTileRows = Tm, t2lTileCols = Tn,
+      t2lNumTileRows = M / Tm, t2lNumTileCols = N / Tn)
+    val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
+    dones shouldBe Seq((0x85, false))
+    for ((off, exp) <- expected) {
+      withClue(s"short linear2tile[$off]: ") { m(BigInt(0x10000) + off) shouldBe exp }
+    }
   }
 
   it should "LINEAR2TILE round-trip: TILE2LINEAR then LINEAR2TILE restores original matrix" in {
@@ -2840,27 +2460,71 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   private val nbwrSlaveFactory: (mutable.HashMap[BigInt, Byte], Int) => FbStreamMemSlave =
     (m, bb) => new FbStreamMemSlave(m, bb, writeDelay = nbWrDelay)
 
+  for ((name, cfg) <- Seq(
+    ("direct depth=1", testCfg),
+    ("direct depth=4", nbwrCfg),
+    ("shared depth=4", nbwrSharedCfg)
+  )) {
+    it should s"idle stays low during delayed COPY responses and done backpressure ($name)" in {
+      val mem = mutable.HashMap.empty[BigInt, Byte]
+      val len = 64
+      fillPattern(mem, 0, len)
+      val cmd = FbTestCmd(tag = 0x29, shape = Seq(len),
+        srcStride = Seq(len), dstStride = Seq(len), srcAddr = 0, dstAddr = 0x2000)
+      val slaves = Seq.fill(cfg.numPorts)(new FbStreamMemSlave(mem, cfg.beatBytes, writeDelay = 12))
+      var idx = 0
+      var sawResponseWait = false
+      var stalledDoneCycles = 0
+      var releaseDone = false
+      val (dones, m) = runForagerBee(cfg, Seq(cmd), mem, maxCycles = 10000,
+        modelFactory = (_, _) => { val s = slaves(idx); idx += 1; s },
+        doneReady = _ => releaseDone,
+        onCycle = (dut, _) => {
+          if (slaves.exists(_.pendingWriteResponses > 0)) {
+            sawResponseWait = true
+            dut.io.idle.peek().litToBoolean shouldBe false
+            dut.io.done.valid.peek().litToBoolean shouldBe false
+          }
+          if (dut.io.done.valid.peek().litToBoolean) {
+            dut.io.idle.peek().litToBoolean shouldBe false
+            dut.io.done.payload.tag.peek().litValue.toInt shouldBe cmd.tag
+            dut.io.done.payload.err.peek().litToBoolean shouldBe false
+            if (!dut.io.done.ready.peek().litToBoolean) {
+              stalledDoneCycles += 1
+              if (stalledDoneCycles == 8) releaseDone = true
+            }
+          } else if (stalledDoneCycles > 0) {
+            fail("done.valid 在反压后的握手前不得撤回")
+          }
+        },
+        onDoneFire = _ => slaves.map(_.wrRespSent).sum shouldBe 1)
+      dones shouldBe Seq((cmd.tag, false))
+      sawResponseWait shouldBe true
+      stalledDoneCycles shouldBe 8
+      for (i <- 0 until len) m(BigInt(0x2000) + i) shouldBe m(BigInt(i))
+    }
+  }
+
   it should "nbwr: elaborate writeOutstandingDepth=4 (direct) and +enableSharedWritePorts=true" in {
     val v1 = ChiselStage.emitSystemVerilog(new ForagerBee(nbwrCfg))
     v1 should include("module ForagerBee")
-    v1 should include("wrInFlight") // 非阻塞路径应生成在途写计数器
+    v1 should include regex """reg\s+\[2:0\]\s+outstanding;"""
     val v2 = ChiselStage.emitSystemVerilog(new ForagerBee(nbwrSharedCfg))
     v2 should include("module ForagerBee")
-    v2 should include("wrInFlight")
+    v2 should include regex """reg\s+\[2:0\]\s+outstanding;"""
     v2 should include("FbWrPortArbiter")
+    v2 should include("ownerFifo")
   }
 
-  it should "nbwr: default config SV contains no wrInFlight (zero-regression guard)" in {
-    // 编译期分支零回归的测试层守卫：=1 时不新增任何非阻塞写硬件，
-    // wrInFlight 信号名不应出现在生成的 SystemVerilog 文本中。
+  it should "nbwr: default depth uses one-bit writer credit and no shared owner FIFO" in {
     val v = ChiselStage.emitSystemVerilog(new ForagerBee(ForagerBeeConfig()))
     v should include("module ForagerBee")
-    v should not include "wrInFlight"
-    // 共享仲裁模式（=1 + enableSharedWritePorts）同样不应引入非阻塞写硬件：
-    // 仲裁器例化但仅走阻塞式路径（无 wrInFlight 信号）
+    v should include regex """reg\s+outstanding;"""
+    v should not include "FbWrPortArbiter"
     val v2 = ChiselStage.emitSystemVerilog(new ForagerBee(ForagerBeeConfig(enableSharedWritePorts = true)))
     v2 should include("FbWrPortArbiter")
-    v2 should not include "wrInFlight"
+    v2 should include regex """reg\s+outstanding;"""
+    v2 should not include "ownerFifo"
   }
 
   it should "nbwr: 1D COPY with writeDelay=8 completes and data correct" in {
@@ -2921,7 +2585,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
 
   it should "nbwr: MX quantize FP16→MXE4M3 1D blockSize=32 with writeDelay=8" in {
     // 复用既有 MX 量化用例的命令参数，仅叠加非阻塞写 + 大响应延迟；
-    // 量化数据突发与 scale 突发均为在途写（MX 特例路径同样受 wrInFlight 门控）。
+    // 量化数据突发与 scale 突发均受 writer outstanding credit 门控。
     val n = 64
     val mem = mutable.HashMap.empty[BigInt, Byte]
     val vals0 = Seq.tabulate(32)(i =>
@@ -3051,194 +2715,76 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     }
   }
 
-  // ===================== 非阻塞写 atomic 标志写（writeOutstandingDepth=4） =====================
-  // 任务11 High-issue 回归：非阻塞路径 atomic 发射门控由 wrInFlight<depth 收紧为 wrInFlight===0，
-  // 确保全部数据写响应排空、errReg 达终态后再判定是否发 atomic（出错不发 atomic）。
-  // 复用 FbBeatCapturingMemSlave 捕获写 beat，writeDelay=8 迫使多突发同时在途。
-
-  it should "nbwr atomic: COPY + atomicEnable emits atomic only after all data responses drained (writeDelay=8)" in {
+  it should "nbwr: preserve a transpose response error coincident with read completion" in {
+    val cfg = testCfg.copy(numPorts = 1, tileSize = 4, writeOutstandingDepth = 4)
+    val cols = 4
+    val rows = 8
     val mem = mutable.HashMap.empty[BigInt, Byte]
-    val len = 256 // 16 beat → 2 突发（maxBurstLen=8）
-    fillPattern(mem, 0, len)
-    val atomicAddr = BigInt(0x6008) // 4B 对齐、非 beat 对齐（byteOff = 8）
-    val expDataBursts = len / (nbwrCfg.beatBytes * nbwrCfg.maxBurstLen) // 2
-    val cmd = FbTestCmd(tag = 0xB1, dimCount = 1,
-      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
-      srcAddr = 0, dstAddr = 0x1000,
-      atomicEnable = true, atomicStoreAddr = atomicAddr)
-    val captured = mutable.ArrayBuffer.empty[FbBeatCapturingMemSlave.Beat]
-    val slaves = Seq.fill(nbwrCfg.numPorts)(
-      new FbBeatCapturingMemSlave(mem, nbwrCfg.beatBytes, captured, writeDelay = nbWrDelay))
-    var idx = 0
-    var respAtDone = -1
-    val (dones, m) = runForagerBee(nbwrCfg, Seq(cmd), mem, maxCycles = 10000,
-      modelFactory = (_, _) => { val s = slaves(idx); idx += 1; s },
-      onDoneFire = _ => if (respAtDone < 0) respAtDone = slaves.map(_.wrRespSent).sum)
-    dones shouldBe Seq((0xB1, false))
-    // 数据搬运正确
-    for (i <- 0 until len) m(BigInt(0x1000) + i) shouldBe m(BigInt(i))
-    // 恰一拍 atomic，且为最后一个写 beat（在所有数据 beat 之后）
-    val atomicBeats = captured.filter(_.atomic)
-    atomicBeats.size shouldBe 1
-    captured.last.atomic shouldBe true
-    captured.count(!_.atomic) shouldBe (expDataBursts * nbwrCfg.maxBurstLen) // 16 数据拍
-    val ab = atomicBeats.head
-    val byteOff = 8
-    ab.addr shouldBe BigInt(0x6000)              // beat 对齐
-    ab.len shouldBe BigInt(0)
-    ab.sof shouldBe true
-    ab.eof shouldBe true
-    ab.strb shouldBe (BigInt(0xF) << byteOff)     // 0xF00
-    ab.data shouldBe (BigInt(1) << (byteOff * 8)) // 1<<64
-    readLe(m, atomicAddr, 4) shouldBe BigInt(1)
-    // done 前所有写响应（2 数据突发 + 1 atomic 突发）均已排空
-    respAtDone shouldBe (expDataBursts + 1)
-  }
-
-  it should "nbwr atomic: data write err returned after sDONE entry suppresses atomic (High-issue regression, writeDelay=8)" in {
-    // 复现 Mark 指出的 High issue 场景：单段 COPY 的 EOF fire 后即进入 sDONE（wrInFlight=1），
-    // 此时 err 响应尚未返回（writeDelay=8）。旧门控 wrInFlight<depth 会让 atomic 立即 fire，
-    // 随后 err 响应回来已无法撤回 → 违反「出错不发 atomic」。修复后 wrInFlight===0 门控
-    // 迫使 atomic 等到 err 响应排空、errReg 终态后再判定，atomicNeeded=false → atomic 被抑制。
-    val mem = mutable.HashMap.empty[BigInt, Byte]
-    val len = 64 // 4 beat → 1 突发（EOF 即进 sDONE，err 响应延迟 8 拍返回）
-    fillPattern(mem, 0, len)
-    val cmd = FbTestCmd(tag = 0xB2, dimCount = 1,
-      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
-      srcAddr = 0, dstAddr = 0x1000,
-      atomicEnable = true, atomicStoreAddr = BigInt(0x7000))
-    val captured = mutable.ArrayBuffer.empty[FbBeatCapturingMemSlave.Beat]
-    // errOnBurst=0：对第一个（数据）突发响应注入 err
-    val slaves = Seq.fill(nbwrCfg.numPorts)(
-      new FbBeatCapturingMemSlave(mem, nbwrCfg.beatBytes, captured, writeDelay = nbWrDelay, errOnBurst = 0))
-    var idx = 0
-    val (dones, _) = runForagerBee(nbwrCfg, Seq(cmd), mem, maxCycles = 10000,
-      modelFactory = (_, _) => { val s = slaves(idx); idx += 1; s })
-    dones shouldBe Seq((0xB2, true))            // err 终态
-    captured.exists(_.atomic) shouldBe false     // atomic 被抑制，未发出
-  }
-
-  it should "nbwr atomic: 4-burst COPY saturating depth=4 + atomicEnable, no deadlock, atomic emitted (writeDelay=8)" in {
-    val mem = mutable.HashMap.empty[BigInt, Byte]
-    val len = 512 // 32 beat → 4 突发，恰好填满深度 4
-    fillPattern(mem, 0, len)
-    val expDataBursts = len / (nbwrCfg.beatBytes * nbwrCfg.maxBurstLen) // 4
-    val atomicAddr = BigInt(0x9004) // byteOff = 4
-    val cmd = FbTestCmd(tag = 0xB3, dimCount = 1,
-      shape = Seq(len), srcStride = Seq(len), dstStride = Seq(len),
-      srcAddr = 0, dstAddr = 0x1000,
-      atomicEnable = true, atomicStoreAddr = atomicAddr)
-    val captured = mutable.ArrayBuffer.empty[FbBeatCapturingMemSlave.Beat]
-    val slaves = Seq.fill(nbwrCfg.numPorts)(
-      new FbBeatCapturingMemSlave(mem, nbwrCfg.beatBytes, captured, writeDelay = nbWrDelay))
-    var idx = 0
-    val (dones, m) = runForagerBee(nbwrCfg, Seq(cmd), mem, maxCycles = 20000,
-      modelFactory = (_, _) => { val s = slaves(idx); idx += 1; s })
-    dones shouldBe Seq((0xB3, false))
-    for (i <- 0 until len) m(BigInt(0x1000) + i) shouldBe m(BigInt(i))
-    val atomicBeats = captured.filter(_.atomic)
-    atomicBeats.size shouldBe 1
-    captured.last.atomic shouldBe true
-    val ab = atomicBeats.head
-    val byteOff = 4
-    ab.addr shouldBe BigInt(0x9000)
-    ab.strb shouldBe (BigInt(0xF) << byteOff)     // 0xF0
-    ab.data shouldBe (BigInt(1) << (byteOff * 8)) // 1<<32
-    readLe(m, atomicAddr, 4) shouldBe BigInt(1)
-    // SOF 门控不死锁：4 数据突发 + 1 atomic 突发的响应全部收回（done 能到达即证明无死锁）
-    slaves.map(_.wrRespSent).sum shouldBe (expDataBursts + 1)
-  }
-
-  // ===================== 阶段 E：描述符布局一致性（纯 Scala，无需仿真） =====================
-
-  // 该用例不经 simulate，直接在 Scala 侧运行：验证 serializeDescriptor（软件打包）与
-  // FbDescLayout（硬件 extract 偏移单一真源）逐字段一致——守住 v3 布局契约。
-  // v3：已删除 cvtScale/cvtZeroPoint（量化参数改由 ForagerBee 顶层 IO 全局供给），
-  //     dstFmt 为最后一个序列化字段，maxDims=4/dw=128 时 totalBits 578→514。
-  it should "descriptor layout: serializeDescriptor packing matches FbDescLayout offsets (pure Scala)" in {
-    val cfg = ForagerBeeConfig(
-      numPorts = 1, maxDims = 4, dataWidth = 128, addressWidth = 32, enableChaining = true)
-    val shp = Seq(16, 8, 4)
-    val ss = Seq(BigInt(64), BigInt(256), BigInt(1024))
-    val ds = Seq(BigInt(32), BigInt(128), BigInt(512))
-    val pv = Seq(2, 0, 1)
-    val beats = serializeDescriptor(cfg,
-      op = 1, tag = 0xAB, dimCount = 3,
-      shape = shp, srcStride = ss, dstStride = ds,
-      srcAddr = BigInt(0x1000), dstAddr = BigInt(0x2000),
-      permVec = pv, padBefore = Seq(3, 5), padAfter = Seq(7, 9),
-      nextDescAddr = BigInt(0x3000), chainMode = true,
-      srcFmt = 8, dstFmt = 1)
-    // 由 beat 序列（little-endian beat 拼接）重组完整 bit 向量
-    var bits = BigInt(0)
-    for ((b, i) <- beats.zipWithIndex) bits |= b << (i * cfg.dataWidth)
-    val o = FbDescLayout.offsets(cfg)
-    def slice(off: Int, w: Int): BigInt = (bits >> off) & ((BigInt(1) << w) - 1)
-
-    slice(o.offOp, FbDescLayout.opBits) shouldBe BigInt(1)
-    slice(o.offTag, FbDescLayout.tagBits) shouldBe BigInt(0xAB)
-    slice(o.offDimCount, FbDescLayout.dimCountBits) shouldBe BigInt(3)
-    for (d <- 0 until cfg.maxDims) {
-      slice(o.offShape + d * 16, 16) shouldBe BigInt(shp.lift(d).getOrElse(0))
-      slice(o.offSrcStride + d * cfg.addressWidth, cfg.addressWidth) shouldBe ss.lift(d).getOrElse(BigInt(0))
-      slice(o.offDstStride + d * cfg.addressWidth, cfg.addressWidth) shouldBe ds.lift(d).getOrElse(BigInt(0))
-      slice(o.offPermVec + d * 3, 3) shouldBe BigInt(pv.lift(d).getOrElse(0))
+    fillPattern(mem, 0, cols * rows)
+    val cmd = FbTestCmd(tag = 0x2a, transpose = true, dimCount = 2,
+      shape = Seq(cols, rows), srcStride = Seq(cols, cols), dstStride = Seq(rows, 0),
+      srcAddr = 0, dstAddr = 0x1000)
+    implicit val testingDirectory: chisel3.testing.HasTestingDirectory = chisel3.testing.HasTestingDirectory.timestamp
+    (new chisel3.simulator.ChiselSim {}).simulateRaw(new FbTransposeCompletionHarness(cfg)) { dut =>
+      // 响应由本用例在读完成拍手动释放，命中同拍错误优先级。
+      val slave = new FbStreamMemSlave(mem, cfg.beatBytes, writeDelay = 10000)
+      pokeCmdPayload(dut.io.cmdIn.payload, cmd)
+      dut.io.cmdIn.valid.poke(false.B)
+      dut.io.done.ready.poke(true.B)
+      dut.io.bus.rd.ready.poke(true.B)
+      dut.io.bus.rdData.valid.poke(false.B)
+      dut.io.bus.rdData.payload.data.poke(0.U)
+      dut.io.bus.rdData.payload.sof.poke(false.B)
+      dut.io.bus.rdData.payload.eof.poke(false.B)
+      dut.io.bus.rdData.payload.err.poke(false.B)
+      dut.io.bus.wr.ready.poke(true.B)
+      dut.io.bus.wrResp.valid.poke(false.B)
+      dut.io.bus.wrResp.payload.err.poke(false.B)
+      dut.reset.poke(true.B)
+      dut.clock.step(2)
+      dut.reset.poke(false.B)
+      var submitted = false
+      var injected = false
+      var completed = false
+      var pending = 0
+      var eofCount = 0
+      var responseCount = 0
+      var cycle = 0
+      while (!completed && cycle < 2000) {
+        slave.step(dut.io.bus)
+        dut.io.cmdIn.valid.poke((!submitted).B)
+        if (!submitted && dut.io.cmdIn.ready.peek().litToBoolean) submitted = true
+        if (dut.io.bus.wr.valid.peek().litToBoolean && dut.io.bus.wr.payload.eof.peek().litToBoolean) {
+          pending += 1
+          eofCount += 1
+        }
+        val coincidence = !injected && pending > 0 && dut.readFinishing.peek().litToBoolean
+        val respond = pending > 0 && (injected || coincidence)
+        dut.io.bus.wrResp.valid.poke(respond.B)
+        dut.io.bus.wrResp.payload.err.poke(coincidence.B)
+        if (respond) {
+          dut.io.bus.wrResp.ready.peek().litToBoolean shouldBe true
+          pending -= 1
+          responseCount += 1
+          if (coincidence) injected = true
+        }
+        if (dut.io.done.valid.peek().litToBoolean) {
+          dut.io.done.payload.tag.peek().litValue shouldBe BigInt(cmd.tag)
+          dut.io.done.payload.err.peek().litToBoolean shouldBe true
+          pending shouldBe 0
+          completed = true
+        }
+        dut.clock.step()
+        cycle += 1
+      }
+      completed shouldBe true
+      injected shouldBe true
+      eofCount shouldBe cols * (rows / cfg.tileSize)
+      responseCount shouldBe eofCount
+      dut.io.busy.peek().litToBoolean shouldBe false
     }
-    slice(o.offSrcAddr, cfg.addressWidth) shouldBe BigInt(0x1000)
-    slice(o.offDstAddr, cfg.addressWidth) shouldBe BigInt(0x2000)
-    slice(o.offPadBefore, 16) shouldBe BigInt(3)
-    slice(o.offPadBefore + 16, 16) shouldBe BigInt(5)
-    slice(o.offPadAfter, 16) shouldBe BigInt(7)
-    slice(o.offPadAfter + 16, 16) shouldBe BigInt(9)
-    slice(o.offNextDescAddr, cfg.addressWidth) shouldBe BigInt(0x3000)
-    slice(o.offChainMode, FbDescLayout.chainModeBits) shouldBe BigInt(1)
-    slice(o.offSrcFmt, FbDescLayout.srcFmtBits) shouldBe BigInt(8)
-    slice(o.offDstFmt, FbDescLayout.dstFmtBits) shouldBe BigInt(1)
-    // 布局自检：偏移末端 == totalBits；descBeats 覆盖 totalBits 且与产出一致
-    o.end shouldBe FbDescLayout.totalBits(cfg)
-    // v3 实算值（maxDims=4、addressWidth=32、dataWidth=128）：
-    //   totalBits = 514（v2 为 578，删除 cvtScale/cvtZeroPoint 共 64 bit）
-    //   descBeats = ceil(514/128) = 5
-    FbDescLayout.totalBits(cfg) shouldBe 514
-    o.end shouldBe 514
-    o.offDstFmt shouldBe 510
-    FbDescLayout.descBeats(cfg) shouldBe 5
-    FbDescLayout.descBeats(cfg) shouldBe beats.length
-    // v3 尾部无残留字段：dstFmt 之后到 totalBits 之间不应再有内容
-    slice(o.end, cfg.dataWidth * beats.length - o.end) shouldBe BigInt(0)
-  }
-
-  // v3 描述符尺寸实算表（纯 Scala，不经 simulate ⟹ 可实跑）：锁死 totalBits/descBeats，
-  // 任何再次增删序列化字段（如未来为链式 MX 量化补 scaleAddr/scaleBlockSize）都必须显式更新本表。
-  // v2 → v3 差值恒为 −64 bit（删除 cvtScale(32) + cvtZeroPoint(32)，量化参数改由顶层 IO 全局供给）。
-  it should "descriptor layout v3: totalBits/descBeats match the published table for all shipped configs (pure Scala)" in {
-    // (名称, maxDims, dataWidth, v3 totalBits, v2 totalBits, v3 descBeats, v2 descBeats)
-    val table = Seq(
-      ("factory  dataWidth=256 maxDims=5", 5, 256, 597, 661, 3, 3),
-      ("testCfg  dataWidth=128 maxDims=5", 5, 128, 597, 661, 5, 6),
-      ("mxqCfg   dataWidth=128 maxDims=5", 5, 128, 597, 661, 5, 6),
-      ("chainCfg dataWidth=128 maxDims=4", 4, 128, 514, 578, 5, 5),
-      ("cvtCfg   dataWidth=128 maxDims=4", 4, 128, 514, 578, 5, 5)
-    )
-    for ((name, maxDims, dataWidth, v3Bits, v2Bits, v3Beats, v2Beats) <- table) {
-      val cfg = ForagerBeeConfig(numPorts = 1, maxDims = maxDims, dataWidth = dataWidth,
-        addressWidth = 32, enableChaining = true)
-      withClue(s"$name totalBits(v3): ") { FbDescLayout.totalBits(cfg) shouldBe v3Bits }
-      withClue(s"$name totalBits(v3) 应比 v2 少 64 bit: ") { v2Bits - v3Bits shouldBe 64 }
-      withClue(s"$name descBeats(v3): ") { FbDescLayout.descBeats(cfg) shouldBe v3Beats }
-      withClue(s"$name descBeats(v2)=ceil(v2Bits/dataWidth): ") {
-        v2Beats shouldBe (v2Bits + dataWidth - 1) / dataWidth
-      }
-      withClue(s"$name descBeats(v3)=ceil(v3Bits/dataWidth): ") {
-        v3Beats shouldBe (v3Bits + dataWidth - 1) / dataWidth
-      }
-      // 布局自检：Offsets.end 必须恰等于 totalBits（FbDescLayout 内部 require 亦覆盖，此处显式断言）
-      withClue(s"$name offsets.end: ") { FbDescLayout.offsets(cfg).end shouldBe v3Bits }
-      // dstFmt 为 v3 最后一个字段
-      withClue(s"$name offDstFmt: ") {
-        FbDescLayout.offsets(cfg).offDstFmt shouldBe v3Bits - FbDescLayout.dstFmtBits
-      }
-    }
+    for (col <- 0 until cols; row <- 0 until rows)
+      mem(BigInt(0x1000 + col * rows + row)) shouldBe mem(BigInt(row * cols + col))
   }
 
   // ===================== 阶段 E：格式派生校验用例（非法编码 / INT4 约束 / 未实现转换 / MX 回归） =====================
@@ -3258,8 +2804,8 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     }
   }
 
-  // INT4 奇数 shape(0)：行字节 ceil(33*4/8)=17 非整 beat → cBadBase 行对齐拒绝
-  it should "reject INT4 with odd shape(0) (row not beat-aligned) with err done" in {
+  // INT4 的 dim0 元素数仍须为偶数；短行支持不放开半字节尾部。
+  it should "reject INT4 with odd shape(0)=33 (half-byte tail) with err done" in {
     val cmd = FbTestCmd(tag = 0xB1, op = "COPY", dimCount = 1,
       shape = Seq(33), srcStride = Seq(17), dstStride = Seq(17),
       srcAddr = 0, dstAddr = 0x1000, srcFmt = 10, dstFmt = 10)
@@ -3307,8 +2853,19 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     dones shouldBe Seq((0xB5, true))
   }
 
+  // INT8 仅支持同格式 COPY；双向整数/浮点跨格式转换均拒绝。
+  for (otherFmt <- Seq(0, 1, 2, 8, 9, 10); (srcFmt, dstFmt) <- Seq((3, otherFmt), (otherFmt, 3))) {
+    it should s"reject INT8 cross-format COPY ($srcFmt->$dstFmt) with err done and no write" in {
+      val cmd = FbTestCmd(tag = 0xB6, op = "COPY", dimCount = 1,
+        shape = Seq(32), srcStride = Seq(128), dstStride = Seq(128),
+        srcAddr = 0, dstAddr = 0x1000, srcFmt = srcFmt, dstFmt = dstFmt)
+      val (dones, m) = runForagerBee(cvtCfg, Seq(cmd), mutable.HashMap.empty)
+      dones shouldBe Seq((0xB6, true))
+      for (a <- 0x1000 until 0x1080) m.get(BigInt(a)) shouldBe None
+    }
+  }
+
   // isMx(dstFmt) + 非 float srcFmt（INT8）→ mxQuantBad.srcFmtBadMx（回归守护）
-  // 量化激活已由 dstFmt 派生（mxQuantEn 字段已删除），触发路径变为「isMx(dstFmt=4) → srcFmtBadMx」，用例语义不变
   it should "reject MX quantize with non-float srcFmt (INT8) with err done" in {
     val cmd = FbTestCmd(tag = 0xB7, op = "COPY", dimCount = 1,
       shape = Seq(32), srcStride = Seq(32), dstStride = Seq(32),
@@ -3427,8 +2984,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     dones shouldBe Seq((0xC1, true))
   }
 
-  // S1：INT4 shape(0)=31（奇数）→ ceil(31*4/8)=16B 恰整 beat，cBadBase 行对齐漏网；
-  // int4ShapeBad（dim0 元素数必须偶数）兜住 → err。
+  // INT4 shape(0)=31 仍产生半字节尾部，由 int4ShapeBad 拒绝，与 beat 对齐无关。
   it should "reject INT4 with odd shape(0)=31 (half-byte leak, int4ShapeBad) with err done" in {
     val cmd = FbTestCmd(tag = 0xC2, op = "COPY", dimCount = 1,
       shape = Seq(31), srcStride = Seq(16), dstStride = Seq(16),
@@ -3446,23 +3002,33 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     dones shouldBe Seq((0xC3, true))
   }
 
-  // N6：padding dim0 字节数非 beat 对齐（INT8 padBefore(0)=1 → 1B，BB=16）→ padAlignBad err。
-  it should "reject padding with non-beat-aligned dim0 pad bytes (padAlignBad) with err done" in {
+  // 单字节 padding 与 17B 输出行现在合法；默认 padValue=0，不应污染尾拍其余字节。
+  it should "padding accepts a one-byte prefix and a partial final beat" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    fillPattern(mem, 0, 16)
+    for (a <- 0x6000 until 0x6030) mem(BigInt(a)) = 0xA5.toByte
     val cmd = FbTestCmd(tag = 0xC4, op = "COPY", dimCount = 2,
       shape = Seq(16, 1), srcStride = Seq(16, 16), dstStride = Seq(48, 48),
       srcAddr = 0, dstAddr = 0x6000, padBefore = Seq(1, 0), padAfter = Seq(0, 0),
       srcFmt = 3, dstFmt = 3)
-    val (dones, _) = runForagerBee(testCfg, Seq(cmd), mutable.HashMap.empty)
-    dones shouldBe Seq((0xC4, true))
+    val (dones, m) = runForagerBee(testCfg, Seq(cmd), mem)
+    dones shouldBe Seq((0xC4, false))
+    m(BigInt(0x6000)) shouldBe 0.toByte
+    for (i <- 0 until 16) m(BigInt(0x6001) + i) shouldBe m(BigInt(i))
+    for (a <- 0x6011 until 0x6030) m(BigInt(a)) shouldBe 0xA5.toByte
   }
 
-  // M1：IM2COL 压缩方向非对齐（kW=1 FP32→FP16，BB=4 → micro-row 源 1 beat，折算 1>>1=0）
-  // → i2cCvtAlignBad err（否则 wr.len 下溢 255、FSM 死锁）。
-  it should "reject IM2COL compression with non-aligned micro-row beats (i2cCvtAlignBad) with err done" in {
+  // FP32→FP16 的单元素 micro-row 用尾包输出 2B，不再要求源 beat 数整除压缩比。
+  it should "IM2COL FP32→FP16 compression accepts a two-byte micro-row tail" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    putFp32(mem, BigInt(0), Seq(1.5f))
+    for (a <- 0x20000 until 0x20004) mem(BigInt(a)) = 0xA5.toByte
     val cmd = mkIm2colCmd(0xC5, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1,
       srcAddr = 0, dstAddr = 0x20000)
-    val (dones, _) = runForagerBee(i2cCvtCfg, Seq(cmd), mutable.HashMap.empty)
-    dones shouldBe Seq((0xC5, true))
+    val (dones, m) = runForagerBee(i2cCvtCfg, Seq(cmd), mem)
+    dones shouldBe Seq((0xC5, false))
+    readElem16(m, BigInt(0x20000)) shouldBe fp16Of(1.5f)
+    for (a <- 0x20002 until 0x20004) m(BigInt(a)) shouldBe 0xA5.toByte
   }
 
   // S3：Dispatcher dst bbox 修复的多端口回归（numPorts=2 + enableConversion）。
@@ -3905,9 +3471,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
 
   // ===================== mxNonQuantBad / MX 裸拷贝边界（改动 1 回归）=====================
 
-  // mxNonQuantBad 收紧为「srcFmt 为 MX 族即拒」（硬件无反量化器）。该判据此前无测试覆盖。
-  // src=MXE4M3(4)、dst=FP32(0)：唯一触发项是 mxNonQuantBad —— fmtEncBad（编码均合法）、
-  // cvtFmtBad（非 INT16/INT32/亚字节）、cvtOpBad（op=COPY）、mxQuantBad（isMx(dstFmt)=false）均不触发。
+  // 启用转换时不支持 MX→非 MX 反量化；保留 err done 与目标区域未写的回归断言。
   it should "reject srcFmt=MX with non-MX dstFmt (dequantize unsupported) with err done" in {
     val cmd = FbTestCmd(tag = 0xB8, op = "COPY", dimCount = 1,
       shape = Seq(32), srcStride = Seq(32), dstStride = Seq(128),
@@ -3983,220 +3547,16 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     }
   }
 
-  // ===================== 链式描述符 + isMx(dstFmt) 入口自守（改动 2）=====================
-
-  // 链式 + 转换双开配置：此前测试中不存在该组合，而出厂 RTL（ForagerBeeElaborate）恰为此组合，
-  // 故 isMx(dstFmt) 链式描述符的内存破坏路径在出厂构建中是活的。
-  private val chainCvtCfg = ForagerBeeConfig(
-    numPorts = 1, queueDepth = 4, maxDims = 4,
-    tileSize = 8, maxBurstLen = 8,
-    dataWidth = 128, addressWidth = 32,
-    enableChaining = true,
-    enableConversion = true, converterPipeStages = 1
-  )
-
-  // 安全关键用例：链式描述符不序列化 scaleAddr/scaleBlockSize，FbChainController 将其硬连线为 0。
-  // 量化激活派生为 isMx(dstFmt) 后，若不拦截，带 MX dstFmt 的描述符会真的走量化通路并向
-  // **物理地址 0x0** 发出 E8M0 scale 的 strb 部分写（len=0 单拍）—— 内存破坏。
-  // 入口自守：isMx(dstFmt) ⟹ injCmd.dimCount := 0 ⟹ 引擎 cBadBase 拒绝 ⟹ err done、链终止。
-  it should "chain: reject descriptor with isMx(dstFmt) via entry self-guard (no write to 0x0)" in {
-    val mem = mutable.HashMap.empty[BigInt, Byte]
-    val chainMem = mutable.HashMap.empty[BigInt, Byte]
-    // 物理地址 0x0 附近预置哨兵：入口自守失效时被 E8M0 scale 部分写破坏，逐字节即检出
-    for (i <- 0 until 64) mem(BigInt(i)) = 0xA5.toByte
-    fillPattern(mem, 0x1000, 64, seed = 41)
-
-    // 描述符（v3 布局，dstFmt 为最后一个序列化字段）：COPY + srcFmt=FP16(1)、dstFmt=MXE4M3(4)
-    val descAddr = BigInt(0x10000)
-    val descBeats = serializeDescriptor(chainCvtCfg,
-      op = 0, tag = 0x61, dimCount = 1,
-      shape = Seq(32), srcStride = Seq(64), dstStride = Seq(32),
-      srcAddr = BigInt(0x3000), dstAddr = BigInt(0x5000),
-      nextDescAddr = 0, chainMode = true,
-      srcFmt = 1, dstFmt = 4)
-    writeDescToMem(chainMem, descAddr, descBeats, chainCvtCfg.beatBytes)
-
-    // 首命令：普通 INT8 纯拷贝（chainMode=true，指向上述描述符）
-    val cmd = FbTestCmdChain(tag = 0x60, dimCount = 1,
-      shape = Seq(64), srcStride = Seq(64), dstStride = Seq(64),
-      srcAddr = 0x1000, dstAddr = 0x2000,
-      chainMode = true, nextDescAddr = descAddr)
-
-    val (dones, m) = runForagerBeeChain(chainCvtCfg, Seq(cmd), mem, chainMem)
-    // 注入的 MX 描述符被 cBadBase（dimCount=0）拒绝 ⟹ 链在 err 处终止，chainLen=2（首命令 + 注入命令）
-    dones shouldBe Seq((0x60, true, 2))
-    // 首命令本身已正常搬运（err 来自第二个链节点）
-    for (i <- 0 until 64) {
-      withClue(s"首命令 dst[$i] @0x${0x2000 + i}%04X: ") {
-        (m.getOrElse(BigInt(0x2000 + i), 0.toByte) & 0xFF) shouldBe
-          (m.getOrElse(BigInt(0x1000 + i), 0.toByte) & 0xFF)
-      }
-    }
-    // 内存破坏防线：scaleAddr 硬连线为 0 ⟹ 哨兵 beat 必须逐字节保持 0xA5。
-    // 入口自守被移除时 sSWRITE 会以 strb 部分写覆盖其中若干字节（E8M0 scale 值），本断言即红。
-    for (i <- 0 until 64) {
-      withClue(f"scale 写目标哨兵 @0x$i%04X（入口自守失效则被 E8M0 部分写破坏）: ") {
-        (m.getOrElse(BigInt(i), 0.toByte) & 0xFF) shouldBe 0xA5
-      }
-    }
-    // 注入描述符的 dst 区不得被写（命令在 sIDLE 即被判 err，FSM 直落 sDONE）
-    for (i <- 0 until 64) {
-      withClue(f"注入描述符 dst @0x${0x5000 + i}%04X: ") {
-        (m.getOrElse(BigInt(0x5000 + i), 0.toByte) & 0xFF) shouldBe 0
-      }
-    }
-  }
-
-  // MUST-FIX 1 正例：enableChaining=true + enableConversion=false（chainCfg）下，链式描述符携带
-  // srcFmt==dstFmt==MXE4M3 必须是合法纯字节拷贝（copy-only 构建中 MX 退化为 1 字节/元素裸格式）。
-  // 改动前入口自守无条件生成 ⟹ 注入的 MX 描述符被 dimCount=0 误拒并截断整条链（err=true、dst 全 0）；
-  // 改动后自守受 cfg.enableConversion 门控 ⟹ copy-only 构建不生成，链式 MX 裸拷贝放行、整条链无 err，
-  // 与经 io.cmd 直连路径（sPASS 原样透传）行为对称。这是此前无任何用例覆盖的 false+chain+MX 组合。
-  it should "chain: allow MX->MX plain byte copy descriptor when enableConversion=false" in {
-    val mem = mutable.HashMap.empty[BigInt, Byte]
-    val chainMem = mutable.HashMap.empty[BigInt, Byte]
-    fillPattern(mem, 0x1000, 32, seed = 11)  // 首命令源区（INT8 纯拷贝）
-    fillPattern(mem, 0x3000, 32, seed = 22)  // 注入描述符源区（MX 裸字节）
-
-    // 描述符（v3 布局）：COPY + srcFmt=MXE4M3(4)、dstFmt=MXE4M3(4) —— copy-only 构建下为合法裸拷贝
-    val descAddr = BigInt(0x10000)
-    val descBeats = serializeDescriptor(chainCfg,
-      op = 0, tag = 0x65, dimCount = 1,
-      shape = Seq(32), srcStride = Seq(32), dstStride = Seq(32),
-      srcAddr = BigInt(0x3000), dstAddr = BigInt(0x5000),
-      nextDescAddr = 0, chainMode = true,
-      srcFmt = 4, dstFmt = 4)
-    writeDescToMem(chainMem, descAddr, descBeats, chainCfg.beatBytes)
-
-    // 首命令：INT8 纯拷贝（chainMode=true，指向上述 MX 描述符）
-    val cmd = FbTestCmdChain(tag = 0x64, dimCount = 1,
-      shape = Seq(32), srcStride = Seq(32), dstStride = Seq(32),
-      srcAddr = 0x1000, dstAddr = 0x2000,
-      chainMode = true, nextDescAddr = descAddr)
-
-    val (dones, m) = runForagerBeeChain(chainCfg, Seq(cmd), mem, chainMem)
-    // 入口自守受 enableConversion 门控 ⟹ copy-only 构建不生成 ⟹ MX 描述符放行、整条链无 err、chainLen=2
-    //（改动前该 MX 描述符被 dimCount=0 误拒 ⟹ err=true，本断言即红）
-    dones shouldBe Seq((0x64, false, 2))
-    // 首命令搬运正确
-    for (i <- 0 until 32) {
-      withClue(s"首命令 dst[$i] @0x${0x2000 + i}%04X: ") {
-        (m.getOrElse(BigInt(0x2000 + i), 0.toByte) & 0xFF) shouldBe
-          (m.getOrElse(BigInt(0x1000 + i), 0.toByte) & 0xFF)
-      }
-    }
-    // 注入的 MX 裸拷贝描述符逐字节搬运正确（改动前被误拒 ⟹ dst 全 0）
-    for (i <- 0 until 32) {
-      withClue(s"MX 描述符 dst[$i] @0x${0x5000 + i}%04X（改动前被 dimCount=0 误拒则全 0）: ") {
-        (m.getOrElse(BigInt(0x5000 + i), 0.toByte) & 0xFF) shouldBe
-          (m.getOrElse(BigInt(0x3000 + i), 0.toByte) & 0xFF)
-      }
-    }
-    // copy-only 构建无量化器 ⟹ 物理地址 0x0 附近不得有任何 scale 写
-    for (i <- 0 until 16) {
-      withClue(f"copy-only 构建不应写 0x0 区 @0x$i%04X: ") {
-        (m.getOrElse(BigInt(i), 0.toByte) & 0xFF) shouldBe 0
-      }
-    }
-  }
-
-  // ===================== 顶层 IO 量化参数穿透链的非默认值动态覆盖（SHOULD-FIX 3）=====================
-
-  // SHOULD-FIX 3a：既有全部用例 pokeCvtGlobal 恒为 (0,0)，若分发循环误写为只接 engines(0)、
-  // 或 cfg_scale/cfg_zeroPoint 被接反，测试仍全绿。本用例经 ForagerBee.io.cvtScale/cvtZeroPoint
-  // 显式驱动非零值，按 FbFormatConverter.int8ToFp32 实际算术逐元素断言。
-  // 期望值推导（INT8→FP32 反量化，dispCvtCfg）：shift=scale(4,0)=2、zp=zeroPoint(7,0)=3；
-  //   elem i：srcByte b_i ⟹ diff=b_i-3（选 b_i≥8 保证 diff≥0，规避硬件对负 diff 的 32-bit 符号扩展语义）
-  //   ⟹ shifted=diff<<2 ⟹ FP32=float(shifted)（整数 <2^24 精确可表示）。
-  //   接反（scale↔zp）会算成 (b_i-2)<<5，与期望不同 ⟹ 断言即检出；(0,0) 会算成 b_i，亦不同。
-  it should "drive non-zero cvtScale/cvtZeroPoint through top IO: INT8->FP32 dequant per-element" in {
-    val srcBytes = (0 until 16).map(i => 8 + i * 2) // 8,10,...,38（互异、正数、均 > zp=3）
-    val mem = mutable.HashMap.empty[BigInt, Byte]
-    srcBytes.zipWithIndex.foreach { case (b, i) => mem(BigInt(i)) = b.toByte }
-    val cmd = FbTestCmd(tag = 0xF0, op = "COPY", dimCount = 1,
-      shape = Seq(16), srcStride = Seq(16), dstStride = Seq(64),
-      srcAddr = 0x0, dstAddr = 0x2000, srcFmt = 3, dstFmt = 0)
-    val (dones, m) = runForagerBee(dispCvtCfg, Seq(cmd), mem, cvtScale = 2, cvtZeroPoint = 3)
-    dones shouldBe Seq((0xF0, false))
-    // 逐元素：FP32((b-3)<<2) 小端 4 字节
-    for (i <- 0 until 16) {
-      val shifted = (srcBytes(i) - 3) << 2
-      val expBits = f32bits(shifted.toFloat)
-      for (k <- 0 until 4) {
-        withClue(f"dst elem$i byte$k @0x${0x2000 + 4 * i + k}%04X（期望 FP32($shifted)）: ") {
-          (m.getOrElse(BigInt(0x2000 + 4 * i + k), 0.toByte) & 0xFF) shouldBe ((expBits >>> (8 * k)) & 0xFF)
-        }
-      }
-    }
-    // 检出力自检：非零 (scale,zp) 结果必须与 (0,0) 及接反 (scale↔zp) 均不同，否则上面断言零检出力
-    val expCorrect = srcBytes.map(b => f32bits(((b - 3) << 2).toFloat))
-    val expZero    = srcBytes.map(b => f32bits(b.toFloat))                 // (0,0)：value=b
-    val expSwapped = srcBytes.map(b => f32bits(((b - 2) << 5).toFloat))     // 接反：shift=5、zp=2
-    withClue("非零量化参数结果应与 (0,0) 不同：") { expCorrect should not be expZero }
-    withClue("非零量化参数结果应与接反 (scale↔zp) 不同：") { expCorrect should not be expSwapped }
-  }
-
-  // SHOULD-FIX 3b：锁定「量化参数分发到全部引擎」而非只接 engines(0)。numPorts=2 下先发一条长命令
-  // 占住 channel 0，迫使转换命令落到 channel 1；若分发循环只接 engines(0)，ch1 的 converter 读到
-  // 未驱动/0 的 cfg_scale ⟹ 反量化结果退化为 (b-0)<<0=b，与期望 (b-3)<<2 不同 ⟹ 断言即检出。
-  it should "deliver global cvtScale/cvtZeroPoint to channel 1 (not only engines(0))" in {
-    val srcBytes = (0 until 16).map(i => 8 + i * 2)
-    val mem = mutable.HashMap.empty[BigInt, Byte]
-    srcBytes.zipWithIndex.foreach { case (b, i) => mem(BigInt(i)) = b.toByte }
-    fillPattern(mem, 0x8000, 256, seed = 5) // cmd0 源区（长命令，占住 ch0）
-    // cmd0：256 字节 INT8 纯拷贝（16 beat），先派发占住 channel 0
-    val cmd0 = FbTestCmd(tag = 0xF1, op = "COPY", dimCount = 1,
-      shape = Seq(256), srcStride = Seq(256), dstStride = Seq(256),
-      srcAddr = 0x8000, dstAddr = 0xC000, srcFmt = 3, dstFmt = 3)
-    // cmd1：INT8→FP32 转换，地址与 cmd0 完全不相交 ⟹ ch0 忙时并行派发到 channel 1
-    val cmd1 = FbTestCmd(tag = 0xF2, op = "COPY", dimCount = 1,
-      shape = Seq(16), srcStride = Seq(16), dstStride = Seq(64),
-      srcAddr = 0x0, dstAddr = 0x2000, srcFmt = 3, dstFmt = 0)
-    val (dones, m) = runForagerBee(dispCvtCfg, Seq(cmd0, cmd1), mem,
-      maxCycles = 50000, cvtScale = 2, cvtZeroPoint = 3)
-    // 两命令并行派发（地址不相交）⟹ done 先后由 roundRobin 仲裁不定，用 toSet
-    dones.toSet shouldBe Set((0xF1, false), (0xF2, false))
-    // cmd1 落 channel 1：其 dst 必按全局 (scale=2,zp=3) 反量化 —— 只接 engines(0) 时此处退化即红
-    for (i <- 0 until 16) {
-      val shifted = (srcBytes(i) - 3) << 2
-      val expBits = f32bits(shifted.toFloat)
-      for (k <- 0 until 4) {
-        withClue(f"ch1 dst elem$i byte$k @0x${0x2000 + 4 * i + k}%04X（期望 FP32($shifted)）: ") {
-          (m.getOrElse(BigInt(0x2000 + 4 * i + k), 0.toByte) & 0xFF) shouldBe ((expBits >>> (8 * k)) & 0xFF)
-        }
-      }
-    }
-    // cmd0 纯拷贝完整性（占位命令本身也须正确）
-    for (i <- 0 until 256) {
-      withClue(f"cmd0 dst[$i] @0x${0xC000 + i}%04X: ") {
-        (m.getOrElse(BigInt(0xC000 + i), 0.toByte) & 0xFF) shouldBe
-          (m.getOrElse(BigInt(0x8000 + i), 0.toByte) & 0xFF)
-      }
-    }
-  }
-
-  // 非仿真冒烟：链式+转换双开（出厂 RTL 组合）与 MX 量化多通道组合均可发射。
-  // 这两条覆盖本次新增逻辑的 elaboration 面：FbChainController 的 isMx(dstFmt) 入口自守、
-  // FbDispatcher 的 scale 第三区间（仅 enableConversion 时生成）、FbEngine 的 mxQuantActive 派生。
-  it should "elaborate enableChaining+enableConversion (factory combination) and mxqCfg (numPorts=2)" in {
-    for (cfg <- Seq(chainCvtCfg, mxqCfg, dispCvtCfg)) {
-      val v = _root_.circt.stage.ChiselStage.emitSystemVerilog(new ForagerBee(cfg))
+  it should "elaborate float conversion and MX quantization configurations" in {
+    for (cfg <- Seq(cvtCfg, mxqCfg, dispCvtCfg)) {
+      val v = ChiselStage.emitSystemVerilog(new ForagerBee(cfg))
       v should include("module ForagerBee")
-      // 顶层量化参数端口应作为输入出现在 RTL 中（enableConversion=true ⟹ Option 为 Some）
-      v should include("cvtScale")
-      v should include("cvtZeroPoint")
     }
   }
 
-  // 反向：copy-only 构建（enableConversion=false）不得声明量化参数输入端口（无悬空引脚）
-  it should "not expose cvtScale/cvtZeroPoint ports when enableConversion=false" in {
-    val v = _root_.circt.stage.ChiselStage.emitSystemVerilog(new ForagerBee(testCfg))
+  it should "not instantiate converters when enableConversion=false" in {
+    val v = ChiselStage.emitSystemVerilog(new ForagerBee(testCfg))
     v should include("module ForagerBee")
-    v should not include ("cvtScale")
-    v should not include ("cvtZeroPoint")
-    // CONSIDER-2：copy-only 构建不得实例化量化器/转换器模块。出厂四套 RTL 全为 enableConversion=true，
-    // 本批唯一真正改变行为的 false 构建从未发射为交付产物 ⟹ 在 elaborate 层锁定其结构裁剪。
-    // （未驱动这些模块时 Chisel 不发射对应 `module`，故模块名字符串不应出现）
     v should not include ("FbMxQuantizer")
     v should not include ("FbFormatConverter")
   }

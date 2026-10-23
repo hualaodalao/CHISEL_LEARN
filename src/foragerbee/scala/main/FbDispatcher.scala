@@ -62,15 +62,15 @@ class FbDispatcher(cfg: ForagerBeeConfig) extends Module {
   io.occupancy := fifo.io.occupancy
 
   // --- 每通道 in-flight 地址范围寄存器 ---
-  val infSrcStart = RegInit(VecInit(Seq.fill(cfg.numPorts)(0.U(cfg.addressWidth.W))))
-  val infSrcEnd   = RegInit(VecInit(Seq.fill(cfg.numPorts)(0.U(cfg.addressWidth.W))))
-  val infDstStart = RegInit(VecInit(Seq.fill(cfg.numPorts)(0.U(cfg.addressWidth.W))))
-  val infDstEnd   = RegInit(VecInit(Seq.fill(cfg.numPorts)(0.U(cfg.addressWidth.W))))
+  val infSrcStart = RegInit(VecInit(Seq.fill(cfg.numPorts)(0.U((cfg.addressWidth + 1).W))))
+  val infSrcEnd   = RegInit(VecInit(Seq.fill(cfg.numPorts)(0.U((cfg.addressWidth + 1).W))))
+  val infDstStart = RegInit(VecInit(Seq.fill(cfg.numPorts)(0.U((cfg.addressWidth + 1).W))))
+  val infDstEnd   = RegInit(VecInit(Seq.fill(cfg.numPorts)(0.U((cfg.addressWidth + 1).W))))
   // MX 量化 scale 侧信道写区间（第三区间，独立参与冲突检测）。
   // infScaleValid 与 infValid 分离：仅量化激活的命令派发时才置位，
   // 非 MX 命令的 scaleAddr 为陈旧值，不得参与检测（否则误报）。
-  val infScaleStart = RegInit(VecInit(Seq.fill(cfg.numPorts)(0.U(cfg.addressWidth.W))))
-  val infScaleEnd   = RegInit(VecInit(Seq.fill(cfg.numPorts)(0.U(cfg.addressWidth.W))))
+  val infScaleStart = RegInit(VecInit(Seq.fill(cfg.numPorts)(0.U((cfg.addressWidth + 1).W))))
+  val infScaleEnd   = RegInit(VecInit(Seq.fill(cfg.numPorts)(0.U((cfg.addressWidth + 1).W))))
   val infScaleValid = RegInit(VecInit(Seq.fill(cfg.numPorts)(false.B)))
   val infValid    = RegInit(VecInit(Seq.fill(cfg.numPorts)(false.B)))
 
@@ -116,8 +116,8 @@ class FbDispatcher(cfg: ForagerBeeConfig) extends Module {
   // PERMUTE 时：srcStride 按 permVec 重映射索引；COPY/TRANSPOSE 时按原维度索引
   // IM2COL 时：srcEnd = srcAddr + C*H*W*elemBytes（由 shape(0) 传入 src 总字节数）
   // SCATTER/GATHER 时：srcEnd = srcAddr + shape(0)（软件填入源端总字节范围）
-  val newSrcStart = cmd.srcAddr
-  val newSrcEnd = {
+  val newSrcStart = cmd.srcAddr & ~((BB - 1).U(addrW.W))
+  val logicalSrcEnd = {
     val contributions = (1 until cfg.maxDims).map { d =>
       val active = d.U(3.W) < cmd.dimCount
       val stride = Mux(isPermute, cmd.srcStride(cmd.permVec(d)), cmd.srcStride(d))
@@ -126,13 +126,13 @@ class FbDispatcher(cfg: ForagerBeeConfig) extends Module {
     }
     val outerSum = if (contributions.isEmpty) 0.U(wideW.W)
                    else contributions.reduce(_ +& _)
-    val normalEnd = (cmd.srcAddr.pad(wideW) +& outerSum +& dim0Bytes)(addrW - 1, 0)
-    // IM2COL：保守 bbox = srcAddr + shape(0)（软件填入 src 总字节数）
-    val im2colSrcEnd = (cmd.srcAddr.pad(wideW) +& cmd.shape(0).pad(wideW))(addrW - 1, 0)
-    // SCATTER/GATHER：保守 bbox = srcAddr + shape(0)（软件填入源端总字节范围）
-    val sgSrcEnd = (cmd.srcAddr.pad(wideW) +& cmd.shape(0).pad(wideW))(addrW - 1, 0)
+    val normalEnd = cmd.srcAddr.pad(wideW) +& outerSum +& dim0Bytes
+    val im2colSrcEnd = cmd.srcAddr.pad(wideW) +& cmd.shape(0).pad(wideW)
+    val sgSrcEnd = cmd.srcAddr.pad(wideW) +& cmd.shape(0).pad(wideW)
     Mux(isScatterGather, sgSrcEnd, Mux(isIm2col, im2colSrcEnd, normalEnd))
   }
+  private val addressLimit = (BigInt(1) << addrW).U
+  val newSrcEnd = (((logicalSrcEnd +& (BB - 1).U) >> log2BB) << log2BB).min(addressLimit)
 
   // --- 目的端 bounding box（支持 Zero-Padding + IM2COL + SCATTER/GATHER） ---
   // Zero-Padding 对 COPY 有效（任意 dimCount）；有 padding 时 dim0/dim1 用 outShape 替代 shape
@@ -165,12 +165,10 @@ class FbDispatcher(cfg: ForagerBeeConfig) extends Module {
       FbDataFmt.rowBytes(outShape0, cmd.dstFmt).pad(wideW),
       FbDataFmt.rowBytes(cmd.shape(0), cmd.dstFmt).pad(wideW))
     val outerSum = dstOuterSpan(Mux(hasPad, outShape1, cmd.shape(1)))
-    val normalEnd = (cmd.dstAddr.pad(wideW) +& outerSum +& dstDim0Bytes)(addrW - 1, 0)
-    // IM2COL：保守 bbox = dstAddr + shape(1)（软件填入 dst 总字节数）
-    val im2colDstEnd = (cmd.dstAddr.pad(wideW) +& cmd.shape(1).pad(wideW))(addrW - 1, 0)
-    // SCATTER/GATHER：保守 bbox = dstAddr + shape(1)（软件填入目的端总字节范围）
-    val sgDstEnd = (cmd.dstAddr.pad(wideW) +& cmd.shape(1).pad(wideW))(addrW - 1, 0)
-    Mux(isScatterGather, sgDstEnd, Mux(isIm2col, im2colDstEnd, normalEnd))
+    val normalEnd = cmd.dstAddr.pad(wideW) +& outerSum +& dstDim0Bytes
+    val im2colDstEnd = cmd.dstAddr.pad(wideW) +& cmd.shape(1).pad(wideW)
+    val sgDstEnd = cmd.dstAddr.pad(wideW) +& cmd.shape(1).pad(wideW)
+    Mux(isScatterGather, sgDstEnd, Mux(isIm2col, im2colDstEnd, normalEnd)).min(addressLimit)
   }
 
   // --- MX 量化 scale 侧信道写 bounding box（第三区间） ---
@@ -199,7 +197,7 @@ class FbDispatcher(cfg: ForagerBeeConfig) extends Module {
     val mxScaleRowBytesAligned = ((mxScaleRowBytes +& (BB - 1).U(wideW.W)) >> log2BB) << log2BB
     (Mux(mxActive, cmd.scaleAddr, 0.U(addrW.W)),
      Mux(mxActive,
-       (cmd.scaleAddr.pad(wideW) +& dstOuterSpan(cmd.shape(1)) +& mxScaleRowBytesAligned)(addrW - 1, 0),
+       (cmd.scaleAddr.pad(wideW) +& dstOuterSpan(cmd.shape(1)) +& mxScaleRowBytesAligned).min(addressLimit),
        0.U(addrW.W)))
   } else {
     // copy-only 构建无量化器 ⇒ 不产生 scale 区间逻辑

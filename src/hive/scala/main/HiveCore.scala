@@ -4,7 +4,7 @@ import chisel3.util._
 class HiveCore(cfg: HiveCoreConfig) extends Module {
 
   val io = IO(new Bundle {
-    val cmd  = slave(Stream(new HiveCoreCmd))
+    val cmd = Vec(4, slave(Stream(new HiveCoreCmd)))
     val resp = master(Stream(new HiveCoreResp))
     val respForTracing = master(Flow(new HiveCoreRespForTracing))
     val dmaA = HiveCoreDMAExtReadOnlyIF(cfg, cfg.aExtW)

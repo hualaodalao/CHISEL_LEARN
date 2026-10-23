@@ -29,13 +29,16 @@ class FbIm2colAddrGen(addressWidth: Int) extends Module {
     val pad          = Input(Vec(2, UInt(8.W)))        // (pH, pW)
     val dilation     = Input(Vec(2, UInt(8.W)))        // (dH, dW)
     val inShape      = Input(Vec(3, UInt(16.W)))       // (C, H, W)
+    val kw           = Input(UInt(8.W))               // fallback 当前选择的水平元素
 
     // 输出：当前 micro-row 信息
     val valid        = Output(Bool())                  // 当前 micro-row 信息有效
     val advance      = Input(Bool())                   // Engine 完成当前 micro-row，推进
-    val srcAddr      = Output(UInt(addressWidth.W))    // 源起始地址（!isPad 时有效）
+    val srcAddr      = Output(UInt(addressWidth.W))    // kw=0 源地址；整行可 burst 时有效
+    val elemSrcAddr  = Output(UInt(addressWidth.W))    // kw 源地址（!elemIsPad 时有效）
+    val elemIsPad    = Output(Bool())                  // ih 或当前 iw 越界
     val dstAddr      = Output(UInt(addressWidth.W))    // 目标地址（始终线性递增）
-    val isPad        = Output(Bool())                  // 当前 micro-row 需写零
+    val isPad        = Output(Bool())                  // ih 越界，当前 micro-row 需写零
     val microRowElems = Output(UInt(8.W))              // micro-row 元素数 = kW
     val burstable    = Output(Bool())                  // 源端连续可 burst（dW==1 且整行不越界）
     val done         = Output(Bool())                  // 全部遍历完成
@@ -55,8 +58,9 @@ class FbIm2colAddrGen(addressWidth: Int) extends Module {
   val C    = RegInit(0.U(16.W))
   val H    = RegInit(0.U(16.W))
   val W    = RegInit(0.U(16.W))
-  val outH = RegInit(0.U(16.W))
-  val outW = RegInit(0.U(16.W))
+  // 最大输出维度为 65535 + 2*255 = 66045；Engine 另行拒绝 >65535。
+  val outH = RegInit(0.U(17.W))
+  val outW = RegInit(0.U(17.W))
   val srcElemBytes = RegInit(0.U(4.W))
   val dstElemBytes = RegInit(0.U(4.W))
 
@@ -68,8 +72,8 @@ class FbIm2colAddrGen(addressWidth: Int) extends Module {
   // ==========================================================================
   val cntKh = RegInit(0.U(8.W))
   val cntC  = RegInit(0.U(16.W))
-  val cntOw = RegInit(0.U(16.W))
-  val cntOh = RegInit(0.U(16.W))
+  val cntOw = RegInit(0.U(17.W))
+  val cntOh = RegInit(0.U(17.W))
 
   // ==========================================================================
   // 状态管理
@@ -100,19 +104,26 @@ class FbIm2colAddrGen(addressWidth: Int) extends Module {
     srcBaseReg := io.srcBase
     dstBaseReg := io.dstBase
 
-    // 计算 outH = (H + 2*pH - dH*(kH-1) - 1) / sH + 1
-    val hExt = io.inShape(1).pad(20)
-    val pH2  = (io.pad(0).pad(20)) << 1
-    val dhKm1 = io.dilation(0).pad(20) * (io.kernel(0).pad(20) - 1.U)
-    val outHnum = hExt + pH2 - dhKm1 - 1.U
-    outH := (outHnum / io.stride(0).pad(20))(15, 0) + 1.U
-
-    // 计算 outW = (W + 2*pW - dW*(kW-1) - 1) / sW + 1
-    val wExt = io.inShape(2).pad(20)
-    val pW2  = (io.pad(1).pad(20)) << 1
-    val dwKm1 = io.dilation(1).pad(20) * (io.kernel(1).pad(20) - 1.U)
-    val outWnum = wExt + pW2 - dwKm1 - 1.U
-    outW := (outWnum / io.stride(1).pad(20))(15, 0) + 1.U
+    // out = (input + 2*pad - (dilation*(kernel-1) + 1)) / stride + 1
+    // Engine 校验几何参数；本模块仍保护减法和除法，非法 start 立即完成。
+    val hKm1 = Mux(io.kernel(0) =/= 0.U, io.kernel(0) - 1.U, 0.U)
+    val wKm1 = Mux(io.kernel(1) =/= 0.U, io.kernel(1) - 1.U, 0.U)
+    val hEffective = (io.dilation(0) * hKm1) +& 1.U
+    val wEffective = (io.dilation(1) * wKm1) +& 1.U
+    val hPadded = io.inShape(1) +& (io.pad(0) << 1)
+    val wPadded = io.inShape(2) +& (io.pad(1) << 1)
+    val geometryValid = (io.inShape(0) =/= 0.U) &&
+      (io.inShape(1) =/= 0.U) && (io.inShape(2) =/= 0.U) &&
+      (io.kernel(0) =/= 0.U) && (io.kernel(1) =/= 0.U) &&
+      (io.stride(0) =/= 0.U) && (io.stride(1) =/= 0.U) &&
+      (io.dilation(0) =/= 0.U) && (io.dilation(1) =/= 0.U) &&
+      (hPadded >= hEffective) && (wPadded >= wEffective)
+    val outHnum = Mux(geometryValid, hPadded, hEffective) - hEffective
+    val outWnum = Mux(geometryValid, wPadded, wEffective) - wEffective
+    val safeSH = Mux(io.stride(0) =/= 0.U, io.stride(0), 1.U)
+    val safeSW = Mux(io.stride(1) =/= 0.U, io.stride(1), 1.U)
+    outH := Mux(geometryValid, outHnum / safeSH + 1.U, 0.U)
+    outW := Mux(geometryValid, outWnum / safeSW + 1.U, 0.U)
 
     // 复位计数器和状态
     cntKh := 0.U
@@ -120,8 +131,8 @@ class FbIm2colAddrGen(addressWidth: Int) extends Module {
     cntOw := 0.U
     cntOh := 0.U
     dstOffset := 0.U
-    running := true.B
-    doneReg := false.B
+    running := geometryValid
+    doneReg := !geometryValid
   }
 
   // ==========================================================================
@@ -167,19 +178,26 @@ class FbIm2colAddrGen(addressWidth: Int) extends Module {
   // 地址与控制信号组合逻辑
   // ==========================================================================
 
-  // ih 越界判断（无符号运算技巧）
-  val ihRaw    = (cntOh * sH).pad(20) + (cntKh * dH).pad(20)  // oh*sH + kh*dH
-  val ihNeg    = ihRaw < pH.pad(20)                             // 上方越界（ih "负"）
-  val ihVal    = ihRaw - pH.pad(20)                             // 实际 ih（仅 !ihNeg 时有效）
-  val ihOver   = ihVal >= H.pad(20)                             // 下方越界
+  // ih = oh*sH - pH + kh*dH；完整乘积/进位和符号位保留到最终地址。
+  val ihRaw    = (cntOh * sH) +& (cntKh * dH)
+  val ihVal    = ihRaw.zext - pH.zext
+  val ihNeg    = ihVal < 0.S
+  val ihOver   = ihVal >= H.zext
   val ihInvalid = ihNeg || ihOver
 
-  // iw 越界判断
-  val iwRaw    = (cntOw * sW).pad(20)                           // ow*sW
-  val iwNeg    = iwRaw < pW.pad(20)                             // 左越界（kw=0 时）
-  val iwVal    = iwRaw - pW.pad(20)                             // 实际 iw_base
-  val iwLast   = iwVal + ((kW - 1.U).pad(20)) * dW.pad(20)     // kw=kW-1 时的 iw
-  val iwOver   = iwLast >= W.pad(20)                            // 右越界
+  // kw=0 的起点和 kw=kW-1 的终点，用于整行 burst 判定。
+  val iwRaw    = cntOw * sW
+  val iwVal    = iwRaw.zext - pW.zext
+  val iwNeg    = iwVal < 0.S
+  val kwLast   = Mux(kW =/= 0.U, kW - 1.U, 0.U)
+  val iwLast   = iwVal +& (kwLast * dW).zext
+  val iwOver   = iwLast >= W.zext
+
+  // fallback 按 io.kw 选择元素，不推进 micro-row 计数器。
+  val elemIwRaw = iwRaw +& (io.kw * dW)
+  val elemIwVal = elemIwRaw.zext - pW.zext
+  val elemIwInvalid = (elemIwVal < 0.S) || (elemIwVal >= W.zext)
+  io.elemIsPad := ihInvalid || elemIwInvalid
 
   // isPad: ih 越界 → 整行 pad
   io.isPad := ihInvalid
@@ -187,11 +205,13 @@ class FbIm2colAddrGen(addressWidth: Int) extends Module {
   // burstable: dW==1 且 ih 有效 且整行 kw 在有效范围内（!iwNeg && !iwOver）
   io.burstable := !ihInvalid && (dW === 1.U) && !iwNeg && !iwOver
 
-  // 源地址（仅 !isPad 时有效）：srcBase + (c*H*W + ih*W + iw_base) * elemBytes
-  val flatIdx = (cntC.pad(addressWidth) * H.pad(addressWidth) * W.pad(addressWidth)) +
-                (ihVal(15, 0).pad(addressWidth) * W.pad(addressWidth)) +
-                iwVal(15, 0).pad(addressWidth)
-  io.srcAddr := srcBaseReg + flatIdx * srcElemBytes.pad(addressWidth)
+  // 源地址：srcBase + (c*H*W + ih*W + iw) * srcElemBytes。
+  // 仅最终 IO 截取 addressWidth，负坐标不会在中间被无符号截断。
+  val srcRowIdx = (cntC * H * W).zext +& (ihVal * W.zext)
+  val flatIdx = srcRowIdx +& iwVal
+  val elemFlatIdx = srcRowIdx +& elemIwVal
+  io.srcAddr := (srcBaseReg.zext +& flatIdx * srcElemBytes.zext).asUInt
+  io.elemSrcAddr := (srcBaseReg.zext +& elemFlatIdx * srcElemBytes.zext).asUInt
 
   // 目的地址（线性递增）
   io.dstAddr := dstBaseReg + dstOffset

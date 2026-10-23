@@ -32,6 +32,7 @@ class HiveCoreRespForTracing extends Bundle {
 class HiveCoreResp extends Bundle {
   val data = UInt(32.W)         // REG_READ 返回数据
   val err  = Bool()             // 错误标志
+  val laneId = UInt(2.W)
 }
 
 

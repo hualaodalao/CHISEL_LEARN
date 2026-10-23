@@ -544,7 +544,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
 
       // ===== Reset =====
       dut.reset.poke(true.B)
-      dut.io.cmd.valid.poke(false.B)
+      dut.io.cmd.foreach(_.valid.poke(false.B))
       dut.io.resp.ready.poke(true.B)
       dut.io.dmaA.req.ready.poke(true.B)
       dut.io.dmaA.rsp.valid.poke(false.B)
@@ -573,7 +573,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       dut.clock.step(2)
 
       def sendCmd(op: HiveCoreOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
-        transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
+        transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
       }
 
       // ===== 配置寄存器（【任务90 收敛】fp32 直出默认；【任务95】outFmt 参数化叠加） =====
@@ -651,8 +651,8 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       // 同范式）；非量化运行该基址不被使用，保持不写（【任务90 收敛】语义零变化）。
       if (isQuant) sendCmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.SCALE_C_REG_ADDR, 0x00, SCALE_C_BASE, 0L)
 
-      prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
-      launchStart(dut.clock, dut.io.cmd)
+      prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
+      launchStart(dut.clock, dut.io.cmd(0))
 
       // 完成判定只读 IRQ_RAW.done；STATUS 仅报告 busy/inFlight/progress。
       var done = false
@@ -832,7 +832,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
           dut.io.dmaScaleB.get.rsp.payload.data.poke(0.U)
         }
 
-        val (stNext, coolNext, irqOpt) = irqPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool)
+        val (stNext, coolNext, irqOpt) = irqPollStep(dut.io.cmd(0), dut.io.resp, pollSt, pollCool)
         pollSt = stNext
         pollCool = coolNext
         irqOpt.foreach { st =>
@@ -846,7 +846,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
 
       dut.io.dmaC.rsp.valid.poke(false.B)
       dut.io.dmaCScale.get.rsp.valid.poke(false.B)
-      dut.io.cmd.valid.poke(false.B)   // 轮询命令用后拉低（防残留影响后续拍）
+      dut.io.cmd.foreach(_.valid.poke(false.B))   // 轮询命令用后拉低（防残留影响后续拍）
 
       if (!done) println(s"[MX] WARNING: timeout at $maxCycles cycles (A=$dmaABeatsSent B=$dmaBBeatsSent C=$dmaCStoreBeats sA=$scaleABeatsSent sB=$scaleBBeatsSent)")
 
@@ -1110,7 +1110,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     simulate(new HiveCore(cfg)) { dut =>
       // ---- Reset + DMA 端口拉到安全默认（本用例不喂数据，err 应在 execute 拍触发） ----
       dut.reset.poke(true.B)
-      dut.io.cmd.valid.poke(false.B)
+      dut.io.cmd.foreach(_.valid.poke(false.B))
       dut.io.resp.ready.poke(true.B)
       dut.io.dmaA.req.ready.poke(true.B)
       dut.io.dmaA.rsp.valid.poke(false.B)
@@ -1127,7 +1127,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       dut.clock.step(2)
 
       def sendCmd(op: HiveCoreOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
-        transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
+        transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
       }
 
       // (#164) 新写序列：reg0=m、reg1=n|k<<16、reg2/3/4=a/b/cAddr、reg5=控制字（旧 reg6+reg7）。
@@ -1137,10 +1137,10 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, ctl5)
       sendCmd(HiveCoreOp.REG_WRITE2, HiveSimCommon.SCALE_A_REG_ADDR, HiveSimCommon.SCALE_B_REG_ADDR, SCALE_A_BASE, SCALE_B_BASE)
 
-      prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
-      launchStart(dut.clock, dut.io.cmd)
+      prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
+      launchStart(dut.clock, dut.io.cmd(0))
       dut.clock.step(200)
-      val raw = readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR)
+      val raw = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR)
       withClue(s"[$caseName] config error only in IRQ_RAW: ") { raw should be(BigInt(2)) }
       dut.io.status.inFlight.expect(false.B)
 
@@ -1148,12 +1148,12 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         DataFormat.MXE4M3.litValue.toLong | (DataFormat.MXE5M2.litValue.toLong << 4)
       sendCmd(HiveCoreOp.REG_WRITE1, 0x05, 0x00, legalCtl5, 0L)
       // START 不清 pending；合法重启后旧 configError 仍记录，须显式 W1C。
-      launchStart(dut.clock, dut.io.cmd)
+      launchStart(dut.clock, dut.io.cmd(0))
       dut.clock.step(100)
-      readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(raw)
+      readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(raw)
       sendCmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.IRQ_CLEAR_REG_ADDR, 0, 2L, 0L)
-      readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(0))
-      readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(0))
+      readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(0))
+      readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(0))
       dut.io.status.inFlight.expect(true.B)
     }
   }
@@ -1201,7 +1201,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       simulate(new HiveCore(cfg)) { dut =>
         // ---- Reset + DMA 端口拉到安全默认（不喂数据，err 应在 execute 拍触发） ----
         dut.reset.poke(true.B)
-        dut.io.cmd.valid.poke(false.B)
+        dut.io.cmd.foreach(_.valid.poke(false.B))
         dut.io.resp.ready.poke(true.B)
         dut.io.dmaA.req.ready.poke(true.B)
         dut.io.dmaA.rsp.valid.poke(false.B)
@@ -1220,7 +1220,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         dut.clock.step(2)
 
         def sendCmd(op: HiveCoreOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
-          transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
+          transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
         }
 
         // (#164) 新写序列：reg0=m、reg1=n|k<<16、reg2/3/4=a/b/cAddr、reg5=控制字。
@@ -1232,13 +1232,13 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, controlWord5) // reg5[28]=loadWMode=1（保持 err 归因 = outFmt 族交叉）
         sendCmd(HiveCoreOp.REG_WRITE2, HiveSimCommon.SCALE_A_REG_ADDR, HiveSimCommon.SCALE_B_REG_ADDR, SCALE_A_BASE, SCALE_B_BASE)
 
-        prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
-        launchStart(dut.clock, dut.io.cmd)
+        prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
+        launchStart(dut.clock, dut.io.cmd(0))
         var pollSt = 0; var pollCool = 0
         var dmaCReqSeen = 0; var dmaCScaleReqSeen = 0
         var raw = BigInt(0)
         for (_ <- 0 until 200) {
-          val (st, cool, irq) = irqPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool)
+          val (st, cool, irq) = irqPollStep(dut.io.cmd(0), dut.io.resp, pollSt, pollCool)
           pollSt = st; pollCool = cool
           irq.foreach(i => raw = i.raw)
           if (dut.io.dmaC.req.valid.peek().litToBoolean) dmaCReqSeen += 1
@@ -1246,11 +1246,11 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
           dut.clock.step()
         }
         // 结束轮询时先排空可能在途的读响应，再做同步寄存器读取。
-        dut.io.cmd.valid.poke(false.B)
+        dut.io.cmd.foreach(_.valid.poke(false.B))
         dut.clock.step(2)
         withClue(s"[$caseName] configError only, no done/DMA errors: ") { raw should be(BigInt(2)) }
-        readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
-        readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(11))
+        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
+        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(11))
         dut.io.status.inFlight.expect(false.B)
         dmaCReqSeen should be(0)
         dmaCScaleReqSeen should be(0)
@@ -1258,14 +1258,14 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         val legalCtl5 = (1L << 28) |
           DataFormat.MXE4M3.litValue.toLong | (DataFormat.MXE5M2.litValue.toLong << 4)
         sendCmd(HiveCoreOp.REG_WRITE1, 0x05, 0x00, legalCtl5, 0L)
-        launchStart(dut.clock, dut.io.cmd)
+        launchStart(dut.clock, dut.io.cmd(0))
         dut.clock.step(100)
         // 合法 START 不清此前配置错误，也不自动清首次 code。
-        readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
-        readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(11))
+        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
+        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(11))
         sendCmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.IRQ_CLEAR_REG_ADDR, 0, 2L, 0L)
-        readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(0))
-        readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(0))
+        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(0))
+        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(0))
         dut.io.status.inFlight.expect(true.B)
       }
     } finally {

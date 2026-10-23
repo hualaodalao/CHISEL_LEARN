@@ -14,17 +14,71 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   private val controlMask = (0 to 18).foldLeft(BigInt(0))((v, b) => v.setBit(b)) |
     Seq(20, 21, 22, 24, 26, 28, 29, 30).foldLeft(BigInt(0))((v, b) => v.setBit(b))
 
-  private case class StartEvent(pc: BigInt, tag: Int, m: BigInt, aAddr: BigInt)
+  // 批次金锚来自 v3.0.0 契约；不读取 RTL 的仲裁或 pending 中间信号。
+  private case class Command(lane: Int, op: HiveCoreOp.Type, a0: Int, a1: Int = 0,
+                             d0: BigInt = 0, d1: BigInt = 0, pc: BigInt = 0, tag: Int = 0)
+  private def w(lane: Int, a: Int, d: BigInt, pc: BigInt = 0, tag: Int = 0): Command =
+    Command(lane, HiveCoreOp.REG_WRITE1, a, d0 = d, pc = pc, tag = tag)
+  private def w2(lane: Int, a0: Int, a1: Int, d0: BigInt, d1: BigInt,
+                 pc: BigInt = 0, tag: Int = 0): Command =
+    Command(lane, HiveCoreOp.REG_WRITE2, a0, a1, d0, d1, pc, tag)
+  private def r(lane: Int, a: Int): Command = Command(lane, HiveCoreOp.REG_READ, a)
+
+  private case class StartEvent(pc: BigInt, tag: Int, m: BigInt, aAddr: BigInt,
+                                n: BigInt, k: BigInt, bAddr: BigInt, aScaleAddr: BigInt)
   private class Driver(val dut: HiveCoreRegIf) {
     val starts = ArrayBuffer[StartEvent]()
     def tick(n: Int = 1): Unit = for (_ <- 0 until n) {
       if (dut.io.start.peek().litToBoolean) starts += StartEvent(
         dut.io.startPc.peek().litValue, dut.io.startTag.peek().litValue.toInt,
-        dut.io.regFile.m.peek().litValue, dut.io.regFile.aAddr.peek().litValue)
+        dut.io.regFile.m.peek().litValue, dut.io.regFile.aAddr.peek().litValue,
+        dut.io.regFile.n.peek().litValue, dut.io.regFile.k.peek().litValue,
+        dut.io.regFile.bAddr.peek().litValue, dut.io.regFile.aScaleAddr.peek().litValue)
       dut.clock.step()
     }
+    def idleCommands(): Unit = dut.io.cmd.foreach(_.valid.poke(false.B))
+    def allReady(value: Boolean): Unit = dut.io.cmd.foreach(_.ready.expect(value.B))
+    def drive(commands: Command*): Unit = {
+      require(commands.nonEmpty && commands.map(_.lane).distinct.size == commands.size)
+      require(commands.forall(c => c.lane >= 0 && c.lane < 4))
+      idleCommands()
+      commands.foreach { c =>
+        pokeRegCommand(dut.io.cmd(c.lane), c.op, c.a0, c.a1, c.d0, c.d1, c.pc, c.tag)
+      }
+    }
+    // 不等待 ACK、不额外 tick：只跨 cmd.fire 边沿，返回时可立即反压。
+    def accept(): Unit = {
+      dut.io.resp.ready.poke(false.B)
+      allReady(true)
+      dut.io.resp.valid.expect(false.B)
+      tick()
+      idleCommands()
+      allReady(false)
+      dut.io.resp.valid.expect(true.B)
+    }
+    def batch(commands: Command*): Unit = { drive(commands: _*); accept() }
+    def expectResponse(lane: Int, err: Boolean = false, data: BigInt = 0): Unit = {
+      allReady(false)
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.payload.laneId.expect(lane.U)
+      dut.io.resp.payload.err.expect(err.B)
+      dut.io.resp.payload.data.expect(data.U)
+    }
+    def hold(lane: Int, err: Boolean = false, data: BigInt = 0, cycles: Int = 3): Unit = {
+      dut.io.resp.ready.poke(false.B)
+      for (_ <- 0 until cycles) { expectResponse(lane, err, data); tick() }
+      expectResponse(lane, err, data)
+    }
+    // 恰好消费一个已核对的完整 payload，随即恢复反压，避免意外丢下一条 ACK。
+    def respond(lane: Int, err: Boolean = false, data: BigInt = 0): Unit = {
+      expectResponse(lane, err, data)
+      dut.io.resp.ready.poke(true.B)
+      allReady(false) // 最后一个 fire 当拍也不允许组合直通 cmd。
+      tick()
+      dut.io.resp.ready.poke(false.B)
+    }
     def init(): Unit = {
-      dut.io.cmd.valid.poke(false.B)
+      idleCommands()
       dut.io.resp.ready.poke(true.B)
       dut.io.busy.poke(false.B)
       dut.io.progress.poke(0.U)
@@ -37,19 +91,23 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
     }
     def request(op: HiveCoreOp.Type, a0: Int, a1: Int = 0, d0: BigInt = 0,
                 d1: BigInt = 0, pc: BigInt = 0, tag: Int = 0): Unit = {
-      pokeRegCommand(dut.io.cmd, op, a0, a1, d0, d1, pc, tag)
+      pokeRegCommand(dut.io.cmd(0), op, a0, a1, d0, d1, pc, tag)
       var waited = 0
-      while (!dut.io.cmd.ready.peek().litToBoolean && waited < 50) { tick(); waited += 1 }
-      dut.io.cmd.ready.expect(true.B)
+      while (!dut.io.cmd(0).ready.peek().litToBoolean && waited < 50) { tick(); waited += 1 }
+      dut.io.cmd(0).ready.expect(true.B)
       tick()
-      dut.io.cmd.valid.poke(false.B)
+      dut.io.cmd(0).valid.poke(false.B)
     }
     def response(err: Boolean = false): BigInt = {
+      dut.io.resp.ready.poke(false.B)
       var waited = 0
       while (!dut.io.resp.valid.peek().litToBoolean && waited < 50) { tick(); waited += 1 }
       dut.io.resp.valid.expect(true.B)
+      dut.io.resp.payload.laneId.expect(0.U)
       dut.io.resp.payload.err.expect(err.B)
       val data = dut.io.resp.payload.data.peek().litValue
+      allReady(false)
+      dut.io.resp.ready.poke(true.B)
       tick()
       data
     }
@@ -85,8 +143,8 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       HiveCoreOp.REG_WRITE2.litValue should be(BigInt(1))
       HiveCoreOp.REG_READ.litValue should be(BigInt(2))
       HiveCoreOp.all.size should be(3)
-      dut.io.cmd.payload.reg0Addr.getWidth should be(6)
-      dut.io.cmd.payload.reg1Addr.getWidth should be(6)
+      dut.io.cmd(0).payload.reg0Addr.getWidth should be(6)
+      dut.io.cmd(0).payload.reg1Addr.getWidth should be(6)
       dut.io.start.expect(false.B); dut.io.inFlight.expect(false.B); dut.io.irq.expect(false.B)
       for (a <- 0 until 64) {
         withClue(s"reset address 0x${a.toHexString}: ") {
@@ -242,7 +300,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       s.write(IRQ_CLEAR_REG_ADDR, 1)
       s.read(IRQ_RAW_REG_ADDR) should be(pending & ~BigInt(1))
       s.read(IRQ_CLEAR_REG_ADDR) should be(BigInt(0))
-      s.write(IRQ_CLEAR_REG_ADDR, BigInt("fffffc00", 16))
+      s.write(IRQ_CLEAR_REG_ADDR, BigInt("fffff800", 16))
       s.read(IRQ_RAW_REG_ADDR) should be(pending & ~BigInt(1))
       // CLEAR 与新 done/DMA 同边沿：所有重新出现的来源保留，其余旧位清零。
       dut.io.done.poke(true.B); dut.io.dmaErrors(1).poke(true.B)
@@ -316,14 +374,14 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       dut.io.resp.ready.poke(false.B)
       s.request(HiveCoreOp.REG_READ, M_REG_ADDR)
       dut.io.resp.valid.expect(true.B)
-      pokeRegCommand(dut.io.cmd, HiveCoreOp.REG_WRITE1, START_REG_ADDR, d0 = 1, pc = 0x76543210, tag = 0xAB)
+      pokeRegCommand(dut.io.cmd(0), HiveCoreOp.REG_WRITE1, START_REG_ADDR, d0 = 1, pc = 0x76543210, tag = 0xAB)
       for (_ <- 0 until 5) {
-        dut.io.cmd.ready.expect(false.B)
+        dut.io.cmd(0).ready.expect(false.B)
         dut.io.resp.valid.expect(true.B); dut.io.resp.payload.data.expect(0x1234.U)
         dut.io.resp.payload.err.expect(false.B); dut.io.start.expect(false.B)
         s.tick()
       }
-      dut.io.cmd.valid.poke(false.B)
+      dut.io.cmd(0).valid.poke(false.B)
       dut.io.resp.ready.poke(true.B); s.response() should be(BigInt(0x1234))
       s.starts.size should be(0)
       dut.io.resp.ready.poke(false.B)
@@ -362,6 +420,439 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       }
       dut.io.resp.ready.poke(true.B); s.response() should be(BigInt(4))
       s.read(STATUS_REG_ADDR) should be(BigInt("ffff0001", 16))
+    }
+  }
+
+  it should "commit eight distinct WRITE2 addresses in one batch and accept sparse lanes without lane0" in {
+    simulate(new HiveCoreRegIf(cfg)) { dut =>
+      val s = new Driver(dut); s.init()
+      dut.io.cmd.length should be(4)
+      dut.io.resp.payload.data.getWidth should be(32)
+      dut.io.resp.payload.err.getWidth should be(1)
+      dut.io.resp.payload.laneId.getWidth should be(2)
+      s.read(IRQ_MASK_REG_ADDR) should be(BigInt(0x7FF))
+      s.batch(w2(0, M_REG_ADDR, NK_REG_ADDR, 0x1234, 0x56789ABC),
+        w2(1, A_REG_ADDR, B_REG_ADDR, 0x11112222, 0x33334444),
+        w2(2, C_REG_ADDR, SCALE_A_REG_ADDR, 0x55556666, 0x77778888),
+        w2(3, SCALE_B_REG_ADDR, SCALE_C_REG_ADDR, 0x12345678, 0x23456789))
+      // 写提交不等 ACK；四路均 fire，八项没有互相覆盖。
+      dut.io.regFile.m.expect(0x1234.U)
+      dut.io.regFile.n.expect(0x9ABC.U); dut.io.regFile.k.expect(0x5678.U)
+      dut.io.regFile.aAddr.expect(0x11112222.U); dut.io.regFile.bAddr.expect(0x33334444.U)
+      dut.io.regFile.cAddr.expect(0x55556666.U); dut.io.regFile.aScaleAddr.expect(0x77778888.U)
+      dut.io.regFile.bScaleAddr.expect(0x12345678.U); dut.io.regFile.cScaleAddr.expect(0x23456789.U)
+      for (lane <- 0 until 4) { s.hold(lane, cycles = 2); s.respond(lane) }
+      s.allReady(true); dut.io.resp.valid.expect(false.B)
+      val expected = Seq(0 -> BigInt(0x1234), 1 -> BigInt(0x56789ABC),
+        2 -> BigInt(0x11112222), 3 -> BigInt(0x33334444), 4 -> BigInt(0x55556666),
+        6 -> BigInt(0x77778888), 7 -> BigInt(0x12345678), 8 -> BigInt(0x23456789))
+      expected.foreach { case (a, value) => s.read(a) should be(value) }
+      s.batch(w2(3, BIAS_REG_ADDR, RQM_REG_ADDR, 0x3456789A, 0x456789AB),
+        w2(1, M_REG_ADDR, RQ_PARAM_REG_ADDR, 0xABCD, BigInt("89ab0035", 16)))
+      dut.io.cmd(0).valid.expect(false.B); dut.io.cmd(2).valid.expect(false.B)
+      s.hold(1); s.respond(1); s.hold(3); s.respond(3)
+      s.allReady(true); dut.io.resp.valid.expect(false.B)
+      s.read(M_REG_ADDR) should be(BigInt(0xABCD))
+      s.read(BIAS_REG_ADDR) should be(BigInt(0x3456789A))
+      s.read(RQM_REG_ADDR) should be(BigInt(0x456789AB))
+      s.read(RQ_PARAM_REG_ADDR) should be(BigInt("89ab0035", 16))
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0))
+    }
+  }
+
+  it should "return four read snapshots and sparse lane0 lane2 reads strictly in ascending lane order" in {
+    simulate(new HiveCoreRegIf(cfg)) { dut =>
+      val s = new Driver(dut); s.init()
+      s.write(M_REG_ADDR, 0x1357); s.write(A_REG_ADDR, 0x2468ACE0)
+      s.done(); dut.io.busy.poke(true.B); dut.io.progress.poke(0x1234.U)
+      s.batch(r(3, IRQ_RAW_REG_ADDR), r(1, A_REG_ADDR), r(0, M_REG_ADDR), r(2, STATUS_REG_ADDR))
+      val expected = Seq(BigInt(0x1357), BigInt(0x2468ACE0), BigInt(0x12340001), BigInt(1))
+      for (lane <- 0 until 4) {
+        s.hold(lane, data = expected(lane), cycles = 2)
+        s.respond(lane, data = expected(lane))
+      }
+      s.allReady(true); dut.io.resp.valid.expect(false.B)
+      s.batch(r(2, IRQ_MASK_REG_ADDR), r(0, A_REG_ADDR))
+      s.hold(0, data = 0x2468ACE0); s.respond(0, data = 0x2468ACE0)
+      s.hold(2, data = 0x7FF); s.respond(2, data = 0x7FF)
+      s.allReady(true); dut.io.resp.valid.expect(false.B)
+    }
+  }
+
+  it should "snapshot the old bank and IRQ for a write read write read batch while writes and new events commit" in {
+    simulate(new HiveCoreRegIf(cfg)) { dut =>
+      val s = new Driver(dut); s.init()
+      s.write(M_REG_ADDR, 7); s.write(A_REG_ADDR, 0x11112222); s.write(B_REG_ADDR, 0x33334444)
+      dut.io.done.poke(true.B); dut.io.dmaErrors(1).poke(true.B)
+      s.batch(w2(0, A_REG_ADDR, M_REG_ADDR, 0xAAAA, 9), r(1, A_REG_ADDR),
+        w2(2, A_REG_ADDR, B_REG_ADDR, 0xBBBB, 0xCCCC), r(3, IRQ_RAW_REG_ADDR))
+      dut.io.done.poke(false.B); dut.io.dmaErrors(1).poke(false.B)
+      dut.io.regFile.aAddr.expect(0xBBBB.U); dut.io.regFile.bAddr.expect(0xCCCC.U)
+      dut.io.regFile.m.expect(9.U); dut.io.inFlight.expect(false.B)
+      s.hold(0); s.respond(0)
+      s.hold(1, data = 0x11112222); s.respond(1, data = 0x11112222)
+      s.hold(2); s.respond(2)
+      s.hold(3, data = 0); s.respond(3, data = 0)
+      s.read(A_REG_ADDR) should be(BigInt(0xBBBB))
+      s.read(B_REG_ADDR) should be(BigInt(0xCCCC)); s.read(M_REG_ADDR) should be(BigInt(9))
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0x409)) // done + DMA[1] + WRITE_CONFLICT
+      s.read(ERROR_CODE_REG_ADDR) should be(BigInt(0))
+    }
+  }
+
+  it should "snapshot STATUS MASK MASKED RAW and ERROR_CODE before same batch writes START and fresh events" in {
+    simulate(new HiveCoreRegIf(cfg)) { dut =>
+      val s = new Driver(dut); s.init()
+      s.configError(6); s.done(); s.write(IRQ_MASK_REG_ADDR, 0)
+      dut.io.done.poke(true.B); dut.io.dmaErrors(7).poke(true.B)
+      dut.io.configError.poke(true.B); dut.io.configErrorCode.poke(9.U)
+      s.batch(w2(0, IRQ_MASK_REG_ADDR, IRQ_CLEAR_REG_ADDR, 0x7FF, 0x7FF),
+        r(1, IRQ_RAW_REG_ADDR), r(2, IRQ_MASK_REG_ADDR), r(3, IRQ_MASKED_REG_ADDR))
+      dut.io.done.poke(false.B); dut.io.dmaErrors(7).poke(false.B); dut.io.configError.poke(false.B)
+      dut.io.irq.expect(false.B)
+      s.respond(0); s.hold(1, data = 3); s.respond(1, data = 3)
+      s.hold(2, data = 0); s.respond(2, data = 0)
+      s.hold(3, data = 3); s.respond(3, data = 3)
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0x203))
+      s.read(ERROR_CODE_REG_ADDR) should be(BigInt(9))
+      dut.io.busy.poke(true.B); dut.io.progress.poke(0x1234.U)
+      s.batch(w2(0, M_REG_ADDR, START_REG_ADDR, 17, 2, pc = 0x12345678, tag = 0x91),
+        r(1, STATUS_REG_ADDR), r(2, ERROR_CODE_REG_ADDR), r(3, IRQ_MASK_REG_ADDR))
+      dut.io.start.expect(true.B); dut.io.inFlight.expect(true.B)
+      dut.io.busy.poke(false.B); dut.io.progress.poke(0xFFFF.U)
+      s.done() // 读仍是 START/done 前的 busy=1、inFlight=0、progress=0x1234。
+      s.respond(0); s.hold(1, data = 0x12340001); s.respond(1, data = 0x12340001)
+      s.respond(2, data = 9); s.respond(3, data = 0x7FF)
+      s.starts.size should be(1); s.starts.last.m should be(BigInt(17))
+      s.read(STATUS_REG_ADDR) should be(BigInt("ffff0000", 16))
+      dut.io.configError.poke(true.B); dut.io.configErrorCode.poke(11.U)
+      s.batch(r(0, ERROR_CODE_REG_ADDR), w(2, IRQ_CLEAR_REG_ADDR, 2))
+      dut.io.configError.poke(false.B)
+      s.hold(0, data = 9); s.respond(0, data = 9); s.respond(2)
+      s.read(ERROR_CODE_REG_ADDR) should be(BigInt(11))
+    }
+  }
+
+  it should "arbitrate all six lane pairs and all four WRITE2 slot pairings including same value conflicts" in {
+    simulate(new HiveCoreRegIf(cfg)) { dut =>
+      val s = new Driver(dut); s.init()
+      val pairs = for (low <- 0 until 4; high <- low + 1 until 4) yield (low, high)
+      for (((low, high), pairIndex) <- pairs.zipWithIndex; lowSlot <- 0 until 2; highSlot <- 0 until 2) {
+        withClue(s"lanes $low/$high slots $lowSlot/$highSlot: ") {
+          s.write(IRQ_CLEAR_REG_ADDR, 0x400)
+          // 覆盖全部 0x00..0x0B；所有数值低于 64，不碰 CONTROL/RQ_PARAM 保留位。
+          val shared = (pairIndex * 4 + lowSlot * 2 + highSlot) % 12
+          val lowOther = (shared + 1) % 12; val highOther = (shared + 2) % 12
+          val lowData = BigInt(0x20 + low * 4 + lowSlot)
+          val highData = BigInt(0x20 + high * 4 + highSlot)
+          val lowCommand = if (lowSlot == 0) w2(low, shared, lowOther, lowData, 0x10 + low)
+            else w2(low, lowOther, shared, 0x10 + low, lowData)
+          val highCommand = if (highSlot == 0) w2(high, shared, highOther, highData, 0x18 + high)
+            else w2(high, highOther, shared, 0x18 + high, highData)
+          s.batch(highCommand, lowCommand)
+          s.hold(low, cycles = 1); s.respond(low); s.hold(high, cycles = 1); s.respond(high)
+          s.read(shared) should be(highData)
+          s.read(lowOther) should be(BigInt(0x10 + low))
+          s.read(highOther) should be(BigInt(0x18 + high))
+          s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0x400))
+          s.read(ERROR_CODE_REG_ADDR) should be(BigInt(0)); dut.io.inFlight.expect(false.B)
+        }
+      }
+      for ((low, high) <- pairs) {
+        s.write(IRQ_CLEAR_REG_ADDR, 0x400)
+        s.batch(w(high, M_REG_ADDR, 0x55), w(low, M_REG_ADDR, 0x55))
+        s.respond(low); s.respond(high)
+        s.read(M_REG_ADDR) should be(BigInt(0x55))
+        s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0x400))
+      }
+    }
+  }
+
+  it should "keep nonconflicting WRITE2 slots and exclude every slot of a rejected high lane from arbitration" in {
+    simulate(new HiveCoreRegIf(cfg)) { dut =>
+      val s = new Driver(dut); s.init()
+      s.batch(w2(0, A_REG_ADDR, B_REG_ADDR, 0x1111, 0x2222),
+        w(1, A_REG_ADDR, 0x3333), w(2, B_REG_ADDR, 0x4444),
+        w2(3, B_REG_ADDR, STATUS_REG_ADDR, 0xFFFF, 0))
+      dut.io.regFile.aAddr.expect(0x3333.U); dut.io.regFile.bAddr.expect(0x4444.U)
+      s.respond(0); s.respond(1); s.respond(2); s.hold(3, err = true); s.respond(3, err = true)
+      s.read(A_REG_ADDR) should be(BigInt(0x3333)); s.read(B_REG_ADDR) should be(BigInt(0x4444))
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0x400))
+      val readOnly = Seq(STATUS_REG_ADDR, IRQ_RAW_REG_ADDR, IRQ_MASKED_REG_ADDR, ERROR_CODE_REG_ADDR)
+      for (ro <- readOnly; badSlot <- 0 until 2) {
+        s.write(IRQ_CLEAR_REG_ADDR, 0x7FF)
+        val before = s.read(A_REG_ADDR)
+        val rejected = if (badSlot == 0) w2(3, ro, A_REG_ADDR, 0, 0xDEAD)
+          else w2(3, A_REG_ADDR, ro, 0xDEAD, 0)
+        s.batch(w2(0, A_REG_ADDR, B_REG_ADDR, 0x5678, 0x9ABC), r(1, A_REG_ADDR), rejected)
+        dut.io.regFile.aAddr.expect(0x5678.U); dut.io.regFile.bAddr.expect(0x9ABC.U)
+        s.respond(0); s.respond(1, data = before); s.respond(3, err = true)
+        s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0))
+        s.read(ERROR_CODE_REG_ADDR) should be(BigInt(0))
+      }
+      // RO 使整条拒绝，不能启动、改 MASK 或 W1C；高 lane 也不能阻挡合法低 lane。
+      s.done(); s.write(IRQ_MASK_REG_ADDR, 0x7FF)
+      s.batch(w(0, IRQ_MASK_REG_ADDR, 0), w2(1, START_REG_ADDR, IRQ_RAW_REG_ADDR, 1, 0),
+        w2(2, IRQ_CLEAR_REG_ADDR, ERROR_CODE_REG_ADDR, 1, 0),
+        w2(3, IRQ_MASK_REG_ADDR, STATUS_REG_ADDR, 0x7FF, 0))
+      s.respond(0); s.respond(1, err = true); s.respond(2, err = true); s.respond(3, err = true)
+      s.read(IRQ_MASK_REG_ADDR) should be(BigInt(0)); s.read(IRQ_RAW_REG_ADDR) should be(BigInt(1))
+      s.starts.size should be(0); dut.io.inFlight.expect(false.B)
+    }
+  }
+
+  it should "reject writes using pre fire inFlight even when done or configError ends the task on that edge" in {
+    simulate(new HiveCoreRegIf(cfg)) { dut =>
+      val s = new Driver(dut); s.init()
+      s.write(M_REG_ADDR, 7); s.write(A_REG_ADDR, 0x1234); s.write(START_REG_ADDR, 1)
+      s.dma(1)
+      dut.io.done.poke(true.B)
+      s.batch(w2(0, IRQ_CLEAR_REG_ADDR, M_REG_ADDR, 0x7FF, 99),
+        w2(1, A_REG_ADDR, IRQ_MASK_REG_ADDR, 0xFFFF, 0),
+        w2(2, START_REG_ADDR, 0x3F, 2, 0), r(3, STATUS_REG_ADDR))
+      dut.io.done.poke(false.B)
+      dut.io.inFlight.expect(false.B); dut.io.regFile.m.expect(7.U); dut.io.regFile.aAddr.expect(0x1234.U)
+      for (lane <- 0 until 3) { s.hold(lane, err = true, cycles = 2); s.respond(lane, err = true) }
+      s.respond(3, data = 4)
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(5)); s.read(IRQ_MASK_REG_ADDR) should be(BigInt(0x7FF))
+      s.read(ERROR_CODE_REG_ADDR) should be(BigInt(0)); s.starts.size should be(1)
+      s.write(IRQ_CLEAR_REG_ADDR, 0x7FF); s.write(START_REG_ADDR, 2)
+      dut.io.configError.poke(true.B); dut.io.configErrorCode.poke(6.U)
+      s.batch(w2(0, IRQ_MASK_REG_ADDR, START_REG_ADDR, 0, 0), w(1, IRQ_CLEAR_REG_ADDR, 0x7FF),
+        r(2, STATUS_REG_ADDR), w2(3, IRQ_MASK_REG_ADDR, M_REG_ADDR, 0x7FF, 88))
+      dut.io.configError.poke(false.B)
+      s.respond(0); s.respond(1); s.respond(2, data = 4); s.respond(3, err = true)
+      s.read(M_REG_ADDR) should be(BigInt(7)); s.read(IRQ_MASK_REG_ADDR) should be(BigInt(0))
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(2)); s.read(ERROR_CODE_REG_ADDR) should be(BigInt(6))
+      dut.io.inFlight.expect(false.B); s.starts.size should be(2)
+      s.write(M_REG_ADDR, 8); s.read(M_REG_ADDR) should be(BigInt(8))
+    }
+  }
+
+  it should "launch once with highest nonzero START metadata and every winning batch configuration despite ACK backpressure" in {
+    simulate(new HiveCoreRegIf(cfg)) { dut =>
+      val s = new Driver(dut); s.init()
+      s.configError(5)
+      s.batch(w2(0, M_REG_ADDR, START_REG_ADDR, 0x3456, 2, pc = 0x11111111, tag = 0x11),
+        w2(1, A_REG_ADDR, B_REG_ADDR, 0x12345678, 0x23456789),
+        w2(2, NK_REG_ADDR, START_REG_ADDR, 0x56789ABC, 4, pc = 0x22222222, tag = 0x22),
+        w2(3, START_REG_ADDR, SCALE_A_REG_ADDR, 8, 0x3456789A,
+          pc = BigInt("fedcba98", 16), tag = 0xE3))
+      dut.io.start.expect(true.B); dut.io.inFlight.expect(true.B)
+      dut.io.startPc.expect(BigInt("fedcba98", 16).U); dut.io.startTag.expect(0xE3.U)
+      s.starts.size should be(0) // accept 只跨接受边沿；下一拍脉冲由 tick 捕获。
+      s.hold(0, cycles = 8)
+      s.starts.size should be(1); dut.io.start.expect(false.B); dut.io.inFlight.expect(true.B)
+      s.starts.last should be(StartEvent(BigInt("fedcba98", 16), 0xE3, 0x3456,
+        0x12345678, 0x9ABC, 0x5678, 0x23456789, 0x3456789A))
+      s.done(); dut.io.inFlight.expect(false.B)
+      for (lane <- 0 until 4) { s.hold(lane, cycles = 2); s.respond(lane) }
+      s.tick(3); s.starts.size should be(1); dut.io.inFlight.expect(false.B)
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0x403))
+      s.read(ERROR_CODE_REG_ADDR) should be(BigInt(5))
+      s.read(M_REG_ADDR) should be(BigInt(0x3456)); s.read(NK_REG_ADDR) should be(BigInt(0x56789ABC))
+      s.read(A_REG_ADDR) should be(BigInt(0x12345678)); s.read(B_REG_ADDR) should be(BigInt(0x23456789))
+      s.read(SCALE_A_REG_ADDR) should be(BigInt(0x3456789A))
+    }
+  }
+
+  it should "ignore zero START high lanes and reserved noops and merge same lane START without a conflict event" in {
+    simulate(new HiveCoreRegIf(cfg)) { dut =>
+      val s = new Driver(dut); s.init()
+      s.batch(w2(0, START_REG_ADDR, START_REG_ADDR, 2, 0, pc = 0x13572468, tag = 0x31),
+        r(1, START_REG_ADDR), w(2, 0x26, 0xFFFF),
+        w2(3, START_REG_ADDR, START_REG_ADDR, 0, 0, pc = 0xDEAD, tag = 0xFF))
+      dut.io.start.expect(true.B); s.hold(0, cycles = 4)
+      s.starts.size should be(1); s.starts.last.pc should be(BigInt(0x13572468))
+      s.starts.last.tag should be(0x31)
+      s.respond(0); s.respond(1); s.respond(2); s.respond(3)
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0)); dut.io.inFlight.expect(true.B)
+      s.done(); s.write(IRQ_CLEAR_REG_ADDR, 0x7FF)
+      s.batch(w(0, 0x26, 1), w2(1, START_REG_ADDR, START_REG_ADDR, 2, 8, pc = 0x24681357, tag = 0x42),
+        w(2, 0x26, 1), w(3, START_REG_ADDR, 0, pc = 0xFFFF, tag = 0xFF))
+      s.hold(0, cycles = 5); s.starts.size should be(2)
+      s.starts.last.pc should be(BigInt(0x24681357)); s.starts.last.tag should be(0x42)
+      for (lane <- 0 until 4) s.respond(lane)
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0)); dut.io.inFlight.expect(true.B)
+      // 在途 START0/no-op 仍合法，同址 READ 也不产生 WRITE_CONFLICT。
+      s.batch(w2(0, START_REG_ADDR, 0x3F, 0, 1), r(1, START_REG_ADDR),
+        w2(2, START_REG_ADDR, 0x3F, 0, 2), w(3, START_REG_ADDR, 0))
+      for (lane <- 0 until 4) s.respond(lane)
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0)); s.starts.size should be(2)
+      s.done(); s.write(IRQ_CLEAR_REG_ADDR, 0x7FF)
+      s.batch(w2(0, M_REG_ADDR, M_REG_ADDR, 1, 2), r(3, M_REG_ADDR))
+      s.respond(0); s.respond(3, data = 0)
+      s.read(M_REG_ADDR) should be(BigInt(2)); s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0))
+    }
+  }
+
+  it should "arbitrate MASK by highest lane and CLEAR by same lane OR then highest lane including CLEAR zero" in {
+    simulate(new HiveCoreRegIf(cfg)) { dut =>
+      val s = new Driver(dut); s.init()
+      s.batch(w2(0, IRQ_MASK_REG_ADDR, IRQ_MASK_REG_ADDR, 0x7FF, 1),
+        w2(1, IRQ_MASK_REG_ADDR, IRQ_MASK_REG_ADDR, 0x7FF, 2),
+        w2(2, IRQ_MASK_REG_ADDR, IRQ_MASK_REG_ADDR, 0x7FF, 4),
+        w2(3, IRQ_MASK_REG_ADDR, IRQ_MASK_REG_ADDR, 0, 0x400))
+      for (lane <- 0 until 4) s.respond(lane)
+      s.read(IRQ_MASK_REG_ADDR) should be(BigInt(0x400))
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0x400)); dut.io.irq.expect(false.B)
+      s.write(IRQ_MASK_REG_ADDR, 0); dut.io.irq.expect(true.B)
+      s.configError(5); s.done(); s.dma(3) // RAW=0x40F。
+      s.batch(w2(0, IRQ_CLEAR_REG_ADDR, IRQ_CLEAR_REG_ADDR, 1, 2), w(1, IRQ_CLEAR_REG_ADDR, 4),
+        w(2, IRQ_CLEAR_REG_ADDR, 8), w2(3, IRQ_CLEAR_REG_ADDR, IRQ_CLEAR_REG_ADDR, 1, 4))
+      for (lane <- 0 until 4) s.respond(lane)
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0x40A)) // 仅最高 lane 的 1|4，不能跨 lane OR。
+      s.read(ERROR_CODE_REG_ADDR) should be(BigInt(5))
+      for (zero <- Seq(BigInt(0), BigInt("fffff800", 16))) {
+        s.batch(w(0, IRQ_CLEAR_REG_ADDR, 0x7FF), w(3, IRQ_CLEAR_REG_ADDR, zero))
+        s.respond(0); s.respond(3)
+        s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0x40A)); s.read(ERROR_CODE_REG_ADDR) should be(BigInt(5))
+      }
+      s.batch(w2(2, IRQ_CLEAR_REG_ADDR, IRQ_CLEAR_REG_ADDR, 2, 8))
+      s.respond(2)
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0x400)); s.read(ERROR_CODE_REG_ADDR) should be(BigInt(0))
+      s.batch(w2(1, IRQ_CLEAR_REG_ADDR, IRQ_CLEAR_REG_ADDR, 0x400, 0))
+      s.respond(1)
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0)); dut.io.irq.expect(false.B)
+      dut.io.inFlight.expect(false.B)
+    }
+  }
+
+  it should "retain fresh WRITE_CONFLICT over same edge W1C without contaminating the first configuration error code" in {
+    simulate(new HiveCoreRegIf(cfg)) { dut =>
+      val s = new Driver(dut); s.init()
+      s.configError(0); s.configError(7); s.write(IRQ_MASK_REG_ADDR, 0)
+      dut.io.done.poke(true.B); dut.io.dmaErrors(1).poke(true.B)
+      s.batch(w2(0, IRQ_CLEAR_REG_ADDR, M_REG_ADDR, 0x7FF, 0x55),
+        w(1, M_REG_ADDR, 0x55), r(2, ERROR_CODE_REG_ADDR), r(3, IRQ_RAW_REG_ADDR))
+      dut.io.done.poke(false.B); dut.io.dmaErrors(1).poke(false.B)
+      s.respond(0); s.respond(1); s.respond(2, data = 0); s.respond(3, data = 2)
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0x409)); dut.io.irq.expect(true.B)
+      s.read(ERROR_CODE_REG_ADDR) should be(BigInt(0)); dut.io.inFlight.expect(false.B)
+      s.configError(6) // RAW=0x40B，首个未清配置码为 6。
+      dut.io.configError.poke(true.B); dut.io.configErrorCode.poke(9.U)
+      s.batch(w2(0, IRQ_MASK_REG_ADDR, IRQ_CLEAR_REG_ADDR, 0, 0x400),
+        w(1, IRQ_MASK_REG_ADDR, 0), r(2, ERROR_CODE_REG_ADDR), r(3, IRQ_RAW_REG_ADDR))
+      dut.io.configError.poke(false.B)
+      s.respond(0); s.respond(1); s.hold(2, data = 6); s.respond(2, data = 6)
+      s.hold(3, data = 0x40B); s.respond(3, data = 0x40B)
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0x40B)); s.read(ERROR_CODE_REG_ADDR) should be(BigInt(6))
+      s.write(IRQ_CLEAR_REG_ADDR, 0x400)
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0xB)); s.read(ERROR_CODE_REG_ADDR) should be(BigInt(6))
+    }
+  }
+
+  it should "block all lanes through the last pending read fire accept held valids only next cycle and discard pending on reset" in {
+    simulate(new HiveCoreRegIf(cfg)) { dut =>
+      val s = new Driver(dut); s.init()
+      s.write(M_REG_ADDR, 0x1234); s.write(A_REG_ADDR, 0x5678)
+      s.batch(r(0, M_REG_ADDR), r(1, A_REG_ADDR), r(2, STATUS_REG_ADDR), r(3, IRQ_RAW_REG_ADDR))
+      // 四路新命令 valid 跨整批保持，包括已消费响应的空 slot；不得提前 fire。
+      s.drive(r(0, M_REG_ADDR), w(1, A_REG_ADDR, 0x9ABC), r(2, STATUS_REG_ADDR),
+        w2(3, IRQ_MASK_REG_ADDR, IRQ_CLEAR_REG_ADDR, 0, 0x7FF))
+      dut.io.busy.poke(true.B); dut.io.progress.poke(0xABCD.U)
+      s.done(); s.dma(1)
+      val expected = Seq(BigInt(0x1234), BigInt(0x5678), BigInt(0), BigInt(0))
+      for (lane <- 0 until 4) {
+        s.hold(lane, data = expected(lane), cycles = 4)
+        dut.io.cmd.foreach(_.valid.expect(true.B))
+        dut.io.regFile.aAddr.expect(0x5678.U)
+        s.respond(lane, data = expected(lane))
+        if (lane != 3) s.allReady(false)
+      }
+      // 最后 read.fire 已过，但新 valid 没有在该边沿被接收。
+      s.allReady(true); dut.io.resp.valid.expect(false.B)
+      dut.io.cmd.foreach(_.valid.expect(true.B)); dut.io.regFile.aAddr.expect(0x5678.U)
+      s.accept() // 下一拍同一组 held valid 才组成新批。
+      dut.io.regFile.aAddr.expect(0x9ABC.U)
+      s.respond(0, data = 0x1234); s.respond(1)
+      s.hold(2, data = BigInt("abcd0001", 16)); s.respond(2, data = BigInt("abcd0001", 16))
+      s.respond(3)
+      s.read(IRQ_MASK_REG_ADDR) should be(BigInt(0)); s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0))
+      dut.io.busy.poke(false.B); dut.io.progress.poke(0.U)
+      s.batch(w2(0, M_REG_ADDR, START_REG_ADDR, 9, 1, pc = 0x24681357, tag = 0x53),
+        r(1, M_REG_ADDR), w(2, IRQ_RAW_REG_ADDR, 0), r(3, IRQ_MASK_REG_ADDR))
+      s.respond(0); s.hold(1, data = 0x1234, cycles = 2)
+      s.starts.size should be(1); dut.io.inFlight.expect(true.B)
+      dut.reset.poke(true.B); s.tick(2); dut.reset.poke(false.B); s.tick()
+      s.allReady(true); dut.io.resp.valid.expect(false.B)
+      dut.io.start.expect(false.B); dut.io.inFlight.expect(false.B); dut.io.irq.expect(false.B)
+      dut.io.regFile.m.expect(0.U); dut.io.regFile.aAddr.expect(0.U)
+      s.tick(2); s.starts.size should be(1); dut.io.resp.valid.expect(false.B)
+      s.batch(r(1, M_REG_ADDR), r(3, IRQ_MASK_REG_ADDR))
+      s.respond(1, data = 0); s.respond(3, data = 0x7FF)
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0)); s.read(ERROR_CODE_REG_ADDR) should be(BigInt(0))
+      s.allReady(true); dut.io.resp.valid.expect(false.B)
+    }
+  }
+
+  it should "reject reserved opcode in a mixed batch without writes START IRQ or conflict side effects" in {
+    simulate(new HiveCoreRegIf(cfg)) { dut =>
+      val s = new Driver(dut)
+      for (target <- Seq(A_REG_ADDR, START_REG_ADDR, IRQ_CLEAR_REG_ADDR, IRQ_MASK_REG_ADDR)) {
+        s.init()
+        s.write(A_REG_ADDR, 0x1234); s.done()
+        val value = target match {
+          case A_REG_ADDR => BigInt(0x5678)
+          case START_REG_ADDR => BigInt(8)
+          case IRQ_CLEAR_REG_ADDR => BigInt(1)
+          case _ => BigInt(0)
+        }
+        s.drive(w(0, target, value, pc = 0x12345678, tag = 0x21), r(1, IRQ_RAW_REG_ADDR),
+          w(2, M_REG_ADDR, 0x33), w2(3, target, M_REG_ADDR, wordMask, wordMask, pc = 0xDEAD, tag = 0xFF))
+        dut.io.cmd(3).payload.op.poke(BigInt(3))
+        s.accept()
+        s.respond(0); s.respond(1, data = 1); s.respond(2)
+        s.hold(3, err = true); s.respond(3, err = true)
+        s.read(M_REG_ADDR) should be(BigInt(0x33))
+        s.read(A_REG_ADDR) should be(BigInt(if (target == A_REG_ADDR) 0x5678 else 0x1234))
+        s.read(IRQ_RAW_REG_ADDR) should be(BigInt(if (target == IRQ_CLEAR_REG_ADDR) 0 else 1))
+        s.read(IRQ_MASK_REG_ADDR) should be(BigInt(if (target == IRQ_MASK_REG_ADDR) 0 else 0x7FF))
+        s.read(ERROR_CODE_REG_ADDR) should be(BigInt(0))
+        dut.io.inFlight.expect((target == START_REG_ADDR).B)
+        s.starts.size should be(if (target == START_REG_ADDR) 1 else 0)
+        if (target == START_REG_ADDR) {
+          s.starts.last.pc should be(BigInt(0x12345678)); s.starts.last.tag should be(0x21)
+        }
+      }
+    }
+  }
+
+  it should "sample winning configuration values when START and configuration addresses conflict in the same batch" in {
+    simulate(new HiveCoreRegIf(cfg)) { dut =>
+      val s = new Driver(dut); s.init()
+      s.batch(w2(0, M_REG_ADDR, START_REG_ADDR, 11, 1, pc = 0x1111, tag = 0x11),
+        w2(1, A_REG_ADDR, NK_REG_ADDR, 0xAAAA, 0x56781234),
+        w2(2, M_REG_ADDR, A_REG_ADDR, 22, 0xBBBB),
+        w2(3, START_REG_ADDR, NK_REG_ADDR, 2, BigInt("9abcdef0", 16), pc = 0x3333, tag = 0x33))
+      dut.io.start.expect(true.B); dut.io.inFlight.expect(true.B)
+      s.hold(0, cycles = 5)
+      s.starts.toSeq should be(Seq(StartEvent(0x3333, 0x33, 22, 0xBBBB, 0xDEF0, 0x9ABC, 0, 0)))
+      for (lane <- 0 until 4) s.respond(lane)
+      s.read(M_REG_ADDR) should be(BigInt(22)); s.read(A_REG_ADDR) should be(BigInt(0xBBBB))
+      s.read(NK_REG_ADDR) should be(BigInt("9abcdef0", 16))
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0x400)); s.read(ERROR_CODE_REG_ADDR) should be(BigInt(0))
+      s.starts.size should be(1); dut.io.inFlight.expect(true.B)
+    }
+  }
+
+  it should "cancel pending START and responses on reset before the launch edge without replaying stale metadata" in {
+    simulate(new HiveCoreRegIf(cfg)) { dut =>
+      val s = new Driver(dut); s.init()
+      s.batch(w2(0, M_REG_ADDR, START_REG_ADDR, 19, 1, pc = 0x1111, tag = 0x11), r(2, M_REG_ADDR))
+      dut.io.start.expect(true.B); dut.io.inFlight.expect(true.B)
+      s.starts.size should be(0)
+      dut.reset.poke(true.B)
+      dut.clock.step(2)
+      dut.reset.poke(false.B); s.tick(3)
+      s.allReady(true); dut.io.resp.valid.expect(false.B)
+      dut.io.start.expect(false.B); dut.io.inFlight.expect(false.B)
+      dut.io.regFile.m.expect(0.U); s.starts.size should be(0)
+      s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0)); s.read(IRQ_MASK_REG_ADDR) should be(BigInt(0x7FF))
+      s.batch(w2(2, M_REG_ADDR, START_REG_ADDR, 23, 2, pc = 0x2222, tag = 0x22))
+      s.hold(2, cycles = 4); s.respond(2)
+      s.starts.toSeq should be(Seq(StartEvent(0x2222, 0x22, 23, 0, 0, 0, 0, 0)))
+      s.allReady(true); dut.io.resp.valid.expect(false.B)
     }
   }
 }

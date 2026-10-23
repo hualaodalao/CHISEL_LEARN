@@ -35,12 +35,12 @@ class HiveCoreDmaErrorSpec extends AnyFlatSpec with Matchers with ChiselSim with
           }
         }
         quiesce(ready = true)
-        dut.io.cmd.valid.poke(false.B); dut.io.resp.ready.poke(true.B)
+        dut.io.cmd.foreach(_.valid.poke(false.B)); dut.io.resp.ready.poke(true.B)
         dut.reset.poke(true.B); dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
         def wr(a: Int, d: BigInt): Unit = {
-          transactReg(dut.clock, dut.io.cmd, dut.io.resp, HiveCoreOp.REG_WRITE1, a, d0 = d)
+          transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, HiveCoreOp.REG_WRITE1, a, d0 = d)
         }
-        def rd(a: Int): BigInt = readRegister(dut.clock, dut.io.cmd, dut.io.resp, a)
+        def rd(a: Int): BigInt = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, a)
         val intRun = source == 7
         val biasOn = source >= 6
         val inFmt = if (intRun) DataFormat.INT8 else DataFormat.MXE4M3
@@ -54,9 +54,9 @@ class HiveCoreDmaErrorSpec extends AnyFlatSpec with Matchers with ChiselSim with
         wr(CONTROL_REG_ADDR, control)
         wr(SCALE_A_REG_ADDR, saBase); wr(SCALE_B_REG_ADDR, sbBase); wr(SCALE_C_REG_ADDR, scBase)
         wr(BIAS_REG_ADDR, biasBase); wr(RQM_REG_ADDR, rqBase); wr(RQ_PARAM_REG_ADDR, 0)
-        prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
+        prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
         wr(IRQ_MASK_REG_ADDR, IRQ_ALL) // 错误必须在全屏蔽时也立即记录。
-        launchStart(dut.clock, dut.io.cmd)
+        launchStart(dut.clock, dut.io.cmd(0))
         var injected = false
         var checkedEarly = false
         var done = false
@@ -68,7 +68,7 @@ class HiveCoreDmaErrorSpec extends AnyFlatSpec with Matchers with ChiselSim with
           if (injected && !checkedEarly) {
             // 上一边沿已经发生错误 rsp.fire；排空命令响应并冻结全部 DMA，独立读 IRQ。
             quiesce(ready = false)
-            dut.io.cmd.valid.poke(false.B); dut.clock.step(2)
+            dut.io.cmd.foreach(_.valid.poke(false.B)); dut.clock.step(2)
             rd(IRQ_RAW_REG_ADDR) should be(expectedError)
             rd(IRQ_MASKED_REG_ADDR) should be(BigInt(0)); dut.io.irq.expect(false.B)
             dut.io.status.inFlight.expect(true.B)
@@ -115,7 +115,7 @@ class HiveCoreDmaErrorSpec extends AnyFlatSpec with Matchers with ChiselSim with
           driveWrite(dut.io.dmaC, 2)
           driveWrite(dut.io.dmaCScale.get, 5)
           if (checkedEarly) {
-            val (st, cool, irq) = irqPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool)
+            val (st, cool, irq) = irqPollStep(dut.io.cmd(0), dut.io.resp, pollSt, pollCool)
             pollSt = st; pollCool = cool
             irq.foreach { i =>
               i.configError should be(false)
@@ -127,7 +127,7 @@ class HiveCoreDmaErrorSpec extends AnyFlatSpec with Matchers with ChiselSim with
           if (injectedThisCycle) injected = true
         }
         quiesce(ready = false)
-        dut.io.cmd.valid.poke(false.B); dut.clock.step(2)
+        dut.io.cmd.foreach(_.valid.poke(false.B)); dut.clock.step(2)
         withClue(s"$name injection/early/completion at cycle $cycle: ") {
           injected should be(true); checkedEarly should be(true); done should be(true)
         }
@@ -141,7 +141,7 @@ class HiveCoreDmaErrorSpec extends AnyFlatSpec with Matchers with ChiselSim with
         wr(IRQ_MASK_REG_ADDR, IRQ_ALL); dut.io.irq.expect(false.B)
         wr(IRQ_MASK_REG_ADDR, 0); dut.io.irq.expect(true.B)
         // 下一 START 不自动清旧错误；显式 W1C 后旧 DMA sticky err 不得反复置 RAW。
-        launchStart(dut.clock, dut.io.cmd)
+        launchStart(dut.clock, dut.io.cmd(0))
         rd(IRQ_RAW_REG_ADDR) should be(expectedError)
         dut.io.status.inFlight.expect(true.B)
         wr(IRQ_CLEAR_REG_ADDR, IRQ_ALL)

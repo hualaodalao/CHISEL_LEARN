@@ -1,43 +1,5 @@
-/** ForagerBee（采集蜂）—— NPU 专用 DMA 搬运模块的配置与命令描述符定义。
-  *
-  * 蜂巢主题命名：采集蜂（ForagerBee）负责为 HiveWorker 脉动阵列（蜂巢）
-  * 搬运张量数据，支持多维 stride 拷贝（COPY）与 2D 分块转置（TRANSPOSE）。
-  *
-  * 本文件定义：
-  *   - [[ForagerBeeConfig]]：顶层参数（DMA 通道数/队列深度/维度上限/
-  *     转置 tile 尺寸/突发上限/数据位宽/地址位宽/通道转置能力/
-  *     链式描述符开关/格式转换开关），全部 compile-time 可配置并 require 校验。
-  *   - [[FbOp]]：操作码枚举（COPY / TRANSPOSE / PERMUTE）。
-  *   - [[FbDataFmt]]：数据格式 ChiselEnum（4-bit：FP32/FP16/BF16/INT8/MXE4M3/MXE5M2
-  *     + 4-bit 扩容新增的 INT32/INT16/INT4；编码 6/7/11-15 非法，由引擎 fmtEncBad 拒绝；
-  *     既有编码为软件可见契约，永不重排）。
-  *   - [[FbCmd]]：命令描述符（统一 dims 组：shape + srcStride + dstStride + 链式 + 格式转换）。
-  *   - [[FbDone]]：完成回执（tag + err + chainLen）。
-  *
-  * 命令语义（统一 ND 描述）：
-  *   - dimCount 个维度，dim0 为最内维（连续维）；shape(i) 为第 i 维元素数。
-  *   - srcStride/dstStride(i) 为字节步长；stride(0) 语义为「最内维行连续字节数」
-  *     （COPY 时 dim0 被展开为连续 INCR 突发，stride(0) 仅作信息字段；
-  *     TRANSPOSE 时 dstStride(0) 用作转置输出行之间的字节步长）。
-  *   - 当前行地址 = base + Σ(idx(i) × stride(i))，i ∈ [1, dimCount)。
-  *   - 元素粒度由 srcFmt（读侧）/dstFmt（写侧）经 FbDataFmt.rowBytes/bytesOfCeil 单一真源派生。
-  *   - **纯搬运契约：srcFmt==dstFmt**（历史 cvtEnable=0 且 fmt 不等的静默纯拷贝已删除；
-  *     转换激活派生为 srcFmt =/= dstFmt，enableConversion=false 时强制 srcFmt==dstFmt）。
-  *   - **MX↔MX 纯字节拷贝被拒**：srcFmt==dstFmt 且均为 MX 族（MXE4M3/MXE5M2）时，在
-  *     enableConversion=true 配置下被 mxQuantBad（srcFmtBadMx：MX 量化要求 srcFmt 为 float）拒绝；
-  *     如需搬运 MX 裸字节，请用 INT8 编码承载（1 字节/元素等宽，纯搬运 srcFmt==dstFmt=INT8）。
-  *     enableConversion=false 的构建中无量化器，MX 编码退化为 1 字节/元素的裸格式，
-  *     srcFmt==dstFmt==MXE4M3/MXE5M2 是合法的纯字节拷贝。
-  *   - **MX 量化激活由 dstFmt 派生**：`isMx(dstFmt)` 即进入 FbMxQuantizer 通路
-  *     （要求 srcFmt 为 float、op=COPY、shape(0) 为 scaleBlockSize 解码值的整数倍、
-  *     scaleAddr 按 beat 对齐、无 padding），不再有独立的「MX 量化使能」开关字段；
-  *     srcFmt 为 MX 而 dstFmt 非 MX（反量化）无硬件支持，由 mxNonQuantBad 拒绝。
-  *
-  * 对齐约束（软件必须保证，硬件对基址与 COPY 行长做运行时检查）：
-  *   - 所有行起始地址（srcAddr/dstAddr 基址）按 beat（dataWidth/8 字节）对齐；
-  *   - COPY：最内维行字节数 shape(0)×elemBytes 必须为整 beat 倍数；
-  *   - TRANSPOSE：源行允许子 beat（自动按 ceil 取整读取并做元素级提取），
-  *     转置输出按字节掩码（wstrb）写入，输出行内偏移由硬件自动处理。
+/** ForagerBee DMA 配置、操作码、数据格式、命令与完成回执。
+  * 数据地址为逻辑字节地址，支持非 beat 对齐搬运与精确尾部写掩码。
   */
 
 import chisel3._
@@ -47,21 +9,16 @@ import chisel3.util._
   *
   * @param numPorts          DMA 通道（Stream master）个数（1..4），每通道一个执行引擎
   * @param queueDepth        命令队列深度（≥1）
-  * @param dataQueueDepth    引擎内数据旁路 Queue 深度（≥1，默认 = maxBurstLen；
-  *                          当该值 < maxBurstLen 时，突发会被拆分以保证不溢出 Queue）
+  * @param dataQueueDepth    数据 Queue 深度（≤0 时自动取 max(maxBurstLen, 4)）
   * @param maxDims           支持的最大维度数（1..5）
   * @param tileSize          转置缓冲 tile 尺寸（tileSize × tileSize 元素槽位，≥2）
   * @param maxBurstLen       单突发最大 beat 数（1..256，受 len 8bit 限制）
-  * @param dataWidth         数据位宽（bit），必须 ≥ 32
+  * @param dataWidth         数据位宽（bit），必须为 ≥32 的 2 次幂
   * @param addressWidth      地址位宽（bit），必须 ≥ 12
-  * @param channelTranspose  每通道是否支持转置（长度 = numPorts，默认全 true 向下兼容）
-  * @param channelPermute   每通道是否支持 PERMUTE（长度 = numPorts，默认全 true 向下兼容）
-  * @param enableSharedWritePorts 写端口共享仲裁开关（true 时引擎写突发经 FbWrPortArbiter
-  *                          交织分配到物理写端口；默认 false 保持 1:1 直连）
-  * @param writeOutstandingDepth 写 outstanding 深度（≥1）。=1 时引擎与仲裁器走现有阻塞式写路径
-  *                          （编译期分支，RTL 逐字不变，零回归）；>1 时启用非阻塞写：
-  *                          引擎写突发在 EOF 拍即推进状态，不等 wrResp，最多允许该深度个
-  *                          在途写突发；不强制绑定 enableSharedWritePorts（直连模式同样受益）
+  * @param channelTranspose  每通道是否支持转置（长度 = numPorts，默认全 true）
+  * @param channelPermute    每通道是否支持 PERMUTE（长度 = numPorts，默认全 true）
+  * @param enableSharedWritePorts 写端口共享仲裁开关（默认 false，1:1 直连）
+  * @param writeOutstandingDepth 最大在途写突发数（≥1；1 为阻塞式，>1 为非阻塞式）
   */
 case class ForagerBeeConfig(
     numPorts: Int = 2,
@@ -74,16 +31,14 @@ case class ForagerBeeConfig(
     addressWidth: Int = 32,
     channelTranspose: Seq[Boolean] = Seq.empty,
     channelPermute: Seq[Boolean] = Seq.empty,
-    enableChaining: Boolean = false,      // 编译时开关：是否启用链式描述符
-    chainDescBeats: Int = 0,              // 描述符内存 beat 数（0=自动计算）
     enableConversion: Boolean = false,    // 编译时开关：是否启用格式转换
-    converterPipeStages: Int = 1,         // 转换流水线深度（1=组合，2+=流水）
+    converterPipeStages: Int = 1,         // 兼容参数：当前转换器未使用它配置流水级数
     channelIm2col: Seq[Boolean] = Seq.empty,  // 每通道是否支持 im2col（默认全 true）
     channelScatterGather: Seq[Boolean] = Seq.empty,  // 每通道是否支持 scatter/gather
     enableSharedWritePorts: Boolean = false,  // 编译时开关：写端口共享仲裁（默认关闭，保持每引擎 1:1 直连）
-    writeOutstandingDepth: Int = 1        // 写 outstanding 深度：=1 走现有阻塞式路径（零回归）；>1 启用非阻塞写
+    writeOutstandingDepth: Int = 1        // 最大在途写突发数：1 为阻塞式，>1 为非阻塞式
 ) {
-  /** 实际数据 Queue 深度（-1 表示自动 = max(maxBurstLen, 4)） */
+  /** 实际数据 Queue 深度（≤0 时自动取 max(maxBurstLen, 4)） */
   val resolvedDataQueueDepth: Int =
     if (dataQueueDepth <= 0) math.max(maxBurstLen, 4) else dataQueueDepth
   /** 实际的通道转置能力序列（空时默认全 true） */
@@ -109,8 +64,8 @@ case class ForagerBeeConfig(
   require(maxDims >= 1 && maxDims <= 5, s"ForagerBeeConfig: maxDims($maxDims) 必须 ∈ [1,5]")
   require(tileSize >= 2, s"ForagerBeeConfig: tileSize($tileSize) 必须 ≥ 2")
   require(maxBurstLen >= 1 && maxBurstLen <= 256, s"ForagerBeeConfig: maxBurstLen($maxBurstLen) 必须 ∈ [1,256]")
-  require(dataWidth >= 32, s"ForagerBeeConfig: dataWidth($dataWidth) 必须 ≥ 32（元素槽位最大 32bit）")
-  require(addressWidth >= 12, s"ForagerBeeConfig: addressWidth($addressWidth) 必须 ≥ 12（4KB 突发边界处理）")
+  require(dataWidth >= 32 && isPow2(dataWidth), s"ForagerBeeConfig: dataWidth($dataWidth) 必须为 ≥32 的 2 次幂")
+  require(addressWidth >= 12, s"ForagerBeeConfig: addressWidth($addressWidth) 必须 ≥ 12")
   require(resolvedChannelTranspose.length == numPorts,
     s"ForagerBeeConfig: channelTranspose 长度(${resolvedChannelTranspose.length}) 必须等于 numPorts($numPorts)")
   require(resolvedChannelPermute.length == numPorts,
@@ -159,17 +114,8 @@ object FbOp extends ChiselEnum {
   val LINEAR2TILE = Value
 }
 
-/** 数据格式枚举（用于搬运时原位格式转换与 MX 量化），ChiselEnum、4-bit，与 [[FbOp]] 风格统一。
-  *
-  * 编码即软件可见契约（描述符 srcFmt/dstFmt 字段、链式描述符打包、测试激励均按此编码），
-  * 既有编码 **永不重排、永不复用**：
-  * {{{
-  *   0 = FP32     1 = FP16     2 = BF16     3 = INT8
-  *   4 = MXE4M3   5 = MXE5M2   6 = （历史空位，保留）   7 =（历史 NONE，已删除，永久保留不复用）
-  *   8 = INT32    9 = INT16   10 = INT4    ← 4-bit 扩容新增（转换算术尚未实现，仅占位编码）
-  * }}}
-  * ChiselEnum 要求字面值严格递增，故成员声明顺序即编码顺序；每个成员显式给出
-  * `Value(n.U(4.W))`，既锁死 4-bit 宽度，也让编码契约在源码中自解释。
+/** 数据格式枚举（4-bit）；软件可见编码固定，6/7/11–15 保留。
+  * 支持同格式搬运、浮点格式转换与浮点到 MX 量化，不支持整数转换算术。
   */
 object FbDataFmt extends ChiselEnum {
 
@@ -182,8 +128,7 @@ object FbDataFmt extends ChiselEnum {
   /** bfloat16（1+8+7，bias=127，2 字节/元素） */
   val BF16 = Value(2.U(4.W))
 
-  /** 有符号 8-bit 整数（2's complement，1 字节/元素；量化 scale/zeroPoint 自 v3 起由
-    * ForagerBee 顶层 IO 全局供给，见 [[ForagerBee]] io.cvtScale/io.cvtZeroPoint，不再随命令携带） */
+  /** 有符号 8-bit 整数（1 字节/元素；仅支持同格式搬运） */
   val INT8 = Value(3.U(4.W))
 
   /** MXFP8 E4M3（{sign(1),exp(4),mant(3)}，bias=7，E8M0 共享 scale，1 字节/元素） */
@@ -195,13 +140,13 @@ object FbDataFmt extends ChiselEnum {
   // 编码 6：历史空位，保留不复用（避免与既有软件/波形约定冲突）
   // 编码 7：历史 NONE（bypass 哨兵），已删除，永久保留不复用
 
-  /** 有符号 32-bit 整数（4 字节/元素）——编码已占位，转换算术待后续任务实现 */
+  /** 有符号 32-bit 整数（4 字节/元素；仅支持同格式搬运） */
   val INT32 = Value(8.U(4.W))
 
-  /** 有符号 16-bit 整数（2 字节/元素）——编码已占位，转换算术待后续任务实现 */
+  /** 有符号 16-bit 整数（2 字节/元素；仅支持同格式搬运） */
   val INT16 = Value(9.U(4.W))
 
-  /** 有符号 4-bit 整数（半字节/元素）——编码已占位，转换算术待后续任务实现 */
+  /** 有符号 4-bit 整数（半字节/元素；仅支持同格式 COPY） */
   val INT4 = Value(10.U(4.W))
 
   /** 编码契约自检（elaboration 期）：任何重排/插入/位宽漂移都在生成 RTL 之前抛异常，
@@ -270,8 +215,8 @@ object FbDataFmt extends ChiselEnum {
   */
 class FbCmd(cfg: ForagerBeeConfig) extends Bundle {
 
-  /** 操作码（COPY / TRANSPOSE） */
-  val op = FbOp() //reserve 4b
+  /** DMA 操作码，见 [[FbOp]] */
+  val op = FbOp()
 
   /** 软件自定义标签，原样随 done 回执返回 */
   val tag = UInt(8.W)
@@ -307,38 +252,30 @@ class FbCmd(cfg: ForagerBeeConfig) extends Bundle {
   /** TILE2LINEAR：列方向 tile 数 Nt = ceil(N/Tn)（非 TILE2LINEAR 时忽略） */
   val t2lNumTileCols = UInt(16.W)
 
-  /** 源基址（须按 beat 对齐） */
+  /** 源逻辑字节基址（无需 beat 对齐） */
   val srcAddr = UInt(cfg.addressWidth.W)
 
-  /** 目的基址（须按 beat 对齐） */
+  /** 目的逻辑字节基址（无需 beat 对齐） */
   val dstAddr = UInt(cfg.addressWidth.W)
 
   /** PERMUTE 维度映射向量：输出第 d 维对应源张量的第 permVec(d) 维。
     * 非 PERMUTE 操作时忽略（默认全 0）。每项 3bit 足以索引最多 5 维。 */
   val permVec = Vec(cfg.maxDims, UInt(3.W))
 
-  /** COPY Zero-Padding：dim0/dim1 前置填充元素数（仅 COPY + dimCount≤2 有效）。
-    * 非 padding 操作时填 0。 */
+  /** ND COPY：dim0/dim1 前置填充元素数（未填充时为 0） */
   val padBefore = Vec(2, UInt(16.W))
 
-  /** COPY Zero-Padding：dim0/dim1 后置填充元素数（仅 COPY + dimCount≤2 有效）。
-    * 非 padding 操作时填 0。 */
+  /** ND COPY：dim0/dim1 后置填充元素数（未填充时为 0） */
   val padAfter = Vec(2, UInt(16.W))
 
-  /** 链式描述符：下一描述符内存地址（0 表示链终止） */
-  val nextDescAddr = UInt(cfg.addressWidth.W)
-
-  /** 链式描述符：是否为链模式（true 时 done 由 ChainController 管理） */
-  val chainMode = Bool()
+  /** 填充值的目标格式原始位模式，按目标元素宽度取低位重复 */
+  val padValue = UInt(32.W)
 
   /** 格式转换：源数据格式（[[FbDataFmt]] ChiselEnum，4-bit） */
   val srcFmt = FbDataFmt()
 
   /** 格式转换：目标数据格式（[[FbDataFmt]] ChiselEnum，4-bit） */
   val dstFmt = FbDataFmt()
-
-  // 注：量化参数 cvtScale/cvtZeroPoint 已从命令字段移至 ForagerBee 顶层 IO
-  // （全局供给、所有通道与所有命令共享），命令描述符不再携带，详见 ForagerBee.io.cvt*。
 
   /** im2col：卷积核尺寸 (kH, kW)，非 IM2COL 时忽略 */
   val im2colKernel = Vec(2, UInt(8.W))
@@ -367,14 +304,6 @@ class FbCmd(cfg: ForagerBeeConfig) extends Bundle {
   /** MX 量化：块大小编码（0→16、1→32、2→64 个元素共享一个 E8M0 scale） */
   val scaleBlockSize = UInt(2.W)
 
-  /** Atomic 标志写使能：置位后，本 DMA 命令**成功完成（errReg=0）**时额外发出一拍
-    * atomic 类型写突发（[[FbWriteBeat]].atomic=true），向 atomicStoreAddr 写入 32-bit 值 1，
-    * 供下游以轮询方式感知「本命令已搬运完毕」。命令出错（errReg=1）时不发。 */
-  val atomicEnable = Bool()
-
-  /** Atomic 标志写目的地址（**必须 4B 对齐**，低 2 位恒 0；非对齐由引擎 atomicAddrBad 拒绝）。
-    * 硬件按 beat 对齐发出单拍突发，strb 精确点亮目标 4 字节，data 把 32'h1 放到对应字 lane。 */
-  val atomicStoreAddr = UInt(cfg.addressWidth.W)
 }
 
 object FbCmd {
@@ -407,11 +336,9 @@ class FbDone(cfg: ForagerBeeConfig) extends Bundle {
   /** 命令标签（原样返回） */
   val tag = UInt(8.W)
 
-  /** 错误标志（非法命令：dimCount=0/超界、TRANSPOSE 维度≠2、非对齐、元素粒度非法等） */
+  /** 命令校验或执行错误标志 */
   val err = Bool()
 
-  /** 链已完成的描述符计数（非链模式时为 1） */
-  val chainLen = UInt(16.W)
 }
 
 object FbDone {

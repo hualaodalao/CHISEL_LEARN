@@ -247,12 +247,12 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
           dut.io.dmaScaleA.get.req, dut.io.dmaScaleB.get.req,
           dut.io.dmaCScale.get.req).foreach(_.ready.poke(true.B))
         dut.io.resp.ready.poke(true.B)
-        dut.io.cmd.valid.poke(false.B)
+        dut.io.cmd.foreach(_.valid.poke(false.B))
         dut.reset.poke(true.B); dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
 
         // ---- Command helper ----
         def cmd(op: HiveCoreOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
-          transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
+          transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
         }
 
         // ---- Configure registers ----
@@ -265,8 +265,8 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
 
         println(s"[$TAG] regs: reg5(controlWord5)=0x${p.controlWord5.toHexString}")
 
-        prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
-        launchStart(dut.clock, dut.io.cmd)
+        prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
+        launchStart(dut.clock, dut.io.cmd(0))
 
         // ---- Main simulation loop ----
         var aS = 0; var bS = 0; var saS = 0; var sbS = 0; var cB = 0; var csB = 0
@@ -318,7 +318,7 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
             dut.io.dmaCScale.get.req.payload.data.peek().litValue,
             v => dut.io.dmaCScale.get.rsp.valid.poke(v.B), sLog)
 
-          val (ps, pc, st) = irqPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool)
+          val (ps, pc, st) = irqPollStep(dut.io.cmd(0), dut.io.resp, pollSt, pollCool)
           pollSt = ps; pollCool = pc
           st.foreach { s => errSeen = s.anyError; done = s.done }
           dut.clock.step(); cycle += 1
@@ -326,8 +326,8 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
 
         dut.io.dmaC.rsp.valid.poke(false.B)
         dut.io.dmaCScale.get.rsp.valid.poke(false.B)
-        dut.io.cmd.valid.poke(false.B)
-        if (errSeen) errCode = readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR).toInt
+        dut.io.cmd.foreach(_.valid.poke(false.B))
+        if (errSeen) errCode = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR).toInt
         if (done && !errSeen) dut.io.status.inFlight.expect(false.B)
 
         println(s"[$TAG] Done: cycles=$cycle done=$done err=$errSeen; " +
@@ -440,12 +440,12 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
           dut.io.dmaScaleA.get.req, dut.io.dmaScaleB.get.req,
           dut.io.dmaCScale.get.req).foreach(_.ready.poke(true.B))
         dut.io.resp.ready.poke(true.B)
-        dut.io.cmd.valid.poke(false.B)
+        dut.io.cmd.foreach(_.valid.poke(false.B))
         dut.reset.poke(true.B); dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
 
         // ---- Command helper ----
         def cmd(op: HiveCoreOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
-          transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
+          transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
         }
 
         // ---- Configure registers (same illegal config) ----
@@ -456,8 +456,8 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
         cmd(HiveCoreOp.REG_WRITE2, HiveSimCommon.SCALE_A_REG_ADDR, HiveSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE)
         cmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
 
-        prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
-        launchStart(dut.clock, dut.io.cmd)
+        prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
+        launchStart(dut.clock, dut.io.cmd(0))
 
         // ---- Poll for err (no data feeding; hardware should reject immediately) ----
         var pollSt = 0; var pollCool = 0
@@ -472,13 +472,13 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
           // Count any dmaC write requests (should be zero)
           if (dut.io.dmaC.req.valid.peek().litToBoolean) cWrites += 1
 
-          val (ps, pc, st) = irqPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool)
+          val (ps, pc, st) = irqPollStep(dut.io.cmd(0), dut.io.resp, pollSt, pollCool)
           pollSt = ps; pollCool = pc
           st.foreach { s => errSeen = s.configError; done = s.done }
           dut.clock.step(); cycle += 1
         }
-        dut.io.cmd.valid.poke(false.B)
-        errCode = readRegister(dut.clock, dut.io.cmd, dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR).toInt
+        dut.io.cmd.foreach(_.valid.poke(false.B))
+        errCode = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR).toInt
         dut.io.status.inFlight.expect(false.B)
         println(s"[$TAG] ErrCase end: cycles=$cycle err=$errSeen errCode=$errCode done=$done cWrites=$cWrites")
       }

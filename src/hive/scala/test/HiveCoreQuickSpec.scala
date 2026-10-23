@@ -731,13 +731,13 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
         Seq(dut.io.dmaC.rsp, dut.io.dmaCScale.get.rsp).foreach { r => r.valid.poke(false.B); r.payload.err.poke(false.B) }
         Seq(dut.io.dmaA.req, dut.io.dmaB.req, dut.io.dmaC.req, dut.io.dmaScaleA.get.req, dut.io.dmaScaleB.get.req,
           dut.io.dmaCScale.get.req).foreach(_.ready.poke(true.B))
-        dut.io.resp.ready.poke(true.B); dut.io.cmd.valid.poke(false.B)
+        dut.io.resp.ready.poke(true.B); dut.io.cmd.foreach(_.valid.poke(false.B))
         dut.reset.poke(true.B); dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
         // ---- 命令 helper：等待真实 fire/response，再消费响应 ----
         def cmd(op: HiveCoreOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
-          transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
+          transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
         }
-        def readReg(a: Int): BigInt = readRegister(dut.clock, dut.io.cmd, dut.io.resp, a)
+        def readReg(a: Int): BigInt = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, a)
         // 配置索引 0..11 紧排：M/NK/A/B/C/CONTROL/ScaleA/ScaleB/ScaleC/Bias/RqM/RqParam。
         // STATUS 独立移到 0x1E，IRQ 寄存器为 0x30..0x34。
         cmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, p.m, p.n.toLong | (p.k.toLong << 16))
@@ -780,8 +780,8 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
             f"reg11 wr=0x${p.controlWord14 & 0xFFFFFFFFL}%08X rd=0x$rb14%08X" }
         println(s"[$TAG] 寄存器回读对账：$regRbMsg → ${if (regRbOk) "一致 ✓" else "不一致 ✗"}")
         // START 不清历史中断；每次任务显式 W1C 清 RAW 并 unmask。
-        prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
-        launchStart(dut.clock, dut.io.cmd)
+        prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
+        launchStart(dut.clock, dut.io.cmd(0))
         var aS = 0; var bS = 0; var saS = 0; var sbS = 0; var cB = 0; var csB = 0; var pollSt = 0; var pollCool = 0
         // 【perf 端口】TB 代行外部 PMU：主循环逐拍采样 io.perf 各电平累加，跑后打印
         //   占空比（可观测性验证 + 合理性粗检；采样窗 = EXECUTE 起至 done/err/超时）
@@ -835,7 +835,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           csB = wrCh("dmaCScale", csB, if (isMxAny(p.cFmt)) plan.expCScaleAddrSeq else Seq.empty,
             dut.io.dmaCScale.get.req.valid.peek().litToBoolean, dut.io.dmaCScale.get.req.payload.addr.peek().litValue.toLong,
             dut.io.dmaCScale.get.req.payload.data.peek().litValue, v => dut.io.dmaCScale.get.rsp.valid.poke(v.B), sLog)
-          val (ps, pc, st) = irqPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool); pollSt = ps; pollCool = pc
+          val (ps, pc, st) = irqPollStep(dut.io.cmd(0), dut.io.resp, pollSt, pollCool); pollSt = ps; pollCool = pc
           st.foreach { s =>
             errSeen = s.anyError
             done = s.done
@@ -843,7 +843,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           perfPeek.zipWithIndex.foreach { case (b, i) => if (b) perfCnt(i) += 1 }
           dut.clock.step(); cycle += 1
         }
-        dut.io.dmaC.rsp.valid.poke(false.B); dut.io.dmaCScale.get.rsp.valid.poke(false.B); dut.io.cmd.valid.poke(false.B)
+        dut.io.dmaC.rsp.valid.poke(false.B); dut.io.dmaCScale.get.rsp.valid.poke(false.B); dut.io.cmd.foreach(_.valid.poke(false.B))
         if (errSeen) errCode = readReg(HiveSimCommon.ERROR_CODE_REG_ADDR).toInt
         if (predicted.isDefined && errSeen) {
           readReg(HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))

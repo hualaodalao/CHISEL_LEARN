@@ -1,99 +1,16 @@
-/** ForagerBee（采集蜂）—— 专用于 NPU 计算的 DMA 搬运模块（顶层）。
-  *
-  * 架构定位：
-  *   蜂巢（Hive）SoC 中，HiveWorker 脉动阵列负责计算，ForagerBee 采集蜂负责
-  *   在片上存储与 NPU 之间搬运张量数据：多维 stride 拷贝（COPY）与
-  *   2D 分块转置（TRANSPOSE，服务于权重/激活布局变换）。
-  *
-  * 内部结构（命令层 → 调度层 → 执行层 → 总线层）：
-  * {{{
-  *   io.cmd（单入口 Stream(FbCmd)）
-  *     → FbDispatcher：StreamFifo + 地址冲突检查（RAW/WAR/WAW）
-  *         + 通道能力匹配（TRANSPOSE 仅派发到支持转置的通道）
-  *         + 优先级编码选空闲通道
-  *     → numPorts 个 FbEngine（按 channelTranspose 配置是否含转置缓冲）
-  *     → io.bus(0..numPorts-1)：每引擎一个 FbStreamBus master
-  *   各引擎 done 回执经 StreamArbiter(roundRobin) 汇到 io.done
-  * }}}
-  *
-  * @param cfg 配置：numPorts(1..4)、queueDepth(≥1)、maxDims(1..4)、
-  *            tileSize(≥2)、maxBurstLen(1..256)、dataWidth、addressWidth、
-  *            channelTranspose（每通道是否支持转置）
-  *
-  * IO 端口语义：
-  *   cmd       : 单命令入队口（slave Stream(FbCmd)），命令字段见 [[FbCmd]]
-  *   occupancy : 命令队列当前占用深度（0..queueDepth）
-  *   done      : 完成回执（master Stream(FbDone)：tag 原样返回、err）
-  *   busy      : 任一引擎非空闲
-  *   bus       : numPorts 个 FbStreamBus master 读写口
-  *   cvtScale / cvtZeroPoint：全局量化参数（仅 enableConversion=true 构建存在，所有通道与
-  *               所有命令共享，改动前须排空——见下「量化参数活线约束」）
-  *
-  * **量化参数活线约束（软件必读，SHOULD-FIX 5）**：
-  * cvtScale/cvtZeroPoint 语义已从 v2 的「随命令锁存（cmdReg 在 sIDLE 快照）」变为「全局活线」
-  * ——顶层 Input 未寄存，组合直连各引擎 FbFormatConverter.cfg_scale/cfg_zeroPoint。由此：
-  *   1. **静默期约束**：命令排队/在途期间改动这两个引脚会即时改变已派发（乃至已入队未派发）
-  *      命令的 INT8↔float 转换结果，且**不报 err**（静默数据漂移）；最多 queueDepth+numPorts
-  *      条命令在飞。**更新前必须 `io.busy=0` 且 `io.occupancy=0`**（两信号均已在顶层暴露）。
-  *   2. **tie-off**：不用转换时置 `32'h0`；高位（scale[31:5] / zp[31:8]）被忽略，应置 0；
-  *      悬空/未驱动时 4-state 仿真为 X、硅上不定值，且不触发 err（无 assume 兜底）。
-  *   3. **能力回退**：「ch0 用 scale A、ch1 用 scale B 并发转换」不再可表达，必须排空→改引脚→重发。
-  *   4. **影响面界定**：**MX 量化器不消费 cvtScale**（FbMxQuantizer 只有 cfg_srcFmt/cfg_dstFmt/
-  *      cfg_blockSize，E8M0 scale 由块内 running-max 自算），故本约束只波及 INT8↔float 转换负载。
-  *   5. enableConversion=false 的 copy-only 构建**不存在**该端口。
-  *   6. 后续可选演进：恢复 per-command 快照语义（每引擎 2×32-bit 寄存器，代价 numPorts×64 flop）
-  *      或引入 CSR 寄存器接口；本轮按用户裁定只做顶层 IO 直供。
-  */
-
 import chisel3._
 import chisel3.util._
 
 class ForagerBee(cfg: ForagerBeeConfig = ForagerBeeConfig()) extends Module {
-  require(cfg.numPorts >= 1 && cfg.numPorts <= 4, s"ForagerBee: numPorts(${cfg.numPorts}) 必须 ∈ [1,4]")
-  require(cfg.queueDepth >= 1, s"ForagerBee: queueDepth(${cfg.queueDepth}) 必须 ≥ 1")
-  require(cfg.maxDims >= 1 && cfg.maxDims <= 5, s"ForagerBee: maxDims(${cfg.maxDims}) 必须 ∈ [1,5]")
-
   val io = IO(new Bundle {
-
-    /** 命令入队口（单入口） */
     val cmd = slave(Stream(new FbCmd(cfg)))
-
-    /** 队列占用深度 */
     val occupancy = Output(UInt(log2Up(cfg.queueDepth + 1).W))
-
-    /** 完成回执（tag/err） */
     val done = master(Stream(new FbDone(cfg)))
-
-    /** 任一引擎非空闲 */
     val busy = Output(Bool())
-
-    /** DMA 读写口（每引擎一个 FbStreamBus master） */
+    val idle = Output(Bool())
     val bus = Vec(cfg.numPorts, master(new FbStreamBus(cfg.dataWidth, cfg.addressWidth)))
-
-    /** 链式描述符独立读总线（仅 enableChaining 时存在） */
-    val chainBus = if (cfg.enableChaining) Some(master(new FbStreamBus(cfg.dataWidth, cfg.addressWidth))) else None
-
-    /** 格式转换量化 scale（仅 enableConversion 时存在）。
-      *
-      * 全局供给：所有通道、所有命令共享同一组量化参数（不再是 [[FbCmd]] 字段），
-      * 穿透路径 ForagerBee.io → FbEngine.io → FbFormatConverter.io.cfg_scale。
-      * **活线、无快照**：该 Input 未寄存，组合直连 converter；命令在飞期间改动会静默改变
-      * 转换结果（不报 err）。更新前须 io.busy=0 且 io.occupancy=0（详见类 docstring 活线约束）。
-      *
-      * 实际语义（与 [[FbFormatConverter]] 实现一致，**不是 IEEE-754 FP32**）：
-      * 仅低 5 bit `cvtScale(4,0)` 被消费，作为 2 的幂移位量（q = round(v / 2^shift)）；
-      * 高 27 bit 被忽略，集成方应置 0。故当前只支持 2 的幂 scale。
-      * enableConversion=false 的 copy-only 构建不声明该端口（避免无用输入引脚）。 */
-    val cvtScale = if (cfg.enableConversion) Some(Input(UInt(32.W))) else None
-
-    /** 格式转换量化 zero point（仅 enableConversion 时存在）。
-      *
-      * 实际语义：仅低 8 bit `cvtZeroPoint(7,0)` 被消费，按**有符号整数**解释（−128..127）；
-      * 高 24 bit 被忽略，集成方应置 0。 */
-    val cvtZeroPoint = if (cfg.enableConversion) Some(Input(UInt(32.W))) else None
   })
 
-  // --- 执行层：每通道一个引擎（按 channelTranspose/channelPermute/channelIm2col/channelScatterGather 决定是否含转置缓冲、PERMUTE、IM2COL 及 SG 支持） ---
   val engines = (0 until cfg.numPorts).map { p =>
     Module(new FbEngine(cfg,
       supportsTranspose = cfg.resolvedChannelTranspose(p),
@@ -102,31 +19,19 @@ class ForagerBee(cfg: ForagerBeeConfig = ForagerBeeConfig()) extends Module {
       supportsScatterGather = cfg.resolvedChannelScatterGather(p)
     ))
   }
-
-  // --- 全局量化参数分发：numPorts 个引擎共享同一组 cvtScale/cvtZeroPoint ---
-  // 顶层端口与引擎侧端口同为 cfg.enableConversion 编译期门控，Option 真值一致，.get 静态安全
-  if (cfg.enableConversion) {
-    for (p <- 0 until cfg.numPorts) {
-      engines(p).io.cvtScale.get     := io.cvtScale.get
-      engines(p).io.cvtZeroPoint.get := io.cvtZeroPoint.get
-    }
-  }
-
-  // --- 调度层：单队列 + 冲突检查 + 通道选择 ---
   val dispatcher = Module(new FbDispatcher(cfg))
+  val expander = Module(new FbTile2LinearExpander(cfg))
+  expander.io.in << io.cmd
+  dispatcher.io.push << expander.io.out
   io.occupancy := dispatcher.io.occupancy
 
-  // 连接调度器与引擎（总线连接按 enableSharedWritePorts 分流，见下）
   for (p <- 0 until cfg.numPorts) {
     engines(p).io.cmdIn << dispatcher.io.pop(p)
     dispatcher.io.chBusy(p) := engines(p).io.busy
     dispatcher.io.chDone(p) := engines(p).io.done.fire
   }
 
-  // --- 总线连接：写端口共享仲裁 或 1:1 直连 ---
   if (cfg.enableSharedWritePorts) {
-    // 读通道（rd/rdData）保持每引擎专用直连；
-    // 写通道（wr/wrResp）经 FbWrPortArbiter 交织分配到物理写端口。
     val wrArb = Module(new FbWrPortArbiter(cfg))
     for (p <- 0 until cfg.numPorts) {
       io.bus(p).rd << engines(p).io.bus.rd
@@ -142,31 +47,7 @@ class ForagerBee(cfg: ForagerBeeConfig = ForagerBeeConfig()) extends Module {
     }
   }
 
-  // --- 完成回执汇流 ---
-  val doneArbOut = StreamArbiterFactory().roundRobin.transactionLock.on(engines.map(_.io.done))
-
-  // --- 链式描述符控制器集成 ---
-  val expander = Module(new FbTile2LinearExpander(cfg))
-
-  if (cfg.enableChaining) {
-    val chainCtrl = Module(new FbChainController(cfg))
-    // io.cmd → chainCtrl.cmdIn
-    chainCtrl.io.cmdIn << io.cmd
-    // chainCtrl.cmdOut → expander → dispatcher
-    expander.io.in << chainCtrl.io.cmdOut
-    dispatcher.io.push << expander.io.out
-    // engines done → chainCtrl.doneIn
-    chainCtrl.io.doneIn << doneArbOut
-    // chainCtrl.doneOut → io.done
-    io.done << chainCtrl.io.doneOut
-    // chainBus 连接
-    io.chainBus.get <> chainCtrl.io.chainBus
-  } else {
-    // 直连模式：io.cmd → expander → dispatcher
-    expander.io.in << io.cmd
-    dispatcher.io.push << expander.io.out
-    io.done << doneArbOut
-  }
-
+  io.done << StreamArbiterFactory().roundRobin.transactionLock.on(engines.map(_.io.done))
   io.busy := VecInit(engines.map(_.io.busy)).asUInt.orR
+  io.idle := !io.busy && io.occupancy === 0.U
 }

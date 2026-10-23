@@ -276,10 +276,6 @@ case class HiveCoreConfig(
     * 本期禁止「双行合拍」，占用率契约见重构计划裁定 9。 */
   val cBeatsPerRowMax: Int = totalN * 32 / cDmaExtW
 
-  val registerNumRW: Int = 12
-  val registerNum: Int = 64
-
-
   val queueAdapterBufferDepth: Int = 18
 
   //MNK width

@@ -204,8 +204,7 @@ class FbMxQuantizer(dataWidth: Int) extends Module {
     val raw16 = io.in.bits((i + 1) * 16 - 1, i * 16)
     val raw32 = io.in.bits((i / 2 + 1) * 32 - 1, (i / 2) * 32)
     val (c, x) = slotTrueExp(raw16, raw32, i % 2 == 0)
-    // 仅块内剩余范围（take）内的槽位贡献
-    slotContrib(i) := c && (i.U < take)
+    slotContrib(i) := c && Mux(isFp32Src, (i / 2).U < take, i.U < take)
     slotExp(i)     := x
   }
   val anyContrib = slotContrib.asUInt.orR

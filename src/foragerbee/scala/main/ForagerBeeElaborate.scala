@@ -39,7 +39,6 @@ object ForagerBeeElaborate extends App {
     addressWidth = 32,
     channelTranspose = Seq(true, false),
     channelPermute = Seq(true, true),
-    enableChaining = true,
     enableConversion = true,
     converterPipeStages = 1,
     channelIm2col = Seq(false, true),
