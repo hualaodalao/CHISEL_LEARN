@@ -1,6 +1,6 @@
 # Hive NPU Core 总体架构
 
-文档版本：`v0.5.0-draft`
+文档版本：`v0.7.0-draft`
 
 修订日期：`2026-10-26`
 
@@ -10,6 +10,8 @@
 
 | 版本号 | 日期 | 修改内容 |
 |---|---|---|
+| v0.7.0-draft | 2026-10-26 | G0 工作负载基线收敛为 0.5B–1.5B W4 模型和 YOLO 等视觉模型；两核 1T 定义为 G0，后续四核 2T 定义为 G0 Pro |
+| v0.6.0-draft | 2026-10-26 | 将 VPU 第 12.7 节改为首版性能、能力、接口与验收要求；设定每 core 256-bit、500 MHz、FP32 8 / FP16 16 GFLOPS 草案指标；产品对比、扩展档位、工作负载和带宽推导迁至独立性能分析文档 |
 | v0.5.0-draft | 2026-10-26 | 补充 INT4/MXFP4 稠密峰值与 W4A8 区别；增加外部 FP32/FP16 VPU 的职责、公开产品配比参考、候选算力和算子/带宽约束，VPU 配置仍待外部实现确认 |
 | v0.4.0-draft | 2026-10-26 | 首发目标调整为 2 cores × 500 MHz、LPDDR4x；定义 INT8/FP8 1T（两核）与 2T（四核）SKU，重算峰值算力、decode 带宽、在途数据和 prefill 理想时间；内存位宽、速率与持续性能仍待确认 |
 | v0.3.0-draft | 2026-10-26 | 移除共享末级缓存及相关架构依赖；采用显式 SRAM 管理和 DMA 预取/双缓冲；系统互联直接连接 DRAM controller，原子同步独立实现，Host 一致性仍由平台或软件承担 |
@@ -81,29 +83,30 @@
 
 显式管理避免透明缓存的命中/缺失、替换和回写路径，但不消除 bank 冲突、互联排队或 DRAM 延迟变化；这些仍由资源规划、流控和性能验证约束。
 
-首个容量与性能评估负载采用 Qwen2.5-7B 量级模型、W4A8、batch=1，分别评估：
+G0 容量与性能评估采用 0.5B–1.5B W4 模型、YOLO 等视觉模型及其典型 batch，至少分别评估：
 
-- decode：M 很小，重点是持续权重带宽、搬运延迟和启动开销；
-- prefill：M 较大，重点是权重复用、阵列利用率和 SRAM 容量；
+- 语言模型 decode：M 很小，重点是持续权重带宽、搬运延迟和启动开销；
+- 语言模型 prefill：M 较大，重点是权重复用、阵列利用率和 SRAM 容量；
+- 视觉模型：覆盖 convolution/GEMM 主干、检测头和后处理，重点是多尺度 tensor、算子切换及端到端时延；
 - attention/VPU：单独计入 KV、向量处理与中间 tensor 流量，不能用 GEMM 峰值替代。
 
-模型仅是评估基线，不构成单模型支持范围；模型精确结构和量化布局仍需锁定。
+上述类型定义 G0 的产品评估范围，不构成单一模型支持承诺；具体模型版本、输入尺寸、batch、量化布局和验收阈值仍需锁定。
 
 ### 2.2 首发配置与资源规划
 
-首发目标为 **2 cores × 500 MHz、1T SKU**；扩展档为 **4 cores × 500 MHz、2T SKU**。GEMM 因频率与功耗约束先采用 500 MHz，不把提高频率作为首发算力达标的前提；具体时序裕量、工作电压和功耗仍需物理实现验证。
+G0 目标为 **2 cores × 500 MHz、1T SKU**；后续 G0 Pro 为 **4 cores × 500 MHz、2T SKU**。GEMM 因频率与功耗约束先采用 500 MHz，不把提高频率作为产品算力达标的前提；具体时序裕量、工作电压和功耗仍需物理实现验证。
 
 | 项目 | 当前基线或方案 | 属性 |
 |---|---|---|
-| 首发 core 数量 / GEMM clock | 2 cores × 500 MHz | 已确定产品目标，非实测结果 |
-| 扩展 SKU | 4 cores × 500 MHz | 2T 产品目标，集成与带宽需独立验证 |
+| G0 core 数量 / GEMM clock | 2 cores × 500 MHz | 1T 产品目标，非实测结果 |
+| G0 Pro core 数量 / GEMM clock | 4 cores × 500 MHz | 后续 2T 产品目标，集成与带宽需独立验证 |
 | GEMM 阵列 | 每 core T=16，256 个 PE，16-bit 物理输入 lane | 现状默认 |
-| 外部 VPU | FP32/FP16；每 GEMM core 主候选 32/64 GFLOPS，低成本候选 16/32 GFLOPS | 架构预算，非已实现能力；见 12.7 |
+| 外部 VPU | 每 core 256-bit 等效执行、500 MHz；FP32 8 / FP16 16 GFLOPS | 首版草案目标，外部实现与 PPA 待确认；见 12.7 |
 | 通用 DMA | 每 core 2 engines；当前 128-bit data、40-bit address | 现状默认 |
 | DMA 目标数据宽度 | 每 engine 256 bit | 目标 |
 | local SRAM | 每 core 8 banks × 256 bit；512 KiB 或 1 MiB/core | 目标组织，容量待确认 |
 | 每 core 外部数据接口 | AXI4，256-bit data、40-bit physical address | 目标 |
-| cluster 汇聚互联 | 按两核/四核负载分别预算；W4 decode 条件化有效权重需求 16/32 GB/s，其他流量与余量另计 | 设计约束，见 12.4 |
+| cluster 汇聚互联 | 按 G0 两核/G0 Pro 四核负载分别预算；W4 decode 条件化有效权重需求 16/32 GB/s，其他流量与余量另计 | 设计约束，见 12.4 |
 | 外部内存 | LPDDR4x；总数据位宽、速率、容量和 controller 配置待确认 | 类型已确定，带宽未冻结 |
 | 同步单元 | 独立同步状态与原子接口 | 目标，容量和协议待确认 |
 
@@ -120,12 +123,12 @@ Peak_operations    = cores × MACs_per_cycle × 2 operations/MAC × 500 MHz
 | 配置 | INT8/FP8 MAC 吞吐 | INT8 稠密峰值 | FP8 稠密峰值 | INT4/MXFP4 MAC 吞吐 | INT4 稠密峰值 | MXFP4 稠密峰值 | 产品定位 |
 |---|---:|---:|---:|---:|---:|---:|---|
 | 单 core × 500 MHz | 0.256 TMAC/s | 0.512 TOPS | 0.512 TFLOPS | 0.512 TMAC/s | 1.024 TOPS | 1.024 TFLOPS | 单核计算基准 |
-| 2 cores × 500 MHz | 0.512 TMAC/s | 1.024 TOPS | 1.024 TFLOPS | 1.024 TMAC/s | 2.048 TOPS | 2.048 TFLOPS | 1T SKU，首发 |
-| 4 cores × 500 MHz | 1.024 TMAC/s | 2.048 TOPS | 2.048 TFLOPS | 2.048 TMAC/s | 4.096 TOPS | 4.096 TFLOPS | 2T SKU，扩展 |
+| 2 cores × 500 MHz | 0.512 TMAC/s | 1.024 TOPS | 1.024 TFLOPS | 1.024 TMAC/s | 2.048 TOPS | 2.048 TFLOPS | G0，1T SKU |
+| 4 cores × 500 MHz | 1.024 TMAC/s | 2.048 TOPS | 2.048 TFLOPS | 2.048 TMAC/s | 4.096 TOPS | 4.096 TFLOPS | 后续 G0 Pro，2T SKU |
 
 本文 FP4 算力指当前支持的 **MXFP4 E2M1 × MXFP4 E2M1**，含 block scale 语义，不宣称任意非 MX FP4 通路；INT4 峰值对应 A/B 均为 INT4。INT/MX 的 W4A8 混配经 B 展开后仍跟随 8bit A，每拍 512 MAC，不能套用同格式 4bit 的翻倍峰值。scale 处理开销不另加到元素 MAC 峰值中。
 
-1T/2T 仍按 INT8/FP8 稠密 GEMM 峰值定义，不改用 INT4 或稀疏口径，也不包含 VPU。上述峰值要求各 core 同时处于有效计算阶段；装载、排空、数据搬运、bank 冲突与任务不均衡使完整任务持续算力低于峰值。4bit 格式的量化精度、scale/布局开销和有效拍占比须单独验证，峰值翻倍不承诺模型速度翻倍。未知工艺、面积、功耗和时序结果不填造数值。
+G0/G0 Pro 的 1T/2T 均按 INT8/FP8 稠密 GEMM 峰值定义，不改用 INT4 或稀疏口径，也不包含 VPU。上述峰值要求各 core 同时处于有效计算阶段；装载、排空、数据搬运、bank 冲突与任务不均衡使完整任务持续算力低于峰值。4bit 格式的量化精度、scale/布局开销和有效拍占比须单独验证，峰值翻倍不承诺模型速度翻倍。未知工艺、面积、功耗和时序结果不填造数值。
 
 ## 3. 总体架构与系统边界
 
@@ -148,7 +151,7 @@ Host / SoC master -------- CSR / doorbell / completion / IRQ
                                                           LPDDR4x
 ```
 
-图示为两核首发；四核 2T SKU 在相同系统互联增加 core2/core3 的独立入口，并重新验证聚合带宽、同步和任务划分。
+图示为 G0 两核配置；后续 G0 Pro 四核 2T SKU 在相同系统互联增加 core2/core3 的独立入口，并重新验证聚合带宽、同步和任务划分。
 
 **目标：** core 可独立执行，也可通过 peer SRAM window、共享 DRAM 数据和事件协同。系统互联直接路由到 DRAM controller 或 peer SRAM，不经过 NPU 内建透明缓存。原子同步由独立同步单元处理；Host 所在平台的 cache/coherence 仍属于外部集成责任。
 
@@ -242,13 +245,13 @@ GEMM 的 A/B/C 物理数据口默认各 256 bit；scale/epilogue 参数采用独
 **目标：** 外部 VPU 支持 FP32 和 FP16 算术，承担 GEMM 之外的向量处理，而不是再建一个同规模矩阵阵列：
 
 - FP16 用于向量输入/输出、逐元素加乘、激活和带宽敏感的中间 tensor；
-- FP32 用于归一化、softmax 等需要较高动态范围或数值稳定性的归约/累加；FP16 输入、FP32 累加和结果转换的混合精度能力须向外部实现确认，不能仅凭“两种格式都支持”推断；
+- FP32 用于归一化、softmax 等需要较高动态范围或数值稳定性的归约/累加；要求支持 FP16 输入转换后以 FP32 累加及结果转换，原生混合精度指令与具体吞吐由外部接口规格确认；
 - 典型算子包括 RMSNorm/LayerNorm、SiLU/GELU、softmax、RoPE、residual add、格式转换及量化辅助；GEMM 已融合的 bias/requant 等工作不重复计入 VPU；
 - QKᵀ 和 attention probability×V 优先按矩阵运算规划，但当前 GEMM 默认输入不支持 FP16/FP32，必须验证量化后的格式与精度；若这些矩阵乘落到 FP16 VPU，单独增加 attention 算力预算，不能混入小型后处理假设。
 
 基础需求包括 add/mul/FMA、比较、sum/max 归约、掩码/tail 和 FP16↔FP32 转换；exp、reciprocal、rsqrt 及可选 GELU 所需特殊函数可由硬件或向量软件实现，但应定义误差、启动间隔和端到端算子吞吐。FMA 的 GFLOPS 不代表每秒可完成同等数量的 exp/归约。
 
-本文只定义能力与吞吐契约，不指定外部 VPU 的 ISA、流水级或内部模块。每 GEMM core 配套一份 VPU 吞吐预算是初评方案；若采用 cluster 共享 VPU，应覆盖聚合吞吐、各 core 数据访问和公平调度，而不能只保留单核容量。算力配比、候选档位及带宽约束见第 12.7 节。
+本文只定义能力与吞吐契约，不指定外部 VPU 的 ISA、流水级或内部模块。首版目标为每 NPU core 配套 256-bit 等效执行能力、FP32 8 / FP16 16 GFLOPS；若采用 cluster 共享 VPU，必须覆盖对应 SKU 的聚合吞吐、各 core 数据访问和公平调度，不得只保留单核容量。性能、接口与验收要求见第 12.7 节；产品配比、扩展档位和工作负载推导见[性能分析](performance_analysis.md#2-vpu-配比选型与工作负载分析)。
 
 ## 5. 存储子系统
 
@@ -335,9 +338,9 @@ DMA 的读请求和写请求分别译码：
 
 **目标：** 每 core 独立 256-bit AXI4 ingress，40-bit 地址；支持 DRAM、peer SRAM 和独立同步单元路由，以及权重/KV/控制流量 QoS。
 
-256-bit 接口若运行于 500 MHz，单向数据峰值为 16 GB/s；两核/四核独立入口的峰值总和为 32/64 GB/s，不代表 DRAM 可提供同等持续带宽。system clock 尚未冻结，不与 GEMM 降频自动绑定。
+256-bit 接口若运行于 500 MHz，单向数据峰值为 16 GB/s；G0 两核/G0 Pro 四核独立入口的峰值总和为 32/64 GB/s，不代表 DRAM 可提供同等持续带宽。system clock 尚未冻结，不与 GEMM 降频自动绑定。
 
-cluster 若汇聚为单路 `256-bit @ 500 MHz`，仅有 16 GB/s：对两核 W4 decode 的条件化权重需求已无其他流量余量，对四核 32 GB/s 需求则不足。更宽主干、多并行通路和独立 system clock 均是实现选项，按第 12 章负载和 LPDDR4x 实际可用带宽确定，不把入口峰值总和直接指定为主干保证值。
+cluster 若汇聚为单路 `256-bit @ 500 MHz`，仅有 16 GB/s：对 G0 两核 W4 decode 的条件化权重需求已无其他流量余量，对 G0 Pro 四核 32 GB/s 需求则不足。更宽主干、多并行通路和独立 system clock 均是实现选项，按第 12 章负载和 LPDDR4x 实际可用带宽确定，不把入口峰值总和直接指定为主干保证值。
 
 remote SRAM 访问也竞争 local banks，必须计入 local 仲裁，不能在带宽表中隐去。
 
@@ -449,7 +452,7 @@ NPU 数据路径不设置透明缓存，不等于 Host/local CPU 没有 cache；
 | CSR/control | slave | AXI4-Lite 32-bit 或 APB | 配置、doorbell、PMU；协议待确认 |
 | local CPU request/response | slave/master | Decoupled custom request | 已有 scheduler 骨架，完整事务语义待实现 |
 | VPU dependency event | 双向 | launch/dependency/done/error | 外部接口待确认，不替代 VPU 指令口 |
-| VPU local data | slave to VPU master | 256-bit local request 为初始候选 | 直连方式、读写并发、寄存器复用与服务配额待确认；带宽约束见 12.7 |
+| VPU local data | slave to VPU master | 1 × 256-bit local request，每拍最多一个读或写 | 首版目标；返回顺序、在途深度与服务配额须在外部接口规格冻结，见 12.7 |
 | interrupt | output | local/Host 分路 level；MSI 为可选 | 路由待确认 |
 | core event link | 双向 | event ID + delivery/ack | 可选增强，未实现 |
 | debug access | 双向 | 系统 debug bridge 或 JTAG 集成 | 暂停、状态、trace；待确认 |
@@ -466,7 +469,7 @@ ring 的 entry 编码、head/tail、满空、回绕、fetch 失败和恢复尚�
 
 ### 9.3 多核任务划分、数据交换与 barrier
 
-**初评划分建议：** 对单请求 GEMM 优先按 N 维输出列分片，每 core 使用不同 B 权重片，共享 A 通过复制或系统搬运分发，输出按列拼接。两核/四核 SKU 的权重带宽估算均以不重复读取同一层完整权重为前提；activation 分发和结果聚合另计流量。
+**初评划分建议：** 对单请求 GEMM 优先按 N 维输出列分片，每 core 使用不同 B 权重片，共享 A 通过复制或系统搬运分发，输出按列拼接。G0 两核/G0 Pro 四核 SKU 的权重带宽估算均以不重复读取同一层完整权重为前提；activation 分发和结果聚合另计流量。
 
 按 M 维分片可能让多个 core 重读权重；独立请求的并行提高的是聚合吞吐，不等同于单请求加速。K 维分片需要跨 core partial sum 归约，不因现有 GEMM 内部 K pass 累加就默认支持，初版暂不采用。
 
@@ -482,7 +485,7 @@ barrier 使用共享同步空间中的 atomic RMW + poll，前提是 atomic 与 
 
 ### 10.1 时钟域与 CDC
 
-GEMM 的两核/四核 SKU 均以 500 MHz 为目标。**首版组织建议：** scheduler、GEMM、DMA、local interconnect 和 SRAM 处于同一 500 MHz core clock；其中非 GEMM 单元的共域方案仍需集成确认。system interconnect、DRAM controller 与 LPDDR4x PHY 可使用独立时钟，频率和比例由系统选型决定。
+GEMM 的 G0 两核/G0 Pro 四核 SKU 均以 500 MHz 为目标。**首版组织建议：** scheduler、GEMM、DMA、local interconnect 和 SRAM 处于同一 500 MHz core clock；其中非 GEMM 单元的共域方案仍需集成确认。system interconnect、DRAM controller 与 LPDDR4x PHY 可使用独立时钟，频率和比例由系统选型决定。
 
 AXI bridge 跨域需成套处理地址、数据、响应及在途归属；异步 FIFO 必须配合 reset/flush 策略。IRQ/event 使用不会丢失通知的跨域机制，不能直接采样单拍脉冲。
 
@@ -530,7 +533,7 @@ debug 暂停必须区分停止新派发和冻结在途事务；trace 需要 comm
 
 所有数字区分：接口峰值、有效计算拍并行度、条件化持续目标、完整任务实测。byte/s 使用对应时钟域实际频率；GB 为十进制，KiB/MiB 为二进制。INT8/INT4 使用 TOPS，FP8/MXFP4 使用 TFLOPS，VPU FP32/FP16 使用 GFLOPS，MAC/FMA 均按 2 operations 计数，SKU 的 T 不代表 TMAC/s。不同精度的峰值比只表示资源配比，不等于相同算法的加速比。
 
-首发两核、扩展四核、GEMM 500 MHz 和 LPDDR4x 类型是产品目标；模型布局、非 GEMM 时钟、内存数据位宽/速率、效率与首拍延迟仍未冻结。第 2.3 节给出稠密峰值，当前未提供 cluster 持续吞吐、PPA 或端到端 token/s 实测。
+G0 两核与后续 G0 Pro 四核、GEMM 500 MHz 和 LPDDR4x 类型是产品目标；模型布局、非 GEMM 时钟、内存数据位宽/速率、效率与首拍延迟仍未冻结。第 2.3 节给出稠密峰值，当前未提供 cluster 持续吞吐、PPA 或端到端性能实测。
 
 ### 12.2 SRAM 容量与 tiling
 
@@ -543,17 +546,11 @@ C_bytes        = M × N × output_bytes
 Required_SRAM  = A + B_double + C + scale/parameters + scratch/reserve
 ```
 
-这里的双缓冲为相邻任务 B 区域，不表示 PE 已支持双 bank；N 必须采用模块实际编程/补齐宽度。公式还需按具体量化方案计入 scale 和 padding。
-
-| 示例 | 数据占用 | 规划含义 |
-|---|---|---|
-| K=18944，N=16 | B 双缓冲 296 KiB；每 A 行 18.5 KiB | 512 KiB 扣 B 后原始可容 11 行 A；1 MiB 可容 39 行，均未扣其他区 |
-| 同上，保留输出/scratch 等 | M≈8 或 M≈32 | 对应 512 KiB/1 MiB 的规划候选，不是容量保证 |
-| K=3584，N=64，M=48 | B 双缓冲 224 KiB，A 168 KiB | 512 KiB 尚需容纳 C、参数和其他用户 |
+这里的双缓冲为相邻任务 B 区域，不表示 PE 已支持双 bank；N 必须采用模块实际编程/补齐宽度。公式还需按具体量化方案计入 scale 和 padding。容量评估必须使用第 2.1 节已批准的 G0 模型与视觉输入，并同时计入当前任务输入/输出、下一任务预取、上一任务写回、VPU scratch 和保留区；在模型及布局冻结前不以单个算例承诺 512 KiB 或 1 MiB 可容纳的 M/K/N 范围。
 
 **现状：** GEMM 默认 `cBufferDepth=64,T=16` 时单命令 `M≤48`。增加结果 buffer 到 256 只在目标 M 超出现有上限等场景才必要，不能作为所有 prefill 的必选前置。
 
-**取舍：** 512 KiB 偏面积/decode；1 MiB 有利于大 K prefill 和 VPU 共存，但收益需通过完整任务利用率而非容量比直接推断。
+**取舍：** 512 KiB 偏面积/decode；1 MiB 有利于较大 K 的 prefill、视觉中间 tensor 和 VPU 共存，但收益需通过完整任务利用率而非容量比直接推断。
 
 ### 12.3 Local SRAM 带宽与请求占用
 
@@ -566,7 +563,7 @@ Required_SRAM  = A + B_double + C + scale/parameters + scratch/reserve
 | GEMM scale A/B read | 各 4 B/cycle | 参数访问可能共用 scale A 口 |
 | GEMM C scale write | 1 B/cycle | 低占空比假设，不作为免仲裁理由 |
 | DMA 两 engine 本地一侧 | 合计 64 B/cycle | 目标 256-bit/engine，DRAM↔local 或 peer↔local |
-| VPU local | 32 B/cycle | 单口初始候选，读写合计预算；不保证 VPU 持续 FMA 峰值，见 12.7 |
+| VPU local | 32 B/cycle | 首版单个 256-bit 请求口，读写合计峰值；不保证 VPU 持续 FMA 峰值，见 12.7 |
 | CPU/debug | 16 B/cycle | 低优先级预算，非已实现接口 |
 
 上述压力预算不计 C-scale 为 216 B/cycle，计入为 217 B/cycle；它是接口字节总和，不是持续带宽证明：
@@ -590,10 +587,10 @@ W8: 32 MAC/cycle × 1.0 B/weight × 500 MHz = 16 GB/s/core
 
 | SKU | W4 有效权重需求 | W8 有效权重需求 |
 |---|---:|---:|
-| 1T，两核 × 500 MHz | 16 GB/s | 32 GB/s |
-| 2T，四核 × 500 MHz | 32 GB/s | 64 GB/s |
+| G0，1T，两核 × 500 MHz | 16 GB/s | 32 GB/s |
+| 后续 G0 Pro，2T，四核 × 500 MHz | 32 GB/s | 64 GB/s |
 
-32 MAC/cycle 是完整负载的评估假设，不由 512 MAC/有效计算拍直接保证，也不是 SKU 的峰值定义。W4A8 是首个模型带宽评估基线，不能用其半字节权重流量代表 INT8/FP8 的 W8 流量。权重装载、PE 切换、子字重复读、scale 和结果流量需另测。两核/四核服务单请求时均采用第 9.3 节的 N 维权重分片假设；若权重复制或任务分配不均，该带宽预算不能直接换算成单请求速度。
+32 MAC/cycle 是完整负载的评估假设，不由 512 MAC/有效计算拍直接保证，也不是 SKU 的峰值定义。W4A8 是首个模型带宽评估基线，不能用其半字节权重流量代表 INT8/FP8 的 W8 流量。权重装载、PE 切换、子字重复读、scale 和结果流量需另测。G0 两核/G0 Pro 四核服务单请求时均采用第 9.3 节的 N 维权重分片假设；若权重复制或任务分配不均，该带宽预算不能直接换算成单请求速度。
 
 **LPDDR4x 与系统带宽：** 内存总数据位宽和传输速率尚未冻结，按所有并行通道的总数据位宽计算，不再次乘 DDR 系数：
 
@@ -621,87 +618,82 @@ W4 latency coverage/cluster: two cores = 4 KiB; four cores = 8 KiB
 
 持续目标受最窄串行端点限制。提高 DMA 位宽而不解决 read outstanding、系统互联和 DRAM controller 后端并行度，无法闭环；SRAM 预取/双缓冲也不能降低没有复用的一次性权重流量。
 
-按每 token 有效权重约 3.6–3.8 GB 的假设，纯权重上限为 `BW_weight_available / weight_bytes_per_token`。若实际可用权重带宽达到上述 16/32 GB/s，分别约为 4.2–4.4/8.4–8.9 token/s；这些只是两核/四核条件化带宽场景，不是 LPDDR4x 选型保证或端到端实测，attention/VPU 和调度仍会限制速度。
+模型级 decode 的纯权重上限按 `BW_weight_available / weight_bytes_per_token` 计算；`weight_bytes_per_token` 必须来自第 2.1 节已批准的 G0 模型、量化格式和实际布局。该上限不是端到端性能保证，attention/VPU、KV、调度和其他 SoC 主设备仍会限制速度。
 
 ### 12.5 Prefill 与 KV 容量
 
-按第 2.3 节 INT8/FP8 稠密峰值，两核/四核的 MAC 吞吐分别为 0.512/1.024 TMAC/s。采用“约 7B MAC/token × 1024 token”的主矩阵粗算：
+G0/G0 Pro 的 prefill 理想计算时间按已批准模型的主矩阵总 MAC 数除以第 2.3 节对应 SKU 的峰值 MAC 吞吐计算，但该结果只用于建立计算下界。权重装载、阵列启动/排空、attention/VPU、调度、数据搬运和实际利用率必须另行计入，不能用理想时间承诺端到端 prefill 时延或 G0 Pro 相对 G0 的实测加速比。若采用 A4/W4，还必须证明 activation 量化格式合法且精度满足模型验收要求，不能把同格式 4bit 峰值作为 W4A8 的默认收益。
 
-| SKU | 理想 MAC 吞吐 | 主矩阵理想时间 |
-|---|---:|---:|
-| 1T，两核 × 500 MHz | 0.512 TMAC/s | 约 14 s |
-| 2T，四核 × 500 MHz | 1.024 TMAC/s | 约 7 s |
-
-这些是计算峰值对应的理想时间，不含权重装载、阵列排空、attention/VPU、调度和数据搬运，不能作为 prefill 延迟保证或四核相对两核的实测加速比。若整个主矩阵负载可合法使用 A4/W4，按第 2.3 节峰值计算的两核/四核理想时间为 7/3.5 s；这要求 activation 也量化为 4bit 且精度可接受，不能作为 W4A8 模型的默认收益。
-
-KV 必须按真实模型 KV heads、层数、head dimension、存储格式和量化附加项推导：
+KV 必须按已批准 G0 模型的 KV heads、层数、head dimension、上下文长度、存储格式和量化附加项推导：
 
 ```text
 KV_bytes/token = layers × 2(K,V) × kv_heads × head_dim × bytes/element
-28 × 2 × 4 × 128 × 1 = 28672 B = 28 KiB/token
-4096 tokens          = 112 MiB
+KV_capacity    = KV_bytes/token × context_length + scale/page/padding overhead
 ```
 
-这是四个 KV heads 的示例，不用 attention query heads 替代。模型配置未锁定前不发布精确容量承诺；MX/block scale、分页和 padding 还可能增加占用。
+不得用 attention query heads 替代 KV heads。模型配置未锁定前不发布精确容量承诺；MX/block scale、分页和 padding 还可能增加占用。
 
 ### 12.6 PPA 与测量依据
 
 500 MHz 是针对 GEMM 频率/功耗约束的产品目标，不等于已完成时序签核，也不据降频比例推算节能比例。尚无可用于本文定量预算的面积、功耗和时序实测。
 
-后续报告至少锁定 RTL 基线、SKU/core 数量、参数、SRAM macro、工艺、电压、工具、各时钟域频率、LPDDR4x 配置、工作负载和测量起止事件；两核/四核、8-bank/16-bank、512 KiB/1 MiB 需同时比较 PPA 与持续任务吞吐。
+后续报告至少锁定 RTL 基线、SKU/core 数量、参数、SRAM macro、工艺、电压、工具、各时钟域频率、LPDDR4x 配置、工作负载和测量起止事件；G0 两核/G0 Pro 四核、8-bank/16-bank、512 KiB/1 MiB 需同时比较 PPA 与持续任务吞吐。
 
-### 12.7 VPU 算力配比与吞吐需求
+### 12.7 VPU 性能指标与接口要求
 
-#### 12.7.1 公开产品参考与适用边界
+**目标：** 首版每个 NPU core 配套一份 256-bit 等效向量执行能力，VPU 目标时钟为 500 MHz，支持 FP32 和 FP16。以下是本架构草案的集成要求，尚未完成外部实现确认或 PPA 验证；产品对比、宽度选型及工作负载推导归入[性能分析](performance_analysis.md#2-vpu-配比选型与工作负载分析)，不作为本节的替代指标。
 
-公开 NPU 产品常只披露整数 TOPS 或 MAC 数，未披露独立 FP32/FP16 向量峰值，不能据总 TOPS 反推出 VPU 配比。下表用可核验的矩阵与通用浮点能力作参考；GPU CUDA 是通用浮点吞吐的代理，**不是独立 VPU**，也不把 CPU、DLA 或其他引擎相加后作为 GEMM 分子。资料来源见附录 B.3。
+#### 12.7.1 计算与数据接口指标
 
-| 产品/口径 | GPU 矩阵 INT8 稠密峰值 | 通用 FP32 峰值 | 通用 FP16 峰值 | INT8 / FP32 | INT8 / FP16 |
-|---|---:|---:|---:|---:|---:|
-| Jetson AGX Orin 64GB | 85 TOPS | 5.3 TFLOPS | 10.6 TFLOPS | 约 16.0:1 | 约 8.0:1 |
-| Jetson Orin Nano 8GB（Super） | 33 TOPS | 2.1 TFLOPS | 4.2 TFLOPS | 约 15.7:1 | 约 7.9:1 |
-| Jetson AGX Xavier GPU | 22 TOPS | 约 1.40 TFLOPS，推导值 | 未在本次引用中独立核验 | 约 15.7:1 | 不推算 |
+| 指标 | 每 NPU core | G0 两核 1T SKU 聚合 | 后续 G0 Pro 四核 2T SKU 聚合 |
+|---|---:|---:|---:|
+| VPU 目标时钟 | 500 MHz | 500 MHz | 500 MHz |
+| 等效向量执行宽度 | 256 bit：8 个 FP32 或 16 个 FP16 元素 | 每 core 同配置 | 每 core 同配置 |
+| FP32 FMA 稳态吞吐 | 8 FMA/cycle | 16 FMA/cycle | 32 FMA/cycle |
+| FP32 FMA 峰值 | 8 GFLOPS | 16 GFLOPS | 32 GFLOPS |
+| FP16 FMA 稳态吞吐 | 16 FMA/cycle | 32 FMA/cycle | 64 FMA/cycle |
+| FP16 FMA 峰值 | 16 GFLOPS | 32 GFLOPS | 64 GFLOPS |
+| local 数据请求端口 | 1 × 256 bit，每拍最多一个读或写请求 | 每 core 独立端口 | 每 core 独立端口 |
+| local 数据接口峰值 | 32 B/cycle；读写合计 16 GB/s | 合计 32 GB/s | 合计 64 GB/s |
 
-Orin 两行取厂家同一型号表的 `GPU Tensor Core INT8 Performance` 稠密值与 `GPU CUDA Core Performance`，不使用 170/67 sparse TOPS，也不使用整机含 DLA 的 AI TOPS。Xavier 的 FP32 按厂家披露的 512 CUDA cores、1.37 GHz，以及每核每拍一个 FP32 FMA（2 operations）推导为 1.403 TFLOPS；厂家列出的 11 FP16 TFLOPS 是矩阵峰值，不能填入通用 FP16 列。型号、频率、功耗档和支持精度不同，公开峰值的比不保证同时持续实现。
+FMA 按 2 operations 计数；FP32/FP16 是替代运行模式，峰值不得相加。FP16 16 GFLOPS 要求每拍处理 16 个有效 FP16 FMA，外部实现必须提供相应打包算术能力。等效执行宽度规定元素吞吐，不规定 ISA 向量长度、物理 lane 组织或 SRAM 数据口以外的内部端口宽度。
 
-Arm Ethos-U85 页面披露 128–2048 MAC 和最高 4 TOPS，但未给独立 FP32/FP16 向量 GFLOPS，故不计算 GEMM/VPU 比。以上只是公开示例，不构成“行业统一 16:1”标准；本项目 FP8/INT8 与 FP32/FP16 的数值配比也不能当成同精度算法加速比。
+计算峰值的验收条件为操作数驻留寄存器或局部缓冲、无访存反压、足够独立 FMA 消除依赖停顿、全部元素有效，并排除流水线启动/排空。多核聚合峰值要求各 core 同时满足这些条件。local 数据接口峰值按连续满宽请求、无仲裁冲突和无返回反压计数；它不是独立读写各 16 GB/s，也不保证 SRAM 流式算子达到寄存器内 FMA 峰值。
 
-#### 12.7.2 VPU 候选算力档位
+#### 12.7.2 算术与数值能力要求
 
-**初评建议：** 每 GEMM core 按 **FP32 32 GFLOPS、FP16 64 GFLOPS** 预留主候选预算；低成本候选为 **FP32 16 GFLOPS、FP16 32 GFLOPS**。这不是已确定的外部 VPU 配置，也不是所有端侧负载的最低必要值，最终由第 12.7.3–12.7.4 节的工作量、时延和带宽验证决定。
+| 能力 | 首版要求 |
+|---|---|
+| 基础算术 | FP32/FP16 add、mul、FMA、比较与选择；FMA 仅在最终结果处舍入 |
+| 混合精度 | FP16 输入转为 FP32 后执行累加/归约，支持结果转回 FP16；可由转换加 FP32 算术实现，不要求原生混合 FMA 或 FP16 双倍累加吞吐 |
+| 归约 | sum/max；归一化与 softmax 的关键累加使用 FP32；明确归约顺序与误差界限 |
+| 数据转换 | FP16↔FP32；量化辅助涉及的转换、舍入和饱和语义必须在算子规格中定义 |
+| 掩码与 tail | 支持非满向量长度；无效元素不得更新结果、参与归约或产生越界访问 |
+| 特殊函数 | exp、reciprocal、rsqrt 提供可调用实现，可为硬件或向量软件；分别定义输入域、误差、启动间隔或软件服务时间 |
+| 浮点边界 | 明确舍入模式、NaN/Inf、subnormal、signed zero 和异常可见性；不得用格式支持代替数值契约 |
 
-以 VPU 500 MHz、每 lane 每拍一 FMA 为演算基准，单精度峰值为 `FP32_lanes × 2 × f_VPU`。主候选对应每拍 32 个 FP32 FMA，低成本候选对应 16 个；FP16 翻倍要求外部实现每拍提供两倍有效 FP16 FMA，不能仅因支持 FP16 就自动获得。FP16 输入/FP32 累加路径的实际吞吐另行确认；两种峰值是替代模式，不同时相加。这里只表达吞吐要求，不规定内部 lane 的物理组织。
+外部实现须满足第 4.4 节的向量算子范围。完整 FP16 attention 矩阵运算不属于本节 FMA 峰值的端到端性能保证；算子落点必须在模型执行计划中明确，不得将当前 GEMM 不支持的输入格式视为已覆盖。
 
-| 候选 | 每 GEMM core 的 VPU FP32 / FP16 | 两核 1T SKU 聚合 FP32 / FP16 | 四核 2T SKU 聚合 FP32 / FP16 | INT8/FP8 GEMM / VPU FP32 | INT8/FP8 GEMM / VPU FP16 |
-|---|---:|---:|---:|---:|---:|
-| 低成本 | 16 / 32 GFLOPS | 32 / 64 GFLOPS | 64 / 128 GFLOPS | 32:1 | 16:1 |
-| 主候选 | 32 / 64 GFLOPS | 64 / 128 GFLOPS | 128 / 256 GFLOPS | 16:1 | 8:1 |
+#### 12.7.3 集成与前进性要求
 
-主候选的数值配比与上表 Orin 通用浮点参考相近；同格式 INT4/MXFP4 的 GEMM 峰值翻倍后，对主候选 FP32/FP16 的比为 32:1/16:1。不得因此直接要求 VPU 也翻倍，须看真实向量工作量是否增加。若采用 cluster 共享 VPU，表中聚合值仅是吞吐预算，跨 core 取数、归约、调度公平性与本地 SRAM 路由仍要独立闭环。
+- VPU 经 local interconnect 访问 local SRAM，遵循第 7.3 节缓冲区所有权和第 8.2 节结果可见性规则；不得绕过 READY 依赖读取输入或提前发布完成。
+- local 数据口支持 byte enable、返回归属、反压和错误传递；adapter 保持双方约定的返回顺序，并按返回缓冲容量限制在途请求。
+- 调度必须为 VPU 和 DMA 提供有限背压下的前进性；VPU 请求反压时，已接受事务的响应仍须排空。
+- VPU 的 launch/dependency/done/error 与 scheduler 建立命令关联；done 与写结果可见分别定义，异常不得被报告为成功。
+- 若改为 cluster 共享 VPU，必须满足对应 SKU 的聚合计算指标，保留各 core 的本地数据访问能力及公平服务，不以共享单核资源替代上述要求。
 
-#### 12.7.3 按端侧算子工作量定档
+#### 12.7.4 验收与规格冻结要求
 
-对每个精度分别统计普通运算量 `F_V`、允许的向量阶段时间 `t_V` 和可达利用率 `u_V`，要求 `P_V_peak ≥ F_V/(t_V×u_V)`。若允许计算与向量流水重叠，还需满足 `P_V_peak×u_V ≥ rho×P_G_peak×u_G`，其中 `rho=F_V/F_G` 来自同一任务的实际算子统计，不由产品峰值比例代替；没有重叠时，GEMM/VPU 时间应相加。
+| 验收项 | 必须提供的结果 |
+|---|---|
+| 峰值计算 | FP32 8、FP16 16 FMA/cycle/core 的稳态测量；记录频率、有效元素、依赖条件和测量窗口 |
+| local 数据口 | 256-bit 满宽请求的读、写及混合序列；核对读写合计每拍最多一请求、数据正确性、反压及返回顺序 |
+| 非 FMA 能力 | add/mul、混合精度、转换、sum/max、exp/reciprocal/rsqrt 分项给出吞吐、延迟或启动间隔与误差；不得套用 FMA GFLOPS |
+| 完整算子 | RMSNorm/LayerNorm、softmax、SiLU、RoPE、residual add、格式转换及量化辅助的数值与服务时间；GELU 仅在目标模型采用时验收 |
+| 系统并发 | GEMM/DMA/VPU 同时运行时的 SRAM 有效字节、bank 冲突、等待与完成可见性；G0 两核和后续 G0 Pro 四核分别验证 |
+| 边界与恢复 | tail、非有限值、地址边界、持续反压、异常和 reset/drain，不丢响应、不误报完成 |
 
-仅作敏感性演算：若普通向量工作量占矩阵 operations 的 2%，GEMM/VPU 可达利用率分别为 50%/25%，则每 core 在 0.512T GEMM 峰值下需要约 20.48 GFLOPS 向量峰值，32 GFLOPS 主候选可作为起点。2% 和利用率均非当前模型实测，不是通用端侧比例；exp、rsqrt、除法与归约串行延迟须另外建模。
-
-对第 2.1 节模型量级，进一步采用 `layers=28,H=3584,I=18944,query_heads=28,kv_heads=4,head_dim=128` 作未冻结算例。每 token 的普通向量预算可按以下量级估算：两次 RMSNorm/层约 `2×layers×(4H+2)`；Q/K RoPE 每二元组四乘两加，约 `3×layers×(H+kv_heads×head_dim)`（旋转系数已备好）；SwiGLU 约 `4×layers×I`；softmax 普通运算暂按 `4×layers×query_heads×context` 预算。context=4096 时合计约 16.11M operations/token，尚未包含所有 residual、转换、比较和量化辅助。
-
-同一算例的 SiLU/softmax 约需 `layers×(I+query_heads×context)=3.74M` 次 exp/token。若采用第 12.4 节四核的条件化 8.9 token/s 场景，上述普通运算约 0.143 GOP/s，而 exp 约 33.3M 次/s，均为整个请求的聚合值。这说明 decode 的普通浮点量可能远小于 FMA 峰值，但仍需 exp/reciprocal/rsqrt、归约与访存的独立吞吐预算；若只允许向量阶段占部分 token 时间，瞬时服务能力须按该时间窗口上调。多核 N 分片不保证所有归约与共享 activation 的向量工作均匀分摊。
-
-attention 矩阵是否由 GEMM 承担会显著改变需求。若 FP16 VPU 负责完整 QKᵀ 与 probability×V，采用同一参数，context=4096 的 decode 额外工作量约为 `4×layers×H×context=1.644G FLOP/token`；1024-token causal prefill 则约为 `2×layers×H×S×(S+1)=210.66G FLOP`（S=1024），忽略尾块无效计算。两核主候选聚合 FP16 128 GFLOPS 即使满利用也需约 1.65 s，四核 256 GFLOPS 需约 0.82 s，尚未含 softmax、KV 搬运和低利用率损失；这必须加到完整任务模型，不能假定 FP16 attention 已在当前低精度 GEMM 中完成。
-
-因此低成本候选适用于经验证的轻量后处理、较低 token/s 或面积优先目标；主候选为 prefill、特殊函数软件展开和不同端侧模型预留空间，但也不保证长上下文 FP16 attention 无瓶颈。定档前应锁定算子落点、精度误差、上下文长度、并发请求数及向量阶段允许时延，不只统计 FMA。
-
-#### 12.7.4 访存与非 FMA 吞吐约束
-
-VPU 单个 256-bit local 口若在 500 MHz 下每拍只服务一个读或写，读写合计峰值为 16 GB/s，不能把它写成读 16 GB/s + 写 16 GB/s。同时，32 个 FP32 FMA/拍的寄存器内峰值不等于从 SRAM 逐元素供数的持续值。
-
-以系数已在寄存器的 `y=a×x+b` 为例，每元素读 x、写 y，FP32 需 8 B、FP16 需 4 B，均贡献 2 FLOP；16 GB/s 的理想带宽上限分别仅为 **4/8 GFLOPS**，尚未扣仲裁和 bank 冲突。向量 a/b 也需流式读取时字节更多；提高 FMA lane 数不能消除这个限制。若希望该 FP32 流式算子持续达到 16/32 GFLOPS，分别需至少 64/128 GB/s 读写有效带宽，不能仍用初始单口预算宣称达标。
-
-首版优先评估向量寄存器/局部缓冲复用和算子融合，减少中间结果落 SRAM；再按 measured kernel bytes 及允许的服务时间决定是否增加读写并发、端口或服务配额。若拓宽 VPU 数据路径，须同步重算第 12.3 节的请求压力、GEMM/DMA 并发和 bank 冲突，不仅改算力表。
-
-最终外部接口应分别给出 FP32/FP16 FMA、FP16 输入/FP32 累加、转换、sum/max 归约，以及 exp/reciprocal/rsqrt 的启动间隔与精度；纯向量软件实现特殊函数时按实际指令数和依赖链测量。VPU 算力预算以端到端算子服务时间闭环，不把 GFLOPS 作为所有算子完成率。
+**规格冻结前置：** 外部 VPU 接口规格必须填入非 FMA 指令吞吐、混合精度路径吞吐、特殊函数数值误差、端到端算子允许服务时间，以及 tag/在途深度、事件与 reset/drain 协议的批准值。上述细项目前待确认，未填入唯一值前不得判定 VPU 集成验收完成；本节不虚构延迟、误差或流式吞吐保证。
 
 ## 13. 架构取舍、实现差距与待确认项
 
@@ -718,21 +710,21 @@ VPU 单个 256-bit local 口若在 500 MHz 下每拍只服务一个读或写，�
 | compiler/runtime 数据计划 | 系统级驻留、预取和复用契约待定义 | 明确 SRAM 分配、tensor 生命周期、DMA 依赖和容量不足时的搬运策略 |
 | 系统互联 | 尚未实现 cluster 系统访问 | 实现 40-bit 路由、DRAM/peer 聚合并行度、QoS 及 CDC |
 | 独立同步单元 | 尚未实现 | 定义同步窗口、原子/普通访问序列化和任务关联 |
-| CPU/VPU 外部接口 | 契约未锁定，VPU 算力为候选预算 | 确认 FP32/FP16、特殊函数/归约吞吐、local 数据服务配额、事件与可见性规则 |
+| CPU/VPU 外部接口 | VPU 首版指标已在草案定义，外部实现与细项契约未确认 | 按 12.7 核对 256-bit、FP32 8 / FP16 16 GFLOPS，并冻结特殊函数/归约、local 数据服务配额、事件与可见性规则 |
 
 ### 13.2 架构决策清单
 
 | 决策 | 已确定目标 / 待确认参数 | 决策依据 |
 |---|---|---|
-| SKU 与 GEMM 频率 | 首发两核 1T，扩展四核 2T，均为 500 MHz；物理签核待完成 | INT8/FP8 稠密峰值、频率/功耗约束和任务划分效率 |
+| SKU 与 GEMM 频率 | G0 为两核 1T，后续 G0 Pro 为四核 2T，均为 500 MHz；物理签核待完成 | INT8/FP8 稠密峰值、频率/功耗约束和任务划分效率 |
 | DRAM | LPDDR4x 已确定；总位宽、速率、容量与 controller 配置待确认 | 按 SKU 验证有效持续带宽、功耗和平台约束 |
-| 时钟与系统主干 | 非 GEMM 共域方案、system clock、聚合宽度与并行通路待确认 | DMA 延迟覆盖、CDC、两核/四核总流量和内存可用带宽 |
+| 时钟与系统主干 | 非 GEMM 共域方案、system clock、聚合宽度与并行通路待确认 | DMA 延迟覆盖、CDC、G0 两核/G0 Pro 四核总流量和内存可用带宽 |
 | SRAM 容量 | 512 KiB / 1 MiB | 大 K tiling、VPU 共存与 SRAM 面积 |
 | SRAM bank/端口 | 8 / 16 banks；macro 类型 | 请求槽冲突、peer 流量和持续带宽 |
 | 数据管理 | 驻留/预取粒度、双缓冲和复用计划 | 容量、任务依赖、搬运量与计算停顿 |
 | 独立同步单元 | 状态容量、原子操作集和协议 | 多核 barrier、顺序和访问延迟 |
 | Host coherence | coherent / software maintenance | SoC fabric 能力、驱动责任 |
-| VPU | 每 GEMM core FP32/FP16 32/64 GFLOPS 主候选，16/32 GFLOPS 低成本候选；分布式/共享与接口待确认 | 公开配比仅作参考；按算子、attention 分工、带宽、特殊函数和 PPA 验证 |
+| VPU | 首版草案每 core 256-bit、500 MHz、FP32 8 / FP16 16 GFLOPS；外部实现、共享组织与细项协议待确认 | 按 12.7 验收计算与接口；非 FMA、数值误差及算子服务时间须形成批准值，扩展选型归入性能分析 |
 | control/IRQ | AXI-Lite/APB，level/MSI | SoC 接口与通知要求 |
 | 生命周期/保护 | reset/drain、timeout、ECC、隔离 | 平台可靠性和安全要求 |
 | event link | 共享内存通知 / 专用窄链路 | 实测同步开销，不按昵称决定设计 |
@@ -755,7 +747,7 @@ local CPU 入口可先验证引擎闭环；Host ring/fetcher 完成后再验系�
 
 ### 14.2 多核与边界测试
 
-先完成两核首发闭环，再独立验证四核 2T SKU 的入口扩展、任务分片、同步、聚合带宽与功耗；不能用两核通过推断四核系统已验收。
+先完成 G0 两核 1T 闭环，再独立验证后续 G0 Pro 四核 2T SKU 的入口扩展、任务分片、同步、聚合带宽与功耗；不能用 G0 通过推断 G0 Pro 已验收。
 
 至少覆盖：peer copy 与本地计算争 bank、多主同步与可见性、持续反压、队列耗尽、tag 复用、SRAM 预取与消费重叠时的覆盖冲突、双缓冲切换、Host cache 维护、窗口越界、ring 回绕，以及任务进行中的局部 reset/错误恢复。
 
@@ -763,11 +755,11 @@ atomic barrier、ECC、event link 和 coherent Host 仅在相应能力实现并�
 
 ### 14.3 性能验收
 
-在目标 500 MHz 下分别核对两核/四核 INT8、FP8、INT4、MXFP4 及 W4A8 的每有效拍乘加贡献和第 2.3 节峰值口径，再记录完整命令的装载、计算、排空占比；1T/2T SKU 定位不替代持续算力和 PPA 验证。
+在目标 500 MHz 下分别核对 G0 两核/G0 Pro 四核 INT8、FP8、INT4、MXFP4 及 W4A8 的每有效拍乘加贡献和第 2.3 节峰值口径，再记录完整命令的装载、计算、排空占比；G0/G0 Pro 的 1T/2T SKU 定位不替代持续算力和 PPA 验证。
 
-VPU 分别测 FP32/FP16 FMA、混合精度归约、转换、exp/reciprocal/rsqrt 和端到端 RMSNorm/softmax/激活；记录有效 lane、访存、特殊函数和归约停顿，并验证尾元素、误差、非有限值及跨 core 竞争。VPU 寄存器内 FMA 峰值与 SRAM 流式算子吞吐分别发布，attention 矩阵落点不同的任务分开验收。
+VPU 按第 12.7 节验收每 core 256-bit 等效执行、500 MHz 下 FP32 8 / FP16 16 GFLOPS，以及单个 256-bit local 请求口的读写合计峰值；混合精度归约、转换、exp/reciprocal/rsqrt 和完整算子按各自批准指标验收。记录有效元素、访存、特殊函数和归约停顿，覆盖 tail、误差、非有限值及跨 core 竞争。寄存器内 FMA 峰值与 SRAM 流式吞吐分别发布，attention 矩阵落点不同的任务分开验收。
 
-将接口峰值、持续物理字节、有效 tensor 字节、GEMM 有效拍利用率和完整任务延迟分别记录。decode/prefill 必须锁定 LPDDR4x 实际配置，含权重/scale、KV、VPU 与 Host 开销，并量化最窄端点、bank 冲突和四核扩展效率；W4 与 W8 流量分别验收。
+将接口峰值、持续物理字节、有效 tensor 字节、GEMM 有效拍利用率和完整任务延迟分别记录。decode/prefill 必须锁定 LPDDR4x 实际配置，含权重/scale、KV、VPU 与 Host 开销，并量化最窄端点、bank 冲突和 G0 Pro 相对 G0 的扩展效率；W4 与 W8 流量分别验收。
 
 当前参考基线为独立模块；尚无 core/cluster 集成 RTL 或系统性能验证结论。方案确认后再细化正式接口、寄存器、配置、异常码和逐项验证计划。
 
@@ -803,12 +795,6 @@ VPU 分别测 FP32/FP16 FMA、混合精度归约、转换、exp/reciprocal/rsqrt
 - 工作负载算例为架构决策提供依据，不与接口定义或实现状态混写；
 - 路线与验证集中在文尾，不把未来优化列作当前架构支持承诺。
 
-### B.3 GEMM/通用浮点配比参考
+### B.3 非规范性性能分析
 
-| 资料 | 本次核验范围 | 使用限制 |
-|---|---|---|
-| [NVIDIA Jetson Orin 官方产品表](https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/) | 同型号 GPU Tensor Core 的 INT8 dense/sparse 与 GPU CUDA Core 的 FP32/FP16 峰值；引用 AGX Orin 64GB 和 Orin Nano 8GB（Super） | 排除整机 DLA TOPS；GPU 通用浮点不是独立 VPU；不同型号和功耗档不拼接，峰值不代表同时持续吞吐 |
-| [NVIDIA Jetson AGX Xavier 架构介绍](https://developer.nvidia.com/blog/nvidia-jetson-agx-xavier-32-teraops-ai-robotics/) | 512 CUDA cores、64 Tensor Cores、1.37 GHz、GPU INT8 22 TOPS 与矩阵 FP16 11 TFLOPS | FP32 1.403 TFLOPS 为按一 FP32 FMA/core/cycle 的推导值，不冒充厂家公布值；矩阵 FP16 不作为 VPU FP16 |
-| [Arm Ethos-U85 官方产品页](https://www.arm.com/products/silicon-ip-cpu/ethos/ethos-u85) | 128–2048 MAC 与最高 4 TOPS；本页未披露独立 FP32/FP16 向量 GFLOPS | 仅说明公开 NPU 数据不足，不能反推 GEMM/VPU 比 |
-
-核验日期为 2026-10-26。第 12.7 节的 VPU 档位是本架构的候选预算，模型操作量、利用率和允许时延是条件化演算，均不属于上述产品厂家的保证或本项目实测。
+VPU 产品配比、执行宽度扩展、工作负载、访存推导及公开来源核验见[性能分析](performance_analysis.md)。这些分析不替代第 12.7 节的架构要求，也不构成实现或产品性能保证。

@@ -1,10 +1,10 @@
 # Hive NPU 架构演进与产品对标路线图
 
-文档版本：`v0.3.0-draft`
+文档版本：`v0.4.0-draft`
 
 修订日期：`2026-10-26`
 
-> 本文是[总体架构](arch.md)的非规范性配套参考，汇总产品调研、竞品比较、架构演进方向与阶段验收建议。具体接口、寄存器、错误码和时序仍以正式架构与模块规格为准。本文中的远期指标是规划候选，不构成 RTL、PPA 或产品交付承诺。
+> 本文是[总体架构](arch.md)的非规范性配套参考，只汇总产品调研、竞品比较、代际演进、产品分档、成本与阶段验收建议。模块级性能推导和敏感性分析记录在[性能分析](performance_analysis.md)；具体接口、寄存器、错误码和时序仍以正式架构与模块规格为准。本文中的远期指标是规划候选，不构成 RTL、PPA 或产品交付承诺。
 
 ## 1. 文档目的与路线原则
 
@@ -627,3 +627,4 @@ G0 Standard 与 Pro、G1/G2 Standard 与 Pro 必须分别维护 costed BOM，不
 - [NVIDIA Jetson 模组与开发套件价格 FAQ](https://developer.nvidia.com/embedded/faq)
 - [TI TDA4VH88TGAALYRQ1 价格](https://www.ti.com/product/TDA4VH-Q1/part-details/TDA4VH88TGAALYRQ1)
 - [TI J784S4XEVM 价格](https://www.ti.com/tool/J784S4XEVM)
+
