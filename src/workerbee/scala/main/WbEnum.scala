@@ -1,4 +1,4 @@
-/** 数据格式枚举：HiveWorker 支持的输入/计算格式（3-bit，6 值） */
+/** 数据格式枚举：WbWorker 支持的输入/计算格式（3-bit，6 值） */
 
 import chisel3._
 
@@ -11,7 +11,7 @@ object DataFormat extends ChiselEnum {
   def isMx4(f: DataFormat.Type): Bool = f === MXE2M1
   /** 【P2 纯 FP8】非 MX 纯 FP8（per-tensor scale，元素编码与 MX8 同为 E4M3/E5M2、
     * 无块 scale 字节）。运行语义 = 阵列侧 remap 回 MX8 基线 + scale 注入点恒 127
-    * （E8M0 2^0=1.0 恒等乘，见 HiveCore.fp8FmtRemap / Executor 127 注入）。
+    * （E8M0 2^0=1.0 恒等乘，见 WorkerBee.fp8FmtRemap / Executor 127 注入）。
     * ★isMx/isMx8/isMx4 均【不含】本族：scale DMA 启动门控（isMx 白送不启动、零
     * 流量）、mxRunB 握手、errCode isAMx^isBMx 跨族拒绝全部依赖这一成员关系。 */
   def isFp8(f: DataFormat.Type): Bool = f === FP8E4M3 || f === FP8E5M2
@@ -24,7 +24,7 @@ object DataFormat extends ChiselEnum {
   /** 每 16-bit lane 打包元素数的【纯 Scala 字面量单一真源】（MXE2M1=4、MX8=2、其余=1）。
     * 本函数只做编译期 Int 计算、不生成任何硬件（零 RTL），供两处共用：
     *   ① 下方运行期硬件版 elemsPerLane 的各 when/otherwise 分支字面量（.U 前的 Int 源）；
-    *   ② HiveCoreCalcConfig.getKLoadNum 的编译期恒等性自证 require。
+    *   ② WorkerBeeCalcConfig.getKLoadNum 的编译期恒等性自证 require。
     * 由此「硬件字面量」与「自证口径」共用同一张表，杜绝双源漂移：改本表即同时改硬件与
     * 触发 getKLoadNum 自证（若其 totalN×2 / totalN×4 二分未同步则 elaboration 期即炸）。 */
   /** 【Phase 3 INT 生态同步】半字节族（INT4/MXE2M1）→4、单字节族（INT8/MXE4M3/MXE5M2/
@@ -43,17 +43,17 @@ object DataFormat extends ChiselEnum {
     *
     * @param hasMx4 编译期门控（= cfg.hasMx4 = supportedFmts.contains(MXE2M1)）。
     *   false（现役 cfgBase/cfgMx 基线）：仅生成 2-bit「isMx8?2:1」逻辑，与 Phase 3
-    *   之前 HiveCoreCalcConfig.elemsPerLaneOf 的内联实现【逐字同构】（同名 val ret、
+    *   之前 WorkerBeeCalcConfig.elemsPerLaneOf 的内联实现【逐字同构】（同名 val ret、
     *   同 when/otherwise 结构），保证重发射 normalized-diff=0——MXE2M1 分支完全不
     *   生成硬件（elaboration 期 Scala if 展开，hasMx4=false 时 isMx4 逻辑不进入 IR）。
     *   true（未来 fp4 配置）：扩为 3-bit，追加 isMx4→4 分支（4 需 3 bit 表示）。
-    * HiveCoreCalcConfig.elemsPerLaneOf 与 HiveCoreExecutor2 kTile 分母共用本定义
+    * WorkerBeeCalcConfig.elemsPerLaneOf 与 WorkerBeeExecutor2 kTile 分母共用本定义
     *   （勿另立裸常数），确保几何/执行两侧 elemsPerLane 口径唯一。 */
   def elemsPerLane(f: DataFormat.Type, hasMx4: Boolean = false): UInt = {
     // 【Phase 3 INT 生态同步】位宽固定 3-bit（容纳 1/2/4），不再由 hasMx4 门控；
     //   判据由 isMx4/isMx8 泛化为 isHalfB/is1B，使 INT4→4、INT8→2 与 MXE2M1→4、
     //   MXE4M3/MXE5M2→2 共用同一张运行期解码表（与 elemsPerLaneLit 单一真源同构）。
-    //   hasMx4 形参保留以兼容调用方签名（HiveCoreCalcConfig.elemsPerLaneOf），但不再决定 Wire 位宽。
+    //   hasMx4 形参保留以兼容调用方签名（WorkerBeeCalcConfig.elemsPerLaneOf），但不再决定 Wire 位宽。
     val ret = Wire(UInt(3.W))
     when(isHalfB(f)){
       ret := elemsPerLaneLit(MXE2M1).U
@@ -66,7 +66,7 @@ object DataFormat extends ChiselEnum {
   }
 }
 
-/** MX 量化格式数值参数表（HiveOutCvt blockScale/quantElem 共用字段，
+/** MX 量化格式数值参数表（WbOutCvt blockScale/quantElem 共用字段，
   * 三格式单例逐条镜像既有内联字面量，bit-exact 来源）：
   *   - blockScale 消费 (maxCodeExp, bias, maxMant23)；
   *   - quantElem 消费 (expW, mantW, bias, maxNormalExp=maxCodeExp, satCode,
@@ -115,7 +115,7 @@ object RoundingMode extends ChiselEnum {
 // 操作码枚举（仅 3 种命令）
 // ============================================================================
 
-object HiveCoreOp extends ChiselEnum {
+object WorkerBeeOp extends ChiselEnum {
   val REG_WRITE1, REG_WRITE2, REG_READ = Value
 }
 
@@ -123,13 +123,13 @@ object HiveCoreOp extends ChiselEnum {
   * 本枚举仅防历史引用编译断裂（结构性重构后 Executor 固定 weight-stationary
   * N→K→M 遍历，C 写回顺序 = push FIFO 序，均与 loopMode 无关）。
   */
-object HiveCoreLoopMode extends ChiselEnum {
+object WorkerBeeLoopMode extends ChiselEnum {
   val MKN = Value
   val TILED = Value
 }
 
 /*内存读取方式：
-MAT：大矩阵存储（原始大矩阵，hive dma自行按行跳地址取tile）
+MAT：大矩阵存储（原始大矩阵，workerbee dma自行按行跳地址取tile）
 TILE：Tile连续存储（经过DMA进行Tile切分，地址连续）
 */
 object AddrMode extends ChiselEnum {

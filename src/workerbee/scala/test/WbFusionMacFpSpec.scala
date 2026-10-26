@@ -1,4 +1,4 @@
-/** HiveFusionMacFpSpec — 移除配置(hasFp=false) bit-exact 数学金锚（Task #8，R12 首个 FusionMac 级测试）
+/** WbFusionMacFpSpec — 移除配置(hasFp=false) bit-exact 数学金锚（Task #8，R12 首个 FusionMac 级测试）
   *
   * ══════════════════════════════════════════════════════════════════════════════
   * 目标（铁律 2：双配置三角互证）
@@ -8,8 +8,8 @@
   *   · REMOVED 配置 hasFp=false （supportedFmts = FMTS_REMOVED(:115) = {MXE4M3,MXE5M2,MXE2M1}，
   *                               lane0 走窄乘法器 FpMulMx8）
   * ★【头注订正 · task#20(5)】原文写「默认配置 hasFp=true（全五格式）」——【该表述已陈旧】：
-  *   `HiveFusionMacFp` 的【类默认】supportedFmts 早已被「砍除 FP16/BF16」裁定收窄为 MX-only
-  *   {MXE4M3,MXE5M2,MXE2M1}（HiveFusionMacFp.scala:43-44），派生谓词 hasFp 由 :50 计算 ⟹
+  *   `WbFusionMacFp` 的【类默认】supportedFmts 早已被「砍除 FP16/BF16」裁定收窄为 MX-only
+  *   {MXE4M3,MXE5M2,MXE2M1}（WbFusionMacFp.scala:43-44），派生谓词 hasFp 由 :50 计算 ⟹
   *   **类默认已收窄为 MX-only（hasFp=false）**，lane0 走窄乘法器 FpMulMx8，宽阵列 FpMulFp16Bf16 整块不生成。
   *   本 spec 里的 "default"/rawDefault/satDefault 只是【历史命名】，指「显式传入全五格式那一档」，
   *   与类默认值无关。8 个 `it should`（:346/:351/:358/:376/:381/:411/:436/:459；★task#36 重新对齐——task#30 在本头注新增 1 行致旧引用整体 +1 漂移）逐条核过：
@@ -26,16 +26,16 @@
   * 铁律 1：金锚由 MX 数学语义第一性原理推导，禁止拟合 RTL
   * ══════════════════════════════════════════════════════════════════════════════
   * 期望值纯从 MX 语义算：
-  *   元素真值 = HiveSimCommon.mxE4M3ToFloat / mxE5M2ToFloat / mxE2M1ToFloat(code, scaleByte)
+  *   元素真值 = WbSimCommon.mxE4M3ToFloat / mxE5M2ToFloat / mxE2M1ToFloat(code, scaleByte)
   *            （既有独立软件模型，解码 sign/exp/mantissa + E8M0 scale=2^(scale-127)，非本文件新写）
   *   lane 乘积 = aElemVal × bElemVal（Double，MX 乘积 ≤8-bit(MX8)/≤4-bit(MX4) 有效位 ⟹ 精确）
   *   金锚和 S  = cReg + Σ lane 乘积（Double 纯张量语义；MX8=2 lane、MX4=fp4BlockSum 4-lane 树）
-  *   金锚 fp32 = HiveSimCommon.swFpNormalize40to32(fp32BitsTo40(floatToRawIntBits(S.toFloat)))
+  *   金锚 fp32 = WbSimCommon.swFpNormalize40to32(fp32BitsTo40(floatToRawIntBits(S.toFloat)))
   *            （复用既有 lazy-40 ↔ fp32 软件模型：金锚侧 :146，硬件侧 :290/:327/:480 —— ★task#36 重新对齐旧引用 :391/:415）
   * 硬件侧 = swFpNormalize40to32(io.sum.peek 的 raw lazy-40)。两侧同经 swFpNormalize40to32 归一到 fp32 比对。
   * 【绝不】跑一遍 RTL 把输出录下来当期望值。若 in-spec 逐位对拍失败 ⟹ 真 bug ⟹ 带证据报告，不调金锚凑 RTL。
   *
-  * ── 逐位断言合法性守卫 goldenExact（math-derived，镜像 HiveDebugModel.goldenExact）──
+  * ── 逐位断言合法性守卫 goldenExact（math-derived，镜像 WbDebugModel.goldenExact）──
   * 仅当【每个 lane 乘积】与【每个累加部分和】都 fp32-无损（v.toFloat.toDouble == v）时才做逐位断言。
   * 充分性证明（第一性原理，非拟合）：
   *   · MX 乘积有效位 ≤8-bit(MX8 aSig×bSig≤15×15=225) / ≤4-bit(MX4 (2+m1)积∈{4,6,9}) ⟹ 乘积恒 fp32-精确；
@@ -48,7 +48,7 @@
   * 提示收紧激励；绝不据此放宽/篡改金锚。
   *
   * ══════════════════════════════════════════════════════════════════════════════
-  * 铁律 3：F1 时序契约（已读 RTL 确认 — verilog_fusionfp_nofp16/Hive_HiveFusionMacFp.sv）
+  * 铁律 3：F1 时序契约（已读 RTL 确认 — verilog_fusionfp_nofp16/Wb_WbFusionMacFp.sv）
   * ══════════════════════════════════════════════════════════════════════════════
   *   · fmt 标志（aIsMx5M2/aIsMx4M3/aIsMx2M1/bIsMx…/isMx4/isMx8 共 12 个）= RegNext(io.aFmt/io.bFmt === ...)，
   *     RTL L110-120 always@(posedge clock) ⟹ 比 io.aFmt/io.bFmt 晚【1 拍】。
@@ -82,7 +82,7 @@
   *   · ScalaTest 参数化用例名撞车致整套 ABORTED(tests run=0)：本 spec 用【固定唯一】的 it should 描述串
   *     （5 个 block 名互异），向量在 block 内以 for 循环 + 带 tag 的 assert 消息逐一校验（不生成参数化用例名）。
   *   · 显式 reset（EphemeralSimulator/Verilator 上电语义）：每个 simulate 开头 reset.poke(true)+全输入安全默认+step。
-  *   · backend：显式 verilator【无 trace】（不混 HiveFstSim）⟹ 不依赖 lz4/CPATH/LIBRARY_PATH、不产波形（规避
+  *   · backend：显式 verilator【无 trace】（不混 WbFstSim）⟹ 不依赖 lz4/CPATH/LIBRARY_PATH、不产波形（规避
   *     VCD path↔testname 耦合与 FST/poke 溢出坑）。
   *   · cReg：in-spec 逐位向量默认 cReg=0（lazyAdd(0,p)=lazy40(p) 恒等；且 cReg 通路 FpAdd 两配置逐字相同 ⟹
   *     cReg≠0 不增加配置判别力），另设 1 条 cReg=1.0 向量行使完整 MAC 累加路径（守卫覆盖其部分和精确性）。
@@ -95,10 +95,10 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scala.collection.mutable
 
-class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
+class WbFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   // 显式 verilator 后端（默认 CompilationSettings，无 trace）：不依赖 lz4/CPATH，不产波形。
-  // 镜像 HiveFstSim 的构造式但去掉 .withTraceStyle（house 既有写法，保证编译通过）。
+  // 镜像 WbFstSim 的构造式但去掉 .withTraceStyle（house 既有写法，保证编译通过）。
   implicit val plainVerilator: HasSimulator =
     HasSimulator.simulators.verilator(
       verilatorSettings = svsim.verilator.Backend.CompilationSettings.default
@@ -115,7 +115,7 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
   private val FMTS_REMOVED = Set(DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1)
 
   // ════════════════════════════════════════════════════════════════════════════
-  // 元素码构造器（纯 Scala，第一性原理位域打包；与 HiveEnum 格式参数一致）
+  // 元素码构造器（纯 Scala，第一性原理位域打包；与 WbEnum 格式参数一致）
   // ════════════════════════════════════════════════════════════════════════════
   // E4M3: s(1)|e(4)|m(3)  bias7 ；E5M2: s(1)|e(5)|m(2) bias15 ；E2M1: s(1)|e(2)|m(1) bias1
   private def e4m3(s: Int, e: Int, m: Int): Int = ((s & 1) << 7) | ((e & 0xF) << 3) | (m & 0x7)
@@ -127,13 +127,13 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
     (n0 & 0xF) | ((n1 & 0xF) << 4) | ((n2 & 0xF) << 8) | ((n3 & 0xF) << 12)
 
   // ════════════════════════════════════════════════════════════════════════════
-  // 数学金锚（第一性原理 MX 语义；复用 HiveSimCommon 独立软件模型，禁拟合 RTL）
+  // 数学金锚（第一性原理 MX 语义；复用 WbSimCommon 独立软件模型，禁拟合 RTL）
   // ════════════════════════════════════════════════════════════════════════════
-  /** 单个 MX 元素真值（Double）：复用 HiveSimCommon.mxToFloat 族（既有独立软件模型）。 */
+  /** 单个 MX 元素真值（Double）：复用 WbSimCommon.mxToFloat 族（既有独立软件模型）。 */
   private def elemVal(code: Int, scale: Int, fmt: DataFormat.Type): Double = fmt match {
-    case DataFormat.MXE5M2 => HiveSimCommon.mxE5M2ToFloat(code, scale)
-    case DataFormat.MXE4M3 => HiveSimCommon.mxE4M3ToFloat(code, scale)
-    case DataFormat.MXE2M1 => HiveSimCommon.mxE2M1ToFloat(code, scale)
+    case DataFormat.MXE5M2 => WbSimCommon.mxE5M2ToFloat(code, scale)
+    case DataFormat.MXE4M3 => WbSimCommon.mxE4M3ToFloat(code, scale)
+    case DataFormat.MXE2M1 => WbSimCommon.mxE2M1ToFloat(code, scale)
     case other => require(false, s"elemVal: 非 MX 格式 $other"); 0.0
   }
 
@@ -143,12 +143,12 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
   /** 金锚 fp32 bits：S(Double) → fp32 → lazy-40 → 归一回 fp32（复用既有 swFpNormalize40to32/fp32BitsTo40）。 */
   private def goldenBits(golden: Double): Long = {
     val fp32 = java.lang.Float.floatToRawIntBits(golden.toFloat) & 0xFFFFFFFFL
-    HiveSimCommon.swFpNormalize40to32(HiveSimCommon.fp32BitsTo40(fp32))
+    WbSimCommon.swFpNormalize40to32(WbSimCommon.fp32BitsTo40(fp32))
   }
 
   /** cReg 的 lazy-40 位（fp32 值 → lazy-40 槽；cVal=0 ⟹ 0）。 */
   private def cRegBits(cVal: Double): BigInt =
-    HiveSimCommon.fp32BitsTo40(java.lang.Float.floatToRawIntBits(cVal.toFloat) & 0xFFFFFFFFL)
+    WbSimCommon.fp32BitsTo40(java.lang.Float.floatToRawIntBits(cVal.toFloat) & 0xFFFFFFFFL)
 
   /** 一条激励向量。aFmt/bFmt 决定元素解码；isMx4 决定 2-lane(MX8) / 4-lane(MX4) 累加结构。 */
   private case class Vec(tag: String, aFmt: DataFormat.Type, bFmt: DataFormat.Type,
@@ -257,7 +257,7 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
   // ════════════════════════════════════════════════════════════════════════════
   private def runInSpec(cfgName: String, fmts: Set[DataFormat.Type],
                         sink: mutable.LinkedHashMap[String, BigInt]): Unit = {
-    simulate(new HiveFusionMacFp(supportedFmts = fmts, useNarrowAdd = false)) { dut =>
+    simulate(new WbFusionMacFp(supportedFmts = fmts, useNarrowAdd = false)) { dut =>
       // ---- 显式 reset（F1：fmt RegNext 复位为 false；data 组合）----
       dut.reset.poke(true.B)
       dut.io.aFmt.poke(DataFormat.MXE4M3)
@@ -287,7 +287,7 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
         dut.clock.step(1)
 
         val sumRaw = dut.io.sum.peek().litValue              // 40-bit lazy-40
-        val actualFp32 = HiveSimCommon.swFpNormalize40to32(sumRaw)
+        val actualFp32 = WbSimCommon.swFpNormalize40to32(sumRaw)
         val (golden, exact) = goldenOf(v)
         // 守卫失败 = 向量落在逐位断言非法域（设计错误，非 RTL bug）；绝不据此改金锚。
         assert(exact,
@@ -299,7 +299,7 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
         sink(v.tag) = sumRaw
         pass += 1
       }
-      println(f"[HiveFusionMacFpSpec] $cfgName in-spec bit-exact PASS $pass/${inSpecVecs.size}")
+      println(f"[WbFusionMacFpSpec] $cfgName in-spec bit-exact PASS $pass/${inSpecVecs.size}")
     }
   }
 
@@ -308,7 +308,7 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
   // ════════════════════════════════════════════════════════════════════════════
   private def runSat(cfgName: String, fmts: Set[DataFormat.Type],
                      sink: mutable.LinkedHashMap[String, Long]): Unit = {
-    simulate(new HiveFusionMacFp(supportedFmts = fmts, useNarrowAdd = false)) { dut =>
+    simulate(new WbFusionMacFp(supportedFmts = fmts, useNarrowAdd = false)) { dut =>
       dut.reset.poke(true.B)
       dut.io.aFmt.poke(DataFormat.MXE2M1); dut.io.bFmt.poke(DataFormat.MXE2M1)
       dut.io.a.poke(0.U); dut.io.b.poke(0.U)
@@ -324,7 +324,7 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
         dut.io.rnd.poke(RoundingMode.RNE); dut.io.consumeValid.poke(false.B)
         dut.clock.step(1)
         val sumRaw = dut.io.sum.peek().litValue
-        val fp32 = HiveSimCommon.swFpNormalize40to32(sumRaw)
+        val fp32 = WbSimCommon.swFpNormalize40to32(sumRaw)
         val expField = ((fp32 >>> 23) & 0xFF).toInt
         val mantField = (fp32 & 0x7FFFFF).toInt
         val isInf = expField == 0xFF && mantField == 0
@@ -332,7 +332,7 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
         // 饱和域只断言「有限 + 无 X 传播（Verilator 2-state；归一化非 NaN）」。不做 bit-exact。
         assert(!isNaN, f"[$cfgName][${v.tag}] SAT: 输出 NaN（X 传播/非法）fp32=0x$fp32%08X")
         sink(v.tag) = fp32
-        println(f"[HiveFusionMacFpSpec] $cfgName SAT ${v.tag}: fp32=0x$fp32%08X " +
+        println(f"[WbFusionMacFpSpec] $cfgName SAT ${v.tag}: fp32=0x$fp32%08X " +
           f"sumRaw=0x${sumRaw.toString(16)} finite=${!isInf && !isNaN}")
       }
     }
@@ -341,7 +341,7 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
   // ════════════════════════════════════════════════════════════════════════════
   // 测试主体（5 个唯一命名 block；向量在 block 内循环校验 ⟹ 无参数化用例名撞车）
   // ════════════════════════════════════════════════════════════════════════════
-  behavior of "HiveFusionMacFp removed-config bit-exact math golden (MX in-spec, R12 first FusionMac-level test)"
+  behavior of "WbFusionMacFp removed-config bit-exact math golden (MX in-spec, R12 first FusionMac-level test)"
 
   it should "match the first-principles MX math golden bit-exact for the DEFAULT config (hasFp=true) in-spec" in {
     runInSpec("default(hasFp=true)", FMTS_DEFAULT, rawDefault)
@@ -364,12 +364,12 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
       val r = rawRemoved(v.tag)
       if (d != r) {
         diffs += 1
-        println(f"[HiveFusionMacFpSpec] CONFIG-DIVERGENCE(in-spec) ${v.tag}: " +
+        println(f"[WbFusionMacFpSpec] CONFIG-DIVERGENCE(in-spec) ${v.tag}: " +
           f"default=0x${d.toString(16)} removed=0x${r.toString(16)}")
       }
       assert(d == r, f"[${v.tag}] 移除配置 != 默认配置（in-spec 应逐位相等）：default=0x${d.toString(16)} removed=0x${r.toString(16)}")
     }
-    println(s"[HiveFusionMacFpSpec] in-spec removed==default raw lazy-40 bit-exact: ${inSpecVecs.size - diffs}/${inSpecVecs.size}")
+    println(s"[WbFusionMacFpSpec] in-spec removed==default raw lazy-40 bit-exact: ${inSpecVecs.size - diffs}/${inSpecVecs.size}")
     diffs shouldBe 0
   }
 
@@ -383,20 +383,20 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
     satRemoved.size shouldBe satVecs.size
     // 显式记录两配置在饱和域的发散（FpAdd.scala §9.1(c) 已归档 out-of-spec 非功能回归：
     //   默认 lane0 宽阵列 magNarrow=2047 vs 移除 lane0 窄乘法器 magNarrow=1920）。不做 bit-exact 断言。
-    println("[HiveFusionMacFpSpec] ===== SATURATION DOMAIN divergence record (out-of-spec, NOT a bit-exact failure) =====")
+    println("[WbFusionMacFpSpec] ===== SATURATION DOMAIN divergence record (out-of-spec, NOT a bit-exact failure) =====")
     for (v <- satVecs) {
       val d = satDefault(v.tag); val r = satRemoved(v.tag)
       val diverged = d != r
-      println(f"[HiveFusionMacFpSpec]   ${v.tag}: default=0x$d%08X removed=0x$r%08X diverged=$diverged " +
+      println(f"[WbFusionMacFpSpec]   ${v.tag}: default=0x$d%08X removed=0x$r%08X diverged=$diverged " +
         "(expected per FpAdd.scala §9.1(c) / blueprint §6.2: magNarrow 2047 vs 1920)")
     }
-    println("[HiveFusionMacFpSpec] ===== end divergence record (in-spec bit-exactness is unaffected) =====")
+    println("[WbFusionMacFpSpec] ===== end divergence record (in-spec bit-exactness is unaffected) =====")
   }
 
   // ════════════════════════════════════════════════════════════════════════════
   // inf/nan 软件异常守护（Task #63 / R7）
   //   · mx8 cvt 类（FpCvtMx8ToMid/FpCvtMx8ToFp32）新增 consumeValid 门控 assert，
-  //     守护源真 = 原 HiveWorkUnit.scala 中的 HiveCvtOpMx（已随 FusionMac 重构删除）。E2M1(fp4) 全 16 码有限 ⟹
+  //     守护源真 = 原 WbWorkUnit.scala 中的 WbCvtOpMx（已随 FusionMac 重构删除）。E2M1(fp4) 全 16 码有限 ⟹
   //     三个 fp4 cvt 不加守护（不动）。
   //   · 负向触发（E5M2 0x7C inf / E4M3 0x7F NaN）+ 不误伤（合法最大有限码）三 block 见下。
   //
@@ -412,7 +412,7 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
     // E5M2 0x7C = e5m2(0,31,0)：exp 全1 ⟹ isInfNanE5M2=true ⟹ selInfNan=true。
     // consumeValid=true 打开守护门控 ⟹ assert 触发 ⟹ Verilator $fatal ⟹ 可捕获 AssertionFailed。
     val ex = intercept[Exception] {
-      simulate(new HiveFusionMacFp(supportedFmts = FMTS_DEFAULT, useNarrowAdd = false)) { dut =>
+      simulate(new WbFusionMacFp(supportedFmts = FMTS_DEFAULT, useNarrowAdd = false)) { dut =>
         dut.reset.poke(true.B)
         dut.io.aFmt.poke(DataFormat.MXE5M2); dut.io.bFmt.poke(DataFormat.MXE5M2)
         dut.io.a.poke(0.U); dut.io.b.poke(0.U)
@@ -430,13 +430,13 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
     }
     // 必须是「断言失败」异常（守护真触发），而非其它无关异常
     ex.getClass.getName should include ("AssertionFailed")
-    println(s"[HiveFusionMacFpSpec] E5M2 inf 0x7C TRIGGERED guard: caught ${ex.getClass.getName} PASS")
+    println(s"[WbFusionMacFpSpec] E5M2 inf 0x7C TRIGGERED guard: caught ${ex.getClass.getName} PASS")
   }
 
   it should "TRIGGER the inf/nan guard for the E4M3 NaN code 0x7F with consumeValid=true" in {
     // E4M3 0x7F = e4m3(0,15,7)：exp 全1 且 mant 全1 ⟹ isInfNanE4M3=true ⟹ selInfNan=true。
     val ex = intercept[Exception] {
-      simulate(new HiveFusionMacFp(supportedFmts = FMTS_DEFAULT, useNarrowAdd = false)) { dut =>
+      simulate(new WbFusionMacFp(supportedFmts = FMTS_DEFAULT, useNarrowAdd = false)) { dut =>
         dut.reset.poke(true.B)
         dut.io.aFmt.poke(DataFormat.MXE4M3); dut.io.bFmt.poke(DataFormat.MXE4M3)
         dut.io.a.poke(0.U); dut.io.b.poke(0.U)
@@ -453,11 +453,11 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
       }
     }
     ex.getClass.getName should include ("AssertionFailed")
-    println(s"[HiveFusionMacFpSpec] E4M3 NaN 0x7F TRIGGERED guard: caught ${ex.getClass.getName} PASS")
+    println(s"[WbFusionMacFpSpec] E4M3 NaN 0x7F TRIGGERED guard: caught ${ex.getClass.getName} PASS")
   }
 
   it should "NOT false-trigger the inf/nan guard for the largest legal finite E4M3 code 0x7E with consumeValid=true" in {
-    simulate(new HiveFusionMacFp(supportedFmts = FMTS_DEFAULT, useNarrowAdd = false)) { dut =>
+    simulate(new WbFusionMacFp(supportedFmts = FMTS_DEFAULT, useNarrowAdd = false)) { dut =>
       // 显式 reset（F1：fmt RegNext 复位 false；data 组合）
       dut.reset.poke(true.B)
       dut.io.aFmt.poke(DataFormat.MXE4M3); dut.io.bFmt.poke(DataFormat.MXE4M3)
@@ -477,11 +477,11 @@ class HiveFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
         dut.io.consumeValid.poke(true.B)   // 守护门控打开：合法码仍须不触发
         dut.clock.step(1)
         val sumRaw = dut.io.sum.peek().litValue
-        val fp32 = HiveSimCommon.swFpNormalize40to32(sumRaw)
+        val fp32 = WbSimCommon.swFpNormalize40to32(sumRaw)
         val isNaN = ((fp32 >>> 23) & 0xFF).toInt == 0xFF && (fp32 & 0x7FFFFF).toInt != 0
         assert(!isNaN, f"[guard-legal] 合法码 0x7E 被误伤：输出 NaN fp32=0x$fp32%08X")
       }
-      println("[HiveFusionMacFpSpec] guard NOT false-triggered for legal E4M3 0x7E (consumeValid=true) PASS")
+      println("[WbFusionMacFpSpec] guard NOT false-triggered for legal E4M3 0x7E (consumeValid=true) PASS")
     }
   }
 }

@@ -1,27 +1,27 @@
 import chisel3._
 import chisel3.util._
 
-class HiveCore(cfg: HiveCoreConfig) extends Module {
+class WorkerBee(cfg: WorkerBeeConfig) extends Module {
 
   val io = IO(new Bundle {
-    val cmd = Vec(4, slave(Stream(new HiveCoreCmd)))
-    val resp = master(Stream(new HiveCoreResp))
-    val respForTracing = master(Flow(new HiveCoreRespForTracing))
-    val dmaA = HiveCoreDMAExtReadOnlyIF(cfg, cfg.aExtW)
-    val dmaC = new HiveCoreDMAExtWriteOnlyIF(cfg, cfg.cDmaExtW)  // P2-清理: 端口位宽直取新契约参数
-    val dmaB = HiveCoreDMAExtReadOnlyIF(cfg, cfg.bExtW)
-    val dmaScaleA = if (cfg.hasMx) Some(HiveCoreDMAExtReadOnlyIF(cfg, cfg.scaleAW))             else None
-    val dmaScaleB = if (cfg.hasMx) Some(HiveCoreDMAExtReadOnlyIF(cfg, cfg.scaleBW)) else None
-    val dmaCScale = if (cfg.hasMx) Some(HiveCoreDMAExtWriteOnlyIF(cfg, cfg.cScaleRowW)) else None
+    val cmd = Vec(4, slave(Stream(new WorkerBeeCmd)))
+    val resp = master(Stream(new WorkerBeeResp))
+    val respForTracing = master(Flow(new WorkerBeeRespForTracing))
+    val dmaA = WorkerBeeDMAExtReadOnlyIF(cfg, cfg.aExtW)
+    val dmaC = new WorkerBeeDMAExtWriteOnlyIF(cfg, cfg.cDmaExtW)  // P2-清理: 端口位宽直取新契约参数
+    val dmaB = WorkerBeeDMAExtReadOnlyIF(cfg, cfg.bExtW)
+    val dmaScaleA = if (cfg.hasMx) Some(WorkerBeeDMAExtReadOnlyIF(cfg, cfg.scaleAW))             else None
+    val dmaScaleB = if (cfg.hasMx) Some(WorkerBeeDMAExtReadOnlyIF(cfg, cfg.scaleBW)) else None
+    val dmaCScale = if (cfg.hasMx) Some(WorkerBeeDMAExtWriteOnlyIF(cfg, cfg.cScaleRowW)) else None
 
-    val status = Output(new HiveCoreStatus(cfg))
+    val status = Output(new WorkerBeeStatus(cfg))
     val irq = Output(Bool())
     // 【perf 观测端口】性能观测信号组（纯组合电平、无内部计数；外部 PMU 按拍采样，
-    //   信号语义见 HiveInterface.scala HiveCorePerf）
-    val perf = Output(new HiveCorePerf)
+    //   信号语义见 WbInterface.scala WorkerBeePerf）
+    val perf = Output(new WorkerBeePerf)
   })
 
-  val regIf = Module(new HiveCoreRegIf(cfg))
+  val regIf = Module(new WorkerBeeRegIf(cfg))
   regIf.io.cmd <> io.cmd
   io.resp <> regIf.io.resp
   val regFile = regIf.io.regFile
@@ -29,17 +29,17 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // ==========================================================================
   // 子模块例化
   // ==========================================================================
-  val calcConfig = Module(new HiveCoreCalcConfig(cfg))
-  val scratchpad = Module(new HiveCoreScratchpad(cfg))
-  val aDma       = Module(new HiveCoreDmaRdOnly(cfg, bufWidth = cfg.totalN * cfg.aEffW, bufDepth = cfg.aBufferDepth))
-  val bDma       = Module(new HiveCoreDmaRdOnly(cfg, bufWidth = cfg.totalN * cfg.bW, bufDepth = cfg.bBufferDepth))
-  val cDma       = Module(new HiveCoreDmaWrOnly(cfg, bufWidth = cfg.totalN * cfg.cEffW, hasFp = cfg.hasFp, hasMx = cfg.hasMx))
-  val executor   = Module(new HiveCoreExecutor2(cfg))
-  val cvt        = Module(new HiveOutCvt(cfg))
-  val hiveComb   = Module(new HiveComb(cfg.arrayN, cfg.clusterM, cfg.aW, cfg.bW, cfg.cEffW, cfg.supportedFmts))
-  val aDmaScale = if (cfg.hasMx) Some(Module(new HiveCoreDmaRdOnly(cfg, bufWidth = cfg.scaleAW,   bufDepth = cfg.scaleBufferDepth))) else None
-  val bDmaScale = if (cfg.hasMx) Some(Module(new HiveCoreDmaRdOnly(cfg, bufWidth = cfg.scaleBW,   bufDepth = cfg.scaleBufferDepth))) else None
-  val cDmaScale = if (cfg.hasMx) Some(Module(new HiveCoreDmaScaleWr(cfg))) else None
+  val calcConfig = Module(new WorkerBeeCalcConfig(cfg))
+  val scratchpad = Module(new WorkerBeeScratchpad(cfg))
+  val aDma       = Module(new WorkerBeeDmaRdOnly(cfg, bufWidth = cfg.totalN * cfg.aEffW, bufDepth = cfg.aBufferDepth))
+  val bDma       = Module(new WorkerBeeDmaRdOnly(cfg, bufWidth = cfg.totalN * cfg.bW, bufDepth = cfg.bBufferDepth))
+  val cDma       = Module(new WorkerBeeDmaWrOnly(cfg, bufWidth = cfg.totalN * cfg.cEffW, hasFp = cfg.hasFp, hasMx = cfg.hasMx))
+  val executor   = Module(new WorkerBeeExecutor2(cfg))
+  val cvt        = Module(new WbOutCvt(cfg))
+  val wbComb   = Module(new WbComb(cfg.arrayN, cfg.clusterM, cfg.aW, cfg.bW, cfg.cEffW, cfg.supportedFmts))
+  val aDmaScale = if (cfg.hasMx) Some(Module(new WorkerBeeDmaRdOnly(cfg, bufWidth = cfg.scaleAW,   bufDepth = cfg.scaleBufferDepth))) else None
+  val bDmaScale = if (cfg.hasMx) Some(Module(new WorkerBeeDmaRdOnly(cfg, bufWidth = cfg.scaleBW,   bufDepth = cfg.scaleBufferDepth))) else None
+  val cDmaScale = if (cfg.hasMx) Some(Module(new WorkerBeeDmaScaleWr(cfg))) else None
 
 
   val startPulse = regIf.io.start
@@ -111,9 +111,9 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // 【P2 纯 FP8】FP8E4M3/FP8E5M2 → MXE4M3/MXE5M2 阵列侧格式重映射（顶层单一真源）：
   //   纯 FP8 的元素编码与 MX8 完全相同（E4M3/E5M2 裸码），差别仅在无块 scale 字节
   //   ⟹ 阵列/MAC/Cell/Worker 零改动、整体走已验证的 MX8×MX8 基线，唯一运行语义
-  //   差异 = Executor scale 注入点恒 127（E8M0 2^0=1.0 恒等乘，见 HiveCoreExecutor
-  //   hiveScaleAIn/hiveScaleBIn 的 Mux）。本函数对非 FP8 值恒等（remap 只改写
-  //   FP8E4M3/FP8E5M2 两个码点），故 a/b 两侧共用。调用点仅两处（hiveComb.io.fmtIn /
+  //   差异 = Executor scale 注入点恒 127（E8M0 2^0=1.0 恒等乘，见 WorkerBeeExecutor
+  //   wbScaleAIn/wbScaleBIn 的 Mux）。本函数对非 FP8 值恒等（remap 只改写
+  //   FP8E4M3/FP8E5M2 两个码点），故 a/b 两侧共用。调用点仅两处（wbComb.io.fmtIn /
   //   .bFmtIn），均 if(cfg.hasFp8) 门控：不含 FP8 的配置零 Mux、逐字不变（零 diff）。
   //   ★混配谓词互斥性：w4a8Mix/intW4a8Mix 与 FP8 互斥（aFmt=FP8×bFmt=MX4/INT4 由
   //   CalcConfig errCode3 新臂运行期拒绝），remap 对 MX4/INT8 值恒等，嵌套安全。
@@ -124,7 +124,7 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
 
   // 【P1-2 W4A8 订正（2026-10-13）】混配下 B/scaleB 两 DMA 的 kt 轮次一律取【全量
   //   calcConfig.kTile = K/aKLoadNum = K/32（A=MX8 口径 = 阵列 K 窗口数）】：bDma 每窗口
-  //   每行读一个 16B 半字片（stretch 模式，见 HiveCoreDmaRdOnly），scaleBDma 每窗口
+  //   每行读一个 16B 半字片（stretch 模式，见 WorkerBeeDmaRdOnly），scaleBDma 每窗口
   //   每行读一个相邻 scale 字 —— 与 fp8×fp8 基线同窗口数、同拍数、同节奏。初版
   //   「源字数 K/64 折半（bKTile）+ push 连推 2 拍」已被证伪废弃：一个 fp4 源字
   //   （64K）跨 2 个 loadW 窗口，连推产生行交错序（PROBE4 权重错序、PROBE6 列对
@@ -324,24 +324,24 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   executor.io.dmaCBusy := (if (cfg.hasMx) cDma.io.busy || cDmaScale.get.io.busy else cDma.io.busy)
 
   // ==========================================================================
-  // Executor ↔ HiveComb
+  // Executor ↔ WbComb
   // ==========================================================================
-  hiveComb.io.aIn      := executor.io.hiveAIn
-  hiveComb.io.psumIn   := executor.io.hivePsumIn
-  hiveComb.io.loadHIn  := executor.io.hiveLoadH
-  hiveComb.io.loadVInLock  := executor.io.hiveLoadVLock
-  hiveComb.io.loadVIn  := executor.io.hiveLoadV
+  wbComb.io.aIn      := executor.io.wbAIn
+  wbComb.io.psumIn   := executor.io.wbPsumIn
+  wbComb.io.loadHIn  := executor.io.wbLoadH
+  wbComb.io.loadVInLock  := executor.io.wbLoadVLock
+  wbComb.io.loadVIn  := executor.io.wbLoadV
   // 水平 loadW 加载（可选模式）：垂直模式下 executor 输出恒 0，阵列侧
   // 相关分支为死路，不加显式 mode 端口、靠信号活跃性自然二选一
-  hiveComb.io.loadWIn      := executor.io.hiveLoadW
-  hiveComb.io.loadWInLock  := executor.io.hiveLoadWLock
-  hiveComb.io.validIn  := executor.io.hiveValidIn
+  wbComb.io.loadWIn      := executor.io.wbLoadW
+  wbComb.io.loadWInLock  := executor.io.wbLoadWLock
+  wbComb.io.validIn  := executor.io.wbValidIn
   // 【P2 纯 FP8】a 侧同款 remap：纯 FP8 运行时阵列看到 MXE4M3/MXE5M2（FusionMacFp
   //   解码、WorkUnit isMx 路由、Worker fmtOk/consumeValid 全部自动走 MX8 基线），
   //   Executor 的 mxRunB 读 raw regFile（isMx(FP8)=false）走非 MX 握手支路——供数
   //   不等 scale FIFO、scale DMA 不启动（零流量），127 由注入点组合直供。
   //   if(cfg.hasFp8) 门控：不含 FP8 的配置逐字不变（零 diff）。
-  hiveComb.io.fmtIn := (if (cfg.hasFp8) fp8FmtRemap(regFile.aFmt) else regFile.aFmt)
+  wbComb.io.fmtIn := (if (cfg.hasFp8) fp8FmtRemap(regFile.aFmt) else regFile.aFmt)
   // bFmt 跟随 aFmt（mixFmtEn=0），保证旧软件 bit-exact；MX 配置允许 mixFmtEn=1
   // 以支持异构双 MX（aFmt=E4M3, bFmt=E5M2）
   // 【P1-2 W4A8 展开路】混配时阵列侧 bFmt 重映射为 MXE4M3：权重已由 bDma push 侧
@@ -356,34 +356,34 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   //   MXE4M3/INT8 恒等）：aFmt=FP8 时 bFmt 必同为 FP8（异配由 errCode3 拒绝），
   //   b 侧 remap 后阵列跑 MX8×MX8；E4M3×E5M2 异构双 FP8 与 MX 的异构双 MX
   //   同构（remap 分别落 E4M3/E5M2）。
-  hiveComb.io.bFmtIn := {
+  wbComb.io.bFmtIn := {
     val bFmtChain = (if (cfg.hasMx4)
       Mux(w4a8Mix, DataFormat.MXE4M3, Mux(intW4a8Mix, DataFormat.INT8, regFile.bFmt))
     else regFile.bFmt)
     if (cfg.hasFp8) fp8FmtRemap(bFmtChain) else bFmtChain
   }
-  hiveComb.io.rndIn    := regFile.rnd
+  wbComb.io.rndIn    := regFile.rnd
 
   // P3: scale wiring -- under an MX config both scale vectors are driven by the
   // Executor scale channels, replacing the P1 top-level constant 0. Both are
   // whole-Vec connections, so the index maps straight through: Executor lane n
-  // drives HiveComb row/lane n. Neither vector is a "per-column resident"
+  // drives WbComb row/lane n. Neither vector is a "per-column resident"
   // quantity -- the lane index is the K-lane axis while the array column is the
-  // output-N axis (see the axis note in HiveComb; the old wording here said
+  // output-N axis (see the axis note in WbComb; the old wording here said
   // "scaleB per-column resident vector" and was stale). Under a non-MX config
   // both stay constant 0 (scale ports / DMA / FIFO are not generated at all),
   // behaviour bit-exact.
   if (cfg.hasMx) {
-    hiveComb.io.scaleAIn := executor.io.hiveScaleAIn.get
-    hiveComb.io.scaleBIn := executor.io.hiveScaleBIn.get
+    wbComb.io.scaleAIn := executor.io.wbScaleAIn.get
+    wbComb.io.scaleBIn := executor.io.wbScaleBIn.get
   } else {
-    hiveComb.io.scaleAIn.foreach(_ := 0.U)
-    hiveComb.io.scaleBIn.foreach(_ := 0.U)
+    wbComb.io.scaleAIn.foreach(_ := 0.U)
+    wbComb.io.scaleBIn.foreach(_ := 0.U)
   }
-  hiveComb.io.clear    := executor.io.hiveClear
+  wbComb.io.clear    := executor.io.wbClear
 
-  executor.io.hiveCOut     := hiveComb.io.cOut
-  executor.io.hiveValidOut := hiveComb.io.validOut
+  executor.io.wbCOut     := wbComb.io.cOut
+  executor.io.wbValidOut := wbComb.io.validOut
 
   // ==========================================================================
   // Flush 信号
@@ -481,7 +481,7 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
 
     // 取数器重入守卫：上一轮取数未回 IDLE 时新脉冲到达 = bias/rqM 字流会交错错序
     assert(!((executor.io.biasFetchReq.get || executor.io.rqMFetchReq.get) && biasFState =/= sBiasFIDLE),
-      "HiveCoreExecutor epilogue fetch request while previous bias/rqM fetch still in flight")
+      "WorkerBeeExecutor epilogue fetch request while previous bias/rqM fetch still in flight")
 
     switch(biasFState) {
       is(sBiasFIDLE) {
@@ -615,7 +615,7 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   // ==========================================================================
   // 【perf 观测端口】纯组合直连既有信号（零新状态、零新时序路径）；计数由外部
   //   PMU 按拍采样完成。dmaX/scaleX 为物理通道口径（scaleA 含 bias/rqM 取数
-  //   盗用拍）；array/busy/stallA/stallB/epilogue 语义见 HiveCorePerf 注释。
+  //   盗用拍）；array/busy/stallA/stallB/epilogue 语义见 WorkerBeePerf 注释。
   // ==========================================================================
   io.perf.dmaA   := io.dmaA.req.valid
   io.perf.dmaB   := io.dmaB.req.valid
@@ -623,7 +623,7 @@ class HiveCore(cfg: HiveCoreConfig) extends Module {
   io.perf.scaleA := (if (cfg.hasMx) io.dmaScaleA.get.req.valid else false.B)
   io.perf.scaleB := (if (cfg.hasMx) io.dmaScaleB.get.req.valid else false.B)
   io.perf.scaleC := (if (cfg.hasMx) io.dmaCScale.get.req.valid else false.B)
-  io.perf.array  := executor.io.hiveValidIn
+  io.perf.array  := executor.io.wbValidIn
   io.perf.stallA := executor.io.perf.stallA
   io.perf.stallB := executor.io.perf.stallB
   // epilogue 活动拍 = bias/rqM 取数 ∨ cvt 管线占用（in.fire 收行 / out.valid 持行

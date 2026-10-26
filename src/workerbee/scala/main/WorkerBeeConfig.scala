@@ -1,6 +1,6 @@
-/** HiveCore 控制模块配置与命令/状态 Bundle 定义。
+/** WorkerBee 控制模块配置与命令/状态 Bundle 定义。
   *
-  * HiveCore 是 Hive 脉动阵列加速器的顶层控制单元，采用「寄存器配置 + 一键执行」架构：
+  * WorkerBee 是 WorkerBee 脉动阵列加速器的顶层控制单元，采用「寄存器配置 + 一键执行」架构：
   *   - REG_WRITE: 写入配置寄存器
   *   - EXECUTE: 触发自动 tiling GEMM 计算
   *   - REG_READ: 读取状态/配置寄存器
@@ -16,7 +16,7 @@ import chisel3.util._
 // 配置
 // ============================================================================
 
-/** HiveCore 编译期配置。
+/** WorkerBee 编译期配置。
   *
   * @param arrayN         单 cluster 内 PE 列数（≥4）
   * @param clusterM       cluster 数量（≥1）
@@ -38,7 +38,7 @@ import chisel3.util._
   *                       （见 cBeatsPerRowMax 注释）；约束族：isPow2 /
   *                       totalN*32 整除 / [totalN*8, totalN*32]（见下方 require）。
   */
-case class HiveCoreConfig(
+case class WorkerBeeConfig(
     arrayN: Int = 8,
     clusterM: Int = 2,
     aW: Int = 16,
@@ -59,7 +59,7 @@ case class HiveCoreConfig(
     cDmaExtW: Int = 256
 ) {
   /*
-  //hive矩阵切分逻辑
+  //workerbee矩阵切分逻辑
   for(n <- 1 to numberOfN){
     for(M <- 1 to numberOfM ){
         kTile = nTile * mTile
@@ -93,12 +93,12 @@ case class HiveCoreConfig(
   val hasInt4: Boolean = supportedFmts.contains(DataFormat.INT4)
 
   /** 是否包含 MX 格式（MXFP8 E4M3 / E5M2）——历史谓词，保留原义供既有外部引用
-    * （HiveCore 顶层 dmaScaleA/dmaScaleB 端口与 scale DMA 子模块生成门控等）。 */
+    * （WorkerBee 顶层 dmaScaleA/dmaScaleB 端口与 scale DMA 子模块生成门控等）。 */
   val hasMx: Boolean = supportedFmts.contains(DataFormat.MXE4M3) || supportedFmts.contains(DataFormat.MXE5M2) || supportedFmts.contains(DataFormat.MXE2M1)
 
   /** Phase 1：MX 硬件生成谓词收敛。
     *   - hasMx8 = MXFP8（E4M3/E5M2），与 hasMx 定义逐字相同（= 现 hasMx 语义）；
-    *   - hasMx4 = MXFP4（E2M1），与 HiveWorkUnit 内同名 private 谓词对齐。
+    *   - hasMx4 = MXFP4（E2M1），与 WbWorkUnit 内同名 private 谓词对齐。
     * 凡「生成 MX 硬件」的判据由 hasMx 改为 (hasMx8 || hasMx4)（新增并列，false 分支逐字保留）。
     * 【#155 MJ1：旧「恒等性铁律」契约已由用户主动作废】
     *   旧契约原文：「对任何不含 MXE2M1 的配置 hasMx4=false，故 hasMx8||hasMx4 == hasMx8 == hasMx，
@@ -109,17 +109,17 @@ case class HiveCoreConfig(
     *   require 实为恒真式，详见其下方注释），前提不再成立 ⟹ 契约作废。
     * 【新基线预期（供 #142 重发射时对照）】三套发射产物（verilog / verilog_mx / verilog_mxfp4）
     *   的 cfg 全部 hasMx4=true ⟹ fp4 支路一律 elaborate。预期非零 diff 的模块至少包含：
-    *     · Hive_HiveOutCvt.sv —— q2Seq / packed4 / 次正规与深下溢新臂全部【无门控】
+    *     · Wb_WbOutCvt.sv —— q2Seq / packed4 / 次正规与深下溢新臂全部【无门控】
     *       （MJ1 取证：`grep 'supportedFmts|hasMx|isMx4|nGroups'` 在该文件只命中 :40/:92/:294/:297），
     *       故只要 hasMx4=true，E2M1 输出支路的门数必然进网表；
-    *     · Hive_HiveWorkUnit.sv —— fp4 quad-lane 通路 + 运行期 Mux(isMx4, quad, dualLane)
-    *       （原并列的 Hive_HiveMacFpMx.sv、8×HiveCvtOpMx + 4 级 HiveMacFpMx 左结合级联
-    *       均已随 FusionMac 重构删除，通路并入 Hive_HiveFusionMacFp.sv）；
-    *     · HiveCoreCalcConfig 的 elemsPerLane 由 2-bit 扩为 3-bit、errCode 8 / Fix-4 errCode 3
+    *     · Wb_WbWorkUnit.sv —— fp4 quad-lane 通路 + 运行期 Mux(isMx4, quad, dualLane)
+    *       （原并列的 Wb_WbMacFpMx.sv、8×WbCvtOpMx + 4 级 WbMacFpMx 左结合级联
+    *       均已随 FusionMac 重构删除，通路并入 Wb_WbFusionMacFp.sv）；
+    *     · WorkerBeeCalcConfig 的 elemsPerLane 由 2-bit 扩为 3-bit、errCode 8 / Fix-4 errCode 3
     *       两支 fp4 运行期守护进入网表；
     *       (#169-W2-3) 另新增 errCode 10（cAddr 非 dmaBytes 对齐守护），【无门控】
     *       ⟹ 三套配置全部 elaborate 该分支；
-    *     · Hive_HiveCoreDmaWrOnly.sv —— (#166) wdata 与 wstrb 同源移位：
+    *     · Wb_WorkerBeeDmaWrOnly.sv —— (#166) wdata 与 wstrb 同源移位：
     *       `io_dmaExtWrIF_req_payload_data` 由裸截取 `_..._data_T_1[255:0]` 变为
     *       以 addr[4:0]（#169-S1 后为显式 5-bit 切片）为控制的 byte-lane 左移；
     *       预期该 assign 的 RHS 与 strb 侧共享【同一个 addr 派生 wire】（同源性可在
@@ -134,10 +134,10 @@ case class HiveCoreConfig(
   val hasMx4: Boolean = supportedFmts.contains(DataFormat.MXE2M1)
 
   // Phase 1 门控半收敛兜底(v1)：hasMx(=hasMx8) 仍是 scale DMA 端口/子模块、io.sum 路由、
-  // HiveOutCvt fp32 支路的唯一主开关；fp4-only 会静默丢弃 quad-lane 结果且无 scale 供数。
+  // WbOutCvt fp32 支路的唯一主开关；fp4-only 会静默丢弃 quad-lane 结果且无 scale 供数。
   // 真·fp4-only 支持需全量迁移 hasMx→(hasMx8||hasMx4) 并解禁 io.sum 禁改区，属 v2 独立立项。
   require(!hasMx4 || hasMx8,
-    s"HiveCoreConfig: MXFP4(E2M1) v1 必须与 MXFP8(E4M3/E5M2) 同时启用" +
+    s"WorkerBeeConfig: MXFP4(E2M1) v1 必须与 MXFP8(E4M3/E5M2) 同时启用" +
     s"（hasMx 仍是 scale DMA 端口与 io.sum 路由主开关，fp4-only 会静默算错），当前 supportedFmts=$supportedFmts")
 
   // (#155 MJ1) 用户设计律编码为编译期不变式：「有 mxfp8 就有 mxfp4，是必选项」。
@@ -161,13 +161,13 @@ case class HiveCoreConfig(
   //       MJ1 的缺陷面（E2M1 输出支路无门控、三套重发射基线不可控）。
   //   消息只用 ASCII（firtool 对非 ASCII 断言消息会发射失败）。
   require(!hasMx8 || hasMx4,
-    "HiveCoreConfig: MXFP8(E4M3/E5M2) requires MXFP4(E2M1) -- per user design rule " +
+    "WorkerBeeConfig: MXFP8(E4M3/E5M2) requires MXFP4(E2M1) -- per user design rule " +
     "\"if mxfp8 is supported then mxfp4 is mandatory\". Together with the require above " +
     "this pins hasMx4 <=> hasMx8 (the MX family is all-in or all-out; FP-only / INT-only / " +
     "no-MX configs keep both false and stay legal). Current supportedFmts=" + supportedFmts)
 
   /** 【P2 纯 FP8】是否包含非 MX 纯 FP8 格式（FP8E4M3/FP8E5M2，per-tensor scale、
-    * 无块 scale 字节）。运行语义 = HiveCore 顶层把阵列侧 fmt remap 回 MX8 基线
+    * 无块 scale 字节）。运行语义 = WorkerBee 顶层把阵列侧 fmt remap 回 MX8 基线
     * + Executor scale 注入点恒 127（E8M0 2^0 恒等乘），scale DMA 三通道因
     * isMx=false 不启动、零流量。remap/127 注入/errCode FP8 各臂均以本谓词做
     * 编译期门控：不含 FP8 的配置（如 MX-only 三格式集）相关硬件零 elaborate、
@@ -180,18 +180,18 @@ case class HiveCoreConfig(
   //   FP8-only（无 MX 格式）配置会在运行期静默算错（阵列侧无 MX 支路可 remap），
   //   编译期直接拒绝。与 MX 族「全有或全无」两条 require 同风格。
   require(!hasFp8 || hasMx,
-    "HiveCoreConfig: pure-FP8(FP8E4M3/FP8E5M2) v1 rides the MX8 datapath via fmt remap " +
+    "WorkerBeeConfig: pure-FP8(FP8E4M3/FP8E5M2) v1 rides the MX8 datapath via fmt remap " +
     "(array sees MXE4M3/E5M2 with scale tied to 127), so FP8 requires the MX family in " +
     "supportedFmts. FP8-only configs would compute silently wrong. Current supportedFmts=" + supportedFmts)
 
   /** P3a C 侧量化 scale 行位宽：每【minBlockSize=16】元素量化块一个 8-bit E8M0 scale 字节
-    * （HiveOutCvt.scaleRow 输出宽度，P3b dmaCScale 通道行宽同源）。
+    * （WbOutCvt.scaleRow 输出宽度，P3b dmaCScale 通道行宽同源）。
     * (#155 MJ2) 订正本行注释的 2× 错：原文写「每 8 元素量化块一个字节」，与实际表达式
     *   `(totalN / minBlockSize) * 8` 相差 2 倍（minBlockSize=16，不是 8）。实际量纲：
     *     cScaleRowW = (totalN / 16) * 8  =  totalN/2  **bit**  =  totalN/16 **字节**。
     *   totalN=16 时 ⟹ 8 bit = 1 字节/行。同类 2× 错另有三处，已一并订正：
-    *   HiveOutCvt.scala「cScaleRowW = nGroups*8」、HiveCoreElaborate.scala 与
-    *   HiveCoreDmaWrOnly.scala 的「cScaleRowW = totalN/8 字节」。 */
+    *   WbOutCvt.scala「cScaleRowW = nGroups*8」、WorkerBeeElaborate.scala 与
+    *   WorkerBeeDmaWrOnly.scala 的「cScaleRowW = totalN/8 字节」。 */
   //DMA    
   val minBlockSize = 16
 
@@ -204,17 +204,17 @@ case class HiveCoreConfig(
   //   cMxBlk 是寄存器字段（16<<blkSel，blkSel∈{0,1}）。二者只在 blkSel=0 时一致：
   //     · blkSel=1（cMxBlk=32）时，一行 totalN 个元素只该产 totalN/32 个 scale 字节，
   //       而端口物理宽度仍是 totalN/16 字节 ⟹ 契约前进量与端口宽度相差 2 倍。
-  //     · 今天 totalN=16 时良性（HiveOutCvt 内 nGroups=totalN/8 ⟹ scaleWire 宽 totalN bit，
+  //     · 今天 totalN=16 时良性（WbOutCvt 内 nGroups=totalN/8 ⟹ scaleWire 宽 totalN bit，
   //       :615 io.scaleOut.bits 目标宽 totalN/2 bit，截断掉的高位与低位同属 block16(0)、值相同，
   //       Ryan §E.2 已独立验证无害）。
   //     · 爆点：totalN >= 32 且 cMxBlk=32 ⟹ 2 倍重叠，后一拍首字节被前一拍次字节覆盖
   //       ⟹ C-scale 外部内存布局【静默损坏】，且顶层 dmaCScale.req.payload.data 端口宽度
   //       对下游 SoC 是 2× 错的。
   // ★cMxBlk=32 需要 cScaleRowW 随 blkSel 可变（运行期 Mux 或多套行宽）；totalN>=32 之前
-  //   必须先解此耦合。此前唯一守护只在 TB 侧（HiveDebugModel 的 cMxBlk require），属测试期。
+  //   必须先解此耦合。此前唯一守护只在 TB 侧（WbDebugModel 的 cMxBlk require），属测试期。
   //
   // 【#169-W3 交叉引用：本「totalN>=32 之前必解耦」清单第二项（strb 括号）已修复（本次）】
-  //   · HiveCoreDmaWrOnly.scala 的 HiveCoreDmaScaleWr 内
+  //   · WorkerBeeDmaWrOnly.scala 的 WorkerBeeDmaScaleWr 内
   //       io.dmaExtWrIF.req.payload.strb := (1 << (rowW / 8) - 1).U
   //     曾是【Scala 运算符优先级缺陷】：`+ -` 优先级高于 `< >` ⟹ 实际算的是
   //     `1 << ((rowW/8) - 1)`，不是 `(1 << (rowW/8)) - 1`。rowW = cScaleRowW = totalN/2 bit：
@@ -224,14 +224,14 @@ case class HiveCoreConfig(
   //     ★#169 当时只登记不修（修它属功能变更，需单独裁定）；用户已裁定，本次已修复
   //     （补括号为 `((1 << (rowW / 8)) - 1).U`）。当前配置 totalN=16 下新旧公式同值（1）
   //     ⟹ 网表级 no-op，三套 verilog 重发射逐字节零 diff；详细登记与取证见该行
-  //     （HiveCoreDmaWrOnly.scala）的 #169-W3 注释块与 build/w3_strb_precedence_fix.md。
+  //     （WorkerBeeDmaWrOnly.scala）的 #169-W3 注释块与 build/w3_strb_precedence_fix.md。
   //     ⟹ totalN 提到 32 时剩余待办 = 把 scaleC 通道纳入 lane 审计 + 本侧 cScaleRowW 解耦。
   //   · 连带订正：scaleC 之所以豁免于 #166 的 lane 移位契约，依据是【端口宽度 = 1 字节
   //     ⟹ lane 窗口退化为单 lane、移位恒为 0】，【不是】旧文档所称「其 strb 为常量满档」
-  //     （后者仅 rowW=8 时巧合成立）。旧理由的三处扩散：HiveSimCommon.scala:604 与
-  //     HiveCoreSimCaseIntSpec.scala:134（test 侧，#170 订正）、build/166 §7.2-6（已追加更正段）。
+  //     （后者仅 rowW=8 时巧合成立）。旧理由的三处扩散：WbSimCommon.scala:604 与
+  //     WorkerBeeSimCaseIntSpec.scala:134（test 侧，#170 订正）、build/166 §7.2-6（已追加更正段）。
   require(minBlockSize == (16 << MXBlockSize.all.map(_.litValue.toInt).min),
-    "HiveCoreConfig: minBlockSize (" + minBlockSize + ") must equal the smallest encodable " +
+    "WorkerBeeConfig: minBlockSize (" + minBlockSize + ") must equal the smallest encodable " +
     "MXBlockSize level (16 << " + MXBlockSize.all.map(_.litValue.toInt).min + "), because " +
     "cScaleRowW = (totalN/minBlockSize)*8 is a COMPILE-TIME port width while the runtime " +
     "block size cMxBlk = 16<<blkSel is a register field. cMxBlk=32 needs cScaleRowW to vary " +
@@ -244,7 +244,7 @@ case class HiveCoreConfig(
   val scaleBW: Int = 8 * maxScalePerCyele
   
 
-  /** C 累加器有效位宽（与 HiveComb 推导逻辑一致）。
+  /** C 累加器有效位宽（与 WbComb 推导逻辑一致）。
     * cW==0 自动推导：含浮点或 MX 时至少 40（延迟规格化 {sign,exp8,mant31} 需要），
     * 纯整数时取 autoAccW（aEffW+bW+log2Up(totalN)，累加防溢出）。
     * Phase 1：MX 判据由 hasMx 收敛为 (hasMx8 || hasMx4)，使 fp4 quad-lane 复用同款
@@ -283,34 +283,34 @@ case class HiveCoreConfig(
 
   // --- elaboration-time require 校验 ---
   // cW == 0 表示自动推导（见 cEffW），此时跳过显式位宽比较
-  require(cW == 0 || cW >= aW, s"HiveCoreConfig: cW($cW) 必须 >= aW($aW)")
-  require(cW == 0 || cW >= bW, s"HiveCoreConfig: cW($cW) 必须 >= bW($bW)")
+  require(cW == 0 || cW >= aW, s"WorkerBeeConfig: cW($cW) 必须 >= aW($aW)")
+  require(cW == 0 || cW >= bW, s"WorkerBeeConfig: cW($cW) 必须 >= bW($bW)")
   // 延迟规格化架构约束：含浮点格式或 MX 格式时 cEffW 必须 >= 40，
   // 以容纳 40-bit 延迟规格化格式 {sign(1), exp(8), mantissa(31)}。
   // MX 复用延迟规格化 fp 累加器。
   // Phase 1：MX 判据 hasMx → (hasMx8 || hasMx4)；fp4 quad-lane 同样复用 40-bit 延迟规格化
   // 累加器。对不含 MXE2M1 的配置 hasMx4=false ⟹ 判据取值与 hasFp||hasMx 逐位相同（零 diff）。
-  if (hasFp || hasMx8 || hasMx4) require(cEffW >= 40, s"HiveCoreConfig: 含浮点/MX 格式时 cEffW($cEffW) 必须 >= 40（延迟规格化需要）")
+  if (hasFp || hasMx8 || hasMx4) require(cEffW >= 40, s"WorkerBeeConfig: 含浮点/MX 格式时 cEffW($cEffW) 必须 >= 40（延迟规格化需要）")
   // 整数累加约束：含整数格式时 cEffW 必须 >= aW+bW，以容纳整数积累加防溢出
-  if (hasInt) require(cEffW >= aW + bW, s"HiveCoreConfig: 含整数格式时 cEffW($cEffW) 必须 >= aW+bW(${aW + bW})（整数累加防溢出需要）")
-  require(arrayN >= 4, s"HiveCoreConfig: arrayN($arrayN) 必须 >= 4")
-  require(clusterM >= 1, s"HiveCoreConfig: clusterM($clusterM) 必须 >= 1")
-  require(aBufferDepth > 0, s"HiveCoreConfig: aBufferDepth($aBufferDepth) 必须 > 0")
-  require(bBufferDepth > 0, s"HiveCoreConfig: bBufferDepth($bBufferDepth) 必须 > 0")
-  require(cBufferDepth >= 2*totalN, s"HiveCoreConfig: cBufferDepth($cBufferDepth) 必须 > 2*totalN($totalN)")
-  require(addrWidth > 0, s"HiveCoreConfig: addrWidth($addrWidth) 必须 > 0")
-  require(addrWidth <= 32, s"HiveCoreConfig: addrWidth($addrWidth) 必须 <= 32")
+  if (hasInt) require(cEffW >= aW + bW, s"WorkerBeeConfig: 含整数格式时 cEffW($cEffW) 必须 >= aW+bW(${aW + bW})（整数累加防溢出需要）")
+  require(arrayN >= 4, s"WorkerBeeConfig: arrayN($arrayN) 必须 >= 4")
+  require(clusterM >= 1, s"WorkerBeeConfig: clusterM($clusterM) 必须 >= 1")
+  require(aBufferDepth > 0, s"WorkerBeeConfig: aBufferDepth($aBufferDepth) 必须 > 0")
+  require(bBufferDepth > 0, s"WorkerBeeConfig: bBufferDepth($bBufferDepth) 必须 > 0")
+  require(cBufferDepth >= 2*totalN, s"WorkerBeeConfig: cBufferDepth($cBufferDepth) 必须 > 2*totalN($totalN)")
+  require(addrWidth > 0, s"WorkerBeeConfig: addrWidth($addrWidth) 必须 > 0")
+  require(addrWidth <= 32, s"WorkerBeeConfig: addrWidth($addrWidth) 必须 <= 32")
   // --- C 写回总线（cDmaExtW）契约 require 族（P0 重构：默认 256、只允许 2 的 N 次幂，
   // 废弃旧 0=满宽哨兵与 5B/元素布局；窄总线拆拍与密集打包由 P2 落地，本阶段只立契约） ---
   // 位宽只允许 2 的 N 次幂（用户裁定；同时拦截负值/0 等非法值）
-  require(isPow2(cDmaExtW), s"HiveCoreConfig: cDmaExtW($cDmaExtW) 必须是 2 的 N 次幂")
+  require(isPow2(cDmaExtW), s"WorkerBeeConfig: cDmaExtW($cDmaExtW) 必须是 2 的 N 次幂")
   // 行拍数上界（最密 32-bit 元素口径 totalN*32/cDmaExtW）必须为整数：
   // 计数器/credit 位宽按 cBeatsPerRowMax 取上界，非整除会使上界语义失效
-  require(totalN * 32 % cDmaExtW == 0, s"HiveCoreConfig: totalN*32(${totalN * 32}) 必须能被 cDmaExtW($cDmaExtW) 整除（行拍数上界为整数）")
+  require(totalN * 32 % cDmaExtW == 0, s"WorkerBeeConfig: totalN*32(${totalN * 32}) 必须能被 cDmaExtW($cDmaExtW) 整除（行拍数上界为整数）")
   // 取值区间 [totalN*8, totalN*32]：下限保证 8-bit 输出格式（mxfp8/int8）一行单拍可容，
   // 上限保证 32-bit 输出格式（fp32/int32）拍数 ≥ 1（不超过整行最密位宽）
   require(totalN * 8 <= cDmaExtW && cDmaExtW <= totalN * 32,
-    s"HiveCoreConfig: cDmaExtW($cDmaExtW) 必须位于 [totalN*8(${totalN * 8}), totalN*32(${totalN * 32})]（8-bit 格式单拍可容、拍数上界整数）")
+    s"WorkerBeeConfig: cDmaExtW($cDmaExtW) 必须位于 [totalN*8(${totalN * 8}), totalN*32(${totalN * 32})]（8-bit 格式单拍可容、拍数上界整数）")
   // mxfp4 半字节几何前提（P0 保留、措辞适配新位宽族）：mxfp4（E2M1）输出为半字节/元素，
   // 窄总线使一行需拆多拍（totalN*4 > cDmaExtW）时，每拍元素数（cDmaExtW/4）必须为偶数，
   // 否则拍段在半字节中间切开导致内存布局错位；单拍整行（totalN*4 <= cDmaExtW，
@@ -320,9 +320,9 @@ case class HiveCoreConfig(
   // Phase 1：判据 hasMx → (hasMx8 || hasMx4)，覆盖仅含 mxfp4(E2M1) 的配置；对不含
   // MXE2M1 的配置 hasMx4=false ⟹ 取值与 hasMx 逐位相同（零 diff）。
   if (hasMx8 || hasMx4) require(totalN * 4 <= cDmaExtW || (cDmaExtW / 4) % 2 == 0,
-    s"HiveCoreConfig: hasMx 窄总线配置要求 mxfp4 每拍元素数（cDmaExtW/4=${cDmaExtW / 4}）为偶数（拍内整字节打包），" +
+    s"WorkerBeeConfig: hasMx 窄总线配置要求 mxfp4 每拍元素数（cDmaExtW/4=${cDmaExtW / 4}）为偶数（拍内整字节打包），" +
     s"该约束覆盖 hasMx 配置的全部窄总线（含量化与非量化输出），当前 cDmaExtW=$cDmaExtW")
-  require(scaleBufferDepth > 0, s"HiveCoreConfig: scaleBufferDepth($scaleBufferDepth) 必须 > 0（hasMx 时 scale FIFO 深度；非 MX 死路参数）")
+  require(scaleBufferDepth > 0, s"WorkerBeeConfig: scaleBufferDepth($scaleBufferDepth) 必须 > 0（hasMx 时 scale FIFO 深度；非 MX 死路参数）")
   // MX 阵列几何硬约束：32-K scale 块 = 16 lane × 2 元素/拍 = 单 pass，该等价关系仅在
   // totalN==16 时成立（scaleBDma lineTarget=kTile、executor 每 sLOAD_B 窗口 pop scaleB
   // 均硬编码此假设）；totalN≠16 的 hasMx 配置会静默数值错或挂死，故在
@@ -332,14 +332,14 @@ case class HiveCoreConfig(
   // 16 lane × 4 elem = 64 K/pass，恰与 mxfp4 的 64-元素 scale 块（block=64）单 pass 对齐，
   // 故 totalN==16 对 fp4 quad-lane 仍是自洽前提（与 fp8 dual-lane 的 16 lane×2 elem=32K/pass、
   // block=32 单 pass 同构）。对不含 MXE2M1 的配置 hasMx4=false ⟹ 取值与 hasMx 逐位相同（零 diff）。
-  if (hasMx8 || hasMx4) require(totalN == 16, s"HiveCoreConfig: MX 要求 totalN==16（fp8：32-K 块=16 lane×2 元素；fp4：64-K 块=16 lane×4 元素，均单 pass），当前 totalN=$totalN")
+  if (hasMx8 || hasMx4) require(totalN == 16, s"WorkerBeeConfig: MX 要求 totalN==16（fp8：32-K 块=16 lane×2 元素；fp4：64-K 块=16 lane×4 元素，均单 pass），当前 totalN=$totalN")
   // MX SIMD 双元素/拍：16-bit lane 打包 2 个 8-bit 元素（低字节=偶 k、高字节=奇 k），
-  // PE 内 4×HiveCvtOpMx + 2×HiveMacFp 级联（二者均为原 HiveWorkUnit.scala 子模块、已随
-  // FusionMac 重构删除，功能并入 FpCvt/FpMul/FpAdd → HiveFusionMacFp），故 aW/bW 必须 >= 16。
+  // PE 内 4×WbCvtOpMx + 2×WbMacFp 级联（二者均为原 WbWorkUnit.scala 子模块、已随
+  // FusionMac 重构删除，功能并入 FpCvt/FpMul/FpAdd → WbFusionMacFp），故 aW/bW 必须 >= 16。
   // Phase 1：判据 hasMx → (hasMx8 || hasMx4)。fp4 quad-lane 同样要求 16-bit lane（打包 4 个
   // 4-bit 元素：io.a(3,0)/(7,4)/(11,8)/(15,12)），故 aW/bW>=16 对 fp4 亦成立。对不含 MXE2M1
   // 的配置 hasMx4=false ⟹ 取值与 hasMx 逐位相同（零 diff）。
-  if (hasMx8 || hasMx4) require(aW >= 16 && bW >= 16, s"HiveCoreConfig: MX SIMD 需要 aW/bW >= 16（fp8：16-bit lane 打包 2 元素；fp4：打包 4 元素），当前 aW=$aW bW=$bW")
+  if (hasMx8 || hasMx4) require(aW >= 16 && bW >= 16, s"WorkerBeeConfig: MX SIMD 需要 aW/bW >= 16（fp8：16-bit lane 打包 2 元素；fp4：打包 4 元素），当前 aW=$aW bW=$bW")
 }
 
 

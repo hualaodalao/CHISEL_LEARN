@@ -1,4 +1,4 @@
-/** HiveCoreExecutor — Weight-Stationary 自动 Tiling GEMM 执行器
+/** WorkerBeeExecutor — Weight-Stationary 自动 Tiling GEMM 执行器
   *
   * EXECUTE 触发后，根据寄存器组中的 M/N/K 维度和阵列能力 (totalN×totalN)
   * 自动切块 tiling，采用 N→K→M 循环顺序实现 weight-stationary 复用：
@@ -20,22 +20,22 @@
   *   - 门控写回结果 (末 K pass，所有 M tiles 完成后)
   *
   * aIn skew 实现说明：
-  *   根据 HiveComb 契约，外部需按「行 i 延迟 i 拍」错峰供数（通道 0 无延迟）。
+  *   根据 WbComb 契约，外部需按「行 i 延迟 i 拍」错峰供数（通道 0 无延迟）。
   *   本模块通过 fire 使能的 ShiftRegister 链实现 skew：供数（aPop）/回灌
   *   （cPop）fire 拍才移位，供数结束后继续使能 totalN-1 拍并灌零，
-  *   让波前完整流过阵列；hiveValidIn 同步保持 curM + 2*(totalN-1) 拍。
+  *   让波前完整流过阵列；wbValidIn 同步保持 curM + 2*(totalN-1) 拍。
   */
 
 import chisel3._
 import chisel3.util._
 import scala.annotation.varargs
 
-/** 旧类名别名：既有测试（HiveCoreSpec elaborate 用例）仍按 HiveCoreExecutor
-  * 引用；新实现类名为 HiveCoreExecutor2，此处保留类型别名使 Test/compile 通过
+/** 旧类名别名：既有测试（WorkerBeeSpec elaborate 用例）仍按 WorkerBeeExecutor
+  * 引用；新实现类名为 WorkerBeeExecutor2，此处保留类型别名使 Test/compile 通过
   */
-class HiveCoreExecutor(cfg: HiveCoreConfig) extends HiveCoreExecutor2(cfg)
+class WorkerBeeExecutor(cfg: WorkerBeeConfig) extends WorkerBeeExecutor2(cfg)
 
-class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
+class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
 
   val io = IO(new Bundle {
     // 控制
@@ -49,8 +49,8 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
     val dmaCBusy = Input(Bool())
 
     // 寄存器输入（由顶层寄存器组驱动）：全部寄存器统一经 io.regFile 引用。
-    val regFile = Input(HiveCoreRegister(cfg))
-    val calcConfig = Input(HiveCoreExePreCalcConfig(cfg))  // tile 数、地址偏移与 cBeatAddrStep
+    val regFile = Input(WorkerBeeRegister(cfg))
+    val calcConfig = Input(WorkerBeeExePreCalcConfig(cfg))  // tile 数、地址偏移与 cBeatAddrStep
     
 
     // A buffer 自主 DMA（RdOnly）：execute 单次启动全自主供数，
@@ -79,13 +79,13 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
     val scaleBPop    = if (cfg.hasMx) Some(slave(Stream(UInt(cfg.scaleBW.W)))) else None
     // 【P0-1 gather】scaleB FIFO 占用量输入：loadW 预取窗口门控用（sDRAIN→sLOAD_B）
     val scaleBOcc    = if (cfg.hasMx) Some(Input(UInt(log2Up(cfg.scaleBufferDepth + 1).W))) else None
-    val hiveScaleAIn = if (cfg.hasMx) Some(Output(Vec(cfg.totalN, UInt(8.W))))   else None
-    val hiveScaleBIn = if (cfg.hasMx) Some(Output(Vec(cfg.totalN, UInt(8.W))))   else None
+    val wbScaleAIn = if (cfg.hasMx) Some(Output(Vec(cfg.totalN, UInt(8.W))))   else None
+    val wbScaleBIn = if (cfg.hasMx) Some(Output(Vec(cfg.totalN, UInt(8.W))))   else None
 
     // 【P0 epilogue-1 fused bias】bias 取数握手（仅 hasMx 生成，与 dmaScaleA 端口同门控）：
     //   biasIn = 16×32b 字流（每 N-tile 一组，收集齐置 biasLoaded）；biasFetchReq/Nt =
     //   取数触发脉冲（sIDLE-execute 发 nt=0，sNEXT_NK_TILE 推进发 nt=curNTile+1），
-    //   由顶层 HiveCore 的 bias 取数器消费（盗用 dmaScaleA 端口供数）。
+    //   由顶层 WorkerBee 的 bias 取数器消费（盗用 dmaScaleA 端口供数）。
     val biasIn       = if (cfg.hasMx) Some(slave(Stream(UInt(32.W))))    else None
     val biasFetchReq = if (cfg.hasMx) Some(Output(Bool()))               else None
     val biasFetchNt  = if (cfg.hasMx) Some(Output(UInt(cfg.mnkWidth.W))) else None
@@ -93,26 +93,26 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
     // 【P0 epilogue-2 fused requant】rqM 取数握手（仅 hasMx 生成，与 bias 同一 dmaScaleA
     //   端口、顶层两相连续取数）：rqMIn = 16×32b 字流（每 N-tile 一组，收集齐置
     //   rqMLoaded）；rqMFetchReq/Nt 同 biasFetchReq/Nt 范式。rqMOut = 已收集的
-    //   per-channel M 向量（寄存器直出，顶层接线至 HiveOutCvt 的 requant 通路；
+    //   per-channel M 向量（寄存器直出，顶层接线至 WbOutCvt 的 requant 通路；
     //   hasInt 门控在例化侧，本模块只按 hasMx 供给）。
     val rqMIn       = if (cfg.hasMx) Some(slave(Stream(UInt(32.W))))    else None
     val rqMFetchReq = if (cfg.hasMx) Some(Output(Bool()))               else None
     val rqMFetchNt  = if (cfg.hasMx) Some(Output(UInt(cfg.mnkWidth.W))) else None
     val rqMOut      = if (cfg.hasMx) Some(Output(Vec(cfg.totalN, UInt(32.W)))) else None
 
-    // HiveComb 驱动
-    val hiveAIn     = Output(Vec(cfg.totalN, UInt(cfg.aEffW.W)))
-    val hivePsumIn  = Output(Vec(cfg.totalN, UInt(cfg.cEffW.W)))
-    val hiveLoadH   = Output(Bool())
-    val hiveLoadV   = Output(Bool())
-    val hiveLoadVLock   = Output(Bool())
+    // WbComb 驱动
+    val wbAIn     = Output(Vec(cfg.totalN, UInt(cfg.aEffW.W)))
+    val wbPsumIn  = Output(Vec(cfg.totalN, UInt(cfg.cEffW.W)))
+    val wbLoadH   = Output(Bool())
+    val wbLoadV   = Output(Bool())
+    val wbLoadVLock   = Output(Bool())
     // 水平 loadW 加载（可选模式，regs(7)(5) 选择）：垂直模式下恒 0
-    val hiveLoadW       = Output(Bool())
-    val hiveLoadWLock   = Output(Bool())
-    val hiveValidIn = Output(Bool())
-    val hiveClear   = Output(Bool())
-    val hiveCOut    = Input(Vec(cfg.totalN, UInt(cfg.cEffW.W)))
-    val hiveValidOut = Input(Bool())
+    val wbLoadW       = Output(Bool())
+    val wbLoadWLock   = Output(Bool())
+    val wbValidIn = Output(Bool())
+    val wbClear   = Output(Bool())
+    val wbCOut    = Input(Vec(cfg.totalN, UInt(cfg.cEffW.W)))
+    val wbValidOut = Input(Bool())
 
     // 进度
     val progress = Output(UInt(16.W))
@@ -173,9 +173,9 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   //   Consumers: scaleB pop handshake gate + lock-beat scaleB valid assertion.
   //   Replaces the former split predicate (handshake gate on isMx(aFmt),
   //   write/forward gates on isMx(bFmt)). Their equality used to be guaranteed
-  //   only indirectly, across modules, by HiveCoreCalcConfig errCode=3
+  //   only indirectly, across modules, by WorkerBeeCalcConfig errCode=3
   //   (aFmt/bFmt same-family XOR check); this file had no local defence.
-  //   HiveCoreExecutor2 is a publicly instantiable module (HiveCoreSpec
+  //   WorkerBeeExecutor2 is a publicly instantiable module (WorkerBeeSpec
   //   elaborates it standalone), so any direct hookup or unit stimulus that
   //   bypasses CalcConfig could run aFmt=MX with bFmt=non-MX: the handshake
   //   gate would fire per beat and the lock beat would be emitted, while the
@@ -189,14 +189,14 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   //   check. That is the required local defence line.
   //   NOTE (#146): the former per-column scaleBRegs register file has been
   //   removed. scaleB now flows combinationally from scaleBPop.payload through
-  //   hiveScaleBIn into the HiveComb/HiveCell/HiveWorker per-lane chain and is
-  //   captured by HiveWorker.scaleBReg on the loadWLock beat. See the axis
+  //   wbScaleBIn into the WbComb/WbCell/WbWorker per-lane chain and is
+  //   captured by WbWorker.scaleBReg on the loadWLock beat. See the axis
   //   comment on the "B scale feed" loop below.
   val mxRunB = DataFormat.isMx(io.regFile.aFmt)
 
   // 【P2 纯 FP8】运行期纯 FP8 判据（aFmt 权威，与 mxRunB 同源同风格）：驱动 scaleA/
   //   scaleB 两注入点的 127 恒等注入。纯 FP8 运行时 isMx(aFmt)=false ⟹ mxRunB=false
-  //   （scale FIFO 恒空、不消费、供数不等 scale），而阵列侧 fmt 已被 HiveCore remap
+  //   （scale FIFO 恒空、不消费、供数不等 scale），而阵列侧 fmt 已被 WorkerBee remap
   //   成 MXE4M3/E5M2 ⟹ MAC 走 MX8 支路并真实消费 scale ⟹ scale 字节必须组合直供
   //   127（E8M0 2^0=1.0 恒等乘，FpCvt 的 exp_fp32 = e + 127 - bias 数学上即纯 FP8
   //   解码）。errCode3 新臂保证 aFmt=FP8 时 bFmt 必同为 FP8，单一 aFmt 判据完备。
@@ -223,7 +223,7 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   
   //A口供数
   for (i <- 0 until cfg.totalN) {
-    io.hiveAIn(i) := io.aPop.payload(cfg.aEffW * (i+1)-1, cfg.aEffW * i)
+    io.wbAIn(i) := io.aPop.payload(cfg.aEffW * (i+1)-1, cfg.aEffW * i)
     if(cfg.hasMx){
       val block = Mux(io.regFile.aMxBlockSize === MXBlockSize.M16, 16.U, 32.U)
       val step = Mux(io.calcConfig.isAX2, 2.U, 4.U)
@@ -235,7 +235,7 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
       //   8-bit（127.U(8.W)）：裸 127.U 推 7-bit，Mux 静默零扩属本项目已三次踩坑的
       //   形态（见 chisel-mux-vecinit-pad 记忆）。
       val scaleAByte = (io.scaleAPop.get.payload >> (idx * 8.U))(7, 0)
-      io.hiveScaleAIn.get(i) := (if (cfg.hasFp8) Mux(fp8Run, 127.U(8.W), scaleAByte) else scaleAByte)
+      io.wbScaleAIn.get(i) := (if (cfg.hasFp8) Mux(fp8Run, 127.U(8.W), scaleAByte) else scaleAByte)
     }
   }
 
@@ -249,22 +249,22 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   //   idx = (lane*step)/blk selects the E8M0 scale byte of the MX block that
   //   this lane belongs to; numScalesPerBeat = kPerBeat/blk distinct bytes are
   //   consumed out of the 32-bit scaleBPop payload.
-  //   hiveScaleBIn(lane) enters HiveComb.io.scaleBIn(lane), which drives
-  //   HiveCell.io.scaleBIn(x=lane) at column y=0 and then shifts right along
-  //   the a-chain (HiveComb cj cascade + HiveCell y cascade, 1 cycle each).
+  //   wbScaleBIn(lane) enters WbComb.io.scaleBIn(lane), which drives
+  //   WbCell.io.scaleBIn(x=lane) at column y=0 and then shifts right along
+  //   the a-chain (WbComb cj cascade + WbCell y cascade, 1 cycle each).
   //   In loadW mode the weight of PE(x,y) is latched from beat (totalN-1-y)
   //   lane x, i.e. B[n_out = y][k-lane x]; because the scaleB chain is
   //   lockstep with the a-chain, PE(x,y) captures on the very same loadWLock
   //   beat the scale byte of lane x of beat (totalN-1-y) -- same beat, same
   //   n_out, same lane, same K-block. Zero cycle skew.
   //   Consequence: the array row coordinate x IS the K-lane axis and the array
-  //   column coordinate y IS the output-N axis. The HiveComb local name
+  //   column coordinate y IS the output-N axis. The WbComb local name
   //   `globalRow` only denotes the PE-grid row coordinate; it never meant the
-  //   weight N axis (see HiveComb / HiveCell / HiveWorker header notes).
+  //   weight N axis (see WbComb / WbCell / WbWorker header notes).
   // ==========================================================================
   if(cfg.hasMx){
     val block = Mux(io.regFile.bMxBlockSize === MXBlockSize.M16, 16.U, 32.U)
-    // 【P1-2 W4A8 stretch 订正（2026-10-13）】混配（isMx8(aFmt)&&isMx4(bFmt)，与 HiveCore.w4a8Mix
+    // 【P1-2 W4A8 stretch 订正（2026-10-13）】混配（isMx8(aFmt)&&isMx4(bFmt)，与 WorkerBee.w4a8Mix
     //   同式）时 bFmt 寄存器仍为 E2M1 ⟹ isBX2=false，但 B DMA 走 stretch：每个阵列拍恒推进
     //   32 个 K 元素（fp8 口径）⟹ 每 lane 每拍 2 个 K、与纯 MX8 同构 ⟹ step=2。
     //   scaleB 侧【无展开】：scaleBDma 取全量 kTile 窗口（reg_kTile=calcConfig.kTile），
@@ -283,7 +283,7 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
       // 【P2 纯 FP8】同 A 侧：fp8Run 时恒 127 恒等注入（scaleB FIFO 不启动、
       //   阵列侧 remap 后的 MX8 MAC 真实消费；两臂显式 8-bit 防 Mux 零扩）。
       val scaleBByte = (io.scaleBPop.get.payload >> (idx * 8.U))(7, 0)
-      io.hiveScaleBIn.get(lane) := (if (cfg.hasFp8) Mux(fp8Run, 127.U(8.W), scaleBByte) else scaleBByte)
+      io.wbScaleBIn.get(lane) := (if (cfg.hasFp8) Mux(fp8Run, 127.U(8.W), scaleBByte) else scaleBByte)
     }
   }
 
@@ -291,8 +291,8 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   // 【P0 epilogue-1 fused bias】bias 收集寄存器、32b→cEffW 基底转换与收集 FSM 外壳
   // --------------------------------------------------------------------------
   // 基底注入方案（零加法器）：bias 取代 sLOAD_A pass-0 的 psum 零基底，沿既有
-  // psum 逐列链进入阵列累加（C[m][n] = bias[n] + Σ A×B）。HiveComb 的 psumIn 是
-  // 输出-N 轴【逐列】注入、psum 沿 K-lane 链向下累加（见 HiveComb 行连接块），
+  // psum 逐列链进入阵列累加（C[m][n] = bias[n] + Σ A×B）。WbComb 的 psumIn 是
+  // 输出-N 轴【逐列】注入、psum 沿 K-lane 链向下累加（见 WbComb 行连接块），
   // 故 biasRegs(i) 即输出列 nt*totalN+i 的 bias；bias 是列常量，经 bSkew 链的
   // 逐列延迟不改变取值。K>totalN 的后续 pass 仍走 cPop 回灌（bias 已烧进
   // pass-0 的 partial sum），阵列/MAC/OutCvt/cDma 全零改动。
@@ -302,11 +302,11 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   private val biasCnt    = if (cfg.hasMx) Some(RegInit(0.U(log2Up(cfg.totalN).W))) else None
 
   // 【P0 epilogue-2 fused requant】rqM 收集寄存器（与 bias 同构；M 向量不进阵列、
-  //   经 rqMOut 顶层接线至 HiveOutCvt 例化的 HiveRequant，故无 lazy 转换）
+  //   经 rqMOut 顶层接线至 WbOutCvt 例化的 WbRequant，故无 lazy 转换）
   private val rqMRegs   = if (cfg.hasMx) Some(RegInit(VecInit(Seq.fill(cfg.totalN)(0.U(32.W))))) else None
   private val rqMLoaded = if (cfg.hasMx) Some(RegInit(false.B)) else None
   private val rqMCnt    = if (cfg.hasMx) Some(RegInit(0.U(log2Up(cfg.totalN).W))) else None
-  // 【P0 epilogue-2 修复】rqM 暂存-提交双缓冲：M 的消费者在 HiveOutCvt in.fire
+  // 【P0 epilogue-2 修复】rqM 暂存-提交双缓冲：M 的消费者在 WbOutCvt in.fire
   //   （C 写回窗口末尾——行经 scratchpad 深缓冲晚到），而重取触发在 sNEXT_NK_TILE
   //   （窗口开门拍）。若字流直接原地重载 rqMRegs，取数会逐 lane 覆盖仍在本块 C
   //   排空路径上的行将要锁存的 M（实测 tile0 末行锁到 tile1 的 M，2/1024 元素
@@ -336,16 +336,16 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
     }
   }
 
-  /** fp32 → lazy40 累加基底：位级镜像金锚权威 HiveSimCommon.fp32BitsTo40 ——
+  /** fp32 → lazy40 累加基底：位级镜像金锚权威 WbSimCommon.fp32BitsTo40 ——
     * e==0（含全部 subnormal）→ 绝对 0；否则 {s, e, 隐含 1, m, 0^(cEffW-33)}，
     * 在 cEffW 内右侧对齐、高位补零（cEffW=40 时即权威式 {s<<39|e<<31|1<<30|m<<7}）。 */
   private def fp32ToLazy40(x: UInt): UInt = {
-    require(cfg.cEffW >= 40, s"HiveCoreExecutor fp32ToLazy40 requires cEffW(${cfg.cEffW}) >= 40 (lazy fp32 accumulator)")
+    require(cfg.cEffW >= 40, s"WorkerBeeExecutor fp32ToLazy40 requires cEffW(${cfg.cEffW}) >= 40 (lazy fp32 accumulator)")
     val e = x(30, 23)
     Mux(e === 0.U, 0.U(cfg.cEffW.W), Cat(x(31), e, 1.U(1.W), x(22, 0), 0.U((cfg.cEffW - 33).W)))
   }
 
-  /** bias 32b 字 → cEffW 累加基底：INT 运行（runIsInt，与 HiveCoreCalcConfig
+  /** bias 32b 字 → cEffW 累加基底：INT 运行（runIsInt，与 WorkerBeeCalcConfig
     * errCode11 判据逐字同式）按 INT32 符号扩展；fp/MX 运行按 fp32 → lazy40。
     * errCode11 已在 EXECUTE 拒绝跨界组合 ⟹ 运行期实际到达的支路与 cFmt 语义一致。
     * 【P2 纯 FP8】runIsInt 补 !isFp8：FP8E4M3/E5M2 不属 is2B/FP32/isMx 任一谓词，
@@ -391,9 +391,9 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
 
 
   //C push 直接push
-  io.cPush.valid := io.hiveValidOut
-  io.cPush.payload := Cat(io.hiveCOut.reverse)
-  assert(!(io.cPush.valid & !io.cPush.ready), "HiveCoreExecutor: cPush valid but C buffer not ready (pop-before-push invariant violated, partial sum lost)")
+  io.cPush.valid := io.wbValidOut
+  io.cPush.payload := Cat(io.wbCOut.reverse)
+  assert(!(io.cPush.valid & !io.cPush.ready), "WorkerBeeExecutor: cPush valid but C buffer not ready (pop-before-push invariant violated, partial sum lost)")
 
   
   // ==========================================================================
@@ -418,19 +418,19 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
   io.flushB := false.B
   io.flushC := false.B
 
-  io.hiveLoadH   := false.B
-  io.hiveLoadV   := false.B
-  io.hiveLoadVLock   := false.B
-  io.hiveLoadW       := false.B
-  io.hiveLoadWLock   := false.B
-  io.hiveValidIn := false.B
-  io.hiveClear   := false.B
+  io.wbLoadH   := false.B
+  io.wbLoadV   := false.B
+  io.wbLoadVLock   := false.B
+  io.wbLoadW       := false.B
+  io.wbLoadWLock   := false.B
+  io.wbValidIn := false.B
+  io.wbClear   := false.B
 
   io.progress := doneTiles
 
 
   for (i <- 0 until cfg.totalN) {
-        io.hivePsumIn(i) := 0.U
+        io.wbPsumIn(i) := 0.U
   }
 
 
@@ -447,7 +447,7 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
       curKTile := 0.U
       curM := 0.U
       doneTiles := 0.U
-      io.hiveClear := true.B
+      io.wbClear := true.B
       hasNext := false.B
       drainNextCnt := 0.U
         // 计算 tile 数。注意：mTiles/kTiles 为 Reg，本拍 := 下一拍才生效，
@@ -457,7 +457,7 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
         // 【Phase 3 INT 生态同步】kTiles 分母判据由 isMx 泛化为「打包格式」= is1B || isHalfB
         //   （含 INT8/INT4 与全部 MX）。半字节族（INT4/MXE2M1）kPerBeat=totalN×4 → K/(totalN×4)；
         //   单字节族（INT8/MXE4M3/MXE5M2）kPerBeat=totalN×2 → K/(totalN×2)；非打包格式走 ceil(K/totalN)。
-        //   与 HiveCoreCalcConfig.kTile 及金锚 HiveDebugModel.aKTiles/bKTiles 同源，不再由 hasMx4 门控。
+        //   与 WorkerBeeCalcConfig.kTile 及金锚 WbDebugModel.aKTiles/bKTiles 同源，不再由 hasMx4 门控。
         val isPackedA = DataFormat.is1B(io.regFile.aFmt) || DataFormat.isHalfB(io.regFile.aFmt)
         val newKTiles = Mux(isPackedA,
           Mux(DataFormat.isHalfB(io.regFile.aFmt),
@@ -479,7 +479,7 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
         // A 侧全局排空不变量仿真检查（仅仿真可见）：上次 execute 中 aDma
         // push 总行数 = nTiles×kTiles×m = executor 消费总行数，新 execute
         // 拍 FIFO 必已排空；非 0 说明供/消行数失配（padding 混入/丢数）
-        assert(io.aOccupancy === 0.U, "HiveCoreExecutor: A buffer not drained at execute pulse (previous run aDma push rows != executor consume rows)")
+        assert(io.aOccupancy === 0.U, "WorkerBeeExecutor: A buffer not drained at execute pulse (previous run aDma push rows != executor consume rows)")
         io.flushA := true.B
         io.flushB := true.B
         io.flushC := true.B
@@ -525,13 +525,13 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
     }
 
 
-    // --- sLOAD_WEIGHT_PE: 从 B buffer pop 权重 → 加载到 HiveComb ---
+    // --- sLOAD_WEIGHT_PE: 从 B buffer pop 权重 → 加载到 WbComb ---
     // loadH 在整个加载窗口保持拉高（fmt/rnd 配置需时间经阵列横向传播）；
     // loadV 跟随 bPop 数据有效性：B buffer 暂无数据时 loadV 自然暂停，
     // RdOnly DMA 喂数到位后自动恢复，无需固定每 2 拍一次的节流。
     is(sLOAD_B) {
-      io.hiveLoadH := true.B               // 配置加载，整个窗口拉高
-      io.hiveLoadV := io.bPop.fire
+      io.wbLoadH := true.B               // 配置加载，整个窗口拉高
+      io.wbLoadV := io.bPop.fire
 
       if(cfg.hasMx){
         // W1：握手门改读单一运行期判据 mxRunB（与写入门/前递门/MAC 消费门同源），
@@ -548,7 +548,7 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
         // W7 lockstep invariant guard (elaborated only when hasMx, evaluated at
         //   runtime only when mxRunB, so non-MX runs can never trip it).
         //   "bPop and scaleBPop fire on the same cycle" is the shared premise of
-        //   the whole scaleB path: hiveScaleBIn is a pure combinational read of
+        //   the whole scaleB path: wbScaleBIn is a pure combinational read of
         //   scaleBPop.payload, so the beat index carried by the weight FIFO and
         //   the beat index carried by the scale FIFO must advance together.
         //   Before #146 this held only as an accidental identity of the two ready
@@ -563,16 +563,16 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
         when(mxRunB) {
           // (1) fire XOR guard: both sides must fire on the same cycle
           assert(!(io.bPop.fire ^ io.scaleBPop.get.fire),
-            "HiveCoreExecutor: MX scaleB lockstep violated - bPop.fire XOR scaleBPop.fire (must fire same cycle, else the per-lane scaleB chain misaligns against the weight diagonal at loadWLock)")
-          // (2) lock-beat scaleB valid guard: hiveLoadWLock fires combinationally
-          //     on the last beat and every lane of hiveScaleBIn reads
+            "WorkerBeeExecutor: MX scaleB lockstep violated - bPop.fire XOR scaleBPop.fire (must fire same cycle, else the per-lane scaleB chain misaligns against the weight diagonal at loadWLock)")
+          // (2) lock-beat scaleB valid guard: wbLoadWLock fires combinationally
+          //     on the last beat and every lane of wbScaleBIn reads
           //     scaleBPop.payload on that very cycle, so the payload must be
           //     valid or all scaleBReg latches capture stale FIFO content.
           //     Structurally implied by the ready term above (fire => both sides
           //     valid); kept as a defence line in case that term is ever relaxed.
           when(loadWModeReg && io.bPop.fire && tileInterCnt === 0.U) {
             assert(io.scaleBPop.get.valid,
-              "HiveCoreExecutor: MX lock beat scaleBPop not valid - scaleBReg would latch stale FIFO payload on loadWLock")
+              "WorkerBeeExecutor: MX lock beat scaleBPop not valid - scaleBReg would latch stale FIFO payload on loadWLock")
           }
         }
       }
@@ -582,7 +582,7 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
       
 
       for (i <- 0 until cfg.totalN) {
-        io.hivePsumIn(i) := io.bPop.payload(cfg.bW * (i + 1) - 1, cfg.bW * i)
+        io.wbPsumIn(i) := io.bPop.payload(cfg.bW * (i + 1) - 1, cfg.bW * i)
       }
 
       
@@ -593,34 +593,34 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
         }.otherwise{
           tileInterCnt := totalN.U - 1.U
           state := sLOAD_A
-          io.hiveLoadVLock := true.B
+          io.wbLoadVLock := true.B
         }
       }
 
 
       // --- 水平 loadW 模式覆盖块（last-connect；loadWModeReg=0 时整块死路，
       //     上方垂直路径逐字保留、行为 bit-exact 不变）：
-      //     权重改经 hiveAIn 的 a 数据链水平加载（loadW 脉冲链移位 +
+      //     权重改经 wbAIn 的 a 数据链水平加载（loadW 脉冲链移位 +
       //     末拍 loadWLock 广播锁存），psumIn 保持 0，loadV 信号组压制为 0。
       //     tileInterCnt/bPop.ready/loadH 计数与握手逻辑共用上方不改 ---
       when(loadWModeReg) {
-        io.hiveLoadV     := false.B        // 压制垂直加载脉冲
-        io.hiveLoadW     := io.bPop.fire   // 水平移位脉冲：停顿自然暂停
-        io.hiveLoadVLock := false.B        // 压制垂直锁存
+        io.wbLoadV     := false.B        // 压制垂直加载脉冲
+        io.wbLoadW     := io.bPop.fire   // 水平移位脉冲：停顿自然暂停
+        io.wbLoadVLock := false.B        // 压制垂直锁存
         for (i <- 0 until cfg.totalN) {
           // 权重经 a 口供数（bPop 的 totalN 个 bW 切片，aEffW > bW 时
           // 高位自动补零）；psumIn 恢复默认 0（权重不再经 psum 口下沉）
-          io.hiveAIn(i)    := io.bPop.payload(cfg.bW * (i + 1) - 1, cfg.bW * i)
-          io.hivePsumIn(i) := 0.U
+          io.wbAIn(i)    := io.bPop.payload(cfg.bW * (i + 1) - 1, cfg.bW * i)
+          io.wbPsumIn(i) := 0.U
         }
         // Last beat fire (tileInterCnt wrapped): emit loadWLock on this very
         // cycle (the unique moment of the diagonal landed state; it must
         // coincide combinationally with the fire cycle of the last beat
         // entering column 0).
         when(io.bPop.fire && tileInterCnt === 0.U) {
-          io.hiveLoadWLock := true.B
+          io.wbLoadWLock := true.B
           // (#146 D1(iii)) The former "W3 last-beat column-0 combinational
-          // forward" `io.hiveScaleBIn.get(0) := io.scaleBPop.get.payload` has
+          // forward" `io.wbScaleBIn.get(0) := io.scaleBPop.get.payload` has
           // been DELETED here. Unreachability / equivalence argument:
           //   (a) Its stated reason for existing is gone. The comment said
           //       "scaleBRegs(0) is written and only takes effect next cycle,
@@ -628,7 +628,7 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
           //       must forward the current scaleBPop.payload". That per-column
           //       scaleBRegs register file has been deleted by the user; scaleB
           //       is now a pure combinational read of scaleBPop.payload (see the
-          //       "B scale feed" loop) that reaches HiveWorker.scaleBReg through
+          //       "B scale feed" loop) that reaches WbWorker.scaleBReg through
           //       the per-lane chain and is captured ON the loadWLock beat. There
           //       is no next-cycle write to forward around any more.
           //   (b) It was bit-exact redundant. For lane 0 the base expression
@@ -688,23 +688,23 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
       io.cPop.ready := feed & needPartialSum
 
       // 跟随 fire（供数暂停时 valid 拉低，避免阵列对保持的旧 a 值重复累加）
-      io.hiveValidIn := io.aPop.fire 
+      io.wbValidIn := io.aPop.fire 
       
       
 
       for(i <- 0 until cfg.totalN){
         when(needPartialSum){
-          io.hivePsumIn(i) := io.cPop.payload(cfg.cEffW * (i + 1) - 1, cfg.cEffW * i)
+          io.wbPsumIn(i) := io.cPop.payload(cfg.cEffW * (i + 1) - 1, cfg.cEffW * i)
         }
       }
 
       // 【P0 epilogue-1】pass-0 基底注入：bias 取代零基底经既有 psum 逐列链下发
       //   （与 needPartialSum 回灌支路互斥：pass-0 注 bias、后续 pass 回灌 partial sum，
-      //   bias 已烧进 pass-0 结果）；biasOn=0 时本 when 恒假、hivePsumIn 保持默认 0
+      //   bias 已烧进 pass-0 结果）；biasOn=0 时本 when 恒假、wbPsumIn 保持默认 0
       if (cfg.hasMx) {
         when(!needPartialSum && io.regFile.biasOn) {
           for (i <- 0 until cfg.totalN) {
-            io.hivePsumIn(i) := biasLazy(i)
+            io.wbPsumIn(i) := biasLazy(i)
           }
         }
       }
@@ -801,7 +801,7 @@ class HiveCoreExecutor2(cfg: HiveCoreConfig) extends Module {
         }
       }.otherwise{
   
-      val anyNewValid = io.hiveValidOut.asUInt.orR
+      val anyNewValid = io.wbValidOut.asUInt.orR
       // 超时退出: 连续 2*totalN 周期无新 valid → 强制退出
       when(!anyNewValid & !io.dmaCBusy) {
         io.done := true.B

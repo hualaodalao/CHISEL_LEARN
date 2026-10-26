@@ -1,6 +1,6 @@
-/** HiveCoreSimCaseIntSpec -- INT8/INT4 end-to-end GEMM verification suite.
+/** WorkerBeeSimCaseIntSpec -- INT8/INT4 end-to-end GEMM verification suite.
   *
-  * Covers the Phase 3 architecture: HiveFusionMacInt dual-lane (INT8) and
+  * Covers the Phase 3 architecture: WbFusionMacInt dual-lane (INT8) and
   * quad-lane (INT4) packed MAC with elemsPerLane = 2 / 4 respectively.
   *
   * Test matrix:
@@ -22,7 +22,7 @@
   * The hardware currently lacks an errCode check for INT+loadWMode=0 (unlike MX
   * which has errCode 4); this is a known gap reported to the team.
   *
-  * Infrastructure: reuses HiveDebugModel.Plan for memory image, golden model,
+  * Infrastructure: reuses WbDebugModel.Plan for memory image, golden model,
   * and address sequences. Uses a custom INT exact-match compare path. (The
   * historical Plan.compare() histogram overflow for 32-bit output formats,
   * nCodes = 1 << 32 wraps to 1, is now fixed in #73.)
@@ -35,15 +35,15 @@ import org.scalatest.matchers.should.Matchers
 import java.nio.file._
 import scala.collection.mutable
 
-class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
-    with HiveAlwaysFstSim with HiveStatusPollApi {
-  import HiveDebugModel._
+class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
+    with WbAlwaysFstSim with WbStatusPollApi {
+  import WbDebugModel._
 
   private val TAG = "INT-E2E"
-  private val SUITE = "HiveCoreSimCaseIntSpec"
+  private val SUITE = "WorkerBeeSimCaseIntSpec"
 
   // ========== Hardware configuration (same as QuickSpec / MxSpec) ==========
-  private val cfg = HiveCoreConfig(
+  private val cfg = WorkerBeeConfig(
     arrayN = 8, clusterM = 2,       // totalN = 16
     aW = 16, bW = 16, cW = 40,
     // Default supportedFmts = {INT8, INT4, MXE4M3, MXE5M2, MXE2M1, FP8E4M3, FP8E5M2}
@@ -52,7 +52,7 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
     scaleBufferDepth = 64
   )
 
-  behavior of "HiveCore INT GEMM"
+  behavior of "WorkerBee INT GEMM"
 
   // ==========================================================================
   // Positive cases
@@ -90,7 +90,7 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
   // 【P1-2 INT W4A8】A=INT8 × B=INT4 正向混配：B DMA stretch（16B 半字片 32B 对齐
   //   单读 + 顶层符号扩展成 INT8 阵列拍），bFmtIn 重映射 INT4→INT8，MAC 走纯 INT8
   //   双 lane 基线（零阵列改动）；无 scale 通路。K=64 ⟹ kTile=2（aKpb=32 阵列窗口
-  //   口径，多窗口轮转）。金锚 expBAddrSeq 混配分支（HiveDebugModel）：窗口步进
+  //   口径，多窗口轮转）。金锚 expBAddrSeq 混配分支（WbDebugModel）：窗口步进
   //   aKpb×4/8=16B、K/aKpb 窗口 × totalN 行降序、物理读 = 对齐单读。
   // ==========================================================================
   it should "run INT8 x INT4 mixed W4A8 M=32 N=16 K=64 loadW=1" in {
@@ -193,7 +193,7 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
     //   (rowW = cScaleRowW = totalN/2 bits; totalN=16 gives rowW=8 bits=1 byte),
     //   故 lane 窗口退化为单 lane、移位恒 0、strb 恒 0xFF。契约并非「豁免」而是
     //   在单 lane 端口上平凡退化，结构上不可能出现 data/strb 错位。
-    val cLog = mutable.ArrayBuffer[HiveSimCommon.CWriteBeat]()
+    val cLog = mutable.ArrayBuffer[WbSimCommon.CWriteBeat]()
     val sLog = mutable.ArrayBuffer[(Long, BigInt)]()
     val addrBad = mutable.ArrayBuffer[String]()
     var addrBadCnt = 0
@@ -205,7 +205,7 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
     var cmpElems = 0
 
     try {
-      simulate(new HiveCore(cfg)) { dut =>
+      simulate(new WorkerBee(cfg)) { dut =>
         // ---- Address check helper (collect, don't throw) ----
         def chk(ch: String, i: Int, hw: Long, exp: Seq[Long]): Unit =
           if (i < exp.size && hw != exp(i)) {
@@ -227,12 +227,12 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
           else { ack(false); i }
 
         // ---- (#166) dmaC write channel driver: additionally peek wstrb so the lane-level
-        //      byte-wise audit (HiveSimCommon.auditCBeatLanes) gets the strobe bits. The old
+        //      byte-wise audit (WbSimCommon.auditCBeatLanes) gets the strobe bits. The old
         //      path never peeked strb, which is exactly why "strb shifted but wdata not"
         //      stayed invisible on the TB side. ----
         def wrChC(ch: String, i: Int, exp: Seq[Long], on: Boolean, ad: => Long, da: => BigInt,
                   st: => BigInt, ack: Boolean => Unit,
-                  log: mutable.ArrayBuffer[HiveSimCommon.CWriteBeat]): Int =
+                  log: mutable.ArrayBuffer[WbSimCommon.CWriteBeat]): Int =
           if (on) { val a = ad; chk(ch, i, a, exp); log += ((a, da, st)); ack(true); i + 1 }
           else { ack(false); i }
 
@@ -251,17 +251,17 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
         dut.reset.poke(true.B); dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
 
         // ---- Command helper ----
-        def cmd(op: HiveCoreOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
+        def cmd(op: WorkerBeeOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
           transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
         }
 
         // ---- Configure registers ----
         // 配置索引 0..11 紧排：M/NK/A/B/C/CONTROL/ScaleA/ScaleB/ScaleC/Bias/RqM/RqParam。
-        cmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, m, n.toLong | (k.toLong << 16))
-        cmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, p.aBase, p.bBase)
-        cmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, p.controlWord5)
-        cmd(HiveCoreOp.REG_WRITE2, HiveSimCommon.SCALE_A_REG_ADDR, HiveSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE)
-        cmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
+        cmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, m, n.toLong | (k.toLong << 16))
+        cmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, p.aBase, p.bBase)
+        cmd(WorkerBeeOp.REG_WRITE2, 0x04, 0x05, C_BASE, p.controlWord5)
+        cmd(WorkerBeeOp.REG_WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE)
+        cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
 
         println(s"[$TAG] regs: reg5(controlWord5)=0x${p.controlWord5.toHexString}")
 
@@ -327,7 +327,7 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
         dut.io.dmaC.rsp.valid.poke(false.B)
         dut.io.dmaCScale.get.rsp.valid.poke(false.B)
         dut.io.cmd.foreach(_.valid.poke(false.B))
-        if (errSeen) errCode = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR).toInt
+        if (errSeen) errCode = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.ERROR_CODE_REG_ADDR).toInt
         if (done && !errSeen) dut.io.status.inFlight.expect(false.B)
 
         println(s"[$TAG] Done: cycles=$cycle done=$done err=$errSeen; " +
@@ -343,7 +343,7 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
           //   （addr↔strb 双向对账、未选通 lane 零填充核查、BEAT-COUNT），违规直接
           //   计入 mismatchCnt ⟹ lane 级契约缺陷不再静默放行。期望拍数取金锚
           //   plan.expCAddrSeq.size（张量语义侧推导），不取硬件实收拍数。
-          val parsed = HiveSimCommon.parseDenseCWriteLogChecked(
+          val parsed = WbSimCommon.parseDenseCWriteLogChecked(
             cLog.toSeq, p.cFmt, m, n, totalN, cfg.cDmaExtW,
             expBeats = Some(plan.expCAddrSeq.size), expElems = Some(m * n))
           val hwBits = parsed.matrix
@@ -428,7 +428,7 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
     var cycle = 0
 
     try {
-      simulate(new HiveCore(cfg)) { dut =>
+      simulate(new WorkerBee(cfg)) { dut =>
         // ---- Reset ----
         Seq(dut.io.dmaA.rsp, dut.io.dmaB.rsp).foreach { r =>
           r.valid.poke(false.B); r.payload.data.poke(0.U); r.payload.err.poke(false.B) }
@@ -444,17 +444,17 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
         dut.reset.poke(true.B); dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
 
         // ---- Command helper ----
-        def cmd(op: HiveCoreOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
+        def cmd(op: WorkerBeeOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
           transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
         }
 
         // ---- Configure registers (same illegal config) ----
         // 与正向运行器同一配置布局，只改变受测配置违约项。
-        cmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, m, n.toLong | (k.toLong << 16))
-        cmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
-        cmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, cAddr, p.controlWord5)
-        cmd(HiveCoreOp.REG_WRITE2, HiveSimCommon.SCALE_A_REG_ADDR, HiveSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE)
-        cmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
+        cmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, m, n.toLong | (k.toLong << 16))
+        cmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
+        cmd(WorkerBeeOp.REG_WRITE2, 0x04, 0x05, cAddr, p.controlWord5)
+        cmd(WorkerBeeOp.REG_WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE)
+        cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
 
         prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
         launchStart(dut.clock, dut.io.cmd(0))
@@ -478,7 +478,7 @@ class HiveCoreSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
           dut.clock.step(); cycle += 1
         }
         dut.io.cmd.foreach(_.valid.poke(false.B))
-        errCode = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR).toInt
+        errCode = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.ERROR_CODE_REG_ADDR).toInt
         dut.io.status.inFlight.expect(false.B)
         println(s"[$TAG] ErrCase end: cycles=$cycle err=$errSeen errCode=$errCode done=$done cWrites=$cWrites")
       }

@@ -43,267 +43,267 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module Hive_HiveFusionMacFp(	// src/hive/scala/main/HiveFusionMacFp.scala:19:7
-  input         clock,	// src/hive/scala/main/HiveFusionMacFp.scala:19:7
-                reset,	// src/hive/scala/main/HiveFusionMacFp.scala:19:7
-  input  [15:0] io_a,	// src/hive/scala/main/HiveFusionMacFp.scala:45:16
-                io_b,	// src/hive/scala/main/HiveFusionMacFp.scala:45:16
-  input  [39:0] io_cReg,	// src/hive/scala/main/HiveFusionMacFp.scala:45:16
-  input  [3:0]  io_aFmt,	// src/hive/scala/main/HiveFusionMacFp.scala:45:16
-                io_bFmt,	// src/hive/scala/main/HiveFusionMacFp.scala:45:16
-  input  [7:0]  io_scaleA,	// src/hive/scala/main/HiveFusionMacFp.scala:45:16
-                io_scaleB,	// src/hive/scala/main/HiveFusionMacFp.scala:45:16
-  input  [2:0]  io_rnd,	// src/hive/scala/main/HiveFusionMacFp.scala:45:16
-  input         io_consumeValid,	// src/hive/scala/main/HiveFusionMacFp.scala:45:16
-  output [39:0] io_sum	// src/hive/scala/main/HiveFusionMacFp.scala:45:16
+module Wb_WbFusionMacFp(	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7
+  input         clock,	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7
+                reset,	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7
+  input  [15:0] io_a,	// src/workerbee/scala/main/WbFusionMacFp.scala:45:16
+                io_b,	// src/workerbee/scala/main/WbFusionMacFp.scala:45:16
+  input  [39:0] io_cReg,	// src/workerbee/scala/main/WbFusionMacFp.scala:45:16
+  input  [3:0]  io_aFmt,	// src/workerbee/scala/main/WbFusionMacFp.scala:45:16
+                io_bFmt,	// src/workerbee/scala/main/WbFusionMacFp.scala:45:16
+  input  [7:0]  io_scaleA,	// src/workerbee/scala/main/WbFusionMacFp.scala:45:16
+                io_scaleB,	// src/workerbee/scala/main/WbFusionMacFp.scala:45:16
+  input  [2:0]  io_rnd,	// src/workerbee/scala/main/WbFusionMacFp.scala:45:16
+  input         io_consumeValid,	// src/workerbee/scala/main/WbFusionMacFp.scala:45:16
+  output [39:0] io_sum	// src/workerbee/scala/main/WbFusionMacFp.scala:45:16
 );
 
-  wire        _cvtFp4ToFp4Mid1B_io_sign;	// src/hive/scala/main/HiveFusionMacFp.scala:185:32
-  wire [7:0]  _cvtFp4ToFp4Mid1B_io_exp;	// src/hive/scala/main/HiveFusionMacFp.scala:185:32
-  wire        _cvtFp4ToFp4Mid1B_io_mant;	// src/hive/scala/main/HiveFusionMacFp.scala:185:32
-  wire        _cvtFp4ToFp4Mid1A_io_sign;	// src/hive/scala/main/HiveFusionMacFp.scala:184:32
-  wire [7:0]  _cvtFp4ToFp4Mid1A_io_exp;	// src/hive/scala/main/HiveFusionMacFp.scala:184:32
-  wire        _cvtFp4ToFp4Mid1A_io_mant;	// src/hive/scala/main/HiveFusionMacFp.scala:184:32
-  wire [31:0] _fp4Mul1_io_prod;	// src/hive/scala/main/HiveFusionMacFp.scala:183:23
-  wire        _cvtFp4ToFp4Mid0B_io_sign;	// src/hive/scala/main/HiveFusionMacFp.scala:170:32
-  wire [7:0]  _cvtFp4ToFp4Mid0B_io_exp;	// src/hive/scala/main/HiveFusionMacFp.scala:170:32
-  wire        _cvtFp4ToFp4Mid0B_io_mant;	// src/hive/scala/main/HiveFusionMacFp.scala:170:32
-  wire        _cvtFp4ToFp4Mid0A_io_sign;	// src/hive/scala/main/HiveFusionMacFp.scala:169:32
-  wire [7:0]  _cvtFp4ToFp4Mid0A_io_exp;	// src/hive/scala/main/HiveFusionMacFp.scala:169:32
-  wire        _cvtFp4ToFp4Mid0A_io_mant;	// src/hive/scala/main/HiveFusionMacFp.scala:169:32
-  wire [31:0] _fp4Mul0_io_prod;	// src/hive/scala/main/HiveFusionMacFp.scala:168:23
-  wire        _cvtFp4ToFp8MidB_io_sign;	// src/hive/scala/main/HiveFusionMacFp.scala:133:31
-  wire [7:0]  _cvtFp4ToFp8MidB_io_exp;	// src/hive/scala/main/HiveFusionMacFp.scala:133:31
-  wire [2:0]  _cvtFp4ToFp8MidB_io_mant;	// src/hive/scala/main/HiveFusionMacFp.scala:133:31
-  wire        _cvtFp4ToFp8MidA_io_sign;	// src/hive/scala/main/HiveFusionMacFp.scala:132:31
-  wire [7:0]  _cvtFp4ToFp8MidA_io_exp;	// src/hive/scala/main/HiveFusionMacFp.scala:132:31
-  wire [2:0]  _cvtFp4ToFp8MidA_io_mant;	// src/hive/scala/main/HiveFusionMacFp.scala:132:31
-  wire        _cvtFp8ToFp8MidB_io_sign;	// src/hive/scala/main/HiveFusionMacFp.scala:131:31
-  wire [7:0]  _cvtFp8ToFp8MidB_io_exp;	// src/hive/scala/main/HiveFusionMacFp.scala:131:31
-  wire [2:0]  _cvtFp8ToFp8MidB_io_mant;	// src/hive/scala/main/HiveFusionMacFp.scala:131:31
-  wire        _cvtFp8ToFp8MidA_io_sign;	// src/hive/scala/main/HiveFusionMacFp.scala:130:31
-  wire [7:0]  _cvtFp8ToFp8MidA_io_exp;	// src/hive/scala/main/HiveFusionMacFp.scala:130:31
-  wire [2:0]  _cvtFp8ToFp8MidA_io_mant;	// src/hive/scala/main/HiveFusionMacFp.scala:130:31
-  wire [31:0] _fp8Mul_io_prod;	// src/hive/scala/main/HiveFusionMacFp.scala:129:22
-  wire [31:0] _cvtFp4ToFp32B_io_out;	// src/hive/scala/main/HiveFusionMacFp.scala:90:31
-  wire [31:0] _cvtFp4ToFp32A_io_out;	// src/hive/scala/main/HiveFusionMacFp.scala:89:31
-  wire [31:0] _cvtFp8ToFp32B_io_out;	// src/hive/scala/main/HiveFusionMacFp.scala:88:31
-  wire [31:0] _cvtFp8ToFp32A_io_out;	// src/hive/scala/main/HiveFusionMacFp.scala:87:31
-  wire [31:0] _cvtBf16ToFp32B_io_out;	// src/hive/scala/main/HiveFusionMacFp.scala:86:32
-  wire [31:0] _cvtBf16ToFp32A_io_out;	// src/hive/scala/main/HiveFusionMacFp.scala:85:32
-  wire [31:0] _cvtFp16ToFp32B_io_out;	// src/hive/scala/main/HiveFusionMacFp.scala:84:32
-  wire [31:0] _cvtFp16ToFp32A_io_out;	// src/hive/scala/main/HiveFusionMacFp.scala:83:32
-  wire [31:0] _fp16Mul_io_prod;	// src/hive/scala/main/HiveFusionMacFp.scala:82:25
-  reg         aIsFp16;	// src/hive/scala/main/HiveFusionMacFp.scala:60:24
-  reg         aIsBf16;	// src/hive/scala/main/HiveFusionMacFp.scala:61:24
-  reg         aIsMx5M2;	// src/hive/scala/main/HiveFusionMacFp.scala:62:25
-  reg         aIsMx4M3;	// src/hive/scala/main/HiveFusionMacFp.scala:63:25
-  reg         aIsMx2M1;	// src/hive/scala/main/HiveFusionMacFp.scala:64:25
-  reg         bIsFp16;	// src/hive/scala/main/HiveFusionMacFp.scala:65:24
-  reg         bIsBf16;	// src/hive/scala/main/HiveFusionMacFp.scala:66:24
-  reg         bIsMx5M2;	// src/hive/scala/main/HiveFusionMacFp.scala:67:25
-  reg         bIsMx4M3;	// src/hive/scala/main/HiveFusionMacFp.scala:68:25
-  reg         isMx4;	// src/hive/scala/main/HiveFusionMacFp.scala:70:22
-  reg         isMx8;	// src/hive/scala/main/HiveFusionMacFp.scala:71:22
-  wire        _GEN = bIsMx5M2 | bIsMx4M3;	// src/hive/scala/main/HiveFusionMacFp.scala:67:25, :68:25, :121:25
-  wire        _r1_T = aIsMx5M2 | aIsMx4M3;	// src/hive/scala/main/HiveFusionMacFp.scala:62:25, :63:25, :148:17
-  always @(posedge clock) begin	// src/hive/scala/main/HiveFusionMacFp.scala:19:7
-    automatic logic _isMx8_T = io_aFmt == 4'h4;	// src/hive/scala/main/HiveFusionMacFp.scala:62:34
-    automatic logic _isMx8_T_1 = io_aFmt == 4'h3;	// src/hive/scala/main/HiveFusionMacFp.scala:63:34
-    automatic logic _isMx4_T = io_aFmt == 4'h5;	// src/hive/scala/main/HiveFusionMacFp.scala:64:34
-    automatic logic _isMx8_T_3 = io_bFmt == 4'h4;	// src/hive/scala/main/HiveFusionMacFp.scala:62:34, :67:34
-    automatic logic _isMx8_T_5 = io_bFmt == 4'h3;	// src/hive/scala/main/HiveFusionMacFp.scala:63:34, :68:34
-    aIsFp16 <= io_aFmt == 4'h1;	// src/hive/scala/main/HiveFusionMacFp.scala:60:{24,33}
-    aIsBf16 <= io_aFmt == 4'h2;	// src/hive/scala/main/HiveFusionMacFp.scala:61:{24,33}
-    aIsMx5M2 <= _isMx8_T;	// src/hive/scala/main/HiveFusionMacFp.scala:62:{25,34}
-    aIsMx4M3 <= _isMx8_T_1;	// src/hive/scala/main/HiveFusionMacFp.scala:63:{25,34}
-    aIsMx2M1 <= _isMx4_T;	// src/hive/scala/main/HiveFusionMacFp.scala:64:{25,34}
-    bIsFp16 <= io_bFmt == 4'h1;	// src/hive/scala/main/HiveFusionMacFp.scala:60:33, :65:{24,33}
-    bIsBf16 <= io_bFmt == 4'h2;	// src/hive/scala/main/HiveFusionMacFp.scala:61:33, :66:{24,33}
-    bIsMx5M2 <= _isMx8_T_3;	// src/hive/scala/main/HiveFusionMacFp.scala:67:{25,34}
-    bIsMx4M3 <= _isMx8_T_5;	// src/hive/scala/main/HiveFusionMacFp.scala:68:{25,34}
-    isMx4 <= _isMx4_T & io_bFmt == 4'h5;	// src/hive/scala/main/HiveFusionMacFp.scala:64:34, :69:34, :70:{22,53}
-    isMx8 <= _isMx8_T | _isMx8_T_1 | _isMx8_T_3 | _isMx8_T_5;	// src/hive/scala/main/HiveFusionMacFp.scala:62:34, :63:34, :67:34, :68:34, :71:{22,53,85,117}
+  wire        _cvtFp4ToFp4Mid1B_io_sign;	// src/workerbee/scala/main/WbFusionMacFp.scala:185:32
+  wire [7:0]  _cvtFp4ToFp4Mid1B_io_exp;	// src/workerbee/scala/main/WbFusionMacFp.scala:185:32
+  wire        _cvtFp4ToFp4Mid1B_io_mant;	// src/workerbee/scala/main/WbFusionMacFp.scala:185:32
+  wire        _cvtFp4ToFp4Mid1A_io_sign;	// src/workerbee/scala/main/WbFusionMacFp.scala:184:32
+  wire [7:0]  _cvtFp4ToFp4Mid1A_io_exp;	// src/workerbee/scala/main/WbFusionMacFp.scala:184:32
+  wire        _cvtFp4ToFp4Mid1A_io_mant;	// src/workerbee/scala/main/WbFusionMacFp.scala:184:32
+  wire [31:0] _fp4Mul1_io_prod;	// src/workerbee/scala/main/WbFusionMacFp.scala:183:23
+  wire        _cvtFp4ToFp4Mid0B_io_sign;	// src/workerbee/scala/main/WbFusionMacFp.scala:170:32
+  wire [7:0]  _cvtFp4ToFp4Mid0B_io_exp;	// src/workerbee/scala/main/WbFusionMacFp.scala:170:32
+  wire        _cvtFp4ToFp4Mid0B_io_mant;	// src/workerbee/scala/main/WbFusionMacFp.scala:170:32
+  wire        _cvtFp4ToFp4Mid0A_io_sign;	// src/workerbee/scala/main/WbFusionMacFp.scala:169:32
+  wire [7:0]  _cvtFp4ToFp4Mid0A_io_exp;	// src/workerbee/scala/main/WbFusionMacFp.scala:169:32
+  wire        _cvtFp4ToFp4Mid0A_io_mant;	// src/workerbee/scala/main/WbFusionMacFp.scala:169:32
+  wire [31:0] _fp4Mul0_io_prod;	// src/workerbee/scala/main/WbFusionMacFp.scala:168:23
+  wire        _cvtFp4ToFp8MidB_io_sign;	// src/workerbee/scala/main/WbFusionMacFp.scala:133:31
+  wire [7:0]  _cvtFp4ToFp8MidB_io_exp;	// src/workerbee/scala/main/WbFusionMacFp.scala:133:31
+  wire [2:0]  _cvtFp4ToFp8MidB_io_mant;	// src/workerbee/scala/main/WbFusionMacFp.scala:133:31
+  wire        _cvtFp4ToFp8MidA_io_sign;	// src/workerbee/scala/main/WbFusionMacFp.scala:132:31
+  wire [7:0]  _cvtFp4ToFp8MidA_io_exp;	// src/workerbee/scala/main/WbFusionMacFp.scala:132:31
+  wire [2:0]  _cvtFp4ToFp8MidA_io_mant;	// src/workerbee/scala/main/WbFusionMacFp.scala:132:31
+  wire        _cvtFp8ToFp8MidB_io_sign;	// src/workerbee/scala/main/WbFusionMacFp.scala:131:31
+  wire [7:0]  _cvtFp8ToFp8MidB_io_exp;	// src/workerbee/scala/main/WbFusionMacFp.scala:131:31
+  wire [2:0]  _cvtFp8ToFp8MidB_io_mant;	// src/workerbee/scala/main/WbFusionMacFp.scala:131:31
+  wire        _cvtFp8ToFp8MidA_io_sign;	// src/workerbee/scala/main/WbFusionMacFp.scala:130:31
+  wire [7:0]  _cvtFp8ToFp8MidA_io_exp;	// src/workerbee/scala/main/WbFusionMacFp.scala:130:31
+  wire [2:0]  _cvtFp8ToFp8MidA_io_mant;	// src/workerbee/scala/main/WbFusionMacFp.scala:130:31
+  wire [31:0] _fp8Mul_io_prod;	// src/workerbee/scala/main/WbFusionMacFp.scala:129:22
+  wire [31:0] _cvtFp4ToFp32B_io_out;	// src/workerbee/scala/main/WbFusionMacFp.scala:90:31
+  wire [31:0] _cvtFp4ToFp32A_io_out;	// src/workerbee/scala/main/WbFusionMacFp.scala:89:31
+  wire [31:0] _cvtFp8ToFp32B_io_out;	// src/workerbee/scala/main/WbFusionMacFp.scala:88:31
+  wire [31:0] _cvtFp8ToFp32A_io_out;	// src/workerbee/scala/main/WbFusionMacFp.scala:87:31
+  wire [31:0] _cvtBf16ToFp32B_io_out;	// src/workerbee/scala/main/WbFusionMacFp.scala:86:32
+  wire [31:0] _cvtBf16ToFp32A_io_out;	// src/workerbee/scala/main/WbFusionMacFp.scala:85:32
+  wire [31:0] _cvtFp16ToFp32B_io_out;	// src/workerbee/scala/main/WbFusionMacFp.scala:84:32
+  wire [31:0] _cvtFp16ToFp32A_io_out;	// src/workerbee/scala/main/WbFusionMacFp.scala:83:32
+  wire [31:0] _fp16Mul_io_prod;	// src/workerbee/scala/main/WbFusionMacFp.scala:82:25
+  reg         aIsFp16;	// src/workerbee/scala/main/WbFusionMacFp.scala:60:24
+  reg         aIsBf16;	// src/workerbee/scala/main/WbFusionMacFp.scala:61:24
+  reg         aIsMx5M2;	// src/workerbee/scala/main/WbFusionMacFp.scala:62:25
+  reg         aIsMx4M3;	// src/workerbee/scala/main/WbFusionMacFp.scala:63:25
+  reg         aIsMx2M1;	// src/workerbee/scala/main/WbFusionMacFp.scala:64:25
+  reg         bIsFp16;	// src/workerbee/scala/main/WbFusionMacFp.scala:65:24
+  reg         bIsBf16;	// src/workerbee/scala/main/WbFusionMacFp.scala:66:24
+  reg         bIsMx5M2;	// src/workerbee/scala/main/WbFusionMacFp.scala:67:25
+  reg         bIsMx4M3;	// src/workerbee/scala/main/WbFusionMacFp.scala:68:25
+  reg         isMx4;	// src/workerbee/scala/main/WbFusionMacFp.scala:70:22
+  reg         isMx8;	// src/workerbee/scala/main/WbFusionMacFp.scala:71:22
+  wire        _GEN = bIsMx5M2 | bIsMx4M3;	// src/workerbee/scala/main/WbFusionMacFp.scala:67:25, :68:25, :121:25
+  wire        _r1_T = aIsMx5M2 | aIsMx4M3;	// src/workerbee/scala/main/WbFusionMacFp.scala:62:25, :63:25, :148:17
+  always @(posedge clock) begin	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7
+    automatic logic _isMx8_T = io_aFmt == 4'h4;	// src/workerbee/scala/main/WbFusionMacFp.scala:62:34
+    automatic logic _isMx8_T_1 = io_aFmt == 4'h3;	// src/workerbee/scala/main/WbFusionMacFp.scala:63:34
+    automatic logic _isMx4_T = io_aFmt == 4'h5;	// src/workerbee/scala/main/WbFusionMacFp.scala:64:34
+    automatic logic _isMx8_T_3 = io_bFmt == 4'h4;	// src/workerbee/scala/main/WbFusionMacFp.scala:62:34, :67:34
+    automatic logic _isMx8_T_5 = io_bFmt == 4'h3;	// src/workerbee/scala/main/WbFusionMacFp.scala:63:34, :68:34
+    aIsFp16 <= io_aFmt == 4'h1;	// src/workerbee/scala/main/WbFusionMacFp.scala:60:{24,33}
+    aIsBf16 <= io_aFmt == 4'h2;	// src/workerbee/scala/main/WbFusionMacFp.scala:61:{24,33}
+    aIsMx5M2 <= _isMx8_T;	// src/workerbee/scala/main/WbFusionMacFp.scala:62:{25,34}
+    aIsMx4M3 <= _isMx8_T_1;	// src/workerbee/scala/main/WbFusionMacFp.scala:63:{25,34}
+    aIsMx2M1 <= _isMx4_T;	// src/workerbee/scala/main/WbFusionMacFp.scala:64:{25,34}
+    bIsFp16 <= io_bFmt == 4'h1;	// src/workerbee/scala/main/WbFusionMacFp.scala:60:33, :65:{24,33}
+    bIsBf16 <= io_bFmt == 4'h2;	// src/workerbee/scala/main/WbFusionMacFp.scala:61:33, :66:{24,33}
+    bIsMx5M2 <= _isMx8_T_3;	// src/workerbee/scala/main/WbFusionMacFp.scala:67:{25,34}
+    bIsMx4M3 <= _isMx8_T_5;	// src/workerbee/scala/main/WbFusionMacFp.scala:68:{25,34}
+    isMx4 <= _isMx4_T & io_bFmt == 4'h5;	// src/workerbee/scala/main/WbFusionMacFp.scala:64:34, :69:34, :70:{22,53}
+    isMx8 <= _isMx8_T | _isMx8_T_1 | _isMx8_T_3 | _isMx8_T_5;	// src/workerbee/scala/main/WbFusionMacFp.scala:62:34, :63:34, :67:34, :68:34, :71:{22,53,85,117}
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// src/hive/scala/main/HiveFusionMacFp.scala:19:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveFusionMacFp.scala:19:7
-      `FIRRTL_BEFORE_INITIAL	// src/hive/scala/main/HiveFusionMacFp.scala:19:7
+  `ifdef ENABLE_INITIAL_REG_	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7
+      `FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/hive/scala/main/HiveFusionMacFp.scala:19:7
-      automatic logic [31:0] _RANDOM[0:0];	// src/hive/scala/main/HiveFusionMacFp.scala:19:7
-      `ifdef INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveFusionMacFp.scala:19:7
-        `INIT_RANDOM_PROLOG_	// src/hive/scala/main/HiveFusionMacFp.scala:19:7
+    initial begin	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7
+      automatic logic [31:0] _RANDOM[0:0];	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7
+      `ifdef INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7
+        `INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/hive/scala/main/HiveFusionMacFp.scala:19:7
-        _RANDOM[/*Zero width*/ 1'b0] = `RANDOM;	// src/hive/scala/main/HiveFusionMacFp.scala:19:7
-        aIsFp16 = _RANDOM[/*Zero width*/ 1'b0][0];	// src/hive/scala/main/HiveFusionMacFp.scala:19:7, :60:24
-        aIsBf16 = _RANDOM[/*Zero width*/ 1'b0][1];	// src/hive/scala/main/HiveFusionMacFp.scala:19:7, :60:24, :61:24
-        aIsMx5M2 = _RANDOM[/*Zero width*/ 1'b0][2];	// src/hive/scala/main/HiveFusionMacFp.scala:19:7, :60:24, :62:25
-        aIsMx4M3 = _RANDOM[/*Zero width*/ 1'b0][3];	// src/hive/scala/main/HiveFusionMacFp.scala:19:7, :60:24, :63:25
-        aIsMx2M1 = _RANDOM[/*Zero width*/ 1'b0][4];	// src/hive/scala/main/HiveFusionMacFp.scala:19:7, :60:24, :64:25
-        bIsFp16 = _RANDOM[/*Zero width*/ 1'b0][5];	// src/hive/scala/main/HiveFusionMacFp.scala:19:7, :60:24, :65:24
-        bIsBf16 = _RANDOM[/*Zero width*/ 1'b0][6];	// src/hive/scala/main/HiveFusionMacFp.scala:19:7, :60:24, :66:24
-        bIsMx5M2 = _RANDOM[/*Zero width*/ 1'b0][7];	// src/hive/scala/main/HiveFusionMacFp.scala:19:7, :60:24, :67:25
-        bIsMx4M3 = _RANDOM[/*Zero width*/ 1'b0][8];	// src/hive/scala/main/HiveFusionMacFp.scala:19:7, :60:24, :68:25
-        isMx4 = _RANDOM[/*Zero width*/ 1'b0][10];	// src/hive/scala/main/HiveFusionMacFp.scala:19:7, :60:24, :70:22
-        isMx8 = _RANDOM[/*Zero width*/ 1'b0][11];	// src/hive/scala/main/HiveFusionMacFp.scala:19:7, :60:24, :71:22
+      `ifdef RANDOMIZE_REG_INIT	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7
+        _RANDOM[/*Zero width*/ 1'b0] = `RANDOM;	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7
+        aIsFp16 = _RANDOM[/*Zero width*/ 1'b0][0];	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7, :60:24
+        aIsBf16 = _RANDOM[/*Zero width*/ 1'b0][1];	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7, :60:24, :61:24
+        aIsMx5M2 = _RANDOM[/*Zero width*/ 1'b0][2];	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7, :60:24, :62:25
+        aIsMx4M3 = _RANDOM[/*Zero width*/ 1'b0][3];	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7, :60:24, :63:25
+        aIsMx2M1 = _RANDOM[/*Zero width*/ 1'b0][4];	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7, :60:24, :64:25
+        bIsFp16 = _RANDOM[/*Zero width*/ 1'b0][5];	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7, :60:24, :65:24
+        bIsBf16 = _RANDOM[/*Zero width*/ 1'b0][6];	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7, :60:24, :66:24
+        bIsMx5M2 = _RANDOM[/*Zero width*/ 1'b0][7];	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7, :60:24, :67:25
+        bIsMx4M3 = _RANDOM[/*Zero width*/ 1'b0][8];	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7, :60:24, :68:25
+        isMx4 = _RANDOM[/*Zero width*/ 1'b0][10];	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7, :60:24, :70:22
+        isMx8 = _RANDOM[/*Zero width*/ 1'b0][11];	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7, :60:24, :71:22
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveFusionMacFp.scala:19:7
-      `FIRRTL_AFTER_INITIAL	// src/hive/scala/main/HiveFusionMacFp.scala:19:7
+    `ifdef FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7
+      `FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WbFusionMacFp.scala:19:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  Hive_FpMulFp16Bf16 fp16Mul (	// src/hive/scala/main/HiveFusionMacFp.scala:82:25
+  Wb_FpMulFp16Bf16 fp16Mul (	// src/workerbee/scala/main/WbFusionMacFp.scala:82:25
     .io_a
       (aIsFp16
          ? _cvtFp16ToFp32A_io_out
          : aIsBf16
              ? _cvtBf16ToFp32A_io_out
-             : aIsMx5M2 | aIsMx4M3 ? _cvtFp8ToFp32A_io_out : _cvtFp4ToFp32A_io_out),	// src/hive/scala/main/HiveFusionMacFp.scala:60:24, :61:24, :62:25, :63:25, :83:32, :85:32, :87:31, :89:31, :108:18, :109:20, :110:24, :111:20, :112:{25,36}, :113:20, :115:20
+             : aIsMx5M2 | aIsMx4M3 ? _cvtFp8ToFp32A_io_out : _cvtFp4ToFp32A_io_out),	// src/workerbee/scala/main/WbFusionMacFp.scala:60:24, :61:24, :62:25, :63:25, :83:32, :85:32, :87:31, :89:31, :108:18, :109:20, :110:24, :111:20, :112:{25,36}, :113:20, :115:20
     .io_b
       (bIsFp16
          ? _cvtFp16ToFp32B_io_out
          : bIsBf16
              ? _cvtBf16ToFp32B_io_out
-             : _GEN ? _cvtFp8ToFp32B_io_out : _cvtFp4ToFp32B_io_out),	// src/hive/scala/main/HiveFusionMacFp.scala:65:24, :66:24, :84:32, :86:32, :88:31, :90:31, :117:18, :118:20, :119:24, :120:20, :121:{25,36}, :122:20, :124:20
+             : _GEN ? _cvtFp8ToFp32B_io_out : _cvtFp4ToFp32B_io_out),	// src/workerbee/scala/main/WbFusionMacFp.scala:65:24, :66:24, :84:32, :86:32, :88:31, :90:31, :117:18, :118:20, :119:24, :120:20, :121:{25,36}, :122:20, :124:20
     .io_rnd  (io_rnd),
     .io_prod (_fp16Mul_io_prod)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:82:25
-  Hive_FpCvtFp16ToFp32 cvtFp16ToFp32A (	// src/hive/scala/main/HiveFusionMacFp.scala:83:32
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:82:25
+  Wb_FpCvtFp16ToFp32 cvtFp16ToFp32A (	// src/workerbee/scala/main/WbFusionMacFp.scala:83:32
     .io_in  (io_a),
     .io_out (_cvtFp16ToFp32A_io_out)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:83:32
-  Hive_FpCvtFp16ToFp32 cvtFp16ToFp32B (	// src/hive/scala/main/HiveFusionMacFp.scala:84:32
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:83:32
+  Wb_FpCvtFp16ToFp32 cvtFp16ToFp32B (	// src/workerbee/scala/main/WbFusionMacFp.scala:84:32
     .io_in  (io_b),
     .io_out (_cvtFp16ToFp32B_io_out)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:84:32
-  Hive_FpCvtBf16ToFp32 cvtBf16ToFp32A (	// src/hive/scala/main/HiveFusionMacFp.scala:85:32
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:84:32
+  Wb_FpCvtBf16ToFp32 cvtBf16ToFp32A (	// src/workerbee/scala/main/WbFusionMacFp.scala:85:32
     .io_in  (io_a),
     .io_out (_cvtBf16ToFp32A_io_out)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:85:32
-  Hive_FpCvtBf16ToFp32 cvtBf16ToFp32B (	// src/hive/scala/main/HiveFusionMacFp.scala:86:32
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:85:32
+  Wb_FpCvtBf16ToFp32 cvtBf16ToFp32B (	// src/workerbee/scala/main/WbFusionMacFp.scala:86:32
     .io_in  (io_b),
     .io_out (_cvtBf16ToFp32B_io_out)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:86:32
-  Hive_FpCvtMx8ToFp32 cvtFp8ToFp32A (	// src/hive/scala/main/HiveFusionMacFp.scala:87:31
-    .io_in     (io_a[7:0]),	// src/hive/scala/main/HiveFusionMacFp.scala:96:32
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:86:32
+  Wb_FpCvtMx8ToFp32 cvtFp8ToFp32A (	// src/workerbee/scala/main/WbFusionMacFp.scala:87:31
+    .io_in     (io_a[7:0]),	// src/workerbee/scala/main/WbFusionMacFp.scala:96:32
     .io_scale  (io_scaleA),
-    .io_isE5M2 (aIsMx5M2),	// src/hive/scala/main/HiveFusionMacFp.scala:62:25
+    .io_isE5M2 (aIsMx5M2),	// src/workerbee/scala/main/WbFusionMacFp.scala:62:25
     .io_out    (_cvtFp8ToFp32A_io_out)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:87:31
-  Hive_FpCvtMx8ToFp32 cvtFp8ToFp32B (	// src/hive/scala/main/HiveFusionMacFp.scala:88:31
-    .io_in     (io_b[7:0]),	// src/hive/scala/main/HiveFusionMacFp.scala:99:32
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:87:31
+  Wb_FpCvtMx8ToFp32 cvtFp8ToFp32B (	// src/workerbee/scala/main/WbFusionMacFp.scala:88:31
+    .io_in     (io_b[7:0]),	// src/workerbee/scala/main/WbFusionMacFp.scala:99:32
     .io_scale  (io_scaleB),
-    .io_isE5M2 (bIsMx5M2),	// src/hive/scala/main/HiveFusionMacFp.scala:67:25
+    .io_isE5M2 (bIsMx5M2),	// src/workerbee/scala/main/WbFusionMacFp.scala:67:25
     .io_out    (_cvtFp8ToFp32B_io_out)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:88:31
-  Hive_FpCvtMx4ToFp32 cvtFp4ToFp32A (	// src/hive/scala/main/HiveFusionMacFp.scala:89:31
-    .io_in    (io_a[3:0]),	// src/hive/scala/main/HiveFusionMacFp.scala:102:32
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:88:31
+  Wb_FpCvtMx4ToFp32 cvtFp4ToFp32A (	// src/workerbee/scala/main/WbFusionMacFp.scala:89:31
+    .io_in    (io_a[3:0]),	// src/workerbee/scala/main/WbFusionMacFp.scala:102:32
     .io_scale (io_scaleA),
     .io_out   (_cvtFp4ToFp32A_io_out)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:89:31
-  Hive_FpCvtMx4ToFp32 cvtFp4ToFp32B (	// src/hive/scala/main/HiveFusionMacFp.scala:90:31
-    .io_in    (io_b[3:0]),	// src/hive/scala/main/HiveFusionMacFp.scala:104:32
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:89:31
+  Wb_FpCvtMx4ToFp32 cvtFp4ToFp32B (	// src/workerbee/scala/main/WbFusionMacFp.scala:90:31
+    .io_in    (io_b[3:0]),	// src/workerbee/scala/main/WbFusionMacFp.scala:104:32
     .io_scale (io_scaleB),
     .io_out   (_cvtFp4ToFp32B_io_out)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:90:31
-  Hive_FpMulMx8 fp8Mul (	// src/hive/scala/main/HiveFusionMacFp.scala:129:22
-    .io_aSign (_r1_T ? _cvtFp8ToFp8MidA_io_sign : _cvtFp4ToFp8MidA_io_sign),	// src/hive/scala/main/HiveFusionMacFp.scala:130:31, :132:31, :148:{17,28}, :149:21, :153:21
-    .io_aExp  (_r1_T ? _cvtFp8ToFp8MidA_io_exp : _cvtFp4ToFp8MidA_io_exp),	// src/hive/scala/main/HiveFusionMacFp.scala:130:31, :132:31, :148:{17,28}, :150:20, :154:20
-    .io_aMant (_r1_T ? _cvtFp8ToFp8MidA_io_mant : _cvtFp4ToFp8MidA_io_mant),	// src/hive/scala/main/HiveFusionMacFp.scala:130:31, :132:31, :148:{17,28}, :151:21, :155:21
-    .io_bSign (_GEN ? _cvtFp8ToFp8MidB_io_sign : _cvtFp4ToFp8MidB_io_sign),	// src/hive/scala/main/HiveFusionMacFp.scala:121:25, :131:31, :133:31, :157:28, :158:21, :162:21
-    .io_bExp  (_GEN ? _cvtFp8ToFp8MidB_io_exp : _cvtFp4ToFp8MidB_io_exp),	// src/hive/scala/main/HiveFusionMacFp.scala:121:25, :131:31, :133:31, :157:28, :159:20, :163:20
-    .io_bMant (_GEN ? _cvtFp8ToFp8MidB_io_mant : _cvtFp4ToFp8MidB_io_mant),	// src/hive/scala/main/HiveFusionMacFp.scala:121:25, :131:31, :133:31, :157:28, :160:21, :164:21
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:90:31
+  Wb_FpMulMx8 fp8Mul (	// src/workerbee/scala/main/WbFusionMacFp.scala:129:22
+    .io_aSign (_r1_T ? _cvtFp8ToFp8MidA_io_sign : _cvtFp4ToFp8MidA_io_sign),	// src/workerbee/scala/main/WbFusionMacFp.scala:130:31, :132:31, :148:{17,28}, :149:21, :153:21
+    .io_aExp  (_r1_T ? _cvtFp8ToFp8MidA_io_exp : _cvtFp4ToFp8MidA_io_exp),	// src/workerbee/scala/main/WbFusionMacFp.scala:130:31, :132:31, :148:{17,28}, :150:20, :154:20
+    .io_aMant (_r1_T ? _cvtFp8ToFp8MidA_io_mant : _cvtFp4ToFp8MidA_io_mant),	// src/workerbee/scala/main/WbFusionMacFp.scala:130:31, :132:31, :148:{17,28}, :151:21, :155:21
+    .io_bSign (_GEN ? _cvtFp8ToFp8MidB_io_sign : _cvtFp4ToFp8MidB_io_sign),	// src/workerbee/scala/main/WbFusionMacFp.scala:121:25, :131:31, :133:31, :157:28, :158:21, :162:21
+    .io_bExp  (_GEN ? _cvtFp8ToFp8MidB_io_exp : _cvtFp4ToFp8MidB_io_exp),	// src/workerbee/scala/main/WbFusionMacFp.scala:121:25, :131:31, :133:31, :157:28, :159:20, :163:20
+    .io_bMant (_GEN ? _cvtFp8ToFp8MidB_io_mant : _cvtFp4ToFp8MidB_io_mant),	// src/workerbee/scala/main/WbFusionMacFp.scala:121:25, :131:31, :133:31, :157:28, :160:21, :164:21
     .io_rnd   (io_rnd),
     .io_prod  (_fp8Mul_io_prod)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:129:22
-  Hive_FpCvtMx8ToMid cvtFp8ToFp8MidA (	// src/hive/scala/main/HiveFusionMacFp.scala:130:31
-    .io_in     (io_a[15:8]),	// src/hive/scala/main/HiveFusionMacFp.scala:135:32
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:129:22
+  Wb_FpCvtMx8ToMid cvtFp8ToFp8MidA (	// src/workerbee/scala/main/WbFusionMacFp.scala:130:31
+    .io_in     (io_a[15:8]),	// src/workerbee/scala/main/WbFusionMacFp.scala:135:32
     .io_scale  (io_scaleA),
-    .io_isE5M2 (aIsMx5M2),	// src/hive/scala/main/HiveFusionMacFp.scala:62:25
+    .io_isE5M2 (aIsMx5M2),	// src/workerbee/scala/main/WbFusionMacFp.scala:62:25
     .io_sign   (_cvtFp8ToFp8MidA_io_sign),
     .io_exp    (_cvtFp8ToFp8MidA_io_exp),
     .io_mant   (_cvtFp8ToFp8MidA_io_mant)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:130:31
-  Hive_FpCvtMx8ToMid cvtFp8ToFp8MidB (	// src/hive/scala/main/HiveFusionMacFp.scala:131:31
-    .io_in     (io_b[15:8]),	// src/hive/scala/main/HiveFusionMacFp.scala:138:32
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:130:31
+  Wb_FpCvtMx8ToMid cvtFp8ToFp8MidB (	// src/workerbee/scala/main/WbFusionMacFp.scala:131:31
+    .io_in     (io_b[15:8]),	// src/workerbee/scala/main/WbFusionMacFp.scala:138:32
     .io_scale  (io_scaleB),
-    .io_isE5M2 (bIsMx5M2),	// src/hive/scala/main/HiveFusionMacFp.scala:67:25
+    .io_isE5M2 (bIsMx5M2),	// src/workerbee/scala/main/WbFusionMacFp.scala:67:25
     .io_sign   (_cvtFp8ToFp8MidB_io_sign),
     .io_exp    (_cvtFp8ToFp8MidB_io_exp),
     .io_mant   (_cvtFp8ToFp8MidB_io_mant)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:131:31
-  Hive_FpCvtMx4ToMx8Mid cvtFp4ToFp8MidA (	// src/hive/scala/main/HiveFusionMacFp.scala:132:31
-    .io_in    (io_a[7:4]),	// src/hive/scala/main/HiveFusionMacFp.scala:141:32
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:131:31
+  Wb_FpCvtMx4ToMx8Mid cvtFp4ToFp8MidA (	// src/workerbee/scala/main/WbFusionMacFp.scala:132:31
+    .io_in    (io_a[7:4]),	// src/workerbee/scala/main/WbFusionMacFp.scala:141:32
     .io_scale (io_scaleA),
     .io_sign  (_cvtFp4ToFp8MidA_io_sign),
     .io_exp   (_cvtFp4ToFp8MidA_io_exp),
     .io_mant  (_cvtFp4ToFp8MidA_io_mant)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:132:31
-  Hive_FpCvtMx4ToMx8Mid cvtFp4ToFp8MidB (	// src/hive/scala/main/HiveFusionMacFp.scala:133:31
-    .io_in    (io_b[7:4]),	// src/hive/scala/main/HiveFusionMacFp.scala:143:32
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:132:31
+  Wb_FpCvtMx4ToMx8Mid cvtFp4ToFp8MidB (	// src/workerbee/scala/main/WbFusionMacFp.scala:133:31
+    .io_in    (io_b[7:4]),	// src/workerbee/scala/main/WbFusionMacFp.scala:143:32
     .io_scale (io_scaleB),
     .io_sign  (_cvtFp4ToFp8MidB_io_sign),
     .io_exp   (_cvtFp4ToFp8MidB_io_exp),
     .io_mant  (_cvtFp4ToFp8MidB_io_mant)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:133:31
-  Hive_FpMulMx4 fp4Mul0 (	// src/hive/scala/main/HiveFusionMacFp.scala:168:23
-    .io_aSign (_cvtFp4ToFp4Mid0A_io_sign),	// src/hive/scala/main/HiveFusionMacFp.scala:169:32
-    .io_aExp  (_cvtFp4ToFp4Mid0A_io_exp),	// src/hive/scala/main/HiveFusionMacFp.scala:169:32
-    .io_aMant (_cvtFp4ToFp4Mid0A_io_mant),	// src/hive/scala/main/HiveFusionMacFp.scala:169:32
-    .io_bSign (_cvtFp4ToFp4Mid0B_io_sign),	// src/hive/scala/main/HiveFusionMacFp.scala:170:32
-    .io_bExp  (_cvtFp4ToFp4Mid0B_io_exp),	// src/hive/scala/main/HiveFusionMacFp.scala:170:32
-    .io_bMant (_cvtFp4ToFp4Mid0B_io_mant),	// src/hive/scala/main/HiveFusionMacFp.scala:170:32
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:133:31
+  Wb_FpMulMx4 fp4Mul0 (	// src/workerbee/scala/main/WbFusionMacFp.scala:168:23
+    .io_aSign (_cvtFp4ToFp4Mid0A_io_sign),	// src/workerbee/scala/main/WbFusionMacFp.scala:169:32
+    .io_aExp  (_cvtFp4ToFp4Mid0A_io_exp),	// src/workerbee/scala/main/WbFusionMacFp.scala:169:32
+    .io_aMant (_cvtFp4ToFp4Mid0A_io_mant),	// src/workerbee/scala/main/WbFusionMacFp.scala:169:32
+    .io_bSign (_cvtFp4ToFp4Mid0B_io_sign),	// src/workerbee/scala/main/WbFusionMacFp.scala:170:32
+    .io_bExp  (_cvtFp4ToFp4Mid0B_io_exp),	// src/workerbee/scala/main/WbFusionMacFp.scala:170:32
+    .io_bMant (_cvtFp4ToFp4Mid0B_io_mant),	// src/workerbee/scala/main/WbFusionMacFp.scala:170:32
     .io_rnd   (io_rnd),
     .io_prod  (_fp4Mul0_io_prod)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:168:23
-  Hive_FpCvtMx4ToMid cvtFp4ToFp4Mid0A (	// src/hive/scala/main/HiveFusionMacFp.scala:169:32
-    .io_in    (io_a[11:8]),	// src/hive/scala/main/HiveFusionMacFp.scala:171:33
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:168:23
+  Wb_FpCvtMx4ToMid cvtFp4ToFp4Mid0A (	// src/workerbee/scala/main/WbFusionMacFp.scala:169:32
+    .io_in    (io_a[11:8]),	// src/workerbee/scala/main/WbFusionMacFp.scala:171:33
     .io_scale (io_scaleA),
     .io_sign  (_cvtFp4ToFp4Mid0A_io_sign),
     .io_exp   (_cvtFp4ToFp4Mid0A_io_exp),
     .io_mant  (_cvtFp4ToFp4Mid0A_io_mant)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:169:32
-  Hive_FpCvtMx4ToMid cvtFp4ToFp4Mid0B (	// src/hive/scala/main/HiveFusionMacFp.scala:170:32
-    .io_in    (io_b[11:8]),	// src/hive/scala/main/HiveFusionMacFp.scala:173:33
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:169:32
+  Wb_FpCvtMx4ToMid cvtFp4ToFp4Mid0B (	// src/workerbee/scala/main/WbFusionMacFp.scala:170:32
+    .io_in    (io_b[11:8]),	// src/workerbee/scala/main/WbFusionMacFp.scala:173:33
     .io_scale (io_scaleB),
     .io_sign  (_cvtFp4ToFp4Mid0B_io_sign),
     .io_exp   (_cvtFp4ToFp4Mid0B_io_exp),
     .io_mant  (_cvtFp4ToFp4Mid0B_io_mant)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:170:32
-  Hive_FpMulMx4 fp4Mul1 (	// src/hive/scala/main/HiveFusionMacFp.scala:183:23
-    .io_aSign (_cvtFp4ToFp4Mid1A_io_sign),	// src/hive/scala/main/HiveFusionMacFp.scala:184:32
-    .io_aExp  (_cvtFp4ToFp4Mid1A_io_exp),	// src/hive/scala/main/HiveFusionMacFp.scala:184:32
-    .io_aMant (_cvtFp4ToFp4Mid1A_io_mant),	// src/hive/scala/main/HiveFusionMacFp.scala:184:32
-    .io_bSign (_cvtFp4ToFp4Mid1B_io_sign),	// src/hive/scala/main/HiveFusionMacFp.scala:185:32
-    .io_bExp  (_cvtFp4ToFp4Mid1B_io_exp),	// src/hive/scala/main/HiveFusionMacFp.scala:185:32
-    .io_bMant (_cvtFp4ToFp4Mid1B_io_mant),	// src/hive/scala/main/HiveFusionMacFp.scala:185:32
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:170:32
+  Wb_FpMulMx4 fp4Mul1 (	// src/workerbee/scala/main/WbFusionMacFp.scala:183:23
+    .io_aSign (_cvtFp4ToFp4Mid1A_io_sign),	// src/workerbee/scala/main/WbFusionMacFp.scala:184:32
+    .io_aExp  (_cvtFp4ToFp4Mid1A_io_exp),	// src/workerbee/scala/main/WbFusionMacFp.scala:184:32
+    .io_aMant (_cvtFp4ToFp4Mid1A_io_mant),	// src/workerbee/scala/main/WbFusionMacFp.scala:184:32
+    .io_bSign (_cvtFp4ToFp4Mid1B_io_sign),	// src/workerbee/scala/main/WbFusionMacFp.scala:185:32
+    .io_bExp  (_cvtFp4ToFp4Mid1B_io_exp),	// src/workerbee/scala/main/WbFusionMacFp.scala:185:32
+    .io_bMant (_cvtFp4ToFp4Mid1B_io_mant),	// src/workerbee/scala/main/WbFusionMacFp.scala:185:32
     .io_rnd   (io_rnd),
     .io_prod  (_fp4Mul1_io_prod)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:183:23
-  Hive_FpCvtMx4ToMid cvtFp4ToFp4Mid1A (	// src/hive/scala/main/HiveFusionMacFp.scala:184:32
-    .io_in    (io_a[15:12]),	// src/hive/scala/main/HiveFusionMacFp.scala:186:33
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:183:23
+  Wb_FpCvtMx4ToMid cvtFp4ToFp4Mid1A (	// src/workerbee/scala/main/WbFusionMacFp.scala:184:32
+    .io_in    (io_a[15:12]),	// src/workerbee/scala/main/WbFusionMacFp.scala:186:33
     .io_scale (io_scaleA),
     .io_sign  (_cvtFp4ToFp4Mid1A_io_sign),
     .io_exp   (_cvtFp4ToFp4Mid1A_io_exp),
     .io_mant  (_cvtFp4ToFp4Mid1A_io_mant)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:184:32
-  Hive_FpCvtMx4ToMid cvtFp4ToFp4Mid1B (	// src/hive/scala/main/HiveFusionMacFp.scala:185:32
-    .io_in    (io_b[15:12]),	// src/hive/scala/main/HiveFusionMacFp.scala:188:33
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:184:32
+  Wb_FpCvtMx4ToMid cvtFp4ToFp4Mid1B (	// src/workerbee/scala/main/WbFusionMacFp.scala:185:32
+    .io_in    (io_b[15:12]),	// src/workerbee/scala/main/WbFusionMacFp.scala:188:33
     .io_scale (io_scaleB),
     .io_sign  (_cvtFp4ToFp4Mid1B_io_sign),
     .io_exp   (_cvtFp4ToFp4Mid1B_io_exp),
     .io_mant  (_cvtFp4ToFp4Mid1B_io_mant)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:185:32
-  Hive_FpAdd fpAdd (	// src/hive/scala/main/HiveFusionMacFp.scala:241:21
-    .io_is4x      (isMx4),	// src/hive/scala/main/HiveFusionMacFp.scala:70:22
-    .io_is2x      (isMx8),	// src/hive/scala/main/HiveFusionMacFp.scala:71:22
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:185:32
+  Wb_FpAdd fpAdd (	// src/workerbee/scala/main/WbFusionMacFp.scala:241:21
+    .io_is4x      (isMx4),	// src/workerbee/scala/main/WbFusionMacFp.scala:70:22
+    .io_is2x      (isMx8),	// src/workerbee/scala/main/WbFusionMacFp.scala:71:22
     .io_cReg      (io_cReg),
-    .io_prodFp16  (_fp16Mul_io_prod),	// src/hive/scala/main/HiveFusionMacFp.scala:82:25
-    .io_prodFp8   (_r1_T | aIsMx2M1 ? _fp8Mul_io_prod : 32'h0),	// src/hive/scala/main/HiveFusionMacFp.scala:64:25, :129:22, :148:17, :242:{15,36}
-    .io_prodFp4_0 (aIsMx2M1 ? _fp4Mul0_io_prod : 32'h0),	// src/hive/scala/main/HiveFusionMacFp.scala:64:25, :168:23, :242:15, :243:15
-    .io_prodFp4_1 (aIsMx2M1 ? _fp4Mul1_io_prod : 32'h0),	// src/hive/scala/main/HiveFusionMacFp.scala:64:25, :183:23, :242:15, :244:15
+    .io_prodFp16  (_fp16Mul_io_prod),	// src/workerbee/scala/main/WbFusionMacFp.scala:82:25
+    .io_prodFp8   (_r1_T | aIsMx2M1 ? _fp8Mul_io_prod : 32'h0),	// src/workerbee/scala/main/WbFusionMacFp.scala:64:25, :129:22, :148:17, :242:{15,36}
+    .io_prodFp4_0 (aIsMx2M1 ? _fp4Mul0_io_prod : 32'h0),	// src/workerbee/scala/main/WbFusionMacFp.scala:64:25, :168:23, :242:15, :243:15
+    .io_prodFp4_1 (aIsMx2M1 ? _fp4Mul1_io_prod : 32'h0),	// src/workerbee/scala/main/WbFusionMacFp.scala:64:25, :183:23, :242:15, :244:15
     .io_sum       (io_sum)
-  );	// src/hive/scala/main/HiveFusionMacFp.scala:241:21
+  );	// src/workerbee/scala/main/WbFusionMacFp.scala:241:21
 endmodule
 

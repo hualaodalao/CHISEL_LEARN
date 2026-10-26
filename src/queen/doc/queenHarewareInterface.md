@@ -445,11 +445,11 @@ val flushDone = Flipped(Valid(Bool()))
 
 ## 6. GEMM 接口
 
-当前 HiveCore 原生接口为命令流、响应流和状态：
+当前 WorkerBee 原生接口为命令流、响应流和状态：
 
 ```text
-cmd  : Stream[HiveCoreCmd]
-resp : Stream[HiveCoreResp]
+cmd  : Stream[WorkerBeeCmd]
+resp : Stream[WorkerBeeResp]
 status.busy/done/err
 ```
 
@@ -459,17 +459,17 @@ GEMM adapter 的建议行为：
 2. 写入完整配置后发送 `EXECUTE`。
 3. 同一 RUN 的寄存器写和 EXECUTE 形成不可交错的 native command burst。
 4. `QRD endpoint=GEMM` 转换为 `REG_READ`，响应送入 Queen QRD ordered response queue。
-5. HiveCore response、status.err 和执行错误转换为 Queen fault。
+5. WorkerBee response、status.err 和执行错误转换为 Queen fault。
 
 GEMM adapter 对 Queen 提供的强 idle 不能只等于 `!status.busy`，还必须包含：
 
 ```text
 adapter 没有待发送的 REG_WRITE/EXECUTE/REG_READ
-HiveCore 没有未消费 response
-HiveCore 没有尚未结束的 DMA 请求/响应
+WorkerBee 没有未消费 response
+WorkerBee 没有尚未结束的 DMA 请求/响应
 ```
 
-GEMM 本地 FENCE 和 WAIT 在 Queen GEMM endpoint queue 的最终派发处执行。条件满足前不得向 HiveCore 发送后续 RUN。
+GEMM 本地 FENCE 和 WAIT 在 Queen GEMM endpoint queue 的最终派发处执行。条件满足前不得向 WorkerBee 发送后续 RUN。
 
 ---
 

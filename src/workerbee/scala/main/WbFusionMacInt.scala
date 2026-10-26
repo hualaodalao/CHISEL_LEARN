@@ -1,10 +1,10 @@
 import chisel3._
 import chisel3.util._
 
-/** HiveFusionMacInt —— 整数融合 MAC（INT8 双 lane / INT4 四 lane SIMD，四路乘积单拍一次吸收）
+/** WbFusionMacInt —— 整数融合 MAC（INT8 双 lane / INT4 四 lane SIMD，四路乘积单拍一次吸收）
   *
-  * 【lane 排布（16-bit 操作数打包，two's complement 编码；与 HiveDebugModel 金锚 /
-  *   DMA 供数序 / HiveCoreCalcConfig.elemsPerLane 同源，勿另立裸常数）】
+  * 【lane 排布（16-bit 操作数打包，two's complement 编码；与 WbDebugModel 金锚 /
+  *   DMA 供数序 / WorkerBeeCalcConfig.elemsPerLane 同源，勿另立裸常数）】
   *   INT8（双 lane，每 16-bit lane 打包 2 个 int8）：
   *     lane0 = a(7,0)   / b(7,0)     偶 k = 2j
   *     lane1 = a(15,8)  / b(15,8)    奇 k = 2j+1
@@ -25,16 +25,16 @@ import chisel3.util._
   *   整数族溢出维持【截断绕回】不加钳位（用户裁定），故取低 cEffW 位即完整语义。
   *
   * 【无 io.rnd 端口】整数乘加与舍入模式无关，端口集缩减为 a/b/cReg/aFmt/bFmt/sum（6 个）。
-  *   宿主 HiveWorkUnit 负责把 io.rnd 只路由给 HiveFusionMacFp（FP/MX 路径）。
+  *   宿主 WbWorkUnit 负责把 io.rnd 只路由给 WbFusionMacFp（FP/MX 路径）。
   *
   * @param aW            激活操作数位宽（SIMD lane 打包要求 >= 16）
   * @param bW            权重操作数位宽（SIMD lane 打包要求 >= 16）
-  * @param cW            累加器位宽（默认 40，与上层 HiveWorkUnit/HiveFusionMacFp 的 cEffW 对齐；
+  * @param cW            累加器位宽（默认 40，与上层 WbWorkUnit/WbFusionMacFp 的 cEffW 对齐；
   *                      cEffW = max(cW, bW)）
   * @param supportedFmts 绝对格式集（写子集即声明该子集为唯一合法输入格式，对齐
-  *                      HiveCoreConfig.supportedFmts 语义）
+  *                      WorkerBeeConfig.supportedFmts 语义）
   */
-class HiveFusionMacInt(
+class WbFusionMacInt(
   aW: Int = 16,
   bW: Int = 16,
   cW: Int = 40,
@@ -43,12 +43,12 @@ class HiveFusionMacInt(
 
   val cEffW: Int = math.max(cW, bW)
 
-  // --- 编译期谓词（命名对齐 HiveCoreConfig.hasInt / HiveFusionMacFp.hasMx8 风格）---
+  // --- 编译期谓词（命名对齐 WorkerBeeConfig.hasInt / WbFusionMacFp.hasMx8 风格）---
   private val hasInt8 = supportedFmts.contains(DataFormat.INT8)
   private val hasInt4 = supportedFmts.contains(DataFormat.INT4)
 
   // --- 护栏（编译期 Scala 断言，不进 RTL；消息纯 ASCII —— firtool 硬约束）---
-  require(hasInt8 || hasInt4, "HiveFusionMacInt: at least one INT format required")
+  require(hasInt8 || hasInt4, "WbFusionMacInt: at least one INT format required")
   require(aW >= 16 && bW >= 16, "INT SIMD lane packing requires 16-bit operands")
   require(cEffW >= 16, "INT accumulator width insufficient")
 
@@ -64,7 +64,7 @@ class HiveFusionMacInt(
   // 【RegNext 安全性】aFmt/bFmt are statically configured before EXECUTE phase;
   //   RegNext does not introduce fmt-data misalignment within a single EXECUTE window
   //   (fmt 在整个 EXECUTE 窗口内恒定，寄存一拍后在首个 compute 拍之前早已 settle，
-  //    稳态下 fmt(N-1) == fmt(N)）。与 HiveFusionMacFp 同风格，用户裁定保留。
+  //    稳态下 fmt(N-1) == fmt(N)）。与 WbFusionMacFp 同风格，用户裁定保留。
   val aIsInt8 = RegNext(io.aFmt === DataFormat.INT8)
   val aIsInt4 = RegNext(io.aFmt === DataFormat.INT4)
   val bIsInt8 = RegNext(io.bFmt === DataFormat.INT8)

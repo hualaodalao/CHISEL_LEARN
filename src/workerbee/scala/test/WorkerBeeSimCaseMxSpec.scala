@@ -1,8 +1,8 @@
-/** HiveCore MXFP8 v2 SIMD 双 MX（异构 E4M3 × E5M2）端到端数值仿真用例。
+/** WorkerBee MXFP8 v2 SIMD 双 MX（异构 E4M3 × E5M2）端到端数值仿真用例。
   *
   * 【v2 SIMD 打包布局】16-bit lane 打包 2 个 8-bit MX 元素：低字节=偶 k=2j、
-  * 高字节=奇 k=2j+1；PE 内 4×HiveCvtOpMx + 2×HiveMacFp 级联（先偶后奇；二者均为原
-  * HiveWorkUnit.scala 子模块、已随 FusionMac 重构删除，功能并入 FpCvt/FpMul/FpAdd → HiveFusionMacFp），
+  * 高字节=奇 k=2j+1；PE 内 4×WbCvtOpMx + 2×WbMacFp 级联（先偶后奇；二者均为原
+  * WbWorkUnit.scala 子模块、已随 FusionMac 重构删除，功能并入 FpCvt/FpMul/FpAdd → WbFusionMacFp），
   * 每拍每波前推进 32 个 K 元素 = 恰好一个 32-K scale 块 = 单 pass，
   * 故 kTile 数 = K/32（scaleA 块下标 kb = kt）。外部 A/B 存储 1 字节/元素：
   * 行步长 = K 字节（非 2K），k 窗口步进 = 32 字节（2×totalN）。
@@ -12,14 +12,14 @@
   * + 双精度 golden 容差交叉（fp32 输出：1e-2 相对容差，唯一偏差源为 fp32 累加舍入；
   * fp16/bf16 输出：同链 40→32→16 两级舍入后逐位硬断言）。MX 运行合法输出族 =
   * outFmt ∈ {0,1,2,3,4,5}（0=fp32 非量化直出，1/2=fp16/bf16 降精度直出，
-  * 3/4/5=MXE4M3/MXE5M2/MXE2M1 量化输出）。fp32 直出为 HiveOutCvt.fmtReg 复位
+  * 3/4/5=MXE4M3/MXE5M2/MXE2M1 量化输出）。fp32 直出为 WbOutCvt.fmtReg 复位
   * 默认值与 MuxCase 默认臂，无任何硬件级拒绝路径。无 dmaCScale 请求（非量化运行
   * 死路，附加断言守护）。
   * 【历史说明】原 v1 bit 锚（sim/mx/v1_anchor_M32_N32_K32.txt）已被 owner 删除
   * （双重违规：持久金锚放在只允许临时仿真产物的 sim/ 下、且被 git add -f 越过
   * .gitignore 强行跟踪；全仓从未有过 writer，不可再生）。相关代码引用已全部清除。
   *
-  * 结构与 HiveCoreSimCaseLoadWSpec 同构（loadW 水平加载 + 转置 B），差异：
+  * 结构与 WorkerBeeSimCaseLoadWSpec 同构（loadW 水平加载 + 转置 B），差异：
   *   - aW=bW=16（16-bit lane 打包 2×8-bit 元素），cW=40（复用 fp32 延迟规格化累加器）
   *   - (#164) 寄存器重排后：控制字全部收敛到 reg5 单寄存器（旧 regs(6)+regs(7) 已删除）：
   *       reg5 = 0x11400043 + (rnd<<16) + (outFmt<<8)
@@ -42,30 +42,30 @@
   *       历史说明注释里，活代码已零残留 ⟹ 该项登记可结案。
   *   - 新增两条 scale 只读 DMA 外部通道（仅 hasMx 暴露）：
   *       dmaScaleA = scaleA（8-bit/beat，随激活流动）
-  *       dmaScaleB = scaleB（【任务109】端口收窄为 8-bit/beat，逐字节，HiveCoreDmaRdOnly
+  *       dmaScaleB = scaleB（【任务109】端口收窄为 8-bit/beat，逐字节，WorkerBeeDmaRdOnly
   *         isA=false 降序遍历；旧 scaleRowW=totalN*8=128-bit 列驻留契约已废，scaleRowW
-  *         字段已从 HiveCoreConfig 删除。下方 scale 路由模型中「128-bit 向量/列驻留」
+  *         字段已从 WorkerBeeConfig 删除。下方 scale 路由模型中「128-bit 向量/列驻留」
   *         等旧描述仅作历史留痕，实际供数已改 8-bit 内存保真 + 逐拍地址硬对账）
   *
   * scale 路由模型（逐拍对齐——见各 gen*Beat 注释）：
   *   - scaleA[m][kb]：executor sLOAD_A 每 aPop.fire pop 一个 8-bit 广播全行，
-  *     随激活链 skew 流入。scaleADma（HiveCoreDmaScaleRd，A 式三级遍历）遍历序 =
+  *     随激活链 skew 流入。scaleADma（WorkerBeeDmaScaleRd，A 式三级遍历）遍历序 =
   *     executor pop 序 =
   *     (round nt) × (kt 外) × (m 内)，共 nTile×kTile×M beat。
   *   - scaleB[kb][n]：executor 每个 sLOAD_B 窗口（每 kTile = 一个 32-K 块）
   *     pop 一个 totalN 向量锁存 scaleBRegs(i)→列 i（globalCol=nTile*totalN+i）。
-  *     pop 序 = (round nt 外) × (kb=kt 块内)，scaleBDma（HiveCoreDmaScaleRd
+  *     pop 序 = (round nt 外) × (kb=kt 块内)，scaleBDma（WorkerBeeDmaScaleRd
   *     isScaleB 两级遍历）按同序取址，共 nTile×kTile beat（每 (nt,kt) 一向量）。
   *
   * golden：C[m][n] = Σ_k mxE4M3ToFloat(aByte[m][k], scaleA[m][k/32])
   *                       × mxE5M2ToFloat(bByte[k][n], scaleB[k/32][n])
-  * 元素值由同一 HiveSimCommon.mxToFloat 重建（硬件/golden 同源），故元素级
+  * 元素值由同一 WbSimCommon.mxToFloat 重建（硬件/golden 同源），故元素级
   * 逐 bit 相等，唯一偏差是 fp32 累加舍入（远小于 1e-2 容差）。
   *
   * 既有非 MX spec 一律零改动，非 MX 路径 bit-exact 由回归门禁守护。
-  * 【硬件侧消费有效门控已实施】MX inf/nan 断言（原 HiveCvtOpMx，已随 FusionMac 重构删除、
+  * 【硬件侧消费有效门控已实施】MX inf/nan 断言（原 WbCvtOpMx，已随 FusionMac 重构删除、
   * 现由 FpCvt 的 mx8 cvt 承接）已由 consumeValid 门控（见
-  * HiveFusionMacFp/HiveWorker），空闲/加载/排空拍垃圾输入不再撞断言 $fatal，
+  * WbFusionMacFp/WbWorker），空闲/加载/排空拍垃圾输入不再撞断言 $fatal，
   * 本 suite 已恢复 ChiselSim 默认随机化（原测试侧 Randomization.uninitialized
   * 零初值规避已移除）。
   */
@@ -77,19 +77,19 @@ import org.scalatest.matchers.should.Matchers
 import java.io._
 import java.nio.file._
 
-/** 【任务97】本文件原私有常量表 MxOutFmt（任务95）已整体迁移至 HiveEnum.DataFormat
+/** 【任务97】本文件原私有常量表 MxOutFmt（任务95）已整体迁移至 WbEnum.DataFormat
   * 枚举（4-bit 编码同源：FP32/FP16/BF16/Reserved3/MXE4M3/MXE5M2/MXE2M1/Reserved7/
   * INT32/INT16/INT8；原 MxFp4 对应枚举名 MXE2M1）。outFmt 参数类型化为
   * DataFormat.Type，整型编码经 outFmtInt（litValue.toInt）收敛，供控制字位域
-  * 打包与 HiveSimCommon 的 Int 接口消费。
+  * 打包与 WbSimCommon 的 Int 接口消费。
   */
 
 
-class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveFstSim with HiveStatusPollApi {
+class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim with WbFstSim with WbStatusPollApi {
 
-  // 【硬件侧门控已实施，测试侧规避已移除】MX inf/nan 断言（原 HiveCvtOpMx，已随 FusionMac
+  // 【硬件侧门控已实施，测试侧规避已移除】MX inf/nan 断言（原 WbCvtOpMx，已随 FusionMac
   // 重构删除、现由 FpCvt 的 mx8 cvt 承接）现受
-  // consumeValid 消费有效门控（HiveFusionMacFp/HiveWorker 单行连入，条件 =
+  // consumeValid 消费有效门控（WbFusionMacFp/WbWorker 单行连入，条件 =
   // MX 结果被真实消费的充要条件），空闲/加载/排空拍的随机垃圾不再触发断言。
   // 故本 suite 恢复 ChiselSim 默认随机化（不传 settings）——默认随机化下全绿
   // 即证明硬件侧门控有效，且还原真实上电语义。
@@ -104,11 +104,11 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
 
   val simDir = "/Users/wangliutailong/Qoder_Proj/Chisel_Learn/sim/mx"
 
-  behavior of "HiveCore MXFP8 GEMM Simulation"
+  behavior of "WorkerBee MXFP8 GEMM Simulation"
 
   it should "run MX single-block GEMM M=32 N=32 K=32 E4M3xE5M2" in {
     runMxGemm(M = 32, N = 32, K = 32,
-      waveName = "hivecore_mx_sim.fst",
+      waveName = "workerbee_mx_sim.fst",
       testMangle = "should-run-MX-single-block-GEMM-M-32-N-32-K-32-E4M3xE5M2",
       // fp32 256-bit 下 2 拍/行，窗口按新拍数几何归档（放宽不放松断言）。
       //outFmt = DataFormat.MXE4M3, 
@@ -125,7 +125,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
   // (1e-2 relative tolerance). Primary numerical guard = golden cross-check.
   // Test name retains "v1-anchor" as historical nomenclature (testMangle/waveName
   // coupling at :1082/:1086); the anchor file itself has been removed per owner
-  // decision (#175). FP32 output remains fully supported hardware (HiveOutCvt
+  // decision (#175). FP32 output remains fully supported hardware (WbOutCvt
   // fmtReg default + MuxCase default arm).
   // expCycleWindow = (120, 800): derived from fp32 2-beats-per-row geometry.
   // blkSel = 0: outFmt=FP32 is NOT quantized (isQuant=false), so blkSel does not
@@ -133,7 +133,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
   // ==========================================================================
   it should "run MX single-block GEMM M=32 N=32 K=32 E4M3xE5M2 fp32 v1-anchor" in {
     runMxGemm(M = 32, N = 32, K = 32,
-      waveName = "hivecore_mx_sim_fp32_anchor.fst",
+      waveName = "workerbee_mx_sim_fp32_anchor.fst",
       testMangle = "should-run-MX-single-block-GEMM-M-32-N-32-K-32-E4M3xE5M2-fp32-v1-anchor",
       outFmt = DataFormat.FP32,
       blkSel = 0,
@@ -163,7 +163,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
   // ==========================================================================
   it should "reject MX E4M3xE5M2 outFmt INT32 errCode 11" in {
     runMxGemm(M = 32, N = 32, K = 32,
-      waveName = "hivecore_mx_sim_errcode11.fst",
+      waveName = "workerbee_mx_sim_errcode11.fst",
       testMangle = "should-reject-MX-E4M3xE5M2-outFmt-INT32-errCode-11",
       outFmt = DataFormat.INT32,
       blkSel = 0,
@@ -172,8 +172,8 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
 
   
   // ==========================================================================
-  // 共享运行器：配置 MX HiveCore，逐拍供 A/B/C/scaleA/scaleB，golden 比对。
-  // 【任务95】outFmt 参数化（4-bit 编码，见 HiveEnum DataFormat 枚举）：
+  // 共享运行器：配置 MX WorkerBee，逐拍供 A/B/C/scaleA/scaleB，golden 比对。
+  // 【任务95】outFmt 参数化（4-bit 编码，见 WbEnum DataFormat 枚举）：
   //   - outFmt ∈ {0,1,2,3,4,5}（MX 合法族）：0=fp32 直出（锚+golden 双守护，默认）；
   //     1/2=fp16/bf16 降精度直出；3/4/5=量化输出——期望链 40→32 规格化 → swQuantBlock（码+块 scale），
   //     dmaC 密集码 + dmaCScale 块 scale 双通道逐拍地址/数据硬对账，
@@ -194,11 +194,11 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       outFmt: DataFormat.Type = DataFormat.FP32, blkSel: Int = 0, rnd: Int = 0,
       cScaleBackpressure: Boolean = false): Unit = {
 
-    val cfg = HiveCoreConfig(
+    val cfg = WorkerBeeConfig(
       arrayN = 8,
       clusterM = 2,                 // totalN = 16
-      aW = 16, bW = 16, cW = 40,      // 与出厂 cfgMx（HiveCoreElaborate）及 err 用例对齐
-      // (#155 MJ1) 不传 supportedFmts ⟹ 走 HiveCoreConfig 默认集，该默认集自本轮起
+      aW = 16, bW = 16, cW = 40,      // 与出厂 cfgMx（WorkerBeeElaborate）及 err 用例对齐
+      // (#155 MJ1) 不传 supportedFmts ⟹ 走 WorkerBeeConfig 默认集，该默认集自本轮起
       //   【已含 MXE2M1】⟹ hasMx4=true，自动满足新 require(!hasMx8 || hasMx4)。
       //   下面这行历史注释掉的 fp8-only 写法【不要取消注释】：MXE2M1 已是默认必选，
       //   显式传 fp8-only 集合会在 cfg 构造期直接抛 IllegalArgumentException。
@@ -206,7 +206,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       //   {INT8, INT4, MXE4M3, MXE5M2, MXE2M1}——FP16/BF16/INT16 已被砍除，故
       //   hasFp=false、hasInt 仍为 true、hasMx/hasMx8/hasMx4 仍全为 true。
       //   本 suite 不受影响且实测 2/2 仍绿：用例是 MX 族【输入】+ FP16/FP32【输出】，
-      //   而 16-bit 输出走 HiveOutCvt/FpCvt 的 40→32→16 两级舍入链，【不依赖 hasFp】
+      //   而 16-bit 输出走 WbOutCvt/FpCvt 的 40→32→16 两级舍入链，【不依赖 hasFp】
       //   （被砍的只是 FP16/BF16 作输入/计算格式）。hasMx4=true 这条本 suite 真正
       //   依赖的谓词未变 ⟹ 上方 require 与全部地址/拍数推导逐字仍成立。
       // 【P2 纯 FP8 订正】默认集现为 7 种（+FP8E4M3/FP8E5M2 ⟹ hasFp8=true，remap/
@@ -234,7 +234,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     // 仅 outFmt=0 生效（下方锚块门控）；用户注释掉的 anchor 守卫 require 保持注释态。
     val isFp16Out = outFmt == DataFormat.FP16 || outFmt == DataFormat.BF16
     val mxFmtOk = outFmt == DataFormat.FP32 || isFp16Out || isQuant   // MX 运行合法族 {0,1,2,3,4,5}
-    val outFmtInt = outFmt.litValue.toInt  // 枚举 → 4-bit 整型编码（控制字位域打包专用；【任务104】HiveSimCommon 已枚举化，地址/拍数/量化调用直传 outFmt）
+    val outFmtInt = outFmt.litValue.toInt  // 枚举 → 4-bit 整型编码（控制字位域打包专用；【任务104】WbSimCommon 已枚举化，地址/拍数/量化调用直传 outFmt）
     val blk = 16 << blkSel   // 【#144】新枚举 {M16=0,M32=1} → blk=16<<blkSel（旧 8<<blkSel 已废）
     // 【任务97】原 Int 范围校验（outFmt 0..15）随类型化作废：DataFormat 枚举已约束
     // 合法值域 0..10；枚举无法表达 11..15 未定义码（本文件无 11..15 使用）。
@@ -251,7 +251,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     // 【任务90 收敛：fp32 直出为合法受守护路径（P0 契约后保留）】格式族交叉校验批准版 =
     // MX 运行 outFmt ∈ {0,1,2,3,4,5}（0000=fp32 非量化直出；「MX 强制量化」严格版已否决）。
     // v1 锚录于 fp32 输出 → 本套件恢复 fp32 直出 + 逐位守护；P3 迁移仅换解析器与密集地址序列。
-    val beatsPerRow = HiveSimCommon.cBeatsPerRow(outFmt, totalN, cfg.cDmaExtW)  // fp32 2 拍/行；【任务98】fp16/bf16 与量化族 1 拍/行（2B/元素，totalN*16=256 恰满拍）
+    val beatsPerRow = WbSimCommon.cBeatsPerRow(outFmt, totalN, cfg.cDmaExtW)  // fp32 2 拍/行；【任务98】fp16/bf16 与量化族 1 拍/行（2B/元素，totalN*16=256 恰满拍）
 
     println(s"debug0 mxFmtOk=$mxFmtOk")
     if (!mxFmtOk) {
@@ -265,13 +265,13 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     // ---- scale 指数与元素内蕴值（确定性，含正负、覆盖多个块/列以暴露路由错位） ----
     def scaleAExp(m: Int, kb: Int): Int = ((m + kb) % 3) - 1        // {-1,0,1}
     def scaleBExp(kb: Int, n: Int): Int = ((n + 2 * kb) % 3) - 1    // {-1,0,1}
-    val scaleA = Array.tabulate(M, kBlocks)((m, kb) => HiveSimCommon.mxScaleByte(scaleAExp(m, kb)))
-    val scaleB = Array.tabulate(kBlocks, N)((kb, n) => HiveSimCommon.mxScaleByte(scaleBExp(kb, n)))
+    val scaleA = Array.tabulate(M, kBlocks)((m, kb) => WbSimCommon.mxScaleByte(scaleAExp(m, kb)))
+    val scaleB = Array.tabulate(kBlocks, N)((kb, n) => WbSimCommon.mxScaleByte(scaleBExp(kb, n)))
 
     def aValF(m: Int, k: Int): Double = ((((m * 7 + k * 3) % 11) - 5).toDouble) * 0.25   // ~[-1.25,1.25]
     def bValF(k: Int, n: Int): Double = ((((k * 5 + n * 2) % 9)  - 4).toDouble) * 0.5    // ~[-2,2]
-    val aByte = Array.tabulate(M, K)((m, k) => HiveSimCommon.floatToMxE4M3(aValF(m, k)))
-    val bByte = Array.tabulate(K, N)((k, n) => HiveSimCommon.floatToMxE5M2(bValF(k, n)))
+    val aByte = Array.tabulate(M, K)((m, k) => WbSimCommon.floatToMxE4M3(aValF(m, k)))
+    val bByte = Array.tabulate(K, N)((k, n) => WbSimCommon.floatToMxE5M2(bValF(k, n)))
     // 内存物理布局：B 转置存储（行=n、列=k），BT(n)(k)=bByte(k)(n)
     val bByteTransposed = Array.tabulate(N, K)((n, k) => bByte(k)(n))
 
@@ -279,8 +279,8 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     def refSum(m: Int, gc: Int): Double =
       (0 until K).map { k =>
         val kb = k / 32
-        HiveSimCommon.mxE4M3ToFloat(aByte(m)(k), scaleA(m)(kb)) *
-          HiveSimCommon.mxE5M2ToFloat(bByte(k)(gc), scaleB(kb)(gc))
+        WbSimCommon.mxE4M3ToFloat(aByte(m)(k), scaleA(m)(kb)) *
+          WbSimCommon.mxE5M2ToFloat(bByte(k)(gc), scaleB(kb)(gc))
       }.sum
     // 期望 fp32 bits 行（totalN 元素，gc≥N 补 0）：与硬件同链重建，供逐位守护与密集拍重组共用。
     def expectedFp32Row(nt: Int, m: Int): Seq[Long] = {
@@ -288,18 +288,18 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         val gc = nt * totalN + lc
         val sum = if (gc < N) refSum(m, gc) else 0.0
         val fp32Bits = java.lang.Float.floatToRawIntBits(sum.toFloat) & 0xFFFFFFFFL
-        HiveSimCommon.swFpNormalize40to32(HiveSimCommon.fp32BitsTo40(fp32Bits))
+        WbSimCommon.swFpNormalize40to32(WbSimCommon.fp32BitsTo40(fp32Bits))
       }
     }
     // 【任务98】fp16/bf16 期望行（与硬件 cvt 两级舍入链逐位同构：40→32 规格化 →
     // fp32ToFp16Rnd/fp32ToBf16Rnd 运行期 rnd 降精度；swFp32ToFp16/swFp32ToBf16
-    // 为 HiveOutCvtSpec 16 用例背书的逐位同构软件模型，含溢出饱和/下溢 FTZ/
+    // 为 WbOutCvtSpec 16 用例背书的逐位同构软件模型，含溢出饱和/下溢 FTZ/
     // inf/nan 处理）。返回 16-bit 元素位模式行，供 elemsToDenseRow（2B/元素
     // 密集布局）与 DMA-C 逐拍数据硬断言共用（主守护）；解码容差交叉见下方第二视角。
     def expectedFp16Row(nt: Int, m: Int): Seq[Long] = {
       expectedFp32Row(nt, m).map { bits =>
-        val half = if (outFmt == DataFormat.FP16) HiveSimCommon.swFp32ToFp16(bits, rnd)
-                   else HiveSimCommon.swFp32ToBf16(bits, rnd)
+        val half = if (outFmt == DataFormat.FP16) WbSimCommon.swFp32ToFp16(bits, rnd)
+                   else WbSimCommon.swFp32ToBf16(bits, rnd)
         half.toLong & 0xFFFFL
       }
     }
@@ -308,7 +308,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     // 不进 amax、元素码输出 0（swQuantBlock 内建掩码，与 QuantSpec 同范式）。
     def expectedQuantRow(nt: Int, m: Int): (Seq[Int], Seq[Int]) = {
       val nEffTile = math.min(totalN, N - nt * totalN)
-      HiveSimCommon.swQuantBlock(expectedFp32Row(nt, m), rnd, outFmt, blkSel, nEffTile)
+      WbSimCommon.swQuantBlock(expectedFp32Row(nt, m), rnd, outFmt, blkSel, nEffTile)
     }
 
     Files.createDirectories(Paths.get(simDir))
@@ -380,7 +380,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     // （#133 订正旧注「三角累积闭式」：那是把当时缺陷 RTL 的行为当规范）。
     // 【任务95】outFmt 参数化：量化族走 cAddrSeqDense 量化布局（mxfp8 行步进 N×1B、
     // mxfp4 N>>1；拍内步进 cBeatAddrStep 同源）；fp32 路径与原逐字一致。
-    val expCAddrSeq = HiveSimCommon.cAddrSeqDense(C_BASE, M, N, totalN, outFmt, cfg.cDmaExtW)
+    val expCAddrSeq = WbSimCommon.cAddrSeqDense(C_BASE, M, N, totalN, outFmt, cfg.cDmaExtW)
     def expCDataBeat(beatIdx: Int): BigInt = {
       val nt = beatIdx / (M * beatsPerRow)
       val inBlock = beatIdx % (M * beatsPerRow)
@@ -390,19 +390,19 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         if (isQuant) expectedQuantRow(nt, row)._1.map(_.toLong)
         else if (isFp16Out) expectedFp16Row(nt, row)   // 【任务98】fp16/bf16 16-bit 位模式（与 cvt 逐位同构）
         else expectedFp32Row(nt, row)
-      val denseRow = HiveSimCommon.elemsToDenseRow(elemRow, outFmt, totalN = totalN)
+      val denseRow = WbSimCommon.elemsToDenseRow(elemRow, outFmt, totalN = totalN)
       // 【#166】lane 偏移由【金锚期望地址】expCAddrSeq(beatIdx) 推出，【不读硬件实收
       //   addr】——后者会把期望值退化成 RTL 的镜像，违反金锚铁律（#133 同类教训）。
       //   推导链：addr mod dmaBytes = 本拍在总线字内的起始 byte lane（AXI 契约），
       //   denseRowBeat 再把密集段左移同样多的 lane ⟹ 与 main 侧 wdata/wstrb 同源移位一致。
-      val laneOff = HiveSimCommon.cLaneOffset(expCAddrSeq(beatIdx), cfg.cDmaExtW)
-      HiveSimCommon.denseRowBeat(denseRow, beatInRow, cfg.cDmaExtW, laneOff)
+      val laneOff = WbSimCommon.cLaneOffset(expCAddrSeq(beatIdx), cfg.cDmaExtW)
+      WbSimCommon.denseRowBeat(denseRow, beatInRow, cfg.cDmaExtW, laneOff)
     }
 
     // ==================== DMA-CSCALE：按 isQuant 分派 ====
     // 【任务90 收敛】fp32 直出非量化运行 → 该通道为死路，仅保留「全程零请求」负向守护。
     // 【任务95】量化运行（outFmt∈{3,4,5}）→ 双通道写回：地址线性模型
-    //   base + nt×(totalN/blk) + m×ceil(N/blk)（与 HiveCoreDmaScaleWr 同源），
+    //   base + nt×(totalN/blk) + m×ceil(N/blk)（与 WorkerBeeDmaScaleWr 同源），
     //   数据 = 每 8 元素组 1 字节 E8M0 scale（scaleBytesPerRow = ceil(N/blk) 字节）；
     //   主循环逐拍地址/数据硬对账（runMxQuantGemm 同范式，W-Adam2 背压可选）。
     val nTilesC = (N + totalN - 1) / totalN
@@ -430,7 +430,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     //   外部布局 scaleA[m][kb] 连续（每行 K/32 字节），地址 = SCALE_A_BASE + m×(K/32) + kb×1。
     // 【P0-1 gather】scale 端口 = 32-bit（4B 对齐量子）。读 DMA 对非对齐逻辑拍发
     //   【对齐多发读】：物理序列 = off==0 → [L]；off!=0 → [L-off, L-off+4]（DMA 内部
-    //   右移 off 字节重组，见 HiveCoreDmaRdOnly gather 段）。期望序列按此契约展开为
+    //   右移 off 字节重组，见 WorkerBeeDmaRdOnly gather 段）。期望序列按此契约展开为
     //   物理序列；供数按【物理地址】返回完整 4 字节对齐字（张量字节映像，越界补 0），
     //   绝不只发 byte0 —— 重组取的是对齐字的第 off 字节。
     def gatherPhys4(addr: Long): Seq[Long] = {
@@ -460,15 +460,15 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
 
     // ==================== DMA-scaleB (scaleB) 数据：8-bit/beat ======================
     // 【任务109】main 侧裁定：dmaScaleB 端口从旧 scaleRowW(=totalN*8=128-bit) 收窄为
-    // 硬编码 8-bit（HiveCore.scala L46），scaleRowW 已从 HiveCoreConfig 删除。驱动
-    // DMA 仍是 HiveCoreDmaRdOnly(bufWidth=8, isA=false)（HiveCore.scala L108），与
+    // 硬编码 8-bit（WorkerBee.scala L46），scaleRowW 已从 WorkerBeeConfig 删除。驱动
+    // DMA 仍是 WorkerBeeDmaRdOnly(bufWidth=8, isA=false)（WorkerBee.scala L108），与
     // dmaB 权重通道同构，逐拍地址生成完全一致：
-    //   start 门控 = calcConfig.startOut & isMx(regFile.bFmt)（HiveCore.scala L471）；
-    //   lineTarget = totalN(=16)（HiveCoreDmaRdOnly L174）；每拍搬 1 字节；块内地址
+    //   start 门控 = calcConfig.startOut & isMx(regFile.bFmt)（WorkerBee.scala L471）；
+    //   lineTarget = totalN(=16)（WorkerBeeDmaRdOnly L174）；每拍搬 1 字节；块内地址
     //   降序 -rowStep（L202）；两级遍历 kTile(reg_kTile=calcConfig.kTile=K/32) 内 ×
     //   nTile(reg_nTile) 外；loadWMode=1 下 switch-K 跳 colTileOff（L258）、
     //   switch-n 跳 colTileOff+(totalN-1)*rowOff（L241）。
-    // rowStep/colTileOff 直取 calcConfig 的 scaleB 偏移（与硬件同源，HiveCoreCalcConfig
+    // rowStep/colTileOff 直取 calcConfig 的 scaleB 偏移（与硬件同源，WorkerBeeCalcConfig
     //   L199-214）：scaleBRowAddressOffset = K/blkB、scaleBColTileAddressOffset =
     //   bKLoadNum/blkB；blkB 由 regFile.bMxBlockSize 决定（【#144】MXBlockSize 收窄后
     //   (#164) reg5[24]=1=M32 → blkB=32，见下方 controlWord5 打包），
@@ -478,7 +478,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     val scaleBRowOff     = (K / blkB).toLong           // = calcConfig.scaleBRowAddressOffset
     val scaleBColTileOff = (bKLoadNum / blkB).toLong   // = calcConfig.scaleBColTileAddressOffset
     val scaleBKTiles     = bKTiles                     // reg_kTile = calcConfig.kTile = K/32
-    // 期望取址序列：镜像 HiveCoreDmaRdOnly(isA=false, loadWMode=1) 遍历（与上方
+    // 期望取址序列：镜像 WorkerBeeDmaRdOnly(isA=false, loadWMode=1) 遍历（与上方
     // expBAddrSeq 同构，仅偏移换 scaleB 的 rowOff/colTileOff）：
     //   block(nTile=r, kTile=kt) 首址 = base + r*nTileJump + (totalN-1)*rowOff + kt*colTileOff
     //   nTileJump = (totalN-1)*rowOff + kTile*colTileOff（switch-n 增量，见 RTL L241）
@@ -494,11 +494,11 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     val expScaleBPhysSeq = expScaleBAddrSeq.toSeq.flatMap(gatherPhys4)
     val scaleBTotalBeats = expScaleBPhysSeq.size       // 逻辑 = nTile*kTile*totalN，物理 = +gather 额外读
     // scale 内存映像（内存保真）：【#61 修复】scaleB 按【n-major】组织。硬件 scaleB DMA
-    //   （HiveCoreDmaRdOnly isA=false, loadWMode=1）逐 beat 地址 = base + n×kBlocks + kb
+    //   （WorkerBeeDmaRdOnly isA=false, loadWMode=1）逐 beat 地址 = base + n×kBlocks + kb
     //   （n=全局列、kb=kTile=scale 块号；与 scaleA 的 m×kBlocks+kb 对称），故 byte(n×kBlocks+kb)=scaleB[kb][n]。
     //   旧解码误按 [kb][n]（kb-major，kb=off/N、n=off%N）：kBlocks=1（K=blk 单块）两布局重合而侥幸绿，
     //   kBlocks>=2 多 pass 发散 → 第二 pass 各列收到错误 scaleB 字节 → 累加错 → fp32 cross-check/DMA-C 失配。
-    //   RTL 与金锚均正确。与 HiveCoreSimCaseMxFp4Spec 头部注释 + genScaleBBeatByAddr n-major 范式对齐（三 runner 一致）。
+    //   RTL 与金锚均正确。与 WorkerBeeSimCaseMxFp4Spec 头部注释 + genScaleBBeatByAddr n-major 范式对齐（三 runner 一致）。
     //   按 req.addr 从映像取字节返回（越界补 0），绝不按 beat 序号顺序发数（历史教训：按序发数会掩盖供数序错位）。
     val scaleBTensorBytes = kBlocks.toLong * N
     // 【P0-1 gather】供完整 4 字节对齐字（张量字节映像 n-major，越界补 0）：DMA 对非对齐
@@ -525,7 +525,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     // 向上重抛保持 ScalaTest fail 语义；成功路径的转存时机（块退出后）与旧代码
     // 完全一致，不破坏 sim/*.fst 固定路径依赖。
     try {
-    simulate(new HiveCore(cfg)) { dut =>
+    simulate(new WorkerBee(cfg)) { dut =>
 
       var dmaABeatsSent = 0
       var dmaCStoreBeats = 0
@@ -538,7 +538,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       val scaleBAddrLog = scala.collection.mutable.ArrayBuffer[Long]()  // scaleB DMA 实际取址序列（逐 beat 对账）
       // 【#166】dmaC 写回日志升为 (addr,data,strb) 三元组：旧口径从不 peek strb，
       //   使「strb 已移位、wdata 未同源移位」在 TB 侧长期不可见。
-      val cWriteLog = scala.collection.mutable.ArrayBuffer[HiveSimCommon.CWriteBeat]()
+      val cWriteLog = scala.collection.mutable.ArrayBuffer[WbSimCommon.CWriteBeat]()
       // 【任务95】dmaCScale 实际写回序列（量化 dequant 交叉第二视角用，非量化恒空）
       val scaleWriteLog = scala.collection.mutable.ArrayBuffer[(Long, BigInt)]()
 
@@ -572,7 +572,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       dut.reset.poke(false.B)
       dut.clock.step(2)
 
-      def sendCmd(op: HiveCoreOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
+      def sendCmd(op: WorkerBeeOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
         transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
       }
 
@@ -582,12 +582,12 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       //   无 is(6)/is(7) 分支 ⟹ 写为 no-op、读回 0（Chisel switch 无 otherwise 即 no-op）。
       // MX 基础位 E4M3×E5M2：aFmt → reg5[3:0]、bFmt → reg5[7:4]（域内位置与旧 regs(7) 相同）；
       // loadWMode=1 在 reg5[28]（MX 下缺省即 errCode 4）；aMxBlk/bMxBlk = reg5[22]/[24]。
-      // 按参数叠加位域（与 HiveInterface.wregs is(5.U) 同源）：rnd → reg5[18:16]（★#164：旧 <<12
+      // 按参数叠加位域（与 WbInterface.wregs is(5.U) 同源）：rnd → reg5[18:16]（★#164：旧 <<12
       //   → 新 <<16；默认 RNE=0 不置位）、outFmt(cFmt) → reg5[11:8]、blkSel(cMxBlk) → reg5[26]。
       // ★(#164 裁定 4) outFmtInt 的掩码由 `& 0x7` 修为 `& 0xF`：DataFormat 是 4-bit 域（枚举 10 值），
       //   3-bit 掩码会把 INT8(8)→0=FP32、INT4(9)→1=FP16 静默截断，而 FP32/FP16 恰好落在 MX
       //   输入的【合法】输出族 {0,1,2,3,4,5} 里 ⟹ 负向用例 runMxOutFmtErrCase 会被静默变成
-      //   正向（硬件不置 err）。金锚 HiveDebugModel.controlWord5 一直用 `& 0xF`，本处为既存缺陷。
+      //   正向（硬件不置 err）。金锚 WbDebugModel.controlWord5 一直用 `& 0xF`，本处为既存缺陷。
       // ★(#155 MJ3) 订正本段注释与下方自检的陈旧字面量 0x65：
       //   0x65 = 5 | 6<<4 是【#97 之前】的 DataFormat 编号（MXE4M3=5、MXE5M2=6）。
       //   #97 把枚举重编号为 FP32=0/FP16=1/BF16=2/MXE4M3=3/MXE5M2=4/MXE2M1=5/INT32=6/…，
@@ -600,7 +600,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       //   第三条使自检的前件 (outFmt==FP32 && blkSel==0 && rnd==0) 恒假 ⟹ 0x43 vs 0x65 的
       //   矛盾被【不可达性】掩盖至今。#155 MJ3 新增的 fp32 锚用例让它重新可达，实测立刻抛：
       //     java.lang.IllegalArgumentException: requirement failed: 控制字自检失败: 0x43
-      //     at HiveCoreSimCaseMxSpec.$anonfun$runMxGemm$38(HiveCoreSimCaseMxSpec.scala:552)
+      //     at WorkerBeeSimCaseMxSpec.$anonfun$runMxGemm$38(WorkerBeeSimCaseMxSpec.scala:552)
       //   （build/155_mxfp4_fp32anchor_try1.log）。这不是锚漂移，是 TB 自检字面量陈旧。
       //   修复方式：期望值改为由 DataFormat 枚举【反解码推导】，不再写死任何进制字面量 ⟹
       //   今后若再有人重编号枚举而忘了改上面的 0x43L，本自检会再次长牙（比原字面量版更强）。
@@ -613,8 +613,8 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       //   sel=1(新枚举 M32=32)，保持「MX 输入 scale 块 = 32」的原意不变（金锚 kBlocks=K/32、
       //   kb=k/32、lane 打包 kt*32 全部按 block=32 推导）。旧 sel=2 在新枚举下越界，硬件
       //   getBlockSize(2) 落 otherwise→16，会使 scaleA/scaleB 行步进 K/16 与金锚 K/32 失配。
-      // (#164) 合并后的单一控制字 reg5：位域由 HiveInterface.wregs 的 is(5.U) 分支逐位推导，
-      //   与金锚 HiveDebugModel.controlWord5 同形（warmup[21]/warmdown[20] 本轮不置位，恒 0）。
+      // (#164) 合并后的单一控制字 reg5：位域由 WbInterface.wregs 的 is(5.U) 分支逐位推导，
+      //   与金锚 WbDebugModel.controlWord5 同形（warmup[21]/warmdown[20] 本轮不置位，恒 0）。
       //   三个 MxBlk 的 `& 0x3` 掩码沿用旧写法（域实际宽 1 bit）：sel∈{0,1} 下与 `& 0x1` 逐位
       //   相同 ⟹ 零行为变化；属既存遗留，本轮不改（已在报告登记）。
       val controlWord5 =
@@ -642,14 +642,14 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       // (#164) 新写序列：reg0=m、reg1=n|k<<16（旧 reg2=k 已并入 reg1 高 16 位）、
       //   reg2/3/4 = a/b/cAddr（旧 reg3/4/5）、reg5 = 控制字（旧 reg6+reg7）。
       //   ★旧 reg6/reg7 那条 sendCmd 已删除：写它们在新布局下是 no-op，留着只会误导。
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, M, N.toLong | (K.toLong << 16))
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, controlWord5)
+      sendCmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, M, N.toLong | (K.toLong << 16))
+      sendCmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
+      sendCmd(WorkerBeeOp.REG_WRITE2, 0x04, 0x05, C_BASE, controlWord5)
       println(s"debug1 controlWord5=0x${controlWord5.toHexString}")
-      sendCmd(HiveCoreOp.REG_WRITE2, HiveSimCommon.SCALE_A_REG_ADDR, HiveSimCommon.SCALE_B_REG_ADDR, SCALE_A_BASE, SCALE_B_BASE)
+      sendCmd(WorkerBeeOp.REG_WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SCALE_A_BASE, SCALE_B_BASE)
       // 【任务95】量化运行补写 0x08 cScaleAddr（ScaleWr 写通道基址源，QuantSpec
       // 同范式）；非量化运行该基址不被使用，保持不写（【任务90 收敛】语义零变化）。
-      if (isQuant) sendCmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.SCALE_C_REG_ADDR, 0x00, SCALE_C_BASE, 0L)
+      if (isQuant) sendCmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.SCALE_C_REG_ADDR, 0x00, SCALE_C_BASE, 0L)
 
       prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
       launchStart(dut.clock, dut.io.cmd(0))
@@ -666,7 +666,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       while (!done && cycle < maxCycles) {
         // --- DMA-A (A) ---
         // 【P3 迁移】由旧「rsp.valid 恒高 + rsp.ready 计数」改为 req.valid 拍响应 +
-        // 逐拍地址硬对账（与 HiveCoreSimCase 主用例/新 RdOnly 架构握手同模式）：
+        // 逐拍地址硬对账（与 WorkerBeeSimCase 主用例/新 RdOnly 架构握手同模式）：
         // 旧模式在新架构下与 req 节奏脱钩造成供数错位/死锁（8000 拍超时、C=0）。
         if (dmaABeatsSent < dmaATotalBeats) {
           if (dut.io.dmaA.req.valid.peek().litToBoolean) {
@@ -709,13 +709,13 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
             //   lane 窗口，strb 必须逐位一致，不一致报错而不静默放行）；② 未选通 lane
             //   不做数据断言，但必须为 0；③ 选通命中的 lane 逐字节与金锚 expData 比对。
             val laneBeatInRow = (dmaCStoreBeats % (M * beatsPerRow)) % beatsPerRow
-            val laneBad = HiveSimCommon.auditCBeatLanes(
+            val laneBad = WbSimCommon.auditCBeatLanes(
               dmaCStoreBeats, reqAddr, writeData, writeStrb, outFmt, totalN, cfg.cDmaExtW,
               laneBeatInRow, Some(expData))
             laneBad.take(8).foreach(v => println(s"[MX]   [#166 LANE] $v"))
             withClue(s"DMA-C store beat #$dmaCStoreBeats AXI byte-lane audit " +
                      f"(addr=0x$reqAddr%X strb=0x$writeStrb%X expStrb=" +
-                     f"0x${HiveSimCommon.cExpStrb(expCAddrSeq(dmaCStoreBeats), outFmt, totalN, cfg.cDmaExtW, laneBeatInRow)}%X): ") {
+                     f"0x${WbSimCommon.cExpStrb(expCAddrSeq(dmaCStoreBeats), outFmt, totalN, cfg.cDmaExtW, laneBeatInRow)}%X): ") {
               laneBad should be(Seq.empty[String])
             }
           }
@@ -884,7 +884,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       // 【任务109】scaleB 取址序硬对账已上移到主循环 req.valid 拍逐 beat 内联执行
       // （见上方 DMA-scaleB 供数块 withClue "addr mismatch"）：旧 128-bit 列驻留序列
       // addr(idx)=base+(idx%kBlocks)*N+(idx/kBlocks)*totalN 已作废，改为镜像
-      // HiveCoreDmaRdOnly(isA=false,loadWMode=1) 的 8-bit 降序遍历 expScaleBAddrSeq。
+      // WorkerBeeDmaRdOnly(isA=false,loadWMode=1) 的 8-bit 降序遍历 expScaleBAddrSeq。
       // 此处仅保留「全部 beat 均已被逐拍对账」的规模自检。
       scaleBAddrLog.size should be(scaleBTotalBeats)
 
@@ -902,7 +902,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       // 【#166】解析改走 Checked 变体：除了矩阵还原，额外拿到全拍 lane 级审计汇总
       //   （addr↔strb 双向对账 + 未选通 lane 零填充 + BEAT-COUNT）并硬断言零违规。
       //   期望拍数取金锚 expCAddrSeq.size（张量语义侧），不取硬件实收拍数。
-      val parsedC = HiveSimCommon.parseDenseCWriteLogChecked(
+      val parsedC = WbSimCommon.parseDenseCWriteLogChecked(
         cWriteLog.toSeq, outFmt, M, N, totalN, cfg.cDmaExtW,
         expBeats = Some(expCAddrSeq.size), expElems = Some(M * N))
       val hwBits = parsedC.matrix
@@ -962,7 +962,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
           // (#170-W11) Use golden expCAddrSeq(beatIdx) instead of hardware-received addr
           //   for lane offset derivation. This eliminates the scenario where the new strb
           //   gating could cause the branch to silently pass with zero comparisons.
-          val laneOff = HiveSimCommon.cLaneOffset(expCAddrSeq(beatIdx), cfg.cDmaExtW)
+          val laneOff = WbSimCommon.cLaneOffset(expCAddrSeq(beatIdx), cfg.cDmaExtW)
           val aligned = data >> (laneOff * 8)
           for (i <- 0 until elemsPerBeat) {
             val globalCol = nt * totalN + beatInRow * elemsPerBeat + i
@@ -1005,8 +1005,8 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         // （近零元素按 absErr 门槛豁免）；fp16ToFloat 含 subnormal/inf/nan 处理，
         // bf16 尾数低位补零重建 fp32 bits 后经 fp32BitsToFloat 解码（同源语义）。
         def decode16(v: Long): Double =
-          if (outFmt == DataFormat.FP16) HiveSimCommon.fp16ToFloat((v & 0xFFFFL).toInt).toDouble
-          else HiveSimCommon.fp32BitsToFloat((v & 0xFFFFL) << 16).toDouble   // bf16 → fp32 尾数低位补零
+          if (outFmt == DataFormat.FP16) WbSimCommon.fp16ToFloat((v & 0xFFFFL).toInt).toDouble
+          else WbSimCommon.fp32BitsToFloat((v & 0xFFFFL) << 16).toDouble   // bf16 → fp32 尾数低位补零
         val tol = if (outFmt == DataFormat.FP16) 1e-2 else 2e-2
         val hwVal = Array.tabulate(M, N) { (m, n) => decode16(hwBits(m)(n)) }
         val ref = Array.tabulate(M, N) { (m, n) => refSum(m, n) }
@@ -1040,7 +1040,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         // fp32 accumulation rounding (24-bit mantissa, K=32 terms), bounded well below
         // 1e-2 relative error. Covers ALL M*N elements. Tolerance = 1e-2 relative.
         val fp32GoldenTol = 1e-2
-        val hwVal = Array.tabulate(M, N) { (m, n) => HiveSimCommon.fp32BitsToFloat(hwBits(m)(n)).toDouble }
+        val hwVal = Array.tabulate(M, N) { (m, n) => WbSimCommon.fp32BitsToFloat(hwBits(m)(n)).toDouble }
         val ref = Array.tabulate(M, N) { (m, n) => refSum(m, n) }
         var mismatchCnt = 0
         var maxRelErr = 0.0
@@ -1076,8 +1076,8 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       // 块外复制约定，源路径段由 testMangle 逐字锚定 it should 用例名）。
       // 【任务94】置于 finally：断言失败时异常上抛后同样在此转存（Verilator 已对
       // 失败拍之前的周期持续写出 trace.fst，文件非空即可拷出供波形器回放）。
-      HiveSimCommon.copyTrace(
-        s"build/chiselsim/HiveCoreSimCaseMxSpec/HiveCore-MXFP8-GEMM-Simulation/$testMangle/workdir-verilator/trace.fst",
+      WbSimCommon.copyTrace(
+        s"build/chiselsim/WorkerBeeSimCaseMxSpec/WorkerBee-MXFP8-GEMM-Simulation/$testMangle/workdir-verilator/trace.fst",
         s"$simDir/$waveName",
         "MX"
       )
@@ -1091,15 +1091,15 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
   //   【不删函数、保持结构】，只把它与新排布对齐，以免日后重新接入时踩 no-op 陷阱。
   private def runMxErrCase(M: Int, N: Int, K: Int, ctl5: Long, caseName: String): Unit = {
     // v2：hasMx 要求 aW/bW>=16（SIMD 双元素/拍）；err 在 sIDLE 拍触发，与位宽无关。
-    // (#155 MJ1) supportedFmts 追加 MXE2M1：HiveCoreConfig 新增 require(!hasMx8 || hasMx4)
+    // (#155 MJ1) supportedFmts 追加 MXE2M1：WorkerBeeConfig 新增 require(!hasMx8 || hasMx4)
     //   （用户设计律「有 mxfp8 就有 mxfp4，是必选项」）⟹ 原先这个 fp8-only 集合会在
-    //   【cfg 构造这一行】抛 IllegalArgumentException。追加后本 cfg 与 HiveCoreElaborate.cfgMx
+    //   【cfg 构造这一行】抛 IllegalArgumentException。追加后本 cfg 与 WorkerBeeElaborate.cfgMx
     //   / cfgMxFp4 全 12 字段相同。对本负向运行器的断言零影响：断言只看 STATUS.err 位、
     //   done 位与 dmaC/dmaCScale 零写请求拍，不绑定具体 errCode；且 aFmt/bFmt 仍是 fp8
     //   （E4M3×E5M2）⟹ isMx4 两臂均假 ⟹ fp4 专属守护（mix errCode3 / K 整除 errCode8）
     //   不抢跑，elemsPerLane 对 fp8 仍为 2 ⟹ 几何与拍数不变。
     //   注：本 def 目前【无调用点】（历史用例已删），仍一并对齐以免留下 fp8-only 陷阱。
-    val cfg = HiveCoreConfig(
+    val cfg = WorkerBeeConfig(
       arrayN = 8, clusterM = 2,
       aW = 16, bW = 16, cW = 40,
       supportedFmts = Set(DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1),
@@ -1107,7 +1107,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       scaleBufferDepth = 256
     )
 
-    simulate(new HiveCore(cfg)) { dut =>
+    simulate(new WorkerBee(cfg)) { dut =>
       // ---- Reset + DMA 端口拉到安全默认（本用例不喂数据，err 应在 execute 拍触发） ----
       dut.reset.poke(true.B)
       dut.io.cmd.foreach(_.valid.poke(false.B))
@@ -1126,34 +1126,34 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
       dut.reset.poke(false.B)
       dut.clock.step(2)
 
-      def sendCmd(op: HiveCoreOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
+      def sendCmd(op: WorkerBeeOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
         transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
       }
 
       // (#164) 新写序列：reg0=m、reg1=n|k<<16、reg2/3/4=a/b/cAddr、reg5=控制字（旧 reg6+reg7）。
       //   ★旧 `sendCmd(REG_WRITE2, 0x06, 0x07, 0L, regs7)` 已删：reg6/reg7 在新布局下写为 no-op。
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, M, N.toLong | (K.toLong << 16))
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
-      sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, ctl5)
-      sendCmd(HiveCoreOp.REG_WRITE2, HiveSimCommon.SCALE_A_REG_ADDR, HiveSimCommon.SCALE_B_REG_ADDR, SCALE_A_BASE, SCALE_B_BASE)
+      sendCmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, M, N.toLong | (K.toLong << 16))
+      sendCmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
+      sendCmd(WorkerBeeOp.REG_WRITE2, 0x04, 0x05, C_BASE, ctl5)
+      sendCmd(WorkerBeeOp.REG_WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SCALE_A_BASE, SCALE_B_BASE)
 
       prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
       launchStart(dut.clock, dut.io.cmd(0))
       dut.clock.step(200)
-      val raw = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR)
+      val raw = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.IRQ_RAW_REG_ADDR)
       withClue(s"[$caseName] config error only in IRQ_RAW: ") { raw should be(BigInt(2)) }
       dut.io.status.inFlight.expect(false.B)
 
       val legalCtl5 = (1L << 28) |
         DataFormat.MXE4M3.litValue.toLong | (DataFormat.MXE5M2.litValue.toLong << 4)
-      sendCmd(HiveCoreOp.REG_WRITE1, 0x05, 0x00, legalCtl5, 0L)
+      sendCmd(WorkerBeeOp.REG_WRITE1, 0x05, 0x00, legalCtl5, 0L)
       // START 不清 pending；合法重启后旧 configError 仍记录，须显式 W1C。
       launchStart(dut.clock, dut.io.cmd(0))
       dut.clock.step(100)
-      readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(raw)
-      sendCmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.IRQ_CLEAR_REG_ADDR, 0, 2L, 0L)
-      readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(0))
-      readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(0))
+      readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.IRQ_RAW_REG_ADDR) should be(raw)
+      sendCmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.IRQ_CLEAR_REG_ADDR, 0, 2L, 0L)
+      readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(0))
+      readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(0))
       dut.io.status.inFlight.expect(true.B)
     }
   }
@@ -1182,14 +1182,14 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     //   独立核算：reg5[3:0]=MXE4M3=3, reg5[7:4]=MXE5M2=4 → (4<<4)|3 = 0x43 ✓
     val controlWord5 =
       (1L << 28) | 0x43L | ((outFmtInt.toLong & 0xF) << 8)
-    // (#155 MJ1) supportedFmts 追加 MXE2M1：HiveCoreConfig 新增 require(!hasMx8 || hasMx4)
+    // (#155 MJ1) supportedFmts 追加 MXE2M1：WorkerBeeConfig 新增 require(!hasMx8 || hasMx4)
     //   ⟹ 原先这个 fp8-only 集合会在【cfg 构造这一行】抛 IllegalArgumentException。
     //   本 def 是【活代码】：runMxGemm 在 outFmt 不属合法族 {0,1,2,3,4,5} 时分派到此处
     //   （现役用例 outFmt=FP16、#155 新增锚用例 outFmt=FP32，都在合法族内；
     //   #178 新增负向用例 outFmt=INT32 不在合法族内 ⟹ 本函数现已可达）。追加后与 cfgMx/cfgMxFp4 全 12 字段相同。
     //   (#178) 断言现绑定 errCode=11（叠加式变强，不放宽既有断言）；违约项仍是唯一的
     //   outFmt 族交叉（aFmt/bFmt = E4M3×E5M2 ⟹ isMx4 两臂均假 ⟹ fp4 专属守护不抢跑）。
-    val cfg = HiveCoreConfig(
+    val cfg = WorkerBeeConfig(
       arrayN = 8, clusterM = 2,
       aW = 16, bW = 16, cW = 40,
       supportedFmts = Set(DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1),
@@ -1198,7 +1198,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
     )
 
     try {
-      simulate(new HiveCore(cfg)) { dut =>
+      simulate(new WorkerBee(cfg)) { dut =>
         // ---- Reset + DMA 端口拉到安全默认（不喂数据，err 应在 execute 拍触发） ----
         dut.reset.poke(true.B)
         dut.io.cmd.foreach(_.valid.poke(false.B))
@@ -1219,7 +1219,7 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         dut.reset.poke(false.B)
         dut.clock.step(2)
 
-        def sendCmd(op: HiveCoreOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
+        def sendCmd(op: WorkerBeeOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
           transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
         }
 
@@ -1227,10 +1227,10 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         //   ★旧 `sendCmd(REG_WRITE2, 0x06, 0x07, 1L << 28, controlWord)` 已删：reg6/reg7 在新
         //   布局下写为 no-op ⟹ loadWMode 与格式字都写不进去，reg5 保持复位 0
         //   （= aFmt/bFmt/cFmt 全 FP32）⟹ errCode 5 抢跑、且 err 归因不再是 outFmt 族交叉。
-        sendCmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, M, N.toLong | (K.toLong << 16))
-        sendCmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
-        sendCmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, controlWord5) // reg5[28]=loadWMode=1（保持 err 归因 = outFmt 族交叉）
-        sendCmd(HiveCoreOp.REG_WRITE2, HiveSimCommon.SCALE_A_REG_ADDR, HiveSimCommon.SCALE_B_REG_ADDR, SCALE_A_BASE, SCALE_B_BASE)
+        sendCmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, M, N.toLong | (K.toLong << 16))
+        sendCmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
+        sendCmd(WorkerBeeOp.REG_WRITE2, 0x04, 0x05, C_BASE, controlWord5) // reg5[28]=loadWMode=1（保持 err 归因 = outFmt 族交叉）
+        sendCmd(WorkerBeeOp.REG_WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SCALE_A_BASE, SCALE_B_BASE)
 
         prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
         launchStart(dut.clock, dut.io.cmd(0))
@@ -1249,28 +1249,28 @@ class HiveCoreSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         dut.io.cmd.foreach(_.valid.poke(false.B))
         dut.clock.step(2)
         withClue(s"[$caseName] configError only, no done/DMA errors: ") { raw should be(BigInt(2)) }
-        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
-        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(11))
+        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
+        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(11))
         dut.io.status.inFlight.expect(false.B)
         dmaCReqSeen should be(0)
         dmaCScaleReqSeen should be(0)
 
         val legalCtl5 = (1L << 28) |
           DataFormat.MXE4M3.litValue.toLong | (DataFormat.MXE5M2.litValue.toLong << 4)
-        sendCmd(HiveCoreOp.REG_WRITE1, 0x05, 0x00, legalCtl5, 0L)
+        sendCmd(WorkerBeeOp.REG_WRITE1, 0x05, 0x00, legalCtl5, 0L)
         launchStart(dut.clock, dut.io.cmd(0))
         dut.clock.step(100)
         // 合法 START 不清此前配置错误，也不自动清首次 code。
-        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
-        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(11))
-        sendCmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.IRQ_CLEAR_REG_ADDR, 0, 2L, 0L)
-        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(0))
-        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, HiveSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(0))
+        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
+        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(11))
+        sendCmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.IRQ_CLEAR_REG_ADDR, 0, 2L, 0L)
+        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(0))
+        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(0))
         dut.io.status.inFlight.expect(true.B)
       }
     } finally {
-      HiveSimCommon.copyTrace(
-        s"build/chiselsim/HiveCoreSimCaseMxSpec/HiveCore-MXFP8-GEMM-Simulation/$testMangle/workdir-verilator/trace.fst",
+      WbSimCommon.copyTrace(
+        s"build/chiselsim/WorkerBeeSimCaseMxSpec/WorkerBee-MXFP8-GEMM-Simulation/$testMangle/workdir-verilator/trace.fst",
         s"$simDir/$waveName",
         "MX"
       )

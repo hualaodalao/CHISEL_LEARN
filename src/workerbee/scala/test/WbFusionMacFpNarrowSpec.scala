@@ -1,9 +1,9 @@
-/** HiveFusionMacFpNarrowSpec — task#18 E：narrow 配置（hasFp=false + useNarrowAdd=true）系统级测试
+/** WbFusionMacFpNarrowSpec — task#18 E：narrow 配置（hasFp=false + useNarrowAdd=true）系统级测试
   *
   * ══════════════════════════════════════════════════════════════════════════════
   * 目标
   * ══════════════════════════════════════════════════════════════════════════════
-  * 验证 HiveFusionMacFp(supportedFmts=MXONLY, useNarrowAdd=true) 配置：
+  * 验证 WbFusionMacFp(supportedFmts=MXONLY, useNarrowAdd=true) 配置：
   *   1. 饱和域输出非 NaN（task#18 A 项 bug fix 的直接系统级验证）
   *   2. MX4 in-spec【lane fraction-sum 无损域】bit-exact。
   *      ★【措辞订正 · task#20(2)】原文写「MX4 in-spec 全域 bit-exact」——【该表述 over-claim，已收窄】：
@@ -29,8 +29,8 @@
   *   （既可能误判 FAIL，也可能因金锚与 RTL 同向舍入而假 PASS）。Dyadic 的加/减/乘【封闭无舍入】，
   *   相对/绝对误差判定式退化为纯 BigInt 整数比较，零浮点参与。
   * · 元素真值 = mxElemDyadic(code, scale, fmt)（本文件内的精确整数版；解码分支序与
-  *   HiveSimCommon.mxToFloat 逐条同源：expSigned = e+scale−bias、fp8 subnormalFtz、E2M1 subnormal=±0.5
-  *   一等公民、underflow clamp；格式参数一律引 HiveEnum.MxFormatParams 单例，禁裸字面量）
+  *   WbSimCommon.mxToFloat 逐条同源：expSigned = e+scale−bias、fp8 subnormalFtz、E2M1 subnormal=±0.5
+  *   一等公民、underflow clamp；格式参数一律引 WbEnum.MxFormatParams 单例，禁裸字面量）
   * · lane 乘积 = aElemVal × bElemVal（Dyadic 乘，精确；MX8 ≤8-bit / MX4 ≤4-bit 有效位 ⟹ 恒 fp32-可表示）
   *   → dyadicToFp32Bits 编码成 fp32 位模式，与上游 FpMulMx8/FpMulMx4 的 in-spec 输出【逐位同值】
   *   （数学证明见 FpAddNarrowSpec 头注「金锚来源」，非拟合）
@@ -48,7 +48,7 @@
   *
   * 本 spec 验证策略（★ task#20(3) 订正：按三段契约【逐向量真实归类】，不再「六条过一条即过」）：
   *   · goldenExact=true 向量（所有部分和 fp32-精确 + 指数跨度 << W）→ nLossy=0, k=0 → 输出精确
-  *     → 可做 bit-exact 断言（最强形式，与 HiveFusionMacFpSpec 同金锚同判据）
+  *     → 可做 bit-exact 断言（最强形式，与 WbFusionMacFpSpec 同金锚同判据）
   *   · 宽指数跨度向量（block4）→ 软件侧【从激励独立重算】E / windowLsb / nLossy / k / absBound
   *     （解析模型与 FpAddNarrowSpec.analyze 同构，全程不读 RTL），然后对【每一条】向量：
   *       (i)  无条件断言契约 ①：|diff| ≤ absBound —— 这是唯一无条件的精度承诺，任何向量都必须成立；
@@ -67,7 +67,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scala.collection.mutable
 
-class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
+class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   implicit val plainVerilator: HasSimulator =
     HasSimulator.simulators.verilator(
@@ -83,7 +83,7 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
     * ⟹ 阈值判定本身就是噪声，故废止。 */
   private val REL_THRESHOLD = math.pow(2, -(W - 1))  // 2^-18（report-only）
 
-  // ── 元素码构造器（与 HiveFusionMacFpSpec 同族，纯 Scala 位域打包）──
+  // ── 元素码构造器（与 WbFusionMacFpSpec 同族，纯 Scala 位域打包）──
   private def e4m3(s: Int, e: Int, m: Int): Int = ((s & 1) << 7) | ((e & 0xF) << 3) | (m & 0x7)
   private def e5m2(s: Int, e: Int, m: Int): Int = ((s & 1) << 7) | ((e & 0x1F) << 2) | (m & 0x3)
   private def e2m1(s: Int, e: Int, m: Int): Int = ((s & 1) << 3) | ((e & 0x3) << 1) | (m & 0x1)
@@ -147,7 +147,7 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
   // ════════════════════════════════════════════════════════════════════════════
   // 数学金锚（第一性原理 MX 语义，全程精确整数；禁拟合 RTL）
   // ════════════════════════════════════════════════════════════════════════════
-  /** 三格式解码旗标（与 HiveSimCommon.mxToFloat 的调用点逐条同源）：
+  /** 三格式解码旗标（与 WbSimCommon.mxToFloat 的调用点逐条同源）：
     * · E4M3：nanNeedMantAllOne=true（e&m 全 1 才 NaN）、subnormalFtz=true（e==0 → ±0）
     * · E5M2：nanNeedMantAllOne=false（e 全 1 即 inf/nan）、subnormalFtz=true
     * · E2M1：noInfNan=true（无 inf/nan 编码）、subnormalFtz=false（e=0/m=1 = ±0.5 一等公民） */
@@ -162,7 +162,7 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
     else if (d == DataFormat.MXE2M1) FmtE2M1
     else { require(false, s"fmtOf: 非 MX 格式 $d（本 spec 只覆盖 MX-only 域）"); FmtE2M1 }
 
-  /** MX 元素【精确】真值（Dyadic）。分支序逐条对齐 HiveSimCommon.mxToFloat：
+  /** MX 元素【精确】真值（Dyadic）。分支序逐条对齐 WbSimCommon.mxToFloat：
     * normal  : ±(2^mantW + m) × 2^(expSigned − 127 − mantW)
     * subnormal(E2M1) : ±1 × 2^(expSigned − 127)（隐含 1.0 ⟹ 不乘 (1+m/2)）
     * fp8 e==0（FTZ）/ expSigned < 1（underflow clamp）⟹ ±0
@@ -236,7 +236,7 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
   }
 
   /** lazy-40 bits → 精确真值。radix：value = mant31 × 2^(exp−157)（bit30 ↔ 2^(exp−127)）；
-    * 真零判据 exp==0 && mant31==0（与 HiveSimCommon.fp32BitsTo40 / swFpNormalize40to32 同约定）。 */
+    * 真零判据 exp==0 && mant31==0（与 WbSimCommon.fp32BitsTo40 / swFpNormalize40to32 同约定）。 */
   private def lazy40ToDyadic(raw: BigInt): Dyadic = {
     val s = ((raw >> 39) & 1).toInt
     val e = ((raw >> 31) & 0xFF).toInt
@@ -254,10 +254,10 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
     }
 
   private def goldenBits(golden: Dyadic): Long =
-    HiveSimCommon.swFpNormalize40to32(HiveSimCommon.fp32BitsTo40(dyadicToFp32RNE(golden)))
+    WbSimCommon.swFpNormalize40to32(WbSimCommon.fp32BitsTo40(dyadicToFp32RNE(golden)))
 
   private def cRegBits(cVal: Dyadic): BigInt =
-    HiveSimCommon.fp32BitsTo40(dyadicToFp32RNE(cVal))
+    WbSimCommon.fp32BitsTo40(dyadicToFp32RNE(cVal))
 
   /** ★【task#25 Kim Minor#3】cReg 槽的【实际驱动真值】= 由驱动位反解，而非直接用未舍入的 v.cVal。
     * DUT 收到的是 cRegBits(v.cVal) = fp32BitsTo40(dyadicToFp32RNE(cVal))（可能已对 cVal 做过单次 RNE），
@@ -273,7 +273,7 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
   /** 五槽 lane 乘积【精确真值】（张量语义；与上游 FpMulMx8/FpMulMx4 的 in-spec 输出逐位同值）。
     * MX4 = 4 个 nibble（a[3:0]/a[7:4]/a[11:8]/a[15:12] → r0/r1/r2/r3）；
     * MX8 = 2 个 byte（a[7:0] → r0、a[15:8] → r1；r2/r3 被 Mux(aIsMx2M1,…) 掩零）。
-    * 端口映射逐字读自 HiveFusionMacFp.scala:225/229(mulL0)、:150/154(fp8Mul)、:188/190(fp4Mul0)、
+    * 端口映射逐字读自 WbFusionMacFp.scala:225/229(mulL0)、:150/154(fp8Mul)、:188/190(fp4Mul0)、
     * :203/205(fp4Mul1) 与 :260-262 的 r1/r2/r3 Mux。 */
   private def laneProducts(v: Vec): Seq[Dyadic] =
     if (v.isMx4) (0 until 4).map { i =>
@@ -507,7 +507,7 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
   // ════════════════════════════════════════════════════════════════════════════
   // 驱动 helper
   // ════════════════════════════════════════════════════════════════════════════
-  private def driveVec(dut: HiveFusionMacFp, v: Vec): BigInt = {
+  private def driveVec(dut: WbFusionMacFp, v: Vec): BigInt = {
     dut.io.aFmt.poke(v.aFmt)
     dut.io.bFmt.poke(v.bFmt)
     dut.io.a.poke(v.a.U)
@@ -521,7 +521,7 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
     dut.io.sum.peek().litValue
   }
 
-  private def resetDut(dut: HiveFusionMacFp): Unit = {
+  private def resetDut(dut: WbFusionMacFp): Unit = {
     dut.reset.poke(true.B)
     dut.io.aFmt.poke(DataFormat.MXE4M3); dut.io.bFmt.poke(DataFormat.MXE4M3)
     dut.io.a.poke(0.U); dut.io.b.poke(0.U)
@@ -533,15 +533,15 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
   // ════════════════════════════════════════════════════════════════════════════
   // 测试主体
   // ════════════════════════════════════════════════════════════════════════════
-  behavior of "HiveFusionMacFp narrow config (useNarrowAdd=true, FpAddNarrow W=19) system-level verification"
+  behavior of "WbFusionMacFp narrow config (useNarrowAdd=true, FpAddNarrow W=19) system-level verification"
 
   it should "produce bit-exact output for MX4 in-spec vectors with lossless cReg slot (lane exponent spread ≤7 << W AND cReg in {0,1.0} => nLossy=0; NOT an MX4 whole-domain claim)" in {
-    simulate(new HiveFusionMacFp(supportedFmts = FMTS_MXONLY, useNarrowAdd = true)) { dut =>
+    simulate(new WbFusionMacFp(supportedFmts = FMTS_MXONLY, useNarrowAdd = true)) { dut =>
       resetDut(dut)
       var pass = 0
       for (v <- mx4Vecs) {
         val sumRaw = driveVec(dut, v)
-        val actualFp32 = HiveSimCommon.swFpNormalize40to32(sumRaw)
+        val actualFp32 = WbSimCommon.swFpNormalize40to32(sumRaw)
         val (golden, exact) = goldenOf(v)
         assert(exact, s"[${v.tag}] DESIGN ERROR: goldenExact=false")
         val exp = goldenBits(golden)
@@ -558,12 +558,12 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
   }
 
   it should "produce bit-exact output for MX8 in-spec vectors with goldenExact=true (effective bits ≤9 << W)" in {
-    simulate(new HiveFusionMacFp(supportedFmts = FMTS_MXONLY, useNarrowAdd = true)) { dut =>
+    simulate(new WbFusionMacFp(supportedFmts = FMTS_MXONLY, useNarrowAdd = true)) { dut =>
       resetDut(dut)
       var pass = 0
       for (v <- mx8ExactVecs) {
         val sumRaw = driveVec(dut, v)
-        val actualFp32 = HiveSimCommon.swFpNormalize40to32(sumRaw)
+        val actualFp32 = WbSimCommon.swFpNormalize40to32(sumRaw)
         val (golden, exact) = goldenOf(v)
         assert(exact, s"[${v.tag}] DESIGN ERROR: goldenExact=false")
         val exp = goldenBits(golden)
@@ -579,12 +579,12 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
   }
 
   it should "keep saturation domain output finite (non-NaN) with lazy-40 expField ≤ ExpSatMax=254 (task#18 A bug fix verification)" in {
-    simulate(new HiveFusionMacFp(supportedFmts = FMTS_MXONLY, useNarrowAdd = true)) { dut =>
+    simulate(new WbFusionMacFp(supportedFmts = FMTS_MXONLY, useNarrowAdd = true)) { dut =>
       resetDut(dut)
       var pass = 0
       for (v <- satVecs) {
         val sumRaw = driveVec(dut, v)
-        val fp32 = HiveSimCommon.swFpNormalize40to32(sumRaw)
+        val fp32 = WbSimCommon.swFpNormalize40to32(sumRaw)
         val expField = ((fp32 >>> 23) & 0xFF).toInt
         val mantField = (fp32 & 0x7FFFFF).toInt
         val isNaN = expField == 0xFF && mantField != 0
@@ -605,7 +605,7 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
   }
 
   it should "enforce the three-part precision contract on MX8 wide-spread vectors with per-vector true classification (J1 exact / J2 rel-bound / J3 abs-bound fallback)" in {
-    simulate(new HiveFusionMacFp(supportedFmts = FMTS_MXONLY, useNarrowAdd = true)) { dut =>
+    simulate(new WbFusionMacFp(supportedFmts = FMTS_MXONLY, useNarrowAdd = true)) { dut =>
       resetDut(dut)
       // ★ task#20(3) 重写纪要（原实现的三处空洞，逐条对应任务书点名）：
       //   (a) 死变量：原 `val absBound = 6.0 * math.abs(golden) * REL_THRESHOLD` 算完就丢，
@@ -621,7 +621,7 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
       val rows = mutable.ArrayBuffer.empty[String]
       for (v <- mx8SpreadVecs) {
         val sumRaw      = driveVec(dut, v)
-        val actualFp32  = HiveSimCommon.swFpNormalize40to32(sumRaw)
+        val actualFp32  = WbSimCommon.swFpNormalize40to32(sumRaw)
         val (golden, _) = goldenOf(v)
         val eOut40      = ((sumRaw >> 31) & 0xFF).toInt
 
@@ -698,7 +698,7 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
     //   「砍除 FP16/BF16」裁定收窄为 MX-only（hasFp=false）。本用例发射【类默认】RTL，断言其
     //   【不含】fp16/bf16 宽阵列（FpMulFp16Bf16 / FpCvtFp16ToFp32 / FpCvtBf16ToFp32），
     //   且【含】lane0 专属窄乘法器 FpMulMx8（hasFp=false 的硬件指纹）⟹ 钉死「默认 = MX-only」不被悄悄翻回。
-    val rtlDefault = _root_.circt.stage.ChiselStage.emitSystemVerilog(new HiveFusionMacFp())
+    val rtlDefault = _root_.circt.stage.ChiselStage.emitSystemVerilog(new WbFusionMacFp())
     rtlDefault should not include "FpMulFp16Bf16"
     rtlDefault should not include "FpCvtFp16ToFp32"
     rtlDefault should not include "FpCvtBf16ToFp32"
@@ -709,7 +709,7 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
     //   ★task#30 A2：pin useNarrowAdd=false（类默认已改为 true；全五格式 + narrow 会撞护栏 require，
     //   而本反证段意图是验宽阵列出现与否，与加法器选型正交）。
     val rtlFull5 = _root_.circt.stage.ChiselStage.emitSystemVerilog(
-      new HiveFusionMacFp(supportedFmts = Set(DataFormat.FP16, DataFormat.BF16,
+      new WbFusionMacFp(supportedFmts = Set(DataFormat.FP16, DataFormat.BF16,
         DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1), useNarrowAdd = false))
     withClue("全五格式（hasFp=true）本应例化宽阵列 FpMulFp16Bf16（否则上方 not include 判据无意义）：") {
       rtlFull5 should include("FpMulFp16Bf16")
@@ -723,7 +723,7 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
     val ex = intercept[IllegalArgumentException] {
       // 触发 elaboration（ChiselStage 会在构造时检查 require）
       _root_.circt.stage.ChiselStage.emitSystemVerilog(
-        new HiveFusionMacFp(
+        new WbFusionMacFp(
           supportedFmts = Set(DataFormat.FP16, DataFormat.BF16, DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1),
           useNarrowAdd = true
         )
@@ -738,7 +738,7 @@ class HiveFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim
     //   新白名单必须【拒绝】。这条正是「白名单堵住 INT/FP32 集绕过」的活体证据。
     val ex2 = intercept[IllegalArgumentException] {
       _root_.circt.stage.ChiselStage.emitSystemVerilog(
-        new HiveFusionMacFp(
+        new WbFusionMacFp(
           supportedFmts = Set(DataFormat.INT8, DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1),
           useNarrowAdd = true
         )

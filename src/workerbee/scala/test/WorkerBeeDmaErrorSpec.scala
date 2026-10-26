@@ -4,9 +4,9 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 /** 顶层真实 DMA rsp.fire 错误路由验证，特别区分 scaleA/bias/rqM 的共享物理端口。 */
-class HiveCoreDmaErrorSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveStatusPollApi {
-  import HiveSimCommon._
-  private val cfg = HiveCoreConfig(cW = 40, aBufferDepth = 256,
+class WorkerBeeDmaErrorSpec extends AnyFlatSpec with Matchers with ChiselSim with WbStatusPollApi {
+  import WbSimCommon._
+  private val cfg = WorkerBeeConfig(cW = 40, aBufferDepth = 256,
     bBufferDepth = 256, cBufferDepth = 256, scaleBufferDepth = 64)
   private val aBase = 0x10000L
   private val bBase = 0x20000L
@@ -18,11 +18,11 @@ class HiveCoreDmaErrorSpec extends AnyFlatSpec with Matchers with ChiselSim with
   private val rqBase = 0x80000L
   private val sources = Seq("A", "B", "C", "scaleA", "scaleB", "scaleC", "bias", "rqM")
 
-  behavior of "HiveCore DMA error interrupts"
+  behavior of "WorkerBee DMA error interrupts"
 
   for ((name, source) <- sources.zipWithIndex) {
     it should s"record $name early, retain inFlight, and finish with both error and done pending" in {
-      simulate(new HiveCore(cfg)) { dut =>
+      simulate(new WorkerBee(cfg)) { dut =>
         val reads = Seq(dut.io.dmaA, dut.io.dmaB, dut.io.dmaScaleA.get, dut.io.dmaScaleB.get)
         val writes = Seq(dut.io.dmaC, dut.io.dmaCScale.get)
         def quiesce(ready: Boolean): Unit = {
@@ -38,7 +38,7 @@ class HiveCoreDmaErrorSpec extends AnyFlatSpec with Matchers with ChiselSim with
         dut.io.cmd.foreach(_.valid.poke(false.B)); dut.io.resp.ready.poke(true.B)
         dut.reset.poke(true.B); dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
         def wr(a: Int, d: BigInt): Unit = {
-          transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, HiveCoreOp.REG_WRITE1, a, d0 = d)
+          transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, WorkerBeeOp.REG_WRITE1, a, d0 = d)
         }
         def rd(a: Int): BigInt = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, a)
         val intRun = source == 7
@@ -88,14 +88,14 @@ class HiveCoreDmaErrorSpec extends AnyFlatSpec with Matchers with ChiselSim with
             if (hit) injectedThisCycle = true
             hit
           }
-          def driveRead(port: HiveCoreDMAExtReadOnlyIF, eventSource: Int, data: BigInt): Unit = {
+          def driveRead(port: WorkerBeeDMAExtReadOnlyIF, eventSource: Int, data: BigInt): Unit = {
             if (port.req.valid.peek().litToBoolean) {
               val accepted = port.rsp.ready.peek().litToBoolean
               port.rsp.valid.poke(true.B); port.rsp.payload.data.poke(data.U)
               port.rsp.payload.err.poke((accepted && errorFor(eventSource)).B)
             }
           }
-          def driveWrite(port: HiveCoreDMAExtWriteOnlyIF, eventSource: Int): Unit = {
+          def driveWrite(port: WorkerBeeDMAExtWriteOnlyIF, eventSource: Int): Unit = {
             if (port.req.valid.peek().litToBoolean) {
               val accepted = port.rsp.ready.peek().litToBoolean
               port.rsp.valid.poke(true.B)

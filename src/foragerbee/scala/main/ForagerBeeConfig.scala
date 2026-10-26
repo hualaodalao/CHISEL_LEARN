@@ -28,7 +28,7 @@ case class ForagerBeeConfig(
     tileSize: Int = 8,
     maxBurstLen: Int = 64,
     dataWidth: Int = 128,
-    addressWidth: Int = 32,
+    addressWidth: Int = 40,
     channelTranspose: Seq[Boolean] = Seq.empty,
     channelPermute: Seq[Boolean] = Seq.empty,
     enableConversion: Boolean = false,    // 编译时开关：是否启用格式转换

@@ -1,4 +1,4 @@
-/** HiveMacFpLazy — 宽累加器 + 延迟规格化 浮点 MAC
+/** WbMacFpLazy — 宽累加器 + 延迟规格化 浮点 MAC
   *
   * 设计策略：累加路径（io.acc）跳过 LZC + 可变左移规格化，仅处理
   * 上溢（加法进位），从而节省面积；规格化仅在最终读出（io.out）时执行一次。
@@ -16,7 +16,7 @@
 import chisel3._
 import chisel3.util._
 
-class HiveMacFpLazy extends Module {
+class WbMacFpLazy extends Module {
   val io = IO(new Bundle {
     val a   = Input(UInt(32.W))   // fp32 multiplicand
     val b   = Input(UInt(32.W))   // fp32 multiplier

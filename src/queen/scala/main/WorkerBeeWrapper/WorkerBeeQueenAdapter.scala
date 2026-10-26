@@ -5,14 +5,14 @@ import chisel3.util._
 
 /*
 
-class HiveQueenAdapter(config: HiveConfig, qconfig: QueenConfig, fifoDepth: Int = 8) extends Module {
+class WorkerBeeQueenAdapter(config: WbConfig, qconfig: QueenConfig, fifoDepth: Int = 8) extends Module {
     val io = IO(new Bundle {
         val queenIf = Flipped(new QueenCpuInterface(qconfig))
-        val hiveReqIf  = master(Stream(new HiveCoreCmd))
-        val hiveRespIf = slave(Stream(new HiveCoreResp))
+        val wbReqIf  = master(Stream(new WorkerBeeCmd))
+        val wbRespIf = slave(Stream(new WorkerBeeResp))
         val error = input(Bool())
         val donePluse = input(Bool())
-        val tracingIf = output(new HiveCoreRespForTracing)
+        val tracingIf = output(new WorkerBeeRespForTracing)
     })
 
     
@@ -25,26 +25,26 @@ class HiveQueenAdapter(config: HiveConfig, qconfig: QueenConfig, fifoDepth: Int 
     io.queenIf.req.ready := queenQueue.io.push.ready
     
     
-    io.hiveReqIf.ready := queenQueue.io.push.ready
+    io.wbReqIf.ready := queenQueue.io.push.ready
 
     val busy = RegInit(false.B)    
     
     
     queenQueue.io.pop.ready := !busy
-    hiveReqIf.valid := false.B
-    hiveReqIf.bits := 0
+    wbReqIf.valid := false.B
+    wbReqIf.bits := 0
     
 
     
     switch(state) {
         is(sIDLE) {
             when(queenQueue.io.pop.fire & (qPayload.funct3 === 0.U || qPayload.funct3 === 1.U)){
-                hiveReqIf.valid := true.B
-                hiveReqIf.op := REG_WRITE2
-                hiveReqIf.reg0Addr := qPayload.rs1Addr
-                hiveReqIf.reg1Addr := qPayload.rs2Addr
-                hiveReqIf.data0 := qPayload.rs1
-                hiveReqIf.data1 := qPayload.rs2
+                wbReqIf.valid := true.B
+                wbReqIf.op := REG_WRITE2
+                wbReqIf.reg0Addr := qPayload.rs1Addr
+                wbReqIf.reg1Addr := qPayload.rs2Addr
+                wbReqIf.data0 := qPayload.rs1
+                wbReqIf.data1 := qPayload.rs2
                 when(qPayload.rs1(31,28) === 0.U){
                     popCnt :=  4
                 } otherwise {

@@ -11,7 +11,7 @@
   *     端口兼容 ≠ 语义等价：两者的数值契约不同（FpAdd = 逐位 bit-exact；本模块 = 三段式误差契约，
   *     见下方），饱和域行为也曾分歧（原钳 255 → fp32 NaN，task#18 A 项已修为钳 254 对齐 FpAdd）。
   *     只有在"A 项修复 + 接受误差契约"两个前提下才谈得上真正 drop-in。
-  * · 接入方式（task#18 B 项；★task#28 起类默认已翻转为 true）：HiveFusionMacFp 编译期参数 `useNarrowAdd: Boolean = true`
+  * · 接入方式（task#18 B 项；★task#28 起类默认已翻转为 true）：WbFusionMacFp 编译期参数 `useNarrowAdd: Boolean = true`
   *   —— **默认 true ⟹ 例化本模块（FpAddNarrow）**；须【显式 pin】false ⟹ 回退 FpAdd（已验证 bit-exact 基线）。
   *   护栏 `require(!useNarrowAdd || !hasFp)`：本模块只支持 MX-only（fp16-only 模式是 don't-care）。
   * · 适用域 = 【MX-only】融合 MAC（mxfp8 E4M3/E5M2 + mxfp4 E2M1，上游已去掉 fp16/bf16）。
@@ -151,7 +151,7 @@
   * ══════════════════════════════════════════════════════════════════════════════
   *   MX4 (is4x=1)          ：激活 {C, L0, L1, L2, L3} = 5 操作数（4 个 fp4 积【直接进树】，
   *                           取消 fp4BlockSum 的中间 LZC 规格化）。is4x=1 时 L1 亦有效
-  *                           （上游 HiveFusionMacFp 的 r1 = Mux(aIsMx2M1, fp8Mul.prod, 0)）。
+  *                           （上游 WbFusionMacFp 的 r1 = Mux(aIsMx2M1, fp8Mul.prod, 0)）。
   *   MX8 (is2x=1 && !is4x) ：激活 {C, L0, L1} = 3 操作数，L2/L3 掩零（掩零必须同时清 expEff，
   *                           否则陈旧/无关的 prodFp4_* 指数会抬高 E ⟹ 真实槽被整体下移 ⟹ 精度崩塌）。
   *   fp16-only (is2x=0 && is4x=0)：MX-only 下【不存在】⟹ don't-care。本实现退化为 {C, L0} 两操作数
@@ -180,7 +180,7 @@
   *          fp32 的 eField==255 是 Inf/NaN 保留域。饱和域（FpAdd.scala §9.1(c)）下乘积槽会溢出成
   *          Inf(eField=0xFF, mant23=0)，而本模块与 FpAdd 一样【只判零、不判 Inf】⟹ Inf 被当成
   *          "指数很大的有限数"吸收 ⟹ E=255 ⟹ expOut=255 且 mant31≠0 ⟹ 下游 fpNormalize40to32
-  *          按 (exp==255 && mant!=0) 归一化出 fp32 **NaN**（可观测故障：HiveFusionMacFpSpec 的
+  *          按 (exp==255 && mant!=0) 归一化出 fp32 **NaN**（可观测故障：WbFusionMacFpSpec 的
   *          饱和域 "output finite (no NaN/X)" 断言直接 FAIL）。钳到 254 后输出恒为有限值。
   *        ★【是否需要对乘积槽显式处理 Inf/NaN？——不需要，以 FpAdd 语义为准】
   *          FpAdd 同样不特判 Inf/NaN 槽（它把 eField=255 当大指数走完整条 lazyAdd），其"优雅降级"
@@ -371,27 +371,27 @@ class FpAddNarrow(cEffW: Int = 40, W: Int = FpAddNarrow.DefaultW) extends Module
   io.sum := (if (cEffW == 40) result40 else Cat(0.U((cEffW - 40).W), result40))
 }
 
-/** FpAddNarrow RTL 发射入口（对齐 HiveFusionMacFpElaborate 约定：withModulePrefix("Hive") +
+/** FpAddNarrow RTL 发射入口（对齐 WbFusionMacFpElaborate 约定：withModulePrefix("Wb") +
   * 每次发射前清空目标目录）。
   *
-  * 三档 W 各发一个独立目录：Chisel 不把构造参数附到模块名，三档顶层都叫 Hive_FpAddNarrow，
+  * 三档 W 各发一个独立目录：Chisel 不把构造参数附到模块名，三档顶层都叫 Wb_FpAddNarrow，
   * 发同一目录会互相覆盖（R10 同理）。目录用途：
-  *   · src/hive/verilog_narrow      —— W=19（默认，task#16 交付结构核对基准）
-  *   · src/hive/verilog_narrow_w16  —— W=16（精度下探 / 面积下界）
-  *   · src/hive/verilog_narrow_w22  —— W=22（精度上探 / 面积上界）
-  * A/B 面积-深度对照的基线 = src/hive/verilog_fusionfp_nofp16/Hive_FpAdd.sv（既有已验证版本）。
+  *   · src/workerbee/verilog_narrow      —— W=19（默认，task#16 交付结构核对基准）
+  *   · src/workerbee/verilog_narrow_w16  —— W=16（精度下探 / 面积下界）
+  *   · src/workerbee/verilog_narrow_w22  —— W=22（精度上探 / 面积上界）
+  * A/B 面积-深度对照的基线 = src/workerbee/verilog_fusionfp_nofp16/Wb_FpAdd.sv（既有已验证版本）。
   *
-  * ★ 本入口只发【独立模块】三档。系统级（HiveFusionMacFp 内例化）的 A/B/C 三配置对照由
-  *   HiveFusionMacFpElaborate 负责（task#18 C 项）：
-  *     · verilog_fusionfp/          默认（useNarrowAdd=false ⟹ Hive_FpAdd.sv）
-  *     · verilog_fusionfp_nofp16/   hasFp=false（useNarrowAdd=false ⟹ Hive_FpAdd.sv）
-  *     · verilog_fusionfp_narrow/   hasFp=false + useNarrowAdd=true ⟹ Hive_FpAddNarrow.sv
+  * ★ 本入口只发【独立模块】三档。系统级（WbFusionMacFp 内例化）的 A/B/C 三配置对照由
+  *   WbFusionMacFpElaborate 负责（task#18 C 项）：
+  *     · verilog_fusionfp/          默认（useNarrowAdd=false ⟹ Wb_FpAdd.sv）
+  *     · verilog_fusionfp_nofp16/   hasFp=false（useNarrowAdd=false ⟹ Wb_FpAdd.sv）
+  *     · verilog_fusionfp_narrow/   hasFp=false + useNarrowAdd=true ⟹ Wb_FpAddNarrow.sv
   *
   * ★【task#20(1) 重发射纪要】三档目录曾滞留 task#18 A 项修复【之前】的陈旧产物：钳位写成
   *   `(|(expRaw[9:8])) ? 8'hFF`（= 255，fp32 的 Inf/NaN 保留域 ⟹ 下游归一化成 NaN），
   *   与当前源 :360-361 的 `expRaw > ExpSatMax(254) ? 254 : expRaw(7,0)` 不一致。
-  *   已用当前源重发射，三档 Hive_FpAddNarrow.sv 现均为 `expRaw > 10'hFE ? 8'hFE`（254 钳位 ✓）。
-  *   · 一致性证据：verilog_narrow/ 与 verilog_fusionfp_narrow/ 的 Hive_FpAddNarrow.sv 做
+  *   已用当前源重发射，三档 Wb_FpAddNarrow.sv 现均为 `expRaw > 10'hFE ? 8'hFE`（254 钳位 ✓）。
+  *   · 一致性证据：verilog_narrow/ 与 verilog_fusionfp_narrow/ 的 Wb_FpAddNarrow.sv 做
   *     locator-normalized diff（剥 firtool 源码定位注释 + 压空白）后【仅差 clock/reset 端口声明】
   *     （独立顶层显式带 clock/reset，内嵌实例从父模块继承）⟹ 功能体逐字同硬件。
   *   · 【保留 w16/w22、不删除】的理由：(a) `.task17_verify/run.py:25` 的 DIRS 映射仍引用全部三档
@@ -419,13 +419,13 @@ object FpAddNarrowElaborate extends App {
   private def emit(w: Int, dir: String): Unit = {
     emitClean(dir)
     ChiselStage.emitSystemVerilogFile(
-      gen = withModulePrefix("Hive") { new FpAddNarrow(40, w) }
+      gen = withModulePrefix("Wb") { new FpAddNarrow(40, w) }
       , args = Array("--target-dir", dir)
     )
     println(s"[FpAddNarrowElaborate] W=$w -> $dir")
   }
 
-  emit(FpAddNarrow.DefaultW, "src/hive/verilog_narrow")     // W=19 默认
-  emit(16, "src/hive/verilog_narrow_w16")
-  emit(22, "src/hive/verilog_narrow_w22")
+  emit(FpAddNarrow.DefaultW, "src/workerbee/verilog_narrow")     // W=19 默认
+  emit(16, "src/workerbee/verilog_narrow_w16")
+  emit(22, "src/workerbee/verilog_narrow_w22")
 }

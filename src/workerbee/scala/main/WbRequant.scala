@@ -1,9 +1,9 @@
-/** HiveRequant — 【P0 epilogue-2】fused requant 独立数值模块（纯组合，totalN-lane 并行）。
+/** WbRequant — 【P0 epilogue-2】fused requant 独立数值模块（纯组合，totalN-lane 并行）。
   *
   * 计算链（TFLite 端侧后量化范式，gemmlowp RoundingDivideByPOT 约定）：
   *   y[i] = sat_fmt( round_half_up( acc[i] × M[i] >> shift ) + zp )
   *   - acc：INT32 累加槽二补码直读（可能已含 epilogue-1 bias 基底、ReLU clamp——
-  *     两者均在调用方 HiveOutCvt 的 int32Seq 源级完成，本模块不做 clamp）；
+  *     两者均在调用方 WbOutCvt 的 int32Seq 源级完成，本模块不做 clamp）；
   *   - M[i]：per-channel int32 乘子（N 轴向量，随 N-tile 由 Executor rqMRegs 供给）；
   *   - shift：per-tensor uint6 算术右移量 [0,63]；
   *   - zp：per-tensor int16 零点；
@@ -20,16 +20,16 @@
   * 数值域：|acc|,|M| < 2^31 ⟹ |prod| < 2^62，64-bit 乘积无溢出；+1/>>1/+zp 全链
   *   ≤ 66-bit，饱和钳位后落回 8/4-bit。
   *
-  * 例化约束：仅 cfg.hasInt 配置例化（见 HiveOutCvt）；模块本身无编译期格式门控。
+  * 例化约束：仅 cfg.hasInt 配置例化（见 WbOutCvt）；模块本身无编译期格式门控。
   * 打包契约：lane i 落 byte i（INT8，bits[8i+7:8i]）/ nibble i（INT4，bits[4i+3:4i]），
-  *   lane0 在最低位——与 HiveOutCvt packedInt8/packedInt4 的 Cat(.reverse) 同序。
+  *   lane0 在最低位——与 WbOutCvt packedInt8/packedInt4 的 Cat(.reverse) 同序。
   */
 
 import chisel3._
 import chisel3.util._
 
-class HiveRequant(cfg: HiveCoreConfig) extends Module {
-  require(cfg.totalN >= 1, s"HiveRequant: totalN(${cfg.totalN}) must be >= 1")
+class WbRequant(cfg: WorkerBeeConfig) extends Module {
+  require(cfg.totalN >= 1, s"WbRequant: totalN(${cfg.totalN}) must be >= 1")
 
   val io = IO(new Bundle {
     /** INT32 累加槽（二补码位型；低列号在低 lane） */

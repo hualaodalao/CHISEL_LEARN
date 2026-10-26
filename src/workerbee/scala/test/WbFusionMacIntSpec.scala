@@ -1,6 +1,6 @@
-/** HiveFusionMacIntSpec -- INT8 dual-lane / INT4 quad-lane unit test
+/** WbFusionMacIntSpec -- INT8 dual-lane / INT4 quad-lane unit test
   *
-  * Golden reference: pure Scala BigInt computation (no HiveDebugModel dependency).
+  * Golden reference: pure Scala BigInt computation (no WbDebugModel dependency).
   * Timing contract: fmt uses RegNext => step(1) after poke to settle.
   * Overflow semantics: truncation wrap-around (two's complement, no clamping).
   */
@@ -13,7 +13,7 @@ import org.scalatest.matchers.should.Matchers
 
 import scala.util.Random
 
-class HiveFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
+class WbFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   // Plain verilator backend (no trace, no lz4 dependency)
   implicit val plainVerilator: HasSimulator =
@@ -109,7 +109,7 @@ class HiveFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
   // ===========================================================================
   // Block 1: INT8 dual-lane positive tests (>= 20 vectors)
   // ===========================================================================
-  behavior of "HiveFusionMacInt INT8 dual-lane"
+  behavior of "WbFusionMacInt INT8 dual-lane"
 
   it should "compute INT8 dual-lane MAC correctly for boundary and random vectors" in {
     val rng = new Random(42)
@@ -147,7 +147,7 @@ class HiveFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
     val allVecs = boundaryVecs ++ randomVecs
     assert(allVecs.size >= 20, s"Need >= 20 vectors, got ${allVecs.size}")
 
-    simulate(new HiveFusionMacInt()) { dut =>
+    simulate(new WbFusionMacInt()) { dut =>
       // Reset
       dut.reset.poke(true.B)
       dut.io.a.poke(0.U)
@@ -179,14 +179,14 @@ class HiveFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
             f"expected=0x${expected.toString(16)} actual=0x${actual.toString(16)}")
         pass += 1
       }
-      println(s"[HiveFusionMacIntSpec] INT8 dual-lane PASS $pass/${allVecs.size}")
+      println(s"[WbFusionMacIntSpec] INT8 dual-lane PASS $pass/${allVecs.size}")
     }
   }
 
   // ===========================================================================
   // Block 2: INT4 quad-lane positive tests (>= 20 vectors)
   // ===========================================================================
-  behavior of "HiveFusionMacInt INT4 quad-lane"
+  behavior of "WbFusionMacInt INT4 quad-lane"
 
   it should "compute INT4 quad-lane MAC correctly for boundary and random vectors" in {
     val rng = new Random(123)
@@ -222,7 +222,7 @@ class HiveFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
     val allVecs = boundaryVecs ++ randomVecs
     assert(allVecs.size >= 20, s"Need >= 20 vectors, got ${allVecs.size}")
 
-    simulate(new HiveFusionMacInt()) { dut =>
+    simulate(new WbFusionMacInt()) { dut =>
       dut.reset.poke(true.B)
       dut.io.a.poke(0.U)
       dut.io.b.poke(0.U)
@@ -253,14 +253,14 @@ class HiveFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
             f"expected=0x${expected.toString(16)} actual=0x${actual.toString(16)}")
         pass += 1
       }
-      println(s"[HiveFusionMacIntSpec] INT4 quad-lane PASS $pass/${allVecs.size}")
+      println(s"[WbFusionMacIntSpec] INT4 quad-lane PASS $pass/${allVecs.size}")
     }
   }
 
   // ===========================================================================
   // Block 3: Truncation wrap-around semantics
   // ===========================================================================
-  behavior of "HiveFusionMacInt truncation wrap-around"
+  behavior of "WbFusionMacInt truncation wrap-around"
 
   it should "wrap around correctly when result overflows cEffW=40 bits" in {
     // 2^39 - 1 = max positive for 40-bit signed
@@ -279,7 +279,7 @@ class HiveFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
       (pack8(-1, 0), pack8(1, 0), cRegPoke(minNeg40), "int8_wrap_to_max")
     )
 
-    simulate(new HiveFusionMacInt()) { dut =>
+    simulate(new WbFusionMacInt()) { dut =>
       dut.reset.poke(true.B)
       dut.io.a.poke(0.U)
       dut.io.b.poke(0.U)
@@ -303,7 +303,7 @@ class HiveFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
         assert(actual == expected,
           f"[wrap $tag] FAIL: a=0x${a.toHexString} b=0x${b.toHexString} " +
             f"expected=0x${expected.toString(16)} actual=0x${actual.toString(16)}")
-        println(f"[HiveFusionMacIntSpec] wrap $tag PASS: sum=0x${actual.toString(16)}")
+        println(f"[WbFusionMacIntSpec] wrap $tag PASS: sum=0x${actual.toString(16)}")
       }
     }
 
@@ -314,7 +314,7 @@ class HiveFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
       (pack4(-8, -8, -8, -8), pack4(7, 7, 7, 7), cRegPoke(minNeg40), "int4_overflow_neg")
     )
 
-    simulate(new HiveFusionMacInt()) { dut =>
+    simulate(new WbFusionMacInt()) { dut =>
       dut.reset.poke(true.B)
       dut.io.a.poke(0.U)
       dut.io.b.poke(0.U)
@@ -338,7 +338,7 @@ class HiveFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
         assert(actual == expected,
           f"[wrap $tag] FAIL: a=0x${a.toHexString} b=0x${b.toHexString} " +
             f"expected=0x${expected.toString(16)} actual=0x${actual.toString(16)}")
-        println(f"[HiveFusionMacIntSpec] wrap $tag PASS: sum=0x${actual.toString(16)}")
+        println(f"[WbFusionMacIntSpec] wrap $tag PASS: sum=0x${actual.toString(16)}")
       }
     }
   }
@@ -346,42 +346,42 @@ class HiveFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
   // ===========================================================================
   // Block 4: require guard negative tests (elaboration-time failures)
   // ===========================================================================
-  behavior of "HiveFusionMacInt require guards"
+  behavior of "WbFusionMacInt require guards"
 
   it should "REJECT empty supportedFmts at elaboration time" in {
     val ex = intercept[IllegalArgumentException] {
       _root_.circt.stage.ChiselStage.emitSystemVerilog(
-        new HiveFusionMacInt(16, 16, 40, Set.empty)
+        new WbFusionMacInt(16, 16, 40, Set.empty)
       )
     }
     ex.getMessage should include("at least one INT format required")
-    println(s"[HiveFusionMacIntSpec] require guard (empty fmts) PASS: ${ex.getMessage.take(80)}")
+    println(s"[WbFusionMacIntSpec] require guard (empty fmts) PASS: ${ex.getMessage.take(80)}")
   }
 
   it should "REJECT aW < 16 at elaboration time" in {
     val ex = intercept[IllegalArgumentException] {
       _root_.circt.stage.ChiselStage.emitSystemVerilog(
-        new HiveFusionMacInt(8, 16, 40, Set(DataFormat.INT8))
+        new WbFusionMacInt(8, 16, 40, Set(DataFormat.INT8))
       )
     }
     ex.getMessage should include("16-bit operands")
-    println(s"[HiveFusionMacIntSpec] require guard (aW<16) PASS: ${ex.getMessage.take(80)}")
+    println(s"[WbFusionMacIntSpec] require guard (aW<16) PASS: ${ex.getMessage.take(80)}")
   }
 
   it should "REJECT bW < 16 at elaboration time" in {
     val ex = intercept[IllegalArgumentException] {
       _root_.circt.stage.ChiselStage.emitSystemVerilog(
-        new HiveFusionMacInt(16, 8, 40, Set(DataFormat.INT4))
+        new WbFusionMacInt(16, 8, 40, Set(DataFormat.INT4))
       )
     }
     ex.getMessage should include("16-bit operands")
-    println(s"[HiveFusionMacIntSpec] require guard (bW<16) PASS: ${ex.getMessage.take(80)}")
+    println(s"[WbFusionMacIntSpec] require guard (bW<16) PASS: ${ex.getMessage.take(80)}")
   }
 
   // ===========================================================================
   // Block 5: INT8-only and INT4-only configurations
   // ===========================================================================
-  behavior of "HiveFusionMacInt single-format configurations"
+  behavior of "WbFusionMacInt single-format configurations"
 
   it should "work correctly with INT8-only configuration (supportedFmts = Set(INT8))" in {
     val rng = new Random(77)
@@ -394,7 +394,7 @@ class HiveFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
       (pack8(aLo, aHi), pack8(bLo, bHi), cRegPoke(cVal))
     }
 
-    simulate(new HiveFusionMacInt(supportedFmts = Set(DataFormat.INT8))) { dut =>
+    simulate(new WbFusionMacInt(supportedFmts = Set(DataFormat.INT8))) { dut =>
       dut.reset.poke(true.B)
       dut.io.a.poke(0.U)
       dut.io.b.poke(0.U)
@@ -421,7 +421,7 @@ class HiveFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
             f"expected=0x${expected.toString(16)} actual=0x${actual.toString(16)}")
         pass += 1
       }
-      println(s"[HiveFusionMacIntSpec] INT8-only config PASS $pass/${vecs.size}")
+      println(s"[WbFusionMacIntSpec] INT8-only config PASS $pass/${vecs.size}")
     }
   }
 
@@ -436,7 +436,7 @@ class HiveFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
        cRegPoke(cVal))
     }
 
-    simulate(new HiveFusionMacInt(supportedFmts = Set(DataFormat.INT4))) { dut =>
+    simulate(new WbFusionMacInt(supportedFmts = Set(DataFormat.INT4))) { dut =>
       dut.reset.poke(true.B)
       dut.io.a.poke(0.U)
       dut.io.b.poke(0.U)
@@ -463,7 +463,7 @@ class HiveFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
             f"expected=0x${expected.toString(16)} actual=0x${actual.toString(16)}")
         pass += 1
       }
-      println(s"[HiveFusionMacIntSpec] INT4-only config PASS $pass/${vecs.size}")
+      println(s"[WbFusionMacIntSpec] INT4-only config PASS $pass/${vecs.size}")
     }
   }
 }

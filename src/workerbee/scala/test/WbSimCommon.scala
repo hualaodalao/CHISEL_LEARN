@@ -1,8 +1,8 @@
-/** HiveCore 仿真测试公共工具：FP16 位模式转换、矩阵文件落盘、
-  * FP32 bit 解析与 FST 波形拷贝。由 HiveCoreSimCase 与
-  * HiveCoreSimCaseLoadWSpec 共用（自两者逐字等价抽取，
+/** WorkerBee 仿真测试公共工具：FP16 位模式转换、矩阵文件落盘、
+  * FP32 bit 解析与 FST 波形拷贝。由 WorkerBeeSimCase 与
+  * WorkerBeeSimCaseLoadWSpec 共用（自两者逐字等价抽取，
   * 差异处以功能更全的一份为准）。
-  * 格式编码统一经 HiveEnum.DataFormat 枚举派生常量驱动（见 object 开头
+  * 格式编码统一经 WbEnum.DataFormat 枚举派生常量驱动（见 object 开头
   * 常量区）；【任务104】fmt 相关公开 API 入参已由 Int 编码迁移为
   * DataFormat.Type 枚举（避免枚举再改编号后调用点静默错位）；控制字
   * 位域打包等仍需整型的场景由调用方以 fmt.litValue.toInt 收敛。
@@ -14,11 +14,11 @@ import chisel3.simulator.scalatest.HasCliOptions
 import java.io._
 import java.nio.file._
 
-object HiveSimCommon {
+object WbSimCommon {
 
   // ========== DataFormat 枚举派生常量（格式编码唯一源） ==========
-  // OutFormat/DataFormat 已合并为单一 DataFormat 枚举（src/hive/scala/main/
-  // HiveEnum.scala），成员声明即隐式 id 顺延：FP32=0 FP16=1 BF16=2 MXE4M3=3
+  // OutFormat/DataFormat 已合并为单一 DataFormat 枚举（src/workerbee/scala/main/
+  // WbEnum.scala），成员声明即隐式 id 顺延：FP32=0 FP16=1 BF16=2 MXE4M3=3
   // MXE5M2=4 MXE2M1=5 INT32=6 INT16=7 INT8=8 INT4=9 FP8E4M3=10 FP8E5M2=11。
   // 【P2 纯 FP8】FP8 两码点不进下方任何 Fmt 分档集合：本组集合服务【输出格式】
   // 域（cOutElemBits 等），而 cFmt=FP8 被硬件 errCode3 链尾臂运行期拒绝 ⟹
@@ -35,9 +35,9 @@ object HiveSimCommon {
   private val FmtInt8   = DataFormat.INT8.litValue.toInt
   private val FmtInt4   = DataFormat.INT4.litValue.toInt
 
-  // 格式族集合（Scala 级，与 HiveEnum 谓词语义对齐，用于元素位宽/字节分档）：
+  // 格式族集合（Scala 级，与 WbEnum 谓词语义对齐，用于元素位宽/字节分档）：
   //   4B 族 = is4B = {FP32,INT32}；2B 族 = is2B ∪ {INT16}（INT16 输出同为
-  //     2B/元素，与 HiveOutCvt 选段 packedInt16 同档；is2B 谓词仅覆盖输入侧
+  //     2B/元素，与 WbOutCvt 选段 packedInt16 同档；is2B 谓词仅覆盖输入侧
   //     浮点 2B 族）；1B 族 = is1B = {INT8,MXE4M3,MXE5M2}；
   //     半字节族 = isHalfB = {INT4,MXE2M1}。
   // 未知编码不在任何集合 → 默认臂 32-bit 档回落（原 reserved 默认臂语义不变）。
@@ -173,8 +173,8 @@ object HiveSimCommon {
     * （Suite/behavior/test 名中空格转 `-`）。
     *
     * @param traceSource ChiselSim 生成的 trace.fst 相对路径
-    * @param traceTarget 目标文件路径（如 sim/hivecore_sim.fst）
-    * @param tag         日志前缀（如 HiveCoreSimCase）
+    * @param traceTarget 目标文件路径（如 sim/workerbee_sim.fst）
+    * @param tag         日志前缀（如 WorkerBeeSimCase）
     */
   def copyTrace(traceSource: String, traceTarget: String, tag: String): Unit = {
     val src = Paths.get(traceSource)
@@ -212,24 +212,24 @@ object HiveSimCommon {
   val IRQ_ALL = 0x7FF
   val POLL_PERIOD: Int = 16
 
-  final case class HiveStatusBits(busy: Boolean, inFlight: Boolean, progress: Int)
-  def decodeStatus(data: BigInt): HiveStatusBits = HiveStatusBits(
+  final case class WbStatusBits(busy: Boolean, inFlight: Boolean, progress: Int)
+  def decodeStatus(data: BigInt): WbStatusBits = WbStatusBits(
     busy = data.testBit(0), inFlight = data.testBit(2),
     progress = ((data >> 16) & 0xFFFF).toInt
   )
 
   /** IRQ_RAW 独立解码；config code 必须另读 ERROR_CODE，不拼接伪 STATUS。 */
-  final case class HiveIrqBits(raw: BigInt) {
+  final case class WbIrqBits(raw: BigInt) {
     def done: Boolean = raw.testBit(0)
     def configError: Boolean = raw.testBit(1)
     def dmaErrors: BigInt = (raw >> 2) & 0xFF
     def writeConflict: Boolean = raw.testBit(10)
     def anyError: Boolean = (raw & 0x7FE) != 0
   }
-  def decodeIrq(data: BigInt): HiveIrqBits = HiveIrqBits(data)
+  def decodeIrq(data: BigInt): WbIrqBits = WbIrqBits(data)
 
   // ========== MX (MXFP8 / MXFP4) 转换 helper ==========
-  // 逐字镜像 Fp32.mxToFp32（src/hive/scala/main/Fp32.scala）的数值语义，
+  // 逐字镜像 Fp32.mxToFp32（src/workerbee/scala/main/Fp32.scala）的数值语义，
   // 作为 P5 MX 用例 golden GEMM 的软件参考模型。任何偏差都会导致 golden 与
   // 硬件失配，故本实现必须与硬件同源同语义（subnormal→0、inf/nan/overflow→
   // fp32Max 保号、underflow→0、normal=sign*2^(e+scale-bias-127)*(1+m/2^mantW)）。
@@ -311,7 +311,7 @@ object HiveSimCommon {
   /** 暴力编码：在 [0,256) 内挑选「非 inf/nan」的 MX 字节，使 mxToFloat(byte, 127)
     * （即 scale-free 内蕴值）最接近 f。返回的字节表示 f 的量化值；配合独立的
     * E8M0 scale，真实值 = mxToFloat(byte, scaleByte)。inf/nan 编码被排除，
-    * 从而 B 权重经 loadW 走 a 链时也不会触发 MX 转换（原 HiveCvtOpMx，已随 FusionMac
+    * 从而 B 权重经 loadW 走 a 链时也不会触发 MX 转换（原 WbCvtOpMx，已随 FusionMac
     * 重构删除、现由 FpCvt 的 mx8 cvt 承接）的 aFmt inf/nan 断言。
     */
   private def floatToMx(f: Double, expW: Int, mantW: Int, bias: Int,
@@ -342,8 +342,8 @@ object HiveSimCommon {
   def floatToMxE5M2(f: Double): Int = floatToMx(f, expW = 5, mantW = 2, bias = 15, nanNeedMantAllOne = false)
 
   // ========== P2 软件参考模型：40→32 规格化 + fp32→fp16/bf16 降精度 ==========
-  // 与 HiveOutCvt 硬件（roundUp16 / fp32ToFp16Rnd / fp32ToBf16Rnd）及
-  // Fp32.fpNormalize40to32 逐位同构，作为 HiveOutCvtSpec 与 outFmt 仿真用例的
+  // 与 WbOutCvt 硬件（roundUp16 / fp32ToFp16Rnd / fp32ToBf16Rnd）及
+  // Fp32.fpNormalize40to32 逐位同构，作为 WbOutCvtSpec 与 outFmt 仿真用例的
   // golden 对拍模型。rnd 编码与 RoundingMode ChiselEnum 同源：
   //   0=RNE 1=RTZ 2=RDN 3=RUP 4=RMM
 
@@ -440,7 +440,7 @@ object HiveSimCommon {
   }
 
   // ========== P3 C 写回密集布局公共模型（256-bit 密集拍，四套件共用） ==========
-  // 与硬件 P0-P2 新架构逐拍同源（HiveCore calcConfig 单式 + HiveCoreDmaWrOnly
+  // 与硬件 P0-P2 新架构逐拍同源（WorkerBee calcConfig 单式 + WorkerBeeDmaWrOnly
   // 运行期拍数解码）：
   //   元素位宽档（DataFormat 编码，格式族集合见 object 开头常量区）：
   //     FP32/INT32/未知回落=32、FP16/BF16/INT16=16、MXE4M3/MXE5M2/INT8=8、
@@ -453,12 +453,12 @@ object HiveSimCommon {
   //     （半字节族 = cDmaExtW/8）；块间跳转按张量语义绝对式 = nt×cColOff（#133：
   //     旧「沿用 cDma sNEXT_N 三角累积闭式（金锚背书）」表述已废止——三角累积是当时
   //     缺陷 RTL 的行为、金锚不得以其为拟合目标；RTL 与金锚现同为线性/绝对模型）。
-  // 编码 = HiveEnum.DataFormat 枚举 litValue（OutFormat/DataFormat 已合并为单一
+  // 编码 = WbEnum.DataFormat 枚举 litValue（OutFormat/DataFormat 已合并为单一
   //   枚举，成员声明即隐式 id：0=FP32 1=FP16 2=BF16 3=MXE4M3 4=MXE5M2 5=MXE2M1
   //   6=INT32 7=INT16 8=INT8 9=INT4）；未知编码不在任何格式族集合 → 32-bit 档回落。
 
   /** outFmt（DataFormat 枚举）→ 元素位宽（32/16/8/4），与硬件
-    * HiveCoreCalcConfig cWriteBytes 谓词链（is4B/is2B/is1B/otherwise）同源 */
+    * WorkerBeeCalcConfig cWriteBytes 谓词链（is4B/is2B/is1B/otherwise）同源 */
   def cOutElemBits(outFmt: DataFormat.Type): Int = {
     val f = outFmt.litValue.toInt
     if (Fmt4B.contains(f)) 32
@@ -486,7 +486,7 @@ object HiveSimCommon {
     *
     * 【#136-KS5 精确化订正：原「与顶层 calcConfig.cBeatAddrStep 同源」的无条件声明不成立】
     *   金锚本式：半字节族 = cDmaExtW/8；其余 = (cDmaExtW/elemBits)×elemBytes。
-    *   RTL（HiveCoreCalcConfig）：cBeatAddrStep = if (cWriteBytes > cDmaBytes) cDmaBytes
+    *   RTL（WorkerBeeCalcConfig）：cBeatAddrStep = if (cWriteBytes > cDmaBytes) cDmaBytes
     *     else cWriteBytes，其中 cWriteBytes = totalN×cEb（半字节族 = totalN/2）、
     *     cDmaBytes = cDmaExtW/8。
     *   ★ 结论：在【beats>1 的全部档位】两式恒等；1B 与半字节族数值分歧，但该分歧
@@ -495,7 +495,7 @@ object HiveSimCommon {
     *     ⟺ cWriteBytes > cDmaBytes（cWriteBytes = totalN×elemBits/8、cDmaBytes =
     *     cDmaExtW/8，同乘 8）。故 beats>1 时 RTL 取 cDmaBytes = cDmaExtW/8，而金锚在
     *     整字节族满足 elemBits = 8×cEb，(cDmaExtW/elemBits)×cEb = cDmaExtW/8，两式相等。
-    *     反向：HiveCoreConfig 强制 cDmaExtW ∈ [totalN×8, totalN×32]，故 elemBits<=8 时
+    *     反向：WorkerBeeConfig 强制 cDmaExtW ∈ [totalN×8, totalN×32]，故 elemBits<=8 时
     *     totalN×elemBits <= totalN×8 <= cDmaExtW ⇒ beats≡1 ⇒ 行内拍下标 b≡0 ⇒
     *     b×step 项恒为 0，step 从不进入任何地址（数值分歧不可观测）。
     *   分歧实例（仅记录，勿改）：cDmaExtW=256 的 1B 档金锚 32 vs RTL cWriteBytes=16；
@@ -513,7 +513,7 @@ object HiveSimCommon {
     *   addr(nt,m,b) = base + nt×cColOff + m×cRowOff + b×cBeatAddrStep
     *
     * 【规范性声明（#133，勿删）】本函数是金锚（oracle）：期望值只允许由 C 的张量语义
-    * 布局推导，【禁止】以 HiveCoreDmaWrOnly 的 RTL 行为为拟合目标。推导如下——
+    * 布局推导，【禁止】以 WorkerBeeDmaWrOnly 的 RTL 行为为拟合目标。推导如下——
     * C 为 M×N row-major，元素 cOutElemBytes 字节（半字节族两列打包一字节，故行/列
     * 步进各减半）：addr(C[i][j]) = base + j×cEb + i×(N×cEb)。写回按 n-tile 分块，
     * 第 nt 块的首列 j = nt×totalN ⇒ 块列偏移 = nt×cColOff（cColOff = totalN×cEb）；
@@ -526,7 +526,7 @@ object HiveSimCommon {
     * 反向拟合，使所有 nTiles≥2 用例的 dmaC 逐拍地址硬断言退化为「RTL 与其镜像自比」
     * 而恒真假绿（FP32/N=32 下 nt=1 首址手算得 base+0xFC0，正确值应为 base+0x40）。
     * RTL 侧已改为 `curAddr := io.regFile.cAddr + colAddr`（基址 + 轮偏移线性模型，与
-    * HiveCoreDmaScaleWr 同构），本式随之回到张量语义绝对式。下方两条 require 是本式
+    * WorkerBeeDmaScaleWr 同构），本式随之回到张量语义绝对式。下方两条 require 是本式
     * 的自证不变式：任何三角化回退都会在【金锚构造期】立刻炸掉（即 Scala 测试体求值、
     * 调用本函数的时刻，早于 simulate；既非 scalac 编译期亦非 Chisel elaboration 期），
     * 【不得注释掉】。其证伪边界（m==1 ∧ nTiles==2 的可证明盲区）见下方 require 段注释。
@@ -556,9 +556,9 @@ object HiveSimCommon {
     //   与绝对式的 nt 系数在 nt=1 也恰为 1（两者仅在 nt>=2 才分歧：三角 3 vs 绝对 2）。
     //   而 nTiles==2 ⇒ nt 只取 {0,1} ⇒ 两式产出【逐拍完全相同】的序列，不存在任何
     //   可区分它们的不变式（provably blind，不是「暂未想到反例」）。
-    //   可达性：HiveDebugModel.validate 只要求 m>0，故 `-Dm=1 -Dn=32` 是合法配置。
+    //   可达性：WbDebugModel.validate 只要求 m>0，故 `-Dm=1 -Dn=32` 是合法配置。
     //   ★ 声明：m==1 不在本护栏覆盖域内。要覆盖 nt=2 的二阶项必须同时满足 m>=2 且
-    //     nTiles>=3（永久护栏用例 = HiveCoreDebugCase 组(f)：m=32, N=48）。
+    //     nTiles>=3（永久护栏用例 = WorkerBeeDebugCase 组(f)：m=32, N=48）。
     //   ★ nt=2 那条 require 的守卫【不得】为了覆盖 m==1 而放宽到 nTiles>=2：其下标
     //     buf(2*m*beats) 在 m==1 ∧ nTiles==2 时 = 2*beats，而序列长度恰为
     //     nTiles*m*beats = 2*beats ⇒ IndexOutOfBoundsException，把「盲区」变成「崩溃」，
@@ -866,7 +866,7 @@ object HiveSimCommon {
     * 中间量位宽：seg 为 cDmaExtW 位，左移最多 (dmaBytes-1)×8 = cDmaExtW-8 位 ⟹ 展宽到
     *   2×cDmaExtW-8 位，故末尾显式 & 掩码截回 cDmaExtW 位（与 RTL 的 (cDmaExtW-1,0) 同义）。
     * 【laneOffsetBytes 必须由金锚期望地址推出】调用方应传
-    *   HiveSimCommon.cLaneOffset(expCAddrSeq(beatIdx), cDmaExtW)，【不得】传硬件实收 addr
+    *   WbSimCommon.cLaneOffset(expCAddrSeq(beatIdx), cDmaExtW)，【不得】传硬件实收 addr
     *   —— 后者会把金锚退化成 RTL 的镜像（金锚铁律）。 */
   def denseRowBeat(row: BigInt, beatInRow: Int, cDmaExtW: Int, laneOffsetBytes: Int): BigInt = {
     val wMask = (BigInt(1) << cDmaExtW) - 1
@@ -885,10 +885,10 @@ object HiveSimCommon {
   // 舍入判定复用上方 swRoundUp（5 模式、RMM=guard，与硬件同源同链：
   // 40→32 固定简化 RNE 规格化 + 量化运行期 rnd，两级舍入链）。
   // fmt 编码 = DataFormat 枚举 litValue，量化白名单 = isMx 族
-  // {MXE4M3, MXE5M2, MXE2M1}（与 HiveOutCvt isQuantFmt = DataFormat.isMx 同源）。
+  // {MXE4M3, MXE5M2, MXE2M1}（与 WbOutCvt isQuantFmt = DataFormat.isMx 同源）。
 
-  /** 量化格式参数表：复用 HiveEnum.MxFormatParams 三单例（字段语义与边界数值
-    * 注释统一收敛于 HiveEnum.scala，逐字段镜像既有内联字面量；此处仅按 fmt
+  /** 量化格式参数表：复用 WbEnum.MxFormatParams 三单例（字段语义与边界数值
+    * 注释统一收敛于 WbEnum.scala，逐字段镜像既有内联字面量；此处仅按 fmt
     * 编码选表，杜绝双源漂移）：
     *   E4M3：maxFinite=448=1.75×2^8，NaN 需 exp&mant 全1（0x7F），饱和 0x7E，
     *         maxMantVal=1.75（mant 全1 是 NaN 不可用，尾数域比较门限=0.75→0x600000）；
@@ -898,7 +898,7 @@ object HiveSimCommon {
     *   E2M1：maxFinite=6.0=1.5×2^2，无 inf/nan 编码（exp 全1 仍为正常数），
     *         nan 输入裁定饱和（0x7），maxMantVal=1.5（尾数域比较门限=0.5→0x400000）。
     * maxNormalExp（swQuantElem 溢出判据）与 maxCodeExp 共用单字段（三格式取值
-    * 恰一致：E4M3=15/E5M2=30/E2M1=3，见 HiveEnum.MxFormatParams 注释）。 */
+    * 恰一致：E4M3=15/E5M2=30/E2M1=3，见 WbEnum.MxFormatParams 注释）。 */
   private def quantFmtParams(fmt: DataFormat.Type): MxFormatParams = fmt.litValue.toInt match {
     case FmtMxE4M3 => MxFormatParams.E4M3
     case FmtMxE5M2 => MxFormatParams.E5M2
@@ -927,7 +927,7 @@ object HiveSimCommon {
     * inf→饱和、nan→目标编码（E2M1 无 nan 编码裁定饱和）、零→±0。
     *
     * @param emitSub (#151 F4) 是否产出【次正规码】。true 仅在 fmt=MXE2M1 时由 swQuantBlock
-    *        传入，与 RTL 侧 HiveOutCvt.quantElem 的同名形参【一一对称】。
+    *        传入，与 RTL 侧 WbOutCvt.quantElem 的同名形参【一一对称】。
     *        OCP MX 规范把 E2M1 的 (e=0,m=1) 定义为 0.m × 2^(1-bias) = ±0.5，是合法可编码值
     *        （E2M1 值集 ±{0,0.5,1,1.5,2,3,4,6}）；原实现 eTgt<1 一律冲刷保号零 ⟹ 码 0x1/0x9
     *        永不发射。E4M3/E5M2 是否同步放开属独立待裁项，本轮【不扩大范围】。 */
@@ -948,7 +948,7 @@ object HiveSimCommon {
     }
     val eTgt = e + bias - s                                   // ÷2^(s-127) ⟺ 目标偏置指数 = e + bias - s
     // ----------------------------------------------------------------------
-    // (#151 F4) OCP MX 次正规产出臂（仅 E2M1）——与 RTL HiveOutCvt.quantElem 的
+    // (#151 F4) OCP MX 次正规产出臂（仅 E2M1）——与 RTL WbOutCvt.quantElem 的
     //   subKeep/subGuard/subSticky/subUp/subRnd/subCarry/subCode 逐行对称。
     //   设 y = |x|/S = 1.f × 2^(eTgt-1)，f = 0.m（23 位）。次正规区覆盖两个 binade：
     //     eTgt =  0 → y ∈ [0.5, 1.0)  网格 {0.5, 1.0}  中点 0.75   shift = 1
@@ -975,7 +975,7 @@ object HiveSimCommon {
       return signPart | subRnd                                // 码 (e=0,m=subRnd)：0 → ±0，1 → ±0.5
     }
     // ----------------------------------------------------------------------
-    // (#151 F4-b) 定向舍入【深下溢】进位臂（仅 E2M1）——与 RTL HiveOutCvt.quantElem 的
+    // (#151 F4-b) 定向舍入【深下溢】进位臂（仅 E2M1）——与 RTL WbOutCvt.quantElem 的
     //   dirAway/deepSel/deepCode 逐行对称。IEEE-754 roundTowardNegative/roundTowardPositive
     //   的定义是「取不超过 / 不低于 x 的【最接近】可表示值」，它不是幅值截断 ⟹ 对任意非零 x，
     //   只要定向把幅值推离零，结果就必须是最小非零可表示值 ±0.5 = 码 (e=0,m=1)，不是保号零：
@@ -1038,7 +1038,7 @@ object HiveSimCommon {
       case _ => l32(i / 32)
     }
     def scaleOf(amax: Long): Int = swBlockScale(amax, maxCodeExp, bias, maxMant23)
-    // (#151 F4) 次正规产出开关：仅 MXE2M1 打开，与 RTL 侧 HiveOutCvt 中「q2Seq 是唯一传
+    // (#151 F4) 次正规产出开关：仅 MXE2M1 打开，与 RTL 侧 WbOutCvt 中「q2Seq 是唯一传
     //   emitSub=true 的例化点」严格对称。E4M3/E5M2 恒 false ⟹ 金锚这两路的码流与 #151
     //   之前【逐位相同】。本行是 swQuantBlock 在 #151 的唯一新增；blkSel/amax 层级/
     //   scaleBytes 分组/padding 掩码语义一字未动。
@@ -1064,8 +1064,8 @@ object HiveSimCommon {
 /** 命令握手及无额外 step 的轮询助手。DMA 主循环可独立轮询 STATUS 或 IRQ_RAW。
   * START 不清 RAW：每次任务先 W1C 清除，再取消 mask，然后发 START。
   */
-trait HiveStatusPollApi extends chisel3.simulator.PeekPokeAPI {
-  def pokeRegCommand(cmd: Stream[HiveCoreCmd], op: HiveCoreOp.Type,
+trait WbStatusPollApi extends chisel3.simulator.PeekPokeAPI {
+  def pokeRegCommand(cmd: Stream[WorkerBeeCmd], op: WorkerBeeOp.Type,
                      r0: Int, r1: Int = 0, d0: BigInt = 0, d1: BigInt = 0,
                      pc: BigInt = 0, tag: Int = 0): Unit = {
     cmd.valid.poke(true.B)
@@ -1079,8 +1079,8 @@ trait HiveStatusPollApi extends chisel3.simulator.PeekPokeAPI {
   }
 
   /** 完整事务：采样有效响应后才消费，避免读回落在 resp.fire 后一拍。 */
-  def transactReg(clock: Clock, cmd: Stream[HiveCoreCmd], resp: Stream[HiveCoreResp],
-                  op: HiveCoreOp.Type, r0: Int, r1: Int = 0,
+  def transactReg(clock: Clock, cmd: Stream[WorkerBeeCmd], resp: Stream[WorkerBeeResp],
+                  op: WorkerBeeOp.Type, r0: Int, r1: Int = 0,
                   d0: BigInt = 0, d1: BigInt = 0, expectedErr: Boolean = false): BigInt = {
     resp.ready.poke(true.B)
     pokeRegCommand(cmd, op, r0, r1, d0, d1)
@@ -1098,18 +1098,18 @@ trait HiveStatusPollApi extends chisel3.simulator.PeekPokeAPI {
     data
   }
 
-  def readRegister(clock: Clock, cmd: Stream[HiveCoreCmd], resp: Stream[HiveCoreResp], addr: Int): BigInt =
-    transactReg(clock, cmd, resp, HiveCoreOp.REG_READ, addr)
+  def readRegister(clock: Clock, cmd: Stream[WorkerBeeCmd], resp: Stream[WorkerBeeResp], addr: Int): BigInt =
+    transactReg(clock, cmd, resp, WorkerBeeOp.REG_READ, addr)
 
-  def prepareStart(clock: Clock, cmd: Stream[HiveCoreCmd], resp: Stream[HiveCoreResp]): Unit = {
-    transactReg(clock, cmd, resp, HiveCoreOp.REG_WRITE1, HiveSimCommon.IRQ_CLEAR_REG_ADDR,
-      d0 = HiveSimCommon.IRQ_ALL)
-    transactReg(clock, cmd, resp, HiveCoreOp.REG_WRITE1, HiveSimCommon.IRQ_MASK_REG_ADDR, d0 = 0)
+  def prepareStart(clock: Clock, cmd: Stream[WorkerBeeCmd], resp: Stream[WorkerBeeResp]): Unit = {
+    transactReg(clock, cmd, resp, WorkerBeeOp.REG_WRITE1, WbSimCommon.IRQ_CLEAR_REG_ADDR,
+      d0 = WbSimCommon.IRQ_ALL)
+    transactReg(clock, cmd, resp, WorkerBeeOp.REG_WRITE1, WbSimCommon.IRQ_MASK_REG_ADDR, d0 = 0)
   }
 
   /** 只走到 START 写 fire，后续拍由 DMA 主循环服务，避免漏掉首个 DMA 请求。 */
-  def launchStart(clock: Clock, cmd: Stream[HiveCoreCmd]): Unit = {
-    pokeRegCommand(cmd, HiveCoreOp.REG_WRITE1, HiveSimCommon.START_REG_ADDR, d0 = 1)
+  def launchStart(clock: Clock, cmd: Stream[WorkerBeeCmd]): Unit = {
+    pokeRegCommand(cmd, WorkerBeeOp.REG_WRITE1, WbSimCommon.START_REG_ADDR, d0 = 1)
     var waited = 0
     while (!cmd.ready.peek().litToBoolean && waited < 100) { clock.step(); waited += 1 }
     assert(cmd.ready.peek().litToBoolean, "START handshake timeout")
@@ -1117,22 +1117,22 @@ trait HiveStatusPollApi extends chisel3.simulator.PeekPokeAPI {
     cmd.valid.poke(false.B)
   }
 
-  def pokeStatusRead(cmd: Stream[HiveCoreCmd]): Unit =
-    pokeRegCommand(cmd, HiveCoreOp.REG_READ, HiveSimCommon.STATUS_REG_ADDR)
+  def pokeStatusRead(cmd: Stream[WorkerBeeCmd]): Unit =
+    pokeRegCommand(cmd, WorkerBeeOp.REG_READ, WbSimCommon.STATUS_REG_ADDR)
 
-  def pokeIrqRead(cmd: Stream[HiveCoreCmd]): Unit =
-    pokeRegCommand(cmd, HiveCoreOp.REG_READ, HiveSimCommon.IRQ_RAW_REG_ADDR)
+  def pokeIrqRead(cmd: Stream[WorkerBeeCmd]): Unit =
+    pokeRegCommand(cmd, WorkerBeeOp.REG_READ, WbSimCommon.IRQ_RAW_REG_ADDR)
 
-  private def pollRegisterStep(cmd: Stream[HiveCoreCmd], resp: Stream[HiveCoreResp],
+  private def pollRegisterStep(cmd: Stream[WorkerBeeCmd], resp: Stream[WorkerBeeResp],
                                pollSt: Int, pollCool: Int, addr: Int): (Int, Int, Option[BigInt]) = {
     if (pollSt == 0) {
-      pokeRegCommand(cmd, HiveCoreOp.REG_READ, addr)
+      pokeRegCommand(cmd, WorkerBeeOp.REG_READ, addr)
       if (cmd.ready.peek().litToBoolean) (1, 0, None) else (0, 0, None)
     } else if (pollSt == 1) {
       cmd.valid.poke(false.B)
       if (resp.valid.peek().litToBoolean) {
         assert(!resp.payload.err.peek().litToBoolean, s"poll read failed at address $addr")
-        (2, HiveSimCommon.POLL_PERIOD, Some(resp.payload.data.peek().litValue))
+        (2, WbSimCommon.POLL_PERIOD, Some(resp.payload.data.peek().litValue))
       } else (1, 0, None)
     } else {
       cmd.valid.poke(false.B)
@@ -1141,16 +1141,16 @@ trait HiveStatusPollApi extends chisel3.simulator.PeekPokeAPI {
     }
   }
 
-  def statusPollStep(cmd: Stream[HiveCoreCmd], resp: Stream[HiveCoreResp],
-                     pollSt: Int, pollCool: Int): (Int, Int, Option[HiveSimCommon.HiveStatusBits]) = {
-    val (st, cool, data) = pollRegisterStep(cmd, resp, pollSt, pollCool, HiveSimCommon.STATUS_REG_ADDR)
-    (st, cool, data.map(HiveSimCommon.decodeStatus))
+  def statusPollStep(cmd: Stream[WorkerBeeCmd], resp: Stream[WorkerBeeResp],
+                     pollSt: Int, pollCool: Int): (Int, Int, Option[WbSimCommon.WbStatusBits]) = {
+    val (st, cool, data) = pollRegisterStep(cmd, resp, pollSt, pollCool, WbSimCommon.STATUS_REG_ADDR)
+    (st, cool, data.map(WbSimCommon.decodeStatus))
   }
 
-  def irqPollStep(cmd: Stream[HiveCoreCmd], resp: Stream[HiveCoreResp],
-                  pollSt: Int, pollCool: Int): (Int, Int, Option[HiveSimCommon.HiveIrqBits]) = {
-    val (st, cool, data) = pollRegisterStep(cmd, resp, pollSt, pollCool, HiveSimCommon.IRQ_RAW_REG_ADDR)
-    (st, cool, data.map(HiveSimCommon.decodeIrq))
+  def irqPollStep(cmd: Stream[WorkerBeeCmd], resp: Stream[WorkerBeeResp],
+                  pollSt: Int, pollCool: Int): (Int, Int, Option[WbSimCommon.WbIrqBits]) = {
+    val (st, cool, data) = pollRegisterStep(cmd, resp, pollSt, pollCool, WbSimCommon.IRQ_RAW_REG_ADDR)
+    (st, cool, data.map(WbSimCommon.decodeIrq))
   }
 }
 
@@ -1171,7 +1171,7 @@ trait HiveStatusPollApi extends chisel3.simulator.PeekPokeAPI {
   *    CPATH=/opt/homebrew/include LIBRARY_PATH=/opt/homebrew/lib，
   *    否则 harness 编译报 `'lz4.h' file not found`。
   */
-trait HiveFstSim { this: HasCliOptions =>
+trait WbFstSim { this: HasCliOptions =>
 
   /** 预置 FST traceStyle 的 verilator simulator（覆盖 HasSimulator
     * companion 的低优先级 default implicit）。
@@ -1203,14 +1203,14 @@ trait HiveFstSim { this: HasCliOptions =>
 
 /** 始终开启 FST 波形的 trait（不依赖 -DemitFst flag）。
   *
-  * 与 HiveFstSim 的差异：HiveFstSim 需显式传 -DemitFst=1 才 dump；本 trait
+  * 与 WbFstSim 的差异：WbFstSim 需显式传 -DemitFst=1 才 dump；本 trait
   * 无条件 enableWavesAtTimeZero=true，仍注册 emitFst 键仅为命令行兼容。
   *
-  * 迁移记录（taskId=143）：原定义于 HiveCoreParamDebugSpec.scala（该文件已被
-  * 用户删除），因 HiveCoreQuickSpec 仍依赖，逐字迁移至本公共文件；原文件
-  * HEAD 版本见 git show HEAD:src/hive/scala/test/HiveCoreParamDebugSpec.scala。
+  * 迁移记录（taskId=143）：原定义于 WorkerBeeParamDebugSpec.scala（该文件已被
+  * 用户删除），因 WorkerBeeQuickSpec 仍依赖，逐字迁移至本公共文件；原文件
+  * HEAD 版本见 git show HEAD:src/workerbee/scala/test/WorkerBeeParamDebugSpec.scala。
   */
-trait HiveAlwaysFstSim { this: HasCliOptions =>
+trait WbAlwaysFstSim { this: HasCliOptions =>
   implicit val fstSimulator: HasSimulator =
     HasSimulator.simulators.verilator(
       verilatorSettings = svsim.verilator.Backend.CompilationSettings.default

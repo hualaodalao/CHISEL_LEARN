@@ -1,6 +1,6 @@
-以端侧（LLM decode / 小 batch / CNN 量化推理）视角过了一遍 HiveCore 现状（16×16 阵列、K/N 空间轴、loadW 权重驻留、FIFO 预取、四 DMA 通道、8 槽寄存器 + execute/irq、errCode 体系）。按性价比排序：
+以端侧（LLM decode / 小 batch / CNN 量化推理）视角过了一遍 WorkerBee 现状（16×16 阵列、K/N 空间轴、loadW 权重驻留、FIFO 预取、四 DMA 通道、8 槽寄存器 + execute/irq、errCode 体系）。按性价比排序：
 
-## 一、Epilogue 是最大空白（寄存器和写回路径已核实无 bias/requant/激活，HiveInterface.scala:122-180）
+## 一、Epilogue 是最大空白（寄存器和写回路径已核实无 bias/requant/激活，WbInterface.scala:122-180）
 
 | 项 | 现状 | 建议 |
 |---|---|---|
@@ -17,7 +17,7 @@
 
 ## 三、控制流（省 CPU、层间零气泡）
 - 现在每层 GEMM 都要 Gingercat 写 8 个寄存器再 execute；LLM decode 每 token 7+ 层。建议把寄存器组做成 **2~4 深描述符队列**（或让 ForagerBee 命令流携带 GEMM 描述符），done 后自动装载下一条。阵列零改动，改动集中在 CalcConfig/寄存器侧。
-- **perf counters**：status 只有 progress/occupancy（HiveInterface.scala:107-116）。加 cycle 总数 + 窗口等待/背压 2~3 个计数器，近零成本，后续所有优化都靠它量化。
+- **perf counters**：status 只有 progress/occupancy（WbInterface.scala:107-116）。加 cycle 总数 + 窗口等待/背压 2~3 个计数器，近零成本，后续所有优化都靠它量化。
 
 ## 四、算力利用率（可接受，暂不动）
 - loadW 窗口与计算串行：pass 开销 = 16/(16+m) 拍。m=1..4 decode 时空闲 50–90%，**但** bDma FIFO 预取使 B 端口持续满流，memory-bound 场景总吞吐不受损；batch≥8 时损失 ≤11%。修复 = PE 权重双缓冲（~8Kbit regs + mux），性价比一般，列观察项。

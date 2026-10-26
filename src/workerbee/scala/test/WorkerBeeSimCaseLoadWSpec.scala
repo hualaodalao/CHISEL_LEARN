@@ -1,20 +1,20 @@
-/** HiveCore 水平 loadW 加载模式完整仿真用例：【#66 起本 suite 无注册用例，详见下方移除记录】
+/** WorkerBee 水平 loadW 加载模式完整仿真用例：【#66 起本 suite 无注册用例，详见下方移除记录】
   *
   * ══════════════════════════════════════════════════════════════════════════
-  * 【#66 移除记录 —— FP16/BF16 已从 HiveCore 支持格式集中砍除，本 suite 唯一用例作废】
+  * 【#66 移除记录 —— FP16/BF16 已从 WorkerBee 支持格式集中砍除，本 suite 唯一用例作废】
   *
-  * ■ 裁定与配置变更（用户裁定，本文件无权改动 HiveCoreConfig）
-  *   HiveCoreConfig.supportedFmts 默认集已由
+  * ■ 裁定与配置变更（用户裁定，本文件无权改动 WorkerBeeConfig）
+  *   WorkerBeeConfig.supportedFmts 默认集已由
   *     {FP16, BF16, INT16, INT8, MXE4M3, MXE5M2, MXE2M1}
   *   收窄为
   *     {INT8, INT4, MXE4M3, MXE5M2, MXE2M1}
   *   ⟹ hasFp = contains(FP16) || contains(BF16) = 【false】。
   *
   * ■ 为什么是【静默】算错（实测签名）
-  *   hasFp=false ⟹ 浮点通路不 elaborate ⟹ HiveWorkUnit 的 baseSel 退化为
+  *   hasFp=false ⟹ 浮点通路不 elaborate ⟹ WbWorkUnit 的 baseSel 退化为
   *   (false,false) => io.cReg ⟹ FP16 输入用例输出全零，STATUS.err 不置位、
   *   EXECUTE 正常 done，只在末尾数值对账断言炸。
-  *   本 suite 唯一用例的输入格式取证：原 :65-66 激励经 HiveSimCommon.floatToFp16 编码，
+  *   本 suite 唯一用例的输入格式取证：原 :65-66 激励经 WbSimCommon.floatToFp16 编码，
   *   原 :257 `val fmt = (1L << 0) | (1L << 4) | (1L << 8)` 写入 regs(7)
   *   ⟹ aFmt=FP16(1) | bFmt=FP16(1) | cFmt=FP16(1)，输入输出均为 FP16。
   *   移除前实测：`*** FAILED *** 1024 was not equal to 0 (:477)`，
@@ -41,17 +41,17 @@
   *     B 按 N×K 转置、bRowOff/bColTileOff、
   *     blockStart 闭式、块内逐 beat -bRowOff 降序）：【与数据格式无关】，按仍支持
   *     格式（INT8/INT4/MX 族）重写 loadW 用例时逐条仍适用，故原样保留。
-  *   · HiveSimCommon 的 FP16/BF16 位转换 helper：公共基础设施，仍被
-  *     HiveCoreSimCaseMxSpec（MX 输入 → FP16 输出，2/2 绿）与 HiveDebugModel 使用。
+  *   · WbSimCommon 的 FP16/BF16 位转换 helper：公共基础设施，仍被
+  *     WorkerBeeSimCaseMxSpec（MX 输入 → FP16 输出，2/2 绿）与 WbDebugModel 使用。
   *
   * ■ ★ 关键区分：被砍的是 FP16/BF16 作【输入/计算】格式，不是作【输出】格式
-  *   16-bit 输出走 HiveOutCvt/FpCvt 的 40→32→16 两级舍入链，不依赖 hasFp，仍可用。
+  *   16-bit 输出走 WbOutCvt/FpCvt 的 40→32→16 两级舍入链，不依赖 hasFp，仍可用。
   *
-  * ■ INT16 排查（同批裁定：Hive 不再支持 INT16）
+  * ■ INT16 排查（同批裁定：WorkerBee 不再支持 INT16）
   *   本 suite 从未注册过 INT16 用例（移除前 grep 全文 0 命中 INT16）⟹ 无红、无需移除。
   *
   * ■ 恢复方式（本文件移除前与 HEAD 逐字一致、未被任何 WIP 修改，可完整取回）
-  *   git show HEAD:src/hive/scala/test/HiveCoreSimCaseLoadWSpec.scala
+  *   git show HEAD:src/workerbee/scala/test/WorkerBeeSimCaseLoadWSpec.scala
   * ══════════════════════════════════════════════════════════════════════════
   *
   * 以下为原有 suite 文档（loadW 模式机制，与格式无关，原样保留）：
@@ -62,12 +62,12 @@
   *   （rnd/三 fmt）已合并为单一 reg5，其中 loadWMode 仍在 bit28（即下方「regs(6)(28)=1」
   *   现应读作「reg5[28]=1」）；旧 reg6/reg7 槽位已删除（main 侧 wregs/rregs 无 is(6)/is(7)
   *   分支 ⟹ 写为 no-op、读回 0）。reg0=m、reg8=STATUS、reg9/0A/0B=三 scale 基址不变。
-  *   新 reg5 完整位域见 HiveDebugModel.controlWord5 的契约注释；aStride/bStride/cStride
+  *   新 reg5 完整位域见 WbDebugModel.controlWord5 的契约注释；aStride/bStride/cStride
   *   三字段已被 main 侧注释删除。
   *   ★本 suite 当前【零活跃注册用例】（已核实，见 #164 报告）⟹ 无活代码需要适配。
   *
-  * 与垂直模式 HiveCoreSimCase 完全同构的回归门禁，唯一差异：
-  *   - regs(6)(28) = 1（loadWMode=1，新 REG_CONTROL 布局）：权重经 bPop → hiveAIn 的 a 数据链
+  * 与垂直模式 WorkerBeeSimCase 完全同构的回归门禁，唯一差异：
+  *   - regs(6)(28) = 1（loadWMode=1，新 REG_CONTROL 布局）：权重经 bPop → wbAIn 的 a 数据链
   *     【(#164) 订正：该位现为 reg5[28]，旧 reg6 槽位已删除】
   *     水平加载（loadW 脉冲链移位 + 末拍 loadWInLock 广播锁存）
   *   - 内存中 B 矩阵按 N×K 转置存储（行=n、列=k）：
@@ -80,7 +80,7 @@
   *   - 落位映射与垂直模式一致：PE(x,y).wReg = B[kTile*totalN+x][nTile*totalN+y]
   *     → C 期望与垂直用例完全相同（H0: C=A·B 零 mismatch）
   *
-  * 既有 spec（HiveCoreSimCase/MultiPass/Probe/HiveCoreSpec/SystolicArray*）
+  * 既有 spec（WorkerBeeSimCase/MultiPass/Probe/WorkerBeeSpec/SystolicArray*）
   * 一律零改动——垂直模式行为 bit-exact 由它们回归守护。
   */
 
@@ -91,7 +91,7 @@ import org.scalatest.matchers.should.Matchers
 import java.io._
 import java.nio.file._
 
-class HiveCoreSimCaseLoadWSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveFstSim with HiveStatusPollApi {
+class WorkerBeeSimCaseLoadWSpec extends AnyFlatSpec with Matchers with ChiselSim with WbFstSim with WbStatusPollApi {
 
   // ========== 测试参数（与垂直 SimCase 一致，C 期望相同；保留供将来重写用例复用） ==========
   val M = 32
@@ -105,7 +105,7 @@ class HiveCoreSimCaseLoadWSpec extends AnyFlatSpec with Matchers with ChiselSim 
   val simDir = "/Users/wangliutailong/Qoder_Proj/Chisel_Learn/sim/loadw"
 
   // 工具方法（floatToFp16/fp16ToFloat/writeMatrixFloat/writeBigIntMatrixHex/
-  // extractBits/fp32BitsToFloat）统一收敛至公共类 HiveSimCommon（限定调用）
+  // extractBits/fp32BitsToFloat）统一收敛至公共类 WbSimCommon（限定调用）
 
   // ========== 主测试 ==========
   // 【#66】此处原有唯一一条 FP16 输入的 it should 注册（:47-478，全内联）已移除，
@@ -114,5 +114,5 @@ class HiveCoreSimCaseLoadWSpec extends AnyFlatSpec with Matchers with ChiselSim 
   //   「#66 移除记录」。要新增 loadW 用例请只用仍受支持的输入格式：
   //   INT8 / INT4 / MXE4M3 / MXE5M2 / MXE2M1（注意 MX 输入本就要求 loadWMode=1）。
 
-  behavior of "HiveCore LoadW-mode GEMM Simulation"
+  behavior of "WorkerBee LoadW-mode GEMM Simulation"
 }

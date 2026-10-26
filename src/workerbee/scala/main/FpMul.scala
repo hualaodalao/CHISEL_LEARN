@@ -9,8 +9,8 @@
   *   · FpMulMx4      — sigW=2 窄化阵列（mxfp4 E2M1 通路）：输入为【最小中间表示】
   *                     sign(1)/exp(8)/mant(1)，转换由外部完成
   *
-  * 乘法逻辑一律内联实现（不调用 Fp32.mul / 不例化原 HiveWorkUnit.scala 中的 HiveMacFpMx，
-  * 该模块已随 FusionMac 重构删除），便于外部自由修改与融合。风格沿用原 HiveMacFpMx：extends Module，纯组合逻辑。
+  * 乘法逻辑一律内联实现（不调用 Fp32.mul / 不例化原 WbWorkUnit.scala 中的 WbMacFpMx，
+  * 该模块已随 FusionMac 重构删除），便于外部自由修改与融合。风格沿用原 WbMacFpMx：extends Module，纯组合逻辑。
   */
 
 import chisel3._
@@ -73,9 +73,9 @@ class FpMulFp16Bf16 extends Module {
   * 3 位 / E5M2 尾数 2 位，加隐含 1 后有效位 ≤ 4（=1+mantW）。
   * 满宽积 mA24*mB24 = (aSig<<20)*(bSig<<20) = (aSig*bSig)<<40：
   * 用 sigW=4 窄积零扩展回 48-bit mProd 布局，与满宽逐位相等（非饱和域 bit-exact，
-  * 依据见原 HiveMacFpMx 头注，该模块已随 FusionMac 重构删除）。guardBit 落在恒 0 低位 ⇒ 结构性恒 0 ⇒ 舍入退化为恒等，
+  * 依据见原 WbMacFpMx 头注，该模块已随 FusionMac 重构删除）。guardBit 落在恒 0 低位 ⇒ 结构性恒 0 ⇒ 舍入退化为恒等，
   * io.rnd 仅为接口兼容性保留。
-  * 乘法逻辑提取自原 HiveWorkUnit.scala 中 HiveMacFpMx（sigW=4）的上游乘积阶段（已删除），纯组合。
+  * 乘法逻辑提取自原 WbWorkUnit.scala 中 WbMacFpMx（sigW=4）的上游乘积阶段（已删除），纯组合。
   *
   * 警示：禁止把本模块当作 FpMulFp16Bf16 的替身用于非 MX/宽尾数通路，
   * 否则会静默截断尾数低位算错。
@@ -129,9 +129,9 @@ class FpMulMx8 extends Module {
   * mant 为 fp32 尾数高 1 位（对应 fp32 mantissa[22]）。E2M1 mantW=1，仅 bit22 有效，
   * 加隐含 1 后有效位 ≤ 2。sigW=4 阵列 3/4 恒零浪费，
   * 故窄化到 sigW=2：代数恒等 (8+4m)(8+4m')<<40 == (2+m)(2+m')<<44 对 m∈{0,1}
-  * 逐位相等（bit-exact 依据见原 HiveMacFpMx sigW=2 变体头注，该模块已随 FusionMac 重构删除）。
+  * 逐位相等（bit-exact 依据见原 WbMacFpMx sigW=2 变体头注，该模块已随 FusionMac 重构删除）。
   * guardBit 结构性恒 0 ⇒ 舍入退化为恒等，io.rnd 仅为接口兼容性保留。
-  * 乘法逻辑提取自原 HiveWorkUnit.scala 中 HiveMacFpMx（sigW=2）的上游乘积阶段（已删除），纯组合。
+  * 乘法逻辑提取自原 WbWorkUnit.scala 中 WbMacFpMx（sigW=2）的上游乘积阶段（已删除），纯组合。
   *
   * 警示：禁止把本模块用于 E2M1 以外的任何格式（含 fp8），否则尾数被静默截断算错。
   */

@@ -1,4 +1,4 @@
-/** HiveCell（巢室）- N×N HiveWorker 脉动阵列（无内部 skew）
+/** WbCell（巢室）- N×N WbWorker 脉动阵列（无内部 skew）
   *
   * @param n     阵列维度（默认 8）
   * @param aW    激活位宽（默认 16）
@@ -7,7 +7,7 @@
   *
   * 新架构要点：
   *   - loadHIn / validIn / fmtIn / rndIn 为标量输入，直接广播到首列 PE（无 ShiftRegister）
-  *   - HiveComb 已完成全局 skew，HiveCell 内部不再做行级 skew
+  *   - WbComb 已完成全局 skew，WbCell 内部不再做行级 skew
   *   - loadH/valid/fmt/rnd 沿水平 PE 链（y 方向）传播（RegNext），自然产生列级延迟
   *   - loadV 沿垂直 PE 链（x 方向，随 psum 链）传播，与垂直权重波同步下沉
   *   - loadH/fmt/rnd 输出为标量（所有行同值）
@@ -30,7 +30,7 @@
 import chisel3._
 import chisel3.util._
 
-class HiveCell(
+class WbCell(
   n: Int = 8,
   aW: Int = 16,
   bW: Int = 16,
@@ -71,7 +71,7 @@ class HiveCell(
     // MX scale: BOTH scaleAIn and scaleBIn are per-row, i.e. indexed by the PE
     // grid row coordinate x. In this array x is the K-LANE axis (the a-chain and
     // both scale chains flow along y, the psum/c chain flows along x; see the
-    // axis note in HiveComb). Both are injected at column y==0 and then shift
+    // axis note in WbComb). Both are injected at column y==0 and then shift
     // right one column per cycle. The previous wording here ("scaleBIn
     // per-column, column-resident") was stale and contradicted the wiring below;
     // corrected in #146 after the port-chain ground-truth audit.
@@ -98,12 +98,12 @@ class HiveCell(
     val scaleBOut = Output(Vec(n, UInt(8.W)))  // per-row（b 链末端 scaleB）
   })
 
-  // --- HiveWorker 网格 ---
-  val pes = Seq.fill(n, n)(Module(new HiveWorker(aW, bW, cEffW, supportedFmts)))
+  // --- WbWorker 网格 ---
+  val pes = Seq.fill(n, n)(Module(new WbWorker(aW, bW, cEffW, supportedFmts)))
 
   // --- loadW 端口 WireDefault 兜底：既有测试（SystolicArrayTest 等）直接
   // 例化本模块时不连接 loadW 口（invalid），兜底回落恒 0，保证垂直模式
-  // bit-exact；顶层 HiveComb 正常驱动时兜底被覆盖 ---
+  // bit-exact；顶层 WbComb 正常驱动时兜底被覆盖 ---
   val loadWInSafe = WireDefault(VecInit(Seq.fill(n)(false.B)))
   loadWInSafe := io.loadWIn
   val loadWInLockSafe = WireDefault(false.B)
@@ -136,7 +136,7 @@ class HiveCell(
         pes(x)(y).io.scaleAIn := io.scaleAIn(x)
         // scaleB per-lane injection at the left edge, using the SAME coordinate x
         // as scaleA (x is the K-lane axis). Deliberately NOT indexed by y: that
-        // would be the wrong-axis form, see the axis note in HiveComb.
+        // would be the wrong-axis form, see the axis note in WbComb.
         pes(x)(y).io.scaleBIn := io.scaleBIn(x)
         // loadW 脉冲链 per-row 注入（水平 loadW 模式，与 a 链同向 lockstep）
         pes(x)(y).io.loadWIn := loadWInSafe(x)

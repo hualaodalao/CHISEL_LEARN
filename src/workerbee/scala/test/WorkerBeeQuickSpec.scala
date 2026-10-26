@@ -1,10 +1,10 @@
-/** HiveCoreQuickSpec — 「一个函数跑一组参数」的极简 HiveCore GEMM 调试用例。
+/** WorkerBeeQuickSpec — 「一个函数跑一组参数」的极简 WorkerBee GEMM 调试用例。
   * 用法：只改下方【唯一一处 ★★★ runCase(...) 调用】，然后重跑裸命令（不带任何 -D）：
-  *   CPATH=/opt/homebrew/include LIBRARY_PATH=/opt/homebrew/lib sbt "testOnly HiveCoreQuickSpec"
+  *   CPATH=/opt/homebrew/include LIBRARY_PATH=/opt/homebrew/lib sbt "testOnly WorkerBeeQuickSpec"
   * CPATH/LIBRARY_PATH 是硬需求（Verilator 5.050 FST writer 依赖 lz4 头）。波形始终开启（复用
-  * HiveCoreParamDebugSpec.scala 的 HiveAlwaysFstSim trait）；本文件不注册任何 -D 键，避开 ChiselSim
-  * HasCliOptions 白名单坑。只做薄封装：内存镜像 / 六通道期望地址 / golden / compare 全复用 HiveDebugModel，
-  * STATUS 轮询复用 HiveStatusPollApi，供数范式与 HiveCoreDebugCase.runDebug 同构（那两个 runner 都是
+  * WorkerBeeParamDebugSpec.scala 的 WbAlwaysFstSim trait）；本文件不注册任何 -D 键，避开 ChiselSim
+  * HasCliOptions 白名单坑。只做薄封装：内存镜像 / 六通道期望地址 / golden / compare 全复用 WbDebugModel，
+  * STATUS 轮询复用 WbStatusPollApi，供数范式与 WorkerBeeDebugCase.runDebug 同构（那两个 runner 都是
   * private、无法跨文件复用，故按同一范式在此收敛成单个函数）。
   *
   * ══ 三条架构约束（自己调 cross 配置必撞）══
@@ -17,11 +17,11 @@
   *   (#164) 寄存器重排后 addrMode 的宿主由旧 reg6 迁到 reg5（位号 14/13/12 不变）。
   *
   * ══ errCode 实测更正（与常见 errCode 表不符，以 RTL 为准）══
-  * HiveCoreCalcConfig 把 a/b/cMxBlockSize 三违约【合并】为单一 errMXLargerThanKLoadNum、errCode 恒置 0，故【errCode
+  * WorkerBeeCalcConfig 把 a/b/cMxBlockSize 三违约【合并】为单一 errMXLargerThanKLoadNum、errCode 恒置 0，故【errCode
   * 1 与 2 永不可达】（QuantSpec「blk32 over totalN」旧期望 2 实得 0 的红项根因，#124；已按 RTL 口径把该用例期望
   * 改为 0）；且五个 when 平级 last-connect、后写覆盖前写 → 真实优先级 6>5>4>3>0。
-  * 【P0-2 去双源】金锚 errCode 镜像已收敛为单一真源 HiveDebugModel.hwErrCode（顺序 if 后写覆盖，逐位镜像 RTL）；
-  * QuickSpec.hwErrCode 与 HiveDebugModel.precheckConfigErr 均委托它，不再有"两份互不一致的软件镜像"。
+  * 【P0-2 去双源】金锚 errCode 镜像已收敛为单一真源 WbDebugModel.hwErrCode（顺序 if 后写覆盖，逐位镜像 RTL）；
+  * QuickSpec.hwErrCode 与 WbDebugModel.precheckConfigErr 均委托它，不再有"两份互不一致的软件镜像"。
   * [Fix-7/P0-1, exists only when cfg.hasMx4=true] fp4 support appended two
   * hasMx4-gated branches to the errComb block, both AFTER the fp8 branches, so
   * last-connect gives them higher priority: MX4xMX8 mix -> errCode3 (Fix-4,
@@ -54,12 +54,12 @@
   * reserved for v2 W4A8; 11 is LIVE: int/non-int cross-boundary #177/#178; 12 is
   * LIVE: biasAddr misalignment P0 epilogue-1);
   * codes 1/2 are never revived.
-  * (#150→#155) QuickSpec 的 cfg 现在【不再显式传 supportedFmts】，回落 HiveCoreConfig
+  * (#150→#155) QuickSpec 的 cfg 现在【不再显式传 supportedFmts】，回落 WorkerBeeConfig
   * 默认集——因为 #155 MJ1 已把 MXE2M1 升格为【默认必选】，默认集本身就是 7 种格式。
   * (#66 订正：上行「7 种格式」已过时) 默认集现为 5 种 {INT8, INT4, MXE4M3, MXE5M2,
   * MXE2M1}——FP16/BF16/INT16 已被用户裁定砍除，故【hasFp=false】。本 suite 不受影响、
   * 实测仍绿：现役唯一用例是 MXE2M1×MXE2M1【输入】→ BF16【输出】，而 16-bit 输出走
-  * HiveOutCvt/FpCvt 的 40→32→16 两级舍入链，【不依赖 hasFp】。但下方那段
+  * WbOutCvt/FpCvt 的 40→32→16 两级舍入链，【不依赖 hasFp】。但下方那段
   * 「为什么必须保持 hasFp/hasInt 为真」的论证前提已不成立，读时请连同其后的 (#66) 订正一起看。
   * （#150 当时是显式写「默认 6 种 + MXE2M1」，那时默认集还不含 MXE2M1；见下方 cfg 的
   * 论证注释与全字段对齐表。）⟹ hasMx4=true 保持不变，这两支【真的会 elaborate】，
@@ -84,11 +84,11 @@
   * 故 nTiles==2 时两式产出逐拍完全相同的序列，任何不变式都区分不了。金锚
   * cAddrSeqDense 的两条 require 因此覆盖不到 -Dm=1 -Dn=32（合法配置）。
   * 现状：RTL 侧 sNEXT_N 已改「基址+轮偏移」线性模型（curAddr := io.regFile.cAddr + colAddr，
-  * 与 HiveCoreDmaScaleWr 同构）；金锚侧 cAddrSeqDense 已改张量语义绝对式
+  * 与 WorkerBeeDmaScaleWr 同构）；金锚侧 cAddrSeqDense 已改张量语义绝对式
   * base + nt*cColOff + row*cRowOff + b*cBeatAddrStep，并内置两条 require 自证（nTiles≥2/≥3
   * 块首拍不变式，【金锚构造期】即炸——即 Scala 测试体求值、调用该函数之时，早于 simulate，
   * 既非 scalac 编译期亦非 Chisel elaboration 期；任何三角化回退都会被拦截）。永久护栏用例见
-  * HiveCoreDebugCase 组(f)：M32 N48 K16 FP16→FP32（nTiles=3、strictAddr 硬编码 true）。
+  * WorkerBeeDebugCase 组(f)：M32 N48 K16 FP16→FP32（nTiles=3、strictAddr 硬编码 true）。
   * 产物：波形 sim/debug/quick.fst；失败/超时另落 sim/debug/quick_fail.txt|_A.hex|_B.hex（sim/ 已 gitignore）。 */
 import chisel3._
 import chisel3.simulator.scalatest._
@@ -97,13 +97,13 @@ import org.scalatest.matchers.should.Matchers
 import java.nio.file._
 import scala.collection.mutable
 
-class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveAlwaysFstSim with HiveStatusPollApi {
-  import HiveDebugModel._
-  private val TAG = "QUICK"; private val SUITE = "HiveCoreQuickSpec"
+class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with WbAlwaysFstSim with WbStatusPollApi {
+  import WbDebugModel._
+  private val TAG = "QUICK"; private val SUITE = "WorkerBeeQuickSpec"
 
   // ══════════════════════════════════════════════════════════════════════════
   // ★★★ 你只需要改这一处调用，改完重跑：
-  //   CPATH=/opt/homebrew/include LIBRARY_PATH=/opt/homebrew/lib sbt "testOnly HiveCoreQuickSpec"
+  //   CPATH=/opt/homebrew/include LIBRARY_PATH=/opt/homebrew/lib sbt "testOnly WorkerBeeQuickSpec"
   // loadW/seed/strictAddr/maxCycles/wave 都有默认值，不写就是默认（见 runCase 签名）。
   // 默认这组 M=N=K=32 FP16→FP16 的 C 数据是 1024/1024 逐位匹配的。【#131 收尾裁定（选项 A）保持本默认
   // 调用不动】：它曾在金锚未对齐期于 dmaC 地址对账上报假红（nTiles=2 触发三角累积缺陷），#133 金锚对齐后
@@ -115,13 +115,13 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   //     （FP16 → n×2），【正比于 N】；列步进 bColTileAddressOffset = totalN×elemsPerLane(bFmt)×bEb
   //     与 N 无关（★#124 ① 起为运行期量；FP16 → totalN×1×2 = 32，与旧式 totalN×(bW/8) 同值），
   //     但轮数 nTilesB = ceil(N/totalN) 直接由 N 决定 ⇒ B 总拍数 = nTilesB × bKTiles × totalN
-  //     随 N 变。loadWMode=1 分支的 bRowAddressOffset 改按 K 派生（见 HiveCoreCalcConfig），
+  //     随 N 变。loadWMode=1 分支的 bRowAddressOffset 改按 K 派生（见 WorkerBeeCalcConfig），
   //     此时「正比于 N」不成立、但 nTilesB 仍随 N 变，故结论不变。
   //   · A 通道：aRowAddressOffset = regFile.k×aEb 与 N 无关（★同为运行期量，FP16 → k×2），但总拍数 =
   //     nTiles × aKTiles × M，其中 nTiles = ceil(N/totalN) ⇒ 仍随 N 变。
   //   · C 通道：cRowAddressOffset = N×cEb【正比于 N】，nTiles 亦随 N 变。
   //   ⇒ 单独改 n 会同时改动 A/B/C 三条序列与三组拍数，不能当单变量对照用；要做单变量
-  //     对照请参考 HiveCoreDebugCase 的 guard122/guard133 组（各自明示了变量与非变量）。
+  //     对照请参考 WorkerBeeDebugCase 的 guard122/guard133 组（各自明示了变量与非变量）。
   // 【#136 实测记录（前提矛盾项，供后续核对）】#134 评审 KS7 指认本文件此处原文含
   //   「B 权重与 N 无关」一句，#136 实施时全仓 grep（含 "与 N 无关"/"与N无关"/"N 无关"）
   //   【0 命中】，且本文件未被 git 跟踪（不在 HEAD 中）故无法查历史版本。据此判断该句
@@ -136,8 +136,8 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   //   逻辑拍 = 16B fp4 半字片（一个阵列 K 窗口的一行）→ 32B 对齐单读 → DMA 内半字
   //   选择 → LUT 精确加宽成 E4M3 阵列拍；scaleBDma 全量 kTile 窗口、每拍一个相邻
   //   scale 字（blk16 时含源块 {2w,2w+1} 字节对）。金锚按张量语义独立推导（窗口
-  //   口径序列见 HiveDebugModel expBAddrSeq/expScaleBAddrSeq 混配分支）；硬件守护见
-  //   HiveCoreCalcConfig（混配 K%64 或 bAddr%32 → errCode 8，反向混配 → 3）。
+  //   口径序列见 WbDebugModel expBAddrSeq/expScaleBAddrSeq 混配分支）；硬件守护见
+  //   WorkerBeeCalcConfig（混配 K%64 或 bAddr%32 → errCode 8，反向混配 → 3）。
   //   命名带 caseTag ⟹ ScalaTest 名互不撞车（DuplicateTestNameException 防护）。
   // ══════════════════════════════════════════════════════════════════════════
   // ① 正向混配 K=64：aBlk=32（=A 侧 kPerBeat，1 scale/kTile）、bBlk=16
@@ -175,7 +175,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   //   硬件：reg5[30]=biasOn + reg9=biasAddr；bias 取数盗用 dmaScaleA 端口（顶层
   //   drain-then-steal 仲裁），executor sLOAD_A 的 pass-0 psum 零基底换 biasLazy
   //   （INT 运行 sext32、fp/MX 运行 fp32→lazy40），零新增加法器。金锚：golden 起始
-  //   累加值 = biasVal(nn)（HiveDebugModel，独立 biasRng 激励流，既有用例零漂移）。
+  //   累加值 = biasVal(nn)（WbDebugModel，独立 biasRng 激励流，既有用例零漂移）。
   //   TB：dmaScaleA 通道改全量服务 + 跑后双流拆分对账（bias 与 scaleA 共端口交错）。
   //   n=32 ⟹ nTiles=2：每条正向用例都覆盖「execute 取 nt=0」与「sNEXT_NK_TILE 推进
   //   取 nt=1」两个取数时机（biasRegs 跨 K pass/M 行驻留复用）。
@@ -212,10 +212,10 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   // 【P0 epilogue-2 fused requant（2026-10-14）】量化整数 epilogue 六用例：
   //   y = sat_fmt(round_half_up(relu(acc) × M[n] >> shift) + zp)，acc 含 epilogue-1
   //   bias 基底（同累加器域）。硬件：reg5[29]=requantOn、reg5[15]=reluOn、reg10=rqMBase、
-  //   reg11=[31:16]zp+[5:0]shift；计算独立成 HiveRequant 模块（16-lane 并行，用户裁定），
+  //   reg11=[31:16]zp+[5:0]shift；计算独立成 WbRequant 模块（16-lane 并行，用户裁定），
   //   OutCvt int32Seq 源级 ReLU clamp（INT 族专属消费域）。M 取数复用 dmaScaleA 端口
   //   （顶层两阶段 epilogue FSM：WAIT 排空 → FETCH_BIAS → FETCH_M 连续盗用，无二次排空），
-  //   TB 侧按地址域拆三流对账。金锚：HiveDebugModel goldenC requant 链（Long 整数算术、
+  //   TB 侧按地址域拆三流对账。金锚：WbDebugModel goldenC requant 链（Long 整数算术、
   //   契约独立推导）+ 独立 rqMRng 激励（定向饱和角点：巨乘子/零/小正/中/小负乘子 lane 混合）。
   //   ★ INT8/INT4【输出】为仓内首例（1B/半字节族 C 写回 + strb 收窄 + FpCvt 旁路全走新档）。
   // ══════════════════════════════════════════════════════════════════════════
@@ -275,9 +275,9 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   //   一行）→ 32B 对齐单读 → DMA 内半字选择 → 顶层符号扩展 Cat(Fill(4,nib(3)),nib(2,0))
   //   成 32B INT8 阵列拍（bFmtIn 重映射 INT4→INT8 ⟹ MAC 走纯 INT8 双 lane 基线，零
   //   阵列改动）；无 scale 通路（INT 族不取 scale，dmaScaleB 全程静默）。金锚按张量
-  //   语义独立推导（HiveDebugModel expBAddrSeq 混配分支：窗口步进 aKpb×4/8=16B、
+  //   语义独立推导（WbDebugModel expBAddrSeq 混配分支：窗口步进 aKpb×4/8=16B、
   //   K/aKpb 个窗口 × totalN 行降序、物理读 = 对齐单读）；硬件守护见
-  //   HiveCoreCalcConfig（混配 loadW=0 / K%64 / bAddr%32 → errCode 8，反向混配 → 3）。
+  //   WorkerBeeCalcConfig（混配 loadW=0 / K%64 / bAddr%32 → errCode 8，反向混配 → 3）。
   // ══════════════════════════════════════════════════════════════════════════
   // ⑯ 正向混配 K=64 → INT32：kTile=2（多窗口轮转）+ nTiles=2（nt 切换）。
   //    ★ loadW 必须显式 Some(1)：None 对 INT 格式自动推导为 0，混配下触发
@@ -324,9 +324,9 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
 
   // ══════════════════════════════════════════════════════════════════════════
   // 【P2 纯 FP8（2026-10-15）】非 MX 纯 FP8 档（per-tensor scale）九用例。
-  //   硬件路线 = remap：HiveCore 把 FP8E4M3/FP8E5M2 重映射成 MXE4M3/MXE5M2 喂阵列
+  //   硬件路线 = remap：WorkerBee 把 FP8E4M3/FP8E5M2 重映射成 MXE4M3/MXE5M2 喂阵列
   //   （FusionMacFp/WorkUnit/Worker 零改动，自动走已验证的 MX8×MX8 基线），
-  //   HiveCoreExecutor 在 scaleA/scaleB 注入点恒注入 127（E8M0 2^0=1.0 恒等）——
+  //   WorkerBeeExecutor 在 scaleA/scaleB 注入点恒注入 127（E8M0 2^0=1.0 恒等）——
   //   per-tensor scale 由软件量化 pre-pass 折进权重，硬件不取 scale DMA（FP8 不在
   //   isMxAny ⟹ scale DMA start 门控自动不启动，scaleA/B 数组与期望地址序列金锚侧
   //   自动退空）。几何：FP8 进 is1B 族（elemsPerLane=2 ⟹ kPerBeat=totalN×2=32、
@@ -399,13 +399,13 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           wave = "sim/debug/quick_fp8_int32out_err11.fst", caseTag = " [P2 FP8 neg INT32 output errCode11]")
 
   /** 编译期配置（totalN=16；cDmaExtW 默认 256；缓冲深度 2048；scaleBufferDepth=64）。
-    * (#155 MJ1) supportedFmts 现在【不再显式传入】，回落 HiveCoreConfig 的默认集。
+    * (#155 MJ1) supportedFmts 现在【不再显式传入】，回落 WorkerBeeConfig 的默认集。
     *   MXE2M1 现在是默认必选，不再需要显式加。
     *   历史：#150 曾把它显式写成「默认 6 种 + MXE2M1」，因为当时默认集不含 MXE2M1、
-    *   hasMx4=false，fp4 硬件（quad-lane unpack、4x sigW=2 HiveMacFpMx、HiveCvtOpMx 的
-    *   isMx4 臂——HiveMacFpMx/HiveCvtOpMx 均为原 HiveWorkUnit.scala 子模块、已随 FusionMac
+    *   hasMx4=false，fp4 硬件（quad-lane unpack、4x sigW=2 WbMacFpMx、WbCvtOpMx 的
+    *   isMx4 臂——WbMacFpMx/WbCvtOpMx 均为原 WbWorkUnit.scala 子模块、已随 FusionMac
     *   重构删除；bits-based colTileAddressOffset、errCode8、mix errCode3、kTiles=K/64）
-    *   在本 DUT 里【根本不存在】，用户手改的 fp4 主用例会被 HiveDebugModel 的 Fix-9
+    *   在本 DUT 里【根本不存在】，用户手改的 fp4 主用例会被 WbDebugModel 的 Fix-9
     *   cfg-aware require 拦下。本轮 MXE2M1 升格为默认必选后，那段显式传参与默认集
     *   【逐元素相同】，继续显式写等于维护一份会漂移的副本，故删除。
     * 【全字段逐一对齐（改前 vs 改后，共 12 个字段）】
@@ -420,30 +420,30 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
     *   totalN=16、hasFp=true、hasInt=true、hasMx=true、hasMx8=true、hasMx4=true、
     *   c1Merge=hasFp&&hasMx=true、cEffW=40、cScaleRowW=8。DUT 逐位不变。
     * 【为什么必须保持 hasFp/hasInt 为真（沿用 #150 的论证，仍然有效）】
-    *   - hasFp 掉假会删掉整条浮点通路，HiveWorkUnit 的 baseSel 退化为 (false,false) => io.cReg，
+    *   - hasFp 掉假会删掉整条浮点通路，WbWorkUnit 的 baseSel 退化为 (false,false) => io.cReg，
     *     FP16 主用例会【静默】输出累加器输入而非乘加结果（不报错）。上方类头那句
     *     「默认 M=N=K=32 FP16->FP16 逐位匹配 1024/1024」是用户每天要用的旋钮。
-    *   - c1Merge = hasFp && hasMx 掉假会让共享的 macShared:HiveMacFp（原 HiveWorkUnit.scala
+    *   - c1Merge = hasFp && hasMx 掉假会让共享的 macShared:WbMacFp（原 WbWorkUnit.scala
     *     子模块，已随 FusionMac 重构删除）消失，fp8 dual-lane
     *     MAC 结构随之改变，「对 fp8 additive / 数值恒等」的说法即告失效。
-    *   故本 cfg 绝不改用 HiveCoreElaborate.cfgMxFp4 那种 MX-only 三格式集。
+    *   故本 cfg 绝不改用 WorkerBeeElaborate.cfgMxFp4 那种 MX-only 三格式集。
     * 【(#66) 订正：上方这段论证的【前提已被现实推翻】，原文按仓库惯例保留不删，但结论不再适用】
-    *   用户已裁定砍除 FP16/BF16，HiveCoreConfig.supportedFmts 默认集现为 5 种
+    *   用户已裁定砍除 FP16/BF16，WorkerBeeConfig.supportedFmts 默认集现为 5 种
     *   {INT8, INT4, MXE4M3, MXE5M2, MXE2M1} ⟹ 本 cfg（不显式传 supportedFmts）
     *   【现在就运行在 hasFp=false 下】，c1Merge = hasFp && hasMx 亦已为 false。
     *   即上方「hasFp 掉假会…」所预言的后果不是假想，而是已实测发生：
-    *   HiveCoreSimCase（9 条 FP16 输入用例）与 HiveCoreSimCaseLoadWSpec（1 条）
+    *   WorkerBeeSimCase（9 条 FP16 输入用例）与 WorkerBeeSimCaseLoadWSpec（1 条）
     *   全部静默输出 C 全零而变红（hw=0.000000 / maxRelErr=1.00e+00 /
     *   strict anchor 0 was not equal to 31743，IRQ_RAW error 不置位），这两个 suite 的
     *   FP16 用例已在 #66 整批移除（详见各自文件头的「#66 移除记录」）。
     *   本 suite 之所以【不受影响、仍绿】：现役唯一用例（见上方 runCase）早已不是
-    *   FP16 输入，而是 MXE2M1×MXE2M1 → BF16【输出】；16-bit 输出走 HiveOutCvt/FpCvt
+    *   FP16 输入，而是 MXE2M1×MXE2M1 → BF16【输出】；16-bit 输出走 WbOutCvt/FpCvt
     *   的 40→32→16 两级舍入链，不依赖 hasFp。故上方「FP16 主用例是用户每天要用的
     *   旋钮」「绝不改用 MX-only 三格式集」两句均已作废：默认集本身已不含 FP16/BF16，
     *   QuickSpec 也不再有任何 FP16 输入用例可被 hasFp 掉假所伤。
     * 【两条 require】require(!hasMx4 || hasMx8) 与本轮新增的 require(!hasMx8 || hasMx4)
     *   合起来钉死 hasMx4 <=> hasMx8；本 cfg 两者皆真 ⟹ 都满足。 */
-  private val cfg = HiveCoreConfig(arrayN = 8, clusterM = 2, aW = 16, bW = 16, cW = 40,
+  private val cfg = WorkerBeeConfig(arrayN = 8, clusterM = 2, aW = 16, bW = 16, cW = 40,
     aBufferDepth = 2048, bBufferDepth = 2048, cBufferDepth = 2048, scaleBufferDepth = 64)
   // 套件级舍入模式：★ 主用例与两条历史永久用例都不传 rnd ⟹ 全部取这里的 RNE（逐字不变）。
   //   (#155 m3) 自本轮起它同时是 runCase 的 per-case `rnd` 形参的【默认值来源】；要单独换
@@ -456,7 +456,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   //   求值默认参数时该字段【尚未初始化 = null】，实测抛：
   //     java.lang.NullPointerException: Cannot invoke
   //       "chisel3.ChiselEnum$Type.litValue()" because "rnd$1" is null
-  //     at HiveCoreQuickSpec.$anonfun$runCase$2(HiveCoreQuickSpec.scala:194)
+  //     at WorkerBeeQuickSpec.$anonfun$runCase$2(WorkerBeeQuickSpec.scala:194)
   //   且只有 ★ 主用例（写在声明之前）会中招，#146/#151/#155 四条（写在声明之后）全绿 ⟹
   //   这是一个极易被误判为「主用例坏了」的前向引用初始化序陷阱。改成 def 后没有存储字段、
   //   不受类体求值顺序影响，调用即返回枚举成员（RoundingMode.RNE 是 object 成员，与本类
@@ -464,7 +464,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   private def rnd: RoundingMode.Type = RoundingMode.RNE
   /** blk(用户面 Int) → MXBlockSize sel：表逐条由枚举成员构造，blk 取定义式 (16 << sel)，不写 sel 字面量（枚举重排也不错位）。
     * 【#144】MXBlockSize 已收窄为 {M16=0, M32=1}，故基档由 8 改 16：16<<0=16→sel0、16<<1=32→sel1，
-    *   与 HiveDebugModel.DebugParams.aMxBlk/bMxBlk/cMxBlk 的 16<<sel 反解码逐位对齐。 */
+    *   与 WbDebugModel.DebugParams.aMxBlk/bMxBlk/cMxBlk 的 16<<sel 反解码逐位对齐。 */
   private val blkToSel: Map[Int, Int] = Seq(MXBlockSize.M16, MXBlockSize.M32)
     .map(e => (16 << e.litValue.toInt) -> e.litValue.toInt).toMap
   private def selOf(w: String, blk: Int): Int = blkToSel.getOrElse(blk, throw new IllegalArgumentException(
@@ -491,9 +491,9 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
               //   进 DebugParams.rnd（litValue.toInt）⟹ 写入 reg5 bits[18:16]（(#164) 前为 regs(7)
               //   bits[14:12]），RTL 与金锚同源。
               rnd: RoundingMode.Type = rnd,
-              // 【P1-2 W4A8】per-case B 张量基址（进 reg3=bAddr）。默认 = HiveDebugModel.B_BASE；
+              // 【P1-2 W4A8】per-case B 张量基址（进 reg3=bAddr）。默认 = WbDebugModel.B_BASE；
               //   仅负例 ⑤ 用它造 bAddr%32!=0 的失配。★测试名【不含 bBase】⟹ 既有用例名逐字不变
-              //   （B_BASE 是 object HiveDebugModel 的 val，无 #155 那种类体前向引用初始化序陷阱）。
+              //   （B_BASE 是 object WbDebugModel 的 val，无 #155 那种类体前向引用初始化序陷阱）。
               bBase: Long = B_BASE,
               // 【P0 epilogue-1】fused bias 开关与 bias 向量基址（进 reg5[30]=biasOn / reg9=biasAddr）。
               //   biasOn=true：金锚 golden 起始累加值 = biasVal(nn)，硬件 pass-0 psum 基底注入
@@ -506,8 +506,8 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
               // 【P0 epilogue-2】fused requant / ReLU 开关与参数（进 reg5[29]=requantOn /
               //   reg5[15]=reluOn / reg10=rqMBase / reg11=[31:16]zp+[5:0]shift）。
               //   requantOn=true：golden = 量化后整数 sat(round_half_up(relu(acc)×M>>s)+zp)
-              //   （HiveDebugModel goldenC requant 链，独立 rqMRng 激励流，既有用例零漂移）；
-              //   硬件 HiveRequant 独立模块 16-lane 并行。reluOn 单独开启（不 requant）也
+              //   （WbDebugModel goldenC requant 链，独立 rqMRng 激励流，既有用例零漂移）；
+              //   硬件 WbRequant 独立模块 16-lane 并行。reluOn 单独开启（不 requant）也
               //   消费于 INT 族输出（int32Seq 源级 clamp）。TB：dmaScaleA 通道拆【三】流
               //   对账（bias / rqM / scaleA）。★测试名【不含 requant 参数】⟹ 既有用例名
               //   逐字不变；requant 用例须带 caseTag（DuplicateTestNameException 防撞车纪律）。
@@ -525,12 +525,12 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
               //   (scalatest 3.2.19, Engine.scala:669-674). testName = getTestName(testText,
               //   currentBranch) depends ONLY on the `it should "<text>"` string, so the collision
               //   is decided before any require/simulate/compare ever runs. sbt prints it as
-              //     HiveCoreQuickSpec *** ABORTED ***
-              //       Duplicate test name: should run ... (blk 16/16/16, ...) (HiveCoreQuickSpec.scala:<the `it should` line>)
+              //     WorkerBeeQuickSpec *** ABORTED ***
+              //       Duplicate test name: should run ... (blk 16/16/16, ...) (WorkerBeeQuickSpec.scala:<the `it should` line>)
               //     Total number of tests run: 0 / Suites: completed 0, aborted 1
               //   i.e. ABORTED, not FAILED: an exception, not an assertion, and not a golden-model
               //   disagreement. The same collision also lands on the svsim working directory, which
-              //   is derived from the test name (build/chiselsim/HiveCoreQuickSpec/should-run-M-32-
+              //   is derived from the test name (build/chiselsim/WorkerBeeQuickSpec/should-run-M-32-
               //   N-32-K-64-DataFormat-4-MXE5M2--x-...-blk-16-16-16--addrMode-AddrMode-0-MAT--), so
               //   making the name unique repairs both layers with one change.
               //   Default "" keeps the ★ primary call above at its exact historical title.
@@ -546,20 +546,20 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
 
-  // ══ ① 运行前配置体检：镜像 HiveCoreCalcConfig 的 errComb/errCodeComb 裸块（RTL 真实口径）══
-  // 【P2 纯 FP8 订正】kLoadNum 补 INT8/FP8 两臂（is1B 语义，与 HiveDebugModel:383 同源）——
+  // ══ ① 运行前配置体检：镜像 WorkerBeeCalcConfig 的 errComb/errCodeComb 裸块（RTL 真实口径）══
+  // 【P2 纯 FP8 订正】kLoadNum 补 INT8/FP8 两臂（is1B 语义，与 WbDebugModel:383 同源）——
   //   本 def 只用于 errExplain 的提示文本，但 INT/FP8 负例命中 8/4 时旧式会打印错误的
   //   kLoadNum/建议值，诊断现场失真。
   private def kLoadNum(f: DataFormat.Type): Int = if (isMx8(f) || f == DataFormat.INT8 || isFp8Fmt(f)) cfg.totalN * 2 else cfg.totalN * 4  // 镜像 getKLoadNum
   /** Some(code) = 硬件会在 START 后直接置 IRQ_RAW error、不进计算。
-    * 【P0-2 去双源】原本此处有一份 QuickSpec 私有的 hwErrCode 镜像，与 HiveDebugModel.precheckConfigErr
+    * 【P0-2 去双源】原本此处有一份 QuickSpec 私有的 hwErrCode 镜像，与 WbDebugModel.precheckConfigErr
     * 互不一致（后者分列 Some(0)/Some(1)/Some(2)、缺 errCode6、优先级 else-if 链首最高）。现已把权威
-    * 镜像提升为 HiveDebugModel.hwErrCode（单一真源，顺序 if 后写覆盖，逐位镜像 RTL last-connect 序），
+    * 镜像提升为 WbDebugModel.hwErrCode（单一真源，顺序 if 后写覆盖，逐位镜像 RTL last-connect 序），
     * 本 def 与 precheckConfigErr 均委托它 ⟹ 两份镜像合一、永不再分叉。
     * Truth order: 3(MX4xMX8 mix) > 11(int/non-int cross) > 8(K not divisible)
     *   > 10(cAddr alignment) > 7(capacity, RTL-only) > 5 > 4 > 3(isAMx^isBMx) > 0.
     *   (#146) The former leading `7(fp4 blk!=64)` term is
-    *   GONE -- errCode 7 was deleted in hardware and in HiveDebugModel.hwErrCode
+    *   GONE -- errCode 7 was deleted in hardware and in WbDebugModel.hwErrCode
     *   (it had degenerated into a tautology once MXBlockSize became a 2-level
     *   {16,32} enum). Code 7 is NOT free: the CAPACITY guard (m > cBufferDepth
     *   - totalN) still drives errCodeComb := 7.U and is LIVE in all three netlists;
@@ -577,7 +577,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
     *   舍入模式（rnd）不是 errCode 0/3/4/5/6/8 中任何一支的输入 ⟹ RDN/RUP 两条不会
     *   把体检结论推向负向。实测五条体检结论均为「配置合法」→ 走正向 golden 比对。 */
   private def hwErrCode(p: DebugParams, cAddr: Long = C_BASE): Option[Int] =
-    HiveDebugModel.hwErrCode(p, cfg.totalN, cfg.hasMx4, cAddr, cfg.cDmaExtW)
+    WbDebugModel.hwErrCode(p, cfg.totalN, cfg.hasMx4, cAddr, cfg.cDmaExtW)
 
   /** 体检命中时的人类可读原因 + 建议值（取值全部由 cfg/枚举推导，不写死） */
   private def errExplain(p: DebugParams, c: Int): String = c match {
@@ -636,7 +636,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       val alignArm = p.requantOn && p.rqMBase % 4L != 0
       (fmtArm, alignArm) match {
         case (true, _) =>
-          s"requantOn=1 requires cFmt INT8/INT4: cFmt=${p.cFmt}. The requant chain (HiveRequant) only " +
+          s"requantOn=1 requires cFmt INT8/INT4: cFmt=${p.cFmt}. The requant chain (WbRequant) only " +
             "defines two saturation domains (INT8 [-128,127] / INT4 [-8,7]); other output formats have " +
             "no defined encoding for the requanted value. Suggestion: set cFmt = INT8 or INT4, or clear " +
             "requantOn (reg5[29])."
@@ -651,7 +651,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
   /** ② 打印体检结论 + 生效配置摘要 + 派生几何（一次打全，便于对着波形看） */
   private def printHealth(p: DebugParams, predicted: Option[Int], plan: Plan): Unit = {
-    println(s"[$TAG] ═════════════ HiveCoreQuickSpec 配置体检 ═════════════")
+    println(s"[$TAG] ═════════════ WorkerBeeQuickSpec 配置体检 ═════════════")
     // (#155 m3) rnd 的打印源从套件级常量改为按 p.rnd 反查枚举成员：加入 per-case rnd 形参后，
     //   这行必须反映【本用例实际生效】的舍入模式，否则 RDN/RUP 用例会打出
     //   "rnd=RoundingMode(0=RNE)(sel=2)" 这种自相矛盾的行（诊断现场直接失真）。
@@ -676,7 +676,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       case Some(c) => println(s"[$TAG] ★★★ 体检不通过：硬件将在 START 后直接置 IRQ_RAW error（errCode=$c），不进计算 ★★★\n" +
         s"[$TAG]   原因：${errExplain(p, c)}\n[$TAG]   处置：仍然继续跑（负向路径）并硬断言硬件确实以 errCode=$c 拒绝、留下波形") }
     val model = precheckConfigErr(p, cfg.totalN, cfg.hasMx4)   // 金锚口径与 RTL 口径不一致时给出 #124 提示
-    if (model != predicted) println(s"[$TAG] 注：HiveDebugModel.precheckConfigErr 预测=$model 与本处 RTL 口径=$predicted 不一致" +
+    if (model != predicted) println(s"[$TAG] 注：WbDebugModel.precheckConfigErr 预测=$model 与本处 RTL 口径=$predicted 不一致" +
       "（#124：errCode 0/1/2 被 RTL 合并为 0，真实优先级是 6>5>4>3>0 的 last-connect 序）")
   }
   /** ⑥ 失败/超时落盘关键数据文件（波形由 finally 的 copyWave 负责） */
@@ -684,14 +684,14 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
     val b = "sim/debug/quick_fail"; val pw = new java.io.PrintWriter(new java.io.File(s"$b.txt"))
     pw.println(p.banner); pw.println("--- 地址对账失配 ---"); addrBad.foreach(pw.println)
     pw.println("--- C 元素失配 ---"); cmpLines.foreach(pw.println); pw.close()
-    // 位宽实参由 bytes 口径 (aEb*8) 改为 bits 口径 aEbits（HiveDebugModel Phase 3 的单一真源；
+    // 位宽实参由 bytes 口径 (aEb*8) 改为 bits 口径 aEbits（WbDebugModel Phase 3 的单一真源；
     //   memElemBytes 按其自身注释只保留给「整字节 storeElem 与语义查询」，不用于位宽推导）：
     //   字节对齐族 aEbits == aEb*8 逐值恒等（FP32/INT32 4↔32、FP16/BF16/INT16 2↔16、
     //   INT8/MX8 1↔8）⟹ 这些格式落盘文本【逐字不变】；亚字节族 fp4/INT4 的 aEb=0 会传成
     //   0 位（mask=(1<<0)-1=0 把码字全抹成 0，且曾让 writeMatrixHex 拼出非法格式串 "%00X"
     //   崩在本行、盖掉真实失配原因），改 aEbits=4 后按 nibble 码字正常落盘。
-    HiveSimCommon.writeMatrixHex(s"${b}_A.hex", plan.aCode.map(_.map(_.toInt)), plan.aEbits)
-    HiveSimCommon.writeMatrixHex(s"${b}_B.hex", plan.bCode.map(_.map(_.toInt)), plan.bEbits)
+    WbSimCommon.writeMatrixHex(s"${b}_A.hex", plan.aCode.map(_.map(_.toInt)), plan.aEbits)
+    WbSimCommon.writeMatrixHex(s"${b}_B.hex", plan.bCode.map(_.map(_.toInt)), plan.bEbits)
     println(s"[$TAG] FAIL 数据文件已落盘: $b.txt / ${b}_A.hex / ${b}_B.hex") }
 
   // ══ 主运行器：③ 镜像+golden → ④ 仿真+六通道收集式地址对账 → ⑤ 逐元素比对 → ⑥⑦ 波形/回读 → ⑧ 收尾 ══
@@ -699,7 +699,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
     val predicted = hwErrCode(p)                     // ① 体检。负向路径不跑金锚 validate：硬件不进计算，
     if (predicted.isEmpty) validate(p, cfg.totalN, cfg.hasMx4)   //   且 validate 的 require 会先于仿真抛掉、用户看不到 errCode
     val plan = new Plan(p, cfg)
-    plan.prepare()      // ③ 内存镜像（loadW=1 时 B 为 N×K 转置，HiveDebugModel 已实现）
+    plan.prepare()      // ③ 内存镜像（loadW=1 时 B 为 N×K 转置，WbDebugModel 已实现）
     printHealth(p, predicted, plan)                  // ② 摘要
     val maxCycles = if (isMxAny(p.cFmt)) math.max(p.maxCycles, 20000) else p.maxCycles
     // 【#166】cLog 升为 (addr,data,strb) 三元组：dmaC 带 wstrb 且已按地址移位，只有
@@ -707,7 +707,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
     //   其端口宽度 = 1 字节 (rowW=8 @ totalN=16) => lane 窗口退化为单 lane、移位恒 0,
     //   data 不移位, 不在 AXI lane 偏移契约范围内。(NOT "strb is constant full-select"
     //   -- that old rationale only holds coincidentally when rowW=8; see build/166 ss9.4.)
-    val cLog = mutable.ArrayBuffer[HiveSimCommon.CWriteBeat](); val sLog = mutable.ArrayBuffer[(Long, BigInt)]()
+    val cLog = mutable.ArrayBuffer[WbSimCommon.CWriteBeat](); val sLog = mutable.ArrayBuffer[(Long, BigInt)]()
     val addrBad = mutable.ArrayBuffer[String](); var addrBadCnt = 0; var cycle = 0; var regRbMsg = ""; var passed = false
     var regRbOk = false; var done = false; var errSeen = false; var errCode = -1; var cmp: Option[plan.CmpSummary] = None
     // 【perf 端口】perf 采样累加器（与上方运行态变量同作用域，供跑后打印与硬断言）
@@ -715,7 +715,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       "array", "stallA", "stallB", "epilogue", "busy")
     val perfCnt = Array.fill(perfNames.size)(0)
     try {
-      simulate(new HiveCore(cfg)) { dut =>
+      simulate(new WorkerBee(cfg)) { dut =>
         // ④ 地址对账只收集不抛（strictAddr 决定跑完后是否判失败），一次能看到全部失配点
         def chk(ch: String, i: Int, hw: Long, exp: Seq[Long]): Unit = if (i < exp.size && hw != exp(i)) {
           addrBadCnt += 1
@@ -734,25 +734,25 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
         dut.io.resp.ready.poke(true.B); dut.io.cmd.foreach(_.valid.poke(false.B))
         dut.reset.poke(true.B); dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
         // ---- 命令 helper：等待真实 fire/response，再消费响应 ----
-        def cmd(op: HiveCoreOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
+        def cmd(op: WorkerBeeOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
           transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
         }
         def readReg(a: Int): BigInt = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, a)
         // 配置索引 0..11 紧排：M/NK/A/B/C/CONTROL/ScaleA/ScaleB/ScaleC/Bias/RqM/RqParam。
         // STATUS 独立移到 0x1E，IRQ 寄存器为 0x30..0x34。
-        cmd(HiveCoreOp.REG_WRITE2, 0x00, 0x01, p.m, p.n.toLong | (p.k.toLong << 16))
+        cmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, p.m, p.n.toLong | (p.k.toLong << 16))
         // 【P1-2 W4A8】基址改取 p.aBase/p.bBase（与 Plan.prepare 内存镜像同源，DebugParams
         //   默认即 A_BASE/B_BASE ⟹ 既有用例写入值逐位不变）；负例 ⑤ 借此把 bAddr%32!=0 送进守护。
-        cmd(HiveCoreOp.REG_WRITE2, 0x02, 0x03, p.aBase, p.bBase)
-        cmd(HiveCoreOp.REG_WRITE2, 0x04, 0x05, C_BASE, p.controlWord5)
-        cmd(HiveCoreOp.REG_WRITE2, HiveSimCommon.SCALE_A_REG_ADDR, HiveSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE); cmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
+        cmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, p.aBase, p.bBase)
+        cmd(WorkerBeeOp.REG_WRITE2, 0x04, 0x05, C_BASE, p.controlWord5)
+        cmd(WorkerBeeOp.REG_WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE); cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
         // 【P0 epilogue-1】reg9 = biasAddr（biasOn=false 时不写：硬件默认 0、该通路整体不激活）。
-        if (p.biasOn) cmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.BIAS_REG_ADDR, 0x00, p.biasBase, 0L)
+        if (p.biasOn) cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.BIAS_REG_ADDR, 0x00, p.biasBase, 0L)
         // 【P0 epilogue-2】reg10 = rqMBase、reg11 = [31:16]zp + [5:0]shift（requantOn=false 时
         //   不写，与 reg9 同范式；reluOn 位在 reg5[15] 已随控制字写入，无独立槽位）。
         if (p.requantOn) {
-          cmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.RQM_REG_ADDR, 0x00, p.rqMBase, 0L)
-          cmd(HiveCoreOp.REG_WRITE1, HiveSimCommon.RQ_PARAM_REG_ADDR, 0x00, p.controlWord14, 0L) }
+          cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.RQM_REG_ADDR, 0x00, p.rqMBase, 0L)
+          cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.RQ_PARAM_REG_ADDR, 0x00, p.controlWord14, 0L) }
         // ⑦ addrMode / 格式字回读对账：addrMode 无硬件消费者，只能靠回读证明「确实写进去了」
         //   (#164) 重排后控制字全部收敛到 reg5 单寄存器 ⟹ 一次回读即可覆盖 loadWMode/三 MxBlk/
         //   warmup/warmdown/rnd/三 addrMode/三 fmt 共 19 个位域；断言强度【不降反升】（旧写法
@@ -763,7 +763,7 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
         // 【P0 epilogue-1】reg9（biasAddr）回读对账（biasOn 时）：biasOn 位本身已由上方 reg5
         //   bit30 覆盖（controlWord5 含 bit30 ⟹ rb5 对账即含 biasOn），此处只补 biasAddr 槽位。
         if (p.biasOn) {
-          val rb12 = readReg(HiveSimCommon.BIAS_REG_ADDR).toLong
+          val rb12 = readReg(WbSimCommon.BIAS_REG_ADDR).toLong
           val rb12Ok = rb12 == (p.biasBase & 0xFFFFFFFFL)
           regRbOk = regRbOk && rb12Ok
           regRbMsg += f"; reg9 wr=0x${p.biasBase & 0xFFFFFFFFL}%08X rd=0x$rb12%08X" }
@@ -771,8 +771,8 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
         //   reg5（controlWord5 含 bit29/bit15 ⟹ rb5 对账即含两位）覆盖，此处补 rqMBase 与
         //   zp/shift 槽位；reg11 回读 = Cat(rqZp.asUInt, 10'b0, rqShift)，负 zp 以补码位型对账。
         if (p.requantOn) {
-          val rb13 = readReg(HiveSimCommon.RQM_REG_ADDR).toLong
-          val rb14 = readReg(HiveSimCommon.RQ_PARAM_REG_ADDR).toLong
+          val rb13 = readReg(WbSimCommon.RQM_REG_ADDR).toLong
+          val rb14 = readReg(WbSimCommon.RQ_PARAM_REG_ADDR).toLong
           val rb13Ok = rb13 == (p.rqMBase & 0xFFFFFFFFL)
           val rb14Ok = rb14 == (p.controlWord14 & 0xFFFFFFFFL)
           regRbOk = regRbOk && rb13Ok && rb14Ok
@@ -821,12 +821,12 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
                    ack: Boolean => Unit, log: mutable.ArrayBuffer[(Long, BigInt)]): Int =
             if (on) { val a = ad; chk(ch, i, a, exp); log += ((a, da)); ack(true); i + 1 } else { ack(false); i }
           /** 【#166】dmaC 专用写通道驱动：在 wrCh 基础上额外 peek wstrb 并记入三元组日志，
-            * 使 HiveSimCommon.auditCBeatLanes 的 lane 级逐字节对账拿得到选通位。
+            * 使 WbSimCommon.auditCBeatLanes 的 lane 级逐字节对账拿得到选通位。
             * 旧口径从不 peek strb —— 那正是「strb 已移位、wdata 未同源移位」在 TB 侧
             * 长期不可见的原因。 */
           def wrChC(ch: String, i: Int, exp: Seq[Long], on: Boolean, ad: => Long, da: => BigInt,
                     st: => BigInt, ack: Boolean => Unit,
-                    log: mutable.ArrayBuffer[HiveSimCommon.CWriteBeat]): Int =
+                    log: mutable.ArrayBuffer[WbSimCommon.CWriteBeat]): Int =
             if (on) { val a = ad; chk(ch, i, a, exp); log += ((a, da, st)); ack(true); i + 1 } else { ack(false); i }
           cB = wrChC("dmaC", cB, plan.expCAddrSeq, dut.io.dmaC.req.valid.peek().litToBoolean,
             dut.io.dmaC.req.payload.addr.peek().litValue.toLong, dut.io.dmaC.req.payload.data.peek().litValue,
@@ -844,9 +844,9 @@ class HiveCoreQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
           dut.clock.step(); cycle += 1
         }
         dut.io.dmaC.rsp.valid.poke(false.B); dut.io.dmaCScale.get.rsp.valid.poke(false.B); dut.io.cmd.foreach(_.valid.poke(false.B))
-        if (errSeen) errCode = readReg(HiveSimCommon.ERROR_CODE_REG_ADDR).toInt
+        if (errSeen) errCode = readReg(WbSimCommon.ERROR_CODE_REG_ADDR).toInt
         if (predicted.isDefined && errSeen) {
-          readReg(HiveSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
+          readReg(WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
           dut.io.status.inFlight.expect(false.B)
         } else if (done && !errSeen) dut.io.status.inFlight.expect(false.B)
         // 【P0 epilogue-1/2】dmaScaleA 跑后拆流对账（仅正向路径：负向路径硬件不进计算、

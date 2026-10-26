@@ -1,8 +1,8 @@
-# HiveCore 硬件规格
+# WorkerBee 硬件规格
 
-文档版本：`v3.0.0`
+文档版本：`v4.0.0`
 
-修订日期：`2026-10-23`
+修订日期：`2026-10-26`
 
 ## 版本控制
 
@@ -22,25 +22,27 @@
 
 | 版本号 | 日期 | 修改内容 | 相关 Feature ID |
 |---|---|---|---|
-| v3.0.0 | 2026-10-23 | 不兼容端口变更：固定四路 HiveCoreCmd Stream 共享单一寄存器 bank，单 resp 新增 2-bit laneId；采用四 slots/pending 位图的单批响应缓存、拍前读快照与逐地址跨 lane 写仲裁，START 合并为下一拍一次启动并使用胜出 lane 元数据；新增 IRQ_RAW[10] WRITE_CONFLICT，IRQ 低 11 bit 有效、复位 mask 为 0x000007FF；寄存器地址与 CONTROL 布局、数值、DMA、首次 tracing 配对限制不变。四路接口专项 23 例、既有计算/DMA 回归 51 例及测试编译通过 | HIVE-F021、HIVE-F022；HIVE-F025（仅 START 元数据选择） |
-| v2.0.0 | 2026-10-23 | 不兼容重设计寄存器命令接口：采用 6-bit 索引和 START 寄存器，重映射配置与 STATUS；由独立 HiveCoreRegIf 管理在途保护、原子双写、分源粘滞中断及首个未清配置错误码；DMA 错误改为响应握手时立即捕获，tracing 元数据改取启动写命令；数值、布局、计算、DMA 搬运流程与性能事件口径不变 | HIVE-F021–HIVE-F023、HIVE-F025 |
-| v1.1.0 | 2026-10-23 | 按通用硬件规格重组为 14 个编号章节，第 7 章为数据表示规范；补充分立的时序/复位说明与性能/资源口径；更新功能清单引用，功能 ID 与既有技术契约不变 | HIVE-F001–HIVE-F025（章节引用） |
-| v1.0.1 | 2026-10-22 | 版本控制前置为文首章节；Feature List 调整为第 3 章；原第 3–14 章顺延为第 4–15 章，并同步更新章节引用；功能 ID 与技术契约不变 | HIVE-F001–HIVE-F025（仅章节引用） |
-| v1.0.0 | 2026-10-22 | 建立首个编号规格基线，覆盖当前计算架构、格式、布局、接口、寄存器、DMA、epilogue、错误码和软件约束；新增带稳定 ID 的 Feature List 及版本控制章节 | HIVE-F001–HIVE-F025 |
+| v4.0.0 | 2026-10-26 | 不兼容命名变更：GEMM 模块由 HiveCore 更名为 WorkerBee（“Hive”名称改指 NPU core）；顶层、配置、命令/响应/DMA/状态 Bundle 与 HiveCore* 子模块改用 `WorkerBee*`，其余 Hive* 子模块改用 `Wb*`，RTL 模块前缀由 `Hive_` 改为 `Wb_`，源码目录改为 `src/workerbee`；Feature ID 前缀由 `HIVE-` 统一改为 `WB-`，编号与语义不变，旧 ID 不再使用，本表历史记录中的模块名与 ID 已同步改写为新名称；硬件行为、端口位宽、寄存器映射和数值契约不变 | WB-F001–WB-F025、WB-P001–WB-P010、WB-D001–WB-D002（仅更名） |
+| v3.0.1 | 2026-10-26 | 按通用规格模板将第 3 章拆分为功能、性能和 Debug 三类独立清单；性能清单按通路位宽、每拍接受/发射能力和并行度分类，原 WB-P003/P004/P005 的复用、credit/FIFO 与 fused epilogue 机制分别归回既有功能条目，旧 P ID 保留为分类记录且不复用；新增产品内建观测能力的 Debug 分类 ID，不改变硬件接口或行为；既有 WB-F024/F025 作为历史稳定 ID 保留并分别关联 Debug 分类 ID | WB-P001、WB-P002、WB-P003–WB-P005（分类记录）、WB-P006–WB-P010、WB-D001–WB-D002；WB-F002、WB-F011–WB-F020、WB-F024、WB-F025 |
+| v3.0.0 | 2026-10-23 | 不兼容端口变更：固定四路 WorkerBeeCmd Stream 共享单一寄存器 bank，单 resp 新增 2-bit laneId；采用四 slots/pending 位图的单批响应缓存、拍前读快照与逐地址跨 lane 写仲裁，START 合并为下一拍一次启动并使用胜出 lane 元数据；新增 IRQ_RAW[10] WRITE_CONFLICT，IRQ 低 11 bit 有效、复位 mask 为 0x000007FF；寄存器地址与 CONTROL 布局、数值、DMA、首次 tracing 配对限制不变。四路接口专项 23 例、既有计算/DMA 回归 51 例及测试编译通过 | WB-F021、WB-F022；WB-F025（仅 START 元数据选择） |
+| v2.0.0 | 2026-10-23 | 不兼容重设计寄存器命令接口：采用 6-bit 索引和 START 寄存器，重映射配置与 STATUS；由独立 WorkerBeeRegIf 管理在途保护、原子双写、分源粘滞中断及首个未清配置错误码；DMA 错误改为响应握手时立即捕获，tracing 元数据改取启动写命令；数值、布局、计算、DMA 搬运流程与性能事件口径不变 | WB-F021–WB-F023、WB-F025 |
+| v1.1.0 | 2026-10-23 | 按通用硬件规格重组为 14 个编号章节，第 7 章为数据表示规范；补充分立的时序/复位说明与性能/资源口径；更新功能清单引用，功能 ID 与既有技术契约不变 | WB-F001–WB-F025（章节引用） |
+| v1.0.1 | 2026-10-22 | 版本控制前置为文首章节；Feature List 调整为第 3 章；原第 3–14 章顺延为第 4–15 章，并同步更新章节引用；功能 ID 与技术契约不变 | WB-F001–WB-F025（仅章节引用） |
+| v1.0.0 | 2026-10-22 | 建立首个编号规格基线，覆盖当前计算架构、格式、布局、接口、寄存器、DMA、epilogue、错误码和软件约束；新增带稳定 ID 的 Feature List 及版本控制章节 | WB-F001–WB-F025 |
 
 ## 1. 文档说明
 
 ### 1.1 目的
 
-本文定义 HiveCore 的软件可见行为、计算语义、存储布局、接口协议和配置约束。本文档 v3.0.0 将 v2.0.0 的单路寄存器命令端口改为固定四路输入，并在单一响应端口新增 laneId，属于不兼容端口契约；寄存器地址映射与 CONTROL 字段不变。本文不记录 RTL 开发过程，也不承诺本规格之外的功能。带 ID 的 Feature List 见第 3 章；文档版本规则与修订记录见文首“版本控制”章节。
+本文定义 WorkerBee 的软件可见行为、计算语义、存储布局、接口协议和配置约束。v3.0.0 将 v2.0.0 的单路寄存器命令端口改为固定四路输入，并在单一响应端口新增 laneId，属于不兼容端口契约；v3.0.1 仅重构 Feature 分类；当前 v4.0.0 将模块由 HiveCore 更名为 WorkerBee、Feature ID 前缀改为 `WB-`，均不改变硬件行为。寄存器地址映射与 CONTROL 字段不变。本文不记录 RTL 开发过程，也不承诺本规格之外的功能。带 ID 的 Feature List 见第 3 章；文档版本规则与修订记录见文首“版本控制”章节。
 
-HIVE-F021、HIVE-F022 的四路接收、单批缓存、响应顺序、读快照、写仲裁、START 时序/元数据及 WRITE_CONFLICT/IRQ 扩展已实现并通过接口验证；既有计算与 DMA 回归通过。验证不扩大参数化配置的支持范围，也不改变 tracing 首次配对等既有限制。
+WB-F021、WB-F022 的四路接收、单批缓存、响应顺序、读快照、写仲裁、START 时序/元数据及 WRITE_CONFLICT/IRQ 扩展已实现并通过接口验证；既有计算与 DMA 回归通过。验证不扩大参数化配置的支持范围，也不改变 tracing 首次配对等既有限制。
 
 ### 1.2 范围
 
 本文覆盖：
 
-- HiveCore GEMM 阵列及其执行顺序；
+- WorkerBee GEMM 阵列及其执行顺序；
 - INT、FP8、MXFP8、MXFP4 数据格式；
 - A、B、C、scale、bias 和 requant 参数的存储布局；
 - 命令、响应、DMA、状态、中断和性能事件接口；
@@ -52,7 +54,7 @@ HIVE-F021、HIVE-F022 的四路接收、单批缓存、响应顺序、读快照�
 
 - “必须”表示违反该要求会导致命令被拒绝、结果未定义或与本规格不一致。
 - “应”表示集成或软件应遵循的推荐约束。
-- “默认配置”指未显式覆盖 `HiveCoreConfig` 参数时的配置。
+- “默认配置”指未显式覆盖 `WorkerBeeConfig` 参数时的配置。
 - `T` 表示阵列输出列数 `totalN = arrayN × clusterM`；默认 `T=16`。
 - `Nlogical` 表示软件需要的有效列数，`Nprog` 表示写入 N 寄存器并按 T 补齐后的列数；除明确写出 `Nlogical` 外，后续公式中的 `N` 均指编程值 `Nprog`。
 - DMA 与存储基地址均为字节地址；命令中的寄存器地址为索引，不是字节偏移。
@@ -60,7 +62,7 @@ HIVE-F021、HIVE-F022 的四路接收、单批缓存、响应顺序、读快照�
 
 ## 2. 模块概述
 
-HiveCore 是面向矩阵乘法和量化推理的 weight-stationary GEMM 单元，计算：
+WorkerBee 是面向矩阵乘法和量化推理的 weight-stationary GEMM 单元，计算：
 
 ```text
 C = Epilogue(A × B + Bias)
@@ -81,43 +83,80 @@ A 的逻辑形状为 `M×K`，B 的有效形状为 `K×Nlogical`。由于硬件�
 
 ### 3.1 Feature ID 规则
 
-Feature ID 使用 `HIVE-Fnnn`，是功能项的稳定标识，不是寄存器地址、指令操作码或错误码。新增功能使用未分配编号；既有 ID 不因章节移动或文案调整而改变，也不得复用。若功能被移除，后续版本保留该 ID 并标注“已移除”。
+Feature ID 按三类独立编号：
 
-下表列出功能及验证状态。“已实现”不表示任意参数化配置均可用，也不消除对应章节的输入域、布局、时序或系统集成约束；详细章节为功能契约的依据。HIVE-F021、HIVE-F022 的四路接口与 IRQ 扩展、HIVE-F025 的胜出 START 元数据选择已通过验证；首次执行配对的既有限制不变。
+| 类别 | 编号格式 | 描述对象 |
+|---|---|---|
+| 功能 | `WB-Fxxx` | 计算、数据搬运、接口及外部行为，包括 credit、预取、复用、融合和操作快路径等机制 |
+| 性能 | `WB-Pxxx` | 各处通路的位宽与带宽、每拍接受/发射/完成能力，以及通路和阵列的并行度 |
+| Debug | `WB-Dxxx` | 产品内建的性能观测、状态追踪等调试能力 |
+
+ID 不是寄存器地址、指令操作码或错误码，不因章节移动或文案调整而重排、复用。新增条目使用对应类别中未分配的编号；移除条目保留原 ID 并标注“已移除”。性能和 Debug 条目只索引已存在的能力，不把目标值、未来计划、普通状态/错误回执、测试平台统计或仿真断言列为 feature。性能条目不得仅复制功能机制名称，分类更正时记录旧 ID 与对应功能 ID 的去向且不复用旧 ID。
+
+`WB-F024`、`WB-F025` 是 v1.0.0 已发布的历史稳定 ID，因此继续保留在功能清单；从 v3.0.1 起分别以 `WB-D001`、`WB-D002` 作为类别清晰的 Debug 索引。新增分类 ID 不重复定义接口契约，详细语义仍以所引用章节为准。
+
+v4.0.0 起 Feature ID 前缀由 `HIVE-` 改为 `WB-`，`HIVE-Xnnn` 与 `WB-Xnnn` 一一对应、编号不变；`HIVE-` 前缀不再用于本模块。
 
 ### 3.2 功能清单
 
 | Feature ID | 功能 | 状态 | 能力与主要约束 | 规格章节 |
 |---|---|---|---|---|
-| HIVE-F001 | Weight-stationary GEMM | 已实现 | T×T PE；K/N 为空间轴、M 为时间轴；循环为 N tile → K pass → M 行 | 4.1、5.1.1–5.1.2 |
-| HIVE-F002 | 多 K pass 内部累加 | 已实现 | 首 pass 使用零或 bias 基底；后续回灌 C FIFO；仅末 pass 写回 | 5.1.3 |
-| HIVE-F003 | INT8 打包乘加 | 已实现 | 默认每 lane 两元素、每拍覆盖 2T 个 K 元素；有符号累加，溢出绕回 | 5.1.1、5.2.3、7.2 |
-| HIVE-F004 | INT4 打包乘加 | 已实现 | 默认每 lane 四元素、每拍覆盖 4T 个 K 元素；二补码 nibble 按递增 K 打包 | 5.1.1、5.2.3、7.2 |
-| HIVE-F005 | MXFP8 计算 | 已实现 | E4M3/E5M2 可交叉组合；使用 E8M0 block scale；必须 loadWMode=1 | 5.2.1、5.2.4、5.2.6、7.4、7.6 |
-| HIVE-F006 | MXFP4 计算 | 已实现 | E2M1 四元素打包；保留 ±0.5 次正规输入；必须 loadWMode=1 | 7.2、5.2.4–5.2.6、7.4、7.6 |
-| HIVE-F007 | 非 MX FP8 计算 | 已实现 | E4M3/E5M2 可交叉组合；单位 scale 注入且不读取输入 scale；必须 loadWMode=1；不能输出 FP8 | 5.2.1–5.2.5 |
-| HIVE-F008 | INT W4A8 | 已实现 | 仅 A=INT8、B=INT4；B 经 DMA stretch 符号扩展；默认 K%64=0、B_ADDR%32=0、loadWMode=1 | 5.2.1、5.3.2、10.2 |
-| HIVE-F009 | MX W4A8 | 已实现 | 仅 A=MXFP8、B=MXFP4；B 经 DMA stretch 展开；ScaleB 按 A 的 K 窗口步进；默认 K%64=0、B_ADDR%32=0 | 5.2.1、7.6.2、5.3.2 |
-| HIVE-F010 | A/B 独立 MX block scale | 已实现 | A/B 独立选择 block16/32；scale 按 K 分组并使用 E8M0 编码 | 5.2.6、7.4、7.6.1–7.6.2 |
-| HIVE-F011 | 浮点/MX 输出转换 | 已实现 | FP32/FP16/BF16 及 MX 输出；支持 RNE/RTZ/RDN/RUP/RMM；内部归约不保证 IEEE 逐项 FP32 bit-exact | 7.1、7.3、5.2.4–5.2.5 |
-| HIVE-F012 | MX 输出量化与 ScaleC 生成 | 已实现 | 每 block 生成 E8M0 scale；默认 C block 仅允许 16；ScaleC 在途/反压限制必须满足 | 7.4、7.6.3、5.2.7、9.6 |
-| HIVE-F013 | 整数输出截断 | 已实现 | INT32/INT16/INT8/INT4；先取 acc32 再按输出位宽截断；非 requant 模式不饱和 | 5.2.3、5.4.1 |
-| HIVE-F014 | Per-channel fused bias | 已实现 | INT32 或 FP32 bias；每输出列一项；仅首 K pass 注入；需要参数取数 DMA | 7.7.1、5.4.2 |
-| HIVE-F015 | Fused ReLU | 已实现 | 只作用于有符号 acc32，在 requant/最终整数截断前钳零；非整数输出忽略使能 | 5.4.1、5.4.3 |
-| HIVE-F016 | Fused requant | 已实现 | Per-channel 有符号乘数、全命令 shift/zero-point；输入为 acc32/relu32；half-up 舍入后饱和至 INT8/INT4；需要参数取数 DMA | 7.7.2、8.7、5.4.4 |
-| HIVE-F017 | B 权重装载模式 | 已实现 | mode0 对应 K×Nprog row-major；mode1 对应预转置 Nprog×K row-major；格式约束决定可用模式 | 5.1.2、7.5.2 |
-| HIVE-F018 | 自主 A/B/C DMA | 已实现 | 按 N/K 窗口遍历；A 每 N tile 重读；C 按完整 T 列写回，软件必须编程 Nprog | 7.5、5.3、9.3–9.4 |
-| HIVE-F019 | 非对齐读 Gather | 已实现 | A/B/ScaleA/ScaleB 非对齐逻辑拍由对齐物理读拼接；相邻覆盖地址必须可访问；W4A8 stretch 使用独立半片选择路径 | 5.3.2–5.3.3 |
-| HIVE-F020 | DMA 握手与读 FIFO credit | 已实现 | 请求/响应 ready-valid；读请求预留 credit；读响应必须同序且每请求恰有一个响应；ScaleC 另有在途限制 | 6.4、9.3–9.4、9.6 |
-| HIVE-F021 | 寄存器命令接口 | 已实现 | 固定四路 REG_WRITE1/REG_WRITE2/REG_READ 共享一个 bank；6-bit 索引，稀疏混合读写同拍 fire；四 slots/pending 单批缓存，单 resp 按 lane 递增返回 data/err/laneId；拍前读快照、逐命令检查与逐地址 lane3>2>1>0 仲裁；非零 START 合并为延后一拍一次启动；ACK 不表示计算完成 | 4.2、6.1–6.3、8、9.2 |
-| HIVE-F022 | 状态与完成/错误中断 | 已实现 | busy、inFlight、progress 不变；分源 IRQ_RAW/MASK/MASKED/CLEAR 低 11 bit；新增粘滞 WRITE_CONFLICT[10]，fresh event 优先于 W1C；DMA 响应握手错误逐事件捕获，不等待 done；完成不表示无错误 | 6.5–6.6、8.6、8.8、11.1–11.2、10.5、5.1.5 |
-| HIVE-F023 | 运行期配置检查 | 已实现 | 判据与优先级不变；IRQ_RAW[1] 标记配置错误，ERROR_CODE 保存首个未清配置错误码；M/N 非零、Nprog、缓冲区可访问性等仍是软件义务 | 8.8、10 |
-| HIVE-F024 | 性能事件输出 | 已实现 | 输出组合事件电平，不含计数器；DMA 事件为 req.valid 而非 req.fire | 11.3 |
-| HIVE-F025 | 首次执行 Tracing | 已实现 | 复位后首次有效非零 START 的 PC/tag 与 start、done/configuration-error 事件；跨 lane 取最高非零 START lane 的命令元数据（此选择契约已验证）；启动脉冲延后一拍，不保证后续任务配对 | 6.3、9.2、11.4 |
+| WB-F001 | Weight-stationary GEMM | 已实现 | T×T PE；K/N 为空间轴、M 为时间轴；循环为 N tile → K pass → M 行 | 4.1、5.1.1–5.1.2 |
+| WB-F002 | 多 K pass 内部累加 | 已实现 | 首 pass 使用零或 bias 基底；后续回灌 C FIFO；仅末 pass 写回 | 5.1.3 |
+| WB-F003 | INT8 打包乘加 | 已实现 | 默认每 lane 两元素、每拍覆盖 2T 个 K 元素；有符号累加，溢出绕回 | 5.1.1、5.2.3、7.2 |
+| WB-F004 | INT4 打包乘加 | 已实现 | 默认每 lane 四元素、每拍覆盖 4T 个 K 元素；二补码 nibble 按递增 K 打包 | 5.1.1、5.2.3、7.2 |
+| WB-F005 | MXFP8 计算 | 已实现 | E4M3/E5M2 可交叉组合；使用 E8M0 block scale；必须 loadWMode=1 | 5.2.1、5.2.4、5.2.6、7.4、7.6 |
+| WB-F006 | MXFP4 计算 | 已实现 | E2M1 四元素打包；保留 ±0.5 次正规输入；必须 loadWMode=1 | 7.2、5.2.4–5.2.6、7.4、7.6 |
+| WB-F007 | 非 MX FP8 计算 | 已实现 | E4M3/E5M2 可交叉组合；单位 scale 注入且不读取输入 scale；必须 loadWMode=1；不能输出 FP8 | 5.2.1–5.2.5 |
+| WB-F008 | INT W4A8 | 已实现 | 仅 A=INT8、B=INT4；B 经 DMA stretch 符号扩展；默认 K%64=0、B_ADDR%32=0、loadWMode=1 | 5.2.1、5.3.2、10.2 |
+| WB-F009 | MX W4A8 | 已实现 | 仅 A=MXFP8、B=MXFP4；B 经 DMA stretch 展开；ScaleB 按 A 的 K 窗口步进；默认 K%64=0、B_ADDR%32=0 | 5.2.1、7.6.2、5.3.2 |
+| WB-F010 | A/B 独立 MX block scale | 已实现 | A/B 独立选择 block16/32；scale 按 K 分组并使用 E8M0 编码 | 5.2.6、7.4、7.6.1–7.6.2 |
+| WB-F011 | 浮点/MX 输出转换 | 已实现 | FP32/FP16/BF16 及 MX 输出；支持 RNE/RTZ/RDN/RUP/RMM；内部归约不保证 IEEE 逐项 FP32 bit-exact | 7.1、7.3、5.2.4–5.2.5 |
+| WB-F012 | MX 输出量化与 ScaleC 生成 | 已实现 | 每 block 生成 E8M0 scale；默认 C block 仅允许 16；ScaleC 在途/反压限制必须满足 | 7.4、7.6.3、5.2.7、9.6 |
+| WB-F013 | 整数输出截断 | 已实现 | INT32/INT16/INT8/INT4；先取 acc32 再按输出位宽截断；非 requant 模式不饱和 | 5.2.3、5.4.1 |
+| WB-F014 | Per-channel fused bias | 已实现 | INT32 或 FP32 bias；每输出列一项；仅首 K pass 注入；需要参数取数 DMA | 7.7.1、5.4.2 |
+| WB-F015 | Fused ReLU | 已实现 | 只作用于有符号 acc32，在 requant/最终整数截断前钳零；非整数输出忽略使能 | 5.4.1、5.4.3 |
+| WB-F016 | Fused requant | 已实现 | Per-channel 有符号乘数、全命令 shift/zero-point；输入为 acc32/relu32；half-up 舍入后饱和至 INT8/INT4；需要参数取数 DMA | 7.7.2、8.7、5.4.4 |
+| WB-F017 | B 权重装载模式 | 已实现 | mode0 对应 K×Nprog row-major；mode1 对应预转置 Nprog×K row-major；格式约束决定可用模式 | 5.1.2、7.5.2 |
+| WB-F018 | 自主 A/B/C DMA | 已实现 | 按 N/K 窗口遍历；A 每 N tile 重读；C 按完整 T 列写回，软件必须编程 Nprog | 7.5、5.3、9.3–9.4 |
+| WB-F019 | 非对齐读 Gather | 已实现 | A/B/ScaleA/ScaleB 非对齐逻辑拍由对齐物理读拼接；相邻覆盖地址必须可访问；W4A8 stretch 使用独立半片选择路径 | 5.3.2–5.3.3 |
+| WB-F020 | DMA 握手与读 FIFO credit | 已实现 | 请求/响应 ready-valid；读请求预留 credit；读响应必须同序且每请求恰有一个响应；ScaleC 另有在途限制 | 6.4、9.3–9.4、9.6 |
+| WB-F021 | 寄存器命令接口 | 已实现 | 固定四路 REG_WRITE1/REG_WRITE2/REG_READ 共享一个 bank；6-bit 索引，稀疏混合读写同拍 fire；四 slots/pending 单批缓存，单 resp 按 lane 递增返回 data/err/laneId；拍前读快照、逐命令检查与逐地址 lane3>2>1>0 仲裁；非零 START 合并为延后一拍一次启动；ACK 不表示计算完成 | 4.2、6.1–6.3、8、9.2 |
+| WB-F022 | 状态与完成/错误中断 | 已实现 | busy、inFlight、progress 不变；分源 IRQ_RAW/MASK/MASKED/CLEAR 低 11 bit；新增粘滞 WRITE_CONFLICT[10]，fresh event 优先于 W1C；DMA 响应握手错误逐事件捕获，不等待 done；完成不表示无错误 | 6.5–6.6、8.6、8.8、11.1–11.2、10.5、5.1.5 |
+| WB-F023 | 运行期配置检查 | 已实现 | 判据与优先级不变；IRQ_RAW[1] 标记配置错误，ERROR_CODE 保存首个未清配置错误码；M/N 非零、Nprog、缓冲区可访问性等仍是软件义务 | 8.8、10 |
+| WB-F024 | 性能事件输出（历史 ID） | 已实现 | 历史功能索引；类别化 Debug 索引为 WB-D001 | 11.3 |
+| WB-F025 | 首次执行 Tracing（历史 ID） | 已实现 | 历史功能索引；类别化 Debug 索引为 WB-D002 | 6.3、9.2、11.4 |
 
-### 3.3 支持边界
+### 3.3 性能清单
 
-功能清单只索引本规格覆盖的能力；不支持项与实现限制见第 14 章。字段可读写不等价于存在相应数据通路功能。
+记 `T=totalN`、`DA=T×aW`、`DB=T×bW`、`DC=cDmaExtW`；默认 `T=16`、`DA=DB=DC=256 bit`。下表给出接口峰值或源码结构推导的局部上限，**不是端到端实测吞吐或持续带宽保证**；有效计算拍不含权重装载、预蓄、排空和停顿拍，物理 DMA 峰值不扣除写 strobe 未选中的字节。
+
+| Feature ID | 通路/性能项目 | 实现状态 | 位宽、带宽或接受/发射/完成率 | 并行能力、成立条件与瓶颈 | 关联功能/契约章节 |
+|---|---|---|---|---|---|
+| WB-P001 | 阵列空间并行与有效计算拍 | 已实现 | `T×T` PE；每个有效 A 拍同时推进 `T` 个输出列，默认 16 列、256 个 PE | 每个 `(N tile, K pass)` 先消费 `T` 个有效 B 拍、再消费 `M` 个有效 A 拍，两阶段不重叠；供数、回灌、参数取数、波前排空和反压降低实际利用率 | WB-F001、WB-F002、WB-F017；4.1、5.1、12.2 |
+| WB-P002 | 低位宽打包计算通路 | 已实现 | 每个有效 A 拍覆盖：INT8/MXFP8/FP8 及 W4A8 混配为 `2T` 个 K 元素、`2T²` 次 lane-element 乘加贡献，默认 32/512；同格式 INT4/MXFP4 为 `4T` 个 K 元素、`4T²` 次贡献，默认 64/1024 | 同拍并行来自每个 16-bit lane 的 2/4 元素打包，不表示完成 512/1024 个独立输出；W4A8 的 4-bit B 经 stretch 后跟随 8-bit A 的 2T 消费口径。仅在相应格式、K 对齐、合法混配和 loadWMode 条件下成立 | WB-F003–WB-F009；5.1.1、5.2、7.2、12.2 |
+| WB-P006 | 寄存器命令接受与响应通路 | 已实现 | 空闲接受拍最多 `4 条/cycle`；单一响应口最多 `1 条/cycle` | 四 lane 可同拍接受稀疏混合命令，但仅有一个寄存器 bank 和一个执行上下文；一批最多四条，任一响应 pending 时不能接受下一批，最后响应 fire 的下一拍才可接新批 | WB-F021；6.1–6.3、9.2、12.1 |
+| WB-P007 | A/B 外部读数据通路 | 已实现 | A、B 各自请求至多 `1 条/cycle`、响应至多 `1 beat/cycle`；每口数据宽 `DA`/`DB`，默认各 `256 bit = 32 byte/cycle`，两口聚合接口峰值默认 `64 byte/cycle` | A/B 为独立端口，可同拍握手和预取；阵列消费阶段仍按 B 后 A 串行。非对齐 gather 可令一个逻辑拍需要两个物理读，FIFO credit、存储响应和反压会降低持续供数率 | WB-F017–WB-F020；5.3.1–5.3.3、6.4、9.3、12.2 |
+| WB-P008 | C 外部写回通路 | 已实现 | 单口宽 `DC`，请求至多 `1 beat/cycle`；默认 `256 bit = 32 byte/cycle` 物理峰值。默认每个 T 列行：4-bit 为 8 有效字节/1 拍，8-bit 为 16/1 拍，16-bit 为 32/1 拍，32-bit 为 64/2 拍 | 不跨行合拍；4/8-bit 行虽只占部分 byte lane，仍占一个物理请求拍。32-bit 行局部上限为 `0.5 row/cycle`，其余格式至多 `1 row/cycle`；C FIFO 供数、外部 ready、地址阶段和末尾响应排空会降低持续速率 | WB-F011–WB-F013、WB-F018、WB-F020；5.3.4、6.4、9.4、12.2 |
+| WB-P009 | Scale 与 epilogue 参数通路 | 已实现 | 默认 ScaleA、ScaleB 读口各 `32 bit`、至多 `1 beat/cycle`；ScaleC 写口 `8 bit`、至多 `1 beat/cycle`；bias/rqM 在 ScaleA 物理口上各按 `32 bit`、至多 `1 item/cycle` 取数 | ScaleA 与 ScaleB 为独立读口，ScaleC 为独立写口；ScaleA、bias、rqM 共用一个物理口，不能并行，bias 与 rqM 同时使能时先后串行取各 `T` 项。ScaleC 仅用于 MX 量化输出并受在途深度和反压限制 | WB-F010、WB-F012、WB-F014、WB-F016、WB-F020；5.2.6–5.2.7、5.4、6.4、9.5–9.6 |
+| WB-P010 | 输出转换行通路 | 已实现 | 输入为 `T×cEffW bit` 累加行，输出容器为 `T×32 bit`；输入接受和数据输出接口各至多 `1 row/cycle`，释放拍可背靠背接收下一行；默认一次并行处理 `T=16` 个输出元素 | 单行锁存，不能同时保有两行；非量化行需数据输出 fire 才释放，MX 量化行还需同一行 ScaleC 成功提交。下游 C/ScaleC FIFO 反压、requant 参数未就绪及 WB-P008 的多拍写回会降低端到端行率 | WB-F011–WB-F016；5.2.3–5.2.7、5.4、9.5、12.2 |
+
+分类勘误：原 `WB-P003`（多 K pass 片内部分和复用）、`WB-P004`（DMA credit/FIFO 解耦）、`WB-P005`（fused epilogue）属于功能机制，分别归入既有 `WB-F002`、`WB-F020`、`WB-F011–WB-F016`；旧 P ID 保留为分类记录、不得复用，**不表示 RTL 功能被删除**。
+
+详细结构拍数见 12.2；端到端延迟、吞吐、频率、面积和功耗实测仍待补充，边界见 12.3。
+
+### 3.4 Debug 清单
+
+| Feature ID | Debug feature | 状态 | 观测能力、适用条件与主要约束 | 契约章节 |
+|---|---|---|---|---|
+| WB-D001 | 性能事件观测 | 已实现 | `perf` 输出 DMA、阵列、stall、epilogue 和 busy 的组合事件电平，不含计数器且不控制功能路径；DMA 事件采用 `req.valid` 口径，外部 PMU 负责采样累加 | 6.6、11.3 |
+| WB-D002 | 首次执行 Tracing | 已实现 | `respForTracing` 无反压输出首次有效启动及其 done/configuration-error 事件，PC/tag 取胜出 START lane；复位后仅首次执行保证配对，不能替代 IRQ/ERROR_CODE | 6.3、9.2、11.4 |
+
+STATUS、IRQ/ERROR_CODE 和普通命令响应属于功能接口，不列为专用 Debug feature；测试平台日志、波形开关和仿真断言也不构成产品内建 Debug 能力。
+
+### 3.5 支持边界
+
+三类清单只索引本规格已实现的能力；不支持项与实现限制见第 14 章。字段可读写不等价于存在相应数据通路功能，接口峰值或局部结构上限也不等价于已测得的持续吞吐。
 
 ## 4. 架构说明
 
@@ -137,18 +176,18 @@ Feature ID 使用 `HIVE-Fnnn`，是功能项的稳定标识，不是寄存器地
 
 | 子模块 | 职责 |
 |---|---|
-| HiveCoreRegIf | 独立管理固定四路命令共享的一个配置/状态 bank、四 slots/pending 单批响应缓存、逐命令译码检查与逐地址仲裁、单 resp 的 laneId/顺序、start 及胜出 PC/tag、inFlight、完成/错误/WRITE_CONFLICT 事件汇聚、IRQ_RAW/MASK/CLEAR、ERROR_CODE 与 irq（四路相关契约已验证） |
+| WorkerBeeRegIf | 独立管理固定四路命令共享的一个配置/状态 bank、四 slots/pending 单批响应缓存、逐命令译码检查与逐地址仲裁、单 resp 的 laneId/顺序、start 及胜出 PC/tag、inFlight、完成/错误/WRITE_CONFLICT 事件汇聚、IRQ_RAW/MASK/CLEAR、ERROR_CODE 与 irq（四路相关契约已验证） |
 | CalcConfig | 检查运行配置并派生执行几何与地址步长 |
 | Executor | 控制权重装载、A 行消费、K pass 回灌和最终排空 |
 | Scratchpad | 提供 A、B、C/partial-sum FIFO |
-| HiveComb | 完成权重驻留乘加与空间归约 |
+| WbComb | 完成权重驻留乘加与空间归约 |
 | A/B 读 DMA、C 写 DMA | 搬运矩阵数据 |
 | Scale 读写 DMA | 搬运输入/输出 scale；ScaleA 物理口另供 bias/rqM 取数 |
-| HiveOutCvt | 完成输出格式转换、整数 ReLU 与 requant |
+| WbOutCvt | 完成输出格式转换、整数 ReLU 与 requant |
 
-顶层向 HiveCoreRegIf 提供 Executor `done`、CalcConfig `errPluse` 及各 DMA 的 `rsp.fire && rsp.err` 分源事件；配置错误事件同时提供 CalcConfig 的错误码。Executor busy/progress 接入 HiveCoreRegIf 供 STATUS 读取，FIFO occupancy 由顶层直接输出到 `io.status`。共享 ScaleA 物理口的响应错误按仲裁器当前响应 owner 归类为 ScaleA、Bias 或 RqM；WAIT 状态仍归 ScaleA，具体映射见第 10.5 节。
+顶层向 WorkerBeeRegIf 提供 Executor `done`、CalcConfig `errPluse` 及各 DMA 的 `rsp.fire && rsp.err` 分源事件；配置错误事件同时提供 CalcConfig 的错误码。Executor busy/progress 接入 WorkerBeeRegIf 供 STATUS 读取，FIFO occupancy 由顶层直接输出到 `io.status`。共享 ScaleA 物理口的响应错误按仲裁器当前响应 owner 归类为 ScaleA、Bias 或 RqM；WAIT 状态仍归 ScaleA，具体映射见第 10.5 节。
 
-HiveCoreRegIf 是寄存器与中断状态的所有者；顶层不得等到 Executor done 才采样 DMA 本地错误锁存状态。计算、DMA 请求/响应协议、数据布局和 perf 事件口径不因这一职责拆分改变。
+WorkerBeeRegIf 是寄存器与中断状态的所有者；顶层不得等到 Executor done 才采样 DMA 本地错误锁存状态。计算、DMA 请求/响应协议、数据布局和 perf 事件口径不因这一职责拆分改变。
 
 功能执行语义见第 5 章；FIFO 深度和编译条件见第 8 章。
 
@@ -220,7 +259,7 @@ IDLE -> DRAIN -> LOAD_B -> LOAD_A -> NEXT_NK_TILE -> ... -> DRAIN -> IDLE
 
 - 清除运行游标；
 - 计算 `nTiles` 和 `kTiles`；
-- 本批合法非零 START 经 HiveCoreRegIf 仲裁产生一次 start（四路 START 契约已验证）、通过 CalcConfig 检查后，flush A/B/C 工作 FIFO；
+- 本批合法非零 START 经 WorkerBeeRegIf 仲裁产生一次 start（四路 START 契约已验证）、通过 CalcConfig 检查后，flush A/B/C 工作 FIFO；
 - 设置首个窗口待执行并进入 DRAIN。
 
 ##### DRAIN
@@ -263,7 +302,7 @@ AND C DMA 不忙
 满足时：
 
 - Executor `done` 输出一拍脉冲；
-- HiveCoreRegIf 清除 `inFlight`，并置位粘滞 `IRQ_RAW[0]`；
+- WorkerBeeRegIf 清除 `inFlight`，并置位粘滞 `IRQ_RAW[0]`；
 - 该完成源是否使 `irq` 置高取决于 `IRQ_MASK[0]`，`irq` 的完整表达式见第 11.2 节；
 - 若这是复位后的首次执行，tracing 输出 done 事件；
 - Executor 返回 IDLE。
@@ -476,11 +515,11 @@ shifted = rounded + zeroPoint
 
 本节四路接收、读快照、写仲裁与 START 契约已验证。
 
-`cmd[0]`、`cmd[1]`、`cmd[2]`、`cmd[3]` 为固定四路、各自具有 ready/valid 握手的 `Stream[HiveCoreCmd]` 输入，由 HiveCoreRegIf 处理。四路共享一个配置/状态/IRQ 寄存器 bank 和一个执行上下文，不是四套配置或四个任务上下文；命令 lane 编号由输入端口位置确定，不新增命令 payload 字段。每路 Payload：
+`cmd[0]`、`cmd[1]`、`cmd[2]`、`cmd[3]` 为固定四路、各自具有 ready/valid 握手的 `Stream[WorkerBeeCmd]` 输入，由 WorkerBeeRegIf 处理。四路共享一个配置/状态/IRQ 寄存器 bank 和一个执行上下文，不是四套配置或四个任务上下文；命令 lane 编号由输入端口位置确定，不新增命令 payload 字段。每路 Payload：
 
 | 字段 | 宽度 | 含义 |
 |---|---:|---|
-| `op` | 2 bit | HiveCoreOp：REG_WRITE1、REG_WRITE2、REG_READ；编码 3 保留 |
+| `op` | 2 bit | WorkerBeeOp：REG_WRITE1、REG_WRITE2、REG_READ；编码 3 保留 |
 | `reg0Addr` | 6 bit | 第一个寄存器索引，即 slot0 的地址 |
 | `reg1Addr` | 6 bit | 第二个寄存器索引，即 slot1 的地址 |
 | `data0` | 32 | 第一个写数据 |
@@ -492,7 +531,7 @@ shifted = rounded + zeroPoint
 
 操作码编码：
 
-| 编码 | HiveCoreOp | 操作 |
+| 编码 | WorkerBeeOp | 操作 |
 |---:|---|---|
 | 0 | REG_WRITE1 | 写 `reg0Addr`，数据为 `data0`；slot1 不参与 |
 | 1 | REG_WRITE2 | 整体检查 `reg0Addr/data0` 与 `reg1Addr/data1`，合法后逐目标地址仲裁提交 |
@@ -558,7 +597,7 @@ IRQ_CLEAR 跨 lane 只使用最高 lane 的候选，禁止跨 lane OR；合法�
 | `err` | 1 | 0=接口接受（包括合法但部分/全部写目标仲裁落败），1=接口拒绝 |
 | `laneId` | 2 bit | 本响应对应的命令输入 lane 编号 0–3 |
 
-每条 `cmd[i].fire` 均生成且只生成一个响应，包括读、写 ACK、合法 no-op 和拒绝命令。HiveCoreRegIf 仅提供四个按 lane 编号的响应缓存 slots 与 4-bit `pending[3:0]` 位图，缓存一批，不建立多批队列或四个执行上下文。接受拍保存每个 fire lane 的 data/err 并置其 pending 位；未 fire lane 的 pending 为 0。响应从接受后的下一拍起可返回。
+每条 `cmd[i].fire` 均生成且只生成一个响应，包括读、写 ACK、合法 no-op 和拒绝命令。WorkerBeeRegIf 仅提供四个按 lane 编号的响应缓存 slots 与 4-bit `pending[3:0]` 位图，缓存一批，不建立多批队列或四个执行上下文。接受拍保存每个 fire lane 的 data/err 并置其 pending 位；未 fire lane 的 pending 为 0。响应从接受后的下一拍起可返回。
 
 只在本批 pending lane 中按编号递增串行输出响应，跳过未参与的 lane；读和所有写 ACK 遵循同一顺序，不按 op、成功/拒绝或写仲裁优先级重排。输出 laneId 是当前最小 pending lane；其 pending 位只在对应 `resp.fire` 清除。尤其读的 pending 不得在捕获快照、内部处理完成或 `resp.valid` 时提前清除，必须等该读响应 `resp.fire`。
 
@@ -580,7 +619,7 @@ REG_WRITE1/REG_WRITE2 的 ACK 不等待计算结束；`resp.err=0` 只表示接�
 | `pc` | 32 | 本批最高合法非零 START lane 的整条命令携带的 PC |
 | `tag` | 8 | 本批最高合法非零 START lane 的整条命令携带的 tag |
 
-四路 START 元数据选择契约已验证：REG_WRITE2 中的 START 使用整条命令的 PC/tag；同 lane 两项非零 START 合并一次，跨 lane 仅最高合法非零 START lane 胜出，本批只捕获一次该命令的 PC/tag。普通配置写、读取、IRQ 写、零 START 写、被拒绝命令以及落败 lane 的 START 均不捕获启动元数据。高 lane 零 START 不阻挡低 lane 非零 START。start 事件与 HiveCoreRegIf 在本批命令接受后一拍产生的单个 start 对应，不因响应反压延后或重复，不把普通 ACK 当作 tracing 完成事件。
+四路 START 元数据选择契约已验证：REG_WRITE2 中的 START 使用整条命令的 PC/tag；同 lane 两项非零 START 合并一次，跨 lane 仅最高合法非零 START lane 胜出，本批只捕获一次该命令的 PC/tag。普通配置写、读取、IRQ 写、零 START 写、被拒绝命令以及落败 lane 的 START 均不捕获启动元数据。高 lane 零 START 不阻挡低 lane 非零 START。start 事件与 WorkerBeeRegIf 在本批命令接受后一拍产生的单个 start 对应，不因响应反压延后或重复，不把普通 ACK 当作 tracing 完成事件。
 
 可靠性边界见第 11.4 节，首次配对限制不变。
 
@@ -699,7 +738,7 @@ A 按 `M×K` row-major 稠密存储：
 A[m][k]
 ```
 
-每个 N tile 都会重新读取对应 A 数据；HiveCore 内部不跨 N tile 缓存 A。
+每个 N tile 都会重新读取对应 A 数据；WorkerBee 内部不跨 N tile 缓存 A。
 
 #### 7.5.2 B 矩阵
 
@@ -731,7 +770,7 @@ C 按 `M×Nprog` row-major 写回，其中 `Nprog` 必须是 T 的整数倍。�
 Nprog = ceil(Nlogical / T) × T
 ```
 
-A×B、C、bias、requant 参数和相关 scale 布局均按 `Nprog` 构造，逻辑列数 `Nlogical` 由软件在 HiveCore 之外保存。补齐列必须具有可访问的 B/参数数据，C 缓冲区也必须按每行 `Nprog` 个元素分配。
+A×B、C、bias、requant 参数和相关 scale 布局均按 `Nprog` 构造，逻辑列数 `Nlogical` 由软件在 WorkerBee 之外保存。补齐列必须具有可访问的 B/参数数据，C 缓冲区也必须按每行 `Nprog` 个元素分配。
 
 ### 7.6 MX Scale 存储布局
 
@@ -865,7 +904,7 @@ bias 和 rqM 共用 ScaleA DMA 物理读口；两者同时启用时，硬件先�
 
 ### 8.3 寄存器索引总表
 
-寄存器索引为 6 bit，范围 `0x00–0x3F`。配置存储由 HiveCoreRegIf 持有；四路共享这一固定 bank（共享与仲裁契约已验证），不按 lane 复制寄存器。地址映射、配置字段的既有位布局与计算含义不变，仅中断有效位扩展到低 11 bit。
+寄存器索引为 6 bit，范围 `0x00–0x3F`。配置存储由 WorkerBeeRegIf 持有；四路共享这一固定 bank（共享与仲裁契约已验证），不按 lane 复制寄存器。地址映射、配置字段的既有位布局与计算含义不变，仅中断有效位扩展到低 11 bit。
 
 | 索引 | 名称 | 访问 | 含义 |
 |---:|---|---|---|
@@ -1024,7 +1063,7 @@ IRQ_MASKED 读返回 `IRQ_RAW & ~IRQ_MASK`，高 21 bit 为 0；读取不清事�
 
 ### 9.1 时钟与复位边界
 
-HiveCore 使用 Chisel `Module` 的隐式 clock/reset 接口。本文不固定交付 RTL 的复位类型、有效电平、同步/异步形式或复位保持周期；这些项目须在具体集成时依据发射 RTL 确认，不得仅由命令/DMA payload 表推定。
+WorkerBee 使用 Chisel `Module` 的隐式 clock/reset 接口。本文不固定交付 RTL 的复位类型、有效电平、同步/异步形式或复位保持周期；这些项目须在具体集成时依据发射 RTL 确认，不得仅由命令/DMA payload 表推定。
 
 复位清除配置寄存器组、待发 start、`inFlight`、IRQ_RAW（含 WRITE_CONFLICT）和 ERROR_CODE；IRQ_MASK 复位为 `0x000007FF`，高 21 bit 为 0，因此 IRQ_MASKED 与 irq 为 0。四路单批缓存复位契约已验证：复位使四个响应 slots 无效、`pending[3:0]=0`、`resp.valid=0`，不保留未消费响应或重发旧启动。未初始化的数据存储内容不构成有效输入；复位后必须重新配置再启动执行。
 
@@ -1032,7 +1071,7 @@ HiveCore 使用 Chisel `Module` 的隐式 clock/reset 接口。本文不固定�
 
 本节四路接收、拍前快照/保护、单批反压与 START 时序/元数据契约已验证。
 
-HiveCoreRegIf 在批接收拍对各 lane 命令整体检查，再对合法写入逐地址仲裁。全部 winning 配置在该 `cmd.fire` 拍提交；本批存在合法非零 START 候选时仅最高 lane 胜出，在接受拍置位一次 `inFlight` 并捕获一次胜出命令的 PC/tag，下一拍输出一个一拍 start，计算使用本批所有 winning 配置。单写 START、同 lane 配置+START 双写和跨 lane 配置/START 同批均使用这一时序；同 lane 两项非零 START 按位 OR 合并一次，零 START 不阻挡非零候选。不建立 shadow 配置组。ACK 不等待启动检查或任务完成；响应反压也不延迟或重复写提交或启动副作用。
+WorkerBeeRegIf 在批接收拍对各 lane 命令整体检查，再对合法写入逐地址仲裁。全部 winning 配置在该 `cmd.fire` 拍提交；本批存在合法非零 START 候选时仅最高 lane 胜出，在接受拍置位一次 `inFlight` 并捕获一次胜出命令的 PC/tag，下一拍输出一个一拍 start，计算使用本批所有 winning 配置。单写 START、同 lane 配置+START 双写和跨 lane 配置/START 同批均使用这一时序；同 lane 两项非零 START 按位 OR 合并一次，零 START 不阻挡非零候选。不建立 shadow 配置组。ACK 不等待启动检查或任务完成；响应反压也不延迟或重复写提交或启动副作用。
 
 同批各读命令在接受拍捕获拍前快照，包含 STATUS 与 IRQ 寄存器，不旁路同拍写/启动/新事件。合法性与 inFlight 保护也仅使用拍前状态：本拍 done/配置错误不使拍前在途配置写或非零 START 变为合法，同批 START 不使原本拍前空闲的其它 lane 配置写变为非法。
 
@@ -1146,7 +1185,7 @@ ScaleC 通过独立 8-bit 写接口输出。当前实现的 ScaleC FIFO/在途�
 
 - 不启动正常 GEMM；
 - CalcConfig 输出 `errPluse` 和按第 10.3 节选出的配置错误码；
-- HiveCoreRegIf 清除 `inFlight`、置位 IRQ_RAW[1]，按首次 pending / 清除同拍新事件规则捕获 ERROR_CODE；
+- WorkerBeeRegIf 清除 `inFlight`、置位 IRQ_RAW[1]，按首次 pending / 清除同拍新事件规则捕获 ERROR_CODE；
 - `irq` 是否置高取决于 IRQ_MASK[1] 及其它未屏蔽 pending 源；
 - 若这是复位后的首次执行，tracing 输出 configuration error。
 
@@ -1154,7 +1193,7 @@ ScaleC 通过独立 8-bit 写接口输出。当前实现的 ScaleC FIFO/在途�
 
 ### 10.5 DMA 错误与上报边界
 
-顶层必须逐拍将各 DMA 的 `rsp.fire && rsp.err` 作为分源事件提供给 HiveCoreRegIf，直接置位第 8.8.1 节对应 IRQ_RAW 位，不等待 Executor done。响应仅 `valid` 而未握手时不重复形成事件；同一源后续错误保持粘滞位，W1C 同拍新事件优先。DMA 本地错误锁存在返回 IDLE 时清除，不影响已捕获的 RAW。因此早期读 DMA 响应错误不会因本地状态先行清除而漏报。
+顶层必须逐拍将各 DMA 的 `rsp.fire && rsp.err` 作为分源事件提供给 WorkerBeeRegIf，直接置位第 8.8.1 节对应 IRQ_RAW 位，不等待 Executor done。响应仅 `valid` 而未握手时不重复形成事件；同一源后续错误保持粘滞位，W1C 同拍新事件优先。DMA 本地错误锁存在返回 IDLE 时清除，不影响已捕获的 RAW。因此早期读 DMA 响应错误不会因本地状态先行清除而漏报。
 
 A、B、C、ScaleB、ScaleC 使用各自响应源。共享 ScaleA 物理口上的错误必须按该响应握手时仲裁器的当前响应 owner 分类，而不是按请求端的新 owner、最终 done 拍 owner 或某项使能位推断：
 
@@ -1319,7 +1358,7 @@ IRQ_RAW（含 WRITE_CONFLICT）与 ERROR_CODE 跨启动保持；没有自动清�
 
 ### 13.4 Cache 与一致性
 
-HiveCore 接口本身不定义 cache coherence。若系统 DMA 与 CPU cache 不一致，软件必须在非零 START 写前 clean 输入和参数缓冲区，并在完成后 invalidate 输出缓冲区；具体操作由 SoC 平台定义。
+WorkerBee 接口本身不定义 cache coherence。若系统 DMA 与 CPU cache 不一致，软件必须在非零 START 写前 clean 输入和参数缓冲区，并在完成后 invalidate 输出缓冲区；具体操作由 SoC 平台定义。
 
 ## 14. 约束与实现限制
 

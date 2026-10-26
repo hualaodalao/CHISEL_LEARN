@@ -165,7 +165,7 @@ class FpCvtMx8ToMid extends Module {
   io.exp  := Mux(io.isE5M2, expE5M2, expE4M3)
   io.mant := Mux(io.isE5M2, mantE5M2, mantE4M3)
 
-  // ========== inf/nan 守护（与原 HiveWorkUnit.scala 中 HiveCvtOpMx 同源，该模块已随 FusionMac 重构删除；E2M1 不经本路径） ==========
+  // ========== inf/nan 守护（与原 WbWorkUnit.scala 中 WbCvtOpMx 同源，该模块已随 FusionMac 重构删除；E2M1 不经本路径） ==========
   //   E5M2 exp 全1 → inf/nan；E4M3 exp 全1 且 mant 全1 → NaN
   val selInfNan = Mux(io.isE5M2, isInfNanE5M2, isInfNanE4M3)
   val consumeValidEff = WireDefault(false.B)
@@ -386,7 +386,7 @@ class FpCvtMx8ToFp32 extends Module {
   // ========== 输出选择 ==========
   io.out := Mux(io.isE5M2, outE5M2, outE4M3)
 
-  // ========== inf/nan 守护（与原 HiveWorkUnit.scala 中 HiveCvtOpMx 同源，该模块已随 FusionMac 重构删除；E2M1 不经本路径） ==========
+  // ========== inf/nan 守护（与原 WbWorkUnit.scala 中 WbCvtOpMx 同源，该模块已随 FusionMac 重构删除；E2M1 不经本路径） ==========
   val selInfNan = Mux(io.isE5M2, isInfNanE5M2, isInfNanE4M3)
   val consumeValidEff = WireDefault(false.B)
   consumeValidEff := io.consumeValid

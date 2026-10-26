@@ -1,11 +1,11 @@
-/** HiveCoreDmaScaleWr — C 侧量化 scale 写回 DMA（P3b，dmaCScale 通道）。
+/** WorkerBeeDmaScaleWr — C 侧量化 scale 写回 DMA（P3b，dmaCScale 通道）。
   *
   * 职责：量化输出（outFmt 1xx）运行时，cDma（WrOnly）每写出一行量化密集行
   * 即同拍产出一行 E8M0 块 scale（cvt.io.scaleOut，宽 cScaleRowW
   * = (totalN/minBlockSize)*8 = totalN/2 **bit** = totalN/16 **字节**；totalN=16 时 8 bit。
   * (#155 MJ2) 订正：原文写「cScaleRowW = totalN/8 字节」，与实际相差 2 倍
   * （minBlockSize=16 而非 8，且原式漏了 bit/字节 量纲）。同类 2× 错另见
-  * HiveCoreElaborate 的 P3b 端口变更留痕与 HiveOutCvt 的 scaleRow 注释，均已一并订正），
+  * WorkerBeeElaborate 的 P3b 端口变更留痕与 WbOutCvt 的 scaleRow 注释，均已一并订正），
   * 经顶层深 2 cScaleFifo（P2 裁定 5：唯一 scale 缓冲，已从 Scratchpad 上移）缓冲后
   * 由本模块写到外部存储（基址 = regFile.cScaleAddr）。
   *
@@ -20,7 +20,7 @@
   *   每轮起始地址恒等于 baseAddr + nt*colTileOffset，无累积误差、易对账。
   *   【#133 撤销旧声明】本段原写「cDma 数据通道的块间跳转用 curAddr += colAddr
   *   三角累积，是已知遗留问题（禁动区）；本模块为新通道，刻意不复制」——该声明已
-  *   过期：cDma（HiveCoreDmaWrOnly.sNEXT_N）已改为 `curAddr := io.regFile.cAddr +
+  *   过期：cDma（WorkerBeeDmaWrOnly.sNEXT_N）已改为 `curAddr := io.regFile.cAddr +
   *   colAddr`，两个 C 侧写通道现同为「基址 + 轮偏移」线性模型，不存在「禁动区」的
   *   三角累积通道。历史教训留痕：当年正是「金锚按缺陷 RTL 反向拟合 + 头注释把它标成
   *   禁动区」两件事互相背书，使该缺陷在所有 nTiles≥2 用例上假绿潜伏。
@@ -47,15 +47,15 @@
   * sIDLE（abort = executePulse & !cQuantRun），busy 归低，dmaCBusy OR 门解锁，
   * 非量化运行正常进行。io.done 不得在 config-err 场景接入完成链。
   *
-  * @param cfg HiveCore 配置（行宽固定 = cfg.cScaleRowW，每 8 元素块 1 字节）
+  * @param cfg WorkerBee 配置（行宽固定 = cfg.cScaleRowW，每 8 元素块 1 字节）
   */
 
 import chisel3._
 import chisel3.util._
 
-/** HiveCoreDmaWrOnly — 只写 DMA 引擎（多拍发射器，P2 两段式架构）。
+/** WorkerBeeDmaWrOnly — 只写 DMA 引擎（多拍发射器，P2 两段式架构）。
   *
-  * 职责：消费顶层 HiveOutCvt 输出的转换后密集行（行粒度握手，fire 即锁存进本模块
+  * 职责：消费顶层 WbOutCvt 输出的转换后密集行（行粒度握手，fire 即锁存进本模块
   * 行寄存器），按 tile 自动地址生成、以 cDmaExtW 位宽逐拍发往外部存储。
   * 拍拆分归本模块（计划裁定 4：cvt = 转换+行寄存器，cDma = 多拍发射器）。
   *
@@ -69,7 +69,7 @@ import chisel3.util._
   *   第 nt 轮块首址 = io.regFile.cAddr + nt*calcConfig.cColTileAddressOffset
   *   块内行首址     = 块首址 + lineCounter*calcConfig.cRowAddressOffset
   *   拍内地址       = curAddr + beatCnt × calcConfig.cBeatAddrStep（顶层单源运行期步进）
-  * 块间跳转 = 「基址 + 轮偏移」线性模型（与同文件 HiveCoreDmaScaleWr 同构）：
+  * 块间跳转 = 「基址 + 轮偏移」线性模型（与同文件 WorkerBeeDmaScaleWr 同构）：
   *   sNEXT_N 拍执行 curAddr := io.regFile.cAddr + colAddr; colAddr := colAddr +
   *   cColTileAddressOffset，其中 colAddr 锁存初值 = 1 轮偏移（见 startReload），
   *   故第 nt 轮起始地址恒 = cAddr + nt*cColTileAddressOffset，无累积误差、易对账。
@@ -77,47 +77,47 @@ import chisel3.util._
   *   (1) 旧注「块间跳转采用『跳回起点再前移一个块』的三角累积增量式计算（金锚背书，
   *       行级不动）：jump = blockOffset - (innerRows - 1) * rowStep」是更早提交的化石
   *       公式、与本模块代码不符；「金锚背书」亦非权威——当时金锚
-  *       （HiveSimCommon.cAddrSeqDense）本身就是按缺陷 RTL 反向拟合出的三角累积闭式
+  *       （WbSimCommon.cAddrSeqDense）本身就是按缺陷 RTL 反向拟合出的三角累积闭式
   *       base + nt*(m-1)*rowOff + nt*(nt+1)/2*colOff，与「curAddr := curAddr + colAddr」
   *       逐字同源，两者互相背书使所有 nTiles≥2 用例的 dmaC 逐拍地址硬断言退化为
   *       「RTL 与其镜像自比」而恒真假绿（FP32/N=32 下 nt=1 首址实得 base+0xFC0、
   *       正确值 base+0x40）。金锚现已改回张量语义绝对式，RTL 与金锚独立推导后相等。
-  *   (2) 旧注「与 HiveCoreExecutor 侧的『C 写回地址别名』约定一致」——该别名在 main
+  *   (2) 旧注「与 WorkerBeeExecutor 侧的『C 写回地址别名』约定一致」——该别名在 main
   *       源码中无任何定义（死引用，全仓仅两处注释命中），已删除；C 侧地址语义的唯一
   *       实际来源是 regFile.cAddr 与 calcConfig 的 cRow/cColTile/cBeatAddrStep 三偏移。
   *       【#136-RW1 采纳选项 (b)】本条留痕改用【描述性表述】、不复述原名裸 token，使
-  *       grep 式死引用审计在 src/hive/scala/main/ 下对该名字 0 命中，无需读上下文区分
-  *       「活引用」与「删除留痕」（同款处理见 HiveCore.scala 与 HiveCoreDmaRdOnly.scala
+  *       grep 式死引用审计在 src/workerbee/scala/main/ 下对该名字 0 命中，无需读上下文区分
+  *       「活引用」与「删除留痕」（同款处理见 WorkerBee.scala 与 WorkerBeeDmaRdOnly.scala
   *       的 #133 死引用清理段）。
   *
   * 【#136-RW3 提交纪律留痕：#133 在 main 侧的触碰清单（实测 5 段注释 + 0 功能行）】
-  *   背景：本文件与 HiveCore.scala / HiveCoreDmaRdOnly.scala 在工作树里【同时承载他任务的
+  *   背景：本文件与 WorkerBee.scala / WorkerBeeDmaRdOnly.scala 在工作树里【同时承载他任务的
   *   功能行】，故「#133 仅注释级」这一结论【无法由 git diff 自证】、只能靠任务标注推断。
   *   为让后续能按任务拆 commit，此处逐段登记 #133 的 main 侧触碰点。下列行号是 #136 全部
   *   编辑落地后的实测值；定位请以【文本锚点】为准，行号会随注释改动漂移（本会话已发生四次
   *   锚点漂移，例如 #118 的 W6 锚点从 L446-449 漂到 L566-567）。
-  *   (1) HiveCoreDmaWrOnly.scala L17-22 ——【#133 撤销旧声明】撤销「cDma sNEXT_N 三角累积
+  *   (1) WorkerBeeDmaWrOnly.scala L17-22 ——【#133 撤销旧声明】撤销「cDma sNEXT_N 三角累积
   *       属禁动区」的过期声明，改述为两个 C 侧写通道同为「基址 + 轮偏移」线性模型。
   *       #136 未再改动此段。
-  *   (2) HiveCoreDmaWrOnly.scala L72-87 ——【#133 订正两条伪权威表述】其一撤销化石公式
+  *   (2) WorkerBeeDmaWrOnly.scala L72-87 ——【#133 订正两条伪权威表述】其一撤销化石公式
   *       jump = blockOffset - (innerRows-1)*rowStep 并说明金锚反向拟合的机理；其二删除
   *       Executor 侧「C 写回地址别名」死引用。其中 L84-87 由 #136-RW1 追加（去裸 token）。
-  *   (3) HiveCore.scala L155-161 ——【#133 死引用清理】calcConfig 生产者注释里「与 Executor
+  *   (3) WorkerBee.scala L155-161 ——【#133 死引用清理】calcConfig 生产者注释里「与 Executor
   *       侧三个 tile 首址别名保持一致」的伪约定删除留痕。其中 L159-161 由 #136-RW1 追加。
-  *   (4) HiveCoreDmaRdOnly.scala L70-78 ——【#133 死引用清理】A/B tile 首址别名死引用的删除
+  *   (4) WorkerBeeDmaRdOnly.scala L70-78 ——【#133 死引用清理】A/B tile 首址别名死引用的删除
   *       留痕。#133 当时只订正命名、未校验同块的化石公式，遗留问题由 #136-KW3 修：KW3 重写
   *       其上方 L26-68（六条跳转分通道描述 + 两支闭式 + 化石公式撤销），L70-75 由 #136-RW1
   *       追加去裸 token，L76-78 由 #136-KW3 追加信号名对照。
-  *   (5) HiveCoreElaborate.scala L67-71 ——【#133 撤销】把「cDma sNEXT_N 三角累积地址模型」
+  *   (5) WorkerBeeElaborate.scala L67-71 ——【#133 撤销】把「cDma sNEXT_N 三角累积地址模型」
   *       从「禁动区典型项」清单移除 + 教训留痕。#136 未再改动此段。
   *   ★ 功能行归属：#133 在 main 侧的功能行改动数 = 【0】。本文件 sNEXT_N 分支的
   *     `curAddr := io.regFile.cAddr + colAddr`（文本锚点定位）是【用户手工修复】、不属
   *     #133；#133 只把金锚与注释改到与该修复一致。
-  *   注：#136 任务描述写「4 段注释」，实测为 5 段（漏计 HiveCoreElaborate.scala 那段），
+  *   注：#136 任务描述写「4 段注释」，实测为 5 段（漏计 WorkerBeeElaborate.scala 那段），
   *     差异已在 #136 报告第 (10) 项「与任务前提矛盾之处」明说。
   *
   * 【#136-RW3 拆 commit 建议：main 侧功能行按任务归属（注释级改动可单独成一 commit）】
-  *   HiveCore.scala：
+  *   WorkerBee.scala：
   *     · respForTracing 端口声明 + tracing FSM（tracingSt/tracingPcReg/tracingTagReg 与
   *       io.respForTracing.valid/payload 全部驱动）        → tracing 任务
   *     · dmaCScale 位宽由字面 8 还原为 cfg.cScaleRowW      → 裁定2
@@ -127,19 +127,19 @@ import chisel3.util._
   *     · blkLatchCnt/blkLatchFull 新增 + scratchpad.io.cPop.ready 与 cvt.io.in.valid 各加
   *       `&& !blkLatchFull`（同源双门）                    → #122
   *     · scaleB lockstep 注释（该段无功能行）              → #118
-  *   HiveCoreDmaRdOnly.scala：
+  *   WorkerBeeDmaRdOnly.scala：
   *     · 删除 bNextKTileAddressOffset 死寄存器             → B5
   *     · sIDLE 锁存与轮内切 k-tile 两处 B 地址改写（降序起点项 (totalN-1)*rowOffset +
   *       lastBTileStartAddr 累加模型）                     → B5
-  *   HiveCoreDmaWrOnly.scala：
+  *   WorkerBeeDmaWrOnly.scala：
   *     · sNEXT_N 的 `curAddr := curAddr + colAddr` → `curAddr := io.regFile.cAddr + colAddr`
   *       （本文件唯一一对功能行改动）                      → 用户手工修复
-  *   HiveCoreElaborate.scala：非注释功能行 = 0
+  *   WorkerBeeElaborate.scala：非注释功能行 = 0
   *
   * 【#136-RW3 结论：回归数字不可归因于单一任务】#136 收尾实测（9 套件全量）：
   *   Total 80 / Suites: completed 9, aborted 0 / succeeded 77, failed 3, canceled 0,
   *   ignored 0。任务书给的基线是 76/73/3；差的 +4 全部来自【并行任务 #137】在 #136
-  *   会话期间给 HiveOutCvtSpec 追加的 4 个 INT4 用例（该套件 18→22，4 例全绿），
+  *   会话期间给 WbOutCvtSpec 追加的 4 个 INT4 用例（该套件 18→22，4 例全绿），
   *   #136 自身新增用例数 = 【0】。
   *   这恰好是本段结论最强的证据：该数字是【整棵未提交工作树的联合属性】—— 它同时
   *   包含 tracing / 裁定2 / B1 / B2 / B5 / #122 / #118 / 用户 dmaC 修正 / #133 / #136 /
@@ -179,15 +179,15 @@ import chisel3.util._
   *     calcConfig.cDmaBufBeatTar）且外部 req.ready 为高的那一拍才拉高 bufPop.ready 弹出
   *     该行 ⇒ 仍是「行粒度握手、每行只收一次」，但收行时刻在【末拍】而非首拍。
   *   - 原文「bufPop.ready = sTRANSFER_M 且行锁存空」描述的是已下线的 lineValid 二态锁存
-  *     模型（旧 HiveCoreDma.scala 时代）。拆分重构后行寄存职责已归顶层 cvt（全设计唯一
-  *     一份，见 HiveCore.scala 的 #122「禁动区声明：不恢复 lineData/lineValid」段），
+  *     模型（旧 WorkerBeeDma.scala 时代）。拆分重构后行寄存职责已归顶层 cvt（全设计唯一
+  *     一份，见 WorkerBee.scala 的 #122「禁动区声明：不恢复 lineData/lineValid」段），
   *     本模块原有的 lineData/lineValid 死寄存器已由 #125 删除（清理段见下方 beatCnt 声明处）。
   *   - 「与 RdOnly 对称」亦不成立：RdOnly 的信用计数 ostCredit 【参与 req.valid 门控】
   *     （`req.valid := ostCredit =/= 0.U & state === sTRANSFER`），即由 buffer 余量决定
   *     发不发 cmd；本模块的 req.valid = (state === sTRANSFER_M) & bufPop.valid、
   *     bufPop.ready = (state === sTRANSFER_M) & req.ready & lastBeat，【两者都不含
   *     ostCredit】——本模块的 ostCredit 只在 sDONE 用作「在途写拍已排空」的放行判据
-  *     （`.elsewhen(ostCredit === 0.U)` 才发 done）。同文件的 HiveCoreDmaScaleWr 又是
+  *     （`.elsewhen(ostCredit === 0.U)` 才发 done）。同文件的 WorkerBeeDmaScaleWr 又是
   *     第三种口径（req.valid 含 `ostCredit =/= depth`），故三者互不对称，勿互相套用。
   *   - 数据在外部 writeData.ready（= dmaExtWrIF.req.ready）为高时才发拍，天然支持逐拍
   *     暂停（此条原文正确，保留）。
@@ -207,7 +207,7 @@ import chisel3.util._
   *     地址的 byte lane 偏移【同源左移】就位，与 strb 行逐拍同源 ⟹ 对外【不再是低位口径】。
   *     下游若忽略 wstrb、按「行数据在总线字低位」整字落盘，将在 off≠0 的拍上错位（#168-S3）。
   *
-  * 【P2 两段式分工（裁定 4/6）】精度转换与行寄存器归顶层 HiveOutCvt（握手模块），
+  * 【P2 两段式分工（裁定 4/6）】精度转换与行寄存器归顶层 WbOutCvt（握手模块），
   * 本模块只消费转换后密集行（bufPop，宽 totalN×32，按 outFmt 选段、高位已由 cvt 填零）
   * 并拆拍发出；格式族判据单源化：io.outFmt ← 顶层唯一源 cOutFmtEff（废除旧「整数强制透传 000」判据）。
   *
@@ -215,13 +215,13 @@ import chisel3.util._
   * 用于异常路径后的强制重启（同 RdOnly 说明）。
   * 安全性：脱离 sTRANSFER_M 时 bufPop.ready/writeData.valid 自然拉低，无协议违约。
   *
-  * @param cfg      HiveCore 配置
+  * @param cfg      WorkerBee 配置
   * @param bufWidth P2 签名保留参数（语义已死：bufPop 位宽固定 = totalN×32 密集行）
   * @param hasFp    P2 签名保留参数（语义已死：规格化硬件随 cvt 上移顶层）
   * @param hasMx    P2 签名保留参数（语义已死：量化支路随 cvt 上移顶层；
   *                 cScalePush 端口删除，scale 改由顶层 cvt.scaleOut → 深 2 cScaleFifo 提交）
   */
-class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean = false, hasMx: Boolean = false) extends Module {
+class WorkerBeeDmaWrOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, hasFp: Boolean = false, hasMx: Boolean = false) extends Module {
   // 总线侧写回位宽：P0 契约直取 cfg.cDmaExtW（默认 256）。
   val extW = cfg.cDmaExtW
   // bufPop 侧位宽：消费顶层 cvt.out 转换后密集行（行粒度，全设计唯一行寄存器在 cvt 内，
@@ -238,9 +238,9 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
     val done  = Output(Bool())                       // 完成脉冲
     val busy  = Output(Bool())                       // 忙标志
     val err   = Output(Bool())                       // 错误标志
-    val dmaExtWrIF = new HiveCoreDMAExtWriteOnlyIF(cfg, extW)
-    val calcConfig = Input(HiveCoreExePreCalcConfig(cfg))  // tile 数、地址偏移与 cBeatAddrStep
-    val regFile = Input(HiveCoreRegister(cfg))           // 仅使用 cAddr/m（loopMode 不影响 C 写回遍历）
+    val dmaExtWrIF = new WorkerBeeDMAExtWriteOnlyIF(cfg, extW)
+    val calcConfig = Input(WorkerBeeExePreCalcConfig(cfg))  // tile 数、地址偏移与 cBeatAddrStep
+    val regFile = Input(WorkerBeeRegister(cfg))           // 仅使用 cAddr/m（loopMode 不影响 C 写回遍历）
     val bufPop = slave(Stream(UInt(popW.W)))         // 消费 cvt.out 转换后整行（行粒度，fire 即锁存）
     val bufOccupancy = Input(UInt(log2Up(cfg.cBufferDepth + 1).W))  // P2 无本模块内消费者（保顶层接线稳定）
     val nCntOut = Output(UInt(cfg.mnkWidth.W))       // 回供当前 N tile 序号，顶层算 cvt.nEff
@@ -261,7 +261,7 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
   val state = RegInit(sIDLE)
 
   // Internal IF
-  val dmaExtWrIF = Wire(new HiveCoreDMAExtWriteOnlyIF(cfg, extW))
+  val dmaExtWrIF = Wire(new WorkerBeeDMAExtWriteOnlyIF(cfg, extW))
   val dmaCurStrb = Wire(UInt((cfg.cDmaExtW / 8).W))
   val dmaMaxStrb = Wire(UInt((cfg.cDmaExtW / 8).W))
   val dma2Strb = Wire(UInt((cfg.cDmaExtW / 8 / 2).W))
@@ -285,7 +285,7 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
   //   `addrShiftBytes << 3` 是 UInt << Int 静态移位 → 8-bit（最大值 31×8=248）；
   //   `data << 8-bit UInt` 是动态移位 → Chisel 层结果展宽到 cDmaExtW + (2^8 - 1) = 511 bit，
   //   故【必须】显式 (cDmaExtW-1, 0) 截回总线位宽。
-  //   ★实测取证（#169 重发射后 src/hive/verilog*/Hive_HiveCoreDmaWrOnly.sv:78-80）：
+  //   ★实测取证（#169 重发射后 src/workerbee/verilog*/Wb_WorkerBeeDmaWrOnly.sv:78-80）：
   //     firtool 【并未】对该移位做已知位收敛，网表中间量就是 `wire [510:0]`（511-bit），
   //     移位量以 `{503'h0, addr[4:0], 3'h0}` 的 511-bit 拼接形式给出。评审 build/168-S4
   //     预期的「≈287-bit = 256+31」【不成立】——那是「firtool 会利用低 3 位恒 0」的推测，
@@ -308,11 +308,11 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
   //       · strb：dmaCurStrb(32-bit) << off 被 32-bit sink 截 ⟹ strb = 0；
   //       · data：off*8 >= 256 ⟹ (cDmaExtW-1,0) 窗口内全 0；
   //     即 strb 与 data【双双归零】⟹ 外部内存一个字节都不写、且不报 err（静默全丢）。
-  //   机器级证据：陈旧产物 src/hive/verilog_mx/Hive_HiveCoreDmaWrOnly.sv:82 的 firtool 输出
+  //   机器级证据：陈旧产物 src/workerbee/verilog_mx/Wb_WorkerBeeDmaWrOnly.sv:82 的 firtool 输出
   //     是 `<< _dmaExtWrIF_req_payload_addr_T_1[4:0]`（而非 [5:0]）——综合器把 %32 收敛成
   //     「丢掉 bit 5」，这正是「取模在做实际工作」的证据（网表看不到 % 不代表源码可删）。
   //   现改写为显式 5-bit 切片，陷阱从根上消除：既不需要取模，也不再需要「勿删」警示。
-  //   恒等性依据：require(isPow2(cDmaExtW)) 已由 HiveCoreConfig.scala:291 强制（#169 追加注释前
+  //   恒等性依据：require(isPow2(cDmaExtW)) 已由 WorkerBeeConfig.scala:291 强制（#169 追加注释前
   //     该行在 :265，评审 build/168 引用的就是旧行号）⟹ dmaBytes
   //     恒为 2 的幂 ⟹ addr mod dmaBytes ≡ addr(log2Up(dmaBytes)-1, 0)，二者【逐值恒等】。
   //   下标安全性：totalN >= 4（arrayN>=4、clusterM>=1）且 require(totalN*8 <= cDmaExtW)
@@ -329,12 +329,12 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
   //       dmaBytes = 32 ⟹ cBeatAddrStep = 32、2 拍/行、cDmaDmaBeatTar = 0 ⟹ lanes = 32
   //       （满档），此时【任何 off > 0】都触发截断：每拍静默丢 off 字节、STATUS.err 不置位
   //       （例：基址余 8 的 64 字节行会少写 16 字节，外部内存保留旧值）。
-  //       ★本路径现由【errCode 10】显式报错（HiveCoreCalcConfig 的「C write-back address
-  //         alignment guard」分支），不再静默；软件对齐契约 W0/W1/W2 见 HiveCoreCalcConfig
+  //       ★本路径现由【errCode 10】显式报错（WorkerBeeCalcConfig 的「C write-back address
+  //         alignment guard」分支），不再静默；软件对齐契约 W0/W1/W2 见 WorkerBeeCalcConfig
   //         的 C WRITE-BACK ALIGNMENT CONTRACT 段（#169-W2）。
   //   (b) N 非 totalN 整数倍 ⟹ rowOff 不是 cWriteBytes 整数倍，属既有「strb 档位不按 N 尾数
   //       细化」缺陷族，#166/#169 范围外，未在此处掩盖；仿真期由 TB 侧 STRB-OVERFLOW 判据
-  //       （HiveSimCommon.auditCBeatLanes）可见，硬件侧【仍无 errCode】。
+  //       （WbSimCommon.auditCBeatLanes）可见，硬件侧【仍无 errCode】。
   // 时序：addrShiftBytes 是 req.payload.addr 的纯组合函数，本行是纯组合桶形移位
   //   （byte 粒度 5 级 mux2），无新增时序元件、无 latch；与 strb 行共用同一源表达式 ⟹ 天然同源。
   //
@@ -347,12 +347,12 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
   //   (2) lane 偏移，用【运行期寄存器】：
   //         addr = curAddr + beatCnt * io.calcConfig.cBeatAddrStep
   //       （见下方 dmaExtWrIF.req.payload.addr 那一行），cBeatAddrStep 由
-  //       HiveCoreCalcConfig.scala 的 cWriteBytes/cBeatAddrStep 派生段运行期算出。
+  //       WorkerBeeCalcConfig.scala 的 cWriteBytes/cBeatAddrStep 派生段运行期算出。
   //   今天的互补性由该派生式保证：
   //     cWriteBytes >  cDmaBytes ⟹ cBeatAddrStep = cDmaBytes (= cDmaExtW/8) 且多拍；
   //     cWriteBytes <= cDmaBytes ⟹ cDmaBufBeatTar = 0 ⟹ beatCnt ≡ 0，(1) 恒为 0 偏移。
   //   ★二者【无 require / 断言绑定】。改 cBeatAddrStep 公式（含「双行合拍」一类提案）
-  //     必须同步复核 (1) 与 (2)。反向交叉引用见 HiveCoreCalcConfig 的
+  //     必须同步复核 (1) 与 (2)。反向交叉引用见 WorkerBeeCalcConfig 的
   //     「#169 W10 REVERSE CROSS-REFERENCE」段。TB 侧若要机器可检，须用【纯张量语义】
   //     不变式（同行相邻两拍 addr 差 = cDmaExtW/8），不得从同一条派生链取值，否则共模失效。
   // ==========================================================================
@@ -405,7 +405,7 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
   // 顶层 cvt 行寄存 → C FIFO）；因为 bufPop.ready 只在 lastBeat 那一拍拉高，一行在其余
   // beatsPerRowEff-1 拍期间由上游 FIFO 保持稳定不前移 —— 原标题担心的「整行错位」是由
   // 【上游持稳】避免的，不是由本模块锁存避免的。
-  // 佐证：HiveCore.scala 的 #122「禁动区声明」明确写「不恢复 lineData/lineValid
+  // 佐证：WorkerBee.scala 的 #122「禁动区声明」明确写「不恢复 lineData/lineValid
   // （行寄存职责已归 cvt，全设计唯一一份）」。
   // ★ 请勿把 lineData/lineValid 接回数据路：那会造出第二份行锁存，重新引入
   //   #122 主修复所消除的同拍竞态（cvt.in.ready 组合直通 ∧ cStoreGate 寄存 ∧ FIFO 未空）。
@@ -423,7 +423,7 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
 
   io.nCntOut := nCnt  // 回供顶层算 cvt.nEff（原 WrOnly 内 nEff 组合逻辑已迁出）
 
-  // P2：内嵌 HiveOutCvt 例化已删除（裁定 4）——cvt 上移 HiveCore 顶层（握手模块：
+  // P2：内嵌 WbOutCvt 例化已删除（裁定 4）——cvt 上移 WorkerBee 顶层（握手模块：
   // in ← cPop mux、out → 本模块 bufPop、scaleOut → 顶层深 2 cScaleFifo），
   // 原 TODO(P2) 临时接法（8+3 处）随本重构全部清除。
 
@@ -587,7 +587,7 @@ class HiveCoreDmaWrOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, hasFp: Boolean =
 
 
 
-class HiveCoreDmaScaleWr(cfg: HiveCoreConfig) extends Module {
+class WorkerBeeDmaScaleWr(cfg: WorkerBeeConfig) extends Module {
   private val rowW = cfg.cScaleRowW
   // P2（裁定 5）：唯一 scale 缓冲 = 顶层深 2 cScaleFifo（原 Scratchpad 内深度
   // scaleBufferDepth 已删）；在途上限/credit 位宽随之收窄（log2Up(2+1)=2 bit）。
@@ -599,10 +599,10 @@ class HiveCoreDmaScaleWr(cfg: HiveCoreConfig) extends Module {
     val done  = Output(Bool())                       // 完成脉冲
     val busy  = Output(Bool())                       // 忙标志
     val err   = Output(Bool())                       // 错误标志（rsp.err 锁存）
-    val dmaExtWrIF = HiveCoreDMAExtWriteOnlyIF(cfg, rowW)  // 外部写通道（行宽 = cScaleRowW）
-    val calcConfig = Input(HiveCoreExePreCalcConfig(cfg))  // nTile + cScale 行/列步进
+    val dmaExtWrIF = WorkerBeeDMAExtWriteOnlyIF(cfg, rowW)  // 外部写通道（行宽 = cScaleRowW）
+    val calcConfig = Input(WorkerBeeExePreCalcConfig(cfg))  // nTile + cScale 行/列步进
     val baseAddr = Input(UInt(cfg.addrWidth.W))      // scale 写回基址（← regFile.cScaleAddr）
-    val regFile = Input(HiveCoreRegister(cfg))       // 仅使用 m（内层行数）
+    val regFile = Input(WorkerBeeRegister(cfg))       // 仅使用 m（内层行数）
     val bufPop = slave(Stream(UInt(rowW.W)))         // 从 cScaleFifo pop 数据
   })
 
@@ -670,12 +670,12 @@ class HiveCoreDmaScaleWr(cfg: HiveCoreConfig) extends Module {
   //     下一行现为 `((1 << (rowW / 8)) - 1).U`。当前配置 totalN=16 ⟹ rowW/8=1，
   //     新旧公式都算 1 ⟹ 纯编译期字面量求值、网表级 no-op ⟹ 重发射三套 verilog
   //     产物逐字节零 diff（取证见 build/w3_strb_precedence_fix.md）。
-  //     交叉引用见 HiveCoreConfig.scala 的 minBlockSize/cScaleRowW 解耦清单
+  //     交叉引用见 WorkerBeeConfig.scala 的 minBlockSize/cScaleRowW 解耦清单
   //     （require(minBlockSize == ...) 上方那段）。
   //   ★同时订正【scaleC 豁免于 #166 lane 契约的理由】：依据是【端口宽度 = 1 字节
   //     （rowW = 8 bit @ totalN=16）⟹ lane 窗口退化为单 lane、移位恒为 0】，
   //     【不是】「其 strb 为常量满档」——后者仅 rowW=8 时巧合成立（见上表）。
-  //     旧理由已扩散到 HiveSimCommon.scala:604、HiveCoreSimCaseIntSpec.scala:134 与
+  //     旧理由已扩散到 WbSimCommon.scala:604、WorkerBeeSimCaseIntSpec.scala:134 与
   //     build/166 §7.2-6（test 侧两处由 #170 订正，build/166 已追加更正段）。
   //     ⟹ 本行括号已修；totalN 提到 32 时剩余待办 = 把 scaleC 纳入 lane 审计
   //     + Config 侧 cScaleRowW 解耦。

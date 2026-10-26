@@ -1,4 +1,4 @@
-/** HiveCore dmaC 写回精度转换模块（P1：握手化独立模块 = 转换核 + 行寄存器）。
+/** WorkerBee dmaC 写回精度转换模块（P1：握手化独立模块 = 转换核 + 行寄存器）。
   *
   * 【P1 两段式契约】cvt = 转换+行寄存器；拍拆分归下游 cDma（多拍发射器）：
   *   - in: slave Stream，数据宽 = totalN × cEffW（转换前原始累加行，每槽 cEffW 位，
@@ -14,8 +14,8 @@
   *     scaleOut.fire 后释放——行/量化的 scale 配对永不错位、不丢失。
   *     in.ready = 行寄存器空闲（未持行，或本拍恰为释放拍，支持背靠背直通）。
   *
-  * outFmt 编码（4-bit；来源 = HiveCoreRegister.cFmt := regs(7)(11,8).asTypeOf(DataFormat())，
-  *   顶层 HiveCore 直连 cvt.io.outFmt := regFile.cFmt。编码定义已收敛至 HiveEnum.DataFormat
+  * outFmt 编码（4-bit；来源 = WorkerBeeRegister.cFmt := regs(7)(11,8).asTypeOf(DataFormat())，
+  *   顶层 WorkerBee 直连 cvt.io.outFmt := regFile.cFmt。编码定义已收敛至 WbEnum.DataFormat
   *   枚举：成员声明即隐式 id 顺延【无显式 Value(n)】，宽度 = 最大 id INT4(9) 的 bitLength = 4）：
   *   0=FP32（默认臂）/ 1=FP16 / 2=BF16 / 3=mxfp8-E4M3 量化 / 4=mxfp8-E5M2 量化 /
   *   5=mxfp4-E2M1 量化 / 6=INT32 / 7=INT16 / 8=INT8 / 9=INT4（#137 补入：整数族四档
@@ -29,7 +29,7 @@
   *   量化判据（本模块 scaleOut.valid 门）= isQuantFmt = DataFormat.isMx(fmtReg)
   *   = {MXE4M3(3), MXE5M2(4), MXE2M1(5)}。INT4 ∉ isMx ⟹ INT4 输出【无块 scale 语义】：
   *   scaleOut.valid 恒 0、不产生 scaleC 行。INT4 与 MXE2M1 仅在打包宽度上对称
-  *   （HiveEnum.isHalfB = INT4 || MXE2M1 ⟹ CalcConfig 侧 8B/行、beats=1），
+  *   （WbEnum.isHalfB = INT4 || MXE2M1 ⟹ CalcConfig 侧 8B/行、beats=1），
   *   量化/scale 语义不共享——INT4 是定点截断档，不是量化档。
   *
   * out 密集行选段（低列号元素在低位，无效高位段填零）：
@@ -70,9 +70,9 @@
   * （RNE 为严格 tie-to-even：guard && (sticky || lsb)；方向性模式按
   * 「被截断位非零」增大幅度），而 applyRounding 是 guard 单参简化签名
   * （其 RNE 不含 lsb tie 判定），强行复用会使两侧语义互相扭曲；此处独立
-  * 实现并与测试软件参考模型（HiveSimCommon.swFp32ToFp16/swFp32ToBf16）
+  * 实现并与测试软件参考模型（WbSimCommon.swFp32ToFp16/swFp32ToBf16）
   * 逐位同构，杜绝双源漂移。量化支路复用同一判定函数（roundUpN 别名，
-  * 5 模式不变、RMM=guard），软件参考为 HiveSimCommon.swQuantBlock。
+  * 5 模式不变、RMM=guard），软件参考为 WbSimCommon.swQuantBlock。
   *
   * 【两级舍入链声明】量化输出与 16-bit 通路同格式：40→32 固定简化 RNE 规格化
   * （fpNormalize40to32）+ 量化运行期 rnd（roundUpN）；方向性模式（RDN/RUP/RMM）
@@ -84,23 +84,23 @@
 import chisel3._
 import chisel3.util._
 
-class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
+class WbOutCvt(cfg: WorkerBeeConfig) extends Module {
   // 延迟规格化格式槽约束：40-bit {sign,exp8,mant31} 必须落在 cEffW 槽低位。
   // P1 按格式族条件化：含 fp/mx 时原 require 语义不变；纯整数配置仅走 int 支路（槽低位截取），
   // 放宽为 cEffW >= 8（int8 截断下限；int32 支路对 <32 位槽零扩展后取低 32 位；
   // #137 int4 仅需 4 位，被该下限天然覆盖，未再放宽）。
   if (cfg.hasFp || cfg.hasMx) {
-    require(cfg.cEffW >= 40, s"HiveOutCvt: cEffW(${cfg.cEffW}) 必须 >= 40（延迟规格化格式需要）")
+    require(cfg.cEffW >= 40, s"WbOutCvt: cEffW(${cfg.cEffW}) 必须 >= 40（延迟规格化格式需要）")
   } else {
-    require(cfg.cEffW >= 8, s"HiveOutCvt: 纯整数配置 cEffW(${cfg.cEffW}) 必须 >= 8（int 支路槽低位截取）")
+    require(cfg.cEffW >= 8, s"WbOutCvt: 纯整数配置 cEffW(${cfg.cEffW}) 必须 >= 8（int 支路槽低位截取）")
   }
   // P3a 量化支路按 8 元素组构建块 amax 树：totalN 必须为 8 的整数倍（MX 配置
   // totalN==16 天然满足，此处拦截未来非 8 倍数配置的静默错位）
-  require(cfg.totalN % 8 == 0, s"HiveOutCvt: totalN(${cfg.totalN}) 必须为 8 的整数倍（量化块按 8 元素组构建）")
+  require(cfg.totalN % 8 == 0, s"WbOutCvt: totalN(${cfg.totalN}) 必须为 8 的整数倍（量化块按 8 元素组构建）")
   private val nGroups: Int = cfg.totalN / 8   // 8 元素组数（量化块基础粒度）
 
-  // outFmt 编码（4-bit；来源 = HiveCoreRegister.cFmt := regs(7)(11,8).asTypeOf(DataFormat())）；
-  // 编码定义已收敛至 HiveEnum.DataFormat 枚举（成员声明即隐式 id 顺延，无显式 Value(n)，
+  // outFmt 编码（4-bit；来源 = WorkerBeeRegister.cFmt := regs(7)(11,8).asTypeOf(DataFormat())）；
+  // 编码定义已收敛至 WbEnum.DataFormat 枚举（成员声明即隐式 id 顺延，无显式 Value(n)，
   // 最大 id = INT4(9) ⟹ 宽度 4-bit）：0=FP32 1=FP16 2=BF16 3=MXE4M3 4=MXE5M2 5=MXE2M1
   // 6=INT32 7=INT16 8=INT8 9=INT4；10..15 reserved 回落 fp32（枚举无成员，仅为 cvt MuxCase
   // 默认臂兜底；execute 拍先被族校验拦截，不参与任何量化选路，故不设枚举值）。
@@ -152,9 +152,9 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   private val rqZpReg    = if (cfg.hasInt) Some(RegInit(0.S(16.W))) else None
   private val reluReg    = if (cfg.hasInt) Some(RegInit(false.B))   else None
 
-  // 格式族判据（一律整值枚举比较，无位拆分；与 HiveEnum 谓词同源）：
+  // 格式族判据（一律整值枚举比较，无位拆分；与 WbEnum 谓词同源）：
   //   int 族（cvt 选段用）= INT32(6)/INT16(7)/INT8(8)/INT4(9)，INT4 由 #137 补入。
-  //     不引用 HiveEnum.isInt（= INT8||INT16||INT4，不含 INT32）作选段判据：本模块
+  //     不引用 WbEnum.isInt（= INT8||INT16||INT4，不含 INT32）作选段判据：本模块
   //     需要四档各自独立选段宽度，逐值判定避免把 INT32 漏在族外。
   //   量化族 = isQuantFmt = DataFormat.isMx(fmtReg) = {MXE4M3(3),MXE5M2(4),MXE2M1(5)}。
   //     【门控核实留痕（#137 要求）】INT4 ∉ isMx ⟹ cFmt=INT4 时 isQuantFmt=false ⟹
@@ -400,7 +400,7 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   }
 
   // --- 逐元素量化（指数减后舍入到目标格式；边界表镜像 Fp32.mxToFp32 取逆） ---
-  // @param p 目标格式参数表（MxFormatParams 单例，字段语义见 HiveEnum）：
+  // @param p 目标格式参数表（MxFormatParams 单例，字段语义见 WbEnum）：
   //        p.maxCodeExp = 正常数最大指数码（E4M3=15：exp 全1 配 mant≤6 仍有限；
   //        E5M2=30：exp 全1 为 inf/nan；E2M1=3：无特殊编码），与 blockScale 侧取值一致共用；
   //        p.satCode 饱和（最大有限值）编码（不含符号位）；p.nanCode nan 映射编码；
@@ -525,7 +525,7 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   }
 
   // 三格式各自例化（静态常量表，字面量收敛为 MxFormatParams 三单例，
-  // 字段语义注释表统一移至 HiveEnum.MxFormatParams，逐条镜像 Fp32 反量化侧字段语义）：
+  // 字段语义注释表统一移至 WbEnum.MxFormatParams，逐条镜像 Fp32 反量化侧字段语义）：
   private val s4Elem: Seq[UInt] = (0 until cfg.totalN).map(i => blockScale(elemAmax(i), MxFormatParams.E4M3))
   private val s5Elem: Seq[UInt] = (0 until cfg.totalN).map(i => blockScale(elemAmax(i), MxFormatParams.E5M2))
   private val s2Elem: Seq[UInt] = (0 until cfg.totalN).map(i => blockScale(elemAmax(i), MxFormatParams.E2M1))
@@ -571,7 +571,7 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   //       高位」。今天良性：nGroups=2 时 g∈{0,1}，s16 取 amax16(g/2)=amax16(0)、
   //       s32 取 amax32(g/4)=amax32(0)，两字节恒同值 ⟹ 截掉的高字节与留下的低字节逐位相同
   //       （Ryan §E.2 独立验证）。
-  //   ★爆点见 HiveCoreConfig 的 minBlockSize require：totalN>=32 且 cMxBlk=32 时相邻组不再
+  //   ★爆点见 WorkerBeeConfig 的 minBlockSize require：totalN>=32 且 cMxBlk=32 时相邻组不再
   //     同值，2 倍重叠会静默损坏 C-scale 外部内存布局。
   private def fmtScalesAt(g: Int): Seq[UInt] = {
     // 三级块界各层 scale（同层各组 amax 已合并，字节值与 elemAmax 侧同源一致）
@@ -608,11 +608,11 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   //      [-128,127]（类头「截断取低位、不饱和」）→ INT4 臂 _(3,0) 同构收窄：
   //      超范围值绕回 mod 16，【不】钳位到 4-bit 有符号范围 [-8,7]。
   //      裁定依据：钳位将是本仓从未存在的第三种语义（INT8/INT16/INT32 三档均无钳位），
-  //      且与金锚 HiveDebugModel.decodeElem 的 INT4 分支 sext(bits,4)（纯二补码符号
+  //      且与金锚 WbDebugModel.decodeElem 的 INT4 分支 sext(bits,4)（纯二补码符号
   //      扩展、无饱和分支）冲突 ⟹ 依「不得自创语义」取截断绕回。
   //      【P0 epilogue-2 例外留痕】上款「不饱和」契约的适用域 = 【非 requant 模式】；
-  //      requantOn=1 时 INT8/INT4 臂改选 HiveRequant 的饱和码行（half-up 舍入 +
-  //      per-channel M + per-tensor shift/zp + 保号饱和，语义见 HiveRequant 类头），
+  //      requantOn=1 时 INT8/INT4 臂改选 WbRequant 的饱和码行（half-up 舍入 +
+  //      per-channel M + per-tensor shift/zp + 保号饱和，语义见 WbRequant 类头），
   //      非 requant 行为逐字不变。
   //   ④ 符号/负零：INT8 臂原样保留 bit7（二补码无负零，-0 ≡ 0x00）→ INT4 臂原样
   //      保留 bit3（-0 ≡ 0x0）；两档均无符号扩展/符号特殊处理。
@@ -643,14 +643,14 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   private val packedInt4: UInt  = Cat(int32Seq.reverse.map(_(3, 0)))
 
   // ==========================================================================
-  // 【P0 epilogue-2 fused requant】数值核 = 独立模块 HiveRequant（totalN-lane 并行
+  // 【P0 epilogue-2 fused requant】数值核 = 独立模块 WbRequant（totalN-lane 并行
   //   纯组合；用户裁定「该功能涉及多个计算，独立出一个模块」）：acc 取 ReLU clamp
   //   后的 int32Seq（单一数据源），M/shift/zp 取随行锁存值，isInt4 由 fmtReg 决定；
   //   输出 = INT8/INT4 饱和码行（half-up 舍入 + per-channel M + per-tensor shift/zp）。
   //   仅 hasInt 配置例化；requantOn=0 时 rqEnReg=0，out.bits 的 INT8/INT4 臂落
   //   packedInt8/packedInt4 侧，与既有行为逐位相同。
   // ==========================================================================
-  private val requantMod = if (cfg.hasInt) Some(Module(new HiveRequant(cfg))) else None
+  private val requantMod = if (cfg.hasInt) Some(Module(new WbRequant(cfg))) else None
   if (cfg.hasInt) {
     requantMod.get.io.acc    := VecInit(int32Seq)
     requantMod.get.io.m      := rqMReg.get
@@ -663,7 +663,7 @@ class HiveOutCvt(cfg: HiveCoreConfig) extends Module {
   // out 密集行选段（契约见类头）：默认臂 = fp32，#137 起【仅】覆盖 reserved 编码
   // 10..15（DataFormat 枚举无成员 ⟹ 九条谓词全假）；INT4(9) 已有专属臂，不再回落。
   // 量化/16/8/4/int 支路按选中格式落低位、高位零填充（int4/mxfp4 同为 totalN×28 填零）。
-  // 【P0 epilogue-2】INT8/INT4 臂追加 requant 选通：rqEnReg=1 时改选 HiveRequant 输出
+  // 【P0 epilogue-2】INT8/INT4 臂追加 requant 选通：rqEnReg=1 时改选 WbRequant 输出
   //   （饱和码行，高位已零填充），否则落既有截断臂（非 requant 语义逐字不变）。
   // ==========================================================================
   private val int8Arm = if (cfg.hasInt)

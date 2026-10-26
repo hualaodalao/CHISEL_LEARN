@@ -46,7 +46,7 @@ object Fp32 {
     *                               按 ±2^(e+scale-bias-127) 正常解码（详见下方 fp32Sub）
     *   - 下溢（exp_fp32 < 1）                → flush-to-zero，输出 ±0
     *   - 上溢（exp_fp32 > 254）或 inf/nan    → saturate 到 fp32 max（保持 sign）
-    *   inf/nan 的 assert 守护放在调用方（原为 HiveWorkUnit.scala 中的 HiveCvtOpMx，已随
+    *   inf/nan 的 assert 守护放在调用方（原为 WbWorkUnit.scala 中的 WbCvtOpMx，已随
     *   FusionMac 重构删除；现由 FpCvt.scala 的 FpCvtMx8ToMid / FpCvtMx8ToFp32 承接），
     *   仅对被选中的格式断言，避免另一路径组合逻辑的误报
     *

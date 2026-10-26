@@ -4,7 +4,7 @@
   * 定位（task#16 用户裁定：L2 方案 ⟹ 放弃逐位 bit-exact，改为相对张量语义 exact 的误差阈值）
   * ══════════════════════════════════════════════════════════════════════════════
   * · 被测模块 = 新建的 `FpAddNarrowOpt`（standalone，直接驱动其 5 个槽端口）。
-  * · 既有 `FpAdd.scala` 及其 bit-exact 测试（HiveFusionMacFpSpec）【一行未改】，独立回归、互不干扰。
+  * · 既有 `FpAdd.scala` 及其 bit-exact 测试（WbFusionMacFpSpec）【一行未改】，独立回归、互不干扰。
   * · 精度契约（★ task#18 D 项订正为【三段式可证明契约】，与模块头注同源）：
   *     ① 绝对界 |diff| ≤ (nLossy + 2^k − 1) × 2^(E−126−W)          —— 【无条件恒成立】
   *     ② 相对界 relErr ≤ 2^−(W−1)（W=19 ⟹ 2^−18）                    —— 【仅良态域】：
@@ -24,9 +24,9 @@
   *   与舍入模式 ⟹ 又把「舍入」引入金锚。Dyadic 用 (BigInt 尾数, Int 2 的幂) ⟹ 加/减/乘【封闭无舍入】，
   *   相对误差判定式 |diff|×2^relShift ≤ |exact| 退化为【纯整数比较】，零浮点参与。
   * 【金锚来源】
-  *   · 元素真值：mxElemDyadic(code, scale, fmt) —— 与 HiveSimCommon.mxToFloat / Fp32.mxToFp32 语义
+  *   · 元素真值：mxElemDyadic(code, scale, fmt) —— 与 WbSimCommon.mxToFloat / Fp32.mxToFp32 语义
   *     同族（expSigned = e + scale − bias；E2M1 subnormalFtz=false ⟹ e=0/m=1 = ±0.5 一等公民；
-  *     fp8 subnormalFtz=true ⟹ e=0 → ±0），但【全程整数】。格式参数一律引 HiveEnum.MxFormatParams
+  *     fp8 subnormalFtz=true ⟹ e=0 → ±0），但【全程整数】。格式参数一律引 WbEnum.MxFormatParams
   *     单例（禁裸字面量，house 铁律）。
   *   · lane 乘积真值 = elemA × elemB（Dyadic 乘，精确）→ 编码成 fp32 位模式驱动槽端口。
   *     ★ 该编码与上游窄乘法器 FpMulMx8 / FpMulMx4 的 in-spec 输出【逐位同值】—— 这是数学证明
@@ -35,7 +35,7 @@
   *       = (aSig×2^(aExp−130)) × (bSig×2^(bExp−130)) = elemA × elemB（元素真值 = aSig×2^(aExp−130)）。
   *       FpMulMx4 同构（aSig = 2+m1，P ∈{4,6,9}）。⟹ 「张量语义乘积」与「上游精确乘积」是同一个数。
   *   · cReg 真值：由 Dyadic 反向编码成 lazy-40（radix: mant31 × 2^(exp−157)），与
-  *     HiveSimCommon.fp32BitsTo40 的编码逐位一致（lz=0 时可在本 spec 内代数验证：
+  *     WbSimCommon.fp32BitsTo40 的编码逐位一致（lz=0 时可在本 spec 内代数验证：
   *     exp = v.e+126+bl、mant31 = mag<<(30−bl+1) ⟹ 对 fp32 normal 恰还原 (1<<30)|(m<<7)）。
   *   · 金锚和 exact = cReg + Σ(【激活】lane 乘积)（纯 Dyadic，激活集由 is4x/is2x 的模式语义决定）。
   * 【绝不】跑一遍 RTL 把输出录下来当期望值。判定失败 ⟹ 真 bug 或激励越域 ⟹ 带证据报告，不调金锚凑 RTL。
@@ -105,7 +105,7 @@
   *     mx4sweep 的 cReg 之所以同样无损，靠的是 2.0 的 mant31 低 31−W 位为 0 且 E−cE < W（激励受限的
   *     巧合，不是格式性质）。cReg 一旦换成满尾数 lazy-40 即出现 nLossy ≥ 1 ⟹ 落 J2/J3 ——
   *     同文件反例：DR3(:765)/G2b(:804)/G3b(:810)/LZ2(:818)/ML2(:829)，全部 Mx4 模式 + cSatMag 满幅 cReg。
-  *     系统级同族反例见 HiveFusionMacFpNarrowSpec 的 n_mx8_cReg_spread（E=154 vs cE=127 ⟹ 差 27 ≥ W=19
+  *     系统级同族反例见 WbFusionMacFpNarrowSpec 的 n_mx8_cReg_spread（E=154 vs cE=127 ⟹ 差 27 ≥ W=19
   *     ⟹ cReg 整槽 term-drop ⟹ nLossy=2 ⟹ 契约 ② 充分条件不成立 ⟹ 只能由契约 ① 绝对界兜底）。
   *
   * ── J2（相对误差阈值，主判定）──
@@ -155,7 +155,7 @@
   * 向量集中所有「跨 W 边界」的指数差都写成 W 的函数 ⟹ 三档 W 覆盖到的是【同一组语义边界】。
   *
   * ══════════════════════════════════════════════════════════════════════════════
-  * 测试坑规避（项目记忆 / house 约定，镜像 HiveFusionMacFpSpec）
+  * 测试坑规避（项目记忆 / house 约定，镜像 WbFusionMacFpSpec）
   * ══════════════════════════════════════════════════════════════════════════════
   *   · ScalaTest 参数化用例名撞车致整套 ABORTED(tests run=0)：本 spec 用【固定唯一】的 it should 描述串
   *     （block 名互异），向量在 block 内以 for 循环 + 带 tag 的 assert 消息逐一校验。
@@ -198,7 +198,7 @@ class FpAddNarrowOptSpec extends AnyFlatSpec with Matchers with ChiselSim {
   private val E5 = DataFormat.MXE5M2
   private val E2 = DataFormat.MXE2M1
 
-  /** in-spec scale 域（三格式元素均不饱和，见 HiveFusionMacFpSpec 头注 §in-spec：scale ≤ 238）。 */
+  /** in-spec scale 域（三格式元素均不饱和，见 WbFusionMacFpSpec 头注 §in-spec：scale ≤ 238）。 */
   private val SA = 127
   private val SB = 127
 
@@ -314,7 +314,7 @@ class FpAddNarrowOptSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   /** 精确真值 → lazy-40 bits。lz = 【强制注入】的前导零位数（覆盖「cReg 带前导零」，lazy 格式合法）。
     * 推导：mant31 = mag << (30−lz−(bl−1)) ⟹ value = mant31 × 2^(exp−157) = mag × 2^v.e
-    *       ⟹ exp = v.e + 126 + lz + bl。lz=0 且 bl=24 时恰还原 HiveSimCommon.fp32BitsTo40 的编码。 */
+    *       ⟹ exp = v.e + 126 + lz + bl。lz=0 且 bl=24 时恰还原 WbSimCommon.fp32BitsTo40 的编码。 */
   private def dyadicToLazy40(v: Dyadic, lz: Int = 0): BigInt = {
     if (v.isZero) return BigInt(0)
     require(lz >= 0 && lz <= 30, s"dyadicToLazy40: lz=$lz 越界 [0,30]")
@@ -331,7 +331,7 @@ class FpAddNarrowOptSpec extends AnyFlatSpec with Matchers with ChiselSim {
   // ════════════════════════════════════════════════════════════════════════════
   // MX 元素精确真值（第一性原理，全程整数；参数引 MxFormatParams 单例，禁裸字面量）
   // ════════════════════════════════════════════════════════════════════════════
-  /** 三格式的解码旗标（与 HiveSimCommon.mxToFloat 的调用点逐条同源）：
+  /** 三格式的解码旗标（与 WbSimCommon.mxToFloat 的调用点逐条同源）：
     * · E4M3：nanNeedMantAllOne=true（e&m 全 1 才 NaN）、subnormalFtz=true（e==0 → ±0）
     * · E5M2：nanNeedMantAllOne=false（e 全 1 即 inf/nan）、subnormalFtz=true
     * · E2M1：noInfNan=true（无 inf/nan 编码，0x7=±6.0 为最大有限值）、subnormalFtz=false
@@ -375,7 +375,7 @@ class FpAddNarrowOptSpec extends AnyFlatSpec with Matchers with ChiselSim {
     else Dyadic(BigInt(sgn) * ((BigInt(1) << p.mantW) + BigInt(m)), expSigned - 127 - p.mantW)
   }
 
-  // 元素码构造器（纯 Scala，第一性原理位域打包；镜像 HiveFusionMacFpSpec）
+  // 元素码构造器（纯 Scala，第一性原理位域打包；镜像 WbFusionMacFpSpec）
   private def e4m3(s: Int, e: Int, m: Int): Int = ((s & 1) << 7) | ((e & 0xF) << 3) | (m & 0x7)
   private def e5m2(s: Int, e: Int, m: Int): Int = ((s & 1) << 7) | ((e & 0x1F) << 2) | (m & 0x3)
   private def e2m1(s: Int, e: Int, m: Int): Int = ((s & 1) << 3) | ((e & 0x3) << 1) | (m & 0x1)
@@ -473,7 +473,7 @@ class FpAddNarrowOptSpec extends AnyFlatSpec with Matchers with ChiselSim {
   // ════════════════════════════════════════════════════════════════════════════
   // 模式与向量
   // ════════════════════════════════════════════════════════════════════════════
-  /** 三模式（优先级 is4x > is2x，逐字对齐 FpAdd.scala:366 与 HiveFusionMacFp.scala:252-253）。
+  /** 三模式（优先级 is4x > is2x，逐字对齐 FpAdd.scala:366 与 WbFusionMacFp.scala:252-253）。
     * laneActive = L0..L3 是否供数；L0 恒激活；L1 = is2x||is4x；L2/L3 = is4x。
     * 上游实际驱动：MX4（aFmt=bFmt=MXE2M1）⟹ isMx4=1、isMx8=0；MX8 ⟹ isMx4=0、isMx8=1。 */
   private final case class ModeSpec(is4x: Boolean, is2x: Boolean) {
@@ -1214,7 +1214,7 @@ class FpAddNarrowOptSpec extends AnyFlatSpec with Matchers with ChiselSim {
   /** firtool 的 ANSI 端口表是【分组】风格：同方向同位宽的连续端口只在组首行写出 `input [39:0]`，
     * 后续行只列端口名（缩进对齐），且每行尾带 `\t// loc` 注释。实测形态：
     * {{{
-    * module Hive_FpAddNarrowOpt(   // ...
+    * module Wb_FpAddNarrowOpt(   // ...
     *   input         clock,     // ...
     *                 reset,     // ...
     *                 io_is4x,   // ...

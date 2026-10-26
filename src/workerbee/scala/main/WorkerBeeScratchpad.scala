@@ -1,4 +1,4 @@
-/** HiveCore 脉动阵列控制器的队列型缓冲系统。
+/** WorkerBee 脉动阵列控制器的队列型缓冲系统。
   *
   * 包含三个独立的 FIFO 缓冲：
   *   - A buffer：激活数据（dmaA 写入，Executor 读出）
@@ -9,7 +9,7 @@
 import chisel3._
 import chisel3.util._
 
-class HiveCoreScratchpad(cfg: HiveCoreConfig) extends Module {
+class WorkerBeeScratchpad(cfg: WorkerBeeConfig) extends Module {
   val io = IO(new Bundle {
     // A buffer: dmaA写入, Executor读出
     val aPush = slave(Stream(UInt((cfg.totalN * cfg.aEffW).W)))
@@ -41,11 +41,11 @@ class HiveCoreScratchpad(cfg: HiveCoreConfig) extends Module {
     val scaleBPop   = if (cfg.hasMx) Some(master(Stream(UInt(cfg.scaleBW.W)))) else None
     // 【P0-1 gather】scaleB FIFO 占用量上报：gather 读使 scaleB 供数节拍不规则
     // （非对齐拍 2 读/拍），Executor 的 loadW 预取窗口要求窗口内 pop 严格逐拍，
-    // 需凭此占用量在窗口开始前预蓄满（见 HiveCoreExecutor sDRAIN→sLOAD_B 门控）。
+    // 需凭此占用量在窗口开始前预蓄满（见 WorkerBeeExecutor sDRAIN→sLOAD_B 门控）。
     val scaleBOccupancy = if (cfg.hasMx) Some(Output(UInt(log2Up(cfg.scaleBufferDepth + 1).W))) else None
     val flushScaleA = if (cfg.hasMx) Some(Input(Bool()))                       else None
     val flushScaleB = if (cfg.hasMx) Some(Input(Bool()))                       else None
-    // P2（裁定 5）：C 侧量化 scale 缓冲已上移 HiveCore 顶层（深 2 cScaleFifo，唯一 scale 缓冲），
+    // P2（裁定 5）：C 侧量化 scale 缓冲已上移 WorkerBee 顶层（深 2 cScaleFifo，唯一 scale 缓冲），
     // 本模块 cScalePush/cScalePop/flushScaleC 三端口与内部 cScaleFifo 例化删除，Scratchpad 回归纯存储。
   })
 
@@ -108,7 +108,7 @@ class HiveCoreScratchpad(cfg: HiveCoreConfig) extends Module {
     scaleBFifo.io.pop.ready     := io.scaleBPop.get.ready
     scaleBFifo.io.flush         := io.flushScaleB.get
     io.scaleBOccupancy.get      := scaleBFifo.io.occupancy
-    // P2（裁定 5）：原 cScaleFifo 例化删除——量化 scale 缓冲上移 HiveCore 顶层（深 2），
+    // P2（裁定 5）：原 cScaleFifo 例化删除——量化 scale 缓冲上移 WorkerBee 顶层（深 2），
     // cvt.scaleOut 握手直接控制提交链，Scratchpad 不再持有 C 侧 scale 存储。
   }
 }

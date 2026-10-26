@@ -5,9 +5,9 @@ import org.scalatest.matchers.should.Matchers
 import scala.collection.mutable.ArrayBuffer
 
 /** 独立接口测试：事件直接由 TB 注入，金锚只取寄存器/握手契约，不依赖 executor。 */
-class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with HiveStatusPollApi {
-  import HiveSimCommon._
-  private val cfg = HiveCoreConfig(cW = 40)
+class WorkerBeeRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with WbStatusPollApi {
+  import WbSimCommon._
+  private val cfg = WorkerBeeConfig(cW = 40)
   private val wordMask = BigInt("ffffffff", 16)
   // CONTROL 已定义位：fmt[11:0], addrMode[14:12], relu[15], rnd[18:16],
   // warmdown[20], warmup[21], blocks[22,24,26], loadW[28], requant[29], bias[30]。
@@ -15,18 +15,18 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
     Seq(20, 21, 22, 24, 26, 28, 29, 30).foldLeft(BigInt(0))((v, b) => v.setBit(b))
 
   // 批次金锚来自 v3.0.0 契约；不读取 RTL 的仲裁或 pending 中间信号。
-  private case class Command(lane: Int, op: HiveCoreOp.Type, a0: Int, a1: Int = 0,
+  private case class Command(lane: Int, op: WorkerBeeOp.Type, a0: Int, a1: Int = 0,
                              d0: BigInt = 0, d1: BigInt = 0, pc: BigInt = 0, tag: Int = 0)
   private def w(lane: Int, a: Int, d: BigInt, pc: BigInt = 0, tag: Int = 0): Command =
-    Command(lane, HiveCoreOp.REG_WRITE1, a, d0 = d, pc = pc, tag = tag)
+    Command(lane, WorkerBeeOp.REG_WRITE1, a, d0 = d, pc = pc, tag = tag)
   private def w2(lane: Int, a0: Int, a1: Int, d0: BigInt, d1: BigInt,
                  pc: BigInt = 0, tag: Int = 0): Command =
-    Command(lane, HiveCoreOp.REG_WRITE2, a0, a1, d0, d1, pc, tag)
-  private def r(lane: Int, a: Int): Command = Command(lane, HiveCoreOp.REG_READ, a)
+    Command(lane, WorkerBeeOp.REG_WRITE2, a0, a1, d0, d1, pc, tag)
+  private def r(lane: Int, a: Int): Command = Command(lane, WorkerBeeOp.REG_READ, a)
 
   private case class StartEvent(pc: BigInt, tag: Int, m: BigInt, aAddr: BigInt,
                                 n: BigInt, k: BigInt, bAddr: BigInt, aScaleAddr: BigInt)
-  private class Driver(val dut: HiveCoreRegIf) {
+  private class Driver(val dut: WorkerBeeRegIf) {
     val starts = ArrayBuffer[StartEvent]()
     def tick(n: Int = 1): Unit = for (_ <- 0 until n) {
       if (dut.io.start.peek().litToBoolean) starts += StartEvent(
@@ -89,7 +89,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       dut.reset.poke(true.B); tick(3); dut.reset.poke(false.B); tick(2)
       starts.clear()
     }
-    def request(op: HiveCoreOp.Type, a0: Int, a1: Int = 0, d0: BigInt = 0,
+    def request(op: WorkerBeeOp.Type, a0: Int, a1: Int = 0, d0: BigInt = 0,
                 d1: BigInt = 0, pc: BigInt = 0, tag: Int = 0): Unit = {
       pokeRegCommand(dut.io.cmd(0), op, a0, a1, d0, d1, pc, tag)
       var waited = 0
@@ -112,15 +112,15 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       data
     }
     def write(a: Int, d: BigInt, err: Boolean = false, pc: BigInt = 0, tag: Int = 0): Unit = {
-      request(HiveCoreOp.REG_WRITE1, a, d0 = d, pc = pc, tag = tag)
+      request(WorkerBeeOp.REG_WRITE1, a, d0 = d, pc = pc, tag = tag)
       response(err) should be(BigInt(0))
     }
     def write2(a0: Int, a1: Int, d0: BigInt, d1: BigInt,
                err: Boolean = false, pc: BigInt = 0, tag: Int = 0): Unit = {
-      request(HiveCoreOp.REG_WRITE2, a0, a1, d0, d1, pc, tag)
+      request(WorkerBeeOp.REG_WRITE2, a0, a1, d0, d1, pc, tag)
       response(err) should be(BigInt(0))
     }
-    def read(a: Int): BigInt = { request(HiveCoreOp.REG_READ, a); response() }
+    def read(a: Int): BigInt = { request(WorkerBeeOp.REG_READ, a); response() }
     def done(): Unit = { dut.io.done.poke(true.B); tick(); dut.io.done.poke(false.B) }
     def configError(code: Int): Unit = {
       dut.io.configErrorCode.poke(code.U); dut.io.configError.poke(true.B)
@@ -134,15 +134,15 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
     }
   }
 
-  behavior of "HiveCoreRegIf"
+  behavior of "WorkerBeeRegIf"
 
   it should "reset and decode all 64 addresses without aliasing or truncation" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
-      HiveCoreOp.REG_WRITE1.litValue should be(BigInt(0))
-      HiveCoreOp.REG_WRITE2.litValue should be(BigInt(1))
-      HiveCoreOp.REG_READ.litValue should be(BigInt(2))
-      HiveCoreOp.all.size should be(3)
+      WorkerBeeOp.REG_WRITE1.litValue should be(BigInt(0))
+      WorkerBeeOp.REG_WRITE2.litValue should be(BigInt(1))
+      WorkerBeeOp.REG_READ.litValue should be(BigInt(2))
+      WorkerBeeOp.all.size should be(3)
       dut.io.cmd(0).payload.reg0Addr.getWidth should be(6)
       dut.io.cmd(0).payload.reg1Addr.getWidth should be(6)
       dut.io.start.expect(false.B); dut.io.inFlight.expect(false.B); dut.io.irq.expect(false.B)
@@ -161,17 +161,17 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
         s.read(M_REG_ADDR) should be(BigInt(0x1234))
       }
       // WRITE1 的第二槽无效，即使它指定 RO/START。
-      s.request(HiveCoreOp.REG_WRITE1, A_REG_ADDR, START_REG_ADDR, 0x4567, 1)
+      s.request(WorkerBeeOp.REG_WRITE1, A_REG_ADDR, START_REG_ADDR, 0x4567, 1)
       s.response() should be(BigInt(0))
       s.starts.size should be(0)
-      s.request(HiveCoreOp.REG_WRITE1, B_REG_ADDR, IRQ_RAW_REG_ADDR, 0x89AB, wordMask)
+      s.request(WorkerBeeOp.REG_WRITE1, B_REG_ADDR, IRQ_RAW_REG_ADDR, 0x89AB, wordMask)
       s.response() should be(BigInt(0))
       s.read(IRQ_RAW_REG_ADDR) should be(BigInt(0))
     }
   }
 
   it should "round trip compact configuration fields and zero every reserved bit" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       val values = Seq(BigInt("fedcba98", 16), BigInt("a987c654", 16),
         BigInt("81234567", 16), BigInt("92345678", 16), BigInt("a3456789", 16),
@@ -208,14 +208,14 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "launch once from either WRITE2 slot and capture updated config and command metadata" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.write(START_REG_ADDR, 0, pc = 0x1111, tag = 1)
       s.starts.size should be(0); dut.io.inFlight.expect(false.B)
       s.read(START_REG_ADDR) should be(BigInt(0))
       // 任意非零（不要求 bit0），接受后的下一拍 start=1，response 背压不延迟启动。
       dut.io.resp.ready.poke(false.B)
-      s.request(HiveCoreOp.REG_WRITE1, START_REG_ADDR, d0 = BigInt("80000000", 16), pc = BigInt("fedc1234", 16), tag = 0xA5)
+      s.request(WorkerBeeOp.REG_WRITE1, START_REG_ADDR, d0 = BigInt("80000000", 16), pc = BigInt("fedc1234", 16), tag = 0xA5)
       dut.io.start.expect(true.B); dut.io.inFlight.expect(true.B)
       dut.io.startPc.expect(BigInt("fedc1234", 16).U); dut.io.startTag.expect(0xA5.U)
       s.tick(3); dut.io.start.expect(false.B)
@@ -239,7 +239,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
         s.read(START_REG_ADDR) should be(BigInt(0))
         // START 保留先前 done RAW，metadata 不受其他命令 pc/tag 扰动。
         s.read(IRQ_RAW_REG_ADDR) should be(BigInt(1))
-        s.request(HiveCoreOp.REG_READ, M_REG_ADDR, pc = 7, tag = 3); s.response()
+        s.request(WorkerBeeOp.REG_READ, M_REG_ADDR, pc = 7, tag = 3); s.response()
         dut.io.startPc.expect(pc.U); dut.io.startTag.expect((0xF0 + i).U)
         s.done()
       }
@@ -250,7 +250,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "reserve inFlight before executor busy and atomically reject conflicting WRITE2 commands" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.write(M_REG_ADDR, 7); s.write(A_REG_ADDR, 0x12345678)
       s.write(START_REG_ADDR, 1, pc = 0xCAFEBABEL, tag = 0x77)
@@ -285,7 +285,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "mask pending interrupts without losing RAW and implement W1C new-event priority" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.done(); s.dma(0xA5)
       val pending = BigInt(1 | (0xA5 << 2))
@@ -304,7 +304,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       s.read(IRQ_RAW_REG_ADDR) should be(pending & ~BigInt(1))
       // CLEAR 与新 done/DMA 同边沿：所有重新出现的来源保留，其余旧位清零。
       dut.io.done.poke(true.B); dut.io.dmaErrors(1).poke(true.B)
-      s.request(HiveCoreOp.REG_WRITE1, IRQ_CLEAR_REG_ADDR, d0 = IRQ_ALL)
+      s.request(WorkerBeeOp.REG_WRITE1, IRQ_CLEAR_REG_ADDR, d0 = IRQ_ALL)
       dut.io.done.poke(false.B); dut.io.dmaErrors(1).poke(false.B)
       s.response() should be(BigInt(0))
       s.read(IRQ_RAW_REG_ADDR) should be(BigInt(1 | (1 << 3)))
@@ -315,7 +315,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "latch the first uncleared config code including zero and replace it on clear-event collisions" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.write(START_REG_ADDR, 1); s.configError(0)
       dut.io.inFlight.expect(false.B)
@@ -330,7 +330,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       s.write(START_REG_ADDR, 2)
       s.read(ERROR_CODE_REG_ADDR) should be(BigInt(13))
       dut.io.configErrorCode.poke(7.U); dut.io.configError.poke(true.B)
-      s.request(HiveCoreOp.REG_WRITE1, IRQ_CLEAR_REG_ADDR, d0 = 2)
+      s.request(WorkerBeeOp.REG_WRITE1, IRQ_CLEAR_REG_ADDR, d0 = 2)
       dut.io.configError.poke(false.B); s.response()
       s.read(IRQ_RAW_REG_ADDR) should be(BigInt(2)); s.read(ERROR_CODE_REG_ADDR) should be(BigInt(7))
       dut.io.inFlight.expect(false.B)
@@ -343,7 +343,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "record all eight DMA sources immediately without ending inFlight and combine them with done" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.write(START_REG_ADDR, 1)
       for (i <- 0 until 8) {
@@ -368,13 +368,13 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "hold responses stable under backpressure without repeating START or W1C side effects" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.write(M_REG_ADDR, 0x1234)
       dut.io.resp.ready.poke(false.B)
-      s.request(HiveCoreOp.REG_READ, M_REG_ADDR)
+      s.request(WorkerBeeOp.REG_READ, M_REG_ADDR)
       dut.io.resp.valid.expect(true.B)
-      pokeRegCommand(dut.io.cmd(0), HiveCoreOp.REG_WRITE1, START_REG_ADDR, d0 = 1, pc = 0x76543210, tag = 0xAB)
+      pokeRegCommand(dut.io.cmd(0), WorkerBeeOp.REG_WRITE1, START_REG_ADDR, d0 = 1, pc = 0x76543210, tag = 0xAB)
       for (_ <- 0 until 5) {
         dut.io.cmd(0).ready.expect(false.B)
         dut.io.resp.valid.expect(true.B); dut.io.resp.payload.data.expect(0x1234.U)
@@ -385,14 +385,14 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       dut.io.resp.ready.poke(true.B); s.response() should be(BigInt(0x1234))
       s.starts.size should be(0)
       dut.io.resp.ready.poke(false.B)
-      s.request(HiveCoreOp.REG_WRITE2, START_REG_ADDR, START_REG_ADDR, 2, 4, 0x76543210, 0xAB)
+      s.request(WorkerBeeOp.REG_WRITE2, START_REG_ADDR, START_REG_ADDR, 2, 4, 0x76543210, 0xAB)
       s.tick(8)
       s.starts.size should be(1)
       dut.io.resp.valid.expect(true.B); dut.io.resp.payload.data.expect(0.U); dut.io.resp.payload.err.expect(false.B)
       dut.io.resp.ready.poke(true.B); s.response()
       s.done()
       dut.io.resp.ready.poke(false.B)
-      s.request(HiveCoreOp.REG_WRITE1, IRQ_CLEAR_REG_ADDR, d0 = 1)
+      s.request(WorkerBeeOp.REG_WRITE1, IRQ_CLEAR_REG_ADDR, d0 = 1)
       s.tick(2)
       s.done() // CLEAR 已 fire，此后新 done 不得因响应仍 HOLD 而被再次清除。
       s.tick(5)
@@ -402,7 +402,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       // 错误响应也必须稳定，且拒绝写无副作用。
       s.write(START_REG_ADDR, 1)
       dut.io.resp.ready.poke(false.B)
-      s.request(HiveCoreOp.REG_WRITE1, M_REG_ADDR, d0 = 99)
+      s.request(WorkerBeeOp.REG_WRITE1, M_REG_ADDR, d0 = 99)
       for (_ <- 0 until 5) {
         dut.io.resp.valid.expect(true.B); dut.io.resp.payload.err.expect(true.B)
         dut.io.resp.payload.data.expect(0.U); s.tick()
@@ -412,7 +412,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
       s.starts.size should be(2)
       // STATUS 响应是 read-fire 快照；后续 busy/progress/done 改变不能污染 HOLD 数据。
       dut.io.resp.ready.poke(false.B)
-      s.request(HiveCoreOp.REG_READ, STATUS_REG_ADDR)
+      s.request(WorkerBeeOp.REG_READ, STATUS_REG_ADDR)
       dut.io.busy.poke(true.B); dut.io.progress.poke(0xFFFF.U); s.done()
       for (_ <- 0 until 4) {
         dut.io.resp.valid.expect(true.B); dut.io.resp.payload.data.expect(4.U)
@@ -424,7 +424,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "commit eight distinct WRITE2 addresses in one batch and accept sparse lanes without lane0" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       dut.io.cmd.length should be(4)
       dut.io.resp.payload.data.getWidth should be(32)
@@ -461,7 +461,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "return four read snapshots and sparse lane0 lane2 reads strictly in ascending lane order" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.write(M_REG_ADDR, 0x1357); s.write(A_REG_ADDR, 0x2468ACE0)
       s.done(); dut.io.busy.poke(true.B); dut.io.progress.poke(0x1234.U)
@@ -480,7 +480,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "snapshot the old bank and IRQ for a write read write read batch while writes and new events commit" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.write(M_REG_ADDR, 7); s.write(A_REG_ADDR, 0x11112222); s.write(B_REG_ADDR, 0x33334444)
       dut.io.done.poke(true.B); dut.io.dmaErrors(1).poke(true.B)
@@ -501,7 +501,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "snapshot STATUS MASK MASKED RAW and ERROR_CODE before same batch writes START and fresh events" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.configError(6); s.done(); s.write(IRQ_MASK_REG_ADDR, 0)
       dut.io.done.poke(true.B); dut.io.dmaErrors(7).poke(true.B)
@@ -534,7 +534,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "arbitrate all six lane pairs and all four WRITE2 slot pairings including same value conflicts" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       val pairs = for (low <- 0 until 4; high <- low + 1 until 4) yield (low, high)
       for (((low, high), pairIndex) <- pairs.zipWithIndex; lowSlot <- 0 until 2; highSlot <- 0 until 2) {
@@ -569,7 +569,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "keep nonconflicting WRITE2 slots and exclude every slot of a rejected high lane from arbitration" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.batch(w2(0, A_REG_ADDR, B_REG_ADDR, 0x1111, 0x2222),
         w(1, A_REG_ADDR, 0x3333), w(2, B_REG_ADDR, 0x4444),
@@ -602,7 +602,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "reject writes using pre fire inFlight even when done or configError ends the task on that edge" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.write(M_REG_ADDR, 7); s.write(A_REG_ADDR, 0x1234); s.write(START_REG_ADDR, 1)
       s.dma(1)
@@ -630,7 +630,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "launch once with highest nonzero START metadata and every winning batch configuration despite ACK backpressure" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.configError(5)
       s.batch(w2(0, M_REG_ADDR, START_REG_ADDR, 0x3456, 2, pc = 0x11111111, tag = 0x11),
@@ -657,7 +657,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "ignore zero START high lanes and reserved noops and merge same lane START without a conflict event" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.batch(w2(0, START_REG_ADDR, START_REG_ADDR, 2, 0, pc = 0x13572468, tag = 0x31),
         r(1, START_REG_ADDR), w(2, 0x26, 0xFFFF),
@@ -687,7 +687,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "arbitrate MASK by highest lane and CLEAR by same lane OR then highest lane including CLEAR zero" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.batch(w2(0, IRQ_MASK_REG_ADDR, IRQ_MASK_REG_ADDR, 0x7FF, 1),
         w2(1, IRQ_MASK_REG_ADDR, IRQ_MASK_REG_ADDR, 0x7FF, 2),
@@ -719,7 +719,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "retain fresh WRITE_CONFLICT over same edge W1C without contaminating the first configuration error code" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.configError(0); s.configError(7); s.write(IRQ_MASK_REG_ADDR, 0)
       dut.io.done.poke(true.B); dut.io.dmaErrors(1).poke(true.B)
@@ -743,7 +743,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "block all lanes through the last pending read fire accept held valids only next cycle and discard pending on reset" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.write(M_REG_ADDR, 0x1234); s.write(A_REG_ADDR, 0x5678)
       s.batch(r(0, M_REG_ADDR), r(1, A_REG_ADDR), r(2, STATUS_REG_ADDR), r(3, IRQ_RAW_REG_ADDR))
@@ -787,7 +787,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "reject reserved opcode in a mixed batch without writes START IRQ or conflict side effects" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut)
       for (target <- Seq(A_REG_ADDR, START_REG_ADDR, IRQ_CLEAR_REG_ADDR, IRQ_MASK_REG_ADDR)) {
         s.init()
@@ -819,7 +819,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "sample winning configuration values when START and configuration addresses conflict in the same batch" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.batch(w2(0, M_REG_ADDR, START_REG_ADDR, 11, 1, pc = 0x1111, tag = 0x11),
         w2(1, A_REG_ADDR, NK_REG_ADDR, 0xAAAA, 0x56781234),
@@ -837,7 +837,7 @@ class HiveCoreRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with Hi
   }
 
   it should "cancel pending START and responses on reset before the launch edge without replaying stale metadata" in {
-    simulate(new HiveCoreRegIf(cfg)) { dut =>
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
       val s = new Driver(dut); s.init()
       s.batch(w2(0, M_REG_ADDR, START_REG_ADDR, 19, 1, pc = 0x1111, tag = 0x11), r(2, M_REG_ADDR))
       dut.io.start.expect(true.B); dut.io.inFlight.expect(true.B)

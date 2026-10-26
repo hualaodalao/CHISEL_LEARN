@@ -36,7 +36,6 @@ object ForagerBeeElaborate extends App {
     tileSize = 16,
     maxBurstLen = 64,
     dataWidth = 256,
-    addressWidth = 32,
     channelTranspose = Seq(true, false),
     channelPermute = Seq(true, true),
     enableConversion = true,

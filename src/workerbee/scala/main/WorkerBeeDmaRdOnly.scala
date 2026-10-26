@@ -1,15 +1,15 @@
-/** HiveCore 轻量级 DMA 引擎（自主 tile 扫描版）。
+/** WorkerBee 轻量级 DMA 引擎（自主 tile 扫描版）。
   *
   * 仅支持线性数据搬运（push/pop queue），启动后完全自主运行，
   * 由 occupancy/availability 反压，不依赖 Executor 逐请求控制：
-  *   - HiveCoreDmaRdOnly: 外部存储 → buffer（A buffer / B buffer）
-  *   - HiveCoreDmaWrOnly: C buffer → 外部存储（storeGate 门控）
+  *   - WorkerBeeDmaRdOnly: 外部存储 → buffer（A buffer / B buffer）
+  *   - WorkerBeeDmaWrOnly: C buffer → 外部存储（storeGate 门控）
   */
 
 import chisel3._
 import chisel3.util._
 
-/** HiveCoreDmaRdOnly — 只读 DMA 引擎（tile 粒度自动地址生成）。
+/** WorkerBeeDmaRdOnly — 只读 DMA 引擎（tile 粒度自动地址生成）。
   *
   * 职责：从外部存储逐 tile 读数据并 push 进内部矩阵 buffer
   *   - io.isA = true : 搬运 A[mTile, kTile] 子块 → A buffer
@@ -56,7 +56,7 @@ import chisel3.util._
   *
   * 【#136-KW3 删除化石公式，勿恢复】此处原写「块间跳转采用『跳回起点再前移一个块』的
   *   增量式计算：jump = blockOffset - (innerRows - 1) * rowStep」。该式与 #133 从
-  *   HiveCoreDmaWrOnly 删掉的那条【逐字同源】，是更早提交的化石，与本模块代码不符：
+  *   WorkerBeeDmaWrOnly 删掉的那条【逐字同源】，是更早提交的化石，与本模块代码不符：
   *   上面【六条】跳转（A 切 k-tile / A 切 n-tile / B 切 k-tile ×2 支 / B 切 n-tile ×2 支）
   *   无一匹配它 —— B 侧走 lastBTileStartAddr 累加模型、A 侧走「base + colAddr」重算
   *   模型，两者都不含「减去 (innerRows-1)*rowStep」这一项；代码中也不存在 blockOffset /
@@ -67,11 +67,11 @@ import chisel3.util._
   *   旧 B 式写 regBAddr + kTileIdx*totalN*bRowOffset + nTileIdx*bColOffset —— 漏掉了
   *   降序起点项 (T-1)*R，且未区分 loadWMode 两支（两支闭式不同，见上）。
   *
-  * 【#133 死引用清理 / #136-RW1 去裸 token】此处原写「与 HiveCoreExecutor 侧的 A/B tile
+  * 【#133 死引用清理 / #136-RW1 去裸 token】此处原写「与 WorkerBeeExecutor 侧的 A/B tile
   *   首址别名一致」并复述了那两个原名的裸 token。结论不变：该类别名在 main 源码中
   *   【无任何定义】（Executor 不消费地址偏移，只发 peekBlock/doneBlock 块协议与 start
   *   脉冲），属死引用，已删除。#136-RW1 采纳选项 (b)：留痕改用【描述性表述】、不再出现
-  *   裸 token，使 grep 式死引用审计在 src/hive/scala/main/ 下 0 命中，无需读上下文区分
+  *   裸 token，使 grep 式死引用审计在 src/workerbee/scala/main/ 下 0 命中，无需读上下文区分
   *   「活引用」与「删除留痕」。
   * 信号名对照：rowOff/colOff 是本注释简写，实际端口为 io.reg_rowOffset /
   *   io.reg_colTileOffset，顶层按通道分别接 calcConfig 的 aRowAddressOffset /
@@ -90,7 +90,7 @@ import chisel3.util._
   *   ★ C 是【运行期量】，随 regFile.aFmt/bFmt 变化：MX8/FP16/BF16/INT16 → 32，
   *     INT8 → 16，INT32 → 64，半字节族 → 0。672fb37 曾把它退化成 elaboration 期常数
   *     totalN×(aW/8)=totalN×(bW/8)=32（aW/bW 是编译期位宽，出厂 16），已由 #124 ① 修复。
-  *     修复只改 HiveCoreCalcConfig 的赋值式，本模块【功能行零改动】，两支闭式原样有效。
+  *     修复只改 WorkerBeeCalcConfig 的赋值式，本模块【功能行零改动】，两支闭式原样有效。
   *   ★ 残余偏差（不属 #124，已由 #139 承接，勿在本模块自行修补）：loadW=1 的
   *     nt 维分量 Δ_nt = nt × (kT × C − R) 来自 lastBTileStartAddr 的【累加】模型与金锚
   *     【闭式】在 K 非 bKpb 整数倍时不同源；#124 ① 只让 kt 维分量 Δ_kt = kt × (C − bKpb×bEb)
@@ -113,19 +113,19 @@ import chisel3.util._
   * sNEXT_COL 为单拍过渡态无需分支（下一拍必落 sTRANSFER/sDONE 被重载捕获）。
   * 安全性：脱离 sTRANSFER 时外部流 ready/valid 自然拉低，无协议违约。
   *
-  * @param cfg     HiveCore 配置
+  * @param cfg     WorkerBee 配置
   * @param bufWidth buffer push 数据位宽（默认 = cfg.aExtW；外部 rsp 与本口
   *                 等宽直连，每拍 push 一个 beat）
   * @param bufDepth buffer 深度（决定 bufAvailability 位宽；默认 = aBufferDepth，
   *                 B 实例需传 bBufferDepth）
   */
-class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 0) extends Module {
+class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int = 0) extends Module {
   val pushW = bufWidth 
   val availDepth = bufDepth
   // 【注释订正（B5 调研发现，仅文档、不改行为）】旧注释称「MX scale 读搬运已拆分为
-  // 独立模块 HiveCoreDmaScaleRd」已 STALE：672fb37 提交删除了 HiveCoreDmaScaleRd.scala，
-  // scaleA/scaleB 现复用本模块（HiveCore 例化 bufWidth=8：scaleA tie isA=true、
-  // scaleB tie isA=false，见 HiveCore.scala scale DMA 接线）。HiveCore.scala L457
+  // 独立模块 WorkerBeeDmaScaleRd」已 STALE：672fb37 提交删除了 WorkerBeeDmaScaleRd.scala，
+  // scaleA/scaleB 现复用本模块（WorkerBee 例化 bufWidth=8：scaleA tie isA=true、
+  // scaleB tie isA=false，见 WorkerBee.scala scale DMA 接线）。WorkerBee.scala L457
   // 同类 STALE 注释属禁动区外的文档瑕疵，一并列入报告交回裁定，不在此改动。
 
   val io = IO(new Bundle {
@@ -137,9 +137,9 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
     val err   = Output(Bool())                       // 错误标志
 
     
-    val dmaExtRdIF = HiveCoreDMAExtReadOnlyIF(cfg, pushW)   // 外部只读通道 cmd(addr)/rsp(data)，与 bufPush 等宽直连
+    val dmaExtRdIF = WorkerBeeDMAExtReadOnlyIF(cfg, pushW)   // 外部只读通道 cmd(addr)/rsp(data)，与 bufPush 等宽直连
 
-    val regFile = Input(HiveCoreRegister(cfg))           // 基地址
+    val regFile = Input(WorkerBeeRegister(cfg))           // 基地址
     val reg_baseAddr = Input(UInt(cfg.addrWidth.W))
     val reg_kTile = Input(UInt(cfg.mnkWidth.W))
     val reg_mTile = Input(UInt(cfg.mnkWidth.W))
@@ -484,7 +484,7 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
               lastBTileStartAddr := lastBTileStartAddr + io.reg_colTileOffset + (cfg.totalN.U - 1.U) * io.reg_rowOffset
             }.otherwise{
               // 【B5 修复：loadWMode=0（垂直/非转置 B）切换 n-tile】
-              // 结构取舍留痕（leader 授权约束 1）：旧 HiveCoreDma.scala 用
+              // 结构取舍留痕（leader 授权约束 1）：旧 WorkerBeeDma.scala 用
               //   curAddr := bAddr + colAddr，其中 colAddr 在 sIDLE 锁存为
               //   bColTileAddressOffset + (totalN-1)*bRowAddressOffset（含降序起点项）。
               // 拆分重构后本文件改用 lastBTileStartAddr 模型（loadWMode=1 分支已采用），
@@ -516,7 +516,7 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
             
           }.otherwise{
             // 【B5 修复：loadWMode=0（垂直/非转置 B）切换 k-tile】
-            // 旧 HiveCoreDma.scala 用 curAddr := curAddr + bNextKTileAddressOffset，
+            // 旧 WorkerBeeDma.scala 用 curAddr := curAddr + bNextKTileAddressOffset，
             //   loadWMode=0 分支 bNextKTileAddressOffset = (totalN*2)*bRowAddressOffset，
             //   旧注释原文：「垂直：B 降序读取，下一 k 维 tile 需 +2*totalN*bRowOff
             //   （这里乘以 2 的原因是 B 矩阵是降序读取）」。×2 的由来：降序遍历末拍后
@@ -543,7 +543,7 @@ class HiveCoreDmaRdOnly(cfg: HiveCoreConfig, bufWidth: Int = 0, bufDepth: Int = 
       // 现 start 拍同周期锁存新参数（上方 |io.start 锁存块）并复位 credit/计数、
       // 直达 sTRANSFER 重启遍历（flush 不返还的 credit 在此恢复）。
       // last-connect 自洽：.elsewhen 分支的 state := sIDLE 在 start 拍不可达（when 优先）；
-      // 次拍以新参数/满 credit/零计数从 sTRANSFER 起跑（与 HiveCoreDmaScaleRd 同构）
+      // 次拍以新参数/满 credit/零计数从 sTRANSFER 起跑（与 WorkerBeeDmaScaleRd 同构）
       when(io.start) {
         state       := sTRANSFER
         errReg      := false.B

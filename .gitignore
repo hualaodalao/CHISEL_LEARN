@@ -42,8 +42,8 @@ sim/
 # OS
 .DS_Store
 
-# 注：src/hive/verilog* 下的三产物（.sv + HiveCore_rtl.zip / HiveCore_mx_rtl.zip /
-# HiveCore_mxfp4_rtl.zip）是【有意入库的交付产物】（下游综合/交付直接取用），不得添加忽略规则。
+# 注：src/workerbee/verilog* 下的三产物（.sv + WorkerBee_rtl.zip / WorkerBee_mx_rtl.zip /
+# WorkerBee_mxfp4_rtl.zip）是【有意入库的交付产物】（下游综合/交付直接取用），不得添加忽略规则。
 # 其中 verilog_mxfp4/ 属 cfgMxFp4(hasMx4=true) 的 fp4 打通产物、【非回归锚点】——normalized-diff=0
 # 硬门槛的回归锚点仍是 verilog/(cfg) + verilog_mx/(cfgMx) 两套（均 hasMx4=false）。
 # 原 `.src/**/verilog*` 一行因前导点从未匹配真实路径（git check-ignore 退出码 1、101 个 .sv 与 zip 全部 tracked）、

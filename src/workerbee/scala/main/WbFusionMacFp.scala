@@ -8,19 +8,19 @@ import scala.collection.JavaConverters._
 
 //this funsion mac support fp16/bf16/mxfp8/mxfp4, suppose the input is 16bits
 //
-// 【杠杆 A / 配置感知】supportedFmts 是【绝对集】：写子集即删硬件（对齐 HiveCoreConfig.scala:47 语义）。
+// 【杠杆 A / 配置感知】supportedFmts 是【绝对集】：写子集即删硬件（对齐 WorkerBeeConfig.scala:47 语义）。
 //   · 默认 = MX-only(MXE4M3/MXE5M2/MXE2M1) ⟹ hasFp=false ⟹ lane0 走专属窄乘法器 FpMulMx8
-//     (用户裁定砍除 FP16/BF16，见 HiveCoreConfig supportedFmts)。
+//     (用户裁定砍除 FP16/BF16，见 WorkerBeeConfig supportedFmts)。
 //     ★【有意的破坏性默认值变更 · task#25 D2 明记】类默认 supportedFmts 已从【旧的全五格式默认】
 //       (FP16/BF16/MXE4M3/MXE5M2/MXE2M1) 收窄为【MX-only】。这是「砍除 FP16/BF16」用户裁定下的
 //       **有意**破坏性变更：任何依赖旧默认（不显式传 supportedFmts 即得全五格式宽阵列）的下游调用，
 //       现在会得到 hasFp=false 的窄乘法器路径。需要全五格式硬件者【必须显式传】完整集合
-//       （见 HiveFusionMacFpSpec 的 FMTS_DEFAULT，及 HiveFusionMacFpElaborate 头注对 verilog_fusionfp/ 锚点的说明）。
-//       钉死此新默认契约的测试见 HiveFusionMacFpNarrowSpec 的 D1 用例（类默认例化 ⟹ RTL 不含 FpMulFp16Bf16）。
+//       （见 WbFusionMacFpSpec 的 FMTS_DEFAULT，及 WbFusionMacFpElaborate 头注对 verilog_fusionfp/ 锚点的说明）。
+//       钉死此新默认契约的测试见 WbFusionMacFpNarrowSpec 的 D1 用例（类默认例化 ⟹ RTL 不含 FpMulFp16Bf16）。
 //   · 若传入全五格式 ⟹ hasFp=true ⟹ lane0 走宽阵列（FpMulFp16Bf16 + 8 个 fp32 域 cvt + 4:1 mux）
 //     ⟹ 与历史 RTL normalized-diff=0（回归锚点）。
 //   · hasFp 只在 elaboration 期决定【生成哪些实例】，绝不门控运行期：is4x/is2x、r1/r2/r3 的 Mux、
-//     五槽累加器接线逐字不动（对齐项目铁律「编译期 if 不门控运行期」+ HiveEnum.scala:32-35）。
+//     五槽累加器接线逐字不动（对齐项目铁律「编译期 if 不门控运行期」+ WbEnum.scala:32-35）。
 //
 // 【task#18 B: useNarrowAdd 编译期选择累加器】
 //   true(默认)  → 例化 FpAddNarrow（L2 窄窗口五槽 CSA 树，精度契约见 FpAddNarrow.scala 头注）★task#28 起为类默认(:45)
@@ -36,7 +36,7 @@ import scala.collection.JavaConverters._
 //     ★【合法区间 · task#25 Sean m1/Ray M1】仅在 useNarrowAdd=true 时生效；取值必须落在 [8,28]
 //       （下界 8 = mxfp8 乘积 8 位有效尾数硬下界、上界 28 = mant31 高 W 位对齐留 3 位余量），
 //       该区间由 FpAddNarrow.scala:226-227 的两条 require 强制（越界在例化 FpAddNarrow 时 elaboration 期即抛）。
-class HiveFusionMacFp(
+class WbFusionMacFp(
   aW: Int = 16,
   bW: Int = 16,
   cW: Int = 40,
@@ -46,20 +46,20 @@ class HiveFusionMacFp(
   narrowW: Int = FpAddNarrow.DefaultW
 ) extends Module {
 
-  // 派生谓词命名与 HiveCoreConfig.scala:78/94/95 逐字对齐，勿另立裸名
+  // 派生谓词命名与 WorkerBeeConfig.scala:78/94/95 逐字对齐，勿另立裸名
   private val hasFp  = supportedFmts.contains(DataFormat.FP16) || supportedFmts.contains(DataFormat.BF16)
   private val hasMx8 = supportedFmts.contains(DataFormat.MXE4M3) || supportedFmts.contains(DataFormat.MXE5M2)
   private val hasMx4 = supportedFmts.contains(DataFormat.MXE2M1)
 
-  // 绝对集护栏（照抄 HiveCoreConfig.scala:100-102 判据与措辞风格，见蓝图 §2.3 / R8）：
+  // 绝对集护栏（照抄 WorkerBeeConfig.scala:100-102 判据与措辞风格，见蓝图 §2.3 / R8）：
   //   · MX 是本模块必选硬件路径（lane1/2/3 无条件生成），故至少需一种 MX 格式（拒 FP-only）。
   //   · MXFP4(E2M1) v1 必须与 MXFP8(E4M3/E5M2) 同时启用（拒 fp4-only；lane1/2/3 供数依赖）。
-  require(hasMx8 || hasMx4, s"HiveFusionMacFp: MX 为必选硬件路径，至少需一种 MX 格式，当前=$supportedFmts")
-  require(!hasMx4 || hasMx8, s"HiveFusionMacFp: MXFP4 v1 必须与 MXFP8 同时启用（lane1/2/3 供数依赖），当前=$supportedFmts")
+  require(hasMx8 || hasMx4, s"WbFusionMacFp: MX 为必选硬件路径，至少需一种 MX 格式，当前=$supportedFmts")
+  require(!hasMx4 || hasMx8, s"WbFusionMacFp: MXFP4 v1 必须与 MXFP8 同时启用（lane1/2/3 供数依赖），当前=$supportedFmts")
   // 用户设计律：MXFP8 存在则 MXFP4 一定存在（MX 族全在或全不在）。与上一条 require(!hasMx4||hasMx8)
   //   合成 hasMx8 ⟺ hasMx4。编译期 Scala 断言，不进 RTL；对已交付两配置（均 hasMx4=true）零影响。
   require(!hasMx8 || hasMx4,
-    s"HiveFusionMacFp: MXFP8(E4M3/E5M2) requires MXFP4(E2M1) -- MX family is all-in-or-all-out (user design rule), current=$supportedFmts")
+    s"WbFusionMacFp: MXFP8(E4M3/E5M2) requires MXFP4(E2M1) -- MX family is all-in-or-all-out (user design rule), current=$supportedFmts")
 
   // task#18 B 护栏：FpAddNarrow 只为 MX-only 做精度承诺（其 fp16-only 模式 is2x=0&&is4x=0 是 don't-care，
   //   见 FpAddNarrow.scala 头注「三模式与激活掩码」）⟹ 用【白名单】判据：supportedFmts 必须
@@ -67,14 +67,14 @@ class HiveFusionMacFp(
   //   非 MX 格式集仍能绕过（它们同样使 hasFp=false）⟹ 判据与文案「仅支持 MX-only」不一致。改白名单后
   //   任何非 MX 元素都会 elaboration 期即拒，使语义与文案精确对齐。风格对齐上方三条 require（编译期断言，不进 RTL）。
   require(!useNarrowAdd || supportedFmts.subsetOf(Set(DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1)),
-    s"HiveFusionMacFp: FpAddNarrow 仅支持 MX-only(MXE4M3/MXE5M2/MXE2M1)，当前 supportedFmts=$supportedFmts 含越界格式")
+    s"WbFusionMacFp: FpAddNarrow 仅支持 MX-only(MXE4M3/MXE5M2/MXE2M1)，当前 supportedFmts=$supportedFmts 含越界格式")
 
   // task#25 Sean m1 / Ray M1：narrowW 仅在 useNarrowAdd=true（例化 FpAddNarrow）时才被读取，
   //   useNarrowAdd=false 下它是 dead 参数（走 FpAdd 基线，窗口概念不存在）。此 require 钉死
   //   「非 narrow 路径不得携带非默认 narrowW」，避免调用方误以为改 narrowW 能影响 FpAdd 基线路径。
   //   合法区间 [8,28] 本身由 FpAddNarrow.scala:226-227 的两条 require 在例化 FpAddNarrow 时强制。
   require(useNarrowAdd || narrowW == FpAddNarrow.DefaultW,
-    s"HiveFusionMacFp: narrowW($narrowW) 仅在 useNarrowAdd=true 时生效；useNarrowAdd=false 时须保持默认 ${FpAddNarrow.DefaultW}")
+    s"WbFusionMacFp: narrowW($narrowW) 仅在 useNarrowAdd=true 时生效；useNarrowAdd=false 时须保持默认 ${FpAddNarrow.DefaultW}")
 
   val cEffW: Int = math.max(cW, bW)
   
@@ -89,8 +89,8 @@ class HiveFusionMacFp(
     val scaleB = Input(UInt(8.W))
     val rnd  = Input(RoundingMode())
     // 消费有效门控（仅 hasMx 块内有意义）：透传给 MX8 转换模块（FpCvtMx8ToMid/FpCvtMx8ToFp32，
-    // 原为 HiveWorkUnit.scala 中的 4×HiveCvtOpMx、已随 FusionMac 重构删除）的 inf/nan 断言；
-    // 非 MX 配置下恒不被选用，行为零影响。由宿主（HiveWorker）单行连入。
+    // 原为 WbWorkUnit.scala 中的 4×WbCvtOpMx、已随 FusionMac 重构删除）的 inf/nan 断言；
+    // 非 MX 配置下恒不被选用，行为零影响。由宿主（WbWorker）单行连入。
     val consumeValid = Input(Bool())
     val sum  = Output(UInt(cEffW.W))
   })
@@ -323,24 +323,24 @@ class HiveFusionMacFp(
 }
 
 
-object HiveFusionMacFpElaborate extends App {
-  // 发射配置（对齐 HiveCoreElaborate.scala:166-168「绝不覆盖回归锚点」约定，见蓝图 §2.4/§7）：
-  //   · A 类默认配置（MX-only, useNarrowAdd=true ⟹ FpAddNarrow）→ src/hive/verilog_fusionfp_mxonly/  ★task#25 C2 改目录; task#28 注释订正
-  //   · B nofp16 配置（显式 MX-only, useNarrowAdd=false）  → src/hive/verilog_fusionfp_nofp16/
+object WbFusionMacFpElaborate extends App {
+  // 发射配置（对齐 WorkerBeeElaborate.scala:166-168「绝不覆盖回归锚点」约定，见蓝图 §2.4/§7）：
+  //   · A 类默认配置（MX-only, useNarrowAdd=true ⟹ FpAddNarrow）→ src/workerbee/verilog_fusionfp_mxonly/  ★task#25 C2 改目录; task#28 注释订正
+  //   · B nofp16 配置（显式 MX-only, useNarrowAdd=false）  → src/workerbee/verilog_fusionfp_nofp16/
   //   · C narrow 配置（MX-only, useNarrowAdd=true ⟹ FpAddNarrow）
-  //                                                       → src/hive/verilog_fusionfp_narrow/  ★task#18 C 新增
-  // 独立目录的理由：Chisel 不把构造参数附到模块名，各配置顶层都叫 Hive_HiveFusionMacFp，
-  //   发同目录会互相覆盖（R10）。每次发射前清空目标目录（照抄 HiveCoreElaborate.scala:185-196
+  //                                                       → src/workerbee/verilog_fusionfp_narrow/  ★task#18 C 新增
+  // 独立目录的理由：Chisel 不把构造参数附到模块名，各配置顶层都叫 Wb_WbFusionMacFp，
+  //   发同目录会互相覆盖（R10）。每次发射前清空目标目录（照抄 WorkerBeeElaborate.scala:185-196
   //   的 deleteRecursively，R11）：否则反复发射会在目录内滞留陈旧 .sv。
   //
   // ★【task#25 C2：verilog_fusionfp/ 是 HEAD 回归锚点，本脚本【不再】向它发射】
-  //   · src/hive/verilog_fusionfp/  = 【HEAD 全五格式(FP16/BF16/MXE4M3/MXE5M2/MXE2M1)宽阵列回归锚点】，
-  //     含 Hive_FpMulFp16Bf16.sv / Hive_FpCvtFp16ToFp32.sv / Hive_FpCvtBf16ToFp32.sv /
-  //     Hive_FpCvtMx8ToFp32.sv / Hive_FpCvtMx4ToFp32.sv 五个宽阵列 .sv。它由 git 恢复到 HEAD 后
+  //   · src/workerbee/verilog_fusionfp/  = 【HEAD 全五格式(FP16/BF16/MXE4M3/MXE5M2/MXE2M1)宽阵列回归锚点】，
+  //     含 Wb_FpMulFp16Bf16.sv / Wb_FpCvtFp16ToFp32.sv / Wb_FpCvtBf16ToFp32.sv /
+  //     Wb_FpCvtMx8ToFp32.sv / Wb_FpCvtMx4ToFp32.sv 五个宽阵列 .sv。它由 git 恢复到 HEAD 后
   //     【冻结】，本脚本任何入口都【不】再写它 ⟹ 锚点永不被覆盖（用户 Q1=Option A 裁定）。
   //     若确需重新取得全五格式 RTL，须【显式传】 supportedFmts = 全五格式集合并另择目录，
   //     本脚本刻意不做此事（那会重新引入已被用户裁定砍除的 FP16/BF16 硬件路径，且有覆盖锚点之险）。
-  //   · src/hive/verilog_fusionfp_mxonly/ = 【当前 MX-only 类默认】（含用户有意加入的 consumeValid/inf-nan
+  //   · src/workerbee/verilog_fusionfp_mxonly/ = 【当前 MX-only 类默认】（含用户有意加入的 consumeValid/inf-nan
   //     守护 ⟹ 前端 FpCvtMx8ToMid 与 HEAD 有别，见类头注 E2 措辞修约）。这是 config A 的新落点。
   //   · 订正原自相矛盾注释：旧文案一面说「A→verilog_fusionfp/」一面又说「A≡B 完全相同硬件」，
   //     而 A（类默认，含 consumeValid 守护）与 B（显式 MXONLY）虽同为 MX-only、但发射目录与语义定位不同，
@@ -359,31 +359,31 @@ object HiveFusionMacFpElaborate extends App {
     Files.createDirectories(outDirPath)
     // 只删除目录内容，保留目录本身
     Files.list(outDirPath).iterator().asScala.foreach(deleteRecursively)
-    println(s"[HiveFusionMacFpElaborate] Cleaned output directory: $outputDir")
+    println(s"[WbFusionMacFpElaborate] Cleaned output directory: $outputDir")
   }
-  private def emit(gen: => HiveFusionMacFp, dir: String, label: String): Unit = {
+  private def emit(gen: => WbFusionMacFp, dir: String, label: String): Unit = {
     emitClean(dir)
     ChiselStage.emitSystemVerilogFile(
-       gen = withModulePrefix("Hive") { gen }
+       gen = withModulePrefix("Wb") { gen }
       ,args = Array("--target-dir", dir)
     )
-    println(s"[HiveFusionMacFpElaborate] $label -> $dir")
+    println(s"[WbFusionMacFpElaborate] $label -> $dir")
   }
   private val MXONLY = Set(DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1)
 
   // --- 配置 A：类默认（MX-only, useNarrowAdd=true ⟹ FpAddNarrow，含 consumeValid 守护）---
   //   ★task#25 C2：发到 verilog_fusionfp_mxonly（新目录），【绝不】写 verilog_fusionfp（HEAD 全五格式锚点）。
   //   ★task#28 注释订正：类默认已从 useNarrowAdd=false 改为 true ⟹ 此配置现例化 FpAddNarrow。
-  emit(new HiveFusionMacFp(), "src/hive/verilog_fusionfp_mxonly",
+  emit(new WbFusionMacFp(), "src/workerbee/verilog_fusionfp_mxonly",
        "config A: class default MX-only (useNarrowAdd=true -> FpAddNarrow)")
 
   // --- 配置 B：显式 MX-only（hasFp=false）+ useNarrowAdd=false ⟹ FpAdd 基线，lane0 走窄乘法器，删宽阵列 ---
   //   ★task#28：显式传 useNarrowAdd=false（类默认已改为 true），保持本配置文档语义与 verilog_fusionfp_nofp16/ 既有产物一致。
-  emit(new HiveFusionMacFp(supportedFmts = MXONLY, useNarrowAdd = false), "src/hive/verilog_fusionfp_nofp16",
+  emit(new WbFusionMacFp(supportedFmts = MXONLY, useNarrowAdd = false), "src/workerbee/verilog_fusionfp_nofp16",
        "config B: nofp16 (hasFp=false, useNarrowAdd=false -> FpAdd)")
 
   // --- 配置 C：MX-only + useNarrowAdd=true ⟹ 例化 FpAddNarrow（L2 窄窗口）★task#18 C 新增 ---
-  emit(new HiveFusionMacFp(supportedFmts = MXONLY, useNarrowAdd = true),
-       "src/hive/verilog_fusionfp_narrow",
+  emit(new WbFusionMacFp(supportedFmts = MXONLY, useNarrowAdd = true),
+       "src/workerbee/verilog_fusionfp_narrow",
        s"config C: narrow (hasFp=false, useNarrowAdd=true -> FpAddNarrow W=${FpAddNarrow.DefaultW})")
 }

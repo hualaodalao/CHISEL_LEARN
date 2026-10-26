@@ -1,4 +1,4 @@
-/** HiveComb（巢脾）- MxM 个 NxN HiveCell 组成更大集群
+/** WbComb（巢脾）- MxM 个 NxN WbCell 组成更大集群
   *                  （权重复用通道加载，无独立 wIn/wOut）
   *
   * @param arrayN   每个子阵列维度（默认 8）
@@ -9,11 +9,11 @@
   *
   * 新架构要点：
   *   - loadHIn / loadVIn 广播到所有子阵列（无 loadHOut/loadVOut 链式传播）
-  *   - fmtIn / rndIn 从首列子阵列进入，经 HiveCell 的 fmtOut/rndOut
+  *   - fmtIn / rndIn 从首列子阵列进入，经 WbCell 的 fmtOut/rndOut
   *     逐列（cj 方向）向右传播
   *   - validIn 需要 array-row 级 skew（ci * arrayN）以对齐行级错峰数据
   *   - fmtIn / rndIn 为配置信号，仅在 loadH 窗口锁存进 PE 配置寄存器，ci 方向无 skew
-  *   - aIn 不做内部 skew：HiveCell 与 HiveComb 都直连，错峰供数由外部 feeder 承担
+  *   - aIn 不做内部 skew：WbCell 与 WbComb 都直连，错峰供数由外部 feeder 承担
   *
   * aIn skew 契约（调用方责任）：
   *   计算阶段外部必须按「行 i 延迟 i 拍」错峰供数，即时刻 t 在 io.aIn(i) 上
@@ -49,7 +49,7 @@ import chisel3._
 import chisel3.util._
 import chisel3.dontTouch
 
-class HiveComb(
+class WbComb(
   arrayN: Int = 8,
   clusterM: Int = 2,
   aW: Int = 16,
@@ -71,7 +71,7 @@ class HiveComb(
 
   // --- elaboration-time require ---
   // 【破坏性变更留痕（C 写回重构本轮引入）】含 FP 族直接例化须显式 cW>=40，
-  // 否则构造期失败。顶层 HiveCore 通过传 cfg.cEffW（已含 >=40 分支）规避。
+  // 否则构造期失败。顶层 WorkerBee 通过传 cfg.cEffW（已含 >=40 分支）规避。
   if (hasFp)  require(cEffW >= 40,         s"含浮点格式时 cEffW($cEffW) 必须 >= 40（延迟规格化需要）")
   if (hasInt) require(cEffW >= aEffW + bW, s"含整数格式时 cEffW($cEffW) 必须 >= aEffW($aEffW) + bW($bW)")
 
@@ -121,12 +121,12 @@ class HiveComb(
 
   // 子阵列
   val arrays = Seq.fill(clusterM, clusterM)(
-    Module(new HiveCell(arrayN, aW, bW, cEffW, supportedFmts))
+    Module(new WbCell(arrayN, aW, bW, cEffW, supportedFmts))
   )
 
   // --- loadW 端口 WireDefault 兜底：既有测试（SystolicArrayTest 等）直接
   // 例化本模块时不连接 loadW 口（invalid），兜底回落恒 0，保证垂直模式
-  // bit-exact；顶层 HiveCore 正常驱动时兜底被覆盖 ---
+  // bit-exact；顶层 WorkerBee 正常驱动时兜底被覆盖 ---
   val loadWInSafe = WireDefault(false.B)
   loadWInSafe := io.loadWIn
   val loadWInLockSafe = WireDefault(false.B)
@@ -134,7 +134,7 @@ class HiveComb(
 
   // --- 全局 skew：每个子阵列行 (ci) 的 valid 延迟（跟踪行级错峰数据） ---
   // 外部供数已按「行 i 延迟 i 拍」错峰，数据波前到达全局 PE(x,y) 的时刻为
-  // r+1+x+y（含行内偏移 x）。valid 在 HiveCell 内沿 x（逐行 RegNext）+ y
+  // r+1+x+y（含行内偏移 x）。valid 在 WbCell 内沿 x（逐行 RegNext）+ y
   // （逐列 RegNext）二维传播，起始 skew 为 ci*arrayN，使 PE(x,y) 的 valid
   // 窗口与数据波前严格对齐。若只在 y 方向传播（广播所有 x 行），cj>0 簇的
   // valid 将滞后数据 (x_local) 拍，前几个深度的累加被错误门控
@@ -327,7 +327,7 @@ class HiveComb(
         // 首行：无条件直连 io.psumIn。
         // 垂直权重加载时传权重；计算阶段（K > totalN 多 pass）由 Executor
         // 注入 partial sum 作为累加基底（cpsRegs 已按行 i 延迟 i 拍 skew）。
-        // 非回灌窗口（首 pass 计算/sDRAIN/sLOAD）Executor 将 hivePsumIn 全置 0，
+        // 非回灌窗口（首 pass 计算/sDRAIN/sLOAD）Executor 将 wbPsumIn 全置 0，
         // 直连不会引入意外数据
         arr.io.validInV(c) := validSkewedPerRow(globalCol)
         arr.io.psumIn(c) := bSkewedPerRow(globalCol)

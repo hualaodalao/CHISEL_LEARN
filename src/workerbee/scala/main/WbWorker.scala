@@ -1,14 +1,14 @@
-/** HiveWorker（工蜂）- Weight-Stationary 处理单元
+/** WbWorker（工蜂）- Weight-Stationary 处理单元
   *
   * 架构定位：
-  *   权重驻留（Weight-Stationary）HiveWorker，无独立 wIn/wOut 端口。
+  *   权重驻留（Weight-Stationary）WbWorker，无独立 wIn/wOut 端口。
   *   权重仅通过 psumIn（loadV 垂直加载）通道加载到内部 wReg；
   *   计算时 aIn 水平传播、psumIn 垂直传播，权重不动、数据流过。
   *
   * @param aW            激活位宽（默认 16）
   * @param bW            权重位宽（默认 16）
   * @param cW            累加器/部分和位宽（默认 48）
-  * @param supportedFmts 本 HiveWorker 支持的数据格式集合（默认 {INT8,INT4,MXE4M3,MXE5M2,MXE2M1}）。
+  * @param supportedFmts 本 WbWorker 支持的数据格式集合（默认 {INT8,INT4,MXE4M3,MXE5M2,MXE2M1}）。
   *                      仅为支持的格式生成 MAC 硬件；运行时 fmtReg 不在 supportedFmts 中则
   *                      不执行累加，psumReg 保持。
   *
@@ -21,8 +21,8 @@
   * IO 端口语义：
   *   aIn  / aOut   : 激活通道，水平传播（左→右），aEffW 位。
   *   psumIn / psumOut : 部分和通道，垂直传播（上→下），cEffW 位；兼作权重加载通道。
-  *   loadHIn  : 水平加载使能（仅配置 fmt/rnd），由 HiveCell 广播（无 loadHOut）。
-  *   loadVIn  : 垂直加载使能（权重），由 HiveCell 广播（无 loadVOut）。
+  *   loadHIn  : 水平加载使能（仅配置 fmt/rnd），由 WbCell 广播（无 loadHOut）。
+  *   loadVIn  : 垂直加载使能（权重），由 WbCell 广播（无 loadVOut）。
   *   validIn / validOut : 数据有效标志，水平传播。
   *   fmtIn   / fmtOut   : 数据格式选择，水平传播。
   *   rndIn   / rndOut   : 舍入模式选择，水平传播。
@@ -57,7 +57,7 @@
 import chisel3._
 import chisel3.util._
 
-class HiveWorker(
+class WbWorker(
   aW: Int = 16,
   bW: Int = 16,
   cW: Int = 48,
@@ -67,13 +67,13 @@ class HiveWorker(
   val cEffW: Int = math.max(cW, bW)
 
   private val hasFp  = supportedFmts.exists(f => f == DataFormat.FP16 || f == DataFormat.BF16)
-  // 【Phase 3 INT 生态同步】整数族收敛为 {INT8, INT4}（INT16 已弃用），与 HiveCoreConfig.hasInt 同口径。
+  // 【Phase 3 INT 生态同步】整数族收敛为 {INT8, INT4}（INT16 已弃用），与 WorkerBeeConfig.hasInt 同口径。
   private val hasInt = supportedFmts.exists(f => f == DataFormat.INT8  || f == DataFormat.INT4)
 
-  // 【破坏性变更留痕（C 写回重构本轮引入，与 HiveComb 同源）】含 FP 族直接例化须显式
-  // cW>=40，否则构造期失败。顶层经 HiveComb → HiveWorker 链传 cfg.cEffW 规避。
-  if (hasFp)  require(cEffW >= 40,          s"HiveWorker: 含浮点格式时 cEffW($cEffW) 必须 >= 40（延迟规格化需要）")
-  if (hasInt) require(cEffW >= aEffW + bW,  s"HiveWorker: 含整数格式时 cEffW($cEffW) 必须 >= aEffW($aEffW) + bW($bW)")
+  // 【破坏性变更留痕（C 写回重构本轮引入，与 WbComb 同源）】含 FP 族直接例化须显式
+  // cW>=40，否则构造期失败。顶层经 WbComb → WbWorker 链传 cfg.cEffW 规避。
+  if (hasFp)  require(cEffW >= 40,          s"WbWorker: 含浮点格式时 cEffW($cEffW) 必须 >= 40（延迟规格化需要）")
+  if (hasInt) require(cEffW >= aEffW + bW,  s"WbWorker: 含整数格式时 cEffW($cEffW) 必须 >= aEffW($aEffW) + bW($bW)")
 
   val io = IO(new Bundle {
     // 激活通道（水平，aEffW 位）
@@ -83,10 +83,10 @@ class HiveWorker(
     val psumIn  = Input(UInt(cEffW.W))
     val psumOut = Output(UInt(cEffW.W))
 
-    // 水平加载（配置）：由 HiveCell 广播到所有 PE，无水平传播输出
+    // 水平加载（配置）：由 WbCell 广播到所有 PE，无水平传播输出
     val loadHIn  = Input(Bool())
 
-    // 垂直加载（仅权重）：由 HiveCell 垂直传递，拉高期间传递
+    // 垂直加载（仅权重）：由 WbCell 垂直传递，拉高期间传递
     val loadVInLock = Input(Bool()) //垂直锁存,脉冲
     val loadVIn  = Input(Bool())
     val loadVOut  = Output(Bool())
@@ -99,16 +99,16 @@ class HiveWorker(
     val loadWOut    = Output(Bool())
     val loadWInLock = Input(Bool())
 
-    // 控制（水平传播：RegNext → 右侧 HiveWorker）
+    // 控制（水平传播：RegNext → 右侧 WbWorker）
     val validIn  = Input(Bool())
     val validOut = Output(Bool())
     val validInV  = Input(Bool())
     val validOutV = Output(Bool())
 
-    // 格式（水平传播：RegNext → 右侧 HiveWorker）
+    // 格式（水平传播：RegNext → 右侧 WbWorker）
     val fmtIn  = Input(DataFormat())
     val fmtOut = Output(DataFormat())
-    // 权重格式（水平传播：RegNext → 右侧 HiveWorker）。mixFmtEn=0 时由上层令
+    // 权重格式（水平传播：RegNext → 右侧 WbWorker）。mixFmtEn=0 时由上层令
     // bFmtIn 跟随 fmtIn，行为与旧单 fmt 路径 bit-exact
     val bFmtIn  = Input(DataFormat())
     val bFmtOut = Output(DataFormat())
@@ -120,14 +120,14 @@ class HiveWorker(
     // That capture is the only sense in which scaleB is "resident" -- it is NOT
     // column-resident and NOT indexed by the output-N axis. In this array the
     // lane coordinate x is the K-lane axis and the column coordinate y is the
-    // output-N axis (see the axis note in HiveComb). Both chains are live and
+    // output-N axis (see the axis note in WbComb). Both chains are live and
     // both feed the MX MAC; the former "P1 only builds the chain, P2 wires the
     // MAC" note was stale and has been removed in #146.
     val scaleAIn  = Input(UInt(8.W))
     val scaleAOut = Output(UInt(8.W))
     val scaleBIn  = Input(UInt(8.W))
     val scaleBOut  = Output(UInt(8.W))
-    // 舍入模式（水平传播：RegNext → 右侧 HiveWorker）
+    // 舍入模式（水平传播：RegNext → 右侧 WbWorker）
     val rndIn   = Input(RoundingMode())
     val rndOut  = Output(RoundingMode())
     // psumReg 清零信号
@@ -140,7 +140,7 @@ class HiveWorker(
 
   // --- loadW 端口 WireDefault 兜底：既有测试（SystolicArrayTest 等）直接
   // 例化本 PE 时不连接 loadW 口（invalid），兜底回落恒 0，保证垂直模式
-  // bit-exact；HiveCell 正常驱动时兜底被覆盖 ---
+  // bit-exact；WbCell 正常驱动时兜底被覆盖 ---
   val loadWInSafe = WireDefault(false.B)
   loadWInSafe := io.loadWIn
   val loadWInLockSafe = WireDefault(false.B)
@@ -187,7 +187,7 @@ class HiveWorker(
     wReg := io.aIn(bW - 1, 0)
   }
   // 两种加载模式互斥：同一拍不允许 loadV 与 loadW 同时锁存
-  assert(!(io.loadVInLock && loadWInLockSafe), "HiveWorker: loadVInLock and loadWInLock asserted simultaneously (mutually exclusive load modes)")
+  assert(!(io.loadVInLock && loadWInLockSafe), "WbWorker: loadVInLock and loadWInLock asserted simultaneously (mutually exclusive load modes)")
   when(io.loadHIn) {
     fmtReg := io.fmtIn
     rndReg := io.rndIn
@@ -215,9 +215,9 @@ class HiveWorker(
   }
 
   // --- 可重构 MAC（使用 fmtReg / rndReg） ---
-  // WorkUnit 已由函数实现重构为独立 HiveWorkUnit Module（便于综合面积
+  // WorkUnit 已由函数实现重构为独立 WbWorkUnit Module（便于综合面积
   // 占比分析）：纯组合 MAC，PE 级状态（wReg/psumReg/fmtReg/rndReg）仍留本模块
-  val workUnit = Module(new HiveWorkUnit(aW, bW, cW, supportedFmts))
+  val workUnit = Module(new WbWorkUnit(aW, bW, cW, supportedFmts))
   workUnit.io.a    := io.aIn(aW - 1, 0)
   workUnit.io.b    := wReg
   workUnit.io.cReg := io.psumIn

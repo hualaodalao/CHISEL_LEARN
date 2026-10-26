@@ -1,7 +1,7 @@
 import chisel3._
 import chisel3.util._
 
-object HiveCoreRegAddr {
+object WorkerBeeRegAddr {
   val M = 0x00
   val NK = 0x01
   val A = 0x02
@@ -23,11 +23,11 @@ object HiveCoreRegAddr {
   val IrqErrorCode = 0x34
 }
 
-class HiveCoreRegIf(cfg: HiveCoreConfig) extends Module {
+class WorkerBeeRegIf(cfg: WorkerBeeConfig) extends Module {
   val io = IO(new Bundle {
-    val cmd = Vec(4, slave(Stream(new HiveCoreCmd)))
-    val resp = master(Stream(new HiveCoreResp))
-    val regFile = Output(new HiveCoreRegister(cfg))
+    val cmd = Vec(4, slave(Stream(new WorkerBeeCmd)))
+    val resp = master(Stream(new WorkerBeeResp))
+    val regFile = Output(new WorkerBeeRegister(cfg))
     val start = Output(Bool())
     val startPc = Output(UInt(32.W))
     val startTag = Output(UInt(8.W))
@@ -41,7 +41,7 @@ class HiveCoreRegIf(cfg: HiveCoreConfig) extends Module {
     val irq = Output(Bool())
   })
 
-  val regFile = RegInit(0.U.asTypeOf(new HiveCoreRegister(cfg)))
+  val regFile = RegInit(0.U.asTypeOf(new WorkerBeeRegister(cfg)))
   val inFlight = RegInit(false.B)
   val startPending = RegInit(false.B)
   val startPc = RegInit(0.U(32.W))
@@ -61,12 +61,12 @@ class HiveCoreRegIf(cfg: HiveCoreConfig) extends Module {
 
   def writeRegister(addr: UInt, data: UInt): Unit = {
     switch(addr) {
-      is(HiveCoreRegAddr.M.U) { regFile.m := data(15, 0) }
-      is(HiveCoreRegAddr.NK.U) { regFile.n := data(15, 0); regFile.k := data(31, 16) }
-      is(HiveCoreRegAddr.A.U) { regFile.aAddr := data }
-      is(HiveCoreRegAddr.B.U) { regFile.bAddr := data }
-      is(HiveCoreRegAddr.C.U) { regFile.cAddr := data }
-      is(HiveCoreRegAddr.Control.U) {
+      is(WorkerBeeRegAddr.M.U) { regFile.m := data(15, 0) }
+      is(WorkerBeeRegAddr.NK.U) { regFile.n := data(15, 0); regFile.k := data(31, 16) }
+      is(WorkerBeeRegAddr.A.U) { regFile.aAddr := data }
+      is(WorkerBeeRegAddr.B.U) { regFile.bAddr := data }
+      is(WorkerBeeRegAddr.C.U) { regFile.cAddr := data }
+      is(WorkerBeeRegAddr.Control.U) {
         regFile.aFmt := data(3, 0).asTypeOf(DataFormat())
         regFile.bFmt := data(7, 4).asTypeOf(DataFormat())
         regFile.cFmt := data(11, 8).asTypeOf(DataFormat())
@@ -84,28 +84,28 @@ class HiveCoreRegIf(cfg: HiveCoreConfig) extends Module {
         regFile.requantOn := data(29)
         regFile.biasOn := data(30)
       }
-      is(HiveCoreRegAddr.ScaleA.U) { regFile.aScaleAddr := data }
-      is(HiveCoreRegAddr.ScaleB.U) { regFile.bScaleAddr := data }
-      is(HiveCoreRegAddr.ScaleC.U) { regFile.cScaleAddr := data }
-      is(HiveCoreRegAddr.Bias.U) { regFile.biasAddr := data }
-      is(HiveCoreRegAddr.RqM.U) { regFile.rqMBase := data }
-      is(HiveCoreRegAddr.RqParam.U) {
+      is(WorkerBeeRegAddr.ScaleA.U) { regFile.aScaleAddr := data }
+      is(WorkerBeeRegAddr.ScaleB.U) { regFile.bScaleAddr := data }
+      is(WorkerBeeRegAddr.ScaleC.U) { regFile.cScaleAddr := data }
+      is(WorkerBeeRegAddr.Bias.U) { regFile.biasAddr := data }
+      is(WorkerBeeRegAddr.RqM.U) { regFile.rqMBase := data }
+      is(WorkerBeeRegAddr.RqParam.U) {
         regFile.rqShift := data(5, 0)
         regFile.rqZp := data(31, 16).asSInt
       }
-      is(HiveCoreRegAddr.IrqMask.U) { irqMask := data(10, 0) }
+      is(WorkerBeeRegAddr.IrqMask.U) { irqMask := data(10, 0) }
     }
   }
 
   def readRegister(addr: UInt): UInt = {
     val data = WireDefault(0.U(32.W))
     switch(addr) {
-      is(HiveCoreRegAddr.M.U) { data := regFile.m }
-      is(HiveCoreRegAddr.NK.U) { data := Cat(regFile.k, regFile.n) }
-      is(HiveCoreRegAddr.A.U) { data := regFile.aAddr }
-      is(HiveCoreRegAddr.B.U) { data := regFile.bAddr }
-      is(HiveCoreRegAddr.C.U) { data := regFile.cAddr }
-      is(HiveCoreRegAddr.Control.U) {
+      is(WorkerBeeRegAddr.M.U) { data := regFile.m }
+      is(WorkerBeeRegAddr.NK.U) { data := Cat(regFile.k, regFile.n) }
+      is(WorkerBeeRegAddr.A.U) { data := regFile.aAddr }
+      is(WorkerBeeRegAddr.B.U) { data := regFile.bAddr }
+      is(WorkerBeeRegAddr.C.U) { data := regFile.cAddr }
+      is(WorkerBeeRegAddr.Control.U) {
         data := Cat(0.U(1.W), regFile.biasOn, regFile.requantOn, regFile.loadWMode,
           0.U(1.W), regFile.cMxBlockSize.asUInt, 0.U(1.W), regFile.bMxBlockSize.asUInt,
           0.U(1.W), regFile.aMxBlockSize.asUInt, regFile.warmup, regFile.warmdown,
@@ -113,26 +113,26 @@ class HiveCoreRegIf(cfg: HiveCoreConfig) extends Module {
           regFile.bAddrMode.asUInt, regFile.aAddrMode.asUInt, regFile.cFmt.asUInt,
           regFile.bFmt.asUInt, regFile.aFmt.asUInt)
       }
-      is(HiveCoreRegAddr.ScaleA.U) { data := regFile.aScaleAddr }
-      is(HiveCoreRegAddr.ScaleB.U) { data := regFile.bScaleAddr }
-      is(HiveCoreRegAddr.ScaleC.U) { data := regFile.cScaleAddr }
-      is(HiveCoreRegAddr.Bias.U) { data := regFile.biasAddr }
-      is(HiveCoreRegAddr.RqM.U) { data := regFile.rqMBase }
-      is(HiveCoreRegAddr.RqParam.U) { data := Cat(regFile.rqZp.asUInt, 0.U(10.W), regFile.rqShift) }
-      is(HiveCoreRegAddr.Status.U) { data := Cat(io.progress, 0.U(13.W), inFlight, 0.U(1.W), io.busy) }
-      is(HiveCoreRegAddr.IrqRaw.U) { data := irqRaw }
-      is(HiveCoreRegAddr.IrqMask.U) { data := irqMask }
-      is(HiveCoreRegAddr.IrqMasked.U) { data := irqMasked }
-      is(HiveCoreRegAddr.IrqErrorCode.U) { data := errorCode }
+      is(WorkerBeeRegAddr.ScaleA.U) { data := regFile.aScaleAddr }
+      is(WorkerBeeRegAddr.ScaleB.U) { data := regFile.bScaleAddr }
+      is(WorkerBeeRegAddr.ScaleC.U) { data := regFile.cScaleAddr }
+      is(WorkerBeeRegAddr.Bias.U) { data := regFile.biasAddr }
+      is(WorkerBeeRegAddr.RqM.U) { data := regFile.rqMBase }
+      is(WorkerBeeRegAddr.RqParam.U) { data := Cat(regFile.rqZp.asUInt, 0.U(10.W), regFile.rqShift) }
+      is(WorkerBeeRegAddr.Status.U) { data := Cat(io.progress, 0.U(13.W), inFlight, 0.U(1.W), io.busy) }
+      is(WorkerBeeRegAddr.IrqRaw.U) { data := irqRaw }
+      is(WorkerBeeRegAddr.IrqMask.U) { data := irqMask }
+      is(WorkerBeeRegAddr.IrqMasked.U) { data := irqMasked }
+      is(WorkerBeeRegAddr.IrqErrorCode.U) { data := errorCode }
     }
     data
   }
 
   def rejectWrite(addr: UInt, data: UInt): Bool = {
-    val readOnly = addr === HiveCoreRegAddr.Status.U || addr === HiveCoreRegAddr.IrqRaw.U ||
-      addr === HiveCoreRegAddr.IrqMasked.U || addr === HiveCoreRegAddr.IrqErrorCode.U
-    val needsIdle = addr <= HiveCoreRegAddr.RqParam.U ||
-      (addr === HiveCoreRegAddr.Start.U && data.orR)
+    val readOnly = addr === WorkerBeeRegAddr.Status.U || addr === WorkerBeeRegAddr.IrqRaw.U ||
+      addr === WorkerBeeRegAddr.IrqMasked.U || addr === WorkerBeeRegAddr.IrqErrorCode.U
+    val needsIdle = addr <= WorkerBeeRegAddr.RqParam.U ||
+      (addr === WorkerBeeRegAddr.Start.U && data.orR)
     readOnly || (inFlight && needsIdle)
   }
 
@@ -156,9 +156,9 @@ class HiveCoreRegIf(cfg: HiveCoreConfig) extends Module {
   for (lane <- 0 until 4) {
     val stream = io.cmd(lane)
     val cmd = stream.payload
-    val write1 = cmd.op === HiveCoreOp.REG_WRITE1
-    val write2 = cmd.op === HiveCoreOp.REG_WRITE2
-    val read = cmd.op === HiveCoreOp.REG_READ
+    val write1 = cmd.op === WorkerBeeOp.REG_WRITE1
+    val write2 = cmd.op === WorkerBeeOp.REG_WRITE2
+    val read = cmd.op === WorkerBeeOp.REG_READ
     val rejected = rejectWrite(cmd.reg0Addr, cmd.data0) ||
       (write2 && rejectWrite(cmd.reg1Addr, cmd.data1))
     acceptedWrites(lane) := stream.fire && (write1 || write2) && !rejected
@@ -171,15 +171,15 @@ class HiveCoreRegIf(cfg: HiveCoreConfig) extends Module {
   }
 
   def hasWriteTarget(addr: UInt, data: UInt): Bool = {
-    addr <= HiveCoreRegAddr.RqParam.U || addr === HiveCoreRegAddr.IrqMask.U ||
-      addr === HiveCoreRegAddr.IrqClear.U || (addr === HiveCoreRegAddr.Start.U && data.orR)
+    addr <= WorkerBeeRegAddr.RqParam.U || addr === WorkerBeeRegAddr.IrqMask.U ||
+      addr === WorkerBeeRegAddr.IrqClear.U || (addr === WorkerBeeRegAddr.Start.U && data.orR)
   }
 
   val writeTargets = (0 until 4).map { lane =>
     val cmd = io.cmd(lane).payload
     Seq(
       (acceptedWrites(lane) && hasWriteTarget(cmd.reg0Addr, cmd.data0), cmd.reg0Addr),
-      (acceptedWrites(lane) && cmd.op === HiveCoreOp.REG_WRITE2 &&
+      (acceptedWrites(lane) && cmd.op === WorkerBeeOp.REG_WRITE2 &&
         hasWriteTarget(cmd.reg1Addr, cmd.data1), cmd.reg1Addr))
   }
   val conflicts = for {
@@ -193,18 +193,18 @@ class HiveCoreRegIf(cfg: HiveCoreConfig) extends Module {
   val clearBits = WireDefault(0.U(11.W))
   for (lane <- 0 until 4) {
     val cmd = io.cmd(lane).payload
-    val write2 = cmd.op === HiveCoreOp.REG_WRITE2
+    val write2 = cmd.op === WorkerBeeOp.REG_WRITE2
     when(acceptedWrites(lane)) {
       writeRegister(cmd.reg0Addr, cmd.data0)
       when(write2) { writeRegister(cmd.reg1Addr, cmd.data1) }
-      val clear0 = cmd.reg0Addr === HiveCoreRegAddr.IrqClear.U
-      val clear1 = write2 && cmd.reg1Addr === HiveCoreRegAddr.IrqClear.U
+      val clear0 = cmd.reg0Addr === WorkerBeeRegAddr.IrqClear.U
+      val clear1 = write2 && cmd.reg1Addr === WorkerBeeRegAddr.IrqClear.U
       when(clear0 || clear1) {
         clearBits := Mux(clear0, cmd.data0(10, 0), 0.U(11.W)) |
           Mux(clear1, cmd.data1(10, 0), 0.U(11.W))
       }
-      val trigger0 = cmd.reg0Addr === HiveCoreRegAddr.Start.U && cmd.data0.orR
-      val trigger1 = write2 && cmd.reg1Addr === HiveCoreRegAddr.Start.U && cmd.data1.orR
+      val trigger0 = cmd.reg0Addr === WorkerBeeRegAddr.Start.U && cmd.data0.orR
+      val trigger1 = write2 && cmd.reg1Addr === WorkerBeeRegAddr.Start.U && cmd.data1.orR
       when(trigger0 || trigger1) {
         startPending := true.B
         startPc := cmd.pc

@@ -1,8 +1,8 @@
 # ForagerBee DMA 硬件规格
 
-文档版本：`v2.0.0`
+文档版本：`v3.0.0`
 
-修订日期：`2026-10-23`
+修订日期：`2026-10-26`
 
 ## 版本控制
 
@@ -16,6 +16,9 @@
 
 | 版本号 | 日期 | 修改内容 | 相关 Feature ID |
 |---|---|---|---|
+| v3.0.0 | 2026-10-26 | **默认配置接口变更**：addressWidth 32→40，导出入口继承默认；命令地址/stride、总线地址和 SG 描述符默认字段宽度随之变化；显式 32 bit 配置仍可使用，操作/格式编码不变 | FB-F001/008/014/028 |
+| v2.1.1 | 2026-10-26 | 性能清单勘误为通路带宽、发射率与并行度；原 P002/P003/P005 归回已有功能，旧 ID 不复用；区分接口峰值与局部稳态上限，不改变 RTL 契约 | FB-P001–FB-P011 |
+| v2.1.0 | 2026-10-26 | 第三章增加性能与 debug 清单及独立编号规则；索引现有性能机制，debug 无条目，不改变 RTL 契约 | FB-P001–FB-P005 |
 | v2.0.0 | 2026-10-23 | **ABI break**：删除 chaining、atomic、全局转换活线及 INT8 shift 量化/反量化；新增 `idle`、`padValue`，按重写后的 Engine、字节适配器更新非对齐、尾部、IM2COL、SG、MX 与写响应语义；保留数值限制和验证缺口 | FB-F002–FB-F020、FB-F027–FB-F030 |
 | v1.0.0 | 2026-10-23 | 首个编号基线：按通用模板建立版本控制、14 章和稳定功能清单 | FB-F001–FB-F026 |
 
@@ -27,7 +30,7 @@
 
 ### 1.2 范围
 
-覆盖 ForagerBee 顶层、Tile 展开器、Dispatcher、Engine、字节读写适配器、浮点转换、MX 量化、转置缓冲、IM2COL、SG 和共享写仲裁。只定义本模块与命令源、存储系统、时钟复位的接口，不声明 Hive 集成、Queen 控制/解码或任何外部 NPU 的已实现连接。
+覆盖 ForagerBee 顶层、Tile 展开器、Dispatcher、Engine、字节读写适配器、浮点转换、MX 量化、转置缓冲、IM2COL、SG 和共享写仲裁。只定义本模块与命令源、存储系统、时钟复位的接口，不声明 WorkerBee 集成、Queen 控制/解码或任何外部 NPU 的已实现连接。
 
 当前入口直接接收 `FbCmd`，没有 Raw DW decoder、链式控制器/描述符总线、atomic 完成写或全局 `cvt*` IO。规划项统一标注“**规划中/非当前 RTL 契约**”，不是交付承诺。
 
@@ -102,7 +105,9 @@ TRANSPOSE：ByteReader -> 原 tile buffer -> 专用带 strobe 写通路
 
 ### 3.1 Feature ID 规则
 
-使用稳定 `FB-Fnnn`，不等于 opcode/地址/错误码。既有 ID 不重排、不复用；移除功能保留 ID 并标“已移除”。只有“已实现”行构成当前能力索引，且受输入域与配置限制；实现状态不代表已通过仿真。
+功能、性能和 debug 分别使用稳定 `FB-Fxxx`、`FB-Pxxx`、`FB-Dxxx`，三类独立从 001 编号，不等于 opcode/地址/错误码。既有 ID 不重排、不复用；移除条目保留 ID 并标“已移除”，分类更正记录原 ID 与对应功能 ID 的去向。只有“已实现”行构成当前能力索引，且受输入域与配置限制；实现状态不代表已通过仿真。
+
+性能清单主要描述各处通路的位宽与带宽、每拍接受/发射/完成能力及并行度；burst/credit、非阻塞写和操作快路径等行为机制归功能清单。必须区分接口峰值、局部稳态上限和实测有效吞吐，不以多个引擎并行执行代替同拍多命令发射的说明。debug 清单描述实际调试能力，不将普通状态输出、错误回执或仿真断言当作专用 debug 功能。有对应能力才填写，无则保留表头、不填条目；规划项见第 14 章及附录。
 
 ### 3.2 功能清单
 
@@ -135,11 +140,37 @@ TRANSPOSE：ByteReader -> 原 tile buffer -> 专用带 strobe 写通路
 | FB-F025 | 4 KiB 自动拆分 | 未实现 | 当前不检查/拆分该边界 | 7.3.3、A.2 |
 | FB-F026 | 细分错误码 | 未实现 | 当前只有 `err` Bool | 10、A.2 |
 | FB-F027 | 完全空闲状态 `idle` | 已实现 | FIFO、执行和 done 反压均计入；不以 `cmd.valid` 门控 | 11.1 |
-| FB-F028 | 物理 beat 对齐/逻辑非对齐及尾部 | 已实现 | 字节 reader/writer、精确转换字节计数；源覆盖 beat 必须可访问 | 5.1.12、7.3.3 |
+| FB-F028 | 物理 beat 对齐/逻辑非对齐及尾部 | 已实现 | 字节 reader/writer、精确转换字节计数、物理 burst 拆分与读队列整 burst credit 预留；源覆盖 beat 必须可访问 | 5.1.12、7.3.3、9.3 |
 | FB-F029 | IM2COL 水平边界与 dilation | 已实现 | `dW=1` 整窗有效则 burst，否则逐 kw fallback；无效元素不读源 | 5.1.6 |
 | FB-F030 | 可编程 `padValue` | 已实现 | 低目的元素位重复，转换后填充，不对 padValue 做数值转换 | 5.1.3、5.1.6 |
 
 功能表仅索引；详细合法域、限制和验证状态见对应章节及第 14 章。
+
+### 3.3 性能清单
+
+记 `D=dataWidth`、`BB=D/8`、`N=numPorts`；默认 `D=128`、`BB=16`、`N=2`。下表为接口峰值或源码结构推导的局部上限，**不是端到端实测吞吐或持续带宽保证**；`byte/cycle` 按有效字节计，外部物理 beat 峰值不扣首尾无效字节。
+
+| Feature ID | 通路/性能项目 | 实现状态 | 位宽、带宽或接受/发射/完成率 | 并行能力、成立条件与瓶颈 | 关联功能/契约章节 |
+|---|---|---|---|---|---|
+| FB-P001 | 命令接受、派发与完成并行度 | 已实现 | 入口接受、向引擎派发、出口完成分别至多 `1 条/cycle`；同时执行至多 `N` 条命令，默认 2 条 | 单 FIFO 单发射，不支持同拍多命令派发；不同引擎可并行执行，每引擎一条命令；能力、地址冲突、HOL 和 done 反压限制实际并行度 | FB-F001/020；5.2.1、5.2.3、12.2 |
+| FB-P004 | 共享写口并行发射宽度 | 已实现 | 启用共享写时，至多 `N` 个不同引擎同拍向 `N` 个写口发射，各口 `D bit`；总接口峰值 `N*BB byte/cycle`，默认 32 | 可同拍多口授权；同一引擎最多使用一个写口、发一个 beat，不支持单引擎跨多口条带化；数据锁、响应归属和反压可能降低可用并行度 | FB-F017；5.2.4、12.2 |
+| FB-P006 | 外部读写数据通路 | 已实现 | 每口读数据、写数据各 `D bit`、至多 `1 beat/cycle`，即各 `BB byte/cycle`；全模块读/写各至多 `N*BB`，默认各 32 | 读写独立，可同拍读写，多口可并行；每引擎仅一个读请求在途，故读 burst 间存在请求间隙；接口峰值不能代替 reader/writer 的持续供耗速率 | FB-F001/016/028；6.2、9.3、12.2 |
+| FB-P007 | 字节 reader 输出通路 | 已实现 | 输出 `D bit`、至多 `BB` 有效字节/packet；长对齐 transfer 的局部稳态上限 `BB/2 byte/cycle`，默认 8 | 物理队列取数追加与输出握手互斥，满 packet 至少一拍追加、一拍输出；需队列有数据、下游无反压，启动、短行、首尾和 burst 间隙额外降速 | FB-F028；5.1.12、12.2 |
+| FB-P008 | 字节 writer 输入/写出通路 | 已实现 | 输入及物理写出各 `D bit`；长对齐满 packet transfer 的局部稳态上限 `BB/2 byte/cycle`，默认 8 | packet 追加与物理写出互斥，不支持同拍装入并写出；需上游持续供数、写口 ready 和足够响应 credit；部分 packet、burst 边界和响应等待额外降速 | FB-F016/028；5.1.12、5.2.4、12.2 |
+| FB-P009 | 普通浮点转换通路 | 已实现 | 输入/输出各 `D bit`；旁路或 16→16 等宽转换接口上限各 `BB byte/cycle`；独立模块满 packet 稳态：32→16 输入 `2*BB/3`、输出 `BB/3`；16→32 输入 `BB/3`、输出 `2*BB/3` | 等宽通路可同拍入出；压缩/扩展装入与排出串行，分别两次装入后一次排出、一次装入后两次排出；无反压且不计首尾，接入 reader/writer 后再受其速率限制；`converterPipeStages` 不改变结构 | FB-F010；5.1.9、5.3.2、12.2 |
+| FB-P010 | MX 收集、量化及输出通路 | 已实现 | 输入/量化数据输出各 `D bit`，scale 内部接口 8 bit；收集阶段至多 `D/32` 个 FP32 或 `D/16` 个 FP16/BF16 元素/cycle，默认 4/8；量化阶段至多 `1 element/cycle`，生成 `1 byte/cycle` | 仅配置生成时存在；收集与量化/排空串行，无双块重叠；量化输出按 `BB` 个 FP8 打包，整体块吞吐低于量化阶段上限；scale 每块一字节，物理侧写与数据共用写口 | FB-F012；5.1.11、5.3.3、12.2 |
+| FB-P011 | 转置缓冲与专用写通路 | 已实现 | tile 输入/输出各 `D bit`；专用写活动段至多 `1 beat/cycle`，物理峰值 `BB byte/cycle`；填充侧受 reader 的 `BB/2` 长对齐上限限制 | 同一 tile 填充与排出串行，不支持双 tile 流水；排出阶段在 ready/credit 允许时可逐拍发射，列/段启动、部分 strobe 和响应等待降低有效吞吐 | FB-F005/016；5.1.4、5.2.4、12.2 |
+
+分类勘误：原 `FB-P002`（burst/credit）、`FB-P003`（非阻塞写）、`FB-P005`（IM2COL 整窗快路径）已移出性能清单，分别归入已有 `FB-F028`、`FB-F016`、`FB-F029`；旧 P ID 保留为分类记录、不得复用，**不表示 RTL 功能被删除**。COPY/PERMUTE/T2L/L2T/SG/IM2COL 使用上述共用字节搬运通路，功能路径差异与逐 transfer 启动成本见对应功能章节。
+
+详细拍频口径见 12.2；端到端延迟、吞吐与 PPA 实测仍待补充。
+
+### 3.4 Debug 清单
+
+| Feature ID | Debug feature | 实现状态 | 观测/控制能力、适用条件与主要约束 | 契约章节 |
+|---|---|---|---|---|
+
+当前无专用 debug 功能，不分配 `FB-Dxxx` 条目；普通状态输出见 11.1，调试接口缺失及仿真断言边界见 11.2。
 
 ## 4. 架构说明
 
@@ -497,6 +528,8 @@ bits[addressWidth+15:addressWidth] = lenBytes（1..65535；0 报错）
 其余高位忽略；entry[i] 地址 = sgListAddr + i*BB。
 ```
 
+默认 addressWidth=40 时，addr 为 bits[39:0]，lenBytes 为 bits[55:40]；有效字段占低 7 字节，其余 beat 字节忽略。显式 32 bit 配置仍使用 addr[31:0]、lenBytes[47:32]，两种布局不可混用；条目步长始终为 BB。
+
 #### 7.2.6 v2.0.0 ABI 删除清单
 
 | 载体 | 删除项 |
@@ -582,16 +615,20 @@ TILE2LINEAR：源 tiled、目的 linear；LINEAR2TILE：反之。
 | tileSize | 8 | >=2；tileSize² 个 32 bit 槽；大参数另有内部宽度限制 |
 | maxBurstLen | 64 | 1..256 beat；读写全部路径的物理 burst 上限 |
 | dataWidth | 128 | **2 的幂且 >=32，配置 require 已检查**；BB=dataWidth/8 |
-| addressWidth | 32 | >=12；不代表已实现 4 KiB split |
+| addressWidth | 40 | >=12；默认地址范围 0..2^40-1（1 TiB）；不代表已实现 4 KiB split |
 | channelTranspose/Permute/Im2col/ScatterGather | 空 | 空时每通道 true，非空长度=numPorts；各能力独立 |
 | enableConversion | false | 生成 float converter 和 MX quantizer；不生成 cvt* IO |
 | converterPipeStages | 1 | 当前传入但不改变转换结构；不能当作有效流水深度 |
 | enableSharedWritePorts | false | 生成写仲裁器 |
 | writeOutstandingDepth | 1 | >=1，1 阻塞、>1 单 transfer 内 NB |
 
-SG 硬件额外要求 dataWidth>=addressWidth+16，否则该通道 SG 命令报错。转换器另要求 dataWidth 为 32 的整数倍、MX 要求 >=32 的 2 次幂，配置已涵盖。maxDims 的 4D expander 限制没有在配置 require 完整检查，不能只看配置通过就声明完整顶层支持 1..3。
+SG 硬件额外要求 dataWidth>=addressWidth+16，否则该通道 SG 命令报错；40 bit 地址要求至少 56 bit 数据容纳描述符，在合法 2 次幂数据位宽中至少 64 bit，默认 128 bit 满足。转换器另要求 dataWidth 为 32 的整数倍、MX 要求 >=32 的 2 次幂，配置已涵盖。maxDims 的 4D expander 限制没有在配置 require 完整检查，不能只看配置通过就声明完整顶层支持 1..3。
 
-上述为 ForagerBeeConfig 默认值。当前 ForagerBeeElaborate 导出入口采用 numPorts=2、queueDepth=4、maxDims=5、tileSize=16、dataWidth=256、maxBurstLen=64、enableConversion=true，transpose=[true,false]、permute=[true,true]、im2col=[false,true]、SG=[true,true]；另选择共享写、depth=4、两者组合。导出配置/入口存在不表示这些配置仿真或 PPA 已验证。
+修改 addressWidth 会同步影响命令的 srcAddr/dstAddr/sgListAddr/scaleAddr、srcStride/dstStride、总线地址、reader/writer 地址寄存器、各操作地址生成和 Dispatcher 的 addressWidth+1 bit 包络。默认 40 bit 不扩大 shape、索引或 transfer 字节计数；padValue 和 32 bit 浮点/转置元素槽也不是地址字段。有限宽度计数、展开 stride 截断及专用地址溢出义务仍见 5.3.1，不能将参数化位宽等同于任意输入无回绕。
+
+显式 ForagerBeeConfig(addressWidth=32) 仍产生 32 bit 接口，并覆盖默认值。命令源与下游须匹配实际配置；SG 描述符地址/长度位域随该参数变化，默认 40 bit 布局见 7.2.5，不能继续使用旧 32 bit 地址布局。
+
+上述为 ForagerBeeConfig 默认值。当前 ForagerBeeElaborate 导出入口继承 addressWidth=40，采用 numPorts=2、queueDepth=4、maxDims=5、tileSize=16、dataWidth=256、maxBurstLen=64、enableConversion=true，transpose=[true,false]、permute=[true,true]、im2col=[false,true]、SG=[true,true]；另选择共享写、depth=4、两者组合。导出配置/入口存在不表示这些配置仿真或 PPA 已验证；已有生成 RTL 不会随源码配置自动更新。
 
 ### 8.2 运行期配置
 
@@ -685,16 +722,20 @@ idle 不额外与 `!cmd.valid` 相与，也不是 cmd.ready 门控。尚未握�
 
 | 指标 | 数值/表达式 | 属性与条件 |
 |---|---|---|
-| 并行命令 | 至多 numPorts | 结构上限；无冲突、能力匹配 |
+| 命令接受/派发/完成率 | 分别至多 1 条/cycle | 单入口、单 FIFO 单发射、单完成出口；不代表每拍都能握手 |
+| 并行命令 | 至多 numPorts | 结构上限；跨引擎并行执行，无冲突、能力匹配；不是同拍多命令发射 |
 | burst 长度 | <=maxBurstLen | 物理剩余、读 credit、transfer 边界共同限制 |
-| 峰值物理总线宽度 | dataWidth bit/端口/拍 | 接口上限，**不是持续有效载荷吞吐保证** |
+| 峰值物理总线宽度 | 每口读/写各 dataWidth bit/拍；总读/写各 numPorts*BB byte/cycle | 独立读写可同拍、多口可并行；接口上限，**不是持续有效载荷吞吐保证** |
+| 字节 reader / writer 局部稳态 | 长对齐满 packet transfer 各至多 BB/2 byte/cycle | 默认各 8；装入与输出互斥且无供数/反压/响应 credit 限制，不计启动、尾部和 burst 边界 |
 | 延迟/有效字节吞吐 | 待测量 | 包括首尾额外读、packet 装卸、转换、写响应和调度气泡 |
 | NB 写 | 同 transfer 内最多配置深度等响应 | 普通行/段/SG 条目边界仍等全部响应 |
 | TRANSPOSE | tile fill 后 drain | 无双 tile 缓冲，源行按列 tile 重读 |
 | IM2COL fallback | 每 kw 独立 transfer | dW!=1/边界情况请求多，局部复用未实现 |
 | SG / MX | 逐条 fetch / collect-quant-drain | 无 SG 预取；MX scale 与数据共享写口 |
 
-reader/writer 储存追加与输出刻意互斥，转换/转置/MX 也有各自节奏，不能据接口宽度宣称逐拍满带宽。converterPipeStages 不改变结构；不宣称此次重写的 throughput 或 RTL 与旧阻塞路径逐字相同/零回归。共享仲裁不增加物理端口数量，实际性能须带负载/反压/起止口径测量。
+局部稳态按长 transfer 中的重复装卸周期推导：reader/writer 对一个完整 `BB` 字节 packet 至少需要一拍追加和一拍输出，故上限 `BB/2 byte/cycle`。转换器独立模块的 32→16 路径两拍各接收 `BB` 源字节，再一拍输出 `BB` 目的字节；16→32 路径一拍接收 `BB` 源字节，再两拍各输出 `BB` 目的字节，故有 3.3 中的输入/输出速率。这些是忽略首尾与供耗限制的局部结构上限，不代表整条 reader→converter→writer 流水达到该值。
+
+转置活动写段可逐拍输出物理 beat，但同 tile 的 fill/drain 不重叠；MX 量化阶段每拍至多一个元素，块收集、排空和 scale 写另占时间。共享仲裁可多口同拍发射，却不增加物理端口数量或允许同一引擎多口发射。`converterPipeStages` 不改变结构，不宣称此次重写的 throughput 或 RTL 与旧阻塞路径逐字相同/零回归。端到端有效吞吐须用有效字节/完整事务总周期测量，记录配置、负载、反压、起止事件；换算 byte/s 使用实际时钟频率，当前不提供未经测量的 GB/s。
 
 ### 12.3 面积、功耗与测量依据
 
@@ -704,7 +745,7 @@ reader/writer 储存追加与输出刻意互斥，转换/转置/MX 也有各自�
 
 ### 13.1 外部环境要求
 
-存储系统支持对齐 beat 请求和 byte strobe，每读恰好 len+1 拍、每写恰好一次响应，共享写保序且不提前响应。源首尾覆盖 beat 均可访问且无副作用；不可把字节 reader 用在 MMIO。4 KiB 禁跨界由软件/外部桥承担。软件管理外部一致性、可见性、地址权限及未覆盖的竞争；本文不声明与 Hive 或其他系统模块已集成。
+存储系统支持对齐 beat 请求和 byte strobe，每读恰好 len+1 拍、每写恰好一次响应，共享写保序且不提前响应。源首尾覆盖 beat 均可访问且无副作用；不可把字节 reader 用在 MMIO。4 KiB 禁跨界由软件/外部桥承担。软件管理外部一致性、可见性、地址权限及未覆盖的竞争；本文不声明与 WorkerBee 或其他系统模块已集成。
 
 ### 13.2 使用流程
 
@@ -753,7 +794,9 @@ reader/writer 储存追加与输出刻意互斥，转换/转置/MX 也有各自�
 - **未实现/规划中**：Raw DW decoder、tileOrder/T2T/单命令 reblock、MX dequant、INT16/INT32/INT4 算术转换、4 KiB split、细分错误码；详见 A.2。
 - **待确认**：在途复位恢复、极端参数化、数值完整正确性、资源/功耗/性能与公平性界限。
 
-**当前验证状态（2026-10-23）**：本轮主源码和测试编译已通过；ForagerBeeSpec 完整保留功能回归 146/146 通过，ForagerBeeByteSpec 的 6/6 个 RTL 仿真用例通过。后者覆盖 4 组顶层配置的 92 条命令及 2 组独立转换路径的 8 次传输。此前偶发的缺失 simulation-log.txt 问题未复现于最终完整回归，根因仍未确定；不能把更换持久化仿真目录视为根因证明。
+**既有完整回归（2026-10-23）**：主源码和测试编译通过；ForagerBeeSpec 完整保留功能回归 146/146 通过，ForagerBeeByteSpec 的 6/6 个 RTL 仿真用例通过。后者覆盖 4 组顶层配置的 92 条命令及 2 组独立转换路径的 8 次传输。此前偶发的缺失 simulation-log.txt 问题未复现于最终完整回归，根因仍未确定；不能把更换持久化仿真目录视为根因证明。
+
+**40 bit 默认配置验证（2026-10-26）**：编译通过；ForagerBeeSpec 定向 4/4 通过，包括默认 40 bit 下 1..4 端口 RTL 发射、显式 32 bit COPY，以及 direct/depth=1、shared/depth=4 两组新增高地址仿真。两组共 28 条命令覆盖高基址、超过 32 bit 的 src/dst stride、裁剪/padding、PERMUTE、TRANSPOSE、IM2COL、SG 描述符/数据、普通转换、MX scale、T2L/L2T、源覆盖读/有效写终点恰为 2^40、越界拒绝及后续恢复；检查低 32 bit 别名、邻字节和最终内存。ForagerBeeByteSpec 按当前默认 40 bit 重跑 6/6 通过；未重跑 ForagerBeeSpec 全 suite，不将定向结果称为当前 148 条全回归通过。固定导出入口未运行，已有生成 RTL 未刷新。
 
 已通过回归覆盖普通/共享、阻塞/NB、128/256 bit、短行/非对齐、转换 packet bytes/last、SG 零长度、IM2COL 水平/dilation、非零 padValue、转置边缘与地址错误恢复、MX scale、delayed-response/done 反压，以及转置读完成与写响应错误同拍聚合；字节回归另检查 sentinel/邻字节和写 strobe。MX 数值完整性、hazard 盲区及极端配置仍有专项缺口。
 
@@ -787,13 +830,15 @@ idle=!busy && occupancy==0（无 cmd.valid gate）
 | FB-OPT008 | head-of-line / RR fairness | 评估多队列、队首旁路或可配置 RR；量化当前最小编号派发和写端口 RR 的饥饿/等待，定义适用负载与公平性验收 |
 | FB-OPT009 | multiple read outstanding / coalescing | 设计读事务 ID/返回关联、physical-credit 预留、重排及小 transfer 合并；兼顾 tail、SG 预取和 writer transfer 间响应语义 |
 | FB-OPT010 | dW fallback performance | 合并 IM2COL 有效水平片段、复用覆盖 beat/减少逐 kw 启动；以 dW>1/边界窗口请求数、有效字节/周期量化，保持无效 pad 不读源 |
-| FB-OPT011 | local NPU data reuse | 探索本地窗口/tile 双缓冲、复用转置重读和 IM2COL 重复输入；先定义局部接口/所有权，不假定已连接任何 Hive/NPU |
+| FB-OPT011 | local NPU data reuse | 探索本地窗口/tile 双缓冲、复用转置重读和 IM2COL 重复输入；先定义局部接口/所有权，不假定已连接任何 WorkerBee/NPU |
 | FB-OPT012 | power gating / resource-perf measurement | 评估独立引擎/能力单元时钟或电源门控、隔离/唤醒与 idle 排空；综合测面积/Fmax/功耗和有效吞吐，记录配置、工艺、工具、负载 |
 | FB-OPT013 | CSR / software driver future | 定义可选 CSR/软件提交、tag 生命周期、错误恢复、地址/缓存管理及 Raw ABI 版本；当前只有结构化 Stream，不宣称驱动/系统集成已交付 |
 
 ### A.3 发布前检查与待验证
 
 - 14 章、版本日期和稳定 ID 对齐；FB-F013/018/019 保留为已移除，新增 FB-F027–030；操作/格式编码未重排。
+- 性能清单 FB-P001/004/006–011 描述通路带宽与并行发射；原 FB-P002/003/005 分类更正归回 FB-F028/016/029，旧 ID 不复用；debug 无条目，未分配 FB-Dxxx。
+- 接口峰值、局部稳态上限与端到端实测分开，不将功能机制、仿真设施或未来计划混入当前性能/debug 能力。
 - 当前字段、字节有效数、物理对齐、padValue、响应排空与 idle 均以主源码为准，规划与删除项不混入当前功能。
-- ForagerBeeSpec 完整回归 146/146、ForagerBeeByteSpec 6/6 已通过，结果已记录到 14.2。
+- 既有完整回归 146/146；40 bit 默认配置定向 4/4、字节回归重跑 6/6 通过，范围与日期已记录到 14.2；已有生成 RTL 未刷新。
 - 已通过回归检查 sentinel/邻字节不改、短行/跨 beat、bytes/last 稳定、SG 表/零长度错误、IM2COL pad 无源读、MX 行末 scale、共享响应路由、错误同拍聚合和 done 反压；数值/盲区/PPA 另有专项缺口。

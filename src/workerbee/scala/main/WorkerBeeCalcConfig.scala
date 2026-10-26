@@ -2,7 +2,7 @@
 import chisel3._
 import chisel3.util._
 
-class HiveCoreCalcConfig(cfg: HiveCoreConfig) extends Module {
+class WorkerBeeCalcConfig(cfg: WorkerBeeConfig) extends Module {
 
     val io = IO(new Bundle {
         val startIn = Input(Bool())
@@ -10,14 +10,14 @@ class HiveCoreCalcConfig(cfg: HiveCoreConfig) extends Module {
         val err = Output(Bool())
         val errPluse = Output(Bool())
         val errCode = Output(UInt(4.W))
-        val calcConfig = Output(HiveCoreExePreCalcConfig(cfg))  // tile 数、地址偏移与 cBeatAddrStep
-        val regFile = Input(HiveCoreRegister(cfg))           // 仅使用 cAddr/m（loopMode 不影响 C 写回遍历）
+        val calcConfig = Output(WorkerBeeExePreCalcConfig(cfg))  // tile 数、地址偏移与 cBeatAddrStep
+        val regFile = Input(WorkerBeeRegister(cfg))           // 仅使用 cAddr/m（loopMode 不影响 C 写回遍历）
   })
 
     val err = RegInit(false.B)
     val errNext = RegNext(err)
     val errCode = Reg(UInt(4.W))
-    val calcConfig = Reg(HiveCoreExePreCalcConfig(cfg)) 
+    val calcConfig = Reg(WorkerBeeExePreCalcConfig(cfg)) 
     val errComb = Wire(Bool())
     val errCodeComb = Wire(UInt(4.W))
 
@@ -81,7 +81,7 @@ def getKLoadNum(t: DataFormat.Type) : UInt = {
 
 
 /** 外部内存每元素字节数（运行期解码）。
-  * 表与优先级逐字镜像金锚 HiveDebugModel.memElemBytes：
+  * 表与优先级逐字镜像金锚 WbDebugModel.memElemBytes：
   *   FP32/INT32→4、FP16/BF16/INT16→2（注意 INT16 归 2B 档）、
   *   INT8/MXE4M3/MXE5M2→1、MXE2M1/INT4（isHalfB 半字节族）→0。
   * 分支序沿用本文件 C 侧既有链（半字节 → 1B → 2B(含 INT16) → otherwise 4B），
@@ -103,7 +103,7 @@ def memElemBytesOf(t: DataFormat.Type) : UInt = {
 }
 
 /** 每 16-bit lane 打包的元素数（MXFP8 dual-lane=2、MXFP4 quad-lane=4、其余=1）。
-  * 与金锚 HiveDebugModel.elemsPerLane 同源；kPerBeat = totalN × 本量。
+  * 与金锚 WbDebugModel.elemsPerLane 同源；kPerBeat = totalN × 本量。
   * 【Phase 3】委托到 DataFormat.elemsPerLane 单一真源（Executor kTile 分母共用），
   *   编译期门控 cfg.hasMx4：
   *   · hasMx4=false（cfgBase/cfgMx 基线）：helper 走 else 支，逐字复刻原内联实现
@@ -148,7 +148,7 @@ bKLoadNum := getKLoadNum(io.regFile.bFmt)
 cMxBlockSize := getBlockSize(io.regFile.cMxBlockSize)
 cNWriteNum := cfg.totalN.U
 
-// 【P1-2 W4A8 订正（2026-10-13）】A=MX8×B=MX4 正向混配谓词（与 HiveCore.w4a8Mix
+// 【P1-2 W4A8 订正（2026-10-13）】A=MX8×B=MX4 正向混配谓词（与 WorkerBee.w4a8Mix
 //   同式；hasMx4 门控，非 MX4 配置恒 false、不生成消费逻辑）。下方 bColTile/
 //   scaleBColTile 两处【阵列窗口口径】覆盖共用：混配下 B/scaleB 的 kTile 步进按
 //   A 侧 aKLoadNum=32 元素窗口推导（bDma stretch 半字片 16B、scaleB 相邻字
@@ -157,7 +157,7 @@ private val w4a8Mix = if (cfg.hasMx4)
   DataFormat.isMx8(io.regFile.aFmt) && DataFormat.isMx4(io.regFile.bFmt)
 else false.B
 
-// 【INT W4A8】A=INT8×B=INT4 正向混配谓词（与 HiveCore.intW4a8Mix 同式；门控
+// 【INT W4A8】A=INT8×B=INT4 正向混配谓词（与 WorkerBee.intW4a8Mix 同式；门控
 //   hasInt&&hasMx4：bDma stretch 端口仅 hasMx4 配置生成，且不存在 INT-only 配置）。
 //   下方 bColTile【阵列窗口口径】覆盖共用：混配下 B 的 kTile 步进按 A 侧
 //   aKLoadNum=32 元素窗口推导（stretch 半字片 16B），而非 INT4 源字口径
@@ -211,7 +211,7 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
         errCodeComb := 4.U
     }
     // 【P2 纯 FP8 · errCode 4 扩展】纯 FP8 运行强制 loadWMode=1（保守裁定，镜像 MX8）：
-    //   阵列侧经 HiveCore.fp8FmtRemap 后跑的就是 MX8×MX8 数据通路，MX8 的全部
+    //   阵列侧经 WorkerBee.fp8FmtRemap 后跑的就是 MX8×MX8 数据通路，MX8 的全部
     //   run-mode 约束（B 转置布局 + loadW 窗口语义）原样继承；loadW=0 的垂直
     //   装载 × FusionMacFp 组合未经验证，不首发。门控 if(cfg.hasFp8)：不含 FP8
     //   的配置零 elaborate（零 diff）。复用 code 4 语义（isMx 系 loadW 违约）。
@@ -239,7 +239,7 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     // ==========================================================================
     // (#169 W2-3) errCode 10 -- C WRITE-BACK ADDRESS ALIGNMENT GUARD.
     // --------------------------------------------------------------------------
-    // ▸ Why: HiveCoreDmaWrOnly puts every C beat onto the external bus word with an
+    // ▸ Why: WorkerBeeDmaWrOnly puts every C beat onto the external bus word with an
     //   AXI byte-lane shift  off = addr mod dmaBytes  (dmaBytes = cDmaExtW/8 = 32),
     //   and BOTH wdata and wstrb are truncated back to the bus word (#166). `off`
     //   derives straight from the RUNTIME register cAddr, so a misaligned C base
@@ -250,16 +250,16 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //   beat, external memory keeps its old value, STATUS.err stays 0 and done still
     //   fires (e.g. a base address 8 mod 32 loses 16 of the 64 bytes of each row).
     //   Before this guard the only net was the TB-side STRB-OVERFLOW criterion
-    //   (HiveSimCommon.auditCBeatLanes): simulation-only, and never executed because
+    //   (WbSimCommon.auditCBeatLanes): simulation-only, and never executed because
     //   every registered case uses a 32B-aligned C_BASE.
     // ▸ Predicate: the low log2Up(dmaBytes) bits of cAddr must all be zero. dmaBytes is
-    //   a power of two because HiveCoreConfig requires isPow2(cDmaExtW), so this is an
+    //   a power of two because WorkerBeeConfig requires isPow2(cDmaExtW), so this is an
     //   exact "cAddr % dmaBytes == 0" test written as a bit slice -- no modulo cell,
-    //   same reasoning as the #169-S1 explicit-slice rewrite in HiveCoreDmaWrOnly.
+    //   same reasoning as the #169-S1 explicit-slice rewrite in WorkerBeeDmaWrOnly.
     //   math.min() clamps the slice for the degenerate addrWidth < log2Up(dmaBytes)
     //   config (address space smaller than one bus word), which is out of support.
     // ▸ Code allocation -- exhaustive enumeration of the CURRENT SOURCE, not of the
-    //   docs (src/hive/doc/problem.md:93 "codes in use 0/3/4/5/6/8, slot 7 is free"
+    //   docs (src/workerbee/doc/problem.md:93 "codes in use 0/3/4/5/6/8, slot 7 is free"
     //   is STALE on both 6 and 7):
     //     0  blocksize violations merged (errMXLargerThanKLoadNum)      LIVE
     //     1  merged into 0, unreachable, never revived                   FROZEN
@@ -268,7 +268,7 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //     4  isMx && loadWMode == 0                                      LIVE
     //     5  aFmt == FP32 || bFmt == FP32                                LIVE
     //     6  cFmt==MXE2M1 && n odd -- COMMENTED OUT in RTL, but STILL MIRRORED by the
-    //        golden model (HiveDebugModel.hwErrCode)  ==> NOT free: allocating it would
+    //        golden model (WbDebugModel.hwErrCode)  ==> NOT free: allocating it would
     //        give one code two meanings. Pre-existing RTL<->anchor divergence, listed as
     //        a #170 (test-side) sync item.
     //     7  capacity: m > cBufferDepth - totalN -- LIVE in RTL. The #146 removal note
@@ -276,7 +276,7 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //        survived and still drives code 7  ==> NOT free (and it is NOT mirrored by
     //        the golden model either -- second pre-existing divergence, #170 item).
     //     8  K not divisible by kPerBeat (MX / MX4 / INT)                LIVE
-    //     9  RESERVED by src/hive/doc/problem.md:89-96 for the v2 optional W4A8
+    //     9  RESERVED by src/workerbee/doc/problem.md:89-96 for the v2 optional W4A8
     //        (MX4xMX8 mix) independent diagnostic  ==> not free without editing that
     //        doc, which is outside the #169 edit scope.
     //     10 <== THIS GUARD: the lowest code that conflicts with nothing anywhere
@@ -299,8 +299,8 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //   Why 10 outranks 7: both are pure software-config faults caught before execution
     //   (err blocks startOut), but a misaligned cAddr is the one whose symptom is SILENT
     //   byte loss in external memory, i.e. the harder one to diagnose, so it wins the
-    //   report. The golden model (HiveDebugModel.hwErrCode / precheckConfigErr),
-    //   HiveCoreQuickSpec.errExplain and src/hive/doc/problem.md must mirror exactly
+    //   report. The golden model (WbDebugModel.hwErrCode / precheckConfigErr),
+    //   WorkerBeeQuickSpec.errExplain and src/workerbee/doc/problem.md must mirror exactly
     //   this order -- handed to #170 as a same-source sync item.
     // ▸ Gating: NONE. Unlike code 8 / Fix-4 code 3 this branch is not wrapped in
     //   if(cfg.hasMx) / if(cfg.hasMx4) / if(cfg.hasInt): the fault is a property of the
@@ -325,7 +325,7 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     // 【P0 epilogue-1 errCode 12（fused bias 基址对齐 + 无取数机构守护）】
     // --------------------------------------------------------------------------
     // ▸ 对齐臂：bias 取数复用 dmaScaleA 32b 只读端口（drain-then-steal 仲裁见
-    //   HiveCore 顶层），单字读契约要求 biasAddr 4B 对齐（端口位宽 32b = 4 字节）；
+    //   WorkerBee 顶层），单字读契约要求 biasAddr 4B 对齐（端口位宽 32b = 4 字节）；
     //   非对齐地址在通用互连下会截丢字节/越界，运行期拒绝（判据与 errCode10 的
     //   cAddr%dmaBytes 同式，粒度换成 32b 端口）。
     // ▸ 第二臂（!hasMx，RTL-only）：bias 取数器随 dmaScaleA 端口一起只在 hasMx
@@ -389,7 +389,7 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //   kPerBeat = totalN×4 = 64，K 非 64 整除时（如 K=96）只累加 floor(96/64)=1 个 kTile
     //   = 64 个 K，尾部 32 个 K【静默丢弃】、结果错但此前无任何 errCode（测试全绿假象）；
     //   K<64 时 newKTiles=0 → kTiles:=newKTiles-1 回绕为 65535 → 65536 轮 pass 跑飞
-    //   （DMA 越界读）。此前唯一守护只在【测试侧金锚】HiveDebugModel.validate 的
+    //   （DMA 越界读）。此前唯一守护只在【测试侧金锚】WbDebugModel.validate 的
     //   require(k%kPerBeat==0)，硬件侧零守护（Executor 旧注释"已在 sIDLE 校验"不成立）。
     // ▸ Decision: a dedicated code 8 was allocated so software can name the fp4
     //   geometry violation precisely. (#146) The original wording here said
@@ -400,7 +400,7 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //   errCode 8 itself was previously unused (problem.md item 6 had "reserved"
     //   8 for the optional W4A8 mix diagnostic; that one was pushed to code 9).
     // ▸ 判据：isMx4(aFmt) && (K % kPerBeat != 0)，kPerBeat = totalN×4（编译期常数，
-    //   totalN=16 时 = 64）。与金锚 HiveDebugModel.hwErrCode / kPerBeat(MXE2M1,totalN) 同源。
+    //   totalN=16 时 = 64）。与金锚 WbDebugModel.hwErrCode / kPerBeat(MXE2M1,totalN) 同源。
     // ▸ 门控：整块包在 if(cfg.hasMx4) 内——cfgBase/cfgMx 基线 hasMx4=false 完全不 elaborate，
     //   现有 errCode 0/3/4/5/6 逐字不变，normalized-diff=0。
     // ▸ Priority (last-connect wins, later source line = higher priority): this
@@ -515,7 +515,7 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     // ==========================================================================
     // (#177) errCode 11 -- INT / NON-INT FORMAT CROSS-BOUNDARY GUARD (V5-only XOR).
     // --------------------------------------------------------------------------
-    // ▸ Why: HiveOutCvt has two mutually exclusive output paths:
+    // ▸ Why: WbOutCvt has two mutually exclusive output paths:
     //     fp32Seq = Fp32.fpNormalize40to32(slot(39,0))  -- {sign,exp8,mant31} delayed normalization
     //     int32Seq = slot(31,0)                          -- raw accumulator bits
     //   The path selector depends on cFmt ONLY. When the COMPUTE format (aFmt) is
@@ -529,12 +529,12 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //   Equivalently: error iff (integer compute + non-integer output) OR
     //                         (non-integer compute + integer output).
     // ▸ Note on DataFormat.isInt including INT16: INT16 is deprecated from supportedFmts
-    //   but cFmt is a raw 4-bit register field (software CAN write 7). HiveOutCvt's
+    //   but cFmt is a raw 4-bit register field (software CAN write 7). WbOutCvt's
     //   packedInt16 path exists and is semantically correct (int32Seq truncated to 16b),
     //   so allowing cFmt=INT16 when runIsInt is harmless -- NOT a silent corruption.
     //   (See #176 ss10 item 4.)
     // ▸ Historical provenance: the original "V5 format legality check" lived in
-    //   HiveCoreExecutor.scala:329-348 (pre-672fb37). Commit 672fb37 ("debug mx")
+    //   WorkerBeeExecutor.scala:329-348 (pre-672fb37). Commit 672fb37 ("debug mx")
     //   deleted it during the errComb migration to CalcConfig. The old literal set
     //   (intFmtOk={8,9,10}, fpFmtOk={0,1,2,3,4,5,6,7}) used the OBSOLETE P0 outFmt
     //   encoding (Cat(regs(7)(16), regs(7)(13,11))) and is INVALID under the current
@@ -583,7 +583,7 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
 
     // ==========================================================================
     // 【Fix-4 errCode 3（MX4×MX8 混配运行期可诊断守护）】aFmt/bFmt 分属 fp4(E2M1) 与
-    //   fp8(E4M3/E5M2) 时，HiveWorkUnit 的运行期选择子 Mux(isMx4(io.aFmt), quadResult,
+    //   fp8(E4M3/E5M2) 时，WbWorkUnit 的运行期选择子 Mux(isMx4(io.aFmt), quadResult,
     //   dualLaneMx()) 只看 aFmt，而被选支路内 b 侧解码器接 io.bFmt → lane 粒度与解码格式
     //   矛盾、v1 数据通路会静默算错。现有 errCode3（isAMx ^ isBMx，见上方裸块）因 isMx 已含
     //   MXE2M1，MXE2M1×MXE4M3 两侧同 true → XOR=0 漏检。本 when 用 isMx4 异或【加强、不替换】
@@ -601,9 +601,9 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //   the highest-priority one. Final truth order:
     //     3 (this block, MX4xMX8 mix) > 8 (fp4 K not divisible) > 6 > 5 > 4
     //       > 3 (isAMx ^ isBMx) > 0
-    //   The golden model (HiveDebugModel.hwErrCode / precheckConfigErr, and
-    //   HiveCoreQuickSpec.hwErrCode which delegates to it) plus
-    //   HiveCoreQuickSpec.errExplain and src/hive/doc/problem.md must mirror
+    //   The golden model (WbDebugModel.hwErrCode / precheckConfigErr, and
+    //   WorkerBeeQuickSpec.hwErrCode which delegates to it) plus
+    //   WorkerBeeQuickSpec.errExplain and src/workerbee/doc/problem.md must mirror
     //   exactly this order.
     //   (#169) UPDATE -- the order printed above is STALE: code 6 is commented out in
     //   RTL, the LIVE capacity code-7 block is unlisted, and #169 inserted the new
@@ -621,7 +621,7 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //     3 (this block) > 11 (int/non-int cross) > 8 (K not divisible)
     //       > 10 (cAddr alignment) > 7 (capacity) > 5 > 4 > 3 (isAMx^isBMx) > 0
     //   【P1-2 UPDATE · 收窄】原判据为 isMx4(aFmt) ^ isMx4(bFmt)（双向混配皆拒）。
-    //   W4A8（A=MX8 × B=MX4）已由 fp4→fp8 push 侧展开路落地（见 HiveCore.w4a8Mix），
+    //   W4A8（A=MX8 × B=MX4）已由 fp4→fp8 push 侧展开路落地（见 WorkerBee.w4a8Mix），
     //   正向混配合法化；本块收窄为只拒反向混配（A=MX4 × B=MX8，数据通路未支持，
     //   理由与原文同：quad/dual lane 选择子只看 aFmt，反向混配会 lane 粒度与解码
     //   格式矛盾、静默算错）。MX-vs-nonMX 裸 errCode3 块（isAMx^isBMx）不受影响。
@@ -634,7 +634,7 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
 
     // ==========================================================================
     // 【INT W4A8 · errCode 3（INT4×INT8 反向混配拒绝）】与上方 Fix-4 MX 反向混配臂
-    //   同构：正向（A=INT8×B=INT4）已由 bDma stretch 展开路落地（HiveCore.intW4a8Mix，
+    //   同构：正向（A=INT8×B=INT4）已由 bDma stretch 展开路落地（WorkerBee.intW4a8Mix，
     //   B 半字片 16B 经 int4SliceToInt8Beat sext 加宽成 32B INT8 阵列拍）；反向
     //   （A=INT4×B=INT8）K 窗口 = aKLoadNum=64 个元素，B 每行窗口切片 = 64 个
     //   INT8 = 64B，超出 B 拍宽（totalN*bW/8=32B）两倍，须 B 侧 push 连推 2 拍——
@@ -663,7 +663,7 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //      r1/r2/r3 乘积槽全零 + scaleB 注入 127 与 B 实际格式矛盾，静默算错。
     //      FP8×MX8 侧已由既有裸 errCode3（isAMx^isBMx）覆盖（isMx(FP8)=false）。
     //      纯 FP8×FP8（含 E4M3×E5M2 异构双 FP8）合法放行。
-    //   ② isFp8(cFmt)：输出侧 FP8 编码不支持——HiveOutCvt 的量化输出路径是 MX
+    //   ② isFp8(cFmt)：输出侧 FP8 编码不支持——WbOutCvt 的量化输出路径是 MX
     //      块 scale 语义（dmaCScale 每 16/32 元素块写 E8M0 字节），per-tensor 纯
     //      FP8 输出无对应通路，未拒绝会静默落 fp32 直出支路（语义错位）。
     //      合法输出集与 MX 运行相同：fp32 直出（cFmt=FP32）或 MX 量化
@@ -705,9 +705,9 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //   matters and none of them was moved:
     //     3 (MX4xMX8 mix, Fix-4) > 8 (fp4 K not divisible) > 6 > 5 > 4
     //       > 3 (isAMx ^ isBMx) > 0
-    //   The golden model (HiveDebugModel.hwErrCode / precheckConfigErr, and
-    //   HiveCoreQuickSpec.hwErrCode which delegates to it) plus
-    //   HiveCoreQuickSpec.errExplain and src/hive/doc/problem.md must mirror
+    //   The golden model (WbDebugModel.hwErrCode / precheckConfigErr, and
+    //   WorkerBeeQuickSpec.hwErrCode which delegates to it) plus
+    //   WorkerBeeQuickSpec.errExplain and src/workerbee/doc/problem.md must mirror
     //   exactly this order.
     // ▸ Gating note: the removed block lived inside `if(cfg.hasMx4)`, so for the
     //   cfgBase/cfgMx baselines (hasMx4=false) it never elaborated at all and
@@ -725,7 +725,7 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     //   Authoritative order as of #169:
     //     3 (MX4xMX8 mix) > 8 (K not divisible) > 10 (cAddr alignment)
     //       > 7 (capacity) > 5 > 4 > 3 (isAMx ^ isBMx) > 0
-    //   Code 6 stays dead in RTL but is still mirrored by HiveDebugModel.hwErrCode --
+    //   Code 6 stays dead in RTL but is still mirrored by WbDebugModel.hwErrCode --
     //   a pre-existing RTL<->anchor divergence handed to #170 (test side).
     //   New allocations must start at 11 from now on: 10 is taken by #169, 9 is
     //   reserved by problem.md:89-96, 6/7/8 are live-or-mirrored, 1/2 stay frozen.
@@ -793,7 +793,7 @@ switch(state) {
   // A矩阵row major 偏移计算
   // 【裁定3 修复：A 行步进偏移链补齐 INT16/INT32 档（refactor loss，同 Issue A 类）】
   // 权威语义三源印证：(a) git 旧码 aRow=Mux(mxRun,k*1,k*(aW/8))（配置位宽 + MX 打包）；
-  //   (b) 已修 C 侧同结构链；(c) 金锚 HiveDebugModel.memElemBytes（测试对账基准）：
+  //   (b) 已修 C 侧同结构链；(c) 金锚 WbDebugModel.memElemBytes（测试对账基准）：
   //   FP32/INT32→4、FP16/BF16/**INT16**→2、INT8/MXE4M3/MXE5M2→1、MXE2M1/INT4→半字节
   //   「不作为输入格式支持」。原链 is2B→*2 / is1B→*1 / otherwise→/2 丢失 INT16(应*2)
   //   与 INT32(应*4)——二者均落 otherwise→/2（4× 偏差），直接致 DebugCase INT 组
@@ -815,11 +815,11 @@ switch(state) {
   //   —— aW 是【编译期】配置位宽（出厂 16），故整式恒 = 32，与运行期 aFmt 无关。
   // 新式：totalN × elemsPerLane(aFmt) × memElemBytes(aFmt) = aKpb × aEb。
   //
-  // ▸ 语义依据（本模块消费者 = HiveCoreDmaRdOnly isA=true 通道）：RdOnly 头注释
+  // ▸ 语义依据（本模块消费者 = WorkerBeeDmaRdOnly isA=true 通道）：RdOnly 头注释
   //   A 侧闭式「块首址(nt, kt) = base + kt*C」，C 即本偏移，是【一个 kTile 在外部
   //   内存中跨过的字节数】。A 行主序 M×K、每元素 aEb 字节、一个 kTile 推进
   //   kPerBeat(aFmt) = totalN × elemsPerLane 个 K 元素 ⇒ C = kPerBeat × aEb。
-  // ▸ 金锚印证（HiveDebugModel.Plan）：aColOff = aKpb.toLong * aEb，其中
+  // ▸ 金锚印证（WbDebugModel.Plan）：aColOff = aKpb.toLong * aEb，其中
   //   aKpb = kPerBeat(aFmt,totalN)、aEb = memElemBytes(aFmt) —— 逐字同式。
   // ▸ 结构对称印证（同文件内部一致性）：本文件 A 侧 scale 的 kTile 步进
   //   scaleAColTileAddressOffset = aKLoadNum / blk、B 侧 scaleBColTileAddressOffset
@@ -860,7 +860,7 @@ switch(state) {
 // B矩阵非转置 row major偏移计算
 // 【裁定3 修复：B 行步进偏移链——(1) loadWMode=0 用 n 而非 m；(2) 补齐 INT16/INT32 档】
 // (1) m→n 依据：GEMM C[M,N]=A[M,K]×B[K,N]，loadWMode=0 时 B 为 K×N 行主序、行长 = N，
-//   行步进按 N 才自洽。git 旧码 bRow(loadWMode=0)=n*(bW/8)、金锚 HiveDebugModel
+//   行步进按 N 才自洽。git 旧码 bRow(loadWMode=0)=n*(bW/8)、金锚 WbDebugModel
 //   bRowOff=(if loadWMode then k else **n**)*bEb 双双用 n；新码误用 regFile.m，
 //   M=N=32 巧合掩盖（既有全测试 M=N=32），M≠N 时 B 地址错位。
 // (2) INT16/INT32 补齐依据同 A 链（memElemBytes：INT16→2、INT32→4）。
@@ -895,12 +895,12 @@ when(io.regFile.loadWMode === 0.U){
 //
 // ▸ 双语义同时满足（B 侧比 A 侧多一层：本偏移在两种 loadWMode 下语义不同）
 //   · loadWMode=0（B 为 K×N 行主序）：C 是【n-tile 步进】= 跨过 totalN 个 N 列
-//     所需的字节数 = totalN × bEb。金锚 HiveDebugModel：
+//     所需的字节数 = totalN × bEb。金锚 WbDebugModel：
 //     bNTileOff = if(loadWMode) totalN*bRowOff else **totalN*bEb** —— 与 C 同式
 //     （非 MX 下 elemsPerLane=1，bKpb=totalN，故新式 = totalN×bEb ✓）。
 //   · loadWMode=1（B 为 N×K 转置，MX 强制走此模式）：C 是【k-tile 步进】=
 //     一个 kTile 推进 bKpb = totalN × elemsPerLane 个 K 元素所需的字节数
-//     = bKpb × bEb。金锚 HiveDebugModel：bKTileOff = if(loadWMode) **bKpb*bEb**
+//     = bKpb × bEb。金锚 WbDebugModel：bKTileOff = if(loadWMode) **bKpb*bEb**
 //     （#121 修正值，禁改）。MX8 下 bKpb = 2×totalN = 32、bEb=1 ⇒ 新式 = 32 ✓。
 //   ⇒ 同一个式子 totalN×elemsPerLane×memElemBytes 精确覆盖两支：非 MX 支
 //     elemsPerLane=1 自动退化成 totalN×bEb（n-tile 语义），MX 支 elemsPerLane=2
@@ -918,10 +918,10 @@ when(io.regFile.loadWMode === 0.U){
 //     Δ(nt,kt) = nt×(kTiles×colTileOff − rowOff) + kt×(colTileOff − bKpb×bEb)
 //   · kt 维分量：代入新式后【恒为 0】（全格式、全 K）—— 这是本次改动消除的部分，
 //     即 Section E【E2】「INT8/INT32 + loadW=1 + kTiles>1 → kt≥1 的 B 地址全错」。
-//   · nt 维分量：属 HiveCoreDmaRdOnly lastBTileStartAddr 累加模型的【结构性残余】
+//   · nt 维分量：属 WorkerBeeDmaRdOnly lastBTileStartAddr 累加模型的【结构性残余】
 //     （累加式与金锚闭式在 K 非 bKpb 整数倍时不同源），改前改后【同样存在】、
 //     非本次引入，已呈报并由 #139 承接。本任务禁动 RdOnly 功能行，故此处不处理。
-// ▸ 反面警示（勿照搬）：旧 HiveCore.scala 曾用 Mux(loadWMode, totalN×k×(bW/8), …)
+// ▸ 反面警示（勿照搬）：旧 WorkerBee.scala 曾用 Mux(loadWMode, totalN×k×(bW/8), …)
 //   这类「n-tile 周期语义」式子，与 lastBTileStartAddr FSM 的累加口径不兼容，
 //   严禁回退到那种写法；colTileOffset 必须保持单一运行期量、由消费者按语义解释。
 // ==========================================================================
@@ -955,8 +955,8 @@ if(cfg.hasMx4 || cfg.hasInt4){
 }
 
 //C矩阵Row Major偏移计算
-// 【IssueA 修复：还原旧 HiveCore.scala 全函数语义（refactor loss，同 B4/B5 类）】
-// 旧码（672fb37^ HiveCore.scala L160/L202-203）用 cOutElemBytes=MuxCase(默认4B) +
+// 【IssueA 修复：还原旧 WorkerBee.scala 全函数语义（refactor loss，同 B4/B5 类）】
+// 旧码（672fb37^ WorkerBee.scala L160/L202-203）用 cOutElemBytes=MuxCase(默认4B) +
 //   cIsFmt4 半字节专用分支（n>>1 / totalN>>1），注释原文：「reserved 回落：非量化/
 //   非16/非8编码（含 fp32 与 1011..1111）自然落 4B 档」。拆分重构时被改成
 //   is4B/is2B/is1B 三分支 partial-chain（无 otherwise），丢失三处：
@@ -987,7 +987,7 @@ when(DataFormat.isHalfB(io.regFile.cFmt)){
 // (#146) MX SCALE READ ALIGNMENT CONTRACT -- full derivation (ASCII only).
 // --------------------------------------------------------------------------
 // 【P0-1 UPDATE (2026-10-12, gather)】This software-alignment contract is
-// SUPERSEDED for the read path: HiveCoreDmaRdOnly now implements GATHER reads --
+// SUPERSEDED for the read path: WorkerBeeDmaRdOnly now implements GATHER reads --
 // a misaligned logical beat at L is served by aligned physical reads
 // [L-off, L-off+4) (off = L mod 4) and an internal byte-shift merge, so scale
 // reads no longer require 4-byte alignment and NO errCode guards it. The
@@ -995,11 +995,11 @@ when(DataFormat.isHalfB(io.regFile.cFmt)){
 // violates alignment (kTileStride = 1/2 bytes for MXFP8) and of the former
 // software obligation; it also remains the source of the two stride formulas.
 // One HARDWARE-SIDE obligation was added in exchange: the loadW preload window
-// pops scaleB strictly one-per-cycle, so HiveCoreExecutor gates sLOAD_B entry on
+// pops scaleB strictly one-per-cycle, so WorkerBeeExecutor gates sLOAD_B entry on
 // scaleB/B FIFO occupancy >= totalN (gather supply can drop to 1 word / 2 cycles).
 // --------------------------------------------------------------------------
 // This block is the SINGLE SOURCE of the two scale address strides consumed by
-// HiveCoreDmaRdOnly (scaleA tied isA=true, scaleB tied isA=false):
+// WorkerBeeDmaRdOnly (scaleA tied isA=true, scaleB tied isA=false):
 //   rowStride   = scaleXRowAddressOffset     = K / blk          [bytes]
 //   kTileStride = scaleXColTileAddressOffset = kLoadNum / blk   [bytes]
 // with blk = 32 for MXBlockSize.M32, 16 for MXBlockSize.M16, and
@@ -1046,7 +1046,7 @@ when(DataFormat.isHalfB(io.regFile.cFmt)){
 //     ruling (do not change the scale tensor layout, do not add a packing state
 //     machine, do not change the scale DMA traversal), so NO hardware guard is
 //     added here. Registered as an open SoC-integration item in
-//     src/hive/doc/problem.md together with the guard options and their cost.
+//     src/workerbee/doc/problem.md together with the guard options and their cost.
 // ==========================================================================
 //A矩阵 scale 偏移计算
 when(MXBlockSize.M32 === io.regFile.aMxBlockSize){
@@ -1094,7 +1094,7 @@ otherwise{
 // above, because the two are the same kind of object: a property of the
 // RUNTIME address stream that the hardware only partially enforces.
 //
-// This block is the SINGLE SOURCE of the five quantities that HiveCoreDmaWrOnly
+// This block is the SINGLE SOURCE of the five quantities that WorkerBeeDmaWrOnly
 // consumes to place a C beat on the external bus word:
 //   cWriteBytes     bytes of one dense output row  (totalN * elemBytes(cFmt))
 //   cDmaBytes       = cDmaExtW/8 = dmaBytes, the bus word size in bytes (32)
@@ -1102,10 +1102,10 @@ otherwise{
 //   cDmaBufBeatTar  last beat index inside a row   (beats/row - 1)
 //   cDmaDmaBeatTar  lane-occupancy selector: 0 -> full, 1 -> 1/2, else -> 1/4
 //
-// The write address of beat (nt, row, beat) is, in HiveCoreDmaWrOnly:
+// The write address of beat (nt, row, beat) is, in WorkerBeeDmaWrOnly:
 //   addr = cAddr + nt*cColTileAddressOffset + row*cRowAddressOffset
 //                + beat*cBeatAddrStep
-// and HiveCoreDmaWrOnly shifts BOTH wdata and wstrb left by
+// and WorkerBeeDmaWrOnly shifts BOTH wdata and wstrb left by
 //   off = addr mod dmaBytes            (#169-S1: addr(log2Up(dmaBytes)-1,0))
 // before truncating them back to the bus word. The number of asserted strb
 // bits is  lanes = dmaBytes >> cDmaDmaBeatTar.
@@ -1166,13 +1166,13 @@ otherwise{
 //   still has bytes, i.e. `lanes` overshoots the valid data. off is unaffected,
 //   so this is the other half of the #168-W2 finding. It is visible in
 //   simulation via the TB-side STRB-OVERFLOW criterion
-//   (HiveSimCommon.auditCBeatLanes) but has NO hardware errCode; it belongs to
+//   (WbSimCommon.auditCBeatLanes) but has NO hardware errCode; it belongs to
 //   the pre-existing "strb granularity is not refined by the N tail" family.
 // ==========================================================================
 // (#169 W10) REVERSE CROSS-REFERENCE -- implicit cross-file contract.
 // --------------------------------------------------------------------------
 // The derivation below (cWriteBytes -> cBeatAddrStep / cDmaBufBeatTar /
-// cDmaDmaBeatTar) is one half of an IMPLICIT contract with HiveCoreDmaWrOnly,
+// cDmaDmaBeatTar) is one half of an IMPLICIT contract with WorkerBeeDmaWrOnly,
 // which maps the same bus word twice, through two INDEPENDENT paths:
 //   (1) intra-beat segmentation, using the COMPILE-TIME constant cDmaExtW:
 //         dmaExtWrIF.req.payload.data :=
@@ -1189,7 +1189,7 @@ otherwise{
 //                               carries the row.
 // There is NO require / assertion binding the two. Editing the cBeatAddrStep or
 // cDmaBufBeatTar formula below -- including any "pack two rows into one beat"
-// proposal -- MUST re-verify both paths in HiveCoreDmaWrOnly. See the
+// proposal -- MUST re-verify both paths in WorkerBeeDmaWrOnly. See the
 // "#169-W10 跨文件隐式契约（勿破）" block there (just above its addrShiftBytes
 // definition) for the forward half of this cross-reference.
 // ==========================================================================

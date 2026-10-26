@@ -1,6 +1,6 @@
 1. 在16*16 fp16算力矩阵下，当前运行a/b的blocksize如果是16是不对的，因为一行理论是两个scale系数，但是当前仍然是只读一个，TB也认为是对的需要修改。 （暂定不支持，后续修改）
 2. ~~目前仅在cdma的写侧加入的strb以及数据shift，后续需要继续修改adma/bdma，同时需要拓宽scale dma读写的位宽以支持一次读多个scale~~
-   【已完成（2026-10-12，P0-1/P0-2）】读侧（adma/bdma/scaleA/scaleB，共享 HiveCoreDmaRdOnly）
+   【已完成（2026-10-12，P0-1/P0-2）】读侧（adma/bdma/scaleA/scaleB，共享 WorkerBeeDmaRdOnly）
    实现 gather 非对齐读：非对齐逻辑拍拆为对齐多发读 + 内部字节移位重组（用户裁定：
    端口位宽不变、软件布局不变、不加对齐 errCode 守护）。scale 读位宽已拓宽为 32-bit。
    配套：loadW 预取窗口按拍消费，Executor 在 sLOAD_B 入口按 B/scaleB FIFO 占用 ≥ totalN
@@ -14,11 +14,11 @@
 ## MXFP4/E2M1 打通（Phase 0-4 + 5a）交付说明（收尾修复 #50 追加）
 
 ### 【Fix-14】cfgMxFp4 的 fmax / 面积预算与 verilog_mx 不可比（时序/面积口径留痕）
-- cfgMxFp4(hasMx4=true) 每 PE 的组合深度 = **4 级 HiveMacFpMx MAC 链**（fp4 quad-lane），
+- cfgMxFp4(hasMx4=true) 每 PE 的组合深度 = **4 级 WbMacFpMx MAC 链**（fp4 quad-lane），
   而 fp8 dual-lane 仅 **2 级**。原因：`sumMx = Mux(isMx4(aFmt), quadResult, dualLaneMx())`
   的**双臂均 elaborate**（Mux 两臂都是实硬件），故即便在 cfgMxFp4 上**跑 fp8**，关键路径
   同样被 4 级 quad-lane 链钳住 → **fmax 被 4 级链决定，与 verilog_mx（2 级）不可比**。
-- `HiveMacLazyDownstream` 是 **Scala object 内联（非 Module）** → firtool **不跨实例去重** →
+- `WbMacLazyDownstream` 是 **Scala object 内联（非 Module）** → firtool **不跨实例去重** →
   Phase 5a 对它的收敛属**纯源码 DRY，非面积优化**：每 PE 仍展开 **5 份 lazy-40 下游副本**。
 - 结论：verilog_mxfp4 的 fmax/面积数据不得与 verilog_mx 直接对比；两者组合深度与副本数不同源。
 
@@ -32,16 +32,16 @@
   4 级链、fp8 走原 2 级链，互不干扰）。
 
 ### 【Fix-13】已知交付缺口：fp4 波形未落地（根因 + 处置）
-- 现象：`sim/mxfp4/` 目录已建但**零文件**，HiveCoreSimCaseMxFp4Spec 的 4（现 5，含 Fix-10
-  errCode7 负向）用例均**无 trace.fst**；对照 HiveCoreSimCaseMxSpec 同 `HiveFstSim` trait 却
+- 现象：`sim/mxfp4/` 目录已建但**零文件**，WorkerBeeSimCaseMxFp4Spec 的 4（现 5，含 Fix-10
+  errCode7 负向）用例均**无 trace.fst**；对照 WorkerBeeSimCaseMxSpec 同 `WbFstSim` trait 却
   在 `sim/mx/` 产出了 trace.fst。
-- **根因**：`HiveFstSim` 的波形开启受 `-DemitFst=1` 门控（`enableWavesAtTimeZero`）。未带该
-  flag 运行时 verilator 不 dump，`workdir-verilator/trace.fst` 不存在；而 `HiveSimCommon.copyTrace`
-  对源文件缺失**只打印 NOTE、不 fail**（`HiveSimCommon.scala` copyTrace 的 else 分支），故缺口
+- **根因**：`WbFstSim` 的波形开启受 `-DemitFst=1` 门控（`enableWavesAtTimeZero`）。未带该
+  flag 运行时 verilator 不 dump，`workdir-verilator/trace.fst` 不存在；而 `WbSimCommon.copyTrace`
+  对源文件缺失**只打印 NOTE、不 fail**（`WbSimCommon.scala` copyTrace 的 else 分支），故缺口
   **静默**通过、从未暴露。`sim/mx/` 有波形说明 MxSpec 曾在带 `-DemitFst=1` 下跑过，MxFp4Spec 未。
 - **处置**：本任务（#50）铁律禁止跑 `sbt test`/仿真（属 #54 验证代理职责），故**无法在此补跑**
   产出波形。**明确登记为已知交付缺口**，交 #54 用带 `-DemitFst=1` 的
-  `testOnly HiveCoreSimCaseMxFp4Spec` 补跑一次，令 5 个 .fst 落入 `sim/mxfp4/`（.fst 已 gitignore，
+  `testOnly WorkerBeeSimCaseMxFp4Spec` 补跑一次，令 5 个 .fst 落入 `sim/mxfp4/`（.fst 已 gitignore，
   属可再生产物、不入库）。copyTrace 的「静默 NOTE」是流程性弱点，非本任务逻辑缺陷。
 
 ### 【最终决策 · 用户 2026-09-12 裁定】MX4×MX8 混合(W4A8)：v1 保留 errCode 运行期可诊断守护，真支持列 v2
@@ -51,11 +51,11 @@ OCP MX 规范允许 A/B 采用**不同 MX 元素类型**，且共享同一 E8M0 
 视为"永久非法"，而是 v1 数据通路尚未实现、v2 立项补齐的**待支持合法组合**。
 
 **② 当前 v1 会静默错算的四处系统性根因**（均因几何/选择只按 aFmt 单点决策，未考虑 A/B 异族）：
-- **MAC lane 选择子只看 aFmt**：`HiveWorkUnit` 的 `Mux(isMx4(io.aFmt), quadResult, dualLaneMx())`
+- **MAC lane 选择子只看 aFmt**：`WbWorkUnit` 的 `Mux(isMx4(io.aFmt), quadResult, dualLaneMx())`
   按 aFmt 选 4-lane/2-lane，而被选支路内 b 侧解码器接 `io.bFmt` → lane 粒度与 b 解码格式矛盾。
 - **K-per-pass / kTile 只按 aFmt**：`getKLoadNum` / Executor kTiles 以 aFmt 的 elemsPerLane 定
   一个 kTile 的 K 元素数；A/B 异族时两侧每拍元素数不同（fp4=4、fp8=2），单一 kTile 几何不成立。
-- **DMA mxRunDma / mxRunB 只看 aFmt**：`HiveCoreDmaRdOnly` 与 Executor 的 MX 运行期门控
+- **DMA mxRunDma / mxRunB 只看 aFmt**：`WorkerBeeDmaRdOnly` 与 Executor 的 MX 运行期门控
   （`mxRunB = isMx(aFmt)` 等）以 aFmt 代表整拍，b 侧 scale/数据供给未按 bFmt 独立成形。
 - **scale 单广播曾是 quad-lane 专属假设**：fp4 v1 曾强制 aMxBlockSize=64（=1 kTile=1 pass=1
   scale 块，保 Executor scaleA 单广播不变式）；混配下 A/B block 语义不同，单广播假设被打破。
@@ -66,7 +66,7 @@ OCP MX 规范允许 A/B 采用**不同 MX 元素类型**，且共享同一 E8M0 
   blk∈{16,32}；Executor 的逐 lane 字节选择 `idx=(lane*step)/blk` 已取代单广播假设（#145）。
 
 **③ v1 处置：保留 errCode 运行期可诊断守护（非静默错算、非永久拒绝）。**
-- 硬件：`HiveCoreCalcConfig.scala` errComb 裸块内 `if(cfg.hasMx4){ when(isMx4(aFmt)^isMx4(bFmt))
+- 硬件：`WorkerBeeCalcConfig.scala` errComb 裸块内 `if(cfg.hasMx4){ when(isMx4(aFmt)^isMx4(bFmt))
   errCodeComb:=3.U }`（Fix-4，暂复用 code 3="v1 不支持的格式组合"）。**【#146 真值序更新】**
   该 when 原置于 errCode7 之前，现 errCode7 分支已整块删除 ⟹ 它成为 when 链的**最后一个分支**，
   即 last-connect 的**最高优先级**。`hasMx4=true` 的完整真值序为：
@@ -74,11 +74,11 @@ OCP MX 规范允许 A/B 采用**不同 MX 元素类型**，且共享同一 E8M0 
   （原表述的最前项 `7(fp4 blk≠64)` 已不存在；但码位 7 并非空闲——容量守护
   `m > cBufferDepth - totalN` 仍驱动 `errCodeComb := 7.U`，三套网表均为活逻辑。
   权威码位表见 :93-94，后续新校验从 12 起分配（11 已 LIVE：int/非int 跨界，#177/#178）。）
-- 金锚：`HiveDebugModel.validate` 加 hasMx4 门控同族 require（Fix-8）+ `precheckConfigErr` 混配
-  `Some(3)` + `HiveCoreQuickSpec.hwErrCode`/`errExplain` 镜像（Fix-7）。测试：`HiveFp4GeometrySpec`
-  case5 MXE2M1×MXE4M3 → errCode3（Fix-11）。**【#146 留痕】** `HiveFp4GeometrySpec` 与
-  `HiveCoreSimCaseMxFp4Spec` 两个套件文件已不在仓库（当前 hive 测试目录仅 4 个 suite：
-  `HiveCoreQuickSpec` / `HiveCoreSimCase` / `HiveCoreSimCaseLoadWSpec` / `HiveCoreSimCaseMxSpec`），
+- 金锚：`WbDebugModel.validate` 加 hasMx4 门控同族 require（Fix-8）+ `precheckConfigErr` 混配
+  `Some(3)` + `WorkerBeeQuickSpec.hwErrCode`/`errExplain` 镜像（Fix-7）。测试：`WbFp4GeometrySpec`
+  case5 MXE2M1×MXE4M3 → errCode3（Fix-11）。**【#146 留痕】** `WbFp4GeometrySpec` 与
+  `WorkerBeeSimCaseMxFp4Spec` 两个套件文件已不在仓库（当前 workerbee 测试目录仅 4 个 suite：
+  `WorkerBeeQuickSpec` / `WorkerBeeSimCase` / `WorkerBeeSimCaseLoadWSpec` / `WorkerBeeSimCaseMxSpec`），
   故上述 fp4 负向用例目前**无执行者**；混配 code3 与 code8 两支仅靠金锚镜像保持同步。
 - 价值：软件读到明确错误码而非静默错算；hasMx4=false 基线（verilog/verilog_mx）零变化（全部门控）。
 
@@ -114,16 +114,16 @@ fp4 的 `kPerBeat = totalN×4 = 64`：
   却**无任何 errCode**（旧测试全绿假象）。
 - `K<64`（如 K=32）→ `newKTiles = 0` → `kTiles := newKTiles - 1` **16-bit 回绕为 65535** → 65536 轮 pass
   跑飞（DMA 越界读）。
-- 此前唯一守护只在**测试侧金锚** `HiveDebugModel.validate` 的 `require(k % kPerBeat == 0)`；**硬件侧零守护**
+- 此前唯一守护只在**测试侧金锚** `WbDebugModel.validate` 的 `require(k % kPerBeat == 0)`；**硬件侧零守护**
   （Executor 旧注释"K%32 已在 sIDLE 校验"**不成立**，本次已订正为"整除契约由 Executor 之外保证"）。
 
-**② 修复：** `HiveCoreCalcConfig.scala` errComb 裸块内、`if(cfg.hasMx4)` 门控追加
+**② 修复：** `WorkerBeeCalcConfig.scala` errComb 裸块内、`if(cfg.hasMx4)` 门控追加
 `when(isMx4(aFmt) && (k(15,0) % (totalN×4) != 0)) { errComb:=true; errCodeComb:=8 }`。
 分配**独立诊断码 8**，令软件精确定位 fp4 的"K 非整除"几何违约。**【#146 更新】** 原句"（而非复用
 code7），令软件区分 blk≠64(7) 与 K 非整除(8) 两类 fp4 几何违约"已失效：errCode 7 分支已整块删除，
 code 8 现为**唯一**的 fp4 几何守护。码位 7 并非空闲：容量守护 (m > cBufferDepth - totalN) 仍驱动 errCodeComb := 7.U，三套网表均为活逻辑（权威码位表见 :93-94）。
 hasMx4=false 基线不 elaborate → verilog/verilog_mx normalized-diff=0。顶层负向用例原见
-`HiveCoreSimCaseMxFp4Spec`（fp4 K=96 → STATUS.err=1/errCode=8/done=false/dmaC 零写回）。
+`WorkerBeeSimCaseMxFp4Spec`（fp4 K=96 → STATUS.err=1/errCode=8/done=false/dmaC 零写回）。
 **【#146 留痕】** 该套件文件已不在仓库，code8 目前**无执行者**；且原文的 `blk=64` 已不可编码
 （`MXBlockSize` 仅 `{sel=0→16, sel=1→32}`），重建该用例时 blk 只能取 16 或 32。
 
@@ -133,37 +133,37 @@ errCode6 之后、Fix-4 混配 code3 之前 ⟹ 混配 code3 覆盖 code8。
 链尾（= 最高优先级）：
 `3(MX4×MX8 混配) > 11(int/非int 跨界) > 8(K 非整除) > 10(cAddr 对齐) > 7(容量，RTL-only) > 5 > 4 > 3(isAMx^isBMx) > 0`。
 注：code 6（fp4 N 奇数）在 RTL 注释但金锚仍镜像，属既有分歧（见 #169 报告）。
-**无遮蔽论证**（取代原"既有 HiveFp4GeometrySpec case5/case2·6 用例 K 均为 64"的实证口径 —— 该套件
+**无遮蔽论证**（取代原"既有 WbFp4GeometrySpec case5/case2·6 用例 K 均为 64"的实证口径 —— 该套件
 已不在仓库）：code8 要求 `isMx4(aFmt)`，混配 code3 要求 `isMx4(aFmt) ^ isMx4(bFmt)`；两者同时成立
 ⟺ `aFmt=fp4 且 bFmt=fp8`，而这一组合本就被混配分支以 code 3 拒绝（v1 不支持 W4A8）⟹ 被 code3
 覆盖不会遮蔽任何**活配置**。`aFmt=bFmt=fp4` 时混配分支不成立、code8 独立生效。
 
-**④ 四处镜像已同步：** 硬件 `HiveCoreCalcConfig.scala`；金锚 `HiveDebugModel.hwErrCode`（新单一真源）
-+ `precheckConfigErr`（委托）+ `validate`（原 require(k%kPerBeat==0) 保留）；`HiveCoreQuickSpec.hwErrCode`
-（委托 HiveDebugModel）+ `errExplain` case8；本 problem.md 真值序。
+**④ 四处镜像已同步：** 硬件 `WorkerBeeCalcConfig.scala`；金锚 `WbDebugModel.hwErrCode`（新单一真源）
++ `precheckConfigErr`（委托）+ `validate`（原 require(k%kPerBeat==0) 保留）；`WorkerBeeQuickSpec.hwErrCode`
+（委托 WbDebugModel）+ `errExplain` case8；本 problem.md 真值序。
 
-**【P0-2 去双源】** `HiveCoreQuickSpec.hwErrCode` 已提升为 `HiveDebugModel.hwErrCode` 公共 def，
+**【P0-2 去双源】** `WorkerBeeQuickSpec.hwErrCode` 已提升为 `WbDebugModel.hwErrCode` 公共 def，
 `precheckConfigErr` 与 QuickSpec 体检均委托它 → 消灭"两份互不一致的 errCode 软件镜像"；同时把金锚
 `Some(0)/Some(1)/Some(2)` 三分**合并为单一 Some(0)**（与 RTL 一致，errCode 1/2 永不可达），
 QuantSpec「blk32 over totalN」期望由 2 改为 0（红1 转绿）。
 
 **⑤【#146 · errCode 7 删除后的同步清单（共 6 处）】**
-1. **硬件** `HiveCoreCalcConfig.scala`：删
+1. **硬件** `WorkerBeeCalcConfig.scala`：删
    `if(cfg.hasMx4){ when((isMx4(aFmt) && aMxBlockSize =/= 64.U) || (isMx4(bFmt) && bMxBlockSize =/= 64.U)){ errComb:=true.B; errCodeComb:=7.U } }`
    整块，原位留 ASCII 根因说明；**when 链其余分支的相对顺序一字未扰动**。同步订正 code8 块与混配
    code3 块的两处优先级注释（原均以"7 >"为序首）。
-2. **金锚** `HiveDebugModel.hwErrCode`：删
+2. **金锚** `WbDebugModel.hwErrCode`：删
    `if (hasMx4 && ((aFmt==MXE2M1 && aMxBlk != 64) || (bFmt==MXE2M1 && bMxBlk != 64))) e = Some(7)`
    （原写在最后 = last-connect 最高优先级），doc 的真值序与 hasMx4 门控说明同步订正。
-3. **金锚** `HiveDebugModel.validate`：`require(p.aMxBlk == 64)` / `require(p.bMxBlk == 64)` →
+3. **金锚** `WbDebugModel.validate`：`require(p.aMxBlk == 64)` / `require(p.bMxBlk == 64)` →
    `require(== 16 || == 32)`（消息 ASCII）。原式在 2 级枚举下**不可满足**，会在仿真前抛掉全部 fp4
    用例；新式镜像"寄存器字段实际可编码的取值集合"，由枚举语义推导、**非拟合 RTL**。
-4. **`HiveCoreQuickSpec`**：删 `errExplain` 的 `case 7`（code7 现落入 `case _` "未知 errCode"臂，
+4. **`WorkerBeeQuickSpec`**：删 `errExplain` 的 `case 7`（code7 现落入 `case _` "未知 errCode"臂，
    语义正确）；订正文件头 errCode 段与 `hwErrCode` doc 的真值序。
-5. **`HiveCoreElaborate.scala`** cfgMxFp4 注释：删 errCode7 表述、订正 `mxBlockSize "=M64=3"`
+5. **`WorkerBeeElaborate.scala`** cfgMxFp4 注释：删 errCode7 表述、订正 `mxBlockSize "=M64=3"`
    （该枚举值已不存在，现为 `{sel=0→16, sel=1→32}`）。
 6. **本 problem.md**：【最终决策】②③⑥ + 【P0-1】②③ + 本清单。
-> 影响面：`HiveCoreSimCase` / `HiveCoreSimCaseLoadWSpec` / `HiveCoreSimCaseMxSpec` 三个 suite 均不含
+> 影响面：`WorkerBeeSimCase` / `WorkerBeeSimCaseLoadWSpec` / `WorkerBeeSimCaseMxSpec` 三个 suite 均不含
 > fp4 用例、也不引用 errCode 7 / `hwErrCode` / `errExplain`，故本次删除对它们**零影响**；
 > `hasMx4=false` 的两套发射基线（verilog / verilog_mx）本来就不 elaborate 该分支 ⟹ 结构逐位不变。
 
@@ -191,32 +191,32 @@ code10 的 `when` 置于 errCode6 之后、code8 之前 ⟹ code8 覆盖 code10�
 `3(MX4×MX8 mix) > 11(int/非int 跨界) > 8(K 非整除) > 10(cAddr 对齐) > 7(容量) > 5 > 4 > 3(isAMx^isBMx) > 0`
 
 **④ 三处镜像已同步：**
-- 硬件 `HiveCoreCalcConfig.scala`（#169 实施，三套 verilog 已重发射）
-- 金锚 `HiveDebugModel.hwErrCode` + `precheckConfigErr`（#170 同步）
-- `HiveCoreQuickSpec.errExplain` case10（#170 同步）
+- 硬件 `WorkerBeeCalcConfig.scala`（#169 实施，三套 verilog 已重发射）
+- 金锚 `WbDebugModel.hwErrCode` + `precheckConfigErr`（#170 同步）
+- `WorkerBeeQuickSpec.errExplain` case10（#170 同步）
 - 本 problem.md 真值序与码位占用表（本节）
 
-**⑤ 负向用例：** `HiveCoreSimCaseIntSpec` 新增 `errCode 10 (cAddr misaligned)` 用例，以
+**⑤ 负向用例：** `WorkerBeeSimCaseIntSpec` 新增 `errCode 10 (cAddr misaligned)` 用例，以
 C_BASE+8（= 0x200008，0x08 mod 32 = 8 ≠ 0）触发守护，断言 err=1/errCode=10/done=false/cWrites=0。
 
 **⑥ 码位占用更新：** errCode 10 不占用 9（已预留 v2 W4A8 混配独立诊断码）。errCode 11 已被 #177 占用（int/非int 跨界守护）。后续新校验从 12 起分配。
 
 ---
 
-### 【回归口径留痕 · #54 收尾】Hive 门槛须用 `testOnly <14 hive suite>`，勿用 `sbt test`
-- **正确口径**：Hive 回归门槛应跑
-  `sbt -J-Xmx6G "testOnly <14 个 hive suite>"`（Hive 专属 14 个 suite 的显式白名单）。
-- **`sbt test` 不可用于 Hive 门槛判定**：`sbt test` 会连带跑 ForagerBee 等**共 23 个 suite**，
+### 【回归口径留痕 · #54 收尾】WorkerBee 门槛须用 `testOnly <14 workerbee suite>`，勿用 `sbt test`
+- **正确口径**：WorkerBee 回归门槛应跑
+  `sbt -J-Xmx6G "testOnly <14 个 workerbee suite>"`（WorkerBee 专属 14 个 suite 的显式白名单）。
+- **`sbt test` 不可用于 WorkerBee 门槛判定**：`sbt test` 会连带跑 ForagerBee 等**共 23 个 suite**，
   多 suite **并发** Verilator 编译/仿真时对共享 `build/chiselsim` workspace 产生**资源争用**，
-  会把 `HiveCoreQuickSpec` 打成**假红**（典型症状：`FileNotFoundException: …compilation-log.txt`
+  会把 `WorkerBeeQuickSpec` 打成**假红**（典型症状：`FileNotFoundException: …compilation-log.txt`
   ——并发下 svsim workspace 的编译日志被另一进程清理/尚未落盘即被读取）。
-- **判别**：该假红在 **Hive-only 隔离跑**（`testOnly` 白名单、无跨族并发）中**消失**，属环境级
-  并发伪失败、非 Hive RTL/金锚逻辑缺陷。**门槛判定一律以 Hive-only 隔离跑为准**，`sbt test`
-  的 QuickSpec 红不得计入 Hive 硬门槛。
-- **【#146 留痕】"14 个 hive suite" 已过期**：当前 `src/hive/scala/test/` 只有 **4 个 suite**
-  （`HiveCoreQuickSpec` / `HiveCoreSimCase` / `HiveCoreSimCaseLoadWSpec` / `HiveCoreSimCaseMxSpec`）
-  加 2 个非 suite 支撑文件（`HiveDebugModel` / `HiveSimCommon`）。结论不变：门槛判定仍以
-  `testOnly <白名单>` 的 Hive-only 隔离跑为准。
+- **判别**：该假红在 **WorkerBee-only 隔离跑**（`testOnly` 白名单、无跨族并发）中**消失**，属环境级
+  并发伪失败、非 WorkerBee RTL/金锚逻辑缺陷。**门槛判定一律以 WorkerBee-only 隔离跑为准**，`sbt test`
+  的 QuickSpec 红不得计入 WorkerBee 硬门槛。
+- **【#146 留痕】"14 个 workerbee suite" 已过期**：当前 `src/workerbee/scala/test/` 只有 **4 个 suite**
+  （`WorkerBeeQuickSpec` / `WorkerBeeSimCase` / `WorkerBeeSimCaseLoadWSpec` / `WorkerBeeSimCaseMxSpec`）
+  加 2 个非 suite 支撑文件（`WbDebugModel` / `WbSimCommon`）。结论不变：门槛判定仍以
+  `testOnly <白名单>` 的 WorkerBee-only 隔离跑为准。
 
 ---
 
@@ -226,7 +226,7 @@ C_BASE+8（= 0x200008，0x08 mod 32 = 8 ≠ 0）触发守护，断言 err=1/errC
 非对齐 32-bit 读，否则硬件上板会出错。**要求软件配置一定对齐**。」本轮据此**只推导并写下契约**，
 **不改** scale 张量布局、**不加**拼包状态机、**不改** scale DMA 遍历。
 
-**② 地址生成的单一真源：** `HiveCoreCalcConfig` 的两个 scale 偏移（scaleA/scaleB 同式）
+**② 地址生成的单一真源：** `WorkerBeeCalcConfig` 的两个 scale 偏移（scaleA/scaleB 同式）
 ```
 rowStride   = scaleXRowAddressOffset     = K / blk          [字节]
 kTileStride = scaleXColTileAddressOffset = kLoadNum / blk   [字节]
@@ -273,7 +273,7 @@ DMA 每拍在该地址发**一次 32-bit 读**：`addr(row, kt) = BASE + row*row
   padding 使两个 stride 都为 4 的倍数；**(c)** scale DMA 改发窄（8-bit）读。**(b)/(c) 本轮按裁定
   不实施**，硬件侧也**未加任何守护**。
 
-**⑤ 本轮新增 blk=16 用例的 K 选择：** `HiveCoreQuickSpec` 的 #146 新增用例取
+**⑤ 本轮新增 blk=16 用例的 K 选择：** `WorkerBeeQuickSpec` 的 #146 新增用例取
 `K=64, aBlk=bBlk=16, MXE5M2×MXE5M2→MXE4M3, M=N=32`。
 - 满足 **(S0)**（TB 的 `SA_BASE/SB_BASE` 为 4 的倍数）与 **(S1)**：`rowStride = K/blk = 64/16 = 4` ✓
   —— 即裁定给出的判据「blk=16 需 K 为 64 的倍数」，K=64 是最小合法值。
@@ -286,9 +286,9 @@ DMA 每拍在该地址发**一次 32-bit 读**：`addr(row, kt) = BASE + row*row
 | 选项 | 做法 | 影响面 | 代价/风险 |
 |---|---|---|---|
 | G1 | 不加任何硬件守护，纯软件契约（**本轮现状**） | 零 RTL 改动、两套发射基线 normalized-diff=0 | 违约配置**静默**产出错误地址；上板才暴露 |
-| G2 | `HiveCoreCalcConfig` 增运行期 errCode（从**空闲的 7** 起分配），判据 `((K/blk) % 4 != 0) \|\| ((kLoadNum/blk) % 4 != 0 && kTiles>1)` | 新增一个 when 分支（须放在链**最前**以免遮蔽既有码，或按裁定明确其优先级）+ 金锚 `hwErrCode`/`errExplain`/problem.md 四处镜像 | **会把现役全部 MXFP8 用例判为非法**（见 ④ 第三点）⟹ 必须同时改布局或改 DMA，否则等于自毁回归 |
+| G2 | `WorkerBeeCalcConfig` 增运行期 errCode（从**空闲的 7** 起分配），判据 `((K/blk) % 4 != 0) \|\| ((kLoadNum/blk) % 4 != 0 && kTiles>1)` | 新增一个 when 分支（须放在链**最前**以免遮蔽既有码，或按裁定明确其优先级）+ 金锚 `hwErrCode`/`errExplain`/problem.md 四处镜像 | **会把现役全部 MXFP8 用例判为非法**（见 ④ 第三点）⟹ 必须同时改布局或改 DMA，否则等于自毁回归 |
 | G3 | scale 布局加 padding：`rowStride`/`kTileStride` 各自向上取整到 4 的倍数 | 改 `scaleXRowAddressOffset`/`scaleXColTileAddressOffset` 两式 + 金锚 `saRowOff/saColOff/sbRowOff/sbColOff` + `buildMemory` 的 scale 落址 + 两条 `expScaleXAddrSeq` | 触碰"禁动区相邻"的金锚几何；scale 张量总字节数上升；软件侧需同步 padding 约定 |
-| G4 | scale DMA 改窄读（8-bit/字节使能），或改"每 4 块一读 + 内部移位" | 改 `HiveCoreDmaRdOnly` 的 scale 通道 + FIFO 宽度语义（#145 刚把 8→32 拓宽，等于回退） | 与 #145 的拓宽决策冲突；改动面最大 |
+| G4 | scale DMA 改窄读（8-bit/字节使能），或改"每 4 块一读 + 内部移位" | 改 `WorkerBeeDmaRdOnly` 的 scale 通道 + FIFO 宽度语义（#145 刚把 8→32 拓宽，等于回退） | 与 #145 的拓宽决策冲突；改动面最大 |
 
 > **推荐**：短期取 **G1 + 集成侧确认 (a)**；若 SoC 确认**不支持**非对齐读，则必须走 **G3**
 > （布局 padding），因为它同时解决 `rowStride` 与 `kTileStride` 两个残差，且不回退 #145。

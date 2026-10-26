@@ -18,9 +18,9 @@
   *     端口兼容 ≠ 语义等价：两者的数值契约不同（FpAdd = 逐位 bit-exact；本模块 = 三段式误差契约，
   *     见下方），饱和域行为也曾分歧（原钳 255 → fp32 NaN，task#18 A 项已修为钳 254 对齐 FpAdd）。
   *     只有在"A 项修复 + 接受误差契约"两个前提下才谈得上真正 drop-in。
-  * · 接入方式（task#18 B 项；★task#28 起类默认已翻转为 true）：HiveFusionMacFp 编译期参数 `useNarrowAdd: Boolean = true`
+  * · 接入方式（task#18 B 项；★task#28 起类默认已翻转为 true）：WbFusionMacFp 编译期参数 `useNarrowAdd: Boolean = true`
   *   —— **默认 true ⟹ 例化本模块（FpAddNarrowOpt）**；须【显式 pin】false ⟹ 回退 FpAdd（已验证 bit-exact 基线）。
-  *   护栏为【白名单式】`supportedFmts ⊆ {MXE4M3, MXE5M2, MXE2M1}`（task#25 Sean m2 收紧，原文 require 以 HiveFusionMacFp.scala:45/:69 为单一真源）⟹ 本模块只支持 MX-only（fp16-only 模式是 don't-care）。
+  *   护栏为【白名单式】`supportedFmts ⊆ {MXE4M3, MXE5M2, MXE2M1}`（task#25 Sean m2 收紧，原文 require 以 WbFusionMacFp.scala:45/:69 为单一真源）⟹ 本模块只支持 MX-only（fp16-only 模式是 don't-care）。
   * · 适用域 = 【MX-only】融合 MAC（mxfp8 E4M3/E5M2 + mxfp4 E2M1，上游已去掉 fp16/bf16）。
   *   fp16/bf16 满宽乘积（24-bit 有效尾数）在窄窗口下会丢低 (24−W) 位 ⟹ 本模块【不为 fp16-only
   *   模式做精度承诺】（见下方「三模式与激活掩码」）。
@@ -158,7 +158,7 @@
   * ══════════════════════════════════════════════════════════════════════════════
   *   MX4 (is4x=1)          ：激活 {C, L0, L1, L2, L3} = 5 操作数（4 个 fp4 积【直接进树】，
   *                           取消 fp4BlockSum 的中间 LZC 规格化）。is4x=1 时 L1 亦有效
-  *                           （上游 HiveFusionMacFp 的 r1 = Mux(aIsMx2M1, fp8Mul.prod, 0)）。
+  *                           （上游 WbFusionMacFp 的 r1 = Mux(aIsMx2M1, fp8Mul.prod, 0)）。
   *   MX8 (is2x=1 && !is4x) ：激活 {C, L0, L1} = 3 操作数，L2/L3 掩零（掩零必须同时清 expEff，
   *                           否则陈旧/无关的 prodFp4_* 指数会抬高 E ⟹ 真实槽被整体下移 ⟹ 精度崩塌）。
   *   fp16-only (is2x=0 && is4x=0)：MX-only 下【不存在】⟹ don't-care。本实现退化为 {C, L0} 两操作数
@@ -187,7 +187,7 @@
   *          fp32 的 eField==255 是 Inf/NaN 保留域。饱和域（FpAdd.scala §9.1(c)）下乘积槽会溢出成
   *          Inf(eField=0xFF, mant23=0)，而本模块与 FpAdd 一样【只判零、不判 Inf】⟹ Inf 被当成
   *          "指数很大的有限数"吸收 ⟹ E=255 ⟹ expOut=255 且 mant31≠0 ⟹ 下游 fpNormalize40to32
-  *          按 (exp==255 && mant!=0) 归一化出 fp32 **NaN**（可观测故障：HiveFusionMacFpSpec 的
+  *          按 (exp==255 && mant!=0) 归一化出 fp32 **NaN**（可观测故障：WbFusionMacFpSpec 的
   *          饱和域 "output finite (no NaN/X)" 断言直接 FAIL）。钳到 254 后输出恒为有限值。
   *        ★【是否需要对乘积槽显式处理 Inf/NaN？——不需要，以 FpAdd 语义为准】
   *          FpAdd 同样不特判 Inf/NaN 槽（它把 eField=255 当大指数走完整条 lazyAdd），其"优雅降级"
@@ -438,12 +438,12 @@ class FpAddNarrowOpt(cEffW: Int = 40, W: Int = FpAddNarrowOpt.DefaultW) extends 
 /** FpAddNarrowOpt RTL 发射入口 —— ★task#37【独立存档，不接入整机】。
   *
   * 本入口只把【优化存档变体】FpAddNarrowOpt 发射到一个独立目录：
-  *   · src/hive/verilog_narrow_opt/  —— W=19（默认档），模块名 Hive_FpAddNarrowOpt。
-  * 每次发射前清空目标目录（照抄 FpAddNarrowElaborate 的 deleteRecursively + withModulePrefix("Hive")）。
+  *   · src/workerbee/verilog_narrow_opt/  —— W=19（默认档），模块名 Wb_FpAddNarrowOpt。
+  * 每次发射前清空目标目录（照抄 FpAddNarrowElaborate 的 deleteRecursively + withModulePrefix("Wb")）。
   *
-  * ★ 与主用的关系：整机（HiveFusionMacFp / HiveCore）例化的是【主用 FpAddNarrow】（已回退为平衡树版），
+  * ★ 与主用的关系：整机（WbFusionMacFp / WorkerBee）例化的是【主用 FpAddNarrow】（已回退为平衡树版），
   *   其系统级配置对照（verilog_fusionfp_mxonly / _nofp16 / _narrow）与三档 W 独立发射
-  *   （verilog_narrow / _w16 / _w22）均由 FpAddNarrowElaborate / HiveFusionMacFpElaborate 负责，
+  *   （verilog_narrow / _w16 / _w22）均由 FpAddNarrowElaborate / WbFusionMacFpElaborate 负责，
   *   与本存档入口【无关】。本存档仅供综合对照参考（用户实测优化版反而更差，故不接入整机）。
   */
 object FpAddNarrowOptElaborate extends App {
@@ -464,13 +464,13 @@ object FpAddNarrowOptElaborate extends App {
   private def emit(w: Int, dir: String): Unit = {
     emitClean(dir)
     ChiselStage.emitSystemVerilogFile(
-      gen = withModulePrefix("Hive") { new FpAddNarrowOpt(40, w) }
+      gen = withModulePrefix("Wb") { new FpAddNarrowOpt(40, w) }
       , args = Array("--target-dir", dir)
     )
     println(s"[FpAddNarrowOptElaborate] W=$w -> $dir")
   }
 
   // ★task#37：opt 存档变体【只发一个代表档】W=19（默认）到独立目录 verilog_narrow_opt/，
-  //   模块名 = Hive_FpAddNarrowOpt；不接入整机、不参与系统级 A/B 对照（那是主用 FpAddNarrow 的职责）。
-  emit(FpAddNarrowOpt.DefaultW, "src/hive/verilog_narrow_opt")   // W=19 默认（opt 存档）
+  //   模块名 = Wb_FpAddNarrowOpt；不接入整机、不参与系统级 A/B 对照（那是主用 FpAddNarrow 的职责）。
+  emit(FpAddNarrowOpt.DefaultW, "src/workerbee/verilog_narrow_opt")   // W=19 默认（opt 存档）
 }

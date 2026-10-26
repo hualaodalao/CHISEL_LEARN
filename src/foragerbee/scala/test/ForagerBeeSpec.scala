@@ -381,6 +381,152 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     v
   }
 
+  for ((shared, depth) <- Seq((false, 1), (true, 4))) {
+    it should s"40-bit addresses: preserve high bases, strides and bounds (shared=$shared depth=$depth)" in {
+      val cfg = ForagerBeeConfig(numPorts = 2, queueDepth = 4, tileSize = 4,
+        maxBurstLen = 4, enableConversion = true,
+        enableSharedWritePorts = shared, writeOutstandingDepth = depth)
+      cfg.addressWidth shouldBe 40
+      val limit = BigInt(1) << cfg.addressWidth
+      val lowMask = (BigInt(1) << 32) - 1
+      val mem = mutable.HashMap.empty[BigInt, Byte]
+      val expected = mutable.HashMap.empty[BigInt, Byte]
+      val commands = mutable.ArrayBuffer.empty[FbTestCmd]
+      def src(tag: Int): BigInt = BigInt("8100000000", 16) + tag * 0x10000 + 3
+      def dst(tag: Int): BigInt = BigInt("a100000000", 16) + tag * 0x10000 + 7
+      def table(tag: Int): BigInt = BigInt("d100000000", 16) + tag * 0x10000
+      def put(base: BigInt, values: Seq[Int]): Unit = {
+        for ((value, i) <- values.zipWithIndex) {
+          mem(base + i) = value.toByte
+          mem((base + i) & lowMask) = 0xe7.toByte
+        }
+      }
+      def expect(base: BigInt, values: Seq[Int]): Unit = {
+        for (i <- -cfg.beatBytes until values.size + cfg.beatBytes) {
+          mem.getOrElseUpdate(base + i, 0xa5.toByte)
+          mem.getOrElseUpdate((base + i) & lowMask, 0x5a.toByte)
+        }
+        for ((value, i) <- values.zipWithIndex) expected(base + i) = value.toByte
+      }
+      def le(value: BigInt, size: Int): Seq[Int] =
+        (0 until size).map(i => ((value >> (8 * i)) & 255).toInt)
+
+      val sourceStride = (BigInt(1) << 32) + 32
+      val destinationStride = (BigInt(2) << 32) + 48
+      for (row <- 0 until 2) {
+        val values = (0 until 5).map(i => row * 17 + i + 1)
+        put(src(1) + (row + 1) * sourceStride + 1, values)
+        expect(dst(1) + row * destinationStride, Seq(0x6d) ++ values ++ Seq(0x6d, 0x6d))
+      }
+      commands += FbTestCmd(tag = 1, dimCount = 2, shape = Seq(5, 2),
+        srcStride = Seq(5, sourceStride), dstStride = Seq(8, destinationStride),
+        srcAddr = src(1), dstAddr = dst(1), srcStartIdx = Seq(1, 1),
+        padBefore = Seq(1, 0), padAfter = Seq(2, 0), padValue = 0x6d)
+
+      for (y <- 0 until 2; z <- 0 until 2) {
+        val values = (0 until 3).map(i => y * 40 + z * 10 + i + 1)
+        put(src(2) + y * 64 + z * 32, values)
+        expect(dst(2) + y * 16 + z * 40, values)
+      }
+      commands += FbTestCmd(tag = 2, op = "PERMUTE", dimCount = 3, shape = Seq(3, 2, 2),
+        srcStride = Seq(3, 32, 64), dstStride = Seq(3, 16, 40),
+        permVec = Seq(0, 2, 1), srcAddr = src(2), dstAddr = dst(2))
+
+      for (row <- 0 until 2) {
+        put(src(3) + row * 8, (0 until 3).map(col => row * 3 + col + 1))
+        for (col <- 0 until 3) expect(dst(3) + col * 8 + row, Seq(row * 3 + col + 1))
+      }
+      commands += FbTestCmd(tag = 3, op = "TRANSPOSE", dimCount = 2, shape = Seq(3, 2),
+        srcStride = Seq(3, 8), dstStride = Seq(8, 0), srcAddr = src(3), dstAddr = dst(3))
+
+      put(src(4), (1 to 12))
+      val im2col = for (oh <- 0 until 2; ow <- 0 until 3; kh <- 0 until 2; kw <- 0 until 2)
+        yield (oh + kh) * 4 + ow + kw + 1
+      expect(dst(4), im2col)
+      commands += FbTestCmd(tag = 4, op = "IM2COL", shape = Seq(12, 24),
+        srcAddr = src(4), dstAddr = dst(4), im2colKernel = Seq(2, 2),
+        im2colStride = Seq(1, 1), im2colDilation = Seq(1, 1), im2colInShape = Seq(1, 3, 4))
+
+      val sgValues = (0 until 10).map(i => 0x31 + i)
+      val sgLengths = Seq(3, 7)
+      put(src(5), sgValues)
+      for (i <- sgLengths.indices) {
+        val address = dst(5) + i * 32
+        val descriptor = address | (BigInt(sgLengths(i)) << cfg.addressWidth)
+        put(table(5) + i * cfg.beatBytes, le(descriptor, cfg.beatBytes))
+        put(table(6) + i * cfg.beatBytes, le(descriptor, cfg.beatBytes))
+        expect(address, sgValues.slice(if (i == 0) 0 else 3, if (i == 0) 3 else 10))
+      }
+      commands += FbTestCmd(tag = 5, op = "SCATTER", shape = Seq(10, 64),
+        srcAddr = src(5), dstAddr = dst(5), sgListAddr = table(5), sgEntryCount = 2)
+      expect(dst(6), sgValues)
+      commands += FbTestCmd(tag = 6, op = "GATHER", shape = Seq(64, 10),
+        srcAddr = dst(5), dstAddr = dst(6), sgListAddr = table(6), sgEntryCount = 2)
+
+      put(src(7), Seq(BigInt("3f800000", 16), BigInt("c0000000", 16),
+        BigInt("3f000000", 16), BigInt(0)).flatMap(le(_, 4)))
+      expect(dst(7), Seq(0x3c00, 0xc000, 0x3800, 0).flatMap(x => le(BigInt(x), 2)))
+      commands += FbTestCmd(tag = 7, shape = Seq(4), srcAddr = src(7), dstAddr = dst(7), srcFmt = 0, dstFmt = 1)
+
+      val scale = BigInt("c100080000", 16)
+      put(src(8), Seq.fill(16)(BigInt("3f800000", 16)).flatMap(le(_, 4)))
+      expect(dst(8), Seq.fill(16)(0x38))
+      expect(scale, Seq(127))
+      commands += FbTestCmd(tag = 8, shape = Seq(16), srcAddr = src(8), dstAddr = dst(8),
+        srcFmt = 0, dstFmt = 4, scaleAddr = scale)
+
+      val matrix = (1 to 16)
+      val tiled = for (ty <- 0 until 2; tx <- 0 until 2; row <- 0 until 2; col <- 0 until 2)
+        yield (ty * 2 + row) * 4 + tx * 2 + col + 1
+      put(src(9), matrix)
+      expect(dst(9), tiled)
+      commands += FbTestCmd(tag = 9, op = "TILE2LINEAR", dimCount = 2, shape = Seq(4, 4),
+        srcAddr = src(9), dstAddr = dst(9), t2lMatCols = 4, t2lTileRows = 2, t2lTileCols = 2,
+        t2lNumTileRows = 2, t2lNumTileCols = 2)
+      expect(dst(10), matrix)
+      commands += FbTestCmd(tag = 10, op = "LINEAR2TILE", dimCount = 2, shape = Seq(4, 4),
+        srcAddr = dst(9), dstAddr = dst(10), t2lMatCols = 4, t2lTileRows = 2, t2lTileCols = 2,
+        t2lNumTileRows = 2, t2lNumTileCols = 2)
+
+      val lastRead = limit - cfg.beatBytes + 3
+      val lastReadValues = (1 to (cfg.beatBytes - 3))
+      put(lastRead, lastReadValues)
+      expect(dst(11), lastReadValues)
+      commands += FbTestCmd(tag = 11, shape = Seq(lastReadValues.size), srcAddr = lastRead, dstAddr = dst(11))
+      put(src(12), (1 to 9))
+      expect(limit - 9, (1 to 9))
+      commands += FbTestCmd(tag = 12, shape = Seq(9), srcAddr = src(12), dstAddr = limit - 9)
+      commands += FbTestCmd(tag = 13, shape = Seq(9), srcAddr = src(12), dstAddr = limit - 8)
+      put(src(14), Seq(0x81, 0x82, 0x83))
+      expect(dst(14), Seq(0x81, 0x82, 0x83))
+      commands += FbTestCmd(tag = 14, shape = Seq(3), srcAddr = src(14), dstAddr = dst(14))
+
+      val golden = mem.toMap ++ expected.toMap
+      val (dones, result) = runForagerBee(cfg, commands.toSeq, mem, maxCycles = 12000,
+        modelFactory = (m, bb) => new FbStreamMemSlave(m, bb, writeDelay = 9),
+        onCycle = (dut, cycle) => {
+          if (cycle == 0) {
+            dut.io.cmd.payload.srcAddr.getWidth shouldBe 40
+            dut.io.cmd.payload.dstAddr.getWidth shouldBe 40
+            dut.io.cmd.payload.sgListAddr.getWidth shouldBe 40
+            dut.io.cmd.payload.scaleAddr.getWidth shouldBe 40
+            dut.io.cmd.payload.srcStride.foreach(_.getWidth shouldBe 40)
+            dut.io.cmd.payload.dstStride.foreach(_.getWidth shouldBe 40)
+          }
+          for (bus <- dut.io.bus) {
+            bus.rd.payload.addr.getWidth shouldBe 40
+            bus.wr.payload.addr.getWidth shouldBe 40
+            if (bus.rd.valid.peek().litToBoolean && bus.rd.ready.peek().litToBoolean)
+              assert(bus.rd.payload.addr.peek().litValue > lowMask, "read address lost its high bits")
+            if (bus.wr.valid.peek().litToBoolean && bus.wr.ready.peek().litToBoolean)
+              assert(bus.wr.payload.addr.peek().litValue > lowMask, "write address lost its high bits")
+          }
+        })
+      dones.sortBy(_._1) shouldBe (1 to 14).map(tag => (tag, tag == 13))
+      result.toMap shouldBe golden
+    }
+  }
+
   // ===================== COPY 用例 =====================
 
   it should "1D COPY: contiguous block transfer (burst split by maxBurstLen)" in {

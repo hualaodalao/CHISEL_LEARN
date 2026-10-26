@@ -7,8 +7,8 @@ import chisel3.dontTouch
 // 命令 Bundle
 // ============================================================================
 
-class HiveCoreCmd extends Bundle {
-  val op      = HiveCoreOp()    // 操作码
+class WorkerBeeCmd extends Bundle {
+  val op      = WorkerBeeOp()    // 操作码
   val reg0Addr = UInt(6.W)       // 寄存器索引
   val reg1Addr = UInt(6.W)       // 寄存器索引
   val data0   = UInt(32.W)      // 写入数据 0
@@ -17,7 +17,7 @@ class HiveCoreCmd extends Bundle {
   val tag     = UInt(8.W)
 }
 
-class HiveCoreRespForTracing extends Bundle {
+class WorkerBeeRespForTracing extends Bundle {
   val state = UInt(2.W) // 00 start 01 end 1x err
   val pc = UInt(32.W)         // REG_READ 返回数据
   val tag  = UInt(8.W)
@@ -28,8 +28,8 @@ class HiveCoreRespForTracing extends Bundle {
 // 命令响应 Bundle
 // ============================================================================
 
-/** HiveCore 命令响应。 */
-class HiveCoreResp extends Bundle {
+/** WorkerBee 命令响应。 */
+class WorkerBeeResp extends Bundle {
   val data = UInt(32.W)         // REG_READ 返回数据
   val err  = Bool()             // 错误标志
   val laneId = UInt(2.W)
@@ -42,18 +42,18 @@ class HiveCoreResp extends Bundle {
 
 /** 外部 DMA 只读通道接口（简化版，无 IMasterSlave）。
   *
-  * 方向按 HiveCore（master）视角声明：rsp 为从外部存储读入的数据流。
+  * 方向按 WorkerBee（master）视角声明：rsp 为从外部存储读入的数据流。
   * 数据位宽按通道参数化（aDma = cfg.aExtW，bDma = cfg.bExtW，
   * 各自匹配对应 buffer 行宽，一拍一行等宽直连）。
   *
-  * @param cfg       HiveCore 配置
+  * @param cfg       WorkerBee 配置
   * @param dataWidth 外部数据位宽（bit）
   */
-object HiveCoreDMAExtReadOnlyIF {
-    def apply(cfg: HiveCoreConfig, dataWidth: Int) = new HiveCoreDMAExtReadOnlyIF(cfg, dataWidth)
+object WorkerBeeDMAExtReadOnlyIF {
+    def apply(cfg: WorkerBeeConfig, dataWidth: Int) = new WorkerBeeDMAExtReadOnlyIF(cfg, dataWidth)
 }
 
-class HiveCoreDMAExtReadOnlyIF(cfg: HiveCoreConfig, dataWidth: Int) extends Bundle {
+class WorkerBeeDMAExtReadOnlyIF(cfg: WorkerBeeConfig, dataWidth: Int) extends Bundle {
   val rsp = Flipped(Stream(new Bundle {
     val data = UInt(dataWidth.W)
     val err = Bool()
@@ -63,10 +63,10 @@ class HiveCoreDMAExtReadOnlyIF(cfg: HiveCoreConfig, dataWidth: Int) extends Bund
   })
 }
 
-object HiveCoreDMAExtWriteOnlyIF {
-  def apply(cfg: HiveCoreConfig, dataWidth: Int) = new HiveCoreDMAExtWriteOnlyIF(cfg, dataWidth)
+object WorkerBeeDMAExtWriteOnlyIF {
+  def apply(cfg: WorkerBeeConfig, dataWidth: Int) = new WorkerBeeDMAExtWriteOnlyIF(cfg, dataWidth)
 }
-class HiveCoreDMAExtWriteOnlyIF(cfg: HiveCoreConfig, dataWidth: Int) extends Bundle {
+class WorkerBeeDMAExtWriteOnlyIF(cfg: WorkerBeeConfig, dataWidth: Int) extends Bundle {
   val rsp = Flipped(Stream(new Bundle {
     val err = Bool()
   }))
@@ -83,11 +83,11 @@ class HiveCoreDMAExtWriteOnlyIF(cfg: HiveCoreConfig, dataWidth: Int) extends Bun
 // 状态 Bundle
 // ============================================================================
 
-/** HiveCore 运行时状态。
+/** WorkerBee 运行时状态。
   *
-  * @param cfg HiveCore 配置
+  * @param cfg WorkerBee 配置
   */
-class HiveCoreStatus(cfg: HiveCoreConfig) extends Bundle {
+class WorkerBeeStatus(cfg: WorkerBeeConfig) extends Bundle {
 
   /** 忙标志 */
   val busy = Bool()
@@ -106,16 +106,16 @@ class HiveCoreStatus(cfg: HiveCoreConfig) extends Bundle {
   /** C 缓冲当前占用量 */
   val cOccupancy = UInt(log2Up(cfg.cBufferDepth + 1).W)
 }
-object HiveCoreStatus {
-  def apply(cfg: HiveCoreConfig) = new HiveCoreStatus(cfg)
+object WorkerBeeStatus {
+  def apply(cfg: WorkerBeeConfig) = new WorkerBeeStatus(cfg)
 }
 
-/** HiveCore 性能观测信号组（【perf 端口】纯组合电平、无内部计数状态；计数/统计
+/** WorkerBee 性能观测信号组（【perf 端口】纯组合电平、无内部计数状态；计数/统计
   * 由外部 PMU 按拍采样完成——本模块不内建 perf counter，用户裁定）。
   *
   * - dmaA/B/C、scaleA/B/C：各 DMA 通道请求有效拍（物理通道口径：scaleA 含
   *   bias/rqM 取数盗用拍；成因分解可外部结合 epilogue 交叉采样）
-  * - array：阵列有效计算拍（hiveValidIn）
+  * - array：阵列有效计算拍（wbValidIn）
   * - stallA：供数相（sLOAD_A）阵列空闲拍——aPop 未 fire（含 A/scaleA 供数
   *   不足、bias/rqM 未收齐、C 写回占用读口等全部挂起成因）
   * - stallB：权重供数等待（loadW 窗口 bPop 停拍 ∨ sDRAIN 预蓄等待拍），双缓冲/
@@ -126,7 +126,7 @@ object HiveCoreStatus {
   *
   * 非 MX 配置下 scaleA/B/C 恒 false（端口形状跨配置保持稳定）。
   */
-class HiveCorePerf extends Bundle {
+class WorkerBeePerf extends Bundle {
   val dmaA = Bool()
   val dmaB = Bool()
   val dmaC = Bool()
@@ -139,11 +139,11 @@ class HiveCorePerf extends Bundle {
   val epilogue = Bool()
   val busy = Bool()
 }
-object HiveCorePerf {
-  def apply() = new HiveCorePerf()
+object WorkerBeePerf {
+  def apply() = new WorkerBeePerf()
 }
 
-class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
+class WorkerBeeRegister(cfg: WorkerBeeConfig) extends Bundle {
   //占用DW0高位编码
   //val cmdType = UInt(4.W);dontTouch(cmdType)
 
@@ -186,11 +186,11 @@ class HiveCoreRegister(cfg: HiveCoreConfig) extends Bundle {
   
 
 }
-object HiveCoreRegister {
-  def apply(cfg: HiveCoreConfig) = new HiveCoreRegister(cfg)
+object WorkerBeeRegister {
+  def apply(cfg: WorkerBeeConfig) = new WorkerBeeRegister(cfg)
 }
 
-class HiveCoreExePreCalcConfig(cfg: HiveCoreConfig) extends Bundle {
+class WorkerBeeExePreCalcConfig(cfg: WorkerBeeConfig) extends Bundle {
   val nTile = UInt(cfg.mnkWidth.W)
   val mTile = UInt(cfg.mnkWidth.W)    
   val kTile = UInt(cfg.mnkWidth.W)
@@ -224,7 +224,7 @@ class HiveCoreExePreCalcConfig(cfg: HiveCoreConfig) extends Bundle {
 
   
 }
-object HiveCoreExePreCalcConfig {
-  def apply(cfg: HiveCoreConfig) = new HiveCoreExePreCalcConfig(cfg)
+object WorkerBeeExePreCalcConfig {
+  def apply(cfg: WorkerBeeConfig) = new WorkerBeeExePreCalcConfig(cfg)
 }
 
