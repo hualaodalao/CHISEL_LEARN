@@ -135,7 +135,7 @@ module Wb_WorkerBeeCalcConfig(	// src/workerbee/scala/main/WorkerBeeCalcConfig.s
     automatic logic            _GEN_1;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:225:26
     automatic logic            _GEN_2;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:225:64
     automatic logic            _GEN_3;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:225:46
-    automatic logic            _GEN_4 = io_regFile_m > 16'h7F0;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:234:23
+    automatic logic            _GEN_4 = io_regFile_m > 16'h10;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:234:23
     automatic logic            _GEN_5 = io_regFile_biasOn & (|(io_regFile_biasAddr[1:0]));	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:340:{28,50,57}
     automatic logic            _cIsIntOut_T;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:370:52
     automatic logic            _cIsIntOut_T_3;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:370:91

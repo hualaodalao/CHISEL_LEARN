@@ -7,20 +7,20 @@ module Wb_WorkerBeeScratchpad(	// src/workerbee/scala/main/WorkerBeeScratchpad.s
   output         io_aPop_valid,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
   input          io_aPop_ready,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
   output [255:0] io_aPop_payload,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
-  output [11:0]  io_aOccupancy,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
+  output [5:0]   io_aOccupancy,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
   input          io_bPush_valid,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
   input  [255:0] io_bPush_payload,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
   output         io_bPop_valid,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
   input          io_bPop_ready,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
   output [255:0] io_bPop_payload,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
-  output [11:0]  io_bOccupancy,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
+  output [5:0]   io_bOccupancy,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
   input          io_cPush_valid,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
   output         io_cPush_ready,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
   input  [639:0] io_cPush_payload,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
   output         io_cPop_valid,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
   input          io_cPop_ready,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
   output [639:0] io_cPop_payload,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
-  output [11:0]  io_cOccupancy,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
+  output [5:0]   io_cOccupancy,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
   input          io_flushA,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
                  io_flushB,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
                  io_flushC,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
@@ -34,7 +34,7 @@ module Wb_WorkerBeeScratchpad(	// src/workerbee/scala/main/WorkerBeeScratchpad.s
   output         io_scaleBPop_valid,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
   input          io_scaleBPop_ready,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
   output [31:0]  io_scaleBPop_payload,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
-  output [8:0]   io_scaleBOccupancy,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
+  output [5:0]   io_scaleBOccupancy,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
   input          io_flushScaleA,	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
                  io_flushScaleB	// src/workerbee/scala/main/WorkerBeeScratchpad.scala:13:14
 );

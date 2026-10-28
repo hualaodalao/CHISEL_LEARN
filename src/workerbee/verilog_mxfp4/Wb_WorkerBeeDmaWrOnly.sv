@@ -87,7 +87,7 @@ module Wb_WorkerBeeDmaWrOnly(	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.sca
   reg  [31:0]  rowStep;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:383:24
   reg  [15:0]  lineCounter;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:384:28
   reg  [15:0]  nCnt;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:385:21
-  reg  [12:0]  ostCredit;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:392:26
+  reg  [6:0]   ostCredit;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:392:26
   reg          beatCnt;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:413:26
   wire         lastBeat = {3'h0, beatCnt} == io_calcConfig_cDmaBufBeatTar;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:224:7, :413:26, :422:32
   wire         _dmaExtWrIF_req_valid_T = state == 3'h2;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:224:7, :261:22, :444:29
@@ -109,7 +109,7 @@ module Wb_WorkerBeeDmaWrOnly(	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.sca
       rowStep <= 32'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:383:24
       lineCounter <= 16'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:384:28
       nCnt <= 16'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:385:21
-      ostCredit <= 13'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:392:26
+      ostCredit <= 7'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:392:26
       beatCnt <= 1'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:363:37, :413:26
     end
     else begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:224:7
@@ -134,7 +134,7 @@ module Wb_WorkerBeeDmaWrOnly(	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.sca
         {{state},
          {state},
          {state},
-         {io_start ? 3'h1 : ostCredit == 13'h0 ? 3'h0 : state},
+         {io_start ? 3'h1 : ostCredit == 7'h0 ? 3'h0 : state},
          {_GEN_7 ? 3'h4 : _GEN_5},
          {_GEN_1 & _GEN_2 ? 3'h3 : state},
          {_GEN_5},
@@ -196,12 +196,12 @@ module Wb_WorkerBeeDmaWrOnly(	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.sca
           rowStep <= io_calcConfig_cRowAddressOffset;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:383:24
       end
       if (~(_GEN | _GEN_9) & _GEN_8 | _GEN)	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:383:24, :384:28, :463:{14,24}, :464:15, :466:58, :500:17, :517:17, :577:22, :579:19
-        ostCredit <= 13'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:392:26
+        ostCredit <= 7'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:392:26
       else if (~(_GEN_3 & io_dmaExtWrIF_rsp_valid)) begin	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:466:33
         if (io_dmaExtWrIF_rsp_valid)	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:233:14
-          ostCredit <= ostCredit - 13'h1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:392:26, :469:30
+          ostCredit <= ostCredit - 7'h1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:392:26, :469:30
         else if (_GEN_3)	// src/utils/Stream/Stream.scala:43:26
-          ostCredit <= ostCredit + 13'h1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:392:26, :469:30, :471:30
+          ostCredit <= ostCredit + 7'h1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:392:26, :469:30, :471:30
       end
       beatCnt <= _GEN ? ~io_start & _GEN_4 : _GEN_10 & _GEN_4;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:383:24, :413:26, :450:59, :451:20, :463:14, :514:15, :517:17, :525:22
     end
@@ -225,8 +225,8 @@ module Wb_WorkerBeeDmaWrOnly(	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.sca
         rowStep = {_RANDOM[3'h2][31:3], _RANDOM[3'h3][2:0]};	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:224:7, :382:24, :383:24
         lineCounter = _RANDOM[3'h3][18:3];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:224:7, :383:24, :384:28
         nCnt = {_RANDOM[3'h3][31:19], _RANDOM[3'h4][2:0]};	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:224:7, :383:24, :385:21
-        ostCredit = _RANDOM[3'h4][16:4];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:224:7, :385:21, :392:26
-        beatCnt = _RANDOM[3'h4][17];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:224:7, :385:21, :413:26
+        ostCredit = _RANDOM[3'h4][10:4];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:224:7, :385:21, :392:26
+        beatCnt = _RANDOM[3'h4][11];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:224:7, :385:21, :413:26
       `endif // RANDOMIZE_REG_INIT
     end // initial
     `ifdef FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:224:7

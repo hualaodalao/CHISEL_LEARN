@@ -177,10 +177,10 @@ object WorkerBeeElaborate extends App {
     clusterM = 2,         // totalN = 16
     aW = 16, bW = 16, cW = 40,
     supportedFmts = Set(DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1),
-    aBufferDepth = 2048,
-    bBufferDepth = 2048,
-    cBufferDepth = 2048,
-    scaleBufferDepth = 256
+    aBufferDepth = 32,
+    bBufferDepth = 32,
+    cBufferDepth = 32,
+    scaleBufferDepth = 32
   )
 
   // 【Phase 4 打通里程碑】MXFP4(E2M1) 发射配置：在 cfgMx 基础上追加 DataFormat.MXE2M1，
@@ -218,7 +218,7 @@ object WorkerBeeElaborate extends App {
   //   encodable values are only sel=0 -> 16 bytes and sel=1 -> 32 bytes (the
   //   former 4-level 8/16/32/64 enum was narrowed to 2 levels, so "=M64=3" no
   //   longer exists). The config layer has no such field; hasMx4 is opened
-  //   purely by supportedFmts containing MXE2M1.
+  //   purely by supportedFmts containing MXE2M1.“”
   // 【#155 MJ1：旧「关键约束·零扰动基线」契约已由用户主动作废】
   //   旧契约原文：「发往独立新目录 src/workerbee/verilog_mxfp4/，绝不覆盖 verilog/verilog_mx
   //   两套回归锚点；cfgBase/cfgMx 的 supportedFmts 未变（不含 MXE2M1 ⟹ hasMx4=false），
@@ -251,10 +251,10 @@ object WorkerBeeElaborate extends App {
     clusterM = 2,         // totalN = 16
     aW = 16, bW = 16, cW = 40,
     supportedFmts = Set(DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1),
-    aBufferDepth = 2048,
-    bBufferDepth = 2048,
-    cBufferDepth = 2048,
-    scaleBufferDepth = 256
+    aBufferDepth = 32,
+    bBufferDepth = 32,
+    cBufferDepth = 32,
+    scaleBufferDepth = 32
   )
 
   /** 单配置发射：清理目录 → 生成 RTL → 递归打包 zip。 */

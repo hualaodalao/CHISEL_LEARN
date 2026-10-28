@@ -8,10 +8,10 @@ module Wb_StreamFifo_3(	// src/utils/Stream/Stream.scala:361:7
   input         io_pop_ready,	// src/utils/Stream/Stream.scala:363:14
   output [31:0] io_pop_payload,	// src/utils/Stream/Stream.scala:363:14
   input         io_flush,	// src/utils/Stream/Stream.scala:363:14
-  output [8:0]  io_occupancy	// src/utils/Stream/Stream.scala:363:14
+  output [5:0]  io_occupancy	// src/utils/Stream/Stream.scala:363:14
 );
 
-  Wb_Queue256_UInt32 queue (	// src/utils/Stream/Stream.scala:371:21
+  Wb_Queue32_UInt32 queue (	// src/utils/Stream/Stream.scala:371:21
     .clock        (clock),
     .reset        (reset),
     .io_enq_valid (io_push_valid),

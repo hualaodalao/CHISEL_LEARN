@@ -62,18 +62,18 @@ module Wb_WorkerBeeExecutor2(	// src/workerbee/scala/main/WorkerBeeExecutor.scal
                  io_regFile_requantOn,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
                  io_calcConfig_isAX2,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
                  io_calcConfig_isBX2,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
-  input  [11:0]  io_aOccupancy,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
+  input  [5:0]   io_aOccupancy,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
   output         io_cStoreGate,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
                  io_cPeek,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
   input          io_cPeekDone,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
-  input  [11:0]  io_cOccupancy,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
+  input  [5:0]   io_cOccupancy,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
   input          io_aPop_valid,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
   output         io_aPop_ready,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
   input  [255:0] io_aPop_payload,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
   input          io_bPop_valid,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
   output         io_bPop_ready,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
   input  [255:0] io_bPop_payload,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
-  input  [11:0]  io_bOccupancy,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
+  input  [5:0]   io_bOccupancy,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
   output         io_cPop_ready,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
   input  [639:0] io_cPop_payload,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
   output         io_cPush_valid,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
@@ -88,7 +88,7 @@ module Wb_WorkerBeeExecutor2(	// src/workerbee/scala/main/WorkerBeeExecutor.scal
   input          io_scaleBPop_valid,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
   output         io_scaleBPop_ready,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
   input  [31:0]  io_scaleBPop_payload,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
-  input  [8:0]   io_scaleBOcc,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
+  input  [5:0]   io_scaleBOcc,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
   output [7:0]   io_wbScaleAIn_0,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
                  io_wbScaleAIn_1,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
                  io_wbScaleAIn_2,	// src/workerbee/scala/main/WorkerBeeExecutor.scala:40:14
@@ -396,16 +396,16 @@ module Wb_WorkerBeeExecutor2(	// src/workerbee/scala/main/WorkerBeeExecutor.scal
       rqMCnt <= 4'h0;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:308:54
     end
     else begin	// src/workerbee/scala/main/WorkerBeeExecutor.scala:38:7
-      automatic logic        _GEN_23;	// src/utils/Stream/Stream.scala:43:26
-      automatic logic        _GEN_24;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:300:55, :365:30, :366:33
-      automatic logic        _GEN_25;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:301:55, :365:30, :367:48, :368:24
-      automatic logic [3:0]  _GEN_26;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:367:48, :369:21, :371:21
-      automatic logic        _GEN_27;	// src/utils/Stream/Stream.scala:43:26
-      automatic logic        _GEN_28;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:307:54, :380:29, :382:47, :383:23
-      automatic logic [3:0]  _GEN_29;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:382:47, :384:20, :386:20
-      automatic logic        _GEN_30;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:365:30, :440:17, :728:30, :742:40
-      automatic logic        _GEN_31;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:380:29, :440:17, :728:30, :742:40
-      automatic logic [11:0] _GEN_32 = 12'h800 - io_cOccupancy;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:211:27
+      automatic logic       _GEN_23;	// src/utils/Stream/Stream.scala:43:26
+      automatic logic       _GEN_24;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:300:55, :365:30, :366:33
+      automatic logic       _GEN_25;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:301:55, :365:30, :367:48, :368:24
+      automatic logic [3:0] _GEN_26;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:367:48, :369:21, :371:21
+      automatic logic       _GEN_27;	// src/utils/Stream/Stream.scala:43:26
+      automatic logic       _GEN_28;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:307:54, :380:29, :382:47, :383:23
+      automatic logic [3:0] _GEN_29;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:382:47, :384:20, :386:20
+      automatic logic       _GEN_30;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:365:30, :440:17, :728:30, :742:40
+      automatic logic       _GEN_31;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:380:29, :440:17, :728:30, :742:40
+      automatic logic [5:0] _GEN_32 = 6'h20 - io_cOccupancy;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:38:7, :211:27
       _GEN_23 = io_biasIn_valid & io_biasIn_ready_0;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeExecutor.scala:364:46
       _GEN_24 = _GEN_23 & (&biasCnt);	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeExecutor.scala:300:55, :302:55, :365:30, :366:33
       _GEN_25 = _GEN_24 | biasLoaded;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:300:55, :301:55, :365:30, :366:33, :367:48, :368:24
@@ -435,7 +435,7 @@ module Wb_WorkerBeeExecutor2(	// src/workerbee/scala/main/WorkerBeeExecutor.scal
         automatic logic _GEN_34;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:786:50
         _GEN_33 = _GEN_13 | ~cStoreGateReg;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:165:29, :208:30, :728:{21,30}, :730:22, :742:{28,40}, :744:24
         _GEN_34 =
-          (|(io_bOccupancy[11:4])) & (~mxRunB_layerCapture | (|(io_scaleBOcc[8:4])));	// src/workerbee/scala/main/WbEnum.scala:9:69, src/workerbee/scala/main/WorkerBeeExecutor.scala:786:{34,50,54,62,82}
+          (|(io_bOccupancy[5:4])) & (~mxRunB_layerCapture | (|(io_scaleBOcc[5:4])));	// src/workerbee/scala/main/WbEnum.scala:9:69, src/workerbee/scala/main/WorkerBeeExecutor.scala:786:{34,50,54,62,82}
         if (_layerCapture_1) begin	// src/workerbee/scala/main/WorkerBeeExecutor.scala:440:17
           if (~_io_wbLoadW_T_layerCapture | (|tileInterCnt)) begin	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeExecutor.scala:141:22, :162:29, :590:26, :591:{27,35}
           end
@@ -498,7 +498,7 @@ module Wb_WorkerBeeExecutor2(	// src/workerbee/scala/main/WorkerBeeExecutor.scal
       cStoreGateReg <=
         ~_GEN_15 & _GEN_12 & ~_GEN_13 & ~cStoreGateReg | ~io_cPeekDone & cStoreGateReg;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:208:30, :219:21, :220:19, :440:17, :728:{21,30}, :742:{28,40}
       cStoreGateRegNxt <= cStoreGateReg;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:208:30, :209:33
-      cBufferReservedAtleastTotalN <= |(_GEN_32[11:4]);	// src/workerbee/scala/main/WorkerBeeExecutor.scala:210:45, :211:{27,43}
+      cBufferReservedAtleastTotalN <= |(_GEN_32[5:4]);	// src/workerbee/scala/main/WorkerBeeExecutor.scala:210:45, :211:{27,43}
       if (_GEN_23 & biasCnt == 4'h0)	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeExecutor.scala:300:55, :302:55, :365:30, :366:33
         biasRegs_0 <= io_biasIn_payload;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:300:55
       if (_GEN_23 & biasCnt == 4'h1)	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeExecutor.scala:300:55, :302:55, :365:30, :366:33
@@ -1028,6 +1028,6 @@ module Wb_WorkerBeeExecutor2(	// src/workerbee/scala/main/WorkerBeeExecutor.scal
   assign io_perf_stallB =
     state == 4'h1 & ~(io_bPop_valid & io_bPop_ready_0) | state == 4'h4 & hasNext
     & ~(|drainNextCnt)
-    & ~((|(io_bOccupancy[11:4])) & (~mxRunB_layerCapture | (|(io_scaleBOcc[8:4]))));	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WbEnum.scala:9:{58,69}, src/workerbee/scala/main/WorkerBeeExecutor.scala:38:7, :141:22, :165:29, :166:24, :406:18, :440:17, :541:21, :784:27, :786:{34,82}, :822:{36,52}, :823:{22,30,50}, :825:{28,40,43,58}, :826:{12,23,34,50,58,61}
+    & ~((|(io_bOccupancy[5:4])) & (~mxRunB_layerCapture | (|(io_scaleBOcc[5:4]))));	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WbEnum.scala:9:{58,69}, src/workerbee/scala/main/WorkerBeeExecutor.scala:38:7, :141:22, :165:29, :166:24, :406:18, :440:17, :541:21, :784:27, :786:{34,82}, :822:{36,52}, :823:{22,30,50}, :825:{28,40,43,58}, :826:{12,23,34,50,58,61}
 endmodule
 
