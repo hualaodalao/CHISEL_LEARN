@@ -1,6 +1,6 @@
 # Hive NPU Core 总体架构
 
-文档版本：`v0.14.0-draft`
+文档版本：`v0.16.0-draft`
 
 修订日期：`2026-10-28`
 
@@ -10,6 +10,8 @@
 
 | 版本号 | 日期 | 修改内容 |
 |---|---|---|
+| v0.16.0-draft | 2026-10-28 | P1-5收口为整个NPU区域独立电源与时钟域，支持独立调频和受控电源关断；补充域边界、正常切换与重新初始化，C024扩展POWER_OFF，新增C038/C039；78条有效AR，500 MHz及原服务门槛不变，不默认retention、独立调压或逐core电源域；P1-5正文人工确认闭环，切换与物理细项仍待冻结，P1-7详细PMU定义及P0-4/P0-7保持暂缓，不表示实现或验收通过 |
+| v0.15.0-draft | 2026-10-28 | P1-6编号/范围/追溯人工确认闭环，不提升目标AR状态，也不表示实现或验收通过；P1-3移除G0边缘端QoS有界服务，P1-2移除详细故障恢复/隔离架构要求，留实现阶段考虑；保留正常CDC/reset/clock-gating、反压响应正确性与基本前进性；76个AR及已批准服务指标不变，P0-4/P0-7保持暂缓，P1-5仅分析、待评审，不实施新clock/power表 |
 | v0.14.0-draft | 2026-10-28 | S表收敛为六条硬件限制对应的固件软件callout，撤销17个S编号并清理正文追溯；新增Qwen3.5-2B模型身份，名义范围扩至0.5B–2B，不冻结执行格式或新指标；原四模型门槛不变，P0-4/P0-7保持暂缓，本轮表述等待人工审查 |
 | v0.13.0-draft | 2026-10-27 | P1-6新增前置AR清单，C/H/S/P四表独立编号；正文与验收建立追溯，区分要求批准、实现和验收状态；P0-4/P0-7保持暂缓，不新增候选参数或PPA保证值 |
 | v0.12.0-draft | 2026-10-27 | P0-5/P0-6 文档评审闭环；批准语言模型与双YOLO的服务/质量门槛及测量口径，规范值落入12.8；容量、算子与服务证据作为后续实施验收交付物，不宣称已实测通过；P0-7开始执行方案分析 |
@@ -60,6 +62,7 @@
 |---|---|
 | NPU core | 单个独立调度、计算和本地存储单元 |
 | NPU cluster | 共享系统互联、同步单元和 DRAM 的多个 NPU core |
+| NPU区域 | 所有NPU cores及NPU侧互联、同步资源组成的电源/时钟管理区域；不包含main CPU、SoC system interconnect和DRAM子系统 |
 | GEMM | 矩阵计算单元，包括私有缓冲、阵列、输出处理和本地读写端口 |
 | scheduler | core 内由 local CPU 使用的硬件命令派发、依赖跟踪、完成和事件管理单元，仅管理 GEMM/DMA，不管理 VPU |
 | 软件任务管理（Queen） | 主 CPU 与 NPU 间的任务编排、软件队列和任务完成管理；不等于 core 内硬件 scheduler |
@@ -98,7 +101,7 @@ AR（Architecture Requirement）使用 `AR-HIVE-Cxxx`、`AR-HIVE-Hxxx`、`AR-HIV
 - 清单是AR规范条目的入口，正文按同一编号展开范围、条件、原理与验收，不另建同义要求；重复展示的数值必须一致，发现冲突须审查修正。
 - “已批准”只表示要求获批；“目标”仍需人工评审，编号本身不提升状态。已批准要求中的接口/数值细项仍按标注的阶段门冻结。
 - 实现状态由第13.1节及责任规格记录，验收状态由第14章的证据记录维护；本次编号不宣称任何AR已经实现或通过测试。
-- 当前未冻结的macro、在途深度、4266 MT/s、汇聚拓扑与PPA数值仍留在候选/待确认清单，不转成已批准保证值。P0-4/P0-7保持暂缓，错误恢复本轮不新增批准AR。
+- 当前未冻结的macro、在途深度、4266 MT/s、汇聚拓扑与PPA数值仍留在候选/待确认清单，不转成已批准保证值。P0-4/P0-7保持暂缓；G0边缘端QoS有界服务及详细故障恢复/隔离移出当前架构范围，后者留实现阶段考虑，不作为冻结或正式签核前置，不新增错误AR。正常CDC/reset、基本前进性与反压响应正确性保留；P1-5已批准NPU区域独立电源、独立调频与受控断电方向，正常切换及物理实现细项仍按第10章冻结。
 - AR不同于模块Feature ID和P0/P1/P2审查问题编号；责任规格后续须逐项列出“满足的AR、实现位置、测试/证据及结论”。正文引用可直接跳转至清单行。
 
 #### 1.5.2 C类：芯片硬件设计要求
@@ -128,20 +131,22 @@ AR（Architecture Requirement）使用 `AR-HIVE-Cxxx`、`AR-HIVE-Hxxx`、`AR-HIV
 | <a id="ar-hive-c021"></a>**AR-HIVE-C021** | main CPU与NPU应采用非一致AXI访问，不依赖硬件snoop。 | G0／G0 Pro | 已批准；一致性契约暂缓 | SoC／内存接口规格 | §8.3／§14.2 |
 | <a id="ar-hive-c022"></a>**AR-HIVE-C022** | 每core应配套独立的256-bit等效VPU执行能力，目标500 MHz，支持FP32/FP16，由local CPU直接控制。 | G0／G0 Pro | 已批准；仓库外实现待确认 | local CPU／VPU规格 | §4.4、§12.7.1／§14.3 |
 | <a id="ar-hive-c023"></a>**AR-HIVE-C023** | 每core VPU应具有独立1×256-bit local请求口，读写合计每拍最多一请求。 | G0／G0 Pro | 已批准；返回/在途细项待冻结 | VPU／本地adapter规格 | §9.1、§12.7.1／§12.7.4、§14.3 |
-| <a id="ar-hive-c024"></a>**AR-HIVE-C024** | 基础电源状态应支持RUN、IDLE、CLOCK_GATED，不依赖power gating、retention或DVFS。 | G0／G0 Pro | 已批准；生命周期待冻结 | 时钟／电源规格 | §10.3／§14.2 |
+| <a id="ar-hive-c024"></a>**AR-HIVE-C024** | NPU区域应支持RUN、IDLE、CLOCK_GATED和POWER_OFF；POWER_OFF不保证内部状态保持，不依赖专用retention或独立调压。 | G0／G0 Pro | 已批准状态集合；切换细项待冻结 | 时钟／电源规格 | §10.3／§14.2 |
 | <a id="ar-hive-c025"></a>**AR-HIVE-C025** | local interconnect应按bank路由与仲裁，允许不同banks的无冲突请求同拍推进。 | G0／G0 Pro | 目标 | 本地互联规格 | §6.1／§14.2 |
 | <a id="ar-hive-c026"></a>**AR-HIVE-C026** | 桥接/互联应保持请求源及返回归属，按返回容量限制在途请求，反压时不丢失已接受事务的响应。 | G0／G0 Pro | 目标；接口协议暂缓 | DMA／互联／VPU adapter规格 | §6.2–6.3、§12.7.3／§14.2 |
 | <a id="ar-hive-c027"></a>**AR-HIVE-C027** | peer SRAM访问应经受范围约束的window路由，并参加目标core的local bank仲裁。 | G0／G0 Pro | 目标；接口协议暂缓 | peer／本地互联规格 | §6.4、§9.3／§14.2 |
-| <a id="ar-hive-c028"></a>**AR-HIVE-C028** | 仲裁与流控应保证有限背压下各主设备前进，不让响应排空依赖获取已耗尽的新请求credit。 | G0／G0 Pro | 目标；有界服务待冻结 | 互联／QoS规格 | §6.1、§6.5、§12.7.3／§14.2 |
-| <a id="ar-hive-c029"></a>**AR-HIVE-C029** | 跨域接口应成套处理地址/数据/响应与复位，IRQ/event跨域不得丢失通知。 | G0／G0 Pro | 目标；域划分待冻结 | CDC／reset规格 | §10.1／§14.2 |
-| <a id="ar-hive-c030"></a>**AR-HIVE-C030** | 正常clock-gating前应停止新提交，确认CPU/VPU阶段安全并排空GEMM/DMA、peer/AXI事务及返回队列；唤醒路径应先于访问接收建立。 | G0／G0 Pro | 目标；生命周期待冻结 | 时钟／电源／core集成规格 | §10.2–10.3／§14.2 |
+| <a id="ar-hive-c028"></a>**AR-HIVE-C028** | 仲裁与流控应保证有限背压下各主设备前进，不让响应排空依赖获取已耗尽的新请求credit。 | G0／G0 Pro | 目标；仅正常前进性 | 互联／流控规格 | §6.1、§6.5、§12.7.3／§14.2 |
+| <a id="ar-hive-c029"></a>**AR-HIVE-C029** | 跨域接口应成套处理地址/数据/响应与复位，IRQ/event跨域不得丢失通知。 | G0／G0 Pro | 目标；CDC/reset组织待冻结 | CDC／reset规格 | §10.1／§14.2 |
+| <a id="ar-hive-c030"></a>**AR-HIVE-C030** | 正常停钟、调频或断电前应停止新任务提交并完成既有工作，确认CPU/VPU阶段安全并排空GEMM/DMA、peer/AXI事务及返回队列；恢复供电/时钟并满足必要初始化后才重新接受访问。 | G0／G0 Pro | 已批准正常切换要求；协议细项待冻结 | 时钟／电源／core集成规格 | §10.2–10.3／§14.2 |
 | <a id="ar-hive-c031"></a>**AR-HIVE-C031** | GEMM local offset桥接应进行窗口译码和范围检查，不截断40-bit系统地址伪装成本地合法地址。 | G0／G0 Pro | 目标；地址映射待冻结 | 地址窗口／桥接规格 | §8.1／§14.2 |
 | <a id="ar-hive-c032"></a>**AR-HIVE-C032** | 系统应定义CSR/debug访问许可及地址window保护边界，不宣称已有多租户/IOMMU隔离。 | G0／G0 Pro | 目标；保护契约待冻结 | SoC保护／debug规格 | §11.2／§14.2 |
-| <a id="ar-hive-c033"></a>**AR-HIVE-C033** | PMU应覆盖GEMM阶段、DMA字节/在途、bank冲突、AXI反压及依赖等待，并明确计数、溢出、清零和snapshot语义。 | G0／G0 Pro | 目标；事件/时间基准待冻结 | PMU规格 | §11.3／§14.3 |
+| <a id="ar-hive-c033"></a>**AR-HIVE-C033** | PMU应覆盖GEMM阶段、DMA字节/在途、bank冲突、AXI反压及依赖等待，并明确计数、溢出、清零和snapshot语义。 | G0／G0 Pro | 目标；P1-7暂缓，详细事件/时间基准未冻结 | PMU规格 | §11.3／§14.3 |
 | <a id="ar-hive-c034"></a>**AR-HIVE-C034** | VPU应支持FP32/FP16 add、mul、FMA、比较与选择；FMA仅在最终结果舍入。 | G0／G0 Pro | 已批准；数值细项待冻结 | VPU算术规格 | §12.7.2／§12.7.4、§14.3 |
 | <a id="ar-hive-c035"></a>**AR-HIVE-C035** | VPU应支持FP16↔FP32转换及FP16输入转换后以FP32累加/归约，不要求原生混合FMA。 | G0／G0 Pro | 已批准；转换细项待冻结 | VPU算术规格 | §12.7.2／§12.7.4、§14.3 |
 | <a id="ar-hive-c036"></a>**AR-HIVE-C036** | VPU应支持sum/max及mask/tail，无效元素不得更新结果、参与归约或产生越界访问。 | G0／G0 Pro | 已批准；归约误差待冻结 | VPU算术／访存规格 | §12.7.2／§12.7.4、§14.3 |
-| <a id="ar-hive-c037"></a>**AR-HIVE-C037** | VPU数值契约应明确舍入、NaN/Inf、subnormal、signed zero及异常可见性，不能仅以格式支持判定通过。 | G0／G0 Pro | 已批准要求；数值细项待冻结，错误协议暂缓 | VPU数值规格 | §12.7.2／§12.7.4、§14.3 |
+| <a id="ar-hive-c037"></a>**AR-HIVE-C037** | VPU数值契约应明确舍入、NaN/Inf、subnormal、signed zero及异常可见性，不能仅以格式支持判定通过。 | G0／G0 Pro | 已批准要求；数值细项待冻结 | VPU数值规格 | §12.7.2／§12.7.4、§14.3 |
+| <a id="ar-hive-c038"></a>**AR-HIVE-C038** | 整个NPU区域应具有独立于main CPU、系统互联及DRAM子系统的可关断电源域；断电控制与边界隔离须在域外可用，不以引擎clock-gating替代电源关断。 | G0／G0 Pro | 已批准能力；电气边界/时序待冻结 | SoC电源域／NPU集成规格 | §2.2、§10.1–10.3／§14.2 |
+| <a id="ar-hive-c039"></a>**AR-HIVE-C039** | NPU区域应具有独立时钟域并支持运行频率调整，不要求主CPU、system或DRAM时钟随之改变；500 MHz仍为原SKU与服务验收基准，停钟不替代调频。 | G0／G0 Pro | 已批准能力；频点/切换细项待冻结 | SoC时钟／CDC规格 | §2.2、§10.1–10.2／§14.2–14.3 |
 
 #### 1.5.3 H类：封装／板卡硬件设计要求
 
@@ -167,7 +172,7 @@ AR（Architecture Requirement）使用 `AR-HIVE-Cxxx`、`AR-HIVE-Hxxx`、`AR-HIV
 | <a id="ar-hive-s018"></a>**AR-HIVE-S018** | GEMM不支持外部partial-sum输入，独立K子命令不能自动续接前一命令的累加结果。 | 需要拆K为独立子命令时，应组织VPU或软件显式累加FP32输出；不得仅拼接命令假定完成完整K归约。 | G0／G0 Pro | 已批准约束；实施待验证 | 固件／FP32累加控制规格 | §12.2／§14.3 |
 | <a id="ar-hive-s022"></a>**AR-HIVE-S022** | VPU基线不强制提供exp、reciprocal、rsqrt专用硬件，FMA峰值不能代表其服务能力。 | 未由硬件提供时，应以向量软件补齐所需函数，并满足冻结的输入域、误差和服务时间要求。 | G0／G0 Pro | 已批准要求；数值/服务细项待冻结 | 固件／VPU函数规格 | §4.4、§12.7.2、§12.7.4／§14.3 |
 
-撤销记录（v0.14.0-draft）：S001–S002、S005、S008–S017、S019–S021、S023共17个编号退出有效清单，不复用。原条目属于软件组织、工作负载/部署或验收事项；硬件控制边界与既有验收要求保留在对应正文及C/P类，不因撤销S编号而改变批准内容。S003/S004/S006/S007/S018/S022保留原号并收窄为上述硬件callout；本轮表述等待人工审查。
+撤销记录（v0.14.0-draft）：S001–S002、S005、S008–S017、S019–S021、S023共17个编号退出有效清单，不复用。原条目属于软件组织、工作负载/部署或验收事项；硬件控制边界与既有验收要求保留在对应正文及C/P类，不因撤销S编号而改变批准内容。S003/S004/S006/S007/S018/S022保留原号并收窄为上述硬件callout；2026-10-28 P1-6编号/范围/追溯人工确认闭环，不提升目标AR状态，也不表示实现或验收通过。
 
 #### 1.5.5 P类：性能与质量验收要求
 
@@ -262,7 +267,8 @@ Qwen3.5-2B 的执行精度、量化方案、算子映射、状态组织与访存
 | main CPU coherence：[C021](#ar-hive-c021)、[S007](#ar-hive-s007) | 非一致 AXI，固件/软件显式 cache 维护及提交/完成屏障 | 同 G0 | 不依赖硬件 snoop；非一致维护责任保留，所有权、映射与屏障协议暂缓，不定义具体软件 API |
 | CSR／IRQ：[C018](#ar-hive-c018)、[C019](#ar-hive-c019) | AXI4-Lite 32-bit；local/main CPU 分路 level IRQ | 同 G0 | 粘滞状态与 mask/clear；寄存器与事务细项待冻结 |
 | 同步单元：[C020](#ar-hive-c020) | cluster 独立共享；READ/WRITE/FETCH_ADD | 同 G0 | 不承载 tensor，容量与原子协议见候选表 |
-| 基础电源状态：[C024](#ar-hive-c024) | RUN、IDLE、CLOCK_GATED | 同 G0 | CDC、唤醒和进入/退出条件仍须生命周期规格 |
+| NPU电源／时钟域：[C038](#ar-hive-c038)、[C039](#ar-hive-c039) | 整个NPU区域独立可关断电源域、独立可调频时钟域 | 同 G0，覆盖全部四核 | 不要求main CPU/system/DRAM随之切换；域外控制、CDC及断电边界隔离见第10章 |
+| 基础电源状态：[C024](#ar-hive-c024)、[C030](#ar-hive-c030) | RUN、IDLE、CLOCK_GATED、POWER_OFF | 同 G0 | POWER_OFF不保证内部状态保持；正常排空、切换和重新初始化细项待冻结 |
 
 local CPU/VPU 均集成于 core 内，其微架构由仓库外实现提供。两 SKU 复用同一 core RTL 和接口；SRAM 深度不同，不能据此承诺复用同一硬 macro 或 floorplan。application CPU 不随 NPU core 数机械翻倍。
 
@@ -273,11 +279,12 @@ local CPU/VPU 均集成于 core 内，其微架构由仓库外实现提供。两
 | 项目 | 批准评估候选 | 唯一值冻结条件 |
 |---|---|---|
 | SRAM macro/端口 | 优先 1RW；G0 每 bank 2048 × 256 bit，Pro 4096 × 256 bit 的逻辑组织 | 接口/库冻结前确认 macro 拼接、byte-write/ECC 路径；物理冻结前通过 500 MHz 时序与竞争测试 |
-| DMA read outstanding | 每 engine 四个 burst 起步；满 burst 合计 8 KiB 返回容量预留 | 接口冻结前定义返回关联、credit 和错误；性能冻结前按延迟分布、排队与并发流量确定深度和物理缓冲组织 |
+| DMA read outstanding | 每 engine 四个 burst 起步；满 burst 合计 8 KiB 返回容量预留 | 接口冻结前定义返回关联、credit 与反压；性能冻结前按延迟分布、排队与并发流量确定深度和物理缓冲组织 |
 | DMA write outstanding | 每 engine 四个 burst 起步 | 接口冻结前确认响应归属；性能冻结前测量同 logical transfer 内重叠与 transfer 边界停顿，不等同于四份完整写数据缓冲 |
 | DRAM 方向汇聚 | G0 256-bit @ 500 MHz；Pro 512-bit @ 500 MHz 或匹配 controller 的两路 256-bit | 接口冻结前选定拓扑与 system clock；性能冻结前计入 peer、控制和其他 SoC 主设备，验证有效 payload |
 | LPDDR4x 速率 | 4266 MT/s 目标 | controller/PHY 与板级选型冻结前确认支持；物理/板级验证通过后才发布可保证速率 |
-| core 时钟组织 | GEMM/DMA/scheduler/local interconnect/SRAM 优先同域 500 MHz | 接口冻结前明确 CDC/reset；物理冻结前验证全部单元时序，system/PHY 频率独立确定 |
+| NPU内部时钟组织 | local CPU/VPU/GEMM/DMA/scheduler/互联/SRAM/同步资源优先共域或同源派生；500 MHz为验收基准 | 区域独立调频是MUST，内部组织、支持频点/范围及正常切换协议仍待冻结；物理阶段验证时序，system/PHY频率独立确定 |
+| NPU电源切换实现 | 整体受控断电，域外电源/时钟/reset及边界管理保持可用 | 独立可关断域是MUST；接口/电源规格冻结控制握手、隔离边界及上电初始化，电气时序与单元选择由后续物理阶段验证 |
 | 同步状态 | 64 × 32-bit 状态 | 接口冻结前由 runtime 的同时活跃 barrier/event 数确认容量、访问与回收规则 |
 | SRAM ECC | 不承诺基线 ECC；是否采用 SECDED 及粒度单独决策 | 库/可靠性冻结前明确校验位、部分写 RMW、恢复与面积；未选择实现前不得发布完整性保证 |
 
@@ -286,7 +293,7 @@ local CPU/VPU 均集成于 core 内，其微架构由仓库外实现提供。两
 #### 2.2.3 非基线能力
 
 - NPU LLC、cluster 共享 tensor SRAM、HBM/3D DRAM、跨 core K 维 partial-sum 归约、多租户/抢占、专用 event link 不属于基础交付能力；不得形成基线依赖。
-- 16-bank/1R1W、扩大 GEMM buffer、cluster 共享 VPU、硬件 main CPU coherence、APB/MSI、SWAP/CAS、power gating/retention/DVFS 均需单独变更决策，不是可任意切换的已批准配置。
+- 16-bank/1R1W、扩大 GEMM buffer、cluster 共享 VPU、硬件 main CPU coherence、APB/MSI、SWAP/CAS、专用retention、独立调压/DVFS及逐core独立电源/调频域均需单独变更决策，不是可任意切换的已批准配置；不包含已批准的区域级独立调频与受控电源关断。
 - 2 GiB G0、16 GiB Pro 属于非基线装配选项；本方案按 G0 4 GiB、Pro 8 GiB 验证。Pro 扩至 16 GiB 须另行验证 controller/PHY、器件密度、rank、地址映射和板级装配；容量增加不提高 x64 数据位宽或持续带宽。
 
 ### 2.3 GEMM 各精度算力与 SKU 口径
@@ -323,7 +330,7 @@ main CPU / software Queen --- task submission / completion / CSR / IRQ
           v
 +------------------------------------------------------------------+
 |                      System interconnect                         |
-|        independent core ingress + peer routing + QoS             |
+|        independent core ingress + peer routing + arbitration     |
 +---------+----------------+-----------------+----------------+-----+
           |                |                 |                |
      +----v-----+     +----v-----+   +--------v-------+  +-----v-----+
@@ -385,7 +392,7 @@ local CPU/VPU 均在 core 内，实现来自仓库之外；图中的边界不是
 | DMA | DRAM/local/peer 数据搬运与布局变换 | 不替代 scheduler 的跨引擎依赖管理 |
 | scheduler | 接受 local CPU 的 GEMM/DMA 命令，管理依赖、派发、同步资源及引擎完成 | 不管理 VPU，不承担主 CPU 与 NPU 之间的任务队列 |
 | local SRAM + local interconnect | 本地数据存放、路由、冲突仲裁与返回 | 不自动推断 tensor 生命周期 |
-| system interconnect | DRAM/peer 访问、共享流量和 QoS | 不自动保证 main CPU 私有 cache 一致性 |
+| system interconnect | DRAM/peer 访问与共享访问仲裁 | 不自动保证 main CPU 私有 cache 一致性 |
 | synchronization unit | 共享同步状态和原子操作序列化 | 不存储 tensor，不代替数据写完成和 fence |
 | local CPU | 执行软件 Queen 提交的任务，控制 scheduler 的 GEMM/DMA 命令和同步，直接管理 VPU，协调阶段完成 | 不替代系统软件任务编排；微架构实现来自仓库之外 |
 | VPU | core 内 CPU 挂接的向量 DSA，执行 local CPU 发出的向量指令/操作并向 local CPU 提供完成观察 | 不接受 scheduler 派发，不管理系统任务队列；实现来自仓库之外 |
@@ -503,13 +510,13 @@ local SRAM 是 scratchpad，不用“L1 cache 命中率”描述其性能。数�
 
 ### 6.1 Local interconnect
 
-关联AR：[AR-HIVE-C025](#ar-hive-c025)、[AR-HIVE-C028](#ar-hive-c028)。bank并行与仲裁前进性分别验证，有界服务参数仍待冻结。
+关联AR：[AR-HIVE-C025](#ar-hive-c025)、[AR-HIVE-C028](#ar-hive-c028)。bank并行与基本正常前进性分别验证；本架构不定义QoS数值，不设最小服务率、配额或最大等待上界。
 
 **目标：** 按 bank 路由、每 bank 仲裁；对不同 banks 的无冲突请求允许同拍推进。
 
 架构请求含 byte address、read/write、data、byte enable 和 source/return routing 信息；内部序号和具体 Bundle 留给接口规格。GEMM 小数据口、CPU 窄口和 256-bit 主数据口通过 adapter 访问。
 
-仲裁建议：`GEMM > VPU > DMA > CPU/debug`，但 DMA 进度决定下一批输入是否到达，因此必须加入 age boost 或最小配额，避免计算优先策略使搬运永久饥饿。
+仲裁实现由互联规格选择；有限背压解除后，各主设备应正常推进，不因计算优先而阻断DMA供数。架构不冻结优先级、配额或等待上界。
 
 ### 6.2 DMA 两侧地址路由
 
@@ -547,7 +554,7 @@ DMA 的读请求和写请求分别译码：
 
 关联AR：[AR-HIVE-C017](#ar-hive-c017)、[AR-HIVE-C027](#ar-hive-c027)。core接口宽度不等于DRAM汇聚拓扑或持续带宽保证。
 
-**批准基线（MUST）：** 每 core 独立 256-bit AXI4 ingress，40-bit 地址。DRAM、peer SRAM 和独立同步单元路由，以及权重/KV/控制流量 QoS 为目标；具体 AXI profile 与顺序域仍待接口冻结。
+**批准基线（MUST）：** 每 core 独立 256-bit AXI4 ingress，40-bit 地址。DRAM、peer SRAM 和独立同步单元路由为目标；具体 AXI profile 与顺序域仍待接口冻结。
 
 256-bit 接口在 500 MHz 下单向数据峰值为 16 GB/s；G0 两核/G0 Pro 四核独立入口峰值总和为 32/64 GB/s，不代表 DRAM 持续带宽。system clock 尚未冻结，不与 GEMM 频率自动绑定。
 
@@ -557,15 +564,15 @@ DMA 的读请求和写请求分别译码：
 
 ### 6.5 前进性与死锁约束
 
-关联AR：[AR-HIVE-C028](#ar-hive-c028)。以下是前进性约束展开，不用标准AXI协议名称代替竞争场景的验证证据。
+关联AR：[AR-HIVE-C028](#ar-hive-c028)。以下仅展开正常运行的基本前进性及响应排空无credit死锁约束，不定义QoS有界服务；不用标准AXI协议名称代替竞争场景的验证证据。
 
 **目标：**
 
 - 响应排空不依赖提交新命令或获取同一被占满队列的 credit；
 - 发起 burst 前可用 credit 与返回 buffer 容量相符；
-- 地址接受后即使计算暂停也能返回响应或上报错误；
+- 正常运行中，计算暂停不阻塞已接受访问的响应；
 - peer copy 不同时长期锁住两端 SRAM 资源；
-- 仲裁公平性和有限背压下的前进性需要系统级验证，不以“标准 AXI”替代证明。
+- 有限背压解除后的正常前进性及响应排空无credit死锁需要系统级验证，不定义QoS有界服务，不以“标准 AXI”替代证明。
 
 ## 7. 执行与编程模型
 
@@ -591,7 +598,7 @@ DMA 的读请求和写请求分别译码：
 
 **目标 scheduler：** 管理 slot、依赖、adapter 派发及同步资源；允许互不依赖的计算与搬运跨周期并行。GEMM/DMA 完成后通过同步接口更新 scheduler 内指定的同步资源，再解除对应依赖；架构完成模型不以当前模块是否携带命令 ID 为前提。
 
-VPU 指令/控制由 local CPU 直接送往 core 内 VPU，VPU 可视为 CPU 挂接的 DSA。scheduler 不接受 VPU launch，也不管理 VPU 命令或完成关联。local CPU 观察 GEMM/DMA 所需同步完成后才能启动依赖其结果的 VPU 操作，并在 VPU 结果对后继消费者可见后提交后继 GEMM/DMA 命令；同步观察与直接 VPU 接口细项待冻结，错误协议留待后续专题。
+VPU 指令/控制由 local CPU 直接送往 core 内 VPU，VPU 可视为 CPU 挂接的 DSA。scheduler 不接受 VPU launch，也不管理 VPU 命令或完成关联。local CPU 观察 GEMM/DMA 所需同步完成后才能启动依赖其结果的 VPU 操作，并在 VPU 结果对后继消费者可见后提交后继 GEMM/DMA 命令；同步观察与直接 VPU 接口细项待冻结，错误处理留实现阶段考虑，不作为当前架构冻结前置。
 
 模块 tag 用于软件主动插入的 tracing/profiling 标记；trace 落到内存后由软件重建运行时 timeline。tracing tag、scheduler 同步资源和总线 transaction ID 分开管理，不以 tracing tag 作为完成或依赖匹配依据。
 
@@ -607,7 +614,7 @@ FREE -> PRODUCER_WRITING -> READY -> CONSUMER_READING -> FREE
 
 - 输入区 READY 前，消费者不得读；
 - GEMM 完成读之前，DMA 不得覆盖输入；
-- 输出写入可见并完成错误检查后，VPU/peer/main CPU 才能消费；
+- 输出写入满足响应完成与可见性条件后，VPU/peer/main CPU 才能消费；
 - buffer 双缓冲切换以完成依赖为依据，不按估计周期或仅 busy=0 推断；
 - 不假定 DMA 内部 hazard 检查覆盖 CPU/VPU/GEMM/peer 的外部访问。
 
@@ -617,7 +624,7 @@ FREE -> PRODUCER_WRITING -> READY -> CONSUMER_READING -> FREE
 
 scheduler 同步资源采用 sync event、sync timeline 等机制，具体类型、数量、更新/等待语义和回收规则待接口规格确认。同步 timeline 表达执行依赖，不是软件根据 trace 重建的 profiling timeline；scheduler 内同步资源与第 8.4 节 cluster 共享原子同步空间也不能默认混为一体。
 
-`WAIT_EVENT`、`SIGNAL_EVENT`、`POLL_EQ` 和 atomic RMW 为目标能力；具体指令编码待确认。event 只解除已定义的依赖，不能隐式完成 CPU cache 维护。软件任务完成由 local CPU 与主 CPU 上的软件 Queen 协作管理，发布/观察协议见第 9.2 节，错误完成协议暂不在本轮冻结。
+`WAIT_EVENT`、`SIGNAL_EVENT`、`POLL_EQ` 和 atomic RMW 为目标能力；具体指令编码待确认。event 只解除已定义的依赖，不能隐式完成 CPU cache 维护。软件任务完成由 local CPU 与主 CPU 上的软件 Queen 协作管理，发布/观察协议见第 9.2 节；错误完成处理留实现阶段考虑，不作为当前架构冻结前置。
 
 完整端到端任务示例见第 14.1 节。
 
@@ -689,9 +696,9 @@ local CPU/VPU 来自仓库之外，但以下均是 core 内部集成接口，不
 |---|---|---|
 | 引擎命令与同步观察 | local CPU↔scheduler | custom request/response、GEMM/DMA同步资源；完整事务语义待实现 |
 | VPU直接控制 | local CPU↔VPU | 指令/控制、背压、完成观察；不经过scheduler，细项待仓库外实现接口确认 |
-| VPU本地数据 | VPU↔local interconnect | 1×256-bit local request，读写合计每拍最多一请求；返回顺序、在途与服务配额见12.7 |
+| VPU本地数据 | VPU↔local interconnect | 1×256-bit local request，读写合计每拍最多一请求；返回顺序、在途与反压见12.7 |
 
-AXI ID、最大 burst、在途数、QoS、错误响应、CDC 与顺序域在接口规格中逐项冻结，不因采用标准协议就默认支持完整 AXI 功能集。
+AXI ID、最大 burst、在途数、CDC 与顺序域在接口规格中逐项冻结，不因采用标准协议就默认支持完整 AXI 功能集。基本AXI错误响应编码若模块实现需要，由接口实现规格处理，不新增错误AR，也不将详细故障恢复列为基线集成前置。
 
 ### 9.2 主控 CPU 任务提交与完成
 
@@ -705,7 +712,7 @@ AXI ID、最大 burst、在途数、QoS、错误响应、CDC 与顺序域在接�
 | core内local CPU | 接收并执行任务，提交GEMM/DMA命令，直接控制VPU，观察各阶段完成并发布任务完成 | 不把VPU交给scheduler派发，不按单个引擎busy下降推断完整任务完成 |
 | core内scheduler | 管理local CPU提交的GEMM/DMA命令、依赖和同步资源，汇总引擎完成 | 不取软件任务队列，不管理VPU或主CPU任务队列 |
 
-软件 Queen 的内部队列布局不属于硬件架构 ABI。主CPU↔local CPU任务接收、反压、通知、任务参数/完成记录的发布顺序，以及local CPU↔scheduler命令接受和同步资源生命周期仍须形成接口契约；本轮只确认层次和所有权，不冻结SQ/CQ编码、固定entry大小、fence/drain、原子或错误协议。硬件ring/fetcher/completion writer不是批准基线；引入须单独变更评审。
+软件 Queen 的内部队列布局不属于硬件架构 ABI。主CPU↔local CPU任务接收、反压、通知、任务参数/完成记录的发布顺序，以及local CPU↔scheduler命令接受和同步资源生命周期仍须形成接口契约；本轮只确认层次和所有权，不冻结SQ/CQ编码、固定entry大小、fence/drain或原子协议。错误处理留实现阶段考虑，不作为当前架构冻结前置。硬件ring/fetcher/completion writer不是批准基线；引入须单独变更评审。
 
 完成中断采用粘滞状态 + mask/clear，local CPU 与 main CPU 分别路由。level IRQ 为批准基线；MSI 非基线，不能作为完成通知依赖。
 
@@ -727,39 +734,56 @@ barrier 使用共享同步空间中的 atomic RMW + poll，前提是 atomic 与 
 
 ### 10.1 时钟域与 CDC
 
-关联AR：[AR-HIVE-C004](#ar-hive-c004)、[AR-HIVE-C029](#ar-hive-c029)。GEMM频率要求不等于全部单元共域获批，CDC/reset组织仍按生命周期规格确认。
+关联AR：[AR-HIVE-C004](#ar-hive-c004)、[AR-HIVE-C029](#ar-hive-c029)、[AR-HIVE-C038](#ar-hive-c038)、[AR-HIVE-C039](#ar-hive-c039)。P1-5收口为区域级独立电源与时钟域，不以空闲执行引擎clock-gating替代独立调频或电源关断。
 
-GEMM 的 G0 两核/G0 Pro 四核 SKU 均以批准的 500 MHz 为目标。**候选组织：** scheduler、GEMM、DMA、local interconnect 和 SRAM 优先处于同一 500 MHz core clock，非 GEMM 单元的共域方案仍需集成与物理确认。system interconnect、DRAM controller 与 LPDDR4x PHY 可使用独立时钟，system 500 MHz 候选不限制 controller/PHY 频率；接口冻结前明确域划分与比例。
+**批准基线（MUST）：** 整个NPU区域具有独立可关断电源域和独立可调频时钟域；NPU调频、停钟和断电不要求main CPU、SoC system interconnect或DRAM子系统执行相同切换。两SKU均按以下区域边界集成，不要求逐core设置独立电源或调频域。
 
-AXI bridge 跨域需成套处理地址、数据、响应及在途归属；异步 FIFO 必须配合 reset/flush 策略。IRQ/event 使用不会丢失通知的跨域机制，不能直接采样单拍脉冲。
+| 区域 | 包含单元 | 电源／时钟边界 |
+|---|---|---|
+| NPU域内 | 所有cores的local CPU、VPU、GEMM、DMA、scheduler、local SRAM，以及NPU侧互联和共享同步资源 | 整体支持独立调频、停钟和受控断电；内部共域／派生时钟组织待冻结 |
+| NPU域外 | main CPU、SoC system interconnect、DRAM controller/PHY及LPDDR4x存储 | 不随NPU断电而关断；各自时钟与供电由SoC定义 |
+| 域外边界管理 | NPU电源/时钟控制、reset控制、访问入口控制及电源边界隔离/唤醒路径 | NPU停钟或断电时仍可用；不得依赖已停钟的local CPU或已断电的NPU CSR完成唤醒 |
+
+**时钟要求：** NPU运行频率可独立调整，不能仅提供clock gate；批准的500 MHz仍为G0/G0 Pro原SKU峰值与服务验收基准，不因调频能力提高算力口径或降低原门槛。调频不自动包含独立电压调节或DVFS。支持频点/范围、时钟源与切换时间须由时钟/接口及物理规格冻结，本节不虚构频率档位或延迟。
+
+**候选组织：** local CPU、VPU、scheduler、GEMM、DMA、local interconnect、SRAM及共享同步资源优先采用共同NPU时钟或同源派生时钟，内部组织仍需集成与物理确认。system interconnect、DRAM controller与LPDDR4x PHY时钟独立确定；system 500 MHz候选不限制controller/PHY频率。
+
+AXI bridge跨域需成套处理地址、数据、响应及在途归属；异步FIFO的reset与两侧状态必须一致，正常切换不得用flush丢弃已接受事务。IRQ/event使用不会丢失通知的跨域机制，不能直接采样单拍脉冲；频率变化、停钟和断电边界须同时覆盖控制与数据路径。
 
 ### 10.2 复位与任务排空
 
-**目标：** reset 同步释放，初始化完成前停止接受新任务。正常停止先停止新提交，再 drain 在途访问，最后关闭 clock。
+关联AR：[AR-HIVE-C029](#ar-hive-c029)、[AR-HIVE-C030](#ar-hive-c030)、[AR-HIVE-C038](#ar-hive-c038)、[AR-HIVE-C039](#ar-hive-c039)。本节只定义初始化与正常域切换的约束，具体握手及顺序协议仍须冻结。
 
-**待确认：** core 局部复位时已经被系统接受的事务怎样完成或标错；peer 正在读写 SRAM 时如何隔离。复位不承诺撤销外部已接受写或回滚部分结果。
+**初始化：** 上电后先确认供电和时钟稳定，reset在对应时钟域同步释放；local CPU及控制/同步状态完成初始化、必要数据显式装载后才允许任务执行。NPU重新上电按重新初始化处理，不假定透明续跑断电前任务。
+
+**正常静止点：** 先停止新任务提交及无关外部/peer新访问，保留已有任务完成所需的引擎派发、数据访问和响应排空路径；已有工作完成后再关闭新派发及访问入口。确认各local CPU处于安全停止点、VPU操作完成、GEMM/DMA空闲、已接受peer/AXI事务及返回队列排空后，才允许停钟、调频或断电。仅scheduler空闲不能证明整个NPU区域可安全切换。断电前还须将必要结果和需跨断电保存的数据写入域外存储，并确认其可见性。
+
+**正常调频：** 在上述静止点完成时钟源/分频切换，确认新时钟稳定且CDC边界就绪后才恢复访问与提交；基线不承诺在命令执行中无停顿切频。仅调频或clock-gating不以清空SRAM/控制状态为前提，具体时钟切换电路须保证状态和通知正确性。
+
+**范围边界：** 带在途事务的强制局部复位、故障隔离/恢复留实现阶段考虑，不在本文细化。复位或断电不承诺撤销外部已接受写或回滚部分结果；本节正常排空要求不重启P1-2，也不替代暂缓的P0-4具体协议。
 
 ### 10.3 电源状态
 
-关联AR：[AR-HIVE-C024](#ar-hive-c024)、[AR-HIVE-C030](#ar-hive-c030)。状态集合已批准，进入/退出和排空条件仍是待冻结生命周期要求，不新增power-gating能力。
+关联AR：[AR-HIVE-C024](#ar-hive-c024)、[AR-HIVE-C030](#ar-hive-c030)、[AR-HIVE-C038](#ar-hive-c038)。**批准基线（MUST）：** RUN、IDLE、CLOCK_GATED和POWER_OFF；区域级受控电源关断是基础能力，不再列为非基线增强。
 
-**批准基线（MUST）：** RUN、IDLE 和 CLOCK_GATED。power gating、SRAM retention 和 DVFS 不属于基础交付能力，进入/退出和唤醒协议仍须生命周期规格冻结。
+| 状态 | 电源／时钟 | 内部状态与进入／退出边界 |
+|---|---|---|
+| RUN | NPU供电开启，时钟运行于批准支持的频点 | 可执行任务和接受访问；原性能验收仍按500 MHz |
+| IDLE | NPU供电开启，时钟运行，无活跃工作 | 状态保持；可恢复执行，停钟/调频/断电前仍须确认第10.2节静止点 |
+| CLOCK_GATED | NPU供电开启，区域时钟停止 | 状态通过持续供电保持，不要求专用retention；域外唤醒路径恢复稳定时钟及访问条件后才接受访问 |
+| POWER_OFF | NPU区域电源关断，时钟停止，跨电源边界隔离生效 | SRAM、寄存器、scheduler、同步资源及CPU/VPU状态不保证保持；重新供电须完成初始化和必要数据装载后才恢复执行 |
 
-进入clock gate不仅需要scheduler空闲，还需local CPU确认任务阶段安全、VPU操作完成、GEMM/DMA及peer/AXI事务和返回队列排空。所有外部访问和 event 的唤醒路径必须先于访问接收建立。
+**受控关断：** 按第10.2节停止新访问并排空，确认必要域外结果可见；域外控制建立跨电源边界隔离并停止NPU时钟，再关断区域电源。跨域bridge、请求入口、IRQ/event及debug边界须在断电期间保持域外可见信号合法，不得使用掉电域的不确定输出。
+
+**重新上电：** 域外控制恢复供电和稳定时钟，保持必要reset与边界隔离，完成同步reset释放和内部初始化后再开放边界访问；任务执行还须满足数据装载与依赖就绪条件。边界管理须支持初始化所需的受控访问，不能形成“等待域内就绪才能供电/供钟”的循环依赖。
+
+POWER_OFF不默认保留任何域内状态，不依赖SRAM或寄存器专用retention；独立调压、retention及逐core独立电源/调频域均为非基线。本节不冻结电压值、电源开关/隔离单元选型、信号极性或上电延迟；这些细项由SoC电源/时钟及集成规格冻结。正常电源边界隔离是受控断电的电气要求，不是已剔除的异常故障隔离专题。
 
 ## 11. 可靠性、安全边界与观测
 
 ### 11.1 异常处理
 
-**暂缓：** 本轮不冻结错误传播与恢复协议，以下保留为后续审查目标，不作为本轮已批准的互操作契约。
-
-**目标：** 对模块错误、AXI 错误和可选 SRAM ECC 汇总来源、错误信息、有效地址与受影响任务范围；具体关联机制留待后续定义，不以 tracing tag 或当前模块命令 ID 为前提。
-
-- completion 明确区分成功/失败；
-- 首错粘滞保存，后续事件可计数；
-- fatal 错误停止新派发，已接受事务按恢复协议 drain 或标错；
-- 不支持事务回滚，部分写入可能仍对外可见；
-- timeout 的定义、门限、受害命令与恢复范围待确认，不能用无限等待掩盖系统死锁。
+**范围边界：** G0边缘端当前不把详细异常恢复与故障隔离列为架构评审项，留实现阶段考虑；本文不冻结错误传播、timeout或局部故障恢复机制，不承诺事务回滚。本范围收窄不影响基本响应正确性或VPU浮点数值边界。
 
 ### 11.2 ECC 与访问保护
 
@@ -771,11 +795,11 @@ AXI bridge 跨域需成套处理地址、数据、响应及在途归属；异步
 
 ### 11.3 PMU 与调试
 
-关联AR：[AR-HIVE-C033](#ar-hive-c033)、[AR-HIVE-C016](#ar-hive-c016)。硬件计数、软件trace和同步完成分别管理，事件与时间基准冻结仍由P1-7承担。
+关联AR：[AR-HIVE-C033](#ar-hive-c033)、[AR-HIVE-C016](#ar-hive-c016)。硬件计数、软件trace和同步完成分别管理；P1-7按用户要求暂缓，当前不开展详细PMU事件定义，不影响scheduler同步事件的功能边界。
 
-**目标观测：** GEMM active/load/stall，DMA physical/useful bytes、burst/在途水位，SRAM bank conflict 与服务配额，预取就绪等待与双缓冲切换停顿，AXI latency/backpressure，同步操作等待，scheduler 依赖等待与命令延迟。
+**目标观测：** GEMM active/load/stall，DMA physical/useful bytes、burst/在途水位，SRAM bank conflict 与访问等待，预取就绪等待与双缓冲切换停顿，AXI latency/backpressure，同步操作等待，scheduler 依赖等待与命令延迟。本清单只保留观测类别，不冻结逐项事件编码或采样条件。
 
-当前 GEMM `perf` 为观测电平，系统计数器尚待实现。计数需明确采样事件、位宽、溢出、清零和 snapshot，不把测试平台统计当作产品内建 PMU。
+当前 GEMM `perf` 为观测电平，系统计数器尚待实现。采样事件、位宽、溢出、清零、snapshot及跨模块时间基准细项随P1-7暂缓，不在本轮逐项定义；实际性能验收仍须提供可核验的测量证据，不能把测试平台统计当作产品内建PMU或宣称观测能力已验收。
 
 debug 暂停必须区分停止新派发和冻结在途事务。tracing/profiling 由软件主动插入标记命令，模块 tag 服务于 trace 记录，记录落到内存后由软件组合运行时 timeline；它不参与 scheduler 的同步完成匹配。trace 时间基准、记录格式、落盘路径、反压与丢失标记待规格确认，不先行保证未知 debug 接口的无扰动能力。
 
@@ -825,7 +849,7 @@ GEMM 无外部 partial sum 输入：每个命令必须能完成其声明的 K �
 - 每 bank 1RW 时，同 bank 读写不可假定并行；
 - 两 DMA engine 若都做 local→local copy，双侧访问预算增加 64 B/cycle，总和达 280/281 B/cycle；
 - remote peer 请求另行竞争 bank；
-- bank 映射、合并、错峰和 QoS 验证共同决定实际吞吐。
+- bank 映射、合并、错峰和竞争下的实际服务验证共同决定实际吞吐。
 
 必须测试实际地址分布和负载组合，不能用 `216<256` 就得出无瓶颈结论。
 
@@ -908,9 +932,9 @@ FMA 按 2 operations 计数；FP32/FP16 是替代运行模式，峰值不得相�
 #### 12.7.3 集成与前进性要求
 
 - VPU 经 local interconnect 访问 local SRAM，遵循第 7.3 节缓冲区所有权和第 8.2 节结果可见性规则；不得绕过 READY 依赖读取输入或提前发布完成。
-- local 数据口支持 byte enable、返回归属、反压和错误传递；adapter 保持双方约定的返回顺序，并按返回缓冲容量限制在途请求。
+- local 数据口支持 byte enable、返回归属和反压；adapter 保持双方约定的返回顺序，并按返回缓冲容量限制在途请求。
 - 调度必须为 VPU 和 DMA 提供有限背压下的前进性；VPU 请求反压时，已接受事务的响应仍须排空。
-- VPU 的控制/指令、背压与完成观察直接连接 local CPU，不与 scheduler 建立命令关联；local CPU 必须区分操作完成与写结果可见，跨引擎阶段同步另定接口规则，错误细项保持暂缓。
+- VPU 的控制/指令、背压与完成观察直接连接 local CPU，不与 scheduler 建立命令关联；local CPU 必须区分操作完成与写结果可见，跨引擎阶段同步另定接口规则。
 - cluster 共享 VPU 为非基线变更；若另行批准，必须满足对应 SKU 聚合计算指标、各 core 本地数据访问及公平服务，不以共享单核资源替代上述要求。
 
 #### 12.7.4 验收与规格冻结要求
@@ -922,9 +946,9 @@ FMA 按 2 operations 计数；FP32/FP16 是替代运行模式，峰值不得相�
 | 非FMA能力：[C034](#ar-hive-c034)、[C035](#ar-hive-c035)、[C036](#ar-hive-c036)、[S022](#ar-hive-s022) | add/mul、混合精度、转换、sum/max、exp/reciprocal/rsqrt 分项给出吞吐、延迟或启动间隔与误差；不得套用 FMA GFLOPS |
 | 完整算子：[C035](#ar-hive-c035)、[C036](#ar-hive-c036)、[S022](#ar-hive-s022) | RMSNorm/LayerNorm、softmax、SiLU、RoPE、residual add、格式转换及量化辅助的数值与服务时间；GELU 仅在目标模型采用时验收；算术、转换/归约与必要特殊函数补齐分别核验，不另列模型执行设计AR |
 | 系统并发：[C028](#ar-hive-c028)、[S006](#ar-hive-s006)、[P029](#ar-hive-p029) | GEMM/DMA/VPU 同时运行时的 SRAM 有效字节、bank 冲突、等待与完成可见性；G0 两核和后续 G0 Pro 四核分别验证 |
-| 边界与恢复：[C029](#ar-hive-c029)、[C030](#ar-hive-c030)、[C037](#ar-hive-c037) | tail、非有限值、地址边界、持续反压、异常和 reset/drain，不丢响应、不误报完成；错误恢复细项在暂缓协议冻结后补验 |
+| 边界与正常生命周期：[C029](#ar-hive-c029)、[C030](#ar-hive-c030)、[C037](#ar-hive-c037) | tail、非有限值、地址边界、持续反压、初始化reset与正常drain，不丢响应、不误报完成 |
 
-**规格冻结前置：** local CPU↔VPU 直接控制接口与 VPU 本地数据接口规格必须填入非 FMA 指令吞吐、混合精度路径吞吐、特殊函数数值误差、端到端算子允许服务时间，以及 local CPU 的完成/可见性观察、跨引擎阶段次序、在途深度、tracing 标记与 reset/drain 协议的批准值。上述细项目前待确认，未填入唯一值前不得判定 VPU 集成验收完成；本节不虚构延迟、误差或流式吞吐保证。
+**规格冻结前置：** local CPU↔VPU 直接控制接口与 VPU 本地数据接口规格必须填入非 FMA 指令吞吐、混合精度路径吞吐、特殊函数数值误差、端到端算子允许服务时间，以及 local CPU 的完成/可见性观察、跨引擎阶段次序、在途深度、tracing 标记与初始化reset及正常drain协议的批准值。上述细项目前待确认，未填入唯一值前不得判定 VPU 集成验收完成；本节不虚构延迟、误差或流式吞吐保证，也不将故障恢复列为冻结前置。
 
 ### 12.8 批准工作负载与持续验收门槛
 
@@ -974,11 +998,11 @@ MXFP8/MXFP4性能数值、cold TTFT、C4096速度及功耗上限仍TBD，须独�
 | GEMM 结果 buffer | 默认 M≤48，批准基线保持 cBufferDepth=64 | 大 M 由软件分块；扩大 buffer 须单独变更，不能解决 SRAM 容量不足 |
 | DMA | 128-bit 默认、每 engine 单读在途 | 集成 256-bit 并实现多读在途；读/写四 burst 候选须按延迟、transfer 边界和返回协议冻结 |
 | scheduler/任务管理 | 硬件译码骨架，无软件Queen与local CPU任务执行闭环 | 主CPU软件Queen提交/回收任务；local CPU控制scheduler派发GEMM/DMA，并直接管理VPU；8 slots/core、tracing独立，硬件ring非基线 |
-| compiler/runtime 数据计划 | 系统级驻留、预取和复用契约待定义 | 明确 SRAM 分配、tensor 生命周期、DMA 依赖和容量不足时的搬运策略 |
+| 固件/软件显式数据搬运与复用 | scratchpad无自动补给，系统级驻留、预取和复用契约待定义 | 明确 SRAM 分配、tensor 生命周期、DMA 依赖及容量不足时的显式搬运，核验跨引擎可见性；模型数据计划仅作性能验收证据，不定义runtime设计AR |
 | FP8/MX 算子映射 | checkpoint scale、未量化层、动态 activation 量化及 attention 尚无系统闭环 | FP8 保留原 scale 语义；MX 首阶段 A/B block32、C FP32；逐算子验证桥接、量化及 FP32 累加的质量与服务时间 |
-| 系统互联/内存 | 尚未实现 cluster 系统访问，持续带宽未测 | 按批准 G0 4 GiB x32 / Pro 8 GiB x64 LPDDR4x 验证 DRAM/peer/QoS/CDC；4266 MT/s 与汇聚拓扑仍为候选 |
+| 系统互联/内存 | 尚未实现 cluster 系统访问，持续带宽未测 | 按批准 G0 4 GiB x32 / Pro 8 GiB x64 LPDDR4x 验证 DRAM/peer/仲裁/CDC；4266 MT/s 与汇聚拓扑仍为候选 |
 | 独立同步单元 | 尚未实现 | 实现 READ/WRITE/FETCH_ADD；冻结状态容量、同步窗口、原子/普通访问序列化和任务关联 |
-| core内CPU/VPU集成接口 | VPU 计算/端口已批准，仓库外实现与细项契约未确认 | 按 12.7 核对每 core 独立 256-bit、FP32 8 / FP16 16 GFLOPS，并冻结非 FMA、数值、服务配额与事件规则 |
+| core内CPU/VPU集成接口 | VPU 计算/端口已批准，仓库外实现与细项契约未确认 | 按 12.7 核对每 core 独立 256-bit、FP32 8 / FP16 16 GFLOPS，并冻结非 FMA、数值、反压/返回与事件规则 |
 
 ### 13.2 架构决策清单
 
@@ -987,7 +1011,8 @@ MXFP8/MXFP4性能数值、cold TTFT、C4096速度及功耗上限仍TBD，须独�
 | SKU 与 GEMM | MUST：G0 两核 1T、Pro 四核 2T，均 500 MHz、T=16、cBufferDepth=64 | INT8/FP8 稠密口径、软件分块、时序与 PPA |
 | 性能模型与 MX 路线 | MUST：第2.1节五模型身份；第12.8节原四模型服务/质量门槛不变，同源BF16→MX路线仅原两个语言模型，先A/B block32、C FP32；新增Qwen3.5-2B仅身份批准，profile、精度、算子/状态、容量与服务/质量门槛待定 | manifest、布局、数值、容量与持续服务实证；新模型独立评审，不继承P008–P027工作负载门槛或旧预算；block16 C为本地MX profile，NVFP4额外tensor/global scale不支持；MX速度及功耗上限仍TBD |
 | DRAM | MUST：G0 4 GiB LPDDR4x x32，Pro 8 GiB x64；16 GiB 非基线扩容，候选 4266 MT/s | controller/PHY/板级支持、有效持续 payload 与竞争 |
-| 时钟与 DRAM 汇聚 | 候选 core 共域 500 MHz；G0 256-bit、Pro 512-bit 或两路 256-bit @ 500 MHz | 接口冻结时选定拓扑/CDC，性能和物理阶段验证 |
+| NPU时钟与DRAM汇聚 | MUST：NPU区域独立时钟域及调频，500 MHz验收基准不变；候选内部共域/同源派生；DRAM汇聚候选G0 256-bit、Pro 512-bit或两路256-bit @ 500 MHz | 接口冻结时选定内部组织、频点/切换及拓扑/CDC，性能和物理阶段验证 |
+| NPU电源域 | MUST：整个NPU区域独立受控关断，main CPU/system/DRAM及必要域外边界管理不随之关断 | 第10章域边界、正常排空、边界隔离及上电初始化；电气时序待冻结，不默认retention、独立调压或逐core域 |
 | SRAM 容量/banks | MUST：G0 512 KiB/core、Pro 1 MiB/core，均 8 × 256 bit | 重叠生命周期、bank 冲突和 SRAM PPA |
 | SRAM macro/端口 | 候选 1RW，byte-write/macro 拼接待确认；16-bank/1R1W 非基线 | 库/接口冻结，部分写与 500 MHz 时序 |
 | DMA | MUST：2 × 256-bit/core、40-bit address、最大 64 beats、多读在途；候选读/写各四 burst/engine | 返回关联、credit、transfer 边界及实际延迟 |
@@ -995,8 +1020,8 @@ MXFP8/MXFP4性能数值、cold TTFT、C4096速度及功耗上限仍TBD，须独�
 | 独立同步单元 | MUST：READ/WRITE/FETCH_ADD；候选 64 × 32-bit，协议待确认 | 活跃 barrier/event 数、顺序与线性化点 |
 | main CPU coherence | MUST：非一致 AXI＋固件/软件 cache 维护；映射/屏障协议暂缓 | 平台非一致维护契约、所有权和结果可见性，不定义具体 API |
 | VPU | MUST：每 core 独立 256-bit、500 MHz、FP32 8 / FP16 16 GFLOPS；仓库外实现及细项待确认 | 12.7 的计算/接口/数值验收；共享 VPU 非基线 |
-| control/IRQ | MUST：AXI4-Lite 32-bit、local/main CPU level；寄存器与路由细项待确认 | doorbell、通知、mask/clear 与错误 |
-| 生命周期/保护 | MUST：RUN/IDLE/CLOCK_GATED；reset/drain/timeout/ECC/保护契约待确认 | CDC、可靠性和安全边界；ECC 不承诺为已实现 |
+| control/IRQ | MUST：AXI4-Lite 32-bit、local/main CPU level；寄存器与路由细项待确认 | doorbell、通知、mask/clear |
+| 生命周期/保护 | MUST：RUN/IDLE/CLOCK_GATED/POWER_OFF；初始化reset、正常drain、调频、断电边界隔离及基本访问保护，具体协议待冻结；ECC非基线 | 正常域切换、重新初始化、CDC及地址/CSR/debug访问边界；ECC不承诺为已实现；详细异常恢复/故障隔离留实现阶段考虑，不在当前架构细化 |
 | 增强能力 | LLC、共享 tensor SRAM、HBM/3D DRAM、K 维跨核归约、抢占、专用 event link 等非基线 | 不形成基础依赖；变更须独立评审 |
 
 B 方案配置已批准，服务保证与物理实现仍需按第 2.2.2 节阶段门闭环；不以候选值代替验收。除项目标识外，内部工作昵称不属于架构决策项。
@@ -1011,7 +1036,7 @@ B 方案配置已批准，服务保证与物理实现仍需按第 2.2.2 节阶�
 2. 从外部存储搬输入到 local SRAM，写完成后转移所有权；
 3. GEMM 计算并写 SRAM，检查数据、scale、tail 和模块错误；
 4. DMA 将结果写回外部存储，排空必要响应；
-5. 验证同步完成可被 CPU 观察、软件完成记录正确，并验证 local/main CPU IRQ；错误完成协议另行审查后补测。
+5. 验证同步完成可被 CPU 观察、软件完成记录正确，并验证 local/main CPU IRQ。
 
 local CPU入口先验证GEMM/DMA引擎闭环及直接VPU控制；主控CPU软件Queen再验证任务提交、local CPU执行和任务完成回收。硬件ring/fetcher/completion writer不是交付依赖。
 
@@ -1019,13 +1044,17 @@ local CPU入口先验证GEMM/DMA引擎闭环及直接VPU控制；主控CPU软件
 
 先完成 G0 两核 1T 闭环，再独立验证后续 G0 Pro 四核 2T SKU 的入口扩展、任务分片、同步、聚合带宽与功耗；不能用 G0 通过推断 G0 Pro 已验收。
 
-至少覆盖：peer copy 与本地计算争 bank、多主同步与可见性、持续反压、队列耗尽、同步资源回收/复用、SRAM 预取与消费重叠时的覆盖冲突、双缓冲切换、main CPU cache 维护、窗口越界，以及独立的 tracing 标记与内存记录核对。软件Queen队列/任务记录复用按冻结的软件协议验收，不要求硬件ring；局部 reset/错误恢复在后续协议冻结后补验。
+至少覆盖：peer copy 与本地计算争 bank、多主同步与可见性、持续反压、队列耗尽、同步资源回收/复用、SRAM 预取与消费重叠时的覆盖冲突、双缓冲切换、main CPU cache 维护、窗口越界，以及独立的 tracing 标记与内存记录核对。软件Queen队列/任务记录复用按冻结的软件协议验收，不要求硬件ring。故障恢复/隔离留实现阶段考虑，不属于本轮架构验收清单。
+
+**正常电源／时钟验收：** 按[C024](#ar-hive-c024)、[C029](#ar-hive-c029)、[C030](#ar-hive-c030)、[C038](#ar-hive-c038)、[C039](#ar-hive-c039)及冻结的第10章责任规格，分别覆盖两SKU全部NPU区域的初始化、clock-gating唤醒、支持频点切换、受控断电和重新上电。核对CPU/VPU安全停止、所有已接受事务及响应排空、断电边界隔离和域外控制可用；不得丢响应或提前恢复访问。验证NPU独立调频/断电时main CPU、system及DRAM无需跟随切换且可继续工作，CLOCK_GATED状态保持，POWER_OFF后不依赖内部状态保留，重新初始化和显式数据装载后再执行任务；电气/时序证据须按后续物理阶段提交，功能仿真不替代物理签核。
 
 READ/WRITE/FETCH_ADD 与非一致 main CPU cache 维护属于批准基线，协议冻结并实现后必须纳入验收；ECC、event link、coherent main CPU 为非基线增强，只有另行选择实现后才进入对应验收，不提前宣称能力。
 
 ### 14.3 性能验收
 
 在目标 500 MHz 下分别核对 G0 两核/G0 Pro 四核 INT8、FP8、INT4、MXFP4 及 W4A8 的每有效拍乘加贡献和第 2.3 节峰值口径，再记录完整命令的装载、计算、排空占比；G0/G0 Pro 的 1T/2T SKU 定位不替代持续算力和 PPA 验证。
+
+独立调频能力不改变原500 MHz服务门槛；其他支持频点的吞吐、时延及能量须按实际频率单独报告，不用频率比例替代实测。POWER_OFF后的供电/时钟恢复、初始化及数据重载应独立报告，不混入模型已加载且可执行的warm P512统计；本轮不为切频、上电延迟或功耗新增数值承诺。
 
 VPU 按第 12.7 节验收每 core 256-bit 等效执行、500 MHz 下 FP32 8 / FP16 16 GFLOPS，以及单个 256-bit local 请求口的读写合计峰值；混合精度归约、转换、exp/reciprocal/rsqrt 和完整算子按各自批准指标验收。记录有效元素、访存、特殊函数和归约停顿，覆盖 tail、误差、非有限值及跨 core 竞争。寄存器内 FMA 峰值与 SRAM 流式吞吐分别发布，attention 矩阵落点不同的任务分开验收。
 
@@ -1042,20 +1071,20 @@ MXFP8/MXFP4 是原两个语言模型已批准的同源评估路线，不替代 F
 
 **新增模型独立待评审阶段门：** Qwen3.5-2B 当前仅身份批准，不自动继承 P008–P027 工作负载门槛或原模型预算。先核验模型 revision/hash 与实际算子/状态组织，再独立评审并冻结 profile、执行精度/量化、算子映射、状态/访存与全生命周期容量及服务/质量标准；批准这些标准后，才开展对应数值、功能、容量和完整服务的证据验收。此阶段门不宣称已有 FP8/MX 版本或已部署，不为新模型冻结数值，也不替代原四模型首轮 signoff 或放宽其门槛。
 
-当前参考基线为独立模块；尚无 core/cluster 集成 RTL 或系统性能验证结论。软件Queen任务管理与local CPU控制边界已确认，P0-4其余协议保持暂缓，本轮不冻结任务通知、fence/drain或错误处理；正式协议确认后再补相应系统验收。
+当前参考基线为独立模块；尚无 core/cluster 集成 RTL 或系统性能验证结论。软件Queen任务管理与local CPU控制边界已确认，P0-4其余协议保持暂缓；第10章补充正常电源/时钟域切换约束，但本轮不冻结任务通知、fence/drain的具体协议或错误处理；正式协议确认后再补相应系统验收。
 
 ### 14.4 逐AR责任、证据与结论
 
-第1.5节每条有效AR均给出责任规格及正文/验收入口。后续规格和测试报告必须按完整AR ID逐项追溯，不能用“模块测试全绿”或“整章通过”替代单项结论。当前有效AR总数为76（C37/H4/S6/P29），另有17个S编号仅保留撤销记录、不复用；76条有效AR均未在本文登记为实测通过。正文中的现有模块事实也不能替代core/SoC验收，本轮S表及追溯调整仍需人工审查。
+第1.5节每条有效AR均给出责任规格及正文/验收入口。后续规格和测试报告必须按完整AR ID逐项追溯，不能用“模块测试全绿”或“整章通过”替代单项结论。当前有效AR总数为78（C39/H4/S6/P29），另有17个S编号仅保留撤销记录、不复用；78条有效AR均未在本文登记为实测通过。P1-6的编号、S类范围及追溯文档评审已经人工确认关闭，不表示全部目标或实现验收通过；P1-5区域电源/时钟定义及正常生命周期的正文评审也已人工确认关闭，具体切换及物理条款仍须冻结。P1-7详细PMU定义暂缓，观测目标及实际性能证据要求保留，不表示PMU或性能验收通过。
 
 每条证据记录至少包含：AR ID、适用SKU、要求版本/批准状态、责任规格及条款、实现基线/参数、验证方法和用例或报告定位、测量条件、预期/实测结果、验收结论及审查记录。要求批准、实现状态、验证结论分列维护；目标或细项未冻结时标为“待冻结/待验证”，不得签为通过。
 
-- **C类：** 配置/拓扑由core及SoC集成检查核验；GEMM、DMA、scheduler、SRAM、CSR/IRQ与同步能力按第14.1–14.2节功能/边界场景验收。CDC、流控、保护和生命周期须有对应冻结规格及竞争/反压证据；VPU按第12.7.4节分项取证。500 MHz要求后续有相应物理时序证据，编号不表示当前已签核。
+- **C类：** 配置/拓扑由core及SoC集成检查核验；GEMM、DMA、scheduler、SRAM、CSR/IRQ与同步能力按第14.1–14.2节功能/边界场景验收。CDC、流控、保护和生命周期须有对应冻结规格及竞争/反压证据；[AR-HIVE-C038](#ar-hive-c038)、[AR-HIVE-C039](#ar-hive-c039)须分别提交区域独立供电/受控关断和独立调频证据，结合C024/C029/C030核对状态、边界隔离及重新初始化，不以clock-gating替代这两项能力。VPU按第12.7.4节分项取证。500 MHz要求后续有相应物理时序证据，编号不表示当前已签核。
 - **H类：** [AR-HIVE-H001](#ar-hive-h001)、[AR-HIVE-H002](#ar-hive-h002)分别检查G0/Pro装配清单、器件容量及总位宽；[AR-HIVE-H003](#ar-hive-h003)核对controller/PHY、rank及地址映射的可达容量测试；[AR-HIVE-H004](#ar-hive-h004)按实际冻结速率提交物理/板级验证，未验证的4266 MT/s不填为通过。
 - **S类：** 仅逐项核验“硬件限制→固件/软件动作”：[AR-HIVE-S003](#ar-hive-s003)核验scratchpad无自动补给下的显式装载、必要写回与分批搬运；[AR-HIVE-S004](#ar-hive-s004)核验更大M拆为合法M≤48子命令；[AR-HIVE-S006](#ar-hive-s006)核验scheduler及DMA hazard未覆盖的跨引擎消费/复用前的完成与可见性确认；[AR-HIVE-S007](#ar-hive-s007)核验非一致访问的cache维护及提交/完成屏障；[AR-HIVE-S018](#ar-hive-s018)核验GEMM无外部partial-sum输入时独立K子命令输出的外部FP32显式累加；[AR-HIVE-S022](#ar-hive-s022)核验缺少专用硬件时向量软件补齐exp、reciprocal、rsqrt及其冻结数值/服务要求。协议暂缓项仅在相应契约批准后正式验收；不以runtime、驱动、API或模型部署设计作为S证据。
 - **P类：** [AR-HIVE-P001](#ar-hive-p001)至[AR-HIVE-P007](#ar-hive-p007)按有效计算拍/FMA稳态条件核验；[AR-HIVE-P008](#ar-hive-p008)至[AR-HIVE-P019](#ar-hive-p019)按完整任务/驻留kernel的各自门槛验收；[AR-HIVE-P020](#ar-hive-p020)至[AR-HIVE-P023](#ar-hive-p023)按冻结参考、数据集和数值预算验质量；[AR-HIVE-P024](#ar-hive-p024)至[AR-HIVE-P029](#ar-hive-p029)核查profile、采样、稳态、全部控制/回退成本与服务证据。P008–P027工作负载门槛不因Qwen3.5-2B身份新增而扩展适用范围；每个编号、每个适用SKU仍需独立结论。
 
-P类目标后续通过责任规格记录“由哪些C/H/S满足”的关系，不因实现分配而重命名。例如[AR-HIVE-P008](#ar-hive-p008)的责任落实应核对GEMM计算、DMA/内存服务、SRAM驻留及必要的固件/软件搬运与跨引擎可见性补齐；模型manifest、执行落点、量化/数值与容量/流量计划只是P验收输入证据，不另列模型或runtime设计AR，也不作为S设计证据。目前仅建立追溯入口，不声称这些资源已经足以达标；本轮不新增AR。后续确需派生硬件要求或必要固件callout时须另行变更评审，不能把未冻结的实现方案补写成批准目标。
+P类目标后续通过责任规格记录“由哪些C/H/S满足”的关系，不因实现分配而重命名。例如[AR-HIVE-P008](#ar-hive-p008)的责任落实应核对GEMM计算、DMA/内存服务、SRAM驻留及必要的固件/软件搬运与跨引擎可见性补齐；模型manifest、执行落点、量化/数值与容量/流量计划只是P验收输入证据，不另列模型或runtime设计AR，也不作为S设计证据。目前仅建立追溯入口，不声称这些资源已经足以达标；本轮C038/C039仅记录已批准的NPU区域电源/时钟能力，不改动P类指标或新增模型AR。后续确需派生硬件要求或必要固件callout时须另行变更评审，不能把未冻结的实现方案补写成批准目标。
 
 ## 附录 A：当前实现追溯
 
