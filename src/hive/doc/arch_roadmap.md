@@ -1,10 +1,12 @@
 # Hive NPU 架构演进与产品对标路线图
 
-文档版本：`v0.4.0-draft`
+文档版本：`v0.5.0-draft`
 
-修订日期：`2026-10-26`
+修订日期：`2026-10-28`
 
 > 本文是[总体架构](arch.md)的非规范性配套参考，只汇总产品调研、竞品比较、代际演进、产品分档、成本与阶段验收建议。模块级性能推导和敏感性分析记录在[性能分析](performance_analysis.md)；具体接口、寄存器、错误码和时序仍以正式架构与模块规格为准。本文中的远期指标是规划候选，不构成 RTL、PPA 或产品交付承诺。
+
+2026-10-28同步G0批准模型范围至名义0.5B–2B：Qwen3.5-2B仅新增身份，精度、容量及服务/质量门槛待独立评审。G0/G0 Pro当前配置和原四模型验收以总体架构为准；本路线图历史W4、YOLOv8和扩展率候选不替代已批准基线，也不作为新增2B模型的保证。
 
 ## 1. 文档目的与路线原则
 
@@ -93,7 +95,7 @@ G0 标准版固定为 2 cores×500 MHz，产品定位名为 1T SKU；G0 Pro 固�
 
 | 代际 | 产品定位 | 主要对标产品 | 推荐计算规模 | 存储与互联 | 主要工作负载 |
 |---|---|---|---|---|---|
-| G0：端侧完整 SoC | 单芯片完成设备控制与边缘推理 | RK3568、NXP i.MX 8M Plus、RK3399Pro | 标准版 1T、Pro 2T 产品定位；TMAC/s 与 TOPS 口径待冻结 | 显式 local SRAM；LPDDR4x；无 D2D | 视觉、语音、轻量 Transformer、0.5B–1.5B W4 模型 |
+| G0：端侧完整 SoC | 单芯片完成设备控制与边缘推理 | RK3568、NXP i.MX 8M Plus、RK3399Pro | 标准版 1T、Pro 2T 产品定位；TMAC/s 与 TOPS 口径待冻结 | 显式 local SRAM；LPDDR4x；无 D2D | 视觉、语音、轻量 Transformer；当前批准语言模型扩至名义0.5B–2B，精确身份与格式见总体架构 |
 | G1：家庭算力卡 | 外部 Host 控制、卡内管理 CPU 自治的本地 AI 加速卡 | Axelera Metis、Mac mini M4、DGX Spark | 建议评估 32–128 dense INT8 TOPS/卡，不作为当前承诺 | 16–64GB 卡载内存；Host PCIe；独立 SerDes/D2D；显式 P2P DMA | 7B/14B 模型、视觉生成、多任务并发、多卡模型切分 |
 | G2：具身智能卡 | 外部强主控协调多卡，卡内管理 CPU 与安全域自治 | Jetson AGX Orin/Thor、TI TDA4VH-Q1 | 依据模型和安全等级冻结，性能参照 Orin–Thor 区间 | ECC 本地内存；冗余侧带；确定性 QoS；故障包含域 | 多传感器融合、VLM/VLA、规划推理、实时感知 |
 
@@ -388,7 +390,7 @@ G2 至少增加以下能力：
 | 外部内存持续效率 | LPDDR4x 长 burst DMA 有效带宽不低于理论峰值 70% | 同标准版，并证明带宽配置可支撑四核 | 卡载内存和 Host PCIe 分别不低于批准目标 | 正常与降级模式分别验收，并开启 ECC |
 | 算子覆盖率 | 冻结模型中 NPU/VPU 执行时间占比候选≥90% | 不低于标准版 | 目标模型关键路径不得因 Host fallback 破坏多卡收益 | 实时关键路径不得依赖非确定 Host fallback |
 | 视觉基线 | YOLOv8n 640×640 INT8、batch=1 候选≥30 FPS | 同条件候选≥60 FPS | 冻结多流/生成模型并发目标 | 按相机数量和感知 deadline 冻结 |
-| Transformer/LLM | 0.5B–1.5B W4；绝对 token/s 在 LPDDR4x 规格冻结后批准，同时要求达到实测内存 roofline 的 60% | 至少一个批准的端到端工作负载达到标准版的 1.3× | 7B/14B W4；decode 候选达到实测内存 roofline 的 65%，prefill 候选达到计算 roofline 的 50% | VLM/VLA 按感知到动作 deadline 和并发传感器负载验收 |
+| Transformer/LLM | 名义0.5B–2B；原两FP8模型的批准指标以总体架构12.8为准，Qwen3.5-2B新增身份的精度、容量及服务目标待评审；本表历史W4/roofline候选不覆盖该新增模型 | 至少一个批准的端到端工作负载达到标准版的 1.3× | 7B/14B W4；decode 候选达到实测内存 roofline 的 65%，prefill 候选达到计算 roofline 的 50% | VLM/VLA 按感知到动作 deadline 和并发传感器负载验收 |
 | D2D/P2P | 不适用 | 不适用 | 单/双向有效载荷建议≥物理 payload 上限 70%；计算并发时单独报告下降比例 | 增加链路故障、降级拓扑和冗余路径验收 |
 | 尾延迟 | 报告 P50/P90/P99，并冻结单流绝对上限 | 多核并发下仍满足同类任务上限 | 报告 P50/P99 及首 token 延迟，多卡拥塞纳入测量 | 实时任务按 P99.999 和 deadline miss 验收 |
 | 热稳定 | 连续目标负载 30 分钟后吞吐不低于稳定前 90% | 同标准版，且不得依靠超频定义 Pro | 卡级热稳态、墙插功耗、噪声和降频曲线全部验收 | 最坏环境温度、降级模式和安全停机同时验收 |
@@ -409,7 +411,7 @@ Pro 不是简单增加峰值 TOPS。除满足标准版全部正确性、软件�
 
 | 代际 | 功能工作负载 | 性能工作负载 | 必测系统指标 |
 |---|---|---|---|
-| G0 | MobileNet、YOLO-nano/small、轻量语音、0.5B–1.5B W4 Transformer | 单流低延迟、持续视觉、多算子混合 | 持续 TOPS、阵列利用率、LPDDR4x 有效带宽、bank conflict、P99 latency、TOPS/W |
+| G0 | 视觉、轻量语音、名义0.5B–2B Transformer；当前批准身份为原两FP8、Qwen3.5-2B及YOLO11n/s，新增2B模型的格式和门槛待评审 | 单流低延迟、持续视觉、多算子混合 | 持续 TOPS、阵列利用率、LPDDR4x 有效带宽、bank conflict、P99 latency、TOPS/W |
 | G1 | 7B/14B LLM、视觉生成、多模型并发 | prefill/decode、KV 压力、双卡模型切分 | token/s、首 token 延迟、卡载内存驻留、P2P 带宽、collective 效率、热稳态功耗 |
 | G2 | 多相机感知、VLM/VLA、规划与实时控制协同 | 计算拥塞、传感器突发、降级运行 | P99.999 latency、deadline miss、故障检测/隔离时间、ECC/CRC 注入、持续温度和降频 |
 
