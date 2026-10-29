@@ -111,149 +111,156 @@ module Wb_WorkerBeeCalcConfig(	// src/workerbee/scala/main/WorkerBeeCalcConfig.s
   reg        calcConfig_isBX2;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25
   reg [1:0]  state;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:28:24
   always @(posedge clock) begin	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    automatic logic            _calcConfig_aColTileAddressOffset_T_3;	// src/workerbee/scala/main/WbEnum.scala:20:42
-    automatic logic            _calcConfig_aColTileAddressOffset_T_4;	// src/workerbee/scala/main/WbEnum.scala:20:56
-    automatic logic            _calcConfig_aColTileAddressOffset_T_6;	// src/workerbee/scala/main/WbEnum.scala:20:72
-    automatic logic            _calcConfig_aColTileAddressOffset_T_8;	// src/workerbee/scala/main/WbEnum.scala:20:88
-    automatic logic            _calcConfig_aColTileAddressOffset_T_10;	// src/workerbee/scala/main/WbEnum.scala:20:105
-    automatic logic [7:0]      aKLoadNum;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:72:29, :73:13, :75:13
-    automatic logic            _calcConfig_bColTileAddressOffset_T_42;	// src/workerbee/scala/main/WbEnum.scala:20:42
-    automatic logic            _calcConfig_bColTileAddressOffset_T_43;	// src/workerbee/scala/main/WbEnum.scala:20:56
-    automatic logic            _calcConfig_bColTileAddressOffset_T_45;	// src/workerbee/scala/main/WbEnum.scala:20:72
-    automatic logic            _calcConfig_bColTileAddressOffset_T_47;	// src/workerbee/scala/main/WbEnum.scala:20:88
-    automatic logic            _calcConfig_bColTileAddressOffset_T_49;	// src/workerbee/scala/main/WbEnum.scala:20:105
-    automatic logic [7:0]      bKLoadNum;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:72:29, :73:13, :75:13
-    automatic logic            _calcConfig_bColTileAddressOffset_T_40;	// src/workerbee/scala/main/WbEnum.scala:11:43
-    automatic logic            _calcConfig_bColTileAddressOffset_T_39;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:167:58
-    automatic logic            _calcConfig_aColTileAddressOffset_T;	// src/workerbee/scala/main/WbEnum.scala:21:45
-    automatic logic            _calcConfig_aColTileAddressOffset_T_1;	// src/workerbee/scala/main/WbEnum.scala:21:59
-    automatic logic            isAMx;	// src/workerbee/scala/main/WbEnum.scala:9:{53,69}
-    automatic logic            isBMx;	// src/workerbee/scala/main/WbEnum.scala:9:{53,69}
-    automatic logic            _errMXLargerThanKLoadNum_T_16;	// src/workerbee/scala/main/WbEnum.scala:9:42
-    automatic logic            _errMXLargerThanKLoadNum_T_17;	// src/workerbee/scala/main/WbEnum.scala:9:58
-    automatic logic            _errMXLargerThanKLoadNum_T_19;	// src/workerbee/scala/main/WbEnum.scala:9:74
-    automatic logic            _GEN;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:204:16
-    automatic logic            _GEN_0;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:209:15
-    automatic logic            _GEN_1;	// src/workerbee/scala/main/WbEnum.scala:17:55
-    automatic logic            _GEN_2;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:220:48
-    automatic logic            _GEN_3;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:225:26
-    automatic logic            _GEN_4;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:225:64
-    automatic logic            _GEN_5;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:225:46
-    automatic logic            _GEN_6 = io_regFile_m > 16'h10;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:234:23
-    automatic logic            _GEN_7 = io_regFile_biasOn & (|(io_regFile_biasAddr[1:0]));	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:340:{28,50,57}
-    automatic logic            _cIsIntOut_T;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:370:52
-    automatic logic            _cIsIntOut_T_3;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:370:91
-    automatic logic            _GEN_8;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:370:31
+    automatic logic            _calcConfig_aColTileAddressOffset_T_3;	// src/workerbee/scala/main/WbEnum.scala:17:42
+    automatic logic            _calcConfig_aColTileAddressOffset_T_4;	// src/workerbee/scala/main/WbEnum.scala:17:56
+    automatic logic            _calcConfig_aColTileAddressOffset_T_6;	// src/workerbee/scala/main/WbEnum.scala:17:72
+    automatic logic            _calcConfig_aColTileAddressOffset_T_8;	// src/workerbee/scala/main/WbEnum.scala:17:88
+    automatic logic            _calcConfig_aColTileAddressOffset_T_10;	// src/workerbee/scala/main/WbEnum.scala:17:105
+    automatic logic [7:0]      aKLoadNum;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:65:29, :66:13, :68:13
+    automatic logic            _calcConfig_bColTileAddressOffset_T_42;	// src/workerbee/scala/main/WbEnum.scala:17:42
+    automatic logic            _calcConfig_bColTileAddressOffset_T_43;	// src/workerbee/scala/main/WbEnum.scala:17:56
+    automatic logic            _calcConfig_bColTileAddressOffset_T_45;	// src/workerbee/scala/main/WbEnum.scala:17:72
+    automatic logic            _calcConfig_bColTileAddressOffset_T_47;	// src/workerbee/scala/main/WbEnum.scala:17:88
+    automatic logic            _calcConfig_bColTileAddressOffset_T_49;	// src/workerbee/scala/main/WbEnum.scala:17:105
+    automatic logic [7:0]      bKLoadNum;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:65:29, :66:13, :68:13
+    automatic logic            _calcConfig_bColTileAddressOffset_T_40;	// src/workerbee/scala/main/WbEnum.scala:10:43
+    automatic logic            _calcConfig_bColTileAddressOffset_T_39;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:145:58
+    automatic logic            _calcConfig_aColTileAddressOffset_T;	// src/workerbee/scala/main/WbEnum.scala:18:45
+    automatic logic            _calcConfig_aColTileAddressOffset_T_1;	// src/workerbee/scala/main/WbEnum.scala:18:59
+    automatic logic            isAMx;	// src/workerbee/scala/main/WbEnum.scala:8:{53,69}
+    automatic logic            isBMx;	// src/workerbee/scala/main/WbEnum.scala:8:{53,69}
+    automatic logic            _errMXLargerThanKLoadNum_T_16;	// src/workerbee/scala/main/WbEnum.scala:8:42
+    automatic logic            _errMXLargerThanKLoadNum_T_17;	// src/workerbee/scala/main/WbEnum.scala:8:58
+    automatic logic            _errMXLargerThanKLoadNum_T_19;	// src/workerbee/scala/main/WbEnum.scala:8:74
+    automatic logic            _GEN;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:178:16
+    automatic logic            _GEN_0;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:183:15
+    automatic logic            _GEN_1;	// src/workerbee/scala/main/WbEnum.scala:14:55
+    automatic logic            _GEN_2;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:190:48
+    automatic logic            _GEN_3;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:196:26
+    automatic logic            _GEN_4;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:196:64
+    automatic logic            _GEN_5;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:196:46
+    automatic logic            _GEN_6 = io_regFile_m > 16'h30;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:201:23
+    automatic logic            _GEN_7 = io_regFile_biasOn & (|(io_regFile_biasAddr[1:0]));	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:223:{28,50,57}
+    automatic logic            _cIsIntOut_T;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:238:52
+    automatic logic            _cIsIntOut_T_3;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:238:91
+    automatic logic            _GEN_8;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:238:31
     automatic logic            _GEN_9 =
-      io_regFile_requantOn & (|(io_regFile_rqMBase[1:0]));	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:374:{31,52,59}
-    automatic logic            _GEN_10;	// src/workerbee/scala/main/WbEnum.scala:10:54
-    automatic logic            _GEN_11 = io_regFile_k == 16'h0;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:429:36
-    automatic logic            _GEN_12 = (|(io_regFile_k[4:0])) | _GEN_11;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:428:{36,57,66}, :429:36
-    automatic logic            _GEN_13;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:427:48
-    automatic logic            _GEN_14;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:440:48
-    automatic logic            _GEN_15 = (|(io_regFile_k[5:0])) | _GEN_11;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:429:36, :450:{36,57,66}
-    automatic logic            _GEN_16;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:449:48
-    automatic logic            _GEN_17;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:462:{48,85}
-    automatic logic            _GEN_18;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:480:50
-    automatic logic            _GEN_19;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:486:50
-    automatic logic            _GEN_20;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:506:{50,89}
-    automatic logic            _cIsIntOut_T_1;	// src/workerbee/scala/main/WbEnum.scala:22:57
-    automatic logic            _calcConfig_aColTileAddressOffset_T_12;	// src/workerbee/scala/main/WbEnum.scala:19:42
-    automatic logic            _calcConfig_aColTileAddressOffset_T_13;	// src/workerbee/scala/main/WbEnum.scala:19:56
-    automatic logic            _GEN_21;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:579:19
-    automatic logic            _GEN_22;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:629:48
-    automatic logic            _GEN_23;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:649:50
-    automatic logic            _GEN_24;	// src/workerbee/scala/main/WbEnum.scala:17:43
-    automatic logic            _GEN_25;	// src/workerbee/scala/main/WbEnum.scala:17:60
-    automatic logic            _GEN_26;	// src/workerbee/scala/main/WbEnum.scala:17:55, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:678:86
-    automatic logic            errComb;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:196:98, :197:68, :199:34, :204:24, :205:17, :209:46, :210:17, :220:79, :221:21, :225:84, :226:17, :234:59, :235:17, :319:55, :320:17, :340:65, :341:17, :370:112, :371:17, :374:67, :375:17, :429:46, :430:21, :442:46, :443:21, :451:46, :452:21, :465:75, :466:21, :482:46, :483:21, :488:46, :489:21, :510:73, :511:21, :579:31, :580:17, :629:86, :630:21, :649:89, :650:21, :679:48, :680:21
-    automatic logic            _GEN_27;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:744:15
-    automatic logic            _GEN_28;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:744:15
-    automatic logic            _GEN_29;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:17:22, :744:15, :1239:26, :1240:17
-    automatic logic            _GEN_30;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:17:22, :744:15
-    automatic logic [3:0][3:0] _GEN_31;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:19:22, :744:15, :755:15, :764:20
-    _calcConfig_aColTileAddressOffset_T_3 = io_regFile_aFmt == 4'h8;	// src/workerbee/scala/main/WbEnum.scala:20:42, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _calcConfig_aColTileAddressOffset_T_4 = io_regFile_aFmt == 4'h3;	// src/workerbee/scala/main/WbEnum.scala:20:56, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _calcConfig_aColTileAddressOffset_T_6 = io_regFile_aFmt == 4'h4;	// src/workerbee/scala/main/WbEnum.scala:20:72, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _calcConfig_aColTileAddressOffset_T_8 = io_regFile_aFmt == 4'hA;	// src/workerbee/scala/main/WbEnum.scala:20:88, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _calcConfig_aColTileAddressOffset_T_10 = io_regFile_aFmt == 4'hB;	// src/workerbee/scala/main/WbEnum.scala:20:105, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+      io_regFile_requantOn & (|(io_regFile_rqMBase[1:0]));	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:242:{31,52,59}
+    automatic logic            _GEN_10;	// src/workerbee/scala/main/WbEnum.scala:9:54
+    automatic logic            _GEN_11 = io_regFile_k == 16'h0;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:261:36
+    automatic logic            _GEN_12 = (|(io_regFile_k[4:0])) | _GEN_11;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:260:{36,57,66}, :261:36
+    automatic logic            _GEN_13;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:259:48
+    automatic logic            _GEN_14;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:269:48
+    automatic logic            _GEN_15 = (|(io_regFile_k[5:0])) | _GEN_11;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:261:36, :279:{36,57,66}
+    automatic logic            _GEN_16;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:278:48
+    automatic logic            _GEN_17;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:290:{48,85}
+    automatic logic            _GEN_18;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:301:50
+    automatic logic            _GEN_19;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:307:50
+    automatic logic            _GEN_20;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:320:{50,89}
+    automatic logic            _calcConfig_aColTileAddressOffset_T_13;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:337:30
+    automatic logic            _GEN_21;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:337:50
+    automatic logic            _cIsIntOut_T_1;	// src/workerbee/scala/main/WbEnum.scala:19:57
+    automatic logic            _calcConfig_aColTileAddressOffset_T_12;	// src/workerbee/scala/main/WbEnum.scala:16:42
+    automatic logic            _GEN_22;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:354:19
+    automatic logic            _GEN_23;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:367:48
+    automatic logic            _GEN_24;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:379:50
+    automatic logic            _GEN_25;	// src/workerbee/scala/main/WbEnum.scala:14:43
+    automatic logic            _GEN_26;	// src/workerbee/scala/main/WbEnum.scala:14:60
+    automatic logic            _GEN_27;	// src/workerbee/scala/main/WbEnum.scala:14:55, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:394:86
+    automatic logic            _calcConfig_bColTileAddressOffset_T_52;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:407:73
+    automatic logic            _GEN_28;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:395:48, :407:{52,94}, :408:21
+    automatic logic            errComb;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:170:98, :171:68, :173:34, :178:24, :179:17, :183:46, :184:17, :190:79, :191:21, :196:84, :197:17, :201:59, :202:17, :215:55, :216:17, :223:65, :224:17, :238:112, :239:17, :242:67, :243:17, :261:46, :262:21, :271:46, :272:21, :280:46, :281:21, :293:75, :294:21, :303:46, :304:21, :309:46, :310:21, :324:73, :325:21, :339:46, :340:21, :354:31, :355:17, :367:86, :368:21, :379:89, :380:21, :395:48, :396:21, :407:{52,94}, :408:21
+    automatic logic            _GEN_29;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:417:15
+    automatic logic            _GEN_30;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:417:15
+    automatic logic            _GEN_31;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:17:22, :417:15, :713:26, :714:17
+    automatic logic            _GEN_32;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:17:22, :417:15
+    automatic logic [3:0][3:0] _GEN_33;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:19:22, :417:15, :425:15, :434:20
+    _calcConfig_aColTileAddressOffset_T_3 = io_regFile_aFmt == 4'h8;	// src/workerbee/scala/main/WbEnum.scala:17:42, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+    _calcConfig_aColTileAddressOffset_T_4 = io_regFile_aFmt == 4'h3;	// src/workerbee/scala/main/WbEnum.scala:17:56, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+    _calcConfig_aColTileAddressOffset_T_6 = io_regFile_aFmt == 4'h4;	// src/workerbee/scala/main/WbEnum.scala:17:72, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+    _calcConfig_aColTileAddressOffset_T_8 = io_regFile_aFmt == 4'hA;	// src/workerbee/scala/main/WbEnum.scala:17:88, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+    _calcConfig_aColTileAddressOffset_T_10 = io_regFile_aFmt == 4'hB;	// src/workerbee/scala/main/WbEnum.scala:17:105, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
     aKLoadNum =
       _calcConfig_aColTileAddressOffset_T_3 | _calcConfig_aColTileAddressOffset_T_4
       | _calcConfig_aColTileAddressOffset_T_6 | _calcConfig_aColTileAddressOffset_T_8
       | _calcConfig_aColTileAddressOffset_T_10
         ? 8'h20
-        : 8'h40;	// src/workerbee/scala/main/WbEnum.scala:20:{42,51,56,67,72,83,88,100,105}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:72:29, :73:13, :75:13, :1054:56
-    _calcConfig_bColTileAddressOffset_T_42 = io_regFile_bFmt == 4'h8;	// src/workerbee/scala/main/WbEnum.scala:20:42, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _calcConfig_bColTileAddressOffset_T_43 = io_regFile_bFmt == 4'h3;	// src/workerbee/scala/main/WbEnum.scala:20:56, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _calcConfig_bColTileAddressOffset_T_45 = io_regFile_bFmt == 4'h4;	// src/workerbee/scala/main/WbEnum.scala:20:72, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _calcConfig_bColTileAddressOffset_T_47 = io_regFile_bFmt == 4'hA;	// src/workerbee/scala/main/WbEnum.scala:20:88, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _calcConfig_bColTileAddressOffset_T_49 = io_regFile_bFmt == 4'hB;	// src/workerbee/scala/main/WbEnum.scala:20:105, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+        : 8'h40;	// src/workerbee/scala/main/WbEnum.scala:17:{42,51,56,67,72,83,88,100,105}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:65:29, :66:13, :68:13, :593:56
+    _calcConfig_bColTileAddressOffset_T_42 = io_regFile_bFmt == 4'h8;	// src/workerbee/scala/main/WbEnum.scala:17:42, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+    _calcConfig_bColTileAddressOffset_T_43 = io_regFile_bFmt == 4'h3;	// src/workerbee/scala/main/WbEnum.scala:17:56, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+    _calcConfig_bColTileAddressOffset_T_45 = io_regFile_bFmt == 4'h4;	// src/workerbee/scala/main/WbEnum.scala:17:72, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+    _calcConfig_bColTileAddressOffset_T_47 = io_regFile_bFmt == 4'hA;	// src/workerbee/scala/main/WbEnum.scala:17:88, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+    _calcConfig_bColTileAddressOffset_T_49 = io_regFile_bFmt == 4'hB;	// src/workerbee/scala/main/WbEnum.scala:17:105, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
     bKLoadNum =
       _calcConfig_bColTileAddressOffset_T_42 | _calcConfig_bColTileAddressOffset_T_43
       | _calcConfig_bColTileAddressOffset_T_45 | _calcConfig_bColTileAddressOffset_T_47
       | _calcConfig_bColTileAddressOffset_T_49
         ? 8'h20
-        : 8'h40;	// src/workerbee/scala/main/WbEnum.scala:20:{42,51,56,67,72,83,88,100,105}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:72:29, :73:13, :75:13, :1054:56
-    _calcConfig_bColTileAddressOffset_T_40 = io_regFile_bFmt == 4'h5;	// src/workerbee/scala/main/WbEnum.scala:11:43, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _calcConfig_bColTileAddressOffset_T_39 = io_regFile_bFmt == 4'h9;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :167:58
-    _calcConfig_aColTileAddressOffset_T = io_regFile_aFmt == 4'h9;	// src/workerbee/scala/main/WbEnum.scala:21:45, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _calcConfig_aColTileAddressOffset_T_1 = io_regFile_aFmt == 4'h5;	// src/workerbee/scala/main/WbEnum.scala:21:59, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+        : 8'h40;	// src/workerbee/scala/main/WbEnum.scala:17:{42,51,56,67,72,83,88,100,105}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:65:29, :66:13, :68:13, :593:56
+    _calcConfig_bColTileAddressOffset_T_40 = io_regFile_bFmt == 4'h5;	// src/workerbee/scala/main/WbEnum.scala:10:43, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+    _calcConfig_bColTileAddressOffset_T_39 = io_regFile_bFmt == 4'h9;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :145:58
+    _calcConfig_aColTileAddressOffset_T = io_regFile_aFmt == 4'h9;	// src/workerbee/scala/main/WbEnum.scala:18:45, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+    _calcConfig_aColTileAddressOffset_T_1 = io_regFile_aFmt == 4'h5;	// src/workerbee/scala/main/WbEnum.scala:18:59, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
     isAMx =
       _calcConfig_aColTileAddressOffset_T_4 | _calcConfig_aColTileAddressOffset_T_6
-      | _calcConfig_aColTileAddressOffset_T_1;	// src/workerbee/scala/main/WbEnum.scala:9:{53,69}, :20:{56,72}, :21:59
+      | _calcConfig_aColTileAddressOffset_T_1;	// src/workerbee/scala/main/WbEnum.scala:8:{53,69}, :17:{56,72}, :18:59
     isBMx =
       _calcConfig_bColTileAddressOffset_T_43 | _calcConfig_bColTileAddressOffset_T_45
-      | _calcConfig_bColTileAddressOffset_T_40;	// src/workerbee/scala/main/WbEnum.scala:9:{53,69}, :11:43, :20:{56,72}
-    _errMXLargerThanKLoadNum_T_16 = io_regFile_cFmt == 4'h3;	// src/workerbee/scala/main/WbEnum.scala:9:42, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _errMXLargerThanKLoadNum_T_17 = io_regFile_cFmt == 4'h4;	// src/workerbee/scala/main/WbEnum.scala:9:58, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _errMXLargerThanKLoadNum_T_19 = io_regFile_cFmt == 4'h5;	// src/workerbee/scala/main/WbEnum.scala:9:74, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _GEN = isAMx ^ isBMx;	// src/workerbee/scala/main/WbEnum.scala:9:{53,69}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:204:16
-    _GEN_0 = (isAMx | isBMx) & ~io_regFile_loadWMode;	// src/workerbee/scala/main/WbEnum.scala:9:{53,69}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:194:22, :209:{15,38}
+      | _calcConfig_bColTileAddressOffset_T_40;	// src/workerbee/scala/main/WbEnum.scala:8:{53,69}, :10:43, :17:{56,72}
+    _errMXLargerThanKLoadNum_T_16 = io_regFile_cFmt == 4'h3;	// src/workerbee/scala/main/WbEnum.scala:8:42, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+    _errMXLargerThanKLoadNum_T_17 = io_regFile_cFmt == 4'h4;	// src/workerbee/scala/main/WbEnum.scala:8:58, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+    _errMXLargerThanKLoadNum_T_19 = io_regFile_cFmt == 4'h5;	// src/workerbee/scala/main/WbEnum.scala:8:74, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+    _GEN = isAMx ^ isBMx;	// src/workerbee/scala/main/WbEnum.scala:8:{53,69}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:178:16
+    _GEN_0 = (isAMx | isBMx) & ~io_regFile_loadWMode;	// src/workerbee/scala/main/WbEnum.scala:8:{53,69}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:168:22, :183:{15,38}
     _GEN_1 =
-      _calcConfig_aColTileAddressOffset_T_8 | _calcConfig_aColTileAddressOffset_T_10;	// src/workerbee/scala/main/WbEnum.scala:17:55, :20:{88,105}
-    _GEN_2 = _GEN_1 & ~io_regFile_loadWMode;	// src/workerbee/scala/main/WbEnum.scala:17:55, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:209:38, :220:48
-    _GEN_3 = io_regFile_aFmt == 4'h0;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :225:26
-    _GEN_4 = io_regFile_bFmt == 4'h0;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :225:64
-    _GEN_5 = _GEN_3 | _GEN_4;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:225:{26,46,64}
-    _cIsIntOut_T = io_regFile_cFmt == 4'h8;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :370:52
-    _cIsIntOut_T_3 = io_regFile_cFmt == 4'h9;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :370:91
-    _GEN_8 = io_regFile_requantOn & ~(_cIsIntOut_T | _cIsIntOut_T_3);	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:370:{31,34,52,72,91}
+      _calcConfig_aColTileAddressOffset_T_8 | _calcConfig_aColTileAddressOffset_T_10;	// src/workerbee/scala/main/WbEnum.scala:14:55, :17:{88,105}
+    _GEN_2 = _GEN_1 & ~io_regFile_loadWMode;	// src/workerbee/scala/main/WbEnum.scala:14:55, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:183:38, :190:48
+    _GEN_3 = io_regFile_aFmt == 4'h0;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :196:26
+    _GEN_4 = io_regFile_bFmt == 4'h0;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :196:64
+    _GEN_5 = _GEN_3 | _GEN_4;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:196:{26,46,64}
+    _cIsIntOut_T = io_regFile_cFmt == 4'h8;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :238:52
+    _cIsIntOut_T_3 = io_regFile_cFmt == 4'h9;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :238:91
+    _GEN_8 = io_regFile_requantOn & ~(_cIsIntOut_T | _cIsIntOut_T_3);	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:238:{31,34,52,72,91}
     _GEN_10 =
-      _calcConfig_aColTileAddressOffset_T_4 | _calcConfig_aColTileAddressOffset_T_6;	// src/workerbee/scala/main/WbEnum.scala:10:54, :20:{56,72}
-    _GEN_13 = _GEN_10 & _GEN_12;	// src/workerbee/scala/main/WbEnum.scala:10:54, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:427:48, :428:66
-    _GEN_14 = _GEN_1 & _GEN_12;	// src/workerbee/scala/main/WbEnum.scala:17:55, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:428:66, :440:48
-    _GEN_16 = _calcConfig_aColTileAddressOffset_T_1 & _GEN_15;	// src/workerbee/scala/main/WbEnum.scala:21:59, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:449:48, :450:66
+      _calcConfig_aColTileAddressOffset_T_4 | _calcConfig_aColTileAddressOffset_T_6;	// src/workerbee/scala/main/WbEnum.scala:9:54, :17:{56,72}
+    _GEN_13 = _GEN_10 & _GEN_12;	// src/workerbee/scala/main/WbEnum.scala:9:54, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:259:48, :260:66
+    _GEN_14 = _GEN_1 & _GEN_12;	// src/workerbee/scala/main/WbEnum.scala:14:55, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:260:66, :269:48
+    _GEN_16 = _calcConfig_aColTileAddressOffset_T_1 & _GEN_15;	// src/workerbee/scala/main/WbEnum.scala:18:59, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:278:48, :279:66
     _GEN_17 =
       _GEN_10 & _calcConfig_bColTileAddressOffset_T_40
-      & (|{_GEN_15, io_regFile_bAddr[4:0]});	// src/workerbee/scala/main/WbEnum.scala:10:54, :11:43, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:450:66, :462:{48,85}, :464:45, :465:{34,65}
-    _GEN_18 = _calcConfig_aColTileAddressOffset_T_3 & _GEN_12;	// src/workerbee/scala/main/WbEnum.scala:20:42, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:428:66, :480:50
-    _GEN_19 = _calcConfig_aColTileAddressOffset_T & _GEN_15;	// src/workerbee/scala/main/WbEnum.scala:21:45, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:450:66, :486:50
+      & (|{_GEN_15, io_regFile_bAddr[4:0]});	// src/workerbee/scala/main/WbEnum.scala:9:54, :10:43, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:279:66, :290:{48,85}, :292:45, :293:{34,65}
+    _GEN_18 = _calcConfig_aColTileAddressOffset_T_3 & _GEN_12;	// src/workerbee/scala/main/WbEnum.scala:17:42, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:260:66, :301:50
+    _GEN_19 = _calcConfig_aColTileAddressOffset_T & _GEN_15;	// src/workerbee/scala/main/WbEnum.scala:18:45, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:279:66, :307:50
     _GEN_20 =
       _calcConfig_aColTileAddressOffset_T_3 & _calcConfig_bColTileAddressOffset_T_39
       & (|{(|{~io_regFile_loadWMode, io_regFile_k[5:0]}) | _GEN_11,
-           io_regFile_bAddr[4:0]});	// src/workerbee/scala/main/WbEnum.scala:20:42, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:167:58, :209:38, :429:36, :450:36, :465:34, :506:{50,89}, :507:44, :508:{58,66}, :509:45, :510:64
-    _cIsIntOut_T_1 = io_regFile_cFmt == 4'h7;	// src/workerbee/scala/main/WbEnum.scala:22:57, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _calcConfig_aColTileAddressOffset_T_12 = io_regFile_aFmt == 4'h1;	// src/workerbee/scala/main/WbEnum.scala:19:42, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _calcConfig_aColTileAddressOffset_T_13 = io_regFile_aFmt == 4'h2;	// src/workerbee/scala/main/WbEnum.scala:19:56, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _GEN_21 =
+           io_regFile_bAddr[4:0]});	// src/workerbee/scala/main/WbEnum.scala:17:42, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:145:58, :183:38, :261:36, :279:36, :293:34, :320:{50,89}, :321:44, :322:{58,66}, :323:45, :324:64
+    _calcConfig_aColTileAddressOffset_T_13 = io_regFile_aFmt == 4'h2;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :337:30
+    _GEN_21 = _calcConfig_aColTileAddressOffset_T_13 & ((|(io_regFile_k[3:0])) | _GEN_11);	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:261:36, :337:{30,50}, :338:{36,51,60}
+    _cIsIntOut_T_1 = io_regFile_cFmt == 4'h7;	// src/workerbee/scala/main/WbEnum.scala:19:57, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+    _calcConfig_aColTileAddressOffset_T_12 = io_regFile_aFmt == 4'h1;	// src/workerbee/scala/main/WbEnum.scala:16:42, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+    _GEN_22 =
       ~(_calcConfig_aColTileAddressOffset_T_12 | _calcConfig_aColTileAddressOffset_T_13)
       & (|io_regFile_aFmt)
       & ~(_calcConfig_aColTileAddressOffset_T_4 | _calcConfig_aColTileAddressOffset_T_6
           | _calcConfig_aColTileAddressOffset_T_1)
       & ~(_calcConfig_aColTileAddressOffset_T_8 | _calcConfig_aColTileAddressOffset_T_10)
-      ^ (_cIsIntOut_T | _cIsIntOut_T_1 | _cIsIntOut_T_3 | io_regFile_cFmt == 4'h6);	// src/workerbee/scala/main/WbEnum.scala:9:{53,69}, :17:55, :19:{42,51,56}, :20:{56,72,88,105}, :21:59, :22:{52,57,67}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :370:{52,91}, :576:{55,74}, :577:{21,55,74,94}, :578:{7,41,44}, :579:19
-    _GEN_22 = _calcConfig_aColTileAddressOffset_T_1 & io_regFile_bFmt != 4'h5;	// src/workerbee/scala/main/WbEnum.scala:11:43, :21:59, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :629:{48,51}
-    _GEN_23 =
-      _calcConfig_aColTileAddressOffset_T & _calcConfig_bColTileAddressOffset_T_42;	// src/workerbee/scala/main/WbEnum.scala:20:42, :21:45, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:649:50
-    _GEN_24 = io_regFile_cFmt == 4'hA;	// src/workerbee/scala/main/WbEnum.scala:17:43, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _GEN_25 = io_regFile_cFmt == 4'hB;	// src/workerbee/scala/main/WbEnum.scala:17:60, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-    _GEN_26 =
+      ^ (_cIsIntOut_T | _cIsIntOut_T_1 | _cIsIntOut_T_3 | io_regFile_cFmt == 4'h6);	// src/workerbee/scala/main/WbEnum.scala:8:{53,69}, :14:55, :16:{42,51}, :17:{56,72,88,105}, :18:59, :19:{52,57,67}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :238:{52,91}, :337:30, :351:{55,74}, :352:{21,55,74,94}, :353:{7,41,44}, :354:19
+    _GEN_23 = _calcConfig_aColTileAddressOffset_T_1 & io_regFile_bFmt != 4'h5;	// src/workerbee/scala/main/WbEnum.scala:10:43, :18:59, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :367:{48,51}
+    _GEN_24 =
+      _calcConfig_aColTileAddressOffset_T & _calcConfig_bColTileAddressOffset_T_42;	// src/workerbee/scala/main/WbEnum.scala:17:42, :18:45, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:379:50
+    _GEN_25 = io_regFile_cFmt == 4'hA;	// src/workerbee/scala/main/WbEnum.scala:14:43, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+    _GEN_26 = io_regFile_cFmt == 4'hB;	// src/workerbee/scala/main/WbEnum.scala:14:60, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
+    _GEN_27 =
       _GEN_1
       ^ (_calcConfig_bColTileAddressOffset_T_47 | _calcConfig_bColTileAddressOffset_T_49)
-      | _GEN_24 | _GEN_25;	// src/workerbee/scala/main/WbEnum.scala:17:{43,55,60}, :20:{88,105}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:678:{49,86}
+      | _GEN_25 | _GEN_26;	// src/workerbee/scala/main/WbEnum.scala:14:{43,55,60}, :17:{88,105}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:394:{49,86}
+    _calcConfig_bColTileAddressOffset_T_52 = io_regFile_bFmt == 4'h2;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :407:73
+    _GEN_28 =
+      _calcConfig_aColTileAddressOffset_T_13 != _calcConfig_bColTileAddressOffset_T_52;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:337:30, :395:48, :407:{52,73,94}, :408:21
     errComb =
-      _GEN_26 | _GEN_23 | _GEN_22 | _GEN_21 | _GEN_20 | _GEN_19 | _GEN_18 | _GEN_17
-      | _GEN_16 | _GEN_14 | _GEN_13 | _GEN_9 | _GEN_8 | _GEN_7
+      _GEN_28 | _GEN_27 | _GEN_24 | _GEN_23 | _GEN_22 | _GEN_21 | _GEN_20 | _GEN_19
+      | _GEN_18 | _GEN_17 | _GEN_16 | _GEN_14 | _GEN_13 | _GEN_9 | _GEN_8 | _GEN_7
       | (|(io_regFile_cAddr[4:0])) | _GEN_6 | _GEN_5 | _GEN_2 | _GEN_0 | _GEN
       | (io_regFile_aMxBlockSize ? 8'h20 : 8'h10) > aKLoadNum
       & (_calcConfig_aColTileAddressOffset_T_4 | _calcConfig_aColTileAddressOffset_T_6
@@ -263,31 +270,32 @@ module Wb_WorkerBeeCalcConfig(	// src/workerbee/scala/main/WorkerBeeCalcConfig.s
          | _calcConfig_bColTileAddressOffset_T_40)
       | (io_regFile_cMxBlockSize ? 8'h20 : 8'h10) > 8'h10
       & (_errMXLargerThanKLoadNum_T_16 | _errMXLargerThanKLoadNum_T_17
-         | _errMXLargerThanKLoadNum_T_19);	// src/workerbee/scala/main/WbEnum.scala:9:{42,53,58,69,74}, :11:43, :17:55, :20:{56,72}, :21:59, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:39:32, :40:13, :42:13, :72:29, :73:13, :75:13, :196:{50,63,98}, :197:{20,33,68}, :198:{20,34}, :199:34, :204:{16,24}, :205:17, :209:{15,46}, :210:17, :220:{48,79}, :221:21, :225:{46,84}, :226:17, :234:{23,59}, :235:17, :319:{26,47,55}, :320:17, :340:{28,65}, :341:17, :370:{31,112}, :371:17, :374:{31,67}, :375:17, :427:48, :429:46, :430:21, :440:48, :442:46, :443:21, :449:48, :451:46, :452:21, :462:{48,85}, :465:75, :466:21, :480:50, :482:46, :483:21, :486:50, :488:46, :489:21, :506:{50,89}, :510:73, :511:21, :579:{19,31}, :580:17, :629:{48,86}, :630:21, :649:{50,89}, :650:21, :678:86, :679:48, :680:21, :1054:56, :1057:56
-    _GEN_27 = state == 2'h0;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:28:24, :744:15
-    _GEN_28 = state == 2'h1;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:28:24, :744:15, :757:15
-    _GEN_29 = (&state) & io_startIn;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:17:22, :28:24, :744:15, :1239:26, :1240:17
-    _GEN_30 = state == 2'h2 | ~_GEN_29;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:17:22, :28:24, :73:30, :744:15, :1239:26, :1240:17
+         | _errMXLargerThanKLoadNum_T_19);	// src/workerbee/scala/main/WbEnum.scala:8:{42,53,58,69,74}, :10:43, :14:55, :17:{56,72}, :18:59, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:38:32, :39:13, :41:13, :65:29, :66:13, :68:13, :170:{50,63,98}, :171:{20,33,68}, :172:{20,34}, :173:34, :178:{16,24}, :179:17, :183:{15,46}, :184:17, :190:{48,79}, :191:21, :196:{46,84}, :197:17, :201:{23,59}, :202:17, :215:{26,47,55}, :216:17, :223:{28,65}, :224:17, :238:{31,112}, :239:17, :242:{31,67}, :243:17, :259:48, :261:46, :262:21, :269:48, :271:46, :272:21, :278:48, :280:46, :281:21, :290:{48,85}, :293:75, :294:21, :301:50, :303:46, :304:21, :307:50, :309:46, :310:21, :320:{50,89}, :324:73, :325:21, :337:50, :339:46, :340:21, :354:{19,31}, :355:17, :367:{48,86}, :368:21, :379:{50,89}, :380:21, :394:86, :395:48, :396:21, :407:{52,94}, :408:21, :593:56, :596:56
+    _GEN_29 = state == 2'h0;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:28:24, :417:15
+    _GEN_30 = state == 2'h1;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:28:24, :417:15, :427:15
+    _GEN_31 = (&state) & io_startIn;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:17:22, :28:24, :417:15, :713:26, :714:17
+    _GEN_32 = state == 2'h2 | ~_GEN_31;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:17:22, :28:24, :66:30, :417:15, :713:26, :714:17
     if (reset) begin	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
       err <= 1'h0;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:17:22
       state <= 2'h0;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:28:24
     end
     else begin	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
-      automatic logic [3:0][1:0] _GEN_32;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:744:15, :756:24, :769:13, :1230:15
-      err <= ~_GEN_27 & (_GEN_28 ? (errComb ? errComb : err) : _GEN_30 & err);	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:17:22, :196:98, :197:68, :199:34, :204:24, :205:17, :209:46, :210:17, :220:79, :221:21, :225:84, :226:17, :234:59, :235:17, :319:55, :320:17, :340:65, :341:17, :370:112, :371:17, :374:67, :375:17, :429:46, :430:21, :442:46, :443:21, :451:46, :452:21, :465:75, :466:21, :482:46, :483:21, :488:46, :489:21, :510:73, :511:21, :579:31, :580:17, :629:86, :630:21, :649:89, :650:21, :679:48, :680:21, :744:15, :754:11, :764:20, :765:13
-      _GEN_32 = {{_GEN_29 ? 2'h1 : state}, {2'h3}, {2'h2}, {io_startIn ? 2'h1 : state}};	// src/workerbee/scala/main/WbEnum.scala:20:56, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:17:22, :28:24, :73:30, :744:15, :756:24, :757:15, :769:13, :1230:15, :1239:26, :1240:17, :1242:19
-      state <= _GEN_32[state];	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:28:24, :744:15, :756:24, :769:13, :1230:15
+      automatic logic [3:0][1:0] _GEN_34;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:417:15, :426:24, :439:13, :707:15
+      err <= ~_GEN_29 & (_GEN_30 ? (errComb ? errComb : err) : _GEN_32 & err);	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:17:22, :170:98, :171:68, :173:34, :178:24, :179:17, :183:46, :184:17, :190:79, :191:21, :196:84, :197:17, :201:59, :202:17, :215:55, :216:17, :223:65, :224:17, :238:112, :239:17, :242:67, :243:17, :261:46, :262:21, :271:46, :272:21, :280:46, :281:21, :293:75, :294:21, :303:46, :304:21, :309:46, :310:21, :324:73, :325:21, :339:46, :340:21, :354:31, :355:17, :367:86, :368:21, :379:89, :380:21, :395:48, :396:21, :407:{52,94}, :408:21, :417:15, :424:11, :434:20, :435:13
+      _GEN_34 = {{_GEN_31 ? 2'h1 : state}, {2'h3}, {2'h2}, {io_startIn ? 2'h1 : state}};	// src/workerbee/scala/main/WbEnum.scala:17:56, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:17:22, :28:24, :66:30, :417:15, :426:24, :427:15, :439:13, :707:15, :713:26, :714:17, :716:19
+      state <= _GEN_34[state];	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:28:24, :417:15, :426:24, :439:13, :707:15
     end
     errNext <= err;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:17:22, :18:26
-    _GEN_31 =
-      {{_GEN_30 ? errCode : 4'h0},
+    _GEN_33 =
+      {{_GEN_32 ? errCode : 4'h0},
        {errCode},
        {errComb
-          ? (_GEN_26 | _GEN_23 | _GEN_22
+          ? (_GEN_28 | _GEN_27 | _GEN_24 | _GEN_23
                ? 4'h3
-               : _GEN_21
+               : _GEN_22
                    ? 4'hB
-                   : _GEN_20 | _GEN_19 | _GEN_18 | _GEN_17 | _GEN_16 | _GEN_14 | _GEN_13
+                   : _GEN_21 | _GEN_20 | _GEN_19 | _GEN_18 | _GEN_17 | _GEN_16 | _GEN_14
+                     | _GEN_13
                        ? 4'h8
                        : _GEN_9 | _GEN_8
                            ? 4'hD
@@ -301,83 +309,85 @@ module Wb_WorkerBeeCalcConfig(	// src/workerbee/scala/main/WorkerBeeCalcConfig.s
                                            ? 4'h5
                                            : _GEN_2 | _GEN_0 ? 4'h4 : _GEN ? 4'h3 : 4'h0)
           : errCode},
-       {4'h0}};	// src/workerbee/scala/main/WbEnum.scala:17:55, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :17:22, :19:22, :196:98, :197:68, :199:34, :204:{16,24}, :205:17, :206:21, :209:{15,46}, :210:17, :211:21, :220:{48,79}, :221:21, :222:25, :225:{46,84}, :226:17, :227:21, :234:{23,59}, :235:17, :236:21, :319:{26,47,55}, :320:17, :321:21, :340:{28,65}, :341:17, :342:21, :370:{31,112}, :371:17, :372:21, :374:{31,67}, :375:17, :376:21, :427:48, :429:46, :430:21, :431:25, :440:48, :442:46, :443:21, :444:25, :449:48, :451:46, :452:21, :453:25, :462:{48,85}, :465:75, :466:21, :467:25, :480:50, :482:46, :483:21, :484:25, :486:50, :488:46, :489:21, :490:25, :506:{50,89}, :510:73, :511:21, :512:25, :579:{19,31}, :580:17, :581:21, :629:{48,86}, :630:21, :631:25, :649:{50,89}, :650:21, :651:25, :678:86, :679:48, :680:21, :681:25, :744:15, :755:15, :764:20, :766:17
-    errCode <= _GEN_31[state];	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:19:22, :28:24, :744:15, :755:15, :764:20
-    if (_GEN_27 | ~_GEN_28) begin	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :744:15
+       {4'h0}};	// src/workerbee/scala/main/WbEnum.scala:14:55, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :17:22, :19:22, :170:98, :171:68, :173:34, :178:{16,24}, :179:17, :180:21, :183:{15,46}, :184:17, :185:21, :190:{48,79}, :191:21, :192:25, :196:{46,84}, :197:17, :198:21, :201:{23,59}, :202:17, :203:21, :215:{26,47,55}, :216:17, :217:21, :223:{28,65}, :224:17, :225:21, :238:{31,112}, :239:17, :240:21, :242:{31,67}, :243:17, :244:21, :259:48, :261:46, :262:21, :263:25, :269:48, :271:46, :272:21, :273:25, :278:48, :280:46, :281:21, :282:25, :290:{48,85}, :293:75, :294:21, :295:25, :301:50, :303:46, :304:21, :305:25, :307:50, :309:46, :310:21, :311:25, :320:{50,89}, :324:73, :325:21, :326:25, :337:50, :339:46, :340:21, :341:25, :354:{19,31}, :355:17, :356:21, :367:{48,86}, :368:21, :369:25, :379:{50,89}, :380:21, :381:25, :394:86, :395:48, :396:21, :397:25, :407:{52,94}, :408:21, :409:25, :417:15, :425:15, :434:20, :436:17
+    errCode <= _GEN_33[state];	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:19:22, :28:24, :417:15, :425:15, :434:20
+    if (_GEN_29 | ~_GEN_30) begin	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :417:15
     end
-    else begin	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :744:15
-      automatic logic        w4a8Mix;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:157:37
-      automatic logic [16:0] _GEN_33 = {1'h0, io_regFile_n};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:771:41
-      automatic logic        _GEN_34;	// src/workerbee/scala/main/WbEnum.scala:20:{51,67,83,100}
-      automatic logic [31:0] _GEN_35 = {14'h0, io_regFile_k, 2'h0};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:804:34
-      automatic logic [31:0] _GEN_36 = {15'h0, io_regFile_k, 1'h0};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:806:34
-      automatic logic [31:0] _GEN_37 = {16'h0, io_regFile_k};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:808:34
-      automatic logic [31:0] _GEN_38 = {17'h0, io_regFile_k[15:1]};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:810:{34,50}
-      automatic logic        _GEN_39;	// src/workerbee/scala/main/WbEnum.scala:18:51
-      automatic logic [31:0] _GEN_40 = {14'h0, io_regFile_n, 2'h0};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:870:34
-      automatic logic        _GEN_41 =
-        io_regFile_bFmt == 4'h1 | io_regFile_bFmt == 4'h2 | io_regFile_bFmt == 4'h7;	// src/workerbee/scala/main/WbEnum.scala:19:{42,51,56}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :871:{47,66}
-      automatic logic [31:0] _GEN_42 = {15'h0, io_regFile_n, 1'h0};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:872:34
-      automatic logic        _GEN_43;	// src/workerbee/scala/main/WbEnum.scala:20:{51,67,83,100}
-      automatic logic [31:0] _GEN_44 = {16'h0, io_regFile_n};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:874:34
-      automatic logic [13:0] _GEN_45;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:941:53
-      automatic logic        _GEN_46;	// src/workerbee/scala/main/WbEnum.scala:21:54
-      automatic logic        _GEN_47;	// src/workerbee/scala/main/WbEnum.scala:20:{51,67,83,100}
-      automatic logic        _GEN_48;	// src/workerbee/scala/main/WbEnum.scala:19:51, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:977:45
-      automatic logic [31:0] _GEN_49 = {21'h0, io_regFile_k[15:5]};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:1053:{43,59}
-      automatic logic [31:0] _GEN_50 = {20'h0, io_regFile_k[15:4]};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:1056:{43,59}
-      automatic logic [7:0]  cWriteBytes;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:1206:44, :1207:17, :1208:47
-      automatic logic        _GEN_51;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:1216:20
-      automatic logic [15:0] _calcConfig_nTile_T_2 = io_regFile_n + 16'hF;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:771:{41,56}
-      automatic logic [15:0] _calcConfig_kTile_T_3 = io_regFile_k + 16'hF;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:786:{44,59}
-      automatic logic [13:0] _calcConfig_bColTileAddressOffset_T_56;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:949:55
-      automatic logic [13:0] _calcConfig_bColTileAddressOffset_T_37;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:941:53
-      automatic logic [16:0] _calcConfig_scaleCRowAddressOffset_T_2 = _GEN_33 + 17'hF;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:771:41, :1085:60
-      automatic logic [16:0] _calcConfig_scaleCRowAddressOffset_T = _GEN_33 + 17'h1F;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:771:41, :1081:60
-      automatic logic [7:0]  _calcConfig_cDmaDmaBeatTar_T;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:1223:44
+    else begin	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :417:15
+      automatic logic        w4a8Mix;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:138:37
+      automatic logic [16:0] _GEN_35 = {1'h0, io_regFile_n};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:441:41
+      automatic logic        _GEN_36;	// src/workerbee/scala/main/WbEnum.scala:17:{51,67,83,100}
+      automatic logic [31:0] _GEN_37 = {14'h0, io_regFile_k, 2'h0};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:465:34
+      automatic logic [31:0] _GEN_38 = {15'h0, io_regFile_k, 1'h0};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:467:34
+      automatic logic [31:0] _GEN_39 = {16'h0, io_regFile_k};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:469:34
+      automatic logic [31:0] _GEN_40 = {17'h0, io_regFile_k[15:1]};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:471:{34,50}
+      automatic logic        _GEN_41;	// src/workerbee/scala/main/WbEnum.scala:15:51
+      automatic logic [31:0] _GEN_42 = {14'h0, io_regFile_n, 2'h0};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:494:34
+      automatic logic        _GEN_43;	// src/workerbee/scala/main/WbEnum.scala:16:51, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:495:47
+      automatic logic [31:0] _GEN_44 = {15'h0, io_regFile_n, 1'h0};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:496:34
+      automatic logic        _GEN_45;	// src/workerbee/scala/main/WbEnum.scala:17:{51,67,83,100}
+      automatic logic [31:0] _GEN_46 = {16'h0, io_regFile_n};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:498:34
+      automatic logic [13:0] _GEN_47;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:534:53
+      automatic logic        _GEN_48;	// src/workerbee/scala/main/WbEnum.scala:18:54
+      automatic logic        _GEN_49;	// src/workerbee/scala/main/WbEnum.scala:17:{51,67,83,100}
+      automatic logic        _GEN_50;	// src/workerbee/scala/main/WbEnum.scala:16:51, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:558:45
+      automatic logic [31:0] _GEN_51 = {21'h0, io_regFile_k[15:5]};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:592:{43,59}
+      automatic logic [31:0] _GEN_52 = {20'h0, io_regFile_k[15:4]};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:595:{43,59}
+      automatic logic [7:0]  cWriteBytes;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:683:44, :684:17, :685:47
+      automatic logic        _GEN_53;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:693:20
+      automatic logic [15:0] _calcConfig_nTile_T_2 = io_regFile_n + 16'hF;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:441:{41,56}
+      automatic logic [15:0] _calcConfig_kTile_T_3 = io_regFile_k + 16'hF;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:455:{44,59}
+      automatic logic [13:0] _calcConfig_bColTileAddressOffset_T_56;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:540:55
+      automatic logic [13:0] _calcConfig_bColTileAddressOffset_T_37;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:534:53
+      automatic logic [16:0] _calcConfig_scaleCRowAddressOffset_T_2 = _GEN_35 + 17'hF;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:441:41, :622:60
+      automatic logic [16:0] _calcConfig_scaleCRowAddressOffset_T = _GEN_35 + 17'h1F;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:441:41, :618:60
+      automatic logic [7:0]  _calcConfig_cDmaDmaBeatTar_T;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:700:44
       w4a8Mix =
         (_calcConfig_aColTileAddressOffset_T_4 | _calcConfig_aColTileAddressOffset_T_6)
-        & _calcConfig_bColTileAddressOffset_T_40;	// src/workerbee/scala/main/WbEnum.scala:10:54, :11:43, :20:{56,72}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:157:37
-      _GEN_34 =
+        & _calcConfig_bColTileAddressOffset_T_40;	// src/workerbee/scala/main/WbEnum.scala:9:54, :10:43, :17:{56,72}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:138:37
+      _GEN_36 =
         _calcConfig_aColTileAddressOffset_T_3 | _calcConfig_aColTileAddressOffset_T_4
         | _calcConfig_aColTileAddressOffset_T_6 | _calcConfig_aColTileAddressOffset_T_8
-        | _calcConfig_aColTileAddressOffset_T_10;	// src/workerbee/scala/main/WbEnum.scala:20:{42,51,56,67,72,83,88,100,105}
-      _GEN_39 = _GEN_4 | io_regFile_bFmt == 4'h6;	// src/workerbee/scala/main/WbEnum.scala:18:{51,56}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :225:64
+        | _calcConfig_aColTileAddressOffset_T_10;	// src/workerbee/scala/main/WbEnum.scala:17:{42,51,56,67,72,83,88,100,105}
+      _GEN_41 = _GEN_4 | io_regFile_bFmt == 4'h6;	// src/workerbee/scala/main/WbEnum.scala:15:{51,56}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :196:64
       _GEN_43 =
+        io_regFile_bFmt == 4'h1 | _calcConfig_bColTileAddressOffset_T_52
+        | io_regFile_bFmt == 4'h7;	// src/workerbee/scala/main/WbEnum.scala:16:{42,51}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :407:73, :495:{47,66}
+      _GEN_45 =
         _calcConfig_bColTileAddressOffset_T_42 | _calcConfig_bColTileAddressOffset_T_43
         | _calcConfig_bColTileAddressOffset_T_45 | _calcConfig_bColTileAddressOffset_T_47
-        | _calcConfig_bColTileAddressOffset_T_49;	// src/workerbee/scala/main/WbEnum.scala:20:{42,51,56,67,72,83,88,100,105}
-      _GEN_45 = {6'h0, aKLoadNum};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:72:29, :73:13, :75:13, :941:53
-      _GEN_46 = _cIsIntOut_T_3 | _errMXLargerThanKLoadNum_T_19;	// src/workerbee/scala/main/WbEnum.scala:9:74, :21:54, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:370:91
-      _GEN_47 =
+        | _calcConfig_bColTileAddressOffset_T_49;	// src/workerbee/scala/main/WbEnum.scala:17:{42,51,56,67,72,83,88,100,105}
+      _GEN_47 = {6'h0, aKLoadNum};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:65:29, :66:13, :68:13, :534:53
+      _GEN_48 = _cIsIntOut_T_3 | _errMXLargerThanKLoadNum_T_19;	// src/workerbee/scala/main/WbEnum.scala:8:74, :18:54, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:238:91
+      _GEN_49 =
         _cIsIntOut_T | _errMXLargerThanKLoadNum_T_16 | _errMXLargerThanKLoadNum_T_17
-        | _GEN_24 | _GEN_25;	// src/workerbee/scala/main/WbEnum.scala:9:{42,58}, :17:{43,60}, :20:{51,67,83,100}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:370:52
-      _GEN_48 = io_regFile_cFmt == 4'h1 | io_regFile_cFmt == 4'h2 | _cIsIntOut_T_1;	// src/workerbee/scala/main/WbEnum.scala:19:{42,51,56}, :22:57, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :977:45
-      cWriteBytes = _GEN_46 ? 8'h8 : _GEN_47 ? 8'h10 : _GEN_48 ? 8'h20 : 8'h40;	// src/workerbee/scala/main/WbEnum.scala:19:51, :20:{51,67,83,100}, :21:54, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:977:45, :1054:56, :1057:56, :1206:44, :1207:17, :1208:47, :1209:17, :1210:87, :1211:17, :1213:17
-      _GEN_51 = cWriteBytes > 8'h20;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:1054:56, :1206:44, :1207:17, :1208:47, :1216:20
-      calcConfig_nTile <= {4'h0, _calcConfig_nTile_T_2[15:4]};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :20:25, :771:{41,56,63}
+        | _GEN_25 | _GEN_26;	// src/workerbee/scala/main/WbEnum.scala:8:{42,58}, :14:{43,60}, :17:{51,67,83,100}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:238:52
+      _GEN_50 = io_regFile_cFmt == 4'h1 | io_regFile_cFmt == 4'h2 | _cIsIntOut_T_1;	// src/workerbee/scala/main/WbEnum.scala:16:{42,51,56}, :19:57, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :558:45
+      cWriteBytes = _GEN_48 ? 8'h8 : _GEN_49 ? 8'h10 : _GEN_50 ? 8'h20 : 8'h40;	// src/workerbee/scala/main/WbEnum.scala:16:51, :17:{51,67,83,100}, :18:54, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:558:45, :593:56, :596:56, :683:44, :684:17, :685:47, :686:17, :687:87, :688:17, :690:17
+      _GEN_53 = cWriteBytes > 8'h20;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:593:56, :683:44, :684:17, :685:47, :693:20
+      calcConfig_nTile <= {4'h0, _calcConfig_nTile_T_2[15:4]};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :20:25, :441:{41,56,63}
       calcConfig_kTile <=
-        _GEN_34 | _calcConfig_aColTileAddressOffset_T
+        _GEN_36 | _calcConfig_aColTileAddressOffset_T
         | _calcConfig_aColTileAddressOffset_T_1
           ? io_regFile_k / {8'h0, aKLoadNum}
-          : {4'h0, _calcConfig_kTile_T_3[15:4]};	// src/workerbee/scala/main/WbEnum.scala:20:{51,67,83,100}, :21:{45,54,59}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :20:25, :72:29, :73:13, :75:13, :507:44, :508:58, :782:{43,82}, :783:{26,43}, :786:{26,44,59,66}
+          : {4'h0, _calcConfig_kTile_T_3[15:4]};	// src/workerbee/scala/main/WbEnum.scala:17:{51,67,83,100}, :18:{45,54,59}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :20:25, :65:29, :66:13, :68:13, :321:44, :322:58, :451:{43,82}, :452:{26,43}, :455:{26,44,59,66}
       calcConfig_aRowAddressOffset <=
         _GEN_3 | io_regFile_aFmt == 4'h6
-          ? _GEN_35
+          ? _GEN_37
           : _calcConfig_aColTileAddressOffset_T_12
             | _calcConfig_aColTileAddressOffset_T_13 | io_regFile_aFmt == 4'h7
-              ? _GEN_36
-              : _GEN_34 ? _GEN_37 : _GEN_38;	// src/workerbee/scala/main/WbEnum.scala:18:{51,56}, :19:{42,51,56}, :20:{51,67,83,100}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :20:25, :225:26, :803:41, :804:34, :805:{47,66,87}, :806:34, :807:47, :808:34, :810:34
+              ? _GEN_38
+              : _GEN_36 ? _GEN_39 : _GEN_40;	// src/workerbee/scala/main/WbEnum.scala:15:{51,56}, :16:{42,51}, :17:{51,67,83,100}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :20:25, :196:26, :337:30, :464:41, :465:34, :466:{47,66,87}, :467:34, :468:47, :469:34, :471:34
       calcConfig_bRowAddressOffset <=
         io_regFile_loadWMode
-          ? (_GEN_39 ? _GEN_35 : _GEN_41 ? _GEN_36 : _GEN_43 ? _GEN_37 : _GEN_38)
-          : _GEN_39
-              ? _GEN_40
-              : _GEN_41 ? _GEN_42 : _GEN_43 ? _GEN_44 : {17'h0, io_regFile_n[15:1]};	// src/workerbee/scala/main/WbEnum.scala:18:51, :19:51, :20:{51,67,83,100}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :804:34, :806:34, :808:34, :810:34, :868:35, :869:41, :870:34, :871:{47,87}, :872:34, :873:47, :874:34, :876:{34,50}, :880:41, :881:34, :882:87, :883:34, :884:47, :885:34, :887:34
+          ? (_GEN_41 ? _GEN_37 : _GEN_43 ? _GEN_38 : _GEN_45 ? _GEN_39 : _GEN_40)
+          : _GEN_41
+              ? _GEN_42
+              : _GEN_43 ? _GEN_44 : _GEN_45 ? _GEN_46 : {17'h0, io_regFile_n[15:1]};	// src/workerbee/scala/main/WbEnum.scala:15:51, :16:51, :17:{51,67,83,100}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :465:34, :467:34, :469:34, :471:34, :492:35, :493:41, :494:34, :495:{47,87}, :496:34, :497:47, :498:34, :500:{34,50}, :504:41, :505:34, :506:87, :507:34, :508:47, :509:34, :511:34
       calcConfig_cRowAddressOffset <=
-        _GEN_46
+        _GEN_48
           ? {17'h0, io_regFile_n[15:1]}
-          : _GEN_47 ? _GEN_44 : _GEN_48 ? _GEN_42 : _GEN_40;	// src/workerbee/scala/main/WbEnum.scala:19:51, :20:{51,67,83,100}, :21:54, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :870:34, :872:34, :874:34, :971:42, :972:{32,48}, :974:45, :975:32, :977:{45,85}, :978:32, :982:32
+          : _GEN_49 ? _GEN_46 : _GEN_50 ? _GEN_44 : _GEN_42;	// src/workerbee/scala/main/WbEnum.scala:16:51, :17:{51,67,83,100}, :18:54, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :494:34, :496:34, :498:34, :552:42, :553:{32,48}, :555:45, :556:32, :558:{45,85}, :559:32, :563:32
       calcConfig_aColTileAddressOffset <=
         {22'h0,
          {6'h0,
@@ -403,11 +413,11 @@ module Wb_WorkerBeeCalcConfig(	// src/workerbee/scala/main/WorkerBeeCalcConfig.s
                       | _calcConfig_aColTileAddressOffset_T_13 | io_regFile_aFmt == 4'h7
                         ? 6'h10
                         : 6'h20},
-         1'h0};	// src/workerbee/scala/main/WbEnum.scala:19:{42,51,56}, :20:{42,51,56,67,72,83,88,100,105}, :21:{45,54,59}, :58:21, :59:11, :60:24, :61:11, :63:11, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :20:25, :40:13, :125:32, :126:13, :127:35, :128:13, :129:{35,40,61}, :130:13, :132:13, :854:{38,68}
+         1'h0};	// src/workerbee/scala/main/WbEnum.scala:16:{42,51}, :17:{42,51,56,67,72,83,88,100,105}, :18:{45,54,59}, :40:21, :41:11, :42:24, :43:11, :45:11, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :20:25, :39:13, :108:32, :109:13, :110:35, :111:13, :112:{35,40,61}, :113:13, :115:13, :337:30, :483:{38,68}
       calcConfig_cColTileAddressOffset <=
-        _GEN_46 ? 32'h8 : _GEN_47 ? 32'h10 : _GEN_48 ? 32'h20 : 32'h40;	// src/workerbee/scala/main/WbEnum.scala:19:51, :20:{51,67,83,100}, :21:54, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :465:34, :971:42, :973:36, :974:45, :976:36, :977:{45,85}, :979:36, :983:36
+        _GEN_48 ? 32'h8 : _GEN_49 ? 32'h10 : _GEN_50 ? 32'h20 : 32'h40;	// src/workerbee/scala/main/WbEnum.scala:16:51, :17:{51,67,83,100}, :18:54, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :293:34, :552:42, :554:36, :555:45, :557:36, :558:{45,85}, :560:36, :564:36
       _calcConfig_bColTileAddressOffset_T_56 =
-        _GEN_45
+        _GEN_47
         * {8'h0,
            _calcConfig_bColTileAddressOffset_T_39 | _calcConfig_bColTileAddressOffset_T_40
              ? 6'h4
@@ -417,12 +427,12 @@ module Wb_WorkerBeeCalcConfig(	// src/workerbee/scala/main/WorkerBeeCalcConfig.s
                | _calcConfig_bColTileAddressOffset_T_47
                | _calcConfig_bColTileAddressOffset_T_49
                  ? 6'h8
-                 : io_regFile_bFmt == 4'h1 | io_regFile_bFmt == 4'h2
+                 : io_regFile_bFmt == 4'h1 | _calcConfig_bColTileAddressOffset_T_52
                    | io_regFile_bFmt == 4'h7
                      ? 6'h10
-                     : 6'h20};	// src/workerbee/scala/main/WbEnum.scala:11:43, :19:{42,51,56}, :20:{42,51,56,67,72,83,88,100,105}, :21:54, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :40:13, :125:32, :126:13, :127:35, :128:13, :129:{35,40,61}, :130:13, :132:13, :167:58, :507:44, :508:58, :941:53, :949:55
+                     : 6'h20};	// src/workerbee/scala/main/WbEnum.scala:10:43, :16:{42,51}, :17:{42,51,56,67,72,83,88,100,105}, :18:54, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :39:13, :108:32, :109:13, :110:35, :111:13, :112:{35,40,61}, :113:13, :115:13, :145:58, :321:44, :322:58, :407:73, :534:53, :540:55
       _calcConfig_bColTileAddressOffset_T_37 =
-        _GEN_45
+        _GEN_47
         * {8'h0,
            _calcConfig_bColTileAddressOffset_T_39 | _calcConfig_bColTileAddressOffset_T_40
              ? 6'h4
@@ -432,10 +442,10 @@ module Wb_WorkerBeeCalcConfig(	// src/workerbee/scala/main/WorkerBeeCalcConfig.s
                | _calcConfig_bColTileAddressOffset_T_47
                | _calcConfig_bColTileAddressOffset_T_49
                  ? 6'h8
-                 : io_regFile_bFmt == 4'h1 | io_regFile_bFmt == 4'h2
+                 : io_regFile_bFmt == 4'h1 | _calcConfig_bColTileAddressOffset_T_52
                    | io_regFile_bFmt == 4'h7
                      ? 6'h10
-                     : 6'h20};	// src/workerbee/scala/main/WbEnum.scala:11:43, :19:{42,51,56}, :20:{42,51,56,67,72,83,88,100,105}, :21:54, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :40:13, :125:32, :126:13, :127:35, :128:13, :129:{35,40,61}, :130:13, :132:13, :167:58, :507:44, :508:58, :941:53
+                     : 6'h20};	// src/workerbee/scala/main/WbEnum.scala:10:43, :16:{42,51}, :17:{42,51,56,67,72,83,88,100,105}, :18:54, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :39:13, :108:32, :109:13, :110:35, :111:13, :112:{35,40,61}, :113:13, :115:13, :145:58, :321:44, :322:58, :407:73, :534:53
       calcConfig_bColTileAddressOffset <=
         _calcConfig_aColTileAddressOffset_T_3 & _calcConfig_bColTileAddressOffset_T_39
           ? {21'h0, _calcConfig_bColTileAddressOffset_T_56[13:3]}
@@ -463,37 +473,38 @@ module Wb_WorkerBeeCalcConfig(	// src/workerbee/scala/main/WorkerBeeCalcConfig.s
                           | _calcConfig_bColTileAddressOffset_T_47
                           | _calcConfig_bColTileAddressOffset_T_49
                             ? 6'h8
-                            : io_regFile_bFmt == 4'h1 | io_regFile_bFmt == 4'h2
+                            : io_regFile_bFmt == 4'h1
+                              | _calcConfig_bColTileAddressOffset_T_52
                               | io_regFile_bFmt == 4'h7
                                 ? 6'h10
                                 : 6'h20},
-                 1'h0};	// src/workerbee/scala/main/WbEnum.scala:11:43, :19:{42,51,56}, :20:{42,51,56,67,72,83,88,100,105}, :21:54, :58:21, :59:11, :60:24, :61:11, :63:11, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :20:25, :40:13, :125:32, :126:13, :127:35, :128:13, :129:{35,40,61}, :130:13, :132:13, :157:37, :167:{39,58}, :935:{36,66}, :940:19, :941:{40,53,86}, :948:24, :949:{42,55,88}
-      calcConfig_scaleARowAddressOffset <= io_regFile_aMxBlockSize ? _GEN_49 : _GEN_50;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :1052:50, :1053:43, :1056:43
+                 1'h0};	// src/workerbee/scala/main/WbEnum.scala:10:43, :16:{42,51}, :17:{42,51,56,67,72,83,88,100,105}, :18:54, :40:21, :41:11, :42:24, :43:11, :45:11, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :20:25, :39:13, :108:32, :109:13, :110:35, :111:13, :112:{35,40,61}, :113:13, :115:13, :138:37, :145:{39,58}, :407:73, :529:{36,66}, :533:19, :534:{40,53,86}, :539:24, :540:{42,55,88}
+      calcConfig_scaleARowAddressOffset <= io_regFile_aMxBlockSize ? _GEN_51 : _GEN_52;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :591:50, :592:43, :595:43
       calcConfig_scaleAColTileAddressOffset <=
-        io_regFile_aMxBlockSize ? {29'h0, aKLoadNum[7:5]} : {28'h0, aKLoadNum[7:4]};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :72:29, :73:13, :75:13, :1052:50, :1054:{43,56}, :1057:{43,56}
-      calcConfig_scaleBRowAddressOffset <= io_regFile_bMxBlockSize ? _GEN_49 : _GEN_50;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :1053:43, :1056:43, :1060:50, :1061:43, :1065:43
+        io_regFile_aMxBlockSize ? {29'h0, aKLoadNum[7:5]} : {28'h0, aKLoadNum[7:4]};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :65:29, :66:13, :68:13, :591:50, :593:{43,56}, :596:{43,56}
+      calcConfig_scaleBRowAddressOffset <= io_regFile_bMxBlockSize ? _GEN_51 : _GEN_52;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :592:43, :595:43, :599:50, :600:43, :604:43
       calcConfig_scaleBColTileAddressOffset <=
         w4a8Mix
           ? {24'h0, aKLoadNum / {2'h0, io_regFile_bMxBlockSize ? 6'h20 : 6'h10}}
-          : io_regFile_bMxBlockSize ? {29'h0, bKLoadNum[7:5]} : {28'h0, bKLoadNum[7:4]};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :40:13, :72:29, :73:13, :75:13, :157:37, :1054:43, :1060:50, :1062:{43,56}, :1066:{43,56}, :1073:17, :1074:43, :1075:{17,22}
+          : io_regFile_bMxBlockSize ? {29'h0, bKLoadNum[7:5]} : {28'h0, bKLoadNum[7:4]};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :39:13, :65:29, :66:13, :68:13, :138:37, :593:43, :599:50, :601:{43,56}, :605:{43,56}, :611:17, :612:43, :613:{17,22}
       calcConfig_scaleCRowAddressOffset <=
         io_regFile_cMxBlockSize
           ? {20'h0, _calcConfig_scaleCRowAddressOffset_T[16:5]}
-          : {19'h0, _calcConfig_scaleCRowAddressOffset_T_2[16:4]};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :1080:50, :1081:{43,60,69}, :1085:{43,60,69}
-      calcConfig_scaleCColTileAddressOffset <= {31'h0, ~io_regFile_cMxBlockSize};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :1080:50, :1082:43, :1086:43
-      calcConfig_cBeatAddrStep <= _GEN_51 ? 32'h20 : {24'h0, cWriteBytes};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :465:34, :1054:43, :1206:44, :1207:17, :1208:47, :1216:{20,33}, :1217:30, :1221:30
-      calcConfig_cDmaBufBeatTar <= _GEN_51 ? {1'h0, cWriteBytes[7:5]} - 4'h1 : 4'h0;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :20:25, :1206:44, :1207:17, :1208:47, :1216:{20,33}, :1218:{31,46,58}, :1222:31
-      _calcConfig_cDmaDmaBeatTar_T = 8'h20 / cWriteBytes;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:1054:56, :1206:44, :1207:17, :1208:47, :1223:44
+          : {19'h0, _calcConfig_scaleCRowAddressOffset_T_2[16:4]};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :617:50, :618:{43,60,69}, :622:{43,60,69}
+      calcConfig_scaleCColTileAddressOffset <= {31'h0, ~io_regFile_cMxBlockSize};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :617:50, :619:43, :623:43
+      calcConfig_cBeatAddrStep <= _GEN_53 ? 32'h20 : {24'h0, cWriteBytes};	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25, :293:34, :593:43, :683:44, :684:17, :685:47, :693:{20,33}, :694:30, :698:30
+      calcConfig_cDmaBufBeatTar <= _GEN_53 ? {1'h0, cWriteBytes[7:5]} - 4'h1 : 4'h0;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :20:25, :683:44, :684:17, :685:47, :693:{20,33}, :695:{31,46,58}, :699:31
+      _calcConfig_cDmaDmaBeatTar_T = 8'h20 / cWriteBytes;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:593:56, :683:44, :684:17, :685:47, :700:44
       calcConfig_cDmaDmaBeatTar <=
-        _GEN_51 ? 4'h0 : _calcConfig_cDmaDmaBeatTar_T[3:0] - 4'h1;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :20:25, :1216:{20,33}, :1219:31, :1223:{31,44,58}
+        _GEN_53 ? 4'h0 : _calcConfig_cDmaDmaBeatTar_T[3:0] - 4'h1;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :20:25, :693:{20,33}, :696:31, :700:{31,44,58}
       calcConfig_isAX2 <=
         _calcConfig_aColTileAddressOffset_T_3 | _calcConfig_aColTileAddressOffset_T_4
         | _calcConfig_aColTileAddressOffset_T_6 | _calcConfig_aColTileAddressOffset_T_8
-        | _calcConfig_aColTileAddressOffset_T_10;	// src/workerbee/scala/main/WbEnum.scala:20:{42,51,56,67,72,83,88,100,105}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25
+        | _calcConfig_aColTileAddressOffset_T_10;	// src/workerbee/scala/main/WbEnum.scala:17:{42,51,56,67,72,83,88,100,105}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25
       calcConfig_isBX2 <=
         _calcConfig_bColTileAddressOffset_T_42 | _calcConfig_bColTileAddressOffset_T_43
         | _calcConfig_bColTileAddressOffset_T_45 | _calcConfig_bColTileAddressOffset_T_47
-        | _calcConfig_bColTileAddressOffset_T_49;	// src/workerbee/scala/main/WbEnum.scala:20:{42,51,56,67,72,83,88,100,105}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25
+        | _calcConfig_bColTileAddressOffset_T_49;	// src/workerbee/scala/main/WbEnum.scala:17:{42,51,56,67,72,83,88,100,105}, src/workerbee/scala/main/WorkerBeeCalcConfig.scala:20:25
     end
   end // always @(posedge)
   `ifdef ENABLE_INITIAL_REG_	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
@@ -538,7 +549,7 @@ module Wb_WorkerBeeCalcConfig(	// src/workerbee/scala/main/WorkerBeeCalcConfig.s
       `FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_startOut = state == 2'h2 & ~err;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :17:22, :28:24, :73:30, :1248:{22,30,33}
+  assign io_startOut = state == 2'h2 & ~err;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :17:22, :28:24, :66:30, :722:{22,30,33}
   assign io_errPluse = err & ~errNext;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :17:22, :18:26, :33:{20,22}
   assign io_errCode = errCode;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :19:22
   assign io_calcConfig_nTile = calcConfig_nTile;	// src/workerbee/scala/main/WorkerBeeCalcConfig.scala:5:7, :20:25

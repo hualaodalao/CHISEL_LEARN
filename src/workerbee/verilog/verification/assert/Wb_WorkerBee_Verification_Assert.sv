@@ -17,15 +17,15 @@
     `define ASSERT_VERBOSE_COND_ 1
   `endif // ASSERT_VERBOSE_COND
 `endif // not def ASSERT_VERBOSE_COND_
-module Wb_WorkerBee_Verification_Assert();	// src/workerbee/scala/main/WorkerBee.scala:483:11
-  `ifndef SYNTHESIS	// src/workerbee/scala/main/WorkerBee.scala:483:11
-    always @(posedge Wb_WorkerBee.clock) begin	// src/workerbee/scala/main/WorkerBee.scala:4:7, :483:11
+module Wb_WorkerBee_Verification_Assert();	// src/workerbee/scala/main/WorkerBee.scala:382:11
+  `ifndef SYNTHESIS	// src/workerbee/scala/main/WorkerBee.scala:382:11
+    always @(posedge Wb_WorkerBee.clock) begin	// src/workerbee/scala/main/WorkerBee.scala:4:7, :382:11
       if (~Wb_WorkerBee.reset & Wb_WorkerBee._layerCapture
-          & Wb_WorkerBee.biasSteal_layerCapture) begin	// src/workerbee/scala/main/WorkerBee.scala:4:7, :448:32, :483:{11,44,76}
-        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WorkerBee.scala:483:11
-          $error("Assertion failed: WorkerBeeExecutor epilogue fetch request while previous bias/rqM fetch still in flight\n");	// src/workerbee/scala/main/WorkerBee.scala:483:11
-        if (`STOP_COND_)	// src/workerbee/scala/main/WorkerBee.scala:483:11
-          $fatal;	// src/workerbee/scala/main/WorkerBee.scala:483:11
+          & Wb_WorkerBee.biasSteal_layerCapture) begin	// src/workerbee/scala/main/WorkerBee.scala:4:7, :347:32, :382:{11,44,76}
+        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WorkerBee.scala:382:11
+          $error("Assertion failed: WorkerBeeExecutor epilogue fetch request while previous bias/rqM fetch still in flight\n");	// src/workerbee/scala/main/WorkerBee.scala:382:11
+        if (`STOP_COND_)	// src/workerbee/scala/main/WorkerBee.scala:382:11
+          $fatal;	// src/workerbee/scala/main/WorkerBee.scala:382:11
       end
     end // always @(posedge)
   `endif // not def SYNTHESIS

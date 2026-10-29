@@ -17,18 +17,18 @@
     `define ASSERT_VERBOSE_COND_ 1
   `endif // ASSERT_VERBOSE_COND
 `endif // not def ASSERT_VERBOSE_COND_
-module Wb_FpCvtMx8ToMid_Verification_Assert();	// src/workerbee/scala/main/FpCvt.scala:173:9
-  `ifndef SYNTHESIS	// src/workerbee/scala/main/FpCvt.scala:173:9
-    always @(posedge Wb_FpCvtMx8ToMid.clock) begin	// src/workerbee/scala/main/FpCvt.scala:101:7, :173:9
+module Wb_FpCvtMx8ToMid_Verification_Assert();	// src/workerbee/scala/main/FpCvt.scala:125:9
+  `ifndef SYNTHESIS	// src/workerbee/scala/main/FpCvt.scala:125:9
+    always @(posedge Wb_FpCvtMx8ToMid.clock) begin	// src/workerbee/scala/main/FpCvt.scala:60:7, :125:9
       if (~Wb_FpCvtMx8ToMid.reset
           & ~(~Wb_FpCvtMx8ToMid.io_consumeValid
               | ~(Wb_FpCvtMx8ToMid.io_isE5M2
                     ? Wb_FpCvtMx8ToMid.isInfNanE5M2_layerCapture
-                    : Wb_FpCvtMx8ToMid.isInfNanE4M3_layerCapture))) begin	// src/workerbee/scala/main/FpCvt.scala:101:7, :102:14, :121:30, :146:25, :170:22, :173:{9,10,27,30}
-        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/FpCvt.scala:173:9
-          $error("Assertion failed: FpCvtMx8ToMid: MX element is inf/nan (saturated to fp32 max); indicates software-side anomaly\n");	// src/workerbee/scala/main/FpCvt.scala:173:9
-        if (`STOP_COND_)	// src/workerbee/scala/main/FpCvt.scala:173:9
-          $fatal;	// src/workerbee/scala/main/FpCvt.scala:173:9
+                    : Wb_FpCvtMx8ToMid.isInfNanE4M3_layerCapture))) begin	// src/workerbee/scala/main/FpCvt.scala:60:7, :61:14, :78:30, :100:25, :122:22, :125:{9,10,27,30}
+        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/FpCvt.scala:125:9
+          $error("Assertion failed: FpCvtMx8ToMid: MX element is inf/nan (saturated to fp32 max); indicates software-side anomaly\n");	// src/workerbee/scala/main/FpCvt.scala:125:9
+        if (`STOP_COND_)	// src/workerbee/scala/main/FpCvt.scala:125:9
+          $fatal;	// src/workerbee/scala/main/FpCvt.scala:125:9
       end
     end // always @(posedge)
   `endif // not def SYNTHESIS

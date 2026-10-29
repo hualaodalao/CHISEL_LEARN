@@ -43,57 +43,57 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module Wb_WbFusionMacInt(	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7
-  input         clock,	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7
-  input  [15:0] io_a,	// src/workerbee/scala/main/WbFusionMacInt.scala:55:14
-                io_b,	// src/workerbee/scala/main/WbFusionMacInt.scala:55:14
-  input  [39:0] io_cReg,	// src/workerbee/scala/main/WbFusionMacInt.scala:55:14
-  input  [3:0]  io_aFmt,	// src/workerbee/scala/main/WbFusionMacInt.scala:55:14
-                io_bFmt,	// src/workerbee/scala/main/WbFusionMacInt.scala:55:14
-  output [39:0] io_sum	// src/workerbee/scala/main/WbFusionMacInt.scala:55:14
+module Wb_WbFusionMacInt(	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7
+  input         clock,	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7
+  input  [15:0] io_a,	// src/workerbee/scala/main/WbFusionMacInt.scala:40:14
+                io_b,	// src/workerbee/scala/main/WbFusionMacInt.scala:40:14
+  input  [39:0] io_cReg,	// src/workerbee/scala/main/WbFusionMacInt.scala:40:14
+  input  [3:0]  io_aFmt,	// src/workerbee/scala/main/WbFusionMacInt.scala:40:14
+                io_bFmt,	// src/workerbee/scala/main/WbFusionMacInt.scala:40:14
+  output [39:0] io_sum	// src/workerbee/scala/main/WbFusionMacInt.scala:40:14
 );
 
-  reg         aIsInt8;	// src/workerbee/scala/main/WbFusionMacInt.scala:68:24
-  reg         aIsInt4;	// src/workerbee/scala/main/WbFusionMacInt.scala:69:24
-  reg         bIsInt8;	// src/workerbee/scala/main/WbFusionMacInt.scala:70:24
-  reg         bIsInt4;	// src/workerbee/scala/main/WbFusionMacInt.scala:71:24
-  wire [7:0]  _mul8_0_a_T_6 = aIsInt8 ? io_a[7:0] : {{5{io_a[3]}}, io_a[2:0]};	// src/workerbee/scala/main/WbFusionMacInt.scala:68:24, :74:{21,35,45,50,58,69}
-  wire [7:0]  _mul8_0_b_T_6 = bIsInt8 ? io_b[7:0] : {{5{io_b[3]}}, io_b[2:0]};	// src/workerbee/scala/main/WbFusionMacInt.scala:70:24, :75:{21,35,45,50,58,69}
-  wire [7:0]  _mul8_1_a_T_6 = aIsInt8 ? io_a[15:8] : {{5{io_a[7]}}, io_a[6:4]};	// src/workerbee/scala/main/WbFusionMacInt.scala:68:24, :79:{21,35,46,51,58,69}
-  wire [7:0]  _mul8_1_b_T_6 = bIsInt8 ? io_b[15:8] : {{5{io_b[7]}}, io_b[6:4]};	// src/workerbee/scala/main/WbFusionMacInt.scala:70:24, :80:{21,35,46,51,58,69}
-  wire        _r3_T = aIsInt4 & bIsInt4;	// src/workerbee/scala/main/WbFusionMacInt.scala:69:24, :71:24, :86:24
+  reg         aIsInt8;	// src/workerbee/scala/main/WbFusionMacInt.scala:51:24
+  reg         aIsInt4;	// src/workerbee/scala/main/WbFusionMacInt.scala:52:24
+  reg         bIsInt8;	// src/workerbee/scala/main/WbFusionMacInt.scala:53:24
+  reg         bIsInt4;	// src/workerbee/scala/main/WbFusionMacInt.scala:54:24
+  wire [7:0]  _mul8_0_a_T_6 = aIsInt8 ? io_a[7:0] : {{5{io_a[3]}}, io_a[2:0]};	// src/workerbee/scala/main/WbFusionMacInt.scala:51:24, :57:{21,35,45,50,58,69}
+  wire [7:0]  _mul8_0_b_T_6 = bIsInt8 ? io_b[7:0] : {{5{io_b[3]}}, io_b[2:0]};	// src/workerbee/scala/main/WbFusionMacInt.scala:53:24, :58:{21,35,45,50,58,69}
+  wire [7:0]  _mul8_1_a_T_6 = aIsInt8 ? io_a[15:8] : {{5{io_a[7]}}, io_a[6:4]};	// src/workerbee/scala/main/WbFusionMacInt.scala:51:24, :62:{21,35,46,51,58,69}
+  wire [7:0]  _mul8_1_b_T_6 = bIsInt8 ? io_b[15:8] : {{5{io_b[7]}}, io_b[6:4]};	// src/workerbee/scala/main/WbFusionMacInt.scala:53:24, :63:{21,35,46,51,58,69}
+  wire        _r3_T = aIsInt4 & bIsInt4;	// src/workerbee/scala/main/WbFusionMacInt.scala:52:24, :54:24, :69:24
   wire [15:0] _sumFull_T_6 =
     {{8{_mul8_0_a_T_6[7]}}, _mul8_0_a_T_6} * {{8{_mul8_0_b_T_6[7]}}, _mul8_0_b_T_6}
     + {{8{_mul8_1_a_T_6[7]}}, _mul8_1_a_T_6} * {{8{_mul8_1_b_T_6[7]}}, _mul8_1_b_T_6}
     + (_r3_T ? {{12{io_a[11]}}, io_a[11:8]} * {{12{io_b[11]}}, io_b[11:8]} : 16'h0)
-    + (_r3_T ? {{12{io_a[15]}}, io_a[15:12]} * {{12{io_b[15]}}, io_b[15:12]} : 16'h0);	// src/workerbee/scala/main/WbFusionMacInt.scala:74:21, :75:21, :76:21, :79:21, :80:21, :81:21, :84:{34,45}, :85:{34,45}, :86:{15,24,44}, :89:{34,45}, :90:{34,45}, :91:{15,44}, :94:{20,25,30}
-  always @(posedge clock) begin	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7
-    aIsInt8 <= io_aFmt == 4'h8;	// src/workerbee/scala/main/WbFusionMacInt.scala:68:{24,33}
-    aIsInt4 <= io_aFmt == 4'h9;	// src/workerbee/scala/main/WbFusionMacInt.scala:69:{24,33}
-    bIsInt8 <= io_bFmt == 4'h8;	// src/workerbee/scala/main/WbFusionMacInt.scala:68:33, :70:{24,33}
-    bIsInt4 <= io_bFmt == 4'h9;	// src/workerbee/scala/main/WbFusionMacInt.scala:69:33, :71:{24,33}
+    + (_r3_T ? {{12{io_a[15]}}, io_a[15:12]} * {{12{io_b[15]}}, io_b[15:12]} : 16'h0);	// src/workerbee/scala/main/WbFusionMacInt.scala:57:21, :58:21, :59:21, :62:21, :63:21, :64:21, :67:{34,45}, :68:{34,45}, :69:{15,24,44}, :71:{34,45}, :72:{34,45}, :73:{15,44}, :76:{20,25,30}
+  always @(posedge clock) begin	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7
+    aIsInt8 <= io_aFmt == 4'h8;	// src/workerbee/scala/main/WbFusionMacInt.scala:51:{24,33}
+    aIsInt4 <= io_aFmt == 4'h9;	// src/workerbee/scala/main/WbFusionMacInt.scala:52:{24,33}
+    bIsInt8 <= io_bFmt == 4'h8;	// src/workerbee/scala/main/WbFusionMacInt.scala:51:33, :53:{24,33}
+    bIsInt4 <= io_bFmt == 4'h9;	// src/workerbee/scala/main/WbFusionMacInt.scala:52:33, :54:{24,33}
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7
-      `FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7
+  `ifdef ENABLE_INITIAL_REG_	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7
+      `FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7
-      automatic logic [31:0] _RANDOM[0:0];	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7
-      `ifdef INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7
-        `INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7
+    initial begin	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7
+      automatic logic [31:0] _RANDOM[0:0];	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7
+      `ifdef INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7
+        `INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7
-        _RANDOM[/*Zero width*/ 1'b0] = `RANDOM;	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7
-        aIsInt8 = _RANDOM[/*Zero width*/ 1'b0][0];	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7, :68:24
-        aIsInt4 = _RANDOM[/*Zero width*/ 1'b0][1];	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7, :68:24, :69:24
-        bIsInt8 = _RANDOM[/*Zero width*/ 1'b0][2];	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7, :68:24, :70:24
-        bIsInt4 = _RANDOM[/*Zero width*/ 1'b0][3];	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7, :68:24, :71:24
+      `ifdef RANDOMIZE_REG_INIT	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7
+        _RANDOM[/*Zero width*/ 1'b0] = `RANDOM;	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7
+        aIsInt8 = _RANDOM[/*Zero width*/ 1'b0][0];	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7, :51:24
+        aIsInt4 = _RANDOM[/*Zero width*/ 1'b0][1];	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7, :51:24, :52:24
+        bIsInt8 = _RANDOM[/*Zero width*/ 1'b0][2];	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7, :51:24, :53:24
+        bIsInt4 = _RANDOM[/*Zero width*/ 1'b0][3];	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7, :51:24, :54:24
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7
-      `FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7
+    `ifdef FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7
+      `FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_sum = {{24{_sumFull_T_6[15]}}, _sumFull_T_6} + io_cReg;	// src/workerbee/scala/main/WbFusionMacInt.scala:37:7, :94:{20,25,30,35}
+  assign io_sum = {{24{_sumFull_T_6[15]}}, _sumFull_T_6} + io_cReg;	// src/workerbee/scala/main/WbFusionMacInt.scala:23:7, :76:{20,25,30,35}
 endmodule
 

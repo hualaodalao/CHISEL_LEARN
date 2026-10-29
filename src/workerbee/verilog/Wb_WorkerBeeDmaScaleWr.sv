@@ -43,151 +43,151 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module Wb_WorkerBeeDmaScaleWr(	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
-  input         clock,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
-                reset,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
-                io_start,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:596:14
-  output        io_busy,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:596:14
-  input         io_dmaExtWrIF_rsp_valid,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:596:14
-  output        io_dmaExtWrIF_req_valid,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:596:14
-  input         io_dmaExtWrIF_req_ready,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:596:14
-  output [31:0] io_dmaExtWrIF_req_payload_addr,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:596:14
-  output [7:0]  io_dmaExtWrIF_req_payload_data,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:596:14
-  input  [15:0] io_calcConfig_nTile,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:596:14
-  input  [31:0] io_calcConfig_scaleCRowAddressOffset,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:596:14
-                io_calcConfig_scaleCColTileAddressOffset,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:596:14
-                io_baseAddr,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:596:14
-  input  [15:0] io_regFile_m,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:596:14
-  input         io_bufPop_valid,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:596:14
-  output        io_bufPop_ready,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:596:14
-  input  [7:0]  io_bufPop_payload	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:596:14
+module Wb_WorkerBeeDmaScaleWr(	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
+  input         clock,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
+                reset,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
+                io_start,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:303:14
+  output        io_busy,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:303:14
+  input         io_dmaExtWrIF_rsp_valid,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:303:14
+  output        io_dmaExtWrIF_req_valid,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:303:14
+  input         io_dmaExtWrIF_req_ready,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:303:14
+  output [31:0] io_dmaExtWrIF_req_payload_addr,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:303:14
+  output [7:0]  io_dmaExtWrIF_req_payload_data,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:303:14
+  input  [15:0] io_calcConfig_nTile,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:303:14
+  input  [31:0] io_calcConfig_scaleCRowAddressOffset,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:303:14
+                io_calcConfig_scaleCColTileAddressOffset,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:303:14
+                io_baseAddr,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:303:14
+  input  [15:0] io_regFile_m,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:303:14
+  input         io_bufPop_valid,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:303:14
+  output        io_bufPop_ready,	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:303:14
+  input  [7:0]  io_bufPop_payload	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:303:14
 );
 
-  reg  [1:0]  state;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:617:22
-  reg  [31:0] curAddr;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:622:24
-  reg  [31:0] colAddr;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:623:24
-  reg  [31:0] rowStep;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:624:24
-  reg  [15:0] lineTarget;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:625:28
-  reg  [15:0] lineCounter;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:626:28
-  reg  [15:0] nCnt;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:627:21
-  reg  [1:0]  ostCredit;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:628:26
-  wire        _io_bufPop_ready_T = state == 2'h1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:617:22, :656:45
+  reg  [1:0]  state;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:320:22
+  reg  [31:0] curAddr;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:322:24
+  reg  [31:0] colAddr;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:323:24
+  reg  [31:0] rowStep;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:324:24
+  reg  [15:0] lineTarget;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:325:28
+  reg  [15:0] lineCounter;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:326:28
+  reg  [15:0] nCnt;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:327:21
+  reg  [1:0]  ostCredit;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:328:26
+  wire        _io_bufPop_ready_T = state == 2'h1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:320:22, :350:45
   wire        io_dmaExtWrIF_req_valid_0 =
-    _io_bufPop_ready_T & io_bufPop_valid & ostCredit != 2'h2;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:628:26, :656:{45,60,78,91}
-  always @(posedge clock) begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
-    if (reset) begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
-      state <= 2'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:617:22
-      curAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:622:24
-      colAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:622:24, :623:24
-      rowStep <= 32'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:622:24, :624:24
-      lineTarget <= 16'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:625:28
-      lineCounter <= 16'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:626:28
-      nCnt <= 16'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:627:21
-      ostCredit <= 2'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:628:26
+    _io_bufPop_ready_T & io_bufPop_valid & ostCredit != 2'h2;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:328:26, :350:{45,60,78,91}
+  always @(posedge clock) begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
+    if (reset) begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
+      state <= 2'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:320:22
+      curAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:322:24
+      colAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:322:24, :323:24
+      rowStep <= 32'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:322:24, :324:24
+      lineTarget <= 16'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:325:28
+      lineCounter <= 16'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:326:28
+      nCnt <= 16'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:327:21
+      ostCredit <= 2'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:328:26
     end
-    else begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
-      automatic logic            _GEN;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:634:14
+    else begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
+      automatic logic            _GEN;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:331:14
       automatic logic            _GEN_0;	// src/utils/Stream/Stream.scala:43:26
-      automatic logic            _GEN_1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:714:26
-      automatic logic            _GEN_2;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:691:17
-      automatic logic            _GEN_3;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:734:23
-      automatic logic [3:0][1:0] _GEN_4;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:617:22, :634:14, :656:45, :691:17, :698:41, :708:22, :728:22, :751:22
-      _GEN = state == 2'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:617:22, :634:14
-      _GEN_0 = io_dmaExtWrIF_req_valid_0 & io_dmaExtWrIF_req_ready;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:656:{60,78}
-      _GEN_1 = lineCounter == lineTarget - 16'h1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:625:28, :626:28, :714:{26,41}
-      _GEN_2 = state == 2'h2;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:617:22, :656:91, :691:17
-      _GEN_3 = nCnt == io_calcConfig_nTile - 16'h1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:627:21, :734:{23,47}
+      automatic logic            _GEN_1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:386:26
+      automatic logic            _GEN_2;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:368:17
+      automatic logic            _GEN_3;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:404:23
+      automatic logic [3:0][1:0] _GEN_4;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:320:22, :331:14, :350:45, :368:17, :373:41, :380:22, :398:22, :417:22
+      _GEN = state == 2'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:320:22, :331:14
+      _GEN_0 = io_dmaExtWrIF_req_valid_0 & io_dmaExtWrIF_req_ready;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:350:{60,78}
+      _GEN_1 = lineCounter == lineTarget - 16'h1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:325:28, :326:28, :386:{26,41}
+      _GEN_2 = state == 2'h2;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:320:22, :350:91, :368:17
+      _GEN_3 = nCnt == io_calcConfig_nTile - 16'h1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:327:21, :404:{23,47}
       _GEN_4 =
         {{io_start ? 2'h1 : ostCredit == 2'h0 ? 2'h0 : state},
          {io_start ? 2'h1 : {_GEN_3, 1'h1}},
          {io_start | ~(_GEN_0 & _GEN_1) ? state : 2'h2},
-         {io_start & _GEN ? 2'h1 : state}};	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:617:22, :628:26, :634:14, :656:{45,91}, :691:17, :698:{21,41}, :699:15, :708:22, :713:42, :714:{26,48}, :716:17, :728:22, :729:21, :734:{23,54}, :735:15, :742:17, :751:22, :752:21, :757:{28,37}, :759:15
-      state <= _GEN_4[state];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:617:22, :634:14, :656:45, :691:17, :698:41, :708:22, :728:22, :751:22
-      if (_GEN | io_start) begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:634:14, :770:24
-        curAddr <= io_baseAddr;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:622:24
-        colAddr <= io_calcConfig_scaleCColTileAddressOffset;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:623:24
-        rowStep <= io_calcConfig_scaleCRowAddressOffset;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:624:24
-        lineTarget <= io_regFile_m;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:625:28
-        nCnt <= 16'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:627:21
+         {io_start & _GEN ? 2'h1 : state}};	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:320:22, :328:26, :331:14, :350:{45,91}, :368:17, :373:{21,41}, :374:15, :380:22, :385:42, :386:{26,48}, :388:17, :398:22, :399:21, :404:{23,54}, :405:15, :411:17, :417:22, :418:21, :423:{28,37}, :425:15
+      state <= _GEN_4[state];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:320:22, :331:14, :350:45, :368:17, :373:41, :380:22, :398:22, :417:22
+      if (_GEN | io_start) begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:331:14, :432:24
+        curAddr <= io_baseAddr;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:322:24
+        colAddr <= io_calcConfig_scaleCColTileAddressOffset;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:323:24
+        rowStep <= io_calcConfig_scaleCRowAddressOffset;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:324:24
+        lineTarget <= io_regFile_m;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:325:28
+        nCnt <= 16'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:327:21
       end
-      else begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:770:24
-        automatic logic             _GEN_5;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:622:24, :728:22, :734:54, :740:17
-        automatic logic [3:0][15:0] _GEN_6;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:627:21, :634:14, :656:45, :691:17, :708:22, :728:22
-        _GEN_5 = io_start | _GEN_3;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:622:24, :728:22, :734:{23,54}, :740:17
-        if (~_GEN) begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:634:14
-          if (_io_bufPop_ready_T) begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:656:45
-            if (io_start | ~_GEN_0 | _GEN_1) begin	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:622:24, :708:22, :713:42, :714:{26,48}
+      else begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:432:24
+        automatic logic             _GEN_5;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:322:24, :398:22, :404:54, :409:17
+        automatic logic [3:0][15:0] _GEN_6;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:327:21, :331:14, :350:45, :368:17, :380:22, :398:22
+        _GEN_5 = io_start | _GEN_3;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:322:24, :398:22, :404:{23,54}, :409:17
+        if (~_GEN) begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:331:14
+          if (_io_bufPop_ready_T) begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:350:45
+            if (io_start | ~_GEN_0 | _GEN_1) begin	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:322:24, :380:22, :385:42, :386:{26,48}
             end
-            else	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:622:24, :708:22, :713:42, :714:48
-              curAddr <= curAddr + rowStep;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:622:24, :624:24, :719:30
+            else	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:322:24, :380:22, :385:42, :386:48
+              curAddr <= curAddr + rowStep;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:322:24, :324:24, :391:30
           end
-          else if (~_GEN_2 | _GEN_5) begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:622:24, :691:17, :728:22, :734:54, :740:17
+          else if (~_GEN_2 | _GEN_5) begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:322:24, :368:17, :398:22, :404:54, :409:17
           end
-          else	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:622:24, :691:17, :728:22
-            curAddr <= io_baseAddr + colAddr;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:622:24, :623:24, :740:32
+          else	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:322:24, :368:17, :398:22
+            curAddr <= io_baseAddr + colAddr;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:322:24, :323:24, :409:32
         end
-        if (_GEN | _io_bufPop_ready_T | ~_GEN_2 | _GEN_5) begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:622:24, :623:24, :634:14, :656:45, :691:17, :728:22, :734:54, :740:17
+        if (_GEN | _io_bufPop_ready_T | ~_GEN_2 | _GEN_5) begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:322:24, :323:24, :331:14, :350:45, :368:17, :398:22, :404:54, :409:17
         end
-        else	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:623:24, :691:17, :728:22
-          colAddr <= colAddr + io_calcConfig_scaleCColTileAddressOffset;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:623:24, :741:28
+        else	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:323:24, :368:17, :398:22
+          colAddr <= colAddr + io_calcConfig_scaleCColTileAddressOffset;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:323:24, :410:28
         _GEN_6 =
           {{(&state) & io_start ? 16'h0 : nCnt},
            {io_start ? 16'h0 : _GEN_3 ? nCnt : nCnt + 16'h1},
            {io_start ? 16'h0 : nCnt},
-           {nCnt}};	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:617:22, :626:28, :627:21, :634:14, :656:45, :691:17, :708:22, :711:21, :728:22, :732:21, :734:{23,54}, :739:{14,22}, :751:22, :754:21, :755:21
-        nCnt <= _GEN_6[state];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:617:22, :627:21, :634:14, :656:45, :691:17, :708:22, :728:22
+           {nCnt}};	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:320:22, :326:28, :327:21, :331:14, :350:45, :368:17, :380:22, :383:21, :398:22, :402:21, :404:{23,54}, :408:{14,22}, :417:22, :420:21, :421:21
+        nCnt <= _GEN_6[state];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:320:22, :327:21, :331:14, :350:45, :368:17, :380:22, :398:22
       end
-      if (_GEN)	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:634:14
-        lineCounter <= 16'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:626:28
-      else if (_io_bufPop_ready_T) begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:656:45
-        if (io_start)	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:596:14
-          lineCounter <= 16'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:626:28
+      if (_GEN)	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:331:14
+        lineCounter <= 16'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:326:28
+      else if (_io_bufPop_ready_T) begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:350:45
+        if (io_start)	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:303:14
+          lineCounter <= 16'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:326:28
         else if (_GEN_0)	// src/utils/Stream/Stream.scala:43:26
-          lineCounter <= _GEN_1 ? 16'h0 : lineCounter + 16'h1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:626:28, :714:{26,48}, :715:23, :718:{23,38}
+          lineCounter <= _GEN_1 ? 16'h0 : lineCounter + 16'h1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:326:28, :386:{26,48}, :387:23, :390:{23,38}
       end
-      else if ((_GEN_2 | (&state)) & io_start)	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:617:22, :626:28, :691:17, :728:22, :731:21, :751:22, :754:21
-        lineCounter <= 16'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:626:28
-      if (_GEN | (_io_bufPop_ready_T | _GEN_2 | (&state)) & io_start)	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:617:22, :634:{14,25}, :656:45, :691:17, :708:22, :712:21, :728:22, :751:22, :756:21
-        ostCredit <= 2'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:628:26
-      else if (~(_GEN_0 & io_dmaExtWrIF_rsp_valid)) begin	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:638:33
+      else if ((_GEN_2 | (&state)) & io_start)	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:320:22, :326:28, :368:17, :398:22, :401:21, :417:22, :420:21
+        lineCounter <= 16'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:326:28
+      if (_GEN | (_io_bufPop_ready_T | _GEN_2 | (&state)) & io_start)	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:320:22, :331:{14,25}, :350:45, :368:17, :380:22, :384:21, :398:22, :417:22, :422:21
+        ostCredit <= 2'h0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:328:26
+      else if (~(_GEN_0 & io_dmaExtWrIF_rsp_valid)) begin	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:335:33
         if (_GEN_0)	// src/utils/Stream/Stream.scala:43:26
-          ostCredit <= ostCredit + 2'h1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:628:26, :641:30
-        else if (io_dmaExtWrIF_rsp_valid)	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:596:14
-          ostCredit <= ostCredit - 2'h1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:628:26, :643:30
+          ostCredit <= ostCredit + 2'h1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:328:26, :338:30
+        else if (io_dmaExtWrIF_rsp_valid)	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:303:14
+          ostCredit <= ostCredit - 2'h1;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:328:26, :340:30
       end
     end
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
-      `FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
+  `ifdef ENABLE_INITIAL_REG_	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
+      `FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
-      automatic logic [31:0] _RANDOM[0:4];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
-      `ifdef INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
-        `INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
+    initial begin	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
+      automatic logic [31:0] _RANDOM[0:4];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
+      `ifdef INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
+        `INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
+      `ifdef RANDOMIZE_REG_INIT	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
         for (logic [2:0] i = 3'h0; i < 3'h5; i += 3'h1) begin
-          _RANDOM[i] = `RANDOM;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
-        end	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
-        state = _RANDOM[3'h0][1:0];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7, :617:22
-        curAddr = {_RANDOM[3'h0][31:2], _RANDOM[3'h1][1:0]};	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7, :617:22, :622:24
-        colAddr = {_RANDOM[3'h1][31:2], _RANDOM[3'h2][1:0]};	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7, :622:24, :623:24
-        rowStep = {_RANDOM[3'h2][31:2], _RANDOM[3'h3][1:0]};	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7, :623:24, :624:24
-        lineTarget = _RANDOM[3'h3][17:2];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7, :624:24, :625:28
-        lineCounter = {_RANDOM[3'h3][31:18], _RANDOM[3'h4][1:0]};	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7, :624:24, :626:28
-        nCnt = _RANDOM[3'h4][17:2];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7, :626:28, :627:21
-        ostCredit = _RANDOM[3'h4][19:18];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7, :626:28, :628:26
+          _RANDOM[i] = `RANDOM;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
+        end	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
+        state = _RANDOM[3'h0][1:0];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7, :320:22
+        curAddr = {_RANDOM[3'h0][31:2], _RANDOM[3'h1][1:0]};	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7, :320:22, :322:24
+        colAddr = {_RANDOM[3'h1][31:2], _RANDOM[3'h2][1:0]};	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7, :322:24, :323:24
+        rowStep = {_RANDOM[3'h2][31:2], _RANDOM[3'h3][1:0]};	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7, :323:24, :324:24
+        lineTarget = _RANDOM[3'h3][17:2];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7, :324:24, :325:28
+        lineCounter = {_RANDOM[3'h3][31:18], _RANDOM[3'h4][1:0]};	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7, :324:24, :326:28
+        nCnt = _RANDOM[3'h4][17:2];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7, :326:28, :327:21
+        ostCredit = _RANDOM[3'h4][19:18];	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7, :326:28, :328:26
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
-      `FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
+    `ifdef FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
+      `FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_busy = |state;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7, :617:22, :688:20
-  assign io_dmaExtWrIF_req_valid = io_dmaExtWrIF_req_valid_0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7, :656:{60,78}
-  assign io_dmaExtWrIF_req_payload_addr = curAddr;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7, :622:24
-  assign io_dmaExtWrIF_req_payload_data = io_bufPop_payload;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7
-  assign io_bufPop_ready = _io_bufPop_ready_T & io_dmaExtWrIF_req_ready;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:590:7, :656:45, :684:60
+  assign io_busy = |state;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7, :320:22, :365:20
+  assign io_dmaExtWrIF_req_valid = io_dmaExtWrIF_req_valid_0;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7, :350:{60,78}
+  assign io_dmaExtWrIF_req_payload_addr = curAddr;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7, :322:24
+  assign io_dmaExtWrIF_req_payload_data = io_bufPop_payload;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7
+  assign io_bufPop_ready = _io_bufPop_ready_T & io_dmaExtWrIF_req_ready;	// src/workerbee/scala/main/WorkerBeeDmaWrOnly.scala:298:7, :350:45, :361:60
 endmodule
 

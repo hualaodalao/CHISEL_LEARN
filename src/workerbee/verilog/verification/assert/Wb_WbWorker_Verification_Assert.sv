@@ -17,15 +17,15 @@
     `define ASSERT_VERBOSE_COND_ 1
   `endif // ASSERT_VERBOSE_COND
 `endif // not def ASSERT_VERBOSE_COND_
-module Wb_WbWorker_Verification_Assert();	// src/workerbee/scala/main/WbWorker.scala:190:9
-  `ifndef SYNTHESIS	// src/workerbee/scala/main/WbWorker.scala:190:9
-    always @(posedge Wb_WbWorker.clock) begin	// src/workerbee/scala/main/WbWorker.scala:60:7, :190:9
+module Wb_WbWorker_Verification_Assert();	// src/workerbee/scala/main/WbWorker.scala:126:9
+  `ifndef SYNTHESIS	// src/workerbee/scala/main/WbWorker.scala:126:9
+    always @(posedge Wb_WbWorker.clock) begin	// src/workerbee/scala/main/WbWorker.scala:28:7, :126:9
       if (~Wb_WbWorker.reset & Wb_WbWorker.io_loadVInLock
-          & Wb_WbWorker.io_loadWInLock) begin	// src/workerbee/scala/main/WbWorker.scala:60:7, :78:14, :190:{9,27}
-        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WbWorker.scala:190:9
-          $error("Assertion failed: WbWorker: loadVInLock and loadWInLock asserted simultaneously (mutually exclusive load modes)\n");	// src/workerbee/scala/main/WbWorker.scala:190:9
-        if (`STOP_COND_)	// src/workerbee/scala/main/WbWorker.scala:190:9
-          $fatal;	// src/workerbee/scala/main/WbWorker.scala:190:9
+          & Wb_WbWorker.io_loadWInLock) begin	// src/workerbee/scala/main/WbWorker.scala:28:7, :45:14, :126:{9,27}
+        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WbWorker.scala:126:9
+          $error("Assertion failed: WbWorker: loadVInLock and loadWInLock asserted simultaneously (mutually exclusive load modes)\n");	// src/workerbee/scala/main/WbWorker.scala:126:9
+        if (`STOP_COND_)	// src/workerbee/scala/main/WbWorker.scala:126:9
+          $fatal;	// src/workerbee/scala/main/WbWorker.scala:126:9
       end
     end // always @(posedge)
   `endif // not def SYNTHESIS

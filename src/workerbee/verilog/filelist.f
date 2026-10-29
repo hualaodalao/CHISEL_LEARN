@@ -1,10 +1,10 @@
 Wb_WorkerBeeRegIf.sv
 Wb_WorkerBeeCalcConfig.sv
-Wb_ram_32x256.sv
-Wb_Queue32_UInt256.sv
+Wb_ram_64x256.sv
+Wb_Queue64_UInt256.sv
 Wb_StreamFifo.sv
-Wb_ram_32x640.sv
-Wb_Queue32_UInt640.sv
+Wb_ram_64x640.sv
+Wb_Queue64_UInt640.sv
 Wb_StreamFifo_2.sv
 Wb_ram_64x32.sv
 Wb_Queue64_UInt32.sv
@@ -22,7 +22,9 @@ Wb_FpCvtMx8ToMid.sv
 Wb_FpCvtMx4ToMx8Mid.sv
 Wb_FpMulMx4.sv
 Wb_FpCvtMx4ToMid.sv
+Wb_FpMulBf16Mx.sv
 Wb_FpAddNarrow.sv
+verification/assert/Wb_WbFusionMacFp_Verification_Assert.sv
 Wb_WbFusionMacFp.sv
 Wb_WbFusionMacInt.sv
 Wb_WbWorkUnit.sv
