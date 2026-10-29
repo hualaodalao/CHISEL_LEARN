@@ -1,8 +1,0 @@
-Wb_FpMulMx8.sv
-verification/assert/Wb_FpCvtMx8ToMid_Verification_Assert.sv
-Wb_FpCvtMx8ToMid.sv
-Wb_FpCvtMx4ToMx8Mid.sv
-Wb_FpMulMx4.sv
-Wb_FpCvtMx4ToMid.sv
-Wb_FpAdd.sv
-Wb_WbFusionMacFp.sv

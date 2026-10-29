@@ -1,305 +1,610 @@
-# Hive NPU 性能分析
+# Hive NPU 端到端性能分析
 
-文档版本：`v0.4.0-draft`
+文档版本：`v0.6.0-draft`
 
-修订日期：`2026-10-28`
+修订日期：`2026-10-29`
 
-> 本文记录非规范性的性能推导、敏感性分析和公开产品数据。架构能力、接口和验收要求以[总体架构](arch.md)为准；代际产品演进、竞品定位、成本和里程碑以[架构路线图](arch_roadmap.md)为准。本文中的候选配置和算例不构成 RTL、PPA 或产品承诺。
+> 本文从完整请求出发，依次分析软件调度、执行计划、数据生命周期和硬件服务，最后以验收 case 检查预算是否可实现。硬件规格与批准服务目标以[总体架构](arch.md)为准，产品演进见[架构路线图](arch_roadmap.md)，逐层算法与张量推导见各模型拆解。本文没有集成系统实测结果。
 
-## 1. 文档边界
+## 1. 分析目标与工作负载
 
-本文用于回答性能选型中的“为什么”和“如果怎样”，包括：
+### 1.1 分析路径与文档边界
 
-- 公开产品资源配比能否作为本项目参考；
-- VPU 执行宽度变化对峰值、供数、面积和功耗的影响；
-- 工作负载对普通向量、特殊函数、归约和 attention 的需求；
-- 计算峰值与 local SRAM 流式带宽之间的 roofline 约束；
-- P0-5/P0-6 两个 FP8 语言模型与同源 BF16→MXFP8/MXFP4 分支的数值、容量、流量和服务阶段门；
-- YOLO11n/YOLO11s 双检测基线的完整流程、算子落点与数值/服务候选。
+本文要回答三个问题：完整任务需要多少计算、流量和活跃内存；这些需求如何落到各 core 和各阶段；实际系统能否在规定服务窗口内完成并保持数值质量。
 
-本文不定义 VPU ISA、接口协议、错误语义或产品代际。首版规范目标见[总体架构第 4.4 节](arch.md#44-vpu-职责与精度需求)和[第 12.7 节](arch.md#127-vpu-性能指标与接口要求)。
-
-2026-10-28总体架构新增批准官方[Qwen3.5-2B](https://huggingface.co/Qwen/Qwen3.5-2B)模型身份，G0工作负载范围扩至名义0.5B–2B。本文件现有语言模型算例仍只覆盖Qwen3-0.6B与DeepSeek-R1-Distill-Qwen-1.5B，未完成Qwen3.5-2B的精度、算子、状态容量或流量分析；既有KV、MAC和服务/质量门槛不能直接套用。新模型的执行格式、量化及服务/质量标准须独立评审，身份获批不代表4 GiB容量或当前硬件已经足以部署。
-
-## 2. VPU 配比、选型与工作负载分析
-
-当前批准基线为每 core 256-bit 等效执行宽度、500 MHz、FP32 8 GFLOPS / FP16 16 GFLOPS，以及一个 256-bit local 数据请求口。以下扩展选项不属于首版要求，也不代表外部 VPU 已实现。
-
-### 2.1 公开产品配比与比较边界
-
-公开 NPU 产品常只披露整数 TOPS 或 MAC 数，未披露独立 FP32/FP16 向量峰值，不能据总 TOPS 反推出 VPU 配比。下表用可核验的矩阵与通用浮点能力作参考；GPU CUDA 是通用浮点吞吐的代理，**不是独立 VPU**，也不把 CPU、DLA 或其他引擎相加后作为 GEMM 分子。核验来源见附录 A。
-
-| 产品/口径 | GPU 矩阵 INT8 稠密峰值 | 通用 FP32 峰值 | 通用 FP16 峰值 | INT8 / FP32 | INT8 / FP16 |
-|---|---:|---:|---:|---:|---:|
-| Jetson AGX Orin 64GB | 85 TOPS | 5.3 TFLOPS | 10.6 TFLOPS | 约 16.0:1 | 约 8.0:1 |
-| Jetson Orin Nano 8GB（Super） | 33 TOPS | 2.1 TFLOPS | 4.2 TFLOPS | 约 15.7:1 | 约 7.9:1 |
-| Jetson AGX Xavier GPU | 22 TOPS | 约 1.40 TFLOPS，推导值 | 未在本次引用中独立核验 | 约 15.7:1 | 不推算 |
-
-Orin 两行取厂家同一型号表的 `GPU Tensor Core INT8 Performance` 稠密值与 `GPU CUDA Core Performance`，不使用 170/67 sparse TOPS，也不使用整机含 DLA 的 AI TOPS。Xavier 的 FP32 按厂家披露的 512 CUDA cores、1.37 GHz，以及每核每拍一个 FP32 FMA（2 operations）推导为 1.403 TFLOPS；厂家列出的 11 FP16 TFLOPS 是矩阵峰值，不能填入通用 FP16 列。型号、频率、功耗档和支持精度不同，公开峰值的比不保证同时持续实现。
-
-Arm Ethos-U85 页面披露 128–2048 MAC 和最高 4 TOPS，但未给独立 FP32/FP16 向量 GFLOPS，故不计算 GEMM/VPU 比。以上不构成“行业统一 16:1”标准；本项目 FP8/INT8 与 FP32/FP16 的数值配比也不能当成同精度算法加速比。
-
-### 2.2 执行宽度与扩展档位
-
-以 VPU 500 MHz、每个 FP32 元素每拍一 FMA 为演算基准，单精度峰值为 `FP32_elements_per_cycle × 2 × f_VPU`。FP16 翻倍要求每拍处理两倍有效 FP16 FMA，不是仅支持 FP16 类型；FP16 输入/FP32 累加路径的吞吐单独统计，两种精度的峰值不同时相加。
-
-| 档位 | 等效执行宽度 | FP32 / FP16 FMA/cycle/core | 每 core FP32 / FP16 | 两核聚合 FP32 / FP16 | 四核聚合 FP32 / FP16 | INT8/FP8 GEMM / VPU FP32、FP16 |
-|---|---:|---:|---:|---:|---:|---|
-| 首版批准基线 | 256 bit | 8 / 16 | 8 / 16 GFLOPS | 16 / 32 GFLOPS | 32 / 64 GFLOPS | 64:1、32:1 |
-| 扩展选项 | 512 bit | 16 / 32 | 16 / 32 GFLOPS | 32 / 64 GFLOPS | 64 / 128 GFLOPS | 32:1、16:1 |
-| 更高吞吐选项 | 1024 bit | 32 / 64 | 32 / 64 GFLOPS | 64 / 128 GFLOPS | 128 / 256 GFLOPS | 16:1、8:1 |
-
-256-bit 是当前首版批准起点。512/1024-bit 只保留为性能评估选项，不因 Orin 的公开配比相近就升格为需求。同格式 INT4/MXFP4 的 GEMM 峰值翻倍也不自动要求 VPU 翻倍。
-
-计算宽度不是访存带宽：每拍 32 个 FP32 元素的一条操作数流为 1024 bit，500 MHz 下是 64 GB/s，但 FMA 可能有多条输入流及输出流，也可能通过寄存器复用减少 SRAM 访问。是否扩宽执行能力须同时比较算子服务时间、寄存器/缓冲成本、供数、面积和功耗；当前没有 PPA 数据证明某个扩展档具有产品收益。
-
-### 2.3 工作负载与时延敏感性
-
-对每个精度分别统计普通运算量 `F_V`、允许的向量阶段时间 `t_V` 和可达利用率 `u_V`，所需峰值可按 `P_V_peak ≥ F_V/(t_V×u_V)` 估算。若允许 GEMM 与 VPU 流水重叠，还需检验 `P_V_peak×u_V ≥ rho×P_G_peak×u_G`，其中 `rho=F_V/F_G` 来自同一任务的实际算子统计；没有重叠时，GEMM/VPU 时间相加。
-
-仅作敏感性演算：普通向量工作量若占矩阵 operations 的 2%，GEMM/VPU 可达利用率分别为 50%/25%，每 core 的 GEMM 峰值为 512 GOP/s，则所需向量峰值约 `0.02×0.50/0.25×512=20.48 GFLOPS`。这个假设下 8 GFLOPS 基线不能满足完全重叠条件，不能据此宣称首版无 VPU 瓶颈；2% 和利用率均非模型实测，也不能据此认定首版必须采用 1024-bit。exp、rsqrt、除法与归约串行延迟另行建模。
-
-采用第 3.1 节两个已批准模型，记 `Q=query_heads×head_dim`、`E=kv_heads×head_dim`，context=2048。Qwen3 的 Q=2048 不等于 H=1024，RoPE 和 attention 不应按 H 代替 Q。
-
-| 普通向量工作 | 每 token 的量级公式 | 边界 |
-|---|---|---|
-| 两次 RMSNorm/层 | `2×layers×(4H+2)` | 未含 final norm、Qwen3 Q/K norm 与全部调度开销 |
-| Q/K RoPE | `3×layers×(Q+E)` | 每二元组四乘两加，旋转系数已备好 |
-| SwiGLU | `4×layers×I` | exp 另计 |
-| softmax 普通运算 | `4×layers×query_heads×context` | 临时预算，不等于实际指令数 |
-
-两模型上述普通运算分别约 **4.50M / 4.25M operations/token**，SiLU/softmax 分别约 **1.004M / 0.939M exp/token**。未含 residual、转换、bias、量化辅助和 checkpoint scale 桥接；这不是完整 VPU 指令量。以第 3.6 节 G0 候选 6 / 2.5 token/s 演算，exp 平均需求约 6.02M / 2.35M 次/s；若只允许 20% token 时间给这一阶段，所需阶段能力增加五倍，且并非必然均分到两核。
-
-decode 普通运算可能远低于 FMA 峰值，但特殊函数、归约、动态量化及访存仍可限制端到端性能；不能用 GFLOPS 替代完整 kernel 服务时间。
-
-### 2.4 FP16 attention 回退的额外负担
-
-若 FP16 VPU 承担完整 QKᵀ 与 probability×V，decode 约为 `4×layers×Q×context` FLOP/token，causal prefill 约为 `2×layers×Q×S×(S+1)` FLOP。以下仅以首版 VPU 满利用率计算下界，不含 softmax、供数、量化与调度。
-
-| 模型 | context=2048 decode | S=512 prefill | G0 prefill 理想下界（32 GFLOPS） | Pro 下界（64 GFLOPS） |
-|---|---:|---:|---:|---:|
-| Qwen3-0.6B | 0.470 GFLOP/token | 30.123 GFLOP | 0.941 s | 0.471 s |
-| DeepSeek-R1-Distill-Qwen-1.5B | 0.352 GFLOP/token | 22.593 GFLOP | 0.706 s | 0.353 s |
-
-G0 decode 理想 attention 时间分别为 14.68 / 11.01 ms/token；实际 FP16 输入/FP32 归约吞吐、寄存器复用和 KV 重读会提高时间。若 attention 落到低精度 GEMM，必须另验 Q/K/V、概率量化、累加与精度；不能默认沿用 FP16 语义或同格式 MXFP4 峰值。GQA 的 KV heads 减少存储，不减少 query heads 对应的 attention 运算量。
-
-### 2.5 访存 roofline 与选型触发条件
-
-一个 256-bit local 请求口在 500 MHz 下每拍最多一个读或写时，读写合计峰值为 16 GB/s，而非读 16 + 写 16 GB/s。以寄存器内标量系数的 `y=a×x+b` 为例，每元素读 x、写 y，FP32 需 8 B、FP16 需 4 B，各贡献 2 FLOP；理想流式上限分别仅为 **4/8 GFLOPS**，未扣仲裁和 bank 冲突。因此 256-bit 执行的 8/16 GFLOPS 也不是单口流式保证。
-
-| FP32 标量系数 FMA 的持续目标 | 最低有效读写合计带宽 | 比较条件 |
-|---|---:|---|
-| 8 GFLOPS | 32 GB/s | 不能由首版单口连续流式供数达成 |
-| 16 GFLOPS | 64 GB/s | 执行扩到 512 bit 后仍需供数或复用 |
-| 32 GFLOPS | 128 GB/s | 执行扩到 1024 bit 后仍需供数或复用 |
-
-若 a、x、b 三个输入均为独立流式 FP32 向量，连同输出为 16 B/元素、2 FLOP，32 GFLOPS 则需 256 GB/s。流量模型必须按实际输入/输出和寄存器复用统计，不用单条 1024-bit 数据流的 64 GB/s 代替总带宽。
-
-演进优先检查寄存器/局部缓冲复用和算子融合，减少中间结果落 SRAM；仅在冻结工作负载的向量服务时间不达标时，比较特殊函数加速、归约优化、执行扩宽与端口扩展。拓宽数据路径必须同步重算总体架构第 12.3 节的请求压力、GEMM/DMA 并发、bank 冲突和 PPA。GFLOPS、exp 启动间隔、归约延迟与完整 kernel 服务时间分别测量，不以更大 FMA 阵列作为所有瓶颈的答案。
-
-## 3. P0-5/P0-6 双模型重评
-
-### 3.1 模型身份、配置与版本
-
-2026-10-27 已批准两个 FP8 signoff 模型与同源 BF16→MXFP8/MXFP4 评估路线；以下 revision 是本轮公开资料的核验快照，正式 manifest 仍须记录文件 hash、tokenizer、runtime 和生成 recipe。既有 checkpoint 的 FP8 发布格式不等于 GEMM 原生可直接运行。
-
-| 模型 / artifact | 核验 revision | 权重文件字节 | 量化身份 |
-|---|---|---:|---|
-| `Qwen/Qwen3-0.6B-FP8` | `e5be08033360965ceca7b0ffd72d521a51331ce0` | 1,062,975,744 | 官方 FP8 E4M3；weight block128×128、dynamic activation，含 BF16 tensor |
-| `RedHatAI/DeepSeek-R1-Distill-Qwen-1.5B-FP8-dynamic` | `b87f998fcda08540b81b50844bcdb811540db5e8` | 2,245,332,464 | 社区 FP8 E4M3；weight channel、activation token，LM head 未量化 |
-| `Qwen/Qwen3-0.6B` | `c1899de289a04d12100db370d81485cdf75e47ca` | 1,503,300,328 | MX 自量化的原始 BF16 源，不是部署完成的 MX checkpoint |
-| `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B` | `ad9f0ae0864d7fbcd1cd905e3c6c5b069cc8b562` | 3,554,214,621 | 同上；不是 MLA/MoE 模型 |
-
-| 配置 | Qwen3-0.6B | DeepSeek-R1-Distill-Qwen-1.5B |
-|---|---:|---:|
-| layers / hidden H / intermediate I | 28 / 1024 / 3072 | 28 / 1536 / 8960 |
-| query heads / KV heads / head dimension | 16 / 8 / 128 | 12 / 2 / 128 |
-| query width Q / KV width E | 2048 / 1024 | 1536 / 256 |
-| vocab / embedding 与 LM head 绑定 | 151936 / 是 | 151936 / 否 |
-| 主干 Linear 权重元素 P | 440,401,920 | 1,310,195,712 |
-| LM head 权重元素 V×H | 155,582,464 | 233,373,696 |
-| 主干＋LM head MAC/token | 595,984,384 | 1,543,569,408 |
-| FP16 KV 字节/token | 114,688（112 KiB） | 28,672（28 KiB） |
-| FP16 KV：2048 / 4096 tokens | 224 / 448 MiB | 56 / 112 MiB |
-
-主干元素按 `P=layers×(2H×Q+2H×E+3H×I)`，LM head 另计 `vocab×H`。embedding 查表不扫描全表，但绑定的 LM head 仍执行完整投影；不因 tying 删除这一计算。Qwen BF16 文件含绑定权重的存储副本，能否去重须校验 tensor 等值和导出布局，不能以逻辑唯一参数量替代文件容量。模型名中的 0.6B/1.5B 不是严格存储上限。
-
-### 3.2 FP8 scale 与同源 MX 执行分支
-
-| 路径 | 必须完成的映射 | 当前判断 |
-|---|---|---|
-| Qwen 已有 FP8 | weight scale 随 K 的128元素块变化；activation 分组/scale 以冻结 runtime 为准 | 不可丢弃 scale 或只在完整 K 归约后乘一个标量；候选是按 scale 边界分 K 子命令，FP32 输出缩放后显式累加，增加启动、C 写回与 VPU 流量 |
-| DeepSeek 已有 FP8 | 对主干 Linear 保留 per-token activation 与 per-output-channel weight scale | 数学上可在不跨 scale 域的归约后做缩放，仍需校验 bias、动态量化及实际 runtime；不是当前系统已实现的保证 |
-| 两个 FP8 的 BF16 层 | embedding、norm、LM head 及其余未量化 tensor 单列 | GEMM 默认不接收 BF16；候选是 VPU/片内 CPU 的合法精度实现，全部计入时延、带宽、功耗；不得静默重新量化后沿用原 FP8 成绩 |
-| 同源 BF16→MXFP8 | 主干 A/B 沿 K 每32元素一个 E8M0 scale；元素 E4M3/E5M2 候选，C FP32 | 已批准评估路线；先验证格式/布局/数值及 activation 运行时量化，再测性能 |
-| 同源 BF16→MXFP4 | 同样 block32，元素 E2M1、C FP32；首轮保留 embedding/LM head 的 BF16 参考精度 | 离线权重量化与动态 activation 量化分别交付；A/B 同为 MXFP4 才适用翻倍峰值，A8/B4 不适用 |
-| 后续本地 MX C | T=16 时 C block16；下一算子的 A 沿 K block32 | 两个独立 scale 的16元素块合成32元素块通常需重新量化，不能拼接冒充标准 MX；另验轴转换、误差和服务成本 |
-
-本轮源码核验 A/B MX 支持 block16/32；T=16 时 C MX block32 超过输出几何，首阶段 C FP32 避开这一限制。标准 MX 的 block32 不要求扩大首阶段 GEMM 输入 block。NVFP4 包含每16元素的 E4M3 block scale，以及额外的 tensor/global scale；当前 Hive 不支持这一额外缩放级。MX 使用 E8M0 block scale，不依赖 NVFP4 第二级 scale，本地 E8M0 MX block16 也不等于 NVFP4。不能直接删除第二级 scale 或把 NVFP4 字节改名为 MX；若转换须另立 artifact、重新量化并验数值和服务。
-
-建议每个 BF16 源各导出 MXFP8 与 MXFP4，共四个独立 artifact。recipe 必须明确权重/activation 分组轴、元素格式、E8M0 scale 选择、RNE/饱和、非有限值/下溢、padding、未量化层、校准语料与 hash、样本长度/数量、seed、工具版本；这些细项尚未批准。先作矩阵与完整模型数值检查，不在 G0 上常驻 BF16 源执行量化，不将已有 FP8→MX 的再量化混作同源 BF16 分支。
-
-### 3.3 DRAM 流量、容量与在途服务
-
-以 batch=1、每 token 主干权重读取一次、LM head 保持2 B/element、KV FP16 为条件；暂不计 scale、padding、重复访问、activation、中间结果和其他主设备。理想 MX 主干字节分别为 `P×(1+1/32)` 和 `P×(0.5+1/32)`，其中每32元素含一个1 B scale。
-
-| 规划量 | Qwen3-0.6B | DeepSeek-R1-Distill-Qwen-1.5B |
-|---|---:|---:|
-| FP8 decode 权重流（主干＋BF16 LM head） | 0.752 GB/token | 1.777 GB/token |
-| MXFP8 权重流，含理想 block32 scale | 0.765 GB/token | 1.818 GB/token |
-| MXFP4 权重流，含理想 block32 scale | 0.545 GB/token | 1.163 GB/token |
-| FP8 权重＋2048-token KV 读取 | 0.986 GB/token | 1.836 GB/token |
-| NPU 可用8 GB/s下的上述流量上界 | 8.11 token/s | 4.36 token/s |
-| NPU 可用16 GB/s下的上述流量上界 | 16.22 token/s | 8.72 token/s |
-
-这里的 KV 是理想读取一次的下界；GQA head 复用不足、块访问、score 落内存、scale 桥接、写回和多核重复读都会增加流量。8/16 GB/s 是用于重评的 NPU 有效 payload 候选，不是纯权重带宽，也不是已批准服务保证。decode 的全文件字节不应计入整张 embedding 查表，但容量仍必须容纳实际部署副本。
-
-| LPDDR4x 4266 MT/s 候选效率 | G0 x32 | Pro x64 |
-|---|---:|---:|
-| 理论峰值 | 17.064 GB/s | 34.128 GB/s |
-| 60% payload | 10.238 GB/s | 20.477 GB/s |
-| 70% payload | 11.945 GB/s | 23.890 GB/s |
-| 80% payload | 13.651 GB/s | 27.302 GB/s |
-
-建议以 NPU 持续 payload≥8/16 GB/s、同时其他 SoC payload=2/4 GB/s 的场景开始评估；60%效率只提供很小的总流量余量，不能预先保证并发通过。分别测 LPDDR controller、system fabric、DMA、NPU 消费链的瓶颈，不能把主干16/32 GB/s接口峰值当有效 payload。
-
-容量按单模型常驻、batch1、最大活跃 context=2304、FP16 KV 规划：两 FP8 文件加 KV 分别约 **1.236 / 2.153 GiB**。若暂为 OS/runtime/其他 SoC 保留1 GiB、额外 activation/scratch/复制与暂存预算256 MiB，合计约 **2.486 / 3.403 GiB**，G0 4 GiB 在这一条件下可规划，余量分别约1.514/0.597 GiB；不是实际峰值验收，也不承诺双模型并发。候选预算一旦被实际生命周期超出，应调整数据计划或重新评审容量，不能删除开销。
-
-同样保守保留 embedding/LM head 存储副本与 KV，MXFP8 两模型约1.249/2.189 GiB，MXFP4 约1.044/1.579 GiB，尚未包含导出 padding、元数据和量化临时区。DeepSeek BF16 源文件约3.310 GiB，不能在4 GiB设备同时容纳上述系统预留并执行离线量化；MX权重在工作站离线生成，运行时只保留部署 artifact。
-
-对每个活跃 engine，最低在途返回容量随 `BW_required×latency` 增长。256-bit、64-beat burst=2 KiB，四满 burst=8 KiB/engine候选；以总NPU8 GB/s和256 ns举例，cluster延迟覆盖下界2 KiB，而1 μs则为约7.813 KiB，均未计排队、传输阶段与安全余量，也不能直接当每engine FIFO深度。候选1 μs并非实测，须按延迟分布、engine分摊、返回credit与内部服务节奏冻结。
-
-### 3.4 SRAM 分块与生命周期峰值
-
-对完整 K 驻留的保守计划，A 一份、B 两份、C FP32 一份，A/B沿 K block32，所有 K/N 已合法补齐：
+分析采用以下顺序：
 
 ```text
-A_data       = M×K×a_bytes
-B_double     = 2×K×N×b_bytes
-MX_scale     = (M×K+2×K×N)/32
-C_FP32       = 4×M×N
-SRAM_peak    = A_data+B_double+MX_scale+C_FP32
-             +previous_writeback+VPU_scratch+parameters+guard+other_live_regions
+服务目标与输入 → 请求阶段预算 → 软件分配与任务依赖
+→ 算子映射与合法分块 → 数据流和生命周期 → 模块服务需求
+→ 联合时间线 → 验收 case → 完整任务复核
 ```
 
-published FP8 的128×128或channel scale按真实布局另计，不套MX scale公式。N 是整个命令的输出分块宽度，不是单独一个 PE；增大N还会增加A重读。以下只列MX8/MX4的数据、scale及一份C，不含尾项，不能据此宣称完整双缓冲可用。
+预算自上而下分解，能力自下而上验证。单个模块达到峰值不是完整任务通过的充分条件；反过来，尚未规定完整服务目标时，也不能随意填写某条接口“必须达到”的 GB/s。
 
-| 模型 down projection K=I | M / N | MXFP8 小计 | MXFP4 小计 | 含义 |
-|---|---|---:|---:|---|
-| Qwen3，K=3072 | 32 / 16 | 200 KiB | 104 KiB | G0有空间继续规划VPU/上一输出，仍需峰值验证 |
-| Qwen3，K=3072 | 32 / 32 | 301 KiB | 157 KiB | 更大N减少命令数，但增加驻留与bank竞争 |
-| DeepSeek，K=8960 | 32 / 16 | 579.5 KiB | 299.5 KiB | MX8保守计划已超G0 512 KiB；Pro可继续规划，G0须缩M、减预取或证实流式供给 |
-| DeepSeek，K=8960 | 32 / 32 | 870.25 KiB | 450.25 KiB | Pro MX8及G0 MX4余量都小，不能直接使用满M32计划 |
-
-DeepSeek MX8的M16/N16小计约434.125 KiB，仍只剩约77.875 KiB给G0其余活跃区。减M会降低权重复用及阵列有效拍占比，不能为通过容量而沿用M32性能。K流式DMA与完整K驻留是不同计划；没有外部partial sum输入不证明全部B必须先装满。跨K子命令的FP32外部累加和更多结果buffer须按实际生命周期计入。
-
-C FP32每个16元素输出占64 B、两个256-bit写拍；它降低量化输出的不确定性，却增加SRAM流量和VPU重新量化工作。后续C MX block16是否值得引入，应比较这一成本与block16→32桥接成本及数值损失。
-
-### 3.5 算子服务与计算上界
-
-第3.1节的主矩阵MAC不含attention和向量运算，也不能全部套FP8 GEMM峰值：两个LM head在原FP8版本都保持BF16。若以FP16 VPU执行LM head，其理想运算时间在G0约9.72/14.59 ms/token，Pro约4.86/7.29 ms/token，还要加BF16→FP16数值适配、权重读取、归约与调度；FP32实现会有不同吞吐。若保留原BF16算术需要CPU或外部VPU能力，必须显式说明，不能假定已支持。
-
-主干GEMM还受16拍权重装载、排空、M时间轴以及C输出反压制约；M1 decode不能要求与M32/M48 prefill同样的峰值利用率。以M32理想有效拍比例约49%作敏感性估算，512-token主干FP8 prefill在G0约0.895/2.661 s，再叠加第2.4节FP16 attention理想下界约0.941/0.706 s。这些不是实际TTFT：G0 DeepSeek的SRAM可能迫使部分算子用更小M，Qwen FP8 scale跨K桥接可增加命令及累加，完整时延必须重算；并行阶段只在有依赖/资源证据时取max，否则相加。
-
-| 算子/通路 | 优先评估落点 | 必须另测的服务与缺口 |
+| 文档 | 承载内容 | 不承担的结论 |
 |---|---|---|
-| 主干Linear | FP8或MX GEMM | scale/bias桥接、M/N/K分块、A重读、装载/排空、C两写拍 |
-| embedding/norm/RoPE/SiLU/residual | VPU或片内CPU | BF16/FP16/FP32语义、Qwen Q/K norm、特殊函数、归约、tail和访存 |
-| QKᵀ / probability×V | FP16 VPU参考；低精度GEMM为独立候选 | KV复用、概率量化、softmax稳定性、完整attention服务，不默认量化KV |
-| MX activation量化与FP32 C后处理 | VPU/合法转换实现 | 动态scale求取、两遍访问、axis/布局、MX4量化和后继桥接 |
-| DRAM/local/peer搬运 | 通用DMA | 多读在途、有效字节、内部串行上限、转置/布局限制、bank争用 |
+| 总体架构 | 硬件能力、接口、容量和批准验收目标 | 某模型已经达到服务目标 |
+| 本文 | 端到端预算、跨模型资源总览、case 矩阵与证据关系 | runtime/驱动/API 设计，逐个算子实现细节 |
+| 模型拆解及后续专项分析 | 模型事实、逐层推导、具体分块/状态/量化方案和详细测试规程 | 未经执行验证的 Hive 服务承诺 |
 
-独立DMA参考规格的byte reader/writer收集与输出串行：目标256-bit时，简单流式端点的BB/2上限为16 B/cycle，即500 MHz下8 GB/s/engine，不是16 GB/s持续payload。两个engine的理论和也不保证整条端到端搬运链达到该值。多在途不会消除这个结构上限。
+### 1.2 模型／子图覆盖矩阵
 
-参考MX量化实现仅支持FP32/FP16/BF16→MXFP8，每engine量化阶段1element/cycle且收集/量化/排出不重叠；500 MHz的0.5G element/s只计量化阶段，不是完整转换吞吐。不支持的MXFP4动态量化与MX反量化不能作为已有DMA能力；必须由VPU/其他明确实现补齐再评估。以上是独立模块参考约束，不是已集成NPU系统成绩。
+下列九个完整模型按八组工作负载组织，另列 MLA 独立子图；均已有拆解文档。已有拆解不等于模型事实、量化部署或 Hive 执行计划已经验收。
 
-### 3.6 P0-5 验收基线与阶段门
+| 序号 | 模型／子图与拆解入口 | 覆盖目的 | 重点算子与资源压力 | Hive 分析状态 |
+|---|---|---|---|---|
+| 1 | [Qwen3-0.6B](model_analysis/Qwen3-0.6B-逐层计算拆解.md) | 基础基线 | 标准 Attention、GQA、RoPE、SwiGLU | 已有拆解；待执行计划、物理流量与服务验证 |
+| 2 | [Qwen3.5-0.8B](model_analysis/Qwen3.5-0.8B-逐层计算拆解.md) | 混合架构基线 | Delta-rule 状态更新、递归／分块归约、短卷积、门控 | 已有拆解；待状态方案与完整服务验证 |
+| 3 | [Qwen3.5-2B](model_analysis/Qwen3.5-2B-逐层计算拆解.md) / [9B](model_analysis/Qwen3.5-9B-逐层计算拆解.md) | 规模压力，不新增架构类别 | 权重与状态容量、带宽及调度规模；两种规模独立建账 | 均已有拆解；本文保留 2B 条件化算例，部署与服务待验证 |
+| 4 | [LFM3-1.7B](model_analysis/LFM3-1.7B-逐层计算拆解.md) | 卷积与 Attention 混合数据流 | 卷积、滑窗与全局 Attention；混合缓存与流式访问 | 已有拆解；待部署版本核验与执行验证 |
+| 5 | [Granite 4.0-H-Tiny](model_analysis/Granite4.0-H-Tiny-逐层计算拆解.md) | Mamba2＋MoE | 状态扫描、专家路由、gather/scatter、小 GEMM | 已有拆解；待路由分布、状态与多核服务验证 |
+| 6 | [Gemma 4 E2B](model_analysis/Gemma4-E2B-逐层计算拆解.md) | Per-Layer Embeddings | 逐层 embedding 查表、非连续读取与融合 | 已有拆解；待查表布局、共享复用与服务验证 |
+| 7 | [YOLO11n](model_analysis/YOLO11n-逐层计算拆解.md) | 检测基线 | 普通／depthwise 卷积、C3k2、SPPF、多尺度融合、C2PSA 空间 Attention、DFL 解码＋NMS | 已有拆解；待冻结导出图、MX 映射与全流程验证 |
+| 8 | [YOLO26n](model_analysis/YOLO26n-逐层计算拆解.md) | 较新的部署路径 | 移除 DFL 的 one-to-one NMS-free 检测头；框解码、top-k、gather、过滤 | 已有拆解；待冻结导出图、MX 映射与全流程验证 |
+| 9 | [MLA](model_analysis/MLA-逐层计算拆解.md)（Multi-head Latent Attention，非完整模型） | 潜变量压缩 Attention 专项 | KV 压缩／重建、解耦 RoPE、latent cache、投影权重吸收方案对照 | 已有拆解；待冻结子图 profile、部署与可执行验证 |
 
-**2026-10-27人工确认本轮P0-5/P0-6文档闭环；规范值以[架构12.8](arch.md#128-批准工作负载与持续验收门槛)为准，以下记录批准目标及推导，不是实测成绩。** 不沿用旧Qwen2.5/INT W4A8数字；FP8保留原artifact语义，MX不因压缩比例自动获得同比例速度承诺。
+本表是分析覆盖清单，不替代[架构批准工作负载](arch.md#128-批准工作负载与持续验收门槛)。不把 Qwen3.5-2B 的预算套给 9B，也不把 YOLO11n 的目标套给 YOLO26n；MLA 只报告子图服务与资源，不报告完整模型的 TTFT、TPOT 或 token/s。MLA 资料包含经典潜向量与后续稀疏/分层压缩路径，各子图固定代际与算法，不混用配置或移植参考机器的速度结论。
 
-批准profile为：P512（batch1、512-token prompt、生成256 tokens、无prefix cache）；D2048（先建立2048-token FP16 KV，再测256个decode step，禁止EOS提前结束，context增长至2304）；C4096（容量/长上下文压力，吞吐独立报告）。固定token序列、template和thinking模式，warm与cold、模型加载、预处理和输出采样分开标时。相同输入和artifact用于G0/Pro比较，不用短回复或不同生成模式提高成绩。
+MXFP8、MXFP4 的 W/A 全量化分别建账。KV、递推状态、累加、输出及非矩阵算子的精度单列；具体边界由量化图定义，不能由 W/A 精度直接推定。
 
-| FP8指标 / profile | G0目标 | Pro目标 | 约束与原因 |
-|---|---:|---:|---|
-| Qwen3-0.6B D2048平均decode | ≥6 token/s | ≥10 token/s | 起始权重＋KV理想流约5.92/9.86 GB/s，保留额外流量余量；Qwen scale桥接尚未证明 |
-| DeepSeek D2048平均decode | ≥2.5 token/s | ≥4 token/s | 起始理想流约4.59/7.34 GB/s；须加LM head、量化、attention与调度服务 |
-| Qwen3-0.6B P512 warm TTFT p95 | ≤4 s | ≤3 s | 包括全部prompt计算和首token，不包括模型首次加载；cold单列 |
-| DeepSeek P512 warm TTFT p95 | ≤8 s | ≤5 s | G0部分算子可能减M，不能按理想M32计算保证 |
-| Qwen3-0.6B D2048 TPOT p95 | ≤250 ms | ≤150 ms | 平均吞吐与尾延迟必须同时通过 |
-| DeepSeek D2048 TPOT p95 | ≤600 ms | ≤400 ms | 同上；不以一次瞬时峰值代替持续服务 |
-| Pro单请求decode加速 | — | 同profile≥1.6×G0 | 实际比值比较，不能只对比两个最低门槛；扩展效率按加速比/2报告 |
-| SRAM驻留GEMM长K基准 | ≥40%相应稠密峰值 | ≥40%相应稠密峰值 | 独立合法M32/M48 kernel，含装载/排空和C；不适用于M1，也不强制所有模型算子满足 |
+### 1.3 输入 profile 与目标登记
 
-D2048的流量随context增长，2304-token KV必须纳入整个运行窗口；表内初始带宽仅解释目标来源，不是准入证明。MXFP8/MXFP4首轮先作同profile质量/流量/服务实测，性能数值TBD；若需以A8/B4替代A4/B4，另立profile且不使用同格式4bit翻倍峰值。
+每个实例冻结模型 revision、tensor/量化 artifact hash、输入数据与布局、采样方式、状态初值、SKU、频率和并发条件。不能只用模型名称标识测试。
 
-检测基线为官方YOLO11n/YOLO11s、640×640、batch1，fps/时延/质量目标已批准，见[第4章](#4-yolo-双检测模型基线与评估)。部署量化、导出图与逐算子服务须在实施验收前冻结并验证，不把浮点参考当成已有FP8/MX部署。
-
-批准质量门槛为：FP8移植通过原checkpoint参考runtime的逐算子误差预算与模型任务一致性；同源MX相对BF16的固定语料perplexity相对增幅≤5%，任务准确率绝对下降≤1个百分点；YOLO mAP绝对下降≤1个百分点。FP8相对BF16的质量差异同样记录，不把发布版本默认视为通过。语料/任务集/hash、低精度误差预算、量化recipe须在数值验收前冻结；MX4若需放宽门槛重新评审，只通过perplexity不足以关闭生成质量验收。
-
-批准测量口径为至少30次warm P512请求报告TTFT分布，D2048至少30轮报告总有效token/总decode时间与TPOT分布；连续重复完整任务≥10分钟验证频率、温度和吞吐稳态。记录batch1单请求和独立并发吞吐，禁止丢弃慢轮次；功耗/能量上限、温度边界、供电和噪声条件仍TBD，不造数值。数值/输入冻结、完整算子覆盖、峰值容量、DMA/DRAM服务与观测能力是性能签核前置，不可用更多MAC掩盖缺项。
-
-**P0-5本轮结论：** 2026-10-27批准的原四模型身份、MX路线、服务/质量门槛与测量阶段门已落入架构，文档评审已关闭；完整算子、量化和持续性能实测仍是正式签核前置。2026-10-28新增的Qwen3.5-2B仅模型身份获批，不包含在本章既有算例及指标闭环结论中。
-
-**P0-6本轮结论：** 容量/流量规划、合法分块约束及实施交付要求已经批准，文档评审已关闭，不等于实际服务已通过。FP8 scale/BF16层执行、DeepSeek大K数据计划、MX4动态量化、FP32 C流量与DRAM/DMA竞争证据仍须按[架构12.2](arch.md#122-sram-容量与-tiling)及[14.3](arch.md#143-性能验收)提交；单模型条件化预算不保证多模型常驻。8/16 GB/s参考payload、4266 MT/s、DMA在途深度未随本轮关闭而冻结，P1-4/P1-7独立保留。主CPU软件Queen/local CPU控制边界不变，P0-4其余协议仍暂缓，本轮不改RTL。
-
-## 4. YOLO 双检测模型基线与评估
-
-### 4.1 模型选择与质量参考
-
-根据用户要求，批准基线必须包含两个 YOLO 检测模型。本轮选定 Ultralytics 官方 COCO 检测预训练 **YOLO11n / YOLO11s**，分别覆盖轻量与较高精度档；两者同属一代、同检测流程，便于比较模型大小与服务压力。选择稳定的同族检测图，不因其他代际名称更新就静默替换基准。
-
-| 模型 | 官方权重名 | 输入 / batch | 厂家参数量 | 厂家FLOPs | 厂家COCO mAP50–95 |
-|---|---|---|---:|---:|---:|
-| YOLO11n | `yolo11n.pt` | 640×640 / 1 | 2.6M | 6.5G | 39.5 |
-| YOLO11s | `yolo11s.pt` | 640×640 / 1 | 9.4M | 21.6G | 47.0 |
-
-来源为[Ultralytics YOLO11官方检测表](https://docs.ultralytics.com/models/yolo11/)，核验日期2026-10-27。参数量、FLOPs与mAP是厂家报告的参考值，不是本项目FP8/MX量化或NPU实测；不得移植厂家CPU/T4时延作为G0/Pro成绩。FLOPs列需与冻结导出图的2operations/MAC统计重新对账，不包含我方layout、量化、DMA和完整预后处理成本。本轮同时核验官方主分支`yolo11.yaml`：包含C3k2、SPPF、C2PSA、Upsample/Concat与P3/P4/P5 Detect；其注释FLOPs为6.6/21.7G，与官网表6.5/21.6G不同，说明版本/统计口径不能混用，正式manifest必须冻结图并重新计数。
-
-官方浮点checkpoint作为质量参考，正式manifest冻结权重hash、Ultralytics/exporter版本、导出图hash/opset、实际tensor dtype及数据集版本。不得把官方`.pt`权重宣称为现成FP8/MX部署版本；FP8/MXFP8/MXFP4的权重和activation格式、校准、未量化算子、scale映射仍待数值评审，禁止依赖NVFP4两级缩放或未支持的转换路径。
-
-### 4.2 检测流程与算子落点
-
-固定COCO val2017评估、80类检测、官方浮点参考；主基准640×640、batch1，不采用seg/pose/obb模型。输入letterbox/归一化、图内运算、框解码、置信度过滤、NMS与坐标还原全部覆盖；阈值、max_det、class-aware/agnostic、动态shape及图内/图外后处理位置写入manifest。密集目标和空检测作为边界场景，不靠提高过滤阈值或删除NMS提高fps。
-
-| 工作 | 优先评估路径 | 不可省略的服务 |
+| Profile | 输入与边界 | 主要服务量 |
 |---|---|---|
-| Conv/可映射Linear | GEMM，DMA或软件执行合法布局转换 | stride/padding、张量tile、M≤48、weight复用、scale、FP32输出与格式桥接 |
-| SiLU、pool、split/concat、resize及残差 | VPU/local CPU或明确DMA COPY路径 | 非矩阵算子不能只按GEMM FLOPs计时，转换能力逐项核验 |
-| 图中的attention类模块及检测头 | 按实际导出图分别映射GEMM/VPU/local CPU | softmax、归约、reshape和检测输出语义；不假定YOLO只有卷积 |
-| 框解码、过滤、NMS、坐标还原 | VPU/local CPU；主CPU处理时单列并计入完整任务 | 候选框数量、空/密集目标、读写流量及尾延迟 |
+| P512，文本 prefill 基线 | batch1、512-token prompt、生成 256 tokens；warm 模型已加载；prefix cache 条件固定 | 完整请求入口至首 token 的 TTFT、prefill 分段时间 |
+| D2048，文本 decode 基线 | batch1、初始 2048-token 上下文、连续 256 个 decode step；持久状态实际构建 | 平均 decode token/s、逐步 TPOT 与 p95；记录上下文增长 |
+| L/S 扫描 | 独立冻结 prompt 长度 L、初始上下文 S、生成长度 D 与 chunk；区分复用缓存/无缓存 | prefill 权重复用、KV/状态、尾块、容量峰值与服务变化 |
+| 完整检测 | COCO val2017、80 类、640×640、batch1；输入预处理到坐标还原后的结果 | 持续 fps、完整帧时延与 p95、mAP50–95 |
+| 多请求并发 | 请求到达序列、并发数、各请求 profile、共享缓存和其他 SoC 负载固定 | 聚合吞吐、单请求时延、排队与各 core 负载 |
+| MLA 独立子图 | batch、query 长度、上下文、head 数、latent/RoPE 维度、精度、cache 初态；prefill/decode 分开 | 输入就绪至子图输出可用的时间、各接口 bytes、latent cache/workspace 峰值 |
 
-主CPU的软件Queen只负责系统任务管理；local CPU调用scheduler执行GEMM/DMA、直接管理VPU。软件Queen任务往返和任何主CPU回退均计入端到端时延/功耗，不能把VPU写成scheduler派发或把仓库外实现画成core外设备。
+固定长度生成明确 EOS 处理，warm 与首次加载分开。持续测试记录实际频率、温度、请求数、运行时长和其他 SoC 流量，不能由短时 kernel 峰值代替。
 
-### 4.3 批准服务指标与验收条件
+| 目标来源与适用范围 | 已批准值或待冻结项 |
+|---|---|
+| Qwen3.5-0.8B/2B，MXFP8/MXFP4，各 SKU | P512 TTFT p95、D2048 平均 decode 和 TPOT p95 均待确认；不继承旧 FP8 数字 |
+| YOLO11n，MXFP8/MXFP4，完整检测 | G0 ≥30 fps、p95 ≤50 ms；Pro ≥48 fps、p95 ≤35 ms |
+| 批准语言模型的同 artifact/profile 单请求 decode 扩展 | Pro/G0 实测速度比 ≥1.6；扩展效率为速度比/2 |
+| 批准模型的数值与质量 | 独立 MX 参考逐算子预算待冻结；语言模型相对 BF16 perplexity 增幅 ≤5%、任务准确率下降 ≤1 个百分点；检测相对浮点参考 mAP50–95 下降 ≤1 个百分点 |
+| 其余分析模型、YOLO26n、MLA | 服务与质量判据单独冻结；没有本文新增的批准数值 |
 
-两个模型纳入功能/质量/性能验收，以下目标已于2026-10-27人工批准并落入[架构12.8](arch.md#128-批准工作负载与持续验收门槛)，不代表实现或持续性能已通过：
+数值引用[架构第 12.8 节](arch.md#128-批准工作负载与持续验收门槛)。架构还包含不在本文当前覆盖清单中的 DeepSeek/YOLO11s，其指标不转移到其他模型。
 
-| 指标 | G0目标 | Pro目标 |
+### 1.4 硬件分析基线
+
+以下为[批准配置](arch.md#22-批准配置与资源规划)摘要。MAC/FMA 计 2 operations；容量使用 KiB/MiB/GiB，带宽使用十进制 GB/s。
+
+| 资源 | 每 core | G0，2 cores | G0 Pro，4 cores |
+|---|---|---|---|
+| GEMM | T=16、256 PE、500 MHz | 同一 core 基线 | 同一 core 基线 |
+| 8-bit 有效计算拍 | 512 MAC/cycle；0.256 TMAC/s | 0.512 TMAC/s；1.024 TOPS/TFLOPS | 1.024 TMAC/s；2.048 TOPS/TFLOPS |
+| 同格式 INT4/MXFP4 有效计算拍 | 1024 MAC/cycle；0.512 TMAC/s | 1.024 TMAC/s；2.048 TOPS/TFLOPS | 2.048 TMAC/s；4.096 TOPS/TFLOPS |
+| GEMM 结果 buffer | cBufferDepth=64；单命令 M≤48 | 多核不扩大单命令 M | SRAM 扩容不扩大单命令 M |
+| VPU，500 MHz | FP32 8 / FP16 16 GFLOPS，替代模式 | FP32 16 / FP16 32 GFLOPS | FP32 32 / FP16 64 GFLOPS |
+| local SRAM | 8×256-bit banks、32-byte 低位交织 | 512 KiB/core；合计 1 MiB | 1 MiB/core；合计 4 MiB |
+| DMA | 2 engines、256-bit、最大 64 beats/burst | 4 engines | 8 engines |
+| DRAM，共用 | LPDDR4x，4266 MT/s | 4 GiB、x32；理论 17.064 GB/s | 8 GiB、x64；理论 34.128 GB/s |
+| SoC 共享 SRAM | 经 system interconnect 显式访问，不是 GEMM/VPU 本地口 | 容量/位宽/banks 待冻结 | 独立核算，不计入 local SRAM |
+
+不同精度的峰值不能相加。合法 W4A8 使用 8-bit 的 512 MAC/cycle，不使用同格式 4-bit 峰值；cluster 峰值要求实际可分摊的工作。接口持续服务、bank 竞争和内存效率见第 6 章。
+
+## 2. 端到端执行全景
+
+### 2.1 请求阶段与计时边界
+
+| 阶段 | 文本任务 | 检测任务 | 计时与资源边界 |
+|---|---|---|---|
+| 加载与准备 | 权重/量化布局加载、状态初始化 | 权重与工作区准备 | cold 单列；warm 不重复计加载，但保留请求内初始化 |
+| 输入处理 | tokenize、输入/位置与初始状态准备 | letterbox、归一化、输入布局转换 | 按声明入口计入，不因 CPU 执行而删除 |
+| 提交与排队 | 主 CPU 提交、core 可用性、任务准备 | 同左 | 区分排队与执行；记录实际到达负载 |
+| 模型主干 | prefill 或单步 decode 的各层 | 网络、特征融合与检测头 | GEMM、VPU、DMA、CPU 工作全部进入时间线 |
+| 输出处理 | final norm、lm_head、采样、token 可见 | 框解码、top-k/过滤、NMS（适用时）、坐标还原 | 输出 tensor 可用不等于请求结果已返回 |
+| 完成与回收 | token 返回、后续 step 状态交接 | 结果返回与缓冲复用 | 数据可见、通知与仍活跃的异步操作明确 |
+
+TTFT 为请求入口至首 token 可用的时延，不是主干 GEMM 时间。TPOT 为相邻输出 token 的间隔，包含该 step 内输出头、采样及必要等待。检测时延为每帧入口至完整结果，持续 fps 为测量窗口内完成帧数/时间。时延与吞吐分别核验。
+
+### 2.2 从服务目标分解阶段预算
+
+为每个冻结 profile 登记目标 `T_first*`、平均 decode 目标 `R_decode*`、`T_step,p95*`，或 `R_frame*`、`T_frame,p95*`。星号表示经批准或在分析 case 中明确冻结的目标，不表示实测。
+
+阶段与算子进一步分配服务窗口 `w_i`、允许首响应延迟 `l_i`、数值预算 `E_i*` 和资源预算 `Q_i* / C_i*`。这些值随执行计划绑定，不是独立硬件规格。
+
+```text
+平均 decode 周期预算 = 1/R_decode*
+持续检测完成周期预算 = 1/R_frame*
+接口需求 BW_req,j,i   = Q_j,i / w_j,i
+计算需求 P_req,i      = F_mapped,i / w_compute,i
+容量需求 C_req,r      = max_t(sum(size of live allocations in region r))
+```
+
+YOLO11n 的持续吞吐对应 G0 平均完成周期 ≤33.333 ms、Pro ≤20.833 ms；完整帧 p95 仍分别为 ≤50/35 ms。这两组数值约束不同，不把平均周期当作每帧时延上限。
+
+预算闭合需同时满足：依赖图的关键路径在请求预算内；每个共享资源在该持续周期中的占用可被调度；排队条件与声明负载一致。各阶段 p95 不能直接相加得到请求 p95，尾时延最终由完整请求样本验证。
+
+## 3. 软件调度与多核执行
+
+### 3.1 控制层级与可观测成本
+
+| 执行者 | 分工 | 性能账目 |
+|---|---|---|
+| 主 CPU 软件 scheduler | 请求/任务分配、core 选择、任务提交与回收 | 主 CPU 占用、排队、提交/完成往返、请求分配不均衡 |
+| local CPU | 本地数据计划、GEMM/DMA 命令组织、直接控制 VPU、数据交接 | 命令准备、VPU 启动、同步、cache 维护及主 CPU 回退的暴露时间 |
+| 硬件 scheduler | GEMM/DMA 命令及依赖完成 | 8 slots/core 的占用、可发命令等待、单 GEMM 上下文的串行限制 |
+| GEMM/VPU/DMA | 按依赖消费数据与产出结果 | 输入等待、执行、输出反压和实际完成时间 |
+
+VPU 不由硬件 scheduler 派发。命令完成、数据对下一消费者可见、完整任务完成分别记录；不能用某个引擎 IRQ 代替所有阶段结束。这里只分析控制成本，不定义软件 API 或驱动结构。
+
+### 3.2 单请求分片与多请求并发
+
+| 策略 | 可能收益 | 必须显式增加的成本 |
+|---|---|---|
+| 投影输出通道分片 | 分摊权重与 GEMM 工作 | 输入广播/复制、输出拼接、后继消费者访问与同步 |
+| attention/state 按 head 分片 | 分摊 KV 或递推状态服务 | head 数不均、GQA 复用、状态所有权、输出投影前的交换 |
+| prefill 按 token tile 组织 | 增加投影复用与并行工作 | 因果依赖、递推 chunk 先后关系、状态交接；不能把 chunk 任意独立化 |
+| 多请求分配到不同 core | 增加聚合吞吐 | 权重/状态副本、DRAM 与共享 SRAM 竞争、请求排队 |
+| 共享数据放 SoC SRAM | 减少部分重复 DRAM 读取或 CPU 交接 | 共享区填充、system 访问、各 core 的 local 搬入、所有权与仲裁 |
+
+K 维跨核归约不是当前架构基线，不作为计划的必要能力。对照单请求分片与多请求并发时，分别报告单请求速度和聚合吞吐，不能相互替代。
+
+### 3.3 命令数量、同步与调度预算
+
+执行计划逐项统计 GEMM/DMA 命令数、VPU 调用数、跨核交换和同步点。仅对独立的矩形投影，命令数可用下式作为初始估算：
+
+```text
+N_cmd ≈ ceil(M_total/M_tile) * ceil(N_total/N_tile) * ceil(K_total/K_tile)
+```
+
+该式不覆盖融合、尾块、布局转换或跨 K partial sum 的额外累加。命令提交能否被执行覆盖，以实际时间线为准；`命令数×单次提交时间` 是 CPU 成本估算，不自动等于端到端暴露成本。
+
+每个调度实例输出 core 分配图、命令顺序、数据就绪事件、同步点和可复用缓冲区。最繁忙 core 的工作、控制等待与通信预算分别核验，不能用 cluster 平均值掩盖单 core 瓶颈。
+
+## 4. 从计算图到执行计划
+
+### 4.1 算子任务记录
+
+模型拆解给出数学工作；可执行计划还需补齐下列记录，才能计算物理需求。
+
+| 项目 | 必须记录的内容 |
+|---|---|
+| 算法与位置 | 使用的算子算法；GEMM、VPU、local CPU 或主 CPU；未覆盖算子单列 |
+| 格式与转换 | W/A、累加、输出、scale、KV/状态精度；每条量化/反量化/布局路径的实现 |
+| 命令与分块 | 合法 M/N/K、padding、尾块、命令数、core 分片轴、实际循环次序 |
+| 复用与融合 | 权重/A/KV 重读次数、寄存器复用、融合前后中间写入/读取变化 |
+| 分配与依赖 | 地址、所属存储区、活跃份数、数据可见、状态更新与缓冲释放事件 |
+| 预算关联 | 所属请求/阶段、`w_i`、各接口 `Q_j,i`、`C_i*`、数值预算与 case ID |
+
+计算账把已映射 GEMM MAC、向量 FLOP、归约次数、特殊函数调用和量化元素数分开。拆解文档可能把逐元素与归约计入广义 MAC，这些数字不能全部除以 GEMM 峰值。
+
+### 4.2 分块、循环次序与精度边界
+
+GEMM 的 K/N 为空间轴，M 为时间轴；单命令 M≤48。64-token 算法 chunk 可按 32+32 等合法命令拆分，但算法依赖不因此消失。增加 SRAM 不自动增加单命令 M，也不证明权重装载与 A 计算能够重叠。
+
+固定 K/N tile 后，M 外循环与 N 外循环会改变权重重读和 A 重读。对 prefill，不能默认整段 prompt 只读取一遍权重，也不能直接使用 `L×decode 权重流量`；对 depthwise/小 GEMM，padding 与实际有效 lane 占比需单列。
+
+跨 K 子命令必须说明 partial sum 的保存、重新读取和显式累加。W/A 量化路径必须包含 scale 求取、编码、padding 与后继格式转换；采用 FP16 attention 或混合精度回退时，应作为独立对照，不能宣称已完成全 MX 部署。
+
+### 4.3 Qwen3.5-2B：从层依赖到任务图
+
+依据[关键超参](model_analysis/Qwen3.5-2B-逐层计算拆解.md#12-关键超参)与[参数核算](model_analysis/Qwen3.5-2B-逐层计算拆解.md#13-参数量核算)，文本模型有 24 层：18 个 DeltaNet、6 个 gated full attention；hidden=2048、MLP intermediate=6144，词表 248320，embedding/lm_head 共享。
+
+```text
+输入/状态就绪 → norm与前置投影 → DeltaNet更新或full attention
+→ 输出投影/残差 → MLP → 下一层
+→ final norm → lm_head → 采样 → token可见
+```
+
+| 路径 | 需要落实的执行选择 | 主要依赖与资源 |
+|---|---|---|
+| prefill 的 DeltaNet | 参考 chunk=64、子块=16；选择块算法、求解与扫描方案 | 块内临时矩阵、块间状态依赖、M 拆命令与数值精度 |
+| decode 的 DeltaNet | 单 token 递推；state 按 head/子矩阵分块 | 状态读取、更新、回写可见，不能套 prefill 工作量 |
+| full attention | QKᵀ、softmax、p·V 的量化与分块路径 | 8 query/2 KV heads、head_dim=256；GQA 复用与 score/probability 是否落存储 |
+| MLP 与输出头 | gate/up/down 的量化边界；lm_head 实际保留位置数 | residual、MLP 活跃区、down K=6144；logits 与采样读写 |
+
+块求逆与三角前代是不同方案，不能只比较 MAC 数就断定 Hive 上谁更快。文本推理的输出头通常保留最后位置，但实际行数按冻结导出图执行，不把某个源码默认参数的解释当作运行保证。
+
+## 5. 数据流与内存生命周期
+
+### 5.1 流量账与容量账
+
+| 账目 | 统计方式 | 需要避免的省略 |
+|---|---|---|
+| 物理流量 | 每请求/step/帧，按接口、方向、core、阶段计实际 bytes | scale、padding、重读、转换、多遍向量访问、状态、输出与副本 |
+| 活跃容量 | 按实际分配的创建、占用、释放事件求峰值 | 当前输入、下一预取、上一写回、scratch、staging 与异步未完成区域 |
+
+```text
+Q_j,i = Q_read,j,i + Q_write,j,i
+C_peak,r = max_t(sum(size_a for allocation a live in region r at t))
+C_DRAM_peak = C_loaded_weights + C_persistent_state(S)
+            + max_t(C_live_activation + C_staging + C_copies)
+            + C_runtime_and_other_SoC
+```
+
+共享读写资源合计流量；独立方向资源还分别核验读与写。同一 tensor 穿过 DRAM、DMA、SRAM 可以在各接口各记一次；同一物理分配不能重复记容量。DRAM 不把已独立分配在 SoC SRAM 的数据再计一份，若实际保留副本则分别计入对应存储区。
+
+### 5.2 存储层级与数据移动
+
+| 存储区 | 典型数据与访问 | 生命周期和服务约束 |
+|---|---|---|
+| DRAM | 权重、外置 KV/状态、大临时区、系统分配 | 容量包含实际加载的非执行权重与 workspace；带宽与其他 SoC 主设备共享 |
+| SoC 共享 SRAM | 共享权重/activation tile、CPU 交接与共享中间结果 | 容量独立冻结；仍需 system 与 local 搬运；没有自动填充或一致性 |
+| 每 core local SRAM | GEMM A/B/C/scale、VPU 向量/state tile、预取/写回区 | 私有容量；8-bank 分布、窄请求占槽与读写冲突分别核验 |
+| GEMM 结果 buffer/寄存器及 DMA 内部缓冲 | 运算中间状态、返回与转换数据 | 与 local 分配分别计；未完成操作不能提前复用缓冲 |
+
+共享 SRAM 命中不等于本地命中。采用共享层需给出“DRAM→共享区→各 core local”的完整流量，以及共享区 refilling、CPU 访问和多主竞争；只比较减少的 DRAM bytes 会高估收益。
+
+### 5.3 Qwen3.5-2B：持久状态与临时区
+
+依据[运行时状态清单](model_analysis/Qwen3.5-2B-逐层计算拆解.md#43-运行时状态不在权重里但决定-sram)，以 FP32 递推状态、FP16 conv/KV 为参考，不预设量化 KV。
+
+| 数据 | 参考容量 | 执行计划必须补齐的内容 |
+|---|---:|---|
+| DeltaNet 递推状态 | 18×16×128×128×4 B =18 MiB；每层 1 MiB、每 head 64 KiB | 分片、驻留比例、更新读写次数与所有权 |
+| conv 历史状态 | 18×6144×3×2 B =648 KiB | ring buffer 布局、每 step 实际更新量 |
+| full-attention KV | 12,288×S B；S=2048/4096/32768 为 24/48/384 MiB | context 增长、KV head 复用、读写布局与分片 |
+| 单位置 FP32 logits | 248320×4 B =993,280 B，约 0.947 MiB | 分 tile 输出、采样读取、归约和 CPU 数据交接 |
+| activation/量化临时区 | 随 tile 与循环次序变化 | residual、gate/up/down、转换 staging 的活跃区峰值 |
+
+全部 18 MiB 递推状态超过两个 SKU 的 local SRAM 总量。单层 1 MiB 超过 G0 单 core 容量，也会占满 Pro 单 core 可用数据容量；不能假定状态与投影、scratch 同时完整驻留。SoC SRAM 的容量未冻结，不能据此宣布状态已可放入共享层。
+
+若 prefill 保存每个 chunk 的状态快照 `h:[ceil(L/64),16,128,128]`，L=8192 时每层有 33,554,432 元素：2 B/element 为 64 MiB，写后读为 128 MiB；FP32 则翻倍。这是该算法的条件化临时区，不是 Hive 固定要求。融合扫描与输出能否消除它，需通过真实依赖和生命周期证明。
+
+纯文本不执行视觉塔，普通 decode 不计 MTP；若 loader 仍保留其权重，实际分配仍进入容量账。模型名义参数量不能证明 G0 的 4 GiB 足够。
+
+### 5.4 local SRAM 分块算例与容量判据
+
+完整 K 驻留、一份 A、两份 B、一份 FP32 C，A/B 均沿 K block32、每 block 一个 1 B scale，以补齐后的 `M×K×N` 计算：
+
+```text
+A_data    = M*K*a_bytes
+B_double  = 2*K*N*b_bytes
+MX_scale  = (M*K + 2*K*N)/32
+C_FP32    = 4*M*N
+C_tile    = A_data + B_double + MX_scale + C_FP32
+C_live    = C_tile + state_tile + previous_writeback
+          + VPU_scratch + conversion_staging + other_live_regions
+```
+
+Qwen3.5-2B down projection 取 K=6144、N_tile=16：
+
+| M_tile | MXFP8 的 C_tile | G0 剩余容量 | MXFP4 的 C_tile | G0 剩余容量 |
+|---|---:|---:|---:|---:|
+| 32 | 398 KiB | 114 KiB | 206 KiB | 306 KiB |
+| 48 | 498 KiB | 14 KiB | 258 KiB | 254 KiB |
+
+这里的 N_tile 是所分配的 B/C tile 列数，不是整个投影输出 N，也不是对命令内部复用的默认保证。命令循环和 PE 覆盖范围需另行记录。
+
+验收使用 `C_live≤512 KiB/core`（G0）或 `≤1 MiB/core`（Pro），并检查分配地址不重叠、对齐与实际布局。例如 M48 的 MXFP8 tile 单独合法且能放入，却只留 14 KiB；若另需一个 64 KiB state head，则组合已经超容量，必须修改计划。流式 K、单份 B、不同 C 格式等方案重新计算，不能沿用本表。
+
+## 6. 硬件加速与模块服务
+
+### 6.1 峰值、结构上限与实际服务
+
+除 DRAM 外，byte/s 换算采用 500 MHz 分析条件；实际时钟组织仍按架构冻结。
+
+| 通路 | 接口峰值或参考上限 | 完整服务需测量的内容 |
+|---|---|---|
+| GEMM A/B 读、C 写 | 各 32 B/cycle，即各 16 GB/s | 权重装载、A 消费、有效计算、排空与写回；接口独立不证明阶段重叠 |
+| GEMM scale | A/B 读各 4 B/cycle；C scale 写 1 B/cycle | 窄访问的 bank 服务槽、数据/scale 同步与回写 |
+| VPU local | 每拍一次 32 B 读或写，合计 16 GB/s/core | 输入/输出、归约、多遍扫描及特殊函数，不能按读写各 16 GB/s |
+| DMA local | 每 engine 32 B/cycle 接口预算 | DRAM/local/peer 的完整搬运；local→local 的源读和目的写同时计入 |
+| 每 core system/peer AXI | 256-bit；500 MHz 时单方向 16 GB/s | burst、汇聚、仲裁、CDC、首响应与返回服务 |
+| local SRAM banks | 每 bank 每拍服务一次时合计 128 GB/s/core | 1RW 为 macro 候选；同 bank 读写、窄请求和 peer 访问竞争 |
+| DRAM controller | G0/Pro 理论 17.064/34.128 GB/s | 实际读写混合、地址分布、其他 SoC 负载、持续 payload 与延迟 |
+| SoC SRAM | 容量、位宽、bank 组织待冻结 | 多主共享、system 往返、refill 与各 core 消费窗口 |
+
+独立 [DMA 参考规格](../../foragerbee/doc/spec.md)的简单 byte reader/writer 串行收集与输出，在 256-bit 下 BB/2=16 B/cycle，即 8 GB/s/engine；这是参考路径结构上限，不是 Hive 已达到的带宽。其 FP32/FP16/BF16→MXFP8 量化阶段为 1 element/cycle/engine，即 0.5G element/s；完整收集、量化、排出服务更慢。MXFP4 动态量化、MX 反量化需指定并验证实现，不能视为已交付 DMA 能力。
+
+### 6.2 每个模块的服务预算
+
+| 模块 | 计算/流量输入 | 服务时间记录 | 验收连接 |
+|---|---|---|---|
+| GEMM | 已映射 MAC、合法 tile、A/B/C/scale bytes | 命令接收→输出可见；分解装载、计算、排空和反压 | 有效拍峰值与真实 tile 完成窗口分别验证 |
+| VPU/CPU 算子 | 向量操作、归约/特殊函数、state bytes | 输入就绪→结果可用；启动、访存、归约与回写 | 不用 FMA 峰值替代 exp/rsqrt 或状态 kernel 服务 |
+| DMA/转换 | 每方向 bytes、元素数、scale/布局、返回缓冲 | 首请求→全部结果可消费；包括完整转换链 | 有效 payload、首响应、完成窗口、数值与实际 workspace |
+| SRAM/system/peer/DRAM | 阶段内真实地址与并发请求 | 每口/方向吞吐、请求槽、延迟、竞争等待 | 在该访问组合下满足 `Q_j,i/w_j,i`，而非独占口峰值 |
+| 控制与同步 | 命令/事件数、数据交接 | 提交、依赖就绪、完成可见与缓冲释放 | 暴露控制等待在分配窗口内，不能漏在端到端边界外 |
+
+`F/P_effective` 与 `Q/BW_effective` 给出下界分量；取最大值只是理想 roofline 下界，不是有串行装载/转换阶段时的完整时间。模块完成窗口必须用实际全路径测试判定。
+
+DMA 延迟覆盖可初估 `B_inflight≥BW_engine×latency`。64 beats×32 B 为 2 KiB，四满 burst 为 8 KiB/engine 候选；还要核验返回 credit、实际请求长度、延迟分布和消费者反压。多在途不消除内部串行阶段上限。
+
+### 6.3 接口需求总账
+
+每个条目保存请求/阶段、core/接口、地址轨迹、读写 bytes、允许窗口、所需 GB/s、可用服务和对应 case，形成可复核的预算行。
+
+| 接口/资源 | 需求来源 | 容量或占用检查 |
+|---|---|---|
+| DRAM | 权重、外置状态/KV、临时区、副本、其他 SoC | 实际已加载权重＋持久状态＋活跃 workspace＋系统分配 |
+| system fabric | DRAM、SoC SRAM、按实际路由经过 system 的 peer 请求 | 按汇聚口求和，不以各 core 接口峰值相加代替 |
+| SoC SRAM | refill、各 core 共享读取、CPU 交接、共享输出 | 独立活跃峰值与多主 bank/端口竞争 |
+| 每 core DMA | 本 core 的外部/local/peer 搬运、格式转换 | 返回缓冲、staging、当前与下一 tile |
+| GEMM A/B/scale、C | 循环次序决定的读取/重读、输出和 scale | 实际 A/B 份数、result buffer 与 local C 分开计 |
+| VPU local | residual、norm、conv、state、KV、量化的多遍读写 | 向量/state tile、归约与转换 scratch |
+| local SRAM banks | 上述本地请求与 peer 请求的真实地址分布 | bytes 与每 bank 请求/cycle 同时核验 |
+| peer/控制 | 输出拼接、广播/复制、状态交换、事件与任务控制 | 收发缓冲、副本、同步与往返延迟 |
+
+窄 scale 请求即使 bytes 很少，也可能消耗完整 bank 槽。共享同一口的服务窗口必须包含同时到来的其他工作；不能对每个消费者都单独承诺整口带宽。
+
+## 7. 联合时间线与瓶颈归因
+
+### 7.1 依赖、重叠与暴露成本
+
+每个 profile 建立主 CPU、local CPU、scheduler、DMA、GEMM、VPU、各存储接口的统一事件时间线。事件至少包括请求入口、命令可发、数据就绪、输入等待、有效计算、输出等待、结果可见、状态交接和请求完成；跨域记录需换算到可比较时间基准。
+
+端到端时间沿实际依赖图计算：串行阶段相加，重叠区只计一次。预取被隐藏须同时证明无依赖冲突、缓冲足够、端口能服务和数据按时就绪；SRAM 双缓冲不等于 PE 双权重 bank，也不保证装载/计算重叠。
+
+| 暴露段 | 归因证据 | 不能据此直接断定的结论 |
+|---|---|---|
+| GEMM 输入等待 | A/B/scale 可见时间、DMA/接口服务与 FIFO 占用 | 只看 DRAM 利用率低就断定 DMA 不忙 |
+| state/VPU 串行段 | 每 head/tile 的读、运算、回写与下一消费者 | 用状态总 bytes 小证明可被隐藏 |
+| SRAM 冲突/输出反压 | bank 请求槽、仲裁、C 写回、缓冲活跃区 | 接口总 bytes 低于 bank 峰值就不存在冲突 |
+| 软件/同步等待 | 命令准备、slot/依赖、跨核事件与数据可见 | 将所有提交时间相加算作完整暴露时间 |
+| 多核失衡/共享竞争 | 最繁忙 core、共享接口与同步到达时间 | core 数翻倍就应得到两倍单请求速度 |
+
+同一等待不能在 GEMM stall、DMA stall 和 DRAM 服务中重复加入关键路径。不能以 `max(GEMM,VPU,DMA)` 代替完整请求时间，也不能把各模块独占实测直接拼成并发时间线。
+
+### 7.2 敏感性与方案对照
+
+| 变量 | 对照方式 | 判据 |
+|---|---|---|
+| L/S 与 chunk | 扫描 prompt/context、chunk 边界与尾块 | 算法工作、权重复用、KV/快照、容量和完整服务变化 |
+| MXFP8→MXFP4 | 各自冻结量化图与实际部署 | bytes、有效拍、转换时间、质量共同比较，不只看压缩比 |
+| M/N/K 与缓冲份数 | 合法 tile、循环顺序、单/双 B、K streaming | 命令数、重读、活跃峰值与模块完成时间 |
+| state 驻留/分片 | 按 head/子矩阵、部分驻留、显式外置 | DRAM 流量减少是否挤出其他 tile，state 依赖窗口是否缩短 |
+| KV/临时结果复用与融合 | baseline/candidate 完整数据计划 | 少落存储的收益与新增 scratch、依赖及数值影响 |
+| 多核/共享 SRAM | 单请求分片、多请求、共享/私有数据方案 | 单请求/聚合指标、local 搬运、共享竞争与所有权成本 |
+| DRAM payload 与其他 SoC | 固定地址/读写组合，扫描外部负载 | controller、fabric、DMA 与消费者链服务分别取证 |
+
+LPDDR4x payload 效率只作条件化敏感性输入：
+
+| 总 payload / 理论峰值 | G0 x32 | Pro x64 |
 |---|---:|---:|
-| YOLO11n持续batch1检测 | ≥30 fps | ≥48 fps |
-| YOLO11n完整检测p95时延 | ≤50 ms | ≤35 ms |
-| YOLO11s持续batch1检测 | ≥10 fps | ≥16 fps |
-| YOLO11s完整检测p95时延 | ≤150 ms | ≤100 ms |
-| 量化mAP50–95损失，相对同源浮点参考 | ≤1个百分点 | ≤1个百分点 |
+| 60% | 10.238 GB/s | 20.477 GB/s |
+| 70% | 11.945 GB/s | 23.890 GB/s |
+| 80% | 13.651 GB/s | 27.302 GB/s |
 
-此前YOLOv8数字不能当成YOLO11性能推导；上述目标保留轻量实时/较高精度两档产品定位，必须用YOLO11导出图、量化和完整服务预算验证。若实际图不通过，重评算子实现；变更批准目标须重新评审，不用同名模型的另一版本替代。G0/Pro以同权重、同图、同量化、同预后处理比较，报告实际Pro加速/扩展效率。
+这是整个 controller 的条件化 payload，不是 NPU 独享带宽。其他 SoC 流量从可用预算扣除，并重测其调度影响。用理想权重字节除以这些值，只能给出特定假设下的吞吐上界。
 
-容量按真实部署权重、当前/下一tile、FP32中间结果、布局变换临时区、VPU scratch、候选框与NMS峰值核算；厂家参数量不能证明512 KiB/core可容纳全部activation。实际验收须提交算子覆盖、数值、SRAM生命周期与DMA/DRAM流量证据，按批准测量口径完成持续与空/密集目标压力测试。当前未下载权重、未导出量化图、未运行NPU测试；P0-5/P0-6关闭仅代表本轮要求与规划获批。
+## 8. 跨模型资源与服务总览
 
-## 附录 A：公开资料与核验限制
+### 8.1 统一总表的字段
 
-| 资料 | 核验范围 | 使用限制 |
+所有模型采用相同字段，但 prefill、decode、整帧与子图分别成行，不将不同单位的数据直接排名。
+
+| 维度 | 汇总内容 | 当前证据要求 |
 |---|---|---|
-| [NVIDIA Jetson Orin 官方产品表](https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/) | 同型号 GPU Tensor Core 的 INT8 dense/sparse 与 GPU CUDA Core 的 FP32/FP16 峰值；AGX Orin 64GB 和 Orin Nano 8GB（Super） | 排除整机 DLA TOPS；GPU 通用浮点不是独立 VPU；不同型号和功耗档不拼接 |
-| [NVIDIA Jetson AGX Xavier 架构介绍](https://developer.nvidia.com/blog/nvidia-jetson-agx-xavier-32-teraops-ai-robotics/) | 512 CUDA cores、64 Tensor Cores、1.37 GHz、GPU INT8 22 TOPS 与矩阵 FP16 11 TFLOPS | FP32 1.403 TFLOPS 为按一 FP32 FMA/core/cycle 的推导值；矩阵 FP16 不作为 VPU FP16 |
-| [Arm Ethos-U85 官方产品页](https://www.arm.com/products/silicon-ip-cpu/ethos/ethos-u85) | 128–2048 MAC 与最高 4 TOPS；本页未披露独立 FP32/FP16 向量 GFLOPS | 不能据此反推 GEMM/VPU 比 |
+| 实例 | revision、artifact、profile、格式、SKU、并发条件 | 与输入/量化图/执行计划一一关联 |
+| 计算 | GEMM MAC、向量 FLOP、归约/特殊函数、量化元素数 | 已映射工作与源算法工作区分 |
+| 流量/带宽 | 每接口读写 bytes、服务窗口、所需/可用 GB/s | 包含重读、转换、共享层、peer 与副本 |
+| 容量 | DRAM、SoC SRAM、最繁忙 core local 峰值 | 生命周期和地址分配支持，不用 cluster 总量替代 |
+| 调度/服务 | 命令数、同步点、各模块完成、关键路径与请求服务 | 同一时钟/负载与完整计时边界 |
+| 结论 | 主要暴露成本、瓶颈、可行方案、case 状态/证据 | 理论、模型仿真、RTL 仿真、硬件实测分别标注 |
 
-产品配比核验日期为2026-10-26；下列模型配置与API文件元数据核验日期为2026-10-27，不下载完整权重。模型操作量、利用率、允许时延和带宽均为条件化演算，不属于厂商保证或本项目实测；规范以总体架构为准。
+当前没有九个模型的统一 Hive 部署和可比较实测。第 1.2 节记录拆解状态，本章只给已知算例与各模型应关闭的压力项，不填伪精确的性能排名。
 
-| 模型公开来源 | 核验范围 | 限制 |
+### 8.2 Qwen3.5-2B decode：条件化预算
+
+拆解文档的[算力账](model_analysis/Qwen3.5-2B-逐层计算拆解.md#81-算力账decodes-较短)给出模型级近似：
+
+```text
+F_decode_MAC(S) ≈ 1.896e9 + 24576*S
+F_lm_head       = 248320*2048 = 508559360 MAC/step
+```
+
+上下文项为六个 full attention 层的 QKᵀ 与 p·V；常数含递推等工作，不全是可映射 GEMM MAC。norm、特殊函数、转换与控制还需分别计服务。
+
+约 1,881.8M 文本权重元素统一套用理想 block32、每 block 一个 1 B scale，仅用于格式敏感性：
+
+| 格式 | 理想表示字节 | 每 step 扫描一次的条件化读取 |
+|---|---:|---:|
+| MXFP8 | 约 1.941 GB | 约 1.941 GB/step |
+| MXFP4 | 约 1.000 GB | 约 1.000 GB/step |
+
+这里没有逐 tensor 核验非矩阵参数、保留精度、padding、布局副本、重复读取和常驻复用，不能作为部署容量或最终 DRAM 流量。共享 embedding 查一行与 lm_head 扫整表的访问也需分开计。
+
+若 FP32 递推状态全外置且每 step 读写各一次，KV 为 FP16、每个历史 KV 元素只读一次，则：
+
+```text
+Q_decode_DRAM(S) = Q_weight_actual
+                + 2*18874368
+                + 12288*S_read + 12288
+                + Q_conv_state + Q_activation + Q_temporary + Q_replication
+BW_average      = R_decode* * Q_decode_DRAM(S)
+```
+
+`S_read` 是本步实际读取长度，是否包含当前 token 按执行计划定义。S_read=4096 时历史 KV 读取为 48 MiB/step，状态全外置读写为 37.75 MB/step；改变驻留、复用、精度或分片就要替换相应项。
+
+这条式子只给平均流量。每层 state 更新的窗口、权重 tile 的装载窗口和量化窗口另行计算 `Q/w`。当前未冻结语言模型服务数值，所需带宽保持参数化；源文档的 310 GB/s、token/s 或“状态必须全驻 SRAM”建议不属于 Hive 条件。
+
+### 8.3 各模型决定的压力项
+
+| 工作负载 | 优先关闭的资源与服务问题 | 关联验证 |
 |---|---|---|
-| [Qwen3-0.6B-FP8](https://huggingface.co/Qwen/Qwen3-0.6B-FP8)、[同源 BF16](https://huggingface.co/Qwen/Qwen3-0.6B) | 本轮revision的config、API tensor dtype统计与文件字节；Q/heads/head_dim、量化与tying | 未运行参考模型、未逐tensor下载校验；正式manifest仍需hash和runtime语义 |
-| [DeepSeek FP8社区版本](https://huggingface.co/RedHatAI/DeepSeek-R1-Distill-Qwen-1.5B-FP8-dynamic)、[同源 BF16](https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B) | config、compressed-tensors量化组、LM head排除、API文件字节与revision | 不宣称DeepSeek官方FP8发布，不将模型名义大小当文件大小 |
-| [GEMM运行期几何](../../workerbee/scala/main/WorkerBeeCalcConfig.scala)、[执行器](../../workerbee/scala/main/WorkerBeeExecutor.scala) | A/B block16/32、T=16的C block16限制、M/K装载与排空 | 独立模块源码，不是cluster吞吐实测 |
-| [DMA参考规格](../../foragerbee/doc/spec.md) | byte reader/writer BB/2、MX8量化1element/cycle、转换支持边界 | 不涉及修改/验证独立DMA项目，不能宣称已集成 |
-| [YOLO11官方检测表](https://docs.ultralytics.com/models/yolo11/)、[官方检测图](https://github.com/ultralytics/ultralytics/blob/main/ultralytics/cfg/models/11/yolo11.yaml) | YOLO11n/s模型身份、640输入、参数/FLOPs/mAP参考，检测图模块组成 | 官网与当前主分支注释统计不同；未下载权重、未运行量化或NPU检测验收 |
+| Qwen3-0.6B | 标准 Attention/GQA 的 KV 复用、RoPE/softmax 与小 M 投影 | attention 子图、调度、prefill/decode 完整任务 |
+| Qwen3.5-0.8B/2B/9B | state 服务、chunk 临时区、权重扫描与规模扩展 | 状态/量化、容量、层/chunk 流水、独立模型服务 |
+| LFM3-1.7B | conv 流式访问与滑窗/全局 Attention 的混合缓存 | 数据轨迹、算子映射与跨路径切换 |
+| Granite 4.0-H-Tiny | Mamba2 状态、专家路由失衡、gather/scatter 与小 GEMM | 冻结路由分布、非连续访问与多核流水 |
+| Gemma 4 E2B | 逐层 embedding 与投影并发、查表布局/共享副本 | 实际 lookup 地址、共享服务与层时间线 |
+| YOLO11n | 多尺度活跃区、depthwise 利用率、DFL/NMS 完整后处理 | 帧流水、空/密集目标、完整 fps/p95 与 mAP |
+| YOLO26n | NMS-free 头的 decode/top-k/gather/过滤与输出规模 | 独立后处理预算；不借用 YOLO11n 阈值 |
+| MLA 子图 | latent cache 读写、展开/权重吸收、临时区与小 GEMM | 固定子图数值、服务和流量对照，不外推完整模型 |
+
+逐层推导留在第 1.2 节的模型文档；复杂状态分块、attention/MLA 方案、共享 SRAM 数据计划、检测映射及详细验收规程可后续单独在 `model_analysis` 下展开。每份专项分析交付可执行计划、bytes/生命周期、服务预算与对应 case 证据，而不是再次罗列峰值。
+
+## 9. 验收 case 与验证闭环
+
+### 9.1 Case 定义、输入冻结与证据
+
+每个 case 实例按以下字段登记，表中的 ID 是本文分析编号，不是新增架构 AR：
+
+```text
+来源需求/上层case → 推导公式与假设 → 固定输入/配置/执行计划
+→ 前置case → 可运行入口和步骤 → 观测量 → 数值门槛
+→ 判定与失败归因 → 原始证据/报告
+```
+
+下文为 case 定义矩阵，不是执行记录。所有 case 当前均未执行；服务窗口、逐算子数值预算、共享 SRAM 配置或运行入口未冻结的实例标为“待冻结”，不能签为通过。
+
+| 参数/证据 | 冻结内容 |
+|---|---|
+| `w_i / l_i` | 对应请求、阶段、接口的完成窗口/首响应延迟上限；由第 2 章预算分解，测量前给出具体数值和单位 |
+| `Q_j,i* / C_i*` | 执行计划推导的物理 bytes/分配峰值；包含 padding、重读、缓冲和副本，不含未经说明的误差容忍 |
+| `E_i*` | 独立量化/数值参考、输入集合、误差指标及各项阈值；精确搬运按 bit/byte 一致判定 |
+| 运行入口 | 实际构建版本、执行程序/仿真入口、输入、步骤、采样数与时长；未实现路径先判不可实施，不虚构命令 |
+| 证据类别 | 理论推导用于预算；模型仿真用于可行性；RTL 仿真用于功能/周期；硬件实测用于实际系统服务。不同类别不相互冒充 |
+| 原始证据 | tensor/输入 hash、命令与地址轨迹、分配生命周期、周期/时间戳、接口统计、数值输出、质量与服务原始样本 |
+
+统计工具的回放、串行化、cache 或频率控制可能改变运行条件；取证运行与无扰动服务运行分开，并检查计数器/trace 的覆盖与自身开销。性能判据的统计窗口和尾时延采样方案随 case 冻结，不在本文任意指定采样次数。
+
+### 9.2 L0：数据计划可实施
+
+L0 不依赖模块速度已通过，但必须有真实实现路径。它先排除“算得出预算、系统却无法执行”的方案。
+
+| Case / 来源需求 | 输入与执行步骤 | 观测量 | 判据与证据 |
+|---|---|---|---|
+| C0-01 图、格式与命令合法性；所有上层任务 | 对冻结导出图逐算子登记实现；生成命令与转换链，检查 M/N/K、scale、布局与尾块；含 M=1/32/48、超 M 上限的拆分、chunk 尾块 | 算子覆盖、合法命令数、数据格式和转换边界 | 100% 算子有可运行路径、0 条非法命令、0 条缺失转换；不能靠隐含 FP16 回退完成 MX 计划。证据：图/命令清单、格式参考与合法性检查 |
+| C0-02 活跃容量与分配；请求/阶段容量预算 | 为每 core、DRAM、SoC SRAM 生成地址与活跃区间；回放创建/消费/异步完成/释放；覆盖峰值 S、预取与上一写回同时活跃 | 每区 C_peak、地址重叠、越界与复用时刻 | G0 local≤512 KiB/core、Pro≤1 MiB/core；DRAM 含系统分配≤4/8 GiB；SoC SRAM≤独立冻结容量；0 次活跃区覆盖/越界。证据：分配表与生命周期峰值 |
+| C0-03 物理流量与预算闭合；第 2/5/6 章 | 从合法计划生成每接口/方向/core/阶段轨迹；计算 Q、w、P_req、C；沿 DAG 核对请求和共享资源预算，标出不满足的行 | bytes、命令/同步数、服务需求、预算缺口 | 0 个未记账路径；每项需求可追溯到完整任务；关键路径/持续资源预算可闭合。w 或上层目标未冻结时只交付参数化推导，不判性能通过。证据：预算行、DAG 与轨迹 |
+
+C0-01～03 均针对同一计划独立检查，通过后才进入服务验证。第 5.4 节 M48 MXFP8＋64 KiB state head 的组合应由 C0-02 识别为超容量，而不是因为单命令合法就通过。
+
+### 9.3 L1：基础资源服务
+
+前置为 C0-01～03。使用上层计划的真实地址/并发轨迹，也保留独占基准以便归因；对 bank 冲突等压力输入，门槛来自该输入对应预算，不要求所有地址都达到理论峰值。
+
+| Case / 上层需求 | 输入与可执行步骤 | 观测量 | 数值判据与证据 |
+|---|---|---|---|
+| C1-01 local SRAM bank 服务；算子/层供数 | 回放 GEMM A/B/scale/C、VPU、DMA、peer 组合；分别执行均匀 bank、同 bank、窄 scale、读写竞争与实际 tile 地址 | 有效 bytes/s、bank 请求/完成槽、首响应、完成时间、数据 | 每口 B_obs≥Q/w、首响应≤l、组合完成≤w，搬运数据精确一致；128 GB/s 仅为条件化结构上限。证据：bank 轨迹、仲裁/反压与计数 |
+| C1-02 DMA 完整搬运；装载/写回窗口 | 用实际布局执行 DRAM↔local、peer↔local、local→local；覆盖短/满 burst、合法非对齐、consumer 反压和多在途；比对源/目的 bytes | 两侧流量、首响应/最终可见、返回缓冲峰值、payload | 搬运 0 byte mismatch；B_obs≥Q/w、首响应≤l、全链完成≤w；缓冲≤配置，未完成前不复用。证据：请求/响应、地址与完成轨迹 |
+| C1-03 system/peer/SoC SRAM 服务；共享/分片阶段 | 在冻结拓扑上回放多 core 搬运、共享 refill/read、CPU 交接与 peer 路由；分别测独占及声明并发组合 | 各汇聚口/方向 bytes、共享峰值、往返、等待与所有权 | 各口和组合满足 Q/w、l、w；数据交接正确，C_shared≤冻结容量；不将 core 口相加视为聚合服务。证据：路由、共享分配与并发 trace |
+| C1-04 DRAM 持续服务；权重/KV/state 阶段 | 在目标 SKU/时钟下回放实际权重、KV/state 读写组合；加入冻结的其他 SoC 负载，持续记录完成与返回 | controller payload、读写比例、延迟、fabric/DMA/consumer 各段服务 | NPU 可用服务≥实际 Q/w，首响应≤l、阶段完成≤w；若需求超过实测能力则预算失败，不以 17.064/34.128 GB/s 理论值替代。证据：多层接口计数与原始时间样本 |
+| C1-05 GEMM 有效拍能力；架构 P001～P005 与投影计算预算 | 在合法、充分供数配置下测各精度有效计算拍；再执行真实 tile，分解 load/compute/drain；INT/MX、W4A8 单独运行 | 有效 MAC/cycle、有效拍/总拍、装载/排空、输出数值 | 8-bit/W4A8 为 512 MAC/cycle/core，同格式 INT4/MXFP4 为 1024；真实 tile 按自己的完成窗口核验，不要求全命令平均等于峰值。证据：有效拍定义、输出与阶段周期 |
+| C1-06 VPU 基础能力；架构 P006/P007 与向量预算 | 按架构无访存反压条件执行 FP32/FP16 FMA；另执行标量 a/b 的 y=a*x+b 流式输入输出与实际向量轨迹 | FMA/cycle、输入输出 bytes、完整时间、数值 | 无反压稳态 FP32=8、FP16=16 FMA/cycle/core；流式服务按 Q/w 与数值预算，不要求达到寄存器峰值。证据：模式、输入/输出与周期/访存计数 |
+
+峰值 case 与应用服务 case 必须同时保留：前者说明硬件计算能力，后者说明合法数据计划能否供数并按时完成。
+
+### 9.4 L2：算子与独立子图
+
+每个实例前置其实际使用的 L1 资源 case。性能从输入数据就绪计至完整输出可被后继消费，包括转换、装载、运算、排空和必要同步；数值逐项按 `E_i*` 核验。
+
+| Case / 前置资源 | 固定输入与执行步骤 | 观测量 | 判据与证据 |
+|---|---|---|---|
+| C2-01 完整投影/卷积映射；C1-01/02/05 及实际外部通路 | 执行计划中的小 M、M 上限、N/K 尾块、down projection 和 depthwise 代表形状；按真实循环含 partial sum 与量化边界 | 输出、有效/补齐 MAC、命令数、各口 Q、C_peak、全时间 | 输出满足 E_i*；Q_obs≤计划预算、C_peak≤C_i*、全时间≤w_i；不只测已驻留 GEMM。证据：参考输出、命令/周期与分配 |
+| C2-02 norm/conv/门控/归约/特殊函数；C1-01/06 与实际搬运 | 对冻结张量执行 RMSNorm、短卷积、RoPE、softmax 等实际 kernel；覆盖长归约、真实动态范围与数值边界 | 误差、特殊函数/归约工作、多遍读写、scratch、全时间 | 各误差项满足 E_i*，实际 bytes/workspace 在预算内且完成≤w_i；FMA 峰值不作为特殊函数服务判据。证据：kernel 输入/输出、多遍访问与周期 |
+| C2-03 MX 量化与布局链；C1-01/02/06 及选定实现资源 | FP32/FP16/BF16 输入分别运行 MX8/MX4 实现；覆盖 block/scale 边界、动态范围、尾块和 padding；输出交给实际消费者 | scale/编码、数值误差、扫描次数、输入/输出 bytes、staging 与完成 | 按独立量化参考满足 E_i*；转换链全部可执行、Q/C 在预算内、完成≤w_i；只有量化阶段快不能通过。证据：参考编码、全链 trace |
+| C2-04 递推状态/chunk；C1-01/02/06 及选定 GEMM/外部资源 | 固定 state 与输入，执行单 token 更新及 chunk 方案；按实际 head/子矩阵分片，测试 chunk 前后连续性和状态写后读 | state/输出误差、状态读写次数、快照、C_peak、串行服务 | state 和输出满足 E_i*，下一消费者读到本步状态，Q/C≤预算、更新/chunk 完成≤w_i。证据：独立递推参考、状态交接与生命周期 |
+| C2-05 完整 Attention；实际使用的 C1-01～06 | 冻结 query/KV heads、S、精度与因果 mask；执行 QKᵀ→softmax→p·V，含量化、KV 复用和输出转换 | 数值、KV/score/probability 流量、临时区、全服务 | 输出满足 E_i*，Q/C≤预算，完整 attention≤w_i；GQA 逻辑 KV 小不证明只读一次。证据：子图参考与物理访问 |
+| C2-06 MLA 方案对照；实际使用的 L1 case | 冻结 latent/RoPE 配置与相同 cache 初态，运行展开和权重吸收候选的 prefill/decode 子图；包含全部压缩/重建与布局转换 | 子图/缓存数值、实际权重/latent bytes、workspace、服务 | 各方案满足 E_i*、Q/C 与独立子图 w_i；与各自推导一致；缺配置/实现/阈值时待冻结。证据：等价性参考、两套计划与子图时间线 |
+| C2-07 专家路由/查表/检测后处理；C1-01/02/03/06 及实际通路 | 分别冻结 MoE 路由分布、逐层 embedding 索引、空/密集检测输出；执行实际 gather/scatter、框解码、top-k、过滤与适用 NMS | 索引/结果正确性、非连续流量、失衡、输出规模、workspace、全时间 | 分别满足各 E_i*、Q/C 与 w_i；YOLO26n 不执行 NMS 也要完成其全部输出处理。证据：每类独立输入参考、访问与服务记录 |
+
+C2-07 的三类实例不互相替代，分别绑定所属模型与执行路径。未使用某资源的子图无需依赖其测试；实际使用却未通过的资源不能省略。
+
+### 9.5 L3：层、流水与调度
+
+前置为 C0 和所用 C1/C2 case。以完整单层、chunk、检测帧阶段为单位，将独占模块实测放回真实并发条件。
+
+| Case / 上层需求 | 执行步骤 | 观测量 | 判据与证据 |
+|---|---|---|---|
+| C3-01 单层/chunk/检测阶段流水；完整任务阶段预算 | 执行完整阶段 DAG，回放当前计算、下一预取、上一写回、VPU/state 同时活跃；baseline/candidate 使用相同输入 | 联合时间线、暴露 load/VPU/state、bank 竞争、C_peak、输出 | 数值正确；阶段完成≤w_i、所有活跃区/流量≤预算；重叠有数据就绪和端口证据，不能由 max 时间推定。证据：多引擎 trace 与生命周期 |
+| C3-02 控制与数据交接；提交/同步窗口 | 从主 CPU 任务提交到 local CPU 执行，硬件 scheduler 跑 GEMM/DMA、local CPU 直控 VPU；覆盖 slot 等待与跨消费者交接 | 排队、命令准备/可发、同步、可见、任务完成与缓冲释放 | 0 次错误依赖/提前复用；暴露控制等待≤分配窗口；完整结果可见再记完成。证据：CPU/任务/引擎事件与输出 |
+| C3-03 多核/共享数据方案；分片与持续资源预算 | 同输入比较单请求分片、私有/共享数据；另按冻结到达序列执行多请求；包含状态、输出拼接与共享 refill | 各 core 工作、peer/system/共享 Q、同步、C_peak、单请求与聚合服务 | 最繁忙 core 与共享资源均满足其预算，数值一致；只对匹配 profile 比较收益，不用聚合吞吐证明单请求扩展。证据：分片图、并发 trace 与服务样本 |
+
+### 9.6 L4：完整任务与质量复核
+
+前置为该任务所用的 C0～C3 case。服务目标已批准也不能省略输入、量化 recipe、运行入口与统计方案的冻结。
+
+| Case / 目标来源 | 可执行步骤与 profile | 观测量 | 数值判据与证据 |
+|---|---|---|---|
+| C4-01 文本 prefill/decode；第 1.3 节与架构 P008/P010/P012 | MX8/MX4、G0/Pro 分别执行 P512 和 D2048；记录完整首 token 与 256 步输出，另扫 L/S；warm/cold、单请求/并发分开 | TTFT p95、平均 decode、TPOT p95、逐步 S、接口 Q/C、关键路径 | 批准模型按各自冻结 T_first*、R_decode*、T_step,p95* 判定；当前 LLM 服务数值待确认，不签性能通过。证据：完整原始请求/step 样本与关联 trace |
+| C4-02 完整检测；YOLO11n 架构 P014/P015，YOLO26n 独立目标 | COCO val2017、640×640、batch1；连续运行预处理→网络→完整后处理→返回，纳入空/密集目标与声明系统负载 | 持续 fps、完整帧 p95、预/后处理、帧流水、Q/C | YOLO11n G0≥30 fps/p95≤50 ms，Pro≥48 fps/p95≤35 ms；YOLO26n 的数值先冻结，不套用。证据：帧入口/完成样本、结果与全链服务 |
+| C4-03 数值/模型质量；架构 P020～P023，扩展模型独立判据 | 先用独立 MX 参考验逐算子，再运行同源 BF16 语言语料/任务及同源浮点检测；固定校准/量化 recipe、数据 hash、采样 | 逐算子误差、状态/任务一致性、perplexity、准确率或 mAP50–95 | 批准语言模型 perplexity 相对增幅≤5%、准确率绝对下降≤1 个百分点；检测 mAP50–95 绝对下降≤1 个百分点；E_i* 全部满足。其余模型另冻判据，不能用 perplexity 替代完整生成质量。证据：独立参考与逐项质量报告 |
+| C4-04 SKU/优化收益复核；架构 P018 与方案收益声明 | 同 artifact/profile/输入分别执行 G0/Pro 的单请求 decode；对优化用同 SKU 的 baseline/candidate 再跑全部相关功能、质量、资源与服务 case | 实测速比、扩展效率、完整时延/吞吐、Q/C 与瓶颈变化 | 批准单请求 decode Pro/G0≥1.6、效率≥0.8；优化收益按预先声明的数值目标判定，质量/容量/相关服务不退回。证据：成对完整任务样本，不以模块加速比代替 |
+
+只有该实例的服务、质量、数据计划和所用依赖 case 均通过，才关闭完整任务。MLA 的终点为 C2-06 的独立子图验收及必要 C3 组合验证，不伪装成 C4 完整模型通过。
+
+### 9.7 依赖关系、具体预算例与关闭条件
+
+```text
+冻结请求目标和输入 → 分配阶段/接口窗口 → C0-01/02/03
+→ 所用C1基础资源 → 所用C2算子/子图
+→ 所用C3流水/控制/多核 → C4服务＋质量＋收益复核
+```
+
+这是验证依赖，不是要求等待硬件实测后才做理论预算。预算先定义需求，底层测试给出能力；不满足时修改计划或重新审定目标，再重跑受影响的上层 case。
+
+以 Qwen3.5-2B down projection/state 服务为例，一条关闭链应包含下列结果：
+
+| 推导/执行环节 | 具体结果或判据 | 对应 case |
+|---|---|---|
+| 投影分块容量 | M32/N16/K6144 的 MX8 tile 为 398 KiB；G0 其余同时活跃区合计必须≤114 KiB | C0-02、C2-01 |
+| state head 容量与流量 | FP32 单 head=64 KiB；若每次读写各一次，合计 128 KiB；驻留/寄存器复用改变时重算 | C0-02/03、C2-04 |
+| 层状态服务需求 | 16 heads 合计读写 2 MiB；若分配状态窗口为 w_state 秒，所用链需服务≥2,097,152/w_state B/s，并完成全部运算与交接≤w_state | C1 相关通路、C2-04 |
+| 投影计算需求 | 此 M32 tile 为 32×6144×16=3,145,728 MAC；仅算术项在 0.256 TMAC/s 下的理想下界为 12.288 μs，不能替代装载/输出完成窗口 | C1-05、C2-01 |
+| 组合是否可重叠 | 回放投影、state、预取与写回的实际 DAG，检查剩余容量、bank 槽和依赖；不预设同层两个阶段并行 | C3-01 |
+| 对请求的影响 | 用同 artifact/profile 的完整样本核验 TTFT/TPOT；state 与投影的暴露时间可追溯到下层预算 | C4-01/03 |
+
+`w_state` 和请求目标未冻结时，这条链只能证明具体 bytes/容量和参数化需求，不能给出虚构 GB/s 或 PASS。状态计算也可能先于带宽达到瓶颈，必须同时验完整运算窗口。
+
+失败按“输入/参考不一致、计划非法或超容量、底层服务不足、数值/算子超预算、并发/调度暴露成本、完整服务/质量失败”分开归因。实测 Q 超过计划时先检查重读、转换和副本；实测时间与预测不符时回溯时间线，不通过修改理论公式来拟合遗漏。
+
+关闭记录包含 case 实例、目标/预算版本、结果、原始证据、差异解释和受影响的上层复测范围。缺数值目标、缺运行入口或只有理论估算的 case 保持待冻结/未执行状态；底层通过不自动关闭 L4。
+
+## 附录 A：分析方法与资料索引
+
+| 来源 | 借鉴内容 | 使用边界 |
+|---|---|---|
+| [NVIDIA LLM inference benchmarking](https://developer.nvidia.com/blog/llm-inference-benchmarking-performance-tuning-with-tensorrt-llm/) | 输入/输出长度、并发、TTFT/TPOT、单请求与聚合吞吐 | 借鉴指标组织，不移植 GPU 实测或软件能力 |
+| [NVIDIA Nsight Compute Profiling Guide](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html) | 分层 roofline、有效/峰值吞吐、事务效率与停顿 | 借鉴取证方法，不把 CUDA 工具当作 Hive 已有运行入口 |
+| [模型拆解目录](model_analysis/) | 第 1.2 节逐层算法、形状与模型账目 | 源文档的精度建议、参考机器速度与“必须驻 SRAM”不自动成为 Hive 要求 |
+| [总体架构](arch.md) | 当前计算/接口/容量、共享 SRAM 和批准服务目标 | 规格、实现候选与实际测量分开 |
+| [DMA 参考规格](../../foragerbee/doc/spec.md) | 简单搬运与量化的阶段结构限制 | 独立参考，不代表本轮已验证 Hive 集成 |
+
+## 附录 B：VPU roofline 与公开产品配比
+
+<a id="2-vpu-配比选型与工作负载分析"></a>
+
+### B.1 单口流式 roofline
+
+VPU 的 256-bit local 单口在 500 MHz 下读写合计为 16 GB/s。`y=a*x+b` 若 a/b 为寄存器标量，每元素读 x、写 y，FP32 为 8 B、FP16 为 4 B，各贡献 2 FLOP；理想流式上限只有 4/8 GFLOPS，低于寄存器内 FMA 峰值 8/16 GFLOPS。
+
+若 a/x/b 都是独立向量，加输出共 16 B/FP32 元素，算术强度进一步下降。执行宽度不能直接换算总访存需求，也不能只算一条操作数流。
+
+| VPU 500 MHz 档位 | FP32 / FP16 峰值，每 core | 状态 |
+|---|---|---|
+| 256-bit | 8 / 16 GFLOPS | 当前架构基线 |
+| 512-bit | 16 / 32 GFLOPS | 扩宽敏感性选项，未批准 |
+| 1024-bit | 32 / 64 GFLOPS | 扩宽敏感性选项，未批准 |
+
+FP16 峰值要求双倍有效 FMA 元素吞吐，不是仅支持 FP16 类型。扩宽前先检查真实 kernel 的特殊函数、归约、寄存器复用与 local 供数，不能只用峰值比例选型。
+
+### B.2 公开产品资源比例
+
+保留此前公开资料核验快照（2026-10-26）。GPU 通用 CUDA 算力不是独立 VPU，整数矩阵与浮点向量峰值比也不是同精度加速比。
+
+| 产品 | GPU INT8 稠密矩阵峰值 | 通用 FP32 | 通用 FP16 | INT8 / FP32、FP16 |
+|---|---:|---:|---:|---|
+| Jetson AGX Orin 64GB | 85 TOPS | 5.3 TFLOPS | 10.6 TFLOPS | 约 16:1、8:1 |
+| Jetson Orin Nano 8GB（Super） | 33 TOPS | 2.1 TFLOPS | 4.2 TFLOPS | 约 15.7:1、7.9:1 |
+| Jetson AGX Xavier GPU | 22 TOPS | 约 1.403 TFLOPS，推导值 | 未独立核验 | 约 15.7:1、不可计算 |
+
+Orin 取[官方同型号表](https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/)的 GPU Tensor Core INT8 dense 与 GPU CUDA 峰值，不计 sparse 或 DLA。[Xavier 架构资料](https://developer.nvidia.com/blog/nvidia-jetson-agx-xavier-32-teraops-ai-robotics/)的 FP32 按 512 CUDA cores×1.37 GHz×2 推导；11 FP16 TFLOPS 为矩阵口径，不填通用 FP16 列。[Ethos-U85](https://www.arm.com/products/silicon-ip-cpu/ethos/ethos-u85)在此前核验中没有独立 FP32/FP16 向量峰值，因此不计算该比例。
+
+这些比值只供资源比较，不构成行业统一配比或 Hive 扩宽依据。
+
+## 附录 C：YOLO 双检测路径的分析入口
+
+<a id="4-yolo-双检测模型基线与评估"></a>
+
+[YOLO11n](model_analysis/YOLO11n-逐层计算拆解.md)与[YOLO26n](model_analysis/YOLO26n-逐层计算拆解.md)均已有模型拆解。Hive 分析需进一步核验冻结导出图、W/A 全 MX 的算子映射、实际分块/流量、活跃内存与完整服务。
+
+| 模型 | 路径差异 | 需要独立验证的内容 |
+|---|---|---|
+| YOLO11n | DFL＋NMS 基线 | 多尺度 feature map、concat/融合活跃区、depthwise 利用率、DFL 与 NMS workspace |
+| YOLO26n | 移除 DFL 的 one-to-one NMS-free 检测头 | 框解码、top-k、gather、过滤、输出规模；移除 NMS 不省略全部后处理 |
+
+两者都计入 letterbox/归一化与坐标还原，空检测和密集目标单独覆盖。实际算子在图内还是图外按 exporter/runtime 冻结，但不改变完整检测的计时边界。
+
+YOLO11 的公开入口为[官方检测表](https://docs.ultralytics.com/models/yolo11/)与[官方检测图](https://github.com/ultralytics/ultralytics/blob/main/ultralytics/cfg/models/11/yolo11.yaml)。此前核验（2026-10-27）发现官网与主分支注释 FLOPs 口径有差异，不能用厂家参数量推定 activation 峰值。YOLO26n 的版本化配置与导出证据按其拆解继续核验；官方浮点权重不作为现成 MX 部署。
