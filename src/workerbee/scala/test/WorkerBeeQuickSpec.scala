@@ -1,94 +1,28 @@
-/** WorkerBeeQuickSpec — 「一个函数跑一组参数」的极简 WorkerBee GEMM 调试用例。
-  * 用法：只改下方【唯一一处 ★★★ runCase(...) 调用】，然后重跑裸命令（不带任何 -D）：
+/** WorkerBeeQuickSpec — 「一个 runCase 跑一组参数」的极简 WorkerBee GEMM 端到端用例集。
+  * 用法：改某条 runCase(...) 的参数，然后重跑裸命令（不带任何 -D）：
   *   CPATH=/opt/homebrew/include LIBRARY_PATH=/opt/homebrew/lib sbt "testOnly WorkerBeeQuickSpec"
   * CPATH/LIBRARY_PATH 是硬需求（Verilator 5.050 FST writer 依赖 lz4 头）。波形始终开启（复用
-  * WorkerBeeParamDebugSpec.scala 的 WbAlwaysFstSim trait）；本文件不注册任何 -D 键，避开 ChiselSim
-  * HasCliOptions 白名单坑。只做薄封装：内存镜像 / 六通道期望地址 / golden / compare 全复用 WbDebugModel，
-  * STATUS 轮询复用 WbStatusPollApi，供数范式与 WorkerBeeDebugCase.runDebug 同构（那两个 runner 都是
-  * private、无法跨文件复用，故按同一范式在此收敛成单个函数）。
+  * WorkerBeeParamDebugSpec.scala 的 WbAlwaysFstSim trait）；本文件不注册任何 -D 键——自定义 -D
+  * 须经 ChiselSim HasCliOptions addOption 注册才在白名单内。内存镜像 / 六通道期望地址 / golden /
+  * compare 全复用 WbDebugModel，STATUS 轮询复用 WbStatusPollApi。
   *
-  * ══ 三条架构约束（自己调 cross 配置必撞）══
-  * 【一】v1 合法【输入配对】只有两类：双 MX（MXE4M3/MXE5M2 互组）、双非 MX 浮点（FP16/BF16 互组）。A=MX×B=非MX
-  *   数学不可实现；A=非MX×B=MX 需 executor 偶奇重排、v1 禁止留 v2；两类非法组合硬件用 errCode3 拦。★ 只管输入
-  *   侧、【不限制输出 cFmt】——「非 MX 输入 → mxfp8 量化输出」合法（C 侧量化消费 fp32 累加器）。
-  * 【二】MX 输入强制 loadWMode=1（否则 errCode4）。故 loadW 默认 None = 按 isMx(aFmt)||isMx(bFmt) 自动推导。
-  * 【三】addrMode 当前【全 RTL 零消费者】：只写 reg5[14:12] + 回读对账、不参与 golden；内存镜像与六路期望地址
-  *   序列一律按 MAT 语义生成，传 TILE 不改变任何数值结果（运行时会打印这句提示，别在波形里白找）。
-  *   (#164) 寄存器重排后 addrMode 的宿主由旧 reg6 迁到 reg5（位号 14/13/12 不变）。
+  * ══ 格式配对约束 ══
+  * 合法【输入配对】只有两类：双 MX（MXE4M3/MXE5M2 互组）、双非 MX 浮点；A=MX×B=非MX 数学不可
+  *   实现，非法组合由 errCode3 拦。★ 只管输入侧、【不限制输出 cFmt】——「非 MX 输入 → mxfp8
+  *   量化输出」合法（C 侧量化消费 fp32 累加器）。
+  * MX 输入强制 loadWMode=1（否则 errCode4）；loadW 默认 None = 按 isMx(aFmt)||isMx(bFmt) 推导。
+  * addrMode 全 RTL 零消费者：只写 reg5[14:12] + 回读对账、不参与 golden；内存镜像与六路期望地址
+  *   一律按 MAT 语义生成，传 TILE 不改变任何数值结果。
   *
-  * ══ errCode 实测更正（与常见 errCode 表不符，以 RTL 为准）══
-  * WorkerBeeCalcConfig 把 a/b/cMxBlockSize 三违约【合并】为单一 errMXLargerThanKLoadNum、errCode 恒置 0，故【errCode
-  * 1 与 2 永不可达】（QuantSpec「blk32 over totalN」旧期望 2 实得 0 的红项根因，#124；已按 RTL 口径把该用例期望
-  * 改为 0）；且五个 when 平级 last-connect、后写覆盖前写 → 真实优先级 6>5>4>3>0。
-  * 【P0-2 去双源】金锚 errCode 镜像已收敛为单一真源 WbDebugModel.hwErrCode（顺序 if 后写覆盖，逐位镜像 RTL）；
-  * QuickSpec.hwErrCode 与 WbDebugModel.precheckConfigErr 均委托它，不再有"两份互不一致的软件镜像"。
-  * [Fix-7/P0-1, exists only when cfg.hasMx4=true] fp4 support appended two
-  * hasMx4-gated branches to the errComb block, both AFTER the fp8 branches, so
-  * last-connect gives them higher priority: MX4xMX8 mix -> errCode3 (Fix-4,
-  * code 3 reused), and fp4 K not divisible by kPerBeat(=64) -> errCode8 (P0-1).
-  * Source order (front to back): code7(capacity) -> code10(cAddr) -> code8(K) -> mix code3,
-  * hence with hasMx4=true the full truth order is
-  *   3(MX4xMX8 mix) > 8(K not divisible) > 10(cAddr alignment) > 7(capacity, RTL-only)
-  *     > 5 > 4 > 3(isAMx^isBMx) > 0
-  * (#178 UPDATE) errCode 11 (int/non-int cross-boundary) inserted after code-8, before
-  * Fix-4. Source order: ...code8(K) -> code11(cross) -> mix code3. Full truth order:
-  *   3(Fix-4) > 11(cross-boundary) > 8(K) > 10(cAddr) > 7(capacity) > 5 > 4 > 3(xor) > 0
-  * (the two code3 predicates are mutually exclusive and share one code).
-  * (P0 epilogue-1 UPDATE) errCode 12 (biasAddr misalignment) inserted after code-10,
-  * before code-8. Full truth order:
-  *   3(Fix-4) > 11(cross) > 8(K) > 12(biasAddr align) > 10(cAddr) > 7(capacity) > 5 > 4 > 3(xor) > 0.
-  * The RTL also carries a !hasMx && biasOn -> 12 defensive arm (no dmaScaleA port on
-  * such netlists would hang the bias fetch forever); all three emitted netlists have
-  * hasMx=true so that arm is dead code and is NOT mirrored by the golden model.
-  * Note: code 6 (MXE2M1 output N odd) is commented out in RTL but still mirrored
-  * by the golden model -- known divergence (see #169 report).
-  * (#146) A third branch used to sit last -- errCode7 "fp4 blk != 64". It has
-  * been DELETED: MXBlockSize was narrowed to the 2-level enum {sel=0 -> 16,
-  * sel=1 -> 32}, so `getBlockSize() =/= 64.U` was a TAUTOLOGY and every fp4 run
-  * was rejected at runtime unconditionally and silently (the golden model
-  * mirrored the same tautology, so RTL and anchor agreed and nothing ever went
-  * red). fp4 now accepts blk in {16, 32} exactly like fp8, errCode 8 is the only
-  * remaining fp4 geometry guard. CODE 7 IS NOT FREE: the CAPACITY guard
-  * (m > cBufferDepth - totalN) still drives errCodeComb := 7.U and is LIVE in all
-  * three emitted netlists. New checks are allocated from 13 upwards (code 9 is
-  * reserved for v2 W4A8; 11 is LIVE: int/non-int cross-boundary #177/#178; 12 is
-  * LIVE: biasAddr misalignment P0 epilogue-1);
-  * codes 1/2 are never revived.
-  * (#150→#155) QuickSpec 的 cfg 现在【不再显式传 supportedFmts】，回落 WorkerBeeConfig
-  * 默认集——因为 #155 MJ1 已把 MXE2M1 升格为【默认必选】，默认集本身就是 7 种格式。
-  * (#66 订正：上行「7 种格式」已过时) 默认集现为 5 种 {INT8, INT4, MXE4M3, MXE5M2,
-  * MXE2M1}——FP16/BF16/INT16 已被用户裁定砍除，故【hasFp=false】。本 suite 不受影响、
-  * 实测仍绿：现役唯一用例是 MXE2M1×MXE2M1【输入】→ BF16【输出】，而 16-bit 输出走
-  * WbOutCvt/FpCvt 的 40→32→16 两级舍入链，【不依赖 hasFp】。但下方那段
-  * 「为什么必须保持 hasFp/hasInt 为真」的论证前提已不成立，读时请连同其后的 (#66) 订正一起看。
-  * （#150 当时是显式写「默认 6 种 + MXE2M1」，那时默认集还不含 MXE2M1；见下方 cfg 的
-  * 论证注释与全字段对齐表。）⟹ hasMx4=true 保持不变，这两支【真的会 elaborate】，
-  * 完整优先级 3(mix) > 8 > 10 > 7(capacity, RTL-only) > 5 > 4 > 3(xor) > 0 对本 suite 生效。#150 之前 QuickSpec
-  * (#178 UPDATE) 完整优先级现为 3(Fix-4) > 11(cross) > 8 > 10 > 7 > 5 > 4 > 3(xor) > 0。
-  * 用的默认 cfg 不含 MXE2M1（hasMx4=false），那两支恒不 elaborate、优先级退回 6>5>4>3>0；
-  * 实测（build/150_fp4_firstrun.log）打开后两支仍不【触发】——因为 fp4 主用例
-  * a/b 同为 MXE2M1（不混配）且 K=64 被 64 整除，体检结论仍是「配置合法」走正向比对。
-  * 注：MX4×MX8 混配(W4A8)数学/OCP 合法，真数据通路支持列 v2；errCode3 是【运行期可诊断】守护（非永久拒绝，
-  * 将来支持只需删守护 when + 补 W4A8 数据通路，aFmt/bFmt 已是独立 4-bit 字段、软件接口无需重构）。
+  * ══ errCode 口径（以 RTL 为准，与常见 errCode 表不符）══
+  * a/b/cMxBlockSize 三违约被【合并】为单一 errMXLargerThanKLoadNum、errCode 恒置 0 ⟹【errCode 1
+  * 与 2 永不可达】。各 when 平级 last-connect、后写覆盖前写，真实优先级为
+  *   3(反向混配) > 11(int/非int 跨界) > 8(K 不整除) > 13(requant) > 12(biasAddr 对齐)
+  *     > 10(cAddr 对齐) > 7(容量，RTL-only) > 5 > 4 > 3(isAMx^isBMx) > 0
+  * 两个 code3 谓词互斥、共用一码；code 9 保留给 v2 W4A8；errCode 7 的现役判据只有【容量】守护
+  * （m > cBufferDepth - totalN）；errCode 6（MXE2M1 输出 N 为奇数）在 RTL 中被注释掉、金锚仍镜像
+  * ⟹ 已知分歧。金锚 errCode 镜像的单一真源是 WbDebugModel.hwErrCode。
   *
-  * ══ 历史缺陷留痕（#133 已修复，本段为知识保留，原「已知不可用区间」段已删）══
-  * dmaC 写回地址曾在多 tile 边界出错（sNEXT_N 三角累积增量式）：nt≥1 块首址实得
-  * base+(M-1)*rowOff+colOff（FP32/M=32/N=32 下 0x200FC0）、正确值 base+colOff（0x200040）。
-  * 当时金锚 cAddrSeqDense 是同一缺陷 RTL 的闭式反向拟合，逐拍地址硬断言退化为「RTL 与镜像
-  * 自比」恒真假绿、全部既有套件放行。★ 正确触发条件【nTiles≥2 且 m≥2】，与 mTiles 无关——
-  * 本段原文「凡 mTiles>1 或 nTiles>1」是错误表述：C 地址序列不含 mTiles 参数、WrOnly 也无
-  * mTile 循环（反例：M=32/N=16 → mTiles=2 但 nTiles=1，修复前后都绿）。
-  * 【#136-KS1 补正：m≥2 是必要条件，不可省】m==1 ∧ nTiles==2 是三角化回退的【可证明
-  * 盲区】——三角式一阶项 nt×(m−1)×rowOff 在 m==1 恒为 0，二阶项系数 nt×(nt+1)/2 在
-  * nt=1 恰为 1（与绝对式 nt 的系数在 nt=1 也恰为 1，两者只在 nt≥2 才分歧：3 vs 2），
-  * 故 nTiles==2 时两式产出逐拍完全相同的序列，任何不变式都区分不了。金锚
-  * cAddrSeqDense 的两条 require 因此覆盖不到 -Dm=1 -Dn=32（合法配置）。
-  * 现状：RTL 侧 sNEXT_N 已改「基址+轮偏移」线性模型（curAddr := io.regFile.cAddr + colAddr，
-  * 与 WorkerBeeDmaScaleWr 同构）；金锚侧 cAddrSeqDense 已改张量语义绝对式
-  * base + nt*cColOff + row*cRowOff + b*cBeatAddrStep，并内置两条 require 自证（nTiles≥2/≥3
-  * 块首拍不变式，【金锚构造期】即炸——即 Scala 测试体求值、调用该函数之时，早于 simulate，
-  * 既非 scalac 编译期亦非 Chisel elaboration 期；任何三角化回退都会被拦截）。永久护栏用例见
-  * WorkerBeeDebugCase 组(f)：M32 N48 K16 FP16→FP32（nTiles=3、strictAddr 硬编码 true）。
   * 产物：波形 sim/debug/quick.fst；失败/超时另落 sim/debug/quick_fail.txt|_A.hex|_B.hex（sim/ 已 gitignore）。 */
 import chisel3._
 import chisel3.simulator.scalatest._
@@ -102,47 +36,25 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
   private val TAG = "QUICK"; private val SUITE = "WorkerBeeQuickSpec"
 
   // ══════════════════════════════════════════════════════════════════════════
-  // ★★★ 你只需要改这一处调用，改完重跑：
-  //   CPATH=/opt/homebrew/include LIBRARY_PATH=/opt/homebrew/lib sbt "testOnly WorkerBeeQuickSpec"
-  // loadW/seed/strictAddr/maxCycles/wave 都有默认值，不写就是默认（见 runCase 签名）。
-  // 默认这组 M=N=K=32 FP16→FP16 的 C 数据是 1024/1024 逐位匹配的。【#131 收尾裁定（选项 A）保持本默认
-  // 调用不动】：它曾在金锚未对齐期于 dmaC 地址对账上报假红（nTiles=2 触发三角累积缺陷），#133 金锚对齐后
-  // 恢复全绿——它是仓库里唯一每天可见的该类缺陷信号灯，勿改成 16（单 tile 会失去信号价值）。
-  //
-  // 【#136-KS7 几何 vs N 依赖性速查（改上方任一参数前先读）】三条通道的地址几何【全部】
-  // 随 N 变化，不存在「B 权重与 N 无关」这类捷径：
-  //   · B 通道：行步进 bRowAddressOffset 在 loadWMode=0（垂直加载）分支 = regFile.n×bEb
-  //     （FP16 → n×2），【正比于 N】；列步进 bColTileAddressOffset = totalN×elemsPerLane(bFmt)×bEb
-  //     与 N 无关（★#124 ① 起为运行期量；FP16 → totalN×1×2 = 32，与旧式 totalN×(bW/8) 同值），
-  //     但轮数 nTilesB = ceil(N/totalN) 直接由 N 决定 ⇒ B 总拍数 = nTilesB × bKTiles × totalN
-  //     随 N 变。loadWMode=1 分支的 bRowAddressOffset 改按 K 派生（见 WorkerBeeCalcConfig），
-  //     此时「正比于 N」不成立、但 nTilesB 仍随 N 变，故结论不变。
-  //   · A 通道：aRowAddressOffset = regFile.k×aEb 与 N 无关（★同为运行期量，FP16 → k×2），但总拍数 =
-  //     nTiles × aKTiles × M，其中 nTiles = ceil(N/totalN) ⇒ 仍随 N 变。
-  //   · C 通道：cRowAddressOffset = N×cEb【正比于 N】，nTiles 亦随 N 变。
-  //   ⇒ 单独改 n 会同时改动 A/B/C 三条序列与三组拍数，不能当单变量对照用；要做单变量
-  //     对照请参考 WorkerBeeDebugCase 的 guard122/guard133 组（各自明示了变量与非变量）。
-  // 【#136 实测记录（前提矛盾项，供后续核对）】#134 评审 KS7 指认本文件此处原文含
-  //   「B 权重与 N 无关」一句，#136 实施时全仓 grep（含 "与 N 无关"/"与N无关"/"N 无关"）
-  //   【0 命中】，且本文件未被 git 跟踪（不在 HEAD 中）故无法查历史版本。据此判断该句
-  //   要么已在 #131/#133 期间被改写掉、要么评审引用有误。上方速查表按裁定的【意图】
-  //   （给出正确的 N 依赖性表述）落地，不针对任何现存错误原文。
+  // 主用例：改这一处调用的参数即可；loadW/seed/strictAddr/maxCycles/wave 都有默认值，
+  //   不写就是默认（见 runCase 签名）。
+  // 【几何 vs N 依赖性】三条通道的地址几何【全部】随 N 变化：B 行步进在 loadWMode=0 分支
+  //   = n×bEb、C 行步进 = N×cEb；三条通道的轮数 nTiles = ceil(N/totalN) 也由 N 决定
+  //   ⇒ 单独改 n 会同时改动 A/B/C 三条地址序列与三组拍数，不能当单变量对照用。
   // ══════════════════════════════════════════════════════════════════════════
   runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE5M2, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.MXE2M1,
           aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT)
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 【P1-2 W4A8 订正（2026-10-13）】A=MX8 × B=MX4 正向混配五用例。B DMA 走 stretch：
-  //   逻辑拍 = 16B fp4 半字片（一个阵列 K 窗口的一行）→ 32B 对齐单读 → DMA 内半字
-  //   选择 → LUT 精确加宽成 E4M3 阵列拍；scaleBDma 全量 kTile 窗口、每拍一个相邻
-  //   scale 字（blk16 时含源块 {2w,2w+1} 字节对）。金锚按张量语义独立推导（窗口
-  //   口径序列见 WbDebugModel expBAddrSeq/expScaleBAddrSeq 混配分支）；硬件守护见
+  // MX W4A8：A=MX8 × B=MX4 正向混配五用例。B DMA 走 stretch：逻辑拍 = 16B fp4 半字片
+  //   （一个阵列 K 窗口的一行）→ 32B 对齐单读 → DMA 内半字选择 → LUT 精确加宽成
+  //   E4M3 阵列拍；scaleBDma 全量 kTile 窗口、每拍一个相邻 scale 字。金锚见
+  //   WbDebugModel expBAddrSeq/expScaleBAddrSeq 混配分支；硬件守护见
   //   WorkerBeeCalcConfig（混配 K%64 或 bAddr%32 → errCode 8，反向混配 → 3）。
-  //   命名带 caseTag ⟹ ScalaTest 名互不撞车（DuplicateTestNameException 防护）。
+  //   ★ 每条都必须带 caseTag 使 ScalaTest 名互不撞车（否则 suite 构造期 abort）。
   // ══════════════════════════════════════════════════════════════════════════
-  // ① 正向混配 K=64：aBlk=32（=A 侧 kPerBeat，1 scale/kTile）、bBlk=16
-  //   （窗口 w 的 scale 字含源块 {2w,2w+1} 字节对 ⟹ Executor idx=lane/8 双字节
-  //   切片可观测；K=64 ⟹ kTile=2 偶数、末窗读恰落张量界内）。
+  // ① 正向混配 K=64：aBlk=32（=A 侧 kPerBeat，1 scale/kTile）、bBlk=16（窗口 w 的 scale 字含源块
+  //   {2w,2w+1} 字节对 ⟹ Executor idx=lane/8 双字节切片可观测）；K=64 ⟹ kTile=2 偶数、末窗读落界内。
   runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.FP32,
           aBlk = 32, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT,
           wave = "sim/debug/quick_w4a8_blk16.fst", caseTag = " [P1-2 W4A8 E4M3xE2M1 blk32/16]")
@@ -153,7 +65,7 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
           aBlk = 32, bBlk = 32, cBlk = 16, addrMode = AddrMode.MAT,
           wave = "sim/debug/quick_w4a8_blk32.fst", caseTag = " [P1-2 W4A8 E5M2xE2M1 K128 blk32/32]")
 
-  // ③ 负向：反向混配 A=MX4 × B=MX8 → errCode 3（数据通路未支持，Fix-4 收窄分支）。
+  // ③ 负向：反向混配 A=MX4 × B=MX8 → errCode 3（数据通路未支持）。
   runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE2M1, bFmt = DataFormat.MXE4M3, cFmt = DataFormat.FP32,
           aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT,
           wave = "sim/debug/quick_w4a8_rev_err3.fst", caseTag = " [P1-2 W4A8 neg reverse-mix errCode3]")
@@ -165,24 +77,22 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
           wave = "sim/debug/quick_w4a8_k32_err8.fst", caseTag = " [P1-2 W4A8 neg K32 errCode8]")
 
   // ⑤ 负向：正向混配 bAddr 未 32B 对齐（stretch 半字拍片单读契约被破坏——
-  //   奇半字拍的 32B 单读将越出张量界）→ errCode 8（订正新增守护）。
+  //   奇半字拍的 32B 单读将越出张量界）→ errCode 8。
   runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.FP32,
           aBlk = 32, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, bBase = B_BASE + 16,
           wave = "sim/debug/quick_w4a8_baddr_err8.fst", caseTag = " [P1-2 W4A8 neg bAddr misalign errCode8]")
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 【P0 epilogue-1 fused bias（2026-10-14）】基底注入四用例：C = bias(N) + A·B。
-  //   硬件：reg5[30]=biasOn + reg9=biasAddr；bias 取数盗用 dmaScaleA 端口（顶层
-  //   drain-then-steal 仲裁），executor sLOAD_A 的 pass-0 psum 零基底换 biasLazy
-  //   （INT 运行 sext32、fp/MX 运行 fp32→lazy40），零新增加法器。金锚：golden 起始
-  //   累加值 = biasVal(nn)（WbDebugModel，独立 biasRng 激励流，既有用例零漂移）。
-  //   TB：dmaScaleA 通道改全量服务 + 跑后双流拆分对账（bias 与 scaleA 共端口交错）。
-  //   n=32 ⟹ nTiles=2：每条正向用例都覆盖「execute 取 nt=0」与「sNEXT_NK_TILE 推进
-  //   取 nt=1」两个取数时机（biasRegs 跨 K pass/M 行驻留复用）。
+  // fused bias：C = bias(N) + A·B，四用例。硬件 reg5[30]=biasOn + reg9=biasAddr；bias 取数
+  //   盗用 dmaScaleA 端口（顶层 drain-then-steal 仲裁），executor sLOAD_A 的 pass-0 psum 零基底
+  //   换 biasLazy（INT 运行 sext32、fp/MX 运行 fp32→lazy40）。金锚：golden 起始累加值
+  //   = biasVal(nn)（WbDebugModel，独立 biasRng 激励流）。n=32 ⟹ nTiles=2：每条正向用例都覆盖
+  //   「execute 取 nt=0」与「sNEXT_NK_TILE 推进取 nt=1」两个取数时机（biasRegs 跨 K pass/M 行
+  //   驻留复用）。
   // ══════════════════════════════════════════════════════════════════════════
-  // ⑥ INT8×INT8 + bias → INT32：INT 路基底注入（sext32 进 40b psum 链）；dmaScaleA
-  //   端口全程只有 bias 流量（INT 运行 scaleA DMA 不启动）——拆分对账退化为 bias 单流，
-  //   同时验证「无 MX 输入时端口盗用不惊扰任何 scale 通路」。loadW=1 与 IntSpec 同范式。
+  // ⑥ INT8×INT8 + bias → INT32：INT 路基底注入（sext32 进 40b psum 链）；dmaScaleA 端口全程
+  //   只有 bias 流量（INT 运行 scaleA DMA 不启动）⟹ 同时覆盖「无 MX 输入时端口盗用不惊扰
+  //   任何 scale 通路」。
   runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT32,
           aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
           biasOn = true, wave = "sim/debug/quick_bias_int8.fst", caseTag = " [P0-ep1 bias INT8xINT8->INT32]")
@@ -209,15 +119,14 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
           wave = "sim/debug/quick_bias_err12.fst", caseTag = " [P0-ep1 neg biasAddr misalign errCode12]")
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 【P0 epilogue-2 fused requant（2026-10-14）】量化整数 epilogue 六用例：
-  //   y = sat_fmt(round_half_up(relu(acc) × M[n] >> shift) + zp)，acc 含 epilogue-1
-  //   bias 基底（同累加器域）。硬件：reg5[29]=requantOn、reg5[15]=reluOn、reg10=rqMBase、
-  //   reg11=[31:16]zp+[5:0]shift；计算独立成 WbRequant 模块（16-lane 并行，用户裁定），
-  //   OutCvt int32Seq 源级 ReLU clamp（INT 族专属消费域）。M 取数复用 dmaScaleA 端口
-  //   （顶层两阶段 epilogue FSM：WAIT 排空 → FETCH_BIAS → FETCH_M 连续盗用，无二次排空），
-  //   TB 侧按地址域拆三流对账。金锚：WbDebugModel goldenC requant 链（Long 整数算术、
-  //   契约独立推导）+ 独立 rqMRng 激励（定向饱和角点：巨乘子/零/小正/中/小负乘子 lane 混合）。
-  //   ★ INT8/INT4【输出】为仓内首例（1B/半字节族 C 写回 + strb 收窄 + FpCvt 旁路全走新档）。
+  // fused requant：量化整数 epilogue 六用例
+  //   y = sat_fmt(round_half_up(relu(acc) × M[n] >> shift) + zp)，acc 含 bias 基底。
+  //   硬件：reg5[29]=requantOn、reg5[15]=reluOn、reg10=rqMBase、reg11=[31:16]zp+[5:0]shift；
+  //   计算独立成 WbRequant 模块（16-lane 并行），OutCvt int32Seq 源级 ReLU clamp
+  //   （INT 族专属消费域）。M 取数复用 dmaScaleA 端口（顶层两阶段 epilogue FSM：
+  //   WAIT 排空 → FETCH_BIAS → FETCH_M 连续盗用），TB 侧按地址域拆三流对账。
+  //   金锚：WbDebugModel goldenC requant 链（Long 整数算术）+ 独立 rqMRng 激励
+  //   （定向饱和角点：巨乘子/零/小正/中/小负乘子 lane 混合）。
   // ══════════════════════════════════════════════════════════════════════════
   // ⑩ INT8×INT8 + bias + requant → INT8：epilogue-1×epilogue-2 全叠加。shift=17/zp=5：
   //   小正乘子 lane（|acc·M|≤~9e5≈2^19.8）商落 [-128,127] 值域内（round-half-up 进位
@@ -270,14 +179,14 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
           wave = "sim/debug/quick_relu_int32.fst", caseTag = " [P0-ep2 relu-only INT8xINT8->INT32]")
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 【P1-2 INT W4A8（2026-10-14）】A=INT8 × B=INT4 正向混配六用例。与 MX W4A8
-  //   同款 B DMA stretch 路：逻辑拍 = 16B INT4 半字片（32 nibble = 一个阵列 K 窗口的
-  //   一行）→ 32B 对齐单读 → DMA 内半字选择 → 顶层符号扩展 Cat(Fill(4,nib(3)),nib(2,0))
-  //   成 32B INT8 阵列拍（bFmtIn 重映射 INT4→INT8 ⟹ MAC 走纯 INT8 双 lane 基线，零
-  //   阵列改动）；无 scale 通路（INT 族不取 scale，dmaScaleB 全程静默）。金锚按张量
-  //   语义独立推导（WbDebugModel expBAddrSeq 混配分支：窗口步进 aKpb×4/8=16B、
-  //   K/aKpb 个窗口 × totalN 行降序、物理读 = 对齐单读）；硬件守护见
-  //   WorkerBeeCalcConfig（混配 loadW=0 / K%64 / bAddr%32 → errCode 8，反向混配 → 3）。
+  // INT W4A8：A=INT8 × B=INT4 正向混配六用例。与 MX W4A8 同款 B DMA stretch 路：
+  //   逻辑拍 = 16B INT4 半字片（32 nibble = 一个阵列 K 窗口的一行）→ 32B 对齐单读 →
+  //   DMA 内半字选择 → 顶层符号扩展 Cat(Fill(4,nib(3)),nib(2,0)) 成 32B INT8 阵列拍
+  //   （bFmtIn 重映射 INT4→INT8 ⟹ MAC 走纯 INT8 双 lane 基线）；无 scale 通路
+  //   （INT 族不取 scale，dmaScaleB 全程静默）。金锚见 WbDebugModel expBAddrSeq 混配
+  //   分支（窗口步进 aKpb×4/8=16B、K/aKpb 个窗口 × totalN 行降序、物理读 = 对齐单读）；
+  //   硬件守护见 WorkerBeeCalcConfig（混配 loadW=0 / K%64 / bAddr%32 → errCode 8，
+  //   反向混配 → 3）。
   // ══════════════════════════════════════════════════════════════════════════
   // ⑯ 正向混配 K=64 → INT32：kTile=2（多窗口轮转）+ nTiles=2（nt 切换）。
   //    ★ loadW 必须显式 Some(1)：None 对 INT 格式自动推导为 0，混配下触发
@@ -286,18 +195,17 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
           aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
           wave = "sim/debug/quick_intw4a8_k64.fst", caseTag = " [P1-2 INT W4A8 INT8xINT4->INT32]")
 
-  // ⑰ 正向混配 + bias + requant → INT8：epilogue-1×epilogue-2 全叠加在混配累加器上
-  //    （acc 含 bias 基底，rqShift/rqZp 与 ⑩ 同参数对照）；dmaScaleA 端口 bias+rqM
-  //    双流连续取数与纯 INT 用例同范式，混配下端口无 scaleA 流量（INT 输入）。
+  // ⑰ 正向混配 + bias + requant → INT8：bias + requant 全叠加在混配累加器上
+  //    （rqShift/rqZp 与 ⑩ 同参数对照）；混配下 dmaScaleA 端口只有 bias+rqM 双流、
+  //    无 scaleA 流量（INT 输入）。
   runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.INT8, bFmt = DataFormat.INT4, cFmt = DataFormat.INT8,
           aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
           biasOn = true, requantOn = true, rqShift = 17, rqZp = 5,
           wave = "sim/debug/quick_intw4a8_rq.fst", caseTag = " [P1-2 INT W4A8 requant INT8xINT4+bias->INT8]")
 
   // ⑱ 负向：反向混配 A=INT4 × B=INT8 → errCode 3（K 窗口 = aKLoadNum=64 元素，
-  //    B 每行窗口切片 64B 超拍宽 32B 两倍、须 push 连推 2 拍——几何不可达（MX 侧
-  //    PROBE4/PROBE6 已证伪的同型机构）；与 MX 反向混配 Fix-4 同处置、链尾最高
-  //    优先级，覆盖 8/11 等一切低码）。
+  //    B 每行窗口切片 64B 超拍宽 32B 两倍、须 push 连推 2 拍，几何不可达）。链尾最高
+  //    优先级，覆盖 8/11 等一切低码。
   runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.INT4, bFmt = DataFormat.INT8, cFmt = DataFormat.INT32,
           aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
           wave = "sim/debug/quick_intw4a8_rev_err3.fst", caseTag = " [P1-2 INT W4A8 neg reverse-mix errCode3]")
@@ -316,23 +224,22 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
 
   // ㉑ 负向：正向混配 loadW=0 → errCode 8（loadW 臂，INT 专属）：stretch 半字切片
   //    取转置布局一行内连续 32 个 K 元素，loadW=0 的 K×N 行主序里同列 K 元素跨行
-  //    步进、几何不可达。纯 INT8/INT4 两种布局均合法（errCode4 不扩 INT 裁定），
-  //    本臂仅混配命中；K/bAddr 均合法 ⟹ 只命中 loadW 臂。
+  //    步进、几何不可达。纯 INT8/INT4 两种布局均合法，本臂仅混配命中；
+  //    K/bAddr 均合法 ⟹ 只命中 loadW 臂。
   runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.INT8, bFmt = DataFormat.INT4, cFmt = DataFormat.INT32,
           aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(0),
           wave = "sim/debug/quick_intw4a8_loadw0_err8.fst", caseTag = " [P1-2 INT W4A8 neg loadW0 errCode8]")
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 【P2 纯 FP8（2026-10-15）】非 MX 纯 FP8 档（per-tensor scale）九用例。
-  //   硬件路线 = remap：WorkerBee 把 FP8E4M3/FP8E5M2 重映射成 MXE4M3/MXE5M2 喂阵列
-  //   （FusionMacFp/WorkUnit/Worker 零改动，自动走已验证的 MX8×MX8 基线），
-  //   WorkerBeeExecutor 在 scaleA/scaleB 注入点恒注入 127（E8M0 2^0=1.0 恒等）——
-  //   per-tensor scale 由软件量化 pre-pass 折进权重，硬件不取 scale DMA（FP8 不在
-  //   isMxAny ⟹ scale DMA start 门控自动不启动，scaleA/B 数组与期望地址序列金锚侧
-  //   自动退空）。几何：FP8 进 is1B 族（elemsPerLane=2 ⟹ kPerBeat=totalN×2=32、
-  //   双 lane 打包、bColTile 运行期步进 32B 全自动）。
+  // 纯 FP8（per-tensor scale）九用例。硬件路线 = remap：WorkerBee 把 FP8E4M3/FP8E5M2
+  //   重映射成 MXE4M3/MXE5M2 喂阵列（走 MX8×MX8 基线），WorkerBeeExecutor 在
+  //   scaleA/scaleB 注入点恒注入 127（E8M0 2^0=1.0 恒等）——per-tensor scale 由软件
+  //   量化 pre-pass 折进权重，硬件不取 scale DMA（FP8 不在 isMxAny ⟹ scale DMA start
+  //   门控不启动，金锚侧 scaleA/B 数组与期望地址序列自动退空）。
+  //   几何：FP8 进 is1B 族（elemsPerLane=2 ⟹ kPerBeat=totalN×2=32、双 lane 打包、
+  //   bColTile 运行期步进 32B）。
   //   ★ loadW 必须显式 Some(1)：None 按 isMxAny 自动推导为 0 → errCode4（FP8 强制
-  //     转置布局，保守裁定 A：镜像 MX8 run-mode 约束）。
+  //     转置布局，镜像 MX8 run-mode 约束）。
   // ══════════════════════════════════════════════════════════════════════════
   // ㉒ 正向基线：FP8E4M3×FP8E4M3 K=64 → FP32。kTile=2（多 K 窗口轮转）+ nTiles=2
   //    （nt 切换）；金锚 = MX 模型 scale≡127（effScale 对 !isMxAny 恒 127，解码/
@@ -350,15 +257,14 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
 
   // ㉔ 正向 + bias → FP32：fp 路 bias 基底注入（fp32→lazy40，biasRunIsInt 对 FP8
   //    取 false）。dmaScaleA 端口全程只有 bias 流量（FP8 非 MX ⟹ scaleA DMA 不启动）
-  //    ——与用例 ⑥ 同范式，验证「无 MX 输入时端口盗用不惊扰 scale 通路」在 FP8 下
-  //    同样成立（跑后拆流对账 scaleA 流 = 空）。
+  //    ——与用例 ⑥ 同范式，跑后拆流对账 scaleA 流 = 空。
   runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.FP8E5M2, bFmt = DataFormat.FP8E5M2, cFmt = DataFormat.FP32,
           aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
           biasOn = true, wave = "sim/debug/quick_fp8_bias.fst", caseTag = " [P2 FP8 E5M2xE5M2+bias->FP32]")
 
   // ㉕ 正向量化输出：FP8E4M3×FP8E4M3 → MXE4M3 块量化输出（blk16）。「非 MX 输入 →
-  //    MX 量化输出」合法（约束一：C 侧量化消费 fp32 累加器）——amax→E8M0→E4M3 全链
-  //    + dmaCScale 通道流量；FP8 输入 × MX 输出的组合首例。
+  //    MX 量化输出」合法（C 侧量化消费 fp32 累加器）——amax→E8M0→E4M3 全链
+  //    + dmaCScale 通道流量。
   runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.FP8E4M3, bFmt = DataFormat.FP8E4M3, cFmt = DataFormat.MXE4M3,
           aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
           wave = "sim/debug/quick_fp8_quant.fst", caseTag = " [P2 FP8 E4M3xE4M3->MXE4M3 quant]")
@@ -377,9 +283,8 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
           wave = "sim/debug/quick_fp8_loadw0_err4.fst", caseTag = " [P2 FP8 neg loadW0 errCode4]")
 
   // ㉘ 负向：FP8×INT8 跨族混配 → errCode 3（链尾 FP8 XOR 臂）：remap 只改 FP8 码点，
-  //    INT8 侧解码落 INT 支路，FusionMacFp 谓词不命中会静默算错——真实硬件空洞，
-  //    本臂为 P2 新增的密封守护。K=64 整除（避 8）、loadW=1（避 4）、cFmt=FP32
-  //    （runIsInt=false=cIsIntOut，避 11）⟹ 只命中链尾 XOR 臂。
+  //    INT8 侧解码落 INT 支路，FusionMacFp 谓词不命中会静默算错。K=64 整除（避 8）、
+  //    loadW=1（避 4）、cFmt=FP32（runIsInt=false=cIsIntOut，避 11）⟹ 只命中链尾 XOR 臂。
   runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.FP8E4M3, bFmt = DataFormat.INT8, cFmt = DataFormat.FP32,
           aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
           wave = "sim/debug/quick_fp8_x_int8_err3.fst", caseTag = " [P2 FP8 neg cross-family FP8xINT8 errCode3]")
@@ -398,72 +303,97 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
           aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
           wave = "sim/debug/quick_fp8_int32out_err11.fst", caseTag = " [P2 FP8 neg INT32 output errCode11]")
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // BF16 输入格式（默认启用）六用例。硬件路线 = 专用窄乘法器，不走 FP8 那种 remap：
+  //   WbFusionMacFp lane0 的第三条分支（hasBf16 && !hasFp16）例化 FpMulBf16Mx，与 MX8
+  //   复用同一条乘积槽 L0；WbWorkUnit 的 io.sum 选择链含 BF16 臂（优先级
+  //   MX > BF16 > INT > cReg，缺这一臂时 BF16 乘积会被 io.cReg 兜底覆写 ⟹ 通路静默死）。
+  //   几何：BF16 非打包、elemsPerLane=1 ⟹ kPerBeat = totalN×1 = 16，每拍 16 个 K、
+  //   一 lane 一元素（对照 MX8 双 lane / MX4 四 lane）。
+  //   ★ 与 FP8 的三处关键差异，用例参数据此而定：
+  //     ① errCode 8 的除数是 16（不是 FP8 的 32）⟹ 负例必须取 K%16≠0；K=48 对 BF16
+  //        是【合法】的（48%16=0），照抄 FP8 的 K=48 会得到一条假负例，故本组取 K=40。
+  //     ② BF16 是【合法输出编码】（WbOutCvt packed16 直出臂）⟹ 有 cFmt=BF16 正向用例，
+  //        与 FP8（cFmt=FP8 被 errCode3 拒）相反。
+  //     ③ 非打包几何下 Executor kTiles 取 ceil（非地板除）⟹ K%16≠0 不是静默丢尾，
+  //        而是多出一个半填充尾 kTile 把越界 K 元素真算进去；K=0 则 0-1 回绕成 65535。
+  //        两种失效模式都由 errCode 8 的「%≠0 || ==0」双判据覆盖。
+  //   ★ loadW 两种模式对 BF16 【均合法】：㉛㉜㉝ 取 Some(1) 水平装载、㉟ 取 Some(0)
+  //     垂直装载；None 对 BF16 自动推导为 0（BF16 不在 isMxAny），也是合法配置。
+  // ══════════════════════════════════════════════════════════════════════════
+  // ㉛ 正向基线：BF16×BF16 K=64 → FP32。kTiles = 64/16 = 4（多 K 窗口轮转）+ nTiles=2。
+  //    金锚侧 BF16 解码 = fp32BitsToFloat(bits << 16)（BF16 就是 fp32 的高 16 位），
+  //    effScale 对非 MX 恒 127 ⟹ 复用 MX 金锚链；tolRel=1e-2（cFmt=FP32 非量化）。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.BF16, bFmt = DataFormat.BF16, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          wave = "sim/debug/quick_bf16_fp32.fst", caseTag = " [BF16 BF16xBF16->FP32]")
+
+  // ㉜ 正向 BF16 输出：BF16×BF16 K=64 → BF16（WbOutCvt.scala packed16 直出臂）。
+  //    输出链 lazy40 → fp32 → BF16 两级舍入，金锚 swFp32ToBf16(norm, rnd)；
+  //    WbDebugModel 对 cFmt=BF16 用 tolRel=2e-2（8 位有效位的单步舍入上界）。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.BF16, bFmt = DataFormat.BF16, cFmt = DataFormat.BF16,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          wave = "sim/debug/quick_bf16_bf16out.fst", caseTag = " [BF16 BF16xBF16->BF16]")
+
+  // ㉝ 正向 + bias → FP32：fp 路 bias 基底注入（biasRunIsInt 对 BF16 取 false，走
+  //    fp32→lazy40 基底）。BF16 非 MX ⟹ scaleA DMA 不启动，dmaScaleA 端口全程只有
+  //    bias 流量（跑后拆流对账 scaleA 流 = 空），与 FP8 用例 ㉔ 同范式。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.BF16, bFmt = DataFormat.BF16, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          biasOn = true, wave = "sim/debug/quick_bf16_bias.fst", caseTag = " [BF16 BF16xBF16+bias->FP32]")
+
+  // ㉞ 负向：K=40（% kPerBeat=16 ≠ 0）→ errCode 8（BF16 专属臂，hasBf16 门控）。
+  //    ★ 不能取 FP8 那条 K=48：48%16=0 对 BF16 合法。40 = 2.5 个 kTile ⟹ ceil 后多出
+  //    半填充尾拍，越界 K 元素被真实 DMA 读入并累加（不是丢尾，是算多）。
+  //    loadW=1、cFmt=FP32 ⟹ 本例只命中 errCode 8 这一臂。
+  runCase(m = 32, n = 32, k = 40, aFmt = DataFormat.BF16, bFmt = DataFormat.BF16, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          wave = "sim/debug/quick_bf16_k40_err8.fst", caseTag = " [BF16 neg K40 errCode8]")
+
+  // ㉟ 正向：loadW=0（垂直装载）BF16×BF16 K=64 → FP32。与 ㉛ 的唯一差异就是 loadW：
+  //    ㉛ 水平（权重经 a 链移位 + loadWLock 广播锁存），本例垂直（权重经 psumIn 下沉
+  //    + loadVLock 锁存），两条路对 wReg 位透明；金锚侧 B 布局自动切到 K×N 行主序
+  //    （bRowOff=n×2、bNTileOff=totalN×2）。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.BF16, bFmt = DataFormat.BF16, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(0),
+          wave = "sim/debug/quick_bf16_loadw0.fst", caseTag = " [BF16 loadW0 vertical->FP32]")
+
+  // ㊱ 负向：BF16×INT8 跨族混配 → errCode 3（链尾 BF16 单边异或臂）。这一臂封堵的是
+  //    既有码位的真空：isMxAny(BF16)=false ⟹ 裸 isAMx^isBMx 不触发；errCode 11 的
+  //    runIsInt 对 BF16 取 false（非整数族）⟹ 跨界臂不触发；BF16 的 code8/code4
+  //    只看 aFmt、混配可满足。漏网后唯一拦截点是 FusionMacFp 消费沿的仿真期 assert
+  //    （综合后消失）⟹ 硅上静默算错（lane0 按 BF16 解 16-bit 字，对侧是 INT 双元素打包）。
+  //    ★ 本臂【不】连带拒 cFmt=BF16（BF16 输出合法，见 ㉜）——与 FP8 臂的 cFmt 子句相反。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.BF16, bFmt = DataFormat.INT8, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          wave = "sim/debug/quick_bf16_x_int8_err3.fst", caseTag = " [BF16 neg cross-family BF16xINT8 errCode3]")
+
   /** 编译期配置（totalN=16；cDmaExtW 默认 256；缓冲深度 2048；scaleBufferDepth=64）。
-    * (#155 MJ1) supportedFmts 现在【不再显式传入】，回落 WorkerBeeConfig 的默认集。
-    *   MXE2M1 现在是默认必选，不再需要显式加。
-    *   历史：#150 曾把它显式写成「默认 6 种 + MXE2M1」，因为当时默认集不含 MXE2M1、
-    *   hasMx4=false，fp4 硬件（quad-lane unpack、4x sigW=2 WbMacFpMx、WbCvtOpMx 的
-    *   isMx4 臂——WbMacFpMx/WbCvtOpMx 均为原 WbWorkUnit.scala 子模块、已随 FusionMac
-    *   重构删除；bits-based colTileAddressOffset、errCode8、mix errCode3、kTiles=K/64）
-    *   在本 DUT 里【根本不存在】，用户手改的 fp4 主用例会被 WbDebugModel 的 Fix-9
-    *   cfg-aware require 拦下。本轮 MXE2M1 升格为默认必选后，那段显式传参与默认集
-    *   【逐元素相同】，继续显式写等于维护一份会漂移的副本，故删除。
-    * 【全字段逐一对齐（改前 vs 改后，共 12 个字段）】
-    *   arrayN 8=8 / clusterM 2=2 / aW 16=16 / bW 16=16 / cW 40=40 /
-    *   supportedFmts {FP16,BF16,INT16,INT8,MXE4M3,MXE5M2,MXE2M1} == 默认集（逐元素相同）/
-    *   (#178 订正：上行是 #155 时的历史快照。当前默认集已收窄为 5 种
-    *   {INT8,INT4,MXE4M3,MXE5M2,MXE2M1}——FP16/BF16/INT16 已砍除，hasFp=false。见 :48 订正。)/
-    *   aBufferDepth 2048=2048 / bBufferDepth 2048=2048 / cBufferDepth 2048=2048 /
-    *   addrWidth 32=32（两侧都走默认）/ scaleBufferDepth 64=64（★未动，cfgMxFp4 才用 256）/
-    *   cDmaExtW 256=256（两侧都走默认）。
-    *   ⟹ 改前 cfg == 改后 cfg（case class 结构相等），派生量随之逐一相同：
-    *   totalN=16、hasFp=true、hasInt=true、hasMx=true、hasMx8=true、hasMx4=true、
-    *   c1Merge=hasFp&&hasMx=true、cEffW=40、cScaleRowW=8。DUT 逐位不变。
-    * 【为什么必须保持 hasFp/hasInt 为真（沿用 #150 的论证，仍然有效）】
-    *   - hasFp 掉假会删掉整条浮点通路，WbWorkUnit 的 baseSel 退化为 (false,false) => io.cReg，
-    *     FP16 主用例会【静默】输出累加器输入而非乘加结果（不报错）。上方类头那句
-    *     「默认 M=N=K=32 FP16->FP16 逐位匹配 1024/1024」是用户每天要用的旋钮。
-    *   - c1Merge = hasFp && hasMx 掉假会让共享的 macShared:WbMacFp（原 WbWorkUnit.scala
-    *     子模块，已随 FusionMac 重构删除）消失，fp8 dual-lane
-    *     MAC 结构随之改变，「对 fp8 additive / 数值恒等」的说法即告失效。
-    *   故本 cfg 绝不改用 WorkerBeeElaborate.cfgMxFp4 那种 MX-only 三格式集。
-    * 【(#66) 订正：上方这段论证的【前提已被现实推翻】，原文按仓库惯例保留不删，但结论不再适用】
-    *   用户已裁定砍除 FP16/BF16，WorkerBeeConfig.supportedFmts 默认集现为 5 种
-    *   {INT8, INT4, MXE4M3, MXE5M2, MXE2M1} ⟹ 本 cfg（不显式传 supportedFmts）
-    *   【现在就运行在 hasFp=false 下】，c1Merge = hasFp && hasMx 亦已为 false。
-    *   即上方「hasFp 掉假会…」所预言的后果不是假想，而是已实测发生：
-    *   WorkerBeeSimCase（9 条 FP16 输入用例）与 WorkerBeeSimCaseLoadWSpec（1 条）
-    *   全部静默输出 C 全零而变红（hw=0.000000 / maxRelErr=1.00e+00 /
-    *   strict anchor 0 was not equal to 31743，IRQ_RAW error 不置位），这两个 suite 的
-    *   FP16 用例已在 #66 整批移除（详见各自文件头的「#66 移除记录」）。
-    *   本 suite 之所以【不受影响、仍绿】：现役唯一用例（见上方 runCase）早已不是
-    *   FP16 输入，而是 MXE2M1×MXE2M1 → BF16【输出】；16-bit 输出走 WbOutCvt/FpCvt
-    *   的 40→32→16 两级舍入链，不依赖 hasFp。故上方「FP16 主用例是用户每天要用的
-    *   旋钮」「绝不改用 MX-only 三格式集」两句均已作废：默认集本身已不含 FP16/BF16，
-    *   QuickSpec 也不再有任何 FP16 输入用例可被 hasFp 掉假所伤。
-    * 【两条 require】require(!hasMx4 || hasMx8) 与本轮新增的 require(!hasMx8 || hasMx4)
-    *   合起来钉死 hasMx4 <=> hasMx8；本 cfg 两者皆真 ⟹ 都满足。 */
+    * supportedFmts 不显式传入、回落 WorkerBeeConfig 默认集（含 MXE2M1 ⟹ hasMx4=true，
+    *   fp4 的 quad-lane 与混配 errCode 3/8 两支真的会 elaborate）。
+    * 不要改用 WorkerBeeElaborate.cfgMxFp4 那种 MX-only 三格式集：hasFp 掉假会删掉整条
+    *   浮点通路（WbWorkUnit 的 baseSel 退化为 (false,false) => io.cReg，浮点输入用例
+    *   会【静默】输出累加器输入而非乘加结果、不报错）。
+    * 派生量：totalN=16、cEffW=40、cScaleRowW=8。
+    * 【两条 require】require(!hasMx4 || hasMx8) 与 require(!hasMx8 || hasMx4) 合起来钉死
+    *   hasMx4 <=> hasMx8；本 cfg 两者皆真。 */
   private val cfg = WorkerBeeConfig(arrayN = 8, clusterM = 2, aW = 16, bW = 16, cW = 40,
     aBufferDepth = 2048, bBufferDepth = 2048, cBufferDepth = 2048, scaleBufferDepth = 64)
-  // 套件级舍入模式：★ 主用例与两条历史永久用例都不传 rnd ⟹ 全部取这里的 RNE（逐字不变）。
-  //   (#155 m3) 自本轮起它同时是 runCase 的 per-case `rnd` 形参的【默认值来源】；要单独换
-  //   某一条用例的舍入模式，请在那条 runCase 调用里传 `rnd = RoundingMode.RDN/RUP/...`，
-  //   不要再改这一行（改这一行会同时改动所有未显式传 rnd 的用例）。
-  // ★★【#155 实测踩坑，务必保留 def 不要改回 val】本文件里 ★ 主用例的 runCase 调用位于
-  //   第 109 行，而本声明位于其后（Scala 类体按书写顺序求值）。默认参数表达式是【在调用点
-  //   即时求值】的（编译器生成 runCase$default$N，在 :109 那一行就调用它），而 runCase 的
-  //   函数体是延迟到 `it should ... in {}` 执行时才跑。若这里写 `private val rnd`，则 :109
-  //   求值默认参数时该字段【尚未初始化 = null】，实测抛：
+  // 套件级舍入模式，同时是 runCase 的 per-case `rnd` 形参的默认值来源；要单独换某一条
+  //   用例的舍入模式，请在那条 runCase 调用里传 `rnd = RoundingMode.RDN/RUP/...`，
+  //   不要改这一行（改这一行会同时改动所有未显式传 rnd 的用例）。
+  // ★★【务必保留 def 不要改回 val】本文件的 runCase 调用写在本声明【之前】（Scala 类体
+  //   按书写顺序求值）。默认参数表达式是在【调用点即时求值】的（编译器生成
+  //   runCase$default$N，在 runCase 那一行就调用它），而 runCase 的函数体延迟到
+  //   `it should ... in {}` 执行时才跑。若这里写 `private val rnd`，求值默认参数时该字段
+  //   尚未初始化 = null，会抛：
   //     java.lang.NullPointerException: Cannot invoke
   //       "chisel3.ChiselEnum$Type.litValue()" because "rnd$1" is null
-  //     at WorkerBeeQuickSpec.$anonfun$runCase$2(WorkerBeeQuickSpec.scala:194)
-  //   且只有 ★ 主用例（写在声明之前）会中招，#146/#151/#155 四条（写在声明之后）全绿 ⟹
-  //   这是一个极易被误判为「主用例坏了」的前向引用初始化序陷阱。改成 def 后没有存储字段、
-  //   不受类体求值顺序影响，调用即返回枚举成员（RoundingMode.RNE 是 object 成员，与本类
-  //   构造顺序无关），语义与「套件级常量」完全一致。
+  //   且只有写在声明之前的用例会中招，极易被误判为「那条用例坏了」。改成 def 后没有存储
+  //   字段、不受类体求值顺序影响，语义与「套件级常量」一致。
   private def rnd: RoundingMode.Type = RoundingMode.RNE
   /** blk(用户面 Int) → MXBlockSize sel：表逐条由枚举成员构造，blk 取定义式 (16 << sel)，不写 sel 字面量（枚举重排也不错位）。
-    * 【#144】MXBlockSize 已收窄为 {M16=0, M32=1}，故基档由 8 改 16：16<<0=16→sel0、16<<1=32→sel1，
+    * MXBlockSize 为 {M16=0, M32=1}：16<<0=16→sel0、16<<1=32→sel1，
     *   与 WbDebugModel.DebugParams.aMxBlk/bMxBlk/cMxBlk 的 16<<sel 反解码逐位对齐。 */
   private val blkToSel: Map[Int, Int] = Seq(MXBlockSize.M16, MXBlockSize.M32)
     .map(e => (16 << e.litValue.toInt) -> e.litValue.toInt).toMap
@@ -471,52 +401,46 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
     s"[$TAG] $w=$blk 非法：MX 块大小只能取 ${blkToSel.keys.toSeq.sorted.mkString(" / ")}"))
 
   /** 唯一入口：注册一个 ScalaTest 用例。改顶部调用的参数、重跑即可。
-    * (#155 m3) 新增 per-case `rnd` 形参，默认取套件级 `private def rnd`（RNE）。
-    *   ★测试名【不含 rnd】（`it should` 那行只由 m/n/k/三格式/三 blk/addrMode/caseTag 组成），
-    *   故加这个形参后既有三条用例的 ScalaTest 名【逐字不变】：不触碰 52 行归一化基线、
-    *   不触碰用户手改的 ★ 主用例行、也不会因改名而让 copyWave 的 testHint/工作目录漂移。
-    *   默认参数表达式 `= rnd` 求值于外层类作用域（Scala 把默认值编译成
+    * per-case `rnd` 形参默认取套件级 `private def rnd`（RNE）；测试名【不含 rnd】
+    *   （`it should` 那行只由 m/n/k/三格式/三 blk/addrMode/caseTag 组成）。
+    * 默认参数表达式 `= rnd` 求值于外层类作用域（Scala 把默认值编译成
     *   `runCase$default$N` 方法，形参名在其中不可见）⟹ 它引用的是套件级成员而非形参自身。
-    *   ★但该默认值是在【调用点即时求值】的（不像函数体那样延迟到 `in {}` 执行时），而本文件
-    *   的 ★ 主用例写在套件级声明之前 ⟹ 套件级 `rnd` 必须是 `def` 而不能是 `val`，否则
-    *   主用例会拿到未初始化的 null 字段。详见下方 `private def rnd` 处的踩坑记录。 */
+    * ★该默认值是在【调用点即时求值】的（不像函数体那样延迟到 `in {}` 执行时），而本文件的
+    *   runCase 调用写在套件级声明之前 ⟹ 套件级 `rnd` 必须是 `def` 而不能是 `val`，否则
+    *   用例会拿到未初始化的 null 字段。详见下方 `private def rnd` 处的说明。 */
   def runCase(m: Int, n: Int, k: Int, aFmt: DataFormat.Type, bFmt: DataFormat.Type, cFmt: DataFormat.Type,
               aBlk: Int, bBlk: Int, cBlk: Int, addrMode: AddrMode.Type,
-              loadW: Option[Int] = None,   // None = 按 isMx(aFmt)||isMx(bFmt) 自动推导（MX 强制 1，约束二）
+              loadW: Option[Int] = None,   // None = 按 isMx(aFmt)||isMx(bFmt) 自动推导（MX 强制 1）
               seed: Long = 1234L,          // 激励随机种子（固定可复现）
               strictAddr: Boolean = true,  // true = 地址对账失配判失败（仍是收集-后断言，一次看全所有失配点）
               maxCycles: Long = 20000L,    // 仿真拍数上限（量化输出内部再抬到 >= 20000）
               wave: String = "sim/debug/quick.fst",
-              // (#155 m3) per-case 舍入模式。默认 = 套件级 RNE（下方 `private def rnd`）。
-              //   进 DebugParams.rnd（litValue.toInt）⟹ 写入 reg5 bits[18:16]（(#164) 前为 regs(7)
-              //   bits[14:12]），RTL 与金锚同源。
+              // per-case 舍入模式。默认 = 套件级 RNE（下方 `private def rnd`）。
+              //   进 DebugParams.rnd（litValue.toInt）⟹ 写入 reg5 bits[18:16]，RTL 与金锚同源。
               rnd: RoundingMode.Type = rnd,
-              // 【P1-2 W4A8】per-case B 张量基址（进 reg3=bAddr）。默认 = WbDebugModel.B_BASE；
-              //   仅负例 ⑤ 用它造 bAddr%32!=0 的失配。★测试名【不含 bBase】⟹ 既有用例名逐字不变
-              //   （B_BASE 是 object WbDebugModel 的 val，无 #155 那种类体前向引用初始化序陷阱）。
+              // per-case B 张量基址（进 reg3=bAddr）。默认 = WbDebugModel.B_BASE；
+              //   负例用它造 bAddr%32!=0 的失配。测试名不含 bBase。
               bBase: Long = B_BASE,
-              // 【P0 epilogue-1】fused bias 开关与 bias 向量基址（进 reg5[30]=biasOn / reg9=biasAddr）。
+              // fused bias 开关与 bias 向量基址（进 reg5[30]=biasOn / reg9=biasAddr）。
               //   biasOn=true：金锚 golden 起始累加值 = biasVal(nn)，硬件 pass-0 psum 基底注入
-              //   （sLOAD_A 零填充位换 bias，零新增加法器）；TB 侧 dmaScaleA 通道改「全量服务 +
-              //   跑后双流拆分对账」（bias 与 scaleA 共端口，drain-then-steal 交错）。★测试名
-              //   【不含 bias 参数】⟹ 既有用例名逐字不变；bias 用例须带 caseTag 区名
-              //   （与 W4A8 #148 同一 DuplicateTestNameException 防撞车纪律）。
+              //   （sLOAD_A 零填充位换 bias）；TB 侧 dmaScaleA 通道「全量服务 + 跑后双流拆分
+              //   对账」（bias 与 scaleA 共端口，drain-then-steal 交错）。测试名不含 bias 参数
+              //   ⟹ bias 用例须带 caseTag 区名（DuplicateTestNameException 防撞车纪律）。
               biasOn: Boolean = false,
               biasBase: Long = BIAS_BASE,
-              // 【P0 epilogue-2】fused requant / ReLU 开关与参数（进 reg5[29]=requantOn /
+              // fused requant / ReLU 开关与参数（进 reg5[29]=requantOn /
               //   reg5[15]=reluOn / reg10=rqMBase / reg11=[31:16]zp+[5:0]shift）。
               //   requantOn=true：golden = 量化后整数 sat(round_half_up(relu(acc)×M>>s)+zp)
-              //   （WbDebugModel goldenC requant 链，独立 rqMRng 激励流，既有用例零漂移）；
-              //   硬件 WbRequant 独立模块 16-lane 并行。reluOn 单独开启（不 requant）也
-              //   消费于 INT 族输出（int32Seq 源级 clamp）。TB：dmaScaleA 通道拆【三】流
-              //   对账（bias / rqM / scaleA）。★测试名【不含 requant 参数】⟹ 既有用例名
-              //   逐字不变；requant 用例须带 caseTag（DuplicateTestNameException 防撞车纪律）。
+              //   （WbDebugModel goldenC requant 链，独立 rqMRng 激励流）；硬件 WbRequant
+              //   独立模块 16-lane 并行。reluOn 单独开启（不 requant）也消费于 INT 族输出
+              //   （int32Seq 源级 clamp）。TB：dmaScaleA 通道拆【三】流对账（bias / rqM /
+              //   scaleA）。测试名不含 requant 参数 ⟹ requant 用例须带 caseTag。
               requantOn: Boolean = false,
               reluOn: Boolean = false,
               rqMBase: Long = RQM_BASE,
               rqShift: Int = 0,
               rqZp: Int = 0,
-              // (#148) caseTag is appended to the ScalaTest test NAME. It exists for exactly one
+              // caseTag is appended to the ScalaTest test NAME. It exists for exactly one
               //   reason: two runCase calls with identical (m,n,k,aFmt,bFmt,cFmt,blks,addrMode)
               //   build the SAME test name, and ScalaTest rejects that while the suite is being
               //   CONSTRUCTED -- org.scalatest.Engine.registerTest ends with
@@ -524,16 +448,10 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
               //       throw new DuplicateTestNameException(testName, ...)
               //   (scalatest 3.2.19, Engine.scala:669-674). testName = getTestName(testText,
               //   currentBranch) depends ONLY on the `it should "<text>"` string, so the collision
-              //   is decided before any require/simulate/compare ever runs. sbt prints it as
-              //     WorkerBeeQuickSpec *** ABORTED ***
-              //       Duplicate test name: should run ... (blk 16/16/16, ...) (WorkerBeeQuickSpec.scala:<the `it should` line>)
-              //     Total number of tests run: 0 / Suites: completed 0, aborted 1
-              //   i.e. ABORTED, not FAILED: an exception, not an assertion, and not a golden-model
-              //   disagreement. The same collision also lands on the svsim working directory, which
-              //   is derived from the test name (build/chiselsim/WorkerBeeQuickSpec/should-run-M-32-
-              //   N-32-K-64-DataFormat-4-MXE5M2--x-...-blk-16-16-16--addrMode-AddrMode-0-MAT--), so
-              //   making the name unique repairs both layers with one change.
-              //   Default "" keeps the ★ primary call above at its exact historical title.
+              //   is decided before any require/simulate/compare ever runs. sbt reports it as
+              //   ABORTED (0 tests run), not FAILED. The same collision also lands on the svsim
+              //   working directory, which is derived from the test name, so making the name
+              //   unique repairs both layers with one change.
               caseTag: String = ""): Unit = {
     val lw = loadW.getOrElse(if (isMxAny(aFmt) || isMxAny(bFmt)) 1 else 0)
     it should s"run M=$m N=$n K=$k $aFmt x $bFmt -> $cFmt (blk $aBlk/$bBlk/$cBlk, addrMode=$addrMode)$caseTag" in {
@@ -547,35 +465,18 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
 
 
   // ══ ① 运行前配置体检：镜像 WorkerBeeCalcConfig 的 errComb/errCodeComb 裸块（RTL 真实口径）══
-  // 【P2 纯 FP8 订正】kLoadNum 补 INT8/FP8 两臂（is1B 语义，与 WbDebugModel:383 同源）——
-  //   本 def 只用于 errExplain 的提示文本，但 INT/FP8 负例命中 8/4 时旧式会打印错误的
-  //   kLoadNum/建议值，诊断现场失真。
+  // kLoadNum 的 INT8/FP8 两臂取 is1B 语义（与 WbDebugModel 同源）；本 def 只用于
+  //   errExplain 的提示文本，口径错了会让 INT/FP8 负例打印失真的 kLoadNum/建议值。
   private def kLoadNum(f: DataFormat.Type): Int = if (isMx8(f) || f == DataFormat.INT8 || isFp8Fmt(f)) cfg.totalN * 2 else cfg.totalN * 4  // 镜像 getKLoadNum
   /** Some(code) = 硬件会在 START 后直接置 IRQ_RAW error、不进计算。
-    * 【P0-2 去双源】原本此处有一份 QuickSpec 私有的 hwErrCode 镜像，与 WbDebugModel.precheckConfigErr
-    * 互不一致（后者分列 Some(0)/Some(1)/Some(2)、缺 errCode6、优先级 else-if 链首最高）。现已把权威
-    * 镜像提升为 WbDebugModel.hwErrCode（单一真源，顺序 if 后写覆盖，逐位镜像 RTL last-connect 序），
-    * 本 def 与 precheckConfigErr 均委托它 ⟹ 两份镜像合一、永不再分叉。
+    * 权威镜像是 WbDebugModel.hwErrCode（单一真源，顺序 if 后写覆盖，逐位镜像 RTL
+    * last-connect 序），本 def 与 precheckConfigErr 均委托它。
     * Truth order: 3(MX4xMX8 mix) > 11(int/non-int cross) > 8(K not divisible)
-    *   > 10(cAddr alignment) > 7(capacity, RTL-only) > 5 > 4 > 3(isAMx^isBMx) > 0.
-    *   (#146) The former leading `7(fp4 blk!=64)` term is
-    *   GONE -- errCode 7 was deleted in hardware and in WbDebugModel.hwErrCode
-    *   (it had degenerated into a tautology once MXBlockSize became a 2-level
-    *   {16,32} enum). Code 7 is NOT free: the CAPACITY guard (m > cBufferDepth
-    *   - totalN) still drives errCodeComb := 7.U and is LIVE in all three netlists;
-    *   it is explained below via case 7.
-    *   (#169/#170) errCode 10 added: cAddr not dmaBytes-aligned.
-    * (#150→#155) cfg 不再显式传 supportedFmts，但默认集已含 MXE2M1 ⟹ cfg.hasMx4=true
-    *   不变，混配3/8 两支【已 elaborate】（#150 之前的默认 cfg 下 hasMx4=false、
-    *   两支恒不 elaborate）；
-    *   但对本 suite 的【五个】用例仍全部【不触发】（#155 m3 起由 3 条增至 5 条）：
-    *     · fp4 主用例（K=64）与 #155 RDN / #155 RUP 两条（同为 K=64）：a/b 同为 MXE2M1
-    *       ⟹ 不混配（errCode3 假），K=64 被 kLoadNum=64 整除 ⟹ errCode8 假；
-    *     · #151 K128 fp4：a/b 同为 MXE2M1，K=128 % 64 = 0 ⟹ 两支同假；
-    *     · #146 fp8 永久用例：a/b 同为 MXE5M2 ⟹ 不混配，且 hasMx4 门下的 fp4 专属
-    *       errCode8 对 fp8 不适用。
-    *   舍入模式（rnd）不是 errCode 0/3/4/5/6/8 中任何一支的输入 ⟹ RDN/RUP 两条不会
-    *   把体检结论推向负向。实测五条体检结论均为「配置合法」→ 走正向 golden 比对。 */
+    *   > 13(requant) > 12(biasAddr) > 10(cAddr alignment) > 7(capacity, RTL-only)
+    *   > 5 > 4 > 3(isAMx^isBMx) > 0.
+    * errCode 7 的现役判据只有容量守护（m > cBufferDepth - totalN），见下方 case 7。
+    * cfg.hasMx4=true ⟹ 混配 3 / fp4 K 整除 8 两支真的会 elaborate。
+    * 舍入模式（rnd）不是任何一支 errCode 的输入。 */
   private def hwErrCode(p: DebugParams, cAddr: Long = C_BASE): Option[Int] =
     WbDebugModel.hwErrCode(p, cfg.totalN, cfg.hasMx4, cAddr, cfg.cDmaExtW)
 
@@ -595,14 +496,21 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
       "【P2 纯 FP8】FP8 跨族混配（isFp8(aFmt) XOR isFp8(bFmt)，如 FP8×INT8——remap 只改 FP8 码点、异侧解码落错支路静默算错）" +
       "与 FP8 输出编码（cFmt=FP8E4M3/E5M2——OutCvt 量化输出是 MX 块 scale 语义、FP8 输出无通路，会静默落 fp32 直出支路）" +
       "同由链尾 errCode3 臂拒绝（最高优先级）。 " +
-      "建议：aFmt/bFmt 改成同族（E4M3/E5M2 互组，或 fp4 E2M1×E2M1）、正向混配、或双非 MX 浮点；本约束不限制输出 cFmt（但 cFmt 不得为 FP8）"
-    case 4 => s"MX 输入（aFmt=${p.aFmt}、bFmt=${p.bFmt}）或纯 FP8 输入（aFmt=${p.aFmt}）必须 loadWMode=1（B 按 N×K 转置存放；FP8 阵列侧 remap 走 MX8 数据通路、run-mode 约束继承），当前为 0。 建议：loadW = Some(1) 或留 None 自动推导（FP8 不在 isMxAny 内，None 会自动取 0，须显式 Some(1)）"
-    case 5 => s"FP32 只能作【输出】格式、不能作 A/B 输入（aFmt=${p.aFmt}、bFmt=${p.bFmt}）。 建议：输入改用受支持的输入格式 INT8/INT4/MXE4M3/MXE5M2/MXE2M1（FP16/BF16 已从 supportedFmts 砍除，不能再作输入）"
+      // 链尾最后一臂：BF16 单边异或，只覆盖 BF16×INT（BF16×MX 走裸 isAMx^isBMx 臂、
+      //   BF16×FP8 走 FP8 异配臂）。★ 与 FP8 臂的差异：不连带拒 cFmt=BF16 —— BF16 是
+      //   合法输出编码（WbOutCvt packed16 直出臂），照抄 FP8 的 cFmt 子句会误拒可用通路。
+      s"【BF16】BF16 跨族混配（(aFmt===BF16) XOR (bFmt===BF16)，如 BF16×INT8——lane0 按 BF16 解 16-bit 单元素、" +
+      s"对侧 INT 是双元素打包，乘积槽语义错位静默算错）由链尾最后一臂拒绝：当前 (aFmt=${p.aFmt} 是 BF16)=" +
+      s"${p.aFmt == DataFormat.BF16} XOR (bFmt=${p.bFmt} 是 BF16)=${p.bFmt == DataFormat.BF16}。" +
+      "BF16【输出】不受此臂限制（cFmt=BF16 合法）。 " +
+      "建议：aFmt/bFmt 改成同族（E4M3/E5M2 互组，或 fp4 E2M1×E2M1，或 BF16×BF16）、正向混配、或双非 MX 浮点；本约束不限制输出 cFmt（但 cFmt 不得为 FP8）"
+    case 4 => s"MX 输入（aFmt=${p.aFmt}、bFmt=${p.bFmt}）或纯 FP8 输入必须 loadWMode=1，当前为 0。 " +
+      "【两者理由不同，勿混为一谈】MX：scale 须按 K 维切分 + B 须 N×K 转置存放；FP8：remap 走 MX8 数据通路、run-mode 约束继承。 " +
+      "【BF16 不在本码范围】2026-10-29 裁定删去 BF16 臂：BF16 无 scale、非打包，MX 的两条理由均不适用，" +
+      "且两条装载路径对 wReg 位透明 ⟹ loadW=0/1 对 BF16 均合法（垂直装载正向用例见 ㉟）。 " +
+      "建议：loadW = Some(1)（FP8 不在 isMxAny 内，None 会自动取 0，须显式 Some(1)）"
+    case 5 => s"FP32 只能作【输出】格式、不能作 A/B 输入（aFmt=${p.aFmt}、bFmt=${p.bFmt}）。 建议：输入改用受支持的输入格式 INT8/INT4/MXE4M3/MXE5M2/MXE2M1/FP8E4M3/FP8E5M2/BF16（BF16 已于全引擎集成时恢复为默认输入格式；FP16 仍未恢复，与 BF16 独立）"
     case 6 => s"mxfp4(MXE2M1) 输出要求 N 为偶数（半字节打包），当前 N=${p.n}。 建议：N 改偶数，或 cFmt 换 MXE4M3/MXE5M2"
-    // (#146) The original case 7 ("fp4 forces mxBlockSize=64") was removed with
-    //   that hardware branch. However code 7 is STILL LIVE: the CAPACITY guard
-    //   (m > cBufferDepth - totalN) drives errCodeComb := 7.U in all three netlists.
-    //   (#173-F4) Restoring case 7 with the correct capacity-exceeded explanation.
     case 7 => s"C buffer capacity exceeded: m=${p.m} > cBufferDepth(${cfg.cBufferDepth}) - totalN(${cfg.totalN}) = ${cfg.cBufferDepth - cfg.totalN}. Suggestion: reduce m or increase cBufferDepth."
     case 8 => s"fp4(E2M1) 输入要求 K 被 kPerBeat(=totalN×4=${cfg.totalN * 4}) 整除 —— 当前 K=${p.k}、aFmt=${p.aFmt}、bFmt=${p.bFmt}。 " +
       s"触发支路：aFmt=MX4（阵列 pass 粒度=${cfg.totalN * 4}）、aFmt=MX8 × bFmt=MX4 混配（B 侧 fp4 源字粒度=${cfg.totalN * 4}，" +
@@ -610,27 +518,29 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
       s"【P1-2 INT W4A8】混配 A=INT8×B=INT4 另要求 loadW=1（stretch 半字切片取转置布局一行内连续 K 元素，" +
       s"loadW=0 的 K×N 行主序几何不可达；纯 INT 两种布局均合法）+ bAddr 32B 对齐（半字拍片单读契约）。 " +
       s"不整除会让 Executor kTiles 地板除静默丢尾（或 K<kPerBeat 时 16-bit 回绕跑飞）。 " +
-      s"建议：K 取 ${cfg.totalN * 4} 的整数倍（一个 kTile = 一个 64-K scale 块 = 单 pass）"
+      s"建议：K 取 ${cfg.totalN * 4} 的整数倍（一个 kTile = 一个 64-K scale 块 = 单 pass）。 " +
+      // BF16 专属臂的除数不同：BF16 非打包、elemsPerLane=1 ⟹ kPerBeat = totalN = 16
+      //   （MX8/FP8 是 32、MX4/INT4 是 64）。失效模式也不同：非打包几何下 Executor kTiles
+      //   取 ceil 而非地板除，K%16≠0 是「多出半填充尾 kTile、越界元素被读入累加」；
+      //   K=0 则 kTiles := 0-1 在 16-bit 上回绕成 65535。同一臂以「% ≠ 0 || == 0」覆盖两者。
+      s"【BF16】aFmt=BF16 的除数是 kPerBeat=totalN×1=${cfg.totalN}（非打包、一 lane 一元素），" +
+      s"当前 K=${p.k} % ${cfg.totalN} = ${if (cfg.totalN != 0) p.k % cfg.totalN else 0}，且另拒 K=0。" +
+      s"注意 K=48 对 BF16 是【合法】的（48%16=0），不要照抄 FP8 的 K=48 负例。建议：K 取 ${cfg.totalN} 的非零整数倍"
     case 10 => s"C base address not ${cfg.cDmaExtW / 8}-byte aligned (cAddr % dmaBytes != 0). " +
       s"dmaBytes = cDmaExtW/8 = ${cfg.cDmaExtW / 8}. AXI byte-lane contract requires the write " +
       s"address to be bus-word aligned; otherwise shifted strb+data cross a bus-word boundary " +
       s"and silently lose bytes. Suggestion: align cAddr to a multiple of ${cfg.cDmaExtW / 8}."
-    // (#178) errCode 11: int/non-int cross-boundary guard (V5-only XOR, #177 RTL).
     case 11 => s"Integer/non-integer format cross-boundary: runIsInt(aFmt=${p.aFmt})=" +
       s"${!isFloatFmt(p.aFmt) && !isMxAny(p.aFmt)} XOR cIsIntOut(cFmt=${p.cFmt})=${isIntFmt(p.cFmt)}. " +
       "The runtime computation type (integer vs float/MX) must match the output format type; " +
       "crossing this boundary produces semantically wrong output bits. " +
       "Suggestion: use integer output (INT32/INT8/INT4) with integer input, " +
       "or float/MX output (FP32/FP16/BF16/MX*) with float/MX input."
-    // 【P0 epilogue-1】errCode 12: biasAddr 非 4B 对齐（reg9）。bias 取数走 dmaScaleA 端口
-    //   逐字（4B）读，biasAddr[1:0]≠0 时每个字都跨界半个字，注入值静默错位 → 运行期拒绝。
-    //   优先级 8 > 12 > 10（last-connect 序，置于 code-10 之后 code-8 之前）。
     case 12 => s"biasOn=1 requires biasAddr (reg9) 4-byte aligned: biasBase=0x${p.biasBase.toHexString}, " +
       s"biasBase % 4 = ${p.biasBase % 4}. The bias fetch drives word (4B) reads directly on the dmaScaleA " +
       "port; a misaligned base makes every word read cross a word boundary and silently corrupts the " +
       "injected psum base. Suggestion: keep biasBase a multiple of 4 (default BIAS_BASE is aligned)."
-    // 【P0 epilogue-2】errCode 13: requant 配置违约（两臂，均无门控）。优先级 8 > 13 > 12 > 10
-    //   （last-connect 序，置于 code-12 之后 code-8 之前）。
+    // errCode 13 两臂（均无门控）：cFmt 非 INT8/INT4，或 rqMBase 非 4B 对齐。
     case 13 =>
       val fmtArm = p.requantOn && !(p.cFmt == DataFormat.INT8 || p.cFmt == DataFormat.INT4)
       val alignArm = p.requantOn && p.rqMBase % 4L != 0
@@ -652,12 +562,8 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
   /** ② 打印体检结论 + 生效配置摘要 + 派生几何（一次打全，便于对着波形看） */
   private def printHealth(p: DebugParams, predicted: Option[Int], plan: Plan): Unit = {
     println(s"[$TAG] ═════════════ WorkerBeeQuickSpec 配置体检 ═════════════")
-    // (#155 m3) rnd 的打印源从套件级常量改为按 p.rnd 反查枚举成员：加入 per-case rnd 形参后，
-    //   这行必须反映【本用例实际生效】的舍入模式，否则 RDN/RUP 用例会打出
-    //   "rnd=RoundingMode(0=RNE)(sel=2)" 这种自相矛盾的行（诊断现场直接失真）。
-    //   对既有三条用例（p.rnd 全为 0）打印文本【逐字节不变】：
-    //   RoundingMode.all(0) 与 RoundingMode.RNE 是同一个枚举成员对象 ⟹ toString 相同
-    //   （实测均为 "RoundingMode(0=RNE)"）。
+    // rnd 打印按 p.rnd 反查枚举成员，必须反映本用例实际生效的舍入模式
+    //   （否则 RDN/RUP 用例会打出自相矛盾的诊断行）。
     println(s"[$TAG] 生效配置: ${p.banner} rnd=${RoundingMode.all(p.rnd)}(sel=${p.rnd}) strictAddr=${p.strictAddr}")
     println(s"[$TAG] 派生几何: totalN=${cfg.totalN} cDmaExtW=${cfg.cDmaExtW} aExtW=${cfg.aExtW} bExtW=${cfg.bExtW} " +
       s"kTiles=${plan.aKTiles} mTiles=${(p.m + cfg.totalN - 1) / cfg.totalN} nTiles=${plan.nTiles} beatsPerRow=${plan.beatsPerRow}；" +
@@ -667,15 +573,14 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
       (if (p.requantOn) s" rqM=${plan.expRqMAddrSeq.size}" else "") + s"；内存镜像字节=${plan.memByteCount}")
     if (p.addrModeSel != AddrMode.MAT.litValue.toInt) println(s"[$TAG] ⚠ addrMode=TILE 已写入 reg5[14:12] 并回读对账通过；" +
       "当前 RTL 无消费者，不影响数值结果（内存镜像 / golden / 六路期望地址一律按 MAT 语义生成）")
-    // 【P0 epilogue-2】reluOn 消费域 = INT 族输出（int32Seq 源级 clamp）；fp/MX 输出对它是
-    //   零消费者位（addrMode=TILE 先例）——如实提示，不判失败。
+    // reluOn 消费域 = INT 族输出（int32Seq 源级 clamp）；fp/MX 输出对它是零消费者位，如实提示不判失败。
     if (p.reluOn && !isIntFmt(p.cFmt)) println(s"[$TAG] ⚠ reluOn=1 但 cFmt=${p.cFmt} 非 INT 族输出：clamp 无消费者，" +
       "数值结果与 reluOn=0 逐位相同（金锚同口径不 clamp）")
     predicted match {
       case None => println(s"[$TAG] 体检结论：配置合法，硬件不会置 config-err → 走正向 golden 逐元素比对 ✓")
       case Some(c) => println(s"[$TAG] ★★★ 体检不通过：硬件将在 START 后直接置 IRQ_RAW error（errCode=$c），不进计算 ★★★\n" +
         s"[$TAG]   原因：${errExplain(p, c)}\n[$TAG]   处置：仍然继续跑（负向路径）并硬断言硬件确实以 errCode=$c 拒绝、留下波形") }
-    val model = precheckConfigErr(p, cfg.totalN, cfg.hasMx4)   // 金锚口径与 RTL 口径不一致时给出 #124 提示
+    val model = precheckConfigErr(p, cfg.totalN, cfg.hasMx4)
     if (model != predicted) println(s"[$TAG] 注：WbDebugModel.precheckConfigErr 预测=$model 与本处 RTL 口径=$predicted 不一致" +
       "（#124：errCode 0/1/2 被 RTL 合并为 0，真实优先级是 6>5>4>3>0 的 last-connect 序）")
   }
@@ -684,12 +589,8 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
     val b = "sim/debug/quick_fail"; val pw = new java.io.PrintWriter(new java.io.File(s"$b.txt"))
     pw.println(p.banner); pw.println("--- 地址对账失配 ---"); addrBad.foreach(pw.println)
     pw.println("--- C 元素失配 ---"); cmpLines.foreach(pw.println); pw.close()
-    // 位宽实参由 bytes 口径 (aEb*8) 改为 bits 口径 aEbits（WbDebugModel Phase 3 的单一真源；
-    //   memElemBytes 按其自身注释只保留给「整字节 storeElem 与语义查询」，不用于位宽推导）：
-    //   字节对齐族 aEbits == aEb*8 逐值恒等（FP32/INT32 4↔32、FP16/BF16/INT16 2↔16、
-    //   INT8/MX8 1↔8）⟹ 这些格式落盘文本【逐字不变】；亚字节族 fp4/INT4 的 aEb=0 会传成
-    //   0 位（mask=(1<<0)-1=0 把码字全抹成 0，且曾让 writeMatrixHex 拼出非法格式串 "%00X"
-    //   崩在本行、盖掉真实失配原因），改 aEbits=4 后按 nibble 码字正常落盘。
+    // 位宽实参取 bits 口径 aEbits（WbDebugModel 的单一真源）：亚字节族 fp4/INT4 的
+    //   aEb=0 会传成 0 位，mask=(1<<0)-1=0 把码字全抹成 0；aEbits=4 才能按 nibble 落盘。
     WbSimCommon.writeMatrixHex(s"${b}_A.hex", plan.aCode.map(_.map(_.toInt)), plan.aEbits)
     WbSimCommon.writeMatrixHex(s"${b}_B.hex", plan.bCode.map(_.map(_.toInt)), plan.bEbits)
     println(s"[$TAG] FAIL 数据文件已落盘: $b.txt / ${b}_A.hex / ${b}_B.hex") }
@@ -702,15 +603,13 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
     plan.prepare()      // ③ 内存镜像（loadW=1 时 B 为 N×K 转置，WbDebugModel 已实现）
     printHealth(p, predicted, plan)                  // ② 摘要
     val maxCycles = if (isMxAny(p.cFmt)) math.max(p.maxCycles, 20000) else p.maxCycles
-    // 【#166】cLog 升为 (addr,data,strb) 三元组：dmaC 带 wstrb 且已按地址移位，只有
-    //   同时收下 strb 才能做 lane 级逐字节对账。sLog（scaleC 通道）保持二元组：
-    //   其端口宽度 = 1 字节 (rowW=8 @ totalN=16) => lane 窗口退化为单 lane、移位恒 0,
-    //   data 不移位, 不在 AXI lane 偏移契约范围内。(NOT "strb is constant full-select"
-    //   -- that old rationale only holds coincidentally when rowW=8; see build/166 ss9.4.)
+    // cLog 为 (addr,data,strb) 三元组：dmaC 带 wstrb 且已按地址移位，必须同时收下 strb
+    //   才能做 lane 级逐字节对账。sLog（scaleC 通道）保持二元组：端口宽 1 字节
+    //   (rowW=8 @ totalN=16) ⟹ lane 窗口退化为单 lane、移位恒 0，不在 lane 偏移契约内。
     val cLog = mutable.ArrayBuffer[WbSimCommon.CWriteBeat](); val sLog = mutable.ArrayBuffer[(Long, BigInt)]()
     val addrBad = mutable.ArrayBuffer[String](); var addrBadCnt = 0; var cycle = 0; var regRbMsg = ""; var passed = false
     var regRbOk = false; var done = false; var errSeen = false; var errCode = -1; var cmp: Option[plan.CmpSummary] = None
-    // 【perf 端口】perf 采样累加器（与上方运行态变量同作用域，供跑后打印与硬断言）
+    // perf 采样累加器（供跑后打印与硬断言）
     val perfNames = Seq("dmaA", "dmaB", "dmaC", "scaleA", "scaleB", "scaleC",
       "array", "stallA", "stallB", "epilogue", "busy")
     val perfCnt = Array.fill(perfNames.size)(0)
@@ -741,35 +640,31 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
         // 配置索引 0..11 紧排：M/NK/A/B/C/CONTROL/ScaleA/ScaleB/ScaleC/Bias/RqM/RqParam。
         // STATUS 独立移到 0x1E，IRQ 寄存器为 0x30..0x34。
         cmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, p.m, p.n.toLong | (p.k.toLong << 16))
-        // 【P1-2 W4A8】基址改取 p.aBase/p.bBase（与 Plan.prepare 内存镜像同源，DebugParams
-        //   默认即 A_BASE/B_BASE ⟹ 既有用例写入值逐位不变）；负例 ⑤ 借此把 bAddr%32!=0 送进守护。
+        // 基址取 p.aBase/p.bBase（与 Plan.prepare 内存镜像同源）；负例 ⑤ 借此把 bAddr%32!=0 送进守护。
         cmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, p.aBase, p.bBase)
         cmd(WorkerBeeOp.REG_WRITE2, 0x04, 0x05, C_BASE, p.controlWord5)
         cmd(WorkerBeeOp.REG_WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE); cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
-        // 【P0 epilogue-1】reg9 = biasAddr（biasOn=false 时不写：硬件默认 0、该通路整体不激活）。
+        // reg9 = biasAddr（biasOn=false 时不写：硬件默认 0、该通路不激活）。
         if (p.biasOn) cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.BIAS_REG_ADDR, 0x00, p.biasBase, 0L)
-        // 【P0 epilogue-2】reg10 = rqMBase、reg11 = [31:16]zp + [5:0]shift（requantOn=false 时
-        //   不写，与 reg9 同范式；reluOn 位在 reg5[15] 已随控制字写入，无独立槽位）。
+        // reg10 = rqMBase、reg11 = [31:16]zp + [5:0]shift（requantOn=false 时不写；
+        //   reluOn 位在 reg5[15] 已随控制字写入，无独立槽位）。
         if (p.requantOn) {
           cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.RQM_REG_ADDR, 0x00, p.rqMBase, 0L)
           cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.RQ_PARAM_REG_ADDR, 0x00, p.controlWord14, 0L) }
-        // ⑦ addrMode / 格式字回读对账：addrMode 无硬件消费者，只能靠回读证明「确实写进去了」
-        //   (#164) 重排后控制字全部收敛到 reg5 单寄存器 ⟹ 一次回读即可覆盖 loadWMode/三 MxBlk/
-        //   warmup/warmdown/rnd/三 addrMode/三 fmt 共 19 个位域；断言强度【不降反升】（旧写法
-        //   两次回读只覆盖 reg6+reg7，新写法一次回读覆盖同一批字段的超集）。regRbOk 仍是硬断言。
+        // ⑦ addrMode / 格式字回读对账：addrMode 无硬件消费者，只能靠回读证明「确实写进去了」。
+        //   控制字全部收敛到 reg5 单寄存器 ⟹ 一次回读即覆盖 loadWMode/三 MxBlk/warmup/
+        //   warmdown/rnd/三 addrMode/三 fmt 共 19 个位域。regRbOk 是硬断言。
         val rb5 = readReg(0x05).toLong
         regRbOk = rb5 == p.controlWord5
         regRbMsg = f"reg5 wr=0x${p.controlWord5}%08X rd=0x$rb5%08X (addrMode at reg5[14:12], rnd at reg5[18:16])"
-        // 【P0 epilogue-1】reg9（biasAddr）回读对账（biasOn 时）：biasOn 位本身已由上方 reg5
-        //   bit30 覆盖（controlWord5 含 bit30 ⟹ rb5 对账即含 biasOn），此处只补 biasAddr 槽位。
+        // reg9（biasAddr）回读对账：biasOn 位本身已由 reg5 bit30 覆盖，此处只补 biasAddr 槽位。
         if (p.biasOn) {
           val rb12 = readReg(WbSimCommon.BIAS_REG_ADDR).toLong
           val rb12Ok = rb12 == (p.biasBase & 0xFFFFFFFFL)
           regRbOk = regRbOk && rb12Ok
           regRbMsg += f"; reg9 wr=0x${p.biasBase & 0xFFFFFFFFL}%08X rd=0x$rb12%08X" }
-        // 【P0 epilogue-2】reg10/reg11 回读对账（requantOn 时）：requantOn/reluOn 位本身已由
-        //   reg5（controlWord5 含 bit29/bit15 ⟹ rb5 对账即含两位）覆盖，此处补 rqMBase 与
-        //   zp/shift 槽位；reg11 回读 = Cat(rqZp.asUInt, 10'b0, rqShift)，负 zp 以补码位型对账。
+        // reg10/reg11 回读对账：requantOn/reluOn 位本身已由 reg5 bit29/bit15 覆盖，此处补
+        //   rqMBase 与 zp/shift 槽位；reg11 回读 = Cat(rqZp.asUInt, 10'b0, rqShift)，负 zp 以补码位型对账。
         if (p.requantOn) {
           val rb13 = readReg(WbSimCommon.RQM_REG_ADDR).toLong
           val rb14 = readReg(WbSimCommon.RQ_PARAM_REG_ADDR).toLong
@@ -783,8 +678,7 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
         prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
         launchStart(dut.clock, dut.io.cmd(0))
         var aS = 0; var bS = 0; var saS = 0; var sbS = 0; var cB = 0; var csB = 0; var pollSt = 0; var pollCool = 0
-        // 【perf 端口】TB 代行外部 PMU：主循环逐拍采样 io.perf 各电平累加，跑后打印
-        //   占空比（可观测性验证 + 合理性粗检；采样窗 = EXECUTE 起至 done/err/超时）
+        // TB 代行外部 PMU：主循环逐拍采样 io.perf 各电平累加（采样窗 = EXECUTE 起至 done/err/超时）
         def perfPeek: Seq[Boolean] = Seq(
           dut.io.perf.dmaA.peek().litToBoolean, dut.io.perf.dmaB.peek().litToBoolean,
           dut.io.perf.dmaC.peek().litToBoolean, dut.io.perf.scaleA.peek().litToBoolean,
@@ -792,9 +686,9 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
           dut.io.perf.array.peek().litToBoolean, dut.io.perf.stallA.peek().litToBoolean,
           dut.io.perf.stallB.peek().litToBoolean, dut.io.perf.epilogue.peek().litToBoolean,
           dut.io.perf.busy.peek().litToBoolean)
-        // 【P0 epilogue-1】dmaScaleA 通道地址全量记录：biasOn 时该端口被 drain-then-steal 仲裁
-        //   复用（bias FSM 与 scaleA DMA 交错发请求，交错序取决于硬件 FSM 时序，金锚不模拟），
-        //   逐拍位置对账不再成立 ⟹ 改为跑后按地址域拆流对账（见 while 循环后的 seqCmp）。
+        // dmaScaleA 通道地址全量记录：biasOn 时该端口被 drain-then-steal 仲裁复用
+        //   （bias FSM 与 scaleA DMA 交错发请求，交错序取决于硬件 FSM 时序、金锚不模拟），
+        //   逐拍位置对账不成立 ⟹ 跑后按地址域拆流对账（见 while 循环后的 seqCmp）。
         val saAddrLog = mutable.ArrayBuffer[Long]()
         def rdA(v: Boolean, d: BigInt): Unit = { dut.io.dmaA.rsp.valid.poke(v.B); dut.io.dmaA.rsp.payload.data.poke(d.U) }
         def rdB(v: Boolean, d: BigInt): Unit = { dut.io.dmaB.rsp.valid.poke(v.B); dut.io.dmaB.rsp.payload.data.poke(d.U) }
@@ -805,11 +699,8 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
             dut.io.dmaA.req.payload.addr.peek().litValue.toLong, rdA, plan.beatAtA)
           bS = rdCh("dmaB", bS, plan.expBAddrSeq, dut.io.dmaB.req.valid.peek().litToBoolean,
             dut.io.dmaB.req.payload.addr.peek().litValue.toLong, rdB, plan.beatAtB)
-          // 【P0 epilogue-1】dmaScaleA 服务口径改造：①供数仍是「req.valid 拍按请求地址从内存
-          //   镜像取数」的同一铁律（wordAt），但【不再】以「超期望拍数」静默断供——bias 流量
-          //   与 scaleA 流量共用本端口，期望拍数按通道分列，超拍/错拍改由跑后拆流对账逐拍
-          //   暴露（比旧口径更严：旧 rdCh 超出 exp.size 的请求直接吞掉不报）。biasOn=false
-          //   时记录流 ≡ scaleA 流，跑后整流对账与旧逐拍对账等价（含拍数短缺/超出的暴露）。
+          // dmaScaleA 供数仍是「req.valid 拍按请求地址从内存镜像取数」（wordAt），但不以
+          //   超期望拍数断供：bias 流量与 scaleA 流量共用本端口，超拍/错拍由跑后拆流对账暴露。
           if (dut.io.dmaScaleA.get.req.valid.peek().litToBoolean) {
             val saAddr = dut.io.dmaScaleA.get.req.payload.addr.peek().litValue.toLong
             saAddrLog += saAddr; rdSA(true, plan.wordAt(saAddr)); saS += 1
@@ -820,10 +711,8 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
           def wrCh(ch: String, i: Int, exp: Seq[Long], on: Boolean, ad: => Long, da: => BigInt,
                    ack: Boolean => Unit, log: mutable.ArrayBuffer[(Long, BigInt)]): Int =
             if (on) { val a = ad; chk(ch, i, a, exp); log += ((a, da)); ack(true); i + 1 } else { ack(false); i }
-          /** 【#166】dmaC 专用写通道驱动：在 wrCh 基础上额外 peek wstrb 并记入三元组日志，
-            * 使 WbSimCommon.auditCBeatLanes 的 lane 级逐字节对账拿得到选通位。
-            * 旧口径从不 peek strb —— 那正是「strb 已移位、wdata 未同源移位」在 TB 侧
-            * 长期不可见的原因。 */
+          /** dmaC 专用写通道驱动：在 wrCh 基础上额外 peek wstrb 并记入三元组日志，
+            * 使 WbSimCommon.auditCBeatLanes 的 lane 级逐字节对账拿得到选通位。 */
           def wrChC(ch: String, i: Int, exp: Seq[Long], on: Boolean, ad: => Long, da: => BigInt,
                     st: => BigInt, ack: Boolean => Unit,
                     log: mutable.ArrayBuffer[WbSimCommon.CWriteBeat]): Int =
@@ -849,14 +738,11 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
           readReg(WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
           dut.io.status.inFlight.expect(false.B)
         } else if (done && !errSeen) dut.io.status.inFlight.expect(false.B)
-        // 【P0 epilogue-1/2】dmaScaleA 跑后拆流对账（仅正向路径：负向路径硬件不进计算、
-        //   无期望流量，只报实收请求数）。bias 域 [biasBase, biasBase+nTiles*totalN*4) 与
-        //   rqM 域 [rqMBase, rqMBase+nTiles*totalN*4) 内的请求分别归 bias/rqM 流，其余归
-        //   scaleA 流（三域两两不相交：SA_BASE/BIAS_BASE/RQM_BASE 独立 64KB 段）；各自与
-        //   expBiasAddrSeq/expRqMAddrSeq/expScaleAAddrSeq 保序逐拍比对，失配进
-        //   addrBad/addrBadCnt（与其余通道同一收集-后断言管线）。biasOn=requantOn=false 时
-        //   不拆流、整流对账（与旧逐拍口径等价，且额外暴露拍数短缺/超出的结构性失配——
-        //   旧 rdCh 超出 exp.size 的请求静默吞掉不报）。
+        // dmaScaleA 跑后拆流对账（仅正向路径：负向路径硬件不进计算、无期望流量）。
+        //   bias 域 [biasBase, +nTiles*totalN*4) 与 rqM 域 [rqMBase, +nTiles*totalN*4) 内的
+        //   请求分别归 bias/rqM 流，其余归 scaleA 流（三域两两不相交：SA/BIAS/RQM_BASE 为
+        //   独立 64KB 段）；各自与 expBias/expRqM/expScaleAAddrSeq 保序逐拍比对，失配进
+        //   addrBad/addrBadCnt。biasOn=requantOn=false 时不拆流、整流对账。
         val saBiasHw: Seq[Long] = {
           val lo = p.biasBase; val hi = p.biasBase + plan.nTiles.toLong * cfg.totalN * 4
           if (p.biasOn) saAddrLog.toSeq.filter(a => a >= lo && a < hi) else Seq.empty }
@@ -884,7 +770,7 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
           s" sB=$sbS/${plan.expScaleBAddrSeq.size} sC=$csB/${plan.expCScaleAddrSeq.size}")
         println(s"[$TAG] 六通道地址对账不一致拍数=$addrBadCnt（strictAddr=${p.strictAddr}）")
         addrBad.foreach(s => println(s"[$TAG]   ADDR-DIFF $s"))
-        // 【perf 端口】跑后 PMU 汇报：各观测电平的采样拍数与占空比（分母 = 主循环拍数 cycle）
+        // 跑后 PMU 汇报：各观测电平的采样拍数与占空比（分母 = 主循环拍数 cycle）
         println(s"[$TAG] perf 采样(cycles=$cycle)：" + perfNames.zip(perfCnt).map { case (n, c) =>
           f"$n=$c%5d(${c * 100.0 / math.max(cycle, 1)}%.1f%%)" }.mkString(" "))
         // ⑤ golden 逐元素比对；负向路径下硬件根本不该进计算，只核对 errCode
@@ -924,8 +810,7 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
         cmp.map(_.mismatch) should be(Some(0)) }
       withClue(s"[$TAG] C lane-level AXI byte-lane audit (laneViolations): ") {
         cmp.map(_.laneViolations) should be(Some(0)) }
-      // 【perf 端口】正向路径合理性硬断言：done 已观测 ⟹ busy 与 array 采样必非零
-      //   （否则 io.perf 接线断裂/采错位，PMU 侧将全量失真）
+      // 正向路径合理性硬断言：done 已观测 ⟹ busy 与 array 采样必非零（否则 io.perf 接线断裂/采错位）
       withClue(s"[$TAG] perf 端口合理性（正向路径 busy/array 采样须非零）：") {
         perfCnt(perfNames.indexOf("busy")) should be > 0
         perfCnt(perfNames.indexOf("array")) should be > 0 } }

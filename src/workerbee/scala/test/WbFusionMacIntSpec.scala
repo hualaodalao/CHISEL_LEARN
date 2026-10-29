@@ -23,9 +23,7 @@ class WbFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   private val cEffW = 40
 
-  // ===========================================================================
   // Pure Scala golden helpers
-  // ===========================================================================
 
   /** Sign-extend a `bits`-wide value (given as BigInt, unsigned interpretation) to signed BigInt. */
   private def sext(value: BigInt, bits: Int): BigInt = {
@@ -47,7 +45,6 @@ class WbFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
     value & mask
   }
 
-  /** Interpret cEffW-bit unsigned as signed BigInt. */
   private def asSignedCEffW(raw: BigInt): BigInt = sext(raw, cEffW)
 
   /** INT8 golden: lane0 = a(7,0)*b(7,0), lane1 = a(15,8)*b(15,8), + cReg(signed).
@@ -90,25 +87,19 @@ class WbFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
     truncToCEffW(sumFull)
   }
 
-  /** Encode a signed int8 value into 8-bit unsigned (two's complement). */
   private def toU8(v: Int): Int = v & 0xFF
 
   /** Pack two int8 values into a 16-bit lane: lane0=lo, lane1=hi. */
   private def pack8(lo: Int, hi: Int): Int = toU8(lo) | (toU8(hi) << 8)
 
-  /** Encode a signed int4 value into 4-bit unsigned. */
   private def toU4(v: Int): Int = v & 0xF
 
   /** Pack four int4 values into a 16-bit lane. */
   private def pack4(n0: Int, n1: Int, n2: Int, n3: Int): Int =
     toU4(n0) | (toU4(n1) << 4) | (toU4(n2) << 8) | (toU4(n3) << 12)
 
-  /** Convert signed BigInt to cEffW-bit unsigned representation for poking cReg. */
   private def cRegPoke(signedVal: BigInt): BigInt = truncToCEffW(signedVal)
 
-  // ===========================================================================
-  // Block 1: INT8 dual-lane positive tests (>= 20 vectors)
-  // ===========================================================================
   behavior of "WbFusionMacInt INT8 dual-lane"
 
   it should "compute INT8 dual-lane MAC correctly for boundary and random vectors" in {
@@ -183,9 +174,6 @@ class WbFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
     }
   }
 
-  // ===========================================================================
-  // Block 2: INT4 quad-lane positive tests (>= 20 vectors)
-  // ===========================================================================
   behavior of "WbFusionMacInt INT4 quad-lane"
 
   it should "compute INT4 quad-lane MAC correctly for boundary and random vectors" in {
@@ -257,9 +245,6 @@ class WbFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
     }
   }
 
-  // ===========================================================================
-  // Block 3: Truncation wrap-around semantics
-  // ===========================================================================
   behavior of "WbFusionMacInt truncation wrap-around"
 
   it should "wrap around correctly when result overflows cEffW=40 bits" in {
@@ -343,9 +328,6 @@ class WbFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
     }
   }
 
-  // ===========================================================================
-  // Block 4: require guard negative tests (elaboration-time failures)
-  // ===========================================================================
   behavior of "WbFusionMacInt require guards"
 
   it should "REJECT empty supportedFmts at elaboration time" in {
@@ -378,9 +360,6 @@ class WbFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
     println(s"[WbFusionMacIntSpec] require guard (bW<16) PASS: ${ex.getMessage.take(80)}")
   }
 
-  // ===========================================================================
-  // Block 5: INT8-only and INT4-only configurations
-  // ===========================================================================
   behavior of "WbFusionMacInt single-format configurations"
 
   it should "work correctly with INT8-only configuration (supportedFmts = Set(INT8))" in {

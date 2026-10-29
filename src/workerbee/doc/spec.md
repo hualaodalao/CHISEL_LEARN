@@ -1,8 +1,8 @@
 # WorkerBee 硬件规格
 
-文档版本：`v4.0.0`
+文档版本：`v4.1.0`
 
-修订日期：`2026-10-26`
+修订日期：`2026-10-29`
 
 ## 版本控制
 
@@ -22,6 +22,7 @@
 
 | 版本号 | 日期 | 修改内容 | 相关 Feature ID |
 |---|---|---|---|
+| v4.1.0 | 2026-10-29 | BF16 升格为默认 A/B 输入格式：新增专用窄乘法器分支、单元素 lane 几何（`K%T=0`）、BF16 混配 errCode 3 守护，以及 BF16 特殊值（输入与乘积下溢冲刷为零、上溢饱和、无 IEEE Inf/NaN 语义）定义；明确 BF16 两种 B 装载模式均合法，errCode 4 不含 BF16。FP16 保持非默认输入，与 BF16 独立。寄存器映射、端口位宽与既有格式的数值契约不变 | WB-F026（新增）；WB-F011、WB-P001、WB-P002（文案） |
 | v4.0.0 | 2026-10-26 | 不兼容命名变更：GEMM 模块由 HiveCore 更名为 WorkerBee（“Hive”名称改指 NPU core）；顶层、配置、命令/响应/DMA/状态 Bundle 与 HiveCore* 子模块改用 `WorkerBee*`，其余 Hive* 子模块改用 `Wb*`，RTL 模块前缀由 `Hive_` 改为 `Wb_`，源码目录改为 `src/workerbee`；Feature ID 前缀由 `HIVE-` 统一改为 `WB-`，编号与语义不变，旧 ID 不再使用，本表历史记录中的模块名与 ID 已同步改写为新名称；硬件行为、端口位宽、寄存器映射和数值契约不变 | WB-F001–WB-F025、WB-P001–WB-P010、WB-D001–WB-D002（仅更名） |
 | v3.0.1 | 2026-10-26 | 按通用规格模板将第 3 章拆分为功能、性能和 Debug 三类独立清单；性能清单按通路位宽、每拍接受/发射能力和并行度分类，原 WB-P003/P004/P005 的复用、credit/FIFO 与 fused epilogue 机制分别归回既有功能条目，旧 P ID 保留为分类记录且不复用；新增产品内建观测能力的 Debug 分类 ID，不改变硬件接口或行为；既有 WB-F024/F025 作为历史稳定 ID 保留并分别关联 Debug 分类 ID | WB-P001、WB-P002、WB-P003–WB-P005（分类记录）、WB-P006–WB-P010、WB-D001–WB-D002；WB-F002、WB-F011–WB-F020、WB-F024、WB-F025 |
 | v3.0.0 | 2026-10-23 | 不兼容端口变更：固定四路 WorkerBeeCmd Stream 共享单一寄存器 bank，单 resp 新增 2-bit laneId；采用四 slots/pending 位图的单批响应缓存、拍前读快照与逐地址跨 lane 写仲裁，START 合并为下一拍一次启动并使用胜出 lane 元数据；新增 IRQ_RAW[10] WRITE_CONFLICT，IRQ 低 11 bit 有效、复位 mask 为 0x000007FF；寄存器地址与 CONTROL 布局、数值、DMA、首次 tracing 配对限制不变。四路接口专项 23 例、既有计算/DMA 回归 51 例及测试编译通过 | WB-F021、WB-F022；WB-F025（仅 START 元数据选择） |
@@ -34,7 +35,7 @@
 
 ### 1.1 目的
 
-本文定义 WorkerBee 的软件可见行为、计算语义、存储布局、接口协议和配置约束。v3.0.0 将 v2.0.0 的单路寄存器命令端口改为固定四路输入，并在单一响应端口新增 laneId，属于不兼容端口契约；v3.0.1 仅重构 Feature 分类；当前 v4.0.0 将模块由 HiveCore 更名为 WorkerBee、Feature ID 前缀改为 `WB-`，均不改变硬件行为。寄存器地址映射与 CONTROL 字段不变。本文不记录 RTL 开发过程，也不承诺本规格之外的功能。带 ID 的 Feature List 见第 3 章；文档版本规则与修订记录见文首“版本控制”章节。
+本文定义 WorkerBee 的软件可见行为、计算语义、存储布局、接口协议和配置约束。v3.0.0 将 v2.0.0 的单路寄存器命令端口改为固定四路输入，并在单一响应端口新增 laneId，属于不兼容端口契约；v3.0.1 仅重构 Feature 分类；v4.0.0 将模块由 HiveCore 更名为 WorkerBee、Feature ID 前缀改为 `WB-`，不改变硬件行为；当前 v4.1.0 将 BF16 升格为默认 A/B 输入格式，属兼容的功能新增。寄存器地址映射与 CONTROL 字段不变。本文不记录 RTL 开发过程，也不承诺本规格之外的功能。带 ID 的 Feature List 见第 3 章；文档版本规则与修订记录见文首“版本控制”章节。
 
 WB-F021、WB-F022 的四路接收、单批缓存、响应顺序、读快照、写仲裁、START 时序/元数据及 WRITE_CONFLICT/IRQ 扩展已实现并通过接口验证；既有计算与 DMA 回归通过。验证不扩大参数化配置的支持范围，也不改变 tracing 首次配对等既有限制。
 
@@ -43,7 +44,7 @@ WB-F021、WB-F022 的四路接收、单批缓存、响应顺序、读快照、�
 本文覆盖：
 
 - WorkerBee GEMM 阵列及其执行顺序；
-- INT、FP8、MXFP8、MXFP4 数据格式；
+- INT、FP8、MXFP8、MXFP4、BF16 数据格式；
 - A、B、C、scale、bias 和 requant 参数的存储布局；
 - 命令、响应、DMA、状态、中断和性能事件接口；
 - 寄存器映射、运行期错误检查及软件编程模型。
@@ -75,9 +76,10 @@ A 的逻辑形状为 `M×K`，B 的有效形状为 `K×Nlogical`。由于硬件�
 - INT8、INT4；
 - MXFP8 E4M3、MXFP8 E5M2；
 - MXFP4 E2M1；
-- 非 MX FP8 E4M3、FP8 E5M2。
+- 非 MX FP8 E4M3、FP8 E5M2；
+- BF16。
 
-当前实现还提供 INT32、INT16、FP32、FP16、BF16 和 MX 格式的输出转换路径。FP8 不支持作为 C 输出格式。
+当前实现还提供 INT32、INT16、FP32、FP16、BF16 和 MX 格式的输出转换路径。FP8 不支持作为 C 输出格式；BF16 既是默认输入格式也是输出格式。FP16 仅为输出格式，不在默认输入能力内。
 
 ## 3. 功能清单（Feature List）
 
@@ -105,14 +107,14 @@ v4.0.0 起 Feature ID 前缀由 `HIVE-` 改为 `WB-`，`HIVE-Xnnn` 与 `WB-Xnnn`
 | WB-F002 | 多 K pass 内部累加 | 已实现 | 首 pass 使用零或 bias 基底；后续回灌 C FIFO；仅末 pass 写回 | 5.1.3 |
 | WB-F003 | INT8 打包乘加 | 已实现 | 默认每 lane 两元素、每拍覆盖 2T 个 K 元素；有符号累加，溢出绕回 | 5.1.1、5.2.3、7.2 |
 | WB-F004 | INT4 打包乘加 | 已实现 | 默认每 lane 四元素、每拍覆盖 4T 个 K 元素；二补码 nibble 按递增 K 打包 | 5.1.1、5.2.3、7.2 |
-| WB-F005 | MXFP8 计算 | 已实现 | E4M3/E5M2 可交叉组合；使用 E8M0 block scale；必须 loadWMode=1 | 5.2.1、5.2.4、5.2.6、7.4、7.6 |
-| WB-F006 | MXFP4 计算 | 已实现 | E2M1 四元素打包；保留 ±0.5 次正规输入；必须 loadWMode=1 | 7.2、5.2.4–5.2.6、7.4、7.6 |
-| WB-F007 | 非 MX FP8 计算 | 已实现 | E4M3/E5M2 可交叉组合；单位 scale 注入且不读取输入 scale；必须 loadWMode=1；不能输出 FP8 | 5.2.1–5.2.5 |
+| WB-F005 | MXFP8 计算 | 已实现 | E4M3/E5M2 可交叉组合；使用 E8M0 block scale；必须 loadWMode=1 | 5.2.1、5.2.5、5.2.7、7.4、7.6 |
+| WB-F006 | MXFP4 计算 | 已实现 | E2M1 四元素打包；保留 ±0.5 次正规输入；必须 loadWMode=1 | 7.2、5.2.5–5.2.7、7.4、7.6 |
+| WB-F007 | 非 MX FP8 计算 | 已实现 | E4M3/E5M2 可交叉组合；单位 scale 注入且不读取输入 scale；必须 loadWMode=1；不能输出 FP8 | 5.2.1–5.2.3、5.2.5–5.2.6 |
 | WB-F008 | INT W4A8 | 已实现 | 仅 A=INT8、B=INT4；B 经 DMA stretch 符号扩展；默认 K%64=0、B_ADDR%32=0、loadWMode=1 | 5.2.1、5.3.2、10.2 |
 | WB-F009 | MX W4A8 | 已实现 | 仅 A=MXFP8、B=MXFP4；B 经 DMA stretch 展开；ScaleB 按 A 的 K 窗口步进；默认 K%64=0、B_ADDR%32=0 | 5.2.1、7.6.2、5.3.2 |
-| WB-F010 | A/B 独立 MX block scale | 已实现 | A/B 独立选择 block16/32；scale 按 K 分组并使用 E8M0 编码 | 5.2.6、7.4、7.6.1–7.6.2 |
-| WB-F011 | 浮点/MX 输出转换 | 已实现 | FP32/FP16/BF16 及 MX 输出；支持 RNE/RTZ/RDN/RUP/RMM；内部归约不保证 IEEE 逐项 FP32 bit-exact | 7.1、7.3、5.2.4–5.2.5 |
-| WB-F012 | MX 输出量化与 ScaleC 生成 | 已实现 | 每 block 生成 E8M0 scale；默认 C block 仅允许 16；ScaleC 在途/反压限制必须满足 | 7.4、7.6.3、5.2.7、9.6 |
+| WB-F010 | A/B 独立 MX block scale | 已实现 | A/B 独立选择 block16/32；scale 按 K 分组并使用 E8M0 编码 | 5.2.7、7.4、7.6.1–7.6.2 |
+| WB-F011 | 浮点/MX 输出转换 | 已实现 | FP32/FP16/BF16 及 MX 输出（BF16 同时是默认输入格式，FP16 不是）；支持 RNE/RTZ/RDN/RUP/RMM；内部归约不保证 IEEE 逐项 FP32 bit-exact | 7.1、7.3、5.2.5–5.2.6 |
+| WB-F012 | MX 输出量化与 ScaleC 生成 | 已实现 | 每 block 生成 E8M0 scale；默认 C block 仅允许 16；ScaleC 在途/反压限制必须满足 | 7.4、7.6.3、5.2.8、9.6 |
 | WB-F013 | 整数输出截断 | 已实现 | INT32/INT16/INT8/INT4；先取 acc32 再按输出位宽截断；非 requant 模式不饱和 | 5.2.3、5.4.1 |
 | WB-F014 | Per-channel fused bias | 已实现 | INT32 或 FP32 bias；每输出列一项；仅首 K pass 注入；需要参数取数 DMA | 7.7.1、5.4.2 |
 | WB-F015 | Fused ReLU | 已实现 | 只作用于有符号 acc32，在 requant/最终整数截断前钳零；非整数输出忽略使能 | 5.4.1、5.4.3 |
@@ -126,6 +128,7 @@ v4.0.0 起 Feature ID 前缀由 `HIVE-` 改为 `WB-`，`HIVE-Xnnn` 与 `WB-Xnnn`
 | WB-F023 | 运行期配置检查 | 已实现 | 判据与优先级不变；IRQ_RAW[1] 标记配置错误，ERROR_CODE 保存首个未清配置错误码；M/N 非零、Nprog、缓冲区可访问性等仍是软件义务 | 8.8、10 |
 | WB-F024 | 性能事件输出（历史 ID） | 已实现 | 历史功能索引；类别化 Debug 索引为 WB-D001 | 11.3 |
 | WB-F025 | 首次执行 Tracing（历史 ID） | 已实现 | 历史功能索引；类别化 Debug 索引为 WB-D002 | 6.3、9.2、11.4 |
+| WB-F026 | BF16 计算 | 已实现 | 专用窄乘法器，不复用 MX remap；每 lane 单元素、每拍覆盖 `T` 个 K 元素；输入与乘积下溢冲刷为零、上溢饱和为最大有限值；两种 B 装载模式均合法；不得与非 BF16 格式混配；可作为 C 输出格式 | 5.2.4、7.1–7.2、10.2 |
 
 ### 3.3 性能清单
 
@@ -133,13 +136,13 @@ v4.0.0 起 Feature ID 前缀由 `HIVE-` 改为 `WB-`，`HIVE-Xnnn` 与 `WB-Xnnn`
 
 | Feature ID | 通路/性能项目 | 实现状态 | 位宽、带宽或接受/发射/完成率 | 并行能力、成立条件与瓶颈 | 关联功能/契约章节 |
 |---|---|---|---|---|---|
-| WB-P001 | 阵列空间并行与有效计算拍 | 已实现 | `T×T` PE；每个有效 A 拍同时推进 `T` 个输出列，默认 16 列、256 个 PE | 每个 `(N tile, K pass)` 先消费 `T` 个有效 B 拍、再消费 `M` 个有效 A 拍，两阶段不重叠；供数、回灌、参数取数、波前排空和反压降低实际利用率 | WB-F001、WB-F002、WB-F017；4.1、5.1、12.2 |
-| WB-P002 | 低位宽打包计算通路 | 已实现 | 每个有效 A 拍覆盖：INT8/MXFP8/FP8 及 W4A8 混配为 `2T` 个 K 元素、`2T²` 次 lane-element 乘加贡献，默认 32/512；同格式 INT4/MXFP4 为 `4T` 个 K 元素、`4T²` 次贡献，默认 64/1024 | 同拍并行来自每个 16-bit lane 的 2/4 元素打包，不表示完成 512/1024 个独立输出；W4A8 的 4-bit B 经 stretch 后跟随 8-bit A 的 2T 消费口径。仅在相应格式、K 对齐、合法混配和 loadWMode 条件下成立 | WB-F003–WB-F009；5.1.1、5.2、7.2、12.2 |
+| WB-P001 | 阵列空间并行与有效计算拍 | 已实现 | `T×T` PE；每个有效 A 拍同时推进 `T` 个输出列，默认 16 列、256 个 PE；非打包 16-bit 格式（BF16）每个有效 A 拍覆盖 `T` 个 K 元素、`T²` 次乘加贡献，默认 16/256 | 每个 `(N tile, K pass)` 先消费 `T` 个有效 B 拍、再消费 `M` 个有效 A 拍，两阶段不重叠；供数、回灌、参数取数、波前排空和反压降低实际利用率 | WB-F001、WB-F002、WB-F017、WB-F026；4.1、5.1、12.2 |
+| WB-P002 | 低位宽打包计算通路 | 已实现 | 每个有效 A 拍覆盖：INT8/MXFP8/FP8 及 W4A8 混配为 `2T` 个 K 元素、`2T²` 次 lane-element 乘加贡献，默认 32/512；同格式 INT4/MXFP4 为 `4T` 个 K 元素、`4T²` 次贡献，默认 64/1024 | 同拍并行来自每个 16-bit lane 的 2/4 元素打包，不表示完成 512/1024 个独立输出；W4A8 的 4-bit B 经 stretch 后跟随 8-bit A 的 2T 消费口径。仅在相应格式、K 对齐、合法混配和 loadWMode 条件下成立。BF16 非打包、每 lane 单元素，不属于本项，见 WB-P001 | WB-F003–WB-F009；5.1.1、5.2、7.2、12.2 |
 | WB-P006 | 寄存器命令接受与响应通路 | 已实现 | 空闲接受拍最多 `4 条/cycle`；单一响应口最多 `1 条/cycle` | 四 lane 可同拍接受稀疏混合命令，但仅有一个寄存器 bank 和一个执行上下文；一批最多四条，任一响应 pending 时不能接受下一批，最后响应 fire 的下一拍才可接新批 | WB-F021；6.1–6.3、9.2、12.1 |
 | WB-P007 | A/B 外部读数据通路 | 已实现 | A、B 各自请求至多 `1 条/cycle`、响应至多 `1 beat/cycle`；每口数据宽 `DA`/`DB`，默认各 `256 bit = 32 byte/cycle`，两口聚合接口峰值默认 `64 byte/cycle` | A/B 为独立端口，可同拍握手和预取；阵列消费阶段仍按 B 后 A 串行。非对齐 gather 可令一个逻辑拍需要两个物理读，FIFO credit、存储响应和反压会降低持续供数率 | WB-F017–WB-F020；5.3.1–5.3.3、6.4、9.3、12.2 |
 | WB-P008 | C 外部写回通路 | 已实现 | 单口宽 `DC`，请求至多 `1 beat/cycle`；默认 `256 bit = 32 byte/cycle` 物理峰值。默认每个 T 列行：4-bit 为 8 有效字节/1 拍，8-bit 为 16/1 拍，16-bit 为 32/1 拍，32-bit 为 64/2 拍 | 不跨行合拍；4/8-bit 行虽只占部分 byte lane，仍占一个物理请求拍。32-bit 行局部上限为 `0.5 row/cycle`，其余格式至多 `1 row/cycle`；C FIFO 供数、外部 ready、地址阶段和末尾响应排空会降低持续速率 | WB-F011–WB-F013、WB-F018、WB-F020；5.3.4、6.4、9.4、12.2 |
-| WB-P009 | Scale 与 epilogue 参数通路 | 已实现 | 默认 ScaleA、ScaleB 读口各 `32 bit`、至多 `1 beat/cycle`；ScaleC 写口 `8 bit`、至多 `1 beat/cycle`；bias/rqM 在 ScaleA 物理口上各按 `32 bit`、至多 `1 item/cycle` 取数 | ScaleA 与 ScaleB 为独立读口，ScaleC 为独立写口；ScaleA、bias、rqM 共用一个物理口，不能并行，bias 与 rqM 同时使能时先后串行取各 `T` 项。ScaleC 仅用于 MX 量化输出并受在途深度和反压限制 | WB-F010、WB-F012、WB-F014、WB-F016、WB-F020；5.2.6–5.2.7、5.4、6.4、9.5–9.6 |
-| WB-P010 | 输出转换行通路 | 已实现 | 输入为 `T×cEffW bit` 累加行，输出容器为 `T×32 bit`；输入接受和数据输出接口各至多 `1 row/cycle`，释放拍可背靠背接收下一行；默认一次并行处理 `T=16` 个输出元素 | 单行锁存，不能同时保有两行；非量化行需数据输出 fire 才释放，MX 量化行还需同一行 ScaleC 成功提交。下游 C/ScaleC FIFO 反压、requant 参数未就绪及 WB-P008 的多拍写回会降低端到端行率 | WB-F011–WB-F016；5.2.3–5.2.7、5.4、9.5、12.2 |
+| WB-P009 | Scale 与 epilogue 参数通路 | 已实现 | 默认 ScaleA、ScaleB 读口各 `32 bit`、至多 `1 beat/cycle`；ScaleC 写口 `8 bit`、至多 `1 beat/cycle`；bias/rqM 在 ScaleA 物理口上各按 `32 bit`、至多 `1 item/cycle` 取数 | ScaleA 与 ScaleB 为独立读口，ScaleC 为独立写口；ScaleA、bias、rqM 共用一个物理口，不能并行，bias 与 rqM 同时使能时先后串行取各 `T` 项。ScaleC 仅用于 MX 量化输出并受在途深度和反压限制 | WB-F010、WB-F012、WB-F014、WB-F016、WB-F020；5.2.7–5.2.8、5.4、6.4、9.5–9.6 |
+| WB-P010 | 输出转换行通路 | 已实现 | 输入为 `T×cEffW bit` 累加行，输出容器为 `T×32 bit`；输入接受和数据输出接口各至多 `1 row/cycle`，释放拍可背靠背接收下一行；默认一次并行处理 `T=16` 个输出元素 | 单行锁存，不能同时保有两行；非量化行需数据输出 fire 才释放，MX 量化行还需同一行 ScaleC 成功提交。下游 C/ScaleC FIFO 反压、requant 参数未就绪及 WB-P008 的多拍写回会降低端到端行率 | WB-F011–WB-F016；5.2.3–5.2.8、5.4、9.5、12.2 |
 
 分类勘误：原 `WB-P003`（多 K pass 片内部分和复用）、`WB-P004`（DMA credit/FIFO 解耦）、`WB-P005`（fused epilogue）属于功能机制，分别归入既有 `WB-F002`、`WB-F020`、`WB-F011–WB-F016`；旧 P ID 保留为分类记录、不得复用，**不表示 RTL 功能被删除**。
 
@@ -221,7 +224,7 @@ kTiles = K / kPerBeat       // 当前默认输入格式要求整除
 |---|---:|---:|
 | INT4、MXFP4 | 4 | 64 |
 | INT8、MXFP8、FP8 | 2 | 32 |
-| 其它单元素格式 | 1 | 16 |
+| BF16 及其它单元素格式 | 1 | 16 |
 
 M 不在 Executor 内再次切 tile。单次命令必须满足：
 
@@ -317,7 +320,8 @@ A 和 B 必须属于同一计算族：
 
 - 整数与非整数不得混合；
 - MX 与非 MX 不得混合；
-- FP8 与非 FP8 不得混合。
+- FP8 与非 FP8 不得混合；
+- BF16 与非 BF16 不得混合。
 
 当前合法组合包括：
 
@@ -332,6 +336,7 @@ A 和 B 必须属于同一计算族：
 | MXFP8 E4M3/E5M2 | MXFP4 E2M1 | 支持，正向 MX W4A8 |
 | MXFP4 E2M1 | MXFP8 E4M3/E5M2 | 不支持 |
 | FP8 E4M3/E5M2 | FP8 E4M3/E5M2 | 支持，E4M3/E5M2 可交叉 |
+| BF16 | BF16 | 支持 |
 
 正向 W4A8 的 A 为 8-bit 激活、B 为 4-bit 权重。
 
@@ -355,7 +360,21 @@ INT8 和 INT4 输入均先符号扩展，再做二补码乘加。整数累加按
 
 开启 requant 时只允许输出 INT8 或 INT4，结果执行舍入、加 zero-point 和有符号饱和。
 
-#### 5.2.4 FP8 与 MX 计算
+#### 5.2.4 BF16 计算
+
+BF16 使用专用窄乘法器，**不**复用 MXFP8 数据通路，也不注入单位 scale。乘法器直接接收 BF16 的 `sign(1)/exp(8)/mant(7)` 三段，有效尾数积写入与 MX 共享的乘积槽，再进入同一条 40-bit lazy 累加归约。
+
+BF16 为非打包格式：每个 16-bit lane 承载一个元素，每个有效 A 拍覆盖 `T` 个 K 元素。因此 `K` 必须为 `T` 的整数倍（默认 16），且 `K=0` 非法。
+
+BF16 既可作为 A/B 输入，也可作为 C 输出格式。BF16 不得与非 BF16 格式混配。
+
+BF16 对 B 的两种装载模式均合法，B 的内存布局按所选模式遵循 5.1.2 和 7.5.2 的通用规则。
+
+*Note：MX 与 FP8 必须使用 `loadWMode=1`，BF16 不受此限。MX 的两条理由（scale 须按 K 维切分、B 须预转置）对 BF16 都不成立——BF16 无输入 scale 且为非打包格式；FP8 的理由是复用 MXFP8 数据通路而继承其约束，而 BF16 走专属窄乘法器。权重在两条装载路径上对乘法器位透明。*
+
+*Note：BF16 的有效尾数积低位结构上恒零，其有效位宽度完全落在默认窄化归约窗口内，归约阶段不因 BF16 引入额外的窗口截断。*
+
+#### 5.2.5 FP8 与 MX 计算
 
 非 MX FP8 在输入端复用 MXFP8 数据通路，硬件注入 E8M0 scale `127` 作为单位缩放。FP8 运行仍必须设置 `loadWMode=1`，但不从 ScaleA/ScaleB 存储器读取输入 scale。
 
@@ -369,21 +388,23 @@ MX 输入使用 E8M0 block scale。MXFP8 乘法器有效尾数宽度为 4 bit，
 
 默认归约器为窄化多操作数加法器，不应视为 IEEE-754 逐操作 bit-exact 累加。规格只保证硬件定义的归约结果和输出舍入，不保证与软件逐项 FP32 累加完全一致。
 
-#### 5.2.5 特殊值处理
+#### 5.2.6 特殊值处理
 
 当前转换采用以下硬件语义：
 
 - MXFP8 和 FP8 次正规输入冲刷为零；
 - MXFP4 E2M1 的 `±0.5` 次正规值保留，且该格式没有 Inf/NaN 编码；
 - MXFP8/FP8 的 A、B 元素在有效计算拍出现相应 Inf/NaN 保留码会触发硬件断言；
-- FP16/BF16（若编译启用）及非整数 FP32 bias 不提供 IEEE Inf/NaN 语义，且 bias 不触发上述断言；软件必须提供有限值；
+- BF16 输入任一侧指数为零（含零与次正规）即冲刷为零；BF16 乘积下溢冲刷为零，上溢饱和到最大有限值；
+- BF16 不提供 IEEE Inf/NaN 语义，其 Inf/NaN 保留码**不触发硬件断言**而按正常数参与运算，软件必须提供有限值；
+- FP16（默认未启用）及非整数 FP32 bias 同样不提供 IEEE Inf/NaN 语义，且 bias 不触发上述断言；软件必须提供有限值；
 - E8M0 输入 scale 的 `0xFF` 是 NaN 保留码，软件不得使用；RTL 不对此值产生配置错误或断言；
 - 有限输入导致的指数上溢饱和到最大有限指数；
 - MX 输出上溢饱和，下溢通常冲刷为零；E2M1 输出额外支持次正规生成。
 
-MXFP4 E2M1 的 `±0.5` 是受支持输入。MXFP8/FP8 元素的 Inf/NaN 保留码、FP16/BF16 输入的 Inf/NaN（若编译启用）、非有限 FP32 bias 以及 E8M0 `0xFF` 不属于受支持输入域；关闭断言后对这些不受支持值的退化结果不构成规范行为。
+MXFP4 E2M1 的 `±0.5` 是受支持输入。MXFP8/FP8 元素的 Inf/NaN 保留码、BF16 输入的 Inf/NaN、FP16 输入的 Inf/NaN（若编译启用）、非有限 FP32 bias 以及 E8M0 `0xFF` 不属于受支持输入域；关闭断言后对这些不受支持值的退化结果不构成规范行为。
 
-#### 5.2.6 MX 输入 Scale 选择
+#### 5.2.7 MX 输入 Scale 选择
 
 每个 MX block 对应一个 8-bit E8M0 scale。ScaleA 和 ScaleB 各使用独立的 32-bit DMA 读口。
 
@@ -399,7 +420,7 @@ scaleIndex = floor(lane × step / blockSize)
 - MXFP4：`step=4`；
 - 正向 MX W4A8 的 B：按 A 的窗口节奏使用 `step=2`。
 
-#### 5.2.7 MX 输出 Scale 生成
+#### 5.2.8 MX 输出 Scale 生成
 
 每个输出 block 产生一个 E8M0 scale byte。零 block 输出 scale 0；非零 block 根据 block 最大幅值计算并限制在有效 E8M0 范围内。
 
@@ -680,7 +701,7 @@ Scale 端口只在编译期包含 MX 硬件时存在。
 |---:|---|---:|:---:|:---:|
 | 0 | FP32 | 32 | 否 | 是 |
 | 1 | FP16 | 16 | 否 | 是 |
-| 2 | BF16 | 16 | 否 | 是 |
+| 2 | BF16 | 16 | 是 | 是 |
 | 3 | MXFP8 E4M3 | 8 | 是 | 是 |
 | 4 | MXFP8 E5M2 | 8 | 是 | 是 |
 | 5 | MXFP4 E2M1 | 4 | 是 | 是 |
@@ -697,6 +718,7 @@ Scale 端口只在编译期包含 MX 硬件时存在。
 
 每个 A/B lane 宽度默认为 16 bit：
 
+- 16-bit 格式（BF16）：整个 lane 承载一个元素，不打包；
 - 8-bit 格式：bit `[7:0]` 为较小 K，bit `[15:8]` 为较大 K；
 - 4-bit 格式：四个 nibble 按 bit `[3:0]、[7:4]、[11:8]、[15:12]` 对应递增 K；
 - INT4 使用 4-bit 二补码；
@@ -880,7 +902,7 @@ bias 和 rqM 共用 ScaleA DMA 物理读口；两者同时启用时，硬件先�
 | `scaleBufferDepth` | 64 | scale FIFO 深度 |
 | `cDmaExtW` | 256 bit | C 写 DMA 数据宽度 |
 
-默认 `supportedFmts` 为 `INT8、INT4、MXE4M3、MXE5M2、MXE2M1、FP8E4M3、FP8E5M2`。
+默认 `supportedFmts` 为 `INT8、INT4、MXE4M3、MXE5M2、MXE2M1、FP8E4M3、FP8E5M2、BF16`。FP16 不在默认集内，与 BF16 是两个独立的编译期开关。
 
 四路端口契约已验证：命令 lane 固定为 4，不新增 lane count 配置 knob；寄存器数量由第 8.3 节固定地址映射定义，`registerNumRW` / `registerNum` 不属于可配置 count，不列入编译配置参数。命令 lane 与阵列 K-lane、A/B 打包 lane、MAC 数据并行度无关，不改变 totalN、aW、bW 或任何数值几何。
 
@@ -1138,15 +1160,21 @@ ScaleC 通过独立 8-bit 写接口输出。当前实现的 ScaleC FIFO/在途�
 - A=MXFP4、B=MXFP8；
 - A=INT4、B=INT8；
 - FP8 与非 FP8 混合；
+- BF16 与非 BF16 混合；
 - C 使用 FP8。
+
+*Note：C 使用 BF16 是合法的（BF16 有输出转换路径），该判据只约束 A/B 输入侧；这一点与 FP8 相反。*
 
 #### errCode 8
 
+- BF16：`K` 必须为 `T` 的整数倍；
 - INT8、MXFP8、FP8：`K` 必须为 `2T` 的整数倍；
 - INT4、MXFP4：`K` 必须为 `4T` 的整数倍；
 - `K=0` 非法；
 - 正向 W4A8 按 4-bit B 的几何要求执行，并附加 B 地址对齐检查；
 - 正向 INT W4A8 必须设置 `loadWMode=1`。
+
+*Note：BF16 非打包，其除数是 `T`（默认 16）而非 `2T`。默认配置下 `K=48` 对 BF16 合法、对 8-bit 格式非法（`48 mod 32 ≠ 0`），`K=32` 对两者都合法；BF16 的除数更小、约束更宽，但两族除数不同，软件不可互相套用。*
 
 #### errCode 12
 

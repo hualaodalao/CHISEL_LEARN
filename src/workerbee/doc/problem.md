@@ -304,5 +304,68 @@ DMA 每拍在该地址发**一次 32-bit 读**：`addr(row, kt) = BASE + row*row
 > - **可新分配 = 12-15**，即 G2 若将来实施，新码应从 **12** 起（不是 7、也不是 11）。
 > G2 的其余判断（「单独实施不可行、须作为 G3 配套」）不受本次订正影响，继续有效。
 
+---
+
+### 【BF16 全引擎集成 · errCode 3/4/8 三个 BF16 守护臂】复用既有码位，不新增分配
+
+**① 背景：** BF16 由独立 MAC 评估阶段转为全引擎集成（`FpMulBf16Mx` 已并入 `WbFusionMacFp`
+lane0 第三分支，`WorkerBeeConfig.supportedFmts` 默认集加入 BF16）。BF16 是**非打包**的
+16-bit 单元素格式、**无 scale**（`WorkerBeeExecutor` 的 `mxRunB` 判据不含 BF16），因此既有
+errCode 守护体系对它存在三个真空。三个新臂**全部复用**既有码位（3/4/8），**不占用 9，也不
+动 12-15**，上节码位表无需修改。
+
+**② errCode 4（BF16 强制 loadWMode=1）** —— `WorkerBeeCalcConfig.scala:238`，门控
+`if(cfg.hasBf16)`，紧随 FP8 code4 臂之后、code5 之前。
+**理由分类务必不要照抄 MX 那套说法**：MX 要求 loadW=1 有两条理由（① scale 系数需按 K 维
+切分、② B 必须转置成 N×K），对 BF16 **两条都不成立**。真实依据与 FP8 臂**逐字同源**：
+「loadW=0 的垂直装载 × `WbFusionMacFp` 浮点融合 MAC 的组合**未经验证**」这条保守裁定。
+边界：errCode 4 **仍不扩 INT**（INT8/INT4 的 loadW=0 是沿 N 维切分的合法打包模式，且走
+另一个 MAC —— `WbFusionMacInt`）。BF16 落在 FP8 这一侧，依据是「同一个浮点融合 MAC +
+该组合未验证」，**不是**「打包格式」这个属性。
+
+**③ errCode 8（BF16 K 几何守护）** —— `WorkerBeeCalcConfig.scala:552`，门控
+`if(cfg.hasBf16)`，置于 INT code8 臂之后、errCode 11 之前。判据
+`aFmt===BF16 && (k[15:0] % totalN != 0 || k[15:0] == 0)`，分母 = `totalN × 1`
+（`elemsPerLane(BF16)=1`；**不可**复用 `getKLoadNum(BF16)`，该函数对非打包格式返回
+`totalN×4` 的无害兜底值，不是 BF16 的 kPerBeat）。
+**与打包族同码但不同根因**：BF16 非打包 ⟹ `WorkerBeeExecutor.scala:466` 的 `newKTiles`
+走 `otherwise` 支的 **ceil(K/totalN)**，**不是**打包族的地板除 ⟹ BF16 **没有**「静默丢尾」
+这个故障模式。两条真实故障各自独立：
+- **K % totalN ≠ 0**：ceil 会多算一个**部分填充**的尾 kTile。阵列按整 tile 供数，尾 tile 中
+  超出张量界的 K 元素由 DMA 越界读入并被**真实累加进结果** ⟹ 结果错。（对照：打包族同位置
+  是「少算一个 tile 丢尾」，两者方向相反、都要拒。）
+- **K == 0**：`newKTiles=0` ⟹ `kTiles := 0-1` 在 16-bit 下回绕为 **65535** ⟹ 65536 轮 pass
+  跑飞 + DMA 越界读。这条与其它格式族逐字同构。
+
+**④ errCode 3（BF16 跨族混配）** —— `WorkerBeeCalcConfig.scala:749`，门控 `if(cfg.hasBf16)`，
+位于 FP8 异配臂之后，为 when 链**最后一个分支 = 最高优先级**。判据
+`(aFmt===BF16) =/= (bFmt===BF16)` 单边异或。
+**真漏洞封堵，非保守收紧**：BF16×{INT8/INT4} 混跑时既有 0/3/4/5/8/11 **全部不命中** ——
+`isMx(BF16)=false` 且 `isMx(INT8)=false` ⟹ 裸 errCode3（`isAMx^isBMx`）不触发；errCode 11 的
+`runIsInt` 判据对 BF16 取 false（`is2B(BF16)=true` 走非整数侧）⟹ 跨界守护不触发；上述新增的
+code 8 / code 4 只看 `aFmt`，混配可满足。漏网后**唯一**拦截点是 `WbFusionMacFp` lane0 消费沿
+的 `assert`（仅仿真可见、综合后消失）⟹ 硅上静默算错。
+**判据刻意不连带拒 cFmt**：BF16 是**合法输出编码**（`WbOutCvt.scala:677` 有 packed16 直出臂），
+与「FP8 输出无通路」的情形**相反** —— 勿照抄 FP8 臂的 ② `isFp8(cFmt)` 做法。
+本臂只补 **BF16×INT** 这一个真空：BF16×MX 已由既有裸 errCode3（`isAMx^isBMx`）覆盖，
+BF16×FP8 已由 FP8 异配臂覆盖。
+
+**⑤ 真值序（不变）：**
+`3 (MX4xMX8 / INT4xINT8 / FP8 异配 / FP8 输出 / BF16 异配) > 11 > 8 > 13 > 12 > 10 > 7 > 5 > 4 > 3 (isAMx^isBMx) > 0`
+
+**⑥ 金锚镜像（`WbDebugModel.scala`）：** `hwErrCode` 三臂（code 4 / code 8 / 链尾 code 3）+
+`validate` 的 BF16 防呆块（`aFmt==bFmt` / `K % totalN == 0` / `loadWMode=1`）。`precheckConfigErr`
+委托 `hwErrCode`，无需独立镜像。
+
+**⑦ 非 BF16 配置零影响（已取证）：** firtool 在本机被内核击杀（exit 137），无法发射 RTL，
+故改用 `ChiselStage.emitCHIRRTL` + 名称归一化（`_T_\d+ → _T`）做结构对拍。对
+`WorkerBeeCalcConfig` 分别以「默认集（含 BF16）」与「#48 之前的默认集（去 BF16）」elaborate：
+**added=23 / removed=0**，23 行全部可逐行归因到上述三个臂（code4 6 行、code8 11 行、code3 6 行），
+证明不含 BF16 的配置**逐行同构**。
+
+**⑧ 遗留（待 firtool 恢复）：** BF16 正/负向端到端用例（#50）、`-J-Xmx6G` 全量回归与 MX-only
+发射期 normalized-diff=0 审计（#51/#52）**均被 firtool 阻塞**。即：#48 把 BF16 放入默认
+`supportedFmts` 这件事**尚未经仿真层面验证**。
+
 
 

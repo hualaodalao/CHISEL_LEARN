@@ -1,19 +1,16 @@
-/** 数据格式枚举：WbWorker 支持的输入/计算格式（3-bit，6 值） */
+/** 数据格式枚举：WbWorker 支持的输入/计算格式 */
 
 import chisel3._
 
 object DataFormat extends ChiselEnum {
   val FP32, FP16, BF16, MXE4M3, MXE5M2, MXE2M1, INT32, INT16, INT8, INT4, FP8E4M3, FP8E5M2 = Value
 
-  /** 判断给定格式是否为 MX 系列（E4M3 或 E5M2） */
   def isMx(f: DataFormat.Type): Bool = f === MXE4M3 || f === MXE5M2 || f === MXE2M1
   def isMx8(f: DataFormat.Type): Bool = f === MXE4M3 || f === MXE5M2
   def isMx4(f: DataFormat.Type): Bool = f === MXE2M1
-  /** 【P2 纯 FP8】非 MX 纯 FP8（per-tensor scale，元素编码与 MX8 同为 E4M3/E5M2、
-    * 无块 scale 字节）。运行语义 = 阵列侧 remap 回 MX8 基线 + scale 注入点恒 127
-    * （E8M0 2^0=1.0 恒等乘，见 WorkerBee.fp8FmtRemap / Executor 127 注入）。
-    * ★isMx/isMx8/isMx4 均【不含】本族：scale DMA 启动门控（isMx 白送不启动、零
-    * 流量）、mxRunB 握手、errCode isAMx^isBMx 跨族拒绝全部依赖这一成员关系。 */
+  /** 非 MX 纯 FP8（per-tensor scale，元素编码与 MX8 同为 E4M3/E5M2、无块 scale 字节）。
+    * isMx/isMx8/isMx4 均【不含】本族——scale DMA 启动门控、mxRunB 握手、
+    * errCode isAMx^isBMx 跨族拒绝都依赖这一成员关系。 */
   def isFp8(f: DataFormat.Type): Bool = f === FP8E4M3 || f === FP8E5M2
   def is4B(f: DataFormat.Type): Bool = f === FP32 || f === INT32
   def is2B(f: DataFormat.Type): Bool = f === FP16 || f === BF16
@@ -21,39 +18,24 @@ object DataFormat extends ChiselEnum {
   def isHalfB(f: DataFormat.Type): Bool = f === INT4 || f === MXE2M1
   def isInt(f: DataFormat.Type): Bool = f === INT8 || f === INT16 || f === INT4
 
-  /** 每 16-bit lane 打包元素数的【纯 Scala 字面量单一真源】（MXE2M1=4、MX8=2、其余=1）。
-    * 本函数只做编译期 Int 计算、不生成任何硬件（零 RTL），供两处共用：
-    *   ① 下方运行期硬件版 elemsPerLane 的各 when/otherwise 分支字面量（.U 前的 Int 源）；
-    *   ② WorkerBeeCalcConfig.getKLoadNum 的编译期恒等性自证 require。
-    * 由此「硬件字面量」与「自证口径」共用同一张表，杜绝双源漂移：改本表即同时改硬件与
-    * 触发 getKLoadNum 自证（若其 totalN×2 / totalN×4 二分未同步则 elaboration 期即炸）。 */
-  /** 【Phase 3 INT 生态同步】半字节族（INT4/MXE2M1）→4、单字节族（INT8/MXE4M3/MXE5M2/
-    * FP8E4M3/FP8E5M2）→2、其余→1。与运行期谓词 isHalfB/is1B 的集合成员逐字同构
-    * （isHalfB={INT4,MXE2M1}、is1B={INT8,MXE4M3,MXE5M2,FP8E4M3,FP8E5M2}），使
-    * INT8/INT4 与 MX8/MX4/纯FP8 共用同一张打包表，杜绝双源漂移。
-    * 注：isHalfB/is1B 返回硬件 Bool，本函数是纯 Scala Int 计算，故此处用 Scala == 显式列举。 */
+  /** 每 16-bit lane 打包元素数的【纯 Scala 字面量单一真源】（半字节族 INT4/MXE2M1→4、
+    * 单字节族 INT8/MXE4M3/MXE5M2/FP8E4M3/FP8E5M2→2、其余→1）。只做编译期 Int 计算、
+    * 不生成硬件，供下方硬件版 elemsPerLane 的分支字面量与
+    * WorkerBeeCalcConfig.getKLoadNum 的恒等性 require 共用（改表即触发自证）。 */
   def elemsPerLaneLit(f: DataFormat.Type): Int =
     if (f == INT4 || f == MXE2M1) 4
     else if (f == INT8 || f == MXE4M3 || f == MXE5M2 || f == FP8E4M3 || f == FP8E5M2) 2
     else 1
 
-  /** 每 16-bit lane 打包的元素数（硬件运行期解码，Phase 3 单一真源）。
-    * MXFP8(E4M3/E5M2) SIMD 双元素/拍 = 2；MXFP4(E2M1) quad-lane 四元素/拍 = 4；
-    * 其余 = 1。kPerBeat = totalN × 本量。各分支字面量取自 elemsPerLaneLit（纯 Scala 单一真源）。
-    *
-    * @param hasMx4 编译期门控（= cfg.hasMx4 = supportedFmts.contains(MXE2M1)）。
-    *   false（现役 cfgBase/cfgMx 基线）：仅生成 2-bit「isMx8?2:1」逻辑，与 Phase 3
-    *   之前 WorkerBeeCalcConfig.elemsPerLaneOf 的内联实现【逐字同构】（同名 val ret、
-    *   同 when/otherwise 结构），保证重发射 normalized-diff=0——MXE2M1 分支完全不
-    *   生成硬件（elaboration 期 Scala if 展开，hasMx4=false 时 isMx4 逻辑不进入 IR）。
-    *   true（未来 fp4 配置）：扩为 3-bit，追加 isMx4→4 分支（4 需 3 bit 表示）。
+  /** 每 16-bit lane 打包的元素数（硬件运行期解码，单一真源）。
+    * kPerBeat = totalN × 本量；各分支字面量取自 elemsPerLaneLit。
     * WorkerBeeCalcConfig.elemsPerLaneOf 与 WorkerBeeExecutor2 kTile 分母共用本定义
-    *   （勿另立裸常数），确保几何/执行两侧 elemsPerLane 口径唯一。 */
+    * （勿另立裸常数），确保几何/执行两侧 elemsPerLane 口径唯一。
+    *
+    * @param hasMx4 仅为兼容调用方签名，不影响位宽与生成结果。 */
   def elemsPerLane(f: DataFormat.Type, hasMx4: Boolean = false): UInt = {
-    // 【Phase 3 INT 生态同步】位宽固定 3-bit（容纳 1/2/4），不再由 hasMx4 门控；
-    //   判据由 isMx4/isMx8 泛化为 isHalfB/is1B，使 INT4→4、INT8→2 与 MXE2M1→4、
-    //   MXE4M3/MXE5M2→2 共用同一张运行期解码表（与 elemsPerLaneLit 单一真源同构）。
-    //   hasMx4 形参保留以兼容调用方签名（WorkerBeeCalcConfig.elemsPerLaneOf），但不再决定 Wire 位宽。
+    // 位宽固定 3-bit（容纳 1/2/4），不由 hasMx4 门控；判据用 isHalfB/is1B，
+    // 使 INT4/MXE2M1→4、INT8/MX8/FP8→2 共用同一张运行期解码表。
     val ret = Wire(UInt(3.W))
     when(isHalfB(f)){
       ret := elemsPerLaneLit(MXE2M1).U
@@ -66,12 +48,11 @@ object DataFormat extends ChiselEnum {
   }
 }
 
-/** MX 量化格式数值参数表（WbOutCvt blockScale/quantElem 共用字段，
-  * 三格式单例逐条镜像既有内联字面量，bit-exact 来源）：
+/** MX 量化格式数值参数表（WbOutCvt blockScale/quantElem 共用字段）：
   *   - blockScale 消费 (maxCodeExp, bias, maxMant23)；
   *   - quantElem 消费 (expW, mantW, bias, maxNormalExp=maxCodeExp, satCode,
-  *     nanCode, nanToSat, fixNanCode)——三格式上 maxNormalExp 与 blockScale 的
-  *     maxCodeExp 取值恰好一致（E4M3=15 / E5M2=30 / E2M1=3），故共用单一字段。
+  *     nanCode, nanToSat, fixNanCode)——三格式上 maxNormalExp 与 maxCodeExp
+  *     取值恰好一致（E4M3=15 / E5M2=30 / E2M1=3），故共用单一字段。
   */
 case class MxFormatParams(
   expW: Int,          // 指数域位宽
@@ -85,18 +66,15 @@ case class MxFormatParams(
   maxMant23: BigInt   // maxMantVal 尾数左对齐到 23 位（blockScale needBump 判定）
 )
 object MxFormatParams {
-  /** mxfp8 E4M3：maxFinite=448=1.75×2^8，饱和 0x7E、NaN=(15,7)=0x7F、
-    * maxMantVal=1.75→尾数 0.75→0x600000 */
+  /** mxfp8 E4M3：maxFinite=448=1.75×2^8，饱和 0x7E、NaN=(15,7)=0x7F、maxMantVal=1.75→尾数 0.75→0x600000 */
   val E4M3 = MxFormatParams(expW = 4, mantW = 3, bias = 7, maxCodeExp = 15,
     satCode = 0x7E, nanCode = 0x7F, nanToSat = false, fixNanCode = true,
     maxMant23 = BigInt("600000", 16))
-  /** mxfp8 E5M2：maxFinite=57344=1.75×2^15，饱和 0x7B、NaN=(31,2)=0x7E
-    * （规范尾数同 fp16Nan 取法） */
+  /** mxfp8 E5M2：maxFinite=57344=1.75×2^15，饱和 0x7B、NaN=(31,2)=0x7E（规范尾数同 fp16Nan 取法） */
   val E5M2 = MxFormatParams(expW = 5, mantW = 2, bias = 15, maxCodeExp = 30,
     satCode = 0x7B, nanCode = 0x7E, nanToSat = false, fixNanCode = false,
     maxMant23 = BigInt("600000", 16))
-  /** mxfp4 E2M1：maxFinite=6.0=1.5×2^2，饱和 0x7、无 nan 编码→饱和裁定、
-    * maxMantVal=1.5→尾数 0.5→0x400000 */
+  /** mxfp4 E2M1：maxFinite=6.0=1.5×2^2，饱和 0x7、无 nan 编码→饱和、maxMantVal=1.5→尾数 0.5→0x400000 */
   val E2M1 = MxFormatParams(expW = 2, mantW = 1, bias = 1, maxCodeExp = 3,
     satCode = 0x7, nanCode = 0x7, nanToSat = true, fixNanCode = false,
     maxMant23 = BigInt("400000", 16))
@@ -111,17 +89,14 @@ object RoundingMode extends ChiselEnum {
       RMM   // Round to Nearest, ties to Max Magnitude
       = Value
 }
-// ============================================================================
-// 操作码枚举（仅 3 种命令）
-// ============================================================================
 
 object WorkerBeeOp extends ChiselEnum {
   val REG_WRITE1, REG_WRITE2, REG_READ = Value
 }
 
-/** 循环顺序枚举：loopMode 位域已被 aFmt/bFmt/mixFmtEn/outFmt 重新占用，
-  * 本枚举仅防历史引用编译断裂（结构性重构后 Executor 固定 weight-stationary
-  * N→K→M 遍历，C 写回顺序 = push FIFO 序，均与 loopMode 无关）。
+/** 循环顺序枚举：loopMode 位域已被 aFmt/bFmt/mixFmtEn/outFmt 重新占用，本枚举仅防引用
+  * 编译断裂。Executor 固定 weight-stationary N→K→M 遍历、C 写回顺序 = push FIFO 序，
+  * 均与 loopMode 无关。
   */
 object WorkerBeeLoopMode extends ChiselEnum {
   val MKN = Value

@@ -1,31 +1,21 @@
 /** WorkerBeeSimCaseIntSpec -- INT8/INT4 end-to-end GEMM verification suite.
   *
-  * Covers the Phase 3 architecture: WbFusionMacInt dual-lane (INT8) and
-  * quad-lane (INT4) packed MAC with elemsPerLane = 2 / 4 respectively.
-  *
-  * Test matrix:
-  *   1. INT8 single kTile  (K=32, loadWMode=1)
-  *   2. INT8 multi kTile   (K=64, loadWMode=1)
-  *   3. INT4 single kTile  (K=64, loadWMode=1)
-  *   4. INT4 multi kTile   (K=128, loadWMode=1)
-  *   5. INT8 K not divisible (K=24 -> errCode 8 negative case)
-  *   6. INT8 cAddr misaligned (C_BASE+8 -> errCode 10 negative case) [#170-W5-2]
+  * WbFusionMacInt dual-lane (INT8) and quad-lane (INT4) packed MAC with
+  * elemsPerLane = 2 / 4 respectively.
   *
   * Output format: INT32 (direct truncation of 40-bit accumulator lower 32 bits;
   * no rounding, no FTZ; golden = exact integer sum).
   *
-  * NOTE on loadWMode: packed INT formats (INT8 elemsPerLane=2, INT4 elemsPerLane=4)
-  * require loadWMode=1 (transposed B, N*K layout) for correct operation -- the same
-  * architectural constraint as MX formats (errCode 4). In loadWMode=0 the B DMA
-  * address stepping (bRowOff = N*elemBytes) causes overlapping reads that don't
+  * loadWMode: packed INT formats (INT8 elemsPerLane=2, INT4 elemsPerLane=4)
+  * require loadWMode=1 (transposed B, N*K layout), the same architectural
+  * constraint as MX formats (errCode 4). In loadWMode=0 the B DMA address
+  * stepping (bRowOff = N*elemBytes) causes overlapping reads that don't
   * correctly pack elemsPerLane consecutive K elements into each 16-bit lane.
-  * The hardware currently lacks an errCode check for INT+loadWMode=0 (unlike MX
-  * which has errCode 4); this is a known gap reported to the team.
+  * The hardware lacks an errCode check for INT+loadWMode=0 (unlike MX which
+  * has errCode 4).
   *
-  * Infrastructure: reuses WbDebugModel.Plan for memory image, golden model,
-  * and address sequences. Uses a custom INT exact-match compare path. (The
-  * historical Plan.compare() histogram overflow for 32-bit output formats,
-  * nCodes = 1 << 32 wraps to 1, is now fixed in #73.)
+  * Infrastructure: reuses WbDebugModel.Plan for memory image, golden model and
+  * address sequences; INT comparison uses an exact-match path.
   */
 
 import chisel3._
@@ -42,21 +32,16 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
   private val TAG = "INT-E2E"
   private val SUITE = "WorkerBeeSimCaseIntSpec"
 
-  // ========== Hardware configuration (same as QuickSpec / MxSpec) ==========
   private val cfg = WorkerBeeConfig(
     arrayN = 8, clusterM = 2,       // totalN = 16
     aW = 16, bW = 16, cW = 40,
     // Default supportedFmts = {INT8, INT4, MXE4M3, MXE5M2, MXE2M1, FP8E4M3, FP8E5M2}
-    //   (P2 起 +纯 FP8 两值 ⟹ hasFp8=true；INT 用例不触发 FP8 臂，行为零变化)
     aBufferDepth = 2048, bBufferDepth = 2048, cBufferDepth = 2048,
     scaleBufferDepth = 64
   )
 
   behavior of "WorkerBee INT GEMM"
 
-  // ==========================================================================
-  // Positive cases
-  // ==========================================================================
 
   it should "run INT8 single kTile M=32 N=16 K=32 loadW=1" in {
     runIntGemm(m = 32, n = 16, k = 32,
@@ -86,13 +71,10 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
       hint = "int4-multi-kTile-loadW1")
   }
 
-  // ==========================================================================
-  // 【P1-2 INT W4A8】A=INT8 × B=INT4 正向混配：B DMA stretch（16B 半字片 32B 对齐
-  //   单读 + 顶层符号扩展成 INT8 阵列拍），bFmtIn 重映射 INT4→INT8，MAC 走纯 INT8
-  //   双 lane 基线（零阵列改动）；无 scale 通路。K=64 ⟹ kTile=2（aKpb=32 阵列窗口
-  //   口径，多窗口轮转）。金锚 expBAddrSeq 混配分支（WbDebugModel）：窗口步进
-  //   aKpb×4/8=16B、K/aKpb 窗口 × totalN 行降序、物理读 = 对齐单读。
-  // ==========================================================================
+  // W4A8 混配：B DMA 16B 半字片按 32B 对齐单读 + 顶层符号扩展成 INT8 阵列拍，
+  //   bFmtIn 重映射 INT4→INT8，MAC 走纯 INT8 双 lane 基线，无 scale 通路。
+  //   K=64 ⟹ kTile=2（aKpb=32 阵列窗口口径，多窗口轮转）。金锚 expBAddrSeq 混配
+  //   分支：窗口步进 aKpb×4/8=16B、K/aKpb 窗口 × totalN 行降序、物理读为对齐单读。
   it should "run INT8 x INT4 mixed W4A8 M=32 N=16 K=64 loadW=1" in {
     runIntGemm(m = 32, n = 16, k = 64,
       aFmt = DataFormat.INT8, bFmt = DataFormat.INT4, cFmt = DataFormat.INT32,
@@ -100,12 +82,9 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
       hint = "int8xint4-w4a8-loadW1")
   }
 
-  // ==========================================================================
-  // 【P0-2 gather】非对齐 A/B 基址：读 DMA 对齐多发读 + 内部字节移位重组的
-  //   端到端数据通路证明。aBase off=3、bBase off=11（不同偏移量覆盖不同合并
-  //   移位档）；行步长 K=32B 对齐 ⟹ 每拍均非对齐、全走 gather 慢路径。
-  //   cAddr 保持 32B 对齐（errCode 10 守护不触发）；全量逐元素对拍验证 merge。
-  // ==========================================================================
+  // 非对齐 A/B 基址：读 DMA 对齐多发读 + 内部字节移位重组的端到端数据通路证明。
+  //   aBase off=3、bBase off=11 覆盖不同合并移位档；行步长 K=32B 对齐 ⟹ 每拍均
+  //   非对齐、全走 gather 慢路径。cAddr 保持 32B 对齐（errCode 10 守护不触发）。
   it should "run INT8 gather M=32 N=16 K=32 loadW=1 with misaligned A/B bases" in {
     runIntGemm(m = 32, n = 16, k = 32,
       aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT32,
@@ -114,9 +93,6 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
       aBase = A_BASE + 3, bBase = B_BASE + 11)
   }
 
-  // ==========================================================================
-  // Negative case: K not divisible by kPerBeat -> errCode 8
-  // ==========================================================================
 
   it should "reject INT8 K=24 with errCode 8 (K not divisible by kPerBeat=32)" in {
     runIntErrCase(m = 32, n = 16, k = 24,
@@ -125,13 +101,9 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
       hint = "int8-errK24")
   }
 
-  // ==========================================================================
-  // 【P1-2 INT W4A8】Negative: reverse mix (A=INT4 × B=INT8) -> errCode 3.
-  //   K 窗口 = aKLoadNum=64 元素，B 每行窗口切片 = 64B 超拍宽 32B 两倍、须 push
-  //   连推 2 拍——几何不可达（MX 侧 PROBE4/PROBE6 已证伪的同型机构）；与 MX 反向
-  //   混配 Fix-4 同处置、链尾最高优先级。K=64 过 aFmt=INT4 纯格式 K%64 检查 ⟹ 只
-  //   命中反向混配臂。
-  // ==========================================================================
+  // 反向混配 A=INT4 × B=INT8：K 窗口 = aKLoadNum=64 元素，B 每行窗口切片 = 64B
+  //   为超拍宽 32B 的两倍、须 push 连推 2 拍，几何不可达。K=64 过 aFmt=INT4 纯格式
+  //   K%64 检查 ⟹ 只命中反向混配臂。
   it should "reject INT4 x INT8 reverse mix with errCode 3" in {
     runIntErrCase(m = 32, n = 16, k = 64,
       aFmt = DataFormat.INT4, bFmt = DataFormat.INT8, cFmt = DataFormat.INT32,
@@ -139,9 +111,6 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
       hint = "int4xint8-rev-err3")
   }
 
-  // ==========================================================================
-  // (#170-W5-2) Negative case: cAddr misaligned -> errCode 10
-  // ==========================================================================
 
   it should "reject INT8 cAddr misaligned with errCode 10 (cAddr%32!=0)" in {
     runIntErrCase(m = 32, n = 16, k = 32,
@@ -151,9 +120,7 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
       cAddr = C_BASE + 8)   // 0x200008: 8 mod 32 = 8 != 0 -> triggers errCode 10
   }
 
-  // ==========================================================================
   // Shared runner: positive INT GEMM
-  // ==========================================================================
   private def runIntGemm(m: Int, n: Int, k: Int,
       aFmt: DataFormat.Type, bFmt: DataFormat.Type, cFmt: DataFormat.Type,
       loadWMode: Boolean, seed: Long, hint: String,
@@ -170,12 +137,10 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
       aBase = aBase, bBase = bBase
     )
 
-    // Pre-flight: errCode check (should be None for valid INT configs)
     val predicted = hwErrCode(p, cfg.totalN, cfg.hasMx4)
     require(predicted.isEmpty,
       s"[$TAG] Config should be legal but hwErrCode returned $predicted; params: ${p.banner}")
 
-    // Validate (golden model constraints)
     validate(p, cfg.totalN, cfg.hasMx4)
 
     val plan = new Plan(p, cfg)
@@ -188,11 +153,10 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
     println(s"[$TAG] Expected beats: A=${plan.expAAddrSeq.size} B=${plan.expBAddrSeq.size} " +
       s"C=${plan.expCAddrSeq.size} sA=${plan.expScaleAAddrSeq.size} sB=${plan.expScaleBAddrSeq.size}")
 
-    // 【#166】cLog 升为 (addr,data,strb) 三元组，以支持 lane 级逐字节对账；
-    //   sLog（scaleC）保持二元组 -- (#170-W3) scaleC 通道端口宽度 = 1 字节
-    //   (rowW = cScaleRowW = totalN/2 bits; totalN=16 gives rowW=8 bits=1 byte),
-    //   故 lane 窗口退化为单 lane、移位恒 0、strb 恒 0xFF。契约并非「豁免」而是
-    //   在单 lane 端口上平凡退化，结构上不可能出现 data/strb 错位。
+    // cLog 为 (addr,data,strb) 三元组以支持 lane 级逐字节对账；sLog（scaleC）保持
+    //   二元组：scaleC 通道端口宽度 = 1 字节（rowW = cScaleRowW = totalN/2 bits，
+    //   totalN=16 ⟹ rowW=8 bits），lane 窗口在单 lane 端口上平凡退化、移位恒 0、
+    //   strb 恒 0xFF，结构上不可能出现 data/strb 错位。
     val cLog = mutable.ArrayBuffer[WbSimCommon.CWriteBeat]()
     val sLog = mutable.ArrayBuffer[(Long, BigInt)]()
     val addrBad = mutable.ArrayBuffer[String]()
@@ -220,13 +184,12 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
           if (vld && cnt < exp.size) { val a = adr; chk(chan, cnt, a, exp); rsp(true, at(a)); cnt + 1 }
           else { rsp(false, BigInt(0)); cnt }
 
-        // ---- Write channel driver ----
         def wrCh(ch: String, i: Int, exp: Seq[Long], on: Boolean, ad: => Long, da: => BigInt,
                  ack: Boolean => Unit, log: mutable.ArrayBuffer[(Long, BigInt)]): Int =
           if (on) { val a = ad; chk(ch, i, a, exp); log += ((a, da)); ack(true); i + 1 }
           else { ack(false); i }
 
-        // ---- (#166) dmaC write channel driver: additionally peek wstrb so the lane-level
+        // ---- dmaC write channel driver: additionally peek wstrb so the lane-level
         //      byte-wise audit (WbSimCommon.auditCBeatLanes) gets the strobe bits. The old
         //      path never peeked strb, which is exactly why "strb shifted but wdata not"
         //      stayed invisible on the TB side. ----
@@ -236,7 +199,6 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
           if (on) { val a = ad; chk(ch, i, a, exp); log += ((a, da, st)); ack(true); i + 1 }
           else { ack(false); i }
 
-        // ---- Reset ----
         Seq(dut.io.dmaA.rsp, dut.io.dmaB.rsp).foreach { r =>
           r.valid.poke(false.B); r.payload.data.poke(0.U); r.payload.err.poke(false.B) }
         Seq(dut.io.dmaScaleA.get.rsp, dut.io.dmaScaleB.get.rsp).foreach { r =>
@@ -250,12 +212,10 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
         dut.io.cmd.foreach(_.valid.poke(false.B))
         dut.reset.poke(true.B); dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
 
-        // ---- Command helper ----
         def cmd(op: WorkerBeeOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
           transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
         }
 
-        // ---- Configure registers ----
         // 配置索引 0..11 紧排：M/NK/A/B/C/CONTROL/ScaleA/ScaleB/ScaleC/Bias/RqM/RqParam。
         cmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, m, n.toLong | (k.toLong << 16))
         cmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, p.aBase, p.bBase)
@@ -268,7 +228,6 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
         prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
         launchStart(dut.clock, dut.io.cmd(0))
 
-        // ---- Main simulation loop ----
         var aS = 0; var bS = 0; var saS = 0; var sbS = 0; var cB = 0; var csB = 0
         var pollSt = 0; var pollCool = 0
 
@@ -288,11 +247,9 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
           dut.io.dmaScaleB.get.rsp.payload.err.poke(false.B) }
 
         while (!done && !errSeen && cycle < p.maxCycles) {
-          // DMA-A read
           aS = rdCh("dmaA", aS, plan.expAAddrSeq,
             dut.io.dmaA.req.valid.peek().litToBoolean,
             dut.io.dmaA.req.payload.addr.peek().litValue.toLong, rdA, plan.beatAtA)
-          // DMA-B read
           bS = rdCh("dmaB", bS, plan.expBAddrSeq,
             dut.io.dmaB.req.valid.peek().litToBoolean,
             dut.io.dmaB.req.payload.addr.peek().litValue.toLong, rdB, plan.beatAtB)
@@ -304,7 +261,6 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
           sbS = rdCh("dmaScaleB", sbS, plan.expScaleBAddrSeq,
             dut.io.dmaScaleB.get.req.valid.peek().litToBoolean,
             dut.io.dmaScaleB.get.req.payload.addr.peek().litValue.toLong, rdSB, plan.wordAt)
-          // DMA-C write
           cB = wrChC("dmaC", cB, plan.expCAddrSeq,
             dut.io.dmaC.req.valid.peek().litToBoolean,
             dut.io.dmaC.req.payload.addr.peek().litValue.toLong,
@@ -334,14 +290,10 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
           s"beats A=$aS/${plan.expAAddrSeq.size} B=$bS/${plan.expBAddrSeq.size} " +
           s"C=$cB/${plan.expCAddrSeq.size} sA=$saS sB=$sbS csC=$csB")
 
-        // ---- Golden compare (INT-specific exact-match path). NOTE: the historical
-        //      Plan.compare() histogram overflow for 32-bit output (nCodes = 1 << 32 = 1)
-        //      is now fixed (#73: elemBits>=32 skips the histogram tally); this local
-        //      path is kept for its INT exact-match semantics. ----
+        // ---- Golden compare: INT exact-match path ----
         if (done && !errSeen) {
-          // 【#166 口径升级：strb 逐字节校验】解析走 Checked 变体，同时跑 lane 级审计
-          //   （addr↔strb 双向对账、未选通 lane 零填充核查、BEAT-COUNT），违规直接
-          //   计入 mismatchCnt ⟹ lane 级契约缺陷不再静默放行。期望拍数取金锚
+          // 解析走 Checked 变体并同时跑 lane 级审计（addr↔strb 双向对账、未选通 lane
+          //   零填充核查、BEAT-COUNT），违规直接计入 mismatchCnt。期望拍数取金锚
           //   plan.expCAddrSeq.size（张量语义侧推导），不取硬件实收拍数。
           val parsed = WbSimCommon.parseDenseCWriteLogChecked(
             cLog.toSeq, p.cFmt, m, n, totalN, cfg.cDmaExtW,
@@ -349,7 +301,7 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
           val hwBits = parsed.matrix
           println(s"[$TAG] (#166 LANE) ${parsed.laneSummary}")
           parsed.violations.take(16).foreach(v => println(s"[$TAG]   [#166 LANE] $v"))
-          // (#170-W7) Separate element mismatch from lane violations (single unit each)
+          // Separate element mismatch from lane violations (single unit each)
           val laneViolations = parsed.violationCount
           var mismatchCnt = 0
           var maxAbsErr = 0.0
@@ -396,9 +348,7 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
     }
   }
 
-  // ==========================================================================
   // Shared runner: negative case (errCode expected)
-  // ==========================================================================
   private def runIntErrCase(m: Int, n: Int, k: Int,
       aFmt: DataFormat.Type, bFmt: DataFormat.Type, cFmt: DataFormat.Type,
       loadWMode: Boolean, expectedErrCode: Int, hint: String,
@@ -414,7 +364,6 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
       waveTarget = s"sim/int/$hint.fst", testHint = hint
     )
 
-    // Pre-flight: confirm hwErrCode predicts the expected code
     val predicted = hwErrCode(p, cfg.totalN, cfg.hasMx4, cAddr, cfg.cDmaExtW)
     require(predicted == Some(expectedErrCode),
       s"[$TAG] hwErrCode predicted $predicted but expected Some($expectedErrCode); params: ${p.banner}")
@@ -429,7 +378,6 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
 
     try {
       simulate(new WorkerBee(cfg)) { dut =>
-        // ---- Reset ----
         Seq(dut.io.dmaA.rsp, dut.io.dmaB.rsp).foreach { r =>
           r.valid.poke(false.B); r.payload.data.poke(0.U); r.payload.err.poke(false.B) }
         Seq(dut.io.dmaScaleA.get.rsp, dut.io.dmaScaleB.get.rsp).foreach { r =>
@@ -443,12 +391,10 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
         dut.io.cmd.foreach(_.valid.poke(false.B))
         dut.reset.poke(true.B); dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
 
-        // ---- Command helper ----
         def cmd(op: WorkerBeeOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
           transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
         }
 
-        // ---- Configure registers (same illegal config) ----
         // 与正向运行器同一配置布局，只改变受测配置违约项。
         cmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, m, n.toLong | (k.toLong << 16))
         cmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
@@ -462,14 +408,12 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
         // ---- Poll for err (no data feeding; hardware should reject immediately) ----
         var pollSt = 0; var pollCool = 0
         while (!done && !errSeen && cycle < p.maxCycles) {
-          // Keep DMA responses idle
           dut.io.dmaA.rsp.valid.poke(false.B)
           dut.io.dmaB.rsp.valid.poke(false.B)
           dut.io.dmaScaleA.get.rsp.valid.poke(false.B)
           dut.io.dmaScaleB.get.rsp.valid.poke(false.B)
           dut.io.dmaC.rsp.valid.poke(false.B)
           dut.io.dmaCScale.get.rsp.valid.poke(false.B)
-          // Count any dmaC write requests (should be zero)
           if (dut.io.dmaC.req.valid.peek().litToBoolean) cWrites += 1
 
           val (ps, pc, st) = irqPollStep(dut.io.cmd(0), dut.io.resp, pollSt, pollCool)
@@ -486,7 +430,6 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
       copyWave(SUITE, hint, p.waveTarget)
     }
 
-    // ---- Assertions ----
     withClue(s"[$TAG] Hardware should set IRQ_RAW error for illegal K: ") {
       errSeen should be(true)
     }

@@ -3,51 +3,36 @@ import chisel3._
 import chisel3.util._
 import chisel3.dontTouch
 
-// ============================================================================
-// 命令 Bundle
-// ============================================================================
 
 class WorkerBeeCmd extends Bundle {
-  val op      = WorkerBeeOp()    // 操作码
-  val reg0Addr = UInt(6.W)       // 寄存器索引
-  val reg1Addr = UInt(6.W)       // 寄存器索引
-  val data0   = UInt(32.W)      // 写入数据 0
-  val data1   = UInt(32.W)      // 写入数据 1
+  val op      = WorkerBeeOp()
+  val reg0Addr = UInt(6.W)
+  val reg1Addr = UInt(6.W)
+  val data0   = UInt(32.W)
+  val data1   = UInt(32.W)
   val pc      = UInt(32.W)
   val tag     = UInt(8.W)
 }
 
 class WorkerBeeRespForTracing extends Bundle {
   val state = UInt(2.W) // 00 start 01 end 1x err
-  val pc = UInt(32.W)         // REG_READ 返回数据
+  val pc = UInt(32.W)
   val tag  = UInt(8.W)
 }
 
 
-// ============================================================================
-// 命令响应 Bundle
-// ============================================================================
 
-/** WorkerBee 命令响应。 */
 class WorkerBeeResp extends Bundle {
   val data = UInt(32.W)         // REG_READ 返回数据
-  val err  = Bool()             // 错误标志
+  val err  = Bool()
   val laneId = UInt(2.W)
 }
 
 
-// ============================================================================
-// DMA 外部通道接口
-// ============================================================================
 
-/** 外部 DMA 只读通道接口（简化版，无 IMasterSlave）。
-  *
-  * 方向按 WorkerBee（master）视角声明：rsp 为从外部存储读入的数据流。
-  * 数据位宽按通道参数化（aDma = cfg.aExtW，bDma = cfg.bExtW，
-  * 各自匹配对应 buffer 行宽，一拍一行等宽直连）。
-  *
-  * @param cfg       WorkerBee 配置
-  * @param dataWidth 外部数据位宽（bit）
+/** 外部 DMA 只读通道接口。方向按 WorkerBee（master）视角声明：rsp 为从外部存储读入的
+  * 数据流。数据位宽按通道参数化（aDma = cfg.aExtW，bDma = cfg.bExtW），各自匹配对应
+  * buffer 行宽，一拍一行等宽直连。
   */
 object WorkerBeeDMAExtReadOnlyIF {
     def apply(cfg: WorkerBeeConfig, dataWidth: Int) = new WorkerBeeDMAExtReadOnlyIF(cfg, dataWidth)
@@ -79,52 +64,32 @@ class WorkerBeeDMAExtWriteOnlyIF(cfg: WorkerBeeConfig, dataWidth: Int) extends B
 }
 
 
-// ============================================================================
-// 状态 Bundle
-// ============================================================================
 
-/** WorkerBee 运行时状态。
-  *
-  * @param cfg WorkerBee 配置
-  */
 class WorkerBeeStatus(cfg: WorkerBeeConfig) extends Bundle {
 
-  /** 忙标志 */
   val busy = Bool()
 
   val inFlight = Bool()
 
-  /** 当前进度（已完成的 tile 数） */
   val progress = UInt(16.W)
 
-  /** A 缓冲当前占用量 */
   val aOccupancy = UInt(log2Up(cfg.aBufferDepth + 1).W)
 
-  /** B（权重）缓冲当前占用量（调试用） */
   val bOccupancy = UInt(log2Up(cfg.bBufferDepth + 1).W)
 
-  /** C 缓冲当前占用量 */
   val cOccupancy = UInt(log2Up(cfg.cBufferDepth + 1).W)
 }
 object WorkerBeeStatus {
   def apply(cfg: WorkerBeeConfig) = new WorkerBeeStatus(cfg)
 }
 
-/** WorkerBee 性能观测信号组（【perf 端口】纯组合电平、无内部计数状态；计数/统计
-  * 由外部 PMU 按拍采样完成——本模块不内建 perf counter，用户裁定）。
-  *
-  * - dmaA/B/C、scaleA/B/C：各 DMA 通道请求有效拍（物理通道口径：scaleA 含
-  *   bias/rqM 取数盗用拍；成因分解可外部结合 epilogue 交叉采样）
-  * - array：阵列有效计算拍（wbValidIn）
-  * - stallA：供数相（sLOAD_A）阵列空闲拍——aPop 未 fire（含 A/scaleA 供数
-  *   不足、bias/rqM 未收齐、C 写回占用读口等全部挂起成因）
-  * - stallB：权重供数等待（loadW 窗口 bPop 停拍 ∨ sDRAIN 预蓄等待拍），双缓冲/
-  *   预取深度决策依据
-  * - epilogue：epilogue 子系统活动拍（bias/rqM 取数 ∨ cvt 转换/量化管线占用；
-  *   C 写回通道活动另由 dmaC/scaleC 观测）
-  * - busy：总忙碌电平（= status.busy，作分母对齐）
-  *
-  * 非 MX 配置下 scaleA/B/C 恒 false（端口形状跨配置保持稳定）。
+/** WorkerBee 性能观测信号组：纯组合电平、无内部计数状态，计数由外部 PMU 按拍采样。
+  * dmaA/B/C、scaleA/B/C = 各 DMA 通道请求有效拍（物理通道口径，scaleA 含 bias/rqM 取数
+  * 盗用拍，非 MX 配置恒 false）；array = 阵列有效计算拍；stallA = 供数相（sLOAD_A）阵列
+  * 空闲拍（aPop 未 fire，含 A/scaleA 供数不足、bias/rqM 未收齐、C 写回占用读口等成因）；
+  * stallB = 权重供数等待（loadW 窗口 bPop 停拍 ∨ sDRAIN 预蓄等待拍）；epilogue =
+  * bias/rqM 取数 ∨ cvt 转换/量化管线占用（C 写回通道活动另由 dmaC/scaleC 观测）；
+  * busy = 总忙碌电平（作分母对齐）。
   */
 class WorkerBeePerf extends Bundle {
   val dmaA = Bool()
@@ -144,8 +109,6 @@ object WorkerBeePerf {
 }
 
 class WorkerBeeRegister(cfg: WorkerBeeConfig) extends Bundle {
-  //占用DW0高位编码
-  //val cmdType = UInt(4.W);dontTouch(cmdType)
 
   val m = UInt(cfg.mnkWidth.W)
   val n = UInt(cfg.mnkWidth.W)
@@ -154,9 +117,6 @@ class WorkerBeeRegister(cfg: WorkerBeeConfig) extends Bundle {
   val bAddr = UInt(cfg.addrWidth.W)
   val cAddr = UInt(cfg.addrWidth.W)
 
-  //val aStride = UInt(4.W)
-  //val bStride = UInt(4.W)
-  //val cStride = UInt(4.W)
   val aAddrMode = AddrMode()
   val bAddrMode = AddrMode()
   val cAddrMode = AddrMode()
@@ -210,10 +170,8 @@ class WorkerBeeExePreCalcConfig(cfg: WorkerBeeConfig) extends Bundle {
   val scaleBColTileAddressOffset = UInt(cfg.addrWidth.W)
   val scaleCRowAddressOffset = UInt(cfg.addrWidth.W)
   val scaleCColTileAddressOffset = UInt(cfg.addrWidth.W)
-  // --- P0 C 写回重构：cDma 拍内地址步进（行内多拍拆分） ---
-  // cBeatAddrStep = (cDmaExtW/elemBits)×elemBytes（运行期：elemBits/elemBytes 由 outFmt
-  // 决定），供 P2 WrOnly 拍内地址 = curAddr + beatCnt×cBeatAddrStep 消费；
-  // P0 阶段只立契约（字段位宽/语义），无消费者，顶层暂占位驱 0。
+  // cBeatAddrStep = (cDmaExtW/elemBits)×elemBytes（elemBits/elemBytes 运行期由 outFmt
+  // 决定），供 WrOnly 拍内地址 = curAddr + beatCnt×cBeatAddrStep 消费（行内多拍拆分）。
   val cBeatAddrStep = UInt(cfg.addrWidth.W)
   val cDmaBufBeatTar = UInt(4.W)
   val cDmaDmaBeatTar = UInt(4.W)

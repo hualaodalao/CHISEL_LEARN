@@ -1,57 +1,25 @@
 /** WbWorker（工蜂）- Weight-Stationary 处理单元
   *
-  * 架构定位：
-  *   权重驻留（Weight-Stationary）WbWorker，无独立 wIn/wOut 端口。
-  *   权重仅通过 psumIn（loadV 垂直加载）通道加载到内部 wReg；
-  *   计算时 aIn 水平传播、psumIn 垂直传播，权重不动、数据流过。
+  * 权重驻留，无独立 wIn/wOut 端口：权重经 psumIn（loadV 垂直加载）进内部 wReg；计算时
+  *   aIn 水平传播（aEffW 位）、psumIn 垂直传播（cEffW 位，兼作权重加载通道），权重不动。
+  *   loadHIn 仅配置 fmt/rnd、loadVIn 加载权重，二者由 WbCell 广播；valid/fmt/rnd 水平
+  *   传播；clear 标量广播清零 psumReg。
+  *
+  * 权重加载协议（双模式，靠 loadV/loadW 信号活跃性二选一，硬件断言守护互斥）：
+  *   垂直模式（默认）：loadHIn=1 锁存 fmt/rnd 配置（不动 wReg）；loadVIn=1 从 psumIn 低位
+  *     锁存 wReg 并透传 psumIn 使权重下沉；加载阶段同时拉高 loadH+loadV，aIn 无需供数。
+  *   水平 loadW 模式：loadWIn 脉冲每拍使权重沿 a 链右移一列（停顿自然保持），末拍
+  *     loadWInLock 广播拍从 aIn(bW-1,0) 锁存 wReg —— 对角线落位态的唯一时刻。
+  *     垂直模式下 loadW 信号组恒 0。
+  *
+  * psumReg 优先级：clear → 0；loadVIn → psumIn（加载期透传）；validIn && fmtOk →
+  *   accumulate(psumIn, product, fmtReg, rndReg)；否则保持。psumOut := psumReg。
   *
   * @param aW            激活位宽（默认 16）
   * @param bW            权重位宽（默认 16）
   * @param cW            累加器/部分和位宽（默认 48）
-  * @param supportedFmts 本 WbWorker 支持的数据格式集合（默认 {INT8,INT4,MXE4M3,MXE5M2,MXE2M1}）。
-  *                      仅为支持的格式生成 MAC 硬件；运行时 fmtReg 不在 supportedFmts 中则
-  *                      不执行累加，psumReg 保持。
-  *
-  * 新架构要点：
-  *   - fmtReg / rndReg：随 loadH 锁存的配置，后续计算使用内部寄存器
-  *   - 权重加载不经过 ShiftRegister：权重沿 psum PE 链自然向下传播
-  *   - loadH 与 loadV 职责分离：loadH 只加载配置，loadV 只加载权重
-  *   - 权重加载时同时拉高 loadH（刷新 fmt/rnd）与 loadV（锁存权重）
-  *
-  * IO 端口语义：
-  *   aIn  / aOut   : 激活通道，水平传播（左→右），aEffW 位。
-  *   psumIn / psumOut : 部分和通道，垂直传播（上→下），cEffW 位；兼作权重加载通道。
-  *   loadHIn  : 水平加载使能（仅配置 fmt/rnd），由 WbCell 广播（无 loadHOut）。
-  *   loadVIn  : 垂直加载使能（权重），由 WbCell 广播（无 loadVOut）。
-  *   validIn / validOut : 数据有效标志，水平传播。
-  *   fmtIn   / fmtOut   : 数据格式选择，水平传播。
-  *   rndIn   / rndOut   : 舍入模式选择，水平传播。
-  *   clear              : psumReg 清零，标量广播。
-  *
-  * 权重加载协议（双模式，靠 loadV/loadW 信号活跃性自然二选一）：
-  *   垂直模式（默认）：
-  *   - loadHIn=true：锁存 fmt/rnd 配置（不动 wReg）
-  *   - loadVIn=true：从 psumIn 低位锁存权重进 wReg，并透传 psumIn 使权重下沉
-  *   - 典型用法：加载阶段同时拉高 loadH+loadV，psumIn 供权重，aIn 无需供数
-  *   水平 loadW 模式：
-  *   - 权重经 a 数据链水平加载：loadWIn 脉冲每拍使权重沿 a 链右移一列
-  *     （aLoadWReg 门控移位，停顿自然保持），末拍 loadWInLock 广播拍
-  *     从 aIn(bW-1,0) 锁存 wReg（对角线落位态唯一时刻）
-  *   - 两模式互斥（硬件断言守护），垂直模式下 loadW 信号组恒 0
-  *
-  * wReg / 配置锁存逻辑：
-  *   loadV：wReg := psumIn 低位
-  *   loadH：fmtReg := fmtIn，rndReg := rndIn
-  *
-  * psumReg 逻辑（优先级从高到低）：
-  *   1. when(clear)                       → psumReg := 0
-  *   2. elsewhen(loadVIn)                 → psumReg := psumIn（加载期间透传）
-  *   3. elsewhen(validIn && fmtOk)        → psumReg := accumulate(psumIn, product, fmtReg, rndReg)
-  *   4. otherwise                         → 保持
-  *
-  * 输出驱动：
-  *   aOut   := RegNext(aIn, 0.U)
-  *   psumOut := psumReg（loadVIn 期间 psumReg := psumIn 等效透传，loadVIn 撤掉后保持权重自然传播）
+  * @param supportedFmts 支持的数据格式集合；仅为其中格式生成 MAC 硬件，运行期 fmtReg
+  *                      不在集合内则不累加、psumReg 保持。
   */
 
 import chisel3._
@@ -67,19 +35,16 @@ class WbWorker(
   val cEffW: Int = math.max(cW, bW)
 
   private val hasFp  = supportedFmts.exists(f => f == DataFormat.FP16 || f == DataFormat.BF16)
-  // 【Phase 3 INT 生态同步】整数族收敛为 {INT8, INT4}（INT16 已弃用），与 WorkerBeeConfig.hasInt 同口径。
+  // 整数族为 {INT8, INT4}，与 WorkerBeeConfig.hasInt 同口径。
   private val hasInt = supportedFmts.exists(f => f == DataFormat.INT8  || f == DataFormat.INT4)
 
-  // 【破坏性变更留痕（C 写回重构本轮引入，与 WbComb 同源）】含 FP 族直接例化须显式
-  // cW>=40，否则构造期失败。顶层经 WbComb → WbWorker 链传 cfg.cEffW 规避。
+  // 含 FP 族直接例化须显式 cW>=40，否则构造期失败；顶层经 WbComb 链传 cfg.cEffW。
   if (hasFp)  require(cEffW >= 40,          s"WbWorker: 含浮点格式时 cEffW($cEffW) 必须 >= 40（延迟规格化需要）")
   if (hasInt) require(cEffW >= aEffW + bW,  s"WbWorker: 含整数格式时 cEffW($cEffW) 必须 >= aEffW($aEffW) + bW($bW)")
 
   val io = IO(new Bundle {
-    // 激活通道（水平，aEffW 位）
     val aIn  = Input(UInt(aEffW.W))
     val aOut = Output(UInt(aEffW.W))
-    // 部分和通道（纵向，cEffW 位）
     val psumIn  = Input(UInt(cEffW.W))
     val psumOut = Output(UInt(cEffW.W))
 
@@ -91,122 +56,87 @@ class WbWorker(
     val loadVIn  = Input(Bool())
     val loadVOut  = Output(Bool())
 
-    // 水平 loadW 加载（可选模式，与垂直加载二选一，靠信号活跃性自然选择）：
-    // loadWIn 沿 a 数据链方向逐列链传播（每脉冲权重右移一列，停顿保持）；
-    // loadWInLock 广播脉冲拍从 aIn 低位锁存 wReg（对角线落位态唯一时刻）。
-    // 垂直模式下该信号组恒 0，相关分支全部为死路（行为 bit-exact 不变）
+    // 水平 loadW 加载（与垂直加载二选一）：loadWIn 沿 a 数据链逐列传播（每脉冲权重右移
+    // 一列，停顿保持）；loadWInLock 广播脉冲拍从 aIn 低位锁存 wReg。垂直模式下恒 0。
     val loadWIn     = Input(Bool())
     val loadWOut    = Output(Bool())
     val loadWInLock = Input(Bool())
 
-    // 控制（水平传播：RegNext → 右侧 WbWorker）
+    // 控制 / 格式 / 舍入模式：水平传播（RegNext → 右侧 WbWorker）
     val validIn  = Input(Bool())
     val validOut = Output(Bool())
     val validInV  = Input(Bool())
     val validOutV = Output(Bool())
 
-    // 格式（水平传播：RegNext → 右侧 WbWorker）
     val fmtIn  = Input(DataFormat())
     val fmtOut = Output(DataFormat())
-    // 权重格式（水平传播：RegNext → 右侧 WbWorker）。mixFmtEn=0 时由上层令
-    // bFmtIn 跟随 fmtIn，行为与旧单 fmt 路径 bit-exact
+    // 权重格式：mixFmtEn=0 时由上层令 bFmtIn 跟随 fmtIn
     val bFmtIn  = Input(DataFormat())
     val bFmtOut = Output(DataFormat())
-    // MX scale: scaleAIn flows with the activations (lockstep with aReg, shifted
-    // right along the a-chain) and is consumed COMBINATIONALLY by the MAC.
-    // scaleBIn also arrives per-lane from the left edge and shifts right along
-    // the very same a-chain; the difference is that it is CAPTURED into
-    // scaleBReg on the load lock beat and the MAC then reads that resident copy.
-    // That capture is the only sense in which scaleB is "resident" -- it is NOT
-    // column-resident and NOT indexed by the output-N axis. In this array the
-    // lane coordinate x is the K-lane axis and the column coordinate y is the
-    // output-N axis (see the axis note in WbComb). Both chains are live and
-    // both feed the MX MAC; the former "P1 only builds the chain, P2 wires the
-    // MAC" note was stale and has been removed in #146.
+    // MX scale: scaleAIn flows with the activations (lockstep with aReg) and is
+    // consumed COMBINATIONALLY by the MAC. scaleBIn shifts right along the same
+    // a-chain but is CAPTURED into scaleBReg on the load lock beat; it is resident
+    // per K-lane (coordinate x), never per output-N column (coordinate y).
     val scaleAIn  = Input(UInt(8.W))
     val scaleAOut = Output(UInt(8.W))
     val scaleBIn  = Input(UInt(8.W))
     val scaleBOut  = Output(UInt(8.W))
-    // 舍入模式（水平传播：RegNext → 右侧 WbWorker）
     val rndIn   = Input(RoundingMode())
     val rndOut  = Output(RoundingMode())
-    // psumReg 清零信号
     val clear   = Input(Bool())
   })
 
-  // --- 初始化状态标志 ---
   val fmtInitActive = RegInit(false.B)
   val rndInitActive = RegInit(false.B)
 
-  // --- loadW 端口 WireDefault 兜底：既有测试（SystolicArrayTest 等）直接
-  // 例化本 PE 时不连接 loadW 口（invalid），兜底回落恒 0，保证垂直模式
-  // bit-exact；WbCell 正常驱动时兜底被覆盖 ---
+  // loadW 端口 WireDefault 兜底：直接例化本 PE 而不连 loadW 口时回落恒 0；
+  //   WbCell 正常驱动时兜底被覆盖。
   val loadWInSafe = WireDefault(false.B)
   loadWInSafe := io.loadWIn
   val loadWInLockSafe = WireDefault(false.B)
   loadWInLockSafe := io.loadWInLock
 
-  // --- 内部配置寄存器（无 RegInit，依赖显式初始化） ---
+  // 内部配置寄存器（无 RegInit，依赖显式初始化）
   val fmtReg = Reg(DataFormat())
   val rndReg = Reg(RoundingMode())
-  // 权重格式寄存器：与 fmtReg 对称，随 loadH 锁存 bFmtIn
   val bFmtReg = Reg(DataFormat())
-  // scaleB resident register: holds the E8M0 scale of this PE's K-lane for the
-  // whole weight-resident window. Latched on the load LOCK beat (loadVInLock or
-  // loadWInLockSafe), strictly together with wReg -- NOT on the loadHIn config
-  // window, and NOT per output column. Both halves of the former wording here
-  // ("column-resident, latched with loadH") were stale; see the latch block
-  // below for the counter-example that forced the lock-beat condition.
+  // scaleB resident register: holds the E8M0 scale of this PE's K-lane for the whole
+  // weight-resident window, latched on the load LOCK beat strictly together with wReg.
   val scaleBReg = RegInit(0.U(8.W))
-  // scaleA flow register: lockstep with aReg (declared here so that the workUnit
-  // can reference it; the assignment sits next to the aReg block below). Note
-  // the MAC consumes io.scaleAIn combinationally, NOT scaleAReg; scaleAReg only
-  // drives the rightward scaleAOut propagation.
+  // scaleA flow register: lockstep with aReg. The MAC consumes io.scaleAIn
+  // combinationally, NOT scaleAReg; scaleAReg only drives scaleAOut propagation.
   val scaleAReg = RegInit(0.U(8.W))
 
-  // 格式支持检测（基于 fmtReg） ---
-  // supportedFmts 是 Set，元素数 >=5 时 Scala 用 HashSet，其 map 出的 Set[Bool]
-  // 迭代顺序取决于每实例新建 Bool 节点的 identity hashCode，导致归约 OR 操作数
-  // 顺序逐实例不同；firtool 结构 dedup 不识别 OR 交换律等价 → 256 个同构 PE 被判
-  // 为 217 个不同模块。改为按 DataFormat 枚举稳定序号 litValue 排序后再归约，
-  // 使所有实例 OR 顺序一致（逻辑严格等价，仅消除 RTL 膨胀）。
+  // 按 litValue 排序后归约：supportedFmts 作为 HashSet 迭代顺序逐实例不同，而 firtool
+  //   dedup 不识别 OR 交换律等价，会把同构 PE 判为不同模块。
   val fmtOk = supportedFmts.toSeq.sortBy(_.litValue).map(f => fmtReg === f).reduce(_ || _)
 
-  // --- 权重驻留寄存器 ---
   val wReg = RegInit(0.U(bW.W))
 
-  // --- wReg / fmtReg / rndReg 锁存逻辑 ---
-  // 权重仅经垂直加载（loadV 上升沿，从 psumIn 低位）；水平加载（loadH）仅锁存配置 fmt/rnd。
-  // 二者独立：加载权重时同时拉高 loadH（刷新配置）与 loadV（锁存权重）。
+  // wReg / fmtReg / rndReg 锁存：权重经 loadV 从 psumIn 低位锁存，loadH 仅锁存 fmt/rnd；
+  //   加载权重时同时拉高 loadH 与 loadV。
   when(io.loadVInLock) {
     wReg := io.psumIn(bW - 1, 0)
   }
-  // 水平 loadW 模式并列分支（last-connect 覆盖）：loadWInLock 广播拍从 aIn
-  // 低位锁存权重。垂直模式 loadWInLock 恒 0，本分支为死路，wReg 行为不变
+  // 水平 loadW 模式并列分支（last-connect 覆盖）：loadWInLock 广播拍从 aIn 低位锁存
+  // 权重；垂直模式下 loadWInLock 恒 0，本分支为死路。
   when(loadWInLockSafe) {
     wReg := io.aIn(bW - 1, 0)
   }
-  // 两种加载模式互斥：同一拍不允许 loadV 与 loadW 同时锁存
   assert(!(io.loadVInLock && loadWInLockSafe), "WbWorker: loadVInLock and loadWInLock asserted simultaneously (mutually exclusive load modes)")
   when(io.loadHIn) {
     fmtReg := io.fmtIn
     rndReg := io.rndIn
-    // 与 fmtReg/rndReg 对称，同一 loadH 窗口锁存权重格式
     bFmtReg := io.bFmtIn
   }
-  // scaleB 驻留寄存器（按 K-lane 驻留、非按输出列驻留，见上方 scaleBReg 声明处）：
-  //   必须与权重 wReg 严格同拍锁存（loadVInLock/loadWInLock
-  //   的 Lock 脉冲拍），而非随 loadHIn 全窗口逐拍跟踪。
-  //   反例：下一 K-块 sLOAD_B 起始拍 loadHIn 即拉高，scaleBReg 会提前切到新块值，
-  //   而 wReg 要到窗口末 Lock 拍才更新；此错拍窗口内，上一 K-块尚在阵列深层排空的
-  //   乘积尾（validIn 在飞脉冲）仍持旧权重却读到新块 scaleB → 高 (m+n) 对角错位，
-  //   且仅当相邻块 scale 不同才可见（等值 scale 下被掩盖，故 unit-scale 多 pass 通过）。
-  //   非 MX 路径 scaleBReg 不被 MAC 选用，锁存条件变更 bit-exact 无影响。
+  // scaleBReg 必须与 wReg 严格同拍锁存（Lock 脉冲拍），不能随 loadHIn 全窗口跟踪：
+  //   loadHIn 在下一 K-块 sLOAD_B 起始拍即拉高而 wReg 要到窗口末 Lock 拍才更新，错拍
+  //   窗口内仍在阵列深层排空的上一块乘积尾会持旧权重读到新块 scaleB → 高 (m+n) 对角错位。
   when(io.loadVInLock || loadWInLockSafe) {
     scaleBReg := io.scaleBIn
   }
 
-  // --- 首次 load 时标记初始化完成（配置随 loadH 锁存） ---
+  // 首次 load 时标记初始化完成（配置随 loadH 锁存）
   when(io.loadHIn && !fmtInitActive) {
     fmtInitActive := true.B
   }
@@ -214,19 +144,15 @@ class WbWorker(
     rndInitActive := true.B
   }
 
-  // --- 可重构 MAC（使用 fmtReg / rndReg） ---
-  // WorkUnit 已由函数实现重构为独立 WbWorkUnit Module（便于综合面积
-  // 占比分析）：纯组合 MAC，PE 级状态（wReg/psumReg/fmtReg/rndReg）仍留本模块
+  // 可重构 MAC：WbWorkUnit 是纯组合 MAC，PE 级状态（wReg/psumReg/fmtReg/rndReg）留本模块
   val workUnit = Module(new WbWorkUnit(aW, bW, cW, supportedFmts))
   workUnit.io.a    := io.aIn(aW - 1, 0)
   workUnit.io.b    := wReg
   workUnit.io.cReg := io.psumIn
   workUnit.io.aFmt := fmtReg
   workUnit.io.bFmt := bFmtReg
-  // MAC 的 scaleA 必须与激活 MAC 输入 io.aIn 同拍（组合直连），而非 scaleAReg
-  //   （后者是已寄存、供 scaleAOut 右传的下一拍值）。用 scaleAReg 会使本 PE 的乘积
-  //   误用上一激活行的 scale（output row m 错用 row m-1 的 scaleA）。scaleAReg 段
-  //   本体保持不动，仅供水平传播 scaleAOut 使用。
+  // MAC 的 scaleA 必须与激活输入 io.aIn 同拍组合直连，而非已寄存的 scaleAReg（后者仅供
+  //   scaleAOut 右传）；否则本 PE 乘积会误用上一激活行的 scale。
   workUnit.io.scaleA := io.scaleAIn
   workUnit.io.scaleB := scaleBReg
   workUnit.io.rnd  := rndReg
@@ -238,18 +164,15 @@ class WbWorker(
   }.elsewhen(io.loadVIn){
     psumReg := io.psumIn
   }.elsewhen(io.validIn && fmtOk) {
-    // 正常计算（使用 fmtReg 和 rndReg）
     psumReg := workUnit.io.sum
   }
 
-  // --- psumOut ---
-  // 始终输出寄存值。行式权重加载协议（loadV 广播脉冲，每权重行 2 拍：
-  // 偶数拍供数 + loadV 脉冲锁存/下沉，奇数拍保持）依赖 psumReg 逐拍寄存
-  // 使权重每拍下沉一行；若做组合旁路，脉冲拍当前供数会穿透到底部簇，
-  // 深层 PE 锁存到错误权重
+  // psumOut 始终输出寄存值：行式权重加载协议（每权重行 2 拍，偶数拍供数 + loadV 脉冲
+  //   锁存/下沉，奇数拍保持）依赖 psumReg 逐拍寄存使权重每拍下沉一行；若做组合旁路，
+  //   脉冲拍的当前供数会穿透到底部簇，深层 PE 会锁存到错误权重。
   io.psumOut := psumReg
 
-  // --- aOut：激活正常水平传播（权重不再经 a 链加载，去掉 loadH 分支）---
+  // aOut：激活水平传播
   val aReg = RegInit(0.U(aEffW.W))
   when(io.clear) {
     aReg := 0.U
@@ -259,7 +182,7 @@ class WbWorker(
   
   io.aOut := aReg
 
-  // --- scaleAOut：scaleA 随激活流，与 aReg lockstep 并列（不改动上方 aReg 段本体）---
+  // scaleAOut：scaleA 随激活流，与 aReg lockstep
   when(io.clear) {
     scaleAReg := 0.U
   }.elsewhen(io.loadWIn | io.validIn){
@@ -268,7 +191,6 @@ class WbWorker(
   io.scaleAOut := scaleAReg
   io.scaleBOut := RegNext(io.scaleBIn)
 
-  // --- 控制传播 ---
   io.validOut := RegNext(io.validIn, false.B)
   io.validOutV := RegNext(io.validInV, false.B)
   io.loadVOut  := RegNext(io.loadVIn, false.B)

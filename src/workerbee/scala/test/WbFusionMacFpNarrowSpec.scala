@@ -1,63 +1,44 @@
-/** WbFusionMacFpNarrowSpec — task#18 E：narrow 配置（hasFp=false + useNarrowAdd=true）系统级测试
+/** WbFusionMacFpNarrowSpec — narrow 配置（hasFp=false + useNarrowAdd=true）的系统级测试
   *
-  * ══════════════════════════════════════════════════════════════════════════════
-  * 目标
-  * ══════════════════════════════════════════════════════════════════════════════
-  * 验证 WbFusionMacFp(supportedFmts=MXONLY, useNarrowAdd=true) 配置：
-  *   1. 饱和域输出非 NaN（task#18 A 项 bug fix 的直接系统级验证）
-  *   2. MX4 in-spec【lane fraction-sum 无损域】bit-exact。
-  *      ★【措辞订正 · task#20(2)】原文写「MX4 in-spec 全域 bit-exact」——【该表述 over-claim，已收窄】：
-  *        无损的只是【同 block 四 lane 的乘积和】：四 lane 共享 scaleA/scaleB ⟹ expField 跨度 ≤7 ≤ W−4，
-  *        且 MX4 乘积 mant23 低 20 位结构性 0 ⟹ 对齐 ts ≤ 20 ⟹ lane 侧 nLossy = 0（这一半成立）。
-  *        但【cReg 槽】不受该论证保护：一旦 cReg 由满精度 fp32 装入（mant31 低 31−W 位非 0，如外部初值/
-  *        上位机写入，或 cReg 真值远小于 lane 主导项而被 E 挤出窗口 ⟹ term-drop），窄 W 窗口就丢低位
-  *        ⟹ 该向量 nLossy ≥ 1、diff ≠ 0，只落在契约 ① 绝对界内（相消域由 ③ 兜底），**并非全域 bit-exact**。
-  *        本 spec 的 mx4Vecs 之所以能逐位断言，是因为其 cReg ∈ {0, 1.0}（fp32-精确、mant31 低 12 位为 0）
-  *        ⟹ cReg 槽同样无损；这是【激励受限】的结论，不是 MX4 模式的全域性质。
-  *        同族的 cReg 主导反例见 FpAddNarrowSpec 的 DR3/G2b/G3b/LZ2/ML2（MX4 模式 + 满尾数 cReg ⟹ 非 J1）。
-  *   3. MX8 in-spec（goldenExact=true 向量）bit-exact（有效位 ≤9 bit << W=19 → nLossy=0 → 精确）
+  * 目标：验证 WbFusionMacFp(supportedFmts=MXONLY, useNarrowAdd=true) 配置
+  *   1. 饱和域输出非 NaN（lazy-40 expField 钳到 ExpSatMax=254 而非 255）
+  *   2. MX4 in-spec【lane fraction-sum 无损域】bit-exact。该域不是 MX4 全域：无损的只是同 block 四 lane
+  *      的乘积和（共享 scaleA/scaleB ⟹ expField 跨度 ≤7 ≤ W−4，且 MX4 乘积 mant23 低 20 位结构性 0
+  *      ⟹ 对齐 ts ≤ 20 ⟹ lane 侧 nLossy = 0）；cReg 槽不受该论证保护（满精度 fp32 装入，或真值远小于
+  *      lane 主导项而被 E 挤出窗口 term-drop）⟹ 那类向量 nLossy ≥ 1、diff ≠ 0，只落契约 ① 绝对界
+  *      （相消域由 ③ 兜底）。本 spec 的 mx4Vecs 能逐位断言是因其 cReg ∈ {0, 1.0}（fp32-精确、mant31
+  *      低 12 位为 0）—— 激励受限的结论，不是 MX4 模式的全域性质；反例见本文件 n_mx8_cReg_spread 与
+  *      FpAddNarrowSpec 的 DR3/G2b/G3b/LZ2/ML2。
+  *   3. MX8 in-spec（goldenExact=true 向量）bit-exact（有效位 ≤9 bit << W=19 ⟹ nLossy=0 ⟹ 精确）
   *   4. MX8 宽指数跨度向量在契约内（绝对界无条件 + 良态域相对界 2^-(W-1)）
-  *   5. require 护栏：useNarrowAdd=true + hasFp=true → elaboration 期 Scala 异常
+  *   5. require 护栏：useNarrowAdd=true + 白名单外格式 → elaboration 期 Scala 异常
   *
-  * ══════════════════════════════════════════════════════════════════════════════
-  * 金锚来源（禁拟合 RTL）
-  * ══════════════════════════════════════════════════════════════════════════════
-  * ★【task#20(4) 订正】金锚载体由 Double 改为 **Dyadic(m:BigInt, e:Int) = m×2^e 精确二进制有理数**，
-  *   与 FpAddNarrowSpec 已在用的金锚同源同纪律。原因（与 FpAddNarrowSpec 头注「为何不用 Double」一致）：
-  *   本 spec 的 block4 要在【相消域】用金锚裁决绝对界，而相消域里 |exact| 可比最大项小十几个数量级；
-  *   Double（53-bit 尾数）在构造 exact = cReg + Σ lane 时自身就会舍入 ⟹ 金锚被污染 ⟹ 兜底判定失去意义
-  *   （既可能误判 FAIL，也可能因金锚与 RTL 同向舍入而假 PASS）。Dyadic 的加/减/乘【封闭无舍入】，
-  *   相对/绝对误差判定式退化为纯 BigInt 整数比较，零浮点参与。
-  * · 元素真值 = mxElemDyadic(code, scale, fmt)（本文件内的精确整数版；解码分支序与
-  *   WbSimCommon.mxToFloat 逐条同源：expSigned = e+scale−bias、fp8 subnormalFtz、E2M1 subnormal=±0.5
-  *   一等公民、underflow clamp；格式参数一律引 WbEnum.MxFormatParams 单例，禁裸字面量）
-  * · lane 乘积 = aElemVal × bElemVal（Dyadic 乘，精确；MX8 ≤8-bit / MX4 ≤4-bit 有效位 ⟹ 恒 fp32-可表示）
-  *   → dyadicToFp32Bits 编码成 fp32 位模式，与上游 FpMulMx8/FpMulMx4 的 in-spec 输出【逐位同值】
-  *   （数学证明见 FpAddNarrowSpec 头注「金锚来源」，非拟合）
-  * · 金锚和 exact = cReg + Σ lane 乘积（纯 Dyadic 张量语义，与求和次序无关 ⟹ 整数加法结合律）
-  * · 金锚 fp32 = swFpNormalize40to32(fp32BitsTo40(dyadicToFp32RNE(exact)))
-  *   —— 只在【最后一步】做单次 RNE 舍入（Dyadic→fp32），全程不经 Double 中转
-  * · 误差判定（纯整数）：相对界 |diff|×2^(W−1) ≤ |exact|；绝对界 |diff| ≤ (nLossy+2^k−1)×windowLsb
+  * 金锚来源（禁拟合 RTL）：载体 = Dyadic(m:BigInt, e:Int) = m×2^e，与 FpAddNarrowSpec 同源同纪律。
+  *   block4 要在相消域用金锚裁决绝对界，而相消域 |exact| 可比最大项小十几个数量级；Double（53-bit
+  *   尾数）构造 exact = cReg + Σ lane 时自身就会舍入 ⟹ 金锚被污染、兜底判定失去意义（既可能误判
+  *   FAIL，也可能因金锚与 RTL 同向舍入而假 PASS）。Dyadic 加/减/乘封闭无舍入 ⟹ 判定式退化为纯 BigInt
+  *   整数比较，零浮点参与。
+  * · 元素真值 mxElemDyadic 的解码分支序与 WbSimCommon.mxToFloat 逐条同源（expSigned = e+scale−bias、
+  *   fp8 subnormalFtz、E2M1 subnormal=±0.5 一等公民、underflow clamp）；格式参数一律引
+  *   WbEnum.MxFormatParams 单例，禁裸字面量。
+  * · lane 乘积 = aElemVal × bElemVal（Dyadic 乘；MX8 ≤8-bit / MX4 ≤4-bit 有效位 ⟹ 恒 fp32-可表示）
+  *   → dyadicToFp32Bits 编码，与上游 FpMulMx8/FpMulMx4 的 in-spec 输出逐位同值。
+  * · 金锚和 exact = cReg + Σ lane 乘积；金锚 fp32 = swFpNormalize40to32(fp32BitsTo40(
+  *   dyadicToFp32RNE(exact)))，只在最后一步做单次 RNE 舍入，全程不经 Double 中转。
+  * · 误差判定（纯整数）：相对界 |diff|×2^(W−1) ≤ |exact|；绝对界 |diff| ≤ (nLossy+2^k−1)×windowLsb。
   *
-  * ══════════════════════════════════════════════════════════════════════════════
   * 精度契约（三段式，与 FpAddNarrow.scala 头注 / FpAddNarrowSpec 同源）
-  * ══════════════════════════════════════════════════════════════════════════════
-  * ① 绝对界 |diff| ≤ (nLossy + 2^k − 1) × 2^(E−126−W)  —— 【无条件恒成立】
-  * ② 相对界 relErr ≤ 2^-(W-1)  —— 【仅良态域】：充分条件 |exact| ≥ (nLossy+2^k−1)×2^(W−1)×windowLsb
+  * ① 绝对界 |diff| ≤ (nLossy + 2^k − 1) × 2^(E−126−W) —— 无条件恒成立
+  * ② 相对界 relErr ≤ 2^-(W-1) —— 仅良态域：充分条件 |exact| ≥ (nLossy+2^k−1)×2^(W−1)×windowLsb
   * ③ 相消域 —— 任意有限 W 都无相对界，由 ① 兜底
   *
-  * 本 spec 验证策略（★ task#20(3) 订正：按三段契约【逐向量真实归类】，不再「六条过一条即过」）：
-  *   · goldenExact=true 向量（所有部分和 fp32-精确 + 指数跨度 << W）→ nLossy=0, k=0 → 输出精确
-  *     → 可做 bit-exact 断言（最强形式，与 WbFusionMacFpSpec 同金锚同判据）
-  *   · 宽指数跨度向量（block4）→ 软件侧【从激励独立重算】E / windowLsb / nLossy / k / absBound
-  *     （解析模型与 FpAddNarrowSpec.analyze 同构，全程不读 RTL），然后对【每一条】向量：
-  *       (i)  无条件断言契约 ①：|diff| ≤ absBound —— 这是唯一无条件的精度承诺，任何向量都必须成立；
-  *       (ii) 再按解析量把该向量归入【恰好一条】路径并施加该路径的断言：
-  *            · J1 精确域：nLossy==0 ∧ k==0 ⟹ 断言 diff == 0
-  *            · J2 良态域：②的充分条件成立 ⟹ 断言 |diff|×2^(W−1) ≤ |exact|
-  *            · J3 相消/多损域：其余 ⟹ 由 (i) 的绝对界兜底（契约 ③，不声称相对界）
-  *       (iii) 汇总断言 nJ1+nJ2+nJ3 == 向量总数（每条都被真实归类，无「或」式放水）
-  *   · 饱和域向量 → out-of-spec，只验 non-NaN + lazy-40 expField ≤ ExpSatMax(254)，不做金锚裁决
+  * 验证策略（按三段契约逐向量真实归类，不做「若干条过一条即过」的放水）：
+  *   · goldenExact=true 向量（部分和 fp32-精确 + 指数跨度 << W）⟹ nLossy=0, k=0 ⟹ 可做 bit-exact 断言
+  *   · 宽指数跨度向量（block4）⟹ 软件侧从激励独立重算 E / windowLsb / nLossy / k / absBound（与
+  *     FpAddNarrowSpec.analyze 同构，全程不读 RTL），再对每一条：(i) 无条件断言契约 ①；(ii) 按解析量
+  *     归入恰好一条路径（J1 nLossy==0 ∧ k==0 ⟹ diff==0；J2 ② 充分条件成立 ⟹ |diff|×2^(W−1) ≤ |exact|；
+  *     J3 其余 ⟹ 由 (i) 的绝对界兜底，不声称相对界）；(iii) 汇总断言 nJ1+nJ2+nJ3 == 向量总数。
+  *   · 饱和域向量 ⟹ out-of-spec，只验 non-NaN + lazy-40 expField ≤ ExpSatMax(254)，不做金锚裁决
   */
 
 import chisel3._
@@ -74,16 +55,12 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
       verilatorSettings = svsim.verilator.Backend.CompilationSettings.default
     )
 
-  // ── 配置常量 ──
   private val FMTS_MXONLY = Set(DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1)
   private val W = FpAddNarrow.DefaultW   // 19
-  /** 契约 ② 的相对阈值 2^−(W−1) = 2^−18。★ task#20(3)：本常量【仅供报告打印】，不参与任何判定 ——
-    * 判定一律走 Dyadic 整数式 `diff.shl(W-1).leAbs(exact)`（等价于 relErr ≤ REL_THRESHOLD，但零浮点）。
-    * 原实现用它做 Double 比较（`relErr <= REL_THRESHOLD`），相消域里 actVal/golden 双双被 Double 舍入
-    * ⟹ 阈值判定本身就是噪声，故废止。 */
+  /** 契约 ② 的相对阈值 2^−(W−1) = 2^−18，仅供报告打印：判定一律走 Dyadic 整数式
+    * `diff.shl(W-1).leAbs(exact)`（用 Double 比较时相消域里两端双双被舍入 ⟹ 阈值判定本身就是噪声）。 */
   private val REL_THRESHOLD = math.pow(2, -(W - 1))  // 2^-18（report-only）
 
-  // ── 元素码构造器（与 WbFusionMacFpSpec 同族，纯 Scala 位域打包）──
   private def e4m3(s: Int, e: Int, m: Int): Int = ((s & 1) << 7) | ((e & 0xF) << 3) | (m & 0x7)
   private def e5m2(s: Int, e: Int, m: Int): Int = ((s & 1) << 7) | ((e & 0x1F) << 2) | (m & 0x3)
   private def e2m1(s: Int, e: Int, m: Int): Int = ((s & 1) << 3) | ((e & 0x3) << 1) | (m & 0x1)
@@ -91,13 +68,10 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
   private def mx4(n0: Int, n1: Int, n2: Int, n3: Int): Int =
     (n0 & 0xF) | ((n1 & 0xF) << 4) | ((n2 & 0xF) << 8) | ((n3 & 0xF) << 12)
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // Dyadic：精确二进制有理数 value = m × 2^e（金锚载体；加/减/乘封闭无舍入）
-  //   ★ task#20(4)：取代原 Double 金锚。与 FpAddNarrowSpec 内的同名载体同构（那边是 private inner
-  //   class 无法跨 spec 复用，故此处独立实现同一套不变量）。
-  // ════════════════════════════════════════════════════════════════════════════
-  /** 不变量（由 Dyadic.apply 唯一入口保证，禁止裸 new）：m 为奇数，或 m == 0 且 e == 0。
-    * ⟹ 规范形唯一 ⟹ 结构相等 (m,e) 即数学相等。 */
+  // Dyadic：精确二进制有理数 value = m × 2^e（金锚载体，加/减/乘封闭无舍入）。与 FpAddNarrowSpec 内
+  //   的同名载体同构（那边是 private inner class 无法跨 spec 复用）。
+  /** 不变量（由 Dyadic.apply 唯一入口保证，禁裸 new）：m 为奇数或 m == 0 且 e == 0 ⟹ 规范形唯一
+    * ⟹ 结构相等 (m,e) 即数学相等。 */
   final class Dyadic(val m: BigInt, val e: Int) {
     def isZero: Boolean = m.signum == 0
     def signum: Int = m.signum
@@ -112,14 +86,11 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
       }
     def -(o: Dyadic): Dyadic = this + (-o)
     def *(o: Dyadic): Dyadic = if (isZero || o.isZero) Dyadic.Zero else Dyadic(m * o.m, e + o.e)
-    /** × 2^n（n 可为负）——无舍入。 */
     def shl(n: Int): Dyadic = Dyadic(m, e + n)
-    /** |this| ≤ |o|（精确整数判定：对齐到公共 2 的幂后比 BigInt，零浮点参与）。 */
     def leAbs(o: Dyadic): Boolean =
       if (isZero) true
       else if (o.isZero) false
       else { val k = math.min(e, o.e); (m.abs << (e - k)) <= (o.m.abs << (o.e - k)) }
-    /** |this| < |o|（严格）。 */
     def ltAbs(o: Dyadic): Boolean =
       if (o.isZero) false
       else if (isZero) true
@@ -139,18 +110,15 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
       if (m.signum == 0) Zero
       else {
         var mm = m.abs; var ee = e
-        while (mm > 1 && !mm.testBit(0)) { mm >>= 1; ee += 1 }   // 剥尾零 → 规范形
+        while (mm > 1 && !mm.testBit(0)) { mm >>= 1; ee += 1 }
         new Dyadic(if (m.signum < 0) -mm else mm, ee)
       }
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
   // 数学金锚（第一性原理 MX 语义，全程精确整数；禁拟合 RTL）
-  // ════════════════════════════════════════════════════════════════════════════
-  /** 三格式解码旗标（与 WbSimCommon.mxToFloat 的调用点逐条同源）：
-    * · E4M3：nanNeedMantAllOne=true（e&m 全 1 才 NaN）、subnormalFtz=true（e==0 → ±0）
-    * · E5M2：nanNeedMantAllOne=false（e 全 1 即 inf/nan）、subnormalFtz=true
-    * · E2M1：noInfNan=true（无 inf/nan 编码）、subnormalFtz=false（e=0/m=1 = ±0.5 一等公民） */
+  /** 三格式解码旗标（与 WbSimCommon.mxToFloat 调用点逐条同源）：E4M3 nanNeedMantAllOne=true +
+    * subnormalFtz=true；E5M2 nanNeedMantAllOne=false + subnormalFtz=true；E2M1 noInfNan=true +
+    * subnormalFtz=false（e=0/m=1 = ±0.5 一等公民）。 */
   private final case class MxElemFmt(p: MxFormatParams, nanNeedMantAllOne: Boolean,
                                      noInfNan: Boolean, subnormalFtz: Boolean)
   private val FmtE4M3 = MxElemFmt(MxFormatParams.E4M3, nanNeedMantAllOne = true,  noInfNan = false, subnormalFtz = true)
@@ -162,12 +130,10 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
     else if (d == DataFormat.MXE2M1) FmtE2M1
     else { require(false, s"fmtOf: 非 MX 格式 $d（本 spec 只覆盖 MX-only 域）"); FmtE2M1 }
 
-  /** MX 元素【精确】真值（Dyadic）。分支序逐条对齐 WbSimCommon.mxToFloat：
-    * normal  : ±(2^mantW + m) × 2^(expSigned − 127 − mantW)
-    * subnormal(E2M1) : ±1 × 2^(expSigned − 127)（隐含 1.0 ⟹ 不乘 (1+m/2)）
-    * fp8 e==0（FTZ）/ expSigned < 1（underflow clamp）⟹ ±0
-    * inf/nan 码 或 expSigned > 254（元素饱和）⟹ out-of-spec，require 拒绝
-    *   （这类向量只出现在 satVecs，走 block3 的 non-NaN 结构断言，【不进】金锚裁决） */
+  /** MX 元素精确真值，分支序逐条对齐 WbSimCommon.mxToFloat：normal = ±(2^mantW + m) ×
+    * 2^(expSigned−127−mantW)；E2M1 subnormal = ±1 × 2^(expSigned−127)（不乘 (1+m/2)）；fp8 e==0 /
+    * expSigned < 1 ⟹ ±0；inf/nan 码或 expSigned > 254 ⟹ require 拒绝（这类向量只出现在 satVecs，
+    * 走 block3 的 non-NaN 结构断言，不进金锚裁决）。 */
   private def mxElemDyadic(code: Int, scale: Int, f: MxElemFmt): Dyadic = {
     val p = f.p
     val b = code & 0xFF
@@ -206,10 +172,8 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
     ((s << 31) | (expField.toLong << 23) | mant23) & 0xFFFFFFFFL
   }
 
-  /** 精确真值 → fp32 bits，【单次 RNE 舍入】（全程 BigInt，不经 Double 中转 ⟹ 无双舍入）。
-    * 取代原 `java.lang.Float.floatToRawIntBits(golden.toDouble)`：后者先把金锚塞进 53-bit Double
-    * 再塞进 24-bit fp32，相消域里两步舍入会污染金锚（task#20(4)）。
-    * goldenExact=true 的向量其金锚本就 fp32-精确 ⟹ 本函数退化为恒等，block1/2 的逐位断言不受影响。 */
+  /** 精确真值 → fp32 bits，单次 RNE 舍入（全程 BigInt，不经 Double 中转：若先塞 53-bit Double 再塞
+    * 24-bit fp32，相消域两步舍入会污染金锚）。goldenExact=true 的向量金锚本就 fp32-精确 ⟹ 退化恒等。 */
   private def dyadicToFp32RNE(v: Dyadic): Long = {
     if (v.isZero) return 0L
     val s = if (v.signum < 0) 1L else 0L
@@ -244,8 +208,7 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
     if (e == 0 && m31.signum == 0) Dyadic.Zero else Dyadic(BigInt(if (s == 1) -1 else 1) * m31, e - 157)
   }
 
-  /** fp32-无损判据（精确整数版，取代 `v.toFloat.toDouble == v` 的 Double 自证）：
-    * 零，或 有效位 ≤24 且 expField ∈ [1,254] ⟹ 该 Dyadic 恰为某个 fp32 normal 的精确真值。 */
+  /** fp32-无损判据（精确整数版）：零，或有效位 ≤24 且 expField ∈ [1,254] ⟹ 恰为某 fp32 normal 真值。 */
   private def fp32Exact(v: Dyadic): Boolean =
     v.isZero || {
       val bl = v.m.abs.bitLength
@@ -259,22 +222,18 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
   private def cRegBits(cVal: Dyadic): BigInt =
     WbSimCommon.fp32BitsTo40(dyadicToFp32RNE(cVal))
 
-  /** ★【task#25 Kim Minor#3】cReg 槽的【实际驱动真值】= 由驱动位反解，而非直接用未舍入的 v.cVal。
-    * DUT 收到的是 cRegBits(v.cVal) = fp32BitsTo40(dyadicToFp32RNE(cVal))（可能已对 cVal 做过单次 RNE），
-    * 若金锚/模型仍参照未舍入的 cVal，就形成「DUT 收 RNE(cVal)、金锚参照 cVal」的双源不一致。
-    * cVal 为 fp32-精确时二者相等（退化恒等，现有向量不受影响）；一旦 cVal 非 fp32-精确即消除偏差。
-    * goldenOf 与 analyzeNarrow 的 cReg 槽真值一律走本函数，保证 assert(mdl.exact == golden) 同源自洽。 */
+  /** cReg 槽的实际驱动真值 = 由驱动位反解，而非未舍入的 v.cVal：DUT 收到的是 fp32BitsTo40(
+    * dyadicToFp32RNE(cVal))，金锚/模型若参照 cVal 就形成双源不一致。goldenOf 与 analyzeNarrow 一律走
+    * 本函数，保证 assert(mdl.exact == golden) 同源自洽。 */
   private def cExactOf(cVal: Dyadic): Dyadic = lazy40ToDyadic(cRegBits(cVal))
 
   private case class Vec(tag: String, aFmt: DataFormat.Type, bFmt: DataFormat.Type,
                          a: Int, b: Int, scaleA: Int, scaleB: Int,
                          isMx4: Boolean, cVal: Dyadic = Dyadic.Zero)
 
-  /** 五槽 lane 乘积【精确真值】（张量语义；与上游 FpMulMx8/FpMulMx4 的 in-spec 输出逐位同值）。
-    * MX4 = 4 个 nibble（a[3:0]/a[7:4]/a[11:8]/a[15:12] → r0/r1/r2/r3）；
-    * MX8 = 2 个 byte（a[7:0] → r0、a[15:8] → r1；r2/r3 被 Mux(aIsMx2M1,…) 掩零）。
-    * 端口映射逐字读自 WbFusionMacFp.scala:225/229(mulL0)、:150/154(fp8Mul)、:188/190(fp4Mul0)、
-    * :203/205(fp4Mul1) 与 :260-262 的 r1/r2/r3 Mux。 */
+  /** 五槽 lane 乘积精确真值（与上游 FpMulMx8/FpMulMx4 的 in-spec 输出逐位同值）。MX4 = 4 个 nibble
+    * （a[3:0]/a[7:4]/a[11:8]/a[15:12] → r0/r1/r2/r3）；MX8 = 2 个 byte（a[7:0] → r0、a[15:8] → r1，
+    * r2/r3 被 Mux(aIsMx2M1,…) 掩零）。端口映射逐字读自 WbFusionMacFp.scala 的 mulL0/fp8Mul/fp4Mul。 */
   private def laneProducts(v: Vec): Seq[Dyadic] =
     if (v.isMx4) (0 until 4).map { i =>
       mxElemDyadic((v.a >> (4 * i)) & 0xF, v.scaleA, FmtE2M1) *
@@ -293,7 +252,7 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   private def goldenMx8(v: Vec): (Dyadic, Boolean) = {
     val p = laneProducts(v)
-    // ★task#25 Kim Minor#3：s0 用【实际驱动真值】cExactOf(v.cVal)（= 由 cRegBits 反解），与 DUT 收到的位同源。
+    // s0 用【实际驱动真值】cExactOf(v.cVal)（= 由 cRegBits 反解），与 DUT 收到的位同源。
     val s0 = cExactOf(v.cVal); val s1 = s0 + p(0); val s2 = s1 + p(1)
     val exact = fp32Exact(p(0)) && fp32Exact(p(1)) && fp32Exact(s0) && fp32Exact(s1) && fp32Exact(s2)
     (s2, exact)
@@ -301,7 +260,7 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   private def goldenMx4(v: Vec): (Dyadic, Boolean) = {
     val p = laneProducts(v)
-    // ★task#25 Kim Minor#3：cReg 项用实际驱动真值 cExactOf(v.cVal)，消除「DUT 收 RNE(cVal)、金锚参照 cVal」双源。
+    // cReg 项用实际驱动真值 cExactOf(v.cVal)，消除「DUT 收 RNE(cVal)、金锚参照 cVal」双源。
     val cExact = cExactOf(v.cVal)
     val s01 = p(0) + p(1); val s23 = p(2) + p(3); val block = s01 + s23; val total = cExact + block
     val exact = p.forall(fp32Exact) && fp32Exact(s01) && fp32Exact(s23) &&
@@ -311,20 +270,12 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   private def goldenOf(v: Vec): (Dyadic, Boolean) = if (v.isMx4) goldenMx4(v) else goldenMx8(v)
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // FpAddNarrow 系统级解析模型（★ task#20(3)）：从【激励】独立重算 E / windowLsb / nLossy / k /
-  // absBound，用于真正校验契约 ①③。与 FpAddNarrowSpec.analyze 同构（同一嵌套 floor 恒等式
-  // floor(floor(x/2^p)/2^q) = floor(x/2^(p+q))），【全程不读 RTL】。
-  // ════════════════════════════════════════════════════════════════════════════
-  /** @param exact       张量语义精确和（Dyadic）
-    * @param eCommon     E = 激活且非零槽 expField 的 max
-    * @param lsb         windowLsb = 2^(E−126−W)
-    * @param nLossy      实际丢失 ≥1 bit 的激活槽数（对齐 floor + term-drop 都计入）
-    * @param nDrop       整槽移出窗口（E − e ≥ W）的槽数
-    * @param kGrow       溢出收回档 k = max(0, bitLength(|S|) − W)
-    * @param absBound    契约 ① 绝对界 (nLossy + 2^k − 1) × windowLsb —— 【无条件】成立
-    * @param mustRel     契约 ② 的【充分条件】是否成立（成立 ⟹ 良态域，相对界必须达标）
-    * @param lossless    nLossy==0 ∧ k==0 ∧ 未钳位 ⟹ 语义必须精确（diff==0） */
+  // FpAddNarrow 系统级解析模型：从激励独立重算 E / windowLsb / nLossy / k / absBound 以校验契约 ①③，
+  // 与 FpAddNarrowSpec.analyze 同构（同一嵌套 floor 恒等式），全程不读 RTL。
+  /** eCommon = E = 激活且非零槽 expField 的 max；lsb = windowLsb = 2^(E−126−W)；nLossy = 丢失 ≥1 bit
+    * 的激活槽数（对齐 floor + term-drop 都计入）；nDrop = 整槽移出窗口（E − e ≥ W）的槽数；kGrow =
+    * max(0, bitLength(|S|) − W)；absBound = (nLossy + 2^k − 1) × windowLsb（无条件成立）；mustRel =
+    * 契约 ② 充分条件成立（⟹ 良态域，相对界必须达标）；lossless ⟹ 必须 diff == 0。 */
   private final case class NarrowModel(exact: Dyadic, eCommon: Int, lsb: Dyadic,
                                        nLossy: Int, nDrop: Int, magFull: BigInt, kGrow: Int,
                                        absBound: Dyadic, mustRel: Boolean, lossless: Boolean,
@@ -339,8 +290,7 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
     val cM = cBits & ((BigInt(1) << 31) - 1)
     val cS = ((cBits >> 39) & 1).toInt
     val cZero = (cE == 0) && (cM.signum == 0)
-    // ★task#25 Kim Minor#3：cReg 槽真值由【实际驱动位】反解（lazy40ToDyadic(cBits)），
-    //   与 goldenMx8/goldenMx4 的 cExactOf(v.cVal) 同源 ⟹ 保持 assert(mdl.exact == golden) 结构自洽。
+    // cReg 槽真值由实际驱动位反解，与 goldenMx8/goldenMx4 的 cExactOf 同源 ⟹ mdl.exact == golden 自洽。
     val cExact = lazy40ToDyadic(cBits)
     // (active, isZero, signBit, eField, mag, fieldW, 精确真值)
     type SlotM = (Boolean, Boolean, Int, Int, BigInt, Int, Dyadic)
@@ -364,10 +314,8 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
       val sh = math.min(math.max(eCommon - s._4, 0), w)
       val ts = (s._6 - w) + sh
       val a = s._5 >> ts
-      // ★【task#25 Kim Minor#1 同构守卫】与 FpAddNarrowSpec.analyze 同一修法：ts 可为负时
-      //   (BigInt(1)<<ts)−1 会退化为 −1（全 1）⟹ 误判 lossy ⟹ nLossy 虚增。用 lost=max(0,ts)：
-      //   lost==0 不进掩码判定，lost>0 才检查低 lost 位；a = s._5 >> ts 不变（负 ts 左移 ≡ RTL W>24 分支）。
-      //   本函数当前仅以 w=W=19 调用（ts 恒 ≥0），此为防御性硬化，杜绝未来放宽 w 时的静默记账漏洞。
+      // ts 可为负时 (1<<ts)−1 退化为全 1 ⟹ 误判 lossy、nLossy 虚增 ⟹ 用 lost=max(0,ts)。当前仅以
+      //   w=W=19 调用（ts 恒 ≥0），此为防御性硬化，杜绝未来放宽 w 时的静默记账漏洞。
       val lost = math.max(0, ts)
       if (lost > 0 && (s._5 & ((BigInt(1) << lost) - 1)).signum != 0) nLossy += 1
       if (eCommon - s._4 >= w) nDrop += 1
@@ -380,33 +328,25 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
     val expClamped = (eCommon + k) > FpAddNarrow.ExpSatMax
     val truncMax = (BigInt(1) << k) - 1                       // |S| mod 2^k 的上界（截断误差 ≤ 此值 × lsb）
     val absBound = Dyadic(BigInt(nLossy) + truncMax, lsb.e)   // 契约 ①：|diff| ≤ 此值（无条件）
-    // 契约 ② 的【充分条件】（纯 Dyadic 整数判定，零浮点）：
-    //   |diff| ≤ absBound ∧ absBound × 2^(W−1) ≤ |exact|  ⟹  |diff| × 2^(W−1) ≤ |exact|  ⟹  relErr ≤ 2^−(W−1)
-    //   成立 ⟹ 本向量属【良态域】，相对界是【必须达标】的硬承诺（不是可选路径）。
+    // 契约 ② 充分条件（纯整数）：absBound × 2^(W−1) ≤ |exact| ⟹ relErr ≤ 2^−(W−1)。成立 ⟹ 本向量属
+    //   良态域，相对界是必须达标的硬承诺，不是可选路径。
     val mustRel = absBound.shl(w - 1).leAbs(exact)
     val lossless = (nLossy == 0) && (k == 0) && !expClamped
     NarrowModel(exact, eCommon, lsb, nLossy, nDrop, magFull, k, absBound, mustRel, lossless, expClamped)
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // MX4 in-spec 向量（bit-exact）
-  //   ★ task#20(2)：本组能逐位断言的前提是【两条】都成立，缺一不可：
-  //     (a) lane 侧无损：四 lane 共享 scaleA/scaleB ⟹ expField 跨度 ≤7 << W=19，且 MX4 乘积 mant23
-  //         低 20 位结构性 0 ⟹ 对齐总移位 ts ≤ 20 ⟹ lane 侧 nLossy = 0；
-  //     (b) cReg 侧无损：本组 cReg ∈ {0, C_ONE=1.0} ⟹ mant31 低 31−W=12 位为 0 且 E − cE < W。
-  //   ⟹ 全五槽 nLossy=0 ∧ k=0 ⟹ FpAddNarrow 输出精确。**这是「激励受限」的结论，不是 MX4 模式的全域性质**：
-  //   一旦 cReg 换成满尾数 fp32（低 12 位非 0）或被 E 挤出窗口，即出现 diff ≠ 0（契约 ①/③ 兜底）。
-  //   反例：本文件 n_mx8_cReg_spread；FpAddNarrowSpec 的 DR3/G2b/G3b/LZ2/ML2。
-  // ════════════════════════════════════════════════════════════════════════════
+  // MX4 in-spec 向量（bit-exact）。逐位断言的前提两条缺一不可：(a) lane 侧无损 —— 四 lane 共享
+  //   scaleA/scaleB ⟹ expField 跨度 ≤7 << W=19，且 MX4 乘积 mant23 低 20 位结构性 0 ⟹ ts ≤ 20；
+  //   (b) cReg 侧无损 —— 本组 cReg ∈ {0, C_ONE=1.0} ⟹ mant31 低 31−W=12 位为 0 且 E − cE < W。
+  // 这是激励受限的结论，非 MX4 全域性质：cReg 换满尾数 fp32 或被 E 挤出窗口即 diff ≠ 0（①/③ 兜底），
+  //   反例见本文件 n_mx8_cReg_spread 与 FpAddNarrowSpec 的 DR3/G2b/G3b/LZ2/ML2。
   private val E2 = DataFormat.MXE2M1
   private val E4 = DataFormat.MXE4M3
   private val E5 = DataFormat.MXE5M2
-  /** cReg 初值 1.0 的【精确】载体（★ task#20(4)：原写 Double 字面量 `1.0`）。
-    * 1.0 = 1×2^0 是 fp32-精确值 ⟹ lazy-40 mant31 的低 31−W=12 位结构性为 0 ⟹ cReg 槽的
-    * 【常量提取】(m31 >> CSh) 本身零损失。★但这【不等于】cReg 槽在整个窄窗口里无损：
-    * 若公共指数 E 比 cReg 的 expField 高出 ≥ W（如 n_mx8_cReg_spread：E=154 vs cE=127，差 27 ≥ 19），
-    * 动态对齐仍会把 cReg 整槽挤出窗口（term-drop）⟹ nLossy ≥ 1 ⟹ 只能由契约 ① 绝对界兜底。
-    * 这正是 task#20(2) 把「MX4/MX8 全域 bit-exact」收窄为「lane fraction-sum 无损域」的原因。 */
+  /** cReg 初值 1.0 的精确载体：1.0 = 1×2^0 是 fp32-精确值 ⟹ mant31 低 31−W=12 位结构性为 0 ⟹ 常量
+    * 提取 (m31 >> CSh) 零损失。但这不等于 cReg 槽在整个窄窗口无损：若 E 比 cReg 的 expField 高出 ≥ W
+    * （n_mx8_cReg_spread：E=154 vs cE=127，差 27 ≥ 19），动态对齐仍把 cReg 整槽挤出窗口 ⟹ nLossy ≥ 1
+    * ⟹ 只能由契约 ① 兜底 —— 这也是 bit-exact 只能限定在 lane fraction-sum 无损域的原因。 */
   private val C_ONE: Dyadic = Dyadic(BigInt(1), 0)
 
   private val mx4Vecs: Seq[Vec] = Seq(
@@ -433,9 +373,7 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
       mx4(e2m1(0,3,1), e2m1(0,2,1), e2m1(0,3,0), e2m1(0,1,1)), 127, 127, true, C_ONE)
   )
 
-  // ════════════════════════════════════════════════════════════════════════════
   // MX8 in-spec 向量（bit-exact：有效位 ≤9 << W=19 且指数跨度小 → nLossy=0）
-  // ════════════════════════════════════════════════════════════════════════════
   private val mx8ExactVecs: Seq[Vec] = Seq(
     Vec("n_mx8_e4m3_m00_07", E4, E4,
       mx8(e4m3(0,7,0), e4m3(0,7,7)), mx8(e4m3(0,7,0), e4m3(0,7,7)), 127, 127, false),
@@ -457,12 +395,10 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
       mx8(e4m3(0,7,3), e4m3(0,7,6)), mx8(e4m3(0,7,3), e4m3(0,7,6)), 238, 100, false)
   )
 
-  // ════════════════════════════════════════════════════════════════════════════
   // MX8 宽指数跨度向量（契约验证：nLossy > 0 → 用相对误差 / 绝对界判定）
   // 构造：lane0 高指数 E5M2(e=30) × E5M2(e=30) vs lane1 低指数 E5M2(e=2) × E5M2(e=2)
   //   → 乘积 expField 跨度 ≈ (30-15)+(30-15) - ((2-15)+(2-15)) = 30+26 = 56 >> W=19
   //   → lane1 完全 term-drop → nLossy ≥ 1 → 验证良态域相对界 or 绝对界兜底
-  // ════════════════════════════════════════════════════════════════════════════
   private val mx8SpreadVecs: Seq[Vec] = Seq(
     // 宽跨度：lane0 exp 远大于 lane1 → lane1 被 term-drop（良态：大项主导，relErr 很小）
     Vec("n_mx8_spread30", E5, E5,
@@ -477,17 +413,14 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
     // 异号相消域：lane0 正大 + lane1 负大 → |exact| 很小 → 条件数放大（契约 ③ 兜底）
     Vec("n_mx8_cancel", E4, E4,
       mx8(e4m3(0,10,7), e4m3(1,10,7)), mx8(e4m3(0,10,7), e4m3(0,10,6)), 127, 127, false),
-    // cReg 非零 + 宽跨度（3 活跃槽，不同指数域）：E=154 而 cReg 的 expField=127 ⟹ 差 27 ≥ W=19
-    //   ⟹ cReg 整槽被 term-drop（nLossy=2：cReg + lane1）⟹ 契约 ② 的充分条件不成立 ⟹ 落 J3 绝对界兜底。
-    //   ★ 这条向量就是 task#20(2) 所指「cReg 主导域窄 W 窗口丢低位」的活体反例（同 block 内 MX8 lane 侧无损，
-    //     但系统级输出 diff ≠ 0 ⟹ 绝非「全域 bit-exact」）。
+    // cReg 非零 + 宽跨度（3 活跃槽）：E=154 而 cReg expField=127 ⟹ 差 27 ≥ W=19 ⟹ cReg 整槽 term-drop
+    //   （nLossy=2：cReg + lane1）⟹ 契约 ② 充分条件不成立 ⟹ 落 J3 绝对界兜底。这是「系统级并非全域
+    //   bit-exact」的活体反例：同 block 内 MX8 lane 侧无损，输出仍 diff ≠ 0。
     Vec("n_mx8_cReg_spread", E5, E5,
       mx8(e5m2(0,28,3), e5m2(0,3,0)), mx8(e5m2(0,28,3), e5m2(0,3,0)), 127, 127, false, C_ONE)
   )
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // 饱和域向量（out-of-spec：验证 bug fix — 输出非 NaN + lazy-40 expField ≤ 254）
-  // ════════════════════════════════════════════════════════════════════════════
+  // 饱和域向量（out-of-spec：验证输出非 NaN + lazy-40 expField ≤ 254）
   private val satVecs: Seq[Vec] = Seq(
     Vec("n_sat_mx4_scaleA253", E2, E2,
       mx4(e2m1(0,3,1), e2m1(0,3,0), e2m1(0,2,1), e2m1(0,3,1)),
@@ -504,9 +437,6 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
       mx8(e4m3(0,15,6), e4m3(0,15,6)), mx8(e4m3(0,15,6), e4m3(0,15,6)), 253, 253, false)
   )
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // 驱动 helper
-  // ════════════════════════════════════════════════════════════════════════════
   private def driveVec(dut: WbFusionMacFp, v: Vec): BigInt = {
     dut.io.aFmt.poke(v.aFmt)
     dut.io.bFmt.poke(v.bFmt)
@@ -530,9 +460,6 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
     dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // 测试主体
-  // ════════════════════════════════════════════════════════════════════════════
   behavior of "WbFusionMacFp narrow config (useNarrowAdd=true, FpAddNarrow W=19) system-level verification"
 
   it should "produce bit-exact output for MX4 in-spec vectors with lossless cReg slot (lane exponent spread ≤7 << W AND cReg in {0,1.0} => nLossy=0; NOT an MX4 whole-domain claim)" in {
@@ -591,7 +518,7 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
         val isInf = expField == 0xFF && mantField == 0
         // lazy-40 层面的不变量
         val eOut40 = ((sumRaw >> 31) & 0xFF).toInt
-        // ★ task#18 A 核心验证：修复前 expOut=255 + mant31≠0 → 归一化成 NaN；修复后钳到 254 → 有限
+        // 核心验证：expOut=255 + mant31≠0 会归一化成 NaN，钳到 254 才保证有限
         assert(!isNaN,
           f"[${v.tag}] ★ SATURATION BUG NOT FIXED: output NaN! fp32=0x$fp32%08X sumRaw=0x${sumRaw.toString(16)}")
         assert(eOut40 <= FpAddNarrow.ExpSatMax,
@@ -607,16 +534,6 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
   it should "enforce the three-part precision contract on MX8 wide-spread vectors with per-vector true classification (J1 exact / J2 rel-bound / J3 abs-bound fallback)" in {
     simulate(new WbFusionMacFp(supportedFmts = FMTS_MXONLY, useNarrowAdd = true)) { dut =>
       resetDut(dut)
-      // ★ task#20(3) 重写纪要（原实现的三处空洞，逐条对应任务书点名）：
-      //   (a) 死变量：原 `val absBound = 6.0 * math.abs(golden) * REL_THRESHOLD` 算完就丢，
-      //       【从未进入任何断言】；实际生效的断言是 `absDiff < maxTerm || relErr <= 1.0`。
-      //   (b) 注释/代码矛盾：注释写「只验证 absDiff < |golden|（输出不比精确值差【一个数量级】以上）」，
-      //       代码却是 `maxTerm = |golden| * 100`（= 两个数量级），且那个 `|| relErr <= 1.0`
-      //       允许【100% 相对误差】单独放行 ⟹ 契约 ③ 的兜底等于没验。
-      //   (c) 「六条过一条即过」：汇总断言 `(nExact + nRel) should be > 0`，本组恰 6 条向量，
-      //       只要任意一条落进 exact/rel 就整体 PASS，其余 5 条即便彻底跑飞也不算失败。
-      //   现改为：每条向量 (i) 先【无条件】过契约 ① 绝对界，(ii) 再按解析量归入【恰好一条】路径
-      //   并施加该路径的强断言，(iii) 汇总 nJ1+nJ2+nJ3 == 向量总数。判定全程 Dyadic 精确整数、零 Double。
       var nJ1 = 0; var nJ2 = 0; var nJ3 = 0
       val rows = mutable.ArrayBuffer.empty[String]
       for (v <- mx8SpreadVecs) {
@@ -625,7 +542,7 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
         val (golden, _) = goldenOf(v)
         val eOut40      = ((sumRaw >> 31) & 0xFF).toInt
 
-        // ── 无条件不变量（与三段归类正交，保留自原实现）──
+        // ── 无条件不变量（与三段归类正交）──
         assert(eOut40 <= FpAddNarrow.ExpSatMax,
           s"[${v.tag}] 无条件不变量违背：eOut=$eOut40 > ExpSatMax=${FpAddNarrow.ExpSatMax}")
         val expField  = ((actualFp32 >>> 23) & 0xFF).toInt
@@ -635,8 +552,7 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
         // ── 解析模型：从【激励】独立重算 E / windowLsb / nLossy / nDrop / k / absBound（全程不读 RTL）──
         val mdl = analyzeNarrow(v, W)
-        // J0 模型自洽：analyzeNarrow 的「逐槽真值和」与 goldenOf 的「张量语义和」必须结构相等
-        //   （Dyadic 规范形唯一 ⟹ (m,e) 相等即数学相等；两条独立路径互验，防模型自身写错）
+        // J0 模型自洽：逐槽真值和与张量语义和必须结构相等（两条独立路径互验，防模型自身写错）
         assert(mdl.exact == golden,
           s"[${v.tag}] J0 模型不自洽：analyzeNarrow.exact=${mdl.exact} != goldenOf=$golden")
         // 契约 ① 的推导前提是 expOut = E + k 未被钳位（钳到 254 会改变输出量级）；本组全为 in-spec 非饱和向量
@@ -648,8 +564,7 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
         val got  = lazy40ToDyadic(sumRaw)
         val diff = got - mdl.exact
 
-        // ── (i) 契约 ①【无条件绝对界】：|diff| ≤ (nLossy + 2^k − 1) × 2^(E−126−W) ──
-        //   E = mdl.eCommon；windowLsb = mdl.lsb = 2^(E−126−W)；absBound = mdl.absBound = (nLossy+2^k−1)×windowLsb
+        // ── (i) 契约 ① 无条件绝对界：|diff| ≤ absBound = (nLossy + 2^k − 1) × 2^(E−126−W) ──
         assert(diff.abs.leAbs(mdl.absBound),
           s"[${v.tag}] ★ 契约 ① 违背：|diff|=${diff.abs} > absBound=${mdl.absBound} " +
             s"(E=${mdl.eCommon} W=$W windowLsb=${mdl.lsb} nLossy=${mdl.nLossy} nDrop=${mdl.nDrop} " +
@@ -663,8 +578,7 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
               s"[${v.tag}] ★ J1 违背：nLossy=0 ∧ k=0 但 diff=$diff != 0（got=$got exact=${mdl.exact}）")
             nJ1 += 1; "J1-exact"
           } else if (mdl.mustRel) {
-            // J2 良态域：absBound × 2^(W−1) ≤ |exact| ⟹ 相对界是【硬承诺】，必须实测达标
-            //   （整数等价式 |diff|×2^(W−1) ≤ |exact| ⟺ relErr ≤ 2^−(W−1)，取代原 Double 除法比较）
+            // J2 良态域：absBound × 2^(W−1) ≤ |exact| ⟹ 相对界是硬承诺，必须实测达标（整数等价式）
             assert(diff.shl(W - 1).abs.leAbs(mdl.exact),
               s"[${v.tag}] ★ 契约 ② 违背：|diff|×2^${W - 1}=${diff.shl(W - 1).abs} > |exact|=${mdl.exact.abs} " +
                 s"⟹ relErr > 2^-${W - 1}（=$REL_THRESHOLD），而本向量属良态域（absBound=${mdl.absBound}）")
@@ -684,20 +598,17 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
       rows.foreach(println)
       println(s"[NarrowSpec] MX8 wide-spread 三段契约：J1(exact)=$nJ1 J2(rel≤2^-${W - 1}=$REL_THRESHOLD)=$nJ2 " +
         s"J3(abs-bound 兜底)=$nJ3 total=${mx8SpreadVecs.size}")
-      // ── (iii) 汇总：每条向量都被【真实归类】（取代原「六条过一条即过」的 (nExact+nRel) > 0）──
+      // ── (iii) 汇总：每条向量都被【真实归类】──
       (nJ1 + nJ2 + nJ3) shouldBe mx8SpreadVecs.size
-      // 激励设计意图自检：本组必须同时覆盖 J2（良态宽跨度）与 J3（cReg term-drop / 相消兜底），
-      //   否则说明向量退化（例如全部 lossless ⟹ block4 沦为 block2 的重复，契约 ③ 无人验证）。
+      // 激励意图自检：本组必须同时覆盖 J2 与 J3，否则向量退化（全部 lossless ⟹ 契约 ③ 无人验证）。
       nJ2 should be > 0
       nJ3 should be > 0
     }
   }
 
   it should "pin the class-default supportedFmts to MX-only (D1: emitted RTL carries no fp16/bf16 wide array FpMulFp16Bf16)" in {
-    // ★task#25 D1（钉死新默认契约，当前该路径零覆盖）：类默认（不显式传 supportedFmts）已被
-    //   「砍除 FP16/BF16」裁定收窄为 MX-only（hasFp=false）。本用例发射【类默认】RTL，断言其
-    //   【不含】fp16/bf16 宽阵列（FpMulFp16Bf16 / FpCvtFp16ToFp32 / FpCvtBf16ToFp32），
-    //   且【含】lane0 专属窄乘法器 FpMulMx8（hasFp=false 的硬件指纹）⟹ 钉死「默认 = MX-only」不被悄悄翻回。
+    // 钉死类默认契约：不显式传 supportedFmts 即 MX-only（hasFp=false）⟹ 发射的 RTL 不含 fp16/bf16
+    //   宽阵列（FpMulFp16Bf16 / FpCvtFp16ToFp32 / FpCvtBf16ToFp32），且含 lane0 专属窄乘法器 FpMulMx8。
     val rtlDefault = _root_.circt.stage.ChiselStage.emitSystemVerilog(new WbFusionMacFp())
     rtlDefault should not include "FpMulFp16Bf16"
     rtlDefault should not include "FpCvtFp16ToFp32"
@@ -705,9 +616,8 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
     withClue("类默认 MX-only 应例化 lane0 窄乘法器 FpMulMx8（hasFp=false 指纹）：") {
       rtlDefault should include("FpMulMx8")
     }
-    // 反证（判别有判别力、非恒真）：显式传全五格式 ⟹ hasFp=true ⟹ 宽阵列必须出现。
-    //   ★task#30 A2：pin useNarrowAdd=false（类默认已改为 true；全五格式 + narrow 会撞护栏 require，
-    //   而本反证段意图是验宽阵列出现与否，与加法器选型正交）。
+    // 反证（判据有判别力、非恒真）：显式传全五格式 ⟹ hasFp=true ⟹ 宽阵列必须出现。此处 pin
+    //   useNarrowAdd=false，因为全五格式 + narrow 会撞护栏 require，而本段意图与加法器选型正交。
     val rtlFull5 = _root_.circt.stage.ChiselStage.emitSystemVerilog(
       new WbFusionMacFp(supportedFmts = Set(DataFormat.FP16, DataFormat.BF16,
         DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1), useNarrowAdd = false))
@@ -718,8 +628,8 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
       "full-5 RTL has FpMulFp16Bf16 (判据有判别力)")
   }
 
-  it should "REJECT useNarrowAdd=true with hasFp=true at elaboration time (require guard)" in {
-    // 护栏验证：useNarrowAdd=true + hasFp=true → elaboration 期 Scala IllegalArgumentException
+  it should "REJECT useNarrowAdd=true with FP16 in supportedFmts at elaboration time (require guard)" in {
+    // 护栏验证：useNarrowAdd=true + 越界格式 → elaboration 期 Scala IllegalArgumentException
     val ex = intercept[IllegalArgumentException] {
       // 触发 elaboration（ChiselStage 会在构造时检查 require）
       _root_.circt.stage.ChiselStage.emitSystemVerilog(
@@ -729,13 +639,15 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
         )
       )
     }
-    // ★task#25 Sean m2 同步：护栏已由 `!hasFp` 改【白名单】`supportedFmts ⊆ {MXE4M3,MXE5M2,MXE2M1}`，
-    //   期望消息随之更新为新文案（仍精确触发于同一条 require）。
-    ex.getMessage should include("FpAddNarrow 仅支持 MX-only(MXE4M3/MXE5M2/MXE2M1)")
-    println(s"[NarrowSpec] require guard (FP16/BF16) PASS: ${ex.getMessage.take(90)}...")
+    // 护栏判据是【白名单】`supportedFmts ⊆ MX(MXE4M3/MXE5M2/MXE2M1) + BF16`，期望子串与
+    //   WbFusionMacFp 的 require 文案单一真源对齐。BF16 可入白名单的依据：FpMulBf16Mx 的 mant23
+    //   低 8 位结构性为零 ⟹ mag24 有效位只占 [23:8]，W=19 窗口 mag24>>5 保留全部有效位，最小无损
+    //   W=16。⟹ 本用例的拒绝原因只剩 FP16；MX+BF16 的【放行】断言见下一个用例。
+    ex.getMessage should include("FpAddNarrow 仅支持 MX(MXE4M3/MXE5M2/MXE2M1) + BF16")
+    println(s"[NarrowSpec] require guard (FP16 out-of-whitelist) PASS: ${ex.getMessage.take(90)}...")
 
-    // ★task#25 Sean m2 附加负向用例：非 MX 的 INT 集（hasFp 仍为 false）——旧 `!hasFp` 判据会【放行】(绕过)，
-    //   新白名单必须【拒绝】。这条正是「白名单堵住 INT/FP32 集绕过」的活体证据。
+    // 负向用例：含 INT 的格式集（hasFp 仍为 false）必须被白名单【拒绝】—— 「白名单堵住 INT/FP32
+    //   集绕过」的活体证据（仅看 hasFp 的判据会放行）。
     val ex2 = intercept[IllegalArgumentException] {
       _root_.circt.stage.ChiselStage.emitSystemVerilog(
         new WbFusionMacFp(
@@ -744,7 +656,42 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
         )
       )
     }
-    ex2.getMessage should include("FpAddNarrow 仅支持 MX-only(MXE4M3/MXE5M2/MXE2M1)")
+    ex2.getMessage should include("FpAddNarrow 仅支持 MX(MXE4M3/MXE5M2/MXE2M1) + BF16")
     println(s"[NarrowSpec] require guard (INT8 bypass) PASS: ${ex2.getMessage.take(90)}...")
   }
+
+  it should "ACCEPT useNarrowAdd=true with MX + BF16 (whitelist widened; BF16 lane0 fits the W=19 window)" in {
+    // 白名单含 BF16 的活体证据（与上一用例的两条拒绝断言互补）：MX + BF16 必须 elaborate 成功，
+    //   且 lane0 走窄路 FpMulBf16Mx（不是 fp32 宽阵列 FpMulFp16Bf16）。无损性依据见上一用例注释；
+    //   W=15 会被 narrowW>=16 的窗口 require 拒绝 ⟹ 同时钉死「默认 W=19 可用」。
+    val rtl = _root_.circt.stage.ChiselStage.emitSystemVerilog(
+      new WbFusionMacFp(
+        supportedFmts = Set(DataFormat.BF16, DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1),
+        useNarrowAdd = true
+      )
+    )
+    withClue("MX+BF16 窄路应例化 BF16 专属窄乘法器 FpMulBf16Mx：") {
+      rtl should include("FpMulBf16Mx")
+    }
+    withClue("MX+BF16 窄路不得退化成 fp32 宽阵列（那是 hasFp16 分支）：") {
+      rtl should not include "FpMulFp16Bf16"
+    }
+    withClue("窄加法器仍须是 FpAddNarrow（非 FpAdd）：") {
+      rtl should include("FpAddNarrow")
+    }
+    println("[NarrowSpec] whitelist widening PASS: MX+BF16 accepted, lane0=FpMulBf16Mx, adder=FpAddNarrow")
+
+    // 窗口下界守护：narrowW=15 < 16 必须拒（BF16 mag24 有效位 16 位，W=16 为最小无损窗口）。
+    val exW = intercept[IllegalArgumentException] {
+      _root_.circt.stage.ChiselStage.emitSystemVerilog(
+        new WbFusionMacFp(
+          supportedFmts = Set(DataFormat.BF16, DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1),
+          useNarrowAdd = true,
+          narrowW = 15
+        )
+      )
+    }
+    println(s"[NarrowSpec] BF16 narrowW>=16 window guard PASS: ${exW.getMessage.take(120)}...")
+  }
 }
+

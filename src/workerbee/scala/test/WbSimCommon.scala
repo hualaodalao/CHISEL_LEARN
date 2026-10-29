@@ -1,11 +1,9 @@
 /** WorkerBee 仿真测试公共工具：FP16 位模式转换、矩阵文件落盘、
   * FP32 bit 解析与 FST 波形拷贝。由 WorkerBeeSimCase 与
-  * WorkerBeeSimCaseLoadWSpec 共用（自两者逐字等价抽取，
-  * 差异处以功能更全的一份为准）。
-  * 格式编码统一经 WbEnum.DataFormat 枚举派生常量驱动（见 object 开头
-  * 常量区）；【任务104】fmt 相关公开 API 入参已由 Int 编码迁移为
-  * DataFormat.Type 枚举（避免枚举再改编号后调用点静默错位）；控制字
-  * 位域打包等仍需整型的场景由调用方以 fmt.litValue.toInt 收敛。
+  * WorkerBeeSimCaseLoadWSpec 共用。
+  * 格式编码统一经 WbEnum.DataFormat 枚举派生常量驱动（见 object 开头常量区）；
+  * fmt 相关公开 API 入参为 DataFormat.Type 枚举（避免枚举改编号后调用点静默
+  * 错位），控制字位域打包等仍需整型的场景由调用方以 fmt.litValue.toInt 收敛。
   */
 
 import chisel3._
@@ -17,13 +15,12 @@ import java.nio.file._
 object WbSimCommon {
 
   // ========== DataFormat 枚举派生常量（格式编码唯一源） ==========
-  // OutFormat/DataFormat 已合并为单一 DataFormat 枚举（src/workerbee/scala/main/
-  // WbEnum.scala），成员声明即隐式 id 顺延：FP32=0 FP16=1 BF16=2 MXE4M3=3
-  // MXE5M2=4 MXE2M1=5 INT32=6 INT16=7 INT8=8 INT4=9 FP8E4M3=10 FP8E5M2=11。
-  // 【P2 纯 FP8】FP8 两码点不进下方任何 Fmt 分档集合：本组集合服务【输出格式】
-  // 域（cOutElemBits 等），而 cFmt=FP8 被硬件 errCode3 链尾臂运行期拒绝 ⟹
-  // 该域永不合法接收 FP8，落默认臂（32-bit 档）即原 reserved 语义。本 object 的全部
-  // 格式编码比较/分档均经此常量区驱动，不再出现裸数字。
+  // DataFormat 成员声明即隐式 id 顺延（src/workerbee/scala/main/WbEnum.scala）：
+  // FP32=0 FP16=1 BF16=2 MXE4M3=3 MXE5M2=4 MXE2M1=5 INT32=6 INT16=7 INT8=8
+  // INT4=9 FP8E4M3=10 FP8E5M2=11。FP8 两码点不进下方任何 Fmt 分档集合：本组集合
+  // 服务【输出格式】域（cOutElemBits 等），而 cFmt=FP8 被硬件 errCode3 链尾臂运行期
+  // 拒绝 ⟹ 该域永不合法接收 FP8，落默认臂（32-bit 档）。本 object 的全部格式编码
+  // 比较/分档均经此常量区驱动，不出现裸数字。
   private val FmtFp32   = DataFormat.FP32.litValue.toInt
   private val FmtFp16   = DataFormat.FP16.litValue.toInt
   private val FmtBf16   = DataFormat.BF16.litValue.toInt
@@ -36,11 +33,10 @@ object WbSimCommon {
   private val FmtInt4   = DataFormat.INT4.litValue.toInt
 
   // 格式族集合（Scala 级，与 WbEnum 谓词语义对齐，用于元素位宽/字节分档）：
-  //   4B 族 = is4B = {FP32,INT32}；2B 族 = is2B ∪ {INT16}（INT16 输出同为
-  //     2B/元素，与 WbOutCvt 选段 packedInt16 同档；is2B 谓词仅覆盖输入侧
-  //     浮点 2B 族）；1B 族 = is1B = {INT8,MXE4M3,MXE5M2}；
-  //     半字节族 = isHalfB = {INT4,MXE2M1}。
-  // 未知编码不在任何集合 → 默认臂 32-bit 档回落（原 reserved 默认臂语义不变）。
+  //   4B 族 = is4B = {FP32,INT32}；2B 族 = is2B ∪ {INT16}（INT16 输出同为 2B/元素，
+  //     与 WbOutCvt 选段 packedInt16 同档；is2B 谓词仅覆盖输入侧浮点 2B 族）；
+  //   1B 族 = is1B = {INT8,MXE4M3,MXE5M2}；半字节族 = isHalfB = {INT4,MXE2M1}。
+  // 未知编码不在任何集合 → 默认臂 32-bit 档回落。
   private val Fmt4B    = Set(FmtFp32, FmtInt32)
   private val Fmt2B    = Set(FmtFp16, FmtBf16, FmtInt16)
   private val Fmt1B    = Set(FmtInt8, FmtMxE4M3, FmtMxE5M2)
@@ -125,13 +121,12 @@ object WbSimCommon {
 
   /** 将矩阵写入文本文件（每行空格分隔的 hex 值） */
   def writeMatrixHex(path: String, matrix: Array[Array[Int]], bitsPerElem: Int): Unit = {
-    // 【退化位宽守护，勿删】bitsPerElem<=0 时 (bitsPerElem+3)/4 == 0，下面那行会拼出格式串
+    // 退化位宽守护：bitsPerElem<=0 时 (bitsPerElem+3)/4 == 0，下面那行会拼出格式串
     //   "%00X"：java.util.Formatter 把 "00" 当成两个 '0' flag，抛
-    //   java.util.DuplicateFormatFlagsException: Flags = '0'（实测复现）。触发者是亚字节族
-    //   （MXE2M1/INT4）按 bytes 口径传 memElemBytes×8 = 0×8 = 0 的调用点，崩在【失败落盘】
-    //   路径上，会把真实失配原因整条盖掉、只剩一个看不出所以然的 Formatter 异常。
-    //   兜底为 1 位：bitsPerElem>=1 时 math.max(1, …) 是恒等变换 ⟹ 所有正常用例的
-    //   零填充位宽、大写 hex、空格分隔、行序【逐字不变】，本守护只消除崩溃、不改输出语义。
+    //   java.util.DuplicateFormatFlagsException。触发者是亚字节族（MXE2M1/INT4）按
+    //   bytes 口径传 memElemBytes×8 = 0×8 = 0 的调用点，崩在【失败落盘】路径上，会把
+    //   真实失配原因整条盖掉。兜底为 1 位：bitsPerElem>=1 时 math.max(1, …) 是恒等
+    //   变换 ⟹ 正常用例的零填充位宽、大写 hex、空格分隔、行序逐字不变。
     val hexDigits = math.max(1, (bitsPerElem + 3) / 4)
     val mask = (1L << bitsPerElem) - 1
     val pw = new PrintWriter(new File(path))
@@ -143,7 +138,7 @@ object WbSimCommon {
 
   /** 将 BigInt 矩阵写入文本文件 */
   def writeBigIntMatrixHex(path: String, matrix: Array[Array[BigInt]], bitsPerElem: Int): Unit = {
-    // 【退化位宽守护】与上方 writeMatrixHex 同源：亚字节族(MXE2M1/INT4) 按 bytes 口径传入时
+    // 退化位宽守护，与上方 writeMatrixHex 同源：亚字节族(MXE2M1/INT4) 按 bytes 口径传入时
     //   bitsPerElem=0 ⟹ (bitsPerElem+3)/4=0。writeMatrixHex 会拼出非法格式串 "%00X" 抛
     //   java.util.DuplicateFormatFlagsException；本函数走 padTo(hexDigits,'0')，hexDigits=0 则
     //   退化为不补零（输出失去固定位宽）。兜底为 1 位：bitsPerElem>=1 时恒等、正常用例输出不变。
@@ -164,9 +159,8 @@ object WbSimCommon {
   // ========== 波形拷贝（FST） ==========
 
   /** 将 ChiselSim 生成的 trace.fst 复制到目标路径（源存在则覆盖复制，
-    * 否则仅打印 NOTE 不 fail，沿用 copyVcd 时代既有约定）。
-    * 硬门禁：源文件存在但为 0 字节时直接 fail（波形产物不完整即视为
-    * 仿真异常，不再仅靠流程约定）。
+    * 否则仅打印 NOTE 不 fail）。硬门禁：源文件存在但为 0 字节时直接 fail
+    * （波形产物不完整即视为仿真异常）。
     * 运行方式：CPATH=/opt/homebrew/include LIBRARY_PATH=/opt/homebrew/lib \
     * sbt "testOnly *<Suite> -- -DemitFst=1"（-D 放 `--` 之后）。
     * FST 源位于 build/chiselsim/&lt;Suite&gt;/&lt;behavior&gt;/&lt;test&gt;/workdir-verilator/trace.fst
@@ -189,7 +183,7 @@ object WbSimCommon {
     }
   }
 
-  // 寄存器地址与解码由接口契约定义，STATUS 不再承载完成/错误信息。
+  // 寄存器地址与解码由接口契约定义，STATUS 不承载完成/错误信息。
   val M_REG_ADDR = 0x00
   val NK_REG_ADDR = 0x01
   val A_REG_ADDR = 0x02
@@ -230,12 +224,11 @@ object WbSimCommon {
 
   // ========== MX (MXFP8 / MXFP4) 转换 helper ==========
   // 逐字镜像 Fp32.mxToFp32（src/workerbee/scala/main/Fp32.scala）的数值语义，
-  // 作为 P5 MX 用例 golden GEMM 的软件参考模型。任何偏差都会导致 golden 与
-  // 硬件失配，故本实现必须与硬件同源同语义（subnormal→0、inf/nan/overflow→
+  // 作为 MX 用例 golden GEMM 的软件参考模型。任何偏差都会导致 golden 与硬件
+  // 失配，故本实现必须与硬件同源同语义（subnormal→0、inf/nan/overflow→
   // fp32Max 保号、underflow→0、normal=sign*2^(e+scale-bias-127)*(1+m/2^mantW)）。
-  // 【Phase 0 同批泛化】硬件侧新增 noInfNan/subnormalFtz 两个编译期形参以纳入
-  // mxfp4 E2M1，本金锚【同批】镜像同款泛化（同语义、同默认实参），禁止以 RTL
-  // 行为反推拟合；fp8 默认实参组合下每一分支与泛化前逐字一致。
+  // noInfNan/subnormalFtz 两个编译期形参与硬件侧同款泛化（同语义、同默认实参）
+  // 以纳入 mxfp4 E2M1；禁止以 RTL 行为反推拟合。
 
   /** MX 元素 + E8M0 scale（8-bit 纯指数，bias 127）→ Double。
     * 与 Fp32.mxToFp32 完全一致：exp_fp32 = e + scale - bias（scale 的 127 与
@@ -266,7 +259,6 @@ object WbSimCommon {
     // fp32Max = intBitsToFloat(0x7F7FFFFF) ≈ 3.4028235e38（保号），与硬件 fp32Max 一致
     val fp32Max = java.lang.Float.intBitsToFloat(0x7F7FFFFF).toDouble
     if (subnormalFtz) {
-      // fp8（E4M3/E5M2）原路径：分支序与表达式与泛化前逐字一致
       if (isZero || isSub) 0.0
       else if (isInfNan || expSigned > 254) sign * fp32Max
       else if (expSigned < 1) 0.0
@@ -293,9 +285,9 @@ object WbSimCommon {
     mxToFloat(elem, scaleByte, expW = 5, mantW = 2, bias = 15, nanNeedMantAllOne = false)
 
   /** MX E2M1（mxfp4，exp2/mant1/bias1）+ scale → Double。
-    * 【金锚纪律】与硬件 Fp32.mxE2M1ToFp32 同批泛化、逐位同源：格式参数一律引
-    * MxFormatParams.E2M1（禁裸字面量），noInfNan=true（无 inf/nan 编码，0x7=±6.0 为
-    * 最大有限值）、subnormalFtz=false（e=0/m=1 = ±0.5 是一等公民值，不得 FTZ）。
+    * 与硬件 Fp32.mxE2M1ToFp32 逐位同源：格式参数一律引 MxFormatParams.E2M1
+    * （禁裸字面量），noInfNan=true（无 inf/nan 编码，0x7=±6.0 为最大有限值）、
+    * subnormalFtz=false（e=0/m=1 = ±0.5 是一等公民值，不得 FTZ）。
     * 幅值域 = {0, ±0.5, ±1, ±1.5, ±2, ±3, ±4, ±6}；元素真值 = 幅值 × 2^(scale-127)。
     * @param elem 元素码；仅低 4 位有效（bit3=sign），高 4 位由软件保证为 0（与硬件同约定）
     */
@@ -311,8 +303,7 @@ object WbSimCommon {
   /** 暴力编码：在 [0,256) 内挑选「非 inf/nan」的 MX 字节，使 mxToFloat(byte, 127)
     * （即 scale-free 内蕴值）最接近 f。返回的字节表示 f 的量化值；配合独立的
     * E8M0 scale，真实值 = mxToFloat(byte, scaleByte)。inf/nan 编码被排除，
-    * 从而 B 权重经 loadW 走 a 链时也不会触发 MX 转换（原 WbCvtOpMx，已随 FusionMac
-    * 重构删除、现由 FpCvt 的 mx8 cvt 承接）的 aFmt inf/nan 断言。
+    * 从而 B 权重经 loadW 走 a 链时也不会触发 MX 转换的 aFmt inf/nan 断言。
     */
   private def floatToMx(f: Double, expW: Int, mantW: Int, bias: Int,
                         nanNeedMantAllOne: Boolean): Int = {
@@ -341,7 +332,7 @@ object WbSimCommon {
   /** float → E5M2 元素字节（scale-free，即 scale=127；inf/nan 编码被排除） */
   def floatToMxE5M2(f: Double): Int = floatToMx(f, expW = 5, mantW = 2, bias = 15, nanNeedMantAllOne = false)
 
-  // ========== P2 软件参考模型：40→32 规格化 + fp32→fp16/bf16 降精度 ==========
+  // ========== 软件参考模型：40→32 规格化 + fp32→fp16/bf16 降精度 ==========
   // 与 WbOutCvt 硬件（roundUp16 / fp32ToFp16Rnd / fp32ToBf16Rnd）及
   // Fp32.fpNormalize40to32 逐位同构，作为 WbOutCvtSpec 与 outFmt 仿真用例的
   // golden 对拍模型。rnd 编码与 RoundingMode ChiselEnum 同源：
@@ -417,7 +408,7 @@ object WbSimCommon {
     val guard = ((normed >> 6) & 1).toInt
     val sticky = if ((normed & 0x3F) != 0) 1 else 0
     val roundUp = guard == 1 && (sticky == 1 || (mant23 & 1) == 1)
-    // 舍入进位与硬件同构（修复留痕）：mant23 全 1 且进位时尾数归零、指数 +1，
+    // 舍入进位与硬件同构：mant23 全 1 且进位时尾数归零、指数 +1，
     // 中间量 9 位防溢出、最终截 8 位（对应 Fp32.fpNormalize40to32 的 mantCarry/eOut）
     val mSum = mant23 + (if (roundUp) 1 else 0)
     val mantCarry = mSum >>> 23
@@ -439,9 +430,8 @@ object WbSimCommon {
     else (BigInt(s) << 39) | (BigInt(e) << 31) | (BigInt(1) << 30) | (BigInt(m) << 7)
   }
 
-  // ========== P3 C 写回密集布局公共模型（256-bit 密集拍，四套件共用） ==========
-  // 与硬件 P0-P2 新架构逐拍同源（WorkerBee calcConfig 单式 + WorkerBeeDmaWrOnly
-  // 运行期拍数解码）：
+  // ========== C 写回密集布局公共模型（256-bit 密集拍，四套件共用） ==========
+  // 与硬件逐拍同源（WorkerBee calcConfig 单式 + WorkerBeeDmaWrOnly 运行期拍数解码）：
   //   元素位宽档（DataFormat 编码，格式族集合见 object 开头常量区）：
   //     FP32/INT32/未知回落=32、FP16/BF16/INT16=16、MXE4M3/MXE5M2/INT8=8、
   //     MXE2M1/INT4=4（半字节族）；
@@ -450,12 +440,9 @@ object WbSimCommon {
   //   发拍数据 = 密集行 >> (beatCnt×cDmaExtW) 取低 cDmaExtW 位（拍内低列号在低位）；
   //   地址：cRowOff = n×outElemBytes（半字节族 = n>>1）、cColOff = totalN×outElemBytes
   //     （半字节族 = totalN>>1）、cBeatAddrStep = (cDmaExtW/elemBits)×elemBytes
-  //     （半字节族 = cDmaExtW/8）；块间跳转按张量语义绝对式 = nt×cColOff（#133：
-  //     旧「沿用 cDma sNEXT_N 三角累积闭式（金锚背书）」表述已废止——三角累积是当时
-  //     缺陷 RTL 的行为、金锚不得以其为拟合目标；RTL 与金锚现同为线性/绝对模型）。
-  // 编码 = WbEnum.DataFormat 枚举 litValue（OutFormat/DataFormat 已合并为单一
-  //   枚举，成员声明即隐式 id：0=FP32 1=FP16 2=BF16 3=MXE4M3 4=MXE5M2 5=MXE2M1
-  //   6=INT32 7=INT16 8=INT8 9=INT4）；未知编码不在任何格式族集合 → 32-bit 档回落。
+  //     （半字节族 = cDmaExtW/8）；块间跳转按张量语义绝对式 = nt×cColOff，RTL 与金锚
+  //     同为线性/绝对模型。
+  // 编码 = WbEnum.DataFormat 枚举 litValue；未知编码不在任何格式族集合 → 32-bit 档回落。
 
   /** outFmt（DataFormat 枚举）→ 元素位宽（32/16/8/4），与硬件
     * WorkerBeeCalcConfig cWriteBytes 谓词链（is4B/is2B/is1B/otherwise）同源 */
@@ -484,24 +471,22 @@ object WbSimCommon {
 
   /** 拍内地址步进（字节）。
     *
-    * 【#136-KS5 精确化订正：原「与顶层 calcConfig.cBeatAddrStep 同源」的无条件声明不成立】
-    *   金锚本式：半字节族 = cDmaExtW/8；其余 = (cDmaExtW/elemBits)×elemBytes。
-    *   RTL（WorkerBeeCalcConfig）：cBeatAddrStep = if (cWriteBytes > cDmaBytes) cDmaBytes
-    *     else cWriteBytes，其中 cWriteBytes = totalN×cEb（半字节族 = totalN/2）、
-    *     cDmaBytes = cDmaExtW/8。
-    *   ★ 结论：在【beats>1 的全部档位】两式恒等；1B 与半字节族数值分歧，但该分歧
-    *     【可证明永不可观测】。不得据此「对齐」数值（对齐会在缩位档引入真错）。
-    *   证明：beats = ceil(totalN×elemBits / cDmaExtW) > 1 ⟺ totalN×elemBits > cDmaExtW
-    *     ⟺ cWriteBytes > cDmaBytes（cWriteBytes = totalN×elemBits/8、cDmaBytes =
-    *     cDmaExtW/8，同乘 8）。故 beats>1 时 RTL 取 cDmaBytes = cDmaExtW/8，而金锚在
-    *     整字节族满足 elemBits = 8×cEb，(cDmaExtW/elemBits)×cEb = cDmaExtW/8，两式相等。
-    *     反向：WorkerBeeConfig 强制 cDmaExtW ∈ [totalN×8, totalN×32]，故 elemBits<=8 时
-    *     totalN×elemBits <= totalN×8 <= cDmaExtW ⇒ beats≡1 ⇒ 行内拍下标 b≡0 ⇒
-    *     b×step 项恒为 0，step 从不进入任何地址（数值分歧不可观测）。
-    *   分歧实例（仅记录，勿改）：cDmaExtW=256 的 1B 档金锚 32 vs RTL cWriteBytes=16；
-    *     cDmaExtW=512 的 2B 档金锚 64 vs RTL 32。cDmaExtW∈{128,512} 结论不变。
-    *   ★ 若将来放宽 cDmaExtW 下界（< totalN×8）或让 1B 族出现 beats>1，上述不可观测性
-    *     立即失效，本式必须与 RTL 同时重推 —— 届时【先改 RTL 再改金锚】，禁止反向拟合。 */
+    * 金锚本式：半字节族 = cDmaExtW/8；其余 = (cDmaExtW/elemBits)×elemBytes。
+    * RTL（WorkerBeeCalcConfig）：cBeatAddrStep = if (cWriteBytes > cDmaBytes) cDmaBytes
+    *   else cWriteBytes，其中 cWriteBytes = totalN×cEb（半字节族 = totalN/2）、
+    *   cDmaBytes = cDmaExtW/8。
+    * 两式在【beats>1 的全部档位】恒等；1B 与半字节族数值分歧，但该分歧【可证明永不
+    *   可观测】。不得据此「对齐」数值（对齐会在缩位档引入真错）。
+    * 证明：beats = ceil(totalN×elemBits / cDmaExtW) > 1 ⟺ totalN×elemBits > cDmaExtW
+    *   ⟺ cWriteBytes > cDmaBytes（同乘 8）。故 beats>1 时 RTL 取 cDmaBytes = cDmaExtW/8，
+    *   而金锚在整字节族满足 elemBits = 8×cEb，(cDmaExtW/elemBits)×cEb = cDmaExtW/8，
+    *   两式相等。反向：WorkerBeeConfig 强制 cDmaExtW ∈ [totalN×8, totalN×32]，故
+    *   elemBits<=8 时 totalN×elemBits <= totalN×8 <= cDmaExtW ⇒ beats≡1 ⇒ 行内拍下标
+    *   b≡0 ⇒ b×step 项恒为 0，step 从不进入任何地址。
+    * 分歧实例：cDmaExtW=256 的 1B 档金锚 32 vs RTL cWriteBytes=16；cDmaExtW=512 的
+    *   2B 档金锚 64 vs RTL 32；cDmaExtW∈{128,512} 结论不变。
+    * 若将来放宽 cDmaExtW 下界（< totalN×8）或让 1B 族出现 beats>1，上述不可观测性
+    *   立即失效，本式必须与 RTL 同时重推 —— 届时【先改 RTL 再改金锚】，禁止反向拟合。 */
   def cBeatAddrStep(outFmt: DataFormat.Type, cDmaExtW: Int): Long = {
     val f = outFmt.litValue.toInt
     if (FmtHalfB.contains(f)) (cDmaExtW / 8).toLong
@@ -512,24 +497,18 @@ object WbSimCommon {
     * 遍历序 nt 外 × m 中 × 行内拍内；地址由【张量语义绝对式】推导：
     *   addr(nt,m,b) = base + nt×cColOff + m×cRowOff + b×cBeatAddrStep
     *
-    * 【规范性声明（#133，勿删）】本函数是金锚（oracle）：期望值只允许由 C 的张量语义
-    * 布局推导，【禁止】以 WorkerBeeDmaWrOnly 的 RTL 行为为拟合目标。推导如下——
+    * 【规范性声明】本函数是金锚（oracle）：期望值只允许由 C 的张量语义布局推导，
+    * 【禁止】以 WorkerBeeDmaWrOnly 的 RTL 行为为拟合目标。推导如下——
     * C 为 M×N row-major，元素 cOutElemBytes 字节（半字节族两列打包一字节，故行/列
     * 步进各减半）：addr(C[i][j]) = base + j×cEb + i×(N×cEb)。写回按 n-tile 分块，
     * 第 nt 块的首列 j = nt×totalN ⇒ 块列偏移 = nt×cColOff（cColOff = totalN×cEb）；
     * 块内第 m 行 i = m ⇒ 行偏移 = m×cRowOff（cRowOff = N×cEb）；行内第 b 拍再叠
     * b×cBeatAddrStep。三项互不耦合、无轮间累积项。
     *
-    * 【历史缺陷留痕（勿回退）】本式曾写成三角累积闭式
-    *   base + nt×(M−1)×cRowOff + nt×(nt+1)/2×cColOff + m×cRowOff + b×step
-    * —— 那是对当时缺陷 RTL（sNEXT_N 用 `curAddr := curAddr + colAddr` 自增累加）的
-    * 反向拟合，使所有 nTiles≥2 用例的 dmaC 逐拍地址硬断言退化为「RTL 与其镜像自比」
-    * 而恒真假绿（FP32/N=32 下 nt=1 首址手算得 base+0xFC0，正确值应为 base+0x40）。
-    * RTL 侧已改为 `curAddr := io.regFile.cAddr + colAddr`（基址 + 轮偏移线性模型，与
-    * WorkerBeeDmaScaleWr 同构），本式随之回到张量语义绝对式。下方两条 require 是本式
-    * 的自证不变式：任何三角化回退都会在【金锚构造期】立刻炸掉（即 Scala 测试体求值、
-    * 调用本函数的时刻，早于 simulate；既非 scalac 编译期亦非 Chisel elaboration 期），
-    * 【不得注释掉】。其证伪边界（m==1 ∧ nTiles==2 的可证明盲区）见下方 require 段注释。
+    * 下方两条 require 是本式的自证不变式：任何三角累积形式都会在【金锚构造期】立刻
+    * 炸掉（即 Scala 测试体求值、调用本函数的时刻，早于 simulate；既非 scalac 编译期
+    * 亦非 Chisel elaboration 期），【不得注释掉】。其证伪边界（m==1 ∧ nTiles==2 的
+    * 可证明盲区）见下方 require 段注释。
     */
   def cAddrSeqDense(cBase: Long, m: Int, n: Int, totalN: Int, outFmt: DataFormat.Type,
                     cDmaExtW: Int): Seq[Long] = {
@@ -550,23 +529,22 @@ object WbSimCommon {
     // 三角式的二阶项 nt×(nt−1)/2×cColOff 在 nt=1 恒为 0，故 nt=1 首拍对三角化回退
     // 不敏感；必须同时钉住 nt=1 与 nt=2 两个块首拍，才能拦住「只修对第一轮」的假修复。
     //
-    // 【#136-KS1 证伪边界：m==1 ∧ nTiles==2 是三角化回退的「可证明盲区」】
+    // 证伪边界：m==1 ∧ nTiles==2 是三角化回退的「可证明盲区」。
     //   机理：三角式 = base + nt×(m−1)×rowOff + nt×(nt+1)/2×colOff + m×rowOff + b×step。
     //   m==1 时一阶项 nt×(m−1)×rowOff 恒为 0；二阶项系数 nt×(nt+1)/2 在 nt=1 恰为 1，
     //   与绝对式的 nt 系数在 nt=1 也恰为 1（两者仅在 nt>=2 才分歧：三角 3 vs 绝对 2）。
     //   而 nTiles==2 ⇒ nt 只取 {0,1} ⇒ 两式产出【逐拍完全相同】的序列，不存在任何
-    //   可区分它们的不变式（provably blind，不是「暂未想到反例」）。
+    //   可区分它们的不变式（provably blind）。
     //   可达性：WbDebugModel.validate 只要求 m>0，故 `-Dm=1 -Dn=32` 是合法配置。
-    //   ★ 声明：m==1 不在本护栏覆盖域内。要覆盖 nt=2 的二阶项必须同时满足 m>=2 且
-    //     nTiles>=3（永久护栏用例 = WorkerBeeDebugCase 组(f)：m=32, N=48）。
-    //   ★ nt=2 那条 require 的守卫【不得】为了覆盖 m==1 而放宽到 nTiles>=2：其下标
+    //   覆盖 nt=2 的二阶项必须同时满足 m>=2 且 nTiles>=3（永久护栏用例 =
+    //     WorkerBeeDebugCase 组(f)：m=32, N=48）。
+    //   nt=2 那条 require 的守卫【不得】为了覆盖 m==1 而放宽到 nTiles>=2：其下标
     //     buf(2*m*beats) 在 m==1 ∧ nTiles==2 时 = 2*beats，而序列长度恰为
-    //     nTiles*m*beats = 2*beats ⇒ IndexOutOfBoundsException，把「盲区」变成「崩溃」，
-    //     无任何诊断价值。
-    //   ★ m==1 情形改由 nt=1 那条的 `colOff > 0` 合取项兜底（下标安全性已核：
+    //     nTiles*m*beats = 2*beats ⇒ IndexOutOfBoundsException。
+    //   m==1 情形由 nt=1 那条的 `colOff > 0` 合取项兜底（下标安全性已核：
     //     nTiles>=2 ⇒ 长度 nTiles*m*beats >= 2*m*beats > m*beats，恒在界内）。
-    // 【#136-CS1 报错文案中性化】原文案把成因锁死为「三角累积回退」。若将来改动的是
-    //   遍历序或下标口径（而非闭式本身），也会以同一文案报错、导致成因误标，故补中性提示。
+    // 报错文案保持成因中性：若改动的是遍历序或下标口径（而非闭式本身），也会以同一
+    //   文案报错，故附中性提示避免成因误标。
     if (nTiles >= 2)
       require(buf(m * beats) == cBase + colOff && colOff > 0,
         f"cAddrSeqDense 自证失败：nt=1 块首拍应为 base+cColOff=0x${cBase + colOff}%X，" +
@@ -587,27 +565,21 @@ object WbSimCommon {
     buf.toSeq
   }
 
-  // ========== (#166) AXI byte lane 契约：C 写回逐拍 (addr, data, strb) lane 级审计 ==========
-  // 【为何需要】旧 TB 口径把 dmaC 写回日志记成 (addr, data) 二元组、且解析器【完全忽略
-  //   addr】：data 一律按「laneOffset=0」解释。这正是 main 侧「strb 已按 addrShiftBytes 左移、
-  //   wdata 直连低位未同源移位」缺陷能长期潜伏的原因 —— TB 与 RTL 犯了同一个错（都假设
-  //   数据在总线字低位），于是互相背书、恒真假绿。
-  // 【新口径】① 日志升级为 (addr, data, strb) 三元组；② addr 推出期望 lane 窗口，与 strb 做
+  // ========== AXI byte lane 契约：C 写回逐拍 (addr, data, strb) lane 级审计 ==========
+  // 口径：① 日志为 (addr, data, strb) 三元组；② addr 推出期望 lane 窗口，与 strb 做
   //   【双向】对账（addr→strb 期望、strb→addr 一致性，不符即报错而不静默放行）；③ 元素级
   //   解析先按 laneOffset 反移位、再按 strb 逐字节门控：只有被选通的 lane 参与数据比对，
   //   未选通 lane 不做数据断言但【必须为 0】（依据见 auditCBeatLanes 第 (3) 条）。
   // 【金锚铁律】本段全部期望值（cLaneOffset / cLanesPerBeat / cExpStrb）均由【张量语义 +
   //   AXI byte lane 契约】独立推导，不读 RTL 的 cDmaDmaBeatTar 档位、不以 RTL 行为为拟合目标。
 
-  /** dmaC write-back single-beat log triple: (addr, data, strb). [#166] Old format was
-    * (addr, data) pair -- strb was never visible to TB; the triple promotes strb to
-    * first-class citizen, enabling lane-level cross-check.
+  /** dmaC write-back single-beat log triple: (addr, data, strb). Promoting strb to a
+    * first-class citizen is what enables the lane-level cross-check.
     * scaleC channel (dmaCScale) is NOT in this contract's scope: its port width = 1 byte
     * (rowW = cScaleRowW = totalN/2 bits => totalN=16 gives rowW=8 bits=1 byte) => the
     * lane window degenerates to a single lane, shift is always 0, data/strb mismatch is
     * structurally impossible. It is not "exempt from the contract" -- the contract
-    * trivially degenerates on a single-lane port. (#170-W3: corrected from the old
-    * rationale "strb is constant full-select" which was factually wrong for totalN>=32.) */
+    * trivially degenerates on a single-lane port. */
   type CWriteBeat = (Long, BigInt, BigInt)
 
   /** 总线字字节数 = 一个 beat 覆盖的 byte lane 数 */
@@ -623,7 +595,7 @@ object WbSimCommon {
     *   行内第 beatInRow 拍覆盖字节区间 [beatInRow×dmaBytes, cWriteBytes) ∩ 一个总线字
     *   ⟹ lanes = clamp(cWriteBytes - beatInRow×dmaBytes, 0, dmaBytes)。
     * 单拍满档（beats=1）与 beats>1 的均分档均与上式一致；beatInRow 默认 0。
-    * 【备注】若将来出现 cWriteBytes 不是 dmaBytes 整数倍的配置（当前 totalN∈{16,32} ×
+    * 若将来出现 cWriteBytes 不是 dmaBytes 整数倍的配置（当前 totalN∈{16,32} ×
     *   elemBits∈{4,8,16,32} 下 cWriteBytes∈{8,16,32,64,128}，永不部分占用），本式会给出
     *   比 RTL 固定档位更窄的末拍 lanes ⟹ 报 STRB-MISMATCH，那是【既有「strb 档位不按
     *   N 尾数细化」缺陷族的真阳性】，不得反向拟合金锚去迁就它。 */
@@ -647,7 +619,7 @@ object WbSimCommon {
   /** Single-beat lane-level audit. Returns violation messages (empty = all green).
     * All messages are ASCII English.
     *
-    * PRECONDITION (W9): The caller MUST independently hard-assert that `addr` equals
+    * PRECONDITION: The caller MUST independently hard-assert that `addr` equals
     *   the golden-anchor expected address for this beat index (e.g. via expCAddrSeq).
     *   This function derives lane offsets from the supplied `addr`; if addr itself is
     *   wrong, the derived expectations are meaningless. The function does NOT validate
@@ -656,16 +628,16 @@ object WbSimCommon {
     * Four violation kinds (each with its RTL-independent derivation):
     *  (1) STRB-OVERFLOW: laneOffset + lanes > dmaBytes => strb left-shift truncated
     *      by bus-word width, data high bits pushed out. This beat necessarily loses
-    *      data. Belongs to the existing "strb granularity does not refine by N
-    *      remainder" defect family (#166 scope-out), but must not silently pass.
-    *      (W8) OVERFLOW takes priority over MISMATCH -- they are mutually exclusive:
+    *      data. Belongs to the "strb granularity does not refine by N
+    *      remainder" defect family, which is out of scope here but must not silently pass.
+    *      OVERFLOW takes priority over MISMATCH -- they are mutually exclusive:
     *      when overflow occurs, the expected strb is itself unrepresentable in
     *      dmaBytes bits, so MISMATCH is a tautological consequence, not independent
     *      information.
     *  (2) STRB-MISMATCH: addr-derived expected lane window differs from actual strb
     *      bit-by-bit. Bidirectional cross-check: catches both "strb not shifted"
     *      (lanes stuck at lane0) and "strb shifted by wrong amount".
-    *      Only reported when OVERFLOW does NOT fire (W8 mutual exclusion).
+    *      Only reported when OVERFLOW does NOT fire (mutual exclusion).
     *  (3) UNSEL-NONZERO: non-zero byte on an unselected lane. Derivation (tensor
     *      semantics, not RTL fitting): dense row carries only low totalN*elemBits
     *      bits of data, everything above is zero-fill (elemsToDenseRow contract,
@@ -680,7 +652,7 @@ object WbSimCommon {
     * Each kind reports at most capPerKind detail messages per beat (prevents log
     * explosion); excess is summarized by count.
     *
-    * NOTE (W8): `violationCount` (the size of the returned Seq) serves ONLY as a
+    * NOTE: `violationCount` (the size of the returned Seq) serves ONLY as a
     *   red/green threshold, NOT as a quantitative metric of "how many independent
     *   defects exist". A single misconfigured beat can produce multiple messages
     *   across kinds; conversely, OVERFLOW suppresses MISMATCH to avoid double-count. */
@@ -722,14 +694,14 @@ object WbSimCommon {
     bad.toSeq
   }
 
-  /** (#166) 密集拍解析 + lane 级审计的汇总结果。
+  /** 密集拍解析 + lane 级审计的汇总结果。
     * @param matrix        还原出的 m×n 元素位模式矩阵（仅选通 lane 写入）
     * @param violations    全部 lane 级违规消息（空 = 全绿）
     * @param beats         实收拍数
     * @param lanesSelected 被 strb 选通的 byte lane 总数（参与数据比对）
     * @param lanesExempt   未选通的 byte lane 总数（不做数据断言，但已校验其为 0）
     * @param elemsWritten  实际写入矩阵的元素数
-    * @param elemsUnsel    因 strb 未选通而豁免的元素数（#166 前会被当成有效数据误写）
+    * @param elemsUnsel    因 strb 未选通而豁免的元素数
     * @param elemsPad      因 globalCol >= n（列 padding）而豁免的元素数 */
   final case class DenseCParse(matrix: Array[Array[Long]], violations: Seq[String],
                                beats: Int, lanesSelected: Int, lanesExempt: Int,
@@ -745,7 +717,7 @@ object WbSimCommon {
 
   /** 256-bit 密集拍 → cResult 元素矩阵公共解析器（四套件共用，杜绝复制粘贴共模错误）。
     *
-    * 【#166 升级：strb 逐字节校验口径】输入 = dmaC 写回日志三元组 (addr, data, strb)，
+    * 输入 = dmaC 写回日志三元组 (addr, data, strb)，
     * 按硬件发出顺序（必为 nt 外 × m 中 × 行内拍内）。每拍处理三步：
     *   ① lane 级审计 auditCBeatLanes（addr↔strb 双向对账 + 未选通 lane 零填充核查，
     *     expDataAt 给出时再加选通 lane 的逐字节数据比对）；
@@ -758,13 +730,12 @@ object WbSimCommon {
     * 返回原始元素位模式（fp32=32-bit bits、16-bit 族=16-bit、8-bit 族=量化码/字节、
     * 半字节族=4-bit 码），数值解释归各套件既有对拍逻辑（v1 数值锚布局无关）。
     *
-    * 【附带修掉的潜伏粗糙】旧实现只按 `globalCol < n` 门控、不按 tile 边界门控：
-    * MXE2M1（elemsPerBeat=64 > totalN=16）下 nt=0 那拍的 i=16..31 会写到属于 nt=1 的列，
-    * 靠后续 nt=1 的拍覆盖而侥幸正确。新的 strb 门控（lanes=8 ⟹ 仅 i=0..15 被选通）
-    * 从语义上直接拦掉了越 tile 写入。
+    * 【附带的越 tile 拦截】strb 门控（lanes=8 ⟹ 仅 i=0..15 被选通）从语义上拦掉越 tile
+    * 写入：MXE2M1（elemsPerBeat=64 > totalN=16）下 nt=0 那拍的 i=16..31 若只按
+    * `globalCol < n` 门控，会写到属于 nt=1 的列。
     *
     * @param expBeats  Expected beat count (= nTiles*m*beatsPerRow); checked as BEAT-COUNT
-    * @param expElems  (#170-W6) Expected number of elements written to the matrix (= m*n
+    * @param expElems  Expected number of elements written to the matrix (= m*n
     *                  for a fully covered dense output). When provided and elemsWritten
     *                  does not match, an ELEMS-WRITTEN violation is appended. This closes
     *                  the gap where #166 treated elemsWritten as diagnostic-only while
@@ -772,7 +743,7 @@ object WbSimCommon {
     * @param expDataAt Golden expected data function (beatIdx -> expected data with lane
     *                  offset already applied); enables selected-lane byte-wise comparison
     *
-    * PRECONDITION (W9): The `addr` field of each CWriteBeat in `log` MUST have been
+    * PRECONDITION: The `addr` field of each CWriteBeat in `log` MUST have been
     *   independently hard-asserted against the golden expected address sequence (e.g.
     *   expCAddrSeq) by the caller BEFORE or ALONGSIDE calling this function. The internal
     *   reverse-shift `data >> (laneOffset * 8)` derives laneOffset from addr; if addr is
@@ -822,7 +793,7 @@ object WbSimCommon {
       if (log.size != eb)
         bad += s"BEAT-COUNT hw=${log.size} exp=$eb (nTiles=$nTiles m=$m beatsPerRow=$beatsPerRow)"
     }
-    // (#170-W6) Element count assertion: elemsWritten must equal m*n for a fully
+    // Element count assertion: elemsWritten must equal m*n for a fully
     //   covered dense output. Catches "fewer writes -> green" (e.g. strb gating
     //   silently skipping elements that should have been written).
     expElems.foreach { ee =>
@@ -833,9 +804,8 @@ object WbSimCommon {
   }
 
   /** 兼容口径：只要矩阵、不要审计汇总。
-    * 【#166 注意】本函数仍会跑完整 lane 审计（内部走 Checked）但【丢弃违规消息】。
-    * 新代码请直接用 parseDenseCWriteLogChecked 并把 violations 折入失败判定，
-    * 否则 lane 级缺陷会重蹈「静默放行」覆辙。 */
+    * 本函数仍会跑完整 lane 审计（内部走 Checked）但【丢弃违规消息】；新代码请直接用
+    * parseDenseCWriteLogChecked 并把 violations 折入失败判定，否则 lane 级缺陷会被静默放行。 */
   def parseDenseCWriteLog(log: Seq[CWriteBeat], outFmt: DataFormat.Type, m: Int, n: Int,
                           totalN: Int, cDmaExtW: Int): Array[Array[Long]] =
     parseDenseCWriteLogChecked(log, outFmt, m, n, totalN, cDmaExtW).matrix
@@ -858,7 +828,7 @@ object WbSimCommon {
     row
   }
 
-  /** 期望发拍数据（【#166】已引入按地址的 lane 偏移语义）：
+  /** 期望发拍数据（含按地址的 lane 偏移语义）：
     *   ① 密集行按总线位宽右移取段（与 WrOnly 发拍表达式同源：
     *      seg = lineData >> (beatCnt×cDmaExtW) 取低 cDmaExtW 位）；
     *   ② 再按 laneOffsetBytes ×8 左移，把本拍数据放到它在总线字内【应在的 byte lane】上
@@ -877,7 +847,7 @@ object WbSimCommon {
   /** fp32 bit 模式 → Float（数值对拍便捷函数，等价 fp32BitsToFloat） */
   def bitsToFp32(bits: Long): Float = fp32BitsToFloat(bits)
 
-  // ========== P3a 软件参考模型：MX 量化（共享 E8M0 scale + 目标格式舍入） ==========
+  // ========== 软件参考模型：MX 量化（共享 E8M0 scale + 目标格式舍入） ==========
   // 独立推导期望（不抄硬件实现结构）：量化语义由「块共享 scale 约束式」出发重建：
   //   amax = 1.f × 2^(E-127)，约束 amax ≤ maxFinite × 2^(s-127)，其中
   //   maxFinite = maxMantVal × 2^(maxCodeExp-bias)；展开得 s = E_eff + bias - maxCodeExp
@@ -926,11 +896,10 @@ object WbSimCommon {
     * 溢出饱和最大有限值（保号）、低于最小正规格化保号 ±0（无次正规）、
     * inf→饱和、nan→目标编码（E2M1 无 nan 编码裁定饱和）、零→±0。
     *
-    * @param emitSub (#151 F4) 是否产出【次正规码】。true 仅在 fmt=MXE2M1 时由 swQuantBlock
+    * @param emitSub 是否产出【次正规码】。true 仅在 fmt=MXE2M1 时由 swQuantBlock
     *        传入，与 RTL 侧 WbOutCvt.quantElem 的同名形参【一一对称】。
     *        OCP MX 规范把 E2M1 的 (e=0,m=1) 定义为 0.m × 2^(1-bias) = ±0.5，是合法可编码值
-    *        （E2M1 值集 ±{0,0.5,1,1.5,2,3,4,6}）；原实现 eTgt<1 一律冲刷保号零 ⟹ 码 0x1/0x9
-    *        永不发射。E4M3/E5M2 是否同步放开属独立待裁项，本轮【不扩大范围】。 */
+    *        （E2M1 值集 ±{0,0.5,1,1.5,2,3,4,6}）；E4M3/E5M2 不开此臂。 */
   def swQuantElem(bits: Long, s: Int, rnd: Int, expW: Int, mantW: Int, bias: Int,
                   maxNormalExp: Int, satCode: Int, nanCode: Int,
                   nanToSat: Boolean, fixNanCode: Boolean,
@@ -947,18 +916,16 @@ object WbSimCommon {
       return signPart | (if (nanToSat) satCode else nanCode)  // nan → 目标编码（E2M1 裁定饱和）
     }
     val eTgt = e + bias - s                                   // ÷2^(s-127) ⟺ 目标偏置指数 = e + bias - s
-    // ----------------------------------------------------------------------
-    // (#151 F4) OCP MX 次正规产出臂（仅 E2M1）——与 RTL WbOutCvt.quantElem 的
+    // OCP MX 次正规产出臂（仅 E2M1）——与 RTL WbOutCvt.quantElem 的
     //   subKeep/subGuard/subSticky/subUp/subRnd/subCarry/subCode 逐行对称。
     //   设 y = |x|/S = 1.f × 2^(eTgt-1)，f = 0.m（23 位）。次正规区覆盖两个 binade：
     //     eTgt =  0 → y ∈ [0.5, 1.0)  网格 {0.5, 1.0}  中点 0.75   shift = 1
     //     eTgt = -1 → y ∈ [0.25, 0.5) 网格 {0,   0.5}  中点 0.25   shift = 2
-    //     eTgt ≤ -2 → y < 0.25       幅值对称模式(RNE/RTZ/RMM) → ±0；定向模式见下方 F4-b 臂
+    //     eTgt ≤ -2 → y < 0.25       幅值对称模式(RNE/RTZ/RMM) → ±0；定向模式见下方臂
     //   shift=1: keep = 1(原隐含位), guard = m 的 bit22,   sticky = m 的 bit21..0 是否非零
     //   shift=2: keep = 0,           guard = 1(原隐含位),  sticky = m 是否非零
     //   进位（keep+up == 2）⟹ 溢出到最小正规值 1.0 = 码 (e=1, m=0)。
     //   swRoundUp 与正规臂【同一函数】⟹ RNE/RTZ/RDN/RUP/RMM 五模式自动一致、无双源。
-    // ----------------------------------------------------------------------
     if (emitSub && (eTgt == 0 || eTgt == -1)) {
       require(expW == 2 && mantW == 1,
         "swQuantElem(emitSub=true): the subnormal arm is derived for E2M1 ONLY " +
@@ -974,17 +941,15 @@ object WbSimCommon {
       if (subRnd >= 2) return signPart | (1 << mantW)         // 进位 → 码 (e=1,m=0) = 1.0
       return signPart | subRnd                                // 码 (e=0,m=subRnd)：0 → ±0，1 → ±0.5
     }
-    // ----------------------------------------------------------------------
-    // (#151 F4-b) 定向舍入【深下溢】进位臂（仅 E2M1）——与 RTL WbOutCvt.quantElem 的
+    // 定向舍入【深下溢】进位臂（仅 E2M1）——与 RTL WbOutCvt.quantElem 的
     //   dirAway/deepSel/deepCode 逐行对称。IEEE-754 roundTowardNegative/roundTowardPositive
     //   的定义是「取不超过 / 不低于 x 的【最接近】可表示值」，它不是幅值截断 ⟹ 对任意非零 x，
     //   只要定向把幅值推离零，结果就必须是最小非零可表示值 ±0.5 = 码 (e=0,m=1)，不是保号零：
     //     RDN(2) 且 sg=1（x<0）→ -0.5·S      RUP(3) 且 sg=0（x>0）→ +0.5·S
     //   RNE/RTZ/RMM 三个幅值对称模式在 y'<0.25 时归零是正确的（0 比 0.5 更近 / 截断 /
-    //   最近-ties-away）⟹ dirAway=false ⟹ 本臂不介入，码流与本臂加入前【逐位相同】。
+    //   最近-ties-away）⟹ dirAway=false ⟹ 本臂不介入。
     //   注：此处 e==0(±0/fp32 次正规) 与 e==255(inf/nan) 已在上方提前返回 ⟹ 到达本臂的
     //   必为非零有限 fp32 正规值，与 RTL 侧 !isZero && !isInf && !isNan 的守卫等价。
-    // ----------------------------------------------------------------------
     if (emitSub && eTgt <= -2) {
       require(expW == 2 && mantW == 1,
         "swQuantElem(emitSub=true) deep-underflow directed-rounding arm: derived for E2M1 " +
@@ -1014,8 +979,7 @@ object WbSimCommon {
 
   /** 整行量化参考：输入为已经 40→32 规格化的 fp32 bits 行（与硬件两级舍入链同链），
     * 返回 (逐元素量化码, 每 8 元素组 1 字节的 scale 序列)。blkSel：0=16/1=32
-    * （【#144】MXBlockSize 收窄后新枚举 {M16=0, M32=1}；旧 0=8/1=16/2=32/3=64 已废）；
-    * 列 ≥ nEff 为 padding：不进 amax、元素码输出 0。 */
+    * （MXBlockSize 枚举 {M16=0, M32=1}）；列 ≥ nEff 为 padding：不进 amax、元素码输出 0。 */
   def swQuantBlock(normFp32s: Seq[Long], rnd: Int, fmt: DataFormat.Type, blkSel: Int, nEff: Int): (Seq[Int], Seq[Int]) = {
     val p = quantFmtParams(fmt)
     // maxNormalExp 与 maxCodeExp 共用 MxFormatParams 单字段（三格式取值恰一致）
@@ -1031,17 +995,15 @@ object WbSimCommon {
     def merge(s: Seq[Long]): Seq[Long] =
       s.grouped(2).map(p => if (p.size == 2) maxMag(p) else p.head).toSeq
     val l16 = merge(groups); val l32 = merge(l16); val l64 = merge(l32)
-    // 【#144】blkSel 新枚举：0→block16(l16)、1→block32(l32)。旧 0=8(groups)/3=64(l64) 档已随枚举删除；
-    //   groups/l64 仍保留供 merge 链构造（l16=merge(groups)），不再作为可选块档。
+    // blkSel：0→block16(l16)、1→block32(l32)；groups/l64 仅供 merge 链构造
+    //   （l16=merge(groups)），不作为可选块档。
     def amaxOf(i: Int): Long = blkSel match {
       case 0 => l16(i / 16)
       case _ => l32(i / 32)
     }
     def scaleOf(amax: Long): Int = swBlockScale(amax, maxCodeExp, bias, maxMant23)
-    // (#151 F4) 次正规产出开关：仅 MXE2M1 打开，与 RTL 侧 WbOutCvt 中「q2Seq 是唯一传
-    //   emitSub=true 的例化点」严格对称。E4M3/E5M2 恒 false ⟹ 金锚这两路的码流与 #151
-    //   之前【逐位相同】。本行是 swQuantBlock 在 #151 的唯一新增；blkSel/amax 层级/
-    //   scaleBytes 分组/padding 掩码语义一字未动。
+    // 次正规产出开关：仅 MXE2M1 打开，与 RTL 侧 WbOutCvt 中「q2Seq 是唯一传
+    //   emitSub=true 的例化点」严格对称；E4M3/E5M2 恒 false。
     val emitSubFmt: Boolean = fmt.litValue.toInt == FmtMxE2M1
     val codes = normFp32s.zipWithIndex.map { case (b, i) =>
       if (i >= nEff) 0                                        // padding 列输出 0（不参与量化）
@@ -1050,7 +1012,7 @@ object WbSimCommon {
         emitSub = emitSubFmt)
     }
     val scaleBytes = (0 until n / 8).map { g =>
-      // 【#144】每 8 元素组 g 输出 1 字节 scale，取所属块的 amax：block16→l16(g/2)、block32→l32(g/4)。
+      // 每 8 元素组 g 输出 1 字节 scale，取所属块的 amax：block16→l16(g/2)、block32→l32(g/4)。
       val amax = blkSel match {
         case 0 => l16(g / 2)
         case _ => l32(g / 4)
@@ -1161,11 +1123,10 @@ trait WbStatusPollApi extends chisel3.simulator.PeekPokeAPI {
   *    Verilog 预处理 define（见 svsim.verilator.Backend.defineFlags），
   *    产物同位 workdir-verilator/trace.fst；
   *  - 仿 Cli.EmitVcd 语义用 addOption 注册 `-DemitFst=[1,true]` flag，
-  *    仅置 simulationSettings.enableWavesAtTimeZero=true：不带开关时波形
-  *    关闭、行为与迁移前 VCD 默认一致（EmitVcd 的 updateBackendSettings
-  *    在 traceStyle 已设时不覆盖，故与 -DemitVcd 共存亦不冲突）；
-  *    注意语义漂移：混入本 trait 后 `-DemitVcd=1` 仍会开启波形 dump，
-  *    但产物为 trace.fst（非 .vcd），请改用 `-DemitFst=1`；
+  *    仅置 simulationSettings.enableWavesAtTimeZero=true：不带开关时波形关闭
+  *    （EmitVcd 的 updateBackendSettings 在 traceStyle 已设时不覆盖，故与
+  *    -DemitVcd 共存不冲突）；注意语义漂移：混入本 trait 后 `-DemitVcd=1` 仍会
+  *    开启波形 dump，但产物为 trace.fst（非 .vcd），请改用 `-DemitFst=1`；
   *  - 环境硬约束：Verilator 5.050 的 FST writer 无条件依赖 lz4 头文件，
   *    ChiselSim 不暴露 -CFLAGS 注入口，运行 sbt 前必须设置
   *    CPATH=/opt/homebrew/include LIBRARY_PATH=/opt/homebrew/lib，
@@ -1205,10 +1166,6 @@ trait WbFstSim { this: HasCliOptions =>
   *
   * 与 WbFstSim 的差异：WbFstSim 需显式传 -DemitFst=1 才 dump；本 trait
   * 无条件 enableWavesAtTimeZero=true，仍注册 emitFst 键仅为命令行兼容。
-  *
-  * 迁移记录（taskId=143）：原定义于 WorkerBeeParamDebugSpec.scala（该文件已被
-  * 用户删除），因 WorkerBeeQuickSpec 仍依赖，逐字迁移至本公共文件；原文件
-  * HEAD 版本见 git show HEAD:src/workerbee/scala/test/WorkerBeeParamDebugSpec.scala。
   */
 trait WbAlwaysFstSim { this: HasCliOptions =>
   implicit val fstSimulator: HasSimulator =
