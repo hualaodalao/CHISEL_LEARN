@@ -39,11 +39,14 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
     private class Driver(dut: QueenDsaDecoder, cfg: QueenConfig) {
         private val ports = Vector(dut.io.gemm, dut.io.dma, dut.io.scheduler)
         private val endpoints = Vector(0, 1, 3)
-        private val depths = Vector(cfg.gemmQueueDepth, cfg.dmaQueueDepth, cfg.schedQueueDepth)
-        private val queues = Vector.fill(3)(mutable.Queue.empty[Vector[Option[Command]]])
+        private val ringDepth = cfg.cmdRingDepth
+        private val entries = mutable.HashMap.empty[BigInt, Vector[Option[Command]]]
+        private val sched = mutable.Queue.empty[Vector[Option[Command]]]
+        private var writePtr = BigInt(0)
+        private var gemmCursor = BigInt(0)
+        private var dmaCursor = BigInt(0)
         private var pending = Vector.fill[Option[Command]](cfg.instructionLanes)(None)
-        private var buffered: Option[Vector[Option[Command]]] = None
-        private var stalled = Vector.fill[Option[Vector[(Boolean, BigInt, BigInt, BigInt)]]](3)(None)
+        private var held = Vector.fill(3)(Option.empty[Vector[(Boolean, BigInt, BigInt, BigInt)]])
         val empty: Vector[Option[Command]] = Vector.fill(cfg.instructionLanes)(None)
         var lastOutput = Vector.fill(3)(Vector.empty[(BigInt, BigInt, BigInt)])
         var lastMask = Vector.fill(3)(Vector.fill(cfg.instructionLanes)(false))
@@ -58,13 +61,25 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
         dut.clock.step(2)
         dut.reset.poke(false.B)
 
+        private def maskOf(packet: Vector[Option[Command]], e: Int): Vector[Option[Command]] =
+            packet.map(_.filter(_.endpoint == endpoints(e)))
+
+        private def ringHead(cursor: BigInt): Option[Vector[Option[Command]]] =
+            if (cursor == writePtr) None else Some(entries(cursor % ringDepth))
+
+        private def hasRingLane(packet: Vector[Option[Command]], e: Int): Boolean =
+            maskOf(packet, e).exists(_.nonEmpty)
+
         def offer(commands: (Int, Command)*): Vector[Option[Command]] = {
             require(commands.map(_._1).distinct.size == commands.size)
             commands.foldLeft(empty) { case (lanes, (i, command)) => lanes.updated(i, Some(command)) }
         }
 
+        private var cycleNo = 0
+
         def cycle(offered: Vector[Option[Command]] = empty,
                   ready: Vector[Boolean] = Vector(false, false, false)): Vector[Boolean] = {
+            cycleNo += 1
             for (i <- 0 until cfg.instructionLanes) {
                 dut.io.inst(i).valid.poke(offered(i).nonEmpty.B)
                 dut.io.inst(i).bits.poke(offered(i).map(_.inst).getOrElse(BigInt(0)).U)
@@ -75,49 +90,85 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
             }
             ports.zip(ready).foreach { case (port, value) => port.ready.poke(value.B) }
 
-            val snapshots = ports.map { port =>
-                port.bits.map { entry =>
-                    (entry.valid.peek().litToBoolean, entry.bits.inst.peek().litValue,
-                        entry.bits.rs1.peek().litValue, entry.bits.rs2.peek().litValue)
+            val gemmHead = ringHead(gemmCursor)
+            val dmaHead = ringHead(dmaCursor)
+            val schedHead = sched.headOption
+            val heads = Vector(gemmHead.map(maskOf(_, 0)), dmaHead.map(maskOf(_, 1)),
+                schedHead.map(maskOf(_, 2)))
+            val presenting = heads.map(_.exists(_.exists(_.nonEmpty)))
+
+            for (e <- 0 until 3) {
+                val port = ports(e)
+                port.valid.expect(presenting(e).B)
+                heads(e).filter(_ => presenting(e)).foreach { packet =>
+                    packet.zip(port.bits).zipWithIndex.foreach { case ((command, lane), i) =>
+                        val actual = (lane.bits.inst.peek().litValue, lane.bits.rs1.peek().litValue,
+                            lane.bits.rs2.peek().litValue)
+                        withClue(s"cycle=$cycleNo port=$e lane=$i " +
+                            s"expected=${command.map(_.payload)} actual=$actual ") {
+                            lane.valid.peek().litToBoolean shouldBe command.nonEmpty
+                            command.foreach(c => actual shouldBe c.payload)
+                        }
+                    }
+                }
+                val snapshot = port.bits.map { lane =>
+                    (lane.valid.peek().litToBoolean, lane.bits.inst.peek().litValue,
+                        lane.bits.rs1.peek().litValue, lane.bits.rs2.peek().litValue)
                 }.toVector
-            }
-            lastOutput = snapshots.zip(queues).map { case (entries, queue) =>
-                if (queue.nonEmpty) entries.collect { case (true, inst, rs1, rs2) => (inst, rs1, rs2) }
-                else Vector.empty
-            }
-            lastMask = snapshots.zip(queues).map { case (entries, queue) =>
-                if (queue.nonEmpty) entries.map(_._1) else Vector.fill(cfg.instructionLanes)(false)
-            }
-            for (e <- 0 until 3) {
-                ports(e).valid.expect(queues(e).nonEmpty.B)
-                stalled(e).foreach { expected => snapshots(e) shouldBe expected }
-                if (queues(e).nonEmpty) {
-                    val expected = queues(e).front
-                    lastMask(e) shouldBe expected.map(_.nonEmpty)
-                    lastOutput(e) shouldBe expected.flatten.map(_.payload)
-                    lastOutput(e).size should be > 0
+                if (presenting(e) && !ready(e)) {
+                    held(e).foreach(previous => snapshot shouldBe previous)
+                    held = held.updated(e, Some(snapshot))
+                } else {
+                    held = held.updated(e, None)
                 }
-                stalled = stalled.updated(e, if (queues(e).nonEmpty && !ready(e)) Some(snapshots(e)) else None)
+                lastMask = lastMask.updated(e, snapshot.map(_._1))
+                lastOutput = lastOutput.updated(e,
+                    snapshot.collect { case (true, inst, rs1, rs2) => (inst, rs1, rs2) })
             }
 
-            val allReady = queues.zip(depths).forall { case (queue, depth) => queue.size < depth }
-            dut.io.inst.foreach(_.ready.expect(allReady.B))
-            val accepted = offered.map(_.nonEmpty && allReady)
-            val returning = if (pending.exists(_.nonEmpty)) Some(pending) else None
-            val outgoing = buffered.orElse(returning)
+            val gemmAdvance = gemmHead.exists(p => !hasRingLane(p, 0) || ready(0))
+            val dmaAdvance = dmaHead.exists(p => !hasRingLane(p, 1) || ready(1))
+            val schedFire = schedHead.nonEmpty && ready(2)
+            val gemmFire = gemmHead.exists(hasRingLane(_, 0)) && ready(0)
+            val dmaFire = dmaHead.exists(hasRingLane(_, 1)) && ready(1)
 
-            for (e <- 0 until 3) {
-                if (ready(e) && queues(e).nonEmpty) {
-                    outputCount += queues(e).dequeue().flatten.size
-                }
-                if (allReady) outgoing.foreach { packet =>
-                    val batch = packet.map(_.filter(_.endpoint == endpoints(e)))
-                    if (batch.exists(_.nonEmpty)) queues(e).enqueue(batch)
+            val pendingRing = pending.exists(_.exists(c => c.endpoint == 0 || c.endpoint == 1))
+            val pendingSched = pending.exists(_.exists(_.endpoint == 3))
+            val gemmNext = gemmCursor + (if (gemmAdvance) 1 else 0)
+            val dmaNext = dmaCursor + (if (dmaAdvance) 1 else 0)
+            val nextCommit = gemmNext.min(dmaNext)
+            val ringReady = writePtr + (if (pendingRing) 1 else 0) - nextCommit < BigInt(ringDepth)
+            val schedNext = sched.size + (if (pendingSched) 1 else 0) - (if (schedFire) 1 else 0)
+            val schedReady = schedNext < 1
+
+            val accepted = Vector.tabulate(cfg.instructionLanes) { i =>
+                offered(i) match {
+                    case Some(command) =>
+                        val canAccept = command.endpoint match {
+                            case 3 => schedReady
+                            case 2 => false
+                            case _ => ringReady
+                        }
+                        dut.io.inst(i).ready.expect(canAccept.B)
+                        canAccept
+                    case None => false
                 }
             }
-            if (allReady) buffered = if (buffered.nonEmpty) returning else None
-            else if (buffered.isEmpty) buffered = returning
-            else returning shouldBe None
+
+            if (gemmFire) outputCount += maskOf(gemmHead.get, 0).flatten.size
+            if (dmaFire) outputCount += maskOf(dmaHead.get, 1).flatten.size
+            if (schedFire) outputCount += maskOf(schedHead.get, 2).flatten.size
+            if (gemmAdvance) gemmCursor += 1
+            if (dmaAdvance) dmaCursor += 1
+            if (schedFire) sched.dequeue()
+            if (pendingRing) {
+                entries(writePtr % ringDepth) = pending
+                writePtr += 1
+            }
+            if (pendingSched) {
+                sched.enqueue(maskOf(pending, 2))
+            }
+            sched.size should be <= 1
             pending = offered.zip(accepted).map { case (command, fire) => if (fire) command else None }
             acceptedCount += accepted.count(identity)
             dut.clock.step()
@@ -126,21 +177,23 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
         def drain(): Unit = {
             var cycles = 0
-            while ((pending.exists(_.nonEmpty) || buffered.nonEmpty || queues.exists(_.nonEmpty)) && cycles < 100) {
+            while ((pending.exists(_.nonEmpty) || sched.nonEmpty || writePtr != gemmCursor ||
+                writePtr != dmaCursor) && cycles < 200) {
                 cycle(ready = Vector(true, true, true))
                 cycles += 1
             }
-            pending shouldBe empty
-            buffered shouldBe None
-            queues.foreach(_.isEmpty shouldBe true)
+            pending.forall(_.isEmpty) shouldBe true
+            writePtr shouldBe gemmCursor
+            writePtr shouldBe dmaCursor
+            sched.isEmpty shouldBe true
             outputCount shouldBe acceptedCount
         }
     }
 
     behavior of "QueenDsaDecoder"
 
-    it should "keep sparse lane masks and input batch boundaries in each Queue entry" in {
-        val cfg = QueenConfig(gemmQueueDepth = 3)
+    it should "keep sparse lane masks and input batch boundaries in each ring slot" in {
+        val cfg = QueenConfig(cmdRingDepth = 3)
         simulate(new QueenDsaDecoder(cfg)) { dut =>
             val d = new Driver(dut, cfg)
             d.cycle(d.offer(0 -> write2(0, 1), 3 -> write2(0, 2))) shouldBe
@@ -158,7 +211,7 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
     }
 
     it should "pair back-to-back instructions with next-cycle operands on the same lane" in {
-        val cfg = QueenConfig(gemmQueueDepth = 3, dmaQueueDepth = 2, schedQueueDepth = 2)
+        val cfg = QueenConfig(cmdRingDepth = 2)
         simulate(new QueenDsaDecoder(cfg)) { dut =>
             val d = new Driver(dut, cfg)
             for ((endpoint, index) <- Vector(0, 1, 3, 0, 1, 3).zipWithIndex) {
@@ -184,27 +237,38 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
         }
     }
 
-    for ((blocker, index) <- Vector(0, 1, 3).zipWithIndex) {
-        it should s"stop all lanes when endpoint $blocker is full and retain next-cycle operands" in {
-            val cfg = QueenConfig(gemmQueueDepth = 1, dmaQueueDepth = 1, schedQueueDepth = 1)
-            simulate(new QueenDsaDecoder(cfg)) { dut =>
-                val d = new Driver(dut, cfg)
-                val others = Vector(0, 1, 3).filterNot(_ == blocker)
-                d.cycle(d.offer((0 until 4).map(i => i -> write2(blocker, i)): _*)) shouldBe
-                    Vector.fill(4)(true)
-                val returning = d.offer((0 until 4).map(i => i -> write2(others(i % 2), 10 + i)): _*)
-                d.cycle(returning) shouldBe Vector.fill(4)(true)
-                val offered = d.offer((0 until 4).map(i => i -> write2(Vector(0, 1, 3)(i % 3), 100 + i)): _*)
-                for (_ <- 0 until 3) {
-                    d.cycle(offered) shouldBe Vector.fill(4)(false)
-                    d.lastOutput.zipWithIndex.foreach { case (commands, e) =>
-                        if (e != index) commands shouldBe empty
-                    }
-                }
-                d.cycle(offered, Vector.tabulate(3)(_ == index)) shouldBe Vector.fill(4)(false)
-                d.cycle(offered) shouldBe Vector.fill(4)(true)
-                d.drain()
-            }
+    it should "pack a whole batch into one ring slot and keep SCHED flowing while the ring is full" in {
+        val cfg = QueenConfig(cmdRingDepth = 2)
+        simulate(new QueenDsaDecoder(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            d.cycle(d.offer((0 until 4).map(i => i -> write2(0, i)): _*)) shouldBe Vector.fill(4)(true)
+            d.cycle(d.offer((0 until 4).map(i => i -> write2(1, 10 + i)): _*)) shouldBe Vector.fill(4)(true)
+            // Both GEMM and DMA slots are live, so only the SCHED bypass can be accepted.
+            d.cycle(d.offer(0 -> write2(0, 20), 3 -> write2(3, 30))) shouldBe
+                Vector(false, false, false, true)
+            // GEMM drains its slot this cycle, so its slot is reusable in the same cycle.
+            d.cycle(d.offer(0 -> write2(0, 21)), Vector(true, false, false)) shouldBe
+                Vector(true, false, false, false)
+            d.drain()
+        }
+    }
+
+    it should "keep GEMM flowing while a DMA packet holds the ring head" in {
+        val cfg = QueenConfig(cmdRingDepth = 4)
+        simulate(new QueenDsaDecoder(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            d.cycle(d.offer(0 -> write2(1, 1))) shouldBe Vector(true, false, false, false)
+            d.cycle(d.offer(0 -> write2(0, 2))) shouldBe Vector(true, false, false, false)
+            d.cycle(d.offer(0 -> write2(1, 3))) shouldBe Vector(true, false, false, false)
+            d.cycle(ready = Vector(true, false, false))
+            d.lastOutput(1).size shouldBe 1
+            d.lastOutput(0).size shouldBe 1
+            d.cycle(ready = Vector(true, false, false))
+            d.lastOutput(1).size shouldBe 1
+            d.lastOutput(0).size shouldBe 0
+            d.cycle(ready = Vector(true, true, true))
+            d.lastOutput(1).size shouldBe 1
+            d.drain()
         }
     }
 
@@ -249,20 +313,26 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
         )
         simulate(new QueenDsaDecoder(cfg)) { dut =>
             val d = new Driver(dut, cfg)
-            commands.zipWithIndex.foreach { case (command, i) =>
-                d.cycle(d.offer((i % 4) -> command), Vector(true, true, true)).count(identity) shouldBe 1
+            var index = 0
+            var cycles = 0
+            // Back-to-back SCHED commands need a retry because the scheduler stage holds one entry.
+            while (index < commands.length && cycles < 200) {
+                val accepted = d.cycle(d.offer((index % 4) -> commands(index)), Vector(true, true, true))
+                accepted.count(identity) should be <= 1
+                if (accepted.exists(identity)) index += 1
+                cycles += 1
             }
+            index shouldBe commands.length
             d.drain()
         }
     }
 
-    for ((lanes, depths) <- Vector(4 -> Vector(1, 2, 3), 4 -> Vector(5, 7, 9), 1 -> Vector(1, 3, 5))) {
-        it should s"match an ordered software queue with $lanes lanes and depths ${depths.mkString("-")}" in {
-            val cfg = QueenConfig(instructionLanes = lanes, gemmQueueDepth = depths(0),
-                dmaQueueDepth = depths(1), schedQueueDepth = depths(2))
+    for ((lanes, ringDepth) <- Vector(4 -> 2, 4 -> 8, 1 -> 2)) {
+        it should s"match an ordered software ring with $lanes lanes and depth $ringDepth" in {
+            val cfg = QueenConfig(instructionLanes = lanes, cmdRingDepth = ringDepth)
             simulate(new QueenDsaDecoder(cfg)) { dut =>
                 val d = new Driver(dut, cfg)
-                val rng = new Random(100 + depths.sum + lanes)
+                val rng = new Random(100 + ringDepth + lanes)
                 var offered = d.empty
                 var tag = 1000
                 for (_ <- 0 until 500) {
@@ -280,9 +350,8 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
         }
     }
 
-    it should "reject nonpositive endpoint FIFO depths" in {
-        an[IllegalArgumentException] should be thrownBy QueenConfig(gemmQueueDepth = 0)
-        an[IllegalArgumentException] should be thrownBy QueenConfig(dmaQueueDepth = 0)
-        an[IllegalArgumentException] should be thrownBy QueenConfig(schedQueueDepth = 0)
+    it should "reject a command ring shallower than two slots" in {
+        an[IllegalArgumentException] should be thrownBy QueenConfig(cmdRingDepth = 1)
+        an[IllegalArgumentException] should be thrownBy QueenConfig(cmdRingDepth = 0)
     }
 }

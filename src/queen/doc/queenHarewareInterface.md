@@ -28,7 +28,7 @@ Scalar Core Decoder
     │   Command Builder
     │       ├── GEMM endpoint queue ── GEMM adapter ── GEMM
     │       ├── DMA  endpoint queue ── DMA adapter  ── DMA
-    │       └── SCHED command queue ── sync/poll/atomic/register logic
+    │       └── SCHED staging ── sync/poll/atomic/register logic
     │                                           │
     │                                           └── system memory master
     │
@@ -37,7 +37,7 @@ Scalar Core Decoder
                                               └── sync query / notify / fault ── Queen
 ```
 
-Scalar Core decoder 根据 endpoint 在 Queen 与 VPU 之间完成指令路由。目标为 VPU 的配置、RUN、WAIT 和 TRACE 指令直接送入 VPU 前端，不进入 Queen，Queen 也不向 VPU 输出命令。Queen 只为 GEMM、DMA 和 SCHED 建立指令队列；GEMM/DMA adapter 将已提交配置快照转换为目标 DSA 的原生命令接口。VPU 与 Queen 之间仅保留同步资源查询、完成通知和错误上报旁带通路。
+Scalar Core decoder 根据 endpoint 在 Queen 与 VPU 之间完成指令路由。目标为 VPU 的配置、RUN、WAIT 和 TRACE 指令直接送入 VPU 前端，不进入 Queen，Queen 也不向 VPU 输出命令。Queen 只接收 GEMM、DMA 和 SCHED 指令，SCHED 不经执行队列；GEMM/DMA adapter 将已提交配置快照转换为目标 DSA 的原生命令接口。VPU 与 Queen 之间仅保留同步资源查询、完成通知和错误上报旁带通路。
 
 ---
 
@@ -77,29 +77,42 @@ val inst = Vec(cfg.instructionLanes,
 
 固定 `custom-0` opcode 仍保留在 `inst` 中，由 Queen 完成全部合法性检查。若后续为了布线压缩 payload，压缩格式必须能够无损恢复原始 32-bit 指令，不能改变 ISA 字段语义。
 
-### 3.3 多 lane 接受顺序
+### 3.3 多 lane 接受与 ready 生成
 
-同一周期中，lane 编号从小到大表示程序顺序。Queen 只能接受连续前缀：
-
-```text
-inst(i).fire => 对所有 j < i，inst(j).fire 必须为 1
-```
-
-不得在更早 lane 阻塞时单独接受更晚 lane。推荐 ready 关系：
+同一周期中，lane 编号从小到大表示程序顺序。Queen 不要求连续前缀：
 
 ```text
-ready(0) = frontendCanAccept(inst(0))
-ready(i) = ready(i-1) && valid(i-1) && frontendCanAccept(inst(i))
+inst(i).fire 不依赖 inst(j).fire，j != i
 ```
+
+任一 lane 可以在其它 lane 阻塞时单独 fire；已 fire 的 lane 之间按 lane 编号保持程序序，未 fire 的 lane 由 CPU 稍后重新提交。
+
+接收单位是整包。同一周期所有 fire 的 lane 合并为一个包，在次拍写入资源；包内未 fire 的 lane 在该包中标记无效。一个包最多含 `instructionLanes` 条指令，与包内有效条数无关。
+
+GEMM 与 DMA 共用一个命令 ring，一包占一个 ring 槽；SCHED 单独走 1 级暂存，一包占该暂存。`inst.ready(i)` 按 lane 目标 endpoint 独立生成：
+
+```text
+ringUsed   = writePtr - min(gemmCursor, dmaCursor)     // 回绕计数
+ringReady  = ringUsed + enq.valid < cmdRingDepth
+
+schedUsed  = schedCount + schedEnq.valid - schedDeq.fire
+schedReady = schedUsed < 1
+
+ready(i) =
+  endpoint ∈ {GEMM, DMA} ? ringReady :
+  endpoint = SCHED        ? schedReady : 0
+```
+
+容量在 fire 时预约，因为下一拍的操作数不可暂停：被接受的 lane 必须保证次拍一定能入队。GEMM 与 DMA 共享容量池，两者各自持有游标，一侧停住只钉住它尚未释放的槽，不会阻塞另一侧已可出队的包。SCHED 深度固定为 1，接受一条后需要空一拍才能再接受，即连续 SCHED 指令最快 1 条/2 周期。
 
 `frontendCanAccept` 必须同时考虑：
 
 - CPU frontend reservation entry 是否充足；
-- 指令所需 endpoint 的入口容量；
+- 指令所需 endpoint 的入口容量：GEMM/DMA 看 ring 余量，SCHED 看暂存是否空闲；
 - QRD 顺序表和读响应缓存是否有空位；
-- 同周期更早 lane 已经占用的容量。
+- 容量按包计，不按指令条数计：同包命中同一资源的 lane 合占一个槽。
 
-若实现第一版只支持每周期接受一条 Queen 指令，可以只允许最早 valid lane ready；外部接口形状仍保持多 lane。
+若实现第一版只支持每周期接受一条 Queen 指令，可以只允许一条 lane ready；外部接口形状仍保持多 lane。
 
 可选提供：
 
@@ -291,7 +304,7 @@ Queen idle 必须同时满足：
 
 ### 4.1 两级结构
 
-Queen 内部只为 GEMM、DMA 和 SCHED 建立队列，不包含 VPU command queue。对于 GEMM/DMA，建议区分：
+Queen 内部只接收 GEMM、DMA 和 SCHED 的指令，不包含 VPU command queue；SCHED 指令只经 1 级暂存就地执行，不建立执行队列。对于 GEMM/DMA，建议区分：
 
 1. **指令接收/配置构建级**：处理 QWR、维护 GEMM/DMA 的 command-building 影子寄存器。
 2. **端点执行队列**：只保存已经形成执行语义的 RUN、FENCE、WAIT 和 TRACE entry。
@@ -334,16 +347,13 @@ class QueenEndpointEntry(cfg: QueenConfig) extends Bundle {
 
 - 同一 GEMM/DMA endpoint 的 RUN/FENCE/WAIT/TRACE 严格按入队顺序执行。
 - FENCE/WAIT 未完成时，后续 entry 不得越过。
-- GEMM、DMA 和 SCHED 可以独立推进，SCHED 全局控制另有明确阻塞范围。
+- GEMM、DMA 与 SCHED 相互独立推进；SCHED 不做条件等待，因此不存在全局阻塞范围。
 
-### 4.3 SCHED command queue
+### 4.3 SCHED 暂存
 
-SCHED queue 处理：
+SCHED 侧只承载就地执行的操作，不做条件等待：
 
 ```text
-SCHED FENCE
-SCHED WAIT_EVENT
-SCHED WAIT_TIMELINE
 SIGNAL_EVENT
 SIGNAL_TIMELINE
 POLL_EQ
@@ -351,7 +361,9 @@ ATOMIC_RMW
 TRACE_TAG(SCHED)
 ```
 
-SCHED 的通知寄存器、fault 寄存器、ACK/ENABLE 和恢复寄存器属于实时管理路径，不得被 SCHED command queue 中的 WAIT/FENCE 阻塞。
+`FENCE`/`WAIT_EVENT`/`WAIT_TIMELINE` 的 `endpoint=SCHED` 为非法编码（见 `queenISA.md` 7.2、8、9）。暂存只有 1 个槽，进入后尽快执行并在完成时释放；因此连续 SCHED 命令最快 1 条/2 周期。需要完成顺序的场景应把 wait 放进消费者（GEMM/DMA）队列。
+
+SCHED 的通知寄存器、fault 寄存器、ACK/ENABLE 和恢复寄存器属于实时管理路径，任何时刻都可访问：既不被 GEMM/DMA 的 wait/fence 阻塞，也不依赖 SCHED 暂存是否空闲。
 
 ---
 
@@ -575,6 +587,32 @@ class QueenSyncState(cfg: QueenConfig) extends Bundle {
 - signal 更新和 wait 查询具备确定的同周期顺序；
 - fault/flush 后旧 context 的 wait 不得观察到重分配资源的新值。
 
+### 9.1 硬件完成信号源
+
+除 `SIGNAL_EVENT/SIGNAL_TIMELINE` 外，GEMM 和 DMA 的完成也可以更新 event/timeline。建议接口：
+
+```scala
+class QueenHwSignal extends Bundle {
+  val enable    = Bool()
+  val isTimeline = Bool()
+  val group     = UInt(5.W)   // event 组
+  val mask      = UInt(32.W)  // event mask
+  val timeline  = UInt(3.W)   // timeline ID
+}
+
+// GEMM/DMA adapter -> Scheduler，随该 RUN 的配置快照携带
+val hwSignal = Valid(new QueenHwSignal)
+```
+
+约束：
+
+- 目标随 RUN 快照提交，不从实时寄存器读取，避免在途完成与后续配置写竞争。
+- 硬件信号只在对应命令的 native completion 被 adapter 接收后应用；同端点必须按命令完成序发布，早到的乱序 completion 缓存到前序 target 已应用。
+- 硬件源只能置位 event 和自增 timeline；清除与赋值仅由软件指令完成。
+- 更新路径独立于 GEMM/DMA 命令队列的阻塞状态，任何端点等待期间仍要能应用。
+- flush/reset 后，未归档 tag 与尚未应用的硬件信号一律作废，不得更新新 context 的资源。
+- 硬件信号与 `notifyPulse` 是两条通路：前者供 wait 使用，后者只累加 CPU 通知计数；同一完成点可以同时触发两者，但不能相互替代。
+
 ---
 
 ## 10. Polling/atomic 系统内存接口
@@ -635,7 +673,7 @@ val notifyPulse = Vec(4, Bool())
 3 SCHED
 ```
 
-同周期四个来源可以同时为 1，Scheduler 必须独立增加四个 COUNT。通知逻辑必须独立于 SCHED command queue，即使 SCHED WAIT/FENCE 阻塞，也必须继续采样、计数和产生 level IRQ。
+同周期四个来源可以同时为 1，Scheduler 必须独立增加四个 COUNT。通知逻辑不得被任何端点的等待门控：GEMM/DMA wait/fence 阻塞期间仍须继续采样、计数和产生 level IRQ。
 
 通知 pulse 不带 payload，软件通过每来源 COUNT 顺序关联任务。同一来源的完成通知必须保持该 endpoint 的命令完成顺序。
 
@@ -690,9 +728,7 @@ case class QueenConfig(
   instructionLanes: Int,
   frontendDepth: Int,
   qrdDepth: Int,
-  gemmQueueDepth: Int,
-  dmaQueueDepth: Int,
-  schedQueueDepth: Int,
+  cmdRingDepth: Int = 64,
   xlen: Int = 32,
   pcWidth: Int = 32,
   addressWidth: Int = 32,
@@ -707,7 +743,7 @@ case class QueenConfig(
 elaboration 阶段至少检查：
 
 - `instructionLanes >= 1`；
-- 所有 queue depth >= 1；
+- 所有 depth >= 1，`cmdRingDepth >= 2`；
 - `xlen == 32`；
 - `timelineCount == 8` 或与 ISA aux 编码范围一致；
 - `eventGroupCount <= 32`；
@@ -718,7 +754,7 @@ elaboration 阶段至少检查：
 
 ## 15. 最小接口验证要求
 
-1. 验证多 lane 只能接受连续前缀，早 lane 阻塞时晚 lane 不得 fire。
+1. 验证多 lane 不要求连续前缀：某 lane 阻塞时其它 lane 仍可 fire；同周期 fire 的多条 lane 按 lane 编号合并为一个包并保持程序序。
 2. 验证每个 lane 的 rs1/rs2 次拍返回与已 fire 指令准确配对。
 3. 验证 frontend 为指令和次拍 rs 预留空间后才拉高 ready。
 4. 验证 QWR/QCTRL 接收后可退休，后端阻塞不撤销已接收请求。
@@ -735,8 +771,9 @@ elaboration 阶段至少检查：
 15. 验证目标为 VPU 的指令由 Scalar Core decoder 直发 VPU，Queen 不存在 VPU command queue 或命令输出。
 16. 验证 VPU WAIT 查询不修改同步资源，完成通知计入 VPU 来源。
 17. 验证四来源同周期 notify 和单来源连续 pulse 均逐周期计数。
-18. 验证 SCHED WAIT/FENCE 阻塞期间仍可处理 notify、fault 和实时管理寄存器。
+18. 验证 GEMM/DMA wait/fence 阻塞期间仍可处理 notify、fault 和实时管理寄存器，且 SCHED 暂存不参与条件等待。
 19. 验证 polling interval、总线 backpressure、error 和 timeout。
 20. 验证 atomic 请求映射为平台原子事务。
 21. 验证 fault 后失败命令不产生成功 notify，flushDone 前不残留旧 context 事件。
 22. 验证普通 CPU pipeline flush 不撤销已经 fire 的 Queen 指令。
+23. 验证硬件完成信号按命令序发布、只置位 event 或自增 timeline、在 GEMM/DMA 等待阻塞期间仍能应用，且 flush 后不更新新 context 的资源。

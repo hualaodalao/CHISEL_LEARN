@@ -15,10 +15,11 @@ Queen 面向四个对等端点：
 
 VPU 不归 Scheduler 调度或管理。Scheduler 只调度 GEMM 和 DMA，并提供 timeline、event/hwLock 等共享同步资源，以及 polling、atomic 等服务。SCHED endpoint 表示 Queen Scheduler 本身。Scalar Core decoder 根据 endpoint 直接分流：VPU 目标指令直接送入 VPU 前端，不进入 Queen；GEMM、DMA 和 SCHED 目标指令送入 Queen。
 
-- `FENCE` 在 GEMM/DMA 命令队列中等待目标设备 idle；目标为 SCHED 时，在 Queen 派发处等待所选 GEMM/DMA idle。Scheduler fence 不包含 VPU。
-- `WAIT_EVENT/WAIT_TIMELINE` 携带 target endpoint：GEMM/DMA 在其命令队列处等待，VPU 在其后端派发队列处等待，SCHED 在 Queen 派发给 DSA 之前等待。
+- `FENCE` 只在 GEMM/DMA 命令队列中等待目标设备 idle，`endpoint=SCHED/VPU` 为非法编码。Scheduler 派发路径不做任何条件等待；跨设备先后顺序由消费者队列一侧的 `FENCE`/`WAIT_*` 表达。
+- `WAIT_EVENT/WAIT_TIMELINE` 携带 target endpoint：GEMM/DMA 在其命令队列处等待，VPU 在其后端派发队列处等待，`endpoint=SCHED` 为非法编码。
 - `SIGNAL_EVENT/SIGNAL_TIMELINE` 固定进入 Scheduler，更新集中管理的同步资源；同步资源的存放位置与 wait 指令的执行位置是两个不同概念。
 - event/timeline 资源由软件通过读取 Queen 资源寄存器申请，申请/分配/消费协议不在本 ISA 中定义。资源申请成功后的 signal/wait 由 ISA 触发。
+- 除 ISA signal 外，GEMM/DMA 完成也可以更新同一套 event/timeline。这类更新不占指令编码，目标由软件在提交前写入端点配置并由硬件在完成点应用，具体映射与可见性由 Queen 硬件规格定义；软件用同一条 wait 观察两类来源。
 - `TRACE_TAG` 通过 endpoint 选择记录位置，可直接派发给 GEMM、DMA、VPU 或 Scheduler。
 - `FENCE/WAIT_EVENT/WAIT_TIMELINE/POLL_EQ` 将 `inst[25]` 复用为 `notify`，置位时在成功完成并退出对应执行位置的周期发出一次通知 pulse。V2 不提供独立通知指令。
 - 所有完成通知由 Scheduler 按来源累计次数并产生持久中断，CPU 查询并确认；通知接口不存在 valid/ready 握手。
@@ -162,9 +163,9 @@ qrd rd, endpoint, regAddr
 
 | cmd | 名称 | endpoint 规则与执行位置 |
 | :---: | :--- | :--- |
-| `4'b0000` | `FENCE` | GEMM/DMA 队列等待 idle；SCHED 派发处等待所选 GEMM/DMA idle；VPU 非法 |
-| `4'b0001` | `WAIT_EVENT` | GEMM/DMA 命令队列、VPU 后端派发队列或 SCHED 派发处 |
-| `4'b0010` | `WAIT_TIMELINE` | GEMM/DMA 命令队列、VPU 后端派发队列或 SCHED 派发处 |
+| `4'b0000` | `FENCE` | GEMM/DMA 队列等待 idle；SCHED/VPU 非法 |
+| `4'b0001` | `WAIT_EVENT` | GEMM/DMA 命令队列或 VPU 后端派发队列；SCHED 非法 |
+| `4'b0010` | `WAIT_TIMELINE` | GEMM/DMA 命令队列或 VPU 后端派发队列；SCHED 非法 |
 | `4'b0011` | `SIGNAL_TIMELINE` | endpoint 固定 SCHED，更新同步资源 |
 | `4'b0100` | `SIGNAL_EVENT` | endpoint 固定 SCHED，更新同步资源 |
 | `4'b0101` | `TRACE_TAG` | endpoint 指定 GEMM/DMA/VPU/SCHED 记录位置 |
@@ -213,25 +214,17 @@ aux   = 0
 
 `endpoint=VPU` 对 Queen `FENCE` 为非法编码。
 
-### 7.2 Scheduler fence
+### 7.2 `endpoint=SCHED` 非法
 
-当 `endpoint=SCHED` 时，`rs1[1:0]` 为端点选择 mask：
+Scheduler 的派发路径不执行任何条件等待。单线程 CPU 上，等待 Scheduler 派发点的指令会让后续所有指令都无法发射，而解除条件往往正需要后续指令，因此 `FENCE` 的 `endpoint=SCHED` 定义为非法编码，前端必须报非法指令异常。
 
-```text
-bit0 GEMM
-bit1 DMA
-rs1[31:2] 必须为 0
-```
-
-该 fence 在 Queen 派发给 DSA 之前执行：先让此前的命令按序派发，随后等待 mask 选中的 GEMM/DMA 为 idle，条件满足后才继续派发 fence 后的 DSA 命令。Scheduler fence 不观察、不阻塞 VPU，也不提供跨 GEMM/DMA/VPU 的全局完成保证。`rs2=x0`、`notify=inst[25]`、`aux=0`；mask 为 0 时无设备等待条件。
-
-`notify=1` 时，该 fence 成功完成的周期由 SCHED 发出一次 pulse，计入 SCHED 来源，不分别计入 mask 选中的 GEMM/DMA 来源；mask 为 0 的 fence 正常完成时同样遵循此规则。
+跨设备先后顺序不经过 Scheduler，而是写进消费者队列：需要 GEMM 在 DMA 完成后才开始，就把 `WAIT_EVENT`/`WAIT_TIMELINE` 或 `FENCE` 放进 GEMM 队列，由 GEMM 在自己的派发点等待。Scheduler 通路只承载 signal、polling、atomic 与 trace，不承载完成顺序。
 
 标量核 RISC-V `FENCE` 与 Queen DSA fence 不等价：
 
 - RISC-V `FENCE` 对应 CPU 侧的指令退休与规定的内存访问排序，不自动等待异步 DSA/VPU 执行 idle。
 - Queen 配置写、控制命令以及 push 给 DSA/VPU 的操作，在前端接受时即可退休。即使这些指令已经退休，GEMM/DMA/VPU 后端也可能仍在执行。
-- 需要等待 GEMM/DMA idle 后继续派发时，软件必须额外向 Queen 发送本地 DSA fence 或 Scheduler fence，不能只使用 RISC-V `FENCE`。
+- 需要等待 GEMM/DMA idle 后继续派发时，软件必须额外发送本地 DSA fence，不能只使用 RISC-V `FENCE`。
 - Queen fence 本身也为异步指令：它保证对应后端的派发顺序，不保证 CPU 在其退休时观察到设备 idle。CPU 可设置 `notify=1` 后执行其他工作或 `WFI`，由完成通知恢复后续任务，也可以通过 `QRD` 读取规定的完成状态；VPU 完成等待由 VPU 自身机制实现。
 
 ---
@@ -245,12 +238,13 @@ rs1[31:2] 必须为 0
 | GEMM | GEMM 命令队列的最终派发处 | 该 GEMM 队列中 wait 之后的命令 |
 | DMA | DMA 命令队列的最终派发处 | 该 DMA 队列中 wait 之后的命令 |
 | VPU | VPU 后端派发队列，由 VPU 实现 | 该 VPU 队列中 wait 之后的命令 |
-| SCHED | Queen 派发给 DSA 之前 | Queen 后续向 GEMM/DMA 的派发，不阻塞 VPU |
+
+`endpoint=SCHED` 为非法编码：Scheduler 派发路径不做条件等待，需要顺序约束的一方应把 wait 放进自己的消费者队列。
 
 GEMM/DMA/VPU 的 wait 执行单元通过同步资源查询接口读取 Scheduler event 状态；读取共享资源不改变 VPU 独立管理的边界。条件满足时移除队头 wait 并继续派发，否则保持等待。wait 不阻止此前已经派发的任务继续运行。
 
 ```text
-endpoint   = GEMM / DMA / VPU / SCHED
+endpoint   = GEMM / DMA / VPU
 rs1[31:0] = event mask
 aux[4:0]  = event group ID
 notify     = inst[25]
@@ -275,12 +269,12 @@ event/timeline 的原子申请与消费由软件按 Queen 资源寄存器协议�
 
 - GEMM/DMA：在对应命令队列的最终派发处等待。
 - VPU：在 VPU 后端派发队列等待，由 VPU 侧实现。
-- SCHED：在 Queen 派发给 GEMM/DMA 之前等待。
+- `endpoint=SCHED`：非法编码，处理方式同第 8 节。
 
 timeline 资源由 Scheduler 集中管理，各 wait 执行单元通过同步资源查询接口获取值；等待只阻塞第 8 节规定的后续派发范围，不申请或消费 timeline，也不阻止已派发任务继续执行。
 
 ```text
-endpoint   = GEMM / DMA / VPU / SCHED
+endpoint   = GEMM / DMA / VPU
 rs1[31:0] = target sequence
 aux[2:0]  = timeline ID
 aux[4:3]  = 0
@@ -296,7 +290,7 @@ Scheduler 保存 8 个 32-bit 单调 timeline。等待条件为：
 (int32_t)(completed[timelineId] - targetSequence) >= 0
 ```
 
-资源由软件通过 Queen 资源寄存器申请，申请成功后的 signal/wait 使用上述 timeline ID。单个 context 内最大在途距离必须小于 `2^31`。普通命令禁止清零 timeline；context reset 必须确认引用该资源的 GEMM/DMA/VPU 等待、执行和信号更新均已退出，不能只检查 Scheduler 队列空闲。
+资源由软件通过 Queen 资源寄存器申请，申请成功后的 signal/wait 使用上述 timeline ID。单个 context 内最大在途距离必须小于 `2^31`。普通命令禁止清零 timeline；context reset 必须确认引用该资源的 GEMM/DMA/VPU 等待、执行和信号更新均已退出，不能只检查 Scheduler 暂存空闲。
 
 软件不得在被 wait 阻塞的同一派发路径后方安排其唯一解除条件，否则会形成队头死锁。
 
@@ -304,7 +298,7 @@ Scheduler 保存 8 个 32-bit 单调 timeline。等待条件为：
 
 ## 10. `SIGNAL_TIMELINE`
 
-`SIGNAL_TIMELINE` 不包含可选 target endpoint 语义；`endpoint` 固定为 SCHED，命令进入 Scheduler 队列并更新 Scheduler timeline 资源。
+`SIGNAL_TIMELINE` 不包含可选 target endpoint 语义；`endpoint` 固定为 SCHED，命令进入 Scheduler 暂存并更新 Scheduler timeline 资源。
 
 ```text
 endpoint  = SCHED
@@ -324,13 +318,15 @@ rs1 != x0: completed[timelineId] = GPR[rs1]
 
 显式写入的新值不得相对当前值回退；非法回退产生同步错误。timeline 只能通过 context reset 清零。
 
-signal 入队或 CPU 指令退休不等于所代表的 DSA 工作完成。若软件用该 signal 表示 GEMM/DMA 完成，必须确保相应的 idle fence 在 signal 更新之前已经满足；不能仅因配置指令在 CPU 侧已退休而提前发布完成值。
+硬件完成源只能自增 timeline，不能赋值或清除。软件显式赋值与硬件自增不得指向同一 timeline；软件自增可以与硬件自增并存，同一时钟沿的多次自增按次数累加。timeline 的分配协议必须把这条约束包含进去。
+
+signal 入队或 CPU 指令退休不等于所代表的 DSA 工作完成。若软件用该 signal 表示 GEMM/DMA 完成，必须确保相应的 idle fence 在 signal 更新之前已经满足；不能仅因配置指令在 CPU 侧已退休而提前发布完成值。改用硬件完成源时，发布时机由该完成点的定义决定，可见性口径见 Queen 硬件规格；若该完成点不保证写可见，软件仍需在提交前使用 fence。
 
 ---
 
 ## 11. `SIGNAL_EVENT`
 
-`SIGNAL_EVENT` 不包含可选 target endpoint 语义；`endpoint` 固定为 SCHED，命令进入 Scheduler 队列并更新 Scheduler event 资源。
+`SIGNAL_EVENT` 不包含可选 target endpoint 语义；`endpoint` 固定为 SCHED，命令进入 Scheduler 暂存并更新 Scheduler event 资源。
 
 ```text
 endpoint   = SCHED
@@ -343,6 +339,8 @@ rs2        = x0
 - `flag=0`：清除所选 event bit。
 
 置位/清除只更新已由软件申请的资源状态，不构成资源申请、原子消费或回收指令。若 signal 表示工作完成，软件必须保证其发布时机满足对应完成依赖，与第 10 节相同。
+
+硬件完成源对 event 只能置位，不能清除。同一 event bit 的软件置位、软件清除与硬件置位在硬件规格规定的提交顺序下生效；同一时钟沿的多个置位取或。
 
 ---
 
@@ -361,7 +359,7 @@ aux        = 0
 - `endpoint=GEMM`：进入 GEMM 队列，在 GEMM 实际派发点记录。
 - `endpoint=DMA`：进入 DMA 队列，在 DMA 实际派发点记录。
 - `endpoint=VPU`：由 Scalar Core decoder 直接送入 VPU 队列，在 VPU 实际派发点记录，不进入 Queen。
-- `endpoint=SCHED`：进入 Scheduler 队列，在 Scheduler 实际执行点记录。
+- `endpoint=SCHED`：进入 Scheduler 暂存，在 Scheduler 实际执行点记录。
 
 ---
 
@@ -402,7 +400,7 @@ flag       = 0
 | :---: | :--- |
 | `2'b00` | `ADD`: `new = old + operand` |
 | `2'b01` | `CLR`: `new = old & ~operand` |
-| `2'b10` | `SET`: `new = old | operand` |
+| `2'b10` | `SET`: `new = old \| operand` |
 | `2'b11` | Reserved |
 
 Scheduler 必须通过具备原子语义的总线事务实现；若底层互连不支持与外部 CPU/cache 一致的 atomic，则该能力只能用于明确标记为 non-cacheable 且由 Scheduler 独占原子访问的地址区间。
@@ -422,7 +420,7 @@ Scheduler 必须通过具备原子语义的总线事务实现；若底层互连�
 | GEMM | GEMM 最终派发处，fence 的 idle 条件或 wait 条件满足并完成 |
 | DMA | DMA 最终派发处，fence 的 idle 条件或 wait 条件满足并完成 |
 | VPU | VPU 后端派发队列，wait 条件满足并完成，由 VPU 侧实现 |
-| SCHED | Scheduler 派发/执行处，fence/wait/polling 条件满足并完成 |
+| SCHED | Scheduler 执行处，signal/polling/atomic 完成的周期 |
 
 CPU 将指令交给前端并成功入队后即可退休。指令在指定端点成功完成时才发出一次 pulse，不能在 CPU 退休或 Queen 接收时提前产生通知。VPU 仅向 Scheduler 汇总通知，不因此归 Scheduler 管理。
 
@@ -535,7 +533,8 @@ COUNT、PENDING 的读取以及 ACK、ENABLE 的写入必须能够在 Scheduler 
 - V2 要求为 0 的保留字段非 0；
 - `QWR2.regBase=31`；
 - `SIGNAL_TIMELINE/SIGNAL_EVENT/POLL_EQ/ATOMIC_RMW` 的 endpoint 不是 SCHED；
-- Queen `FENCE` 的 endpoint 为 VPU；
+- Queen `FENCE` 的 endpoint 为 VPU 或 SCHED；
+- `WAIT_EVENT/WAIT_TIMELINE` 的 endpoint 为 SCHED；
 - `SIGNAL_TIMELINE/TRACE_TAG/ATOMIC_RMW` 的 `inst[25]` 非 0；
 - 前端可判定的未实现寄存器地址。
 
@@ -604,9 +603,9 @@ notify 状态查询及 ACK/ENABLE 封装通过 Scheduler 寄存器读写实现�
 3. 验证 `QWR2` 相邻地址、`regBase=31` 异常及 `macroEop` 当前写入包含在提交快照中。
 4. 随机重排不同 DSA 配置寄存器的写入顺序，最终快照必须一致；`macroEop` 不得越过前序写入。
 5. 验证 GEMM/DMA 本地 fence 在设备 idle 后才继续目标队列派发，非目标队列不受阻塞。
-6. 验证 Scheduler fence 在所选 GEMM/DMA idle 后才继续 Queen 的后续 DSA 派发，不包含 VPU。
+6. 验证 `FENCE/WAIT_EVENT/WAIT_TIMELINE` 的 `endpoint=SCHED` 在前端报非法指令，Scheduler 派发路径不出现条件等待。
 7. 验证 Queen 配置/控制指令前端入队即退休；RISC-V `FENCE` 不因已退休异步命令的 DSA/VPU 尚未 idle 而额外等待。
-8. 验证 wait endpoint 路由：GEMM/DMA 命令队列、VPU 后端派发队列、Queen 派发处分别执行等待。
+8. 验证 wait endpoint 路由：GEMM/DMA 命令队列与 VPU 后端派发队列分别执行等待，SCHED 为非法编码。
 9. 验证 `WAIT_EVENT` 只查询、不申请/消费/修改资源；资源申请由 Queen 寄存器协议处理，不在 wait ISA 中实现。
 10. 验证 `SIGNAL_TIMELINE rs1=x0` 自增、显式赋值、回绕比较、禁止回退和资源安全 reset。
 11. 验证 TRACE_TAG 仅由 endpoint 选择 GEMM/DMA/VPU/SCHED 记录位置，flag 非 0 报非法指令。
@@ -617,11 +616,11 @@ notify 状态查询及 ACK/ENABLE 封装通过 Scheduler 寄存器读写实现�
 16. 验证 `FENCE/WAIT_EVENT/WAIT_TIMELINE/POLL_EQ` 的 `inst[25]` 两种取值均合法，只有 `notify=1` 才在成功完成时通知；前端入队和 CPU 退休不提前产生 pulse。
 17. 验证 `SIGNAL_EVENT` 的 bit25 保持 set/clr；`SIGNAL_TIMELINE/TRACE_TAG/ATOMIC_RMW` 的 bit25 非 0 在前端报非法指令。
 18. 验证 `QCTRL.cmd=4'b0111` 在全部 endpoint、bit25 两种取值及不同操作数字段下均在前端报非法指令，不入队、不产生通知。
-19. 验证 GEMM/DMA/VPU/SCHED 的 wait 完成通知计入执行端点来源；Scheduler fence 只产生一次 SCHED 来源通知，包括多设备 mask 和 mask 为 0 的情况。
+19. 验证 GEMM/DMA/VPU 的 wait 完成通知计入执行端点来源；SCHED 来源通知只由 signal/polling/atomic 完成产生，每条指令至多一次。
 20. 验证带 notify 的指令不越过同端点前序命令；不同端点不产生隐式依赖，wait 通知不被误判为其他设备 idle。
 21. 验证 fence/wait 条件初始已满足时仍只通知一次；条件持续满足但命令未退出时不重复通知，`notify=0` 或不支持 notify 的指令不发完成 pulse。
 22. 验证 `POLL_EQ(notify=1)` 仅在收到比较成功的读响应并完成时通知；读请求发出、比较失败重试、总线错误、超时及 flush 不产生成功通知，其他命令的 fault/flush 同样不产生成功通知。
 23. 验证无 valid/ready 的通知 pulse 逐周期采样：四来源同周期通知各自加一，单来源连续周期为 1 时每周期加一，不做上升沿检测，也不重复计数。
-24. 验证 Scheduler wait/fence 阻塞期间仍持续采样通知、读取 COUNT/PENDING 和处理 ACK/ENABLE；端点完成不等待 CPU ACK。
+24. 验证 GEMM/DMA wait/fence 阻塞期间仍持续采样通知、读取 COUNT/PENDING 和处理 ACK/ENABLE；端点完成不等待 CPU ACK，Scheduler 通路不被任何等待门控。
 25. 验证 COUNT/ACK/pending/IRQ：读不清状态、屏蔽不丢计数、旧快照 ACK 不覆盖新增通知、同周期 ACK 与 pulse 到达无丢失。
 26. 验证 CPU 执行 `WFI` 前已到达的通知仍保持 pending，单来源累计计数回绕时按模数差计算新增次数。
