@@ -1,14 +1,14 @@
 # WorkerBee gem5 性能模型规格
 
-版本：v0.1.2（P0 实施中）  
-日期：2026-10-28  
-状态：P0 idle 骨架、基线工具与 RTL 边沿单测已实现；边沿运行受宿主启动问题阻塞，命令/GEMM/DMA 模型仍待实现，P0 尚未验收。
+版本：v0.2.2（L1 已实现）  
+日期：2026-10-30  
+状态：P0 idle 骨架、基线工具与 8 项 RTL 边沿单测通过；L1 粗粒度 GEMM timing 模型已实现并通过 INT8 与 MXFP8 形状扫描，第 2.4、14 章定义其契约。L2 逐拍模型尚未开始，第 4、6 章的精确语义仍是对 L2 的要求
 
 ## 1. 目的、依据与规范等级
 
 本规格定义 WorkerBee GEMM 的 gem5 timing 模型，用于分析 kernel 延迟、计算/供数停顿、DMA流量及存储竞争。目录与实施步骤见 [实施规划](plan.md)。
 
-硬件基线：[WorkerBee 硬件规格](../doc/spec.md) v4.0.0，2026-10-26。编写时源码 HEAD 为 `7be63b713f813314a9e021aec00d1ff17576a485`；该 commit 不替代文件内容 hash，实际模型验收必须记录参与构建的源码与RTL hash。
+硬件基线：[WorkerBee 硬件规格](../doc/spec.md) v4.1.0，2026-10-29。编写时源码 HEAD 为 `7be63b713f813314a9e021aec00d1ff17576a485`；该 commit 不替代文件内容 hash，实际模型验收必须记录参与构建的源码与RTL hash。
 
 依据优先级：
 
@@ -45,12 +45,16 @@
 |---|---|
 | 命令与寄存器 | 可见行为和关键握手逐拍一致 |
 | 地址与流量 | 同配置同输入的物理请求序列、大小、strobe和响应数完全一致 |
-| 确定性校准时序 | 核心校准集合逐拍一致，周期误差为0；这是验收目标，尚未实现 |
+| 确定性校准时序 | 核心校准集合逐拍一致，周期误差为0；这是 L2 目标，尚未实现 |
 | 实际存储环境 | 时序由明确的gem5存储模型决定；没有RTL同环境证据时不得标为RTL精确 |
 | 数值 | timing-only不承诺C或ScaleC值，data_valid=false |
 | 硅片性能 | 没有实际硬件和系统校准前不承诺误差百分比 |
 
 不能以“总周期误差小于5%”放宽寄存器错误、流量错误、提前完成或数据丢失。较大kernel的误差统计必须给出适用配置和样本，不作为跳过基础精确对拍的理由。
+
+### 2.4 L1 粗粒度精度（当前已实现）
+
+`model_kind=timing_loose` 的输出只承诺三件事：窗口与 beat 的结构计数、真实 DMA 地址与物理字节数、由结构决定的 stall 分解。它不承诺逐拍事件序列与 RTL 一致，不能用于第 12 章的 L2 验收，也不能替代第 5 章的 RTL 校准。具体拍级语义见第 14 章。
 
 ## 3. 模型架构与配置边界
 
@@ -449,12 +453,121 @@ kernel由多task组成时按实际任务累加。2按一次乘法和一次加法
 
 U01/U02影响性能结构，裁定原则为先澄清而非自动改RTL。未裁定时可以做P1接口骨架研究，不能冻结受影响的GEMM性能实现或误差承诺。
 
-2026-10-28 已补充默认配置下的 8 项 RTL 子模块边沿单测：FIFO、CalcConfig、cvt、阵列波前/skew/deskew、executor 窗口、读 credit/gather/stretch。首轮 FIFO 与 CalcConfig 通过；完整集合虽已编译并发射 RTL，但 8 项均在宿主仿真启动时失败，未进入测试体，因此不构成时序通过或 RTL 回归证据。系统日志记录 AMFI 签名问题，Java 启动的子进程在动态加载器入口阻塞；未修改安全策略或签名来绕过检查。
+2026-10-30 在默认配置（规格 v4.1.0，含 BF16）下取得 8 项 RTL 子模块边沿单测全绿报告：FIFO、CalcConfig、cvt、阵列波前/skew/deskew、executor 窗口、读 credit/gather/stretch。之前一轮 8 项失败发生在宿主启动阶段，未进入测试体：新链接的仿真程序首次执行时由企业 EDR 云端判定拦截，超过约 10 s 窗口被杀死，svsim 因缺少 `simulation-log.txt` 把该失败报成文件缺失；签名有效性、swap 与设计代码均已排除，未修改任何安全策略。该宿主行为由工具内预热加重试消化，不改变验收口径。
+
+该报告仍是子模块级证据：它不覆盖顶层 GEMM 数据通路、写响应排空、回灌与中断，因此不能作为时序通过或 RTL 回归结论。
 
 `calibrate.py` 只有在所选 suite 全部测试通过、采样非空、源码前后相同且基线/RTL/采样/XML 完整性检查通过后才生成 `calibration.json`。子模块报告即使全绿也必须保留 `edge_calibrated=false`、`p0_accepted=false`、`performance_valid=false`、`data_valid=false`；不能替代顶层写响应排空、ScaleA 参数 owner、ScaleC 服务域或 gem5 协议验证。G5-U01–U06 本次均不关闭。
 
-## 14. 版本管理
+## 14. L1 粗粒度时序模型契约
+
+本章定义 `model_kind=timing_loose`、`model_phase=L1` 的可观测行为。第 4、6、7 章的逐拍语义是 L2 的目标；L1 只实现与本契约一致的部分。
+
+### 14.1 命令入口
+
+- 命令由 `VectorParam.UInt64 command_batches` 提供，每批 22 word：`[0]` 最早 cycle、`[1]` lane mask，之后每 lane 5 word（`op | reg0<<8 | reg1<<16`、`data0`、`data1`、`pc`、`tag`）。模型在寄存器文件可接收且 `cycle >= 最早 cycle` 的拍接受整批；批次不拆分、不早于最早 cycle 注入。
+- 四 lane 同拍写入、同拍触发 START；启动拍对寄存器取快照，之后同一批内其他写入不再影响该任务。
+- 输入不合法（M/N/K 或 A/B 格式不受支持）时记录 `input` 错误并撤销 START，不产生 GEMM 周期。
+
+### 14.2 执行时间
+
+- 窗口顺序：N tile → (K pass × (T 个 B beat, M 个 A beat))。一拍至多消费一个 B beat 和一个 A beat。
+- 进入窗口前 B 侧需预蓄 T 个 beat（MX 时 ScaleB 同步预蓄）；不足则计 `stall_b_cycles`。A 侧不足或输出缓冲无空间计 `stall_a_cycles`。
+- 第 m 行在其末 K pass 的 A beat 被消费时入队，等待 `array_pipeline_latency` 拍后进入 C 写通道；C 通道每拍至多一个 beat。`array_busy_cycles` 按 A beat 计数。
+- 完成事件在所有输出行写通道排空后发出；`latency_cycles` 从 START 快照拍算到 done 拍。
+
+### 14.3 地址与流量
+
+A/B/C/ScaleA/ScaleB/ScaleC 的地址公式与 RTL 的 row/colTile 偏移链一致（含 loadW 两种布局、w4a8 stretch 与 scale 步进）。读 beat 未按端口拍宽对齐时拆成两个对齐读（gather），两个响应到齐后才计一个 beat，物理字节按两次请求计；gather 一旦开始就必然补发 hi 读，包括最后一个逻辑 beat（其 lo 读已用掉最后一个生产额度）。写 beat 携带 byte-enable 覆盖有效字节。模型不校验返回数据内容。
+
+### 14.4 存储环境
+
+默认每个 DMA 端口接一个私有 `SimpleMemory` bank，六个地址区间互不相交；地址布局由 `command_trace.banked_layout` 生成，A→0、B→1、C→2、ScaleA/bias/rqM→3、ScaleB→4、ScaleC→5。`--shared-bus` 用 `SystemXBar` 复现端口竞争，只用于竞争实验。
+
+### 14.5 输出
+
+`model_result.json` 含：`simulated_cycles`、`jobs_started/done`、`config_errors`、`input_errors`、`last_error_code`、`gemm{start_cycle, done_cycle, latency_cycles, executor_cycles, array_busy_cycles, stall_a_cycles, stall_b_cycles, scheduled_ops}`、`job`（快照与几何）、`commands`（接收批次/响应/冲突计数）、`irq`、`dma`（每口 requests/responses/retries/bytes/errors）、`errors`。`gemm.py` 另算 `macs_per_cycle`、`utilization`（峰值 `T × kPerBeat`）、`dma_bytes_per_cycle` 与 `array_busy_fraction`。
+
+所有输出固定 `data_valid=false`、`performance_valid=false`；L1 结果不得标为 RTL 校准或性能承诺。
+
+## 15. 版本管理
 
 模型规格与硬件规格分别版本化。接口/trace不兼容改动升主版本；新增兼容支持域升次版本；澄清文字升修订号。草案阶段仍须更新状态，不能将“计划支持”改写为“已实现”而无测试证据。
 
 实现版本每次发布记录：支持profile、格式与环境范围、验证集合、已知限制和与硬件基线的对应关系。源码更名、模型统计扩展和系统环境变动也须检查trace与报告可比性。
+
+## 附录 A. 运行与复现命令
+
+以下命令均在仓库根执行。基线环境固定为 gem5 commit `c8222cc67a399bfc01e8658dd14b30d5bfd634f9` 与同一仓库 venv 内的 scons；换机时只替换 `GEM5_ROOT` 与 `SCONS` 前缀。模型以 `EXTRAS` 外部模块编入 gem5，不修改 gem5 源码，也不复用既有 RISCV/X86 variant。
+
+### A.1 构建
+
+```sh
+GEM5_ROOT="/path/to/gem5"
+SCONS="/path/to/gem5-venv/bin/scons"
+python3 -B src/workerbee/gem5/tools/build.py \
+  --gem5-root "$GEM5_ROOT" --scons "$SCONS"
+```
+
+首次自动执行 `scons defconfig build/WORKERBEE_P0 build_opts/NULL EXTRAS=<repo>/src/workerbee/gem5/model`，随后执行 `scons build/WORKERBEE_P0/gem5.opt -j 6 EXTRAS=...`；产物为 `<GEM5_ROOT>/build/WORKERBEE_P0/gem5.opt`，构建记录写 `p0-build.json`（含可执行文件 sha256）。模型 C++/绑定改动后必须重新构建；`--build-name` 只接受 `WORKERBEE_P0*`，gem5 commit 不符会直接拒绝。
+
+### A.2 单个 GEMM 作业（L1）
+
+```sh
+GEM5="$GEM5_ROOT/build/WORKERBEE_P0/gem5.opt"
+RUN="$PWD/sim/workerbee/gem5/l1-run"
+"$GEM5" -d "$RUN" src/workerbee/gem5/configs/gemm.py \
+  --shape 48x128x256 --a-fmt INT8 --b-fmt INT8 --c-fmt INT32 \
+  --clock 500MHz --memory-latency 1ns --array-latency 31 --dma-outstanding 4
+```
+
+`-d` 指定的输出目录必须不存在。MXFP8 示例：
+
+```sh
+"$GEM5" -d "$PWD/sim/workerbee/gem5/l1-run-mx8" src/workerbee/gem5/configs/gemm.py \
+  --shape 16x16x64 --a-fmt MXE4M3 --b-fmt MXE4M3 --c-fmt MXE4M3 --load-w 1 \
+  --blk-a 32 --blk-b 32 --blk-c 16
+```
+
+输出目录含 `manifest.json`、`model_result.json`、`result.json` 与 gem5 原生统计。默认六口各接私有 `SimpleMemory` bank；`--shared-bus` 改接共享 `SystemXBar`，只用于竞争实验。
+
+### A.3 形状扫描
+
+```sh
+python3 -B src/workerbee/gem5/tools/scan.py --gem5 "$GEM5" \
+  --output "$PWD/sim/workerbee/gem5/scan-run" --preset int8
+python3 -B src/workerbee/gem5/tools/scan.py --gem5 "$GEM5" \
+  --output "$PWD/sim/workerbee/gem5/scan-run-mx8" --preset mx8 \
+  --a-fmt MXE4M3 --b-fmt MXE4M3 --c-fmt MXE4M3 --load-w 1 \
+  --blk-a 32 --blk-b 32 --blk-c 16
+```
+
+每个形状一个独立 gem5 进程（模型排空 trace 即退出仿真）；聚合结果写 `scan.json` 与 `scan.md`，结果口径见 [实施规划](plan.md) 第 8 章。
+
+### A.4 P0 idle smoke
+
+```sh
+python3 -B src/workerbee/gem5/tools/elaborate.py --sbt sbt --output-dir "$RUN/rtl"
+"$GEM5" --outdir="$RUN/smoke" src/workerbee/gem5/configs/run.py \
+  --gem5-root "$GEM5_ROOT" --rtl-dir "$RUN/rtl"
+```
+
+`run.py` 只验证 SimObject 装配与源码/RTL hash，不发命令、不跑 GEMM；smoke 保存 `manifest.json`、`result.json` 和 gem5 原生统计。
+
+### A.5 RTL 边沿校准
+
+```sh
+python3 -B src/workerbee/gem5/tools/calibrate.py \
+  --rtl-dir "$PWD/sim/workerbee/gem5/rtl-baseline-20261030" \
+  --output-dir "$PWD/sim/workerbee/gem5/rtl-edges-run"
+python3 -B src/workerbee/gem5/tools/calibrate.py \
+  --output-dir "$PWD/sim/workerbee/gem5/rtl-edges-run" --verify-only
+```
+
+`calibrate.py` 不调用 gem5，而是用 `sbt testOnly` + Verilator 跑 RTL 子模块单测；输出目录须不存在。`plan.md`、`spec.md`、模型源码与 Python 工具都计入 `model_source_hash`，任一处改动后旧报告失效，须按当前来源重跑。报告只覆盖子模块边沿，仍为 `edge_calibrated=false`、`p0_accepted=false`。
+
+### A.6 Python 回归
+
+```sh
+python3 -B -m unittest discover -s src/workerbee/gem5/tests -p 'test_*.py'
+```

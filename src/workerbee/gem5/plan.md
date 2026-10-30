@@ -1,19 +1,24 @@
 # WorkerBee gem5 模型实施规划
 
-版本：v0.1.2（P0 实施中）  
-日期：2026-10-28  
-状态：已实现 P0 idle 骨架、基线工具和 RTL 边沿单测；单测运行受宿主启动问题阻塞，P0 验收未通过，尚无 GEMM 执行模型  
-目标：以 RTL 校准的 GEMM timing 模型开展 kernel 和网络性能探测。
+版本：v0.2.1（L1 已实现）  
+日期：2026-10-30  
+状态：P0 idle 骨架、基线工具和 8 项 RTL 边沿单测通过；L1 粗粒度 GEMM timing 模型已实现并通过 INT8 与 MXFP8 形状扫描。RTL 逐拍对拍（L2）未开始，`edge_calibrated=false`、`performance_valid=false`
+目标：先以粗粒度 GEMM timing 开展 kernel 和网络性能探测，再按需推进 RTL 逐拍校准。
 
 本文定义目录、文件职责和实施顺序；行为与验收契约见 [模型规格](spec.md)。硬件契约引用 [WorkerBee 硬件规格](../doc/spec.md)，不在这里另建硬件寄存器或指令编码。
 
 ## 1. 实施范围与路线
 
-采用 gem5 `ClockedObject` + C++ 时序状态模型 + 六路内存请求端口。第一版不引入 CPU、Linux、MMIO 或尚未定义的 NPU ISA，使用 trace driver 驱动现有四路命令接口。
+采用 gem5 `ClockedObject` + C++ 时序状态模型 + 六路内存请求端口。不引入 CPU、Linux、MMIO 或尚未定义的 NPU ISA，使用 trace driver 驱动现有四路命令接口。
 
-先实现逐 GEMM 时钟拍推进的参考 timing 模型，保留 FIFO、DMA、权重装载、波前、回灌及输出转换的资源关系；通过 RTL 对拍后再压缩无外部交互的事件区间。不能先用固定 GEMM 延迟替代内部执行过程。
+路线分两步，当前只承诺第一步：
 
-第一版为 **timing-only**：支持当前默认输入格式与合法输出格式对应的时序、地址、流量及中断，不执行完整矩阵数值计算。它可以完成命令轨迹的性能仿真，但不能验证网络输出或精度。具体限制见模型规格第 2、9 章。
+1. **L1 粗粒度（已实现）**：保留 GEMM 的结构性时间——N→K 窗口顺序、每拍一个 A beat 与一个 B beat、B 预蓄、多 K pass 回灌、31 拍阵列流水延迟、C 写回排空、DMA 真实地址与字节数、gather 与 outstanding 限制——但不复现逐 PE 波前、skew/deskew 与输出转换内部拍级细节。它不是固定延迟公式：窗口障碍与 DMA 供数停顿由结构决定。
+2. **L2 精确路线（后续）**：逐拍复现 FIFO、DMA credit、权重装载、波前、回灌与输出转换资源关系，并与同配置 RTL 对拍。在 L2 完成前，任何结果都不得称为周期准确。
+
+L1 输出统一标记 `model_kind=timing_loose`、`phase=L1`、`data_valid=false`、`performance_valid=false`、`p0_accepted=false`。它不替代第 5 章的 RTL 校准，也不能作为 L2 验收证据。
+
+第一版为 **timing-only**：支持当前默认输入格式与合法输出格式对应的时序、地址、流量及中断，不执行完整矩阵数值计算。具体限制见模型规格第 2、9、14 章。
 
 ```text
 kernel 描述 / 编译器命令轨迹
@@ -33,7 +38,7 @@ kernel 描述 / 编译器命令轨迹
 
 ## 2. 目录结构
 
-P0 已创建顶层绑定、六端口 idle 骨架、默认 profile、基线/发射/构建工具及 smoke 入口；下列后续阶段文件仍为实施目标，不提前放空壳。当前不能提交命令或执行 GEMM。
+L1 已创建的文件如下；标注「L2」的条目是精确路线的实施目标，不提前放空壳。
 
 ```text
 src/workerbee/gem5/
@@ -41,54 +46,41 @@ src/workerbee/gem5/
 ├── spec.md                         # 模型行为、输入输出及验收契约
 ├── model/
 │   ├── SConscript                  # 外部 gem5 模块构建入口
-│   ├── WorkerBee.py                # Python SimObject 声明
+│   ├── WorkerBee.py                # Python SimObject 声明（L1 参数）
 │   ├── workerbee.hh
-│   ├── workerbee.cc                # 顶层 ClockedObject、时钟推进、端口与统计
-│   ├── types.hh                    # 命令、响应、格式、窗口/行 token
-│   ├── regfile.hh
-│   ├── regfile.cc                  # 四路共享 bank、仲裁、响应、IRQ
-│   ├── geometry.hh
-│   ├── geometry.cc                 # 配置检查与地址/执行几何
-│   ├── executor.hh
-│   ├── executor.cc                 # 执行 FSM 与波前/回灌协调
-│   ├── dma.hh
-│   ├── dma.cc                      # 读/写 DMA 状态与 gem5 请求适配
-│   ├── datapath.hh
-│   ├── datapath.cc                 # FIFO、有效 token 流水及单行输出转换
-│   └── test_support/
-│       ├── SConscript
-│       ├── TestDevices.py
-│       ├── trace_driver.hh
-│       ├── trace_driver.cc         # 命令与响应反压驱动，不属于 DUT
-│       ├── timing_memory.hh
-│       └── timing_memory.cc        # 确定性内存、延迟/反压/错误注入
+│   ├── workerbee.cc                # 顶层 ClockedObject、拍推进、端口、trace 装载、JSON 结果
+│   ├── types.hh                    # 命令、trace batch、格式枚举
+│   ├── regfile.hh/.cc              # 四 lane 接收、寄存器、IRQ/ERROR_CODE、启动快照
+│   ├── geometry.hh/.cc             # 配置检查与地址/执行几何
+│   ├── stream.hh/.cc               # 读/写 DMA 流：credit、gather、retry、行写
+│   ├── executor.hh/.cc             # 五状态窗口 FSM：B 预蓄 → A 消费 → 下一 tile → 排空
+│   └── test_support/               # L2：命令驱动、确定性内存与错误注入
 ├── configs/
-│   ├── run.py                      # 唯一运行入口，拼装 DUT 与测试环境
+│   ├── run.py                      # P0 idle smoke（不执行 GEMM）
+│   ├── gemm.py                     # L1 单任务 GEMM 入口：私有 bank 或共享总线
 │   ├── hardware.py                 # 已验证硬件配置清单
-│   └── memory.py                   # 确定性内存、local SRAM、互连/DRAM 配置
+│   └── memory.py                   # L2：存储/互连组合与仲裁
 ├── tools/
-│   ├── baseline.py                 # P0 source/RTL 清单与 SHA256
-│   ├── build.py                    # P0 隔离 gem5 构建与二进制来源记录
-│   ├── elaborate.py                # P0 安全发射与默认 profile 对账
-│   ├── EmitP0.scala                # P0 独立 WorkerBeeConfig() RTL 发射助手
-│   ├── timing_evidence.py          # P0 结构与 API 源码定位；不是边沿校准
-│   ├── calibrate.py                # P0 RTL 单测、逐拍采样与溯源检查
-│   ├── trace.py                    # 后续 kernel 描述转合法命令轨迹
-│   ├── compare.py                  # 后续 RTL/gem5 事件归一化与差异定位
-│   └── report.py                   # 后续统计归一化、配置扫描汇总
+│   ├── baseline.py                 # source/RTL 清单与 SHA256
+│   ├── build.py                    # 隔离 gem5 构建与二进制来源记录
+│   ├── elaborate.py                # 安全发射与默认 profile 对账
+│   ├── EmitP0.scala                # 独立 WorkerBeeConfig() RTL 发射助手
+│   ├── timing_evidence.py          # 结构与 API 源码定位；不是边沿校准
+│   ├── calibrate.py                # RTL 单测、逐拍采样与溯源检查
+│   ├── command_trace.py            # 形状/格式 → 四 lane 命令轨迹、地址布局、JSONL
+│   ├── scan.py                     # 形状扫描驱动与 scan.json/scan.md 汇总
+│   ├── compare.py                  # L2：RTL/gem5 事件归一化与差异定位
+│   └── report.py                   # L2：统计归一化与配置扫描汇总
 └── tests/
-    ├── test_baseline.py            # P0 哈希、来源隔离、CLI 错误
-    ├── test_p0.py                  # P0 profile、过期基线、范围守卫
+    ├── test_baseline.py            # 哈希、来源隔离、CLI 错误
+    ├── test_p0.py                  # profile、过期基线、范围守卫
     ├── test_calibrate.py           # 单测结果、RTL/来源完整性与验收守卫
+    ├── test_command_trace.py       # 命令字、几何、布局、打包
+    ├── test_scan.py                # 扫描参数、结构估计、汇总表格
     ├── RtlEdgeSuite.scala          # 统一采样、只读测试与双线程编译设置
     ├── WorkerBeeRtlStorageSpec.scala # FIFO、CalcConfig、cvt 单测
     ├── WorkerBeeRtlArraySpec.scala # 波前、skew/deskew、executor 窗口
-    ├── WorkerBeeRtlDmaSpec.scala   # 读 credit、gather、stretch 单测
-    ├── cases.json                  # 手写形状、地址、格式与故障用例描述
-    ├── test_contract.py            # 寄存器/IRQ/四路握手
-    ├── test_dma.py                 # 地址、gather/stretch、credit、writeback
-    ├── test_timing.py              # FIFO、流水、背压、RTL 对拍
-    └── test_workload.py            # trace 转换、重复执行、性能报告
+    └── WorkerBeeRtlDmaSpec.scala   # 读 credit、gather、stretch 单测
 ```
 
 ### 2.1 仓库与外部环境边界
@@ -111,13 +103,14 @@ src/workerbee/gem5/
 | 文件 | 核心内容 | 明确不负责 |
 |---|---|---|
 | `WorkerBee.py` | C++ 类绑定、GEMM clock domain、真实硬件配置及 DMA 端口 | 寄存器执行语义、网络调度 |
-| `workerbee.hh/.cc` | 持有子状态；拍前快照/组合评估/拍后提交；端口绑定、生命周期、stats、debug 输出 | 用总延迟公式直接完成命令 |
-| `types.hh` | 与硬件同编码的 DataFormat、op、command/response；`nt/kt/m` token；硬件状态与仿真元数据分离 | 新硬件指令或寄存器 |
-| `regfile.hh/.cc` | bank、4 slots/pending、lane 仲裁、START、读快照、RAW/MASK/CLEAR/ERROR_CODE | GEMM 几何、内存调度 |
-| `geometry.hh/.cc` | M/N/K 检查；格式族、block、stride、地址、beat 数；CalcConfig 阶段 | 自动替硬件补齐 N 或拆分 M |
-| `executor.hh/.cc` | 五状态执行 FSM；B/ScaleB 预蓄；A/ScaleA 锁步；回灌与写门；完成 | 外部 kernel 调度、擅自跨命令保留权重 |
-| `dma.hh/.cc` | 自主扫描 FSM；gather/stretch；credit/在途记账；ScaleA owner；包、retry、响应顺序适配 | 缓存/DRAM 延迟预测、数值矩阵计算 |
-| `datapath.hh/.cc` | A/B/C/scale FIFO；按实际 enable 推进的有效 token；C回灌；单行 cvt 保持及ScaleC FIFO | 每 PE 的浮点或整数算术 |
+| `workerbee.hh/.cc` | 持有子状态；逐拍推进；端口绑定、生命周期、trace 装载、stats、JSON 结果 | 用总延迟公式直接完成命令 |
+| `types.hh` | 与硬件同编码的 DataFormat、op、command；trace batch | 新硬件指令或寄存器 |
+| `regfile.hh/.cc` | 四 lane 接收、寄存器、START、读快照、RAW/MASK/CLEAR/ERROR_CODE、DMA 错误锁存 | GEMM 几何、内存调度 |
+| `geometry.hh/.cc` | M/N/K 检查；格式族、block、stride、地址、beat 数 | 自动替硬件补齐 N 或拆分 M |
+| `executor.hh/.cc` | 五状态窗口 FSM；B 预蓄；A 消费；回灌与写门；C 行延迟排队与排空 | 外部 kernel 调度、擅自跨命令保留权重 |
+| `stream.hh/.cc` | 读/写 DMA 流：占用与 outstanding、gather、retry、行写字节选通 | 缓存/DRAM 延迟预测、数值矩阵计算 |
+
+L1 把 FIFO、地址生成和端口适配合并在这些状态类里；L2 若需要独立的 FIFO/cvt 状态，再按实际调用边界拆分，不预先建空壳。
 
 这些 C++ 状态类由一个 DUT 时钟对象统一推进，不把每个内部子模块注册成独立 SimObject。测试环境与外部存储才是独立 SimObject。初始不创建通用插件框架或多套等价执行引擎。
 
@@ -125,18 +118,21 @@ src/workerbee/gem5/
 
 | 文件 | 输入 | 输出与职责 |
 |---|---|---|
-| `trace_driver.*` | 原始命令批次、响应 ready 时间表、任务标记 | 持稳输入直到 fire；匹配 ACK；提供外部理想提交器，明确不代表 CPU/ISA |
-| `timing_memory.*` | 延迟、ready/服务窗口、响应顺序和故障注入描述 | 可复现的内存响应；支持源码所需同拍/后续拍边界验证 |
+| `trace_driver.*` | L2：原始命令批次、响应 ready 时间表、任务标记 | 持稳输入直到 fire；匹配 ACK；外部理想提交器，不代表 CPU/ISA |
+| `timing_memory.*` | L2：延迟、ready/服务窗口、响应顺序和故障注入描述 | 可复现的内存响应；支持同拍/后续拍边界验证 |
 | `hardware.py` | 经同配置 RTL 验证的参数 | 唯一命名 profile，派生参数不能重复配置 |
-| `memory.py` | 存储容量、端口宽度/共享关系、延迟、频率 | 明确的系统组合，不把六口都默认为独享无限带宽 |
-| `run.py` | hardware profile、内存环境、trace、seed、输出目录 | 实例化、运行、生成 manifest 与结果；拒绝不受支持运行域 |
-| `trace.py` | GEMM kernel 形状、逻辑 N、格式、地址、block/epilogue | M拆命令、N/K合法补齐、B布局/打包描述与真实寄存器操作；不包含模型时间表 |
-| `compare.py` | 同输入的 RTL 与 gem5 事件 | 首个差异的 cycle/port/nt/kt/m；精确流量和状态检查 |
-| `report.py` | manifest、原始 stats、任务边界 | 周期、流量、利用率、stall、宿主速度和误差；不提供“校正系数” |
+| `memory.py` | L2：存储容量、端口宽度/共享关系、延迟、频率 | 明确的系统组合，不把六口都默认为独享无限带宽 |
+| `gemm.py` | 形状/格式/block、时钟、存储与模型旋钮 | 生成命令轨迹、实例化 WorkerBee 与六个存储 bank、写 manifest/result |
+| `command_trace.py` | GEMM 形状、逻辑 N、格式、地址与 block/epilogue | 四 lane 命令轨迹、地址布局、JSONL；不含模型时间表 |
+| `scan.py` | 形状网格与运行参数 | 逐形状运行 gem5 并汇总 scan.json/scan.md |
+| `compare.py` | L2：同输入的 RTL 与 gem5 事件 | 首个差异的 cycle/port/nt/kt/m；精确流量和状态检查 |
+| `report.py` | L2：manifest、原始 stats、任务边界 | 周期、流量、利用率、stall、宿主速度和误差；不提供“校正系数” |
 
 只在形成真实调用边界时继续拆文件；以上职责不要求一个函数对应一个文件。
 
 ## 4. 实现步骤与阶段门槛
+
+P0、P1 已完成并被 L1 复用；P2 起的逐拍对拍属于 L2 路线，未开始。L1 的已完成范围见第 8 章。
 
 ### P0：冻结基线和建模证据
 
@@ -256,14 +252,16 @@ python3 -B -m unittest discover -s src/workerbee/gem5/tests -p 'test_*.py'
 
 发射目录必须不存在；构建只用新建 `WORKERBEE_P0` variant，不覆盖既有 RISCV/X86 二进制；所有步骤不得修改源文件来绕过检查。RTL 目录保存 `hardware.json`、`baseline.json` 与日志；smoke 保存 `manifest.json`、`result.json` 和 gem5 原生统计。硬件源码或 RTL 改变后必须重新发射；模型 C++/绑定改变后必须重新构建。
 
-### 7.1 RTL 边沿校准进度（2026-10-28）
+### 7.1 RTL 边沿校准进度（2026-10-30）
 
 - 已实现 3 个 suite、8 项默认配置子模块测试及统一拍前 JSONL 采样；设计 RTL 与原有测试未修改。
-- Python 工具回归 50 项通过，包括 Scala 测试来源清单、基线 hash、逐用例采样覆盖/单调周期、RTL/XML 完整性与单测不得冒充 P0 验收的守卫。
+- Python 工具回归 54 项通过，包括 Scala 测试来源清单、基线 hash、逐用例采样覆盖/单调周期、RTL/XML 完整性与单测不得冒充 P0 验收的守卫。
 - 首轮 `sim/workerbee/gem5/rtl-edges-20261028-storage/` 中 FIFO、CalcConfig 通过，cvt 启动失败；它不是完整通过的校准报告。
-- 完整集合 `sim/workerbee/gem5/rtl-edges-20261028-units/` 的 8 个设计均通过编译/发射并生成仿真程序，实际 Makefile 为 `-j 2`；8 项均因缺少 `simulation-log.txt` 失败，无测试体采样，不记为时序通过。
-- `startup-diagnostics.json` 保存宿主启动证据及关联日志/XML/调用栈 hash。同一程序由 Python 直接启动可完成 ready/done 协议；Java ProcessBuilder 在 JDK 17/26 下均阻塞，采样停在 `_dyld_start`。系统日志记录生成程序的 AMFI `Unrecoverable CT signature issue`；当前探测不支持 swap 耗尽归因。没有修改签名或系统安全设置。
-- 宿主启动问题解决后，先重跑 cvt/FIFO/CalcConfig，再运行 array/executor 和 DMA，最后在源码稳定且全新的目录执行完整集合。只有真实测试通过才生成校准报告；本次没有 `calibration.json`。
+- 硬件升到规格 v4.1.0（BF16 默认输入）后，`p0-20261027` 的 RTL 基线已与源码不符，`hardware.py`/`EmitP0.scala` 同步补上 BF16；`sim/workerbee/gem5/rtl-baseline-20261030/` 按当前源码重新发射，派生参数未变。
+- 完整集合 `sim/workerbee/gem5/rtl-edges-20261030/` 8 项全部通过（单次 sbt 运行即全绿，约 1 分钟），`calibration.json` 与 `--verify-only` 复核均通过。
+- 之前的 `rtl-edges-20261028-units/` 8 项失败源于宿主启动拦截：新链接的仿真程序首次执行时由企业 EDR 做云端信誉判定，超过约 10 s 窗口即被 SIGKILL，进程未到 main，svsim 因缺少 `simulation-log.txt` 把该失败伪装成文件缺失。签名本身有效（`codesign --verify --strict` 通过、重新签名仍被杀）；swap 与签名有效性均已排除。诊断与证据在 `startup-diagnostics.json`，未修改任何签名或系统安全设置。
+- 该宿主问题由工具自行消化：`calibrate.py` 检测到启动签名后，先对每个已编译仿真程序做一次 `D` 预热（最多 4 次），再在同一目录重跑 sbt，最多 3 轮；重跑验证过即使 Verilator 重链接也会通过，因此恢复靠重试而非二进制复用。
+- 仍不能据此声称周期准确：本报告只有子模块边沿，`edge_calibrated=false`，顶层 GEMM/写响应排空、ScaleA owner、C 写域、ScaleC 服务域与 gem5 协议适配仍未验证。
 
 ```sh
 python3 -B src/workerbee/gem5/tools/calibrate.py \
@@ -275,4 +273,65 @@ python3 -B src/workerbee/gem5/tools/calibrate.py \
 
 `--suite` 可重复指定上述单个 suite；输出目录须不存在。成功报告同时检查当前 hardware/model 来源、默认 RTL 基线、完整产物清单及 XML 用例结果。采样工具与 Scala 单测均计入 model source hash；任何来源变更后旧报告失效，不能沿用失败轮次或历史两项通过作为当前全量验收。
 
-**未通过的门槛**：完整 RTL 单测、顶层 GEMM/写响应排空、ScaleA 参数 owner、C-write 计数合法域、ScaleC 服务域、G5-U01–U06、gem5 协议及 Linux 构建验收。`edge_calibrated=false`、`p0_accepted=false`、`performance_valid=false`、`data_valid=false` 保持不变，不能以单测或 idle smoke 声称 GEMM 已实现或周期准确。
+**未通过的门槛**：顶层 GEMM/写响应排空、ScaleA 参数 owner、C-write 计数合法域、ScaleC 服务域、G5-U01–U06、gem5 协议及 Linux 构建验收。8 项子模块边沿单测通过不等于上述门槛通过，`edge_calibrated=false`、`p0_accepted=false`、`performance_valid=false`、`data_valid=false` 保持不变，不能以单测或 idle smoke 声称 GEMM 已实现或周期准确。
+
+## 8. L1 粗粒度模型（2026-10-30）
+
+### 8.1 时间语义
+
+- 一拍消费一个 A beat（M 行之一）与一个 B beat（T 行之一）；窗口顺序 N tile → K pass → (T 个 B beat, M 个 A beat)，与 RTL executor 的状态顺序一致。
+- B 侧先预蓄满 T 个 beat 才进入窗口；窗口内 B 供不上时计 stall，不提前推进。
+- 每个输出行在其末 K pass 的 A beat 之后排队，`array_pipeline_latency`（默认 31）拍后进入 C 写通道；通道每拍最多一个 beat。
+- 峰值口径：阵列 16×16 PE、每 lane 每拍打包 `16/elemBits` 个元素，故峰值 = `T × kPerBeat` MAC/cycle（INT8=512、BF16=256、INT4=1024）。利用率 = 实测 MAC/cycle ÷ 该峰值。
+- 不建模：逐 PE 波前、skew/deskew、FIFO 透传、cvt 内部保持、多实例竞争。
+
+### 8.2 存储环境
+
+默认六个 DMA 端口各接一个 `SimpleMemory` bank，地址区间互不相交（`command_trace.banked_layout`：A→0、B→1、C→2、ScaleA/bias/rqM→3、ScaleB→4、ScaleC→5）。这样拍数只反映 GEMM 结构与 DMA 流控，不掺入互连排队。`--shared-bus` 切回六口共享一个 `SystemXBar` 的竞争实验：同一 16×16×64 INT8 任务从 141 拍升到 778 拍，其中 CoherentXBar 每读往返约 10 个 DUT 拍、发射被限到每 2 拍一个请求，属互连而非 DUT 行为，故不作为默认口径。
+
+### 8.3 首批结果（500 MHz，1 ns 私有 bank，`--array-latency 31`）
+
+`sim/workerbee/gem5/scan-20261030/`：INT8 18 个形状（M∈{16,32,48}、N∈{16,64,128}、K∈{64,256}）。整表 18/18 成功，详细表格见 `scan.md`。
+
+| 指标 | 观察 |
+|---|---|
+| 16×16×64 | 141 拍，结构性估计 127 拍，利用率 0.227 |
+| 48×128×256 | 4383 拍，利用率 0.701（本批最高） |
+| 趋势 | M 增大时利用率单调上升：每窗口固定付出 T 个 B beat，M 越大摊薄越彻底（N=128、K=256 时 M=16/32/48 分别为 0.445/0.613/0.701） |
+| 流量 | A/C 请求与字节数等于理论值；B 在 INT8、N=16 时因行步进 16 B 小于 32 B 拍宽，一半 beat 触发 gather，物理字节为 1.5× |
+
+以上数字只描述结构与流控。它们未与 RTL 对拍，不能用于性能承诺；`model_kind=timing_loose`、`data_valid=false`、`performance_valid=false`。
+
+`sim/workerbee/gem5/scan-20261030-mx8/`：MXFP8（A/B/C 均 MXE4M3、`loadW=1`、blkA=blkB=32、blkC=16）8 个形状（M∈{16,32}、N∈{16,64}、K∈{64,128}），8/8 成功。
+
+| 指标 | 观察 |
+|---|---|
+| 16×16×64 | 125 拍，结构性估计 111 拍，利用率 0.256 |
+| 32×64×128 | 936 拍，利用率 0.547（本批最高） |
+| 与 INT8 对比 | 同形状下 MX8 每窗口的 B beat 数不变（`kPerBeat` 相同），但 scale 读把 4 B 拍拆成两次非对齐读，`dma_bytes_per_cycle` 升至 24–38；峰值同为 `16 × 32 = 512` MAC/cycle |
+| 缩放读流量 | ScaleA/ScaleB 每个逻辑 beat 的地址步进为 1 B，只有 1/4 落在 4 B 拍边界，故 32 个 beat 产生 56 次物理请求 |
+
+MX8 首轮曾整批 20M 拍超时：最后一个逻辑 scale beat 非对齐时，gather 的 lo 读已把 `produced_` 推到 `count_`，`ReadStream::tick()` 先判 `produced_ == count_` 提前返回，hi 读永不补发，beat 永久滞留 `reserved_`，第二个 K 窗口的 `scaleB` 占用停在 15 < T。现已把 gather 分支移到该判断之前，并让 hi 读遵守 outstanding 上限；修复后两组扫描全部通过，模型输出本身未改变口径。
+
+### 8.4 复现
+
+```sh
+GEM5="/path/to/gem5/build/WORKERBEE_P0/gem5.opt"
+RUN="$REPO/sim/workerbee/gem5/l1-run"
+"$GEM5" -d "$RUN" src/workerbee/gem5/configs/gemm.py --shape 16x16x64
+"$GEM5" -d "$RUN-mx8" src/workerbee/gem5/configs/gemm.py --shape 16x16x64 \
+  --a-fmt MXE4M3 --b-fmt MXE4M3 --c-fmt MXE4M3 --load-w 1 \
+  --blk-a 32 --blk-b 32 --blk-c 16
+python3 -B src/workerbee/gem5/tools/scan.py --gem5 "$GEM5" \
+  --output "$REPO/sim/workerbee/gem5/scan-new-run" --preset int8
+python3 -B src/workerbee/gem5/tools/scan.py --gem5 "$GEM5" \
+  --output "$REPO/sim/workerbee/gem5/scan-new-run-mx8" --preset mx8 \
+  --a-fmt MXE4M3 --b-fmt MXE4M3 --c-fmt MXE4M3 --load-w 1 --blk-a 32 --blk-b 32 --blk-c 16
+```
+
+`gemm.py` 的输出目录必须不存在（模型会写 `model_result.json` 并退出仿真）；`scan.py` 默认删除成功形状的子目录，加 `--keep-runs` 保留。每次模型 C++/绑定变化后需重新构建 `WORKERBEE_P0`。
+
+### 8.5 文档变更与校准记录
+
+`baseline.py` 把 `gem5/plan.md`、`gem5/spec.md` 与模型源码一起计入 `model_source_hash`，因此本次文档与 L1 模型更新会使 `sim/workerbee/gem5/rtl-edges-20261030/calibration.json` 与 `rtl-edges-20261030-l1/` 的模型来源失效。已按当前来源重跑边沿校准到 `sim/workerbee/gem5/rtl-edges-20261030-l1-fix/`（8 项全绿，`--verify-only` 通过，仍为 `edge_calibrated=false`）；旧目录保留为历史证据，`--verify-only` 对其报 `Stale RTL calibration sources` 属预期，不能沿用其结论。
+
