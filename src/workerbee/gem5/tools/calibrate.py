@@ -4,8 +4,10 @@ import json
 import os
 from pathlib import Path
 import platform
+import shutil
 import subprocess
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 
 MODULE_ROOT = Path(__file__).resolve().parents[1]
@@ -21,9 +23,54 @@ SUITES = {
     "WorkerBeeRtlDmaSpec": {"dma_credit", "dma_gather", "dma_stretch"},
 }
 
+STARTUP_SIGNATURE = "simulation-log.txt (No such file or directory)"
+WARMUP_ATTEMPTS = 4
+WARMUP_TIMEOUT_SECONDS = 120
+SBT_ATTEMPTS = 3
+
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def simulators(output):
+    return sorted(Path(output).glob("work/*/*/should-*/workdir-verilator/simulation"))
+
+
+def startup_failure(log_path, offset=0):
+    try:
+        return STARTUP_SIGNATURE in Path(log_path).read_bytes()[offset:].decode(errors="replace")
+    except OSError:
+        return False
+
+
+def warm_simulator(binary, attempts=WARMUP_ATTEMPTS, run=subprocess.run):
+    with tempfile.TemporaryDirectory(prefix="workerbee-rtl-warmup-") as scratch:
+        environment = dict(os.environ)
+        environment["SVSIM_SIMULATION_LOG"] = str(Path(scratch) / "simulation-log.txt")
+        environment["SVSIM_EXECUTION_SCRIPT"] = str(Path(scratch) / "execution-script.txt")
+        for attempt in range(1, attempts + 1):
+            try:
+                completed = run([str(binary)], input="D\n", text=True, capture_output=True,
+                                env=environment, timeout=WARMUP_TIMEOUT_SECONDS, check=False)
+            except subprocess.TimeoutExpired:
+                continue
+            if completed.returncode == 0 and completed.stdout.startswith("r ready"):
+                return attempt
+    raise RuntimeError(f"Simulator did not start within {attempts} attempts: {binary}")
+
+
+def warm_simulators(output):
+    binaries = simulators(output)
+    if not binaries:
+        raise RuntimeError(f"No compiled simulators under {Path(output) / 'work'}")
+    return {binary: warm_simulator(binary) for binary in binaries}
+
+
+def run_sbt(command, output, environment):
+    with (output / "calibration.log").open("a", buffering=1) as log:
+        return subprocess.run(command, cwd=REPO_ROOT, env=environment,
+                              stdout=log, stderr=subprocess.STDOUT, check=False)
 
 
 def read_results(directory, suites):
@@ -117,10 +164,25 @@ def calibrate(output_dir, rtl_dir, sbt, suites):
     for name, path in (("CPATH", "/opt/homebrew/include"), ("LIBRARY_PATH", "/opt/homebrew/lib")):
         if Path(path).is_dir():
             environment[name] = os.pathsep.join(filter(None, (environment.get(name), path)))
-    with (output / "calibration.log").open("w", buffering=1) as log:
+    log_path = output / "calibration.log"
+    with log_path.open("w", buffering=1) as log:
         log.write(json.dumps(command) + "\n")
-        completed = subprocess.run(command, cwd=REPO_ROOT, env=environment,
-                                   stdout=log, stderr=subprocess.STDOUT, check=False)
+    warmup = {"triggered": False, "attempts": {}, "sbt_runs": 0}
+    offset = log_path.stat().st_size
+    for _ in range(SBT_ATTEMPTS):
+        warmup["sbt_runs"] += 1
+        completed = run_sbt(command, output, environment)
+        attempt_log_offset, offset = offset, log_path.stat().st_size
+        if not completed.returncode or not startup_failure(log_path, attempt_log_offset):
+            break
+        # A hosted simulator that dies before its first prompt leaves svsim without a log to
+        # read, which surfaces as this startup signature instead of the test result.
+        warmup["triggered"] = True
+        for binary, attempts in warm_simulators(output).items():
+            warmup["attempts"][binary.relative_to(output).as_posix()] = attempts
+        for path in output.glob("*.jsonl"):
+            path.unlink()
+        shutil.rmtree(output / "test-reports", ignore_errors=True)
     after = snapshot(REPO_ROOT)
     if completed.returncode:
         raise RuntimeError(f"RTL calibration failed ({completed.returncode}); see {output / 'calibration.log'}")
@@ -141,7 +203,7 @@ def calibrate(output_dir, rtl_dir, sbt, suites):
         "baseline_rtl_hash": baseline["rtl_hash"], "baseline_directory": str(Path(rtl_dir).resolve()),
         "instrumentation": "test-only read probes and isolated submodule fixtures; no design source changes",
         "sampling": "signals sampled after input settling, immediately before each rising edge; reset frames identified where logged",
-        "verilator_compile_jobs": 2,
+        "verilator_compile_jobs": 2, "simulator_warmup": warmup,
         "suites": list(suites), "cases": cases, "unit_edges_passed": True,
         "complete_unit_suite": set(suites) == set(SUITES), "edge_calibrated": False,
         "p0_accepted": False, "performance_valid": False, "data_valid": False,

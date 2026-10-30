@@ -18,7 +18,7 @@ object WorkerBeeGem5P0Elaborate {
       DataFormat.INT8 -> "INT8", DataFormat.INT4 -> "INT4",
       DataFormat.MXE4M3 -> "MXE4M3", DataFormat.MXE5M2 -> "MXE5M2",
       DataFormat.MXE2M1 -> "MXE2M1", DataFormat.FP8E4M3 -> "FP8E4M3",
-      DataFormat.FP8E5M2 -> "FP8E5M2"
+      DataFormat.FP8E5M2 -> "FP8E5M2", DataFormat.BF16 -> "BF16"
     ).filter { case (fmt, _) => cfg.supportedFmts.contains(fmt) }.map(_._2).sorted
     require(formatNames.size == cfg.supportedFmts.size, "Unsupported P0 input format")
     val formats = formatNames.map(name => "\"" + name + "\"").mkString(",")

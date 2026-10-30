@@ -3,6 +3,7 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -149,6 +150,42 @@ class CalibrationTests(unittest.TestCase):
     def test_existing_output_is_never_overwritten(self):
         with self.assertRaisesRegex(ValueError, "new directory"):
             calibrator.calibrate(self.output, self.output, "sbt", list(self.suites))
+
+    def test_startup_failure_signature_is_detected(self):
+        log = self.output / "calibration.log"
+        log.write_text("[info] java.io.FileNotFoundException: /x/workdir-verilator/simulation-log.txt"
+                       " (No such file or directory)\n")
+        self.assertTrue(calibrator.startup_failure(log))
+        log.write_text("[error] assertion failed: expected 5, got 3\n")
+        self.assertFalse(calibrator.startup_failure(log))
+        self.assertFalse(calibrator.startup_failure(self.output / "absent.log"))
+
+    def test_compiled_simulators_are_discovered(self):
+        work = self.output / "work/Suite/A-suite/should-case/workdir-verilator"
+        work.mkdir(parents=True)
+        binary = work / "simulation"
+        binary.write_text("#!/bin/sh\n")
+        self.assertEqual(calibrator.simulators(self.output), [binary])
+
+    def test_simulator_warmup_retries_until_ready(self):
+        calls = []
+
+        def run(command, **options):
+            calls.append((command, options))
+            code = -9 if len(calls) < 3 else 0
+            return subprocess.CompletedProcess(command, code, "r ready\n" if code == 0 else "")
+
+        self.assertEqual(calibrator.warm_simulator(Path("work/simulation"), run=run), 3)
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(calls[0][1]["input"], "D\n")
+        self.assertTrue(calls[0][1]["env"]["SVSIM_SIMULATION_LOG"].startswith("/"))
+
+    def test_simulator_warmup_reports_exhaustion(self):
+        def run(command, **options):
+            raise subprocess.TimeoutExpired(command, calibrator.WARMUP_TIMEOUT_SECONDS)
+
+        with self.assertRaisesRegex(RuntimeError, "did not start"):
+            calibrator.warm_simulator(Path("work/simulation"), attempts=2, run=run)
 
     def test_cli_errors_are_structured(self):
         stderr = io.StringIO()

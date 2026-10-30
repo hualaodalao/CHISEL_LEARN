@@ -4,7 +4,7 @@ GEM5_COMMIT = "c8222cc67a399bfc01e8658dd14b30d5bfd634f9"
 
 DEFAULT_PROFILE = {
     "name": PROFILE_NAME,
-    "spec_version": "4.0.0",
+    "spec_version": "4.1.0",
     "parameters": {
         "arrayN": 8,
         "clusterM": 2,
@@ -18,7 +18,7 @@ DEFAULT_PROFILE = {
         "scaleBufferDepth": 64,
         "cDmaExtW": 256,
         "supportedFmts": [
-            "FP8E4M3", "FP8E5M2", "INT4", "INT8", "MXE2M1", "MXE4M3", "MXE5M2",
+            "BF16", "FP8E4M3", "FP8E5M2", "INT4", "INT8", "MXE2M1", "MXE4M3", "MXE5M2",
         ],
     },
     "derived": {
