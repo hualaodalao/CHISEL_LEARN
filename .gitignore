@@ -8,6 +8,11 @@ project/project/target/
 .metals/
 .bsp/
 
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
 # IDE
 .idea/
 .vscode/
