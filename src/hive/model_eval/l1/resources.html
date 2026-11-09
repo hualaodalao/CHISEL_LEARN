@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Hive · L1 资源与时间账本</title>
+<title>Hive · L1 任务与资源账本</title>
 <style>
 :root{--paper:#f4f0e6;--surface:#fcfaf4;--ink:#292d24;--muted:#616654;--line:#d9d7c7;--dram:#7b854b;--gemm:#ac633e;--vpu:#587d83;--cpu:#80648d;--handoff:#b59836;--wash:#e9e8d9;--mono:'JetBrains Mono','IBM Plex Mono',monospace;--sans:'Space Grotesk','IBM Plex Sans','PingFang SC',sans-serif}
-*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 var(--sans)}button,select{font:inherit;color:inherit}button,select,summary{min-height:44px}button{cursor:pointer}button:focus-visible,select:focus-visible,summary:focus-visible,a:focus-visible{outline:3px solid var(--gemm);outline-offset:3px}button{background:transparent;border:1px solid var(--line);border-radius:5px;padding:9px 12px;text-align:left;transition:background .2s,border-color .2s}button:hover{background:var(--wash);border-color:var(--muted)}button[aria-pressed=true]{border-color:var(--gemm);background:#eee1d1}select{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:10px;font-size:14px}h1,h2,h3,p{margin:0}h1{font-size:clamp(34px,5.5vw,76px);line-height:1.05;letter-spacing:-2px;font-weight:800;max-width:750px}h2{font-size:27px;line-height:1.2;letter-spacing:-.6px}h3{font-size:18px}small,.note{color:var(--muted);font-size:13px}code,.mono{font-family:var(--mono)}.shell{max-width:1440px;margin:auto;padding:34px 40px 60px}.mast{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--ink);padding-bottom:14px;gap:16px}.eyebrow{font:12px var(--mono);letter-spacing:1.5px;color:var(--muted)}.badge{font:12px var(--mono);border:1px solid var(--gemm);color:#824927;padding:5px 9px}.intro{display:grid;grid-template-columns:1.7fr 1fr;gap:36px;margin:40px 0 30px;align-items:end}.intro p{max-width:650px;margin-top:20px;color:var(--muted)}.control{min-width:0}label{display:block;margin-bottom:10px;font:12px var(--mono);letter-spacing:1px}.notice{padding:16px 20px;border-left:4px solid var(--gemm);background:#ede4d4;overflow-wrap:anywhere}.notice strong{display:block}.warning{margin-top:12px;background:#eee4cb;border-left-color:var(--handoff)}.overview{display:grid;grid-template-columns:1.4fr 1fr 1fr;margin:26px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.stat{padding:22px 24px 22px 0;min-width:0}.stat+.stat{border-left:1px solid var(--line);padding-left:24px}.big{font:700 clamp(34px,4vw,56px)/1.25 var(--mono);letter-spacing:-2px;margin:8px 0}.stat-value{font:700 23px/1.3 var(--mono);margin:14px 0 9px;overflow-wrap:anywhere}.hardware{display:flex;flex-wrap:wrap;gap:10px 26px;font-size:13px;margin:18px 0 28px}.hardware span{font-family:var(--mono)}.section{border-top:1px solid var(--ink);padding-top:25px;margin-top:38px;min-width:0}.section-head{display:flex;justify-content:space-between;gap:20px;align-items:baseline;margin-bottom:18px}.section-head .note{max-width:500px}.legend{display:flex;flex-wrap:wrap;gap:12px 22px;margin:14px 0}.legend-item{display:flex;gap:7px;align-items:center;font:12px var(--mono)}.dot{width:9px;height:9px;border-radius:50%;background:var(--color)}.stack{display:flex;height:20px;border-radius:3px;overflow:hidden;background:var(--wash)}.segment{background:var(--color);min-width:0}.category-list{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:16px 0}.category-item{border-top:3px solid var(--color);padding-top:8px;min-width:0}.category-item strong{display:block;font:600 19px var(--mono);margin:7px 0}.accounting{display:flex;flex-wrap:wrap;gap:8px 26px;color:var(--muted);font-size:13px;padding-top:8px}.workspace{display:grid;grid-template-columns:minmax(300px,.85fr) minmax(0,1.5fr);gap:32px;align-items:start}.layer-map{display:grid;gap:5px;max-height:690px;overflow-y:auto;padding:4px}.layer-button{display:grid;grid-template-columns:94px 1fr 88px;align-items:center;gap:9px;width:100%;border-color:transparent;padding:8px;min-height:46px}.layer-button .stack{height:12px}.layer-name{font-size:12px}.layer-time{font:12px var(--mono);text-align:right}.panel{background:var(--surface);border:1px solid var(--line);padding:24px;min-width:0}.panel-heading{display:flex;justify-content:space-between;gap:14px;align-items:start}.panel-heading .mono{font-size:12px;color:var(--muted);overflow-wrap:anywhere}.operator-list{display:grid;gap:5px;margin:18px 0 24px;max-height:330px;overflow-y:auto;padding:3px}.op-button{display:grid;grid-template-columns:minmax(0,1fr) 62px 86px;gap:9px;align-items:center;padding:8px;min-height:44px}.op-button span:first-child{overflow-wrap:anywhere;font-family:var(--mono);font-size:12px}.op-button .engine{font:10px var(--mono);color:var(--muted)}.op-button .time{font:12px var(--mono);text-align:right}.operator-detail{border-top:1px solid var(--line);padding-top:23px}.operator-detail h3{font:700 23px var(--mono);overflow-wrap:anywhere}.meta{color:var(--muted);font:12px/1.8 var(--mono);margin:12px 0;overflow-wrap:anywhere}.detail-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:16px 0}.fact{background:var(--paper);padding:12px;min-width:0}.fact strong{display:block;font:600 15px var(--mono);margin-top:6px;overflow-wrap:anywhere}.table-scroll{overflow:auto;max-width:100%;margin:14px 0;overscroll-behavior-x:contain}table{width:100%;border-collapse:collapse;font-size:12px;text-align:left}th{font-weight:600;color:var(--muted);background:var(--wash);padding:10px;white-space:nowrap}td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}td.numeric{font-family:var(--mono);white-space:nowrap;text-align:right}#detail-metrics table{table-layout:fixed}#detail-metrics td:first-child{width:60%}#detail-metrics td.numeric{white-space:normal;overflow-wrap:anywhere}#layer-table{min-width:780px}#ledger-table{min-width:1120px}#ledger-table th:nth-child(1){min-width:160px}#ledger-table th:nth-child(2){min-width:210px}#ledger-table th:nth-child(3){min-width:145px}#ledger-table th:nth-child(4){min-width:110px}#ledger-table th:nth-child(5){min-width:230px}#ledger-table th:nth-child(6){min-width:240px}#ledger-table td{max-width:250px;overflow-wrap:anywhere}details{border-top:1px solid var(--line);margin-top:14px;padding-top:8px}summary{cursor:pointer;display:list-item;padding:8px 0;font-size:14px;font-weight:600}summary:hover{color:var(--gemm)}.list{padding-left:20px;font-size:12px;color:var(--muted);overflow-wrap:anywhere}.list li{margin:7px 0}.source-list{display:grid;gap:14px;margin:15px 0}.source{font:12px var(--mono);overflow-wrap:anywhere;padding-bottom:12px;border-bottom:1px solid var(--line)}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.7 var(--mono);margin:14px 0}.provenance{display:grid;grid-template-columns:1fr 1fr;gap:32px}.provenance>*{min-width:0}.footer{border-top:1px solid var(--line);margin-top:40px;padding-top:20px;color:var(--muted);font:11px/1.8 var(--mono);overflow-wrap:anywhere}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}[hidden]{display:none!important}.reveal{animation:rise .5s ease-out both}@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-@media(max-width:1000px){.shell{padding:26px}.workspace{grid-template-columns:1fr 1.3fr;gap:18px}.layer-button{grid-template-columns:78px 1fr 78px;gap:6px}.panel{padding:18px}.intro{grid-template-columns:1.2fr 1fr;gap:20px}.detail-facts{grid-template-columns:1fr 1fr}.big{font-size:40px}}
-@media(max-width:720px){.shell{padding:22px 16px 40px}.intro,.workspace,.provenance{grid-template-columns:1fr}.intro{margin-top:30px;gap:26px}h1{letter-spacing:-1px;font-size:46px}.mast{align-items:start}.eyebrow{font-size:10px;letter-spacing:1px}.badge{font-size:10px;white-space:nowrap}.overview{grid-template-columns:1fr 1fr}.stat:first-child{grid-column:1/-1;border-bottom:1px solid var(--line)}.stat{padding:17px 12px 17px 0}.stat+.stat{padding-left:12px}.stat:nth-child(2){border-left:0;padding-left:0}.big{font-size:46px}.stat-value{font-size:18px}.section-head{display:block}.section-head .note{margin-top:10px}.category-list{grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}.category-item strong{font-size:16px}.layer-map{max-height:360px}.layer-button{grid-template-columns:84px 1fr 88px}.panel{padding:16px}.detail-facts{grid-template-columns:1fr 1fr}.op-button{grid-template-columns:minmax(0,1fr) 45px 77px;gap:6px}.hardware{gap:9px 18px}.accounting{display:grid;gap:6px}.notice{padding:13px 15px}.category-item small{font-size:11px}.provenance{gap:12px}.panel-heading{flex-wrap:wrap}}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 var(--sans)}button,select,input{font:inherit;color:inherit}button,select,summary{min-height:44px}button{cursor:pointer;min-width:44px;background:transparent;border:1px solid var(--line);border-radius:4px;padding:9px 12px;text-align:left;transition:background .18s ease-out,border-color .18s ease-out}button:hover{background:var(--wash);border-color:var(--muted)}button[aria-pressed=true]{border-color:var(--gemm);background:#eee1d1}button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--gemm);outline-offset:3px}select{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:10px;font-size:14px}h1,h2,h3,p{margin:0}h1{font-size:clamp(42px,5.5vw,76px);line-height:1.05;letter-spacing:-2px;font-weight:800;max-width:750px}h2{font-size:27px;line-height:1.2;letter-spacing:-.6px}h3{font-size:18px}small,.note{color:var(--muted);font-size:13px}code,.mono{font-family:var(--mono)}.shell{max-width:1480px;margin:auto;padding:34px 40px 60px}.mast{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--ink);padding-bottom:14px;gap:16px}.eyebrow{font:12px var(--mono);letter-spacing:1.5px;color:var(--muted)}.badge{font:12px var(--mono);border:1px solid var(--gemm);color:#824927;padding:5px 9px}.intro{display:grid;grid-template-columns:1.7fr 1fr;gap:36px;margin:40px 0 30px;align-items:end}.intro p{max-width:650px;margin-top:20px;color:var(--muted)}label{display:block;margin-bottom:10px;font:12px var(--mono);letter-spacing:1px}.notice{padding:16px 20px;border-left:4px solid var(--gemm);background:#ede4d4;overflow-wrap:anywhere}.notice strong{display:block}.warning{margin-top:12px;background:#eee4cb;border-left-color:var(--handoff)}.overview{display:grid;grid-template-columns:1.4fr 1fr 1fr;margin:26px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.stat{padding:22px 24px 22px 0;min-width:0}.stat+.stat{border-left:1px solid var(--line);padding-left:24px}.big{font:800 clamp(34px,4vw,56px)/1.25 var(--mono);letter-spacing:-2px;margin:8px 0}.stat-value{font:800 23px/1.3 var(--mono);margin:14px 0 9px;overflow-wrap:anywhere}.hardware,.references{display:flex;flex-wrap:wrap;gap:10px 26px;font-size:13px;margin:18px 0 28px}.hardware span,.references strong{font-family:var(--mono)}.section{border-top:1px solid var(--ink);padding-top:25px;margin-top:38px;min-width:0}.section-head{display:flex;justify-content:space-between;gap:20px;align-items:baseline;margin-bottom:18px}.section-head .note{max-width:530px}.workspace{display:grid;grid-template-columns:minmax(240px,.65fr) minmax(0,1.6fr);gap:32px;align-items:start}.layer-map{display:grid;gap:5px;max-height:690px;overflow-y:auto;padding:4px}.layer-button{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:9px;width:100%;border-color:transparent;padding:8px}.layer-name{font-size:12px}.layer-time{font:12px var(--mono);text-align:right}.budget-track{grid-column:1/-1;height:5px;background:var(--wash)}.budget-fill{height:100%;background:var(--dram)}.panel{background:var(--surface);border:1px solid var(--line);padding:24px;min-width:0}.panel-heading{display:flex;justify-content:space-between;gap:14px;align-items:start}.panel-heading .mono{font-size:12px;color:var(--muted);overflow-wrap:anywhere}.operator-list,.task-list{display:grid;gap:5px;margin:18px 0 24px;max-height:300px;overflow-y:auto;padding:3px}.op-button,.task-button{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;align-items:center;padding:8px}.op-button span:first-child,.task-button span:first-child{overflow-wrap:anywhere;font:12px var(--mono)}.op-button .time,.task-button .time{font:12px var(--mono);text-align:right}.task-button small{grid-column:1/-1;font:11px var(--mono);overflow-wrap:anywhere}.operator-detail,.task-detail{border-top:1px solid var(--line);padding-top:23px}.operator-detail h3,.task-detail h3{font:800 21px var(--mono);overflow-wrap:anywhere}.meta{color:var(--muted);font:12px/1.8 var(--mono);margin:12px 0;white-space:pre-wrap;overflow-wrap:anywhere}.detail-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:16px 0}.fact{background:var(--paper);padding:12px;min-width:0}.fact strong{display:block;font:800 15px var(--mono);margin-top:6px;overflow-wrap:anywhere}.table-scroll{overflow:auto;max-width:100%;max-height:600px;margin:14px 0;overscroll-behavior-x:contain}table{width:100%;border-collapse:collapse;font-size:12px;text-align:left}caption{text-align:left;font:12px var(--mono);color:var(--muted);padding:6px 0}th{font-weight:800;color:var(--muted);background:var(--wash);padding:10px;white-space:nowrap;position:sticky;top:0}td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top;max-width:320px;overflow-wrap:anywhere;white-space:pre-wrap}td.numeric{font-family:var(--mono)}details{border-top:1px solid var(--line);margin-top:14px;padding-top:8px}summary{cursor:pointer;display:list-item;padding:8px 0;font-size:14px;font-weight:800}summary:hover{color:var(--gemm)}.list{padding-left:20px;font-size:12px;color:var(--muted);overflow-wrap:anywhere}.list li{margin:7px 0}.source-list{display:grid;gap:14px;margin:15px 0}.source{font:12px var(--mono);overflow-wrap:anywhere;padding-bottom:12px;border-bottom:1px solid var(--line)}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.7 var(--mono);margin:14px 0}.provenance{display:grid;grid-template-columns:1fr 1fr;gap:32px}.provenance>*{min-width:0}.footer{border-top:1px solid var(--line);margin-top:40px;padding-top:20px;color:var(--muted);font:11px/1.8 var(--mono);overflow-wrap:anywhere}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}[hidden]{display:none!important}.reveal{animation:rise .35s ease-out both}.overview.reveal{animation-delay:.08s}@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.timeline-controls{display:grid;grid-template-columns:minmax(180px,1fr) 2fr;gap:24px;align-items:center}.check{display:flex;align-items:center;gap:10px;min-height:44px;margin:0;letter-spacing:0}.check input{width:20px;height:20px;accent-color:var(--gemm)}.legend{display:flex;flex-wrap:wrap;gap:12px 22px;margin:14px 0}.legend-item{display:flex;gap:7px;align-items:center;font:12px var(--mono)}.dot{width:9px;height:9px;background:var(--color)}.timeline{max-height:500px;overflow:auto;padding:4px}.timeline-row{display:grid;grid-template-columns:240px minmax(180px,1fr) 140px;gap:12px;align-items:center;margin:5px 0;min-width:620px}.timeline-label{font:11px var(--mono);overflow-wrap:anywhere}.timeline-label small{display:block}.timeline-track{height:26px;position:relative;background:var(--wash)}.projection-bar{position:absolute;height:24px;top:1px;background:repeating-linear-gradient(135deg,transparent,transparent 4px,#fcfaf477 4px,#fcfaf477 7px),var(--color);border:1px dashed var(--ink);min-width:2px;border-radius:0;padding:0;min-height:24px;min-width:2px}.projection-bar:hover{background-color:var(--color);filter:brightness(.85)}.projection-bar[aria-pressed=true]{border:2px solid var(--ink);background-color:var(--color)}.projection-label{font:11px var(--mono);color:var(--muted)}.category-list{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:16px 0}.category-item{border-top:3px solid var(--color);padding-top:8px;min-width:0}.category-item strong{display:block;font:800 18px var(--mono);margin:7px 0;overflow-wrap:anywhere}
+@media(max-width:1000px){.shell{padding:26px}.workspace{grid-template-columns:minmax(200px,.6fr) minmax(0,1.4fr);gap:18px}.panel{padding:18px}.intro{grid-template-columns:1.2fr 1fr;gap:20px}.detail-facts{grid-template-columns:1fr 1fr}.big{font-size:40px}}
+@media(max-width:720px){.shell{padding:22px 16px 40px}.intro,.workspace,.provenance,.timeline-controls{grid-template-columns:1fr}.intro{margin-top:30px;gap:26px}h1{letter-spacing:-1px;font-size:46px}.mast{align-items:start}.eyebrow{font-size:10px;letter-spacing:1px}.badge{font-size:10px;white-space:nowrap}.overview{grid-template-columns:1fr 1fr}.stat:first-child{grid-column:1/-1;border-bottom:1px solid var(--line)}.stat{padding:17px 12px 17px 0}.stat+.stat{padding-left:12px}.stat:nth-child(2){border-left:0;padding-left:0}.big{font-size:46px}.stat-value{font-size:18px}.section-head{display:block}.section-head .note{margin-top:10px}.category-list{grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}.category-item strong{font-size:16px}.layer-map{max-height:310px}.panel{padding:16px}.detail-facts{grid-template-columns:1fr 1fr}.notice{padding:13px 15px}.provenance{gap:12px}.panel-heading{flex-wrap:wrap}.timeline-controls{gap:12px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
@@ -18,32 +18,49 @@
 <div id="data-error" class="notice warning" role="alert" hidden>无法读取报告数据。</div>
 <main id="report" hidden>
 <section class="intro reveal">
-<div><div class="eyebrow">OPERATOR → COMMAND → WINDOW</div><h1>看见每一层的<br>资源与时间。</h1><p id="model-description"></p></div>
-<div class="control"><label for="case-select">选择独立工作点 / ATTENTION 路径</label><select id="case-select"></select><p class="note" style="margin-top:10px">切换报告中已有的算例；不是在线仿真，也不是连续生成过程。</p></div>
+<div><div class="eyebrow">LAYER → LOGICAL OP → PRIMITIVE TASK</div><h1>预算不是延迟。<br>让未知可见。</h1><p id="model-description"></p></div>
+<div><label for="case-select">选择独立工作点 / ATTENTION 路径</label><select id="case-select"></select><p class="note">只切换报告已有算例；不是在线仿真或连续生成。</p></div>
 </section>
-<div class="notice"><strong id="calibration-notice"></strong><span>单核确定性解析账本。数字只包含已建模成本，不是实测延迟或可达性能；未知成本不计入合计。</span></div>
-<div id="partial-warning" class="notice warning" hidden><strong>仅部分已知资源时间 · 不输出吞吐</strong>本 profile 未提供完整时钟、local 端口服务率与 SRAM 容量。L1 部分时间不能与 L0 总下界直接比较，未知值没有补零或猜测。</div>
-<section class="overview" aria-label="全模型结果">
-<div class="stat"><div class="eyebrow">已计入全模型时间</div><div class="big" id="total-time"></div><p class="note" id="total-scope"></p></div>
-<div class="stat"><div class="eyebrow">L0 同输入资源下界</div><div class="stat-value" id="l0-time"></div><p class="note" id="l0-scope"></p></div>
-<div class="stat"><div class="eyebrow">仅已计入成本的吞吐</div><div class="stat-value" id="throughput"></div><p class="note" id="throughput-scope"></p></div>
+<div class="notice"><strong id="calibration-notice"></strong><span>已知服务预算是各任务的本地已知成本之和，不是经过时间。条件投影忽略未知服务，不证明实际并行、重叠或可达性能。</span></div>
+<div id="partial-warning" class="notice warning"><strong>覆盖不完整 · 不输出完整吞吐</strong>未知开始、结束与 makespan 保持未知，不补零。L0 仅作参考，不与本 L1 投影直接比较。</div>
+<div id="blocked-warning" class="notice warning" role="status" hidden><strong>排程被约束阻断 · 无条件投影</strong><details><summary>查看当前固定计划的阻断约束</summary><pre id="blocked-constraints"></pre></details></div>
+<section class="overview reveal" aria-label="全模型预算与经过时间">
+<div class="stat"><div class="eyebrow">MAKESPAN / 完整经过时间</div><div class="big" id="total-time"></div><p class="note" id="total-scope"></p></div>
+<div class="stat"><div class="eyebrow">已知服务预算 / 可加工作量</div><div class="stat-value" id="known-service-budget"></div><p class="note">Σ 任务本地已知预算；不是延迟，也不是层跨度之和。</p></div>
+<div class="stat"><div class="eyebrow">条件投影 / 非实际时间</div><div class="stat-value" id="projection-time"></div><p class="note">忽略未知服务后，按显式实例与资源预约得到的投影跨度。</p></div>
 </section>
+<div class="references"><div>L0 同输入下界 <strong id="l0-time"></strong><p class="note" id="l0-scope"></p></div><div>完整模型吞吐 <strong id="throughput"></strong><p class="note" id="throughput-scope"></p></div></div>
 <div class="hardware" id="hardware"></div>
-<section aria-labelledby="attribution-heading"><h2 id="attribution-heading">时间由谁占用？</h2><div class="legend" id="legend"></div><div id="total-stack"></div><div class="category-list" id="category-list"></div><div class="accounting"><span>逐层算子合计 <strong id="operators-time"></strong></span><span>跨引擎交接 <strong id="handoff-time"></strong> · <span id="handoff-count"></span> 次</span></div><p class="note" style="margin-top:12px">同源资源先取 max；已许可的重叠区间由主导资源归因。五类归因可相加，原始资源需求不可直接相加。交接间隔不属于任何模型层。</p></section>
-<section class="section" aria-labelledby="layers-heading"><div class="section-head"><h2 id="layers-heading">01 / 逐层资源地图</h2><p class="note">条长相对于本工作点最慢层；颜色为该层的已计入时间构成。选择一层，再查看其中算子。</p></div>
-<div class="workspace"><div><div class="layer-map" id="layer-map" aria-label="选择模型层"></div><p class="note" style="margin-top:12px">包含 Transformer blocks、final norm、LM head 与 sampling；未覆盖的服务仍在排除项中。</p></div>
-<article class="panel"><div class="panel-heading"><h3 id="layer-title"></h3><span class="mono" id="layer-subtitle"></span></div><div id="layer-stack" style="margin-top:14px"></div><div class="operator-list" id="operator-list" aria-label="选择算子"></div>
-<div class="operator-detail"><h3 id="detail-title"></h3><p class="meta" id="detail-meta"></p><div class="detail-facts" id="detail-facts"></div><p class="note" id="detail-evidence"></p><div id="detail-metrics"></div>
-<details id="placement-details" hidden><summary>驻留与容量依据</summary><pre id="placement-data"></pre></details>
-<details open><summary>原始资源账本 · 不是可加时间</summary><p class="note">同一 origin 表示同源流，在不同约束下取 max。seconds 为未知时，仅保留资源量，不计入时间；零已计入时间不代表该算子免费。</p><div class="table-scroll"><table id="ledger-table"><thead><tr><th>资源 / 实例</th><th>origin / 重叠组</th><th>原始时间需求</th><th>字节</th><th>拍 / 周期 / 操作</th><th>来源 / 依据</th></tr></thead><tbody></tbody></table></div><details><summary>同源耦合关系</summary><pre id="coupling-data"></pre></details></details>
-<details id="op-excluded-details"><summary id="op-excluded-summary">算子未计入项</summary><ul class="list" id="op-excluded"></ul></details>
-</div></article></div></section>
-<section class="section" aria-labelledby="table-heading"><div class="section-head"><h2 id="table-heading">02 / 全层对账表</h2><p class="note">可加的是已计入归因；此表不包含跨引擎交接间隔。</p></div><div class="table-scroll"><table id="layer-table"><thead><tr><th>模型层</th><th>算子数</th><th>已计入时间</th><th>DRAM</th><th>GEMM</th><th>VPU</th><th>CPU</th><th>交接</th></tr></thead><tbody></tbody></table></div></section>
-<section class="section" aria-labelledby="scope-heading"><div class="section-head"><h2 id="scope-heading">03 / 假设、边界与来源</h2><p class="note">逻辑周期不是墙钟校准。默认串行单核，无隐式 inter-op SRAM cache；多核映射与通信未建模。</p></div><div class="provenance"><div><details open><summary>可信度与未校准边界</summary><pre id="validity"></pre><p class="note" id="calibration-reason"></p></details><details><summary id="excluded-summary">完整未计入成本</summary><ul class="list" id="excluded-list"></ul></details><details><summary>模型总资源 · 权威 Python 账本</summary><pre id="total-metrics"></pre></details></div><div><details><summary>命名输入与场景参数</summary><pre id="named-inputs"></pre></details><details><summary>来源指纹 / SHA-256</summary><div class="source-list" id="sources"></div></details><details><summary>硬件引用出处</summary><pre id="citations"></pre></details></div></div></section>
-<footer class="footer">离线单文件 · 无外部依赖 · 数值来自 Python L1 时间线<br>Manifest digest <span id="digest"></span></footer>
+<section class="section" aria-labelledby="layers-heading"><div class="section-head"><h2 id="layers-heading">01 / 层 → 算子 → 原子任务</h2><p class="note">左侧条长只比较已知服务预算，不表示层经过时间。逻辑算子可拥有多个不同引擎的任务。</p></div>
+<div class="workspace"><aside><div class="layer-map" id="layer-map" aria-label="选择模型层"></div></aside>
+<article class="panel"><div class="panel-heading"><h3 id="layer-title"></h3><span class="mono" id="layer-subtitle"></span></div><details><summary>层资源指标</summary><pre id="layer-metrics"></pre></details><div class="operator-list" id="operator-list" aria-label="选择逻辑算子"></div>
+<div class="operator-detail"><h3 id="detail-title"></h3><p class="meta" id="detail-meta"></p><div class="detail-facts" id="detail-facts"></div><p class="note" id="detail-evidence"></p><details><summary>算子资源指标</summary><div id="detail-metrics"></div></details>
+<details id="ledger-details" hidden><summary>调试资源账本 · 原始需求不是可加经过时间</summary><div id="ledger-table"></div><details><summary>同源耦合关系</summary><pre id="coupling-data"></pre></details><details><summary>账本排除项</summary><pre id="ledger-excluded"></pre></details></details>
+<details><summary id="op-excluded-summary">算子未计入项</summary><ul class="list" id="op-excluded"></ul></details>
+<h3 style="margin-top:24px">原子任务 / 实例与时刻</h3><p class="note">下方实例筛选同时作用于任务列表与全局条件投影。</p><div class="task-list" id="task-list" aria-label="选择原子任务"></div>
+<div class="task-detail" id="task-detail" hidden><h3 id="task-title"></h3><p class="meta" id="task-meta"></p><div class="detail-facts" id="task-facts"></div>
+<details open><summary>强类型规格 / shape / dtype</summary><pre id="task-spec"></pre><div id="task-tensors"></div></details>
+<details open><summary>阶段表 · 未知服务仍未知</summary><div id="phase-table"></div></details>
+<details><summary>等待 / 资源约束</summary><pre id="task-waits"></pre></details><details><summary>任务资源指标</summary><pre id="task-metrics"></pre></details><details><summary>任务未计入项</summary><ul class="list" id="task-excluded"></ul></details>
+</div></div></article></div></section>
+<section class="section" aria-labelledby="timeline-heading"><div class="section-head"><h2 id="timeline-heading">02 / 条件投影 · 实例视图</h2><p class="note">斜纹虚线条均为条件投影，不是实际重叠的证据。开始与结束未知的任务不会被画作零时长实际任务。</p></div>
+<div class="timeline-controls"><div><label for="instance-filter">筛选实例 / 同时筛选原子任务</label><select id="instance-filter"></select></div><label class="check" for="show-projection"><input type="checkbox" id="show-projection" checked>显示忽略未知成本的条件投影（非实测）</label></div>
+<div class="legend" id="legend"></div><p class="note" id="timeline-scope"></p><div id="timeline" class="timeline" tabindex="0" role="region" aria-label="可滚动条件投影任务条"></div>
+<h3 style="margin-top:24px">投影关键路径归因</h3><p class="note">投影归因来自 Python 排程器；不是资源 busy 之和，也不是服务预算之和。</p><div class="category-list" id="category-list"></div><details><summary>完整经过时间归因（若已知）</summary><pre id="actual-attribution"></pre></details>
+</section>
+<section class="section" aria-labelledby="table-heading"><div class="section-head"><h2 id="table-heading">03 / 全层预算对账</h2><p class="note">只对账服务预算。层 / 算子跨度不可相加为 makespan。</p></div><div id="layer-table"></div></section>
+<section class="section" aria-labelledby="resources-heading"><div class="section-head"><h2 id="resources-heading">04 / 资源、缓冲与数据流</h2><p class="note">实际值与条件投影分列；未知不等于空闲或零占用。</p></div>
+<div class="provenance"><div><h3>资源 busy / 非经过时间之和</h3><div id="resource-busy-table"></div></div><div><h3>内存域峰值</h3><div id="memory-peak-table"></div></div></div>
+<details open><summary>缓冲分配与生命周期</summary><div id="buffer-table"></div><pre id="buffer-policy"></pre></details>
+<details><summary>张量 / shape / dtype / 内存域</summary><div id="tensor-table"></div></details><details open><summary>数据流 · 逻辑字节与物理传输分开</summary><div id="traffic-table"></div></details>
+</section>
+<section class="section" aria-labelledby="scope-heading"><div class="section-head"><h2 id="scope-heading">05 / 边界、排程与来源</h2><p class="note">逻辑周期不是墙钟校准；实例数量与显式拓扑不是实际性能证明。</p></div>
+<div class="provenance"><div><details open><summary>可信度与跨等级可比性</summary><pre id="validity"></pre><p class="note" id="calibration-reason"></p></details><details><summary id="excluded-summary">完整未计入成本</summary><ul class="list" id="excluded-list"></ul></details><details><summary>模型总资源指标</summary><pre id="total-metrics"></pre></details><details><summary>显式硬件拓扑</summary><pre id="topology-data"></pre></details><details><summary>原始排程器结果 / blocked constraints</summary><pre id="schedule-data"></pre></details><details><summary>原始任务图</summary><pre id="graph-data"></pre></details></div>
+<div><details><summary>完整 Manifest / 命名输入</summary><pre id="manifest-data"></pre><pre id="named-inputs"></pre></details><details><summary>来源指纹 / SHA-256</summary><div class="source-list" id="sources"></div></details><details><summary>硬件引用出处</summary><pre id="citations"></pre></details></div></div>
+</section>
+<footer class="footer">离线单文件 · 无外部依赖 · 数值来自 Python L1 任务 / 资源排程账本<br>Manifest digest <span id="digest"></span></footer>
 <p id="selection-status" class="sr-only" role="status" aria-live="polite"></p>
-</main>
-</div>
+</main></div>
 <script id="l1-data" type="application/json">__L1_PAYLOAD__</script>
 <script>
 'use strict';
@@ -51,41 +68,244 @@
   const e = id => document.getElementById(id);
   const categories = ['dram','gemm','vpu','cpu','handoff'];
   const labels = {dram:'DRAM',gemm:'GEMM',vpu:'VPU',cpu:'CPU',handoff:'交接'};
-  const create = (tag, text, className) => {const node=document.createElement(tag);if(text!==undefined)node.textContent=String(text);if(className)node.className=className;return node;};
-  const set = (id, text) => {e(id).textContent=String(text);};
-  const count = n => n===null||n===undefined ? '未知' : Number(n).toLocaleString('en-US',{maximumFractionDigits:3});
-  const time = n => {if(n===null||n===undefined)return '未知（未计入）';if(n===0)return '0 s';const [scale,unit]=n>=1?[1,'s']:n>=.001?[1e3,'ms']:n>=.000001?[1e6,'µs']:[1e9,'ns'];return (n*scale).toLocaleString('en-US',{maximumFractionDigits:2})+' '+unit;};
-  const bytes = n => {if(n===null||n===undefined)return '未提供';if(n===0)return '0 B';const units=['B','KiB','MiB','GiB','TiB'];const i=Math.min(4,Math.max(0,Math.floor(Math.log(n)/Math.log(1024))));return (n/1024**i).toLocaleString('en-US',{maximumFractionDigits:2})+' '+units[i];};
-  const layerName = id => /^block-\d+$/.test(id)?'Block '+String(Number(id.slice(6))+1).padStart(2,'0'):({'final-norm':'Final norm','lm-head':'LM head',sampling:'Sampling'}[id]||id);
-  const list = (node, values) => node.replaceChildren(...values.map(value=>create('li',value)));
-  const metricGroups = [
-    ['命令 / 窗口 / 节拍', [['commands','命令'],['windows','窗口'],['array_cycles','阵列逻辑周期'],['compute_cycles','A consume 周期'],['load_cycles','loadW 周期'],['a_beats','A 拍'],['b_beats','B 拍'],['c_rows','C 输出行'],['c_beats','C 物理 DMA 拍']]],
-    ['MAC / 工作量', [['semantic_macs','语义 MAC'],['useful_macs','有用 MAC'],['issued_macs','发射 MAC'],['padded_macs','Padding 额外 MAC'],['masked_macs','Mask 掩码 MAC'],['array_utilization','阵列 consume 周期占比'],['norm_calls','Norm 调用'],['softmax_reductions','Softmax 归约']]],
-    ['数据 / Scale · 逻辑与物理分开', [['a_logical_bytes','A 逻辑字节'],['a_physical_bytes','A 物理端口字节'],['b_logical_bytes','B 逻辑字节'],['b_physical_bytes','B 物理端口字节'],['c_logical_bytes','C 逻辑字节'],['c_physical_bytes','C 物理 DMA 字节'],['scale_a_logical_bytes','Scale A 逻辑字节'],['scale_a_physical_bytes','Scale A 物理取数字节'],['scale_b_logical_bytes','Scale B 逻辑字节'],['scale_b_physical_bytes','Scale B 物理取数字节'],['dram_bytes','DRAM 字节'],['weight_unique_bytes','唯一权重字节'],['weight_dram_bytes','权重 DRAM 字节'],['weight_reload_bytes','权重额外重装字节'],['k_split_accum_bytes','K 拆分归约字节']]]
-  ];
+  const create = (tag, text, className) => {
+    const node = document.createElement(tag);
+    if (text !== undefined) node.textContent = String(text);
+    if (className) node.className = className;
+    return node;
+  };
+  const set = (id, text) => { e(id).textContent = String(text); };
+  const known = value => typeof value === 'number' && Number.isFinite(value);
+  const count = value => known(value) ? value.toLocaleString('en-US',{maximumFractionDigits:3}) : '未知';
+  const time = value => {
+    if (!known(value)) return '未知';
+    if (value === 0) return '0 s';
+    const [scale,unit] = value >= 1 ? [1,'s'] : value >= .001 ? [1e3,'ms'] : value >= .000001 ? [1e6,'µs'] : [1e9,'ns'];
+    return (value*scale).toLocaleString('en-US',{maximumFractionDigits:2})+' '+unit;
+  };
+  const bytes = value => {
+    if (!known(value)) return '未知';
+    if (value === 0) return '0 B';
+    const units = ['B','KiB','MiB','GiB','TiB'];
+    const index = Math.min(4,Math.max(0,Math.floor(Math.log(value)/Math.log(1024))));
+    return (value/1024**index).toLocaleString('en-US',{maximumFractionDigits:2})+' '+units[index];
+  };
+  const text = value => value === null || value === undefined ? '未知' : typeof value === 'object' ? JSON.stringify(value,null,2) : String(value);
+  const json = (id, value) => set(id,text(value));
+  const array = value => Array.isArray(value) ? value : [];
+  const layerName = id => /^block-\d+$/.test(id) ? 'Block '+String(Number(id.slice(6))+1).padStart(2,'0') : ({'final-norm':'Final norm','lm-head':'LM head',sampling:'Sampling'}[id] || id);
+  const list = (id, values) => e(id).replaceChildren(...(array(values).length ? array(values).map(value => create('li',text(value))) : [create('li','无列出项；不代表完整覆盖。')]));
+  function table(id, headers, rows, caption) {
+    const root = e(id), scroll = create('div',undefined,'table-scroll');
+    scroll.tabIndex = 0;
+    scroll.setAttribute('role','region');
+    scroll.setAttribute('aria-label',caption);
+    const node = create('table'), head = create('thead'), body = create('tbody'), heading = create('tr');
+    node.append(create('caption',caption));
+    for (const label of headers) { const cell = create('th',label); cell.scope = 'col'; heading.append(cell); }
+    head.append(heading);
+    for (const values of rows) {
+      const row = create('tr');
+      for (const value of values) { const cell = create('td',undefined,'numeric'); if (value instanceof Node) cell.append(value); else cell.textContent = text(value); row.append(cell); }
+      body.append(row);
+    }
+    if (!rows.length) { const row = create('tr'), cell = create('td','无记录 / 未提供'); cell.colSpan = headers.length; row.append(cell); body.append(row); }
+    node.append(head,body); scroll.append(node); root.replaceChildren(scroll);
+  }
+  function records(id, values, caption) {
+    const rows = array(values), keys = [...new Set(rows.flatMap(row => Object.keys(row || {})))];
+    table(id,keys.length ? keys : ['记录'],rows.map(row => keys.map(key => row[key])),caption);
+  }
+  function facts(id, values) {
+    e(id).replaceChildren(...values.map(([label,value]) => { const node = create('div',undefined,'fact'); node.append(create('small',label),create('strong',value)); return node; }));
+  }
+  function pressed(root, key, value) {
+    for (const button of e(root).querySelectorAll('button')) button.setAttribute('aria-pressed',String(button.dataset[key] === value));
+  }
   try {
-    const data=JSON.parse(e('l1-data').textContent);
-    if(!data.cases.length)throw new Error('报告未包含工作点');
-    let current=data.cases[0], selectedLayer=current.layers[0].layer, selectedOp=null;
-    set('model-description',data.manifest.model+' · 由算子映射、命令合法化与窗口计数构成的确定性解析时间线。此处 L1 是评估等级，不是模型的第一层。');
-    set('calibration-notice',data.manifest.notice);
-    set('calibration-reason',data.manifest.not_calibrated_reason);
-    set('named-inputs',JSON.stringify(data.manifest.named_inputs,null,2));
-    set('citations',JSON.stringify(data.manifest.citations,null,2));
-    set('digest',data.digest);
-    for(const source of data.manifest.sources){const node=create('div',undefined,'source');node.append(create('div',source.path),create('div',source.sha256),create('div',bytes(source.bytes)));e('sources').append(node);}
-    for(const category of categories){const node=create('span',undefined,'legend-item');node.style.setProperty('--color','var(--'+category+')');node.append(create('span',undefined,'dot'),create('span',labels[category]));e('legend').append(node);}
-    data.cases.forEach((c,i)=>{const option=create('option',c.profile+' · '+c.phase+' · S='+c.seq_len+' · B='+c.batch+' · '+c.fmt+' · '+c.attention);option.value=String(i);e('case-select').append(option);});
-    const hardware=data.hardware;
-    for(const [label,value,id] of [['配置核数 / 已用核数',hardware.configured_cores+' / '+hardware.active_cores],['时钟',hardware.freq_hz===null?'未提供':count(hardware.freq_hz/1e6)+' MHz'],['有效 DRAM',count(hardware.effective_dram_gbps)+' GB/s'],['SRAM / core',bytes(hardware.sram_bytes_per_core),'sram-capacity'],['local / core',hardware.local_iface_gbps===null?'未提供':count(hardware.local_iface_gbps)+' GB/s']]){const node=create('div',label+' '),valueNode=create('span',value);if(id)valueNode.id=id;node.append(valueNode);e('hardware').append(node);}
-    function stack(shares,total,fraction=1){const node=create('div',undefined,'stack');node.style.width=Math.max(0,Math.min(100,fraction*100))+'%';node.setAttribute('aria-label',categories.map(c=>labels[c]+' '+time(shares[c])).join('，'));for(const category of categories){const segment=create('span',undefined,'segment');segment.style.setProperty('--color','var(--'+category+')');segment.style.width=(total?shares[category]/total*100:0)+'%';segment.title=labels[category]+' '+time(shares[category]);node.append(segment);}return node;}
-    function renderMetrics(op){const root=e('detail-metrics');root.replaceChildren();const used=new Set();for(const [heading,keys] of metricGroups){const rows=keys.filter(([key])=>Object.hasOwn(op.metrics,key));if(!rows.length)continue;root.append(create('h3',heading));const scroll=create('div',undefined,'table-scroll'),table=create('table'),body=create('tbody');for(const [key,label] of rows){used.add(key);const row=create('tr'),value=op.metrics[key];const formatted=key.endsWith('_bytes')?bytes(value):key==='array_utilization'?(value*100).toFixed(2)+'%':count(value);const cell=create('td',formatted,'numeric');cell.title=String(value);row.append(create('td',label),cell);body.append(row);}table.append(body);scroll.append(table);root.append(scroll);}const other=Object.entries(op.metrics).filter(([key])=>!used.has(key)&&key!=='placements');if(other.length){const details=create('details'),summary=create('summary','其他算子资源');details.append(summary,create('pre',JSON.stringify(Object.fromEntries(other),null,2)));root.append(details);}e('placement-details').hidden=!op.metrics.placements;set('placement-data',JSON.stringify(op.metrics.placements||[],null,2));}
-    function renderOperator(id){const op=current.operators.find(op=>op.id===id);selectedOp=id;for(const button of e('operator-list').querySelectorAll('button'))button.setAttribute('aria-pressed',String(button.dataset.opId===id));set('detail-title',op.name);set('detail-meta',op.engine+' / '+op.kind+' · '+op.id+'\n依赖：'+(op.dependencies.join(', ')||'无')+'\n主导资源：'+(op.dominant_resources.join(', ')||'无已知时间服务'));set('detail-evidence',op.evidence);e('detail-facts').replaceChildren();for(const [label,value] of [['已计入时间',time(op.t_s)],['解析起点',time(op.start_s)],['解析终点',time(op.end_s)]]){const node=create('div',undefined,'fact');node.append(create('small',label),create('strong',value));e('detail-facts').append(node);}renderMetrics(op);const body=e('ledger-table').querySelector('tbody');body.replaceChildren();for(const charge of op.ledger.charges){const row=create('tr');row.append(create('td',charge.resource+' / '+charge.instance),create('td',charge.origin.stream+' / '+charge.origin.producer+'\n'+charge.overlap_class),create('td',time(charge.seconds),'numeric'),create('td',bytes(charge.bytes),'numeric'),create('td',count(charge.beats)+' 拍 / '+count(charge.cycles)+' cyc / '+count(charge.ops)+' ops','numeric'));const evidence=create('td');evidence.append(create('div',charge.source));if(charge.evidence){const detail=create('details');detail.append(create('summary','依据'),create('p',charge.evidence));evidence.append(detail);}row.append(evidence);body.append(row);}set('coupling-data',JSON.stringify(op.ledger.coupling,null,2));set('op-excluded-summary','算子未计入项 · '+op.excluded_costs.length);list(e('op-excluded'),op.excluded_costs);e('op-excluded-details').open=op.excluded_costs.length>0;set('selection-status',layerName(selectedLayer)+'，'+op.name+'，已计入 '+time(op.t_s));}
-    function renderLayer(id){selectedLayer=id;const layer=current.layers.find(layer=>layer.layer===id);for(const button of e('layer-map').querySelectorAll('button'))button.setAttribute('aria-pressed',String(button.dataset.layerId===id));for(const button of e('layer-table').querySelectorAll('button'))button.setAttribute('aria-pressed',String(button.closest('tr').dataset.layerId===id));set('layer-title',layerName(id));set('layer-subtitle',layer.operators+' 算子 · '+time(layer.t_s));e('layer-stack').replaceChildren(stack(layer.attribution_s,layer.t_s));const ops=current.operators.filter(op=>op.layer===id);e('operator-list').replaceChildren();for(const op of ops){const button=create('button',undefined,'op-button');button.type='button';button.dataset.opId=op.id;button.append(create('span',op.name),create('span',op.engine,'engine'),create('span',time(op.t_s),'time'));button.addEventListener('click',()=>renderOperator(op.id));e('operator-list').append(button);}renderOperator(ops.some(op=>op.id===selectedOp)?selectedOp:ops[0].id);}
-    function renderCase(index){current=data.cases[index];set('total-time',time(current.t_modeled_s));set('total-scope',current.cross_level_comparable?'串行单核 · 含已计入交接 · 未知服务未计入':'仅部分已知资源时间，不构成完整延迟');e('partial-warning').hidden=current.cross_level_comparable;set('l0-time',time(current.l0_time_lower_bound_s));set('l0-scope',current.cross_level_comparable?'资源下界，不是算子串行时间；L1 ≥ L0':'仅列参考值 · 本 L1 部分时间不可比较');const throughput=current.modeled_throughput_excluding_unknown_costs;set('throughput',throughput===null?'不输出':count(throughput)+' '+current.throughput_unit);set('throughput-scope',current.phase==='prefill'?'prompt tokens/s，不是生成速度；未知成本未计入':'不是可达性能或实测吞吐；未知成本未计入');e('total-stack').replaceChildren(stack(current.attribution_s,current.t_modeled_s));e('category-list').replaceChildren();for(const category of categories){const node=create('div',undefined,'category-item');node.style.setProperty('--color','var(--'+category+')');node.append(create('small',labels[category]),create('strong',current.attribution_s[category]===0?'无已计入时间':time(current.attribution_s[category])),create('small',current.t_modeled_s?(100*current.attribution_s[category]/current.t_modeled_s).toFixed(1)+'% 已计入':'无已计入时间'));e('category-list').append(node);}set('operators-time',time(current.operators_time_s));set('handoff-time',current.handoff_time_s?time(current.handoff_time_s)+'（场景输入）':'未知服务未计入');set('handoff-count',count(current.handoffs));set('validity',JSON.stringify({profile:current.profile,active_cores:current.active_cores,model_kind:current.model_kind,coverage_complete:current.coverage_complete,performance_valid:current.performance_valid,data_valid:current.data_valid},null,2));set('total-metrics',JSON.stringify(current.metrics,null,2));set('excluded-summary','完整未计入成本 · '+current.excluded_costs.length);list(e('excluded-list'),current.excluded_costs);e('layer-map').replaceChildren();const body=e('layer-table').querySelector('tbody');body.replaceChildren();const maxTime=Math.max(...current.layers.map(layer=>layer.t_s));for(const layer of current.layers){const button=create('button',undefined,'layer-button');button.type='button';button.dataset.layerId=layer.layer;const track=create('div');track.append(stack(layer.attribution_s,layer.t_s,maxTime?layer.t_s/maxTime:0));button.append(create('span',layerName(layer.layer),'layer-name'),track,create('span',time(layer.t_s),'layer-time'));button.addEventListener('click',()=>renderLayer(layer.layer));e('layer-map').append(button);const row=create('tr');row.dataset.layerId=layer.layer;const label=create('td'),tableButton=create('button',layerName(layer.layer));tableButton.type='button';tableButton.addEventListener('click',()=>renderLayer(layer.layer));label.append(tableButton);row.append(label,create('td',layer.operators,'numeric'),create('td',time(layer.t_s),'numeric'));for(const category of categories)row.append(create('td',time(layer.attribution_s[category]),'numeric'));body.append(row);}renderLayer(current.layers.some(layer=>layer.layer===selectedLayer)?selectedLayer:current.layers[0].layer);}
-    e('case-select').addEventListener('change',()=>renderCase(Number(e('case-select').value)));
-    renderCase(0);e('report').hidden=false;
-  } catch(error) {set('data-error','无法读取报告数据：'+error.message);e('data-error').hidden=false;e('report').hidden=true;}
+    const data = JSON.parse(e('l1-data').textContent);
+    if (!array(data.cases).length) throw new Error('报告未包含工作点');
+    const manifest = data.manifest || {}, hardware = data.hardware || {};
+    let current, selectedLayer = null, selectedOp = null, selectedTask = null, instance = '', blocked = false;
+    let taskMap = new Map(), opMap = new Map();
+    const projectionAvailable = () => !blocked && known(current.projection_makespan_s);
+    const projectionTime = value => projectionAvailable() ? time(value) : '无条件投影';
+    const projectionValue = value => projectionAvailable() ? value : null;
+    const matchesInstance = task => !instance || (instance === '__unassigned__' ? task.instance_id === null || task.instance_id === undefined : task.instance_id === instance);
+    set('model-description',text(manifest.model)+' · L1 是评估等级，不是模型第一层。按逻辑算子、强类型原子任务与显式资源实例追踪预算。');
+    set('calibration-notice',manifest.notice || '确定性解析账本 · 未校准');
+    set('calibration-reason',manifest.not_calibrated_reason || '未覆盖成本仍未知；本报告不宣称可达性能。');
+    json('manifest-data',manifest); json('named-inputs',manifest.named_inputs); json('citations',manifest.citations); set('digest',text(data.digest));
+    for (const source of array(manifest.sources)) {
+      const node = create('div',undefined,'source'); node.append(create('div',text(source.path)),create('div',text(source.sha256)),create('div',bytes(source.bytes))); e('sources').append(node);
+    }
+    for (const category of categories) {
+      const node = create('span',undefined,'legend-item'); node.style.setProperty('--color','var(--'+category+')'); node.append(create('span',undefined,'dot'),create('span',labels[category])); e('legend').append(node);
+    }
+    data.cases.forEach((c,index) => {
+      const option = create('option',c.profile+' · '+c.phase+' · S='+c.seq_len+' · B='+c.batch+' · '+c.fmt+' · '+c.attention+' · '+c.active_cores+' core(s) · '+c.scheduling_policy);
+      option.value = String(index); e('case-select').append(option);
+    });
+    function renderHardware() {
+      e('hardware').replaceChildren();
+      for (const [label,value,id] of [
+        ['配置核数 / 本算例活动核数',count(hardware.configured_cores)+' / '+count(current.active_cores)],
+        ['排程策略',text(current.scheduling_policy)], ['时钟',known(hardware.freq_hz) ? count(hardware.freq_hz/1e6)+' MHz' : '未知'],
+        ['有效 DRAM',known(hardware.effective_dram_gbps) ? count(hardware.effective_dram_gbps)+' GB/s' : '未知'],
+        ['SRAM / core',bytes(hardware.sram_bytes_per_core),'sram-capacity'],
+        ['local / core',known(hardware.local_iface_gbps) ? count(hardware.local_iface_gbps)+' GB/s' : '未知']
+      ]) { const node = create('div',label+' '), valueNode = create('span',value); if (id) valueNode.id = id; node.append(valueNode); e('hardware').append(node); }
+    }
+    function renderTask(id) {
+      const task = taskMap.get(id);
+      selectedTask = task ? id : null; e('task-detail').hidden = !task;
+      pressed('task-list','taskId',selectedTask); pressed('timeline','taskId',selectedTask);
+      if (!task) return;
+      set('task-title',task.id);
+      set('task-meta',task.engine_kind+' · 实例 '+text(task.instance_id)+'\n成本依据：'+(task.cost_basis === 'unbound_candidate_budget' ? '未绑定候选实例 '+text(task.budget_instance_id)+' 的预算，不是已排程实例' : '绑定实例预算')+'\n父算子：'+task.parent_op_id+'\n依赖：'+(array(task.dependencies).join(', ') || '无'));
+      facts('task-facts',[
+        ['已知服务预算',time(task.known_service_budget_s)],['实际开始',time(task.start_s)],['实际结束',time(task.end_s)],
+        ['条件投影开始',projectionTime(task.projection_start_s)],['条件投影结束',projectionTime(task.projection_end_s)]
+      ]);
+      json('task-spec',task.spec);
+      const tensors = new Map(array(current.graph && current.graph.tensors).map(tensor => [tensor.id,tensor]));
+      const tensorRows = [];
+      for (const [direction,refs] of [['输入',task.inputs],['输出',task.outputs]]) for (const ref of array(refs)) {
+        const tensor = tensors.get(ref.tensor_id) || {};
+        tensorRows.push([direction,ref.tensor_id,tensor.shape,ref.dtype || tensor.dtype,tensor.memory_domain,{starts:ref.starts,stops:ref.stops},tensor.base_id]);
+      }
+      table('task-tensors',['方向','张量','shape','dtype','内存域','切片','base'],tensorRows,'任务强类型输入 / 输出');
+      table('phase-table',['阶段 / 类别','实际开始','实际结束','完整服务时间','已知部分 known_seconds','投影开始','投影结束','资源 claims','来源 / 依据'],
+        array(task.phases).map(phase => [phase.id+' / '+phase.category,time(phase.start_s),time(phase.end_s),time(phase.seconds),time(phase.known_seconds),projectionTime(phase.projection_start_s),projectionTime(phase.projection_end_s),phase.claims,{source:phase.source,evidence:phase.evidence}]),'任务阶段 · 投影不等于实际');
+      json('task-waits',task.waits); json('task-metrics',task.metrics); list('task-excluded',task.excluded_costs);
+      set('selection-status',layerName(selectedLayer)+'，'+text(selectedOp)+'，任务 '+task.id+'，实际开始 '+time(task.start_s)+'，实际结束 '+time(task.end_s));
+    }
+    function renderTasks() {
+      const op = opMap.get(selectedOp);
+      const tasks = op ? array(op.tasks).map(id => taskMap.get(id)).filter(task => task && matchesInstance(task)) : [];
+      e('task-list').replaceChildren();
+      for (const task of tasks) {
+        const button = create('button',undefined,'task-button'); button.type = 'button'; button.dataset.taskId = task.id;
+        button.append(create('span',task.id),create('span',task.engine_kind,'time'),create('small','实例 '+text(task.instance_id)+' · 实际 '+time(task.start_s)+' → '+time(task.end_s)),create('small','已知预算 '+time(task.known_service_budget_s)+' · 条件投影 '+projectionTime(task.projection_start_s)+' → '+projectionTime(task.projection_end_s)));
+        button.addEventListener('click',() => renderTask(task.id)); e('task-list').append(button);
+      }
+      if (!tasks.length) e('task-list').append(create('p','此算子在当前实例筛选下没有任务。','note'));
+      renderTask(tasks.some(task => task.id === selectedTask) ? selectedTask : tasks.length ? tasks[0].id : null);
+    }
+    function renderOperator(id) {
+      const op = opMap.get(id); selectedOp = op ? id : null; pressed('operator-list','opId',selectedOp);
+      set('detail-title',op ? op.name : '此层没有逻辑算子');
+      set('detail-meta',op ? op.kind+' · '+op.id+' · '+array(op.tasks).length+' 原子任务 · 语义 MAC '+count(op.mac) : '');
+      set('detail-evidence',op ? text(op.evidence) : '');
+      facts('detail-facts',op ? [['已知服务预算',time(op.known_service_budget_s)],['实际跨度',time(op.span_s)],['条件投影跨度',projectionTime(op.projection_span_s)]] : []);
+      table('detail-metrics',['指标','权威值'],Object.entries(op && op.metrics || {}),'算子资源指标');
+      const ledger = op && op.ledger; e('ledger-details').hidden = !ledger;
+      records('ledger-table',ledger && ledger.charges,'调试 charges · 不求和为经过时间'); json('coupling-data',ledger && ledger.coupling); json('ledger-excluded',ledger && ledger.excluded);
+      set('op-excluded-summary','算子未计入项 · '+array(op && op.excluded_costs).length); list('op-excluded',op && op.excluded_costs);
+      renderTasks();
+    }
+    function renderLayer(id) {
+      const layer = array(current.layers).find(layer => layer.layer === id); selectedLayer = layer ? id : null;
+      pressed('layer-map','layerId',selectedLayer); pressed('layer-table','layerId',selectedLayer);
+      set('layer-title',layer ? layerName(id) : '无层记录');
+      set('layer-subtitle',layer ? count(layer.operators)+' 算子 / '+count(layer.tasks)+' 任务\n预算 '+time(layer.known_service_budget_s)+' · 实际跨度 '+time(layer.span_s)+' · 投影 '+projectionTime(layer.projection_span_s) : '');
+      json('layer-metrics',layer && layer.metrics);
+      const ops = array(current.operators).filter(op => op.layer === id); e('operator-list').replaceChildren();
+      for (const op of ops) {
+        const button = create('button',undefined,'op-button'); button.type = 'button'; button.dataset.opId = op.id;
+        button.append(create('span',op.name+' / '+op.kind),create('span',time(op.known_service_budget_s),'time'));
+        button.addEventListener('click',() => renderOperator(op.id)); e('operator-list').append(button);
+      }
+      renderOperator(ops.some(op => op.id === selectedOp) ? selectedOp : ops.length ? ops[0].id : null);
+    }
+    function renderTimeline() {
+      const root = e('timeline'); root.replaceChildren();
+      const tasks = array(current.tasks).filter(matchesInstance);
+      set('timeline-scope',count(tasks.length)+' 个任务符合筛选 · 时间轴 0 → '+projectionTime(current.projection_makespan_s)+' · 全部条形仅为条件投影');
+      if (!projectionAvailable() || !e('show-projection').checked) {
+        root.append(create('p',blocked ? '约束阻断：无条件投影。请查看 blocked constraints。' : !projectionAvailable() ? '投影未知：不绘制时间条。' : '条件投影视图已隐藏；实际时刻仍在任务详情中。','note')); return;
+      }
+      const horizon = current.projection_makespan_s;
+      for (const task of tasks) {
+        const row = create('div',undefined,'timeline-row'), label = create('div',task.id,'timeline-label'), track = create('div',undefined,'timeline-track');
+        label.append(create('small',task.engine_kind+' / '+text(task.instance_id))); row.append(label,track);
+        if (known(task.projection_start_s) && known(task.projection_end_s) && task.projection_end_s >= task.projection_start_s) {
+          const button = create('button',undefined,'projection-bar'); button.type = 'button'; button.dataset.taskId = task.id;
+          const category = String(task.engine_kind).toLowerCase(); button.style.setProperty('--color','var(--'+(categories.includes(category) ? category : 'dram')+')');
+          button.style.left = (horizon > 0 ? Math.max(0,Math.min(100,task.projection_start_s/horizon*100)) : 0)+'%';
+          button.style.width = (horizon > 0 ? Math.max(0,Math.min(100,(task.projection_end_s-task.projection_start_s)/horizon*100)) : 0)+'%';
+          const description = '条件投影（非实际） '+task.id+' / '+text(task.instance_id)+' '+time(task.projection_start_s)+' → '+time(task.projection_end_s);
+          button.setAttribute('aria-label',description); button.title = description; button.setAttribute('aria-pressed',String(task.id === selectedTask));
+          button.addEventListener('click',() => { selectedTask = task.id; const op = opMap.get(task.parent_op_id); if (op) { renderLayer(op.layer); renderOperator(op.id); renderTask(task.id); } }); track.append(button);
+          row.append(create('span','投影 '+time(task.projection_start_s)+' → '+time(task.projection_end_s),'projection-label'));
+        } else row.append(create('span','投影时刻未知','projection-label'));
+        root.append(row);
+      }
+      if (!tasks.length) root.append(create('p','此实例没有任务。','note'));
+    }
+    function renderResources() {
+      const busy = current.resource_busy_s || {}, projectedBusy = current.projection_resource_busy_s || {};
+      table('resource-busy-table',['资源实例','实际 busy','条件投影 busy'],[...new Set([...Object.keys(busy),...Object.keys(projectedBusy)])].map(id => [id,time(busy[id]),projectionTime(projectedBusy[id])]),'资源占用 · 实际 / 条件投影分列');
+      const peaks = current.memory_peak_bytes || {}, projectedPeaks = current.projection_memory_peak_bytes || {};
+      table('memory-peak-table',['内存域','实际峰值','条件投影峰值'],[...new Set([...Object.keys(peaks),...Object.keys(projectedPeaks)])].map(id => [id,bytes(peaks[id]),projectionAvailable() ? bytes(projectedPeaks[id]) : '无条件投影']),'内存域峰值 · 未知不补零');
+      const plan = current.buffer_plan || {};
+      records('buffer-table',plan.allocations,'缓冲分配 · acquire / releases 保留任务与阶段');
+      json('buffer-policy',{execution:plan.execution,source:plan.source,evidence:plan.evidence});
+      records('tensor-table',current.graph && current.graph.tensors,'张量强类型与内存域');
+      table('traffic-table',['stream / owner task','tensor','interface / domain','方向','逻辑字节','物理字节','物理拍','segment','依据'],array(current.traffic).map(flow => [flow.stream_id+' / '+flow.owner_task_id,flow.tensor_id,flow.interface+' / '+flow.memory_domain,flow.direction,bytes(flow.logical_bytes),bytes(flow.physical_bytes),count(flow.physical_beats),flow.segment,flow.evidence]),'序列化 Traffic · 按唯一 stream 与 owner task');
+    }
+    function renderCase(index) {
+      current = data.cases[index];
+      taskMap = new Map(array(current.tasks).map(task => [task.id,task])); opMap = new Map(array(current.operators).map(op => [op.id,op]));
+      const constraintsOf = value => Array.isArray(value) ? value : value && (typeof value !== 'object' || Object.keys(value).length) ? [value] : [];
+      const constraints = [...constraintsOf(current.blocked_constraints),...constraintsOf(current.schedule && current.schedule.blocked_constraints)];
+      blocked = (constraints.length > 0 && !known(current.projection_makespan_s)) || Boolean(current.schedule && (current.schedule.blocked === true || current.schedule.status === 'blocked'));
+      e('blocked-warning').hidden = !blocked; json('blocked-constraints',constraints.length ? constraints : current.schedule);
+      set('total-time',time(current.makespan_s));
+      set('total-scope',known(current.makespan_s) ? '解析排程经过时间；仍不是实测或可达性能。' : '含未知服务，完整经过时间不可确定。');
+      set('known-service-budget',time(current.known_service_budget_s)); set('projection-time',projectionTime(current.projection_makespan_s));
+      set('l0-time',time(current.l0_time_lower_bound_s)); set('l0-scope',current.comparison_reason || '跨等级不可直接比较。');
+      const throughputKnown = current.coverage_complete === true && current.performance_valid === true && known(current.makespan_s) && known(current.modeled_throughput);
+      set('throughput',throughputKnown ? count(current.modeled_throughput)+' '+(current.phase === 'prefill' ? 'prompt tokens/s' : 'tokens/s') : '不输出');
+      set('throughput-scope',throughputKnown ? '仅解析模型值，不是实测性能。' : '覆盖不完整 / 时间未知；不以已知预算或投影计算吞吐。');
+      e('partial-warning').hidden = current.coverage_complete === true && current.performance_valid === true;
+      renderHardware();
+      e('show-projection').disabled = !projectionAvailable();
+      e('category-list').replaceChildren(...categories.map(category => {
+        const node = create('div',undefined,'category-item'); node.style.setProperty('--color','var(--'+category+')');
+        node.append(create('small',labels[category]),create('strong',projectionTime(current.projection_attribution_s && current.projection_attribution_s[category])),create('small','仅条件投影归因')); return node;
+      }));
+      json('actual-attribution',current.attribution_s);
+      const instances = [...new Set(array(current.tasks).map(task => task.instance_id).filter(id => id !== null && id !== undefined))].sort();
+      if (instance !== '__unassigned__' && !instances.includes(instance)) instance = '';
+      e('instance-filter').replaceChildren();
+      for (const [value,label] of [['','全部实例'],...instances.map(id => [id,id]),['__unassigned__','未分配 / 未知实例']]) {
+        const option = create('option',label); option.value = value; e('instance-filter').append(option);
+      }
+      e('instance-filter').value = instance;
+      e('layer-map').replaceChildren();
+      const layers = array(current.layers), maxBudget = Math.max(0,...layers.map(layer => known(layer.known_service_budget_s) ? layer.known_service_budget_s : 0));
+      const layerRows = [];
+      for (const layer of layers) {
+        const button = create('button',undefined,'layer-button'); button.type = 'button'; button.dataset.layerId = layer.layer;
+        const track = create('div',undefined,'budget-track'), fill = create('div',undefined,'budget-fill');
+        fill.style.width = (maxBudget > 0 && known(layer.known_service_budget_s) ? layer.known_service_budget_s/maxBudget*100 : 0)+'%'; track.setAttribute('aria-hidden','true'); track.append(fill);
+        button.append(create('span',layerName(layer.layer),'layer-name'),create('span',time(layer.known_service_budget_s),'layer-time'),track);
+        button.addEventListener('click',() => renderLayer(layer.layer)); e('layer-map').append(button);
+        const tableButton = create('button',layerName(layer.layer)); tableButton.type = 'button'; tableButton.dataset.layerId = layer.layer; tableButton.addEventListener('click',() => renderLayer(layer.layer));
+        layerRows.push([tableButton,count(layer.operators),count(layer.tasks),time(layer.known_service_budget_s),time(layer.span_s),projectionTime(layer.projection_span_s)]);
+      }
+      table('layer-table',['模型层','算子数','任务数','已知服务预算','实际跨度','条件投影跨度'],layerRows,'层级预算 · 不合计跨度');
+      json('validity',{profile:current.profile,active_cores:current.active_cores,scheduling_policy:current.scheduling_policy,coverage_complete:current.coverage_complete,performance_valid:current.performance_valid,data_valid:current.data_valid,cross_level_comparable:current.cross_level_comparable,comparison_reason:current.comparison_reason});
+      json('total-metrics',current.metrics); json('topology-data',current.topology); json('schedule-data',current.schedule); json('graph-data',current.graph);
+      set('excluded-summary','完整未计入成本 · '+array(current.excluded_costs).length); list('excluded-list',current.excluded_costs);
+      renderResources(); renderLayer(layers.some(layer => layer.layer === selectedLayer) ? selectedLayer : layers.length ? layers[0].layer : null); renderTimeline();
+    }
+    e('case-select').addEventListener('change',() => renderCase(Number(e('case-select').value)));
+    e('instance-filter').addEventListener('change',() => { instance = e('instance-filter').value; renderTasks(); renderTimeline(); });
+    e('show-projection').addEventListener('change',renderTimeline);
+    renderCase(0); e('report').hidden = false;
+  } catch (error) { set('data-error','无法读取报告数据：'+error.message); e('data-error').hidden = false; e('report').hidden = true; }
 })();
 </script>
 </body>

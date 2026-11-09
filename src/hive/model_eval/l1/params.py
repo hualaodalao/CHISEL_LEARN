@@ -9,7 +9,7 @@ class ModelParams:
     weight_policy: str = "stream"
     overlap: bool = False
     overlap_evidence: str = ""
-    sync_us: float = 0.0
+    sync_us: float | None = None
     exp_cycles_per_element: float | None = None
     reciprocal_cycles_per_vector: float | None = None
     rsqrt_cycles_per_vector: float | None = None
@@ -38,7 +38,6 @@ class ModelParams:
 
     def named_inputs(self) -> dict:
         inputs = asdict(self)
-        inputs["active_cores"] = 1
         inputs["numeric_source"] = "exact element bytes + logical scale bytes"
         inputs["service_assumptions"] = {
             "vpu_fp32_lanes": {"source": "architecture_peak", "ref": "arch.md:937-945"},
@@ -51,6 +50,7 @@ class ModelParams:
                 "ref": "AR-HIVE-S022"},
             "cpu_sampling": {"source": "scenario" if self.cpu_cycles_per_comparison is not None
                              else "excluded", "algorithm": "full_sort_comparison_budget"},
-            "handoff": {"source": "scenario" if self.sync_us else "excluded", "value_us": self.sync_us},
+            "handoff": {"source": "scenario" if self.sync_us is not None else "unknown",
+                        "value_us": self.sync_us},
         }
         return inputs

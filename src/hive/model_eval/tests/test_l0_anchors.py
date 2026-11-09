@@ -282,7 +282,7 @@ class TestArrayGeometry(unittest.TestCase):
         self.assertEqual(self.geom.profile_name, self.gem5["name"])
         self.assertEqual(self.geom.spec_version, self.gem5["spec_version"])
         self.assertEqual(self.geom.array_n, params["arrayN"])
-        self.assertEqual(self.geom.cluster_m, params["clusterM"])
+        self.assertEqual(self.geom.array_m, params["arrayM"])
         self.assertEqual(self.geom.total_n, derived["totalN"])
         self.assertEqual(self.geom.a_ext_w, derived["aExtW"])
         self.assertEqual(self.geom.b_ext_w, derived["bExtW"])
@@ -293,7 +293,8 @@ class TestArrayGeometry(unittest.TestCase):
 
     def test_tile_n_is_total_n(self):
         self.assertEqual(self.geom.tile_n, 16)
-        self.assertEqual(self.geom.total_n, self.geom.array_n * self.geom.cluster_m)
+        self.assertEqual(self.geom.total_n, self.geom.array_n)
+        self.assertEqual(self.geom.array_m, self.geom.array_n)
 
     def test_beat_bytes_are_32(self):
         # 同源取 max 的前提就是单口 32 B/cycle

@@ -8,11 +8,11 @@ from unittest.mock import patch
 
 from hive.model_eval.frontend.qwen3_06b import build
 from hive.model_eval.hw.geometry import _load_gem5_hardware, load_array_geometry, repo_root
-from hive.model_eval.l1 import windows
-from hive.model_eval.l1.gemm_geom import (
-    Command, GemmShape, format_elem_bytes, format_is_mx, legalize,
+from hive.model_eval.l1 import gemm_model
+from hive.model_eval.l1.gemm_model import (
+    Command, GemmShape, Window, WindowCounts, count_windows, format_elem_bytes,
+    format_is_mx, iter_windows, legalize,
 )
-from hive.model_eval.l1.windows import Window, WindowCounts, count_windows, iter_windows
 
 
 class GeometryTestCase(unittest.TestCase):
@@ -69,6 +69,7 @@ class TestQwenAnchors(GeometryTestCase):
                          19788544)
         b_beats = 28 * sum(c.b_beats for c in layer) + head.b_beats
         self.assertEqual(b_beats * self.geometry.b_bytes_per_beat, 595984384)
+        self.assertEqual(28 * sum(c.c_rows for c in layer) + head.c_rows, 31000)
 
 
 class TestFrozenGeometry(GeometryTestCase):
@@ -356,8 +357,8 @@ class TestWindows(GeometryTestCase):
     def test_aggregation_does_not_construct_or_iterate_windows(self):
         shape = GemmShape(1, 151936, 1024)
         commands = legalize(shape, self.geometry)
-        with patch.object(windows, "iter_windows", side_effect=AssertionError("enumerated")), \
-             patch.object(windows, "Window", side_effect=AssertionError("materialized")):
+        with patch.object(gemm_model, "iter_windows", side_effect=AssertionError("enumerated")), \
+             patch.object(gemm_model, "Window", side_effect=AssertionError("materialized")):
             self.assertEqual(count_windows(shape, iter(commands)).windows, 303872)
 
     def test_iterator_is_lazy_and_empty_input_is_empty(self):

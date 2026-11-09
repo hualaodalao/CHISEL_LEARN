@@ -40,6 +40,13 @@ class NumFormat:
         exact = self.bytes_per_param_exact
         return f"exact({exact.numerator}/{exact.denominator})"
 
+BF16 = NumFormat(
+    name="BF16",
+    elem_bytes=Fraction(2),
+    scale_bytes_per_elem=Fraction(0),
+    mac_family="int8_fp8_mxfp8_w4a8",
+    doc_bytes_per_param=2.0,
+)
 
 MXFP8 = NumFormat(
     name="MXFP8",

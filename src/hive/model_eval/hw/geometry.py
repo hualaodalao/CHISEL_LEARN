@@ -37,7 +37,7 @@ class ArrayGeometry:
     profile_name: str
     spec_version: str
     array_n: int
-    cluster_m: int
+    array_m: int
     total_n: int
     a_ext_w: int
     b_ext_w: int
@@ -88,7 +88,7 @@ def load_array_geometry(root: Path | None = None) -> ArrayGeometry:
         profile_name=profile["name"],
         spec_version=profile["spec_version"],
         array_n=params["arrayN"],
-        cluster_m=params["clusterM"],
+        array_m=params["arrayM"],
         total_n=derived["totalN"],
         a_ext_w=derived["aExtW"],
         b_ext_w=derived["bExtW"],
@@ -109,9 +109,9 @@ def load_array_geometry(root: Path | None = None) -> ArrayGeometry:
 
 
 def _check_derivations(g: ArrayGeometry) -> None:
-    if g.total_n != g.array_n * g.cluster_m:
+    if g.total_n != g.array_n or g.array_m != g.array_n:
         raise ValueError(
-            f"totalN {g.total_n} != arrayN {g.array_n} × clusterM {g.cluster_m}；"
+            f"方形契约破坏：totalN {g.total_n} 与 arrayM {g.array_m} 都必须 == arrayN {g.array_n}；"
             " gem5 profile 的派生关系变了，eval 侧的 T 不再可信"
         )
     if g.a_buffer_depth <= 0 or g.b_buffer_depth <= 0:

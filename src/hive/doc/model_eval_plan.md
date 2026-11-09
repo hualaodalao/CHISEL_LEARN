@@ -2,6 +2,8 @@
 
 2026-11-02 ｜ 首个算例 Qwen3-0.6B ｜ L0/L1 首版与离线网页已实现；161 条 unittest 回归通过；性能仍未校准
 
+> **当前 L1 架构**见已批准的 [model_eval_l1_opt.md](model_eval_l1_opt.md)，实现 API/schema2 见 [model_eval_spec.md](model_eval_spec.md)。本文保留首版历史设计与验收设想（串行标量合成、严格跨级断言等），不作为当前接口或验证状态；文件表/旧路径已迁移到现行模块，L0/模型计量与历史记录保持原样。
+
 **实施范围：L0 与 L1。** L2/L3 归 `src/workerbee/gem5/`，本计划只写它们是什么、L0/L1 为什么不能替代它们、以及接口与降级约定，不建目录、不排里程碑、不定验收。
 
 ---
@@ -108,7 +110,7 @@ M0 两件事（`hw/` 硬件 profile、`frontend/` 模型前端）无依赖，可
 
 优先于任何单层的实现选择。
 
-**单一真源。** 阵列几何（`arrayN`/`clusterM`/`totalN`/`cEffW`/`supportedFmts`）只从 `src/workerbee/gem5/configs/hardware.py` 的 `DEFAULT_PROFILE` 读；模型参数量只认 `Qwen3-0.6B-逐层计算拆解.md` 附录 B 脚本；硬件常数只认 `arch.md` 与 `arch_roadmap.md`。
+**单一真源。** 阵列几何（`arrayN`/`arrayM`/`totalN`/`cEffW`/`supportedFmts`）只从 `src/workerbee/gem5/configs/hardware.py` 的 `DEFAULT_PROFILE` 读；模型参数量只认 `Qwen3-0.6B-逐层计算拆解.md` 附录 B 脚本；硬件常数只认 `arch.md` 与 `arch_roadmap.md`。
 
 **回归锚点先行。** 每层先把已知答案写成测试断言，再写实现。L0 已采用标准库 unittest（本机未安装 pytest），不新增必需依赖。
 
@@ -285,33 +287,34 @@ t_total     = Σ t_op + handoffs × sync_us        # sync_us 默认 0
 
 | 路径 | 内容 |
 |---|---|
-| `l1/mapping.py` | 算子 → 引擎（GEMM / VPU / DMA / CPU）；合法化；padding 浪费 |
-| `l1/gemm_geom.py` | 第一层命令拆分与格式/粒度检查 |
-| `l1/windows.py` | 第二层窗口枚举与逻辑拍数 |
-| `l1/residency.py` | 按 profile 活跃区容量判定 staging/驻留、双缓冲、**生成 `coupling` 表** |
-| `l1/ledger.py` | `Origin` / `Charge` / `Ledger` 与同源取 max 的显式实现 |
-| `l1/dram.py` | 字节 → DRAM 时间，效率因子命名输入 |
-| `l1/vpu.py` | 非 GEMM 代价与 CPU 采样 |
-| `l1/kernels.py` | 逐算子代价函数注册表 |
-| `l1/params.py` | 结构参数与未校准回退值，每项带 spec 引用与 `source="fallback"` |
-| `l1/timeline.py` | 三步合成、重叠开关、交接气泡 |
-| `l1/web.py` + `l1/resources.html` | 离线网页：逐层归因、逐算子逻辑/物理资源与原始账本 |
-| `l1/run.py` | CLI 入口，支持 `--json` / `--html` |
+| [l1/mapping.py](../model_eval/l1/mapping.py) | LogicalOp→TaskGraph，显式 producer/consumer、转换/补齐与 K merge |
+| [l1/gemm_model.py](../model_eval/l1/gemm_model.py) | 唯一 GEMM 文件：命令拆分、窗口计数、流量与阶段预算；原两拆分模块已删除，无兼容重导出 |
+| [l1/residency.py](../model_eval/l1/residency.py) | ExecutionPlan、BufferPlan 与 base allocation 生命周期 |
+| [l1/ledger.py](../model_eval/l1/ledger.py) | EngineCost/Phase、资源/流量/缓冲需求与原始账目 |
+| [l1/dram.py](../model_eval/l1/dram.py) | 服务换算，缺速率保持未知 |
+| [l1/vpu_model.py](../model_eval/l1/vpu_model.py)、[cpu_model.py](../model_eval/l1/cpu_model.py)、[dma_model.py](../model_eval/l1/dma_model.py) | 独立 typed 引擎模型；转换/整数 merge/跨 core route 未知阶段显式保留 |
+| [l1/kernels.py](../model_eval/l1/kernels.py) | 薄 estimate 分发，不持有成本算法 |
+| [l1/params.py](../model_eval/l1/params.py) | 结构/场景参数及来源 |
+| [hw/topology.py](../model_eval/hw/topology.py) | 多实例、私有内存/端口、共享 DRAM，不自动分片 |
+| [l1/scheduler.py](../model_eval/l1/scheduler.py) | 固定计划 serial/list 预约，actual 与条件 projection 分离 |
+| [l1/timeline.py](../model_eval/l1/timeline.py) | 引擎估算/调度编排与 schema2 报告 |
+| [l1/web.py](../model_eval/l1/web.py) + [resources.html](../model_eval/l1/resources.html) | 任务/阶段、预算/跨度、流量/等待/容量与原始账目 |
+| [l1/run.py](../model_eval/l1/run.py) | CLI、Topology/ExecutionPlan/调度输入，JSON/HTML |
 
-### 实施步骤
+### 首版实施步骤（历史设计，非当前接口）
 
 1. `l1/mapping.py` 引擎映射与合法化。
-2. `l1/gemm_geom.py` 命令拆分。
-3. `l1/windows.py` 窗口枚举——先写下面的对账表断言再写实现。
-4. `l1/residency.py` 驻留判定与 `coupling` 生成。
+2. `l1/gemm_model.py` 命令拆分（历史拆分模块已合并）。
+3. `l1/gemm_model.py` 窗口枚举——先写下面的对账表断言再写实现。
+4. `l1/residency.py` 驻留判定与 `coupling` 生成（历史职责；现行职责见上表）。
 5. `l1/ledger.py` 账本与同源折叠。
 6. `l1/dram.py` 时间换算。
-7. `l1/vpu.py` 非 GEMM 代价。
+7. `l1/vpu_model.py` / `cpu_model.py` / `dma_model.py` 非 GEMM 代价（历史共用入口已拆分）。
 8. `l1/params.py` 回退值，逐项带引用。
 9. `l1/kernels.py` 注册表接线。
 10. `common/report.py` 五类归因表（可与 1、2 并行）。
 11. `l1/timeline.py` 合成。
-12. 跨层断言 `t_L1 >= t_L0`。
+12. 跨层断言 `t_L1 >= t_L0`（已退役的首版设想，现行比较见顶部说明）。
 13. `l1/run.py` + prefill/decode 扫描。
 
 第 1、2、10 步可并发。
@@ -392,7 +395,7 @@ L1 prefill 的 QK/AV 有效量按 `S(S+1)/2`，包含因果对角线；softmax �
 **单元回归**（`PYTHONPATH=src python3 -m unittest discover -s src/hive/model_eval/tests -t src`）
 
 1. 参数量：`fixed=15,750,144`、`s_term=4,112`、`uniq=596,049,920`、`ckpt=751,632,384`、`wb=614,527,468` 逐位相同。
-2. 几何：eval 侧读到的 `arrayN`/`clusterM`/`totalN`/`cEffW`/`supportedFmts` 与 gem5 `DEFAULT_PROFILE` 逐字段相同，不一致即失败。
+2. 几何：eval 侧读到的 `arrayN`/`arrayM`/`totalN`/`cEffW`/`supportedFmts` 与 gem5 `DEFAULT_PROFILE` 逐字段相同，不一致即失败。
 3. 常数：三个 profile 的 DRAM / 算力数字与 `arch.md`、`arch_roadmap.md` 一致。
 4. L0 吞吐：310 profile 下 504.5 / 285.9 / 70.9 / 19.8 tok/s。
 5. L1 几何：对账表十项逐位一致（含 `491,520×32 = 15,728,640` 与 `4,861,952×32 = 155,582,464` 两个交叉校验）。

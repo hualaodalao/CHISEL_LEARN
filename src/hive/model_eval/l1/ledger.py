@@ -58,11 +58,12 @@ class Ledger:
 @dataclass(frozen=True)
 class FoldedCharge:
     origin: Origin
-    seconds: float
+    seconds: float | None
     category: str
     dominant_resource: str
     overlap_class: str
     evidence: str
+    known_seconds: float = 0.0
 
 
 def fold(ledger: Ledger) -> list[FoldedCharge]:
@@ -83,10 +84,138 @@ def fold(ledger: Ledger) -> list[FoldedCharge]:
                 if relation != "same_source":
                     raise ValueError(f"同源折叠缺少耦合依据：{pair}")
         known = [c for c in charges if c.seconds is not None]
-        if not known:
-            continue
-        dominant = max(known, key=lambda c: c.seconds)
-        folded.append(FoldedCharge(dominant.origin, dominant.seconds,
+        dominant = max(known, key=lambda c: c.seconds) if known else charges[0]
+        budget = dominant.seconds if known else 0.0
+        folded.append(FoldedCharge(dominant.origin,
+                                   budget if len(known) == len(charges) else None,
                                    dominant.category, dominant.resource,
-                                   dominant.overlap_class, dominant.evidence))
+                                   dominant.overlap_class, dominant.evidence, budget))
     return folded
+
+
+@dataclass(frozen=True)
+class ResourceClaim:
+    resource: str
+    amount: float = 1.0
+
+    def __post_init__(self) -> None:
+        if not self.resource or not math.isfinite(self.amount) or self.amount <= 0:
+            raise ValueError("resource claims require finite positive amounts")
+
+
+@dataclass(frozen=True)
+class Traffic:
+    stream_id: str
+    owner_task_id: str
+    tensor_id: str | None
+    interface: str
+    memory_domain: str
+    direction: str
+    logical_bytes: float
+    physical_bytes: float
+    physical_beats: int = 0
+    segment: str = ""
+    evidence: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.stream_id or not self.owner_task_id or self.direction not in ("read", "write"):
+            raise ValueError("traffic requires stream identity, owner and direction")
+        if any(not math.isfinite(n) or n < 0 for n in
+               (self.logical_bytes, self.physical_bytes, self.physical_beats)):
+            raise ValueError("traffic counts must be finite and nonnegative")
+
+
+@dataclass(frozen=True)
+class Phase:
+    id: str
+    seconds: float | None
+    category: str
+    dependencies: tuple[str, ...] = ()
+    claims: tuple[ResourceClaim, ...] = ()
+    known_seconds: float = 0.0
+    source: str = "structural"
+    evidence: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.id or self.category not in CATEGORIES:
+            raise ValueError("phase requires an ID and attribution category")
+        if self.seconds is not None and (not math.isfinite(self.seconds) or self.seconds < 0):
+            raise ValueError("phase time must be nonnegative or unknown")
+        if not math.isfinite(self.known_seconds) or self.known_seconds < 0:
+            raise ValueError("known service budget must be nonnegative")
+
+    @property
+    def budget_s(self) -> float:
+        return self.seconds if self.seconds is not None else self.known_seconds
+
+
+@dataclass(frozen=True)
+class BufferRequest:
+    id: str
+    memory_domain: str
+    size_bytes: int
+    alignment: int = 1
+    acquire_phase: str | None = None
+    release_phase: str | None = None
+    tensor_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.id or type(self.size_bytes) is not int or self.size_bytes < 0:
+            raise ValueError("buffer sizes must be nonnegative integers")
+        if type(self.alignment) is not int or self.alignment < 1:
+            raise ValueError("buffer alignment must be a positive integer")
+
+    @property
+    def allocated_bytes(self) -> int:
+        return math.ceil(self.size_bytes / self.alignment) * self.alignment
+
+
+@dataclass(frozen=True)
+class EngineCost:
+    task_id: str
+    instance_id: str
+    phases: tuple[Phase, ...]
+    lease_resources: tuple[str, ...] = ()
+    traffic: tuple[Traffic, ...] = ()
+    buffers: tuple[BufferRequest, ...] = ()
+    metrics: dict = field(default_factory=dict)
+    ledger: Ledger = field(default_factory=Ledger)
+    excluded_costs: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        ids = {phase.id for phase in self.phases}
+        if len(ids) != len(self.phases):
+            raise ValueError("duplicate phase ID")
+        pending = {p.id: set(p.dependencies) for p in self.phases}
+        if any(dep not in ids for deps in pending.values() for dep in deps):
+            raise ValueError("missing phase dependency")
+        while pending:
+            ready = {key for key, deps in pending.items() if not deps}
+            if not ready:
+                raise ValueError("phase dependency cycle")
+            for key in ready:
+                del pending[key]
+            for deps in pending.values():
+                deps.difference_update(ready)
+        for buffer in self.buffers:
+            if any(endpoint is not None and endpoint not in ids
+                   for endpoint in (buffer.acquire_phase, buffer.release_phase)):
+                raise ValueError("buffer lifecycle refers to missing phase")
+        owners = {(t.stream_id, t.owner_task_id) for t in self.traffic}
+        if any(owner != self.task_id for _, owner in owners):
+            raise ValueError("traffic owner disagrees with task")
+
+    @property
+    def known_service_s(self) -> float:
+        ends: dict[str, float] = {}
+        pending = {p.id: p for p in self.phases}
+        while pending:
+            for key, phase in tuple(pending.items()):
+                if all(dep in ends for dep in phase.dependencies):
+                    ends[key] = max((ends[dep] for dep in phase.dependencies), default=0.0) + phase.budget_s
+                    del pending[key]
+        return max(ends.values(), default=0.0)
+
+    @property
+    def complete(self) -> bool:
+        return all(phase.seconds is not None for phase in self.phases)

@@ -2,19 +2,20 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ..common.manifest import Manifest
 from ..hw.profiles import HwProfile
-from .timeline import L1Result
+
+if TYPE_CHECKING:
+    from .timeline import L1Result
 
 
 def report_payload(profile: HwProfile, results: list[L1Result], manifest: Manifest) -> dict:
     cases = []
     for result in results:
         case = result.to_dict(debug=True)
-        case.update({"label": f"{result.workload.label} / {result.attention}",
-                     "operators_time_s": sum(op.t_s for op in result.operations),
-                     "handoff_time_s": result.attribution_s["handoff"]})
+        case["label"] = f"{result.workload.label} / {result.attention}"
         cases.append(case)
     iface = profile.local_iface_bytes_per_s_per_core
     return {
@@ -23,7 +24,7 @@ def report_payload(profile: HwProfile, results: list[L1Result], manifest: Manife
         "hardware": {
             "profile": profile.name,
             "configured_cores": profile.n_core,
-            "active_cores": 1,
+            "active_cores": len(results[0].topology.active_cores) if results else 0,
             "freq_hz": profile.freq_hz,
             "dram_gbps": profile.dram_peak_bytes_per_s / 1e9,
             "effective_dram_gbps": profile.dram_effective_bytes_per_s / 1e9,
