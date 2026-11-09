@@ -24,7 +24,7 @@ object WorkerBeeGem5P0Elaborate {
     val formats = formatNames.map(name => "\"" + name + "\"").mkString(",")
     val profile = s"""{
       "parameters": {
-        "arrayN": ${cfg.arrayN}, "clusterM": ${cfg.clusterM},
+        "arrayN": ${cfg.arrayN}, "arrayM": ${cfg.arrayM},
         "aW": ${cfg.aW}, "bW": ${cfg.bW}, "cW": ${cfg.cW},
         "aBufferDepth": ${cfg.aBufferDepth}, "bBufferDepth": ${cfg.bBufferDepth},
         "cBufferDepth": ${cfg.cBufferDepth}, "addrWidth": ${cfg.addrWidth},

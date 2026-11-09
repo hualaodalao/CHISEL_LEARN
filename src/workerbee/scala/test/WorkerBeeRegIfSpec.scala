@@ -10,9 +10,9 @@ class WorkerBeeRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with W
   private val cfg = WorkerBeeConfig(cW = 40)
   private val wordMask = BigInt("ffffffff", 16)
   // CONTROL 已定义位：fmt[11:0], addrMode[14:12], relu[15], rnd[18:16],
-  // warmdown[20], warmup[21], blocks[22,24,26], loadW[28], requant[29], bias[30]。
+  // warmdown[20], warmup[21], blocks[22,24,26], osFmtKeep[27], loadW[28], requant[29], bias[30], osM1[31]。
   private val controlMask = (0 to 18).foldLeft(BigInt(0))((v, b) => v.setBit(b)) |
-    Seq(20, 21, 22, 24, 26, 28, 29, 30).foldLeft(BigInt(0))((v, b) => v.setBit(b))
+    Seq(20, 21, 22, 24, 26, 27, 28, 29, 30, 31).foldLeft(BigInt(0))((v, b) => v.setBit(b))
 
   // 批次金锚来自 v3.0.0 契约；不读取 RTL 的仲裁或 pending 中间信号。
   private case class Command(lane: Int, op: WorkerBeeOp.Type, a0: Int, a1: Int = 0,
@@ -204,6 +204,50 @@ class WorkerBeeRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim with W
       s.write2(SCALE_B_REG_ADDR, 0x27, 0x2468ACE0, wordMask)
       s.read(SCALE_B_REG_ADDR) should be(BigInt(0x2468ACE0)); s.read(0x27) should be(BigInt(0))
       s.starts.size should be(0)
+    }
+  }
+
+  it should "store and clear osM1 on CONTROL bit31 with reset and inFlight write protection" in {
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
+      val s = new Driver(dut); s.init()
+      // 复位后 osM1=0：CONTROL 读回 bit31 为 0。
+      (s.read(CONTROL_REG_ADDR) & (BigInt(1) << 31)) should be(BigInt(0))
+      dut.io.regFile.osM1.expect(false.B)
+      // bit31 写入 / 读回，且不扰动相邻已定义位（bit30 及以下保持复位值）。
+      s.write(CONTROL_REG_ADDR, BigInt(1) << 31)
+      dut.io.regFile.osM1.expect(true.B)
+      s.read(CONTROL_REG_ADDR) should be(BigInt(1) << 31)
+      // 不带 bit31 的 CONTROL 写清除 osM1（regFile 位域整体重写语义）。
+      s.write(CONTROL_REG_ADDR, BigInt(1) << 30)
+      dut.io.regFile.osM1.expect(false.B)
+      s.read(CONTROL_REG_ADDR) should be(BigInt(1) << 30)
+      // inFlight 期间 CONTROL 整体禁写：osM1 不得被写入。
+      s.write(START_REG_ADDR, 1)
+      s.write(CONTROL_REG_ADDR, BigInt(1) << 31, err = true)
+      dut.io.regFile.osM1.expect(false.B)
+      s.read(CONTROL_REG_ADDR) should be(BigInt(1) << 30)
+      s.done()
+    }
+  }
+
+  it should "store and clear osFmtKeep on CONTROL bit27 independently of neighbouring fields" in {
+    simulate(new WorkerBeeRegIf(cfg)) { dut =>
+      val s = new Driver(dut); s.init()
+      (s.read(CONTROL_REG_ADDR) & (BigInt(1) << 27)) should be(BigInt(0))
+      dut.io.regFile.osFmtKeep.expect(false.B)
+      s.write(CONTROL_REG_ADDR, BigInt(1) << 27)
+      dut.io.regFile.osFmtKeep.expect(true.B)
+      dut.io.regFile.loadWMode.expect(false.B)
+      dut.io.regFile.cMxBlockSize.expect(MXBlockSize.M16)
+      s.read(CONTROL_REG_ADDR) should be(BigInt(1) << 27)
+      // 相邻 bit26(cMxBlk)/bit28(loadW) 置位而 bit27 清零：osFmtKeep 随整体重写清除
+      s.write(CONTROL_REG_ADDR, (BigInt(1) << 26) | (BigInt(1) << 28))
+      dut.io.regFile.osFmtKeep.expect(false.B)
+      s.read(CONTROL_REG_ADDR) should be((BigInt(1) << 26) | (BigInt(1) << 28))
+      s.write(START_REG_ADDR, 1)
+      s.write(CONTROL_REG_ADDR, BigInt(1) << 27, err = true)
+      dut.io.regFile.osFmtKeep.expect(false.B)
+      s.done()
     }
   }
 

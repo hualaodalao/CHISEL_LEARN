@@ -6,8 +6,8 @@ DEFAULT_PROFILE = {
     "name": PROFILE_NAME,
     "spec_version": "4.1.0",
     "parameters": {
-        "arrayN": 8,
-        "clusterM": 2,
+        "arrayN": 16,
+        "arrayM": 16,
         "aW": 16,
         "bW": 16,
         "cW": 0,

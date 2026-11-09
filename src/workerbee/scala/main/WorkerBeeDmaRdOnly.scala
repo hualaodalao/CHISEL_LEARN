@@ -30,7 +30,7 @@ import chisel3.util._
   *     每个 n-tile 轮重复扫同一份 A 地址序列。块内第 i 行 = 块首址 + i*R，
   *     i ∈ [0, regFile.m)；总拍数 = nTiles × kT × regFile.m。
   *
-  * ★ B 通道（io.isA=false，块内【降序】，lineTarget 恒 = T）：
+  * ★ B 通道（io.isA=false；WS 块内【降序】，OS 升序见下方 osB 段；lineTarget 恒 = T）：
   *     sIDLE 锁存 curAddr = lastBTileStartAddr = base + (T-1)*R（块内降序起点 = 最高行）
   *     sTRANSFER 每 req.fire 拍 curAddr -= rowStep（降序，权重下沉协议）
   *     块内第 j 行 = lastBTileStartAddr - j*R，j ∈ [0, T)
@@ -46,6 +46,15 @@ import chisel3.util._
   *     loadWMode=1: blockStart(nt, kt) = base + (nt+1)*(T-1)*R + (nt*kT + kt)*C
   *     总拍数 = nTiles × kT × T
   *
+  * ★ B 通道 OS 升序（osB = !io.isA && io.regFile.osM1，S2 起；A 与 WS B 不受影响）：
+  *     sIDLE/重启 锁存 curAddr = osAnchor = base（每 N tile 首列锚点 = K0 起点）
+  *     sTRANSFER 每 finalReqFire 拍 curAddr += rowStep（与 A 同向升序）
+  *     切 k-tile   osAnchor += C；curAddr = osAnchor（新 K 窗口的 j=0）
+  *     切 n-tile   osAnchor = base + (nCnt+1)×T×R；curAddr 同值（闭式直接重算，
+  *                 不复用 loadW=1 累加模型的 Δ_nt 偏差）
+  *   ⇒ 闭式：addr(nt, kt, j) = base + (nt×T + j)×R + kt×S，S = colTileOffset，j ∈ [0, T)
+  *     scaleB 复用本模块与判据（isA=false 同式），步长由顶层分别传入。
+  *
   * C = colTileOffset = Kpb × Eb（A 为 kTile 步进；B 在 loadW=0 时是 n-tile 步进
   *   = totalN×bEb，loadW=1 时是 k-tile 步进）。★C 是【运行期量】、不是常数，随
   *   regFile.aFmt/bFmt 变化：MX8/FP16/BF16/INT16 → 32，INT8 → 16，INT32 → 64，半字节族 → 0。
@@ -57,8 +66,9 @@ import chisel3.util._
   *
   * start 语义：io.start 在任意状态均可重新装载，用于异常路径（executor errState 不 pop ⟹
   *   DMA 可能卡 sDONE 等 credit）后的强制重启。sDONE/sTRANSFER 内置 start 重载分支，当拍锁存
-  *   新遍历参数并直达 sTRANSFER（start 是单拍脉冲，不可经 sIDLE 中转等待），ostCredit/errReg/
-  *   lineCounter 同拍复位；锁存体与 sIDLE 共用同一组合表达式。
+  *   新遍历参数（curAddr/osAnchor/lastBTileStartAddr/colAddr/rowStep/lineTarget）并直达/留在
+  *   sTRANSFER（start 是单拍脉冲，不可经 sIDLE 中转等待），ostCredit/errReg/gPhase/inflCnt/
+  *   lineCounter/kCnt/nCnt 同拍复位；锁存体与 sIDLE 共用同一组合表达式（startXxx Wire）。
   *
   * @param cfg     WorkerBee 配置
   * @param bufWidth buffer push 数据位宽（默认 = cfg.aExtW；外部 rsp 与本口等宽直连）
@@ -112,6 +122,7 @@ class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int 
 
   val curAddr = RegInit(0.U(cfg.addrWidth.W))
   val lastBTileStartAddr = RegInit(0.U(cfg.addrWidth.W))
+  val osAnchor = RegInit(0.U(cfg.addrWidth.W))  // OS B 当前 N tile 首列锚点（K0 起点），仅 osB 使用
   val colAddr = RegInit(0.U(cfg.addrWidth.W))
   val rowStep = RegInit(0.U(cfg.addrWidth.W))  // 内层每拍地址步进
   val kCnt = RegInit(0.U(cfg.mnkWidth.W))
@@ -124,6 +135,40 @@ class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int 
   val ERR_BUS = 1.U(2.W)
   val ERR_FIFO = 2.U(2.W)
   val errState = RegInit(0.U(2.W))
+
+  // osB：OS 升序 B/scaleB 遍历判据（S2，运行期量）。A 通道与 WS B 保留原分支。
+  val osB = !io.isA && io.regFile.osM1
+
+  // 同源启动锁存体：sIDLE 首启与 sTRANSFER/sDONE 中途重启共用同一组合表达式，保证任意
+  //   状态 reload 后遍历参数与首启完全一致（含 osB 的锚点与升序起点）。
+  val startCurAddr    = Wire(UInt(cfg.addrWidth.W))
+  val startOsAnchor   = Wire(UInt(cfg.addrWidth.W))
+  val startLastB      = Wire(UInt(cfg.addrWidth.W))
+  val startColAddr    = Wire(UInt(cfg.addrWidth.W))
+  val startRowStep    = Wire(UInt(cfg.addrWidth.W))
+  val startLineTarget = Wire(UInt(16.W))
+  when(io.isA) {
+    startCurAddr    := io.reg_baseAddr
+    startOsAnchor   := 0.U
+    startLastB      := 0.U
+    startColAddr    := io.reg_colTileOffset
+    startRowStep    := io.reg_rowOffset
+    startLineTarget := io.regFile.m
+  }.elsewhen(osB) {
+    startCurAddr    := io.reg_baseAddr
+    startOsAnchor   := io.reg_baseAddr
+    startLastB      := 0.U
+    startColAddr    := io.reg_colTileOffset
+    startRowStep    := io.reg_rowOffset
+    startLineTarget := cfg.totalN.U
+  }.otherwise {
+    startCurAddr    := io.reg_baseAddr + (cfg.totalN - 1).U * io.reg_rowOffset
+    startOsAnchor   := 0.U
+    startLastB      := io.reg_baseAddr + (cfg.totalN - 1).U * io.reg_rowOffset
+    startColAddr    := io.reg_colTileOffset
+    startRowStep    := io.reg_rowOffset
+    startLineTarget := cfg.totalN.U
+  }
 
   // gather 读：非对齐逻辑拍的「对齐多发读 + 字节移位重组」。外部读端口按
   //   portBytes = pushW/8 字节对齐取数；逻辑拍地址 L 非对齐时，DMA 自发读
@@ -297,20 +342,15 @@ class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int 
       // 防重复 start 竞态：重载拍已直达 sTRANSFER，仅当本拍确在 sIDLE 才允许 start 推进
       when(io.start){
         state  := sTRANSFER
-
-        when(io.isA) {
-          curAddr   := io.reg_baseAddr
-          colAddr   := io.reg_colTileOffset
-          rowStep   := io.reg_rowOffset
-          lineTarget  := io.regFile.m
-        }.otherwise {
-          curAddr            := io.reg_baseAddr + (cfg.totalN - 1).U * io.reg_rowOffset
-          lastBTileStartAddr := io.reg_baseAddr + (cfg.totalN - 1).U * io.reg_rowOffset
-          colAddr   := io.reg_colTileOffset
-          rowStep   := io.reg_rowOffset
-          lineTarget  := cfg.totalN.U
-        }        
-        
+        // B 路 sDONE 退出时 kCnt/nCnt 停在末值，不清零会让下一任务从旧 tile 号续跑
+        kCnt               := 0.U
+        nCnt               := 0.U
+        curAddr            := startCurAddr
+        osAnchor           := startOsAnchor
+        lastBTileStartAddr := startLastB
+        colAddr   := startColAddr
+        rowStep   := startRowStep
+        lineTarget := startLineTarget
       }
 
     }
@@ -325,6 +365,12 @@ class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int 
         ostCredit   := bufDepth.U
         gPhase      := 0.U
         inflCnt     := 0.U
+        curAddr            := startCurAddr
+        osAnchor           := startOsAnchor
+        lastBTileStartAddr := startLastB
+        colAddr   := startColAddr
+        rowStep   := startRowStep
+        lineTarget := startLineTarget
       }.elsewhen(finalReqFire){
           when(lineCounter === lineTarget - 1.U){
             state := sNEXT_COL
@@ -332,7 +378,8 @@ class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int 
           }.otherwise{
             lineCounter := lineCounter + 1.U
           }
-          when(io.isA){
+          when(io.isA || osB){
+            // A 与 OS B 块内升序
             curAddr := curAddr + rowStep
           }.otherwise{
             // B 块内降序（权重下沉协议，见锁存块注释）
@@ -370,7 +417,12 @@ class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int 
             nCnt := nCnt + 1.U
             state := sTRANSFER            
 
-            when(io.regFile.loadWMode){
+            when(osB) {
+              // OS 升序：锚点 = base + (nCnt+1)×T×R 闭式直接重算（nCnt 为旧值），
+              //   不复用 loadW=1 累加模型的 Δ_nt 偏差
+              osAnchor := io.reg_baseAddr + (nCnt + 1.U) * cfg.totalN.U * io.reg_rowOffset
+              curAddr  := io.reg_baseAddr + (nCnt + 1.U) * cfg.totalN.U * io.reg_rowOffset
+            }.elsewhen(io.regFile.loadWMode){
               curAddr := lastBTileStartAddr + io.reg_colTileOffset + (cfg.totalN.U - 1.U) * io.reg_rowOffset
               lastBTileStartAddr := lastBTileStartAddr + io.reg_colTileOffset + (cfg.totalN.U - 1.U) * io.reg_rowOffset
             }.otherwise{
@@ -388,7 +440,11 @@ class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int 
           kCnt := kCnt + 1.U
           state := sTRANSFER
           
-          when(io.regFile.loadWMode){
+          when(osB) {
+            // OS 升序：锚点前移一个 K 窗口步进，curAddr 取新锚点（j=0）
+            osAnchor := osAnchor + io.reg_colTileOffset
+            curAddr  := osAnchor + io.reg_colTileOffset
+          }.elsewhen(io.regFile.loadWMode){
             
             curAddr := lastBTileStartAddr + io.reg_colTileOffset
             lastBTileStartAddr := lastBTileStartAddr + io.reg_colTileOffset
@@ -419,6 +475,12 @@ class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int 
         ostCredit   := bufDepth.U
         gPhase      := 0.U
         inflCnt     := 0.U
+        curAddr            := startCurAddr
+        osAnchor           := startOsAnchor
+        lastBTileStartAddr := startLastB
+        colAddr   := startColAddr
+        rowStep   := startRowStep
+        lineTarget := startLineTarget
       }.elsewhen(ostCredit === bufDepth.U){
         io.done := true.B
         state := sIDLE

@@ -204,7 +204,17 @@ object WbDebugModel {
       reluOn: Boolean = false,
       rqMBase: Long = RQM_BASE,
       rqShift: Int = 0,
-      rqZp: Int = 0) {
+      rqZp: Int = 0,
+      // OS-M1 模式位 reg5[31]：osM1=true 仅 M=1 且 loadWMode=1 合法，其余形状硬件
+      //   errCode 14 拒绝。B/scaleB 地址金锚按 osM1 分支（升序闭式），数值金锚同 WS。
+      osM1: Boolean = false,
+      // reg5[27]：同格式跳过 OS 格式广播的提示位；纯性能语义，不改数值金锚与 errCode
+      osFmtKeep: Boolean = false,
+      // 软件逻辑列数（0 = 全部 n 列）。>0 时 n 须为 ceil(nLogical/totalN)×totalN（Nprog 契约），
+      //   列 [nLogical,n) 是软件显式写零的 padding：B/bias/rqM 置零，写回全范围仍按张量语义对账。
+      nLogical: Int = 0) {
+
+    def nLog: Int = if (nLogical == 0) n else nLogical
 
     // MXBlockSize 枚举 = {M16=0, M32=1}，bytes = 16<<sel：基档 M16=16 元素、每 +1 档翻倍。
     def aMxBlk: Int = 16 << aMxBlkSel
@@ -212,8 +222,8 @@ object WbDebugModel {
     def cMxBlk: Int = 16 << cMxBlkSel
 
     /** 单一控制字 reg5，位域由寄存器契约独立推导：
-      *     [31]    保留 0     | [30]    biasOn      | [29]    requantOn
-      *     [28]    loadWMode  | [27]    保留 0
+      *     [31]    osM1       | [30]    biasOn      | [29]    requantOn
+      *     [28]    loadWMode  | [27]    osFmtKeep
       *     [26]    cMxBlk     | [25]    保留 0       | [24]    bMxBlk
       *     [23]    保留 0     | [22]    aMxBlk       | [21]    warmup
       *     [20]    warmdown   | [19]    保留 0       | [18:16] rnd
@@ -223,9 +233,11 @@ object WbDebugModel {
       *     MXBlockSize {M16, M32}→1-bit；Cat 总宽 = 32。
       * 三个 MxBlk 的掩码 `& 0x3` 对 sel∈{0,1}（全部合法取值）与 `& 0x1` 产出逐位相同。 */
     def controlWord5: Long =
+      (if (osM1) 1L << 31 else 0L) |
       (if (biasOn) 1L << 30 else 0L) |
       (if (requantOn) 1L << 29 else 0L) |
       (if (loadWMode) 1L << 28 else 0L) |
+      (if (osFmtKeep) 1L << 27 else 0L) |
         ((cMxBlkSel.toLong & 0x3) << 26) | ((bMxBlkSel.toLong & 0x3) << 24) |
         ((aMxBlkSel.toLong & 0x3) << 22) |
         (if (warmup)   1L << 21 else 0L) |
@@ -249,14 +261,16 @@ object WbDebugModel {
         f"reg5=0x${controlWord5}%08X" +
         // bias / requant 状态只在启用时进 banner
         (if (biasOn) f" biasOn=1 biasBase=0x${biasBase}%08X" else "") +
-        (if (requantOn) f" requantOn=1 reluOn=${if (reluOn) 1 else 0} rqMBase=0x${rqMBase}%08X shift=$rqShift zp=$rqZp" else "")
+        (if (requantOn) f" requantOn=1 reluOn=${if (reluOn) 1 else 0} rqMBase=0x${rqMBase}%08X shift=$rqShift zp=$rqZp" else "") +
+        (if (osM1) " osM1=1" else "") +
+        (if (osFmtKeep) " osFmtKeep=1" else "")
   }
 
   // 配置合法性预检（与 WorkerBeeCalcConfig errCode 语义同源，用于分派负向路径）
 
   /** WorkerBeeCalcConfig errComb 裸块的软件镜像（单一真源，precheckConfigErr 与
     * QuickSpec 体检共用）。用顺序 if + 后写覆盖编码硬件 last-connect 优先级：
-    *   3(反向混配) > 3(FP8/BF16 异或) > 11 > 8 > 13 > 12 > 10 > 7 > 5 > 4 > 3(isAMx^isBMx) > 0。
+    *   3(反向混配) > 3(FP8/BF16 异或) > 11 > 8 > 13 > 12 > 10 > 7 > 5 > 4 > 3(isAMx^isBMx) > 0 > 14(osM1，链首最低)。
     * errCode 0：硬件把 a/b/cMxBlockSize 三违约合并为 errMXLargerThanKLoadNum，1/2 不可达。
     * code 6（MXE2M1 输出 N 为奇数）在 RTL 中被注释掉，本金锚仍镜像它 —— 已知偏差。
     * code 7 = 容量超限（m > cBufferDepth - totalN），该臂为 RTL-only，本镜像不含它。
@@ -265,6 +279,9 @@ object WbDebugModel {
                  cAddr: Long = C_BASE, cDmaExtW: Int = 256): Option[Int] = {
     def kLoadNum(f: DataFormat.Type): Int = if (isMx8(f) || f == DataFormat.INT8 || isFp8Fmt(f)) totalN * 2 else totalN * 4  // 镜像 getKLoadNum（is1B 语义）
     val aMx = isMxAny(p.aFmt); val bMx = isMxAny(p.bFmt); var e = Option.empty[Int]
+    // errCode 14（最低优先级，链首）：osM1 仅支持 M=1 且 loadWMode=1。放在第一个赋值位
+    //   置使后续各臂可覆盖它，镜像 RTL 把 when 放在 errComb 裸块最前。
+    if (p.osM1 && (p.m != 1 || !p.loadWMode)) e = Some(14)
     if ((aMx && p.aMxBlk > kLoadNum(p.aFmt)) || (bMx && p.bMxBlk > kLoadNum(p.bFmt)) ||
         (isMxAny(p.cFmt) && p.cMxBlk > totalN)) e = Some(0)   // RTL 把三个 blk 违约合并成单一 errCode 0
     if (aMx != bMx) e = Some(3)
@@ -346,6 +363,8 @@ object WbDebugModel {
   def validate(p: DebugParams, totalN: Int, hasMx4: Boolean = false): Unit = {
     require(p.m > 0 && p.n > 0 && p.k > 0, s"M/N/K 必须 > 0，当前 M=${p.m} N=${p.n} K=${p.k}")
     require(p.rnd >= 0 && p.rnd <= 4, s"rnd=${p.rnd} 越界（0..4）")
+    require(p.nLogical == 0 || (p.nLogical > 0 && p.n == (p.nLogical + totalN - 1) / totalN * totalN),
+      s"nLogical=${p.nLogical} 时 N 须编程为 Nprog=ceil(nLogical/$totalN)×$totalN，当前 N=${p.n}")
     if (isMxAny(p.aFmt) || isMxAny(p.bFmt)) {
       // MX8×MX4 混配时两侧各自有整除要求（MX8 kpb=32、fp4 源节拍 kpb=64），取 math.max
       //   即同时约束两侧；单侧 MX 时 = 该侧 kPerBeat。
@@ -672,10 +691,21 @@ object WbDebugModel {
       if (isW4A8 || isIntW4A8) {
         val bKTileOffMix = aKpb.toLong * bEbits / 8                 // 混配 k 窗口步进 = 16B
         for (r <- 0 until nTiles; w <- 0 until (p.k / aKpb)) {
-          val blockStart = p.bBase + r * bNTileOff + (totalN - 1) * bRowOff + w * bKTileOffMix
-          for (s <- 0 until totalN) buf += blockStart - s * bRowOff
+          if (p.osM1)
+            for (j <- 0 until totalN) buf += p.bBase + r * bNTileOff + j * bRowOff + w * bKTileOffMix
+          else {
+            val blockStart = p.bBase + r * bNTileOff + (totalN - 1) * bRowOff + w * bKTileOffMix
+            for (s <- 0 until totalN) buf += blockStart - s * bRowOff
+          }
         }
         buf.toSeq.map(addr => addr - addr % 32L)
+      } else if (p.osM1) {
+        // OS 升序（S2 闭式，§4.2）：addr(nt,kt,j) = bBase + nt*bNTileOff + j*bRowOff +
+        //   kt*bKTileOff，块内自然列 j 升序；物理读口径（gather 32B）不变。混配臂的 OS
+        //   升序在上一臂内分支。
+        for (r <- 0 until nTiles; kt <- 0 until bKTiles; j <- 0 until totalN)
+          buf += p.bBase + r * bNTileOff + j * bRowOff + kt * bKTileOff
+        buf.toSeq.flatMap(gatherPhys(_, 32L))
       } else {
         for (r <- 0 until nTiles; kt <- 0 until bKTiles) {
           val blockStart = p.bBase + r * bNTileOff + (totalN - 1) * bRowOff + kt * bKTileOff
@@ -713,15 +743,23 @@ object WbDebugModel {
     // 混配 scaleB 期望序列按阵列窗口口径：窗口数 = K/aKpb，窗口 w 的 32-K 块 = blk16 的
     //   {2w,2w+1} / blk32 的 {w} ⟹ kTile 步进 = aKpb/bMxBlk（blk16→2B、blk32→1B），
     //   块内 totalN 行降序，非对齐交 gather。纯格式用 sbColOff = bKpb/blk。
+    //   OS 升序（S2）同 B 数据闭式：块内自然列升序，N-tile 步进 = totalN*sbRowOff。
     val expScaleBAddrSeq: Seq[Long] = {
       val buf = mutable.ArrayBuffer.empty[Long]
       if (isW4A8) {
         val sbColOffMix = (aKpb / p.bMxBlk).toLong
         for (r <- 0 until nTiles; w <- 0 until (p.k / aKpb)) {
-          val blockStart = SB_BASE + r * (totalN * sbRowOff) + (totalN - 1) * sbRowOff + w * sbColOffMix
-          for (s <- 0 until totalN) buf += blockStart - s * sbRowOff
+          if (p.osM1)
+            for (j <- 0 until totalN) buf += SB_BASE + r * (totalN * sbRowOff) + j * sbRowOff + w * sbColOffMix
+          else {
+            val blockStart = SB_BASE + r * (totalN * sbRowOff) + (totalN - 1) * sbRowOff + w * sbColOffMix
+            for (s <- 0 until totalN) buf += blockStart - s * sbRowOff
+          }
         }
-      } else if (isMxAny(p.bFmt))
+      } else if (p.osM1 && isMxAny(p.bFmt))
+        for (r <- 0 until nTiles; kt <- 0 until bKTiles; j <- 0 until totalN)
+          buf += SB_BASE + r * (totalN * sbRowOff) + j * sbRowOff + kt * sbColOff
+      else if (isMxAny(p.bFmt))
         for (r <- 0 until nTiles; kt <- 0 until bKTiles) {
           val blockStart = SB_BASE + r * (totalN * sbRowOff) + (totalN - 1) * sbRowOff + kt * sbColOff
           for (s <- 0 until totalN) buf += blockStart - s * sbRowOff
@@ -738,7 +776,8 @@ object WbDebugModel {
       else (rng.nextDouble() * 4.0 - 2.0)                          // ~[-2,2]
 
     val aCode: Array[Array[Long]] = Array.tabulate(p.m, p.k)((_, _) => encodeElem(p.aFmt, nextVal(p.aFmt), p.rnd))
-    val bCode: Array[Array[Long]] = Array.tabulate(p.k, p.n)((_, _) => encodeElem(p.bFmt, nextVal(p.bFmt), p.rnd))
+    val bCode: Array[Array[Long]] = Array.tabulate(p.k, p.n)((_, nn) =>
+      encodeElem(p.bFmt, if (nn < p.nLog) nextVal(p.bFmt) else 0.0, p.rnd))
 
     // fused bias 向量激励与张量语义值。独立 rng 实例（种子异或盐值）使扰动只进 bias。
     // 长度 nTiles*totalN 个 4B 字：第 nt 个 tile 的 totalN 个字 = 输出列 nt*totalN+i 的基底。
@@ -751,9 +790,10 @@ object WbDebugModel {
     /** biasCode(i)：第 i 个 bias 字的 4B 位模式（i = nt*totalN + lane），fp32 bits 或 INT32 补码 */
     val biasCode: Array[Long] =
       if (!p.biasOn) Array.empty
-      else Array.tabulate(nTiles * totalN) { _ =>
+      else Array.tabulate(nTiles * totalN) { i =>
         val v = biasRng.nextInt(33) - 16
-        if (biasRunIsInt) v.toLong
+        if (i >= p.nLog) 0L
+        else if (biasRunIsInt) v.toLong
         else (java.lang.Float.floatToRawIntBits(v.toFloat / 8.0f).toLong & 0xFFFFFFFFL)
       }
     /** biasVal(nn)：输出列 nn 的基底张量语义值（golden 累加初值） */
@@ -778,7 +818,8 @@ object WbDebugModel {
     val rqMCode: Array[Long] =
       if (!p.requantOn) Array.empty
       else Array.tabulate(nTiles * totalN) { i =>
-        (i % totalN) % 6 match {
+        if (i >= p.nLog) 0L
+        else (i % totalN) % 6 match {
           case 0 => 0x40000000L
           case 1 => 0L
           case 2 => (rqMRng.nextInt(251) + 1).toLong
@@ -842,10 +883,18 @@ object WbDebugModel {
       //   isIntFmt(cFmt)。INT 输入运行的累加器是精确整数 ⟹ Double 域 max(·,0) 与硬件
       //   32-bit 槽 clamp 等价（errCode 11 XOR 保证 INT 输出 ⟺ INT 输入）。
       val reluActive = p.reluOn && isIntFmt(p.cFmt)
-      if (!p.requantOn && !reluActive) raw
+      // 非 requant 的窄整数输出（INT8/INT4）按补码截断绕回，只有 requant 饱和
+      val wrapBits = if (p.cFmt == DataFormat.INT8) 8 else if (p.cFmt == DataFormat.INT4) 4 else 0
+      def wrap(v: Double): Double =
+        if (wrapBits == 0) v
+        else {
+          val sh = 64 - wrapBits
+          ((v.toLong << sh) >> sh).toDouble
+        }
+      if (!p.requantOn && !reluActive && wrapBits == 0) raw
       else Array.tabulate(p.m, p.n) { (mm, nn) =>
         val v = raw(mm)(nn)
-        if (!p.requantOn) { if (reluActive && v < 0.0) 0.0 else v }
+        if (!p.requantOn) wrap(if (reluActive && v < 0.0) 0.0 else v)
         else {
           // requantOn：golden 即量化后输出整数 y = sat_fmt(round_half_up(relu(acc)
           //   × M[nn] >> shift) + zp)。acc 为纯 INT 链精确整数累加器（require 兜底）；
@@ -1159,8 +1208,23 @@ object WbDebugModel {
       val nCodes: Int = if (histEnabled) 1 << elemBits else 0
       val hwHist  = Array.fill(nCodes)(0)   // 硬件实发码计数
       val expHist = Array.fill(nCodes)(0)   // 金锚期望码计数（仅 MX 有意义）
+      var logicalBad = 0                    // 列 [0,nLog) 的失配元素数
+      var padBad = 0                        // padding 列 [nLog,n) 的失配元素数
+      // padding 列输入全零 ⟹ 张量语义 acc=0：requant 输出 clamp(zp)，其余输出 0
+      val padRef: Double =
+        if (!p.requantOn) 0.0
+        else {
+          val lo = if (p.cFmt == DataFormat.INT4) -8L else -128L
+          val hi = if (p.cFmt == DataFormat.INT4) 7L else 127L
+          math.max(lo, math.min(hi, p.rqZp.toLong)).toDouble
+        }
       for (mm <- 0 until p.m; nn <- 0 until p.n) {
+        val mismatchBefore = mismatch
         val ref = goldenC(mm)(nn)
+        if (nn >= p.nLog && ref != padRef) {
+          mismatch += 1
+          if (details.size < 32) details += f"C($mm,$nn) PAD-SEMANTIC golden=$ref%.6g 应为 $padRef%.6g（padding 输入未全零）"
+        }
         // MX 量化输出：本元素所属块的 E8M0 scale 字节（仅用于反量化与旧启发式对照，判定
         //   换成独立算出的 expScale/expCode）
         val mxScale: Int =
@@ -1321,7 +1385,11 @@ object WbDebugModel {
             }
           }
         }
+        if (mismatch > mismatchBefore) { if (nn < p.nLog) logicalBad += 1 else padBad += 1 }
       }
+      if (p.nLog < p.n)
+        println(s"[$TAG] (PAD) 逻辑列 [0,${p.nLog}) 失配 $logicalBad 元素；padding 列 [${p.nLog},${p.n}) " +
+          s"失配 $padBad 元素（padding 期望值 $padRef）")
       // C 侧块 scale 字节值硬断言 —— 逐块比对，任何一块不符即红。
       //   不比 scale 值时，scale 通路只要自洽（硬件写的 scale 与硬件写的码互相匹配）就能过，
       //   哪怕整条 amax→E8M0 编码链算错也看不出来。

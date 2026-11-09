@@ -28,10 +28,16 @@ verification/assert/Wb_WbFusionMacFp_Verification_Assert.sv
 Wb_WbFusionMacFp.sv
 Wb_WbFusionMacInt.sv
 Wb_WbWorkUnit.sv
+verification/assert/Wb_WbWorkerOsM1_Verification_Assert.sv
+Wb_WbWorkerOsM1.sv
 verification/assert/Wb_WbWorker_Verification_Assert.sv
 Wb_WbWorker.sv
-Wb_WbCell.sv
+verification/assert/Wb_WbComb_Verification_Assert.sv
 Wb_WbComb.sv
+verification/assert/Wb_WbOsM1Feeder_Verification_Assert.sv
+Wb_WbOsM1Feeder.sv
+verification/assert/Wb_WbOsM1Sequencer_Verification_Assert.sv
+Wb_WbOsM1Sequencer.sv
 Wb_WorkerBeeDmaRdOnly_2.sv
 Wb_WorkerBeeDmaScaleWr.sv
 Wb_ram_2x8.sv

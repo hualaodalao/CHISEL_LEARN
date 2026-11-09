@@ -4,5 +4,6 @@
   `include "layers-Wb_WorkerBee-Verification.sv"	// src/workerbee/scala/main/WorkerBee.scala:4:7
   `include "layers-Wb_WorkerBeeExecutor2-Verification-Assert.sv"	// src/workerbee/scala/main/WorkerBee.scala:4:7
   `include "layers-Wb_WbComb-Verification-Assert.sv"	// src/workerbee/scala/main/WorkerBee.scala:4:7
+  `include "layers-Wb_WbOsM1Sequencer-Verification-Assert.sv"	// src/workerbee/scala/main/WorkerBee.scala:4:7
   bind Wb_WorkerBee Wb_WorkerBee_Verification_Assert verification_assert ();
 `endif // not def layers_Wb_WorkerBee_Verification_Assert

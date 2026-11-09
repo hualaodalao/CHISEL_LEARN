@@ -3,4 +3,5 @@
   `define layers_Wb_WorkerBee_Verification
   `include "layers-Wb_WorkerBeeExecutor2-Verification.sv"	// src/workerbee/scala/main/WorkerBee.scala:4:7
   `include "layers-Wb_WbComb-Verification.sv"	// src/workerbee/scala/main/WorkerBee.scala:4:7
+  `include "layers-Wb_WbOsM1Sequencer-Verification.sv"	// src/workerbee/scala/main/WorkerBee.scala:4:7
 `endif // not def layers_Wb_WorkerBee_Verification

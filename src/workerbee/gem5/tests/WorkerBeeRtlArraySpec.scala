@@ -4,7 +4,7 @@ import chisel3.util.experimental.BoringUtils
 import scala.collection.mutable
 
 private class WorkerBeeRtlArrayWrapper(cfg: WorkerBeeConfig) extends Module {
-  val array = Module(new WbComb(8, 2, 16, 16, cfg.cEffW, cfg.supportedFmts))
+  val array = Module(new WbComb(cfg.arrayN, cfg.arrayM, cfg.aW, cfg.bW, cfg.cEffW, cfg.supportedFmts))
   val io = IO(chiselTypeOf(array.io))
   array.io <> io
 
@@ -31,7 +31,7 @@ private class WorkerBeeRtlArrayWrapper(cfg: WorkerBeeConfig) extends Module {
   observed.cOutAllData := BoringUtils.tapAndRead(array.cOutAllData)
   observed.cOutShiftEn := BoringUtils.tapAndRead(array.cOutShiftEn)
   for (((row, col), index) <- coordinates.zipWithIndex) {
-    val pe = array.arrays(row / 8)(col / 8).pes(row % 8)(col % 8)
+    val pe = array.pes(row)(col)
     observed.horizontalIn(index) := BoringUtils.tapAndRead(pe.io.validIn)
     observed.horizontalOut(index) := BoringUtils.tapAndRead(pe.io.validOut)
     observed.verticalIn(index) := BoringUtils.tapAndRead(pe.io.validInV)
@@ -181,6 +181,15 @@ class WorkerBeeRtlArraySpec extends RtlEdgeSuite {
         dut.io.fmtIn.poke(DataFormat.INT8)
         dut.io.bFmtIn.poke(DataFormat.INT8)
         dut.io.rndIn.poke(RoundingMode.RNE)
+        dut.io.osM1.poke(false.B)
+        dut.io.osSeedEn.poke(false.B)
+        dut.io.osAdvance.poke(false.B)
+        dut.io.osLastIn.poke(false.B)
+        for (col <- 0 until t) {
+          dut.io.osB(col).poke(0.U)
+          dut.io.osScaleB(col).poke(0.U)
+          dut.io.osSeed(col).poke(0.U)
+        }
         val a = Vector.tabulate(t)(row => BigInt(1 + ((cycle + 1) * 17 + row * 3) % 101) * 257)
         val scale = Vector.tabulate(t)(row => BigInt((cycle * 7 + row * 11) & 255))
         for (row <- 0 until t) {

@@ -166,7 +166,16 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     val isAMx = DataFormat.isMx(io.regFile.aFmt)
     val isBMx = DataFormat.isMx(io.regFile.bFmt)
     val isMx = isAMx || isBMx
-    
+
+    // errCode 14 —— OS-M1 模式守护。osM1 仅支持 M=1 且 loadWMode=1：OS 升序 DMA 与
+    //   首行向右脉动契约只在 B 为 N×K 转置布局（loadW=1）且单行输出驻留下成立。
+    //   放在块首（last-connect 最低优先级）：既有格式/K/输出/epilogue 错误仍覆盖它，
+    //   叠加配置归因到具体码而非 14。
+    when(io.regFile.osM1 && (io.regFile.m =/= 1.U || io.regFile.loadWMode === 0.U)){
+        errComb := true.B
+        errCodeComb := 14.U
+    }
+
     val errMXLargerThanKLoadNum = ((aMxBlockSize > aKLoadNum) & DataFormat.isMx(io.regFile.aFmt))|
     ((bMxBlockSize > bKLoadNum) & DataFormat.isMx(io.regFile.bFmt))|
     ((cMxBlockSize > cNWriteNum) & DataFormat.isMx(io.regFile.cFmt))
@@ -210,7 +219,8 @@ bElemBytes := memElemBytesOf(io.regFile.bFmt)
     // errCode 码位：0 blocksize 违约（1/2 保留不分配）；3 isAMx^isBMx 与各族反向/
     //   跨族混配；4 isMx/FP8 且 loadWMode==0；5 aFmt/bFmt 为 FP32；6 不可再分配；
     //   7 容量 m > cBufferDepth-totalN；8 K 不被 kPerBeat 整除；9 预留；10 本守护；
-    //   11 int/非 int 跨界；12 bias；13 requant。errCode 为 UInt(4.W)，新码从 14 起。
+    //   11 int/非 int 跨界；12 bias；13 requant；14 osM1 形状/装载模式（块首最低优先级）。
+    //   errCode 为 UInt(4.W)，新码从 15 起。
     val cAlignBitsW = math.min(log2Up(cfg.cDmaExtW / 8), cfg.addrWidth)
     when(io.regFile.cAddr(cAlignBitsW - 1, 0) =/= 0.U){
         errComb := true.B

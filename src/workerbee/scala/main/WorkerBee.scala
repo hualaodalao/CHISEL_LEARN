@@ -32,7 +32,8 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
   val cDma       = Module(new WorkerBeeDmaWrOnly(cfg, bufWidth = cfg.totalN * cfg.cEffW, hasFp = cfg.hasFp, hasMx = cfg.hasMx))
   val executor   = Module(new WorkerBeeExecutor2(cfg))
   val cvt        = Module(new WbOutCvt(cfg))
-  val wbComb   = Module(new WbComb(cfg.arrayN, cfg.clusterM, cfg.aW, cfg.bW, cfg.cEffW, cfg.supportedFmts))
+  val wbComb   = Module(new WbComb(cfg.arrayN, cfg.arrayM, cfg.aW, cfg.bW, cfg.cEffW, cfg.supportedFmts))
+  val osSeq    = Module(new WbOsM1Sequencer(cfg.totalN, cfg.aEffW, cfg.bW, cfg.scaleAW, cfg.scaleBW, 16, cfg.hasMx))
   val aDmaScale = if (cfg.hasMx) Some(Module(new WorkerBeeDmaRdOnly(cfg, bufWidth = cfg.scaleAW,   bufDepth = cfg.scaleBufferDepth))) else None
   val bDmaScale = if (cfg.hasMx) Some(Module(new WorkerBeeDmaRdOnly(cfg, bufWidth = cfg.scaleBW,   bufDepth = cfg.scaleBufferDepth))) else None
   val cDmaScale = if (cfg.hasMx) Some(Module(new WorkerBeeDmaScaleWr(cfg))) else None
@@ -202,7 +203,9 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
 
   executor.io.bPop.valid   := scratchpad.io.bPop.valid
   executor.io.bPop.payload := scratchpad.io.bPop.payload
-  scratchpad.io.bPop.ready := executor.io.bPop.ready
+  osSeq.io.bIn.valid       := scratchpad.io.bPop.valid
+  osSeq.io.bIn.payload     := scratchpad.io.bPop.payload
+  scratchpad.io.bPop.ready := Mux(executor.io.osActive, osSeq.io.bIn.ready, executor.io.bPop.ready)
   executor.io.bOccupancy   := scratchpad.io.bOccupancy
 
   private val blkLatchCnt = RegInit(0.U(cfg.mnkWidth.W))
@@ -247,7 +250,9 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
 
   executor.io.aPop.valid   := scratchpad.io.aPop.valid
   executor.io.aPop.payload := scratchpad.io.aPop.payload
-  scratchpad.io.aPop.ready := executor.io.aPop.ready
+  osSeq.io.aIn.valid       := scratchpad.io.aPop.valid
+  osSeq.io.aIn.payload     := scratchpad.io.aPop.payload
+  scratchpad.io.aPop.ready := Mux(executor.io.osActive, osSeq.io.aIn.ready, executor.io.aPop.ready)
   executor.io.aOccupancy   := scratchpad.io.aOccupancy
   executor.io.cOccupancy   := scratchpad.io.cOccupancy
 
@@ -257,7 +262,9 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
   // 量化运行时 drain/done 需等 dmaCScale 写完 ⟹ dmaCBusy 取两通道之或
   executor.io.dmaCBusy := (if (cfg.hasMx) cDma.io.busy || cDmaScale.get.io.busy else cDma.io.busy)
 
+  // OS-M1 下 A token 复用行 0 的 aIn/validIn（行 0 无 skew），其余行冻结
   wbComb.io.aIn      := executor.io.wbAIn
+  wbComb.io.aIn(0)   := Mux(executor.io.osActive, osSeq.io.aOut, executor.io.wbAIn(0))
   wbComb.io.psumIn   := executor.io.wbPsumIn
   wbComb.io.loadHIn  := executor.io.wbLoadH
   wbComb.io.loadVInLock  := executor.io.wbLoadVLock
@@ -266,7 +273,7 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
   // 相关分支为死路，不加显式 mode 端口、靠信号活跃性自然二选一
   wbComb.io.loadWIn      := executor.io.wbLoadW
   wbComb.io.loadWInLock  := executor.io.wbLoadWLock
-  wbComb.io.validIn  := executor.io.wbValidIn
+  wbComb.io.validIn  := Mux(executor.io.osActive, osSeq.io.aTokenValid, executor.io.wbValidIn)
   // a 侧 FP8 remap：纯 FP8 运行时阵列看到 MXE4M3/MXE5M2，而 Executor 的 mxRunB 读 raw
   //   regFile（isMx(FP8)=false）走非 MX 握手支路——供数不等 scale FIFO、scale DMA 不启动，
   //   127 由注入点组合直供。
@@ -287,12 +294,36 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
   //   【不是】按列驻留量：lane 下标是 K-lane 轴，而阵列列是输出 N 轴。非 MX 配置下恒 0。
   if (cfg.hasMx) {
     wbComb.io.scaleAIn := executor.io.wbScaleAIn.get
+    // OS 首行无 skew：scaleA 字节与 A token 同拍注入行 0，沿 scaleA 链随 osAdvance 右传
+    wbComb.io.scaleAIn(0) := Mux(executor.io.osActive, osSeq.io.aScaleByte, executor.io.wbScaleAIn.get(0))
     wbComb.io.scaleBIn := executor.io.wbScaleBIn.get
   } else {
     wbComb.io.scaleAIn.foreach(_ := 0.U)
     wbComb.io.scaleBIn.foreach(_ := 0.U)
   }
   wbComb.io.clear    := executor.io.wbClear
+  wbComb.io.osM1      := executor.io.osActive
+  wbComb.io.osB       := osSeq.io.bOut
+  wbComb.io.osScaleB  := osSeq.io.scaleBByte
+  wbComb.io.osSeed    := executor.io.osSeed
+  wbComb.io.osSeedEn  := executor.io.osSeedEn
+  wbComb.io.osAdvance := osSeq.io.advance
+  wbComb.io.osLastIn  := osSeq.io.aLast
+
+  // Sequencer 仅在 OS 执行期活跃，其余时间常 flush 保持空闲
+  osSeq.io.flush   := !executor.io.osActive
+  osSeq.io.start   := executor.io.osStart
+  osSeq.io.kTiles  := executor.io.osKTiles
+  osSeq.io.mxMode  := executor.io.osMxMode
+  osSeq.io.scaleOne   := executor.io.osScaleOne
+  osSeq.io.scaleAStep := executor.io.osScaleAStep
+  osSeq.io.scaleBStep := executor.io.osScaleBStep
+  osSeq.io.scaleABlk  := executor.io.osScaleABlk
+  osSeq.io.scaleBBlk  := executor.io.osScaleBBlk
+  osSeq.io.consume := wbComb.io.osConsume
+  osSeq.io.done    := wbComb.io.osDone
+  executor.io.osResultsReady := osSeq.io.resultsReady
+  executor.io.osPsum         := wbComb.io.osPsum
 
   executor.io.wbCOut     := wbComb.io.cOut
   executor.io.wbValidOut := wbComb.io.validOut
@@ -458,10 +489,16 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
 
     executor.io.scaleAPop.get.valid   := scratchpad.io.scaleAPop.get.valid
     executor.io.scaleAPop.get.payload := scratchpad.io.scaleAPop.get.payload
-    scratchpad.io.scaleAPop.get.ready := executor.io.scaleAPop.get.ready
+    scratchpad.io.scaleAPop.get.ready := Mux(executor.io.osActive, osSeq.io.scaleAIn.get.ready,
+      executor.io.scaleAPop.get.ready)
     executor.io.scaleBPop.get.valid   := scratchpad.io.scaleBPop.get.valid
     executor.io.scaleBPop.get.payload := scratchpad.io.scaleBPop.get.payload
-    scratchpad.io.scaleBPop.get.ready := executor.io.scaleBPop.get.ready
+    scratchpad.io.scaleBPop.get.ready := Mux(executor.io.osActive, osSeq.io.scaleBIn.get.ready,
+      executor.io.scaleBPop.get.ready)
+    osSeq.io.scaleAIn.get.valid   := scratchpad.io.scaleAPop.get.valid
+    osSeq.io.scaleAIn.get.payload := scratchpad.io.scaleAPop.get.payload
+    osSeq.io.scaleBIn.get.valid   := scratchpad.io.scaleBPop.get.valid
+    osSeq.io.scaleBIn.get.payload := scratchpad.io.scaleBPop.get.payload
     executor.io.scaleBOcc.get         := scratchpad.io.scaleBOccupancy.get
   }
 
@@ -505,9 +542,13 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
   io.perf.scaleA := (if (cfg.hasMx) io.dmaScaleA.get.req.valid else false.B)
   io.perf.scaleB := (if (cfg.hasMx) io.dmaScaleB.get.req.valid else false.B)
   io.perf.scaleC := (if (cfg.hasMx) io.dmaCScale.get.req.valid else false.B)
-  io.perf.array  := executor.io.wbValidIn
-  io.perf.stallA := executor.io.perf.stallA
-  io.perf.stallB := executor.io.perf.stallB
+  val osRun = osSeq.io.phase === WbOsM1Phase.sRun
+  val osTail = osSeq.io.phase === WbOsM1Phase.sTail && !wbComb.io.osDone.asUInt.andR
+  val osMissingB = osSeq.io.headValid.zip(wbComb.io.osDone).map { case (head, done) => !head && !done }.reduce(_ || _)
+  io.perf.array  := Mux(executor.io.osActive, wbComb.io.osConsume.asUInt.orR, executor.io.wbValidIn)
+  io.perf.stallA := Mux(executor.io.osActive, osRun && !osSeq.io.aTokenValid, executor.io.perf.stallA)
+  io.perf.stallB := Mux(executor.io.osActive,
+    (osRun && !osSeq.io.headValid.asUInt.andR) || (osTail && osMissingB), executor.io.perf.stallB)
   // epilogue 活动拍 = bias/rqM 取数 ∨ cvt 管线占用（in.fire 收行 / out.valid 持行
   //   交付 / scaleOut.valid 量化 scale 行）；C 写回通道活动另由 dmaC/scaleC 观测
   io.perf.epilogue := perfBiasFetchActive || cvt.io.in.fire || cvt.io.out.valid || cvt.io.scaleOut.valid

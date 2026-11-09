@@ -80,9 +80,11 @@ class WorkerBeeRegIf(cfg: WorkerBeeConfig) extends Module {
         regFile.aMxBlockSize := data(22).asTypeOf(MXBlockSize())
         regFile.bMxBlockSize := data(24).asTypeOf(MXBlockSize())
         regFile.cMxBlockSize := data(26).asTypeOf(MXBlockSize())
+        regFile.osFmtKeep := data(27)
         regFile.loadWMode := data(28)
         regFile.requantOn := data(29)
         regFile.biasOn := data(30)
+        regFile.osM1 := data(31)
       }
       is(WorkerBeeRegAddr.ScaleA.U) { regFile.aScaleAddr := data }
       is(WorkerBeeRegAddr.ScaleB.U) { regFile.bScaleAddr := data }
@@ -106,8 +108,8 @@ class WorkerBeeRegIf(cfg: WorkerBeeConfig) extends Module {
       is(WorkerBeeRegAddr.B.U) { data := regFile.bAddr }
       is(WorkerBeeRegAddr.C.U) { data := regFile.cAddr }
       is(WorkerBeeRegAddr.Control.U) {
-        data := Cat(0.U(1.W), regFile.biasOn, regFile.requantOn, regFile.loadWMode,
-          0.U(1.W), regFile.cMxBlockSize.asUInt, 0.U(1.W), regFile.bMxBlockSize.asUInt,
+        data := Cat(regFile.osM1, regFile.biasOn, regFile.requantOn, regFile.loadWMode,
+          regFile.osFmtKeep, regFile.cMxBlockSize.asUInt, 0.U(1.W), regFile.bMxBlockSize.asUInt,
           0.U(1.W), regFile.aMxBlockSize.asUInt, regFile.warmup, regFile.warmdown,
           0.U(1.W), regFile.rnd.asUInt, regFile.reluOn, regFile.cAddrMode.asUInt,
           regFile.bAddrMode.asUInt, regFile.aAddrMode.asUInt, regFile.cFmt.asUInt,

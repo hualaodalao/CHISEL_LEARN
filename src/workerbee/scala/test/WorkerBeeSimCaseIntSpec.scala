@@ -33,7 +33,7 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
   private val SUITE = "WorkerBeeSimCaseIntSpec"
 
   private val cfg = WorkerBeeConfig(
-    arrayN = 8, clusterM = 2,       // totalN = 16
+    arrayN = 16, arrayM = 16,       // totalN = 16
     aW = 16, bW = 16, cW = 40,
     // Default supportedFmts = {INT8, INT4, MXE4M3, MXE5M2, MXE2M1, FP8E4M3, FP8E5M2}
     aBufferDepth = 2048, bBufferDepth = 2048, cBufferDepth = 2048,
@@ -93,6 +93,26 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
       aBase = A_BASE + 3, bBase = B_BASE + 11)
   }
 
+  // OS-M1（M=1、loadW=1）：B 升序直取、首行本地累加，整数金锚与 WS 同一张量语义。
+  it should "run OS-M1 INT8 M=1 N=32 K=128 loadW=1" in {
+    runIntGemm(m = 1, n = 32, k = 128,
+      aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT32,
+      loadWMode = true, seed = 48L, hint = "osm1-int8", osM1 = true)
+  }
+
+  it should "run OS-M1 INT4 M=1 N=16 K=256 loadW=1" in {
+    runIntGemm(m = 1, n = 16, k = 256,
+      aFmt = DataFormat.INT4, bFmt = DataFormat.INT4, cFmt = DataFormat.INT32,
+      loadWMode = true, seed = 49L, hint = "osm1-int4", osM1 = true)
+  }
+
+  // OS + INT W4A8 + 非对齐 A 基址：混配 stretch 单读与 A gather 在 OS 升序下同时生效。
+  it should "run OS-M1 INT8 x INT4 W4A8 M=1 N=48 K=64 loadW=1 with misaligned A base" in {
+    runIntGemm(m = 1, n = 48, k = 64,
+      aFmt = DataFormat.INT8, bFmt = DataFormat.INT4, cFmt = DataFormat.INT32,
+      loadWMode = true, seed = 50L, hint = "osm1-int-w4a8", aBase = A_BASE + 5, osM1 = true)
+  }
+
 
   it should "reject INT8 K=24 with errCode 8 (K not divisible by kPerBeat=32)" in {
     runIntErrCase(m = 32, n = 16, k = 24,
@@ -124,7 +144,7 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
   private def runIntGemm(m: Int, n: Int, k: Int,
       aFmt: DataFormat.Type, bFmt: DataFormat.Type, cFmt: DataFormat.Type,
       loadWMode: Boolean, seed: Long, hint: String,
-      aBase: Long = A_BASE, bBase: Long = B_BASE): Unit = {
+      aBase: Long = A_BASE, bBase: Long = B_BASE, osM1: Boolean = false): Unit = {
 
     val p = DebugParams(
       m = m, n = n, k = k,
@@ -134,7 +154,7 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
       addrModeSel = 0, rnd = 0, seed = seed,
       strictAddr = true, maxCycles = 16000,
       waveTarget = s"sim/int/$hint.fst", testHint = hint,
-      aBase = aBase, bBase = bBase
+      aBase = aBase, bBase = bBase, osM1 = osM1
     )
 
     val predicted = hwErrCode(p, cfg.totalN, cfg.hasMx4)

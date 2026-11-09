@@ -74,6 +74,23 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
 
     val progress = Output(UInt(16.W))
 
+    // OS-M1 任务生命周期：Executor 只管阶段与提交，逐拍推进由顶层 WbOsM1Sequencer 承担
+    val osActive       = Output(Bool())
+    val osStart        = Output(Bool())
+    val osKTiles       = Output(UInt(16.W))
+    // OS scale 字节选择参数，与 WS 注入点同源：step = 每 K-lane 元素数，blk = MX 块大小
+    val osMxMode       = Output(Bool())
+    val osScaleOne     = Output(Bool())
+    val osScaleAStep   = Output(UInt(3.W))
+    val osScaleBStep   = Output(UInt(3.W))
+    val osScaleABlk    = Output(UInt(6.W))
+    val osScaleBBlk    = Output(UInt(6.W))
+    val osResultsReady = Input(Bool())
+    val osPsum         = Input(Vec(cfg.totalN, UInt(cfg.cEffW.W)))
+    // OS 首行 psum 基底：下标 = 物理列 = 本 N tile 内自然列序，与 osStart 同拍生效
+    val osSeed         = Output(Vec(cfg.totalN, UInt(cfg.cEffW.W)))
+    val osSeedEn       = Output(Bool())
+
     // 探针（纯组合）：stallA = sLOAD_A aPop 未 fire，stallB = loadW 窗口停拍 ∨ 预蓄等待
     val perf = Output(new Bundle {
       val stallA = Bool()
@@ -86,6 +103,10 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
   val sLOAD_A          = 2.U(4.W)
   val sNEXT_NK_TILE    = 3.U(4.W)
   val sDRAIN           = 4.U(4.W)
+  val sOS_SETUP        = 5.U(4.W)
+  val sOS_START        = 6.U(4.W)
+  val sOS_RUN          = 7.U(4.W)
+  val sOS_WAITC        = 8.U(4.W)
 
 
   val state = RegInit(sIDLE)
@@ -108,6 +129,16 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
   val hasNext = RegInit(false.B)
   // 水平 loadW 模式锁存（execute 拍采样 regs(7)(5)；垂直模式恒 false）
   val loadWModeReg = RegInit(false.B)
+
+  // 阵列 PE 内 fmt/bFmt/rnd 只在 loadH 窗口锁存；影子记录上次完整广播的取值（复位无效）。
+  //   osFmtKeep 仅在影子有效且三项全等时生效，否则照常广播 ⟹ 软件误置位不致算错。
+  val fmtShadowValid = RegInit(false.B)
+  val fmtShadowA     = Reg(DataFormat())
+  val fmtShadowB     = Reg(DataFormat())
+  val fmtShadowRnd   = Reg(RoundingMode())
+  val osSkipSetup = io.regFile.osFmtKeep && fmtShadowValid && fmtShadowA === io.regFile.aFmt &&
+    fmtShadowB === io.regFile.bFmt && fmtShadowRnd === io.regFile.rnd
+  val osSetupCnt = RegInit(0.U(log2Up(cfg.totalN).W))
 
   // mxRunB —— 运行期唯一 MX 判据（消费方 = scaleB pop 握手门 + lock 拍 valid 断言），
   //   以 aFmt 为权威（与 MAC 的 sumMx 消费门同源）⟹「握手 fire ⇔ scaleB 被消费 ⇔
@@ -134,12 +165,12 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
   }
 
   
+  val scaleABlk  = Mux(io.regFile.aMxBlockSize === MXBlockSize.M16, 16.U(6.W), 32.U(6.W))
+  val scaleAStep = Mux(io.calcConfig.isAX2, 2.U(3.W), 4.U(3.W))
   for (i <- 0 until cfg.totalN) {
     io.wbAIn(i) := io.aPop.payload(cfg.aEffW * (i+1)-1, cfg.aEffW * i)
     if(cfg.hasMx){
-      val block = Mux(io.regFile.aMxBlockSize === MXBlockSize.M16, 16.U, 32.U)
-      val step = Mux(io.calcConfig.isAX2, 2.U, 4.U)
-      val idx = (i.U * step) / block
+      val idx = (i.U * scaleAStep) / scaleABlk
       // apply(hi, lo) 只接受字面量、不支持动态位选 ⟹ 取第 idx 个 8-bit scale 字节的
       //   唯一等价形态 = 右移 idx*8 后取低 8 位；两臂显式 8-bit 防 Mux 静默零扩。
       val scaleAByte = (io.scaleAPop.get.payload >> (idx * 8.U))(7, 0)
@@ -150,24 +181,30 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
   // B scale feed —— 轴向语义（勿按直觉改动）：lane 是 K-lane 索引而非权重行(N)索引，
   //   承载 b beat 的 K 元素 [kt*kPerBeat + lane*step, ... + step-1]，故 idx =
   //   (lane*step)/blk 选中该 lane 所属 MX 块的 E8M0 字节。wbScaleBIn(lane) → 列 y=0 的
-  //   WbCell(x=lane) 再沿 a 链右移；loadW 模式下 PE(x,y) 的权重锁自 beat (totalN-1-y) 的
+  //   PE(x=lane) 再沿 a 链右移；loadW 模式下 PE(x,y) 的权重锁自 beat (totalN-1-y) 的
   //   lane x，scaleB 链与 a 链 lockstep ⟹ 同一 loadWLock 拍捕获同 n_out、同 lane、同 K
   //   块的 scale，零 skew。故阵列行坐标 x 即 K-lane 轴、列坐标 y 即输出 N 轴。
+  val scaleBBlk = Mux(io.regFile.bMxBlockSize === MXBlockSize.M16, 16.U(6.W), 32.U(6.W))
+  // W4A8 混配时 bFmt 仍为 E2M1 ⟹ isBX2=false，但 B DMA 走 stretch 每拍恒推进 32 个 K
+  //   元素 ⟹ 每 lane 每拍 2 个 K、与纯 MX8 同构 ⟹ step=2；scaleB 侧按 fp8 语义切片。
+  val scaleBStep = if (cfg.hasMx4)
+    Mux(io.calcConfig.isBX2 || (DataFormat.isMx8(io.regFile.aFmt) && DataFormat.isMx4(io.regFile.bFmt)), 2.U(3.W), 4.U(3.W))
+  else Mux(io.calcConfig.isBX2, 2.U(3.W), 4.U(3.W))
   if(cfg.hasMx){
-    val block = Mux(io.regFile.bMxBlockSize === MXBlockSize.M16, 16.U, 32.U)
-    // W4A8 混配时 bFmt 仍为 E2M1 ⟹ isBX2=false，但 B DMA 走 stretch 每拍恒推进 32 个 K
-    //   元素 ⟹ 每 lane 每拍 2 个 K、与纯 MX8 同构 ⟹ step=2；scaleB 侧按 fp8 语义切片。
-    val step = if (cfg.hasMx4)
-      Mux(io.calcConfig.isBX2 || (DataFormat.isMx8(io.regFile.aFmt) && DataFormat.isMx4(io.regFile.bFmt)), 2.U, 4.U)
-    else Mux(io.calcConfig.isBX2, 2.U, 4.U)
-
     for (lane <- 0 until cfg.totalN) {
-      val idx = (lane.U * step) / block
+      val idx = (lane.U * scaleBStep) / scaleBBlk
       // 同 A 侧：动态字节选择 = 右移 idx*8 后取低 8 位；fp8Run 时恒 127 注入
       val scaleBByte = (io.scaleBPop.get.payload >> (idx * 8.U))(7, 0)
       io.wbScaleBIn.get(lane) := (if (cfg.hasFp8) Mux(fp8Run, 127.U(8.W), scaleBByte) else scaleBByte)
     }
   }
+
+  io.osMxMode     := mxRunB
+  io.osScaleOne   := fp8Run
+  io.osScaleAStep := scaleAStep
+  io.osScaleBStep := scaleBStep
+  io.osScaleABlk  := scaleABlk
+  io.osScaleBBlk  := scaleBBlk
 
   // bias 基底注入（零加法器）：取代 sLOAD_A pass-0 的 psum 零基底，沿既有 psum 逐列链进
   // 阵列累加。psumIn 是输出-N 轴逐列注入 ⟹ biasRegs(i) 即输出列 nt*totalN+i；bias 是列
@@ -275,6 +312,12 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
 
   io.progress := doneTiles
 
+  io.osActive := state === sOS_SETUP || state === sOS_START || state === sOS_RUN || state === sOS_WAITC
+  io.osStart  := false.B
+  io.osKTiles := kTiles + 1.U
+  io.osSeed   := (if (cfg.hasMx) VecInit(Seq.tabulate(cfg.totalN)(biasLazy)) else VecInit(Seq.fill(cfg.totalN)(0.U(cfg.cEffW.W))))
+  io.osSeedEn := false.B
+
 
   for (i <- 0 until cfg.totalN) {
         io.wbPsumIn(i) := 0.U
@@ -325,6 +368,14 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
 
       when(io.execute) {
         loadWModeReg := io.regFile.loadWMode
+        fmtShadowValid := true.B
+        fmtShadowA     := io.regFile.aFmt
+        fmtShadowB     := io.regFile.bFmt
+        fmtShadowRnd   := io.regFile.rnd
+        when(io.regFile.osM1) {
+          osSetupCnt := (totalN - 1).U
+          state := Mux(osSkipSetup, sOS_START, sOS_SETUP)
+        }
       }
 
       // bias 首拍取数触发：请求 nt=0 的 16 字；biasLoaded/biasCnt 同拍清零
@@ -530,6 +581,71 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
       }
     }
     
+
+    // OS-M1：SETUP 持续 totalN 拍 loadH 让 fmt/bFmt/rnd 走完首行横链；每 N tile 经 START
+    //   单拍启动 Sequencer（osDone 只能由 clear 清，故 START 必须晚于 clear 一拍）。
+    is(sOS_SETUP) {
+      io.wbLoadH := true.B
+      io.wbClear := true.B
+      osSetupCnt := osSetupCnt - 1.U
+      when(osSetupCnt === 0.U) {
+        state := sOS_START
+      }
+    }
+
+    // bias 未收齐时挂起启动：seed 与 osStart 同拍，Sequencer 启动拍不 consume ⟹ 基底先于首个 MAC
+    is(sOS_START) {
+      val biasReady = if (cfg.hasMx) !(io.regFile.biasOn && !biasLoaded.get) else true.B
+      when(biasReady) {
+        io.osStart := true.B
+        if (cfg.hasMx) io.osSeedEn := io.regFile.biasOn
+        state := sOS_RUN
+      }
+    }
+
+    // 提交拍：唯一一次 cPush + clear 清 psum/done；!cStoreGateReg 防上一 tile 门未落时
+    //   拉门被吞（同 sNEXT_NK_TILE 门吞没竞态），cPush.ready 门控满足 pop-before-push 断言。
+    //   requant 另等本 tile 的 rqM 真正提交进 rqMRegs（rqMLoaded 只代表 staging 收齐）。
+    is(sOS_RUN) {
+      val rqMReady = if (cfg.hasMx) !(io.regFile.requantOn && (rqMCommitArmed.get || !rqMLoaded.get)) else true.B
+      when(io.osResultsReady && !cStoreGateReg && io.cPush.ready && rqMReady) {
+        io.cPush.valid := true.B
+        io.cPush.payload := Cat(io.osPsum.reverse)
+        io.wbClear := true.B
+        cStoreGateReg := true.B
+        doneTiles := doneTiles + kTiles + 1.U
+        when(curNTile < nTiles) {
+          curNTile := curNTile + 1.U
+          state := sOS_START
+          // 本 tile 基底已在启动拍注入、rqM 走 staging ⟹ 提交拍即可重取下一 tile
+          if (cfg.hasMx) {
+            when(io.regFile.biasOn) {
+              io.biasFetchReq.get := true.B
+              io.biasFetchNt.get := curNTile + 1.U
+              biasLoaded.get := false.B
+              biasCnt.get := 0.U
+            }
+            when(io.regFile.requantOn) {
+              io.rqMFetchReq.get := true.B
+              io.rqMFetchNt.get := curNTile + 1.U
+              rqMLoaded.get := false.B
+              rqMCnt.get := 0.U
+            }
+          }
+        }.otherwise {
+          curNTile := 0.U
+          state := sOS_WAITC
+        }
+      }
+    }
+
+    // 无 WS drain 倒计数覆盖 cPeek→dmaCBusy 的起拍延迟 ⟹ 须先等门由 cPeekDone 落下
+    is(sOS_WAITC) {
+      when(!cStoreGateReg && !io.dmaCBusy) {
+        io.done := true.B
+        state := sIDLE
+      }
+    }
 
     is(sDRAIN) {
   

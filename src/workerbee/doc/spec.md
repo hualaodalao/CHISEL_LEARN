@@ -1,8 +1,8 @@
 # WorkerBee 硬件规格
 
-文档版本：`v4.1.0`
+文档版本：`v4.2.0`
 
-修订日期：`2026-10-29`
+修订日期：`2026-11-09`
 
 ## 版本控制
 
@@ -22,6 +22,7 @@
 
 | 版本号 | 日期 | 修改内容 | 相关 Feature ID |
 |---|---|---|---|
+| v4.2.0 | 2026-11-09 | 增加显式 OS-M1 模式：CONTROL[31]、M=1/loadWMode=1 守护与 errCode 14；方形阵列按 arrayN×arrayM 扁平组织，首行本地累加、A 右传、B/ScaleB 按列升序送入双槽窗口；定义 Run/Tail、自然列序 bias/requant、一次提交与完整 Nprog 写回、模式间数值关系及 OS 性能事件。CONTROL[27] 为 osFmtKeep，软件使用基线值 0；默认交付保持一套全格式 RTL | WB-F027、WB-P011（新增）；WB-F001、WB-F002、WB-F014、WB-F016–WB-F019、WB-F023、WB-D001 |
 | v4.1.0 | 2026-10-29 | BF16 升格为默认 A/B 输入格式：新增专用窄乘法器分支、单元素 lane 几何（`K%T=0`）、BF16 混配 errCode 3 守护，以及 BF16 特殊值（输入与乘积下溢冲刷为零、上溢饱和、无 IEEE Inf/NaN 语义）定义；明确 BF16 两种 B 装载模式均合法，errCode 4 不含 BF16。FP16 保持非默认输入，与 BF16 独立。寄存器映射、端口位宽与既有格式的数值契约不变 | WB-F026（新增）；WB-F011、WB-P001、WB-P002（文案） |
 | v4.0.0 | 2026-10-26 | 不兼容命名变更：GEMM 模块由 HiveCore 更名为 WorkerBee（“Hive”名称改指 NPU core）；顶层、配置、命令/响应/DMA/状态 Bundle 与 HiveCore* 子模块改用 `WorkerBee*`，其余 Hive* 子模块改用 `Wb*`，RTL 模块前缀由 `Hive_` 改为 `Wb_`，源码目录改为 `src/workerbee`；Feature ID 前缀由 `HIVE-` 统一改为 `WB-`，编号与语义不变，旧 ID 不再使用，本表历史记录中的模块名与 ID 已同步改写为新名称；硬件行为、端口位宽、寄存器映射和数值契约不变 | WB-F001–WB-F025、WB-P001–WB-P010、WB-D001–WB-D002（仅更名） |
 | v3.0.1 | 2026-10-26 | 按通用规格模板将第 3 章拆分为功能、性能和 Debug 三类独立清单；性能清单按通路位宽、每拍接受/发射能力和并行度分类，原 WB-P003/P004/P005 的复用、credit/FIFO 与 fused epilogue 机制分别归回既有功能条目，旧 P ID 保留为分类记录且不复用；新增产品内建观测能力的 Debug 分类 ID，不改变硬件接口或行为；既有 WB-F024/F025 作为历史稳定 ID 保留并分别关联 Debug 分类 ID | WB-P001、WB-P002、WB-P003–WB-P005（分类记录）、WB-P006–WB-P010、WB-D001–WB-D002；WB-F002、WB-F011–WB-F020、WB-F024、WB-F025 |
@@ -35,9 +36,7 @@
 
 ### 1.1 目的
 
-本文定义 WorkerBee 的软件可见行为、计算语义、存储布局、接口协议和配置约束。v3.0.0 将 v2.0.0 的单路寄存器命令端口改为固定四路输入，并在单一响应端口新增 laneId，属于不兼容端口契约；v3.0.1 仅重构 Feature 分类；v4.0.0 将模块由 HiveCore 更名为 WorkerBee、Feature ID 前缀改为 `WB-`，不改变硬件行为；当前 v4.1.0 将 BF16 升格为默认 A/B 输入格式，属兼容的功能新增。寄存器地址映射与 CONTROL 字段不变。本文不记录 RTL 开发过程，也不承诺本规格之外的功能。带 ID 的 Feature List 见第 3 章；文档版本规则与修订记录见文首“版本控制”章节。
-
-WB-F021、WB-F022 的四路接收、单批缓存、响应顺序、读快照、写仲裁、START 时序/元数据及 WRITE_CONFLICT/IRQ 扩展已实现并通过接口验证；既有计算与 DMA 回归通过。验证不扩大参数化配置的支持范围，也不改变 tracing 首次配对等既有限制。
+本文定义 WorkerBee 的软件可见行为、计算语义、存储布局、接口协议和配置约束。WorkerBee 支持固定四路寄存器命令共享一个执行上下文，以及显式选择的 WS 和 OS-M1 数据流；默认 A/B 输入包含 BF16 和各受支持低位宽格式。OS-M1 使用 CONTROL[31]，不增加顶层命令或 DMA 端口。本文不承诺规格之外的功能。带 ID 的 Feature List 见第 3 章；文档版本规则与修订记录见文首“版本控制”章节。
 
 ### 1.2 范围
 
@@ -56,20 +55,20 @@ WB-F021、WB-F022 的四路接收、单批缓存、响应顺序、读快照、�
 - “必须”表示违反该要求会导致命令被拒绝、结果未定义或与本规格不一致。
 - “应”表示集成或软件应遵循的推荐约束。
 - “默认配置”指未显式覆盖 `WorkerBeeConfig` 参数时的配置。
-- `T` 表示阵列输出列数 `totalN = arrayN × clusterM`；默认 `T=16`。
+- `T` 表示阵列方形边长（行数 = 输出列数）`totalN = arrayN`，且 `arrayM == arrayN`；默认 `T=16`。
 - `Nlogical` 表示软件需要的有效列数，`Nprog` 表示写入 N 寄存器并按 T 补齐后的列数；除明确写出 `Nlogical` 外，后续公式中的 `N` 均指编程值 `Nprog`。
 - DMA 与存储基地址均为字节地址；命令中的寄存器地址为索引，不是字节偏移。
 - 除非另有说明，多字节数据采用低地址存放低有效字节的布局。
 
 ## 2. 模块概述
 
-WorkerBee 是面向矩阵乘法和量化推理的 weight-stationary GEMM 单元，计算：
+WorkerBee 是面向矩阵乘法和量化推理的 GEMM 单元，支持 weight-stationary（WS）和单行输出驻留（OS-M1）两种数据流，计算：
 
 ```text
 C = Epilogue(A × B + Bias)
 ```
 
-A 的逻辑形状为 `M×K`，B 的有效形状为 `K×Nlogical`。由于硬件要求 N 维按阵列宽度补齐，实际编程和存储形状为 B=`K×Nprog`、C=`M×Nprog`。阵列以 K 和 N 作为空间轴，以 M 作为时间轴；每个 `(N tile, K pass)` 装载一次权重，并连续处理全部 M 行。
+A 的逻辑形状为 `M×K`，B 的有效形状为 `K×Nlogical`。由于硬件要求 N 维按阵列宽度补齐，实际编程和存储形状为 B=`K×Nprog`、C=`M×Nprog`。WS 以 K 和 N 作为空间轴、M 作为时间轴；每个 `(N tile, K pass)` 装载一次权重，并连续处理全部 M 行。OS-M1 仅用于 `M=1、loadWMode=1`，以首行 T 个 PE 分别驻留一个输出列的部分和，沿时间轴完成全 K 累加；不根据 M 自动切换模式。
 
 当前默认输入能力为：
 
@@ -104,7 +103,7 @@ v4.0.0 起 Feature ID 前缀由 `HIVE-` 改为 `WB-`，`HIVE-Xnnn` 与 `WB-Xnnn`
 | Feature ID | 功能 | 状态 | 能力与主要约束 | 规格章节 |
 |---|---|---|---|---|
 | WB-F001 | Weight-stationary GEMM | 已实现 | T×T PE；K/N 为空间轴、M 为时间轴；循环为 N tile → K pass → M 行 | 4.1、5.1.1–5.1.2 |
-| WB-F002 | 多 K pass 内部累加 | 已实现 | 首 pass 使用零或 bias 基底；后续回灌 C FIFO；仅末 pass 写回 | 5.1.3 |
+| WB-F002 | 多 K pass 内部累加 | 已实现 | WS 首 pass 使用零或 bias 基底，后续回灌 C FIFO；OS-M1 以首行本地反馈跨 K 窗口延续；均在全 K 完成后写回 | 5.1.3、5.1.6 |
 | WB-F003 | INT8 打包乘加 | 已实现 | 默认每 lane 两元素、每拍覆盖 2T 个 K 元素；有符号累加，溢出绕回 | 5.1.1、5.2.3、7.2 |
 | WB-F004 | INT4 打包乘加 | 已实现 | 默认每 lane 四元素、每拍覆盖 4T 个 K 元素；二补码 nibble 按递增 K 打包 | 5.1.1、5.2.3、7.2 |
 | WB-F005 | MXFP8 计算 | 已实现 | E4M3/E5M2 可交叉组合；使用 E8M0 block scale；必须 loadWMode=1 | 5.2.1、5.2.5、5.2.7、7.4、7.6 |
@@ -116,7 +115,7 @@ v4.0.0 起 Feature ID 前缀由 `HIVE-` 改为 `WB-`，`HIVE-Xnnn` 与 `WB-Xnnn`
 | WB-F011 | 浮点/MX 输出转换 | 已实现 | FP32/FP16/BF16 及 MX 输出（BF16 同时是默认输入格式，FP16 不是）；支持 RNE/RTZ/RDN/RUP/RMM；内部归约不保证 IEEE 逐项 FP32 bit-exact | 7.1、7.3、5.2.5–5.2.6 |
 | WB-F012 | MX 输出量化与 ScaleC 生成 | 已实现 | 每 block 生成 E8M0 scale；默认 C block 仅允许 16；ScaleC 在途/反压限制必须满足 | 7.4、7.6.3、5.2.8、9.6 |
 | WB-F013 | 整数输出截断 | 已实现 | INT32/INT16/INT8/INT4；先取 acc32 再按输出位宽截断；非 requant 模式不饱和 | 5.2.3、5.4.1 |
-| WB-F014 | Per-channel fused bias | 已实现 | INT32 或 FP32 bias；每输出列一项；仅首 K pass 注入；需要参数取数 DMA | 7.7.1、5.4.2 |
+| WB-F014 | Per-channel fused bias | 已实现 | INT32 或 FP32 bias；每输出列一项；WS 首 K pass 注入，OS-M1 每 N tile 启动时播种一次；需要参数取数 DMA | 7.7.1、5.4.2、5.4.5 |
 | WB-F015 | Fused ReLU | 已实现 | 只作用于有符号 acc32，在 requant/最终整数截断前钳零；非整数输出忽略使能 | 5.4.1、5.4.3 |
 | WB-F016 | Fused requant | 已实现 | Per-channel 有符号乘数、全命令 shift/zero-point；输入为 acc32/relu32；half-up 舍入后饱和至 INT8/INT4；需要参数取数 DMA | 7.7.2、8.7、5.4.4 |
 | WB-F017 | B 权重装载模式 | 已实现 | mode0 对应 K×Nprog row-major；mode1 对应预转置 Nprog×K row-major；格式约束决定可用模式 | 5.1.2、7.5.2 |
@@ -128,7 +127,8 @@ v4.0.0 起 Feature ID 前缀由 `HIVE-` 改为 `WB-`，`HIVE-Xnnn` 与 `WB-Xnnn`
 | WB-F023 | 运行期配置检查 | 已实现 | 判据与优先级不变；IRQ_RAW[1] 标记配置错误，ERROR_CODE 保存首个未清配置错误码；M/N 非零、Nprog、缓冲区可访问性等仍是软件义务 | 8.8、10 |
 | WB-F024 | 性能事件输出（历史 ID） | 已实现 | 历史功能索引；类别化 Debug 索引为 WB-D001 | 11.3 |
 | WB-F025 | 首次执行 Tracing（历史 ID） | 已实现 | 历史功能索引；类别化 Debug 索引为 WB-D002 | 6.3、9.2、11.4 |
-| WB-F026 | BF16 计算 | 已实现 | 专用窄乘法器，不复用 MX remap；每 lane 单元素、每拍覆盖 `T` 个 K 元素；输入与乘积下溢冲刷为零、上溢饱和为最大有限值；两种 B 装载模式均合法；不得与非 BF16 格式混配；可作为 C 输出格式 | 5.2.4、7.1–7.2、10.2 |
+| WB-F026 | BF16 计算 | 已实现 | 专用窄乘法器，不复用 MX remap；每 lane 单元素；输入与乘积下溢冲刷为零、上溢饱和为最大有限值；WS 两种 B 装载模式均合法，OS-M1 要求 mode1；不得与非 BF16 格式混配；可作为 C 输出格式 | 5.2.4、7.1–7.2、10.2 |
+| WB-F027 | OS-M1 单行输出驻留 | 已实现 | CONTROL[31] 显式使能，仅 M=1/loadWMode=1；首行 T 个 PE 本地累加，A/ScaleA 右传，B/ScaleB 升序送入每列双槽窗口；Run/Tail 按真实消费推进，全 K 后自然列序提交一次，沿用 epilogue 和完整 Nprog 写回 | 4.1–4.2、5.1.6、5.2.9、5.4.5、7.5–7.7、8.5、10.2 |
 
 ### 3.3 性能清单
 
@@ -136,13 +136,14 @@ v4.0.0 起 Feature ID 前缀由 `HIVE-` 改为 `WB-`，`HIVE-Xnnn` 与 `WB-Xnnn`
 
 | Feature ID | 通路/性能项目 | 实现状态 | 位宽、带宽或接受/发射/完成率 | 并行能力、成立条件与瓶颈 | 关联功能/契约章节 |
 |---|---|---|---|---|---|
-| WB-P001 | 阵列空间并行与有效计算拍 | 已实现 | `T×T` PE；每个有效 A 拍同时推进 `T` 个输出列，默认 16 列、256 个 PE；非打包 16-bit 格式（BF16）每个有效 A 拍覆盖 `T` 个 K 元素、`T²` 次乘加贡献，默认 16/256 | 每个 `(N tile, K pass)` 先消费 `T` 个有效 B 拍、再消费 `M` 个有效 A 拍，两阶段不重叠；供数、回灌、参数取数、波前排空和反压降低实际利用率 | WB-F001、WB-F002、WB-F017、WB-F026；4.1、5.1、12.2 |
-| WB-P002 | 低位宽打包计算通路 | 已实现 | 每个有效 A 拍覆盖：INT8/MXFP8/FP8 及 W4A8 混配为 `2T` 个 K 元素、`2T²` 次 lane-element 乘加贡献，默认 32/512；同格式 INT4/MXFP4 为 `4T` 个 K 元素、`4T²` 次贡献，默认 64/1024 | 同拍并行来自每个 16-bit lane 的 2/4 元素打包，不表示完成 512/1024 个独立输出；W4A8 的 4-bit B 经 stretch 后跟随 8-bit A 的 2T 消费口径。仅在相应格式、K 对齐、合法混配和 loadWMode 条件下成立。BF16 非打包、每 lane 单元素，不属于本项，见 WB-P001 | WB-F003–WB-F009；5.1.1、5.2、7.2、12.2 |
+| WB-P001 | WS 阵列空间并行与有效计算拍 | 已实现 | `T×T` PE；每个有效 A 拍同时推进 `T` 个输出列，默认 16 列、256 个 PE；非打包 16-bit 格式（BF16）每个有效 A 拍覆盖 `T` 个 K 元素、`T²` 次乘加贡献，默认 16/256 | 每个 `(N tile, K pass)` 先消费 `T` 个有效 B 拍、再消费 `M` 个有效 A 拍，两阶段不重叠；供数、回灌、参数取数、波前排空和反压降低实际利用率 | WB-F001、WB-F002、WB-F017、WB-F026；4.1、5.1、12.2 |
+| WB-P002 | WS 低位宽打包计算通路 | 已实现 | 每个有效 A 拍覆盖：INT8/MXFP8/FP8 及 W4A8 混配为 `2T` 个 K 元素、`2T²` 次 lane-element 乘加贡献，默认 32/512；同格式 INT4/MXFP4 为 `4T` 个 K 元素、`4T²` 次贡献，默认 64/1024 | 同拍并行来自每个 16-bit lane 的 2/4 元素打包，不表示完成 512/1024 个独立输出；W4A8 的 4-bit B 经 stretch 后跟随 8-bit A 的 2T 消费口径。仅在相应格式、K 对齐、合法混配和 loadWMode 条件下成立。BF16 非打包、每 lane 单元素，不属于本项，见 WB-P001 | WB-F003–WB-F009；5.1.1、5.2、7.2、12.2 |
 | WB-P006 | 寄存器命令接受与响应通路 | 已实现 | 空闲接受拍最多 `4 条/cycle`；单一响应口最多 `1 条/cycle` | 四 lane 可同拍接受稀疏混合命令，但仅有一个寄存器 bank 和一个执行上下文；一批最多四条，任一响应 pending 时不能接受下一批，最后响应 fire 的下一拍才可接新批 | WB-F021；6.1–6.3、9.2、12.1 |
-| WB-P007 | A/B 外部读数据通路 | 已实现 | A、B 各自请求至多 `1 条/cycle`、响应至多 `1 beat/cycle`；每口数据宽 `DA`/`DB`，默认各 `256 bit = 32 byte/cycle`，两口聚合接口峰值默认 `64 byte/cycle` | A/B 为独立端口，可同拍握手和预取；阵列消费阶段仍按 B 后 A 串行。非对齐 gather 可令一个逻辑拍需要两个物理读，FIFO credit、存储响应和反压会降低持续供数率 | WB-F017–WB-F020；5.3.1–5.3.3、6.4、9.3、12.2 |
+| WB-P007 | A/B 外部读数据通路 | 已实现 | A、B 各自请求至多 `1 条/cycle`、响应至多 `1 beat/cycle`；每口数据宽 `DA`/`DB`，默认各 `256 bit = 32 byte/cycle`，两口聚合接口峰值默认 `64 byte/cycle` | A/B 为独立端口，可同拍握手和预取；WS 消费阶段按 B 后 A 串行，OS-M1 可在当前窗口消费时预取下一窗口。非对齐 gather 可令一个逻辑拍需要两个物理读，FIFO credit、存储响应和反压会降低持续供数率 | WB-F017–WB-F020；5.3.1–5.3.3、6.4、9.3、12.2 |
 | WB-P008 | C 外部写回通路 | 已实现 | 单口宽 `DC`，请求至多 `1 beat/cycle`；默认 `256 bit = 32 byte/cycle` 物理峰值。默认每个 T 列行：4-bit 为 8 有效字节/1 拍，8-bit 为 16/1 拍，16-bit 为 32/1 拍，32-bit 为 64/2 拍 | 不跨行合拍；4/8-bit 行虽只占部分 byte lane，仍占一个物理请求拍。32-bit 行局部上限为 `0.5 row/cycle`，其余格式至多 `1 row/cycle`；C FIFO 供数、外部 ready、地址阶段和末尾响应排空会降低持续速率 | WB-F011–WB-F013、WB-F018、WB-F020；5.3.4、6.4、9.4、12.2 |
 | WB-P009 | Scale 与 epilogue 参数通路 | 已实现 | 默认 ScaleA、ScaleB 读口各 `32 bit`、至多 `1 beat/cycle`；ScaleC 写口 `8 bit`、至多 `1 beat/cycle`；bias/rqM 在 ScaleA 物理口上各按 `32 bit`、至多 `1 item/cycle` 取数 | ScaleA 与 ScaleB 为独立读口，ScaleC 为独立写口；ScaleA、bias、rqM 共用一个物理口，不能并行，bias 与 rqM 同时使能时先后串行取各 `T` 项。ScaleC 仅用于 MX 量化输出并受在途深度和反压限制 | WB-F010、WB-F012、WB-F014、WB-F016、WB-F020；5.2.7–5.2.8、5.4、6.4、9.5–9.6 |
 | WB-P010 | 输出转换行通路 | 已实现 | 输入为 `T×cEffW bit` 累加行，输出容器为 `T×32 bit`；输入接受和数据输出接口各至多 `1 row/cycle`，释放拍可背靠背接收下一行；默认一次并行处理 `T=16` 个输出元素 | 单行锁存，不能同时保有两行；非量化行需数据输出 fire 才释放，MX 量化行还需同一行 ScaleC 成功提交。下游 C/ScaleC FIFO 反压、requant 参数未就绪及 WB-P008 的多拍写回会降低端到端行率 | WB-F011–WB-F016；5.2.3–5.2.8、5.4、9.5、12.2 |
+| WB-P011 | OS-M1 首行并行消费 | 已实现 | 每个逻辑 advance 至多推进 T 个首行 PE；BF16/8-bit/4-bit 每个有效列分别产生 1/2/4 个 lane-element 乘加贡献，默认稳态聚合为 16/32/64；W4A8 跟随 8-bit A 的双元素口径 | 首填充和尾波仅部分列有效；Run 必须有 A token 且全部 B/scale 窗口有效，Tail 只要求未完成列有窗口。其余 T×(T−1) 个 PE 不承担 OS 计算，不表示 T² 个 PE 同时工作 | WB-F027；5.1.6、11.3、12.2 |
 
 分类勘误：原 `WB-P003`（多 K pass 片内部分和复用）、`WB-P004`（DMA credit/FIFO 解耦）、`WB-P005`（fused epilogue）属于功能机制，分别归入既有 `WB-F002`、`WB-F020`、`WB-F011–WB-F016`；旧 P ID 保留为分类记录、不得复用，**不表示 RTL 功能被删除**。
 
@@ -152,7 +153,7 @@ v4.0.0 起 Feature ID 前缀由 `HIVE-` 改为 `WB-`，`HIVE-Xnnn` 与 `WB-Xnnn`
 
 | Feature ID | Debug feature | 状态 | 观测能力、适用条件与主要约束 | 契约章节 |
 |---|---|---|---|---|
-| WB-D001 | 性能事件观测 | 已实现 | `perf` 输出 DMA、阵列、stall、epilogue 和 busy 的组合事件电平，不含计数器且不控制功能路径；DMA 事件采用 `req.valid` 口径，外部 PMU 负责采样累加 | 6.6、11.3 |
+| WB-D001 | 性能事件观测 | 已实现 | `perf` 输出 DMA、阵列、stall、epilogue 和 busy 的组合事件电平，不含计数器且不控制功能路径；DMA 为 `req.valid`，OS 阵列为真实 consume、Tail 豁免已完成空列；外部 PMU 采样累加并处理事件重叠 | 6.7、11.3 |
 | WB-D002 | 首次执行 Tracing | 已实现 | `respForTracing` 无反压输出首次有效启动及其 done/configuration-error 事件，PC/tag 取胜出 START lane；复位后仅首次执行保证配对，不能替代 IRQ/ERROR_CODE | 6.3、9.2、11.4 |
 
 STATUS、IRQ/ERROR_CODE 和普通命令响应属于功能接口，不列为专用 Debug feature；测试平台日志、波形开关和仿真断言也不构成产品内建 Debug 能力。
@@ -165,7 +166,9 @@ STATUS、IRQ/ERROR_CODE 和普通命令响应属于功能接口，不列为专�
 
 ### 4.1 阵列组织
 
-阵列包含 `T×T` 个 PE：
+阵列以 `arrayN×arrayM` 扁平网格例化，当前要求 `arrayN=arrayM=T`，共 `T×T` 个 PE。默认 T=16，每个 PE 仅有一份乘加单元，首行 T 个 PE 支持 WS/OS-M1 双模式，其余 PE 使用 WS 数据通路。
+
+WS 模式中：
 
 - x 方向对应 K-lane；
 - y 方向对应输出 N 列；
@@ -173,7 +176,7 @@ STATUS、IRQ/ERROR_CODE 和普通命令响应属于功能接口，不列为专�
 - partial sum 沿 x 方向归约；
 - B 权重锁存在 PE 内。
 
-默认 `T=16`。每个阵列有效计算拍同时产生 T 个输出列的部分结果。
+OS-M1 模式中，首行列 j 对应逻辑输出列 `nt×T+j`，A/ScaleA/有效 token 复用原右传链，B/ScaleB 从各列窗口供给。部分和在该列 PE 本地反馈；其余行和 WS skew 状态不随 OS advance 推进。两种模式不同时执行。
 
 ### 4.2 子模块与数据通路
 
@@ -181,9 +184,11 @@ STATUS、IRQ/ERROR_CODE 和普通命令响应属于功能接口，不列为专�
 |---|---|
 | WorkerBeeRegIf | 独立管理固定四路命令共享的一个配置/状态 bank、四 slots/pending 单批响应缓存、逐命令译码检查与逐地址仲裁、单 resp 的 laneId/顺序、start 及胜出 PC/tag、inFlight、完成/错误/WRITE_CONFLICT 事件汇聚、IRQ_RAW/MASK/CLEAR、ERROR_CODE 与 irq（四路相关契约已验证） |
 | CalcConfig | 检查运行配置并派生执行几何与地址步长 |
-| Executor | 控制权重装载、A 行消费、K pass 回灌和最终排空 |
+| Executor | 控制 WS 权重装载、A 行消费、K pass 回灌；OS 配置、播种、一次提交及最终写回等待 |
 | Scratchpad | 提供 A、B、C/partial-sum FIFO |
-| WbComb | 完成权重驻留乘加与空间归约 |
+| WbComb | 完成 WS 空间归约或 OS 首行本地累加，复用同一乘加单元与输出转换入口 |
+| WbOsM1Sequencer | 捕获 A/ScaleA 窗口并逐 lane 串行化，协调 Run/Tail 的统一 advance |
+| WbOsM1Feeder | 按升序列号将 B/ScaleB 原子写入每列双槽窗口，按列消费推进读 lane |
 | A/B 读 DMA、C 写 DMA | 搬运矩阵数据 |
 | Scale 读写 DMA | 搬运输入/输出 scale；ScaleA 物理口另供 bias/rqM 取数 |
 | WbOutCvt | 完成输出格式转换、整数 ReLU 与 requant |
@@ -200,7 +205,7 @@ WorkerBeeRegIf 是寄存器与中断状态的所有者；顶层不得等到 Exec
 
 #### 5.1.1 循环顺序与执行几何
 
-硬件执行顺序固定为：
+`osM1=0` 时 WS 执行顺序为：
 
 ```text
 for nt in N tiles:
@@ -250,9 +255,9 @@ MX、FP8 以及正向 INT W4A8 必须使用 `loadWMode=1`。
 - 只有最后一个 K pass 的结果进入输出转换和 C DMA；
 - 中间 K pass 结果只在内部 C FIFO 中周转，不写回外部存储器。
 
-#### 5.1.4 执行状态机
+#### 5.1.4 WS 执行状态机
 
-Executor 包含五个状态：
+`osM1=0` 时 Executor 使用五个状态：
 
 ```text
 IDLE -> DRAIN -> LOAD_B -> LOAD_A -> NEXT_NK_TILE -> ... -> DRAIN -> IDLE
@@ -294,13 +299,15 @@ IDLE -> DRAIN -> LOAD_B -> LOAD_A -> NEXT_NK_TILE -> ... -> DRAIN -> IDLE
 
 #### 5.1.5 完成行为
 
-完成条件为：
+WS 完成条件为：
 
 ```text
 无下一窗口
 AND 阵列无有效输出
-AND C DMA 不忙
+AND C/ScaleC DMA 不忙
 ```
+
+OS-M1 在最后 N tile 提交后，等待最终写回门释放且 C/ScaleC DMA 不忙；各列完成或累加行提交本身不产生任务 done，见 5.1.6。
 
 满足时：
 
@@ -311,6 +318,38 @@ AND C DMA 不忙
 - Executor 返回 IDLE。
 
 完成事件表示 Executor 到达上述排空条件，不代表任务无错误，也不自动清除任何错误源。DMA 错误 IRQ 可先于完成出现，不终止正在执行的任务；软件必须区分错误事件与完成事件，见第 10.5、13.1 节。配置检查拒绝正常 GEMM 时，`inFlight` 由配置错误脉冲清除，不以 `IRQ_RAW[0]` 为该路径的结束依据。
+
+#### 5.1.6 OS-M1 生命周期与消费协议
+
+OS-M1 必须显式设置 `osM1=1`，且满足 `M=1、loadWMode=1`。A/B 格式、K 粒度、block、地址和 epilogue 约束与 WS 共用；N 仍必须编程为 Nprog。`osM1=0` 使用 WS，不因 M=1 自动切换。
+
+Executor 生命周期为：
+
+```text
+IDLE -> OS_SETUP -> OS_START -> OS_RUN
+                   ^             |
+                   +-- 下一 N tile提交
+                                 |
+                          最后 N tile提交 -> OS_WAITC -> IDLE
+```
+
+- **OS_SETUP**：基线 `osFmtKeep=0` 时广播 `fmt/bFmt/rnd` 共 T 拍，并清除首行部分和和有效 token；本任务的其余 N tile 不重复广播。
+- **OS_START**：开启 bias 时等待本 tile 参数收齐，按自然列号播种，再启动 Sequencer；启动拍不消费 A。rqM 可与计算重叠取数，但必须在提交前就绪。
+- **OS_RUN**：Sequencer 按下述 Run/Tail 协议完成全 K；Executor 等待所有列完成和输出提交条件，不为每个 K 窗口打开 C 写回门。
+- **提交**：全部首行结果已注册、上一写回门已释放、C FIFO 可接受且本 tile rqM 已正式提交时，整行 `cPush.fire` 恰好一次。列 0 放在累加行最低位；随后清除首行部分和/完成状态，并为下一 N tile 重新读取 bias/rqM。
+- **OS_WAITC**：最后 N tile 提交后，等待写回门释放、C 和 ScaleC DMA 空闲才产生任务 done。
+
+每列拥有两个完整 B 窗口槽；一个槽包含 `T×bW` bit 数据、配对的 `scaleBW` bit scale 字和 K 窗口标识。默认槽数据为 256 bit、scale 字为 32 bit。MX 运行只在 B 与 ScaleB 均有效且目标列有空槽时原子入队；非 MX 不等待 scale。列窗口按 `j=0..T−1` 循环分发，不是独立于 B 的两套 scale ping-pong。
+
+槽头按 lane 0 到 T−1 每次输出一个 bW-bit packed 字，只有该列真实 consume 时推进；第 T 次消费才释放整槽。一个槽供数时，另一槽可预取下一 K 窗口；槽已满则向上游反压。末 lane 消费可同拍接收新窗口，读端仍使用已注册的旧槽头，不旁路新入队数据。
+
+A 保持行主序；Sequencer 捕获一拍 `T×aW` 数据及其 MX ScaleA，按 lane 递增串行送入首行列 0。A、ScaleA、有效 token 和最后标记沿原水平链右传，每次逻辑 advance 移动一列；暂停拍保持链状态及各列读 lane，不消费窗口。
+
+- **Run**：仅当已捕获的 A token 有效且全部 T 列 B/scale 槽头均有效时统一 advance；部分列即使尚无 A token，也参与该阶段的槽头就绪门控。
+- **Tail**：最后一个 A token 注入后不再索取新 A；只要求未完成列的槽头有效，已完成列的空槽头不阻塞右侧尾波。
+- **Done**：列 j 消费到最后 token 时锁存完成状态；全部列完成后停止 advance，结果保持直至一次提交。
+
+令 `g=elemsPerLane(aFmt)`、`L=K/g`，以首个逻辑 advance 为编号 0，列 j 在 `[j,L+j)` 内有效消费。每列 consume=L，Run advance=L，Tail advance=T−1，总 advance=L+T−1；前后填充只使部分列有效，不产生重复消费。供数、scale、gather 或输出停顿可增加真实时钟，不能把 advance 数解释为端到端完成时限。
 
 ### 5.2 数值处理
 
@@ -364,13 +403,13 @@ INT8 和 INT4 输入均先符号扩展，再做二补码乘加。整数累加按
 
 BF16 使用专用窄乘法器，**不**复用 MXFP8 数据通路，也不注入单位 scale。乘法器直接接收 BF16 的 `sign(1)/exp(8)/mant(7)` 三段，有效尾数积写入与 MX 共享的乘积槽，再进入同一条 40-bit lazy 累加归约。
 
-BF16 为非打包格式：每个 16-bit lane 承载一个元素，每个有效 A 拍覆盖 `T` 个 K 元素。因此 `K` 必须为 `T` 的整数倍（默认 16），且 `K=0` 非法。
+BF16 为非打包格式：每个 16-bit lane 承载一个元素。WS 每个有效 A 拍覆盖 `T` 个 K 元素，OS-M1 每次每列有效消费覆盖一个 K 元素，A 窗口仍包含 T 个元素。因此 `K` 必须为 `T` 的整数倍（默认 16），且 `K=0` 非法。
 
 BF16 既可作为 A/B 输入，也可作为 C 输出格式。BF16 不得与非 BF16 格式混配。
 
-BF16 对 B 的两种装载模式均合法，B 的内存布局按所选模式遵循 5.1.2 和 7.5.2 的通用规则。
+WS 下 BF16 对 B 的两种装载模式均合法，B 的内存布局按所选模式遵循 5.1.2 和 7.5.2 的通用规则。OS-M1 下 BF16 同样要求 `loadWMode=1`，该限制来自单行数据流，不来自 BF16 格式。
 
-*Note：MX 与 FP8 必须使用 `loadWMode=1`，BF16 不受此限。MX 的两条理由（scale 须按 K 维切分、B 须预转置）对 BF16 都不成立——BF16 无输入 scale 且为非打包格式；FP8 的理由是复用 MXFP8 数据通路而继承其约束，而 BF16 走专属窄乘法器。权重在两条装载路径上对乘法器位透明。*
+*Note：WS 中 MX 与 FP8 必须使用 `loadWMode=1`，BF16 不受格式级限制。MX 的两条理由（scale 须按 K 维切分、B 须预转置）对 BF16 都不成立——BF16 无输入 scale 且为非打包格式；FP8 的理由是复用 MXFP8 数据通路而继承其约束，而 BF16 走专属窄乘法器。权重在两条装载路径上对乘法器位透明。*
 
 *Note：BF16 的有效尾数积低位结构上恒零，其有效位宽度完全落在默认窄化归约窗口内，归约阶段不因 BF16 引入额外的窗口截断。*
 
@@ -424,6 +463,20 @@ scaleIndex = floor(lane × step / blockSize)
 
 每个输出 block 产生一个 E8M0 scale byte。零 block 输出 scale 0；非零 block 根据 block 最大幅值计算并限制在有效 E8M0 范围内。
 
+#### 5.2.9 OS-M1 与 WS 结果一致性
+
+在两种模式均合法、`M=1、loadWMode=1、osFmtKeep=0`，且逻辑 A、B、scale、bias/rqM、输出格式与舍入相同时，`osM1=1` 与 `osM1=0` 的 C 结果关系如下。物理 B/ScaleB 的遍历方向不同，不改变逻辑张量：
+
+| 输入族 | OS-M1 与 WS 结果关系 |
+|---|---|
+| INT8、INT4、INT W4A8（含 requant、ReLU） | 逐位一致 |
+| BF16 | 逐位一致 |
+| MXFP8、MXFP4、MX W4A8、FP8 | 不保证逐位一致；两种模式各自满足 5.2.5 的窄化归约契约 |
+
+OS-M1 下 MX 输入 scale 的选择规则与 5.2.7 相同：scaleA 取 A lane 对应字节，scaleB 按列独立取对应字节；FP8 两侧均注入 `127`。
+
+*Note：整数累加的模运算不依赖求和顺序，最终 ReLU/requant 采用相同 acc32 和参数。浮点族两模式使用相同乘加单元及 lane 内归约序列；WS 沿 K 方向传播部分和，OS-M1 在首行按 K 递增本地反馈。40-bit 部分和保存/回灌不额外截位，但归约本身仍遵循窄化窗口规则，不等价于逐项 FP32 累加。MX/FP8 的模式间逐位关系不属于规格保证。*
+
 ### 5.3 数据搬运
 
 #### 5.3.1 A 读取
@@ -438,7 +491,17 @@ A_BASE + kt × aKStride + m × aRowStride
 
 #### 5.3.2 B 读取与 W4A8 Stretch
 
-B DMA 遍历 N tile 和 K pass。每个窗口读取 T 个逻辑拍并按阵列装载顺序送入 Executor。
+B DMA 遍历 N tile 和 K 窗口，每个窗口读取 T 个逻辑拍。WS 保持原列降序装载；OS-M1 按逻辑列 `nt×T+j`、`j=0..T−1` 升序送入各列窗口，ScaleB 使用相同方向和窗口顺序。
+
+OS-M1 的 B 为预转置的稠密 Nprog×K 布局，令 `bitsB` 为外部 B 元素位宽：
+
+```text
+bRowStride = K × bitsB / 8
+bKStride   = kPerBeatA × bitsB / 8
+bAddr(nt, kt, j) = B_BASE + (nt×T+j)×bRowStride + kt×bKStride
+```
+
+上述是逻辑字节地址；非对齐地址按 gather 转为对齐物理请求。W4A8 中 B 的外部元素仍为 4 bit，窗口覆盖范围跟随 8-bit A，不因 DMA 展开而变成 8-bit 存储布局。
 
 W4A8 使用 stretch 读取：一个 32-byte 对齐物理字包含两个 16-byte 4-bit 半片，硬件根据 K 窗口选择低半或高半。软件必须满足对应的 B 基址对齐要求。
 
@@ -486,7 +549,7 @@ out     = truncate(acc32/relu32)                // requantOn=0 的整数输出
 
 #### 5.4.2 Bias
 
-Bias 每个输出列一个值，只在 `kt=0` 注入。后续 K pass 回灌的 partial sum 已包含 bias，因此不会重复相加。
+Bias 每个输出列一个值。WS 只在 `kt=0` 注入，后续 K pass 回灌的 partial sum 已包含 bias；OS-M1 在每个 N tile 启动时播种一次，后续 K 窗口继续本地累加，不重复相加。
 
 - 整数路径：bias 按 INT32 符号扩展；
 - 非整数路径：bias 按 FP32 解码后转为内部 lazy 格式；FP32 指数为 0 的值按零处理。
@@ -529,6 +592,14 @@ shifted = rounded + zeroPoint
 - C 格式必须为 INT8 或 INT4；
 - `RQ_M_ADDR` 必须 4-byte 对齐；
 - 编译配置必须包含参数取数 DMA。
+
+#### 5.4.5 OS-M1 自然列序 Epilogue
+
+OS-M1 的部分和列 j、bias 项 j、rqM 项 j 和输出列 `nt×T+j` 同序，不增加列反转。bias 在每个 N tile 启动时只播种一次：INT32 符号扩展为内部累加宽度，FP32 转为 lazy 格式；跨 K 窗口本地反馈不重复播种。
+
+每个 N tile 的 rqM 必须进入正式参数寄存器后才能提交累加行，暂存收齐本身不代表提交完成。下一 N tile 参数取数可与前一 tile 输出转换/写回重叠，前一行使用的参数不得被下一组暂存内容覆盖。
+
+提交复用 WbOutCvt、ReLU、requant、C/ScaleC DMA 及同一写回门。C 或 ScaleC 反压延长等待，不增加该 N tile 的提交次数；非 requant INT8/INT4 仍截断绕回，requant 仍饱和。每个输出行按完整 T 列和 Nprog 布局写回，软件只消费前 Nlogical 列。
 
 ## 6. 接口规范
 
@@ -776,7 +847,7 @@ B 必须预转置为 `Nprog×K` row-major：
 BT[n][k] = B[k][n]
 ```
 
-MX、FP8 和正向 INT W4A8 必须采用此布局。
+MX、FP8 和正向 INT W4A8 必须采用此布局。OS-M1 的所有输入格式也必须采用此布局；B/ScaleB 升序读取只改变遍历方向，不定义第二种转置格式。
 
 #### 7.5.3 C 矩阵
 
@@ -792,7 +863,9 @@ C 按 `M×Nprog` row-major 写回，其中 `Nprog` 必须是 T 的整数倍。�
 Nprog = ceil(Nlogical / T) × T
 ```
 
-A×B、C、bias、requant 参数和相关 scale 布局均按 `Nprog` 构造，逻辑列数 `Nlogical` 由软件在 WorkerBee 之外保存。补齐列必须具有可访问的 B/参数数据，C 缓冲区也必须按每行 `Nprog` 个元素分配。
+A×B、C、bias、requant 参数和相关 scale 布局均按 `Nprog` 构造，逻辑列数 `Nlogical` 由软件在 WorkerBee 之外保存。补齐列必须具有可访问的 B/参数数据，C 缓冲区也必须按每行 `Nprog` 个元素分配。WS 和 OS-M1 均不读取 Nlogical，也不自动屏蔽补齐列。
+
+若要求补齐列的乘加结果为零，软件应提供 B=0、bias=0，并使用合法有限 scale；启用 requant 时还应提供 rqM=0。此时 requant 输出为按 INT8/INT4 范围饱和后的 zeroPoint，不一定为零。无论补齐列的数值如何，完整 Nprog 写回范围都必须可访问。
 
 ### 7.6 MX Scale 存储布局
 
@@ -889,9 +962,9 @@ bias 和 rqM 共用 ScaleA DMA 物理读口；两者同时启用时，硬件先�
 
 | 参数 | 默认值 | 含义 |
 |---|---:|---|
-| `arrayN` | 8 | 每个 cluster 的 N 方向宽度 |
-| `clusterM` | 2 | cluster 数 |
-| `totalN` | 16 | `arrayN × clusterM` |
+| `arrayN` | 16 | 阵列行数（K-lane 轴） |
+| `arrayM` | 16 | 阵列列数（输出 N 轴，须 == arrayN） |
+| `totalN` | 16 | `arrayN`（方形边长） |
 | `aW` | 16 bit | 每个 K-lane 的 A 输入打包宽度 |
 | `bW` | 16 bit | 每个 PE 的 B 权重打包宽度 |
 | `cW` | 0 | 自动派生累加宽度 |
@@ -910,7 +983,7 @@ bias 和 rqM 共用 ScaleA DMA 物理读口；两者同时启用时，硬件先�
 
 配置必须满足：
 
-- `arrayN ≥ 4`，`clusterM ≥ 1`；
+- `arrayN ≥ 4`，`arrayM ≥ 1` 且 `arrayM == arrayN`（引擎按方形切块）；
 - `aBufferDepth > 0`，`bBufferDepth > 0`；
 - `cBufferDepth ≥ 2T`；
 - `0 < addrWidth ≤ 32`；
@@ -996,11 +1069,13 @@ M、N、K 均为 16-bit 无符号值。
 | `[24]` | `bMxBlockSize` | 0=16，1=32 |
 | `[25]` | Reserved | 写入被忽略 |
 | `[26]` | `cMxBlockSize` | 0=16，1=32 |
-| `[27]` | Reserved | 写入被忽略 |
+| `[27]` | `osFmtKeep` | OS 格式广播优化控制；软件应写 0，基线执行完整广播 |
 | `[28]` | `loadWMode` | B 装载模式 |
 | `[29]` | `requantOn` | Requant 使能 |
 | `[30]` | `biasOn` | Bias 使能 |
-| `[31]` | Reserved | 写入被忽略 |
+| `[31]` | `osM1` | 0=WS，1=OS-M1；必须 M=1 且 loadWMode=1 |
+
+`osM1` 和 `osFmtKeep` 均可写入并读回，复位为 0；`osFmtKeep` 不改变格式字段或数值契约。本文使用 `osFmtKeep=0` 的完整广播基线，不以该位承诺跳过广播的节拍收益。
 
 `AddrMode` 编码定义为 MAT/TILE，但当前主数据通路没有消费这三个字段；软件应写 0，不能依赖 TILE 模式改变 DMA 地址行为。
 
@@ -1141,7 +1216,7 @@ ScaleC 通过独立 8-bit 写接口输出。当前实现的 ScaleC FIFO/在途�
 | 11 | 计算域与 C 输出的整数/非整数族不一致 |
 | 12 | Bias 配置非法 |
 | 13 | Requant 配置非法 |
-| 14 | 保留，无生产者 |
+| 14 | `osM1=1` 且 M≠1 或 loadWMode≠1 |
 | 15 | 保留，无生产者 |
 
 ### 10.2 主要判据
@@ -1187,6 +1262,10 @@ ScaleC 通过独立 8-bit 写接口输出。当前实现的 ScaleC FIFO/在途�
 - RQ_M_ADDR 非 4-byte 对齐；
 - 编译配置不含参数取数硬件。
 
+#### errCode 14
+
+`osM1=1` 且 `M≠1` 或 `loadWMode≠1`。OS-M1 不放宽任一格式、K、block、地址或 epilogue 约束；同时存在其它错误时，按 10.3 的优先级报告具体配置错误。
+
 ### 10.3 错误优先级
 
 多个错误同时成立时，RTL 的最终优先级从高到低为：
@@ -1203,6 +1282,7 @@ ScaleC 通过独立 8-bit 写接口输出。当前实现的 ScaleC FIFO/在途�
 > 4
 > 3(MX one-sided)
 > 0
+> 14(OS-M1 shape/load mode)
 ```
 
 该优先级选择同一次 CalcConfig 检查的错误码，不等于不同任务间覆盖 ERROR_CODE 的优先级。软件不得假设 errCode 会报告同次检查中最先出现或数值最小的错误；首个未清配置错误的跨事件保存规则见第 8.8.4 节。
@@ -1263,7 +1343,7 @@ DMA 错误不是 fail-fast：已发出的事务不会撤销，通道继续排空
 | `bOccupancy` | B FIFO 占用 |
 | `cOccupancy` | C FIFO 占用 |
 
-`io.status` 不含 `done` 或 `err`。`progress` 不表示 M 行数，也不表示写回 byte 数；其计算口径保持不变。`busy=0` 不保证没有已接受启动，`inFlight=0` 也不表示成功：配置检查失败同样结束在途状态。完成与错误必须从 IRQ_RAW 和 ERROR_CODE 判断。
+`io.status` 不含 `done` 或 `err`。`progress` 不表示 M 行数，也不表示写回 byte 数；WS 每完成一个 `(N,K)` pass 增加 1，OS-M1 每提交一个 N tile 增加该 tile 的 K 窗口数，计算期间不逐 K 窗口实时增加。`busy=0` 不保证没有已接受启动，`inFlight=0` 也不表示成功：配置检查失败同样结束在途状态。完成与错误必须从 IRQ_RAW 和 ERROR_CODE 判断。
 
 ### 11.2 完成与错误中断
 
@@ -1309,13 +1389,15 @@ RAW 不携带任务 tag，也不累计事件次数。这里的 IRQ pending 是�
 | `scaleA` | ScaleA 物理口 `req.valid`，包含 bias/rqM 取数 |
 | `scaleB` | ScaleB DMA `req.valid` |
 | `scaleC` | ScaleC DMA `req.valid` |
-| `array` | 阵列输入有效，即 LOAD_A 的 `aPop.fire` |
-| `stallA` | LOAD_A 中没有发生 `aPop.fire` |
-| `stallB` | LOAD_B 中没有 `bPop.fire`，或预蓄 B/ScaleB 不足 |
-| `epilogue` | bias/rqM 取数活动，或输出转换输入/输出/scale 有效 |
+| `array` | WS 的阵列输入 `wbValidIn`（LOAD_A 的 `aPop.fire`）；OS-M1 至少一列真实 consume，包含 Tail |
+| `stallA` | WS 的 LOAD_A 中没有 `aPop.fire`；OS-M1 的 Run 缺已捕获的 A/ScaleA token |
+| `stallB` | WS 的 LOAD_B 中没有 `bPop.fire`，或 DRAIN 倒计数归零且有下一窗口时 B/ScaleB 预蓄不足；OS-M1 的 Run 缺任一 B/scale 槽头，或 Tail 的未完成列缺槽头 |
+| `epilogue` | bias/rqM 取数活动，或输出转换 `in.fire`、数据 `out.valid`、scale `out.valid` |
 | `busy` | Executor 非 IDLE |
 
 DMA 事件使用 `req.valid` 而不是 `req.fire`。当外部 `ready=0` 时，同一请求可令事件连续多个周期为 1；外部 PMU 若要统计事务数，应额外结合对应 ready 信号。
+
+OS-M1 的 Run 可同时缺 A 和 B，因此 stallA/stallB 可以同时为高；两者不能直接相加作为互斥停顿总周期。Tail 不索取新 A，已完成列的空 B 槽头不产生 stallB。配置广播、提交和最终写回等待不属于 OS 供数停顿。`array` 为活动周期，不表示活跃列数、乘加元素数或已完成输出行数；C/ScaleC 活动由对应 DMA 事件独立观测。
 
 ### 11.4 Tracing 可靠性边界
 
@@ -1333,9 +1415,9 @@ tracing 状态在首次启动后不会返回初始态，后续执行的 tracing 
 
 ### 12.2 结构性处理拍数
 
-每个 `(N tile, K pass)` 权重窗口消费 T 个有效 B 拍，随后消费 M 个有效 A 拍，见第 5.1 节。每个 T 列输出行的 C 写拍数由输出位宽决定，见第 5.3.4 节。
+WS 每个 `(N tile, K pass)` 权重窗口消费 T 个有效 B 拍，随后消费 M 个有效 A 拍。OS-M1 每个 N tile 串行消费 `L=K/g` 个 A token，各列分别 consume=L；Run advance=L，Tail advance=T−1，全 K 后提交一行。默认 `osFmtKeep=0` 时每任务广播 T 拍；首窗口填充、K 窗口预取和上一 tile 写回可以部分重叠，不规定为零开销。每个 T 列输出行的 C 写拍数由输出位宽决定，见 5.3.4。
 
-这些是有效数据消费/写请求次数，不是固定端到端延迟。配置阶段、预蓄、波前排空、供数反压、参数取数、输出转换及写响应等待均会影响实际周期数。
+这些是有效数据消费/写请求次数，不是固定端到端延迟。配置阶段、预蓄、DMA 控制空泡、gather、供数反压、参数取数、输出转换及写响应等待均会影响实际周期数。OS 尾波的 T−1 是逻辑 advance 数，未完成列缺供数时会延长真实时钟。
 
 ### 12.3 实测指标边界
 
@@ -1351,7 +1433,7 @@ tracing 状态在首次启动后不会返回初始态，后续执行的 tracing 
 
 1. 复位后确认 `inFlight=0`；校验 `M≥1、Nlogical≥1、K≥1`，计算 `Nprog=ceil(Nlogical/T)×T`；
 2. 按 `Nprog` 准备 A、B、C 和可选 scale/bias/requant 缓冲区，并完成 B 转置、4-bit 打包和补齐列；
-3. 写入 M/Nprog/K、A/B/C 地址和 CONTROL。可用任意稀疏 lane 子集同拍组批，允许混合读写；按本批 fire lane 递增接收所有读响应/写 ACK，以 laneId 匹配并逐条确认 `resp.err=0`。所有响应排空前不能提交下一批，最后响应 fire 后下一拍可接新批；
+3. 写入 M/Nprog/K、A/B/C 地址和 CONTROL。选择 OS-M1 时必须写 `M=1、loadWMode=1、osM1=1、osFmtKeep=0`；选择 WS 时写 `osM1=0`，不能仅根据 M 推定数据流。可用任意稀疏 lane 子集同拍组批，允许混合读写；按本批 fire lane 递增接收所有读响应/写 ACK，以 laneId 匹配并逐条确认 `resp.err=0`。所有响应排空前不能提交下一批，最后响应 fire 后下一拍可接新批；
 4. MX 运行写入 ScaleA/ScaleB/ScaleC 地址（索引 `0x06/0x07/0x08`）；
 5. bias 运行写入 BIAS_ADDR（`0x09`）；
 6. requant 运行写入 RQ_M_ADDR（`0x0A`）和 RQ_PARAM（`0x0B`）。配置批应避免跨 lane 同址写；合法冲突不令 ACK 报错，低 lane 的冲突字段可能不生效，其它字段仍可生效，不能认为 REG_WRITE2 两项必定一起获胜；
@@ -1392,7 +1474,8 @@ WorkerBee 接口本身不定义 cache coherence。若系统 DMA 与 CPU cache �
 
 ### 14.1 当前实现限制摘要
 
-- 当前发布配置固定 MX 阵列几何 `T=16`；
+- 唯一默认交付配置使用方形 `T=16` 阵列，所有默认受支持格式通路均存在，由运行期格式选择；
+- OS-M1 仅支持 M=1/loadWMode=1，首行参与计算，不支持多行 OS；软件使用 osFmtKeep=0；
 - 单命令 M 受 C buffer 容量限制；
 - `M/N` 必须大于 0，但 RTL 没有专用错误码；
 - 编程值 N 必须补齐为 T 的整数倍，硬件不自动缩窄末 tile；
@@ -1428,7 +1511,7 @@ WorkerBee 接口本身不定义 cache coherence。若系统 DMA 与 CPU cache �
 ### A.1 关键公式
 
 ```text
-T            = arrayN × clusterM
+T            = totalN = arrayN
 nTiles       = ceil(N / T)
 elemsPerLane = 4 for INT4/MXFP4
                2 for INT8/MXFP8/FP8
@@ -1436,6 +1519,14 @@ elemsPerLane = 4 for INT4/MXFP4
 kPerBeat     = T × elemsPerLane
 kTiles       = K / kPerBeat
 Mmax         = cBufferDepth - T
+
+OS-M1: M=1, loadWMode=1
+L            = K / elemsPerLane
+consume[j]   = L
+RunAdvance   = L
+TailAdvance  = T-1
+advanceTile  = L+T-1
+commitTile   = 1
 ```
 
 MX 输入 scale：

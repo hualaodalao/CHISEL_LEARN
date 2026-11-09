@@ -66,7 +66,7 @@ P0 Python 类型 `WorkerBeeGemm` 绑定 `gem5::workerbee::WorkerBee`，头文件
 
 | 项目 | 值/规则 |
 |---|---|
-| arrayN / clusterM / T | 8 / 2 / 16，T派生而非独立配置 |
+| arrayN / arrayM / T | 16 / 16 / 16，T派生而非独立配置 |
 | A/B lane宽 | 各16 bit |
 | A/B DMA宽 | 各T×16=256 bit |
 | C DMA宽 | 256 bit |

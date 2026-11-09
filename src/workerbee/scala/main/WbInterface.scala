@@ -85,9 +85,10 @@ object WorkerBeeStatus {
 
 /** WorkerBee 性能观测信号组：纯组合电平、无内部计数状态，计数由外部 PMU 按拍采样。
   * dmaA/B/C、scaleA/B/C = 各 DMA 通道请求有效拍（物理通道口径，scaleA 含 bias/rqM 取数
-  * 盗用拍，非 MX 配置恒 false）；array = 阵列有效计算拍；stallA = 供数相（sLOAD_A）阵列
-  * 空闲拍（aPop 未 fire，含 A/scaleA 供数不足、bias/rqM 未收齐、C 写回占用读口等成因）；
-  * stallB = 权重供数等待（loadW 窗口 bPop 停拍 ∨ sDRAIN 预蓄等待拍）；epilogue =
+  * 盗用拍，非 MX 配置恒 false）；array = WS 的 wbValidIn 或 OS 至少一列真实 consume（含 Tail）；
+  * stallA = WS sLOAD_A 中 aPop 未 fire，或 OS Run 缺已捕获 A/scaleA；stallB = WS loadW
+  * bPop 停拍 ∨ sDRAIN 预蓄等待，或 OS Run 缺任一 B/scale 窗口、Tail 未完成列缺窗口；
+  * OS A/B 缺口可同时为高，Setup/Commit 不计供数停顿，Tail 不索取新 A；epilogue =
   * bias/rqM 取数 ∨ cvt 转换/量化管线占用（C 写回通道活动另由 dmaC/scaleC 观测）；
   * busy = 总忙碌电平（作分母对齐）。
   */
@@ -124,6 +125,8 @@ class WorkerBeeRegister(cfg: WorkerBeeConfig) extends Bundle {
   val bMxBlockSize = MXBlockSize()
   val cMxBlockSize = MXBlockSize()
   val loadWMode = Bool()
+  val osM1 = Bool()
+  val osFmtKeep = Bool()
   val aFmt = DataFormat()
   val bFmt = DataFormat()
   val cFmt = DataFormat()

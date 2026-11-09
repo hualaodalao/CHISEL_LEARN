@@ -110,7 +110,36 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
       expCycleWindow = None)
   }
 
-  
+  // OS-M1：B/scaleB 块内升序取址，M=1；fp32 走双精度 golden 容差交叉，fp16 走 16-bit 容差交叉。
+  it should "run MX OS-M1 GEMM M=1 N=32 K=128 E4M3xE5M2 fp32" in {
+    runMxGemm(M = 1, N = 32, K = 128,
+      waveName = "workerbee_mx_osm1_n32_k128.fst",
+      testMangle = "should-run-MX-OS-M1-GEMM-M-1-N-32-K-128-E4M3xE5M2-fp32",
+      outFmt = DataFormat.FP32, osM1 = true)
+  }
+
+  it should "run MX OS-M1 GEMM M=1 N=48 K=64 E4M3xE5M2 fp16" in {
+    runMxGemm(M = 1, N = 48, K = 64,
+      waveName = "workerbee_mx_osm1_n48_k64_fp16.fst",
+      testMangle = "should-run-MX-OS-M1-GEMM-M-1-N-48-K-64-E4M3xE5M2-fp16",
+      outFmt = DataFormat.FP16, osM1 = true)
+  }
+
+  // OS-M1 量化输出：dmaCScale 间歇反压下每 N tile 码行与块 scale 各提交一次、不丢不重。
+  it should "run MX OS-M1 GEMM M=1 N=32 K=64 E4M3xE5M2 mxe4m3 scaleC backpressure" in {
+    runMxGemm(M = 1, N = 32, K = 64,
+      waveName = "workerbee_mx_osm1_n32_k64_q_bp.fst",
+      testMangle = "should-run-MX-OS-M1-GEMM-M-1-N-32-K-64-E4M3xE5M2-mxe4m3-scaleC-backpressure",
+      outFmt = DataFormat.MXE4M3, cScaleBackpressure = true, osM1 = true)
+  }
+
+  it should "run MX WS GEMM M=16 N=32 K=64 E4M3xE5M2 mxe4m3 scaleC backpressure" in {
+    runMxGemm(M = 16, N = 32, K = 64,
+      waveName = "workerbee_mx_ws_m16_n32_k64_q_bp.fst",
+      testMangle = "should-run-MX-WS-GEMM-M-16-N-32-K-64-E4M3xE5M2-mxe4m3-scaleC-backpressure",
+      outFmt = DataFormat.MXE4M3, cScaleBackpressure = true)
+  }
+
   // 共享运行器：配置 MX WorkerBee，逐拍供 A/B/C/scaleA/scaleB，golden 比对。
   //   - outFmt ∈ {0,1,2,3,4,5}（MX 合法族）：0=fp32 直出；1/2=fp16/bf16 降精度直出；
   //     3/4/5=量化输出——期望链 40→32 规格化 → swQuantBlock（码+块 scale），dmaC 密集码 +
@@ -126,11 +155,11 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
   private def runMxGemm(M: Int, N: Int, K: Int, waveName: String, testMangle: String,
       expCycleWindow: Option[(Int, Int)] = None,
       outFmt: DataFormat.Type = DataFormat.FP32, blkSel: Int = 0, rnd: Int = 0,
-      cScaleBackpressure: Boolean = false): Unit = {
+      cScaleBackpressure: Boolean = false, osM1: Boolean = false): Unit = {
 
     val cfg = WorkerBeeConfig(
-      arrayN = 8,
-      clusterM = 2,                 // totalN = 16
+      arrayN = 16,
+      arrayM = 16,                  // totalN = 16
       aW = 16, bW = 16, cW = 40,      // 与出厂 cfgMx（WorkerBeeElaborate）及 err 用例对齐
       // 不传 supportedFmts ⟹ 走 WorkerBeeConfig 默认集，该默认集含 MXE2M1 ⟹ hasMx4=true，
       //   满足 require(!hasMx8 || hasMx4)。★ 下面注释掉的 fp8-only 写法不要取消注释：
@@ -147,6 +176,7 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
     val totalN = cfg.totalN         // 16
     val aEffW  = cfg.aEffW          // 16（v2：16-bit lane 打包 2×8-bit 元素）
     require(K % 32 == 0, s"MX 用例 K($K) 必须 32 对齐")
+    require(!osM1 || M == 1, s"osM1 用例须 M=1（实测 M=$M）")
     val kBlocks = K / 32            // scale 块数
     // outFmt 族合法性分派（与 Executor mxFmtOk 同源）：Scala 级族判断必须用枚举 ==，
     // 返回硬件 Bool 的 DataFormat.isQuant 不能用于 Scala if 分派。
@@ -264,9 +294,14 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
     val bColTileOff = totalN.toLong * K             // 轮间跳 = totalN 个转置行 × K 字节
     val kSliceStep = totalN.toLong * (cfg.bW / 8)   // = 2*totalN = 32 字节（k 窗口步进）
     val expBAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
+    // OS-M1：块内自然列 j 升序（addr = base + r*bColTileOff + j*bRowOff + kt*kSliceStep）。
     for (r <- 0 until nTilesB; kt <- 0 until bKTiles) {
-      val blockStart = B_BASE + r.toLong * bColTileOff + (totalN - 1).toLong * bRowOff + kt.toLong * kSliceStep
-      for (r2 <- 0 until totalN) expBAddrSeq += blockStart - r2 * bRowOff
+      if (osM1)
+        for (j <- 0 until totalN) expBAddrSeq += B_BASE + r.toLong * bColTileOff + j.toLong * bRowOff + kt.toLong * kSliceStep
+      else {
+        val blockStart = B_BASE + r.toLong * bColTileOff + (totalN - 1).toLong * bRowOff + kt.toLong * kSliceStep
+        for (r2 <- 0 until totalN) expBAddrSeq += blockStart - r2 * bRowOff
+      }
     }
     val dmaBTotalBeats = expBAddrSeq.size
     // lane i = pack{bByte[kt*32+2i+1][n] 高, bByte[kt*32+2i][n] 低}；n 降序协议不变。
@@ -276,7 +311,7 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
       val idxInRound = idx % beatsPerRound
       val kt = idxInRound / totalN
       val s = idxInRound % totalN
-      val n = nTileIdx * totalN + (totalN - 1 - s)
+      val n = nTileIdx * totalN + (if (osM1) s else totalN - 1 - s)
       var data = BigInt(0)
       for (i <- 0 until totalN) {
         val kEven = kt * 32 + 2 * i
@@ -316,12 +351,12 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
     // fp32 直出非量化运行 → 该通道为死路，仅保留「全程零请求」负向守护。
     // 量化运行（outFmt∈{3,4,5}）→ 双通道写回：地址线性模型
     //   base + nt×(totalN/blk) + m×ceil(N/blk)（与 WorkerBeeDmaScaleWr 同源），
-    //   数据 = 每 8 元素组 1 字节 E8M0 scale（scaleBytesPerRow = ceil(N/blk) 字节）；
+    //   数据 = 本 tile 内每 blk 元素块 1 字节 E8M0 scale（colOff = totalN/blk 字节/拍，
+    //   第 j 字节 ↔ 块 j ↔ swQuantBlock 8 元素粒度的第 j*(blk/8) 字节）；
     //   主循环逐拍地址/数据硬对账。
     val nTilesC = (N + totalN - 1) / totalN
     val scaleRowOff = (N + blk - 1).toLong / blk          // scale 行步进 = ceil(N/blk) 字节
     val scaleColOff = totalN.toLong / blk                 // 列 tile 步进 = totalN/blk 字节
-    val scaleBytesPerRow = scaleRowOff.toInt
     val expCScaleAddrSeq: Seq[Long] =
       if (isQuant) for (nt <- 0 until nTilesC; m <- 0 until M)
         yield SCALE_C_BASE + nt * scaleColOff + m * scaleRowOff
@@ -331,8 +366,8 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
       val row = beatIdx % M
       val (_, scales) = expectedQuantRow(nt, row)
       var data = BigInt(0)
-      for ((s, g) <- scales.zipWithIndex if g < scaleBytesPerRow)
-        data = data | (BigInt(s & 0xFF) << (8 * g))
+      for (j <- 0 until scaleColOff.toInt)
+        data = data | (BigInt(scales(j * (blk / 8)) & 0xFF) << (8 * j))
       data
     }
 
@@ -393,10 +428,16 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
     //   块内 totalN 拍降序 -rowOff。总 beat = nTile*kTile*totalN。
     val scaleBNTileJump = (totalN - 1).toLong * scaleBRowOff + scaleBKTiles.toLong * scaleBColTileOff
     val expScaleBAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
+    // OS-M1：块内自然列升序，N-tile 步进 = totalN*rowOff（与上式 nTileJump 相等）。
     for (r <- 0 until nTilesB; kt <- 0 until scaleBKTiles) {
-      val blockStart = SCALE_B_BASE + r.toLong * scaleBNTileJump +
-        (totalN - 1).toLong * scaleBRowOff + kt.toLong * scaleBColTileOff
-      for (r2 <- 0 until totalN) expScaleBAddrSeq += blockStart - r2.toLong * scaleBRowOff
+      if (osM1)
+        for (j <- 0 until totalN) expScaleBAddrSeq += SCALE_B_BASE + r.toLong * totalN * scaleBRowOff +
+          j.toLong * scaleBRowOff + kt.toLong * scaleBColTileOff
+      else {
+        val blockStart = SCALE_B_BASE + r.toLong * scaleBNTileJump +
+          (totalN - 1).toLong * scaleBRowOff + kt.toLong * scaleBColTileOff
+        for (r2 <- 0 until totalN) expScaleBAddrSeq += blockStart - r2.toLong * scaleBRowOff
+      }
     }
     // gather：同 scaleA，逻辑序列按 4B 对齐契约展开为物理序列（总 beat 增加）
     val expScaleBPhysSeq = expScaleBAddrSeq.toSeq.flatMap(gatherPhys4)
@@ -493,6 +534,7 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
       //   kb=k/32、lane 打包 kt*32 的推导一致；sel=2 在该枚举下越界，硬件 getBlockSize
       //   落 otherwise→16，会使 scaleA/scaleB 行步进 K/16 与金锚 K/32 失配。
       val controlWord5 =
+        (if (osM1) 1L << 31 else 0L) |               // osM1        reg5[31]
         (1L << 28) |                                 // loadWMode   reg5[28]
         ((blkSel.toLong & 0x3) << 26) |              // cMxBlk      reg5[26]
         ((1L & 0x3) << 24) |                         // bMxBlk      reg5[24] = sel1 = M32
@@ -505,7 +547,7 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
         //   自检会长牙）；fp32 直出 + blkSel=0 + rnd=RNE 时 outFmt/rnd/blkSel 三域均为 0
         //   ⟹ 期望值 = 基础位 | loadWMode 与 a/bMxBlk 三个结构位（本 runner 的硬编码契约）。
         val expCtlBase = DataFormat.MXE4M3.litValue.toInt | (DataFormat.MXE5M2.litValue.toInt << 4)
-        val expCtl5 = (1L << 28) | (1L << 24) | (1L << 22) | expCtlBase.toLong
+        val expCtl5 = (if (osM1) 1L << 31 else 0L) | (1L << 28) | (1L << 24) | (1L << 22) | expCtlBase.toLong
         require(controlWord5 == expCtl5,
           s"reg5 control-word self-check failed: got 0x${controlWord5.toHexString} expected " +
           s"0x${expCtl5.toHexString} = loadWMode(1<<28) | bMxBlk(1<<24) | aMxBlk(1<<22) | " +
@@ -826,7 +868,7 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
               compared += 1
               val code = ((aligned >> (elemBitsX * i)) & ((1 << elemBitsX) - 1)).toInt
               val localCol = globalCol - nt * totalN
-              val grp = localCol / 8   // scale 字节按 tile 内局部列分组（低块号低位）
+              val grp = localCol / blk   // beat 第 j 字节 ↔ tile 内第 j 个 blk 元素块
               val scale = ((scaleBeat >> (8 * grp)) & 0xFF).toInt
               val hw = dequant(code, scale)
               val ref = refSum(row, globalCol)
@@ -941,7 +983,7 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
     //   fp8（E4M3×E5M2）⟹ isMx4 两臂均假 ⟹ fp4 专属守护（mix errCode3 / K 整除
     //   errCode8）不抢跑，elemsPerLane 对 fp8 仍为 2 ⟹ 几何与拍数不变。
     val cfg = WorkerBeeConfig(
-      arrayN = 8, clusterM = 2,
+      arrayN = 16, arrayM = 16,
       aW = 16, bW = 16, cW = 40,
       supportedFmts = Set(DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1),
       aBufferDepth = 2048, bBufferDepth = 2048, cBufferDepth = 2048,
@@ -1015,7 +1057,7 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
     // ★ supportedFmts 必须含 MXE2M1：否则 require(!hasMx8 || hasMx4) 会在 cfg 构造这一行
     //   抛 IllegalArgumentException。本 def 是活代码：runMxGemm 在 outFmt 不属合法族时分派到此。
     val cfg = WorkerBeeConfig(
-      arrayN = 8, clusterM = 2,
+      arrayN = 16, arrayM = 16,
       aW = 16, bW = 16, cW = 40,
       supportedFmts = Set(DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1),
       aBufferDepth = 2048, bBufferDepth = 2048, cBufferDepth = 2048,

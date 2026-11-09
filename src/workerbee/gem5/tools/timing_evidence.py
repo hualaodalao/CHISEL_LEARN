@@ -8,7 +8,7 @@ _RULES = (
      "A/B/C use StreamFifo with profile depths; C raw row is totalN*cEffW bits"),
     ("input_valid_skew", "WbComb.scala", "validSkewedShiftRegisters(0) := io.validIn",
      "valid shifts each edge; row i selects delay i; data shifts use shiftEnableIn"),
-    ("output_deskew", "WbComb.scala", "val dly = clusterM * arrayN - 1 - i",
+    ("output_deskew", "WbComb.scala", "val dly = arrayM - 1 - i",
      "first data delay stage updates unconditionally; later stages use cOutShiftEn"),
     ("pe_valid_h", "WbWorker.scala", "io.validOut := RegNext(io.validIn, false.B)",
      "horizontal valid has one registered stage per PE"),

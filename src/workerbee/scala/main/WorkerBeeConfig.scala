@@ -10,8 +10,9 @@ import chisel3.util._
 
 /** WorkerBee 编译期配置。
   *
-  * @param arrayN         单 cluster 内 PE 列数（≥4）
-  * @param clusterM       cluster 数量（≥1）
+  * @param arrayN         阵列行数（K-lane 轴，≥4）
+  * @param arrayM         阵列列数（输出 N 轴，≥1）；引擎按方形 totalN×totalN 切块，
+  *                       当前必须 == arrayN（见下方 require）
   * @param aW             A 矩阵元素位宽
   * @param bW             B 矩阵元素位宽
   * @param cW             C 累加器位宽（0 = 自动推导）
@@ -27,8 +28,8 @@ import chisel3.util._
   *                       约束族：isPow2 / totalN*32 整除 / [totalN*8, totalN*32]。
   */
 case class WorkerBeeConfig(
-    arrayN: Int = 8,
-    clusterM: Int = 2,
+    arrayN: Int = 16,
+    arrayM: Int = 16,
     aW: Int = 16,
     bW: Int = 16,
     cW: Int = 0,
@@ -43,8 +44,9 @@ case class WorkerBeeConfig(
     cDmaExtW: Int = 256
 ) {
   
-  /** PE 总列数 */
-  val totalN: Int = arrayN * clusterM
+  /** 阵列行数（K-lane 轴）。引擎（Executor/DMA/输出转换）按方形 totalN×totalN 切块，
+    * 列数 arrayM 当前必须 == totalN（下方 require 守护）。 */
+  val totalN: Int = arrayN
   val totalNx2: Int = totalN * 2
   val totalNx4: Int = totalN * 4
 
@@ -184,7 +186,10 @@ case class WorkerBeeConfig(
   // 整数累加约束：含整数格式时 cEffW 必须 >= aW+bW，以容纳整数积累加防溢出
   if (hasInt) require(cEffW >= aW + bW, s"WorkerBeeConfig: 含整数格式时 cEffW($cEffW) 必须 >= aW+bW(${aW + bW})（整数累加防溢出需要）")
   require(arrayN >= 4, s"WorkerBeeConfig: arrayN($arrayN) 必须 >= 4")
-  require(clusterM >= 1, s"WorkerBeeConfig: clusterM($clusterM) 必须 >= 1")
+  require(arrayM >= 1, s"WorkerBeeConfig: arrayM($arrayM) 必须 >= 1")
+  // 引擎（Executor/DMA/输出转换）按方形 totalN×totalN 切块，列侧常量未解耦；放开矩形前
+  //   须先拆分各模块的列轴常量。
+  require(arrayN == arrayM, s"WorkerBeeConfig: 引擎按方形切块，arrayM($arrayM) 必须 == arrayN($arrayN)")
   require(aBufferDepth > 0, s"WorkerBeeConfig: aBufferDepth($aBufferDepth) 必须 > 0")
   require(bBufferDepth > 0, s"WorkerBeeConfig: bBufferDepth($bBufferDepth) 必须 > 0")
   require(cBufferDepth >= 2*totalN, s"WorkerBeeConfig: cBufferDepth($cBufferDepth) 必须 > 2*totalN($totalN)")

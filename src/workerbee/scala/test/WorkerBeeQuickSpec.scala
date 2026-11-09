@@ -18,7 +18,7 @@
   * a/b/cMxBlockSize 三违约被【合并】为单一 errMXLargerThanKLoadNum、errCode 恒置 0 ⟹【errCode 1
   * 与 2 永不可达】。各 when 平级 last-connect、后写覆盖前写，真实优先级为
   *   3(反向混配) > 11(int/非int 跨界) > 8(K 不整除) > 13(requant) > 12(biasAddr 对齐)
-  *     > 10(cAddr 对齐) > 7(容量，RTL-only) > 5 > 4 > 3(isAMx^isBMx) > 0
+  *     > 10(cAddr 对齐) > 7(容量，RTL-only) > 5 > 4 > 3(isAMx^isBMx) > 0 > 14(osM1，链首最低)
   * 两个 code3 谓词互斥、共用一码；code 9 保留给 v2 W4A8；errCode 7 的现役判据只有【容量】守护
   * （m > cBufferDepth - totalN）；errCode 6（MXE2M1 输出 N 为奇数）在 RTL 中被注释掉、金锚仍镜像
   * ⟹ 已知分歧。金锚 errCode 镜像的单一真源是 WbDebugModel.hwErrCode。
@@ -33,6 +33,7 @@ import scala.collection.mutable
 
 class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with WbAlwaysFstSim with WbStatusPollApi {
   import WbDebugModel._
+  import WorkerBeeQuickSpec.TaskOutcome
   private val TAG = "QUICK"; private val SUITE = "WorkerBeeQuickSpec"
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -368,6 +369,264 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
           aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
           wave = "sim/debug/quick_bf16_x_int8_err3.fst", caseTag = " [BF16 neg cross-family BF16xINT8 errCode3]")
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // OS-M1 用例。硬件：reg5[31]=osM1 + WorkerBeeCalcConfig errCode 14
+  //   （osM1 && (m≠1 || loadWMode=0)，链首最低优先级 ⟹ 叠加其它错误时归因到具体码）。
+  //   正向 osM1 与 WS 共用同一张量语义金锚（plan.compare 同一容差），另断言每 N tile
+  //   恰一次 C 行提交（无中间 psum 写回）。
+  // ══════════════════════════════════════════════════════════════════════════
+  // ㊲ 负向：osM1=1 但 M=32（≠1）→ errCode 14。BF16 合法配置（K=64%16=0、loadW=1、
+  //   cFmt=FP32 同族）⟹ 只命中 14（14 不覆盖任何既有臂）。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.BF16, bFmt = DataFormat.BF16, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_m32_err14.fst", caseTag = " [S1 osM1 neg M32 errCode14]")
+
+  // ㊳ 负向：osM1=1 但 loadWMode=0 → errCode 14（第二臂）。BF16 对 loadW=0 合法
+  //   （无 errCode 4 拦截），M=1 ⟹ 只命中 14。
+  runCase(m = 1, n = 32, k = 64, aFmt = DataFormat.BF16, bFmt = DataFormat.BF16, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(0), osM1 = true,
+          wave = "sim/debug/quick_osm1_loadw0_err14.fst", caseTag = " [S1 osM1 neg loadW0 errCode14]")
+
+  // ㊴ 正向 BF16 OS：多 K（kTiles=4）、多 N（nTiles=2）数值金锚。
+  runCase(m = 1, n = 32, k = 64, aFmt = DataFormat.BF16, bFmt = DataFormat.BF16, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_m1_legal.fst", caseTag = " [S2 osM1 legal M1 loadW1]")
+
+  // ㊵ 负向叠加：osM1=1 ∧ M=32 ∧ BF16×INT8 跨族混配 → errCode 3（链尾最高优先级），
+  //   证明 14 可被既有臂覆盖（last-connect 优先级链：3 > … > 14）。
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.BF16, bFmt = DataFormat.INT8, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_stack_err3.fst", caseTag = " [S1 osM1 neg stacked errCode3]")
+
+  // ㊶ 单 K、单 N：kTiles=1（首窗即末窗）、nTiles=1（无下一 tile Prime）。
+  runCase(m = 1, n = 16, k = 16, aFmt = DataFormat.BF16, bFmt = DataFormat.BF16, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_k16_n16.fst", caseTag = " [S8 osM1 single K single N]")
+
+  // ㊷ 长 K 单 N：kTiles=16，B 双槽窗口长时间轮转。
+  runCase(m = 1, n = 16, k = 256, aFmt = DataFormat.BF16, bFmt = DataFormat.BF16, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_k256_n16.fst", caseTag = " [S8 osM1 long K]")
+
+  // ㊸ 奇数 N tile：nTiles=3，跨两次 Wait-C→Prime 切换。
+  runCase(m = 1, n = 48, k = 64, aFmt = DataFormat.BF16, bFmt = DataFormat.BF16, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_n48.fst", caseTag = " [S8 osM1 three N tiles]")
+
+  // ㊹ A/B/C 周期反压（period=7，每通道约 3/7 拍 ready=0，三通道相位错开）：
+  //   C 下游未 ready 时结果须保持不丢，A/B 断供时阵列须停等而非吞空拍。
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.BF16, bFmt = DataFormat.BF16, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true, bpPeriod = 7,
+          wave = "sim/debug/quick_osm1_backpressure.fst", caseTag = " [S8 osM1 ABC backpressure]")
+
+  // ㊽ 复位后首个任务即带 osFmtKeep：格式影子无效 ⟹ 必须回落正常广播，数值金锚照常通过。
+  runCase(m = 1, n = 32, k = 64, aFmt = DataFormat.BF16, bFmt = DataFormat.BF16, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true, osFmtKeep = true,
+          wave = "sim/debug/quick_osm1_keep_after_reset.fst", caseTag = " [S8 osM1 osFmtKeep after reset]")
+
+  // ㊺ 连续两个 OS 任务（形状与种子均不同）：第二个任务不得继承第一个的窗口/波前/完成残留。
+  runSeqCase(" [S8 OS->OS]", Seq(seqParams(32, 64, "osm1_seq_os_os"),
+      seqParams(16, 128, "osm1_seq_os_os", seed = 5678L))) { _ => () }
+
+  // ㊻ OS→WS→OS 同形状同种子：模式切换无残留；OS 与 WS 结果须逐位一致（同一张量、两种数据流）。
+  runSeqCase(" [S8 OS->WS->OS]", Seq(seqParams(32, 64, "osm1_seq_os_ws_os"),
+      seqParams(32, 64, "osm1_seq_os_ws_os", osM1 = false),
+      seqParams(32, 64, "osm1_seq_os_ws_os"))) { o =>
+    assertSameC("OS#0 vs WS#1", o(0), o(1)); assertSameC("OS#0 vs OS#2", o(0), o(2)) }
+
+  // ㊼ osFmtKeep 跳过广播：OS → OS(keep，同格式命中跳过) → WS → OS(keep，WS 刷新影子后命中跳过)。
+  //   跳过不得改变数值（与任务 0 逐位一致）；busy 拍数不得多于未跳过的任务 0，差值如实打印。
+  runSeqCase(" [S8 osFmtKeep skip]", Seq(seqParams(32, 64, "osm1_seq_keep"),
+      seqParams(32, 64, "osm1_seq_keep", osFmtKeep = true),
+      seqParams(32, 64, "osm1_seq_keep", osM1 = false),
+      seqParams(32, 64, "osm1_seq_keep", osFmtKeep = true))) { o =>
+    println(s"[$TAG] osFmtKeep 收益：busy 任务0(广播)=${o(0).perf("busy")} 任务1(跳过)=${o(1).perf("busy")} " +
+      s"任务3(WS 后跳过)=${o(3).perf("busy")} → 节省 ${o(0).perf("busy") - o(1).perf("busy")} 拍")
+    withClue(s"[$TAG] 跳过广播的任务 busy 不得多于广播任务：") { o(1).perf("busy") should be <= o(0).perf("busy") }
+    assertSameC("OS#0 vs OS(keep)#1", o(0), o(1)); assertSameC("OS#0 vs OS(keep)#3", o(0), o(3)) }
+
+  // ㊾ 影子失配回落：WS INT8 → OS BF16(keep，fmt 失配须广播) → OS BF16 RTZ(keep，仅 rnd 失配须广播)。
+  //   错误跳过会让首行 PE 按 INT8 解 BF16 字，数值金锚即失配。
+  runSeqCase(" [S8 osFmtKeep fallback]", Seq(
+      seqParams(32, 64, "osm1_seq_keep_fallback", osM1 = false, aFmt = DataFormat.INT8, cFmt = DataFormat.INT32),
+      seqParams(32, 64, "osm1_seq_keep_fallback", osFmtKeep = true),
+      seqParams(32, 64, "osm1_seq_keep_fallback", osFmtKeep = true, rndMode = RoundingMode.RTZ))) { _ => () }
+
+  // ── S9 INT 族 OS：INT8 双 lane / INT4 四 lane / INT W4A8（B 经 DMA 逐 nibble sext 展开）。
+  //   整数累加与求和次序无关 ⟹ OS 与 WS 逐位一致（序列用例 assertSameC）。
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_int8.fst", caseTag = " [S9 osM1 INT8 multi K multi N]")
+
+  runCase(m = 1, n = 16, k = 32, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_int8_k32.fst", caseTag = " [S9 osM1 INT8 single K single N]")
+
+  runCase(m = 1, n = 48, k = 256, aFmt = DataFormat.INT4, bFmt = DataFormat.INT4, cFmt = DataFormat.INT32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_int4.fst", caseTag = " [S9 osM1 INT4 multi K three N]")
+
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.INT8, bFmt = DataFormat.INT4, cFmt = DataFormat.INT32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_int_w4a8.fst", caseTag = " [S9 osM1 INT W4A8]")
+
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true, bpPeriod = 7,
+          wave = "sim/debug/quick_osm1_int8_bp.fst", caseTag = " [S9 osM1 INT8 ABC backpressure]")
+
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.INT8, bFmt = DataFormat.INT4, cFmt = DataFormat.INT32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true, bpPeriod = 5,
+          wave = "sim/debug/quick_osm1_int_w4a8_bp.fst", caseTag = " [S9 osM1 INT W4A8 ABC backpressure]")
+
+  // INT 族 OS→WS→OS：同张量两种数据流须逐位一致。
+  Seq((DataFormat.INT8, DataFormat.INT8, 128), (DataFormat.INT4, DataFormat.INT4, 128),
+      (DataFormat.INT8, DataFormat.INT4, 128)).foreach { case (af, bf, k) =>
+    val (an, bn) = (fmtName(af), fmtName(bf))
+    val tag = s"osm1_seq_${an}_$bn".toLowerCase
+    def sp(os: Boolean) = seqParams(32, k, tag, osM1 = os, aFmt = af, cFmt = DataFormat.INT32, bFmt = Some(bf))
+    runSeqCase(s" [S9 OS->WS->OS $an x $bn]", Seq(sp(true), sp(false), sp(true))) { o =>
+      assertSameC("OS#0 vs WS#1", o(0), o(1)); assertSameC("OS#0 vs OS#2", o(0), o(2)) }
+  }
+
+  // ── S9 MX/FP8/W4A8 OS：scaleA 字节随 A lane、scaleB 字节随各列 B lane 选择；纯 FP8 两侧恒 127。
+  //   OS 沿 K 串行累加、WS 沿 K-lane 树形归约 ⟹ 浮点结果与 WS 不保证逐位一致，两者各自对同一
+  //   张量金锚（同一容差）比对，OS/WS 位差在序列用例中打印。aBlk/bBlk 独立取值以区分两侧字节选择。
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 32, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_mx8.fst", caseTag = " [S9 osM1 MX8 multi K multi N]")
+
+  runCase(m = 1, n = 48, k = 64, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.FP32,
+          aBlk = 32, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_mx8_n48.fst", caseTag = " [S9 osM1 MX8 three N]")
+
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.MXE2M1, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.FP32,
+          aBlk = 32, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_mx4.fst", caseTag = " [S9 osM1 MX4 multi K multi N]")
+
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 32, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_mx_w4a8.fst", caseTag = " [S9 osM1 MX W4A8]")
+
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.FP8E4M3, bFmt = DataFormat.FP8E4M3, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_fp8_e4m3.fst", caseTag = " [S9 osM1 FP8 E4M3]")
+
+  runCase(m = 1, n = 16, k = 64, aFmt = DataFormat.FP8E5M2, bFmt = DataFormat.FP8E5M2, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_fp8_e5m2.fst", caseTag = " [S9 osM1 FP8 E5M2]")
+
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 32, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true, bpPeriod = 7,
+          wave = "sim/debug/quick_osm1_mx8_bp.fst", caseTag = " [S9 osM1 MX8 five-channel backpressure]")
+
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.FP32,
+          aBlk = 32, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true, bpPeriod = 5,
+          wave = "sim/debug/quick_osm1_mx_w4a8_bp.fst", caseTag = " [S9 osM1 MX W4A8 five-channel backpressure]")
+
+  // 负向：osM1 合法形状下反向混配 A=MX4×B=MX8 → errCode 3（高于 errCode 14 链首）。
+  runCase(m = 1, n = 32, k = 64, aFmt = DataFormat.MXE2M1, bFmt = DataFormat.MXE4M3, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_rev_mix_err3.fst", caseTag = " [S9 osM1 neg reverse-mix errCode3]")
+
+  // MX/FP8 OS→WS→OS：两次 OS 须逐位一致（无跨任务残留）；OS 与 WS 均过金锚，位差只打印。
+  Seq((DataFormat.MXE4M3, DataFormat.MXE5M2, 128, 0, 1), (DataFormat.MXE2M1, DataFormat.MXE2M1, 128, 1, 0),
+      (DataFormat.MXE4M3, DataFormat.MXE2M1, 128, 0, 1), (DataFormat.FP8E4M3, DataFormat.FP8E4M3, 128, 0, 0),
+      (DataFormat.FP8E5M2, DataFormat.FP8E5M2, 64, 0, 0)).foreach { case (af, bf, k, aSel, bSel) =>
+    val (an, bn) = (fmtName(af), fmtName(bf))
+    val tag = s"osm1_seq_${an}_$bn".toLowerCase
+    def sp(os: Boolean) = seqParams(32, k, tag, osM1 = os, aFmt = af, cFmt = DataFormat.FP32, bFmt = Some(bf),
+      aBlkSel = aSel, bBlkSel = bSel)
+    runSeqCase(s" [S9 OS->WS->OS $an x $bn]", Seq(sp(true), sp(false), sp(true))) { o =>
+      reportBitDiff(s"$an x $bn K$k", o(0), o(1)); assertSameC("OS#0 vs OS#2", o(0), o(2)) }
+  }
+
+  // 跨族切换 MX→INT→MX：scale 通路在 INT 任务中关闭、回到 MX 后重新按字节选择，首尾 OS 逐位一致。
+  runSeqCase(" [S9 OS cross-format MX->INT->MX]", Seq(
+      seqParams(32, 128, "osm1_seq_mx_int_mx", aFmt = DataFormat.MXE4M3, bFmt = Some(DataFormat.MXE5M2), bBlkSel = 1),
+      seqParams(32, 128, "osm1_seq_mx_int_mx", aFmt = DataFormat.INT8, cFmt = DataFormat.INT32),
+      seqParams(32, 128, "osm1_seq_mx_int_mx", aFmt = DataFormat.MXE4M3, bFmt = Some(DataFormat.MXE5M2), bBlkSel = 1))) { o =>
+    assertSameC("OS MX#0 vs OS MX#2", o(0), o(2)) }
+
+  // ── S10 OS epilogue：bias 在启动拍按自然列序注入首行 psum；rqM 经 staging 提交后该 tile 才提交 C 行；
+  //   每 N tile 提交拍重取下一 tile 的 bias/rqM。rqM 激励按 lane%6 布饱和角点，多 tile 下列/tile 错位必失配。
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT8,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true, bpPeriod = 7,
+          biasOn = true, requantOn = true, rqShift = 17, rqZp = 5,
+          wave = "sim/debug/quick_osm1_rq_int8_bias_bp.fst", caseTag = " [S10 osM1 bias+requant INT8 backpressure]")
+
+  runCase(m = 1, n = 48, k = 64, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT8,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          biasOn = true, requantOn = true, reluOn = true, rqShift = 13, rqZp = 0,
+          wave = "sim/debug/quick_osm1_rq_relu_int8.fst", caseTag = " [S10 osM1 bias+requant+relu INT8 three N]")
+
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT4,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true, bpPeriod = 5,
+          requantOn = true, rqShift = 17, rqZp = -3,
+          wave = "sim/debug/quick_osm1_rq_int4_bp.fst", caseTag = " [S10 osM1 requant INT4 backpressure]")
+
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT4,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          requantOn = true, reluOn = true, rqShift = 17, rqZp = -3,
+          wave = "sim/debug/quick_osm1_rq_relu_int4.fst", caseTag = " [S10 osM1 requant+relu INT4]")
+
+  runCase(m = 1, n = 32, k = 64, aFmt = DataFormat.INT8, bFmt = DataFormat.INT4, cFmt = DataFormat.INT8,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          biasOn = true, requantOn = true, rqShift = 17, rqZp = 5,
+          wave = "sim/debug/quick_osm1_intw4a8_rq.fst", caseTag = " [S10 osM1 INT W4A8 bias+requant]")
+
+  // 非 requant 的 INT8 输出：bias 叠加后 |acc| 常超 127 ⟹ 截断回绕（与 requant 饱和对照）。
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT8,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          biasOn = true, wave = "sim/debug/quick_osm1_bias_int8_wrap.fst", caseTag = " [S10 osM1 bias INT8 wrap]")
+
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          reluOn = true, wave = "sim/debug/quick_osm1_relu_int32.fst", caseTag = " [S10 osM1 relu-only INT32]")
+
+  // MX：bias 走 fp32→lazy40 基底，与 scaleA 共 dmaScaleA 端口交错取数；量化输出覆盖 cvt/scaleC 链。
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 32, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true, bpPeriod = 7,
+          biasOn = true, wave = "sim/debug/quick_osm1_bias_mx8_bp.fst", caseTag = " [S10 osM1 bias MX8 backpressure]")
+
+  runCase(m = 1, n = 32, k = 64, aFmt = DataFormat.MXE5M2, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.MXE4M3,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          biasOn = true, wave = "sim/debug/quick_osm1_bias_mx_quant.fst", caseTag = " [S10 osM1 bias MX8 quant]")
+
+  runCase(m = 1, n = 32, k = 64, aFmt = DataFormat.BF16, bFmt = DataFormat.BF16, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          biasOn = true, wave = "sim/debug/quick_osm1_bias_bf16.fst", caseTag = " [S10 osM1 bias BF16]")
+
+  // N 补齐：寄存器 N=Nprog，padding 列 B/bias/rqM 显式写零；全写回范围与前 Nlogical 列分别对账。
+  runCase(m = 1, n = 16, k = 64, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT8,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          biasOn = true, requantOn = true, rqShift = 17, rqZp = 5, nLogical = 1,
+          wave = "sim/debug/quick_osm1_pad_n1.fst", caseTag = " [S10 osM1 pad Nlogical=1 bias+requant]")
+
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true, bpPeriod = 7,
+          biasOn = true, nLogical = 17,
+          wave = "sim/debug/quick_osm1_pad_n17_int.fst", caseTag = " [S10 osM1 pad Nlogical=17 bias INT32 backpressure]")
+
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 32, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          biasOn = true, nLogical = 17,
+          wave = "sim/debug/quick_osm1_pad_n17_mx.fst", caseTag = " [S10 osM1 pad Nlogical=17 bias MX8]")
+
+  runCase(m = 32, n = 32, k = 64, aFmt = DataFormat.INT8, bFmt = DataFormat.INT8, cFmt = DataFormat.INT8,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1),
+          biasOn = true, requantOn = true, rqShift = 17, rqZp = 5, nLogical = 17,
+          wave = "sim/debug/quick_ws_pad_n17_rq.fst", caseTag = " [S10 WS pad Nlogical=17 bias+requant]")
+
+  // 整数 epilogue OS→WS→OS：bias/requant 后仍逐位一致；跨任务 rqM 提交与 bias 重取无残留。
+  Seq((DataFormat.INT8, DataFormat.INT8, false), (DataFormat.INT8, DataFormat.INT4, true)).foreach { case (af, bf, relu) =>
+    val (an, bn) = (fmtName(af), fmtName(bf))
+    val tag = s"osm1_seq_rq_${an}_$bn".toLowerCase
+    def sp(os: Boolean) = seqParams(32, 128, tag, osM1 = os, aFmt = af, cFmt = DataFormat.INT8, bFmt = Some(bf))
+      .copy(biasOn = true, requantOn = true, reluOn = relu, rqShift = 17, rqZp = 5)
+    runSeqCase(s" [S10 OS->WS->OS bias+requant $an x $bn]", Seq(sp(true), sp(false), sp(true))) { o =>
+      assertSameC("OS#0 vs WS#1", o(0), o(1)); assertSameC("OS#0 vs OS#2", o(0), o(2)) }
+  }
+
   /** 编译期配置（totalN=16；cDmaExtW 默认 256；缓冲深度 2048；scaleBufferDepth=64）。
     * supportedFmts 不显式传入、回落 WorkerBeeConfig 默认集（含 MXE2M1 ⟹ hasMx4=true，
     *   fp4 的 quad-lane 与混配 errCode 3/8 两支真的会 elaborate）。
@@ -377,7 +636,7 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
     * 派生量：totalN=16、cEffW=40、cScaleRowW=8。
     * 【两条 require】require(!hasMx4 || hasMx8) 与 require(!hasMx8 || hasMx4) 合起来钉死
     *   hasMx4 <=> hasMx8；本 cfg 两者皆真。 */
-  private val cfg = WorkerBeeConfig(arrayN = 8, clusterM = 2, aW = 16, bW = 16, cW = 40,
+  private val cfg = WorkerBeeConfig(arrayN = 16, arrayM = 16, aW = 16, bW = 16, cW = 40,
     aBufferDepth = 2048, bBufferDepth = 2048, cBufferDepth = 2048, scaleBufferDepth = 64)
   // 套件级舍入模式，同时是 runCase 的 per-case `rnd` 形参的默认值来源；要单独换某一条
   //   用例的舍入模式，请在那条 runCase 调用里传 `rnd = RoundingMode.RDN/RUP/...`，
@@ -411,6 +670,15 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
   def runCase(m: Int, n: Int, k: Int, aFmt: DataFormat.Type, bFmt: DataFormat.Type, cFmt: DataFormat.Type,
               aBlk: Int, bBlk: Int, cBlk: Int, addrMode: AddrMode.Type,
               loadW: Option[Int] = None,   // None = 按 isMx(aFmt)||isMx(bFmt) 自动推导（MX 强制 1）
+              // OS-M1 模式位 reg5[31]。合法组合 = M=1 ∧ loadW=1；其余形状 errCode 14 拒绝
+              //   （最低优先级，叠加其它错误归因到具体码）。正向 osM1 与 WS 同一数值金锚，
+              //   另断言每 N tile 恰一次 C 行提交。测试名不含 osM1 ⟹ osM1 用例须带 caseTag 区名。
+              osM1: Boolean = false,
+              // reg5[27]：与上一任务 {aFmt,bFmt,rnd} 相同时跳过 OS 格式广播；纯性能提示，
+              //   不改数值金锚与 errCode。
+              osFmtKeep: Boolean = false,
+              // >0 时 A/B/C/scaleA/scaleB 五通道 req.ready 周期性拉低（见 runTasks）。测试名不含本参数。
+              bpPeriod: Int = 0,
               seed: Long = 1234L,          // 激励随机种子（固定可复现）
               strictAddr: Boolean = true,  // true = 地址对账失配判失败（仍是收集-后断言，一次看全所有失配点）
               maxCycles: Long = 20000L,    // 仿真拍数上限（量化输出内部再抬到 >= 20000）
@@ -440,6 +708,8 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
               rqMBase: Long = RQM_BASE,
               rqShift: Int = 0,
               rqZp: Int = 0,
+              // 软件逻辑列数（0 = 全 n 列）；>0 时 n 取 Nprog 且 padding 列输入全零（见 DebugParams）
+              nLogical: Int = 0,
               // caseTag is appended to the ScalaTest test NAME. It exists for exactly one
               //   reason: two runCase calls with identical (m,n,k,aFmt,bFmt,cFmt,blks,addrMode)
               //   build the SAME test name, and ScalaTest rejects that while the suite is being
@@ -455,13 +725,37 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
               caseTag: String = ""): Unit = {
     val lw = loadW.getOrElse(if (isMxAny(aFmt) || isMxAny(bFmt)) 1 else 0)
     it should s"run M=$m N=$n K=$k $aFmt x $bFmt -> $cFmt (blk $aBlk/$bBlk/$cBlk, addrMode=$addrMode)$caseTag" in {
-      runQuick(DebugParams(m = m, n = n, k = k, aFmt = aFmt, bFmt = bFmt, cFmt = cFmt, loadWMode = lw != 0,
+      runTasks(Seq(DebugParams(m = m, n = n, k = k, aFmt = aFmt, bFmt = bFmt, cFmt = cFmt, loadWMode = lw != 0,
         aMxBlkSel = selOf("aBlk", aBlk), bMxBlkSel = selOf("bBlk", bBlk), cMxBlkSel = selOf("cBlk", cBlk),
         addrModeSel = addrMode.litValue.toInt, rnd = rnd.litValue.toInt, seed = seed, strictAddr = strictAddr,
         maxCycles = maxCycles.toInt, waveTarget = wave, testHint = s"run-M-$m-N-$n-K-$k", bBase = bBase,
         biasOn = biasOn, biasBase = biasBase,
-        requantOn = requantOn, reluOn = reluOn, rqMBase = rqMBase, rqShift = rqShift, rqZp = rqZp)) }
+        requantOn = requantOn, reluOn = reluOn, rqMBase = rqMBase, rqShift = rqShift, rqZp = rqZp,
+        osM1 = osM1, osFmtKeep = osFmtKeep, nLogical = nLogical)), bpPeriod) }
   }
+
+  /** 同一 DUT 复位一次后连跑 ps 全部任务（任务间不复位），check 拿到全部任务的跑后事实做跨任务断言。
+    * 测试名由各任务模式/格式/形状拼接，caseTag 区分同序列。 */
+  private def runSeqCase(caseTag: String, ps: Seq[DebugParams])(check: Seq[TaskOutcome] => Unit): Unit = {
+    val desc = ps.map(p => s"${if (p.osM1) "OS" else "WS"}(${p.aFmt} M${p.m} N${p.n} K${p.k})").mkString(" -> ")
+    it should s"run task sequence $desc$caseTag" in { check(runTasks(ps)) }
+  }
+
+  /** "DataFormat(8=INT8)" → "INT8"：用于用例名与波形文件名。 */
+  private def fmtName(f: DataFormat.Type): String = f.toString.dropWhile(_ != '=').drop(1).takeWhile(_ != ')')
+
+  /** M=1、loadW=1、同族 A/B 的序列任务参数（波形目标 sim/debug/quick_$tag.fst）。
+    * 在类体用例注册期求值，只能引用 WbDebugModel 常量，不得引用本类后定义的 val。 */
+  private def seqParams(n: Int, k: Int, tag: String, osM1: Boolean = true, osFmtKeep: Boolean = false,
+                        aFmt: DataFormat.Type = DataFormat.BF16, cFmt: DataFormat.Type = DataFormat.FP32,
+                        rndMode: RoundingMode.Type = RoundingMode.RNE, seed: Long = 1234L,
+                        bFmt: Option[DataFormat.Type] = None, aBlkSel: Int = 0, bBlkSel: Int = 0,
+                        cBlkSel: Int = 0): DebugParams =
+    DebugParams(m = 1, n = n, k = k, aFmt = aFmt, bFmt = bFmt.getOrElse(aFmt), cFmt = cFmt, loadWMode = true,
+      aMxBlkSel = aBlkSel, bMxBlkSel = bBlkSel, cMxBlkSel = cBlkSel, addrModeSel = AddrMode.MAT.litValue.toInt,
+      rnd = rndMode.litValue.toInt, seed = seed, strictAddr = true, maxCycles = 20000,
+      waveTarget = s"sim/debug/quick_$tag.fst", testHint = "run-task-sequence",
+      osM1 = osM1, osFmtKeep = osFmtKeep)
 
 
   // ══ ① 运行前配置体检：镜像 WorkerBeeCalcConfig 的 errComb/errCodeComb 裸块（RTL 真实口径）══
@@ -557,6 +851,10 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
             "word boundary and silently corrupts the per-channel multipliers. " +
             "Suggestion: keep rqMBase a multiple of 4 (default RQM_BASE is aligned)."
       }
+    case 14 => s"osM1=1 仅支持 M=1 且 loadWMode=1（OS 升序 DMA 与首行向右脉动契约只在 B 转置布局下成立）：" +
+      s"当前 M=${p.m}、loadWMode=${if (p.loadWMode) 1 else 0}。 " +
+      "errCode 14 为最低优先级——叠加其它配置错误时归因到具体码（3/8/11 等覆盖它）。 " +
+      "建议：osM1 运行取 M=1 且 loadW=Some(1)；其余形状保持 osM1=0 走 WS 路径"
     case _ => s"Unrecognized errCode $c -- not registered in errExplain (possibly a new code not yet synced)"
   }
   /** ② 打印体检结论 + 生效配置摘要 + 派生几何（一次打全，便于对着波形看） */
@@ -596,7 +894,56 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
     println(s"[$TAG] FAIL 数据文件已落盘: $b.txt / ${b}_A.hex / ${b}_B.hex") }
 
   // ══ 主运行器：③ 镜像+golden → ④ 仿真+六通道收集式地址对账 → ⑤ 逐元素比对 → ⑥⑦ 波形/回读 → ⑧ 收尾 ══
-  private def runQuick(p: DebugParams): Unit = {
+  private val perfNames = Seq("dmaA", "dmaB", "dmaC", "scaleA", "scaleB", "scaleC",
+    "array", "stallA", "stallB", "epilogue", "busy")
+
+  /** 同一 DUT 只复位一次、按序跑完 ps 中全部任务（任务间不复位，残留状态即被测对象）。
+    * bpPeriod>0：A/B/C/scaleA/scaleB 五通道 req.ready 以 bpPeriod 为周期确定性拉低约 1/3 拍，各通道相位错开。 */
+  private def runTasks(ps: Seq[DebugParams], bpPeriod: Int = 0): Seq[TaskOutcome] = {
+    require(ps.nonEmpty)
+    val outs = mutable.ArrayBuffer[TaskOutcome]()
+    try {
+      simulate(new WorkerBee(cfg)) { dut =>
+        // ---- Reset：六个 DMA 通道全置 idle（req.ready=1、rsp.valid=0）----
+        Seq(dut.io.dmaA.rsp, dut.io.dmaB.rsp).foreach { r => r.valid.poke(false.B); r.payload.data.poke(0.U); r.payload.err.poke(false.B) }
+        Seq(dut.io.dmaScaleA.get.rsp, dut.io.dmaScaleB.get.rsp).foreach { r => r.valid.poke(false.B); r.payload.data.poke(0.U); r.payload.err.poke(false.B) }
+        Seq(dut.io.dmaC.rsp, dut.io.dmaCScale.get.rsp).foreach { r => r.valid.poke(false.B); r.payload.err.poke(false.B) }
+        Seq(dut.io.dmaA.req, dut.io.dmaB.req, dut.io.dmaC.req, dut.io.dmaScaleA.get.req, dut.io.dmaScaleB.get.req,
+          dut.io.dmaCScale.get.req).foreach(_.ready.poke(true.B))
+        dut.io.resp.ready.poke(true.B); dut.io.cmd.foreach(_.valid.poke(false.B))
+        dut.reset.poke(true.B); dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
+        ps.zipWithIndex.foreach { case (p, i) =>
+          if (ps.size > 1) println(s"[$TAG] ───────── 任务 #$i/${ps.size}（同一 DUT，不复位）─────────")
+          outs += runTask(dut, p, bpPeriod)
+        }
+      }
+    } finally {
+      // ⑥ 波形：成功也 dump；失败/超时同样走这里（simulate 块退出后 verilator 才 flush trace.fst）
+      val head = ps.head
+      copyWave(SUITE, head.testHint, head.waveTarget)
+      val wb = try Files.size(Paths.get(head.waveTarget)) catch { case _: Throwable => -1L }
+      outs.zipWithIndex.foreach { case (o, i) =>
+        val who = if (ps.size > 1) s"task #$i " else ""
+        if (o.passed) println(s"[$TAG] ${who}PASS: " + o.mismatch.map(mm => s"${o.elems - mm}/${o.elems} elements matched, laneViolations=${o.laneViolations.getOrElse(-1)}")   // ⑧ 收尾行
+          .getOrElse(s"negative path errCode=${o.errCode} hit prediction, hardware did not compute") +
+          s", addr check all green (mismatch ${o.addrBadCnt} beats), reg readback OK, waveform ${head.waveTarget} = $wb bytes")
+        else {
+          val first = o.cmpDetails.headOption.getOrElse(if (!o.done) s"超时未 done（cycles=${o.cycles}/${o.maxCycles}）"
+            else s"errSeen=${o.errSeen} errCode=${o.errCode} regRbOk=${o.regRbOk}")
+          println(s"[$TAG] ${who}FAIL: elemMismatch=${o.mismatch.getOrElse(-1)}/${o.elems} " +
+            s"laneViolations=${o.laneViolations.getOrElse(-1)}, " +
+            s"addr mismatch ${o.addrBadCnt} beats, first: $first, waveform ${head.waveTarget} ($wb bytes)")
+          dumpFailFiles(o.p, o.plan, o.addrBad, o.cmpDetails) }
+      }
+      if (outs.size < ps.size) println(s"[$TAG] 任务 #${outs.size}/${ps.size} 异常中止，其后任务未运行")
+    }
+    // 硬断言放在 finally 之后：确保波形与数据文件已落盘再报红
+    outs.zipWithIndex.foreach { case (o, i) =>
+      withClue(if (ps.size > 1) s"[$TAG] 任务 #$i: " else "") { assertOutcome(o) } }
+    outs.toSeq
+  }
+
+  private def runTask(dut: WorkerBee, p: DebugParams, bpPeriod: Int): TaskOutcome = {
     val predicted = hwErrCode(p)                     // ① 体检。负向路径不跑金锚 validate：硬件不进计算，
     if (predicted.isEmpty) validate(p, cfg.totalN, cfg.hasMx4)   //   且 validate 的 require 会先于仿真抛掉、用户看不到 errCode
     val plan = new Plan(p, cfg)
@@ -607,212 +954,239 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
     //   才能做 lane 级逐字节对账。sLog（scaleC 通道）保持二元组：端口宽 1 字节
     //   (rowW=8 @ totalN=16) ⟹ lane 窗口退化为单 lane、移位恒 0，不在 lane 偏移契约内。
     val cLog = mutable.ArrayBuffer[WbSimCommon.CWriteBeat](); val sLog = mutable.ArrayBuffer[(Long, BigInt)]()
-    val addrBad = mutable.ArrayBuffer[String](); var addrBadCnt = 0; var cycle = 0; var regRbMsg = ""; var passed = false
-    var regRbOk = false; var done = false; var errSeen = false; var errCode = -1; var cmp: Option[plan.CmpSummary] = None
-    // perf 采样累加器（供跑后打印与硬断言）
-    val perfNames = Seq("dmaA", "dmaB", "dmaC", "scaleA", "scaleB", "scaleC",
-      "array", "stallA", "stallB", "epilogue", "busy")
+    val addrBad = mutable.ArrayBuffer[String](); var addrBadCnt = 0; var cycle = 0; var regRbMsg = ""
+    var regRbOk = false; var done = false; var errSeen = false; var errCode = -1
     val perfCnt = Array.fill(perfNames.size)(0)
-    try {
-      simulate(new WorkerBee(cfg)) { dut =>
-        // ④ 地址对账只收集不抛（strictAddr 决定跑完后是否判失败），一次能看到全部失配点
-        def chk(ch: String, i: Int, hw: Long, exp: Seq[Long]): Unit = if (i < exp.size && hw != exp(i)) {
-          addrBadCnt += 1
-          if (addrBad.size < 16) addrBad += f"$ch beat#$i hw=0x$hw%X exp=0x${exp(i)}%X delta=${hw - exp(i)}%d" }
-        /** 读通道统一驱动：req.valid 拍按【请求地址】从字节镜像供数（内存保真，绝不按 beat 序号发数）+ 地址对账 */
-        def rdCh(chan: String, cnt: Int, exp: Seq[Long], vld: => Boolean, adr: => Long,
-                 rsp: (Boolean, BigInt) => Unit, at: Long => BigInt): Int =
-          if (vld && cnt < exp.size) { val a = adr; chk(chan, cnt, a, exp); rsp(true, at(a)); cnt + 1 }
-          else { rsp(false, BigInt(0)); cnt }
-        // ---- Reset：六个 DMA 通道全置 idle（req.ready=1、rsp.valid=0）----
-        Seq(dut.io.dmaA.rsp, dut.io.dmaB.rsp).foreach { r => r.valid.poke(false.B); r.payload.data.poke(0.U); r.payload.err.poke(false.B) }
-        Seq(dut.io.dmaScaleA.get.rsp, dut.io.dmaScaleB.get.rsp).foreach { r => r.valid.poke(false.B); r.payload.data.poke(0.U); r.payload.err.poke(false.B) }
-        Seq(dut.io.dmaC.rsp, dut.io.dmaCScale.get.rsp).foreach { r => r.valid.poke(false.B); r.payload.err.poke(false.B) }
-        Seq(dut.io.dmaA.req, dut.io.dmaB.req, dut.io.dmaC.req, dut.io.dmaScaleA.get.req, dut.io.dmaScaleB.get.req,
-          dut.io.dmaCScale.get.req).foreach(_.ready.poke(true.B))
-        dut.io.resp.ready.poke(true.B); dut.io.cmd.foreach(_.valid.poke(false.B))
-        dut.reset.poke(true.B); dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
-        // ---- 命令 helper：等待真实 fire/response，再消费响应 ----
-        def cmd(op: WorkerBeeOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
-          transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
-        }
-        def readReg(a: Int): BigInt = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, a)
-        // 配置索引 0..11 紧排：M/NK/A/B/C/CONTROL/ScaleA/ScaleB/ScaleC/Bias/RqM/RqParam。
-        // STATUS 独立移到 0x1E，IRQ 寄存器为 0x30..0x34。
-        cmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, p.m, p.n.toLong | (p.k.toLong << 16))
-        // 基址取 p.aBase/p.bBase（与 Plan.prepare 内存镜像同源）；负例 ⑤ 借此把 bAddr%32!=0 送进守护。
-        cmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, p.aBase, p.bBase)
-        cmd(WorkerBeeOp.REG_WRITE2, 0x04, 0x05, C_BASE, p.controlWord5)
-        cmd(WorkerBeeOp.REG_WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE); cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
-        // reg9 = biasAddr（biasOn=false 时不写：硬件默认 0、该通路不激活）。
-        if (p.biasOn) cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.BIAS_REG_ADDR, 0x00, p.biasBase, 0L)
-        // reg10 = rqMBase、reg11 = [31:16]zp + [5:0]shift（requantOn=false 时不写；
-        //   reluOn 位在 reg5[15] 已随控制字写入，无独立槽位）。
-        if (p.requantOn) {
-          cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.RQM_REG_ADDR, 0x00, p.rqMBase, 0L)
-          cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.RQ_PARAM_REG_ADDR, 0x00, p.controlWord14, 0L) }
-        // ⑦ addrMode / 格式字回读对账：addrMode 无硬件消费者，只能靠回读证明「确实写进去了」。
-        //   控制字全部收敛到 reg5 单寄存器 ⟹ 一次回读即覆盖 loadWMode/三 MxBlk/warmup/
-        //   warmdown/rnd/三 addrMode/三 fmt 共 19 个位域。regRbOk 是硬断言。
-        val rb5 = readReg(0x05).toLong
-        regRbOk = rb5 == p.controlWord5
-        regRbMsg = f"reg5 wr=0x${p.controlWord5}%08X rd=0x$rb5%08X (addrMode at reg5[14:12], rnd at reg5[18:16])"
-        // reg9（biasAddr）回读对账：biasOn 位本身已由 reg5 bit30 覆盖，此处只补 biasAddr 槽位。
-        if (p.biasOn) {
-          val rb12 = readReg(WbSimCommon.BIAS_REG_ADDR).toLong
-          val rb12Ok = rb12 == (p.biasBase & 0xFFFFFFFFL)
-          regRbOk = regRbOk && rb12Ok
-          regRbMsg += f"; reg9 wr=0x${p.biasBase & 0xFFFFFFFFL}%08X rd=0x$rb12%08X" }
-        // reg10/reg11 回读对账：requantOn/reluOn 位本身已由 reg5 bit29/bit15 覆盖，此处补
-        //   rqMBase 与 zp/shift 槽位；reg11 回读 = Cat(rqZp.asUInt, 10'b0, rqShift)，负 zp 以补码位型对账。
-        if (p.requantOn) {
-          val rb13 = readReg(WbSimCommon.RQM_REG_ADDR).toLong
-          val rb14 = readReg(WbSimCommon.RQ_PARAM_REG_ADDR).toLong
-          val rb13Ok = rb13 == (p.rqMBase & 0xFFFFFFFFL)
-          val rb14Ok = rb14 == (p.controlWord14 & 0xFFFFFFFFL)
-          regRbOk = regRbOk && rb13Ok && rb14Ok
-          regRbMsg += f"; reg10 wr=0x${p.rqMBase & 0xFFFFFFFFL}%08X rd=0x$rb13%08X; " +
-            f"reg11 wr=0x${p.controlWord14 & 0xFFFFFFFFL}%08X rd=0x$rb14%08X" }
-        println(s"[$TAG] 寄存器回读对账：$regRbMsg → ${if (regRbOk) "一致 ✓" else "不一致 ✗"}")
-        // START 不清历史中断；每次任务显式 W1C 清 RAW 并 unmask。
-        prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
-        launchStart(dut.clock, dut.io.cmd(0))
-        var aS = 0; var bS = 0; var saS = 0; var sbS = 0; var cB = 0; var csB = 0; var pollSt = 0; var pollCool = 0
-        // TB 代行外部 PMU：主循环逐拍采样 io.perf 各电平累加（采样窗 = EXECUTE 起至 done/err/超时）
-        def perfPeek: Seq[Boolean] = Seq(
-          dut.io.perf.dmaA.peek().litToBoolean, dut.io.perf.dmaB.peek().litToBoolean,
-          dut.io.perf.dmaC.peek().litToBoolean, dut.io.perf.scaleA.peek().litToBoolean,
-          dut.io.perf.scaleB.peek().litToBoolean, dut.io.perf.scaleC.peek().litToBoolean,
-          dut.io.perf.array.peek().litToBoolean, dut.io.perf.stallA.peek().litToBoolean,
-          dut.io.perf.stallB.peek().litToBoolean, dut.io.perf.epilogue.peek().litToBoolean,
-          dut.io.perf.busy.peek().litToBoolean)
-        // dmaScaleA 通道地址全量记录：biasOn 时该端口被 drain-then-steal 仲裁复用
-        //   （bias FSM 与 scaleA DMA 交错发请求，交错序取决于硬件 FSM 时序、金锚不模拟），
-        //   逐拍位置对账不成立 ⟹ 跑后按地址域拆流对账（见 while 循环后的 seqCmp）。
-        val saAddrLog = mutable.ArrayBuffer[Long]()
-        def rdA(v: Boolean, d: BigInt): Unit = { dut.io.dmaA.rsp.valid.poke(v.B); dut.io.dmaA.rsp.payload.data.poke(d.U) }
-        def rdB(v: Boolean, d: BigInt): Unit = { dut.io.dmaB.rsp.valid.poke(v.B); dut.io.dmaB.rsp.payload.data.poke(d.U) }
-        def rdSA(v: Boolean, d: BigInt): Unit = { dut.io.dmaScaleA.get.rsp.valid.poke(v.B); dut.io.dmaScaleA.get.rsp.payload.data.poke(d.U) }
-        def rdSB(v: Boolean, d: BigInt): Unit = { dut.io.dmaScaleB.get.rsp.valid.poke(v.B); dut.io.dmaScaleB.get.rsp.payload.data.poke(d.U) }
-        while (!done && !errSeen && cycle < maxCycles) {
-          aS = rdCh("dmaA", aS, plan.expAAddrSeq, dut.io.dmaA.req.valid.peek().litToBoolean,
-            dut.io.dmaA.req.payload.addr.peek().litValue.toLong, rdA, plan.beatAtA)
-          bS = rdCh("dmaB", bS, plan.expBAddrSeq, dut.io.dmaB.req.valid.peek().litToBoolean,
-            dut.io.dmaB.req.payload.addr.peek().litValue.toLong, rdB, plan.beatAtB)
-          // dmaScaleA 供数仍是「req.valid 拍按请求地址从内存镜像取数」（wordAt），但不以
-          //   超期望拍数断供：bias 流量与 scaleA 流量共用本端口，超拍/错拍由跑后拆流对账暴露。
-          if (dut.io.dmaScaleA.get.req.valid.peek().litToBoolean) {
-            val saAddr = dut.io.dmaScaleA.get.req.payload.addr.peek().litValue.toLong
-            saAddrLog += saAddr; rdSA(true, plan.wordAt(saAddr)); saS += 1
-          } else rdSA(false, BigInt(0))
-          sbS = rdCh("dmaScaleB", sbS, plan.expScaleBAddrSeq, dut.io.dmaScaleB.get.req.valid.peek().litToBoolean,
-            dut.io.dmaScaleB.get.req.payload.addr.peek().litValue.toLong, rdSB, plan.wordAt)
-          /** 写通道统一驱动：req.valid 拍记录 (addr,data) + 地址对账（scaleC 传空序列即自动跳过对账） */
-          def wrCh(ch: String, i: Int, exp: Seq[Long], on: Boolean, ad: => Long, da: => BigInt,
-                   ack: Boolean => Unit, log: mutable.ArrayBuffer[(Long, BigInt)]): Int =
-            if (on) { val a = ad; chk(ch, i, a, exp); log += ((a, da)); ack(true); i + 1 } else { ack(false); i }
-          /** dmaC 专用写通道驱动：在 wrCh 基础上额外 peek wstrb 并记入三元组日志，
-            * 使 WbSimCommon.auditCBeatLanes 的 lane 级逐字节对账拿得到选通位。 */
-          def wrChC(ch: String, i: Int, exp: Seq[Long], on: Boolean, ad: => Long, da: => BigInt,
-                    st: => BigInt, ack: Boolean => Unit,
-                    log: mutable.ArrayBuffer[WbSimCommon.CWriteBeat]): Int =
-            if (on) { val a = ad; chk(ch, i, a, exp); log += ((a, da, st)); ack(true); i + 1 } else { ack(false); i }
-          cB = wrChC("dmaC", cB, plan.expCAddrSeq, dut.io.dmaC.req.valid.peek().litToBoolean,
-            dut.io.dmaC.req.payload.addr.peek().litValue.toLong, dut.io.dmaC.req.payload.data.peek().litValue,
-            dut.io.dmaC.req.payload.strb.peek().litValue,
-            v => dut.io.dmaC.rsp.valid.poke(v.B), cLog)
-          csB = wrCh("dmaCScale", csB, if (isMxAny(p.cFmt)) plan.expCScaleAddrSeq else Seq.empty,
-            dut.io.dmaCScale.get.req.valid.peek().litToBoolean, dut.io.dmaCScale.get.req.payload.addr.peek().litValue.toLong,
-            dut.io.dmaCScale.get.req.payload.data.peek().litValue, v => dut.io.dmaCScale.get.rsp.valid.poke(v.B), sLog)
-          val (ps, pc, st) = irqPollStep(dut.io.cmd(0), dut.io.resp, pollSt, pollCool); pollSt = ps; pollCool = pc
-          st.foreach { s =>
-            errSeen = s.anyError
-            done = s.done
-          }
-          perfPeek.zipWithIndex.foreach { case (b, i) => if (b) perfCnt(i) += 1 }
-          dut.clock.step(); cycle += 1
-        }
-        dut.io.dmaC.rsp.valid.poke(false.B); dut.io.dmaCScale.get.rsp.valid.poke(false.B); dut.io.cmd.foreach(_.valid.poke(false.B))
-        if (errSeen) errCode = readReg(WbSimCommon.ERROR_CODE_REG_ADDR).toInt
-        if (predicted.isDefined && errSeen) {
-          readReg(WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
-          dut.io.status.inFlight.expect(false.B)
-        } else if (done && !errSeen) dut.io.status.inFlight.expect(false.B)
-        // dmaScaleA 跑后拆流对账（仅正向路径：负向路径硬件不进计算、无期望流量）。
-        //   bias 域 [biasBase, +nTiles*totalN*4) 与 rqM 域 [rqMBase, +nTiles*totalN*4) 内的
-        //   请求分别归 bias/rqM 流，其余归 scaleA 流（三域两两不相交：SA/BIAS/RQM_BASE 为
-        //   独立 64KB 段）；各自与 expBias/expRqM/expScaleAAddrSeq 保序逐拍比对，失配进
-        //   addrBad/addrBadCnt。biasOn=requantOn=false 时不拆流、整流对账。
-        val saBiasHw: Seq[Long] = {
-          val lo = p.biasBase; val hi = p.biasBase + plan.nTiles.toLong * cfg.totalN * 4
-          if (p.biasOn) saAddrLog.toSeq.filter(a => a >= lo && a < hi) else Seq.empty }
-        val saRqMHw: Seq[Long] = {
-          val lo = p.rqMBase; val hi = p.rqMBase + plan.nTiles.toLong * cfg.totalN * 4
-          if (p.requantOn) saAddrLog.toSeq.filter(a => a >= lo && a < hi) else Seq.empty }
-        val saScaleHw: Seq[Long] =
-          if (p.biasOn || p.requantOn) saAddrLog.toSeq.filterNot(a => saBiasHw.contains(a) || saRqMHw.contains(a))
-          else saAddrLog.toSeq
-        def seqCmp(ch: String, hw: Seq[Long], exp: Seq[Long]): Unit = {
-          val n = math.max(hw.size, exp.size); var i = 0
-          while (i < n) {
-            val h = if (i < hw.size) hw(i) else -1L; val e = if (i < exp.size) exp(i) else -1L
-            if (h != e) { addrBadCnt += 1
-              if (addrBad.size < 16) addrBad += f"$ch beat#$i hw=${if (h < 0) "MISSING" else f"0x$h%X"} exp=${if (e < 0) "MISSING" else f"0x$e%X"}" }
-            i += 1 } }
-        if (predicted.isEmpty) {
-          seqCmp("dmaScaleA/scaleA", saScaleHw, plan.expScaleAAddrSeq)
-          if (p.biasOn) seqCmp("dmaScaleA/bias", saBiasHw, plan.expBiasAddrSeq)
-          if (p.requantOn) seqCmp("dmaScaleA/rqM", saRqMHw, plan.expRqMAddrSeq) }
-        println(s"[$TAG] 运行结束: cycles=$cycle/$maxCycles done=$done err=$errSeen(errCode=$errCode)；beat A=$aS/${plan.expAAddrSeq.size} " +
-          s"B=$bS/${plan.expBAddrSeq.size} C=$cB/${plan.expCAddrSeq.size} sA=${saScaleHw.size}/${plan.expScaleAAddrSeq.size}" +
-          (if (p.biasOn) s" bias=${saBiasHw.size}/${plan.expBiasAddrSeq.size}" else "") +
-          (if (p.requantOn) s" rqM=${saRqMHw.size}/${plan.expRqMAddrSeq.size}" else "") +
-          s" sB=$sbS/${plan.expScaleBAddrSeq.size} sC=$csB/${plan.expCScaleAddrSeq.size}")
-        println(s"[$TAG] 六通道地址对账不一致拍数=$addrBadCnt（strictAddr=${p.strictAddr}）")
-        addrBad.foreach(s => println(s"[$TAG]   ADDR-DIFF $s"))
-        // 跑后 PMU 汇报：各观测电平的采样拍数与占空比（分母 = 主循环拍数 cycle）
-        println(s"[$TAG] perf 采样(cycles=$cycle)：" + perfNames.zip(perfCnt).map { case (n, c) =>
-          f"$n=$c%5d(${c * 100.0 / math.max(cycle, 1)}%.1f%%)" }.mkString(" "))
-        // ⑤ golden 逐元素比对；负向路径下硬件根本不该进计算，只核对 errCode
-        if (predicted.isDefined) { passed = errSeen && errCode == predicted.get && !done && regRbOk
-          println(s"[$TAG] 负向路径：体检预测 errCode=${predicted.get}，实测 err=$errSeen errCode=$errCode done=$done → ${if (passed) "符合预测 ✓" else "与预测不符 ✗"}") }
-        else if (!done) println(s"[$TAG] 超时：$maxCycles 拍内未观测到 IRQ_RAW.done")
-        else { val c = plan.compare(cLog.toSeq, sLog.toSeq); cmp = Some(c)
-          println(f"[$TAG] C compare: elemMismatch=${c.mismatch}/${c.elems} laneViolations=${c.laneViolations} " +
-            f"maxRelErr=${c.maxRelErr}%.3e maxAbsErr=${c.maxAbsErr}%.3e")
-          c.details.zipWithIndex.foreach { case (s, i) => println(s"[$TAG]   ${if (i == 0) "first mismatch" else "MISMATCH"} $s") }
-          passed = !errSeen && regRbOk && c.mismatch == 0 && c.laneViolations == 0 && (addrBadCnt == 0 || !p.strictAddr) }
-      }
-    } finally {
-      // ⑥ 波形：成功也 dump；失败/超时同样走这里（simulate 块退出后 verilator 才 flush trace.fst）
-      copyWave(SUITE, p.testHint, p.waveTarget)
-      val wb = try Files.size(Paths.get(p.waveTarget)) catch { case _: Throwable => -1L }
-      if (passed) println(s"[$TAG] PASS: " + cmp.map(c => s"${c.elems - c.mismatch}/${c.elems} elements matched, laneViolations=${c.laneViolations}")   // ⑧ 收尾行
-        .getOrElse(s"negative path errCode=${errCode} hit prediction, hardware did not compute") +
-        s", addr check all green (mismatch $addrBadCnt beats), reg readback OK, waveform ${p.waveTarget} = $wb bytes")
-      else {
-        val first = cmp.flatMap(_.details.headOption).getOrElse(if (!done) s"超时未 done（cycles=$cycle/$maxCycles）" else s"errSeen=$errSeen errCode=$errCode regRbOk=$regRbOk")
-        println(s"[$TAG] FAIL: elemMismatch=${cmp.map(_.mismatch).getOrElse(-1)}/${cmp.map(_.elems).getOrElse(p.m * p.n)} " +
-          s"laneViolations=${cmp.map(_.laneViolations).getOrElse(-1)}, " +
-          s"addr mismatch $addrBadCnt beats, first: $first, waveform ${p.waveTarget} ($wb bytes)")
-        dumpFailFiles(p, plan, addrBad.toSeq, cmp.map(_.details).getOrElse(Seq.empty)) }
+    // ④ 地址对账只收集不抛（strictAddr 决定跑完后是否判失败），一次能看到全部失配点
+    def chk(ch: String, i: Int, hw: Long, exp: Seq[Long]): Unit = if (i < exp.size && hw != exp(i)) {
+      addrBadCnt += 1
+      if (addrBad.size < 16) addrBad += f"$ch beat#$i hw=0x$hw%X exp=0x${exp(i)}%X delta=${hw - exp(i)}%d" }
+    /** 读通道统一驱动：req.fire 拍按【请求地址】从字节镜像供数（内存保真，绝不按 beat 序号发数）+ 地址对账 */
+    def rdCh(chan: String, cnt: Int, exp: Seq[Long], vld: => Boolean, adr: => Long,
+             rsp: (Boolean, BigInt) => Unit, at: Long => BigInt): Int =
+      if (vld && cnt < exp.size) { val a = adr; chk(chan, cnt, a, exp); rsp(true, at(a)); cnt + 1 }
+      else { rsp(false, BigInt(0)); cnt }
+    // ---- 命令 helper：等待真实 fire/response，再消费响应 ----
+    def cmd(op: WorkerBeeOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
+      transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
     }
-    // 硬断言放在 finally 之后：确保波形与数据文件已落盘再报红
-    withClue(s"[$TAG] 寄存器回读对账（$regRbMsg）：") { regRbOk should be(true) }
-    if (predicted.isDefined)
-      withClue(s"[$TAG] 体检预测硬件应以 errCode=${predicted.get} 拒绝（RTL 把 blk 三违约合并为 0，见文件头更正段）：") {
-        (errSeen, errCode, done) should be((true, predicted.get, false)) }
-    else {
-      withClue(s"[$TAG] 正向路径不应出现 IRQ_RAW error、须在 maxCycles=$maxCycles 内观测到 done：") { (errSeen, done) should be((false, true)) }
-      withClue(s"[$TAG] 六通道逐拍地址对账（语义模型 vs 硬件）：") {
-        if (p.strictAddr) addrBadCnt should be(0) else println(s"[$TAG] strictAddr=false → 失配 $addrBadCnt 拍只报告不判失败") }
-      withClue(s"[$TAG] C element-level golden compare (no tolerance relaxation, no anchor change): ") {
-        cmp.map(_.mismatch) should be(Some(0)) }
-      withClue(s"[$TAG] C lane-level AXI byte-lane audit (laneViolations): ") {
-        cmp.map(_.laneViolations) should be(Some(0)) }
-      // 正向路径合理性硬断言：done 已观测 ⟹ busy 与 array 采样必非零（否则 io.perf 接线断裂/采错位）
-      withClue(s"[$TAG] perf 端口合理性（正向路径 busy/array 采样须非零）：") {
-        perfCnt(perfNames.indexOf("busy")) should be > 0
-        perfCnt(perfNames.indexOf("array")) should be > 0 } }
+    def readReg(a: Int): BigInt = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, a)
+    // 配置索引 0..11 紧排：M/NK/A/B/C/CONTROL/ScaleA/ScaleB/ScaleC/Bias/RqM/RqParam。
+    // STATUS 独立移到 0x1E，IRQ 寄存器为 0x30..0x34。
+    cmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, p.m, p.n.toLong | (p.k.toLong << 16))
+    // 基址取 p.aBase/p.bBase（与 Plan.prepare 内存镜像同源）；负例 ⑤ 借此把 bAddr%32!=0 送进守护。
+    cmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, p.aBase, p.bBase)
+    cmd(WorkerBeeOp.REG_WRITE2, 0x04, 0x05, C_BASE, p.controlWord5)
+    cmd(WorkerBeeOp.REG_WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE); cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
+    // reg9 = biasAddr（biasOn=false 时不写：硬件默认 0、该通路不激活）。
+    if (p.biasOn) cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.BIAS_REG_ADDR, 0x00, p.biasBase, 0L)
+    // reg10 = rqMBase、reg11 = [31:16]zp + [5:0]shift（requantOn=false 时不写；
+    //   reluOn 位在 reg5[15] 已随控制字写入，无独立槽位）。
+    if (p.requantOn) {
+      cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.RQM_REG_ADDR, 0x00, p.rqMBase, 0L)
+      cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.RQ_PARAM_REG_ADDR, 0x00, p.controlWord14, 0L) }
+    // ⑦ addrMode / 格式字回读对账：addrMode 无硬件消费者，只能靠回读证明「确实写进去了」。
+    //   控制字全部收敛到 reg5 单寄存器 ⟹ 一次回读即覆盖全部控制位域。regRbOk 是硬断言。
+    val rb5 = readReg(0x05).toLong
+    regRbOk = rb5 == p.controlWord5
+    regRbMsg = f"reg5 wr=0x${p.controlWord5}%08X rd=0x$rb5%08X (addrMode at reg5[14:12], rnd at reg5[18:16])"
+    // reg9（biasAddr）回读对账：biasOn 位本身已由 reg5 bit30 覆盖，此处只补 biasAddr 槽位。
+    if (p.biasOn) {
+      val rb12 = readReg(WbSimCommon.BIAS_REG_ADDR).toLong
+      val rb12Ok = rb12 == (p.biasBase & 0xFFFFFFFFL)
+      regRbOk = regRbOk && rb12Ok
+      regRbMsg += f"; reg9 wr=0x${p.biasBase & 0xFFFFFFFFL}%08X rd=0x$rb12%08X" }
+    // reg10/reg11 回读对账：requantOn/reluOn 位本身已由 reg5 bit29/bit15 覆盖，此处补
+    //   rqMBase 与 zp/shift 槽位；reg11 回读 = Cat(rqZp.asUInt, 10'b0, rqShift)，负 zp 以补码位型对账。
+    if (p.requantOn) {
+      val rb13 = readReg(WbSimCommon.RQM_REG_ADDR).toLong
+      val rb14 = readReg(WbSimCommon.RQ_PARAM_REG_ADDR).toLong
+      val rb13Ok = rb13 == (p.rqMBase & 0xFFFFFFFFL)
+      val rb14Ok = rb14 == (p.controlWord14 & 0xFFFFFFFFL)
+      regRbOk = regRbOk && rb13Ok && rb14Ok
+      regRbMsg += f"; reg10 wr=0x${p.rqMBase & 0xFFFFFFFFL}%08X rd=0x$rb13%08X; " +
+        f"reg11 wr=0x${p.controlWord14 & 0xFFFFFFFFL}%08X rd=0x$rb14%08X" }
+    println(s"[$TAG] 寄存器回读对账：$regRbMsg → ${if (regRbOk) "一致 ✓" else "不一致 ✗"}")
+    // START 不清历史中断；每次任务显式 W1C 清 RAW 并 unmask。
+    prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
+    launchStart(dut.clock, dut.io.cmd(0))
+    var aS = 0; var bS = 0; var saS = 0; var sbS = 0; var cB = 0; var csB = 0; var pollSt = 0; var pollCool = 0
+    // TB 代行外部 PMU：主循环逐拍采样 io.perf 各电平累加（采样窗 = EXECUTE 起至 done/err/超时）
+    def perfPeek: Seq[Boolean] = Seq(
+      dut.io.perf.dmaA.peek().litToBoolean, dut.io.perf.dmaB.peek().litToBoolean,
+      dut.io.perf.dmaC.peek().litToBoolean, dut.io.perf.scaleA.peek().litToBoolean,
+      dut.io.perf.scaleB.peek().litToBoolean, dut.io.perf.scaleC.peek().litToBoolean,
+      dut.io.perf.array.peek().litToBoolean, dut.io.perf.stallA.peek().litToBoolean,
+      dut.io.perf.stallB.peek().litToBoolean, dut.io.perf.epilogue.peek().litToBoolean,
+      dut.io.perf.busy.peek().litToBoolean)
+    // dmaScaleA 通道地址全量记录：biasOn 时该端口被 drain-then-steal 仲裁复用
+    //   （bias FSM 与 scaleA DMA 交错发请求，交错序取决于硬件 FSM 时序、金锚不模拟），
+    //   逐拍位置对账不成立 ⟹ 跑后按地址域拆流对账（见 while 循环后的 seqCmp）。
+    val saAddrLog = mutable.ArrayBuffer[Long]()
+    def rdA(v: Boolean, d: BigInt): Unit = { dut.io.dmaA.rsp.valid.poke(v.B); dut.io.dmaA.rsp.payload.data.poke(d.U) }
+    def rdB(v: Boolean, d: BigInt): Unit = { dut.io.dmaB.rsp.valid.poke(v.B); dut.io.dmaB.rsp.payload.data.poke(d.U) }
+    def rdSA(v: Boolean, d: BigInt): Unit = { dut.io.dmaScaleA.get.rsp.valid.poke(v.B); dut.io.dmaScaleA.get.rsp.payload.data.poke(d.U) }
+    def rdSB(v: Boolean, d: BigInt): Unit = { dut.io.dmaScaleB.get.rsp.valid.poke(v.B); dut.io.dmaScaleB.get.rsp.payload.data.poke(d.U) }
+    /** 写通道统一驱动：req.fire 拍记录 (addr,data) + 地址对账（scaleC 传空序列即自动跳过对账） */
+    def wrCh(ch: String, i: Int, exp: Seq[Long], on: Boolean, ad: => Long, da: => BigInt,
+             ack: Boolean => Unit, log: mutable.ArrayBuffer[(Long, BigInt)]): Int =
+      if (on) { val a = ad; chk(ch, i, a, exp); log += ((a, da)); ack(true); i + 1 } else { ack(false); i }
+    /** dmaC 专用写通道驱动：在 wrCh 基础上额外 peek wstrb 并记入三元组日志，
+      * 使 WbSimCommon.auditCBeatLanes 的 lane 级逐字节对账拿得到选通位。 */
+    def wrChC(ch: String, i: Int, exp: Seq[Long], on: Boolean, ad: => Long, da: => BigInt,
+              st: => BigInt, ack: Boolean => Unit,
+              log: mutable.ArrayBuffer[WbSimCommon.CWriteBeat]): Int =
+      if (on) { val a = ad; chk(ch, i, a, exp); log += ((a, da, st)); ack(true); i + 1 } else { ack(false); i }
+    // 通道 ch（A=0/B=1/C=2/scaleA=3/scaleB=4）本拍是否被反压；相位错开 5 拍避免各通道同拍齐停。
+    def bpLow(ch: Int): Boolean = bpPeriod > 0 && Math.floorMod(cycle + 5 * ch, bpPeriod) < (bpPeriod + 2) / 3
+    val bpReqs = Seq(dut.io.dmaA.req, dut.io.dmaB.req, dut.io.dmaC.req, dut.io.dmaScaleA.get.req, dut.io.dmaScaleB.get.req)
+    while (!done && !errSeen && cycle < maxCycles) {
+      val rdy = Seq.tabulate(5)(ch => !bpLow(ch))
+      bpReqs.zip(rdy).foreach { case (r, b) => r.ready.poke(b.B) }
+      aS = rdCh("dmaA", aS, plan.expAAddrSeq, rdy(0) && dut.io.dmaA.req.valid.peek().litToBoolean,
+        dut.io.dmaA.req.payload.addr.peek().litValue.toLong, rdA, plan.beatAtA)
+      bS = rdCh("dmaB", bS, plan.expBAddrSeq, rdy(1) && dut.io.dmaB.req.valid.peek().litToBoolean,
+        dut.io.dmaB.req.payload.addr.peek().litValue.toLong, rdB, plan.beatAtB)
+      // dmaScaleA 供数仍是「req.fire 拍按请求地址从内存镜像取数」（wordAt），但不以
+      //   超期望拍数断供：bias 流量与 scaleA 流量共用本端口，超拍/错拍由跑后拆流对账暴露。
+      if (rdy(3) && dut.io.dmaScaleA.get.req.valid.peek().litToBoolean) {
+        val saAddr = dut.io.dmaScaleA.get.req.payload.addr.peek().litValue.toLong
+        saAddrLog += saAddr; rdSA(true, plan.wordAt(saAddr)); saS += 1
+      } else rdSA(false, BigInt(0))
+      sbS = rdCh("dmaScaleB", sbS, plan.expScaleBAddrSeq, rdy(4) && dut.io.dmaScaleB.get.req.valid.peek().litToBoolean,
+        dut.io.dmaScaleB.get.req.payload.addr.peek().litValue.toLong, rdSB, plan.wordAt)
+      cB = wrChC("dmaC", cB, plan.expCAddrSeq, rdy(2) && dut.io.dmaC.req.valid.peek().litToBoolean,
+        dut.io.dmaC.req.payload.addr.peek().litValue.toLong, dut.io.dmaC.req.payload.data.peek().litValue,
+        dut.io.dmaC.req.payload.strb.peek().litValue,
+        v => dut.io.dmaC.rsp.valid.poke(v.B), cLog)
+      csB = wrCh("dmaCScale", csB, if (isMxAny(p.cFmt)) plan.expCScaleAddrSeq else Seq.empty,
+        dut.io.dmaCScale.get.req.valid.peek().litToBoolean, dut.io.dmaCScale.get.req.payload.addr.peek().litValue.toLong,
+        dut.io.dmaCScale.get.req.payload.data.peek().litValue, v => dut.io.dmaCScale.get.rsp.valid.poke(v.B), sLog)
+      val (ps, pc, st) = irqPollStep(dut.io.cmd(0), dut.io.resp, pollSt, pollCool); pollSt = ps; pollCool = pc
+      st.foreach { s =>
+        errSeen = s.anyError
+        done = s.done
+      }
+      perfPeek.zipWithIndex.foreach { case (b, i) => if (b) perfCnt(i) += 1 }
+      dut.clock.step(); cycle += 1
+    }
+    // 任务边界把六通道恢复为 idle（ready=1、rsp 无效），下一个任务从同一 TB 初态起跑。
+    bpReqs.foreach(_.ready.poke(true.B))
+    Seq(dut.io.dmaA.rsp, dut.io.dmaB.rsp, dut.io.dmaScaleA.get.rsp, dut.io.dmaScaleB.get.rsp).foreach(_.valid.poke(false.B))
+    dut.io.dmaC.rsp.valid.poke(false.B); dut.io.dmaCScale.get.rsp.valid.poke(false.B); dut.io.cmd.foreach(_.valid.poke(false.B))
+    if (errSeen) errCode = readReg(WbSimCommon.ERROR_CODE_REG_ADDR).toInt
+    if (predicted.isDefined && errSeen) {
+      readReg(WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
+      dut.io.status.inFlight.expect(false.B)
+    } else if (done && !errSeen) dut.io.status.inFlight.expect(false.B)
+    // dmaScaleA 跑后拆流对账（仅正向路径：负向路径硬件不进计算、无期望流量）。
+    //   bias 域 [biasBase, +nTiles*totalN*4) 与 rqM 域 [rqMBase, +nTiles*totalN*4) 内的
+    //   请求分别归 bias/rqM 流，其余归 scaleA 流（三域两两不相交：SA/BIAS/RQM_BASE 为
+    //   独立 64KB 段）；各自与 expBias/expRqM/expScaleAAddrSeq 保序逐拍比对，失配进
+    //   addrBad/addrBadCnt。biasOn=requantOn=false 时不拆流、整流对账。
+    val saBiasHw: Seq[Long] = {
+      val lo = p.biasBase; val hi = p.biasBase + plan.nTiles.toLong * cfg.totalN * 4
+      if (p.biasOn) saAddrLog.toSeq.filter(a => a >= lo && a < hi) else Seq.empty }
+    val saRqMHw: Seq[Long] = {
+      val lo = p.rqMBase; val hi = p.rqMBase + plan.nTiles.toLong * cfg.totalN * 4
+      if (p.requantOn) saAddrLog.toSeq.filter(a => a >= lo && a < hi) else Seq.empty }
+    val saScaleHw: Seq[Long] =
+      if (p.biasOn || p.requantOn) saAddrLog.toSeq.filterNot(a => saBiasHw.contains(a) || saRqMHw.contains(a))
+      else saAddrLog.toSeq
+    def seqCmp(ch: String, hw: Seq[Long], exp: Seq[Long]): Unit = {
+      val n = math.max(hw.size, exp.size); var i = 0
+      while (i < n) {
+        val h = if (i < hw.size) hw(i) else -1L; val e = if (i < exp.size) exp(i) else -1L
+        if (h != e) { addrBadCnt += 1
+          if (addrBad.size < 16) addrBad += f"$ch beat#$i hw=${if (h < 0) "MISSING" else f"0x$h%X"} exp=${if (e < 0) "MISSING" else f"0x$e%X"}" }
+        i += 1 } }
+    if (predicted.isEmpty) {
+      seqCmp("dmaScaleA/scaleA", saScaleHw, plan.expScaleAAddrSeq)
+      if (p.biasOn) seqCmp("dmaScaleA/bias", saBiasHw, plan.expBiasAddrSeq)
+      if (p.requantOn) seqCmp("dmaScaleA/rqM", saRqMHw, plan.expRqMAddrSeq) }
+    println(s"[$TAG] 运行结束: cycles=$cycle/$maxCycles done=$done err=$errSeen(errCode=$errCode)；beat A=$aS/${plan.expAAddrSeq.size} " +
+      s"B=$bS/${plan.expBAddrSeq.size} C=$cB/${plan.expCAddrSeq.size} sA=${saScaleHw.size}/${plan.expScaleAAddrSeq.size}" +
+      (if (p.biasOn) s" bias=${saBiasHw.size}/${plan.expBiasAddrSeq.size}" else "") +
+      (if (p.requantOn) s" rqM=${saRqMHw.size}/${plan.expRqMAddrSeq.size}" else "") +
+      s" sB=$sbS/${plan.expScaleBAddrSeq.size} sC=$csB/${plan.expCScaleAddrSeq.size}" +
+      (if (bpPeriod > 0) s"（A/B/C/scaleA/scaleB 周期反压 period=$bpPeriod）" else ""))
+    println(s"[$TAG] 六通道地址对账不一致拍数=$addrBadCnt（strictAddr=${p.strictAddr}）")
+    addrBad.foreach(s => println(s"[$TAG]   ADDR-DIFF $s"))
+    // 跑后 PMU 汇报：各观测电平的采样拍数与占空比（分母 = 主循环拍数 cycle）
+    println(s"[$TAG] perf 采样(cycles=$cycle)：" + perfNames.zip(perfCnt).map { case (n, c) =>
+      f"$n=$c%5d(${c * 100.0 / math.max(cycle, 1)}%.1f%%)" }.mkString(" "))
+    // ⑤ golden 逐元素比对；负向路径下硬件根本不该进计算，只核对 errCode
+    var passed = false; var cmp: Option[plan.CmpSummary] = None
+    if (predicted.isDefined) { passed = errSeen && errCode == predicted.get && !done && regRbOk
+      println(s"[$TAG] 负向路径：体检预测 errCode=${predicted.get}，实测 err=$errSeen errCode=$errCode done=$done → ${if (passed) "符合预测 ✓" else "与预测不符 ✗"}") }
+    else if (!done) println(s"[$TAG] 超时：$maxCycles 拍内未观测到 IRQ_RAW.done")
+    else { val c = plan.compare(cLog.toSeq, sLog.toSeq); cmp = Some(c)
+      println(f"[$TAG] C compare: elemMismatch=${c.mismatch}/${c.elems} laneViolations=${c.laneViolations} " +
+        f"maxRelErr=${c.maxRelErr}%.3e maxAbsErr=${c.maxAbsErr}%.3e")
+      c.details.zipWithIndex.foreach { case (s, i) => println(s"[$TAG]   ${if (i == 0) "first mismatch" else "MISMATCH"} $s") }
+      passed = !errSeen && regRbOk && c.mismatch == 0 && c.laneViolations == 0 && (addrBadCnt == 0 || !p.strictAddr) &&
+        (!p.osM1 || osCommitOnce(cLog.toSeq, plan)) }
+    TaskOutcome(p, predicted, maxCycles, cycle, done, errSeen, errCode, regRbOk, regRbMsg, addrBadCnt,
+      addrBad.toSeq, cLog.toSeq, cmp.map(_.mismatch), cmp.map(_.laneViolations), cmp.map(_.elems).getOrElse(p.m * p.n),
+      cmp.map(_.details).getOrElse(Seq.empty), perfNames.zip(perfCnt).toMap, passed, plan)
   }
+
+  // OS-M1 每 N tile 只提交一次最终 C 行：拍数与语义金锚同长且无重复地址（无中间 psum 写回）。
+  private def osCommitOnce(cLog: Seq[WbSimCommon.CWriteBeat], plan: Plan): Boolean =
+    cLog.size == plan.expCAddrSeq.size && cLog.map(_._1).distinct.size == cLog.size
+
+  private def assertOutcome(o: TaskOutcome): Unit = {
+    val p = o.p
+    withClue(s"[$TAG] 寄存器回读对账（${o.regRbMsg}）：") { o.regRbOk should be(true) }
+    if (o.predicted.isDefined)
+      withClue(s"[$TAG] 体检预测硬件应以 errCode=${o.predicted.get} 拒绝（RTL 把 blk 三违约合并为 0，见文件头更正段）：") {
+        (o.errSeen, o.errCode, o.done) should be((true, o.predicted.get, false)) }
+    else {
+      withClue(s"[$TAG] 正向路径不应出现 IRQ_RAW error、须在 maxCycles=${o.maxCycles} 内观测到 done：") { (o.errSeen, o.done) should be((false, true)) }
+      withClue(s"[$TAG] 六通道逐拍地址对账（语义模型 vs 硬件）：") {
+        if (p.strictAddr) o.addrBadCnt should be(0) else println(s"[$TAG] strictAddr=false → 失配 ${o.addrBadCnt} 拍只报告不判失败") }
+      withClue(s"[$TAG] C element-level golden compare (no tolerance relaxation, no anchor change): ") {
+        o.mismatch should be(Some(0)) }
+      withClue(s"[$TAG] C lane-level AXI byte-lane audit (laneViolations): ") {
+        o.laneViolations should be(Some(0)) }
+      if (p.osM1)
+        withClue(s"[$TAG] OS-M1 每 N tile 恰一次 C 行提交（拍数=语义金锚、地址无重复）：") {
+          (o.cLog.size, o.cLog.map(_._1).distinct.size) should be((o.plan.expCAddrSeq.size, o.plan.expCAddrSeq.size)) }
+      withClue(s"[$TAG] perf 端口合理性（正向路径 busy 与 array 均须非零）：") {
+        o.perf("busy") should be > 0
+        o.perf("array") should be > 0 } }
+  }
+
+  /** FP32 输出的 OS/WS 位差：地址序须一致；按 strb 全选通的 32-bit 字逐元素比较，打印不同元素数与最大 ULP 距离。 */
+  private def reportBitDiff(what: String, os: TaskOutcome, ws: TaskOutcome): Unit = {
+    withClue(s"[$TAG] $what OS/WS C 写回地址序须一致：") { os.cLog.map(_._1) should be(ws.cLog.map(_._1)) }
+    def ord(b: Long): Long = if ((b & 0x80000000L) != 0) -(b & 0x7FFFFFFFL) else b
+    val pairs = os.cLog.zip(ws.cLog).flatMap { case ((_, dx, sx), (_, dy, _)) =>
+      (0 until cfg.cDmaExtW / 32).filter(i => ((sx >> (4 * i)) & 0xF) == 0xF)
+        .map(i => (((dx >> (32 * i)) & 0xFFFFFFFFL).toLong, ((dy >> (32 * i)) & 0xFFFFFFFFL).toLong)) }
+    val ulps = pairs.map { case (a, b) => math.abs(ord(a) - ord(b)) }
+    println(s"[$TAG] OS/WS 位差 $what：${ulps.count(_ != 0)}/${pairs.size} 个 FP32 元素不同，最大 ULP 距离=${
+      if (ulps.isEmpty) 0 else ulps.max}")
+  }
+
+  /** 两个任务的 C 写回逐拍逐位一致（地址/数据/选通三元组）。 */
+  private def assertSameC(what: String, a: TaskOutcome, b: TaskOutcome): Unit = {
+    val diff = a.cLog.zip(b.cLog).indexWhere { case (x, y) => x != y }
+    val firstDiff = if (diff < 0) None else Some(diff)
+    firstDiff.foreach { i =>
+      val (x, y) = (a.cLog(i), b.cLog(i))
+      println(f"[$TAG] $what 首个不一致 beat#$i：addr 0x${x._1}%X/0x${y._1}%X data 0x${x._2.toString(16)}/0x${y._2.toString(16)}") }
+    withClue(s"[$TAG] $what C 写回须逐位一致：") { (b.cLog.size, firstDiff) should be((a.cLog.size, None)) }
+  }
+}
+
+object WorkerBeeQuickSpec {
+  import WbDebugModel._
+
+  /** 单个任务的跑后事实；硬断言统一在 assertOutcome（波形/数据文件落盘之后）执行。 */
+  final case class TaskOutcome(p: DebugParams, predicted: Option[Int], maxCycles: Int, cycles: Int,
+      done: Boolean, errSeen: Boolean, errCode: Int, regRbOk: Boolean, regRbMsg: String,
+      addrBadCnt: Int, addrBad: Seq[String], cLog: Seq[WbSimCommon.CWriteBeat],
+      mismatch: Option[Int], laneViolations: Option[Int], elems: Int, cmpDetails: Seq[String],
+      perf: Map[String, Int], passed: Boolean, plan: Plan)
 }
