@@ -110,6 +110,10 @@ class GemmSpec:
     evidence: str = ""
     a_storage_shape: tuple[int, ...] = ()
     b_storage_shape: tuple[int, ...] = ()
+    split_policy: str = "default"
+    a_domain: str = "dram"
+    b_domain: str = "dram"
+    c_domain: str = "dram"
 
     def __post_init__(self) -> None:
         _positive_dimensions((self.m, self.n, self.k))
@@ -125,6 +129,11 @@ class GemmSpec:
             raise ValueError("integer GEMM requires INT32; floating GEMM requires FP32")
         if self.semantic_macs is not None and (type(self.semantic_macs) is not int or not 0 <= self.semantic_macs <= self.m * self.n * self.k):
             raise ValueError("semantic MACs must fit issued shape")
+        if not self.split_policy:
+            raise ValueError("GEMM split policy must be named")
+        for name in (self.a_domain, self.b_domain, self.c_domain):
+            if not isinstance(name, str) or not name:
+                raise ValueError("GEMM operand domains must be named")
 
 
 @dataclass(frozen=True)
@@ -191,6 +200,24 @@ class TransferSpec:
 
 TaskSpec: TypeAlias = GemmSpec | VpuSpec | CpuSpec | TransferSpec
 
+ENGINE_SPECS: dict[str, type] = {
+    "GEMM": GemmSpec,
+    "VPU": VpuSpec,
+    "CPU": CpuSpec,
+    "DMA": TransferSpec,
+}
+
+
+def register_engine_kind(kind: str, spec_type: type) -> None:
+    """Register a primitive spec type for a new engine kind.
+
+    A new kind also needs a topology instance and an L1 estimator; this only
+    makes the task/spec pair representable.
+    """
+    if not kind or kind in ENGINE_SPECS:
+        raise ValueError(f"engine kind already registered or empty: {kind!r}")
+    ENGINE_SPECS[kind] = spec_type
+
 
 @dataclass(frozen=True)
 class PrimitiveTask:
@@ -204,8 +231,8 @@ class PrimitiveTask:
     allowed_instances: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        expected = {"GEMM": GemmSpec, "VPU": VpuSpec, "CPU": CpuSpec, "DMA": TransferSpec}
-        if not self.id or self.engine_kind not in expected or not isinstance(self.spec, expected[self.engine_kind]):
+        expected = ENGINE_SPECS.get(self.engine_kind)
+        if not self.id or expected is None or not isinstance(self.spec, expected):
             raise ValueError("task engine and specification disagree")
 
 

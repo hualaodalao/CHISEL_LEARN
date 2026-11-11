@@ -17,6 +17,8 @@ class ModelParams:
     cpu_freq_hz: float | None = None
     vpu_fp32_lanes: int = 8
     vpu_fp16_lanes: int = 16
+    vpu_conversion_elements_per_cycle: int | None = None
+    vpu_fp32_accum_elements_per_cycle: int | None = None
     block_size: int = 32
 
     def __post_init__(self) -> None:
@@ -33,6 +35,11 @@ class ModelParams:
             raise ValueError("CPU 时钟必须为正")
         if self.vpu_fp32_lanes < 1 or self.vpu_fp16_lanes < 1:
             raise ValueError("VPU lane 数必须为正")
+        for name in ("vpu_conversion_elements_per_cycle",
+                     "vpu_fp32_accum_elements_per_cycle"):
+            value = getattr(self, name)
+            if value is not None and (type(value) is not int or value < 1):
+                raise ValueError(f"{name} 必须为正整数或省略")
         if self.block_size not in (16, 32):
             raise ValueError("MX block_size 仅支持 16/32")
 
@@ -48,6 +55,10 @@ class ModelParams:
                 value is not None for value in (self.exp_cycles_per_element,
                 self.reciprocal_cycles_per_vector, self.rsqrt_cycles_per_vector)) else "excluded",
                 "ref": "AR-HIVE-S022"},
+            "vpu_conversion": {"source": "scenario" if self.vpu_conversion_elements_per_cycle
+                               is not None else "excluded", "unit": "elements/cycle"},
+            "vpu_fp32_accumulation": {"source": "scenario" if self.vpu_fp32_accum_elements_per_cycle
+                                      is not None else "excluded", "unit": "elements/cycle"},
             "cpu_sampling": {"source": "scenario" if self.cpu_cycles_per_comparison is not None
                              else "excluded", "algorithm": "full_sort_comparison_budget"},
             "handoff": {"source": "scenario" if self.sync_us is not None else "unknown",

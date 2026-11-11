@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import sys
 from dataclasses import asdict
@@ -18,7 +19,9 @@ from ..common.report import (
     header_block,
 )
 from ..common.workload import Phase, WorkloadPoint, decode, frame, prefill
-from ..frontend.qwen3_06b import get_model
+from ..frontend import builtins as _builtins  # noqa: F401  (registers built-in models)
+from ..frontend.plan import ModelPlan
+from ..frontend.registry import get_model
 from ..frontend.spec import FORMATS
 from ..hw.geometry import load_array_geometry
 from ..hw.profiles import get_profile
@@ -41,6 +44,8 @@ def _machine_balance(profile, mac_family: str) -> float:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="hive.model_eval.l0.run")
     parser.add_argument("--model", default="Qwen3-0.6B")
+    parser.add_argument("--extension", action="append", default=[],
+                        help="显式导入的扩展模块，可重复；不会自动扫描目录")
     parser.add_argument("--profile", default="G0")
     parser.add_argument("--workload", default="decode", choices=("decode", "prefill", "frame"))
     parser.add_argument("--seq", default="1", help="逗号分隔的上下文/prompt 长度")
@@ -57,7 +62,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    for module in args.extension:
+        try:
+            importlib.import_module(module)
+        except ImportError as error:
+            parser.error(f"无法导入扩展 {module!r}: {error}")
     seqs = [int(s) for s in args.seq.split(",") if s.strip() != ""]
 
     model = get_model(args.model)
@@ -95,6 +106,8 @@ def main(argv: list[str] | None = None) -> int:
             "tile_n": geometry.tile_n,
         },
         excluded_costs=excluded.for_workload(points[0]),
+        provenance=(model.provenance_paths() if isinstance(model, ModelPlan)
+                    else (model.source, "src/hive/model_eval/frontend/qwen3_06b.py")),
     )
 
     print(header_block(man))

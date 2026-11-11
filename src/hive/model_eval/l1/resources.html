@@ -31,6 +31,16 @@
 </section>
 <div class="references"><div>L0 同输入下界 <strong id="l0-time"></strong><p class="note" id="l0-scope"></p></div><div>完整模型吞吐 <strong id="throughput"></strong><p class="note" id="throughput-scope"></p></div></div>
 <div class="hardware" id="hardware"></div>
+<section class="section" aria-labelledby="cost-view-heading"><div class="section-head"><h2 id="cost-view-heading">00 / 算子 cost 与下界</h2><p class="note">下界不是可达 makespan；未知服务不折 0。排序按已知预算，不是实测时间。</p></div>
+<div class="overview" aria-label="覆盖率与保守下界">
+<div class="stat"><div class="eyebrow">覆盖 / KNOWN TASKS</div><div class="stat-value" id="coverage-summary"></div><p class="note">已知 / 全部原子任务；未知比例见下界说明。</p></div>
+<div class="stat"><div class="eyebrow">综合下界 / LOWER BOUND</div><div class="stat-value" id="lower-bound"></div><p class="note" id="lower-bound-scope"></p></div>
+<div class="stat"><div class="eyebrow">TOP UNKNOWN</div><div class="stat-value" id="unknown-top"></div><p class="note">按受影响任务数排序的根因。</p></div>
+</div>
+<div id="bounds-table"></div>
+<div id="operator-cost-table"></div>
+<details><summary>未覆盖根因 · 按任务数</summary><ul class="list" id="unknown-list"></ul></details>
+</section>
 <section class="section" aria-labelledby="layers-heading"><div class="section-head"><h2 id="layers-heading">01 / 层 → 算子 → 原子任务</h2><p class="note">左侧条长只比较已知服务预算，不表示层经过时间。逻辑算子可拥有多个不同引擎的任务。</p></div>
 <div class="workspace"><aside><div class="layer-map" id="layer-map" aria-label="选择模型层"></div></aside>
 <article class="panel"><div class="panel-heading"><h3 id="layer-title"></h3><span class="mono" id="layer-subtitle"></span></div><details><summary>层资源指标</summary><pre id="layer-metrics"></pre></details><div class="operator-list" id="operator-list" aria-label="选择逻辑算子"></div>
@@ -156,6 +166,28 @@
         ['local / core',known(hardware.local_iface_gbps) ? count(hardware.local_iface_gbps)+' GB/s' : '未知']
       ]) { const node = create('div',label+' '), valueNode = create('span',value); if (id) valueNode.id = id; node.append(valueNode); e('hardware').append(node); }
     }
+    function renderCostView() {
+      const bounds = current.bounds || {}, coverage = current.coverage || {};
+      set('coverage-summary',count(coverage.tasks_known)+' / '+count(coverage.tasks_total));
+      set('lower-bound',time(bounds.lower_bound_s));
+      set('lower-bound-scope',(bounds.complete ? '所有下界分量已知；' : '部分分量含未知，仍为下界；')+'unknown 比例 '+count(coverage.unknown_ratio*100)+'%');
+      const entries = Object.entries(bounds.engine_busy_lb_s || {});
+      const busiest = entries.length ? entries.reduce((a,b) => b[1] > a[1] ? b : a) : ['未知',null];
+      table('bounds-table',['下界项','值'],[
+        ['最忙引擎 '+busiest[0],time(busiest[1])],
+        ['DRAM 流量下界',time(bounds.dram_lb_s)],
+        ['DAG 关键路径',time(bounds.critical_path_lb_s)],
+        ['综合下界',time(bounds.lower_bound_s)]
+      ],'下界 · 不是可达 makespan；unknown 不补零');
+      const ops = array(current.operator_costs).slice().sort((a,b) => (b.known_seconds||0)-(a.known_seconds||0)).slice(0,20);
+      table('operator-cost-table',['算子','形态','引擎','时间','已知预算','DRAM 字节','basis'],
+        ops.map(op => [op.task_id,op.form,op.engine_kind,time(op.seconds),time(op.known_seconds),
+          bytes((op.dram_read_bytes||0)+(op.dram_write_bytes||0)),op.basis]),
+        '算子 cost · 按已知预算排序');
+      const unknowns = array(current.top_unknowns).slice(0,8);
+      set('unknown-top',unknowns.length ? unknowns[0].cause.slice(0,48) : '无');
+      list('unknown-list',unknowns.map(item => item.cause+' · '+item.category+' · '+item.tasks+' tasks'));
+    }
     function renderTask(id) {
       const task = taskMap.get(id);
       selectedTask = task ? id : null; e('task-detail').hidden = !task;
@@ -269,7 +301,7 @@
       set('throughput',throughputKnown ? count(current.modeled_throughput)+' '+(current.phase === 'prefill' ? 'prompt tokens/s' : 'tokens/s') : '不输出');
       set('throughput-scope',throughputKnown ? '仅解析模型值，不是实测性能。' : '覆盖不完整 / 时间未知；不以已知预算或投影计算吞吐。');
       e('partial-warning').hidden = current.coverage_complete === true && current.performance_valid === true;
-      renderHardware();
+      renderHardware(); renderCostView();
       e('show-projection').disabled = !projectionAvailable();
       e('category-list').replaceChildren(...categories.map(category => {
         const node = create('div',undefined,'category-item'); node.style.setProperty('--color','var(--'+category+')');

@@ -268,7 +268,8 @@ def estimate(task: PrimitiveTask, engine_config, execution_plan) -> EngineCost:
     _positive_integer("alignment", alignment)
     profile, geometry, params = engine_config.profile, engine_config.geometry, engine_config.params
     shape = GemmShape(spec.m, spec.n, spec.k, spec.a_fmt, spec.b_fmt, 32, spec.block_size)
-    commands = legalize(shape, geometry)
+    from .split_policies import split_commands
+    commands = split_commands(shape, geometry, spec.split_policy)
     counts = count_windows(shape, commands)
     a_elem, b_elem = format_elem_bytes(spec.a_fmt), format_elem_bytes(spec.b_fmt)
     a_mx, b_mx = format_is_mx(spec.a_fmt), format_is_mx(spec.b_fmt)
@@ -399,14 +400,15 @@ def estimate(task: PrimitiveTask, engine_config, execution_plan) -> EngineCost:
         metrics["dram_bytes"] += byte_count
         return result
 
-    weight_acquire = stage("b", "weight-stage", weight_unique) if resident else None
+    weight_acquire = (stage("b", "weight-stage", weight_unique)
+                      if resident and spec.b_domain == "dram" else None)
     command_footprints = []
     b_dram = weight_unique if resident else 0
     for index, c in enumerate(commands):
         prefix = f"command-{index}"
         command_start = len(phases)
         a_command = int(c.m * c.k * a_elem) + (c.m * c.k // spec.block_size if a_mx else 0)
-        if staged:
+        if staged and spec.a_domain == "dram":
             stage("a", f"{prefix}:a-stage", a_command)
         for part, passes, offset, output in (
             ("internal", c.k_tiles - 1, 0, False),
@@ -433,7 +435,7 @@ def estimate(task: PrimitiveTask, engine_config, execution_plan) -> EngineCost:
                 charge("port.dma_b", b_origin, _local_seconds(b_physical, profile), byte_count=b_physical, beats=b_beats),
                 charge("array.loadW", b_origin, _cycle_seconds(b_beats, profile), cycles=b_beats),
             ]
-            if not resident:
+            if not resident and spec.b_domain == "dram":
                 b_total = b_bytes + sb_bytes
                 b_charges.insert(0, charge("dram.b", b_origin, b_total / profile.dram_effective_bytes_per_s, byte_count=b_total))
                 stream("dram.b", f"{segment}:loadW", "b", b_total, b_total)
@@ -451,7 +453,7 @@ def estimate(task: PrimitiveTask, engine_config, execution_plan) -> EngineCost:
                 charge("array.consume", a_origin, _cycle_seconds(a_beats, profile), cycles=a_beats,
                        ops=c.m * c.n * passes * c.k_per_beat, overlap_class=overlap_class),
             ]
-            if not staged:
+            if not staged and spec.a_domain == "dram":
                 a_total = a_bytes + sa_bytes
                 a_charges.insert(0, charge("dram.a", a_origin, a_total / profile.dram_effective_bytes_per_s,
                                           byte_count=a_total, overlap_class=overlap_class))
@@ -471,17 +473,19 @@ def estimate(task: PrimitiveTask, engine_config, execution_plan) -> EngineCost:
                 c_charges = [
                     charge("port.dma_c", c_origin, _local_seconds(c_physical, profile), byte_count=c_physical,
                            beats=c_beats, overlap_class=overlap_class),
-                    charge("dram.c", c_origin, c_bytes / profile.dram_effective_bytes_per_s,
-                           byte_count=c_bytes, overlap_class=overlap_class),
                 ]
+                if spec.c_domain == "dram":
+                    c_charges.append(charge("dram.c", c_origin, c_bytes / profile.dram_effective_bytes_per_s,
+                                            byte_count=c_bytes, overlap_class=overlap_class))
                 if overlap:
                     emit(f"{segment}:consume_write", a_charges + c_charges)
                 else:
                     emit(f"{segment}:consume", a_charges)
                     emit(f"{segment}:write", c_charges)
                 stream("port.dma_c", f"{segment}:write", "c", c_bytes, c_physical, c_beats)
-                stream("dram.c", f"{segment}:write", "c", c_bytes, c_bytes)
-                metrics["dram_bytes"] += c_bytes
+                if spec.c_domain == "dram":
+                    stream("dram.c", f"{segment}:write", "c", c_bytes, c_bytes)
+                    metrics["dram_bytes"] += c_bytes
             else:
                 emit(f"{segment}:consume", a_charges)
             values = {
@@ -506,7 +510,8 @@ def estimate(task: PrimitiveTask, engine_config, execution_plan) -> EngineCost:
         if c.k_offset:
             metrics["k_split_cells"] += c.m * c.n
     if resident:
-        request("weight-resident", weight_unique, weight_acquire, phases[-1].id, "b")
+        request("weight-resident", weight_unique, weight_acquire or phases[0].id,
+                phases[-1].id, "b")
     footprint = max(command_footprints) + (_round_up(weight_unique, alignment) if resident else 0)
     capacity = profile.sram_bytes_per_core
     if capacity is None and (resident or staged or overlap):
@@ -525,6 +530,8 @@ def estimate(task: PrimitiveTask, engine_config, execution_plan) -> EngineCost:
         "placement": {"weight_policy": weight_policy, "activation_policy": activation_policy,
                       "capacity_bytes": capacity, "footprint_bytes": footprint, "alignment": alignment},
     })
+    if any(domain != "dram" for domain in (spec.a_domain, spec.b_domain, spec.c_domain)):
+        excluded.append("non-DRAM GEMM operands skip external traffic; local port service remains analytical")
     if metrics["k_split_cells"]:
         excluded.append("independent K commands require explicit downstream merge tasks and partial-sum placement")
     return EngineCost(task.id, engine_config.id, tuple(phases), (engine_resource,), tuple(traffic),

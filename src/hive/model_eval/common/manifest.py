@@ -29,11 +29,11 @@ _NOT_CALIBRATED_REASON = (
     "本报告未导入或应用 RTL 校准证据，外部 gem5 验收状态不代表本报告已校准"
 )
 
-# 报告要追溯到的真源。缺文件即报错，不静默跳过。
+# 报告要追溯到的真源。缺文件即报错，不静默跳过。模型/层来源由调用方通过
+# ``provenance`` 传入，避免把某个模型文档固定成全局真源。
 PROVENANCE_PATHS = (
     "src/hive/doc/arch.md",
     "src/hive/doc/arch_roadmap.md",
-    "src/hive/doc/model_analysis/Qwen3-0.6B-逐层计算拆解.md",
     "src/workerbee/gem5/configs/hardware.py",
 )
 
@@ -75,6 +75,18 @@ class Manifest:
         return hashlib.sha256(encoded).hexdigest()
 
 
+def _relative(root: Path, path: str) -> str:
+    # Provenance may point at a document anchor, e.g. "doc.md#appendix-B".
+    path = path.split("#", 1)[0]
+    candidate = Path(path)
+    if candidate.is_absolute():
+        try:
+            return candidate.relative_to(root).as_posix()
+        except ValueError:
+            return candidate.as_posix()
+    return candidate.as_posix()
+
+
 def _fingerprint(root: Path, rel: str) -> SourceFingerprint:
     path = root / rel
     if not path.is_file():
@@ -90,10 +102,13 @@ def build(
     layer: str,
     named_inputs: dict[str, object],
     excluded_costs: list[str],
+    provenance: tuple[str, ...] | list[str] = (),
     root: Path | None = None,
 ) -> Manifest:
     root = root or repo_root()
     release, commit = gem5_release(root)
+    paths = list(dict.fromkeys((*PROVENANCE_PATHS,
+                                *(_relative(root, path) for path in provenance))))
     return Manifest(
         profile=profile.name,
         model=model_name,
@@ -105,7 +120,7 @@ def build(
         not_calibrated_reason=_NOT_CALIBRATED_REASON,
         named_inputs=dict(named_inputs),
         excluded_costs=list(excluded_costs),
-        sources=[_fingerprint(root, rel) for rel in PROVENANCE_PATHS],
+        sources=[_fingerprint(root, rel) for rel in paths],
         gem5_release=release,
         gem5_commit=commit,
         citations=[

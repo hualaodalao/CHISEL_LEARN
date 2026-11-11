@@ -5,7 +5,7 @@ import math
 from dataclasses import asdict, dataclass
 from typing import Iterable
 
-from ..common.opspec import PrimitiveTask, TaskGraph, TransferSpec
+from ..common.opspec import ENGINE_SPECS, PrimitiveTask, TaskGraph, TransferSpec
 from ..l1.params import ModelParams
 from .geometry import ArrayGeometry
 from .profiles import HwProfile
@@ -80,7 +80,7 @@ class Topology:
             if key != domain.id:
                 raise ValueError("memory domain registry key disagrees with ID")
         for key, instance in self.instances.items():
-            if key != instance.id or instance.kind not in ("GEMM", "VPU", "CPU", "DMA"):
+            if key != instance.id or instance.kind not in ENGINE_SPECS:
                 raise ValueError("invalid engine instance registry")
             if instance.memory_domain not in self.memory_domains:
                 raise ValueError("engine memory domain is unregistered")

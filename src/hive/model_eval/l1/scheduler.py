@@ -142,7 +142,8 @@ def _resolve(instance: EngineConfig, topology: Topology, name: str) -> str:
 
 
 def _claims(cost: EngineCost, instance: EngineConfig, topology: Topology):
-    leases = {_resolve(instance, topology, "engine")}
+    engine_key = _resolve(instance, topology, "engine")
+    leases = {engine_key}
     leases.update(_resolve(instance, topology, name) for name in cost.lease_resources)
     claims = {}
     for phase in cost.phases:
@@ -150,8 +151,10 @@ def _claims(cost: EngineCost, instance: EngineConfig, topology: Topology):
         for claim in phase.claims:
             key = _resolve(instance, topology, claim.resource)
             amounts[key] = amounts.get(key, 0.0) + claim.amount
-        # A phase uses its task's existing lease; it does not acquire it twice.
-        amounts = {key: amount - (1.0 if key in leases else 0.0)
+        # Only the engine lease is held for the whole task.  Other leased
+        # resources still need their phase claims, otherwise a phase claim
+        # silently cancels the mutual exclusion it was meant to express.
+        amounts = {key: amount - (1.0 if key == engine_key else 0.0)
                    for key, amount in amounts.items()}
         claims[phase.id] = {key: amount for key, amount in amounts.items() if amount > 0}
     for key in leases:
@@ -159,7 +162,7 @@ def _claims(cost: EngineCost, instance: EngineConfig, topology: Topology):
             raise _Blocked(f"lease {key} exceeds physical capacity")
     for amounts in claims.values():
         for key, amount in amounts.items():
-            if amount + (1 if key in leases else 0) > topology.resources[key].capacity * (1 + 1e-12):
+            if amount + (1 if key == engine_key else 0) > topology.resources[key].capacity * (1 + 1e-12):
                 raise _Blocked(f"claim on {key} exceeds physical capacity")
     return leases, claims
 

@@ -18,7 +18,7 @@ from hive.model_eval.l1.mapping import lower_model, map_model
 from hive.model_eval.l1.params import ModelParams
 from hive.model_eval.l1.residency import ExecutionPlan
 from hive.model_eval.l1.run import main
-from hive.model_eval.l1.timeline import evaluate
+from hive.model_eval.l1.timeline import evaluate, estimate_graph, evaluate_graph
 
 
 class TestMapping(unittest.TestCase):
@@ -175,6 +175,16 @@ class TestTimeline(unittest.TestCase):
         phases = [phase for task in tasks for phase in task["phases"] if ":handoff-" in phase["id"]]
         self.assertTrue(phases)
         self.assertTrue(all(phase["category"] == "handoff" and phase["seconds"] == .5e-6 for phase in phases))
+
+    def test_injected_costs_still_receive_handoffs(self):
+        graph = lower_model(self.small, MXFP8, decode(1), geometry=self.geometry)
+        topology = default_topology(G0, self.geometry, ModelParams())
+        plan = ExecutionPlan("stream", "stream")
+        costs = estimate_graph(graph, topology, plan)
+        scheduled = evaluate_graph(graph, topology, execution_plan=plan,
+                                   scheduling_policy="serial", costs=costs)
+        phase_ids = {phase.phase_id for task in scheduled.tasks for phase in task.phases}
+        self.assertTrue(any(":handoff-" in phase_id for phase_id in phase_ids))
 
 
 class TestCli(unittest.TestCase):

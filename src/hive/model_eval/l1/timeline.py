@@ -6,17 +6,22 @@ from typing import Callable
 
 from ..common.opspec import TaskGraph, VpuSpec
 from ..common.workload import WorkloadPoint
+from ..frontend.layers.base import LAYERS, LayerInstance
+from ..frontend.plan import ModelPlan
 from ..frontend.spec import ModelSpec, NumFormat
 from ..hw.geometry import ArrayGeometry, load_array_geometry
 from ..hw.profiles import HwProfile
 from ..hw.topology import Topology, default_topology
 from ..l0.roofline import evaluate as evaluate_l0
 from . import kernels
+from .compose import lower_plan
+from .cost_view import build_cost_view
+from .dispatchers import dispatch
 from .ledger import EngineCost, Ledger, Phase, ResourceClaim
 from .mapping import lower_model
 from .params import ModelParams
 from .residency import BufferPlan, ExecutionPlan
-from .scheduler import ScheduleResult, schedule
+from .scheduler import ScheduleResult
 
 
 def _sum_metrics(costs: list[EngineCost]) -> dict:
@@ -40,6 +45,16 @@ def _span(tasks: list[dict], start: str, end: str) -> float | None:
     if any(task[start] is None or task[end] is None for task in tasks):
         return None
     return max(task[end] for task in tasks) - min(task[start] for task in tasks)
+
+
+def _leaf_op_ids(layer: LayerInstance) -> tuple[str, ...]:
+    definition = LAYERS.get(layer.type, layer.version)
+    if definition.children is None:
+        return (layer.op_name or layer.id,)
+    ids: list[str] = []
+    for child in definition.children(layer):
+        ids.extend(_leaf_op_ids(child))
+    return tuple(ids)
 
 
 def estimate_graph(graph: TaskGraph, topology: Topology,
@@ -97,12 +112,14 @@ def evaluate_graph(graph: TaskGraph, topology: Topology, *,
                    execution_plan: ExecutionPlan | None = None,
                    buffer_plan: BufferPlan | None = None,
                    scheduling_policy: str = "list",
-                   costs: dict[str, dict[str, EngineCost]] | None = None) -> ScheduleResult:
+                   costs: dict[str, dict[str, EngineCost]] | None = None,
+                   dispatcher: str | Callable[..., ScheduleResult] | None = None) -> ScheduleResult:
     execution_plan = execution_plan or ExecutionPlan(activation_policy="stream")
     estimates = costs if costs is not None else estimate_graph(graph, topology, execution_plan)
-    if costs is None:
-        _handoffs(graph, estimates, topology)
-    return schedule(graph, estimates, topology, buffer_plan, policy=scheduling_policy)
+    _handoffs(graph, estimates, topology)
+    if callable(dispatcher):
+        return dispatcher(graph, estimates, topology, buffer_plan)
+    return dispatch(dispatcher or scheduling_policy, graph, estimates, topology, buffer_plan)
 
 
 @dataclass(frozen=True)
@@ -123,6 +140,8 @@ class L1Result:
     excluded_costs: tuple[str, ...]
     cross_level_comparable: bool = False
     comparison_reason: str = "L0 is a cluster roofline reference; L1 routes engines and explicit staged/stream traffic differently"
+    plan: ModelPlan | None = None
+    dram_effective_bytes_per_s: float | None = None
     performance_valid: bool = field(default=False, init=False)
     data_valid: bool = field(default=False, init=False)
 
@@ -151,7 +170,9 @@ class L1Result:
         return {task.task_id: self.costs[task.task_id][task.budget_instance_id]
                 for task in self.schedule.tasks if task.budget_instance_id is not None}
 
-    def to_dict(self, debug: bool = False) -> dict:
+    def to_dict(self, debug: bool = False, detailed: bool = True) -> dict:
+        view = build_cost_view(self.graph, self.costs, self.schedule, self.topology,
+                               self.dram_effective_bytes_per_s)
         scheduled = {task.task_id: task for task in self.schedule.tasks}
         selected = self.selected_costs
         tasks = []
@@ -208,6 +229,24 @@ class L1Result:
                 "known_service_budget_s": sum(op["known_service_budget_s"] for op in members),
                 "span_s": _span(layer_tasks, "start_s", "end_s"),
                 "projection_span_s": _span(layer_tasks, "projection_start_s", "projection_end_s")})
+        layer_tree = None
+        if self.plan is not None:
+            layer_tree = []
+            for layer in self.plan.iter_layers():
+                definition = LAYERS.get(layer.type, layer.version)
+                op_ids = set(_leaf_op_ids(layer))
+                members = [task for task in tasks if task["parent_op_id"] in op_ids]
+                costs = [selected[task["id"]] for task in members if task["id"] in selected]
+                layer_tree.append({
+                    "id": layer.id,
+                    "type": LAYERS.canonical(layer.type, layer.version)[0],
+                    "aggregate": definition.children is not None,
+                    "operators": len(op_ids),
+                    "tasks": len(members),
+                    "known_service_budget_s": sum(cost.known_service_s for cost in costs),
+                    "span_s": _span(members, "start_s", "end_s"),
+                    "projection_span_s": _span(members, "projection_start_s", "projection_end_s"),
+                })
         payload = {"schema_version": 2, "model": self.model, "profile": self.profile, "fmt": self.fmt,
                 "phase": self.workload.phase.value, "seq_len": self.workload.seq_len,
                 "batch": self.workload.batch, "attention": self.attention,
@@ -223,7 +262,8 @@ class L1Result:
                 "comparison_reason": self.comparison_reason, "modeled_throughput": self.modeled_throughput,
                 "throughput_unit": self.workload.throughput_unit, "coverage_complete": False,
                 "performance_valid": False, "data_valid": False, "metrics": self.metrics,
-                "layers": layer_rows, "operators": operators, "tasks": tasks,
+                "layers": layer_rows, "layer_tree": layer_tree,
+                "operators": operators, "tasks": tasks,
                 "traffic": [{**asdict(flow), "budget_instance_id": cost.instance_id,
                              "cost_basis": "bound_instance" if scheduled[cost.task_id].instance_id
                              else "unbound_candidate_budget"}
@@ -234,26 +274,49 @@ class L1Result:
                 "projection_memory_peak_bytes": self.schedule.projection_memory_peak_bytes,
                 "topology": self.topology.to_dict(), "buffer_plan": self.buffer_plan.to_dict(),
                 "graph": asdict(self.graph), "schedule": self.schedule.to_dict(),
+                "operator_costs": [asdict(item) for item in view.operators],
+                "bounds": asdict(view.bounds),
+                "coverage": asdict(view.coverage),
+                "top_unknowns": [asdict(item) for item in view.unknowns],
                 "excluded_costs": list(self.excluded_costs)}
+        if not detailed:
+            for key in ("layer_tree", "operators", "tasks", "traffic", "resource_busy_s",
+                        "projection_resource_busy_s", "memory_peak_bytes",
+                        "projection_memory_peak_bytes", "topology", "buffer_plan",
+                        "graph", "schedule"):
+                payload.pop(key, None)
         return json.loads(json.dumps(payload, allow_nan=False))
 
 
-def evaluate(model: ModelSpec, profile: HwProfile, fmt: NumFormat,
+def evaluate(model: ModelSpec | ModelPlan, profile: HwProfile, fmt: NumFormat,
              point: WorkloadPoint, *, attention: str = "vpu",
              params: ModelParams | None = None, geometry: ArrayGeometry | None = None,
              topology: Topology | None = None, execution_plan: ExecutionPlan | None = None,
              buffer_plan: BufferPlan | None = None, scheduling_policy: str = "serial",
-             lowering: Callable[..., TaskGraph] | None = None) -> L1Result:
+             lowering: Callable[..., TaskGraph] | None = None,
+             costs: dict[str, dict[str, EngineCost]] | None = None,
+             dispatcher: str | Callable[..., ScheduleResult] | None = None) -> L1Result:
     params = params or ModelParams()
     geometry = geometry or load_array_geometry()
     topology = topology or default_topology(profile, geometry, params)
     plan = execution_plan or ExecutionPlan(params.weight_policy, "stream")
-    graph = lower_model(model, fmt, point, attention, geometry=geometry,
-                        block_size=params.block_size, lowering=lowering)
+    if isinstance(model, ModelPlan):
+        if lowering is not None:
+            graph = lowering(model, fmt, point, attention=attention, geometry=geometry,
+                             block_size=params.block_size)
+            graph.validate()
+        else:
+            graph = lower_plan(model, fmt, point, attention=attention,
+                               geometry=geometry, block_size=params.block_size)
+    else:
+        graph = lower_model(model, fmt, point, attention, geometry=geometry,
+                            block_size=params.block_size, lowering=lowering)
     buffer_plan = buffer_plan or BufferPlan.from_graph(graph, plan)
-    costs = estimate_graph(graph, topology, plan)
-    _handoffs(graph, costs, topology)
-    scheduled = schedule(graph, costs, topology, buffer_plan, policy=scheduling_policy)
+    estimates = estimate_graph(graph, topology, plan) if costs is None else costs
+    scheduled = evaluate_graph(graph, topology, execution_plan=plan,
+                               buffer_plan=buffer_plan, scheduling_policy=scheduling_policy,
+                               costs=estimates, dispatcher=dispatcher)
+    costs = estimates
     selected = {task.task_id: costs[task.task_id][task.budget_instance_id]
                 for task in scheduled.tasks if task.budget_instance_id is not None}
     totals = _sum_metrics(list(selected.values()))
@@ -274,4 +337,6 @@ def evaluate(model: ModelSpec, profile: HwProfile, fmt: NumFormat,
         if scheduled.makespan_s + 1e-12 < dram_bound:
             raise AssertionError("schedule violates its actual shared DRAM traffic lower bound")
     return L1Result(model.name, profile.name, point, fmt.name, attention, graph, topology, plan,
-                    buffer_plan, scheduled, costs, l0.t_s, totals, tuple(sorted(excluded)))
+                    buffer_plan, scheduled, costs, l0.t_s, totals, tuple(sorted(excluded)),
+                    plan=model if isinstance(model, ModelPlan) else None,
+                    dram_effective_bytes_per_s=profile.dram_effective_bytes_per_s)
