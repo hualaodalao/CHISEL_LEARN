@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..frontend.spec import ModelSpec
+from ..frontend.plan import ModelPlan
 from .roofline import L0Result
 
 
@@ -61,7 +61,7 @@ def attribute(result: L0Result, machine_balance: float) -> Attribution:
     )
 
 
-def kv_weight_crossover(model: ModelSpec, bytes_per_param: float) -> float:
+def kv_weight_crossover(model: ModelPlan, bytes_per_param: float) -> float:
     """KV 流量追平权重流量的上下文长度。超过这个点，加长上下文开始主导带宽。"""
     kv_per_token = model.kv_bytes_per_token
     if kv_per_token == 0:

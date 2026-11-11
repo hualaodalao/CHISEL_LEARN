@@ -134,11 +134,9 @@ class TestPhaseLease(unittest.TestCase):
 
 class TestGemmMemoryDomain(unittest.TestCase):
     def setUp(self):
-        from hive.model_eval.frontend import qwen3_06b as legacy
-        from hive.model_eval.l1.mapping import lower_model
-        model = legacy.build()
-        small = replace(model, layer_types=(replace(model.layer_types[0], count=1),))
-        graph = lower_model(small, MXFP8, decode(1), geometry=load_array_geometry())
+        from hive.model_eval.l1.compose import lower_plan
+        model = get_model("Qwen3-0.6B", config={**CONFIG, "num_hidden_layers": 1})
+        graph = lower_plan(model, MXFP8, decode(1), geometry=load_array_geometry())
         self.task = next(task for task in graph.tasks if task.engine_kind == "GEMM")
         self.geometry = load_array_geometry()
         self.instance = default_topology(G0, self.geometry, ModelParams()).instances["gemm0"]

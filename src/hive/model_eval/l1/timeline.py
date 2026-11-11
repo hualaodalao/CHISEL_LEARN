@@ -8,7 +8,7 @@ from ..common.opspec import TaskGraph, VpuSpec
 from ..common.workload import WorkloadPoint
 from ..frontend.layers.base import LAYERS, LayerInstance
 from ..frontend.plan import ModelPlan
-from ..frontend.spec import ModelSpec, NumFormat
+from ..frontend.spec import NumFormat
 from ..hw.geometry import ArrayGeometry, load_array_geometry
 from ..hw.profiles import HwProfile
 from ..hw.topology import Topology, default_topology
@@ -18,7 +18,6 @@ from .compose import lower_plan
 from .cost_view import build_cost_view
 from .dispatchers import dispatch
 from .ledger import EngineCost, Ledger, Phase, ResourceClaim
-from .mapping import lower_model
 from .params import ModelParams
 from .residency import BufferPlan, ExecutionPlan
 from .scheduler import ScheduleResult
@@ -288,7 +287,7 @@ class L1Result:
         return json.loads(json.dumps(payload, allow_nan=False))
 
 
-def evaluate(model: ModelSpec | ModelPlan, profile: HwProfile, fmt: NumFormat,
+def evaluate(model: ModelPlan, profile: HwProfile, fmt: NumFormat,
              point: WorkloadPoint, *, attention: str = "vpu",
              params: ModelParams | None = None, geometry: ArrayGeometry | None = None,
              topology: Topology | None = None, execution_plan: ExecutionPlan | None = None,
@@ -300,17 +299,13 @@ def evaluate(model: ModelSpec | ModelPlan, profile: HwProfile, fmt: NumFormat,
     geometry = geometry or load_array_geometry()
     topology = topology or default_topology(profile, geometry, params)
     plan = execution_plan or ExecutionPlan(params.weight_policy, "stream")
-    if isinstance(model, ModelPlan):
-        if lowering is not None:
-            graph = lowering(model, fmt, point, attention=attention, geometry=geometry,
-                             block_size=params.block_size)
-            graph.validate()
-        else:
-            graph = lower_plan(model, fmt, point, attention=attention,
-                               geometry=geometry, block_size=params.block_size)
+    if lowering is not None:
+        graph = lowering(model, fmt, point, attention=attention, geometry=geometry,
+                         block_size=params.block_size)
+        graph.validate()
     else:
-        graph = lower_model(model, fmt, point, attention, geometry=geometry,
-                            block_size=params.block_size, lowering=lowering)
+        graph = lower_plan(model, fmt, point, attention=attention,
+                           geometry=geometry, block_size=params.block_size)
     buffer_plan = buffer_plan or BufferPlan.from_graph(graph, plan)
     estimates = estimate_graph(graph, topology, plan) if costs is None else costs
     scheduled = evaluate_graph(graph, topology, execution_plan=plan,
@@ -338,5 +333,5 @@ def evaluate(model: ModelSpec | ModelPlan, profile: HwProfile, fmt: NumFormat,
             raise AssertionError("schedule violates its actual shared DRAM traffic lower bound")
     return L1Result(model.name, profile.name, point, fmt.name, attention, graph, topology, plan,
                     buffer_plan, scheduled, costs, l0.t_s, totals, tuple(sorted(excluded)),
-                    plan=model if isinstance(model, ModelPlan) else None,
+                    plan=model,
                     dram_effective_bytes_per_s=profile.dram_effective_bytes_per_s)

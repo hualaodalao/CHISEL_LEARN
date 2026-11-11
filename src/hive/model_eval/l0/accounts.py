@@ -9,7 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from ..common.workload import Phase, WorkloadPoint
-from ..frontend.spec import ModelSpec, NumFormat
+from ..frontend.plan import ModelPlan
+from ..frontend.spec import NumFormat
 
 
 @dataclass(frozen=True)
@@ -28,7 +29,7 @@ class Account:
         return self.breakdown.get(key, 0.0) / self.total
 
 
-def work_account(model: ModelSpec, point: WorkloadPoint) -> Account:
+def work_account(model: ModelPlan, point: WorkloadPoint) -> Account:
     body_fixed = model.body_mac_fixed()
     body_s = model.body_mac_s_coef()
     body_s2 = model.body_mac_s2_coef()
@@ -62,7 +63,7 @@ def work_account(model: ModelSpec, point: WorkloadPoint) -> Account:
     return Account(total=sum(parts.values()), breakdown=parts)
 
 
-def traffic_account(model: ModelSpec, fmt: NumFormat, point: WorkloadPoint, *, use_doc_bytes: bool) -> Account:
+def traffic_account(model: ModelPlan, fmt: NumFormat, point: WorkloadPoint, *, use_doc_bytes: bool) -> Account:
     bpp = fmt.bytes_per_param(use_doc_value=use_doc_bytes)
     S = point.seq_len
     batch = point.batch

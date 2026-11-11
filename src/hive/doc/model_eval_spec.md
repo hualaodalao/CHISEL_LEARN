@@ -32,19 +32,18 @@
 | 项目 | L0 | L1 |
 |---|---|---|
 | 建模方式 | 全模型 MAC/字节闭式 roofline | LogicalOp→PrimitiveTask 图、独立引擎预算、物理资源与内存预约 |
-| 输入 | ModelSpec、HwProfile、NumFormat、WorkloadPoint | 同左，另加 ModelParams、ArrayGeometry、Topology、ExecutionPlan、BufferPlan；也可直接输入 TaskGraph |
+| 输入 | ModelPlan、HwProfile、NumFormat、WorkloadPoint | 同左，另加 ModelParams、ArrayGeometry、Topology、ExecutionPlan、BufferPlan；也可直接输入 TaskGraph |
 | 主要输出 | 理想带宽时间、计算时间、吞吐上界、瓶颈及分项 | 已知服务预算、actual/条件投影跨度、任务与资源等待、流量、内存峰值、未知约束 |
 | 默认是否加载权重 | 否 | 否 |
 | 默认是否执行真实前向 | 否；独立 `torch_check` 例外见 4.4 | 否 |
 | 是否逐周期事件仿真 | 否 | 否 |
 | 默认并行口径 | 可使用 profile 声明的全部核心峰值 | 单 active core、每类引擎一个实例、serial；多实例必须显式声明 |
 
-当前完整模型前端提供两条路径：
+当前完整模型前端只有一条路径：
 
-- **ModelPlan 路径（默认）**：`frontend/layers/` 注册基础层与聚合层，`frontend/models/` 负责模型组合，`frontend/registry.py` 是中立模型注册表。Qwen3-0.6B 是内置 demo；`--extension` 可显式加载外部层/模型。L1 通过 `l1/compose.py` 的 emitter 递归展开，层几何显式声明，不再从参数余额反推 `head_dim`。
-- **legacy 路径**：`frontend/qwen3_06b.py` 的 `ModelSpec` 与 `l1/mapping.py` 的 `map_model()/lower_model()` 保留一个兼容版本，仅支持 Qwen 同构 `qwen3_full_attention` 层型。它仍用于旧测试、数值锚点和自定义 `lowering=` 回调。
+- **ModelPlan 路径**：`frontend/layers/` 注册基础层与聚合层，`frontend/models/` 负责模型组合，`frontend/registry.py` 是中立模型注册表。Qwen3-0.6B 是内置 demo；`--extension` 可显式加载外部层/模型。L1 通过 `l1/compose.py` 的 emitter 递归展开，层几何显式声明，不从参数余额反推 `head_dim`。旧的 `ModelSpec`/`map_model()`/`lower_model()` 兼容路径已移除。
 
-`frame` 是 L0 工作点接口；L1 的 plan/legacy 路径都不提供视觉模型展开器。
+`frame` 是 L0 工作点接口；L1 的 plan 路径不提供视觉模型展开器。
 
 本模块不包含 RTL 仿真、gem5 校准、checkpoint 加载、tokenizer、采样器实现、PyTorch 图捕获、自动编译、自动融合、自动分片或最优 tiling。读取硬件几何配置不表示启动 gem5，也不表示完成 RTL 校准。
 
@@ -89,12 +88,11 @@ L0 是独立分析工具，不是 L1 的前置阶段。L1 报告中的 L0 数值
 
 | 区域 | 文件 | 职责 |
 |---|---|---|
-| 模型前端 | `frontend/spec.py` | 数值格式、TensorSpec、legacy ModelSpec/LayerTypeSpec |
+| 模型前端 | `frontend/spec.py` | 数值格式 NumFormat 与 FORMATS |
 | 模型前端 | `frontend/layers/base.py` | LayerDefinition、LayerInstance、LayerL0、LayerRegistry、WeightAllocation |
 | 模型前端 | `frontend/layers/generic.py`、`qwen3.py` | 基础层与 Qwen 家族聚合层定义及 L0 公式 |
 | 模型前端 | `frontend/plan.py` | ModelPlan、权重分配、层树遍历与参数/L0 汇总 |
 | 模型前端 | `frontend/registry.py`、`models/`、`builtins.py` | 中立模型注册表、内置 demo、显式内置加载入口 |
-| 模型前端 | `frontend/qwen3_06b.py` | legacy Qwen ModelSpec 注册表与锚点公式 |
 | 公共 | `common/workload.py` | phase、seq_len、batch |
 | 公共 | `common/opspec.py` | LogicalOp、PrimitiveTask、TaskGraph、tensor/base/view 和各引擎 typed spec |
 | 公共 | `common/manifest.py` | 来源指纹、具名输入、有效性与未覆盖项 |
@@ -105,7 +103,7 @@ L0 是独立分析工具，不是 L1 的前置阶段。L1 报告中的 L0 数值
 | L0 | `l0/accounts.py`、`roofline.py`、`bottleneck.py` | 工作量/流量、roofline、瓶颈归因 |
 | L0 | `l0/excluded.py`、`torch_check.py` | 未覆盖说明与外部计数交叉检查 |
 | L0 | `l0/run.py`、`web.py`、`resources.html` | CLI、JSON 和离线 HTML |
-| L1 | `l1/mapping.py`、`timeline.py` | legacy 模型到任务图、引擎估算、调度编排和报告 |
+| L1 | `l1/timeline.py` | 引擎估算、调度编排和报告 |
 | L1 | `l1/graph_builder.py`、`compose.py`、`emitters/` | 公共图构造器、emitter 注册表和 ModelPlan 递归展开 |
 | L1 | `l1/split_policies.py`、`dispatchers.py`、`engines.py` | GEMM 命令拆分、调度策略和引擎 estimator 注册表 |
 | L1 | `l1/costing/registry.py` | 算子形态 `(spec_kind, engine_kind) → cost_fn` 注册表与 `simple_cost()` |
@@ -161,7 +159,7 @@ l1.run.main(argv)
        └─ L1Result / schema_version=2 JSON / HTML（含 layer_tree）
 ```
 
-全模型入口为 `timeline.evaluate()`，同时接受 `ModelPlan` 与 legacy `ModelSpec`。ModelPlan 路径通过 `l1.compose.lower_plan()` 展开；legacy 路径通过 `mapping.lower_model(..., lowering=...)`。直接构造的 TaskGraph 使用 `timeline.evaluate_graph()`。
+全模型入口为 `timeline.evaluate()`，接受 `ModelPlan`，通过 `l1.compose.lower_plan()` 展开；传入 `lowering=` 回调时改用该回调生成的 TaskGraph。直接构造的 TaskGraph 使用 `timeline.evaluate_graph()`。
 
 单任务成本由 `engines.estimate()`（`kernels.estimate()` 仍为兼容入口）返回。它先查 `costing.registry` 的 `(spec_kind, engine_kind)`，未命中再回退引擎级 estimator。`gemm_model.legalize()` 是默认拆分策略；`split_policies.split_commands()` 让 builder 与 estimator 共享同一策略选择。`gemm_model.count_windows()` 仅提供结构账，不构成完整执行计划或性能结果。
 
@@ -193,9 +191,9 @@ frame(batch: int = 1) -> WorkloadPoint
 
 每个 CLI `--seq` 值表示独立工作点，不表示连续生成过程。L1 decode 的 `seq_len` 同时用于历史 KV 读取和参考 QK/AV 长度，当前 token 的 KV 写入另计；真实推理中追加后的可见长度通常为 `S_past+1`，两种口径不得混用。
 
-### 3.2 NumFormat 与 TensorSpec
+### 3.2 NumFormat
 
-定义：`frontend/spec.py`。
+定义：`frontend/spec.py`。模型结构由 `frontend/plan.py` 的 `ModelPlan` 与 `frontend/layers` 的层注册表表达；本模块只保留 L0/L1 共用的数值格式。
 
 | NumFormat 字段 | 类型 | 含义 |
 |---|---|---|
@@ -216,59 +214,9 @@ frame(batch: int = 1) -> WorkloadPoint
 
 `BF16` 常量使用 `mac_family=int8_fp8_mxfp8_w4a8`，该映射不构成独立 BF16 硬件性能证据，也不表示 L1 GEMM/VPU/转换路径已完成注册与验证。
 
-`TensorSpec(name, shape)` 保存权重名称和存储形状，`elements` 为维度连乘。线性权重使用 `[N,K]`，逻辑 GEMM 为 `X[M,K] @ Wᵀ[K,N]`。构造器不执行维度合法性校验。
+### 3.3 ModelPlan
 
-### 3.3 LayerTypeSpec
-
-定义：`frontend/spec.py`。除 `tensors` 默认空元组外，字段均为必需项。
-
-| 字段 | 单位或类型 | 含义，均按一个实例 |
-|---|---|---|
-| `name` | str | legacy 层型标识；legacy L1 lowering 仅接受 `qwen3_full_attention` |
-| `count` | int | 同形状实例数，不表示权重值共享 |
-| `params_unique` | 元素 | 每实例唯一参数量 |
-| `params_streamed_per_token` | 元素 | decode 每步流过的参数量，可不同于唯一参数量 |
-| `mac_fixed` | MAC/token | 与上下文无关的工作量 |
-| `mac_s_coef` | MAC/参考位置/token | decode 的 S 线性系数 |
-| `mac_s2_coef` | MAC | prefill 整段 S² 系数，包含来源中已定义的因果折半 |
-| `kv_bytes_per_token` | B/token | 每缓存一个 token 的 K+V 大小 |
-| `state_bytes` | B | 固定循环状态，与随上下文增长的 KV 分开 |
-| `tensors` | tuple[TensorSpec,...] | L1 lowering 所需投影权重形状 |
-
-构造器不自动核对参数总量、head 几何或 count。L0 使用聚合字段，不从 `tensors` 重新推导总量。`layer_types` 按类型和 count 聚合，不能表达任意逐层交错顺序；此类架构的 L1 展开需要额外提供顺序描述。
-
-### 3.4 ModelSpec
-
-定义：`frontend/spec.py`。所有字段均为必需项。
-
-| 字段 | 含义 |
-|---|---|
-| `name` | 报告显示的模型名 |
-| `layer_types` | 层型及数量 |
-| `final_norm_mac` | 末层 norm 每 token 工作量 |
-| `lm_head_params` / `lm_head_mac` | 输出头参数量及每输出位置工作量 |
-| `embedding_params` | embedding 参数量元数据；当前不生成独立 embedding 成本 |
-| `params_unique` / `params_checkpoint` | 逻辑唯一参数与 checkpoint 登记元素总数 |
-| `vocab_size` / `hidden_size` | 词表大小与残差流宽度 |
-| `source` | 模型公式来源标识，不是自动加载路径 |
-
-派生接口：
-
-```text
-layer_count = Σ(count)
-params_streamed_per_token = Σ(count × 层型流过参数) + lm_head_params + hidden_size
-kv_bytes_per_token = Σ(count × 层型 KV bytes/token)
-state_bytes = Σ(count × 层型 state_bytes)
-body_mac_fixed() / body_mac_s_coef() / body_mac_s2_coef() = 对应系数按 count 求和
-```
-
-`params_streamed_per_token` 固定加入 `hidden_size` 作为 final norm 权重数，即使 `final_norm_mac=0` 也不会自动移除。容量和流量不会根据 embedding 是否共享自动去重，builder 负责提供一致数值。
-
-Qwen builder `build(config=None)` 使用默认 CONFIG 或传入的完整 dict；非空 dict 不会与默认配置自动合并。`MODELS` 是“模型名→零参数 builder”注册表，`get_model(name)` 对未知名字抛出 KeyError。
-
-### 3.4.1 ModelPlan（plan 路径）
-
-定义：`frontend/plan.py`。ModelPlan 是有序层链，默认路径即 `layers` 顺序；第一版不实现通用分支图。
+定义：`frontend/plan.py`。ModelPlan 是有序层链，默认路径即 `layers` 顺序；第一版不实现通用分支图。层语义与 L0 闭式由 `frontend/layers` 的层注册表提供，模型文件只组合层实例与权重分配，不再自带聚合公式。
 
 | 字段 | 含义 |
 |---|---|
@@ -277,7 +225,7 @@ Qwen builder `build(config=None)` 使用默认 CONFIG 或传入的完整 dict；
 | `allocations` | 模型级 `WeightAllocation(id, shape, checkpoint_copies)`，用于 tied embedding 等共享 |
 | `input_roles` / `output_roles` | 模型输入输出角色名 |
 
-派生接口与 `ModelSpec` 同形，L0 `accounts` 可直接消费：
+派生接口由叶子层闭式聚合而来，L0 `accounts` 可直接消费：
 
 ```text
 params_unique / params_checkpoint
@@ -292,7 +240,11 @@ lm_head_mac          # 所有叶子 mac_output 之和
 
 `ModelPlan.validate()` 检查几何类型、权重角色齐全、allocation 声明与形状、重复层 ID 和未引用 allocation；不证明模型数学等价。
 
-### 3.5 HwProfile
+叶子层的 `WeightSpec(name, shape)` 保存权重名称与存储形状。线性权重使用 `[N,K]`（`LinearGeometry(in_features, out_features)` 对应 `WeightSpec("weight", (out_features, in_features))`），逻辑 GEMM 为 `X[M,K] @ Wᵀ[K,N]`。
+
+模型注册表位于 `frontend/registry.py`：`register_model(name, build, *, version=1, source)` 登记“模型名→ModelPlan builder”，`MODELS` 以 `(name, version)` 为键；`get_model(name, *, version=1, config=None)` 调用 builder 返回 ModelPlan，对未登记名字抛出 KeyError，`list_models()` 列出已登记键。Qwen builder `frontend/models/qwen3_06b.build(config=None)` 使用默认 CONFIG 或传入的完整 dict；非空 dict 不会与默认配置自动合并。
+
+### 3.4 HwProfile
 
 定义：`hw/profiles.py`。
 
@@ -326,7 +278,7 @@ local 参数或频率未知时 local 速率为 None。未知 family 且无 decla
 
 G0/G0_PRO 的 eta=1，单核 8-bit family 为 512 MAC/cycle、4-bit family 为 1024。310 声明整机 12.5×10¹² MAC/s，不区分格式。L1 默认拓扑不会按 `n_core` 自动启用多个核心。
 
-### 3.6 ArrayGeometry
+### 3.5 ArrayGeometry
 
 定义：`hw/geometry.py`。
 
@@ -351,7 +303,7 @@ G0/G0_PRO 的 eta=1，单核 8-bit family 为 512 MAC/cycle、4-bit family 为 1
 
 `repo_root(start=None)` 向上查找包含 `build.sbt` 的目录，失败时抛出 RuntimeError；缺少硬件配置时抛出 FileNotFoundError。`gem5_release(root=None)` 仅返回记录的 release/commit，不运行 gem5。
 
-### 3.7 ModelParams
+### 3.6 ModelParams
 
 定义：`l1/params.py`。
 
@@ -450,8 +402,6 @@ L0 CLI JSON 为 `{"manifest": ..., "results": [...]}`。每条 result 包含 pha
 - `TaskGraph.validate()` 检查 ID、依赖无环、tensor shape/dtype、base/view/stride 覆盖、生产者祖先、无序重叠写和 transfer stream owner；不证明模型数学等价。
 
 默认 plan 路径的 Qwen lowering 由 `qwen3.decoder_block` 聚合 emitter 递归驱动：block → norm/attention/residual/post-norm/MLP/residual；attention → q/k/v、QK norm、RoPE、KV append、QK、softmax、AV、o_proj；MLP → gate/up、SiLU gate、down。`head_dim` 由 `Qwen3BlockGeometry` 显式给出，不从参数余额反推。Q/K/V 共享量化 A，gate/up 共享另一份量化 A；GQA 使用共享 KV base 的逐 head views。decode `S=0` 不生成 QK/softmax/AV；S>0 每 block 18 个 LogicalOp，S=0 为 15 个。INT32 与 FP32 始终区分，类型转换和跨 K partial-sum 合并是独立任务。
-
-legacy `map_model()/lower_model()` 仍按 `qwen3_full_attention` 字符串索引，并用参数余额反推 head_dim；该路径仅作兼容，不应作为新模型模板。
 
 报告分组为 28 个 block 加 final norm、lm_head、sampling，共 31 组；`layer_tree` 另给聚合层与叶子层两级视图。`layers` 数量不是 decoder 层数或原子任务数。
 
@@ -665,13 +615,13 @@ register_layer(LayerDefinition(
 
 ### 7.4 自定义 lowering 与直接任务图
 
-legacy 自定义 lowering 的调用契约为：
+自定义 lowering 的调用契约为：
 
 ```text
 lowering(model, fmt, point, attention=..., geometry=..., block_size=...) -> TaskGraph
 ```
 
-该回调可传给 `mapping.lower_model()`、legacy `timeline.evaluate()` 或 ModelPlan `timeline.evaluate()`。返回图执行结构校验，不自动证明数学等价。
+该回调传给 `timeline.evaluate(..., lowering=...)`，`model` 为 ModelPlan；缺省时改用 `l1.compose.lower_plan()`。返回图执行结构校验，不自动证明数学等价。
 
 直接任务图使用 `timeline.evaluate_graph()`，调用者负责全部 LogicalOp、PrimitiveTask、tensor、显式转换、padding backing、依赖、成本覆盖和未知项。GEMM 非对齐形状必须提供相应 `a_storage_shape` / `b_storage_shape` 及完整 backing 写入，不能只修改逻辑 tensor shape。
 
@@ -768,7 +718,7 @@ VPU lane、自定义 lowering、BufferPlan 和异构资源仅通过 Python API �
 
 | API | 返回或职责 |
 |---|---|
-| `l0.roofline.evaluate(model,profile,fmt,point,use_doc_bytes=True)` | L0Result；model 可为 ModelSpec 或 ModelPlan |
+| `l0.roofline.evaluate(model,profile,fmt,point,use_doc_bytes=True)` | L0Result；model 为 ModelPlan |
 | `frontend.builtins` | 显式注册内置层与 demo 模型 |
 | `frontend.registry.get_model(name,version=1,config=None)` | ModelPlan |
 | `frontend.registry.register_model(name,build,version=1,source=...)` | 注册新模型 |
@@ -777,8 +727,6 @@ VPU lane、自定义 lowering、BufferPlan 和异构资源仅通过 Python API �
 | `l1.compose.lower_plan(plan,fmt,point,attention="vpu",geometry=None,block_size=32)` | ModelPlan → TaskGraph |
 | `l1.graph_builder.GraphBuilder(block_size,split_policy="default")` | 公共 op/task/tensor/view/DMA 构造器 |
 | `l1.emitters.register_emitter(name,version,fn)` | 注册层 emitter |
-| `l1.mapping.map_model(model,fmt,point,attention="vpu")` | legacy Qwen LogicalOp 序列，不是执行 DAG |
-| `l1.mapping.lower_model(...,lowering=None)` | legacy 默认或自定义 TaskGraph |
 | `l1.split_policies.register_split_policy(name,fn)` / `split_commands(...)` | GEMM 命令序列注册与查询 |
 | `l1.gemm_model.legalize(shape,geometry)` | 默认命令合法化结果 |
 | `l1.gemm_model.count_windows(shape,commands)` | 聚合窗口账，不物化全部窗口 |
@@ -788,7 +736,7 @@ VPU lane、自定义 lowering、BufferPlan 和异构资源仅通过 Python API �
 | `l1.timeline.estimate_graph(graph,topology,execution_plan)` | 每任务各候选成本 |
 | `l1.timeline.evaluate_graph(...,scheduling_policy="list",costs=None,dispatcher=None)` | 直接图 ScheduleResult；始终应用一次 handoff |
 | `l1.scheduler.schedule(graph,costs,topology,buffer_plan=None,policy="list")` | 固定图/计划的 ScheduleResult |
-| `l1.timeline.evaluate(...,scheduling_policy="serial",lowering=None,costs=None,dispatcher=None)` | 完整模型 L1Result；model 可为 ModelSpec 或 ModelPlan |
+| `l1.timeline.evaluate(...,scheduling_policy="serial",lowering=None,costs=None,dispatcher=None)` | 完整模型 L1Result；model 为 ModelPlan |
 | `l0.web` / `l1.web.report_payload` / `render_html` | 同一次结果的 JSON/HTML 导出 |
 
 主要 typed spec：

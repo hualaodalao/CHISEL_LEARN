@@ -107,7 +107,7 @@ class ModelPlan:
     def mac_output(self) -> int:
         return sum(layer_l0(layer).mac_output for layer in self.iter_leaves())
 
-    # The following names mirror ModelSpec so L0 accounting can consume either.
+    # Closed-form accessors consumed directly by L0 accounting.
     @property
     def params_unique(self) -> int:
         return self.unique_params()

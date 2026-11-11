@@ -1,16 +1,27 @@
 from __future__ import annotations
 
 import json
-from math import isclose
+from dataclasses import dataclass
+from math import isclose, prod
 from pathlib import Path
 
 from ..common.manifest import Manifest
 from ..common.workload import Phase
 from ..frontend.layers.base import LAYERS, LayerInstance, layer_l0
 from ..frontend.plan import ModelPlan
-from ..frontend.spec import ModelSpec, NumFormat, TensorSpec
+from ..frontend.spec import NumFormat
 from ..hw.profiles import HwProfile
 from .roofline import L0Result
+
+
+@dataclass(frozen=True)
+class _WeightTensor:
+    name: str
+    shape: tuple[int, ...]
+
+    @property
+    def elements(self) -> int:
+        return prod(self.shape)
 
 
 def _row(result: L0Result, profile: HwProfile, fmt: NumFormat, id: str, name: str,
@@ -43,7 +54,7 @@ def _row(result: L0Result, profile: HwProfile, fmt: NumFormat, id: str, name: st
 def _leaf_weights(layer: LayerInstance) -> tuple:
     definition = LAYERS.get(layer.type, layer.version)
     if definition.children is None:
-        return tuple(TensorSpec(weight.role, weight.shape) for weight in layer.weights)
+        return tuple(_WeightTensor(weight.role, weight.shape) for weight in layer.weights)
     weights = ()
     for child in definition.children(layer):
         weights += _leaf_weights(child)
@@ -51,7 +62,6 @@ def _leaf_weights(layer: LayerInstance) -> tuple:
 
 
 def _unique_params(layer: LayerInstance) -> int:
-    from math import prod
     definition = LAYERS.get(layer.type, layer.version)
     if definition.children is not None:
         return sum(_unique_params(child) for child in definition.children(layer))
@@ -93,58 +103,13 @@ def _plan_layer_resources(model: ModelPlan, profile: HwProfile, fmt: NumFormat,
 
 
 def layer_resources(
-    model: ModelSpec | ModelPlan, profile: HwProfile, fmt: NumFormat, result: L0Result
+    model: ModelPlan, profile: HwProfile, fmt: NumFormat, result: L0Result
 ) -> list[dict]:
-    if isinstance(model, ModelPlan):
-        return _plan_layer_resources(model, profile, fmt, result)
-    point = result.workload
-    S, batch = point.seq_len, point.batch
-    rows = []
-
-    def row(id, name, kind, mac, params, kv_bytes, state_bytes, tensors):
-        return _row(result, profile, fmt, id, name, kind, mac, params, kv_bytes,
-                    state_bytes, tensors)
-
-    for layer_type in model.layer_types:
-        if point.phase is Phase.DECODE:
-            mac = (layer_type.mac_fixed + layer_type.mac_s_coef * S) * batch
-            params = layer_type.params_streamed_per_token
-        elif point.phase is Phase.PREFILL:
-            mac = (layer_type.mac_fixed * S + layer_type.mac_s2_coef * S * S) * batch
-            params = layer_type.params_unique
-        else:
-            mac = layer_type.mac_fixed * batch
-            params = layer_type.params_streamed_per_token
-        kv_bytes = 0 if point.phase is Phase.FRAME else layer_type.kv_bytes_per_token * S * batch
-        for _ in range(layer_type.count):
-            index = len(rows)
-            rows.append(row(
-                f"block-{index}", f"Block {index + 1:02d}", "block", mac, params,
-                kv_bytes, layer_type.state_bytes * batch, layer_type.tensors,
-            ))
-
-    norm_mac = model.final_norm_mac * batch
-    if point.phase is Phase.PREFILL:
-        norm_mac *= S
-    rows.append(row(
-        "final-norm", "Final norm", "norm", norm_mac, model.hidden_size, 0, 0,
-        (TensorSpec("final_norm", (model.hidden_size,)),),
-    ))
-    rows.append(row(
-        "lm-head", "LM head", "head", model.lm_head_mac * batch,
-        model.lm_head_params, 0, 0,
-        (TensorSpec("lm_head", (model.vocab_size, model.hidden_size)),),
-    ))
-
-    for key, expected in (("mac", result.mac), ("traffic_bytes", result.traffic_bytes)):
-        actual = sum(r[key] for r in rows)
-        if not isclose(actual, expected, rel_tol=1e-12, abs_tol=1e-6):
-            raise ValueError(f"逐层 {key} 合计 {actual} 与 L0 总账 {expected} 不一致")
-    return rows
+    return _plan_layer_resources(model, profile, fmt, result)
 
 
 def report_payload(
-    model: ModelSpec, profile: HwProfile, fmt: NumFormat,
+    model: ModelPlan, profile: HwProfile, fmt: NumFormat,
     results: list[L0Result], manifest: Manifest,
 ) -> dict:
     cases = []

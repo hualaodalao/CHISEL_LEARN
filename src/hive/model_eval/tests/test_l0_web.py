@@ -9,7 +9,9 @@ from pathlib import Path
 
 from hive.model_eval.common.manifest import build as build_manifest
 from hive.model_eval.common.workload import decode, frame, prefill
-from hive.model_eval.frontend.qwen3_06b import CONFIG, build
+from hive.model_eval.frontend import builtins  # noqa: F401  (registers built-in models)
+from hive.model_eval.frontend.models.qwen3_06b import CONFIG
+from hive.model_eval.frontend.registry import get_model
 from hive.model_eval.frontend.spec import FORMATS, MXFP8
 from hive.model_eval.hw.profiles import G0, G0_PRO, MODEL_ANALYSIS_310
 from hive.model_eval.l0.excluded import for_workload
@@ -20,7 +22,7 @@ from hive.model_eval.l0.web import layer_resources, render_html, report_payload
 
 class TestLayerResources(unittest.TestCase):
     def test_layer_totals_match_every_profile_format_and_phase(self):
-        model = build()
+        model = get_model("Qwen3-0.6B")
         for profile in (G0, G0_PRO, MODEL_ANALYSIS_310):
             for fmt in FORMATS.values():
                 for point in (decode(0), decode(4096, 4), prefill(1024, 2), frame()):
@@ -42,7 +44,7 @@ class TestLayerResources(unittest.TestCase):
                         ))
 
     def test_decode_single_block_and_tails(self):
-        model = build()
+        model = get_model("Qwen3-0.6B")
         result = evaluate(model, G0, MXFP8, decode(4096))
         rows = layer_resources(model, G0, MXFP8, result)
         self.assertEqual(rows[0]["mac"], 32_592_896)
@@ -50,22 +52,23 @@ class TestLayerResources(unittest.TestCase):
         self.assertEqual(rows[-2]["mac"], 2048)
         self.assertEqual(rows[-1]["mac"], 155_582_464)
         self.assertEqual(rows[-1]["tensors"][0]["shape"], [151936, 1024])
-        self.assertEqual(len(rows[0]["tensors"]), 7)
+        # 7 个投影 + input_norm/post_norm/qk_norm 三组系数权重。
+        self.assertEqual(len(rows[0]["tensors"]), 10)
 
     def test_count_is_not_hardcoded(self):
-        model = build({**CONFIG, "num_hidden_layers": 3})
+        model = get_model("Qwen3-0.6B", config={**CONFIG, "num_hidden_layers": 3})
         result = evaluate(model, G0, MXFP8, decode(0))
         self.assertEqual(len(layer_resources(model, G0, MXFP8, result)), 5)
 
     def test_prefill_head_once_norm_for_all_tokens(self):
-        model = build()
+        model = get_model("Qwen3-0.6B")
         result = evaluate(model, G0, MXFP8, prefill(1024))
         rows = layer_resources(model, G0, MXFP8, result)
         self.assertEqual(rows[-2]["mac"], 2048 * 1024)
         self.assertEqual(rows[-1]["mac"], 155_582_464)
 
     def test_resource_time_sums_but_layer_max_is_not_model_time(self):
-        model = build()
+        model = get_model("Qwen3-0.6B")
         result = evaluate(model, G0, MXFP8, prefill(1024))
         rows = layer_resources(model, G0, MXFP8, result)
         self.assertTrue(isclose(sum(r["t_compute_s"] for r in rows), result.t_compute_s))
@@ -75,7 +78,7 @@ class TestLayerResources(unittest.TestCase):
 
 class TestHtmlExport(unittest.TestCase):
     def payload(self, profile=G0):
-        model = build()
+        model = get_model("Qwen3-0.6B")
         points = [decode(0), decode(4096), decode(32768)]
         results = [evaluate(model, profile, MXFP8, p) for p in points]
         manifest = build_manifest(

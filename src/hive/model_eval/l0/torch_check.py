@@ -1,7 +1,7 @@
 """可选的 torch 交叉校验：只用来对工作量，不用来测时间。
 
 torch 的 wall time 与 Hive 无关——它不知道 T=16 补齐、512 KiB 驻留、显式 SRAM
-搬运。这里只拿 `FlopCounterMode` 的 MAC 计数和 `ModelSpec` 对表。torch 或权重缺失
+搬运。这里只拿 `FlopCounterMode` 的 MAC 计数和 `ModelPlan` 对表。torch 或权重缺失
 时返回 skipped，绝不让主流程失败。
 """
 
@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..common.workload import Phase, WorkloadPoint
-from ..frontend.spec import ModelSpec
+from ..frontend.plan import ModelPlan
 from .accounts import work_account
 
 TOLERANCE = 0.02
@@ -39,7 +39,7 @@ def _import_torch():
 
 
 def cross_check(
-    model: ModelSpec,
+    model: ModelPlan,
     point: WorkloadPoint,
     *,
     module=None,

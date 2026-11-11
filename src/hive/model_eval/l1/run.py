@@ -9,14 +9,13 @@ from ..common import manifest as manifest_mod
 from ..common.report import Table, format_bytes, format_time, header_block
 from ..common.workload import decode, prefill
 from ..frontend import builtins as _builtins  # noqa: F401  (registers built-in models)
-from ..frontend.plan import ModelPlan
 from ..frontend.registry import get_model
 from ..frontend.spec import FORMATS
 from ..hw.geometry import load_array_geometry, repo_root
 from ..hw.profiles import get_profile
 from ..hw.topology import explicit_topology
+from .compose import ATTENTION_VARIANTS
 from .ledger import CATEGORIES
-from .mapping import ATTENTION_VARIANTS
 from .params import ModelParams
 from .residency import ExecutionPlan
 from .timeline import evaluate
@@ -128,16 +127,12 @@ def main(argv: list[str] | None = None) -> int:
                    "output_format": "INT32" if fmt.name.startswith("INT") else "FP32",
                    "topology": topology.to_dict(), "execution_plan": plan.to_dict(),
                    "scheduling_policy": args.schedule,
-                   "lowering": ("ModelPlan emitter composition" if isinstance(model, ModelPlan)
-                                else "Qwen tensor producer/consumer graph; configurable Python lowering API"),
+                   "lowering": "ModelPlan emitter composition",
                    "projection": "conditional known-cost projection; not evidence of actual overlap"})
     provenance = ["src/workerbee/doc/spec.md", "src/hive/model_eval/common/opspec.py",
                   "src/hive/model_eval/hw/geometry.py", "src/hive/model_eval/hw/profiles.py",
                   "src/hive/model_eval/hw/topology.py"]
-    if isinstance(model, ModelPlan):
-        provenance.extend(model.provenance_paths())
-    else:
-        provenance.extend((model.source, "src/hive/model_eval/frontend/qwen3_06b.py"))
+    provenance.extend(model.provenance_paths())
     provenance.extend(path.relative_to(repo_root()).as_posix()
                       for path in sorted(Path(__file__).parent.glob("*.py")))
     provenance.extend(path.relative_to(repo_root()).as_posix()

@@ -6,13 +6,24 @@ from fractions import Fraction
 from itertools import islice
 from unittest.mock import patch
 
-from hive.model_eval.frontend.qwen3_06b import build
+from hive.model_eval.frontend.models.qwen3_06b import CONFIG
 from hive.model_eval.hw.geometry import _load_gem5_hardware, load_array_geometry, repo_root
 from hive.model_eval.l1 import gemm_model
 from hive.model_eval.l1.gemm_model import (
     Command, GemmShape, Window, WindowCounts, count_windows, format_elem_bytes,
     format_is_mx, iter_windows, legalize,
 )
+
+# Qwen3-0.6B 的七个投影权重形状，直接由模型 CONFIG 推出（与附录 B 同源）。
+_H = CONFIG["hidden_size"]
+_I = CONFIG["intermediate_size"]
+_V = CONFIG["vocab_size"]
+_L = CONFIG["num_hidden_layers"]
+_Q = CONFIG["num_attention_heads"] * CONFIG["head_dim"]
+_KV = CONFIG["num_key_value_heads"] * CONFIG["head_dim"]
+PROJECTIONS = [("q_proj", (_Q, _H)), ("k_proj", (_KV, _H)), ("v_proj", (_KV, _H)),
+               ("o_proj", (_H, _Q)), ("gate_proj", (_I, _H)), ("up_proj", (_I, _H)),
+               ("down_proj", (_H, _I))]
 
 
 class GeometryTestCase(unittest.TestCase):
@@ -26,15 +37,12 @@ class GeometryTestCase(unittest.TestCase):
 
 class TestQwenAnchors(GeometryTestCase):
     def test_seven_projection_shapes_and_layer_totals(self):
-        tensors = build().layer_types[0].tensors
-        self.assertEqual(
-            [(tensor.name, tensor.shape) for tensor in tensors],
-            [("q_proj", (2048, 1024)), ("k_proj", (1024, 1024)),
-             ("v_proj", (1024, 1024)), ("o_proj", (1024, 2048)),
-             ("gate_proj", (3072, 1024)), ("up_proj", (3072, 1024)),
-             ("down_proj", (1024, 3072))],
-        )
-        counts = [self.counts(GemmShape(1, *tensor.shape)) for tensor in tensors]
+        self.assertEqual(PROJECTIONS,
+                         [("q_proj", (2048, 1024)), ("k_proj", (1024, 1024)),
+                          ("v_proj", (1024, 1024)), ("o_proj", (1024, 2048)),
+                          ("gate_proj", (3072, 1024)), ("up_proj", (3072, 1024)),
+                          ("down_proj", (1024, 3072))])
+        counts = [self.counts(GemmShape(1, *shape)) for _, shape in PROJECTIONS]
         self.assertEqual([c.windows for c in counts],
                          [4096, 2048, 2048, 4096, 6144, 6144, 6144])
         expected = {"commands": 7, "windows": 30720, "a_beats": 30720,
@@ -61,15 +69,13 @@ class TestQwenAnchors(GeometryTestCase):
         self.assertEqual(counts.padded_macs, 0)
 
     def test_whole_28_layers_plus_head(self):
-        model = build()
-        layer = [self.counts(GemmShape(1, *t.shape))
-                 for t in model.layer_types[0].tensors]
-        head = self.counts(GemmShape(1, model.vocab_size, model.hidden_size))
-        self.assertEqual(28 * sum(c.array_cycles for c in layer) + head.array_cycles,
+        layer = [self.counts(GemmShape(1, *shape)) for _, shape in PROJECTIONS]
+        head = self.counts(GemmShape(1, _V, _H))
+        self.assertEqual(_L * sum(c.array_cycles for c in layer) + head.array_cycles,
                          19788544)
-        b_beats = 28 * sum(c.b_beats for c in layer) + head.b_beats
+        b_beats = _L * sum(c.b_beats for c in layer) + head.b_beats
         self.assertEqual(b_beats * self.geometry.b_bytes_per_beat, 595984384)
-        self.assertEqual(28 * sum(c.c_rows for c in layer) + head.c_rows, 31000)
+        self.assertEqual(_L * sum(c.c_rows for c in layer) + head.c_rows, 31000)
 
 
 class TestFrozenGeometry(GeometryTestCase):

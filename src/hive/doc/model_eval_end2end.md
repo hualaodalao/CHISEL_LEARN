@@ -1,8 +1,8 @@
 # Qwen3-0.6B：model_eval L0/L1 端到端代码导读
 
-本文以一次固定输入追踪 model_eval 的完整执行过程，说明模型如何变成 ModelSpec/ModelPlan、LogicalOp、PrimitiveTask、EngineCost、ScheduleResult 和最终报告。重点不是操作步骤，而是**代码在哪里循环、每次调用改变什么数据结构、哪些数值在哪一层产生**。
+本文以一次固定输入追踪 model_eval 的完整执行过程，说明模型如何变成 ModelPlan、LogicalOp、PrimitiveTask、EngineCost、ScheduleResult 和最终报告。重点不是操作步骤，而是**代码在哪里循环、每次调用改变什么数据结构、哪些数值在哪一层产生**。
 
-> 当前 CLI 默认走 ModelPlan + emitter 路径（`frontend/registry` → `l1/compose.lower_plan()`）。本文第 5 节的逐行样本仍以保留的 legacy `map_model()/lower_model()` 为例，便于和数值锚点对照；两条路径的 op/task 金锚一致。plan 路径的接口与扩展方式见[建模规范 §2.3/§7](model_eval_spec.md)。
+> 模型结构由层注册表（`frontend/layers`）与 `ModelPlan` 表达，模型名通过中立 `frontend/registry` 解析；L1 展开走 `l1/compose.lower_plan()` 递归调用 `l1/emitters`。旧的 `ModelSpec`/`map_model()`/`lower_model()` 兼容路径已移除，本文所有代码引用均指向当前实现。plan 路径的接口与扩展方式见[建模规范 §2.3/§7](model_eval_spec.md)。
 
 固定算例为：Qwen3-0.6B、G0、MXFP8、decode、`S=0`、batch=1、VPU attention、单 active core、每类引擎一个实例、stream/stream、serial。该算例用于展示代码路径，不表示实测硬件性能。
 
@@ -20,7 +20,7 @@ L0 和 L1 有独立 CLI 入口。相同模型配置会分别进入两条计算�
 
 ```text
 公共输入
-  ├─ get_model("Qwen3-0.6B")        → ModelSpec
+  ├─ get_model("Qwen3-0.6B")        → ModelPlan（registry → models/qwen3_06b.build）
   ├─ get_profile("G0")              → HwProfile
   ├─ FORMATS["MXFP8"]              → NumFormat
   ├─ decode(0, batch=1)             → WorkloadPoint
@@ -39,8 +39,7 @@ L1
   l1.run.main()
     → ModelParams / Topology / ExecutionPlan
     → 每个 WorkloadPoint × attention variant 调用 timeline.evaluate()
-      → compose.lower_plan()           → ModelPlan 递归 emitter
-        或 mapping.lower_model()       → legacy map_model + _GraphBuilder
+      → compose.lower_plan()           → ModelPlan 递归 emitter → TaskGraph
       → BufferPlan.from_graph()      → buffer 生命周期
       → estimate_graph()             → task × instance → EngineCost
       → _handoffs()                  → 跨引擎依赖前缀 Phase
@@ -83,9 +82,9 @@ results = [evaluate(...) for point in points for variant in variants]
 
 最后一个列表推导是二维笛卡尔积：每个工作点分别评估每个 attention variant。`both` 不会把两个 variant 合并成一条执行流水线。
 
-### 2.2 Qwen builder 将配置压缩成 ModelSpec
+### 2.2 Qwen builder 将配置组合成 ModelPlan
 
-Qwen 配置定义在 [frontend/qwen3_06b.py:13-22](../model_eval/frontend/qwen3_06b.py#L13)：
+Qwen 配置定义在 [frontend/models/qwen3_06b.py:18-26](../model_eval/frontend/models/qwen3_06b.py#L18)：
 
 | 符号 | 值 | 含义 |
 |---|---:|---|
@@ -97,41 +96,40 @@ Qwen 配置定义在 [frontend/qwen3_06b.py:13-22](../model_eval/frontend/qwen3_
 | n_kv | 8 | KV heads |
 | d_h | 128 | head dim |
 
-`build()` 在 [frontend/qwen3_06b.py:25-89](../model_eval/frontend/qwen3_06b.py#L25) 中先推导参数量，再构造一个聚合 LayerTypeSpec：
+`build()` 在 [frontend/models/qwen3_06b.py:29-76](../model_eval/frontend/models/qwen3_06b.py#L29) 中**不写任何闭式公式**，只把已注册的层组合成一个 `ModelPlan`：
 
 ```python
-q = H * (n_h * d_h)
-kv = 2 * H * (n_kv * d_h)
-o = H * (n_h * d_h)
-attn = H + q + kv + o + 2 * d_h + H
-mlp = 3 * H * I
-layer = attn + mlp
-emb = V * H
+block = Qwen3BlockGeometry(hidden=H, heads=n_h, kv_heads=n_kv,
+                           head_dim=d_h, intermediate=I)
+stack = tuple(LayerInstance(id=f"block-{i:02d}", type="qwen3.decoder_block",
+                            geometry=block) for i in range(L))
+head = (final-norm, lm-head, sampling)   # generic.rms_norm / lm_head / sampling
+return ModelPlan(name="Qwen3-0.6B", layers=stack + head,
+                 allocations=(WeightAllocation("embedding", (V, H),
+                                               checkpoint_copies=2),), ...)
 ```
 
-代入当前配置：
+参数量与 MAC 系数不在模型文件里，而在层定义的 L0 闭式中（[frontend/layers/qwen3.py](../model_eval/frontend/layers/qwen3.py)、[frontend/layers/generic.py](../model_eval/frontend/layers/generic.py)）。`ModelPlan` 通过 `iter_leaves()` 遍历叶子层并求和，得到与附录 B 一致的聚合量：
 
 | 量 | 计算 | 结果 |
 |---|---|---:|
 | q_proj 参数 | 1024×2048 | 2,097,152 |
 | k/v_proj 参数合计 | 2×1024×1024 | 2,097,152 |
 | o_proj 参数 | 1024×2048 | 2,097,152 |
-| attention 部分含 norm 参数 | 上式 `attn` | 6,293,760 |
+| attention 部分含 norm 参数 | 上式合计 | 6,293,760 |
 | MLP 参数 | 3×1024×3072 | 9,437,184 |
 | 单 block 参数 | attn+mlp | 15,730,944 |
 | embedding / lm_head | 151936×1024 | 155,582,464 |
 | 全模型唯一参数 | 28×layer+emb+H | 596,049,920 |
 
-同一个 LayerTypeSpec 还保存：
+`qwen3.decoder_block` 是聚合层：它本身不拥有权重，`children()` 展开为 attention（q/k/v/o_proj、qk_norm、rope、kv_transfer、qk/softmax/av）与 SwiGLU MLP（gate/up/down_proj、silu_gate）以及两个 residual。每个叶子层的 L0 给出：
 
-- `count=28`，表示 28 个同形状实例；
-- `mac_fixed=15,750,144`，表示每 block、每 token 与上下文无关的 MAC 等价量；
-- `mac_s_coef=4112`，表示 decode 的 S 线性项；
-- `mac_s2_coef=2048`，表示 prefill 的 QK/AV 因果二次项；
-- `kv_bytes_per_token=4096`，全模型因此为 28×4096=114,688 B/token；
-- 七个投影权重的 TensorSpec。
+- `mac_fixed=15,750,144`（单 block 合计），表示每 block、每 token 与上下文无关的 MAC 等价量；
+- `mac_s_coef=4112`（单 block 合计），表示 decode 的 S 线性项；
+- `mac_s2_coef=2048`（单 block 合计），表示 prefill 的 QK/AV 因果二次项；
+- `kv_bytes_per_token=4096`（单 block），全模型因此为 28×4096=114,688 B/token。
 
-七个权重形状直接决定后续 GEMM 形状：
+七个投影权重形状由层 geometry 决定，直接决定后续 GEMM 形状：
 
 | 权重 | 存储 `[N,K]` | 逻辑计算 |
 |---|---|---|
@@ -143,7 +141,7 @@ emb = V * H
 | up_proj | `[3072,1024]` | `[M,1024] @ [1024,3072]` |
 | down_proj | `[1024,3072]` | `[M,3072] @ [3072,1024]` |
 
-`get_model()` 只是注册表查询并调用 builder，见 [frontend/qwen3_06b.py:92-100](../model_eval/frontend/qwen3_06b.py#L92)。这里没有读取 checkpoint，也没有构造 PyTorch module。
+`get_model()` 只是中立注册表查询并调用 builder，见 [frontend/registry.py:36-42](../model_eval/frontend/registry.py#L36)。lm_head 的权重通过 `allocation="embedding"` 与 embedding 共享同一份唯一参数，`checkpoint_copies=2` 表示 checkpoint 中存了两份。这里没有读取 checkpoint，也没有构造 PyTorch module。
 
 ### 2.3 NumFormat、HwProfile 与 ArrayGeometry 提供不同事实
 
@@ -155,7 +153,7 @@ emb = V * H
 
 profile 回答“速率是多少”，geometry 回答“命令和窗口怎样形成”，NumFormat 回答“每个元素占多少存储以及查哪一族峰值”。
 
-## 3. L0：从 ModelSpec 到闭式 roofline
+## 3. L0：从 ModelPlan 到闭式 roofline
 
 ### 3.1 CLI 对每个工作点独立调用 evaluate
 
@@ -173,7 +171,7 @@ attributions = [bottleneck.attribute(r, balance) for r in results]
 
 ### 3.2 work_account 按 phase 汇总 MAC
 
-[l0/accounts.py:31-62](../model_eval/l0/accounts.py#L31) 从 ModelSpec 取出聚合系数：
+[l0/accounts.py:31-62](../model_eval/l0/accounts.py#L31) 从 ModelPlan 取出聚合系数（这些方法对叶子层 L0 求和）：
 
 ```python
 body_fixed = model.body_mac_fixed()
@@ -286,14 +284,13 @@ for kind, count in counts.items():
 
 ### 4.2 timeline.evaluate 是完整模型总编排
 
-[l1/timeline.py:241-277](../model_eval/l1/timeline.py#L241) 按固定顺序执行：
+[l1/timeline.py:290-341](../model_eval/l1/timeline.py#L290) 按固定顺序执行：
 
 ```python
-graph = lower_model(...)
+graph = lower_plan(model, fmt, point, attention=attention, ...)
 buffer_plan = buffer_plan or BufferPlan.from_graph(graph, plan)
 costs = estimate_graph(graph, topology, plan)
-_handoffs(graph, costs, topology)
-scheduled = schedule(graph, costs, topology, buffer_plan, policy=scheduling_policy)
+scheduled = evaluate_graph(graph, topology, ..., costs=costs)   # 内部 _handoffs + dispatch
 ...
 l0 = evaluate_l0(model, profile, fmt, point, use_doc_bytes=False)
 ...
@@ -307,39 +304,34 @@ return L1Result(...)
 - L0 参考在 L1 调度完成后才计算，且只写入参考字段；
 - 最终 L1Result 同时保存 graph、topology、plan、schedule 和 costs，报告不需要重新推导。
 
-## 5. 第一次展开：ModelSpec → LogicalOp
+## 5. 第一次展开：ModelPlan → LogicalOp（emitter 递归）
 
-### 5.1 map_model 只描述逻辑算子
+### 5.1 lower_plan 与 EmitContext 派发
 
-> 本节及后续 legacy 展开细节仅用于对照保留路径。新模型应注册 `LayerDefinition` + emitter；plan 路径的叶子 op/task ID 与本节的 `block-00/q_proj` 等保持一致。
-
-[l1/mapping.py:15-126](../model_eval/l1/mapping.py#L15) 的 `map_model()` 首先确定矩阵行数：
+[l1/compose.py:25-45](../model_eval/l1/compose.py#L25) 的 `lower_plan()` 先 `plan.validate()`，再建立一个 `GraphBuilder` 和 `EmitContext`，然后顺序遍历顶层层：
 
 ```python
-rows = point.batch * (point.seq_len if point.phase is Phase.PREFILL else 1)
+builder = GraphBuilder(block_size)
+ctx = EmitContext(plan, point, fmt, geometry, attention, builder)
+current = builder.tensor("input:hidden", (ctx.rows, _hidden_width(plan)), "FP32", external=True)
+inputs = {"hidden": current}
+for layer in plan.layers:
+    outputs = ctx.emit(layer, inputs)
+    inputs = {**inputs, **outputs}
 ```
 
-当前 decode batch=1，因此 rows=1。内部 `add()` 闭包统一构造 LogicalOp，并为 VPU/CPU 补齐 DRAM 读写字段：
+`ctx.rows` 在 [l1/emitters/base.py:36-38](../model_eval/l1/emitters/base.py#L36) 定义为 `batch × (seq if prefill else 1)`；当前 decode batch=1，因此 rows=1。`ctx.emit()` 按 `(layer.type, layer.version)` 查 `EMITTERS` 注册表并调用对应 emitter；未注册则抛 `MissingL1Coverage`，不会静默回退。
 
-```python
-def add(layer, name, engine, kind, **values):
-    ...
-    operations.append(LogicalOp(f"{layer}/{name}", layer, name, kind, **values))
-```
+emitter 分两类：
 
-此处的 `engine` 是后续任务分解的语义提示，不代表已经生成一个且仅一个物理任务。
+- **聚合 emitter**（如 `qwen3.decoder_block`、`qwen3.gqa_attention`、`qwen3.swiglu_mlp`）只负责把子层按数据流连起来，通过 `ctx.emit(ctx.child(instance, "q_proj"), {"x": hidden})` 递归派发；
+- **叶子 emitter**（如 `generic.linear`、`generic.rms_norm`、`generic.softmax`）调用 `ctx.operation()` 生成一个 LogicalOp，再调用 `builder.vector/gemm/task` 生成任务。
 
-### 5.2 28 次 block 循环生成什么
+`ctx.operation()` 在 [l1/emitters/base.py:55-66](../model_eval/l1/emitters/base.py#L55) 统一构造 LogicalOp，并为 VPU/CPU 补齐 DRAM 读写字段。此处的 `engine` 是后续任务分解的语义提示，不代表已经生成一个且仅一个物理任务。
 
-[l1/mapping.py:34-116](../model_eval/l1/mapping.py#L34) 先遍历 layer type，再执行：
+### 5.2 28 个 block 实例生成什么
 
-```python
-for _ in range(layer_type.count):
-    layer = f"block-{index:02d}"
-    ...
-```
-
-当前 count=28，所以生成 `block-00` 到 `block-27`。每个 block 的顺序如下：
+`plan.layers` 含 28 个 `qwen3.decoder_block` 实例（`block-00` 到 `block-27`）。[l1/emitters/qwen3.py:16-27](../model_eval/l1/emitters/qwen3.py#L16) 的 `emit_decoder_block()` 依次派发 input_norm → attention → attention_residual → post_norm → mlp → mlp_residual。每个 block 的逻辑算子顺序如下：
 
 | 顺序 | LogicalOp | 当前 S=0 的主要形状或工作量 |
 |---:|---|---|
@@ -362,11 +354,11 @@ for _ in range(layer_type.count):
 | 17 | down_proj | M=1,N=1024,K=3072 |
 | 18 | mlp_residual | 1024 元素 |
 
-S=0 时跳过 qk/softmax/av，因此每 block 为 15 个 LogicalOp；S>0 时为 18 个。attention variant 只改变 qk/av 的语义引擎和 GemmGroup，softmax 始终为 VPU。
+S=0 时跳过 qk/softmax/av，因此每 block 为 15 个 LogicalOp；S>0 时为 18 个。attention variant 只改变 qk/av 的语义引擎和 GemmGroup，softmax 始终为 VPU。叶子 op ID 形如 `block-00/q_proj`、`block-00/silu_gate`（聚合层 scope 不进入叶子 op 名）。
 
 ### 5.3 模型尾部增加三个分组
 
-[l1/mapping.py:117-125](../model_eval/l1/mapping.py#L117) 在 block 循环之后追加：
+顶层层在 28 个 block 之后还有 final-norm、lm-head、sampling，分别由 `generic.rms_norm`、`generic.lm_head`、`generic.sampling` emitter 展开：
 
 ```text
 final-norm/norm       VPU
@@ -382,11 +374,11 @@ sampling/sampling     CPU, vectors=batch,length=151936
 
 这些对象尚未包含 tensor 生产者、任务依赖、GEMM 命令或物理实例。
 
-## 6. 第二次展开：LogicalOp → TaskGraph
+## 6. 第二次展开：LogicalOp → TaskGraph（GraphBuilder）
 
-### 6.1 _GraphBuilder 维护 producer 和 tensor 注册表
+### 6.1 GraphBuilder 维护 producer 和 tensor 注册表
 
-[l1/mapping.py:129-159](../model_eval/l1/mapping.py#L129) 的 builder 保存四组状态：
+[l1/graph_builder.py:18-27](../model_eval/l1/graph_builder.py#L18) 的 `GraphBuilder` 保存四组状态：
 
 ```python
 self.tasks = []
@@ -398,9 +390,8 @@ self.padded_operands = {}
 `tensor()` 注册 Tensor；`task()` 是依赖形成的核心：
 
 ```python
-deps = tuple(dict.fromkeys((*dependencies,
-                            *(self.producers[t] for t in inputs
-                              if t in self.producers))))
+deps = tuple(dict.fromkeys((*(self.producers[t] for t in inputs
+                             if t in self.producers), *dependencies)))
 ...
 self.producers[result] = id
 self.tasks.append(PrimitiveTask(...))
@@ -413,30 +404,29 @@ self.tasks.append(PrimitiveTask(...))
 
 因此 DAG 主要来自 tensor 生产/消费关系，而不是 scheduler 猜测算子顺序。`dict.fromkeys()` 只负责去重并保持顺序。
 
-### 6.2 convert、weight 和 norm 是任务生成闭包
+### 6.2 convert、gemm、vector、dma 是 builder 方法
 
-`convert()` 位于 [l1/mapping.py:161-172](../model_eval/l1/mapping.py#L161)：
+叶子 emitter 不直接拼 PrimitiveTask，而是调用 builder 的四个方法：
 
-- dtype 已相同且 MX scale 轴一致时直接返回原 tensor，不生成任务；
-- 否则生成一个 VPU `convert` 任务，其服务保持未知；
-- 输出注册新 tensor 和 producer。
+- `convert()`（[l1/graph_builder.py:77-90](../model_eval/l1/graph_builder.py#L77)）：dtype 已相同且 MX scale 轴一致时直接返回原 tensor，不生成任务；否则生成一个 VPU `convert` 任务，其服务保持未知，并注册新 tensor 和 producer。
+- `vector()`（[l1/graph_builder.py:92-100](../model_eval/l1/graph_builder.py#L92)）：用 `VpuSpec` 创建一个 VPU 任务。
+- `gemm()`（[l1/graph_builder.py:102-163](../model_eval/l1/graph_builder.py#L102)）：合法化、padding、GEMM 任务与可选 k_accum，见 6.4。
+- `dma()`（[l1/graph_builder.py:165-178](../model_eval/l1/graph_builder.py#L165)）：创建 DMA transfer 任务并注册输出 producer。
 
-`weight()` 位于 [l1/mapping.py:255-261](../model_eval/l1/mapping.py#L255)：
+权重 GEMM 的组合模式在 [l1/emitters/generic.py:26-33](../model_eval/l1/emitters/generic.py#L26) 的 `_weight_gemm()`：
 
 ```python
-a = builder.convert(op, a, fmt.name, "quantize-input")
-b = builder.tensor(..., fmt.name, external=True, scale_axis=0)
-out = builder.gemm(..., GemmSpec(...), geometry)
-return builder.convert(op, out, "FP32", "dequantize-output")
+a = ctx.builder.convert(op, a, ctx.fmt.name, "quantize-input")
+b = ctx.builder.tensor(op.id + ":weight", (k, n), ctx.fmt.name, external=True, scale_axis=0)
+out = ctx.builder.gemm(op, a, b, GemmSpec(...), ctx.geometry)
+return ctx.builder.convert(op, out, "FP32", "dequantize-output")
 ```
 
-它描述“激活按需量化→external 权重→GEMM→按需转 FP32”。是否真正产生 convert 任务由输入输出 dtype 决定，不能仅从函数名推断任务数。
-
-`norm()` 位于 [l1/mapping.py:263-276](../model_eval/l1/mapping.py#L263)：有 norm 系数时先创建 DMA coefficient transfer，再创建 VPU norm，并将 DMA 加入 norm 依赖。
+它描述“激活按需量化→external 权重→GEMM→按需转 FP32”。是否真正产生 convert 任务由输入输出 dtype 决定，不能仅从函数名推断任务数。norm emitter 在有系数时先创建 DMA coefficient transfer，再创建 VPU norm，并将 DMA 加入 norm 依赖。
 
 ### 6.3 一个 decoder block 的数据流
 
-主循环位于 [l1/mapping.py:278-397](../model_eval/l1/mapping.py#L278)。当前 block 的 tensor 流为：
+聚合 emitter 递归派发后，当前 block 的 tensor 流为：
 
 ```text
 current
@@ -457,26 +447,26 @@ current
 
 几个容易误读的细节：
 
-- Q/K/V 的 `weight()` 接收同一个量化 tensor，不会生成三份量化 A；
+- Q/K/V 的 `_weight_gemm()` 接收同一个量化 tensor，不会生成三份量化 A；
 - gate/up 共享另一份量化 A；
 - K/V 先显式转为 FP16，再由 DMA append 到 KV allocation；
 - 当前 S=0 时创建 external empty-attention-context 以保留后续 o_proj 数据流，这只是结构基线，不是数值前向；
 - `current` 在每个 block 末尾替换为新的 residual 输出，下一个 block 的 producer 链由此延续。
 
-S>0 时，VPU attention 直接构造 QK→softmax→AV；quantized GEMM 路径还在 batch/head 双重循环中创建 Q/K/V views、逐 head QK/AV、概率量化和 head join，见 [l1/mapping.py:337-386](../model_eval/l1/mapping.py#L337)。
+S>0 时，VPU attention 直接构造 QK→softmax→AV；quantized GEMM 路径还在 batch/head 双重循环中创建 Q/K/V views、逐 head QK/AV、概率量化和 head join，见 [l1/emitters/qwen3.py:75-176](../model_eval/l1/emitters/qwen3.py#L75)。
 
-### 6.4 GEMM 在 lowering 中先做合法化和 padding
+### 6.4 GEMM 在 builder 中先做合法化和 padding
 
-`builder.gemm()` 位于 [l1/mapping.py:182-233](../model_eval/l1/mapping.py#L182)。它在真正创建 GEMM 任务前调用：
+`builder.gemm()` 在真正创建 GEMM 任务前调用共享命令规划：
 
 ```python
-commands = legalize(GemmShape(...), geometry)
+commands = split_commands(GemmShape(...), geometry, policy)
 k_parts = len({command.k_offset for command in commands})
 padded_n = ...
 padded_k = ...
 ```
 
-随后：
+`split_commands()`（[l1/split_policies.py](../model_eval/l1/split_policies.py)）默认调用 `gemm_model.legalize()`，builder 与 estimator 共用同一入口，避免两处合法化漂移。随后：
 
 1. 分别检查 A/B storage shape；
 2. 若逻辑形状小于 padded storage，创建显式 VPU repack/zero-pad；
@@ -490,12 +480,12 @@ padded_k = ...
 
 ### 6.5 模型尾部与图校验
 
-[l1/mapping.py:398-413](../model_eval/l1/mapping.py#L398) 依次创建 final norm、lm_head 和 CPU sampling。prefill 会先用带步长的 view 选择每个序列最后一个位置，再进入 lm_head；decode 不需要该 view。
+顶层 emitter 依次创建 final norm、lm_head 和 CPU sampling。prefill 会先用带步长的 view 选择每个序列最后一个位置，再进入 lm_head；decode 不需要该 view。
 
-最后：
+`lower_plan()` 最后：
 
 ```python
-graph = TaskGraph(operations, tuple(builder.tasks),
+graph = TaskGraph(tuple(builder.operations), tuple(builder.tasks),
                   tuple(builder.tensors.values()), ...)
 graph.validate()
 ```
@@ -922,19 +912,19 @@ unassigned  无可选成本
 
 ```text
 CONFIG dict
-  → ModelSpec / LayerTypeSpec / TensorSpec
-      只含模型聚合量与权重形状
+  → ModelPlan（LayerInstance 树 + WeightAllocation）
+      层 geometry/权重角色；L0 闭式在 LayerDefinition 中
 
 WorkloadPoint + NumFormat + HwProfile
   → L0 Account(MAC) + Account(bytes)
   → L0Result
       只含闭式 roofline 与瓶颈
 
-ModelSpec + WorkloadPoint + NumFormat
-  → tuple[LogicalOp]
+ModelPlan + WorkloadPoint + NumFormat
+  → emitter 递归 → tuple[LogicalOp]
       有语义形状，尚无生产者 DAG
 
-LogicalOp + _GraphBuilder + ArrayGeometry
+LogicalOp + GraphBuilder + ArrayGeometry
   → TaskGraph(operations, tasks, tensors)
       有 typed spec、显式转换、padding、依赖和 base/view
 

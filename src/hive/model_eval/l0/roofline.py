@@ -9,7 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from ..common.workload import Phase, WorkloadPoint
-from ..frontend.spec import ModelSpec, NumFormat
+from ..frontend.plan import ModelPlan
+from ..frontend.spec import NumFormat
 from ..hw.profiles import HwProfile
 from .accounts import Account, traffic_account, work_account
 
@@ -44,7 +45,7 @@ class L0Result:
 
 
 def evaluate(
-    model: ModelSpec,
+    model: ModelPlan,
     profile: HwProfile,
     fmt: NumFormat,
     point: WorkloadPoint,

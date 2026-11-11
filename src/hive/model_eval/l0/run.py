@@ -20,7 +20,6 @@ from ..common.report import (
 )
 from ..common.workload import Phase, WorkloadPoint, decode, frame, prefill
 from ..frontend import builtins as _builtins  # noqa: F401  (registers built-in models)
-from ..frontend.plan import ModelPlan
 from ..frontend.registry import get_model
 from ..frontend.spec import FORMATS
 from ..hw.geometry import load_array_geometry
@@ -106,8 +105,7 @@ def main(argv: list[str] | None = None) -> int:
             "tile_n": geometry.tile_n,
         },
         excluded_costs=excluded.for_workload(points[0]),
-        provenance=(model.provenance_paths() if isinstance(model, ModelPlan)
-                    else (model.source, "src/hive/model_eval/frontend/qwen3_06b.py")),
+        provenance=model.provenance_paths(),
     )
 
     print(header_block(man))

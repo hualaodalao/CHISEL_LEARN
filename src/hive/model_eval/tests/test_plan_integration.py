@@ -1,13 +1,16 @@
-"""Phase 3 integration: plan-driven L0/L1/report/manifest."""
+"""Plan-driven L0/L1/report/manifest integration anchors.
+
+The legacy ModelSpec path these results were once compared against has been
+removed; the ModelPlan emitter path is now the single source, so the checks
+below pin absolute values and internal consistency directly.
+"""
 
 import unittest
-from dataclasses import replace
 from pathlib import Path
 
 from hive.model_eval.common.manifest import build as build_manifest
 from hive.model_eval.common.workload import decode, prefill
 from hive.model_eval.frontend import builtins  # noqa: F401  (registers layers/models)
-from hive.model_eval.frontend import qwen3_06b as legacy
 from hive.model_eval.frontend.models.qwen3_06b import CONFIG
 from hive.model_eval.frontend.registry import get_model
 from hive.model_eval.frontend.spec import MXFP8
@@ -24,32 +27,34 @@ def _plan(layers=None):
     return get_model("Qwen3-0.6B", config={**CONFIG, "num_hidden_layers": layers})
 
 
-def _legacy(layers=None):
-    model = legacy.build()
-    if layers is None:
-        return model
-    return replace(model, layer_types=(replace(model.layer_types[0], count=layers),))
-
-
 class TestPlanL1(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.geometry = load_array_geometry()
         cls.plan = _plan(1)
-        cls.model = _legacy(1)
 
-    def test_plan_evaluation_matches_legacy(self):
+    def test_plan_evaluation_is_self_consistent(self):
         for point in (decode(0), decode(5), prefill(16)):
             for variant in ("vpu", "quantized_gemm"):
                 with self.subTest(point=point, variant=variant):
-                    old = evaluate(self.model, G0, MXFP8, point, attention=variant,
-                                   geometry=self.geometry)
-                    new = evaluate(self.plan, G0, MXFP8, point, attention=variant,
-                                   geometry=self.geometry)
-                    self.assertEqual(new.makespan_s, old.makespan_s)
-                    self.assertEqual(new.projection_makespan_s, old.projection_makespan_s)
-                    self.assertEqual(new.metrics, old.metrics)
-                    self.assertEqual(new.excluded_costs, old.excluded_costs)
+                    result = evaluate(self.plan, G0, MXFP8, point, attention=variant,
+                                      geometry=self.geometry)
+                    self.assertIsNone(result.makespan_s)
+                    self.assertIsNone(result.modeled_throughput)
+                    metrics = result.metrics
+                    self.assertEqual(metrics["semantic_macs"],
+                                     metrics["l0_reference_macs"]
+                                     + metrics["extra_semantic_macs_vs_l0"])
+                    if result.projection_makespan_s is not None:
+                        self.assertAlmostEqual(
+                            sum(result.projection_attribution_s.values()),
+                            result.projection_makespan_s)
+
+    def test_single_block_decode_anchor(self):
+        result = evaluate(self.plan, G0, MXFP8, decode(0), attention="vpu",
+                          geometry=self.geometry)
+        self.assertEqual(result.metrics["array_cycles"], 5688064)
+        self.assertEqual(result.metrics["semantic_macs"], 171334656)
 
     def test_report_has_aggregate_and_leaf_layers(self):
         result = evaluate(self.plan, G0, MXFP8, decode(5), geometry=self.geometry)
@@ -68,19 +73,18 @@ class TestPlanL1(unittest.TestCase):
 class TestPlanL0(unittest.TestCase):
     def test_layer_resources_match_roofline(self):
         plan = _plan()
-        model = _legacy()
         for point in (decode(0), decode(4096, 4), prefill(1024, 2)):
             with self.subTest(point=point):
                 result = evaluate_l0(plan, G0, MXFP8, point)
-                expected = evaluate_l0(model, G0, MXFP8, point)
-                self.assertEqual(result.t_s, expected.t_s)
-                self.assertEqual(result.work, expected.work)
-                self.assertEqual(result.traffic, expected.traffic)
                 rows = layer_resources(plan, G0, MXFP8, result)
                 self.assertEqual(len(rows), 30)
                 self.assertAlmostEqual(sum(row["mac"] for row in rows), result.mac)
                 self.assertAlmostEqual(sum(row["traffic_bytes"] for row in rows),
                                        result.traffic_bytes)
+
+    def test_decode_zero_mac_anchor(self):
+        result = evaluate_l0(_plan(), G0, MXFP8, decode(0))
+        self.assertEqual(int(result.mac), 596588544)
 
     def test_layer_count_follows_plan(self):
         small = _plan(3)

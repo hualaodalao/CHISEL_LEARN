@@ -3,46 +3,58 @@ import io
 import json
 import tempfile
 import unittest
-from dataclasses import replace
 from pathlib import Path
 
 from hive.model_eval.common.opspec import GemmGroup, GemmSpec, VpuSpec
-from hive.model_eval.common.workload import decode, frame, prefill
-from hive.model_eval.frontend.qwen3_06b import build
+from hive.model_eval.common.workload import decode, prefill
+from hive.model_eval.frontend import builtins  # noqa: F401  (registers built-in models)
+from hive.model_eval.frontend.models.qwen3_06b import CONFIG
+from hive.model_eval.frontend.registry import get_model
 from hive.model_eval.frontend.spec import FORMATS, INT8, MXFP8
 from hive.model_eval.hw.geometry import load_array_geometry
 from hive.model_eval.hw.profiles import G0, G0_PRO, MODEL_ANALYSIS_310
 from hive.model_eval.hw.topology import default_topology, explicit_topology
 from hive.model_eval.l0.accounts import work_account
-from hive.model_eval.l1.mapping import lower_model, map_model
+from hive.model_eval.l1.compose import lower_plan
 from hive.model_eval.l1.params import ModelParams
 from hive.model_eval.l1.residency import ExecutionPlan
 from hive.model_eval.l1.run import main
 from hive.model_eval.l1.timeline import evaluate, estimate_graph, evaluate_graph
 
 
+def _plan(layers=None):
+    config = dict(CONFIG)
+    if layers is not None:
+        config["num_hidden_layers"] = layers
+    return get_model("Qwen3-0.6B", config=config)
+
+
 class TestMapping(unittest.TestCase):
     def setUp(self):
-        self.model = build()
+        self.model = _plan()
         self.geometry = load_array_geometry()
+
+    def ops(self, point, variant="vpu", fmt=MXFP8, model=None):
+        return lower_plan(model or self.model, fmt, point, attention=variant,
+                          geometry=self.geometry).operations
 
     def test_decode_semantic_work_matches_l0(self):
         for seq in (0, 1, 4096, 131072):
             for batch in (1, 3):
                 point = decode(seq, batch)
-                self.assertEqual(sum(op.mac for op in map_model(self.model, MXFP8, point)),
+                self.assertEqual(sum(op.mac for op in self.ops(point)),
                                  work_account(self.model, point).total)
 
     def test_prefill_causal_diagonal_and_softmax_are_explicit(self):
         point = prefill(49, 2)
-        operations = map_model(self.model, MXFP8, point)
+        operations = self.ops(point)
         softmax = sum(op.mac for op in operations if op.kind == "softmax")
         self.assertEqual(sum(op.mac for op in operations) - softmax,
                          work_account(self.model, point).total + 28 * 16 * 128 * 49 * 2)
         self.assertEqual(softmax, 28 * 16 * 49 * 50 * 2 // 2)
 
     def test_structural_calls_and_head_position(self):
-        operations = map_model(self.model, MXFP8, decode(4096))
+        operations = self.ops(decode(4096))
         self.assertEqual(sum(op.vectors for op in operations if op.kind == "norm"), 729)
         self.assertEqual(sum(op.vectors for op in operations if op.kind == "softmax"), 448)
         weight = [op for op in operations if op.kind == "weight_gemm"]
@@ -50,9 +62,10 @@ class TestMapping(unittest.TestCase):
         self.assertEqual(weight[-1].gemms, (GemmGroup(1, 151936, 1024),))
 
     def test_qkv_and_gate_up_are_independent_forks(self):
-        graph = lower_model(self.model, MXFP8, decode(1), geometry=self.geometry)
+        graph = lower_plan(self.model, MXFP8, decode(1), geometry=self.geometry)
         tasks = {task.id: task for task in graph.tasks}
-        projections = [tasks[f"block-00/{name}/execute"] for name in ("q_proj", "k_proj", "v_proj")]
+        projections = [tasks[f"block-00/{name}/execute"]
+                       for name in ("q_proj", "k_proj", "v_proj")]
         self.assertEqual(len({task.inputs[0].tensor_id for task in projections}), 1)
         for task in projections:
             self.assertFalse(any(other.id in task.dependencies for other in projections))
@@ -64,9 +77,10 @@ class TestMapping(unittest.TestCase):
         graph.validate()
 
     def test_repeat_heads_use_shared_kv_views_not_shared_b_gemm(self):
-        graph = lower_model(replace(self.model, layer_types=(replace(self.model.layer_types[0], count=1),)),
-                            MXFP8, decode(32, 2), "quantized_gemm", geometry=self.geometry)
-        qk = [task for task in graph.tasks if task.parent_op_id == "block-00/qk" and task.engine_kind == "GEMM"]
+        graph = lower_plan(_plan(1), MXFP8, decode(32, 2), attention="quantized_gemm",
+                           geometry=self.geometry)
+        qk = [task for task in graph.tasks if task.parent_op_id == "block-00/qk"
+              and task.engine_kind == "GEMM"]
         self.assertEqual(len(qk), 32)
         self.assertTrue(all((task.spec.m, task.spec.n, task.spec.k) == (1, 32, 128) for task in qk))
         self.assertEqual(len({task.inputs[1].tensor_id for task in qk}), 16)
@@ -77,39 +91,39 @@ class TestMapping(unittest.TestCase):
         self.assertTrue(all(tensors[view.base_id].dtype == "FP16" for view in views))
 
     def test_explicit_conversion_tasks_and_types(self):
-        graph = lower_model(self.model, INT8, decode(0), geometry=self.geometry)
+        graph = lower_plan(self.model, INT8, decode(0), geometry=self.geometry)
         gemms = [task for task in graph.tasks if isinstance(task.spec, GemmSpec)]
         self.assertTrue(all(task.spec.c_dtype == "INT32" for task in gemms))
         conversions = [task for task in graph.tasks if isinstance(task.spec, VpuSpec) and task.spec.kind == "convert"]
         self.assertTrue(any(task.spec.input_dtype == "INT32" and task.spec.output_dtype == "FP32" for task in conversions))
 
     def test_last_prompt_position_view_is_strided_by_batch(self):
-        graph = lower_model(self.model, MXFP8, prefill(7, 3), geometry=self.geometry)
+        graph = lower_plan(self.model, MXFP8, prefill(7, 3), geometry=self.geometry)
         view = next(tensor for tensor in graph.tensors if tensor.id == "final-norm:last-position")
         self.assertEqual(view.base_starts, (6, 0))
         self.assertEqual(view.base_steps, (7, 1))
         self.assertEqual(view.shape, (3, 1024))
 
     def test_custom_lowering_is_called_not_overridden(self):
-        graph = lower_model(self.model, MXFP8, decode(0), geometry=self.geometry)
+        graph = lower_plan(self.model, MXFP8, decode(0), geometry=self.geometry)
         seen = []
         def custom(model, fmt, point, **kwargs):
             seen.append((model, fmt, point))
             return graph
-        self.assertIs(lower_model(self.model, MXFP8, decode(0), geometry=self.geometry, lowering=custom), graph)
+        result = evaluate(self.model, G0, MXFP8, decode(0), geometry=self.geometry, lowering=custom)
+        self.assertIs(result.graph, graph)
         self.assertEqual(len(seen), 1)
 
-    def test_invalid_coverage_rejected(self):
-        for point, variant in ((frame(), "vpu"), (decode(1), "bf16_gemm")):
-            with self.assertRaises(ValueError):
-                map_model(self.model, MXFP8, point, variant)
+    def test_invalid_attention_variant_rejected(self):
+        with self.assertRaises(ValueError):
+            self.ops(decode(1), variant="bf16_gemm")
 
 
 class TestTimeline(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.model = build()
-        cls.small = replace(cls.model, layer_types=(replace(cls.model.layer_types[0], count=2),))
+        cls.model = _plan()
+        cls.small = _plan(2)
         cls.geometry = load_array_geometry()
 
     def test_weight_only_anchors_survive_new_backend(self):
@@ -177,7 +191,7 @@ class TestTimeline(unittest.TestCase):
         self.assertTrue(all(phase["category"] == "handoff" and phase["seconds"] == .5e-6 for phase in phases))
 
     def test_injected_costs_still_receive_handoffs(self):
-        graph = lower_model(self.small, MXFP8, decode(1), geometry=self.geometry)
+        graph = lower_plan(self.small, MXFP8, decode(1), geometry=self.geometry)
         topology = default_topology(G0, self.geometry, ModelParams())
         plan = ExecutionPlan("stream", "stream")
         costs = estimate_graph(graph, topology, plan)
@@ -224,3 +238,7 @@ class TestCli(unittest.TestCase):
             payload = path.read_text()
             self.assertEqual(self.invoke(*args), first)
             self.assertEqual(path.read_text(), payload)
+
+
+if __name__ == "__main__":
+    unittest.main()

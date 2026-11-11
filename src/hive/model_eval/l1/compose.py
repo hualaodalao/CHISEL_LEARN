@@ -10,6 +10,8 @@ from ..hw.geometry import ArrayGeometry
 from .emitters import EmitContext
 from .graph_builder import GraphBuilder
 
+ATTENTION_VARIANTS = ("vpu", "quantized_gemm")
+
 
 def _hidden_width(plan: ModelPlan) -> int:
     geometry = plan.layers[0].geometry

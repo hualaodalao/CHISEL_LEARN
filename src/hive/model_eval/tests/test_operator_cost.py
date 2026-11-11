@@ -2,7 +2,9 @@ import math
 import unittest
 
 from hive.model_eval.common.workload import decode
-from hive.model_eval.frontend.qwen3_06b import CONFIG, build
+from hive.model_eval.frontend import builtins  # noqa: F401  (registers built-in models)
+from hive.model_eval.frontend.models.qwen3_06b import CONFIG
+from hive.model_eval.frontend.registry import get_model
 from hive.model_eval.frontend.spec import MXFP8
 from hive.model_eval.hw.geometry import load_array_geometry
 from hive.model_eval.hw.profiles import G0
@@ -13,7 +15,7 @@ class TestOperatorCostView(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.geometry = load_array_geometry()
-        cls.model = build({**CONFIG, "num_hidden_layers": 1})
+        cls.model = get_model("Qwen3-0.6B", config={**CONFIG, "num_hidden_layers": 1})
         cls.result = evaluate(cls.model, G0, MXFP8, decode(0),
                               attention="vpu", geometry=cls.geometry)
         cls.payload = cls.result.to_dict()

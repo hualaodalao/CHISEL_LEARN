@@ -11,7 +11,9 @@ from unittest.mock import patch
 
 from hive.model_eval.common.manifest import build as build_manifest
 from hive.model_eval.common.workload import decode, prefill
-from hive.model_eval.frontend.qwen3_06b import CONFIG, build
+from hive.model_eval.frontend import builtins  # noqa: F401  (registers built-in models)
+from hive.model_eval.frontend.models.qwen3_06b import CONFIG
+from hive.model_eval.frontend.registry import get_model
 from hive.model_eval.frontend.spec import FORMATS, MXFP8
 from hive.model_eval.hw.profiles import G0, G0_PRO, MODEL_ANALYSIS_310
 from hive.model_eval.l1 import web
@@ -31,7 +33,7 @@ LEGACY_FIELDS = {
 class TestL1Web(unittest.TestCase):
     @staticmethod
     def small_model(layers=2):
-        return build({**CONFIG, "num_hidden_layers": layers})
+        return get_model("Qwen3-0.6B", config={**CONFIG, "num_hidden_layers": layers})
 
     def payload(self, profile=G0, points=None, params=None, model=None, fmt=MXFP8):
         model = model or self.small_model()

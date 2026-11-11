@@ -482,7 +482,7 @@ def lowering(model, fmt, point, *, attention, geometry, block_size):
     return graph
 ```
 
-将回调传给 `mapping.lower_model(..., lowering=lowering)` 或 `timeline.evaluate(..., lowering=lowering)`。返回对象必须是 TaskGraph，并通过 ID、依赖、tensor、view、生产者和 stream owner 校验。
+将回调传给 `timeline.evaluate(..., lowering=lowering)`（`model` 为 ModelPlan）。返回对象必须是 TaskGraph，并通过 ID、依赖、tensor、view、生产者和 stream owner 校验。
 
 逐层扩展优先注册 emitter（见上一节），只有需要整体替换图时才用 lowering 回调。
 
@@ -513,7 +513,7 @@ L1 参数错误通常由 argparse 以退出码 2 报告；自定义回调异常�
 |---|---|
 | 层语义与 L0 闭式 | `frontend/layers/`（`LayerDefinition.l0`） |
 | 模型组装与注册 | `frontend/models/`、`frontend/plan.py`、`frontend/registry.py` |
-| DAG、格式与视图契约 | `common/opspec.py`、`l1/mapping.py` |
+| DAG、格式与视图契约 | `common/opspec.py`、`l1/graph_builder.py` |
 | 图展开（lowering） | `l1/emitters/`、`l1/graph_builder.py` |
 | 算子 cost 公式 | `l1/costing/forms/`、`l1/costing/registry.py` |
 | GEMM 命令与窗口 | `l1/gemm_model.py`、`l1/costing/gemm_commands.py` |

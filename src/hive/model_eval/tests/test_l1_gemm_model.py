@@ -7,7 +7,7 @@ from hive.model_eval.hw.geometry import load_array_geometry
 from hive.model_eval.hw.profiles import G0, MODEL_ANALYSIS_310
 from hive.model_eval.hw.topology import default_topology
 from hive.model_eval.l1 import gemm_model
-from hive.model_eval.l1.mapping import _GraphBuilder
+from hive.model_eval.l1.graph_builder import GraphBuilder
 from hive.model_eval.l1.params import ModelParams
 from hive.model_eval.l1.residency import ExecutionPlan
 
@@ -125,7 +125,7 @@ class TestGemmModel(unittest.TestCase):
     def test_tail_c_and_k_merge_allocate_physical_padded_output(self):
         for geometry in (self.geometry, replace(self.geometry, mnk_width=8)):
             op = LogicalOp("op", "layer", "tail", "gemm")
-            builder = _GraphBuilder((op,), 32)
+            builder = GraphBuilder(32, operations=(op,))
             a = builder.tensor("a", (2, 500), "MXFP8", external=True)
             b = builder.tensor("b", (500, 17), "MXFP8", external=True, scale_axis=0)
             result = builder.gemm(op, a, b, GemmSpec(2, 17, 500), geometry)
@@ -143,7 +143,7 @@ class TestGemmModel(unittest.TestCase):
 
     def test_padding_has_backing_producer_bytes_and_unknown_service(self):
         op = LogicalOp("op", "layer", "tail", "gemm")
-        builder = _GraphBuilder((op,), 32)
+        builder = GraphBuilder(32, operations=(op,))
         a = builder.tensor("a", (1, 500), "MXFP8", external=True)
         b = builder.tensor("b", (500, 17), "MXFP8", external=True, scale_axis=0)
         builder.gemm(op, a, b, GemmSpec(1, 17, 500, weight=True), self.geometry)
@@ -175,7 +175,7 @@ class TestGemmModel(unittest.TestCase):
 
     def test_shared_padded_kv_operand_has_one_producer(self):
         op = LogicalOp("op", "layer", "tail", "gemm")
-        builder = _GraphBuilder((op,), 32)
+        builder = GraphBuilder(32, operations=(op,))
         a = builder.tensor("a", (1, 32), "MXFP8", external=True)
         b = builder.tensor("b", (32, 17), "MXFP8", external=True, scale_axis=0)
         for suffix in ("head-0", "head-1"):

@@ -1,15 +1,15 @@
-"""ModelPlan / layer-registry anchors against the legacy Qwen ModelSpec.
+"""ModelPlan / layer-registry anchors.
 
-The legacy ``frontend.qwen3_06b`` remains the L0 truth during the migration.
-These tests prove the composed plan reproduces its parameter and L0 totals
-without re-deriving any closed-form expression in the model file.
+The legacy ``frontend.qwen3_06b`` ModelSpec these totals were once compared
+against has been removed; the values below are the appendix-B anchors pinned
+directly against the composed plan.
 """
 
 import unittest
 from dataclasses import replace
+from math import prod
 
 from hive.model_eval.frontend import builtins  # noqa: F401  (registers layers/models)
-from hive.model_eval.frontend import qwen3_06b as legacy
 from hive.model_eval.frontend.layers import LAYERS, LayerL0, layer_l0
 from hive.model_eval.frontend.layers.generic import (
     AttentionMatmulGeometry,
@@ -19,53 +19,68 @@ from hive.model_eval.frontend.layers.generic import (
     SamplingGeometry,
 )
 from hive.model_eval.frontend.layers.qwen3 import Qwen3BlockGeometry
-from hive.model_eval.frontend.plan import ModelPlan
 from hive.model_eval.frontend.registry import get_model, list_models
+
+# src/hive/doc/model_analysis/Qwen3-0.6B-逐层计算拆解.md 附录 B
+LAYERS_N = 28
+LAYER_PARAMS = 15_730_944
+BODY_PARAMS = 440_466_432
+EMB = 155_582_464
+UNIQ = 596_049_920
+CKPT = 751_632_384
+FIXED = 15_750_144
+S_TERM = 4_112
+KV_TOK = 114_688
+HIDDEN = 1024
+VOCAB = 151936
+HEADS = 16
+KV_HEADS = 8
+HEAD_DIM = 128
+FINAL_NORM_MAC = 2 * HIDDEN
+LM_HEAD_MAC = VOCAB * HIDDEN
+BODY_S2 = LAYERS_N * HEADS * HEAD_DIM
 
 
 class TestQwenModelPlanAnchors(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.plan = get_model("Qwen3-0.6B")
-        cls.legacy = legacy.build()
         cls.blocks = tuple(layer for layer in cls.plan.iter_layers()
                            if layer.type == "qwen3.decoder_block")
 
     def test_plan_is_registered_and_valid(self):
         self.assertIn(("Qwen3-0.6B", 1), list_models())
         self.plan.validate()
-        self.assertEqual(len(self.blocks), self.legacy.layer_types[0].count)
+        self.assertEqual(len(self.blocks), LAYERS_N)
 
-    def test_parameter_totals_match_legacy(self):
-        self.assertEqual(self.plan.unique_params(), self.legacy.params_unique)
-        self.assertEqual(self.plan.checkpoint_params(), self.legacy.params_checkpoint)
-        self.assertEqual(self.plan.params_streamed_per_token,
-                         self.legacy.params_streamed_per_token)
-        self.assertEqual(self.plan.kv_bytes_per_token, self.legacy.kv_bytes_per_token)
-        self.assertEqual(self.plan.state_bytes, self.legacy.state_bytes)
+    def test_parameter_totals(self):
+        self.assertEqual(self.plan.unique_params(), UNIQ)
+        self.assertEqual(self.plan.checkpoint_params(), CKPT)
+        self.assertEqual(self.plan.params_streamed_per_token, UNIQ)
+        self.assertEqual(self.plan.kv_bytes_per_token, KV_TOK)
+        self.assertEqual(self.plan.state_bytes, 0)
 
-    def test_body_mac_totals_match_legacy(self):
+    def test_body_mac_totals(self):
         fixed = sum(layer_l0(block).mac_fixed for block in self.blocks)
-        self.assertEqual(fixed, self.legacy.body_mac_fixed())
+        self.assertEqual(fixed, LAYERS_N * FIXED)
         self.assertEqual(sum(layer_l0(block).mac_s_coef for block in self.blocks),
-                         self.legacy.body_mac_s_coef())
+                         LAYERS_N * S_TERM)
         self.assertEqual(sum(layer_l0(block).mac_s2_coef for block in self.blocks),
-                         self.legacy.body_mac_s2_coef())
+                         BODY_S2)
 
     def test_final_norm_is_separate_from_body(self):
-        self.assertEqual(self.plan.mac_fixed() - self.legacy.body_mac_fixed(),
-                         self.legacy.final_norm_mac)
-        self.assertEqual(self.plan.mac_s_coef(), self.legacy.body_mac_s_coef())
-        self.assertEqual(self.plan.mac_s2_coef(), self.legacy.body_mac_s2_coef())
+        self.assertEqual(self.plan.mac_fixed() - LAYERS_N * FIXED, FINAL_NORM_MAC)
+        self.assertEqual(self.plan.mac_s_coef(), LAYERS_N * S_TERM)
+        self.assertEqual(self.plan.mac_s2_coef(), BODY_S2)
 
     def test_lm_head_is_per_output_position(self):
-        self.assertEqual(self.plan.lm_head_mac, self.legacy.lm_head_mac)
-        lm_head = next(layer for layer in self.plan.iter_layers()
+        self.assertEqual(self.plan.lm_head_mac, LM_HEAD_MAC)
+        lm_head = next(layer for layer in self.plan.iter_leaves()
                        if layer.type == "generic.lm_head")
         l0 = layer_l0(lm_head)
         self.assertEqual(l0.mac_fixed, 0)
         self.assertEqual(l0.mac_s_coef, 0)
-        self.assertEqual(l0.mac_output, self.legacy.lm_head_mac)
+        self.assertEqual(l0.mac_output, LM_HEAD_MAC)
 
     def test_aggregate_l0_is_the_sum_of_children(self):
         block = self.blocks[0]
@@ -85,10 +100,10 @@ class TestQwenModelPlanAnchors(unittest.TestCase):
         block = self.blocks[0]
         geometry = block.geometry
         self.assertIsInstance(geometry, Qwen3BlockGeometry)
-        self.assertEqual(geometry.hidden, 1024)
-        self.assertEqual(geometry.heads, 16)
-        self.assertEqual(geometry.kv_heads, 8)
-        self.assertEqual(geometry.head_dim, 128)
+        self.assertEqual(geometry.hidden, HIDDEN)
+        self.assertEqual(geometry.heads, HEADS)
+        self.assertEqual(geometry.kv_heads, KV_HEADS)
+        self.assertEqual(geometry.head_dim, HEAD_DIM)
         # hidden != heads * head_dim; q_proj width comes from the head geometry.
         self.assertNotEqual(geometry.hidden, geometry.heads * geometry.head_dim)
         attention = next(child for child in
@@ -98,9 +113,9 @@ class TestQwenModelPlanAnchors(unittest.TestCase):
                       LAYERS.get(attention.type, attention.version).children(attention)
                       if child.id.endswith("/q_proj"))
         self.assertIsInstance(q_proj.geometry, LinearGeometry)
-        self.assertEqual(q_proj.geometry.out_features, 16 * 128)
+        self.assertEqual(q_proj.geometry.out_features, HEADS * HEAD_DIM)
 
-    def test_attention_leaf_l0_matches_legacy_coefficients(self):
+    def test_attention_leaf_l0_coefficients(self):
         attention = next(layer for layer in self.plan.iter_layers()
                          if layer.type == "qwen3.gqa_attention")
         definition = LAYERS.get(attention.type, attention.version)
@@ -114,25 +129,23 @@ class TestQwenModelPlanAnchors(unittest.TestCase):
         self.assertIsInstance(rope.geometry, RopeGeometry)
         self.assertIsInstance(qk.geometry, AttentionMatmulGeometry)
         self.assertIsInstance(av.geometry, AttentionMatmulGeometry)
-        self.assertEqual(layer_l0(norm).mac_fixed,
-                         2 * 128 * (16 + 8))
-        self.assertEqual(layer_l0(rope).mac_fixed, 4 * (128 // 2) * (16 + 8))
+        self.assertEqual(layer_l0(norm).mac_fixed, 2 * HEAD_DIM * (HEADS + KV_HEADS))
+        self.assertEqual(layer_l0(rope).mac_fixed, 4 * (HEAD_DIM // 2) * (HEADS + KV_HEADS))
         self.assertEqual(layer_l0(qk).mac_s_coef + layer_l0(av).mac_s_coef,
-                         2 * 16 * 128)
-        self.assertEqual(layer_l0(softmax).mac_s_coef, 16)
+                         2 * HEADS * HEAD_DIM)
+        self.assertEqual(layer_l0(softmax).mac_s_coef, HEADS)
         self.assertEqual(layer_l0(qk).mac_s2_coef + layer_l0(av).mac_s2_coef,
-                         16 * 128)
+                         HEADS * HEAD_DIM)
 
     def test_tied_embedding_allocation(self):
         allocation = next(item for item in self.plan.allocations
                           if item.id == "embedding")
-        self.assertEqual(allocation.shape, (151936, 1024))
+        self.assertEqual(allocation.shape, (VOCAB, HIDDEN))
         self.assertEqual(allocation.checkpoint_copies, 2)
         lm_head = next(layer for layer in self.plan.iter_leaves()
                        if layer.type == "generic.lm_head")
         self.assertEqual(lm_head.weights[0].allocation, "embedding")
-        self.assertEqual(self.plan.unique_params() - 151936 * 1024,
-                         self.legacy.params_unique - self.legacy.embedding_params)
+        self.assertEqual(self.plan.unique_params() - VOCAB * HIDDEN, UNIQ - EMB)
 
     def test_sampling_has_zero_l0_and_is_documented_as_excluded(self):
         sampling = next(layer for layer in self.plan.iter_leaves()
@@ -162,7 +175,7 @@ class TestQwenModelPlanAnchors(unittest.TestCase):
 class TestModelPlanGuards(unittest.TestCase):
     def test_illegal_head_split_is_rejected(self):
         with self.assertRaises(ValueError):
-            Qwen3BlockGeometry(1024, 15, 8, 128, 3072).validate()
+            Qwen3BlockGeometry(HIDDEN, 15, KV_HEADS, HEAD_DIM, 3072).validate()
 
     def test_duplicate_layer_id_is_rejected(self):
         plan = get_model("Qwen3-0.6B")

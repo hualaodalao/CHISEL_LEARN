@@ -14,7 +14,9 @@ from fractions import Fraction
 from pathlib import Path
 
 from hive.model_eval.common import manifest, workload
-from hive.model_eval.frontend import qwen3_06b, spec
+from hive.model_eval.frontend import builtins, spec  # noqa: F401  (registers built-in models)
+from hive.model_eval.frontend.layers.base import layer_l0
+from hive.model_eval.frontend.registry import get_model
 from hive.model_eval.hw import geometry, profiles
 from hive.model_eval.l0 import accounts, bottleneck, excluded, roofline, run, torch_check
 
@@ -66,25 +68,38 @@ class TestAppendixBParams(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.model = qwen3_06b.build()
+        cls.model = get_model("Qwen3-0.6B")
+        cls.blocks = [layer for layer in cls.model.layers
+                      if layer.type == "qwen3.decoder_block"]
+        cls.block = cls.blocks[0]
+
+    def _block_params(self):
+        from math import prod
+        prefix = self.block.id + "/"
+        return sum(prod(weight.shape) for leaf in self.model.iter_leaves()
+                   if leaf.id.startswith(prefix) for weight in leaf.weights)
 
     def test_layer_and_body(self):
-        layer_types = self.model.layer_types
-        self.assertEqual(len(layer_types), 1)
-        self.assertEqual(layer_types[0].params_unique, APPENDIX_B["layer"])
-        self.assertEqual(layer_types[0].count * layer_types[0].params_unique, APPENDIX_B["body"])
+        self.assertEqual(len(self.blocks), 28)
+        self.assertEqual(self._block_params(), APPENDIX_B["layer"])
+        self.assertEqual(len(self.blocks) * self._block_params(), APPENDIX_B["body"])
 
     def test_embedding_and_lm_head(self):
-        self.assertEqual(self.model.embedding_params, APPENDIX_B["emb"])
-        self.assertEqual(self.model.lm_head_params, APPENDIX_B["emb"])
+        from math import prod
+        embedding = next(a for a in self.model.allocations if a.id == "embedding")
+        self.assertEqual(prod(embedding.shape), APPENDIX_B["emb"])
+        lm_head = next(layer for layer in self.model.iter_leaves()
+                       if layer.type == "generic.lm_head")
+        self.assertEqual(prod(lm_head.weights[0].shape), APPENDIX_B["emb"])
 
     def test_unique_and_checkpoint(self):
         self.assertEqual(self.model.params_unique, APPENDIX_B["uniq"])
         self.assertEqual(self.model.params_checkpoint, APPENDIX_B["ckpt"])
 
     def test_mac_coefficients(self):
-        self.assertEqual(self.model.layer_types[0].mac_fixed, APPENDIX_B["fixed"])
-        self.assertEqual(self.model.layer_types[0].mac_s_coef, APPENDIX_B["s_term"])
+        l0 = layer_l0(self.block)
+        self.assertEqual(l0.mac_fixed, APPENDIX_B["fixed"])
+        self.assertEqual(l0.mac_s_coef, APPENDIX_B["s_term"])
         self.assertEqual(self.model.body_mac_fixed(), 28 * APPENDIX_B["fixed"])
         self.assertEqual(self.model.body_mac_s_coef(), 28 * APPENDIX_B["s_term"])
 
@@ -107,7 +122,7 @@ class TestDecodeMac(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.model = qwen3_06b.build()
+        cls.model = get_model("Qwen3-0.6B")
 
     def test_four_tiers(self):
         for seq, expected in DECODE_MAC.items():
@@ -126,7 +141,7 @@ class TestAccountInvariants(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.model = qwen3_06b.build()
+        cls.model = get_model("Qwen3-0.6B")
 
     def test_breakdown_sums_to_total(self):
         points = [workload.decode(0), workload.decode(4096), workload.prefill(1024)]
@@ -157,7 +172,7 @@ class TestRoofline310(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.model = qwen3_06b.build()
+        cls.model = get_model("Qwen3-0.6B")
         cls.profile = profiles.get_profile("310")
 
     def test_profile_is_format_agnostic(self):
@@ -218,7 +233,7 @@ class TestG0Profile(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.model = qwen3_06b.build()
+        cls.model = get_model("Qwen3-0.6B")
 
     def test_constants_match_arch(self):
         g0 = profiles.get_profile("G0")
@@ -307,7 +322,7 @@ class TestFormatSwitching(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.model = qwen3_06b.build()
+        cls.model = get_model("Qwen3-0.6B")
         cls.profile = profiles.get_profile("G0")
 
     def test_mxfp4_halves_compute_time(self):
@@ -347,7 +362,7 @@ class TestManifestAndExcluded(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.model = qwen3_06b.build()
+        cls.model = get_model("Qwen3-0.6B")
 
     def _manifest(self):
         return manifest.build(
@@ -390,7 +405,7 @@ class TestTorchCrossCheck(unittest.TestCase):
     """torch 是可选依赖，缺了只能跳过，不能让流水线失败。"""
 
     def test_skips_without_module(self):
-        result = torch_check.cross_check(qwen3_06b.build(), workload.decode(4096))
+        result = torch_check.cross_check(get_model("Qwen3-0.6B"), workload.decode(4096))
         self.assertEqual(result.status, "skipped")
         self.assertTrue(result.reason)
 
@@ -450,7 +465,7 @@ class TestUpperBoundContract(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.result = roofline.evaluate(
-            qwen3_06b.build(),
+            get_model("Qwen3-0.6B"),
             profiles.get_profile("G0"),
             spec.MXFP8,
             workload.decode(4096),
