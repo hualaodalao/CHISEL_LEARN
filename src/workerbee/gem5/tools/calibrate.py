@@ -20,7 +20,8 @@ from run import baseline_for_run
 SUITES = {
     "WorkerBeeRtlStorageSpec": {"fifo_boundary", "calc_config_edges", "cvt_release_edges"},
     "WorkerBeeRtlArraySpec": {"array_wavefront", "executor_windows"},
-    "WorkerBeeRtlDmaSpec": {"dma_credit", "dma_gather", "dma_stretch"},
+    "WorkerBeeRtlDmaSpec": {"dma_credit", "dma_gather", "dma_stretch",
+                            "dma_osb_ascending", "dma_osb_gather", "dma_osb_w4a8", "dma_osb_restart"},
 }
 
 STARTUP_SIGNATURE = "simulation-log.txt (No such file or directory)"
