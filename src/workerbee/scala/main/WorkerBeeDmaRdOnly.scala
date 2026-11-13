@@ -73,9 +73,27 @@ import chisel3.util._
   * @param cfg     WorkerBee 配置
   * @param bufWidth buffer push 数据位宽（默认 = cfg.aExtW；外部 rsp 与本口等宽直连）
   * @param bufDepth buffer 深度（默认 = aBufferDepth，B 实例需传 bBufferDepth）
+  * @param noGather 本实例每逻辑拍只需一个对齐端口字（消费端自行按偏移选字节）⟹ 抑制
+  *                 gather 第二读。仅 scaleB 例化传 true；编译期常量，false 时所有相关
+  *                 表达式化简回原式。快路径另需基址字对齐（运行期判 reg_baseAddr 低位），
+  *                 基址非对齐时退回 gather，软件张量布局契约不变。
+  * @param pairStretch W4A8 混配 B 同字复用：偶数窗口发读、奇数窗口从 16 字配对缓存推，
+  *                 一次 32B 读供两个 16B 半字逻辑拍 ⟹ B 物理读字节减半。仅 bDma 例化传
+  *                 true；编译期常量 + 运行期 io.stretch 门控，false/纯格式时全部逻辑 DCE
+  *                 回原式。需 hasMx4（stretch 端口）。详见 doc/bdata_pair_plan.md。
+  * @param pairScale MX scaleB 同字复用（rank 2b）：新字窗口 (kCnt*demand)%4==0 发读、其余
+  *                 窗口从 16×4B 缓存推原始字，一次读供 F=4/demand 个窗口（demand=reg_colTileOffset
+  *                 ∈{1,2}，F∈{4,2}）⟹ scaleB 读字节降。仅 bDmaScale 例化传 true；运行期门控
+  *                 demand∈{1,2} 且 sbRowOff/base 4B 对齐，否则退回 A 级基线。消费端 off 不动。
+  *                 与 pairStretch 互斥；是 pair 机制的 demand 可变泛化。详见 doc/scaleb_pair_plan.md。
   */
-class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int = 0) extends Module {
-  val pushW = bufWidth 
+class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int = 0,
+    noGather: Boolean = false, pairStretch: Boolean = false, pairScale: Boolean = false) extends Module {
+  require(!pairStretch || cfg.hasMx4, "WorkerBeeDmaRdOnly: pairStretch requires hasMx4 (stretch port)")
+  require(!pairScale || cfg.hasMx, "WorkerBeeDmaRdOnly: pairScale requires hasMx (scale port)")
+  require(!(pairStretch && pairScale), "WorkerBeeDmaRdOnly: pairStretch and pairScale are mutually exclusive")
+  private val pairAny = pairStretch || pairScale
+  val pushW = bufWidth
   val availDepth = bufDepth
   // scaleA/scaleB 搬运复用本模块（WorkerBee 例化 bufWidth=8：scaleA tie isA=true、
   // scaleB tie isA=false，见 WorkerBee.scala scale DMA 接线）。
@@ -190,14 +208,58 @@ class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int 
   val offReg  = Reg(UInt(offBits.W))                   // 非对齐拍字节偏移（合并移位量）
 
   val byteOff     = curAddr(offBits - 1, 0)
+  // noGather 实例的 gather 使能：基址非字对齐时有用字节可能跨字 ⟹ 必须保留 gather；
+  //   基址字对齐时消费端可用闭式 off 在单对齐字内选字节 ⟹ 抑制第二读。其余实例恒 true。
+  private val gatherEn = if (noGather) io.reg_baseAddr(offBits - 1, 0) =/= 0.U else true.B
   // stretch 模式旁路 gather 判定：逻辑拍是半字片，奇片拍由半字位选择取代 lo/hi 两读。
-  val unaligned   = if (cfg.hasMx4) byteOff =/= 0.U && !io.stretch.get else byteOff =/= 0.U
+  val unaligned   = (if (cfg.hasMx4) byteOff =/= 0.U && !io.stretch.get else byteOff =/= 0.U) && gatherEn
   val alignedBase = curAddr & ~((portBytes - 1).U(cfg.addrWidth.W))
   // 逻辑拍「末物理读」fire：对齐拍 = req.fire；非对齐拍 = hi 读 fire（gPhase===2）。
   // lo 读 fire（gPhase===0 && unaligned）不算 ⟹ lineCounter/curAddr/credit 均按逻辑拍推进。
   val finalReqFire = io.dmaExtRdIF.req.fire && !(gPhase === 0.U && unaligned)
   // hi 字与 lo 字拼接后右移 off 字节，截回 pushW：= memory[L .. L+portBytes)
   val mergedData = (Cat(io.dmaExtRdIF.rsp.payload.data, loReg) >> (offReg << 3))(pushW - 1, 0)
+
+  // ---- pair 同字复用（pairStretch=bDma 混配 B / pairScale=bDmaScale，二者互斥）----
+  // 新字窗口发 totalN 个对齐读、各列一字入缓存并推；复用窗口不发读、从缓存推。一次读供
+  //   F=4/demand 个逻辑拍 ⟹ credit 扣 F、门控 ≥F。新字判据 = (kCnt*demand)%4==0：
+  //   pairStretch demand=2（编译期）⟹ kCnt 偶/奇，与 rank 2 逐位等价；pairScale demand=
+  //   reg_colTileOffset（运行期 ∈{1,2}）⟹ F∈{4,2}。★新字窗读流水发起（req.fire 推进遍历），
+  //   其 rsp 可能滞后到 kCnt 已切复用窗 ⟹ 缓存写与新字推由 rsp 侧驱动（不看当前 kCnt）：pair
+  //   模式每个 rsp 都是新字窗应答（复用窗不发读），按收齐序 pairRspCnt 写缓存。复用推须等本
+  //   新字窗 totalN 个 rsp 全收齐（pairEvenDone）才开始。push 序仍 (w,j) 列最内层、每逻辑拍 1
+  //   推，与基线逐拍同构。非 pair 实例 pairActive=false.B ⟹ 全部 DCE 回原式。
+  // scaleB 快路径门控：demand∈{1,2}（F∈{4,2}，demand=4 无可省）且 sbRowOff/base 4B 对齐
+  //   （逐列字边界一致）；否则退回 A 级基线（每窗口读、noGather 单对齐字）。
+  private val pairScaleEn = if (pairScale)
+    (io.reg_colTileOffset === 1.U || io.reg_colTileOffset === 2.U) &&
+      io.reg_rowOffset(1, 0) === 0.U && io.reg_baseAddr(1, 0) === 0.U
+    else false.B
+  val pairActive = if (pairStretch) io.stretch.get else if (pairScale) pairScaleEn else false.B
+  private val pairDemand = if (pairStretch) 2.U else if (pairScale) io.reg_colTileOffset else 1.U
+  private val pairF = if (pairStretch) 2.U else if (pairScale) Mux(io.reg_colTileOffset === 1.U, 4.U, 2.U) else 1.U
+  // 复用窗口 = (kCnt*demand)%4!=0；pairStretch 化简为 kCnt(0)（rank 2 原式）。
+  val pairOdd = if (pairStretch) kCnt(0) else if (pairScale) ((kCnt * io.reg_colTileOffset)(1, 0) =/= 0.U) else false.B
+  // 下一窗口是否新字窗（重置 pairRspCnt 仅在最后一个复用窗末拍，避免 F=4 中途清零死锁）。
+  private val pairNextRead = ((kCnt + 1.U) * pairDemand)(1, 0) === 0.U
+  private val pairIdxW   = log2Up(cfg.totalN)
+  private val pairCache  = if (pairAny) Some(RegInit(VecInit(Seq.fill(cfg.totalN)(0.U(pushW.W))))) else None
+  private val pairRspCnt = if (pairAny) Some(RegInit(0.U(log2Up(cfg.totalN + 1).W))) else None
+  val pairEvenDone  = if (pairAny) pairRspCnt.get >= cfg.totalN.U else false.B
+  val pairPushValid = if (pairAny) pairActive && pairOdd && state === sTRANSFER && pairEvenDone else false.B
+  val pairPushFire  = pairPushValid && io.bufPush.ready
+  // 遍历推进：新字窗 = req.fire（finalReqFire）；复用窗 = 缓存 push 拍。非 pair 实例恒 finalReqFire。
+  val advFire = if (pairAny) Mux(pairActive && pairOdd, pairPushFire, finalReqFire) else finalReqFire
+  if (pairAny) {
+    when(io.start) {
+      pairRspCnt.get := 0.U
+    }.elsewhen(pairActive && io.dmaExtRdIF.rsp.fire && !pairEvenDone) {
+      pairCache.get(pairRspCnt.get(pairIdxW - 1, 0)) := io.dmaExtRdIF.rsp.payload.data
+      pairRspCnt.get := pairRspCnt.get + 1.U
+    }.elsewhen(advFire && pairOdd && lineCounter === lineTarget - 1.U && pairNextRead) {
+      pairRspCnt.get := 0.U
+    }
+  }
 
   // gPhase 推进（lo 发→lo 收→hi 发→hi 收）。★TB/AXI 可能零延迟应答（req.fire 同拍
   // rsp.fire）：lo/hi 各有同拍捷径（loSameCycle 0→2、hiSameCycle 2→0），否则 lo 字会被
@@ -240,7 +302,8 @@ class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int 
   private val selTail = if (cfg.hasMx4) Some(RegInit(0.U(log2Up(selDepth).W))) else None
   private val selCnt  = if (cfg.hasMx4) Some(RegInit(0.U(log2Up(bufDepth + 1).W))) else None
   if (cfg.hasMx4) {
-    val selEnqFire = io.dmaExtRdIF.req.fire && io.stretch.get
+    val selEnqFire = if (pairStretch) (io.dmaExtRdIF.req.fire && io.stretch.get && !pairActive)
+      else (io.dmaExtRdIF.req.fire && io.stretch.get)
     // 零延迟应答且队空：本拍 rsp 即本拍 req 的应答，半字位直取当前 curAddr，不入队
     val selBypass  = selEnqFire && io.dmaExtRdIF.rsp.fire && selCnt.get === 0.U
     val selStore   = selEnqFire && !selBypass
@@ -249,9 +312,17 @@ class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int 
     //   ★stretchSrc 的 Mux 两臂【必须】都是「按位选出的 rsp 半字」：若把 1-bit 半字位本身放进
     //   Mux 臂，Chisel 会零扩成 128'h0/1 ⟹ stretchSrc 退化为「元素0=LUT(halfbit)、其余全 0」。
     val selBit = Mux(selBypass, curAddr(offBits - 1), selBits.get(selTail.get))
-    io.stretchSrc.get := Mux(selBit,
-      io.dmaExtRdIF.rsp.payload.data(pushW - 1, pushW / 2),
-      io.dmaExtRdIF.rsp.payload.data(pushW / 2 - 1, 0))
+    // pair 模式：奇推（pairPushValid）取缓存高半字；其余（偶 rsp，含滞后到奇窗的偶应答）取
+    //   rsp 低半字。选择依据 = pairPushValid 而非当前 kCnt ⟹ 偶应答滞后也不会误选缓存。
+    val stretchWord = if (pairStretch)
+      Mux(pairActive,
+        Mux(pairPushValid, pairCache.get(lineCounter(pairIdxW - 1, 0)), io.dmaExtRdIF.rsp.payload.data),
+        io.dmaExtRdIF.rsp.payload.data)
+      else io.dmaExtRdIF.rsp.payload.data
+    val stretchSel = if (pairStretch) Mux(pairActive, pairPushValid, selBit) else selBit
+    io.stretchSrc.get := Mux(stretchSel,
+      stretchWord(pushW - 1, pushW / 2),
+      stretchWord(pushW / 2 - 1, 0))
     when(io.start) {
       selCnt.get := 0.U
     }.elsewhen(selStore && selDeqFire) {
@@ -284,8 +355,10 @@ class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int 
     }
 
     when(finalReqFire & io.bufPopFire){
+      // pair：一次读扣 F、同拍 pop 返 1 ⟹ 净 −(F−1)；非 pair 净 0（不变）。
+      if (pairAny) when(pairActive) { ostCredit := ostCredit - (pairF - 1.U) }
     }.elsewhen(finalReqFire){
-      ostCredit := ostCredit - 1.U
+      ostCredit := ostCredit - (if (pairAny) Mux(pairActive, pairF, 1.U) else 1.U)
     }.elsewhen(io.bufPopFire){
       ostCredit := ostCredit + 1.U
     }
@@ -295,13 +368,22 @@ class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int 
   // 请求门控。gPhase=0：对齐拍凭 credit 自由发；非对齐拍须先 drain（inflCnt===0）且预占 1
   //   credit（hi 读将扣）。gPhase=2：发 hi 读（credit 已预占，不再查）。gPhase=1/3：等 rsp 不发。
   //   stretch=1 时 unaligned 恒假 ⟹ gPhase 恒 0、门控即基线（1 读 1 槽/拍）。
-  io.dmaExtRdIF.req.valid       := state === sTRANSFER && (
+  private val reqValidBase = state === sTRANSFER && (
     (gPhase === 0.U && ostCredit =/= 0.U && (!unaligned || inflCnt === 0.U)) ||
     (gPhase === 2.U)
   )
+  // pair 模式：仅新字窗口发读、且须预留 F 槽（一次读供 F 个 push）。非 pair 实例恒基线。
+  io.dmaExtRdIF.req.valid := (if (pairAny)
+    reqValidBase && (!pairActive || (!pairOdd && ostCredit >= pairF))
+    else reqValidBase)
   // stretch 默认臂取 alignedBase：奇半字拍（L mod portBytes = portBytes/2）只发一次对齐读
   //   [L-off, +portBytes)，半字由 sel FIFO 选；偶半字拍 alignedBase == curAddr，同基线。
-  private val reqAddrDefault = if (cfg.hasMx4) Mux(io.stretch.get, alignedBase, curAddr) else curAddr
+  //   noGather 实例恒取 alignedBase：快路径下就是那个单对齐字；退回 gather 时对齐拍
+  //   curAddr == alignedBase、非对齐拍由下方 lo/hi 臂覆盖 ⟹ 两态同值。
+  private val reqAddrDefault =
+    if (noGather) alignedBase
+    else if (cfg.hasMx4) Mux(io.stretch.get, alignedBase, curAddr)
+    else curAddr
   io.dmaExtRdIF.req.payload.addr := MuxCase(reqAddrDefault, Seq(
     (gPhase === 0.U && unaligned) -> alignedBase,               // lo 读：对齐化
     (gPhase === 2.U)              -> (alignedBase + portBytes.U) // hi 读：下一对齐字
@@ -315,18 +397,29 @@ class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int 
     !(io.dmaExtRdIF.req.fire && unaligned)
   if (cfg.hasMx4) {
     when(io.stretch.get) {
-      // stretch：gPhase 恒 0、无 gather ⟹ push 脉冲 = alignedRspPush，payload = 顶层加宽整拍
-      io.bufPush.valid   := alignedRspPush
+      // stretch：gPhase 恒 0、无 gather ⟹ push 脉冲 = alignedRspPush（偶 rsp）|| pairPushValid
+      //   （奇窗缓存推），payload = 顶层加宽整拍。两者时间互斥（pairPushValid 须 pairEvenDone）。
+      io.bufPush.valid   := (if (pairStretch) alignedRspPush || pairPushValid else alignedRspPush)
       io.bufPush.payload := io.stretchBeat.get
     }.otherwise {
-      io.bufPush.valid   := alignedRspPush || hiSameCycle ||
-        (io.dmaExtRdIF.rsp.valid && gPhase === 3.U)
-      io.bufPush.payload := Mux(gPhase === 3.U || hiSameCycle, mergedData, io.dmaExtRdIF.rsp.payload.data)
+      // pairScale（scaleB）：复用窗推缓存原始字（pairPushValid），新字窗/gather 推 rsp/merged。
+      //   非 pairScale 实例编译期化简回原式。
+      io.bufPush.valid   := (if (pairScale)
+        alignedRspPush || hiSameCycle || (io.dmaExtRdIF.rsp.valid && gPhase === 3.U) || pairPushValid
+        else alignedRspPush || hiSameCycle || (io.dmaExtRdIF.rsp.valid && gPhase === 3.U))
+      io.bufPush.payload := (if (pairScale)
+        Mux(pairPushValid, pairCache.get(lineCounter(pairIdxW - 1, 0)),
+          Mux(gPhase === 3.U || hiSameCycle, mergedData, io.dmaExtRdIF.rsp.payload.data))
+        else Mux(gPhase === 3.U || hiSameCycle, mergedData, io.dmaExtRdIF.rsp.payload.data))
     }
   } else {
-    io.bufPush.valid   := alignedRspPush || hiSameCycle ||
-      (io.dmaExtRdIF.rsp.valid && gPhase === 3.U)
-    io.bufPush.payload := Mux(gPhase === 3.U || hiSameCycle, mergedData, io.dmaExtRdIF.rsp.payload.data)
+    io.bufPush.valid   := (if (pairScale)
+      alignedRspPush || hiSameCycle || (io.dmaExtRdIF.rsp.valid && gPhase === 3.U) || pairPushValid
+      else alignedRspPush || hiSameCycle || (io.dmaExtRdIF.rsp.valid && gPhase === 3.U))
+    io.bufPush.payload := (if (pairScale)
+      Mux(pairPushValid, pairCache.get(lineCounter(pairIdxW - 1, 0)),
+        Mux(gPhase === 3.U || hiSameCycle, mergedData, io.dmaExtRdIF.rsp.payload.data))
+      else Mux(gPhase === 3.U || hiSameCycle, mergedData, io.dmaExtRdIF.rsp.payload.data))
   }
 
   io.done := false.B
@@ -371,7 +464,7 @@ class WorkerBeeDmaRdOnly(cfg: WorkerBeeConfig, bufWidth: Int = 0, bufDepth: Int 
         colAddr   := startColAddr
         rowStep   := startRowStep
         lineTarget := startLineTarget
-      }.elsewhen(finalReqFire){
+      }.elsewhen(advFire){
           when(lineCounter === lineTarget - 1.U){
             state := sNEXT_COL
             lineCounter := 0.U

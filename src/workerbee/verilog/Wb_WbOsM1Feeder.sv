@@ -119,6 +119,21 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
                  io_headValid_14,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
                  io_headValid_15,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
   output [15:0]  io_headKt_0,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
+                 io_headKt_1,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
+                 io_headKt_2,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
+                 io_headKt_3,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
+                 io_headKt_4,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
+                 io_headKt_5,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
+                 io_headKt_6,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
+                 io_headKt_7,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
+                 io_headKt_8,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
+                 io_headKt_9,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
+                 io_headKt_10,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
+                 io_headKt_11,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
+                 io_headKt_12,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
+                 io_headKt_13,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
+                 io_headKt_14,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
+                 io_headKt_15,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
   output [3:0]   io_laneOut_0,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
                  io_laneOut_1,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
                  io_laneOut_2,	// src/workerbee/scala/main/WbOsM1Feeder.scala:22:14
@@ -145,64 +160,94 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
   reg  [15:0]       slots_0_1_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_1_0_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_1_0_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_1_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_1_1_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_1_1_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_1_1_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_2_0_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_2_0_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_2_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_2_1_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_2_1_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_2_1_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_3_0_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_3_0_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_3_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_3_1_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_3_1_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_3_1_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_4_0_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_4_0_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_4_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_4_1_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_4_1_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_4_1_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_5_0_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_5_0_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_5_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_5_1_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_5_1_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_5_1_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_6_0_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_6_0_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_6_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_6_1_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_6_1_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_6_1_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_7_0_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_7_0_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_7_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_7_1_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_7_1_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_7_1_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_8_0_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_8_0_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_8_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_8_1_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_8_1_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_8_1_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_9_0_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_9_0_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_9_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_9_1_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_9_1_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_9_1_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_10_0_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_10_0_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_10_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_10_1_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_10_1_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_10_1_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_11_0_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_11_0_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_11_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_11_1_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_11_1_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_11_1_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_12_0_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_12_0_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_12_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_12_1_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_12_1_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_12_1_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_13_0_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_13_0_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_13_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_13_1_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_13_1_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_13_1_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_14_0_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_14_0_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_14_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_14_1_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_14_1_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_14_1_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_15_0_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_15_0_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_15_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [255:0]      slots_15_1_bWindow;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg  [31:0]       slots_15_1_scaleWord;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
+  reg  [15:0]       slots_15_1_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
   reg               heads_0;	// src/workerbee/scala/main/WbOsM1Feeder.scala:36:30
   reg               heads_1;	// src/workerbee/scala/main/WbOsM1Feeder.scala:36:30
   reg               heads_2;	// src/workerbee/scala/main/WbOsM1Feeder.scala:36:30
@@ -710,180 +755,210 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_1_0_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_1_0_scaleWord <= _slots_1_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_1_0_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_1 & tails_1)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_1_1_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_1_1_scaleWord <= _slots_1_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_1_1_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_2 & ~tails_2)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_2_0_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_2_0_scaleWord <= _slots_2_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_2_0_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_2 & tails_2)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_2_1_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_2_1_scaleWord <= _slots_2_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_2_1_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_3 & ~tails_3)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_3_0_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_3_0_scaleWord <= _slots_3_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_3_0_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_3 & tails_3)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_3_1_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_3_1_scaleWord <= _slots_3_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_3_1_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_4 & ~tails_4)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_4_0_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_4_0_scaleWord <= _slots_4_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_4_0_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_4 & tails_4)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_4_1_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_4_1_scaleWord <= _slots_4_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_4_1_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_5 & ~tails_5)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_5_0_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_5_0_scaleWord <= _slots_5_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_5_0_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_5 & tails_5)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_5_1_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_5_1_scaleWord <= _slots_5_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_5_1_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_6 & ~tails_6)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_6_0_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_6_0_scaleWord <= _slots_6_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_6_0_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_6 & tails_6)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_6_1_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_6_1_scaleWord <= _slots_6_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_6_1_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_7 & ~tails_7)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_7_0_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_7_0_scaleWord <= _slots_7_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_7_0_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_7 & tails_7)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_7_1_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_7_1_scaleWord <= _slots_7_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_7_1_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_8 & ~tails_8)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_8_0_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_8_0_scaleWord <= _slots_8_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_8_0_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_8 & tails_8)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_8_1_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_8_1_scaleWord <= _slots_8_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_8_1_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_9 & ~tails_9)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_9_0_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_9_0_scaleWord <= _slots_9_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_9_0_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_9 & tails_9)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_9_1_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_9_1_scaleWord <= _slots_9_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_9_1_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_10 & ~tails_10)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_10_0_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_10_0_scaleWord <= _slots_10_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_10_0_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_10 & tails_10)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_10_1_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_10_1_scaleWord <= _slots_10_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_10_1_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_11 & ~tails_11)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_11_0_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_11_0_scaleWord <= _slots_11_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_11_0_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_11 & tails_11)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_11_1_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_11_1_scaleWord <= _slots_11_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_11_1_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_12 & ~tails_12)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_12_0_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_12_0_scaleWord <= _slots_12_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_12_0_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_12 & tails_12)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_12_1_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_12_1_scaleWord <= _slots_12_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_12_1_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_13 & ~tails_13)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_13_0_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_13_0_scaleWord <= _slots_13_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_13_0_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_13 & tails_13)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_13_1_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_13_1_scaleWord <= _slots_13_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_13_1_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_14 & ~tails_14)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_14_0_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_14_0_scaleWord <= _slots_14_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_14_0_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_14 & tails_14)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_14_1_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_14_1_scaleWord <= _slots_14_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_14_1_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_15 & ~tails_15)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_15_0_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_15_0_scaleWord <= _slots_15_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_15_0_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (io_flush | ~(push_15 & tails_15)) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :37:30, :66:24, :67:20, :73:18, :74:43
     end
     else begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :67:20, :73:18
       slots_15_1_bWindow <= io_bIn_payload;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38
       slots_15_1_scaleWord <= _slots_15_scaleWord_T;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :76:26
+      slots_15_1_kt <= kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:35:38, :41:27
     end
     if (reset) begin	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
       heads_0 <= 1'h0;	// src/workerbee/scala/main/WbOsM1Feeder.scala:36:30
@@ -1156,6 +1231,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h19],
            _RANDOM[9'h1A]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_1_0_scaleWord = _RANDOM[9'h1B];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_1_0_kt = _RANDOM[9'h1C][15:0];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_1_1_bWindow =
           {_RANDOM[9'h1C][31:16],
            _RANDOM[9'h1D],
@@ -1167,6 +1243,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h23],
            _RANDOM[9'h24][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_1_1_scaleWord = {_RANDOM[9'h24][31:16], _RANDOM[9'h25][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_1_1_kt = _RANDOM[9'h25][31:16];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_2_0_bWindow =
           {_RANDOM[9'h26],
            _RANDOM[9'h27],
@@ -1177,6 +1254,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h2C],
            _RANDOM[9'h2D]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_2_0_scaleWord = _RANDOM[9'h2E];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_2_0_kt = _RANDOM[9'h2F][15:0];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_2_1_bWindow =
           {_RANDOM[9'h2F][31:16],
            _RANDOM[9'h30],
@@ -1188,6 +1266,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h36],
            _RANDOM[9'h37][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_2_1_scaleWord = {_RANDOM[9'h37][31:16], _RANDOM[9'h38][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_2_1_kt = _RANDOM[9'h38][31:16];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_3_0_bWindow =
           {_RANDOM[9'h39],
            _RANDOM[9'h3A],
@@ -1198,6 +1277,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h3F],
            _RANDOM[9'h40]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_3_0_scaleWord = _RANDOM[9'h41];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_3_0_kt = _RANDOM[9'h42][15:0];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_3_1_bWindow =
           {_RANDOM[9'h42][31:16],
            _RANDOM[9'h43],
@@ -1209,6 +1289,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h49],
            _RANDOM[9'h4A][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_3_1_scaleWord = {_RANDOM[9'h4A][31:16], _RANDOM[9'h4B][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_3_1_kt = _RANDOM[9'h4B][31:16];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_4_0_bWindow =
           {_RANDOM[9'h4C],
            _RANDOM[9'h4D],
@@ -1219,6 +1300,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h52],
            _RANDOM[9'h53]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_4_0_scaleWord = _RANDOM[9'h54];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_4_0_kt = _RANDOM[9'h55][15:0];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_4_1_bWindow =
           {_RANDOM[9'h55][31:16],
            _RANDOM[9'h56],
@@ -1230,6 +1312,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h5C],
            _RANDOM[9'h5D][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_4_1_scaleWord = {_RANDOM[9'h5D][31:16], _RANDOM[9'h5E][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_4_1_kt = _RANDOM[9'h5E][31:16];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_5_0_bWindow =
           {_RANDOM[9'h5F],
            _RANDOM[9'h60],
@@ -1240,6 +1323,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h65],
            _RANDOM[9'h66]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_5_0_scaleWord = _RANDOM[9'h67];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_5_0_kt = _RANDOM[9'h68][15:0];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_5_1_bWindow =
           {_RANDOM[9'h68][31:16],
            _RANDOM[9'h69],
@@ -1251,6 +1335,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h6F],
            _RANDOM[9'h70][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_5_1_scaleWord = {_RANDOM[9'h70][31:16], _RANDOM[9'h71][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_5_1_kt = _RANDOM[9'h71][31:16];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_6_0_bWindow =
           {_RANDOM[9'h72],
            _RANDOM[9'h73],
@@ -1261,6 +1346,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h78],
            _RANDOM[9'h79]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_6_0_scaleWord = _RANDOM[9'h7A];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_6_0_kt = _RANDOM[9'h7B][15:0];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_6_1_bWindow =
           {_RANDOM[9'h7B][31:16],
            _RANDOM[9'h7C],
@@ -1272,6 +1358,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h82],
            _RANDOM[9'h83][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_6_1_scaleWord = {_RANDOM[9'h83][31:16], _RANDOM[9'h84][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_6_1_kt = _RANDOM[9'h84][31:16];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_7_0_bWindow =
           {_RANDOM[9'h85],
            _RANDOM[9'h86],
@@ -1282,6 +1369,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h8B],
            _RANDOM[9'h8C]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_7_0_scaleWord = _RANDOM[9'h8D];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_7_0_kt = _RANDOM[9'h8E][15:0];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_7_1_bWindow =
           {_RANDOM[9'h8E][31:16],
            _RANDOM[9'h8F],
@@ -1293,6 +1381,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h95],
            _RANDOM[9'h96][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_7_1_scaleWord = {_RANDOM[9'h96][31:16], _RANDOM[9'h97][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_7_1_kt = _RANDOM[9'h97][31:16];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_8_0_bWindow =
           {_RANDOM[9'h98],
            _RANDOM[9'h99],
@@ -1303,6 +1392,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h9E],
            _RANDOM[9'h9F]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_8_0_scaleWord = _RANDOM[9'hA0];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_8_0_kt = _RANDOM[9'hA1][15:0];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_8_1_bWindow =
           {_RANDOM[9'hA1][31:16],
            _RANDOM[9'hA2],
@@ -1314,6 +1404,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'hA8],
            _RANDOM[9'hA9][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_8_1_scaleWord = {_RANDOM[9'hA9][31:16], _RANDOM[9'hAA][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_8_1_kt = _RANDOM[9'hAA][31:16];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_9_0_bWindow =
           {_RANDOM[9'hAB],
            _RANDOM[9'hAC],
@@ -1324,6 +1415,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'hB1],
            _RANDOM[9'hB2]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_9_0_scaleWord = _RANDOM[9'hB3];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_9_0_kt = _RANDOM[9'hB4][15:0];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_9_1_bWindow =
           {_RANDOM[9'hB4][31:16],
            _RANDOM[9'hB5],
@@ -1335,6 +1427,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'hBB],
            _RANDOM[9'hBC][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_9_1_scaleWord = {_RANDOM[9'hBC][31:16], _RANDOM[9'hBD][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_9_1_kt = _RANDOM[9'hBD][31:16];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_10_0_bWindow =
           {_RANDOM[9'hBE],
            _RANDOM[9'hBF],
@@ -1345,6 +1438,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'hC4],
            _RANDOM[9'hC5]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_10_0_scaleWord = _RANDOM[9'hC6];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_10_0_kt = _RANDOM[9'hC7][15:0];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_10_1_bWindow =
           {_RANDOM[9'hC7][31:16],
            _RANDOM[9'hC8],
@@ -1356,6 +1450,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'hCE],
            _RANDOM[9'hCF][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_10_1_scaleWord = {_RANDOM[9'hCF][31:16], _RANDOM[9'hD0][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_10_1_kt = _RANDOM[9'hD0][31:16];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_11_0_bWindow =
           {_RANDOM[9'hD1],
            _RANDOM[9'hD2],
@@ -1366,6 +1461,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'hD7],
            _RANDOM[9'hD8]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_11_0_scaleWord = _RANDOM[9'hD9];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_11_0_kt = _RANDOM[9'hDA][15:0];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_11_1_bWindow =
           {_RANDOM[9'hDA][31:16],
            _RANDOM[9'hDB],
@@ -1377,6 +1473,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'hE1],
            _RANDOM[9'hE2][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_11_1_scaleWord = {_RANDOM[9'hE2][31:16], _RANDOM[9'hE3][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_11_1_kt = _RANDOM[9'hE3][31:16];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_12_0_bWindow =
           {_RANDOM[9'hE4],
            _RANDOM[9'hE5],
@@ -1387,6 +1484,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'hEA],
            _RANDOM[9'hEB]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_12_0_scaleWord = _RANDOM[9'hEC];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_12_0_kt = _RANDOM[9'hED][15:0];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_12_1_bWindow =
           {_RANDOM[9'hED][31:16],
            _RANDOM[9'hEE],
@@ -1398,6 +1496,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'hF4],
            _RANDOM[9'hF5][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_12_1_scaleWord = {_RANDOM[9'hF5][31:16], _RANDOM[9'hF6][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_12_1_kt = _RANDOM[9'hF6][31:16];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_13_0_bWindow =
           {_RANDOM[9'hF7],
            _RANDOM[9'hF8],
@@ -1408,6 +1507,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'hFD],
            _RANDOM[9'hFE]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_13_0_scaleWord = _RANDOM[9'hFF];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_13_0_kt = _RANDOM[9'h100][15:0];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_13_1_bWindow =
           {_RANDOM[9'h100][31:16],
            _RANDOM[9'h101],
@@ -1419,6 +1519,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h107],
            _RANDOM[9'h108][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_13_1_scaleWord = {_RANDOM[9'h108][31:16], _RANDOM[9'h109][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_13_1_kt = _RANDOM[9'h109][31:16];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_14_0_bWindow =
           {_RANDOM[9'h10A],
            _RANDOM[9'h10B],
@@ -1429,6 +1530,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h110],
            _RANDOM[9'h111]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_14_0_scaleWord = _RANDOM[9'h112];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_14_0_kt = _RANDOM[9'h113][15:0];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_14_1_bWindow =
           {_RANDOM[9'h113][31:16],
            _RANDOM[9'h114],
@@ -1440,6 +1542,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h11A],
            _RANDOM[9'h11B][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_14_1_scaleWord = {_RANDOM[9'h11B][31:16], _RANDOM[9'h11C][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_14_1_kt = _RANDOM[9'h11C][31:16];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_15_0_bWindow =
           {_RANDOM[9'h11D],
            _RANDOM[9'h11E],
@@ -1450,6 +1553,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h123],
            _RANDOM[9'h124]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_15_0_scaleWord = _RANDOM[9'h125];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_15_0_kt = _RANDOM[9'h126][15:0];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_15_1_bWindow =
           {_RANDOM[9'h126][31:16],
            _RANDOM[9'h127],
@@ -1461,6 +1565,7 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
            _RANDOM[9'h12D],
            _RANDOM[9'h12E][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         slots_15_1_scaleWord = {_RANDOM[9'h12E][31:16], _RANDOM[9'h12F][15:0]};	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
+        slots_15_1_kt = _RANDOM[9'h12F][31:16];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38
         heads_0 = _RANDOM[9'h130][0];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :36:30
         heads_1 = _RANDOM[9'h130][1];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :36:30
         heads_2 = _RANDOM[9'h130][2];	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :36:30
@@ -1584,6 +1689,21 @@ module Wb_WbOsM1Feeder(	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
   assign io_headValid_14 = io_headValid_14_0;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
   assign io_headValid_15 = io_headValid_15_0;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7
   assign io_headKt_0 = heads_0 ? slots_0_1_kt : slots_0_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38, :36:30, :47:40
+  assign io_headKt_1 = heads_1 ? slots_1_1_kt : slots_1_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38, :36:30, :47:40
+  assign io_headKt_2 = heads_2 ? slots_2_1_kt : slots_2_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38, :36:30, :47:40
+  assign io_headKt_3 = heads_3 ? slots_3_1_kt : slots_3_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38, :36:30, :47:40
+  assign io_headKt_4 = heads_4 ? slots_4_1_kt : slots_4_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38, :36:30, :47:40
+  assign io_headKt_5 = heads_5 ? slots_5_1_kt : slots_5_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38, :36:30, :47:40
+  assign io_headKt_6 = heads_6 ? slots_6_1_kt : slots_6_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38, :36:30, :47:40
+  assign io_headKt_7 = heads_7 ? slots_7_1_kt : slots_7_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38, :36:30, :47:40
+  assign io_headKt_8 = heads_8 ? slots_8_1_kt : slots_8_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38, :36:30, :47:40
+  assign io_headKt_9 = heads_9 ? slots_9_1_kt : slots_9_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38, :36:30, :47:40
+  assign io_headKt_10 = heads_10 ? slots_10_1_kt : slots_10_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38, :36:30, :47:40
+  assign io_headKt_11 = heads_11 ? slots_11_1_kt : slots_11_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38, :36:30, :47:40
+  assign io_headKt_12 = heads_12 ? slots_12_1_kt : slots_12_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38, :36:30, :47:40
+  assign io_headKt_13 = heads_13 ? slots_13_1_kt : slots_13_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38, :36:30, :47:40
+  assign io_headKt_14 = heads_14 ? slots_14_1_kt : slots_14_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38, :36:30, :47:40
+  assign io_headKt_15 = heads_15 ? slots_15_1_kt : slots_15_0_kt;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :35:38, :36:30, :47:40
   assign io_laneOut_0 = lanes_0;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :39:30
   assign io_laneOut_1 = lanes_1;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :39:30
   assign io_laneOut_2 = lanes_2;	// src/workerbee/scala/main/WbOsM1Feeder.scala:4:7, :39:30

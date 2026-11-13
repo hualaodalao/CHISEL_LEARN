@@ -22,6 +22,7 @@ class WbOsM1RowHarness(n: Int = 16) extends WbOsM1RowDut(n) {
   seq.io.scaleBStep := 4.U
   seq.io.scaleABlk := 16.U
   seq.io.scaleBBlk := 16.U
+  seq.io.scaleBAligned := true.B
   seq.io.flush := io.flush
   seq.io.start := io.start
   seq.io.kTiles := io.kTiles
@@ -157,6 +158,9 @@ class WbOsM1SequencerSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.io.scaleBStep.poke(gB.U)
       dut.io.scaleABlk.poke(blkA.U)
       dut.io.scaleBBlk.poke(blkB.U)
+      // 本用例直接喂随机 scale 字（非 DMA 产出的对齐字），按 gather 已重组口径验字节选择
+      //   ⟹ 字内偏移恒 0。对齐字快路径的 off 由端到端 MX 用例覆盖。
+      dut.io.scaleBAligned.poke(false.B)
       dut.io.flush.poke(false.B)
       dut.io.start.poke(false.B)
       dut.io.kTiles.poke(kTiles.U)

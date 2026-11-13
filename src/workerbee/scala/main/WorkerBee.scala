@@ -28,14 +28,14 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
   val calcConfig = Module(new WorkerBeeCalcConfig(cfg))
   val scratchpad = Module(new WorkerBeeScratchpad(cfg))
   val aDma       = Module(new WorkerBeeDmaRdOnly(cfg, bufWidth = cfg.totalN * cfg.aEffW, bufDepth = cfg.aBufferDepth))
-  val bDma       = Module(new WorkerBeeDmaRdOnly(cfg, bufWidth = cfg.totalN * cfg.bW, bufDepth = cfg.bBufferDepth))
+  val bDma       = Module(new WorkerBeeDmaRdOnly(cfg, bufWidth = cfg.totalN * cfg.bW, bufDepth = cfg.bBufferDepth, pairStretch = true))
   val cDma       = Module(new WorkerBeeDmaWrOnly(cfg, bufWidth = cfg.totalN * cfg.cEffW, hasFp = cfg.hasFp, hasMx = cfg.hasMx))
   val executor   = Module(new WorkerBeeExecutor2(cfg))
   val cvt        = Module(new WbOutCvt(cfg))
   val wbComb   = Module(new WbComb(cfg.arrayN, cfg.arrayM, cfg.aW, cfg.bW, cfg.cEffW, cfg.supportedFmts))
   val osSeq    = Module(new WbOsM1Sequencer(cfg.totalN, cfg.aEffW, cfg.bW, cfg.scaleAW, cfg.scaleBW, 16, cfg.hasMx))
   val aDmaScale = if (cfg.hasMx) Some(Module(new WorkerBeeDmaRdOnly(cfg, bufWidth = cfg.scaleAW,   bufDepth = cfg.scaleBufferDepth))) else None
-  val bDmaScale = if (cfg.hasMx) Some(Module(new WorkerBeeDmaRdOnly(cfg, bufWidth = cfg.scaleBW,   bufDepth = cfg.scaleBufferDepth))) else None
+  val bDmaScale = if (cfg.hasMx) Some(Module(new WorkerBeeDmaRdOnly(cfg, bufWidth = cfg.scaleBW,   bufDepth = cfg.scaleBufferDepth, noGather = true, pairScale = true))) else None
   val cDmaScale = if (cfg.hasMx) Some(Module(new WorkerBeeDmaScaleWr(cfg))) else None
 
 
@@ -320,6 +320,7 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
   osSeq.io.scaleBStep := executor.io.osScaleBStep
   osSeq.io.scaleABlk  := executor.io.osScaleABlk
   osSeq.io.scaleBBlk  := executor.io.osScaleBBlk
+  osSeq.io.scaleBAligned := executor.io.osScaleBAligned
   osSeq.io.consume := wbComb.io.osConsume
   osSeq.io.done    := wbComb.io.osDone
   executor.io.osResultsReady := osSeq.io.resultsReady

@@ -31,10 +31,8 @@ import org.scalatest.matchers.should.Matchers
 import java.nio.file._
 import scala.collection.mutable
 
-class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with WbAlwaysFstSim with WbStatusPollApi {
+class WorkerBeeQuickSpec extends WorkerBeeCaseSpec {
   import WbDebugModel._
-  import WorkerBeeQuickSpec.TaskOutcome
-  private val TAG = "QUICK"; private val SUITE = "WorkerBeeQuickSpec"
 
   // ══════════════════════════════════════════════════════════════════════════
   // 主用例：改这一处调用的参数即可；loadW/seed/strictAddr/maxCycles/wave 都有默认值，
@@ -523,6 +521,51 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
           aBlk = 32, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true, bpPeriod = 5,
           wave = "sim/debug/quick_osm1_mx_w4a8_bp.fst", caseTag = " [S9 osM1 MX W4A8 five-channel backpressure]")
 
+  // ── A 级 scaleB 单对齐字边界：K%64≠0 ⟹ sbRowOff = K/blk 非 4B 倍数 ⟹ 字内偏移 off 逐列
+  //   不同。K=32（kTiles=1）只验 j 项，K=96（kTiles=3）验 j 与 kt 交叉。MX8 的 errCode 8 只
+  //   要求 K%32==0 故 32/96 合法；MX4 要求 K%64==0 不适用。OS 与 WS 两路都须覆盖。
+  runCase(m = 1, n = 32, k = 32, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_mx8_k32_blk16.fst", caseTag = " [A级 osM1 MX8 K32 blk16 off逐列]")
+
+  runCase(m = 1, n = 32, k = 96, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_mx8_k96_blk16.fst", caseTag = " [A级 osM1 MX8 K96 blk16 off逐列]")
+
+  runCase(m = 1, n = 32, k = 32, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 32, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_mx8_k32_blk32.fst", caseTag = " [A级 osM1 MX8 K32 blk32 off逐列]")
+
+  runCase(m = 1, n = 32, k = 96, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.FP32,
+          aBlk = 32, bBlk = 32, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
+          wave = "sim/debug/quick_osm1_mx8_k96_blk32.fst", caseTag = " [A级 osM1 MX8 K96 blk32 off逐列]")
+
+  runCase(m = 2, n = 32, k = 96, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = false,
+          wave = "sim/debug/quick_ws_mx8_k96_blk16.fst", caseTag = " [A级 WS MX8 K96 blk16 off逐列]")
+
+  runCase(m = 2, n = 32, k = 32, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 32, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = false,
+          wave = "sim/debug/quick_ws_mx8_k32_blk32.fst", caseTag = " [A级 WS MX8 K32 blk32 off逐列]")
+
+  // ── rank2b scaleB 同字复用矩阵补全：pairScale 使能 = demand∈{1,2} 且 sbRowOff=K/bBlk 为 4B 倍数。
+  //   demand=2 ⟹ F=2（偶窗读、奇窗缓存推）。上面 A 级边界用例（K32/96，sbRowOff%4≠0）已覆盖
+  //   退回基线；此处补「使能复用」侧在 WS 与 MX4-blk32 的缺口（OS 侧由 Phase0 A2/A4 覆盖）。
+  //   MX8-blk16 WS：sbRowOff=128/16=8、demand=32/16=2 ⟹ F=2，B 数据非 stretch 路 + 五通道反压。
+  runCase(m = 2, n = 32, k = 128, aFmt = DataFormat.MXE4M3, bFmt = DataFormat.MXE5M2, cFmt = DataFormat.FP32,
+          aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = false, bpPeriod = 5,
+          wave = "sim/debug/quick_ws_mx8_k128_blk16_pair.fst", caseTag = " [rank2b WS MX8 K128 blk16 F2 pair bp]")
+
+  //   MX4-blk32 OS：sbRowOff=128/32=4、demand=64/32=2 ⟹ F=2，纯 MX4 stretch 路 + 反压。
+  runCase(m = 1, n = 32, k = 128, aFmt = DataFormat.MXE2M1, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.FP32,
+          aBlk = 32, bBlk = 32, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true, bpPeriod = 5,
+          wave = "sim/debug/quick_osm1_mx4_k128_blk32_pair.fst", caseTag = " [rank2b osM1 MX4 K128 blk32 F2 pair bp]")
+
+  //   MX4-blk32 WS：同几何 F=2，WS 消费端 off=tileInterCnt 闭式（与 OS headKt(j) 不同源）须同样命中缓存字。
+  runCase(m = 2, n = 32, k = 128, aFmt = DataFormat.MXE2M1, bFmt = DataFormat.MXE2M1, cFmt = DataFormat.FP32,
+          aBlk = 32, bBlk = 32, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = false,
+          wave = "sim/debug/quick_ws_mx4_k128_blk32_pair.fst", caseTag = " [rank2b WS MX4 K128 blk32 F2 pair]")
+
   // 负向：osM1 合法形状下反向混配 A=MX4×B=MX8 → errCode 3（高于 errCode 14 链首）。
   runCase(m = 1, n = 32, k = 64, aFmt = DataFormat.MXE2M1, bFmt = DataFormat.MXE4M3, cFmt = DataFormat.FP32,
           aBlk = 16, bBlk = 16, cBlk = 16, addrMode = AddrMode.MAT, loadW = Some(1), osM1 = true,
@@ -626,6 +669,14 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
     runSeqCase(s" [S10 OS->WS->OS bias+requant $an x $bn]", Seq(sp(true), sp(false), sp(true))) { o =>
       assertSameC("OS#0 vs WS#1", o(0), o(1)); assertSameC("OS#0 vs OS#2", o(0), o(2)) }
   }
+}
+
+abstract class WorkerBeeCaseSpec extends AnyFlatSpec with Matchers with ChiselSim with WbAlwaysFstSim with WbStatusPollApi {
+  import WbDebugModel._
+  import WorkerBeeCaseSpec.TaskOutcome
+
+  protected def TAG: String = "QUICK"
+  private def SUITE: String = getClass.getSimpleName
 
   /** 编译期配置（totalN=16；cDmaExtW 默认 256；缓冲深度 2048；scaleBufferDepth=64）。
     * supportedFmts 不显式传入、回落 WorkerBeeConfig 默认集（含 MXE2M1 ⟹ hasMx4=true，
@@ -638,18 +689,6 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
     *   hasMx4 <=> hasMx8；本 cfg 两者皆真。 */
   private val cfg = WorkerBeeConfig(arrayN = 16, arrayM = 16, aW = 16, bW = 16, cW = 40,
     aBufferDepth = 2048, bBufferDepth = 2048, cBufferDepth = 2048, scaleBufferDepth = 64)
-  // 套件级舍入模式，同时是 runCase 的 per-case `rnd` 形参的默认值来源；要单独换某一条
-  //   用例的舍入模式，请在那条 runCase 调用里传 `rnd = RoundingMode.RDN/RUP/...`，
-  //   不要改这一行（改这一行会同时改动所有未显式传 rnd 的用例）。
-  // ★★【务必保留 def 不要改回 val】本文件的 runCase 调用写在本声明【之前】（Scala 类体
-  //   按书写顺序求值）。默认参数表达式是在【调用点即时求值】的（编译器生成
-  //   runCase$default$N，在 runCase 那一行就调用它），而 runCase 的函数体延迟到
-  //   `it should ... in {}` 执行时才跑。若这里写 `private val rnd`，求值默认参数时该字段
-  //   尚未初始化 = null，会抛：
-  //     java.lang.NullPointerException: Cannot invoke
-  //       "chisel3.ChiselEnum$Type.litValue()" because "rnd$1" is null
-  //   且只有写在声明之前的用例会中招，极易被误判为「那条用例坏了」。改成 def 后没有存储
-  //   字段、不受类体求值顺序影响，语义与「套件级常量」一致。
   private def rnd: RoundingMode.Type = RoundingMode.RNE
   /** blk(用户面 Int) → MXBlockSize sel：表逐条由枚举成员构造，blk 取定义式 (16 << sel)，不写 sel 字面量（枚举重排也不错位）。
     * MXBlockSize 为 {M16=0, M32=1}：16<<0=16→sel0、16<<1=32→sel1，
@@ -659,14 +698,6 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
   private def selOf(w: String, blk: Int): Int = blkToSel.getOrElse(blk, throw new IllegalArgumentException(
     s"[$TAG] $w=$blk 非法：MX 块大小只能取 ${blkToSel.keys.toSeq.sorted.mkString(" / ")}"))
 
-  /** 唯一入口：注册一个 ScalaTest 用例。改顶部调用的参数、重跑即可。
-    * per-case `rnd` 形参默认取套件级 `private def rnd`（RNE）；测试名【不含 rnd】
-    *   （`it should` 那行只由 m/n/k/三格式/三 blk/addrMode/caseTag 组成）。
-    * 默认参数表达式 `= rnd` 求值于外层类作用域（Scala 把默认值编译成
-    *   `runCase$default$N` 方法，形参名在其中不可见）⟹ 它引用的是套件级成员而非形参自身。
-    * ★该默认值是在【调用点即时求值】的（不像函数体那样延迟到 `in {}` 执行时），而本文件的
-    *   runCase 调用写在套件级声明之前 ⟹ 套件级 `rnd` 必须是 `def` 而不能是 `val`，否则
-    *   用例会拿到未初始化的 null 字段。详见下方 `private def rnd` 处的说明。 */
   def runCase(m: Int, n: Int, k: Int, aFmt: DataFormat.Type, bFmt: DataFormat.Type, cFmt: DataFormat.Type,
               aBlk: Int, bBlk: Int, cBlk: Int, addrMode: AddrMode.Type,
               loadW: Option[Int] = None,   // None = 按 isMx(aFmt)||isMx(bFmt) 自动推导（MX 强制 1）
@@ -736,17 +767,15 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
 
   /** 同一 DUT 复位一次后连跑 ps 全部任务（任务间不复位），check 拿到全部任务的跑后事实做跨任务断言。
     * 测试名由各任务模式/格式/形状拼接，caseTag 区分同序列。 */
-  private def runSeqCase(caseTag: String, ps: Seq[DebugParams])(check: Seq[TaskOutcome] => Unit): Unit = {
+  protected def runSeqCase(caseTag: String, ps: Seq[DebugParams], bpPeriod: Int = 0)(check: Seq[TaskOutcome] => Unit): Unit = {
     val desc = ps.map(p => s"${if (p.osM1) "OS" else "WS"}(${p.aFmt} M${p.m} N${p.n} K${p.k})").mkString(" -> ")
-    it should s"run task sequence $desc$caseTag" in { check(runTasks(ps)) }
+    it should s"run task sequence $desc$caseTag" in { check(runTasks(ps, bpPeriod)) }
   }
 
   /** "DataFormat(8=INT8)" → "INT8"：用于用例名与波形文件名。 */
-  private def fmtName(f: DataFormat.Type): String = f.toString.dropWhile(_ != '=').drop(1).takeWhile(_ != ')')
+  protected def fmtName(f: DataFormat.Type): String = f.toString.dropWhile(_ != '=').drop(1).takeWhile(_ != ')')
 
-  /** M=1、loadW=1、同族 A/B 的序列任务参数（波形目标 sim/debug/quick_$tag.fst）。
-    * 在类体用例注册期求值，只能引用 WbDebugModel 常量，不得引用本类后定义的 val。 */
-  private def seqParams(n: Int, k: Int, tag: String, osM1: Boolean = true, osFmtKeep: Boolean = false,
+  protected def seqParams(n: Int, k: Int, tag: String, osM1: Boolean = true, osFmtKeep: Boolean = false,
                         aFmt: DataFormat.Type = DataFormat.BF16, cFmt: DataFormat.Type = DataFormat.FP32,
                         rndMode: RoundingMode.Type = RoundingMode.RNE, seed: Long = 1234L,
                         bFmt: Option[DataFormat.Type] = None, aBlkSel: Int = 0, bBlkSel: Int = 0,
@@ -859,7 +888,7 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
   }
   /** ② 打印体检结论 + 生效配置摘要 + 派生几何（一次打全，便于对着波形看） */
   private def printHealth(p: DebugParams, predicted: Option[Int], plan: Plan): Unit = {
-    println(s"[$TAG] ═════════════ WorkerBeeQuickSpec 配置体检 ═════════════")
+    println(s"[$TAG] ═════════════ $SUITE 配置体检 ═════════════")
     // rnd 打印按 p.rnd 反查枚举成员，必须反映本用例实际生效的舍入模式
     //   （否则 RDN/RUP 用例会打出自相矛盾的诊断行）。
     println(s"[$TAG] 生效配置: ${p.banner} rnd=${RoundingMode.all(p.rnd)}(sel=${p.rnd}) strictAddr=${p.strictAddr}")
@@ -884,7 +913,7 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
   }
   /** ⑥ 失败/超时落盘关键数据文件（波形由 finally 的 copyWave 负责） */
   private def dumpFailFiles(p: DebugParams, plan: Plan, addrBad: Seq[String], cmpLines: Seq[String]): Unit = {
-    val b = "sim/debug/quick_fail"; val pw = new java.io.PrintWriter(new java.io.File(s"$b.txt"))
+    val b = s"sim/debug/${TAG.toLowerCase(java.util.Locale.ROOT)}_fail"; val pw = new java.io.PrintWriter(new java.io.File(s"$b.txt"))
     pw.println(p.banner); pw.println("--- 地址对账失配 ---"); addrBad.foreach(pw.println)
     pw.println("--- C 元素失配 ---"); cmpLines.foreach(pw.println); pw.close()
     // 位宽实参取 bits 口径 aEbits（WbDebugModel 的单一真源）：亚字节族 fp4/INT4 的
@@ -1158,7 +1187,7 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
   }
 
   /** FP32 输出的 OS/WS 位差：地址序须一致；按 strb 全选通的 32-bit 字逐元素比较，打印不同元素数与最大 ULP 距离。 */
-  private def reportBitDiff(what: String, os: TaskOutcome, ws: TaskOutcome): Unit = {
+  protected def reportBitDiff(what: String, os: TaskOutcome, ws: TaskOutcome): Unit = {
     withClue(s"[$TAG] $what OS/WS C 写回地址序须一致：") { os.cLog.map(_._1) should be(ws.cLog.map(_._1)) }
     def ord(b: Long): Long = if ((b & 0x80000000L) != 0) -(b & 0x7FFFFFFFL) else b
     val pairs = os.cLog.zip(ws.cLog).flatMap { case ((_, dx, sx), (_, dy, _)) =>
@@ -1170,7 +1199,7 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
   }
 
   /** 两个任务的 C 写回逐拍逐位一致（地址/数据/选通三元组）。 */
-  private def assertSameC(what: String, a: TaskOutcome, b: TaskOutcome): Unit = {
+  protected def assertSameC(what: String, a: TaskOutcome, b: TaskOutcome): Unit = {
     val diff = a.cLog.zip(b.cLog).indexWhere { case (x, y) => x != y }
     val firstDiff = if (diff < 0) None else Some(diff)
     firstDiff.foreach { i =>
@@ -1180,7 +1209,7 @@ class WorkerBeeQuickSpec extends AnyFlatSpec with Matchers with ChiselSim with W
   }
 }
 
-object WorkerBeeQuickSpec {
+object WorkerBeeCaseSpec {
   import WbDebugModel._
 
   /** 单个任务的跑后事实；硬断言统一在 assertOutcome（波形/数据文件落盘之后）执行。 */

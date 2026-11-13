@@ -155,14 +155,14 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
                  io_perf_busy	// src/workerbee/scala/main/WorkerBee.scala:6:14
 );
 
-  wire            scratchpad_io_scaleBPop_ready;	// src/workerbee/scala/main/WorkerBee.scala:496:45
-  wire            scratchpad_io_scaleAPop_ready;	// src/workerbee/scala/main/WorkerBee.scala:492:45
+  wire            scratchpad_io_scaleBPop_ready;	// src/workerbee/scala/main/WorkerBee.scala:497:45
+  wire            scratchpad_io_scaleAPop_ready;	// src/workerbee/scala/main/WorkerBee.scala:493:45
   wire            scratchpad_io_aPop_ready;	// src/workerbee/scala/main/WorkerBee.scala:255:34
   wire            cvt_io_in_valid;	// src/workerbee/scala/main/WorkerBee.scala:221:{47,73}
   wire            scratchpad_io_bPop_ready;	// src/workerbee/scala/main/WorkerBee.scala:208:34
-  wire            _cScaleFifo_io_push_ready;	// src/workerbee/scala/main/WorkerBee.scala:515:28
-  wire            _cScaleFifo_io_pop_valid;	// src/workerbee/scala/main/WorkerBee.scala:515:28
-  wire [7:0]      _cScaleFifo_io_pop_payload;	// src/workerbee/scala/main/WorkerBee.scala:515:28
+  wire            _cScaleFifo_io_push_ready;	// src/workerbee/scala/main/WorkerBee.scala:516:28
+  wire            _cScaleFifo_io_pop_valid;	// src/workerbee/scala/main/WorkerBee.scala:516:28
+  wire [7:0]      _cScaleFifo_io_pop_payload;	// src/workerbee/scala/main/WorkerBee.scala:516:28
   wire            _cDmaScale_io_busy;	// src/workerbee/scala/main/WorkerBee.scala:39:45
   wire            _cDmaScale_io_dmaExtWrIF_req_valid;	// src/workerbee/scala/main/WorkerBee.scala:39:45
   wire            _cDmaScale_io_bufPop_ready;	// src/workerbee/scala/main/WorkerBee.scala:39:45
@@ -419,6 +419,7 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
   wire [2:0]      _executor_io_osScaleBStep;	// src/workerbee/scala/main/WorkerBee.scala:33:26
   wire [5:0]      _executor_io_osScaleABlk;	// src/workerbee/scala/main/WorkerBee.scala:33:26
   wire [5:0]      _executor_io_osScaleBBlk;	// src/workerbee/scala/main/WorkerBee.scala:33:26
+  wire            _executor_io_osScaleBAligned;	// src/workerbee/scala/main/WorkerBee.scala:33:26
   wire [39:0]     _executor_io_osSeed_0;	// src/workerbee/scala/main/WorkerBee.scala:33:26
   wire [39:0]     _executor_io_osSeed_1;	// src/workerbee/scala/main/WorkerBee.scala:33:26
   wire [39:0]     _executor_io_osSeed_2;	// src/workerbee/scala/main/WorkerBee.scala:33:26
@@ -453,6 +454,7 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
   wire            _scratchpad_io_aPop_valid;	// src/workerbee/scala/main/WorkerBee.scala:29:26
   wire [255:0]    _scratchpad_io_aPop_payload;	// src/workerbee/scala/main/WorkerBee.scala:29:26
   wire [6:0]      _scratchpad_io_aOccupancy;	// src/workerbee/scala/main/WorkerBee.scala:29:26
+  wire            _scratchpad_io_bPush_ready;	// src/workerbee/scala/main/WorkerBee.scala:29:26
   wire            _scratchpad_io_bPop_valid;	// src/workerbee/scala/main/WorkerBee.scala:29:26
   wire [255:0]    _scratchpad_io_bPop_payload;	// src/workerbee/scala/main/WorkerBee.scala:29:26
   wire [6:0]      _scratchpad_io_bOccupancy;	// src/workerbee/scala/main/WorkerBee.scala:29:26
@@ -462,6 +464,7 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
   wire [6:0]      _scratchpad_io_cOccupancy;	// src/workerbee/scala/main/WorkerBee.scala:29:26
   wire            _scratchpad_io_scaleAPop_valid;	// src/workerbee/scala/main/WorkerBee.scala:29:26
   wire [31:0]     _scratchpad_io_scaleAPop_payload;	// src/workerbee/scala/main/WorkerBee.scala:29:26
+  wire            _scratchpad_io_scaleBPush_ready;	// src/workerbee/scala/main/WorkerBee.scala:29:26
   wire            _scratchpad_io_scaleBPop_valid;	// src/workerbee/scala/main/WorkerBee.scala:29:26
   wire [31:0]     _scratchpad_io_scaleBPop_payload;	// src/workerbee/scala/main/WorkerBee.scala:29:26
   wire [6:0]      _scratchpad_io_scaleBOccupancy;	// src/workerbee/scala/main/WorkerBee.scala:29:26
@@ -543,54 +546,54 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
     intW4a8Mix ? 4'h8 : _regIf_io_regFile_bFmt;	// src/workerbee/scala/main/WorkerBee.scala:23:21, :97:{18,38}, :287:42
   wire [3:0]      wbComb_io_bFmtIn_bFmtChain =
     w4a8Mix ? 4'h3 : _wbComb_io_bFmtIn_bFmtChain_T;	// src/workerbee/scala/main/WbEnum.scala:9:43, src/workerbee/scala/main/WorkerBee.scala:90:36, :287:{10,42}
-  reg  [1:0]      biasFState;	// src/workerbee/scala/main/WorkerBee.scala:365:30
-  reg  [15:0]     biasFNt;	// src/workerbee/scala/main/WorkerBee.scala:366:30
-  reg  [4:0]      biasFSent;	// src/workerbee/scala/main/WorkerBee.scala:367:30
-  reg  [4:0]      biasFRcvd;	// src/workerbee/scala/main/WorkerBee.scala:368:30
-  reg  [6:0]      biasPortInfl;	// src/workerbee/scala/main/WorkerBee.scala:369:31
-  reg             biasFPhaseBias;	// src/workerbee/scala/main/WorkerBee.scala:370:33
-  reg             biasFPhaseM;	// src/workerbee/scala/main/WorkerBee.scala:371:33
-  wire            biasSteal_layerCapture = |biasFState;	// src/workerbee/scala/main/WorkerBee.scala:365:30, :378:32
-  wire            rspToBias = biasFState == 2'h2;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :365:30, :379:32
-  wire [31:0]     _GEN_1 = {10'h0, biasFNt, 6'h0};	// src/workerbee/scala/main/WorkerBee.scala:366:30, :382:{41,51}
-  wire [31:0]     _GEN_2 = {25'h0, biasFSent, 2'h0};	// src/workerbee/scala/main/WorkerBee.scala:4:7, :367:30, :382:72
+  reg  [1:0]      biasFState;	// src/workerbee/scala/main/WorkerBee.scala:366:30
+  reg  [15:0]     biasFNt;	// src/workerbee/scala/main/WorkerBee.scala:367:30
+  reg  [4:0]      biasFSent;	// src/workerbee/scala/main/WorkerBee.scala:368:30
+  reg  [4:0]      biasFRcvd;	// src/workerbee/scala/main/WorkerBee.scala:369:30
+  reg  [6:0]      biasPortInfl;	// src/workerbee/scala/main/WorkerBee.scala:370:31
+  reg             biasFPhaseBias;	// src/workerbee/scala/main/WorkerBee.scala:371:33
+  reg             biasFPhaseM;	// src/workerbee/scala/main/WorkerBee.scala:372:33
+  wire            biasSteal_layerCapture = |biasFState;	// src/workerbee/scala/main/WorkerBee.scala:366:30, :379:32
+  wire            rspToBias = biasFState == 2'h2;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :366:30, :380:32
+  wire [31:0]     _GEN_1 = {10'h0, biasFNt, 6'h0};	// src/workerbee/scala/main/WorkerBee.scala:367:30, :383:{41,51}
+  wire [31:0]     _GEN_2 = {25'h0, biasFSent, 2'h0};	// src/workerbee/scala/main/WorkerBee.scala:4:7, :368:30, :383:72
   wire            io_perf_scaleA_0 =
     biasSteal_layerCapture
       ? (rspToBias | (&biasFState)) & ~(biasFSent[4])
-      : _aDmaScale_io_dmaExtRdIF_req_valid;	// src/workerbee/scala/main/WorkerBee.scala:37:45, :365:30, :367:30, :378:32, :379:32, :380:32, :381:{52,85,98}, :385:29
-  wire            _regIf_io_dmaErrors_3_T = biasFState != 2'h2;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :365:30, :379:32, :391:46
-  wire            executor_io_biasIn_valid = io_dmaScaleA_rsp_valid & rspToBias;	// src/workerbee/scala/main/WorkerBee.scala:379:32, :393:55
-  wire            executor_io_rqMIn_valid = io_dmaScaleA_rsp_valid & (&biasFState);	// src/workerbee/scala/main/WorkerBee.scala:365:30, :380:32, :395:54
+      : _aDmaScale_io_dmaExtRdIF_req_valid;	// src/workerbee/scala/main/WorkerBee.scala:37:45, :366:30, :368:30, :379:32, :380:32, :381:32, :382:{52,85,98}, :386:29
+  wire            _regIf_io_dmaErrors_3_T = biasFState != 2'h2;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :366:30, :380:32, :392:46
+  wire            executor_io_biasIn_valid = io_dmaScaleA_rsp_valid & rspToBias;	// src/workerbee/scala/main/WorkerBee.scala:380:32, :394:55
+  wire            executor_io_rqMIn_valid = io_dmaScaleA_rsp_valid & (&biasFState);	// src/workerbee/scala/main/WorkerBee.scala:366:30, :381:32, :396:54
   wire            io_dmaScaleA_rsp_ready_0 =
-    rspToBias ? _executor_io_biasIn_ready : ~(&biasFState) | _executor_io_rqMIn_ready;	// src/workerbee/scala/main/WorkerBee.scala:33:26, :365:30, :379:32, :380:32, :397:29, :398:30
-  wire            _scalePortError_T = io_dmaScaleA_rsp_valid & io_dmaScaleA_rsp_ready_0;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:397:29
-  wire            scalePortError = _scalePortError_T & io_dmaScaleA_rsp_payload_err;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:407:43
-  wire            _layerCapture = _executor_io_biasFetchReq | _executor_io_rqMFetchReq;	// src/workerbee/scala/main/WorkerBee.scala:33:26, :413:44
+    rspToBias ? _executor_io_biasIn_ready : ~(&biasFState) | _executor_io_rqMIn_ready;	// src/workerbee/scala/main/WorkerBee.scala:33:26, :366:30, :380:32, :381:32, :398:29, :399:30
+  wire            _scalePortError_T = io_dmaScaleA_rsp_valid & io_dmaScaleA_rsp_ready_0;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:398:29
+  wire            scalePortError = _scalePortError_T & io_dmaScaleA_rsp_payload_err;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:408:43
+  wire            _layerCapture = _executor_io_biasFetchReq | _executor_io_rqMFetchReq;	// src/workerbee/scala/main/WorkerBee.scala:33:26, :414:44
   assign scratchpad_io_scaleAPop_ready =
-    _executor_io_osActive ? _osSeq_io_scaleAIn_ready : _executor_io_scaleAPop_ready;	// src/workerbee/scala/main/WorkerBee.scala:33:26, :36:24, :492:45
+    _executor_io_osActive ? _osSeq_io_scaleAIn_ready : _executor_io_scaleAPop_ready;	// src/workerbee/scala/main/WorkerBee.scala:33:26, :36:24, :493:45
   assign scratchpad_io_scaleBPop_ready =
-    _executor_io_osActive ? _osSeq_io_scaleBIn_ready : _executor_io_scaleBPop_ready;	// src/workerbee/scala/main/WorkerBee.scala:33:26, :36:24, :496:45
-  wire            osRun = _osSeq_io_phase == 2'h1;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :36:24, :545:30
+    _executor_io_osActive ? _osSeq_io_scaleBIn_ready : _executor_io_scaleBPop_ready;	// src/workerbee/scala/main/WorkerBee.scala:33:26, :36:24, :497:45
+  wire            osRun = _osSeq_io_phase == 2'h1;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :36:24, :546:30
   always @(posedge clock) begin	// src/workerbee/scala/main/WorkerBee.scala:4:7
     if (reset) begin	// src/workerbee/scala/main/WorkerBee.scala:4:7
       tracingSt <= 1'h0;	// src/workerbee/scala/main/WorkerBee.scala:60:26
       blkLatchCnt <= 16'h0;	// src/workerbee/scala/main/WorkerBee.scala:211:36
-      biasFState <= 2'h0;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :365:30
-      biasFNt <= 16'h0;	// src/workerbee/scala/main/WorkerBee.scala:366:30
-      biasFSent <= 5'h0;	// src/workerbee/scala/main/WorkerBee.scala:367:30
-      biasFRcvd <= 5'h0;	// src/workerbee/scala/main/WorkerBee.scala:368:30
-      biasPortInfl <= 7'h0;	// src/workerbee/scala/main/WorkerBee.scala:118:22, :369:31
-      biasFPhaseBias <= 1'h0;	// src/workerbee/scala/main/WorkerBee.scala:370:33
-      biasFPhaseM <= 1'h0;	// src/workerbee/scala/main/WorkerBee.scala:371:33
+      biasFState <= 2'h0;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :366:30
+      biasFNt <= 16'h0;	// src/workerbee/scala/main/WorkerBee.scala:367:30
+      biasFSent <= 5'h0;	// src/workerbee/scala/main/WorkerBee.scala:368:30
+      biasFRcvd <= 5'h0;	// src/workerbee/scala/main/WorkerBee.scala:369:30
+      biasPortInfl <= 7'h0;	// src/workerbee/scala/main/WorkerBee.scala:118:22, :370:31
+      biasFPhaseBias <= 1'h0;	// src/workerbee/scala/main/WorkerBee.scala:371:33
+      biasFPhaseM <= 1'h0;	// src/workerbee/scala/main/WorkerBee.scala:372:33
     end
     else begin	// src/workerbee/scala/main/WorkerBee.scala:4:7
       automatic logic            _GEN_3;	// src/utils/Stream/Stream.scala:43:26
-      automatic logic            _GEN_4;	// src/workerbee/scala/main/WorkerBee.scala:435:24
-      automatic logic [3:0][1:0] _GEN_5;	// src/workerbee/scala/main/WorkerBee.scala:379:32, :416:24, :418:75, :428:36, :435:42
-      automatic logic [3:0][4:0] _GEN_6;	// src/workerbee/scala/main/WorkerBee.scala:367:30, :379:32, :416:24, :418:75, :435:42
-      automatic logic [3:0][4:0] _GEN_7;	// src/workerbee/scala/main/WorkerBee.scala:368:30, :379:32, :416:24, :418:75, :435:42
-      _GEN_3 = io_perf_scaleA_0 & io_dmaScaleA_req_ready;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:385:29
-      _GEN_4 = biasFRcvd == 5'h10;	// src/workerbee/scala/main/WorkerBee.scala:228:54, :368:30, :435:24
+      automatic logic            _GEN_4;	// src/workerbee/scala/main/WorkerBee.scala:436:24
+      automatic logic [3:0][1:0] _GEN_5;	// src/workerbee/scala/main/WorkerBee.scala:380:32, :417:24, :419:75, :429:36, :436:42
+      automatic logic [3:0][4:0] _GEN_6;	// src/workerbee/scala/main/WorkerBee.scala:368:30, :380:32, :417:24, :419:75, :436:42
+      automatic logic [3:0][4:0] _GEN_7;	// src/workerbee/scala/main/WorkerBee.scala:369:30, :380:32, :417:24, :419:75, :436:42
+      _GEN_3 = io_perf_scaleA_0 & io_dmaScaleA_req_ready;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:386:29
+      _GEN_4 = biasFRcvd == 5'h10;	// src/workerbee/scala/main/WorkerBee.scala:228:54, :369:30, :436:24
       tracingSt <= _GEN_0 | tracingSt;	// src/workerbee/scala/main/WorkerBee.scala:60:26, :67:26, :68:23, :69:19
       if (_cDma_io_doneBlock | _regIf_io_start)	// src/workerbee/scala/main/WorkerBee.scala:23:21, :32:26, :213:26
         blkLatchCnt <= 16'h0;	// src/workerbee/scala/main/WorkerBee.scala:211:36
@@ -600,20 +603,20 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
         {{(&biasFState) & _GEN_4 ? 2'h0 : biasFState},
          {_GEN_4 ? {2{biasFPhaseM}} : biasFState},
          {(|biasPortInfl) ? biasFState : {1'h1, ~biasFPhaseBias}},
-         {_layerCapture ? 2'h1 : biasFState}};	// src/workerbee/scala/main/WorkerBee.scala:4:7, :365:30, :369:31, :370:33, :371:33, :379:32, :380:32, :404:70, :413:44, :416:24, :418:75, :424:25, :428:36, :429:{22,28}, :435:{24,42}, :438:{22,28}, :444:{42,55}
-      biasFState <= _GEN_5[biasFState];	// src/workerbee/scala/main/WorkerBee.scala:365:30, :379:32, :416:24, :418:75, :428:36, :435:42
-      if (biasFState == 2'h0 & _layerCapture) begin	// src/workerbee/scala/main/WorkerBee.scala:4:7, :365:30, :366:30, :413:44, :416:24, :418:75, :419:25
+         {_layerCapture ? 2'h1 : biasFState}};	// src/workerbee/scala/main/WorkerBee.scala:4:7, :366:30, :370:31, :371:33, :372:33, :380:32, :381:32, :405:70, :414:44, :417:24, :419:75, :425:25, :429:36, :430:{22,28}, :436:{24,42}, :439:{22,28}, :445:{42,55}
+      biasFState <= _GEN_5[biasFState];	// src/workerbee/scala/main/WorkerBee.scala:366:30, :380:32, :417:24, :419:75, :429:36, :436:42
+      if (biasFState == 2'h0 & _layerCapture) begin	// src/workerbee/scala/main/WorkerBee.scala:4:7, :366:30, :367:30, :414:44, :417:24, :419:75, :420:25
         biasFNt <=
-          _executor_io_biasFetchReq ? _executor_io_biasFetchNt : _executor_io_rqMFetchNt;	// src/workerbee/scala/main/WorkerBee.scala:33:26, :366:30, :419:31
-        biasFPhaseBias <= _executor_io_biasFetchReq;	// src/workerbee/scala/main/WorkerBee.scala:33:26, :370:33
-        biasFPhaseM <= _executor_io_rqMFetchReq;	// src/workerbee/scala/main/WorkerBee.scala:33:26, :371:33
+          _executor_io_biasFetchReq ? _executor_io_biasFetchNt : _executor_io_rqMFetchNt;	// src/workerbee/scala/main/WorkerBee.scala:33:26, :367:30, :420:31
+        biasFPhaseBias <= _executor_io_biasFetchReq;	// src/workerbee/scala/main/WorkerBee.scala:33:26, :371:33
+        biasFPhaseM <= _executor_io_rqMFetchReq;	// src/workerbee/scala/main/WorkerBee.scala:33:26, :372:33
       end
       _GEN_6 =
         {{(&biasFState) & _GEN_3 ? biasFSent + 5'h1 : biasFSent},
          {_GEN_4 ? 5'h0 : _GEN_3 ? biasFSent + 5'h1 : biasFSent},
          {biasFSent},
-         {_layerCapture ? 5'h0 : biasFSent}};	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:365:30, :367:30, :379:32, :380:32, :413:44, :416:24, :418:75, :420:25, :433:{32,44,57}, :435:{24,42}, :436:21, :442:{32,44,57}
-      biasFSent <= _GEN_6[biasFState];	// src/workerbee/scala/main/WorkerBee.scala:365:30, :367:30, :379:32, :416:24, :418:75, :435:42
+         {_layerCapture ? 5'h0 : biasFSent}};	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:366:30, :368:30, :380:32, :381:32, :414:44, :417:24, :419:75, :421:25, :434:{32,44,57}, :436:{24,42}, :437:21, :443:{32,44,57}
+      biasFSent <= _GEN_6[biasFState];	// src/workerbee/scala/main/WorkerBee.scala:366:30, :368:30, :380:32, :417:24, :419:75, :436:42
       _GEN_7 =
         {{executor_io_rqMIn_valid & _executor_io_rqMIn_ready
             ? biasFRcvd + 5'h1
@@ -624,12 +627,12 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
                 ? biasFRcvd + 5'h1
                 : biasFRcvd},
          {biasFRcvd},
-         {_layerCapture ? 5'h0 : biasFRcvd}};	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:33:26, :368:30, :379:32, :393:55, :395:54, :413:44, :416:24, :418:75, :421:25, :434:{43,55,68}, :435:{24,42}, :437:21, :443:{42,54,67}
-      biasFRcvd <= _GEN_7[biasFState];	// src/workerbee/scala/main/WorkerBee.scala:365:30, :368:30, :379:32, :416:24, :418:75, :435:42
-      if (_GEN_3 & ~_scalePortError_T)	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:402:{27,30}
-        biasPortInfl <= biasPortInfl + 7'h1;	// src/workerbee/scala/main/WorkerBee.scala:369:31, :403:36
-      else if (~_GEN_3 & _scalePortError_T & (|biasPortInfl))	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:369:31, :404:{16,34,54,70}
-        biasPortInfl <= biasPortInfl - 7'h1;	// src/workerbee/scala/main/WorkerBee.scala:369:31, :405:36
+         {_layerCapture ? 5'h0 : biasFRcvd}};	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:33:26, :369:30, :380:32, :394:55, :396:54, :414:44, :417:24, :419:75, :422:25, :435:{43,55,68}, :436:{24,42}, :438:21, :444:{42,54,67}
+      biasFRcvd <= _GEN_7[biasFState];	// src/workerbee/scala/main/WorkerBee.scala:366:30, :369:30, :380:32, :417:24, :419:75, :436:42
+      if (_GEN_3 & ~_scalePortError_T)	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:403:{27,30}
+        biasPortInfl <= biasPortInfl + 7'h1;	// src/workerbee/scala/main/WorkerBee.scala:370:31, :404:36
+      else if (~_GEN_3 & _scalePortError_T & (|biasPortInfl))	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:370:31, :405:{16,34,54,70}
+        biasPortInfl <= biasPortInfl - 7'h1;	// src/workerbee/scala/main/WorkerBee.scala:370:31, :406:36
     end
     if (_GEN_0) begin	// src/workerbee/scala/main/WorkerBee.scala:60:26, :67:26, :68:23, :69:19
       tracingPcReg <= _regIf_io_startPc;	// src/workerbee/scala/main/WorkerBee.scala:23:21, :61:25
@@ -653,13 +656,13 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
         tracingPcReg = {_RANDOM[2'h0][31:1], _RANDOM[2'h1][0]};	// src/workerbee/scala/main/WorkerBee.scala:4:7, :60:26, :61:25
         tracingTagReg = _RANDOM[2'h1][8:1];	// src/workerbee/scala/main/WorkerBee.scala:4:7, :61:25, :62:26
         blkLatchCnt = _RANDOM[2'h1][24:9];	// src/workerbee/scala/main/WorkerBee.scala:4:7, :61:25, :211:36
-        biasFState = _RANDOM[2'h1][26:25];	// src/workerbee/scala/main/WorkerBee.scala:4:7, :61:25, :365:30
-        biasFNt = {_RANDOM[2'h1][31:27], _RANDOM[2'h2][10:0]};	// src/workerbee/scala/main/WorkerBee.scala:4:7, :61:25, :366:30
-        biasFSent = _RANDOM[2'h2][15:11];	// src/workerbee/scala/main/WorkerBee.scala:4:7, :366:30, :367:30
-        biasFRcvd = _RANDOM[2'h2][20:16];	// src/workerbee/scala/main/WorkerBee.scala:4:7, :366:30, :368:30
-        biasPortInfl = _RANDOM[2'h2][27:21];	// src/workerbee/scala/main/WorkerBee.scala:4:7, :366:30, :369:31
-        biasFPhaseBias = _RANDOM[2'h2][28];	// src/workerbee/scala/main/WorkerBee.scala:4:7, :366:30, :370:33
-        biasFPhaseM = _RANDOM[2'h2][29];	// src/workerbee/scala/main/WorkerBee.scala:4:7, :366:30, :371:33
+        biasFState = _RANDOM[2'h1][26:25];	// src/workerbee/scala/main/WorkerBee.scala:4:7, :61:25, :366:30
+        biasFNt = {_RANDOM[2'h1][31:27], _RANDOM[2'h2][10:0]};	// src/workerbee/scala/main/WorkerBee.scala:4:7, :61:25, :367:30
+        biasFSent = _RANDOM[2'h2][15:11];	// src/workerbee/scala/main/WorkerBee.scala:4:7, :367:30, :368:30
+        biasFRcvd = _RANDOM[2'h2][20:16];	// src/workerbee/scala/main/WorkerBee.scala:4:7, :367:30, :369:30
+        biasPortInfl = _RANDOM[2'h2][27:21];	// src/workerbee/scala/main/WorkerBee.scala:4:7, :367:30, :370:31
+        biasFPhaseBias = _RANDOM[2'h2][28];	// src/workerbee/scala/main/WorkerBee.scala:4:7, :367:30, :371:33
+        biasFPhaseM = _RANDOM[2'h2][29];	// src/workerbee/scala/main/WorkerBee.scala:4:7, :367:30, :372:33
       `endif // RANDOMIZE_REG_INIT
     end // initial
     `ifdef FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WorkerBee.scala:4:7
@@ -748,11 +751,11 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
     .io_dmaErrors_1            (io_dmaB_rsp_valid & io_dmaB_rsp_payload_err),	// src/workerbee/scala/main/WorkerBee.scala:52:45
     .io_dmaErrors_2            (io_dmaC_rsp_valid & io_dmaC_rsp_payload_err),	// src/workerbee/scala/main/WorkerBee.scala:53:45
     .io_dmaErrors_3
-      (scalePortError & _regIf_io_dmaErrors_3_T & ~(&biasFState)),	// src/workerbee/scala/main/WorkerBee.scala:365:30, :379:32, :380:32, :391:{46,60}, :407:43, :408:{45,59}
+      (scalePortError & _regIf_io_dmaErrors_3_T & ~(&biasFState)),	// src/workerbee/scala/main/WorkerBee.scala:366:30, :380:32, :381:32, :392:{46,60}, :408:43, :409:{45,59}
     .io_dmaErrors_4            (io_dmaScaleB_rsp_valid & io_dmaScaleB_rsp_payload_err),	// src/workerbee/scala/main/WorkerBee.scala:55:56
     .io_dmaErrors_5            (io_dmaCScale_rsp_valid & io_dmaCScale_rsp_payload_err),	// src/workerbee/scala/main/WorkerBee.scala:56:56
-    .io_dmaErrors_6            (scalePortError & rspToBias),	// src/workerbee/scala/main/WorkerBee.scala:379:32, :407:43, :409:45
-    .io_dmaErrors_7            (scalePortError & (&biasFState)),	// src/workerbee/scala/main/WorkerBee.scala:365:30, :380:32, :407:43, :410:45
+    .io_dmaErrors_6            (scalePortError & rspToBias),	// src/workerbee/scala/main/WorkerBee.scala:380:32, :408:43, :410:45
+    .io_dmaErrors_7            (scalePortError & (&biasFState)),	// src/workerbee/scala/main/WorkerBee.scala:366:30, :381:32, :408:43, :411:45
     .io_inFlight               (io_status_inFlight),
     .io_irq                    (io_irq)
   );	// src/workerbee/scala/main/WorkerBee.scala:23:21
@@ -822,6 +825,7 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
     .io_aPop_payload       (_scratchpad_io_aPop_payload),
     .io_aOccupancy         (_scratchpad_io_aOccupancy),
     .io_bPush_valid        (_bDma_io_bufPush_valid),	// src/workerbee/scala/main/WorkerBee.scala:31:26
+    .io_bPush_ready        (_scratchpad_io_bPush_ready),
     .io_bPush_payload      (_bDma_io_bufPush_payload),	// src/workerbee/scala/main/WorkerBee.scala:31:26
     .io_bPop_valid         (_scratchpad_io_bPop_valid),
     .io_bPop_ready         (scratchpad_io_bPop_ready),	// src/workerbee/scala/main/WorkerBee.scala:208:34
@@ -843,12 +847,13 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
     .io_scaleAPush_valid   (_aDmaScale_io_bufPush_valid),	// src/workerbee/scala/main/WorkerBee.scala:37:45
     .io_scaleAPush_payload (_aDmaScale_io_bufPush_payload),	// src/workerbee/scala/main/WorkerBee.scala:37:45
     .io_scaleAPop_valid    (_scratchpad_io_scaleAPop_valid),
-    .io_scaleAPop_ready    (scratchpad_io_scaleAPop_ready),	// src/workerbee/scala/main/WorkerBee.scala:492:45
+    .io_scaleAPop_ready    (scratchpad_io_scaleAPop_ready),	// src/workerbee/scala/main/WorkerBee.scala:493:45
     .io_scaleAPop_payload  (_scratchpad_io_scaleAPop_payload),
     .io_scaleBPush_valid   (_bDmaScale_io_bufPush_valid),	// src/workerbee/scala/main/WorkerBee.scala:38:45
+    .io_scaleBPush_ready   (_scratchpad_io_scaleBPush_ready),
     .io_scaleBPush_payload (_bDmaScale_io_bufPush_payload),	// src/workerbee/scala/main/WorkerBee.scala:38:45
     .io_scaleBPop_valid    (_scratchpad_io_scaleBPop_valid),
-    .io_scaleBPop_ready    (scratchpad_io_scaleBPop_ready),	// src/workerbee/scala/main/WorkerBee.scala:496:45
+    .io_scaleBPop_ready    (scratchpad_io_scaleBPop_ready),	// src/workerbee/scala/main/WorkerBee.scala:497:45
     .io_scaleBPop_payload  (_scratchpad_io_scaleBPop_payload),
     .io_scaleBOccupancy    (_scratchpad_io_scaleBOccupancy),
     .io_flushScaleA        (_executor_io_flushA),	// src/workerbee/scala/main/WorkerBee.scala:33:26
@@ -857,7 +862,6 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
   Wb_WorkerBeeDmaRdOnly aDma (	// src/workerbee/scala/main/WorkerBee.scala:30:26
     .clock                          (clock),
     .reset                          (reset),
-    .io_isA                         (1'h1),
     .io_start                       (_calcConfig_io_startOut),	// src/workerbee/scala/main/WorkerBee.scala:28:26
     .io_dmaExtRdIF_rsp_valid        (io_dmaA_rsp_valid),
     .io_dmaExtRdIF_rsp_payload_data (io_dmaA_rsp_payload_data),
@@ -865,8 +869,6 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
     .io_dmaExtRdIF_req_ready        (io_dmaA_req_ready),
     .io_dmaExtRdIF_req_payload_addr (io_dmaA_req_payload_addr),
     .io_regFile_m                   (_regIf_io_regFile_m),	// src/workerbee/scala/main/WorkerBee.scala:23:21
-    .io_regFile_loadWMode           (_regIf_io_regFile_loadWMode),	// src/workerbee/scala/main/WorkerBee.scala:23:21
-    .io_regFile_osM1                (_regIf_io_regFile_osM1),	// src/workerbee/scala/main/WorkerBee.scala:23:21
     .io_reg_baseAddr                (_regIf_io_regFile_aAddr),	// src/workerbee/scala/main/WorkerBee.scala:23:21
     .io_reg_kTile                   (_calcConfig_io_calcConfig_kTile),	// src/workerbee/scala/main/WorkerBee.scala:28:26
     .io_reg_nTile                   (_calcConfig_io_calcConfig_nTile),	// src/workerbee/scala/main/WorkerBee.scala:28:26
@@ -874,23 +876,17 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
     .io_reg_colTileOffset           (_calcConfig_io_calcConfig_aColTileAddressOffset),	// src/workerbee/scala/main/WorkerBee.scala:28:26
     .io_bufPush_valid               (_aDma_io_bufPush_valid),
     .io_bufPush_payload             (_aDma_io_bufPush_payload),
-    .io_bufPopFire
-      (_scratchpad_io_aPop_valid & scratchpad_io_aPop_ready),	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:29:26, :255:34
-    .io_stretch                     (1'h0),
-    .io_stretchSrc                  (/* unused */),
-    .io_stretchBeat                 (256'h0)	// src/workerbee/scala/main/WorkerBee.scala:157:29
+    .io_bufPopFire                  (_scratchpad_io_aPop_valid & scratchpad_io_aPop_ready)	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:29:26, :255:34
   );	// src/workerbee/scala/main/WorkerBee.scala:30:26
-  Wb_WorkerBeeDmaRdOnly bDma (	// src/workerbee/scala/main/WorkerBee.scala:31:26
+  Wb_WorkerBeeDmaRdOnly_1 bDma (	// src/workerbee/scala/main/WorkerBee.scala:31:26
     .clock                          (clock),
     .reset                          (reset),
-    .io_isA                         (1'h0),
     .io_start                       (_calcConfig_io_startOut),	// src/workerbee/scala/main/WorkerBee.scala:28:26
     .io_dmaExtRdIF_rsp_valid        (io_dmaB_rsp_valid),
     .io_dmaExtRdIF_rsp_payload_data (io_dmaB_rsp_payload_data),
     .io_dmaExtRdIF_req_valid        (_bDma_io_dmaExtRdIF_req_valid),
     .io_dmaExtRdIF_req_ready        (io_dmaB_req_ready),
     .io_dmaExtRdIF_req_payload_addr (io_dmaB_req_payload_addr),
-    .io_regFile_m                   (_regIf_io_regFile_m),	// src/workerbee/scala/main/WorkerBee.scala:23:21
     .io_regFile_loadWMode           (_regIf_io_regFile_loadWMode),	// src/workerbee/scala/main/WorkerBee.scala:23:21
     .io_regFile_osM1                (_regIf_io_regFile_osM1),	// src/workerbee/scala/main/WorkerBee.scala:23:21
     .io_reg_baseAddr                (_regIf_io_regFile_bAddr),	// src/workerbee/scala/main/WorkerBee.scala:23:21
@@ -899,6 +895,7 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
     .io_reg_rowOffset               (_calcConfig_io_calcConfig_bRowAddressOffset),	// src/workerbee/scala/main/WorkerBee.scala:28:26
     .io_reg_colTileOffset           (_calcConfig_io_calcConfig_bColTileAddressOffset),	// src/workerbee/scala/main/WorkerBee.scala:28:26
     .io_bufPush_valid               (_bDma_io_bufPush_valid),
+    .io_bufPush_ready               (_scratchpad_io_bPush_ready),	// src/workerbee/scala/main/WorkerBee.scala:29:26
     .io_bufPush_payload             (_bDma_io_bufPush_payload),
     .io_bufPopFire
       (_scratchpad_io_bPop_valid & scratchpad_io_bPop_ready),	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:29:26, :208:34
@@ -1080,6 +1077,7 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
     .io_regFile_aFmt         (_regIf_io_regFile_aFmt),	// src/workerbee/scala/main/WorkerBee.scala:23:21
     .io_regFile_bFmt         (_regIf_io_regFile_bFmt),	// src/workerbee/scala/main/WorkerBee.scala:23:21
     .io_regFile_rnd          (_regIf_io_regFile_rnd),	// src/workerbee/scala/main/WorkerBee.scala:23:21
+    .io_regFile_bScaleAddr   (_regIf_io_regFile_bScaleAddr),	// src/workerbee/scala/main/WorkerBee.scala:23:21
     .io_regFile_biasOn       (_regIf_io_regFile_biasOn),	// src/workerbee/scala/main/WorkerBee.scala:23:21
     .io_regFile_requantOn    (_regIf_io_regFile_requantOn),	// src/workerbee/scala/main/WorkerBee.scala:23:21
     .io_calcConfig_isAX2     (_calcConfig_io_calcConfig_isAX2),	// src/workerbee/scala/main/WorkerBee.scala:28:26
@@ -1143,12 +1141,12 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
     .io_wbScaleBIn_13        (_executor_io_wbScaleBIn_13),
     .io_wbScaleBIn_14        (_executor_io_wbScaleBIn_14),
     .io_wbScaleBIn_15        (_executor_io_wbScaleBIn_15),
-    .io_biasIn_valid         (executor_io_biasIn_valid),	// src/workerbee/scala/main/WorkerBee.scala:393:55
+    .io_biasIn_valid         (executor_io_biasIn_valid),	// src/workerbee/scala/main/WorkerBee.scala:394:55
     .io_biasIn_ready         (_executor_io_biasIn_ready),
     .io_biasIn_payload       (io_dmaScaleA_rsp_payload_data),
     .io_biasFetchReq         (_executor_io_biasFetchReq),
     .io_biasFetchNt          (_executor_io_biasFetchNt),
-    .io_rqMIn_valid          (executor_io_rqMIn_valid),	// src/workerbee/scala/main/WorkerBee.scala:395:54
+    .io_rqMIn_valid          (executor_io_rqMIn_valid),	// src/workerbee/scala/main/WorkerBee.scala:396:54
     .io_rqMIn_ready          (_executor_io_rqMIn_ready),
     .io_rqMIn_payload        (io_dmaScaleA_rsp_payload_data),
     .io_rqMFetchReq          (_executor_io_rqMFetchReq),
@@ -1235,6 +1233,7 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
     .io_osScaleBStep         (_executor_io_osScaleBStep),
     .io_osScaleABlk          (_executor_io_osScaleABlk),
     .io_osScaleBBlk          (_executor_io_osScaleBBlk),
+    .io_osScaleBAligned      (_executor_io_osScaleBAligned),
     .io_osResultsReady       (_osSeq_io_resultsReady),	// src/workerbee/scala/main/WorkerBee.scala:36:24
     .io_osPsum_0             (_wbComb_io_osPsum_0),	// src/workerbee/scala/main/WorkerBee.scala:35:24
     .io_osPsum_1             (_wbComb_io_osPsum_1),	// src/workerbee/scala/main/WorkerBee.scala:35:24
@@ -1285,7 +1284,7 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
     .io_out_ready      (_cDma_io_bufPop_ready),	// src/workerbee/scala/main/WorkerBee.scala:32:26
     .io_out_valid      (_cvt_io_out_valid),
     .io_out_bits       (_cvt_io_out_bits),
-    .io_scaleOut_ready (_cScaleFifo_io_push_ready),	// src/workerbee/scala/main/WorkerBee.scala:515:28
+    .io_scaleOut_ready (_cScaleFifo_io_push_ready),	// src/workerbee/scala/main/WorkerBee.scala:516:28
     .io_scaleOut_valid (_cvt_io_scaleOut_valid),
     .io_scaleOut_bits  (_cvt_io_scaleOut_bits),
     .io_rqM_0          (_executor_io_rqMOut_0),	// src/workerbee/scala/main/WorkerBee.scala:33:26
@@ -1570,6 +1569,7 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
     .io_scaleBStep       (_executor_io_osScaleBStep),	// src/workerbee/scala/main/WorkerBee.scala:33:26
     .io_scaleABlk        (_executor_io_osScaleABlk),	// src/workerbee/scala/main/WorkerBee.scala:33:26
     .io_scaleBBlk        (_executor_io_osScaleBBlk),	// src/workerbee/scala/main/WorkerBee.scala:33:26
+    .io_scaleBAligned    (_executor_io_osScaleBAligned),	// src/workerbee/scala/main/WorkerBee.scala:33:26
     .io_advance          (_osSeq_io_advance),
     .io_aOut             (_osSeq_io_aOut),
     .io_aScaleByte       (_osSeq_io_aScaleByte),
@@ -1629,20 +1629,17 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
   Wb_WorkerBeeDmaRdOnly_2 aDmaScale (	// src/workerbee/scala/main/WorkerBee.scala:37:45
     .clock                          (clock),
     .reset                          (reset),
-    .io_isA                         (1'h1),
     .io_start
       (_calcConfig_io_startOut
        & (_aDmaScale_io_start_T | _aDmaScale_io_start_T_1
-          | _regIf_io_regFile_aFmt == 4'h5)),	// src/workerbee/scala/main/WbEnum.scala:8:{53,69,74}, :9:{43,59}, :10:43, src/workerbee/scala/main/WorkerBee.scala:23:21, :28:26, :343:55
+          | _regIf_io_regFile_aFmt == 4'h5)),	// src/workerbee/scala/main/WbEnum.scala:8:{53,69,74}, :9:{43,59}, :10:43, src/workerbee/scala/main/WorkerBee.scala:23:21, :28:26, :344:55
     .io_dmaExtRdIF_rsp_valid
-      (io_dmaScaleA_rsp_valid & _regIf_io_dmaErrors_3_T & ~(&biasFState)),	// src/workerbee/scala/main/WorkerBee.scala:365:30, :379:32, :380:32, :391:{43,46,57,60}
+      (io_dmaScaleA_rsp_valid & _regIf_io_dmaErrors_3_T & ~(&biasFState)),	// src/workerbee/scala/main/WorkerBee.scala:366:30, :380:32, :381:32, :392:{43,46,57,60}
     .io_dmaExtRdIF_rsp_payload_data (io_dmaScaleA_rsp_payload_data),
     .io_dmaExtRdIF_req_valid        (_aDmaScale_io_dmaExtRdIF_req_valid),
-    .io_dmaExtRdIF_req_ready        (io_dmaScaleA_req_ready & ~biasSteal_layerCapture),	// src/workerbee/scala/main/WorkerBee.scala:378:32, :387:{43,46}
+    .io_dmaExtRdIF_req_ready        (io_dmaScaleA_req_ready & ~biasSteal_layerCapture),	// src/workerbee/scala/main/WorkerBee.scala:379:32, :388:{43,46}
     .io_dmaExtRdIF_req_payload_addr (_aDmaScale_io_dmaExtRdIF_req_payload_addr),
     .io_regFile_m                   (_regIf_io_regFile_m),	// src/workerbee/scala/main/WorkerBee.scala:23:21
-    .io_regFile_loadWMode           (_regIf_io_regFile_loadWMode),	// src/workerbee/scala/main/WorkerBee.scala:23:21
-    .io_regFile_osM1                (_regIf_io_regFile_osM1),	// src/workerbee/scala/main/WorkerBee.scala:23:21
     .io_reg_baseAddr                (_regIf_io_regFile_aScaleAddr),	// src/workerbee/scala/main/WorkerBee.scala:23:21
     .io_reg_kTile                   (_calcConfig_io_calcConfig_kTile),	// src/workerbee/scala/main/WorkerBee.scala:28:26
     .io_reg_nTile                   (_calcConfig_io_calcConfig_nTile),	// src/workerbee/scala/main/WorkerBee.scala:28:26
@@ -1652,22 +1649,20 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
     .io_bufPush_valid               (_aDmaScale_io_bufPush_valid),
     .io_bufPush_payload             (_aDmaScale_io_bufPush_payload),
     .io_bufPopFire
-      (_scratchpad_io_scaleAPop_valid & scratchpad_io_scaleAPop_ready)	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:29:26, :492:45
+      (_scratchpad_io_scaleAPop_valid & scratchpad_io_scaleAPop_ready)	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:29:26, :493:45
   );	// src/workerbee/scala/main/WorkerBee.scala:37:45
-  Wb_WorkerBeeDmaRdOnly_2 bDmaScale (	// src/workerbee/scala/main/WorkerBee.scala:38:45
+  Wb_WorkerBeeDmaRdOnly_3 bDmaScale (	// src/workerbee/scala/main/WorkerBee.scala:38:45
     .clock                          (clock),
     .reset                          (reset),
-    .io_isA                         (1'h0),
     .io_start
       (_calcConfig_io_startOut
        & (_regIf_io_regFile_bFmt == 4'h3 | _regIf_io_regFile_bFmt == 4'h4
-          | _bDmaScale_io_start_T_3)),	// src/workerbee/scala/main/WbEnum.scala:8:{42,53,58,69}, :9:{43,59}, :10:43, src/workerbee/scala/main/WorkerBee.scala:23:21, :28:26, :454:55
+          | _bDmaScale_io_start_T_3)),	// src/workerbee/scala/main/WbEnum.scala:8:{42,53,58,69}, :9:{43,59}, :10:43, src/workerbee/scala/main/WorkerBee.scala:23:21, :28:26, :455:55
     .io_dmaExtRdIF_rsp_valid        (io_dmaScaleB_rsp_valid),
     .io_dmaExtRdIF_rsp_payload_data (io_dmaScaleB_rsp_payload_data),
     .io_dmaExtRdIF_req_valid        (_bDmaScale_io_dmaExtRdIF_req_valid),
     .io_dmaExtRdIF_req_ready        (io_dmaScaleB_req_ready),
     .io_dmaExtRdIF_req_payload_addr (io_dmaScaleB_req_payload_addr),
-    .io_regFile_m                   (_regIf_io_regFile_m),	// src/workerbee/scala/main/WorkerBee.scala:23:21
     .io_regFile_loadWMode           (_regIf_io_regFile_loadWMode),	// src/workerbee/scala/main/WorkerBee.scala:23:21
     .io_regFile_osM1                (_regIf_io_regFile_osM1),	// src/workerbee/scala/main/WorkerBee.scala:23:21
     .io_reg_baseAddr                (_regIf_io_regFile_bScaleAddr),	// src/workerbee/scala/main/WorkerBee.scala:23:21
@@ -1677,9 +1672,10 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
     .io_reg_colTileOffset
       (_calcConfig_io_calcConfig_scaleBColTileAddressOffset),	// src/workerbee/scala/main/WorkerBee.scala:28:26
     .io_bufPush_valid               (_bDmaScale_io_bufPush_valid),
+    .io_bufPush_ready               (_scratchpad_io_scaleBPush_ready),	// src/workerbee/scala/main/WorkerBee.scala:29:26
     .io_bufPush_payload             (_bDmaScale_io_bufPush_payload),
     .io_bufPopFire
-      (_scratchpad_io_scaleBPop_valid & scratchpad_io_scaleBPop_ready)	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:29:26, :496:45
+      (_scratchpad_io_scaleBPop_valid & scratchpad_io_scaleBPop_ready)	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBee.scala:29:26, :497:45
   );	// src/workerbee/scala/main/WorkerBee.scala:38:45
   Wb_WorkerBeeDmaScaleWr cDmaScale (	// src/workerbee/scala/main/WorkerBee.scala:39:45
     .clock                                    (clock),
@@ -1687,7 +1683,7 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
     .io_start
       (_calcConfig_io_startOut
        & (_regIf_io_regFile_cFmt == 4'h3 | _regIf_io_regFile_cFmt == 4'h4
-          | _regIf_io_regFile_cFmt == 4'h5)),	// src/workerbee/scala/main/WbEnum.scala:8:{42,53,58,69,74}, :9:{43,59}, :10:43, src/workerbee/scala/main/WorkerBee.scala:23:21, :28:26, :506:59
+          | _regIf_io_regFile_cFmt == 4'h5)),	// src/workerbee/scala/main/WbEnum.scala:8:{42,53,58,69,74}, :9:{43,59}, :10:43, src/workerbee/scala/main/WorkerBee.scala:23:21, :28:26, :507:59
     .io_busy                                  (_cDmaScale_io_busy),
     .io_dmaExtWrIF_rsp_valid                  (io_dmaCScale_rsp_valid),
     .io_dmaExtWrIF_req_valid                  (_cDmaScale_io_dmaExtWrIF_req_valid),
@@ -1701,11 +1697,11 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
       (_calcConfig_io_calcConfig_scaleCColTileAddressOffset),	// src/workerbee/scala/main/WorkerBee.scala:28:26
     .io_baseAddr                              (_regIf_io_regFile_cScaleAddr),	// src/workerbee/scala/main/WorkerBee.scala:23:21
     .io_regFile_m                             (_regIf_io_regFile_m),	// src/workerbee/scala/main/WorkerBee.scala:23:21
-    .io_bufPop_valid                          (_cScaleFifo_io_pop_valid),	// src/workerbee/scala/main/WorkerBee.scala:515:28
+    .io_bufPop_valid                          (_cScaleFifo_io_pop_valid),	// src/workerbee/scala/main/WorkerBee.scala:516:28
     .io_bufPop_ready                          (_cDmaScale_io_bufPop_ready),
-    .io_bufPop_payload                        (_cScaleFifo_io_pop_payload)	// src/workerbee/scala/main/WorkerBee.scala:515:28
+    .io_bufPop_payload                        (_cScaleFifo_io_pop_payload)	// src/workerbee/scala/main/WorkerBee.scala:516:28
   );	// src/workerbee/scala/main/WorkerBee.scala:39:45
-  Wb_StreamFifo_5 cScaleFifo (	// src/workerbee/scala/main/WorkerBee.scala:515:28
+  Wb_StreamFifo_5 cScaleFifo (	// src/workerbee/scala/main/WorkerBee.scala:516:28
     .clock           (clock),
     .reset           (reset),
     .io_push_valid   (_cvt_io_scaleOut_valid),	// src/workerbee/scala/main/WorkerBee.scala:34:26
@@ -1715,7 +1711,7 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
     .io_pop_ready    (_cDmaScale_io_bufPop_ready),	// src/workerbee/scala/main/WorkerBee.scala:39:45
     .io_pop_payload  (_cScaleFifo_io_pop_payload),
     .io_flush        (_executor_io_flushC)	// src/workerbee/scala/main/WorkerBee.scala:33:26
-  );	// src/workerbee/scala/main/WorkerBee.scala:515:28
+  );	// src/workerbee/scala/main/WorkerBee.scala:516:28
   assign io_respForTracing_valid =
     tracingSt ? _executor_io_done | _calcConfig_io_errPluse : _regIf_io_start;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :23:21, :28:26, :33:26, :60:26, :67:26, :68:23, :78:{29,49}
   assign io_respForTracing_payload_state =
@@ -1728,14 +1724,14 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
   assign io_dmaC_req_valid = _cDma_io_dmaExtWrIF_req_valid;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :32:26
   assign io_dmaB_rsp_ready = 1'h1;	// src/workerbee/scala/main/WorkerBee.scala:4:7
   assign io_dmaB_req_valid = _bDma_io_dmaExtRdIF_req_valid;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :31:26
-  assign io_dmaScaleA_rsp_ready = io_dmaScaleA_rsp_ready_0;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :397:29
-  assign io_dmaScaleA_req_valid = io_perf_scaleA_0;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :385:29
+  assign io_dmaScaleA_rsp_ready = io_dmaScaleA_rsp_ready_0;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :398:29
+  assign io_dmaScaleA_req_valid = io_perf_scaleA_0;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :386:29
   assign io_dmaScaleA_req_payload_addr =
     biasSteal_layerCapture
       ? (rspToBias
            ? _regIf_io_regFile_biasAddr + _GEN_1 + _GEN_2
            : _regIf_io_regFile_rqMBase + _GEN_1 + _GEN_2)
-      : _aDmaScale_io_dmaExtRdIF_req_payload_addr;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :23:21, :37:45, :378:32, :379:32, :382:{41,72}, :383:{41,72}, :386:{36,51}
+      : _aDmaScale_io_dmaExtRdIF_req_payload_addr;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :23:21, :37:45, :379:32, :380:32, :383:{41,72}, :384:{41,72}, :387:{36,51}
   assign io_dmaScaleB_rsp_ready = 1'h1;	// src/workerbee/scala/main/WorkerBee.scala:4:7
   assign io_dmaScaleB_req_valid = _bDmaScale_io_dmaExtRdIF_req_valid;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :38:45
   assign io_dmaCScale_rsp_ready = 1'h1;	// src/workerbee/scala/main/WorkerBee.scala:4:7
@@ -1749,7 +1745,7 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
   assign io_perf_dmaA = _aDma_io_dmaExtRdIF_req_valid;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :30:26
   assign io_perf_dmaB = _bDma_io_dmaExtRdIF_req_valid;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :31:26
   assign io_perf_dmaC = _cDma_io_dmaExtWrIF_req_valid;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :32:26
-  assign io_perf_scaleA = io_perf_scaleA_0;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :385:29
+  assign io_perf_scaleA = io_perf_scaleA_0;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :386:29
   assign io_perf_scaleB = _bDmaScale_io_dmaExtRdIF_req_valid;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :38:45
   assign io_perf_scaleC = _cDmaScale_io_dmaExtWrIF_req_valid;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :39:45
   assign io_perf_array =
@@ -1770,9 +1766,9 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
            _wbComb_io_osConsume_2,
            _wbComb_io_osConsume_1,
            _wbComb_io_osConsume_0})
-      : _executor_io_wbValidIn;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :33:26, :35:24, :548:{24,67,74}
+      : _executor_io_wbValidIn;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :33:26, :35:24, :549:{24,67,74}
   assign io_perf_stallA =
-    _executor_io_osActive ? osRun & ~_osSeq_io_aTokenValid : _executor_io_perf_stallA;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :33:26, :36:24, :545:30, :549:{24,53,56}
+    _executor_io_osActive ? osRun & ~_osSeq_io_aTokenValid : _executor_io_perf_stallA;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :33:26, :36:24, :546:30, :550:{24,53,56}
   assign io_perf_stallB =
     _executor_io_osActive
       ? osRun
@@ -1819,10 +1815,10 @@ module Wb_WorkerBee(	// src/workerbee/scala/main/WorkerBee.scala:4:7
            | ~_osSeq_io_headValid_12 & ~_wbComb_io_osDone_12 | ~_osSeq_io_headValid_13
            & ~_wbComb_io_osDone_13 | ~_osSeq_io_headValid_14 & ~_wbComb_io_osDone_14
            | ~_osSeq_io_headValid_15 & ~_wbComb_io_osDone_15)
-      : _executor_io_perf_stallB;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :33:26, :35:24, :36:24, :545:30, :546:{31,53,74,81}, :547:{88,94,97,114}, :550:24, :551:{12,35,42,48,59}
+      : _executor_io_perf_stallB;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :33:26, :35:24, :36:24, :546:30, :547:{31,53,74,81}, :548:{88,94,97,114}, :551:24, :552:{12,35,42,48,59}
   assign io_perf_epilogue =
     biasSteal_layerCapture | _io_perf_epilogue_T | _cvt_io_out_valid
-    | _cvt_io_scaleOut_valid;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/workerbee/scala/main/WorkerBee.scala:4:7, :34:26, :378:32, :554:{43,61,81}
+    | _cvt_io_scaleOut_valid;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/workerbee/scala/main/WorkerBee.scala:4:7, :34:26, :379:32, :555:{43,61,81}
   assign io_perf_busy = _executor_io_busy;	// src/workerbee/scala/main/WorkerBee.scala:4:7, :33:26
 endmodule
 

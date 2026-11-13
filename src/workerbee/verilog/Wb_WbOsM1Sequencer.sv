@@ -99,6 +99,7 @@ module Wb_WbOsM1Sequencer(	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7
                  io_scaleBStep,	// src/workerbee/scala/main/WbOsM1Sequencer.scala:24:14
   input  [5:0]   io_scaleABlk,	// src/workerbee/scala/main/WbOsM1Sequencer.scala:24:14
                  io_scaleBBlk,	// src/workerbee/scala/main/WbOsM1Sequencer.scala:24:14
+  input          io_scaleBAligned,	// src/workerbee/scala/main/WbOsM1Sequencer.scala:24:14
   output         io_advance,	// src/workerbee/scala/main/WbOsM1Sequencer.scala:24:14
   output [15:0]  io_aOut,	// src/workerbee/scala/main/WbOsM1Sequencer.scala:24:14
   output [7:0]   io_aScaleByte,	// src/workerbee/scala/main/WbOsM1Sequencer.scala:24:14
@@ -156,62 +157,77 @@ module Wb_WbOsM1Sequencer(	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7
   output [1:0]   io_phase	// src/workerbee/scala/main/WbOsM1Sequencer.scala:24:14
 );
 
-  wire [15:0]       feeder_io_headKt_0_layerCapture;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [31:0]       _feeder_io_scaleOut_0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [31:0]       _feeder_io_scaleOut_1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [31:0]       _feeder_io_scaleOut_2;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [31:0]       _feeder_io_scaleOut_3;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [31:0]       _feeder_io_scaleOut_4;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [31:0]       _feeder_io_scaleOut_5;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [31:0]       _feeder_io_scaleOut_6;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [31:0]       _feeder_io_scaleOut_7;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [31:0]       _feeder_io_scaleOut_8;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [31:0]       _feeder_io_scaleOut_9;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [31:0]       _feeder_io_scaleOut_10;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [31:0]       _feeder_io_scaleOut_11;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [31:0]       _feeder_io_scaleOut_12;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [31:0]       _feeder_io_scaleOut_13;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [31:0]       _feeder_io_scaleOut_14;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [31:0]       _feeder_io_scaleOut_15;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire              _feeder_io_headValid_0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire              _feeder_io_headValid_1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire              _feeder_io_headValid_2;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire              _feeder_io_headValid_3;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire              _feeder_io_headValid_4;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire              _feeder_io_headValid_5;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire              _feeder_io_headValid_6;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire              _feeder_io_headValid_7;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire              _feeder_io_headValid_8;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire              _feeder_io_headValid_9;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire              _feeder_io_headValid_10;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire              _feeder_io_headValid_11;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire              _feeder_io_headValid_12;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire              _feeder_io_headValid_13;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire              _feeder_io_headValid_14;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire              _feeder_io_headValid_15;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [3:0]        _feeder_io_laneOut_1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [3:0]        _feeder_io_laneOut_2;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [3:0]        _feeder_io_laneOut_3;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [3:0]        _feeder_io_laneOut_4;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [3:0]        _feeder_io_laneOut_5;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [3:0]        _feeder_io_laneOut_6;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [3:0]        _feeder_io_laneOut_7;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [3:0]        _feeder_io_laneOut_8;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [3:0]        _feeder_io_laneOut_9;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [3:0]        _feeder_io_laneOut_10;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [3:0]        _feeder_io_laneOut_11;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [3:0]        _feeder_io_laneOut_12;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [3:0]        _feeder_io_laneOut_13;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [3:0]        _feeder_io_laneOut_14;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [3:0]        _feeder_io_laneOut_15;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  reg  [1:0]        phase;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:71:30
-  reg  [255:0]      aWindow;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:72:28
-  reg  [31:0]       aScale;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:73:27
-  reg               aValid;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:74:31
-  reg  [3:0]        aLane;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:75:30
-  reg  [15:0]       tileKt;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:77:31
-  reg  [15:0]       kTilesReg;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:78:34
-  wire              tail = phase == 2'h2;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:71:30, :81:28
+  wire [31:0]       _feeder_io_scaleOut_0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [31:0]       _feeder_io_scaleOut_1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [31:0]       _feeder_io_scaleOut_2;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [31:0]       _feeder_io_scaleOut_3;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [31:0]       _feeder_io_scaleOut_4;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [31:0]       _feeder_io_scaleOut_5;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [31:0]       _feeder_io_scaleOut_6;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [31:0]       _feeder_io_scaleOut_7;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [31:0]       _feeder_io_scaleOut_8;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [31:0]       _feeder_io_scaleOut_9;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [31:0]       _feeder_io_scaleOut_10;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [31:0]       _feeder_io_scaleOut_11;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [31:0]       _feeder_io_scaleOut_12;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [31:0]       _feeder_io_scaleOut_13;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [31:0]       _feeder_io_scaleOut_14;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [31:0]       _feeder_io_scaleOut_15;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire              _feeder_io_headValid_0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire              _feeder_io_headValid_1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire              _feeder_io_headValid_2;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire              _feeder_io_headValid_3;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire              _feeder_io_headValid_4;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire              _feeder_io_headValid_5;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire              _feeder_io_headValid_6;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire              _feeder_io_headValid_7;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire              _feeder_io_headValid_8;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire              _feeder_io_headValid_9;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire              _feeder_io_headValid_10;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire              _feeder_io_headValid_11;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire              _feeder_io_headValid_12;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire              _feeder_io_headValid_13;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire              _feeder_io_headValid_14;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire              _feeder_io_headValid_15;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [15:0]       _feeder_io_headKt_1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [15:0]       _feeder_io_headKt_2;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [15:0]       _feeder_io_headKt_3;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [15:0]       _feeder_io_headKt_4;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [15:0]       _feeder_io_headKt_5;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [15:0]       _feeder_io_headKt_6;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [15:0]       _feeder_io_headKt_7;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [15:0]       _feeder_io_headKt_8;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [15:0]       _feeder_io_headKt_9;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [15:0]       _feeder_io_headKt_10;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [15:0]       _feeder_io_headKt_11;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [15:0]       _feeder_io_headKt_12;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [15:0]       _feeder_io_headKt_13;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [15:0]       _feeder_io_headKt_14;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [15:0]       _feeder_io_headKt_15;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [3:0]        _feeder_io_laneOut_1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [3:0]        _feeder_io_laneOut_2;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [3:0]        _feeder_io_laneOut_3;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [3:0]        _feeder_io_laneOut_4;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [3:0]        _feeder_io_laneOut_5;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [3:0]        _feeder_io_laneOut_6;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [3:0]        _feeder_io_laneOut_7;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [3:0]        _feeder_io_laneOut_8;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [3:0]        _feeder_io_laneOut_9;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [3:0]        _feeder_io_laneOut_10;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [3:0]        _feeder_io_laneOut_11;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [3:0]        _feeder_io_laneOut_12;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [3:0]        _feeder_io_laneOut_13;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [3:0]        _feeder_io_laneOut_14;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [3:0]        _feeder_io_laneOut_15;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  reg  [1:0]        phase;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:74:30
+  reg  [255:0]      aWindow;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:75:28
+  reg  [31:0]       aScale;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:76:27
+  reg               aValid;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:77:31
+  reg  [3:0]        aLane;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:78:30
+  reg  [15:0]       aKt;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:79:28
+  reg  [15:0]       tileKt;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:80:31
+  reg  [15:0]       kTilesReg;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:81:34
+  wire              tail = phase == 2'h2;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:74:30, :84:28
   wire [15:0]       _allDone_T_layerCapture =
     {io_done_15,
      io_done_14,
@@ -228,8 +244,8 @@ module Wb_WbOsM1Sequencer(	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7
      io_done_3,
      io_done_2,
      io_done_1,
-     io_done_0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:82:33
-  wire              tokenValid = phase == 2'h1 & aValid;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:71:30, :74:31, :80:31, :86:36, :124:13
+     io_done_0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:85:33
+  wire              tokenValid = phase == 2'h1 & aValid;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:74:30, :77:31, :83:31, :89:36, :127:13
   wire              advance_layerCapture =
     ~io_flush
     & (tokenValid
@@ -256,13 +272,12 @@ module Wb_WbOsM1Sequencer(	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7
        & (io_done_8 | _feeder_io_headValid_8) & (io_done_9 | _feeder_io_headValid_9)
        & (io_done_10 | _feeder_io_headValid_10) & (io_done_11 | _feeder_io_headValid_11)
        & (io_done_12 | _feeder_io_headValid_12) & (io_done_13 | _feeder_io_headValid_13)
-       & (io_done_14 | _feeder_io_headValid_14) & (io_done_15 | _feeder_io_headValid_15));	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30, :81:28, :82:{33,40}, :83:{46,53}, :84:{83,99}, :86:36, :87:{25,35,51,64,73,76,85}
-  wire              inject_layerCapture = advance_layerCapture & tokenValid;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:86:36, :87:35, :88:32
-  wire              lastLane_layerCapture = &aLane;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:75:30, :89:32
-  wire              lastWindow = tileKt == kTilesReg - 16'h1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:77:31, :78:34, :90:{35,49}
-  wire              _aSpace_T_1 = inject_layerCapture & lastLane_layerCapture;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:88:32, :89:32, :95:43
+       & (io_done_14 | _feeder_io_headValid_14) & (io_done_15 | _feeder_io_headValid_15));	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :84:28, :85:{33,40}, :86:{46,53}, :87:{83,99}, :89:36, :90:{25,35,51,64,73,76,85}
+  wire              inject_layerCapture = advance_layerCapture & tokenValid;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:89:36, :90:35, :91:32
+  wire              lastWindow = tileKt == kTilesReg - 16'h1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:80:31, :81:34, :93:{35,49}
+  wire              _aSpace_T_1 = inject_layerCapture & (&aLane);	// src/workerbee/scala/main/WbOsM1Sequencer.scala:78:30, :91:32, :92:32, :98:43
   wire              aCapture =
-    ~io_flush & (~aValid | _aSpace_T_1) & io_aIn_valid & (~io_mxMode | io_scaleAIn_valid);	// src/workerbee/scala/main/WbOsM1Sequencer.scala:74:31, :87:25, :95:{24,32,43}, :96:{36,46,62,66,76}
+    ~io_flush & (~aValid | _aSpace_T_1) & io_aIn_valid & (~io_mxMode | io_scaleAIn_valid);	// src/workerbee/scala/main/WbOsM1Sequencer.scala:77:31, :90:25, :98:{24,32,43}, :99:{36,46,62,66,76}
   wire [15:0][15:0] _GEN =
     {{aWindow[255:240]},
      {aWindow[239:224]},
@@ -279,99 +294,270 @@ module Wb_WbOsM1Sequencer(	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7
      {aWindow[63:48]},
      {aWindow[47:32]},
      {aWindow[31:16]},
-     {aWindow[15:0]}};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:72:28, :135:{11,30}
-  wire [31:0]       _io_aScaleByte_T_3 =
-    aScale >> {22'h0, {3'h0, aLane} * {4'h0, io_scaleAStep} / {1'h0, io_scaleABlk}, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :71:30, :73:27, :75:30, :139:{40,51,59}
-  wire [3:0]        feeder_io_laneOut_0_layerCapture;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  wire [6:0]        _GEN_0 = {4'h0, io_scaleBStep};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:51
-  wire [6:0]        _GEN_1 = {1'h0, io_scaleBBlk};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:71:30, :139:59
-  wire [31:0]       _io_scaleBByte_0_T_3 =
+     {aWindow[15:0]}};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:75:28, :138:{11,30}
+  wire [7:0]        scaleBDemand = {1'h0, io_scaleBStep, 4'h0} / {2'h0, io_scaleBBlk};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :74:30, :150:{35,52}
+  wire [31:0]       _io_aScaleByte_T_5 =
+    aScale >> {22'h0, {3'h0, aLane} * {4'h0, io_scaleAStep} / {1'h0, io_scaleABlk}, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :76:27, :78:30, :142:{40,51,59}
+  wire [15:0]       feeder_io_headKt_0_layerCapture;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [1:0]        _io_scaleBByte_0_ktLocal_T_2 =
+    feeder_io_headKt_0_layerCapture[1:0] - aKt[1:0] + tileKt[1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :79:28, :80:31, :152:{39,45}
+  wire              _io_scaleBByte_15_T_2 = scaleBDemand == 8'h2;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:150:52, :156:26
+  wire              _GEN_0 = ~io_scaleBAligned | scaleBDemand == 8'h4;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:150:52, :154:{8,9}, :155:{10,24}
+  wire [3:0]        feeder_io_laneOut_0_layerCapture;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  wire [6:0]        _GEN_1 = {4'h0, io_scaleBStep};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:51
+  wire [6:0]        _GEN_2 = {1'h0, io_scaleBBlk};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:142:59
+  wire [31:0]       _io_scaleBByte_0_T_13 =
     _feeder_io_scaleOut_0
-    >> {22'h0, {3'h0, feeder_io_laneOut_0_layerCapture} * _GEN_0 / _GEN_1, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30, :139:{40,51,59}
-  wire [31:0]       _io_scaleBByte_1_T_3 =
+    >> {22'h0,
+        {3'h0, feeder_io_laneOut_0_layerCapture} * _GEN_1 / _GEN_2
+          + {5'h0,
+             _GEN_0
+               ? 2'h0
+               : _io_scaleBByte_15_T_2
+                   ? {_io_scaleBByte_0_ktLocal_T_2[0], 1'h0}
+                   : _io_scaleBByte_0_ktLocal_T_2},
+        3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :74:30, :142:{40,51,59,65}, :152:45, :153:{30,40}, :154:8, :155:10, :156:{12,26,38,40}
+  wire [1:0]        _io_scaleBByte_1_q_T_1 =
+    io_kTiles[1:0] + _feeder_io_headKt_1[1:0] - aKt[1:0] + tileKt[1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :79:28, :80:31, :152:{39,45}, :153:30
+  wire [31:0]       _io_scaleBByte_1_T_13 =
     _feeder_io_scaleOut_1
-    >> {22'h0, {3'h0, _feeder_io_laneOut_1} * _GEN_0 / _GEN_1, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30, :139:{40,51,59}
-  wire [31:0]       _io_scaleBByte_2_T_3 =
+    >> {22'h0,
+        {3'h0, _feeder_io_laneOut_1} * _GEN_1 / _GEN_2
+          + {5'h0,
+             _GEN_0
+               ? 2'h0
+               : _io_scaleBByte_15_T_2
+                   ? {_io_scaleBByte_1_q_T_1[0], 1'h0}
+                   : _io_scaleBByte_1_q_T_1},
+        3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :74:30, :142:{40,51,59,65}, :152:45, :153:{30,40}, :154:8, :155:10, :156:{12,26,38,40}
+  wire [1:0]        _GEN_3 = {io_kTiles[0], 1'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:153:30
+  wire [1:0]        _io_scaleBByte_2_q_T_1 =
+    _GEN_3 + _feeder_io_headKt_2[1:0] - aKt[1:0] + tileKt[1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :79:28, :80:31, :152:{39,45}, :153:30
+  wire [31:0]       _io_scaleBByte_2_T_13 =
     _feeder_io_scaleOut_2
-    >> {22'h0, {3'h0, _feeder_io_laneOut_2} * _GEN_0 / _GEN_1, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30, :139:{40,51,59}
-  wire [31:0]       _io_scaleBByte_3_T_3 =
+    >> {22'h0,
+        {3'h0, _feeder_io_laneOut_2} * _GEN_1 / _GEN_2
+          + {5'h0,
+             _GEN_0
+               ? 2'h0
+               : _io_scaleBByte_15_T_2
+                   ? {_io_scaleBByte_2_q_T_1[0], 1'h0}
+                   : _io_scaleBByte_2_q_T_1},
+        3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :74:30, :142:{40,51,59,65}, :152:45, :153:{30,40}, :154:8, :155:10, :156:{12,26,38,40}
+  wire [1:0]        _io_scaleBByte_3_q_T_1 =
+    io_kTiles[1:0] * 2'h3 + _feeder_io_headKt_3[1:0] - aKt[1:0] + tileKt[1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :79:28, :80:31, :152:{39,45}, :153:{18,30}
+  wire [31:0]       _io_scaleBByte_3_T_13 =
     _feeder_io_scaleOut_3
-    >> {22'h0, {3'h0, _feeder_io_laneOut_3} * _GEN_0 / _GEN_1, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30, :139:{40,51,59}
-  wire [31:0]       _io_scaleBByte_4_T_3 =
+    >> {22'h0,
+        {3'h0, _feeder_io_laneOut_3} * _GEN_1 / _GEN_2
+          + {5'h0,
+             _GEN_0
+               ? 2'h0
+               : _io_scaleBByte_15_T_2
+                   ? {_io_scaleBByte_3_q_T_1[0], 1'h0}
+                   : _io_scaleBByte_3_q_T_1},
+        3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :74:30, :142:{40,51,59,65}, :152:45, :153:{30,40}, :154:8, :155:10, :156:{12,26,38,40}
+  wire [1:0]        _io_scaleBByte_4_q_T_1 =
+    _feeder_io_headKt_4[1:0] - aKt[1:0] + tileKt[1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :79:28, :80:31, :152:{39,45}, :153:30
+  wire [31:0]       _io_scaleBByte_4_T_13 =
     _feeder_io_scaleOut_4
-    >> {22'h0, {3'h0, _feeder_io_laneOut_4} * _GEN_0 / _GEN_1, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30, :139:{40,51,59}
-  wire [31:0]       _io_scaleBByte_5_T_3 =
+    >> {22'h0,
+        {3'h0, _feeder_io_laneOut_4} * _GEN_1 / _GEN_2
+          + {5'h0,
+             _GEN_0
+               ? 2'h0
+               : _io_scaleBByte_15_T_2
+                   ? {_io_scaleBByte_4_q_T_1[0], 1'h0}
+                   : _io_scaleBByte_4_q_T_1},
+        3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :74:30, :142:{40,51,59,65}, :152:45, :153:{30,40}, :154:8, :155:10, :156:{12,26,38,40}
+  wire [1:0]        _io_scaleBByte_5_q_T_1 =
+    io_kTiles[1:0] + _feeder_io_headKt_5[1:0] - aKt[1:0] + tileKt[1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :79:28, :80:31, :152:{39,45}, :153:30
+  wire [31:0]       _io_scaleBByte_5_T_13 =
     _feeder_io_scaleOut_5
-    >> {22'h0, {3'h0, _feeder_io_laneOut_5} * _GEN_0 / _GEN_1, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30, :139:{40,51,59}
-  wire [31:0]       _io_scaleBByte_6_T_3 =
+    >> {22'h0,
+        {3'h0, _feeder_io_laneOut_5} * _GEN_1 / _GEN_2
+          + {5'h0,
+             _GEN_0
+               ? 2'h0
+               : _io_scaleBByte_15_T_2
+                   ? {_io_scaleBByte_5_q_T_1[0], 1'h0}
+                   : _io_scaleBByte_5_q_T_1},
+        3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :74:30, :142:{40,51,59,65}, :152:45, :153:{30,40}, :154:8, :155:10, :156:{12,26,38,40}
+  wire [1:0]        _io_scaleBByte_6_q_T_1 =
+    _GEN_3 + _feeder_io_headKt_6[1:0] - aKt[1:0] + tileKt[1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :79:28, :80:31, :152:{39,45}, :153:30
+  wire [31:0]       _io_scaleBByte_6_T_13 =
     _feeder_io_scaleOut_6
-    >> {22'h0, {3'h0, _feeder_io_laneOut_6} * _GEN_0 / _GEN_1, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30, :139:{40,51,59}
-  wire [31:0]       _io_scaleBByte_7_T_3 =
+    >> {22'h0,
+        {3'h0, _feeder_io_laneOut_6} * _GEN_1 / _GEN_2
+          + {5'h0,
+             _GEN_0
+               ? 2'h0
+               : _io_scaleBByte_15_T_2
+                   ? {_io_scaleBByte_6_q_T_1[0], 1'h0}
+                   : _io_scaleBByte_6_q_T_1},
+        3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :74:30, :142:{40,51,59,65}, :152:45, :153:{30,40}, :154:8, :155:10, :156:{12,26,38,40}
+  wire [1:0]        _io_scaleBByte_7_q_T_1 =
+    io_kTiles[1:0] * 2'h3 + _feeder_io_headKt_7[1:0] - aKt[1:0] + tileKt[1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :79:28, :80:31, :152:{39,45}, :153:{18,30}
+  wire [31:0]       _io_scaleBByte_7_T_13 =
     _feeder_io_scaleOut_7
-    >> {22'h0, {3'h0, _feeder_io_laneOut_7} * _GEN_0 / _GEN_1, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30, :139:{40,51,59}
-  wire [31:0]       _io_scaleBByte_8_T_3 =
+    >> {22'h0,
+        {3'h0, _feeder_io_laneOut_7} * _GEN_1 / _GEN_2
+          + {5'h0,
+             _GEN_0
+               ? 2'h0
+               : _io_scaleBByte_15_T_2
+                   ? {_io_scaleBByte_7_q_T_1[0], 1'h0}
+                   : _io_scaleBByte_7_q_T_1},
+        3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :74:30, :142:{40,51,59,65}, :152:45, :153:{30,40}, :154:8, :155:10, :156:{12,26,38,40}
+  wire [1:0]        _io_scaleBByte_8_q_T_1 =
+    _feeder_io_headKt_8[1:0] - aKt[1:0] + tileKt[1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :79:28, :80:31, :152:{39,45}, :153:30
+  wire [31:0]       _io_scaleBByte_8_T_13 =
     _feeder_io_scaleOut_8
-    >> {22'h0, {3'h0, _feeder_io_laneOut_8} * _GEN_0 / _GEN_1, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30, :139:{40,51,59}
-  wire [31:0]       _io_scaleBByte_9_T_3 =
+    >> {22'h0,
+        {3'h0, _feeder_io_laneOut_8} * _GEN_1 / _GEN_2
+          + {5'h0,
+             _GEN_0
+               ? 2'h0
+               : _io_scaleBByte_15_T_2
+                   ? {_io_scaleBByte_8_q_T_1[0], 1'h0}
+                   : _io_scaleBByte_8_q_T_1},
+        3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :74:30, :142:{40,51,59,65}, :152:45, :153:{30,40}, :154:8, :155:10, :156:{12,26,38,40}
+  wire [1:0]        _io_scaleBByte_9_q_T_1 =
+    io_kTiles[1:0] + _feeder_io_headKt_9[1:0] - aKt[1:0] + tileKt[1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :79:28, :80:31, :152:{39,45}, :153:30
+  wire [31:0]       _io_scaleBByte_9_T_13 =
     _feeder_io_scaleOut_9
-    >> {22'h0, {3'h0, _feeder_io_laneOut_9} * _GEN_0 / _GEN_1, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30, :139:{40,51,59}
-  wire [31:0]       _io_scaleBByte_10_T_3 =
+    >> {22'h0,
+        {3'h0, _feeder_io_laneOut_9} * _GEN_1 / _GEN_2
+          + {5'h0,
+             _GEN_0
+               ? 2'h0
+               : _io_scaleBByte_15_T_2
+                   ? {_io_scaleBByte_9_q_T_1[0], 1'h0}
+                   : _io_scaleBByte_9_q_T_1},
+        3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :74:30, :142:{40,51,59,65}, :152:45, :153:{30,40}, :154:8, :155:10, :156:{12,26,38,40}
+  wire [1:0]        _io_scaleBByte_10_q_T_1 =
+    _GEN_3 + _feeder_io_headKt_10[1:0] - aKt[1:0] + tileKt[1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :79:28, :80:31, :152:{39,45}, :153:30
+  wire [31:0]       _io_scaleBByte_10_T_13 =
     _feeder_io_scaleOut_10
-    >> {22'h0, {3'h0, _feeder_io_laneOut_10} * _GEN_0 / _GEN_1, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30, :139:{40,51,59}
-  wire [31:0]       _io_scaleBByte_11_T_3 =
+    >> {22'h0,
+        {3'h0, _feeder_io_laneOut_10} * _GEN_1 / _GEN_2
+          + {5'h0,
+             _GEN_0
+               ? 2'h0
+               : _io_scaleBByte_15_T_2
+                   ? {_io_scaleBByte_10_q_T_1[0], 1'h0}
+                   : _io_scaleBByte_10_q_T_1},
+        3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :74:30, :142:{40,51,59,65}, :152:45, :153:{30,40}, :154:8, :155:10, :156:{12,26,38,40}
+  wire [1:0]        _io_scaleBByte_11_q_T_1 =
+    io_kTiles[1:0] * 2'h3 + _feeder_io_headKt_11[1:0] - aKt[1:0] + tileKt[1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :79:28, :80:31, :152:{39,45}, :153:{18,30}
+  wire [31:0]       _io_scaleBByte_11_T_13 =
     _feeder_io_scaleOut_11
-    >> {22'h0, {3'h0, _feeder_io_laneOut_11} * _GEN_0 / _GEN_1, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30, :139:{40,51,59}
-  wire [31:0]       _io_scaleBByte_12_T_3 =
+    >> {22'h0,
+        {3'h0, _feeder_io_laneOut_11} * _GEN_1 / _GEN_2
+          + {5'h0,
+             _GEN_0
+               ? 2'h0
+               : _io_scaleBByte_15_T_2
+                   ? {_io_scaleBByte_11_q_T_1[0], 1'h0}
+                   : _io_scaleBByte_11_q_T_1},
+        3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :74:30, :142:{40,51,59,65}, :152:45, :153:{30,40}, :154:8, :155:10, :156:{12,26,38,40}
+  wire [1:0]        _io_scaleBByte_12_q_T_1 =
+    _feeder_io_headKt_12[1:0] - aKt[1:0] + tileKt[1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :79:28, :80:31, :152:{39,45}, :153:30
+  wire [31:0]       _io_scaleBByte_12_T_13 =
     _feeder_io_scaleOut_12
-    >> {22'h0, {3'h0, _feeder_io_laneOut_12} * _GEN_0 / _GEN_1, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30, :139:{40,51,59}
-  wire [31:0]       _io_scaleBByte_13_T_3 =
+    >> {22'h0,
+        {3'h0, _feeder_io_laneOut_12} * _GEN_1 / _GEN_2
+          + {5'h0,
+             _GEN_0
+               ? 2'h0
+               : _io_scaleBByte_15_T_2
+                   ? {_io_scaleBByte_12_q_T_1[0], 1'h0}
+                   : _io_scaleBByte_12_q_T_1},
+        3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :74:30, :142:{40,51,59,65}, :152:45, :153:{30,40}, :154:8, :155:10, :156:{12,26,38,40}
+  wire [1:0]        _io_scaleBByte_13_q_T_1 =
+    io_kTiles[1:0] + _feeder_io_headKt_13[1:0] - aKt[1:0] + tileKt[1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :79:28, :80:31, :152:{39,45}, :153:30
+  wire [31:0]       _io_scaleBByte_13_T_13 =
     _feeder_io_scaleOut_13
-    >> {22'h0, {3'h0, _feeder_io_laneOut_13} * _GEN_0 / _GEN_1, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30, :139:{40,51,59}
-  wire [31:0]       _io_scaleBByte_14_T_3 =
+    >> {22'h0,
+        {3'h0, _feeder_io_laneOut_13} * _GEN_1 / _GEN_2
+          + {5'h0,
+             _GEN_0
+               ? 2'h0
+               : _io_scaleBByte_15_T_2
+                   ? {_io_scaleBByte_13_q_T_1[0], 1'h0}
+                   : _io_scaleBByte_13_q_T_1},
+        3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :74:30, :142:{40,51,59,65}, :152:45, :153:{30,40}, :154:8, :155:10, :156:{12,26,38,40}
+  wire [1:0]        _io_scaleBByte_14_q_T_1 =
+    _GEN_3 + _feeder_io_headKt_14[1:0] - aKt[1:0] + tileKt[1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :79:28, :80:31, :152:{39,45}, :153:30
+  wire [31:0]       _io_scaleBByte_14_T_13 =
     _feeder_io_scaleOut_14
-    >> {22'h0, {3'h0, _feeder_io_laneOut_14} * _GEN_0 / _GEN_1, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30, :139:{40,51,59}
-  wire [31:0]       _io_scaleBByte_15_T_3 =
+    >> {22'h0,
+        {3'h0, _feeder_io_laneOut_14} * _GEN_1 / _GEN_2
+          + {5'h0,
+             _GEN_0
+               ? 2'h0
+               : _io_scaleBByte_15_T_2
+                   ? {_io_scaleBByte_14_q_T_1[0], 1'h0}
+                   : _io_scaleBByte_14_q_T_1},
+        3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :74:30, :142:{40,51,59,65}, :152:45, :153:{30,40}, :154:8, :155:10, :156:{12,26,38,40}
+  wire [1:0]        _io_scaleBByte_15_q_T_1 =
+    io_kTiles[1:0] * 2'h3 + _feeder_io_headKt_15[1:0] - aKt[1:0] + tileKt[1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :79:28, :80:31, :152:{39,45}, :153:{18,30}
+  wire [31:0]       _io_scaleBByte_15_T_13 =
     _feeder_io_scaleOut_15
-    >> {22'h0, {3'h0, _feeder_io_laneOut_15} * _GEN_0 / _GEN_1, 3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30, :139:{40,51,59}
-  wire              _io_resultsReady_T_layerCapture = &phase;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:71:30, :146:37
+    >> {22'h0,
+        {3'h0, _feeder_io_laneOut_15} * _GEN_1 / _GEN_2
+          + {5'h0,
+             _GEN_0
+               ? 2'h0
+               : _io_scaleBByte_15_T_2
+                   ? {_io_scaleBByte_15_q_T_1[0], 1'h0}
+                   : _io_scaleBByte_15_q_T_1},
+        3'h0};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30, :74:30, :142:{40,51,59,65}, :152:45, :153:{30,40}, :154:8, :155:10, :156:{12,26,38,40}
+  wire              _io_resultsReady_T_layerCapture = &phase;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:74:30, :164:37
   always @(posedge clock) begin	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7
     if (reset) begin	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7
-      phase <= 2'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:71:30, :101:11
-      aValid <= 1'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:71:30, :74:31
-      aLane <= 4'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :75:30
-      tileKt <= 16'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:77:31
-      kTilesReg <= 16'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:78:34
+      phase <= 2'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:74:30
+      aValid <= 1'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:77:31
+      aLane <= 4'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :78:30
+      aKt <= 16'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:79:28
+      tileKt <= 16'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:80:31
+      kTilesReg <= 16'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:81:34
     end
     else begin	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7
+      automatic logic _GEN_4;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:79:28, :119:18, :121:22, :122:13
+      _GEN_4 = inject_layerCapture & (&aLane);	// src/workerbee/scala/main/WbOsM1Sequencer.scala:78:30, :79:28, :91:32, :92:32, :119:18, :121:22, :122:13
       if (io_flush) begin	// src/workerbee/scala/main/WbOsM1Sequencer.scala:24:14
-        phase <= 2'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:71:30, :101:11
-        aLane <= 4'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :75:30
+        phase <= 2'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:74:30
+        aLane <= 4'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :78:30
+        aKt <= 16'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:79:28
       end
       else begin	// src/workerbee/scala/main/WbOsM1Sequencer.scala:24:14
         if (io_start)	// src/workerbee/scala/main/WbOsM1Sequencer.scala:24:14
-          phase <= 2'h1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:71:30, :124:13
-        else if (_aSpace_T_1 & lastWindow)	// src/workerbee/scala/main/WbOsM1Sequencer.scala:90:35, :95:43, :127:35
-          phase <= 2'h2;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:71:30, :81:28
-        else if (tail & (&_allDone_T_layerCapture))	// src/workerbee/scala/main/WbOsM1Sequencer.scala:81:28, :82:{33,40}, :129:21
-          phase <= 2'h3;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:71:30, :130:13
-        if (inject_layerCapture)	// src/workerbee/scala/main/WbOsM1Sequencer.scala:88:32
-          aLane <= aLane + 4'h1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :75:30, :117:22
+          phase <= 2'h1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:74:30, :127:13
+        else if (_aSpace_T_1 & lastWindow)	// src/workerbee/scala/main/WbOsM1Sequencer.scala:93:35, :98:43, :130:35
+          phase <= 2'h2;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:74:30, :84:28
+        else if (tail & (&_allDone_T_layerCapture))	// src/workerbee/scala/main/WbOsM1Sequencer.scala:84:28, :85:{33,40}, :132:21
+          phase <= 2'h3;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:74:30
+        if (inject_layerCapture)	// src/workerbee/scala/main/WbOsM1Sequencer.scala:91:32
+          aLane <= aLane + 4'h1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :78:30, :120:22
+        if (_GEN_4)	// src/workerbee/scala/main/WbOsM1Sequencer.scala:79:28, :119:18, :121:22, :122:13
+          aKt <= aKt + 16'h1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:79:28, :122:20
       end
-      aValid <= ~io_flush & (aCapture | ~_aSpace_T_1 & aValid);	// src/workerbee/scala/main/WbOsM1Sequencer.scala:74:31, :95:43, :96:{36,46,62}, :100:18, :102:12, :111:20, :112:14, :113:36, :114:14
-      if (io_flush | io_start)	// src/workerbee/scala/main/WbOsM1Sequencer.scala:100:18, :105:12, :116:18, :123:20, :126:14
-        tileKt <= 16'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:77:31
-      else if (inject_layerCapture & lastLane_layerCapture)	// src/workerbee/scala/main/WbOsM1Sequencer.scala:77:31, :88:32, :89:32, :116:18, :118:22, :120:16
-        tileKt <= tileKt + 16'h1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:77:31, :90:49, :120:26
-      if (io_flush | ~io_start) begin	// src/workerbee/scala/main/WbOsM1Sequencer.scala:78:34, :100:18, :123:20
+      aValid <= ~io_flush & (aCapture | ~_aSpace_T_1 & aValid);	// src/workerbee/scala/main/WbOsM1Sequencer.scala:77:31, :98:43, :99:{36,46,62}, :103:18, :105:12, :114:20, :115:14, :116:36, :117:14
+      if (io_flush | io_start)	// src/workerbee/scala/main/WbOsM1Sequencer.scala:103:18, :108:12, :119:18, :126:20, :129:14
+        tileKt <= 16'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:80:31
+      else if (_GEN_4)	// src/workerbee/scala/main/WbOsM1Sequencer.scala:79:28, :119:18, :121:22, :122:13
+        tileKt <= tileKt + 16'h1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:80:31, :123:26
+      if (io_flush | ~io_start) begin	// src/workerbee/scala/main/WbOsM1Sequencer.scala:81:34, :103:18, :126:20
       end
-      else	// src/workerbee/scala/main/WbOsM1Sequencer.scala:78:34, :100:18, :123:20
-        kTilesReg <= io_kTiles;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:78:34
+      else	// src/workerbee/scala/main/WbOsM1Sequencer.scala:81:34, :103:18, :126:20
+        kTilesReg <= io_kTiles;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:81:34
     end
-    if (io_flush | ~aCapture) begin	// src/workerbee/scala/main/WbOsM1Sequencer.scala:72:28, :73:27, :96:{36,46,62}, :100:18, :107:20
+    if (io_flush | ~aCapture) begin	// src/workerbee/scala/main/WbOsM1Sequencer.scala:75:28, :76:27, :99:{36,46,62}, :103:18, :110:20
     end
-    else begin	// src/workerbee/scala/main/WbOsM1Sequencer.scala:73:27, :100:18, :107:20
-      aWindow <= io_aIn_payload;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:72:28
-      aScale <= io_mxMode ? io_scaleAIn_payload : 32'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:73:27, :109:32
+    else begin	// src/workerbee/scala/main/WbOsM1Sequencer.scala:76:27, :103:18, :110:20
+      aWindow <= io_aIn_payload;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:75:28
+      aScale <= io_mxMode ? io_scaleAIn_payload : 32'h0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:76:27, :112:32
     end
   end // always @(posedge)
   `ifdef ENABLE_INITIAL_REG_	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7
@@ -387,7 +573,7 @@ module Wb_WbOsM1Sequencer(	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7
         for (logic [3:0] i = 4'h0; i < 4'hB; i += 4'h1) begin
           _RANDOM[i] = `RANDOM;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7
         end	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7
-        phase = _RANDOM[4'h0][1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :71:30
+        phase = _RANDOM[4'h0][1:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :74:30
         aWindow =
           {_RANDOM[4'h0][31:2],
            _RANDOM[4'h1],
@@ -397,19 +583,20 @@ module Wb_WbOsM1Sequencer(	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7
            _RANDOM[4'h5],
            _RANDOM[4'h6],
            _RANDOM[4'h7],
-           _RANDOM[4'h8][1:0]};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :71:30, :72:28
-        aScale = {_RANDOM[4'h8][31:2], _RANDOM[4'h9][1:0]};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :72:28, :73:27
-        aValid = _RANDOM[4'h9][2];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :73:27, :74:31
-        aLane = _RANDOM[4'h9][6:3];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :73:27, :75:30
-        tileKt = {_RANDOM[4'h9][31:23], _RANDOM[4'hA][6:0]};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :73:27, :77:31
-        kTilesReg = _RANDOM[4'hA][22:7];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :77:31, :78:34
+           _RANDOM[4'h8][1:0]};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :74:30, :75:28
+        aScale = {_RANDOM[4'h8][31:2], _RANDOM[4'h9][1:0]};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :75:28, :76:27
+        aValid = _RANDOM[4'h9][2];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :76:27, :77:31
+        aLane = _RANDOM[4'h9][6:3];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :76:27, :78:30
+        aKt = _RANDOM[4'h9][22:7];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :76:27, :79:28
+        tileKt = {_RANDOM[4'h9][31:23], _RANDOM[4'hA][6:0]};	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :76:27, :80:31
+        kTilesReg = _RANDOM[4'hA][22:7];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :80:31, :81:34
       `endif // RANDOMIZE_REG_INIT
     end // initial
     `ifdef FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7
       `FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  Wb_WbOsM1Feeder feeder (	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
+  Wb_WbOsM1Feeder feeder (	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
     .clock               (clock),
     .reset               (reset),
     .io_bIn_valid        (io_bIn_valid),
@@ -485,6 +672,21 @@ module Wb_WbOsM1Sequencer(	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7
     .io_headValid_14     (_feeder_io_headValid_14),
     .io_headValid_15     (_feeder_io_headValid_15),
     .io_headKt_0         (feeder_io_headKt_0_layerCapture),
+    .io_headKt_1         (_feeder_io_headKt_1),
+    .io_headKt_2         (_feeder_io_headKt_2),
+    .io_headKt_3         (_feeder_io_headKt_3),
+    .io_headKt_4         (_feeder_io_headKt_4),
+    .io_headKt_5         (_feeder_io_headKt_5),
+    .io_headKt_6         (_feeder_io_headKt_6),
+    .io_headKt_7         (_feeder_io_headKt_7),
+    .io_headKt_8         (_feeder_io_headKt_8),
+    .io_headKt_9         (_feeder_io_headKt_9),
+    .io_headKt_10        (_feeder_io_headKt_10),
+    .io_headKt_11        (_feeder_io_headKt_11),
+    .io_headKt_12        (_feeder_io_headKt_12),
+    .io_headKt_13        (_feeder_io_headKt_13),
+    .io_headKt_14        (_feeder_io_headKt_14),
+    .io_headKt_15        (_feeder_io_headKt_15),
     .io_laneOut_0        (feeder_io_laneOut_0_layerCapture),
     .io_laneOut_1        (_feeder_io_laneOut_1),
     .io_laneOut_2        (_feeder_io_laneOut_2),
@@ -501,48 +703,48 @@ module Wb_WbOsM1Sequencer(	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7
     .io_laneOut_13       (_feeder_io_laneOut_13),
     .io_laneOut_14       (_feeder_io_laneOut_14),
     .io_laneOut_15       (_feeder_io_laneOut_15)
-  );	// src/workerbee/scala/main/WbOsM1Sequencer.scala:59:30
-  assign io_aIn_ready = aCapture;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :96:{36,46,62}
-  assign io_scaleAIn_ready = io_mxMode & aCapture;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :96:{36,46,62}, :98:48
-  assign io_advance = advance_layerCapture;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :87:35
-  assign io_aOut = _GEN[aLane];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :75:30, :135:11
-  assign io_aScaleByte = io_scaleOne ? 8'h7F : _io_aScaleByte_T_3[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:{8,40,73}
-  assign io_aTokenValid = tokenValid;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :86:36
-  assign io_aLast = tokenValid & lastLane_layerCapture & lastWindow;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :86:36, :89:32, :90:35, :145:{26,38}
-  assign io_scaleBByte_0 = io_scaleOne ? 8'h7F : _io_scaleBByte_0_T_3[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:{8,40,73}
-  assign io_scaleBByte_1 = io_scaleOne ? 8'h7F : _io_scaleBByte_1_T_3[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:{8,40,73}
-  assign io_scaleBByte_2 = io_scaleOne ? 8'h7F : _io_scaleBByte_2_T_3[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:{8,40,73}
-  assign io_scaleBByte_3 = io_scaleOne ? 8'h7F : _io_scaleBByte_3_T_3[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:{8,40,73}
-  assign io_scaleBByte_4 = io_scaleOne ? 8'h7F : _io_scaleBByte_4_T_3[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:{8,40,73}
-  assign io_scaleBByte_5 = io_scaleOne ? 8'h7F : _io_scaleBByte_5_T_3[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:{8,40,73}
-  assign io_scaleBByte_6 = io_scaleOne ? 8'h7F : _io_scaleBByte_6_T_3[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:{8,40,73}
-  assign io_scaleBByte_7 = io_scaleOne ? 8'h7F : _io_scaleBByte_7_T_3[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:{8,40,73}
-  assign io_scaleBByte_8 = io_scaleOne ? 8'h7F : _io_scaleBByte_8_T_3[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:{8,40,73}
-  assign io_scaleBByte_9 = io_scaleOne ? 8'h7F : _io_scaleBByte_9_T_3[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:{8,40,73}
-  assign io_scaleBByte_10 = io_scaleOne ? 8'h7F : _io_scaleBByte_10_T_3[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:{8,40,73}
-  assign io_scaleBByte_11 = io_scaleOne ? 8'h7F : _io_scaleBByte_11_T_3[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:{8,40,73}
-  assign io_scaleBByte_12 = io_scaleOne ? 8'h7F : _io_scaleBByte_12_T_3[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:{8,40,73}
-  assign io_scaleBByte_13 = io_scaleOne ? 8'h7F : _io_scaleBByte_13_T_3[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:{8,40,73}
-  assign io_scaleBByte_14 = io_scaleOne ? 8'h7F : _io_scaleBByte_14_T_3[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:{8,40,73}
-  assign io_scaleBByte_15 = io_scaleOne ? 8'h7F : _io_scaleBByte_15_T_3[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :139:{8,40,73}
-  assign io_headValid_0 = _feeder_io_headValid_0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :59:30
-  assign io_headValid_1 = _feeder_io_headValid_1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :59:30
-  assign io_headValid_2 = _feeder_io_headValid_2;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :59:30
-  assign io_headValid_3 = _feeder_io_headValid_3;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :59:30
-  assign io_headValid_4 = _feeder_io_headValid_4;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :59:30
-  assign io_headValid_5 = _feeder_io_headValid_5;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :59:30
-  assign io_headValid_6 = _feeder_io_headValid_6;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :59:30
-  assign io_headValid_7 = _feeder_io_headValid_7;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :59:30
-  assign io_headValid_8 = _feeder_io_headValid_8;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :59:30
-  assign io_headValid_9 = _feeder_io_headValid_9;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :59:30
-  assign io_headValid_10 = _feeder_io_headValid_10;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :59:30
-  assign io_headValid_11 = _feeder_io_headValid_11;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :59:30
-  assign io_headValid_12 = _feeder_io_headValid_12;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :59:30
-  assign io_headValid_13 = _feeder_io_headValid_13;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :59:30
-  assign io_headValid_14 = _feeder_io_headValid_14;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :59:30
-  assign io_headValid_15 = _feeder_io_headValid_15;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :59:30
+  );	// src/workerbee/scala/main/WbOsM1Sequencer.scala:62:30
+  assign io_aIn_ready = aCapture;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :99:{36,46,62}
+  assign io_scaleAIn_ready = io_mxMode & aCapture;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :99:{36,46,62}, :101:48
+  assign io_advance = advance_layerCapture;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :90:35
+  assign io_aOut = _GEN[aLane];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :78:30, :138:11
+  assign io_aScaleByte = io_scaleOne ? 8'h7F : _io_aScaleByte_T_5[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:{8,40,79}
+  assign io_aTokenValid = tokenValid;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :89:36
+  assign io_aLast = tokenValid & (&aLane) & lastWindow;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :78:30, :89:36, :92:32, :93:35, :163:{26,38}
+  assign io_scaleBByte_0 = io_scaleOne ? 8'h7F : _io_scaleBByte_0_T_13[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:{8,40,79}
+  assign io_scaleBByte_1 = io_scaleOne ? 8'h7F : _io_scaleBByte_1_T_13[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:{8,40,79}
+  assign io_scaleBByte_2 = io_scaleOne ? 8'h7F : _io_scaleBByte_2_T_13[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:{8,40,79}
+  assign io_scaleBByte_3 = io_scaleOne ? 8'h7F : _io_scaleBByte_3_T_13[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:{8,40,79}
+  assign io_scaleBByte_4 = io_scaleOne ? 8'h7F : _io_scaleBByte_4_T_13[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:{8,40,79}
+  assign io_scaleBByte_5 = io_scaleOne ? 8'h7F : _io_scaleBByte_5_T_13[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:{8,40,79}
+  assign io_scaleBByte_6 = io_scaleOne ? 8'h7F : _io_scaleBByte_6_T_13[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:{8,40,79}
+  assign io_scaleBByte_7 = io_scaleOne ? 8'h7F : _io_scaleBByte_7_T_13[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:{8,40,79}
+  assign io_scaleBByte_8 = io_scaleOne ? 8'h7F : _io_scaleBByte_8_T_13[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:{8,40,79}
+  assign io_scaleBByte_9 = io_scaleOne ? 8'h7F : _io_scaleBByte_9_T_13[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:{8,40,79}
+  assign io_scaleBByte_10 = io_scaleOne ? 8'h7F : _io_scaleBByte_10_T_13[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:{8,40,79}
+  assign io_scaleBByte_11 = io_scaleOne ? 8'h7F : _io_scaleBByte_11_T_13[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:{8,40,79}
+  assign io_scaleBByte_12 = io_scaleOne ? 8'h7F : _io_scaleBByte_12_T_13[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:{8,40,79}
+  assign io_scaleBByte_13 = io_scaleOne ? 8'h7F : _io_scaleBByte_13_T_13[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:{8,40,79}
+  assign io_scaleBByte_14 = io_scaleOne ? 8'h7F : _io_scaleBByte_14_T_13[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:{8,40,79}
+  assign io_scaleBByte_15 = io_scaleOne ? 8'h7F : _io_scaleBByte_15_T_13[7:0];	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :142:{8,40,79}
+  assign io_headValid_0 = _feeder_io_headValid_0;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :62:30
+  assign io_headValid_1 = _feeder_io_headValid_1;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :62:30
+  assign io_headValid_2 = _feeder_io_headValid_2;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :62:30
+  assign io_headValid_3 = _feeder_io_headValid_3;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :62:30
+  assign io_headValid_4 = _feeder_io_headValid_4;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :62:30
+  assign io_headValid_5 = _feeder_io_headValid_5;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :62:30
+  assign io_headValid_6 = _feeder_io_headValid_6;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :62:30
+  assign io_headValid_7 = _feeder_io_headValid_7;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :62:30
+  assign io_headValid_8 = _feeder_io_headValid_8;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :62:30
+  assign io_headValid_9 = _feeder_io_headValid_9;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :62:30
+  assign io_headValid_10 = _feeder_io_headValid_10;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :62:30
+  assign io_headValid_11 = _feeder_io_headValid_11;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :62:30
+  assign io_headValid_12 = _feeder_io_headValid_12;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :62:30
+  assign io_headValid_13 = _feeder_io_headValid_13;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :62:30
+  assign io_headValid_14 = _feeder_io_headValid_14;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :62:30
+  assign io_headValid_15 = _feeder_io_headValid_15;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :62:30
   assign io_resultsReady =
-    (tail | _io_resultsReady_T_layerCapture) & (&_allDone_T_layerCapture);	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :81:28, :82:{33,40}, :146:{28,37,48}
-  assign io_phase = phase;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :71:30
+    (tail | _io_resultsReady_T_layerCapture) & (&_allDone_T_layerCapture);	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :84:28, :85:{33,40}, :164:{28,37,48}
+  assign io_phase = phase;	// src/workerbee/scala/main/WbOsM1Sequencer.scala:8:7, :74:30
 endmodule
 

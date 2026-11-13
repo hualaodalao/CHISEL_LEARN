@@ -3,6 +3,7 @@ module Wb_StreamFifo_3(	// src/utils/Stream/Stream.scala:361:7
   input         clock,	// src/utils/Stream/Stream.scala:361:7
                 reset,	// src/utils/Stream/Stream.scala:361:7
                 io_push_valid,	// src/utils/Stream/Stream.scala:363:14
+  output        io_push_ready,	// src/utils/Stream/Stream.scala:363:14
   input  [31:0] io_push_payload,	// src/utils/Stream/Stream.scala:363:14
   output        io_pop_valid,	// src/utils/Stream/Stream.scala:363:14
   input         io_pop_ready,	// src/utils/Stream/Stream.scala:363:14
@@ -14,6 +15,7 @@ module Wb_StreamFifo_3(	// src/utils/Stream/Stream.scala:361:7
   Wb_Queue64_UInt32 queue (	// src/utils/Stream/Stream.scala:371:21
     .clock        (clock),
     .reset        (reset),
+    .io_enq_ready (io_push_ready),
     .io_enq_valid (io_push_valid),
     .io_enq_bits  (io_push_payload),
     .io_deq_ready (io_pop_ready),

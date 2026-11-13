@@ -117,11 +117,11 @@ class WorkerBeeOsM1PerfSpec extends AnyFlatSpec with ChiselSim with WbStatusPoll
   }
 
   private def params(n: Int, k: Int, seed: Long, mx: Boolean = false,
-      unaligned: Boolean = false): DebugParams = DebugParams(
+      unaligned: Boolean = false, mix: Boolean = false, intMix: Boolean = false): DebugParams = DebugParams(
     m = 1, n = n, k = k,
-    aFmt = if (mx) DataFormat.MXE4M3 else DataFormat.BF16,
-    bFmt = if (mx) DataFormat.MXE5M2 else DataFormat.BF16,
-    cFmt = DataFormat.FP32, loadWMode = true,
+    aFmt = if (intMix) DataFormat.INT8 else if (mx || mix) DataFormat.MXE4M3 else DataFormat.BF16,
+    bFmt = if (intMix) DataFormat.INT4 else if (mix) DataFormat.MXE2M1 else if (mx) DataFormat.MXE5M2 else DataFormat.BF16,
+    cFmt = if (intMix) DataFormat.INT32 else DataFormat.FP32, loadWMode = true,
     aMxBlkSel = 0, bMxBlkSel = if (mx) 1 else 0, cMxBlkSel = 0,
     addrModeSel = 0, rnd = 0, seed = seed, strictAddr = true,
     maxCycles = 600000, waveTarget = "", testHint = "OS-M1 性能观测",
@@ -141,7 +141,14 @@ class WorkerBeeOsM1PerfSpec extends AnyFlatSpec with ChiselSim with WbStatusPoll
       PerfCase("BF16 非对齐 N48 K64", params(48, 64, 1104, unaligned = true),
         Traffic(a = 23, b = 7, c = 9, randomReady = true)),
       PerfCase("MX8 E4M3xE5M2 N48 K128", params(48, 128, 1105, mx = true),
-        Traffic(a = 29, b = 5, sa = 41, sb = 11, c = 13, randomReady = true))
+        Traffic(a = 29, b = 5, sa = 41, sb = 11, c = 13, randomReady = true)),
+      // 阶段3 pairStretch H1 专项：混配 B 走配对缓存，非零 B 响应延迟使偶窗读流水发起、
+      //   偶应答滞后到 kCnt 已切奇 ⟹ 覆盖「缓存写先于读 / 偶应答滞后不误选缓存」冒险。
+      //   零延迟存储会让 pairRspCnt 与 req 同拍收齐、掩盖该冒险，故必须带 b>0 延迟。
+      PerfCase("MX W4A8 混配 N48 K128 非零延迟", params(48, 128, 1106, mix = true),
+        Traffic(a = 29, b = 5, sa = 41, sb = 11, c = 13, randomReady = true)),
+      PerfCase("INT W4A8 混配 N48 K128 非零延迟", params(48, 128, 1107, intMix = true),
+        Traffic(a = 23, b = 7, c = 9, randomReady = true))
     )
     simulate(new WorkerBeeOsM1PerfWrapper(cfg)) { dut =>
       for (testCase <- cases) {
@@ -524,8 +531,15 @@ class WorkerBeeOsM1PerfSpec extends AnyFlatSpec with ChiselSim with WbStatusPoll
     readers.foreach(_.idle())
     writer.idle()
     totals.check(tag)
-    assert(totals.count("B.logicalReq") == plan.nTiles.toLong * plan.bKTiles * t &&
-      totals.count("B.push") == plan.nTiles.toLong * plan.bKTiles * t,
+    // 混配（pairStretch）：B 遍历窗口 = A 侧 aKTiles（reg_kTile=K/aKpb），push 仍每逻辑拍 1 次
+    //   ⟹ B.push = nTiles×aKTiles×t；读仅偶窗 ⟹ B.logicalReq = nTiles×(aKTiles/2)×t。
+    //   纯格式 aKTiles==bKTiles 且每窗发读 ⟹ 两支均回落到原 bKTiles 口径（逐值不变）。
+    val isMixPair = (isMx8(p.aFmt) && p.bFmt == DataFormat.MXE2M1) ||
+      (p.aFmt == DataFormat.INT8 && p.bFmt == DataFormat.INT4)
+    val bPushWin = if (isMixPair) plan.aKTiles else plan.bKTiles
+    val bReqWin  = if (isMixPair) plan.aKTiles / 2 else plan.bKTiles
+    assert(totals.count("B.logicalReq") == plan.nTiles.toLong * bReqWin * t &&
+      totals.count("B.push") == plan.nTiles.toLong * bPushWin * t,
       s"$tag B 逻辑请求/推入数量与张量窗口不一致")
     assert(totals.count("C.req") == cLog.size && totals.count("C.rsp") == writer.responses,
       s"$tag C 事件必须完整包含在 execute/done 测量窗内")

@@ -38,6 +38,9 @@ class WbOsM1Sequencer(
     val scaleBStep = Input(UInt(3.W))
     val scaleABlk = Input(UInt(6.W))
     val scaleBBlk = Input(UInt(6.W))
+    // scaleB 基址字对齐 ⟹ DMA 推真实对齐字，字节索引须补字内偏移；非对齐 ⟹ DMA 已
+    //   gather 移位重组，偏移必须归 0。与 Executor WS 注入点同源。
+    val scaleBAligned = Input(Bool())
 
     val advance = Output(Bool())
     val aOut = Output(UInt(aEffW.W))
@@ -135,11 +138,26 @@ class WbOsM1Sequencer(
   io.aOut := aWindow.asTypeOf(Vec(T, UInt(aEffW.W)))(aLane)
   io.aScaleWord := aScale
   // 选择源（aScale/aLane、槽头 scale 字/lane）暂停拍均保持 ⟹ 字节选择随之保持
-  private def selByte(word: UInt, lane: UInt, step: UInt, blk: UInt): UInt =
-    Mux(io.scaleOne, 127.U(8.W), (word >> (((lane * step) / blk) * 8.U))(7, 0))
-  io.aScaleByte := selByte(aScale, aLane, io.scaleAStep, io.scaleABlk)
+  private def selByte(word: UInt, lane: UInt, step: UInt, blk: UInt, off: UInt): UInt =
+    Mux(io.scaleOne, 127.U(8.W), (word >> (((lane * step) / blk + off) * 8.U))(7, 0))
+  // scaleB 字内偏移：DMA 恒推 alignedBase 那个真实对齐字，故索引须补
+  //   off = demand*(j*kTiles + kt) mod 4，demand = T*step/blk ∈{1,2,4}（整除 4 ⟹ 有用字节
+  //   永不跨字，off ≤ 4-demand ⟹ idx+off ≤ 3）。列步进 sbRowOff = kTiles*demand 在
+  //   K%64≠0 时非 4B 倍数 ⟹ off 逐列不同，必须按 j 算。
+  //   ★kt 必须取本列槽头 headKt(j)：OS 第 j 列 token 比列 0 延迟 j 拍，各列当前窗口号不同，
+  //   用列 0 的 tileKt 会让 j>0 全选错字节。headKt 是跨 N tile 全局计数，减 (aKt - tileKt)
+  //   = nt*kTiles 换回本 tile 窗口号；只需 mod 4 ⟹ 低位加减即可，无除法器。
+  private val scaleBDemand = (T.U * io.scaleBStep) / io.scaleBBlk
+  private def bOff(j: Int): UInt = {
+    val ktLocal = feeder.io.headKt(j) - aKt + tileKt
+    val q = (j.U * io.kTiles + ktLocal)(1, 0)
+    Mux(!io.scaleBAligned, 0.U(2.W),
+      Mux(scaleBDemand === 4.U, 0.U(2.W),
+        Mux(scaleBDemand === 2.U, Cat(q(0), 0.U(1.W)), q)))
+  }
+  io.aScaleByte := selByte(aScale, aLane, io.scaleAStep, io.scaleABlk, 0.U(2.W))
   for (j <- 0 until T)
-    io.scaleBByte(j) := selByte(feeder.io.scaleOut(j), feeder.io.laneOut(j), io.scaleBStep, io.scaleBBlk)
+    io.scaleBByte(j) := selByte(feeder.io.scaleOut(j), feeder.io.laneOut(j), io.scaleBStep, io.scaleBBlk, bOff(j))
   io.aLane := aLane
   io.aTokenValid := tokenValid
   io.aLast := tokenValid && lastLane && lastWindow

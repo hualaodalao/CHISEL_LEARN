@@ -11,6 +11,7 @@ Wb_Queue64_UInt32.sv
 Wb_StreamFifo_3.sv
 Wb_WorkerBeeScratchpad.sv
 Wb_WorkerBeeDmaRdOnly.sv
+Wb_WorkerBeeDmaRdOnly_1.sv
 Wb_WorkerBeeDmaWrOnly.sv
 verification/assert/Wb_WorkerBeeExecutor2_Verification_Assert.sv
 Wb_WorkerBeeExecutor2.sv
@@ -39,6 +40,7 @@ Wb_WbOsM1Feeder.sv
 verification/assert/Wb_WbOsM1Sequencer_Verification_Assert.sv
 Wb_WbOsM1Sequencer.sv
 Wb_WorkerBeeDmaRdOnly_2.sv
+Wb_WorkerBeeDmaRdOnly_3.sv
 Wb_WorkerBeeDmaScaleWr.sv
 Wb_ram_2x8.sv
 Wb_Queue2_UInt8.sv

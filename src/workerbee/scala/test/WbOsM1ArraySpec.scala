@@ -29,6 +29,7 @@ class WbOsM1ArrayHarness(n: Int = 16) extends WbOsM1RowDut(n) {
   seq.io.scaleBStep := 4.U
   seq.io.scaleABlk := 16.U
   seq.io.scaleBBlk := 16.U
+  seq.io.scaleBAligned := true.B
   seq.io.flush := io.flush
   seq.io.start := io.start
   seq.io.kTiles := io.kTiles

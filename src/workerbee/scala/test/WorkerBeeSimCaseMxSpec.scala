@@ -427,9 +427,13 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
     //   nTileJump = (totalN-1)*rowOff + kTile*colTileOff（switch-n 增量）
     //   块内 totalN 拍降序 -rowOff。总 beat = nTile*kTile*totalN。
     val scaleBNTileJump = (totalN - 1).toLong * scaleBRowOff + scaleBKTiles.toLong * scaleBColTileOff
+    // rank2b（pairScale）：demand=scaleBColTileOff∈{1,2} 且 scaleBRowOff%4==0 时仅新字窗口
+    //   (kt*demand)%4==0 发读（其余硬件缓存推）；否则全窗口（A级基线）。镜像 WbDebugModel sbReadWin。
+    val sbPairEnMx = (scaleBColTileOff == 1L || scaleBColTileOff == 2L) && (scaleBRowOff % 4L == 0L)
+    def sbReadWinMx(kt: Int): Boolean = !sbPairEnMx || (kt.toLong * scaleBColTileOff) % 4L == 0L
     val expScaleBAddrSeq = scala.collection.mutable.ArrayBuffer[Long]()
     // OS-M1：块内自然列升序，N-tile 步进 = totalN*rowOff（与上式 nTileJump 相等）。
-    for (r <- 0 until nTilesB; kt <- 0 until scaleBKTiles) {
+    for (r <- 0 until nTilesB; kt <- 0 until scaleBKTiles if sbReadWinMx(kt)) {
       if (osM1)
         for (j <- 0 until totalN) expScaleBAddrSeq += SCALE_B_BASE + r.toLong * totalN * scaleBRowOff +
           j.toLong * scaleBRowOff + kt.toLong * scaleBColTileOff
@@ -439,9 +443,11 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
         for (r2 <- 0 until totalN) expScaleBAddrSeq += blockStart - r2.toLong * scaleBRowOff
       }
     }
-    // gather：同 scaleA，逻辑序列按 4B 对齐契约展开为物理序列（总 beat 增加）
-    val expScaleBPhysSeq = expScaleBAddrSeq.toSeq.flatMap(gatherPhys4)
-    val scaleBTotalBeats = expScaleBPhysSeq.size       // 逻辑 = nTile*kTile*totalN，物理 = +gather 额外读
+    // A 级：scaleB 每逻辑拍只发一次对齐读 [L&~3, +4)（有用字节 = 低 demand=kPerBeat/blk
+    //   个，demand 整除 4 ⟹ 永不跨字，gather 第二读纯浪费）；字内偏移由消费端 idx 加 off
+    //   承担。SCALE_B_BASE 4B 对齐 ⟹ 恒走快路径。scaleA 仍走 gather（未改）。
+    val expScaleBPhysSeq = expScaleBAddrSeq.toSeq.map(a => a - a % 4L)
+    val scaleBTotalBeats = expScaleBPhysSeq.size       // = 逻辑 beat 数 nTile*kTile*totalN（1 读 1 拍）
     // scale 内存映像（内存保真）：★ scaleB 按 n-major 组织。硬件 scaleB DMA
     //   （WorkerBeeDmaRdOnly isA=false, loadWMode=1）逐 beat 地址 = base + n×kBlocks + kb
     //   （n=全局列、kb=kTile=scale 块号；与 scaleA 的 m×kBlocks+kb 对称），

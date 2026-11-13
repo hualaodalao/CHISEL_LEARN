@@ -85,6 +85,9 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
     val osScaleBStep   = Output(UInt(3.W))
     val osScaleABlk    = Output(UInt(6.W))
     val osScaleBBlk    = Output(UInt(6.W))
+    // scaleB 基址字对齐 ⟹ DMA 走单对齐字快路径，消费端字节索引须加字内偏移 off；
+    //   基址非对齐时 DMA 退回 gather（payload 已移位重组）⟹ off 必须归 0。
+    val osScaleBAligned = Output(Bool())
     val osResultsReady = Input(Bool())
     val osPsum         = Input(Vec(cfg.totalN, UInt(cfg.cEffW.W)))
     // OS 首行 psum 基底：下标 = 物理列 = 本 N tile 内自然列序，与 osStart 同拍生效
@@ -190,9 +193,20 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
   val scaleBStep = if (cfg.hasMx4)
     Mux(io.calcConfig.isBX2 || (DataFormat.isMx8(io.regFile.aFmt) && DataFormat.isMx4(io.regFile.bFmt)), 2.U(3.W), 4.U(3.W))
   else Mux(io.calcConfig.isBX2, 2.U(3.W), 4.U(3.W))
+  // scaleB 字内偏移（与 OS Sequencer 同式）：DMA 基址字对齐时恒推 alignedBase 那个真实
+  //   对齐字 ⟹ 索引补 off = demand*(col*kTiles + kt) mod 4；基址非对齐时 DMA 退回 gather
+  //   已移位重组 ⟹ off 归 0。WS 块内降序，本拍 scaleB 字的权重列号 = tileInterCnt
+  //   （自 totalN-1 逐拍递减，与 bPop/scaleBPop lockstep）；kTiles 寄存器存 count-1，
+  //   故计数须 +1。off 与 lane 无关（lane 是 K-lane，只决定字内 idx）。
+  val scaleBAligned = io.regFile.bScaleAddr(1, 0) === 0.U
+  val scaleBDemand  = (totalN.U * scaleBStep) / scaleBBlk
+  private val scaleBQ = (tileInterCnt * (kTiles + 1.U) + curKTile)(1, 0)
+  private val scaleBOff = Mux(!scaleBAligned, 0.U(2.W),
+    Mux(scaleBDemand === 4.U, 0.U(2.W),
+      Mux(scaleBDemand === 2.U, Cat(scaleBQ(0), 0.U(1.W)), scaleBQ)))
   if(cfg.hasMx){
     for (lane <- 0 until cfg.totalN) {
-      val idx = (lane.U * scaleBStep) / scaleBBlk
+      val idx = (lane.U * scaleBStep) / scaleBBlk + scaleBOff
       // 同 A 侧：动态字节选择 = 右移 idx*8 后取低 8 位；fp8Run 时恒 127 注入
       val scaleBByte = (io.scaleBPop.get.payload >> (idx * 8.U))(7, 0)
       io.wbScaleBIn.get(lane) := (if (cfg.hasFp8) Mux(fp8Run, 127.U(8.W), scaleBByte) else scaleBByte)
@@ -205,6 +219,7 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
   io.osScaleBStep := scaleBStep
   io.osScaleABlk  := scaleABlk
   io.osScaleBBlk  := scaleBBlk
+  io.osScaleBAligned := scaleBAligned
 
   // bias 基底注入（零加法器）：取代 sLOAD_A pass-0 的 psum 零基底，沿既有 psum 逐列链进
   // 阵列累加。psumIn 是输出-N 轴逐列注入 ⟹ biasRegs(i) 即输出列 nt*totalN+i；bias 是列

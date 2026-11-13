@@ -690,7 +690,11 @@ object WbDebugModel {
       val buf = mutable.ArrayBuffer.empty[Long]
       if (isW4A8 || isIntW4A8) {
         val bKTileOffMix = aKpb.toLong * bEbits / 8                 // 混配 k 窗口步进 = 16B
-        for (r <- 0 until nTiles; w <- 0 until (p.k / aKpb)) {
+        // 阶段3（pairStretch）：偶窗 w 与奇窗 w+1 共用同一 32B 字（窗口步进 16B、列步进
+        //   bRowOff 为 32B 倍数、bBase%32==0）⟹ DMA 仅偶窗发读、奇窗从配对缓存推高半字。
+        //   物理读序列只含偶窗（by 2），每偶窗仍 totalN 列各一个对齐字；数据按地址取整字
+        //   （beatAtB），奇窗高半字由硬件从缓存提取，金锚 C 张量值不变。
+        for (r <- 0 until nTiles; w <- 0 until (p.k / aKpb) by 2) {
           if (p.osM1)
             for (j <- 0 until totalN) buf += p.bBase + r * bNTileOff + j * bRowOff + w * bKTileOffMix
           else {
@@ -742,13 +746,22 @@ object WbDebugModel {
 
     // 混配 scaleB 期望序列按阵列窗口口径：窗口数 = K/aKpb，窗口 w 的 32-K 块 = blk16 的
     //   {2w,2w+1} / blk32 的 {w} ⟹ kTile 步进 = aKpb/bMxBlk（blk16→2B、blk32→1B），
-    //   块内 totalN 行降序，非对齐交 gather。纯格式用 sbColOff = bKpb/blk。
+    //   块内 totalN 行降序。纯格式用 sbColOff = bKpb/blk。
     //   OS 升序（S2）同 B 数据闭式：块内自然列升序，N-tile 步进 = totalN*sbRowOff。
+    //   物理读 = 单对齐字 [L&~3, +4)：每拍只有低 demand=kPerBeat/blk 字节被消费且 demand
+    //   整除 4 ⟹ 有用字节永不跨字，第二读纯浪费（A 级）。字内偏移由消费端 idx 加 off 承担。
+    //   SB_BASE 4B 对齐 ⟹ 恒走快路径；基址非对齐时硬件退回 gather（本模型不覆盖该布局）。
     val expScaleBAddrSeq: Seq[Long] = {
       val buf = mutable.ArrayBuffer.empty[Long]
+      // rank2b（pairScale）：scaleB 同字复用。使能 = demand∈{1,2}（F=4/demand∈{4,2}）且
+      //   sbRowOff%4==0（逐列字边界一致；SB_BASE 4B 对齐恒成立）；使能时仅新字窗口
+      //   (w*demand)%4==0 发读、其余窗口硬件从缓存推 ⟹ 物理序列只含新字窗。否则全窗口（A级基线）。
+      val sbDemand = if (isW4A8) (aKpb / p.bMxBlk).toLong else sbColOff
+      val sbPairEn = (sbDemand == 1L || sbDemand == 2L) && (sbRowOff % 4L == 0L)
+      def sbReadWin(w: Int): Boolean = !sbPairEn || (w.toLong * sbDemand) % 4L == 0L
       if (isW4A8) {
         val sbColOffMix = (aKpb / p.bMxBlk).toLong
-        for (r <- 0 until nTiles; w <- 0 until (p.k / aKpb)) {
+        for (r <- 0 until nTiles; w <- 0 until (p.k / aKpb) if sbReadWin(w)) {
           if (p.osM1)
             for (j <- 0 until totalN) buf += SB_BASE + r * (totalN * sbRowOff) + j * sbRowOff + w * sbColOffMix
           else {
@@ -757,14 +770,14 @@ object WbDebugModel {
           }
         }
       } else if (p.osM1 && isMxAny(p.bFmt))
-        for (r <- 0 until nTiles; kt <- 0 until bKTiles; j <- 0 until totalN)
+        for (r <- 0 until nTiles; kt <- 0 until bKTiles if sbReadWin(kt); j <- 0 until totalN)
           buf += SB_BASE + r * (totalN * sbRowOff) + j * sbRowOff + kt * sbColOff
       else if (isMxAny(p.bFmt))
-        for (r <- 0 until nTiles; kt <- 0 until bKTiles) {
+        for (r <- 0 until nTiles; kt <- 0 until bKTiles if sbReadWin(kt)) {
           val blockStart = SB_BASE + r * (totalN * sbRowOff) + (totalN - 1) * sbRowOff + kt * sbColOff
           for (s <- 0 until totalN) buf += blockStart - s * sbRowOff
         }
-      buf.toSeq.flatMap(gatherPhys(_, 4L))
+      buf.toSeq.map(a => a - a % 4L)
     }
 
     // 激励（固定种子，确定性）
