@@ -306,10 +306,74 @@ class TestTaskGraph(unittest.TestCase):
         with self.assertRaises(ValueError):
             TaskGraph((op,), tasks).validate()
 
-    def test_integer_gemm_output_is_not_fp32(self):
-        with self.assertRaises(ValueError):
-            GemmSpec(1, 16, 32, "INT8", "INT8", "FP32")
+    def test_gemm_output_format_rules(self):
+        # Integer accumulator may stay INT32 or leave via an FP32/FP16/BF16/MX epilogue.
         GemmSpec(1, 16, 32, "INT8", "INT8", "INT32")
+        for dtype in ("FP32", "FP16", "BF16", "MXFP8", "MXFP4"):
+            GemmSpec(1, 16, 32, "INT8", "INT8", dtype)
+            GemmSpec(1, 16, 32, "MXFP8", "MXFP8", dtype)
+        # Floating inputs have no INT32 accumulator; unsupported output formats rejected.
+        with self.assertRaises(ValueError):
+            GemmSpec(1, 16, 32, "MXFP8", "MXFP8", "INT32")
+        with self.assertRaises(ValueError):
+            GemmSpec(1, 16, 32, "MXFP8", "MXFP8", "FP8")
+
+    def test_convert_dtype_contract_is_enforced(self):
+        op = LogicalOp("op", "layer", "composite", "custom")
+        x = Tensor("x", (8,), "FP32", external=True)
+        y = Tensor("y", (8,), "MXFP8")
+        spec = VpuSpec("convert", input_dtype="FP32", output_dtype="MXFP8")
+        task = PrimitiveTask("c", "op", "VPU", spec,
+                             inputs=(TensorRef("x"),), outputs=(TensorRef("y"),))
+        graph = TaskGraph((op,), (task,), (x, y))
+        graph.validate()
+        bad_in = replace(task, spec=replace(spec, input_dtype="INT8"))
+        with self.assertRaisesRegex(ValueError, "convert input type mismatch"):
+            replace(graph, tasks=(bad_in,)).validate()
+        bad_out = replace(task, spec=replace(spec, output_dtype="FP32"))
+        with self.assertRaisesRegex(ValueError, "convert output type mismatch"):
+            replace(graph, tasks=(bad_out,)).validate()
+
+    def test_dma_convert_dtype_contract_is_enforced(self):
+        op = LogicalOp("op", "layer", "composite", "custom")
+        x = Tensor("x", (8,), "FP32", external=True)
+        y = Tensor("y", (8,), "MXFP8")
+        spec = TransferSpec("cvt", "dram", "dram", x.size_bytes, input_dtype="FP32",
+                            output_dtype="MXFP8", read_bytes=x.size_bytes,
+                            write_bytes=y.size_bytes, elements=8)
+        task = PrimitiveTask("c", "op", "DMA", spec,
+                             inputs=(TensorRef("x"),), outputs=(TensorRef("y"),))
+        graph = TaskGraph((op,), (task,), (x, y))
+        graph.validate()
+        bad_in = replace(task, spec=replace(spec, input_dtype="INT8"))
+        with self.assertRaisesRegex(ValueError, "DMA convert input type mismatch"):
+            replace(graph, tasks=(bad_in,)).validate()
+        bad_out = replace(task, spec=replace(spec, output_dtype="FP32"))
+        with self.assertRaisesRegex(ValueError, "DMA convert output type mismatch"):
+            replace(graph, tasks=(bad_out,)).validate()
+
+    def test_transfer_spec_conversion_fields_validate(self):
+        with self.assertRaises(ValueError):
+            TransferSpec("s", "dram", "dram", 4, input_dtype="FP32")  # missing output dtype
+        with self.assertRaises(ValueError):
+            TransferSpec("s", "dram", "dram", 4, input_dtype="FP32", output_dtype="BOGUS")
+        with self.assertRaises(ValueError):
+            TransferSpec("s", "dram", "dram", 4, input_dtype="FP32", output_dtype="MXFP8",
+                         read_bytes=-1)
+        # Pure transfer (no dtype fields) stays valid and unchanged.
+        TransferSpec("s", "dram", "dram", 4)
+
+    def test_missing_conversion_before_gemm_is_rejected(self):
+        op = LogicalOp("op", "layer", "composite", "custom")
+        a = Tensor("a", (1, 32), "FP32", external=True)
+        b = Tensor("b", (32, 16), "MXFP8", external=True, scale_axis=0)
+        out = Tensor("out", (1, 16), "FP32")
+        task = PrimitiveTask("g", "op", "GEMM",
+                             GemmSpec(1, 16, 32, "MXFP8", "MXFP8", "FP32"),
+                             inputs=(TensorRef("a"), TensorRef("b")),
+                             outputs=(TensorRef("out"),))
+        with self.assertRaisesRegex(ValueError, "GEMM operand shape/type mismatch"):
+            TaskGraph((op,), (task,), (a, b, out)).validate()
 
     def test_cpu_algorithm_is_not_inferred_from_shape(self):
         with self.assertRaises(ValueError):

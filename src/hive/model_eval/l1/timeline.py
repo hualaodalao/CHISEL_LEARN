@@ -14,7 +14,7 @@ from ..hw.profiles import HwProfile
 from ..hw.topology import Topology, default_topology
 from ..l0.roofline import evaluate as evaluate_l0
 from . import kernels
-from .compose import lower_plan
+from .compose import DispatchPolicy, lower_plan
 from .cost_view import build_cost_view
 from .dispatchers import dispatch
 from .ledger import EngineCost, Ledger, Phase, ResourceClaim
@@ -294,7 +294,8 @@ def evaluate(model: ModelPlan, profile: HwProfile, fmt: NumFormat,
              buffer_plan: BufferPlan | None = None, scheduling_policy: str = "serial",
              lowering: Callable[..., TaskGraph] | None = None,
              costs: dict[str, dict[str, EngineCost]] | None = None,
-             dispatcher: str | Callable[..., ScheduleResult] | None = None) -> L1Result:
+             dispatcher: str | Callable[..., ScheduleResult] | None = None,
+             dispatch: DispatchPolicy | None = None) -> L1Result:
     params = params or ModelParams()
     geometry = geometry or load_array_geometry()
     topology = topology or default_topology(profile, geometry, params)
@@ -305,7 +306,8 @@ def evaluate(model: ModelPlan, profile: HwProfile, fmt: NumFormat,
         graph.validate()
     else:
         graph = lower_plan(model, fmt, point, attention=attention,
-                           geometry=geometry, block_size=params.block_size)
+                           geometry=geometry, block_size=params.block_size,
+                           dispatch=dispatch)
     buffer_plan = buffer_plan or BufferPlan.from_graph(graph, plan)
     estimates = estimate_graph(graph, topology, plan) if costs is None else costs
     scheduled = evaluate_graph(graph, topology, execution_plan=plan,

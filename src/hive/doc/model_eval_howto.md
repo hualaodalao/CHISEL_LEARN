@@ -138,6 +138,58 @@ PYTHONPATH=src python3 -m hive.model_eval.l1.run \
 
 检查任务阶段和 manifest 中的场景参数。`--sync-us 0` 表示显式零成本 handoff 场景；省略该参数才表示未知。`--conversion-elements-per-cycle` 和 `--accum-elements-per-cycle` 分别给 conversion/pack/dequant 与 FP32 accumulation 一个场景吞吐；省略时仍为 unknown，不会静默按 1 或 0 计费。填入这些参数不会补齐控制排空、路由和其他未覆盖服务。
 
+## 如何派发 convert 引擎与选择 GEMM 输出格式
+
+辅助任务的引擎由你在 emit 层通过 `DispatchPolicy` 选择，不由 cost 自动挑选；builder 只按传入引擎构造任务。派发与 DMA 转换吞吐**仅 Python API，无 CLI flag**。字段与默认值见[接口参考](model_eval_spec.md)的 DispatchPolicy 与 §5.4，设计原因见[设计说明](model_eval_explanation.md)§3。
+
+`DispatchPolicy(convert, pad, k_merge, head_join, gemm_output)` 默认全 VPU、`gemm_output=None`，逐位复现历史 lowering：
+
+- `convert="DMA"`：量化/dequantize/pack 等 dtype 转换改由 DMA 搬运中完成，读/写字节可不等；转换吞吐用 `ModelParams(dma_conversion_elements_per_cycle=...)` 场景参数，省略则 unknown。DMA 支持任意格式对。
+- `gemm_output="FP32"|"FP16"|"BF16"|"MXFP8"|"MXFP4"`：GEMM 直接输出该格式（epilogue 融合，按 GEMM 自身输出吞吐计费），输出已是目标格式时省去独立 dequantize 任务。输入端 quantize 始终独立，不可融合。
+- `pad`/`k_merge`/`head_join` 当前仅 VPU，设其它引擎会抛未建模错误。
+
+以下示例对比默认 VPU 与 DMA-cvt 的覆盖，并演示整数 GEMM 的 FP32 epilogue 融合：
+
+```bash
+PYTHONPATH=src python3 - <<'PY'
+from hive.model_eval.common.workload import decode
+from hive.model_eval.frontend import builtins  # noqa: F401  注册内置模型
+from hive.model_eval.frontend.models.qwen3_06b import CONFIG
+from hive.model_eval.frontend.registry import get_model
+from hive.model_eval.frontend.spec import INT8, MXFP8
+from hive.model_eval.hw.geometry import load_array_geometry
+from hive.model_eval.hw.profiles import G0
+from hive.model_eval.l1.emitters import DispatchPolicy
+from hive.model_eval.l1.params import ModelParams
+from hive.model_eval.l1.timeline import evaluate
+
+geometry = load_array_geometry()
+plan = get_model("Qwen3-0.6B", config={**CONFIG, "num_hidden_layers": 1})
+point = decode(0)
+
+default = evaluate(plan, G0, MXFP8, point, attention="vpu", geometry=geometry)
+dma = evaluate(plan, G0, MXFP8, point, attention="vpu", geometry=geometry,
+               dispatch=DispatchPolicy(convert="DMA"),
+               params=ModelParams(dma_conversion_elements_per_cycle=16))
+print("VPU 覆盖:", default.to_dict()["coverage"])
+print("DMA 覆盖:", dma.to_dict()["coverage"])
+
+fused = evaluate(plan, G0, INT8, point, attention="vpu", geometry=geometry,
+                 dispatch=DispatchPolicy(gemm_output="FP32"))
+print("融合后 dequantize 任务数:",
+      sum(t.id.endswith("/dequantize-output") for t in fused.graph.tasks))
+PY
+```
+
+判读要点：
+
+- DMA-cvt 给定场景吞吐后，convert 任务从 unknown 变为 scenario，`coverage` 的 `tasks_known` 上升；省略 `dma_conversion_elements_per_cycle` 时这些任务仍 unknown，不折 0。这是设计空间探索量，不是硬件实测，结论应落入硬件设计建议（例如「DMA cvt 吞吐需 ≥ X 才优于 VPU 路」）。
+- `gemm_output="FP32"` 用于整数 GEMM 时，`dequantize-output` 任务数为 0（int→float 融进 GEMM 输出）；浮点 GEMM 设 `FP16`/`MXFP8` 等仍保留末尾转 FP32 的独立 convert。
+- 漏做/做错 convert 会被 `TaskGraph.validate()` 的 dtype 交叉校验硬抓（VPU 与 DMA 均查），不会静默。
+- 比较不同派发时保持模型、格式、工作点、拓扑与场景参数口径一致；派发改变任务绑定与资源争用，不改变拓扑。
+
+自定义 lowering 回调自行决定引擎，不接受 `dispatch`；`dispatch` 仅作用默认 `lower_plan` 路径（见下文「如何注入自定义 lowering」）。
+
 ## 如何读取算子 cost、下界与覆盖率
 
 默认 CLI 输出已经从“只有投影”改为“算子 cost + 保守下界 + 覆盖”：
@@ -486,7 +538,7 @@ def lowering(model, fmt, point, *, attention, geometry, block_size):
 
 逐层扩展优先注册 emitter（见上一节），只有需要整体替换图时才用 lowering 回调。
 
-自定义 lowering 负责算子分解、显式转换、padding backing、依赖和未知服务声明；scheduler 只负责固定图的实例选择与资源预约，不会补全缺失任务或证明模型数学等价。
+自定义 lowering 负责算子分解、显式转换、padding backing、依赖和未知服务声明；scheduler 只负责固定图的实例选择与资源预约，不会补全缺失任务或证明模型数学等价。自定义 lowering 自行选择引擎，`evaluate(..., dispatch=...)` 的 DispatchPolicy 仅作用默认 `lower_plan` 路径，不传入 lowering 回调。
 
 ## 如何排查未知时间、容量和格式错误
 

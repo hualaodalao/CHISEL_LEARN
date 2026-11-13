@@ -30,6 +30,8 @@ _ELEM_BYTES = {
     "INT8": Fraction(1), "INT4": Fraction(1, 2), "FP8": Fraction(1),
     "MXFP8": Fraction(1), "MXFP4": Fraction(1, 2), "BF16": Fraction(2),
 }
+_OUTPUT_DATA_BYTES = {"INT32": Fraction(4), "FP32": Fraction(4), "FP16": Fraction(2),
+                      "BF16": Fraction(2), "MXFP8": Fraction(1), "MXFP4": Fraction(1, 2)}
 _FORWARD_W4A8 = {("INT8", "INT4"), ("MXFP8", "MXFP4")}
 
 
@@ -256,8 +258,10 @@ def estimate(task: PrimitiveTask, engine_config, execution_plan) -> EngineCost:
         raise ValueError("GEMM estimator requires a GEMM engine instance")
     spec = task.spec
     integer = _format_family(spec.a_fmt) in ("INT8", "INT4")
-    if spec.c_dtype != ("INT32" if integer else "FP32"):
-        raise ValueError("GEMM accumulation dtype does not match input formats")
+    allowed_c = (("INT32", "FP32", "FP16", "BF16", "MXFP8", "MXFP4") if integer
+                 else ("FP32", "FP16", "BF16", "MXFP8", "MXFP4"))
+    if spec.c_dtype not in allowed_c:
+        raise ValueError("GEMM output dtype does not match input formats")
     if task.allowed_instances and engine_config.id not in task.allowed_instances:
         raise ValueError("GEMM instance is not allowed for task")
     weight_policy = execution_plan.weight_policy
@@ -267,7 +271,10 @@ def estimate(task: PrimitiveTask, engine_config, execution_plan) -> EngineCost:
         raise ValueError("unsupported GEMM execution policy")
     _positive_integer("alignment", alignment)
     profile, geometry, params = engine_config.profile, engine_config.geometry, engine_config.params
-    shape = GemmShape(spec.m, spec.n, spec.k, spec.a_fmt, spec.b_fmt, 32, spec.block_size)
+    c_data_elem = _OUTPUT_DATA_BYTES[spec.c_dtype]
+    c_mx = spec.c_dtype.startswith("MX")
+    shape = GemmShape(spec.m, spec.n, spec.k, spec.a_fmt, spec.b_fmt,
+                      int(c_data_elem * 8), spec.block_size)
     from .split_policies import split_commands
     commands = split_commands(shape, geometry, spec.split_policy)
     counts = count_windows(shape, commands)
@@ -403,6 +410,7 @@ def estimate(task: PrimitiveTask, engine_config, execution_plan) -> EngineCost:
     weight_acquire = (stage("b", "weight-stage", weight_unique)
                       if resident and spec.b_domain == "dram" else None)
     command_footprints = []
+    total_c_beats = 0
     b_dram = weight_unique if resident else 0
     for index, c in enumerate(commands):
         prefix = f"command-{index}"
@@ -466,9 +474,12 @@ def estimate(task: PrimitiveTask, engine_config, execution_plan) -> EngineCost:
             stream("port.dma_a", f"{segment}:consume", "a", a_bytes, a_physical, a_beats)
             c_bytes = c_physical = 0
             if output:
-                c_bytes = c.m * c.n * 4
-                c_beats = c.m * c.n_tiles * max(1, math.ceil(c.tile_n * 4 / geometry.c_bytes_per_beat))
+                c_scale_bytes = c.m * math.ceil(c.n / spec.block_size) if c_mx else 0
+                c_bytes = math.ceil(c.m * c.n * c_data_elem) + c_scale_bytes
+                c_beats = (c.m * c.n_tiles * max(1, math.ceil(c.tile_n * c_data_elem / geometry.c_bytes_per_beat))
+                           + (math.ceil(c_scale_bytes / geometry.c_bytes_per_beat) if c_mx else 0))
                 c_physical = c_beats * geometry.c_bytes_per_beat
+                total_c_beats += c_beats
                 c_origin = Origin(f"{task.id}:{segment}:write", "dma_c")
                 c_charges = [
                     charge("port.dma_c", c_origin, _local_seconds(c_physical, profile), byte_count=c_physical,
@@ -519,6 +530,7 @@ def estimate(task: PrimitiveTask, engine_config, execution_plan) -> EngineCost:
     if capacity is not None and footprint > capacity:
         raise ValueError(f"GEMM capacity failure: {weight_policy}/{activation_policy} needs {footprint} bytes; capacity is {capacity}")
     metrics.update({
+        "c_beats": total_c_beats,
         "issued_macs": counts.useful_macs + counts.padded_macs,
         "semantic_macs": spec.semantic_macs if spec.semantic_macs is not None else counts.useful_macs,
         "masked_macs": counts.useful_macs - (spec.semantic_macs if spec.semantic_macs is not None else counts.useful_macs),

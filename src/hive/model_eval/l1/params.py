@@ -19,6 +19,7 @@ class ModelParams:
     vpu_fp16_lanes: int = 16
     vpu_conversion_elements_per_cycle: int | None = None
     vpu_fp32_accum_elements_per_cycle: int | None = None
+    dma_conversion_elements_per_cycle: int | None = None
     block_size: int = 32
 
     def __post_init__(self) -> None:
@@ -36,7 +37,8 @@ class ModelParams:
         if self.vpu_fp32_lanes < 1 or self.vpu_fp16_lanes < 1:
             raise ValueError("VPU lane 数必须为正")
         for name in ("vpu_conversion_elements_per_cycle",
-                     "vpu_fp32_accum_elements_per_cycle"):
+                     "vpu_fp32_accum_elements_per_cycle",
+                     "dma_conversion_elements_per_cycle"):
             value = getattr(self, name)
             if value is not None and (type(value) is not int or value < 1):
                 raise ValueError(f"{name} 必须为正整数或省略")
@@ -59,6 +61,9 @@ class ModelParams:
                                is not None else "excluded", "unit": "elements/cycle"},
             "vpu_fp32_accumulation": {"source": "scenario" if self.vpu_fp32_accum_elements_per_cycle
                                       is not None else "excluded", "unit": "elements/cycle"},
+            "dma_conversion": {"source": "scenario" if self.dma_conversion_elements_per_cycle
+                               is not None else "excluded", "unit": "elements/cycle",
+                               "note": "inline DMA format conversion; transfer bandwidth reuses profile interface"},
             "cpu_sampling": {"source": "scenario" if self.cpu_cycles_per_comparison is not None
                              else "excluded", "algorithm": "full_sort_comparison_budget"},
             "handoff": {"source": "scenario" if self.sync_us is not None else "unknown",

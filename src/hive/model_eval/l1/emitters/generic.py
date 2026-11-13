@@ -24,13 +24,17 @@ def _bpp(ctx: EmitContext) -> float:
 
 
 def _weight_gemm(ctx: EmitContext, op, a: str, m: int, n: int, k: int) -> str:
-    a = ctx.builder.convert(op, a, ctx.fmt.name, "quantize-input")
+    a = ctx.builder.convert(op, a, ctx.fmt.name, "quantize-input",
+                            engine=ctx.dispatch.convert)
     b = ctx.builder.tensor(op.id + ":weight", (k, n), ctx.fmt.name, external=True,
                            scale_axis=0)
     out = ctx.builder.gemm(op, a, b, GemmSpec(
-        m, n, k, ctx.fmt.name, ctx.fmt.name, ctx.output_dtype, ctx.block_size,
-        op.mac, True, op.evidence), ctx.geometry)
-    return ctx.builder.convert(op, out, "FP32", "dequantize-output")
+        m, n, k, ctx.fmt.name, ctx.fmt.name,
+        ctx.dispatch.gemm_output or ctx.output_dtype, ctx.block_size,
+        op.mac, True, op.evidence), ctx.geometry,
+        pad_engine=ctx.dispatch.pad, merge_engine=ctx.dispatch.k_merge)
+    return ctx.builder.convert(op, out, "FP32", "dequantize-output",
+                               engine=ctx.dispatch.convert)
 
 
 @emitter("generic.linear")
@@ -80,7 +84,8 @@ def emit_rms_norm(ctx, instance, inputs):
                                 dependencies=dependencies)
     outputs = {"hidden": result}
     if geometry.quantize:
-        outputs["quantized"] = ctx.builder.convert(op, result, ctx.fmt.name, "quantize")
+        outputs["quantized"] = ctx.builder.convert(op, result, ctx.fmt.name, "quantize",
+                                                   engine=ctx.dispatch.convert)
     if geometry.last_position_only and ctx.point.phase is Phase.PREFILL:
         rows_total = rows
         outputs["hidden"] = ctx.builder.view(
@@ -157,8 +162,10 @@ def emit_kv_append(ctx, instance, inputs):
     op = ctx.operation(instance, "DMA", "kv_transfer",
                        read_bytes=read_bytes, write_bytes=write_bytes,
                        evidence="FP16 KV; explicit external read/write, no cache hits")
-    packed_k = ctx.builder.convert(op, inputs["k"], "FP16", "pack-k")
-    packed_v = ctx.builder.convert(op, inputs["v"], "FP16", "pack-v")
+    packed_k = ctx.builder.convert(op, inputs["k"], "FP16", "pack-k",
+                                   engine=ctx.dispatch.convert)
+    packed_v = ctx.builder.convert(op, inputs["v"], "FP16", "pack-v",
+                                   engine=ctx.dispatch.convert)
     outputs = {}
     cache_outputs = ()
     if seq:

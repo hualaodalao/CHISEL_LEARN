@@ -24,6 +24,25 @@ class MissingL1Coverage(RuntimeError):
 
 
 @dataclass(frozen=True)
+class DispatchPolicy:
+    """User-chosen engine dispatch for auxiliary lowering tasks.
+
+    The emit layer consults this and passes the engine to the builder; the
+    builder only constructs the typed spec for the engine it is told.  Defaults
+    reproduce the historical all-VPU lowering exactly.
+    """
+
+    convert: str = "VPU"
+    pad: str = "VPU"
+    k_merge: str = "VPU"
+    head_join: str = "VPU"
+    # GEMM epilogue output format; None keeps the accumulator dtype (INT32/FP32)
+    # plus a separate dequantize convert.  The epilogue runs at the GEMM's own
+    # output throughput; only c bytes/beats change.
+    gemm_output: str | None = None
+
+
+@dataclass(frozen=True)
 class EmitContext:
     plan: ModelPlan
     point: WorkloadPoint
@@ -31,6 +50,7 @@ class EmitContext:
     geometry: ArrayGeometry
     variant: str
     builder: GraphBuilder
+    dispatch: DispatchPolicy = DispatchPolicy()
 
     @property
     def rows(self) -> int:

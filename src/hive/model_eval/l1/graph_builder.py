@@ -74,20 +74,32 @@ class GraphBuilder:
                                         tuple(TensorRef(t) for t in inputs), outputs))
         return result
 
-    def convert(self, op: LogicalOp, tensor: str, dtype: str, suffix: str, *, scale_axis=-1) -> str:
+    def convert(self, op: LogicalOp, tensor: str, dtype: str, suffix: str, *,
+                engine: str = "VPU", scale_axis=-1) -> str:
         source = self.tensors[tensor]
         if source.dtype == dtype and (not dtype.startswith("MX") or
                 source.scale_axis % len(source.shape) == scale_axis % len(source.shape)):
             return tensor
         target = Tensor("target", source.shape, dtype, block_size=self.block_size,
                         scale_axis=scale_axis, memory_domain=source.memory_domain)
-        return self.task(op, suffix, "VPU", VpuSpec(
-            "convert", elements=math.prod(source.shape), read_bytes=source.size_bytes,
-            write_bytes=target.size_bytes, dram_read_bytes=source.size_bytes,
-            dram_write_bytes=target.size_bytes, input_dtype=source.dtype, output_dtype=dtype,
-            evidence="explicit dtype/layout/quantization conversion; service unknown"),
-            (tensor,), source.shape, dtype, scale_axis=scale_axis,
-            memory_domain=source.memory_domain)
+        if engine == "VPU":
+            return self.task(op, suffix, "VPU", VpuSpec(
+                "convert", elements=math.prod(source.shape), read_bytes=source.size_bytes,
+                write_bytes=target.size_bytes, dram_read_bytes=source.size_bytes,
+                dram_write_bytes=target.size_bytes, input_dtype=source.dtype, output_dtype=dtype,
+                evidence="explicit dtype/layout/quantization conversion; service unknown"),
+                (tensor,), source.shape, dtype, scale_axis=scale_axis,
+                memory_domain=source.memory_domain)
+        if engine == "DMA":
+            return self.task(op, suffix, "DMA", TransferSpec(
+                op.id + "/" + suffix, source.memory_domain, source.memory_domain,
+                source.size_bytes, direction="copy", input_dtype=source.dtype, output_dtype=dtype,
+                read_bytes=source.size_bytes, write_bytes=target.size_bytes,
+                elements=math.prod(source.shape),
+                evidence="explicit DMA inline dtype conversion; read/write bytes differ; service scenario"),
+                (tensor,), source.shape, dtype, scale_axis=scale_axis,
+                memory_domain=source.memory_domain)
+        raise ValueError(f"{engine} conversion cost is not modeled yet; only VPU and DMA are supported")
 
     def vector(self, op: LogicalOp, inputs: tuple[str, ...], shape: tuple[int, ...], *,
                suffix="execute", spec: VpuSpec | None = None, dtype="FP32",
@@ -100,7 +112,8 @@ class GraphBuilder:
         return result
 
     def gemm(self, op: LogicalOp, a: str, b: str, spec: GemmSpec, geometry,
-             suffix="execute", split_policy: str | None = None) -> str:
+             suffix="execute", split_policy: str | None = None, *,
+             pad_engine: str = "VPU", merge_engine: str = "VPU") -> str:
         from .gemm_model import GemmShape
         policy = split_policy or self.split_policy
         a_domain, b_domain = self.tensors[a].memory_domain, self.tensors[b].memory_domain
@@ -119,6 +132,8 @@ class GraphBuilder:
                 operands.append(self.padded_operands[key])
                 continue
             if source.shape != storage_shape:
+                if pad_engine != "VPU":
+                    raise ValueError(f"{pad_engine} operand pad/repack cost is not modeled yet; only VPU is supported")
                 target = Tensor("target", storage_shape, source.dtype,
                                 block_size=self.block_size, scale_axis=axis,
                                 memory_domain=source.memory_domain)
@@ -145,6 +160,8 @@ class GraphBuilder:
                             memory_domain=spec.c_domain)
         result = partial
         if k_parts > 1:
+            if merge_engine != "VPU":
+                raise ValueError(f"{merge_engine} K-merge cost is not modeled yet; only VPU is supported")
             cells = sum(command.m * command.n for command in commands if command.k_offset)
             result = self.vector(op, (partial,), (spec.m, padded_n), suffix=suffix + "-k-merge",
                                  dtype=spec.c_dtype, memory_domain=spec.c_domain,

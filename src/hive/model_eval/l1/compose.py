@@ -7,7 +7,7 @@ from ..common.workload import WorkloadPoint
 from ..frontend.plan import ModelPlan
 from ..frontend.spec import NumFormat
 from ..hw.geometry import ArrayGeometry
-from .emitters import EmitContext
+from .emitters import DispatchPolicy, EmitContext
 from .graph_builder import GraphBuilder
 
 ATTENTION_VARIANTS = ("vpu", "quantized_gemm")
@@ -24,13 +24,18 @@ def _hidden_width(plan: ModelPlan) -> int:
 
 def lower_plan(plan: ModelPlan, fmt: NumFormat, point: WorkloadPoint, *,
                attention: str = "vpu", geometry: ArrayGeometry | None = None,
-               block_size: int = 32) -> TaskGraph:
+               block_size: int = 32, dispatch: DispatchPolicy | None = None) -> TaskGraph:
     if geometry is None:
         from ..hw.geometry import load_array_geometry
         geometry = load_array_geometry()
     plan.validate()
+    if dispatch is not None and dispatch.gemm_output is not None:
+        if dispatch.gemm_output not in ("FP32", "FP16", "BF16", "MXFP8", "MXFP4"):
+            raise ValueError(f"gemm_output {dispatch.gemm_output!r} is not modeled; "
+                             "epilogue supports FP32/FP16/BF16/MXFP8/MXFP4")
     builder = GraphBuilder(block_size)
-    ctx = EmitContext(plan, point, fmt, geometry, attention, builder)
+    ctx = EmitContext(plan, point, fmt, geometry, attention, builder,
+                      dispatch or DispatchPolicy())
     current = builder.tensor("input:hidden", (ctx.rows, _hidden_width(plan)),
                              "FP32", external=True)
     inputs = {"hidden": current}

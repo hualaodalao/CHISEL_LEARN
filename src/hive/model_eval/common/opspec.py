@@ -123,10 +123,10 @@ class GemmSpec:
                 _positive_dimensions(storage)
                 if len(storage) != 2 or any(a < b for a, b in zip(storage, logical)):
                     raise ValueError("GEMM storage shape must contain its logical operand")
-        if self.c_dtype not in ("FP32", "INT32"):
-            raise ValueError("GEMM accumulation type must be FP32 or INT32")
-        if (self.a_fmt.startswith("INT")) != (self.c_dtype == "INT32"):
-            raise ValueError("integer GEMM requires INT32; floating GEMM requires FP32")
+        if self.c_dtype not in ("FP32", "INT32", "FP16", "BF16", "MXFP8", "MXFP4"):
+            raise ValueError("GEMM output type must be FP32, INT32, FP16, BF16, MXFP8 or MXFP4")
+        if self.c_dtype == "INT32" and not self.a_fmt.startswith("INT"):
+            raise ValueError("INT32 output requires an integer input format")
         if self.semantic_macs is not None and (type(self.semantic_macs) is not int or not 0 <= self.semantic_macs <= self.m * self.n * self.k):
             raise ValueError("semantic MACs must fit issued shape")
         if not self.split_policy:
@@ -190,12 +190,27 @@ class TransferSpec:
     tensor: TensorRef | None = None
     direction: str = "copy"
     evidence: str = ""
+    input_dtype: str = ""
+    output_dtype: str = ""
+    read_bytes: int | None = None
+    write_bytes: int | None = None
+    elements: int = 0
 
     def __post_init__(self) -> None:
         if not self.stream_id or type(self.byte_count) is not int or self.byte_count < 0:
             raise ValueError("transfer requires a unique stream and nonnegative byte count")
         if self.direction not in ("read", "write", "copy"):
             raise ValueError("unsupported transfer direction")
+        if bool(self.input_dtype) != bool(self.output_dtype):
+            raise ValueError("transfer conversion requires both input and output dtype")
+        for name in (self.input_dtype, self.output_dtype):
+            if name and name not in _FORMAT_BITS:
+                raise ValueError("unsupported transfer conversion dtype")
+        for name in (self.read_bytes, self.write_bytes):
+            if name is not None and (type(name) is not int or name < 0):
+                raise ValueError("transfer conversion bytes must be nonnegative integers")
+        if type(self.elements) is not int or self.elements < 0:
+            raise ValueError("transfer conversion elements must be a nonnegative integer")
 
 
 TaskSpec: TypeAlias = GemmSpec | VpuSpec | CpuSpec | TransferSpec
@@ -306,6 +321,18 @@ class TaskGraph:
                             raise ValueError("GEMM backing view requires an explicit layout conversion")
                 if any(tensors[ref.tensor_id].dtype != spec.c_dtype for ref in task.outputs):
                     raise ValueError("GEMM output type mismatch")
+            if isinstance(task.spec, VpuSpec) and task.spec.kind == "convert":
+                spec = task.spec
+                if any(tensors[ref.tensor_id].dtype != spec.input_dtype for ref in task.inputs):
+                    raise ValueError("convert input type mismatch; conversion must be explicit")
+                if any(tensors[ref.tensor_id].dtype != spec.output_dtype for ref in task.outputs):
+                    raise ValueError("convert output type mismatch; conversion must be explicit")
+            if isinstance(task.spec, TransferSpec) and task.spec.input_dtype:
+                spec = task.spec
+                if any(tensors[ref.tensor_id].dtype != spec.input_dtype for ref in task.inputs):
+                    raise ValueError("DMA convert input type mismatch; conversion must be explicit")
+                if any(tensors[ref.tensor_id].dtype != spec.output_dtype for ref in task.outputs):
+                    raise ValueError("DMA convert output type mismatch; conversion must be explicit")
         while pending:
             ready = sorted(key for key, dependencies in pending.items() if not dependencies)
             if not ready:

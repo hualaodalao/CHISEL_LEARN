@@ -136,18 +136,21 @@ def _emit_quantized_attention(ctx, instance, q, k, v, cache):
                 starts=(batch_index, kv_head, 0, 0),
                 stops=(batch_index + 1, kv_head + 1, seq, dim))
             qa = ctx.builder.convert(qk_op, q_view, ctx.fmt.name,
-                                     suffix + "-quantize-q")
+                                     suffix + "-quantize-q", engine=ctx.dispatch.convert)
             key = (batch_index, kv_head)
             if key not in quantized_keys:
                 quantized_keys[key] = ctx.builder.convert(
                     qk_op, k_view, ctx.fmt.name,
-                    f"b{batch_index}-kv{kv_head}-quantize-k", scale_axis=0)
+                    f"b{batch_index}-kv{kv_head}-quantize-k", scale_axis=0,
+                    engine=ctx.dispatch.convert)
             kb = quantized_keys[key]
             mac = dim * seq if m == 1 else dim * seq * (seq + 1) // 2
             scores = ctx.builder.gemm(qk_op, qa, kb, GemmSpec(
                 m, seq, dim, ctx.fmt.name, ctx.fmt.name, ctx.output_dtype,
-                ctx.block_size, mac, evidence=qk_op.evidence), ctx.geometry, suffix)
-            scores = ctx.builder.convert(qk_op, scores, "FP32", suffix + "-dequantize")
+                ctx.block_size, mac, evidence=qk_op.evidence), ctx.geometry, suffix,
+                pad_engine=ctx.dispatch.pad, merge_engine=ctx.dispatch.k_merge)
+            scores = ctx.builder.convert(qk_op, scores, "FP32", suffix + "-dequantize",
+                                         engine=ctx.dispatch.convert)
             elements = seq if m == 1 else seq * (seq + 1) // 2
             probabilities = ctx.builder.vector(
                 softmax_op, (scores,), (m, seq), suffix=suffix,
@@ -157,18 +160,21 @@ def _emit_quantized_attention(ctx, instance, q, k, v, cache):
                              dram_read_bytes=4 * elements,
                              dram_write_bytes=4 * elements))
             pa = ctx.builder.convert(av_op, probabilities, ctx.fmt.name,
-                                     suffix + "-quantize-p")
+                                     suffix + "-quantize-p", engine=ctx.dispatch.convert)
             if key not in quantized_values:
                 quantized_values[key] = ctx.builder.convert(
                     av_op, v_view, ctx.fmt.name,
-                    f"b{batch_index}-kv{kv_head}-quantize-v", scale_axis=0)
+                    f"b{batch_index}-kv{kv_head}-quantize-v", scale_axis=0,
+                    engine=ctx.dispatch.convert)
             vb = quantized_values[key]
             context = ctx.builder.gemm(av_op, pa, vb, GemmSpec(
                 m, dim, seq, ctx.fmt.name, ctx.fmt.name, ctx.output_dtype,
-                ctx.block_size, mac, evidence=av_op.evidence), ctx.geometry, suffix)
+                ctx.block_size, mac, evidence=av_op.evidence), ctx.geometry, suffix,
+                pad_engine=ctx.dispatch.pad, merge_engine=ctx.dispatch.k_merge)
             contexts.append(ctx.builder.convert(av_op, context, "FP32",
-                                                suffix + "-dequantize"))
-    return ctx.builder.task(av_op, "join-heads", "VPU", VpuSpec(
+                                                suffix + "-dequantize",
+                                                engine=ctx.dispatch.convert))
+    return ctx.builder.task(av_op, "join-heads", ctx.dispatch.head_join, VpuSpec(
         "convert", elements=rows * q_width,
         read_bytes=4 * rows * q_width, write_bytes=4 * rows * q_width,
         dram_read_bytes=4 * rows * q_width, dram_write_bytes=4 * rows * q_width,

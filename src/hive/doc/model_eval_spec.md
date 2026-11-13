@@ -319,6 +319,7 @@ G0/G0_PRO 的 eta=1，单核 8-bit family 为 512 MAC/cycle、4-bit family 为 1
 | `vpu_fp32_lanes` / `vpu_fp16_lanes` | 8 / 16 | VPU 架构 lane 参数 |
 | `vpu_conversion_elements_per_cycle` | None | conversion/pack/dequant 场景吞吐；None 保持 unknown |
 | `vpu_fp32_accum_elements_per_cycle` | None | FP32 accumulation/reduction 场景吞吐；None 保持 unknown |
+| `dma_conversion_elements_per_cycle` | None | DMA 搬运中格式转换场景吞吐；None 保持 unknown；仅 Python API，无 CLI flag |
 | `block_size` | 32 | MX block，支持 16 或 32 |
 
 速率参数必须为有限非负数，CPU 频率必须为正，lane 数必须为正；conversion/accumulation 参数必须为正整数或省略。启用 overlap 必须提供非空 evidence。evidence 仅登记调用者声明，不被程序验证为 RTL 或测量证据。
@@ -425,6 +426,8 @@ array_cycles = loadW_beats + consume_beats
 
 C 每行独立按 C DMA 宽度计拍；独立 K 命令均输出 C。`array_utilization = consume/(loadW+consume)` 是结构比值，不是实测阵列效率。
 
+GEMM 输出格式 `c_dtype` 不限于累加器。整数输入（INT8/INT4）累加器为 INT32，浮点输入累加器为 FP32；`c_dtype` 可取 {FP32, INT32, FP16, BF16, MXFP8, MXFP4}，其中 INT32 仅限整数输入。输出端格式转换（epilogue：→FP16/BF16 精度 cast、→FP32 int→float、→MX requant）融合进 GEMM 自身输出吞吐，不新增独立阶段或吞吐参数：输出格式只改变 C 字节/beat（FP32/INT32=4B，FP16/BF16=2B，MXFP8=1B+scale，MXFP4=0.5B+scale），MX scale 沿 N 轴按 `c.m*ceil(c.n/block_size)` 计入输出字节与 beat，内部 C 窗口缓冲仍按累加器 4B。输入端 quantize 在 GEMM 之前，epilogue 够不着，不可融合，仍是独立 pre-GEMM 任务。`array_cycles` 与输出格式无关。
+
 MX A 的 scale 轴为 K 轴 1，B 为 K 轴 0。容量按对应轴每行 `ceil(K/block_size)` 计算，平均 scale 字节不能替代物理请求账。A/B storage shape 必须覆盖 padded N/K；默认 lowering 生成显式 VPU repack/zero-pad 任务，服务保持未知。手工图必须写满 backing。
 
 K 分命令保留 backing stride 和全局 K offset；仅显式 A staging 使用 command-local 布局。跨 K partial-sum 通过独立 `k_accum` 任务合并，不在 GEMM 内隐式免费合并。
@@ -437,11 +440,13 @@ K 分命令保留 backing stride 和全局 K offset；仅显式 A staging 使用
 | rope / residual / silu_gate | FP32 lane-rate 回退；SiLU 另有 exp/reciprocal |
 | attention_vpu | FP16 FMA architecture peak；类型转换和 FP32 累加另列；有 conversion/accum 参数时按场景计费，缺省 unknown |
 | k_accum | FP32 按 lane 回退；INT32 不静默转 FP32，服务未知 |
-| convert | 量化、packing、dequantization、repad/layout 等显式服务；有 conversion 参数时按 elements/cycle 计费，否则 unknown |
+| convert | 量化、packing、dequantization、repad/layout 等显式服务；可派 VPU 或 DMA（`DispatchPolicy.convert`）。VPU 有 conversion 参数时按 elements/cycle 计费，否则 unknown |
 | CPU sampling | 每 batch 向量独立按 `vectors × ceil(length × log2(max(2,length)))` 计比较；需要比较周期和 CPU 频率 |
-| DMA | 按实际源/目的端口计费；私有↔私有不冒记 DRAM，DRAM↔DRAM 计一次读加一次写 |
+| DMA | 按实际源/目的端口计费；私有↔私有不冒记 DRAM，DRAM↔DRAM 计一次读加一次写。inline 格式转换（声明 input/output dtype）按 source_read→conversion→destination_write 串行计费，读/写字节可不等；转换吞吐用 `dma_conversion_elements_per_cycle` 场景参数，缺省 unknown，搬运带宽复用 profile 接口 |
 
 VPU/CPU/DMA 公式位于 `l1/costing/forms/`；`vpu_model.py`、`cpu_model.py`、`dma_model.py` 只保留兼容包装。新增算子通过 `costing.registry.register_operator_estimator(spec_kind, engine_kind, fn)` 接入，公式内部可复用 `costing.services` 的 phase/traffic/buffer 构造；不需要修改四个引擎模型文件。
+
+**引擎派发（DispatchPolicy）**：辅助任务的引擎由 emit 层 user 选择，不由 cost 自动挑选；builder 只按传入引擎构造 typed spec。`l1.emitters.DispatchPolicy(convert, pad, k_merge, head_join, gemm_output)` 默认全 VPU、`gemm_output=None`（沿用累加器输出加独立 dequantize），逐位复现历史 lowering。`convert` 可取 VPU/DMA；`pad`/`k_merge`/`head_join` 当前仅 VPU，其它引擎抛未建模错误；`gemm_output` 设 GEMM 输出格式 {FP32, FP16, BF16, MXFP8, MXFP4} 以融合 epilogue（INT32 不作为 epilogue 目标）。派发经 `lower_plan(..., dispatch=...)` / `evaluate(..., dispatch=...)` 传入，仅 Python API，无 CLI flag；自定义 lowering 回调自行决定引擎，不接受 dispatch。convert 任务的 input/output dtype 由 `TaskGraph.validate()` 对 VPU 与 DMA 分别交叉校验，漏做/做错转换硬报错。拓扑是固定输入，派发改变任务绑定与资源争用，不改变拓扑本身。
 
 通用 handoff 仅添加到“依赖两端 engine kind 不同，且两端都不是 DMA”的目标任务。`sync_us=None` 表示未知，显式 0 表示零成本场景。任意一端为 DMA 时不添加该通用 handoff，以避免与显式搬运/可见性服务重复计费；这不表示同步免费。跨 core DMA 分别预约两端真实 local 端口，`cross_domain_route` 保持未知。
 
@@ -724,9 +729,10 @@ VPU lane、自定义 lowering、BufferPlan 和异构资源仅通过 Python API �
 | `frontend.registry.register_model(name,build,version=1,source=...)` | 注册新模型 |
 | `frontend.layers.register_layer(definition)` | 注册新层定义 |
 | `frontend.plan.ModelPlan.iter_layers()/iter_leaves()/validate()` | 层树遍历、校验与 L0 汇总 |
-| `l1.compose.lower_plan(plan,fmt,point,attention="vpu",geometry=None,block_size=32)` | ModelPlan → TaskGraph |
+| `l1.compose.lower_plan(plan,fmt,point,attention="vpu",geometry=None,block_size=32,dispatch=None)` | ModelPlan → TaskGraph；dispatch 为 DispatchPolicy |
 | `l1.graph_builder.GraphBuilder(block_size,split_policy="default")` | 公共 op/task/tensor/view/DMA 构造器 |
 | `l1.emitters.register_emitter(name,version,fn)` | 注册层 emitter |
+| `l1.emitters.DispatchPolicy(convert="VPU",pad="VPU",k_merge="VPU",head_join="VPU",gemm_output=None)` | emit 层辅助任务引擎派发与 GEMM 输出格式；仅 Python API |
 | `l1.split_policies.register_split_policy(name,fn)` / `split_commands(...)` | GEMM 命令序列注册与查询 |
 | `l1.gemm_model.legalize(shape,geometry)` | 默认命令合法化结果 |
 | `l1.gemm_model.count_windows(shape,commands)` | 聚合窗口账，不物化全部窗口 |
@@ -736,17 +742,17 @@ VPU lane、自定义 lowering、BufferPlan 和异构资源仅通过 Python API �
 | `l1.timeline.estimate_graph(graph,topology,execution_plan)` | 每任务各候选成本 |
 | `l1.timeline.evaluate_graph(...,scheduling_policy="list",costs=None,dispatcher=None)` | 直接图 ScheduleResult；始终应用一次 handoff |
 | `l1.scheduler.schedule(graph,costs,topology,buffer_plan=None,policy="list")` | 固定图/计划的 ScheduleResult |
-| `l1.timeline.evaluate(...,scheduling_policy="serial",lowering=None,costs=None,dispatcher=None)` | 完整模型 L1Result；model 为 ModelPlan |
+| `l1.timeline.evaluate(...,scheduling_policy="serial",lowering=None,costs=None,dispatcher=None,dispatch=None)` | 完整模型 L1Result；model 为 ModelPlan；dispatch 仅作用默认 lower_plan 路径 |
 | `l0.web` / `l1.web.report_payload` / `render_html` | 同一次结果的 JSON/HTML 导出 |
 
 主要 typed spec：
 
 | 类型 | 契约摘要 |
 |---|---|
-| `GemmSpec` | m/n/k、A/B 格式、C dtype、block_size、semantic_macs、weight、evidence、可选 A/B storage shape、`split_policy`、A/B/C 内存域；C 仅允许与输入族匹配的 INT32/FP32。非 `dram` 域跳过外部流量，但本地端口服务仍建模 |
+| `GemmSpec` | m/n/k、A/B 格式、C dtype、block_size、semantic_macs、weight、evidence、可选 A/B storage shape、`split_policy`、A/B/C 内存域；C dtype ∈ {FP32, INT32, FP16, BF16, MXFP8, MXFP4}，INT32 仅限整数输入，epilogue 按 GEMM 自身输出吞吐计费。非 `dram` 域跳过外部流量，但本地端口服务仍建模 |
 | `VpuSpec` | kind、MAC、elements、vectors、length、读写流量、输入输出 dtype、evidence |
 | `CpuSpec` | 当前 `kind="sampling"`、vectors、length 等；不推断任意 CPU 算法 |
-| `TransferSpec` | stream_id、source_domain、destination_domain、byte_count、tensor、direction、evidence；direction 不覆盖实际端点收费 |
+| `TransferSpec` | stream_id、source_domain、destination_domain、byte_count、tensor、direction、evidence；direction 不覆盖实际端点收费。可选转换字段 input_dtype/output_dtype/read_bytes/write_bytes/elements（默认空/None）：两者 dtype 均声明时触发 inline 转换计费，读/写字节可不等，纯搬运路径不变 |
 | `PrimitiveTask` | id、parent_op_id、engine_kind、spec、dependencies、inputs、outputs、allowed_instances；engine_kind 必须已在 `common.opspec.ENGINE_SPECS` 注册 |
 | `LayerDefinition` | name/version/geometry_type/input/output/weight roles/children/l0/source |
 | `ModelPlan` | layers/allocations/input/output roles/source；聚合层不拥有权重 |
@@ -789,10 +795,12 @@ JSON `results[]` 与 HTML `cases[]` 对应同一组 Python 结果。
 
 当前未覆盖或默认未知的范围包括：
 
-- 控制设置、prologue/epilogue、drain、retry、FIFO、真实仲裁、DMA 首字节/响应、bank 冲突和物理 burst；
-- 量化/反量化、布局转换、补齐服务、混合精度累加、整数 merge、特殊函数和真实 CPU sampler；
+- 控制设置、命令 prologue/epilogue 流水气泡、drain、retry、FIFO、真实仲裁、DMA 首字节/响应、bank 冲突和物理 burst；
+- 独立量化/反量化、布局转换、补齐服务、混合精度累加、整数 merge、特殊函数和真实 CPU sampler（默认 unknown，需显式场景参数）；
 - 跨 core route/visibility、通用 handoff 默认服务、命令提交和软件 scheduler 完整成本；
 - 任意模型/checkpoint 捕获、自动编译、自动分片/融合/最优 tiling 和 SRAM 重规划；
 - 完整依赖闭包、结果内容哈希、RTL 校准和数值正确性。
+
+GEMM 输出格式 epilogue（→FP16/BF16 cast、→FP32 int→float、→MX requant）已建模，按 GEMM 自身输出吞吐融合进 C 字节/beat，不另列独立阶段；DMA inline 格式转换已建模，搬运带宽复用 profile 接口、转换吞吐需 `dma_conversion_elements_per_cycle` 场景参数。两者均不补齐上面列出的命令流水气泡、独立转换服务或其他未覆盖项。
 
 显式场景参数只补充其声明的服务，不将其他未覆盖项自动转化为已知事实。

@@ -35,6 +35,10 @@ scheduler 不决定算法分解。它面对固定 TaskGraph，在候选实例上
 
 相应的限制也很明确：系统不会自动发现最优分解、自动拆分单个 GEMM、自动融合或自动搜索 SRAM 计划。多实例只有在图中已有可并行任务且资源允许时才有意义。
 
+引擎派发同样属于 lowering 决策，且由使用者显式选择，而不是由 cost 自动挑选。convert、pad、K-merge、join-heads 等辅助任务交给 VPU 还是 DMA，GEMM 是否直接输出下游格式（epilogue 融合），都由 emit 层通过 DispatchPolicy 表达；builder 只按传入引擎构造 typed spec，cost 公式在任务绑定后各自计算。这样骨架（compose→emit→builder→estimate→schedule）保持固定，扩展只是改 lowering 策略、加算子与加 cost 公式，而不是让调度器暗中改变算法。自由派发配有 dtype 安全网：漏做或做错 convert 会被图校验硬抓，不会静默。
+
+把派发交给使用者而非 cost 最小化，是因为这些引擎的灵活度、带宽与转换吞吐本身是待探索量：DMA 支持哪些格式对、转换吞吐需多高才优于 VPU 路、GEMM epilogue 融合省多少 DRAM 往返，应由仿真扫出结果，落入硬件设计建议，而不是以现有硬件证据为前提——硬件会根据模型仿真情况调整。模型当前的格式限制是建模假设，不是硬件定律；拓扑是固定输入，派发改变的是任务绑定与资源争用，不改变拓扑本身。探索 cost 用显式场景参数表达（如 `dma_conversion_elements_per_cycle`），缺参保持 unknown，不伪造确定吞吐。
+
 ## 4. 显式 tensor base/view 使数据流可验证
 
 仅按 tensor 名称追踪依赖会误判共享存储。两个 view 可能访问同一 base 的不同区域，也可能覆盖同一元素；reshape 和 stride 会进一步改变名称与元素之间的直觉关系。

@@ -232,5 +232,74 @@ class TestDmaBuffersAndUnknowns(unittest.TestCase):
                                topology.instances["dma0"], plan)
 
 
+def convert_transfer(source="dram", destination="dram", *, input_dtype="FP32",
+                     output_dtype="MXFP8", elements=64, read_bytes=256, write_bytes=66):
+    spec = TransferSpec("test:cvt", source, destination, read_bytes,
+                        input_dtype=input_dtype, output_dtype=output_dtype,
+                        read_bytes=read_bytes, write_bytes=write_bytes, elements=elements)
+    return PrimitiveTask("test:cvt", "test:op", "DMA", spec,
+                         inputs=(TensorRef("source"),), outputs=(TensorRef("dest"),))
+
+
+class TestDmaConversion(unittest.TestCase):
+    def test_dram_conversion_charges_read_convert_write_serially(self):
+        params = ModelParams(dma_conversion_elements_per_cycle=8)
+        cost = estimate(convert_transfer(), params=params)
+        self.assertEqual([p.id.rsplit(":", 1)[-1] for p in cost.phases],
+                         ["source_read", "conversion", "destination_write"])
+        self.assertEqual(cost.phases[1].dependencies, (cost.phases[0].id,))
+        self.assertEqual(cost.phases[2].dependencies, (cost.phases[1].id,))
+        cycles = (64 + 8 - 1) // 8
+        expected = dram.seconds(256, G0) + dram.cycle_seconds(cycles, G0) + dram.seconds(66, G0)
+        self.assertAlmostEqual(cost.known_service_s, expected, delta=expected * 1e-12)
+        self.assertTrue(cost.complete)
+        self.assertEqual(cost.metrics["read_bytes"], 256)
+        self.assertEqual(cost.metrics["write_bytes"], 66)
+        self.assertEqual(cost.metrics["dram_read_bytes"], 256)
+        self.assertEqual(cost.metrics["dram_write_bytes"], 66)
+        self.assertEqual(cost.metrics["physical_bytes"], 322)
+        self.assertEqual(cost.metrics["conversion_cycles"], cycles)
+        self.assertEqual(cost.phases[1].source, "scenario")
+        self.assertIn("dma_conversion_elements_per_cycle=8", cost.phases[1].evidence)
+
+    def test_conversion_unknown_without_scenario_param(self):
+        cost = estimate(convert_transfer())
+        conv = next(p for p in cost.phases if p.id.endswith(":conversion"))
+        self.assertIsNone(conv.seconds)
+        self.assertEqual(conv.source, "unknown")
+        self.assertFalse(cost.complete)
+        self.assertAlmostEqual(cost.known_service_s, dram.seconds(256 + 66, G0),
+                               delta=dram.seconds(322, G0) * 1e-12)
+        self.assertTrue(any("dma_conversion_elements_per_cycle is unset" in item
+                            for item in cost.excluded_costs))
+
+    def test_arbitrary_format_pairs_are_supported(self):
+        params = ModelParams(dma_conversion_elements_per_cycle=8)
+        for a, b in (("FP32", "MXFP8"), ("MXFP8", "FP32"), ("INT8", "FP16"),
+                     ("BF16", "MXFP4"), ("MXFP4", "INT8"), ("FP16", "BF16")):
+            with self.subTest(pair=(a, b)):
+                cost = estimate(convert_transfer(input_dtype=a, output_dtype=b), params=params)
+                self.assertTrue(any(p.id.endswith(":conversion") for p in cost.phases))
+                self.assertTrue(cost.complete)
+
+    def test_local_domain_conversion_charges_local_port_and_engine(self):
+        params = ModelParams(dma_conversion_elements_per_cycle=8)
+        cost = estimate(convert_transfer("core0.sram", "core0.sram"), params=params)
+        self.assertEqual([p.id.rsplit(":", 1)[-1] for p in cost.phases],
+                         ["source_local_read", "conversion", "destination_local_write"])
+        self.assertEqual(cost.metrics["local_bytes"], 256 + 66)
+        self.assertEqual(cost.metrics["dram_read_bytes"], 0)
+        self.assertEqual(cost.metrics["dram_write_bytes"], 0)
+        self.assertEqual({t.memory_domain for t in cost.traffic}, {"core0.sram"})
+        self.assertTrue(cost.complete)
+
+    def test_pure_transfer_path_is_unchanged_without_dtype_fields(self):
+        cost = estimate(transfer("dram", "dram", size=129))
+        self.assertEqual([p.id.rsplit(":", 1)[-1] for p in cost.phases],
+                         ["source_read", "destination_write"])
+        self.assertFalse(any(p.id.endswith(":conversion") for p in cost.phases))
+        self.assertEqual(cost.metrics["physical_bytes"], 129)
+
+
 if __name__ == "__main__":
     unittest.main()

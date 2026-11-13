@@ -308,11 +308,11 @@ return L1Result(...)
 
 ### 5.1 lower_plan 与 EmitContext 派发
 
-[l1/compose.py:25-45](../model_eval/l1/compose.py#L25) 的 `lower_plan()` 先 `plan.validate()`，再建立一个 `GraphBuilder` 和 `EmitContext`，然后顺序遍历顶层层：
+[l1/compose.py:25-50](../model_eval/l1/compose.py#L25) 的 `lower_plan()` 先 `plan.validate()`，再建立一个 `GraphBuilder` 和 `EmitContext`，然后顺序遍历顶层层：
 
 ```python
 builder = GraphBuilder(block_size)
-ctx = EmitContext(plan, point, fmt, geometry, attention, builder)
+ctx = EmitContext(plan, point, fmt, geometry, attention, builder, dispatch or DispatchPolicy())
 current = builder.tensor("input:hidden", (ctx.rows, _hidden_width(plan)), "FP32", external=True)
 inputs = {"hidden": current}
 for layer in plan.layers:
@@ -320,7 +320,9 @@ for layer in plan.layers:
     inputs = {**inputs, **outputs}
 ```
 
-`ctx.rows` 在 [l1/emitters/base.py:36-38](../model_eval/l1/emitters/base.py#L36) 定义为 `batch × (seq if prefill else 1)`；当前 decode batch=1，因此 rows=1。`ctx.emit()` 按 `(layer.type, layer.version)` 查 `EMITTERS` 注册表并调用对应 emitter；未注册则抛 `MissingL1Coverage`，不会静默回退。
+`ctx.rows` 在 [l1/emitters/base.py:55-58](../model_eval/l1/emitters/base.py#L55) 定义为 `batch × (seq if prefill else 1)`；当前 decode batch=1，因此 rows=1。`ctx.emit()` 按 `(layer.type, layer.version)` 查 `EMITTERS` 注册表并调用对应 emitter；未注册则抛 `MissingL1Coverage`，不会静默回退。
+
+`ctx.dispatch` 是 [l1/emitters/base.py:27-42](../model_eval/l1/emitters/base.py#L27) 的 `DispatchPolicy`，由 `lower_plan(..., dispatch=...)` / `evaluate(..., dispatch=...)` 传入（仅 Python API）。emitter 把 `ctx.dispatch.convert` 等显式传给 builder，由 user 选择辅助任务引擎；默认全 VPU、`gemm_output=None`，逐位复现历史 lowering。派发改变任务绑定，不改变拓扑。
 
 emitter 分两类：
 
@@ -408,21 +410,22 @@ self.tasks.append(PrimitiveTask(...))
 
 叶子 emitter 不直接拼 PrimitiveTask，而是调用 builder 的四个方法：
 
-- `convert()`（[l1/graph_builder.py:77-90](../model_eval/l1/graph_builder.py#L77)）：dtype 已相同且 MX scale 轴一致时直接返回原 tensor，不生成任务；否则生成一个 VPU `convert` 任务，其服务保持未知，并注册新 tensor 和 producer。
-- `vector()`（[l1/graph_builder.py:92-100](../model_eval/l1/graph_builder.py#L92)）：用 `VpuSpec` 创建一个 VPU 任务。
-- `gemm()`（[l1/graph_builder.py:102-163](../model_eval/l1/graph_builder.py#L102)）：合法化、padding、GEMM 任务与可选 k_accum，见 6.4。
-- `dma()`（[l1/graph_builder.py:165-178](../model_eval/l1/graph_builder.py#L165)）：创建 DMA transfer 任务并注册输出 producer。
+- `convert()`（[l1/graph_builder.py:77-102](../model_eval/l1/graph_builder.py#L77)）：dtype 已相同且 MX scale 轴一致时直接返回原 tensor，不生成任务；否则按 `engine` 生成一个 VPU `convert` 任务或 DMA inline 转换任务（`DispatchPolicy.convert`，默认 VPU），并注册新 tensor 和 producer。VPU 转换服务默认未知；DMA 转换读/写字节可不等，转换吞吐需场景参数。其它引擎抛未建模错误。
+- `vector()`（[l1/graph_builder.py:104-112](../model_eval/l1/graph_builder.py#L104)）：用 `VpuSpec` 创建一个 VPU 任务。
+- `gemm()`（[l1/graph_builder.py:114-180](../model_eval/l1/graph_builder.py#L114)）：合法化、padding、GEMM 任务与可选 k_accum，见 6.4；pad/k-merge 引擎由 `pad_engine`/`merge_engine` 传入（默认 VPU）。
+- `dma()`（[l1/graph_builder.py:182-196](../model_eval/l1/graph_builder.py#L182)）：创建 DMA transfer 任务并注册输出 producer。
 
-权重 GEMM 的组合模式在 [l1/emitters/generic.py:26-33](../model_eval/l1/emitters/generic.py#L26) 的 `_weight_gemm()`：
+权重 GEMM 的组合模式在 [l1/emitters/generic.py:26-37](../model_eval/l1/emitters/generic.py#L26) 的 `_weight_gemm()`：
 
 ```python
-a = ctx.builder.convert(op, a, ctx.fmt.name, "quantize-input")
+a = ctx.builder.convert(op, a, ctx.fmt.name, "quantize-input", engine=ctx.dispatch.convert)
 b = ctx.builder.tensor(op.id + ":weight", (k, n), ctx.fmt.name, external=True, scale_axis=0)
-out = ctx.builder.gemm(op, a, b, GemmSpec(...), ctx.geometry)
-return ctx.builder.convert(op, out, "FP32", "dequantize-output")
+out = ctx.builder.gemm(op, a, b, GemmSpec(..., ctx.dispatch.gemm_output or ctx.output_dtype, ...),
+                       ctx.geometry, pad_engine=ctx.dispatch.pad, merge_engine=ctx.dispatch.k_merge)
+return ctx.builder.convert(op, out, "FP32", "dequantize-output", engine=ctx.dispatch.convert)
 ```
 
-它描述“激活按需量化→external 权重→GEMM→按需转 FP32”。是否真正产生 convert 任务由输入输出 dtype 决定，不能仅从函数名推断任务数。norm emitter 在有系数时先创建 DMA coefficient transfer，再创建 VPU norm，并将 DMA 加入 norm 依赖。
+它描述“激活按需量化→external 权重→GEMM→按需转 FP32”。是否真正产生 convert 任务由输入输出 dtype 决定，不能仅从函数名推断任务数。convert 引擎由 `ctx.dispatch.convert` 选择（VPU/DMA）；`ctx.dispatch.gemm_output` 设定 GEMM 输出格式时，epilogue 融合进 GEMM，输出已是目标格式则末尾 dequantize 成为 no-op（例如整数 GEMM 直接输出 FP32 省去独立 dequantize 任务）。norm emitter 在有系数时先创建 DMA coefficient transfer，再创建 VPU norm，并将 DMA 加入 norm 依赖。
 
 ### 6.3 一个 decoder block 的数据流
 
