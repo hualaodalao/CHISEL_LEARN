@@ -5,9 +5,9 @@
   *   - A/scaleA/valid 复用 WS 水平链：MAC 组合直读 io.aIn/io.scaleAIn（两模式同源、
   *     无 mux），右传寄存器捕获条件按模式切换——OS 下仅随 osAdvance 捕获（token 波
   *     严格逐列推进，暂停拍保持），WS 下同 WbWorker（loadWIn|validIn）。
-  *   - B 方向换源：osM1 ? (osB, osScaleB) : (wReg, scaleBReg)——OS 权重来自双槽窗口
-  *     FIFO 槽位，不走垂直/水平加载路径；cReg 改为本地 psumReg 反馈（OS 无 psumIn
-  *     垂直通道）。
+  *   - B 方向换源：osM1 ? (osB, osScaleB) : (rdSelIn ? bankB : bankA)——OS 权重来自双槽
+  *     窗口 FIFO 槽位，不走垂直/水平加载路径；WS 侧双 bank 由随 skew 的 rdSelIn 组合选择。
+  *     cReg 改为本地 psumReg 反馈（OS 无 psumIn 垂直通道）。
   *   - osSeed/osSeedEn：OS psum 显式初始化（§6.1 首行 bias 基底）。刻意不复用
   *     loadV/loadW——§6.1 禁止以 WS 权重加载语义暗示 OS 初始化。
   *   - osAdvance：严格全 16 路门控广播（§5.1 RunAdvance）——单列 PE 看不到其他列
@@ -63,6 +63,13 @@ class WbWorkerOsM1(
     val loadWOut    = Output(Bool())
     val loadWInLock = Input(Bool())
 
+    // 独立 W 数据链 + 双 bank 选择（与 WbWorker 逐字段一致；OS 态 wrSel/rdSelIn 恒 0）
+    val wIn      = Input(UInt(bW.W))
+    val wOut     = Output(UInt(bW.W))
+    val wrSel    = Input(Bool())
+    val rdSelIn  = Input(Bool())
+    val rdSelOut = Output(Bool())
+
     val validIn  = Input(Bool())
     val validOut = Output(Bool())
     val validInV  = Input(Bool())
@@ -115,12 +122,28 @@ class WbWorkerOsM1(
   val fmtOk = supportedFmts.toSeq.sortBy(_.litValue).map(f => fmtReg === f).reduce(_ || _)
 
   val wReg = RegInit(0.U(bW.W))
+  // bank B 驻留寄存器 + W 链移位元素（与 WbWorker 同构；scale 复用既有 scaleBOut 链）
+  val wRegB      = RegInit(0.U(bW.W))
+  val scaleBRegB = RegInit(0.U(8.W))
+  val wChainReg  = RegInit(0.U(bW.W))
+  when(io.loadWIn) {
+    wChainReg := io.wIn
+  }
+  io.wOut := wChainReg
 
   when(io.loadVInLock) {
     wReg := io.psumIn(bW - 1, 0)
+    scaleBReg := io.scaleBIn
   }
+  // 水平 W 模式：lock 广播拍从 wIn 锁存，wrSel 全局广播选 bank（OS 态恒 0 ⟹ 死路）
   when(loadWInLockSafe) {
-    wReg := io.aIn(bW - 1, 0)
+    when(io.wrSel) {
+      wRegB      := io.wIn
+      scaleBRegB := io.scaleBIn
+    }.otherwise {
+      wReg      := io.wIn
+      scaleBReg := io.scaleBIn
+    }
   }
   assert(!(io.loadVInLock && loadWInLockSafe), "WbWorkerOsM1: loadVInLock and loadWInLock asserted simultaneously (mutually exclusive load modes)")
   when(io.loadHIn) {
@@ -128,9 +151,7 @@ class WbWorkerOsM1(
     rndReg := io.rndIn
     bFmtReg := io.bFmtIn
   }
-  when(io.loadVInLock || loadWInLockSafe) {
-    scaleBReg := io.scaleBIn
-  }
+  // scale 与权重同一 when 块锁存，保证严格同拍（错拍会致高 (m+n) 对角错位，见 WbWorker）
 
   when(io.loadHIn && !fmtInitActive) {
     fmtInitActive := true.B
@@ -148,13 +169,14 @@ class WbWorkerOsM1(
 
   val workUnit = Module(new WbWorkUnit(aW, bW, cW, supportedFmts))
   workUnit.io.a    := io.aIn(aW - 1, 0)
-  workUnit.io.b    := Mux(io.osM1, io.osB, wReg)
+  // WS 侧 bank mux 用组合 io.rdSelIn（与 validIn 同拍）；OS 侧仍直供窗口 FIFO 槽位
+  workUnit.io.b    := Mux(io.osM1, io.osB, Mux(io.rdSelIn, wRegB, wReg))
   workUnit.io.cReg := Mux(io.osM1, psumReg, io.psumIn)
   workUnit.io.aFmt := fmtReg
   workUnit.io.bFmt := bFmtReg
   // scaleA 与激活输入同拍组合直连（同 WbWorker），不读已寄存的 scaleAReg
   workUnit.io.scaleA := io.scaleAIn
-  workUnit.io.scaleB := Mux(io.osM1, io.osScaleB, scaleBReg)
+  workUnit.io.scaleB := Mux(io.osM1, io.osScaleB, Mux(io.rdSelIn, scaleBRegB, scaleBReg))
   workUnit.io.rnd  := rndReg
   // 仅门控 FP/MX 解码断言：与 WS 同为 fmtOk && isMx(fmtReg)，INT/BF16 token 不进 MX 断言域
   workUnit.io.consumeValid := Mux(io.osM1, osConsume, io.validIn) && fmtOk && DataFormat.isMx(fmtReg)
@@ -173,22 +195,28 @@ class WbWorkerOsM1(
 
   io.psumOut := psumReg
 
-  // aOut/scaleAOut：捕获条件按模式切换（OS 仅随 osAdvance，暂停拍保持）
+  // aOut/scaleAOut：捕获条件按模式切换（OS 仅随 osAdvance，暂停拍保持）。WS 侧 A 口纯
+  //   激活 ⟹ 使能只剩 validIn（权重已走独立 W 链）。
   val aReg = RegInit(0.U(aEffW.W))
   when(io.clear) {
     aReg := 0.U
-  }.elsewhen(Mux(io.osM1, io.osAdvance, io.loadWIn | io.validIn)) {
+  }.elsewhen(Mux(io.osM1, io.osAdvance, io.validIn)) {
     aReg := io.aIn
   }
   io.aOut := aReg
 
   when(io.clear) {
     scaleAReg := 0.U
-  }.elsewhen(Mux(io.osM1, io.osAdvance, io.loadWIn | io.validIn)) {
+  }.elsewhen(Mux(io.osM1, io.osAdvance, io.validIn)) {
     scaleAReg := io.scaleAIn
   }
   io.scaleAOut := scaleAReg
   io.scaleBOut := RegNext(io.scaleBIn)
+
+  // rdSelOut：读选择子随激活右传（仅供右传，MAC 消费组合 io.rdSelIn）
+  val rdSelReg = RegInit(false.B)
+  rdSelReg := io.rdSelIn
+  io.rdSelOut := rdSelReg
 
   // validOut：WS 下每拍捕获（等价 RegNext）；OS 下随 osAdvance、暂停保持。
   //   clear 复位须 osM1 门控——WbWorker 的 validOut=RegNext 不受 clear 影响，

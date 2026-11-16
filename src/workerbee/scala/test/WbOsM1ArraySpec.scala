@@ -39,6 +39,7 @@ class WbOsM1ArrayHarness(n: Int = 16) extends WbOsM1RowDut(n) {
     comb.io.psumIn(i) := 0.U
     comb.io.scaleAIn(i) := 0.U
     comb.io.scaleBIn(i) := 0.U
+    comb.io.wIn(i) := 0.U
   }
   comb.io.validIn := seq.io.aTokenValid
   comb.io.loadHIn := io.loadH
@@ -46,6 +47,8 @@ class WbOsM1ArrayHarness(n: Int = 16) extends WbOsM1RowDut(n) {
   comb.io.loadVInLock := false.B
   comb.io.loadWIn := false.B
   comb.io.loadWInLock := false.B
+  comb.io.wrSel := false.B
+  comb.io.rdSelIn := false.B
   comb.io.fmtIn := io.fmt
   comb.io.bFmtIn := io.fmt
   comb.io.rndIn := RoundingMode.RNE

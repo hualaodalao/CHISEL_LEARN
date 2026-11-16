@@ -17,17 +17,18 @@
     `define ASSERT_VERBOSE_COND_ 1
   `endif // ASSERT_VERBOSE_COND
 `endif // not def ASSERT_VERBOSE_COND_
-module Wb_WbComb_Verification_Assert();	// src/workerbee/scala/main/WbComb.scala:287:9
-  `ifndef SYNTHESIS	// src/workerbee/scala/main/WbComb.scala:287:9
-    always @(posedge Wb_WbComb.clock) begin	// src/workerbee/scala/main/WbComb.scala:57:7, :287:9
+module Wb_WbComb_Verification_Assert();	// src/workerbee/scala/main/WbComb.scala:319:9
+  `ifndef SYNTHESIS	// src/workerbee/scala/main/WbComb.scala:319:9
+    always @(posedge Wb_WbComb.clock) begin	// src/workerbee/scala/main/WbComb.scala:59:7, :319:9
       if (~Wb_WbComb.reset
           & ~(Wb_WbComb._osRow_15_io_validInV_T_layerCapture
               | ~(Wb_WbComb.io_loadVIn | Wb_WbComb.io_loadVInLock | Wb_WbComb.io_loadWIn
-                  | Wb_WbComb.io_loadWInLock))) begin	// src/workerbee/scala/main/WbComb.scala:57:7, :78:14, :137:49, :287:{9,19,22,35,53,68}
-        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WbComb.scala:287:9
-          $error("Assertion failed: WbComb: weight load signals must stay low in OS-M1 mode\n");	// src/workerbee/scala/main/WbComb.scala:287:9
-        if (`STOP_COND_)	// src/workerbee/scala/main/WbComb.scala:287:9
-          $fatal;	// src/workerbee/scala/main/WbComb.scala:287:9
+                  | Wb_WbComb.io_loadWInLock | Wb_WbComb.io_wrSel
+                  | Wb_WbComb.io_rdSelIn))) begin	// src/workerbee/scala/main/WbComb.scala:59:7, :80:14, :152:49, :319:{9,19,22,35,53,68,87,99}
+        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WbComb.scala:319:9
+          $error("Assertion failed: WbComb: weight load and bank select signals must stay low in OS-M1 mode\n");	// src/workerbee/scala/main/WbComb.scala:319:9
+        if (`STOP_COND_)	// src/workerbee/scala/main/WbComb.scala:319:9
+          $fatal;	// src/workerbee/scala/main/WbComb.scala:319:9
       end
     end // always @(posedge)
   `endif // not def SYNTHESIS

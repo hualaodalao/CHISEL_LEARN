@@ -1,5 +1,5 @@
 /** WbComb（巢脾）- arrayN × arrayM 个 PE 平面脉动阵列（无簇层级；首行为 WbWorkerOsM1，其余 WbWorker）
-  *                  （权重复用通道加载，无独立 wIn/wOut）
+  *                  （垂直模式权重经 psumIn 复用通道加载；水平 W 模式走独立 wIn/wOut 链）
   *
   * @param arrayN   阵列行数（K-lane 轴，默认 16）
   * @param arrayM   阵列列数（输出 N 轴，默认 16）
@@ -15,11 +15,11 @@
   * aIn skew 契约（调用方责任）：计算阶段外部必须按「行 i 延迟 i 拍」错峰供数，即时刻 t
   *   在 io.aIn(i) 上给出逻辑第 (t - i) 拍的激活（t < i 时给 0）。加载阶段无需 skew。
   *
-  * 加载时序要求：权重加载需同时拉高 loadHIn + loadVIn（loadW 水平模式则拉高 loadHIn +
-  *   loadWIn），psumIn 供权重（loadW 模式经 aIn 供权重）、另一输入无需供数，使能脉冲需
-  *   覆盖全链传播（纵链/横链全深 arrayN，Executor 按 totalN 拍窗口驱动）；释放 loadV 后
-  *   需保持 psumIn=权重直到 loadV 沿 i 链排空（>= arrayN 拍）再置 0 并 clear，否则尾部
-  *   仍高的 loadV 会把 0 锁进深层 PE 的 wReg。
+  * 加载时序要求：权重加载需同时拉高 loadHIn + loadVIn（水平 W 模式则拉高 loadHIn +
+  *   loadWIn），垂直模式 psumIn 供权重、水平 W 模式 wIn 供权重（scale 两模式均走 scaleBIn），
+  *   另一输入无需供数，使能脉冲需覆盖全链传播（纵链/横链全深 arrayN，Executor 按 totalN
+  *   拍窗口驱动）；释放 loadV 后需保持 psumIn=权重直到 loadV 沿 i 链排空（>= arrayN 拍）
+  *   再置 0 并 clear，否则尾部仍高的 loadV 会把 0 锁进深层 PE 的 wReg。
   *
   * skew 策略：aIn 不做 skew，加载/计算阶段统一直连；validIn 保留行级 skew（行 i 延迟 i
   *   拍）以跟踪行级错峰数据；psumIn 首行（i=0）无条件直连，加载期传权重，计算期由调用
@@ -44,6 +44,8 @@ object WbComb {
     val aIn: UInt; val aOut: UInt; val psumIn: UInt; val psumOut: UInt
     val loadHIn: Bool; val loadVInLock: Bool; val loadVIn: Bool; val loadVOut: Bool
     val loadWIn: Bool; val loadWOut: Bool; val loadWInLock: Bool
+    val wIn: UInt; val wOut: UInt; val wrSel: Bool
+    val rdSelIn: Bool; val rdSelOut: Bool
     val validIn: Bool; val validOut: Bool; val validInV: Bool; val validOutV: Bool
     val fmtIn: DataFormat.Type; val fmtOut: DataFormat.Type
     val bFmtIn: DataFormat.Type; val bFmtOut: DataFormat.Type
@@ -87,6 +89,14 @@ class WbComb(
     // loadWIn 沿 j 方向 per-row 级联（与 a 链 lockstep）。垂直模式下恒 0。
     val loadWIn = Input(Bool())
     val loadWInLock = Input(Bool())
+    // 独立 W 数据链（per-row 注入，沿 j 右移，无 skew）：权重不再借 a 链，故预装载可在
+    // 计算期推进。scale 复用 scaleBIn 链（同深 lockstep、只在 lock 拍捕获）。
+    val wIn   = Input(Vec(arrayN, UInt(bW.W)))
+    // 写侧 bank 选择：全阵列广播，与 loadWInLock 同拍
+    val wrSel = Input(Bool())
+    // 读侧 bank 选择：标量注入，经与 valid 完全相同的行 skew + 横链传播 ⟹ PE(i,j) 的
+    // rdSelIn 与 validIn 严格同拍（延迟 i+j）。这是双缓冲切换下界为 m+1 而非 m+30 的根因。
+    val rdSelIn = Input(Bool())
     val validIn = Input(Bool())   // 标量 validIn
     val fmtIn   = Input(DataFormat())
     val rndIn   = Input(RoundingMode())
@@ -95,9 +105,9 @@ class WbComb(
     // coordinate, which in this array is the K-lane axis; neither is per-column.
     // scaleAIn rides the activation skew chain (scaleASkewedPerRow), staying lockstep
     // with aIn during compute. scaleBIn comes straight from the top-level port with no
-    // skew chain: it is only consumed on the loadWLock beat, and during the whole loadW
-    // window scaleASkewedPerRow is bypassed to a direct connection too, so on that
-    // phase both sides have the same shape and the same per-column cascade depth.
+    // skew chain: it is only consumed on the load lock beat. It shares the W chain's
+    // shape and per-column cascade depth (one register per column, injected straight at
+    // j==0), so weight and scale land on the same diagonal at the same lock beat.
     val scaleAIn = Input(Vec(arrayN, UInt(8.W)))
     val scaleBIn = Input(Vec(arrayN, UInt(8.W)))
 
@@ -115,6 +125,11 @@ class WbComb(
     val osPsum    = Output(Vec(arrayM, UInt(cEffW.W)))
     val osConsume = Output(Vec(arrayM, Bool()))
     val osDone    = Output(Vec(arrayM, Bool()))
+
+    // rd_sel 对角抽头：两个角 PE 实际看到的 bank 选择电平。rdSelIn 走「行 skew i + 横链 j」
+    //   ⟹ 两者相差 (arrayN-1)+(arrayM-1) 拍。若误做成全局广播则两者同拍翻面。
+    val rdSelFirst = Output(Bool())
+    val rdSelLast  = Output(Bool())
   })
 
 
@@ -149,6 +164,25 @@ class WbComb(
     }
   }
 
+  // rd_sel 行 skew：独立 1-bit 链，结构与 validSkewedShiftRegisters 完全镜像（无条件移位、
+  //   行 i 延迟 i 拍），不与 valid 共用寄存器 ⟹ 时序推理独立、可单独断言。PE(i,j) 再经
+  //   横链延迟 j ⟹ rdSelIn 与 validIn 严格同拍（i+j），每个 PE 恰在自己末次旧权重读之后、
+  //   首次新权重读之前翻转，i+j 在两侧约束中消掉 ⟹ 切换下界 m+1（非全局广播的 m+30）。
+  val rdSelSkewedShiftRegisters = RegInit(VecInit(Seq.fill(arrayN)(false.B)))
+  rdSelSkewedShiftRegisters(0) := io.rdSelIn && !io.osM1
+  for(i <- 1 until arrayN){
+    rdSelSkewedShiftRegisters(i) := rdSelSkewedShiftRegisters(i-1)
+  }
+  val rdSelSkewedPerRow = WireInit(VecInit(Seq.fill(arrayN)(false.B)))
+  for(i <- 0 until arrayN){
+    if(i == 0){
+      rdSelSkewedPerRow(0) := io.rdSelIn && !io.osM1
+    }
+    else{
+      rdSelSkewedPerRow(i) := rdSelSkewedShiftRegisters(i-1)
+    }
+  }
+
   val aSkewedPerRow = WireInit(VecInit(Seq.fill(arrayN)(0.U(aEffW.W))))
   dontTouch(aSkewedPerRow)
   for(i <- 0 until arrayN){
@@ -167,11 +201,6 @@ class WbComb(
         }
       }
       aSkewedPerRow(i) := aSkewedShiftRegisters(delay - 1)
-      // 水平 loadW 模式加载旁路（last-connect 覆盖，与 bSkew 的 loadV 旁路同构；垂直模式
-      // loadWIn 恒 0 时为死路）：加载窗口内权重水平加载无需 skew，各行同拍直连 io.aIn
-      when(loadWInSafe){
-        aSkewedPerRow(i) := io.aIn(i)
-      }
     }
   }
   // scaleA skew：per-row，与 aSkewedPerRow 完全镜像（随激活链同 skew 流动）。
@@ -193,9 +222,6 @@ class WbComb(
         }
       }
       scaleASkewedPerRow(i) := scaleASkewedShiftRegisters(delay - 1)
-      when(loadWInSafe){
-        scaleASkewedPerRow(i) := io.scaleAIn(i)
-      }
     }
   }
   val bSkewedPerRow = WireInit(VecInit(Seq.fill(arrayN)(0.U(cEffW.W))))
@@ -234,6 +260,7 @@ class WbComb(
       pe.io.loadHIn      := io.loadHIn
       pe.io.loadVInLock  := io.loadVInLock
       pe.io.loadWInLock  := loadWInLockSafe
+      pe.io.wrSel        := io.wrSel
 
       if (j == 0) {
         pe.io.fmtIn    := io.fmtIn
@@ -245,6 +272,9 @@ class WbComb(
         // scaleB per-lane injection at the left edge, straight (no skew chain)
         pe.io.scaleBIn := io.scaleBIn(i)
         pe.io.loadWIn  := loadWInSafe
+        // W 链左缘直连（无 skew）：装载窗口内各行同拍供数，与 scaleBIn 同形同深
+        pe.io.wIn      := io.wIn(i)
+        pe.io.rdSelIn  := rdSelSkewedPerRow(i)
       } else {
         pe.io.fmtIn    := pes(i)(j-1).io.fmtOut
         pe.io.rndIn    := pes(i)(j-1).io.rndOut
@@ -254,6 +284,8 @@ class WbComb(
         pe.io.scaleAIn := pes(i)(j-1).io.scaleAOut
         pe.io.scaleBIn := pes(i)(j-1).io.scaleBOut
         pe.io.loadWIn  := pes(i)(j-1).io.loadWOut
+        pe.io.wIn      := pes(i)(j-1).io.wOut
+        pe.io.rdSelIn  := pes(i)(j-1).io.rdSelOut
       }
 
       if (i == 0) {
@@ -284,8 +316,11 @@ class WbComb(
     io.osConsume(j) := pe.osConsume
     io.osDone(j)    := pe.osDone
   }
-  assert(!io.osM1 || !(io.loadVIn || io.loadVInLock || loadWInSafe || loadWInLockSafe),
-    "WbComb: weight load signals must stay low in OS-M1 mode")
+  assert(!io.osM1 || !(io.loadVIn || io.loadVInLock || loadWInSafe || loadWInLockSafe || io.wrSel || io.rdSelIn),
+    "WbComb: weight load and bank select signals must stay low in OS-M1 mode")
+
+  io.rdSelFirst := pes(0)(0).io.rdSelIn
+  io.rdSelLast  := pes(arrayN - 1)(arrayM - 1).io.rdSelIn
 
   // 阵列输出 deskew：cOut/validOut 从底部行取值（psum 从上到下流动，结果在底部行）
   val cOutAllValidOut = WireInit(VecInit(Seq.fill(arrayM)(false.B)))

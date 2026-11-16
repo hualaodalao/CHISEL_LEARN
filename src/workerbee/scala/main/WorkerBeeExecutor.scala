@@ -64,9 +64,14 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
     val wbLoadH   = Output(Bool())
     val wbLoadV   = Output(Bool())
     val wbLoadVLock   = Output(Bool())
-    // 水平 loadW 加载（可选模式，regs(7)(5) 选择）：垂直模式下恒 0
+    // 水平 W 装载（可选模式，regs(7)(5) 选择）：垂直模式下恒 0
     val wbLoadW       = Output(Bool())
     val wbLoadWLock   = Output(Bool())
+    // 独立 W 数据链供数（水平模式权重不再借 wbAIn）；scale 仍走 wbScaleBIn
+    val wbWIn         = Output(Vec(cfg.totalN, UInt(cfg.bW.W)))
+    // 双 bank 选择：写侧全局广播、读侧随 A 口 skew 逐 PE 进入
+    val wbWrSel       = Output(Bool())
+    val wbRdSelIn     = Output(Bool())
     val wbValidIn = Output(Bool())
     val wbClear   = Output(Bool())
     val wbCOut    = Input(Vec(cfg.totalN, UInt(cfg.cEffW.W)))
@@ -132,6 +137,26 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
   val hasNext = RegInit(false.B)
   // 水平 loadW 模式锁存（execute 拍采样 regs(7)(5)；垂直模式恒 false）
   val loadWModeReg = RegInit(false.B)
+
+  // ── 双 bank 预装载（仅 loadWMode=1、非 OS）──────────────────────────────
+  // rdSelReg = 计算侧正在读的 bank；写侧恒 ~rdSelReg（只动 inactive bank ⟹ 与在途波前
+  //   天然不冲突，不需阵列静默）。rdSelIn 是标量电平，由 WbComb 经与 valid 相同的行 skew
+  //   + 横链传播 ⟹ PE(i,j) 恰在自己首行新权重读取拍看到新 bank（i+j 两侧消掉）。
+  val rdSelReg    = RegInit(false.B)
+  val preActive   = RegInit(false.B)  // 预装载窗口进行中（可跨 sLOAD_A/sNEXT/sDRAIN）
+  val preloadDone = RegInit(false.B)  // 下一 tile 已装入 inactive bank ⟹ 跳过 sLOAD_B
+  val preInterCnt = RegInit(0.U(log2Up(cfg.totalN).W))
+  val preKTile    = Reg(UInt(16.W))
+  // 预装载起始行号 = max(0, m - totalN)。推导：lock 拍 L_w = start + (totalN-1) 须满足
+  //   ① bank 复用 L_w > m-1+(2*totalN-1)-P（该 bank 上次被 tile t-1 读到的最晚拍）
+  //   ② 装好先于被读 L_w < P（P = 周期）
+  //   取 start = max(0, m-totalN) 对全部 m 同时满足两条（m≤29 时 P=31、m≥30 时 P=m+2）。
+  val preStartAt  = Mux(io.regFile.m > totalN.U, io.regFile.m - totalN.U, 0.U)
+  // 预装载跳过 sLOAD_B 后，周期 P = m(LOAD_A) + 1(NEXT) + D(DRAIN)，D = 本计数初值 + 1。
+  //   回灌下界 L = 2*totalN-1 = 31 要求 P ≥ 31 ⟹ D ≥ 30-m ⟹ 初值 = 29-m（m<30）；
+  //   m ≥ 30 时 m+1 已主导，初值取 0（D=1）⟹ P = m+2，比下界 m+1 多 1 拍（FSM 最小粒度）。
+  val drainTargetCnt = Mux(io.regFile.m < (2 * totalN - 2).U,
+    (2 * totalN - 3).U - io.regFile.m, 0.U)
 
   // 阵列 PE 内 fmt/bFmt/rnd 只在 loadH 窗口锁存；影子记录上次完整广播的取值（复位无效）。
   //   osFmtKeep 仅在影子有效且三项全等时生效，否则照常广播 ⟹ 软件误置位不致算错。
@@ -200,7 +225,11 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
   //   故计数须 +1。off 与 lane 无关（lane 是 K-lane，只决定字内 idx）。
   val scaleBAligned = io.regFile.bScaleAddr(1, 0) === 0.U
   val scaleBDemand  = (totalN.U * scaleBStep) / scaleBBlk
-  private val scaleBQ = (tileInterCnt * (kTiles + 1.U) + curKTile)(1, 0)
+  // 【陷阱1】预装载窗口内本拍 scaleB 字属于**下一 tile**，而 tileInterCnt/curKTile 仍指
+  //   当前计算 tile ⟹ 必须用独立的 preInterCnt/preKTile 重算偏移，否则 scale 静默错位。
+  private val scaleBQ = Mux(preActive,
+    (preInterCnt * (kTiles + 1.U) + preKTile)(1, 0),
+    (tileInterCnt * (kTiles + 1.U) + curKTile)(1, 0))
   private val scaleBOff = Mux(!scaleBAligned, 0.U(2.W),
     Mux(scaleBDemand === 4.U, 0.U(2.W),
       Mux(scaleBDemand === 2.U, Cat(scaleBQ(0), 0.U(1.W)), scaleBQ)))
@@ -322,6 +351,10 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
   io.wbLoadVLock   := false.B
   io.wbLoadW       := false.B
   io.wbLoadWLock   := false.B
+  for (i <- 0 until cfg.totalN) { io.wbWIn(i) := 0.U }
+  // mode 0 / OS 态恒 0：垂直装载写 bank A、计算读 bank A ⟹ 逐拍不变；OS 断言要求恒低。
+  io.wbWrSel   := loadWModeReg && !io.osActive && ~rdSelReg
+  io.wbRdSelIn := loadWModeReg && !io.osActive && rdSelReg
   io.wbValidIn := false.B
   io.wbClear   := false.B
 
@@ -383,6 +416,11 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
 
       when(io.execute) {
         loadWModeReg := io.regFile.loadWMode
+        // 双 bank 状态逐任务复位：首 tile 走完整 sLOAD_B bootstrap（写 ~false=bank B，
+        //   lock 后翻面读 B），OS 态 rdSelIn 恒 0 满足 WbComb 断言。
+        rdSelReg    := false.B
+        preActive   := false.B
+        preloadDone := false.B
         fmtShadowValid := true.B
         fmtShadowA     := io.regFile.aFmt
         fmtShadowB     := io.regFile.bFmt
@@ -464,20 +502,27 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
           tileInterCnt := totalN.U - 1.U
           state := sLOAD_A
           io.wbLoadVLock := true.B
+          // 进入新 tile 的计算 ⟹ 读侧翻到刚写好的 bank（写侧恒 ~rdSelReg）。rdSelIn 经
+          //   skew 传播后恰与首行新权重读取同拍到达每个 PE。
+          when(loadWModeReg) { rdSelReg := ~rdSelReg }
+          // 本窗口是完整 16 beat 装载 ⟹ 作废任何未完成/已完成的预装载状态（回退路径：
+          //   预装载未在 drain 结束前装好时走这里，W 链被本窗口全量重推后 lock，正确）。
+          preActive   := false.B
+          preloadDone := false.B
         }
       }
 
 
-      // 水平 loadW 覆盖块（last-connect；loadWModeReg=0 时整块死路、上方垂直通路即生效
-      //     路径）：权重经 wbAIn 的 a 链水平加载（脉冲链移位 + 末拍 loadWLock 广播锁存），
-      //     psumIn 保持 0、loadV 压制为 0；计数与握手共用上方
+      // 水平 W 覆盖块（last-connect；loadWModeReg=0 时整块死路、上方垂直通路即生效
+      //     路径）：权重经**独立 W 链** wbWIn 水平加载（脉冲链移位 + 末拍 loadWLock 广播
+      //     锁存），不再占用 wbAIn ⟹ A 口纯激活，为预装载与计算重叠让出通道。
+      //     psumIn 保持 0、loadV 压制为 0；计数与握手共用上方。
       when(loadWModeReg) {
         io.wbLoadV     := false.B
         io.wbLoadW     := io.bPop.fire   // 水平移位脉冲：停顿自然暂停
         io.wbLoadVLock := false.B
         for (i <- 0 until cfg.totalN) {
-          // 权重经 a 口供数（bPop 的 totalN 个 bW 切片，aEffW > bW 时高位自动补零）
-          io.wbAIn(i)    := io.bPop.payload(cfg.bW * (i + 1) - 1, cfg.bW * i)
+          io.wbWIn(i)    := io.bPop.payload(cfg.bW * (i + 1) - 1, cfg.bW * i)
           io.wbPsumIn(i) := 0.U
         }
         // Last beat fire: loadWLock must be emitted on this very cycle, combinationally
@@ -494,8 +539,14 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
       val needPartialSum = curKTile > 0.U
 
       // 需要 partial sum 时必须占用 c 口读出口 ⟹ 等 CDMA 搬空 cbuffer 让出读口；
-      // biasOn/requantOn 且未收齐时挂起供数（aPop/scaleA 均可反压，挂起安全）
-      val feedBase = (cBufferReservedAtleastTotalN) & Mux(needPartialSum, cStoreGateReg === false.B, true.B) &
+      // biasOn/requantOn 且未收齐时挂起供数（aPop/scaleA 均可反压，挂起安全）。
+      // 【回灌就绪守护】并入 cPop.valid：上一 kTile 第 r 行结果要 r+L 拍才入 FIFO
+      //   （L = 2*totalN-1 = 31，已实测），而 feed 原本不查 valid ⟹ 周期一旦压到 L 以下
+      //   会照常 fire、照常算，只是 psum 基底取到未就绪的行 —— 静默数值错且无断言会响。
+      //   现 FSM 的 33+m > 31 只是巧合余量（M=1 仅剩 3 拍），双缓冲把余量压到零后本守护
+      //   是唯一防线。33+m 基线下 cPop.valid 恒真 ⟹ 加守护零行为变化。
+      val feedBase = (cBufferReservedAtleastTotalN) &
+        Mux(needPartialSum, (cStoreGateReg === false.B) && io.cPop.valid, true.B) &
         (if (cfg.hasMx) !(io.regFile.biasOn && !biasLoaded.get) else true.B) &
         (if (cfg.hasMx) !(io.regFile.requantOn && !rqMLoaded.get) else true.B)
       // MX：激活消费与 scaleA 严格 lockstep——scaleA FIFO 尚空时消费首个激活行会使全体
@@ -540,6 +591,16 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
         }
       }
 
+      // 预装载启动：到达 preStartAt 行且下一 tile 存在、B/scaleB FIFO 已预蓄足 totalN。
+      //   窗口一旦启动即跨态推进（见文末全局覆盖块），此处只负责点火与索引快照。
+      when(loadWModeReg && !preActive && !preloadDone && curM === preStartAt &&
+           ((curKTile < kTiles) || (curNTile < nTiles)) &&
+           io.bOccupancy >= cfg.totalN.U && (!mxRunB || io.scaleBOcc.get >= cfg.totalN.U)) {
+        preActive   := true.B
+        preInterCnt := (totalN - 1).U
+        preKTile    := Mux(curKTile < kTiles, curKTile + 1.U, 0.U)
+      }
+
       when(io.aPop.fire){
         curM := curM + 1.U
       }
@@ -555,7 +616,7 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
     is(sNEXT_NK_TILE){
       when(curKTile < kTiles){
         doneTiles := doneTiles + 1.U
-        drainNextCnt := cfg.totalN.U - 1.U
+        drainNextCnt := Mux(loadWModeReg, drainTargetCnt, cfg.totalN.U - 1.U)
         curKTile := curKTile + 1.U
         hasNext := true.B
         state := sDRAIN
@@ -565,7 +626,7 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
         // 后再升门；副作用置于通过分支内，防停留拍重复计数。
         when(cStoreGateReg === false.B){
           doneTiles := doneTiles + 1.U
-          drainNextCnt := cfg.totalN.U - 1.U
+          drainNextCnt := Mux(loadWModeReg, drainTargetCnt, cfg.totalN.U - 1.U)
           curKTile := 0.U
           cStoreGateReg := true.B
           when(curNTile < nTiles){
@@ -667,6 +728,13 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
       when(hasNext){
         when(drainNextCnt =/= 0.U){
           drainNextCnt := drainNextCnt - 1.U
+        }.elsewhen(loadWModeReg && preloadDone){
+          // 预装载已把下一 tile 装进 inactive bank ⟹ 跳过整个 16 拍 sLOAD_B，直接进计算。
+          //   读侧在此翻面：rdSelIn 经 skew 传播后与首行新权重读取同拍到达每个 PE。
+          hasNext     := false.B
+          preloadDone := false.B
+          rdSelReg    := ~rdSelReg
+          state       := sLOAD_A
         }.elsewhen(io.bOccupancy >= cfg.totalN.U && (!mxRunB || io.scaleBOcc.get >= cfg.totalN.U)){
           // 进入 sLOAD_B 的预蓄条件：① B FIFO ≥ totalN（窗口内 bPop 逐拍消费 totalN 拍，
           //   最坏 2 拍/字、缺口 ≤ 8 字）；② MX 另需 scaleB FIFO ≥ totalN（与 bPop 同拍
@@ -675,6 +743,9 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
           // 水平 loadW 模式 drain 重载（与 sNEXT_NK_TILE 初值一致）
           when(loadWModeReg) {
             drainNextCnt := (2 * (totalN - 1) + 1).U
+            // 回退：预装载未在 drain 内装完 ⟹ 撤销窗口，避免文末覆盖块与 sLOAD_B 同时驱动
+            //   W 链/bPop（两者 preInterCnt 与 tileInterCnt 不同步会提前发 lock）。
+            preActive := false.B
           }
           hasNext := false.B
           state := sLOAD_B
@@ -690,6 +761,37 @@ class WorkerBeeExecutor2(cfg: WorkerBeeConfig) extends Module {
 
     }
 
+  }
+
+  // ── 预装载窗口驱动（last-connect 覆盖；仅 loadWMode=1、非 OS）─────────────
+  // bPop 在 sLOAD_A/sNEXT/sDRAIN 本空闲 ⟹ 无端口竞争。W 链独立于 a 链与 psum 链，故预装载
+  //   可与激活供数、partial-sum 回灌同拍进行，不需把 wbPsumIn 清零（loadV 恒 0）。
+  //   bPop/scaleBPop 严格同拍 lockstep（与 sLOAD_B 同式），保证窗口内逐拍供数节奏。
+  when(loadWModeReg && !io.osActive && preActive) {
+    io.wbLoadW := io.bPop.fire
+    for (i <- 0 until cfg.totalN) {
+      io.wbWIn(i) := io.bPop.payload(cfg.bW * (i + 1) - 1, cfg.bW * i)
+    }
+    if (cfg.hasMx) {
+      when(mxRunB) {
+        io.bPop.ready          := io.bPop.valid & io.scaleBPop.get.valid
+        io.scaleBPop.get.ready := io.bPop.valid & io.scaleBPop.get.valid
+      }.otherwise {
+        io.bPop.ready          := true.B
+        io.scaleBPop.get.ready := false.B
+      }
+    } else {
+      io.bPop.ready := true.B
+    }
+    when(io.bPop.fire) {
+      when(preInterCnt =/= 0.U) {
+        preInterCnt := preInterCnt - 1.U
+      }.otherwise {
+        io.wbLoadWLock := true.B
+        preActive   := false.B
+        preloadDone := true.B
+      }
+    }
   }
 
   // perf 观测探针（纯组合、无状态）：bWindowReady 与 sDRAIN→sLOAD_B 转移条件同源；

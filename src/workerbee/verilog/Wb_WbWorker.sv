@@ -43,176 +43,204 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module Wb_WbWorker(	// src/workerbee/scala/main/WbWorker.scala:28:7
-  input         clock,	// src/workerbee/scala/main/WbWorker.scala:28:7
-                reset,	// src/workerbee/scala/main/WbWorker.scala:28:7
-  input  [15:0] io_aIn,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  output [15:0] io_aOut,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  input  [39:0] io_psumIn,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  output [39:0] io_psumOut,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  input         io_loadHIn,	// src/workerbee/scala/main/WbWorker.scala:45:14
-                io_loadVInLock,	// src/workerbee/scala/main/WbWorker.scala:45:14
-                io_loadVIn,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  output        io_loadVOut,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  input         io_loadWIn,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  output        io_loadWOut,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  input         io_loadWInLock,	// src/workerbee/scala/main/WbWorker.scala:45:14
-                io_validIn,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  output        io_validOut,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  input         io_validInV,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  output        io_validOutV,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  input  [3:0]  io_fmtIn,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  output [3:0]  io_fmtOut,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  input  [3:0]  io_bFmtIn,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  output [3:0]  io_bFmtOut,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  input  [7:0]  io_scaleAIn,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  output [7:0]  io_scaleAOut,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  input  [7:0]  io_scaleBIn,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  output [7:0]  io_scaleBOut,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  input  [2:0]  io_rndIn,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  output [2:0]  io_rndOut,	// src/workerbee/scala/main/WbWorker.scala:45:14
-  input         io_clear	// src/workerbee/scala/main/WbWorker.scala:45:14
+module Wb_WbWorker(	// src/workerbee/scala/main/WbWorker.scala:33:7
+  input         clock,	// src/workerbee/scala/main/WbWorker.scala:33:7
+                reset,	// src/workerbee/scala/main/WbWorker.scala:33:7
+  input  [15:0] io_aIn,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  output [15:0] io_aOut,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  input  [39:0] io_psumIn,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  output [39:0] io_psumOut,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  input         io_loadHIn,	// src/workerbee/scala/main/WbWorker.scala:50:14
+                io_loadVInLock,	// src/workerbee/scala/main/WbWorker.scala:50:14
+                io_loadVIn,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  output        io_loadVOut,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  input         io_loadWIn,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  output        io_loadWOut,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  input         io_loadWInLock,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  input  [15:0] io_wIn,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  output [15:0] io_wOut,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  input         io_wrSel,	// src/workerbee/scala/main/WbWorker.scala:50:14
+                io_rdSelIn,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  output        io_rdSelOut,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  input         io_validIn,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  output        io_validOut,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  input         io_validInV,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  output        io_validOutV,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  input  [3:0]  io_fmtIn,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  output [3:0]  io_fmtOut,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  input  [3:0]  io_bFmtIn,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  output [3:0]  io_bFmtOut,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  input  [7:0]  io_scaleAIn,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  output [7:0]  io_scaleAOut,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  input  [7:0]  io_scaleBIn,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  output [7:0]  io_scaleBOut,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  input  [2:0]  io_rndIn,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  output [2:0]  io_rndOut,	// src/workerbee/scala/main/WbWorker.scala:50:14
+  input         io_clear	// src/workerbee/scala/main/WbWorker.scala:50:14
 );
 
-  wire [39:0] _workUnit_io_sum;	// src/workerbee/scala/main/WbWorker.scala:148:24
-  reg  [3:0]  fmtReg;	// src/workerbee/scala/main/WbWorker.scala:100:19
-  reg  [2:0]  rndReg;	// src/workerbee/scala/main/WbWorker.scala:101:19
-  reg  [3:0]  bFmtReg;	// src/workerbee/scala/main/WbWorker.scala:102:20
-  reg  [7:0]  scaleBReg;	// src/workerbee/scala/main/WbWorker.scala:105:26
-  reg  [7:0]  scaleAReg;	// src/workerbee/scala/main/WbWorker.scala:108:26
-  wire        _workUnit_io_consumeValid_T_1 = fmtReg == 4'h3;	// src/workerbee/scala/main/WbWorker.scala:100:19, :112:70
-  wire        _workUnit_io_consumeValid_T_2 = fmtReg == 4'h4;	// src/workerbee/scala/main/WbWorker.scala:100:19, :112:70
-  wire        _workUnit_io_consumeValid_T_4 = fmtReg == 4'h5;	// src/workerbee/scala/main/WbWorker.scala:100:19, :112:70
-  reg  [15:0] wReg;	// src/workerbee/scala/main/WbWorker.scala:114:21
+  wire [39:0] _workUnit_io_sum;	// src/workerbee/scala/main/WbWorker.scala:178:24
+  reg  [3:0]  fmtReg;	// src/workerbee/scala/main/WbWorker.scala:115:19
+  reg  [2:0]  rndReg;	// src/workerbee/scala/main/WbWorker.scala:116:19
+  reg  [3:0]  bFmtReg;	// src/workerbee/scala/main/WbWorker.scala:117:20
+  reg  [7:0]  scaleBReg;	// src/workerbee/scala/main/WbWorker.scala:120:26
+  reg  [7:0]  scaleAReg;	// src/workerbee/scala/main/WbWorker.scala:123:26
+  wire        _workUnit_io_consumeValid_T_1 = fmtReg == 4'h3;	// src/workerbee/scala/main/WbWorker.scala:115:19, :127:70
+  wire        _workUnit_io_consumeValid_T_2 = fmtReg == 4'h4;	// src/workerbee/scala/main/WbWorker.scala:115:19, :127:70
+  wire        _workUnit_io_consumeValid_T_4 = fmtReg == 4'h5;	// src/workerbee/scala/main/WbWorker.scala:115:19, :127:70
+  reg  [15:0] wReg;	// src/workerbee/scala/main/WbWorker.scala:129:21
+  reg  [15:0] wRegB;	// src/workerbee/scala/main/WbWorker.scala:131:27
+  reg  [7:0]  scaleBRegB;	// src/workerbee/scala/main/WbWorker.scala:132:27
+  reg  [15:0] wChainReg;	// src/workerbee/scala/main/WbWorker.scala:135:26
   wire        _workUnit_io_consumeValid_T =
     io_validIn
     & (fmtReg == 4'h2 | _workUnit_io_consumeValid_T_1 | _workUnit_io_consumeValid_T_2
        | _workUnit_io_consumeValid_T_4 | fmtReg == 4'h8 | fmtReg == 4'h9 | fmtReg == 4'hA
-       | fmtReg == 4'hB);	// src/workerbee/scala/main/WbWorker.scala:100:19, :112:{70,86}, :159:42
-  reg  [39:0] psumReg;	// src/workerbee/scala/main/WbWorker.scala:161:24
-  reg  [15:0] aReg;	// src/workerbee/scala/main/WbWorker.scala:176:21
-  reg  [7:0]  io_scaleBOut_REG;	// src/workerbee/scala/main/WbWorker.scala:192:26
-  reg         io_validOut_REG;	// src/workerbee/scala/main/WbWorker.scala:194:25
-  reg         io_validOutV_REG;	// src/workerbee/scala/main/WbWorker.scala:195:26
-  reg         io_loadVOut_REG;	// src/workerbee/scala/main/WbWorker.scala:196:26
-  reg         io_loadWOut_REG;	// src/workerbee/scala/main/WbWorker.scala:197:26
-  reg  [3:0]  io_fmtOut_REG;	// src/workerbee/scala/main/WbWorker.scala:198:25
-  reg  [3:0]  io_bFmtOut_REG;	// src/workerbee/scala/main/WbWorker.scala:199:25
-  reg  [2:0]  io_rndOut_REG;	// src/workerbee/scala/main/WbWorker.scala:200:25
-  always @(posedge clock) begin	// src/workerbee/scala/main/WbWorker.scala:28:7
-    if (io_loadHIn) begin	// src/workerbee/scala/main/WbWorker.scala:45:14
-      fmtReg <= io_fmtIn;	// src/workerbee/scala/main/WbWorker.scala:100:19
-      rndReg <= io_rndIn;	// src/workerbee/scala/main/WbWorker.scala:101:19
-      bFmtReg <= io_bFmtIn;	// src/workerbee/scala/main/WbWorker.scala:102:20
+       | fmtReg == 4'hB);	// src/workerbee/scala/main/WbWorker.scala:115:19, :127:{70,86}, :192:42
+  reg  [39:0] psumReg;	// src/workerbee/scala/main/WbWorker.scala:194:24
+  reg  [15:0] aReg;	// src/workerbee/scala/main/WbWorker.scala:209:21
+  reg  [7:0]  io_scaleBOut_REG;	// src/workerbee/scala/main/WbWorker.scala:225:26
+  reg         rdSelReg;	// src/workerbee/scala/main/WbWorker.scala:229:25
+  reg         io_validOut_REG;	// src/workerbee/scala/main/WbWorker.scala:233:25
+  reg         io_validOutV_REG;	// src/workerbee/scala/main/WbWorker.scala:234:26
+  reg         io_loadVOut_REG;	// src/workerbee/scala/main/WbWorker.scala:235:26
+  reg         io_loadWOut_REG;	// src/workerbee/scala/main/WbWorker.scala:236:26
+  reg  [3:0]  io_fmtOut_REG;	// src/workerbee/scala/main/WbWorker.scala:237:25
+  reg  [3:0]  io_bFmtOut_REG;	// src/workerbee/scala/main/WbWorker.scala:238:25
+  reg  [2:0]  io_rndOut_REG;	// src/workerbee/scala/main/WbWorker.scala:239:25
+  always @(posedge clock) begin	// src/workerbee/scala/main/WbWorker.scala:33:7
+    if (io_loadHIn) begin	// src/workerbee/scala/main/WbWorker.scala:50:14
+      fmtReg <= io_fmtIn;	// src/workerbee/scala/main/WbWorker.scala:115:19
+      rndReg <= io_rndIn;	// src/workerbee/scala/main/WbWorker.scala:116:19
+      bFmtReg <= io_bFmtIn;	// src/workerbee/scala/main/WbWorker.scala:117:20
     end
-    io_scaleBOut_REG <= io_scaleBIn;	// src/workerbee/scala/main/WbWorker.scala:192:26
-    if (reset) begin	// src/workerbee/scala/main/WbWorker.scala:28:7
-      scaleBReg <= 8'h0;	// src/workerbee/scala/main/WbWorker.scala:105:26
-      scaleAReg <= 8'h0;	// src/workerbee/scala/main/WbWorker.scala:108:26
-      wReg <= 16'h0;	// src/workerbee/scala/main/WbWorker.scala:114:21
-      psumReg <= 40'h0;	// src/workerbee/scala/main/WbWorker.scala:161:24
-      aReg <= 16'h0;	// src/workerbee/scala/main/WbWorker.scala:176:21
-      io_validOut_REG <= 1'h0;	// src/workerbee/scala/main/WbWorker.scala:89:30, :194:25
-      io_validOutV_REG <= 1'h0;	// src/workerbee/scala/main/WbWorker.scala:89:30, :195:26
-      io_loadVOut_REG <= 1'h0;	// src/workerbee/scala/main/WbWorker.scala:89:30, :196:26
-      io_loadWOut_REG <= 1'h0;	// src/workerbee/scala/main/WbWorker.scala:89:30, :197:26
-      io_fmtOut_REG <= 4'h8;	// src/workerbee/scala/main/WbWorker.scala:112:70, :198:25
-      io_bFmtOut_REG <= 4'h8;	// src/workerbee/scala/main/WbWorker.scala:112:70, :199:25
-      io_rndOut_REG <= 3'h0;	// src/workerbee/scala/main/WbWorker.scala:28:7, :200:25
+    io_scaleBOut_REG <= io_scaleBIn;	// src/workerbee/scala/main/WbWorker.scala:225:26
+    if (reset) begin	// src/workerbee/scala/main/WbWorker.scala:33:7
+      scaleBReg <= 8'h0;	// src/workerbee/scala/main/WbWorker.scala:120:26
+      scaleAReg <= 8'h0;	// src/workerbee/scala/main/WbWorker.scala:123:26
+      wReg <= 16'h0;	// src/workerbee/scala/main/WbWorker.scala:129:21
+      wRegB <= 16'h0;	// src/workerbee/scala/main/WbWorker.scala:131:27
+      scaleBRegB <= 8'h0;	// src/workerbee/scala/main/WbWorker.scala:132:27
+      wChainReg <= 16'h0;	// src/workerbee/scala/main/WbWorker.scala:135:26
+      psumReg <= 40'h0;	// src/workerbee/scala/main/WbWorker.scala:194:24
+      aReg <= 16'h0;	// src/workerbee/scala/main/WbWorker.scala:209:21
+      rdSelReg <= 1'h0;	// src/workerbee/scala/main/WbWorker.scala:104:30, :229:25
+      io_validOut_REG <= 1'h0;	// src/workerbee/scala/main/WbWorker.scala:104:30, :233:25
+      io_validOutV_REG <= 1'h0;	// src/workerbee/scala/main/WbWorker.scala:104:30, :234:26
+      io_loadVOut_REG <= 1'h0;	// src/workerbee/scala/main/WbWorker.scala:104:30, :235:26
+      io_loadWOut_REG <= 1'h0;	// src/workerbee/scala/main/WbWorker.scala:104:30, :236:26
+      io_fmtOut_REG <= 4'h8;	// src/workerbee/scala/main/WbWorker.scala:127:70, :237:25
+      io_bFmtOut_REG <= 4'h8;	// src/workerbee/scala/main/WbWorker.scala:127:70, :238:25
+      io_rndOut_REG <= 3'h0;	// src/workerbee/scala/main/WbWorker.scala:33:7, :239:25
     end
-    else begin	// src/workerbee/scala/main/WbWorker.scala:28:7
-      if (io_loadVInLock | io_loadWInLock)	// src/workerbee/scala/main/WbWorker.scala:135:23
-        scaleBReg <= io_scaleBIn;	// src/workerbee/scala/main/WbWorker.scala:105:26
-      if (io_clear) begin	// src/workerbee/scala/main/WbWorker.scala:45:14
-        scaleAReg <= 8'h0;	// src/workerbee/scala/main/WbWorker.scala:108:26
-        psumReg <= 40'h0;	// src/workerbee/scala/main/WbWorker.scala:161:24
-        aReg <= 16'h0;	// src/workerbee/scala/main/WbWorker.scala:176:21
+    else begin	// src/workerbee/scala/main/WbWorker.scala:33:7
+      if (io_loadWInLock & ~io_wrSel | io_loadVInLock)	// src/workerbee/scala/main/WbWorker.scala:120:26, :142:24, :144:15, :149:25, :150:20, :155:17
+        scaleBReg <= io_scaleBIn;	// src/workerbee/scala/main/WbWorker.scala:120:26
+      if (io_clear) begin	// src/workerbee/scala/main/WbWorker.scala:50:14
+        scaleAReg <= 8'h0;	// src/workerbee/scala/main/WbWorker.scala:123:26
+        psumReg <= 40'h0;	// src/workerbee/scala/main/WbWorker.scala:194:24
+        aReg <= 16'h0;	// src/workerbee/scala/main/WbWorker.scala:209:21
       end
-      else begin	// src/workerbee/scala/main/WbWorker.scala:45:14
-        if (io_loadWIn | io_validIn) begin	// src/workerbee/scala/main/WbWorker.scala:179:25
-          scaleAReg <= io_scaleAIn;	// src/workerbee/scala/main/WbWorker.scala:108:26
-          aReg <= io_aIn;	// src/workerbee/scala/main/WbWorker.scala:176:21
+      else begin	// src/workerbee/scala/main/WbWorker.scala:50:14
+        if (io_validIn) begin	// src/workerbee/scala/main/WbWorker.scala:50:14
+          scaleAReg <= io_scaleAIn;	// src/workerbee/scala/main/WbWorker.scala:123:26
+          aReg <= io_aIn;	// src/workerbee/scala/main/WbWorker.scala:209:21
         end
-        if (io_loadVIn)	// src/workerbee/scala/main/WbWorker.scala:45:14
-          psumReg <= io_psumIn;	// src/workerbee/scala/main/WbWorker.scala:161:24
-        else if (_workUnit_io_consumeValid_T)	// src/workerbee/scala/main/WbWorker.scala:159:42
-          psumReg <= _workUnit_io_sum;	// src/workerbee/scala/main/WbWorker.scala:148:24, :161:24
+        if (io_loadVIn)	// src/workerbee/scala/main/WbWorker.scala:50:14
+          psumReg <= io_psumIn;	// src/workerbee/scala/main/WbWorker.scala:194:24
+        else if (_workUnit_io_consumeValid_T)	// src/workerbee/scala/main/WbWorker.scala:192:42
+          psumReg <= _workUnit_io_sum;	// src/workerbee/scala/main/WbWorker.scala:178:24, :194:24
       end
-      if (io_loadWInLock)	// src/workerbee/scala/main/WbWorker.scala:45:14
-        wReg <= io_aIn;	// src/workerbee/scala/main/WbWorker.scala:114:21
-      else if (io_loadVInLock)	// src/workerbee/scala/main/WbWorker.scala:45:14
-        wReg <= io_psumIn[15:0];	// src/workerbee/scala/main/WbWorker.scala:114:21, :119:22
-      io_validOut_REG <= io_validIn;	// src/workerbee/scala/main/WbWorker.scala:194:25
-      io_validOutV_REG <= io_validInV;	// src/workerbee/scala/main/WbWorker.scala:195:26
-      io_loadVOut_REG <= io_loadVIn;	// src/workerbee/scala/main/WbWorker.scala:196:26
-      io_loadWOut_REG <= io_loadWIn & ~io_loadWInLock;	// src/workerbee/scala/main/WbWorker.scala:197:{26,39,42}
-      io_fmtOut_REG <= io_fmtIn;	// src/workerbee/scala/main/WbWorker.scala:198:25
-      io_bFmtOut_REG <= io_bFmtIn;	// src/workerbee/scala/main/WbWorker.scala:199:25
-      io_rndOut_REG <= io_rndIn;	// src/workerbee/scala/main/WbWorker.scala:200:25
+      if (~io_loadWInLock | io_wrSel) begin	// src/workerbee/scala/main/WbWorker.scala:142:24, :149:25, :150:20
+        if (io_loadVInLock)	// src/workerbee/scala/main/WbWorker.scala:50:14
+          wReg <= io_psumIn[15:0];	// src/workerbee/scala/main/WbWorker.scala:129:21, :143:22
+      end
+      else	// src/workerbee/scala/main/WbWorker.scala:142:24, :149:25, :150:20
+        wReg <= io_wIn;	// src/workerbee/scala/main/WbWorker.scala:129:21
+      if (io_loadWInLock & io_wrSel) begin	// src/workerbee/scala/main/WbWorker.scala:131:27, :149:25, :150:20, :151:18
+        wRegB <= io_wIn;	// src/workerbee/scala/main/WbWorker.scala:131:27
+        scaleBRegB <= io_scaleBIn;	// src/workerbee/scala/main/WbWorker.scala:132:27
+      end
+      if (io_loadWIn)	// src/workerbee/scala/main/WbWorker.scala:50:14
+        wChainReg <= io_wIn;	// src/workerbee/scala/main/WbWorker.scala:135:26
+      rdSelReg <= io_rdSelIn;	// src/workerbee/scala/main/WbWorker.scala:229:25
+      io_validOut_REG <= io_validIn;	// src/workerbee/scala/main/WbWorker.scala:233:25
+      io_validOutV_REG <= io_validInV;	// src/workerbee/scala/main/WbWorker.scala:234:26
+      io_loadVOut_REG <= io_loadVIn;	// src/workerbee/scala/main/WbWorker.scala:235:26
+      io_loadWOut_REG <= io_loadWIn & ~io_loadWInLock;	// src/workerbee/scala/main/WbWorker.scala:236:{26,39,42}
+      io_fmtOut_REG <= io_fmtIn;	// src/workerbee/scala/main/WbWorker.scala:237:25
+      io_bFmtOut_REG <= io_bFmtIn;	// src/workerbee/scala/main/WbWorker.scala:238:25
+      io_rndOut_REG <= io_rndIn;	// src/workerbee/scala/main/WbWorker.scala:239:25
     end
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// src/workerbee/scala/main/WbWorker.scala:28:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WbWorker.scala:28:7
-      `FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WbWorker.scala:28:7
+  `ifdef ENABLE_INITIAL_REG_	// src/workerbee/scala/main/WbWorker.scala:33:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WbWorker.scala:33:7
+      `FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WbWorker.scala:33:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/workerbee/scala/main/WbWorker.scala:28:7
-      automatic logic [31:0] _RANDOM[0:3];	// src/workerbee/scala/main/WbWorker.scala:28:7
-      `ifdef INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WbWorker.scala:28:7
-        `INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WbWorker.scala:28:7
+    initial begin	// src/workerbee/scala/main/WbWorker.scala:33:7
+      automatic logic [31:0] _RANDOM[0:5];	// src/workerbee/scala/main/WbWorker.scala:33:7
+      `ifdef INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WbWorker.scala:33:7
+        `INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WbWorker.scala:33:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/workerbee/scala/main/WbWorker.scala:28:7
-        for (logic [2:0] i = 3'h0; i < 3'h4; i += 3'h1) begin
-          _RANDOM[i[1:0]] = `RANDOM;	// src/workerbee/scala/main/WbWorker.scala:28:7
-        end	// src/workerbee/scala/main/WbWorker.scala:28:7
-        fmtReg = _RANDOM[2'h0][5:2];	// src/workerbee/scala/main/WbWorker.scala:28:7, :100:19
-        rndReg = _RANDOM[2'h0][8:6];	// src/workerbee/scala/main/WbWorker.scala:28:7, :100:19, :101:19
-        bFmtReg = _RANDOM[2'h0][12:9];	// src/workerbee/scala/main/WbWorker.scala:28:7, :100:19, :102:20
-        scaleBReg = _RANDOM[2'h0][20:13];	// src/workerbee/scala/main/WbWorker.scala:28:7, :100:19, :105:26
-        scaleAReg = _RANDOM[2'h0][28:21];	// src/workerbee/scala/main/WbWorker.scala:28:7, :100:19, :108:26
-        wReg = {_RANDOM[2'h0][31:29], _RANDOM[2'h1][12:0]};	// src/workerbee/scala/main/WbWorker.scala:28:7, :100:19, :114:21
-        psumReg = {_RANDOM[2'h1][31:13], _RANDOM[2'h2][20:0]};	// src/workerbee/scala/main/WbWorker.scala:28:7, :114:21, :161:24
-        aReg = {_RANDOM[2'h2][31:21], _RANDOM[2'h3][4:0]};	// src/workerbee/scala/main/WbWorker.scala:28:7, :161:24, :176:21
-        io_scaleBOut_REG = _RANDOM[2'h3][12:5];	// src/workerbee/scala/main/WbWorker.scala:28:7, :176:21, :192:26
-        io_validOut_REG = _RANDOM[2'h3][13];	// src/workerbee/scala/main/WbWorker.scala:28:7, :176:21, :194:25
-        io_validOutV_REG = _RANDOM[2'h3][14];	// src/workerbee/scala/main/WbWorker.scala:28:7, :176:21, :195:26
-        io_loadVOut_REG = _RANDOM[2'h3][15];	// src/workerbee/scala/main/WbWorker.scala:28:7, :176:21, :196:26
-        io_loadWOut_REG = _RANDOM[2'h3][16];	// src/workerbee/scala/main/WbWorker.scala:28:7, :176:21, :197:26
-        io_fmtOut_REG = _RANDOM[2'h3][20:17];	// src/workerbee/scala/main/WbWorker.scala:28:7, :176:21, :198:25
-        io_bFmtOut_REG = _RANDOM[2'h3][24:21];	// src/workerbee/scala/main/WbWorker.scala:28:7, :176:21, :199:25
-        io_rndOut_REG = _RANDOM[2'h3][27:25];	// src/workerbee/scala/main/WbWorker.scala:28:7, :176:21, :200:25
+      `ifdef RANDOMIZE_REG_INIT	// src/workerbee/scala/main/WbWorker.scala:33:7
+        for (logic [2:0] i = 3'h0; i < 3'h6; i += 3'h1) begin
+          _RANDOM[i] = `RANDOM;	// src/workerbee/scala/main/WbWorker.scala:33:7
+        end	// src/workerbee/scala/main/WbWorker.scala:33:7
+        fmtReg = _RANDOM[3'h0][5:2];	// src/workerbee/scala/main/WbWorker.scala:33:7, :115:19
+        rndReg = _RANDOM[3'h0][8:6];	// src/workerbee/scala/main/WbWorker.scala:33:7, :115:19, :116:19
+        bFmtReg = _RANDOM[3'h0][12:9];	// src/workerbee/scala/main/WbWorker.scala:33:7, :115:19, :117:20
+        scaleBReg = _RANDOM[3'h0][20:13];	// src/workerbee/scala/main/WbWorker.scala:33:7, :115:19, :120:26
+        scaleAReg = _RANDOM[3'h0][28:21];	// src/workerbee/scala/main/WbWorker.scala:33:7, :115:19, :123:26
+        wReg = {_RANDOM[3'h0][31:29], _RANDOM[3'h1][12:0]};	// src/workerbee/scala/main/WbWorker.scala:33:7, :115:19, :129:21
+        wRegB = _RANDOM[3'h1][28:13];	// src/workerbee/scala/main/WbWorker.scala:33:7, :129:21, :131:27
+        scaleBRegB = {_RANDOM[3'h1][31:29], _RANDOM[3'h2][4:0]};	// src/workerbee/scala/main/WbWorker.scala:33:7, :129:21, :132:27
+        wChainReg = _RANDOM[3'h2][20:5];	// src/workerbee/scala/main/WbWorker.scala:33:7, :132:27, :135:26
+        psumReg = {_RANDOM[3'h2][31:21], _RANDOM[3'h3][28:0]};	// src/workerbee/scala/main/WbWorker.scala:33:7, :132:27, :194:24
+        aReg = {_RANDOM[3'h3][31:29], _RANDOM[3'h4][12:0]};	// src/workerbee/scala/main/WbWorker.scala:33:7, :194:24, :209:21
+        io_scaleBOut_REG = _RANDOM[3'h4][20:13];	// src/workerbee/scala/main/WbWorker.scala:33:7, :209:21, :225:26
+        rdSelReg = _RANDOM[3'h4][21];	// src/workerbee/scala/main/WbWorker.scala:33:7, :209:21, :229:25
+        io_validOut_REG = _RANDOM[3'h4][22];	// src/workerbee/scala/main/WbWorker.scala:33:7, :209:21, :233:25
+        io_validOutV_REG = _RANDOM[3'h4][23];	// src/workerbee/scala/main/WbWorker.scala:33:7, :209:21, :234:26
+        io_loadVOut_REG = _RANDOM[3'h4][24];	// src/workerbee/scala/main/WbWorker.scala:33:7, :209:21, :235:26
+        io_loadWOut_REG = _RANDOM[3'h4][25];	// src/workerbee/scala/main/WbWorker.scala:33:7, :209:21, :236:26
+        io_fmtOut_REG = _RANDOM[3'h4][29:26];	// src/workerbee/scala/main/WbWorker.scala:33:7, :209:21, :237:25
+        io_bFmtOut_REG = {_RANDOM[3'h4][31:30], _RANDOM[3'h5][1:0]};	// src/workerbee/scala/main/WbWorker.scala:33:7, :209:21, :238:25
+        io_rndOut_REG = _RANDOM[3'h5][4:2];	// src/workerbee/scala/main/WbWorker.scala:33:7, :238:25, :239:25
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WbWorker.scala:28:7
-      `FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WbWorker.scala:28:7
+    `ifdef FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WbWorker.scala:33:7
+      `FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WbWorker.scala:33:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  Wb_WbWorkUnit workUnit (	// src/workerbee/scala/main/WbWorker.scala:148:24
+  Wb_WbWorkUnit workUnit (	// src/workerbee/scala/main/WbWorker.scala:178:24
     .clock           (clock),
     .reset           (reset),
     .io_a            (io_aIn),
-    .io_b            (wReg),	// src/workerbee/scala/main/WbWorker.scala:114:21
+    .io_b            (io_rdSelIn ? wRegB : wReg),	// src/workerbee/scala/main/WbWorker.scala:129:21, :131:27, :183:26
     .io_cReg         (io_psumIn),
-    .io_aFmt         (fmtReg),	// src/workerbee/scala/main/WbWorker.scala:100:19
-    .io_bFmt         (bFmtReg),	// src/workerbee/scala/main/WbWorker.scala:102:20
+    .io_aFmt         (fmtReg),	// src/workerbee/scala/main/WbWorker.scala:115:19
+    .io_bFmt         (bFmtReg),	// src/workerbee/scala/main/WbWorker.scala:117:20
     .io_scaleA       (io_scaleAIn),
-    .io_scaleB       (scaleBReg),	// src/workerbee/scala/main/WbWorker.scala:105:26
-    .io_rnd          (rndReg),	// src/workerbee/scala/main/WbWorker.scala:101:19
+    .io_scaleB       (io_rdSelIn ? scaleBRegB : scaleBReg),	// src/workerbee/scala/main/WbWorker.scala:120:26, :132:27, :190:28
+    .io_rnd          (rndReg),	// src/workerbee/scala/main/WbWorker.scala:116:19
     .io_consumeValid
       (_workUnit_io_consumeValid_T
        & (_workUnit_io_consumeValid_T_1 | _workUnit_io_consumeValid_T_2
-          | _workUnit_io_consumeValid_T_4)),	// src/workerbee/scala/main/WbEnum.scala:8:{53,69}, src/workerbee/scala/main/WbWorker.scala:112:70, :159:{42,51}
+          | _workUnit_io_consumeValid_T_4)),	// src/workerbee/scala/main/WbEnum.scala:8:{53,69}, src/workerbee/scala/main/WbWorker.scala:127:70, :192:{42,51}
     .io_sum          (_workUnit_io_sum)
-  );	// src/workerbee/scala/main/WbWorker.scala:148:24
-  assign io_aOut = aReg;	// src/workerbee/scala/main/WbWorker.scala:28:7, :176:21
-  assign io_psumOut = psumReg;	// src/workerbee/scala/main/WbWorker.scala:28:7, :161:24
-  assign io_loadVOut = io_loadVOut_REG;	// src/workerbee/scala/main/WbWorker.scala:28:7, :196:26
-  assign io_loadWOut = io_loadWOut_REG;	// src/workerbee/scala/main/WbWorker.scala:28:7, :197:26
-  assign io_validOut = io_validOut_REG;	// src/workerbee/scala/main/WbWorker.scala:28:7, :194:25
-  assign io_validOutV = io_validOutV_REG;	// src/workerbee/scala/main/WbWorker.scala:28:7, :195:26
-  assign io_fmtOut = io_fmtOut_REG;	// src/workerbee/scala/main/WbWorker.scala:28:7, :198:25
-  assign io_bFmtOut = io_bFmtOut_REG;	// src/workerbee/scala/main/WbWorker.scala:28:7, :199:25
-  assign io_scaleAOut = scaleAReg;	// src/workerbee/scala/main/WbWorker.scala:28:7, :108:26
-  assign io_scaleBOut = io_scaleBOut_REG;	// src/workerbee/scala/main/WbWorker.scala:28:7, :192:26
-  assign io_rndOut = io_rndOut_REG;	// src/workerbee/scala/main/WbWorker.scala:28:7, :200:25
+  );	// src/workerbee/scala/main/WbWorker.scala:178:24
+  assign io_aOut = aReg;	// src/workerbee/scala/main/WbWorker.scala:33:7, :209:21
+  assign io_psumOut = psumReg;	// src/workerbee/scala/main/WbWorker.scala:33:7, :194:24
+  assign io_loadVOut = io_loadVOut_REG;	// src/workerbee/scala/main/WbWorker.scala:33:7, :235:26
+  assign io_loadWOut = io_loadWOut_REG;	// src/workerbee/scala/main/WbWorker.scala:33:7, :236:26
+  assign io_wOut = wChainReg;	// src/workerbee/scala/main/WbWorker.scala:33:7, :135:26
+  assign io_rdSelOut = rdSelReg;	// src/workerbee/scala/main/WbWorker.scala:33:7, :229:25
+  assign io_validOut = io_validOut_REG;	// src/workerbee/scala/main/WbWorker.scala:33:7, :233:25
+  assign io_validOutV = io_validOutV_REG;	// src/workerbee/scala/main/WbWorker.scala:33:7, :234:26
+  assign io_fmtOut = io_fmtOut_REG;	// src/workerbee/scala/main/WbWorker.scala:33:7, :237:25
+  assign io_bFmtOut = io_bFmtOut_REG;	// src/workerbee/scala/main/WbWorker.scala:33:7, :238:25
+  assign io_scaleAOut = scaleAReg;	// src/workerbee/scala/main/WbWorker.scala:33:7, :123:26
+  assign io_scaleBOut = io_scaleBOut_REG;	// src/workerbee/scala/main/WbWorker.scala:33:7, :225:26
+  assign io_rndOut = io_rndOut_REG;	// src/workerbee/scala/main/WbWorker.scala:33:7, :239:25
 endmodule
 

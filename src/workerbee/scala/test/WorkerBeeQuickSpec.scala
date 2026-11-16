@@ -924,7 +924,14 @@ abstract class WorkerBeeCaseSpec extends AnyFlatSpec with Matchers with ChiselSi
 
   // ══ 主运行器：③ 镜像+golden → ④ 仿真+六通道收集式地址对账 → ⑤ 逐元素比对 → ⑥⑦ 波形/回读 → ⑧ 收尾 ══
   private val perfNames = Seq("dmaA", "dmaB", "dmaC", "scaleA", "scaleB", "scaleC",
-    "array", "stallA", "stallB", "epilogue", "busy")
+    "array", "stallA", "stallB", "epilogue", "busy", "cRowIn", "rdSelFirst", "rdSelLast")
+  // 只给这两条稀疏流额外记事件拍号（busy/dmaX 是稠密电平，逐拍记会撑爆内存）。
+  //   array 与 cRowIn 同序等长（每输入行恰一结果行）⟹ 按下标配对即行级波前延迟。
+  private val perfEvNames = Seq("array", "cRowIn")
+  // rd_sel 是双 bank 选择【电平】，一次翻面后长期保持 ⟹ 只有上升沿才是事件。
+  //   检边放在 TB 侧，RTL 抽头保持纯电平、零新增状态。
+  private val perfEdgeNames = Seq("rdSelFirst", "rdSelLast")
+  private val perfEvNamesAll = perfEvNames ++ perfEdgeNames
 
   /** 同一 DUT 只复位一次、按序跑完 ps 中全部任务（任务间不复位，残留状态即被测对象）。
     * bpPeriod>0：A/B/C/scaleA/scaleB 五通道 req.ready 以 bpPeriod 为周期确定性拉低约 1/3 拍，各通道相位错开。 */
@@ -986,6 +993,9 @@ abstract class WorkerBeeCaseSpec extends AnyFlatSpec with Matchers with ChiselSi
     val addrBad = mutable.ArrayBuffer[String](); var addrBadCnt = 0; var cycle = 0; var regRbMsg = ""
     var regRbOk = false; var done = false; var errSeen = false; var errCode = -1
     val perfCnt = Array.fill(perfNames.size)(0)
+    val perfEvIdx = perfEvNamesAll.map(perfNames.indexOf)
+    val perfEv = Array.fill(perfEvNamesAll.size)(mutable.ArrayBuffer.empty[Int])
+    val perfPrev = Array.fill(perfNames.size)(false)
     // ④ 地址对账只收集不抛（strictAddr 决定跑完后是否判失败），一次能看到全部失配点
     def chk(ch: String, i: Int, hw: Long, exp: Seq[Long]): Unit = if (i < exp.size && hw != exp(i)) {
       addrBadCnt += 1
@@ -1047,7 +1057,8 @@ abstract class WorkerBeeCaseSpec extends AnyFlatSpec with Matchers with ChiselSi
       dut.io.perf.scaleB.peek().litToBoolean, dut.io.perf.scaleC.peek().litToBoolean,
       dut.io.perf.array.peek().litToBoolean, dut.io.perf.stallA.peek().litToBoolean,
       dut.io.perf.stallB.peek().litToBoolean, dut.io.perf.epilogue.peek().litToBoolean,
-      dut.io.perf.busy.peek().litToBoolean)
+      dut.io.perf.busy.peek().litToBoolean, dut.io.perf.cRowIn.peek().litToBoolean,
+      dut.io.perf.rdSelFirst.peek().litToBoolean, dut.io.perf.rdSelLast.peek().litToBoolean)
     // dmaScaleA 通道地址全量记录：biasOn 时该端口被 drain-then-steal 仲裁复用
     //   （bias FSM 与 scaleA DMA 交错发请求，交错序取决于硬件 FSM 时序、金锚不模拟），
     //   逐拍位置对账不成立 ⟹ 跑后按地址域拆流对账（见 while 循环后的 seqCmp）。
@@ -1096,7 +1107,12 @@ abstract class WorkerBeeCaseSpec extends AnyFlatSpec with Matchers with ChiselSi
         errSeen = s.anyError
         done = s.done
       }
-      perfPeek.zipWithIndex.foreach { case (b, i) => if (b) perfCnt(i) += 1 }
+      val pv = perfPeek
+      pv.zipWithIndex.foreach { case (b, i) => if (b) perfCnt(i) += 1 }
+      perfEvIdx.zipWithIndex.foreach { case (pi, k) =>
+        if (pv(pi) && (k < perfEvNames.size || !perfPrev(pi))) perfEv(k) += cycle
+      }
+      perfPrev.indices.foreach(i => perfPrev(i) = pv(i))
       dut.clock.step(); cycle += 1
     }
     // 任务边界把六通道恢复为 idle（ready=1、rsp 无效），下一个任务从同一 TB 初态起跑。
@@ -1157,7 +1173,8 @@ abstract class WorkerBeeCaseSpec extends AnyFlatSpec with Matchers with ChiselSi
         (!p.osM1 || osCommitOnce(cLog.toSeq, plan)) }
     TaskOutcome(p, predicted, maxCycles, cycle, done, errSeen, errCode, regRbOk, regRbMsg, addrBadCnt,
       addrBad.toSeq, cLog.toSeq, cmp.map(_.mismatch), cmp.map(_.laneViolations), cmp.map(_.elems).getOrElse(p.m * p.n),
-      cmp.map(_.details).getOrElse(Seq.empty), perfNames.zip(perfCnt).toMap, passed, plan)
+      cmp.map(_.details).getOrElse(Seq.empty), perfNames.zip(perfCnt).toMap, passed, plan,
+      perfEvNamesAll.zip(perfEv.map(_.toSeq)).toMap)
   }
 
   // OS-M1 每 N tile 只提交一次最终 C 行：拍数与语义金锚同长且无重复地址（无中间 psum 写回）。
@@ -1212,10 +1229,12 @@ abstract class WorkerBeeCaseSpec extends AnyFlatSpec with Matchers with ChiselSi
 object WorkerBeeCaseSpec {
   import WbDebugModel._
 
-  /** 单个任务的跑后事实；硬断言统一在 assertOutcome（波形/数据文件落盘之后）执行。 */
+  /** 单个任务的跑后事实；硬断言统一在 assertOutcome（波形/数据文件落盘之后）执行。
+    * perfEv = 稀疏观测流的事件拍号（拍号原点 = 主循环起点，与 cycles 同一时间基）。 */
   final case class TaskOutcome(p: DebugParams, predicted: Option[Int], maxCycles: Int, cycles: Int,
       done: Boolean, errSeen: Boolean, errCode: Int, regRbOk: Boolean, regRbMsg: String,
       addrBadCnt: Int, addrBad: Seq[String], cLog: Seq[WbSimCommon.CWriteBeat],
       mismatch: Option[Int], laneViolations: Option[Int], elems: Int, cmpDetails: Seq[String],
-      perf: Map[String, Int], passed: Boolean, plan: Plan)
+      perf: Map[String, Int], passed: Boolean, plan: Plan,
+      perfEv: Map[String, Seq[Int]] = Map.empty)
 }

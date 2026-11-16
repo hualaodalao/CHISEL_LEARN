@@ -22,6 +22,7 @@
 
 | 版本号 | 日期 | 修改内容 | 相关 Feature ID |
 |---|---|---|---|
+| v4.3.0 | 2026-11-16 | `loadWMode=1` 的 WS 权重装载改用独立水平 W 链（不再借 A 链），每 PE 驻留双权重 bank：写侧选择广播锁存只写非在读 bank，读侧选择随激活波前逐 PE 对角传播，使下一窗口权重装载与当前窗口计算/排空重叠；未完成时回退完整装载窗口。回灌就绪改由供数门控查 C buffer 读出口 valid 保证，有效稳态周期下界订正为 `2T`。perf 新增 `cRowIn`、`rdSelFirst`、`rdSelLast` 三个组合电平抽头 | WB-F002、WB-F024 / WB-D001；5.1.2、11.3、12.2 |
 | v4.2.0 | 2026-11-09 | 增加显式 OS-M1 模式：CONTROL[31]、M=1/loadWMode=1 守护与 errCode 14；方形阵列按 arrayN×arrayM 扁平组织，首行本地累加、A 右传、B/ScaleB 按列升序送入双槽窗口；定义 Run/Tail、自然列序 bias/requant、一次提交与完整 Nprog 写回、模式间数值关系及 OS 性能事件。CONTROL[27] 为 osFmtKeep，软件使用基线值 0；默认交付保持一套全格式 RTL | WB-F027、WB-P011（新增）；WB-F001、WB-F002、WB-F014、WB-F016–WB-F019、WB-F023、WB-D001 |
 | v4.1.0 | 2026-10-29 | BF16 升格为默认 A/B 输入格式：新增专用窄乘法器分支、单元素 lane 几何（`K%T=0`）、BF16 混配 errCode 3 守护，以及 BF16 特殊值（输入与乘积下溢冲刷为零、上溢饱和、无 IEEE Inf/NaN 语义）定义；明确 BF16 两种 B 装载模式均合法，errCode 4 不含 BF16。FP16 保持非默认输入，与 BF16 独立。寄存器映射、端口位宽与既有格式的数值契约不变 | WB-F026（新增）；WB-F011、WB-P001、WB-P002（文案） |
 | v4.0.0 | 2026-10-26 | 不兼容命名变更：GEMM 模块由 HiveCore 更名为 WorkerBee（“Hive”名称改指 NPU core）；顶层、配置、命令/响应/DMA/状态 Bundle 与 HiveCore* 子模块改用 `WorkerBee*`，其余 Hive* 子模块改用 `Wb*`，RTL 模块前缀由 `Hive_` 改为 `Wb_`，源码目录改为 `src/workerbee`；Feature ID 前缀由 `HIVE-` 统一改为 `WB-`，编号与语义不变，旧 ID 不再使用，本表历史记录中的模块名与 ID 已同步改写为新名称；硬件行为、端口位宽、寄存器映射和数值契约不变 | WB-F001–WB-F025、WB-P001–WB-P010、WB-D001–WB-D002（仅更名） |
@@ -241,12 +242,16 @@ M ≤ cBufferDepth - T
 
 #### 5.1.2 权重驻留与装载
 
-每个 `(nt,kt)` 先消费 T 个 B 拍完成权重装载，然后连续消费 M 个 A 拍。相同权重在该窗口内供全部 M 行复用。
+每个 `(nt,kt)` 消费 T 个 B 拍完成权重装载，并连续消费 M 个 A 拍。相同权重在该窗口内供全部 M 行复用。
 
 - `loadWMode=0`：B 通过垂直 partial-sum 链装载；
-- `loadWMode=1`：B 通过水平 A 链移位装载，并在最后一拍锁存。
+- `loadWMode=1`：B 通过**独立水平 W 链**移位装载，并在最后一拍广播锁存。W 链不占用 A 链与 partial-sum 链。
 
 MX、FP8 以及正向 INT W4A8 必须使用 `loadWMode=1`。
+
+`loadWMode=1` 下每个 PE 驻留**两个权重 bank**（含各自的 block scale）。写侧选择广播全局锁存，只写入当前未被计算读取的 bank；读侧选择是随激活波前逐 PE 传播的电平，经与激活相同的行错位与列移位到达每个 PE，因此该 PE 恰在自己读取新权重首行的那一拍切换 bank。两侧时序语义不同，不可合并为单一全局 bank 选择。
+
+由此权重装载窗口可与上一窗口的计算及排空重叠：下一 `(nt,kt)` 的 T 个 B 拍在当前窗口的激活供数期间预装载，稳态下不再单独占用装载状态。若预装载未能在排空结束前完成，控制状态机回退为完整的 T 拍装载窗口，数值结果不变、仅周期增加。`loadWMode=0` 与 OS-M1 不启用双 bank，两个选择信号恒为 0。
 
 #### 5.1.3 多 K Pass 累加
 
@@ -1394,8 +1399,15 @@ RAW 不携带任务 tag，也不累计事件次数。这里的 IRQ pending 是�
 | `stallB` | WS 的 LOAD_B 中没有 `bPop.fire`，或 DRAIN 倒计数归零且有下一窗口时 B/ScaleB 预蓄不足；OS-M1 的 Run 缺任一 B/scale 槽头，或 Tail 的未完成列缺槽头 |
 | `epilogue` | bias/rqM 取数活动，或输出转换 `in.fire`、数据 `out.valid`、scale `out.valid` |
 | `busy` | Executor 非 IDLE |
+| `cRowIn` | 结果行写入 C buffer 的有效拍。WS 为 deskew 对齐后的每个结果行一拍；OS-M1 为每个 N tile 的提交拍 |
+| `rdSelFirst` | 阵列首个 PE（行 0、列 0）实际读取的权重 bank 选择电平 |
+| `rdSelLast` | 阵列末个 PE（行 T−1、列 T−1）实际读取的权重 bank 选择电平 |
 
 DMA 事件使用 `req.valid` 而不是 `req.fire`。当外部 `ready=0` 时，同一请求可令事件连续多个周期为 1；外部 PMU 若要统计事务数，应额外结合对应 ready 信号。
+
+WS 下 `array` 与 `cRowIn` 是同序等长的两条事件流：每个输入激活行恰产生一个结果行，且结果行按激活行序入 C buffer。外部 PMU 按事件序号配对两者的采样拍号，其差即阵列行级波前延迟；`array` 相邻事件拍号差大于 1 处即 `(N tile, K pass)` 边界。OS-M1 下两条流不等长，不具此配对关系。
+
+`rdSelFirst`/`rdSelLast` 是电平而非脉冲，外部 PMU 需自行检上升沿。`loadWMode=1` 的 WS 下两者上升沿相差 `2(T−1)` 拍，即读侧 bank 选择随波前对角传播的直接观测；差值为 0 表示退化成了全局广播切换。`loadWMode=0` 与 OS-M1 下两者恒为 0。
 
 OS-M1 的 Run 可同时缺 A 和 B，因此 stallA/stallB 可以同时为高；两者不能直接相加作为互斥停顿总周期。Tail 不索取新 A，已完成列的空 B 槽头不产生 stallB。配置广播、提交和最终写回等待不属于 OS 供数停顿。`array` 为活动周期，不表示活跃列数、乘加元素数或已完成输出行数；C/ScaleC 活动由对应 DMA 事件独立观测。
 
@@ -1415,9 +1427,13 @@ tracing 状态在首次启动后不会返回初始态，后续执行的 tracing 
 
 ### 12.2 结构性处理拍数
 
-WS 每个 `(N tile, K pass)` 权重窗口消费 T 个有效 B 拍，随后消费 M 个有效 A 拍。OS-M1 每个 N tile 串行消费 `L=K/g` 个 A token，各列分别 consume=L；Run advance=L，Tail advance=T−1，全 K 后提交一行。默认 `osFmtKeep=0` 时每任务广播 T 拍；首窗口填充、K 窗口预取和上一 tile 写回可以部分重叠，不规定为零开销。每个 T 列输出行的 C 写拍数由输出位宽决定，见 5.3.4。
+WS 每个 `(N tile, K pass)` 权重窗口消费 T 个有效 B 拍与 M 个有效 A 拍。`loadWMode=0` 下两者串行；`loadWMode=1` 下 B 拍可与上一窗口的 A 拍及排空重叠（见 5.1.2），故有效拍数之和不等于窗口周期。OS-M1 每个 N tile 串行消费 `L=K/g` 个 A token，各列分别 consume=L；Run advance=L，Tail advance=T−1，全 K 后提交一行。默认 `osFmtKeep=0` 时每任务广播 T 拍；首窗口填充、K 窗口预取和上一 tile 写回可以部分重叠，不规定为零开销。每个 T 列输出行的 C 写拍数由输出位宽决定，见 5.3.4。
 
 这些是有效数据消费/写请求次数，不是固定端到端延迟。配置阶段、预蓄、DMA 控制空泡、gather、供数反压、参数取数、输出转换及写响应等待均会影响实际周期数。OS 尾波的 T−1 是逻辑 advance 数，未完成列缺供数时会延长真实时钟。
+
+WS 的相邻 K pass 之间经 C buffer 回灌部分和：下一 pass 的第 r 行激活以同一 r 行的上一 pass 结果作为累加基底，结果行按激活行序入 C buffer。结果行相对激活行的波前延迟为 `2T−1` 拍（纵向 valid 链 T−1 拍、末列横向 skew T−1 拍、输出寄存 1 拍），与 M 和数据格式无关。
+
+该延迟的观测口径是结果行**写入** C buffer 的拍号；C buffer 为非直通 FIFO，读出口 valid 比写入晚一拍，而激活供数门控查的是读出口 valid。因此每个 `(N tile, K pass)` 的**有效稳态周期下界为 `2T` 拍**，该下界不随 M 减小而放松。供数门控包含 C buffer 读出口 valid：周期被压到下界以下时表现为激活供数停等（计入 `stallA`），不会静默回灌尚未就绪的部分和。
 
 ### 12.3 实测指标边界
 

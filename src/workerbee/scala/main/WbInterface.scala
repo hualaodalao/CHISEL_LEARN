@@ -90,7 +90,11 @@ object WorkerBeeStatus {
   * bPop 停拍 ∨ sDRAIN 预蓄等待，或 OS Run 缺任一 B/scale 窗口、Tail 未完成列缺窗口；
   * OS A/B 缺口可同时为高，Setup/Commit 不计供数停顿，Tail 不索取新 A；epilogue =
   * bias/rqM 取数 ∨ cvt 转换/量化管线占用（C 写回通道活动另由 dmaC/scaleC 观测）；
-  * busy = 总忙碌电平（作分母对齐）。
+  * busy = 总忙碌电平（作分母对齐）；cRowIn = 结果行写入 C buffer 的有效拍（WS 每 deskew
+  * 对齐后的结果行 1 拍、OS 每 N tile 提交 1 拍）。cRowIn 与 array 是同序等长的两条流，
+  * 逐事件拍号相减即阵列行级波前延迟，也就是 K pass 间 partial-sum 回灌的依赖下界。
+  * rdSelFirst/rdSelLast = 双 bank 读选择在角 PE(0,0) 与 PE(arrayN-1,arrayM-1) 的实际电平；
+  * 两者上升沿相差 (arrayN-1)+(arrayM-1) 拍即证明 rd_sel 随波前对角传播而非全局广播。
   */
 class WorkerBeePerf extends Bundle {
   val dmaA = Bool()
@@ -104,6 +108,9 @@ class WorkerBeePerf extends Bundle {
   val stallB = Bool()
   val epilogue = Bool()
   val busy = Bool()
+  val cRowIn = Bool()
+  val rdSelFirst = Bool()
+  val rdSelLast = Bool()
 }
 object WorkerBeePerf {
   def apply() = new WorkerBeePerf()

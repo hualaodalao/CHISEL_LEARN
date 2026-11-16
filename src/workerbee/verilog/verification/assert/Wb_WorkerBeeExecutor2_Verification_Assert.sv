@@ -17,44 +17,44 @@
     `define ASSERT_VERBOSE_COND_ 1
   `endif // ASSERT_VERBOSE_COND
 `endif // not def ASSERT_VERBOSE_COND_
-module Wb_WorkerBeeExecutor2_Verification_Assert();	// src/workerbee/scala/main/WorkerBeeExecutor.scala:445:19
-  `ifndef SYNTHESIS	// src/workerbee/scala/main/WorkerBeeExecutor.scala:298:9
-    always @(posedge Wb_WorkerBeeExecutor2.clock) begin	// src/workerbee/scala/main/WorkerBeeExecutor.scala:12:7, :298:9
-      automatic logic _GEN;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:342:17, :437:22
+module Wb_WorkerBeeExecutor2_Verification_Assert();	// src/workerbee/scala/main/WorkerBeeExecutor.scala:483:19
+  `ifndef SYNTHESIS	// src/workerbee/scala/main/WorkerBeeExecutor.scala:327:9
+    always @(posedge Wb_WorkerBeeExecutor2.clock) begin	// src/workerbee/scala/main/WorkerBeeExecutor.scala:12:7, :327:9
+      automatic logic _GEN;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:375:17, :475:22
       _GEN =
         Wb_WorkerBeeExecutor2._layerCapture & Wb_WorkerBeeExecutor2._layerCapture_1
-        & Wb_WorkerBeeExecutor2.mxRunB_layerCapture;	// src/workerbee/scala/main/WbEnum.scala:8:69, src/workerbee/scala/main/WorkerBeeExecutor.scala:342:17, :437:22
+        & Wb_WorkerBeeExecutor2.mxRunB_layerCapture;	// src/workerbee/scala/main/WbEnum.scala:8:69, src/workerbee/scala/main/WorkerBeeExecutor.scala:375:17, :475:22
       if (~Wb_WorkerBeeExecutor2.reset & Wb_WorkerBeeExecutor2.io_cPush_valid_0
-          & ~Wb_WorkerBeeExecutor2.io_cPush_ready) begin	// src/workerbee/scala/main/WorkerBeeExecutor.scala:12:7, :14:14, :298:{9,27,29}
-        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WorkerBeeExecutor.scala:298:9
-          $error("Assertion failed: WorkerBeeExecutor: cPush valid but C buffer not ready (pop-before-push invariant violated, partial sum lost)\n");	// src/workerbee/scala/main/WorkerBeeExecutor.scala:298:9
-        if (`STOP_COND_)	// src/workerbee/scala/main/WorkerBeeExecutor.scala:298:9
-          $fatal;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:298:9
+          & ~Wb_WorkerBeeExecutor2.io_cPush_ready) begin	// src/workerbee/scala/main/WorkerBeeExecutor.scala:12:7, :14:14, :327:{9,27,29}
+        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WorkerBeeExecutor.scala:327:9
+          $error("Assertion failed: WorkerBeeExecutor: cPush valid but C buffer not ready (pop-before-push invariant violated, partial sum lost)\n");	// src/workerbee/scala/main/WorkerBeeExecutor.scala:327:9
+        if (`STOP_COND_)	// src/workerbee/scala/main/WorkerBeeExecutor.scala:327:9
+          $fatal;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:327:9
       end
       if (Wb_WorkerBeeExecutor2._layerCapture_0 & Wb_WorkerBeeExecutor2.io_execute
-          & ~Wb_WorkerBeeExecutor2.reset & (|Wb_WorkerBeeExecutor2.io_aOccupancy)) begin	// src/workerbee/scala/main/WorkerBeeExecutor.scala:12:7, :14:14, :298:9, :342:17, :371:24, :374:{15,30}
-        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WorkerBeeExecutor.scala:374:15
-          $error("Assertion failed: WorkerBeeExecutor: A buffer not drained at execute pulse (previous run aDma push rows != executor consume rows)\n");	// src/workerbee/scala/main/WorkerBeeExecutor.scala:374:15
-        if (`STOP_COND_)	// src/workerbee/scala/main/WorkerBeeExecutor.scala:374:15
-          $fatal;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:374:15
+          & ~Wb_WorkerBeeExecutor2.reset & (|Wb_WorkerBeeExecutor2.io_aOccupancy)) begin	// src/workerbee/scala/main/WorkerBeeExecutor.scala:12:7, :14:14, :327:9, :375:17, :404:24, :407:{15,30}
+        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WorkerBeeExecutor.scala:407:15
+          $error("Assertion failed: WorkerBeeExecutor: A buffer not drained at execute pulse (previous run aDma push rows != executor consume rows)\n");	// src/workerbee/scala/main/WorkerBeeExecutor.scala:407:15
+        if (`STOP_COND_)	// src/workerbee/scala/main/WorkerBeeExecutor.scala:407:15
+          $fatal;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:407:15
       end
       if (_GEN & ~Wb_WorkerBeeExecutor2.reset
           & (Wb_WorkerBeeExecutor2._io_wbLoadW_T_layerCapture
              ^ Wb_WorkerBeeExecutor2.io_scaleBPop_valid
-             & Wb_WorkerBeeExecutor2.io_scaleBPop_ready_0)) begin	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeExecutor.scala:12:7, :14:14, :298:9, :342:17, :437:22, :439:{17,33}
-        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WorkerBeeExecutor.scala:439:17
-          $error("Assertion failed: WorkerBeeExecutor: MX scaleB lockstep violated - bPop.fire XOR scaleBPop.fire (must fire same cycle, else the per-lane scaleB chain misaligns against the weight diagonal at loadWLock)\n");	// src/workerbee/scala/main/WorkerBeeExecutor.scala:439:17
-        if (`STOP_COND_)	// src/workerbee/scala/main/WorkerBeeExecutor.scala:439:17
-          $fatal;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:439:17
+             & Wb_WorkerBeeExecutor2.io_scaleBPop_ready_0)) begin	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeExecutor.scala:12:7, :14:14, :327:9, :375:17, :475:22, :477:{17,33}
+        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WorkerBeeExecutor.scala:477:17
+          $error("Assertion failed: WorkerBeeExecutor: MX scaleB lockstep violated - bPop.fire XOR scaleBPop.fire (must fire same cycle, else the per-lane scaleB chain misaligns against the weight diagonal at loadWLock)\n");	// src/workerbee/scala/main/WorkerBeeExecutor.scala:477:17
+        if (`STOP_COND_)	// src/workerbee/scala/main/WorkerBeeExecutor.scala:477:17
+          $fatal;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:477:17
       end
       if (_GEN & Wb_WorkerBeeExecutor2.loadWModeReg
           & Wb_WorkerBeeExecutor2._io_wbLoadW_T_layerCapture
           & Wb_WorkerBeeExecutor2.tileInterCnt == 4'h0 & ~Wb_WorkerBeeExecutor2.reset
-          & ~Wb_WorkerBeeExecutor2.io_scaleBPop_valid) begin	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeExecutor.scala:12:7, :14:14, :129:29, :134:29, :298:9, :342:17, :437:22, :444:{29,45,61,70}, :445:19
-        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WorkerBeeExecutor.scala:445:19
-          $error("Assertion failed: WorkerBeeExecutor: MX lock beat scaleBPop not valid - scaleBReg would latch stale FIFO payload on loadWLock\n");	// src/workerbee/scala/main/WorkerBeeExecutor.scala:445:19
-        if (`STOP_COND_)	// src/workerbee/scala/main/WorkerBeeExecutor.scala:445:19
-          $fatal;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:445:19
+          & ~Wb_WorkerBeeExecutor2.io_scaleBPop_valid) begin	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeExecutor.scala:12:7, :14:14, :134:29, :139:29, :327:9, :375:17, :475:22, :482:{29,45,61,70}, :483:19
+        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WorkerBeeExecutor.scala:483:19
+          $error("Assertion failed: WorkerBeeExecutor: MX lock beat scaleBPop not valid - scaleBReg would latch stale FIFO payload on loadWLock\n");	// src/workerbee/scala/main/WorkerBeeExecutor.scala:483:19
+        if (`STOP_COND_)	// src/workerbee/scala/main/WorkerBeeExecutor.scala:483:19
+          $fatal;	// src/workerbee/scala/main/WorkerBeeExecutor.scala:483:19
       end
     end // always @(posedge)
   `endif // not def SYNTHESIS

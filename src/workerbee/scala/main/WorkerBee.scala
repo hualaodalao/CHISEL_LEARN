@@ -273,6 +273,11 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
   // 相关分支为死路，不加显式 mode 端口、靠信号活跃性自然二选一
   wbComb.io.loadWIn      := executor.io.wbLoadW
   wbComb.io.loadWInLock  := executor.io.wbLoadWLock
+  // 独立 W 数据链 + 双 bank 选择：wrSel 全局广播（写 inactive bank），rdSelIn 标量注入
+  //   后由 WbComb 经与 valid 相同的行 skew + 横链传播 ⟹ 逐 PE 对角翻转。
+  wbComb.io.wIn     := executor.io.wbWIn
+  wbComb.io.wrSel   := executor.io.wbWrSel
+  wbComb.io.rdSelIn := executor.io.wbRdSelIn
   wbComb.io.validIn  := Mux(executor.io.osActive, osSeq.io.aTokenValid, executor.io.wbValidIn)
   // a 侧 FP8 remap：纯 FP8 运行时阵列看到 MXE4M3/MXE5M2，而 Executor 的 mxRunB 读 raw
   //   regFile（isMx(FP8)=false）走非 MX 握手支路——供数不等 scale FIFO、scale DMA 不启动，
@@ -554,4 +559,7 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
   //   交付 / scaleOut.valid 量化 scale 行）；C 写回通道活动另由 dmaC/scaleC 观测
   io.perf.epilogue := perfBiasFetchActive || cvt.io.in.fire || cvt.io.out.valid || cvt.io.scaleOut.valid
   io.perf.busy   := executor.io.busy
+  io.perf.cRowIn := executor.io.cPush.valid
+  io.perf.rdSelFirst := wbComb.io.rdSelFirst
+  io.perf.rdSelLast  := wbComb.io.rdSelLast
 }

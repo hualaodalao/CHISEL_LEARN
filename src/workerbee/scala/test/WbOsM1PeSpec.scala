@@ -51,6 +51,10 @@ class WbOsM1PeHarness(
     val loadVIn     = Input(Bool())
     val loadWIn     = Input(Bool())
     val loadWInLock = Input(Bool())
+    // 独立 W 链 + 双 bank 选择（两 PE 同源直连）
+    val wIn         = Input(UInt(bW.W))
+    val wrSel       = Input(Bool())
+    val rdSelIn     = Input(Bool())
     val validIn     = Input(Bool())
     val validInV    = Input(Bool())
     val fmtIn       = Input(DataFormat())
@@ -78,6 +82,8 @@ class WbOsM1PeHarness(
     val osBFmtOut   = Output(DataFormat())
     val osScaleAOut = Output(UInt(8.W))
     val osScaleBOut = Output(UInt(8.W))
+    val osWOut      = Output(UInt(bW.W))
+    val osRdSelOut  = Output(Bool())
     val osRndOut    = Output(RoundingMode())
     val osLastOut   = Output(Bool())
     val osConsume   = Output(Bool())
@@ -93,6 +99,8 @@ class WbOsM1PeHarness(
     val wsBFmtOut   = Output(DataFormat())
     val wsScaleAOut = Output(UInt(8.W))
     val wsScaleBOut = Output(UInt(8.W))
+    val wsWOut      = Output(UInt(bW.W))
+    val wsRdSelOut  = Output(Bool())
     val wsRndOut    = Output(RoundingMode())
   })
 
@@ -103,6 +111,9 @@ class WbOsM1PeHarness(
   osPe.io.loadVIn := io.loadVIn
   osPe.io.loadWIn := io.loadWIn
   osPe.io.loadWInLock := io.loadWInLock
+  osPe.io.wIn := io.wIn
+  osPe.io.wrSel := io.wrSel
+  osPe.io.rdSelIn := io.rdSelIn
   osPe.io.validIn := io.validIn
   osPe.io.validInV := io.validInV
   osPe.io.fmtIn := io.fmtIn
@@ -126,6 +137,9 @@ class WbOsM1PeHarness(
   wsPe.io.loadVIn := io.loadVIn
   wsPe.io.loadWIn := io.loadWIn
   wsPe.io.loadWInLock := io.loadWInLock
+  wsPe.io.wIn := io.wIn
+  wsPe.io.wrSel := io.wrSel
+  wsPe.io.rdSelIn := io.rdSelIn
   wsPe.io.validIn := io.validIn
   wsPe.io.validInV := io.validInV
   wsPe.io.fmtIn := io.fmtIn
@@ -145,6 +159,8 @@ class WbOsM1PeHarness(
   io.osBFmtOut := osPe.io.bFmtOut
   io.osScaleAOut := osPe.io.scaleAOut
   io.osScaleBOut := osPe.io.scaleBOut
+  io.osWOut := osPe.io.wOut
+  io.osRdSelOut := osPe.io.rdSelOut
   io.osRndOut := osPe.io.rndOut
   io.osLastOut := osPe.io.osLastOut
   io.osConsume := osPe.io.osConsume
@@ -160,6 +176,8 @@ class WbOsM1PeHarness(
   io.wsBFmtOut := wsPe.io.bFmtOut
   io.wsScaleAOut := wsPe.io.scaleAOut
   io.wsScaleBOut := wsPe.io.scaleBOut
+  io.wsWOut := wsPe.io.wOut
+  io.wsRdSelOut := wsPe.io.rdSelOut
   io.wsRndOut := wsPe.io.rndOut
 }
 
@@ -183,6 +201,9 @@ class WbOsM1PeSpec extends AnyFlatSpec with Matchers with ChiselSim {
     dut.io.loadVIn.poke(false.B)
     dut.io.loadWIn.poke(false.B)
     dut.io.loadWInLock.poke(false.B)
+    dut.io.wIn.poke(0.U)
+    dut.io.wrSel.poke(false.B)
+    dut.io.rdSelIn.poke(false.B)
     dut.io.validIn.poke(false.B)
     dut.io.validInV.poke(false.B)
     dut.io.fmtIn.poke(DataFormat.INT8)
@@ -216,6 +237,8 @@ class WbOsM1PeSpec extends AnyFlatSpec with Matchers with ChiselSim {
     assert(dut.io.osBFmtOut.peek().litValue == dut.io.wsBFmtOut.peek().litValue, s"$m bFmtOut")
     assert(dut.io.osScaleAOut.peek().litValue == dut.io.wsScaleAOut.peek().litValue, s"$m scaleAOut")
     assert(dut.io.osScaleBOut.peek().litValue == dut.io.wsScaleBOut.peek().litValue, s"$m scaleBOut")
+    assert(dut.io.osWOut.peek().litValue == dut.io.wsWOut.peek().litValue, s"$m wOut")
+    assert(dut.io.osRdSelOut.peek().litToBoolean == dut.io.wsRdSelOut.peek().litToBoolean, s"$m rdSelOut")
     assert(dut.io.osRndOut.peek().litValue == dut.io.wsRndOut.peek().litValue, s"$m rndOut")
     assert(!dut.io.osConsume.peek().litToBoolean, s"$m osConsume must be 0 (osM1=0)")
     assert(!dut.io.osDone.peek().litToBoolean, s"$m osDone must be 0 (osM1=0)")
@@ -245,6 +268,9 @@ class WbOsM1PeSpec extends AnyFlatSpec with Matchers with ChiselSim {
         dut.io.loadVIn.poke(false.B)
         dut.io.loadWIn.poke(false.B)
         dut.io.loadWInLock.poke(false.B)
+        dut.io.wIn.poke(0.U)
+        dut.io.wrSel.poke(false.B)
+        dut.io.rdSelIn.poke(false.B)
         dut.io.validIn.poke(false.B)
         dut.io.validInV.poke(false.B)
         dut.io.scaleAIn.poke(0.U)
@@ -267,7 +293,12 @@ class WbOsM1PeSpec extends AnyFlatSpec with Matchers with ChiselSim {
         val loadVInLock = rng.nextBoolean()
         val loadWInLock = if (loadVInLock) false else rng.nextBoolean()
         val f = fmtSeq(rng.nextInt(fmtSeq.size))
-        dut.io.aIn.poke((safeByte | (safeByte << 8)).U)
+        val wVal = safeByte | (safeByte << 8)
+        dut.io.aIn.poke(wVal.U)
+        // 水平 W 装载的权重源已从 aIn 迁到独立 wIn；同源同值驱动以保持 WS 等价对照
+        dut.io.wIn.poke(wVal.U)
+        dut.io.wrSel.poke(rng.nextBoolean().B)
+        dut.io.rdSelIn.poke(rng.nextBoolean().B)
         // psumIn 低 16 位会经 loadVInLock 进入 wReg（权重元素解码），一并避让
         dut.io.psumIn.poke(((BigInt(32, rng) << 16) | BigInt(safeByte | (safeByte << 8))).U)
         dut.io.loadHIn.poke(rng.nextBoolean().B)
@@ -409,6 +440,9 @@ class WbOsM1PeSpec extends AnyFlatSpec with Matchers with ChiselSim {
         dut.io.loadVIn.poke(false.B)
         dut.io.loadWIn.poke(false.B)
         dut.io.loadWInLock.poke(false.B)
+        dut.io.wIn.poke(0.U)
+        dut.io.wrSel.poke(false.B)
+        dut.io.rdSelIn.poke(false.B)
         dut.io.validIn.poke(false.B)
         dut.io.validInV.poke(false.B)
         dut.io.fmtIn.poke(fmt)
