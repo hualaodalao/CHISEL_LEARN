@@ -3,18 +3,20 @@ import chisel3.util._
 
 class QueenDsaCommand(val cfg: QueenConfig) extends Bundle {
     val inst = UInt(32.W)
+    val pc = UInt(cfg.pcWidth.W)
     val rs1 = UInt(cfg.xlen.W)
     val rs2 = UInt(cfg.xlen.W)
 }
 
 class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
     val io = IO(new Bundle {
-        val inst = Vec(cfg.instructionLanes, Flipped(Decoupled(UInt(32.W))))
+        val inst = Vec(cfg.instructionLanes, Flipped(Decoupled(new QueenIssue(cfg))))
         val rs1 = Vec(cfg.instructionLanes, Flipped(Valid(UInt(cfg.xlen.W))))
         val rs2 = Vec(cfg.instructionLanes, Flipped(Valid(UInt(cfg.xlen.W))))
         val gemm = Decoupled(Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg))))
         val dma = Decoupled(Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg))))
         val scheduler = Decoupled(Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg))))
+        val trap = Valid(new QueenTrap(cfg))
     })
 
     private val GEMM = 0
@@ -35,15 +37,18 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
 
     private val pending = RegInit(VecInit(Seq.fill(cfg.instructionLanes)(false.B)))
     private val pendingInst = Reg(Vec(cfg.instructionLanes, UInt(32.W)))
+    private val pendingPc = Reg(Vec(cfg.instructionLanes, UInt(cfg.pcWidth.W)))
     private val batch = Wire(Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg))))
 
     for (i <- 0 until cfg.instructionLanes) {
         pending(i) := io.inst(i).fire
         when(io.inst(i).fire) {
-            pendingInst(i) := io.inst(i).bits
+            pendingInst(i) := io.inst(i).bits.inst
+            pendingPc(i) := io.inst(i).bits.pc
         }
         batch(i).valid := pending(i)
         batch(i).bits.inst := Mux(pending(i), pendingInst(i), 0.U)
+        batch(i).bits.pc := Mux(pending(i), pendingPc(i), 0.U)
         batch(i).bits.rs1 := Mux(pending(i) && io.rs1(i).valid, io.rs1(i).bits, 0.U)
         batch(i).bits.rs2 := Mux(pending(i) && io.rs2(i).valid, io.rs2(i).bits, 0.U)
     }
@@ -104,9 +109,85 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
     private val schedReady = schedUsed < 1.U
 
     // Capacity is reserved at accept time because the next-cycle operands cannot stall.
+    // Legality is decided before accept: an illegal lane never fires, and every lane at or
+    // after the first illegal one is held back so program order stays intact.
+    private val gemmOpen = RegInit(false.B)
+    private val dmaOpen = RegInit(false.B)
+
+    private def trapCause(inst: UInt, gOpen: Bool, dOpen: Bool): UInt = {
+        val funct3 = inst(14, 12)
+        val endpoint = inst(31, 30)
+        val cmd = inst(29, 26)
+        val aux = inst(11, 7)
+        val isCtrl = funct3 === 3.U
+        val schedOnly = cmd === 3.U || cmd === 4.U || cmd === 6.U || cmd === 8.U
+        val gemmDmaOnly = cmd === 0.U || cmd === 9.U
+        val noSched = cmd === 1.U || cmd === 2.U
+        val auxZero = cmd === 0.U || cmd === 5.U || cmd === 6.U || cmd === 9.U
+        val auxHiZero = cmd === 2.U || cmd === 3.U
+        val bit25Zero = cmd === 3.U || cmd === 5.U || cmd === 8.U
+        val cause = Wire(UInt(cfg.trapCauseWidth.W))
+        cause := QueenTrapCause.none.U
+        when(inst(6, 0) =/= 0x0b.U) {
+            cause := QueenTrapCause.opcode.U
+        }.elsewhen(funct3 > 3.U) {
+            cause := QueenTrapCause.funct3.U
+        }.elsewhen(isCtrl && (cmd === 7.U || cmd >= 10.U)) {
+            cause := QueenTrapCause.cmd.U
+        }.elsewhen(isCtrl && ((schedOnly && endpoint =/= SCHED.U) ||
+            (gemmDmaOnly && endpoint =/= GEMM.U && endpoint =/= DMA.U) ||
+            (noSched && endpoint === SCHED.U))) {
+            cause := QueenTrapCause.endpoint.U
+        }.elsewhen((funct3 === 0.U && inst(10, 7) =/= 0.U) ||
+            (funct3 === 1.U && aux =/= 0.U) ||
+            (funct3 === 2.U && inst(19, 15) =/= 0.U) ||
+            (isCtrl && ((auxZero && aux =/= 0.U) ||
+                (auxHiZero && aux(4, 3) =/= 0.U) ||
+                (cmd === 8.U && aux(4, 2) =/= 0.U)))) {
+            cause := QueenTrapCause.reserved.U
+        }.elsewhen(funct3 === 0.U && Cat(inst(11), inst(29, 25)) === 63.U) {
+            cause := QueenTrapCause.regBase.U
+        }.elsewhen(isCtrl && bit25Zero && inst(25)) {
+            cause := QueenTrapCause.notifyBit.U
+        }.elsewhen(isCtrl && cmd === 9.U && !Mux(endpoint === GEMM.U, gOpen, dOpen)) {
+            cause := QueenTrapCause.emptyRun.U
+        }
+        cause
+    }
+
+    private val illegal = Wire(Vec(cfg.instructionLanes, UInt(cfg.trapCauseWidth.W)))
+    private val blocked = Wire(Vec(cfg.instructionLanes, Bool()))
+    private var gOpen: Bool = gemmOpen
+    private var dOpen: Bool = dmaOpen
     for (i <- 0 until cfg.instructionLanes) {
-        val endpoint = io.inst(i).bits(31, 30)
-        io.inst(i).ready := ((endpoint === GEMM.U) || (endpoint === DMA.U)) && ringReady ||
+        val inst = io.inst(i).bits.inst
+        illegal(i) := trapCause(inst, gOpen, dOpen)
+        blocked(i) := (0 to i).map(j => io.inst(j).valid && illegal(j) =/= 0.U).reduce(_ || _)
+        val endpoint = inst(31, 30)
+        val isQwr = inst(14, 12) === 0.U || inst(14, 12) === 1.U
+        val isRun = inst(14, 12) === 3.U && inst(29, 26) === 9.U
+        val fire = io.inst(i).fire
+        // openGroup folds in lane order so a QWR and a RUN in the same packet stay ordered.
+        gOpen = Mux(endpoint === GEMM.U,
+            Mux(fire && isQwr, true.B, Mux(fire && isRun, false.B, gOpen)), gOpen)
+        dOpen = Mux(endpoint === DMA.U,
+            Mux(fire && isQwr, true.B, Mux(fire && isRun, false.B, dOpen)), dOpen)
+    }
+    gemmOpen := gOpen
+    dmaOpen := dOpen
+
+    private val illegalValid = VecInit((0 until cfg.instructionLanes).map(i =>
+        io.inst(i).valid && illegal(i) =/= 0.U))
+    private val firstIllegal = PriorityEncoder(illegalValid)
+    io.trap.valid := illegalValid.asUInt.orR
+    io.trap.bits.pc := io.inst(firstIllegal).bits.pc
+    io.trap.bits.inst := io.inst(firstIllegal).bits.inst
+    io.trap.bits.cause := illegal(firstIllegal)
+
+    for (i <- 0 until cfg.instructionLanes) {
+        val endpoint = io.inst(i).bits.inst(31, 30)
+        val resourceReady = ((endpoint === GEMM.U) || (endpoint === DMA.U)) && ringReady ||
             (endpoint === SCHED.U) && schedReady
+        io.inst(i).ready := resourceReady && !blocked(i)
     }
 }

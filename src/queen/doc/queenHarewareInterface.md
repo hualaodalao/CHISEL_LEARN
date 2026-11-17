@@ -37,7 +37,7 @@ Scalar Core Decoder
                                               └── sync query / notify / fault ── Queen
 ```
 
-Scalar Core decoder 根据 endpoint 在 Queen 与 VPU 之间完成指令路由。目标为 VPU 的配置、RUN、WAIT 和 TRACE 指令直接送入 VPU 前端，不进入 Queen，Queen 也不向 VPU 输出命令。Queen 只接收 GEMM、DMA 和 SCHED 指令，SCHED 不经执行队列；GEMM/DMA adapter 将已提交配置快照转换为目标 DSA 的原生命令接口。VPU 与 Queen 之间仅保留同步资源查询、完成通知和错误上报旁带通路。
+Scalar Core decoder 根据 endpoint 在 Queen 与 VPU 之间完成指令路由。目标为 VPU 的配置、RUN、WAIT 和 TRACE 指令直接送入 VPU 前端，不进入 Queen，Queen 也不向 VPU 输出命令。Queen 只接收 GEMM、DMA 和 SCHED 指令，SCHED 不经执行队列；GEMM/DMA adapter 把配置写与 `RUN` 按序转发到设备，配置寄存器由设备自己维护。VPU 与 Queen 之间仅保留同步资源查询、完成通知和错误上报旁带通路。
 
 ---
 
@@ -306,22 +306,24 @@ Queen idle 必须同时满足：
 
 Queen 内部只接收 GEMM、DMA 和 SCHED 的指令，不包含 VPU command queue；SCHED 指令只经 1 级暂存就地执行，不建立执行队列。对于 GEMM/DMA，建议区分：
 
-1. **指令接收/配置构建级**：处理 QWR、维护 GEMM/DMA 的 command-building 影子寄存器。
-2. **端点执行队列**：只保存已经形成执行语义的 RUN、FENCE、WAIT 和 TRACE entry。
+1. **指令接收级**：接收 QWR/QCTRL，按 endpoint 分流并保持程序序。
+2. **端点派发队列**：保存 QWR、RUN、FENCE、WAIT 和 TRACE entry，按序派发到设备。
 
-普通 `QWR1/QWR2` 不直接进入 DSA native command queue。GEMM/DMA 的处理规则为：
+配置寄存器位于 DSA 内部，Queen 不维护配置影子，也不生成配置快照。GEMM/DMA 的处理规则为：
 
 ```text
-QWR without macroEop:
-    更新对应 GEMM/DMA endpoint 的 command-building shadow
+QWR1/QWR2:
+    按序转发为目标设备的寄存器写，不受 credit 门控
+    该端点 openGroup 置位
 
-QWR with macroEop:
-    先应用当前 QWR
-    原子快照完整配置
-    向对应 GEMM/DMA execution queue 写入 RUN(snapshot)
+QCTRL RUN:
+    要求设备 cfgCredit > 0，否则派发级停等
+    关闭当前配置组并启动设备
+    该端点 openGroup 清零
+    cmdTag/swTag 随启动命令透传
 ```
 
-这样可以保证已经入队的 RUN 不会被后续配置写修改。目标为 VPU 的 QWR 和 macroEop 由 Scalar Core decoder 直接送入 VPU，并不经过上述结构。
+已启动配置不被后续配置写修改，这一保证由设备的配置缓冲承担（见 5.6）。目标为 VPU 的 QWR 与启动命令由 Scalar Core decoder 直接送入 VPU，并不经过上述结构。
 
 ### 4.2 端点 entry
 
@@ -329,7 +331,7 @@ QWR with macroEop:
 
 ```scala
 object QueenEndpointOp extends ChiselEnum {
-  val RUN, FENCE, WAIT_EVENT, WAIT_TIMELINE, TRACE_TAG = Value
+  val QWR, RUN, FENCE, WAIT_EVENT, WAIT_TIMELINE, TRACE_TAG = Value
 }
 
 class QueenEndpointEntry(cfg: QueenConfig) extends Bundle {
@@ -339,13 +341,12 @@ class QueenEndpointEntry(cfg: QueenConfig) extends Bundle {
   val aux      = UInt(5.W)
   val operand0 = UInt(cfg.xlen.W)
   val operand1 = UInt(cfg.xlen.W)
-  val config   = new QueenConfigSnapshot(cfg)
 }
 ```
 
-该 entry 只用于 Queen 内部的 GEMM/DMA execution queue。实际实现可以用 tagged union 或按 endpoint 定制 Bundle，避免所有 entry 都携带最大配置快照。无论物理编码如何，必须保持以下顺序：
+该 entry 只用于 Queen 内部的 GEMM/DMA 派发队列，不携带配置快照：`QWR` 的 operand 是寄存器地址与数据，`RUN` 的 operand 是 `cmdTag/swTag`。无论物理编码如何，必须保持以下顺序：
 
-- 同一 GEMM/DMA endpoint 的 RUN/FENCE/WAIT/TRACE 严格按入队顺序执行。
+- 同一 GEMM/DMA endpoint 的 QWR/RUN/FENCE/WAIT/TRACE 严格按入队顺序执行。
 - FENCE/WAIT 未完成时，后续 entry 不得越过。
 - GEMM、DMA 与 SCHED 相互独立推进；SCHED 不做条件等待，因此不存在全局阻塞范围。
 
@@ -373,7 +374,7 @@ SCHED 的通知寄存器、fault 寄存器、ACK/ENABLE 和恢复寄存器属于
 
 Queen 的 GEMM/DMA endpoint adapter 属于 Queen Scheduler 集成边界，负责：
 
-- 将 RUN 配置快照转换为目标 DSA 的原生命令。
+- 将 QWR 转发为设备寄存器写，将 RUN 转发为设备启动命令。
 - 保持原生命令直到 ready 握手。
 - 收集 native completion、read response 和 fault。
 - 维护设备强 idle。
@@ -384,11 +385,24 @@ GEMM 和 DMA 不需要理解 Queen 的 32-bit ISA 编码，只接收自身原生
 
 ### 5.2 命令接口
 
-所有 native command 接口使用 ready/valid：
+Queen 侧的派发 adapter（`QueenDsaAdapter`，每端点一个）把端点出口的整包串行化为统一的 native 命令：
 
 ```scala
-val cmd = Decoupled(new NativeDsaCmd(...))
+class QueenNativeCmd(cfg: QueenConfig) extends Bundle {
+  val isStart = Bool()          // 1 = RUN 启动命令，0 = 寄存器写
+  val regAddr = UInt(10.W)      // 启动命令时为 0
+  val data    = UInt(cfg.xlen.W)
+  val pc      = UInt(cfg.pcWidth.W)
+  val cmdTag  = UInt(8.W)       // RUN 的 rs1 低 8 位
+  val swTag   = UInt(cfg.xlen.W) // RUN 的 rs2
+}
+
+val out = Decoupled(new QueenNativeCmd(cfg))
 ```
+
+串行化规则：`QWR2` 展开为 `regBase` 与 `regBase+1` 两条写（先 `rs1` 后 `rs2`），`QWR1` 一条写，`RUN` 一条启动命令；无效 lane 每周期跳过一个；整包全部发射完成后才接受下一包。`FENCE/WAIT/TRACE` 由端点控制器在本级之前消费，`QRD` 走读响应通路。
+
+设备相关映射（`QueenNativeCmd` → `WorkerBeeCmd` 或 DMA 配置前端）属各端点 adapter 的剩余工作。
 
 当 `valid=1 && ready=0` 时，payload 必须保持不变。只有 `fire` 表示 DSA 已接受命令。
 
@@ -408,7 +422,7 @@ idle=1 必须同时表示：
 - 没有命令正在执行；
 - 没有未完成的内存读写请求或响应；
 - 没有尚未被 adapter 接收的 completion/fault；
-- adapter 没有尚未发送完成的 native command burst。
+- adapter 没有尚未发送完成的配置写或启动命令。
 
 仅 `cmd.ready=1`、设备输入 FIFO 为空或计算阵列停止均不能单独作为 idle。
 
@@ -421,12 +435,15 @@ class QueenDsaCompletion(cfg: QueenConfig) extends Bundle {
   val sequence = UInt(cfg.sequenceWidth.W)
   val error    = Bool()
   val code     = UInt(cfg.faultCodeWidth.W)
+  val hwSignal = new QueenHwSignal   // 见 9.1，设备在 RUN 被接受时锁存
 }
 
 val completion = Flipped(Decoupled(new QueenDsaCompletion(cfg)))
 ```
 
 DSA native completion 若不带 Queen sequence，由 adapter 在提交时分配私有 sequence/tag 并维护映射。私有 tag 用于错误归因和多引擎乱序 completion，不对 CPU 暴露。
+
+`hwSignal` 是该次工作提交时锁存的硬件信号目标，由设备随 completion 一并回传（见 9.1）。Queen 不在完成时读取设备配置寄存器，因此目标不受后续配置写影响。`error=1` 的 completion 不得携带有效目标。
 
 错误信息不得使用无保持能力的单拍 pulse。adapter 必须持续拉高 completion/fault valid，直到 Queen 接收。
 
@@ -453,6 +470,24 @@ val flushDone = Flipped(Valid(Bool()))
 
 不支持安全 abort 的 DSA 必须将 `abortRunning` 视为非法，并等待当前工作自然结束后再完成 flush。
 
+### 5.6 配置 credit 与配置组
+
+配置寄存器归设备所有，设备用 credit 告知 Queen 还能接受多少条 `RUN`。credit 只门控 `RUN`，`QWR`/`QRD` 随时可写可读：
+
+```scala
+val cfgCredit = Input(UInt(cfg.cfgCreditWidth.W))
+```
+
+- `cfgCredit` 为电平，表示设备还能接受的 `RUN` 数；位宽必须覆盖设备声明的缓冲数。
+- `RUN` 要求 `cfgCredit` 大于 0，被设备接受即占用一个 credit；Queen 侧不另设计数器，直接看设备电平。`QWR`/`QRD` 不检查 credit。
+- 设备在执行上下文取走配置时归还 credit，不是完成时归还，因此配置准备可以与上一次执行重叠。
+- 同一端点的命令是单条按序流，credit 只会被 Queen 自己发出的 `RUN` 占用，因此电平检查无竞争。
+- credit 为 0 时 `RUN` 在派发级停等，该端点后续指令按程序序等待；另一端点不受影响。
+- openGroup 为 0 时的 `RUN` 是非法指令，在前端报 trap。
+- 第一版不把 credit 纳入前端 ring 准入判定：派发级停等即可，共享 ring 的 per-consumer 游标已容得下单侧停顿。该门控已在 `QueenDsaAdapter` 实现。
+
+设备侧义务（实现不在本文范围内）：`RUN` 被接受后，后续 `QWR` 不得改变该 `RUN` 已提交的配置；要重叠配置准备与执行，设备需自行保证这一点（通常需要双缓冲）；flush/reset 后 credit 必须与 Queen 重新对齐。
+
 ---
 
 ## 6. GEMM 接口
@@ -467,21 +502,22 @@ status.busy/done/err
 
 GEMM adapter 的建议行为：
 
-1. 从 `RUN(configSnapshot)` 生成一组 `REG_WRITE1/REG_WRITE2`。
-2. 写入完整配置后发送 `EXECUTE`。
-3. 同一 RUN 的寄存器写和 EXECUTE 形成不可交错的 native command burst。
-4. `QRD endpoint=GEMM` 转换为 `REG_READ`，响应送入 Queen QRD ordered response queue。
+1. `QWR1/QWR2` 逐条转发为 `REG_WRITE1/REG_WRITE2`，地址与数据原样透传。
+2. `RUN` 转发为启动命令（WorkerBee 侧为 Start 寄存器写），`cmdTag/swTag` 随命令携带。
+3. 同一配置组的寄存器写与启动不得与其它配置组交错。
+4. `QRD endpoint=GEMM` 转换为 `REG_READ`，响应送入 Queen QRD ordered response queue；Queen 不缓存配置值。
 5. WorkerBee response、status.err 和执行错误转换为 Queen fault。
+6. 设备通过 `cfgCredit` 告知可接受的 `RUN` 数，Queen 按 5.6 只对 `RUN` 准入。
 
 GEMM adapter 对 Queen 提供的强 idle 不能只等于 `!status.busy`，还必须包含：
 
 ```text
-adapter 没有待发送的 REG_WRITE/EXECUTE/REG_READ
+adapter 没有待发送的 REG_WRITE/启动命令/REG_READ
 WorkerBee 没有未消费 response
 WorkerBee 没有尚未结束的 DMA 请求/响应
 ```
 
-GEMM 本地 FENCE 和 WAIT 在 Queen GEMM endpoint queue 的最终派发处执行。条件满足前不得向 WorkerBee 发送后续 RUN。
+GEMM 本地 FENCE 和 WAIT 在 Queen GEMM endpoint queue 的最终派发处执行。条件满足前不得向 WorkerBee 发送后续 QWR 或 RUN。
 
 ---
 
@@ -496,33 +532,35 @@ occupancy : UInt
 busy      : Bool
 ```
 
+ForagerBee 当前只有描述符接口，没有寄存器接口。按本契约，DMA 侧需要新增配置前端：接收寄存器写、在 `RUN` 时组装并提交一个完整 `FbCmd`。该前端属设备侧实现，不在本文范围内。
+
 DMA adapter 的建议行为：
 
-1. DMA command-building shadow 与 `FbCmd` 字段建立固定寄存器映射。
-2. `macroEop` 产生一个完整 `FbCmd` 快照。
-3. 每个 RUN 只向 ForagerBee cmd 发送一个完整描述符。
-4. adapter 为命令分配内部 tag，将 `FbDone.tag` 映射回 Queen sequence/pc。
-5. `FbDone.err` 转换为 Queen asynchronous fault。
+1. `QWR1/QWR2` 逐条转发到设备配置前端，Queen 不维护 `FbCmd` 影子。
+2. `RUN` 转发为提交命令，由设备组装并提交一个完整 `FbCmd`。
+3. adapter 维护 tag 到 Queen sequence/pc 的映射，将 `FbDone.tag` 归档。
+4. `FbDone.err` 转换为 Queen asynchronous fault。
+5. 设备通过 `cfgCredit` 告知可接受的 `RUN` 数，Queen 按 5.6 只对 `RUN` 准入。
 
 DMA 强 idle 至少满足：
 
 ```text
 ForagerBee busy == 0
 ForagerBee occupancy == 0
-adapter 没有待提交 FbCmd
+adapter 没有待转发的配置写或 RUN
 adapter 没有待消费或待归档 FbDone
 相关内存总线没有 outstanding transaction
 ```
 
 DMA 本地 FENCE 和 WAIT 在 Queen DMA endpoint queue 的最终派发处执行。ForagerBee 不需要理解 Queen FENCE/WAIT 编码。
 
-`QRD endpoint=DMA` 优先读取 Queen DMA shadow、adapter 状态和映射后的 DMA 状态寄存器。只有寄存器表明确要求时才向 ForagerBee 发起 native read。
+`QRD endpoint=DMA` 读取设备配置寄存器与状态寄存器，读请求不得越过同端点此前的配置写；Queen 不缓存配置值。
 
 ---
 
 ## 8. VPU 旁带接口
 
-目标为 VPU 的配置、RUN、WAIT 和 TRACE 指令由 Scalar Core decoder 直接派发到 VPU 前端。Queen 不接收这些指令，也不维护 VPU 配置影子、VPU command queue 或 VPU adapter，并且不存在 Queen 到 VPU 的命令接口。
+目标为 VPU 的配置、RUN、WAIT 和 TRACE 指令由 Scalar Core decoder 直接派发到 VPU 前端。Queen 不接收这些指令，也不维护 VPU command queue 或 VPU adapter，并且不存在 Queen 到 VPU 的命令接口。
 
 VPU 自行保证其指令顺序、WAIT 阻塞、TRACE 记录以及所需的 Scalar Core 写回/退休协议。Queen 与 VPU 只通过以下同步资源查询、通知和错误旁带接口交互。
 
@@ -600,13 +638,15 @@ class QueenHwSignal extends Bundle {
   val timeline  = UInt(3.W)   // timeline ID
 }
 
-// GEMM/DMA adapter -> Scheduler，随该 RUN 的配置快照携带
-val hwSignal = Valid(new QueenHwSignal)
+// 作为 QueenDsaCompletion.hwSignal 字段随 completion 回传（见 5.4），
+// 不单独开一条通道，避免目标与完成事件之间出现顺序歧义。
 ```
 
 约束：
 
-- 目标随 RUN 快照提交，不从实时寄存器读取，避免在途完成与后续配置写竞争。
+- 目标由设备在 `RUN` 被接受时锁存进该次工作的配置缓冲，并随该次工作的 completion 回传；Queen 不保存配置副本，也不在完成时重新读取设备寄存器，避免与后续配置写竞争。
+- 设备侧义务：`RUN` 被接受时锁存 `HW_SIGNAL_TARGET/HW_SIGNAL_VALID`，完成时原样回传；DSA 不需要理解 event/timeline 语义，只负责锁存与回传。
+- 锁存与 credit 归还是两个事件：锁存发生在 `RUN` 被接受时，credit 在执行上下文取走该份配置后归还。
 - 硬件信号只在对应命令的 native completion 被 adapter 接收后应用；同端点必须按命令完成序发布，早到的乱序 completion 缓存到前序 target 已应用。
 - 硬件源只能置位 event 和自增 timeline；清除与赋值仅由软件指令完成。
 - 更新路径独立于 GEMM/DMA 命令队列的阻塞状态，任何端点等待期间仍要能应用。
@@ -710,7 +750,7 @@ fault 汇总必须满足：
 复位后：
 
 - 所有 frontend、QRD、endpoint 和 native adapter 队列为空；
-- command-building shadow 使用寄存器表规定的复位值；
+- 设备配置寄存器使用寄存器表规定的复位值，Queen 侧 openGroup 清零、credit 与设备重新对齐；
 - event/timeline、COUNT、ACK、ENABLE 和 fault 状态按 ISA/寄存器规范复位；
 - irq 拉低；
 - 不存在旧 context completion 或 notify。
@@ -729,6 +769,7 @@ case class QueenConfig(
   frontendDepth: Int,
   qrdDepth: Int,
   cmdRingDepth: Int = 64,
+  cfgCreditWidth: Int = 4,
   xlen: Int = 32,
   pcWidth: Int = 32,
   addressWidth: Int = 32,
@@ -744,6 +785,7 @@ elaboration 阶段至少检查：
 
 - `instructionLanes >= 1`；
 - 所有 depth >= 1，`cmdRingDepth >= 2`；
+- `cfgCreditWidth >= 1` 且足以表示设备声明的配置缓冲数；
 - `xlen == 32`；
 - `timelineCount == 8` 或与 ISA aux 编码范围一致；
 - `eventGroupCount <= 32`；
@@ -763,9 +805,9 @@ elaboration 阶段至少检查：
 7. 验证 rd=x0 的 QRD 执行副作用但不写 GPR。
 8. 验证跨 endpoint QRD 响应乱序到达时仍按请求顺序写回和退休。
 9. 验证同步非法指令不进入 endpoint queue，并只报告最早非法 lane。
-10. 验证 macroEop 当前写入包含在配置快照中，后续写入不修改已入队 RUN。
-11. 验证同一 GEMM/DMA endpoint 的 RUN/FENCE/WAIT/TRACE 不越过。
-12. 验证 GEMM native command burst 不与其他 RUN 交错。
+10. 验证 `RUN` 之前的配置写全部到达设备，`RUN` 之后的配置写不修改已启动配置。
+11. 验证同一 GEMM/DMA endpoint 的 QWR/RUN/FENCE/WAIT/TRACE 不越过。
+12. 验证同一配置组的寄存器写与启动不与其他配置组交错。
 13. 验证 DMA FbCmd/FbDone tag 映射和乱序 completion 错误归因。
 14. 验证强 idle 包含命令、执行、内存响应和 completion 全部退出。
 15. 验证目标为 VPU 的指令由 Scalar Core decoder 直发 VPU，Queen 不存在 VPU command queue 或命令输出。
@@ -777,3 +819,6 @@ elaboration 阶段至少检查：
 21. 验证 fault 后失败命令不产生成功 notify，flushDone 前不残留旧 context 事件。
 22. 验证普通 CPU pipeline flush 不撤销已经 fire 的 Queen 指令。
 23. 验证硬件完成信号按命令序发布、只置位 event 或自增 timeline、在 GEMM/DMA 等待阻塞期间仍能应用，且 flush 后不更新新 context 的资源。
+24. 验证 credit 只门控 RUN：credit 为 0 时 QWR/QRD 仍可接受与转发，RUN 停等；设备取走配置即归还 credit。
+25. 验证空配置组 RUN 在前端报 trap，不进入派发队列、不启动设备。
+26. 验证 RUN 的 cmdTag/swTag 透传到设备命令与 trace/fault 关联。

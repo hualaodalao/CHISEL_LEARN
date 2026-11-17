@@ -13,18 +13,35 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
     )
 
     private case class Command(inst: BigInt, rs1: BigInt = 0, rs2: BigInt = 0,
-                               rs1Valid: Boolean = false, rs2Valid: Boolean = false) {
+                               rs1Valid: Boolean = false, rs2Valid: Boolean = false,
+                               pc: BigInt = 0) {
         def endpoint: Int = ((inst >> 30) & 3).toInt
-        def payload: (BigInt, BigInt, BigInt) =
-            (inst, if (rs1Valid) rs1 else BigInt(0), if (rs2Valid) rs2 else BigInt(0))
+        def payload: (BigInt, BigInt, BigInt, BigInt) =
+            (inst, pc, if (rs1Valid) rs1 else BigInt(0), if (rs2Valid) rs2 else BigInt(0))
     }
 
+    private def qwr2(endpoint: Int, regBase: Int, rsv: Int = 0): BigInt =
+        (BigInt(endpoint) << 30) | (BigInt(regBase & 31) << 25) | (BigInt(2) << 20) |
+            (BigInt(1) << 15) | (BigInt((regBase >> 5) & 1) << 11) | (BigInt(rsv) << 7) | 0x0b
+
+    private def qwr1(endpoint: Int, regAddr: Int, rsv: Int = 0): BigInt =
+        (BigInt(endpoint) << 30) | (BigInt(regAddr) << 20) | (BigInt(1) << 15) |
+            (BigInt(1) << 12) | (BigInt(rsv) << 7) | 0x0b
+
+    private def qrd(endpoint: Int, regAddr: Int, rd: Int, rsv: Int = 0): BigInt =
+        (BigInt(endpoint) << 30) | (BigInt(regAddr) << 20) | (BigInt(rsv) << 15) |
+            (BigInt(2) << 12) | (BigInt(rd) << 7) | 0x0b
+
+    private def qctrl(endpoint: Int, cmd: Int, aux: Int = 0, bit25: Int = 0): BigInt =
+        (BigInt(endpoint) << 30) | (BigInt(cmd) << 26) | (BigInt(bit25) << 25) |
+            (BigInt(3) << 12) | (BigInt(aux) << 7) | 0x0b
+
     private def write2(endpoint: Int, tag: Int): Command = Command(
-        (BigInt(endpoint) << 30) | (BigInt(tag % 31) << 25) | (BigInt(2) << 20) |
-            (BigInt(1) << 15) | (BigInt(tag & 1) << 11) | 0x0b,
+        qwr2(endpoint, tag % 63),
         BigInt("12340000", 16) | tag,
         BigInt("fedc0000", 16) | tag,
-        rs1Valid = true, rs2Valid = true
+        rs1Valid = true, rs2Valid = true,
+        pc = BigInt("4000", 16) | tag
     )
 
     private def control(endpoint: Int, cmd: Int, rs1: BigInt = 0, rs2: BigInt = 0,
@@ -36,6 +53,41 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
         rs1, rs2, hasRs1, hasRs2
     )
 
+    private def run(endpoint: Int, cmdTag: Int = 0, swTag: BigInt = 0): Command =
+        control(endpoint, 9, rs1 = cmdTag, rs2 = swTag, hasRs2 = swTag != 0)
+
+    private def illegalCause(c: Command, gOpen: Boolean, dOpen: Boolean): Int = {
+        val inst = c.inst
+        val funct3 = ((inst >> 12) & 7).toInt
+        val endpoint = c.endpoint
+        val cmd = ((inst >> 26) & 15).toInt
+        val aux = ((inst >> 7) & 31).toInt
+        val bit25 = ((inst >> 25) & 1).toInt
+        val isCtrl = funct3 == 3
+        val schedOnly = Set(3, 4, 6, 8).contains(cmd)
+        val gemmDmaOnly = Set(0, 9).contains(cmd)
+        val noSched = Set(1, 2).contains(cmd)
+        val auxZero = Set(0, 5, 6, 9).contains(cmd)
+        val auxHiZero = Set(2, 3).contains(cmd)
+        val bit25Zero = Set(3, 5, 8).contains(cmd)
+        val regBase = (((inst >> 11) & 1) << 5) | ((inst >> 25) & 31)
+        if ((inst & 0x7f) != 0x0b) QueenTrapCause.opcode
+        else if (funct3 > 3) QueenTrapCause.funct3
+        else if (isCtrl && (cmd == 7 || cmd >= 10)) QueenTrapCause.cmd
+        else if (isCtrl && ((schedOnly && endpoint != 3) ||
+            (gemmDmaOnly && endpoint != 0 && endpoint != 1) ||
+            (noSched && endpoint == 3))) QueenTrapCause.endpoint
+        else if ((funct3 == 0 && ((inst >> 7) & 15) != 0) ||
+            (funct3 == 1 && aux != 0) ||
+            (funct3 == 2 && ((inst >> 15) & 31) != 0) ||
+            (isCtrl && ((auxZero && aux != 0) || (auxHiZero && (aux >> 3) != 0) ||
+                (cmd == 8 && (aux >> 2) != 0)))) QueenTrapCause.reserved
+        else if (funct3 == 0 && regBase == 63) QueenTrapCause.regBase
+        else if (isCtrl && bit25Zero && bit25 == 1) QueenTrapCause.notifyBit
+        else if (isCtrl && cmd == 9 && !(if (endpoint == 0) gOpen else dOpen)) QueenTrapCause.emptyRun
+        else QueenTrapCause.none
+    }
+
     private class Driver(dut: QueenDsaDecoder, cfg: QueenConfig) {
         private val ports = Vector(dut.io.gemm, dut.io.dma, dut.io.scheduler)
         private val endpoints = Vector(0, 1, 3)
@@ -45,15 +97,20 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
         private var writePtr = BigInt(0)
         private var gemmCursor = BigInt(0)
         private var dmaCursor = BigInt(0)
+        private var gemmOpen = false
+        private var dmaOpen = false
         private var pending = Vector.fill[Option[Command]](cfg.instructionLanes)(None)
-        private var held = Vector.fill(3)(Option.empty[Vector[(Boolean, BigInt, BigInt, BigInt)]])
+        private var held = Vector.fill(3)(Option.empty[Vector[(Boolean, BigInt, BigInt, BigInt, BigInt)]])
         val empty: Vector[Option[Command]] = Vector.fill(cfg.instructionLanes)(None)
         var lastOutput = Vector.fill(3)(Vector.empty[(BigInt, BigInt, BigInt)])
         var lastMask = Vector.fill(3)(Vector.fill(cfg.instructionLanes)(false))
         var acceptedCount = 0
         var outputCount = 0
+        var trapCount = 0
 
-        dut.io.inst.foreach { p => p.valid.poke(false.B); p.bits.poke(0.U) }
+        dut.io.inst.foreach { p =>
+            p.valid.poke(false.B); p.bits.inst.poke(0.U); p.bits.pc.poke(0.U)
+        }
         dut.io.rs1.foreach { p => p.valid.poke(false.B); p.bits.poke(0.U) }
         dut.io.rs2.foreach { p => p.valid.poke(false.B); p.bits.poke(0.U) }
         ports.foreach(_.ready.poke(false.B))
@@ -82,7 +139,8 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
             cycleNo += 1
             for (i <- 0 until cfg.instructionLanes) {
                 dut.io.inst(i).valid.poke(offered(i).nonEmpty.B)
-                dut.io.inst(i).bits.poke(offered(i).map(_.inst).getOrElse(BigInt(0)).U)
+                dut.io.inst(i).bits.inst.poke(offered(i).map(_.inst).getOrElse(BigInt(0)).U)
+                dut.io.inst(i).bits.pc.poke(offered(i).map(_.pc).getOrElse(BigInt(0)).U)
                 dut.io.rs1(i).valid.poke(pending(i).exists(_.rs1Valid).B)
                 dut.io.rs1(i).bits.poke(pending(i).map(_.rs1).getOrElse(BigInt(0)).U)
                 dut.io.rs2(i).valid.poke(pending(i).exists(_.rs2Valid).B)
@@ -102,8 +160,8 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 port.valid.expect(presenting(e).B)
                 heads(e).filter(_ => presenting(e)).foreach { packet =>
                     packet.zip(port.bits).zipWithIndex.foreach { case ((command, lane), i) =>
-                        val actual = (lane.bits.inst.peek().litValue, lane.bits.rs1.peek().litValue,
-                            lane.bits.rs2.peek().litValue)
+                        val actual = (lane.bits.inst.peek().litValue, lane.bits.pc.peek().litValue,
+                            lane.bits.rs1.peek().litValue, lane.bits.rs2.peek().litValue)
                         withClue(s"cycle=$cycleNo port=$e lane=$i " +
                             s"expected=${command.map(_.payload)} actual=$actual ") {
                             lane.valid.peek().litToBoolean shouldBe command.nonEmpty
@@ -113,7 +171,8 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 }
                 val snapshot = port.bits.map { lane =>
                     (lane.valid.peek().litToBoolean, lane.bits.inst.peek().litValue,
-                        lane.bits.rs1.peek().litValue, lane.bits.rs2.peek().litValue)
+                        lane.bits.pc.peek().litValue, lane.bits.rs1.peek().litValue,
+                        lane.bits.rs2.peek().litValue)
                 }.toVector
                 if (presenting(e) && !ready(e)) {
                     held(e).foreach(previous => snapshot shouldBe previous)
@@ -123,7 +182,7 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 }
                 lastMask = lastMask.updated(e, snapshot.map(_._1))
                 lastOutput = lastOutput.updated(e,
-                    snapshot.collect { case (true, inst, rs1, rs2) => (inst, rs1, rs2) })
+                    snapshot.collect { case (true, inst, _, rs1, rs2) => (inst, rs1, rs2) })
             }
 
             val gemmAdvance = gemmHead.exists(p => !hasRingLane(p, 0) || ready(0))
@@ -141,19 +200,48 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
             val schedNext = sched.size + (if (pendingSched) 1 else 0) - (if (schedFire) 1 else 0)
             val schedReady = schedNext < 1
 
-            val accepted = Vector.tabulate(cfg.instructionLanes) { i =>
-                offered(i) match {
-                    case Some(command) =>
-                        val canAccept = command.endpoint match {
-                            case 3 => schedReady
-                            case 2 => false
-                            case _ => ringReady
-                        }
-                        dut.io.inst(i).ready.expect(canAccept.B)
-                        canAccept
-                    case None => false
+            // Legality and openGroup fold in lane order, exactly like the RTL chain.
+            val causes = Array.fill(cfg.instructionLanes)(QueenTrapCause.none)
+            val accepted = Array.fill(cfg.instructionLanes)(false)
+            var gOpen = gemmOpen
+            var dOpen = dmaOpen
+            for (i <- 0 until cfg.instructionLanes) {
+                offered(i).foreach { c => causes(i) = illegalCause(c, gOpen, dOpen) }
+                val blocked = (0 to i).exists(j => offered(j).nonEmpty && causes(j) != 0)
+                val canAccept = offered(i).exists { c =>
+                    !blocked && (c.endpoint match {
+                        case 3 => schedReady
+                        case 2 => false
+                        case _ => ringReady
+                    })
+                }
+                withClue(s"cycle=$cycleNo lane=$i cause=${causes(i)} blocked=$blocked ") {
+                    if (offered(i).nonEmpty) dut.io.inst(i).ready.expect(canAccept.B)
+                }
+                accepted(i) = canAccept
+                if (canAccept) {
+                    val c = offered(i).get
+                    val funct3 = ((c.inst >> 12) & 7).toInt
+                    val isQwr = funct3 == 0 || funct3 == 1
+                    val isRun = funct3 == 3 && ((c.inst >> 26) & 15).toInt == 9
+                    if (c.endpoint == 0) gOpen = if (isQwr) true else if (isRun) false else gOpen
+                    if (c.endpoint == 1) dOpen = if (isQwr) true else if (isRun) false else dOpen
                 }
             }
+            gemmOpen = gOpen
+            dmaOpen = dOpen
+
+            val firstIllegal = (0 until cfg.instructionLanes).find(i =>
+                offered(i).nonEmpty && causes(i) != 0)
+            withClue(s"cycle=$cycleNo trap ") {
+                dut.io.trap.valid.expect(firstIllegal.nonEmpty.B)
+                firstIllegal.foreach { i =>
+                    dut.io.trap.bits.pc.expect(offered(i).get.pc.U)
+                    dut.io.trap.bits.inst.expect(offered(i).get.inst.U)
+                    dut.io.trap.bits.cause.expect(causes(i).U)
+                }
+            }
+            if (firstIllegal.nonEmpty) trapCount += 1
 
             if (gemmFire) outputCount += maskOf(gemmHead.get, 0).flatten.size
             if (dmaFire) outputCount += maskOf(dmaHead.get, 1).flatten.size
@@ -172,7 +260,7 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
             pending = offered.zip(accepted).map { case (command, fire) => if (fire) command else None }
             acceptedCount += accepted.count(identity)
             dut.clock.step()
-            accepted
+            accepted.toVector
         }
 
         def drain(): Unit = {
@@ -294,11 +382,10 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
     it should "package source channels without decoding the instruction's operand requirements" in {
         val cfg = QueenConfig()
         val commands = Vector(
-            Command((BigInt(0x321) << 20) | (BigInt(1) << 15) | (BigInt(1) << 12) | 0x80b,
-                rs1 = 55, rs1Valid = true),
-            Command((BigInt(1) << 30) | (BigInt(0x123) << 20) | (BigInt(2) << 12) | (BigInt(5) << 7) | 0x0b),
+            Command(qwr1(0, 0x321), rs1 = 55, rs1Valid = true),
+            Command(qrd(1, 0x123, rd = 5)),
             control(0, 0, bit25 = 1, hasRs1 = false),
-            control(3, 0, rs1 = 3, bit25 = 1),
+            control(1, 0, rs1 = 3, bit25 = 1),
             control(1, 1, rs1 = 0x55, aux = 31, bit25 = 1),
             control(0, 2, rs1 = 1234, aux = 7),
             control(3, 3, aux = 6, hasRs1 = false),
@@ -308,8 +395,8 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
             control(3, 6, rs1 = 0x1000, rs2 = 0x87654321L, bit25 = 1, hasRs2 = true),
             control(3, 8, rs1 = 0x2000, rs2 = 0x42, aux = 2, hasRs2 = true),
             write2(0, 100).copy(rs1Valid = false, rs2Valid = false),
-            control(1, 0, rs1 = 0x11, rs2 = 0x22, hasRs2 = true),
-            control(3, 7, rs1 = 0x33, rs2 = 0x44, hasRs2 = true)
+            control(3, 5, rs1 = 0x99),
+            control(1, 2, rs1 = 7, aux = 1)
         )
         simulate(new QueenDsaDecoder(cfg)) { dut =>
             val d = new Driver(dut, cfg)
@@ -323,6 +410,92 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 cycles += 1
             }
             index shouldBe commands.length
+            d.trapCount shouldBe 0
+            d.drain()
+        }
+    }
+
+    it should "report the earliest illegal lane and hold back every later lane" in {
+        val cfg = QueenConfig()
+        simulate(new QueenDsaDecoder(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            d.cycle(d.offer(0 -> write2(0, 1), 1 -> Command(0x0c, pc = BigInt("1000", 16)),
+                2 -> write2(0, 2))) shouldBe Vector(true, false, false, false)
+            d.cycle(d.offer(0 -> Command(qctrl(3, 0), pc = BigInt("2000", 16)),
+                1 -> Command(0x0c, pc = BigInt("3000", 16)))) shouldBe Vector(false, false, false, false)
+            d.cycle(d.offer(0 -> write2(0, 3))) shouldBe Vector(true, false, false, false)
+            d.trapCount shouldBe 2
+            d.drain()
+        }
+    }
+
+    it should "reject reserved encodings, endpoint violations and empty-group RUN" in {
+        val cfg = QueenConfig()
+        val illegal = Vector(
+            Command(0x0c),
+            Command(qwr2(0, 1) | (BigInt(4) << 12)),
+            Command(qwr2(0, 63)),
+            Command(qwr2(0, 1, rsv = 1)),
+            Command(qwr1(0, 5, rsv = 1)),
+            Command(qrd(0, 5, rd = 1, rsv = 1)),
+            Command(qctrl(0, 7)),
+            Command(qctrl(0, 10)),
+            Command(qctrl(3, 0)),
+            Command(qctrl(3, 1)),
+            Command(qctrl(3, 2)),
+            Command(qctrl(0, 3)),
+            Command(qctrl(1, 4)),
+            Command(qctrl(0, 6)),
+            Command(qctrl(1, 8)),
+            Command(qctrl(3, 9)),
+            Command(qctrl(0, 5, bit25 = 1)),
+            Command(qctrl(3, 3, bit25 = 1)),
+            Command(qctrl(3, 8, bit25 = 1)),
+            Command(qctrl(0, 0, aux = 1)),
+            Command(qctrl(3, 6, aux = 1)),
+            Command(qctrl(0, 5, aux = 1)),
+            Command(qctrl(0, 2, aux = 8)),
+            Command(qctrl(3, 3, aux = 8)),
+            Command(qctrl(3, 8, aux = 4)),
+            Command(qctrl(0, 9)),
+            Command(qctrl(0, 9, aux = 1))
+        )
+        simulate(new QueenDsaDecoder(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            illegal.foreach { c =>
+                withClue(s"inst=${c.inst.toString(16)} ") {
+                    d.cycle(d.offer(0 -> c), Vector(true, true, true)) shouldBe
+                        Vector(false, false, false, false)
+                }
+            }
+            d.trapCount shouldBe illegal.size
+            d.acceptedCount shouldBe 0
+            d.drain()
+        }
+    }
+
+    it should "track openGroup per endpoint and accept a same-packet QWR then RUN" in {
+        val cfg = QueenConfig()
+        simulate(new QueenDsaDecoder(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            d.cycle(d.offer(0 -> run(0)), Vector(true, true, true)) shouldBe
+                Vector(false, false, false, false)
+            d.cycle(d.offer(0 -> write2(0, 1)), Vector(true, true, true)) shouldBe
+                Vector(true, false, false, false)
+            d.cycle(d.offer(0 -> run(0, cmdTag = 0x12)), Vector(true, true, true)) shouldBe
+                Vector(true, false, false, false)
+            d.cycle(d.offer(0 -> run(0)), Vector(true, true, true)) shouldBe
+                Vector(false, false, false, false)
+            // GEMM closing its group does not open DMA's.
+            d.cycle(d.offer(0 -> run(1)), Vector(true, true, true)) shouldBe
+                Vector(false, false, false, false)
+            d.cycle(d.offer(0 -> write2(1, 2), 1 -> run(1, cmdTag = 0x34)),
+                Vector(true, true, true)) shouldBe Vector(true, true, false, false)
+            d.cycle(d.offer(0 -> write2(0, 3), 1 -> run(0, cmdTag = 0x56)),
+                Vector(true, true, true)) shouldBe Vector(true, true, false, false)
+            // An illegal lane blocks the QWR behind it, so the RUN still sees an empty group.
+            d.cycle(d.offer(0 -> Command(0x0c), 1 -> write2(0, 4), 2 -> run(0)),
+                Vector(true, true, true)) shouldBe Vector(false, false, false, false)
             d.drain()
         }
     }

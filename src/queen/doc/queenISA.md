@@ -17,6 +17,7 @@ VPU 不归 Scheduler 调度或管理。Scheduler 只调度 GEMM 和 DMA，并提
 
 - `FENCE` 只在 GEMM/DMA 命令队列中等待目标设备 idle，`endpoint=SCHED/VPU` 为非法编码。Scheduler 派发路径不做任何条件等待；跨设备先后顺序由消费者队列一侧的 `FENCE`/`WAIT_*` 表达。
 - `WAIT_EVENT/WAIT_TIMELINE` 携带 target endpoint：GEMM/DMA 在其命令队列处等待，VPU 在其后端派发队列处等待，`endpoint=SCHED` 为非法编码。
+- `QWR1/QWR2` 只写 DSA 内部的配置寄存器，`QCTRL RUN` 关闭当前配置组并启动设备；Queen 不保存配置影子，设备用 credit 告知还能接受多少条 `RUN`，`QWR`/`QRD` 不受 credit 门控（见 6.4）。
 - `SIGNAL_EVENT/SIGNAL_TIMELINE` 固定进入 Scheduler，更新集中管理的同步资源；同步资源的存放位置与 wait 指令的执行位置是两个不同概念。
 - event/timeline 资源由软件通过读取 Queen 资源寄存器申请，申请/分配/消费协议不在本 ISA 中定义。资源申请成功后的 signal/wait 由 ISA 触发。
 - 除 ISA signal 外，GEMM/DMA 完成也可以更新同一套 event/timeline。这类更新不占指令编码，目标由软件在提交前写入端点配置并由硬件在完成点应用，具体映射与可见性由 Queen 硬件规格定义；软件用同一条 wait 观察两类来源。
@@ -43,18 +44,18 @@ VPU 不归 Scheduler 调度或管理。Scheduler 只调度 GEMM 和 DMA，并提
 
 ### 2.2 DSA 配置与提交
 
-每个 DSA 端点维护 command-building 配置影子寄存器。配置寄存器之间不存在写入先后依赖，软件可以按任意顺序写入。
+配置寄存器位于 DSA 内部，Queen 不保存配置影子，也不生成配置快照。`QWR1/QWR2` 是按序转发的寄存器写，`QCTRL RUN` 是启动命令。配置寄存器之间不存在写入先后依赖，软件可以按任意顺序写入。
 
 - CPU 顺序发送 Queen ISA 指令；Scalar Core decoder 先按 endpoint 选择 Queen 或 VPU 前端。指令握手时，对应前端锁存指令和 PC、预留完整请求 entry，所需 GPR 操作数按 CPU 接口约定在下一周期返回并锁存到该 entry。除 `QRD` 外，前端入队成功即满足退休条件。
-- 后端按目标端点的指令顺序处理配置写入，不得让 `macroEop` 越过此前的配置指令。
-- 普通 `QWR1/QWR2` 只更新目标端点的配置影子寄存器。
+- 后端按目标端点的指令顺序转发配置写，`RUN` 不得越过同端点此前的 `QWR`。
+- 一个配置组指两次 `RUN` 之间的全部 `QWR`。设备把配置组写入当前打开的配置缓冲，在收到 `RUN` 之前不得执行。
 - 同一寄存器被重复写入时，以最后一笔按序处理的值为准。
-- `macroEop=1` 时，后端先应用当前指令携带的寄存器写入，再原子快照完整配置并触发目标 DSA 工作；该动作可以晚于 CPU 指令退休。
-- DSA 只能看到已提交的配置快照，不得观察配置写到一半的状态。
-- DSA 命令 FIFO 满时，后端保持待提交配置并暂停推进，不得丢弃命令。只有前端也无法继续缓存请求时，才向 CPU 施加 backpressure。
-- 提交成功后，后续配置写入新的 command-building 状态，不得修改已入队命令。
+- `RUN` 关闭当前配置组并启动目标 DSA；该动作可以晚于 CPU 指令退休。
+- 设备必须保证已启动的配置不被后续配置写修改：配置缓冲在被执行上下文取走前不得复用，取走后即归还 credit（见 6.4）。
+- 设备用 credit 告知还能接受多少条 `RUN`。credit 只门控 `RUN`，`QWR`/`QRD` 随时可写可读；credit 为 0 时 `RUN` 停等，不得丢弃命令。只有前端也无法继续缓存请求时，才向 CPU 施加 backpressure。
+- `RUN` 之后新的 `QWR` 开启新的配置组，不得修改已启动的配置。
 
-`macroEop` 只表示“配置完成并提交 DSA 命令”，不用于拼接 `QCTRL` 多指令 payload。V2 的 `QCTRL` 使用 `rs1/rs2` 携带完整动态操作数。
+`QCTRL` 使用 `rs1/rs2` 携带完整动态操作数，不用于拼接多指令 payload。
 
 ### 2.3 CPU GPR 使用原则
 
@@ -74,17 +75,18 @@ VPU 不归 Scheduler 调度或管理。Scheduler 只调度 GEMM 和 DMA，并提
 | Field | Bits | Name | Description |
 | :--- | :--- | :--- | :--- |
 | `inst[31:30]` | 2 | endpoint | GEMM/DMA/VPU/SCHED |
-| `inst[29:25]` | 5 | regBase | 第一个 DSA 寄存器地址，只允许 `0..30` |
+| `inst[29:25]` | 5 | regBase[4:0] | 第一个 DSA 寄存器地址的低 5 位 |
 | `inst[24:20]` | 5 | rs2 | CPU 源寄存器 2 |
 | `inst[19:15]` | 5 | rs1 | CPU 源寄存器 1 |
 | `inst[14:12]` | 3 | funct3 | 固定 `3'b000` |
-| `inst[11]` | 1 | macroEop | 当前双写完成后提交 DSA 命令 |
+| `inst[11]` | 1 | regBase[5] | 地址第 5 位；`regBase = {inst[11], inst[29:25]}`，只允许 `0..62` |
 | `inst[10:7]` | 4 | rsv | V2 固定为 0 |
 | `inst[6:0]` | 7 | opcode | 固定 `7'b0001011` |
 
 约束：
 
-- `regBase=31` 为非法指令，禁止地址回绕。
+- `regBase=63` 为非法指令，保证 `regBase+1` 不越出 6-bit 地址窗口。
+- `QWR` 不携带提交语义，提交由 `QCTRL RUN` 承担。
 - 高频配置寄存器对应该在 DSA 寄存器表中按偶数/奇数或连续地址成对布局。
 - 非相邻寄存器使用两条 `QWR1`，不得为少数非相邻场景恢复 `rs2Addr` 字段。
 - 相邻双写释放了原 `rs2Addr` 占用的编码空间，使 `funct3` 恢复为标准 `[14:12]`。
@@ -92,7 +94,7 @@ VPU 不归 Scheduler 调度或管理。Scheduler 只调度 GEMM 和 DMA，并提
 伪汇编：
 
 ```text
-qwr2 endpoint, regBase, rs1, rs2, macroEop
+qwr2 endpoint, regBase, rs1, rs2
 ```
 
 ---
@@ -105,14 +107,13 @@ qwr2 endpoint, regBase, rs1, rs2, macroEop
 | `inst[29:20]` | 10 | regAddr | DSA 寄存器地址 `0..1023` |
 | `inst[19:15]` | 5 | rs1 | CPU 源寄存器 |
 | `inst[14:12]` | 3 | funct3 | 固定 `3'b001` |
-| `inst[11]` | 1 | macroEop | 当前写入完成后提交 DSA 命令 |
-| `inst[10:7]` | 4 | rsv | V2 固定为 0 |
+| `inst[11:7]` | 5 | rsv | V2 固定为 0 |
 | `inst[6:0]` | 7 | opcode | 固定 `7'b0001011` |
 
 伪汇编：
 
 ```text
-qwr1 endpoint, regAddr, rs1, macroEop
+qwr1 endpoint, regAddr, rs1
 ```
 
 ---
@@ -134,7 +135,7 @@ CPU 必须在 Queen 返回读响应或异常后才能退休该指令。CPU 顺�
 
 即使允许多个 `QRD` 在途，CPU 也只需按顺序保留目的 `rd`，将第 N 个读响应对应到第 N 个读请求。不同端点的读延迟可以不同，但 Queen 不得将后发请求的响应提前返回；实现可以串行处理读请求，或在内部缓存早到响应以维持顺序。写与控制指令不产生读响应，不占用该响应顺序。
 
-读取配置影子寄存器时，读请求不得越过同端点此前的配置写入。读取资源分配寄存器可能包含申请副作用，其协议由 Queen 寄存器表定义；对 `rd=x0` 的读请求也必须执行一次，只有 CPU 写回结果被丢弃。
+读取 DSA 配置寄存器时，读请求不得越过同端点此前的配置写入；配置值由设备按序返回，Queen 不缓存配置影子。读取资源分配寄存器可能包含申请副作用，其协议由 Queen 寄存器表定义；对 `rd=x0` 的读请求也必须执行一次，只有 CPU 写回结果被丢弃。
 
 伪汇编：
 
@@ -150,7 +151,7 @@ qrd rd, endpoint, regAddr
 
 | Field | Bits | Name | Description |
 | :--- | :--- | :--- | :--- |
-| `inst[31:30]` | 2 | endpoint | `FENCE/WAIT_EVENT/WAIT_TIMELINE/TRACE_TAG` 的执行端点；signal/polling/atomic 固定为 SCHED |
+| `inst[31:30]` | 2 | endpoint | `FENCE/WAIT_EVENT/WAIT_TIMELINE/TRACE_TAG/RUN` 的执行端点；signal/polling/atomic 固定为 SCHED |
 | `inst[29:26]` | 4 | cmd | 控制命令类型 |
 | `inst[25]` | 1 | notify / flag | fence/wait/polling 的完成通知使能；SIGNAL_EVENT 的 set/clr；其他命令固定为 0 |
 | `inst[24:20]` | 5 | rs2 | CPU 源寄存器 2，未使用时必须为 `x0` |
@@ -172,6 +173,7 @@ qrd rd, endpoint, regAddr
 | `4'b0110` | `POLL_EQ` | endpoint 固定 SCHED |
 | `4'b0111` | Reserved | V2 必须解码为非法指令 |
 | `4'b1000` | `ATOMIC_RMW` | endpoint 固定 SCHED |
+| `4'b1001` | `RUN` | endpoint=GEMM/DMA，关闭当前配置组并启动设备；SCHED 非法，VPU 由 VPU 前端定义 |
 | 其他 | Reserved | V2 必须解码为非法指令 |
 
 ### 6.3 `inst[25]` 按 cmd 复用
@@ -182,12 +184,41 @@ qrd rd, endpoint, regAddr
 | `WAIT_EVENT` | notify | event 条件满足后不通知 | event 条件满足并完成 wait 时通知 |
 | `WAIT_TIMELINE` | notify | sequence 条件满足后不通知 | sequence 条件满足并完成 wait 时通知 |
 | `POLL_EQ` | notify | 比较成功后不通知 | 比较成功并完成 polling 时通知 |
+| `RUN` | notify | 启动后不通知 | 该 RUN 完成时通知 |
 | `SIGNAL_EVENT` | flag | 清除 event bit | 置位 event bit |
 | `SIGNAL_TIMELINE/TRACE_TAG/ATOMIC_RMW` | rsv | 合法 | 非法指令 |
 
 notify 不改变 endpoint 路由、等待条件、派发顺序或 CPU 退休规则。前端锁存 bit25，后端保留到该条指令完成。仅凭条件电平为真或 CPU 指令已退休，不能产生通知。
 
 通知必须关联一次成功完成事件：条件未满足、指令仍停留在队头、发生 fault 或被 flush/reset 丢弃时不产生成功通知。条件到达时已满足的指令，执行完成后也只通知一次；连续完成的不同指令可以每周期各通知一次。
+
+### 6.4 `RUN`：配置组提交与 DSA 启动
+
+`RUN` 是唯一的 DSA 启动命令。配置数据全部由 `QWR` 写入设备，`RUN` 本身不携带配置。
+
+```text
+endpoint  = GEMM / DMA
+cmd       = 4'b1001
+notify    = inst[25]
+rs1[7:0]  = cmdTag（可选，0 表示不使用；高 24 位忽略）
+rs2       = swTag（可选，原样透传，0 表示不使用）
+aux       = 0
+```
+
+- `RUN` 关闭当前配置组并启动目标设备；设备在收到 `RUN` 之前不得执行该组配置。
+- `RUN` 按序派发，不得越过同端点此前的 `QWR`；同端点的 `FENCE/WAIT_*` 仍按队头阻塞规则处理。
+- `cmdTag` 取 `rs1` 值的低 8 位，高 24 位忽略；`swTag` 取整个 `rs2` 值。两者透传到设备命令标签与 trace/fault 关联字段，不影响执行语义。操作数在次拍才返回，因此它们的取值不构成前端非法指令条件。
+- `notify=1` 时，该 `RUN` 对应的工作成功完成的周期由该端点发出一次 pulse；启动本身不产生通知。
+- `endpoint=SCHED` 为非法编码。VPU 的启动由 VPU 前端自行定义，不进入 Queen。
+- 硬件完成信号目标 `HW_SIGNAL_TARGET` 是设备配置寄存器，由 `QWR` 在 `RUN` 之前写入；设备在 `RUN` 被接受时锁存该目标，完成时随 completion 回传，Queen 不保存副本。
+
+配置组与 credit：
+
+- Queen 为每个 GEMM/DMA 端点维护一个 openGroup 标志：`QWR` 置位，`RUN` 清零。`RUN` 时 openGroup 为 0 即空配置组，在前端报非法指令。
+- credit 只门控 `RUN`：`QWR`/`QRD` 随时可写可读，不受 credit 限制。`RUN` 要求 credit 大于 0，被设备接受即占用一个 credit；Queen 侧不另设计数器，直接看设备给出的电平。
+- credit 由下游 DSA 在执行上下文取走配置时归还，不是完成时归还，因此配置准备可以与上一次执行重叠。
+- credit 为 0 时 `RUN` 在派发级停等。该端点后续指令仍按程序序等待，另一端点不受影响。
+- 设备侧义务：`RUN` 被接受后，后续 `QWR` 不得改变该 `RUN` 已提交的配置；要重叠配置准备与执行，设备需自行保证这一点（通常需要双缓冲）。DSA 侧实现不在本文范围内。
 
 ---
 
@@ -511,7 +542,7 @@ COUNT、PENDING 的读取以及 ACK、ENABLE 的写入必须能够在 Scheduler 
 
 - CPU 顺序发出 Queen ISA 请求，Scalar Core decoder 按 endpoint 路由到 Queen 或 VPU 前端。请求握手时，对应前端锁存指令和 PC，并为完整请求及所需源操作数预留 entry；CPU 在约定的下一周期返回源 GPR 值，接收前端将其锁存到对应 entry，后续执行不再读取 CPU GPR。
 - 除 `QRD` 外，`QWR1/QWR2/QCTRL` 都是异步操作，给到对应前端接收队列并成功入队后即可退休。VPU 目标指令由 Scalar Core decoder 直接送入 VPU 独立前端，不进入 Queen，也不表示由 Scheduler 管理 VPU。
-- 带 `macroEop` 的配置写也在前端入队后退休，不等待后端应用配置、生成快照、触发执行或设备 idle。
+- 配置写与 `RUN` 都在前端入队后退休，不等待设备应用配置、启动执行或设备 idle。
 - fence/wait/polling 指令同样在前端入队后退休，其等待/比较条件在对应后端执行；`notify=1` 不改变退休规则。CPU 可继续发送后续指令，直至前端队列背压。
 - 带 notify 的指令成功完成时，端点发出一次 pulse，Scheduler 在采样周期更新对应 COUNT/pending，不存在通知 valid/ready 握手，也不等待 CPU 中断处理。
 - `QRD` 必须等待顺序返回的数据或异常后才能退休。读响应只对应读请求，接口不要求 transaction ID。
@@ -519,7 +550,7 @@ COUNT、PENDING 的读取以及 ACK、ENABLE 的写入必须能够在 Scheduler 
 ### 16.2 Backpressure
 
 - 前端没有空间保存完整请求及操作数时，必须拉低请求 ready，未接受的指令不得退休。
-- DSA 命令队列满、wait/fence 未满足或配置快照暂不可提交，只阻塞对应后端推进，不撤销此前已接受指令的退休。
+- DSA 命令队列满、wait/fence 未满足或设备配置 credit 不足，只阻塞对应后端推进，不撤销此前已接受指令的退休。
 - 后端拥塞导致前端缓存也满时，才将背压传递到 CPU。
 - `QRD` 请求和响应必须按序；没有读处理/响应缓存容量时暂停接受新的读请求。
 
@@ -531,7 +562,9 @@ COUNT、PENDING 的读取以及 ACK、ENABLE 的写入必须能够在 Scheduler 
 
 - opcode/funct3/cmd 为保留编码；
 - V2 要求为 0 的保留字段非 0；
-- `QWR2.regBase=31`；
+- `QWR2.regBase=63`；
+- `RUN` 的 endpoint 不是 GEMM/DMA；
+- `RUN` 之前没有配置写（空配置组）；
 - `SIGNAL_TIMELINE/SIGNAL_EVENT/POLL_EQ/ATOMIC_RMW` 的 endpoint 不是 SCHED；
 - Queen `FENCE` 的 endpoint 为 VPU 或 SCHED；
 - `WAIT_EVENT/WAIT_TIMELINE` 的 endpoint 为 SCHED；
@@ -564,10 +597,11 @@ faultPc
 
 ```c
 void queen_wr2(unsigned endpoint, unsigned reg_base,
-               uint32_t value0, uint32_t value1, bool eop);
-void queen_wr1(unsigned endpoint, unsigned reg_addr,
-               uint32_t value, bool eop);
+               uint32_t value0, uint32_t value1);
+void queen_wr1(unsigned endpoint, unsigned reg_addr, uint32_t value);
 uint32_t queen_rd(unsigned endpoint, unsigned reg_addr);
+void queen_run(unsigned endpoint, uint32_t cmd_tag, uint32_t sw_tag,
+               bool notify);
 
 void queen_fence(unsigned endpoint, uint32_t gemm_dma_mask, bool notify);
 void queen_wait_event(unsigned endpoint, unsigned group,
@@ -588,6 +622,8 @@ void queen_notify_ack(unsigned source_endpoint, uint32_t processed_count);
 void queen_notify_enable(uint32_t source_mask);
 ```
 
+`queen_run` 发出 `QCTRL RUN`，`cmd_tag` 取低 8 位、`sw_tag` 原样透传，两者为 0 表示不使用；`notify` 编码到 `inst[25]`。
+
 `queen_fence/queen_wait_event/queen_wait_timeline/queen_poll_eq` 各发出一条异步 ISA，`notify` 直接编码到 `inst[25]`；置为 true 时在成功完成后通知 CPU。`queen_signal_event` 的 `set` 参数仍编码到同一位，不产生完成通知。
 
 notify 状态查询及 ACK/ENABLE 封装通过 Scheduler 寄存器读写实现，不新增 ISA。`source_endpoint` 表示查询的来源，寄存器访问的 endpoint 始终为 SCHED。
@@ -600,8 +636,8 @@ notify 状态查询及 ACK/ENABLE 封装通过 Scheduler 寄存器读写实现�
 
 1. 为每条指令提供 encode/decode 十六进制测试向量。
 2. 验证全部保留编码在前端退休前触发非法指令。
-3. 验证 `QWR2` 相邻地址、`regBase=31` 异常及 `macroEop` 当前写入包含在提交快照中。
-4. 随机重排不同 DSA 配置寄存器的写入顺序，最终快照必须一致；`macroEop` 不得越过前序写入。
+3. 验证 `QWR2` 相邻地址与 6-bit `regBase` 拼接（含 `inst[11]=1` 的高位地址）、`regBase=63` 异常。
+4. 随机重排同一配置组内不同 DSA 配置寄存器的写入顺序，设备最终看到的配置必须一致；`RUN` 不得越过前序写入。
 5. 验证 GEMM/DMA 本地 fence 在设备 idle 后才继续目标队列派发，非目标队列不受阻塞。
 6. 验证 `FENCE/WAIT_EVENT/WAIT_TIMELINE` 的 `endpoint=SCHED` 在前端报非法指令，Scheduler 派发路径不出现条件等待。
 7. 验证 Queen 配置/控制指令前端入队即退休；RISC-V `FENCE` 不因已退休异步命令的 DSA/VPU 尚未 idle 而额外等待。
@@ -624,3 +660,8 @@ notify 状态查询及 ACK/ENABLE 封装通过 Scheduler 寄存器读写实现�
 24. 验证 GEMM/DMA wait/fence 阻塞期间仍持续采样通知、读取 COUNT/PENDING 和处理 ACK/ENABLE；端点完成不等待 CPU ACK，Scheduler 通路不被任何等待门控。
 25. 验证 COUNT/ACK/pending/IRQ：读不清状态、屏蔽不丢计数、旧快照 ACK 不覆盖新增通知、同周期 ACK 与 pulse 到达无丢失。
 26. 验证 CPU 执行 `WFI` 前已到达的通知仍保持 pending，单来源累计计数回绕时按模数差计算新增次数。
+27. 验证 `RUN` 关闭配置组并启动设备：`RUN` 之前设备不得执行，`RUN` 之后的 `QWR` 不得修改已启动配置。
+28. 验证空配置组 `RUN`、`RUN endpoint=SCHED`、`RUN aux` 非 0 均在前端报非法指令；`rs1` 高 24 位非 0 不报非法，只取低 8 位作 `cmdTag`。
+29. 验证 credit 只门控 `RUN`：credit 为 0 时 `QWR`/`QRD` 仍可接受与转发，`RUN` 停等；设备取走配置后归还 credit，`RUN` 恢复派发。
+30. 验证 `RUN` 的 `cmd_tag/sw_tag` 原样透传到设备命令与 trace/fault 关联，`notify=1` 时该 RUN 完成只通知一次。
+31. 验证 `QWR1` 的 `inst[11]` 非 0 报非法指令；`QWR2` 的 `inst[11]` 作为地址高位不报非法。
