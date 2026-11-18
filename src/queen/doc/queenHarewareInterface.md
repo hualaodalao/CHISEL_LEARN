@@ -313,11 +313,12 @@ Queen 内部只接收 GEMM、DMA 和 SCHED 的指令，不包含 VPU command que
 
 ```text
 QWR1/QWR2:
-    按序转发为目标设备的寄存器写，不受 credit 门控
+    按 lane 序并行转发为目标设备的寄存器写，不受 credit 门控
+    QWR2 是一条双地址写（reg0Addr/reg1Addr、data0/data1），不拆成两拍
     该端点 openGroup 置位
 
 QCTRL RUN:
-    要求设备 cfgCredit > 0，否则派发级停等
+    独占一个 beat；设备在该 beat 上以 cmd.ready 告知能否接受，否则停等
     关闭当前配置组并启动设备
     该端点 openGroup 清零
     cmdTag/swTag 随启动命令透传
@@ -385,26 +386,54 @@ GEMM 和 DMA 不需要理解 Queen 的 32-bit ISA 编码，只接收自身原生
 
 ### 5.2 命令接口
 
-Queen 侧的派发 adapter（`QueenDsaAdapter`，每端点一个）把端点出口的整包串行化为统一的 native 命令：
+Queen 侧的派发 adapter（`QueenDsaAdapter`，每端点一个）把端点出口的整包**并行**展开为统一的 native 命令，一条指令对应一条 native 命令，`QWR2` 不再拆成两拍：
 
 ```scala
-class QueenNativeCmd(cfg: QueenConfig) extends Bundle {
-  val isStart = Bool()          // 1 = RUN 启动命令，0 = 寄存器写
-  val regAddr = UInt(10.W)      // 启动命令时为 0
-  val data    = UInt(cfg.xlen.W)
-  val pc      = UInt(cfg.pcWidth.W)
-  val cmdTag  = UInt(8.W)       // RUN 的 rs1 低 8 位
-  val swTag   = UInt(cfg.xlen.W) // RUN 的 rs2
+object QueenNativeOp extends ChiselEnum {
+  val WRITE1, WRITE2, READ, RUN = Value
 }
 
-val out = Decoupled(new QueenNativeCmd(cfg))
+class QueenNativeCmd(cfg: QueenConfig) extends Bundle {
+  val op       = QueenNativeOp()
+  val reg0Addr = UInt(10.W)      // QWR1: inst[29:20]；QWR2: {inst[11],inst[29:25]}；RUN: 0
+  val reg1Addr = UInt(10.W)      // WRITE2 时 = reg0Addr+1，由 Queen 保证；其它 op 为 0
+  val data0    = UInt(cfg.xlen.W) // rs1；RUN 为 0
+  val data1    = UInt(cfg.xlen.W) // rs2，仅 WRITE2 有效；其它 op 为 0
+  val pc       = UInt(cfg.pcWidth.W)
+  val cmdTag   = UInt(8.W)       // RUN 的 rs1 低 8 位；其它 op 为 0
+  val swTag    = UInt(cfg.xlen.W) // RUN 的 rs2；其它 op 为 0
+}
+
+val out = Decoupled(Vec(cfg.nativeWidth, Valid(new QueenNativeCmd(cfg))))
 ```
 
-串行化规则：`QWR2` 展开为 `regBase` 与 `regBase+1` 两条写（先 `rs1` 后 `rs2`），`QWR1` 一条写，`RUN` 一条启动命令；无效 lane 每周期跳过一个；整包全部发射完成后才接受下一包。`FENCE/WAIT/TRACE` 由端点控制器在本级之前消费，`QRD` 走读响应通路。
+并行度 `nativeWidth` 由 `QueenConfig.nativeLanes` 决定，`0` 表示与上游 `instructionLanes` 对齐（默认 4），取值范围 `1..instructionLanes`。每个出口 lane 带独立 `Valid`，保留包内原始 lane 位置。
+
+**beat 切分规则**（一个 beat = 一次 `out.fire`）：
+
+1. 一个 beat 是包内 lane 的**连续切片**，按 lane 序，长度不超过 `nativeWidth`。
+2. **只有 `QWR1/QWR2` 可以合并进同一个 beat**。切片内第一条有效 lane 是写时，beat 向后延伸穿过写与无效 lane，**停在第一条 `QCTRL`/`QRD` 之前**（不含它）。
+3. **任何 `QCTRL`（含 `RUN`）或 `QRD` 独占一个 beat**：切片内第一条有效 lane 是它们时，beat 只含这一条命令。
+4. 全无效的切片不占 `fire`，直接跳过。
+5. 整包全部 beat 发完后才接受下一包；入口 ready 取当拍游标，故末个 beat fire 的次拍才拉高。
+
+因此同端点一包内的多条 `RUN`（如 `[QWR,RUN,QWR,RUN]`，前端 openGroup 按 lane 序折叠后合法）会被切成多个 beat，设备不必仲裁同拍多启动。`RUN` 永远独占 beat ⟹ 该次启动的全部配置写都在更早的 beat 落进 shadow，设备在 `RUN` 当拍直接 dump shadow 即可，**不需要处理“同 beat 写进快照”**。
+
+**流控只有一个 ready**。`out.valid` 不依赖任何设备信号，设备按 beat 内容给出 `out.ready`：
+
+```text
+纯写 beat        : ready 恒 1（硬义务，不得被忙闲或未完成回执反压）
+RUN beat         : ready = 设备能否接受新 RUN（credit 与命令队列共同决定）
+QRD beat         : ready = 读响应通路可收（即 resp.ready）
+```
+
+Queen 侧不再有 `ready_start`/`ready_rd` 端口：前者的信息并入设备 `ready`，后者本来就是 Queen 自己读响应表的余量，由 Queen 在 QRD 准入侧管理，与设备端口无关。设备的 `ready` 可以依赖 beat 内容，但 Queen 的 `valid` 不依赖 `ready`，无组合环。
+
+`READ` 已在 op 枚举中定义（设备须实现），但 QRD 顺序表落地前 adapter 不支持该编码，遇到即停等并触发仿真断言。`FENCE/WAIT/TRACE` 由端点控制器在本级之前消费。
 
 设备相关映射（`QueenNativeCmd` → `WorkerBeeCmd` 或 DMA 配置前端）属各端点 adapter 的剩余工作。
 
-当 `valid=1 && ready=0` 时，payload 必须保持不变。只有 `fire` 表示 DSA 已接受命令。
+当 `valid=1 && ready=0` 时，整个 beat 的 payload 与各 lane `Valid` 必须保持不变。只有 `fire` 表示 DSA 已接受该 beat。
 
 Queen 不得因为 DSA ready 暂时拉低而丢弃 RUN，也不得重复发送已经 fire 的命令。
 
@@ -470,21 +499,16 @@ val flushDone = Flipped(Valid(Bool()))
 
 不支持安全 abort 的 DSA 必须将 `abortRunning` 视为非法，并等待当前工作自然结束后再完成 flush。
 
-### 5.6 配置 credit 与配置组
+### 5.6 配置流控与配置组
 
-配置寄存器归设备所有，设备用 credit 告知 Queen 还能接受多少条 `RUN`。credit 只门控 `RUN`，`QWR`/`QRD` 随时可写可读：
+配置寄存器归设备所有。`RUN` 独占 beat（5.2），设备在该 beat 上用 `out.ready` 告知能否接受新启动；纯写 beat 恒可收，`QRD` 只被读响应通路反压（见 16.6）。Queen 侧**没有独立的 `ready_start` 端口**，`out.valid` 也不依赖设备信号。
 
-```scala
-val cfgCredit = Input(UInt(cfg.cfgCreditWidth.W))
-```
-
-- `cfgCredit` 为电平，表示设备还能接受的 `RUN` 数；位宽必须覆盖设备声明的缓冲数。
-- `RUN` 要求 `cfgCredit` 大于 0，被设备接受即占用一个 credit；Queen 侧不另设计数器，直接看设备电平。`QWR`/`QRD` 不检查 credit。
-- 设备在执行上下文取走配置时归还 credit，不是完成时归还，因此配置准备可以与上一次执行重叠。
-- 同一端点的命令是单条按序流，credit 只会被 Queen 自己发出的 `RUN` 占用，因此电平检查无竞争。
-- credit 为 0 时 `RUN` 在派发级停等，该端点后续指令按程序序等待；另一端点不受影响。
+- `RUN` beat 的 ready 由设备的 credit 与命令队列共同决定：credit 大于 0 且队列可收时为 1。Queen 只看这一位，不读 credit 计数、不另设计数器。
+- credit 计数是设备内部量，不外露为寄存器；归还点由设备自定（见 16.7）。
+- `RUN` 被设备接受即占用一个 credit；ready 为 0 时该 beat 在派发级停等，该端点后续指令按程序序等待，另一端点不受影响。
+- 同一端点的 beat 是按序流且每个 `RUN` beat 只含一条 `RUN`，credit 只会被 Queen 自己发出的 `RUN` 占用，因此电平检查无竞争。
 - openGroup 为 0 时的 `RUN` 是非法指令，在前端报 trap。
-- 第一版不把 credit 纳入前端 ring 准入判定：派发级停等即可，共享 ring 的 per-consumer 游标已容得下单侧停顿。该门控已在 `QueenDsaAdapter` 实现。
+- 第一版不把设备 ready 纳入前端 ring 准入判定：派发级停等即可，共享 ring 的 per-consumer 游标已容得下单侧停顿。
 
 设备侧义务（实现不在本文范围内）：`RUN` 被接受后，后续 `QWR` 不得改变该 `RUN` 已提交的配置；要重叠配置准备与执行，设备需自行保证这一点（通常需要双缓冲）；flush/reset 后 credit 必须与 Queen 重新对齐。
 
@@ -507,7 +531,7 @@ GEMM adapter 的建议行为：
 3. 同一配置组的寄存器写与启动不得与其它配置组交错。
 4. `QRD endpoint=GEMM` 转换为 `REG_READ`，响应送入 Queen QRD ordered response queue；Queen 不缓存配置值。
 5. WorkerBee response、status.err 和执行错误转换为 Queen fault。
-6. 设备通过 `cfgCredit` 告知可接受的 `RUN` 数，Queen 按 5.6 只对 `RUN` 准入。
+6. 设备在 `RUN` beat 上以 `cmd.ready` 告知能否接受，Queen 按 5.6 只对该 beat 停等。
 
 GEMM adapter 对 Queen 提供的强 idle 不能只等于 `!status.busy`，还必须包含：
 
@@ -532,7 +556,7 @@ occupancy : UInt
 busy      : Bool
 ```
 
-ForagerBee 当前只有描述符接口，没有寄存器接口。按本契约，DMA 侧需要新增配置前端：接收寄存器写、在 `RUN` 时组装并提交一个完整 `FbCmd`。该前端属设备侧实现，不在本文范围内。
+ForagerBee 当前只有描述符接口，没有寄存器接口。按本契约，DMA 侧需要新增配置前端：接收寄存器写、在 `RUN` 时组装并提交一个完整 `FbCmd`。该前端属设备侧实现，不在本文范围内；其寄存器分区、公共契约区地址与按 op 分类的 ready 语义必须遵循第 16 章。
 
 DMA adapter 的建议行为：
 
@@ -540,7 +564,7 @@ DMA adapter 的建议行为：
 2. `RUN` 转发为提交命令，由设备组装并提交一个完整 `FbCmd`。
 3. adapter 维护 tag 到 Queen sequence/pc 的映射，将 `FbDone.tag` 归档。
 4. `FbDone.err` 转换为 Queen asynchronous fault。
-5. 设备通过 `cfgCredit` 告知可接受的 `RUN` 数，Queen 按 5.6 只对 `RUN` 准入。
+5. 设备在 `RUN` beat 上以 `cmd.ready` 告知能否接受，Queen 按 5.6 只对该 beat 停等。
 
 DMA 强 idle 至少满足：
 
@@ -644,9 +668,9 @@ class QueenHwSignal extends Bundle {
 
 约束：
 
-- 目标由设备在 `RUN` 被接受时锁存进该次工作的配置缓冲，并随该次工作的 completion 回传；Queen 不保存配置副本，也不在完成时重新读取设备寄存器，避免与后续配置写竞争。
-- 设备侧义务：`RUN` 被接受时锁存 `HW_SIGNAL_TARGET/HW_SIGNAL_VALID`，完成时原样回传；DSA 不需要理解 event/timeline 语义，只负责锁存与回传。
-- 锁存与 credit 归还是两个事件：锁存发生在 `RUN` 被接受时，credit 在执行上下文取走该份配置后归还。
+- 目标由设备在 `RUN` 被接受时从公共契约区 `0x080/0x081` 锁存进该次工作，并随该次工作的 completion 回传；Queen 不保存配置副本，也不在完成时重新读取设备寄存器，避免与后续配置写竞争。
+- 设备侧义务：`RUN` 被接受时锁存 `HW_SIGNAL_TARGET/HW_SIGNAL_MASK`（位排布见 16.2），完成时原样回传；DSA 不需要理解 event/timeline 语义，只负责锁存与回传。
+- 锁存发生在 `RUN` 被接受时；credit 归还点由设备自定，两者不必是同一事件。
 - 硬件信号只在对应命令的 native completion 被 adapter 接收后应用；同端点必须按命令完成序发布，早到的乱序 completion 缓存到前序 target 已应用。
 - 硬件源只能置位 event 和自增 timeline；清除与赋值仅由软件指令完成。
 - 更新路径独立于 GEMM/DMA 命令队列的阻塞状态，任何端点等待期间仍要能应用。
@@ -766,10 +790,10 @@ fault 汇总必须满足：
 ```scala
 case class QueenConfig(
   instructionLanes: Int,
+  nativeLanes: Int = 0,
   frontendDepth: Int,
   qrdDepth: Int,
   cmdRingDepth: Int = 64,
-  cfgCreditWidth: Int = 4,
   xlen: Int = 32,
   pcWidth: Int = 32,
   addressWidth: Int = 32,
@@ -784,8 +808,8 @@ case class QueenConfig(
 elaboration 阶段至少检查：
 
 - `instructionLanes >= 1`；
+- `nativeLanes >= 0` 且派生的 `nativeWidth`（0 表示等于 `instructionLanes`）落在 `1..instructionLanes`；
 - 所有 depth >= 1，`cmdRingDepth >= 2`；
-- `cfgCreditWidth >= 1` 且足以表示设备声明的配置缓冲数；
 - `xlen == 32`；
 - `timelineCount == 8` 或与 ISA aux 编码范围一致；
 - `eventGroupCount <= 32`；
@@ -819,6 +843,254 @@ elaboration 阶段至少检查：
 21. 验证 fault 后失败命令不产生成功 notify，flushDone 前不残留旧 context 事件。
 22. 验证普通 CPU pipeline flush 不撤销已经 fire 的 Queen 指令。
 23. 验证硬件完成信号按命令序发布、只置位 event 或自增 timeline、在 GEMM/DMA 等待阻塞期间仍能应用，且 flush 后不更新新 context 的资源。
-24. 验证 credit 只门控 RUN：credit 为 0 时 QWR/QRD 仍可接受与转发，RUN 停等；设备取走配置即归还 credit。
+24. 验证单 ready 分类正确：纯写 beat 恒可收（含读响应被反压时），RUN beat 按 credit 停等而非报错，READ beat 只被 resp.ready 反压。
 25. 验证空配置组 RUN 在前端报 trap，不进入派发队列、不启动设备。
 26. 验证 RUN 的 cmdTag/swTag 透传到设备命令与 trace/fault 关联。
+27. 验证 `QWR2` 在原生接口上是一条双地址写，`reg1Addr=reg0Addr+1`，两个寄存器同时生效。
+28. 验证 beat 切分：一个 beat 至多一条 `RUN` 且为末条有效 lane；`[QWR,RUN,QWR,RUN]` 切成两个 beat；全无效切片不占 fire。
+29. 验证 `nativeWidth` 小于 `instructionLanes` 时按连续切片分片，lane 位置与程序序不变。
+30. 验证 `RUN` beat 的 ready 为 0 时只停该 beat，纯写 beat 照常 fire；被停 beat 的 payload 与各 lane Valid 保持不变。
+31. 验证写不占 resp 通道：写错误走 per-lane wrErr pulse，读响应反压不影响配置写。
+
+---
+
+
+## 16. DSA 设备寄存器空间与握手契约
+
+本章由 Queen 侧规定，GEMM/DMA 设备参考实施。设备内部私有寄存器排布不在本章范围内，但公共契约区的地址、字段与握手语义必须一致，否则软件无法跨设备复用配置代码。
+
+### 16.1 地址空间分区
+
+`QWR1/QRD` 地址 10 bit（0..1023），`QWR2.regBase` 6 bit（0..62）。
+
+| 区间 | 归属 | 约束 |
+|---|---|---|
+| `0x000..0x03F` | 设备私有 RW 配置 | 64 槽窗口，恰好等于 `QWR2` 的 6-bit regBase 范围；实际数量可配（第 17 章） |
+| `0x040..0x05F` | 设备私有 RO 状态 | 32 槽窗口，由 DSA 输入；实际数量可配 |
+| `0x060..0x07F` | 设备私有中断 | `0x60/0x64/0x68/0x6C` 四槽，其余保留 |
+| `0x080..0x0FF` | Queen 公共契约区 | 按功能分块，地址与字段固定；设备私有寄存器不得占用 |
+| `0x100..0x3FF` | 保留 | 写回 err，读回 0 |
+
+私有区的内部排布 Queen 不强制，但第 17 章的通用 `QueenDsaRegIf` 按上表实现，直接例化即得到一致布局。窗口内未实现的地址按保留处理（写回 err、读回 0）。
+
+公共区按 32 槽对齐分 4 块，块号 = `addr[6:5]`、块内偏移 = `addr[4:0]`，便于地址解码与后续扩展：
+
+| 块 | 区间 | 用途 | 当前已用 |
+|---|---|---|---|
+| 0 | `0x080..0x09F` | 信号契约（配置） | 2 槽 |
+| 1 | `0x0A0..0x0BF` | trace 契约（配置） | 1 槽 |
+| 2 | `0x0C0..0x0DF` | 保留 | 0 槽 |
+| 3 | `0x0E0..0x0FF` | 保留 | 0 槽 |
+
+扩展规则：新功能只在所属块内追加地址，**不得改动已定义地址与字段**；块内未列出地址为保留（写回 err，读回 0）。跨块功能必须新开块并更新本章。公共区超出 `QWR2` 窗口，用 `QWR1` 访问；信号目标通常跨多条 `RUN` 不变，两条 `QWR1` 的开销可忽略。
+
+**寄存器与端口的分工原则**：公共契约区只放**软件写、设备消费**的配置，以及无命令归属、无端口可承载的兜底状态。凡是 Queen 需要的状态与事件——能否接受 `RUN`、强 idle、完成的 `sequence/error/code/hwSignal`、命令级错误归因——一律走 16.5 的握手端口，**不得**在公共区另立状态寄存器。理由：Queen 是架构状态的归属地，端口是无损、按序、可背压的，而寄存器读回是 last-value 采样，多条同拍完成会丢中间事件；重复实现还会给软件一条绕过 Queen 归档的错误路径。块 2 因此整块保留。
+
+强制范围：块 0 的 `HW_SIGNAL_TARGET/HW_SIGNAL_MASK` 必须实现（否则硬件完成信号源不可用）。块 1 为**标准化地址的可选项**——设备可以不实现，但一旦实现必须用规定地址与字段；未实现时读回 0、写回 err。块 2/块 3 整块保留。握手端口（16.5）全部必须实现。
+
+### 16.2 块 0：信号契约（QN-F029）
+
+两个寄存器合起来就是 9.1 的 `QueenHwSignal`，字段一一对应，设备只做搬运不做解释。
+
+| 地址 | 名称 | 访问 | 复位值 | 必须 |
+|---|---|---|---|---|
+| `0x080` | `HW_SIGNAL_TARGET` | RW | 0 | 是 |
+| `0x081` | `HW_SIGNAL_MASK` | RW | 0 | 是 |
+
+`0x080 HW_SIGNAL_TARGET` 位排布：
+
+| 位 | 字段 | 对应 `QueenHwSignal` | 含义 |
+|---|---|---|---|
+| 0 | `enable` | `enable` | 1=该次 `RUN` 完成时更新同步资源；0=不更新（即原 `HW_SIGNAL_VALID`，不单独占地址） |
+| 1 | `kind` | `isTimeline` | 0=event；1=timeline |
+| 6:2 | `group` | `group`（5 bit） | event 组号 0..31；`kind=1` 时忽略 |
+| 9:7 | `timeline` | `timeline`（3 bit） | timeline ID 0..7；`kind=0` 时忽略 |
+| 31:10 | 保留 | — | 必须写 0；写非 0 回 err，读回 0 |
+
+`0x081 HW_SIGNAL_MASK` 位排布：`[31:0]` 全部为 event mask，bit i 对应 `events[group]` 的 bit i；`kind=1`（timeline）时整个寄存器被忽略。
+
+编码示例：
+
+```text
+置位 event 组 3 的 bit3      : 0x080 = (3<<2)|0|1 = 0x0000000D, 0x081 = 0x00000008
+同时置位组 3 的 bit0/3/31    : 0x080 = 0x0000000D,             0x081 = 0x80000009
+自增 timeline 5             : 0x080 = (5<<7)|2|1 = 0x00000283, 0x081 = 任意（忽略）
+不发信号                    : 0x080 = 0x00000000（复位值）
+```
+
+用法与时序：
+
+1. 软件用 `QWR1` 写 `0x080/0x081`，必须落在同一配置组内、`RUN` 之前，可与设备私有配置任意交错。地址超出 `QWR2` 的 0..62 窗口，只能用 `QWR1`。
+2. 这两个寄存器是**单一持久副本，不参与设备双 bank 切换**。因此即使设备私有配置是“每组必须全量重写”的非继承双 bank，信号目标仍可跨多条 `RUN` 只写一次。
+3. 设备在 `RUN` 被接受**当拍**（该 beat `fire` 且其末条 lane 为 `RUN`）把两个寄存器采样进该次工作的上下文，与私有配置快照同一时刻。此后软件改写只影响后续 `RUN`。
+4. `QRD 0x080/0x081` 读回的是**当前可写副本**，不是任何在途工作的锁存值。在途工作用的目标只能从它的 completion 看到；Queen 不在完成时回读设备寄存器。
+5. 该次工作完成时，设备把锁存值原样放进 `QueenDsaCompletion.hwSignal`（5.4），由 Scheduler 应用：`kind=event` 用 `group`+`mask` 置位，`kind=timeline` 自增对应 timeline。硬件源只能置位与自增，清除/赋值只由软件指令做。
+6. `enable=0` 时 completion 仍正常回传，`hwSignal.enable=0`，不更新任何资源。`enable=1 && kind=event && mask=0` 是合法的空操作，不是错误。
+7. `error=1` 的 completion 不得携带有效目标（5.4）。
+8. 设备不做 `group`/`timeline` 的范围检查（它不知道 Queen 的 `eventGroupCount`）。越界目标由 Queen 在应用时丢弃并上报 fault。
+9. 一条 `RUN` 只能指向**一个** group 或一个 timeline；同组内可用 mask 一次置多位。跨多 group 置位需要多条 `RUN` 或软件 `SIGNAL_EVENT`。
+10. flush/reset 后两个寄存器取复位值 0，已锁存但未应用的信号一律作废。
+
+### 16.3 块 1：trace 契约（QN-F020）
+
+| 地址 | 名称 | 访问 | 复位值 | 必须 | 字段与用法 |
+|---|---|---|---|---|---|
+| `0x0A0` | `TRACE_CTRL` | RW | 0 | 否 | bit0 enable；bit1 record_pc；bit[31:2] 保留必须为 0 |
+
+用法：
+
+- `TRACE_TAG` 指令在设备**实际派发点**记录 `rs1`，不是在 Queen 入队时记录。
+- `TRACE_CTRL.enable=0` 时指令照常完成，但不记录。`record_pc=1` 时记录携带该条指令的 pc。
+- `TRACE_CTRL` 与块 0 一样是单一持久副本，不参与 bank 切换，也不随 `RUN` 锁存——它控制的是派发点行为，不是某次工作的上下文。
+- trace 记录值（32 位软件标记）与 `RUN` 的 8 位 `cmdTag`（命令归档标签）是**两个不同概念**。
+- 记录流走旁带通路（尚未实现），由 Queen 侧归档。本块**不设** `TRACE_LAST_VALUE/LAST_PC/COUNT/DROP_COUNT` 之类观测寄存器：按 16.1 的分工原则，记录与丢弃计数属于 Queen 要的事件流，必须走端口，last-value 寄存器会丢中间事件。
+
+### 16.4 块 2/块 3：整块保留
+
+两块都不分配寄存器。错误按归属分三条既有通路，不再另立 `ERR_*`：
+
+| 错误种类 | 通路 |
+|---|---|
+| 能归属到某条命令的执行错误 | completion 的 `error/code`；pc 与 `cmdTag` 由 Queen 自己的命令归档提供 |
+| 寄存器写错误（非法地址等） | `wrErr` per-lane pulse，Queen 锁存为 fault |
+| 无命令归属的设备本地错误（SRAM ECC、与命令无关的总线错误等） | 设备私有中断 `INT_RAW` 逐位置位 + 私有 `statusRegs` 放错误码 |
+
+第三条是删除 `ERR_STATUS/ERR_CODE/ERR_CLEAR` 的理由：中断 `RAW` 本身就是 sticky + W1C 的逐位事件通知，`statusRegs` 已能承载错误码，两者合起来覆盖 `ERR_*` 的全部信息。给错误码一个“标准地址”也没有实际收益——码的编码本来就是设备私有的，通用软件无法跨设备解读。
+
+因此**不设** `ERR_STATUS/ERR_CODE/ERR_CLEAR/ERR_PC/ERR_TAG`，也不设 `DONE_TAG/DONE_ERR/DONE_COUNT/DONE_SW_TAG`。`swTag` 是软件自带的标记，软件按自己的提交记录对应，不需要设备回读。Queen 的 fault 汇总仍以 completion 为准。
+
+### 16.5 必须外露的握手端口
+
+| 端口 | 方向（设备视角） | 含义 |
+|---|---|---|
+| `cmd` | Input `Decoupled(Vec(nativeWidth, Valid(QueenNativeCmd)))` | 并行配置 beat；其 `ready` 是唯一的流控出口（16.6） |
+| `completion` | Output `Decoupled` | 完成流，含 `sequence/error/code/hwSignal`，必须可背压保持 |
+| `idle` | Output | 强 idle，供 fence 与状态输出 |
+| `resp` | Output `Decoupled` | **只承载 QRD 读数据与 err**；写不占此通道 |
+| `wrErr` | Output `Vec(nativeWidth, Bool())` | 写错误 per-lane pulse，无 ready，Queen 无条件采样并锁存为 fault |
+
+这些端口是 Queen 获取设备状态的**唯一**通路：
+
+- `idle` 必须是**强 idle**：命令队列空、无执行、无未完成内存请求/响应、无未接收 completion（见 5.3）。`busy=0` 或输入 FIFO 空都不足以作为 idle。
+- credit 可收性只由 `RUN` beat 的 `cmd.ready` 表达，Queen 与软件都不需要 credit 计数——发不进去就停等，因此不设 `CFG_CREDIT`。
+- 设备内部 occupancy 是设备自己的量，Queen 的准入只看自己的 ring 与 `cmd.ready`，因此不设 `DEV_STATUS`。
+
+### 16.6 单一 ready 与写/读通道分离
+
+5.2 的切分规则保证一个 beat 要么是纯写、要么是单条 `QCTRL`/`QRD`，因此**一个 `cmd.ready` 就足以表达全部流控**，不再需要 `ready_start`/`ready_rd` 两条独立电平：
+
+```text
+纯写 beat   : cmd.ready 恒 1
+RUN beat    : cmd.ready = 设备能否接受新 RUN（credit > 0 且命令队列可收）
+QRD beat    : cmd.ready = resp.ready（读响应通路可收）
+```
+
+- Queen 的 `out.valid` **不依赖** `cmd.ready`，设备的 `ready` 可以依赖 beat 内容，无组合环。
+- `QRD` 的准入还受 Queen 自己的读响应顺序表余量限制，那是 Queen 内部判定，不是设备端口。
+- 设备若有除 credit/队满之外的额外接收限制，必须并入对应 beat 的 `ready`，不得接受后再回 err。
+
+硬约束：
+
+- **纯写 beat 的 `ready` 恒 1**，不得被设备忙闲、也不得被未取走的回执反压。这是单 ready 方案成立的前提。
+- `RUN` 在 credit 不足或队满时必须让 `ready=0` **反压**，不得接受后回 err：`RUN` 在 Queen 前端入队即退休，err 会导致命令永久丢失。
+- `READ` 只被 `resp.ready` 反压；设备不得用“忙”拒绝 `READ`。
+- **写不占 `resp` 通道**：`resp` 只承载 QRD 的 data/err，与被接受的读命令同拍有效。写错误走 `wrErr` per-lane pulse（无 ready），Queen 无条件采样并锁存为 fault 状态。这样读响应反压不会连带停住配置写。
+
+### 16.7 credit 语义
+
+- credit 只定义为“设备还能接受多少条 `RUN`”，**归还点由设备自定**：可以在执行上下文取走配置时归还，也可以在完成时归还。Queen 只看 `RUN` beat 的 `cmd.ready`，不假设归还点。
+- 归还点影响吞吐口径：取走即还允许配置准备与执行充分重叠；按完成归还则把在途 `RUN` 数绑到执行资源数。设备必须在自己的规格中写明归还点与初值。
+- 无论哪种归还点，credit 不足都必须反压，不得丢弃 `RUN`。
+
+### 16.8 设备侧其它义务
+
+- `RUN` 被接受后，后续 `QWR` 不得改变该次已提交配置。
+- 若设备要求每条命令全量配置（如双 bank 不继承旧值），必须在自己的规格中写明；Queen ISA 默认允许增量配置。该要求只适用于设备私有区，公共契约区寄存器不参与 bank 切换（16.2）。
+- flush/reset 后 credit 与 Queen 重新对齐，公共区寄存器取复位值。
+
+并行 beat 带来的设备侧义务（5.2 的切分规则是 Queen 侧保证）：
+
+- **`RUN` 独占 beat**，因此该次启动的全部配置写都在更早的 beat 落进 shadow。设备在 `RUN` 当拍直接 `live := shadow` 即正确，**不需要处理“同 beat 写进快照”**，也不必对同拍多启动做仲裁。
+- **`WRITE2` 是一条命令写两个地址**：`reg1Addr = reg0Addr + 1` 由 Queen 给出，设备直接使用，不要自行推导；两个地址的写必须同时生效，不得只生效一半。地址合法性按整个地址对判定，任一非法则整条命令回 err 且两个寄存器都不改。
+- **同 beat 内同一寄存器被多个 lane 写时以 lane 序最后一条为准**；但中断 `RAW` 的 W1C 与 `FORCE` 的 W1S 必须**跨 lane 合并**（清除位按位或、置位位按位或），不是 last-wins。
+
+### 16.9 软件配置流程示例
+
+```text
+QWR1 endpoint=DMA, 0x080, 0x0000000D   // enable=1, kind=event, group=3；跨 RUN 不变时只写一次
+QWR1 endpoint=DMA, 0x081, 0x00000008   // 置位 events[3] 的 bit3
+QWR1/QWR2 endpoint=DMA, 0x00..0x22, ... // 设备私有配置（全量或增量按设备规格）
+QCTRL RUN endpoint=DMA, cmdTag=0x11, swTag=0x2000  // 关闭配置组并启动，设备当拍锁存 0x080/0x081
+...                                    // 完成后回传 completion{sequence, error=0, hwSignal}
+QWR1 endpoint=DMA, 0x00..0x22, ...      // 下一组配置，可与上一次执行重叠；信号目标无需重写
+QCTRL RUN endpoint=DMA, cmdTag=0x12
+```
+
+---
+
+## 17. 通用 DSA 寄存器接口 `QueenDsaRegIf`
+
+`src/queen/scala/common/QueenDsaRegIf.scala` 是本章契约的**设备侧参考实现**，DSA 可直接例化，不必各自手写一套语义不一致的寄存器前端。它消费 5.2 的并行 native beat，不做 ISA 解码。
+
+### 17.1 参数
+
+```scala
+case class QueenDsaRegIfConfig(
+  numCfgRegs: Int = 64,      // 1..64，RW 配置寄存器数量
+  numStatusRegs: Int = 32,   // 0..32，RO 状态输入数量
+  intrWidth: Int = 32,       // 1..32，中断源位数
+  qcfg: QueenConfig = QueenConfig()
+)
+```
+
+地址窗口固定（16.1），只有**数量**可配：小设备不必为用不到的槽位付出 shadow+live 两组触发器。cmd lane 数取 `qcfg.nativeWidth`，与 Queen 出口宽度天然对齐。寄存器数据宽度固定 32，`qcfg.xlen` 必须为 32。
+
+### 17.2 地址映射
+
+| 地址 | 名称 | 访问 | 复位值 | 说明 |
+|---|---|---|---|---|
+| `0x00..numCfgRegs-1` | 配置 | RW | 0 | shadow 可写可读；live 在 `RUN` 当拍整组 dump |
+| `0x40..0x40+numStatusRegs-1` | 状态 | RO | — | 直接来自 `statusRegs` 输入 |
+| `0x60` | `INT_RAW` | RO + W1C | 0 | 硬件事件置位，写 1 清对应位 |
+| `0x64` | `INT_FORCE` | RO + W1S | 0 | 写 1 置 raw，供软件调试；读回 raw |
+| `0x68` | `INT_MASK` | RW | 全 1 | 1=屏蔽，默认全屏蔽 |
+| `0x6C` | `INT_STATUS` | RO | 0 | `raw & ~mask` |
+| `0x80/0x81` | `HW_SIGNAL_TARGET/MASK` | RW | 0 | 16.2；`RUN` 当拍锁存到 `hwSignal` |
+| `0xA0` | `TRACE_CTRL` | RW | 0 | 16.3；记录流本身不在本模块 |
+
+中断四寄存器的顺序与字段语义取自 `utils/bus/regif/Interrupts.scala` 的 `IntrRFMS4`，基址按 `0x60` 对齐。该库的 `BusIf` 是单写口模型，无法直接例化到 4 lane 并行写，故本模块**沿用其更新方程**而非复用其实例：
+
+```text
+raw := (raw & ~clrMask) | setMask | intrSrc      // 置位优先
+clrMask = 各 lane 对 INT_RAW 的 W1C 数据按位或
+setMask = 各 lane 对 INT_FORCE 的 W1S 数据按位或
+```
+
+### 17.3 端口
+
+| 端口 | 方向 | 类型 | 含义 |
+|---|---|---|---|
+| `cmd` | 输入 | `Decoupled(Vec(lanes, Valid(QueenNativeCmd)))` | 并行 beat；单 ready，分类见 16.6 |
+| `resp` | 输出 | `Decoupled({data, err})` | 只承载 QRD 读结果，与被接受的读命令同拍 |
+| `wrErr` | 输出 | `Vec(lanes, Bool())` | 写错误 per-lane pulse，无 ready |
+| `cfgRegs` | 输出 | `Vec(numCfgRegs, UInt(32.W))` | **live** 组，即已提交配置 |
+| `statusRegs` | 输入 | `Vec(numStatusRegs, UInt(32.W))` | RO 状态源 |
+| `intrSrc` | 输入 | `UInt(intrWidth.W)` | 硬件事件，逐拍置位 raw |
+| `irq` | 输出 | `Bool` | `(raw & ~mask)` 非零 |
+| `start` | 输出 | `Bool` | `RUN` 被接受当拍的一拍 pulse |
+| `startReady` | 输入 | `Bool` | DSA 告知能否接受新 `RUN`；决定 `RUN` beat 的 ready |
+| `startPc/startTag/startSwTag` | 输出 | `UInt` | 随 `start` pulse 有效的命令标签 |
+| `hwSignal` | 输出 | `QueenHwSignal` | `RUN` 当拍锁存的信号目标，供 DSA 附到 completion |
+
+### 17.4 语义要点
+
+- **写恒可收**：纯写 beat 的 ready 恒 1，与 `resp.ready`、设备忙闲无关。写错误只体现在 `wrErr`，不影响接受。
+- **`QRD` 读 shadow**：软件读到的是"我写了什么"，不是正在执行的配置；正在执行的配置只能从 `cfgRegs`（live）观察。
+- **`RUN` 当拍**：`live := shadow`、`start` 拉高一拍、锁存 `0x80/0x81`。因为 `RUN` 独占 beat，shadow 已含该组全部写。
+- **credit 不在本模块**：`startReady` 由 DSA 自己产生（在途标志、队列余量等），本模块不做计数器，也不假设归还点。
+- **中断逐拍更新**，不依赖命令是否被接受。无命令归属的本地错误由 DSA 接进 `intrSrc` 并把错误码放进 `statusRegs`，本模块不另设 `ERR_*` 寄存器（16.4）。
+- **beat 形状断言**：`RUN`/`READ` 所在 beat 若含多于一条有效 lane，仿真断言失败——把 5.2 的 Queen 侧保证变成设备侧可检查的约束。
+
+### 17.5 边界
+
+本模块不含 completion 归档、tag→sequence 映射、强 idle 判定、trace 记录流与设备执行逻辑，这些仍属各 DSA 与 Queen adapter 的剩余工作（14.1）。两个现有 RegIf（`WorkerBeeRegIf`/`FbRegIf`）尚未迁移到本模块。

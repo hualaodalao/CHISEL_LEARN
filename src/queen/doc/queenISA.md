@@ -52,7 +52,7 @@ VPU 不归 Scheduler 调度或管理。Scheduler 只调度 GEMM 和 DMA，并提
 - 同一寄存器被重复写入时，以最后一笔按序处理的值为准。
 - `RUN` 关闭当前配置组并启动目标 DSA；该动作可以晚于 CPU 指令退休。
 - 设备必须保证已启动的配置不被后续配置写修改：配置缓冲在被执行上下文取走前不得复用，取走后即归还 credit（见 6.4）。
-- 设备用 credit 告知还能接受多少条 `RUN`。credit 只门控 `RUN`，`QWR`/`QRD` 随时可写可读；credit 为 0 时 `RUN` 停等，不得丢弃命令。只有前端也无法继续缓存请求时，才向 CPU 施加 backpressure。
+- `RUN` 独占一个派发 beat，设备在该 beat 上用命令通道的 ready 告知能否接受新启动；纯写 beat 恒可写，`QRD` 只被 Queen 自己的读响应缓存反压，与设备忙闲无关。ready 为 0 时 `RUN` 停等，不得丢弃命令。只有前端也无法继续缓存请求时，才向 CPU 施加 backpressure。
 - `RUN` 之后新的 `QWR` 开启新的配置组，不得修改已启动的配置。
 
 `QCTRL` 使用 `rs1/rs2` 携带完整动态操作数，不用于拼接多指令 payload。
@@ -87,6 +87,7 @@ VPU 不归 Scheduler 调度或管理。Scheduler 只调度 GEMM 和 DMA，并提
 
 - `regBase=63` 为非法指令，保证 `regBase+1` 不越出 6-bit 地址窗口。
 - `QWR` 不携带提交语义，提交由 `QCTRL RUN` 承担。
+- 在 Queen→DSA 原生接口上 `QWR2` 是**一条双地址写命令**（`WRITE2`，携带 `reg0Addr/reg1Addr` 与 `data0/data1`），不拆成两条单写；两个寄存器必须同时生效。见 Queen 硬件接口约束 5.2。
 - 高频配置寄存器对应该在 DSA 寄存器表中按偶数/奇数或连续地址成对布局。
 - 非相邻寄存器使用两条 `QWR1`，不得为少数非相邻场景恢复 `rs2Addr` 字段。
 - 相邻双写释放了原 `rs2Addr` 占用的编码空间，使 `funct3` 恢复为标准 `[14:12]`。
@@ -210,14 +211,15 @@ aux       = 0
 - `cmdTag` 取 `rs1` 值的低 8 位，高 24 位忽略；`swTag` 取整个 `rs2` 值。两者透传到设备命令标签与 trace/fault 关联字段，不影响执行语义。操作数在次拍才返回，因此它们的取值不构成前端非法指令条件。
 - `notify=1` 时，该 `RUN` 对应的工作成功完成的周期由该端点发出一次 pulse；启动本身不产生通知。
 - `endpoint=SCHED` 为非法编码。VPU 的启动由 VPU 前端自行定义，不进入 Queen。
-- 硬件完成信号目标 `HW_SIGNAL_TARGET` 是设备配置寄存器，由 `QWR` 在 `RUN` 之前写入；设备在 `RUN` 被接受时锁存该目标，完成时随 completion 回传，Queen 不保存副本。
+- 硬件完成信号目标 `HW_SIGNAL_TARGET/HW_SIGNAL_MASK` 是设备公共契约区寄存器（固定地址 `0x080/0x081`，见 Queen 硬件接口约束第 16 章），由 `QWR` 在 `RUN` 之前写入；设备在 `RUN` 被接受时锁存，完成时随 completion 回传，Queen 不保存副本。
 
 配置组与 credit：
 
 - Queen 为每个 GEMM/DMA 端点维护一个 openGroup 标志：`QWR` 置位，`RUN` 清零。`RUN` 时 openGroup 为 0 即空配置组，在前端报非法指令。
-- credit 只门控 `RUN`：`QWR`/`QRD` 随时可写可读，不受 credit 限制。`RUN` 要求 credit 大于 0，被设备接受即占用一个 credit；Queen 侧不另设计数器，直接看设备给出的电平。
-- credit 由下游 DSA 在执行上下文取走配置时归还，不是完成时归还，因此配置准备可以与上一次执行重叠。
-- credit 为 0 时 `RUN` 在派发级停等。该端点后续指令仍按程序序等待，另一端点不受影响。
+- 流控只门控 `RUN`：`QWR` 恒可写，`QRD` 只看 Queen 读响应通路。`RUN` beat 要求设备 ready 为 1，被接受即占用一个设备内部 credit；Queen 侧不读 credit 计数、不另设计数器，也没有独立的 `ready_start` 端口。
+- credit 只表示“设备还能接受多少条 `RUN`”，归还点由设备自定（取走配置即还或完成时还），Queen 只看电平。设备须在自己的规格中写明归还点与初值；无论哪种，credit 不足都必须反压而不是报错丢弃。
+- ready 为 0 时该 `RUN` beat 停等。因为 `RUN` 独占 beat，同组的配置写已在更早的 beat 发出，不会被它拖住。该端点后续指令仍按程序序等待，另一端点不受影响。
+- 派发是并行的：只有 `QWR1/QWR2` 可以合并进一个 beat（至多 `nativeWidth` 条），任何 `QCTRL`/`QRD` 独占一个 beat。因此同端点一包内的多条 `RUN` 会分多个 beat 下发，设备同拍只会看到一条 `RUN`，且它不与任何配置写同拍。
 - 设备侧义务：`RUN` 被接受后，后续 `QWR` 不得改变该 `RUN` 已提交的配置；要重叠配置准备与执行，设备需自行保证这一点（通常需要双缓冲）。DSA 侧实现不在本文范围内。
 
 ---
@@ -662,6 +664,6 @@ notify 状态查询及 ACK/ENABLE 封装通过 Scheduler 寄存器读写实现�
 26. 验证 CPU 执行 `WFI` 前已到达的通知仍保持 pending，单来源累计计数回绕时按模数差计算新增次数。
 27. 验证 `RUN` 关闭配置组并启动设备：`RUN` 之前设备不得执行，`RUN` 之后的 `QWR` 不得修改已启动配置。
 28. 验证空配置组 `RUN`、`RUN endpoint=SCHED`、`RUN aux` 非 0 均在前端报非法指令；`rs1` 高 24 位非 0 不报非法，只取低 8 位作 `cmdTag`。
-29. 验证 credit 只门控 `RUN`：credit 为 0 时 `QWR`/`QRD` 仍可接受与转发，`RUN` 停等；设备取走配置后归还 credit，`RUN` 恢复派发。
+29. 验证流控只门控 `RUN`：`RUN` beat 的 ready 为 0 时纯写 beat 仍可接受与转发、`RUN` 停等而非报错；`QRD` 只被 Queen 读响应缓存反压；设备按其声明的归还点返还 credit 后 `RUN` 恢复派发。
 30. 验证 `RUN` 的 `cmd_tag/sw_tag` 原样透传到设备命令与 trace/fault 关联，`notify=1` 时该 RUN 完成只通知一次。
 31. 验证 `QWR1` 的 `inst[11]` 非 0 报非法指令；`QWR2` 的 `inst[11]` 作为地址高位不报非法。
