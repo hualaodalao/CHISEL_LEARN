@@ -16,6 +16,7 @@ lazy val root = (project in file("."))
     Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "llc" / "scala" / "main",
     Test / unmanagedSourceDirectories += baseDirectory.value / "src" / "llc" / "scala" / "test",
     Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "queen" / "scala" / "main",
+    Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "queen" / "scala" / "common",
     Test / unmanagedSourceDirectories += baseDirectory.value / "src" / "queen" / "scala" / "test",
     Compile / unmanagedSources / excludeFilter := "MaskedLiteral.scala",
     libraryDependencies ++= Seq(
