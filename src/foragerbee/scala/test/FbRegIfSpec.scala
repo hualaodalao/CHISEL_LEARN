@@ -24,9 +24,17 @@ class FbRegIfSpec extends AnyFlatSpec with Matchers {
       for (p <- 0 until cfg.numPorts) models(p).step(dut.io.bus(p))
       dut.clock.step()
     }
+    private def pokeLane(l: Int, op: FbRegOp.Type, a0: Int, d0: BigInt,
+        a1: Int, d1: BigInt, tag: Int): Unit = {
+      val p = dut.io.cmd(l).payload
+      p.op.poke(op); p.reg0Addr.poke(a0.U); p.reg1Addr.poke(a1.U)
+      p.data0.poke(d0); p.data1.poke(d1); p.tag.poke(tag.U); p.pc.poke(0.U)
+    }
+    private def clearCmd(): Unit =
+      for (l <- 0 until 4) dut.io.cmd(l).valid.poke(false.B)
     def reset(): Unit = {
-      dut.io.cmd.valid.poke(false.B)
-      dut.io.cmd.payload.poke(0.U.asTypeOf(new FbRegCmd))
+      clearCmd()
+      for (l <- 0 until 4) dut.io.cmd(l).payload.poke(0.U.asTypeOf(new FbRegCmd))
       dut.io.resp.ready.poke(true.B)
       for (b <- dut.io.bus) {
         b.rd.ready.poke(false.B)
@@ -38,24 +46,42 @@ class FbRegIfSpec extends AnyFlatSpec with Matchers {
       }
       dut.reset.poke(true.B); dut.clock.step(2); dut.reset.poke(false.B)
     }
-    def idle(n: Int = 1): Unit = {
-      dut.io.cmd.valid.poke(false.B)
-      for (_ <- 0 until n) stepBus()
-    }
+    def idle(n: Int = 1): Unit = { clearCmd(); for (_ <- 0 until n) stepBus() }
+    // 单命令走 lane0，两拍握手：接受拍 + 回执排空拍
     def xfer(op: FbRegOp.Type, a0: Int, d0: BigInt = 0, a1: Int = 0,
         d1: BigInt = 0, tag: Int = 0): (BigInt, Boolean) = {
-      val p = dut.io.cmd.payload
-      p.op.poke(op); p.reg0Addr.poke(a0.U); p.reg1Addr.poke(a1.U)
-      p.data0.poke(d0); p.data1.poke(d1); p.tag.poke(tag.U); p.pc.poke(0.U)
-      dut.io.cmd.valid.poke(true.B); dut.io.resp.ready.poke(true.B)
-      for (m <- 0 until cfg.numPorts) models(m).step(dut.io.bus(m))
-      val fire = dut.io.cmd.ready.peek().litToBoolean
+      clearCmd()
+      pokeLane(0, op, a0, d0, a1, d1, tag)
+      dut.io.cmd(0).valid.poke(true.B)
+      assert(dut.io.cmd(0).ready.peek().litToBoolean, "空闲 batch 应接受命令")
+      stepBus()
+      clearCmd()
+      assert(dut.io.resp.valid.peek().litToBoolean, "应有回执")
       val data = dut.io.resp.payload.data.peek().litValue
       val err = dut.io.resp.payload.err.peek().litToBoolean
-      assert(fire, "resp.ready=1 时命令应被接受")
-      dut.clock.step()
-      dut.io.cmd.valid.poke(false.B)
+      stepBus()
       (data, err)
+    }
+    // 一个 batch 同时驱动多 lane，按 lane 序排空回执，返回 (data, err, laneId)
+    def batch(cmds: Seq[(FbRegOp.Type, Int, BigInt, Int, BigInt, Int)]): Seq[(BigInt, Boolean, Int)] = {
+      clearCmd()
+      for (l <- cmds.indices) {
+        val (op, a0, d0, a1, d1, tag) = cmds(l)
+        pokeLane(l, op, a0, d0, a1, d1, tag)
+        dut.io.cmd(l).valid.poke(true.B)
+      }
+      stepBus()
+      clearCmd()
+      val out = mutable.ArrayBuffer.empty[(BigInt, Boolean, Int)]
+      for (_ <- cmds.indices) {
+        assert(dut.io.resp.valid.peek().litToBoolean, "应有回执")
+        val data = dut.io.resp.payload.data.peek().litValue
+        val err = dut.io.resp.payload.err.peek().litToBoolean
+        val lane = dut.io.resp.payload.laneId.peek().litValue.toInt
+        out += ((data, err, lane))
+        stepBus()
+      }
+      out.toSeq
     }
     def write(a: Int, d: BigInt): Unit = {
       val (_, e) = xfer(FbRegOp.WRITE1, a, d); assert(!e, s"write 0x${a.toHexString} 不应 err")
@@ -360,5 +386,60 @@ class FbRegIfSpec extends AnyFlatSpec with Matchers {
       sim.credit shouldBe 2
     }
     for ((addr, byte) <- expected) result(addr) shouldBe byte
+  }
+
+  it should "commit 4-lane parallel writes and return reads in lane order" in {
+    withSim() { sim =>
+      val addrs = Seq(FbRegAddr.SRC_ADDR_LO, FbRegAddr.DST_ADDR_LO,
+        FbRegAddr.SG_LIST_LO, FbRegAddr.SCALE_LO)
+      val vals = Seq(BigInt(0x11111111L), BigInt(0x22222222L), BigInt(0x33333333L), BigInt(0x44444444L))
+      val w = sim.batch(addrs.zip(vals).map { case (a, v) => (FbRegOp.WRITE1, a, v, 0, BigInt(0), 0) })
+      w.map(_._2) shouldBe Seq(false, false, false, false)
+      w.map(_._3) shouldBe Seq(0, 1, 2, 3)
+      for ((a, v) <- addrs.zip(vals)) sim.read(a) shouldBe v
+      // 4 路读按 lane 序返回
+      val r = sim.batch(addrs.map(a => (FbRegOp.READ, a, BigInt(0), 0, BigInt(0), 0)))
+      r.map(_._3) shouldBe Seq(0, 1, 2, 3)
+      r.map(_._1) shouldBe vals
+      r.map(_._2) shouldBe Seq(false, false, false, false)
+      // 两条读占据 lane0/lane1，读不同地址，回执仍按 lane 升序排空
+      val r2 = sim.batch(Seq(
+        (FbRegOp.READ, addrs(1), BigInt(0), 0, BigInt(0), 0),
+        (FbRegOp.READ, addrs(3), BigInt(0), 0, BigInt(0), 0)))
+      r2.map(_._3) shouldBe Seq(0, 1)
+      r2.map(_._1) shouldBe Seq(vals(1), vals(3))
+    }
+  }
+
+  it should "err on cross-lane same-address writes without committing" in {
+    withSim() { sim =>
+      val res = sim.batch(Seq(
+        (FbRegOp.WRITE1, FbRegAddr.ADDR_HI, BigInt(0xaaaaL), 0, BigInt(0), 0),
+        (FbRegOp.WRITE1, FbRegAddr.ADDR_HI, BigInt(0xbbbbL), 0, BigInt(0), 0),
+        (FbRegOp.WRITE1, FbRegAddr.SRC_ADDR_LO, BigInt(0x1234L), 0, BigInt(0), 0)))
+      res.map(_._3) shouldBe Seq(0, 1, 2)
+      res.map(_._2) shouldBe Seq(true, true, false) // 同址两 lane 冲突 err
+      sim.read(FbRegAddr.ADDR_HI) shouldBe 0       // 冲突不写
+      sim.read(FbRegAddr.SRC_ADDR_LO) shouldBe 0x1234L
+    }
+  }
+
+  it should "grant only the lowest START lane in a batch" in {
+    val mem = mutable.HashMap.empty[BigInt, Byte]
+    val s = BigInt("8100080000", 16); val d = BigInt("a100080000", 16)
+    put(mem, s, (1 to 16))
+    val result = withSim(prefill = mem) { sim =>
+      sim.copy1D(s, d, 16)
+      val res = sim.batch(Seq(
+        (FbRegOp.START, 0, BigInt(0), 0, BigInt(0), 1),
+        (FbRegOp.START, 0, BigInt(0), 0, BigInt(0), 2)))
+      res.map(_._3) shouldBe Seq(0, 1)
+      res.map(_._2) shouldBe Seq(false, true) // 仅最低 lane 入队，其余 err
+      sim.credit shouldBe 1                   // N=2，仅一条占用
+      sim.waitDone(1)
+      sim.doneCnt shouldBe 1
+      sim.read(FbRegAddr.DONE) shouldBe 1     // tag 来自获授权 lane0
+    }
+    for (i <- 0 until 16) result(d + i) shouldBe (i + 1).toByte
   }
 }

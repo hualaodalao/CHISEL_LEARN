@@ -17,8 +17,9 @@ class FbRegCmd extends Bundle {
 }
 
 class FbRegResp extends Bundle {
-  val data = UInt(32.W)
-  val err  = Bool()
+  val data   = UInt(32.W)
+  val err    = Bool()
+  val laneId = UInt(2.W)
 }
 
 /** 寄存器槽位（7 bit 地址）：配置 0x00..0x22，0x23..0x3F 保留，状态 0x40+ 只读。 */
@@ -66,9 +67,11 @@ object FbRegAddr {
   val CREDIT   = 0x43
 }
 
-/** 双 bank 寄存器接口：写落 shadow，START 组装 shadow 为 FbCmd 快照入队并切换 bank。
-  * credit 初值 numPorts，START 接受 -1、引擎 done.fire +1；credit==0 或命令队列满时 START 回 err。
-  * credit 按完成而非派发返还：hazard 阻塞派发期间 credit 仍占用。
+/** 4 路寄存器配置接口（仿 WorkerBeeRegIf）：cmd 4 lane、resp 1 lane。
+  * 一个 batch 内 4 路可并行写；回执按 lane 优先级（PriorityEncoder）依次排空，读自然按 lane 序返回。
+  * 双 bank：写落 shadow，START 组装 shadow 为 FbCmd 快照入队并切换 bank。
+  * credit 初值 numPorts，START 接受 -1、引擎 done.fire +1；credit==0 或队列满时 START 回 err。
+  * 同 batch 多条 START 仅授权最低 lane 一条入队，其余回 err；跨 lane 同址写冲突回 err 且不写。
   */
 class FbRegIf(cfg: ForagerBeeConfig) extends Module {
   require(cfg.addressWidth <= 40,
@@ -78,9 +81,10 @@ class FbRegIf(cfg: ForagerBeeConfig) extends Module {
   private val addrW = cfg.addressWidth
   private val creditW = log2Up(cfg.numPorts + 1)
   private val occW = log2Up(cfg.queueDepth + 1)
+  private val numLanes = 4
 
   val io = IO(new Bundle {
-    val cmd       = slave(Stream(new FbRegCmd))
+    val cmd       = Vec(numLanes, slave(Stream(new FbRegCmd)))
     val resp      = master(Stream(new FbRegResp))
     val fbCmd     = master(Stream(new FbCmd(cfg)))
     val done      = slave(Stream(new FbDone(cfg)))
@@ -96,50 +100,78 @@ class FbRegIf(cfg: ForagerBeeConfig) extends Module {
   private val lastErr = RegInit(false.B)
   private val doneCnt = RegInit(0.U(32.W))
 
-  private val op = io.cmd.payload.op
-  private val a0 = io.cmd.payload.reg0Addr
-  private val a1 = io.cmd.payload.reg1Addr
-  private val isW1    = op === FbRegOp.WRITE1
-  private val isW2    = op === FbRegOp.WRITE2
-  private val isRd    = op === FbRegOp.READ
-  private val isStart = op === FbRegOp.START
-
   private def isCfg(a: UInt): Bool = a < FbRegAddr.NumCfg.U
   private def isStatus(a: UInt): Bool =
     a === FbRegAddr.STATUS.U || a === FbRegAddr.DONE.U ||
     a === FbRegAddr.DONE_CNT.U || a === FbRegAddr.CREDIT.U
-
-  private val w0Bad = !isCfg(a0)
-  private val w1Bad = !isCfg(a1)
-  private val writeErr = (isW1 && w0Bad) || (isW2 && (w0Bad || w1Bad || a0 === a1))
-  private val readErr  = isRd && !isCfg(a0) && !isStatus(a0)
-  private val startErr = isStart && (credit === 0.U || !io.fbCmd.ready)
-  private val err = writeErr || readErr || startErr
-
-  private val bank = banks(shadow)
   private def statusRead(a: UInt): UInt = MuxLookup(a, 0.U(32.W))(Seq(
     FbRegAddr.STATUS.U   -> Cat(0.U(14.W), io.occupancy.pad(16), io.idle, io.busy),
     FbRegAddr.DONE.U     -> Cat(0.U(23.W), lastErr, lastTag),
     FbRegAddr.DONE_CNT.U -> doneCnt,
     FbRegAddr.CREDIT.U   -> credit.pad(32)
   ))
-  private val readData = Mux(isCfg(a0), bank(a0), statusRead(a0))
+  private val bank = banks(shadow)
 
-  // 组合回执：命令被接受当拍给出结果，resp.ready 即 cmd.ready。
-  io.resp.valid := io.cmd.valid
-  io.resp.payload.data := Mux(isRd, readData, 0.U)
-  io.resp.payload.err := err
-  io.cmd.ready := io.resp.ready
+  // --- 回执缓冲：batch 接收，按 lane 优先级排空（读按 lane 序返回）---
+  private val respPending = RegInit(VecInit(Seq.fill(numLanes)(false.B)))
+  private val readPending = RegInit(VecInit(Seq.fill(numLanes)(false.B)))
+  private val respData = RegInit(VecInit(Seq.fill(numLanes)(0.U(32.W))))
+  private val respErr = RegInit(VecInit(Seq.fill(numLanes)(false.B)))
+  private val respLane = PriorityEncoder(respPending.asUInt)
+  private val acceptBatch = !readPending.asUInt.orR && !respPending.asUInt.orR
 
-  private val accept = io.cmd.fire
-  when(accept && isW1 && !writeErr) { bank(a0) := io.cmd.payload.data0 }
-  when(accept && isW2 && !writeErr) {
-    bank(a0) := io.cmd.payload.data0
-    bank(a1) := io.cmd.payload.data1
+  io.cmd.foreach(_.ready := acceptBatch)
+  io.resp.valid := respPending.asUInt.orR
+  io.resp.payload.data := respData(respLane)
+  io.resp.payload.err := respErr(respLane)
+  io.resp.payload.laneId := respLane
+  when(io.resp.fire) {
+    respPending(respLane) := false.B
+    readPending(respLane) := false.B
+  }
+
+  // --- 逐 lane 解码 ---
+  private val op = io.cmd.map(_.payload.op)
+  private val a0 = io.cmd.map(_.payload.reg0Addr)
+  private val a1 = io.cmd.map(_.payload.reg1Addr)
+  private val isW1 = op.map(_ === FbRegOp.WRITE1)
+  private val isW2 = op.map(_ === FbRegOp.WRITE2)
+  private val isRd = op.map(_ === FbRegOp.READ)
+  private val isStart = op.map(_ === FbRegOp.START)
+  private val fire = io.cmd.map(_.fire)
+
+  private val writeBad = (0 until numLanes).map { l =>
+    (isW1(l) && !isCfg(a0(l))) ||
+    (isW2(l) && (!isCfg(a0(l)) || !isCfg(a1(l)) || a0(l) === a1(l)))
+  }
+  private val readBad = (0 until numLanes).map(l => isRd(l) && !isCfg(a0(l)) && !isStatus(a0(l)))
+  private val wrAttempt = (0 until numLanes).map(l => fire(l) && (isW1(l) || isW2(l)) && !writeBad(l))
+
+  // 跨 lane 同址写冲突检测（仅与写尝试有关，不含 conflict 自身，避免组合环）
+  private val writeTargets = (0 until numLanes).map { l =>
+    Seq((wrAttempt(l) && isCfg(a0(l)), a0(l)),
+        (wrAttempt(l) && isW2(l) && isCfg(a1(l)), a1(l)))
+  }
+  private val conflict = (0 until numLanes).map { l =>
+    val mine = writeTargets(l)
+    val others = (0 until numLanes).filter(_ != l).flatMap(k => writeTargets(k))
+    mine.map { case (v, a) =>
+      v && others.map { case (ov, oa) => ov && oa === a }.reduce(_ || _)
+    }.reduce(_ || _)
+  }
+  private val acceptedWrites = (0 until numLanes).map(l => wrAttempt(l) && !conflict(l))
+
+  // --- START：同 batch 仅授权最低 lane 一条入队 ---
+  private val startValid = VecInit((0 until numLanes).map(l => fire(l) && isStart(l)))
+  private val startGrant = PriorityEncoderOH(startValid.asUInt)
+  private val startLane = PriorityEncoder(startValid.asUInt)
+  private val startPush = startValid.asUInt.orR && credit =/= 0.U && io.fbCmd.ready
+  private val startErr = (0 until numLanes).map { l =>
+    startValid(l) && !(startGrant(l) && credit =/= 0.U && io.fbCmd.ready)
   }
 
   private def addrOf(lo: UInt, hiByte: UInt): UInt = Cat(hiByte, lo)(addrW - 1, 0)
-  private def assemble(b: Vec[UInt]): FbCmd = {
+  private def assemble(b: Vec[UInt], tag: UInt): FbCmd = {
     val c = Wire(new FbCmd(cfg))
     val ctrl = b(FbRegAddr.CTRL)
     val aux  = b(FbRegAddr.AUX)
@@ -147,7 +179,7 @@ class FbRegIf(cfg: ForagerBeeConfig) extends Module {
     val hi12 = b(FbRegAddr.STRIDE_HI_12)
     val hi34 = b(FbRegAddr.STRIDE_HI_34)
     c.op             := ctrl(2, 0).asTypeOf(FbOp())
-    c.tag            := io.cmd.payload.tag
+    c.tag            := tag
     c.dimCount       := ctrl(5, 3)
     c.srcFmt         := ctrl(9, 6).asTypeOf(FbDataFmt())
     c.dstFmt         := ctrl(13, 10).asTypeOf(FbDataFmt())
@@ -201,10 +233,24 @@ class FbRegIf(cfg: ForagerBeeConfig) extends Module {
     c
   }
 
-  private val startFire = accept && isStart && !startErr
-  io.fbCmd.valid := startFire
-  io.fbCmd.payload := assemble(bank)
-  when(startFire) { shadow := !shadow }
+  io.fbCmd.valid := startPush
+  io.fbCmd.payload := assemble(bank, io.cmd(startLane).payload.tag)
+  when(startPush) { shadow := !shadow }
+
+  // --- batch 接收：并行写、锁存逐 lane 回执 ---
+  for (l <- 0 until numLanes) {
+    when(fire(l)) {
+      respPending(l) := true.B
+      readPending(l) := isRd(l)
+      respData(l) := Mux(isRd(l), Mux(isCfg(a0(l)), bank(a0(l)), statusRead(a0(l))), 0.U)
+      respErr(l) := ((isW1(l) || isW2(l)) && (writeBad(l) || conflict(l))) ||
+        readBad(l) || startErr(l)
+    }
+    when(acceptedWrites(l)) {
+      bank(a0(l)) := io.cmd(l).payload.data0
+      when(isW2(l)) { bank(a1(l)) := io.cmd(l).payload.data1 }
+    }
+  }
 
   io.done.ready := true.B
   when(io.done.fire) {
@@ -212,5 +258,5 @@ class FbRegIf(cfg: ForagerBeeConfig) extends Module {
     lastErr := io.done.payload.err
     doneCnt := doneCnt + 1.U
   }
-  credit := credit - startFire.asUInt + io.done.fire.asUInt
+  credit := credit - startPush.asUInt + io.done.fire.asUInt
 }

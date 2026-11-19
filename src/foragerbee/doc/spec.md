@@ -1,6 +1,6 @@
 # ForagerBee DMA 硬件规格
 
-文档版本：`v3.1.0`
+文档版本：`v4.0.0`
 
 修订日期：`2026-11-17`
 
@@ -16,6 +16,7 @@
 
 | 版本号 | 日期 | 修改内容 | 相关 Feature ID |
 |---|---|---|---|
+| v4.0.0 | 2026-11-17 | **寄存器接口 ABI 变更**：cmd 由单 lane 改为 4 lane、resp 1 lane 带 laneId；batch 接收、4 路并行写、回执按 lane 优先级排空（读按 lane 序返回）；跨 lane 同址写冲突 err、同 batch 多 START 仅授权最低 lane；credit/双 bank 语义不变 | FB-F031 |
 | v3.1.0 | 2026-11-17 | 兼容新增：可选寄存器配置顶层 ForagerBeeReg/FbRegIf（WRITE1/WRITE2/READ/START、双 bank、credit=N 按 done 返还、配置 0x00–0x3F/状态 0x40+）；原 ForagerBee cmd/done Stream 契约与引擎零改动 | FB-F031 |
 | v3.0.0 | 2026-10-26 | **默认配置接口变更**：addressWidth 32→40，导出入口继承默认；命令地址/stride、总线地址和 SG 描述符默认字段宽度随之变化；显式 32 bit 配置仍可使用，操作/格式编码不变 | FB-F001/008/014/028 |
 | v2.1.1 | 2026-10-26 | 性能清单勘误为通路带宽、发射率与并行度；原 P002/P003/P005 归回已有功能，旧 ID 不复用；区分接口峰值与局部稳态上限，不改变 RTL 契约 | FB-P001–FB-P011 |
@@ -144,7 +145,7 @@ TRANSPOSE：ByteReader -> 原 tile buffer -> 专用带 strobe 写通路
 | FB-F028 | 物理 beat 对齐/逻辑非对齐及尾部 | 已实现 | 字节 reader/writer、精确转换字节计数、物理 burst 拆分与读队列整 burst credit 预留；源覆盖 beat 必须可访问 | 5.1.12、7.3.3、9.3 |
 | FB-F029 | IM2COL 水平边界与 dilation | 已实现 | `dW=1` 整窗有效则 burst，否则逐 kw fallback；无效元素不读源 | 5.1.6 |
 | FB-F030 | 可编程 `padValue` | 已实现 | 低目的元素位重复，转换后填充，不对 padValue 做数值转换 | 5.1.3、5.1.6 |
-| FB-F031 | 寄存器配置接口（ForagerBeeReg） | 已实现 | 可选包装层；WRITE1/WRITE2/READ/START、双 bank、credit=N 按 done 返还；原 cmd/done Stream 顶层保留 | 8.3 |
+| FB-F031 | 寄存器配置接口（ForagerBeeReg） | 已实现 | 可选包装层；4 lane cmd/1 lane resp（laneId）、WRITE1/WRITE2/READ/START、双 bank、credit=N 按 done 返还；原 cmd/done Stream 顶层保留 | 8.3 |
 
 功能表仅索引；详细合法域、限制和验证状态见对应章节及第 14 章。
 
@@ -192,7 +193,7 @@ TRANSPOSE：ByteReader -> 原 tile buffer -> 专用带 strobe 写通路
 | `FbScatterGatherCtrl`（能力及位宽条件） | 复用读口逐条 fetch，一个 beat 一个描述符，无预取 |
 | `FbWrPortArbiter`（可选） | 写数据选择与响应 owner 路由，无数据 FIFO |
 | done 仲裁 | transaction-lock round-robin，反压保持选中的回执 |
-| `FbRegIf`（可选包装） | 寄存器堆双 bank、WRITE1/WRITE2/READ/START 解码、credit 计数、FbCmd 组装；消费 done 更新状态 |
+| `FbRegIf`（可选包装） | 4 lane 寄存器堆双 bank、WRITE1/WRITE2/READ/START 解码、按 lane 序排空回执、credit 计数、FbCmd 组装；消费 done 更新状态 |
 | `ForagerBeeReg`（可选顶层） | FbRegIf + ForagerBee 内部连线，外露寄存器命令/回执与总线；引擎零改动 |
 
 ### 4.2 数据通路与控制通路
@@ -644,7 +645,9 @@ SG 硬件额外要求 dataWidth>=addressWidth+16，否则该通道 SG 命令报�
 
 #### 8.3.1 命令/回执接口
 
-`FbRegCmd`：op(2 bit)、reg0Addr/reg1Addr(**7 bit**)、data0/data1(32)、pc(32)、tag(8)；单 lane Stream。`FbRegResp`：data(32)、err(1)。回执组合给出：命令被接受当拍返回结果，`resp.ready` 即 `cmd.ready`，无反压时逐拍一条。
+`FbRegCmd`：op(2 bit)、reg0Addr/reg1Addr(**7 bit**)、data0/data1(32)、pc(32)、tag(8)；**cmd 为 4 lane Stream**（`Vec(4)`，对齐 Queen 4 指令 lane）。`FbRegResp`：data(32)、err(1)、**laneId(2)**，**resp 为 1 lane**。
+
+接收/排空仿 WorkerBeeRegIf：无 pending 回执时 `acceptBatch=1`，4 lane 同拍接受一个 batch（4 路可并行写）；每 lane 回执锁存进缓冲，由 `PriorityEncoder(respPending)` 按 lane 优先级逐拍排空，`resp.laneId` 标识来源 lane。**读因此严格按 lane 升序依次返回**。batch 未排空前 `cmd.ready=0`（各 lane 一致）。
 
 | op | 编码 | 语义 |
 |---|---|---|
@@ -706,10 +709,12 @@ SG 硬件额外要求 dataWidth>=addressWidth+16，否则该通道 SG 命令报�
 - credit 初值 = numPorts（N）。START 被接受则 credit−1；每个引擎 done.fire 恢复 1（上限 N）。credit==0 时 START 回 err（N=1 即 START 后再 START 必错）。
 - credit 按**完成**而非派发返还：快照入队后即使 Dispatcher 因地址 hazard 迟迟不派发，credit 仍占用，直到该命令 done。命令队列满（fbCmd.ready=0）时 START 亦回 err，即使 credit>0。
 - 引擎在派发时锁存命令，故 active bank 在途期间写 shadow 安全。done 由 FbRegIf 消费（ready 恒 1），更新 lastTag/lastErr/DONE_CNT 并返还 credit；包装顶层不再外露 done Stream。
+- **4 路并行写**：一个 batch 内各 lane 的 WRITE1/WRITE2 同拍提交。**跨 lane 同址写冲突**（含某 lane WRITE2 的 reg0/reg1 与他 lane 目标同址）使相关 lane 回 err 且不写；单 lane WRITE2 自身 reg0==reg1 亦 err。
+- **同 batch 多条 START 仅授权最低 lane 一条入队**（PriorityEncoderOH），其余 START lane 回 err；fbCmd 单口每拍至多入队一条。获授权 lane 的 tag 进入组装命令。
 
 #### 8.3.5 验证状态
 
-FbRegIfSpec 8/8 通过：35 槽写读回环、WRITE2 同址/只读/保留/未映射 err、40 bit 高地址 COPY、双 bank 切换与忙时排队、N=1 credit 耗尽与恢复、hazard 阻塞下 credit 不提前返还、队满 START err、TRANSPOSE/PERMUTE/IM2COL/T2L/MX/SG/pad 组装与金锚等价。基础 ForagerBee 既有回归不受影响（包装为附加层）。
+FbRegIfSpec 11/11 通过：35 槽写读回环、WRITE2 同址/只读/保留/未映射 err、40 bit 高地址 COPY、双 bank 切换与忙时排队、N=1 credit 耗尽与恢复、hazard 阻塞下 credit 不提前返还、队满 START err、TRANSPOSE/PERMUTE/IM2COL/T2L/MX/SG/pad 组装与金锚等价、4 路并行写与读按 lane 序返回、跨 lane 同址写冲突 err、同 batch 多 START 仅授权最低 lane。基础 ForagerBee 既有回归不受影响（包装为附加层）。
 
 ## 9. 时序与复位规范
 
@@ -914,5 +919,5 @@ idle=!busy && occupancy==0（无 cmd.valid gate）
 - 接口峰值、局部稳态上限与端到端实测分开，不将功能机制、仿真设施或未来计划混入当前性能/debug 能力。
 - 当前字段、字节有效数、物理对齐、padValue、响应排空与 idle 均以主源码为准，规划与删除项不混入当前功能。
 - 既有完整回归 146/146；40 bit 默认配置定向 4/4、字节回归重跑 6/6 通过，范围与日期已记录到 14.2；已有生成 RTL 未刷新。
-- 寄存器接口 FbRegIfSpec 8/8 通过（8.3.5）；ForagerBeeReg 为附加包装层，基础 ForagerBee 契约与引擎零改动。
+- 寄存器接口 FbRegIfSpec 11/11 通过（8.3.5）；ForagerBeeReg 为附加包装层，基础 ForagerBee 契约与引擎零改动。
 - 已通过回归检查 sentinel/邻字节不改、短行/跨 beat、bytes/last 稳定、SG 表/零长度错误、IM2COL pad 无源读、MX 行末 scale、共享响应路由、错误同拍聚合和 done 反压；数值/盲区/PPA 另有专项缺口。
