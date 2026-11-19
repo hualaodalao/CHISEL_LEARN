@@ -12,6 +12,21 @@ class QueenTrap(val cfg: QueenConfig) extends Bundle {
     val cause = UInt(cfg.trapCauseWidth.W)
 }
 
+/** QRD 写回：按程序序一次一条，与 qrdRetire 同拍有效。 */
+class QueenAsyncRd(val cfg: QueenConfig) extends Bundle {
+    val addr = UInt(5.W)
+    val data = UInt(cfg.xlen.W)
+}
+
+/** QRD 退休：读数据写回（rd=x0 时 rdValid=0）或读错误转同步异常。 */
+class QueenRetire(val cfg: QueenConfig) extends Bundle {
+    val pc = UInt(cfg.pcWidth.W)
+    val rdValid = Bool()
+    val rdIndex = UInt(5.W)
+    val trap = Bool()
+    val trapCause = UInt(cfg.trapCauseWidth.W)
+}
+
 object QueenTrapCause {
     val none = 0
     val opcode = 1
@@ -20,17 +35,7 @@ object QueenTrapCause {
     val endpoint = 4
     val reserved = 5
     val regBase = 6
-    val notifyBit = 7
+    val bit25 = 7
     val emptyRun = 8
-}
-
-class QueenCpuLaneInterface(val cfg: QueenConfig) extends Bundle {
-    val inst = Flipped(Decoupled(UInt(32.W)))
-    val rs1 = Flipped(Valid(UInt(cfg.xlen.W)))
-    val rs2 = Flipped(Valid(UInt(cfg.xlen.W)))
-    val rd = Decoupled(UInt(cfg.xlen.W))
-}
-
-class QueenCpuMultiLaneInterface(val cfg: QueenConfig) extends Bundle {
-    val lanes = Vec(cfg.instructionLanes, new QueenCpuLaneInterface(cfg))
+    val rdError = 9
 }

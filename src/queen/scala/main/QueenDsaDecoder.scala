@@ -17,6 +17,9 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
         val dma = Decoupled(Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg))))
         val scheduler = Decoupled(Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg))))
         val trap = Valid(new QueenTrap(cfg))
+        val qrdUsed = Input(UInt(log2Ceil(cfg.qrdDepth + 1).W))
+        val qrdAlloc = Vec(cfg.instructionLanes, Valid(new QueenQrdEntry(cfg)))
+        val idle = Output(Bool())
     })
 
     private val GEMM = 0
@@ -125,7 +128,7 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
         val noSched = cmd === 1.U || cmd === 2.U
         val auxZero = cmd === 0.U || cmd === 5.U || cmd === 6.U || cmd === 9.U
         val auxHiZero = cmd === 2.U || cmd === 3.U
-        val bit25Zero = cmd === 3.U || cmd === 5.U || cmd === 8.U
+        val bit25Zero = cmd =/= 4.U
         val cause = Wire(UInt(cfg.trapCauseWidth.W))
         cause := QueenTrapCause.none.U
         when(inst(6, 0) =/= 0x0b.U) {
@@ -148,7 +151,7 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
         }.elsewhen(funct3 === 0.U && Cat(inst(11), inst(29, 25)) === 63.U) {
             cause := QueenTrapCause.regBase.U
         }.elsewhen(isCtrl && bit25Zero && inst(25)) {
-            cause := QueenTrapCause.notifyBit.U
+            cause := QueenTrapCause.bit25.U
         }.elsewhen(isCtrl && cmd === 9.U && !Mux(endpoint === GEMM.U, gOpen, dOpen)) {
             cause := QueenTrapCause.emptyRun.U
         }
@@ -157,8 +160,11 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
 
     private val illegal = Wire(Vec(cfg.instructionLanes, UInt(cfg.trapCauseWidth.W)))
     private val blocked = Wire(Vec(cfg.instructionLanes, Bool()))
+    private val ready = Wire(Vec(cfg.instructionLanes, Bool()))
     private var gOpen: Bool = gemmOpen
     private var dOpen: Bool = dmaOpen
+    // QRD 槽在 accept 时分配，不是在派发时：否则排在 WAIT 后面的读会被后发的读超车。
+    private var qrdCnt = 0.U(log2Ceil(cfg.instructionLanes + 1).W)
     for (i <- 0 until cfg.instructionLanes) {
         val inst = io.inst(i).bits.inst
         illegal(i) := trapCause(inst, gOpen, dOpen)
@@ -166,7 +172,17 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
         val endpoint = inst(31, 30)
         val isQwr = inst(14, 12) === 0.U || inst(14, 12) === 1.U
         val isRun = inst(14, 12) === 3.U && inst(29, 26) === 9.U
-        val fire = io.inst(i).fire
+        val isQrd = inst(14, 12) === 2.U
+        val resourceReady = ((endpoint === GEMM.U) || (endpoint === DMA.U)) && ringReady ||
+            (endpoint === SCHED.U) && schedReady
+        val qrdRoom = (io.qrdUsed +& qrdCnt +& isQrd.asUInt) <= cfg.qrdDepth.U
+        ready(i) := resourceReady && !blocked(i) && (!isQrd || qrdRoom)
+        val fire = io.inst(i).valid && ready(i)
+        qrdCnt = qrdCnt + Mux(fire && isQrd, 1.U, 0.U)
+        io.qrdAlloc(i).valid := fire && isQrd
+        io.qrdAlloc(i).bits.pc := io.inst(i).bits.pc
+        io.qrdAlloc(i).bits.rdIndex := inst(11, 7)
+        io.qrdAlloc(i).bits.source := Mux(endpoint === SCHED.U, 2.U, endpoint)
         // openGroup folds in lane order so a QWR and a RUN in the same packet stay ordered.
         gOpen = Mux(endpoint === GEMM.U,
             Mux(fire && isQwr, true.B, Mux(fire && isRun, false.B, gOpen)), gOpen)
@@ -185,9 +201,9 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
     io.trap.bits.cause := illegal(firstIllegal)
 
     for (i <- 0 until cfg.instructionLanes) {
-        val endpoint = io.inst(i).bits.inst(31, 30)
-        val resourceReady = ((endpoint === GEMM.U) || (endpoint === DMA.U)) && ringReady ||
-            (endpoint === SCHED.U) && schedReady
-        io.inst(i).ready := resourceReady && !blocked(i)
+        io.inst(i).ready := ready(i)
     }
+
+    io.idle := writePtr === gemmCursor && writePtr === dmaCursor &&
+        schedStage.io.count === 0.U && !pending.asUInt.orR
 }

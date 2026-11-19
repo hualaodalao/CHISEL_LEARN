@@ -43,11 +43,6 @@ class QueenDsaRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim {
         private var sigTarget = BigInt(0)
         private var sigMask = BigInt(0)
         private var traceCtrl = BigInt(0)
-        private var hwEnable = false
-        private var hwTimeline = false
-        private var hwGroup = 0
-        private var hwMask = BigInt(0)
-        private var hwId = 0
         var accepted = 0
         var reads = Vector.empty[(Int, BigInt, Boolean)]
         var starts = Vector.empty[(BigInt, Int, BigInt)]
@@ -164,11 +159,11 @@ class QueenDsaRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
             for (j <- 0 until cfg.numCfgRegs) dut.io.cfgRegs(j).expect(live(j).U)
             dut.io.irq.expect(((intrRaw & ~intrMask & intrMaskRst) != 0).B)
-            dut.io.hwSignal.enable.expect(hwEnable.B)
-            dut.io.hwSignal.isTimeline.expect(hwTimeline.B)
-            dut.io.hwSignal.group.expect(hwGroup.U)
-            dut.io.hwSignal.mask.expect(hwMask.U)
-            dut.io.hwSignal.timeline.expect(hwId.U)
+            dut.io.hwSignal.enable.expect(((sigTarget & 1) != 0).B)
+            dut.io.hwSignal.isTimeline.expect(((sigTarget & 2) != 0).B)
+            dut.io.hwSignal.group.expect(((sigTarget >> 2) & 31).U)
+            dut.io.hwSignal.mask.expect(sigMask.U)
+            dut.io.hwSignal.timeline.expect(((sigTarget >> 7) & 7).U)
 
             var clr = BigInt(0)
             var set = BigInt(0)
@@ -190,11 +185,6 @@ class QueenDsaRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 }
                 if (hasRun) {
                     Array.copy(shadow, 0, live, 0, cfg.numCfgRegs)
-                    hwEnable = (sigTarget & 1) != 0
-                    hwTimeline = (sigTarget & 2) != 0
-                    hwGroup = ((sigTarget >> 2) & 31).toInt
-                    hwId = ((sigTarget >> 7) & 7).toInt
-                    hwMask = sigMask
                 }
             }
             // 中断更新不依赖命令接受，逐拍生效。
@@ -289,20 +279,21 @@ class QueenDsaRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim {
         }
     }
 
-    it should "latch the signal target at RUN and ignore later writes" in {
+    it should "expose the signal target combinationally for the device to sample at start" in {
         simulate(new QueenDsaRegIf(small)) { dut =>
             val d = new Driver(dut, small)
             d.cycle(d.beat(0 -> wr1(SigTarget, 0x0d), 1 -> wr1(SigMask, 0x88)), respReady = true)
-            d.cycle(d.beat(0 -> run(1)), startReady = true)
             dut.io.hwSignal.enable.expect(true.B)
             dut.io.hwSignal.isTimeline.expect(false.B)
             dut.io.hwSignal.group.expect(3.U)
             dut.io.hwSignal.mask.expect(0x88.U)
-            d.cycle(d.beat(0 -> wr1(SigTarget, 0x283)), respReady = true)
+            d.cycle(d.beat(0 -> run(1)), startReady = true)
             dut.io.hwSignal.group.expect(3.U)
-            dut.io.hwSignal.mask.expect(0x88.U)
-            d.cycle(d.beat(0 -> run(2)), startReady = true)
+            d.cycle(d.beat(0 -> wr1(SigTarget, 0x283)), respReady = true)
+            // 目标改写立刻可见：锁存是设备的责任，不是 RegIf 的。
             dut.io.hwSignal.isTimeline.expect(true.B)
+            dut.io.hwSignal.timeline.expect(5.U)
+            d.cycle(d.beat(0 -> run(2)), startReady = true)
             dut.io.hwSignal.timeline.expect(5.U)
         }
     }

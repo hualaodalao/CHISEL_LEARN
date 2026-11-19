@@ -18,12 +18,14 @@ class QueenNativeCmd(val cfg: QueenConfig) extends Bundle {
 
 /** 把一个端点包并行展开为设备配置命令。纯写 lane 合并为一个 beat；QCTRL/QRD 独占一个
   * beat，故设备侧只需一个 ready：写 beat 恒可收，RUN/READ beat 由设备按 op 给出可收性。
-  * FENCE/WAIT/TRACE 必须由端点控制器在本级之前消费，QRD 走尚未实现的读响应通路。
+  * FENCE/WAIT/TRACE 必须由端点控制器在本级之前消费。
   */
 class QueenDsaAdapter(val cfg: QueenConfig) extends Module {
     val io = IO(new Bundle {
         val in = Flipped(Decoupled(Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg)))))
         val out = Decoupled(Vec(cfg.nativeWidth, Valid(new QueenNativeCmd(cfg))))
+        val deviceIdle = Input(Bool())
+        val idle = Output(Bool())
     })
 
     private val lanes = cfg.instructionLanes
@@ -45,6 +47,7 @@ class QueenDsaAdapter(val cfg: QueenConfig) extends Module {
     private val candWr = Wire(Vec(width, Bool()))
     private val candOther = Wire(Vec(width, Bool()))
     private val candRun = Wire(Vec(width, Bool()))
+    private val candRd = Wire(Vec(width, Bool()))
     for (j <- 0 until width) {
         val idx = base +& j.U
         val slot = at(idx)
@@ -54,6 +57,7 @@ class QueenDsaAdapter(val cfg: QueenConfig) extends Module {
         candWr(j) := cand(j).valid && (funct3 === 0.U || funct3 === 1.U)
         candOther(j) := cand(j).valid && !candWr(j)
         candRun(j) := candOther(j) && funct3 === 3.U && slot.bits.inst(29, 26) === 9.U
+        candRd(j) := candOther(j) && funct3 === 2.U
     }
 
     private def firstIdx(sel: Vec[Bool]): UInt = {
@@ -75,31 +79,34 @@ class QueenDsaAdapter(val cfg: QueenConfig) extends Module {
     private val inBeat = (0 until width).map(j => cand(j).valid && j.U(cntW.W) < beatLen)
     private val beatValid = inBeat.reduce(_ || _)
     private val beatSupported = (0 until width)
-        .map(j => !inBeat(j) || candWr(j) || candRun(j)).reduce(_ && _)
+        .map(j => !inBeat(j) || candWr(j) || candRun(j) || candRd(j)).reduce(_ && _)
 
     for (j <- 0 until width) {
         val b = cand(j).bits
         val funct3 = b.inst(14, 12)
         val isW2 = funct3 === 0.U
         val isRun = candRun(j)
+        val isRd = candRd(j)
         val regBase = Cat(0.U(4.W), Cat(b.inst(11), b.inst(29, 25)))
         val o = io.out.bits(j)
         o.valid := inBeat(j)
         o.bits.op := Mux(isRun, QueenNativeOp.RUN.asUInt,
-            Mux(isW2, QueenNativeOp.WRITE2.asUInt, QueenNativeOp.WRITE1.asUInt))
+            Mux(isRd, QueenNativeOp.READ.asUInt,
+                Mux(isW2, QueenNativeOp.WRITE2.asUInt, QueenNativeOp.WRITE1.asUInt)))
             .asTypeOf(QueenNativeOp())
         o.bits.reg0Addr := Mux(isRun, 0.U(10.W), Mux(isW2, regBase, b.inst(29, 20)))
         o.bits.reg1Addr := Mux(isW2, regBase + 1.U(10.W), 0.U(10.W))
-        o.bits.data0 := Mux(isRun, 0.U(cfg.xlen.W), b.rs1)
+        o.bits.data0 := Mux(isRun || isRd, 0.U(cfg.xlen.W), b.rs1)
         o.bits.data1 := Mux(isW2, b.rs2, 0.U(cfg.xlen.W))
         o.bits.pc := b.pc
         o.bits.cmdTag := Mux(isRun, b.rs1(7, 0), 0.U(8.W))
         o.bits.swTag := Mux(isRun, b.rs2, 0.U(cfg.xlen.W))
-        assert(!cand(j).valid || isW2 || funct3 === 1.U || isRun,
-            "QueenDsaAdapter: only QWR1/QWR2/RUN are supported at this stage")
+        assert(!cand(j).valid || isW2 || funct3 === 1.U || isRun || isRd,
+            "QueenDsaAdapter: only QWR1/QWR2/QRD/RUN are supported at this stage")
     }
 
     io.out.valid := beatValid && beatSupported
+    io.idle := !active && io.deviceIdle
 
     when(inRange && (io.out.fire || !beatValid)) {
         base := base + beatLen

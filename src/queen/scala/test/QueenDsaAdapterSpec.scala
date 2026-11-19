@@ -36,6 +36,7 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
     private val Write1 = 0
     private val Write2 = 1
+    private val Read = 2
     private val Run = 3
 
     private case class Native(op: Int, reg0: Int, reg1: Int, data0: BigInt, data1: BigInt,
@@ -43,6 +44,7 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
     private def expected(c: Cmd): Native =
         if (c.isRun) Native(Run, 0, 0, 0, 0, c.pc, (c.rs1 & 0xff).toInt, c.rs2)
+        else if (c.isQrd) Native(Read, ((c.inst >> 20) & 1023).toInt, 0, 0, 0, c.pc, 0, 0)
         else if (c.isQwr2) Native(Write2, c.base, c.base + 1, c.rs1, c.rs2, c.pc, 0, 0)
         else Native(Write1, ((c.inst >> 20) & 1023).toInt, 0, c.rs1, 0, c.pc, 0, 0)
 
@@ -65,6 +67,7 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
             l.bits.rs1.poke(0.U); l.bits.rs2.poke(0.U)
         }
         dut.io.out.ready.poke(false.B)
+        dut.io.deviceIdle.poke(true.B)
         dut.reset.poke(true.B)
         dut.clock.step(2)
         dut.reset.poke(false.B)
@@ -79,7 +82,7 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
         private var cycleNo = 0
 
         def cycle(offered: Option[Vector[Option[Cmd]]] = None,
-                  ready: Boolean = false): Boolean = {
+                  ready: Boolean = false, deviceIdle: Boolean = true): Boolean = {
             cycleNo += 1
             dut.io.in.valid.poke(offered.nonEmpty.B)
             for (i <- 0 until lanes) {
@@ -92,10 +95,12 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 lane.bits.rs2.poke(c.map(_.rs2).getOrElse(BigInt(0)).U)
             }
             dut.io.out.ready.poke(ready.B)
+            dut.io.deviceIdle.poke(deviceIdle.B)
 
             val done = active && base >= lanes
             val inReady = !active || done
             dut.io.in.ready.expect(inReady.B)
+            dut.io.idle.expect((!active && deviceIdle).B)
             val inFire = offered.nonEmpty && inReady
 
             val inRange = active && base < lanes
@@ -111,7 +116,7 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
             val beatLen = if (hasOther) firstOtherIdx + (if (alone) 1 else 0) else full
             val beat = cand.zipWithIndex.map { case (c, j) => if (j < beatLen) c else None }
             val beatValid = beat.exists(_.nonEmpty)
-            val beatSupported = beat.flatten.forall(c => c.isWrite || c.isRun)
+            val beatSupported = beat.flatten.forall(c => c.isWrite || c.isRun || c.isQrd)
             val outValid = beatValid && beatSupported
             dut.io.out.valid.expect(outValid.B)
 
@@ -320,16 +325,17 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
         }
     }
 
-    it should "stall on QRD until the read-response path exists" in {
+    it should "emit a QRD as a READ beat that occupies the beat alone" in {
         val cfg = QueenConfig()
-        val ex = intercept[Exception] {
-            simulate(new QueenDsaAdapter(cfg)) { dut =>
-                val d = new Driver(dut, cfg)
-                d.cycle(Some(d.offer(0 -> qrd(0x40, 1))), ready = true)
-                d.cycle(ready = true)
-            }
+        simulate(new QueenDsaAdapter(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            val a = qwr1(0, 0x11, pc = 0)
+            val r = qrd(0x40, 5, pc = 4)
+            val b = qwr1(1, 0x22, pc = 8)
+            d.cycle(Some(d.offer(0 -> a, 1 -> r, 2 -> b)), ready = true)
+            d.drain()
+            d.beats shouldBe Vector(Vector(expected(a)), Vector(expected(r)), Vector(expected(b)))
         }
-        ex.getClass.getName should include("AssertionFailed")
     }
 
     for ((lanes, native) <- Vector((4, 4), (4, 2), (4, 1), (2, 2), (1, 1), (8, 3))) {
@@ -346,10 +352,11 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
                             if (rng.nextInt(3) == 0) None
                             else {
                                 total += 1
-                                rng.nextInt(3) match {
+                                rng.nextInt(4) match {
                                     case 0 => Some(qwr2(rng.nextInt(63), rng.nextInt(1 << 30),
                                         rng.nextInt(1 << 30), pc = total))
                                     case 1 => Some(qwr1(rng.nextInt(1024), rng.nextInt(1 << 30), pc = total))
+                                    case 2 => Some(qrd(rng.nextInt(1024), rng.nextInt(32), pc = total))
                                     case _ => Some(run(rng.nextInt(256), rng.nextInt(1 << 30), pc = total))
                                 }
                             }
@@ -366,6 +373,24 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 d.acceptedPackets should be > 0
                 d.emitted.size shouldBe d.expectedNative
             }
+        }
+    }
+
+    it should "report idle only when the packet is drained and the device is idle" in {
+        val cfg = QueenConfig()
+        simulate(new QueenDsaAdapter(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            d.cycle()
+            dut.io.idle.expect(true.B)
+            d.cycle(deviceIdle = false)
+            dut.io.idle.expect(false.B)
+            d.cycle(Some(d.offer(0 -> qwr1(0, 1), 1 -> qwr1(1, 2))), ready = true,
+                deviceIdle = true)
+            d.cycle(ready = true)
+            dut.io.idle.expect(false.B)
+            d.drain()
+            d.cycle()
+            dut.io.idle.expect(true.B)
         }
     }
 

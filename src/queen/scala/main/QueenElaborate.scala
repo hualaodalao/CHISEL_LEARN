@@ -34,7 +34,7 @@ object QueenElaborate extends App {
   }
 
   
-  emit(new Queen(QueenConfig()), "src/queen/verilog",
+  emit(new QueenTop(QueenConfig()), "src/queen/verilog",
        "default config")
 
 }

@@ -69,7 +69,7 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
         val noSched = Set(1, 2).contains(cmd)
         val auxZero = Set(0, 5, 6, 9).contains(cmd)
         val auxHiZero = Set(2, 3).contains(cmd)
-        val bit25Zero = Set(3, 5, 8).contains(cmd)
+        val bit25Zero = cmd != 4
         val regBase = (((inst >> 11) & 1) << 5) | ((inst >> 25) & 31)
         if ((inst & 0x7f) != 0x0b) QueenTrapCause.opcode
         else if (funct3 > 3) QueenTrapCause.funct3
@@ -83,7 +83,7 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
             (isCtrl && ((auxZero && aux != 0) || (auxHiZero && (aux >> 3) != 0) ||
                 (cmd == 8 && (aux >> 2) != 0)))) QueenTrapCause.reserved
         else if (funct3 == 0 && regBase == 63) QueenTrapCause.regBase
-        else if (isCtrl && bit25Zero && bit25 == 1) QueenTrapCause.notifyBit
+        else if (isCtrl && bit25Zero && bit25 == 1) QueenTrapCause.bit25
         else if (isCtrl && cmd == 9 && !(if (endpoint == 0) gOpen else dOpen)) QueenTrapCause.emptyRun
         else QueenTrapCause.none
     }
@@ -107,12 +107,15 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
         var acceptedCount = 0
         var outputCount = 0
         var trapCount = 0
+        var qrdUsed = 0
+        var allocs = Vector.empty[(BigInt, Int, Int)]
 
         dut.io.inst.foreach { p =>
             p.valid.poke(false.B); p.bits.inst.poke(0.U); p.bits.pc.poke(0.U)
         }
         dut.io.rs1.foreach { p => p.valid.poke(false.B); p.bits.poke(0.U) }
         dut.io.rs2.foreach { p => p.valid.poke(false.B); p.bits.poke(0.U) }
+        dut.io.qrdUsed.poke(0.U)
         ports.foreach(_.ready.poke(false.B))
         dut.reset.poke(true.B)
         dut.clock.step(2)
@@ -147,6 +150,7 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 dut.io.rs2(i).bits.poke(pending(i).map(_.rs2).getOrElse(BigInt(0)).U)
             }
             ports.zip(ready).foreach { case (port, value) => port.ready.poke(value.B) }
+            dut.io.qrdUsed.poke(qrdUsed.U)
 
             val gemmHead = ringHead(gemmCursor)
             val dmaHead = ringHead(dmaCursor)
@@ -205,11 +209,14 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
             val accepted = Array.fill(cfg.instructionLanes)(false)
             var gOpen = gemmOpen
             var dOpen = dmaOpen
+            var qrdCnt = 0
             for (i <- 0 until cfg.instructionLanes) {
                 offered(i).foreach { c => causes(i) = illegalCause(c, gOpen, dOpen) }
                 val blocked = (0 to i).exists(j => offered(j).nonEmpty && causes(j) != 0)
+                val isQrd = offered(i).exists(c => ((c.inst >> 12) & 7).toInt == 2)
+                val qrdRoom = qrdUsed + qrdCnt + (if (isQrd) 1 else 0) <= cfg.qrdDepth
                 val canAccept = offered(i).exists { c =>
-                    !blocked && (c.endpoint match {
+                    !blocked && (!isQrd || qrdRoom) && (c.endpoint match {
                         case 3 => schedReady
                         case 2 => false
                         case _ => ringReady
@@ -217,6 +224,7 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 }
                 withClue(s"cycle=$cycleNo lane=$i cause=${causes(i)} blocked=$blocked ") {
                     if (offered(i).nonEmpty) dut.io.inst(i).ready.expect(canAccept.B)
+                    dut.io.qrdAlloc(i).valid.expect((canAccept && isQrd).B)
                 }
                 accepted(i) = canAccept
                 if (canAccept) {
@@ -226,6 +234,16 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
                     val isRun = funct3 == 3 && ((c.inst >> 26) & 15).toInt == 9
                     if (c.endpoint == 0) gOpen = if (isQwr) true else if (isRun) false else gOpen
                     if (c.endpoint == 1) dOpen = if (isQwr) true else if (isRun) false else dOpen
+                    if (isQrd) {
+                        qrdCnt += 1
+                        val exp = (c.pc, ((c.inst >> 7) & 31).toInt,
+                            if (c.endpoint == 3) 2 else c.endpoint)
+                        val act = (dut.io.qrdAlloc(i).bits.pc.peek().litValue,
+                            dut.io.qrdAlloc(i).bits.rdIndex.peek().litValue.toInt,
+                            dut.io.qrdAlloc(i).bits.source.peek().litValue.toInt)
+                        withClue(s"cycle=$cycleNo lane=$i qrdAlloc ") { act shouldBe exp }
+                        allocs = allocs :+ exp
+                    }
                 }
             }
             gemmOpen = gOpen
@@ -384,15 +402,15 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
         val commands = Vector(
             Command(qwr1(0, 0x321), rs1 = 55, rs1Valid = true),
             Command(qrd(1, 0x123, rd = 5)),
-            control(0, 0, bit25 = 1, hasRs1 = false),
-            control(1, 0, rs1 = 3, bit25 = 1),
-            control(1, 1, rs1 = 0x55, aux = 31, bit25 = 1),
+            control(0, 0, hasRs1 = false),
+            control(1, 0, rs1 = 3),
+            control(1, 1, rs1 = 0x55, aux = 31),
             control(0, 2, rs1 = 1234, aux = 7),
             control(3, 3, aux = 6, hasRs1 = false),
             control(3, 3, rs1 = 2222, aux = 3),
             control(3, 4, rs1 = 0x88, aux = 5, bit25 = 1),
             control(0, 5, rs1 = 0x12345678),
-            control(3, 6, rs1 = 0x1000, rs2 = 0x87654321L, bit25 = 1, hasRs2 = true),
+            control(3, 6, rs1 = 0x1000, rs2 = 0x87654321L, hasRs2 = true),
             control(3, 8, rs1 = 0x2000, rs2 = 0x42, aux = 2, hasRs2 = true),
             write2(0, 100).copy(rs1Valid = false, rs2Valid = false),
             control(3, 5, rs1 = 0x99),
@@ -451,6 +469,11 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
             Command(qctrl(0, 5, bit25 = 1)),
             Command(qctrl(3, 3, bit25 = 1)),
             Command(qctrl(3, 8, bit25 = 1)),
+            Command(qctrl(0, 0, bit25 = 1)),
+            Command(qctrl(0, 1, bit25 = 1)),
+            Command(qctrl(1, 2, bit25 = 1)),
+            Command(qctrl(3, 6, bit25 = 1)),
+            Command(qctrl(0, 9, bit25 = 1)),
             Command(qctrl(0, 0, aux = 1)),
             Command(qctrl(3, 6, aux = 1)),
             Command(qctrl(0, 5, aux = 1)),
@@ -526,5 +549,47 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
     it should "reject a command ring shallower than two slots" in {
         an[IllegalArgumentException] should be thrownBy QueenConfig(cmdRingDepth = 1)
         an[IllegalArgumentException] should be thrownBy QueenConfig(cmdRingDepth = 0)
+    }
+
+    private def readCmd(endpoint: Int, addr: Int, rd: Int, pc: BigInt) =
+        Command(qrd(endpoint, addr, rd), pc = pc)
+
+    it should "allocate QRD entries in lane order and map SCHED to source 2" in {
+        val cfg = QueenConfig(qrdDepth = 2)
+        simulate(new QueenDsaDecoder(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            val reads = Vector(readCmd(3, 0x40, 1, 0x100), readCmd(0, 0x10, 2, 0x104),
+                readCmd(1, 0x20, 3, 0x108), readCmd(3, 0x6c, 4, 0x10c))
+            d.cycle(d.offer(reads.zipWithIndex.map { case (c, i) => i -> c }: _*),
+                Vector(true, true, true)) shouldBe Vector(true, true, false, false)
+            // SCHED 暂存正被上一拍的 SCHED 读占用，故第四条要再等一拍。
+            d.cycle(d.offer(2 -> reads(2)), Vector(true, true, true)) shouldBe
+                Vector(false, false, true, false)
+            d.cycle(d.offer(3 -> reads(3)), Vector(true, true, true)) shouldBe
+                Vector(false, false, false, true)
+            d.allocs shouldBe Vector((BigInt(0x100), 1, 2), (BigInt(0x104), 2, 0),
+                (BigInt(0x108), 3, 1), (BigInt(0x10c), 4, 2))
+            d.drain()
+        }
+    }
+
+    it should "hold back only the QRD lanes when the in-flight table is full" in {
+        val cfg = QueenConfig(qrdDepth = 2)
+        simulate(new QueenDsaDecoder(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            d.qrdUsed = 2
+            d.cycle(d.offer(0 -> readCmd(0, 0x10, 1, 0x200), 1 -> write2(1, 7)),
+                Vector(true, true, true)) shouldBe Vector(false, true, false, false)
+            d.allocs shouldBe empty
+            d.qrdUsed = 1
+            d.cycle(d.offer(0 -> readCmd(0, 0x10, 1, 0x200)), Vector(true, true, true)) shouldBe
+                Vector(true, false, false, false)
+            d.allocs shouldBe Vector((BigInt(0x200), 1, 0))
+            d.drain()
+        }
+    }
+
+    it should "reject a QRD table shallower than one entry" in {
+        an[IllegalArgumentException] should be thrownBy QueenConfig(qrdDepth = 0)
     }
 }

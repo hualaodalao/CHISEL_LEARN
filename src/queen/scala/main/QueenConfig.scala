@@ -10,11 +10,19 @@ case class QueenConfig(
     val instructionLanes: Int = 4,
     val nativeLanes: Int = 0,
     val cmdRingDepth: Int = 64,
-    val trapCauseWidth: Int = 8
+    val trapCauseWidth: Int = 8,
+    val faultCodeWidth: Int = 8,
+    val eventGroupCount: Int = 32,
+    val timelineCount: Int = 8,
+    val qrdDepth: Int = 16
 ) {
     require(instructionLanes >= 1)
+    require(qrdDepth >= 1)
     require(cmdRingDepth >= 2)
     require(trapCauseWidth >= 4)
+    require(faultCodeWidth >= 1)
+    require(eventGroupCount == 32, "QueenConfig: hwSignal.group 为 5-bit，事件组固定 32")
+    require(timelineCount == 8, "QueenConfig: hwSignal.timeline 为 3-bit，时间线固定 8")
     require(nativeLanes >= 0)
     require(nativeWidth <= instructionLanes,
         s"QueenConfig: nativeLanes($nativeLanes) 不得超过 instructionLanes($instructionLanes)")

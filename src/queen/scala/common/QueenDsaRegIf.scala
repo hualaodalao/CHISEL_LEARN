@@ -1,7 +1,7 @@
 import chisel3._
 import chisel3.util._
 
-/** Queen 硬件接口约束 9.1 的硬件完成信号目标：设备在 RUN 被接受时锁存，随 completion 回传。 */
+/** Queen 硬件接口约束 9.1 的硬件完成信号目标：start 当拍组合给出，由设备自行采样并随 completion 回传。 */
 class QueenHwSignal extends Bundle {
     val enable = Bool()
     val isTimeline = Bool()
@@ -81,10 +81,13 @@ class QueenDsaRegIf(cfg: QueenDsaRegIfConfig) extends Module {
     private val sigTarget = RegInit(0.U(32.W))
     private val sigMask = RegInit(0.U(32.W))
     private val traceCtrl = RegInit(0.U(32.W))
-    private val hwLatch = RegInit(0.U.asTypeOf(new QueenHwSignal))
 
     io.cfgRegs := live
-    io.hwSignal := hwLatch
+    io.hwSignal.enable := sigTarget(0)
+    io.hwSignal.isTimeline := sigTarget(1)
+    io.hwSignal.group := sigTarget(6, 2)
+    io.hwSignal.timeline := sigTarget(9, 7)
+    io.hwSignal.mask := sigMask
     io.irq := (intrRaw & ~intrMask).orR
 
     private val lane = io.cmd.bits
@@ -196,10 +199,5 @@ class QueenDsaRegIf(cfg: QueenDsaRegIfConfig) extends Module {
 
     when(accept && hasRun) {
         live := shadow
-        hwLatch.enable := sigTarget(0)
-        hwLatch.isTimeline := sigTarget(1)
-        hwLatch.group := sigTarget(6, 2)
-        hwLatch.timeline := sigTarget(9, 7)
-        hwLatch.mask := sigMask
     }
 }
