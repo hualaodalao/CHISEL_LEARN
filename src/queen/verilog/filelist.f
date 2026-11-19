@@ -1,1 +1,16 @@
-Queen_Queen.sv
+Queen_Queue1_Vec4_Valid_QueenDsaCommand.sv
+verification/assert/Queen_QueenDsaDecoder_Verification_Assert.sv
+Queen_ring_64x516.sv
+Queen_QueenDsaDecoder.sv
+verification/assert/Queen_QueenEndpointCtrl_Verification_Assert.sv
+Queen_QueenEndpointCtrl.sv
+verification/assert/Queen_QueenDsaAdapter_Verification_Assert.sv
+Queen_QueenDsaAdapter.sv
+verification/assert/Queen_QueenSchedCtrl_Verification_Assert.sv
+Queen_QueenSchedCtrl.sv
+Queen_QueenSyncState.sv
+Queen_ram_16x33.sv
+Queen_Queue16_QueenDsaRegResp.sv
+verification/assert/Queen_QueenQrdTracker_Verification_Assert.sv
+Queen_QueenQrdTracker.sv
+Queen_QueenTop.sv
