@@ -16,6 +16,8 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
 
     val status = Output(new WorkerBeeStatus(cfg))
     val irq = Output(Bool())
+    // 配置 credit 电平：还能接受的 RUN 数。只门控 RUN，QWR/QRD 不受它限制。
+    val cfgCredit = Output(UInt(1.W))
     // 性能观测信号组（纯组合电平、无内部计数；外部 PMU 按拍采样，语义见 WorkerBeePerf）
     val perf = Output(new WorkerBeePerf)
   })
@@ -534,6 +536,7 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
 
   io.status.busy       := executor.io.busy
   io.status.inFlight   := regIf.io.inFlight
+  io.cfgCredit         := regIf.io.cfgCredit
   io.status.progress   := executor.io.progress
   io.status.aOccupancy := scratchpad.io.aOccupancy
   io.status.bOccupancy := scratchpad.io.bOccupancy

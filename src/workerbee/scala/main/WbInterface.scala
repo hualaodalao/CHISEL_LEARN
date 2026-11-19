@@ -6,8 +6,10 @@ import chisel3.dontTouch
 
 class WorkerBeeCmd extends Bundle {
   val op      = WorkerBeeOp()
-  val reg0Addr = UInt(6.W)
-  val reg1Addr = UInt(6.W)
+  // 10 bit 对齐 Queen QWR1/QRD 的 inst[29:20] regAddr(0..1023)；状态/IRQ 区在 0x40 之后，
+  //   6 bit 装不下。QWR2 的 regBase 仍是 6 bit(0..62)，由上游保证 reg1Addr = reg0Addr+1 <= 63。
+  val reg0Addr = UInt(10.W)
+  val reg1Addr = UInt(10.W)
   val data0   = UInt(32.W)
   val data1   = UInt(32.W)
   val pc      = UInt(32.W)

@@ -1,8 +1,8 @@
 # WorkerBee 硬件规格
 
-文档版本：`v4.2.0`
+文档版本：`v5.0.0`
 
-修订日期：`2026-11-09`
+修订日期：`2026-11-17`
 
 ## 版本控制
 
@@ -22,6 +22,7 @@
 
 | 版本号 | 日期 | 修改内容 | 相关 Feature ID |
 |---|---|---|---|
+| v5.0.0 | 2026-11-17 | 不兼容配置通路变更（对齐 Queen 接口语义）：WorkerBeeOp 新增 `RUN`（编码 3，原保留），启动不再经寄存器写，原 `START`=`0x10` 删除；配置寄存器拆为 shadow/live 两组——QWR/QRD 恒读写 shadow 且执行期不受限，`RUN` 接受拍把 shadow 整组 dump 进 live 并启动，`io.regFile` 恒取 live，故同批配置写属于下一次提交；新增 1-bit 电平输出 `cfgCredit`（=`!inFlight`）只门控 `RUN`，本批仅授权最低 valid 的 `RUN` lane，tracing 元数据改取该命令；命令地址由 6-bit 扩为 10-bit，状态/IRQ 区迁至 `0x40–0x45`（STATUS `0x40`、IRQ_RAW `0x41`、MASK `0x42`、MASKED `0x43`、CLEAR `0x44`、ERROR_CODE `0x45`），旧 `0x1E`/`0x30–0x34` 成为保留空洞；执行期配置写不再以 `resp.err` 拒绝。CONTROL 位布局、数值、DMA、IRQ 位定义与首次 tracing 配对限制不变。`hwSignal` 记录为待办，本版不实现。四路接口专项 26 例通过 | WB-F021、WB-F022、WB-F025、WB-D002；6.1–6.3、6.8（新增）、8.3、8.6、8.8、9.2、13.1–13.4、14.1–14.2 |
 | v4.3.0 | 2026-11-16 | `loadWMode=1` 的 WS 权重装载改用独立水平 W 链（不再借 A 链），每 PE 驻留双权重 bank：写侧选择广播锁存只写非在读 bank，读侧选择随激活波前逐 PE 对角传播，使下一窗口权重装载与当前窗口计算/排空重叠；未完成时回退完整装载窗口。回灌就绪改由供数门控查 C buffer 读出口 valid 保证，有效稳态周期下界订正为 `2T`。perf 新增 `cRowIn`、`rdSelFirst`、`rdSelLast` 三个组合电平抽头 | WB-F002、WB-F024 / WB-D001；5.1.2、11.3、12.2 |
 | v4.2.0 | 2026-11-09 | 增加显式 OS-M1 模式：CONTROL[31]、M=1/loadWMode=1 守护与 errCode 14；方形阵列按 arrayN×arrayM 扁平组织，首行本地累加、A 右传、B/ScaleB 按列升序送入双槽窗口；定义 Run/Tail、自然列序 bias/requant、一次提交与完整 Nprog 写回、模式间数值关系及 OS 性能事件。CONTROL[27] 为 osFmtKeep，软件使用基线值 0；默认交付保持一套全格式 RTL | WB-F027、WB-P011（新增）；WB-F001、WB-F002、WB-F014、WB-F016–WB-F019、WB-F023、WB-D001 |
 | v4.1.0 | 2026-10-29 | BF16 升格为默认 A/B 输入格式：新增专用窄乘法器分支、单元素 lane 几何（`K%T=0`）、BF16 混配 errCode 3 守护，以及 BF16 特殊值（输入与乘积下溢冲刷为零、上溢饱和、无 IEEE Inf/NaN 语义）定义；明确 BF16 两种 B 装载模式均合法，errCode 4 不含 BF16。FP16 保持非默认输入，与 BF16 独立。寄存器映射、端口位宽与既有格式的数值契约不变 | WB-F026（新增）；WB-F011、WB-P001、WB-P002（文案） |
@@ -123,7 +124,7 @@ v4.0.0 起 Feature ID 前缀由 `HIVE-` 改为 `WB-`，`HIVE-Xnnn` 与 `WB-Xnnn`
 | WB-F018 | 自主 A/B/C DMA | 已实现 | 按 N/K 窗口遍历；A 每 N tile 重读；C 按完整 T 列写回，软件必须编程 Nprog | 7.5、5.3、9.3–9.4 |
 | WB-F019 | 非对齐读 Gather | 已实现 | A/B/ScaleA/ScaleB 非对齐逻辑拍由对齐物理读拼接；相邻覆盖地址必须可访问；W4A8 stretch 使用独立半片选择路径 | 5.3.2–5.3.3 |
 | WB-F020 | DMA 握手与读 FIFO credit | 已实现 | 请求/响应 ready-valid；读请求预留 credit；读响应必须同序且每请求恰有一个响应；ScaleC 另有在途限制 | 6.4、9.3–9.4、9.6 |
-| WB-F021 | 寄存器命令接口 | 已实现 | 固定四路 REG_WRITE1/REG_WRITE2/REG_READ 共享一个 bank；6-bit 索引，稀疏混合读写同拍 fire；四 slots/pending 单批缓存，单 resp 按 lane 递增返回 data/err/laneId；拍前读快照、逐命令检查与逐地址 lane3>2>1>0 仲裁；非零 START 合并为延后一拍一次启动；ACK 不表示计算完成 | 4.2、6.1–6.3、8、9.2 |
+| WB-F021 | 寄存器命令接口 | 已实现 | 固定四路 REG_WRITE1/REG_WRITE2/REG_READ/RUN 共享 shadow/live 两组配置 bank；10-bit 索引，稀疏混合读写同拍 fire；四 slots/pending 单批缓存，单 resp 按 lane 递增返回 data/err/laneId；拍前读快照、逐命令检查与逐地址 lane3>2>1>0 仲裁；RUN 把 shadow 整组提交进 live 并延后一拍启动一次，本批仅授权最低 RUN lane；ACK 不表示计算完成 | 4.2、6.1–6.3、6.8、8、9.2 |
 | WB-F022 | 状态与完成/错误中断 | 已实现 | busy、inFlight、progress 不变；分源 IRQ_RAW/MASK/MASKED/CLEAR 低 11 bit；新增粘滞 WRITE_CONFLICT[10]，fresh event 优先于 W1C；DMA 响应握手错误逐事件捕获，不等待 done；完成不表示无错误 | 6.5–6.6、8.6、8.8、11.1–11.2、10.5、5.1.5 |
 | WB-F023 | 运行期配置检查 | 已实现 | 判据与优先级不变；IRQ_RAW[1] 标记配置错误，ERROR_CODE 保存首个未清配置错误码；M/N 非零、Nprog、缓冲区可访问性等仍是软件义务 | 8.8、10 |
 | WB-F024 | 性能事件输出（历史 ID） | 已实现 | 历史功能索引；类别化 Debug 索引为 WB-D001 | 11.3 |
@@ -155,7 +156,7 @@ v4.0.0 起 Feature ID 前缀由 `HIVE-` 改为 `WB-`，`HIVE-Xnnn` 与 `WB-Xnnn`
 | Feature ID | Debug feature | 状态 | 观测能力、适用条件与主要约束 | 契约章节 |
 |---|---|---|---|---|
 | WB-D001 | 性能事件观测 | 已实现 | `perf` 输出 DMA、阵列、stall、epilogue 和 busy 的组合事件电平，不含计数器且不控制功能路径；DMA 为 `req.valid`，OS 阵列为真实 consume、Tail 豁免已完成空列；外部 PMU 采样累加并处理事件重叠 | 6.7、11.3 |
-| WB-D002 | 首次执行 Tracing | 已实现 | `respForTracing` 无反压输出首次有效启动及其 done/configuration-error 事件，PC/tag 取胜出 START lane；复位后仅首次执行保证配对，不能替代 IRQ/ERROR_CODE | 6.3、9.2、11.4 |
+| WB-D002 | 首次执行 Tracing | 已实现 | `respForTracing` 无反压输出首次有效启动及其 done/configuration-error 事件，PC/tag 取获授权 RUN 命令；复位后仅首次执行保证配对，不能替代 IRQ/ERROR_CODE | 6.3、9.2、11.4 |
 
 STATUS、IRQ/ERROR_CODE 和普通命令响应属于功能接口，不列为专用 Debug feature；测试平台日志、波形开关和仿真断言也不构成产品内建 Debug 能力。
 
@@ -183,7 +184,7 @@ OS-M1 模式中，首行列 j 对应逻辑输出列 `nt×T+j`，A/ScaleA/有效 
 
 | 子模块 | 职责 |
 |---|---|
-| WorkerBeeRegIf | 独立管理固定四路命令共享的一个配置/状态 bank、四 slots/pending 单批响应缓存、逐命令译码检查与逐地址仲裁、单 resp 的 laneId/顺序、start 及胜出 PC/tag、inFlight、完成/错误/WRITE_CONFLICT 事件汇聚、IRQ_RAW/MASK/CLEAR、ERROR_CODE 与 irq（四路相关契约已验证） |
+| WorkerBeeRegIf | 独立管理固定四路命令共享的 shadow/live 两组配置寄存器与状态/IRQ 寄存器、四 slots/pending 单批响应缓存、逐命令译码检查与逐地址仲裁、单 resp 的 laneId/顺序、RUN 提交与 start 及其 PC/tag、inFlight、cfgCredit、完成/错误/WRITE_CONFLICT 事件汇聚、IRQ_RAW/MASK/CLEAR、ERROR_CODE 与 irq（四路相关契约已验证） |
 | CalcConfig | 检查运行配置并派生执行几何与地址步长 |
 | Executor | 控制 WS 权重装载、A 行消费、K pass 回灌；OS 配置、播种、一次提交及最终写回等待 |
 | Scratchpad | 提供 A、B、C/partial-sum FIFO |
@@ -272,7 +273,7 @@ IDLE -> DRAIN -> LOAD_B -> LOAD_A -> NEXT_NK_TILE -> ... -> DRAIN -> IDLE
 
 - 清除运行游标；
 - 计算 `nTiles` 和 `kTiles`；
-- 本批合法非零 START 经 WorkerBeeRegIf 仲裁产生一次 start（四路 START 契约已验证）、通过 CalcConfig 检查后，flush A/B/C 工作 FIFO；
+- 获授权的 RUN 经 WorkerBeeRegIf 产生一次 start（RUN 契约已验证）、通过 CalcConfig 检查后，flush A/B/C 工作 FIFO；
 - 设置首个窗口待执行并进入 DRAIN。
 
 ##### DRAIN
@@ -610,19 +611,21 @@ OS-M1 的部分和列 j、bias 项 j、rqM 项 j 和输出列 `nt×T+j` 同序�
 
 ### 6.1 命令接口
 
-本节四路接收、读快照、写仲裁与 START 契约已验证。
+本节四路接收、读快照、写仲裁、RUN 提交与 credit 契约已验证。
 
-`cmd[0]`、`cmd[1]`、`cmd[2]`、`cmd[3]` 为固定四路、各自具有 ready/valid 握手的 `Stream[WorkerBeeCmd]` 输入，由 WorkerBeeRegIf 处理。四路共享一个配置/状态/IRQ 寄存器 bank 和一个执行上下文，不是四套配置或四个任务上下文；命令 lane 编号由输入端口位置确定，不新增命令 payload 字段。每路 Payload：
+`cmd[0]`、`cmd[1]`、`cmd[2]`、`cmd[3]` 为固定四路、各自具有 ready/valid 握手的 `Stream[WorkerBeeCmd]` 输入，由 WorkerBeeRegIf 处理。四路共享一组 shadow 配置寄存器、一组 live 执行寄存器和一个执行上下文，不是四套配置或四个任务上下文；命令 lane 编号由输入端口位置确定，不新增命令 payload 字段。每路 Payload：
 
 | 字段 | 宽度 | 含义 |
 |---|---:|---|
-| `op` | 2 bit | WorkerBeeOp：REG_WRITE1、REG_WRITE2、REG_READ；编码 3 保留 |
-| `reg0Addr` | 6 bit | 第一个寄存器索引，即 slot0 的地址 |
-| `reg1Addr` | 6 bit | 第二个寄存器索引，即 slot1 的地址 |
+| `op` | 2 bit | WorkerBeeOp：REG_WRITE1、REG_WRITE2、REG_READ、RUN；四个编码全部合法 |
+| `reg0Addr` | 10 bit | 第一个寄存器索引，即 slot0 的地址 |
+| `reg1Addr` | 10 bit | 第二个寄存器索引，即 slot1 的地址 |
 | `data0` | 32 | 第一个写数据 |
 | `data1` | 32 | 第二个写数据 |
 | `pc` | 32 | tracing PC |
 | `tag` | 8 | tracing tag |
+
+地址宽度为 10 bit，与上游 QWR1/QRD 的 10-bit 寄存器地址字段对齐，覆盖第 8.3 节 `0x40` 之后的状态/IRQ 区。上游若以 6-bit 相邻基址形式提交双写（QWR2），必须自行保证 `reg1Addr = reg0Addr + 1 ≤ 63`，即双写只能落在配置区。
 
 这里的 slot0/slot1 是一条命令内的两项写字段，与第 6.2 节按 lane 分配的四个响应缓存 slots 不同。
 
@@ -633,32 +636,51 @@ OS-M1 的部分和列 j、bias 项 j、rqM 项 j 和输出列 `nt×T+j` 同序�
 | 0 | REG_WRITE1 | 写 `reg0Addr`，数据为 `data0`；slot1 不参与 |
 | 1 | REG_WRITE2 | 整体检查 `reg0Addr/data0` 与 `reg1Addr/data1`，合法后逐目标地址仲裁提交 |
 | 2 | REG_READ | 读取 `reg0Addr`；`reg1Addr/data0/data1` 不参与读取 |
-| 3 | 保留 | 拒绝，`resp.err=1`，无副作用 |
+| 3 | RUN | 把 shadow 组整组提交进 live 组并启动一次执行；`reg0Addr/reg1Addr/data0/data1` 全部不参与 |
 
-本接口只有上述三个合法操作码。启动计算通过向 `START`（索引 `0x10`）写入非零值完成，不另设执行操作码。寄存器地址是寄存器索引，不是 MMIO byte offset。
+启动计算只通过 `RUN` 完成，不再有启动寄存器地址（原 `START`=`0x10` 已删除）。`RUN` 不携带配置：它提交的是此前已写入 shadow 组的内容。寄存器地址是寄存器索引，不是 MMIO byte offset。
+
+#### 6.1.0 两组寄存器与提交语义
+
+配置通路只有两组寄存器，没有第三级镜像：
+
+| 组 | 写入者 | 读取者 | 执行期可写 |
+|---|---|---|---|
+| shadow | REG_WRITE1 / REG_WRITE2 | REG_READ | 是，不受 `inFlight` 或 credit 门控 |
+| live | 仅 `RUN` 被接受的那一拍 | 全部执行侧消费者（CalcConfig、DMA、Executor、输出转换、阵列） | 否 |
+
+`RUN` 被接受时把 shadow 组整组拷贝进 live 组，`io.regFile` 恒取 live 组。因此：
+
+- 执行期后续 REG_WRITE 只改 shadow，不扰动已提交配置——这是上游配置准备与本次执行重叠的硬件基础；
+- REG_READ 恒读 shadow，即"软件写了什么"，不是正在执行的配置。执行侧配置没有软件可读回地址；
+- **`RUN` 提交的是接受拍之前的 shadow 值**。与 `RUN` 同批 fire 的配置写落在下一拍才生效的 shadow 上，不属于本次提交，必须留给下一次 `RUN`。软件不得把 `RUN` 与它所依赖的配置写放在同一批。
+
+复位同时清除两组。
+
+*Note（已知不合规，待改）：上面第三条"同批配置写不属于本次提交"是**当前实现行为**，与 Queen 接口 v3.0.0 §16.8 相反——该章要求 `RUN` 快照必须包含同一 beat 内它前面那些 lane 的写，并明确点名 `liveReg := shadowReg` 取旧值不满足。因此本条不是 settled 设计选择，而是待修差距 R1；实施时本条软件义务与对应用例都要撤掉。差距、代价与 sequencing 见 `doc/queen_v3_gap.md`。用户 2026-11-18 裁定 R1–R4 全部搁置，等 Queen 侧继续完善。*
 
 #### 6.1.1 单批接收与拍前检查
 
-当响应 pending 位图为空时，四路均可接收命令；本拍所有 `cmd[i].fire` 组成一批。允许任意混合读写以及任意稀疏 lane 子集同拍 fire，例如仅 lane1 与 lane3；低层不要求 lane0 起的连续前缀，也不要求各路 op 相同。未 fire 的 lane 不属于本批，不预留其响应，也不能在后续拍补入本批。每批最多四条命令，每个 lane 至多一条。
+当响应 pending 位图为空时，四路均可接收 REG_WRITE1/REG_WRITE2/REG_READ；本拍所有 `cmd[i].fire` 组成一批。允许任意混合读写以及任意稀疏 lane 子集同拍 fire，例如仅 lane1 与 lane3；低层不要求 lane0 起的连续前缀，也不要求各路 op 相同。未 fire 的 lane 不属于本批，不预留其响应，也不能在后续拍补入本批。每批最多四条命令，每个 lane 至多一条。
 
-`cmd[i].ready` 只受第 6.2 节单批未消费响应反压，不直接受执行事务在途门控。所有命令的合法性与 `inFlight` 保护均使用 `cmd.fire` 拍之前的状态独立检查；不得让某 lane 的 START、同拍 done 或配置错误先改变其它 lane 的合法性。拍前 `inFlight=0` 时，同批配置写与非零 START 可同时合法；拍前 `inFlight=1` 时，即使本拍 done/配置错误清除在途，配置写与非零 START 仍被拒绝。
+读写命令的 `cmd[i].ready` 只受第 6.2 节单批未消费响应反压，不受执行事务在途门控。`RUN` 额外受两项门控：拍前 `inFlight=0`（等价于 `cfgCredit>0`，见第 6.8 节），且本批只授权一条 `RUN`——按 lane 编号升序取最低 valid 的 `RUN` lane（lane0 优先，与第 6.1.2 节写仲裁的高 lane 优先相反），其余 `RUN` lane 本拍 ready 为 0，保持 valid 等待。授权只看 valid，不看 fire，不构成 ready↔valid 组合环。
 
-`inFlight` 在本批合法非零 START 仲裁产生启动时置位，覆盖启动脉冲前、CalcConfig 配置阶段、执行及最终排空，直到 Executor done 或 CalcConfig 配置错误脉冲清除；不能用 Executor busy 代替该保护状态。
+所有命令的合法性检查均使用 `cmd.fire` 拍之前的状态；不得让某 lane 的 `RUN`、同拍 done 或配置错误先改变其它 lane 的合法性。`RUN` 的门控同样用拍前 `inFlight`：本拍 done/配置错误清除在途时，该边沿仍按拍前 `inFlight=1` 拒绝 `RUN`，credit 在下一拍才为 1，等待中的 `RUN` 于下一拍准入。
+
+`inFlight` 在 `RUN` 被接受时置位，覆盖启动脉冲前、CalcConfig 配置阶段、执行及最终排空，直到 Executor done 或 CalcConfig 配置错误脉冲清除；不能用 Executor busy 代替该保护状态。
 
 | 命令项 | 拍前 `inFlight=0` | 拍前 `inFlight=1` |
 |---|---|---|
 | REG_READ | 允许 | 允许 |
-| 配置寄存器写（`0x00–0x0B`） | 允许 | 拒绝，`resp.err=1` |
-| 非零 START 写 | 允许，参与启动仲裁 | 拒绝，`resp.err=1` |
-| 零 START 写 | no-op | no-op |
+| 配置寄存器写（`0x00–0x0B`） | 允许，写 shadow | 允许，写 shadow；live 不变 |
+| RUN | 允许，本批仅最低 `RUN` lane 获授权 | ready=0，停等（不是 `resp.err`） |
 | IRQ_MASK / IRQ_CLEAR 写 | 允许 | 允许 |
 | 已知只读寄存器写 | 拒绝，`resp.err=1` | 拒绝，`resp.err=1` |
 | 保留索引写 | no-op | no-op |
-| 非法操作码 | 拒绝，`resp.err=1` | 拒绝，`resp.err=1` |
 
-保留索引读取返回 0；已知只读寄存器与保留索引的区别以第 8.3 节为准。配置写即使写入值与当前相同，仍按配置写执行在途检查。接口拒绝不产生配置错误 IRQ，也不参与写仲裁或 WRITE_CONFLICT。
+保留索引读取返回 0；已知只读寄存器与保留索引的区别以第 8.3 节为准。接口拒绝不产生配置错误 IRQ，也不参与写仲裁或 WRITE_CONFLICT。`RUN` 的 ready 停等不产生响应，也不置任何错误位。
 
-REG_WRITE2 的两项必须先整体检查：任何一项被拒绝，整条命令 `resp.err=1`，两项均无效，不更新配置或 IRQ_MASK、不执行 W1C，也不触发 start；两项均不得参与仲裁或阻挡其它合法 lane。拒绝不阻止同拍外部完成/错误事件的正常捕获。保留索引或 START 零写本身是合法 no-op，不使另一合法项被拒绝。
+REG_WRITE2 的两项必须先整体检查：任何一项被拒绝，整条命令 `resp.err=1`，两项均无效，不更新配置或 IRQ_MASK、不执行 W1C；两项均不得参与仲裁或阻挡其它合法 lane。拒绝不阻止同拍外部完成/错误事件的正常捕获。保留索引写本身是合法 no-op，不使另一合法项被拒绝。
 
 #### 6.1.2 合法写入的逐地址仲裁
 
@@ -666,25 +688,24 @@ REG_WRITE2 的两项必须先整体检查：任何一项被拒绝，整条命令
 
 - 普通可写寄存器同址时 slot1（`data1`）胜；包括配置寄存器与 IRQ_MASK，字段截取和保留位处理仍按该寄存器定义。
 - 同一 lane 两项 IRQ_CLEAR 的低 11 bit 按位 OR，作为该 lane 的一个清除候选。
-- 同一 lane 两项 START 仅非零值参与，非零项按位 OR，至多形成一个启动候选；零项不触发、不阻挡非零项，也不计冲突。START 数据不存储。
 
-跨 lane 对每个实际可写目标地址按 `lane3 > lane2 > lane1 > lane0` 仲裁。实际目标为配置寄存器（`0x00–0x0B`）、IRQ_MASK、IRQ_CLEAR，以及非零 START；读、保留索引 no-op 与 START 零写不提供目标。普通同址写由最高 lane 覆盖该地址的整项写入，不做跨 lane 寄存器位域合并。
+跨 lane 对每个实际可写目标地址按 `lane3 > lane2 > lane1 > lane0` 仲裁。实际目标为配置寄存器（`0x00–0x0B`）、IRQ_MASK、IRQ_CLEAR；读、保留索引 no-op 与 `RUN` 不提供写目标。普通同址写由最高 lane 覆盖该地址的整项写入，不做跨 lane 寄存器位域合并。
 
 落败的冲突字段不生效，该命令其它不冲突或在其目标上胜出的字段仍生效，且整条合法命令 `resp.err=0`。REG_WRITE2 的原子性仅指合法性拒绝时整条无副作用；合法后的两个 slot 按地址分别仲裁，不保证跨 lane 时两个 slot 一起获胜，也不因其中一个落败而撤销另一个。例如 lane0 双写 A_ADDR/B_ADDR、lane3 单写 A_ADDR：A_ADDR 取 lane3，B_ADDR 仍取 lane0，两条 ACK 均 `err=0`。
 
 IRQ_CLEAR 跨 lane 只使用最高 lane 的候选，禁止跨 lane OR；合法的 CLEAR 写即使数据为 0 也参与仲裁并阻挡低 lane 的 CLEAR。例如 lane3 CLEAR=0、lane0 CLEAR=1，不清 bit0，并形成跨 lane 同址写冲突。新事件仍按第 8.8、11.2 节优先于获胜 W1C。
 
-跨 lane START 只在合法且非零的候选中选择最高 lane，其 PC/tag 取自该 lane 的整条命令。高 lane START=0 不阻挡低 lane 非零 START；多个合法非零 START 同址参与写冲突判定，但本批仅安排一次启动、一次元数据捕获和一个下一拍的一拍 start 脉冲。
-
-本批所有 winning 配置在接受拍生效，下一拍 start 使用这些配置；不限于与 START 同一 lane 或同一条 REG_WRITE2 的配置项，配置与 START 在命令两项中的顺序均适用。不建立 shadow 配置组。响应反压不延迟或重复写提交、`inFlight` 置位、元数据捕获或启动。
+获授权的 `RUN` 在接受拍置位一次 `inFlight`、捕获一次该命令的 PC/tag，并在下一拍产生一个一拍 start 脉冲；live 组在同一接受拍更新，故下游在 start 拍看到的就是本次提交的配置。`RUN` 不是写命令，与任何配置地址同批都不形成 WRITE_CONFLICT。响应反压不延迟或重复写提交、live 提交、`inFlight` 置位、元数据捕获或启动。
 
 #### 6.1.3 读取快照
 
-每条 REG_READ 在其 `cmd.fire` 拍捕获拍前寄存器值到对应响应 slot，不旁路任何 lane 的同拍写。配置寄存器、STATUS、IRQ_RAW、IRQ_MASK、IRQ_MASKED 与 ERROR_CODE 均使用拍前快照；同拍 START 引起的 `inFlight` 置位、CLEAR/MASK 写、WRITE_CONFLICT、完成/配置错误/DMA 新事件不会改写这条读响应。START、IRQ_CLEAR 与保留索引的读取仍为 0。快照在响应背压期间保持，不在响应输出或消费时重新取值。
+每条 REG_READ 在其 `cmd.fire` 拍捕获拍前寄存器值到对应响应 slot，不旁路任何 lane 的同拍写。配置寄存器读的是 shadow 组的拍前值；STATUS、IRQ_RAW、IRQ_MASK、IRQ_MASKED 与 ERROR_CODE 同样使用拍前快照。同拍 `RUN` 引起的 `inFlight` 置位、CLEAR/MASK 写、WRITE_CONFLICT、完成/配置错误/DMA 新事件不会改写这条读响应。IRQ_CLEAR 与保留索引的读取仍为 0。快照在响应背压期间保持，不在响应输出或消费时重新取值。
 
 ### 6.2 普通响应接口
 
 本节单批 slots/pending、响应顺序与反压契约已验证。
+
+*Note（已知不合规，待改）：本节的批缓存回执模型与 Queen 接口 v3.0.0 §16.6 冲突——该章要求写 beat 的 `cmd.ready` 恒 1、`WRITE` 不得被未取走的回执反压、且**回执与命令同拍**（`resp.valid = accept`）并按 lane 区分不丢。当前实现是注册下一拍 + 单条 resp 升序串行 + 任何 pending 时全 lane ready 低，三点都不满足。这是待修差距 R2，也是四项中唯一动顶层端口形状与共享 TB 基类的一项，详见 `doc/queen_v3_gap.md`。用户 2026-11-18 裁定搁置。*
 
 `resp` 保持单一带 ready/valid 握手的输出流，不扩展为四路：
 
@@ -702,9 +723,9 @@ IRQ_CLEAR 跨 lane 只使用最高 lane 的候选，禁止跨 lane OR；合法�
 
 最后一个响应 fire 的当拍，拍前 pending 仍非空，因此所有 lane ready 仍为 0，不同拍接入下一批；最后响应 fire 后的下一拍 pending 才为空，四路可接下一批。若无 pending，resp.valid=0。不存在本批读未消费时穿插下一批写入或用最后一次 resp.fire 组合直通接收的例外。
 
-REG_WRITE1/REG_WRITE2 的 ACK 不等待计算结束；`resp.err=0` 只表示接口接受该寄存器操作，不表示每个写字段都仲裁获胜、配置合法、GEMM 已完成或结果无错误。`resp.err=1` 表示第 6.1 节定义的逐命令拒绝，该命令整体无副作用。WRITE_CONFLICT 不改变任一响应的 err。
+REG_WRITE1/REG_WRITE2 的 ACK 不等待计算结束；`resp.err=0` 只表示接口接受该寄存器操作，不表示每个写字段都仲裁获胜、配置合法、GEMM 已完成或结果无错误。`RUN` 的 ACK 同样只表示提交被接受（shadow 已进 live、`inFlight` 已置位），`data=0`、`err=0`；credit 不足时 `RUN` 停在 ready 低，不产生 ACK 也不产生 err。`resp.err=1` 表示第 6.1 节定义的逐命令拒绝，该命令整体无副作用。WRITE_CONFLICT 不改变任一响应的 err。
 
-运行期配置检查和 DMA 故障不改变已返回或待返回的 ACK，不通过 `resp.err` 上报；它们通过 IRQ_RAW、ERROR_CODE 与 irq 观测。软件必须先确认 START 写 ACK 成功，并结合本批 START 仲裁选择，再按第 13.1 节区分配置错误、执行完成、DMA 错误和 WRITE_CONFLICT，不能仅凭 ACK、irq 电平或 busy 变化判断成功完成。
+运行期配置检查和 DMA 故障不改变已返回或待返回的 ACK，不通过 `resp.err` 上报；它们通过 IRQ_RAW、ERROR_CODE 与 irq 观测。软件必须先确认 `RUN` 的 ACK 成功，再按第 13.1 节区分配置错误、执行完成、DMA 错误和 WRITE_CONFLICT，不能仅凭 ACK、irq 电平或 busy 变化判断成功完成。
 
 ### 6.3 Tracing 接口
 
@@ -713,10 +734,10 @@ REG_WRITE1/REG_WRITE2 的 ACK 不等待计算结束；`resp.err=0` 只表示接�
 | 字段 | 宽度 | 含义 |
 |---|---:|---|
 | `state` | 2 | 0=start，1=done，3=configuration error |
-| `pc` | 32 | 本批最高合法非零 START lane 的整条命令携带的 PC |
-| `tag` | 8 | 本批最高合法非零 START lane 的整条命令携带的 tag |
+| `pc` | 32 | 获授权 `RUN` 命令携带的 PC |
+| `tag` | 8 | 获授权 `RUN` 命令携带的 tag |
 
-四路 START 元数据选择契约已验证：REG_WRITE2 中的 START 使用整条命令的 PC/tag；同 lane 两项非零 START 合并一次，跨 lane 仅最高合法非零 START lane 胜出，本批只捕获一次该命令的 PC/tag。普通配置写、读取、IRQ 写、零 START 写、被拒绝命令以及落败 lane 的 START 均不捕获启动元数据。高 lane 零 START 不阻挡低 lane 非零 START。start 事件与 WorkerBeeRegIf 在本批命令接受后一拍产生的单个 start 对应，不因响应反压延后或重复，不把普通 ACK 当作 tracing 完成事件。
+元数据选择契约已验证：本批只有一条 `RUN` 获授权（最低 valid 的 `RUN` lane），PC/tag 取自该条命令。普通配置写、读取、IRQ 写、被拒绝命令以及未获授权的 `RUN` lane 均不捕获启动元数据。start 事件与 WorkerBeeRegIf 在 `RUN` 接受后一拍产生的单个 start 对应，不因响应反压延后或重复，不把普通 ACK 当作 tracing 完成事件。
 
 可靠性边界见第 11.4 节，首次配对限制不变。
 
@@ -768,6 +789,28 @@ Scale 端口只在编译期包含 MX 硬件时存在。
 ### 6.7 性能事件接口
 
 `perf` 为无握手输出 Bundle，各事件均为 1-bit 电平。事件定义与计数口径见第 11.3 节。
+
+### 6.8 配置 credit 接口
+
+`cfgCredit` 为 1-bit 电平输出，无 ready/valid 握手，表示设备还能接受的 `RUN` 数：
+
+| 条件 | `cfgCredit` |
+|---|---:|
+| `inFlight=0` | 1 |
+| `inFlight=1` | 0 |
+
+契约：
+
+- credit 只门控 `RUN`。REG_WRITE1/REG_WRITE2/REG_READ 不检查 credit，执行期随时可写读 shadow 组。
+- 本设备只有一组 live 执行上下文，故 credit 深度为 1、位宽 1 bit。`RUN` 被接受即占满，直到 Executor done 或 CalcConfig 配置错误脉冲才归还；DMA 错误不归还 credit。
+- 归还发生在**结束在途那一拍之后的下一拍**：`cfgCredit` 与 `RUN` 的 ready 都取拍前 `inFlight`，故 done/配置错误脉冲当拍仍为 0，下一拍才为 1。等待中的 `RUN` 在下一拍准入，不存在同边沿直通。
+- 上游一个 beat 内至多一条 `RUN` 且为末条有效 lane（Queen 侧保证），credit 只会被本设备自己接受的 `RUN` 占用，电平检查无竞争。
+- credit 为 0 时 `RUN` 在派发级停等（ready 低），不产生 ACK、不置错误位；上游后续指令按程序序等待。
+- 要让上游在执行期就提交下一个 `RUN`，需要第三组配置缓冲；当前不做，见第 14.2 节。
+
+*Note（已知不合规，待改）：Queen 接口 v3.0.0 §16.5/16.6 把设备端口定义为 `ready_start`（Bool），credit 计数不外露、不设 `CFG_CREDIT`；Queen adapter 端口已是 `readyStart: Bool`。本设备外露的 `cfgCredit: UInt(1.W)` 在深度 1 时与之信息等价、且不依赖 `cmd.valid`（语义已合规），差的是端口名与类型，属待修差距 R3。另 §16.5 要求必须外露 `completion: Decoupled{sequence,error,code,hwSignal}` 与**强 idle**，本设备目前只有 `status`/`irq`，两者皆缺，属差距 R4；其 sequence/cmdTag/swTag 映射两侧均未定。详见 `doc/queen_v3_gap.md`。*
+
+*Note：Queen 契约 §9.1 的 `hwSignal`（RUN 接受时锁存硬件信号目标、随 completion 回传、`error=1` 不得携带有效目标）尚未实现。用户 2026-11-18 裁定先不做，等 Queen 侧继续迭代完善；本版不定义其地址、位域或时序。*
 
 ## 7. 数据表示规范
 
@@ -1004,7 +1047,7 @@ bias 和 rqM 共用 ScaleA DMA 物理读口；两者同时启用时，硬件先�
 
 ### 8.3 寄存器索引总表
 
-寄存器索引为 6 bit，范围 `0x00–0x3F`。配置存储由 WorkerBeeRegIf 持有；四路共享这一固定 bank（共享与仲裁契约已验证），不按 lane 复制寄存器。地址映射、配置字段的既有位布局与计算含义不变，仅中断有效位扩展到低 11 bit。
+寄存器索引为 10 bit，与上游 QWR1/QRD 的地址字段等宽。配置区 `0x00–0x0B` 落在 6-bit 相邻基址窗口内，可由 QWR2 双写；状态/IRQ 区从 `0x40` 起，超出该窗口，只能由 QWR1/QRD 单条访问。配置存储由 WorkerBeeRegIf 持有，分为 shadow 与 live 两组（见第 6.1.0 节）；四路共享这两组固定 bank（共享与仲裁契约已验证），不按 lane 复制寄存器。地址映射、配置字段的既有位布局与计算含义不变，仅中断有效位扩展到低 11 bit。
 
 | 索引 | 名称 | 访问 | 含义 |
 |---:|---|---|---|
@@ -1020,17 +1063,18 @@ bias 和 rqM 共用 ScaleA DMA 物理读口；两者同时启用时，硬件先�
 | `0x09` | BIAS_ADDR | RW | Bias 基地址 |
 | `0x0A` | RQ_M_ADDR | RW | Requant 乘数基地址 |
 | `0x0B` | RQ_PARAM | RW | Zero-point 和 shift |
-| `0x0C–0x0F` | RESERVED | — | 读 0，写 no-op |
-| `0x10` | START | 写触发 / 读 0 | 非零写触发一次启动，零写 no-op |
-| `0x11–0x1D` | RESERVED | — | 读 0，写 no-op |
-| `0x1E` | STATUS | RO | executorBusy、inFlight、progress |
-| `0x1F–0x2F` | RESERVED | — | 读 0，写 no-op |
-| `0x30` | IRQ_RAW | RO | 低 11 bit 分源粘滞完成/错误/WRITE_CONFLICT 事件 |
-| `0x31` | IRQ_MASK | RW | 低 11 bit 中 bit=1 屏蔽对应中断源；复位 `0x000007FF` |
-| `0x32` | IRQ_MASKED | RO | 低 11 bit 为 `IRQ_RAW & ~IRQ_MASK`，高 21 bit 为 0 |
-| `0x33` | IRQ_CLEAR | W1C / 读 0 | 低 11 bit 写 1 清对应 RAW；bit 1 同步清 ERROR_CODE |
-| `0x34` | ERROR_CODE | RO | 低 4 bit 为首个未清配置错误码 |
-| `0x35–0x3F` | RESERVED | — | 读 0，写 no-op |
+| `0x0C–0x3F` | RESERVED | — | 读 0，写 no-op |
+| `0x40` | STATUS | RO | executorBusy、inFlight、progress |
+| `0x41` | IRQ_RAW | RO | 低 11 bit 分源粘滞完成/错误/WRITE_CONFLICT 事件 |
+| `0x42` | IRQ_MASK | RW | 低 11 bit 中 bit=1 屏蔽对应中断源；复位 `0x000007FF` |
+| `0x43` | IRQ_MASKED | RO | 低 11 bit 为 `IRQ_RAW & ~IRQ_MASK`，高 21 bit 为 0 |
+| `0x44` | IRQ_CLEAR | W1C / 读 0 | 低 11 bit 写 1 清对应 RAW；bit 1 同步清 ERROR_CODE |
+| `0x45` | ERROR_CODE | RO | 低 4 bit 为首个未清配置错误码 |
+| `0x46–0x3FF` | RESERVED | — | 读 0，写 no-op |
+
+`0x00–0x0B` 的 RW 指 shadow 组：写入立即生效于 shadow，`RUN` 后才进入 live。STATUS 与 IRQ 区不属于任何一组配置缓冲，是独立的运行状态/事件寄存器，读写随时可用。
+
+启动没有寄存器地址：原 `START`=`0x10` 已删除，`0x10` 现为保留空洞（读 0、写 no-op、不启动）。原 `0x1E` STATUS 与 `0x30–0x34` IRQ 区同样已迁出，旧地址全部成为保留空洞。
 
 M/N_K/CONTROL/RQ_PARAM 的字段定义分别见第 8.4、8.5、8.7 节。A/B/C、scale、bias 与 rqM 地址寄存器保留既有地址宽度及字段处理规则，DMA `addrWidth` 与对齐/可访问范围约束不变。
 
@@ -1084,21 +1128,29 @@ M、N、K 均为 16-bit 无符号值。
 
 `AddrMode` 编码定义为 MAT/TILE，但当前主数据通路没有消费这三个字段；软件应写 0，不能依赖 TILE 模式改变 DMA 地址行为。
 
-### 8.6 STATUS 与 START
+### 8.6 STATUS 与 RUN
 
-`STATUS` 位于索引 `0x1E`：
+`STATUS` 位于索引 `0x40`：
 
 | Bits | 字段 | 含义 |
 |---|---|---|
 | `[0]` | `executorBusy` | Executor 非 IDLE，与 `io.status.busy` 相同 |
 | `[1]` | Reserved | 0 |
-| `[2]` | `inFlight` | 有效启动写已接受，尚未收到 done 或配置错误脉冲 |
+| `[2]` | `inFlight` | `RUN` 已接受，尚未收到 done 或配置错误脉冲 |
 | `[15:3]` | Reserved | 0 |
 | `[31:16]` | `progress` | 已完成 `(N,K)` pass 数 |
 
 STATUS 不含完成、错误标志或错误码；写入拒绝，`resp.err=1`。`executorBusy` 可能在 `inFlight=1` 的启动/配置阶段仍为 0。任务结果必须读取 IRQ_RAW 与 ERROR_CODE，不能以 STATUS 的保留位或 busy 单独判断。
 
-`START` 位于索引 `0x10`，读返回 0，不存储写数据。四路 START 契约已验证：命令整体合法后，非零 32-bit 写值参与启动仲裁，零写不触发、不阻挡也不计冲突。同 lane 两项非零 START 按位 OR 合并一次，跨 lane 选择最高合法非零 START lane；本批只在接受拍置位一次 `inFlight`、捕获一次胜出命令的 PC/tag，并在下一拍产生一个一拍 start。计算使用本批所有 winning 配置。START 不清除 IRQ_RAW、IRQ_MASK 或 ERROR_CODE；在途拍前检查和 REG_WRITE2 的整体拒绝/逐地址仲裁规则见第 6.1 节。STATUS 与其它寄存器读均按第 6.1.3 节取拍前快照，不旁路本拍 START、写入或新事件。
+启动由 `WorkerBeeOp.RUN` 命令完成，没有寄存器地址（原 `START`=`0x10` 已删除，该索引现为保留空洞）。RUN 契约已验证：
+
+- `RUN` 不携带配置，`reg0Addr/reg1Addr/data0/data1` 全部被忽略；即使地址指向只读或 IRQ 寄存器也不产生写、拒绝或 W1C 副作用。
+- 接受拍把 shadow 组整组拷贝进 live 组、置位一次 `inFlight`、捕获一次该命令的 PC/tag，下一拍产生一个一拍 start。计算使用**接受拍之前**的 shadow 值；同批配置写不属于本次提交（见第 6.1.0 节）。
+- 本批只授权最低 valid 的 `RUN` lane；其余 `RUN` lane ready 低、保持 valid 等待。`RUN` 不是写命令，不参与逐地址仲裁，也不形成 WRITE_CONFLICT。
+- 拍前 `inFlight=1`（`cfgCredit=0`）时 `RUN` 停在 ready 低，不产生 ACK 或 err；done/配置错误脉冲当拍仍拒绝，下一拍才准入。
+- `RUN` 不清除 IRQ_RAW、IRQ_MASK 或 ERROR_CODE。
+
+STATUS 与其它寄存器读均按第 6.1.3 节取拍前快照，不旁路本拍 `RUN`、写入或新事件。
 
 ### 8.7 RQ_PARAM
 
@@ -1112,7 +1164,7 @@ STATUS 不含完成、错误标志或错误码；写入拒绝，`resp.err=1`。`
 
 本节新增 WRITE_CONFLICT、低 11 bit 扩展及四路 CLEAR/MASK 仲裁相关契约已验证；既有完成/DMA 事件源与配置错误首码规则保持不变。
 
-#### 8.8.1 IRQ_RAW（`0x30`，RO）
+#### 8.8.1 IRQ_RAW（`0x41`，RO）
 
 IRQ_RAW 捕获以下分源事件并保持，直至对应 W1C 或复位；读取没有副作用，捕获不受 IRQ_MASK 影响。
 
@@ -1131,23 +1183,23 @@ IRQ_RAW 捕获以下分源事件并保持，直至对应 W1C 或复位；读取�
 | 10 | WRITE_CONFLICT | 同一接受批中，不同 lane 的已接受且整条合法写命令具有相同实际可写目标地址 |
 | `[31:11]` | Reserved | 高 21 bit 读 0，无事件源 |
 
-WRITE_CONFLICT 的实际目标与第 6.1.2 节相同：配置寄存器、IRQ_MASK、IRQ_CLEAR、非零 START。按 lane 内归并后的目标集合判定，只要至少两个不同 lane 指向同一实际可写地址即形成事件，即便 data 相同或经字段截取后结果相同。IRQ_CLEAR=0 仍有实际目标，会阻挡低 lane，也可形成冲突；START=0 没有实际目标。
+WRITE_CONFLICT 的实际目标与第 6.1.2 节相同：配置寄存器、IRQ_MASK、IRQ_CLEAR。按 lane 内归并后的目标集合判定，只要至少两个不同 lane 指向同一实际可写地址即形成事件，即便 data 相同或经字段截取后结果相同。IRQ_CLEAR=0 仍有实际目标，会阻挡低 lane，也可形成冲突；RUN 不是写命令，没有实际目标。
 
-读写同址、同 lane 两项重复、整条被拒绝命令的任何项、保留索引 no-op 和 START 零写均不形成该事件。同拍多个地址或多个 lane 对的冲突只汇聚为一个 `newEvents[10]`，不记录次数。RAW bit10 粘滞直到 W1C/复位，fresh event 优先于同拍 W1C。该事件仅报告确定性仲裁中的跨 lane 写竞争，不改变命令 err、ERROR_CODE 或 inFlight，不撤销 winning 写入，也不终止任务。
+读写同址、同 lane 两项重复、整条被拒绝命令的任何项、保留索引 no-op 和 RUN 均不形成该事件。同拍多个地址或多个 lane 对的冲突只汇聚为一个 `newEvents[10]`，不记录次数。RAW bit10 粘滞直到 W1C/复位，fresh event 优先于同拍 W1C。该事件仅报告确定性仲裁中的跨 lane 写竞争，不改变命令 err、ERROR_CODE 或 inFlight，不撤销 winning 写入，也不终止任务。
 
-#### 8.8.2 IRQ_MASK（`0x31`，RW）与 IRQ_MASKED（`0x32`，RO）
+#### 8.8.2 IRQ_MASK（`0x42`，RW）与 IRQ_MASKED（`0x43`，RO）
 
 IRQ_MASK 仅低 11 bit 有效：1=屏蔽对应源，0=允许该源驱动 irq。复位值为 `0x000007FF`（`0x7FF`），全部源默认屏蔽；高 21 bit 写入忽略，读回为 0。合法写按第 6.1.2 节同 lane slot1 优先、跨 lane 最高 lane 优先。修改屏蔽不清除或阻止 RAW 捕获，已经 pending 的源解除屏蔽后即可驱动 irq。不存在额外 ENABLE 寄存器。
 
 IRQ_MASKED 读返回 `IRQ_RAW & ~IRQ_MASK`，高 21 bit 为 0；读取不清事件。IRQ_RAW 与 IRQ_MASKED 的写入均拒绝。
 
-#### 8.8.3 IRQ_CLEAR（`0x33`，W1C / 读 0）
+#### 8.8.3 IRQ_CLEAR（`0x44`，W1C / 读 0）
 
 仅低 11 bit 有效，写 1 清对应 IRQ_RAW 位，写 0 保持；高 21 bit 写入忽略，读取恒为 0。写 bit 1 同步清除 ERROR_CODE，写 bit10 清 WRITE_CONFLICT。先将同一 lane 的两个 IRQ_CLEAR 数据低 11 bit 按位 OR，再在跨 lane 候选中仅选最高 lane 执行 W1C；不跨 lane OR。CLEAR=0（包括仅写保留高位）仍参与地址仲裁，可阻挡低 lane 清除。整条命令被拒绝时，其两项既不清位也不参与仲裁。
 
-同一拍 CLEAR 与新事件作用于同一 RAW 位时，新事件优先，RAW 保持置位；包括 CLEAR 冲突自身产生的新 bit10。IRQ_CLEAR 不终止任务，不清 `inFlight` 或 progress；START、普通读取、完成事件和屏蔽写均不自动清 RAW。
+同一拍 CLEAR 与新事件作用于同一 RAW 位时，新事件优先，RAW 保持置位；包括 CLEAR 冲突自身产生的新 bit10。IRQ_CLEAR 不终止任务，不清 `inFlight` 或 progress；RUN、普通读取、完成事件和屏蔽写均不自动清 RAW。
 
-#### 8.8.4 ERROR_CODE（`0x34`，RO）
+#### 8.8.4 ERROR_CODE（`0x45`，RO）
 
 `[3:0]` 保存首个未清配置错误码，`[31:4]` 读 0；复位为 0。错误码含义和 CalcConfig 同次检查的优先级见第 10.1–10.3 节。
 
@@ -1155,7 +1207,7 @@ IRQ_MASKED 读返回 `IRQ_RAW & ~IRQ_MASK`，高 21 bit 为 0；读取不清事�
 - 原 `IRQ_RAW[1]=1` 且本拍不清 bit 1 时，后续配置错误只保持 pending，不覆盖 ERROR_CODE；
 - CLEAR bit 1 与新配置错误同拍时，捕获新错误码且 RAW bit 1 保持置位；
 - CLEAR bit 1 且无新配置错误时，ERROR_CODE 清零，与 RAW bit 1 同步；
-- START 不清 ERROR_CODE，DMA 错误和完成事件不修改 ERROR_CODE。
+- RUN 不清 ERROR_CODE，DMA 错误和完成事件不修改 ERROR_CODE。
 
 错误码 0 本身是有效配置错误码；是否有 pending 配置错误必须看 IRQ_RAW[1]，不得通过 ERROR_CODE 是否非零判断。
 
@@ -1171,17 +1223,17 @@ WorkerBee 使用 Chisel `Module` 的隐式 clock/reset 接口。本文不固定�
 
 ### 9.2 初始化与执行在途约束
 
-本节四路接收、拍前快照/保护、单批反压与 START 时序/元数据契约已验证。
+本节四路接收、拍前快照、单批反压、RUN 提交时序/元数据与 credit 契约已验证。
 
-WorkerBeeRegIf 在批接收拍对各 lane 命令整体检查，再对合法写入逐地址仲裁。全部 winning 配置在该 `cmd.fire` 拍提交；本批存在合法非零 START 候选时仅最高 lane 胜出，在接受拍置位一次 `inFlight` 并捕获一次胜出命令的 PC/tag，下一拍输出一个一拍 start，计算使用本批所有 winning 配置。单写 START、同 lane 配置+START 双写和跨 lane 配置/START 同批均使用这一时序；同 lane 两项非零 START 按位 OR 合并一次，零 START 不阻挡非零候选。不建立 shadow 配置组。ACK 不等待启动检查或任务完成；响应反压也不延迟或重复写提交或启动副作用。
+WorkerBeeRegIf 在批接收拍对各 lane 命令整体检查，再对合法写入逐地址仲裁。全部 winning 配置写在该 `cmd.fire` 拍提交进 shadow 组；获授权的 RUN 在同一接受拍把 shadow 整组拷贝进 live 组、置位一次 `inFlight` 并捕获一次该命令的 PC/tag，下一拍输出一个一拍 start。计算使用**接受拍之前**的 shadow 值，同批配置写留给下一次 RUN。本批仅授权最低 valid 的 RUN lane，其余 RUN lane ready 低等待。ACK 不等待启动检查或任务完成；响应反压也不延迟或重复写提交、live 提交或启动副作用。
 
-同批各读命令在接受拍捕获拍前快照，包含 STATUS 与 IRQ 寄存器，不旁路同拍写/启动/新事件。合法性与 inFlight 保护也仅使用拍前状态：本拍 done/配置错误不使拍前在途配置写或非零 START 变为合法，同批 START 不使原本拍前空闲的其它 lane 配置写变为非法。
+同批各读命令在接受拍捕获拍前快照，配置寄存器读 shadow 组，STATUS 与 IRQ 寄存器读独立状态，不旁路同拍写/启动/新事件。RUN 门控仅使用拍前 `inFlight`：本拍 done/配置错误清除在途时该边沿仍拒绝 RUN，下一拍才准入。配置写不受 inFlight 门控，同批 RUN 也不使其它 lane 的配置写变为非法。
 
 本批四 slots/pending 中任何响应未消费时（尤其有 pending 读时），四路 ready 全低；pending 只在各自 `resp.fire` 清除，响应背压时 data/err/laneId 稳定。最后响应 fire 的当拍不接新批，下一拍才可接新批。读响应阻塞不推迟本批已合法写入的提交或下一拍 start，不能把响应排空当作写提交点。
 
 CalcConfig 检查通过后，有效执行启动时的工作 FIFO flush 与状态迁移见第 5.1.4 节。`inFlight` 持续覆盖配置与执行阶段，在 Executor done 或 CalcConfig 配置错误脉冲时清除，错误是否被屏蔽或软件是否清 IRQ 不影响该状态。DMA 错误事件不清 `inFlight`，也不产生 fail-fast 终止。WRITE_CONFLICT 同样不清 `inFlight`、不修改 ERROR_CODE 或命令 err。
 
-在途期间允许 READ、IRQ_MASK/IRQ_CLEAR 写、零 START 写和保留索引 no-op；配置写和非零 START 写按第 6.1 节逐命令拒绝，而不是排队等待执行结束。上述允许仍须等单批响应排空，不绕过四路统一 ready 门控。
+在途期间允许 READ、配置写（落 shadow，live 不变）、IRQ_MASK/IRQ_CLEAR 写和保留索引 no-op，因此下一次任务的配置准备可与本次执行重叠。RUN 按第 6.1.1 节在 credit=0 时停在 ready 低等待，不是以 `resp.err` 拒绝。上述允许仍须等单批响应排空，不绕过四路统一 ready 门控。
 
 本文没有定义执行中复位对外部已接受 DMA 请求的取消、响应丢弃或结果回滚协议。系统必须先协调在途事务，再按其复位方案处理，不得把复位解释为完整的事务撤销机制。
 
@@ -1294,7 +1346,7 @@ ScaleC 通过独立 8-bit 写接口输出。当前实现的 ScaleC FIFO/在途�
 
 ### 10.4 配置错误行为
 
-本批合法非零 START 仲裁产生的单个延后一拍 start 触发运行期配置检查（四路 START 选择/时序已验证），检查本批全部 winning 配置；检查判据、优先级与首码保持规则不变。若配置非法：
+获授权 RUN 产生的单个延后一拍 start 触发运行期配置检查（RUN 选择/时序已验证），检查该次提交进 live 组的全部配置；检查判据、优先级与首码保持规则不变。若配置非法：
 
 - 不启动正常 GEMM；
 - CalcConfig 输出 `errPluse` 和按第 10.3 节选出的配置错误码；
@@ -1302,7 +1354,7 @@ ScaleC 通过独立 8-bit 写接口输出。当前实现的 ScaleC FIFO/在途�
 - `irq` 是否置高取决于 IRQ_MASK[1] 及其它未屏蔽 pending 源；
 - 若这是复位后的首次执行，tracing 输出 configuration error。
 
-配置错误不追溯修改 START 写的 ACK，也不通过 STATUS 或 `io.status.err` 上报。该检查失败路径以配置错误脉冲结束在途状态，不要求 Executor 产生完成事件。DMA 错误或 irq 电平本身不终止运行中的任务。
+配置错误不追溯修改 RUN 的 ACK，也不通过 STATUS 或 `io.status.err` 上报。该检查失败路径以配置错误脉冲结束在途状态，不要求 Executor 产生完成事件。DMA 错误或 irq 电平本身不终止运行中的任务。
 
 ### 10.5 DMA 错误与上报边界
 
@@ -1328,7 +1380,7 @@ DMA 错误不是 fail-fast：已发出的事务不会撤销，通道继续排空
 - `M≥1`、`N≥1`；M/N 为 0 会使内部减一计数回绕，可能越界运行或挂死；
 - 编程值 `N=Nprog` 且为 T 的整数倍；
 - A/B/C 和参数缓冲区实际可访问范围；
-- 配置写与非零 START 写必须在拍前 `inFlight=0` 时提交；在途违约由接口 `resp.err=1` 逐命令拒绝，不是运行期配置错误码；四路拍前检查/仲裁契约已验证，合法的跨 lane 写冲突仅置 WRITE_CONFLICT，不分配 errCode；
+- 配置写在任何时刻都合法（落 shadow 组），不产生在途违约错误；RUN 必须在拍前 `inFlight=0` 时提交，credit=0 时停在 ready 低等待，不置 `resp.err`、不是运行期配置错误码；四路拍前检查/仲裁契约已验证，合法的跨 lane 写冲突仅置 WRITE_CONFLICT，不分配 errCode；
 - 保留字段写 0；
 - 使用编译配置真正生成的 A/B 格式；
 - 外部 DMA 严格同序并对每个请求返回一个且仅一个响应。
@@ -1342,7 +1394,7 @@ DMA 错误不是 fail-fast：已发出的事务不会撤销，通道继续排空
 | 字段 | 含义 |
 |---|---|
 | `busy` | Executor 不在 IDLE；对应 STATUS.executorBusy |
-| `inFlight` | 有效非零 START 写已接受，尚未收到 Executor done 或 CalcConfig 配置错误脉冲 |
+| `inFlight` | RUN 已接受，尚未收到 Executor done 或 CalcConfig 配置错误脉冲 |
 | `progress` | 已完成的 `(N tile, K pass)` 数 |
 | `aOccupancy` | A FIFO 占用 |
 | `bOccupancy` | B FIFO 占用 |
@@ -1371,16 +1423,16 @@ IRQ_RAW[31:11]     = 0
 
 - RAW 粘滞且不受 mask 捕获门控；MASK 只影响 IRQ_MASKED 与 irq，低 11 bit 有效，高 21 bit 保留为 0；
 - 复位清 RAW 与 ERROR_CODE，MASK 复位为低 11 bit 全 1（`0x000007FF`），默认全屏蔽；
-- START 不清 RAW 或 ERROR_CODE；读取、完成和写 MASK 也不自动清除；
+- RUN 不清 RAW 或 ERROR_CODE；读取、完成和写 MASK 也不自动清除；
 - CLEAR/new 同拍时 fresh event 优先，包括 bit10；清 bit 1 同步处理 ERROR_CODE，首个未清配置错误码规则仍见第 8.8.4 节；
 - IRQ_RAW[0] 是完成 pending，不是无错误标志；IRQ_RAW[1] 是配置检查失败，IRQ_RAW[9:2] 是分源 DMA 响应错误，IRQ_RAW[10] 是跨 lane 实际写地址冲突；
-- WRITE_CONFLICT 即便 data 相同也捕获，但读写同址、同 lane 重复、拒绝命令、保留 no-op、START0 不算；同拍多个冲突只置一个 bit10，不影响响应 err、ERROR_CODE 或 inFlight；
+- WRITE_CONFLICT 即便 data 相同也捕获，但读写同址、同 lane 重复、拒绝命令、保留 no-op、RUN 不算；同拍多个冲突只置一个 bit10，不影响响应 err、ERROR_CODE 或 inFlight；
 - 错误 IRQ 可以早于完成，IRQ 本身不是任务终止信号，也不是 fail-fast；
 - 软件轮询应读取 IRQ_RAW，不依赖 MASK 是否允许 irq；irq 或 IRQ_MASKED 为 0 不代表没有错误或完成事件。
 
 IRQ_MASK 写也在接受拍按同 lane 普通同址 slot1 胜、跨 lane 最高 lane 胜提交，不因本批读 pending 或响应背压延后。所有 IRQ 寄存器读取是 `cmd.fire` 拍的拍前快照，不含本拍 CLEAR/MASK 更新或 fresh event；读取自身不清事件。
 
-RAW 不携带任务 tag，也不累计事件次数。这里的 IRQ pending 是事件粘滞位，与响应缓存 pending 位图不同。启动前必须按第 13.1–13.2 节清除旧事件并确认完成清除写的 ACK，避免把旧完成位误判为新任务完成；START 不提供隐式事件清除。
+RAW 不携带任务 tag，也不累计事件次数。这里的 IRQ pending 是事件粘滞位，与响应缓存 pending 位图不同。启动前必须按第 13.1–13.2 节清除旧事件并确认完成清除写的 ACK，避免把旧完成位误判为新任务完成；RUN 不提供隐式事件清除。
 
 ### 11.3 性能事件
 
@@ -1413,7 +1465,7 @@ OS-M1 的 Run 可同时缺 A 和 B，因此 stallA/stallB 可以同时为高；�
 
 ### 11.4 Tracing 可靠性边界
 
-tracing 保持既有首次可靠范围：只有复位后的第一次实际启动，保证产生配对的 start 与 done/configuration-error 事件；元数据为该批最高合法非零 START lane 的整条命令 PC/tag（四路选择契约已验证）。零写、被拒绝命令和落败 START lane 不另算执行启动；同 lane 两项或跨 lane 多个非零 START 候选均只产生一次启动，不产生第二个任务。
+tracing 保持既有首次可靠范围：只有复位后的第一次实际启动，保证产生配对的 start 与 done/configuration-error 事件；元数据为获授权 RUN 命令的 PC/tag（最低 RUN lane 授权契约已验证）。被拒绝命令和未获授权的 RUN lane 不另算执行启动；同批多个 RUN 候选只产生一次启动，不产生第二个任务。
 
 tracing 状态在首次启动后不会返回初始态，后续执行的 tracing 行为不属于可靠接口契约；此次重设计不扩展为多任务可靠配对。软件不得用 tracing 代替 IRQ_RAW/ERROR_CODE 的结果判断或 `inFlight` 的在途判断。
 
@@ -1445,7 +1497,7 @@ WS 的相邻 K pass 之间经 C buffer 回灌部分和：下一 pass 的第 r �
 
 ### 13.1 基本使用流程
 
-本节四路组批、响应 laneId/排空、拍前读、START 仲裁及 bit10 诊断相关用法已验证；数值与 DMA 软件义务不变。
+本节四路组批、响应 laneId/排空、拍前读、RUN 提交/credit 及 bit10 诊断相关用法已验证；数值与 DMA 软件义务不变。
 
 1. 复位后确认 `inFlight=0`；校验 `M≥1、Nlogical≥1、K≥1`，计算 `Nprog=ceil(Nlogical/T)×T`；
 2. 按 `Nprog` 准备 A、B、C 和可选 scale/bias/requant 缓冲区，并完成 B 转置、4-bit 打包和补齐列；
@@ -1454,7 +1506,7 @@ WS 的相邻 K pass 之间经 C buffer 回灌部分和：下一 pass 的第 r �
 5. bias 运行写入 BIAS_ADDR（`0x09`）；
 6. requant 运行写入 RQ_M_ADDR（`0x0A`）和 RQ_PARAM（`0x0B`）。配置批应避免跨 lane 同址写；合法冲突不令 ACK 报错，低 lane 的冲突字段可能不生效，其它字段仍可生效，不能认为 REG_WRITE2 两项必定一起获胜；
 7. 在上一任务已结束后读取并处理旧 IRQ_RAW/ERROR_CODE，向 IRQ_CLEAR 写 `0x000007FF` 清旧 pending（含 bit10），确认清除写 ACK 并排空本批；需要电平中断时将 IRQ_MASK 的相应位写 0，复位默认全部屏蔽。CLEAR 推荐只由一个 lane 提交；同批多 lane CLEAR 不 OR，最高 lane 的 CLEAR=0 也会阻挡低 lane。需要确认清后值时在后续批读取，同批读是清除前快照；
-8. 向 START（`0x10`）写非零值并确认 `resp.err=0`；建议每批仅一个非零 START 候选，确保预期启动命令与元数据。多个合法非零 START 时只有最高 lane 的 PC/tag 生效，本批仅启动一次；零 START 不触发也不阻挡。ACK 只确认接口接受，start 在接受后的下一拍产生，不等待响应消费。可按第 6.1 节用配置+START 双写或跨 lane 同批配置/START 提交最后的配置，本批所有 winning 配置都用于此次启动；
+8. 确认 `cfgCredit=1`（等价 `inFlight=0`）后发一条 `RUN` 并确认 `resp.err=0`；建议每批仅一个 RUN，确保预期启动命令与元数据。同批多个 RUN 时只有最低 lane 获授权，本批仅启动一次，其余 RUN 保持 valid 等待。ACK 只确认提交被接受，start 在接受后的下一拍产生，不等待响应消费。**RUN 不得与它所依赖的配置写同批**：它提交的是接受拍之前的 shadow 值，同批配置写属于下一次提交（第 6.1.0 节）；
 9. 轮询 IRQ_RAW，或在 irq 通知后读取 IRQ_RAW；不要只等 irq、busy 变化或任一非零 RAW 就认定完成。配置错误位 1 置位时读取 ERROR_CODE，并确认 `inFlight=0`；该路径不等待完成位。仅 DMA 错误位 `[9:2]` 置位时记录错误但继续等待 IRQ_RAW[0] 与在途结束，不提前回收缓冲区。bit10 是写仲裁冲突诊断，不是配置检查失败或完成，不改变 err、ERROR_CODE 或 inFlight；应核对实际 winning 配置与预期是否一致，不能因该 IRQ 提前回收缓冲区或在途重配；
 10. 完成位 0 置位后仍检查全部错误源；错误任务不能据完成位判为结果有效。若曾出现 WRITE_CONFLICT，另须依据逐地址仲裁核实实际配置是否符合软件意图，不能仅以全部 ACK 成功替代这一核实。无已上报错误的任务在满足输出存储/cache 一致性及既有 DMA/ScaleC 集成约束后消费 C；完成不扩展未标记内存错误的检测能力；
 11. 保存诊断信息后按需 W1C 清 pending；清 bit 1 同步清 ERROR_CODE，清 bit10 清冲突记录，fresh event 同拍优先于 W1C。若执行尚在途清错误位，软件须保留已观察错误记录，不能因此把该任务最终视为无错误。
@@ -1465,8 +1517,8 @@ IRQ_RAW（含 WRITE_CONFLICT）与 ERROR_CODE 跨启动保持；没有自动清�
 
 1. 确认 `inFlight=0`，并已处理上一任务的完成/配置错误及 DMA 错误，保存所需 bit10 诊断；不得在仅看到早期错误 IRQ 后立即启动下一任务；
 2. 保存旧 IRQ_RAW/ERROR_CODE 诊断，由一个 lane 写 IRQ_CLEAR 清除已处理事件，确认清除写 ACK 并排空该批；需要时在后续批读回 IRQ_RAW 确认不存在旧完成 pending，不用同批拍前读来确认本拍清除。同拍新事件会保持置位，不得当作清除失败而忽略；
-3. 更新配置并按 laneId 确认各 ACK，避免非预期同址冲突；在非零 START 写之前完成旧事件清除。START 本身不清 RAW 或 ERROR_CODE，配置与 START 可按第 6.1 节同批但仅使用 winning 配置；
-4. 在上一批最后响应 fire 后的下一拍或更晚提交下一批命令；提交下一次非零 START 写并确认 ACK，通过新的 IRQ_RAW 完成/配置错误事件与 `inFlight` 判断结束，再检查错误源与 WRITE_CONFLICT 诊断。
+3. 更新 shadow 配置并按 laneId 确认各 ACK，避免非预期同址冲突；在 RUN 之前完成旧事件清除。RUN 本身不清 RAW 或 ERROR_CODE。本步的配置写**可与上一任务执行重叠**（credit 只门控 RUN），但不得与本次 RUN 同批；
+4. 在上一批最后响应 fire 后的下一拍或更晚提交下一批命令；确认 `cfgCredit=1` 后发下一条 RUN 并确认 ACK，通过新的 IRQ_RAW 完成/配置错误事件与 `inFlight` 判断结束，再检查错误源与 WRITE_CONFLICT 诊断。
 
 轮询流程不依赖 mask；中断流程必须为所需源解除屏蔽并在通知后读 RAW 分辨来源。若选择保留旧事件，RAW 位不区分新旧任务且 ERROR_CODE 保留首个未清配置错误，不能据这些旧值完成新任务判定。所有 REG_READ、写 ACK、合法 no-op 和拒绝响应均参与本批排空；pending 读未 fire 时不允许任何 lane 接收下一批。
 
@@ -1479,12 +1531,12 @@ IRQ_RAW（含 WRITE_CONFLICT）与 ERROR_CODE 跨启动保持；没有自动清�
 - 正向 W4A8 的 B 基地址满足错误检查要求；
 - gather 可能访问的相邻对齐字均位于合法存储区；
 - B、C、bias、rqM 和 scale 均按 `Nprog` 提供完整补齐列；
-- 在拍前 `inFlight=1` 时不修改配置寄存器、不提交非零 START；硬件会逐命令以接口错误拒绝这类命令，不提供排队；本批其它合法 lane 不受拒绝命令阻挡（四路拍前检查/仲裁契约已验证）；
+- 在拍前 `inFlight=1` 时不提交 RUN；硬件让该 RUN 停在 ready 低等待 credit，不以接口错误拒绝、也不排队执行。配置写在此期间合法且只落 shadow 组，正在执行的 live 组不受影响；本批其它合法 lane 不受等待 RUN 阻挡（四路拍前检查/仲裁与 credit 契约已验证）；
 - 输出写回完成前，不回收或覆盖任何输入、参数和输出缓冲区；早期 DMA 错误 IRQ 不解除这一义务。
 
 ### 13.4 Cache 与一致性
 
-WorkerBee 接口本身不定义 cache coherence。若系统 DMA 与 CPU cache 不一致，软件必须在非零 START 写前 clean 输入和参数缓冲区，并在完成后 invalidate 输出缓冲区；具体操作由 SoC 平台定义。
+WorkerBee 接口本身不定义 cache coherence。若系统 DMA 与 CPU cache 不一致，软件必须在 RUN 前 clean 输入和参数缓冲区，并在完成后 invalidate 输出缓冲区；具体操作由 SoC 平台定义。若利用执行期重叠准备下一任务配置，须在该次 RUN 之前完成对应缓冲区的 clean。
 
 ## 14. 约束与实现限制
 
@@ -1499,12 +1551,12 @@ WorkerBee 接口本身不定义 cache coherence。若系统 DMA 与 CPU cache �
 - 默认配置的 C block 只允许 16；
 - W4A8 只支持 A8×B4，不支持 A4×B8；
 - `AddrMode`、`warmup`、`warmdown` 当前仅可读写，不改变数据通路；
-- 固定四路命令共享一个 bank/执行上下文，仅四 slots/pending 缓存一批响应；任意混合读写及稀疏 lane 同拍 fire，不要求连续前缀（四路相关契约已验证）；
-- 接口不排队执行任务；拍前在途配置写与非零 START 逐命令拒绝，但 READ 与 IRQ 写仍可用，均须遵守单批响应未排空时所有 lane ready 低；读 pending 只在 resp.fire 清，最后响应 fire 后下一拍可接下批（已验证）；
+- 固定四路命令共享 shadow/live 两组配置 bank 与一个执行上下文，仅四 slots/pending 缓存一批响应；任意混合读写及稀疏 lane 同拍 fire，不要求连续前缀（四路相关契约已验证）；
+- 接口不排队执行任务；credit=0 时 RUN 停在 ready 低等待，READ、配置写与 IRQ 写仍可用，均须遵守单批响应未排空时所有 lane ready 低；读 pending 只在 resp.fire 清，最后响应 fire 后下一拍可接下批（已验证）；
 - 写在 cmd.fire 当拍按目标地址仲裁提交，读取拍前快照不旁路同拍写或 STATUS/IRQ 新状态；响应背压时 data/err/laneId 稳定（已验证）；
-- 合法写逐地址 lane3>2>1>0，落败冲突字段不生效、其它字段仍可生效且 err=0；REG_WRITE2 仅拒绝原子，不保证跨 lane 两项一起胜出；CLEAR 同 lane OR、跨 lane 最高 lane（含 CLEAR0），START 仅非零参与并合并为下一拍单个 start/最高非零 lane 元数据（已验证）；
-- START 写 ACK 不表示计算完成或配置合法，运行期错误经 IRQ 而非 ACK 返回；
-- IRQ_RAW/ERROR_CODE 不因 START 自动清除；完成位不表示无错误，错误 IRQ 不表示任务已终止；
+- 合法写逐地址 lane3>2>1>0，落败冲突字段不生效、其它字段仍可生效且 err=0；REG_WRITE2 仅拒绝原子，不保证跨 lane 两项一起胜出；CLEAR 同 lane OR、跨 lane 最高 lane（含 CLEAR0），RUN 本批仅授权最低 lane 并产生下一拍单个 start/该命令元数据（已验证）；
+- RUN 的 ACK 不表示计算完成或配置合法，运行期错误经 IRQ 而非 ACK 返回；
+- IRQ_RAW/ERROR_CODE 不因 RUN 自动清除；完成位不表示无错误，错误 IRQ 不表示任务已终止；
 - WRITE_CONFLICT bit10 仅记录跨 lane 已接受合法命令的同址实际写目标冲突，不改变 err、ERROR_CODE 或 inFlight；低 11 bit IRQ、高 21 bit 保留、reset mask=0x7FF、fresh event 优先于 W1C（已验证）；
 - tracing 只保证复位后的首次执行；
 - 仅握手响应上的 `rsp.err` 可作为 DMA 错误事件，未标记的内存错误不可检测，assert 不转为 IRQ；
@@ -1517,7 +1569,8 @@ WorkerBee 接口本身不定义 cache coherence。若系统 DMA 与 CPU cache �
 
 - `AddrMode` 的 TILE 寻址、`warmup`、`warmdown` 的数据通路行为；当前仅保留字段读写；
 - A4×B8 反向混配、FP8 C 输出、自动 N 尾 tile 缩窄写回；
-- 执行任务排队、多批命令队列、四 lane 独立配置/执行上下文、shadow 配置组、错误 fail-fast/事务撤销、未标记内存错误检测、多任务可靠 tracing；
+- 执行任务排队、多批命令队列、四 lane 独立配置/执行上下文、第三组配置缓冲（执行期即提交下一个 RUN）、错误 fail-fast/事务撤销、未标记内存错误检测、多任务可靠 tracing；
+- Queen 契约 §9.1 的 `hwSignal` 目标锁存与随 completion 回传；待 Queen 侧硬件语义对齐后另行定义（第 6.8 节 Note）；
 - 可配置命令 lane count 或寄存器 count、将命令 lane 解释为 MAC 数据 lane、同批响应未排空即接受下一批、读旁路同拍写、跨 lane REG_WRITE2 两项共同获胜保证、跨 lane IRQ_CLEAR OR；上述四路非目标边界已验证，不扩展既有计算/DMA 能力；
 - 独立 IRQ ENABLE、自动启动清 IRQ、以完成位表示无错误或将断言转换为 IRQ；
 - 内建 PMU 计数器、cache coherence、SiLU/GELU 或外部 Scheduler 功能。

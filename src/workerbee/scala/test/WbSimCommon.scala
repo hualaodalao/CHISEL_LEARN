@@ -196,13 +196,14 @@ object WbSimCommon {
   val BIAS_REG_ADDR = 0x09
   val RQM_REG_ADDR = 0x0A
   val RQ_PARAM_REG_ADDR = 0x0B
-  val START_REG_ADDR = 0x10
-  val STATUS_REG_ADDR = 0x1E
-  val IRQ_RAW_REG_ADDR = 0x30
-  val IRQ_MASK_REG_ADDR = 0x31
-  val IRQ_MASKED_REG_ADDR = 0x32
-  val IRQ_CLEAR_REG_ADDR = 0x33
-  val ERROR_CODE_REG_ADDR = 0x34
+  // 状态/IRQ 区在 0x40 之后：超出 Queen QWR2 的 6-bit regBase 窗口，只能 QWR1/QRD 访问。
+  // 启动无寄存器地址，由 WorkerBeeOp.RUN 触发（原 START_REG_ADDR=0x10 已删除）。
+  val STATUS_REG_ADDR = 0x40
+  val IRQ_RAW_REG_ADDR = 0x41
+  val IRQ_MASK_REG_ADDR = 0x42
+  val IRQ_MASKED_REG_ADDR = 0x43
+  val IRQ_CLEAR_REG_ADDR = 0x44
+  val ERROR_CODE_REG_ADDR = 0x45
   val IRQ_ALL = 0x7FF
   val POLL_PERIOD: Int = 16
 
@@ -1024,7 +1025,7 @@ object WbSimCommon {
 }
 
 /** 命令握手及无额外 step 的轮询助手。DMA 主循环可独立轮询 STATUS 或 IRQ_RAW。
-  * START 不清 RAW：每次任务先 W1C 清除，再取消 mask，然后发 START。
+  * RUN 不清 RAW：每次任务先 W1C 清除，再取消 mask，然后发 RUN。
   */
 trait WbStatusPollApi extends chisel3.simulator.PeekPokeAPI {
   def pokeRegCommand(cmd: Stream[WorkerBeeCmd], op: WorkerBeeOp.Type,
@@ -1069,12 +1070,13 @@ trait WbStatusPollApi extends chisel3.simulator.PeekPokeAPI {
     transactReg(clock, cmd, resp, WorkerBeeOp.REG_WRITE1, WbSimCommon.IRQ_MASK_REG_ADDR, d0 = 0)
   }
 
-  /** 只走到 START 写 fire，后续拍由 DMA 主循环服务，避免漏掉首个 DMA 请求。 */
+  /** 只走到 RUN fire，后续拍由 DMA 主循环服务，避免漏掉首个 DMA 请求。
+    * RUN 不携带配置：它把 shadow 组 dump 进 live 并启动，故配置必须先写完。 */
   def launchStart(clock: Clock, cmd: Stream[WorkerBeeCmd]): Unit = {
-    pokeRegCommand(cmd, WorkerBeeOp.REG_WRITE1, WbSimCommon.START_REG_ADDR, d0 = 1)
+    pokeRegCommand(cmd, WorkerBeeOp.RUN, 0)
     var waited = 0
     while (!cmd.ready.peek().litToBoolean && waited < 100) { clock.step(); waited += 1 }
-    assert(cmd.ready.peek().litToBoolean, "START handshake timeout")
+    assert(cmd.ready.peek().litToBoolean, "RUN handshake timeout")
     clock.step()
     cmd.valid.poke(false.B)
   }

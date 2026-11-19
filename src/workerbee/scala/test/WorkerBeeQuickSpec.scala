@@ -1011,7 +1011,7 @@ abstract class WorkerBeeCaseSpec extends AnyFlatSpec with Matchers with ChiselSi
     }
     def readReg(a: Int): BigInt = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, a)
     // 配置索引 0..11 紧排：M/NK/A/B/C/CONTROL/ScaleA/ScaleB/ScaleC/Bias/RqM/RqParam。
-    // STATUS 独立移到 0x1E，IRQ 寄存器为 0x30..0x34。
+    // STATUS 在 0x40，IRQ 寄存器为 0x41..0x45；启动无寄存器地址，由 WorkerBeeOp.RUN 触发。
     cmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, p.m, p.n.toLong | (p.k.toLong << 16))
     // 基址取 p.aBase/p.bBase（与 Plan.prepare 内存镜像同源）；负例 ⑤ 借此把 bAddr%32!=0 送进守护。
     cmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, p.aBase, p.bBase)
