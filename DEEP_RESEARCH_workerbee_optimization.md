@@ -1225,7 +1225,7 @@ CPATH=/opt/homebrew/include LIBRARY_PATH=/opt/homebrew/lib \
 | 3 | **2** | **D：B 数据同字复用（DMA 侧路线）** | **✅ 已实施（2026-11-12）** | DMA 侧 16×32B 配对缓存（+512 B），偶窗读/奇窗缓存推；bAmp 2→1、B 读/kTile 16→8、吞吐 +0；244/244 全绿，pair 逻辑隔离于 bDma。pop 侧推荐已推翻（feeder/Buffer 代价更大），见 bdata_pair_plan.md |
 | 3b | **2b** | **B 级：scaleB 同字复用（DMA 侧泛化 pair）** | ✅ 已实施（2026-11-13） | 吞吐 +0（理想存储）、sB 字节 64→32/16（358→326/310）；247/247 全绿、bDma 逐位不变；带宽受压混配 8/duty+8 |
 | 4 | **3** | **C32：OS 输出列 16→32 + 内部推送 64 B/拍** | **降级为条件项（2026-11-13 核算）** | **仅 stretch 混配有效**（增量 2.0×）；纯格式 B 端口已 100% 阵列下界 ⟹ 零收益，而签核部署为 W/A 全量化纯格式。代价：+16 OS PE（256→272）、C FIFO **+5 KB**、feeder +1 KB、`totalN` 双用途解耦（`require(totalN==16)` hasMx 直接炸）、WS M 上限 48→32。C 输出端口**不是**墙（最坏 23%）。原「算术实例不增加」与「INT 2.01×/MX8 2.95×」已作废 |
-| 5 | **4** | **WS（M>1）权重双缓冲**（仅 loadWMode=1） | **方案 A 已选定（用户裁定 2026-11-13：wr_sel 广播锁存 / rd_sel 随 skew）；前置取证 0 已闭合，未动功能 RTL** | 见 `src/workerbee/doc/ws_wbuf_plan.md`。**A 专用 W 口 + 双 bank + wr_sel 广播 / rd_sel 随 A 口 skew**（改动最小，**1312 B** = 41 bit/PE，复用既有 scaleB 移位链与 loadW 脉冲链）/ **B 广播总线**（flop 最小 800 B，同增益，rd_sel 同样必须随 skew，无 STA 故总线时序未闭合，作后续面积候选）/ **C 连续流水出局**（原 4–5× 作废）。**取证 0 已完成**：加 `io.perf.cRowIn` 抽头 + Phase0Spec **B5** 组，实测回灌下界 **L=31**（6656 样本 min=max=31）⟹ 周期律 `max(m+1, 31, 16/duty)`，M=8 **1.326×**、M=16 **1.584×**、M=1 仅 1.100×，**峰值 ≈2.03×@M=30**。**新增硬约束**：`feed`/`cPop.ready` 不查 `cPop.valid` 且无 assert ⟹ A 必须自带回灌守护，否则静默算错；**rd_sel 必须与 validIn 同拍**（用 `rdSelIn` 非 `rdSelReg`），错一拍即整块权重用错 bank。**duty 旧担忧已消解**：bp=3/5/7 带宽项 24/26.7/28 全 < 31 ⟹ 不退化，只有 bp=4（duty 0.5→32 拍）才反超 |
+| 5 | **4** | **WS（M>1）权重双缓冲**（仅 loadWMode=1） | **✅ 已实施并验证（2026-11-16）** | 见 `src/workerbee/doc/ws_wbuf_plan.md` §13 实施记录 + `build/rtl-audit-rank4.md`。方案 A（用户裁定：wr_sel 广播锁存 / rd_sel 随 skew）。**265 test / 20 suite 全绿**，金锚 bit-exact、六通道地址对账 0 坏拍、mode 0 与 OS-M1 逐拍不变。**实测三格式周期塌到 ≈32 平台、斜率 1→0**：M=8 BF16 1.280× / MX8 1.279× / MX4 1.275×；M=16 1.526× / 1.521× / 1.511×；B4 双 K 差分稳态边际 **距下界 1.000×**（贴死）。**三处订正**：① 有效回灌下界是 **L+1=32** 不是 L=31（L 测在 cPush.valid，C FIFO 为 `Queue(flow=false)` 晚一拍）；② 面积 **1316.75 B**（PE 1312 B + skew 链 15 bit + FSM 23 bit），非 1312/1568 B；③ 周期律带宽项须取**全部读端口** max，`predPort`/`predDram` 已补 scaleA。**守护已承重**：`cPop.valid` 并入 feed 后 WS `stallA` 由 0 变 `iters−nTiles`（每反馈 kTile 停等 1 拍），把静默回灌错值换成可观测停等。**rd_sel 对角取证**：`perf.rdSelFirst/rdSelLast` 上升沿恒差 **30 拍**（640 次翻面零例外，blk16/blk32 × bp=5）。**bp=4 零余量无悬崖**（B7）：M=1/8 贴 32；M=16 的 48 拍是 **scaleA 端口墙**（1.5m 拍/kTile）非预装载回退。重发射审计：72→72 文件集不变、变更集恰等预期面、**58 个逐位不变** |
 | 6 | **7** | aPop/bPop 零拍 clock-enable | **待实施** | 需 ASIC + SAIF/FSDB 功耗仿真能力（本仓当前无） |
 | 6 | **8** | **累加器精度契约成文规格** | **待实施（可独立推进）** | 无前置 |
 | — | **5** | 真实 DRAM 时序模型 / PMU 字节计数（0.7） | **暂缓（用户裁定）** | 范围只 cover WorkerBee 本身 |
@@ -1254,16 +1254,18 @@ CPATH=/opt/homebrew/include LIBRARY_PATH=/opt/homebrew/lib \
 | **12** | 「INT8×INT4 与 MX 部署基线**冲突**」（rank 0b） | **措辞错误**：硬件上完全独立、共用同一套 stretch 通路（`WorkerBeeConfig.scala:38` / `WorkerBee.scala:152-155`、`:287` / `WorkerBeeCalcConfig.scala:187`），errCode 3 只拦单次 GEMM 内跨族混配 ⟹ 可逐层混用。真正差异是**量化契约**，不是通路互斥 | **用户质疑后核对代码** |
 | **13** | 「rank 0b = 1.46× 立即收益，待产品裁定」 | **降级为不立项（冗余）**：与 rank 1 同源（都拆 scaleB 墙）。rank 1 后 MX8×MX4 = 8704+C37 = 8741 拍 = **15.00 GMAC/s vs INT 14.95**，C 在 29~107 内两者相差 ≤0.5% ⟹ 0b 无独立吞吐收益，rank 1 还保留已批准的 MX 基线 | 同上，核对时发现 |
 
-### 11.5 变更边界声明
+### 11.5 变更边界声明（**仅限阶段 0 取证轮，2026-11-11**）
 
-- **未改任何 RTL**（`src/workerbee/scala/main` 零改动）。
+> ⚠️ 本节描述的是**阶段 0 取证那一轮**的边界，不是当前仓库状态。后续 rank 1 / 2 / 2b / 4 均已改动功能 RTL 并提交，各项状态以 §11.3 表为准。
+
+- **该轮未改任何 RTL**（`src/workerbee/scala/main` 零改动）。
 - **既有文件唯一改动**：`WorkerBeeQuickSpec.scala` 的 `runSeqCase` 增加 `bpPeriod: Int = 0` 形参并透传给 `runTasks`——**纯附加、默认值保持原行为**，既有调用者不受影响。（该文件另有先前任务 #82 抽取 `WorkerBeeCaseSpec` 基类的未提交改动，非本轮产生。）
 - 本轮新增文件：`src/workerbee/scala/test/WorkerBeePhase0Spec.scala`（8 个 test：A1/A2/A3/A4/**A5**/B/C3/C5）、本报告、`build/phase0-20261111/`（测量报告与日志）。
 - **0.8 归因只加 TB 断言，不改 RTL**：新增 A5 组（MX4×MX4 与 INT8×INT4 的 K1024 双 K 差分）、把阵列活跃拍恒等式 `array = 16×iters + (totalN−1)×nTiles` 升级为硬断言、新增结构周期模型 `structCycles` 与残差分解打印。
 - **范围收敛（用户裁定）**：0.7 外部真实 DRAM 时序模型暂缓；`predDram` 在 spec 与测量报告中均标为「仅参考列」，权威口径为端口级 `predPort`。
 - 测量报告落 `build/`（只放报告与日志）；波形落 `sim/debug/`（只放临时文件）。
-- **未做任何 git 写操作。**
-- **全量回归基线已确立**：20 suite / **238 test 全绿**（47 分 01 秒，`-J-Xmx10G`），零 RTL 改动下取得 ⟹ 阶段 2 的前置条件已满足，详见 §11.6。
+- **该轮未做 git 写操作**（rank4 实施轮已由用户授权提交：`0df702d` / `6cea699` / `17b6237`）。
+- **该轮全量回归基线**：20 suite / **238 test 全绿**（47 分 01 秒，`-J-Xmx10G`），零 RTL 改动下取得 ⟹ 阶段 2 的前置条件已满足，详见 §11.6。**当前基线为 265 test**（见 §11.3 rank4 行）。
 
 ### 11.6 全量回归基线（阶段 2 前置）—— **已确立，全绿**
 
