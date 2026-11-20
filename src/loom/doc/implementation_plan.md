@@ -498,7 +498,7 @@ sbt -J-Xmx6G -batch "runMain loom.LoomMain blocks   --out generated/loom/blocks"
 ### 11.2 当前基线（2026-11-20，link spec 实施中）
 
 - **已完成**：link `direction`/`dateline` 入 IR 与 C0；G1 改为 SCC 环判定（简单 router 环由 dateline 放行，显式优先、否则自动最小 link id；复杂 SCC、自环、游离切点仍拒绝）；`vc = 类 × 2 + 半区` 随拍携带；路由器每输入 6 个 VC 队列与三级仲裁；切点出端口半区 0→1；路由器新增 `outRspFwd/inRspFwd` 与按方向 BFS 的响应路由表（`routeMaster` 反向入端口、`routeMasterFwd` 前向出端口），分区边界新增前向响应端口与 async CDC；出端口固定一级寄存器、response 每跳至少一级 pipe 以打断环上组合环；新增 `ring_4.json`（单向，RTL 用例）与 `ring_3_bidir.json`。
-- **验证**：23 suite / 105 用例全绿；`ring_4` 断言请求 2 跳后数据与 vc 4→5，响应沿环前向返回；`ring_3_bidir` 断言 bulk vc 4→5、非切点 lat 保持 2。
-- **fabric 内部四通道拆分**：`LmRdReq/LmWrData/LmRdData/LmWrResp` 独立 bundle 与交换机；链路/分区每通道独立 pipe/CDC；顶层保留 `LmReq/LmRsp` 适配层，NI 完成拆分与合并，`LmReq` 增加 `strb`；写响应经 `wresp` 不再携带数据（测试期望改为 0 或改读）。
-- **未实现**：响应通道的 dateline 半区翻转；顶层四通道端口（第二刀）；多拍 burst 的 `wresp` 聚合与 `rdata` 计数；全局位宽与窄端点 adapter 接 NI。
-- **顺序**：顶层四通道端口 → 响应通道 dateline → 多拍 burst → 位宽/窄端点。
+- **验证**：23 suite / 106 用例全绿；`ring_4` 断言请求 2 跳后数据与 vc 4→5，响应沿环前向返回；`ring_3_bidir` 断言 bulk vc 4→5、非切点 lat 保持 2。
+- **顶层四通道（第二刀）**：`LmTop`/`LmNetworkTop`/`LmPartitionIo` 端点侧改为 `masterRdReq/masterWrData/masterRdData/masterWrResp`（slave 镜像），perf 四组计数；shell 直接驱动四通道；`LmReq`/`LmRsp` 仅保留在单路由器内部与 `LmTop` 适配器。
+- **未实现**：响应通道的 dateline 半区翻转；多拍 burst 的 `wresp` 聚合与 `rdata` 计数；全局位宽与窄端点 adapter 接 NI。
+- **顺序**：响应通道 dateline → 多拍 burst → 位宽/窄端点。

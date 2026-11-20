@@ -14,20 +14,18 @@ class LmCreditSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   private def init(dut: LmTop, p: FabricParams): Unit = {
     for (i <- 0 until p.nMaster) {
-      dut.io.master(i).valid.poke(false.B)
-      dut.io.master(i).bits.write.poke(false.B)
-      dut.io.master(i).bits.addr.poke(0.U)
-      dut.io.master(i).bits.len.poke(0.U)
-      dut.io.master(i).bits.src.poke(0.U)
-      dut.io.master(i).bits.data.poke(0.U)
-      dut.io.masterRsp(i).ready.poke(true.B)
+      dut.io.masterRdReq(i).valid.poke(false.B)
+      dut.io.masterRdReq(i).bits.src.poke(i.U)
+      dut.io.masterWrData(i).valid.poke(false.B)
+      dut.io.masterWrData(i).bits.src.poke(i.U)
+      dut.io.masterRdData(i).ready.poke(true.B)
+      dut.io.masterWrResp(i).ready.poke(true.B)
     }
     for (j <- 0 until p.nSlave) {
-      dut.io.slave(j).ready.poke(true.B)
-      dut.io.slaveRsp(j).valid.poke(false.B)
-      dut.io.slaveRsp(j).bits.src.poke(0.U)
-      dut.io.slaveRsp(j).bits.data.poke(0.U)
-      dut.io.slaveRsp(j).bits.err.poke(false.B)
+      dut.io.slaveRdReq(j).ready.poke(true.B)
+      dut.io.slaveWrData(j).ready.poke(true.B)
+      dut.io.slaveRdData(j).valid.poke(false.B)
+      dut.io.slaveWrResp(j).valid.poke(false.B)
     }
     dut.reset.poke(true.B)
     dut.clock.step(2)
@@ -35,22 +33,22 @@ class LmCreditSpec extends AnyFlatSpec with Matchers with ChiselSim {
   }
 
   private def issue(dut: LmTop, m: Int, addr: Long = 0L): Unit = {
-    dut.io.master(m).bits.write.poke(true.B)
-    dut.io.master(m).bits.addr.poke(addr.U)
-    dut.io.master(m).bits.src.poke(m.U)
-    dut.io.master(m).bits.data.poke(0x1234L.U)
-    dut.io.master(m).valid.poke(true.B)
+    dut.io.masterWrData(m).bits.addr.poke(addr.U)
+    dut.io.masterWrData(m).bits.data.poke(0x1234L.U)
+    dut.io.masterWrData(m).valid.poke(true.B)
     dut.clock.step()
-    dut.io.master(m).valid.poke(false.B)
+    dut.io.masterWrData(m).valid.poke(false.B)
   }
 
   private def respond(dut: LmTop, j: Int, src: Int): Unit = {
-    dut.io.slaveRsp(j).bits.src.poke(src.U)
-    dut.io.slaveRsp(j).bits.data.poke(0x5678L.U)
-    dut.io.slaveRsp(j).bits.err.poke(false.B)
-    dut.io.slaveRsp(j).valid.poke(true.B)
+    dut.io.slaveWrResp(j).bits.src.poke(src.U)
+    dut.io.slaveWrResp(j).bits.err.poke(false.B)
+    dut.io.slaveWrResp(j).valid.poke(true.B)
     dut.clock.step()
-    dut.io.slaveRsp(j).valid.poke(false.B)
+    dut.io.slaveWrResp(j).valid.poke(false.B)
+    // One more edge: the response leaves the port merge stage and the return
+    // slot is released.
+    dut.clock.step()
   }
 
   behavior of "LmCreditMgr and LmSlotPool"
@@ -59,23 +57,21 @@ class LmCreditSpec extends AnyFlatSpec with Matchers with ChiselSim {
     val p = FabricParams.simple("bp", 2, 2, 32, 64)
     simulate(new LmTop(p)) { dut =>
       init(dut, p)
-      dut.io.slave(0).ready.poke(false.B)
-      dut.io.master(0).bits.write.poke(true.B)
-      dut.io.master(0).bits.addr.poke(0.U)
-      dut.io.master(0).bits.src.poke(0.U)
-      dut.io.master(0).valid.poke(true.B)
+      dut.io.slaveWrData(0).ready.poke(false.B)
+      dut.io.masterWrData(0).bits.addr.poke(0.U)
+      dut.io.masterWrData(0).valid.poke(true.B)
       dut.clock.step()
 
       // The request is queued and its credit is reserved, so the master can
       // keep injecting while the slave holds the request.
-      dut.io.master(0).ready.expect(true.B)
-      dut.io.slave(0).valid.expect(false.B)
+      dut.io.masterWrData(0).ready.expect(true.B)
+      dut.io.slaveWrData(0).valid.expect(false.B)
       dut.io.perf.returnSlots(0).expect(1.U)
 
-      dut.io.slave(0).ready.poke(true.B)
+      dut.io.slaveWrData(0).ready.poke(true.B)
       dut.clock.step()
-      dut.io.slave(0).valid.expect(true.B)
-      dut.io.master(0).valid.poke(false.B)
+      dut.io.slaveWrData(0).valid.expect(true.B)
+      dut.io.masterWrData(0).valid.poke(false.B)
     }
   }
 
@@ -90,27 +86,23 @@ class LmCreditSpec extends AnyFlatSpec with Matchers with ChiselSim {
       issue(dut, 0)
       dut.io.perf.returnSlots(0).expect(2.U)
 
-      dut.io.master(0).bits.write.poke(true.B)
-      dut.io.master(0).bits.addr.poke(0.U)
-      dut.io.master(0).bits.src.poke(0.U)
-      dut.io.master(0).valid.poke(true.B)
+      dut.io.masterWrData(0).bits.addr.poke(0.U)
+      dut.io.masterWrData(0).valid.poke(true.B)
       dut.clock.step()
-      dut.io.master(0).ready.expect(false.B)
-      dut.io.slave(0).valid.expect(false.B)
-      dut.io.master(0).valid.poke(false.B)
+      dut.io.masterWrData(0).ready.expect(false.B)
+      dut.io.slaveWrData(0).valid.expect(false.B)
+      dut.io.masterWrData(0).valid.poke(false.B)
 
       respond(dut, 0, 0)
       dut.io.perf.returnSlots(0).expect(1.U)
 
-      dut.io.master(0).bits.write.poke(true.B)
-      dut.io.master(0).bits.addr.poke(0.U)
-      dut.io.master(0).bits.src.poke(0.U)
-      dut.io.master(0).valid.poke(true.B)
+      dut.io.masterWrData(0).bits.addr.poke(0.U)
+      dut.io.masterWrData(0).valid.poke(true.B)
       dut.clock.step()
       // The request was accepted during the cycle even though the credit
       // counter is full again afterwards (combinational output drops).
       dut.io.perf.returnSlots(0).expect(2.U)
-      dut.io.master(0).valid.poke(false.B)
+      dut.io.masterWrData(0).valid.poke(false.B)
     }
   }
 
@@ -126,25 +118,21 @@ class LmCreditSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.io.perf.respSlots(0).expect(2.U)
       dut.io.perf.returnSlots(0).expect(2.U)
 
-      dut.io.master(0).bits.write.poke(true.B)
-      dut.io.master(0).bits.addr.poke(0.U)
-      dut.io.master(0).bits.src.poke(0.U)
-      dut.io.master(0).valid.poke(true.B)
+      dut.io.masterWrData(0).bits.addr.poke(0.U)
+      dut.io.masterWrData(0).valid.poke(true.B)
       dut.clock.step()
-      dut.io.master(0).ready.expect(false.B)
-      dut.io.master(0).valid.poke(false.B)
+      dut.io.masterWrData(0).ready.expect(false.B)
+      dut.io.masterWrData(0).valid.poke(false.B)
 
       respond(dut, 0, 0)
       dut.io.perf.respSlots(0).expect(1.U)
 
-      dut.io.master(0).bits.write.poke(true.B)
-      dut.io.master(0).bits.addr.poke(0.U)
-      dut.io.master(0).bits.src.poke(0.U)
-      dut.io.master(0).valid.poke(true.B)
+      dut.io.masterWrData(0).bits.addr.poke(0.U)
+      dut.io.masterWrData(0).valid.poke(true.B)
       dut.clock.step()
       // Same observation rule: the pool is full again after accepting it.
       dut.io.perf.respSlots(0).expect(2.U)
-      dut.io.master(0).valid.poke(false.B)
+      dut.io.masterWrData(0).valid.poke(false.B)
     }
   }
 
@@ -153,10 +141,9 @@ class LmCreditSpec extends AnyFlatSpec with Matchers with ChiselSim {
     intercept[Throwable] {
       simulate(new LmTop(p)) { dut =>
         init(dut, p)
-        dut.io.slaveRsp(0).bits.src.poke(0.U)
-        dut.io.slaveRsp(0).bits.data.poke(0x1L.U)
-        dut.io.slaveRsp(0).valid.poke(true.B)
-        dut.clock.step()
+        dut.io.slaveWrResp(0).bits.src.poke(0.U)
+        dut.io.slaveWrResp(0).valid.poke(true.B)
+        dut.clock.step(3)
       }
     }
   }

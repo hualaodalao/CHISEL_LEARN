@@ -4,10 +4,9 @@ import chisel3._
 import chisel3.util._
 import loom.ir.LoomDefaults
 
-/** Endpoint request: the merged view of the `rreq` and `wdata` channels.
-  * `src` names the issuing master; `id` is the AXI4 transaction namespace and
-  * is transported unchanged by every hop. The network splits this port into
-  * per-channel traffic inside its NIs.
+/** Merged request view kept inside the flat router: `write` selects the
+  * channel, and one word travels per transaction. Endpoint ports carry the
+  * four channels separately; only `LmTop` still builds this view.
   */
 class LmReq(
     val addrWidth: Int,
@@ -25,11 +24,16 @@ class LmReq(
   val vc = UInt(LoomDefaults.VcWidth.W)
 }
 
+/** Merged response view kept inside the flat router. `write` tags the channel
+  * the response belongs to, so the endpoint adapter can hand it back on the
+  * channel that issued the request.
+  */
 class LmRsp(
     val dataWidth: Int,
     val idWidth: Int,
     val tagWidth: Int = loom.ir.LoomDefaults.AxiIdWidth
 ) extends Bundle {
+  val write = Bool()
   val src = UInt(idWidth.W)
   val id = UInt(tagWidth.W)
   val data = UInt(dataWidth.W)
@@ -37,19 +41,31 @@ class LmRsp(
   val vc = UInt(LoomDefaults.VcWidth.W)
 }
 
+/** Passive Decoupled wiring: `to` is driven from `from` whichever of the two
+  * is a port of the current module and whichever is a child port.
+  */
+object LmWire {
+  def link[T <: Data](from: DecoupledIO[T], to: DecoupledIO[T]): Unit = {
+    to.valid := from.valid
+    to.bits := from.bits
+    from.ready := to.ready
+  }
+}
+
 /** Return-slot credit for one master.
   *
   * Allocated when a request is injected, released when its response reaches
   * the master. Treats "alloc without capacity" and "release while empty" as
-  * protocol failures (P3).
+  * protocol failures (P3). Allocation and release are counts because the two
+  * request and the two response channels may each move in the same cycle.
   */
 class LmCreditMgr(depth: Int) extends Module {
   require(depth >= 1, "credit depth must be >= 1")
   private val w = math.max(1, log2Ceil(depth + 1))
 
   val io = IO(new Bundle {
-    val alloc = Input(Bool())
-    val release = Input(Bool())
+    val alloc = Input(UInt(2.W))
+    val release = Input(UInt(2.W))
     val canAlloc = Output(Bool())
     val count = Output(UInt(w.W))
   })
@@ -58,26 +74,30 @@ class LmCreditMgr(depth: Int) extends Module {
   io.canAlloc := cnt < depth.U
   io.count := cnt
 
-  when(io.alloc && !io.release) { cnt := cnt + 1.U }
-  when(io.release && !io.alloc) { cnt := cnt - 1.U }
+  private val up = io.alloc >= io.release
+  private val step = Mux(up, io.alloc - io.release, io.release - io.alloc)
+  when(step =/= 0.U) {
+    cnt := Mux(up, cnt + step, cnt - step)
+  }
 
-  assert(!io.alloc || io.canAlloc, "LM-P3: return credit overflow")
-  assert(!io.release || cnt =/= 0.U, "LM-P3: return credit underflow")
+  assert(cnt +& io.alloc <= depth.U, "LM-P3: return credit overflow")
+  assert(io.release <= cnt, "LM-P3: return credit underflow")
 }
 
 /** Destination response slots for one slave.
   *
   * Allocated at request injection, released when the response leaves the
   * slave. This is the G3 pre-reservation that removes the
-  * "request waits for a response buffer" deadlock state.
+  * "request waits for a response buffer" deadlock state. Both request
+  * channels may allocate in one cycle, so allocation is a count.
   */
 class LmSlotPool(depth: Int) extends Module {
   require(depth >= 1, "response slot depth must be >= 1")
   private val w = math.max(1, log2Ceil(depth + 1))
 
   val io = IO(new Bundle {
-    val alloc = Input(Bool())
-    val release = Input(Bool())
+    val alloc = Input(UInt(2.W))
+    val release = Input(UInt(2.W))
     val canAlloc = Output(Bool())
     val count = Output(UInt(w.W))
   })
@@ -86,11 +106,14 @@ class LmSlotPool(depth: Int) extends Module {
   io.canAlloc := cnt < depth.U
   io.count := cnt
 
-  when(io.alloc && !io.release) { cnt := cnt + 1.U }
-  when(io.release && !io.alloc) { cnt := cnt - 1.U }
+  private val up = io.alloc >= io.release
+  private val step = Mux(up, io.alloc - io.release, io.release - io.alloc)
+  when(step =/= 0.U) {
+    cnt := Mux(up, cnt + step, cnt - step)
+  }
 
-  assert(!io.alloc || io.canAlloc, "LM-P3: response slot overflow")
-  assert(!io.release || cnt =/= 0.U, "LM-P3: response slot underflow")
+  assert(cnt +& io.alloc <= depth.U, "LM-P3: response slot overflow")
+  assert(io.release <= cnt, "LM-P3: response slot underflow")
 }
 
 /** Per-class virtual-channel queue.
@@ -395,8 +418,8 @@ class LmFlatRouter(p: FabricParams) extends Module {
       .map(j => reqFire(j) && (selGrant(j) === i.U))
       .reduce(_ || _)
 
-    retCredit(i).io.alloc := vc(i).io.enq.fire
-    retCredit(i).io.release := io.inRsp(i).valid && io.inRsp(i).ready
+    retCredit(i).io.alloc := vc(i).io.enq.fire.asUInt
+    retCredit(i).io.release := (io.inRsp(i).valid && io.inRsp(i).ready).asUInt
     io.perf.returnSlots(i) := retCredit(i).io.count
 
     // Every queued request holds a return credit, so the credit count is a
@@ -406,8 +429,8 @@ class LmFlatRouter(p: FabricParams) extends Module {
   }
 
   for (j <- 0 until p.nSlave) {
-    respPool(j).io.alloc := admitFireSlave(j)
-    respPool(j).io.release := io.outRsp(j).valid && io.outRsp(j).ready
+    respPool(j).io.alloc := admitFireSlave(j).asUInt
+    respPool(j).io.release := (io.outRsp(j).valid && io.outRsp(j).ready).asUInt
     io.perf.respSlots(j) := respPool(j).io.count
   }
 
@@ -456,69 +479,228 @@ class LmFlatRouter(p: FabricParams) extends Module {
   }
 }
 
-/** Top-level shell: master-facing ports and slave-facing ports.
-  * MNet/SNet are zero-delay port groupings.
+/** Endpoint adapter of the flat router, master side: the two request channels
+  * are interleaved onto the router's merged request port and the merged
+  * response goes back out on the channel its `write` tag names. Credits stay
+  * in the router.
+  */
+class LmFlatMasterPort(p: FabricParams) extends Module {
+  private def rdReqT = new LmRdReq(p.addrWidth, p.idWidth, p.tagWidth)
+  private def wrDataT = new LmWrData(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth)
+  private def rdDataT = new LmRdData(p.dataWidth, p.idWidth, p.tagWidth)
+  private def wrRespT = new LmWrResp(p.idWidth, p.tagWidth)
+
+  val io = IO(new Bundle {
+    val rdReq = Flipped(Decoupled(rdReqT))
+    val wrData = Flipped(Decoupled(wrDataT))
+    val rdData = Decoupled(rdDataT)
+    val wrResp = Decoupled(wrRespT)
+    val req = Decoupled(new LmReq(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth))
+    val rsp = Flipped(Decoupled(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth)))
+  })
+
+  private val reqArb = Module(new LmRrArbiterN(2))
+  reqArb.io.req(0) := io.rdReq.valid
+  reqArb.io.req(1) := io.wrData.valid
+  private val selWr = reqArb.io.grant === 1.U
+
+  io.req.valid := reqArb.io.valid
+  io.req.bits.write := selWr
+  io.req.bits.addr := Mux(selWr, io.wrData.bits.addr, io.rdReq.bits.addr)
+  io.req.bits.len := Mux(selWr, 0.U, io.rdReq.bits.len)
+  io.req.bits.src := Mux(selWr, io.wrData.bits.src, io.rdReq.bits.src)
+  io.req.bits.id := Mux(selWr, io.wrData.bits.id, io.rdReq.bits.id)
+  io.req.bits.data := Mux(selWr, io.wrData.bits.data, 0.U)
+  io.req.bits.strb := Mux(selWr, io.wrData.bits.strb, 0.U)
+  io.req.bits.vc := Mux(selWr, io.wrData.bits.vc, io.rdReq.bits.vc)
+  io.rdReq.ready := io.req.ready && reqArb.io.valid && !selWr
+  io.wrData.ready := io.req.ready && reqArb.io.valid && selWr
+
+  // The router's response bits follow its ready (the grant picks the source),
+  // so the split by channel tag needs one register in between.
+  private val rspQ = Module(new Queue(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth), 1))
+  rspQ.io.enq <> io.rsp
+  private val head = rspQ.io.deq.bits
+  private val have = rspQ.io.deq.valid
+
+  io.rdData.valid := have && !head.write
+  io.rdData.bits.data := head.data
+  io.rdData.bits.src := head.src
+  io.rdData.bits.id := head.id
+  io.rdData.bits.last := true.B
+  io.rdData.bits.err := head.err
+  io.rdData.bits.vc := head.vc
+
+  io.wrResp.valid := have && head.write
+  io.wrResp.bits.src := head.src
+  io.wrResp.bits.id := head.id
+  io.wrResp.bits.err := head.err
+  io.wrResp.bits.vc := head.vc
+
+  rspQ.io.deq.ready := Mux(head.write, io.wrResp.ready, io.rdData.ready)
+}
+
+/** Endpoint adapter of the flat router, slave side: one merged request is
+  * split onto the channel its write bit selects, and the two response channels
+  * are merged back for the router.
+  */
+class LmFlatSlavePort(
+    addrWidth: Int,
+    dataWidth: Int,
+    idWidth: Int,
+    tagWidth: Int = loom.ir.LoomDefaults.AxiIdWidth
+) extends Module {
+  val io = IO(new Bundle {
+    val req = Flipped(Decoupled(new LmReq(addrWidth, dataWidth, idWidth, tagWidth)))
+    val rsp = Decoupled(new LmRsp(dataWidth, idWidth, tagWidth))
+    val rdReq = Decoupled(new LmRdReq(addrWidth, idWidth, tagWidth))
+    val wrData = Decoupled(new LmWrData(addrWidth, dataWidth, idWidth, tagWidth))
+    val rdData = Flipped(Decoupled(new LmRdData(dataWidth, idWidth, tagWidth)))
+    val wrResp = Flipped(Decoupled(new LmWrResp(idWidth, tagWidth)))
+  })
+
+  // The router's output ready depends on its output bits (the grant follows
+  // the decoded address), so the split needs one register in between.
+  private val reqQ = Module(new Queue(new LmReq(addrWidth, dataWidth, idWidth, tagWidth), 1))
+  reqQ.io.enq <> io.req
+  private val head = reqQ.io.deq.bits
+  private val have = reqQ.io.deq.valid
+
+  io.rdReq.valid := have && !head.write
+  io.rdReq.bits.addr := head.addr
+  io.rdReq.bits.len := head.len
+  io.rdReq.bits.src := head.src
+  io.rdReq.bits.id := head.id
+  io.rdReq.bits.vc := head.vc
+
+  io.wrData.valid := have && head.write
+  io.wrData.bits.addr := head.addr
+  io.wrData.bits.data := head.data
+  io.wrData.bits.strb := head.strb
+  io.wrData.bits.src := head.src
+  io.wrData.bits.id := head.id
+  io.wrData.bits.vc := head.vc
+  io.wrData.bits.last := true.B
+  reqQ.io.deq.ready := Mux(head.write, io.wrData.ready, io.rdReq.ready)
+
+  // Each channel keeps one entry so the merge decision never depends on the
+  // arriving valid bits.
+  private val rdQ = Module(new Queue(new LmRdData(dataWidth, idWidth, tagWidth), 1))
+  private val wrQ = Module(new Queue(new LmWrResp(idWidth, tagWidth), 1))
+  rdQ.io.enq.valid := io.rdData.valid
+  rdQ.io.enq.bits := io.rdData.bits
+  io.rdData.ready := rdQ.io.enq.ready
+  wrQ.io.enq.valid := io.wrResp.valid
+  wrQ.io.enq.bits := io.wrResp.bits
+  io.wrResp.ready := wrQ.io.enq.ready
+
+  // The merge decision must not depend on the router's ready, which in turn
+  // depends on this port's valid.
+  private val rspArb = Module(new LmRrArbiterN(2))
+  rspArb.io.req(0) := rdQ.io.deq.valid
+  rspArb.io.req(1) := wrQ.io.deq.valid
+  private val pickWr = rspArb.io.grant === 1.U
+
+  io.rsp.valid := rspArb.io.valid
+  io.rsp.bits.write := pickWr
+  io.rsp.bits.src := Mux(pickWr, wrQ.io.deq.bits.src, rdQ.io.deq.bits.src)
+  io.rsp.bits.id := Mux(pickWr, wrQ.io.deq.bits.id, rdQ.io.deq.bits.id)
+  io.rsp.bits.data := Mux(pickWr, 0.U, rdQ.io.deq.bits.data)
+  io.rsp.bits.err := Mux(pickWr, wrQ.io.deq.bits.err, rdQ.io.deq.bits.err)
+  io.rsp.bits.vc := Mux(pickWr, wrQ.io.deq.bits.vc, rdQ.io.deq.bits.vc)
+  rdQ.io.deq.ready := io.rsp.ready && rspArb.io.valid && !pickWr
+  wrQ.io.deq.ready := io.rsp.ready && rspArb.io.valid && pickWr
+}
+
+/** Top-level shell: master-facing and slave-facing four-channel ports.
+  * MNet/SNet are zero-delay port groupings; the flat router keeps its merged
+  * request/response view behind the endpoint adapters.
   */
 class LmTop(p: FabricParams) extends Module {
   private val maxRetW = math.max(1, log2Ceil(p.maxReturnSlots + 1))
   private val maxRspW = math.max(1, log2Ceil(p.maxRespSlots + 1))
 
+  private def rdReqT = new LmRdReq(p.addrWidth, p.idWidth, p.tagWidth)
+  private def wrDataT = new LmWrData(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth)
+  private def rdDataT = new LmRdData(p.dataWidth, p.idWidth, p.tagWidth)
+  private def wrRespT = new LmWrResp(p.idWidth, p.tagWidth)
+
   val io = IO(new Bundle {
-    val master = Vec(p.nMaster, Flipped(Decoupled(new LmReq(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth))))
-    val masterRsp = Vec(p.nMaster, Decoupled(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth)))
-    val slave = Vec(p.nSlave, Decoupled(new LmReq(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth)))
-    val slaveRsp = Vec(p.nSlave, Flipped(Decoupled(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth))))
+    val masterRdReq = Vec(p.nMaster, Flipped(Decoupled(rdReqT)))
+    val masterWrData = Vec(p.nMaster, Flipped(Decoupled(wrDataT)))
+    val masterRdData = Vec(p.nMaster, Decoupled(rdDataT))
+    val masterWrResp = Vec(p.nMaster, Decoupled(wrRespT))
+    val slaveRdReq = Vec(p.nSlave, Decoupled(rdReqT))
+    val slaveWrData = Vec(p.nSlave, Decoupled(wrDataT))
+    val slaveRdData = Vec(p.nSlave, Flipped(Decoupled(rdDataT)))
+    val slaveWrResp = Vec(p.nSlave, Flipped(Decoupled(wrRespT)))
     val perf = Output(new Bundle {
       val returnSlots = Vec(p.nMaster, UInt(maxRetW.W))
       val respSlots = Vec(p.nSlave, UInt(maxRspW.W))
-      val requests = UInt(32.W)
-      val responses = UInt(32.W)
+      val rdRequests = UInt(32.W)
+      val wrBeats = UInt(32.W)
+      val rdResponses = UInt(32.W)
+      val wrResponses = UInt(32.W)
       val errors = UInt(32.W)
       val errSticky = Bool()
     })
   })
 
   private val router = Module(new LmFlatRouter(p))
-  private val reqCnt = RegInit(0.U(32.W))
-  private val rspCnt = RegInit(0.U(32.W))
+  private val mPort = Seq.tabulate(p.nMaster)(_ => Module(new LmFlatMasterPort(p)))
+  private val sPort = Seq.tabulate(p.nSlave)(_ =>
+    Module(new LmFlatSlavePort(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth)))
+
+  private val rdReqCnt = RegInit(0.U(32.W))
+  private val wrBeatCnt = RegInit(0.U(32.W))
+  private val rdRspCnt = RegInit(0.U(32.W))
+  private val wrRspCnt = RegInit(0.U(32.W))
   private val errCnt = RegInit(0.U(32.W))
   private val errSticky = RegInit(false.B)
 
   for (i <- 0 until p.nMaster) {
-    router.io.in(i).valid := io.master(i).valid
-    router.io.in(i).bits := io.master(i).bits
-    io.master(i).ready := router.io.in(i).ready
+    LmWire.link(io.masterRdReq(i), mPort(i).io.rdReq)
+    LmWire.link(io.masterWrData(i), mPort(i).io.wrData)
+    LmWire.link(mPort(i).io.rdData, io.masterRdData(i))
+    LmWire.link(mPort(i).io.wrResp, io.masterWrResp(i))
+    mPort(i).io.req <> router.io.in(i)
+    router.io.inRsp(i) <> mPort(i).io.rsp
 
-    when(io.master(i).fire) { reqCnt := reqCnt + 1.U }
-    when(io.masterRsp(i).fire) {
-      rspCnt := rspCnt + 1.U
-      when(io.masterRsp(i).bits.err) {
+    when(io.masterRdReq(i).fire) { rdReqCnt := rdReqCnt + 1.U }
+    when(io.masterWrData(i).fire) { wrBeatCnt := wrBeatCnt + 1.U }
+    when(io.masterRdData(i).fire) {
+      rdRspCnt := rdRspCnt + 1.U
+      when(io.masterRdData(i).bits.err) {
+        errCnt := errCnt + 1.U
+        errSticky := true.B
+      }
+    }
+    when(io.masterWrResp(i).fire) {
+      wrRspCnt := wrRspCnt + 1.U
+      when(io.masterWrResp(i).bits.err) {
         errCnt := errCnt + 1.U
         errSticky := true.B
       }
     }
 
-    io.masterRsp(i).valid := router.io.inRsp(i).valid
-    io.masterRsp(i).bits := router.io.inRsp(i).bits
-    router.io.inRsp(i).ready := io.masterRsp(i).ready
-
     io.perf.returnSlots(i) := router.io.perf.returnSlots(i)
   }
 
   for (j <- 0 until p.nSlave) {
-    io.slave(j).valid := router.io.out(j).valid
-    io.slave(j).bits := router.io.out(j).bits
-    router.io.out(j).ready := io.slave(j).ready
-
-    router.io.outRsp(j).valid := io.slaveRsp(j).valid
-    router.io.outRsp(j).bits := io.slaveRsp(j).bits
-    io.slaveRsp(j).ready := router.io.outRsp(j).ready
+    router.io.out(j) <> sPort(j).io.req
+    sPort(j).io.rsp <> router.io.outRsp(j)
+    LmWire.link(sPort(j).io.rdReq, io.slaveRdReq(j))
+    LmWire.link(sPort(j).io.wrData, io.slaveWrData(j))
+    LmWire.link(io.slaveRdData(j), sPort(j).io.rdData)
+    LmWire.link(io.slaveWrResp(j), sPort(j).io.wrResp)
 
     io.perf.respSlots(j) := router.io.perf.respSlots(j)
   }
 
-  io.perf.requests := reqCnt
-  io.perf.responses := rspCnt
+  io.perf.rdRequests := rdReqCnt
+  io.perf.wrBeats := wrBeatCnt
+  io.perf.rdResponses := rdRspCnt
+  io.perf.wrResponses := wrRspCnt
   io.perf.errors := errCnt
   io.perf.errSticky := errSticky
 }

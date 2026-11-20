@@ -19,20 +19,18 @@ class LmQosSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   private def init(dut: LmTop, p: FabricParams): Unit = {
     for (i <- 0 until p.nMaster) {
-      dut.io.master(i).valid.poke(false.B)
-      dut.io.master(i).bits.write.poke(true.B)
-      dut.io.master(i).bits.addr.poke(0.U)
-      dut.io.master(i).bits.len.poke(0.U)
-      dut.io.master(i).bits.src.poke(i.U)
-      dut.io.master(i).bits.data.poke(0.U)
-      dut.io.masterRsp(i).ready.poke(true.B)
+      dut.io.masterRdReq(i).valid.poke(false.B)
+      dut.io.masterRdReq(i).bits.src.poke(i.U)
+      dut.io.masterWrData(i).valid.poke(false.B)
+      dut.io.masterWrData(i).bits.src.poke(i.U)
+      dut.io.masterRdData(i).ready.poke(true.B)
+      dut.io.masterWrResp(i).ready.poke(true.B)
     }
     for (j <- 0 until p.nSlave) {
-      dut.io.slave(j).ready.poke(true.B)
-      dut.io.slaveRsp(j).valid.poke(false.B)
-      dut.io.slaveRsp(j).bits.src.poke(0.U)
-      dut.io.slaveRsp(j).bits.data.poke(0.U)
-      dut.io.slaveRsp(j).bits.err.poke(false.B)
+      dut.io.slaveRdReq(j).ready.poke(true.B)
+      dut.io.slaveWrData(j).ready.poke(true.B)
+      dut.io.slaveRdData(j).valid.poke(false.B)
+      dut.io.slaveWrResp(j).valid.poke(false.B)
     }
     dut.reset.poke(true.B)
     dut.clock.step(2)
@@ -50,18 +48,28 @@ class LmQosSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
     simulate(new LmTop(p)) { dut =>
       init(dut, p)
-      dut.io.master(0).valid.poke(true.B)
-      dut.io.master(1).valid.poke(true.B)
+      dut.io.masterWrData(0).valid.poke(true.B)
+      dut.io.masterWrData(1).valid.poke(true.B)
 
-      val grants = (0 until 5).map { _ =>
+      // Samples the source of the requests the slave port carries. Over one
+      // filtered 5-slot schedule with lat idle that is 4 ctl and 1 bulk.
+      dut.clock.step(2)
+      val grants = Seq.newBuilder[Int]
+      var taken = 0
+      var guard = 0
+      while (taken < 5 && guard < 20) {
+        if (dut.io.slaveWrData(0).valid.peek().litToBoolean) {
+          grants += dut.io.slaveWrData(0).bits.src.peek().litValue.toInt
+          taken += 1
+        }
         dut.clock.step()
-        dut.io.slave(0).bits.src.peek().litValue.toInt
+        guard += 1
       }
+      taken shouldBe 5
 
-      // The post-step sample is the next combinational grant; over a full
-      // 7-slot schedule with lat idle that is 4 ctl and 1 bulk.
-      grants.count(_ == 0) shouldBe 4
-      grants.count(_ == 1) shouldBe 1
+      val seen = grants.result()
+      seen.count(_ == 0) shouldBe 4
+      seen.count(_ == 1) shouldBe 1
     }
   }
 
@@ -74,12 +82,12 @@ class LmQosSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
     simulate(new LmTop(p)) { dut =>
       init(dut, p)
-      dut.io.master(1).valid.poke(true.B)
+      dut.io.masterWrData(1).valid.poke(true.B)
       for (_ <- 0 until 3) dut.clock.step()
 
       // Start ctl just after its schedule slot; without aging it would wait
       // 12 bulk slots before the schedule wraps back to ctl.
-      dut.io.master(0).valid.poke(true.B)
+      dut.io.masterWrData(0).valid.poke(true.B)
       var waited = 0
       var served = false
       while (!served && waited < 12) {

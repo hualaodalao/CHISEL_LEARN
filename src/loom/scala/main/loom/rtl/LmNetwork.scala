@@ -401,82 +401,63 @@ class LmNetRouter(p: NetworkParams, spec: NetRouterSpec) extends Module {
   wrRespSw.io.inFwd <> io.inWrRespFwd
 }
 
-/** Master-side NI: splits the endpoint request into the read-address and write
-  * data channels, merges the two response channels back, and owns the
-  * return-slot credit.
+/** Master-side NI: stamps the issuing master and the scheduling VC on both
+  * request channels and owns the return-slot credit. A slot is taken by
+  * either request and given back by either response; the channels themselves
+  * stay independent.
   */
 class LmMasterNi(p: NetworkParams, master: Int) extends Module {
   private val retW = math.max(1, log2Ceil(p.masterReturnSlots(master) + 1))
   private val vc = (p.masterClass(master) * LoomDefaults.VcHalves).U
 
   val io = IO(new Bundle {
-    val in = Flipped(Decoupled(new LmReq(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth)))
+    val inRdReq = Flipped(Decoupled(new LmRdReq(p.addrWidth, p.idWidth, p.tagWidth)))
+    val inWrData = Flipped(Decoupled(new LmWrData(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth)))
+    val outRdData = Decoupled(new LmRdData(p.dataWidth, p.idWidth, p.tagWidth))
+    val outWrResp = Decoupled(new LmWrResp(p.idWidth, p.tagWidth))
     val outRdReq = Decoupled(new LmRdReq(p.addrWidth, p.idWidth, p.tagWidth))
     val outWrData = Decoupled(new LmWrData(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth))
     val inRdData = Flipped(Decoupled(new LmRdData(p.dataWidth, p.idWidth, p.tagWidth)))
     val inWrResp = Flipped(Decoupled(new LmWrResp(p.idWidth, p.tagWidth)))
-    val outRsp = Decoupled(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth))
     val credit = Output(UInt(retW.W))
   })
 
   private val credit = Module(new LmCreditMgr(p.masterReturnSlots(master)))
 
-  io.outRdReq.valid := io.in.valid && !io.in.bits.write && credit.io.canAlloc
-  io.outRdReq.bits.addr := io.in.bits.addr
-  io.outRdReq.bits.len := io.in.bits.len
+  // Both request channels can allocate in the same cycle, so admission is
+  // checked for the pair.
+  private val twoFree = credit.io.count +& 2.U <= p.masterReturnSlots(master).U
+  private val reqOk =
+    credit.io.canAlloc && (!(io.inRdReq.valid && io.inWrData.valid) || twoFree)
+
+  io.outRdReq.valid := io.inRdReq.valid && reqOk
+  io.outRdReq.bits := io.inRdReq.bits
   io.outRdReq.bits.src := master.U
-  io.outRdReq.bits.id := io.in.bits.id
   io.outRdReq.bits.vc := vc
+  io.inRdReq.ready := io.outRdReq.ready && reqOk
 
-  io.outWrData.valid := io.in.valid && io.in.bits.write && credit.io.canAlloc
-  io.outWrData.bits.addr := io.in.bits.addr
-  io.outWrData.bits.data := io.in.bits.data
-  io.outWrData.bits.strb := io.in.bits.strb
+  io.outWrData.valid := io.inWrData.valid && reqOk
+  io.outWrData.bits := io.inWrData.bits
   io.outWrData.bits.src := master.U
-  io.outWrData.bits.id := io.in.bits.id
-  io.outWrData.bits.last := true.B
   io.outWrData.bits.vc := vc
+  io.inWrData.ready := io.outWrData.ready && reqOk
 
-  io.in.ready := credit.io.canAlloc &&
-    Mux(io.in.bits.write, io.outWrData.ready, io.outRdReq.ready)
+  LmWire.link(io.inRdData, io.outRdData)
+  LmWire.link(io.inWrResp, io.outWrResp)
 
-  // The two response channels are independent sources for one master port.
-  // Each gets one entry: the router gates its response valid with this NI's
-  // ready, so the merge decision must not depend on the arriving valid bits.
-  private val rdQ = Module(new Queue(new LmRdData(p.dataWidth, p.idWidth, p.tagWidth), 1))
-  private val wrQ = Module(new Queue(new LmWrResp(p.idWidth, p.tagWidth), 1))
-  rdQ.io.enq.valid := io.inRdData.valid
-  rdQ.io.enq.bits := io.inRdData.bits
-  io.inRdData.ready := rdQ.io.enq.ready
-  wrQ.io.enq.valid := io.inWrResp.valid
-  wrQ.io.enq.bits := io.inWrResp.bits
-  io.inWrResp.ready := wrQ.io.enq.ready
-
-  private val rspArb = Module(new LmRrArbiterN(2))
-  rspArb.io.req(0) := rdQ.io.deq.valid && io.outRsp.ready
-  rspArb.io.req(1) := wrQ.io.deq.valid && io.outRsp.ready
-  private val pickWr = rspArb.io.grant === 1.U
-
-  io.outRsp.valid := rspArb.io.valid
-  io.outRsp.bits.src := Mux(pickWr, wrQ.io.deq.bits.src, rdQ.io.deq.bits.src)
-  io.outRsp.bits.id := Mux(pickWr, wrQ.io.deq.bits.id, rdQ.io.deq.bits.id)
-  io.outRsp.bits.data := Mux(pickWr, 0.U, rdQ.io.deq.bits.data)
-  io.outRsp.bits.err := Mux(pickWr, wrQ.io.deq.bits.err, rdQ.io.deq.bits.err)
-  io.outRsp.bits.vc := Mux(pickWr, wrQ.io.deq.bits.vc, rdQ.io.deq.bits.vc)
-  rdQ.io.deq.ready := io.outRsp.ready && rspArb.io.valid && !pickWr
-  wrQ.io.deq.ready := io.outRsp.ready && rspArb.io.valid && pickWr
-
-  credit.io.alloc := io.outRdReq.fire || io.outWrData.fire
-  credit.io.release := io.outRsp.fire
+  credit.io.alloc := io.outRdReq.fire.asUInt +& io.outWrData.fire.asUInt
+  credit.io.release := io.inRdData.fire.asUInt +& io.inWrResp.fire.asUInt
   io.credit := credit.io.count
 
-  assert(!io.in.valid || !io.in.ready || credit.io.canAlloc,
+  assert(!io.inRdReq.valid || !io.inRdReq.ready || credit.io.canAlloc,
+    "LM-P3: accepted request without a return slot")
+  assert(!io.inWrData.valid || !io.inWrData.ready || credit.io.canAlloc,
     "LM-P3: accepted request without a return slot")
 }
 
-/** Slave-side NI: merges the two request channels into the endpoint port,
-  * remembers the request type so each response leaves on its own channel, and
-  * owns the destination response slot.
+/** Slave-side NI: stamps the response VC from the issuing master and owns the
+  * destination response slot. A slot is taken by either request and given back
+  * by either response, so neither channel can block the other.
   */
 class LmSlaveNi(p: NetworkParams, slave: Int) extends Module {
   private val slotW = math.max(1, log2Ceil(p.slaveRespSlots(slave) + 1))
@@ -485,64 +466,43 @@ class LmSlaveNi(p: NetworkParams, slave: Int) extends Module {
   val io = IO(new Bundle {
     val inRdReq = Flipped(Decoupled(new LmRdReq(p.addrWidth, p.idWidth, p.tagWidth)))
     val inWrData = Flipped(Decoupled(new LmWrData(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth)))
-    val out = Decoupled(new LmReq(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth))
-    val inRsp = Flipped(Decoupled(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth)))
     val outRdData = Decoupled(new LmRdData(p.dataWidth, p.idWidth, p.tagWidth))
     val outWrResp = Decoupled(new LmWrResp(p.idWidth, p.tagWidth))
+    val outRdReq = Decoupled(new LmRdReq(p.addrWidth, p.idWidth, p.tagWidth))
+    val outWrData = Decoupled(new LmWrData(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth))
+    val inRdData = Flipped(Decoupled(new LmRdData(p.dataWidth, p.idWidth, p.tagWidth)))
+    val inWrResp = Flipped(Decoupled(new LmWrResp(p.idWidth, p.tagWidth)))
     val slot = Output(UInt(slotW.W))
   })
 
   private val slot = Module(new LmSlotPool(p.slaveRespSlots(slave)))
-  // One entry per accepted request: every request holds exactly one slot, so
-  // the pool depth also bounds this FIFO.
-  private val typeQ = Module(new Queue(Bool(), p.slaveRespSlots(slave)))
 
-  private val reqArb = Module(new LmRrArbiterN(2))
-  reqArb.io.req(0) := io.inRdReq.valid && slot.io.canAlloc
-  reqArb.io.req(1) := io.inWrData.valid && slot.io.canAlloc
-  private val selWr = reqArb.io.grant === 1.U
+  private val twoFree = slot.io.count +& 2.U <= p.slaveRespSlots(slave).U
+  private val reqOk =
+    slot.io.canAlloc && (!(io.inRdReq.valid && io.inWrData.valid) || twoFree)
 
-  io.out.valid := reqArb.io.valid
-  io.out.bits.write := selWr
-  io.out.bits.addr := Mux(selWr, io.inWrData.bits.addr, io.inRdReq.bits.addr)
-  io.out.bits.len := Mux(selWr, 0.U, io.inRdReq.bits.len)
-  io.out.bits.src := Mux(selWr, io.inWrData.bits.src, io.inRdReq.bits.src)
-  io.out.bits.id := Mux(selWr, io.inWrData.bits.id, io.inRdReq.bits.id)
-  io.out.bits.data := Mux(selWr, io.inWrData.bits.data, 0.U)
-  io.out.bits.strb := Mux(selWr, io.inWrData.bits.strb, 0.U)
-  io.out.bits.vc := Mux(selWr, io.inWrData.bits.vc, io.inRdReq.bits.vc)
-  io.inRdReq.ready := io.out.ready && reqArb.io.valid && !selWr
-  io.inWrData.ready := io.out.ready && reqArb.io.valid && selWr
+  io.outRdReq.valid := io.inRdReq.valid && reqOk
+  io.outRdReq.bits := io.inRdReq.bits
+  io.inRdReq.ready := io.outRdReq.ready && reqOk
 
-  typeQ.io.enq.valid := io.out.fire
-  typeQ.io.enq.bits := selWr
-  assert(!io.out.fire || typeQ.io.enq.ready, "LM-P3: response type queue overflow")
+  io.outWrData.valid := io.inWrData.valid && reqOk
+  io.outWrData.bits := io.inWrData.bits
+  io.inWrData.ready := io.outWrData.ready && reqOk
 
-  private val headWr = typeQ.io.deq.bits
-  private val haveType = typeQ.io.deq.valid
+  io.outRdData.valid := io.inRdData.valid
+  io.outRdData.bits := io.inRdData.bits
+  io.outRdData.bits.vc := VecInit(rspVc)(io.inRdData.bits.src)
+  io.inRdData.ready := io.outRdData.ready
 
-  io.outRdData.valid := io.inRsp.valid && haveType && !headWr
-  io.outRdData.bits.data := io.inRsp.bits.data
-  io.outRdData.bits.src := io.inRsp.bits.src
-  io.outRdData.bits.id := io.inRsp.bits.id
-  io.outRdData.bits.last := true.B
-  io.outRdData.bits.err := io.inRsp.bits.err
-  io.outRdData.bits.vc := VecInit(rspVc)(io.inRsp.bits.src)
+  io.outWrResp.valid := io.inWrResp.valid
+  io.outWrResp.bits := io.inWrResp.bits
+  io.outWrResp.bits.vc := VecInit(rspVc)(io.inWrResp.bits.src)
+  io.inWrResp.ready := io.outWrResp.ready
 
-  io.outWrResp.valid := io.inRsp.valid && haveType && headWr
-  io.outWrResp.bits.src := io.inRsp.bits.src
-  io.outWrResp.bits.id := io.inRsp.bits.id
-  io.outWrResp.bits.err := io.inRsp.bits.err
-  io.outWrResp.bits.vc := VecInit(rspVc)(io.inRsp.bits.src)
-
-  io.inRsp.ready := haveType && Mux(headWr, io.outWrResp.ready, io.outRdData.ready)
-  typeQ.io.deq.ready := io.inRsp.fire
-
-  slot.io.alloc := io.out.fire
-  slot.io.release := io.outRdData.fire || io.outWrResp.fire
+  slot.io.alloc := io.outRdReq.fire.asUInt +& io.outWrData.fire.asUInt
+  slot.io.release := io.inRdData.fire.asUInt +& io.inWrResp.fire.asUInt
   io.slot := slot.io.count
 
-  assert(!io.inRsp.valid || haveType, "LM-P3: response without a tracked request")
   assert(!io.inRdReq.valid || !io.inRdReq.ready || slot.io.canAlloc,
     "LM-P3: accepted request without a response slot")
   assert(!io.inWrData.valid || !io.inWrData.ready || slot.io.canAlloc,
@@ -655,24 +615,34 @@ class LmNetworkTop(p: NetworkParams) extends Module {
 
   private def rdReqT = new LmRdReq(p.addrWidth, p.idWidth, p.tagWidth)
   private def wrDataT = new LmWrData(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth)
+  private def rdDataT = new LmRdData(p.dataWidth, p.idWidth, p.tagWidth)
+  private def wrRespT = new LmWrResp(p.idWidth, p.tagWidth)
 
   val io = IO(new Bundle {
-    val master = Vec(p.nMaster, Flipped(Decoupled(new LmReq(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth))))
-    val masterRsp = Vec(p.nMaster, Decoupled(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth)))
-    val slave = Vec(p.nSlave, Decoupled(new LmReq(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth)))
-    val slaveRsp = Vec(p.nSlave, Flipped(Decoupled(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth))))
+    val masterRdReq = Vec(p.nMaster, Flipped(Decoupled(rdReqT)))
+    val masterWrData = Vec(p.nMaster, Flipped(Decoupled(wrDataT)))
+    val masterRdData = Vec(p.nMaster, Decoupled(rdDataT))
+    val masterWrResp = Vec(p.nMaster, Decoupled(wrRespT))
+    val slaveRdReq = Vec(p.nSlave, Decoupled(rdReqT))
+    val slaveWrData = Vec(p.nSlave, Decoupled(wrDataT))
+    val slaveRdData = Vec(p.nSlave, Flipped(Decoupled(rdDataT)))
+    val slaveWrResp = Vec(p.nSlave, Flipped(Decoupled(wrRespT)))
     val perf = Output(new Bundle {
       val returnSlots = Vec(p.nMaster, UInt(maxRetW.W))
       val respSlots = Vec(p.nSlave, UInt(maxRspW.W))
-      val requests = UInt(32.W)
-      val responses = UInt(32.W)
+      val rdRequests = UInt(32.W)
+      val wrBeats = UInt(32.W)
+      val rdResponses = UInt(32.W)
+      val wrResponses = UInt(32.W)
       val errors = UInt(32.W)
       val errSticky = Bool()
     })
   })
 
-  private val reqCnt = RegInit(0.U(32.W))
-  private val rspCnt = RegInit(0.U(32.W))
+  private val rdReqCnt = RegInit(0.U(32.W))
+  private val wrBeatCnt = RegInit(0.U(32.W))
+  private val rdRspCnt = RegInit(0.U(32.W))
+  private val wrRspCnt = RegInit(0.U(32.W))
   private val errCnt = RegInit(0.U(32.W))
   private val errSticky = RegInit(false.B)
   private val mNi = Seq.tabulate(p.nMaster)(i => Module(new LmMasterNi(p, i)))
@@ -733,9 +703,10 @@ class LmNetworkTop(p: NetworkParams) extends Module {
   for (i <- 0 until p.nMaster) {
     val r = p.masterRouter(i)
     val port = p.masterPort(i)
-    mNi(i).io.in.valid := io.master(i).valid
-    mNi(i).io.in.bits := io.master(i).bits
-    io.master(i).ready := mNi(i).io.in.ready
+    LmWire.link(io.masterRdReq(i), mNi(i).io.inRdReq)
+    LmWire.link(io.masterWrData(i), mNi(i).io.inWrData)
+    LmWire.link(mNi(i).io.outRdData, io.masterRdData(i))
+    LmWire.link(mNi(i).io.outWrResp, io.masterWrResp(i))
 
     routers(r).io.inRdReq(port).valid := mNi(i).io.outRdReq.valid && mnetRdReqOk(i)
     routers(r).io.inRdReq(port).bits := mNi(i).io.outRdReq.bits
@@ -745,13 +716,13 @@ class LmNetworkTop(p: NetworkParams) extends Module {
     routers(r).io.inWrData(port).bits := mNi(i).io.outWrData.bits
     mNi(i).io.outWrData.ready := routers(r).io.inWrData(port).ready && mnetWrDataOk(i)
 
+    routers(r).io.inRdData(port).ready := mNi(i).io.inRdData.ready
     mNi(i).io.inRdData.valid := routers(r).io.inRdData(port).valid && mnetRdDataOk(i)
     mNi(i).io.inRdData.bits := routers(r).io.inRdData(port).bits
-    routers(r).io.inRdData(port).ready := mNi(i).io.inRdData.ready
 
+    routers(r).io.inWrResp(port).ready := mNi(i).io.inWrResp.ready
     mNi(i).io.inWrResp.valid := routers(r).io.inWrResp(port).valid && mnetWrRespOk(i)
     mNi(i).io.inWrResp.bits := routers(r).io.inWrResp(port).bits
-    routers(r).io.inWrResp(port).ready := mNi(i).io.inWrResp.ready
 
     routers(r).io.inRdDataFwd(port).valid := false.B
     routers(r).io.inRdDataFwd(port).bits :=
@@ -760,14 +731,18 @@ class LmNetworkTop(p: NetworkParams) extends Module {
     routers(r).io.inWrRespFwd(port).bits :=
       0.U.asTypeOf(chiselTypeOf(routers(r).io.inWrRespFwd(port).bits))
 
-    io.masterRsp(i).valid := mNi(i).io.outRsp.valid
-    io.masterRsp(i).bits := mNi(i).io.outRsp.bits
-    mNi(i).io.outRsp.ready := io.masterRsp(i).ready
-
-    when(io.master(i).fire) { reqCnt := reqCnt + 1.U }
-    when(io.masterRsp(i).fire) {
-      rspCnt := rspCnt + 1.U
-      when(io.masterRsp(i).bits.err) {
+    when(io.masterRdReq(i).fire) { rdReqCnt := rdReqCnt + 1.U }
+    when(io.masterWrData(i).fire) { wrBeatCnt := wrBeatCnt + 1.U }
+    when(io.masterRdData(i).fire) {
+      rdRspCnt := rdRspCnt + 1.U
+      when(io.masterRdData(i).bits.err) {
+        errCnt := errCnt + 1.U
+        errSticky := true.B
+      }
+    }
+    when(io.masterWrResp(i).fire) {
+      wrRspCnt := wrRspCnt + 1.U
+      when(io.masterWrResp(i).bits.err) {
         errCnt := errCnt + 1.U
         errSticky := true.B
       }
@@ -792,13 +767,10 @@ class LmNetworkTop(p: NetworkParams) extends Module {
     sNi(j).io.inWrData.bits := sSkidWr(j).io.out.bits
     sSkidWr(j).io.out.ready := sNi(j).io.inWrData.ready && snetWrDataOk(j)
 
-    io.slave(j).valid := sNi(j).io.out.valid
-    io.slave(j).bits := sNi(j).io.out.bits
-    sNi(j).io.out.ready := io.slave(j).ready
-
-    sNi(j).io.inRsp.valid := io.slaveRsp(j).valid
-    sNi(j).io.inRsp.bits := io.slaveRsp(j).bits
-    io.slaveRsp(j).ready := sNi(j).io.inRsp.ready
+    LmWire.link(sNi(j).io.outRdReq, io.slaveRdReq(j))
+    LmWire.link(sNi(j).io.outWrData, io.slaveWrData(j))
+    LmWire.link(io.slaveRdData(j), sNi(j).io.inRdData)
+    LmWire.link(io.slaveWrResp(j), sNi(j).io.inWrResp)
 
     routers(r).io.outRdData(port).valid := sNi(j).io.outRdData.valid && snetRdDataOk(j)
     routers(r).io.outRdData(port).bits := sNi(j).io.outRdData.bits
@@ -833,8 +805,10 @@ class LmNetworkTop(p: NetworkParams) extends Module {
     routers(l.toRouter).io.inWrRespFwd(l.toPort) <> link.io.bWrRespFwd
   }
 
-  io.perf.requests := reqCnt
-  io.perf.responses := rspCnt
+  io.perf.rdRequests := rdReqCnt
+  io.perf.wrBeats := wrBeatCnt
+  io.perf.rdResponses := rdRspCnt
+  io.perf.wrResponses := wrRspCnt
   io.perf.errors := errCnt
   io.perf.errSticky := errSticky
 }

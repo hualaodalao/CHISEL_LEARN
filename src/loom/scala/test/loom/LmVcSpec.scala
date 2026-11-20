@@ -18,20 +18,18 @@ class LmVcSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   private def init(dut: LmTop, p: FabricParams): Unit = {
     for (i <- 0 until p.nMaster) {
-      dut.io.master(i).valid.poke(false.B)
-      dut.io.master(i).bits.write.poke(true.B)
-      dut.io.master(i).bits.addr.poke(0.U)
-      dut.io.master(i).bits.len.poke(0.U)
-      dut.io.master(i).bits.src.poke(i.U)
-      dut.io.master(i).bits.data.poke(0.U)
-      dut.io.masterRsp(i).ready.poke(true.B)
+      dut.io.masterRdReq(i).valid.poke(false.B)
+      dut.io.masterRdReq(i).bits.src.poke(i.U)
+      dut.io.masterWrData(i).valid.poke(false.B)
+      dut.io.masterWrData(i).bits.src.poke(i.U)
+      dut.io.masterRdData(i).ready.poke(true.B)
+      dut.io.masterWrResp(i).ready.poke(true.B)
     }
     for (j <- 0 until p.nSlave) {
-      dut.io.slave(j).ready.poke(true.B)
-      dut.io.slaveRsp(j).valid.poke(false.B)
-      dut.io.slaveRsp(j).bits.src.poke(0.U)
-      dut.io.slaveRsp(j).bits.data.poke(0.U)
-      dut.io.slaveRsp(j).bits.err.poke(false.B)
+      dut.io.slaveRdReq(j).ready.poke(true.B)
+      dut.io.slaveWrData(j).ready.poke(true.B)
+      dut.io.slaveRdData(j).valid.poke(false.B)
+      dut.io.slaveWrResp(j).valid.poke(false.B)
     }
     dut.reset.poke(true.B)
     dut.clock.step(2)
@@ -41,11 +39,10 @@ class LmVcSpec extends AnyFlatSpec with Matchers with ChiselSim {
   behavior of "LmVcQueue"
 
   it should "fill to its depth, backpressure, and preserve order" in {
-    simulate(new LmVcQueue(new LmReq(32, 64, 1), 2)) { dut =>
-      dut.io.enq.bits.write.poke(true.B)
+    simulate(new LmVcQueue(new LmWrData(32, 64, 1), 2)) { dut =>
       dut.io.enq.bits.addr.poke(0.U)
-      dut.io.enq.bits.len.poke(0.U)
       dut.io.enq.bits.src.poke(0.U)
+      dut.io.enq.bits.vc.poke(0.U)
       dut.io.enq.bits.data.poke(0x11L.U)
       dut.io.deq.ready.poke(false.B)
 
@@ -75,10 +72,10 @@ class LmVcSpec extends AnyFlatSpec with Matchers with ChiselSim {
     val p = FabricParams.simple("pkt", 2, 2, 32, 64, masterClass = Seq(Bulk, Bulk))
     simulate(new LmTop(p)) { dut =>
       init(dut, p)
-      dut.io.master(0).bits.len.poke(3.U) // 4 beats, the bulk maximum
-      dut.io.master(0).valid.poke(true.B)
+      dut.io.masterRdReq(0).bits.len.poke(3.U) // 4 beats, the bulk maximum
+      dut.io.masterRdReq(0).valid.poke(true.B)
       dut.clock.step()
-      dut.io.master(0).ready.expect(true.B)
+      dut.io.masterRdReq(0).ready.expect(true.B)
     }
   }
 
@@ -87,8 +84,8 @@ class LmVcSpec extends AnyFlatSpec with Matchers with ChiselSim {
     intercept[Throwable] {
       simulate(new LmTop(p)) { dut =>
         init(dut, p)
-        dut.io.master(0).bits.len.poke(4.U) // 5 beats
-        dut.io.master(0).valid.poke(true.B)
+        dut.io.masterRdReq(0).bits.len.poke(4.U) // 5 beats
+        dut.io.masterRdReq(0).valid.poke(true.B)
         dut.clock.step()
       }
     }
@@ -99,8 +96,8 @@ class LmVcSpec extends AnyFlatSpec with Matchers with ChiselSim {
     intercept[Throwable] {
       simulate(new LmTop(p)) { dut =>
         init(dut, p)
-        dut.io.master(0).bits.len.poke(1.U)
-        dut.io.master(0).valid.poke(true.B)
+        dut.io.masterRdReq(0).bits.len.poke(1.U)
+        dut.io.masterRdReq(0).valid.poke(true.B)
         dut.clock.step()
       }
     }
@@ -110,10 +107,10 @@ class LmVcSpec extends AnyFlatSpec with Matchers with ChiselSim {
     val p = FabricParams.simple("pkt", 2, 2, 32, 64, masterClass = Seq(Lat, Bulk))
     simulate(new LmTop(p)) { dut =>
       init(dut, p)
-      dut.io.master(0).bits.len.poke(1.U) // 2 beats, the lat maximum
-      dut.io.master(0).valid.poke(true.B)
+      dut.io.masterRdReq(0).bits.len.poke(1.U) // 2 beats, the lat maximum
+      dut.io.masterRdReq(0).valid.poke(true.B)
       dut.clock.step()
-      dut.io.master(0).ready.expect(true.B)
+      dut.io.masterRdReq(0).ready.expect(true.B)
     }
   }
 }

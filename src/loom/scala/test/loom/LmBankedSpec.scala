@@ -18,20 +18,18 @@ class LmBankedSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   private def init(dut: LmTop): Unit = {
     for (i <- 0 until p.nMaster) {
-      dut.io.master(i).valid.poke(false.B)
-      dut.io.master(i).bits.write.poke(false.B)
-      dut.io.master(i).bits.addr.poke(0.U)
-      dut.io.master(i).bits.len.poke(0.U)
-      dut.io.master(i).bits.src.poke(0.U)
-      dut.io.master(i).bits.data.poke(0.U)
-      dut.io.masterRsp(i).ready.poke(true.B)
+      dut.io.masterRdReq(i).valid.poke(false.B)
+      dut.io.masterRdReq(i).bits.src.poke(i.U)
+      dut.io.masterWrData(i).valid.poke(false.B)
+      dut.io.masterWrData(i).bits.src.poke(i.U)
+      dut.io.masterRdData(i).ready.poke(true.B)
+      dut.io.masterWrResp(i).ready.poke(true.B)
     }
     for (j <- 0 until p.nSlave) {
-      dut.io.slave(j).ready.poke(true.B)
-      dut.io.slaveRsp(j).valid.poke(false.B)
-      dut.io.slaveRsp(j).bits.src.poke(0.U)
-      dut.io.slaveRsp(j).bits.data.poke(0.U)
-      dut.io.slaveRsp(j).bits.err.poke(false.B)
+      dut.io.slaveRdReq(j).ready.poke(true.B)
+      dut.io.slaveWrData(j).ready.poke(true.B)
+      dut.io.slaveRdData(j).valid.poke(false.B)
+      dut.io.slaveWrResp(j).valid.poke(false.B)
     }
     dut.reset.poke(true.B)
     dut.clock.step(2)
@@ -40,11 +38,11 @@ class LmBankedSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   private def waitValid(dut: LmTop, j: Int, limit: Int = 6): Boolean = {
     var cycles = 0
-    while (!dut.io.slave(j).valid.peek().litToBoolean && cycles < limit) {
+    while (!dut.io.slaveWrData(j).valid.peek().litToBoolean && cycles < limit) {
       dut.clock.step()
       cycles += 1
     }
-    dut.io.slave(j).valid.peek().litToBoolean
+    dut.io.slaveWrData(j).valid.peek().litToBoolean
   }
 
   behavior of "LmTop (banked)"
@@ -53,36 +51,40 @@ class LmBankedSpec extends AnyFlatSpec with Matchers with ChiselSim {
     simulate(new LmTop(p)) { dut =>
       init(dut)
 
-      dut.io.master(0).bits.write.poke(true.B)
-      dut.io.master(0).bits.addr.poke(0x2000.U) // slave 2, bank 1
-      dut.io.master(0).bits.data.poke(0x22L.U)
-      dut.io.master(0).valid.poke(true.B)
+      dut.io.masterWrData(0).bits.addr.poke(0x2000.U) // slave 2, bank 1
+      dut.io.masterWrData(0).bits.data.poke(0x22L.U)
+      dut.io.masterWrData(0).valid.poke(true.B)
 
-      dut.io.master(1).bits.write.poke(true.B)
-      dut.io.master(1).bits.addr.poke(0x0000.U) // slave 0, bank 0
-      dut.io.master(1).bits.src.poke(1.U)
-      dut.io.master(1).bits.data.poke(0x11L.U)
-      dut.io.master(1).valid.poke(true.B)
+      dut.io.masterWrData(1).bits.addr.poke(0x0000.U) // slave 0, bank 0
+      dut.io.masterWrData(1).bits.data.poke(0x11L.U)
+      dut.io.masterWrData(1).valid.poke(true.B)
 
       dut.clock.step()
-      dut.io.master(0).valid.poke(false.B)
-      dut.io.master(1).valid.poke(false.B)
+      dut.io.masterWrData(0).valid.poke(false.B)
+      dut.io.masterWrData(1).valid.poke(false.B)
 
       waitValid(dut, 0) shouldBe true
-      dut.io.slave(0).bits.addr.expect(0x0000.U)
-      dut.io.slave(0).bits.data.expect(0x11L.U)
+      dut.io.slaveWrData(0).bits.addr.expect(0x0000.U)
+      dut.io.slaveWrData(0).bits.data.expect(0x11L.U)
 
       waitValid(dut, 2) shouldBe true
-      dut.io.slave(2).bits.addr.expect(0x2000.U)
-      dut.io.slave(2).bits.data.expect(0x22L.U)
+      dut.io.slaveWrData(2).bits.addr.expect(0x2000.U)
+      dut.io.slaveWrData(2).bits.data.expect(0x22L.U)
 
-      dut.io.slaveRsp(0).bits.src.poke(1.U)
-      dut.io.slaveRsp(0).bits.data.poke(0xabcL.U)
-      dut.io.slaveRsp(0).valid.poke(true.B)
+      dut.io.slaveWrResp(0).bits.src.poke(1.U)
+      dut.io.slaveWrResp(0).bits.err.poke(false.B)
+      dut.io.slaveWrResp(0).valid.poke(true.B)
       dut.clock.step()
-      dut.io.masterRsp(1).valid.expect(true.B)
-      dut.io.masterRsp(1).bits.data.expect(0xabcL.U)
-      dut.io.slaveRsp(0).valid.poke(false.B)
+      dut.io.slaveWrResp(0).valid.poke(false.B)
+
+      var seen = false
+      var cycles = 0
+      while (!seen && cycles < 10) {
+        seen = dut.io.masterWrResp(1).valid.peek().litToBoolean
+        if (!seen) { dut.clock.step(); cycles += 1 }
+      }
+      seen shouldBe true
+      dut.io.masterWrResp(1).bits.src.expect(1.U)
     }
   }
 

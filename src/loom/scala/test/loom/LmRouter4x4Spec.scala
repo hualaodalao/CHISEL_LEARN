@@ -16,24 +16,51 @@ class LmRouter4x4Spec extends AnyFlatSpec with Matchers with ChiselSim {
 
   private def init(dut: LmTop): Unit = {
     for (i <- 0 until p.nMaster) {
-      dut.io.master(i).valid.poke(false.B)
-      dut.io.master(i).bits.write.poke(false.B)
-      dut.io.master(i).bits.addr.poke(0.U)
-      dut.io.master(i).bits.len.poke(0.U)
-      dut.io.master(i).bits.src.poke(0.U)
-      dut.io.master(i).bits.data.poke(0.U)
-      dut.io.masterRsp(i).ready.poke(true.B)
+      dut.io.masterRdReq(i).valid.poke(false.B)
+      dut.io.masterRdReq(i).bits.src.poke(i.U)
+      dut.io.masterWrData(i).valid.poke(false.B)
+      dut.io.masterWrData(i).bits.src.poke(i.U)
+      dut.io.masterRdData(i).ready.poke(true.B)
+      dut.io.masterWrResp(i).ready.poke(true.B)
     }
     for (j <- 0 until p.nSlave) {
-      dut.io.slave(j).ready.poke(true.B)
-      dut.io.slaveRsp(j).valid.poke(false.B)
-      dut.io.slaveRsp(j).bits.src.poke(0.U)
-      dut.io.slaveRsp(j).bits.data.poke(0.U)
-      dut.io.slaveRsp(j).bits.err.poke(false.B)
+      dut.io.slaveRdReq(j).ready.poke(true.B)
+      dut.io.slaveWrData(j).ready.poke(true.B)
+      dut.io.slaveRdData(j).valid.poke(false.B)
+      dut.io.slaveWrResp(j).valid.poke(false.B)
     }
     dut.reset.poke(true.B)
     dut.clock.step(2)
     dut.reset.poke(false.B)
+  }
+
+  private def waitRdReq(dut: LmTop, j: Int, limit: Int = 10): Unit = {
+    var cycles = 0
+    while (!dut.io.slaveRdReq(j).valid.peek().litToBoolean && cycles < limit) {
+      dut.clock.step()
+      cycles += 1
+    }
+    dut.io.slaveRdReq(j).valid.expect(true.B)
+  }
+
+  private def waitRdData(dut: LmTop, m: Int, limit: Int = 10): Unit = {
+    var cycles = 0
+    while (!dut.io.masterRdData(m).valid.peek().litToBoolean && cycles < limit) {
+      dut.clock.step()
+      cycles += 1
+    }
+    dut.io.masterRdData(m).valid.expect(true.B)
+  }
+
+  /** Sources seen on a slave port while it holds a valid request. */
+  private def sampleSrc(dut: LmTop, j: Int, cycles: Int): Seq[Int] = {
+    val seen = Seq.newBuilder[Int]
+    for (_ <- 0 until cycles) {
+      if (dut.io.slaveWrData(j).valid.peek().litToBoolean)
+        seen += dut.io.slaveWrData(j).bits.src.peek().litValue.toInt
+      dut.clock.step()
+    }
+    seen.result()
   }
 
   behavior of "LmTop 4x4"
@@ -43,29 +70,25 @@ class LmRouter4x4Spec extends AnyFlatSpec with Matchers with ChiselSim {
       init(dut)
 
       for (i <- 0 until p.nMaster) {
-        dut.io.master(i).bits.write.poke(true.B)
-        dut.io.master(i).bits.addr.poke((i << 12).U)
-        dut.io.master(i).bits.src.poke(i.U)
-        dut.io.master(i).bits.data.poke((0xa000 + i).U)
-        dut.io.master(i).valid.poke(true.B)
+        dut.io.masterRdReq(i).bits.addr.poke((i << 12).U)
+        dut.io.masterRdReq(i).valid.poke(true.B)
         dut.clock.step()
+        dut.io.masterRdReq(i).valid.poke(false.B)
 
-        dut.io.slave(i).valid.expect(true.B)
-        dut.io.slave(i).bits.addr.expect((i << 12).U)
-        dut.io.slave(i).bits.src.expect(i.U)
-        dut.io.slave(i).bits.data.expect((0xa000 + i).U)
-        dut.io.master(i).valid.poke(false.B)
+        waitRdReq(dut, i)
+        dut.io.slaveRdReq(i).bits.addr.expect((i << 12).U)
+        dut.io.slaveRdReq(i).bits.src.expect(i.U)
 
-        dut.io.slaveRsp(i).bits.src.poke(i.U)
-        dut.io.slaveRsp(i).bits.data.poke((0xb000 + i).U)
-        dut.io.slaveRsp(i).bits.err.poke(false.B)
-        dut.io.slaveRsp(i).valid.poke(true.B)
+        dut.io.slaveRdData(i).bits.src.poke(i.U)
+        dut.io.slaveRdData(i).bits.data.poke((0xb000 + i).U)
+        dut.io.slaveRdData(i).valid.poke(true.B)
         dut.clock.step()
+        dut.io.slaveRdData(i).valid.poke(false.B)
 
-        dut.io.masterRsp(i).valid.expect(true.B)
-        dut.io.masterRsp(i).bits.src.expect(i.U)
-        dut.io.masterRsp(i).bits.data.expect((0xb000 + i).U)
-        dut.io.slaveRsp(i).valid.poke(false.B)
+        waitRdData(dut, i)
+        dut.io.masterRdData(i).bits.src.expect(i.U)
+        dut.io.masterRdData(i).bits.data.expect((0xb000 + i).U)
+        dut.clock.step()
       }
     }
   }
@@ -74,30 +97,28 @@ class LmRouter4x4Spec extends AnyFlatSpec with Matchers with ChiselSim {
     simulate(new LmTop(p)) { dut =>
       init(dut)
 
-      // Both masters request the same slave. Admission alternates through
-      // the VC queues: m0 enters first, so the slave sees m0 after the
-      // first edge and m1 after the second.
-      dut.io.master(0).bits.write.poke(true.B)
-      dut.io.master(0).bits.addr.poke(0.U)
-      dut.io.master(0).bits.src.poke(0.U)
-      dut.io.master(0).valid.poke(true.B)
-      dut.io.master(1).bits.write.poke(true.B)
-      dut.io.master(1).bits.addr.poke(0.U)
-      dut.io.master(1).bits.src.poke(1.U)
-      dut.io.master(1).valid.poke(true.B)
-      dut.clock.step()
-      dut.io.slave(0).bits.src.expect(0.U)
+      // Both masters request the same slave; admission alternates through the
+      // VC queues, so the slave port sees both sources in turn.
+      dut.io.masterWrData(0).bits.addr.poke(0.U)
+      dut.io.masterWrData(0).bits.data.poke(0x10L.U)
+      dut.io.masterWrData(0).valid.poke(true.B)
+      dut.io.masterWrData(1).bits.addr.poke(0.U)
+      dut.io.masterWrData(1).bits.data.poke(0x11L.U)
+      dut.io.masterWrData(1).valid.poke(true.B)
 
-      // m1 is admitted next and drives the port one cycle later.
-      dut.clock.step()
-      dut.io.slave(0).bits.src.expect(1.U)
+      val both = sampleSrc(dut, 0, 5)
+      both should contain(0)
+      both should contain(1)
+      both.take(2) shouldBe Seq(0, 1)
 
-      // Drop m1: m1 drains once, then m0 keeps the port.
-      dut.io.master(1).valid.poke(false.B)
-      dut.clock.step()
-      dut.io.slave(0).bits.src.expect(0.U)
+      // Drop m1: its pipeline drains, then m0 keeps the port.
+      dut.io.masterWrData(1).valid.poke(false.B)
+      dut.clock.step(6)
+      val only0 = sampleSrc(dut, 0, 3)
+      only0 shouldBe Seq.fill(only0.length)(0)
+      only0 should not be empty
 
-      dut.io.master(0).valid.poke(false.B)
+      dut.io.masterWrData(0).valid.poke(false.B)
     }
   }
 }

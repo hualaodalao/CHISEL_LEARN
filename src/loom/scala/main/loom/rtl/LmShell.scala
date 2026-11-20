@@ -34,10 +34,11 @@ class LmRData(val dataWidth: Int) extends Bundle {
 /** Burst engine shared by all protocol shells.
   *
   * A command is latched, its beats are issued one by one on the fabric
-  * request channel (write data travels with each request), and the matching
-  * responses are drained. Writes produce one aggregated response; reads
-  * produce one rdata beat per response. Requests are only ever generated in
-  * the SEND state, never from the response path (G4).
+  * request channels (reads on `rdReq`, write payloads on `wrData`), and the
+  * matching responses are drained from `rdData` and `wrResp`. Writes produce
+  * one aggregated response; reads produce one rdata beat per response.
+  * Requests are only ever generated in the SEND state, never from the
+  * response path (G4).
   */
 class LmShellCore(
     addrWidth: Int,
@@ -54,8 +55,10 @@ class LmShellCore(
     val wdata = Flipped(Decoupled(new LmShellBeat(dataWidth)))
     val bresp = Decoupled(new LmShellResp)
     val rdata = Decoupled(new LmRData(dataWidth))
-    val req = Decoupled(new LmReq(addrWidth, dataWidth, idWidth, tagWidth))
-    val rsp = Flipped(Decoupled(new LmRsp(dataWidth, idWidth, tagWidth)))
+    val rdReq = Decoupled(new LmRdReq(addrWidth, idWidth, tagWidth))
+    val wrData = Decoupled(new LmWrData(addrWidth, dataWidth, idWidth, tagWidth))
+    val rdData = Flipped(Decoupled(new LmRdData(dataWidth, idWidth, tagWidth)))
+    val wrResp = Flipped(Decoupled(new LmWrResp(idWidth, tagWidth)))
   })
 
   private val sIdle :: sSend :: sDrain :: sBwait :: Nil = Enum(4)
@@ -69,10 +72,13 @@ class LmShellCore(
   private val burstId = RegInit(0.U(tagWidth.W))
 
   io.cmd.ready := state === sIdle
-  io.req.valid := false.B
-  io.req.bits := 0.U.asTypeOf(chiselTypeOf(io.req.bits))
+  io.rdReq.valid := false.B
+  io.rdReq.bits := 0.U.asTypeOf(chiselTypeOf(io.rdReq.bits))
+  io.wrData.valid := false.B
+  io.wrData.bits := 0.U.asTypeOf(chiselTypeOf(io.wrData.bits))
   io.wdata.ready := false.B
-  io.rsp.ready := false.B
+  io.rdData.ready := false.B
+  io.wrResp.ready := false.B
   io.rdata.valid := false.B
   io.rdata.bits := 0.U.asTypeOf(chiselTypeOf(io.rdata.bits))
   io.bresp.valid := state === sBwait
@@ -95,33 +101,42 @@ class LmShellCore(
     when(sent === beats) {
       state := sDrain
     }.otherwise {
-      io.req.valid := Mux(writeMode, io.wdata.valid, true.B)
-      io.req.bits.write := writeMode
-      io.req.bits.addr := base + (sent << busBytesLog2)
-      io.req.bits.len := 0.U
-      io.req.bits.src := srcId.U
-      io.req.bits.id := burstId
-      io.req.bits.data := io.wdata.bits.data
-      io.req.bits.strb := io.wdata.bits.strb
-      io.wdata.ready := io.req.ready
-      when(io.req.fire) { sent := sent + 1.U }
+      val beatAddr = base + (sent << busBytesLog2)
+      io.rdReq.valid := !writeMode
+      io.rdReq.bits.addr := beatAddr
+      io.rdReq.bits.len := 0.U
+      io.rdReq.bits.src := srcId.U
+      io.rdReq.bits.id := burstId
+      io.rdReq.bits.vc := 0.U
+
+      io.wrData.valid := writeMode && io.wdata.valid
+      io.wrData.bits.addr := beatAddr
+      io.wrData.bits.data := io.wdata.bits.data
+      io.wrData.bits.strb := io.wdata.bits.strb
+      io.wrData.bits.src := srcId.U
+      io.wrData.bits.id := burstId
+      // Every beat is one fabric transaction, so it also ends its burst.
+      io.wrData.bits.last := true.B
+      io.wrData.bits.vc := 0.U
+
+      io.wdata.ready := writeMode && io.wrData.ready
+      when(Mux(writeMode, io.wrData.fire, io.rdReq.fire)) { sent := sent + 1.U }
     }
   }
 
   when(state === sDrain) {
-    when(writeMode) {
-      io.rsp.ready := true.B
-    }.otherwise {
-      io.rdata.valid := io.rsp.valid
-      io.rdata.bits.data := io.rsp.bits.data
-      io.rdata.bits.err := io.rsp.bits.err
-      io.rdata.bits.last := got === beats - 1.U
-      io.rsp.ready := io.rdata.ready
-    }
-    when(io.rsp.fire) {
+    io.wrResp.ready := writeMode
+    io.rdData.ready := !writeMode && io.rdata.ready
+    io.rdata.valid := !writeMode && io.rdData.valid
+    io.rdata.bits.data := io.rdData.bits.data
+    io.rdata.bits.err := io.rdData.bits.err
+    io.rdata.bits.last := got === beats - 1.U
+
+    when(Mux(writeMode, io.wrResp.fire, io.rdData.fire)) {
       // Same-(src,id) ordering: the fabric must return the burst's ID.
-      assert(io.rsp.bits.id === burstId, "LM-SHELL: response ID does not match the burst")
-      errAcc := errAcc || io.rsp.bits.err
+      assert(Mux(writeMode, io.wrResp.bits.id, io.rdData.bits.id) === burstId,
+        "LM-SHELL: response ID does not match the burst")
+      errAcc := errAcc || Mux(writeMode, io.wrResp.bits.err, io.rdData.bits.err)
       got := got + 1.U
       when(got === beats - 1.U) {
         state := Mux(writeMode, sBwait, sIdle)
@@ -156,8 +171,10 @@ class LmShellNative(addrWidth: Int, dataWidth: Int, idWidth: Int, srcId: Int) ex
     val wdata = Flipped(Decoupled(new LmNativeW(dataWidth)))
     val rsp = Decoupled(new LmShellResp)
     val rdata = Decoupled(new LmRData(dataWidth))
-    val fabReq = Decoupled(new LmReq(addrWidth, dataWidth, idWidth))
-    val fabRsp = Flipped(Decoupled(new LmRsp(dataWidth, idWidth)))
+    val fabRdReq = Decoupled(new LmRdReq(addrWidth, idWidth))
+    val fabWrData = Decoupled(new LmWrData(addrWidth, dataWidth, idWidth))
+    val fabRdData = Flipped(Decoupled(new LmRdData(dataWidth, idWidth)))
+    val fabWrResp = Flipped(Decoupled(new LmWrResp(idWidth)))
   })
 
   private val core = Module(new LmShellCore(addrWidth, dataWidth, idWidth, srcId))
@@ -182,8 +199,10 @@ class LmShellNative(addrWidth: Int, dataWidth: Int, idWidth: Int, srcId: Int) ex
   io.rdata.bits := core.io.rdata.bits
   core.io.rdata.ready := io.rdata.ready
 
-  io.fabReq <> core.io.req
-  core.io.rsp <> io.fabRsp
+  io.fabRdReq <> core.io.rdReq
+  io.fabWrData <> core.io.wrData
+  io.fabRdData <> core.io.rdData
+  io.fabWrResp <> core.io.wrResp
 }
 
 // ---------------------------------------------------------------------------
@@ -221,8 +240,10 @@ class LmShellAxiLite4(addrWidth: Int, dataWidth: Int, idWidth: Int, srcId: Int) 
     val b = Decoupled(new LmAxiLite4B)
     val ar = Flipped(Decoupled(new LmAxiLite4Ar(addrWidth)))
     val r = Decoupled(new LmAxiLite4R(dataWidth))
-    val fabReq = Decoupled(new LmReq(addrWidth, dataWidth, idWidth))
-    val fabRsp = Flipped(Decoupled(new LmRsp(dataWidth, idWidth)))
+    val fabRdReq = Decoupled(new LmRdReq(addrWidth, idWidth))
+    val fabWrData = Decoupled(new LmWrData(addrWidth, dataWidth, idWidth))
+    val fabRdData = Flipped(Decoupled(new LmRdData(dataWidth, idWidth)))
+    val fabWrResp = Flipped(Decoupled(new LmWrResp(idWidth)))
   })
 
   private val core = Module(new LmShellCore(addrWidth, dataWidth, idWidth, srcId))
@@ -251,8 +272,10 @@ class LmShellAxiLite4(addrWidth: Int, dataWidth: Int, idWidth: Int, srcId: Int) 
   io.r.bits.resp := Mux(core.io.rdata.bits.err, 2.U, 0.U)
   core.io.rdata.ready := io.r.ready
 
-  io.fabReq <> core.io.req
-  core.io.rsp <> io.fabRsp
+  io.fabRdReq <> core.io.rdReq
+  io.fabWrData <> core.io.wrData
+  io.fabRdData <> core.io.rdData
+  io.fabWrResp <> core.io.wrResp
 }
 
 // ---------------------------------------------------------------------------
@@ -314,8 +337,10 @@ class LmShellAxi4(
     val b = Decoupled(new LmAxi4B(tagWidth))
     val ar = Flipped(Decoupled(new LmAxi4Ar(addrWidth, tagWidth)))
     val r = Decoupled(new LmAxi4R(dataWidth, tagWidth))
-    val fabReq = Decoupled(new LmReq(addrWidth, dataWidth, idWidth, tagWidth))
-    val fabRsp = Flipped(Decoupled(new LmRsp(dataWidth, idWidth, tagWidth)))
+    val fabRdReq = Decoupled(new LmRdReq(addrWidth, idWidth, tagWidth))
+    val fabWrData = Decoupled(new LmWrData(addrWidth, dataWidth, idWidth, tagWidth))
+    val fabRdData = Flipped(Decoupled(new LmRdData(dataWidth, idWidth, tagWidth)))
+    val fabWrResp = Flipped(Decoupled(new LmWrResp(idWidth, tagWidth)))
   })
 
   private val core = Module(new LmShellCore(addrWidth, dataWidth, idWidth, srcId, tagWidth))
@@ -361,8 +386,10 @@ class LmShellAxi4(
   io.r.bits.id := arId
   core.io.rdata.ready := io.r.ready
 
-  io.fabReq <> core.io.req
-  core.io.rsp <> io.fabRsp
+  io.fabRdReq <> core.io.rdReq
+  io.fabWrData <> core.io.wrData
+  io.fabRdData <> core.io.rdData
+  io.fabWrResp <> core.io.wrResp
 }
 
 // ---------------------------------------------------------------------------
@@ -397,8 +424,10 @@ class LmShellTlUl(addrWidth: Int, dataWidth: Int, idWidth: Int, srcId: Int) exte
   val io = IO(new Bundle {
     val a = Flipped(Decoupled(new LmTlA(addrWidth, dataWidth)))
     val d = Decoupled(new LmTlD(dataWidth))
-    val fabReq = Decoupled(new LmReq(addrWidth, dataWidth, idWidth))
-    val fabRsp = Flipped(Decoupled(new LmRsp(dataWidth, idWidth)))
+    val fabRdReq = Decoupled(new LmRdReq(addrWidth, idWidth))
+    val fabWrData = Decoupled(new LmWrData(addrWidth, dataWidth, idWidth))
+    val fabRdData = Flipped(Decoupled(new LmRdData(dataWidth, idWidth)))
+    val fabWrResp = Flipped(Decoupled(new LmWrResp(idWidth)))
   })
 
   private val core = Module(new LmShellCore(addrWidth, dataWidth, idWidth, srcId))
@@ -454,6 +483,8 @@ class LmShellTlUl(addrWidth: Int, dataWidth: Int, idWidth: Int, srcId: Int) exte
   core.io.bresp.ready := io.d.ready && writeDone
   core.io.rdata.ready := io.d.ready && readDone
 
-  io.fabReq <> core.io.req
-  core.io.rsp <> io.fabRsp
+  io.fabRdReq <> core.io.rdReq
+  io.fabWrData <> core.io.wrData
+  io.fabRdData <> core.io.rdData
+  io.fabWrResp <> core.io.wrResp
 }

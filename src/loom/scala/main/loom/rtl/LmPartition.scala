@@ -60,8 +60,9 @@ object PartitionParams {
   }
 }
 
-/** Port contract shared by a real partition and its stub. Endpoint ports keep
-  * the merged LmReq/LmRsp view; the four channel groups cross the boundary.
+/** Port contract shared by a real partition and its stub. Endpoint ports are
+  * the four channels; the same four channel groups plus their forward
+  * directions cross the boundary.
   */
 class LmPartitionIo(
     nMaster: Int,
@@ -75,10 +76,15 @@ class LmPartitionIo(
     rspW: Int,
     tagWidth: Int = loom.ir.LoomDefaults.AxiIdWidth
 ) extends Bundle {
-  val master = Vec(nMaster, Flipped(Decoupled(new LmReq(addrWidth, dataWidth, idWidth, tagWidth))))
-  val masterRsp = Vec(nMaster, Decoupled(new LmRsp(dataWidth, idWidth, tagWidth)))
-  val slave = Vec(nSlave, Decoupled(new LmReq(addrWidth, dataWidth, idWidth, tagWidth)))
-  val slaveRsp = Vec(nSlave, Flipped(Decoupled(new LmRsp(dataWidth, idWidth, tagWidth))))
+  val masterRdReq = Vec(nMaster, Flipped(Decoupled(new LmRdReq(addrWidth, idWidth, tagWidth))))
+  val masterWrData =
+    Vec(nMaster, Flipped(Decoupled(new LmWrData(addrWidth, dataWidth, idWidth, tagWidth))))
+  val masterRdData = Vec(nMaster, Decoupled(new LmRdData(dataWidth, idWidth, tagWidth)))
+  val masterWrResp = Vec(nMaster, Decoupled(new LmWrResp(idWidth, tagWidth)))
+  val slaveRdReq = Vec(nSlave, Decoupled(new LmRdReq(addrWidth, idWidth, tagWidth)))
+  val slaveWrData = Vec(nSlave, Decoupled(new LmWrData(addrWidth, dataWidth, idWidth, tagWidth)))
+  val slaveRdData = Vec(nSlave, Flipped(Decoupled(new LmRdData(dataWidth, idWidth, tagWidth))))
+  val slaveWrResp = Vec(nSlave, Flipped(Decoupled(new LmWrResp(idWidth, tagWidth))))
 
   val boundaryOutRdReq = Vec(nOutLink, Decoupled(new LmRdReq(addrWidth, idWidth, tagWidth)))
   val boundaryOutWrData =
@@ -194,9 +200,10 @@ class LmPartitionTop(p: NetworkParams, pp: PartitionParams) extends Module {
   for ((i, m) <- pp.masters.zipWithIndex) {
     val r = routers(p.masterRouter(i))
     val port = p.masterPort(i)
-    mNi(m).io.in.valid := io.master(m).valid
-    mNi(m).io.in.bits := io.master(m).bits
-    io.master(m).ready := mNi(m).io.in.ready
+    LmWire.link(io.masterRdReq(m), mNi(m).io.inRdReq)
+    LmWire.link(io.masterWrData(m), mNi(m).io.inWrData)
+    LmWire.link(mNi(m).io.outRdData, io.masterRdData(m))
+    LmWire.link(mNi(m).io.outWrResp, io.masterWrResp(m))
 
     r.io.inRdReq(port).valid := mNi(m).io.outRdReq.valid && mnetRdReqOk(i)
     r.io.inRdReq(port).bits := mNi(m).io.outRdReq.bits
@@ -206,22 +213,19 @@ class LmPartitionTop(p: NetworkParams, pp: PartitionParams) extends Module {
     r.io.inWrData(port).bits := mNi(m).io.outWrData.bits
     mNi(m).io.outWrData.ready := r.io.inWrData(port).ready && mnetWrDataOk(i)
 
+    r.io.inRdData(port).ready := mNi(m).io.inRdData.ready
     mNi(m).io.inRdData.valid := r.io.inRdData(port).valid && mnetRdDataOk(i)
     mNi(m).io.inRdData.bits := r.io.inRdData(port).bits
-    r.io.inRdData(port).ready := mNi(m).io.inRdData.ready
 
+    r.io.inWrResp(port).ready := mNi(m).io.inWrResp.ready
     mNi(m).io.inWrResp.valid := r.io.inWrResp(port).valid && mnetWrRespOk(i)
     mNi(m).io.inWrResp.bits := r.io.inWrResp(port).bits
-    r.io.inWrResp(port).ready := mNi(m).io.inWrResp.ready
 
     r.io.inRdDataFwd(port).valid := false.B
     r.io.inRdDataFwd(port).bits := 0.U.asTypeOf(chiselTypeOf(r.io.inRdDataFwd(port).bits))
     r.io.inWrRespFwd(port).valid := false.B
     r.io.inWrRespFwd(port).bits := 0.U.asTypeOf(chiselTypeOf(r.io.inWrRespFwd(port).bits))
 
-    io.masterRsp(m).valid := mNi(m).io.outRsp.valid
-    io.masterRsp(m).bits := mNi(m).io.outRsp.bits
-    mNi(m).io.outRsp.ready := io.masterRsp(m).ready
     io.perf.returnSlots(m) := mNi(m).io.credit
   }
 
@@ -241,13 +245,10 @@ class LmPartitionTop(p: NetworkParams, pp: PartitionParams) extends Module {
     sNi(s).io.inWrData.bits := sSkidWr(s).io.out.bits
     sSkidWr(s).io.out.ready := sNi(s).io.inWrData.ready && snetWrDataOk(j)
 
-    io.slave(s).valid := sNi(s).io.out.valid
-    io.slave(s).bits := sNi(s).io.out.bits
-    sNi(s).io.out.ready := io.slave(s).ready
-
-    sNi(s).io.inRsp.valid := io.slaveRsp(s).valid
-    sNi(s).io.inRsp.bits := io.slaveRsp(s).bits
-    io.slaveRsp(s).ready := sNi(s).io.inRsp.ready
+    LmWire.link(sNi(s).io.outRdReq, io.slaveRdReq(s))
+    LmWire.link(sNi(s).io.outWrData, io.slaveWrData(s))
+    LmWire.link(io.slaveRdData(s), sNi(s).io.inRdData)
+    LmWire.link(io.slaveWrResp(s), sNi(s).io.inWrResp)
 
     r.io.outRdData(port).valid := sNi(s).io.outRdData.valid && snetRdDataOk(j)
     r.io.outRdData(port).bits := sNi(s).io.outRdData.bits
@@ -332,10 +333,14 @@ class LmWrapperTop(p: NetworkParams, parts: Seq[PartitionParams]) extends Module
   private def wrRespT = new LmWrResp(p.idWidth, p.tagWidth)
 
   val io = IO(new Bundle {
-    val master = Vec(p.nMaster, Flipped(Decoupled(new LmReq(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth))))
-    val masterRsp = Vec(p.nMaster, Decoupled(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth)))
-    val slave = Vec(p.nSlave, Decoupled(new LmReq(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth)))
-    val slaveRsp = Vec(p.nSlave, Flipped(Decoupled(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth))))
+    val masterRdReq = Vec(p.nMaster, Flipped(Decoupled(rdReqT)))
+    val masterWrData = Vec(p.nMaster, Flipped(Decoupled(wrDataT)))
+    val masterRdData = Vec(p.nMaster, Decoupled(rdDataT))
+    val masterWrResp = Vec(p.nMaster, Decoupled(wrRespT))
+    val slaveRdReq = Vec(p.nSlave, Decoupled(rdReqT))
+    val slaveWrData = Vec(p.nSlave, Decoupled(wrDataT))
+    val slaveRdData = Vec(p.nSlave, Flipped(Decoupled(rdDataT)))
+    val slaveWrResp = Vec(p.nSlave, Flipped(Decoupled(wrRespT)))
     val perf = Output(new Bundle {
       val returnSlots = Vec(p.nMaster, UInt(maxRetW.W))
       val respSlots = Vec(p.nSlave, UInt(maxRspW.W))
@@ -359,22 +364,18 @@ class LmWrapperTop(p: NetworkParams, parts: Seq[PartitionParams]) extends Module
   }
 
   for (pi <- parts.indices; (g, l) <- parts(pi).masters.zipWithIndex) {
-    insts(pi).io.master(l).valid := io.master(g).valid
-    insts(pi).io.master(l).bits := io.master(g).bits
-    io.master(g).ready := insts(pi).io.master(l).ready
-    io.masterRsp(g).valid := insts(pi).io.masterRsp(l).valid
-    io.masterRsp(g).bits := insts(pi).io.masterRsp(l).bits
-    insts(pi).io.masterRsp(l).ready := io.masterRsp(g).ready
+    LmWire.link(io.masterRdReq(g), insts(pi).io.masterRdReq(l))
+    LmWire.link(io.masterWrData(g), insts(pi).io.masterWrData(l))
+    LmWire.link(insts(pi).io.masterRdData(l), io.masterRdData(g))
+    LmWire.link(insts(pi).io.masterWrResp(l), io.masterWrResp(g))
     io.perf.returnSlots(g) := insts(pi).io.perf.returnSlots(l)
   }
 
   for (pi <- parts.indices; (g, l) <- parts(pi).slaves.zipWithIndex) {
-    io.slave(g).valid := insts(pi).io.slave(l).valid
-    io.slave(g).bits := insts(pi).io.slave(l).bits
-    insts(pi).io.slave(l).ready := io.slave(g).ready
-    insts(pi).io.slaveRsp(l).valid := io.slaveRsp(g).valid
-    insts(pi).io.slaveRsp(l).bits := io.slaveRsp(g).bits
-    io.slaveRsp(g).ready := insts(pi).io.slaveRsp(l).ready
+    LmWire.link(insts(pi).io.slaveRdReq(l), io.slaveRdReq(g))
+    LmWire.link(insts(pi).io.slaveWrData(l), io.slaveWrData(g))
+    LmWire.link(io.slaveRdData(g), insts(pi).io.slaveRdData(l))
+    LmWire.link(io.slaveWrResp(g), insts(pi).io.slaveWrResp(l))
     io.perf.respSlots(g) := insts(pi).io.perf.respSlots(l)
   }
 
@@ -462,30 +463,50 @@ class LmPartitionStub(p: NetworkParams, pp: PartitionParams) extends Module {
     pp.masters.size, pp.slaves.size, pp.outLinks.size, pp.inLinks.size,
     p.addrWidth, p.dataWidth, p.idWidth, maxRetW, maxRspW, p.tagWidth))
 
-  private val mPending = Seq.fill(pp.masters.size)(RegInit(false.B))
-  private val mSrc = Seq.fill(pp.masters.size)(RegInit(0.U(p.idWidth.W)))
-  private val mId = Seq.fill(pp.masters.size)(RegInit(0.U(p.tagWidth.W)))
+  private val mRdPend = Seq.fill(pp.masters.size)(RegInit(false.B))
+  private val mRdSrc = Seq.fill(pp.masters.size)(RegInit(0.U(p.idWidth.W)))
+  private val mRdId = Seq.fill(pp.masters.size)(RegInit(0.U(p.tagWidth.W)))
+  private val mWrPend = Seq.fill(pp.masters.size)(RegInit(false.B))
+  private val mWrSrc = Seq.fill(pp.masters.size)(RegInit(0.U(p.idWidth.W)))
+  private val mWrId = Seq.fill(pp.masters.size)(RegInit(0.U(p.tagWidth.W)))
 
   for (m <- pp.masters.indices) {
-    io.master(m).ready := !mPending(m)
-    when(io.master(m).fire) {
-      mPending(m) := true.B
-      mSrc(m) := io.master(m).bits.src
-      mId(m) := io.master(m).bits.id
+    io.masterRdReq(m).ready := !mRdPend(m)
+    when(io.masterRdReq(m).fire) {
+      mRdPend(m) := true.B
+      mRdSrc(m) := io.masterRdReq(m).bits.src
+      mRdId(m) := io.masterRdReq(m).bits.id
     }
-    io.masterRsp(m).valid := mPending(m)
-    io.masterRsp(m).bits.src := mSrc(m)
-    io.masterRsp(m).bits.id := mId(m)
-    io.masterRsp(m).bits.data := 0.U
-    io.masterRsp(m).bits.err := true.B
-    io.masterRsp(m).bits.vc := 0.U
-    when(io.masterRsp(m).fire) { mPending(m) := false.B }
+    io.masterRdData(m).valid := mRdPend(m)
+    io.masterRdData(m).bits.src := mRdSrc(m)
+    io.masterRdData(m).bits.id := mRdId(m)
+    io.masterRdData(m).bits.data := 0.U
+    io.masterRdData(m).bits.last := true.B
+    io.masterRdData(m).bits.err := true.B
+    io.masterRdData(m).bits.vc := 0.U
+    when(io.masterRdData(m).fire) { mRdPend(m) := false.B }
+
+    io.masterWrData(m).ready := !mWrPend(m)
+    when(io.masterWrData(m).fire) {
+      mWrPend(m) := true.B
+      mWrSrc(m) := io.masterWrData(m).bits.src
+      mWrId(m) := io.masterWrData(m).bits.id
+    }
+    io.masterWrResp(m).valid := mWrPend(m)
+    io.masterWrResp(m).bits.src := mWrSrc(m)
+    io.masterWrResp(m).bits.id := mWrId(m)
+    io.masterWrResp(m).bits.err := true.B
+    io.masterWrResp(m).bits.vc := 0.U
+    when(io.masterWrResp(m).fire) { mWrPend(m) := false.B }
   }
 
   for (s <- pp.slaves.indices) {
-    io.slave(s).valid := false.B
-    io.slave(s).bits := 0.U.asTypeOf(chiselTypeOf(io.slave(s).bits))
-    io.slaveRsp(s).ready := true.B
+    io.slaveRdReq(s).valid := false.B
+    io.slaveRdReq(s).bits := 0.U.asTypeOf(chiselTypeOf(io.slaveRdReq(s).bits))
+    io.slaveWrData(s).valid := false.B
+    io.slaveWrData(s).bits := 0.U.asTypeOf(chiselTypeOf(io.slaveWrData(s).bits))
+    io.slaveRdData(s).ready := true.B
+    io.slaveWrResp(s).ready := true.B
   }
 
   private val bRdReqPend = Seq.fill(pp.inLinks.size)(RegInit(false.B))

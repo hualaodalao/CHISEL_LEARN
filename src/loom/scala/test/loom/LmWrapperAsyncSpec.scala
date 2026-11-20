@@ -3,7 +3,6 @@ package loom
 import java.nio.file.{Files, Paths}
 
 import chisel3._
-import chisel3.util._
 import chisel3.simulator.HasSimulator
 import chisel3.simulator.scalatest._
 import loom.ir.{Ir, Json}
@@ -53,21 +52,18 @@ class LmWrapperAsyncSpec extends AnyFlatSpec with Matchers with ChiselSim {
   private def init(dut: LmWrapperTop, ck: ClockDriver): Unit = {
     dut.io.domainClk.get.length shouldBe 2
     for (i <- 0 until net.nMaster) {
-      dut.io.master(i).valid.poke(false.B)
-      dut.io.master(i).bits.write.poke(true.B)
-      dut.io.master(i).bits.addr.poke(0.U)
-      dut.io.master(i).bits.len.poke(0.U)
-      dut.io.master(i).bits.src.poke(i.U)
-      dut.io.master(i).bits.data.poke(0.U)
-      dut.io.master(i).bits.strb.poke(0.U)
-      dut.io.masterRsp(i).ready.poke(true.B)
+      dut.io.masterRdReq(i).valid.poke(false.B)
+      dut.io.masterRdReq(i).bits.src.poke(i.U)
+      dut.io.masterWrData(i).valid.poke(false.B)
+      dut.io.masterWrData(i).bits.src.poke(i.U)
+      dut.io.masterRdData(i).ready.poke(true.B)
+      dut.io.masterWrResp(i).ready.poke(true.B)
     }
     for (j <- 0 until net.nSlave) {
-      dut.io.slave(j).ready.poke(true.B)
-      dut.io.slaveRsp(j).valid.poke(false.B)
-      dut.io.slaveRsp(j).bits.src.poke(0.U)
-      dut.io.slaveRsp(j).bits.data.poke(0.U)
-      dut.io.slaveRsp(j).bits.err.poke(false.B)
+      dut.io.slaveRdReq(j).ready.poke(true.B)
+      dut.io.slaveWrData(j).ready.poke(true.B)
+      dut.io.slaveRdData(j).valid.poke(false.B)
+      dut.io.slaveWrResp(j).valid.poke(false.B)
     }
     for (d <- 0 until 2) {
       dut.io.domainClk.get(d).poke(false.B)
@@ -86,24 +82,28 @@ class LmWrapperAsyncSpec extends AnyFlatSpec with Matchers with ChiselSim {
       data: Long,
       write: Boolean
   ): Unit = {
-    dut.io.master(m).bits.write.poke(write.B)
-    dut.io.master(m).bits.addr.poke(addr.U)
-    dut.io.master(m).bits.src.poke(m.U)
-    dut.io.master(m).bits.data.poke(data.U)
-    dut.io.master(m).valid.poke(true.B)
+    if (write) {
+      dut.io.masterWrData(m).bits.addr.poke(addr.U)
+      dut.io.masterWrData(m).bits.data.poke(data.U)
+    } else {
+      dut.io.masterRdReq(m).bits.addr.poke(addr.U)
+    }
+    val req = if (write) dut.io.masterWrData(m) else dut.io.masterRdReq(m)
+    req.valid.poke(true.B)
 
     var accepted = false
     var guard = 0
     while (!accepted && guard < 400) {
       ck.lowPhase()
-      accepted = dut.io.master(m).ready.peek().litValue == 1
+      accepted = req.ready.peek().litValue == 1
       ck.highPhase()
       guard += 1
     }
     accepted shouldBe true
-    dut.io.master(m).valid.poke(false.B)
+    req.valid.poke(false.B)
 
     val j = ((addr >> 12) & 1).toInt
+    val slaveReq = if (write) dut.io.slaveWrData(j) else dut.io.slaveRdReq(j)
     var seen = false
     var addrSeen = BigInt(0)
     var dataSeen = BigInt(0)
@@ -111,27 +111,34 @@ class LmWrapperAsyncSpec extends AnyFlatSpec with Matchers with ChiselSim {
     guard = 0
     while (!seen && guard < 400) {
       ck.lowPhase()
-      if (dut.io.slave(j).valid.peek().litValue == 1) {
+      if (slaveReq.valid.peek().litValue == 1) {
         seen = true
-        addrSeen = dut.io.slave(j).bits.addr.peek().litValue
-        dataSeen = dut.io.slave(j).bits.data.peek().litValue
-        srcSeen = dut.io.slave(j).bits.src.peek().litValue
+        addrSeen = slaveReq.bits.addr.peek().litValue
+        srcSeen =
+          if (write) dut.io.slaveWrData(j).bits.src.peek().litValue
+          else dut.io.slaveRdReq(j).bits.src.peek().litValue
+        // A read carries no write data; a write beat carries its own payload.
+        if (write) dataSeen = dut.io.slaveWrData(j).bits.data.peek().litValue
       }
       ck.highPhase()
       guard += 1
     }
     seen shouldBe true
     addrSeen shouldBe BigInt(addr)
-    // A read carries no write data; a write beat carries its own payload.
     dataSeen shouldBe (if (write) BigInt(data) else BigInt(0))
     srcSeen shouldBe BigInt(m)
 
     // Let the request fire and allocate its response slot before returning.
     ck.cycle(4)
 
-    dut.io.slaveRsp(j).bits.src.poke(m.U)
-    dut.io.slaveRsp(j).bits.data.poke((data + 0x1000).U)
-    dut.io.slaveRsp(j).valid.poke(true.B)
+    if (write) {
+      dut.io.slaveWrResp(j).bits.src.poke(m.U)
+      dut.io.slaveWrResp(j).valid.poke(true.B)
+    } else {
+      dut.io.slaveRdData(j).bits.src.poke(m.U)
+      dut.io.slaveRdData(j).bits.data.poke((data + 0x1000).U)
+      dut.io.slaveRdData(j).valid.poke(true.B)
+    }
     // The response is captured on a slow rising edge; a rising edge can land
     // on either half step, so count both.
     var sent = false
@@ -143,14 +150,21 @@ class LmWrapperAsyncSpec extends AnyFlatSpec with Matchers with ChiselSim {
       guard += 1
     }
     sent shouldBe true
-    dut.io.slaveRsp(j).valid.poke(false.B)
+    if (write) {
+      dut.io.slaveWrResp(j).valid.poke(false.B)
+    } else {
+      dut.io.slaveRdData(j).valid.poke(false.B)
+    }
 
     var got = Option.empty[BigInt]
     guard = 0
     while (got.isEmpty && guard < 400) {
       ck.lowPhase()
-      if (dut.io.masterRsp(m).valid.peek().litValue == 1)
-        got = Some(dut.io.masterRsp(m).bits.data.peek().litValue)
+      if (write) {
+        if (dut.io.masterWrResp(m).valid.peek().litValue == 1) got = Some(BigInt(0))
+      } else if (dut.io.masterRdData(m).valid.peek().litValue == 1) {
+        got = Some(dut.io.masterRdData(m).bits.data.peek().litValue)
+      }
       ck.highPhase()
       guard += 1
     }
