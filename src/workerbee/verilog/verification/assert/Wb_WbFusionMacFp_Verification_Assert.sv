@@ -61,49 +61,49 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module Wb_WbFusionMacFp_Verification_Assert();	// src/workerbee/scala/main/WbFusionMacFp.scala:329:11
-  reg bIsMx2M1;	// src/workerbee/scala/main/WbFusionMacFp.scala:91:25
-  `ifndef SYNTHESIS	// src/workerbee/scala/main/WbFusionMacFp.scala:326:11
-    always @(posedge Wb_WbFusionMacFp.clock) begin	// src/workerbee/scala/main/WbFusionMacFp.scala:23:7, :326:11
+module Wb_WbFusionMacFp_Verification_Assert();	// src/workerbee/scala/main/WbFusionMacFp.scala:346:11
+  reg bIsMx2M1;	// src/workerbee/scala/main/WbFusionMacFp.scala:95:25
+  `ifndef SYNTHESIS	// src/workerbee/scala/main/WbFusionMacFp.scala:343:11
+    always @(posedge Wb_WbFusionMacFp.clock) begin	// src/workerbee/scala/main/WbFusionMacFp.scala:26:7, :343:11
       if (~Wb_WbFusionMacFp.reset
           & ~(~Wb_WbFusionMacFp.io_consumeValid | Wb_WbFusionMacFp.isBf16Pair_layerCapture
               | (Wb_WbFusionMacFp._r1_T_layerCapture | Wb_WbFusionMacFp.aIsMx2M1)
-              & (Wb_WbFusionMacFp._mxPair_T_2_layerCapture | bIsMx2M1))) begin	// src/workerbee/scala/main/WbFusionMacFp.scala:23:7, :67:16, :86:25, :91:25, :96:67, :175:17, :184:17, :325:{39,51,74}, :326:{11,12,29,43}
-        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WbFusionMacFp.scala:326:11
-          $error("Assertion failed: WbFusionMacFp: lane0 BF16 path accepts only BF16 x BF16 or MX x MX operand pairs\n");	// src/workerbee/scala/main/WbFusionMacFp.scala:326:11
-        if (`STOP_COND_)	// src/workerbee/scala/main/WbFusionMacFp.scala:326:11
-          $fatal;	// src/workerbee/scala/main/WbFusionMacFp.scala:326:11
+              & (Wb_WbFusionMacFp._mxPair_T_2_layerCapture | bIsMx2M1))) begin	// src/workerbee/scala/main/WbFusionMacFp.scala:26:7, :71:16, :90:25, :95:25, :100:67, :182:17, :191:17, :342:{39,51,74}, :343:{11,12,29,43}
+        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WbFusionMacFp.scala:343:11
+          $error("Assertion failed: WbFusionMacFp: lane0 BF16 path accepts only BF16 x BF16 or MX x MX operand pairs\n");	// src/workerbee/scala/main/WbFusionMacFp.scala:343:11
+        if (`STOP_COND_)	// src/workerbee/scala/main/WbFusionMacFp.scala:343:11
+          $fatal;	// src/workerbee/scala/main/WbFusionMacFp.scala:343:11
       end
       if (~Wb_WbFusionMacFp.reset
           & ~(~Wb_WbFusionMacFp.io_consumeValid
               | Wb_WbFusionMacFp._cvtConsumeValid_T_layerCapture
               | Wb_WbFusionMacFp._mulL0_io_aExp_T_layerCapture != 8'hFF
-              & Wb_WbFusionMacFp._mulL0_io_bExp_T_layerCapture != 8'hFF)) begin	// src/workerbee/scala/main/WbFusionMacFp.scala:23:7, :67:16, :101:49, :316:43, :319:43, :326:{11,12}, :329:{11,29,44,59,69,83}
-        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WbFusionMacFp.scala:329:11
-          $error("Assertion failed: WbFusionMacFp: BF16 inf/nan operands are outside the finite arithmetic contract\n");	// src/workerbee/scala/main/WbFusionMacFp.scala:329:11
-        if (`STOP_COND_)	// src/workerbee/scala/main/WbFusionMacFp.scala:329:11
-          $fatal;	// src/workerbee/scala/main/WbFusionMacFp.scala:329:11
+              & Wb_WbFusionMacFp._mulL0_io_bExp_T_layerCapture != 8'hFF)) begin	// src/workerbee/scala/main/WbFusionMacFp.scala:26:7, :71:16, :105:49, :333:43, :336:43, :343:{11,12}, :346:{11,29,44,59,69,83}
+        if (`ASSERT_VERBOSE_COND_)	// src/workerbee/scala/main/WbFusionMacFp.scala:346:11
+          $error("Assertion failed: WbFusionMacFp: BF16 inf/nan operands are outside the finite arithmetic contract\n");	// src/workerbee/scala/main/WbFusionMacFp.scala:346:11
+        if (`STOP_COND_)	// src/workerbee/scala/main/WbFusionMacFp.scala:346:11
+          $fatal;	// src/workerbee/scala/main/WbFusionMacFp.scala:346:11
       end
     end // always @(posedge)
   `endif // not def SYNTHESIS
-  always @(posedge Wb_WbFusionMacFp.clock)	// src/workerbee/scala/main/WbFusionMacFp.scala:23:7
-    bIsMx2M1 <= Wb_WbFusionMacFp._isMx4_T_1_layerCapture;	// src/workerbee/scala/main/WbFusionMacFp.scala:91:{25,34}
-  `ifdef ENABLE_INITIAL_REG_	// src/workerbee/scala/main/WbFusionMacFp.scala:329:11
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WbFusionMacFp.scala:329:11
-      `FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WbFusionMacFp.scala:329:11
+  always @(posedge Wb_WbFusionMacFp.clock)	// src/workerbee/scala/main/WbFusionMacFp.scala:26:7
+    bIsMx2M1 <= Wb_WbFusionMacFp._isMx4_T_1_layerCapture;	// src/workerbee/scala/main/WbFusionMacFp.scala:95:{25,34}
+  `ifdef ENABLE_INITIAL_REG_	// src/workerbee/scala/main/WbFusionMacFp.scala:346:11
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WbFusionMacFp.scala:346:11
+      `FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WbFusionMacFp.scala:346:11
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/workerbee/scala/main/WbFusionMacFp.scala:329:11
-      automatic logic [31:0] _RANDOM[0:0];	// src/workerbee/scala/main/WbFusionMacFp.scala:329:11
-      `ifdef INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WbFusionMacFp.scala:329:11
-        `INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WbFusionMacFp.scala:329:11
+    initial begin	// src/workerbee/scala/main/WbFusionMacFp.scala:346:11
+      automatic logic [31:0] _RANDOM[0:0];	// src/workerbee/scala/main/WbFusionMacFp.scala:346:11
+      `ifdef INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WbFusionMacFp.scala:346:11
+        `INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WbFusionMacFp.scala:346:11
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/workerbee/scala/main/WbFusionMacFp.scala:329:11
-        _RANDOM[/*Zero width*/ 1'b0] = `RANDOM;	// src/workerbee/scala/main/WbFusionMacFp.scala:329:11
-        bIsMx2M1 = _RANDOM[/*Zero width*/ 1'b0][9];	// src/workerbee/scala/main/WbFusionMacFp.scala:91:25, :329:11
+      `ifdef RANDOMIZE_REG_INIT	// src/workerbee/scala/main/WbFusionMacFp.scala:346:11
+        _RANDOM[/*Zero width*/ 1'b0] = `RANDOM;	// src/workerbee/scala/main/WbFusionMacFp.scala:346:11
+        bIsMx2M1 = _RANDOM[/*Zero width*/ 1'b0][9];	// src/workerbee/scala/main/WbFusionMacFp.scala:95:25, :346:11
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WbFusionMacFp.scala:329:11
-      `FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WbFusionMacFp.scala:329:11
+    `ifdef FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WbFusionMacFp.scala:346:11
+      `FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WbFusionMacFp.scala:346:11
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
 endmodule

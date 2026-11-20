@@ -21,10 +21,9 @@ Wb_FpMulMx8.sv
 verification/assert/Wb_FpCvtMx8ToMid_Verification_Assert.sv
 Wb_FpCvtMx8ToMid.sv
 Wb_FpCvtMx4ToMx8Mid.sv
-Wb_FpMulMx4.sv
-Wb_FpCvtMx4ToMid.sv
 Wb_FpMulBf16Mx.sv
-Wb_FpAddNarrow.sv
+Wb_FpAddLazy3.sv
+Wb_Mx4BlockInt.sv
 verification/assert/Wb_WbFusionMacFp_Verification_Assert.sv
 Wb_WbFusionMacFp.sv
 Wb_WbFusionMacInt.sv

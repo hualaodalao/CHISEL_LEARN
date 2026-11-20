@@ -12,14 +12,17 @@ import chisel3.util._
 // supportedFmts 是绝对集：写子集即删硬件。类默认值为 MX-only，只在独立单测例化时生效；整机
 //   例化由 WorkerBee 透传 cfg.supportedFmts（含 BF16 ⟹ lane0 走 FpMulBf16Mx）。需要全五格式
 //   宽阵列硬件者必须显式传完整集合。hasFp 只在 elaboration 期决定生成哪些实例，绝不门控运行
-//   期：is4x/is2x、r1/r2/r3 的 Mux、五槽累加器接线与格式集无关。
+//   期：is4x/is2x、r1 的 Mux 与累加器接线与格式集无关（r2/r3 仅 useNarrowAdd=false 基线路生成）。
 //
-// useNarrowAdd 编译期选择累加器：true（默认）例化 FpAddNarrow（L2 窄窗口五槽 CSA 树，精度
-//   契约见 FpAddNarrow.scala 头注）；false 须显式 pin，例化 bit-exact 基线 FpAdd。两者 I/O
-//   port-compatible（8 端口方向/名称/位宽全同）⟹ 共享 wiring helper。FpAddNarrow 白名单为
-//   MX + BF16，FP16 与 INT/FP32 集越界。narrowW 默认 FpAddNarrow.DefaultW (19)，仅在
-//   useNarrowAdd=true 时生效，合法区间 [8,28]（下界 8 = mxfp8 乘积 8 位有效尾数，上界 28 =
-//   mant31 高 W 位对齐留 3 位余量），由 FpAddNarrow 的两条 require 强制。
+// useNarrowAdd 编译期选择累加器：true（默认）走 C 方案——Mx4BlockInt 整数前端（直接吃 MX4 四
+//   nibble 算块和）+ FpAddLazy3 三槽全 lazy-40 累加器 {C,S1,S2}（精度契约同 FpAddNarrow 族，见
+//   FpAddLazy3.scala 头注）；false 须显式 pin，例化 bit-exact 基线 FpAdd 五槽（仍消费 r2/r3）。
+//   默认路不例化 fp4Mul0/1 + 4×FpCvtMx4ToMid（r2/r3 不被消费 ⟹ 死硬件红利，编译期 if 不例化）。
+//   narrow 白名单为 MX + BF16，FP16 与 INT/FP32 集越界。narrowW 默认 FpAddNarrow.DefaultW (19)，
+//   仅在 useNarrowAdd=true 时生效，合法区间 [8,28]（下界 8 = mxfp8 乘积 8 位有效尾数，上界 28 =
+//   mant31 高 W 位对齐留 3 位余量），由 FpAddLazy3 的两条 require 强制。
+//   MX4 运行期 S1=blk、S2=0；MX8 运行期 S1=lazy40(r0)、S2=lazy40(r1)；BF16 运行期 S1=lazy40(r0)、
+//   S2=0。MX8/BF16 与五槽掩零后逐位等价；MX4 单拍数值相等但 lazy 切分不同（非逐位，多拍累加可分叉）。
 class WbFusionMacFp(
   aW: Int = 16,
   bW: Int = 16,
@@ -45,12 +48,13 @@ class WbFusionMacFp(
   require(!hasMx8 || hasMx4,
     s"WbFusionMacFp: MXFP8(E4M3/E5M2) requires MXFP4(E2M1) -- MX family is all-in-or-all-out (user design rule), current=$supportedFmts")
 
-  // BF16 在 FpAddNarrow 白名单内：其乘积来自 FpMulBf16Mx、mant23 低 8 位结构性恒 0，mag24 有效
-  //   位只占 [23:8] 共 16 位，narrowW >= 16 时 magW = mag24 >> (24−W) 把全部有效位留在窗内。
-  //   FP16 在名单外：它走 fp32 转换路，mant23 全 23 位有效，会被窄窗口截断。
+  // BF16 在 narrow（C 方案）白名单内：其乘积来自 FpMulBf16Mx、mant23 低 8 位结构性恒 0，mag24 有效
+  //   位只占 [23:8] 共 16 位，narrowW >= 16 时窗口提取把全部有效位留在窗内（FpAddLazy3 经 lazy 打包
+  //   后 magW=mant31>>CSh 与 mag24>>(24−W) 同值）。FP16 在名单外：它走 fp32 转换路，mant23 全 23 位
+  //   有效，会被窄窗口截断。
   require(!useNarrowAdd || supportedFmts.subsetOf(
             Set(DataFormat.MXE4M3, DataFormat.MXE5M2, DataFormat.MXE2M1, DataFormat.BF16)),
-    s"WbFusionMacFp: FpAddNarrow 仅支持 MX(MXE4M3/MXE5M2/MXE2M1) + BF16，当前 supportedFmts=$supportedFmts 含越界格式")
+    s"WbFusionMacFp: narrow 累加器（C 方案）仅支持 MX(MXE4M3/MXE5M2/MXE2M1) + BF16，当前 supportedFmts=$supportedFmts 含越界格式")
 
   // BF16 窗口无损下界 narrowW >= 16（= FpMulBf16Mx 乘积有效位数 1+8+8-1）：低于 16 会截掉真实
   //   有效位，编译期拦死而非静默降精度。
@@ -102,6 +106,9 @@ class WbFusionMacFp(
 
   // lane0 乘积槽引用：module 级 var 桥接下方三个互斥 if 块的作用域，纯 Scala 别名、不建节点
   var r0: UInt = null
+  // lane2/lane3 乘积槽：仅 useNarrowAdd=false（FpAdd 五槽基线）路赋值；C 方案默认路不例化 fp4Mul0/1
+  var r2: UInt = null
+  var r3: UInt = null
 
   // hasFp16=true：lane0 走宽阵列（fp16/bf16/mx8/mx4 各经 fp32 域 cvt → FpMulFp16Bf16 的
   //   4:1 mux）；其余两配置下整块不生成。
@@ -192,35 +199,45 @@ class WbFusionMacFp(
   }
   
 
-  val fp4Mul0 = Module(new FpMulMx4())
-  val cvtFp4ToFp4Mid0A = Module(new FpCvtMx4ToMid())
-  val cvtFp4ToFp4Mid0B = Module(new FpCvtMx4ToMid())
-  cvtFp4ToFp4Mid0A.io.in := io.a(11,8)
-  cvtFp4ToFp4Mid0A.io.scale := io.scaleA
-  cvtFp4ToFp4Mid0B.io.in := io.b(11,8)
-  cvtFp4ToFp4Mid0B.io.scale := io.scaleB
-  fp4Mul0.io.rnd := io.rnd
-  fp4Mul0.io.aSign := cvtFp4ToFp4Mid0A.io.sign
-  fp4Mul0.io.bSign := cvtFp4ToFp4Mid0B.io.sign
-  fp4Mul0.io.bExp := cvtFp4ToFp4Mid0B.io.exp
-  fp4Mul0.io.bMant := cvtFp4ToFp4Mid0B.io.mant
-  fp4Mul0.io.aExp := cvtFp4ToFp4Mid0A.io.exp
-  fp4Mul0.io.aMant := cvtFp4ToFp4Mid0A.io.mant
-  
-  val fp4Mul1 = Module(new FpMulMx4())
-  val cvtFp4ToFp4Mid1A = Module(new FpCvtMx4ToMid())
-  val cvtFp4ToFp4Mid1B = Module(new FpCvtMx4ToMid())
-  cvtFp4ToFp4Mid1A.io.in := io.a(15,12)
-  cvtFp4ToFp4Mid1A.io.scale := io.scaleA
-  cvtFp4ToFp4Mid1B.io.in := io.b(15,12)
-  cvtFp4ToFp4Mid1B.io.scale := io.scaleB
-  fp4Mul1.io.rnd := io.rnd
-  fp4Mul1.io.aSign := cvtFp4ToFp4Mid1A.io.sign
-  fp4Mul1.io.bSign := cvtFp4ToFp4Mid1B.io.sign
-  fp4Mul1.io.bExp := cvtFp4ToFp4Mid1B.io.exp
-  fp4Mul1.io.bMant := cvtFp4ToFp4Mid1B.io.mant
-  fp4Mul1.io.aExp := cvtFp4ToFp4Mid1A.io.exp
-  fp4Mul1.io.aMant := cvtFp4ToFp4Mid1A.io.mant
+  // lane2/lane3 的 fp32 域 MX4 乘积路（fp4Mul0/1 + 4×FpCvtMx4ToMid）仅供 useNarrowAdd=false 的
+  //   FpAdd 五槽基线消费。C 方案默认路（useNarrowAdd=true）改用 Mx4BlockInt 整数前端直接吃 nibble
+  //   算四积块和 ⟹ r2/r3 不再被消费 ⟹ 编译期 if 不例化这 2 个 FpMulMx4 + 4 个 FpCvtMx4ToMid，
+  //   拿掉死硬件红利（firtool 对悬空实例会保留，故必须不例化而非例化后悬空）。
+  //   注意 FpCvtMx4ToMx8Mid（lane0/lane1 的 MX4→MX8 中间表示）仍在上方/下方使用，不在此删列。
+  if (!useNarrowAdd) {
+    val fp4Mul0 = Module(new FpMulMx4())
+    val cvtFp4ToFp4Mid0A = Module(new FpCvtMx4ToMid())
+    val cvtFp4ToFp4Mid0B = Module(new FpCvtMx4ToMid())
+    cvtFp4ToFp4Mid0A.io.in := io.a(11,8)
+    cvtFp4ToFp4Mid0A.io.scale := io.scaleA
+    cvtFp4ToFp4Mid0B.io.in := io.b(11,8)
+    cvtFp4ToFp4Mid0B.io.scale := io.scaleB
+    fp4Mul0.io.rnd := io.rnd
+    fp4Mul0.io.aSign := cvtFp4ToFp4Mid0A.io.sign
+    fp4Mul0.io.bSign := cvtFp4ToFp4Mid0B.io.sign
+    fp4Mul0.io.bExp := cvtFp4ToFp4Mid0B.io.exp
+    fp4Mul0.io.bMant := cvtFp4ToFp4Mid0B.io.mant
+    fp4Mul0.io.aExp := cvtFp4ToFp4Mid0A.io.exp
+    fp4Mul0.io.aMant := cvtFp4ToFp4Mid0A.io.mant
+
+    val fp4Mul1 = Module(new FpMulMx4())
+    val cvtFp4ToFp4Mid1A = Module(new FpCvtMx4ToMid())
+    val cvtFp4ToFp4Mid1B = Module(new FpCvtMx4ToMid())
+    cvtFp4ToFp4Mid1A.io.in := io.a(15,12)
+    cvtFp4ToFp4Mid1A.io.scale := io.scaleA
+    cvtFp4ToFp4Mid1B.io.in := io.b(15,12)
+    cvtFp4ToFp4Mid1B.io.scale := io.scaleB
+    fp4Mul1.io.rnd := io.rnd
+    fp4Mul1.io.aSign := cvtFp4ToFp4Mid1A.io.sign
+    fp4Mul1.io.bSign := cvtFp4ToFp4Mid1B.io.sign
+    fp4Mul1.io.bExp := cvtFp4ToFp4Mid1B.io.exp
+    fp4Mul1.io.bMant := cvtFp4ToFp4Mid1B.io.mant
+    fp4Mul1.io.aExp := cvtFp4ToFp4Mid1A.io.exp
+    fp4Mul1.io.aMant := cvtFp4ToFp4Mid1A.io.mant
+
+    r2 = Mux(aIsMx2M1, fp4Mul0.io.prod, 0.U(32.W))
+    r3 = Mux(aIsMx2M1, fp4Mul1.io.prod, 0.U(32.W))
+  }
   
   // hasFp=false：lane0 走专属窄乘法器（克隆 lane1 结构）。cvtL0* 取 io.a/io.b 的低 8/4 bit
   //   （lane0 元素），与 lane1 取高位 io.a(15,8)/(7,4) 区分。
@@ -332,12 +349,20 @@ class WbFusionMacFp(
   }
 
   val r1 = Mux(aIsMx5M2 | aIsMx4M3 | aIsMx2M1,  fp8Mul.io.prod, 0.U(32.W))
-  val r2 = Mux(aIsMx2M1, fp4Mul0.io.prod, 0.U(32.W))
-  val r3 = Mux(aIsMx2M1, fp4Mul1.io.prod, 0.U(32.W))
 
-  // 五槽累加器的条件例化 + 共享接线 helper。FpAdd / FpAddNarrow 逐端口一致但是不同的类且无公共
-  //   trait，故把 8 个端口引用传给同一个 helper：接线语义只写一份，杜绝两分支漏接/错接端口
-  //   （错接会被 last-connect 静默覆盖）；参数全为 Data 引用，不建硬件节点。
+  // fp32 乘积槽 → lazy-40（纯连线 + 零判据）：{sign, exp, Cat(隐含1, mant23), 7'b0}。
+  //   含隐含 1 ⟹ unpackC 的 magW=mant31>>CSh 与 FpAddNarrow.unpackProd 的 mag24>>(24−W) 同值，
+  //   是 C 方案 MX8/BF16 与五槽逐位等价的前提。fp32 真零(e==0&&m==0)映射 lazy 真零，避免 E1 非规格码。
+  private def fp32ToLazy40(p: UInt): UInt = {
+    val e = p(30, 23); val m = p(22, 0)
+    val isZero = (e === 0.U) && (m === 0.U)
+    val lazy40 = Mux(isZero, 0.U(40.W), Cat(p(31), e, 1.U(1.W), m, 0.U(7.W)))
+    if (cEffW == 40) lazy40 else Cat(0.U((cEffW - 40).W), lazy40)
+  }
+  private def widen40(v: UInt): UInt =
+    if (cEffW == 40) v else Cat(0.U((cEffW - 40).W), v(39, 0))
+
+  // 五槽接线 helper（仅 useNarrowAdd=false 的 FpAdd 基线用）：8 端口引用传同一 helper，杜绝漏接/错接。
   private def connectFiveSlotAdder(cReg: UInt, is4x: Bool, is2x: Bool,
                                    prodFp16: UInt, prodFp8: UInt,
                                    prodFp4_0: UInt, prodFp4_1: UInt, sum: UInt): Unit = {
@@ -351,18 +376,30 @@ class WbFusionMacFp(
     io.sum    := sum
   }
   if (useNarrowAdd) {
-    // 默认路径：L2 窄窗口累加器（精度契约见 FpAddNarrow.scala 头注）
-    val fpAddNarrow = Module(new FpAddNarrow(cEffW, narrowW))
-    connectFiveSlotAdder(fpAddNarrow.io.cReg, fpAddNarrow.io.is4x, fpAddNarrow.io.is2x,
-      fpAddNarrow.io.prodFp16, fpAddNarrow.io.prodFp8,
-      fpAddNarrow.io.prodFp4_0, fpAddNarrow.io.prodFp4_1, fpAddNarrow.io.sum)
+    // C 方案默认路：MX4 块内整数前端 + 三槽全 lazy-40 累加器。
+    //   MX4：S1=blk（四 nibble 整数块和）、S2=0；MX8：S1=lazy(r0)、S2=lazy(r1)；
+    //   BF16：S1=lazy(r0)、S2=lazy(r1)=0（r1 被 aIsMx* 门为 0）。槽选择只看运行期 isMx4。
+    //   先例化 FpAddLazy3：其 require(cEffW>=40 / W∈[8,28]) 须在 fp32ToLazy40/widen40 的
+    //   (cEffW−40) 位宽算术之前触发，否则非法 cEffW 会先撞 Chisel 负位宽错而非规格护栏消息。
+    val fpAddLazy3 = Module(new FpAddLazy3(cEffW, narrowW))
+    val mx4Blk = Module(new Mx4BlockInt())
+    mx4Blk.io.a := io.a
+    mx4Blk.io.b := io.b
+    mx4Blk.io.scaleA := io.scaleA
+    mx4Blk.io.scaleB := io.scaleB
+    val lazyR0 = fp32ToLazy40(r0)
+    val lazyR1 = fp32ToLazy40(r1)
+    fpAddLazy3.io.c  := io.cReg
+    fpAddLazy3.io.s1 := Mux(isMx4, widen40(mx4Blk.io.blk), lazyR0)
+    fpAddLazy3.io.s2 := Mux(isMx4, 0.U(cEffW.W), lazyR1)
+    io.sum := fpAddLazy3.io.sum
   } else {
-    // useNarrowAdd=false 分支（须显式 pin）：bit-exact 基线 FpAdd
+    // useNarrowAdd=false 分支（须显式 pin）：bit-exact 基线 FpAdd 五槽，仍消费 r2/r3。
     val fpAdd = Module(new FpAdd(cEffW))
     connectFiveSlotAdder(fpAdd.io.cReg, fpAdd.io.is4x, fpAdd.io.is2x,
       fpAdd.io.prodFp16, fpAdd.io.prodFp8,
       fpAdd.io.prodFp4_0, fpAdd.io.prodFp4_1, fpAdd.io.sum)
   }
-  
+
 }
 

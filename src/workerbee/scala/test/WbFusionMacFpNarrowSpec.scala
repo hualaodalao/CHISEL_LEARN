@@ -616,6 +616,11 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
     withClue("类默认 MX-only 应例化 lane0 窄乘法器 FpMulMx8（hasFp=false 指纹）：") {
       rtlDefault should include("FpMulMx8")
     }
+    withClue("类默认 narrow 路应走 C 方案 FpAddLazy3 + Mx4BlockInt：") {
+      rtlDefault should include("FpAddLazy3")
+      rtlDefault should include("Mx4BlockInt")
+      rtlDefault should not include "FpAddNarrow"
+    }
     // 反证（判据有判别力、非恒真）：显式传全五格式 ⟹ hasFp=true ⟹ 宽阵列必须出现。此处 pin
     //   useNarrowAdd=false，因为全五格式 + narrow 会撞护栏 require，而本段意图与加法器选型正交。
     val rtlFull5 = _root_.circt.stage.ChiselStage.emitSystemVerilog(
@@ -643,7 +648,7 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
     //   WbFusionMacFp 的 require 文案单一真源对齐。BF16 可入白名单的依据：FpMulBf16Mx 的 mant23
     //   低 8 位结构性为零 ⟹ mag24 有效位只占 [23:8]，W=19 窗口 mag24>>5 保留全部有效位，最小无损
     //   W=16。⟹ 本用例的拒绝原因只剩 FP16；MX+BF16 的【放行】断言见下一个用例。
-    ex.getMessage should include("FpAddNarrow 仅支持 MX(MXE4M3/MXE5M2/MXE2M1) + BF16")
+    ex.getMessage should include("仅支持 MX(MXE4M3/MXE5M2/MXE2M1) + BF16")
     println(s"[NarrowSpec] require guard (FP16 out-of-whitelist) PASS: ${ex.getMessage.take(90)}...")
 
     // 负向用例：含 INT 的格式集（hasFp 仍为 false）必须被白名单【拒绝】—— 「白名单堵住 INT/FP32
@@ -656,7 +661,7 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
         )
       )
     }
-    ex2.getMessage should include("FpAddNarrow 仅支持 MX(MXE4M3/MXE5M2/MXE2M1) + BF16")
+    ex2.getMessage should include("仅支持 MX(MXE4M3/MXE5M2/MXE2M1) + BF16")
     println(s"[NarrowSpec] require guard (INT8 bypass) PASS: ${ex2.getMessage.take(90)}...")
   }
 
@@ -676,10 +681,24 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
     withClue("MX+BF16 窄路不得退化成 fp32 宽阵列（那是 hasFp16 分支）：") {
       rtl should not include "FpMulFp16Bf16"
     }
-    withClue("窄加法器仍须是 FpAddNarrow（非 FpAdd）：") {
-      rtl should include("FpAddNarrow")
+    withClue("C 方案窄加法器须是 FpAddLazy3（三槽）+ Mx4BlockInt（MX4 整数前端），非 FpAdd/FpAddNarrow：") {
+      rtl should include("FpAddLazy3")
+      rtl should include("Mx4BlockInt")
     }
-    println("[NarrowSpec] whitelist widening PASS: MX+BF16 accepted, lane0=FpMulBf16Mx, adder=FpAddNarrow")
+    // F4 死硬件审计：默认 narrow 路不例化五槽 FpAddNarrow，也不例化 lane2/3 的 fp32 MX4 乘积路
+    //   （2×FpMulMx4 + 4×FpCvtMx4ToMid 已被 Mx4BlockInt 整数前端取代）。FpCvtMx4ToMx8Mid 仍在
+    //   （lane0/lane1 的 MX4→MX8 中间表示），故只断言 FpCvtMx4ToMid 消失、不断言所有 MX4 cvt 消失。
+    withClue("F4：C 方案默认路不得保留五槽 FpAddNarrow 实例：") {
+      rtl should not include "FpAddNarrow"
+    }
+    withClue("F4：C 方案默认路不得保留 lane2/3 的 FpMulMx4 实例：") {
+      rtl should not include "FpMulMx4"
+    }
+    withClue("F4：C 方案默认路不得保留 FpCvtMx4ToMid 实例（区别于仍保留的 FpCvtMx4ToMx8Mid）：") {
+      rtl should not include "FpCvtMx4ToMid"
+    }
+    println("[NarrowSpec] whitelist widening PASS: MX+BF16 accepted, lane0=FpMulBf16Mx, " +
+      "adder=FpAddLazy3+Mx4BlockInt; F4 dead-hardware (FpAddNarrow/FpMulMx4/FpCvtMx4ToMid) absent")
 
     // 窗口下界守护：narrowW=15 < 16 必须拒（BF16 mag24 有效位 16 位，W=16 为最小无损窗口）。
     val exW = intercept[IllegalArgumentException] {
@@ -692,6 +711,38 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
       )
     }
     println(s"[NarrowSpec] BF16 narrowW>=16 window guard PASS: ${exW.getMessage.take(120)}...")
+  }
+
+  it should "flush MX4 tiny-scale/underflow to true zero and saturate overflow to finite ~fp32max (C-scheme F2 boundary coverage)" in {
+    // F2 零覆盖域定向用例（pe_array_ce_plan §6.2/§6.3/§6.1.1）：C 方案 Mx4BlockInt 的边界语义。
+    simulate(new WbFusionMacFp(supportedFmts = FMTS_MXONLY, useNarrowAdd = true)) { dut =>
+      resetDut(dut)
+      // tiny 域：eSum=120<121 ⟹ 整块冲刷真零（§6.2 语义变更：旧 RTL 出 E1 非规格码）。cReg=0 ⟹ 输出真零。
+      val tiny = Vec("n_mx4_tiny_eSum120", E2, E2, mx4(7,7,7,7), mx4(7,7,7,7), 60, 60, true)
+      val rawTiny = driveVec(dut, tiny)
+      assert(rawTiny == BigInt(0), s"[tiny] lazy 输出须真零，实得 0x${rawTiny.toString(16)}")
+      assert(WbSimCommon.swFpNormalize40to32(rawTiny) == 0L, "[tiny] 归一 fp32 须 0")
+      // underflow 域：scaleA=0、全 nibble e2=1 ⟹ e2+scaleA=1<2 逐元素冲刷（与张量 expSigned<1 同源）。
+      val uf = Vec("n_mx4_underflow_scaleA0", E2, E2, mx4(2,2,3,3), mx4(2,3,2,3), 0, 128, true)
+      assert(driveVec(dut, uf) == BigInt(0), "[underflow] 全元素冲刷须真零")
+      // 判别力反证：同 nibble、scaleA=2 ⟹ e2+2=3≥2 不冲刷 ⟹ 非零。
+      val ok = Vec("n_mx4_noUnderflow_scaleA2", E2, E2, mx4(2,2,3,3), mx4(2,3,2,3), 2, 128, true)
+      assert(driveVec(dut, ok) != BigInt(0), "[underflow 反证] scaleA=2 不应冲刷")
+      // 溢出域：eSum=380,eRaw=260>254 ⟹ block satmax {sgn,254,0x7FFFFF80}，经 FpAddLazy3 W=19 窗口
+      //   截断后归一为有限 ≈fp32max（mant23 ∈ [0x7FFFE0,0x7FFFFF]，即 fp32max−31ulp 内，相对偏差 ≤2^-18）。
+      //   语义 goal（有限、≈max、非 Inf/NaN、非静默 2^k 缩小）达成；非逐位 fp32max（W 窗截断所致）。
+      val ovf = Vec("n_mx4_ovf_eSum380", E2, E2, mx4(7,7,7,7), mx4(7,7,7,7), 253, 127, true)
+      val rawOvf = driveVec(dut, ovf)
+      val fp32Ovf = WbSimCommon.swFpNormalize40to32(rawOvf)
+      val eOut40 = ((rawOvf >> 31) & 0xFF).toInt
+      val expF = ((fp32Ovf >>> 23) & 0xFF).toInt
+      val mantF = (fp32Ovf & 0x7FFFFF).toInt
+      assert(eOut40 == 254, s"[ovf] lazy eOut40 须 254，实得 $eOut40")
+      assert(expF == 254, s"[ovf] 须有限（expField=254，非 Inf/NaN 255），实得 expField=$expF")
+      assert(mantF >= 0x7FFFE0 && mantF <= 0x7FFFFF,
+        f"[ovf] 须 ≈fp32max（mant23∈[0x7FFFE0,0x7FFFFF]），实得 0x$fp32Ovf%08X")
+      println(f"[NarrowSpec] MX4 F2 边界域 PASS：tiny/underflow 真零、overflow→0x$fp32Ovf%08X(≈fp32max, eOut40=$eOut40)")
+    }
   }
 }
 

@@ -404,12 +404,12 @@ class WbFusionMacFpBf16Spec extends AnyFlatSpec with Matchers with ChiselSim {
         }
         ex.getMessage should include(message)
       }
-    withClue("FP16 is outside the FpAddNarrow whitelist: ") {
+    withClue("FP16 is outside the narrow (C-scheme) whitelist: ") {
       val ex = intercept[IllegalArgumentException] {
         _root_.circt.stage.ChiselStage.emitSystemVerilog(
           new WbFusionMacFp(supportedFmts = fmts + DataFormat.FP16))
       }
-      ex.getMessage should include("FpAddNarrow")
+      ex.getMessage should include("仅支持 MX(MXE4M3/MXE5M2/MXE2M1) + BF16")
     }
     for (w <- Seq(16, 28)) withClue(s"legal narrowW endpoint $w: ") {
       _root_.circt.stage.ChiselStage.emitSystemVerilog(

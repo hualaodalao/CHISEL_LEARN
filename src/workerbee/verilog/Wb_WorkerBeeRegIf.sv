@@ -43,739 +43,763 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module Wb_WorkerBeeRegIf(	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
-  input         clock,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
-                reset,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
-                io_cmd_0_valid,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output        io_cmd_0_ready,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [1:0]  io_cmd_0_payload_op,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [5:0]  io_cmd_0_payload_reg0Addr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_cmd_0_payload_reg1Addr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [31:0] io_cmd_0_payload_data0,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_cmd_0_payload_data1,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_cmd_0_payload_pc,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [7:0]  io_cmd_0_payload_tag,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input         io_cmd_1_valid,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output        io_cmd_1_ready,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [1:0]  io_cmd_1_payload_op,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [5:0]  io_cmd_1_payload_reg0Addr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_cmd_1_payload_reg1Addr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [31:0] io_cmd_1_payload_data0,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_cmd_1_payload_data1,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_cmd_1_payload_pc,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [7:0]  io_cmd_1_payload_tag,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input         io_cmd_2_valid,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output        io_cmd_2_ready,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [1:0]  io_cmd_2_payload_op,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [5:0]  io_cmd_2_payload_reg0Addr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_cmd_2_payload_reg1Addr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [31:0] io_cmd_2_payload_data0,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_cmd_2_payload_data1,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_cmd_2_payload_pc,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [7:0]  io_cmd_2_payload_tag,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input         io_cmd_3_valid,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output        io_cmd_3_ready,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [1:0]  io_cmd_3_payload_op,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [5:0]  io_cmd_3_payload_reg0Addr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_cmd_3_payload_reg1Addr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [31:0] io_cmd_3_payload_data0,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_cmd_3_payload_data1,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_cmd_3_payload_pc,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [7:0]  io_cmd_3_payload_tag,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output        io_resp_valid,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input         io_resp_ready,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output [31:0] io_resp_payload_data,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output        io_resp_payload_err,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output [1:0]  io_resp_payload_laneId,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output [15:0] io_regFile_m,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_regFile_n,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_regFile_k,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output [31:0] io_regFile_aAddr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_regFile_bAddr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_regFile_cAddr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output        io_regFile_aMxBlockSize,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_regFile_bMxBlockSize,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_regFile_cMxBlockSize,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_regFile_loadWMode,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_regFile_osM1,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_regFile_osFmtKeep,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output [3:0]  io_regFile_aFmt,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_regFile_bFmt,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_regFile_cFmt,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output [2:0]  io_regFile_rnd,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output [31:0] io_regFile_aScaleAddr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_regFile_bScaleAddr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_regFile_cScaleAddr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output        io_regFile_biasOn,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output [31:0] io_regFile_biasAddr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output        io_regFile_requantOn,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_regFile_reluOn,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output [31:0] io_regFile_rqMBase,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output [5:0]  io_regFile_rqShift,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output [15:0] io_regFile_rqZp,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output        io_start,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output [31:0] io_startPc,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output [7:0]  io_startTag,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input         io_busy,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [15:0] io_progress,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input         io_done,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_configError,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input  [3:0]  io_configErrorCode,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  input         io_dmaErrors_0,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_dmaErrors_1,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_dmaErrors_2,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_dmaErrors_3,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_dmaErrors_4,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_dmaErrors_5,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_dmaErrors_6,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_dmaErrors_7,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-  output        io_inFlight,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
-                io_irq	// src/workerbee/scala/main/WorkerBeeRegIf.scala:27:14
+module Wb_WorkerBeeRegIf(	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
+  input         clock,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
+                reset,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
+                io_cmd_0_valid,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output        io_cmd_0_ready,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [1:0]  io_cmd_0_payload_op,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [9:0]  io_cmd_0_payload_reg0Addr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_cmd_0_payload_reg1Addr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [31:0] io_cmd_0_payload_data0,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_cmd_0_payload_data1,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_cmd_0_payload_pc,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [7:0]  io_cmd_0_payload_tag,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input         io_cmd_1_valid,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output        io_cmd_1_ready,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [1:0]  io_cmd_1_payload_op,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [9:0]  io_cmd_1_payload_reg0Addr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_cmd_1_payload_reg1Addr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [31:0] io_cmd_1_payload_data0,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_cmd_1_payload_data1,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_cmd_1_payload_pc,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [7:0]  io_cmd_1_payload_tag,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input         io_cmd_2_valid,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output        io_cmd_2_ready,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [1:0]  io_cmd_2_payload_op,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [9:0]  io_cmd_2_payload_reg0Addr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_cmd_2_payload_reg1Addr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [31:0] io_cmd_2_payload_data0,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_cmd_2_payload_data1,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_cmd_2_payload_pc,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [7:0]  io_cmd_2_payload_tag,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input         io_cmd_3_valid,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output        io_cmd_3_ready,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [1:0]  io_cmd_3_payload_op,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [9:0]  io_cmd_3_payload_reg0Addr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_cmd_3_payload_reg1Addr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [31:0] io_cmd_3_payload_data0,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_cmd_3_payload_data1,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_cmd_3_payload_pc,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [7:0]  io_cmd_3_payload_tag,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output        io_resp_valid,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input         io_resp_ready,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output [31:0] io_resp_payload_data,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output        io_resp_payload_err,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output [1:0]  io_resp_payload_laneId,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output [15:0] io_regFile_m,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_regFile_n,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_regFile_k,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output [31:0] io_regFile_aAddr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_regFile_bAddr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_regFile_cAddr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output        io_regFile_aMxBlockSize,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_regFile_bMxBlockSize,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_regFile_cMxBlockSize,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_regFile_loadWMode,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_regFile_osM1,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_regFile_osFmtKeep,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output [3:0]  io_regFile_aFmt,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_regFile_bFmt,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_regFile_cFmt,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output [2:0]  io_regFile_rnd,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output [31:0] io_regFile_aScaleAddr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_regFile_bScaleAddr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_regFile_cScaleAddr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output        io_regFile_biasOn,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output [31:0] io_regFile_biasAddr,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output        io_regFile_requantOn,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_regFile_reluOn,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output [31:0] io_regFile_rqMBase,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output [5:0]  io_regFile_rqShift,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output [15:0] io_regFile_rqZp,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output        io_start,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output [31:0] io_startPc,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output [7:0]  io_startTag,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input         io_busy,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [15:0] io_progress,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input         io_done,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_configError,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input  [3:0]  io_configErrorCode,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  input         io_dmaErrors_0,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_dmaErrors_1,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_dmaErrors_2,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_dmaErrors_3,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_dmaErrors_4,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_dmaErrors_5,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_dmaErrors_6,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_dmaErrors_7,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+  output        io_inFlight,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_irq,	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
+                io_cfgCredit	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:14
 );
 
-  reg  [15:0]      regFile_m;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg  [15:0]      regFile_n;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg  [15:0]      regFile_k;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg  [31:0]      regFile_aAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg  [31:0]      regFile_bAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg  [31:0]      regFile_cAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg              regFile_aAddrMode;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg              regFile_bAddrMode;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg              regFile_cAddrMode;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg              regFile_aMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg              regFile_bMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg              regFile_cMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg              regFile_loadWMode;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg              regFile_osM1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg              regFile_osFmtKeep;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg  [3:0]       regFile_aFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg  [3:0]       regFile_bFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg  [3:0]       regFile_cFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg  [2:0]       regFile_rnd;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg  [31:0]      regFile_aScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg  [31:0]      regFile_bScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg  [31:0]      regFile_cScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg              regFile_warmup;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg              regFile_warmdown;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg              regFile_biasOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg  [31:0]      regFile_biasAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg              regFile_requantOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg              regFile_reluOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg  [31:0]      regFile_rqMBase;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg  [5:0]       regFile_rqShift;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg  [15:0]      regFile_rqZp;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-  reg              inFlight;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:45:25
-  reg              startPending;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:46:29
-  reg  [31:0]      startPc;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:24
-  reg  [7:0]       startTag;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:25
-  reg  [10:0]      irqRaw;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:49:23
-  reg  [10:0]      irqMask;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24
-  reg  [3:0]       errorCode;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:51:26
-  wire [10:0]      irqMasked = irqRaw & ~irqMask;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:49:23, :50:24, :52:{26,28}
-  reg              respPending_0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28
-  reg              respPending_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28
-  reg              respPending_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28
-  reg              respPending_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28
-  reg              readPending_0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:142:28
-  reg              readPending_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:142:28
-  reg              readPending_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:142:28
-  reg              readPending_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:142:28
-  reg  [31:0]      respData_0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:143:25
-  reg  [31:0]      respData_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:143:25
-  reg  [31:0]      respData_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:143:25
-  reg  [31:0]      respData_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:143:25
-  reg              respErr_0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:144:24
-  reg              respErr_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:144:24
-  reg              respErr_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:144:24
-  reg              respErr_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:144:24
+  reg  [15:0]      shadowReg_m;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg  [15:0]      shadowReg_n;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg  [15:0]      shadowReg_k;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg  [31:0]      shadowReg_aAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg  [31:0]      shadowReg_bAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg  [31:0]      shadowReg_cAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg              shadowReg_aAddrMode;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg              shadowReg_bAddrMode;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg              shadowReg_cAddrMode;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg              shadowReg_aMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg              shadowReg_bMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg              shadowReg_cMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg              shadowReg_loadWMode;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg              shadowReg_osM1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg              shadowReg_osFmtKeep;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg  [3:0]       shadowReg_aFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg  [3:0]       shadowReg_bFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg  [3:0]       shadowReg_cFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg  [2:0]       shadowReg_rnd;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg  [31:0]      shadowReg_aScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg  [31:0]      shadowReg_bScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg  [31:0]      shadowReg_cScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg              shadowReg_warmup;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg              shadowReg_warmdown;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg              shadowReg_biasOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg  [31:0]      shadowReg_biasAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg              shadowReg_requantOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg              shadowReg_reluOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg  [31:0]      shadowReg_rqMBase;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg  [5:0]       shadowReg_rqShift;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg  [15:0]      shadowReg_rqZp;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+  reg  [15:0]      liveReg_m;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg  [15:0]      liveReg_n;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg  [15:0]      liveReg_k;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg  [31:0]      liveReg_aAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg  [31:0]      liveReg_bAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg  [31:0]      liveReg_cAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg              liveReg_aMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg              liveReg_bMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg              liveReg_cMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg              liveReg_loadWMode;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg              liveReg_osM1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg              liveReg_osFmtKeep;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg  [3:0]       liveReg_aFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg  [3:0]       liveReg_bFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg  [3:0]       liveReg_cFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg  [2:0]       liveReg_rnd;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg  [31:0]      liveReg_aScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg  [31:0]      liveReg_bScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg  [31:0]      liveReg_cScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg              liveReg_biasOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg  [31:0]      liveReg_biasAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg              liveReg_requantOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg              liveReg_reluOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg  [31:0]      liveReg_rqMBase;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg  [5:0]       liveReg_rqShift;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg  [15:0]      liveReg_rqZp;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+  reg              inFlight;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:68:25
+  reg              startPending;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:69:29
+  reg  [31:0]      startPc;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:70:24
+  reg  [7:0]       startTag;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:71:25
+  reg  [10:0]      irqRaw;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:72:23
+  reg  [10:0]      irqMask;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24
+  reg  [3:0]       errorCode;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:74:26
+  wire [10:0]      irqMasked = irqRaw & ~irqMask;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:72:23, :73:24, :75:{26,28}
+  reg              respPending_0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28
+  reg              respPending_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28
+  reg              respPending_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28
+  reg              respPending_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28
+  reg              readPending_0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:164:28
+  reg              readPending_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:164:28
+  reg              readPending_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:164:28
+  reg              readPending_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:164:28
+  reg  [31:0]      respData_0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:165:25
+  reg  [31:0]      respData_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:165:25
+  reg  [31:0]      respData_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:165:25
+  reg  [31:0]      respData_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:165:25
+  reg              respErr_0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:24
+  reg              respErr_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:24
+  reg              respErr_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:24
+  reg              respErr_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:24
   wire [3:0]       _io_resp_valid_T =
-    {respPending_3, respPending_2, respPending_1, respPending_0};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28, :145:46
+    {respPending_3, respPending_2, respPending_1, respPending_0};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28, :167:46
   wire [1:0]       respLane =
-    respPending_0 ? 2'h0 : respPending_1 ? 2'h1 : {1'h1, ~respPending_2};	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28, :162:25
+    respPending_0 ? 2'h0 : respPending_1 ? 2'h1 : {1'h1, ~respPending_2};	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28, :198:25
   wire             acceptBatch =
     {readPending_3, readPending_2, readPending_1, readPending_0} == 4'h0
-    & _io_resp_valid_T == 4'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:142:28, :145:46, :146:{34,41,45,68}
-  wire [3:0][31:0] _GEN = {{respData_3}, {respData_2}, {respData_1}, {respData_0}};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:143:25, :149:24
-  wire [3:0]       _GEN_0 = {{respErr_3}, {respErr_2}, {respErr_1}, {respErr_0}};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:144:24, :150:23
-  always @(posedge clock) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
-    if (reset) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
-      regFile_m <= 16'h0;	// <stdin>:27288:38, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_n <= 16'h0;	// <stdin>:27288:38, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_k <= 16'h0;	// <stdin>:27288:38, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_aAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_bAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_cAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_aAddrMode <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_bAddrMode <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_cAddrMode <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_aMxBlockSize <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_bMxBlockSize <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_cMxBlockSize <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_loadWMode <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_osM1 <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_osFmtKeep <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_aFmt <= 4'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_bFmt <= 4'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_cFmt <= 4'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_rnd <= 3'h0;	// <stdin>:27272:5, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_aScaleAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_bScaleAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_cScaleAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_warmup <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_warmdown <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_biasOn <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_biasAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_requantOn <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_reluOn <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_rqMBase <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_rqShift <= 6'h0;	// <stdin>:27261:43, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      regFile_rqZp <= 16'h0;	// <stdin>:27288:38, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-      inFlight <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:45:25
-      startPending <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:46:29
-      startPc <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:24
-      startTag <= 8'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:25
-      irqRaw <= 11'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:49:23
-      irqMask <= 11'h7FF;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24
-      errorCode <= 4'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:51:26
-      respPending_0 <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28
-      respPending_1 <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28
-      respPending_2 <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28
-      respPending_3 <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28
-      readPending_0 <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:142:28
-      readPending_1 <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:142:28
-      readPending_2 <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:142:28
-      readPending_3 <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:142:28
-      respData_0 <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:143:25
-      respData_1 <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:143:25
-      respData_2 <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:143:25
-      respData_3 <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:143:25
-      respErr_0 <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:144:24
-      respErr_1 <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:144:24
-      respErr_2 <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:144:24
-      respErr_3 <= 1'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:144:24
+    & _io_resp_valid_T == 4'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:164:28, :167:46, :168:{34,41,45,68}
+  wire [3:0]       runGrant =
+    io_cmd_0_valid & (&io_cmd_0_payload_op)
+      ? 4'h1
+      : io_cmd_1_valid & (&io_cmd_1_payload_op)
+          ? 4'h2
+          : io_cmd_2_valid & (&io_cmd_2_payload_op)
+              ? 4'h4
+              : {io_cmd_3_valid & (&io_cmd_3_payload_op), 3'h0};	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:173:{21,45}
+  wire             io_cmd_0_ready_0 =
+    acceptBatch & (~(io_cmd_0_valid & (&io_cmd_0_payload_op)) | ~inFlight & runGrant[0]);	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:68:25, :168:45, :173:45, :179:36, :180:{39,43,50,54,64,75}
+  wire             io_cmd_1_ready_0 =
+    acceptBatch & (~(io_cmd_1_valid & (&io_cmd_1_payload_op)) | ~inFlight & runGrant[1]);	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:68:25, :168:45, :173:45, :179:36, :180:{39,43,50,54,64,75}
+  wire             io_cmd_2_ready_0 =
+    acceptBatch & (~(io_cmd_2_valid & (&io_cmd_2_payload_op)) | ~inFlight & runGrant[2]);	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:68:25, :168:45, :173:45, :179:36, :180:{39,43,50,54,64,75}
+  wire             io_cmd_3_ready_0 =
+    acceptBatch & (~(io_cmd_3_valid & (&io_cmd_3_payload_op)) | ~inFlight & runGrant[3]);	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:68:25, :168:45, :173:45, :179:36, :180:{39,43,50,54,64,75}
+  wire [3:0][31:0] _GEN = {{respData_3}, {respData_2}, {respData_1}, {respData_0}};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:165:25, :184:24
+  wire [3:0]       _GEN_0 = {{respErr_3}, {respErr_2}, {respErr_1}, {respErr_0}};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:24, :185:23
+  always @(posedge clock) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
+    if (reset) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
+      shadowReg_m <= 16'h0;	// <stdin>:20888:40, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_n <= 16'h0;	// <stdin>:20888:40, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_k <= 16'h0;	// <stdin>:20888:40, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_aAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_bAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_cAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_aAddrMode <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_bAddrMode <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_cAddrMode <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_aMxBlockSize <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_bMxBlockSize <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_cMxBlockSize <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_loadWMode <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_osM1 <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_osFmtKeep <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_aFmt <= 4'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_bFmt <= 4'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_cFmt <= 4'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_rnd <= 3'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_aScaleAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_bScaleAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_cScaleAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_warmup <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_warmdown <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_biasOn <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_biasAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_requantOn <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_reluOn <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_rqMBase <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_rqShift <= 6'h0;	// <stdin>:20861:45, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      shadowReg_rqZp <= 16'h0;	// <stdin>:20888:40, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+      liveReg_m <= 16'h0;	// <stdin>:20888:40, src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_n <= 16'h0;	// <stdin>:20888:40, src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_k <= 16'h0;	// <stdin>:20888:40, src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_aAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_bAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_cAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_aMxBlockSize <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_bMxBlockSize <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_cMxBlockSize <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_loadWMode <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_osM1 <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_osFmtKeep <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_aFmt <= 4'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_bFmt <= 4'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_cFmt <= 4'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_rnd <= 3'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_aScaleAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_bScaleAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_cScaleAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_biasOn <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_biasAddr <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_requantOn <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_reluOn <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_rqMBase <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_rqShift <= 6'h0;	// <stdin>:20861:45, src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      liveReg_rqZp <= 16'h0;	// <stdin>:20888:40, src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32
+      inFlight <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:68:25
+      startPending <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:69:29
+      startPc <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:70:24
+      startTag <= 8'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:71:25
+      irqRaw <= 11'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:72:23
+      irqMask <= 11'h7FF;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24
+      errorCode <= 4'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:74:26
+      respPending_0 <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28
+      respPending_1 <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28
+      respPending_2 <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28
+      respPending_3 <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28
+      readPending_0 <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:164:28
+      readPending_1 <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:164:28
+      readPending_2 <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:164:28
+      readPending_3 <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:164:28
+      respData_0 <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:165:25
+      respData_1 <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:165:25
+      respData_2 <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:165:25
+      respData_3 <= 32'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:165:25
+      respErr_0 <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:166:24
+      respErr_1 <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:166:24
+      respErr_2 <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:166:24
+      respErr_3 <= 1'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:166:24
     end
-    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
-      automatic logic        _GEN_1 = (|_io_resp_valid_T) & io_resp_ready;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:145:46, :148:39
-      automatic logic        _GEN_2 = _GEN_1 & respLane == 2'h0;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28, :152:22, :153:27
-      automatic logic        _GEN_3 = _GEN_1 & respLane == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28, :152:22, :153:27, :162:25
-      automatic logic        _GEN_4 = _GEN_1 & respLane == 2'h2;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28, :152:22, :153:27
-      automatic logic        _GEN_5 = _GEN_1 & (&respLane);	// src/main/scala/chisel3/util/Mux.scala:58:84, src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28, :152:22, :153:27
-      automatic logic        write2 = io_cmd_0_payload_op == 2'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:162:25
-      automatic logic        read;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:163:23
-      automatic logic        _respData_0_T_12;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:25
-      automatic logic        _respData_0_T_13;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:63
-      automatic logic        _respData_0_T_15;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:135:12
-      automatic logic        _respData_0_T_16;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:135:53
-      automatic logic        _writeTargets_T = io_cmd_0_payload_reg0Addr < 6'hC;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:136:26
-      automatic logic        _trigger0_T = io_cmd_0_payload_reg0Addr == 6'h10;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:137:13
-      automatic logic        _writeTargets_T_11 = io_cmd_0_payload_reg1Addr < 6'hC;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:136:26
-      automatic logic        _trigger1_T = io_cmd_0_payload_reg1Addr == 6'h10;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:137:13
-      automatic logic        rejected;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:{55,93}, :135:45, :138:14, :164:57
-      automatic logic        _acceptedWrites_0_T = io_cmd_0_valid & acceptBatch;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:146:45
-      automatic logic        _respErr_0_T_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:52
-      automatic logic        acceptedWrites_0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-      automatic logic [31:0] _GEN_6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:105:39
-      automatic logic [31:0] _GEN_7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:125:44
-      automatic logic [31:0] _GEN_8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:126:45
-      automatic logic [31:0] _GEN_9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:127:47
-      automatic logic [31:0] _GEN_10;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:128:50
-      automatic logic        write2_1 = io_cmd_1_payload_op == 2'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:162:25
-      automatic logic        read_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:163:23
-      automatic logic        _respData_1_T_12;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:25
-      automatic logic        _respData_1_T_13;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:63
-      automatic logic        _respData_1_T_15;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:135:12
-      automatic logic        _respData_1_T_16;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:135:53
-      automatic logic        _writeTargets_T_20 = io_cmd_1_payload_reg0Addr < 6'hC;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:136:26
-      automatic logic        _trigger0_T_2 = io_cmd_1_payload_reg0Addr == 6'h10;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:137:13
-      automatic logic        _writeTargets_T_31 = io_cmd_1_payload_reg1Addr < 6'hC;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:136:26
-      automatic logic        _trigger1_T_3 = io_cmd_1_payload_reg1Addr == 6'h10;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:137:13
-      automatic logic        rejected_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:{55,93}, :135:45, :138:14, :164:57
-      automatic logic        _acceptedWrites_1_T = io_cmd_1_valid & acceptBatch;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:146:45
-      automatic logic        _respErr_1_T_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:52
-      automatic logic        acceptedWrites_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-      automatic logic        write2_2 = io_cmd_2_payload_op == 2'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:162:25
-      automatic logic        read_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:163:23
-      automatic logic        _respData_2_T_12;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:25
-      automatic logic        _respData_2_T_13;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:63
-      automatic logic        _respData_2_T_15;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:135:12
-      automatic logic        _respData_2_T_16;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:135:53
-      automatic logic        _writeTargets_T_40 = io_cmd_2_payload_reg0Addr < 6'hC;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:136:26
-      automatic logic        _trigger0_T_4 = io_cmd_2_payload_reg0Addr == 6'h10;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:137:13
-      automatic logic        _writeTargets_T_51 = io_cmd_2_payload_reg1Addr < 6'hC;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:136:26
-      automatic logic        _trigger1_T_6 = io_cmd_2_payload_reg1Addr == 6'h10;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:137:13
-      automatic logic        rejected_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:{55,93}, :135:45, :138:14, :164:57
-      automatic logic        _acceptedWrites_2_T = io_cmd_2_valid & acceptBatch;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:146:45
-      automatic logic        _respErr_2_T_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:52
-      automatic logic        acceptedWrites_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-      automatic logic        write2_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:162:25
-      automatic logic        read_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:163:23
-      automatic logic        _respData_3_T_12;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:25
-      automatic logic        _respData_3_T_13;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:63
-      automatic logic        _respData_3_T_15;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:135:12
-      automatic logic        _respData_3_T_16;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:135:53
-      automatic logic        _writeTargets_T_60 = io_cmd_3_payload_reg0Addr < 6'hC;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:136:26
-      automatic logic        _trigger0_T_6 = io_cmd_3_payload_reg0Addr == 6'h10;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:137:13
-      automatic logic        _writeTargets_T_71 = io_cmd_3_payload_reg1Addr < 6'hC;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:136:26
-      automatic logic        _trigger1_T_9 = io_cmd_3_payload_reg1Addr == 6'h10;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:137:13
-      automatic logic        rejected_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:{55,93}, :135:45, :138:14, :164:57
-      automatic logic        _acceptedWrites_3_T = io_cmd_3_valid & acceptBatch;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:146:45
-      automatic logic        _respErr_3_T_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:52
-      automatic logic        acceptedWrites_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-      automatic logic        _writeTargets_T_1 = io_cmd_0_payload_reg0Addr == 6'h31;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18, :176:48
-      automatic logic        clear0 = io_cmd_0_payload_reg0Addr == 6'h33;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:177:12
-      automatic logic        writeTargets_0_0_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:183:29
-      automatic logic        _writeTargets_T_12 = io_cmd_0_payload_reg1Addr == 6'h31;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18, :176:48
-      automatic logic        _clear1_T = io_cmd_0_payload_reg1Addr == 6'h33;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:177:12
-      automatic logic        writeTargets_0_1_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:184:{29,66}
-      automatic logic        _writeTargets_T_21 = io_cmd_1_payload_reg0Addr == 6'h31;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18, :176:48
-      automatic logic        clear0_1 = io_cmd_1_payload_reg0Addr == 6'h33;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:177:12
-      automatic logic        writeTargets_1_0_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:183:29
-      automatic logic        _writeTargets_T_32 = io_cmd_1_payload_reg1Addr == 6'h31;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18, :176:48
-      automatic logic        _clear1_T_1 = io_cmd_1_payload_reg1Addr == 6'h33;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:177:12
-      automatic logic        writeTargets_1_1_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:184:{29,66}
-      automatic logic        _writeTargets_T_41 = io_cmd_2_payload_reg0Addr == 6'h31;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18, :176:48
-      automatic logic        clear0_2 = io_cmd_2_payload_reg0Addr == 6'h33;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:177:12
-      automatic logic        writeTargets_2_0_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:183:29
-      automatic logic        _writeTargets_T_52 = io_cmd_2_payload_reg1Addr == 6'h31;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18, :176:48
-      automatic logic        _clear1_T_2 = io_cmd_2_payload_reg1Addr == 6'h33;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:177:12
-      automatic logic        writeTargets_2_1_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:184:{29,66}
-      automatic logic        _writeTargets_T_61;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:176:48
-      automatic logic        clear0_3 = io_cmd_3_payload_reg0Addr == 6'h33;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:177:12
-      automatic logic        writeTargets_3_0_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:183:29
-      automatic logic        _writeTargets_T_72;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:176:48
-      automatic logic        _clear1_T_3 = io_cmd_3_payload_reg1Addr == 6'h33;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:177:12
-      automatic logic        writeTargets_3_1_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:184:{29,66}
-      automatic logic        _GEN_11 = io_cmd_0_payload_reg0Addr == 6'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_12;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-      automatic logic        _GEN_13 = io_cmd_0_payload_reg0Addr == 6'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_14;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-      automatic logic        _GEN_15 = io_cmd_0_payload_reg0Addr == 6'h3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_16;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-      automatic logic        _GEN_17 = io_cmd_0_payload_reg0Addr == 6'h4;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_18;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-      automatic logic        _GEN_19 = io_cmd_0_payload_reg0Addr == 6'h5;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_20;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-      automatic logic        _GEN_21 = io_cmd_0_payload_reg0Addr == 6'h6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_22;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-      automatic logic        _GEN_23 = io_cmd_0_payload_reg0Addr == 6'h7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_24;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-      automatic logic        _GEN_25 = io_cmd_0_payload_reg0Addr == 6'h8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_26;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-      automatic logic        _GEN_27 = io_cmd_0_payload_reg0Addr == 6'h9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_28;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-      automatic logic        _GEN_29 = io_cmd_0_payload_reg0Addr == 6'hA;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_30;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-      automatic logic        _GEN_31 = io_cmd_0_payload_reg0Addr == 6'hB;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :136:26
-      automatic logic        _GEN_32;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-      automatic logic        _GEN_33;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18
-      automatic logic        _GEN_34 = io_cmd_0_payload_reg1Addr == 6'h0;	// <stdin>:27261:43, src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18
-      automatic logic        _GEN_35;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :201:20
-      automatic logic        _GEN_36 = io_cmd_0_payload_reg1Addr == 6'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_37;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_38 = io_cmd_0_payload_reg1Addr == 6'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_39;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_40 = io_cmd_0_payload_reg1Addr == 6'h3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_41;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_42 = io_cmd_0_payload_reg1Addr == 6'h4;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_43;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_44 = io_cmd_0_payload_reg1Addr == 6'h5;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_45;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_46 = io_cmd_0_payload_reg1Addr == 6'h6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_47;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_48 = io_cmd_0_payload_reg1Addr == 6'h7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_49;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_50 = io_cmd_0_payload_reg1Addr == 6'h8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_51;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_52 = io_cmd_0_payload_reg1Addr == 6'h9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_53;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_54 = io_cmd_0_payload_reg1Addr == 6'hA;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_55;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_56 = io_cmd_0_payload_reg1Addr == 6'hB;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :136:26
-      automatic logic        _GEN_57;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_58;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        clear1 = write2 & _clear1_T;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:162:25, :177:12, :203:27
-      automatic logic        _GEN_59 =
-        _trigger0_T & (|io_cmd_0_payload_data0) | write2 & _trigger1_T
-        & (|io_cmd_0_payload_data1);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:137:{13,50}, :162:25, :208:64, :209:{29,74}, :210:21
-      automatic logic        _GEN_60;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:60:16, :199:32, :210:34
-      automatic logic        _GEN_61;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:24, :199:32, :210:34, :212:17
-      automatic logic        _GEN_62 = io_cmd_1_payload_reg0Addr == 6'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_63;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_64 = io_cmd_1_payload_reg0Addr == 6'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_65;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_66 = io_cmd_1_payload_reg0Addr == 6'h3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_67;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_68 = io_cmd_1_payload_reg0Addr == 6'h4;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_69;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_70 = io_cmd_1_payload_reg0Addr == 6'h5;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_71;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_72 = io_cmd_1_payload_reg0Addr == 6'h6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_73;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_74 = io_cmd_1_payload_reg0Addr == 6'h7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_75;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_76 = io_cmd_1_payload_reg0Addr == 6'h8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_77;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_78 = io_cmd_1_payload_reg0Addr == 6'h9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_79;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_80 = io_cmd_1_payload_reg0Addr == 6'hA;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_81;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_82 = io_cmd_1_payload_reg0Addr == 6'hB;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :136:26
-      automatic logic        _GEN_83;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_84;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_85 = io_cmd_1_payload_reg1Addr == 6'h0;	// <stdin>:27261:43, src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18
-      automatic logic        _GEN_86;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :201:20
-      automatic logic        _GEN_87 = io_cmd_1_payload_reg1Addr == 6'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_88;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_89 = io_cmd_1_payload_reg1Addr == 6'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_90;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_91 = io_cmd_1_payload_reg1Addr == 6'h3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_92;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_93 = io_cmd_1_payload_reg1Addr == 6'h4;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_94;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_95 = io_cmd_1_payload_reg1Addr == 6'h5;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_96;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_97 = io_cmd_1_payload_reg1Addr == 6'h6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_98;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_99 = io_cmd_1_payload_reg1Addr == 6'h7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_100;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_101 = io_cmd_1_payload_reg1Addr == 6'h8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_102;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_103 = io_cmd_1_payload_reg1Addr == 6'h9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_104;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_105 = io_cmd_1_payload_reg1Addr == 6'hA;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_106;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_107 = io_cmd_1_payload_reg1Addr == 6'hB;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :136:26
-      automatic logic        _GEN_108;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_109;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        clear1_1 = write2_1 & _clear1_T_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:162:25, :177:12, :203:27
-      automatic logic        _GEN_110 =
-        _trigger0_T_2 & (|io_cmd_1_payload_data0) | write2_1 & _trigger1_T_3
-        & (|io_cmd_1_payload_data1);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:137:{13,50}, :162:25, :208:64, :209:{29,74}, :210:21
-      automatic logic        _GEN_111;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:199:32, :210:34, :211:22
-      automatic logic        _GEN_112;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:199:32, :210:34
-      automatic logic        _GEN_113 = io_cmd_2_payload_reg0Addr == 6'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_114;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_115 = io_cmd_2_payload_reg0Addr == 6'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_116;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_117 = io_cmd_2_payload_reg0Addr == 6'h3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_118;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_119 = io_cmd_2_payload_reg0Addr == 6'h4;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_120;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_121 = io_cmd_2_payload_reg0Addr == 6'h5;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_122;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_123 = io_cmd_2_payload_reg0Addr == 6'h6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_124;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_125 = io_cmd_2_payload_reg0Addr == 6'h7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_126;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_127 = io_cmd_2_payload_reg0Addr == 6'h8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_128;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_129 = io_cmd_2_payload_reg0Addr == 6'h9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_130;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_131 = io_cmd_2_payload_reg0Addr == 6'hA;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_132;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_133 = io_cmd_2_payload_reg0Addr == 6'hB;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :136:26
-      automatic logic        _GEN_134;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_135;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-      automatic logic        _GEN_136 = io_cmd_2_payload_reg1Addr == 6'h0;	// <stdin>:27261:43, src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18
-      automatic logic        _GEN_137;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :201:20
-      automatic logic        _GEN_138 = io_cmd_2_payload_reg1Addr == 6'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_139;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_140 = io_cmd_2_payload_reg1Addr == 6'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_141;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_142 = io_cmd_2_payload_reg1Addr == 6'h3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_143;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_144 = io_cmd_2_payload_reg1Addr == 6'h4;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_145;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_146 = io_cmd_2_payload_reg1Addr == 6'h5;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_147;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_148 = io_cmd_2_payload_reg1Addr == 6'h6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_149;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_150 = io_cmd_2_payload_reg1Addr == 6'h7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_151;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_152 = io_cmd_2_payload_reg1Addr == 6'h8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_153;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_154 = io_cmd_2_payload_reg1Addr == 6'h9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_155;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_156 = io_cmd_2_payload_reg1Addr == 6'hA;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-      automatic logic        _GEN_157;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_158 = io_cmd_2_payload_reg1Addr == 6'hB;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :136:26
-      automatic logic        _GEN_159;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        _GEN_160;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-      automatic logic        clear1_2 = write2_2 & _clear1_T_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:162:25, :177:12, :203:27
-      automatic logic        _GEN_161 =
-        _trigger0_T_4 & (|io_cmd_2_payload_data0) | write2_2 & _trigger1_T_6
-        & (|io_cmd_2_payload_data1);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:137:{13,50}, :162:25, :208:64, :209:{29,74}, :210:21
-      automatic logic        _GEN_162;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:199:32, :210:34, :212:17
-      automatic logic        clear1_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:203:27
-      automatic logic [10:0] clearBits;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:199:32, :204:30, :205:19
-      automatic logic        _GEN_163;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:210:21
-      automatic logic        _GEN_164;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:199:32, :210:34, :211:22
-      read = io_cmd_0_payload_op == 2'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:163:23
-      _respData_0_T_12 = io_cmd_0_payload_reg0Addr == 6'h1E;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:25
-      _respData_0_T_13 = io_cmd_0_payload_reg0Addr == 6'h30;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:63
-      _respData_0_T_15 = io_cmd_0_payload_reg0Addr == 6'h32;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:135:12
-      _respData_0_T_16 = io_cmd_0_payload_reg0Addr == 6'h34;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:135:53
+    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
+      automatic logic        _GEN_1 = (|_io_resp_valid_T) & io_resp_ready;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:167:46, :183:39
+      automatic logic        _GEN_2 = _GEN_1 & respLane == 2'h0;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28, :187:22, :188:27
+      automatic logic        _GEN_3 = _GEN_1 & respLane == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28, :187:22, :188:27, :198:25
+      automatic logic        _GEN_4 = _GEN_1 & respLane == 2'h2;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28, :187:22, :188:27
+      automatic logic        _GEN_5 = _GEN_1 & (&respLane);	// src/main/scala/chisel3/util/Mux.scala:58:84, src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28, :187:22, :188:27
+      automatic logic        write2 = io_cmd_0_payload_op == 2'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:198:25
+      automatic logic        read;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:199:23
+      automatic logic        _respData_0_T_12;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:10
+      automatic logic        _respData_0_T_13;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:48
+      automatic logic        _respData_0_T_15;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:161:12
+      automatic logic        _respData_0_T_16;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:161:53
+      automatic logic        rejected;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:{40,78}, :161:45, :201:46
+      automatic logic        _acceptedRuns_0_T = io_cmd_0_valid & io_cmd_0_ready_0;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:180:39
+      automatic logic        _respErr_0_T;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:52
+      automatic logic        acceptedWrites_0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+      automatic logic        acceptedRuns_0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:203:39
+      automatic logic [31:0] _GEN_6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:130:39
+      automatic logic [31:0] _GEN_7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:150:44
+      automatic logic [31:0] _GEN_8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:151:45
+      automatic logic [31:0] _GEN_9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:152:47
+      automatic logic [31:0] _GEN_10;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:153:50
+      automatic logic        write2_1 = io_cmd_1_payload_op == 2'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:198:25
+      automatic logic        read_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:199:23
+      automatic logic        _respData_1_T_12;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:10
+      automatic logic        _respData_1_T_13;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:48
+      automatic logic        _respData_1_T_15;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:161:12
+      automatic logic        _respData_1_T_16;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:161:53
+      automatic logic        rejected_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:{40,78}, :161:45, :201:46
+      automatic logic        _acceptedRuns_1_T = io_cmd_1_valid & io_cmd_1_ready_0;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:180:39
+      automatic logic        _respErr_1_T;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:52
+      automatic logic        acceptedWrites_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+      automatic logic        acceptedRuns_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:203:39
+      automatic logic        write2_2 = io_cmd_2_payload_op == 2'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:198:25
+      automatic logic        read_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:199:23
+      automatic logic        _respData_2_T_12;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:10
+      automatic logic        _respData_2_T_13;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:48
+      automatic logic        _respData_2_T_15;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:161:12
+      automatic logic        _respData_2_T_16;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:161:53
+      automatic logic        rejected_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:{40,78}, :161:45, :201:46
+      automatic logic        _acceptedRuns_2_T = io_cmd_2_valid & io_cmd_2_ready_0;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:180:39
+      automatic logic        _respErr_2_T;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:52
+      automatic logic        acceptedWrites_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+      automatic logic        acceptedRuns_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:203:39
+      automatic logic        write2_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:198:25
+      automatic logic        read_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:199:23
+      automatic logic        _respData_3_T_12;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:10
+      automatic logic        _respData_3_T_13;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:48
+      automatic logic        _respData_3_T_15;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:161:12
+      automatic logic        _respData_3_T_16;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:161:53
+      automatic logic        rejected_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:{40,78}, :161:45, :201:46
+      automatic logic        _acceptedRuns_3_T = io_cmd_3_valid & io_cmd_3_ready_0;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:180:39
+      automatic logic        _respErr_3_T;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:52
+      automatic logic        acceptedWrites_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+      automatic logic        acceptedRuns_3 = _acceptedRuns_3_T & (&io_cmd_3_payload_op);	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:173:45, :203:39
+      automatic logic        _writeTargets_T_1 = io_cmd_0_payload_reg0Addr == 10'h42;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18, :213:48
+      automatic logic        clear0 = io_cmd_0_payload_reg0Addr == 10'h44;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:214:12
+      automatic logic        writeTargets_0_0_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:219:29
+      automatic logic        _writeTargets_T_8 = io_cmd_0_payload_reg1Addr == 10'h42;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18, :213:48
+      automatic logic        _clear1_T = io_cmd_0_payload_reg1Addr == 10'h44;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:214:12
+      automatic logic        writeTargets_0_1_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:220:{29,66}
+      automatic logic        _writeTargets_T_13 = io_cmd_1_payload_reg0Addr == 10'h42;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18, :213:48
+      automatic logic        clear0_1 = io_cmd_1_payload_reg0Addr == 10'h44;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:214:12
+      automatic logic        writeTargets_1_0_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:219:29
+      automatic logic        _writeTargets_T_20 = io_cmd_1_payload_reg1Addr == 10'h42;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18, :213:48
+      automatic logic        _clear1_T_1 = io_cmd_1_payload_reg1Addr == 10'h44;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:214:12
+      automatic logic        writeTargets_1_1_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:220:{29,66}
+      automatic logic        _writeTargets_T_25 = io_cmd_2_payload_reg0Addr == 10'h42;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18, :213:48
+      automatic logic        clear0_2 = io_cmd_2_payload_reg0Addr == 10'h44;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:214:12
+      automatic logic        writeTargets_2_0_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:219:29
+      automatic logic        _writeTargets_T_32 = io_cmd_2_payload_reg1Addr == 10'h42;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18, :213:48
+      automatic logic        _clear1_T_2 = io_cmd_2_payload_reg1Addr == 10'h44;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:214:12
+      automatic logic        writeTargets_2_1_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:220:{29,66}
+      automatic logic        _writeTargets_T_37;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:213:48
+      automatic logic        clear0_3 = io_cmd_3_payload_reg0Addr == 10'h44;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:214:12
+      automatic logic        writeTargets_3_0_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:219:29
+      automatic logic        _writeTargets_T_44;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:213:48
+      automatic logic        _clear1_T_3 = io_cmd_3_payload_reg1Addr == 10'h44;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:214:12
+      automatic logic        writeTargets_3_1_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:220:{29,66}
+      automatic logic        _GEN_11 = io_cmd_0_payload_reg0Addr == 10'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_12;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+      automatic logic        _GEN_13 = io_cmd_0_payload_reg0Addr == 10'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_14;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+      automatic logic        _GEN_15 = io_cmd_0_payload_reg0Addr == 10'h3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_16;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+      automatic logic        _GEN_17 = io_cmd_0_payload_reg0Addr == 10'h4;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_18;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+      automatic logic        _GEN_19 = io_cmd_0_payload_reg0Addr == 10'h5;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_20;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+      automatic logic        _GEN_21 = io_cmd_0_payload_reg0Addr == 10'h6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_22;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+      automatic logic        _GEN_23 = io_cmd_0_payload_reg0Addr == 10'h7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_24;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+      automatic logic        _GEN_25 = io_cmd_0_payload_reg0Addr == 10'h8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_26;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+      automatic logic        _GEN_27 = io_cmd_0_payload_reg0Addr == 10'h9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_28;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+      automatic logic        _GEN_29 = io_cmd_0_payload_reg0Addr == 10'hA;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_30;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+      automatic logic        _GEN_31 = io_cmd_0_payload_reg0Addr == 10'hB;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_32;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+      automatic logic        _GEN_33;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18
+      automatic logic        _GEN_34 = io_cmd_0_payload_reg1Addr == 10'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :148:51
+      automatic logic        _GEN_35;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :237:20
+      automatic logic        _GEN_36 = io_cmd_0_payload_reg1Addr == 10'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_37;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_38 = io_cmd_0_payload_reg1Addr == 10'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_39;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_40 = io_cmd_0_payload_reg1Addr == 10'h3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_41;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_42 = io_cmd_0_payload_reg1Addr == 10'h4;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_43;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_44 = io_cmd_0_payload_reg1Addr == 10'h5;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_45;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_46 = io_cmd_0_payload_reg1Addr == 10'h6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_47;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_48 = io_cmd_0_payload_reg1Addr == 10'h7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_49;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_50 = io_cmd_0_payload_reg1Addr == 10'h8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_51;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_52 = io_cmd_0_payload_reg1Addr == 10'h9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_53;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_54 = io_cmd_0_payload_reg1Addr == 10'hA;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_55;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_56 = io_cmd_0_payload_reg1Addr == 10'hB;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_57;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_58;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        clear1 = write2 & _clear1_T;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:198:25, :214:12, :239:27
+      automatic logic        _GEN_59 = io_cmd_1_payload_reg0Addr == 10'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_60;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_61 = io_cmd_1_payload_reg0Addr == 10'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_62;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_63 = io_cmd_1_payload_reg0Addr == 10'h3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_64;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_65 = io_cmd_1_payload_reg0Addr == 10'h4;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_66;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_67 = io_cmd_1_payload_reg0Addr == 10'h5;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_68;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_69 = io_cmd_1_payload_reg0Addr == 10'h6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_70;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_71 = io_cmd_1_payload_reg0Addr == 10'h7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_72;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_73 = io_cmd_1_payload_reg0Addr == 10'h8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_74;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_75 = io_cmd_1_payload_reg0Addr == 10'h9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_76;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_77 = io_cmd_1_payload_reg0Addr == 10'hA;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_78;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_79 = io_cmd_1_payload_reg0Addr == 10'hB;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_80;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_81;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_82 = io_cmd_1_payload_reg1Addr == 10'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :148:51
+      automatic logic        _GEN_83;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :237:20
+      automatic logic        _GEN_84 = io_cmd_1_payload_reg1Addr == 10'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_85;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_86 = io_cmd_1_payload_reg1Addr == 10'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_87;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_88 = io_cmd_1_payload_reg1Addr == 10'h3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_89;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_90 = io_cmd_1_payload_reg1Addr == 10'h4;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_91;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_92 = io_cmd_1_payload_reg1Addr == 10'h5;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_93;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_94 = io_cmd_1_payload_reg1Addr == 10'h6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_95;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_96 = io_cmd_1_payload_reg1Addr == 10'h7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_97;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_98 = io_cmd_1_payload_reg1Addr == 10'h8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_99;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_100 = io_cmd_1_payload_reg1Addr == 10'h9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_101;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_102 = io_cmd_1_payload_reg1Addr == 10'hA;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_103;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_104 = io_cmd_1_payload_reg1Addr == 10'hB;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_105;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_106;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        clear1_1 = write2_1 & _clear1_T_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:198:25, :214:12, :239:27
+      automatic logic        _GEN_107 = io_cmd_2_payload_reg0Addr == 10'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_108;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_109 = io_cmd_2_payload_reg0Addr == 10'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_110;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_111 = io_cmd_2_payload_reg0Addr == 10'h3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_112;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_113 = io_cmd_2_payload_reg0Addr == 10'h4;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_114;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_115 = io_cmd_2_payload_reg0Addr == 10'h5;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_116;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_117 = io_cmd_2_payload_reg0Addr == 10'h6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_118;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_119 = io_cmd_2_payload_reg0Addr == 10'h7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_120;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_121 = io_cmd_2_payload_reg0Addr == 10'h8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_122;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_123 = io_cmd_2_payload_reg0Addr == 10'h9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_124;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_125 = io_cmd_2_payload_reg0Addr == 10'hA;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_126;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_127 = io_cmd_2_payload_reg0Addr == 10'hB;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_128;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_129;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+      automatic logic        _GEN_130 = io_cmd_2_payload_reg1Addr == 10'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :148:51
+      automatic logic        _GEN_131;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :237:20
+      automatic logic        _GEN_132 = io_cmd_2_payload_reg1Addr == 10'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_133;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_134 = io_cmd_2_payload_reg1Addr == 10'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_135;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_136 = io_cmd_2_payload_reg1Addr == 10'h3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_137;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_138 = io_cmd_2_payload_reg1Addr == 10'h4;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_139;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_140 = io_cmd_2_payload_reg1Addr == 10'h5;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_141;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_142 = io_cmd_2_payload_reg1Addr == 10'h6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_143;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_144 = io_cmd_2_payload_reg1Addr == 10'h7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_145;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_146 = io_cmd_2_payload_reg1Addr == 10'h8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_147;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_148 = io_cmd_2_payload_reg1Addr == 10'h9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_149;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_150 = io_cmd_2_payload_reg1Addr == 10'hA;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_151;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_152 = io_cmd_2_payload_reg1Addr == 10'hB;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+      automatic logic        _GEN_153;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        _GEN_154;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+      automatic logic        clear1_2 = write2_2 & _clear1_T_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:198:25, :214:12, :239:27
+      automatic logic        clear1_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:239:27
+      automatic logic [10:0] clearBits;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:235:32, :240:30, :241:19
+      automatic logic        _GEN_155;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32, :247:30, :248:15
+      read = io_cmd_0_payload_op == 2'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:199:23
+      _respData_0_T_12 = io_cmd_0_payload_reg0Addr == 10'h40;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:10
+      _respData_0_T_13 = io_cmd_0_payload_reg0Addr == 10'h41;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:48
+      _respData_0_T_15 = io_cmd_0_payload_reg0Addr == 10'h43;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:161:12
+      _respData_0_T_16 = io_cmd_0_payload_reg0Addr == 10'h45;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:161:53
       rejected =
-        _respData_0_T_12 | _respData_0_T_13 | _respData_0_T_15 | _respData_0_T_16
-        | inFlight & (_writeTargets_T | _trigger0_T & (|io_cmd_0_payload_data0)) | write2
-        & (io_cmd_0_payload_reg1Addr == 6'h1E | io_cmd_0_payload_reg1Addr == 6'h30
-           | io_cmd_0_payload_reg1Addr == 6'h32 | io_cmd_0_payload_reg1Addr == 6'h34
-           | inFlight & (_writeTargets_T_11 | _trigger1_T & (|io_cmd_0_payload_data1)));	// src/workerbee/scala/main/WorkerBeeRegIf.scala:45:25, :134:{25,55,63,93}, :135:{12,45,53}, :136:{26,56}, :137:{13,42,50}, :138:{14,27}, :162:25, :164:57, :165:15
-      _respErr_0_T_1 = io_cmd_0_payload_op == 2'h0 | write2;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:161:25, :162:25, :166:52
-      acceptedWrites_0 = _acceptedWrites_0_T & _respErr_0_T_1 & ~rejected;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:134:{55,93}, :135:45, :138:14, :164:57, :166:{41,52,63,66}
-      _GEN_6 = {16'h0, regFile_m};	// <stdin>:27288:38, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :105:39
-      _GEN_7 = {21'h0, irqRaw};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:49:23, :125:44
-      _GEN_8 = {21'h0, irqMask};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :125:44, :126:45
-      _GEN_9 = {21'h0, irqMasked};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:52:26, :125:44, :127:47
-      _GEN_10 = {28'h0, errorCode};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:51:26, :128:50
-      read_1 = io_cmd_1_payload_op == 2'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:163:23
-      _respData_1_T_12 = io_cmd_1_payload_reg0Addr == 6'h1E;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:25
-      _respData_1_T_13 = io_cmd_1_payload_reg0Addr == 6'h30;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:63
-      _respData_1_T_15 = io_cmd_1_payload_reg0Addr == 6'h32;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:135:12
-      _respData_1_T_16 = io_cmd_1_payload_reg0Addr == 6'h34;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:135:53
+        _respData_0_T_12 | _respData_0_T_13 | _respData_0_T_15 | _respData_0_T_16 | write2
+        & (io_cmd_0_payload_reg1Addr == 10'h40 | io_cmd_0_payload_reg1Addr == 10'h41
+           | io_cmd_0_payload_reg1Addr == 10'h43 | io_cmd_0_payload_reg1Addr == 10'h45);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:{10,40,48,78}, :161:{12,45,53}, :198:25, :201:{46,57}
+      _respErr_0_T = io_cmd_0_payload_op == 2'h0 | write2;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:197:25, :198:25, :202:52
+      acceptedWrites_0 = _acceptedRuns_0_T & _respErr_0_T & ~rejected;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:160:{40,78}, :161:45, :201:46, :202:{41,52,63,66}
+      acceptedRuns_0 = _acceptedRuns_0_T & (&io_cmd_0_payload_op);	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:173:45, :203:39
+      _GEN_6 = {16'h0, shadowReg_m};	// <stdin>:20888:40, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :130:39
+      _GEN_7 = {21'h0, irqRaw};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:72:23, :150:44
+      _GEN_8 = {21'h0, irqMask};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :150:44, :151:45
+      _GEN_9 = {21'h0, irqMasked};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:75:26, :150:44, :152:47
+      _GEN_10 = {28'h0, errorCode};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:74:26, :153:50
+      read_1 = io_cmd_1_payload_op == 2'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:199:23
+      _respData_1_T_12 = io_cmd_1_payload_reg0Addr == 10'h40;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:10
+      _respData_1_T_13 = io_cmd_1_payload_reg0Addr == 10'h41;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:48
+      _respData_1_T_15 = io_cmd_1_payload_reg0Addr == 10'h43;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:161:12
+      _respData_1_T_16 = io_cmd_1_payload_reg0Addr == 10'h45;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:161:53
       rejected_1 =
         _respData_1_T_12 | _respData_1_T_13 | _respData_1_T_15 | _respData_1_T_16
-        | inFlight & (_writeTargets_T_20 | _trigger0_T_2 & (|io_cmd_1_payload_data0))
         | write2_1
-        & (io_cmd_1_payload_reg1Addr == 6'h1E | io_cmd_1_payload_reg1Addr == 6'h30
-           | io_cmd_1_payload_reg1Addr == 6'h32 | io_cmd_1_payload_reg1Addr == 6'h34
-           | inFlight & (_writeTargets_T_31 | _trigger1_T_3 & (|io_cmd_1_payload_data1)));	// src/workerbee/scala/main/WorkerBeeRegIf.scala:45:25, :134:{25,55,63,93}, :135:{12,45,53}, :136:{26,56}, :137:{13,42,50}, :138:{14,27}, :162:25, :164:57, :165:15
-      _respErr_1_T_1 = io_cmd_1_payload_op == 2'h0 | write2_1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:161:25, :162:25, :166:52
-      acceptedWrites_1 = _acceptedWrites_1_T & _respErr_1_T_1 & ~rejected_1;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:134:{55,93}, :135:45, :138:14, :164:57, :166:{41,52,63,66}
-      read_2 = io_cmd_2_payload_op == 2'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:163:23
-      _respData_2_T_12 = io_cmd_2_payload_reg0Addr == 6'h1E;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:25
-      _respData_2_T_13 = io_cmd_2_payload_reg0Addr == 6'h30;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:63
-      _respData_2_T_15 = io_cmd_2_payload_reg0Addr == 6'h32;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:135:12
-      _respData_2_T_16 = io_cmd_2_payload_reg0Addr == 6'h34;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:135:53
+        & (io_cmd_1_payload_reg1Addr == 10'h40 | io_cmd_1_payload_reg1Addr == 10'h41
+           | io_cmd_1_payload_reg1Addr == 10'h43 | io_cmd_1_payload_reg1Addr == 10'h45);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:{10,40,48,78}, :161:{12,45,53}, :198:25, :201:{46,57}
+      _respErr_1_T = io_cmd_1_payload_op == 2'h0 | write2_1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:197:25, :198:25, :202:52
+      acceptedWrites_1 = _acceptedRuns_1_T & _respErr_1_T & ~rejected_1;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:160:{40,78}, :161:45, :201:46, :202:{41,52,63,66}
+      acceptedRuns_1 = _acceptedRuns_1_T & (&io_cmd_1_payload_op);	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:173:45, :203:39
+      read_2 = io_cmd_2_payload_op == 2'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:199:23
+      _respData_2_T_12 = io_cmd_2_payload_reg0Addr == 10'h40;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:10
+      _respData_2_T_13 = io_cmd_2_payload_reg0Addr == 10'h41;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:48
+      _respData_2_T_15 = io_cmd_2_payload_reg0Addr == 10'h43;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:161:12
+      _respData_2_T_16 = io_cmd_2_payload_reg0Addr == 10'h45;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:161:53
       rejected_2 =
         _respData_2_T_12 | _respData_2_T_13 | _respData_2_T_15 | _respData_2_T_16
-        | inFlight & (_writeTargets_T_40 | _trigger0_T_4 & (|io_cmd_2_payload_data0))
         | write2_2
-        & (io_cmd_2_payload_reg1Addr == 6'h1E | io_cmd_2_payload_reg1Addr == 6'h30
-           | io_cmd_2_payload_reg1Addr == 6'h32 | io_cmd_2_payload_reg1Addr == 6'h34
-           | inFlight & (_writeTargets_T_51 | _trigger1_T_6 & (|io_cmd_2_payload_data1)));	// src/workerbee/scala/main/WorkerBeeRegIf.scala:45:25, :134:{25,55,63,93}, :135:{12,45,53}, :136:{26,56}, :137:{13,42,50}, :138:{14,27}, :162:25, :164:57, :165:15
-      _respErr_2_T_1 = io_cmd_2_payload_op == 2'h0 | write2_2;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:161:25, :162:25, :166:52
-      acceptedWrites_2 = _acceptedWrites_2_T & _respErr_2_T_1 & ~rejected_2;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:134:{55,93}, :135:45, :138:14, :164:57, :166:{41,52,63,66}
-      write2_3 = io_cmd_3_payload_op == 2'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:162:25
-      read_3 = io_cmd_3_payload_op == 2'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:163:23
-      _respData_3_T_12 = io_cmd_3_payload_reg0Addr == 6'h1E;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:25
-      _respData_3_T_13 = io_cmd_3_payload_reg0Addr == 6'h30;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:63
-      _respData_3_T_15 = io_cmd_3_payload_reg0Addr == 6'h32;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:135:12
-      _respData_3_T_16 = io_cmd_3_payload_reg0Addr == 6'h34;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:135:53
+        & (io_cmd_2_payload_reg1Addr == 10'h40 | io_cmd_2_payload_reg1Addr == 10'h41
+           | io_cmd_2_payload_reg1Addr == 10'h43 | io_cmd_2_payload_reg1Addr == 10'h45);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:{10,40,48,78}, :161:{12,45,53}, :198:25, :201:{46,57}
+      _respErr_2_T = io_cmd_2_payload_op == 2'h0 | write2_2;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:197:25, :198:25, :202:52
+      acceptedWrites_2 = _acceptedRuns_2_T & _respErr_2_T & ~rejected_2;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:160:{40,78}, :161:45, :201:46, :202:{41,52,63,66}
+      acceptedRuns_2 = _acceptedRuns_2_T & (&io_cmd_2_payload_op);	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:173:45, :203:39
+      write2_3 = io_cmd_3_payload_op == 2'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:198:25
+      read_3 = io_cmd_3_payload_op == 2'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:199:23
+      _respData_3_T_12 = io_cmd_3_payload_reg0Addr == 10'h40;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:10
+      _respData_3_T_13 = io_cmd_3_payload_reg0Addr == 10'h41;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:48
+      _respData_3_T_15 = io_cmd_3_payload_reg0Addr == 10'h43;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:161:12
+      _respData_3_T_16 = io_cmd_3_payload_reg0Addr == 10'h45;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:161:53
       rejected_3 =
         _respData_3_T_12 | _respData_3_T_13 | _respData_3_T_15 | _respData_3_T_16
-        | inFlight & (_writeTargets_T_60 | _trigger0_T_6 & (|io_cmd_3_payload_data0))
         | write2_3
-        & (io_cmd_3_payload_reg1Addr == 6'h1E | io_cmd_3_payload_reg1Addr == 6'h30
-           | io_cmd_3_payload_reg1Addr == 6'h32 | io_cmd_3_payload_reg1Addr == 6'h34
-           | inFlight & (_writeTargets_T_71 | _trigger1_T_9 & (|io_cmd_3_payload_data1)));	// src/workerbee/scala/main/WorkerBeeRegIf.scala:45:25, :134:{25,55,63,93}, :135:{12,45,53}, :136:{26,56}, :137:{13,42,50}, :138:{14,27}, :162:25, :164:57, :165:15
-      _respErr_3_T_1 = io_cmd_3_payload_op == 2'h0 | write2_3;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:161:25, :162:25, :166:52
-      acceptedWrites_3 = _acceptedWrites_3_T & _respErr_3_T_1 & ~rejected_3;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:134:{55,93}, :135:45, :138:14, :164:57, :166:{41,52,63,66}
+        & (io_cmd_3_payload_reg1Addr == 10'h40 | io_cmd_3_payload_reg1Addr == 10'h41
+           | io_cmd_3_payload_reg1Addr == 10'h43 | io_cmd_3_payload_reg1Addr == 10'h45);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:{10,40,48,78}, :161:{12,45,53}, :198:25, :201:{46,57}
+      _respErr_3_T = io_cmd_3_payload_op == 2'h0 | write2_3;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:197:25, :198:25, :202:52
+      acceptedWrites_3 = _acceptedRuns_3_T & _respErr_3_T & ~rejected_3;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:160:{40,78}, :161:45, :201:46, :202:{41,52,63,66}
       writeTargets_0_0_1 =
         acceptedWrites_0
-        & (_writeTargets_T | _writeTargets_T_1 | clear0 | _trigger0_T
-           & (|io_cmd_0_payload_data0));	// src/workerbee/scala/main/WorkerBeeRegIf.scala:136:26, :137:{13,50}, :166:{41,63}, :176:{40,48,79}, :177:{12,44,82}, :183:29
+        & (io_cmd_0_payload_reg0Addr < 10'hC | _writeTargets_T_1 | clear0);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}, :213:{10,40,48,79}, :214:12, :219:29
       writeTargets_0_1_1 =
         acceptedWrites_0 & write2
-        & (_writeTargets_T_11 | _writeTargets_T_12 | _clear1_T | _trigger1_T
-           & (|io_cmd_0_payload_data1));	// src/workerbee/scala/main/WorkerBeeRegIf.scala:136:26, :137:{13,50}, :162:25, :166:{41,63}, :176:{40,48,79}, :177:{12,44,82}, :184:{29,66}
+        & (io_cmd_0_payload_reg1Addr < 10'hC | _writeTargets_T_8 | _clear1_T);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:198:25, :202:{41,63}, :213:{10,40,48,79}, :214:12, :220:{29,66}
       writeTargets_1_0_1 =
         acceptedWrites_1
-        & (_writeTargets_T_20 | _writeTargets_T_21 | clear0_1 | _trigger0_T_2
-           & (|io_cmd_1_payload_data0));	// src/workerbee/scala/main/WorkerBeeRegIf.scala:136:26, :137:{13,50}, :166:{41,63}, :176:{40,48,79}, :177:{12,44,82}, :183:29
+        & (io_cmd_1_payload_reg0Addr < 10'hC | _writeTargets_T_13 | clear0_1);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}, :213:{10,40,48,79}, :214:12, :219:29
       writeTargets_1_1_1 =
         acceptedWrites_1 & write2_1
-        & (_writeTargets_T_31 | _writeTargets_T_32 | _clear1_T_1 | _trigger1_T_3
-           & (|io_cmd_1_payload_data1));	// src/workerbee/scala/main/WorkerBeeRegIf.scala:136:26, :137:{13,50}, :162:25, :166:{41,63}, :176:{40,48,79}, :177:{12,44,82}, :184:{29,66}
+        & (io_cmd_1_payload_reg1Addr < 10'hC | _writeTargets_T_20 | _clear1_T_1);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:198:25, :202:{41,63}, :213:{10,40,48,79}, :214:12, :220:{29,66}
       writeTargets_2_0_1 =
         acceptedWrites_2
-        & (_writeTargets_T_40 | _writeTargets_T_41 | clear0_2 | _trigger0_T_4
-           & (|io_cmd_2_payload_data0));	// src/workerbee/scala/main/WorkerBeeRegIf.scala:136:26, :137:{13,50}, :166:{41,63}, :176:{40,48,79}, :177:{12,44,82}, :183:29
+        & (io_cmd_2_payload_reg0Addr < 10'hC | _writeTargets_T_25 | clear0_2);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}, :213:{10,40,48,79}, :214:12, :219:29
       writeTargets_2_1_1 =
         acceptedWrites_2 & write2_2
-        & (_writeTargets_T_51 | _writeTargets_T_52 | _clear1_T_2 | _trigger1_T_6
-           & (|io_cmd_2_payload_data1));	// src/workerbee/scala/main/WorkerBeeRegIf.scala:136:26, :137:{13,50}, :162:25, :166:{41,63}, :176:{40,48,79}, :177:{12,44,82}, :184:{29,66}
-      _writeTargets_T_61 = io_cmd_3_payload_reg0Addr == 6'h31;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18, :176:48
+        & (io_cmd_2_payload_reg1Addr < 10'hC | _writeTargets_T_32 | _clear1_T_2);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:198:25, :202:{41,63}, :213:{10,40,48,79}, :214:12, :220:{29,66}
+      _writeTargets_T_37 = io_cmd_3_payload_reg0Addr == 10'h42;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18, :213:48
       writeTargets_3_0_1 =
         acceptedWrites_3
-        & (_writeTargets_T_60 | _writeTargets_T_61 | clear0_3 | _trigger0_T_6
-           & (|io_cmd_3_payload_data0));	// src/workerbee/scala/main/WorkerBeeRegIf.scala:136:26, :137:{13,50}, :166:{41,63}, :176:{40,48,79}, :177:{12,44,82}, :183:29
-      _writeTargets_T_72 = io_cmd_3_payload_reg1Addr == 6'h31;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18, :176:48
+        & (io_cmd_3_payload_reg0Addr < 10'hC | _writeTargets_T_37 | clear0_3);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}, :213:{10,40,48,79}, :214:12, :219:29
+      _writeTargets_T_44 = io_cmd_3_payload_reg1Addr == 10'h42;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18, :213:48
       writeTargets_3_1_1 =
         acceptedWrites_3 & write2_3
-        & (_writeTargets_T_71 | _writeTargets_T_72 | _clear1_T_3 | _trigger1_T_9
-           & (|io_cmd_3_payload_data1));	// src/workerbee/scala/main/WorkerBeeRegIf.scala:136:26, :137:{13,50}, :162:25, :166:{41,63}, :176:{40,48,79}, :177:{12,44,82}, :184:{29,66}
-      _GEN_12 = (|io_cmd_0_payload_reg0Addr) & _GEN_11;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18, :104:18
-      _GEN_14 = ~(|io_cmd_0_payload_reg0Addr) | _GEN_11 | ~_GEN_13;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18, :104:18
-      _GEN_16 = ~(|io_cmd_0_payload_reg0Addr) | _GEN_11 | _GEN_13 | ~_GEN_15;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18, :104:18
-      _GEN_18 = ~(|io_cmd_0_payload_reg0Addr) | _GEN_11 | _GEN_13 | _GEN_15 | ~_GEN_17;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18, :104:18
+        & (io_cmd_3_payload_reg1Addr < 10'hC | _writeTargets_T_44 | _clear1_T_3);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:198:25, :202:{41,63}, :213:{10,40,48,79}, :214:12, :220:{29,66}
+      _GEN_12 = (|io_cmd_0_payload_reg0Addr) & _GEN_11;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18, :129:18
+      _GEN_14 = ~(|io_cmd_0_payload_reg0Addr) | _GEN_11 | ~_GEN_13;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18, :129:18
+      _GEN_16 = ~(|io_cmd_0_payload_reg0Addr) | _GEN_11 | _GEN_13 | ~_GEN_15;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18, :129:18
+      _GEN_18 = ~(|io_cmd_0_payload_reg0Addr) | _GEN_11 | _GEN_13 | _GEN_15 | ~_GEN_17;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18, :129:18
       _GEN_20 =
-        ~(|io_cmd_0_payload_reg0Addr) | _GEN_11 | _GEN_13 | _GEN_15 | _GEN_17 | ~_GEN_19;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18, :104:18
+        ~(|io_cmd_0_payload_reg0Addr) | _GEN_11 | _GEN_13 | _GEN_15 | _GEN_17 | ~_GEN_19;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18, :129:18
       _GEN_22 =
         ~(|io_cmd_0_payload_reg0Addr) | _GEN_11 | _GEN_13 | _GEN_15 | _GEN_17 | _GEN_19
-        | ~_GEN_21;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18, :104:18
+        | ~_GEN_21;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18, :129:18
       _GEN_24 =
         ~(|io_cmd_0_payload_reg0Addr) | _GEN_11 | _GEN_13 | _GEN_15 | _GEN_17 | _GEN_19
-        | _GEN_21 | ~_GEN_23;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18, :104:18
+        | _GEN_21 | ~_GEN_23;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18, :129:18
       _GEN_26 =
         ~(|io_cmd_0_payload_reg0Addr) | _GEN_11 | _GEN_13 | _GEN_15 | _GEN_17 | _GEN_19
-        | _GEN_21 | _GEN_23 | ~_GEN_25;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18, :104:18
+        | _GEN_21 | _GEN_23 | ~_GEN_25;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18, :129:18
       _GEN_28 =
         ~(|io_cmd_0_payload_reg0Addr) | _GEN_11 | _GEN_13 | _GEN_15 | _GEN_17 | _GEN_19
-        | _GEN_21 | _GEN_23 | _GEN_25 | ~_GEN_27;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18, :104:18
+        | _GEN_21 | _GEN_23 | _GEN_25 | ~_GEN_27;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18, :129:18
       _GEN_30 =
         ~(|io_cmd_0_payload_reg0Addr) | _GEN_11 | _GEN_13 | _GEN_15 | _GEN_17 | _GEN_19
-        | _GEN_21 | _GEN_23 | _GEN_25 | _GEN_27 | ~_GEN_29;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18, :104:18
+        | _GEN_21 | _GEN_23 | _GEN_25 | _GEN_27 | ~_GEN_29;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18, :129:18
       _GEN_32 =
         ~(|io_cmd_0_payload_reg0Addr) | _GEN_11 | _GEN_13 | _GEN_15 | _GEN_17 | _GEN_19
-        | _GEN_21 | _GEN_23 | _GEN_25 | _GEN_27 | _GEN_29 | ~_GEN_31;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18, :104:18
+        | _GEN_21 | _GEN_23 | _GEN_25 | _GEN_27 | _GEN_29 | ~_GEN_31;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18, :129:18
       _GEN_33 =
         ~(|io_cmd_0_payload_reg0Addr) | _GEN_11 | _GEN_13 | _GEN_15 | _GEN_17 | _GEN_19
-        | _GEN_21 | _GEN_23 | _GEN_25 | _GEN_27 | _GEN_29 | _GEN_31 | ~_writeTargets_T_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18, :104:18, :176:48
-      _GEN_35 = write2 & _GEN_34;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :162:25, :201:20
-      _GEN_37 = ~write2 | _GEN_34 | ~_GEN_36;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_39 = ~write2 | _GEN_34 | _GEN_36 | ~_GEN_38;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_41 = ~write2 | _GEN_34 | _GEN_36 | _GEN_38 | ~_GEN_40;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_43 = ~write2 | _GEN_34 | _GEN_36 | _GEN_38 | _GEN_40 | ~_GEN_42;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_45 = ~write2 | _GEN_34 | _GEN_36 | _GEN_38 | _GEN_40 | _GEN_42 | ~_GEN_44;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
+        | _GEN_21 | _GEN_23 | _GEN_25 | _GEN_27 | _GEN_29 | _GEN_31 | ~_writeTargets_T_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18, :129:18, :213:48
+      _GEN_35 = write2 & _GEN_34;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :198:25, :237:20
+      _GEN_37 = ~write2 | _GEN_34 | ~_GEN_36;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_39 = ~write2 | _GEN_34 | _GEN_36 | ~_GEN_38;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_41 = ~write2 | _GEN_34 | _GEN_36 | _GEN_38 | ~_GEN_40;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_43 = ~write2 | _GEN_34 | _GEN_36 | _GEN_38 | _GEN_40 | ~_GEN_42;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_45 = ~write2 | _GEN_34 | _GEN_36 | _GEN_38 | _GEN_40 | _GEN_42 | ~_GEN_44;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
       _GEN_47 =
-        ~write2 | _GEN_34 | _GEN_36 | _GEN_38 | _GEN_40 | _GEN_42 | _GEN_44 | ~_GEN_46;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
+        ~write2 | _GEN_34 | _GEN_36 | _GEN_38 | _GEN_40 | _GEN_42 | _GEN_44 | ~_GEN_46;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
       _GEN_49 =
         ~write2 | _GEN_34 | _GEN_36 | _GEN_38 | _GEN_40 | _GEN_42 | _GEN_44 | _GEN_46
-        | ~_GEN_48;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
+        | ~_GEN_48;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
       _GEN_51 =
         ~write2 | _GEN_34 | _GEN_36 | _GEN_38 | _GEN_40 | _GEN_42 | _GEN_44 | _GEN_46
-        | _GEN_48 | ~_GEN_50;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
+        | _GEN_48 | ~_GEN_50;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
       _GEN_53 =
         ~write2 | _GEN_34 | _GEN_36 | _GEN_38 | _GEN_40 | _GEN_42 | _GEN_44 | _GEN_46
-        | _GEN_48 | _GEN_50 | ~_GEN_52;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
+        | _GEN_48 | _GEN_50 | ~_GEN_52;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
       _GEN_55 =
         ~write2 | _GEN_34 | _GEN_36 | _GEN_38 | _GEN_40 | _GEN_42 | _GEN_44 | _GEN_46
-        | _GEN_48 | _GEN_50 | _GEN_52 | ~_GEN_54;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
+        | _GEN_48 | _GEN_50 | _GEN_52 | ~_GEN_54;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
       _GEN_57 =
         ~write2 | _GEN_34 | _GEN_36 | _GEN_38 | _GEN_40 | _GEN_42 | _GEN_44 | _GEN_46
-        | _GEN_48 | _GEN_50 | _GEN_52 | _GEN_54 | ~_GEN_56;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
+        | _GEN_48 | _GEN_50 | _GEN_52 | _GEN_54 | ~_GEN_56;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
       _GEN_58 =
         ~write2 | _GEN_34 | _GEN_36 | _GEN_38 | _GEN_40 | _GEN_42 | _GEN_44 | _GEN_46
-        | _GEN_48 | _GEN_50 | _GEN_52 | _GEN_54 | _GEN_56 | ~_writeTargets_T_12;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :176:48, :201:20
-      _GEN_60 = acceptedWrites_0 & _GEN_59;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:60:16, :166:{41,63}, :199:32, :210:{21,34}
-      _GEN_61 = acceptedWrites_0 & _GEN_59;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:24, :166:{41,63}, :199:32, :210:{21,34}, :212:17
-      _GEN_63 = (|io_cmd_1_payload_reg0Addr) & _GEN_62;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-      _GEN_65 = ~(|io_cmd_1_payload_reg0Addr) | _GEN_62 | ~_GEN_64;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-      _GEN_67 = ~(|io_cmd_1_payload_reg0Addr) | _GEN_62 | _GEN_64 | ~_GEN_66;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-      _GEN_69 = ~(|io_cmd_1_payload_reg0Addr) | _GEN_62 | _GEN_64 | _GEN_66 | ~_GEN_68;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-      _GEN_71 =
-        ~(|io_cmd_1_payload_reg0Addr) | _GEN_62 | _GEN_64 | _GEN_66 | _GEN_68 | ~_GEN_70;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-      _GEN_73 =
-        ~(|io_cmd_1_payload_reg0Addr) | _GEN_62 | _GEN_64 | _GEN_66 | _GEN_68 | _GEN_70
-        | ~_GEN_72;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-      _GEN_75 =
-        ~(|io_cmd_1_payload_reg0Addr) | _GEN_62 | _GEN_64 | _GEN_66 | _GEN_68 | _GEN_70
-        | _GEN_72 | ~_GEN_74;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-      _GEN_77 =
-        ~(|io_cmd_1_payload_reg0Addr) | _GEN_62 | _GEN_64 | _GEN_66 | _GEN_68 | _GEN_70
-        | _GEN_72 | _GEN_74 | ~_GEN_76;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-      _GEN_79 =
-        ~(|io_cmd_1_payload_reg0Addr) | _GEN_62 | _GEN_64 | _GEN_66 | _GEN_68 | _GEN_70
-        | _GEN_72 | _GEN_74 | _GEN_76 | ~_GEN_78;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
+        | _GEN_48 | _GEN_50 | _GEN_52 | _GEN_54 | _GEN_56 | ~_writeTargets_T_8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :213:48, :237:20
+      _GEN_60 = (|io_cmd_1_payload_reg0Addr) & _GEN_59;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+      _GEN_62 = ~(|io_cmd_1_payload_reg0Addr) | _GEN_59 | ~_GEN_61;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+      _GEN_64 = ~(|io_cmd_1_payload_reg0Addr) | _GEN_59 | _GEN_61 | ~_GEN_63;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+      _GEN_66 = ~(|io_cmd_1_payload_reg0Addr) | _GEN_59 | _GEN_61 | _GEN_63 | ~_GEN_65;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+      _GEN_68 =
+        ~(|io_cmd_1_payload_reg0Addr) | _GEN_59 | _GEN_61 | _GEN_63 | _GEN_65 | ~_GEN_67;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+      _GEN_70 =
+        ~(|io_cmd_1_payload_reg0Addr) | _GEN_59 | _GEN_61 | _GEN_63 | _GEN_65 | _GEN_67
+        | ~_GEN_69;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+      _GEN_72 =
+        ~(|io_cmd_1_payload_reg0Addr) | _GEN_59 | _GEN_61 | _GEN_63 | _GEN_65 | _GEN_67
+        | _GEN_69 | ~_GEN_71;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+      _GEN_74 =
+        ~(|io_cmd_1_payload_reg0Addr) | _GEN_59 | _GEN_61 | _GEN_63 | _GEN_65 | _GEN_67
+        | _GEN_69 | _GEN_71 | ~_GEN_73;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+      _GEN_76 =
+        ~(|io_cmd_1_payload_reg0Addr) | _GEN_59 | _GEN_61 | _GEN_63 | _GEN_65 | _GEN_67
+        | _GEN_69 | _GEN_71 | _GEN_73 | ~_GEN_75;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+      _GEN_78 =
+        ~(|io_cmd_1_payload_reg0Addr) | _GEN_59 | _GEN_61 | _GEN_63 | _GEN_65 | _GEN_67
+        | _GEN_69 | _GEN_71 | _GEN_73 | _GEN_75 | ~_GEN_77;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+      _GEN_80 =
+        ~(|io_cmd_1_payload_reg0Addr) | _GEN_59 | _GEN_61 | _GEN_63 | _GEN_65 | _GEN_67
+        | _GEN_69 | _GEN_71 | _GEN_73 | _GEN_75 | _GEN_77 | ~_GEN_79;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
       _GEN_81 =
-        ~(|io_cmd_1_payload_reg0Addr) | _GEN_62 | _GEN_64 | _GEN_66 | _GEN_68 | _GEN_70
-        | _GEN_72 | _GEN_74 | _GEN_76 | _GEN_78 | ~_GEN_80;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-      _GEN_83 =
-        ~(|io_cmd_1_payload_reg0Addr) | _GEN_62 | _GEN_64 | _GEN_66 | _GEN_68 | _GEN_70
-        | _GEN_72 | _GEN_74 | _GEN_76 | _GEN_78 | _GEN_80 | ~_GEN_82;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-      _GEN_84 =
-        ~(|io_cmd_1_payload_reg0Addr) | _GEN_62 | _GEN_64 | _GEN_66 | _GEN_68 | _GEN_70
-        | _GEN_72 | _GEN_74 | _GEN_76 | _GEN_78 | _GEN_80 | _GEN_82 | ~_writeTargets_T_21;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :176:48, :199:32
-      _GEN_86 = write2_1 & _GEN_85;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :162:25, :201:20
-      _GEN_88 = ~write2_1 | _GEN_85 | ~_GEN_87;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_90 = ~write2_1 | _GEN_85 | _GEN_87 | ~_GEN_89;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_92 = ~write2_1 | _GEN_85 | _GEN_87 | _GEN_89 | ~_GEN_91;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_94 = ~write2_1 | _GEN_85 | _GEN_87 | _GEN_89 | _GEN_91 | ~_GEN_93;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_96 = ~write2_1 | _GEN_85 | _GEN_87 | _GEN_89 | _GEN_91 | _GEN_93 | ~_GEN_95;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_98 =
-        ~write2_1 | _GEN_85 | _GEN_87 | _GEN_89 | _GEN_91 | _GEN_93 | _GEN_95 | ~_GEN_97;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_100 =
-        ~write2_1 | _GEN_85 | _GEN_87 | _GEN_89 | _GEN_91 | _GEN_93 | _GEN_95 | _GEN_97
-        | ~_GEN_99;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_102 =
-        ~write2_1 | _GEN_85 | _GEN_87 | _GEN_89 | _GEN_91 | _GEN_93 | _GEN_95 | _GEN_97
-        | _GEN_99 | ~_GEN_101;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_104 =
-        ~write2_1 | _GEN_85 | _GEN_87 | _GEN_89 | _GEN_91 | _GEN_93 | _GEN_95 | _GEN_97
-        | _GEN_99 | _GEN_101 | ~_GEN_103;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
+        ~(|io_cmd_1_payload_reg0Addr) | _GEN_59 | _GEN_61 | _GEN_63 | _GEN_65 | _GEN_67
+        | _GEN_69 | _GEN_71 | _GEN_73 | _GEN_75 | _GEN_77 | _GEN_79 | ~_writeTargets_T_13;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :213:48, :235:32
+      _GEN_83 = write2_1 & _GEN_82;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :198:25, :237:20
+      _GEN_85 = ~write2_1 | _GEN_82 | ~_GEN_84;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_87 = ~write2_1 | _GEN_82 | _GEN_84 | ~_GEN_86;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_89 = ~write2_1 | _GEN_82 | _GEN_84 | _GEN_86 | ~_GEN_88;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_91 = ~write2_1 | _GEN_82 | _GEN_84 | _GEN_86 | _GEN_88 | ~_GEN_90;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_93 = ~write2_1 | _GEN_82 | _GEN_84 | _GEN_86 | _GEN_88 | _GEN_90 | ~_GEN_92;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_95 =
+        ~write2_1 | _GEN_82 | _GEN_84 | _GEN_86 | _GEN_88 | _GEN_90 | _GEN_92 | ~_GEN_94;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_97 =
+        ~write2_1 | _GEN_82 | _GEN_84 | _GEN_86 | _GEN_88 | _GEN_90 | _GEN_92 | _GEN_94
+        | ~_GEN_96;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_99 =
+        ~write2_1 | _GEN_82 | _GEN_84 | _GEN_86 | _GEN_88 | _GEN_90 | _GEN_92 | _GEN_94
+        | _GEN_96 | ~_GEN_98;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_101 =
+        ~write2_1 | _GEN_82 | _GEN_84 | _GEN_86 | _GEN_88 | _GEN_90 | _GEN_92 | _GEN_94
+        | _GEN_96 | _GEN_98 | ~_GEN_100;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_103 =
+        ~write2_1 | _GEN_82 | _GEN_84 | _GEN_86 | _GEN_88 | _GEN_90 | _GEN_92 | _GEN_94
+        | _GEN_96 | _GEN_98 | _GEN_100 | ~_GEN_102;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_105 =
+        ~write2_1 | _GEN_82 | _GEN_84 | _GEN_86 | _GEN_88 | _GEN_90 | _GEN_92 | _GEN_94
+        | _GEN_96 | _GEN_98 | _GEN_100 | _GEN_102 | ~_GEN_104;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
       _GEN_106 =
-        ~write2_1 | _GEN_85 | _GEN_87 | _GEN_89 | _GEN_91 | _GEN_93 | _GEN_95 | _GEN_97
-        | _GEN_99 | _GEN_101 | _GEN_103 | ~_GEN_105;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_108 =
-        ~write2_1 | _GEN_85 | _GEN_87 | _GEN_89 | _GEN_91 | _GEN_93 | _GEN_95 | _GEN_97
-        | _GEN_99 | _GEN_101 | _GEN_103 | _GEN_105 | ~_GEN_107;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_109 =
-        ~write2_1 | _GEN_85 | _GEN_87 | _GEN_89 | _GEN_91 | _GEN_93 | _GEN_95 | _GEN_97
-        | _GEN_99 | _GEN_101 | _GEN_103 | _GEN_105 | _GEN_107 | ~_writeTargets_T_32;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :176:48, :201:20
-      _GEN_111 = acceptedWrites_1 & _GEN_110;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}, :199:32, :210:{21,34}, :211:22
-      _GEN_112 = acceptedWrites_1 ? _GEN_110 | _GEN_61 | inFlight : _GEN_61 | inFlight;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:45:25, :47:24, :166:{41,63}, :199:32, :210:{21,34}, :212:17, :214:18
-      _GEN_114 = (|io_cmd_2_payload_reg0Addr) & _GEN_113;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-      _GEN_116 = ~(|io_cmd_2_payload_reg0Addr) | _GEN_113 | ~_GEN_115;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-      _GEN_118 = ~(|io_cmd_2_payload_reg0Addr) | _GEN_113 | _GEN_115 | ~_GEN_117;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
+        ~write2_1 | _GEN_82 | _GEN_84 | _GEN_86 | _GEN_88 | _GEN_90 | _GEN_92 | _GEN_94
+        | _GEN_96 | _GEN_98 | _GEN_100 | _GEN_102 | _GEN_104 | ~_writeTargets_T_20;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :213:48, :237:20
+      _GEN_108 = (|io_cmd_2_payload_reg0Addr) & _GEN_107;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+      _GEN_110 = ~(|io_cmd_2_payload_reg0Addr) | _GEN_107 | ~_GEN_109;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+      _GEN_112 = ~(|io_cmd_2_payload_reg0Addr) | _GEN_107 | _GEN_109 | ~_GEN_111;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+      _GEN_114 =
+        ~(|io_cmd_2_payload_reg0Addr) | _GEN_107 | _GEN_109 | _GEN_111 | ~_GEN_113;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+      _GEN_116 =
+        ~(|io_cmd_2_payload_reg0Addr) | _GEN_107 | _GEN_109 | _GEN_111 | _GEN_113
+        | ~_GEN_115;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+      _GEN_118 =
+        ~(|io_cmd_2_payload_reg0Addr) | _GEN_107 | _GEN_109 | _GEN_111 | _GEN_113
+        | _GEN_115 | ~_GEN_117;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
       _GEN_120 =
-        ~(|io_cmd_2_payload_reg0Addr) | _GEN_113 | _GEN_115 | _GEN_117 | ~_GEN_119;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
+        ~(|io_cmd_2_payload_reg0Addr) | _GEN_107 | _GEN_109 | _GEN_111 | _GEN_113
+        | _GEN_115 | _GEN_117 | ~_GEN_119;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
       _GEN_122 =
-        ~(|io_cmd_2_payload_reg0Addr) | _GEN_113 | _GEN_115 | _GEN_117 | _GEN_119
-        | ~_GEN_121;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
+        ~(|io_cmd_2_payload_reg0Addr) | _GEN_107 | _GEN_109 | _GEN_111 | _GEN_113
+        | _GEN_115 | _GEN_117 | _GEN_119 | ~_GEN_121;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
       _GEN_124 =
-        ~(|io_cmd_2_payload_reg0Addr) | _GEN_113 | _GEN_115 | _GEN_117 | _GEN_119
-        | _GEN_121 | ~_GEN_123;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
+        ~(|io_cmd_2_payload_reg0Addr) | _GEN_107 | _GEN_109 | _GEN_111 | _GEN_113
+        | _GEN_115 | _GEN_117 | _GEN_119 | _GEN_121 | ~_GEN_123;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
       _GEN_126 =
-        ~(|io_cmd_2_payload_reg0Addr) | _GEN_113 | _GEN_115 | _GEN_117 | _GEN_119
-        | _GEN_121 | _GEN_123 | ~_GEN_125;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
+        ~(|io_cmd_2_payload_reg0Addr) | _GEN_107 | _GEN_109 | _GEN_111 | _GEN_113
+        | _GEN_115 | _GEN_117 | _GEN_119 | _GEN_121 | _GEN_123 | ~_GEN_125;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
       _GEN_128 =
-        ~(|io_cmd_2_payload_reg0Addr) | _GEN_113 | _GEN_115 | _GEN_117 | _GEN_119
-        | _GEN_121 | _GEN_123 | _GEN_125 | ~_GEN_127;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-      _GEN_130 =
-        ~(|io_cmd_2_payload_reg0Addr) | _GEN_113 | _GEN_115 | _GEN_117 | _GEN_119
-        | _GEN_121 | _GEN_123 | _GEN_125 | _GEN_127 | ~_GEN_129;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-      _GEN_132 =
-        ~(|io_cmd_2_payload_reg0Addr) | _GEN_113 | _GEN_115 | _GEN_117 | _GEN_119
-        | _GEN_121 | _GEN_123 | _GEN_125 | _GEN_127 | _GEN_129 | ~_GEN_131;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-      _GEN_134 =
-        ~(|io_cmd_2_payload_reg0Addr) | _GEN_113 | _GEN_115 | _GEN_117 | _GEN_119
-        | _GEN_121 | _GEN_123 | _GEN_125 | _GEN_127 | _GEN_129 | _GEN_131 | ~_GEN_133;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-      _GEN_135 =
-        ~(|io_cmd_2_payload_reg0Addr) | _GEN_113 | _GEN_115 | _GEN_117 | _GEN_119
-        | _GEN_121 | _GEN_123 | _GEN_125 | _GEN_127 | _GEN_129 | _GEN_131 | _GEN_133
-        | ~_writeTargets_T_41;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :176:48, :199:32
-      _GEN_137 = write2_2 & _GEN_136;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :162:25, :201:20
-      _GEN_139 = ~write2_2 | _GEN_136 | ~_GEN_138;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_141 = ~write2_2 | _GEN_136 | _GEN_138 | ~_GEN_140;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_143 = ~write2_2 | _GEN_136 | _GEN_138 | _GEN_140 | ~_GEN_142;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_145 = ~write2_2 | _GEN_136 | _GEN_138 | _GEN_140 | _GEN_142 | ~_GEN_144;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
+        ~(|io_cmd_2_payload_reg0Addr) | _GEN_107 | _GEN_109 | _GEN_111 | _GEN_113
+        | _GEN_115 | _GEN_117 | _GEN_119 | _GEN_121 | _GEN_123 | _GEN_125 | ~_GEN_127;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+      _GEN_129 =
+        ~(|io_cmd_2_payload_reg0Addr) | _GEN_107 | _GEN_109 | _GEN_111 | _GEN_113
+        | _GEN_115 | _GEN_117 | _GEN_119 | _GEN_121 | _GEN_123 | _GEN_125 | _GEN_127
+        | ~_writeTargets_T_25;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :213:48, :235:32
+      _GEN_131 = write2_2 & _GEN_130;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :198:25, :237:20
+      _GEN_133 = ~write2_2 | _GEN_130 | ~_GEN_132;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_135 = ~write2_2 | _GEN_130 | _GEN_132 | ~_GEN_134;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_137 = ~write2_2 | _GEN_130 | _GEN_132 | _GEN_134 | ~_GEN_136;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_139 = ~write2_2 | _GEN_130 | _GEN_132 | _GEN_134 | _GEN_136 | ~_GEN_138;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_141 =
+        ~write2_2 | _GEN_130 | _GEN_132 | _GEN_134 | _GEN_136 | _GEN_138 | ~_GEN_140;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_143 =
+        ~write2_2 | _GEN_130 | _GEN_132 | _GEN_134 | _GEN_136 | _GEN_138 | _GEN_140
+        | ~_GEN_142;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_145 =
+        ~write2_2 | _GEN_130 | _GEN_132 | _GEN_134 | _GEN_136 | _GEN_138 | _GEN_140
+        | _GEN_142 | ~_GEN_144;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
       _GEN_147 =
-        ~write2_2 | _GEN_136 | _GEN_138 | _GEN_140 | _GEN_142 | _GEN_144 | ~_GEN_146;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
+        ~write2_2 | _GEN_130 | _GEN_132 | _GEN_134 | _GEN_136 | _GEN_138 | _GEN_140
+        | _GEN_142 | _GEN_144 | ~_GEN_146;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
       _GEN_149 =
-        ~write2_2 | _GEN_136 | _GEN_138 | _GEN_140 | _GEN_142 | _GEN_144 | _GEN_146
-        | ~_GEN_148;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
+        ~write2_2 | _GEN_130 | _GEN_132 | _GEN_134 | _GEN_136 | _GEN_138 | _GEN_140
+        | _GEN_142 | _GEN_144 | _GEN_146 | ~_GEN_148;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
       _GEN_151 =
-        ~write2_2 | _GEN_136 | _GEN_138 | _GEN_140 | _GEN_142 | _GEN_144 | _GEN_146
-        | _GEN_148 | ~_GEN_150;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
+        ~write2_2 | _GEN_130 | _GEN_132 | _GEN_134 | _GEN_136 | _GEN_138 | _GEN_140
+        | _GEN_142 | _GEN_144 | _GEN_146 | _GEN_148 | ~_GEN_150;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
       _GEN_153 =
-        ~write2_2 | _GEN_136 | _GEN_138 | _GEN_140 | _GEN_142 | _GEN_144 | _GEN_146
-        | _GEN_148 | _GEN_150 | ~_GEN_152;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_155 =
-        ~write2_2 | _GEN_136 | _GEN_138 | _GEN_140 | _GEN_142 | _GEN_144 | _GEN_146
-        | _GEN_148 | _GEN_150 | _GEN_152 | ~_GEN_154;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_157 =
-        ~write2_2 | _GEN_136 | _GEN_138 | _GEN_140 | _GEN_142 | _GEN_144 | _GEN_146
-        | _GEN_148 | _GEN_150 | _GEN_152 | _GEN_154 | ~_GEN_156;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_159 =
-        ~write2_2 | _GEN_136 | _GEN_138 | _GEN_140 | _GEN_142 | _GEN_144 | _GEN_146
-        | _GEN_148 | _GEN_150 | _GEN_152 | _GEN_154 | _GEN_156 | ~_GEN_158;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-      _GEN_160 =
-        ~write2_2 | _GEN_136 | _GEN_138 | _GEN_140 | _GEN_142 | _GEN_144 | _GEN_146
-        | _GEN_148 | _GEN_150 | _GEN_152 | _GEN_154 | _GEN_156 | _GEN_158
-        | ~_writeTargets_T_52;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :176:48, :201:20
-      _GEN_162 = acceptedWrites_2 & _GEN_161;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}, :199:32, :210:{21,34}, :212:17
-      clear1_3 = write2_3 & _clear1_T_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:162:25, :177:12, :203:27
+        ~write2_2 | _GEN_130 | _GEN_132 | _GEN_134 | _GEN_136 | _GEN_138 | _GEN_140
+        | _GEN_142 | _GEN_144 | _GEN_146 | _GEN_148 | _GEN_150 | ~_GEN_152;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+      _GEN_154 =
+        ~write2_2 | _GEN_130 | _GEN_132 | _GEN_134 | _GEN_136 | _GEN_138 | _GEN_140
+        | _GEN_142 | _GEN_144 | _GEN_146 | _GEN_148 | _GEN_150 | _GEN_152
+        | ~_writeTargets_T_32;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :213:48, :237:20
+      clear1_3 = write2_3 & _clear1_T_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:198:25, :214:12, :239:27
       clearBits =
         acceptedWrites_3 & (clear0_3 | clear1_3)
           ? (clear0_3 ? io_cmd_3_payload_data0[10:0] : 11'h0)
@@ -789,2813 +813,2834 @@ module Wb_WorkerBeeRegIf(	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
                   : acceptedWrites_0 & (clear0 | clear1)
                       ? (clear0 ? io_cmd_0_payload_data0[10:0] : 11'h0)
                         | (clear1 ? io_cmd_0_payload_data1[10:0] : 11'h0)
-                      : 11'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:49:23, :166:{41,63}, :177:12, :195:30, :199:32, :203:27, :204:{19,30}, :205:{19,25,43,63}, :206:{14,32}
-      _GEN_163 =
-        _trigger0_T_6 & (|io_cmd_3_payload_data0) | write2_3 & _trigger1_T_9
-        & (|io_cmd_3_payload_data1);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:137:{13,50}, :162:25, :208:64, :209:{29,74}, :210:21
-      _GEN_164 = acceptedWrites_3 & _GEN_163;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}, :199:32, :210:{21,34}, :211:22
-      if (acceptedWrites_3) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-        automatic logic _GEN_165;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18
-        automatic logic _GEN_166;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18
-        automatic logic _GEN_167;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18
-        automatic logic _GEN_168;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18
-        automatic logic _GEN_169;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18
-        automatic logic _GEN_170;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-        automatic logic _GEN_171;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18
-        automatic logic _GEN_172;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18
-        automatic logic _GEN_173;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18
-        automatic logic _GEN_174;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18
-        automatic logic _GEN_175;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18
-        automatic logic _GEN_176;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18
-        automatic logic _GEN_177 = io_cmd_3_payload_reg1Addr == 6'h0;	// <stdin>:27261:43, src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18
-        automatic logic _GEN_178 = io_cmd_3_payload_reg1Addr == 6'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        automatic logic _GEN_179 = io_cmd_3_payload_reg1Addr == 6'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        automatic logic _GEN_180 = io_cmd_3_payload_reg1Addr == 6'h3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        automatic logic _GEN_181 = io_cmd_3_payload_reg1Addr == 6'h4;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        automatic logic _GEN_182 = io_cmd_3_payload_reg1Addr == 6'h5;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        automatic logic _GEN_183;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-        automatic logic _GEN_184 = io_cmd_3_payload_reg1Addr == 6'h6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        automatic logic _GEN_185 = io_cmd_3_payload_reg1Addr == 6'h7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        automatic logic _GEN_186 = io_cmd_3_payload_reg1Addr == 6'h8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        automatic logic _GEN_187 = io_cmd_3_payload_reg1Addr == 6'h9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        automatic logic _GEN_188 = io_cmd_3_payload_reg1Addr == 6'hA;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        automatic logic _GEN_189 = io_cmd_3_payload_reg1Addr == 6'hB;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :136:26
-        _GEN_165 = io_cmd_3_payload_reg0Addr == 6'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        _GEN_166 = io_cmd_3_payload_reg0Addr == 6'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        _GEN_167 = io_cmd_3_payload_reg0Addr == 6'h3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        _GEN_168 = io_cmd_3_payload_reg0Addr == 6'h4;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        _GEN_169 = io_cmd_3_payload_reg0Addr == 6'h5;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        _GEN_170 =
-          ~(|io_cmd_3_payload_reg0Addr) | _GEN_165 | _GEN_166 | _GEN_167 | _GEN_168
-          | ~_GEN_169;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-        _GEN_171 = io_cmd_3_payload_reg0Addr == 6'h6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        _GEN_172 = io_cmd_3_payload_reg0Addr == 6'h7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        _GEN_173 = io_cmd_3_payload_reg0Addr == 6'h8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        _GEN_174 = io_cmd_3_payload_reg0Addr == 6'h9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        _GEN_175 = io_cmd_3_payload_reg0Addr == 6'hA;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18
-        _GEN_176 = io_cmd_3_payload_reg0Addr == 6'hB;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :136:26
-        _GEN_183 =
-          ~write2_3 | _GEN_177 | _GEN_178 | _GEN_179 | _GEN_180 | _GEN_181 | ~_GEN_182;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-        if (write2_3 & _GEN_177)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :162:25, :201:20
-          regFile_m <= io_cmd_3_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-        else if (|io_cmd_3_payload_reg0Addr) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-          if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-            if (_GEN_137)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :201:20
-              regFile_m <= io_cmd_2_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-            else if (|io_cmd_2_payload_reg0Addr) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-              if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                if (_GEN_86)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :201:20
-                  regFile_m <= io_cmd_1_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-                else if (|io_cmd_1_payload_reg0Addr) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_35)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :201:20
-                      regFile_m <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-                    else if (~(|io_cmd_0_payload_reg0Addr))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-                      regFile_m <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
+                      : 11'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:72:23, :202:{41,63}, :214:12, :231:30, :235:32, :239:27, :240:{19,30}, :241:{19,25,43,63}, :242:{14,32}
+      _GEN_155 = acceptedRuns_3 | acceptedRuns_2 | acceptedRuns_1 | acceptedRuns_0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32, :203:39, :247:30, :248:15
+      if (acceptedWrites_3) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+        automatic logic _GEN_156;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18
+        automatic logic _GEN_157;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18
+        automatic logic _GEN_158;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18
+        automatic logic _GEN_159;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18
+        automatic logic _GEN_160;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18
+        automatic logic _GEN_161;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+        automatic logic _GEN_162;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18
+        automatic logic _GEN_163;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18
+        automatic logic _GEN_164;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18
+        automatic logic _GEN_165;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18
+        automatic logic _GEN_166;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18
+        automatic logic _GEN_167;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18
+        automatic logic _GEN_168 = io_cmd_3_payload_reg1Addr == 10'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :148:51
+        automatic logic _GEN_169 = io_cmd_3_payload_reg1Addr == 10'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        automatic logic _GEN_170 = io_cmd_3_payload_reg1Addr == 10'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        automatic logic _GEN_171 = io_cmd_3_payload_reg1Addr == 10'h3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        automatic logic _GEN_172 = io_cmd_3_payload_reg1Addr == 10'h4;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        automatic logic _GEN_173 = io_cmd_3_payload_reg1Addr == 10'h5;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        automatic logic _GEN_174;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+        automatic logic _GEN_175 = io_cmd_3_payload_reg1Addr == 10'h6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        automatic logic _GEN_176 = io_cmd_3_payload_reg1Addr == 10'h7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        automatic logic _GEN_177 = io_cmd_3_payload_reg1Addr == 10'h8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        automatic logic _GEN_178 = io_cmd_3_payload_reg1Addr == 10'h9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        automatic logic _GEN_179 = io_cmd_3_payload_reg1Addr == 10'hA;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        automatic logic _GEN_180 = io_cmd_3_payload_reg1Addr == 10'hB;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        _GEN_156 = io_cmd_3_payload_reg0Addr == 10'h1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        _GEN_157 = io_cmd_3_payload_reg0Addr == 10'h2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        _GEN_158 = io_cmd_3_payload_reg0Addr == 10'h3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        _GEN_159 = io_cmd_3_payload_reg0Addr == 10'h4;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        _GEN_160 = io_cmd_3_payload_reg0Addr == 10'h5;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        _GEN_161 =
+          ~(|io_cmd_3_payload_reg0Addr) | _GEN_156 | _GEN_157 | _GEN_158 | _GEN_159
+          | ~_GEN_160;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+        _GEN_162 = io_cmd_3_payload_reg0Addr == 10'h6;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        _GEN_163 = io_cmd_3_payload_reg0Addr == 10'h7;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        _GEN_164 = io_cmd_3_payload_reg0Addr == 10'h8;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        _GEN_165 = io_cmd_3_payload_reg0Addr == 10'h9;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        _GEN_166 = io_cmd_3_payload_reg0Addr == 10'hA;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        _GEN_167 = io_cmd_3_payload_reg0Addr == 10'hB;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18
+        _GEN_174 =
+          ~write2_3 | _GEN_168 | _GEN_169 | _GEN_170 | _GEN_171 | _GEN_172 | ~_GEN_173;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+        if (write2_3 & _GEN_168)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :198:25, :237:20
+          shadowReg_m <= io_cmd_3_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+        else if (|io_cmd_3_payload_reg0Addr) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+          if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+            if (_GEN_131)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :237:20
+              shadowReg_m <= io_cmd_2_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+            else if (|io_cmd_2_payload_reg0Addr) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+              if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                if (_GEN_83)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :237:20
+                  shadowReg_m <= io_cmd_1_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+                else if (|io_cmd_1_payload_reg0Addr) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_35)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :237:20
+                      shadowReg_m <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+                    else if (~(|io_cmd_0_payload_reg0Addr))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+                      shadowReg_m <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-                  regFile_m <= io_cmd_1_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+                  shadowReg_m <= io_cmd_1_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
               end
-              else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                if (_GEN_35)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :201:20
-                  regFile_m <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-                else if (~(|io_cmd_0_payload_reg0Addr))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-                  regFile_m <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-              end
-            end
-            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-              regFile_m <= io_cmd_2_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-          end
-          else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-            if (_GEN_86)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :201:20
-              regFile_m <= io_cmd_1_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-            else if (|io_cmd_1_payload_reg0Addr) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-              if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                if (_GEN_35)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :201:20
-                  regFile_m <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-                else if (~(|io_cmd_0_payload_reg0Addr))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-                  regFile_m <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
+              else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                if (_GEN_35)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :237:20
+                  shadowReg_m <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+                else if (~(|io_cmd_0_payload_reg0Addr))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+                  shadowReg_m <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
               end
             end
-            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-              regFile_m <= io_cmd_1_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
+            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+              shadowReg_m <= io_cmd_2_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
           end
-          else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-            if (_GEN_35)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :201:20
-              regFile_m <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-            else if (~(|io_cmd_0_payload_reg0Addr))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-              regFile_m <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
+          else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+            if (_GEN_83)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :237:20
+              shadowReg_m <= io_cmd_1_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+            else if (|io_cmd_1_payload_reg0Addr) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+              if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                if (_GEN_35)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :237:20
+                  shadowReg_m <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+                else if (~(|io_cmd_0_payload_reg0Addr))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+                  shadowReg_m <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+              end
+            end
+            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+              shadowReg_m <= io_cmd_1_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+          end
+          else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+            if (_GEN_35)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :237:20
+              shadowReg_m <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+            else if (~(|io_cmd_0_payload_reg0Addr))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+              shadowReg_m <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
           end
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-          regFile_m <= io_cmd_3_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-        if (~write2_3 | _GEN_177 | ~_GEN_178) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-          if ((|io_cmd_3_payload_reg0Addr) & _GEN_165) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-            regFile_n <= io_cmd_3_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-            regFile_k <= io_cmd_3_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+          shadowReg_m <= io_cmd_3_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+        if (~write2_3 | _GEN_168 | ~_GEN_169) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+          if ((|io_cmd_3_payload_reg0Addr) & _GEN_156) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+            shadowReg_n <= io_cmd_3_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+            shadowReg_k <= io_cmd_3_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
           end
-          else if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-            if (_GEN_139) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-              if (_GEN_114) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                regFile_n <= io_cmd_2_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-                regFile_k <= io_cmd_2_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+          else if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+            if (_GEN_133) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+              if (_GEN_108) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                shadowReg_n <= io_cmd_2_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+                shadowReg_k <= io_cmd_2_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
               end
-              else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                if (_GEN_88) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                  if (_GEN_63) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                    regFile_n <= io_cmd_1_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-                    regFile_k <= io_cmd_1_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+              else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                if (_GEN_85) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                  if (_GEN_60) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                    shadowReg_n <= io_cmd_1_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+                    shadowReg_k <= io_cmd_1_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
                   end
-                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_37) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_12) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_n <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-                        regFile_k <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_37) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_12) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_n <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+                        shadowReg_k <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
                       end
                     end
-                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_n <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-                      regFile_k <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_n <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+                      shadowReg_k <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
                     end
                   end
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                  regFile_n <= io_cmd_1_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-                  regFile_k <= io_cmd_1_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                  shadowReg_n <= io_cmd_1_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+                  shadowReg_k <= io_cmd_1_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
                 end
               end
-              else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                if (_GEN_37) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                  if (_GEN_12) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                    regFile_n <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-                    regFile_k <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+              else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                if (_GEN_37) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                  if (_GEN_12) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                    shadowReg_n <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+                    shadowReg_k <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
                   end
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                  regFile_n <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-                  regFile_k <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                  shadowReg_n <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+                  shadowReg_k <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
                 end
               end
             end
-            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-              regFile_n <= io_cmd_2_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-              regFile_k <= io_cmd_2_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+              shadowReg_n <= io_cmd_2_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+              shadowReg_k <= io_cmd_2_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
             end
           end
-          else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-            if (_GEN_88) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-              if (_GEN_63) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                regFile_n <= io_cmd_1_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-                regFile_k <= io_cmd_1_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+          else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+            if (_GEN_85) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+              if (_GEN_60) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                shadowReg_n <= io_cmd_1_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+                shadowReg_k <= io_cmd_1_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
               end
-              else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                if (_GEN_37) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                  if (_GEN_12) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                    regFile_n <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-                    regFile_k <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+              else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                if (_GEN_37) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                  if (_GEN_12) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                    shadowReg_n <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+                    shadowReg_k <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
                   end
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                  regFile_n <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-                  regFile_k <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                  shadowReg_n <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+                  shadowReg_k <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
                 end
               end
             end
-            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-              regFile_n <= io_cmd_1_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-              regFile_k <= io_cmd_1_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+              shadowReg_n <= io_cmd_1_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+              shadowReg_k <= io_cmd_1_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
             end
           end
-          else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-            if (_GEN_37) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-              if (_GEN_12) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                regFile_n <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-                regFile_k <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+          else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+            if (_GEN_37) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+              if (_GEN_12) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                shadowReg_n <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+                shadowReg_k <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
               end
             end
-            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-              regFile_n <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-              regFile_k <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+              shadowReg_n <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+              shadowReg_k <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
             end
           end
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_n <= io_cmd_3_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-          regFile_k <= io_cmd_3_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_n <= io_cmd_3_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+          shadowReg_k <= io_cmd_3_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
         end
-        if (~write2_3 | _GEN_177 | _GEN_178 | ~_GEN_179) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_165 | ~_GEN_166) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_141) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_116) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_90) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_65) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                          if (_GEN_39) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            if (_GEN_14) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        if (~write2_3 | _GEN_168 | _GEN_169 | ~_GEN_170) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_156 | ~_GEN_157) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_135) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_110) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_87) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_62) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                          if (_GEN_39) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            if (_GEN_14) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                             end
-                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                              regFile_aAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                              shadowReg_aAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                           end
-                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            regFile_aAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            shadowReg_aAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                         end
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        regFile_aAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        shadowReg_aAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_aAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_aAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
-                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_39) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_14) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_39) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_14) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_aAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_aAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_aAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_aAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_aAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_aAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_90) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_65) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_39) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_14) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_87) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_62) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_39) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_14) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_aAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_aAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_aAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_aAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_aAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_aAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_39) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_14) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_39) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_14) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_aAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_aAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_aAddr <= io_cmd_3_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_aAddr <= io_cmd_3_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_aAddr <= io_cmd_3_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (~write2_3 | _GEN_177 | _GEN_178 | _GEN_179 | ~_GEN_180) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_165 | _GEN_166 | ~_GEN_167) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_143) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_118) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_92) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_67) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                          if (_GEN_41) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            if (_GEN_16) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_aAddr <= io_cmd_3_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (~write2_3 | _GEN_168 | _GEN_169 | _GEN_170 | ~_GEN_171) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_156 | _GEN_157 | ~_GEN_158) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_137) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_112) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_89) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_64) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                          if (_GEN_41) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            if (_GEN_16) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                             end
-                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                              regFile_bAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                              shadowReg_bAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                           end
-                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            regFile_bAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            shadowReg_bAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                         end
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        regFile_bAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        shadowReg_bAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_bAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_bAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
-                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_41) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_16) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_41) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_16) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_bAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_bAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_bAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_bAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_bAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_bAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_bAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_bAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_92) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_67) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_41) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_16) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_89) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_64) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_41) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_16) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_bAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_bAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_bAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_bAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_bAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_bAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_bAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_bAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_41) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_16) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_41) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_16) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_bAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_bAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_bAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_bAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_bAddr <= io_cmd_3_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_bAddr <= io_cmd_3_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_bAddr <= io_cmd_3_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (~write2_3 | _GEN_177 | _GEN_178 | _GEN_179 | _GEN_180 | ~_GEN_181) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_165 | _GEN_166 | _GEN_167
-              | ~_GEN_168) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_145) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_120) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_94) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_69) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                          if (_GEN_43) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            if (_GEN_18) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_bAddr <= io_cmd_3_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (~write2_3 | _GEN_168 | _GEN_169 | _GEN_170 | _GEN_171 | ~_GEN_172) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_156 | _GEN_157 | _GEN_158
+              | ~_GEN_159) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_139) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_114) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_91) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_66) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                          if (_GEN_43) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            if (_GEN_18) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                             end
-                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                              regFile_cAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                              shadowReg_cAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                           end
-                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            regFile_cAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            shadowReg_cAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                         end
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        regFile_cAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        shadowReg_cAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_cAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_cAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
-                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_43) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_18) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_43) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_18) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_cAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_cAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_cAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_cAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_cAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_cAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_cAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_cAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_94) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_69) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_43) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_18) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_91) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_66) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_43) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_18) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_cAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_cAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_cAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_cAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_cAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_cAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_cAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_cAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_43) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_18) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_43) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_18) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_cAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_cAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_cAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_cAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_cAddr <= io_cmd_3_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_cAddr <= io_cmd_3_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_cAddr <= io_cmd_3_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_183) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_170) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_147) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_122) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_96) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_71) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                          if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_cAddr <= io_cmd_3_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_174) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_161) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_141) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_116) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_93) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_68) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                          if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                             end
-                            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                              regFile_aAddrMode <= io_cmd_0_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                              regFile_bAddrMode <= io_cmd_0_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                              regFile_cAddrMode <= io_cmd_0_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                              regFile_aMxBlockSize <= io_cmd_0_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                              regFile_bMxBlockSize <= io_cmd_0_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                              regFile_cMxBlockSize <= io_cmd_0_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                              regFile_loadWMode <= io_cmd_0_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                              regFile_osM1 <= io_cmd_0_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                              regFile_osFmtKeep <= io_cmd_0_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                              regFile_aFmt <= io_cmd_0_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                              regFile_bFmt <= io_cmd_0_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                              regFile_cFmt <= io_cmd_0_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                              regFile_rnd <= io_cmd_0_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
+                            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                              shadowReg_aAddrMode <= io_cmd_0_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                              shadowReg_bAddrMode <= io_cmd_0_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                              shadowReg_cAddrMode <= io_cmd_0_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                              shadowReg_aMxBlockSize <= io_cmd_0_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                              shadowReg_bMxBlockSize <= io_cmd_0_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                              shadowReg_cMxBlockSize <= io_cmd_0_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                              shadowReg_loadWMode <= io_cmd_0_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                              shadowReg_osM1 <= io_cmd_0_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                              shadowReg_osFmtKeep <= io_cmd_0_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                              shadowReg_aFmt <= io_cmd_0_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                              shadowReg_bFmt <= io_cmd_0_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                              shadowReg_cFmt <= io_cmd_0_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                              shadowReg_rnd <= io_cmd_0_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
                             end
                           end
-                          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            regFile_aAddrMode <= io_cmd_0_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                            regFile_bAddrMode <= io_cmd_0_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                            regFile_cAddrMode <= io_cmd_0_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                            regFile_aMxBlockSize <= io_cmd_0_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                            regFile_bMxBlockSize <= io_cmd_0_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                            regFile_cMxBlockSize <= io_cmd_0_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                            regFile_loadWMode <= io_cmd_0_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                            regFile_osM1 <= io_cmd_0_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                            regFile_osFmtKeep <= io_cmd_0_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                            regFile_aFmt <= io_cmd_0_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                            regFile_bFmt <= io_cmd_0_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                            regFile_cFmt <= io_cmd_0_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                            regFile_rnd <= io_cmd_0_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
+                          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            shadowReg_aAddrMode <= io_cmd_0_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                            shadowReg_bAddrMode <= io_cmd_0_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                            shadowReg_cAddrMode <= io_cmd_0_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                            shadowReg_aMxBlockSize <= io_cmd_0_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                            shadowReg_bMxBlockSize <= io_cmd_0_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                            shadowReg_cMxBlockSize <= io_cmd_0_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                            shadowReg_loadWMode <= io_cmd_0_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                            shadowReg_osM1 <= io_cmd_0_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                            shadowReg_osFmtKeep <= io_cmd_0_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                            shadowReg_aFmt <= io_cmd_0_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                            shadowReg_bFmt <= io_cmd_0_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                            shadowReg_cFmt <= io_cmd_0_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                            shadowReg_rnd <= io_cmd_0_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
                           end
                         end
                       end
-                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        regFile_aAddrMode <= io_cmd_1_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                        regFile_bAddrMode <= io_cmd_1_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                        regFile_cAddrMode <= io_cmd_1_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                        regFile_aMxBlockSize <= io_cmd_1_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                        regFile_bMxBlockSize <= io_cmd_1_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                        regFile_cMxBlockSize <= io_cmd_1_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                        regFile_loadWMode <= io_cmd_1_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                        regFile_osM1 <= io_cmd_1_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                        regFile_osFmtKeep <= io_cmd_1_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                        regFile_aFmt <= io_cmd_1_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                        regFile_bFmt <= io_cmd_1_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                        regFile_cFmt <= io_cmd_1_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                        regFile_rnd <= io_cmd_1_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
+                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        shadowReg_aAddrMode <= io_cmd_1_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                        shadowReg_bAddrMode <= io_cmd_1_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                        shadowReg_cAddrMode <= io_cmd_1_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                        shadowReg_aMxBlockSize <= io_cmd_1_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                        shadowReg_bMxBlockSize <= io_cmd_1_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                        shadowReg_cMxBlockSize <= io_cmd_1_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                        shadowReg_loadWMode <= io_cmd_1_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                        shadowReg_osM1 <= io_cmd_1_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                        shadowReg_osFmtKeep <= io_cmd_1_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                        shadowReg_aFmt <= io_cmd_1_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                        shadowReg_bFmt <= io_cmd_1_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                        shadowReg_cFmt <= io_cmd_1_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                        shadowReg_rnd <= io_cmd_1_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
                       end
                     end
-                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_aAddrMode <= io_cmd_1_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                      regFile_bAddrMode <= io_cmd_1_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                      regFile_cAddrMode <= io_cmd_1_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                      regFile_aMxBlockSize <= io_cmd_1_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                      regFile_bMxBlockSize <= io_cmd_1_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                      regFile_cMxBlockSize <= io_cmd_1_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                      regFile_loadWMode <= io_cmd_1_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                      regFile_osM1 <= io_cmd_1_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                      regFile_osFmtKeep <= io_cmd_1_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                      regFile_aFmt <= io_cmd_1_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                      regFile_bFmt <= io_cmd_1_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                      regFile_cFmt <= io_cmd_1_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                      regFile_rnd <= io_cmd_1_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
+                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_aAddrMode <= io_cmd_1_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                      shadowReg_bAddrMode <= io_cmd_1_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                      shadowReg_cAddrMode <= io_cmd_1_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                      shadowReg_aMxBlockSize <= io_cmd_1_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                      shadowReg_bMxBlockSize <= io_cmd_1_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                      shadowReg_cMxBlockSize <= io_cmd_1_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                      shadowReg_loadWMode <= io_cmd_1_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                      shadowReg_osM1 <= io_cmd_1_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                      shadowReg_osFmtKeep <= io_cmd_1_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                      shadowReg_aFmt <= io_cmd_1_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                      shadowReg_bFmt <= io_cmd_1_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                      shadowReg_cFmt <= io_cmd_1_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                      shadowReg_rnd <= io_cmd_1_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
                     end
                   end
-                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_aAddrMode <= io_cmd_0_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                        regFile_bAddrMode <= io_cmd_0_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                        regFile_cAddrMode <= io_cmd_0_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                        regFile_aMxBlockSize <= io_cmd_0_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                        regFile_bMxBlockSize <= io_cmd_0_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                        regFile_cMxBlockSize <= io_cmd_0_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                        regFile_loadWMode <= io_cmd_0_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                        regFile_osM1 <= io_cmd_0_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                        regFile_osFmtKeep <= io_cmd_0_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                        regFile_aFmt <= io_cmd_0_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                        regFile_bFmt <= io_cmd_0_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                        regFile_cFmt <= io_cmd_0_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                        regFile_rnd <= io_cmd_0_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
+                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_aAddrMode <= io_cmd_0_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                        shadowReg_bAddrMode <= io_cmd_0_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                        shadowReg_cAddrMode <= io_cmd_0_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                        shadowReg_aMxBlockSize <= io_cmd_0_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                        shadowReg_bMxBlockSize <= io_cmd_0_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                        shadowReg_cMxBlockSize <= io_cmd_0_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                        shadowReg_loadWMode <= io_cmd_0_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                        shadowReg_osM1 <= io_cmd_0_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                        shadowReg_osFmtKeep <= io_cmd_0_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                        shadowReg_aFmt <= io_cmd_0_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                        shadowReg_bFmt <= io_cmd_0_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                        shadowReg_cFmt <= io_cmd_0_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                        shadowReg_rnd <= io_cmd_0_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
                       end
                     end
-                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_aAddrMode <= io_cmd_0_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                      regFile_bAddrMode <= io_cmd_0_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                      regFile_cAddrMode <= io_cmd_0_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                      regFile_aMxBlockSize <= io_cmd_0_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                      regFile_bMxBlockSize <= io_cmd_0_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                      regFile_cMxBlockSize <= io_cmd_0_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                      regFile_loadWMode <= io_cmd_0_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                      regFile_osM1 <= io_cmd_0_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                      regFile_osFmtKeep <= io_cmd_0_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                      regFile_aFmt <= io_cmd_0_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                      regFile_bFmt <= io_cmd_0_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                      regFile_cFmt <= io_cmd_0_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                      regFile_rnd <= io_cmd_0_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
+                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_aAddrMode <= io_cmd_0_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                      shadowReg_bAddrMode <= io_cmd_0_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                      shadowReg_cAddrMode <= io_cmd_0_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                      shadowReg_aMxBlockSize <= io_cmd_0_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                      shadowReg_bMxBlockSize <= io_cmd_0_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                      shadowReg_cMxBlockSize <= io_cmd_0_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                      shadowReg_loadWMode <= io_cmd_0_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                      shadowReg_osM1 <= io_cmd_0_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                      shadowReg_osFmtKeep <= io_cmd_0_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                      shadowReg_aFmt <= io_cmd_0_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                      shadowReg_bFmt <= io_cmd_0_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                      shadowReg_cFmt <= io_cmd_0_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                      shadowReg_rnd <= io_cmd_0_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
                     end
                   end
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_aAddrMode <= io_cmd_2_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                  regFile_bAddrMode <= io_cmd_2_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                  regFile_cAddrMode <= io_cmd_2_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                  regFile_aMxBlockSize <= io_cmd_2_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                  regFile_bMxBlockSize <= io_cmd_2_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                  regFile_cMxBlockSize <= io_cmd_2_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                  regFile_loadWMode <= io_cmd_2_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                  regFile_osM1 <= io_cmd_2_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                  regFile_osFmtKeep <= io_cmd_2_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                  regFile_aFmt <= io_cmd_2_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                  regFile_bFmt <= io_cmd_2_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                  regFile_cFmt <= io_cmd_2_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                  regFile_rnd <= io_cmd_2_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_aAddrMode <= io_cmd_2_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                  shadowReg_bAddrMode <= io_cmd_2_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                  shadowReg_cAddrMode <= io_cmd_2_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                  shadowReg_aMxBlockSize <= io_cmd_2_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                  shadowReg_bMxBlockSize <= io_cmd_2_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                  shadowReg_cMxBlockSize <= io_cmd_2_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                  shadowReg_loadWMode <= io_cmd_2_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                  shadowReg_osM1 <= io_cmd_2_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                  shadowReg_osFmtKeep <= io_cmd_2_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                  shadowReg_aFmt <= io_cmd_2_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                  shadowReg_bFmt <= io_cmd_2_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                  shadowReg_cFmt <= io_cmd_2_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                  shadowReg_rnd <= io_cmd_2_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aAddrMode <= io_cmd_2_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                regFile_bAddrMode <= io_cmd_2_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                regFile_cAddrMode <= io_cmd_2_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                regFile_aMxBlockSize <= io_cmd_2_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                regFile_bMxBlockSize <= io_cmd_2_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                regFile_cMxBlockSize <= io_cmd_2_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                regFile_loadWMode <= io_cmd_2_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                regFile_osM1 <= io_cmd_2_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                regFile_osFmtKeep <= io_cmd_2_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                regFile_aFmt <= io_cmd_2_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                regFile_bFmt <= io_cmd_2_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                regFile_cFmt <= io_cmd_2_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                regFile_rnd <= io_cmd_2_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aAddrMode <= io_cmd_2_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                shadowReg_bAddrMode <= io_cmd_2_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                shadowReg_cAddrMode <= io_cmd_2_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                shadowReg_aMxBlockSize <= io_cmd_2_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                shadowReg_bMxBlockSize <= io_cmd_2_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                shadowReg_cMxBlockSize <= io_cmd_2_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                shadowReg_loadWMode <= io_cmd_2_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                shadowReg_osM1 <= io_cmd_2_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                shadowReg_osFmtKeep <= io_cmd_2_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                shadowReg_aFmt <= io_cmd_2_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                shadowReg_bFmt <= io_cmd_2_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                shadowReg_cFmt <= io_cmd_2_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                shadowReg_rnd <= io_cmd_2_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
               end
             end
-            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_96) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_71) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_93) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_68) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_aAddrMode <= io_cmd_0_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                        regFile_bAddrMode <= io_cmd_0_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                        regFile_cAddrMode <= io_cmd_0_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                        regFile_aMxBlockSize <= io_cmd_0_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                        regFile_bMxBlockSize <= io_cmd_0_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                        regFile_cMxBlockSize <= io_cmd_0_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                        regFile_loadWMode <= io_cmd_0_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                        regFile_osM1 <= io_cmd_0_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                        regFile_osFmtKeep <= io_cmd_0_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                        regFile_aFmt <= io_cmd_0_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                        regFile_bFmt <= io_cmd_0_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                        regFile_cFmt <= io_cmd_0_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                        regFile_rnd <= io_cmd_0_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
+                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_aAddrMode <= io_cmd_0_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                        shadowReg_bAddrMode <= io_cmd_0_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                        shadowReg_cAddrMode <= io_cmd_0_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                        shadowReg_aMxBlockSize <= io_cmd_0_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                        shadowReg_bMxBlockSize <= io_cmd_0_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                        shadowReg_cMxBlockSize <= io_cmd_0_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                        shadowReg_loadWMode <= io_cmd_0_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                        shadowReg_osM1 <= io_cmd_0_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                        shadowReg_osFmtKeep <= io_cmd_0_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                        shadowReg_aFmt <= io_cmd_0_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                        shadowReg_bFmt <= io_cmd_0_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                        shadowReg_cFmt <= io_cmd_0_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                        shadowReg_rnd <= io_cmd_0_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
                       end
                     end
-                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_aAddrMode <= io_cmd_0_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                      regFile_bAddrMode <= io_cmd_0_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                      regFile_cAddrMode <= io_cmd_0_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                      regFile_aMxBlockSize <= io_cmd_0_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                      regFile_bMxBlockSize <= io_cmd_0_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                      regFile_cMxBlockSize <= io_cmd_0_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                      regFile_loadWMode <= io_cmd_0_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                      regFile_osM1 <= io_cmd_0_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                      regFile_osFmtKeep <= io_cmd_0_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                      regFile_aFmt <= io_cmd_0_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                      regFile_bFmt <= io_cmd_0_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                      regFile_cFmt <= io_cmd_0_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                      regFile_rnd <= io_cmd_0_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
+                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_aAddrMode <= io_cmd_0_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                      shadowReg_bAddrMode <= io_cmd_0_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                      shadowReg_cAddrMode <= io_cmd_0_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                      shadowReg_aMxBlockSize <= io_cmd_0_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                      shadowReg_bMxBlockSize <= io_cmd_0_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                      shadowReg_cMxBlockSize <= io_cmd_0_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                      shadowReg_loadWMode <= io_cmd_0_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                      shadowReg_osM1 <= io_cmd_0_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                      shadowReg_osFmtKeep <= io_cmd_0_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                      shadowReg_aFmt <= io_cmd_0_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                      shadowReg_bFmt <= io_cmd_0_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                      shadowReg_cFmt <= io_cmd_0_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                      shadowReg_rnd <= io_cmd_0_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
                     end
                   end
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_aAddrMode <= io_cmd_1_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                  regFile_bAddrMode <= io_cmd_1_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                  regFile_cAddrMode <= io_cmd_1_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                  regFile_aMxBlockSize <= io_cmd_1_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                  regFile_bMxBlockSize <= io_cmd_1_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                  regFile_cMxBlockSize <= io_cmd_1_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                  regFile_loadWMode <= io_cmd_1_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                  regFile_osM1 <= io_cmd_1_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                  regFile_osFmtKeep <= io_cmd_1_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                  regFile_aFmt <= io_cmd_1_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                  regFile_bFmt <= io_cmd_1_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                  regFile_cFmt <= io_cmd_1_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                  regFile_rnd <= io_cmd_1_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_aAddrMode <= io_cmd_1_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                  shadowReg_bAddrMode <= io_cmd_1_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                  shadowReg_cAddrMode <= io_cmd_1_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                  shadowReg_aMxBlockSize <= io_cmd_1_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                  shadowReg_bMxBlockSize <= io_cmd_1_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                  shadowReg_cMxBlockSize <= io_cmd_1_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                  shadowReg_loadWMode <= io_cmd_1_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                  shadowReg_osM1 <= io_cmd_1_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                  shadowReg_osFmtKeep <= io_cmd_1_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                  shadowReg_aFmt <= io_cmd_1_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                  shadowReg_bFmt <= io_cmd_1_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                  shadowReg_cFmt <= io_cmd_1_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                  shadowReg_rnd <= io_cmd_1_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aAddrMode <= io_cmd_1_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                regFile_bAddrMode <= io_cmd_1_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                regFile_cAddrMode <= io_cmd_1_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                regFile_aMxBlockSize <= io_cmd_1_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                regFile_bMxBlockSize <= io_cmd_1_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                regFile_cMxBlockSize <= io_cmd_1_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                regFile_loadWMode <= io_cmd_1_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                regFile_osM1 <= io_cmd_1_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                regFile_osFmtKeep <= io_cmd_1_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                regFile_aFmt <= io_cmd_1_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                regFile_bFmt <= io_cmd_1_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                regFile_cFmt <= io_cmd_1_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                regFile_rnd <= io_cmd_1_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aAddrMode <= io_cmd_1_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                shadowReg_bAddrMode <= io_cmd_1_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                shadowReg_cAddrMode <= io_cmd_1_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                shadowReg_aMxBlockSize <= io_cmd_1_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                shadowReg_bMxBlockSize <= io_cmd_1_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                shadowReg_cMxBlockSize <= io_cmd_1_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                shadowReg_loadWMode <= io_cmd_1_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                shadowReg_osM1 <= io_cmd_1_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                shadowReg_osFmtKeep <= io_cmd_1_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                shadowReg_aFmt <= io_cmd_1_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                shadowReg_bFmt <= io_cmd_1_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                shadowReg_cFmt <= io_cmd_1_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                shadowReg_rnd <= io_cmd_1_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
               end
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_aAddrMode <= io_cmd_0_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                  regFile_bAddrMode <= io_cmd_0_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                  regFile_cAddrMode <= io_cmd_0_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                  regFile_aMxBlockSize <= io_cmd_0_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                  regFile_bMxBlockSize <= io_cmd_0_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                  regFile_cMxBlockSize <= io_cmd_0_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                  regFile_loadWMode <= io_cmd_0_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                  regFile_osM1 <= io_cmd_0_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                  regFile_osFmtKeep <= io_cmd_0_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                  regFile_aFmt <= io_cmd_0_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                  regFile_bFmt <= io_cmd_0_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                  regFile_cFmt <= io_cmd_0_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                  regFile_rnd <= io_cmd_0_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_aAddrMode <= io_cmd_0_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                  shadowReg_bAddrMode <= io_cmd_0_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                  shadowReg_cAddrMode <= io_cmd_0_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                  shadowReg_aMxBlockSize <= io_cmd_0_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                  shadowReg_bMxBlockSize <= io_cmd_0_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                  shadowReg_cMxBlockSize <= io_cmd_0_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                  shadowReg_loadWMode <= io_cmd_0_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                  shadowReg_osM1 <= io_cmd_0_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                  shadowReg_osFmtKeep <= io_cmd_0_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                  shadowReg_aFmt <= io_cmd_0_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                  shadowReg_bFmt <= io_cmd_0_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                  shadowReg_cFmt <= io_cmd_0_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                  shadowReg_rnd <= io_cmd_0_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aAddrMode <= io_cmd_0_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                regFile_bAddrMode <= io_cmd_0_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                regFile_cAddrMode <= io_cmd_0_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                regFile_aMxBlockSize <= io_cmd_0_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                regFile_bMxBlockSize <= io_cmd_0_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                regFile_cMxBlockSize <= io_cmd_0_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                regFile_loadWMode <= io_cmd_0_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                regFile_osM1 <= io_cmd_0_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                regFile_osFmtKeep <= io_cmd_0_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                regFile_aFmt <= io_cmd_0_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                regFile_bFmt <= io_cmd_0_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                regFile_cFmt <= io_cmd_0_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                regFile_rnd <= io_cmd_0_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aAddrMode <= io_cmd_0_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                shadowReg_bAddrMode <= io_cmd_0_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                shadowReg_cAddrMode <= io_cmd_0_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                shadowReg_aMxBlockSize <= io_cmd_0_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                shadowReg_bMxBlockSize <= io_cmd_0_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                shadowReg_cMxBlockSize <= io_cmd_0_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                shadowReg_loadWMode <= io_cmd_0_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                shadowReg_osM1 <= io_cmd_0_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                shadowReg_osFmtKeep <= io_cmd_0_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                shadowReg_aFmt <= io_cmd_0_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                shadowReg_bFmt <= io_cmd_0_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                shadowReg_cFmt <= io_cmd_0_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                shadowReg_rnd <= io_cmd_0_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
               end
             end
           end
-          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_aAddrMode <= io_cmd_3_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-            regFile_bAddrMode <= io_cmd_3_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-            regFile_cAddrMode <= io_cmd_3_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-            regFile_aMxBlockSize <= io_cmd_3_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-            regFile_bMxBlockSize <= io_cmd_3_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-            regFile_cMxBlockSize <= io_cmd_3_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-            regFile_loadWMode <= io_cmd_3_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-            regFile_osM1 <= io_cmd_3_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-            regFile_osFmtKeep <= io_cmd_3_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-            regFile_aFmt <= io_cmd_3_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-            regFile_bFmt <= io_cmd_3_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-            regFile_cFmt <= io_cmd_3_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-            regFile_rnd <= io_cmd_3_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
+          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_aAddrMode <= io_cmd_3_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+            shadowReg_bAddrMode <= io_cmd_3_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+            shadowReg_cAddrMode <= io_cmd_3_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+            shadowReg_aMxBlockSize <= io_cmd_3_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+            shadowReg_bMxBlockSize <= io_cmd_3_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+            shadowReg_cMxBlockSize <= io_cmd_3_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+            shadowReg_loadWMode <= io_cmd_3_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+            shadowReg_osM1 <= io_cmd_3_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+            shadowReg_osFmtKeep <= io_cmd_3_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+            shadowReg_aFmt <= io_cmd_3_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+            shadowReg_bFmt <= io_cmd_3_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+            shadowReg_cFmt <= io_cmd_3_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+            shadowReg_rnd <= io_cmd_3_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
           end
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_aAddrMode <= io_cmd_3_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-          regFile_bAddrMode <= io_cmd_3_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-          regFile_cAddrMode <= io_cmd_3_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-          regFile_aMxBlockSize <= io_cmd_3_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-          regFile_bMxBlockSize <= io_cmd_3_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-          regFile_cMxBlockSize <= io_cmd_3_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-          regFile_loadWMode <= io_cmd_3_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-          regFile_osM1 <= io_cmd_3_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-          regFile_osFmtKeep <= io_cmd_3_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-          regFile_aFmt <= io_cmd_3_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-          regFile_bFmt <= io_cmd_3_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-          regFile_cFmt <= io_cmd_3_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-          regFile_rnd <= io_cmd_3_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_aAddrMode <= io_cmd_3_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+          shadowReg_bAddrMode <= io_cmd_3_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+          shadowReg_cAddrMode <= io_cmd_3_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+          shadowReg_aMxBlockSize <= io_cmd_3_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+          shadowReg_bMxBlockSize <= io_cmd_3_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+          shadowReg_cMxBlockSize <= io_cmd_3_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+          shadowReg_loadWMode <= io_cmd_3_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+          shadowReg_osM1 <= io_cmd_3_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+          shadowReg_osFmtKeep <= io_cmd_3_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+          shadowReg_aFmt <= io_cmd_3_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+          shadowReg_bFmt <= io_cmd_3_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+          shadowReg_cFmt <= io_cmd_3_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+          shadowReg_rnd <= io_cmd_3_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
         end
-        if (~write2_3 | _GEN_177 | _GEN_178 | _GEN_179 | _GEN_180 | _GEN_181 | _GEN_182
-            | ~_GEN_184) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_165 | _GEN_166 | _GEN_167 | _GEN_168
-              | _GEN_169 | ~_GEN_171) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_149) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_124) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_98) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_73) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                          if (_GEN_47) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            if (_GEN_22) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        if (~write2_3 | _GEN_168 | _GEN_169 | _GEN_170 | _GEN_171 | _GEN_172 | _GEN_173
+            | ~_GEN_175) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_156 | _GEN_157 | _GEN_158 | _GEN_159
+              | _GEN_160 | ~_GEN_162) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_143) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_118) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_95) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_70) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                          if (_GEN_47) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            if (_GEN_22) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                             end
-                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                              regFile_aScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                              shadowReg_aScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                           end
-                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            regFile_aScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            shadowReg_aScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                         end
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        regFile_aScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        shadowReg_aScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_aScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_aScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
-                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_47) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_22) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_47) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_22) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_aScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_aScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_aScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_aScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_aScaleAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_aScaleAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aScaleAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aScaleAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_98) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_73) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_47) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_22) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_95) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_70) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_47) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_22) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_aScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_aScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_aScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_aScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_aScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_aScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_47) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_22) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_47) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_22) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_aScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_aScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_aScaleAddr <= io_cmd_3_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_aScaleAddr <= io_cmd_3_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_aScaleAddr <= io_cmd_3_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (~write2_3 | _GEN_177 | _GEN_178 | _GEN_179 | _GEN_180 | _GEN_181 | _GEN_182
-            | _GEN_184 | ~_GEN_185) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_165 | _GEN_166 | _GEN_167 | _GEN_168
-              | _GEN_169 | _GEN_171 | ~_GEN_172) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_151) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_126) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_100) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_75) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                          if (_GEN_49) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            if (_GEN_24) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_aScaleAddr <= io_cmd_3_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (~write2_3 | _GEN_168 | _GEN_169 | _GEN_170 | _GEN_171 | _GEN_172 | _GEN_173
+            | _GEN_175 | ~_GEN_176) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_156 | _GEN_157 | _GEN_158 | _GEN_159
+              | _GEN_160 | _GEN_162 | ~_GEN_163) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_145) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_120) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_97) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_72) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                          if (_GEN_49) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            if (_GEN_24) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                             end
-                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                              regFile_bScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                              shadowReg_bScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                           end
-                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            regFile_bScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            shadowReg_bScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                         end
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        regFile_bScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        shadowReg_bScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_bScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_bScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
-                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_49) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_24) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_49) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_24) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_bScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_bScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_bScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_bScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_bScaleAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_bScaleAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_bScaleAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_bScaleAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_100) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_75) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_49) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_24) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_97) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_72) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_49) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_24) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_bScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_bScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_bScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_bScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_bScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_bScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_bScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_bScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_49) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_24) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_49) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_24) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_bScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_bScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_bScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_bScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_bScaleAddr <= io_cmd_3_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_bScaleAddr <= io_cmd_3_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_bScaleAddr <= io_cmd_3_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (~write2_3 | _GEN_177 | _GEN_178 | _GEN_179 | _GEN_180 | _GEN_181 | _GEN_182
-            | _GEN_184 | _GEN_185 | ~_GEN_186) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_165 | _GEN_166 | _GEN_167 | _GEN_168
-              | _GEN_169 | _GEN_171 | _GEN_172 | ~_GEN_173) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_153) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_128) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_102) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_77) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                          if (_GEN_51) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            if (_GEN_26) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_bScaleAddr <= io_cmd_3_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (~write2_3 | _GEN_168 | _GEN_169 | _GEN_170 | _GEN_171 | _GEN_172 | _GEN_173
+            | _GEN_175 | _GEN_176 | ~_GEN_177) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_156 | _GEN_157 | _GEN_158 | _GEN_159
+              | _GEN_160 | _GEN_162 | _GEN_163 | ~_GEN_164) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_147) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_122) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_99) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_74) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                          if (_GEN_51) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            if (_GEN_26) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                             end
-                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                              regFile_cScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                              shadowReg_cScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                           end
-                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            regFile_cScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            shadowReg_cScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                         end
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        regFile_cScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        shadowReg_cScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_cScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_cScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
-                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_51) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_26) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_51) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_26) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_cScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_cScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_cScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_cScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_cScaleAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_cScaleAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_cScaleAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_cScaleAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_102) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_77) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_51) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_26) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_99) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_74) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_51) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_26) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_cScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_cScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_cScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_cScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_cScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_cScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_cScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_cScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_51) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_26) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_51) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_26) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_cScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_cScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_cScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-            end
-          end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_cScaleAddr <= io_cmd_3_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_cScaleAddr <= io_cmd_3_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_183) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_170) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_147) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_122) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_96) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_71) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                          if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                            end
-                            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                              regFile_warmup <= io_cmd_0_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                              regFile_warmdown <= io_cmd_0_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                              regFile_biasOn <= io_cmd_0_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
-                            end
-                          end
-                          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            regFile_warmup <= io_cmd_0_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                            regFile_warmdown <= io_cmd_0_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                            regFile_biasOn <= io_cmd_0_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
-                          end
-                        end
-                      end
-                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        regFile_warmup <= io_cmd_1_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                        regFile_warmdown <= io_cmd_1_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                        regFile_biasOn <= io_cmd_1_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
-                      end
-                    end
-                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_warmup <= io_cmd_1_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                      regFile_warmdown <= io_cmd_1_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                      regFile_biasOn <= io_cmd_1_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
-                    end
-                  end
-                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                      end
-                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_warmup <= io_cmd_0_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                        regFile_warmdown <= io_cmd_0_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                        regFile_biasOn <= io_cmd_0_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
-                      end
-                    end
-                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_warmup <= io_cmd_0_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                      regFile_warmdown <= io_cmd_0_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                      regFile_biasOn <= io_cmd_0_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
-                    end
-                  end
-                end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_warmup <= io_cmd_2_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                  regFile_warmdown <= io_cmd_2_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                  regFile_biasOn <= io_cmd_2_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
-                end
-              end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_warmup <= io_cmd_2_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                regFile_warmdown <= io_cmd_2_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                regFile_biasOn <= io_cmd_2_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
-              end
-            end
-            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_96) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_71) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                      end
-                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_warmup <= io_cmd_0_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                        regFile_warmdown <= io_cmd_0_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                        regFile_biasOn <= io_cmd_0_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
-                      end
-                    end
-                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_warmup <= io_cmd_0_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                      regFile_warmdown <= io_cmd_0_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                      regFile_biasOn <= io_cmd_0_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
-                    end
-                  end
-                end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_warmup <= io_cmd_1_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                  regFile_warmdown <= io_cmd_1_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                  regFile_biasOn <= io_cmd_1_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
-                end
-              end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_warmup <= io_cmd_1_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                regFile_warmdown <= io_cmd_1_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                regFile_biasOn <= io_cmd_1_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
-              end
-            end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_warmup <= io_cmd_0_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                  regFile_warmdown <= io_cmd_0_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                  regFile_biasOn <= io_cmd_0_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
-                end
-              end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_warmup <= io_cmd_0_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                regFile_warmdown <= io_cmd_0_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                regFile_biasOn <= io_cmd_0_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
-              end
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_cScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_warmup <= io_cmd_3_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-            regFile_warmdown <= io_cmd_3_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-            regFile_biasOn <= io_cmd_3_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
-          end
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_cScaleAddr <= io_cmd_3_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_warmup <= io_cmd_3_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-          regFile_warmdown <= io_cmd_3_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-          regFile_biasOn <= io_cmd_3_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
-        end
-        if (~write2_3 | _GEN_177 | _GEN_178 | _GEN_179 | _GEN_180 | _GEN_181 | _GEN_182
-            | _GEN_184 | _GEN_185 | _GEN_186 | ~_GEN_187) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_165 | _GEN_166 | _GEN_167 | _GEN_168
-              | _GEN_169 | _GEN_171 | _GEN_172 | _GEN_173 | ~_GEN_174) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_155) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_130) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_104) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_79) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                          if (_GEN_53) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            if (_GEN_28) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_cScaleAddr <= io_cmd_3_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_174) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_161) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_141) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_116) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_93) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_68) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                          if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                             end
-                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                              regFile_biasAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-                          end
-                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            regFile_biasAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-                        end
-                      end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        regFile_biasAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-                    end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_biasAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-                  end
-                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_53) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_28) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                      end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_biasAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-                    end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_biasAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-                  end
-                end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_biasAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-              end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_biasAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-            end
-            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_104) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_79) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_53) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_28) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                      end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_biasAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-                    end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_biasAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-                  end
-                end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_biasAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-              end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_biasAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-            end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_53) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_28) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_biasAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-              end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_biasAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-            end
-          end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_biasAddr <= io_cmd_3_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_biasAddr <= io_cmd_3_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_183) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_170) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_147) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_122) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_96) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_71) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                          if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                            end
-                            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                              regFile_requantOn <= io_cmd_0_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                              regFile_reluOn <= io_cmd_0_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+                            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                              shadowReg_warmup <= io_cmd_0_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                              shadowReg_warmdown <= io_cmd_0_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                              shadowReg_biasOn <= io_cmd_0_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
                             end
                           end
-                          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            regFile_requantOn <= io_cmd_0_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                            regFile_reluOn <= io_cmd_0_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+                          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            shadowReg_warmup <= io_cmd_0_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                            shadowReg_warmdown <= io_cmd_0_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                            shadowReg_biasOn <= io_cmd_0_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
                           end
                         end
                       end
-                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        regFile_requantOn <= io_cmd_1_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                        regFile_reluOn <= io_cmd_1_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        shadowReg_warmup <= io_cmd_1_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                        shadowReg_warmdown <= io_cmd_1_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                        shadowReg_biasOn <= io_cmd_1_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
                       end
                     end
-                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_requantOn <= io_cmd_1_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                      regFile_reluOn <= io_cmd_1_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_warmup <= io_cmd_1_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                      shadowReg_warmdown <= io_cmd_1_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                      shadowReg_biasOn <= io_cmd_1_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
                     end
                   end
-                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_requantOn <= io_cmd_0_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                        regFile_reluOn <= io_cmd_0_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_warmup <= io_cmd_0_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                        shadowReg_warmdown <= io_cmd_0_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                        shadowReg_biasOn <= io_cmd_0_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
                       end
                     end
-                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_requantOn <= io_cmd_0_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                      regFile_reluOn <= io_cmd_0_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_warmup <= io_cmd_0_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                      shadowReg_warmdown <= io_cmd_0_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                      shadowReg_biasOn <= io_cmd_0_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
                     end
                   end
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_requantOn <= io_cmd_2_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                  regFile_reluOn <= io_cmd_2_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_warmup <= io_cmd_2_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                  shadowReg_warmdown <= io_cmd_2_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                  shadowReg_biasOn <= io_cmd_2_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_requantOn <= io_cmd_2_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                regFile_reluOn <= io_cmd_2_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_warmup <= io_cmd_2_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                shadowReg_warmdown <= io_cmd_2_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                shadowReg_biasOn <= io_cmd_2_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
               end
             end
-            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_96) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_71) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_93) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_68) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_requantOn <= io_cmd_0_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                        regFile_reluOn <= io_cmd_0_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_warmup <= io_cmd_0_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                        shadowReg_warmdown <= io_cmd_0_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                        shadowReg_biasOn <= io_cmd_0_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
                       end
                     end
-                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_requantOn <= io_cmd_0_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                      regFile_reluOn <= io_cmd_0_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_warmup <= io_cmd_0_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                      shadowReg_warmdown <= io_cmd_0_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                      shadowReg_biasOn <= io_cmd_0_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
                     end
                   end
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_requantOn <= io_cmd_1_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                  regFile_reluOn <= io_cmd_1_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_warmup <= io_cmd_1_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                  shadowReg_warmdown <= io_cmd_1_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                  shadowReg_biasOn <= io_cmd_1_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_requantOn <= io_cmd_1_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                regFile_reluOn <= io_cmd_1_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_warmup <= io_cmd_1_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                shadowReg_warmdown <= io_cmd_1_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                shadowReg_biasOn <= io_cmd_1_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
               end
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_requantOn <= io_cmd_0_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                  regFile_reluOn <= io_cmd_0_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_warmup <= io_cmd_0_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                  shadowReg_warmdown <= io_cmd_0_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                  shadowReg_biasOn <= io_cmd_0_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_requantOn <= io_cmd_0_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                regFile_reluOn <= io_cmd_0_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_warmup <= io_cmd_0_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                shadowReg_warmdown <= io_cmd_0_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                shadowReg_biasOn <= io_cmd_0_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
               end
             end
           end
-          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_requantOn <= io_cmd_3_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-            regFile_reluOn <= io_cmd_3_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_warmup <= io_cmd_3_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+            shadowReg_warmdown <= io_cmd_3_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+            shadowReg_biasOn <= io_cmd_3_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
           end
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_requantOn <= io_cmd_3_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-          regFile_reluOn <= io_cmd_3_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_warmup <= io_cmd_3_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+          shadowReg_warmdown <= io_cmd_3_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+          shadowReg_biasOn <= io_cmd_3_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
         end
-        if (~write2_3 | _GEN_177 | _GEN_178 | _GEN_179 | _GEN_180 | _GEN_181 | _GEN_182
-            | _GEN_184 | _GEN_185 | _GEN_186 | _GEN_187 | ~_GEN_188) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_165 | _GEN_166 | _GEN_167 | _GEN_168
-              | _GEN_169 | _GEN_171 | _GEN_172 | _GEN_173 | _GEN_174 | ~_GEN_175) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_157) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_132) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_106) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_81) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                          if (_GEN_55) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            if (_GEN_30) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        if (~write2_3 | _GEN_168 | _GEN_169 | _GEN_170 | _GEN_171 | _GEN_172 | _GEN_173
+            | _GEN_175 | _GEN_176 | _GEN_177 | ~_GEN_178) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_156 | _GEN_157 | _GEN_158 | _GEN_159
+              | _GEN_160 | _GEN_162 | _GEN_163 | _GEN_164 | ~_GEN_165) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_149) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_124) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_101) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_76) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                          if (_GEN_53) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            if (_GEN_28) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                             end
-                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                              regFile_rqMBase <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                              shadowReg_biasAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                           end
-                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            regFile_rqMBase <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            shadowReg_biasAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                         end
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        regFile_rqMBase <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        shadowReg_biasAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_rqMBase <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_biasAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
-                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_55) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_30) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_53) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_28) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_rqMBase <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_biasAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_rqMBase <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_biasAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_rqMBase <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_biasAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_rqMBase <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_biasAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_106) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_81) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_55) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_30) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_101) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_76) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_53) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_28) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_rqMBase <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_biasAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_rqMBase <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_biasAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_rqMBase <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_biasAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_rqMBase <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_biasAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_55) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_30) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_53) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_28) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_rqMBase <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_biasAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_rqMBase <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_biasAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_rqMBase <= io_cmd_3_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_biasAddr <= io_cmd_3_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_rqMBase <= io_cmd_3_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (~write2_3 | _GEN_177 | _GEN_178 | _GEN_179 | _GEN_180 | _GEN_181 | _GEN_182
-            | _GEN_184 | _GEN_185 | _GEN_186 | _GEN_187 | _GEN_188 | ~_GEN_189) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :201:20
-          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_165 | _GEN_166 | _GEN_167 | _GEN_168
-              | _GEN_169 | _GEN_171 | _GEN_172 | _GEN_173 | _GEN_174 | _GEN_175
-              | ~_GEN_176) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :199:32
-            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_159) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_134) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_108) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_83) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                          if (_GEN_57) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            if (_GEN_32) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_biasAddr <= io_cmd_3_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_174) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_161) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_141) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_116) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_93) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_68) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                          if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                             end
-                            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                              regFile_rqShift <= io_cmd_0_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                              regFile_rqZp <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+                            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                              shadowReg_requantOn <= io_cmd_0_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                              shadowReg_reluOn <= io_cmd_0_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
                             end
                           end
-                          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            regFile_rqShift <= io_cmd_0_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                            regFile_rqZp <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+                          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            shadowReg_requantOn <= io_cmd_0_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                            shadowReg_reluOn <= io_cmd_0_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
                           end
                         end
                       end
-                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        regFile_rqShift <= io_cmd_1_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                        regFile_rqZp <= io_cmd_1_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        shadowReg_requantOn <= io_cmd_1_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                        shadowReg_reluOn <= io_cmd_1_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
                       end
                     end
-                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_rqShift <= io_cmd_1_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                      regFile_rqZp <= io_cmd_1_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_requantOn <= io_cmd_1_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                      shadowReg_reluOn <= io_cmd_1_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
                     end
                   end
-                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_57) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_32) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_rqShift <= io_cmd_0_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                        regFile_rqZp <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_requantOn <= io_cmd_0_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                        shadowReg_reluOn <= io_cmd_0_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
                       end
                     end
-                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_rqShift <= io_cmd_0_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                      regFile_rqZp <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_requantOn <= io_cmd_0_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                      shadowReg_reluOn <= io_cmd_0_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
                     end
                   end
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_rqShift <= io_cmd_2_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                  regFile_rqZp <= io_cmd_2_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_requantOn <= io_cmd_2_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                  shadowReg_reluOn <= io_cmd_2_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_rqShift <= io_cmd_2_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                regFile_rqZp <= io_cmd_2_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_requantOn <= io_cmd_2_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                shadowReg_reluOn <= io_cmd_2_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
               end
             end
-            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_108) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_83) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_57) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_32) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_93) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_68) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_rqShift <= io_cmd_0_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                        regFile_rqZp <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_requantOn <= io_cmd_0_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                        shadowReg_reluOn <= io_cmd_0_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
                       end
                     end
-                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_rqShift <= io_cmd_0_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                      regFile_rqZp <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_requantOn <= io_cmd_0_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                      shadowReg_reluOn <= io_cmd_0_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
                     end
                   end
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_rqShift <= io_cmd_1_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                  regFile_rqZp <= io_cmd_1_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_requantOn <= io_cmd_1_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                  shadowReg_reluOn <= io_cmd_1_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_rqShift <= io_cmd_1_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                regFile_rqZp <= io_cmd_1_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_requantOn <= io_cmd_1_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                shadowReg_reluOn <= io_cmd_1_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
               end
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_57) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_32) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_rqShift <= io_cmd_0_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                  regFile_rqZp <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_requantOn <= io_cmd_0_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                  shadowReg_reluOn <= io_cmd_0_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_rqShift <= io_cmd_0_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                regFile_rqZp <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_requantOn <= io_cmd_0_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                shadowReg_reluOn <= io_cmd_0_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
               end
             end
           end
-          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_rqShift <= io_cmd_3_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-            regFile_rqZp <= io_cmd_3_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_requantOn <= io_cmd_3_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+            shadowReg_reluOn <= io_cmd_3_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
           end
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_rqShift <= io_cmd_3_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-          regFile_rqZp <= io_cmd_3_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_requantOn <= io_cmd_3_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+          shadowReg_reluOn <= io_cmd_3_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
         end
-        if (~write2_3 | _GEN_177 | _GEN_178 | _GEN_179 | _GEN_180 | _GEN_181 | _GEN_182
-            | _GEN_184 | _GEN_185 | _GEN_186 | _GEN_187 | _GEN_188 | _GEN_189
-            | ~_writeTargets_T_72) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :162:25, :176:48, :201:20
-          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_165 | _GEN_166 | _GEN_167 | _GEN_168
-              | _GEN_169 | _GEN_171 | _GEN_172 | _GEN_173 | _GEN_174 | _GEN_175 | _GEN_176
-              | ~_writeTargets_T_61) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :104:18, :176:48, :199:32
-            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_160) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_135) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_109) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_84) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                          if (_GEN_58) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            if (_GEN_33) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18
+        if (~write2_3 | _GEN_168 | _GEN_169 | _GEN_170 | _GEN_171 | _GEN_172 | _GEN_173
+            | _GEN_175 | _GEN_176 | _GEN_177 | _GEN_178 | ~_GEN_179) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_156 | _GEN_157 | _GEN_158 | _GEN_159
+              | _GEN_160 | _GEN_162 | _GEN_163 | _GEN_164 | _GEN_165 | ~_GEN_166) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_151) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_126) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_103) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_78) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                          if (_GEN_55) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            if (_GEN_30) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                             end
-                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18
-                              irqMask <= io_cmd_0_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                              shadowReg_rqMBase <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                           end
-                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                            irqMask <= io_cmd_0_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            shadowReg_rqMBase <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                         end
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                        irqMask <= io_cmd_1_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        shadowReg_rqMBase <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      irqMask <= io_cmd_1_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_rqMBase <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
-                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_58) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_33) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18
+                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_55) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_30) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18
-                        irqMask <= io_cmd_0_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_rqMBase <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      irqMask <= io_cmd_0_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_rqMBase <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  irqMask <= io_cmd_2_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_rqMBase <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                irqMask <= io_cmd_2_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_rqMBase <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_109) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_84) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_58) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_33) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18
+            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_103) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_78) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_55) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_30) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18
-                        irqMask <= io_cmd_0_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_rqMBase <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      irqMask <= io_cmd_0_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_rqMBase <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  irqMask <= io_cmd_1_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_rqMBase <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                irqMask <= io_cmd_1_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_rqMBase <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_58) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_33) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_55) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_30) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18
-                  irqMask <= io_cmd_0_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_rqMBase <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                irqMask <= io_cmd_0_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_rqMBase <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            irqMask <= io_cmd_3_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_rqMBase <= io_cmd_3_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          irqMask <= io_cmd_3_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_rqMBase <= io_cmd_3_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (~write2_3 | _GEN_168 | _GEN_169 | _GEN_170 | _GEN_171 | _GEN_172 | _GEN_173
+            | _GEN_175 | _GEN_176 | _GEN_177 | _GEN_178 | _GEN_179 | ~_GEN_180) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :237:20
+          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_156 | _GEN_157 | _GEN_158 | _GEN_159
+              | _GEN_160 | _GEN_162 | _GEN_163 | _GEN_164 | _GEN_165 | _GEN_166
+              | ~_GEN_167) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :235:32
+            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_153) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_128) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_105) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_80) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                          if (_GEN_57) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            if (_GEN_32) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                            end
+                            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                              shadowReg_rqShift <= io_cmd_0_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                              shadowReg_rqZp <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+                            end
+                          end
+                          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            shadowReg_rqShift <= io_cmd_0_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                            shadowReg_rqZp <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+                          end
+                        end
+                      end
+                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        shadowReg_rqShift <= io_cmd_1_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                        shadowReg_rqZp <= io_cmd_1_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+                      end
+                    end
+                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_rqShift <= io_cmd_1_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                      shadowReg_rqZp <= io_cmd_1_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+                    end
+                  end
+                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_57) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_32) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                      end
+                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_rqShift <= io_cmd_0_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                        shadowReg_rqZp <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+                      end
+                    end
+                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_rqShift <= io_cmd_0_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                      shadowReg_rqZp <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+                    end
+                  end
+                end
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_rqShift <= io_cmd_2_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                  shadowReg_rqZp <= io_cmd_2_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+                end
+              end
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_rqShift <= io_cmd_2_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                shadowReg_rqZp <= io_cmd_2_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+              end
+            end
+            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_105) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_80) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_57) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_32) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                      end
+                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_rqShift <= io_cmd_0_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                        shadowReg_rqZp <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+                      end
+                    end
+                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_rqShift <= io_cmd_0_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                      shadowReg_rqZp <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+                    end
+                  end
+                end
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_rqShift <= io_cmd_1_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                  shadowReg_rqZp <= io_cmd_1_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+                end
+              end
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_rqShift <= io_cmd_1_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                shadowReg_rqZp <= io_cmd_1_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+              end
+            end
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_57) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_32) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                end
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_rqShift <= io_cmd_0_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                  shadowReg_rqZp <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+                end
+              end
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_rqShift <= io_cmd_0_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                shadowReg_rqZp <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+              end
+            end
+          end
+          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_rqShift <= io_cmd_3_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+            shadowReg_rqZp <= io_cmd_3_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+          end
+        end
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_rqShift <= io_cmd_3_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+          shadowReg_rqZp <= io_cmd_3_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+        end
+        if (~write2_3 | _GEN_168 | _GEN_169 | _GEN_170 | _GEN_171 | _GEN_172 | _GEN_173
+            | _GEN_175 | _GEN_176 | _GEN_177 | _GEN_178 | _GEN_179 | _GEN_180
+            | ~_writeTargets_T_44) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :198:25, :213:48, :237:20
+          if (~(|io_cmd_3_payload_reg0Addr) | _GEN_156 | _GEN_157 | _GEN_158 | _GEN_159
+              | _GEN_160 | _GEN_162 | _GEN_163 | _GEN_164 | _GEN_165 | _GEN_166 | _GEN_167
+              | ~_writeTargets_T_37) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :129:18, :213:48, :235:32
+            if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_154) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_129) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_106) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_81) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                          if (_GEN_58) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            if (_GEN_33) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18
+                            end
+                            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18
+                              irqMask <= io_cmd_0_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+                          end
+                          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                            irqMask <= io_cmd_0_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+                        end
+                      end
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                        irqMask <= io_cmd_1_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+                    end
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      irqMask <= io_cmd_1_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+                  end
+                  else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_58) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_33) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18
+                      end
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18
+                        irqMask <= io_cmd_0_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+                    end
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      irqMask <= io_cmd_0_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+                  end
+                end
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  irqMask <= io_cmd_2_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+              end
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                irqMask <= io_cmd_2_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+            end
+            else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_106) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_81) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_58) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_33) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18
+                      end
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18
+                        irqMask <= io_cmd_0_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+                    end
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      irqMask <= io_cmd_0_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+                  end
+                end
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  irqMask <= io_cmd_1_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+              end
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                irqMask <= io_cmd_1_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+            end
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_58) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_33) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18
+                end
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18
+                  irqMask <= io_cmd_0_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+              end
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                irqMask <= io_cmd_0_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+            end
+          end
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            irqMask <= io_cmd_3_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+        end
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          irqMask <= io_cmd_3_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
       end
-      else if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-        if (_GEN_137)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :201:20
-          regFile_m <= io_cmd_2_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-        else if (|io_cmd_2_payload_reg0Addr) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-          if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-            if (_GEN_86)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :201:20
-              regFile_m <= io_cmd_1_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-            else if (|io_cmd_1_payload_reg0Addr) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-              if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                if (_GEN_35)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :201:20
-                  regFile_m <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-                else if (~(|io_cmd_0_payload_reg0Addr))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-                  regFile_m <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
+      else if (acceptedWrites_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+        if (_GEN_131)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :237:20
+          shadowReg_m <= io_cmd_2_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+        else if (|io_cmd_2_payload_reg0Addr) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+          if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+            if (_GEN_83)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :237:20
+              shadowReg_m <= io_cmd_1_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+            else if (|io_cmd_1_payload_reg0Addr) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+              if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                if (_GEN_35)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :237:20
+                  shadowReg_m <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+                else if (~(|io_cmd_0_payload_reg0Addr))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+                  shadowReg_m <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
               end
             end
-            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-              regFile_m <= io_cmd_1_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
+            else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+              shadowReg_m <= io_cmd_1_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
           end
-          else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-            if (_GEN_35)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :201:20
-              regFile_m <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-            else if (~(|io_cmd_0_payload_reg0Addr))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-              regFile_m <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
+          else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+            if (_GEN_35)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :237:20
+              shadowReg_m <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+            else if (~(|io_cmd_0_payload_reg0Addr))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+              shadowReg_m <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
           end
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-          regFile_m <= io_cmd_2_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-        if (_GEN_139) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_114) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_n <= io_cmd_2_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-            regFile_k <= io_cmd_2_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+          shadowReg_m <= io_cmd_2_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+        if (_GEN_133) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_108) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_n <= io_cmd_2_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+            shadowReg_k <= io_cmd_2_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
           end
-          else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-            if (_GEN_88) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-              if (_GEN_63) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                regFile_n <= io_cmd_1_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-                regFile_k <= io_cmd_1_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+          else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+            if (_GEN_85) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+              if (_GEN_60) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                shadowReg_n <= io_cmd_1_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+                shadowReg_k <= io_cmd_1_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
               end
-              else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                if (_GEN_37) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                  if (_GEN_12) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                    regFile_n <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-                    regFile_k <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+              else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                if (_GEN_37) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                  if (_GEN_12) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                    shadowReg_n <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+                    shadowReg_k <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
                   end
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                  regFile_n <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-                  regFile_k <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                  shadowReg_n <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+                  shadowReg_k <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
                 end
               end
             end
-            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-              regFile_n <= io_cmd_1_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-              regFile_k <= io_cmd_1_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+              shadowReg_n <= io_cmd_1_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+              shadowReg_k <= io_cmd_1_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
             end
           end
-          else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-            if (_GEN_37) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-              if (_GEN_12) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                regFile_n <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-                regFile_k <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+          else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+            if (_GEN_37) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+              if (_GEN_12) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                shadowReg_n <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+                shadowReg_k <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
               end
             end
-            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-              regFile_n <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-              regFile_k <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+              shadowReg_n <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+              shadowReg_k <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
             end
           end
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_n <= io_cmd_2_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-          regFile_k <= io_cmd_2_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_n <= io_cmd_2_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+          shadowReg_k <= io_cmd_2_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
         end
-        if (_GEN_141) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_116) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_90) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_65) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_39) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_14) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        if (_GEN_135) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_110) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_87) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_62) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_39) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_14) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_aAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_aAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_aAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_aAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_aAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_aAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_39) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_14) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_39) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_14) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_aAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_aAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_aAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_aAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_aAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_143) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_118) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_92) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_67) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_41) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_16) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_aAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_137) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_112) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_89) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_64) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_41) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_16) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_bAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_bAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_bAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_bAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_bAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_bAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_bAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_bAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_41) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_16) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_41) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_16) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_bAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_bAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_bAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_bAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_bAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_bAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_bAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_145) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_120) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_94) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_69) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_43) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_18) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_bAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_139) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_114) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_91) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_66) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_43) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_18) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_cAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_cAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_cAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_cAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_cAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_cAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_cAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_cAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_43) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_18) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_43) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_18) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_cAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_cAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_cAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-            end
-          end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_cAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_cAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_147) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_122) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_96) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_71) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                      end
-                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_aAddrMode <= io_cmd_0_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                        regFile_bAddrMode <= io_cmd_0_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                        regFile_cAddrMode <= io_cmd_0_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                        regFile_aMxBlockSize <= io_cmd_0_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                        regFile_bMxBlockSize <= io_cmd_0_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                        regFile_cMxBlockSize <= io_cmd_0_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                        regFile_loadWMode <= io_cmd_0_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                        regFile_osM1 <= io_cmd_0_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                        regFile_osFmtKeep <= io_cmd_0_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                        regFile_aFmt <= io_cmd_0_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                        regFile_bFmt <= io_cmd_0_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                        regFile_cFmt <= io_cmd_0_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                        regFile_rnd <= io_cmd_0_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
-                      end
-                    end
-                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_aAddrMode <= io_cmd_0_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                      regFile_bAddrMode <= io_cmd_0_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                      regFile_cAddrMode <= io_cmd_0_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                      regFile_aMxBlockSize <= io_cmd_0_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                      regFile_bMxBlockSize <= io_cmd_0_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                      regFile_cMxBlockSize <= io_cmd_0_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                      regFile_loadWMode <= io_cmd_0_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                      regFile_osM1 <= io_cmd_0_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                      regFile_osFmtKeep <= io_cmd_0_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                      regFile_aFmt <= io_cmd_0_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                      regFile_bFmt <= io_cmd_0_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                      regFile_cFmt <= io_cmd_0_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                      regFile_rnd <= io_cmd_0_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
-                    end
-                  end
-                end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_aAddrMode <= io_cmd_1_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                  regFile_bAddrMode <= io_cmd_1_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                  regFile_cAddrMode <= io_cmd_1_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                  regFile_aMxBlockSize <= io_cmd_1_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                  regFile_bMxBlockSize <= io_cmd_1_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                  regFile_cMxBlockSize <= io_cmd_1_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                  regFile_loadWMode <= io_cmd_1_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                  regFile_osM1 <= io_cmd_1_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                  regFile_osFmtKeep <= io_cmd_1_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                  regFile_aFmt <= io_cmd_1_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                  regFile_bFmt <= io_cmd_1_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                  regFile_cFmt <= io_cmd_1_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                  regFile_rnd <= io_cmd_1_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
-                end
-              end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aAddrMode <= io_cmd_1_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                regFile_bAddrMode <= io_cmd_1_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                regFile_cAddrMode <= io_cmd_1_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                regFile_aMxBlockSize <= io_cmd_1_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                regFile_bMxBlockSize <= io_cmd_1_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                regFile_cMxBlockSize <= io_cmd_1_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                regFile_loadWMode <= io_cmd_1_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                regFile_osM1 <= io_cmd_1_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                regFile_osFmtKeep <= io_cmd_1_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                regFile_aFmt <= io_cmd_1_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                regFile_bFmt <= io_cmd_1_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                regFile_cFmt <= io_cmd_1_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                regFile_rnd <= io_cmd_1_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
-              end
-            end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_aAddrMode <= io_cmd_0_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                  regFile_bAddrMode <= io_cmd_0_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                  regFile_cAddrMode <= io_cmd_0_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                  regFile_aMxBlockSize <= io_cmd_0_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                  regFile_bMxBlockSize <= io_cmd_0_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                  regFile_cMxBlockSize <= io_cmd_0_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                  regFile_loadWMode <= io_cmd_0_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                  regFile_osM1 <= io_cmd_0_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                  regFile_osFmtKeep <= io_cmd_0_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                  regFile_aFmt <= io_cmd_0_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                  regFile_bFmt <= io_cmd_0_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                  regFile_cFmt <= io_cmd_0_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                  regFile_rnd <= io_cmd_0_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
-                end
-              end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aAddrMode <= io_cmd_0_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                regFile_bAddrMode <= io_cmd_0_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                regFile_cAddrMode <= io_cmd_0_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                regFile_aMxBlockSize <= io_cmd_0_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                regFile_bMxBlockSize <= io_cmd_0_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                regFile_cMxBlockSize <= io_cmd_0_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                regFile_loadWMode <= io_cmd_0_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                regFile_osM1 <= io_cmd_0_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                regFile_osFmtKeep <= io_cmd_0_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                regFile_aFmt <= io_cmd_0_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                regFile_bFmt <= io_cmd_0_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                regFile_cFmt <= io_cmd_0_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                regFile_rnd <= io_cmd_0_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
-              end
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_cAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_aAddrMode <= io_cmd_2_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-            regFile_bAddrMode <= io_cmd_2_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-            regFile_cAddrMode <= io_cmd_2_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-            regFile_aMxBlockSize <= io_cmd_2_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-            regFile_bMxBlockSize <= io_cmd_2_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-            regFile_cMxBlockSize <= io_cmd_2_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-            regFile_loadWMode <= io_cmd_2_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-            regFile_osM1 <= io_cmd_2_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-            regFile_osFmtKeep <= io_cmd_2_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-            regFile_aFmt <= io_cmd_2_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-            regFile_bFmt <= io_cmd_2_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-            regFile_cFmt <= io_cmd_2_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-            regFile_rnd <= io_cmd_2_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
-          end
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_cAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_aAddrMode <= io_cmd_2_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-          regFile_bAddrMode <= io_cmd_2_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-          regFile_cAddrMode <= io_cmd_2_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-          regFile_aMxBlockSize <= io_cmd_2_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-          regFile_bMxBlockSize <= io_cmd_2_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-          regFile_cMxBlockSize <= io_cmd_2_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-          regFile_loadWMode <= io_cmd_2_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-          regFile_osM1 <= io_cmd_2_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-          regFile_osFmtKeep <= io_cmd_2_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-          regFile_aFmt <= io_cmd_2_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-          regFile_bFmt <= io_cmd_2_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-          regFile_cFmt <= io_cmd_2_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-          regFile_rnd <= io_cmd_2_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
-        end
-        if (_GEN_149) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_124) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_98) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_73) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_47) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_22) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_cAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_141) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_116) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_93) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_68) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_aScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-                    end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_aScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-                  end
-                end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_aScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-              end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-            end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_47) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_22) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_aScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-              end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-            end
-          end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_aScaleAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_aScaleAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_151) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_126) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_100) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_75) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_49) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_24) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                      end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_bScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-                    end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_bScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-                  end
-                end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_bScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-              end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_bScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-            end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_49) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_24) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_bScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-              end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_bScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-            end
-          end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_bScaleAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_bScaleAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_153) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_128) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_102) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_77) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_51) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_26) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                      end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_cScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-                    end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_cScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-                  end
-                end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_cScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-              end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_cScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-            end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_51) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_26) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_cScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-              end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_cScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-            end
-          end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_cScaleAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_cScaleAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_147) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_122) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_96) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_71) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                      end
-                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_warmup <= io_cmd_0_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                        regFile_warmdown <= io_cmd_0_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                        regFile_biasOn <= io_cmd_0_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
+                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_aAddrMode <= io_cmd_0_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                        shadowReg_bAddrMode <= io_cmd_0_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                        shadowReg_cAddrMode <= io_cmd_0_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                        shadowReg_aMxBlockSize <= io_cmd_0_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                        shadowReg_bMxBlockSize <= io_cmd_0_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                        shadowReg_cMxBlockSize <= io_cmd_0_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                        shadowReg_loadWMode <= io_cmd_0_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                        shadowReg_osM1 <= io_cmd_0_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                        shadowReg_osFmtKeep <= io_cmd_0_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                        shadowReg_aFmt <= io_cmd_0_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                        shadowReg_bFmt <= io_cmd_0_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                        shadowReg_cFmt <= io_cmd_0_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                        shadowReg_rnd <= io_cmd_0_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
                       end
                     end
-                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_warmup <= io_cmd_0_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                      regFile_warmdown <= io_cmd_0_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                      regFile_biasOn <= io_cmd_0_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
+                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_aAddrMode <= io_cmd_0_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                      shadowReg_bAddrMode <= io_cmd_0_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                      shadowReg_cAddrMode <= io_cmd_0_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                      shadowReg_aMxBlockSize <= io_cmd_0_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                      shadowReg_bMxBlockSize <= io_cmd_0_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                      shadowReg_cMxBlockSize <= io_cmd_0_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                      shadowReg_loadWMode <= io_cmd_0_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                      shadowReg_osM1 <= io_cmd_0_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                      shadowReg_osFmtKeep <= io_cmd_0_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                      shadowReg_aFmt <= io_cmd_0_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                      shadowReg_bFmt <= io_cmd_0_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                      shadowReg_cFmt <= io_cmd_0_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                      shadowReg_rnd <= io_cmd_0_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
                     end
                   end
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_warmup <= io_cmd_1_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                  regFile_warmdown <= io_cmd_1_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                  regFile_biasOn <= io_cmd_1_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_aAddrMode <= io_cmd_1_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                  shadowReg_bAddrMode <= io_cmd_1_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                  shadowReg_cAddrMode <= io_cmd_1_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                  shadowReg_aMxBlockSize <= io_cmd_1_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                  shadowReg_bMxBlockSize <= io_cmd_1_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                  shadowReg_cMxBlockSize <= io_cmd_1_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                  shadowReg_loadWMode <= io_cmd_1_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                  shadowReg_osM1 <= io_cmd_1_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                  shadowReg_osFmtKeep <= io_cmd_1_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                  shadowReg_aFmt <= io_cmd_1_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                  shadowReg_bFmt <= io_cmd_1_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                  shadowReg_cFmt <= io_cmd_1_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                  shadowReg_rnd <= io_cmd_1_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_warmup <= io_cmd_1_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                regFile_warmdown <= io_cmd_1_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                regFile_biasOn <= io_cmd_1_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aAddrMode <= io_cmd_1_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                shadowReg_bAddrMode <= io_cmd_1_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                shadowReg_cAddrMode <= io_cmd_1_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                shadowReg_aMxBlockSize <= io_cmd_1_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                shadowReg_bMxBlockSize <= io_cmd_1_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                shadowReg_cMxBlockSize <= io_cmd_1_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                shadowReg_loadWMode <= io_cmd_1_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                shadowReg_osM1 <= io_cmd_1_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                shadowReg_osFmtKeep <= io_cmd_1_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                shadowReg_aFmt <= io_cmd_1_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                shadowReg_bFmt <= io_cmd_1_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                shadowReg_cFmt <= io_cmd_1_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                shadowReg_rnd <= io_cmd_1_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
               end
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_warmup <= io_cmd_0_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                  regFile_warmdown <= io_cmd_0_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                  regFile_biasOn <= io_cmd_0_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_aAddrMode <= io_cmd_0_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                  shadowReg_bAddrMode <= io_cmd_0_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                  shadowReg_cAddrMode <= io_cmd_0_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                  shadowReg_aMxBlockSize <= io_cmd_0_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                  shadowReg_bMxBlockSize <= io_cmd_0_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                  shadowReg_cMxBlockSize <= io_cmd_0_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                  shadowReg_loadWMode <= io_cmd_0_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                  shadowReg_osM1 <= io_cmd_0_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                  shadowReg_osFmtKeep <= io_cmd_0_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                  shadowReg_aFmt <= io_cmd_0_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                  shadowReg_bFmt <= io_cmd_0_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                  shadowReg_cFmt <= io_cmd_0_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                  shadowReg_rnd <= io_cmd_0_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_warmup <= io_cmd_0_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                regFile_warmdown <= io_cmd_0_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                regFile_biasOn <= io_cmd_0_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aAddrMode <= io_cmd_0_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                shadowReg_bAddrMode <= io_cmd_0_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                shadowReg_cAddrMode <= io_cmd_0_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                shadowReg_aMxBlockSize <= io_cmd_0_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                shadowReg_bMxBlockSize <= io_cmd_0_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                shadowReg_cMxBlockSize <= io_cmd_0_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                shadowReg_loadWMode <= io_cmd_0_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                shadowReg_osM1 <= io_cmd_0_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                shadowReg_osFmtKeep <= io_cmd_0_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                shadowReg_aFmt <= io_cmd_0_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                shadowReg_bFmt <= io_cmd_0_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                shadowReg_cFmt <= io_cmd_0_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                shadowReg_rnd <= io_cmd_0_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
               end
             end
           end
-          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_warmup <= io_cmd_2_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-            regFile_warmdown <= io_cmd_2_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-            regFile_biasOn <= io_cmd_2_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
+          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_aAddrMode <= io_cmd_2_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+            shadowReg_bAddrMode <= io_cmd_2_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+            shadowReg_cAddrMode <= io_cmd_2_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+            shadowReg_aMxBlockSize <= io_cmd_2_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+            shadowReg_bMxBlockSize <= io_cmd_2_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+            shadowReg_cMxBlockSize <= io_cmd_2_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+            shadowReg_loadWMode <= io_cmd_2_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+            shadowReg_osM1 <= io_cmd_2_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+            shadowReg_osFmtKeep <= io_cmd_2_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+            shadowReg_aFmt <= io_cmd_2_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+            shadowReg_bFmt <= io_cmd_2_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+            shadowReg_cFmt <= io_cmd_2_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+            shadowReg_rnd <= io_cmd_2_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
           end
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_warmup <= io_cmd_2_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-          regFile_warmdown <= io_cmd_2_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-          regFile_biasOn <= io_cmd_2_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_aAddrMode <= io_cmd_2_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+          shadowReg_bAddrMode <= io_cmd_2_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+          shadowReg_cAddrMode <= io_cmd_2_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+          shadowReg_aMxBlockSize <= io_cmd_2_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+          shadowReg_bMxBlockSize <= io_cmd_2_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+          shadowReg_cMxBlockSize <= io_cmd_2_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+          shadowReg_loadWMode <= io_cmd_2_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+          shadowReg_osM1 <= io_cmd_2_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+          shadowReg_osFmtKeep <= io_cmd_2_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+          shadowReg_aFmt <= io_cmd_2_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+          shadowReg_bFmt <= io_cmd_2_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+          shadowReg_cFmt <= io_cmd_2_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+          shadowReg_rnd <= io_cmd_2_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
         end
-        if (_GEN_155) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_130) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_104) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_79) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_53) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_28) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        if (_GEN_143) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_118) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_95) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_70) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_47) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_22) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_biasAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_aScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_biasAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_aScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_biasAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_aScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_biasAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_53) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_28) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_47) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_22) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_biasAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_aScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_biasAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_biasAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_aScaleAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_biasAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_147) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_122) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_96) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_71) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_aScaleAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_145) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_120) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_97) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_72) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_49) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_24) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_requantOn <= io_cmd_0_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                        regFile_reluOn <= io_cmd_0_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_bScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+                    end
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_bScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+                  end
+                end
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_bScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+              end
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_bScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+            end
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_49) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_24) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                end
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_bScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+              end
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_bScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+            end
+          end
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_bScaleAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        end
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_bScaleAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_147) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_122) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_99) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_74) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_51) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_26) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                      end
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_cScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+                    end
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_cScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+                  end
+                end
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_cScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+              end
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_cScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+            end
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_51) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_26) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                end
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_cScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+              end
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_cScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+            end
+          end
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_cScaleAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        end
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_cScaleAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_141) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_116) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_93) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_68) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                      end
+                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_warmup <= io_cmd_0_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                        shadowReg_warmdown <= io_cmd_0_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                        shadowReg_biasOn <= io_cmd_0_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
                       end
                     end
-                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_requantOn <= io_cmd_0_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                      regFile_reluOn <= io_cmd_0_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_warmup <= io_cmd_0_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                      shadowReg_warmdown <= io_cmd_0_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                      shadowReg_biasOn <= io_cmd_0_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
                     end
                   end
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_requantOn <= io_cmd_1_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                  regFile_reluOn <= io_cmd_1_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_warmup <= io_cmd_1_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                  shadowReg_warmdown <= io_cmd_1_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                  shadowReg_biasOn <= io_cmd_1_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_requantOn <= io_cmd_1_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                regFile_reluOn <= io_cmd_1_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_warmup <= io_cmd_1_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                shadowReg_warmdown <= io_cmd_1_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                shadowReg_biasOn <= io_cmd_1_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
               end
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_requantOn <= io_cmd_0_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                  regFile_reluOn <= io_cmd_0_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_warmup <= io_cmd_0_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                  shadowReg_warmdown <= io_cmd_0_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                  shadowReg_biasOn <= io_cmd_0_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_requantOn <= io_cmd_0_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                regFile_reluOn <= io_cmd_0_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_warmup <= io_cmd_0_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                shadowReg_warmdown <= io_cmd_0_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                shadowReg_biasOn <= io_cmd_0_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
               end
             end
           end
-          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_requantOn <= io_cmd_2_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-            regFile_reluOn <= io_cmd_2_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_warmup <= io_cmd_2_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+            shadowReg_warmdown <= io_cmd_2_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+            shadowReg_biasOn <= io_cmd_2_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
           end
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_requantOn <= io_cmd_2_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-          regFile_reluOn <= io_cmd_2_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_warmup <= io_cmd_2_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+          shadowReg_warmdown <= io_cmd_2_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+          shadowReg_biasOn <= io_cmd_2_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
         end
-        if (_GEN_157) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_132) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_106) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_81) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_55) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_30) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        if (_GEN_149) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_124) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_101) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_76) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_53) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_28) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_rqMBase <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_biasAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_rqMBase <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_biasAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_rqMBase <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_biasAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_rqMBase <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_biasAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_55) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_30) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_53) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_28) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_rqMBase <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_biasAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_rqMBase <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_biasAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_rqMBase <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_biasAddr <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_rqMBase <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_159) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_134) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_108) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_83) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_57) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_32) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_biasAddr <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_141) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_116) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_93) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_68) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                        regFile_rqShift <= io_cmd_0_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                        regFile_rqZp <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_requantOn <= io_cmd_0_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                        shadowReg_reluOn <= io_cmd_0_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
                       end
                     end
-                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      regFile_rqShift <= io_cmd_0_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                      regFile_rqZp <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_requantOn <= io_cmd_0_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                      shadowReg_reluOn <= io_cmd_0_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
                     end
                   end
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  regFile_rqShift <= io_cmd_1_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                  regFile_rqZp <= io_cmd_1_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_requantOn <= io_cmd_1_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                  shadowReg_reluOn <= io_cmd_1_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_rqShift <= io_cmd_1_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                regFile_rqZp <= io_cmd_1_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_requantOn <= io_cmd_1_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                shadowReg_reluOn <= io_cmd_1_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
               end
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_57) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_32) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_rqShift <= io_cmd_0_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                  regFile_rqZp <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_requantOn <= io_cmd_0_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                  shadowReg_reluOn <= io_cmd_0_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_rqShift <= io_cmd_0_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                regFile_rqZp <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_requantOn <= io_cmd_0_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                shadowReg_reluOn <= io_cmd_0_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
               end
             end
           end
-          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_rqShift <= io_cmd_2_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-            regFile_rqZp <= io_cmd_2_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_requantOn <= io_cmd_2_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+            shadowReg_reluOn <= io_cmd_2_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
           end
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_rqShift <= io_cmd_2_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-          regFile_rqZp <= io_cmd_2_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_requantOn <= io_cmd_2_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+          shadowReg_reluOn <= io_cmd_2_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
         end
-        if (_GEN_160) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_135) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_109) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_84) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-                    if (_GEN_58) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      if (_GEN_33) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18
+        if (_GEN_151) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_126) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_103) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_78) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_55) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_30) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                       end
-                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18
-                        irqMask <= io_cmd_0_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_rqMBase <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                     end
-                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                      irqMask <= io_cmd_0_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_rqMBase <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
                   end
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-                  irqMask <= io_cmd_1_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_rqMBase <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                irqMask <= io_cmd_1_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_rqMBase <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
-            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_58) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_33) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_55) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_30) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18
-                  irqMask <= io_cmd_0_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_rqMBase <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                irqMask <= io_cmd_0_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_rqMBase <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            irqMask <= io_cmd_2_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_rqMBase <= io_cmd_2_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          irqMask <= io_cmd_2_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_rqMBase <= io_cmd_2_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_153) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_128) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_105) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_80) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_57) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_32) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                      end
+                      else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                        shadowReg_rqShift <= io_cmd_0_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                        shadowReg_rqZp <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+                      end
+                    end
+                    else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      shadowReg_rqShift <= io_cmd_0_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                      shadowReg_rqZp <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+                    end
+                  end
+                end
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  shadowReg_rqShift <= io_cmd_1_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                  shadowReg_rqZp <= io_cmd_1_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+                end
+              end
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_rqShift <= io_cmd_1_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                shadowReg_rqZp <= io_cmd_1_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+              end
+            end
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_57) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_32) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                end
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_rqShift <= io_cmd_0_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                  shadowReg_rqZp <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+                end
+              end
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_rqShift <= io_cmd_0_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                shadowReg_rqZp <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+              end
+            end
+          end
+          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_rqShift <= io_cmd_2_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+            shadowReg_rqZp <= io_cmd_2_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+          end
+        end
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_rqShift <= io_cmd_2_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+          shadowReg_rqZp <= io_cmd_2_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+        end
+        if (_GEN_154) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_129) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_106) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_81) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+                    if (_GEN_58) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      if (_GEN_33) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18
+                      end
+                      else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18
+                        irqMask <= io_cmd_0_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+                    end
+                    else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                      irqMask <= io_cmd_0_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+                  end
+                end
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+                  irqMask <= io_cmd_1_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+              end
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                irqMask <= io_cmd_1_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+            end
+            else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_58) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_33) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18
+                end
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18
+                  irqMask <= io_cmd_0_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+              end
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                irqMask <= io_cmd_0_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+            end
+          end
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            irqMask <= io_cmd_2_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+        end
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          irqMask <= io_cmd_2_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
       end
-      else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-        if (_GEN_86)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :201:20
-          regFile_m <= io_cmd_1_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-        else if (|io_cmd_1_payload_reg0Addr) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-          if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-            if (_GEN_35)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :201:20
-              regFile_m <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-            else if (~(|io_cmd_0_payload_reg0Addr))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-              regFile_m <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
+      else if (acceptedWrites_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+        if (_GEN_83)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :237:20
+          shadowReg_m <= io_cmd_1_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+        else if (|io_cmd_1_payload_reg0Addr) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+          if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+            if (_GEN_35)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :237:20
+              shadowReg_m <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+            else if (~(|io_cmd_0_payload_reg0Addr))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+              shadowReg_m <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
           end
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-          regFile_m <= io_cmd_1_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-        if (_GEN_88) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_63) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_n <= io_cmd_1_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-            regFile_k <= io_cmd_1_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+          shadowReg_m <= io_cmd_1_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+        if (_GEN_85) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_60) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_n <= io_cmd_1_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+            shadowReg_k <= io_cmd_1_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
           end
-          else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-            if (_GEN_37) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-              if (_GEN_12) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                regFile_n <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-                regFile_k <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+          else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+            if (_GEN_37) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+              if (_GEN_12) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                shadowReg_n <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+                shadowReg_k <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
               end
             end
-            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-              regFile_n <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-              regFile_k <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+            else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+              shadowReg_n <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+              shadowReg_k <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
             end
           end
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_n <= io_cmd_1_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-          regFile_k <= io_cmd_1_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_n <= io_cmd_1_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+          shadowReg_k <= io_cmd_1_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
         end
-        if (_GEN_90) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_65) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_39) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_14) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        if (_GEN_87) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_62) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_39) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_14) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_aAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_aAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_aAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_aAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_aAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_92) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_67) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_41) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_16) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_aAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_89) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_64) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_41) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_16) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_bAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_bAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_bAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_bAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_bAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_bAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_bAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_94) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_69) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_43) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_18) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_bAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_91) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_66) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_43) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_18) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_cAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_cAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_cAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_cAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_cAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_cAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_cAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_96) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_71) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_cAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_93) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_68) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_aAddrMode <= io_cmd_0_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                  regFile_bAddrMode <= io_cmd_0_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                  regFile_cAddrMode <= io_cmd_0_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                  regFile_aMxBlockSize <= io_cmd_0_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                  regFile_bMxBlockSize <= io_cmd_0_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                  regFile_cMxBlockSize <= io_cmd_0_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                  regFile_loadWMode <= io_cmd_0_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                  regFile_osM1 <= io_cmd_0_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                  regFile_osFmtKeep <= io_cmd_0_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                  regFile_aFmt <= io_cmd_0_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                  regFile_bFmt <= io_cmd_0_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                  regFile_cFmt <= io_cmd_0_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                  regFile_rnd <= io_cmd_0_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_aAddrMode <= io_cmd_0_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                  shadowReg_bAddrMode <= io_cmd_0_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                  shadowReg_cAddrMode <= io_cmd_0_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                  shadowReg_aMxBlockSize <= io_cmd_0_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                  shadowReg_bMxBlockSize <= io_cmd_0_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                  shadowReg_cMxBlockSize <= io_cmd_0_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                  shadowReg_loadWMode <= io_cmd_0_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                  shadowReg_osM1 <= io_cmd_0_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                  shadowReg_osFmtKeep <= io_cmd_0_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                  shadowReg_aFmt <= io_cmd_0_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                  shadowReg_bFmt <= io_cmd_0_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                  shadowReg_cFmt <= io_cmd_0_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                  shadowReg_rnd <= io_cmd_0_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aAddrMode <= io_cmd_0_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-                regFile_bAddrMode <= io_cmd_0_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-                regFile_cAddrMode <= io_cmd_0_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-                regFile_aMxBlockSize <= io_cmd_0_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-                regFile_bMxBlockSize <= io_cmd_0_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-                regFile_cMxBlockSize <= io_cmd_0_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-                regFile_loadWMode <= io_cmd_0_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-                regFile_osM1 <= io_cmd_0_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-                regFile_osFmtKeep <= io_cmd_0_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-                regFile_aFmt <= io_cmd_0_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-                regFile_bFmt <= io_cmd_0_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-                regFile_cFmt <= io_cmd_0_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-                regFile_rnd <= io_cmd_0_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
-              end
-            end
-          end
-          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_aAddrMode <= io_cmd_1_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-            regFile_bAddrMode <= io_cmd_1_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-            regFile_cAddrMode <= io_cmd_1_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-            regFile_aMxBlockSize <= io_cmd_1_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-            regFile_bMxBlockSize <= io_cmd_1_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-            regFile_cMxBlockSize <= io_cmd_1_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-            regFile_loadWMode <= io_cmd_1_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-            regFile_osM1 <= io_cmd_1_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-            regFile_osFmtKeep <= io_cmd_1_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-            regFile_aFmt <= io_cmd_1_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-            regFile_bFmt <= io_cmd_1_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-            regFile_cFmt <= io_cmd_1_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-            regFile_rnd <= io_cmd_1_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
-          end
-        end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_aAddrMode <= io_cmd_1_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-          regFile_bAddrMode <= io_cmd_1_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-          regFile_cAddrMode <= io_cmd_1_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-          regFile_aMxBlockSize <= io_cmd_1_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-          regFile_bMxBlockSize <= io_cmd_1_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-          regFile_cMxBlockSize <= io_cmd_1_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-          regFile_loadWMode <= io_cmd_1_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-          regFile_osM1 <= io_cmd_1_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-          regFile_osFmtKeep <= io_cmd_1_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-          regFile_aFmt <= io_cmd_1_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-          regFile_bFmt <= io_cmd_1_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-          regFile_cFmt <= io_cmd_1_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-          regFile_rnd <= io_cmd_1_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
-        end
-        if (_GEN_98) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_73) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_47) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_22) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_aScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-              end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_aScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-            end
-          end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_aScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_aScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_100) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_75) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_49) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_24) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_bScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-              end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_bScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-            end
-          end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_bScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_bScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_102) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_77) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_51) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_26) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_cScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-              end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_cScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-            end
-          end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_cScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_cScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_96) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_71) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_warmup <= io_cmd_0_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                  regFile_warmdown <= io_cmd_0_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                  regFile_biasOn <= io_cmd_0_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
-                end
-              end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_warmup <= io_cmd_0_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-                regFile_warmdown <= io_cmd_0_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-                regFile_biasOn <= io_cmd_0_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aAddrMode <= io_cmd_0_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+                shadowReg_bAddrMode <= io_cmd_0_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+                shadowReg_cAddrMode <= io_cmd_0_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+                shadowReg_aMxBlockSize <= io_cmd_0_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+                shadowReg_bMxBlockSize <= io_cmd_0_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+                shadowReg_cMxBlockSize <= io_cmd_0_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+                shadowReg_loadWMode <= io_cmd_0_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+                shadowReg_osM1 <= io_cmd_0_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+                shadowReg_osFmtKeep <= io_cmd_0_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+                shadowReg_aFmt <= io_cmd_0_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+                shadowReg_bFmt <= io_cmd_0_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+                shadowReg_cFmt <= io_cmd_0_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+                shadowReg_rnd <= io_cmd_0_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
               end
             end
           end
-          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_warmup <= io_cmd_1_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-            regFile_warmdown <= io_cmd_1_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-            regFile_biasOn <= io_cmd_1_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
+          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_aAddrMode <= io_cmd_1_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+            shadowReg_bAddrMode <= io_cmd_1_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+            shadowReg_cAddrMode <= io_cmd_1_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+            shadowReg_aMxBlockSize <= io_cmd_1_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+            shadowReg_bMxBlockSize <= io_cmd_1_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+            shadowReg_cMxBlockSize <= io_cmd_1_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+            shadowReg_loadWMode <= io_cmd_1_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+            shadowReg_osM1 <= io_cmd_1_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+            shadowReg_osFmtKeep <= io_cmd_1_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+            shadowReg_aFmt <= io_cmd_1_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+            shadowReg_bFmt <= io_cmd_1_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+            shadowReg_cFmt <= io_cmd_1_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+            shadowReg_rnd <= io_cmd_1_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
           end
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_warmup <= io_cmd_1_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-          regFile_warmdown <= io_cmd_1_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-          regFile_biasOn <= io_cmd_1_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_aAddrMode <= io_cmd_1_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+          shadowReg_bAddrMode <= io_cmd_1_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+          shadowReg_cAddrMode <= io_cmd_1_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+          shadowReg_aMxBlockSize <= io_cmd_1_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+          shadowReg_bMxBlockSize <= io_cmd_1_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+          shadowReg_cMxBlockSize <= io_cmd_1_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+          shadowReg_loadWMode <= io_cmd_1_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+          shadowReg_osM1 <= io_cmd_1_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+          shadowReg_osFmtKeep <= io_cmd_1_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+          shadowReg_aFmt <= io_cmd_1_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+          shadowReg_bFmt <= io_cmd_1_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+          shadowReg_cFmt <= io_cmd_1_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+          shadowReg_rnd <= io_cmd_1_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
         end
-        if (_GEN_104) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_79) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_53) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_28) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        if (_GEN_95) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_70) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_47) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_22) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_biasAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_aScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_biasAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_aScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_biasAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_aScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_biasAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_96) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_71) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_aScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_97) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_72) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_49) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_24) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_requantOn <= io_cmd_0_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                  regFile_reluOn <= io_cmd_0_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_bScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+              end
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_bScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+            end
+          end
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_bScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        end
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_bScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_99) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_74) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_51) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_26) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                end
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_cScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+              end
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_cScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+            end
+          end
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_cScaleAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        end
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_cScaleAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_93) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_68) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                end
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_warmup <= io_cmd_0_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                  shadowReg_warmdown <= io_cmd_0_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                  shadowReg_biasOn <= io_cmd_0_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_requantOn <= io_cmd_0_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-                regFile_reluOn <= io_cmd_0_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_warmup <= io_cmd_0_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+                shadowReg_warmdown <= io_cmd_0_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+                shadowReg_biasOn <= io_cmd_0_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
               end
             end
           end
-          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_requantOn <= io_cmd_1_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-            regFile_reluOn <= io_cmd_1_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_warmup <= io_cmd_1_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+            shadowReg_warmdown <= io_cmd_1_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+            shadowReg_biasOn <= io_cmd_1_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
           end
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_requantOn <= io_cmd_1_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-          regFile_reluOn <= io_cmd_1_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_warmup <= io_cmd_1_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+          shadowReg_warmdown <= io_cmd_1_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+          shadowReg_biasOn <= io_cmd_1_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
         end
-        if (_GEN_106) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_81) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_55) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_30) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        if (_GEN_101) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_76) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_53) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_28) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_rqMBase <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_biasAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_rqMBase <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_biasAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_rqMBase <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_biasAddr <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_rqMBase <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_108) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_83) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_57) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_32) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_biasAddr <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_93) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_68) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-                  regFile_rqShift <= io_cmd_0_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                  regFile_rqZp <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_requantOn <= io_cmd_0_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                  shadowReg_reluOn <= io_cmd_0_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
                 end
               end
-              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                regFile_rqShift <= io_cmd_0_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-                regFile_rqZp <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_requantOn <= io_cmd_0_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+                shadowReg_reluOn <= io_cmd_0_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
               end
             end
           end
-          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            regFile_rqShift <= io_cmd_1_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-            regFile_rqZp <= io_cmd_1_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_requantOn <= io_cmd_1_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+            shadowReg_reluOn <= io_cmd_1_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
           end
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_rqShift <= io_cmd_1_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-          regFile_rqZp <= io_cmd_1_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_requantOn <= io_cmd_1_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+          shadowReg_reluOn <= io_cmd_1_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
         end
-        if (_GEN_109) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_84) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-              if (_GEN_58) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                if (_GEN_33) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18
+        if (_GEN_103) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_78) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_55) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_30) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
                 end
-                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18
-                  irqMask <= io_cmd_0_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_rqMBase <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
               end
-              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-                irqMask <= io_cmd_0_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_rqMBase <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
             end
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :199:32
-            irqMask <= io_cmd_1_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_rqMBase <= io_cmd_1_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          irqMask <= io_cmd_1_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_rqMBase <= io_cmd_1_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_105) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_80) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_57) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_32) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                end
+                else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+                  shadowReg_rqShift <= io_cmd_0_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                  shadowReg_rqZp <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+                end
+              end
+              else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                shadowReg_rqShift <= io_cmd_0_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+                shadowReg_rqZp <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+              end
+            end
+          end
+          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            shadowReg_rqShift <= io_cmd_1_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+            shadowReg_rqZp <= io_cmd_1_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+          end
+        end
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_rqShift <= io_cmd_1_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+          shadowReg_rqZp <= io_cmd_1_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+        end
+        if (_GEN_106) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_81) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+              if (_GEN_58) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                if (_GEN_33) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18
+                end
+                else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18
+                  irqMask <= io_cmd_0_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+              end
+              else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+                irqMask <= io_cmd_0_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+            end
+          end
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :235:32
+            irqMask <= io_cmd_1_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+        end
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          irqMask <= io_cmd_1_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
       end
-      else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:166:{41,63}
-        if (_GEN_35)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :64:44, :201:20
-          regFile_m <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-        else if (~(|io_cmd_0_payload_reg0Addr))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:104:18
-          regFile_m <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :64:51
-        if (_GEN_37) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_12) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-            regFile_n <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-            regFile_k <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+      else if (acceptedWrites_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:202:{41,63}
+        if (_GEN_35)	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :88:46, :237:20
+          shadowReg_m <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+        else if (~(|io_cmd_0_payload_reg0Addr))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:129:18
+          shadowReg_m <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :88:53
+        if (_GEN_37) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_12) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+            shadowReg_n <= io_cmd_0_payload_data0[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+            shadowReg_k <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
           end
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_n <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:52
-          regFile_k <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :65:78
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_n <= io_cmd_0_payload_data1[15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:54
+          shadowReg_k <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :89:82
         end
-        if (_GEN_39) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_14) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        if (_GEN_39) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_14) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-            regFile_aAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+            shadowReg_aAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_aAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_41) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_16) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_aAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_41) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_16) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-            regFile_bAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+            shadowReg_bAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_bAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_43) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_18) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_bAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_43) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_18) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-            regFile_cAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+            shadowReg_cAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_cAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_cAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
           end
-          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-            regFile_aAddrMode <= io_cmd_0_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-            regFile_bAddrMode <= io_cmd_0_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-            regFile_cAddrMode <= io_cmd_0_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-            regFile_aMxBlockSize <= io_cmd_0_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-            regFile_bMxBlockSize <= io_cmd_0_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-            regFile_cMxBlockSize <= io_cmd_0_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-            regFile_loadWMode <= io_cmd_0_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-            regFile_osM1 <= io_cmd_0_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-            regFile_osFmtKeep <= io_cmd_0_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-            regFile_aFmt <= io_cmd_0_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-            regFile_bFmt <= io_cmd_0_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-            regFile_cFmt <= io_cmd_0_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-            regFile_rnd <= io_cmd_0_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
-          end
-        end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_aAddrMode <= io_cmd_0_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :73:34
-          regFile_bAddrMode <= io_cmd_0_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :74:34
-          regFile_cAddrMode <= io_cmd_0_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :75:34
-          regFile_aMxBlockSize <= io_cmd_0_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :80:37
-          regFile_bMxBlockSize <= io_cmd_0_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :81:37
-          regFile_cMxBlockSize <= io_cmd_0_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :82:37
-          regFile_loadWMode <= io_cmd_0_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :84:34
-          regFile_osM1 <= io_cmd_0_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :87:29
-          regFile_osFmtKeep <= io_cmd_0_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :83:34
-          regFile_aFmt <= io_cmd_0_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :70:29
-          regFile_bFmt <= io_cmd_0_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :71:29
-          regFile_cFmt <= io_cmd_0_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :72:29
-          regFile_rnd <= io_cmd_0_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :77:28
-        end
-        if (_GEN_47) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_22) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-          end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-            regFile_aScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_aScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_49) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_24) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-          end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-            regFile_bScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_bScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_51) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_26) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-          end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-            regFile_cScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_cScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-          end
-          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-            regFile_warmup <= io_cmd_0_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-            regFile_warmdown <= io_cmd_0_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-            regFile_biasOn <= io_cmd_0_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
+          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+            shadowReg_aAddrMode <= io_cmd_0_payload_data0[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+            shadowReg_bAddrMode <= io_cmd_0_payload_data0[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+            shadowReg_cAddrMode <= io_cmd_0_payload_data0[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+            shadowReg_aMxBlockSize <= io_cmd_0_payload_data0[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+            shadowReg_bMxBlockSize <= io_cmd_0_payload_data0[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+            shadowReg_cMxBlockSize <= io_cmd_0_payload_data0[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+            shadowReg_loadWMode <= io_cmd_0_payload_data0[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+            shadowReg_osM1 <= io_cmd_0_payload_data0[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+            shadowReg_osFmtKeep <= io_cmd_0_payload_data0[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+            shadowReg_aFmt <= io_cmd_0_payload_data0[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+            shadowReg_bFmt <= io_cmd_0_payload_data0[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+            shadowReg_cFmt <= io_cmd_0_payload_data0[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+            shadowReg_rnd <= io_cmd_0_payload_data0[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
           end
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_warmup <= io_cmd_0_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :79:31
-          regFile_warmdown <= io_cmd_0_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :78:33
-          regFile_biasOn <= io_cmd_0_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :86:31
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_aAddrMode <= io_cmd_0_payload_data1[12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :97:36
+          shadowReg_bAddrMode <= io_cmd_0_payload_data1[13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :98:36
+          shadowReg_cAddrMode <= io_cmd_0_payload_data1[14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :99:36
+          shadowReg_aMxBlockSize <= io_cmd_0_payload_data1[22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :104:39
+          shadowReg_bMxBlockSize <= io_cmd_0_payload_data1[24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :105:39
+          shadowReg_cMxBlockSize <= io_cmd_0_payload_data1[26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :106:39
+          shadowReg_loadWMode <= io_cmd_0_payload_data1[28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :108:36
+          shadowReg_osM1 <= io_cmd_0_payload_data1[31];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :111:31
+          shadowReg_osFmtKeep <= io_cmd_0_payload_data1[27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :107:36
+          shadowReg_aFmt <= io_cmd_0_payload_data1[3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :94:31
+          shadowReg_bFmt <= io_cmd_0_payload_data1[7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :95:31
+          shadowReg_cFmt <= io_cmd_0_payload_data1[11:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :96:31
+          shadowReg_rnd <= io_cmd_0_payload_data1[18:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :101:30
         end
-        if (_GEN_53) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_28) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        if (_GEN_47) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_22) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-            regFile_biasAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+            shadowReg_aScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_biasAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_aScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_49) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_24) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
           end
-          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-            regFile_requantOn <= io_cmd_0_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-            regFile_reluOn <= io_cmd_0_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
-          end
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+            shadowReg_bScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_requantOn <= io_cmd_0_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :85:34
-          regFile_reluOn <= io_cmd_0_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :76:31
-        end
-        if (_GEN_55) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_30) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_bScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_51) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_26) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-            regFile_rqMBase <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+            shadowReg_cScaleAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_rqMBase <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24
-        if (_GEN_57) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_32) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_cScaleAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
           end
-          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :63:18
-            regFile_rqShift <= io_cmd_0_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-            regFile_rqZp <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+            shadowReg_warmup <= io_cmd_0_payload_data0[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+            shadowReg_warmdown <= io_cmd_0_payload_data0[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+            shadowReg_biasOn <= io_cmd_0_payload_data0[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
           end
         end
-        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          regFile_rqShift <= io_cmd_0_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :95:32
-          regFile_rqZp <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :96:29
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_warmup <= io_cmd_0_payload_data1[21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :103:33
+          shadowReg_warmdown <= io_cmd_0_payload_data1[20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :102:35
+          shadowReg_biasOn <= io_cmd_0_payload_data1[30];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :110:33
         end
-        if (_GEN_58) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          if (_GEN_33) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18
+        if (_GEN_53) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_28) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
           end
-          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :63:18
-            irqMask <= io_cmd_0_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+            shadowReg_biasAddr <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
         end
-        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:63:18, :201:20
-          irqMask <= io_cmd_0_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:50:24, :98:55
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_biasAddr <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_45) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_20) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+          end
+          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+            shadowReg_requantOn <= io_cmd_0_payload_data0[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+            shadowReg_reluOn <= io_cmd_0_payload_data0[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
+          end
+        end
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_requantOn <= io_cmd_0_payload_data1[29];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :109:36
+          shadowReg_reluOn <= io_cmd_0_payload_data1[15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :100:33
+        end
+        if (_GEN_55) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_30) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+          end
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+            shadowReg_rqMBase <= io_cmd_0_payload_data0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        end
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_rqMBase <= io_cmd_0_payload_data1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34
+        if (_GEN_57) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_32) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+          end
+          else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :87:18
+            shadowReg_rqShift <= io_cmd_0_payload_data0[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+            shadowReg_rqZp <= io_cmd_0_payload_data0[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+          end
+        end
+        else begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          shadowReg_rqShift <= io_cmd_0_payload_data1[5:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :119:34
+          shadowReg_rqZp <= io_cmd_0_payload_data1[31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :120:31
+        end
+        if (_GEN_58) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          if (_GEN_33) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18
+          end
+          else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :87:18
+            irqMask <= io_cmd_0_payload_data0[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
+        end
+        else	// src/workerbee/scala/main/WorkerBeeRegIf.scala:87:18, :237:20
+          irqMask <= io_cmd_0_payload_data1[10:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:73:24, :122:55
       end
-      inFlight <=
-        ~(io_done | io_configError)
-        & (acceptedWrites_3 ? _GEN_163 | _GEN_162 | _GEN_112 : _GEN_162 | _GEN_112);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:45:25, :166:{41,63}, :199:32, :210:{21,34}, :212:17, :214:18, :223:{16,35,46}
-      startPending <=
-        _GEN_164
-        | (acceptedWrites_2 ? _GEN_161 | _GEN_111 | _GEN_60 : _GEN_111 | _GEN_60);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:46:29, :60:16, :166:{41,63}, :199:32, :210:{21,34}, :211:22
-      if (_GEN_164) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:199:32, :210:34, :211:22
-        startPc <= io_cmd_3_payload_pc;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:24
-        startTag <= io_cmd_3_payload_tag;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:25
+      if (_GEN_155) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32, :247:30, :248:15
+        liveReg_m <= shadowReg_m;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_n <= shadowReg_n;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_k <= shadowReg_k;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_aAddr <= shadowReg_aAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_bAddr <= shadowReg_bAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_cAddr <= shadowReg_cAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_aMxBlockSize <= shadowReg_aMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_bMxBlockSize <= shadowReg_bMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_cMxBlockSize <= shadowReg_cMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_loadWMode <= shadowReg_loadWMode;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_osM1 <= shadowReg_osM1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_osFmtKeep <= shadowReg_osFmtKeep;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_aFmt <= shadowReg_aFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_bFmt <= shadowReg_bFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_cFmt <= shadowReg_cFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_rnd <= shadowReg_rnd;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_aScaleAddr <= shadowReg_aScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_bScaleAddr <= shadowReg_bScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_cScaleAddr <= shadowReg_cScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_biasOn <= shadowReg_biasOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_biasAddr <= shadowReg_biasAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_requantOn <= shadowReg_requantOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_reluOn <= shadowReg_reluOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_rqMBase <= shadowReg_rqMBase;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_rqShift <= shadowReg_rqShift;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
+        liveReg_rqZp <= shadowReg_rqZp;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :67:32
       end
-      else if (_GEN_162) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:199:32, :210:34, :212:17
-        startPc <= io_cmd_2_payload_pc;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:24
-        startTag <= io_cmd_2_payload_tag;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:25
+      inFlight <= ~(io_done | io_configError) & (_GEN_155 | inFlight);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:67:32, :68:25, :247:30, :248:15, :252:16, :260:{16,35,46}
+      startPending <= acceptedRuns_3 | acceptedRuns_2 | acceptedRuns_1 | acceptedRuns_0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:69:29, :203:39, :247:30, :249:20
+      if (acceptedRuns_3) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:203:39
+        startPc <= io_cmd_3_payload_pc;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:70:24
+        startTag <= io_cmd_3_payload_tag;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:71:25
       end
-      else if (_GEN_111) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:199:32, :210:34, :211:22
-        startPc <= io_cmd_1_payload_pc;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:24
-        startTag <= io_cmd_1_payload_tag;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:25
+      else if (acceptedRuns_2) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:203:39
+        startPc <= io_cmd_2_payload_pc;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:70:24
+        startTag <= io_cmd_2_payload_tag;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:71:25
       end
-      else if (_GEN_61) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:24, :199:32, :210:34, :212:17
-        startPc <= io_cmd_0_payload_pc;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:24
-        startTag <= io_cmd_0_payload_tag;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:48:25
+      else if (acceptedRuns_1) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:203:39
+        startPc <= io_cmd_1_payload_pc;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:70:24
+        startTag <= io_cmd_1_payload_tag;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:71:25
+      end
+      else if (acceptedRuns_0) begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:203:39
+        startPc <= io_cmd_0_payload_pc;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:70:24
+        startTag <= io_cmd_0_payload_tag;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:71:25
       end
       irqRaw <=
         irqRaw & ~clearBits
@@ -3645,67 +3690,67 @@ module Wb_WorkerBeeRegIf(	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
            io_dmaErrors_1,
            io_dmaErrors_0,
            io_configError,
-           io_done};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:49:23, :183:29, :184:{29,66}, :192:{20,33,44}, :193:42, :199:32, :204:30, :205:19, :219:22, :220:{21,23,35}
-      if (io_configError & (~(irqRaw[1]) | clearBits[1]))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:49:23, :199:32, :204:30, :205:19, :221:17, :222:{23,27,34,38}
-        errorCode <= io_configErrorCode;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:51:26
-      else if (clearBits[1])	// src/workerbee/scala/main/WorkerBeeRegIf.scala:199:32, :204:30, :205:19, :221:17
-        errorCode <= 4'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:51:26
-      respPending_0 <= _acceptedWrites_0_T | ~_GEN_2 & respPending_0;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28, :152:22, :153:27, :167:23, :168:25
-      respPending_1 <= _acceptedWrites_1_T | ~_GEN_3 & respPending_1;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28, :152:22, :153:27, :167:23, :168:25
-      respPending_2 <= _acceptedWrites_2_T | ~_GEN_4 & respPending_2;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28, :152:22, :153:27, :167:23, :168:25
-      respPending_3 <= _acceptedWrites_3_T | ~_GEN_5 & respPending_3;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28, :152:22, :153:27, :167:23, :168:25
-      readPending_0 <= _acceptedWrites_0_T ? read : ~_GEN_2 & readPending_0;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28, :142:28, :152:22, :153:27, :154:27, :163:23, :167:23, :169:25
-      readPending_1 <= _acceptedWrites_1_T ? read_1 : ~_GEN_3 & readPending_1;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28, :142:28, :152:22, :153:27, :154:27, :163:23, :167:23, :169:25
-      readPending_2 <= _acceptedWrites_2_T ? read_2 : ~_GEN_4 & readPending_2;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28, :142:28, :152:22, :153:27, :154:27, :163:23, :167:23, :169:25
-      readPending_3 <= _acceptedWrites_3_T ? read_3 : ~_GEN_5 & readPending_3;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:141:28, :142:28, :152:22, :153:27, :154:27, :163:23, :167:23, :169:25
-      if (_acceptedWrites_0_T) begin	// src/utils/Stream/Stream.scala:43:26
+           io_done};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:72:23, :219:29, :220:{29,66}, :228:{20,33,44}, :229:42, :235:32, :240:30, :241:19, :256:22, :257:{21,23,35}
+      if (io_configError & (~(irqRaw[1]) | clearBits[1]))	// src/workerbee/scala/main/WorkerBeeRegIf.scala:72:23, :235:32, :240:30, :241:19, :258:17, :259:{23,27,34,38}
+        errorCode <= io_configErrorCode;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:74:26
+      else if (clearBits[1])	// src/workerbee/scala/main/WorkerBeeRegIf.scala:235:32, :240:30, :241:19, :258:17
+        errorCode <= 4'h0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:74:26
+      respPending_0 <= _acceptedRuns_0_T | ~_GEN_2 & respPending_0;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28, :187:22, :188:27, :204:23, :205:25
+      respPending_1 <= _acceptedRuns_1_T | ~_GEN_3 & respPending_1;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28, :187:22, :188:27, :204:23, :205:25
+      respPending_2 <= _acceptedRuns_2_T | ~_GEN_4 & respPending_2;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28, :187:22, :188:27, :204:23, :205:25
+      respPending_3 <= _acceptedRuns_3_T | ~_GEN_5 & respPending_3;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28, :187:22, :188:27, :204:23, :205:25
+      readPending_0 <= _acceptedRuns_0_T ? read : ~_GEN_2 & readPending_0;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28, :164:28, :187:22, :188:27, :189:27, :199:23, :204:23, :206:25
+      readPending_1 <= _acceptedRuns_1_T ? read_1 : ~_GEN_3 & readPending_1;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28, :164:28, :187:22, :188:27, :189:27, :199:23, :204:23, :206:25
+      readPending_2 <= _acceptedRuns_2_T ? read_2 : ~_GEN_4 & readPending_2;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28, :164:28, :187:22, :188:27, :189:27, :199:23, :204:23, :206:25
+      readPending_3 <= _acceptedRuns_3_T ? read_3 : ~_GEN_5 & readPending_3;	// src/utils/Stream/Stream.scala:43:26, src/workerbee/scala/main/WorkerBeeRegIf.scala:163:28, :164:28, :187:22, :188:27, :189:27, :199:23, :204:23, :206:25
+      if (_acceptedRuns_0_T) begin	// src/utils/Stream/Stream.scala:43:26
         respData_0 <=
           read
             ? ((|io_cmd_0_payload_reg0Addr)
-                 ? (io_cmd_0_payload_reg0Addr == 6'h1
-                      ? {regFile_k, regFile_n}
-                      : io_cmd_0_payload_reg0Addr == 6'h2
-                          ? regFile_aAddr
-                          : io_cmd_0_payload_reg0Addr == 6'h3
-                              ? regFile_bAddr
-                              : io_cmd_0_payload_reg0Addr == 6'h4
-                                  ? regFile_cAddr
-                                  : io_cmd_0_payload_reg0Addr == 6'h5
-                                      ? {regFile_osM1,
-                                         regFile_biasOn,
-                                         regFile_requantOn,
-                                         regFile_loadWMode,
-                                         regFile_osFmtKeep,
-                                         regFile_cMxBlockSize,
+                 ? (io_cmd_0_payload_reg0Addr == 10'h1
+                      ? {shadowReg_k, shadowReg_n}
+                      : io_cmd_0_payload_reg0Addr == 10'h2
+                          ? shadowReg_aAddr
+                          : io_cmd_0_payload_reg0Addr == 10'h3
+                              ? shadowReg_bAddr
+                              : io_cmd_0_payload_reg0Addr == 10'h4
+                                  ? shadowReg_cAddr
+                                  : io_cmd_0_payload_reg0Addr == 10'h5
+                                      ? {shadowReg_osM1,
+                                         shadowReg_biasOn,
+                                         shadowReg_requantOn,
+                                         shadowReg_loadWMode,
+                                         shadowReg_osFmtKeep,
+                                         shadowReg_cMxBlockSize,
                                          1'h0,
-                                         regFile_bMxBlockSize,
+                                         shadowReg_bMxBlockSize,
                                          1'h0,
-                                         regFile_aMxBlockSize,
-                                         regFile_warmup,
-                                         regFile_warmdown,
+                                         shadowReg_aMxBlockSize,
+                                         shadowReg_warmup,
+                                         shadowReg_warmdown,
                                          1'h0,
-                                         regFile_rnd,
-                                         regFile_reluOn,
-                                         regFile_cAddrMode,
-                                         regFile_bAddrMode,
-                                         regFile_aAddrMode,
-                                         regFile_cFmt,
-                                         regFile_bFmt,
-                                         regFile_aFmt}
-                                      : io_cmd_0_payload_reg0Addr == 6'h6
-                                          ? regFile_aScaleAddr
-                                          : io_cmd_0_payload_reg0Addr == 6'h7
-                                              ? regFile_bScaleAddr
-                                              : io_cmd_0_payload_reg0Addr == 6'h8
-                                                  ? regFile_cScaleAddr
-                                                  : io_cmd_0_payload_reg0Addr == 6'h9
-                                                      ? regFile_biasAddr
-                                                      : io_cmd_0_payload_reg0Addr == 6'hA
-                                                          ? regFile_rqMBase
-                                                          : io_cmd_0_payload_reg0Addr == 6'hB
-                                                              ? {regFile_rqZp,
+                                         shadowReg_rnd,
+                                         shadowReg_reluOn,
+                                         shadowReg_cAddrMode,
+                                         shadowReg_bAddrMode,
+                                         shadowReg_aAddrMode,
+                                         shadowReg_cFmt,
+                                         shadowReg_bFmt,
+                                         shadowReg_aFmt}
+                                      : io_cmd_0_payload_reg0Addr == 10'h6
+                                          ? shadowReg_aScaleAddr
+                                          : io_cmd_0_payload_reg0Addr == 10'h7
+                                              ? shadowReg_bScaleAddr
+                                              : io_cmd_0_payload_reg0Addr == 10'h8
+                                                  ? shadowReg_cScaleAddr
+                                                  : io_cmd_0_payload_reg0Addr == 10'h9
+                                                      ? shadowReg_biasAddr
+                                                      : io_cmd_0_payload_reg0Addr == 10'hA
+                                                          ? shadowReg_rqMBase
+                                                          : io_cmd_0_payload_reg0Addr == 10'hB
+                                                              ? {shadowReg_rqZp,
                                                                  10'h0,
-                                                                 regFile_rqShift}
+                                                                 shadowReg_rqShift}
                                                               : _respData_0_T_12
                                                                   ? {io_progress,
                                                                      13'h0,
@@ -3714,7 +3759,7 @@ module Wb_WorkerBeeRegIf(	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
                                                                      io_busy}
                                                                   : _respData_0_T_13
                                                                       ? _GEN_7
-                                                                      : io_cmd_0_payload_reg0Addr == 6'h31
+                                                                      : io_cmd_0_payload_reg0Addr == 10'h42
                                                                           ? _GEN_8
                                                                           : _respData_0_T_15
                                                                               ? _GEN_9
@@ -3722,57 +3767,57 @@ module Wb_WorkerBeeRegIf(	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
                                                                                   ? _GEN_10
                                                                                   : 32'h0)
                  : _GEN_6)
-            : 32'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :45:25, :103:27, :104:18, :105:39, :106:{40,46}, :107:39, :108:39, :109:39, :111:{14,20}, :118:44, :119:44, :120:44, :121:42, :122:41, :123:{45,51}, :124:{44,50}, :125:44, :126:45, :127:47, :128:50, :134:{25,63}, :135:{12,53}, :136:26, :143:25, :163:23, :170:28
-        respErr_0 <= io_cmd_0_payload_op != 2'h2 & (~_respErr_0_T_1 | rejected);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:{55,93}, :135:45, :138:14, :144:24, :163:23, :164:57, :166:52, :171:{24,30,34,54}
+            : 32'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :68:25, :128:27, :129:18, :130:39, :131:{40,46}, :132:39, :133:39, :134:39, :136:{14,20}, :143:44, :144:44, :145:44, :146:42, :147:41, :148:{45,51}, :149:{44,50}, :150:44, :151:45, :152:47, :153:50, :160:{10,48}, :161:{12,53}, :165:25, :199:23, :207:28
+        respErr_0 <= _respErr_0_T & rejected;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:{40,78}, :161:45, :166:24, :201:46, :202:52, :208:43
       end
-      if (_acceptedWrites_1_T) begin	// src/utils/Stream/Stream.scala:43:26
+      if (_acceptedRuns_1_T) begin	// src/utils/Stream/Stream.scala:43:26
         respData_1 <=
           read_1
             ? ((|io_cmd_1_payload_reg0Addr)
-                 ? (io_cmd_1_payload_reg0Addr == 6'h1
-                      ? {regFile_k, regFile_n}
-                      : io_cmd_1_payload_reg0Addr == 6'h2
-                          ? regFile_aAddr
-                          : io_cmd_1_payload_reg0Addr == 6'h3
-                              ? regFile_bAddr
-                              : io_cmd_1_payload_reg0Addr == 6'h4
-                                  ? regFile_cAddr
-                                  : io_cmd_1_payload_reg0Addr == 6'h5
-                                      ? {regFile_osM1,
-                                         regFile_biasOn,
-                                         regFile_requantOn,
-                                         regFile_loadWMode,
-                                         regFile_osFmtKeep,
-                                         regFile_cMxBlockSize,
+                 ? (io_cmd_1_payload_reg0Addr == 10'h1
+                      ? {shadowReg_k, shadowReg_n}
+                      : io_cmd_1_payload_reg0Addr == 10'h2
+                          ? shadowReg_aAddr
+                          : io_cmd_1_payload_reg0Addr == 10'h3
+                              ? shadowReg_bAddr
+                              : io_cmd_1_payload_reg0Addr == 10'h4
+                                  ? shadowReg_cAddr
+                                  : io_cmd_1_payload_reg0Addr == 10'h5
+                                      ? {shadowReg_osM1,
+                                         shadowReg_biasOn,
+                                         shadowReg_requantOn,
+                                         shadowReg_loadWMode,
+                                         shadowReg_osFmtKeep,
+                                         shadowReg_cMxBlockSize,
                                          1'h0,
-                                         regFile_bMxBlockSize,
+                                         shadowReg_bMxBlockSize,
                                          1'h0,
-                                         regFile_aMxBlockSize,
-                                         regFile_warmup,
-                                         regFile_warmdown,
+                                         shadowReg_aMxBlockSize,
+                                         shadowReg_warmup,
+                                         shadowReg_warmdown,
                                          1'h0,
-                                         regFile_rnd,
-                                         regFile_reluOn,
-                                         regFile_cAddrMode,
-                                         regFile_bAddrMode,
-                                         regFile_aAddrMode,
-                                         regFile_cFmt,
-                                         regFile_bFmt,
-                                         regFile_aFmt}
-                                      : io_cmd_1_payload_reg0Addr == 6'h6
-                                          ? regFile_aScaleAddr
-                                          : io_cmd_1_payload_reg0Addr == 6'h7
-                                              ? regFile_bScaleAddr
-                                              : io_cmd_1_payload_reg0Addr == 6'h8
-                                                  ? regFile_cScaleAddr
-                                                  : io_cmd_1_payload_reg0Addr == 6'h9
-                                                      ? regFile_biasAddr
-                                                      : io_cmd_1_payload_reg0Addr == 6'hA
-                                                          ? regFile_rqMBase
-                                                          : io_cmd_1_payload_reg0Addr == 6'hB
-                                                              ? {regFile_rqZp,
+                                         shadowReg_rnd,
+                                         shadowReg_reluOn,
+                                         shadowReg_cAddrMode,
+                                         shadowReg_bAddrMode,
+                                         shadowReg_aAddrMode,
+                                         shadowReg_cFmt,
+                                         shadowReg_bFmt,
+                                         shadowReg_aFmt}
+                                      : io_cmd_1_payload_reg0Addr == 10'h6
+                                          ? shadowReg_aScaleAddr
+                                          : io_cmd_1_payload_reg0Addr == 10'h7
+                                              ? shadowReg_bScaleAddr
+                                              : io_cmd_1_payload_reg0Addr == 10'h8
+                                                  ? shadowReg_cScaleAddr
+                                                  : io_cmd_1_payload_reg0Addr == 10'h9
+                                                      ? shadowReg_biasAddr
+                                                      : io_cmd_1_payload_reg0Addr == 10'hA
+                                                          ? shadowReg_rqMBase
+                                                          : io_cmd_1_payload_reg0Addr == 10'hB
+                                                              ? {shadowReg_rqZp,
                                                                  10'h0,
-                                                                 regFile_rqShift}
+                                                                 shadowReg_rqShift}
                                                               : _respData_1_T_12
                                                                   ? {io_progress,
                                                                      13'h0,
@@ -3781,7 +3826,7 @@ module Wb_WorkerBeeRegIf(	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
                                                                      io_busy}
                                                                   : _respData_1_T_13
                                                                       ? _GEN_7
-                                                                      : io_cmd_1_payload_reg0Addr == 6'h31
+                                                                      : io_cmd_1_payload_reg0Addr == 10'h42
                                                                           ? _GEN_8
                                                                           : _respData_1_T_15
                                                                               ? _GEN_9
@@ -3789,57 +3834,57 @@ module Wb_WorkerBeeRegIf(	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
                                                                                   ? _GEN_10
                                                                                   : 32'h0)
                  : _GEN_6)
-            : 32'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :45:25, :103:27, :104:18, :105:39, :106:{40,46}, :107:39, :108:39, :109:39, :111:{14,20}, :118:44, :119:44, :120:44, :121:42, :122:41, :123:{45,51}, :124:{44,50}, :125:44, :126:45, :127:47, :128:50, :134:{25,63}, :135:{12,53}, :136:26, :143:25, :163:23, :170:28
-        respErr_1 <= io_cmd_1_payload_op != 2'h2 & (~_respErr_1_T_1 | rejected_1);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:{55,93}, :135:45, :138:14, :144:24, :163:23, :164:57, :166:52, :171:{24,30,34,54}
+            : 32'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :68:25, :128:27, :129:18, :130:39, :131:{40,46}, :132:39, :133:39, :134:39, :136:{14,20}, :143:44, :144:44, :145:44, :146:42, :147:41, :148:{45,51}, :149:{44,50}, :150:44, :151:45, :152:47, :153:50, :160:{10,48}, :161:{12,53}, :165:25, :199:23, :207:28
+        respErr_1 <= _respErr_1_T & rejected_1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:{40,78}, :161:45, :166:24, :201:46, :202:52, :208:43
       end
-      if (_acceptedWrites_2_T) begin	// src/utils/Stream/Stream.scala:43:26
+      if (_acceptedRuns_2_T) begin	// src/utils/Stream/Stream.scala:43:26
         respData_2 <=
           read_2
             ? ((|io_cmd_2_payload_reg0Addr)
-                 ? (io_cmd_2_payload_reg0Addr == 6'h1
-                      ? {regFile_k, regFile_n}
-                      : io_cmd_2_payload_reg0Addr == 6'h2
-                          ? regFile_aAddr
-                          : io_cmd_2_payload_reg0Addr == 6'h3
-                              ? regFile_bAddr
-                              : io_cmd_2_payload_reg0Addr == 6'h4
-                                  ? regFile_cAddr
-                                  : io_cmd_2_payload_reg0Addr == 6'h5
-                                      ? {regFile_osM1,
-                                         regFile_biasOn,
-                                         regFile_requantOn,
-                                         regFile_loadWMode,
-                                         regFile_osFmtKeep,
-                                         regFile_cMxBlockSize,
+                 ? (io_cmd_2_payload_reg0Addr == 10'h1
+                      ? {shadowReg_k, shadowReg_n}
+                      : io_cmd_2_payload_reg0Addr == 10'h2
+                          ? shadowReg_aAddr
+                          : io_cmd_2_payload_reg0Addr == 10'h3
+                              ? shadowReg_bAddr
+                              : io_cmd_2_payload_reg0Addr == 10'h4
+                                  ? shadowReg_cAddr
+                                  : io_cmd_2_payload_reg0Addr == 10'h5
+                                      ? {shadowReg_osM1,
+                                         shadowReg_biasOn,
+                                         shadowReg_requantOn,
+                                         shadowReg_loadWMode,
+                                         shadowReg_osFmtKeep,
+                                         shadowReg_cMxBlockSize,
                                          1'h0,
-                                         regFile_bMxBlockSize,
+                                         shadowReg_bMxBlockSize,
                                          1'h0,
-                                         regFile_aMxBlockSize,
-                                         regFile_warmup,
-                                         regFile_warmdown,
+                                         shadowReg_aMxBlockSize,
+                                         shadowReg_warmup,
+                                         shadowReg_warmdown,
                                          1'h0,
-                                         regFile_rnd,
-                                         regFile_reluOn,
-                                         regFile_cAddrMode,
-                                         regFile_bAddrMode,
-                                         regFile_aAddrMode,
-                                         regFile_cFmt,
-                                         regFile_bFmt,
-                                         regFile_aFmt}
-                                      : io_cmd_2_payload_reg0Addr == 6'h6
-                                          ? regFile_aScaleAddr
-                                          : io_cmd_2_payload_reg0Addr == 6'h7
-                                              ? regFile_bScaleAddr
-                                              : io_cmd_2_payload_reg0Addr == 6'h8
-                                                  ? regFile_cScaleAddr
-                                                  : io_cmd_2_payload_reg0Addr == 6'h9
-                                                      ? regFile_biasAddr
-                                                      : io_cmd_2_payload_reg0Addr == 6'hA
-                                                          ? regFile_rqMBase
-                                                          : io_cmd_2_payload_reg0Addr == 6'hB
-                                                              ? {regFile_rqZp,
+                                         shadowReg_rnd,
+                                         shadowReg_reluOn,
+                                         shadowReg_cAddrMode,
+                                         shadowReg_bAddrMode,
+                                         shadowReg_aAddrMode,
+                                         shadowReg_cFmt,
+                                         shadowReg_bFmt,
+                                         shadowReg_aFmt}
+                                      : io_cmd_2_payload_reg0Addr == 10'h6
+                                          ? shadowReg_aScaleAddr
+                                          : io_cmd_2_payload_reg0Addr == 10'h7
+                                              ? shadowReg_bScaleAddr
+                                              : io_cmd_2_payload_reg0Addr == 10'h8
+                                                  ? shadowReg_cScaleAddr
+                                                  : io_cmd_2_payload_reg0Addr == 10'h9
+                                                      ? shadowReg_biasAddr
+                                                      : io_cmd_2_payload_reg0Addr == 10'hA
+                                                          ? shadowReg_rqMBase
+                                                          : io_cmd_2_payload_reg0Addr == 10'hB
+                                                              ? {shadowReg_rqZp,
                                                                  10'h0,
-                                                                 regFile_rqShift}
+                                                                 shadowReg_rqShift}
                                                               : _respData_2_T_12
                                                                   ? {io_progress,
                                                                      13'h0,
@@ -3848,7 +3893,7 @@ module Wb_WorkerBeeRegIf(	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
                                                                      io_busy}
                                                                   : _respData_2_T_13
                                                                       ? _GEN_7
-                                                                      : io_cmd_2_payload_reg0Addr == 6'h31
+                                                                      : io_cmd_2_payload_reg0Addr == 10'h42
                                                                           ? _GEN_8
                                                                           : _respData_2_T_15
                                                                               ? _GEN_9
@@ -3856,57 +3901,57 @@ module Wb_WorkerBeeRegIf(	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
                                                                                   ? _GEN_10
                                                                                   : 32'h0)
                  : _GEN_6)
-            : 32'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :45:25, :103:27, :104:18, :105:39, :106:{40,46}, :107:39, :108:39, :109:39, :111:{14,20}, :118:44, :119:44, :120:44, :121:42, :122:41, :123:{45,51}, :124:{44,50}, :125:44, :126:45, :127:47, :128:50, :134:{25,63}, :135:{12,53}, :136:26, :143:25, :163:23, :170:28
-        respErr_2 <= io_cmd_2_payload_op != 2'h2 & (~_respErr_2_T_1 | rejected_2);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:{55,93}, :135:45, :138:14, :144:24, :163:23, :164:57, :166:52, :171:{24,30,34,54}
+            : 32'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :68:25, :128:27, :129:18, :130:39, :131:{40,46}, :132:39, :133:39, :134:39, :136:{14,20}, :143:44, :144:44, :145:44, :146:42, :147:41, :148:{45,51}, :149:{44,50}, :150:44, :151:45, :152:47, :153:50, :160:{10,48}, :161:{12,53}, :165:25, :199:23, :207:28
+        respErr_2 <= _respErr_2_T & rejected_2;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:{40,78}, :161:45, :166:24, :201:46, :202:52, :208:43
       end
-      if (_acceptedWrites_3_T) begin	// src/utils/Stream/Stream.scala:43:26
+      if (_acceptedRuns_3_T) begin	// src/utils/Stream/Stream.scala:43:26
         respData_3 <=
           read_3
             ? ((|io_cmd_3_payload_reg0Addr)
-                 ? (io_cmd_3_payload_reg0Addr == 6'h1
-                      ? {regFile_k, regFile_n}
-                      : io_cmd_3_payload_reg0Addr == 6'h2
-                          ? regFile_aAddr
-                          : io_cmd_3_payload_reg0Addr == 6'h3
-                              ? regFile_bAddr
-                              : io_cmd_3_payload_reg0Addr == 6'h4
-                                  ? regFile_cAddr
-                                  : io_cmd_3_payload_reg0Addr == 6'h5
-                                      ? {regFile_osM1,
-                                         regFile_biasOn,
-                                         regFile_requantOn,
-                                         regFile_loadWMode,
-                                         regFile_osFmtKeep,
-                                         regFile_cMxBlockSize,
+                 ? (io_cmd_3_payload_reg0Addr == 10'h1
+                      ? {shadowReg_k, shadowReg_n}
+                      : io_cmd_3_payload_reg0Addr == 10'h2
+                          ? shadowReg_aAddr
+                          : io_cmd_3_payload_reg0Addr == 10'h3
+                              ? shadowReg_bAddr
+                              : io_cmd_3_payload_reg0Addr == 10'h4
+                                  ? shadowReg_cAddr
+                                  : io_cmd_3_payload_reg0Addr == 10'h5
+                                      ? {shadowReg_osM1,
+                                         shadowReg_biasOn,
+                                         shadowReg_requantOn,
+                                         shadowReg_loadWMode,
+                                         shadowReg_osFmtKeep,
+                                         shadowReg_cMxBlockSize,
                                          1'h0,
-                                         regFile_bMxBlockSize,
+                                         shadowReg_bMxBlockSize,
                                          1'h0,
-                                         regFile_aMxBlockSize,
-                                         regFile_warmup,
-                                         regFile_warmdown,
+                                         shadowReg_aMxBlockSize,
+                                         shadowReg_warmup,
+                                         shadowReg_warmdown,
                                          1'h0,
-                                         regFile_rnd,
-                                         regFile_reluOn,
-                                         regFile_cAddrMode,
-                                         regFile_bAddrMode,
-                                         regFile_aAddrMode,
-                                         regFile_cFmt,
-                                         regFile_bFmt,
-                                         regFile_aFmt}
-                                      : io_cmd_3_payload_reg0Addr == 6'h6
-                                          ? regFile_aScaleAddr
-                                          : io_cmd_3_payload_reg0Addr == 6'h7
-                                              ? regFile_bScaleAddr
-                                              : io_cmd_3_payload_reg0Addr == 6'h8
-                                                  ? regFile_cScaleAddr
-                                                  : io_cmd_3_payload_reg0Addr == 6'h9
-                                                      ? regFile_biasAddr
-                                                      : io_cmd_3_payload_reg0Addr == 6'hA
-                                                          ? regFile_rqMBase
-                                                          : io_cmd_3_payload_reg0Addr == 6'hB
-                                                              ? {regFile_rqZp,
+                                         shadowReg_rnd,
+                                         shadowReg_reluOn,
+                                         shadowReg_cAddrMode,
+                                         shadowReg_bAddrMode,
+                                         shadowReg_aAddrMode,
+                                         shadowReg_cFmt,
+                                         shadowReg_bFmt,
+                                         shadowReg_aFmt}
+                                      : io_cmd_3_payload_reg0Addr == 10'h6
+                                          ? shadowReg_aScaleAddr
+                                          : io_cmd_3_payload_reg0Addr == 10'h7
+                                              ? shadowReg_bScaleAddr
+                                              : io_cmd_3_payload_reg0Addr == 10'h8
+                                                  ? shadowReg_cScaleAddr
+                                                  : io_cmd_3_payload_reg0Addr == 10'h9
+                                                      ? shadowReg_biasAddr
+                                                      : io_cmd_3_payload_reg0Addr == 10'hA
+                                                          ? shadowReg_rqMBase
+                                                          : io_cmd_3_payload_reg0Addr == 10'hB
+                                                              ? {shadowReg_rqZp,
                                                                  10'h0,
-                                                                 regFile_rqShift}
+                                                                 shadowReg_rqShift}
                                                               : _respData_3_T_12
                                                                   ? {io_progress,
                                                                      13'h0,
@@ -3915,7 +3960,7 @@ module Wb_WorkerBeeRegIf(	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
                                                                      io_busy}
                                                                   : _respData_3_T_13
                                                                       ? _GEN_7
-                                                                      : io_cmd_3_payload_reg0Addr == 6'h31
+                                                                      : io_cmd_3_payload_reg0Addr == 10'h42
                                                                           ? _GEN_8
                                                                           : _respData_3_T_15
                                                                               ? _GEN_9
@@ -3923,122 +3968,149 @@ module Wb_WorkerBeeRegIf(	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
                                                                                   ? _GEN_10
                                                                                   : 32'h0)
                  : _GEN_6)
-            : 32'h0;	// <stdin>:27263:42, src/workerbee/scala/main/WorkerBeeRegIf.scala:44:24, :45:25, :103:27, :104:18, :105:39, :106:{40,46}, :107:39, :108:39, :109:39, :111:{14,20}, :118:44, :119:44, :120:44, :121:42, :122:41, :123:{45,51}, :124:{44,50}, :125:44, :126:45, :127:47, :128:50, :134:{25,63}, :135:{12,53}, :136:26, :143:25, :163:23, :170:28
-        respErr_3 <= io_cmd_3_payload_op != 2'h2 & (~_respErr_3_T_1 | rejected_3);	// src/workerbee/scala/main/WorkerBeeRegIf.scala:134:{55,93}, :135:45, :138:14, :144:24, :163:23, :164:57, :166:52, :171:{24,30,34,54}
+            : 32'h0;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:66:34, :68:25, :128:27, :129:18, :130:39, :131:{40,46}, :132:39, :133:39, :134:39, :136:{14,20}, :143:44, :144:44, :145:44, :146:42, :147:41, :148:{45,51}, :149:{44,50}, :150:44, :151:45, :152:47, :153:50, :160:{10,48}, :161:{12,53}, :165:25, :199:23, :207:28
+        respErr_3 <= _respErr_3_T & rejected_3;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:160:{40,78}, :161:45, :166:24, :201:46, :202:52, :208:43
       end
     end
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
-      `FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
+  `ifdef ENABLE_INITIAL_REG_	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
+      `FIRRTL_BEFORE_INITIAL	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
-      automatic logic [31:0] _RANDOM[0:17];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
-      `ifdef INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
-        `INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
+    initial begin	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
+      automatic logic [31:0] _RANDOM[0:28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
+      `ifdef INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
+        `INIT_RANDOM_PROLOG_	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
-        for (logic [4:0] i = 5'h0; i < 5'h12; i += 5'h1) begin
-          _RANDOM[i] = `RANDOM;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
-        end	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
-        regFile_m = _RANDOM[5'h0][15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_n = _RANDOM[5'h0][31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_k = _RANDOM[5'h1][15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_aAddr = {_RANDOM[5'h1][31:16], _RANDOM[5'h2][15:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_bAddr = {_RANDOM[5'h2][31:16], _RANDOM[5'h3][15:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_cAddr = {_RANDOM[5'h3][31:16], _RANDOM[5'h4][15:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_aAddrMode = _RANDOM[5'h4][16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_bAddrMode = _RANDOM[5'h4][17];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_cAddrMode = _RANDOM[5'h4][18];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_aMxBlockSize = _RANDOM[5'h4][19];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_bMxBlockSize = _RANDOM[5'h4][20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_cMxBlockSize = _RANDOM[5'h4][21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_loadWMode = _RANDOM[5'h4][22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_osM1 = _RANDOM[5'h4][23];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_osFmtKeep = _RANDOM[5'h4][24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_aFmt = _RANDOM[5'h4][28:25];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_bFmt = {_RANDOM[5'h4][31:29], _RANDOM[5'h5][0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_cFmt = _RANDOM[5'h5][4:1];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_rnd = _RANDOM[5'h5][7:5];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_aScaleAddr = {_RANDOM[5'h5][31:8], _RANDOM[5'h6][7:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_bScaleAddr = {_RANDOM[5'h6][31:8], _RANDOM[5'h7][7:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_cScaleAddr = {_RANDOM[5'h7][31:8], _RANDOM[5'h8][7:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_warmup = _RANDOM[5'h8][8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_warmdown = _RANDOM[5'h8][9];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_biasOn = _RANDOM[5'h8][10];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_biasAddr = {_RANDOM[5'h8][31:11], _RANDOM[5'h9][10:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_requantOn = _RANDOM[5'h9][11];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_reluOn = _RANDOM[5'h9][12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_rqMBase = {_RANDOM[5'h9][31:13], _RANDOM[5'hA][12:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_rqShift = _RANDOM[5'hA][18:13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        regFile_rqZp = {_RANDOM[5'hA][31:19], _RANDOM[5'hB][2:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-        inFlight = _RANDOM[5'hB][3];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24, :45:25
-        startPending = _RANDOM[5'hB][4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24, :46:29
-        startPc = {_RANDOM[5'hB][31:5], _RANDOM[5'hC][4:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24, :47:24
-        startTag = _RANDOM[5'hC][12:5];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :47:24, :48:25
-        irqRaw = _RANDOM[5'hC][23:13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :47:24, :49:23
-        irqMask = {_RANDOM[5'hC][31:24], _RANDOM[5'hD][2:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :47:24, :50:24
-        errorCode = _RANDOM[5'hD][6:3];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :50:24, :51:26
-        respPending_0 = _RANDOM[5'hD][7];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :50:24, :141:28
-        respPending_1 = _RANDOM[5'hD][8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :50:24, :141:28
-        respPending_2 = _RANDOM[5'hD][9];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :50:24, :141:28
-        respPending_3 = _RANDOM[5'hD][10];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :50:24, :141:28
-        readPending_0 = _RANDOM[5'hD][11];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :50:24, :142:28
-        readPending_1 = _RANDOM[5'hD][12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :50:24, :142:28
-        readPending_2 = _RANDOM[5'hD][13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :50:24, :142:28
-        readPending_3 = _RANDOM[5'hD][14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :50:24, :142:28
-        respData_0 = {_RANDOM[5'hD][31:15], _RANDOM[5'hE][14:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :50:24, :143:25
-        respData_1 = {_RANDOM[5'hE][31:15], _RANDOM[5'hF][14:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :143:25
-        respData_2 = {_RANDOM[5'hF][31:15], _RANDOM[5'h10][14:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :143:25
-        respData_3 = {_RANDOM[5'h10][31:15], _RANDOM[5'h11][14:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :143:25
-        respErr_0 = _RANDOM[5'h11][15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :143:25, :144:24
-        respErr_1 = _RANDOM[5'h11][16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :143:25, :144:24
-        respErr_2 = _RANDOM[5'h11][17];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :143:25, :144:24
-        respErr_3 = _RANDOM[5'h11][18];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :143:25, :144:24
+      `ifdef RANDOMIZE_REG_INIT	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
+        for (logic [4:0] i = 5'h0; i < 5'h1D; i += 5'h1) begin
+          _RANDOM[i] = `RANDOM;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
+        end	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
+        shadowReg_m = _RANDOM[5'h0][15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_n = _RANDOM[5'h0][31:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_k = _RANDOM[5'h1][15:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_aAddr = {_RANDOM[5'h1][31:16], _RANDOM[5'h2][15:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_bAddr = {_RANDOM[5'h2][31:16], _RANDOM[5'h3][15:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_cAddr = {_RANDOM[5'h3][31:16], _RANDOM[5'h4][15:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_aAddrMode = _RANDOM[5'h4][16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_bAddrMode = _RANDOM[5'h4][17];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_cAddrMode = _RANDOM[5'h4][18];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_aMxBlockSize = _RANDOM[5'h4][19];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_bMxBlockSize = _RANDOM[5'h4][20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_cMxBlockSize = _RANDOM[5'h4][21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_loadWMode = _RANDOM[5'h4][22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_osM1 = _RANDOM[5'h4][23];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_osFmtKeep = _RANDOM[5'h4][24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_aFmt = _RANDOM[5'h4][28:25];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_bFmt = {_RANDOM[5'h4][31:29], _RANDOM[5'h5][0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_cFmt = _RANDOM[5'h5][4:1];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_rnd = _RANDOM[5'h5][7:5];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_aScaleAddr = {_RANDOM[5'h5][31:8], _RANDOM[5'h6][7:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_bScaleAddr = {_RANDOM[5'h6][31:8], _RANDOM[5'h7][7:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_cScaleAddr = {_RANDOM[5'h7][31:8], _RANDOM[5'h8][7:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_warmup = _RANDOM[5'h8][8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_warmdown = _RANDOM[5'h8][9];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_biasOn = _RANDOM[5'h8][10];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_biasAddr = {_RANDOM[5'h8][31:11], _RANDOM[5'h9][10:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_requantOn = _RANDOM[5'h9][11];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_reluOn = _RANDOM[5'h9][12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_rqMBase = {_RANDOM[5'h9][31:13], _RANDOM[5'hA][12:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_rqShift = _RANDOM[5'hA][18:13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        shadowReg_rqZp = {_RANDOM[5'hA][31:19], _RANDOM[5'hB][2:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34
+        liveReg_m = _RANDOM[5'hB][18:3];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34, :67:32
+        liveReg_n = {_RANDOM[5'hB][31:19], _RANDOM[5'hC][2:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :66:34, :67:32
+        liveReg_k = _RANDOM[5'hC][18:3];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_aAddr = {_RANDOM[5'hC][31:19], _RANDOM[5'hD][18:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_bAddr = {_RANDOM[5'hD][31:19], _RANDOM[5'hE][18:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_cAddr = {_RANDOM[5'hE][31:19], _RANDOM[5'hF][18:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_aMxBlockSize = _RANDOM[5'hF][22];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_bMxBlockSize = _RANDOM[5'hF][23];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_cMxBlockSize = _RANDOM[5'hF][24];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_loadWMode = _RANDOM[5'hF][25];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_osM1 = _RANDOM[5'hF][26];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_osFmtKeep = _RANDOM[5'hF][27];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_aFmt = _RANDOM[5'hF][31:28];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_bFmt = _RANDOM[5'h10][3:0];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_cFmt = _RANDOM[5'h10][7:4];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_rnd = _RANDOM[5'h10][10:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_aScaleAddr = {_RANDOM[5'h10][31:11], _RANDOM[5'h11][10:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_bScaleAddr = {_RANDOM[5'h11][31:11], _RANDOM[5'h12][10:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_cScaleAddr = {_RANDOM[5'h12][31:11], _RANDOM[5'h13][10:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_biasOn = _RANDOM[5'h13][13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_biasAddr = {_RANDOM[5'h13][31:14], _RANDOM[5'h14][13:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_requantOn = _RANDOM[5'h14][14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_reluOn = _RANDOM[5'h14][15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_rqMBase = {_RANDOM[5'h14][31:16], _RANDOM[5'h15][15:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_rqShift = _RANDOM[5'h15][21:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        liveReg_rqZp = {_RANDOM[5'h15][31:22], _RANDOM[5'h16][5:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+        inFlight = _RANDOM[5'h16][6];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32, :68:25
+        startPending = _RANDOM[5'h16][7];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32, :69:29
+        startPc = {_RANDOM[5'h16][31:8], _RANDOM[5'h17][7:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32, :70:24
+        startTag = _RANDOM[5'h17][15:8];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :70:24, :71:25
+        irqRaw = _RANDOM[5'h17][26:16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :70:24, :72:23
+        irqMask = {_RANDOM[5'h17][31:27], _RANDOM[5'h18][5:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :70:24, :73:24
+        errorCode = _RANDOM[5'h18][9:6];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :73:24, :74:26
+        respPending_0 = _RANDOM[5'h18][10];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :73:24, :163:28
+        respPending_1 = _RANDOM[5'h18][11];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :73:24, :163:28
+        respPending_2 = _RANDOM[5'h18][12];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :73:24, :163:28
+        respPending_3 = _RANDOM[5'h18][13];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :73:24, :163:28
+        readPending_0 = _RANDOM[5'h18][14];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :73:24, :164:28
+        readPending_1 = _RANDOM[5'h18][15];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :73:24, :164:28
+        readPending_2 = _RANDOM[5'h18][16];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :73:24, :164:28
+        readPending_3 = _RANDOM[5'h18][17];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :73:24, :164:28
+        respData_0 = {_RANDOM[5'h18][31:18], _RANDOM[5'h19][17:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :73:24, :165:25
+        respData_1 = {_RANDOM[5'h19][31:18], _RANDOM[5'h1A][17:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :165:25
+        respData_2 = {_RANDOM[5'h1A][31:18], _RANDOM[5'h1B][17:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :165:25
+        respData_3 = {_RANDOM[5'h1B][31:18], _RANDOM[5'h1C][17:0]};	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :165:25
+        respErr_0 = _RANDOM[5'h1C][18];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :165:25, :166:24
+        respErr_1 = _RANDOM[5'h1C][19];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :165:25, :166:24
+        respErr_2 = _RANDOM[5'h1C][20];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :165:25, :166:24
+        respErr_3 = _RANDOM[5'h1C][21];	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :165:25, :166:24
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
-      `FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
+    `ifdef FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
+      `FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_cmd_0_ready = acceptBatch;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :146:45
-  assign io_cmd_1_ready = acceptBatch;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :146:45
-  assign io_cmd_2_ready = acceptBatch;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :146:45
-  assign io_cmd_3_ready = acceptBatch;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :146:45
-  assign io_resp_valid = |_io_resp_valid_T;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :145:46, :148:39
-  assign io_resp_payload_data = _GEN[respLane];	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :149:24
-  assign io_resp_payload_err = _GEN_0[respLane];	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :150:23
-  assign io_resp_payload_laneId = respLane;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7
-  assign io_regFile_m = regFile_m;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_n = regFile_n;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_k = regFile_k;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_aAddr = regFile_aAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_bAddr = regFile_bAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_cAddr = regFile_cAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_aMxBlockSize = regFile_aMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_bMxBlockSize = regFile_bMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_cMxBlockSize = regFile_cMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_loadWMode = regFile_loadWMode;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_osM1 = regFile_osM1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_osFmtKeep = regFile_osFmtKeep;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_aFmt = regFile_aFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_bFmt = regFile_bFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_cFmt = regFile_cFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_rnd = regFile_rnd;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_aScaleAddr = regFile_aScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_bScaleAddr = regFile_bScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_cScaleAddr = regFile_cScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_biasOn = regFile_biasOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_biasAddr = regFile_biasAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_requantOn = regFile_requantOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_reluOn = regFile_reluOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_rqMBase = regFile_rqMBase;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_rqShift = regFile_rqShift;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_regFile_rqZp = regFile_rqZp;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :44:24
-  assign io_start = startPending;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :46:29
-  assign io_startPc = startPc;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :47:24
-  assign io_startTag = startTag;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :48:25
-  assign io_inFlight = inFlight;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :45:25
-  assign io_irq = |irqMasked;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:26:7, :52:26, :59:23
+  assign io_cmd_0_ready = io_cmd_0_ready_0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :180:39
+  assign io_cmd_1_ready = io_cmd_1_ready_0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :180:39
+  assign io_cmd_2_ready = io_cmd_2_ready_0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :180:39
+  assign io_cmd_3_ready = io_cmd_3_ready_0;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :180:39
+  assign io_resp_valid = |_io_resp_valid_T;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :167:46, :183:39
+  assign io_resp_payload_data = _GEN[respLane];	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :184:24
+  assign io_resp_payload_err = _GEN_0[respLane];	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :185:23
+  assign io_resp_payload_laneId = respLane;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7
+  assign io_regFile_m = liveReg_m;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_n = liveReg_n;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_k = liveReg_k;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_aAddr = liveReg_aAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_bAddr = liveReg_bAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_cAddr = liveReg_cAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_aMxBlockSize = liveReg_aMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_bMxBlockSize = liveReg_bMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_cMxBlockSize = liveReg_cMxBlockSize;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_loadWMode = liveReg_loadWMode;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_osM1 = liveReg_osM1;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_osFmtKeep = liveReg_osFmtKeep;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_aFmt = liveReg_aFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_bFmt = liveReg_bFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_cFmt = liveReg_cFmt;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_rnd = liveReg_rnd;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_aScaleAddr = liveReg_aScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_bScaleAddr = liveReg_bScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_cScaleAddr = liveReg_cScaleAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_biasOn = liveReg_biasOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_biasAddr = liveReg_biasAddr;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_requantOn = liveReg_requantOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_reluOn = liveReg_reluOn;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_rqMBase = liveReg_rqMBase;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_rqShift = liveReg_rqShift;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_regFile_rqZp = liveReg_rqZp;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :67:32
+  assign io_start = startPending;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :69:29
+  assign io_startPc = startPc;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :70:24
+  assign io_startTag = startTag;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :71:25
+  assign io_inFlight = inFlight;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :68:25
+  assign io_irq = |irqMasked;	// src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :75:26, :82:23
+  assign io_cfgCredit = ~inFlight;	// <stdin>:20863:44, src/workerbee/scala/main/WorkerBeeRegIf.scala:47:7, :68:25, :83:22
 endmodule
 
