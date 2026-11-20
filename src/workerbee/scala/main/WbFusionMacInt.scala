@@ -73,7 +73,9 @@ class WbFusionMacInt(
   val r3 = Mux(aIsInt4 & bIsInt4, mul4_1_a * mul4_1_b, 0.S(16.W))
 
   // 四路乘积 + cReg 一次吸收，显式截位到 cEffW（溢出绕回，不钳位）
-  val sumFull = r0 + r1 + r2 + r3 + io.cReg.asSInt
+  // 每个积显式 pad(19)：四积和上界 32768（INT8 a=b=0x8080）超 16-bit 有符号上界 32767，
+  //   不钉位宽时 firtool 会把中间和收窄到 16-bit ⟹ 该单点 mod 2^16 偏 −65536。
+  val sumFull = r0.pad(19) + r1.pad(19) + r2.pad(19) + r3.pad(19) + io.cReg.asSInt
   io.sum := sumFull.asUInt(cEffW - 1, 0)
 
 }

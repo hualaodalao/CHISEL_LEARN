@@ -32,13 +32,6 @@ class WbFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
     if (v.testBit(bits - 1)) v - (BigInt(1) << bits) else v
   }
 
-  /** Truncate a signed BigInt to `bits`-wide two's complement (wrap-around), return signed. */
-  private def truncSInt(value: BigInt, bits: Int): BigInt = {
-    val mask = (BigInt(1) << bits) - 1
-    val v = value & mask
-    if (v.testBit(bits - 1)) v - (BigInt(1) << bits) else v
-  }
-
   /** Truncate a signed BigInt result to cEffW-bit two's complement (wrap-around), return unsigned. */
   private def truncToCEffW(value: BigInt): BigInt = {
     val mask = (BigInt(1) << cEffW) - 1
@@ -47,44 +40,30 @@ class WbFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   private def asSignedCEffW(raw: BigInt): BigInt = sext(raw, cEffW)
 
-  /** INT8 golden: lane0 = a(7,0)*b(7,0), lane1 = a(15,8)*b(15,8), + cReg(signed).
-    * Models Chisel SInt width semantics: r_i are SInt(16.W); the left-associative + chain
-    * yields SInt(max(lhs,rhs).W) at each step (no width growth for SInt.+).
-    * Steps: SInt(16)+SInt(16)->SInt(16), then SInt(16)+SInt(40)->SInt(40). */
+  /** INT8 golden（张量语义，全精度求和后截 cEffW）：lane0 = a(7,0)*b(7,0)，lane1 = a(15,8)*b(15,8)，
+    * + cReg(signed)。四积和上界 32768（a=b=0x8080）超 16-bit 有符号上界 ⟹ 中间和不得截 16-bit。
+    * 旧版曾按缺陷 RTL 把中间和 truncSInt(...,16)（拟合 RTL，违反金锚纪律），已订正为全精度。 */
   private def goldenInt8(a: Int, b: Int, cRegRaw: BigInt): BigInt = {
     val aLo = sext(BigInt(a & 0xFF), 8)
     val aHi = sext(BigInt((a >> 8) & 0xFF), 8)
     val bLo = sext(BigInt(b & 0xFF), 8)
     val bHi = sext(BigInt((b >> 8) & 0xFF), 8)
-    val r0 = aLo * bLo   // always fits SInt(16)
-    val r1 = aHi * bHi   // always fits SInt(16)
-    val r2 = BigInt(0)   // INT8 mode: lanes 2,3 gated to zero
-    val r3 = BigInt(0)
-    // Left-associative addition with SInt(16.W) intermediate truncation
-    val s1 = truncSInt(r0 + r1, 16)
-    val s2 = truncSInt(s1 + r2, 16)
-    val s3 = truncSInt(s2 + r3, 16)
-    // Final: SInt(16) + SInt(40) -> SInt(40)
+    val r0 = aLo * bLo
+    val r1 = aHi * bHi
     val cSigned = asSignedCEffW(cRegRaw)
-    val sumFull = truncSInt(s3 + cSigned, cEffW)
-    truncToCEffW(sumFull)
+    truncToCEffW(r0 + r1 + cSigned)   // INT8：lane2/3 恒 0；全精度 BigInt 求和后截 40-bit 绕回
   }
 
-  /** INT4 golden: 4 nibbles each sext(4->8) then multiply, sum + cReg(signed).
-    * Same Chisel SInt width semantics: r_i SInt(16.W), left-assoc + stays at SInt(16.W),
-    * final + cReg expands to SInt(40.W). (INT4 products max 64, sum max 256 -- no 16-bit overflow.) */
+  /** INT4 golden（张量语义，全精度求和后截 cEffW）：4 nibble 各 sext(4->8) 相乘，和 + cReg(signed)。
+    * INT4 积上界 64、和上界 256，无 16-bit 溢出；仍统一全精度求和，与 INT8 同源。 */
   private def goldenInt4(a: Int, b: Int, cRegRaw: BigInt): BigInt = {
     val r = (0 until 4).map { i =>
       val nibA = sext(BigInt((a >> (4 * i)) & 0xF), 4)
       val nibB = sext(BigInt((b >> (4 * i)) & 0xF), 4)
       nibA * nibB
     }
-    val s1 = truncSInt(r(0) + r(1), 16)
-    val s2 = truncSInt(s1 + r(2), 16)
-    val s3 = truncSInt(s2 + r(3), 16)
     val cSigned = asSignedCEffW(cRegRaw)
-    val sumFull = truncSInt(s3 + cSigned, cEffW)
-    truncToCEffW(sumFull)
+    truncToCEffW(r.sum + cSigned)
   }
 
   private def toU8(v: Int): Int = v & 0xFF
@@ -171,6 +150,39 @@ class WbFusionMacIntSpec extends AnyFlatSpec with Matchers with ChiselSim {
         pass += 1
       }
       println(s"[WbFusionMacIntSpec] INT8 dual-lane PASS $pass/${allVecs.size}")
+    }
+  }
+
+  behavior of "WbFusionMacInt INT8 four-product sum width (P7 trigger)"
+
+  it should "compute INT8 a=b=0x8080 sum=32768 without 16-bit intermediate overflow" in {
+    // 唯一触发点：r0=r1=(−128)*(−128)=16384，四积和=32768 超 16-bit 有符号上界 32767。
+    // 缺陷 RTL 先 mod 2^16 ⟹ −32768，偏 −65536。修后 pad(19) 全精度 ⟹ +32768。
+    val a = pack8(-128, -128)   // 0x8080
+    val b = pack8(-128, -128)   // 0x8080
+    val cRegs = Seq(BigInt(0), BigInt(1), BigInt(-1), BigInt("549755813887"))
+    simulate(new WbFusionMacInt()) { dut =>
+      dut.reset.poke(true.B)
+      dut.io.aFmt.poke(DataFormat.INT8)
+      dut.io.bFmt.poke(DataFormat.INT8)
+      dut.clock.step(3)
+      dut.reset.poke(false.B)
+      dut.clock.step(2)
+      for (cSigned <- cRegs) {
+        val cRaw = cRegPoke(cSigned)
+        dut.io.a.poke(a.U)
+        dut.io.b.poke(b.U)
+        dut.io.cReg.poke(cRaw.U)
+        dut.clock.step(1)
+        val actual = dut.io.sum.peek().litValue
+        val expected = goldenInt8(a, b, cRaw)
+        // 张量语义显式锚：四积和恒 32768，加 cReg 后截 40-bit
+        val anchor = truncToCEffW(BigInt(32768) + asSignedCEffW(cRaw))
+        assert(expected == anchor, s"golden self-check failed for cReg=$cSigned")
+        assert(actual == expected,
+          f"[P7 trigger] FAIL: a=b=0x8080 cReg=$cSigned expected=0x${expected.toString(16)} actual=0x${actual.toString(16)}")
+        println(f"[WbFusionMacIntSpec] P7 trigger cReg=$cSigned PASS: sum=0x${actual.toString(16)} (四积和=32768)")
+      }
     }
   }
 
