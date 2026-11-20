@@ -17,7 +17,7 @@
 | **P2** | **方案 C（MX4 块内整数前端 + 3 槽 lazy 加法器）实测省 0.1103 mm² = 阵列 6.19%**，零数据流改动。**推荐立项。** |
 | **P3** | **方案 E（加法器移出 PE + 列树）在 6 格式并集下两种形态都更差**：flat +7.21%、pair +3.84%（vs 基线）；vs C 分别 +14.29% / +10.70%。**不立项。** |
 | **P4** | E 失败的根因是**节点数下界**，不是实现质量：MX8 每 PE 每拍 2 个 fp32 积且不可整数化 ⟹ 并集必须按 32 lazy 叶/列 provisioning；C 的串行链用 **16 个 3 槽节点/列**吸收 {carry, 积0, 积1}，任何 32 叶树需 **32 个节点**。E 在 MX4-only 下赢的 −42% 来自「把求和留在整数域」，而并集里那 12 个整数节点替换的是**为 MX8 已经付过钱的 lazy 节点** ⟹ 收益归零。 |
-| **P5** | §6.5 Q1（饱和域）**已实测定价**：复刻逐元素饱和使 C 的收益从 **6.19% 降到 3.37%**（代价 0.0502 mm² = 200.3 µm²/PE）。这是语义裁定，须用户拍。 |
+| **P5** | §6.1 Q1（饱和域）**已实测定价**：选项1 复刻逐元素饱和使 C 收益 **6.19%→3.37%**（+0.0502 mm²）。**选项2 声明规格变更 + block 级饱和到 max（§6.1.1）仅 +16.2 µm²/PE 直接逻辑（≈0.004 mm²），收益 ≈−5.96% 基本不变**，比选项1 便宜约 12×；Inf 会破坏有限值累加器（cReg=Inf 塌零）不可取。签核量化流不可达饱和域（F3）。这是语义裁定，须用户拍。 |
 | **P6** | 本轮在测量代理里查出并修正 **4 处语义缺陷**（subnormal 等效尾数、underflow 冲刷、raw 前端位宽截断、小 scale 指数无符号绕回），修正后全部重测。**修正前的 C/E 数字作废**，本文数字为修正后口径。 |
 | **P7** | **独立缺陷（与 C/E 无关）**：交付 RTL `Wb_WbFusionMacInt` 的四积中间和被 firtool 收窄到 16 bit，在 **INT8 且 a=b=0x8080** 这一个输入组合上结果偏 −65536。已用 yosys SAT 反例证实。建议单独修，见 §7。 |
 | **P8** | 混合形态「C 串行链 + 仅 MX4 组网络」解析定价约 **−0.54%**，且注入时序在不去 skew 时不闭合 ⟹ 不值得立项，见 §5.4。 |
@@ -297,14 +297,54 @@ overflow 饱和（`exp>254 → exp=254, mant=1`，即 ±1.5×2^127）。饱和�
 | 选项 | 语义 | 实测阵列收益 | 代价 |
 |---|---|---|---|
 | **1 复刻逐元素饱和** | 饱和域**数值**一致（仍非逐位，lazy 切分差异同在） | **−3.37%** | +0.0502 mm²（200.3 µm²/PE） |
-| **2 声明规格变更** | 饱和域不承诺数值一致，金锚按张量语义重推 | **−6.19%** | 0 面积；须改规格 + 金锚 |
+| **2 声明规格变更 + block 级饱和到 max** | 非溢出域精确；溢出域饱和到有限 fp32max（§6.1.1） | **≈−5.96%** | +~0.004 mm²（16.2 µm²/PE 直接逻辑）；须改规格 + 金锚 |
 | 3 运行期 fallback 旧路 | 一致 | **0**（5 槽硬件不能删） | 不成立 |
 
 > 触发域极窄：`e2+scale>255` ⟹ 仅 `(e2=3, scale≥253)` 或 `(e2=2, scale=254)`。
 > 该域块和本身也撞 lazy-40 的 `expOut` 钳 254（`FpAddNarrow` 头注 E3），属已定义退化域。
 > **F3 已查证**：签核量化流产生饱和需 amax≥2.98e38（fp32 顶端尾段），签核模型 O(1)–O(10²) 不可达
-> ⟹ 选项 2 在签核流**无饱和域数值风险**且省 2.82 个百分点。⚠ 但这是软件流保证非硬件契约
+> ⟹ 选项 2 在签核流**无饱和域数值风险**且省 ≈2.6 个百分点。⚠ 但这是软件流保证非硬件契约
 > （DMA 接受任意 scale）；且**无论选 1/2，C 都非逐位兼容（P9），金锚均须重推**。**本文不擅自选**。
+
+### 6.1.1 选项 2 的溢出语义：block 级饱和到 max（已实测定价，2026-11-19）
+
+**为什么必须定义**：C 整数前端不算逐元素 fp32，块和精确携带为「整数尾数 + 共享指数 eSum−120」。
+但 lazy-40 指数 8-bit、钳 254 ⟹ 可表示值 < 2¹²⁸。当 `eRaw=eSum−120>254`（eSum>374）真值超范围。
+**原代理只钳指数不动尾数 ⟹ 静默缩小 2^(eSum−374) 倍的错误有限值**（比 Inf 更糟，不可检测）——
+这是隐性 bug，选项 2 必须把它换成有定义的行为。
+
+**选定语义：饱和到有限 fp32max**（不建议 Inf，理由见下）：
+- 溢出时打包 lazy 码 `{sgn, 8'd254, 31'h7FFFFF80}`。该码经 [Fp32.scala:211 fpNormalize40to32](../scala/main/Fp32.scala)
+  （RNE）**恰好归一化为有限 fp32max `{s,254,0x7FFFFF}`**（Python 验证）。
+- **RNE 对齐陷阱**：尾数若置全 1 `0x7FFFFFFF`，RNE 进位 → expOut=255 → **fp32 Inf**；
+  必须用 `0x7FFFFF80`（bit6=0 ⟹ roundUp=0 ⟹ 无进位）。已验证两种码的归一化结果。
+- 非溢出域逐位等同原前端（精确）；tiny/零域仍冲刷真零。`verify_satmax.py` 穷举：
+  **精确域 89766 + 溢出域 39204（==±fp32max）+ tiny/零 68166，0 失配**。
+
+**为什么不用 Inf**（追代码证实）：
+- lazy-40 是有限值格式。注入 `{s,255,0}` 会被 [FpAddNarrow.scala:123 unpackC](../scala/main/FpAddNarrow.scala)
+  当 eEff=255、magW=0 ⟹ 抬高公共指数 E=255 ⟹ 其余槽全 term-drop ⟹ **整个累加器塌成真零**（灾难）。
+- `fpNormalize40to32` 做 LZC 规格化，`{255,0}` 被归成小有限值而非 fp32 Inf。
+- 故 Inf 需保留编码 + 加法器特判 + 归一化旁路 + 跨 C FIFO/psum 链状态传播 ⟹ 跨多模块、验证面大。
+  饱和到 max  staying finite，累加器语义不变，且与既有约定一致（元素饱和 1.5×2¹²⁷、量化溢出饱和最大码、
+  FpAddNarrow 钳 254 避 Inf/NaN）。
+
+**实测代价**（`summary19.txt`/`summary20.txt`，交付 RTL 零改动）：
+- **直接逻辑 = 前端单模块 +16.226 µm²/PE**（mx4_frontend 562.324 → satmax 578.550），即一个溢出 mux。
+- 整 PE 代理差分散布 −76…+149 µm²（WorkUnit −76.3 / MAC +94.4 / Worker +149.5 / OsM1 +17.6），
+  是 **abc 跨边界共享重排**所致（连 union 单模块差都 −30.6；重采样 n1=n2=n3 确定 ⟹ 非运行噪声，
+  是结构敏感）。OsM1 +17.6 与前端直接逻辑 +16.2 吻合 ⟹ **真实逻辑成本 ≈16 µm²/PE**。
+- **阵列最佳估算 ≈16.2×256 ≈ 0.0042 mm² ≈ 阵列 0.23%**，C 收益 −6.19% → **≈−5.96%**（噪声内基本不变）。
+  即便取最坏整 PE 代理上界 0.036 mm² 仍 < 选项 1 的 0.0502。**比选项 1 便宜约 12×，比 Inf 便宜得多。**
+-  definitive 整 PE 数字须真实 Chisel 实现 + 重发射（F4/F5）；代理 abc 共享伪影不迁移到真实 RTL。
+
+**两个裁定项**：
+1. **非 sticky**：饱和码是有限 lazy 值，回灌累加器后异号相加可 desaturate。真 IEEE 饱和/Inf 是 sticky。
+   本域 out-of-contract（F3 签核不可达），非 sticky 大概率可接受，但须明确裁定。
+2. **保守阈值**：ovf 判据 `eRaw>254` 在 eSum=375 且 bsum 很小时会饱和掉技术上仍可表示（leading-zeros）的值。
+   深 out-of-contract 域，可接受；如需精确可改为按真值幅值判溢出（代价略增）。
+3. **累加溢出未改**：本语义只覆盖前端 block 溢出；跨 kTile 累加把 cReg 指数推向 254 仍走 FpAddNarrow E3
+   （共享、现状不动）。若要全链路一致饱和，须另对齐 E3 钳位也置 max 尾数（影响 MX8/BF16 高域，单列裁定）。
 
 ### 6.2 tiny-scale 域（**F1 已结，见 §8.4.1**）
 
@@ -492,7 +532,7 @@ val sumFull = r0.pad(19) + r1.pad(19) + r2.pad(19) + r3.pad(19) + io.cReg.asSInt
 | F4 | **死硬件红利核实**：真实 Chisel 删例化后重发射，确认 `FpMulMx4`/`FpCvtMx4ToMid` 实例消失 | §8.3 (2) |
 | F5 | **184 µm² 红利在整 PE 的兑现率**：重发射后重跑 yosys 整 PE 对照 | 与本文 1.6707 mm² 对账（±1.77% 噪声内） |
 
-#### 8.4.1 F1–F3 取证结果（2026-11-19，已结；F4/F5 须 C 实施后做）
+#### 8.4.1 F1–F5 取证结果（F1–F3 2026-11-19 已结；F4/F5 2026-11-20 C 实施后已结）
 
 **in-spec 域定义**（F1 证明的适用域，`f1_probe.sv:inSpec`）：
 `noSat`（sa,sb≤252，排除元素饱和）∧ 每非零积 fp32 exp 字段≥1（`eAdj=eSum+e2a+e2b+normBit−2≥128`，
@@ -527,6 +567,26 @@ val sumFull = r0.pad(19) + r1.pad(19) + r2.pad(19) + r3.pad(19) + io.cReg.asSInt
   ⟹ **饱和域在签核量化流不可达**。
 - **⚠ 边界**：硬件经 DMA 接受任意 scale 字节，量化器不变量是**软件流保证**而非硬件强制契约。
   Q1（声明饱和 out-of-contract 保 −6.19% vs 复刻饱和 −3.37%）仍由用户裁定；数据强烈支持「签核流不可达」。
+
+**F4 — 死硬件红利核实（2026-11-20，C 实施后重发射，已结）**
+- 真实 Chisel 编译期 `if(!useNarrowAdd)` 不例化 fp4Mul0/1 + 4×FpCvtMx4ToMid；默认 RTL 重发射后
+  `Wb_FpAddNarrow.sv`/`Wb_FpMulMx4.sv`/`Wb_FpCvtMx4ToMid.sv` 三文件删除，新增 `Wb_Mx4BlockInt.sv`/`Wb_FpAddLazy3.sv`。
+- C 的 WbWorker 依赖闭包 = 10 模块，无上述三者；交付 `Wb_WbFusionMacFp.sv` dead-ref grep = **0**；
+  `FpCvtMx4ToMx8Mid`（lane0/lane1 MX4→MX8 中间表示）×4 保留 ⟹ **184 µm² 死硬件红利兑现**（编译期不例化，非悬空）。
+- Q1 裁定 = **选项 2 + block 饱和到 max**；`FpAddNarrow` 保留为精度契约参考（仍被 FpAddNarrowSpec/OptSpec 测试），默认 RTL 不再例化。
+
+**F5 — 整 PE 红利兑现率（2026-11-20，真实重发射 RTL yosys+nangate45，已结）**
+- 基线（HEAD 5 槽 MAC + 当前 WP-A IntMac + 未改 PE 模块）阵列 **1.8014 mm²** → C **1.6805 mm²** = **−6.71%**
+  （IntMac 两侧同 1714.902 µm² ⟹ 纯 WP-B）。单模块 MAC 3995.054→3604.832（−9.77%）、WorkUnit 5734.694→5252.702、
+  Worker 7018.942→6557.698、OsM1 7304.094→6665.694。
+- 对账（±1.77% 噪声内）：真实 C vs 本文代理 1.6707 **+0.59%**、vs satmax 1.6975 **−1.00%**、真实基线 vs 代理 1.7810 **+1.15%**。
+  收益符号与量级确认，真实 **−6.71%** 略优于代理 −6.19%（Q1 选 2+satmax 增量已含于 Mx4BlockInt）。
+- ⚠ 代理与真实 ~1% 系统偏移来自 yosys 0.69→0.71 + 真实独立模块文件 vs 代理共享 e_nodes.v 的 abc 输入序差异；
+  §3 代理数字保留作背景，**definitive 以本 F5 真实实测为准**。
+- 测量法：`hoist.py`（提 automatic，四守卫，不回写交付 RTL）+ `closure.py`（只读依赖闭包，hoisted-if-exists）
+  + `synth -flatten -noshare`；报告 `build/wpB_f5_area.md`，脚本/日志 `sim/wpB-f5-20261120/`。
+- 定向精度回归（非全量，按用户裁定纯数据通路不涉控制层）：Mx4BlockIntSpec/FpAddLazy3Spec/WbFusionMacFpNarrowSpec/
+  WbFusionMacFpBf16Spec/WbFusionMacIntSpec **44/44 绿、5 suite、SBT_EXIT=0**；spec 同步 v5.1.0（§5.2.5/§5.2.6）。
 
 ### 8.5 验证与回归
 
@@ -571,6 +631,9 @@ val sumFull = r0.pad(19) + r1.pad(19) + r2.pad(19) + r3.pad(19) + io.cReg.asSInt
 | `f1_lane.sv` / `f1_l1_f1_lane{0,1,23}.ys` / `.log` | **L1 逐 lane 积精确引理**（3×256=768 SAT 全 SUCCESS） |
 | `f3_quant_invariant.py` / `.log` | **F3 量化器饱和不变量穷举**（饱和需 amax≥2.98e38） |
 | `f1a*.log` / `f1_l2.log` | 端到端单 miter 不收敛记录（minisat，无 SMT solver；故用 L1+L2 分解） |
+| `e_nodes.v:mx4_frontend_satmax` / `mac_add_union_satmax` | **Q1 选项2 block 级饱和到 max 前端代理**（§6.1.1） |
+| `verify_satmax.py` / `.log` | satmax 语义穷举（精确 89766 + 溢出→fp32max 39204 + tiny/零 68166，0 失配） |
+| `run19.sh` / `summary19.txt` / `run20.sh` / `summary20.txt` | satmax vs C 整 PE 对照 + 3× 重采样（前端 +16.2 µm²/PE；整 PE 差分 abc 共享散布） |
 
 ### 9.2 关键数据来源
 

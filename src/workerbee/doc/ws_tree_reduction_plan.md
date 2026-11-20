@@ -695,7 +695,7 @@ L1 的 adder_k 在 cycle τ+2k+1 算 token τ、在 τ+2k+2 算 token τ+1……
 而 GEMM 要的是**所有 kTile 的总和**（K/16 个 kTile）。跨 kTile 的累加必须有个地方做。
 
 **现状怎么做**：靠 C buffer 回灌 —— 末行结果 → C FIFO → 回到首行 `psumIn` 当下一 kTile 的基底。
-**这条回路就是 32 拍环路的来源**（[ws_wbuf_plan.md:60](ws_wbuf_plan.md)：L = 2·totalN−1 = 31，+1 = C FIFO）。
+**这条回路就是 32 拍环路的来源**（ws_wbuf_plan.md:60（已归档，见 git 历史）：L = 2·totalN−1 = 31，+1 = C FIFO）。
 
 **列驻留累加器**：在每列本地放一个寄存器，`accReg <= accReg + treeOut`。
 就是 §7.5 代理里的 `radd2 aA(.x(r2), .y(accR), .q(accR))`，也是 `tree16_acc` 里那个第 16 个节点。
@@ -831,7 +831,7 @@ M=1 时 `m+1=2`，BF16 端口下界 16 ⟹ **P = 16**，对比现状 32 ⟹ **2.
 ### 8.1 现状 WS 的 32 拍环路
 
 周期律（已实测钉死）：`cyc/kTile = max(m+1, L+1=32, max_over_ports(beats_per_kTile/duty))`
-（[rank7_isolation_plan.md:60](rank7_isolation_plan.md)、[ws_wbuf_plan.md:60](ws_wbuf_plan.md)）。
+（[rank7_isolation_plan.md:60](rank7_isolation_plan.md)、ws_wbuf_plan.md:60（已归档，见 git 历史））。
 `L = 2·totalN − 1 = 31` = 纵向 `validV` 链 15 + 末列横向 skew 15 + 输出寄存 1。
 
 根因：**psum 基底要在波前起点（首行）进入，结果却在波前终点（末行）产出**，再经 C buffer 回灌
@@ -1013,7 +1013,7 @@ E4M3/E5M2 另跑「仅 normal + finite」变体以给出**最紧下界**（排�
 | A 行 skew 契约 | [WbComb.scala:15-16](../scala/main/WbComb.scala) |
 | OS 本地 acc 反馈（D2 可复用的机制） | [WbWorkerOsM1.scala:174](../scala/main/WbWorkerOsM1.scala) |
 | INT 走独立 MAC | [WbWorkUnit.scala:81-84](../scala/main/WbWorkUnit.scala) |
-| WS 周期律与 L=31 分解 | [rank7_isolation_plan.md:60](rank7_isolation_plan.md)、[ws_wbuf_plan.md:60](ws_wbuf_plan.md) |
+| WS 周期律与 L=31 分解 | [rank7_isolation_plan.md:60](rank7_isolation_plan.md)、ws_wbuf_plan.md:60（已归档，见 git 历史） |
 | OS 周期律硬断言 | [WorkerBeeOsM1PerfSpec.scala:573](../scala/test/WorkerBeeOsM1PerfSpec.scala) |
 | OS 实测拍/kTile | [DEEP_RESEARCH_workerbee_optimization.md:163-167](../../../DEEP_RESEARCH_workerbee_optimization.md) |
 | B 端口占用 94.1–98.5% 与字节不可约 | [os_splitk_plan.md:54-56](os_splitk_plan.md)、[:63-71](os_splitk_plan.md) |
