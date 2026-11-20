@@ -4,11 +4,10 @@ import chisel3._
 import chisel3.util._
 import loom.ir.LoomDefaults
 
-/** S1/S3 native transaction: write data travels with the request.
-  * Later sprints split WDATA into a separate channel.
-  */
-/** Fabric request. `src` names the issuing master; `id` is the AXI4
-  * transaction namespace and is transported unchanged by every hop.
+/** Endpoint request: the merged view of the `rreq` and `wdata` channels.
+  * `src` names the issuing master; `id` is the AXI4 transaction namespace and
+  * is transported unchanged by every hop. The network splits this port into
+  * per-channel traffic inside its NIs.
   */
 class LmReq(
     val addrWidth: Int,
@@ -22,6 +21,7 @@ class LmReq(
   val src = UInt(idWidth.W)
   val id = UInt(tagWidth.W)
   val data = UInt(dataWidth.W)
+  val strb = UInt((dataWidth / 8).W)
   val vc = UInt(LoomDefaults.VcWidth.W)
 }
 

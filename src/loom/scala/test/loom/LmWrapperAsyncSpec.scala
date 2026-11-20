@@ -59,6 +59,7 @@ class LmWrapperAsyncSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.io.master(i).bits.len.poke(0.U)
       dut.io.master(i).bits.src.poke(i.U)
       dut.io.master(i).bits.data.poke(0.U)
+      dut.io.master(i).bits.strb.poke(0.U)
       dut.io.masterRsp(i).ready.poke(true.B)
     }
     for (j <- 0 until net.nSlave) {
@@ -77,8 +78,15 @@ class LmWrapperAsyncSpec extends AnyFlatSpec with Matchers with ChiselSim {
     for (d <- 0 until 2) dut.io.domainReset.get(d).poke(false.B)
   }
 
-  private def request(dut: LmWrapperTop, ck: ClockDriver, m: Int, addr: Long, data: Long): Unit = {
-    dut.io.master(m).bits.write.poke(true.B)
+  private def request(
+      dut: LmWrapperTop,
+      ck: ClockDriver,
+      m: Int,
+      addr: Long,
+      data: Long,
+      write: Boolean
+  ): Unit = {
+    dut.io.master(m).bits.write.poke(write.B)
     dut.io.master(m).bits.addr.poke(addr.U)
     dut.io.master(m).bits.src.poke(m.U)
     dut.io.master(m).bits.data.poke(data.U)
@@ -114,7 +122,8 @@ class LmWrapperAsyncSpec extends AnyFlatSpec with Matchers with ChiselSim {
     }
     seen shouldBe true
     addrSeen shouldBe BigInt(addr)
-    dataSeen shouldBe BigInt(data)
+    // A read carries no write data; a write beat carries its own payload.
+    dataSeen shouldBe (if (write) BigInt(data) else BigInt(0))
     srcSeen shouldBe BigInt(m)
 
     // Let the request fire and allocate its response slot before returning.
@@ -145,22 +154,22 @@ class LmWrapperAsyncSpec extends AnyFlatSpec with Matchers with ChiselSim {
       ck.highPhase()
       guard += 1
     }
-    got shouldBe Some(BigInt(data + 0x1000))
+    got shouldBe Some(if (write) BigInt(0) else BigInt(data + 0x1000))
   }
 
   behavior of "LmWrapperTop (async partitions)"
 
   it should "carry requests and responses across a 2:1 async boundary" in {
     val ops = Seq(
-      (0, 0x0000L, 0x11L),
-      (1, 0x1000L, 0x22L),
-      (0, 0x1000L, 0x33L),
-      (1, 0x2000L, 0x44L)
+      (0, 0x0000L, 0x11L, true),
+      (1, 0x1000L, 0x22L, false),
+      (0, 0x1000L, 0x33L, true),
+      (1, 0x2000L, 0x44L, false)
     )
     simulate(new LmWrapperTop(net, parts)) { dut =>
       val ck = new ClockDriver(dut)
       init(dut, ck)
-      ops.foreach { case (m, addr, data) => request(dut, ck, m, addr, data) }
+      ops.foreach { case (m, addr, data, write) => request(dut, ck, m, addr, data, write) }
     }
   }
 }

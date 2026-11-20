@@ -102,6 +102,7 @@ class LmShellCore(
       io.req.bits.src := srcId.U
       io.req.bits.id := burstId
       io.req.bits.data := io.wdata.bits.data
+      io.req.bits.strb := io.wdata.bits.strb
       io.wdata.ready := io.req.ready
       when(io.req.fire) { sent := sent + 1.U }
     }

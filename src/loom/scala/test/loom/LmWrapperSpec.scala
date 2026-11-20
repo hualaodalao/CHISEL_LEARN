@@ -37,6 +37,7 @@ class LmWrapperSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.io.master(i).bits.len.poke(0.U)
       dut.io.master(i).bits.src.poke(i.U)
       dut.io.master(i).bits.data.poke(0.U)
+      dut.io.master(i).bits.strb.poke(0.U)
       dut.io.masterRsp(i).ready.poke(true.B)
     }
     for (j <- 0 until net.nSlave) {
@@ -51,12 +52,12 @@ class LmWrapperSpec extends AnyFlatSpec with Matchers with ChiselSim {
     dut.reset.poke(false.B)
   }
 
-  private def drive(dut: LmWrapperTop, ops: Seq[(Int, Long, Long)]): Trace = {
+  private def drive(dut: LmWrapperTop, ops: Seq[(Int, Long, Long, Boolean)]): Trace = {
     val slaveTrace = Seq.newBuilder[(Int, BigInt, BigInt, BigInt)]
     val masterTrace = Seq.newBuilder[(Int, BigInt)]
 
-    for ((m, addr, data) <- ops) {
-      dut.io.master(m).bits.write.poke(true.B)
+    for ((m, addr, data, write) <- ops) {
+      dut.io.master(m).bits.write.poke(write.B)
       dut.io.master(m).bits.addr.poke(addr.U)
       dut.io.master(m).bits.src.poke(m.U)
       dut.io.master(m).bits.data.poke(data.U)
@@ -114,10 +115,10 @@ class LmWrapperSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   it should "keep the transaction trace identical across partition counts" in {
     val ops = Seq(
-      (0, 0x0000L, 0x11L),
-      (1, 0x1000L, 0x22L),
-      (0, 0x1000L, 0x33L),
-      (1, 0x2000L, 0x44L)
+      (0, 0x0000L, 0x11L, true),
+      (1, 0x1000L, 0x22L, false),
+      (0, 0x1000L, 0x33L, true),
+      (1, 0x2000L, 0x44L, false)
     )
 
     var flat: Trace = null
@@ -145,6 +146,7 @@ class LmWrapperSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.io.master(0).bits.len.poke(0.U)
       dut.io.master(0).bits.src.poke(0.U)
       dut.io.master(0).bits.data.poke(0.U)
+      dut.io.master(0).bits.strb.poke(0.U)
       dut.io.masterRsp(0).ready.poke(true.B)
       for (s <- 0 until front.slaves.size) {
         dut.io.slave(s).ready.poke(true.B)
@@ -167,14 +169,20 @@ class LmWrapperSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   it should "close the boundary credit with one error response" in {
     simulate(new LmPartitionStub(net, back)) { dut =>
-      dut.io.boundaryInReq(0).valid.poke(false.B)
-      dut.io.boundaryInReq(0).bits.write.poke(true.B)
-      dut.io.boundaryInReq(0).bits.addr.poke(0.U)
-      dut.io.boundaryInReq(0).bits.len.poke(0.U)
-      dut.io.boundaryInReq(0).bits.src.poke(0.U)
-      dut.io.boundaryInReq(0).bits.data.poke(0.U)
-      dut.io.boundaryInReq(0).bits.vc.poke(0.U)
-      dut.io.boundaryInRsp(0).ready.poke(true.B)
+      dut.io.boundaryInRdReq(0).valid.poke(false.B)
+      dut.io.boundaryInRdReq(0).bits.addr.poke(0.U)
+      dut.io.boundaryInRdReq(0).bits.len.poke(0.U)
+      dut.io.boundaryInRdReq(0).bits.src.poke(0.U)
+      dut.io.boundaryInRdReq(0).bits.vc.poke(0.U)
+      dut.io.boundaryInRdData(0).ready.poke(true.B)
+      dut.io.boundaryInWrData(0).valid.poke(false.B)
+      dut.io.boundaryInWrData(0).bits.addr.poke(0.U)
+      dut.io.boundaryInWrData(0).bits.data.poke(0.U)
+      dut.io.boundaryInWrData(0).bits.strb.poke(0.U)
+      dut.io.boundaryInWrData(0).bits.src.poke(0.U)
+      dut.io.boundaryInWrData(0).bits.last.poke(true.B)
+      dut.io.boundaryInWrData(0).bits.vc.poke(0.U)
+      dut.io.boundaryInWrResp(0).ready.poke(true.B)
       for (s <- 0 until back.slaves.size) {
         dut.io.slave(s).ready.poke(true.B)
         dut.io.slaveRsp(s).valid.poke(false.B)
@@ -183,13 +191,21 @@ class LmWrapperSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.clock.step(2)
       dut.reset.poke(false.B)
 
-      dut.io.boundaryInReq(0).bits.src.poke(1.U)
-      dut.io.boundaryInReq(0).valid.poke(true.B)
+      dut.io.boundaryInRdReq(0).bits.src.poke(1.U)
+      dut.io.boundaryInRdReq(0).valid.poke(true.B)
       dut.clock.step()
-      dut.io.boundaryInReq(0).valid.poke(false.B)
-      dut.io.boundaryInRsp(0).valid.expect(true.B)
-      dut.io.boundaryInRsp(0).bits.err.expect(true.B)
-      dut.io.boundaryInRsp(0).bits.src.expect(1.U)
+      dut.io.boundaryInRdReq(0).valid.poke(false.B)
+      dut.io.boundaryInRdData(0).valid.expect(true.B)
+      dut.io.boundaryInRdData(0).bits.err.expect(true.B)
+      dut.io.boundaryInRdData(0).bits.src.expect(1.U)
+
+      dut.io.boundaryInWrData(0).bits.src.poke(1.U)
+      dut.io.boundaryInWrData(0).valid.poke(true.B)
+      dut.clock.step()
+      dut.io.boundaryInWrData(0).valid.poke(false.B)
+      dut.io.boundaryInWrResp(0).valid.expect(true.B)
+      dut.io.boundaryInWrResp(0).bits.err.expect(true.B)
+      dut.io.boundaryInWrResp(0).bits.src.expect(1.U)
     }
   }
 }

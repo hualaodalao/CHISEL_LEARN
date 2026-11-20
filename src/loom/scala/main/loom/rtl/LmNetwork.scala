@@ -4,24 +4,60 @@ import chisel3._
 import chisel3.util._
 import loom.ir.LoomDefaults
 
-/** Request bundle inside a multi-router network. Class is carried per
-  * request because a router input port can serve masters of different
-  * classes.
+/** Fields shared by the two request-direction channels: both pick an output
+  * from their own address and carry the scheduling VC.
   */
-class LmNetReq(
-    val addrWidth: Int,
-    val dataWidth: Int,
-    val idWidth: Int,
-    val qosWidth: Int,
-    val tagWidth: Int = LoomDefaults.AxiIdWidth
-) extends Bundle {
-  val write = Bool()
+abstract class LmAddrReq(val addrWidth: Int) extends Bundle {
   val addr = UInt(addrWidth.W)
+  val vc = UInt(LoomDefaults.VcWidth.W)
+}
+
+/** Read address channel: one transaction per read burst. */
+class LmRdReq(addrWidth: Int, idWidth: Int, tagWidth: Int = LoomDefaults.AxiIdWidth)
+    extends LmAddrReq(addrWidth) {
   val len = UInt(8.W)
   val src = UInt(idWidth.W)
   val id = UInt(tagWidth.W)
+}
+
+/** Write data channel: one transaction per write beat. Every beat carries its
+  * own address, so a burst may take different paths hop by hop.
+  */
+class LmWrData(
+    addrWidth: Int,
+    dataWidth: Int,
+    idWidth: Int,
+    tagWidth: Int = LoomDefaults.AxiIdWidth
+) extends LmAddrReq(addrWidth) {
   val data = UInt(dataWidth.W)
+  val strb = UInt((dataWidth / 8).W)
+  val src = UInt(idWidth.W)
+  val id = UInt(tagWidth.W)
+  val last = Bool()
+}
+
+/** Fields shared by the two response-direction channels: both are routed back
+  * to the issuing master only.
+  */
+abstract class LmSrcRouted(val idWidth: Int) extends Bundle {
+  val src = UInt(idWidth.W)
   val vc = UInt(LoomDefaults.VcWidth.W)
+}
+
+/** Read data channel: one transaction per read beat. */
+class LmRdData(dataWidth: Int, idWidth: Int, tagWidth: Int = LoomDefaults.AxiIdWidth)
+    extends LmSrcRouted(idWidth) {
+  val data = UInt(dataWidth.W)
+  val id = UInt(tagWidth.W)
+  val last = Bool()
+  val err = Bool()
+}
+
+/** Write response channel: one transaction per write burst, no data. */
+class LmWrResp(idWidth: Int, tagWidth: Int = LoomDefaults.AxiIdWidth)
+    extends LmSrcRouted(idWidth) {
+  val id = UInt(tagWidth.W)
+  val err = Bool()
 }
 
 /** Round-robin arbiter for an arbitrary radix (including 1). */
@@ -80,74 +116,88 @@ class LmPipe[T <: Data](gen: T, stages: Int) extends Module {
   }
 }
 
-/** Router with explicit in/out port layout and route tables from NetworkParams.
-  *
-  * Requests carry their QoS class. Responses are routed by master index
-  * through the reverse route table. End-to-end credits and response slots
-  * live in the MNet/SNet NIs, so the router itself is buffer-free.
+/** MNet/SNet shared-port token: at most one transaction per channel per
+  * cycle, round-robin across the endpoints bound to that net.
   */
-class LmNetRouter(p: NetworkParams, spec: NetRouterSpec) extends Module {
+class LmNetToken(nPorts: Int) extends Module {
+  require(nPorts >= 1, "a net needs at least one port")
+
+  val io = IO(new Bundle {
+    val req = Input(Vec(nPorts, Bool()))
+    val ok = Output(Vec(nPorts, Bool()))
+  })
+
+  private val arb = Module(new LmRrArbiterN(nPorts))
+  arb.io.req := io.req
+  for (i <- 0 until nPorts) io.ok(i) := arb.io.valid && (arb.io.grant === i.U)
+}
+
+/** One request-direction channel: per-input x VC queues, three-level
+  * arbitration (input RR per (out, vc) -> class-internal half RR -> class
+  * WRR), address-window routing and the dateline half flip on cut links.
+  *
+  * `lenOf` is set for the read-address channel, the only channel that carries
+  * a burst length; the per-beat write channel has no packet to bound.
+  */
+class LmReqSwitch[T <: LmAddrReq](
+    gen: T,
+    p: NetworkParams,
+    spec: NetRouterSpec,
+    lenOf: Option[T => UInt] = None
+) extends Module {
   private val nClasses = p.classWeights.length
-  private val qosW = math.max(1, log2Ceil(nClasses))
   private val slaveBits = math.max(1, log2Ceil(p.nSlave))
   private val outW = math.max(1, log2Ceil(spec.nOut))
   private val inW = math.max(1, log2Ceil(spec.nIn))
+  private val nVc = nClasses * LoomDefaults.VcHalves
 
   val io = IO(new Bundle {
-    val inReq = Vec(spec.nIn, Flipped(Decoupled(
-      new LmNetReq(p.addrWidth, p.dataWidth, p.idWidth, qosW, p.tagWidth))))
-    val outReq = Vec(spec.nOut, Decoupled(
-      new LmNetReq(p.addrWidth, p.dataWidth, p.idWidth, qosW, p.tagWidth)))
-    val outRsp = Vec(spec.nOut, Flipped(Decoupled(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth))))
-    val inRsp = Vec(spec.nIn, Decoupled(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth)))
-    val outRspFwd = Vec(spec.nOut, Decoupled(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth)))
-    val inRspFwd = Vec(spec.nIn, Flipped(Decoupled(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth))))
+    val in = Vec(spec.nIn, Flipped(Decoupled(gen)))
+    val out = Vec(spec.nOut, Decoupled(gen))
   })
 
+  private val chType = chiselTypeOf(io.out(0).bits)
   private val routeSlaveVec = VecInit(spec.routeSlave.map(_.U(outW.W)))
 
   // One VC queue per (input port, vc). VC id = class * 2 + dateline half;
   // a cut link flips the half from 0 to 1 and never back.
-  private val nVc = nClasses * LoomDefaults.VcHalves
-  private val vc = Seq.tabulate(spec.nIn) { i =>
+  private val vc = Seq.tabulate(spec.nIn) { _ =>
     Seq.tabulate(nVc) { v =>
-      Module(new LmVcQueue(new LmNetReq(p.addrWidth, p.dataWidth, p.idWidth, qosW, p.tagWidth),
-        p.classDepth(v / LoomDefaults.VcHalves)))
+      Module(new LmVcQueue(chType, p.classDepth(v / LoomDefaults.VcHalves)))
     }
   }
 
   for (i <- 0 until spec.nIn) {
-    val cls = io.inReq(i).bits.vc >> 1
-    io.inReq(i).ready := VecInit(vc(i).map(_.io.enq.ready))(io.inReq(i).bits.vc)
+    io.in(i).ready := VecInit(vc(i).map(_.io.enq.ready))(io.in(i).bits.vc)
     for (v <- 0 until nVc) {
-      vc(i)(v).io.enq.valid := io.inReq(i).valid && (io.inReq(i).bits.vc === v.U)
-      vc(i)(v).io.enq.bits := io.inReq(i).bits
+      vc(i)(v).io.enq.valid := io.in(i).valid && (io.in(i).bits.vc === v.U)
+      vc(i)(v).io.enq.bits := io.in(i).bits
     }
-    when(io.inReq(i).fire) {
-      assert(io.inReq(i).bits.len +& 1.U <=
-        VecInit(p.classMaxPacket.map(_.U(8.W)))(cls), "LM-G6: request exceeds class maxPacketBeats")
-      when(cls === LoomDefaults.QosOrder.indexOf("ctl").U) {
-        assert(io.inReq(i).bits.len === 0.U, "LM-G7: ctl request must be single-beat")
+    lenOf.foreach { len =>
+      val cls = io.in(i).bits.vc >> 1
+      when(io.in(i).fire) {
+        assert(len(io.in(i).bits) +& 1.U <=
+          VecInit(p.classMaxPacket.map(_.U(8.W)))(cls), "LM-G6: request exceeds class maxPacketBeats")
+        when(cls === LoomDefaults.QosOrder.indexOf("ctl").U) {
+          assert(len(io.in(i).bits) === 0.U, "LM-G7: ctl request must be single-beat")
+        }
       }
     }
-    assert(!io.inReq(i).valid || io.inReq(i).bits.vc < nVc.U,
+    assert(!io.in(i).valid || io.in(i).bits.vc < nVc.U,
       "LM-NET: request carries an unknown VC")
   }
 
   private val outReady = Wire(Vec(spec.nOut, Bool()))
   private val coreValid = Wire(Vec(spec.nOut, Bool()))
-  private val coreBits =
-    Wire(Vec(spec.nOut, new LmNetReq(p.addrWidth, p.dataWidth, p.idWidth, qosW, p.tagWidth)))
+  private val coreBits = Wire(Vec(spec.nOut, chType))
   // Every output keeps one register stage. Besides timing, this decouples
-  // outReq.bits from outReq.ready: on a ring the ready chain otherwise folds
-  // back into the VC select of the upstream router.
-  private val bankStage: Seq[Option[LmPipe[LmNetReq]]] = Seq.tabulate(spec.nOut) { _ =>
-    Some(Module(new LmPipe(new LmNetReq(p.addrWidth, p.dataWidth, p.idWidth, qosW, p.tagWidth), 1)))
+  // out.bits from out.ready: on a ring the ready chain otherwise folds back
+  // into the VC select of the upstream router.
+  private val bankStage: Seq[LmPipe[T]] = Seq.tabulate(spec.nOut) { _ =>
+    Module(new LmPipe(chType, 1))
   }
 
-  for (j <- 0 until spec.nOut) {
-    outReady(j) := bankStage(j).map(_.io.in.ready).getOrElse(io.outReq(j).ready)
-  }
+  for (j <- 0 until spec.nOut) outReady(j) := bankStage(j).io.in.ready
 
   // Three levels: input arbitration per (out, vc), one RR across the two
   // halves of a class, then the weighted class schedule.
@@ -201,15 +251,9 @@ class LmNetRouter(p: NetworkParams, spec: NetRouterSpec) extends Module {
   // Banking groups output muxes and adds one register stage per output; it
   // does not add arbitration or change routing.
   for (j <- 0 until spec.nOut) {
-    bankStage(j) match {
-      case Some(st) =>
-        st.io.in.valid := coreValid(j)
-        st.io.in.bits := coreBits(j)
-        io.outReq(j) <> st.io.out
-      case None =>
-        io.outReq(j).valid := coreValid(j)
-        io.outReq(j).bits := coreBits(j)
-    }
+    bankStage(j).io.in.valid := coreValid(j)
+    bankStage(j).io.in.bits := coreBits(j)
+    io.out(j) <> bankStage(j).io.out
   }
 
   for (i <- 0 until spec.nIn; v <- 0 until nVc) {
@@ -217,10 +261,13 @@ class LmNetRouter(p: NetworkParams, spec: NetRouterSpec) extends Module {
       .map(j => outFire(j) && (selVc(j) === v.U) && (selIn(j) === i.U))
       .reduce(_ || _)
   }
+}
 
-  // Unified response switch. Sources: local slave ports and both response
-  // directions arriving on links. Destinations: master ports (in side) and
-  // link ports (in side for a reverse hop, out side for a forward hop).
+/** One response-direction channel: sources are the local slave ports and the
+  * forward hops arriving on links; destinations are the master ports (in side)
+  * and the link ports (in side for a reverse hop, out side for a forward hop).
+  */
+class LmRspSwitch[T <: LmSrcRouted](gen: T, p: NetworkParams, spec: NetRouterSpec) extends Module {
   private val nMasterPorts = spec.inMaster.count(_ >= 0)
   private val nSlavePorts = spec.outSlave.count(_ >= 0)
   private val nLinkPorts = spec.nOut - nSlavePorts
@@ -229,6 +276,14 @@ class LmNetRouter(p: NetworkParams, spec: NetRouterSpec) extends Module {
   private val nDests = spec.nIn + nLinkPorts
   private val destW = math.max(1, log2Ceil(math.max(1, nDests)))
 
+  val io = IO(new Bundle {
+    val out = Vec(spec.nOut, Flipped(Decoupled(gen)))
+    val outFwd = Vec(spec.nOut, Decoupled(gen))
+    val in = Vec(spec.nIn, Decoupled(gen))
+    val inFwd = Vec(spec.nIn, Flipped(Decoupled(gen)))
+  })
+
+  private val chType = chiselTypeOf(io.out(0).bits)
   private val respDest = p.masterClass.indices.map { m =>
     val r = if (m < spec.routeMaster.size) spec.routeMaster(m) else -1
     val f = if (m < spec.routeMasterFwd.size) spec.routeMasterFwd(m) else -1
@@ -238,25 +293,25 @@ class LmNetRouter(p: NetworkParams, spec: NetRouterSpec) extends Module {
   }
 
   private val srcValid = scala.collection.mutable.ArrayBuffer.empty[Bool]
-  private val srcBits = scala.collection.mutable.ArrayBuffer.empty[LmRsp]
+  private val srcBits = scala.collection.mutable.ArrayBuffer.empty[T]
   for (j <- 0 until spec.nOut) {
-    srcValid += io.outRsp(j).valid
-    srcBits += io.outRsp(j).bits
+    srcValid += io.out(j).valid
+    srcBits += io.out(j).bits
   }
   for (i <- nMasterPorts until spec.nIn) {
-    srcValid += io.inRspFwd(i).valid
-    srcBits += io.inRspFwd(i).bits
+    srcValid += io.inFwd(i).valid
+    srcBits += io.inFwd(i).bits
   }
 
   private val destReady = Wire(Vec(nDests, Bool()))
   private val destValid = Wire(Vec(nDests, Bool()))
-  private val destBits = Wire(Vec(nDests, new LmRsp(p.dataWidth, p.idWidth, p.tagWidth)))
+  private val destBits = Wire(Vec(nDests, chType))
   private val srcDst = Wire(Vec(nSrcs, UInt(destW.W)))
   private val srcReady = Wire(Vec(nSrcs, Bool()))
 
-  for (d <- 0 until spec.nIn) destReady(d) := io.inRsp(d).ready
+  for (d <- 0 until spec.nIn) destReady(d) := io.in(d).ready
   for (k <- 0 until nLinkPorts) {
-    destReady(spec.nIn + k) := io.outRspFwd(nSlavePorts + k).ready
+    destReady(spec.nIn + k) := io.outFwd(nSlavePorts + k).ready
   }
   for (s <- 0 until nSrcs) {
     srcDst(s) := VecInit(respDest.map(_.U(destW.W)))(srcBits(s).src)
@@ -279,54 +334,139 @@ class LmNetRouter(p: NetworkParams, spec: NetRouterSpec) extends Module {
   }
 
   for (d <- 0 until spec.nIn) {
-    io.inRsp(d).valid := destValid(d)
-    io.inRsp(d).bits := destBits(d)
+    io.in(d).valid := destValid(d)
+    io.in(d).bits := destBits(d)
   }
   for (k <- 0 until nLinkPorts) {
-    io.outRspFwd(nSlavePorts + k).valid := destValid(spec.nIn + k)
-    io.outRspFwd(nSlavePorts + k).bits := destBits(spec.nIn + k)
+    io.outFwd(nSlavePorts + k).valid := destValid(spec.nIn + k)
+    io.outFwd(nSlavePorts + k).bits := destBits(spec.nIn + k)
   }
-  for (j <- 0 until spec.nOut) io.outRsp(j).ready := srcReady(j)
+  for (j <- 0 until spec.nOut) io.out(j).ready := srcReady(j)
   for (i <- nMasterPorts until spec.nIn) {
-    io.inRspFwd(i).ready := srcReady(spec.nOut + (i - nMasterPorts))
+    io.inFwd(i).ready := srcReady(spec.nOut + (i - nMasterPorts))
   }
-  for (i <- 0 until nMasterPorts) io.inRspFwd(i).ready := true.B
+  for (i <- 0 until nMasterPorts) io.inFwd(i).ready := true.B
   for (j <- 0 until nSlavePorts) {
-    io.outRspFwd(j).valid := false.B
-    io.outRspFwd(j).bits := 0.U.asTypeOf(chiselTypeOf(io.outRspFwd(j).bits))
+    io.outFwd(j).valid := false.B
+    io.outFwd(j).bits := 0.U.asTypeOf(chType)
   }
 }
 
-/** Master-side NI: owns the return-slot credit and injects the class. */
+/** Router with explicit in/out port layout and route tables from NetworkParams.
+  *
+  * The four channels are physically independent: each has its own queues,
+  * arbitration and handshake, so no channel can block another. End-to-end
+  * credits and response slots live in the MNet/SNet NIs, so the router itself
+  * is buffer-free apart from the VC queues and the output stage.
+  */
+class LmNetRouter(p: NetworkParams, spec: NetRouterSpec) extends Module {
+  private def rdReqT = new LmRdReq(p.addrWidth, p.idWidth, p.tagWidth)
+  private def wrDataT = new LmWrData(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth)
+  private def rdDataT = new LmRdData(p.dataWidth, p.idWidth, p.tagWidth)
+  private def wrRespT = new LmWrResp(p.idWidth, p.tagWidth)
+
+  val io = IO(new Bundle {
+    val inRdReq = Vec(spec.nIn, Flipped(Decoupled(rdReqT)))
+    val outRdReq = Vec(spec.nOut, Decoupled(rdReqT))
+    val inWrData = Vec(spec.nIn, Flipped(Decoupled(wrDataT)))
+    val outWrData = Vec(spec.nOut, Decoupled(wrDataT))
+    val outRdData = Vec(spec.nOut, Flipped(Decoupled(rdDataT)))
+    val inRdData = Vec(spec.nIn, Decoupled(rdDataT))
+    val outRdDataFwd = Vec(spec.nOut, Decoupled(rdDataT))
+    val inRdDataFwd = Vec(spec.nIn, Flipped(Decoupled(rdDataT)))
+    val outWrResp = Vec(spec.nOut, Flipped(Decoupled(wrRespT)))
+    val inWrResp = Vec(spec.nIn, Decoupled(wrRespT))
+    val outWrRespFwd = Vec(spec.nOut, Decoupled(wrRespT))
+    val inWrRespFwd = Vec(spec.nIn, Flipped(Decoupled(wrRespT)))
+  })
+
+  private val rdReqSw = Module(new LmReqSwitch(rdReqT, p, spec, Some((b: LmRdReq) => b.len)))
+  rdReqSw.io.in <> io.inRdReq
+  io.outRdReq <> rdReqSw.io.out
+
+  private val wrDataSw = Module(new LmReqSwitch(wrDataT, p, spec))
+  wrDataSw.io.in <> io.inWrData
+  io.outWrData <> wrDataSw.io.out
+
+  private val rdDataSw = Module(new LmRspSwitch(rdDataT, p, spec))
+  rdDataSw.io.out <> io.outRdData
+  io.inRdData <> rdDataSw.io.in
+  io.outRdDataFwd <> rdDataSw.io.outFwd
+  rdDataSw.io.inFwd <> io.inRdDataFwd
+
+  private val wrRespSw = Module(new LmRspSwitch(wrRespT, p, spec))
+  wrRespSw.io.out <> io.outWrResp
+  io.inWrResp <> wrRespSw.io.in
+  io.outWrRespFwd <> wrRespSw.io.outFwd
+  wrRespSw.io.inFwd <> io.inWrRespFwd
+}
+
+/** Master-side NI: splits the endpoint request into the read-address and write
+  * data channels, merges the two response channels back, and owns the
+  * return-slot credit.
+  */
 class LmMasterNi(p: NetworkParams, master: Int) extends Module {
-  private val qosW = math.max(1, log2Ceil(p.classWeights.length))
   private val retW = math.max(1, log2Ceil(p.masterReturnSlots(master) + 1))
+  private val vc = (p.masterClass(master) * LoomDefaults.VcHalves).U
 
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new LmReq(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth)))
-    val out = Decoupled(new LmNetReq(p.addrWidth, p.dataWidth, p.idWidth, qosW, p.tagWidth))
-    val inRsp = Flipped(Decoupled(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth)))
+    val outRdReq = Decoupled(new LmRdReq(p.addrWidth, p.idWidth, p.tagWidth))
+    val outWrData = Decoupled(new LmWrData(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth))
+    val inRdData = Flipped(Decoupled(new LmRdData(p.dataWidth, p.idWidth, p.tagWidth)))
+    val inWrResp = Flipped(Decoupled(new LmWrResp(p.idWidth, p.tagWidth)))
     val outRsp = Decoupled(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth))
     val credit = Output(UInt(retW.W))
   })
 
   private val credit = Module(new LmCreditMgr(p.masterReturnSlots(master)))
 
-  io.out.valid := io.in.valid && credit.io.canAlloc
-  io.out.bits.write := io.in.bits.write
-  io.out.bits.addr := io.in.bits.addr
-  io.out.bits.len := io.in.bits.len
-  io.out.bits.src := master.U
-  io.out.bits.id := io.in.bits.id
-  io.out.bits.data := io.in.bits.data
-  io.out.bits.vc := (p.masterClass(master) * LoomDefaults.VcHalves).U
-  io.in.ready := io.out.ready && credit.io.canAlloc
+  io.outRdReq.valid := io.in.valid && !io.in.bits.write && credit.io.canAlloc
+  io.outRdReq.bits.addr := io.in.bits.addr
+  io.outRdReq.bits.len := io.in.bits.len
+  io.outRdReq.bits.src := master.U
+  io.outRdReq.bits.id := io.in.bits.id
+  io.outRdReq.bits.vc := vc
 
-  io.outRsp.valid := io.inRsp.valid
-  io.outRsp.bits := io.inRsp.bits
-  io.inRsp.ready := io.outRsp.ready
+  io.outWrData.valid := io.in.valid && io.in.bits.write && credit.io.canAlloc
+  io.outWrData.bits.addr := io.in.bits.addr
+  io.outWrData.bits.data := io.in.bits.data
+  io.outWrData.bits.strb := io.in.bits.strb
+  io.outWrData.bits.src := master.U
+  io.outWrData.bits.id := io.in.bits.id
+  io.outWrData.bits.last := true.B
+  io.outWrData.bits.vc := vc
 
-  credit.io.alloc := io.out.fire
+  io.in.ready := credit.io.canAlloc &&
+    Mux(io.in.bits.write, io.outWrData.ready, io.outRdReq.ready)
+
+  // The two response channels are independent sources for one master port.
+  // Each gets one entry: the router gates its response valid with this NI's
+  // ready, so the merge decision must not depend on the arriving valid bits.
+  private val rdQ = Module(new Queue(new LmRdData(p.dataWidth, p.idWidth, p.tagWidth), 1))
+  private val wrQ = Module(new Queue(new LmWrResp(p.idWidth, p.tagWidth), 1))
+  rdQ.io.enq.valid := io.inRdData.valid
+  rdQ.io.enq.bits := io.inRdData.bits
+  io.inRdData.ready := rdQ.io.enq.ready
+  wrQ.io.enq.valid := io.inWrResp.valid
+  wrQ.io.enq.bits := io.inWrResp.bits
+  io.inWrResp.ready := wrQ.io.enq.ready
+
+  private val rspArb = Module(new LmRrArbiterN(2))
+  rspArb.io.req(0) := rdQ.io.deq.valid && io.outRsp.ready
+  rspArb.io.req(1) := wrQ.io.deq.valid && io.outRsp.ready
+  private val pickWr = rspArb.io.grant === 1.U
+
+  io.outRsp.valid := rspArb.io.valid
+  io.outRsp.bits.src := Mux(pickWr, wrQ.io.deq.bits.src, rdQ.io.deq.bits.src)
+  io.outRsp.bits.id := Mux(pickWr, wrQ.io.deq.bits.id, rdQ.io.deq.bits.id)
+  io.outRsp.bits.data := Mux(pickWr, 0.U, rdQ.io.deq.bits.data)
+  io.outRsp.bits.err := Mux(pickWr, wrQ.io.deq.bits.err, rdQ.io.deq.bits.err)
+  io.outRsp.bits.vc := Mux(pickWr, wrQ.io.deq.bits.vc, rdQ.io.deq.bits.vc)
+  rdQ.io.deq.ready := io.outRsp.ready && rspArb.io.valid && !pickWr
+  wrQ.io.deq.ready := io.outRsp.ready && rspArb.io.valid && pickWr
+
+  credit.io.alloc := io.outRdReq.fire || io.outWrData.fire
   credit.io.release := io.outRsp.fire
   io.credit := credit.io.count
 
@@ -334,52 +474,89 @@ class LmMasterNi(p: NetworkParams, master: Int) extends Module {
     "LM-P3: accepted request without a return slot")
 }
 
-/** Slave-side NI: owns the destination response slot. */
+/** Slave-side NI: merges the two request channels into the endpoint port,
+  * remembers the request type so each response leaves on its own channel, and
+  * owns the destination response slot.
+  */
 class LmSlaveNi(p: NetworkParams, slave: Int) extends Module {
-  private val qosW = math.max(1, log2Ceil(p.classWeights.length))
   private val slotW = math.max(1, log2Ceil(p.slaveRespSlots(slave) + 1))
+  private val rspVc = p.masterClass.map(c => (c * LoomDefaults.VcHalves).U(LoomDefaults.VcWidth.W))
 
   val io = IO(new Bundle {
-    val in = Flipped(Decoupled(new LmNetReq(p.addrWidth, p.dataWidth, p.idWidth, qosW, p.tagWidth)))
+    val inRdReq = Flipped(Decoupled(new LmRdReq(p.addrWidth, p.idWidth, p.tagWidth)))
+    val inWrData = Flipped(Decoupled(new LmWrData(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth)))
     val out = Decoupled(new LmReq(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth))
     val inRsp = Flipped(Decoupled(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth)))
-    val outRsp = Decoupled(new LmRsp(p.dataWidth, p.idWidth, p.tagWidth))
+    val outRdData = Decoupled(new LmRdData(p.dataWidth, p.idWidth, p.tagWidth))
+    val outWrResp = Decoupled(new LmWrResp(p.idWidth, p.tagWidth))
     val slot = Output(UInt(slotW.W))
   })
 
   private val slot = Module(new LmSlotPool(p.slaveRespSlots(slave)))
+  // One entry per accepted request: every request holds exactly one slot, so
+  // the pool depth also bounds this FIFO.
+  private val typeQ = Module(new Queue(Bool(), p.slaveRespSlots(slave)))
 
-  io.out.valid := io.in.valid && slot.io.canAlloc
-  io.out.bits.write := io.in.bits.write
-  io.out.bits.addr := io.in.bits.addr
-  io.out.bits.len := io.in.bits.len
-  io.out.bits.src := io.in.bits.src
-  io.out.bits.id := io.in.bits.id
-  io.out.bits.data := io.in.bits.data
-  io.out.bits.vc := io.in.bits.vc
-  io.in.ready := io.out.ready && slot.io.canAlloc
+  private val reqArb = Module(new LmRrArbiterN(2))
+  reqArb.io.req(0) := io.inRdReq.valid && slot.io.canAlloc
+  reqArb.io.req(1) := io.inWrData.valid && slot.io.canAlloc
+  private val selWr = reqArb.io.grant === 1.U
 
-  io.outRsp.valid := io.inRsp.valid
-  io.outRsp.bits := io.inRsp.bits
-  io.outRsp.bits.vc :=
-    VecInit(p.masterClass.map(c => (c * LoomDefaults.VcHalves).U(LoomDefaults.VcWidth.W)))(
-      io.inRsp.bits.src)
-  io.inRsp.ready := io.outRsp.ready
+  io.out.valid := reqArb.io.valid
+  io.out.bits.write := selWr
+  io.out.bits.addr := Mux(selWr, io.inWrData.bits.addr, io.inRdReq.bits.addr)
+  io.out.bits.len := Mux(selWr, 0.U, io.inRdReq.bits.len)
+  io.out.bits.src := Mux(selWr, io.inWrData.bits.src, io.inRdReq.bits.src)
+  io.out.bits.id := Mux(selWr, io.inWrData.bits.id, io.inRdReq.bits.id)
+  io.out.bits.data := Mux(selWr, io.inWrData.bits.data, 0.U)
+  io.out.bits.strb := Mux(selWr, io.inWrData.bits.strb, 0.U)
+  io.out.bits.vc := Mux(selWr, io.inWrData.bits.vc, io.inRdReq.bits.vc)
+  io.inRdReq.ready := io.out.ready && reqArb.io.valid && !selWr
+  io.inWrData.ready := io.out.ready && reqArb.io.valid && selWr
+
+  typeQ.io.enq.valid := io.out.fire
+  typeQ.io.enq.bits := selWr
+  assert(!io.out.fire || typeQ.io.enq.ready, "LM-P3: response type queue overflow")
+
+  private val headWr = typeQ.io.deq.bits
+  private val haveType = typeQ.io.deq.valid
+
+  io.outRdData.valid := io.inRsp.valid && haveType && !headWr
+  io.outRdData.bits.data := io.inRsp.bits.data
+  io.outRdData.bits.src := io.inRsp.bits.src
+  io.outRdData.bits.id := io.inRsp.bits.id
+  io.outRdData.bits.last := true.B
+  io.outRdData.bits.err := io.inRsp.bits.err
+  io.outRdData.bits.vc := VecInit(rspVc)(io.inRsp.bits.src)
+
+  io.outWrResp.valid := io.inRsp.valid && haveType && headWr
+  io.outWrResp.bits.src := io.inRsp.bits.src
+  io.outWrResp.bits.id := io.inRsp.bits.id
+  io.outWrResp.bits.err := io.inRsp.bits.err
+  io.outWrResp.bits.vc := VecInit(rspVc)(io.inRsp.bits.src)
+
+  io.inRsp.ready := haveType && Mux(headWr, io.outWrResp.ready, io.outRdData.ready)
+  typeQ.io.deq.ready := io.inRsp.fire
 
   slot.io.alloc := io.out.fire
-  slot.io.release := io.outRsp.fire
+  slot.io.release := io.outRdData.fire || io.outWrResp.fire
   io.slot := slot.io.count
 
-  assert(!io.in.valid || !io.in.ready || slot.io.canAlloc,
+  assert(!io.inRsp.valid || haveType, "LM-P3: response without a tracked request")
+  assert(!io.inRdReq.valid || !io.inRdReq.ready || slot.io.canAlloc,
+    "LM-P3: accepted request without a response slot")
+  assert(!io.inWrData.valid || !io.inWrData.ready || slot.io.canAlloc,
     "LM-P3: accepted request without a response slot")
 }
 
-/** Router-to-router link: sync Pipe stages or a bidirectional async link. */
+/** Router-to-router link: four independent channel groups. Requests take the
+  * configured pipe stages, responses always at least one register; an async
+  * link gets one CDC FIFO per channel and direction.
+  */
 class LmRouterLink(
     addrWidth: Int,
     dataWidth: Int,
     idWidth: Int,
-    qosWidth: Int,
     pipe: Int,
     isAsync: Boolean,
     asyncDepth: Int,
@@ -389,77 +566,80 @@ class LmRouterLink(
   require(!isAsync || (asyncDepth >= 2 && (asyncDepth & (asyncDepth - 1)) == 0),
     "async link depth must be a power of two >= 2")
 
+  private def rdReqT = new LmRdReq(addrWidth, idWidth, tagWidth)
+  private def wrDataT = new LmWrData(addrWidth, dataWidth, idWidth, tagWidth)
+  private def rdDataT = new LmRdData(dataWidth, idWidth, tagWidth)
+  private def wrRespT = new LmWrResp(idWidth, tagWidth)
+
   val io = IO(new Bundle {
     val aClk = Input(Bool())
     val aReset = Input(Bool())
     val bClk = Input(Bool())
     val bReset = Input(Bool())
-    val aReq = Flipped(Decoupled(new LmNetReq(addrWidth, dataWidth, idWidth, qosWidth, tagWidth)))
-    val bReq = Decoupled(new LmNetReq(addrWidth, dataWidth, idWidth, qosWidth, tagWidth))
-    val bRsp = Flipped(Decoupled(new LmRsp(dataWidth, idWidth, tagWidth)))
-    val aRsp = Decoupled(new LmRsp(dataWidth, idWidth, tagWidth))
-    val aRspF = Flipped(Decoupled(new LmRsp(dataWidth, idWidth, tagWidth)))
-    val bRspF = Decoupled(new LmRsp(dataWidth, idWidth, tagWidth))
+    val aRdReq = Flipped(Decoupled(rdReqT))
+    val bRdReq = Decoupled(rdReqT)
+    val aWrData = Flipped(Decoupled(wrDataT))
+    val bWrData = Decoupled(wrDataT)
+    val bRdData = Flipped(Decoupled(rdDataT))
+    val aRdData = Decoupled(rdDataT)
+    val bWrResp = Flipped(Decoupled(wrRespT))
+    val aWrResp = Decoupled(wrRespT)
+    val aRdDataFwd = Flipped(Decoupled(rdDataT))
+    val bRdDataFwd = Decoupled(rdDataT)
+    val aWrRespFwd = Flipped(Decoupled(wrRespT))
+    val bWrRespFwd = Decoupled(wrRespT)
     val creditUsed = Output(UInt(16.W))
   })
 
-  private val reqType = new LmNetReq(addrWidth, dataWidth, idWidth, qosWidth, tagWidth)
-  private val rspType = new LmRsp(dataWidth, idWidth, tagWidth)
+  private def stage[T <: Data](gen: T, stages: Int, in: DecoupledIO[T], out: DecoupledIO[T]): Unit = {
+    val p = Module(new LmPipe(gen, stages))
+    p.io.in <> in
+    out <> p.io.out
+  }
+
+  private def cdc[T <: Data](
+      gen: T,
+      srcClk: Bool,
+      srcReset: Bool,
+      dstClk: Bool,
+      dstReset: Bool,
+      in: DecoupledIO[T],
+      out: DecoupledIO[T]
+  ): UInt = {
+    val link = withClockAndReset(srcClk.asClock, srcReset) {
+      Module(new LmAsyncLink(gen.getWidth, asyncDepth))
+    }
+    link.io.dstClk := dstClk
+    link.io.dstReset := dstReset
+    link.io.in.valid := in.valid
+    link.io.in.bits := in.bits.asUInt
+    in.ready := link.io.in.ready
+    out.valid := link.io.out.valid
+    out.bits := link.io.out.bits.asTypeOf(chiselTypeOf(out.bits))
+    link.io.out.ready := out.ready
+    link.io.creditUsed
+  }
 
   if (!isAsync) {
-    val reqPipe = Module(new LmPipe(reqType, pipe))
-    reqPipe.io.in <> io.aReq
-    io.bReq <> reqPipe.io.out
-
+    stage(rdReqT, pipe, io.aRdReq, io.bRdReq)
+    stage(wrDataT, pipe, io.aWrData, io.bWrData)
     // Responses always get at least one register: on a ring the response
     // channel closes a combinational loop around the routers.
-    val rspPipe = Module(new LmPipe(rspType, math.max(1, pipe)))
-    rspPipe.io.in <> io.bRsp
-    io.aRsp <> rspPipe.io.out
-
-    val rspFPipe = Module(new LmPipe(rspType, math.max(1, pipe)))
-    rspFPipe.io.in <> io.aRspF
-    io.bRspF <> rspFPipe.io.out
-
+    stage(rdDataT, math.max(1, pipe), io.bRdData, io.aRdData)
+    stage(wrRespT, math.max(1, pipe), io.bWrResp, io.aWrResp)
+    stage(rdDataT, math.max(1, pipe), io.aRdDataFwd, io.bRdDataFwd)
+    stage(wrRespT, math.max(1, pipe), io.aWrRespFwd, io.bWrRespFwd)
     io.creditUsed := 0.U
   } else {
-    val reqLink = withClockAndReset(io.aClk.asClock, io.aReset) {
-      Module(new LmAsyncLink(reqType.getWidth, asyncDepth))
-    }
-    reqLink.io.dstClk := io.bClk
-    reqLink.io.dstReset := io.bReset
-    reqLink.io.in.valid := io.aReq.valid
-    reqLink.io.in.bits := io.aReq.bits.asUInt
-    io.aReq.ready := reqLink.io.in.ready
-    io.bReq.valid := reqLink.io.out.valid
-    io.bReq.bits := reqLink.io.out.bits.asTypeOf(chiselTypeOf(io.bReq.bits))
-    reqLink.io.out.ready := io.bReq.ready
-
-    val rspLink = withClockAndReset(io.bClk.asClock, io.bReset) {
-      Module(new LmAsyncLink(rspType.getWidth, asyncDepth))
-    }
-    rspLink.io.dstClk := io.aClk
-    rspLink.io.dstReset := io.aReset
-    rspLink.io.in.valid := io.bRsp.valid
-    rspLink.io.in.bits := io.bRsp.bits.asUInt
-    io.bRsp.ready := rspLink.io.in.ready
-    io.aRsp.valid := rspLink.io.out.valid
-    io.aRsp.bits := rspLink.io.out.bits.asTypeOf(chiselTypeOf(io.aRsp.bits))
-    rspLink.io.out.ready := io.aRsp.ready
-
-    val rspFLink = withClockAndReset(io.aClk.asClock, io.aReset) {
-      Module(new LmAsyncLink(rspType.getWidth, asyncDepth))
-    }
-    rspFLink.io.dstClk := io.bClk
-    rspFLink.io.dstReset := io.bReset
-    rspFLink.io.in.valid := io.aRspF.valid
-    rspFLink.io.in.bits := io.aRspF.bits.asUInt
-    io.aRspF.ready := rspFLink.io.in.ready
-    io.bRspF.valid := rspFLink.io.out.valid
-    io.bRspF.bits := rspFLink.io.out.bits.asTypeOf(chiselTypeOf(io.bRspF.bits))
-    rspFLink.io.out.ready := io.bRspF.ready
-
-    io.creditUsed := reqLink.io.creditUsed
+    val credits = Seq(
+      cdc(rdReqT, io.aClk, io.aReset, io.bClk, io.bReset, io.aRdReq, io.bRdReq),
+      cdc(wrDataT, io.aClk, io.aReset, io.bClk, io.bReset, io.aWrData, io.bWrData),
+      cdc(rdDataT, io.bClk, io.bReset, io.aClk, io.aReset, io.bRdData, io.aRdData),
+      cdc(wrRespT, io.bClk, io.bReset, io.aClk, io.aReset, io.bWrResp, io.aWrResp),
+      cdc(rdDataT, io.aClk, io.aReset, io.bClk, io.bReset, io.aRdDataFwd, io.bRdDataFwd),
+      cdc(wrRespT, io.aClk, io.aReset, io.bClk, io.bReset, io.aWrRespFwd, io.bWrRespFwd)
+    )
+    io.creditUsed := credits.reduce(_ +& _)(15, 0)
   }
 }
 
@@ -470,9 +650,11 @@ class LmNetworkTop(p: NetworkParams) extends Module {
   require(!p.links.exists(_.async),
     "async multi-router top is not supported yet; use LmRouterLink standalone")
 
-  private val qosW = math.max(1, log2Ceil(p.classWeights.length))
   private val maxRetW = math.max(1, log2Ceil(p.maxReturnSlots + 1))
   private val maxRspW = math.max(1, log2Ceil(p.maxRespSlots + 1))
+
+  private def rdReqT = new LmRdReq(p.addrWidth, p.idWidth, p.tagWidth)
+  private def wrDataT = new LmWrData(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth)
 
   val io = IO(new Bundle {
     val master = Vec(p.nMaster, Flipped(Decoupled(new LmReq(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth))))
@@ -497,49 +679,56 @@ class LmNetworkTop(p: NetworkParams) extends Module {
   private val sNi = Seq.tabulate(p.nSlave)(j => Module(new LmSlaveNi(p, j)))
   private val routers = p.routers.map(spec => Module(new LmNetRouter(p, spec)))
   private val links = p.links.map(l =>
-    Module(new LmRouterLink(p.addrWidth, p.dataWidth, p.idWidth, qosW,
+    Module(new LmRouterLink(p.addrWidth, p.dataWidth, p.idWidth,
       l.pipe, l.async, l.asyncFifoDepth, p.tagWidth)))
 
-  // MNet/SNet are shared ports: one request and one response per net per
-  // cycle. Ports stay per endpoint; the tokens enforce the shared bandwidth.
-  private val mnetReqArb = Seq.tabulate(p.nMnet)(_ => Module(new LmRrArbiterN(p.nMaster)))
-  private val mnetReqOk = Wire(Vec(p.nMaster, Bool()))
-  private val mnetRspArb = Seq.tabulate(p.nMnet)(_ => Module(new LmRrArbiterN(p.nMaster)))
-  private val mnetRspOk = Wire(Vec(p.nMaster, Bool()))
-  // One-beat skid per slave breaks the token<->ready combinational path:
-  // the router sees only the skid's capacity, while the SNet token is
-  // decided from the skid output.
-  private val sSkid = Seq.tabulate(p.nSlave)(_ =>
-    Module(new LmPipe(new LmNetReq(p.addrWidth, p.dataWidth, p.idWidth, qosW, p.tagWidth), 1)))
+  // MNet/SNet are shared ports: one transaction per channel and direction per
+  // net per cycle. Ports stay per endpoint; the tokens enforce the shared
+  // bandwidth.
+  private val mnetRdReqTok = Seq.tabulate(p.nMnet)(_ => Module(new LmNetToken(p.nMaster)))
+  private val mnetWrDataTok = Seq.tabulate(p.nMnet)(_ => Module(new LmNetToken(p.nMaster)))
+  private val mnetRdDataTok = Seq.tabulate(p.nMnet)(_ => Module(new LmNetToken(p.nMaster)))
+  private val mnetWrRespTok = Seq.tabulate(p.nMnet)(_ => Module(new LmNetToken(p.nMaster)))
+  private val snetRdReqTok = Seq.tabulate(p.nSnet)(_ => Module(new LmNetToken(p.nSlave)))
+  private val snetWrDataTok = Seq.tabulate(p.nSnet)(_ => Module(new LmNetToken(p.nSlave)))
+  private val snetRdDataTok = Seq.tabulate(p.nSnet)(_ => Module(new LmNetToken(p.nSlave)))
+  private val snetWrRespTok = Seq.tabulate(p.nSnet)(_ => Module(new LmNetToken(p.nSlave)))
+
+  // One-beat skid per slave and request channel breaks the token<->ready
+  // combinational path: the router sees only the skid's capacity, while the
+  // SNet token is decided from the skid output.
+  private val sSkidRd = Seq.tabulate(p.nSlave)(_ => Module(new LmPipe(rdReqT, 1)))
+  private val sSkidWr = Seq.tabulate(p.nSlave)(_ => Module(new LmPipe(wrDataT, 1)))
   for (j <- 0 until p.nSlave) {
-    routers(p.slaveRouter(j)).io.outReq(p.slavePort(j)) <> sSkid(j).io.in
+    routers(p.slaveRouter(j)).io.outRdReq(p.slavePort(j)) <> sSkidRd(j).io.in
+    routers(p.slaveRouter(j)).io.outWrData(p.slavePort(j)) <> sSkidWr(j).io.in
   }
-  private val snetReqArb = Seq.tabulate(p.nSnet)(_ => Module(new LmRrArbiterN(p.nSlave)))
-  private val snetReqOk = Wire(Vec(p.nSlave, Bool()))
-  private val snetRspArb = Seq.tabulate(p.nSnet)(_ => Module(new LmRrArbiterN(p.nSlave)))
-  private val snetRspOk = Wire(Vec(p.nSlave, Bool()))
 
   for (m <- 0 until p.nMnet; i <- 0 until p.nMaster) {
-    mnetReqArb(m).io.req(i) := mNi(i).io.out.valid && (p.masterMnet(i) == m).B
-    mnetRspArb(m).io.req(i) := routers(p.masterRouter(i)).io.inRsp(p.masterPort(i)).valid &&
-      (p.masterMnet(i) == m).B
-  }
-  for (i <- 0 until p.nMaster) {
-    val aq = mnetReqArb(p.masterMnet(i))
-    mnetReqOk(i) := aq.io.valid && (aq.io.grant === i.U)
-    val ar = mnetRspArb(p.masterMnet(i))
-    mnetRspOk(i) := ar.io.valid && (ar.io.grant === i.U)
+    val onNet = (p.masterMnet(i) == m).B
+    mnetRdReqTok(m).io.req(i) := mNi(i).io.outRdReq.valid && onNet
+    mnetWrDataTok(m).io.req(i) := mNi(i).io.outWrData.valid && onNet
+    mnetRdDataTok(m).io.req(i) :=
+      routers(p.masterRouter(i)).io.inRdData(p.masterPort(i)).valid && onNet
+    mnetWrRespTok(m).io.req(i) :=
+      routers(p.masterRouter(i)).io.inWrResp(p.masterPort(i)).valid && onNet
   }
   for (s <- 0 until p.nSnet; j <- 0 until p.nSlave) {
-    snetReqArb(s).io.req(j) := sSkid(j).io.out.valid && (p.slaveSnet(j) == s).B
-    snetRspArb(s).io.req(j) := sNi(j).io.outRsp.valid && (p.slaveSnet(j) == s).B
+    val onNet = (p.slaveSnet(j) == s).B
+    snetRdReqTok(s).io.req(j) := sSkidRd(j).io.out.valid && onNet
+    snetWrDataTok(s).io.req(j) := sSkidWr(j).io.out.valid && onNet
+    snetRdDataTok(s).io.req(j) := sNi(j).io.outRdData.valid && onNet
+    snetWrRespTok(s).io.req(j) := sNi(j).io.outWrResp.valid && onNet
   }
-  for (j <- 0 until p.nSlave) {
-    val aq = snetReqArb(p.slaveSnet(j))
-    snetReqOk(j) := aq.io.valid && (aq.io.grant === j.U)
-    val ar = snetRspArb(p.slaveSnet(j))
-    snetRspOk(j) := ar.io.valid && (ar.io.grant === j.U)
-  }
+
+  private def mnetRdReqOk(i: Int): Bool = mnetRdReqTok(p.masterMnet(i)).io.ok(i)
+  private def mnetWrDataOk(i: Int): Bool = mnetWrDataTok(p.masterMnet(i)).io.ok(i)
+  private def mnetRdDataOk(i: Int): Bool = mnetRdDataTok(p.masterMnet(i)).io.ok(i)
+  private def mnetWrRespOk(i: Int): Bool = mnetWrRespTok(p.masterMnet(i)).io.ok(i)
+  private def snetRdReqOk(j: Int): Bool = snetRdReqTok(p.slaveSnet(j)).io.ok(j)
+  private def snetWrDataOk(j: Int): Bool = snetWrDataTok(p.slaveSnet(j)).io.ok(j)
+  private def snetRdDataOk(j: Int): Bool = snetRdDataTok(p.slaveSnet(j)).io.ok(j)
+  private def snetWrRespOk(j: Int): Bool = snetWrRespTok(p.slaveSnet(j)).io.ok(j)
 
   for (i <- 0 until p.nMaster) {
     val r = p.masterRouter(i)
@@ -548,17 +737,28 @@ class LmNetworkTop(p: NetworkParams) extends Module {
     mNi(i).io.in.bits := io.master(i).bits
     io.master(i).ready := mNi(i).io.in.ready
 
-    routers(r).io.inReq(port).valid := mNi(i).io.out.valid && mnetReqOk(i)
-    routers(r).io.inReq(port).bits := mNi(i).io.out.bits
-    mNi(i).io.out.ready := routers(r).io.inReq(port).ready && mnetReqOk(i)
+    routers(r).io.inRdReq(port).valid := mNi(i).io.outRdReq.valid && mnetRdReqOk(i)
+    routers(r).io.inRdReq(port).bits := mNi(i).io.outRdReq.bits
+    mNi(i).io.outRdReq.ready := routers(r).io.inRdReq(port).ready && mnetRdReqOk(i)
 
-    mNi(i).io.inRsp.valid := routers(r).io.inRsp(port).valid && mnetRspOk(i)
-    mNi(i).io.inRsp.bits := routers(r).io.inRsp(port).bits
-    routers(r).io.inRsp(port).ready := mNi(i).io.inRsp.ready
+    routers(r).io.inWrData(port).valid := mNi(i).io.outWrData.valid && mnetWrDataOk(i)
+    routers(r).io.inWrData(port).bits := mNi(i).io.outWrData.bits
+    mNi(i).io.outWrData.ready := routers(r).io.inWrData(port).ready && mnetWrDataOk(i)
 
-    routers(r).io.inRspFwd(port).valid := false.B
-    routers(r).io.inRspFwd(port).bits :=
-      0.U.asTypeOf(chiselTypeOf(routers(r).io.inRspFwd(port).bits))
+    mNi(i).io.inRdData.valid := routers(r).io.inRdData(port).valid && mnetRdDataOk(i)
+    mNi(i).io.inRdData.bits := routers(r).io.inRdData(port).bits
+    routers(r).io.inRdData(port).ready := mNi(i).io.inRdData.ready
+
+    mNi(i).io.inWrResp.valid := routers(r).io.inWrResp(port).valid && mnetWrRespOk(i)
+    mNi(i).io.inWrResp.bits := routers(r).io.inWrResp(port).bits
+    routers(r).io.inWrResp(port).ready := mNi(i).io.inWrResp.ready
+
+    routers(r).io.inRdDataFwd(port).valid := false.B
+    routers(r).io.inRdDataFwd(port).bits :=
+      0.U.asTypeOf(chiselTypeOf(routers(r).io.inRdDataFwd(port).bits))
+    routers(r).io.inWrRespFwd(port).valid := false.B
+    routers(r).io.inWrRespFwd(port).bits :=
+      0.U.asTypeOf(chiselTypeOf(routers(r).io.inWrRespFwd(port).bits))
 
     io.masterRsp(i).valid := mNi(i).io.outRsp.valid
     io.masterRsp(i).bits := mNi(i).io.outRsp.bits
@@ -577,15 +777,20 @@ class LmNetworkTop(p: NetworkParams) extends Module {
   }
 
   for (j <- 0 until p.nSlave) {
-    routers(p.slaveRouter(j)).io.outRspFwd(p.slavePort(j)).ready := true.B
+    routers(p.slaveRouter(j)).io.outRdDataFwd(p.slavePort(j)).ready := true.B
+    routers(p.slaveRouter(j)).io.outWrRespFwd(p.slavePort(j)).ready := true.B
   }
 
   for (j <- 0 until p.nSlave) {
     val r = p.slaveRouter(j)
     val port = p.slavePort(j)
-    sNi(j).io.in.valid := sSkid(j).io.out.valid && snetReqOk(j)
-    sNi(j).io.in.bits := sSkid(j).io.out.bits
-    sSkid(j).io.out.ready := sNi(j).io.in.ready && snetReqOk(j)
+    sNi(j).io.inRdReq.valid := sSkidRd(j).io.out.valid && snetRdReqOk(j)
+    sNi(j).io.inRdReq.bits := sSkidRd(j).io.out.bits
+    sSkidRd(j).io.out.ready := sNi(j).io.inRdReq.ready && snetRdReqOk(j)
+
+    sNi(j).io.inWrData.valid := sSkidWr(j).io.out.valid && snetWrDataOk(j)
+    sNi(j).io.inWrData.bits := sSkidWr(j).io.out.bits
+    sSkidWr(j).io.out.ready := sNi(j).io.inWrData.ready && snetWrDataOk(j)
 
     io.slave(j).valid := sNi(j).io.out.valid
     io.slave(j).bits := sNi(j).io.out.bits
@@ -595,9 +800,13 @@ class LmNetworkTop(p: NetworkParams) extends Module {
     sNi(j).io.inRsp.bits := io.slaveRsp(j).bits
     io.slaveRsp(j).ready := sNi(j).io.inRsp.ready
 
-    routers(r).io.outRsp(port).valid := sNi(j).io.outRsp.valid && snetRspOk(j)
-    routers(r).io.outRsp(port).bits := sNi(j).io.outRsp.bits
-    sNi(j).io.outRsp.ready := routers(r).io.outRsp(port).ready && snetRspOk(j)
+    routers(r).io.outRdData(port).valid := sNi(j).io.outRdData.valid && snetRdDataOk(j)
+    routers(r).io.outRdData(port).bits := sNi(j).io.outRdData.bits
+    sNi(j).io.outRdData.ready := routers(r).io.outRdData(port).ready && snetRdDataOk(j)
+
+    routers(r).io.outWrResp(port).valid := sNi(j).io.outWrResp.valid && snetWrRespOk(j)
+    routers(r).io.outWrResp(port).bits := sNi(j).io.outWrResp.bits
+    sNi(j).io.outWrResp.ready := routers(r).io.outWrResp(port).ready && snetWrRespOk(j)
 
     io.perf.respSlots(j) := sNi(j).io.slot
   }
@@ -608,13 +817,20 @@ class LmNetworkTop(p: NetworkParams) extends Module {
     link.io.bClk := false.B
     link.io.bReset := false.B
 
-    link.io.aReq <> routers(l.fromRouter).io.outReq(l.fromPort)
-    routers(l.toRouter).io.inReq(l.toPort) <> link.io.bReq
-    link.io.bRsp <> routers(l.toRouter).io.inRsp(l.toPort)
-    routers(l.fromRouter).io.outRsp(l.fromPort) <> link.io.aRsp
+    link.io.aRdReq <> routers(l.fromRouter).io.outRdReq(l.fromPort)
+    routers(l.toRouter).io.inRdReq(l.toPort) <> link.io.bRdReq
+    link.io.aWrData <> routers(l.fromRouter).io.outWrData(l.fromPort)
+    routers(l.toRouter).io.inWrData(l.toPort) <> link.io.bWrData
 
-    link.io.aRspF <> routers(l.fromRouter).io.outRspFwd(l.fromPort)
-    routers(l.toRouter).io.inRspFwd(l.toPort) <> link.io.bRspF
+    link.io.bRdData <> routers(l.toRouter).io.inRdData(l.toPort)
+    routers(l.fromRouter).io.outRdData(l.fromPort) <> link.io.aRdData
+    link.io.bWrResp <> routers(l.toRouter).io.inWrResp(l.toPort)
+    routers(l.fromRouter).io.outWrResp(l.fromPort) <> link.io.aWrResp
+
+    link.io.aRdDataFwd <> routers(l.fromRouter).io.outRdDataFwd(l.fromPort)
+    routers(l.toRouter).io.inRdDataFwd(l.toPort) <> link.io.bRdDataFwd
+    link.io.aWrRespFwd <> routers(l.fromRouter).io.outWrRespFwd(l.fromPort)
+    routers(l.toRouter).io.inWrRespFwd(l.toPort) <> link.io.bWrRespFwd
   }
 
   io.perf.requests := reqCnt

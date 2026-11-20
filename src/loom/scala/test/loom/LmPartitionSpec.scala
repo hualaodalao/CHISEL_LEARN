@@ -31,9 +31,12 @@ class LmChainSplitHarness(net: NetworkParams, front: PartitionParams, back: Part
   b.io.slave <> io.slave
   io.slaveRsp <> b.io.slaveRsp
 
-  f.io.boundaryOutReq <> b.io.boundaryInReq
-  b.io.boundaryInRsp <> f.io.boundaryOutRsp
-  f.io.boundaryOutRspFwd <> b.io.boundaryInRspFwd
+  f.io.boundaryOutRdReq <> b.io.boundaryInRdReq
+  f.io.boundaryOutWrData <> b.io.boundaryInWrData
+  b.io.boundaryInRdData <> f.io.boundaryOutRdData
+  b.io.boundaryInWrResp <> f.io.boundaryOutWrResp
+  f.io.boundaryOutRdDataFwd <> b.io.boundaryInRdDataFwd
+  f.io.boundaryOutWrRespFwd <> b.io.boundaryInWrRespFwd
 }
 
 class LmPartitionSpec extends AnyFlatSpec with Matchers with ChiselSim {
@@ -57,6 +60,7 @@ class LmPartitionSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.io.master(i).bits.len.poke(0.U)
       dut.io.master(i).bits.src.poke(i.U)
       dut.io.master(i).bits.data.poke(0.U)
+      dut.io.master(i).bits.strb.poke(0.U)
       dut.io.masterRsp(i).ready.poke(true.B)
     }
     for (j <- 0 until back.slaves.size) {
@@ -147,7 +151,52 @@ class LmPartitionSpec extends AnyFlatSpec with Matchers with ChiselSim {
           guard += 1
         }
       }
-      got shouldBe Some(BigInt(0x1234))
+      got shouldBe Some(BigInt(0))
+
+      // A read crosses the same boundary on rreq and returns on rdata.
+      dut.io.master(0).bits.write.poke(false.B)
+      dut.io.master(0).bits.addr.poke(0x1000.U)
+      dut.io.master(0).bits.src.poke(0.U)
+      dut.io.master(0).valid.poke(true.B)
+      accepted = false
+      guard = 0
+      while (!accepted && guard < 40) {
+        accepted = dut.io.master(0).ready.peek().litValue == 1
+        dut.clock.step()
+        guard += 1
+      }
+      accepted shouldBe true
+      dut.io.master(0).valid.poke(false.B)
+
+      seen = false
+      guard = 0
+      while (!seen && guard < 60) {
+        seen = dut.io.slave(1).valid.peek().litValue == 1
+        if (!seen) { dut.clock.step(); guard += 1 }
+      }
+      seen shouldBe true
+      dut.io.slave(1).bits.write.expect(false.B)
+      dut.io.slave(1).bits.addr.expect(0x1000.U)
+
+      dut.clock.step()
+      dut.io.slaveRsp(1).bits.src.poke(0.U)
+      dut.io.slaveRsp(1).bits.data.poke(0x5678L.U)
+      dut.io.slaveRsp(1).valid.poke(true.B)
+      dut.clock.step()
+      dut.io.slaveRsp(1).valid.poke(false.B)
+
+      got = Option.empty[BigInt]
+      guard = 0
+      while (got.isEmpty && guard < 60) {
+        if (dut.io.masterRsp(0).valid.peek().litValue == 1) {
+          got = Some(dut.io.masterRsp(0).bits.data.peek().litValue)
+          dut.clock.step()
+        } else {
+          dut.clock.step()
+          guard += 1
+        }
+      }
+      got shouldBe Some(BigInt(0x5678))
     }
   }
 }

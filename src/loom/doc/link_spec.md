@@ -138,7 +138,7 @@ A 满足"不因下游未腾空而死锁"；字面意义的"任何情况都不等
 
 ## 12. 实现状态（2026-11-20）
 
-已完成（103 用例全绿）：
+已完成（105 用例全绿）：
 
 - **IR/C0**：link 增加 `direction`（bidirectional/forward）与 `dateline`；`Reports.estimate` 输出二者。
 - **G1**：CDG 改为 SCC 分析——每个顶点入/出度均为 1 且全为 router-router 的简单环，由切点放行（显式优先，否则自动取 link id 最小）；复杂 SCC 仍报 `LM-G1: CDG cycle ... (not a ring)`；自环仍拒绝；显式切点不在环上报错。
@@ -146,8 +146,11 @@ A 满足"不因下游未腾空而死锁"；字面意义的"任何情况都不等
 - **前向响应**：路由器新增 `outRspFwd`/`inRspFwd`；响应路由表按方向图 BFS（双向 link 走反向、单向 link 走正向），由 `routeMaster`/`routeMasterFwd` 分别给出入端口/出端口；响应开关统一按 src 选路。分区边界新增前向响应端口，async 切点加 CDC；`ring_4` 用例验证请求 2 跳、响应沿环前向返回。
 - **时序安全**：路由器出端口固定一级寄存器、每跳 response 通道至少一级 pipe，打断环上组合环。
 
+- **fabric 内部四通道拆分**：`LmRdReq`/`LmWrData`/`LmRdData`/`LmWrResp` 四套独立 bundle 与独立交换机（请求各一套按地址路由 + VC 队列，响应各一套按 src 路由）；`LmRouterLink` 每通道独立 pipe/CDC；分区边界与 stub 覆盖全部通道及前向响应。顶层仍保留 `LmReq`/`LmRsp` 适配层（`LmMasterNi` 按 write 拆分、`rdata/wresp` 合并；`LmSlaveNi` 合并请求、按写标志 FIFO 回 `rdata`/`wresp`）。`LmReq` 增加 `strb`。
+
 未实现：
 
 - 响应通道的 dateline 半区翻转尚未实现（请求通道已有）；响应在环上目前依赖每跳寄存器与最短路径，安全性论证不完整。
-- 四通道物理拆分（`rreq/wdata/rdata/wresp`、`strb` 端到端、burst 级 `wresp`）未做，现有 fabric 仍是每拍请求、写数据随请求。
+- 顶层端口仍是事务级 `LmReq/LmRsp`，四通道尚未暴露到 shell/端点边界（第二刀）。
+- 多拍 burst 的 `wresp` 聚合与 `rdata` 计数未做；当前仍是每拍一次事务（shell 的 len=0 语义），`rreq.len>0` 不展开。
 - 全局位宽与窄端点 adapter 未接入 NI（`LmWidthAdapter` 已有 2:1）。

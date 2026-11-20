@@ -60,7 +60,9 @@ object PartitionParams {
   }
 }
 
-/** Port contract shared by a real partition and its stub. */
+/** Port contract shared by a real partition and its stub. Endpoint ports keep
+  * the merged LmReq/LmRsp view; the four channel groups cross the boundary.
+  */
 class LmPartitionIo(
     nMaster: Int,
     nSlave: Int,
@@ -69,7 +71,6 @@ class LmPartitionIo(
     addrWidth: Int,
     dataWidth: Int,
     idWidth: Int,
-    qosWidth: Int,
     retW: Int,
     rspW: Int,
     tagWidth: Int = loom.ir.LoomDefaults.AxiIdWidth
@@ -78,14 +79,25 @@ class LmPartitionIo(
   val masterRsp = Vec(nMaster, Decoupled(new LmRsp(dataWidth, idWidth, tagWidth)))
   val slave = Vec(nSlave, Decoupled(new LmReq(addrWidth, dataWidth, idWidth, tagWidth)))
   val slaveRsp = Vec(nSlave, Flipped(Decoupled(new LmRsp(dataWidth, idWidth, tagWidth))))
-  val boundaryOutReq =
-    Vec(nOutLink, Decoupled(new LmNetReq(addrWidth, dataWidth, idWidth, qosWidth, tagWidth)))
-  val boundaryOutRsp = Vec(nOutLink, Flipped(Decoupled(new LmRsp(dataWidth, idWidth, tagWidth))))
-  val boundaryInReq =
-    Vec(nInLink, Flipped(Decoupled(new LmNetReq(addrWidth, dataWidth, idWidth, qosWidth, tagWidth))))
-  val boundaryInRsp = Vec(nInLink, Decoupled(new LmRsp(dataWidth, idWidth, tagWidth)))
-  val boundaryOutRspFwd = Vec(nOutLink, Decoupled(new LmRsp(dataWidth, idWidth, tagWidth)))
-  val boundaryInRspFwd = Vec(nInLink, Flipped(Decoupled(new LmRsp(dataWidth, idWidth, tagWidth))))
+
+  val boundaryOutRdReq = Vec(nOutLink, Decoupled(new LmRdReq(addrWidth, idWidth, tagWidth)))
+  val boundaryOutWrData =
+    Vec(nOutLink, Decoupled(new LmWrData(addrWidth, dataWidth, idWidth, tagWidth)))
+  val boundaryInRdReq = Vec(nInLink, Flipped(Decoupled(new LmRdReq(addrWidth, idWidth, tagWidth))))
+  val boundaryInWrData =
+    Vec(nInLink, Flipped(Decoupled(new LmWrData(addrWidth, dataWidth, idWidth, tagWidth))))
+
+  val boundaryOutRdData =
+    Vec(nOutLink, Flipped(Decoupled(new LmRdData(dataWidth, idWidth, tagWidth))))
+  val boundaryOutWrResp = Vec(nOutLink, Flipped(Decoupled(new LmWrResp(idWidth, tagWidth))))
+  val boundaryInRdData = Vec(nInLink, Decoupled(new LmRdData(dataWidth, idWidth, tagWidth)))
+  val boundaryInWrResp = Vec(nInLink, Decoupled(new LmWrResp(idWidth, tagWidth)))
+
+  val boundaryOutRdDataFwd = Vec(nOutLink, Decoupled(new LmRdData(dataWidth, idWidth, tagWidth)))
+  val boundaryOutWrRespFwd = Vec(nOutLink, Decoupled(new LmWrResp(idWidth, tagWidth)))
+  val boundaryInRdDataFwd = Vec(nInLink, Flipped(Decoupled(new LmRdData(dataWidth, idWidth, tagWidth))))
+  val boundaryInWrRespFwd = Vec(nInLink, Flipped(Decoupled(new LmWrResp(idWidth, tagWidth))))
+
   val perf = new Bundle {
     val returnSlots = Vec(nMaster, UInt(retW.W))
     val respSlots = Vec(nSlave, UInt(rspW.W))
@@ -96,23 +108,27 @@ class LmPartitionIo(
   *
   * Router port layouts and route tables are inherited from the full network,
   * so a router that routes to a slave in another partition simply drives the
-  * boundary port at that link position. Boundary channels are registered
-  * with at least one pipe stage. Async boundary links are legal: the wrapper
-  * inserts the CDC on the cut, while internal async links stay rejected
-  * because every router in a partition shares one clock.
+  * boundary port at that link position. Every channel group is registered with
+  * at least one pipe stage. Async boundary links are legal: the wrapper
+  * inserts one CDC per channel on the cut, while internal async links stay
+  * rejected because every router in a partition shares one clock.
   */
 class LmPartitionTop(p: NetworkParams, pp: PartitionParams) extends Module {
   require(!pp.internalLinks.exists(_.async),
     "async links inside a partition are pointless: all members share one clock")
   require(pp.pipe >= 1, "boundary pipe must be at least one stage")
 
-  private val qosW = math.max(1, log2Ceil(p.classWeights.length))
   private val maxRetW = math.max(1, log2Ceil(p.maxReturnSlots + 1))
   private val maxRspW = math.max(1, log2Ceil(p.maxRespSlots + 1))
 
+  private def rdReqT = new LmRdReq(p.addrWidth, p.idWidth, p.tagWidth)
+  private def wrDataT = new LmWrData(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth)
+  private def rdDataT = new LmRdData(p.dataWidth, p.idWidth, p.tagWidth)
+  private def wrRespT = new LmWrResp(p.idWidth, p.tagWidth)
+
   val io = IO(new LmPartitionIo(
     pp.masters.size, pp.slaves.size, pp.outLinks.size, pp.inLinks.size,
-    p.addrWidth, p.dataWidth, p.idWidth, qosW, maxRetW, maxRspW, p.tagWidth))
+    p.addrWidth, p.dataWidth, p.idWidth, maxRetW, maxRspW, p.tagWidth))
 
   private val routers = pp.routers.map(idx => idx -> Module(new LmNetRouter(p, p.routers(idx)))).toMap
   private val mNi = pp.masters.map(i => Module(new LmMasterNi(p, i)))
@@ -120,49 +136,60 @@ class LmPartitionTop(p: NetworkParams, pp: PartitionParams) extends Module {
 
   // Only endpoints owned by this partition are active; the tokens keep the
   // MNet/SNet shared-port bandwidth contract across the subset.
-  private val mnetReqArb = Seq.tabulate(p.nMnet)(_ => Module(new LmRrArbiterN(p.nMaster)))
-  private val mnetRspArb = Seq.tabulate(p.nMnet)(_ => Module(new LmRrArbiterN(p.nMaster)))
-  private val sSkid = pp.slaves.map(j =>
-    Module(new LmPipe(new LmNetReq(p.addrWidth, p.dataWidth, p.idWidth, qosW, p.tagWidth), 1)))
+  private val mnetRdReqTok = Seq.tabulate(p.nMnet)(_ => Module(new LmNetToken(p.nMaster)))
+  private val mnetWrDataTok = Seq.tabulate(p.nMnet)(_ => Module(new LmNetToken(p.nMaster)))
+  private val mnetRdDataTok = Seq.tabulate(p.nMnet)(_ => Module(new LmNetToken(p.nMaster)))
+  private val mnetWrRespTok = Seq.tabulate(p.nMnet)(_ => Module(new LmNetToken(p.nMaster)))
+  private val snetRdReqTok = Seq.tabulate(p.nSnet)(_ => Module(new LmNetToken(p.nSlave)))
+  private val snetWrDataTok = Seq.tabulate(p.nSnet)(_ => Module(new LmNetToken(p.nSlave)))
+  private val snetRdDataTok = Seq.tabulate(p.nSnet)(_ => Module(new LmNetToken(p.nSlave)))
+  private val snetWrRespTok = Seq.tabulate(p.nSnet)(_ => Module(new LmNetToken(p.nSlave)))
+
+  private val sSkidRd = pp.slaves.map(_ => Module(new LmPipe(rdReqT, 1)))
+  private val sSkidWr = pp.slaves.map(_ => Module(new LmPipe(wrDataT, 1)))
   for ((j, s) <- pp.slaves.zipWithIndex) {
-    routers(p.slaveRouter(j)).io.outReq(p.slavePort(j)) <> sSkid(s).io.in
+    routers(p.slaveRouter(j)).io.outRdReq(p.slavePort(j)) <> sSkidRd(s).io.in
+    routers(p.slaveRouter(j)).io.outWrData(p.slavePort(j)) <> sSkidWr(s).io.in
   }
-  private val snetReqArb = Seq.tabulate(p.nSnet)(_ => Module(new LmRrArbiterN(p.nSlave)))
-  private val snetRspArb = Seq.tabulate(p.nSnet)(_ => Module(new LmRrArbiterN(p.nSlave)))
-  for (m <- 0 until p.nMnet; i <- 0 until p.nMaster) {
-    mnetReqArb(m).io.req(i) := false.B
-    mnetRspArb(m).io.req(i) := false.B
+
+  for (m <- 0 until p.nMnet) {
+    for (i <- 0 until p.nMaster) {
+      mnetRdReqTok(m).io.req(i) := false.B
+      mnetWrDataTok(m).io.req(i) := false.B
+      mnetRdDataTok(m).io.req(i) := false.B
+      mnetWrRespTok(m).io.req(i) := false.B
+    }
   }
-  for (s <- 0 until p.nSnet; j <- 0 until p.nSlave) {
-    snetReqArb(s).io.req(j) := false.B
-    snetRspArb(s).io.req(j) := false.B
+  for (s <- 0 until p.nSnet) {
+    for (j <- 0 until p.nSlave) {
+      snetRdReqTok(s).io.req(j) := false.B
+      snetWrDataTok(s).io.req(j) := false.B
+      snetRdDataTok(s).io.req(j) := false.B
+      snetWrRespTok(s).io.req(j) := false.B
+    }
   }
-  for ((i, _) <- pp.masters.zipWithIndex) {
+  for ((i, m) <- pp.masters.zipWithIndex) {
     val r = routers(p.masterRouter(i))
-    mnetReqArb(p.masterMnet(i)).io.req(i) := mNi(pp.masters.indexOf(i)).io.out.valid
-    mnetRspArb(p.masterMnet(i)).io.req(i) := r.io.inRsp(p.masterPort(i)).valid
+    mnetRdReqTok(p.masterMnet(i)).io.req(i) := mNi(m).io.outRdReq.valid
+    mnetWrDataTok(p.masterMnet(i)).io.req(i) := mNi(m).io.outWrData.valid
+    mnetRdDataTok(p.masterMnet(i)).io.req(i) := r.io.inRdData(p.masterPort(i)).valid
+    mnetWrRespTok(p.masterMnet(i)).io.req(i) := r.io.inWrResp(p.masterPort(i)).valid
   }
   for ((j, s) <- pp.slaves.zipWithIndex) {
-    val r = routers(p.slaveRouter(j))
-    snetReqArb(p.slaveSnet(j)).io.req(j) := sSkid(s).io.out.valid
-    snetRspArb(p.slaveSnet(j)).io.req(j) := sNi(s).io.outRsp.valid
+    snetRdReqTok(p.slaveSnet(j)).io.req(j) := sSkidRd(s).io.out.valid
+    snetWrDataTok(p.slaveSnet(j)).io.req(j) := sSkidWr(s).io.out.valid
+    snetRdDataTok(p.slaveSnet(j)).io.req(j) := sNi(s).io.outRdData.valid
+    snetWrRespTok(p.slaveSnet(j)).io.req(j) := sNi(s).io.outWrResp.valid
   }
-  private def mnetReqOk(i: Int): Bool = {
-    val a = mnetReqArb(p.masterMnet(i))
-    a.io.valid && (a.io.grant === i.U)
-  }
-  private def mnetRspOk(i: Int): Bool = {
-    val a = mnetRspArb(p.masterMnet(i))
-    a.io.valid && (a.io.grant === i.U)
-  }
-  private def snetReqOk(j: Int): Bool = {
-    val a = snetReqArb(p.slaveSnet(j))
-    a.io.valid && (a.io.grant === j.U)
-  }
-  private def snetRspOk(j: Int): Bool = {
-    val a = snetRspArb(p.slaveSnet(j))
-    a.io.valid && (a.io.grant === j.U)
-  }
+
+  private def mnetRdReqOk(i: Int): Bool = mnetRdReqTok(p.masterMnet(i)).io.ok(i)
+  private def mnetWrDataOk(i: Int): Bool = mnetWrDataTok(p.masterMnet(i)).io.ok(i)
+  private def mnetRdDataOk(i: Int): Bool = mnetRdDataTok(p.masterMnet(i)).io.ok(i)
+  private def mnetWrRespOk(i: Int): Bool = mnetWrRespTok(p.masterMnet(i)).io.ok(i)
+  private def snetRdReqOk(j: Int): Bool = snetRdReqTok(p.slaveSnet(j)).io.ok(j)
+  private def snetWrDataOk(j: Int): Bool = snetWrDataTok(p.slaveSnet(j)).io.ok(j)
+  private def snetRdDataOk(j: Int): Bool = snetRdDataTok(p.slaveSnet(j)).io.ok(j)
+  private def snetWrRespOk(j: Int): Bool = snetWrRespTok(p.slaveSnet(j)).io.ok(j)
 
   for ((i, m) <- pp.masters.zipWithIndex) {
     val r = routers(p.masterRouter(i))
@@ -170,15 +197,28 @@ class LmPartitionTop(p: NetworkParams, pp: PartitionParams) extends Module {
     mNi(m).io.in.valid := io.master(m).valid
     mNi(m).io.in.bits := io.master(m).bits
     io.master(m).ready := mNi(m).io.in.ready
-    r.io.inReq(port).valid := mNi(m).io.out.valid && mnetReqOk(i)
-    r.io.inReq(port).bits := mNi(m).io.out.bits
-    mNi(m).io.out.ready := r.io.inReq(port).ready && mnetReqOk(i)
-    mNi(m).io.inRsp.valid := r.io.inRsp(port).valid && mnetRspOk(i)
-    mNi(m).io.inRsp.bits := r.io.inRsp(port).bits
-    r.io.inRsp(port).ready := mNi(m).io.inRsp.ready
 
-    r.io.inRspFwd(port).valid := false.B
-    r.io.inRspFwd(port).bits := 0.U.asTypeOf(chiselTypeOf(r.io.inRspFwd(port).bits))
+    r.io.inRdReq(port).valid := mNi(m).io.outRdReq.valid && mnetRdReqOk(i)
+    r.io.inRdReq(port).bits := mNi(m).io.outRdReq.bits
+    mNi(m).io.outRdReq.ready := r.io.inRdReq(port).ready && mnetRdReqOk(i)
+
+    r.io.inWrData(port).valid := mNi(m).io.outWrData.valid && mnetWrDataOk(i)
+    r.io.inWrData(port).bits := mNi(m).io.outWrData.bits
+    mNi(m).io.outWrData.ready := r.io.inWrData(port).ready && mnetWrDataOk(i)
+
+    mNi(m).io.inRdData.valid := r.io.inRdData(port).valid && mnetRdDataOk(i)
+    mNi(m).io.inRdData.bits := r.io.inRdData(port).bits
+    r.io.inRdData(port).ready := mNi(m).io.inRdData.ready
+
+    mNi(m).io.inWrResp.valid := r.io.inWrResp(port).valid && mnetWrRespOk(i)
+    mNi(m).io.inWrResp.bits := r.io.inWrResp(port).bits
+    r.io.inWrResp(port).ready := mNi(m).io.inWrResp.ready
+
+    r.io.inRdDataFwd(port).valid := false.B
+    r.io.inRdDataFwd(port).bits := 0.U.asTypeOf(chiselTypeOf(r.io.inRdDataFwd(port).bits))
+    r.io.inWrRespFwd(port).valid := false.B
+    r.io.inWrRespFwd(port).bits := 0.U.asTypeOf(chiselTypeOf(r.io.inWrRespFwd(port).bits))
+
     io.masterRsp(m).valid := mNi(m).io.outRsp.valid
     io.masterRsp(m).bits := mNi(m).io.outRsp.bits
     mNi(m).io.outRsp.ready := io.masterRsp(m).ready
@@ -186,71 +226,82 @@ class LmPartitionTop(p: NetworkParams, pp: PartitionParams) extends Module {
   }
 
   for ((j, s) <- pp.slaves.zipWithIndex) {
-    routers(p.slaveRouter(j)).io.outRspFwd(p.slavePort(j)).ready := true.B
+    routers(p.slaveRouter(j)).io.outRdDataFwd(p.slavePort(j)).ready := true.B
+    routers(p.slaveRouter(j)).io.outWrRespFwd(p.slavePort(j)).ready := true.B
   }
 
   for ((j, s) <- pp.slaves.zipWithIndex) {
     val r = routers(p.slaveRouter(j))
     val port = p.slavePort(j)
-    sNi(s).io.in.valid := sSkid(s).io.out.valid && snetReqOk(j)
-    sNi(s).io.in.bits := sSkid(s).io.out.bits
-    sSkid(s).io.out.ready := sNi(s).io.in.ready && snetReqOk(j)
+    sNi(s).io.inRdReq.valid := sSkidRd(s).io.out.valid && snetRdReqOk(j)
+    sNi(s).io.inRdReq.bits := sSkidRd(s).io.out.bits
+    sSkidRd(s).io.out.ready := sNi(s).io.inRdReq.ready && snetRdReqOk(j)
+
+    sNi(s).io.inWrData.valid := sSkidWr(s).io.out.valid && snetWrDataOk(j)
+    sNi(s).io.inWrData.bits := sSkidWr(s).io.out.bits
+    sSkidWr(s).io.out.ready := sNi(s).io.inWrData.ready && snetWrDataOk(j)
+
     io.slave(s).valid := sNi(s).io.out.valid
     io.slave(s).bits := sNi(s).io.out.bits
     sNi(s).io.out.ready := io.slave(s).ready
+
     sNi(s).io.inRsp.valid := io.slaveRsp(s).valid
     sNi(s).io.inRsp.bits := io.slaveRsp(s).bits
     io.slaveRsp(s).ready := sNi(s).io.inRsp.ready
-    r.io.outRsp(port).valid := sNi(s).io.outRsp.valid && snetRspOk(j)
-    r.io.outRsp(port).bits := sNi(s).io.outRsp.bits
-    sNi(s).io.outRsp.ready := r.io.outRsp(port).ready && snetRspOk(j)
+
+    r.io.outRdData(port).valid := sNi(s).io.outRdData.valid && snetRdDataOk(j)
+    r.io.outRdData(port).bits := sNi(s).io.outRdData.bits
+    sNi(s).io.outRdData.ready := r.io.outRdData(port).ready && snetRdDataOk(j)
+
+    r.io.outWrResp(port).valid := sNi(s).io.outWrResp.valid && snetWrRespOk(j)
+    r.io.outWrResp(port).bits := sNi(s).io.outWrResp.bits
+    sNi(s).io.outWrResp.ready := r.io.outWrResp(port).ready && snetWrRespOk(j)
     io.perf.respSlots(s) := sNi(s).io.slot
   }
 
   for (l <- pp.internalLinks) {
-    val link = Module(new LmRouterLink(p.addrWidth, p.dataWidth, p.idWidth, qosW,
+    val link = Module(new LmRouterLink(p.addrWidth, p.dataWidth, p.idWidth,
       l.pipe, l.async, l.asyncFifoDepth, p.tagWidth))
     link.io.aClk := false.B
     link.io.aReset := false.B
     link.io.bClk := false.B
     link.io.bReset := false.B
-    link.io.aReq <> routers(l.fromRouter).io.outReq(l.fromPort)
-    routers(l.toRouter).io.inReq(l.toPort) <> link.io.bReq
-    link.io.bRsp <> routers(l.toRouter).io.inRsp(l.toPort)
-    routers(l.fromRouter).io.outRsp(l.fromPort) <> link.io.aRsp
-    link.io.aRspF <> routers(l.fromRouter).io.outRspFwd(l.fromPort)
-    routers(l.toRouter).io.inRspFwd(l.toPort) <> link.io.bRspF
+    link.io.aRdReq <> routers(l.fromRouter).io.outRdReq(l.fromPort)
+    routers(l.toRouter).io.inRdReq(l.toPort) <> link.io.bRdReq
+    link.io.aWrData <> routers(l.fromRouter).io.outWrData(l.fromPort)
+    routers(l.toRouter).io.inWrData(l.toPort) <> link.io.bWrData
+    link.io.bRdData <> routers(l.toRouter).io.inRdData(l.toPort)
+    routers(l.fromRouter).io.outRdData(l.fromPort) <> link.io.aRdData
+    link.io.bWrResp <> routers(l.toRouter).io.inWrResp(l.toPort)
+    routers(l.fromRouter).io.outWrResp(l.fromPort) <> link.io.aWrResp
+    link.io.aRdDataFwd <> routers(l.fromRouter).io.outRdDataFwd(l.fromPort)
+    routers(l.toRouter).io.inRdDataFwd(l.toPort) <> link.io.bRdDataFwd
+    link.io.aWrRespFwd <> routers(l.fromRouter).io.outWrRespFwd(l.fromPort)
+    routers(l.toRouter).io.inWrRespFwd(l.toPort) <> link.io.bWrRespFwd
   }
 
-  private val reqType = new LmNetReq(p.addrWidth, p.dataWidth, p.idWidth, qosW, p.tagWidth)
-  private val rspType = new LmRsp(p.dataWidth, p.idWidth, p.tagWidth)
+  private def staged[T <: Data](gen: T, src: DecoupledIO[T], dst: DecoupledIO[T]): Unit = {
+    val pipe = Module(new LmPipe(gen, pp.pipe))
+    pipe.io.in <> src
+    dst <> pipe.io.out
+  }
 
   for ((l, k) <- pp.outLinks.zipWithIndex) {
-    val outReqPipe = Module(new LmPipe(reqType, pp.pipe))
-    outReqPipe.io.in <> routers(l.fromRouter).io.outReq(l.fromPort)
-    io.boundaryOutReq(k) <> outReqPipe.io.out
-
-    val outRspPipe = Module(new LmPipe(rspType, pp.pipe))
-    outRspPipe.io.in <> io.boundaryOutRsp(k)
-    routers(l.fromRouter).io.outRsp(l.fromPort) <> outRspPipe.io.out
-
-    val outRspFPipe = Module(new LmPipe(rspType, pp.pipe))
-    routers(l.fromRouter).io.outRspFwd(l.fromPort) <> outRspFPipe.io.in
-    io.boundaryOutRspFwd(k) <> outRspFPipe.io.out
+    staged(rdReqT, routers(l.fromRouter).io.outRdReq(l.fromPort), io.boundaryOutRdReq(k))
+    staged(wrDataT, routers(l.fromRouter).io.outWrData(l.fromPort), io.boundaryOutWrData(k))
+    staged(rdDataT, io.boundaryOutRdData(k), routers(l.fromRouter).io.outRdData(l.fromPort))
+    staged(wrRespT, io.boundaryOutWrResp(k), routers(l.fromRouter).io.outWrResp(l.fromPort))
+    staged(rdDataT, routers(l.fromRouter).io.outRdDataFwd(l.fromPort), io.boundaryOutRdDataFwd(k))
+    staged(wrRespT, routers(l.fromRouter).io.outWrRespFwd(l.fromPort), io.boundaryOutWrRespFwd(k))
   }
 
   for ((l, k) <- pp.inLinks.zipWithIndex) {
-    val inReqPipe = Module(new LmPipe(reqType, pp.pipe))
-    inReqPipe.io.in <> io.boundaryInReq(k)
-    routers(l.toRouter).io.inReq(l.toPort) <> inReqPipe.io.out
-
-    val inRspPipe = Module(new LmPipe(rspType, pp.pipe))
-    inRspPipe.io.in <> routers(l.toRouter).io.inRsp(l.toPort)
-    io.boundaryInRsp(k) <> inRspPipe.io.out
-
-    val inRspFPipe = Module(new LmPipe(rspType, pp.pipe))
-    inRspFPipe.io.in <> io.boundaryInRspFwd(k)
-    routers(l.toRouter).io.inRspFwd(l.toPort) <> inRspFPipe.io.out
+    staged(rdReqT, io.boundaryInRdReq(k), routers(l.toRouter).io.inRdReq(l.toPort))
+    staged(wrDataT, io.boundaryInWrData(k), routers(l.toRouter).io.inWrData(l.toPort))
+    staged(rdDataT, routers(l.toRouter).io.inRdData(l.toPort), io.boundaryInRdData(k))
+    staged(wrRespT, routers(l.toRouter).io.inWrResp(l.toPort), io.boundaryInWrResp(k))
+    staged(rdDataT, io.boundaryInRdDataFwd(k), routers(l.toRouter).io.inRdDataFwd(l.toPort))
+    staged(wrRespT, io.boundaryInWrRespFwd(k), routers(l.toRouter).io.inWrRespFwd(l.toPort))
   }
 }
 
@@ -261,8 +312,8 @@ class LmPartitionTop(p: NetworkParams, pp: PartitionParams) extends Module {
   * the port list is unchanged. With several domains the wrapper exposes
   * `domainClk`/`domainReset` (one entry per declared clock, sorted by id) and
   * runs each partition in its own domain. A sync cut link is wired directly;
-  * an async cut link gets one `LmAsyncLink` per direction, clocked from the
-  * source domain with the destination domain as `dstClk`.
+  * an async cut link gets one `LmAsyncLink` per channel and direction, clocked
+  * from the source domain with the destination domain as `dstClk`.
   */
 class LmWrapperTop(p: NetworkParams, parts: Seq[PartitionParams]) extends Module {
   require(parts.nonEmpty, "at least one partition is required")
@@ -274,6 +325,11 @@ class LmWrapperTop(p: NetworkParams, parts: Seq[PartitionParams]) extends Module
 
   private val maxRetW = math.max(1, log2Ceil(p.maxReturnSlots + 1))
   private val maxRspW = math.max(1, log2Ceil(p.maxRespSlots + 1))
+
+  private def rdReqT = new LmRdReq(p.addrWidth, p.idWidth, p.tagWidth)
+  private def wrDataT = new LmWrData(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth)
+  private def rdDataT = new LmRdData(p.dataWidth, p.idWidth, p.tagWidth)
+  private def wrRespT = new LmWrResp(p.idWidth, p.tagWidth)
 
   val io = IO(new Bundle {
     val master = Vec(p.nMaster, Flipped(Decoupled(new LmReq(p.addrWidth, p.dataWidth, p.idWidth, p.tagWidth))))
@@ -324,9 +380,28 @@ class LmWrapperTop(p: NetworkParams, parts: Seq[PartitionParams]) extends Module
 
   private def partOfRouter(r: Int): Int = parts.indexWhere(_.routers.contains(r))
 
-  private val qosW = math.max(1, log2Ceil(p.classWeights.length))
-  private val reqType = new LmNetReq(p.addrWidth, p.dataWidth, p.idWidth, qosW, p.tagWidth)
-  private val rspType = new LmRsp(p.dataWidth, p.idWidth, p.tagWidth)
+  private def cdc[T <: Data](
+      gen: T,
+      depth: Int,
+      srcClk: Clock,
+      srcReset: Reset,
+      dstClk: Clock,
+      dstReset: Reset,
+      in: DecoupledIO[T],
+      out: DecoupledIO[T]
+  ): Unit = {
+    val link = withClockAndReset(srcClk, srcReset) {
+      Module(new LmAsyncLink(gen.getWidth, depth))
+    }
+    link.io.dstClk := dstClk.asUInt.asBool
+    link.io.dstReset := dstReset.asUInt.asBool
+    link.io.in.valid := in.valid
+    link.io.in.bits := in.bits.asUInt
+    in.ready := link.io.in.ready
+    out.valid := link.io.out.valid
+    out.bits := link.io.out.bits.asTypeOf(chiselTypeOf(out.bits))
+    link.io.out.ready := out.ready
+  }
 
   for (l <- p.links) {
     val fromPart = partOfRouter(l.fromRouter)
@@ -336,56 +411,38 @@ class LmWrapperTop(p: NetworkParams, parts: Seq[PartitionParams]) extends Module
       val ik = parts(toPart).inLinks.indexWhere(_.id == l.id)
       require(ok >= 0 && ik >= 0, s"cut link ${l.id} is missing from a partition boundary")
 
-      val outReq = insts(fromPart).io.boundaryOutReq(ok)
-      val inReq = insts(toPart).io.boundaryInReq(ik)
-      val inRsp = insts(toPart).io.boundaryInRsp(ik)
-      val outRsp = insts(fromPart).io.boundaryOutRsp(ok)
+      val fOut = insts(fromPart).io
+      val tIn = insts(toPart).io
 
       if (!l.async) {
-        outReq <> inReq
-        inRsp <> outRsp
-        insts(fromPart).io.boundaryOutRspFwd(ok) <> insts(toPart).io.boundaryInRspFwd(ik)
+        fOut.boundaryOutRdReq(ok) <> tIn.boundaryInRdReq(ik)
+        fOut.boundaryOutWrData(ok) <> tIn.boundaryInWrData(ik)
+        tIn.boundaryInRdData(ik) <> fOut.boundaryOutRdData(ok)
+        tIn.boundaryInWrResp(ik) <> fOut.boundaryOutWrResp(ok)
+        fOut.boundaryOutRdDataFwd(ok) <> tIn.boundaryInRdDataFwd(ik)
+        fOut.boundaryOutWrRespFwd(ok) <> tIn.boundaryInWrRespFwd(ik)
       } else {
         require((l.asyncFifoDepth & (l.asyncFifoDepth - 1)) == 0 && l.asyncFifoDepth >= 2,
           s"async link ${l.id} depth ${l.asyncFifoDepth} must be a power of two >= 2")
 
-        val reqLink = withClockAndReset(partitionClock(fromPart), partitionReset(fromPart)) {
-          Module(new LmAsyncLink(reqType.getWidth, l.asyncFifoDepth))
-        }
-        reqLink.io.dstClk := partitionClock(toPart).asUInt.asBool
-        reqLink.io.dstReset := partitionReset(toPart).asUInt.asBool
-        reqLink.io.in.valid := outReq.valid
-        reqLink.io.in.bits := outReq.bits.asUInt
-        outReq.ready := reqLink.io.in.ready
-        inReq.valid := reqLink.io.out.valid
-        inReq.bits := reqLink.io.out.bits.asTypeOf(chiselTypeOf(inReq.bits))
-        reqLink.io.out.ready := inReq.ready
+        val fClk = partitionClock(fromPart)
+        val fRst = partitionReset(fromPart)
+        val tClk = partitionClock(toPart)
+        val tRst = partitionReset(toPart)
+        val depth = l.asyncFifoDepth
 
-        val rspLink = withClockAndReset(partitionClock(toPart), partitionReset(toPart)) {
-          Module(new LmAsyncLink(rspType.getWidth, l.asyncFifoDepth))
-        }
-        rspLink.io.dstClk := partitionClock(fromPart).asUInt.asBool
-        rspLink.io.dstReset := partitionReset(fromPart).asUInt.asBool
-        rspLink.io.in.valid := inRsp.valid
-        rspLink.io.in.bits := inRsp.bits.asUInt
-        inRsp.ready := rspLink.io.in.ready
-        outRsp.valid := rspLink.io.out.valid
-        outRsp.bits := rspLink.io.out.bits.asTypeOf(chiselTypeOf(outRsp.bits))
-        rspLink.io.out.ready := outRsp.ready
-
-        val rspFLink = withClockAndReset(partitionClock(fromPart), partitionReset(fromPart)) {
-          Module(new LmAsyncLink(rspType.getWidth, l.asyncFifoDepth))
-        }
-        val outRspFwd = insts(fromPart).io.boundaryOutRspFwd(ok)
-        val inRspFwd = insts(toPart).io.boundaryInRspFwd(ik)
-        rspFLink.io.dstClk := partitionClock(toPart).asUInt.asBool
-        rspFLink.io.dstReset := partitionReset(toPart).asUInt.asBool
-        rspFLink.io.in.valid := outRspFwd.valid
-        rspFLink.io.in.bits := outRspFwd.bits.asUInt
-        outRspFwd.ready := rspFLink.io.in.ready
-        inRspFwd.valid := rspFLink.io.out.valid
-        inRspFwd.bits := rspFLink.io.out.bits.asTypeOf(chiselTypeOf(inRspFwd.bits))
-        rspFLink.io.out.ready := inRspFwd.ready
+        cdc(rdReqT, depth, fClk, fRst, tClk, tRst,
+          fOut.boundaryOutRdReq(ok), tIn.boundaryInRdReq(ik))
+        cdc(wrDataT, depth, fClk, fRst, tClk, tRst,
+          fOut.boundaryOutWrData(ok), tIn.boundaryInWrData(ik))
+        cdc(rdDataT, depth, tClk, tRst, fClk, fRst,
+          tIn.boundaryInRdData(ik), fOut.boundaryOutRdData(ok))
+        cdc(wrRespT, depth, tClk, tRst, fClk, fRst,
+          tIn.boundaryInWrResp(ik), fOut.boundaryOutWrResp(ok))
+        cdc(rdDataT, depth, fClk, fRst, tClk, tRst,
+          fOut.boundaryOutRdDataFwd(ok), tIn.boundaryInRdDataFwd(ik))
+        cdc(wrRespT, depth, fClk, fRst, tClk, tRst,
+          fOut.boundaryOutWrRespFwd(ok), tIn.boundaryInWrRespFwd(ik))
       }
     }
   }
@@ -394,17 +451,16 @@ class LmWrapperTop(p: NetworkParams, parts: Seq[PartitionParams]) extends Module
 /** Stub with the same port contract as a real partition (S4).
   *
   * Every accepted request (local master or boundary input) is answered with
-  * exactly one error response, so upstream credits and response slots close
-  * even when the real partition is replaced.
+  * exactly one error response on the matching channel, so upstream credits and
+  * response slots close even when the real partition is replaced.
   */
 class LmPartitionStub(p: NetworkParams, pp: PartitionParams) extends Module {
-  private val qosW = math.max(1, log2Ceil(p.classWeights.length))
   private val maxRetW = math.max(1, log2Ceil(p.maxReturnSlots + 1))
   private val maxRspW = math.max(1, log2Ceil(p.maxRespSlots + 1))
 
   val io = IO(new LmPartitionIo(
     pp.masters.size, pp.slaves.size, pp.outLinks.size, pp.inLinks.size,
-    p.addrWidth, p.dataWidth, p.idWidth, qosW, maxRetW, maxRspW, p.tagWidth))
+    p.addrWidth, p.dataWidth, p.idWidth, maxRetW, maxRspW, p.tagWidth))
 
   private val mPending = Seq.fill(pp.masters.size)(RegInit(false.B))
   private val mSrc = Seq.fill(pp.masters.size)(RegInit(0.U(p.idWidth.W)))
@@ -432,39 +488,65 @@ class LmPartitionStub(p: NetworkParams, pp: PartitionParams) extends Module {
     io.slaveRsp(s).ready := true.B
   }
 
-  private val bPending = Seq.fill(pp.inLinks.size)(RegInit(false.B))
-  private val bSrc = Seq.fill(pp.inLinks.size)(RegInit(0.U(p.idWidth.W)))
-  private val bId = Seq.fill(pp.inLinks.size)(RegInit(0.U(p.tagWidth.W)))
+  private val bRdReqPend = Seq.fill(pp.inLinks.size)(RegInit(false.B))
+  private val bRdReqSrc = Seq.fill(pp.inLinks.size)(RegInit(0.U(p.idWidth.W)))
+  private val bRdReqId = Seq.fill(pp.inLinks.size)(RegInit(0.U(p.tagWidth.W)))
+  private val bWrPend = Seq.fill(pp.inLinks.size)(RegInit(false.B))
+  private val bWrSrc = Seq.fill(pp.inLinks.size)(RegInit(0.U(p.idWidth.W)))
+  private val bWrId = Seq.fill(pp.inLinks.size)(RegInit(0.U(p.tagWidth.W)))
 
   for (b <- pp.inLinks.indices) {
-    io.boundaryInReq(b).ready := !bPending(b)
-    when(io.boundaryInReq(b).fire) {
-      bPending(b) := true.B
-      bSrc(b) := io.boundaryInReq(b).bits.src
-      bId(b) := io.boundaryInReq(b).bits.id
+    io.boundaryInRdReq(b).ready := !bRdReqPend(b)
+    when(io.boundaryInRdReq(b).fire) {
+      bRdReqPend(b) := true.B
+      bRdReqSrc(b) := io.boundaryInRdReq(b).bits.src
+      bRdReqId(b) := io.boundaryInRdReq(b).bits.id
     }
-    io.boundaryInRsp(b).valid := bPending(b)
-    io.boundaryInRsp(b).bits.src := bSrc(b)
-    io.boundaryInRsp(b).bits.id := bId(b)
-    io.boundaryInRsp(b).bits.data := 0.U
-    io.boundaryInRsp(b).bits.err := true.B
-    io.boundaryInRsp(b).bits.vc := 0.U
-    when(io.boundaryInRsp(b).fire) { bPending(b) := false.B }
+    io.boundaryInRdData(b).valid := bRdReqPend(b)
+    io.boundaryInRdData(b).bits.src := bRdReqSrc(b)
+    io.boundaryInRdData(b).bits.id := bRdReqId(b)
+    io.boundaryInRdData(b).bits.data := 0.U
+    io.boundaryInRdData(b).bits.last := true.B
+    io.boundaryInRdData(b).bits.err := true.B
+    io.boundaryInRdData(b).bits.vc := 0.U
+    when(io.boundaryInRdData(b).fire) { bRdReqPend(b) := false.B }
+
+    // A write burst ends with `last` and is answered by exactly one wresp, so
+    // beats are accepted until a response is owed.
+    io.boundaryInWrData(b).ready := !bWrPend(b)
+    when(io.boundaryInWrData(b).fire) {
+      when(io.boundaryInWrData(b).bits.last) {
+        bWrPend(b) := true.B
+        bWrSrc(b) := io.boundaryInWrData(b).bits.src
+        bWrId(b) := io.boundaryInWrData(b).bits.id
+      }
+    }
+    io.boundaryInWrResp(b).valid := bWrPend(b)
+    io.boundaryInWrResp(b).bits.src := bWrSrc(b)
+    io.boundaryInWrResp(b).bits.id := bWrId(b)
+    io.boundaryInWrResp(b).bits.err := true.B
+    io.boundaryInWrResp(b).bits.vc := 0.U
+    when(io.boundaryInWrResp(b).fire) { bWrPend(b) := false.B }
   }
 
   for (o <- pp.outLinks.indices) {
-    io.boundaryOutReq(o).valid := false.B
-    io.boundaryOutReq(o).bits := 0.U.asTypeOf(chiselTypeOf(io.boundaryOutReq(o).bits))
-    io.boundaryOutRsp(o).ready := true.B
-    io.boundaryOutRspFwd(o).valid := false.B
-    io.boundaryOutRspFwd(o).bits := 0.U.asTypeOf(chiselTypeOf(io.boundaryOutRspFwd(o).bits))
+    io.boundaryOutRdReq(o).valid := false.B
+    io.boundaryOutRdReq(o).bits := 0.U.asTypeOf(chiselTypeOf(io.boundaryOutRdReq(o).bits))
+    io.boundaryOutWrData(o).valid := false.B
+    io.boundaryOutWrData(o).bits := 0.U.asTypeOf(chiselTypeOf(io.boundaryOutWrData(o).bits))
+    io.boundaryOutRdData(o).ready := true.B
+    io.boundaryOutWrResp(o).ready := true.B
+    io.boundaryOutRdDataFwd(o).valid := false.B
+    io.boundaryOutRdDataFwd(o).bits := 0.U.asTypeOf(chiselTypeOf(io.boundaryOutRdDataFwd(o).bits))
+    io.boundaryOutWrRespFwd(o).valid := false.B
+    io.boundaryOutWrRespFwd(o).bits := 0.U.asTypeOf(chiselTypeOf(io.boundaryOutWrRespFwd(o).bits))
   }
 
   for (b <- pp.inLinks.indices) {
-    io.boundaryInRspFwd(b).ready := true.B
+    io.boundaryInRdDataFwd(b).ready := true.B
+    io.boundaryInWrRespFwd(b).ready := true.B
   }
 
   for (m <- pp.masters.indices) io.perf.returnSlots(m) := 0.U
   for (s <- pp.slaves.indices) io.perf.respSlots(s) := 0.U
 }
-

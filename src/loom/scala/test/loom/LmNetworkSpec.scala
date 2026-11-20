@@ -27,6 +27,7 @@ class LmNetworkSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.io.master(i).bits.len.poke(0.U)
       dut.io.master(i).bits.src.poke(i.U)
       dut.io.master(i).bits.data.poke(0.U)
+      dut.io.master(i).bits.strb.poke(0.U)
       dut.io.masterRsp(i).ready.poke(true.B)
     }
     for (j <- 0 until p.nSlave) {
@@ -41,8 +42,14 @@ class LmNetworkSpec extends AnyFlatSpec with Matchers with ChiselSim {
     dut.reset.poke(false.B)
   }
 
-  private def send(dut: LmNetworkTop, m: Int, addr: Long, data: Long): Unit = {
-    dut.io.master(m).bits.write.poke(true.B)
+  private def send(
+      dut: LmNetworkTop,
+      m: Int,
+      addr: Long,
+      data: Long,
+      write: Boolean = true
+  ): Unit = {
+    dut.io.master(m).bits.write.poke(write.B)
     dut.io.master(m).bits.addr.poke(addr.U)
     dut.io.master(m).bits.src.poke(m.U)
     dut.io.master(m).bits.data.poke(data.U)
@@ -110,6 +117,25 @@ class LmNetworkSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.io.perf.returnSlots(0).expect(1.U)
 
       respond(dut, 3, 0, 0x1234L)
+      // A write response carries no data.
+      waitMasterRsp(dut, 0) shouldBe BigInt(0)
+      dut.io.perf.returnSlots(0).expect(0.U)
+    }
+  }
+
+  it should "return read data on the rdata channel" in {
+    val p = load("tree_3r")
+    simulate(new LmNetworkTop(p)) { dut =>
+      init(dut, p)
+
+      send(dut, 0, 0x3000L, 0L, write = false)
+      waitSlave(dut, 3)
+      dut.io.slave(3).bits.write.expect(false.B)
+      dut.io.slave(3).bits.addr.expect(0x3000.U)
+      dut.io.slave(3).bits.len.expect(0.U)
+      dut.io.slave(3).bits.src.expect(0.U)
+
+      respond(dut, 3, 0, 0x1234L)
       waitMasterRsp(dut, 0) shouldBe BigInt(0x1234)
       dut.io.perf.returnSlots(0).expect(0.U)
     }
@@ -120,7 +146,7 @@ class LmNetworkSpec extends AnyFlatSpec with Matchers with ChiselSim {
     simulate(new LmNetworkTop(p)) { dut =>
       init(dut, p)
 
-      send(dut, 3, 0x0000L, 0x55L)
+      send(dut, 3, 0x0000L, 0L, write = false)
       waitSlave(dut, 0)
       dut.io.slave(0).bits.addr.expect(0x0.U)
       dut.io.slave(0).bits.src.expect(3.U)
@@ -137,7 +163,7 @@ class LmNetworkSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.io.masterRsp(3).ready.poke(true.B)
 
       dut.io.master(3).bits.id.poke(9.U)
-      send(dut, 3, 0x0000L, 0x5aL)
+      send(dut, 3, 0x0000L, 0L, write = false)
       waitSlave(dut, 0)
       dut.io.slave(0).bits.id.expect(9.U)
 
@@ -161,7 +187,7 @@ class LmNetworkSpec extends AnyFlatSpec with Matchers with ChiselSim {
     simulate(new LmNetworkTop(p)) { dut =>
       init(dut, p)
 
-      send(dut, 1, 0x1000L, 0xdeadL)
+      send(dut, 1, 0x1000L, 0L, write = false)
       waitSlave(dut, 1)
       dut.io.slave(1).bits.addr.expect(0x1000.U)
       dut.io.slave(1).bits.src.expect(1.U)
@@ -184,7 +210,7 @@ class LmNetworkSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.io.slave(0).bits.data.expect(0x5151L.U)
 
       respond(dut, 0, 0, 0x6161L)
-      waitMasterRsp(dut, 0) shouldBe BigInt(0x6161)
+      waitMasterRsp(dut, 0) shouldBe BigInt(0)
     }
   }
 
@@ -200,7 +226,7 @@ class LmNetworkSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.io.slave(0).bits.vc.expect(5.U) // bulk 4 flips to 5 on r0->r1
 
       respond(dut, 0, 0, 0x44L)
-      waitMasterRsp(dut, 0, 80) shouldBe BigInt(0x44)
+      waitMasterRsp(dut, 0, 80) shouldBe BigInt(0)
     }
   }
 
@@ -215,14 +241,14 @@ class LmNetworkSpec extends AnyFlatSpec with Matchers with ChiselSim {
       waitSlave(dut, 0)
       dut.io.slave(0).bits.vc.expect(5.U)
       respond(dut, 0, 0, 0x21L)
-      waitMasterRsp(dut, 0) shouldBe BigInt(0x21)
+      waitMasterRsp(dut, 0) shouldBe BigInt(0)
 
       // m1 -> s0 takes r2->r1, which is not cut: lat vc stays 2.
       send(dut, 1, 0x0000L, 0x12L)
       waitSlave(dut, 0)
       dut.io.slave(0).bits.vc.expect(2.U)
       respond(dut, 0, 1, 0x22L)
-      waitMasterRsp(dut, 1) shouldBe BigInt(0x22)
+      waitMasterRsp(dut, 1) shouldBe BigInt(0)
     }
   }
 }
