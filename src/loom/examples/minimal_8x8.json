@@ -1,0 +1,386 @@
+{
+  "schema": "loom/v1",
+  "meta": {
+    "name": "minimal_8x8"
+  },
+  "clockDomains": [
+    {
+      "id": "core",
+      "freqMHz": 1000
+    }
+  ],
+  "qos": {
+    "classes": [
+      {
+        "name": "ctl",
+        "vcs": 1,
+        "depth": 4,
+        "arbitration": "wrr",
+        "weight": 4,
+        "maxPacketBeats": 1
+      },
+      {
+        "name": "lat",
+        "vcs": 1,
+        "depth": 8,
+        "arbitration": "wrr",
+        "weight": 2,
+        "maxPacketBeats": 2
+      },
+      {
+        "name": "bulk",
+        "vcs": 2,
+        "depth": 16,
+        "arbitration": "wrr",
+        "weight": 1,
+        "maxPacketBeats": 4
+      }
+    ]
+  },
+  "endpoints": [
+    {
+      "id": "m0",
+      "role": "master",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "outstanding": 4,
+      "clock": "core",
+      "qos": "ctl",
+      "attach": "mnet0"
+    },
+    {
+      "id": "m1",
+      "role": "master",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "outstanding": 4,
+      "clock": "core",
+      "qos": "ctl",
+      "attach": "mnet1"
+    },
+    {
+      "id": "m2",
+      "role": "master",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "outstanding": 4,
+      "clock": "core",
+      "qos": "lat",
+      "attach": "mnet2"
+    },
+    {
+      "id": "m3",
+      "role": "master",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "outstanding": 4,
+      "clock": "core",
+      "qos": "lat",
+      "attach": "mnet3"
+    },
+    {
+      "id": "m4",
+      "role": "master",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "outstanding": 4,
+      "clock": "core",
+      "qos": "bulk",
+      "attach": "mnet4"
+    },
+    {
+      "id": "m5",
+      "role": "master",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "outstanding": 4,
+      "clock": "core",
+      "qos": "bulk",
+      "attach": "mnet5"
+    },
+    {
+      "id": "m6",
+      "role": "master",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "outstanding": 4,
+      "clock": "core",
+      "qos": "bulk",
+      "attach": "mnet6"
+    },
+    {
+      "id": "m7",
+      "role": "master",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "outstanding": 4,
+      "clock": "core",
+      "qos": "bulk",
+      "attach": "mnet7"
+    },
+    {
+      "id": "s0",
+      "role": "slave",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "clock": "core",
+      "attach": "snet0"
+    },
+    {
+      "id": "s1",
+      "role": "slave",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "clock": "core",
+      "attach": "snet1"
+    },
+    {
+      "id": "s2",
+      "role": "slave",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "clock": "core",
+      "attach": "snet2"
+    },
+    {
+      "id": "s3",
+      "role": "slave",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "clock": "core",
+      "attach": "snet3"
+    },
+    {
+      "id": "s4",
+      "role": "slave",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "clock": "core",
+      "attach": "snet4"
+    },
+    {
+      "id": "s5",
+      "role": "slave",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "clock": "core",
+      "attach": "snet5"
+    },
+    {
+      "id": "s6",
+      "role": "slave",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "clock": "core",
+      "attach": "snet6"
+    },
+    {
+      "id": "s7",
+      "role": "slave",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "clock": "core",
+      "attach": "snet7"
+    }
+  ],
+  "fabric": {
+    "mnet": [
+      {
+        "name": "mnet0",
+        "clock": "core"
+      },
+      {
+        "name": "mnet1",
+        "clock": "core"
+      },
+      {
+        "name": "mnet2",
+        "clock": "core"
+      },
+      {
+        "name": "mnet3",
+        "clock": "core"
+      },
+      {
+        "name": "mnet4",
+        "clock": "core"
+      },
+      {
+        "name": "mnet5",
+        "clock": "core"
+      },
+      {
+        "name": "mnet6",
+        "clock": "core"
+      },
+      {
+        "name": "mnet7",
+        "clock": "core"
+      }
+    ],
+    "snet": [
+      {
+        "name": "snet0",
+        "clock": "core"
+      },
+      {
+        "name": "snet1",
+        "clock": "core"
+      },
+      {
+        "name": "snet2",
+        "clock": "core"
+      },
+      {
+        "name": "snet3",
+        "clock": "core"
+      },
+      {
+        "name": "snet4",
+        "clock": "core"
+      },
+      {
+        "name": "snet5",
+        "clock": "core"
+      },
+      {
+        "name": "snet6",
+        "clock": "core"
+      },
+      {
+        "name": "snet7",
+        "clock": "core"
+      }
+    ],
+    "routers": [
+      {
+        "name": "r0",
+        "in": 8,
+        "out": 8,
+        "clock": "core",
+        "switch": {
+          "kind": "flat",
+          "banks": 1
+        }
+      }
+    ],
+    "links": [
+      {
+        "from": "mnet0",
+        "to": "r0",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "mnet1",
+        "to": "r0",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "mnet2",
+        "to": "r0",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "mnet3",
+        "to": "r0",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "mnet4",
+        "to": "r0",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "mnet5",
+        "to": "r0",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "mnet6",
+        "to": "r0",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "mnet7",
+        "to": "r0",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "r0",
+        "to": "snet0",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "r0",
+        "to": "snet1",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "r0",
+        "to": "snet2",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "r0",
+        "to": "snet3",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "r0",
+        "to": "snet4",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "r0",
+        "to": "snet5",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "r0",
+        "to": "snet6",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "r0",
+        "to": "snet7",
+        "width": 128,
+        "pipe": 0
+      }
+    ],
+    "timing": {
+      "maxFanin": 8,
+      "maxCombDepth": 12
+    }
+  }
+}

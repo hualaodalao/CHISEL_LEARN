@@ -1,0 +1,643 @@
+package loom
+
+import java.nio.file.{Files, Path, Paths}
+import java.security.MessageDigest
+
+import _root_.circt.stage.ChiselStage
+import loom.check.Checks
+import loom.graph.FabricGraph
+import loom.ir.{Canonical, Ir, JArr, JBool, JObj, JStr, JValue, Json}
+import loom.report.{Reports, Sram, TbGen}
+import loom.rtl.{
+  FabricParams, LmAsyncFifo, LmAsyncLink, LmCdcCredit, LmNetworkTop, LmPartitionStub,
+  LmPartitionTop, LmTop, LmWidthAdapter, LmWrapperTop, NetworkParams, PartitionParams
+}
+
+object LoomMain {
+  private val ToolVersion = "1.1.0"
+
+  private final case class Validated(
+      ir: Ir,
+      hash: String,
+      gates: Vector[(String, Boolean)],
+      errors: List[String],
+      warnings: List[String]
+  )
+
+  def main(args: Array[String]): Unit = args.toList match {
+    case "check" :: rest => runCheck(rest)
+    case "estimate" :: rest => runEstimate(rest)
+    case "emit" :: rest => runEmit(rest)
+    case "blocks" :: rest => runBlocks(rest)
+    case "formal" :: rest => runFormal(rest)
+    case "diff" :: rest => runDiff(rest)
+    case "serve" :: rest => runServe(rest)
+    case "version" :: _ =>
+      println(s"loom $ToolVersion (schema loom/v1)")
+    case _ => usage()
+  }
+
+  private def usage(): Unit = {
+    println("usage:")
+    println("  loom check    --config <file> [--out <dir>]")
+    println("  loom estimate --config <file> --out <dir>")
+    println("  loom emit     --config <file> --out <dir> [--cache] [--formal]")
+    println("  loom formal   --config <file> --out <dir>")
+    println("  loom diff     --a <file|dir> --b <file|dir>")
+    println("  loom serve    --dir <dir> [--port <n>] [--examples <dir>] [--work <dir>]")
+    println("  loom blocks   --out <dir>")
+    println("  loom version")
+    sys.exit(2)
+  }
+
+  private def opt(xs: List[String], key: String): Option[String] =
+    xs.sliding(2).collectFirst { case List(`key`, v) => v }
+
+  private def must(xs: List[String], key: String): String =
+    opt(xs, key).getOrElse { usage(); sys.exit(2) }
+
+  private def has(xs: List[String], key: String): Boolean = xs.contains(key)
+
+  private def readConfig(path: String): JValue =
+    Json.parse(Files.readString(Paths.get(path)))
+
+  private def writeJson(dir: String, file: String, v: JValue): Unit = {
+    val d = Paths.get(dir)
+    Files.createDirectories(d)
+    Files.writeString(d.resolve(file), Canonical.pretty(v) + "\n")
+  }
+
+  private def sha256(path: Path): String = {
+    val md = MessageDigest.getInstance("SHA-256")
+    md.update(Files.readAllBytes(path))
+    md.digest().map(b => f"${b & 0xff}%02x").mkString
+  }
+
+  private def filesUnder(root: Path, skip: Path => Boolean): Seq[Path] = {
+    import scala.jdk.CollectionConverters._
+    if (!Files.exists(root)) Seq.empty
+    else Files.walk(root).iterator().asScala
+      .filter(Files.isRegularFile(_))
+      .filterNot(skip)
+      .toSeq
+      .sortBy(p => root.relativize(p).toString.replace('\\', '/'))
+  }
+
+  private def validate(root: JValue): Validated = {
+    val hash = Canonical.hash(root)
+    val c0 = Checks.run(root)
+    if (c0.nonEmpty) {
+      c0.foreach(e => println(s"ERROR: $e"))
+      sys.exit(3)
+    }
+    val ir = Ir.fromJson(root)
+    val g = loom.check.Gates.run(ir)
+    Validated(
+      ir = ir,
+      hash = hash,
+      gates = g.gates,
+      errors = c0 ++ g.errors,
+      warnings = Reports.timingWarnings(ir)
+    )
+  }
+
+  private def runCheck(xs: List[String]): Unit = {
+    val cfg = must(xs, "--config")
+    val v = validate(readConfig(cfg))
+    opt(xs, "--out").foreach { dir =>
+      writeJson(dir, "checks.json", Reports.checksJson(v.ir, v.hash, v.errors, v.warnings, v.gates))
+      writeJson(dir, "graph.json", FabricGraph.fromIr(v.ir).toJson)
+    }
+    if (v.errors.nonEmpty) {
+      v.errors.foreach(e => println(s"ERROR: $e"))
+      sys.exit(3)
+    }
+    println(s"OK name=${v.ir.meta.name} hash=${v.hash} warnings=${v.warnings.size}")
+    v.warnings.foreach(w => println(s"WARN: $w"))
+  }
+
+  private def runEstimate(xs: List[String]): Unit = {
+    val cfg = must(xs, "--config")
+    val out = must(xs, "--out")
+    val v = validate(readConfig(cfg))
+    if (v.errors.nonEmpty) {
+      v.errors.foreach(e => println(s"ERROR: $e"))
+      sys.exit(3)
+    }
+    writeJson(out, "estimate.json", Reports.estimateJson(v.ir, v.hash))
+    println(s"estimate written to $out/estimate.json hash=${v.hash} warnings=${v.warnings.size}")
+  }
+
+  private def manifestMatches(out: String, hash: String): Boolean = {
+    val p = Paths.get(out, "manifest.json")
+    if (!Files.exists(p)) false
+    else Json.parse(Files.readString(p)) match {
+      case o: JObj =>
+        val m = o.fields.toMap
+        val hashOk = m.get("configHash").contains(JStr(hash))
+        val verOk = m.get("version").contains(JStr(ToolVersion))
+        val files = m.get("files").collect { case JArr(xs) => xs }.getOrElse(Vector.empty)
+        hashOk && verOk && files.nonEmpty && files.forall {
+          case JObj(g) =>
+            val f = g.toMap
+            (for {
+              rel <- f.get("path").collect { case JStr(s) => s }
+              h <- f.get("sha256").collect { case JStr(s) => s }
+            } yield {
+              val fp = Paths.get(out, rel)
+              Files.exists(fp) && sha256(fp) == h
+            }).getOrElse(false)
+          case _ => false
+        }
+      case _ => false
+    }
+  }
+
+  private def runEmit(xs: List[String]): Unit = {
+    val cfg = must(xs, "--config")
+    val out = must(xs, "--out")
+    val v = validate(readConfig(cfg))
+
+    if (v.errors.nonEmpty) {
+      writeJson(out, "checks.json", Reports.checksJson(v.ir, v.hash, v.errors, v.warnings, v.gates))
+      v.errors.foreach(e => println(s"ERROR: $e"))
+      sys.exit(3)
+    }
+
+    if (has(xs, "--cache") && manifestMatches(out, v.hash)) {
+      println(s"up to date: $out (hash=${v.hash})")
+      return
+    }
+
+    Files.createDirectories(Paths.get(out))
+
+    val (emittedName, emittedMasters, emittedSlaves) =
+      if (v.ir.routers.length == 1) {
+        val params =
+          try FabricParams.fromIr(v.ir)
+          catch {
+            case e: Throwable =>
+              println(s"ERROR: ${e.getMessage}")
+              sys.exit(3)
+          }
+        ChiselStage.emitSystemVerilogFile(new LmTop(params), Array("--target-dir", out))
+        (params.name, params.nMaster, params.nSlave)
+      } else {
+        val net =
+          try NetworkParams.fromIr(v.ir)
+          catch {
+            case e: Throwable =>
+              println(s"ERROR: ${e.getMessage}")
+              sys.exit(3)
+          }
+        // The flat network top is single-clock; async cuts only exist on the
+        // partitioned wrapper, so that emission is skipped in async configs.
+        if (!(v.ir.partitions.nonEmpty && net.links.exists(_.async)))
+          ChiselStage.emitSystemVerilogFile(new LmNetworkTop(net), Array("--target-dir", out))
+        (net.name, net.nMaster, net.nSlave)
+      }
+
+    writeJson(out, "checks.json", Reports.checksJson(v.ir, v.hash, Nil, v.warnings, v.gates))
+    writeJson(out, "estimate.json", Reports.estimateJson(v.ir, v.hash))
+    writeJson(out, "graph.json", FabricGraph.fromIr(v.ir).toJson)
+
+    if (v.ir.partitions.nonEmpty) {
+      val net = NetworkParams.fromIr(v.ir)
+      val pps = v.ir.partitions.map(spec => PartitionParams.fromIr(v.ir, net, spec))
+      val topsDir = Paths.get(out, "tops")
+      Files.createDirectories(topsDir)
+      ChiselStage.emitSystemVerilogFile(new LmWrapperTop(net, pps), Array("--target-dir", topsDir.toString))
+      v.ir.partitions.zip(pps).foreach { case (spec, pp) =>
+        val pdir = Paths.get(out, "partitions", spec.name)
+        val stubDir = pdir.resolve("stub")
+        Files.createDirectories(pdir)
+        Files.createDirectories(stubDir)
+        ChiselStage.emitSystemVerilogFile(
+          new LmPartitionTop(net, pp), Array("--target-dir", pdir.toString))
+        writeJson(pdir.toString, "ports.json", Reports.portsJson(v.ir, net, pp, v.hash))
+        ChiselStage.emitSystemVerilogFile(
+          new LmPartitionStub(net, pp), Array("--target-dir", stubDir.toString))
+      }
+      println(s"emitted ${v.ir.partitions.size} partition top(s), wrapper and stubs")
+    }
+
+    writeSramBlocks(out, v.ir)
+
+    val flatTop =
+      if (v.ir.routers.length == 1) Some("LmTop")
+      else if (v.ir.partitions.nonEmpty &&
+        NetworkParams.fromIr(v.ir).links.exists(_.async)) None
+      else Some("LmNetworkTop")
+    val extraTops =
+      if (v.ir.partitions.nonEmpty && flatTop.nonEmpty) Seq("LmWrapperTop") else Nil
+    writeTestbenches(out, flatTop.getOrElse("LmWrapperTop"), extraTops)
+    writeAssertionList(out)
+    val formal = if (has(xs, "--formal")) Some(runFormalModels(out, v)) else None
+    writeSignoff(out, v, formal)
+    writeManifest(out, v)
+
+    println(s"emitted $emittedName (${emittedMasters}x${emittedSlaves}) to $out")
+    println(s"hash=${v.hash} warnings=${v.warnings.size}")
+    v.warnings.foreach(w => println(s"WARN: $w"))
+  }
+
+  /** Behavioral SRAM macros for planning. The emitted fabric RTL keeps its
+    * inferred memories and nothing is rewritten to use these files.
+    */
+  private def writeSramBlocks(out: String, ir: Ir): Unit = {
+    val shapes = Reports.sramNeedsOf(ir)
+      .filter { case (d, w) => d * w >= Sram.ThresholdBits }
+      .distinct
+      .sortBy(s => (s._1, s._2))
+    if (shapes.isEmpty) return
+    val dir = Paths.get(out, "sram")
+    Files.createDirectories(dir)
+    shapes.foreach { case (d, w) =>
+      Files.writeString(dir.resolve(Sram.fileName(d, w)), Sram.singlePort(d, w))
+    }
+    val list = shapes.map { case (d, w) => Sram.fileName(d, w) }.sorted
+    Files.writeString(dir.resolve("filelist.f"), list.mkString("\n") + "\n")
+    println(s"emitted ${shapes.size} SRAM block(s) to $dir")
+  }
+
+  private def writeTestbenches(out: String, top: String, extraTops: Seq[String]): Unit = {    val tbDir = Paths.get(out, "tb")
+    Files.createDirectories(tbDir)
+    // A partitioned config emits its wrapper under tops/, which can be the
+    // primary top when the flat network is skipped.
+    val topSv =
+      if (Files.exists(Paths.get(out, s"$top.sv"))) Paths.get(out, s"$top.sv")
+      else Paths.get(out, "tops", s"$top.sv")
+    val candidates = Seq(top -> topSv) ++
+      extraTops.map(t => t -> Paths.get(out, "tops", s"$t.sv"))
+    candidates.foreach { case (name, sv) =>
+      if (Files.exists(sv)) {
+        val text = Files.readString(sv)
+        Files.writeString(tbDir.resolve(s"${name}_tb.sv"), TbGen.testbench(name, text))
+      }
+    }
+  }
+
+  private def writeAssertionList(out: String): Unit = {
+    val root = Paths.get(out)
+    val files = filesUnder(root.resolve("verification"), _ => false)
+      .map(p => root.relativize(p).toString.replace('\\', '/'))
+    Files.createDirectories(root.resolve("tb"))
+    Files.writeString(root.resolve("tb").resolve("assertions.f"),
+      (files.mkString("\n") + (if (files.nonEmpty) "\n" else "")))
+  }
+
+  private def artifactCounts(out: String): (Int, Int, Int) = {
+    val root = Paths.get(out)
+    val all = filesUnder(root, p => {
+      val rel = root.relativize(p).toString.replace('\\', '/')
+      rel == "manifest.json" || rel.startsWith("formal/")
+    })
+    val sv = all.filter(_.getFileName.toString.endsWith(".sv"))
+    val (verif, rest) = sv.partition { p =>
+      root.relativize(p).toString.replace('\\', '/').startsWith("verification/")
+    }
+    val (tb, rtl) = rest.partition { p =>
+      root.relativize(p).toString.replace('\\', '/').startsWith("tb/")
+    }
+    (rtl.size, verif.size, tb.size)
+  }
+
+  private def writeSignoff(out: String, v: Validated, formal: Option[JValue]): Unit = {
+    val md = Reports.signoffMarkdown(v.ir, v.hash, v.gates, v.warnings,
+      artifactCounts(out), formal)
+    Files.writeString(Paths.get(out, "signoff.md"), md)
+  }
+
+  private def writeManifest(out: String, v: Validated): Unit = {
+    val root = Paths.get(out)
+    val files = filesUnder(root, p => {
+      val rel = root.relativize(p).toString.replace('\\', '/')
+      rel == "manifest.json" || rel.startsWith("formal/")
+    }).map(p => root.relativize(p).toString.replace('\\', '/') -> sha256(p))
+    writeJson(out, "manifest.json",
+      Reports.manifestJson(v.ir.meta.name, v.hash, ToolVersion, files))
+  }
+
+  /** Bounded proofs over the control-token models. The models are independent
+    * of the configuration, so results are reused across networks.
+    */
+  private def runFormalModels(out: String, v: Validated): JValue = {
+    val dir = Paths.get(out, "formal")
+    Files.createDirectories(dir)
+    val models = Seq(
+      ("token_8x8", "src/loom/formal/token_8x8.sv", 12, "P1-P3 + route safety"),
+      ("token_rr8", "src/loom/formal/token_rr8.sv", 20, "P5 bounded progress"),
+      ("token_response", "src/loom/formal/token_response.sv", 12, "P6/P8 no loss, exact-once"),
+      ("token_cdc", "src/loom/formal/token_cdc.sv", 12, "P7 CDC credit"),
+      ("token_cdc_buf", "src/loom/formal/token_cdc_buf.sv", 12, "G9 async boundary buffer")
+    )
+    val checks = models.map { case (top, src, depth, prop) =>
+      val log = dir.resolve(s"${top}.log")
+      val ok =
+        try {
+          val pb = new ProcessBuilder(
+            "yosys", "-p",
+            s"read_verilog -formal -sv $src; prep -top $top; async2sync; memory; chformal -lower; " +
+              s"sat -seq $depth -set-init-zero -prove-asserts")
+          pb.redirectErrorStream(true)
+          pb.redirectOutput(log.toFile)
+          pb.start().waitFor() == 0 &&
+            Files.readString(log).contains("SAT proof finished - no model found: SUCCESS")
+        } catch {
+          case e: Throwable =>
+            Files.writeString(log, s"launch failed: ${e.getMessage}\n")
+            false
+        }
+      println(s"formal $top ($prop, depth $depth): ${if (ok) "PASS" else "FAIL"}")
+      (top, prop, ok, s"formal/${top}.log")
+    }
+    val j = Reports.formalJson(v.ir.meta.name, v.hash, checks)
+    Files.writeString(dir.resolve("formal.json"), Canonical.pretty(j) + "\n")
+    j
+  }
+
+  private def runFormal(xs: List[String]): Unit = {
+    val cfg = must(xs, "--config")
+    val out = must(xs, "--out")
+    val v = validate(readConfig(cfg))
+    if (v.errors.nonEmpty) {
+      v.errors.foreach(e => println(s"ERROR: $e"))
+      sys.exit(3)
+    }
+    Files.createDirectories(Paths.get(out))
+    val j = runFormalModels(out, v)
+    if (Files.exists(Paths.get(out, "checks.json"))) {
+      writeSignoff(out, v, Some(j))
+      writeManifest(out, v)
+    }
+    val ok = j match {
+      case o: JObj => o.fields.toMap.get("ok").contains(JBool(true))
+      case _ => false
+    }
+    if (!ok) sys.exit(4)
+  }
+
+  /** CG5: compare the report baseline of two emitted directories. */
+  private def diffReports(a: Path, b: Path): Unit = {
+    val names = Seq("checks.json", "estimate.json", "graph.json")
+    val missing = names.filter(n => !Files.exists(a.resolve(n)) || !Files.exists(b.resolve(n)))
+    if (missing.nonEmpty) {
+      missing.foreach(n => println(s"ERROR missing $n in one of the directories"))
+      sys.exit(3)
+    }
+    val diffs = names.filter { n =>
+      Canonical.render(Json.parse(Files.readString(a.resolve(n)))) !=
+        Canonical.render(Json.parse(Files.readString(b.resolve(n))))
+    }
+    if (diffs.isEmpty) {
+      println(s"MATCH reports ${names.mkString(", ")}")
+    } else {
+      diffs.foreach(n => println(s"DIFF report $n"))
+      sys.exit(4)
+    }
+  }
+
+  private def runDiff(xs: List[String]): Unit = {
+    val aPath = Paths.get(must(xs, "--a"))
+    val bPath = Paths.get(must(xs, "--b"))
+    if (Files.isDirectory(aPath) && Files.isDirectory(bPath)) {
+      diffReports(aPath, bPath)
+      return
+    }
+
+    val a = validate(readConfig(aPath.toString))
+    val b = validate(readConfig(bPath.toString))
+    if (a.errors.nonEmpty || b.errors.nonEmpty) {
+      (a.errors ++ b.errors).foreach(e => println(s"ERROR: $e"))
+      sys.exit(3)
+    }
+
+    def endpoints(ir: Ir) =
+      ir.endpoints.map(e => s"${e.role}:${e.id}").sorted
+    def routers(ir: Ir) =
+      ir.routers.map(r => s"${r.name}:${r.in}x${r.out}:${r.switchKind}/${r.banks}").sorted
+    def links(ir: Ir) =
+      ir.links.map(l => s"${l.from}->${l.to}:${l.width}:${l.cdc}:${l.pipe}").sorted
+
+    val diffs = Seq(
+      "endpoints" -> (endpoints(a.ir), endpoints(b.ir)),
+      "routers" -> (routers(a.ir), routers(b.ir)),
+      "links" -> (links(a.ir), links(b.ir))
+    ).collect { case (k, (l, r)) if l != r => k }
+
+    val pa = a.ir.partitions.map(_.name)
+    val pb = b.ir.partitions.map(_.name)
+    if (pa != pb) println(s"info: partitions differ A=$pa B=$pb")
+
+    if (diffs.isEmpty) {
+      println(s"MATCH network contract (A hash=${a.hash} B hash=${b.hash})")
+      if (a.hash != b.hash) println("note: hashes differ (partitioning or formatting)")
+    } else {
+      diffs.foreach { d =>
+        println(s"DIFF $d")
+        d match {
+          case "endpoints" =>
+            println(s"  A: ${endpoints(a.ir).mkString(", ")}")
+            println(s"  B: ${endpoints(b.ir).mkString(", ")}")
+          case "routers" =>
+            println(s"  A: ${routers(a.ir).mkString(", ")}")
+            println(s"  B: ${routers(b.ir).mkString(", ")}")
+          case _ =>
+            println(s"  A: ${links(a.ir).mkString(", ")}")
+            println(s"  B: ${links(b.ir).mkString(", ")}")
+        }
+      }
+      sys.exit(4)
+    }
+  }
+
+  /** GUI plus static preview of emitted artifacts. The browser only edits IR;
+    * gates and estimates come from the same `LoomApi` the CLI uses.
+    */
+  private def runServe(xs: List[String]): Unit = {
+    import com.sun.net.httpserver.{HttpExchange, HttpHandler, HttpServer}
+    import java.net.InetSocketAddress
+    import java.nio.charset.StandardCharsets
+
+    val dir = Paths.get(must(xs, "--dir")).toAbsolutePath.normalize()
+    val port = opt(xs, "--port").map(_.toInt).getOrElse(8000)
+    val examples = Paths.get(opt(xs, "--examples").getOrElse("src/loom/examples"))
+      .toAbsolutePath.normalize()
+    require(Files.isDirectory(dir), s"not a directory: $dir")
+
+    val draftName = "loom_draft.json"
+    val stateFile = Paths.get(System.getProperty("user.home"), ".loom", "serve_workspace")
+    def rememberedWorkspace: Option[Path] =
+      if (Files.isRegularFile(stateFile)) {
+        val p = new String(Files.readAllBytes(stateFile), StandardCharsets.UTF_8).trim
+        if (p.nonEmpty) Some(Paths.get(p).toAbsolutePath.normalize()) else None
+      } else None
+    def rememberWorkspace(p: Path): Unit = {
+      Files.createDirectories(stateFile.getParent)
+      Files.write(stateFile, p.toString.getBytes(StandardCharsets.UTF_8))
+    }
+    val workspace = new java.util.concurrent.atomic.AtomicReference[Option[Path]](
+      opt(xs, "--work").map(p => Paths.get(p).toAbsolutePath.normalize()).orElse(rememberedWorkspace))
+    workspace.get().foreach { p =>
+      require(!Files.exists(p) || Files.isDirectory(p), s"workspace is not a directory: $p")
+      Files.createDirectories(p)
+    }
+
+    val assets = Set("index.html", "app.js", "style.css")
+
+    def asset(name: String): Option[Array[Byte]] = {
+      val live = Paths.get("src/loom/gui", name)
+      if (Files.isRegularFile(live)) Some(Files.readAllBytes(live))
+      else Option(getClass.getResourceAsStream("/" + name)).map { in =>
+        try in.readAllBytes() finally in.close()
+      }
+    }
+
+    def json(ex: HttpExchange, code: Int, body: String): Unit =
+      send(ex, code, "application/json", body.getBytes(StandardCharsets.UTF_8))
+
+    def quoteJson(s: String): String =
+      "\"" + s.flatMap {
+        case '"' => "\\\""
+        case '\\' => "\\\\"
+        case '\n' => "\\n"
+        case '\r' => "\\r"
+        case '\t' => "\\t"
+        case c => c.toString
+      } + "\""
+
+    def contentType(name: String): String = name.split('.').lastOption.getOrElse("") match {
+      case "html" => "text/html; charset=utf-8"
+      case "json" => "application/json"
+      case "js" => "text/javascript; charset=utf-8"
+      case "css" => "text/css; charset=utf-8"
+      case "md" => "text/markdown; charset=utf-8"
+      case "sv" | "f" | "tcl" => "text/plain; charset=utf-8"
+      case _ => "application/octet-stream"
+    }
+
+    def send(ex: HttpExchange, code: Int, ct: String, body: Array[Byte]): Unit = {
+      ex.getResponseHeaders.add("Content-Type", ct)
+      ex.sendResponseHeaders(code, body.length)
+      val os = ex.getResponseBody
+      os.write(body)
+      os.close()
+    }
+
+    val server = HttpServer.create(new InetSocketAddress(port), 0)
+    server.createContext("/", new HttpHandler {
+      def handle(ex: HttpExchange): Unit = {
+        val path = ex.getRequestURI.getPath
+        val rel = path.stripPrefix("/")
+        val method = ex.getRequestMethod
+
+        if (method == "POST" && path == "/api/evaluate") {
+          val body = new String(ex.getRequestBody.readAllBytes(), StandardCharsets.UTF_8)
+          json(ex, 200, LoomApi.evaluateText(body))
+        } else if (path == "/api/workspace") {
+          if (method == "POST") {
+            val raw = new String(ex.getRequestBody.readAllBytes(), StandardCharsets.UTF_8).trim
+            val p = Paths.get(raw).toAbsolutePath.normalize()
+            if (raw.isEmpty || !p.isAbsolute || p.getParent == null) {
+              json(ex, 400, "{\"error\":\"workspace must be an absolute directory path\"}\n")
+            } else if (Files.exists(p) && !Files.isDirectory(p)) {
+              json(ex, 400, "{\"error\":\"path exists and is not a directory\"}\n")
+            } else {
+              Files.createDirectories(p)
+              workspace.set(Some(p))
+              rememberWorkspace(p)
+              val hasDraft = Files.isRegularFile(p.resolve(draftName))
+              json(ex, 200, s"{\"workspace\":${quoteJson(p.toString)},\"draft\":$hasDraft}\n")
+            }
+          } else {
+            val ws = workspace.get()
+            val hasDraft = ws.exists(p => Files.isRegularFile(p.resolve(draftName)))
+            val body = ws match {
+              case Some(p) => s"{\"workspace\":${quoteJson(p.toString)},\"draft\":$hasDraft}\n"
+              case None => "{\"workspace\":null,\"draft\":false}\n"
+            }
+            json(ex, 200, body)
+          }
+        } else if (path == "/api/draft") {
+          workspace.get() match {
+            case None =>
+              json(ex, 409, "{\"error\":\"workspace not set\"}\n")
+            case Some(p) =>
+              val draft = p.resolve(draftName)
+              if (method == "POST") {
+                val body = ex.getRequestBody.readAllBytes()
+                val tmp = p.resolve(draftName + ".tmp")
+                Files.write(tmp, body)
+                Files.move(tmp, draft,
+                  java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                  java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+                json(ex, 200, "{\"saved\":true}\n")
+              } else if (Files.isRegularFile(draft)) {
+                send(ex, 200, "application/json", Files.readAllBytes(draft))
+              } else {
+                json(ex, 404, "{\"error\":\"no draft\"}\n")
+              }
+          }
+        } else if (path == "/api/examples") {
+          import scala.jdk.CollectionConverters._
+          val names =
+            if (!Files.isDirectory(examples)) Seq.empty
+            else Files.list(examples).iterator().asScala
+              .filter(p => Files.isRegularFile(p) && p.getFileName.toString.endsWith(".json"))
+              .map(_.getFileName.toString).toSeq.sorted
+          json(ex, 200, names.map(n => "\"" + n + "\"").mkString("[", ",", "]") + "\n")
+        } else if (path == "/api/example") {
+          val name = Option(ex.getRequestURI.getQuery)
+            .flatMap(_.split('&').collectFirst { case q if q.startsWith("name=") => q.stripPrefix("name=") })
+            .getOrElse("")
+          val target = examples.resolve(name).normalize()
+          if (!name.matches("[A-Za-z0-9_.-]+\\.json") || !target.startsWith(examples) || !Files.isRegularFile(target)) {
+            json(ex, 404, "{\"error\":\"example not found\"}\n")
+          } else {
+            send(ex, 200, "application/json", Files.readAllBytes(target))
+          }
+        } else if (path == "/" || assets.contains(rel)) {
+          val name = if (rel == "/" || rel.isEmpty) "index.html" else rel
+          asset(name) match {
+            case Some(bytes) => send(ex, 200, contentType(name), bytes)
+            case None => send(ex, 404, "text/plain", s"missing asset $name".getBytes(StandardCharsets.UTF_8))
+          }
+        } else {
+          val target = dir.resolve(rel).normalize()
+          if (!target.startsWith(dir)) {
+            send(ex, 403, "text/plain", "forbidden".getBytes(StandardCharsets.UTF_8))
+          } else if (Files.isDirectory(target)) {
+            val entries = filesUnder(target, _ => false).map(p => dir.relativize(p).toString)
+            send(ex, 200, "text/plain", (rel + "\n" + entries.mkString("\n") + "\n").getBytes(StandardCharsets.UTF_8))
+          } else if (Files.isRegularFile(target)) {
+            send(ex, 200, contentType(target.getFileName.toString), Files.readAllBytes(target))
+          } else {
+            send(ex, 404, "text/plain", s"not found: $rel".getBytes(StandardCharsets.UTF_8))
+          }
+        }
+      }
+    })
+    server.start()
+    val wsNote = workspace.get().map(p => s", workspace $p").getOrElse("")
+    println(s"serving $dir at http://localhost:$port/ (Ctrl-C to stop)$wsNote")
+    new java.util.concurrent.CountDownLatch(1).await()
+  }
+
+  /** Emit the standalone CDC / width building blocks for review and reuse. */
+  private def runBlocks(xs: List[String]): Unit = {
+    val out = must(xs, "--out")
+    Files.createDirectories(Paths.get(out))
+    val opts = Array("--target-dir", out)
+    ChiselStage.emitSystemVerilogFile(new LmAsyncFifo(64, 8), opts)
+    ChiselStage.emitSystemVerilogFile(new LmCdcCredit(8), opts)
+    ChiselStage.emitSystemVerilogFile(new LmAsyncLink(64, 8), opts)
+    ChiselStage.emitSystemVerilogFile(new LmWidthAdapter(256, 128), opts)
+
+    import scala.jdk.CollectionConverters._
+    val sv = Files.list(Paths.get(out)).iterator().asScala
+      .filter(p => p.getFileName.toString.endsWith(".sv"))
+      .map(_.getFileName.toString).toSeq.sorted
+    Files.writeString(Paths.get(out, "filelist.f"), sv.mkString("\n") + "\n")
+    println(s"emitted CDC/width blocks to $out")
+  }
+}

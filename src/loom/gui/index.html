@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loom — fabric configuration workbench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="masthead">
+  <div class="brand">
+    <span class="monogram" aria-hidden="true">LM</span>
+    <div class="brand-text">
+      <h1>Loom</h1>
+      <p>fabric configuration workbench</p>
+    </div>
+  </div>
+  <div class="head-controls">
+    <label class="head-field">Example
+      <select id="examples"></select>
+    </label>
+    <button id="load">Load</button>
+    <button id="evaluate" class="primary">Evaluate</button>
+    <button id="workspace" class="ghost" title="draft workspace">workspace</button>
+    <span id="hash" class="hash-chip" title="canonical config hash"></span>
+  </div>
+</header>
+
+<main class="workspace">
+  <aside class="panel rail" aria-label="Structure">
+    <section class="block">
+      <div class="block-head">
+        <h2>Design</h2>
+        <span id="summary" class="subtle"></span>
+      </div>
+      <div class="field-grid">
+        <label>Name <input id="design-name" type="text" spellcheck="false"></label>
+        <label>Address width
+          <select id="addr-width"></select>
+        </label>
+        <label>Data width
+          <select id="data-width"></select>
+        </label>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>Clocks</h2>
+        <button id="add-clock" class="ghost">+ clock</button>
+      </div>
+      <div id="clocks" class="chip-list"></div>
+      <p class="hint">Router, MNet and SNet clocks can only use these domains.</p>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>Structure</h2>
+        <button id="add-partition" class="ghost">+ partition</button>
+      </div>
+      <div id="structure" class="tree"></div>
+      <p class="hint">MNet → router and router → SNet links are generated automatically. A network is one shared port: its endpoints share one transaction per cycle in each direction.</p>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>Router links</h2>
+      </div>
+      <div id="links" class="link-list"></div>
+      <div class="inline-form" id="link-form"></div>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>Endpoints</h2>
+        <button id="add-endpoint" class="ghost">+ endpoint</button>
+      </div>
+      <div id="endpoints"></div>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>Address map</h2>
+        <button id="addr-auto" class="ghost">auto 4K</button>
+      </div>
+      <div id="address-map" class="addr-map"></div>
+      <p id="addr-note" class="hint"></p>
+    </section>
+  </aside>
+
+  <section class="stage">
+    <section class="panel viz">
+      <div class="block-head">
+        <h2>Topology</h2>
+        <span id="cdg" class="subtle"></span>
+      </div>
+      <div id="topology" class="topology"></div>
+      <div id="topology-legend" class="legend"></div>
+    </section>
+
+    <div class="split">
+      <section class="panel">
+        <div class="block-head">
+          <h2>Gates</h2>
+          <span id="gate-summary" class="subtle"></span>
+        </div>
+        <div id="gates" class="gate-grid"></div>
+        <div id="problems" class="problems"></div>
+      </section>
+
+      <section class="panel">
+        <div class="block-head">
+          <h2>Estimate</h2>
+          <span class="subtle">planning only</span>
+        </div>
+        <div id="estimate"></div>
+      </section>
+    </div>
+
+    <details class="panel matrix-panel" open>
+      <summary>Connection matrix</summary>
+      <div class="matrix-wrap"><table id="matrix" class="matrix"></table></div>
+      <p class="hint">Cell = router hops from initiator to target; — = unreachable. Bandwidth of shared MNet/SNet ports is not shown here.</p>
+    </details>
+
+    <details class="panel ir-panel">
+      <summary>IR JSON</summary>
+      <textarea id="editor" spellcheck="false" aria-label="IR JSON"></textarea>
+      <div class="row">
+        <button id="apply">Apply editor</button>
+        <button id="canonical">Canonicalize</button>
+        <button id="export">Export</button>
+      </div>
+    </details>
+  </section>
+
+  <aside class="panel inspector" id="inspector" aria-label="Inspector"></aside>
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<dialog id="ws-dialog" class="ws-dialog">
+  <h2>Draft workspace</h2>
+  <p class="hint">The IR draft is written to <code>loom_draft.json</code> in this folder after every edit, so a refresh restores your work.</p>
+  <label class="ws-path-field">Directory
+    <input id="ws-path" type="text" spellcheck="false" placeholder="/Users/you/loom-work">
+  </label>
+  <div class="row">
+    <button id="ws-cancel" class="ghost" type="button">Cancel</button>
+    <button id="ws-apply" class="primary" type="button">Use folder</button>
+  </div>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>
