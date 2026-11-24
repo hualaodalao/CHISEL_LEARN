@@ -142,6 +142,36 @@ class LmNetworkSpec extends AnyFlatSpec with Matchers with ChiselSim {
     dut.io.masterWrResp(m).bits.err.expect(false.B)
   }
 
+  private def waitMasterWrVc(dut: LmNetworkTop, m: Int, guardMax: Int = 80): BigInt = {
+    var got = Option.empty[BigInt]
+    var guard = 0
+    while (got.isEmpty && guard < guardMax) {
+      if (dut.io.masterWrResp(m).valid.peek().litValue == 1) {
+        got = Some(dut.io.masterWrResp(m).bits.vc.peek().litValue)
+        dut.io.masterWrResp(m).bits.err.expect(false.B)
+      }
+      dut.clock.step()
+      guard += 1
+    }
+    got shouldBe defined
+    got.get
+  }
+
+  private def waitMasterRdVc(dut: LmNetworkTop, m: Int, guardMax: Int = 80): BigInt = {
+    var got = Option.empty[BigInt]
+    var guard = 0
+    while (got.isEmpty && guard < guardMax) {
+      if (dut.io.masterRdData(m).valid.peek().litValue == 1) {
+        got = Some(dut.io.masterRdData(m).bits.vc.peek().litValue)
+        dut.io.masterRdData(m).bits.err.expect(false.B)
+      }
+      dut.clock.step()
+      guard += 1
+    }
+    got shouldBe defined
+    got.get
+  }
+
   behavior of "LmNetworkTop"
 
   it should "route a root master to a leaf slave and return the response" in {
@@ -296,6 +326,74 @@ class LmNetworkSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.io.slaveWrData(0).bits.vc.expect(2.U)
       respondWrite(dut, 0, 1)
       waitMasterWr(dut, 1)
+    }
+  }
+
+  it should "flip the wresp dateline half on a forward cut and keep it elsewhere" in {
+    val p = load("ring_4")
+    p.routers.find(_.name == "r0").get.outCut shouldBe Seq(true)
+    p.routers.filter(_.name != "r0").forall(_.outCut == Seq(false)) shouldBe true
+    simulate(new LmNetworkTop(p)) { dut =>
+      init(dut, p)
+
+      // m1@r1 -> s1@r3: the response returns r3->r0->r1 and crosses the
+      // r0->r1 cut, so lat vc 2 flips to 3.
+      sendWrite(dut, 1, 0x1000L, 0x21L)
+      waitSlaveWr(dut, 1, 80)
+      dut.io.slaveWrData(1).bits.vc.expect(2.U)
+      respondWrite(dut, 1, 1)
+      waitMasterWrVc(dut, 1) shouldBe BigInt(3)
+
+      // m0@r0 -> s0@r2: the response returns r2->r3->r0, no cut, so bulk
+      // vc stays 4 (half 0) even though the request flipped to 5.
+      sendWrite(dut, 0, 0x0000L, 0x22L)
+      waitSlaveWr(dut, 0, 80)
+      dut.io.slaveWrData(0).bits.vc.expect(5.U)
+      respondWrite(dut, 0, 0)
+      waitMasterWrVc(dut, 0) shouldBe BigInt(4)
+    }
+  }
+
+  it should "flip the rdata dateline half on a forward cut and keep it elsewhere" in {
+    val p = load("ring_4")
+    simulate(new LmNetworkTop(p)) { dut =>
+      init(dut, p)
+
+      sendRead(dut, 1, 0x1000L)
+      waitSlaveRd(dut, 1, 80)
+      respondRead(dut, 1, 1, 0x31L)
+      waitMasterRdVc(dut, 1) shouldBe BigInt(3)
+
+      sendRead(dut, 0, 0x0000L)
+      waitSlaveRd(dut, 0, 80)
+      respondRead(dut, 0, 0, 0x32L)
+      waitMasterRdVc(dut, 0) shouldBe BigInt(4)
+    }
+  }
+
+  it should "keep the response half on reverse hops whose reverse link is not cut" in {
+    val p = load("ring_3_bidir")
+    // r0->r1 and r0->r2 are cut, so r0's in-links carry inCut=true; the
+    // reverse links r1->r0 and r1->r2 exist but are not cut.
+    p.routers.find(_.name == "r0").get.inCut shouldBe Seq(true, true)
+    p.routers.find(_.name == "r1").get.inCut shouldBe Seq(false, false)
+    simulate(new LmNetworkTop(p)) { dut =>
+      init(dut, p)
+
+      // Response s0@r1 -> m0@r0 rides link r0->r1 backwards; the reverse
+      // IR link r1->r0 is not cut, so bulk vc stays 4.
+      sendWrite(dut, 0, 0x0000L, 0x41L)
+      waitSlaveWr(dut, 0)
+      dut.io.slaveWrData(0).bits.vc.expect(5.U)
+      respondWrite(dut, 0, 0)
+      waitMasterWrVc(dut, 0) shouldBe BigInt(4)
+
+      // Response s0@r1 -> m1@r2 rides link r2->r1 backwards; r1->r2 is
+      // not cut either, so lat vc stays 2.
+      sendWrite(dut, 1, 0x0000L, 0x42L)
+      waitSlaveWr(dut, 0)
+      respondWrite(dut, 0, 1)
+      waitMasterWrVc(dut, 1) shouldBe BigInt(2)
     }
   }
 }

@@ -138,7 +138,7 @@ A 满足"不因下游未腾空而死锁"；字面意义的"任何情况都不等
 
 ## 12. 实现状态（2026-11-20）
 
-已完成（106 用例全绿）：
+已完成（109 用例全绿）：
 
 - **IR/C0**：link 增加 `direction`（bidirectional/forward）与 `dateline`；`Reports.estimate` 输出二者。
 - **G1**：CDG 改为 SCC 分析——每个顶点入/出度均为 1 且全为 router-router 的简单环，由切点放行（显式优先，否则自动取 link id 最小）；复杂 SCC 仍报 `LM-G1: CDG cycle ... (not a ring)`；自环仍拒绝；显式切点不在环上报错。
@@ -151,6 +151,6 @@ A 满足"不因下游未腾空而死锁"；字面意义的"任何情况都不等
 
 未实现：
 
-- 响应通道的 dateline 半区翻转尚未实现（请求通道已有）；响应在环上目前依赖每跳寄存器与最短路径，安全性论证不完整。
+- **响应通道 dateline**：`LmRspSwitch` 增加每源 × VC 半区队列与三级仲裁；前向响应按 `outCut`、反向响应按反向 IR link 的切点（`inCut`）翻半区，不回切；master 目的端口不翻。
 - 多拍 burst 的 `wresp` 聚合与 `rdata` 计数未做；当前仍是每拍一次事务（shell 的 len=0 语义），`rreq.len>0` 不展开。
 - 全局位宽与窄端点 adapter 未接入 NI（`LmWidthAdapter` 已有 2:1）。

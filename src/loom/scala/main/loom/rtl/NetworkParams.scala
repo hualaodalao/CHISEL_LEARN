@@ -37,7 +37,8 @@ final case class NetRouterSpec(
     routeMaster: Seq[Int],
     banks: Int = 1,
     outCut: Seq[Boolean] = Nil,
-    routeMasterFwd: Seq[Int] = Nil
+    routeMasterFwd: Seq[Int] = Nil,
+    inCut: Seq[Boolean] = Nil
 )
 
 /** Elaborated multi-router network. */
@@ -304,10 +305,16 @@ object NetworkParams {
         val l = graphLinks(id)
         cutLabels.contains(s"${l.from}->${l.to}")
       }
+      // A reverse response leaves through the in-port of link X->k; its cut
+      // is the one on the reverse IR link k->X when that link exists.
+      val inCut = inL.map { id =>
+        val l = graphLinks(id)
+        cutLabels.contains(s"${l.to}->${l.from}")
+      }
       NetRouterSpec(k, routerNames(k), inM.size + inL.size, outS.size + outL.size,
         inMaster, inLink, outSlave, outLink, routeSlave, routeMaster,
         banks = specByName(routerNames(k)).banks, outCut = outCut,
-        routeMasterFwd = routeMasterFwd)
+        routeMasterFwd = routeMasterFwd, inCut = inCut)
     }
     routers.foreach { s =>
       require(s.banks >= 1 && s.banks <= 8 && (s.banks & (s.banks - 1)) == 0,

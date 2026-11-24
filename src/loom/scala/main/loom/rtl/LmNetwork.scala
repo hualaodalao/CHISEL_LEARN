@@ -266,8 +266,14 @@ class LmReqSwitch[T <: LmAddrReq](
 /** One response-direction channel: sources are the local slave ports and the
   * forward hops arriving on links; destinations are the master ports (in side)
   * and the link ports (in side for a reverse hop, out side for a forward hop).
+  * Like the request side, each source has per-VC-half queues and each
+  * destination arbitrates input RR -> half RR -> class WRR, then flips the
+  * dateline half to 1 on a cut crossing (reverse hops use the reverse IR
+  * link's cut, forward hops the out-link's cut).
   */
 class LmRspSwitch[T <: LmSrcRouted](gen: T, p: NetworkParams, spec: NetRouterSpec) extends Module {
+  private val nClasses = p.classWeights.length
+  private val nVc = nClasses * LoomDefaults.VcHalves
   private val nMasterPorts = spec.inMaster.count(_ >= 0)
   private val nSlavePorts = spec.outSlave.count(_ >= 0)
   private val nLinkPorts = spec.nOut - nSlavePorts
@@ -275,6 +281,7 @@ class LmRspSwitch[T <: LmSrcRouted](gen: T, p: NetworkParams, spec: NetRouterSpe
   private val nSrcs = spec.nOut + nFwdIn
   private val nDests = spec.nIn + nLinkPorts
   private val destW = math.max(1, log2Ceil(math.max(1, nDests)))
+  private val srcW = math.max(1, log2Ceil(math.max(1, nSrcs)))
 
   val io = IO(new Bundle {
     val out = Vec(spec.nOut, Flipped(Decoupled(gen)))
@@ -291,60 +298,97 @@ class LmRspSwitch[T <: LmSrcRouted](gen: T, p: NetworkParams, spec: NetRouterSpe
     else if (f >= nSlavePorts) spec.nIn + (f - nSlavePorts)
     else 0
   }
+  private val destVec = VecInit(respDest.map(_.U(destW.W)))
 
-  private val srcValid = scala.collection.mutable.ArrayBuffer.empty[Bool]
-  private val srcBits = scala.collection.mutable.ArrayBuffer.empty[T]
-  for (j <- 0 until spec.nOut) {
-    srcValid += io.out(j).valid
-    srcBits += io.out(j).bits
+  private val srcPorts: Seq[DecoupledIO[T]] =
+    (0 until spec.nOut).map(io.out(_)) ++ (nMasterPorts until spec.nIn).map(io.inFwd(_))
+
+  // One VC queue per (source, vc); a response waits in its own half.
+  private val vc = Seq.tabulate(nSrcs) { _ =>
+    Seq.tabulate(nVc) { v =>
+      Module(new LmVcQueue(chType, p.classDepth(v / LoomDefaults.VcHalves)))
+    }
   }
-  for (i <- nMasterPorts until spec.nIn) {
-    srcValid += io.inFwd(i).valid
-    srcBits += io.inFwd(i).bits
+
+  for (s <- 0 until nSrcs) {
+    srcPorts(s).ready := VecInit(vc(s).map(_.io.enq.ready))(srcPorts(s).bits.vc)
+    for (v <- 0 until nVc) {
+      vc(s)(v).io.enq.valid := srcPorts(s).valid && (srcPorts(s).bits.vc === v.U)
+      vc(s)(v).io.enq.bits := srcPorts(s).bits
+    }
+    assert(!srcPorts(s).valid || srcPorts(s).bits.vc < nVc.U,
+      "LM-NET: response carries an unknown VC")
   }
 
   private val destReady = Wire(Vec(nDests, Bool()))
-  private val destValid = Wire(Vec(nDests, Bool()))
-  private val destBits = Wire(Vec(nDests, chType))
-  private val srcDst = Wire(Vec(nSrcs, UInt(destW.W)))
-  private val srcReady = Wire(Vec(nSrcs, Bool()))
+  private val coreValid = Wire(Vec(nDests, Bool()))
+  private val coreBits = Wire(Vec(nDests, chType))
+  // One register stage per destination decouples valid from ready, so the
+  // response channel closes no combinational loop around a ring.
+  private val bankStage: Seq[LmPipe[T]] = Seq.tabulate(nDests)(_ => Module(new LmPipe(chType, 1)))
+  for (d <- 0 until nDests) destReady(d) := bankStage(d).io.in.ready
 
-  for (d <- 0 until spec.nIn) destReady(d) := io.in(d).ready
-  for (k <- 0 until nLinkPorts) {
-    destReady(spec.nIn + k) := io.outFwd(nSlavePorts + k).ready
-  }
-  for (s <- 0 until nSrcs) {
-    srcDst(s) := VecInit(respDest.map(_.U(destW.W)))(srcBits(s).src)
-  }
-
-  private val dArb = (0 until nDests).map { d =>
-    val arb = Module(new LmRrArbiterN(nSrcs))
-    for (s <- 0 until nSrcs) {
-      arb.io.req(s) := srcValid(s) && (srcDst(s) === d.U) && destReady(d)
+  private val vcArb = Seq.tabulate(nDests) { d =>
+    Seq.tabulate(nVc) { v =>
+      val arb = Module(new LmRrArbiterN(nSrcs))
+      for (s <- 0 until nSrcs) {
+        arb.io.req(s) := vc(s)(v).io.deq.valid &&
+          (destVec(vc(s)(v).io.deq.bits.src) === d.U) &&
+          destReady(d)
+      }
+      arb
     }
-    destValid(d) := arb.io.valid
-    destBits(d) := VecInit(srcBits.toSeq)(arb.io.grant)
-    arb
   }
 
-  for (s <- 0 until nSrcs) {
-    srcReady(s) := (0 until nDests)
-      .map(d => dArb(d).io.valid && (dArb(d).io.grant === s.U))
+  private val halfSel = Seq.tabulate(nDests) { d =>
+    Seq.tabulate(nClasses) { c =>
+      val arb = Module(new LmRrArbiterN(LoomDefaults.VcHalves))
+      for (h <- 0 until LoomDefaults.VcHalves) {
+        arb.io.req(h) := vcArb(d)(c * LoomDefaults.VcHalves + h).io.valid
+      }
+      arb
+    }
+  }
+
+  private val classSel = Seq.tabulate(nDests)(_ => Module(new LmWrrArbiter(p.classWeights)))
+
+  private val vcBitsByVc =
+    VecInit((0 until nVc).map(v => VecInit(vc.map(_(v).io.deq.bits))))
+  private val destFire = Wire(Vec(nDests, Bool()))
+  private val selVc = Wire(Vec(nDests, UInt(LoomDefaults.VcWidth.W)))
+  private val selSrc = Wire(Vec(nDests, UInt(srcW.W)))
+
+  for (d <- 0 until nDests) {
+    for (c <- 0 until nClasses) classSel(d).io.req(c) := halfSel(d)(c).io.valid
+    coreValid(d) := classSel(d).io.valid
+    val half = VecInit(halfSel(d).map(_.io.grant))(classSel(d).io.grant)
+    selVc(d) := Cat(classSel(d).io.grant, half)
+    selSrc(d) := VecInit(vcArb(d).map(_.io.grant))(selVc(d))
+    val row = vcBitsByVc(selVc(d))
+    coreBits(d) := (if (nSrcs == 1) row(0) else row(selSrc(d)))
+    val cut =
+      if (d < nMasterPorts) false
+      else if (d < spec.nIn) {
+        val k = d - nMasterPorts
+        if (k < spec.inCut.size) spec.inCut(k) else false
+      } else spec.outCut(d - spec.nIn)
+    when(cut.B) { coreBits(d).vc := Cat(classSel(d).io.grant, 1.U(1.W)) }
+    destFire(d) := classSel(d).io.valid && destReady(d)
+  }
+
+  for (d <- 0 until nDests) {
+    bankStage(d).io.in.valid := coreValid(d)
+    bankStage(d).io.in.bits := coreBits(d)
+  }
+  for (d <- 0 until spec.nIn) io.in(d) <> bankStage(d).io.out
+  for (k <- 0 until nLinkPorts) io.outFwd(nSlavePorts + k) <> bankStage(spec.nIn + k).io.out
+
+  for (s <- 0 until nSrcs; v <- 0 until nVc) {
+    vc(s)(v).io.deq.ready := (0 until nDests)
+      .map(d => destFire(d) && (selVc(d) === v.U) && (selSrc(d) === s.U))
       .reduce(_ || _)
   }
 
-  for (d <- 0 until spec.nIn) {
-    io.in(d).valid := destValid(d)
-    io.in(d).bits := destBits(d)
-  }
-  for (k <- 0 until nLinkPorts) {
-    io.outFwd(nSlavePorts + k).valid := destValid(spec.nIn + k)
-    io.outFwd(nSlavePorts + k).bits := destBits(spec.nIn + k)
-  }
-  for (j <- 0 until spec.nOut) io.out(j).ready := srcReady(j)
-  for (i <- nMasterPorts until spec.nIn) {
-    io.inFwd(i).ready := srcReady(spec.nOut + (i - nMasterPorts))
-  }
   for (i <- 0 until nMasterPorts) io.inFwd(i).ready := true.B
   for (j <- 0 until nSlavePorts) {
     io.outFwd(j).valid := false.B
