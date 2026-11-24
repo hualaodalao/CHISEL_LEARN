@@ -1,6 +1,6 @@
 # Queen 硬件规格
 
-文档版本：`v6.2.0`
+文档版本：`v6.3.0`
 
 修订日期：`2026-11-24`
 
@@ -20,6 +20,7 @@
 
 | 版本号 | 日期 | 修改内容 | 相关 Feature ID |
 |---|---|---|---|
+| v6.3.0 | 2026-11-24 | `endpoint=2'b10`（VPU）误路由从「指令永久滞留、只能 reset」改为**前端报 trap cause 4**；新增 SCHED `0x03 POLL_TIMEOUT`（RW，复位 **0=禁用**）：一条 `POLL_EQ` 的最大 cycle 数，到期报 **kind=3/code=2** 并**中止该命令、放行派发点**（否则软件连清 fault 的写都发不进去），在途 READ 未回时须等它回来才放行（无 transaction ID，防陈旧响应配错比较器），超时后不再发 READ，**是否 flush 由软件决定**；`POLL_INTERVAL`/`POLL_TIMEOUT` 均不随 flush 复位，`0x02/0x03` 相邻可由一条 `QWR2` 同拍写。trace 记录流与 VPU 同步旁带裁定为 **TBD：只保留契约与接口位置，不实现**；设备侧（WorkerBee/ForagerBee）按本规格自行对齐，不属 Queen 交付范围 | QN-F006、QN-F021、QN-F025 |
 | v6.2.0 | 2026-11-24 | polling/atomic 与 flush 落地：新增 `QueenMemMaster`（`memDepth` 默认 **8** 笔在途、无 transaction ID、**响应按请求序返回是总线硬义务**、`memResp.ready` 恒 1）与顶层 `memReq/memResp`；`POLL_EQ` 阻塞 SCHED 派发点直到读值相等、`ATOMIC_RMW` 发出即放行，两者**均无 CPU 可见完成通知**（推翻 v6.0.0 的「通路待定」）；SCHED 新增 `0x01 RECOVER`(WO)、`0x02 POLL_INTERVAL`(RW，复位 8，写 0 非法)。新增 `QueenFlushCtrl`：三触发源（`RECOVER` 写 / `QCTRL FLUSH` cmd=10 / CPU `flushReq` 端口）、两侧**四相 req/ack**、前端接受并丢弃、在途 QRD 回 `rdValid=1/data=0xdeadbeef/trap=0`、DSA 队列全丢、迟到 completion 丢弃、event/timeline/fault/openGroup 清零（`POLL_INTERVAL` 保持）；顶层新增 `flushReq/flushAck` 与两路 `gemmFlushReq/ACK`、`dmaFlushReq/ACK`，**`flushReq` 按 sys 级广播语义实现：整个 req 有效期间 Queen 停在 flush 态，排空后还要静默 `flushQuietCycles`（默认 8）拍无扰动才拉 ack，任何新指令 fire/迟到 completion/总线响应都重新计数**；fault 新增 **kind=3**（code 0=总线错误、1=地址未对齐）成为第七个源；`idle` 纳入内存主接口与 flush 控制器；`QueenQrdEntry` 加 `dummy` 位；`QueenConfig` 加 `memDepth`/`flushQuietCycles` | QN-F021、QN-F022、QN-F025..QN-F028、QN-F032、QN-F033 |
 | v6.1.0 | 2026-11-19 | QRD 读通路落地：新增 `QueenQrdTracker`（前端 accept 时按 lane 序多推入口、`qrdDepth` 默认 16 可配、三来源响应 FIFO、按程序序退休），顶层新增 `asyncRd`/`qrdRetire`/`gemmResp`/`dmaResp`，读错误走 `qrdRetire.trap` + cause 9（`rdError`）；`QueenSchedCtrl` 折入 Scheduler 寄存器前端（`0x00 FAULT_CLEAR` WO、`0x40..0x5F EVENT`、`0x60..0x67 TIMELINE`、`0x68..0x6B FAULT_*`、`0x6C IDLE`，连续 QWR 切片一拍并行执行、QRD/SIGNAL/TRACE 独占一拍）；**删除顶层 `faultClear` 端口**，清除只能由软件写 SCHED `0x00` 触发；SCHED `wrErr` 成为第六个 fault 源；`idle` 纳入在途读表；新增设备硬义务「同端点读响应必须按请求序返回」 | QN-F008、QN-F009、QN-F023、QN-F025、QN-F028、QN-F032 |
 | v6.0.0 | 2026-11-18 | 不兼容的 ISA 变更：**删除 Queen 侧完成通知机制**（notify 位、notifyPulse、四来源 COUNT/ACK/PENDING/ENABLE 全部移除），`inst[25]` 除 `SIGNAL_EVENT` 的 set/clr 外收为保留位（trap cause 7 更名为 `bit25`）；CPU 感知完成改走设备自己的中断 + 同步状态读。新增 `QueenEndpointCtrl`（GEMM/DMA 队头消费 FENCE/WAIT_EVENT/WAIT_TIMELINE/TRACE_TAG）与 `QueenSchedCtrl`（每拍一条 SIGNAL_EVENT/SIGNAL_TIMELINE）；`QueenSyncState` 加软件写口（逐位置位优先、软件与硬件自增累加、显式回退抑制并报 fault）；fault 加 2-bit `kind` 并接入 `wrErr`；顶层删除 `scheduler` 外露端口、新增 `wrErr` 输入与 `irq` | QN-F011、QN-F015..QN-F020、QN-F023..QN-F025、QN-F028、QN-F029 |
@@ -146,7 +147,7 @@ Scalar Core decoder
 | QN-F003 | GEMM/DMA 共享命令 ring 与 SCHED 暂存 | 已实现 | GEMM/DMA 共用一个 `cmdRingDepth` 个整包槽的 ring，各消费者独立游标；SCHED 为 1 级暂存；包内其余 lane 被标记无效 | 5.2 |
 | QN-F004 | 整包出队握手与背压保持 | 已实现 | 出口为整包 `Decoupled`；`valid && !ready` 期间 payload 不变 | 5.2 |
 | QN-F005 | 入口背压与 lane 接受规则 | 已实现 | 不要求连续前缀；`inst.ready` 按目标资源容量预约，规则见 5.1 | 5.1 |
-| QN-F006 | 指令合法性检查与同步 trap | 已实现 | 检查 opcode/funct3/cmd/保留位/`regBase=63`/endpoint 约束/`inst[25]` 规则/空组 `RUN`；只报程序序最早一条，其后 lane 不 fire；未实现寄存器地址与执行期错误不检测 | 5.3 |
+| QN-F006 | 指令合法性检查与同步 trap | 已实现 | 检查 opcode/funct3/cmd/保留位/`regBase=63`/endpoint 约束（含 `endpoint=2'b10` 误路由）/`inst[25]` 规则/空组 `RUN`；只报程序序最早一条，其后 lane 不 fire；设备寄存器地址与执行期错误不在前端检测 | 5.3 |
 | QN-F007 | 前端请求 entry 与退休时序 | 未实现 | 除 QRD 外入队即可退休；前端需为请求与次拍操作数预留空间 | 5.3 |
 | QN-F008 | QRD 顺序读响应表 | 已实现 | `QueenQrdTracker`：前端 accept 时按 lane 序分配 entry（一拍最多 `instructionLanes` 条），`qrdDepth` 个在途槽；GEMM/DMA/SCHED 各一个响应 FIFO 缓存早到响应，跨端点乱序到达仍按请求序退休；同端点响应保序是设备义务，故 entry 不存 regAddr | 5.4 |
 | QN-F009 | 异步标量写回 `asyncRd` 与 `qrdRetire` | 已实现 | 只有表头可驱动 `asyncRd`；`rd=x0` 不写回但仍执行读取并退休；读错误不产生 `asyncRd`，改由 `qrdRetire.trap=1` + cause 9 上报；`asyncRd` 反压期间表头保持 | 5.4 |
@@ -161,7 +162,7 @@ Scalar Core decoder
 | QN-F018 | `SIGNAL_TIMELINE` | 已实现 | 按 `rs1` 索引是否为 `x0` 决定自增或赋值，不看读回值；显式回退抑制更新并报 fault(kind=2) | 5.7 |
 | QN-F019 | `SIGNAL_EVENT` | 已实现 | `inst[25]` 为 set/clr；与硬件置位同拍冲突时逐位置位优先 | 5.7 |
 | QN-F020 | `TRACE_TAG` | 部分实现 | 在端点控制器/SCHED 控制器按 lane 序消费，不停等派发；记录流协议未定，当前不产生记录 | 5.7 |
-| QN-F021 | `POLL_EQ` | 已实现 | 4-byte 对齐 32-bit 读，间隔由 SCHED `0x02 POLL_INTERVAL` 给出（复位 8，写 0 非法）；**阻塞 SCHED 派发点**直到读值相等；不产生 CPU 可见完成通知 | 5.7 |
+| QN-F021 | `POLL_EQ` | 已实现 | 4-byte 对齐 32-bit 读，间隔由 SCHED `0x02 POLL_INTERVAL` 给出（复位 8，写 0 非法）；**阻塞 SCHED 派发点**直到读值相等；`0x03 POLL_TIMEOUT`（复位 0=禁用）到期报 kind=3/code=2 并中止本命令、放行派发点，是否 flush 由软件决定；不产生 CPU 可见完成通知 | 5.7 |
 | QN-F022 | `ATOMIC_RMW` | 已实现 | `aux[1:0]` 为 ADD/CLR/SET，必须映射为真实原子事务；**发出即放行**，最多 `memDepth` 笔在途；不产生 CPU 可见完成通知 | 5.7 |
 | QN-F023 | timeline/event 资源、双更新源与 VPU 只读查询 | 部分实现 | `QueenSyncState` 已实现 32 event group × 32 bit 与 8 timeline × 32 bit、只读视图、硬件源（同拍双端点按位或/计数相加）与软件源（逐位置位优先、自增累加、回退抑制）；软件读通路已由 SCHED `QRD` 落地（QN-F032）；VPU 查询未实现 | 5.8 |
 | QN-F024 | 完成通知计数与 level 中断 | 已移除 | V2 删除 Queen 侧通知机制：设备工作完成由设备自己的中断块上报，跨引擎条件由 event/timeline 表达。`POLL_EQ/ATOMIC_RMW` 已裁定为无 CPU 可见完成通知 | 5.8 |
@@ -385,8 +386,8 @@ beat 切分：一个 beat 是包内 lane 的连续切片，长度不超过 `nati
 | 输入与触发 | SCHED 执行 | 在 endpoint 实际派发点执行 | SCHED 执行，间隔由配置寄存器给出（复位默认 8 周期） | SCHED 执行 |
 | 处理语义 | `inst[25]=1` 置位，`=0` 清除，作用于 `aux[4:0]` 组与 `rs1` mask | 记录 `rs1` 作为 tracing tag | 发起 32-bit 读，与 `rs2` 比较，相等即完成，否则按间隔重试 | `aux[1:0]` 为 ADD/CLR/SET，`2'b11` 保留；通过平台原子事务实现 |
 | 输出与完成 | 更新 event；不产生 CPU 可见事件 | 目标契约在记录点产生 trace 记录；当前消费为 no-op | 比较成功时消费该命令并放行后续；**不产生 CPU 可见完成通知** | 发出即消费该命令；V2 不返回旧值，不产生 CPU 可见完成通知 |
-| 边界情形 | 与硬件置位同拍冲突时逐位置位优先 | `endpoint=SCHED` 由 SCHED 控制器消费 | 阻塞 SCHED 派发点，期间不执行其它命令；失配后等满 `POLL_INTERVAL` 才重读 | 最多 `memDepth` 笔在途；不支持一致原子的区间只能用于 non-cacheable 独占地址 |
-| 异常关联 | 10.1 | 10.1 | 未对齐不发请求，报 kind=3/code=1；总线错误 kind=3/code=0 | 同左 |
+| 边界情形 | 与硬件置位同拍冲突时逐位置位优先 | `endpoint=SCHED` 由 SCHED 控制器消费 | 阻塞 SCHED 派发点，期间不执行其它命令；失配后等满 `POLL_INTERVAL` 才重读；`POLL_TIMEOUT`（`0x03`，复位 0=禁用）到期则中止本命令并放行派发点，但在途 READ 未回时不得提前放行 | 最多 `memDepth` 笔在途；不支持一致原子的区间只能用于 non-cacheable 独占地址 |
+| 异常关联 | 10.1 | 10.1 | 未对齐不发请求，报 kind=3/code=1；总线错误 kind=3/code=0；超时 kind=3/code=2，是否 flush 由软件决定 | 同左（无超时） |
 
 `QCTRL FLUSH`（cmd=10，endpoint 固定 SCHED，aux/flag 为 0）与写 SCHED `0x01 RECOVER`、CPU `flushReq` 端口共用同一条恢复流程，见 5.9。
 
@@ -415,8 +416,8 @@ fault 寄存器访问必须独立于 SCHED 暂存的推进：SCHED 通路不参�
 | 输入与触发 | SCHED 执行到命令 | `QueenFlushCtrl` 状态机 | 连续评估 |
 | 处理语义 | `QueenMemMaster` 允许 `memDepth`（默认 8）笔在途、无 transaction ID，**响应按请求序返回是总线硬义务**；在途表只记「是否 READ」，READ 结果送 `POLL_EQ` 比较器、ATOMIC 只看 error；地址必须 4-byte 对齐 | 两侧四相 req/ack（req↑ → ack↑ → req↓ → ack↓）：先与两设备握手，再等内部与设备全排空，再静默 `flushQuietCycles`（默认 8）拍无扰动，然后清 event/timeline/fault/openGroup，最后回 CPU ack。**`flushReq` 是 sys 级广播，整个 req 有效期间 Queen 都停在 flush 态**；静默窗内任何新指令 fire、迟到 completion 或总线响应都重新计数。flush 期间前端接受并丢弃、在途 QRD 回 `0xdeadbeef`、DSA 队列全丢、迟到 completion 丢弃、polling 中止；内存事务不可撤销，只停发新请求并等响应回来 | `QueenTop.idle` = decoder idle（ring 游标对齐 + SCHED 空 + 无 pending）&& SCHED 控制器 idle && 两端点控制器 idle && 两 adapter idle（`!active && deviceIdle`）&& 在途读表空（含三响应 FIFO）&& 内存主接口空 && flush 控制器空闲 |
 | 输出与完成 | `memReq`/`memResp` 握手；准入预留响应槽故 `memResp.ready` 恒 1 | CPU 侧 `flushAck`；设备侧 `gemmFlushReq/ACK`、`dmaFlushReq/ACK` | `idle` 输出 |
-| 边界情形 | 未对齐不发请求，直接报 fault 并消费该命令；`POLL_EQ` 失配后等满 `POLL_INTERVAL` 才重读；**`POLL_EQ` 停等，任一时刻至多一笔 READ 在途，且它在途时不允许再发任何事务** | 内部触发没有 sys req 可等，`flushAck` 只有一拍；`POLL_INTERVAL` 是软件配置旋钮，不随 flush 复位；排空条件在静默窗内失效则退回排空态；**软件义务**：flush 期间可继续发指令（接受并丢弃），但持续发射会让静默窗永不满足 | 任一条件不满足即 `idle=0`；SCHED `IDLE` 寄存器口径不含在途读表与 flush 控制器 |
-| 异常关联 | 10.1（kind=3：code 0=总线错误、1=地址未对齐） | 10.2 | 无 |
+| 边界情形 | 未对齐不发请求，直接报 fault 并消费该命令；`POLL_EQ` 失配后等满 `POLL_INTERVAL` 才重读；`POLL_TIMEOUT` 到期中止本命令并放行派发点，但在途 READ 未回时须等它回来；**`POLL_EQ` 停等，任一时刻至多一笔 READ 在途，且它在途时不允许再发任何事务** | 内部触发没有 sys req 可等，`flushAck` 只有一拍；`POLL_INTERVAL`/`POLL_TIMEOUT` 是软件配置旋钮，不随 flush 复位；排空条件在静默窗内失效则退回排空态；**软件义务**：flush 期间可继续发指令（接受并丢弃），但持续发射会让静默窗永不满足 | 任一条件不满足即 `idle=0`；SCHED `IDLE` 寄存器口径不含在途读表与 flush 控制器 |
+| 异常关联 | 10.1（kind=3：code 0=总线错误、1=地址未对齐、2=POLL_EQ 超时） | 10.2 | 无 |
 
 `inst.fire` 是不可撤销边界：已 fire 的指令只能由显式 flush/reset 终止，普通 CPU 流水线 flush 不得撤销。V2 不支持投机接收；若将来引入，必须在 issue payload 中增加 epoch/kill token，并重新定义所有副作用提交点。
 
@@ -472,7 +473,7 @@ fault 寄存器访问必须独立于 SCHED 暂存的推进：SCHED 通路不参�
 
 `QueenEndpointCtrl`（每端点一个）已实现端口：`in/out`（整包 `Decoupled`）、`events/timelines` 只读输入、`backendIdle`（接 `adapter.idle`）、`idle`。转发切片按原序压缩到 lane 0 起，切片含 `QWR/QRD/RUN`；beat 切分由 adapter 负责。
 
-`QueenSchedCtrl` 已实现端口：`in`（SCHED 暂存整包）、`sw`（`Output(QueenSyncWrite)`，每拍至多一条）、`resp`（`Decoupled(QueenDsaRegResp)`，QRD 读响应）、`wrErr`（`Vec(L, Bool())`，非法写地址 per-lane pulse）、`faultClear`（`Bool`，写 `0x00` 当拍 pulse）、`flushTrig`（`Bool`，写 `0x01` 或执行 `FLUSH` 当拍 pulse）、`memReq`（`Decoupled(QueenMemReq)`）、`rdData`（`Flipped(Valid(UInt(32.W)))`）、`memUsed`、`addrErr`（`Bool`，未对齐 pulse）、`events/timelines/faultValid/faultKind/faultEndpoint/faultCode` 只读输入、`idleIn`（不含本模块与在途读的派发通路 idle）、`flushing`、`idle`。
+`QueenSchedCtrl` 已实现端口：`in`（SCHED 暂存整包）、`sw`（`Output(QueenSyncWrite)`，每拍至多一条）、`resp`（`Decoupled(QueenDsaRegResp)`，QRD 读响应）、`wrErr`（`Vec(L, Bool())`，非法写地址 per-lane pulse）、`faultClear`（`Bool`，写 `0x00` 当拍 pulse）、`flushTrig`（`Bool`，写 `0x01` 或执行 `FLUSH` 当拍 pulse）、`memReq`（`Decoupled(QueenMemReq)`）、`rdData`（`Flipped(Valid(UInt(32.W)))`）、`memUsed`、`addrErr`（`Bool`，未对齐 pulse）、`timeout`（`Bool`，`POLL_EQ` 超时中止当拍 pulse）、`events/timelines/faultValid/faultKind/faultEndpoint/faultCode` 只读输入、`idleIn`（不含本模块与在途读的派发通路 idle）、`flushing`、`idle`。
 
 `QueenQrdTracker` 已实现端口：`alloc`（`Flipped(Vec(L, Valid(QueenQrdEntry{pc, rdIndex, source, dummy})))`）、`used`、`resp`（`Vec(3, Flipped(Decoupled(QueenDsaRegResp)))`，ready 恒 1）、`asyncRd`、`retire`、`markDummy`（flush 入口拍把全部 entry 标为 dummy）、`flushing`（丢弃旧响应并排空 FIFO）、`idle`。
 
@@ -546,11 +547,11 @@ fault 寄存器访问必须独立于 SCHED 暂存的推进：SCHED 通路不参�
 
 指令字段布局以 `queenISA.md` 为准，本文不重复。Queen 侧只使用 `inst[31:30]` 做路由，其余字段原样透传给下游执行层与命令解码。已实现的出口包按 lane 位置打包，无效 lane 的 `inst`、`rs1`、`rs2` 全部填 0，因此空 lane 的 `inst[31:30]=2'b00`，消费方必须先用 `Valid` 过滤，不能只看 payload。
 
-`2'b10` 在已实现的分流中不命中任何队列，属于尚未接入 VPU 直发路径的空档，见 14.1。
+`2'b10` 是 VPU，由 Scalar Core decoder 直发 VPU 前端；送到 Queen 一律在前端报 trap cause 4，因为 Queen 没有 VPU 队列，见 14.1。
 
 ### 7.3 存储布局与地址约定
 
-polling/atomic 使用 32-bit、4-byte 对齐的物理地址（`QueenMemReq.address` 宽 `xlen`）；`ATOMIC_RMW` 只能用于平台保证原子性且由 Scheduler 独占的地址区间。物理地址空间归属与总线错误编码由平台定义，超时阈值尚未定义。
+polling/atomic 使用 32-bit、4-byte 对齐的物理地址（`QueenMemReq.address` 宽 `xlen`）；`ATOMIC_RMW` 只能用于平台保证原子性且由 Scheduler 独占的地址区间。物理地址空间归属与总线错误编码由平台定义；polling 超时阈值是运行期寄存器 SCHED `0x03 POLL_TIMEOUT`（复位 0=禁用），不是平台常量。
 
 ## 8. 配置与寄存器规范
 
@@ -580,6 +581,7 @@ polling/atomic 使用 32-bit、4-byte 对齐的物理地址（`QueenMemReq.addre
 运行期配置集中在 SCHED 端点寄存器（8.3.1）：
 
 - polling 间隔 `POLL_INTERVAL`（`0x02`）：正整数，复位默认 8 周期，写 0 非法（报 `wrErr` 且保持原值）；**不随 flush 复位**。
+- polling 超时 `POLL_TIMEOUT`（`0x03`）：一条 `POLL_EQ` 的最大 cycle 数，复位 **0 = 禁用**；到期报 fault 并中止该命令，是否 flush 由软件决定；**不随 flush 复位**。
 - 恢复触发 `RECOVER`（`0x01`）：任意值写入即触发一次 flush，与 `QCTRL FLUSH`、CPU `flushReq` 端口等价。该路径在 `QueenSchedCtrl` 就地执行，不经过可能被冻结的普通命令队列。
 - 硬件信号目标 `HW_SIGNAL_TARGET[e]`：只对 GEMM/DMA 端点存在，属于该端点的设备配置寄存器。软件在 `RUN` 之前用 `QWR` 写入，设备在完成点应用；运行时改写只影响后续启动的 RUN。
 
@@ -596,11 +598,12 @@ polling/atomic 使用 32-bit、4-byte 对齐的物理地址（`QueenMemReq.addre
 | `0x00` | `FAULT_CLEAR` | WO | 0 | 任意值写入即清 `faultValid`；同拍新错误优先。读回 0 且报 `err` |
 | `0x01` | `RECOVER` | WO | 0 | 任意值写入即触发一次 flush（5.9）。读回 0 且报 `err` |
 | `0x02` | `POLL_INTERVAL` | RW | 8 | `POLL_EQ` 失配后的重读间隔（cycle）；**写 0 非法**，报 `wrErr` 且保持原值 |
-| `0x03..0x3F` | 保留 | — | 0 | 写报 `wrErr`，读报 `err=1` 且 `data=0` |
+| `0x03` | `POLL_TIMEOUT` | RW | 0 | 一条 `POLL_EQ` 的最大 cycle 数；**0 = 禁用**。到期报 kind=3/code=2 并中止该命令、放行派发点 |
+| `0x04..0x3F` | 保留 | — | 0 | 写报 `wrErr`，读报 `err=1` 且 `data=0` |
 | `0x40..0x5F` | `EVENT[0..31]` | RO | 0 | `events[addr-0x40]` 的 32-bit 当前值 |
 | `0x60..0x67` | `TIMELINE[0..7]` | RO | 0 | `timelines[addr-0x60]` 的 32-bit 当前值 |
 | `0x68` | `FAULT_VALID` | RO | 0 | 最新一条 fault 的有效标志 |
-| `0x69` | `FAULT_KIND` | RO | 0 | 0=设备执行错误 / 1=写非法地址 / 2=timeline 回退 / 3=内存错误 |
+| `0x69` | `FAULT_KIND` | RO | 0 | 0=设备执行错误 / 1=写非法地址 / 2=timeline 回退 / 3=内存错误（code 0=总线错误、1=未对齐、2=POLL_EQ 超时） |
 | `0x6A` | `FAULT_ENDPOINT` | RO | 0 | GEMM=0、DMA=1、SCHED=3 |
 | `0x6B` | `FAULT_CODE` | RO | 0 | `faultCodeWidth` 位错误码 |
 | `0x6C` | `IDLE` | RO | 1 | bit0 = 派发通路强 idle（见下） |
@@ -610,7 +613,7 @@ polling/atomic 使用 32-bit、4-byte 对齐的物理地址（`QueenMemReq.addre
 
 `IDLE` 的 bit0 = `decoder.idle && 两端点控制器.idle && 两 adapter.idle（含 deviceIdle）&& schedCtrl.idle`，**不含在途读表与 flush 控制器**——否则读 `IDLE` 的那条 QRD 自身就把读回值钉死为 0。顶层 `idle` 端口额外与在途读表空、内存主接口空、flush 控制器空闲取与，口径比 `IDLE` 寄存器更严。
 
-执行纪律：队头连续的 `QWR1/QWR2` 切片**一拍并行执行**（`wrErr` 为 per-lane pulse，`FAULT_CLEAR`/`RECOVER` 按 lane OR 归约，同拍多 lane 写 `POLL_INTERVAL` 以 lane 序最后一条为准）；`QRD`/`SIGNAL_EVENT`/`SIGNAL_TIMELINE`/`TRACE_TAG`/`POLL_EQ`/`ATOMIC_RMW`/`FLUSH` 各独占一拍。因此 `QWR → SIGNAL → QRD` 天然保序，不需要额外握手。`QWR2` 的第二个地址是 `regBase+1`：指向 `0x00` 的 `QWR2` 会同时触发清除与 `wrErr`（`0x01` 现在合法，但 `0x02` 写 0 仍非法），软件应只用 `QWR1` 写这三个管理寄存器。
+执行纪律：队头连续的 `QWR1/QWR2` 切片**一拍并行执行**（`wrErr` 为 per-lane pulse，`FAULT_CLEAR`/`RECOVER` 按 lane OR 归约，同拍多 lane 写 `POLL_INTERVAL`/`POLL_TIMEOUT` 以 lane 序最后一条为准）；`QRD`/`SIGNAL_EVENT`/`SIGNAL_TIMELINE`/`TRACE_TAG`/`POLL_EQ`/`ATOMIC_RMW`/`FLUSH` 各独占一拍。因此 `QWR → SIGNAL → QRD` 天然保序，不需要额外握手。`QWR2` 的第二个地址是 `regBase+1`：`0x02/0x03` 相邻且都合法，一条 `QWR2` 可一拍同时写间隔与超时；指向 `0x00` 的 `QWR2` 仍会同时触发清除与 `wrErr`，软件应只用 `QWR1` 写 `FAULT_CLEAR`/`RECOVER`。
 
 `POLL_EQ`/`ATOMIC_RMW` 由 `QueenMemMaster` 执行（5.9）：前者阻塞派发点直到读值相等，后者发出即放行，两者都不产生 CPU 可见完成通知。
 
@@ -670,16 +673,16 @@ cycle N+2  : 该槽或暂存成为各自出口的队头，下游可 fire
 | 已实现：`SIGNAL_TIMELINE` 显式回退 | SCHED 执行期 signed 距离为负 | `fault{kind=2,endpoint=SCHED,code=timeline ID}` | 抑制该次赋值，同拍硬件自增仍生效 | 软件写 SCHED `0x00` 或 reset |
 | 已实现：polling/atomic 地址未对齐 | SCHED 执行期 `rs1[1:0] != 0` | `fault{kind=3,endpoint=SCHED,code=1}` | 不发内存请求，直接消费该命令 | 软件写 SCHED `0x00`、flush 或 reset |
 | 已实现：polling/atomic 总线错误 | `memResp.error=1` | `fault{kind=3,endpoint=SCHED,code=0}` | 不发布成功状态；在途事务按序消费 | 软件写 SCHED `0x00`、flush 或 reset |
+| 已实现：`POLL_EQ` 超时 | `POLL_TIMEOUT`（SCHED `0x03`，0=禁用）计数到 0 | `fault{kind=3,endpoint=SCHED,code=2}` + level `faultIrq` | 中止该命令并放行派发点；在途 READ 未回时等它回来才放行；超时后不再发 READ | 软件写 SCHED `0x00`、自行决定是否 flush、或 reset |
 | 目标契约：VPU fault | 在途工作 | 异步 fault + `irq` | 冻结相关队列 | CPU ACK 或 reset |
-| 目标契约：polling 超时 | 尚未定义 | 待定 | 待定 | 待定 |
 | 已实现：`inst` 需要 `rs` 但 `rs.valid=0` | 无检测 | 无 | 该源填 0，指令继续派发 | 不适用 |
-| 已实现：`endpoint=2'b10` | 无检测 | 无 | 该 lane 无队列可入，`ready` 不被驱动，指令滞留 | 只能 reset |
+| 已实现：`endpoint=2'b10`（VPU）误路由 | 前端 `trapCause` | 同步 trap cause 4（`endpoint`），该 lane 及其后 lane 不 fire | 指令不入队；Queen 无 VPU 队列，收下就永远没有消费者 | 随 CPU trap 处理 |
 
 当前交付有同步 `trap`（cause 1..8）、退休时的读错误（`qrdRetire.trap`，cause 9）与四类异步 fault 源（设备 completion、`wrErr`（含 SCHED）、内存错误、timeline 回退）及 `faultIrq`/`irq`；flush 恢复已实现，VPU 通路 fault 与 polling 超时仍未定义。仿真断言（第 9.3 节的入队断言）只在验证环境生效，不属于硬件错误接口。
 
 ### 10.2 优先级与恢复
 
-已实现语义：只保留**最新一条** fault 的 `{valid, kind, endpoint, code}`，后到错误覆盖先到错误；同拍多源按固定优先级取一条；`faultIrq` 为 level 且等于 valid，保持到软件写 SCHED `0x00`、flush 清状态或 reset，同拍新错误优先于清除。fault 不带 pc/sequence 归因——归因信息在 completion 的 trace 上下文里。fault 管理寄存器访问不受 endpoint WAIT/FENCE 阻塞（SCHED 与 GEMM/DMA 队列独立），但**会被未完成的 `POLL_EQ` 挡住**（它阻塞 SCHED 派发点），这是「无 CPU 感知」的直接代价，硬件不加旁路。`error=1` 的 completion 不得携带有效目标，故失败工作不会发布 event/timeline 成功状态。
+已实现语义：只保留**最新一条** fault 的 `{valid, kind, endpoint, code}`，后到错误覆盖先到错误；同拍多源按固定优先级取一条；`faultIrq` 为 level 且等于 valid，保持到软件写 SCHED `0x00`、flush 清状态或 reset，同拍新错误优先于清除。fault 不带 pc/sequence 归因——归因信息在 completion 的 trace 上下文里。fault 管理寄存器访问不受 endpoint WAIT/FENCE 阻塞（SCHED 与 GEMM/DMA 队列独立），但**会被未完成的 `POLL_EQ` 挡住**（它阻塞 SCHED 派发点）；这是「无 CPU 感知」的直接代价，硬件不加旁路，需要保证可清时配置 `POLL_TIMEOUT`。`error=1` 的 completion 不得携带有效目标，故失败工作不会发布 event/timeline 成功状态。
 
 已接受但未完成的指令不可由 CPU 普通流水线 flush 回滚，只有显式 Queen flush/reset 能终止。flush 已实现（5.9）：被丢弃的命令不会再开始执行、无法取消的总线事务等其自然返回、旧 context 的 completion 一律丢弃。
 
@@ -802,7 +805,7 @@ cycle 2: gemm.valid=1，gemm.bits(0).valid=1，其余 lane valid=0
 | 项目 | 限制及影响 | 集成/使用义务 | 契约引用 |
 |---|---|---|---|
 | 合法性检查只覆盖编码 | 已检测 opcode/funct3/cmd/保留位/endpoint/`regBase=63`/空组 `RUN`/`inst[25]` 规则；寄存器地址合法性由设备或 SCHED 前端在执行期判定，走 `wrErr`/`resp.err`，不回溯撤销已退休指令 | 上游仍需保证寄存器地址合法；执行期错误经异步 fault 或读错误响应上报 | 5.3、10.1 |
-| `endpoint=2'b10` 滞留 | 该 lane 不命中任何队列，其 `ready` 恒为 0；指令永久滞留，无 trap、无超时 | Scalar Core decoder 必须把 VPU 指令直发 VPU，绝不送入 Queen | 5.2、10.1 |
+| `endpoint=2'b10` 误路由报 trap | Queen 没有 VPU 队列，前端直接报 cause 4，不再让指令滞留 | Scalar Core decoder 仍必须把 VPU 指令直发 VPU；报错只是让误路由立刻可见，不是正常通路 | 5.2、10.1 |
 | QRD 依赖设备保序 | Queen 不为读响应打 tag、不做同端点重排；设备若乱序返回同端点读响应，数据会被配到错误的 `rd` 且无法检测 | 设备必须保证同端点读响应按请求序返回（接口文档第 16 章硬义务）；跨端点乱序由 Queen 三个 FIFO 吸收 | 5.4、接口 16 |
 | 容量按整包计 | 一个包无论含 1 条还是 4 条指令都占 ring 一个槽；同包的 GEMM/DMA lane 合占该槽，SCHED lane 另占暂存 | 上层评估吞吐时按包而非按指令计容量 | 8.1、12.1 |
 | ring 槽按两游标释放 | 槽只有在 GEMM 与 DMA 都越过它之后才可复用；单侧长期不消费会耗尽 ring 并反压入口，但不会阻塞另一侧已可出队的包 | 上层需保证两侧消费者都持续前进 | 5.2、A.1.1 |
@@ -818,7 +821,7 @@ cycle 2: gemm.valid=1，gemm.bits(0).valid=1，其余 lane valid=0
 | GEMM 真实设备尚未接入 | 配置与完成通路已用 `QueenDsaRegIf` + 假 DSA 整条闭环验证，但 `WorkerBeeRegIf` 未迁移：缺 hwSignal 寄存器与回传、缺 `swTag`，且 `QueenNativeCmd` 到 `WorkerBeeCmd` 的映射、上下文采样与 completion 生成尚无 RTL | 接真实 WorkerBee 前 GEMM 执行端到端不可用；`cfgCredit` 需作为 `RUN` beat 的 ready 来源，写必须脱离 resp 反压，并须在 `start` 当拍采样上下文 | 5.6、接口 16、17 |
 | GEMM 设备侧 ready 违反 16.6 | `WorkerBeeRegIf` 的 `cmd.ready` 含 `acceptBatch = !readPending && !respPending`，任何未取走的回执（含写回执）会反压包括 `WRITE` 在内的所有命令；且写也占 resp 通道 | 契约要求纯写 beat 的 ready 恒 1、写不占 resp；设备侧需拆开或改用 `QueenDsaRegIf`，否则读响应阻塞会连带停住配置写 | 接口 16.6、17 |
 | 顶层到恢复闭环为止 | `QueenTop` 已含端点控制器、SCHED 同步执行与寄存器前端、completion 接收、双源同步资源、四类 fault、多层 idle、QRD 在途表/顺序退休、polling/atomic 内存主接口与 flush 恢复；仍不含 trace 管理与真实设备侧命令映射 | 端到端可观测到 `RUN→completion→event→WAIT 解阻塞`、`QRD→asyncRd/qrdRetire` 与 `flush→dummy 退休→状态清零`；软件可读写同步状态与 fault 记录 | 4.1、6.2 |
-| `POLL_EQ` 挡住 fault 清除 | `POLL_EQ` 阻塞 SCHED 派发点，排在其后的 `QWR 0x00` 一起被挡住 | 这是「无 CPU 可见完成通知」的直接代价，硬件不加旁路；软件不得把清 fault 写在未完成的 `POLL_EQ` 之后 | 5.7、10.2 |
+| `POLL_EQ` 挡住 fault 清除 | `POLL_EQ` 阻塞 SCHED 派发点，排在其后的 `QWR 0x00` 一起被挡住 | 这是「无 CPU 可见完成通知」的直接代价，硬件不加旁路；需要保证可清时配置 `POLL_TIMEOUT`（`0x03`），超时中止后派发点放行 | 5.7、10.2 |
 | 内存响应必须按序 | `QueenMemMaster` 无 transaction ID，在途表只记「是否 READ」并按序消费 | 总线/平台必须保证响应按请求序返回，否则 READ 结果会配错比较器 | 5.9、接口 10 |
 | flush 期间 CPU 仍可发指令 | flush 对 CPU 是异步的（可能由中断触发），接受并丢弃保证 QRD 立刻回 dummy 不挂死；但静默窗要求连续 `flushQuietCycles` 拍无新指令 | 持续不间断发射会让 flush 永不完成；软件最终必须安静下来。`flushReq` 是 sys 级广播，Queen 在整个 req 有效期间都停在 flush 态 | 5.9、ISA 6.5 |
 | `POLL_EQ` 停等而非流水 | 任一时刻至多一笔 READ 在途，且它在途时不允许再发任何事务（atomic 也发不出） | 因此不存在「多笔 polling 读在途、其中一笔命中、其余要 drop」的场景；8 个在途槽只由 `ATOMIC_RMW` 使用。要流水化 polling 需另加丢弃语义 | 5.7、5.9 |
@@ -831,16 +834,15 @@ cycle 2: gemm.valid=1，gemm.bits(0).valid=1，其余 lane valid=0
 不支持或未实现：
 
 - GEMM/DMA 设备侧命令映射与 completion 生成（QN-F012/F013 的设备侧部分）。
-- VPU 同步查询（QN-F023 的 VPU 部分）、trace 记录流（QN-F020 的记录部分）。
-- polling 超时机制（QN-F021 的超时部分）。
+- VPU 同步查询（QN-F023 的 VPU 部分）、trace 记录流（QN-F020 的记录部分）——两者均裁定为 **TBD，只保留契约与接口位置，不实现**。
 - 投机接收。V2 不支持；引入需要 epoch/kill token。
 
 待确认：
 
 - 硬件信号在 completion 与强 idle 之间的可见性口径：当前按 completion 定义，若 DSA 的 completion 不保证写可见，需要改成 idle 触发。
 - trace 记录流的协议、格式与 Queen 侧存储组织。
-- polling/atomic 的物理地址空间归属与超时阈值（总线错误编码已定为 kind=3/code=0）。
-- 各设备私有配置寄存器排布、credit 初值与归还点（公共契约区地址已由 Queen 规定，见接口文档第 16 章）。
+- polling/atomic 的物理地址空间归属（总线错误编码已定为 kind=3/code=0，超时为 code=2）。
+- 各设备私有配置寄存器排布、credit 初值与归还点（公共契约区地址已由 Queen 规定，见接口文档第 16 章）。设备侧按本规格自行对齐，不属于 Queen 的交付范围。
 
 ## 附录：补充资料
 

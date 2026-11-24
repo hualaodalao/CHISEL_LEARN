@@ -15,6 +15,8 @@ Queen 面向四个对等端点：
 
 VPU 不归 Scheduler 调度或管理。Scheduler 只调度 GEMM 和 DMA，并提供 timeline、event/hwLock 等共享同步资源，以及 polling、atomic 等服务。SCHED endpoint 表示 Queen Scheduler 本身。Scalar Core decoder 根据 endpoint 直接分流：VPU 目标指令直接送入 VPU 前端，不进入 Queen；GEMM、DMA 和 SCHED 目标指令送入 Queen。
 
+**`endpoint=2'b10` 送到 Queen 是非法指令**（前端报 trap cause 4 `endpoint`）。Queen 没有 VPU 队列，收下它就永远没有消费者；报错而不是让指令滞留，是为了让误路由立刻可见。
+
 - `FENCE` 只在 GEMM/DMA 命令队列中等待目标设备 idle，`endpoint=SCHED/VPU` 为非法编码。Scheduler 派发路径不做任何条件等待；跨设备先后顺序由消费者队列一侧的 `FENCE`/`WAIT_*` 表达。
 - `WAIT_EVENT/WAIT_TIMELINE` 携带 target endpoint：GEMM/DMA 在其命令队列处等待，VPU 在其后端派发队列处等待，`endpoint=SCHED` 为非法编码。
 - `QWR1/QWR2` 只写 DSA 内部的配置寄存器，`QCTRL RUN` 关闭当前配置组并启动设备；Queen 不保存配置影子，设备用 credit 告知还能接受多少条 `RUN`，`QWR`/`QRD` 不受 credit 门控（见 6.4）。
@@ -426,9 +428,17 @@ Scheduler polling 间隔 N 通过 SCHED `0x02 POLL_INTERVAL` 设置，复位默�
 
 每 N cycle 最多发起一次 32-bit polling 读取；实际发起还受总线 ready 和内存主接口在途容量（`memDepth`，默认 8）限制。读值等于 `rs2` 时命令完成并放行后续，否则等满 N 拍再读。地址未 4-byte 对齐时不发请求，直接产生 kind=3/code=1 的 fault 并消费该命令。总线错误产生 kind=3/code=0 的 fault。
 
-**软件义务**：`POLL_EQ` 挡住 SCHED 派发点，所以清 fault 的 `QWR 0x00` 不得排在未完成的 `POLL_EQ` 之后。硬件不加旁路。
+**超时**：SCHED `0x03 POLL_TIMEOUT`（RW，复位 **0 = 禁用**）给出一条 `POLL_EQ` 命令从开始到完成的最大 cycle 数。计数在命令启动时装载、`POLL_EQ` 持有派发点期间逐拍递减（含等响应与等间隔）。到 0 即超时：
 
-V2 基础指令不携带 compare mask；需要 masked compare 时通过 Scheduler 配置寄存器扩展。超时机制尚未定义，待后续裁定。
+- 产生 kind=3/code=2 的 fault，拉 level `faultIrq`/`irq`；
+- **中止该条 `POLL_EQ` 并放行派发点**——否则软件连清 fault 的 `QWR 0x00` 都发不进去，中断不可操作；
+- 若超时瞬间还有一笔 READ 在途，必须等它回来才放行（无 transaction ID，陈旧响应否则会配到下一条 `POLL_EQ` 的比较器上）；
+- 超时后不再发新的 READ；
+- **是否 flush 由软件决定**，硬件不自动触发恢复。
+
+**软件义务**：`POLL_EQ` 挡住 SCHED 派发点，所以清 fault 的 `QWR 0x00` 不得排在未完成的 `POLL_EQ` 之后。硬件不加旁路；需要保证可清时请配置 `POLL_TIMEOUT`，超时中止后派发点即放行。
+
+V2 基础指令不携带 compare mask；需要 masked compare 时通过 Scheduler 配置寄存器扩展。
 
 ---
 
@@ -477,7 +487,7 @@ CPU 感知后端完成有两条通路：
 - `FENCE/WAIT_*` 只阻塞本端点后续派发，不产生任何 CPU 可见事件。软件不得把"指令已退休"当作设备工作已完成。
 - 设备中断是电平 + sticky 位，同一位在软件读走前多次完成会合并；需要计数时用设备私有的完成计数寄存器，Queen 不提供。
 - **`POLL_EQ`/`ATOMIC_RMW` 不产生 CPU 可见完成通知**（已裁定，见第 13/14 章）：`POLL_EQ` 阻塞 SCHED 派发点，`ATOMIC_RMW` 发出即放行。CPU 需要感知时读内存本身。
-- 同步状态的软件读通路已落地：`QRD endpoint=SCHED` 读 `0x02 POLL_INTERVAL`、`0x40..0x5F EVENT[0..31]`、`0x60..0x67 TIMELINE[0..7]`、`0x68..0x6B FAULT_VALID/KIND/ENDPOINT/CODE`、`0x6C IDLE`；`QWR1 endpoint=SCHED, 0x00` 清 fault、`0x01` 触发恢复。完整映射见 `queenHarewareInterface.md` 第 18 章。
+- 同步状态的软件读通路已落地：`QRD endpoint=SCHED` 读 `0x02 POLL_INTERVAL`、`0x03 POLL_TIMEOUT`、`0x40..0x5F EVENT[0..31]`、`0x60..0x67 TIMELINE[0..7]`、`0x68..0x6B FAULT_VALID/KIND/ENDPOINT/CODE`、`0x6C IDLE`；`QWR1 endpoint=SCHED, 0x00` 清 fault、`0x01` 触发恢复。完整映射见 `queenHarewareInterface.md` 第 18 章。
 
 ---
 
@@ -510,6 +520,7 @@ CPU 感知后端完成有两条通路：
 - `QWR2.regBase=63`；
 - `RUN` 的 endpoint 不是 GEMM/DMA；
 - `RUN` 之前没有配置写（空配置组）；
+- `endpoint=2'b10`（VPU）的任何指令——Queen 无 VPU 队列，误路由必须立刻报错；
 - `SIGNAL_TIMELINE/SIGNAL_EVENT/POLL_EQ/ATOMIC_RMW/FLUSH` 的 endpoint 不是 SCHED；
 - Queen `FENCE` 的 endpoint 为 VPU 或 SCHED；
 - `WAIT_EVENT/WAIT_TIMELINE` 的 endpoint 为 SCHED；
@@ -585,7 +596,7 @@ void queen_atomic_rmw(uint32_t address, uint32_t operand, unsigned op);
 12. 验证跨端点多个 `QRD` 延迟不同时仍按请求顺序返回，混入异步写/控制不影响响应配对，不需要 transaction ID。
 13. 验证前端 queue full、后端阻塞、response backpressure 和异步 fault 不丢失。
 14. 验证 polling 间隔复位为 8 cycle，写 SCHED `0x02` 后使用配置的 N cycle，写 0 报 `wrErr` 且保持原值。
-15. 验证 polling/atomic 的地址对齐与总线错误路径（kind=3，code 1=未对齐、0=总线错误）；超时路径尚未定义。
+15. 验证 polling/atomic 的地址对齐与总线错误路径（kind=3，code 1=未对齐、0=总线错误）；验证 `POLL_TIMEOUT`（`0x03`，复位 0=禁用）到期报 kind=3/code=2、中止 `POLL_EQ` 并放行派发点，且在途 READ 未回时不得提前放行、超时后不得再发 READ。
 16. 验证 `SIGNAL_EVENT` 的 bit25 两种取值均合法（set/clr）；其余全部 cmd 的 bit25 非 0 在前端报非法指令，且该检查先于空组 `RUN` 判定。
 17. 验证 `QCTRL.cmd=4'b0111` 在全部 endpoint、bit25 两种取值及不同操作数字段下均在前端报非法指令，不入队。
 18. 验证 `FENCE` 等目标设备强 idle、`WAIT_EVENT/WAIT_TIMELINE` 等同步条件，条件未满足时只停本端点队头，其后 lane 不越过，另一端点与 SCHED 不受影响。

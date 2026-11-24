@@ -274,6 +274,8 @@ val trap = Output(Valid(new QueenTrap(cfg)))
 
 同周期出现非法指令时，只接受并报告程序序最早的非法 lane；该 lane 之后的 lane 不得 fire。trap 为无 ready 的单周期接口，Scalar Core 必须能够无条件采样。
 
+`endpoint=2'b10`（VPU）送到 Queen 一律报 cause 4（`endpoint`）：Queen 没有 VPU 队列，收下就永远没有消费者。Scalar Core decoder 仍必须把 VPU 指令直发 VPU，报错只是让误路由立刻可见，不是正常通路。
+
 ### 3.10 CPU 中断与状态
 
 Queen 对 CPU 输出一个 level-sensitive 中断：
@@ -774,12 +776,13 @@ val memResp = Flipped(Decoupled(new QueenMemResp))
 
 - 地址必须 4-byte 对齐；未对齐不发请求，直接产生 kind=3/code=1 的 fault 并消费该命令。
 - `POLL_EQ` 比较失败后必须等满 `POLL_INTERVAL`（SCHED `0x02`，复位 8）拍才能再次发 READ。
+- `POLL_TIMEOUT`（SCHED `0x03`，复位 **0 = 禁用**）给出一条 `POLL_EQ` 的最大 cycle 数：启动时装载、持有派发点期间逐拍递减。到 0 报 kind=3/code=2 的 fault 并**中止该命令、放行派发点**（否则软件连清 fault 的写都发不进去）。若超时瞬间还有 READ 在途，必须等它回来才放行——无 transaction ID，陈旧响应否则会配到下一条 `POLL_EQ`。超时后不再发新 READ。**是否 flush 由软件决定**，硬件不自动恢复。
 - ATOMIC 操作必须映射为平台真正支持的原子事务；普通 read-modify-write 序列不能冒充与 CPU/cache 一致的 atomic。
 - `memResp.valid=1 && ready=0` 时 data/error 必须保持不变（本协议下 ready 恒 1，该情形不出现）。
 - 总线 error 产生 kind=3/code=0 的异步 fault。
 - **在途事务不可撤销**：flush 只能停止发新请求并等已发出的响应回来，不能取消总线事务。
 
-**软件义务**：`POLL_EQ` 挡住 SCHED 派发点，所以清 fault 的 `QWR 0x00` 不得排在未完成的 `POLL_EQ` 之后，否则会被一起挡住。这是「`POLL_EQ`/`ATOMIC_RMW` 不产生 CPU 可见完成通知」的直接代价，硬件不加旁路。
+**软件义务**：`POLL_EQ` 挡住 SCHED 派发点，所以清 fault 的 `QWR 0x00` 不得排在未完成的 `POLL_EQ` 之后，否则会被一起挡住。这是「`POLL_EQ`/`ATOMIC_RMW` 不产生 CPU 可见完成通知」的直接代价，硬件不加旁路；需要保证可清时配置 `POLL_TIMEOUT`（`0x03`），超时中止后派发点即放行。
 
 ---
 
@@ -895,7 +898,7 @@ elaboration 阶段至少检查：
 16. 验证 VPU WAIT 查询不修改同步资源。
 17. 验证 Queen 不产生任何完成通知 pulse，设备中断是唯一的单引擎完成通路。
 18. 验证 GEMM/DMA wait/fence 阻塞期间仍可处理 fault 和实时管理寄存器，且 SCHED 暂存不参与条件等待。
-19. 验证 polling interval（SCHED `0x02`，复位 8、写 0 非法）、总线 backpressure 与 error；超时路径尚未定义。
+19. 验证 polling interval（SCHED `0x02`，复位 8、写 0 非法）、总线 backpressure 与 error；验证 `POLL_TIMEOUT`（`0x03`，复位 0=禁用）到期报 kind=3/code=2、中止命令并放行派发点，在途 READ 未回时不得提前放行、超时后不得再发 READ。
 20. 验证 atomic 请求映射为平台原子事务，且 `memDepth` 笔在途时响应仍按请求序消费。
 21. 验证 fault 后失败工作不发布 event/timeline 成功状态，`flushAck` 拉起前不残留旧 context 事件。
 22. 验证普通 CPU pipeline flush 不撤销已经 fire 的 Queen 指令。
@@ -1180,11 +1183,12 @@ SCHED 端点的寄存器由 `QueenSchedCtrl` 就地实现，**不复用 `QueenDs
 | `0x00` | `FAULT_CLEAR` | WO | 0 | 任意值写入即清 `faultValid`；同拍新错误优先。读回 `err=1/data=0` |
 | `0x01` | `RECOVER` | WO | 0 | 任意值写入即触发一次 flush（5.5）。读回 `err=1/data=0` |
 | `0x02` | `POLL_INTERVAL` | RW | 8 | `POLL_EQ` 失配后的重读间隔（拍）。**写 0 非法**，报 `wrErr` 且保持原值 |
-| `0x03..0x3F` | 保留 | — | 0 | 写报 `wrErr`，读报 `err=1/data=0` |
+| `0x03` | `POLL_TIMEOUT` | RW | 0 | 一条 `POLL_EQ` 的最大 cycle 数；**0 = 禁用**。到期报 kind=3/code=2 并中止该命令。不随 flush 复位 |
+| `0x04..0x3F` | 保留 | — | 0 | 写报 `wrErr`，读报 `err=1/data=0` |
 | `0x40..0x5F` | `EVENT[0..31]` | RO | 0 | `events[addr-0x40]` |
 | `0x60..0x67` | `TIMELINE[0..7]` | RO | 0 | `timelines[addr-0x60]` |
 | `0x68` | `FAULT_VALID` | RO | 0 | 最新一条 fault 的有效标志 |
-| `0x69` | `FAULT_KIND` | RO | 0 | 0=设备执行错误 / 1=写非法地址 / 2=timeline 回退 / 3=内存错误 |
+| `0x69` | `FAULT_KIND` | RO | 0 | 0=设备执行错误 / 1=写非法地址 / 2=timeline 回退 / 3=内存错误（code 0=总线错误、1=未对齐、2=POLL_EQ 超时） |
 | `0x6A` | `FAULT_ENDPOINT` | RO | 0 | GEMM=0、DMA=1、SCHED=3 |
 | `0x6B` | `FAULT_CODE` | RO | 0 | `faultCodeWidth` 位错误码 |
 | `0x6C` | `IDLE` | RO | 1 | bit0 = 派发通路强 idle |
@@ -1194,7 +1198,7 @@ SCHED 端点的寄存器由 `QueenSchedCtrl` 就地实现，**不复用 `QueenDs
 
 `IDLE` 的 bit0 = `decoder.idle && 两端点控制器.idle && 两 adapter.idle（含 deviceIdle）&& schedCtrl.idle`，**不含在途读表与 flush 控制器**——否则读 `IDLE` 的那条 QRD 自身就把读回值钉死为 0。顶层 `idle` 端口额外与在途读表空、内存主接口空、flush 控制器空闲取与，口径更严。
 
-执行纪律：队头连续的 `QWR1/QWR2` 切片一拍并行执行（`wrErr` 为 per-lane pulse，`FAULT_CLEAR`/`RECOVER` 按 lane OR 归约，同拍多 lane 写 `POLL_INTERVAL` 以 lane 序最后一条为准）；`QRD`/`SIGNAL_EVENT`/`SIGNAL_TIMELINE`/`TRACE_TAG`/`POLL_EQ`/`ATOMIC_RMW`/`FLUSH` 各独占一拍。因此 `QWR → SIGNAL → QRD` 天然保序。`QWR2` 的第二个地址是 `regBase+1`：指向 `0x00` 的 `QWR2` 会同时触发清除与 `wrErr`（`0x01` 现在合法，但 `0x02` 写 0 仍非法），软件应只用 `QWR1` 写这三个管理寄存器。
+执行纪律：队头连续的 `QWR1/QWR2` 切片一拍并行执行（`wrErr` 为 per-lane pulse，`FAULT_CLEAR`/`RECOVER` 按 lane OR 归约，同拍多 lane 写 `POLL_INTERVAL`/`POLL_TIMEOUT` 以 lane 序最后一条为准）；`QRD`/`SIGNAL_EVENT`/`SIGNAL_TIMELINE`/`TRACE_TAG`/`POLL_EQ`/`ATOMIC_RMW`/`FLUSH` 各独占一拍。因此 `QWR → SIGNAL → QRD` 天然保序。`QWR2` 的第二个地址是 `regBase+1`：`0x02/0x03` 相邻且都合法，故一条 `QWR2` 可以一拍同时写间隔与超时；但指向 `0x00` 的 `QWR2` 会同时触发清除与 `wrErr`（`0x01` 合法而 `0x00` 的配对地址落在保留区），软件应只用 `QWR1` 写 `FAULT_CLEAR`/`RECOVER`。
 
 顶层**没有 `faultClear` 端口**：清除故障的唯一通路是软件写 SCHED `0x00`。这保证清除动作与同步状态读走同一条按序通路，不会被 GEMM/DMA 的 WAIT/FENCE 阻塞。
 
