@@ -348,6 +348,7 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
   wire [31:0] _schedCtrl_io_memReq_bits_address;	// src/queen/scala/main/QueenTop.scala:53:35
   wire [31:0] _schedCtrl_io_memReq_bits_operand;	// src/queen/scala/main/QueenTop.scala:53:35
   wire        _schedCtrl_io_addrErr;	// src/queen/scala/main/QueenTop.scala:53:35
+  wire        _schedCtrl_io_timeout;	// src/queen/scala/main/QueenTop.scala:53:35
   wire        _schedCtrl_io_idle;	// src/queen/scala/main/QueenTop.scala:53:35
   wire        _dmaAdapter_io_in_ready;	// src/queen/scala/main/QueenTop.scala:52:36
   wire        _dmaAdapter_io_idle;	// src/queen/scala/main/QueenTop.scala:52:36
@@ -506,8 +507,8 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
       automatic logic [3:0] _GEN;	// src/queen/scala/main/QueenTop.scala:148:31
       automatic logic [3:0] _GEN_0;	// src/queen/scala/main/QueenTop.scala:149:30
       automatic logic [3:0] _GEN_1;	// src/queen/scala/main/QueenTop.scala:150:37
-      automatic logic       sel_5;	// src/queen/scala/main/QueenTop.scala:151:39
-      automatic logic [6:0] _GEN_2;	// src/queen/scala/main/QueenTop.scala:160:14
+      automatic logic       sel_5;	// src/queen/scala/main/QueenTop.scala:151:{39,53}
+      automatic logic [6:0] _GEN_2;	// src/queen/scala/main/QueenTop.scala:161:14
       sel_0 = gemmCompValid & io_gemmCompletion_bits_error;	// src/queen/scala/main/QueenTop.scala:121:57, :144:32
       sel_1 = dmaCompValid & io_dmaCompletion_bits_error;	// src/queen/scala/main/QueenTop.scala:122:55, :146:31
       _GEN = {io_gemmWrErr_3, io_gemmWrErr_2, io_gemmWrErr_1, io_gemmWrErr_0};	// src/queen/scala/main/QueenTop.scala:148:31
@@ -517,26 +518,26 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
          _schedCtrl_io_wrErr_2,
          _schedCtrl_io_wrErr_1,
          _schedCtrl_io_wrErr_0};	// src/queen/scala/main/QueenTop.scala:53:35, :150:37
-      sel_5 = _schedCtrl_io_addrErr | _mem_io_err;	// src/queen/scala/main/QueenTop.scala:53:35, :56:29, :151:39
-      _GEN_2 = {_sync_io_rollback, sel_5, |_GEN_1, |_GEN_0, |_GEN, sel_1, sel_0};	// src/queen/scala/main/QueenTop.scala:54:30, :144:32, :146:31, :148:{31,38}, :149:{30,37}, :150:{37,44}, :151:39, :160:14
+      sel_5 = _schedCtrl_io_addrErr | _mem_io_err | _schedCtrl_io_timeout;	// src/queen/scala/main/QueenTop.scala:53:35, :56:29, :151:{39,53}
+      _GEN_2 = {_sync_io_rollback, sel_5, |_GEN_1, |_GEN_0, |_GEN, sel_1, sel_0};	// src/queen/scala/main/QueenTop.scala:54:30, :144:32, :146:31, :148:{31,38}, :149:{30,37}, :150:{37,44}, :151:{39,53}, :161:14
       faultValid <=
-        (|_GEN_2) | ~(_flush_io_clearState | _schedCtrl_io_faultClear) & faultValid;	// src/queen/scala/main/QueenTop.scala:53:35, :57:31, :134:37, :160:{14,21,26}, :161:20, :165:37, :166:20, :167:41, :168:20
-      if (|_GEN_2) begin	// src/queen/scala/main/QueenTop.scala:160:{14,21}
+        (|_GEN_2) | ~(_flush_io_clearState | _schedCtrl_io_faultClear) & faultValid;	// src/queen/scala/main/QueenTop.scala:53:35, :57:31, :134:37, :161:{14,21,26}, :162:20, :166:37, :167:20, :168:41, :169:20
+      if (|_GEN_2) begin	// src/queen/scala/main/QueenTop.scala:161:{14,21}
         automatic logic [2:0]      idx;	// src/main/scala/chisel3/util/Mux.scala:58:84
-        automatic logic            _faultCode_T_4;	// src/queen/scala/main/QueenTop.scala:157:28
-        automatic logic            _faultCode_T_6;	// src/queen/scala/main/QueenTop.scala:157:28
-        automatic logic            _faultCode_T_8;	// src/queen/scala/main/QueenTop.scala:157:28
-        automatic logic            _faultCode_T_10;	// src/queen/scala/main/QueenTop.scala:157:28
-        automatic logic            _faultCode_T_12;	// src/queen/scala/main/QueenTop.scala:157:28
+        automatic logic            _faultCode_T_4;	// src/queen/scala/main/QueenTop.scala:158:28
+        automatic logic            _faultCode_T_6;	// src/queen/scala/main/QueenTop.scala:158:28
+        automatic logic            _faultCode_T_8;	// src/queen/scala/main/QueenTop.scala:158:28
+        automatic logic            _faultCode_T_10;	// src/queen/scala/main/QueenTop.scala:158:28
+        automatic logic            _faultCode_T_12;	// src/queen/scala/main/QueenTop.scala:158:28
         automatic logic [7:0][7:0] _GEN_3 =
           {{8'h0},
            {{5'h0, _sync_io_rollbackId}},
-           {{7'h0, _schedCtrl_io_addrErr}},
+           {_schedCtrl_io_addrErr ? 8'h1 : {6'h0, _schedCtrl_io_timeout, 1'h0}},
            {8'h0},
            {8'h0},
            {8'h0},
            {io_dmaCompletion_bits_code},
-           {io_gemmCompletion_bits_code}};	// src/queen/scala/main/QueenTop.scala:53:35, :54:30, :152:16, :153:64, :157:28
+           {io_gemmCompletion_bits_code}};	// src/queen/scala/main/QueenTop.scala:11:7, :53:35, :54:30, :152:16, :153:20, :154:64, :158:28
         idx =
           sel_0
             ? 3'h0
@@ -544,23 +545,23 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
                 ? 3'h1
                 : (|_GEN)
                     ? 3'h2
-                    : (|_GEN_0) ? 3'h3 : (|_GEN_1) ? 3'h4 : sel_5 ? 3'h5 : 3'h6;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:144:32, :146:31, :148:{31,38}, :149:{30,37}, :150:{37,44}, :151:39
-        _faultCode_T_4 = idx == 3'h2;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:157:28
-        _faultCode_T_6 = idx == 3'h3;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:157:28
-        _faultCode_T_8 = idx == 3'h4;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:157:28
-        _faultCode_T_10 = idx == 3'h5;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:157:28
-        _faultCode_T_12 = idx == 3'h6;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:157:28
+                    : (|_GEN_0) ? 3'h3 : (|_GEN_1) ? 3'h4 : sel_5 ? 3'h5 : 3'h6;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:144:32, :146:31, :148:{31,38}, :149:{30,37}, :150:{37,44}, :151:{39,53}
+        _faultCode_T_4 = idx == 3'h2;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:158:28
+        _faultCode_T_6 = idx == 3'h3;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:158:28
+        _faultCode_T_8 = idx == 3'h4;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:158:28
+        _faultCode_T_10 = idx == 3'h5;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:158:28
+        _faultCode_T_12 = idx == 3'h6;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:158:28
         faultKind <=
           _faultCode_T_12
             ? 2'h2
             : _faultCode_T_10
                 ? 2'h3
-                : {1'h0, _faultCode_T_8 | _faultCode_T_6 | _faultCode_T_4};	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:11:7, :135:36, :157:28
+                : {1'h0, _faultCode_T_8 | _faultCode_T_6 | _faultCode_T_4};	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:11:7, :135:36, :153:20, :158:28
         faultEndpoint <=
           _faultCode_T_12 | _faultCode_T_10 | _faultCode_T_8
             ? 2'h3
-            : _faultCode_T_6 ? 2'h1 : _faultCode_T_4 ? 2'h0 : {1'h0, idx == 3'h1};	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:11:7, :136:40, :157:28
-        faultCode <= _GEN_3[idx];	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:137:36, :157:28
+            : _faultCode_T_6 ? 2'h1 : _faultCode_T_4 ? 2'h0 : {1'h0, idx == 3'h1};	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:11:7, :136:40, :158:28
+        faultCode <= _GEN_3[idx];	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:137:36, :158:28
       end
     end
   end // always @(posedge)
@@ -1072,6 +1073,7 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
     .io_rdData_bits         (_mem_io_rdData_bits),	// src/queen/scala/main/QueenTop.scala:56:29
     .io_memUsed             (_mem_io_used),	// src/queen/scala/main/QueenTop.scala:56:29
     .io_addrErr             (_schedCtrl_io_addrErr),
+    .io_timeout             (_schedCtrl_io_timeout),
     .io_events_0            (_sync_io_events_0),	// src/queen/scala/main/QueenTop.scala:54:30
     .io_events_1            (_sync_io_events_1),	// src/queen/scala/main/QueenTop.scala:54:30
     .io_events_2            (_sync_io_events_2),	// src/queen/scala/main/QueenTop.scala:54:30

@@ -227,7 +227,7 @@ module Queen_QueenEndpointCtrl(	// src/queen/scala/main/QueenEndpointCtrl.scala:
       ? _GEN_2[29:7]
       : ctrlSel_1
           ? _GEN_7[29:7]
-          : ctrlSel_2 ? _GEN_9[29:7] : ctrlSel_3 ? _GEN_11[29:7] : 23'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:41:36, :59:30, :61:{26,32}, :83:66
+          : ctrlSel_2 ? _GEN_9[29:7] : ctrlSel_3 ? _GEN_11[29:7] : 23'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:41:36, :59:30, :61:{26,32}, :83:66
   wire             isCtrl = ctrlInst[7:5] == 3'h3;	// src/queen/scala/main/QueenEndpointCtrl.scala:61:{26,32}, :89:{34,43}
   wire             isFence_layerCapture = isCtrl & ctrlInst[22:19] == 4'h0;	// src/queen/scala/main/QueenEndpointCtrl.scala:61:{26,32}, :66:43, :86:31, :89:43, :90:{34,41}
   wire             isWaitEvent_layerCapture = isCtrl & ctrlInst[22:19] == 4'h1;	// src/queen/scala/main/QueenEndpointCtrl.scala:39:24, :61:{26,32}, :86:31, :89:43, :91:{38,45}
@@ -250,7 +250,7 @@ module Queen_QueenEndpointCtrl(	// src/queen/scala/main/QueenEndpointCtrl.scala:
         automatic logic [31:0]       ctrlRs1 =
           ctrlSel_0
             ? _GEN_5
-            : ctrlSel_1 ? _GEN_8 : ctrlSel_2 ? _GEN_10 : ctrlSel_3 ? _GEN_12 : 32'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:41:36, :59:30, :61:{26,32}, :83:66
+            : ctrlSel_1 ? _GEN_8 : ctrlSel_2 ? _GEN_10 : ctrlSel_3 ? _GEN_12 : 32'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:41:36, :59:30, :61:{26,32}, :83:66
         automatic logic [7:0][31:0]  _GEN_15 =
           {{io_timelines_7},
            {io_timelines_6},
@@ -370,25 +370,25 @@ module Queen_QueenEndpointCtrl(	// src/queen/scala/main/QueenEndpointCtrl.scala:
   assign io_in_ready = io_in_ready_0;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :28:28
   assign io_out_valid = io_out_valid_0;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :81:36
   assign io_out_bits_0_valid = fwd_0;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :76:{16,33}
-  assign io_out_bits_0_bits_inst = fwd_0 ? _GEN_2 : 32'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :41:36, :76:{16,33}, :79:35
-  assign io_out_bits_0_bits_pc = fwd_0 ? _GEN_3[base[1:0]] : 32'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:31, :33:42, :41:36, :76:{16,33}, :79:35
-  assign io_out_bits_0_bits_rs1 = fwd_0 ? _GEN_5 : 32'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :41:36, :76:{16,33}, :79:35
-  assign io_out_bits_0_bits_rs2 = fwd_0 ? _GEN_6[base[1:0]] : 32'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:31, :33:42, :41:36, :76:{16,33}, :79:35
+  assign io_out_bits_0_bits_inst = fwd_0 ? _GEN_2 : 32'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :41:36, :76:{16,33}, :79:35
+  assign io_out_bits_0_bits_pc = fwd_0 ? _GEN_3[base[1:0]] : 32'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:31, :33:42, :41:36, :76:{16,33}, :79:35
+  assign io_out_bits_0_bits_rs1 = fwd_0 ? _GEN_5 : 32'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :41:36, :76:{16,33}, :79:35
+  assign io_out_bits_0_bits_rs2 = fwd_0 ? _GEN_6[base[1:0]] : 32'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:31, :33:42, :41:36, :76:{16,33}, :79:35
   assign io_out_bits_1_valid = fwd_1;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :76:{16,33}
-  assign io_out_bits_1_bits_inst = fwd_1 ? _GEN_7 : 32'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :41:36, :76:{16,33}, :79:35
-  assign io_out_bits_1_bits_pc = fwd_1 ? _GEN_3[idx_1[1:0]] : 32'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :33:42, :39:24, :41:36, :76:{16,33}, :79:35
-  assign io_out_bits_1_bits_rs1 = fwd_1 ? _GEN_8 : 32'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :41:36, :76:{16,33}, :79:35
-  assign io_out_bits_1_bits_rs2 = fwd_1 ? _GEN_6[idx_1[1:0]] : 32'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :33:42, :39:24, :41:36, :76:{16,33}, :79:35
+  assign io_out_bits_1_bits_inst = fwd_1 ? _GEN_7 : 32'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :41:36, :76:{16,33}, :79:35
+  assign io_out_bits_1_bits_pc = fwd_1 ? _GEN_3[idx_1[1:0]] : 32'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :33:42, :39:24, :41:36, :76:{16,33}, :79:35
+  assign io_out_bits_1_bits_rs1 = fwd_1 ? _GEN_8 : 32'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :41:36, :76:{16,33}, :79:35
+  assign io_out_bits_1_bits_rs2 = fwd_1 ? _GEN_6[idx_1[1:0]] : 32'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :33:42, :39:24, :41:36, :76:{16,33}, :79:35
   assign io_out_bits_2_valid = fwd_2;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :76:{16,33}
-  assign io_out_bits_2_bits_inst = fwd_2 ? _GEN_9 : 32'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :41:36, :76:{16,33}, :79:35
-  assign io_out_bits_2_bits_pc = fwd_2 ? _GEN_3[idx_2[1:0]] : 32'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :33:42, :39:24, :41:36, :76:{16,33}, :79:35
-  assign io_out_bits_2_bits_rs1 = fwd_2 ? _GEN_10 : 32'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :41:36, :76:{16,33}, :79:35
-  assign io_out_bits_2_bits_rs2 = fwd_2 ? _GEN_6[idx_2[1:0]] : 32'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :33:42, :39:24, :41:36, :76:{16,33}, :79:35
+  assign io_out_bits_2_bits_inst = fwd_2 ? _GEN_9 : 32'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :41:36, :76:{16,33}, :79:35
+  assign io_out_bits_2_bits_pc = fwd_2 ? _GEN_3[idx_2[1:0]] : 32'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :33:42, :39:24, :41:36, :76:{16,33}, :79:35
+  assign io_out_bits_2_bits_rs1 = fwd_2 ? _GEN_10 : 32'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :41:36, :76:{16,33}, :79:35
+  assign io_out_bits_2_bits_rs2 = fwd_2 ? _GEN_6[idx_2[1:0]] : 32'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :33:42, :39:24, :41:36, :76:{16,33}, :79:35
   assign io_out_bits_3_valid = fwd_3;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :76:{16,33}
-  assign io_out_bits_3_bits_inst = fwd_3 ? _GEN_11 : 32'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :41:36, :76:{16,33}, :79:35
-  assign io_out_bits_3_bits_pc = fwd_3 ? _GEN_3[idx_3[1:0]] : 32'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :33:42, :39:24, :41:36, :76:{16,33}, :79:35
-  assign io_out_bits_3_bits_rs1 = fwd_3 ? _GEN_12 : 32'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :41:36, :76:{16,33}, :79:35
-  assign io_out_bits_3_bits_rs2 = fwd_3 ? _GEN_6[idx_3[1:0]] : 32'h0;	// <stdin>:1464:51, :1752:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :33:42, :39:24, :41:36, :76:{16,33}, :79:35
+  assign io_out_bits_3_bits_inst = fwd_3 ? _GEN_11 : 32'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :41:36, :76:{16,33}, :79:35
+  assign io_out_bits_3_bits_pc = fwd_3 ? _GEN_3[idx_3[1:0]] : 32'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :33:42, :39:24, :41:36, :76:{16,33}, :79:35
+  assign io_out_bits_3_bits_rs1 = fwd_3 ? _GEN_12 : 32'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :41:36, :76:{16,33}, :79:35
+  assign io_out_bits_3_bits_rs2 = fwd_3 ? _GEN_6[idx_3[1:0]] : 32'h0;	// <stdin>:1472:51, :1760:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :33:42, :39:24, :41:36, :76:{16,33}, :79:35
   assign io_idle = ~active;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :23:33, :28:20
 endmodule
 
