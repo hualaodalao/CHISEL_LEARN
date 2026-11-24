@@ -14,10 +14,14 @@ case class QueenConfig(
     val faultCodeWidth: Int = 8,
     val eventGroupCount: Int = 32,
     val timelineCount: Int = 8,
-    val qrdDepth: Int = 16
+    val qrdDepth: Int = 16,
+    val memDepth: Int = 8,
+    val flushQuietCycles: Int = 8
 ) {
     require(instructionLanes >= 1)
     require(qrdDepth >= 1)
+    require(memDepth >= 1)
+    require(flushQuietCycles >= 1)
     require(cmdRingDepth >= 2)
     require(trapCauseWidth >= 4)
     require(faultCodeWidth >= 1)

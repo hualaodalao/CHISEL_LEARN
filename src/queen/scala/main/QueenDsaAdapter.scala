@@ -25,6 +25,7 @@ class QueenDsaAdapter(val cfg: QueenConfig) extends Module {
         val in = Flipped(Decoupled(Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg)))))
         val out = Decoupled(Vec(cfg.nativeWidth, Valid(new QueenNativeCmd(cfg))))
         val deviceIdle = Input(Bool())
+        val flushing = Input(Bool())
         val idle = Output(Bool())
     })
 
@@ -105,7 +106,7 @@ class QueenDsaAdapter(val cfg: QueenConfig) extends Module {
             "QueenDsaAdapter: only QWR1/QWR2/QRD/RUN are supported at this stage")
     }
 
-    io.out.valid := beatValid && beatSupported
+    io.out.valid := beatValid && beatSupported && !io.flushing
     io.idle := !active && io.deviceIdle
 
     when(inRange && (io.out.fire || !beatValid)) {
@@ -114,9 +115,14 @@ class QueenDsaAdapter(val cfg: QueenConfig) extends Module {
     when(done && !io.in.fire) {
         active := false.B
     }
-    when(io.in.fire) {
+    when(io.in.fire && !io.flushing) {
         pkt := io.in.bits
         base := 0.U
         active := true.B
+    }
+    // flush 期间整包丢弃：ready 仍为 1 让端点控制器排空，但不再装载、不再发 beat。
+    when(io.flushing) {
+        active := false.B
+        base := 0.U
     }
 }

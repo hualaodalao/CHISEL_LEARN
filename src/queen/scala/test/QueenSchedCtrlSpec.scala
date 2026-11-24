@@ -17,6 +17,7 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
         def funct3: Int = ((inst >> 12) & 7).toInt
         def cmd: Int = ((inst >> 26) & 15).toInt
         def aux: Int = ((inst >> 7) & 31).toInt
+        def memOp: Int = ((inst >> 7) & 3).toInt
         def rs1Idx: Int = ((inst >> 15) & 31).toInt
         def set: Boolean = ((inst >> 25) & 1) == 1
         def addr: Int = ((inst >> 20) & 1023).toInt
@@ -37,9 +38,17 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
         Cmd((BigInt(Sched) << 30) | (BigInt(5) << 26) | (BigInt(1) << 15) |
             (BigInt(3) << 12) | 0x0b, value, 0, pc)
 
-    private def pollEq(addr: BigInt) =
+    private def pollEq(addr: BigInt, exp: BigInt = 0, pc: BigInt = 0) =
         Cmd((BigInt(Sched) << 30) | (BigInt(6) << 26) | (BigInt(1) << 15) |
-            (BigInt(3) << 12) | 0x0b, addr, 0, 0)
+            (BigInt(2) << 20) | (BigInt(3) << 12) | 0x0b, addr, exp, pc)
+
+    private def atomicRmw(op: Int, addr: BigInt, operand: BigInt, pc: BigInt = 0) =
+        Cmd((BigInt(Sched) << 30) | (BigInt(8) << 26) | (BigInt(op) << 7) |
+            (BigInt(1) << 15) | (BigInt(2) << 20) | (BigInt(3) << 12) | 0x0b,
+            addr, operand, pc)
+
+    private def flushCmd(pc: BigInt = 0) =
+        Cmd((BigInt(Sched) << 30) | (BigInt(10) << 26) | (BigInt(3) << 12) | 0x0b, 0, 0, pc)
 
     private def qwr1(addr: Int, data: BigInt, pc: BigInt = 0) =
         Cmd((BigInt(Sched) << 30) | (BigInt(addr) << 20) | (BigInt(1) << 15) |
@@ -74,6 +83,18 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
         var faultEndpoint = 0
         var faultCode = 0
         var idleIn = true
+        var memReqReady = true
+        var rdDataNext = Option.empty[BigInt]
+        var memInflight = Vector.empty[Boolean]
+        var memReqs = Vector.empty[(Int, BigInt, BigInt)]
+        var addrErrs = 0
+        var flushTrigs = 0
+        var pollInterval = BigInt(8)
+        private var pollBusy = false
+        private var pollWait = false
+        private var pollTimer = BigInt(0)
+        private var pollAddr = BigInt(0)
+        private var pollExp = BigInt(0)
 
         dut.io.in.valid.poke(false.B)
         dut.io.in.bits.foreach { l =>
@@ -82,6 +103,10 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
         }
         dut.io.resp.ready.poke(true.B)
         dut.io.idleIn.poke(true.B)
+        dut.io.memReq.ready.poke(true.B)
+        dut.io.memUsed.poke(0.U)
+        dut.io.rdData.valid.poke(false.B)
+        dut.io.rdData.bits.poke(0.U)
         dut.io.events.foreach(_.poke(0.U))
         dut.io.timelines.foreach(_.poke(0.U))
         dut.io.faultValid.poke(false.B)
@@ -105,7 +130,11 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
             else if (addr == 0x6a) (BigInt(faultEndpoint), false)
             else if (addr == 0x6b) (BigInt(faultCode), false)
             else if (addr == 0x6c) (BigInt(if (idleIn && !active) 1 else 0), false)
+            else if (addr == 0x02) (pollInterval, false)
             else (BigInt(0), true)
+
+        private def wrLegal(addr: Int, data: BigInt): Boolean =
+            addr == 0 || addr == 1 || (addr == 2 && data != 0)
 
         private var cycleNo = 0
 
@@ -129,6 +158,10 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
             dut.io.faultKind.poke(faultKind.U)
             dut.io.faultEndpoint.poke(faultEndpoint.U)
             dut.io.faultCode.poke(faultCode.U)
+            dut.io.memReq.ready.poke(memReqReady.B)
+            dut.io.memUsed.poke(memInflight.size.U)
+            dut.io.rdData.valid.poke(rdDataNext.nonEmpty.B)
+            dut.io.rdData.bits.poke(rdDataNext.getOrElse(BigInt(0)).U)
 
             val done = active && base >= lanes
             val inReady = !active || done
@@ -151,19 +184,27 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
             val beatLen = if (alone) firstOtherIdx + 1 else fwdLen
             val wrSel = Vector.tabulate(lanes)(j => !alone && cand(j).nonEmpty && j < fwdLen)
 
+            val interval0 = pollInterval
             val expErr = Vector.tabulate(lanes) { j =>
                 if (!wrSel(j)) false else {
                     val c = cand(j).get
                     val a0 = if (c.isW2) c.regBase else c.addr
                     val a1 = c.regBase + 1
-                    a0 != 0 || (c.isW2 && a1 != 0)
+                    !wrLegal(a0, c.rs1) || (c.isW2 && !wrLegal(a1, c.rs2))
                 }
             }
-            val expClear = wrSel.zipWithIndex.exists { case (s, j) =>
-                s && {
+            def hits(c: Cmd, target: Int): Boolean = {
+                val a0 = if (c.isW2) c.regBase else c.addr
+                a0 == target || (c.isW2 && c.regBase + 1 == target)
+            }
+            val expClear = wrSel.zipWithIndex.exists { case (s, j) => s && hits(cand(j).get, 0) }
+            val expRecover = wrSel.zipWithIndex.exists { case (s, j) => s && hits(cand(j).get, 1) }
+            for (j <- 0 until lanes) {
+                if (wrSel(j)) {
                     val c = cand(j).get
                     val a0 = if (c.isW2) c.regBase else c.addr
-                    a0 == 0 || (c.isW2 && c.regBase + 1 == 0)
+                    if (a0 == 2 && c.rs1 != 0) pollInterval = c.rs1
+                    if (c.isW2 && c.regBase + 1 == 2 && c.rs2 != 0) pollInterval = c.rs2
                 }
             }
             for (j <- 0 until lanes) {
@@ -180,7 +221,7 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
             val head = if (alone) Some(cand(firstOtherIdx).get) else None
             val isQrd = head.exists(_.funct3 == 2)
             val supported = head.exists(c =>
-                c.funct3 == 2 || (c.funct3 == 3 && Set(3, 4, 5).contains(c.cmd)))
+                c.funct3 == 2 || (c.funct3 == 3 && Set(3, 4, 5, 6, 8, 10).contains(c.cmd)))
             val exec = alone && supported
             val respFire = exec && isQrd && respReady
 
@@ -210,9 +251,64 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
                     if (respFire) resps = resps :+ ((data, err))
                 }
             }
-            if (exec) consumed = consumed :+ head.get
+            val isPoll = head.exists(c => c.funct3 == 3 && c.cmd == 6)
+            val isAtomic = head.exists(c => c.funct3 == 3 && c.cmd == 8)
+            val isFlush = head.exists(c => c.funct3 == 3 && c.cmd == 10)
+            val pBusy0 = pollBusy
+            val pWait0 = pollWait
+            val pTimer0 = pollTimer
+            val pollStart = exec && isPoll && !pBusy0
+            val pollMisalign = pollStart && head.get.rs1 % 4 != 0
+            val pollIssue = pBusy0 && !pWait0 && pTimer0 == 0
+            val pollMatch = pBusy0 && pWait0 && rdDataNext.contains(pollExp)
+            val pollMiss = pBusy0 && pWait0 && rdDataNext.exists(_ != pollExp)
+            val atomicStart = exec && isAtomic && !pBusy0
+            val atomicMisalign = atomicStart && head.get.rs1 % 4 != 0
+            val memRoom = memInflight.size < cfg.memDepth
+            val expMemValid = (pollIssue || (atomicStart && !atomicMisalign)) && memRoom
+            val memFire = expMemValid && memReqReady
+            val expOp = if (pollIssue) 0 else Vector(1, 2, 3, 0)(head.map(_.memOp).getOrElse(0))
+            val expAddr = if (pollIssue) pollAddr else head.map(_.rs1).getOrElse(BigInt(0))
+            val expOperand = if (pollIssue) BigInt(0) else head.map(_.rs2).getOrElse(BigInt(0))
 
-            if (inRange && (if (alone) respFire || (exec && !isQrd) else true)) base += beatLen
+            dut.io.memReq.valid.expect(expMemValid.B)
+            if (expMemValid) {
+                val act = (dut.io.memReq.bits.op.peek().litValue.toInt,
+                    dut.io.memReq.bits.address.peek().litValue,
+                    dut.io.memReq.bits.operand.peek().litValue)
+                withClue(s"cycle=$cycleNo memReq ") { act shouldBe ((expOp, expAddr, expOperand)) }
+            }
+            val expAddrErr = pollMisalign || atomicMisalign
+            dut.io.addrErr.expect(expAddrErr.B)
+            if (expAddrErr) addrErrs += 1
+            val expFlush = expRecover || (exec && isFlush)
+            dut.io.flushTrig.expect(expFlush.B)
+            if (expFlush) flushTrigs += 1
+
+            val aloneDone =
+                if (isPoll) pollMatch || pollMisalign
+                else if (isAtomic) atomicMisalign || memFire
+                else if (isQrd) respFire
+                else exec
+            val advance = inRange && (if (alone) aloneDone else !pBusy0)
+            if (advance && alone) consumed = consumed :+ head.get
+
+            if (pollStart && !pollMisalign) {
+                pollBusy = true; pollWait = false; pollTimer = BigInt(0)
+                pollAddr = head.get.rs1; pollExp = head.get.rs2
+            }
+            if (pollIssue && memFire) pollWait = true
+            if (pollMatch) { pollBusy = false; pollWait = false }
+            if (pollMiss) { pollWait = false; pollTimer = interval0 }
+            if (pBusy0 && !pWait0 && pTimer0 != 0) pollTimer = pTimer0 - 1
+            if (memFire) {
+                memInflight = memInflight :+ pollIssue
+                memReqs = memReqs :+ ((expOp, expAddr, expOperand))
+            }
+            if (rdDataNext.nonEmpty) memInflight = memInflight.drop(1)
+            rdDataNext = None
+
+            if (advance) base += beatLen
             if (done && !inFire) active = false
             if (inFire) {
                 pkt = offered.get
@@ -295,19 +391,21 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
         }
     }
 
-    it should "clear the fault on any write to 0x00 and reject every other write address" in {
+    it should "clear the fault on 0x00, trigger recover on 0x01 and reject reserved writes" in {
         val cfg = QueenConfig()
         simulate(new QueenSchedCtrl(cfg)) { dut =>
             val d = new Driver(dut, cfg)
             d.cycle(Some(d.offer(0 -> qwr1(0x00, 0), 1 -> qwr1(0x01, 0), 2 -> qwr1(0x40, 0))))
             d.cycle()
-            d.wrErrs shouldBe Vector(Vector(1, 2))
+            d.wrErrs shouldBe Vector(Vector(2))
             d.clears shouldBe 1
-            // QWR2 的第二个地址必然落在保留区，故整条 lane 报错。
-            d.cycle(Some(d.offer(0 -> qwr2(0, 0, 0))))
+            d.flushTrigs shouldBe 1
+            // QWR2 的第二个地址落在保留区，故整条 lane 报错。
+            d.cycle(Some(d.offer(0 -> qwr2(2, 4, 0))))
             d.cycle()
-            d.wrErrs shouldBe Vector(Vector(1, 2), Vector(0))
-            d.clears shouldBe 2
+            d.wrErrs shouldBe Vector(Vector(2), Vector(0))
+            d.clears shouldBe 1
+            d.pollInterval shouldBe BigInt(4)
             d.drain()
         }
     }
@@ -372,16 +470,107 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
         }
     }
 
-    it should "reject POLL_EQ until the memory master exists" in {
+    it should "block the dispatch point on POLL_EQ until the read value matches" in {
         val cfg = QueenConfig()
-        val ex = intercept[Exception] {
-            simulate(new QueenSchedCtrl(cfg)) { dut =>
-                val d = new Driver(dut, cfg)
-                d.cycle(Some(d.offer(0 -> pollEq(0x1000))))
-                d.drain()
-            }
+        simulate(new QueenSchedCtrl(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            d.cycle(Some(d.offer(0 -> pollEq(0x1000, 0x5a5a), 1 -> signalEvent(1, 0x1))))
+            d.cycle()
+            d.cycle()
+            d.memReqs shouldBe Vector((0, BigInt(0x1000), BigInt(0)))
+            d.rdDataNext = Some(BigInt(1))
+            d.cycle()
+            d.writes shouldBe empty
+            // 复位间隔 8：失配后要等满 8 拍才重读。
+            for (_ <- 0 until 8) d.cycle()
+            d.memReqs.size shouldBe 1
+            d.cycle()
+            d.memReqs.size shouldBe 2
+            d.rdDataNext = Some(BigInt(0x5a5a))
+            d.cycle()
+            d.drain()
+            d.writes shouldBe Vector(Sw(false, 1, false, false, BigInt(1)))
+            d.consumed.size shouldBe 2
         }
-        ex.getClass.getName should include("AssertionFailed")
+    }
+
+    it should "program the polling interval through 0x02 and read it back" in {
+        val cfg = QueenConfig()
+        simulate(new QueenSchedCtrl(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            d.cycle(Some(d.offer(0 -> qwr1(0x02, 3))))
+            d.drain()
+            d.cycle(Some(d.offer(0 -> qrd(0x02))))
+            d.drain()
+            d.resps shouldBe Vector((BigInt(3), false))
+            d.cycle(Some(d.offer(0 -> qwr1(0x02, 0))))
+            d.cycle()
+            d.wrErrs shouldBe Vector(Vector(0))
+            d.pollInterval shouldBe BigInt(3)
+            d.drain()
+        }
+    }
+
+    it should "issue ATOMIC_RMW without blocking the dispatch point" in {
+        val cfg = QueenConfig()
+        simulate(new QueenSchedCtrl(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            val cmds = Vector(atomicRmw(0, 0x2000, 1), atomicRmw(1, 0x2004, 2),
+                atomicRmw(2, 0x2008, 4), atomicRmw(0, 0x200c, 8))
+            d.cycle(Some(d.offer(cmds.zipWithIndex.map { case (c, i) => i -> c }: _*)))
+            d.drain()
+            d.memReqs shouldBe Vector((1, BigInt(0x2000), BigInt(1)),
+                (2, BigInt(0x2004), BigInt(2)), (3, BigInt(0x2008), BigInt(4)),
+                (1, BigInt(0x200c), BigInt(8)))
+            d.memInflight.size shouldBe 4
+            d.consumed shouldBe cmds
+        }
+    }
+
+    it should "hold ATOMIC_RMW while the memory master refuses the request" in {
+        val cfg = QueenConfig()
+        simulate(new QueenSchedCtrl(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            d.memReqReady = false
+            d.cycle(Some(d.offer(0 -> atomicRmw(0, 0x2000, 1))))
+            for (_ <- 0 until 4) d.cycle()
+            d.memReqs shouldBe empty
+            d.memReqReady = true
+            d.drain()
+            d.memReqs.size shouldBe 1
+        }
+    }
+
+    it should "flag an unaligned polling or atomic address without issuing a request" in {
+        val cfg = QueenConfig()
+        simulate(new QueenSchedCtrl(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            d.cycle(Some(d.offer(0 -> pollEq(0x1002, 1))))
+            d.cycle()
+            d.addrErrs shouldBe 1
+            d.memReqs shouldBe empty
+            d.drain()
+            d.cycle(Some(d.offer(0 -> atomicRmw(0, 0x2001, 1))))
+            d.cycle()
+            d.addrErrs shouldBe 2
+            d.memReqs shouldBe empty
+            d.drain()
+        }
+    }
+
+    it should "raise flushTrig for QCTRL FLUSH and for a write to RECOVER" in {
+        val cfg = QueenConfig()
+        simulate(new QueenSchedCtrl(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            d.cycle(Some(d.offer(0 -> flushCmd())))
+            d.cycle()
+            d.flushTrigs shouldBe 1
+            d.drain()
+            d.cycle(Some(d.offer(0 -> qwr1(0x01, 0))))
+            d.cycle()
+            d.flushTrigs shouldBe 2
+            d.drain()
+        }
     }
 
     it should "match an ordered software model under random packets" in {

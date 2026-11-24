@@ -64,16 +64,16 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
         val aux = ((inst >> 7) & 31).toInt
         val bit25 = ((inst >> 25) & 1).toInt
         val isCtrl = funct3 == 3
-        val schedOnly = Set(3, 4, 6, 8).contains(cmd)
+        val schedOnly = Set(3, 4, 6, 8, 10).contains(cmd)
         val gemmDmaOnly = Set(0, 9).contains(cmd)
         val noSched = Set(1, 2).contains(cmd)
-        val auxZero = Set(0, 5, 6, 9).contains(cmd)
+        val auxZero = Set(0, 5, 6, 9, 10).contains(cmd)
         val auxHiZero = Set(2, 3).contains(cmd)
         val bit25Zero = cmd != 4
         val regBase = (((inst >> 11) & 1) << 5) | ((inst >> 25) & 31)
         if ((inst & 0x7f) != 0x0b) QueenTrapCause.opcode
         else if (funct3 > 3) QueenTrapCause.funct3
-        else if (isCtrl && (cmd == 7 || cmd >= 10)) QueenTrapCause.cmd
+        else if (isCtrl && (cmd == 7 || cmd >= 11)) QueenTrapCause.cmd
         else if (isCtrl && ((schedOnly && endpoint != 3) ||
             (gemmDmaOnly && endpoint != 0 && endpoint != 1) ||
             (noSched && endpoint == 3))) QueenTrapCause.endpoint

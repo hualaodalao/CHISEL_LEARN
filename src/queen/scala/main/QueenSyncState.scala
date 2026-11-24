@@ -25,6 +25,7 @@ class QueenSyncState(val cfg: QueenConfig) extends Module {
         val timelines = Output(Vec(cfg.timelineCount, UInt(32.W)))
         val rollback = Output(Bool())
         val rollbackId = Output(UInt(3.W))
+        val clear = Input(Bool())
     })
 
     private val events = RegInit(VecInit(Seq.fill(cfg.eventGroupCount)(0.U(32.W))))
@@ -45,7 +46,7 @@ class QueenSyncState(val cfg: QueenConfig) extends Module {
         val sel = swEvent && io.sw.index === g.U
         val swSet = Mux(sel && !io.sw.clr, io.sw.data, 0.U(32.W))
         val swClr = Mux(sel && io.sw.clr, io.sw.data, 0.U(32.W))
-        events(g) := (events(g) & ~swClr) | hwSet | swSet
+        events(g) := Mux(io.clear, 0.U(32.W), (events(g) & ~swClr) | hwSet | swSet)
     }
 
     private val assignSel = VecInit((0 until cfg.timelineCount).map(t =>
@@ -59,6 +60,7 @@ class QueenSyncState(val cfg: QueenConfig) extends Module {
             hit(c, true.B) && c.bits.hwSignal.timeline === t.U)))
         val swInc = swTimeline && !io.sw.assign && io.sw.index(2, 0) === t.U
         val assign = assignSel(t) && !io.rollback
-        timelines(t) := Mux(assign, io.sw.data, timelines(t) + hwInc + swInc.asUInt)
+        timelines(t) := Mux(io.clear, 0.U(32.W),
+            Mux(assign, io.sw.data, timelines(t) + hwInc + swInc.asUInt))
     }
 }

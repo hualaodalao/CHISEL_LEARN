@@ -21,12 +21,14 @@ private class QueenFakeDsa(cfg: QueenConfig, latency: Int) extends Module {
         val faultCode = Input(UInt(cfg.faultCodeWidth.W))
         val completion = Valid(new QueenDsaCompletion(cfg))
         val idle = Output(Bool())
+        val flushReq = Input(Bool())
+        val flushAck = Output(Bool())
     })
 
     private val stage = RegInit(VecInit(Seq.fill(latency)(
         0.U.asTypeOf(Valid(new QueenDsaCompletion(cfg))))))
     private val entry = Wire(Valid(new QueenDsaCompletion(cfg)))
-    entry.valid := io.start
+    entry.valid := io.start && !io.flushReq
     entry.bits.pc := io.pc
     entry.bits.cmdTag := io.tag
     entry.bits.swTag := io.swTag
@@ -37,6 +39,15 @@ private class QueenFakeDsa(cfg: QueenConfig, latency: Int) extends Module {
     for (i <- 1 until latency) stage(i) := stage(i - 1)
     io.completion := stage(latency - 1)
     io.idle := !stage.map(_.valid).reduce(_ || _)
+
+    // 假设备只做「丢弃已排队工作 + 四相 ack」，不建模真实 abort 的等待语义。
+    private val fAck = RegInit(false.B)
+    when(io.flushReq && !fAck) {
+        stage.foreach(_ := 0.U.asTypeOf(Valid(new QueenDsaCompletion(cfg))))
+        fAck := true.B
+    }
+    when(!io.flushReq) { fAck := false.B }
+    io.flushAck := fAck
 }
 
 private class QueenConfigPathDut(cfg: QueenConfig, rcfg: QueenDsaRegIfConfig,
@@ -48,6 +59,12 @@ private class QueenConfigPathDut(cfg: QueenConfig, rcfg: QueenDsaRegIfConfig,
         val trap = Valid(new QueenTrap(cfg))
         val asyncRd = Decoupled(new QueenAsyncRd(cfg))
         val qrdRetire = Decoupled(new QueenRetire(cfg))
+        val memReq = Decoupled(new QueenMemReq(cfg))
+        val memResp = Flipped(Decoupled(new QueenMemResp))
+        val flushReq = Input(Bool())
+        val flushAck = Output(Bool())
+        val gemmFlushReq = Output(Bool())
+        val dmaFlushReq = Output(Bool())
         val gemmStartReady = Input(Bool())
         val dmaStartReady = Input(Bool())
         val gemmFaultEn = Input(Bool())
@@ -90,6 +107,16 @@ private class QueenConfigPathDut(cfg: QueenConfig, rcfg: QueenDsaRegIfConfig,
     io.trap <> top.io.trap
     io.asyncRd <> top.io.asyncRd
     io.qrdRetire <> top.io.qrdRetire
+    io.memReq <> top.io.memReq
+    top.io.memResp <> io.memResp
+    top.io.flushReq := io.flushReq
+    io.flushAck := top.io.flushAck
+    io.gemmFlushReq := top.io.gemmFlushReq
+    io.dmaFlushReq := top.io.dmaFlushReq
+    top.io.gemmFlushAck := gemmDev.io.flushAck
+    top.io.dmaFlushAck := dmaDev.io.flushAck
+    gemmDev.io.flushReq := top.io.gemmFlushReq
+    dmaDev.io.flushReq := top.io.dmaFlushReq
 
     top.io.gemm <> gemmReg.io.cmd
     top.io.dma <> dmaReg.io.cmd
@@ -186,6 +213,9 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
         Cmd((BigInt(3) << 30) | (BigInt(4) << 26) | (BigInt(1) << 25) | (BigInt(1) << 15) |
             (BigInt(group) << 7) | (BigInt(3) << 12) | 0x0b, mask, 0, pc)
 
+    private def flushCmd(pc: BigInt = 0) =
+        Cmd((BigInt(3) << 30) | (BigInt(10) << 26) | (BigInt(3) << 12) | 0x0b, 0, 0, pc)
+
     private class Driver(dut: QueenConfigPathDut) {
         private val lanes = cfg.instructionLanes
         var gemmStarts = Vector.empty[(Int, BigInt)]
@@ -208,6 +238,11 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
         dut.io.dmaFaultCode.poke(0.U)
         dut.io.asyncRd.ready.poke(true.B)
         dut.io.qrdRetire.ready.poke(true.B)
+        dut.io.flushReq.poke(false.B)
+        dut.io.memReq.ready.poke(true.B)
+        dut.io.memResp.valid.poke(false.B)
+        dut.io.memResp.bits.data.poke(0.U)
+        dut.io.memResp.bits.error.poke(false.B)
         dut.reset.poke(true.B)
         dut.clock.step(2)
         dut.reset.poke(false.B)
@@ -284,6 +319,36 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
         def regs(port: Vec[UInt]): Vector[BigInt] = port.map(_.peek().litValue).toVector
         def events: Vector[BigInt] = dut.io.events.map(_.peek().litValue).toVector
         def timelines: Vector[BigInt] = dut.io.timelines.map(_.peek().litValue).toVector
+
+        /** CPU 侧四相：req↑ → 设备 req/ack 走完 → Queen ack↑ → req↓ → ack↓。 */
+        def cpuFlush(limit: Int = 200): Unit = {
+            dut.io.flushReq.poke(true.B)
+            var sawDevReq = false
+            var sawDevFall = false
+            var acked = false
+            var n = 0
+            while (!acked && n < limit) {
+                step()
+                n += 1
+                val g = dut.io.gemmFlushReq.peek().litToBoolean
+                val dd = dut.io.dmaFlushReq.peek().litToBoolean
+                if (g && dd) sawDevReq = true
+                if (sawDevReq && !g && !dd) sawDevFall = true
+                if (dut.io.flushAck.peek().litToBoolean) acked = true
+            }
+            acked shouldBe true
+            sawDevReq shouldBe true
+            sawDevFall shouldBe true
+            dut.io.flushReq.poke(false.B)
+            var dropped = false
+            n = 0
+            while (!dropped && n < limit) {
+                step()
+                n += 1
+                dropped = !dut.io.flushAck.peek().litToBoolean
+            }
+            dropped shouldBe true
+        }
     }
 
     behavior of "Queen config path end to end"
@@ -524,6 +589,85 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.settle()
             d.retires shouldBe Vector((BigInt(0xd00), false, 5, true, 9))
             d.asyncWrites shouldBe empty
+        }
+    }
+
+    it should "flush through the CPU four-phase port and retire in-flight QRDs as dummy" in {
+        simulate(new QueenConfigPathDut(cfg, rcfg)) { dut =>
+            val d = new Driver(dut)
+            d.offer(0 -> qwr1(Gemm, 0, 0), 1 -> run(Gemm, 1, pc = 4),
+                2 -> waitEvent(Gemm, 5, 1, pc = 8), 3 -> qrd(Gemm, 0, 1, pc = 12))
+            d.settle(6)
+            // WAIT 永不满足，QRD 卡在 ring 里，只在在途表占一个槽。
+            d.retires shouldBe empty
+            dut.io.idle.expect(false.B)
+            d.cpuFlush()
+            d.retires.map(r => (r._1, r._2, r._3, r._4)) shouldBe
+                Vector((BigInt(12), true, 1, false))
+            d.asyncWrites shouldBe Vector((1, BigInt("deadbeef", 16)))
+            d.settle()
+            dut.io.idle.expect(true.B)
+            d.events.forall(_ == 0) shouldBe true
+        }
+    }
+
+    it should "trigger the same recovery from QCTRL FLUSH" in {
+        simulate(new QueenConfigPathDut(cfg, rcfg)) { dut =>
+            val d = new Driver(dut)
+            d.offer(0 -> qwr1(Gemm, 0, 0), 1 -> run(Gemm, 2, pc = 4),
+                2 -> waitEvent(Gemm, 5, 1, pc = 8), 3 -> qrd(Gemm, 0, 2, pc = 12))
+            d.settle(6)
+            d.retires shouldBe empty
+            d.offer(0 -> flushCmd(pc = 0x20))
+            d.settle(40)
+            d.asyncWrites shouldBe Vector((2, BigInt("deadbeef", 16)))
+            dut.io.idle.expect(true.B)
+        }
+    }
+
+    it should "keep accepting and dropping QRDs while the sys flushReq stays high after ack" in {
+        simulate(new QueenConfigPathDut(cfg, rcfg)) { dut =>
+            val d = new Driver(dut)
+            dut.io.flushReq.poke(true.B)
+            var acked = false
+            var n = 0
+            while (!acked && n < 200) {
+                d.step()
+                n += 1
+                acked = dut.io.flushAck.peek().litToBoolean
+            }
+            acked shouldBe true
+            // sys 还没收齐其它模块的 ack，req 仍高：Queen 必须停在 flush 态。
+            dut.io.idle.expect(false.B)
+            d.offer(0 -> qrd(Sched, 0x40, 3, pc = 0xe00))
+            d.settle(4)
+            d.asyncWrites shouldBe Vector((3, BigInt("deadbeef", 16)))
+            dut.io.flushAck.expect(true.B)
+            dut.io.flushReq.poke(false.B)
+            d.settle(4)
+            dut.io.flushAck.expect(false.B)
+            dut.io.idle.expect(true.B)
+        }
+    }
+
+    it should "clear sync state and fault on a RECOVER write" in {
+        simulate(new QueenConfigPathDut(cfg, rcfg)) { dut =>
+            val d = new Driver(dut)
+            d.offer(0 -> signalEvent(3, 0x8))
+            d.settle()
+            d.events(3) shouldBe BigInt(0x8)
+            dut.io.gemmFaultEn.poke(true.B)
+            dut.io.gemmFaultCode.poke(7.U)
+            d.offer(0 -> qwr1(Gemm, 0, 0), 1 -> run(Gemm, 3))
+            d.settle()
+            dut.io.faultValid.expect(true.B)
+            dut.io.gemmFaultEn.poke(false.B)
+            d.offer(0 -> qwr1(Sched, 1, 0))
+            d.settle(40)
+            dut.io.faultValid.expect(false.B)
+            d.events.forall(_ == 0) shouldBe true
+            d.timelines.forall(_ == 0) shouldBe true
+            dut.io.idle.expect(true.B)
         }
     }
 }

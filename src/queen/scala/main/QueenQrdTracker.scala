@@ -6,6 +6,7 @@ class QueenQrdEntry(val cfg: QueenConfig) extends Bundle {
     val rdIndex = UInt(5.W)
     // 0=GEMM 1=DMA 2=SCHED
     val source = UInt(2.W)
+    val dummy = Bool()
 }
 
 /** QRD 在途表：前端 accept 时按 lane 序分配 entry，退休时按程序序取回响应。
@@ -13,6 +14,7 @@ class QueenQrdEntry(val cfg: QueenConfig) extends Bundle {
   * 同端点响应必须按请求序返回（设备义务），故 entry 不存 regAddr，队头只认来源。
   * 三个来源各自缓存早到响应，跨端点乱序到达仍按程序序退休。
   * 准入已为每条在途 QRD 预留一个响应槽，故 resp.ready 恒 1。
+  * flush 期间所有 entry 回 dummy（`0xdeadbeef`，不报 trap），旧响应被排空丢弃。
   */
 class QueenQrdTracker(val cfg: QueenConfig) extends Module {
     val io = IO(new Bundle {
@@ -21,6 +23,8 @@ class QueenQrdTracker(val cfg: QueenConfig) extends Module {
         val resp = Vec(3, Flipped(Decoupled(new QueenDsaRegResp)))
         val asyncRd = Decoupled(new QueenAsyncRd(cfg))
         val retire = Decoupled(new QueenRetire(cfg))
+        val markDummy = Input(Bool())
+        val flushing = Input(Bool())
         val idle = Output(Bool())
     })
 
@@ -47,15 +51,17 @@ class QueenQrdTracker(val cfg: QueenConfig) extends Module {
         }
     }
     assert(count +& allocCount <= depth.U, "QueenQrdTracker: allocation overflow")
+    // 覆盖同拍新分配的 entry：它在 flush 生效后被丢弃，永远等不到真实响应。
+    when(io.markDummy) { entries.foreach(_.dummy := true.B) }
     wrIdx := slot(wrIdx +& allocCount)
     count := (count +& allocCount - io.retire.fire.asUInt)(cntW - 1, 0)
 
     private val fifos = Seq.fill(3)(Module(new Queue(new QueenDsaRegResp, depth)))
     for (s <- 0 until 3) {
-        fifos(s).io.enq.valid := io.resp(s).valid
+        fifos(s).io.enq.valid := io.resp(s).valid && !io.flushing
         fifos(s).io.enq.bits := io.resp(s).bits
         io.resp(s).ready := true.B
-        assert(!io.resp(s).valid || fifos(s).io.enq.ready,
+        assert(!io.resp(s).valid || io.flushing || fifos(s).io.enq.ready,
             "QueenQrdTracker: response overflow, admission must reserve a slot")
     }
 
@@ -63,8 +69,10 @@ class QueenQrdTracker(val cfg: QueenConfig) extends Module {
     private val headValid = count =/= 0.U
     private val respValid = VecInit(fifos.map(_.io.deq.valid))
     private val respBits = VecInit(fifos.map(_.io.deq.bits))
-    private val headResp = respBits(head.source)
-    private val headReady = headValid && respValid(head.source)
+    private val dummyResp = WireDefault(0.U.asTypeOf(new QueenDsaRegResp))
+    dummyResp.data := BigInt("deadbeef", 16).U(32.W)
+    private val headResp = Mux(head.dummy, dummyResp, respBits(head.source))
+    private val headReady = headValid && (head.dummy || respValid(head.source))
     private val writeBack = head.rdIndex =/= 0.U && !headResp.err
 
     io.asyncRd.valid := headReady && writeBack
@@ -78,9 +86,10 @@ class QueenQrdTracker(val cfg: QueenConfig) extends Module {
     io.retire.bits.trapCause := Mux(headResp.err, QueenTrapCause.rdError.U, QueenTrapCause.none.U)
 
     for (s <- 0 until 3) {
-        fifos(s).io.deq.ready := io.retire.fire && head.source === s.U
+        fifos(s).io.deq.ready := io.flushing ||
+            (io.retire.fire && !head.dummy && head.source === s.U)
     }
     when(io.retire.fire) { rdIdx := slot(rdIdx + 1.U) }
 
-    io.idle := count === 0.U
+    io.idle := count === 0.U && !respValid.asUInt.orR
 }

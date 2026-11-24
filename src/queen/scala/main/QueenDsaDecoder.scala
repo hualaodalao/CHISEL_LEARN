@@ -19,6 +19,8 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
         val trap = Valid(new QueenTrap(cfg))
         val qrdUsed = Input(UInt(log2Ceil(cfg.qrdDepth + 1).W))
         val qrdAlloc = Vec(cfg.instructionLanes, Valid(new QueenQrdEntry(cfg)))
+        val flushing = Input(Bool())
+        val flushStart = Input(Bool())
         val idle = Output(Bool())
     })
 
@@ -44,8 +46,8 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
     private val batch = Wire(Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg))))
 
     for (i <- 0 until cfg.instructionLanes) {
-        pending(i) := io.inst(i).fire
-        when(io.inst(i).fire) {
+        pending(i) := io.inst(i).fire && !io.flushing
+        when(io.inst(i).fire && !io.flushing) {
             pendingInst(i) := io.inst(i).bits.inst
             pendingPc(i) := io.inst(i).bits.pc
         }
@@ -83,7 +85,7 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
     when(gemmAdvance) { gemmCursor := (gemmCursor + 1.U)(ptrW - 1, 0) }
     when(dmaAdvance) { dmaCursor := (dmaCursor + 1.U)(ptrW - 1, 0) }
 
-    private val ringEnqValid = hasLane(batch, GEMM) || hasLane(batch, DMA)
+    private val ringEnqValid = (hasLane(batch, GEMM) || hasLane(batch, DMA)) && !io.flushing
     private val half = (BigInt(1) << (ptrW - 1)).U(ptrW.W)
     private val gemmNext = gemmCursor + gemmAdvance.asUInt
     private val dmaNext = dmaCursor + dmaAdvance.asUInt
@@ -100,15 +102,25 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
         ring(writePtr % ringDepth.U) := batch
         writePtr := (writePtr + 1.U)(ptrW - 1, 0)
     }
+    when(io.flushStart) {
+        writePtr := 0.U
+        gemmCursor := 0.U
+        dmaCursor := 0.U
+    }
 
     // SCHED never waits, so it bypasses the ring and keeps a single entry.
-    private val schedStage = Module(new Queue(
-        Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg))), 1))
-    io.scheduler <> schedStage.io.deq
-    schedStage.io.enq.valid := hasLane(batch, SCHED)
-    schedStage.io.enq.bits := selectLanes(batch, SCHED)
-    private val schedUsed = schedStage.io.count +& schedStage.io.enq.valid.asUInt -
-        schedStage.io.deq.fire.asUInt
+    private val schedValid = RegInit(false.B)
+    private val schedBits = Reg(Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg))))
+    io.scheduler.valid := schedValid
+    io.scheduler.bits := schedBits
+    private val schedEnq = hasLane(batch, SCHED) && !io.flushing
+    when(io.scheduler.fire) { schedValid := false.B }
+    when(schedEnq) {
+        schedValid := true.B
+        schedBits := selectLanes(batch, SCHED)
+    }
+    when(io.flushing) { schedValid := false.B }
+    private val schedUsed = schedValid.asUInt +& schedEnq.asUInt - io.scheduler.fire.asUInt
     private val schedReady = schedUsed < 1.U
 
     // Capacity is reserved at accept time because the next-cycle operands cannot stall.
@@ -123,10 +135,10 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
         val cmd = inst(29, 26)
         val aux = inst(11, 7)
         val isCtrl = funct3 === 3.U
-        val schedOnly = cmd === 3.U || cmd === 4.U || cmd === 6.U || cmd === 8.U
+        val schedOnly = cmd === 3.U || cmd === 4.U || cmd === 6.U || cmd === 8.U || cmd === 10.U
         val gemmDmaOnly = cmd === 0.U || cmd === 9.U
         val noSched = cmd === 1.U || cmd === 2.U
-        val auxZero = cmd === 0.U || cmd === 5.U || cmd === 6.U || cmd === 9.U
+        val auxZero = cmd === 0.U || cmd === 5.U || cmd === 6.U || cmd === 9.U || cmd === 10.U
         val auxHiZero = cmd === 2.U || cmd === 3.U
         val bit25Zero = cmd =/= 4.U
         val cause = Wire(UInt(cfg.trapCauseWidth.W))
@@ -135,7 +147,7 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
             cause := QueenTrapCause.opcode.U
         }.elsewhen(funct3 > 3.U) {
             cause := QueenTrapCause.funct3.U
-        }.elsewhen(isCtrl && (cmd === 7.U || cmd >= 10.U)) {
+        }.elsewhen(isCtrl && (cmd === 7.U || cmd >= 11.U)) {
             cause := QueenTrapCause.cmd.U
         }.elsewhen(isCtrl && ((schedOnly && endpoint =/= SCHED.U) ||
             (gemmDmaOnly && endpoint =/= GEMM.U && endpoint =/= DMA.U) ||
@@ -173,7 +185,8 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
         val isQwr = inst(14, 12) === 0.U || inst(14, 12) === 1.U
         val isRun = inst(14, 12) === 3.U && inst(29, 26) === 9.U
         val isQrd = inst(14, 12) === 2.U
-        val resourceReady = ((endpoint === GEMM.U) || (endpoint === DMA.U)) && ringReady ||
+        val resourceReady = io.flushing ||
+            ((endpoint === GEMM.U) || (endpoint === DMA.U)) && ringReady ||
             (endpoint === SCHED.U) && schedReady
         val qrdRoom = (io.qrdUsed +& qrdCnt +& isQrd.asUInt) <= cfg.qrdDepth.U
         ready(i) := resourceReady && !blocked(i) && (!isQrd || qrdRoom)
@@ -183,14 +196,15 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
         io.qrdAlloc(i).bits.pc := io.inst(i).bits.pc
         io.qrdAlloc(i).bits.rdIndex := inst(11, 7)
         io.qrdAlloc(i).bits.source := Mux(endpoint === SCHED.U, 2.U, endpoint)
+        io.qrdAlloc(i).bits.dummy := io.flushing
         // openGroup folds in lane order so a QWR and a RUN in the same packet stay ordered.
         gOpen = Mux(endpoint === GEMM.U,
             Mux(fire && isQwr, true.B, Mux(fire && isRun, false.B, gOpen)), gOpen)
         dOpen = Mux(endpoint === DMA.U,
             Mux(fire && isQwr, true.B, Mux(fire && isRun, false.B, dOpen)), dOpen)
     }
-    gemmOpen := gOpen
-    dmaOpen := dOpen
+    gemmOpen := Mux(io.flushing, false.B, gOpen)
+    dmaOpen := Mux(io.flushing, false.B, dOpen)
 
     private val illegalValid = VecInit((0 until cfg.instructionLanes).map(i =>
         io.inst(i).valid && illegal(i) =/= 0.U))
@@ -205,5 +219,5 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
     }
 
     io.idle := writePtr === gemmCursor && writePtr === dmaCursor &&
-        schedStage.io.count === 0.U && !pending.asUInt.orR
+        !schedValid && !pending.asUInt.orR
 }

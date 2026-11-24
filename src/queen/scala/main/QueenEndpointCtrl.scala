@@ -14,6 +14,7 @@ class QueenEndpointCtrl(val cfg: QueenConfig) extends Module {
         val events = Input(Vec(cfg.eventGroupCount, UInt(32.W)))
         val timelines = Input(Vec(cfg.timelineCount, UInt(32.W)))
         val backendIdle = Input(Bool())
+        val flushing = Input(Bool())
         val idle = Output(Bool())
     })
 
@@ -77,7 +78,7 @@ class QueenEndpointCtrl(val cfg: QueenConfig) extends Module {
         io.out.bits(j).valid := fwd(j)
         io.out.bits(j).bits := Mux(fwd(j), cand(j).bits, 0.U.asTypeOf(new QueenDsaCommand(cfg)))
     }
-    io.out.valid := fwd.asUInt.orR
+    io.out.valid := fwd.asUInt.orR && !io.flushing
 
     private val ctrlSel = VecInit((0 until lanes).map(j => alone && j.U(cntW.W) === firstCtrlIdx))
     private val ctrlInst = pick(ctrlSel, j => cand(j).bits.inst, 0.U(32.W))
@@ -104,9 +105,14 @@ class QueenEndpointCtrl(val cfg: QueenConfig) extends Module {
     private val advance = inRange && (io.out.fire || (alone && cond) || (!alone && !io.out.valid))
     when(advance) { base := base + beatLen }
     when(done && !io.in.fire) { active := false.B }
-    when(io.in.fire) {
+    when(io.in.fire && !io.flushing) {
         pkt := io.in.bits
         base := 0.U
         active := true.B
+    }
+    // flush 期间整包丢弃：ready 仍为 1 让上游 ring 排空，但不再装载、不再转发。
+    when(io.flushing) {
+        active := false.B
+        base := 0.U
     }
 }
