@@ -339,7 +339,7 @@ class WbFusionMacFpSpec extends AnyFlatSpec with Matchers with ChiselSim {
       val d = satDefault(v.tag); val r = satRemoved(v.tag)
       val diverged = d != r
       println(f"[WbFusionMacFpSpec]   ${v.tag}: default=0x$d%08X removed=0x$r%08X diverged=$diverged " +
-        "(expected per FpAdd.scala §9.1(c) / blueprint §6.2: magNarrow 2047 vs 1920)")
+        "(expected per FpAdd.scala §9.1(c): magNarrow 2047 vs 1920)")
     }
     println("[WbFusionMacFpSpec] ===== end divergence record (in-spec bit-exactness is unaffected) =====")
   }

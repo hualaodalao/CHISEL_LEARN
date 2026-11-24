@@ -5,7 +5,7 @@
   *      全程整数算出，禁拟合 RTL。覆盖 k∈{0,1,2}、expOut 钳 254、完全相消、零槽、term-drop、前导零。
   *   ② 逐位对拍：同一 simulate 内例化 FpAddLazy3 与 FpAddNarrow，宿主把 fp32 乘积打包成 lazy-40
   *      喂三槽，FpAddNarrow 走 MX8(is2x=1)/BF16(is2x=0) 掩零模式 ⟹ 两者输出必须【逐位相等】。
-  *      这是 C 方案非 MX4 族零 diff 的依据（pe_array_ce_plan §8.2(b)(c)）。对拍对任意 fp32/lazy 位
+  *      这是 C 方案非 MX4 族零 diff 的依据。对拍对任意 fp32/lazy 位
   *      模式成立（结构等价，非精度依赖），故用全随机位模式 + 结构化边界。
   * 纯组合：poke 后 step(1) 再 peek（与 FpAddNarrowSpec 同约定）。
   */

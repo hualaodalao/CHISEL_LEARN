@@ -714,10 +714,10 @@ class WbFusionMacFpNarrowSpec extends AnyFlatSpec with Matchers with ChiselSim {
   }
 
   it should "flush MX4 tiny-scale/underflow to true zero and saturate overflow to finite ~fp32max (C-scheme F2 boundary coverage)" in {
-    // F2 零覆盖域定向用例（pe_array_ce_plan §6.2/§6.3/§6.1.1）：C 方案 Mx4BlockInt 的边界语义。
+    // F2 零覆盖域定向用例：C 方案 Mx4BlockInt 的边界语义。
     simulate(new WbFusionMacFp(supportedFmts = FMTS_MXONLY, useNarrowAdd = true)) { dut =>
       resetDut(dut)
-      // tiny 域：eSum=120<121 ⟹ 整块冲刷真零（§6.2 语义变更：旧 RTL 出 E1 非规格码）。cReg=0 ⟹ 输出真零。
+      // tiny 域：eSum=120<121 ⟹ 整块冲刷真零。cReg=0 ⟹ 输出真零。
       val tiny = Vec("n_mx4_tiny_eSum120", E2, E2, mx4(7,7,7,7), mx4(7,7,7,7), 60, 60, true)
       val rawTiny = driveVec(dut, tiny)
       assert(rawTiny == BigInt(0), s"[tiny] lazy 输出须真零，实得 0x${rawTiny.toString(16)}")

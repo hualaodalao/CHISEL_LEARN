@@ -667,7 +667,7 @@ OS-M1 的部分和列 j、bias 项 j、rqM 项 j 和输出列 `nt×T+j` 同序�
 
 复位同时清除两组。
 
-*Note（已知不合规，待改）：上面第三条"同批配置写不属于本次提交"是**当前实现行为**，与 Queen 接口 v3.0.0 §16.8 相反——该章要求 `RUN` 快照必须包含同一 beat 内它前面那些 lane 的写，并明确点名 `liveReg := shadowReg` 取旧值不满足。因此本条不是 settled 设计选择，而是待修差距 R1；实施时本条软件义务与对应用例都要撤掉。差距、代价与 sequencing 见 `doc/queen_v3_gap.md`。用户 2026-11-18 裁定 R1–R4 全部搁置，等 Queen 侧继续完善。*
+*Note（已知不合规，待改）：上面第三条"同批配置写不属于本次提交"是**当前实现行为**，与 Queen 接口 v3.0.0 §16.8 相反——该章要求 `RUN` 快照必须包含同一 beat 内它前面那些 lane 的写，并明确点名 `liveReg := shadowReg` 取旧值不满足。因此本条不是 settled 设计选择，而是待修差距 R1；实施时本条软件义务与对应用例都要撤掉。差距、代价与 sequencing 见 git 历史（原 `doc/queen_v3_gap.md`，已删除）。用户 2026-11-18 裁定 R1–R4 全部搁置，等 Queen 侧继续完善。*
 
 #### 6.1.1 单批接收与拍前检查
 
@@ -715,7 +715,7 @@ IRQ_CLEAR 跨 lane 只使用最高 lane 的候选，禁止跨 lane OR；合法�
 
 本节单批 slots/pending、响应顺序与反压契约已验证。
 
-*Note（已知不合规，待改）：本节的批缓存回执模型与 Queen 接口 v3.0.0 §16.6 冲突——该章要求写 beat 的 `cmd.ready` 恒 1、`WRITE` 不得被未取走的回执反压、且**回执与命令同拍**（`resp.valid = accept`）并按 lane 区分不丢。当前实现是注册下一拍 + 单条 resp 升序串行 + 任何 pending 时全 lane ready 低，三点都不满足。这是待修差距 R2，也是四项中唯一动顶层端口形状与共享 TB 基类的一项，详见 `doc/queen_v3_gap.md`。用户 2026-11-18 裁定搁置。*
+*Note（已知不合规，待改）：本节的批缓存回执模型与 Queen 接口 v3.0.0 §16.6 冲突——该章要求写 beat 的 `cmd.ready` 恒 1、`WRITE` 不得被未取走的回执反压、且**回执与命令同拍**（`resp.valid = accept`）并按 lane 区分不丢。当前实现是注册下一拍 + 单条 resp 升序串行 + 任何 pending 时全 lane ready 低，三点都不满足。这是待修差距 R2，也是四项中唯一动顶层端口形状与共享 TB 基类的一项，详见 git 历史（原 `doc/queen_v3_gap.md`，已删除）。用户 2026-11-18 裁定搁置。*
 
 `resp` 保持单一带 ready/valid 握手的输出流，不扩展为四路：
 
@@ -818,7 +818,7 @@ Scale 端口只在编译期包含 MX 硬件时存在。
 - credit 为 0 时 `RUN` 在派发级停等（ready 低），不产生 ACK、不置错误位；上游后续指令按程序序等待。
 - 要让上游在执行期就提交下一个 `RUN`，需要第三组配置缓冲；当前不做，见第 14.2 节。
 
-*Note（已知不合规，待改）：Queen 接口 v3.0.0 §16.5/16.6 把设备端口定义为 `ready_start`（Bool），credit 计数不外露、不设 `CFG_CREDIT`；Queen adapter 端口已是 `readyStart: Bool`。本设备外露的 `cfgCredit: UInt(1.W)` 在深度 1 时与之信息等价、且不依赖 `cmd.valid`（语义已合规），差的是端口名与类型，属待修差距 R3。另 §16.5 要求必须外露 `completion: Decoupled{sequence,error,code,hwSignal}` 与**强 idle**，本设备目前只有 `status`/`irq`，两者皆缺，属差距 R4；其 sequence/cmdTag/swTag 映射两侧均未定。详见 `doc/queen_v3_gap.md`。*
+*Note（已知不合规，待改）：Queen 接口 v3.0.0 §16.5/16.6 把设备端口定义为 `ready_start`（Bool），credit 计数不外露、不设 `CFG_CREDIT`；Queen adapter 端口已是 `readyStart: Bool`。本设备外露的 `cfgCredit: UInt(1.W)` 在深度 1 时与之信息等价、且不依赖 `cmd.valid`（语义已合规），差的是端口名与类型，属待修差距 R3。另 §16.5 要求必须外露 `completion: Decoupled{sequence,error,code,hwSignal}` 与**强 idle**，本设备目前只有 `status`/`irq`，两者皆缺，属差距 R4；其 sequence/cmdTag/swTag 映射两侧均未定。详见 git 历史（原 `doc/queen_v3_gap.md`，已删除）。*
 
 *Note：Queen 契约 §9.1 的 `hwSignal`（RUN 接受时锁存硬件信号目标、随 completion 回传、`error=1` 不得携带有效目标）尚未实现。用户 2026-11-18 裁定先不做，等 Queen 侧继续迭代完善；本版不定义其地址、位域或时序。*
 

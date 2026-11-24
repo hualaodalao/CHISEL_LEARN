@@ -313,7 +313,7 @@ class WorkerBeePhase0Spec extends WorkerBeeCaseSpec {
     writeReport("A5")
   }
 
-  // ══════════ B：WS（M>1）周期账，裁定 tbd.md:23 ══════════
+  // ══════════ B：WS（M>1）周期账 ══════════
   runSeqCase("-p0-B", Seq(1, 2, 4, 8, 16).map { m =>
     params(DataFormat.BF16, DataFormat.BF16, 512, m, false, s"B-ws-m$m")
   }) { os =>

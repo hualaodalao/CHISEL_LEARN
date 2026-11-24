@@ -20,7 +20,7 @@ import chisel3.util._
   *   ⟹ magFull(W+2)=0 ⟹ 五槽 kGrow 探测退化为与三槽相同的 {W,W+1} ⟹ 对齐、求和、k 档、打包
   *   逐位一致。前提是宿主把 fp32 乘积 p 打包成 lazy40 = {p(31),p(30,23),Cat(1,p(22,0)),7'b0}
   *   （含隐含 1），其 unpackC 的 magW=mant31>>CSh 与 FpAddNarrow.unpackProd 的 mag24>>(24−W) 同值。
-  *   MX4 走整数前端块和，与五槽数值相等但非逐位（lazy 切分位置不同，见 pe_array_ce_plan §6.4 P9）。
+  *   MX4 走整数前端块和，与五槽数值相等但非逐位（lazy 切分位置不同）。
   *
   * lazy-40: [39]sign [38:31]exp(biased-127,不规格化,允许 leading zeros) [30:0]mant31；
   *   value = mant31 × 2^(exp−157)；真零判据 exp==0 && mant31==0。
