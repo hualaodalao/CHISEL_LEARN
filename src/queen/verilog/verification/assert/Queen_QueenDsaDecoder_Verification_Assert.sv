@@ -17,16 +17,16 @@
     `define ASSERT_VERBOSE_COND_ 1
   `endif // ASSERT_VERBOSE_COND
 `endif // not def ASSERT_VERBOSE_COND_
-module Queen_QueenDsaDecoder_Verification_Assert();	// src/queen/scala/main/QueenDsaDecoder.scala:98:11
-  `ifndef SYNTHESIS	// src/queen/scala/main/QueenDsaDecoder.scala:98:11
-    always @(posedge Queen_QueenDsaDecoder.clock) begin	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :98:11
+module Queen_QueenDsaDecoder_Verification_Assert();	// src/queen/scala/main/QueenDsaDecoder.scala:100:11
+  `ifndef SYNTHESIS	// src/queen/scala/main/QueenDsaDecoder.scala:100:11
+    always @(posedge Queen_QueenDsaDecoder.clock) begin	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :100:11
       if (~Queen_QueenDsaDecoder.reset
           & ~(~Queen_QueenDsaDecoder.ringEnqValid_layerCapture
-              | Queen_QueenDsaDecoder.ringUsed_layerCapture < 8'h40)) begin	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :86:53, :94:38, :95:40, :98:{11,12,26}
-        if (`ASSERT_VERBOSE_COND_)	// src/queen/scala/main/QueenDsaDecoder.scala:98:11
-          $error("Assertion failed at QueenDsaDecoder.scala:98\n");	// src/queen/scala/main/QueenDsaDecoder.scala:98:11
-        if (`STOP_COND_)	// src/queen/scala/main/QueenDsaDecoder.scala:98:11
-          $fatal;	// src/queen/scala/main/QueenDsaDecoder.scala:98:11
+              | Queen_QueenDsaDecoder.ringUsed_layerCapture < 8'h40)) begin	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :88:78, :96:38, :97:40, :100:{11,12,26}
+        if (`ASSERT_VERBOSE_COND_)	// src/queen/scala/main/QueenDsaDecoder.scala:100:11
+          $error("Assertion failed at QueenDsaDecoder.scala:100\n");	// src/queen/scala/main/QueenDsaDecoder.scala:100:11
+        if (`STOP_COND_)	// src/queen/scala/main/QueenDsaDecoder.scala:100:11
+          $fatal;	// src/queen/scala/main/QueenDsaDecoder.scala:100:11
       end
     end // always @(posedge)
   `endif // not def SYNTHESIS

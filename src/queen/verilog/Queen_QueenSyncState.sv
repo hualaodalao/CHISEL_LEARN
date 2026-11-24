@@ -105,59 +105,60 @@ module Queen_QueenSyncState(	// src/queen/scala/main/QueenSyncState.scala:20:7
                 io_timelines_6,	// src/queen/scala/main/QueenSyncState.scala:21:16
                 io_timelines_7,	// src/queen/scala/main/QueenSyncState.scala:21:16
   output        io_rollback,	// src/queen/scala/main/QueenSyncState.scala:21:16
-  output [2:0]  io_rollbackId	// src/queen/scala/main/QueenSyncState.scala:21:16
+  output [2:0]  io_rollbackId,	// src/queen/scala/main/QueenSyncState.scala:21:16
+  input         io_clear	// src/queen/scala/main/QueenSyncState.scala:21:16
 );
 
-  reg  [31:0]      events_0;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_1;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_2;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_3;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_4;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_5;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_6;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_7;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_8;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_9;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_10;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_11;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_12;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_13;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_14;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_15;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_16;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_17;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_18;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_19;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_20;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_21;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_22;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_23;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_24;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_25;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_26;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_27;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_28;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_29;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_30;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      events_31;	// src/queen/scala/main/QueenSyncState.scala:30:33
-  reg  [31:0]      timelines_0;	// src/queen/scala/main/QueenSyncState.scala:31:36
-  reg  [31:0]      timelines_1;	// src/queen/scala/main/QueenSyncState.scala:31:36
-  reg  [31:0]      timelines_2;	// src/queen/scala/main/QueenSyncState.scala:31:36
-  reg  [31:0]      timelines_3;	// src/queen/scala/main/QueenSyncState.scala:31:36
-  reg  [31:0]      timelines_4;	// src/queen/scala/main/QueenSyncState.scala:31:36
-  reg  [31:0]      timelines_5;	// src/queen/scala/main/QueenSyncState.scala:31:36
-  reg  [31:0]      timelines_6;	// src/queen/scala/main/QueenSyncState.scala:31:36
-  reg  [31:0]      timelines_7;	// src/queen/scala/main/QueenSyncState.scala:31:36
-  wire             swTimeline = io_sw_valid & io_sw_isTimeline;	// src/queen/scala/main/QueenSyncState.scala:39:42
-  wire             _assignSel_T_28 = swTimeline & io_sw_assign;	// src/queen/scala/main/QueenSyncState.scala:39:42, :52:20
-  wire             assignSel_0 = _assignSel_T_28 & ~(|(io_sw_index[2:0]));	// src/queen/scala/main/QueenSyncState.scala:52:{20,36,50,57}
-  wire             assignSel_1 = _assignSel_T_28 & io_sw_index[2:0] == 3'h1;	// src/queen/scala/main/QueenSyncState.scala:52:{20,36,50,57}
-  wire             assignSel_2 = _assignSel_T_28 & io_sw_index[2:0] == 3'h2;	// src/queen/scala/main/QueenSyncState.scala:52:{20,36,50,57}
-  wire             assignSel_3 = _assignSel_T_28 & io_sw_index[2:0] == 3'h3;	// src/queen/scala/main/QueenSyncState.scala:52:{20,36,50,57}
-  wire             assignSel_4 = _assignSel_T_28 & io_sw_index[2:0] == 3'h4;	// src/queen/scala/main/QueenSyncState.scala:43:58, :52:{20,36,50,57}
-  wire             assignSel_5 = _assignSel_T_28 & io_sw_index[2:0] == 3'h5;	// src/queen/scala/main/QueenSyncState.scala:43:58, :52:{20,36,50,57}
-  wire             assignSel_6 = _assignSel_T_28 & io_sw_index[2:0] == 3'h6;	// src/queen/scala/main/QueenSyncState.scala:43:58, :52:{20,36,50,57}
-  wire             assignSel_7 = _assignSel_T_28 & (&(io_sw_index[2:0]));	// src/queen/scala/main/QueenSyncState.scala:52:{20,36,50,57}
+  reg  [31:0]      events_0;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_1;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_2;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_3;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_4;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_5;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_6;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_7;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_8;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_9;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_10;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_11;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_12;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_13;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_14;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_15;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_16;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_17;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_18;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_19;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_20;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_21;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_22;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_23;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_24;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_25;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_26;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_27;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_28;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_29;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_30;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      events_31;	// src/queen/scala/main/QueenSyncState.scala:31:33
+  reg  [31:0]      timelines_0;	// src/queen/scala/main/QueenSyncState.scala:32:36
+  reg  [31:0]      timelines_1;	// src/queen/scala/main/QueenSyncState.scala:32:36
+  reg  [31:0]      timelines_2;	// src/queen/scala/main/QueenSyncState.scala:32:36
+  reg  [31:0]      timelines_3;	// src/queen/scala/main/QueenSyncState.scala:32:36
+  reg  [31:0]      timelines_4;	// src/queen/scala/main/QueenSyncState.scala:32:36
+  reg  [31:0]      timelines_5;	// src/queen/scala/main/QueenSyncState.scala:32:36
+  reg  [31:0]      timelines_6;	// src/queen/scala/main/QueenSyncState.scala:32:36
+  reg  [31:0]      timelines_7;	// src/queen/scala/main/QueenSyncState.scala:32:36
+  wire             swTimeline = io_sw_valid & io_sw_isTimeline;	// src/queen/scala/main/QueenSyncState.scala:40:42
+  wire             _assignSel_T_28 = swTimeline & io_sw_assign;	// src/queen/scala/main/QueenSyncState.scala:40:42, :53:20
+  wire             assignSel_0 = _assignSel_T_28 & ~(|(io_sw_index[2:0]));	// src/queen/scala/main/QueenSyncState.scala:53:{20,36,50,57}
+  wire             assignSel_1 = _assignSel_T_28 & io_sw_index[2:0] == 3'h1;	// src/queen/scala/main/QueenSyncState.scala:53:{20,36,50,57}
+  wire             assignSel_2 = _assignSel_T_28 & io_sw_index[2:0] == 3'h2;	// src/queen/scala/main/QueenSyncState.scala:53:{20,36,50,57}
+  wire             assignSel_3 = _assignSel_T_28 & io_sw_index[2:0] == 3'h3;	// src/queen/scala/main/QueenSyncState.scala:53:{20,36,50,57}
+  wire             assignSel_4 = _assignSel_T_28 & io_sw_index[2:0] == 3'h4;	// src/queen/scala/main/QueenSyncState.scala:44:58, :53:{20,36,50,57}
+  wire             assignSel_5 = _assignSel_T_28 & io_sw_index[2:0] == 3'h5;	// src/queen/scala/main/QueenSyncState.scala:44:58, :53:{20,36,50,57}
+  wire             assignSel_6 = _assignSel_T_28 & io_sw_index[2:0] == 3'h6;	// src/queen/scala/main/QueenSyncState.scala:44:58, :53:{20,36,50,57}
+  wire             assignSel_7 = _assignSel_T_28 & (&(io_sw_index[2:0]));	// src/queen/scala/main/QueenSyncState.scala:53:{20,36,50,57}
   wire [7:0][31:0] _GEN =
     {{timelines_7},
      {timelines_6},
@@ -166,7 +167,7 @@ module Queen_QueenSyncState(	// src/queen/scala/main/QueenSyncState.scala:20:7
      {timelines_3},
      {timelines_2},
      {timelines_1},
-     {timelines_0}};	// src/queen/scala/main/QueenSyncState.scala:31:36, :54:21
+     {timelines_0}};	// src/queen/scala/main/QueenSyncState.scala:32:36, :55:21
   wire             io_rollback_0 =
     (|{assignSel_7,
        assignSel_6,
@@ -175,504 +176,584 @@ module Queen_QueenSyncState(	// src/queen/scala/main/QueenSyncState.scala:20:7
        assignSel_3,
        assignSel_2,
        assignSel_1,
-       assignSel_0}) & $signed(io_sw_data - _GEN[io_sw_index[2:0]]) < 32'sh0;	// src/queen/scala/main/QueenSyncState.scala:30:41, :52:{36,50}, :53:{30,37,41}, :54:{21,60}
+       assignSel_0}) & $signed(io_sw_data - _GEN[io_sw_index[2:0]]) < 32'sh0;	// src/queen/scala/main/QueenSyncState.scala:31:41, :53:{36,50}, :54:{30,37,41}, :55:{21,60}
   always @(posedge clock) begin	// src/queen/scala/main/QueenSyncState.scala:20:7
     if (reset) begin	// src/queen/scala/main/QueenSyncState.scala:20:7
-      events_0 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_1 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_2 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_3 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_4 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_5 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_6 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_7 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_8 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_9 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_10 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_11 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_12 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_13 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_14 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_15 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_16 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_17 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_18 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_19 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_20 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_21 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_22 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_23 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_24 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_25 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_26 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_27 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_28 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_29 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_30 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      events_31 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}
-      timelines_0 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:41, :31:36
-      timelines_1 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:41, :31:36
-      timelines_2 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:41, :31:36
-      timelines_3 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:41, :31:36
-      timelines_4 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:41, :31:36
-      timelines_5 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:41, :31:36
-      timelines_6 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:41, :31:36
-      timelines_7 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:30:41, :31:36
+      events_0 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_1 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_2 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_3 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_4 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_5 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_6 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_7 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_8 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_9 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_10 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_11 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_12 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_13 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_14 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_15 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_16 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_17 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_18 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_19 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_20 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_21 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_22 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_23 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_24 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_25 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_26 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_27 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_28 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_29 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_30 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      events_31 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}
+      timelines_0 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:41, :32:36
+      timelines_1 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:41, :32:36
+      timelines_2 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:41, :32:36
+      timelines_3 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:41, :32:36
+      timelines_4 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:41, :32:36
+      timelines_5 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:41, :32:36
+      timelines_6 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:41, :32:36
+      timelines_7 <= 32'h0;	// src/queen/scala/main/QueenSyncState.scala:31:41, :32:36
     end
     else begin	// src/queen/scala/main/QueenSyncState.scala:20:7
-      automatic logic swEvent = io_sw_valid & ~io_sw_isTimeline;	// src/queen/scala/main/QueenSyncState.scala:38:{39,42}
+      automatic logic swEvent = io_sw_valid & ~io_sw_isTimeline;	// src/queen/scala/main/QueenSyncState.scala:39:{39,42}
       automatic logic _hwInc_T_77 =
-        io_completion_0_valid & io_completion_0_bits_hwSignal_enable;	// src/queen/scala/main/QueenSyncState.scala:36:17
+        io_completion_0_valid & io_completion_0_bits_hwSignal_enable;	// src/queen/scala/main/QueenSyncState.scala:37:17
       automatic logic _hwInc_T_82 =
-        io_completion_1_valid & io_completion_1_bits_hwSignal_enable;	// src/queen/scala/main/QueenSyncState.scala:36:17
-      automatic logic sel = swEvent & io_sw_index == 5'h0;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_1 = swEvent & io_sw_index == 5'h1;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_2 = swEvent & io_sw_index == 5'h2;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_3 = swEvent & io_sw_index == 5'h3;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_4 = swEvent & io_sw_index == 5'h4;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_5 = swEvent & io_sw_index == 5'h5;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_6 = swEvent & io_sw_index == 5'h6;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_7 = swEvent & io_sw_index == 5'h7;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_8 = swEvent & io_sw_index == 5'h8;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_9 = swEvent & io_sw_index == 5'h9;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_10 = swEvent & io_sw_index == 5'hA;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_11 = swEvent & io_sw_index == 5'hB;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_12 = swEvent & io_sw_index == 5'hC;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_13 = swEvent & io_sw_index == 5'hD;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_14 = swEvent & io_sw_index == 5'hE;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_15 = swEvent & io_sw_index == 5'hF;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_16 = swEvent & io_sw_index == 5'h10;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_17 = swEvent & io_sw_index == 5'h11;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_18 = swEvent & io_sw_index == 5'h12;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_19 = swEvent & io_sw_index == 5'h13;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_20 = swEvent & io_sw_index == 5'h14;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_21 = swEvent & io_sw_index == 5'h15;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_22 = swEvent & io_sw_index == 5'h16;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_23 = swEvent & io_sw_index == 5'h17;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_24 = swEvent & io_sw_index == 5'h18;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_25 = swEvent & io_sw_index == 5'h19;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_26 = swEvent & io_sw_index == 5'h1A;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_27 = swEvent & io_sw_index == 5'h1B;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_28 = swEvent & io_sw_index == 5'h1C;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_29 = swEvent & io_sw_index == 5'h1D;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_30 = swEvent & io_sw_index == 5'h1E;	// src/queen/scala/main/QueenSyncState.scala:38:39, :43:58, :45:{27,42}
-      automatic logic sel_31 = swEvent & (&io_sw_index);	// src/queen/scala/main/QueenSyncState.scala:38:39, :45:{27,42}
+        io_completion_1_valid & io_completion_1_bits_hwSignal_enable;	// src/queen/scala/main/QueenSyncState.scala:37:17
+      automatic logic sel = swEvent & io_sw_index == 5'h0;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_1 = swEvent & io_sw_index == 5'h1;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_2 = swEvent & io_sw_index == 5'h2;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_3 = swEvent & io_sw_index == 5'h3;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_4 = swEvent & io_sw_index == 5'h4;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_5 = swEvent & io_sw_index == 5'h5;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_6 = swEvent & io_sw_index == 5'h6;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_7 = swEvent & io_sw_index == 5'h7;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_8 = swEvent & io_sw_index == 5'h8;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_9 = swEvent & io_sw_index == 5'h9;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_10 = swEvent & io_sw_index == 5'hA;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_11 = swEvent & io_sw_index == 5'hB;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_12 = swEvent & io_sw_index == 5'hC;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_13 = swEvent & io_sw_index == 5'hD;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_14 = swEvent & io_sw_index == 5'hE;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_15 = swEvent & io_sw_index == 5'hF;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_16 = swEvent & io_sw_index == 5'h10;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_17 = swEvent & io_sw_index == 5'h11;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_18 = swEvent & io_sw_index == 5'h12;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_19 = swEvent & io_sw_index == 5'h13;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_20 = swEvent & io_sw_index == 5'h14;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_21 = swEvent & io_sw_index == 5'h15;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_22 = swEvent & io_sw_index == 5'h16;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_23 = swEvent & io_sw_index == 5'h17;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_24 = swEvent & io_sw_index == 5'h18;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_25 = swEvent & io_sw_index == 5'h19;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_26 = swEvent & io_sw_index == 5'h1A;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_27 = swEvent & io_sw_index == 5'h1B;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_28 = swEvent & io_sw_index == 5'h1C;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_29 = swEvent & io_sw_index == 5'h1D;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_30 = swEvent & io_sw_index == 5'h1E;	// src/queen/scala/main/QueenSyncState.scala:39:39, :44:58, :46:{27,42}
+      automatic logic sel_31 = swEvent & (&io_sw_index);	// src/queen/scala/main/QueenSyncState.scala:39:39, :46:{27,42}
       events_0 <=
-        events_0 & ~(sel & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h0
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h0
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_0 & ~(sel & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h0
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h0
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_1 <=
-        events_1 & ~(sel_1 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h1
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h1
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_1 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_1 & ~(sel_1 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h1
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h1
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_1 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_2 <=
-        events_2 & ~(sel_2 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h2
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h2
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_2 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_2 & ~(sel_2 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h2
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h2
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_2 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_3 <=
-        events_3 & ~(sel_3 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h3
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h3
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_3 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_3 & ~(sel_3 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h3
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h3
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_3 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_4 <=
-        events_4 & ~(sel_4 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h4
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h4
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_4 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_4 & ~(sel_4 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h4
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h4
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_4 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_5 <=
-        events_5 & ~(sel_5 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h5
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h5
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_5 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_5 & ~(sel_5 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h5
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h5
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_5 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_6 <=
-        events_6 & ~(sel_6 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h6
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h6
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_6 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_6 & ~(sel_6 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h6
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h6
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_6 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_7 <=
-        events_7 & ~(sel_7 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h7
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h7
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_7 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_7 & ~(sel_7 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h7
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h7
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_7 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_8 <=
-        events_8 & ~(sel_8 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h8
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h8
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_8 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_8 & ~(sel_8 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h8
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h8
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_8 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_9 <=
-        events_9 & ~(sel_9 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h9
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h9
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_9 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_9 & ~(sel_9 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h9
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h9
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_9 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_10 <=
-        events_10 & ~(sel_10 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'hA
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'hA
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_10 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_10 & ~(sel_10 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'hA
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'hA
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_10 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_11 <=
-        events_11 & ~(sel_11 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'hB
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'hB
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_11 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_11 & ~(sel_11 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'hB
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'hB
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_11 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_12 <=
-        events_12 & ~(sel_12 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'hC
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'hC
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_12 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_12 & ~(sel_12 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'hC
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'hC
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_12 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_13 <=
-        events_13 & ~(sel_13 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'hD
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'hD
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_13 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_13 & ~(sel_13 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'hD
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'hD
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_13 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_14 <=
-        events_14 & ~(sel_14 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'hE
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'hE
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_14 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_14 & ~(sel_14 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'hE
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'hE
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_14 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_15 <=
-        events_15 & ~(sel_15 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'hF
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'hF
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_15 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_15 & ~(sel_15 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'hF
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'hF
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_15 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_16 <=
-        events_16 & ~(sel_16 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h10
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h10
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_16 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_16 & ~(sel_16 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h10
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h10
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_16 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_17 <=
-        events_17 & ~(sel_17 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h11
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h11
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_17 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_17 & ~(sel_17 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h11
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h11
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_17 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_18 <=
-        events_18 & ~(sel_18 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h12
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h12
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_18 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_18 & ~(sel_18 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h12
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h12
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_18 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_19 <=
-        events_19 & ~(sel_19 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h13
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h13
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_19 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_19 & ~(sel_19 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h13
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h13
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_19 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_20 <=
-        events_20 & ~(sel_20 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h14
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h14
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_20 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_20 & ~(sel_20 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h14
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h14
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_20 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_21 <=
-        events_21 & ~(sel_21 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h15
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h15
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_21 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_21 & ~(sel_21 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h15
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h15
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_21 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_22 <=
-        events_22 & ~(sel_22 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h16
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h16
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_22 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_22 & ~(sel_22 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h16
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h16
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_22 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_23 <=
-        events_23 & ~(sel_23 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h17
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h17
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_23 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_23 & ~(sel_23 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h17
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h17
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_23 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_24 <=
-        events_24 & ~(sel_24 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h18
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h18
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_24 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_24 & ~(sel_24 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h18
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h18
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_24 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_25 <=
-        events_25 & ~(sel_25 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h19
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h19
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_25 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_25 & ~(sel_25 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h19
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h19
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_25 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_26 <=
-        events_26 & ~(sel_26 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h1A
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h1A
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_26 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_26 & ~(sel_26 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h1A
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h1A
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_26 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_27 <=
-        events_27 & ~(sel_27 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h1B
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h1B
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_27 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_27 & ~(sel_27 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h1B
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h1B
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_27 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_28 <=
-        events_28 & ~(sel_28 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h1C
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h1C
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_28 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_28 & ~(sel_28 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h1C
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h1C
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_28 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_29 <=
-        events_29 & ~(sel_29 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h1D
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h1D
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_29 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_29 & ~(sel_29 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h1D
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h1D
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_29 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_30 <=
-        events_30 & ~(sel_30 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & io_completion_0_bits_hwSignal_group == 5'h1E
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & io_completion_1_bits_hwSignal_group == 5'h1E
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_30 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_30 & ~(sel_30 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & io_completion_0_bits_hwSignal_group == 5'h1E
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & io_completion_1_bits_hwSignal_group == 5'h1E
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_30 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       events_31 <=
-        events_31 & ~(sel_31 & io_sw_clr ? io_sw_data : 32'h0)
-        | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
-           & (&io_completion_0_bits_hwSignal_group)
-             ? io_completion_0_bits_hwSignal_mask
-             : 32'h0)
-        | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
-           & (&io_completion_1_bits_hwSignal_group)
-             ? io_completion_1_bits_hwSignal_mask
-             : 32'h0) | (sel_31 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:30:{33,41}, :36:{17,43,73}, :43:{16,33,58}, :44:23, :45:27, :46:{24,29,32}, :47:{24,29}, :48:{33,35,43,51}
+        io_clear
+          ? 32'h0
+          : events_31 & ~(sel_31 & io_sw_clr ? io_sw_data : 32'h0)
+            | (_hwInc_T_77 & ~io_completion_0_bits_hwSignal_isTimeline
+               & (&io_completion_0_bits_hwSignal_group)
+                 ? io_completion_0_bits_hwSignal_mask
+                 : 32'h0)
+            | (_hwInc_T_82 & ~io_completion_1_bits_hwSignal_isTimeline
+               & (&io_completion_1_bits_hwSignal_group)
+                 ? io_completion_1_bits_hwSignal_mask
+                 : 32'h0) | (sel_31 & ~io_sw_clr ? io_sw_data : 32'h0);	// src/queen/scala/main/QueenSyncState.scala:31:{33,41}, :37:{17,43,73}, :44:{16,33,58}, :45:23, :46:27, :47:{24,29,32}, :48:{24,29}, :49:{25,58,60,68,76}
       timelines_0 <=
-        assignSel_0 & ~io_rollback_0
-          ? io_sw_data
-          : timelines_0
-            + {30'h0,
-               {1'h0,
-                _hwInc_T_77 & io_completion_0_bits_hwSignal_isTimeline
-                  & io_completion_0_bits_hwSignal_timeline == 3'h0}
-                 + {1'h0,
-                    _hwInc_T_82 & io_completion_1_bits_hwSignal_isTimeline
-                      & io_completion_1_bits_hwSignal_timeline == 3'h0}}
-            + {31'h0, swTimeline & ~io_sw_assign & ~(|(io_sw_index[2:0]))};	// src/queen/scala/main/QueenSyncState.scala:31:36, :36:{17,43}, :39:42, :43:58, :52:{36,50,57}, :53:41, :54:60, :58:29, :59:{28,56}, :60:{32,35,49,70}, :61:{35,38}, :62:{28,62,70}
+        io_clear
+          ? 32'h0
+          : assignSel_0 & ~io_rollback_0
+              ? io_sw_data
+              : timelines_0
+                + {30'h0,
+                   {1'h0,
+                    _hwInc_T_77 & io_completion_0_bits_hwSignal_isTimeline
+                      & io_completion_0_bits_hwSignal_timeline == 3'h0}
+                     + {1'h0,
+                        _hwInc_T_82 & io_completion_1_bits_hwSignal_isTimeline
+                          & io_completion_1_bits_hwSignal_timeline == 3'h0}}
+                + {31'h0, swTimeline & ~io_sw_assign & ~(|(io_sw_index[2:0]))};	// src/queen/scala/main/QueenSyncState.scala:31:41, :32:36, :37:{17,43}, :40:42, :44:58, :53:{36,50,57}, :54:41, :55:60, :59:29, :60:{28,56}, :61:{32,35,49,70}, :62:{35,38}, :63:28, :64:{16,50,58}
       timelines_1 <=
-        assignSel_1 & ~io_rollback_0
-          ? io_sw_data
-          : timelines_1
-            + {30'h0,
-               {1'h0,
-                _hwInc_T_77 & io_completion_0_bits_hwSignal_isTimeline
-                  & io_completion_0_bits_hwSignal_timeline == 3'h1}
-                 + {1'h0,
-                    _hwInc_T_82 & io_completion_1_bits_hwSignal_isTimeline
-                      & io_completion_1_bits_hwSignal_timeline == 3'h1}}
-            + {31'h0, swTimeline & ~io_sw_assign & io_sw_index[2:0] == 3'h1};	// src/queen/scala/main/QueenSyncState.scala:31:36, :36:{17,43}, :39:42, :52:{36,50,57}, :53:41, :54:60, :58:29, :59:{28,56}, :60:{32,35,49,70}, :61:{35,38}, :62:{28,62,70}
+        io_clear
+          ? 32'h0
+          : assignSel_1 & ~io_rollback_0
+              ? io_sw_data
+              : timelines_1
+                + {30'h0,
+                   {1'h0,
+                    _hwInc_T_77 & io_completion_0_bits_hwSignal_isTimeline
+                      & io_completion_0_bits_hwSignal_timeline == 3'h1}
+                     + {1'h0,
+                        _hwInc_T_82 & io_completion_1_bits_hwSignal_isTimeline
+                          & io_completion_1_bits_hwSignal_timeline == 3'h1}}
+                + {31'h0, swTimeline & ~io_sw_assign & io_sw_index[2:0] == 3'h1};	// src/queen/scala/main/QueenSyncState.scala:31:41, :32:36, :37:{17,43}, :40:42, :53:{36,50,57}, :54:41, :55:60, :59:29, :60:{28,56}, :61:{32,35,49,70}, :62:{35,38}, :63:28, :64:{16,50,58}
       timelines_2 <=
-        assignSel_2 & ~io_rollback_0
-          ? io_sw_data
-          : timelines_2
-            + {30'h0,
-               {1'h0,
-                _hwInc_T_77 & io_completion_0_bits_hwSignal_isTimeline
-                  & io_completion_0_bits_hwSignal_timeline == 3'h2}
-                 + {1'h0,
-                    _hwInc_T_82 & io_completion_1_bits_hwSignal_isTimeline
-                      & io_completion_1_bits_hwSignal_timeline == 3'h2}}
-            + {31'h0, swTimeline & ~io_sw_assign & io_sw_index[2:0] == 3'h2};	// src/queen/scala/main/QueenSyncState.scala:31:36, :36:{17,43}, :39:42, :52:{36,50,57}, :53:41, :54:60, :58:29, :59:{28,56}, :60:{32,35,49,70}, :61:{35,38}, :62:{28,62,70}
+        io_clear
+          ? 32'h0
+          : assignSel_2 & ~io_rollback_0
+              ? io_sw_data
+              : timelines_2
+                + {30'h0,
+                   {1'h0,
+                    _hwInc_T_77 & io_completion_0_bits_hwSignal_isTimeline
+                      & io_completion_0_bits_hwSignal_timeline == 3'h2}
+                     + {1'h0,
+                        _hwInc_T_82 & io_completion_1_bits_hwSignal_isTimeline
+                          & io_completion_1_bits_hwSignal_timeline == 3'h2}}
+                + {31'h0, swTimeline & ~io_sw_assign & io_sw_index[2:0] == 3'h2};	// src/queen/scala/main/QueenSyncState.scala:31:41, :32:36, :37:{17,43}, :40:42, :53:{36,50,57}, :54:41, :55:60, :59:29, :60:{28,56}, :61:{32,35,49,70}, :62:{35,38}, :63:28, :64:{16,50,58}
       timelines_3 <=
-        assignSel_3 & ~io_rollback_0
-          ? io_sw_data
-          : timelines_3
-            + {30'h0,
-               {1'h0,
-                _hwInc_T_77 & io_completion_0_bits_hwSignal_isTimeline
-                  & io_completion_0_bits_hwSignal_timeline == 3'h3}
-                 + {1'h0,
-                    _hwInc_T_82 & io_completion_1_bits_hwSignal_isTimeline
-                      & io_completion_1_bits_hwSignal_timeline == 3'h3}}
-            + {31'h0, swTimeline & ~io_sw_assign & io_sw_index[2:0] == 3'h3};	// src/queen/scala/main/QueenSyncState.scala:31:36, :36:{17,43}, :39:42, :52:{36,50,57}, :53:41, :54:60, :58:29, :59:{28,56}, :60:{32,35,49,70}, :61:{35,38}, :62:{28,62,70}
+        io_clear
+          ? 32'h0
+          : assignSel_3 & ~io_rollback_0
+              ? io_sw_data
+              : timelines_3
+                + {30'h0,
+                   {1'h0,
+                    _hwInc_T_77 & io_completion_0_bits_hwSignal_isTimeline
+                      & io_completion_0_bits_hwSignal_timeline == 3'h3}
+                     + {1'h0,
+                        _hwInc_T_82 & io_completion_1_bits_hwSignal_isTimeline
+                          & io_completion_1_bits_hwSignal_timeline == 3'h3}}
+                + {31'h0, swTimeline & ~io_sw_assign & io_sw_index[2:0] == 3'h3};	// src/queen/scala/main/QueenSyncState.scala:31:41, :32:36, :37:{17,43}, :40:42, :53:{36,50,57}, :54:41, :55:60, :59:29, :60:{28,56}, :61:{32,35,49,70}, :62:{35,38}, :63:28, :64:{16,50,58}
       timelines_4 <=
-        assignSel_4 & ~io_rollback_0
-          ? io_sw_data
-          : timelines_4
-            + {30'h0,
-               {1'h0,
-                _hwInc_T_77 & io_completion_0_bits_hwSignal_isTimeline
-                  & io_completion_0_bits_hwSignal_timeline == 3'h4}
-                 + {1'h0,
-                    _hwInc_T_82 & io_completion_1_bits_hwSignal_isTimeline
-                      & io_completion_1_bits_hwSignal_timeline == 3'h4}}
-            + {31'h0, swTimeline & ~io_sw_assign & io_sw_index[2:0] == 3'h4};	// src/queen/scala/main/QueenSyncState.scala:31:36, :36:{17,43}, :39:42, :43:58, :52:{36,50}, :53:41, :54:60, :58:29, :59:{28,56}, :60:{32,35,49,70}, :61:{35,38}, :62:{28,62,70}
+        io_clear
+          ? 32'h0
+          : assignSel_4 & ~io_rollback_0
+              ? io_sw_data
+              : timelines_4
+                + {30'h0,
+                   {1'h0,
+                    _hwInc_T_77 & io_completion_0_bits_hwSignal_isTimeline
+                      & io_completion_0_bits_hwSignal_timeline == 3'h4}
+                     + {1'h0,
+                        _hwInc_T_82 & io_completion_1_bits_hwSignal_isTimeline
+                          & io_completion_1_bits_hwSignal_timeline == 3'h4}}
+                + {31'h0, swTimeline & ~io_sw_assign & io_sw_index[2:0] == 3'h4};	// src/queen/scala/main/QueenSyncState.scala:31:41, :32:36, :37:{17,43}, :40:42, :44:58, :53:{36,50}, :54:41, :55:60, :59:29, :60:{28,56}, :61:{32,35,49,70}, :62:{35,38}, :63:28, :64:{16,50,58}
       timelines_5 <=
-        assignSel_5 & ~io_rollback_0
-          ? io_sw_data
-          : timelines_5
-            + {30'h0,
-               {1'h0,
-                _hwInc_T_77 & io_completion_0_bits_hwSignal_isTimeline
-                  & io_completion_0_bits_hwSignal_timeline == 3'h5}
-                 + {1'h0,
-                    _hwInc_T_82 & io_completion_1_bits_hwSignal_isTimeline
-                      & io_completion_1_bits_hwSignal_timeline == 3'h5}}
-            + {31'h0, swTimeline & ~io_sw_assign & io_sw_index[2:0] == 3'h5};	// src/queen/scala/main/QueenSyncState.scala:31:36, :36:{17,43}, :39:42, :43:58, :52:{36,50}, :53:41, :54:60, :58:29, :59:{28,56}, :60:{32,35,49,70}, :61:{35,38}, :62:{28,62,70}
+        io_clear
+          ? 32'h0
+          : assignSel_5 & ~io_rollback_0
+              ? io_sw_data
+              : timelines_5
+                + {30'h0,
+                   {1'h0,
+                    _hwInc_T_77 & io_completion_0_bits_hwSignal_isTimeline
+                      & io_completion_0_bits_hwSignal_timeline == 3'h5}
+                     + {1'h0,
+                        _hwInc_T_82 & io_completion_1_bits_hwSignal_isTimeline
+                          & io_completion_1_bits_hwSignal_timeline == 3'h5}}
+                + {31'h0, swTimeline & ~io_sw_assign & io_sw_index[2:0] == 3'h5};	// src/queen/scala/main/QueenSyncState.scala:31:41, :32:36, :37:{17,43}, :40:42, :44:58, :53:{36,50}, :54:41, :55:60, :59:29, :60:{28,56}, :61:{32,35,49,70}, :62:{35,38}, :63:28, :64:{16,50,58}
       timelines_6 <=
-        assignSel_6 & ~io_rollback_0
-          ? io_sw_data
-          : timelines_6
-            + {30'h0,
-               {1'h0,
-                _hwInc_T_77 & io_completion_0_bits_hwSignal_isTimeline
-                  & io_completion_0_bits_hwSignal_timeline == 3'h6}
-                 + {1'h0,
-                    _hwInc_T_82 & io_completion_1_bits_hwSignal_isTimeline
-                      & io_completion_1_bits_hwSignal_timeline == 3'h6}}
-            + {31'h0, swTimeline & ~io_sw_assign & io_sw_index[2:0] == 3'h6};	// src/queen/scala/main/QueenSyncState.scala:31:36, :36:{17,43}, :39:42, :43:58, :52:{36,50}, :53:41, :54:60, :58:29, :59:{28,56}, :60:{32,35,49,70}, :61:{35,38}, :62:{28,62,70}
+        io_clear
+          ? 32'h0
+          : assignSel_6 & ~io_rollback_0
+              ? io_sw_data
+              : timelines_6
+                + {30'h0,
+                   {1'h0,
+                    _hwInc_T_77 & io_completion_0_bits_hwSignal_isTimeline
+                      & io_completion_0_bits_hwSignal_timeline == 3'h6}
+                     + {1'h0,
+                        _hwInc_T_82 & io_completion_1_bits_hwSignal_isTimeline
+                          & io_completion_1_bits_hwSignal_timeline == 3'h6}}
+                + {31'h0, swTimeline & ~io_sw_assign & io_sw_index[2:0] == 3'h6};	// src/queen/scala/main/QueenSyncState.scala:31:41, :32:36, :37:{17,43}, :40:42, :44:58, :53:{36,50}, :54:41, :55:60, :59:29, :60:{28,56}, :61:{32,35,49,70}, :62:{35,38}, :63:28, :64:{16,50,58}
       timelines_7 <=
-        assignSel_7 & ~io_rollback_0
-          ? io_sw_data
-          : timelines_7
-            + {30'h0,
-               {1'h0,
-                _hwInc_T_77 & io_completion_0_bits_hwSignal_isTimeline
-                  & (&io_completion_0_bits_hwSignal_timeline)}
-                 + {1'h0,
-                    _hwInc_T_82 & io_completion_1_bits_hwSignal_isTimeline
-                      & (&io_completion_1_bits_hwSignal_timeline)}}
-            + {31'h0, swTimeline & ~io_sw_assign & (&(io_sw_index[2:0]))};	// src/queen/scala/main/QueenSyncState.scala:31:36, :36:{17,43}, :39:42, :52:{36,50}, :53:41, :54:60, :58:29, :59:{28,56}, :60:{32,35,49,70}, :61:{35,38}, :62:{28,62,70}
+        io_clear
+          ? 32'h0
+          : assignSel_7 & ~io_rollback_0
+              ? io_sw_data
+              : timelines_7
+                + {30'h0,
+                   {1'h0,
+                    _hwInc_T_77 & io_completion_0_bits_hwSignal_isTimeline
+                      & (&io_completion_0_bits_hwSignal_timeline)}
+                     + {1'h0,
+                        _hwInc_T_82 & io_completion_1_bits_hwSignal_isTimeline
+                          & (&io_completion_1_bits_hwSignal_timeline)}}
+                + {31'h0, swTimeline & ~io_sw_assign & (&(io_sw_index[2:0]))};	// src/queen/scala/main/QueenSyncState.scala:31:41, :32:36, :37:{17,43}, :40:42, :53:{36,50}, :54:41, :55:60, :59:29, :60:{28,56}, :61:{32,35,49,70}, :62:{35,38}, :63:28, :64:{16,50,58}
     end
   end // always @(posedge)
   `ifdef ENABLE_INITIAL_REG_	// src/queen/scala/main/QueenSyncState.scala:20:7
@@ -688,93 +769,93 @@ module Queen_QueenSyncState(	// src/queen/scala/main/QueenSyncState.scala:20:7
         for (logic [5:0] i = 6'h0; i < 6'h28; i += 6'h1) begin
           _RANDOM[i] = `RANDOM;	// src/queen/scala/main/QueenSyncState.scala:20:7
         end	// src/queen/scala/main/QueenSyncState.scala:20:7
-        events_0 = _RANDOM[6'h0];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_1 = _RANDOM[6'h1];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_2 = _RANDOM[6'h2];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_3 = _RANDOM[6'h3];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_4 = _RANDOM[6'h4];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_5 = _RANDOM[6'h5];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_6 = _RANDOM[6'h6];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_7 = _RANDOM[6'h7];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_8 = _RANDOM[6'h8];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_9 = _RANDOM[6'h9];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_10 = _RANDOM[6'hA];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_11 = _RANDOM[6'hB];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_12 = _RANDOM[6'hC];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_13 = _RANDOM[6'hD];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_14 = _RANDOM[6'hE];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_15 = _RANDOM[6'hF];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_16 = _RANDOM[6'h10];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_17 = _RANDOM[6'h11];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_18 = _RANDOM[6'h12];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_19 = _RANDOM[6'h13];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_20 = _RANDOM[6'h14];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_21 = _RANDOM[6'h15];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_22 = _RANDOM[6'h16];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_23 = _RANDOM[6'h17];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_24 = _RANDOM[6'h18];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_25 = _RANDOM[6'h19];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_26 = _RANDOM[6'h1A];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_27 = _RANDOM[6'h1B];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_28 = _RANDOM[6'h1C];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_29 = _RANDOM[6'h1D];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_30 = _RANDOM[6'h1E];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        events_31 = _RANDOM[6'h1F];	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-        timelines_0 = _RANDOM[6'h20];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:36
-        timelines_1 = _RANDOM[6'h21];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:36
-        timelines_2 = _RANDOM[6'h22];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:36
-        timelines_3 = _RANDOM[6'h23];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:36
-        timelines_4 = _RANDOM[6'h24];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:36
-        timelines_5 = _RANDOM[6'h25];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:36
-        timelines_6 = _RANDOM[6'h26];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:36
-        timelines_7 = _RANDOM[6'h27];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:36
+        events_0 = _RANDOM[6'h0];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_1 = _RANDOM[6'h1];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_2 = _RANDOM[6'h2];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_3 = _RANDOM[6'h3];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_4 = _RANDOM[6'h4];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_5 = _RANDOM[6'h5];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_6 = _RANDOM[6'h6];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_7 = _RANDOM[6'h7];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_8 = _RANDOM[6'h8];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_9 = _RANDOM[6'h9];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_10 = _RANDOM[6'hA];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_11 = _RANDOM[6'hB];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_12 = _RANDOM[6'hC];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_13 = _RANDOM[6'hD];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_14 = _RANDOM[6'hE];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_15 = _RANDOM[6'hF];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_16 = _RANDOM[6'h10];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_17 = _RANDOM[6'h11];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_18 = _RANDOM[6'h12];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_19 = _RANDOM[6'h13];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_20 = _RANDOM[6'h14];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_21 = _RANDOM[6'h15];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_22 = _RANDOM[6'h16];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_23 = _RANDOM[6'h17];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_24 = _RANDOM[6'h18];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_25 = _RANDOM[6'h19];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_26 = _RANDOM[6'h1A];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_27 = _RANDOM[6'h1B];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_28 = _RANDOM[6'h1C];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_29 = _RANDOM[6'h1D];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_30 = _RANDOM[6'h1E];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        events_31 = _RANDOM[6'h1F];	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+        timelines_0 = _RANDOM[6'h20];	// src/queen/scala/main/QueenSyncState.scala:20:7, :32:36
+        timelines_1 = _RANDOM[6'h21];	// src/queen/scala/main/QueenSyncState.scala:20:7, :32:36
+        timelines_2 = _RANDOM[6'h22];	// src/queen/scala/main/QueenSyncState.scala:20:7, :32:36
+        timelines_3 = _RANDOM[6'h23];	// src/queen/scala/main/QueenSyncState.scala:20:7, :32:36
+        timelines_4 = _RANDOM[6'h24];	// src/queen/scala/main/QueenSyncState.scala:20:7, :32:36
+        timelines_5 = _RANDOM[6'h25];	// src/queen/scala/main/QueenSyncState.scala:20:7, :32:36
+        timelines_6 = _RANDOM[6'h26];	// src/queen/scala/main/QueenSyncState.scala:20:7, :32:36
+        timelines_7 = _RANDOM[6'h27];	// src/queen/scala/main/QueenSyncState.scala:20:7, :32:36
       `endif // RANDOMIZE_REG_INIT
     end // initial
     `ifdef FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenSyncState.scala:20:7
       `FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenSyncState.scala:20:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_events_0 = events_0;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_1 = events_1;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_2 = events_2;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_3 = events_3;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_4 = events_4;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_5 = events_5;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_6 = events_6;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_7 = events_7;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_8 = events_8;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_9 = events_9;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_10 = events_10;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_11 = events_11;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_12 = events_12;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_13 = events_13;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_14 = events_14;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_15 = events_15;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_16 = events_16;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_17 = events_17;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_18 = events_18;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_19 = events_19;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_20 = events_20;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_21 = events_21;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_22 = events_22;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_23 = events_23;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_24 = events_24;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_25 = events_25;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_26 = events_26;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_27 = events_27;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_28 = events_28;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_29 = events_29;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_30 = events_30;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_events_31 = events_31;	// src/queen/scala/main/QueenSyncState.scala:20:7, :30:33
-  assign io_timelines_0 = timelines_0;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:36
-  assign io_timelines_1 = timelines_1;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:36
-  assign io_timelines_2 = timelines_2;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:36
-  assign io_timelines_3 = timelines_3;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:36
-  assign io_timelines_4 = timelines_4;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:36
-  assign io_timelines_5 = timelines_5;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:36
-  assign io_timelines_6 = timelines_6;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:36
-  assign io_timelines_7 = timelines_7;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:36
-  assign io_rollback = io_rollback_0;	// src/queen/scala/main/QueenSyncState.scala:20:7, :53:41
-  assign io_rollbackId = io_sw_index[2:0];	// src/queen/scala/main/QueenSyncState.scala:20:7, :52:50
+  assign io_events_0 = events_0;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_1 = events_1;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_2 = events_2;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_3 = events_3;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_4 = events_4;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_5 = events_5;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_6 = events_6;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_7 = events_7;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_8 = events_8;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_9 = events_9;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_10 = events_10;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_11 = events_11;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_12 = events_12;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_13 = events_13;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_14 = events_14;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_15 = events_15;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_16 = events_16;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_17 = events_17;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_18 = events_18;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_19 = events_19;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_20 = events_20;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_21 = events_21;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_22 = events_22;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_23 = events_23;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_24 = events_24;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_25 = events_25;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_26 = events_26;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_27 = events_27;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_28 = events_28;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_29 = events_29;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_30 = events_30;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_events_31 = events_31;	// src/queen/scala/main/QueenSyncState.scala:20:7, :31:33
+  assign io_timelines_0 = timelines_0;	// src/queen/scala/main/QueenSyncState.scala:20:7, :32:36
+  assign io_timelines_1 = timelines_1;	// src/queen/scala/main/QueenSyncState.scala:20:7, :32:36
+  assign io_timelines_2 = timelines_2;	// src/queen/scala/main/QueenSyncState.scala:20:7, :32:36
+  assign io_timelines_3 = timelines_3;	// src/queen/scala/main/QueenSyncState.scala:20:7, :32:36
+  assign io_timelines_4 = timelines_4;	// src/queen/scala/main/QueenSyncState.scala:20:7, :32:36
+  assign io_timelines_5 = timelines_5;	// src/queen/scala/main/QueenSyncState.scala:20:7, :32:36
+  assign io_timelines_6 = timelines_6;	// src/queen/scala/main/QueenSyncState.scala:20:7, :32:36
+  assign io_timelines_7 = timelines_7;	// src/queen/scala/main/QueenSyncState.scala:20:7, :32:36
+  assign io_rollback = io_rollback_0;	// src/queen/scala/main/QueenSyncState.scala:20:7, :54:41
+  assign io_rollbackId = io_sw_index[2:0];	// src/queen/scala/main/QueenSyncState.scala:20:7, :53:50
 endmodule
 

@@ -6,4 +6,5 @@
   `include "layers-Queen_QueenDsaAdapter-Verification.sv"	// src/queen/scala/main/QueenTop.scala:11:7
   `include "layers-Queen_QueenSchedCtrl-Verification.sv"	// src/queen/scala/main/QueenTop.scala:11:7
   `include "layers-Queen_QueenQrdTracker-Verification.sv"	// src/queen/scala/main/QueenTop.scala:11:7
+  `include "layers-Queen_QueenMemMaster-Verification.sv"	// src/queen/scala/main/QueenTop.scala:11:7
 `endif // not def layers_Queen_QueenTop_Verification

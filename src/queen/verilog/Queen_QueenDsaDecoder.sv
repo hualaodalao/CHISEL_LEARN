@@ -127,15 +127,19 @@ module Queen_QueenDsaDecoder(	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
                 io_scheduler_bits_0_valid,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output [31:0] io_scheduler_bits_0_bits_inst,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
                 io_scheduler_bits_0_bits_rs1,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
+                io_scheduler_bits_0_bits_rs2,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output        io_scheduler_bits_1_valid,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output [31:0] io_scheduler_bits_1_bits_inst,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
                 io_scheduler_bits_1_bits_rs1,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
+                io_scheduler_bits_1_bits_rs2,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output        io_scheduler_bits_2_valid,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output [31:0] io_scheduler_bits_2_bits_inst,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
                 io_scheduler_bits_2_bits_rs1,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
+                io_scheduler_bits_2_bits_rs2,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output        io_scheduler_bits_3_valid,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output [31:0] io_scheduler_bits_3_bits_inst,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
                 io_scheduler_bits_3_bits_rs1,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
+                io_scheduler_bits_3_bits_rs2,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output        io_trap_valid,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output [31:0] io_trap_bits_pc,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
                 io_trap_bits_inst,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
@@ -145,121 +149,139 @@ module Queen_QueenDsaDecoder(	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
   output [31:0] io_qrdAlloc_0_bits_pc,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output [4:0]  io_qrdAlloc_0_bits_rdIndex,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output [1:0]  io_qrdAlloc_0_bits_source,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
-  output        io_qrdAlloc_1_valid,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
+  output        io_qrdAlloc_0_bits_dummy,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
+                io_qrdAlloc_1_valid,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output [31:0] io_qrdAlloc_1_bits_pc,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output [4:0]  io_qrdAlloc_1_bits_rdIndex,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output [1:0]  io_qrdAlloc_1_bits_source,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
-  output        io_qrdAlloc_2_valid,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
+  output        io_qrdAlloc_1_bits_dummy,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
+                io_qrdAlloc_2_valid,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output [31:0] io_qrdAlloc_2_bits_pc,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output [4:0]  io_qrdAlloc_2_bits_rdIndex,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output [1:0]  io_qrdAlloc_2_bits_source,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
-  output        io_qrdAlloc_3_valid,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
+  output        io_qrdAlloc_2_bits_dummy,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
+                io_qrdAlloc_3_valid,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output [31:0] io_qrdAlloc_3_bits_pc,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output [4:0]  io_qrdAlloc_3_bits_rdIndex,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output [1:0]  io_qrdAlloc_3_bits_source,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
+  output        io_qrdAlloc_3_bits_dummy,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
+  input         io_flushing,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
+                io_flushStart,	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
   output        io_idle	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
 );
 
-  wire             _schedStage_io_deq_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:105:36
-  wire             _schedStage_io_count;	// src/queen/scala/main/QueenDsaDecoder.scala:105:36
-  wire [515:0]     _ring_ext_R0_data;	// src/queen/scala/main/QueenDsaDecoder.scala:64:27
-  wire [515:0]     _ring_ext_R1_data;	// src/queen/scala/main/QueenDsaDecoder.scala:64:27
-  reg              pending_0;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34
-  reg              pending_1;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34
-  reg              pending_2;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34
-  reg              pending_3;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34
-  reg  [31:0]      pendingInst_0;	// src/queen/scala/main/QueenDsaDecoder.scala:42:34
-  reg  [31:0]      pendingInst_1;	// src/queen/scala/main/QueenDsaDecoder.scala:42:34
-  reg  [31:0]      pendingInst_2;	// src/queen/scala/main/QueenDsaDecoder.scala:42:34
-  reg  [31:0]      pendingInst_3;	// src/queen/scala/main/QueenDsaDecoder.scala:42:34
-  reg  [31:0]      pendingPc_0;	// src/queen/scala/main/QueenDsaDecoder.scala:43:32
-  reg  [31:0]      pendingPc_1;	// src/queen/scala/main/QueenDsaDecoder.scala:43:32
-  reg  [31:0]      pendingPc_2;	// src/queen/scala/main/QueenDsaDecoder.scala:43:32
-  reg  [31:0]      pendingPc_3;	// src/queen/scala/main/QueenDsaDecoder.scala:43:32
-  wire [31:0]      batch_0_bits_inst = pending_0 ? pendingInst_0 : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34, :42:34, :53:34
-  wire             _batch_0_bits_rs1_T = pending_0 & io_rs1_0_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34, :55:45
-  wire             _batch_0_bits_rs2_T = pending_0 & io_rs2_0_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34, :56:45
-  wire [31:0]      batch_1_bits_inst = pending_1 ? pendingInst_1 : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34, :42:34, :53:34
-  wire             _batch_1_bits_rs1_T = pending_1 & io_rs1_1_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34, :55:45
-  wire             _batch_1_bits_rs2_T = pending_1 & io_rs2_1_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34, :56:45
-  wire [31:0]      batch_2_bits_inst = pending_2 ? pendingInst_2 : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34, :42:34, :53:34
-  wire             _batch_2_bits_rs1_T = pending_2 & io_rs1_2_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34, :55:45
-  wire             _batch_2_bits_rs2_T = pending_2 & io_rs2_2_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34, :56:45
-  wire [31:0]      batch_3_bits_inst = pending_3 ? pendingInst_3 : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34, :42:34, :53:34
-  wire             _batch_3_bits_rs1_T = pending_3 & io_rs1_3_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34, :55:45
-  wire             _batch_3_bits_rs2_T = pending_3 & io_rs2_3_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34, :56:45
-  reg  [7:0]       writePtr;	// src/queen/scala/main/QueenDsaDecoder.scala:65:35
-  reg  [7:0]       gemmCursor;	// src/queen/scala/main/QueenDsaDecoder.scala:66:37
-  reg  [7:0]       dmaCursor;	// src/queen/scala/main/QueenDsaDecoder.scala:67:36
-  wire             gemmPresent = gemmCursor != writePtr;	// src/queen/scala/main/QueenDsaDecoder.scala:65:35, :66:37, :69:42
-  wire             dmaPresent = dmaCursor != writePtr;	// src/queen/scala/main/QueenDsaDecoder.scala:65:35, :67:36, :70:40
+  wire [515:0]     _ring_ext_R0_data;	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
+  wire [515:0]     _ring_ext_R1_data;	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
+  reg              pending_0;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34
+  reg              pending_1;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34
+  reg              pending_2;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34
+  reg              pending_3;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34
+  reg  [31:0]      pendingInst_0;	// src/queen/scala/main/QueenDsaDecoder.scala:44:34
+  reg  [31:0]      pendingInst_1;	// src/queen/scala/main/QueenDsaDecoder.scala:44:34
+  reg  [31:0]      pendingInst_2;	// src/queen/scala/main/QueenDsaDecoder.scala:44:34
+  reg  [31:0]      pendingInst_3;	// src/queen/scala/main/QueenDsaDecoder.scala:44:34
+  reg  [31:0]      pendingPc_0;	// src/queen/scala/main/QueenDsaDecoder.scala:45:32
+  reg  [31:0]      pendingPc_1;	// src/queen/scala/main/QueenDsaDecoder.scala:45:32
+  reg  [31:0]      pendingPc_2;	// src/queen/scala/main/QueenDsaDecoder.scala:45:32
+  reg  [31:0]      pendingPc_3;	// src/queen/scala/main/QueenDsaDecoder.scala:45:32
+  wire [31:0]      batch_0_bits_inst = pending_0 ? pendingInst_0 : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34, :44:34, :55:34
+  wire             _batch_0_bits_rs1_T = pending_0 & io_rs1_0_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34, :57:45
+  wire             _batch_0_bits_rs2_T = pending_0 & io_rs2_0_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34, :58:45
+  wire [31:0]      batch_1_bits_inst = pending_1 ? pendingInst_1 : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34, :44:34, :55:34
+  wire             _batch_1_bits_rs1_T = pending_1 & io_rs1_1_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34, :57:45
+  wire             _batch_1_bits_rs2_T = pending_1 & io_rs2_1_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34, :58:45
+  wire [31:0]      batch_2_bits_inst = pending_2 ? pendingInst_2 : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34, :44:34, :55:34
+  wire             _batch_2_bits_rs1_T = pending_2 & io_rs1_2_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34, :57:45
+  wire             _batch_2_bits_rs2_T = pending_2 & io_rs2_2_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34, :58:45
+  wire [31:0]      batch_3_bits_inst = pending_3 ? pendingInst_3 : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34, :44:34, :55:34
+  wire             _batch_3_bits_rs1_T = pending_3 & io_rs1_3_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34, :57:45
+  wire             _batch_3_bits_rs2_T = pending_3 & io_rs2_3_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34, :58:45
+  reg  [7:0]       writePtr;	// src/queen/scala/main/QueenDsaDecoder.scala:67:35
+  reg  [7:0]       gemmCursor;	// src/queen/scala/main/QueenDsaDecoder.scala:68:37
+  reg  [7:0]       dmaCursor;	// src/queen/scala/main/QueenDsaDecoder.scala:69:36
+  wire             gemmPresent = gemmCursor != writePtr;	// src/queen/scala/main/QueenDsaDecoder.scala:67:35, :68:37, :71:42
+  wire             dmaPresent = dmaCursor != writePtr;	// src/queen/scala/main/QueenDsaDecoder.scala:67:35, :69:36, :72:40
   wire             gemmHas =
     _ring_ext_R0_data[128] & ~(|(_ring_ext_R0_data[127:126])) | _ring_ext_R0_data[257]
     & ~(|(_ring_ext_R0_data[256:255])) | _ring_ext_R0_data[386]
     & ~(|(_ring_ext_R0_data[385:384])) | _ring_ext_R0_data[515]
-    & ~(|(_ring_ext_R0_data[514:513]));	// src/queen/scala/main/QueenDsaDecoder.scala:30:{39,56,65,90}, :64:27
+    & ~(|(_ring_ext_R0_data[514:513]));	// src/queen/scala/main/QueenDsaDecoder.scala:32:{39,56,65,90}, :66:27
   wire             dmaHas =
     _ring_ext_R1_data[128] & _ring_ext_R1_data[127:126] == 2'h1 | _ring_ext_R1_data[257]
     & _ring_ext_R1_data[256:255] == 2'h1 | _ring_ext_R1_data[386]
     & _ring_ext_R1_data[385:384] == 2'h1 | _ring_ext_R1_data[515]
-    & _ring_ext_R1_data[514:513] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:30:{39,56,65,90}, :64:27
-  wire             io_gemm_valid_0 = gemmPresent & gemmHas;	// src/queen/scala/main/QueenDsaDecoder.scala:30:90, :69:42, :76:34
-  wire             hit = _ring_ext_R0_data[128] & ~(|(_ring_ext_R0_data[127:126]));	// src/queen/scala/main/QueenDsaDecoder.scala:30:{56,65}, :35:{30,56}, :64:27
-  wire             hit_1 = _ring_ext_R0_data[257] & ~(|(_ring_ext_R0_data[256:255]));	// src/queen/scala/main/QueenDsaDecoder.scala:30:{56,65}, :35:{30,56}, :64:27
-  wire             hit_2 = _ring_ext_R0_data[386] & ~(|(_ring_ext_R0_data[385:384]));	// src/queen/scala/main/QueenDsaDecoder.scala:30:{56,65}, :35:{30,56}, :64:27
-  wire             hit_3 = _ring_ext_R0_data[515] & ~(|(_ring_ext_R0_data[514:513]));	// src/queen/scala/main/QueenDsaDecoder.scala:30:{56,65}, :35:{30,56}, :64:27
-  wire             io_dma_valid_0 = dmaPresent & dmaHas;	// src/queen/scala/main/QueenDsaDecoder.scala:30:90, :70:40, :78:32
-  wire             hit_4 = _ring_ext_R1_data[128] & _ring_ext_R1_data[127:126] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:30:56, :35:{30,56}, :64:27
-  wire             hit_5 = _ring_ext_R1_data[257] & _ring_ext_R1_data[256:255] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:30:56, :35:{30,56}, :64:27
-  wire             hit_6 = _ring_ext_R1_data[386] & _ring_ext_R1_data[385:384] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:30:56, :35:{30,56}, :64:27
-  wire             hit_7 = _ring_ext_R1_data[515] & _ring_ext_R1_data[514:513] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:30:56, :35:{30,56}, :64:27
+    & _ring_ext_R1_data[514:513] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:32:{39,56,65,90}, :66:27
+  wire             io_gemm_valid_0 = gemmPresent & gemmHas;	// src/queen/scala/main/QueenDsaDecoder.scala:32:90, :71:42, :78:34
+  wire             hit = _ring_ext_R0_data[128] & ~(|(_ring_ext_R0_data[127:126]));	// src/queen/scala/main/QueenDsaDecoder.scala:32:{56,65}, :37:{30,56}, :66:27
+  wire             hit_1 = _ring_ext_R0_data[257] & ~(|(_ring_ext_R0_data[256:255]));	// src/queen/scala/main/QueenDsaDecoder.scala:32:{56,65}, :37:{30,56}, :66:27
+  wire             hit_2 = _ring_ext_R0_data[386] & ~(|(_ring_ext_R0_data[385:384]));	// src/queen/scala/main/QueenDsaDecoder.scala:32:{56,65}, :37:{30,56}, :66:27
+  wire             hit_3 = _ring_ext_R0_data[515] & ~(|(_ring_ext_R0_data[514:513]));	// src/queen/scala/main/QueenDsaDecoder.scala:32:{56,65}, :37:{30,56}, :66:27
+  wire             io_dma_valid_0 = dmaPresent & dmaHas;	// src/queen/scala/main/QueenDsaDecoder.scala:32:90, :72:40, :80:32
+  wire             hit_4 = _ring_ext_R1_data[128] & _ring_ext_R1_data[127:126] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:32:56, :37:{30,56}, :66:27
+  wire             hit_5 = _ring_ext_R1_data[257] & _ring_ext_R1_data[256:255] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:32:56, :37:{30,56}, :66:27
+  wire             hit_6 = _ring_ext_R1_data[386] & _ring_ext_R1_data[385:384] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:32:56, :37:{30,56}, :66:27
+  wire             hit_7 = _ring_ext_R1_data[515] & _ring_ext_R1_data[514:513] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:32:56, :37:{30,56}, :66:27
   wire             gemmAdvance =
-    gemmPresent & (~gemmHas | io_gemm_ready & io_gemm_valid_0);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:30:90, :69:42, :76:34, :81:{43,47,56}
-  wire             dmaAdvance = dmaPresent & (~dmaHas | io_dma_ready & io_dma_valid_0);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:30:90, :70:40, :78:32, :82:{41,45,53}
+    gemmPresent & (~gemmHas | io_gemm_ready & io_gemm_valid_0);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:32:90, :71:42, :78:34, :83:{43,47,56}
+  wire             dmaAdvance = dmaPresent & (~dmaHas | io_dma_ready & io_dma_valid_0);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:32:90, :72:40, :80:32, :84:{41,45,53}
   wire             ringEnqValid_layerCapture =
-    pending_0 & batch_0_bits_inst[31:30] == 2'h0 | pending_1
-    & batch_1_bits_inst[31:30] == 2'h0 | pending_2 & batch_2_bits_inst[31:30] == 2'h0
-    | pending_3 & batch_3_bits_inst[31:30] == 2'h0 | pending_0
-    & batch_0_bits_inst[31:30] == 2'h1 | pending_1 & batch_1_bits_inst[31:30] == 2'h1
-    | pending_2 & batch_2_bits_inst[31:30] == 2'h1 | pending_3
-    & batch_3_bits_inst[31:30] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:30:{39,56,65,90}, :41:34, :53:34, :86:53
-  wire [7:0]       _gemmNext_T = gemmCursor + {7'h0, gemmAdvance};	// src/queen/scala/main/QueenDsaDecoder.scala:66:37, :81:43, :88:39
-  wire [7:0]       _dmaNext_T = dmaCursor + {7'h0, dmaAdvance};	// src/queen/scala/main/QueenDsaDecoder.scala:67:36, :82:41, :89:37
-  wire [7:0]       _nextCommit_T = _gemmNext_T - _dmaNext_T;	// src/queen/scala/main/QueenDsaDecoder.scala:88:39, :89:37, :91:44
+    (pending_0 & batch_0_bits_inst[31:30] == 2'h0 | pending_1
+     & batch_1_bits_inst[31:30] == 2'h0 | pending_2 & batch_2_bits_inst[31:30] == 2'h0
+     | pending_3 & batch_3_bits_inst[31:30] == 2'h0 | pending_0
+     & batch_0_bits_inst[31:30] == 2'h1 | pending_1 & batch_1_bits_inst[31:30] == 2'h1
+     | pending_2 & batch_2_bits_inst[31:30] == 2'h1 | pending_3
+     & batch_3_bits_inst[31:30] == 2'h1) & ~io_flushing;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:32:{39,56,65,90}, :43:34, :49:42, :55:34, :88:{54,78}
+  wire [7:0]       _gemmNext_T = gemmCursor + {7'h0, gemmAdvance};	// src/queen/scala/main/QueenDsaDecoder.scala:68:37, :83:43, :90:39
+  wire [7:0]       _dmaNext_T = dmaCursor + {7'h0, dmaAdvance};	// src/queen/scala/main/QueenDsaDecoder.scala:69:36, :84:41, :91:37
+  wire [7:0]       _nextCommit_T = _gemmNext_T - _dmaNext_T;	// src/queen/scala/main/QueenDsaDecoder.scala:90:39, :91:37, :93:44
   wire [7:0]       ringUsed_layerCapture =
-    writePtr - (_nextCommit_T[7] ? _gemmNext_T : _dmaNext_T);	// src/queen/scala/main/QueenDsaDecoder.scala:65:35, :88:39, :89:37, :91:{33,44,55}, :94:38
+    writePtr - (_nextCommit_T[7] ? _gemmNext_T : _dmaNext_T);	// src/queen/scala/main/QueenDsaDecoder.scala:67:35, :90:39, :91:37, :93:{33,44,55}, :96:38
   wire             ringReady =
-    {1'h0, ringUsed_layerCapture} + {8'h0, ringEnqValid_layerCapture} < 9'h40;	// src/queen/scala/main/QueenDsaDecoder.scala:86:53, :94:38, :96:{39,63}
-  wire             schedStage_io_enq_valid =
-    pending_0 & (&(batch_0_bits_inst[31:30])) | pending_1 & (&(batch_1_bits_inst[31:30]))
-    | pending_2 & (&(batch_2_bits_inst[31:30])) | pending_3
-    & (&(batch_3_bits_inst[31:30]));	// src/queen/scala/main/QueenDsaDecoder.scala:30:{39,56,65,90}, :41:34, :53:34
-  wire             hit_8 = pending_0 & (&(batch_0_bits_inst[31:30]));	// src/queen/scala/main/QueenDsaDecoder.scala:30:56, :35:{30,56}, :41:34, :53:34
-  wire             hit_9 = pending_1 & (&(batch_1_bits_inst[31:30]));	// src/queen/scala/main/QueenDsaDecoder.scala:30:56, :35:{30,56}, :41:34, :53:34
-  wire             hit_10 = pending_2 & (&(batch_2_bits_inst[31:30]));	// src/queen/scala/main/QueenDsaDecoder.scala:30:56, :35:{30,56}, :41:34, :53:34
-  wire             hit_11 = pending_3 & (&(batch_3_bits_inst[31:30]));	// src/queen/scala/main/QueenDsaDecoder.scala:30:56, :35:{30,56}, :41:34, :53:34
+    {1'h0, ringUsed_layerCapture} + {8'h0, ringEnqValid_layerCapture} < 9'h40;	// src/queen/scala/main/QueenDsaDecoder.scala:88:78, :96:38, :98:{39,63}
+  reg              schedValid;	// src/queen/scala/main/QueenDsaDecoder.scala:112:37
+  reg              schedBits_0_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:113:32
+  reg  [31:0]      schedBits_0_bits_inst;	// src/queen/scala/main/QueenDsaDecoder.scala:113:32
+  reg  [31:0]      schedBits_0_bits_rs1;	// src/queen/scala/main/QueenDsaDecoder.scala:113:32
+  reg  [31:0]      schedBits_0_bits_rs2;	// src/queen/scala/main/QueenDsaDecoder.scala:113:32
+  reg              schedBits_1_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:113:32
+  reg  [31:0]      schedBits_1_bits_inst;	// src/queen/scala/main/QueenDsaDecoder.scala:113:32
+  reg  [31:0]      schedBits_1_bits_rs1;	// src/queen/scala/main/QueenDsaDecoder.scala:113:32
+  reg  [31:0]      schedBits_1_bits_rs2;	// src/queen/scala/main/QueenDsaDecoder.scala:113:32
+  reg              schedBits_2_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:113:32
+  reg  [31:0]      schedBits_2_bits_inst;	// src/queen/scala/main/QueenDsaDecoder.scala:113:32
+  reg  [31:0]      schedBits_2_bits_rs1;	// src/queen/scala/main/QueenDsaDecoder.scala:113:32
+  reg  [31:0]      schedBits_2_bits_rs2;	// src/queen/scala/main/QueenDsaDecoder.scala:113:32
+  reg              schedBits_3_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:113:32
+  reg  [31:0]      schedBits_3_bits_inst;	// src/queen/scala/main/QueenDsaDecoder.scala:113:32
+  reg  [31:0]      schedBits_3_bits_rs1;	// src/queen/scala/main/QueenDsaDecoder.scala:113:32
+  reg  [31:0]      schedBits_3_bits_rs2;	// src/queen/scala/main/QueenDsaDecoder.scala:113:32
+  wire             schedEnq =
+    (pending_0 & (&(batch_0_bits_inst[31:30])) | pending_1 & (&(batch_1_bits_inst[31:30]))
+     | pending_2 & (&(batch_2_bits_inst[31:30])) | pending_3
+     & (&(batch_3_bits_inst[31:30]))) & ~io_flushing;	// src/queen/scala/main/QueenDsaDecoder.scala:32:{39,56,65,90}, :43:34, :49:42, :55:34, :116:50
+  wire             _schedUsed_T_1 = io_scheduler_ready & schedValid;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:112:37
   wire             schedReady =
-    {1'h0, _schedStage_io_count} + {1'h0, schedStage_io_enq_valid}
-    - {1'h0, io_scheduler_ready & _schedStage_io_deq_valid} == 2'h0;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:30:90, :105:36, :110:{49,83}, :112:40
-  reg              gemmOpen;	// src/queen/scala/main/QueenDsaDecoder.scala:117:35
-  reg              dmaOpen;	// src/queen/scala/main/QueenDsaDecoder.scala:118:34
-  wire             illegal_0_isCtrl = io_inst_0_bits_inst[14:12] == 3'h3;	// src/queen/scala/main/QueenDsaDecoder.scala:121:26, :125:29
-  wire             _illegal_0_auxHiZero_T_1 = io_inst_0_bits_inst[29:26] == 4'h3;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :126:29
-  wire             _illegal_0_auxZero_T_3 = io_inst_0_bits_inst[29:26] == 4'h6;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :126:59
-  wire             _illegal_0_T_37 = io_inst_0_bits_inst[29:26] == 4'h8;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :126:74
-  wire             _illegal_0_auxZero_T = io_inst_0_bits_inst[29:26] == 4'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :127:31
-  wire             _illegal_0_T_53 = io_inst_0_bits_inst[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :127:46
-  wire             _illegal_0_auxHiZero_T = io_inst_0_bits_inst[29:26] == 4'h2;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :128:42
+    {1'h0, schedValid} + {1'h0, schedEnq} - {1'h0, _schedUsed_T_1} == 2'h0;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:112:37, :116:50, :123:{47,66}, :124:40
+  reg              gemmOpen;	// src/queen/scala/main/QueenDsaDecoder.scala:129:35
+  reg              dmaOpen;	// src/queen/scala/main/QueenDsaDecoder.scala:130:34
+  wire             illegal_0_isCtrl = io_inst_0_bits_inst[14:12] == 3'h3;	// src/queen/scala/main/QueenDsaDecoder.scala:133:26, :137:29
+  wire             _illegal_0_auxHiZero_T_1 = io_inst_0_bits_inst[29:26] == 4'h3;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :138:29
+  wire             _illegal_0_auxZero_T_3 = io_inst_0_bits_inst[29:26] == 4'h6;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :138:59
+  wire             _illegal_0_T_37 = io_inst_0_bits_inst[29:26] == 4'h8;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :138:74
+  wire             _illegal_0_auxZero_T_7 = io_inst_0_bits_inst[29:26] == 4'hA;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :138:89
+  wire             _illegal_0_auxZero_T = io_inst_0_bits_inst[29:26] == 4'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :139:31
+  wire             _illegal_0_T_53 = io_inst_0_bits_inst[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :139:46
+  wire             _illegal_0_auxHiZero_T = io_inst_0_bits_inst[29:26] == 4'h2;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :140:42
   wire [7:0]       illegal_0 =
     io_inst_0_bits_inst[6:0] == 7'hB
       ? (io_inst_0_bits_inst[14]
            ? 8'h2
            : illegal_0_isCtrl
-             & (io_inst_0_bits_inst[29:26] == 4'h7 | io_inst_0_bits_inst[29:26] > 4'h9)
+             & (io_inst_0_bits_inst[29:26] == 4'h7 | io_inst_0_bits_inst[29:26] > 4'hA)
                ? 8'h3
                : illegal_0_isCtrl
                  & ((_illegal_0_auxHiZero_T_1 | io_inst_0_bits_inst[29:26] == 4'h4
-                     | _illegal_0_auxZero_T_3 | _illegal_0_T_37)
+                     | _illegal_0_auxZero_T_3 | _illegal_0_T_37 | _illegal_0_auxZero_T_7)
                     & io_inst_0_bits_inst[31:30] != 2'h3
                     | (_illegal_0_auxZero_T | _illegal_0_T_53)
                     & (|(io_inst_0_bits_inst[31:30])) & io_inst_0_bits_inst[31:30] != 2'h1
@@ -271,8 +293,8 @@ module Queen_QueenDsaDecoder(	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
                      | io_inst_0_bits_inst[14:12] == 3'h2
                      & (|(io_inst_0_bits_inst[19:15])) | illegal_0_isCtrl
                      & ((_illegal_0_auxZero_T | io_inst_0_bits_inst[29:26] == 4'h5
-                         | _illegal_0_auxZero_T_3 | _illegal_0_T_53)
-                        & (|(io_inst_0_bits_inst[11:7]))
+                         | _illegal_0_auxZero_T_3 | _illegal_0_T_53
+                         | _illegal_0_auxZero_T_7) & (|(io_inst_0_bits_inst[11:7]))
                         | (_illegal_0_auxHiZero_T | _illegal_0_auxHiZero_T_1)
                         & (|(io_inst_0_bits_inst[11:10])) | _illegal_0_T_37
                         & (|(io_inst_0_bits_inst[11:9])))
@@ -289,41 +311,41 @@ module Queen_QueenDsaDecoder(	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
                                           ? dmaOpen
                                           : gemmOpen),
                                   3'h0})
-      : 8'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:11:7, :30:65, :117:35, :118:34, :121:26, :122:28, :123:23, :124:23, :125:29, :126:{29,37,44,52,59,67,74}, :127:{31,39,46}, :128:{27,35,42}, :129:{35,42,50,65}, :130:37, :131:29, :133:15, :134:{18,25,37}, :135:19, :136:{27,34}, :137:19, :138:{27,35,43,50,60}, :139:19, :140:{27,42,54,67}, :141:{26,38,49,61,72}, :142:{22,34,49}, :143:19, :144:{28,36,43,51,60}, :145:{21,29,36,45}, :146:{21,29,36,45,54}, :147:{21,34,50}, :148:{28,34,41,50}, :149:{30,36,43,55}, :150:19, :151:{35,41,46,56,66,76}, :152:19, :153:{27,40,47,53}, :154:19, :155:{27,42,45,49,59,86}, :156:19
-  wire             isQrd = io_inst_0_bits_inst[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaDecoder.scala:121:26, :146:21, :175:34
-  wire             _resourceReady_T_1 = io_inst_0_bits_inst[31:30] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:122:28, :176:65
-  wire [5:0]       _GEN = {1'h0, io_qrdUsed};	// src/queen/scala/main/QueenDsaDecoder.scala:178:{35,45}
+      : 8'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:32:65, :129:35, :130:34, :133:26, :134:28, :135:23, :136:23, :137:29, :138:{29,37,44,52,59,67,74,82,89}, :139:{31,39,46}, :140:{27,35,42}, :141:{35,42,50,65,80}, :142:37, :143:29, :145:15, :146:{18,25,37}, :147:19, :148:{27,34}, :149:19, :150:{27,35,43,50,60}, :151:19, :152:{27,42,54,67}, :153:{26,38,49,61,72}, :154:{22,34,49}, :155:19, :156:{28,36,43,51,60}, :157:{21,29,36,45}, :158:{21,29,36,45,54}, :159:{21,34,50}, :160:{28,34,41,50}, :161:{30,36,43,55}, :162:19, :163:{35,41,46,56,66,76}, :164:19, :165:{27,40,47,53}, :166:19, :167:{27,42,45,49,59,86}, :168:19
+  wire             isQrd = io_inst_0_bits_inst[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaDecoder.scala:133:26, :158:21, :187:34
+  wire             _resourceReady_T_1 = io_inst_0_bits_inst[31:30] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:134:28, :189:49
+  wire [5:0]       _GEN = {1'h0, io_qrdUsed};	// src/queen/scala/main/QueenDsaDecoder.scala:191:{35,45}
   wire             ready_0 =
-    ((~(|(io_inst_0_bits_inst[31:30])) | _resourceReady_T_1) & ringReady
+    (io_flushing | (~(|(io_inst_0_bits_inst[31:30])) | _resourceReady_T_1) & ringReady
      | (&(io_inst_0_bits_inst[31:30])) & schedReady) & ~(io_inst_0_valid & (|illegal_0))
-    & (io_inst_0_bits_inst[14:12] != 3'h2 | {1'h0, _GEN + {5'h0, isQrd}} < 7'h11);	// src/queen/scala/main/QueenDsaDecoder.scala:96:63, :112:40, :121:26, :122:28, :134:{25,37}, :135:19, :136:34, :146:21, :155:59, :171:{58,72}, :175:34, :176:{40,52,65,77,90}, :177:{23,36}, :178:{35,45,62}, :179:{35,38,50,54,61}
-  wire             fire = io_inst_0_valid & ready_0;	// src/queen/scala/main/QueenDsaDecoder.scala:179:{35,50}, :180:37
-  wire             io_qrdAlloc_0_valid_0 = fire & isQrd;	// src/queen/scala/main/QueenDsaDecoder.scala:175:34, :180:37, :181:36
+    & (io_inst_0_bits_inst[14:12] != 3'h2 | {1'h0, _GEN + {5'h0, isQrd}} < 7'h11);	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :98:63, :124:40, :133:26, :134:28, :146:{25,37}, :147:19, :148:34, :158:21, :167:59, :183:{58,72}, :187:34, :188:41, :189:{24,36,49,61,74}, :190:{23,36}, :191:{35,45,62}, :192:{35,38,50,54,61}
+  wire             fire = io_inst_0_valid & ready_0;	// src/queen/scala/main/QueenDsaDecoder.scala:192:{35,50}, :193:37
+  wire             io_qrdAlloc_0_valid_0 = fire & isQrd;	// src/queen/scala/main/QueenDsaDecoder.scala:187:34, :193:37, :194:36
   wire             _GEN_0 =
-    fire & (~(|(io_inst_0_bits_inst[14:12])) | io_inst_0_bits_inst[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaDecoder.scala:121:26, :144:28, :145:21, :173:{34,42,58}, :180:37, :188:22
+    fire & (~(|(io_inst_0_bits_inst[14:12])) | io_inst_0_bits_inst[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaDecoder.scala:133:26, :156:28, :157:21, :185:{34,42,58}, :193:37, :202:22
   wire             _GEN_1 =
-    fire & io_inst_0_bits_inst[14:12] == 3'h3 & io_inst_0_bits_inst[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :121:26, :123:23, :125:29, :174:{34,42,58}, :180:37, :188:49
-  wire             _GEN_2 = _GEN_0 | ~_GEN_1 & gemmOpen;	// src/queen/scala/main/QueenDsaDecoder.scala:117:35, :174:42, :188:{16,22,43,49}
-  wire             _GEN_3 = (|(io_inst_0_bits_inst[31:30])) ? gemmOpen : _GEN_2;	// src/queen/scala/main/QueenDsaDecoder.scala:117:35, :122:28, :155:59, :187:20, :188:16
-  wire             _GEN_4 = _GEN_0 | ~_GEN_1 & dmaOpen;	// src/queen/scala/main/QueenDsaDecoder.scala:118:34, :174:42, :188:{22,43,49}, :190:{16,43}
-  wire             _GEN_5 = _resourceReady_T_1 ? _GEN_4 : dmaOpen;	// src/queen/scala/main/QueenDsaDecoder.scala:118:34, :176:65, :189:20, :190:16
-  wire             illegal_1_isCtrl = io_inst_1_bits_inst[14:12] == 3'h3;	// src/queen/scala/main/QueenDsaDecoder.scala:121:26, :125:29
-  wire             _illegal_1_auxHiZero_T_1 = io_inst_1_bits_inst[29:26] == 4'h3;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :126:29
-  wire             _illegal_1_auxZero_T_3 = io_inst_1_bits_inst[29:26] == 4'h6;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :126:59
-  wire             _illegal_1_T_37 = io_inst_1_bits_inst[29:26] == 4'h8;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :126:74
-  wire             _illegal_1_auxZero_T = io_inst_1_bits_inst[29:26] == 4'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :127:31
-  wire             _illegal_1_T_53 = io_inst_1_bits_inst[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :127:46
-  wire             _illegal_1_auxHiZero_T = io_inst_1_bits_inst[29:26] == 4'h2;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :128:42
+    fire & io_inst_0_bits_inst[14:12] == 3'h3 & io_inst_0_bits_inst[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaDecoder.scala:133:26, :135:23, :137:29, :139:46, :186:{34,42,58}, :193:37, :202:49
+  wire             _GEN_2 =
+    (|(io_inst_0_bits_inst[31:30])) ? gemmOpen : _GEN_0 | ~_GEN_1 & gemmOpen;	// src/queen/scala/main/QueenDsaDecoder.scala:129:35, :134:28, :167:59, :186:42, :201:20, :202:{16,22,43,49}
+  wire             _GEN_3 = _resourceReady_T_1 ? _GEN_0 | ~_GEN_1 & dmaOpen : dmaOpen;	// src/queen/scala/main/QueenDsaDecoder.scala:130:34, :186:42, :189:49, :202:{22,43,49}, :203:20, :204:{16,43}
+  wire             illegal_1_isCtrl = io_inst_1_bits_inst[14:12] == 3'h3;	// src/queen/scala/main/QueenDsaDecoder.scala:133:26, :137:29
+  wire             _illegal_1_auxHiZero_T_1 = io_inst_1_bits_inst[29:26] == 4'h3;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :138:29
+  wire             _illegal_1_auxZero_T_3 = io_inst_1_bits_inst[29:26] == 4'h6;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :138:59
+  wire             _illegal_1_T_37 = io_inst_1_bits_inst[29:26] == 4'h8;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :138:74
+  wire             _illegal_1_auxZero_T_7 = io_inst_1_bits_inst[29:26] == 4'hA;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :138:89
+  wire             _illegal_1_auxZero_T = io_inst_1_bits_inst[29:26] == 4'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :139:31
+  wire             _illegal_1_T_53 = io_inst_1_bits_inst[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :139:46
+  wire             _illegal_1_auxHiZero_T = io_inst_1_bits_inst[29:26] == 4'h2;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :140:42
   wire [7:0]       illegal_1 =
     io_inst_1_bits_inst[6:0] == 7'hB
       ? (io_inst_1_bits_inst[14]
            ? 8'h2
            : illegal_1_isCtrl
-             & (io_inst_1_bits_inst[29:26] == 4'h7 | io_inst_1_bits_inst[29:26] > 4'h9)
+             & (io_inst_1_bits_inst[29:26] == 4'h7 | io_inst_1_bits_inst[29:26] > 4'hA)
                ? 8'h3
                : illegal_1_isCtrl
                  & ((_illegal_1_auxHiZero_T_1 | io_inst_1_bits_inst[29:26] == 4'h4
-                     | _illegal_1_auxZero_T_3 | _illegal_1_T_37)
+                     | _illegal_1_auxZero_T_3 | _illegal_1_T_37 | _illegal_1_auxZero_T_7)
                     & io_inst_1_bits_inst[31:30] != 2'h3
                     | (_illegal_1_auxZero_T | _illegal_1_T_53)
                     & (|(io_inst_1_bits_inst[31:30])) & io_inst_1_bits_inst[31:30] != 2'h1
@@ -335,8 +357,8 @@ module Queen_QueenDsaDecoder(	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
                      | io_inst_1_bits_inst[14:12] == 3'h2
                      & (|(io_inst_1_bits_inst[19:15])) | illegal_1_isCtrl
                      & ((_illegal_1_auxZero_T | io_inst_1_bits_inst[29:26] == 4'h5
-                         | _illegal_1_auxZero_T_3 | _illegal_1_T_53)
-                        & (|(io_inst_1_bits_inst[11:7]))
+                         | _illegal_1_auxZero_T_3 | _illegal_1_T_53
+                         | _illegal_1_auxZero_T_7) & (|(io_inst_1_bits_inst[11:7]))
                         | (_illegal_1_auxHiZero_T | _illegal_1_auxHiZero_T_1)
                         & (|(io_inst_1_bits_inst[11:10])) | _illegal_1_T_37
                         & (|(io_inst_1_bits_inst[11:9])))
@@ -350,46 +372,46 @@ module Queen_QueenDsaDecoder(	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
                                : {4'h0,
                                   illegal_1_isCtrl & _illegal_1_T_53
                                     & ~((|(io_inst_1_bits_inst[31:30]))
-                                          ? _GEN_5
-                                          : _GEN_3),
+                                          ? _GEN_3
+                                          : _GEN_2),
                                   3'h0})
-      : 8'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:11:7, :30:65, :121:26, :122:28, :123:23, :124:23, :125:29, :126:{29,37,44,52,59,67,74}, :127:{31,39,46}, :128:{27,35,42}, :129:{35,42,50,65}, :130:37, :131:29, :133:15, :134:{18,25,37}, :135:19, :136:{27,34}, :137:19, :138:{27,35,43,50,60}, :139:19, :140:{27,42,54,67}, :141:{26,38,49,61,72}, :142:{22,34,49}, :143:19, :144:{28,36,43,51,60}, :145:{21,29,36,45}, :146:{21,29,36,45,54}, :147:{21,34,50}, :148:{28,34,41,50}, :149:{30,36,43,55}, :150:19, :151:{35,41,46,56,66,76}, :152:19, :153:{27,40,47,53}, :154:19, :155:{27,42,45,49,59,86}, :156:19, :187:20, :189:20
-  wire             isQrd_1 = io_inst_1_bits_inst[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaDecoder.scala:121:26, :146:21, :175:34
-  wire             _resourceReady_T_7 = io_inst_1_bits_inst[31:30] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:122:28, :176:65
+      : 8'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:32:65, :133:26, :134:28, :135:23, :136:23, :137:29, :138:{29,37,44,52,59,67,74,82,89}, :139:{31,39,46}, :140:{27,35,42}, :141:{35,42,50,65,80}, :142:37, :143:29, :145:15, :146:{18,25,37}, :147:19, :148:{27,34}, :149:19, :150:{27,35,43,50,60}, :151:19, :152:{27,42,54,67}, :153:{26,38,49,61,72}, :154:{22,34,49}, :155:19, :156:{28,36,43,51,60}, :157:{21,29,36,45}, :158:{21,29,36,45,54}, :159:{21,34,50}, :160:{28,34,41,50}, :161:{30,36,43,55}, :162:19, :163:{35,41,46,56,66,76}, :164:19, :165:{27,40,47,53}, :166:19, :167:{27,42,45,49,59,86}, :168:19, :201:20, :203:20
+  wire             isQrd_1 = io_inst_1_bits_inst[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaDecoder.scala:133:26, :158:21, :187:34
+  wire             _resourceReady_T_8 = io_inst_1_bits_inst[31:30] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:134:28, :189:49
   wire             ready_1 =
-    ((~(|(io_inst_1_bits_inst[31:30])) | _resourceReady_T_7) & ringReady
+    (io_flushing | (~(|(io_inst_1_bits_inst[31:30])) | _resourceReady_T_8) & ringReady
      | (&(io_inst_1_bits_inst[31:30])) & schedReady)
     & ~(io_inst_0_valid & (|illegal_0) | io_inst_1_valid & (|illegal_1))
     & (io_inst_1_bits_inst[14:12] != 3'h2 | {1'h0, _GEN + {5'h0, io_qrdAlloc_0_valid_0}}
-       + {6'h0, isQrd_1} < 7'h11);	// src/queen/scala/main/QueenDsaDecoder.scala:96:63, :112:40, :121:26, :122:28, :134:{25,37}, :135:19, :136:34, :146:21, :155:59, :171:{58,72,90}, :175:34, :176:{40,52,65,77,90}, :177:{23,36}, :178:{35,45,62}, :179:{35,38,50,54,61}, :181:36
-  wire             fire_1 = io_inst_1_valid & ready_1;	// src/queen/scala/main/QueenDsaDecoder.scala:179:{35,50}, :180:37
-  wire             io_qrdAlloc_1_valid_0 = fire_1 & isQrd_1;	// src/queen/scala/main/QueenDsaDecoder.scala:175:34, :180:37, :181:36
-  wire [2:0]       _GEN_6 = {2'h0, io_qrdAlloc_0_valid_0} + {2'h0, io_qrdAlloc_1_valid_0};	// src/queen/scala/main/QueenDsaDecoder.scala:181:{25,36}
+       + {6'h0, isQrd_1} < 7'h11);	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :98:63, :124:40, :133:26, :134:28, :146:{25,37}, :147:19, :148:34, :158:21, :167:59, :183:{58,72,90}, :187:34, :188:41, :189:{24,36,49,61,74}, :190:{23,36}, :191:{35,45,62}, :192:{35,38,50,54,61}, :194:36
+  wire             fire_1 = io_inst_1_valid & ready_1;	// src/queen/scala/main/QueenDsaDecoder.scala:192:{35,50}, :193:37
+  wire             io_qrdAlloc_1_valid_0 = fire_1 & isQrd_1;	// src/queen/scala/main/QueenDsaDecoder.scala:187:34, :193:37, :194:36
+  wire [2:0]       _GEN_4 = {2'h0, io_qrdAlloc_0_valid_0} + {2'h0, io_qrdAlloc_1_valid_0};	// src/queen/scala/main/QueenDsaDecoder.scala:194:{25,36}
+  wire             _GEN_5 =
+    fire_1 & (~(|(io_inst_1_bits_inst[14:12])) | io_inst_1_bits_inst[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaDecoder.scala:133:26, :156:28, :157:21, :185:{34,42,58}, :193:37, :202:22
+  wire             _GEN_6 =
+    fire_1 & io_inst_1_bits_inst[14:12] == 3'h3 & io_inst_1_bits_inst[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaDecoder.scala:133:26, :135:23, :137:29, :139:46, :186:{34,42,58}, :193:37, :202:49
   wire             _GEN_7 =
-    fire_1 & (~(|(io_inst_1_bits_inst[14:12])) | io_inst_1_bits_inst[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaDecoder.scala:121:26, :144:28, :145:21, :173:{34,42,58}, :180:37, :188:22
-  wire             _GEN_8 =
-    fire_1 & io_inst_1_bits_inst[14:12] == 3'h3 & io_inst_1_bits_inst[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :121:26, :123:23, :125:29, :174:{34,42,58}, :180:37, :188:49
-  wire             _GEN_9 = _GEN_7 | ~_GEN_8 & _GEN_3;	// src/queen/scala/main/QueenDsaDecoder.scala:174:42, :187:20, :188:{16,22,43,49}
-  wire             _GEN_10 = (|(io_inst_1_bits_inst[31:30])) ? _GEN_3 : _GEN_9;	// src/queen/scala/main/QueenDsaDecoder.scala:122:28, :155:59, :187:20, :188:16
-  wire             _GEN_11 = _GEN_7 | ~_GEN_8 & _GEN_5;	// src/queen/scala/main/QueenDsaDecoder.scala:174:42, :188:{22,43,49}, :189:20, :190:{16,43}
-  wire             _GEN_12 = _resourceReady_T_7 ? _GEN_11 : _GEN_5;	// src/queen/scala/main/QueenDsaDecoder.scala:176:65, :189:20, :190:16
-  wire             illegal_2_isCtrl = io_inst_2_bits_inst[14:12] == 3'h3;	// src/queen/scala/main/QueenDsaDecoder.scala:121:26, :125:29
-  wire             _illegal_2_auxHiZero_T_1 = io_inst_2_bits_inst[29:26] == 4'h3;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :126:29
-  wire             _illegal_2_auxZero_T_3 = io_inst_2_bits_inst[29:26] == 4'h6;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :126:59
-  wire             _illegal_2_T_37 = io_inst_2_bits_inst[29:26] == 4'h8;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :126:74
-  wire             _illegal_2_auxZero_T = io_inst_2_bits_inst[29:26] == 4'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :127:31
-  wire             _illegal_2_T_53 = io_inst_2_bits_inst[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :127:46
-  wire             _illegal_2_auxHiZero_T = io_inst_2_bits_inst[29:26] == 4'h2;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :128:42
+    (|(io_inst_1_bits_inst[31:30])) ? _GEN_2 : _GEN_5 | ~_GEN_6 & _GEN_2;	// src/queen/scala/main/QueenDsaDecoder.scala:134:28, :167:59, :186:42, :201:20, :202:{16,22,43,49}
+  wire             _GEN_8 = _resourceReady_T_8 ? _GEN_5 | ~_GEN_6 & _GEN_3 : _GEN_3;	// src/queen/scala/main/QueenDsaDecoder.scala:186:42, :189:49, :202:{22,43,49}, :203:20, :204:{16,43}
+  wire             illegal_2_isCtrl = io_inst_2_bits_inst[14:12] == 3'h3;	// src/queen/scala/main/QueenDsaDecoder.scala:133:26, :137:29
+  wire             _illegal_2_auxHiZero_T_1 = io_inst_2_bits_inst[29:26] == 4'h3;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :138:29
+  wire             _illegal_2_auxZero_T_3 = io_inst_2_bits_inst[29:26] == 4'h6;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :138:59
+  wire             _illegal_2_T_37 = io_inst_2_bits_inst[29:26] == 4'h8;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :138:74
+  wire             _illegal_2_auxZero_T_7 = io_inst_2_bits_inst[29:26] == 4'hA;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :138:89
+  wire             _illegal_2_auxZero_T = io_inst_2_bits_inst[29:26] == 4'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :139:31
+  wire             _illegal_2_T_53 = io_inst_2_bits_inst[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :139:46
+  wire             _illegal_2_auxHiZero_T = io_inst_2_bits_inst[29:26] == 4'h2;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :140:42
   wire [7:0]       illegal_2 =
     io_inst_2_bits_inst[6:0] == 7'hB
       ? (io_inst_2_bits_inst[14]
            ? 8'h2
            : illegal_2_isCtrl
-             & (io_inst_2_bits_inst[29:26] == 4'h7 | io_inst_2_bits_inst[29:26] > 4'h9)
+             & (io_inst_2_bits_inst[29:26] == 4'h7 | io_inst_2_bits_inst[29:26] > 4'hA)
                ? 8'h3
                : illegal_2_isCtrl
                  & ((_illegal_2_auxHiZero_T_1 | io_inst_2_bits_inst[29:26] == 4'h4
-                     | _illegal_2_auxZero_T_3 | _illegal_2_T_37)
+                     | _illegal_2_auxZero_T_3 | _illegal_2_T_37 | _illegal_2_auxZero_T_7)
                     & io_inst_2_bits_inst[31:30] != 2'h3
                     | (_illegal_2_auxZero_T | _illegal_2_T_53)
                     & (|(io_inst_2_bits_inst[31:30])) & io_inst_2_bits_inst[31:30] != 2'h1
@@ -401,8 +423,8 @@ module Queen_QueenDsaDecoder(	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
                      | io_inst_2_bits_inst[14:12] == 3'h2
                      & (|(io_inst_2_bits_inst[19:15])) | illegal_2_isCtrl
                      & ((_illegal_2_auxZero_T | io_inst_2_bits_inst[29:26] == 4'h5
-                         | _illegal_2_auxZero_T_3 | _illegal_2_T_53)
-                        & (|(io_inst_2_bits_inst[11:7]))
+                         | _illegal_2_auxZero_T_3 | _illegal_2_T_53
+                         | _illegal_2_auxZero_T_7) & (|(io_inst_2_bits_inst[11:7]))
                         | (_illegal_2_auxHiZero_T | _illegal_2_auxHiZero_T_1)
                         & (|(io_inst_2_bits_inst[11:10])) | _illegal_2_T_37
                         & (|(io_inst_2_bits_inst[11:9])))
@@ -416,46 +438,46 @@ module Queen_QueenDsaDecoder(	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
                                : {4'h0,
                                   illegal_2_isCtrl & _illegal_2_T_53
                                     & ~((|(io_inst_2_bits_inst[31:30]))
-                                          ? _GEN_12
-                                          : _GEN_10),
+                                          ? _GEN_8
+                                          : _GEN_7),
                                   3'h0})
-      : 8'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:11:7, :30:65, :121:26, :122:28, :123:23, :124:23, :125:29, :126:{29,37,44,52,59,67,74}, :127:{31,39,46}, :128:{27,35,42}, :129:{35,42,50,65}, :130:37, :131:29, :133:15, :134:{18,25,37}, :135:19, :136:{27,34}, :137:19, :138:{27,35,43,50,60}, :139:19, :140:{27,42,54,67}, :141:{26,38,49,61,72}, :142:{22,34,49}, :143:19, :144:{28,36,43,51,60}, :145:{21,29,36,45}, :146:{21,29,36,45,54}, :147:{21,34,50}, :148:{28,34,41,50}, :149:{30,36,43,55}, :150:19, :151:{35,41,46,56,66,76}, :152:19, :153:{27,40,47,53}, :154:19, :155:{27,42,45,49,59,86}, :156:19, :187:20, :189:20
-  wire             isQrd_2 = io_inst_2_bits_inst[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaDecoder.scala:121:26, :146:21, :175:34
-  wire             _resourceReady_T_13 = io_inst_2_bits_inst[31:30] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:122:28, :176:65
+      : 8'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:32:65, :133:26, :134:28, :135:23, :136:23, :137:29, :138:{29,37,44,52,59,67,74,82,89}, :139:{31,39,46}, :140:{27,35,42}, :141:{35,42,50,65,80}, :142:37, :143:29, :145:15, :146:{18,25,37}, :147:19, :148:{27,34}, :149:19, :150:{27,35,43,50,60}, :151:19, :152:{27,42,54,67}, :153:{26,38,49,61,72}, :154:{22,34,49}, :155:19, :156:{28,36,43,51,60}, :157:{21,29,36,45}, :158:{21,29,36,45,54}, :159:{21,34,50}, :160:{28,34,41,50}, :161:{30,36,43,55}, :162:19, :163:{35,41,46,56,66,76}, :164:19, :165:{27,40,47,53}, :166:19, :167:{27,42,45,49,59,86}, :168:19, :201:20, :203:20
+  wire             isQrd_2 = io_inst_2_bits_inst[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaDecoder.scala:133:26, :158:21, :187:34
+  wire             _resourceReady_T_15 = io_inst_2_bits_inst[31:30] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:134:28, :189:49
   wire             ready_2 =
-    ((~(|(io_inst_2_bits_inst[31:30])) | _resourceReady_T_13) & ringReady
+    (io_flushing | (~(|(io_inst_2_bits_inst[31:30])) | _resourceReady_T_15) & ringReady
      | (&(io_inst_2_bits_inst[31:30])) & schedReady)
     & ~(io_inst_0_valid & (|illegal_0) | io_inst_1_valid & (|illegal_1) | io_inst_2_valid
         & (|illegal_2))
-    & (io_inst_2_bits_inst[14:12] != 3'h2 | {1'h0, _GEN + {3'h0, _GEN_6}}
-       + {6'h0, isQrd_2} < 7'h11);	// src/queen/scala/main/QueenDsaDecoder.scala:96:63, :112:40, :121:26, :122:28, :134:{25,37}, :135:19, :136:34, :146:21, :155:59, :171:{58,72,90}, :175:34, :176:{40,52,65,77,90}, :177:{23,36}, :178:{35,45,62}, :179:{35,38,50,54,61}, :181:25
-  wire             fire_2 = io_inst_2_valid & ready_2;	// src/queen/scala/main/QueenDsaDecoder.scala:179:{35,50}, :180:37
-  wire             io_qrdAlloc_2_valid_0 = fire_2 & isQrd_2;	// src/queen/scala/main/QueenDsaDecoder.scala:175:34, :180:37, :181:36
-  wire             _GEN_13 =
-    fire_2 & (~(|(io_inst_2_bits_inst[14:12])) | io_inst_2_bits_inst[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaDecoder.scala:121:26, :144:28, :145:21, :173:{34,42,58}, :180:37, :188:22
-  wire             _GEN_14 =
-    fire_2 & io_inst_2_bits_inst[14:12] == 3'h3 & io_inst_2_bits_inst[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :121:26, :123:23, :125:29, :174:{34,42,58}, :180:37, :188:49
-  wire             _GEN_15 = _GEN_13 | ~_GEN_14 & _GEN_10;	// src/queen/scala/main/QueenDsaDecoder.scala:174:42, :187:20, :188:{16,22,43,49}
-  wire             _GEN_16 = (|(io_inst_2_bits_inst[31:30])) ? _GEN_10 : _GEN_15;	// src/queen/scala/main/QueenDsaDecoder.scala:122:28, :155:59, :187:20, :188:16
-  wire             _GEN_17 = _GEN_13 | ~_GEN_14 & _GEN_12;	// src/queen/scala/main/QueenDsaDecoder.scala:174:42, :188:{22,43,49}, :189:20, :190:{16,43}
-  wire             _GEN_18 = _resourceReady_T_13 ? _GEN_17 : _GEN_12;	// src/queen/scala/main/QueenDsaDecoder.scala:176:65, :189:20, :190:16
-  wire             illegal_3_isCtrl = io_inst_3_bits_inst[14:12] == 3'h3;	// src/queen/scala/main/QueenDsaDecoder.scala:121:26, :125:29
-  wire             _illegal_3_auxHiZero_T_1 = io_inst_3_bits_inst[29:26] == 4'h3;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :126:29
-  wire             _illegal_3_auxZero_T_3 = io_inst_3_bits_inst[29:26] == 4'h6;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :126:59
-  wire             _illegal_3_T_37 = io_inst_3_bits_inst[29:26] == 4'h8;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :126:74
-  wire             _illegal_3_auxZero_T = io_inst_3_bits_inst[29:26] == 4'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :127:31
-  wire             _illegal_3_T_53 = io_inst_3_bits_inst[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :127:46
-  wire             _illegal_3_auxHiZero_T = io_inst_3_bits_inst[29:26] == 4'h2;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :123:23, :128:42
+    & (io_inst_2_bits_inst[14:12] != 3'h2 | {1'h0, _GEN + {3'h0, _GEN_4}}
+       + {6'h0, isQrd_2} < 7'h11);	// src/queen/scala/main/QueenDsaDecoder.scala:98:63, :124:40, :133:26, :134:28, :146:{25,37}, :147:19, :148:34, :158:21, :167:59, :183:{58,72,90}, :187:34, :188:41, :189:{24,36,49,61,74}, :190:{23,36}, :191:{35,45,62}, :192:{35,38,50,54,61}, :194:25
+  wire             fire_2 = io_inst_2_valid & ready_2;	// src/queen/scala/main/QueenDsaDecoder.scala:192:{35,50}, :193:37
+  wire             io_qrdAlloc_2_valid_0 = fire_2 & isQrd_2;	// src/queen/scala/main/QueenDsaDecoder.scala:187:34, :193:37, :194:36
+  wire             _GEN_9 =
+    fire_2 & (~(|(io_inst_2_bits_inst[14:12])) | io_inst_2_bits_inst[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaDecoder.scala:133:26, :156:28, :157:21, :185:{34,42,58}, :193:37, :202:22
+  wire             _GEN_10 =
+    fire_2 & io_inst_2_bits_inst[14:12] == 3'h3 & io_inst_2_bits_inst[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaDecoder.scala:133:26, :135:23, :137:29, :139:46, :186:{34,42,58}, :193:37, :202:49
+  wire             _GEN_11 =
+    (|(io_inst_2_bits_inst[31:30])) ? _GEN_7 : _GEN_9 | ~_GEN_10 & _GEN_7;	// src/queen/scala/main/QueenDsaDecoder.scala:134:28, :167:59, :186:42, :201:20, :202:{16,22,43,49}
+  wire             _GEN_12 = _resourceReady_T_15 ? _GEN_9 | ~_GEN_10 & _GEN_8 : _GEN_8;	// src/queen/scala/main/QueenDsaDecoder.scala:186:42, :189:49, :202:{22,43,49}, :203:20, :204:{16,43}
+  wire             illegal_3_isCtrl = io_inst_3_bits_inst[14:12] == 3'h3;	// src/queen/scala/main/QueenDsaDecoder.scala:133:26, :137:29
+  wire             _illegal_3_auxHiZero_T_1 = io_inst_3_bits_inst[29:26] == 4'h3;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :138:29
+  wire             _illegal_3_auxZero_T_3 = io_inst_3_bits_inst[29:26] == 4'h6;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :138:59
+  wire             _illegal_3_T_37 = io_inst_3_bits_inst[29:26] == 4'h8;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :138:74
+  wire             _illegal_3_auxZero_T_7 = io_inst_3_bits_inst[29:26] == 4'hA;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :138:89
+  wire             _illegal_3_auxZero_T = io_inst_3_bits_inst[29:26] == 4'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :139:31
+  wire             _illegal_3_T_53 = io_inst_3_bits_inst[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :139:46
+  wire             _illegal_3_auxHiZero_T = io_inst_3_bits_inst[29:26] == 4'h2;	// src/queen/scala/main/QueenDsaDecoder.scala:135:23, :140:42
   wire [7:0]       illegal_3 =
     io_inst_3_bits_inst[6:0] == 7'hB
       ? (io_inst_3_bits_inst[14]
            ? 8'h2
            : illegal_3_isCtrl
-             & (io_inst_3_bits_inst[29:26] == 4'h7 | io_inst_3_bits_inst[29:26] > 4'h9)
+             & (io_inst_3_bits_inst[29:26] == 4'h7 | io_inst_3_bits_inst[29:26] > 4'hA)
                ? 8'h3
                : illegal_3_isCtrl
                  & ((_illegal_3_auxHiZero_T_1 | io_inst_3_bits_inst[29:26] == 4'h4
-                     | _illegal_3_auxZero_T_3 | _illegal_3_T_37)
+                     | _illegal_3_auxZero_T_3 | _illegal_3_T_37 | _illegal_3_auxZero_T_7)
                     & io_inst_3_bits_inst[31:30] != 2'h3
                     | (_illegal_3_auxZero_T | _illegal_3_T_53)
                     & (|(io_inst_3_bits_inst[31:30])) & io_inst_3_bits_inst[31:30] != 2'h1
@@ -467,8 +489,8 @@ module Queen_QueenDsaDecoder(	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
                      | io_inst_3_bits_inst[14:12] == 3'h2
                      & (|(io_inst_3_bits_inst[19:15])) | illegal_3_isCtrl
                      & ((_illegal_3_auxZero_T | io_inst_3_bits_inst[29:26] == 4'h5
-                         | _illegal_3_auxZero_T_3 | _illegal_3_T_53)
-                        & (|(io_inst_3_bits_inst[11:7]))
+                         | _illegal_3_auxZero_T_3 | _illegal_3_T_53
+                         | _illegal_3_auxZero_T_7) & (|(io_inst_3_bits_inst[11:7]))
                         | (_illegal_3_auxHiZero_T | _illegal_3_auxHiZero_T_1)
                         & (|(io_inst_3_bits_inst[11:10])) | _illegal_3_T_37
                         & (|(io_inst_3_bits_inst[11:9])))
@@ -482,109 +504,125 @@ module Queen_QueenDsaDecoder(	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
                                : {4'h0,
                                   illegal_3_isCtrl & _illegal_3_T_53
                                     & ~((|(io_inst_3_bits_inst[31:30]))
-                                          ? _GEN_18
-                                          : _GEN_16),
+                                          ? _GEN_12
+                                          : _GEN_11),
                                   3'h0})
-      : 8'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:11:7, :30:65, :121:26, :122:28, :123:23, :124:23, :125:29, :126:{29,37,44,52,59,67,74}, :127:{31,39,46}, :128:{27,35,42}, :129:{35,42,50,65}, :130:37, :131:29, :133:15, :134:{18,25,37}, :135:19, :136:{27,34}, :137:19, :138:{27,35,43,50,60}, :139:19, :140:{27,42,54,67}, :141:{26,38,49,61,72}, :142:{22,34,49}, :143:19, :144:{28,36,43,51,60}, :145:{21,29,36,45}, :146:{21,29,36,45,54}, :147:{21,34,50}, :148:{28,34,41,50}, :149:{30,36,43,55}, :150:19, :151:{35,41,46,56,66,76}, :152:19, :153:{27,40,47,53}, :154:19, :155:{27,42,45,49,59,86}, :156:19, :187:20, :189:20
-  wire             isQrd_3 = io_inst_3_bits_inst[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaDecoder.scala:121:26, :146:21, :175:34
-  wire             _resourceReady_T_19 = io_inst_3_bits_inst[31:30] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:122:28, :176:65
+      : 8'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:32:65, :133:26, :134:28, :135:23, :136:23, :137:29, :138:{29,37,44,52,59,67,74,82,89}, :139:{31,39,46}, :140:{27,35,42}, :141:{35,42,50,65,80}, :142:37, :143:29, :145:15, :146:{18,25,37}, :147:19, :148:{27,34}, :149:19, :150:{27,35,43,50,60}, :151:19, :152:{27,42,54,67}, :153:{26,38,49,61,72}, :154:{22,34,49}, :155:19, :156:{28,36,43,51,60}, :157:{21,29,36,45}, :158:{21,29,36,45,54}, :159:{21,34,50}, :160:{28,34,41,50}, :161:{30,36,43,55}, :162:19, :163:{35,41,46,56,66,76}, :164:19, :165:{27,40,47,53}, :166:19, :167:{27,42,45,49,59,86}, :168:19, :201:20, :203:20
+  wire             isQrd_3 = io_inst_3_bits_inst[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaDecoder.scala:133:26, :158:21, :187:34
+  wire             _resourceReady_T_22 = io_inst_3_bits_inst[31:30] == 2'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:134:28, :189:49
   wire             ready_3 =
-    ((~(|(io_inst_3_bits_inst[31:30])) | _resourceReady_T_19) & ringReady
+    (io_flushing | (~(|(io_inst_3_bits_inst[31:30])) | _resourceReady_T_22) & ringReady
      | (&(io_inst_3_bits_inst[31:30])) & schedReady)
     & ~(io_inst_0_valid & (|illegal_0) | io_inst_1_valid & (|illegal_1) | io_inst_2_valid
         & (|illegal_2) | io_inst_3_valid & (|illegal_3))
     & (io_inst_3_bits_inst[14:12] != 3'h2
-       | {1'h0, _GEN + {3'h0, _GEN_6 + {2'h0, io_qrdAlloc_2_valid_0}}}
-       + {6'h0, isQrd_3} < 7'h11);	// src/queen/scala/main/QueenDsaDecoder.scala:96:63, :112:40, :121:26, :122:28, :134:{25,37}, :135:19, :136:34, :146:21, :155:59, :171:{58,72,90}, :175:34, :176:{40,52,65,77,90}, :177:{23,36}, :178:{35,45,62}, :179:{35,38,50,54,61}, :181:{25,36}
-  wire             fire_3 = io_inst_3_valid & ready_3;	// src/queen/scala/main/QueenDsaDecoder.scala:179:{35,50}, :180:37
-  wire             illegalValid_0 = io_inst_0_valid & (|illegal_0);	// src/queen/scala/main/QueenDsaDecoder.scala:134:{25,37}, :135:19, :136:34, :171:72, :196:26
-  wire             illegalValid_1 = io_inst_1_valid & (|illegal_1);	// src/queen/scala/main/QueenDsaDecoder.scala:134:{25,37}, :135:19, :136:34, :171:72, :196:26
-  wire             illegalValid_2 = io_inst_2_valid & (|illegal_2);	// src/queen/scala/main/QueenDsaDecoder.scala:134:{25,37}, :135:19, :136:34, :171:72, :196:26
+       | {1'h0, _GEN + {3'h0, _GEN_4 + {2'h0, io_qrdAlloc_2_valid_0}}}
+       + {6'h0, isQrd_3} < 7'h11);	// src/queen/scala/main/QueenDsaDecoder.scala:98:63, :124:40, :133:26, :134:28, :146:{25,37}, :147:19, :148:34, :158:21, :167:59, :183:{58,72,90}, :187:34, :188:41, :189:{24,36,49,61,74}, :190:{23,36}, :191:{35,45,62}, :192:{35,38,50,54,61}, :194:{25,36}
+  wire             fire_3 = io_inst_3_valid & ready_3;	// src/queen/scala/main/QueenDsaDecoder.scala:192:{35,50}, :193:37
+  wire             illegalValid_0 = io_inst_0_valid & (|illegal_0);	// src/queen/scala/main/QueenDsaDecoder.scala:146:{25,37}, :147:19, :148:34, :183:72, :210:26
+  wire             illegalValid_1 = io_inst_1_valid & (|illegal_1);	// src/queen/scala/main/QueenDsaDecoder.scala:146:{25,37}, :147:19, :148:34, :183:72, :210:26
+  wire             illegalValid_2 = io_inst_2_valid & (|illegal_2);	// src/queen/scala/main/QueenDsaDecoder.scala:146:{25,37}, :147:19, :148:34, :183:72, :210:26
   wire [1:0]       firstIllegal =
-    illegalValid_0 ? 2'h0 : illegalValid_1 ? 2'h1 : {1'h1, ~illegalValid_2};	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:196:26
-  wire [3:0][31:0] _GEN_19 =
-    {{io_inst_3_bits_pc}, {io_inst_2_bits_pc}, {io_inst_1_bits_pc}, {io_inst_0_bits_pc}};	// src/queen/scala/main/QueenDsaDecoder.scala:199:21
-  wire [3:0][31:0] _GEN_20 =
+    illegalValid_0 ? 2'h0 : illegalValid_1 ? 2'h1 : {1'h1, ~illegalValid_2};	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:11:7, :210:26
+  wire [3:0][31:0] _GEN_13 =
+    {{io_inst_3_bits_pc}, {io_inst_2_bits_pc}, {io_inst_1_bits_pc}, {io_inst_0_bits_pc}};	// src/queen/scala/main/QueenDsaDecoder.scala:213:21
+  wire [3:0][31:0] _GEN_14 =
     {{io_inst_3_bits_inst},
      {io_inst_2_bits_inst},
      {io_inst_1_bits_inst},
-     {io_inst_0_bits_inst}};	// src/queen/scala/main/QueenDsaDecoder.scala:199:21
-  wire [3:0][7:0]  _GEN_21 = {{illegal_3}, {illegal_2}, {illegal_1}, {illegal_0}};	// src/queen/scala/main/QueenDsaDecoder.scala:134:{25,37}, :135:19, :136:34, :201:24
+     {io_inst_0_bits_inst}};	// src/queen/scala/main/QueenDsaDecoder.scala:213:21
+  wire [3:0][7:0]  _GEN_15 = {{illegal_3}, {illegal_2}, {illegal_1}, {illegal_0}};	// src/queen/scala/main/QueenDsaDecoder.scala:146:{25,37}, :147:19, :148:34, :215:24
   always @(posedge clock) begin	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
     automatic logic _pending_0_T;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
     automatic logic _pending_1_T;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
     automatic logic _pending_2_T;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
     automatic logic _pending_3_T;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-    _pending_0_T = ready_0 & io_inst_0_valid;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:179:{35,50}
-    _pending_1_T = ready_1 & io_inst_1_valid;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:179:{35,50}
-    _pending_2_T = ready_2 & io_inst_2_valid;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:179:{35,50}
-    _pending_3_T = ready_3 & io_inst_3_valid;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:179:{35,50}
+    _pending_0_T = ready_0 & io_inst_0_valid;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:192:{35,50}
+    _pending_1_T = ready_1 & io_inst_1_valid;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:192:{35,50}
+    _pending_2_T = ready_2 & io_inst_2_valid;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:192:{35,50}
+    _pending_3_T = ready_3 & io_inst_3_valid;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:192:{35,50}
     if (reset) begin	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
-      pending_0 <= 1'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34
-      pending_1 <= 1'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34
-      pending_2 <= 1'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34
-      pending_3 <= 1'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:41:34
-      writePtr <= 8'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:65:35
-      gemmCursor <= 8'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:66:37
-      dmaCursor <= 8'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:67:36
-      gemmOpen <= 1'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:117:35
-      dmaOpen <= 1'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:118:34
+      pending_0 <= 1'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34
+      pending_1 <= 1'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34
+      pending_2 <= 1'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34
+      pending_3 <= 1'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:43:34
+      writePtr <= 8'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:67:35
+      gemmCursor <= 8'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:68:37
+      dmaCursor <= 8'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:69:36
+      schedValid <= 1'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:112:37
+      gemmOpen <= 1'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:129:35
+      dmaOpen <= 1'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:130:34
     end
     else begin	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
-      automatic logic _GEN_22;	// src/queen/scala/main/QueenDsaDecoder.scala:188:22
-      automatic logic _GEN_23;	// src/queen/scala/main/QueenDsaDecoder.scala:174:42, :188:49
-      _GEN_22 =
-        fire_3 & (~(|(io_inst_3_bits_inst[14:12])) | io_inst_3_bits_inst[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaDecoder.scala:121:26, :144:28, :145:21, :173:{34,42,58}, :180:37, :188:22
-      _GEN_23 =
-        fire_3 & io_inst_3_bits_inst[14:12] == 3'h3 & io_inst_3_bits_inst[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :121:26, :123:23, :125:29, :174:{34,42,58}, :180:37, :188:49
-      pending_0 <= _pending_0_T;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:41:34
-      pending_1 <= _pending_1_T;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:41:34
-      pending_2 <= _pending_2_T;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:41:34
-      pending_3 <= _pending_3_T;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:41:34
-      if (ringEnqValid_layerCapture)	// src/queen/scala/main/QueenDsaDecoder.scala:86:53
-        writePtr <= writePtr + 8'h1;	// src/queen/scala/main/QueenDsaDecoder.scala:65:35, :101:31
-      if (gemmAdvance)	// src/queen/scala/main/QueenDsaDecoder.scala:81:43
-        gemmCursor <= gemmCursor + 8'h1;	// src/queen/scala/main/QueenDsaDecoder.scala:66:37, :83:51
-      if (dmaAdvance)	// src/queen/scala/main/QueenDsaDecoder.scala:82:41
-        dmaCursor <= dmaCursor + 8'h1;	// src/queen/scala/main/QueenDsaDecoder.scala:67:36, :84:48
-      if (|(io_inst_3_bits_inst[31:30])) begin	// src/queen/scala/main/QueenDsaDecoder.scala:122:28, :155:59
-        if (|(io_inst_2_bits_inst[31:30])) begin	// src/queen/scala/main/QueenDsaDecoder.scala:122:28, :155:59
-          if (|(io_inst_1_bits_inst[31:30])) begin	// src/queen/scala/main/QueenDsaDecoder.scala:122:28, :155:59
-            if (~(|(io_inst_0_bits_inst[31:30])))	// src/queen/scala/main/QueenDsaDecoder.scala:122:28, :155:59
-              gemmOpen <= _GEN_2;	// src/queen/scala/main/QueenDsaDecoder.scala:117:35, :188:16
-          end
-          else	// src/queen/scala/main/QueenDsaDecoder.scala:155:59
-            gemmOpen <= _GEN_9;	// src/queen/scala/main/QueenDsaDecoder.scala:117:35, :188:16
-        end
-        else	// src/queen/scala/main/QueenDsaDecoder.scala:155:59
-          gemmOpen <= _GEN_15;	// src/queen/scala/main/QueenDsaDecoder.scala:117:35, :188:16
+      automatic logic _GEN_16 =
+        fire_3 & (~(|(io_inst_3_bits_inst[14:12])) | io_inst_3_bits_inst[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaDecoder.scala:133:26, :156:28, :157:21, :185:{34,42,58}, :193:37, :202:22
+      automatic logic _GEN_17 =
+        fire_3 & io_inst_3_bits_inst[14:12] == 3'h3 & io_inst_3_bits_inst[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaDecoder.scala:133:26, :135:23, :137:29, :139:46, :186:{34,42,58}, :193:37, :202:49
+      pending_0 <= _pending_0_T & ~io_flushing;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:43:34, :49:{39,42}
+      pending_1 <= _pending_1_T & ~io_flushing;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:43:34, :49:{39,42}
+      pending_2 <= _pending_2_T & ~io_flushing;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:43:34, :49:{39,42}
+      pending_3 <= _pending_3_T & ~io_flushing;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:43:34, :49:{39,42}
+      if (io_flushStart) begin	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
+        writePtr <= 8'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:67:35
+        gemmCursor <= 8'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:68:37
+        dmaCursor <= 8'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:69:36
       end
-      else	// src/queen/scala/main/QueenDsaDecoder.scala:155:59
-        gemmOpen <= _GEN_22 | ~_GEN_23 & _GEN_16;	// src/queen/scala/main/QueenDsaDecoder.scala:117:35, :174:42, :187:20, :188:{16,22,43,49}
-      if (_resourceReady_T_19)	// src/queen/scala/main/QueenDsaDecoder.scala:176:65
-        dmaOpen <= _GEN_22 | ~_GEN_23 & _GEN_18;	// src/queen/scala/main/QueenDsaDecoder.scala:118:34, :174:42, :188:{22,43,49}, :189:20, :190:{16,43}
-      else if (_resourceReady_T_13)	// src/queen/scala/main/QueenDsaDecoder.scala:176:65
-        dmaOpen <= _GEN_17;	// src/queen/scala/main/QueenDsaDecoder.scala:118:34, :190:16
-      else if (_resourceReady_T_7)	// src/queen/scala/main/QueenDsaDecoder.scala:176:65
-        dmaOpen <= _GEN_11;	// src/queen/scala/main/QueenDsaDecoder.scala:118:34, :190:16
-      else if (_resourceReady_T_1)	// src/queen/scala/main/QueenDsaDecoder.scala:176:65
-        dmaOpen <= _GEN_4;	// src/queen/scala/main/QueenDsaDecoder.scala:118:34, :190:16
+      else begin	// src/queen/scala/main/QueenDsaDecoder.scala:12:16
+        if (ringEnqValid_layerCapture)	// src/queen/scala/main/QueenDsaDecoder.scala:88:78
+          writePtr <= writePtr + 8'h1;	// src/queen/scala/main/QueenDsaDecoder.scala:67:35, :103:31
+        if (gemmAdvance)	// src/queen/scala/main/QueenDsaDecoder.scala:83:43
+          gemmCursor <= gemmCursor + 8'h1;	// src/queen/scala/main/QueenDsaDecoder.scala:68:37, :85:51
+        if (dmaAdvance)	// src/queen/scala/main/QueenDsaDecoder.scala:84:41
+          dmaCursor <= dmaCursor + 8'h1;	// src/queen/scala/main/QueenDsaDecoder.scala:69:36, :86:48
+      end
+      schedValid <= ~io_flushing & (schedEnq | ~_schedUsed_T_1 & schedValid);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:112:37, :116:50, :117:{29,42}, :118:20, :119:20, :122:{23,36}
+      gemmOpen <=
+        ~io_flushing
+        & ((|(io_inst_3_bits_inst[31:30])) ? _GEN_11 : _GEN_16 | ~_GEN_17 & _GEN_11);	// src/queen/scala/main/QueenDsaDecoder.scala:118:20, :122:{23,36}, :129:35, :134:28, :167:59, :186:42, :201:20, :202:{16,22,43,49}, :206:20
+      dmaOpen <=
+        ~io_flushing & (_resourceReady_T_22 ? _GEN_16 | ~_GEN_17 & _GEN_12 : _GEN_12);	// src/queen/scala/main/QueenDsaDecoder.scala:118:20, :122:{23,36}, :130:34, :186:42, :189:49, :202:{22,43,49}, :203:20, :204:{16,43}, :207:19
     end
-    if (_pending_0_T) begin	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      pendingInst_0 <= io_inst_0_bits_inst;	// src/queen/scala/main/QueenDsaDecoder.scala:42:34
-      pendingPc_0 <= io_inst_0_bits_pc;	// src/queen/scala/main/QueenDsaDecoder.scala:43:32
+    if (_pending_0_T & ~io_flushing) begin	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:49:42, :50:30
+      pendingInst_0 <= io_inst_0_bits_inst;	// src/queen/scala/main/QueenDsaDecoder.scala:44:34
+      pendingPc_0 <= io_inst_0_bits_pc;	// src/queen/scala/main/QueenDsaDecoder.scala:45:32
     end
-    if (_pending_1_T) begin	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      pendingInst_1 <= io_inst_1_bits_inst;	// src/queen/scala/main/QueenDsaDecoder.scala:42:34
-      pendingPc_1 <= io_inst_1_bits_pc;	// src/queen/scala/main/QueenDsaDecoder.scala:43:32
+    if (_pending_1_T & ~io_flushing) begin	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:49:42, :50:30
+      pendingInst_1 <= io_inst_1_bits_inst;	// src/queen/scala/main/QueenDsaDecoder.scala:44:34
+      pendingPc_1 <= io_inst_1_bits_pc;	// src/queen/scala/main/QueenDsaDecoder.scala:45:32
     end
-    if (_pending_2_T) begin	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      pendingInst_2 <= io_inst_2_bits_inst;	// src/queen/scala/main/QueenDsaDecoder.scala:42:34
-      pendingPc_2 <= io_inst_2_bits_pc;	// src/queen/scala/main/QueenDsaDecoder.scala:43:32
+    if (_pending_2_T & ~io_flushing) begin	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:49:42, :50:30
+      pendingInst_2 <= io_inst_2_bits_inst;	// src/queen/scala/main/QueenDsaDecoder.scala:44:34
+      pendingPc_2 <= io_inst_2_bits_pc;	// src/queen/scala/main/QueenDsaDecoder.scala:45:32
     end
-    if (_pending_3_T) begin	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      pendingInst_3 <= io_inst_3_bits_inst;	// src/queen/scala/main/QueenDsaDecoder.scala:42:34
-      pendingPc_3 <= io_inst_3_bits_pc;	// src/queen/scala/main/QueenDsaDecoder.scala:43:32
+    if (_pending_3_T & ~io_flushing) begin	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaDecoder.scala:49:42, :50:30
+      pendingInst_3 <= io_inst_3_bits_inst;	// src/queen/scala/main/QueenDsaDecoder.scala:44:34
+      pendingPc_3 <= io_inst_3_bits_pc;	// src/queen/scala/main/QueenDsaDecoder.scala:45:32
+    end
+    if (schedEnq) begin	// src/queen/scala/main/QueenDsaDecoder.scala:116:50
+      automatic logic hit_8;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30
+      automatic logic hit_9;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30
+      automatic logic hit_10;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30
+      automatic logic hit_11;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30
+      hit_8 = pending_0 & (&(batch_0_bits_inst[31:30]));	// src/queen/scala/main/QueenDsaDecoder.scala:32:56, :37:{30,56}, :43:34, :55:34
+      hit_9 = pending_1 & (&(batch_1_bits_inst[31:30]));	// src/queen/scala/main/QueenDsaDecoder.scala:32:56, :37:{30,56}, :43:34, :55:34
+      hit_10 = pending_2 & (&(batch_2_bits_inst[31:30]));	// src/queen/scala/main/QueenDsaDecoder.scala:32:56, :37:{30,56}, :43:34, :55:34
+      hit_11 = pending_3 & (&(batch_3_bits_inst[31:30]));	// src/queen/scala/main/QueenDsaDecoder.scala:32:56, :37:{30,56}, :43:34, :55:34
+      schedBits_0_valid <= hit_8;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30, :113:32
+      schedBits_0_bits_inst <= hit_8 ? pendingInst_0 : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30, :39:24, :44:34, :55:34, :113:32
+      schedBits_0_bits_rs1 <= hit_8 & _batch_0_bits_rs1_T ? io_rs1_0_bits : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30, :39:24, :57:{33,45}, :113:32
+      schedBits_0_bits_rs2 <= hit_8 & _batch_0_bits_rs2_T ? io_rs2_0_bits : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30, :39:24, :58:{33,45}, :113:32
+      schedBits_1_valid <= hit_9;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30, :113:32
+      schedBits_1_bits_inst <= hit_9 ? pendingInst_1 : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30, :39:24, :44:34, :55:34, :113:32
+      schedBits_1_bits_rs1 <= hit_9 & _batch_1_bits_rs1_T ? io_rs1_1_bits : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30, :39:24, :57:{33,45}, :113:32
+      schedBits_1_bits_rs2 <= hit_9 & _batch_1_bits_rs2_T ? io_rs2_1_bits : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30, :39:24, :58:{33,45}, :113:32
+      schedBits_2_valid <= hit_10;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30, :113:32
+      schedBits_2_bits_inst <= hit_10 ? pendingInst_2 : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30, :39:24, :44:34, :55:34, :113:32
+      schedBits_2_bits_rs1 <= hit_10 & _batch_2_bits_rs1_T ? io_rs1_2_bits : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30, :39:24, :57:{33,45}, :113:32
+      schedBits_2_bits_rs2 <= hit_10 & _batch_2_bits_rs2_T ? io_rs2_2_bits : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30, :39:24, :58:{33,45}, :113:32
+      schedBits_3_valid <= hit_11;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30, :113:32
+      schedBits_3_bits_inst <= hit_11 ? pendingInst_3 : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30, :39:24, :44:34, :55:34, :113:32
+      schedBits_3_bits_rs1 <= hit_11 & _batch_3_bits_rs1_T ? io_rs1_3_bits : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30, :39:24, :57:{33,45}, :113:32
+      schedBits_3_bits_rs2 <= hit_11 & _batch_3_bits_rs2_T ? io_rs2_3_bits : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:37:30, :39:24, :58:{33,45}, :113:32
     end
   end // always @(posedge)
   `ifdef ENABLE_INITIAL_REG_	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
@@ -592,48 +630,65 @@ module Queen_QueenDsaDecoder(	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
       `FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
     `endif // FIRRTL_BEFORE_INITIAL
     initial begin	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
-      automatic logic [31:0] _RANDOM[0:8];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
+      automatic logic [31:0] _RANDOM[0:25];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
       `ifdef INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
         `INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
       `endif // INIT_RANDOM_PROLOG_
       `ifdef RANDOMIZE_REG_INIT	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
-        for (logic [3:0] i = 4'h0; i < 4'h9; i += 4'h1) begin
+        for (logic [4:0] i = 5'h0; i < 5'h1A; i += 5'h1) begin
           _RANDOM[i] = `RANDOM;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
         end	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
-        pending_0 = _RANDOM[4'h0][0];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :41:34
-        pending_1 = _RANDOM[4'h0][1];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :41:34
-        pending_2 = _RANDOM[4'h0][2];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :41:34
-        pending_3 = _RANDOM[4'h0][3];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :41:34
-        pendingInst_0 = {_RANDOM[4'h0][31:4], _RANDOM[4'h1][3:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :41:34, :42:34
-        pendingInst_1 = {_RANDOM[4'h1][31:4], _RANDOM[4'h2][3:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :42:34
-        pendingInst_2 = {_RANDOM[4'h2][31:4], _RANDOM[4'h3][3:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :42:34
-        pendingInst_3 = {_RANDOM[4'h3][31:4], _RANDOM[4'h4][3:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :42:34
-        pendingPc_0 = {_RANDOM[4'h4][31:4], _RANDOM[4'h5][3:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :42:34, :43:32
-        pendingPc_1 = {_RANDOM[4'h5][31:4], _RANDOM[4'h6][3:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :43:32
-        pendingPc_2 = {_RANDOM[4'h6][31:4], _RANDOM[4'h7][3:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :43:32
-        pendingPc_3 = {_RANDOM[4'h7][31:4], _RANDOM[4'h8][3:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :43:32
-        writePtr = _RANDOM[4'h8][11:4];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :43:32, :65:35
-        gemmCursor = _RANDOM[4'h8][19:12];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :43:32, :66:37
-        dmaCursor = _RANDOM[4'h8][27:20];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :43:32, :67:36
-        gemmOpen = _RANDOM[4'h8][28];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :43:32, :117:35
-        dmaOpen = _RANDOM[4'h8][29];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :43:32, :118:34
+        pending_0 = _RANDOM[5'h0][0];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :43:34
+        pending_1 = _RANDOM[5'h0][1];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :43:34
+        pending_2 = _RANDOM[5'h0][2];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :43:34
+        pending_3 = _RANDOM[5'h0][3];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :43:34
+        pendingInst_0 = {_RANDOM[5'h0][31:4], _RANDOM[5'h1][3:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :43:34, :44:34
+        pendingInst_1 = {_RANDOM[5'h1][31:4], _RANDOM[5'h2][3:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :44:34
+        pendingInst_2 = {_RANDOM[5'h2][31:4], _RANDOM[5'h3][3:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :44:34
+        pendingInst_3 = {_RANDOM[5'h3][31:4], _RANDOM[5'h4][3:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :44:34
+        pendingPc_0 = {_RANDOM[5'h4][31:4], _RANDOM[5'h5][3:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :44:34, :45:32
+        pendingPc_1 = {_RANDOM[5'h5][31:4], _RANDOM[5'h6][3:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :45:32
+        pendingPc_2 = {_RANDOM[5'h6][31:4], _RANDOM[5'h7][3:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :45:32
+        pendingPc_3 = {_RANDOM[5'h7][31:4], _RANDOM[5'h8][3:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :45:32
+        writePtr = _RANDOM[5'h8][11:4];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :45:32, :67:35
+        gemmCursor = _RANDOM[5'h8][19:12];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :45:32, :68:37
+        dmaCursor = _RANDOM[5'h8][27:20];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :45:32, :69:36
+        schedValid = _RANDOM[5'h8][28];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :45:32, :112:37
+        schedBits_0_valid = _RANDOM[5'h8][29];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :45:32, :113:32
+        schedBits_0_bits_inst = {_RANDOM[5'h8][31:30], _RANDOM[5'h9][29:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :45:32, :113:32
+        schedBits_0_bits_rs1 = {_RANDOM[5'hA][31:30], _RANDOM[5'hB][29:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+        schedBits_0_bits_rs2 = {_RANDOM[5'hB][31:30], _RANDOM[5'hC][29:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+        schedBits_1_valid = _RANDOM[5'hC][30];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+        schedBits_1_bits_inst = {_RANDOM[5'hC][31], _RANDOM[5'hD][30:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+        schedBits_1_bits_rs1 = {_RANDOM[5'hE][31], _RANDOM[5'hF][30:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+        schedBits_1_bits_rs2 = {_RANDOM[5'hF][31], _RANDOM[5'h10][30:0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+        schedBits_2_valid = _RANDOM[5'h10][31];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+        schedBits_2_bits_inst = _RANDOM[5'h11];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+        schedBits_2_bits_rs1 = _RANDOM[5'h13];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+        schedBits_2_bits_rs2 = _RANDOM[5'h14];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+        schedBits_3_valid = _RANDOM[5'h15][0];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+        schedBits_3_bits_inst = {_RANDOM[5'h15][31:1], _RANDOM[5'h16][0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+        schedBits_3_bits_rs1 = {_RANDOM[5'h17][31:1], _RANDOM[5'h18][0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+        schedBits_3_bits_rs2 = {_RANDOM[5'h18][31:1], _RANDOM[5'h19][0]};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+        gemmOpen = _RANDOM[5'h19][1];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32, :129:35
+        dmaOpen = _RANDOM[5'h19][2];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32, :130:34
       `endif // RANDOMIZE_REG_INIT
     end // initial
     `ifdef FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
       `FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  Queen_ring_64x516 ring_ext (	// src/queen/scala/main/QueenDsaDecoder.scala:64:27
-    .R0_addr (gemmCursor[5:0]),	// src/queen/scala/main/QueenDsaDecoder.scala:66:37, :71:44
-    .R0_en   (1'h1),
+  Queen_ring_64x516 ring_ext (	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
+    .R0_addr (gemmCursor[5:0]),	// src/queen/scala/main/QueenDsaDecoder.scala:68:37, :73:44
+    .R0_en   (1'h1),	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
     .R0_clk  (clock),
     .R0_data (_ring_ext_R0_data),
-    .R1_addr (dmaCursor[5:0]),	// src/queen/scala/main/QueenDsaDecoder.scala:67:36, :72:42
-    .R1_en   (1'h1),
+    .R1_addr (dmaCursor[5:0]),	// src/queen/scala/main/QueenDsaDecoder.scala:69:36, :74:42
+    .R1_en   (1'h1),	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
     .R1_clk  (clock),
     .R1_data (_ring_ext_R1_data),
-    .W0_addr (writePtr[5:0]),	// src/queen/scala/main/QueenDsaDecoder.scala:65:35, :100:23
-    .W0_en   (ringEnqValid_layerCapture),	// src/queen/scala/main/QueenDsaDecoder.scala:86:53
+    .W0_addr (writePtr[5:0]),	// src/queen/scala/main/QueenDsaDecoder.scala:67:35, :102:23
+    .W0_en   (ringEnqValid_layerCapture),	// src/queen/scala/main/QueenDsaDecoder.scala:88:78
     .W0_clk  (clock),
     .W0_data
       ({pending_3,
@@ -655,122 +710,102 @@ module Queen_QueenDsaDecoder(	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
         batch_0_bits_inst,
         pending_0 ? pendingPc_0 : 32'h0,
         _batch_0_bits_rs1_T ? io_rs1_0_bits : 32'h0,
-        _batch_0_bits_rs2_T ? io_rs2_0_bits : 32'h0})	// src/queen/scala/main/QueenDsaDecoder.scala:41:34, :43:32, :53:34, :54:32, :55:{33,45}, :56:{33,45}, :64:27
-  );	// src/queen/scala/main/QueenDsaDecoder.scala:64:27
-  Queen_Queue1_Vec4_Valid_QueenDsaCommand schedStage (	// src/queen/scala/main/QueenDsaDecoder.scala:105:36
-    .clock                   (clock),
-    .reset                   (reset),
-    .io_enq_valid            (schedStage_io_enq_valid),	// src/queen/scala/main/QueenDsaDecoder.scala:30:90
-    .io_enq_bits_0_valid     (hit_8),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30
-    .io_enq_bits_0_bits_inst (hit_8 ? pendingInst_0 : 32'h0),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30, :37:24, :42:34, :53:34
-    .io_enq_bits_0_bits_pc   (hit_8 ? pendingPc_0 : 32'h0),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30, :37:24, :43:32, :54:32
-    .io_enq_bits_0_bits_rs1  (hit_8 & _batch_0_bits_rs1_T ? io_rs1_0_bits : 32'h0),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30, :37:24, :55:{33,45}
-    .io_enq_bits_0_bits_rs2  (hit_8 & _batch_0_bits_rs2_T ? io_rs2_0_bits : 32'h0),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30, :37:24, :56:{33,45}
-    .io_enq_bits_1_valid     (hit_9),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30
-    .io_enq_bits_1_bits_inst (hit_9 ? pendingInst_1 : 32'h0),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30, :37:24, :42:34, :53:34
-    .io_enq_bits_1_bits_pc   (hit_9 ? pendingPc_1 : 32'h0),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30, :37:24, :43:32, :54:32
-    .io_enq_bits_1_bits_rs1  (hit_9 & _batch_1_bits_rs1_T ? io_rs1_1_bits : 32'h0),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30, :37:24, :55:{33,45}
-    .io_enq_bits_1_bits_rs2  (hit_9 & _batch_1_bits_rs2_T ? io_rs2_1_bits : 32'h0),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30, :37:24, :56:{33,45}
-    .io_enq_bits_2_valid     (hit_10),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30
-    .io_enq_bits_2_bits_inst (hit_10 ? pendingInst_2 : 32'h0),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30, :37:24, :42:34, :53:34
-    .io_enq_bits_2_bits_pc   (hit_10 ? pendingPc_2 : 32'h0),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30, :37:24, :43:32, :54:32
-    .io_enq_bits_2_bits_rs1  (hit_10 & _batch_2_bits_rs1_T ? io_rs1_2_bits : 32'h0),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30, :37:24, :55:{33,45}
-    .io_enq_bits_2_bits_rs2  (hit_10 & _batch_2_bits_rs2_T ? io_rs2_2_bits : 32'h0),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30, :37:24, :56:{33,45}
-    .io_enq_bits_3_valid     (hit_11),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30
-    .io_enq_bits_3_bits_inst (hit_11 ? pendingInst_3 : 32'h0),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30, :37:24, :42:34, :53:34
-    .io_enq_bits_3_bits_pc   (hit_11 ? pendingPc_3 : 32'h0),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30, :37:24, :43:32, :54:32
-    .io_enq_bits_3_bits_rs1  (hit_11 & _batch_3_bits_rs1_T ? io_rs1_3_bits : 32'h0),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30, :37:24, :55:{33,45}
-    .io_enq_bits_3_bits_rs2  (hit_11 & _batch_3_bits_rs2_T ? io_rs2_3_bits : 32'h0),	// src/queen/scala/main/QueenDsaDecoder.scala:35:30, :37:24, :56:{33,45}
-    .io_deq_ready            (io_scheduler_ready),
-    .io_deq_valid            (_schedStage_io_deq_valid),
-    .io_deq_bits_0_valid     (io_scheduler_bits_0_valid),
-    .io_deq_bits_0_bits_inst (io_scheduler_bits_0_bits_inst),
-    .io_deq_bits_0_bits_rs1  (io_scheduler_bits_0_bits_rs1),
-    .io_deq_bits_1_valid     (io_scheduler_bits_1_valid),
-    .io_deq_bits_1_bits_inst (io_scheduler_bits_1_bits_inst),
-    .io_deq_bits_1_bits_rs1  (io_scheduler_bits_1_bits_rs1),
-    .io_deq_bits_2_valid     (io_scheduler_bits_2_valid),
-    .io_deq_bits_2_bits_inst (io_scheduler_bits_2_bits_inst),
-    .io_deq_bits_2_bits_rs1  (io_scheduler_bits_2_bits_rs1),
-    .io_deq_bits_3_valid     (io_scheduler_bits_3_valid),
-    .io_deq_bits_3_bits_inst (io_scheduler_bits_3_bits_inst),
-    .io_deq_bits_3_bits_rs1  (io_scheduler_bits_3_bits_rs1),
-    .io_count                (_schedStage_io_count)
-  );	// src/queen/scala/main/QueenDsaDecoder.scala:105:36
-  assign io_inst_0_ready = ready_0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :179:{35,50}
-  assign io_inst_1_ready = ready_1;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :179:{35,50}
-  assign io_inst_2_ready = ready_2;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :179:{35,50}
-  assign io_inst_3_ready = ready_3;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :179:{35,50}
-  assign io_gemm_valid = io_gemm_valid_0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :76:34
-  assign io_gemm_bits_0_valid = hit;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30
-  assign io_gemm_bits_0_bits_inst = hit ? _ring_ext_R0_data[127:96] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_gemm_bits_0_bits_pc = hit ? _ring_ext_R0_data[95:64] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_gemm_bits_0_bits_rs1 = hit ? _ring_ext_R0_data[63:32] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_gemm_bits_0_bits_rs2 = hit ? _ring_ext_R0_data[31:0] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_gemm_bits_1_valid = hit_1;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30
-  assign io_gemm_bits_1_bits_inst = hit_1 ? _ring_ext_R0_data[256:225] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_gemm_bits_1_bits_pc = hit_1 ? _ring_ext_R0_data[224:193] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_gemm_bits_1_bits_rs1 = hit_1 ? _ring_ext_R0_data[192:161] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_gemm_bits_1_bits_rs2 = hit_1 ? _ring_ext_R0_data[160:129] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_gemm_bits_2_valid = hit_2;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30
-  assign io_gemm_bits_2_bits_inst = hit_2 ? _ring_ext_R0_data[385:354] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_gemm_bits_2_bits_pc = hit_2 ? _ring_ext_R0_data[353:322] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_gemm_bits_2_bits_rs1 = hit_2 ? _ring_ext_R0_data[321:290] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_gemm_bits_2_bits_rs2 = hit_2 ? _ring_ext_R0_data[289:258] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_gemm_bits_3_valid = hit_3;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30
-  assign io_gemm_bits_3_bits_inst = hit_3 ? _ring_ext_R0_data[514:483] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_gemm_bits_3_bits_pc = hit_3 ? _ring_ext_R0_data[482:451] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_gemm_bits_3_bits_rs1 = hit_3 ? _ring_ext_R0_data[450:419] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_gemm_bits_3_bits_rs2 = hit_3 ? _ring_ext_R0_data[418:387] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_dma_valid = io_dma_valid_0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :78:32
-  assign io_dma_bits_0_valid = hit_4;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30
-  assign io_dma_bits_0_bits_inst = hit_4 ? _ring_ext_R1_data[127:96] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_dma_bits_0_bits_pc = hit_4 ? _ring_ext_R1_data[95:64] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_dma_bits_0_bits_rs1 = hit_4 ? _ring_ext_R1_data[63:32] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_dma_bits_0_bits_rs2 = hit_4 ? _ring_ext_R1_data[31:0] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_dma_bits_1_valid = hit_5;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30
-  assign io_dma_bits_1_bits_inst = hit_5 ? _ring_ext_R1_data[256:225] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_dma_bits_1_bits_pc = hit_5 ? _ring_ext_R1_data[224:193] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_dma_bits_1_bits_rs1 = hit_5 ? _ring_ext_R1_data[192:161] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_dma_bits_1_bits_rs2 = hit_5 ? _ring_ext_R1_data[160:129] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_dma_bits_2_valid = hit_6;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30
-  assign io_dma_bits_2_bits_inst = hit_6 ? _ring_ext_R1_data[385:354] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_dma_bits_2_bits_pc = hit_6 ? _ring_ext_R1_data[353:322] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_dma_bits_2_bits_rs1 = hit_6 ? _ring_ext_R1_data[321:290] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_dma_bits_2_bits_rs2 = hit_6 ? _ring_ext_R1_data[289:258] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_dma_bits_3_valid = hit_7;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30
-  assign io_dma_bits_3_bits_inst = hit_7 ? _ring_ext_R1_data[514:483] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_dma_bits_3_bits_pc = hit_7 ? _ring_ext_R1_data[482:451] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_dma_bits_3_bits_rs1 = hit_7 ? _ring_ext_R1_data[450:419] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_dma_bits_3_bits_rs2 = hit_7 ? _ring_ext_R1_data[418:387] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :35:30, :37:24, :64:27
-  assign io_scheduler_valid = _schedStage_io_deq_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :105:36
+        _batch_0_bits_rs2_T ? io_rs2_0_bits : 32'h0})	// src/queen/scala/main/QueenDsaDecoder.scala:43:34, :45:32, :55:34, :56:32, :57:{33,45}, :58:{33,45}, :66:27
+  );	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
+  assign io_inst_0_ready = ready_0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :192:{35,50}
+  assign io_inst_1_ready = ready_1;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :192:{35,50}
+  assign io_inst_2_ready = ready_2;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :192:{35,50}
+  assign io_inst_3_ready = ready_3;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :192:{35,50}
+  assign io_gemm_valid = io_gemm_valid_0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :78:34
+  assign io_gemm_bits_0_valid = hit;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30
+  assign io_gemm_bits_0_bits_inst = hit ? _ring_ext_R0_data[127:96] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_gemm_bits_0_bits_pc = hit ? _ring_ext_R0_data[95:64] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_gemm_bits_0_bits_rs1 = hit ? _ring_ext_R0_data[63:32] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_gemm_bits_0_bits_rs2 = hit ? _ring_ext_R0_data[31:0] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_gemm_bits_1_valid = hit_1;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30
+  assign io_gemm_bits_1_bits_inst = hit_1 ? _ring_ext_R0_data[256:225] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_gemm_bits_1_bits_pc = hit_1 ? _ring_ext_R0_data[224:193] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_gemm_bits_1_bits_rs1 = hit_1 ? _ring_ext_R0_data[192:161] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_gemm_bits_1_bits_rs2 = hit_1 ? _ring_ext_R0_data[160:129] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_gemm_bits_2_valid = hit_2;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30
+  assign io_gemm_bits_2_bits_inst = hit_2 ? _ring_ext_R0_data[385:354] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_gemm_bits_2_bits_pc = hit_2 ? _ring_ext_R0_data[353:322] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_gemm_bits_2_bits_rs1 = hit_2 ? _ring_ext_R0_data[321:290] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_gemm_bits_2_bits_rs2 = hit_2 ? _ring_ext_R0_data[289:258] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_gemm_bits_3_valid = hit_3;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30
+  assign io_gemm_bits_3_bits_inst = hit_3 ? _ring_ext_R0_data[514:483] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_gemm_bits_3_bits_pc = hit_3 ? _ring_ext_R0_data[482:451] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_gemm_bits_3_bits_rs1 = hit_3 ? _ring_ext_R0_data[450:419] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_gemm_bits_3_bits_rs2 = hit_3 ? _ring_ext_R0_data[418:387] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_dma_valid = io_dma_valid_0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :80:32
+  assign io_dma_bits_0_valid = hit_4;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30
+  assign io_dma_bits_0_bits_inst = hit_4 ? _ring_ext_R1_data[127:96] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_dma_bits_0_bits_pc = hit_4 ? _ring_ext_R1_data[95:64] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_dma_bits_0_bits_rs1 = hit_4 ? _ring_ext_R1_data[63:32] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_dma_bits_0_bits_rs2 = hit_4 ? _ring_ext_R1_data[31:0] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_dma_bits_1_valid = hit_5;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30
+  assign io_dma_bits_1_bits_inst = hit_5 ? _ring_ext_R1_data[256:225] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_dma_bits_1_bits_pc = hit_5 ? _ring_ext_R1_data[224:193] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_dma_bits_1_bits_rs1 = hit_5 ? _ring_ext_R1_data[192:161] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_dma_bits_1_bits_rs2 = hit_5 ? _ring_ext_R1_data[160:129] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_dma_bits_2_valid = hit_6;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30
+  assign io_dma_bits_2_bits_inst = hit_6 ? _ring_ext_R1_data[385:354] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_dma_bits_2_bits_pc = hit_6 ? _ring_ext_R1_data[353:322] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_dma_bits_2_bits_rs1 = hit_6 ? _ring_ext_R1_data[321:290] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_dma_bits_2_bits_rs2 = hit_6 ? _ring_ext_R1_data[289:258] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_dma_bits_3_valid = hit_7;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30
+  assign io_dma_bits_3_bits_inst = hit_7 ? _ring_ext_R1_data[514:483] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_dma_bits_3_bits_pc = hit_7 ? _ring_ext_R1_data[482:451] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_dma_bits_3_bits_rs1 = hit_7 ? _ring_ext_R1_data[450:419] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_dma_bits_3_bits_rs2 = hit_7 ? _ring_ext_R1_data[418:387] : 32'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :37:30, :39:24, :66:27
+  assign io_scheduler_valid = schedValid;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :112:37
+  assign io_scheduler_bits_0_valid = schedBits_0_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+  assign io_scheduler_bits_0_bits_inst = schedBits_0_bits_inst;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+  assign io_scheduler_bits_0_bits_rs1 = schedBits_0_bits_rs1;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+  assign io_scheduler_bits_0_bits_rs2 = schedBits_0_bits_rs2;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+  assign io_scheduler_bits_1_valid = schedBits_1_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+  assign io_scheduler_bits_1_bits_inst = schedBits_1_bits_inst;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+  assign io_scheduler_bits_1_bits_rs1 = schedBits_1_bits_rs1;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+  assign io_scheduler_bits_1_bits_rs2 = schedBits_1_bits_rs2;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+  assign io_scheduler_bits_2_valid = schedBits_2_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+  assign io_scheduler_bits_2_bits_inst = schedBits_2_bits_inst;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+  assign io_scheduler_bits_2_bits_rs1 = schedBits_2_bits_rs1;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+  assign io_scheduler_bits_2_bits_rs2 = schedBits_2_bits_rs2;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+  assign io_scheduler_bits_3_valid = schedBits_3_valid;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+  assign io_scheduler_bits_3_bits_inst = schedBits_3_bits_inst;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+  assign io_scheduler_bits_3_bits_rs1 = schedBits_3_bits_rs1;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
+  assign io_scheduler_bits_3_bits_rs2 = schedBits_3_bits_rs2;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :113:32
   assign io_trap_valid =
-    |{io_inst_3_valid & (|illegal_3), illegalValid_2, illegalValid_1, illegalValid_0};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :134:{25,37}, :135:19, :136:34, :171:72, :196:26, :198:{35,42}
-  assign io_trap_bits_pc = _GEN_19[firstIllegal];	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:11:7, :199:21
-  assign io_trap_bits_inst = _GEN_20[firstIllegal];	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:11:7, :199:21
-  assign io_trap_bits_cause = _GEN_21[firstIllegal];	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:11:7, :201:24
-  assign io_qrdAlloc_0_valid = io_qrdAlloc_0_valid_0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :181:36
+    |{io_inst_3_valid & (|illegal_3), illegalValid_2, illegalValid_1, illegalValid_0};	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :146:{25,37}, :147:19, :148:34, :183:72, :210:26, :212:{35,42}
+  assign io_trap_bits_pc = _GEN_13[firstIllegal];	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:11:7, :213:21
+  assign io_trap_bits_inst = _GEN_14[firstIllegal];	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:11:7, :213:21
+  assign io_trap_bits_cause = _GEN_15[firstIllegal];	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenDsaDecoder.scala:11:7, :215:24
+  assign io_qrdAlloc_0_valid = io_qrdAlloc_0_valid_0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :194:36
   assign io_qrdAlloc_0_bits_pc = io_inst_0_bits_pc;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
-  assign io_qrdAlloc_0_bits_rdIndex = io_inst_0_bits_inst[11:7];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :124:23
+  assign io_qrdAlloc_0_bits_rdIndex = io_inst_0_bits_inst[11:7];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :136:23
   assign io_qrdAlloc_0_bits_source =
-    (&(io_inst_0_bits_inst[31:30])) ? 2'h2 : io_inst_0_bits_inst[31:30];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :122:28, :128:42, :177:23, :185:42
-  assign io_qrdAlloc_1_valid = io_qrdAlloc_1_valid_0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :181:36
+    (&(io_inst_0_bits_inst[31:30])) ? 2'h2 : io_inst_0_bits_inst[31:30];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :134:28, :140:42, :190:23, :198:42
+  assign io_qrdAlloc_0_bits_dummy = io_flushing;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
+  assign io_qrdAlloc_1_valid = io_qrdAlloc_1_valid_0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :194:36
   assign io_qrdAlloc_1_bits_pc = io_inst_1_bits_pc;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
-  assign io_qrdAlloc_1_bits_rdIndex = io_inst_1_bits_inst[11:7];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :124:23
+  assign io_qrdAlloc_1_bits_rdIndex = io_inst_1_bits_inst[11:7];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :136:23
   assign io_qrdAlloc_1_bits_source =
-    (&(io_inst_1_bits_inst[31:30])) ? 2'h2 : io_inst_1_bits_inst[31:30];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :122:28, :128:42, :177:23, :185:42
-  assign io_qrdAlloc_2_valid = io_qrdAlloc_2_valid_0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :181:36
+    (&(io_inst_1_bits_inst[31:30])) ? 2'h2 : io_inst_1_bits_inst[31:30];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :134:28, :140:42, :190:23, :198:42
+  assign io_qrdAlloc_1_bits_dummy = io_flushing;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
+  assign io_qrdAlloc_2_valid = io_qrdAlloc_2_valid_0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :194:36
   assign io_qrdAlloc_2_bits_pc = io_inst_2_bits_pc;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
-  assign io_qrdAlloc_2_bits_rdIndex = io_inst_2_bits_inst[11:7];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :124:23
+  assign io_qrdAlloc_2_bits_rdIndex = io_inst_2_bits_inst[11:7];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :136:23
   assign io_qrdAlloc_2_bits_source =
-    (&(io_inst_2_bits_inst[31:30])) ? 2'h2 : io_inst_2_bits_inst[31:30];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :122:28, :128:42, :177:23, :185:42
-  assign io_qrdAlloc_3_valid = fire_3 & isQrd_3;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :175:34, :180:37, :181:36
+    (&(io_inst_2_bits_inst[31:30])) ? 2'h2 : io_inst_2_bits_inst[31:30];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :134:28, :140:42, :190:23, :198:42
+  assign io_qrdAlloc_2_bits_dummy = io_flushing;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
+  assign io_qrdAlloc_3_valid = fire_3 & isQrd_3;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :187:34, :193:37, :194:36
   assign io_qrdAlloc_3_bits_pc = io_inst_3_bits_pc;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
-  assign io_qrdAlloc_3_bits_rdIndex = io_inst_3_bits_inst[11:7];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :124:23
+  assign io_qrdAlloc_3_bits_rdIndex = io_inst_3_bits_inst[11:7];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :136:23
   assign io_qrdAlloc_3_bits_source =
-    (&(io_inst_3_bits_inst[31:30])) ? 2'h2 : io_inst_3_bits_inst[31:30];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :122:28, :128:42, :177:23, :185:42
+    (&(io_inst_3_bits_inst[31:30])) ? 2'h2 : io_inst_3_bits_inst[31:30];	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :134:28, :140:42, :190:23, :198:42
+  assign io_qrdAlloc_3_bits_dummy = io_flushing;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7
   assign io_idle =
-    writePtr == gemmCursor & writePtr == dmaCursor & ~_schedStage_io_count
-    & {pending_3, pending_2, pending_1, pending_0} == 4'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :41:34, :65:35, :66:37, :67:36, :105:36, :207:{25,40,52,66}, :208:{29,37,49,56}
+    writePtr == gemmCursor & writePtr == dmaCursor & ~schedValid
+    & {pending_3, pending_2, pending_1, pending_0} == 4'h0;	// src/queen/scala/main/QueenDsaDecoder.scala:11:7, :43:34, :67:35, :68:37, :69:36, :112:37, :221:{25,40,52,66}, :222:{9,21,33,40}
 endmodule
 

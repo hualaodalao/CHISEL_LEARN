@@ -1,4 +1,3 @@
-Queen_Queue1_Vec4_Valid_QueenDsaCommand.sv
 verification/assert/Queen_QueenDsaDecoder_Verification_Assert.sv
 Queen_ring_64x516.sv
 Queen_QueenDsaDecoder.sv
@@ -13,4 +12,9 @@ Queen_ram_16x33.sv
 Queen_Queue16_QueenDsaRegResp.sv
 verification/assert/Queen_QueenQrdTracker_Verification_Assert.sv
 Queen_QueenQrdTracker.sv
+Queen_ram_8x1.sv
+Queen_Queue8_Bool.sv
+verification/assert/Queen_QueenMemMaster_Verification_Assert.sv
+Queen_QueenMemMaster.sv
+Queen_QueenFlushCtrl.sv
 Queen_QueenTop.sv

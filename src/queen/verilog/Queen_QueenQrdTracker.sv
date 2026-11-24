@@ -43,119 +43,141 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module Queen_QueenQrdTracker(	// src/queen/scala/main/QueenQrdTracker.scala:17:7
-  input         clock,	// src/queen/scala/main/QueenQrdTracker.scala:17:7
-                reset,	// src/queen/scala/main/QueenQrdTracker.scala:17:7
-                io_alloc_0_valid,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input  [31:0] io_alloc_0_bits_pc,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input  [4:0]  io_alloc_0_bits_rdIndex,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input  [1:0]  io_alloc_0_bits_source,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input         io_alloc_1_valid,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input  [31:0] io_alloc_1_bits_pc,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input  [4:0]  io_alloc_1_bits_rdIndex,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input  [1:0]  io_alloc_1_bits_source,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input         io_alloc_2_valid,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input  [31:0] io_alloc_2_bits_pc,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input  [4:0]  io_alloc_2_bits_rdIndex,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input  [1:0]  io_alloc_2_bits_source,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input         io_alloc_3_valid,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input  [31:0] io_alloc_3_bits_pc,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input  [4:0]  io_alloc_3_bits_rdIndex,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input  [1:0]  io_alloc_3_bits_source,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  output [4:0]  io_used,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input         io_resp_0_valid,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input  [31:0] io_resp_0_bits_data,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input         io_resp_0_bits_err,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-                io_resp_1_valid,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input  [31:0] io_resp_1_bits_data,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input         io_resp_1_bits_err,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-                io_resp_2_valid,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input  [31:0] io_resp_2_bits_data,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input         io_resp_2_bits_err,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-                io_asyncRd_ready,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  output        io_asyncRd_valid,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  output [4:0]  io_asyncRd_bits_addr,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  output [31:0] io_asyncRd_bits_data,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  input         io_retire_ready,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  output        io_retire_valid,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  output [31:0] io_retire_bits_pc,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  output        io_retire_bits_rdValid,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  output [4:0]  io_retire_bits_rdIndex,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  output        io_retire_bits_trap,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  output [7:0]  io_retire_bits_trapCause,	// src/queen/scala/main/QueenQrdTracker.scala:18:16
-  output        io_idle	// src/queen/scala/main/QueenQrdTracker.scala:18:16
+module Queen_QueenQrdTracker(	// src/queen/scala/main/QueenQrdTracker.scala:19:7
+  input         clock,	// src/queen/scala/main/QueenQrdTracker.scala:19:7
+                reset,	// src/queen/scala/main/QueenQrdTracker.scala:19:7
+                io_alloc_0_valid,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input  [31:0] io_alloc_0_bits_pc,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input  [4:0]  io_alloc_0_bits_rdIndex,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input  [1:0]  io_alloc_0_bits_source,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input         io_alloc_0_bits_dummy,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+                io_alloc_1_valid,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input  [31:0] io_alloc_1_bits_pc,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input  [4:0]  io_alloc_1_bits_rdIndex,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input  [1:0]  io_alloc_1_bits_source,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input         io_alloc_1_bits_dummy,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+                io_alloc_2_valid,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input  [31:0] io_alloc_2_bits_pc,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input  [4:0]  io_alloc_2_bits_rdIndex,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input  [1:0]  io_alloc_2_bits_source,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input         io_alloc_2_bits_dummy,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+                io_alloc_3_valid,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input  [31:0] io_alloc_3_bits_pc,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input  [4:0]  io_alloc_3_bits_rdIndex,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input  [1:0]  io_alloc_3_bits_source,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input         io_alloc_3_bits_dummy,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  output [4:0]  io_used,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input         io_resp_0_valid,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input  [31:0] io_resp_0_bits_data,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input         io_resp_0_bits_err,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+                io_resp_1_valid,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input  [31:0] io_resp_1_bits_data,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input         io_resp_1_bits_err,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+                io_resp_2_valid,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input  [31:0] io_resp_2_bits_data,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input         io_resp_2_bits_err,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+                io_asyncRd_ready,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  output        io_asyncRd_valid,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  output [4:0]  io_asyncRd_bits_addr,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  output [31:0] io_asyncRd_bits_data,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input         io_retire_ready,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  output        io_retire_valid,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  output [31:0] io_retire_bits_pc,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  output        io_retire_bits_rdValid,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  output [4:0]  io_retire_bits_rdIndex,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  output        io_retire_bits_trap,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  output [7:0]  io_retire_bits_trapCause,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  input         io_markDummy,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+                io_flushing,	// src/queen/scala/main/QueenQrdTracker.scala:20:16
+  output        io_idle	// src/queen/scala/main/QueenQrdTracker.scala:20:16
 );
 
-  wire              fifos_2_io_enq_ready_layerCapture;	// src/queen/scala/main/QueenQrdTracker.scala:53:43
-  wire              fifos_1_io_enq_ready_layerCapture;	// src/queen/scala/main/QueenQrdTracker.scala:53:43
-  wire              fifos_0_io_enq_ready_layerCapture;	// src/queen/scala/main/QueenQrdTracker.scala:53:43
-  wire              io_retire_valid_0;	// src/queen/scala/main/QueenQrdTracker.scala:73:34
-  wire              _fifos_2_io_deq_valid;	// src/queen/scala/main/QueenQrdTracker.scala:53:43
-  wire [31:0]       _fifos_2_io_deq_bits_data;	// src/queen/scala/main/QueenQrdTracker.scala:53:43
-  wire              _fifos_2_io_deq_bits_err;	// src/queen/scala/main/QueenQrdTracker.scala:53:43
-  wire              _fifos_1_io_deq_valid;	// src/queen/scala/main/QueenQrdTracker.scala:53:43
-  wire [31:0]       _fifos_1_io_deq_bits_data;	// src/queen/scala/main/QueenQrdTracker.scala:53:43
-  wire              _fifos_1_io_deq_bits_err;	// src/queen/scala/main/QueenQrdTracker.scala:53:43
-  wire              _fifos_0_io_deq_valid;	// src/queen/scala/main/QueenQrdTracker.scala:53:43
-  wire [31:0]       _fifos_0_io_deq_bits_data;	// src/queen/scala/main/QueenQrdTracker.scala:53:43
-  wire              _fifos_0_io_deq_bits_err;	// src/queen/scala/main/QueenQrdTracker.scala:53:43
-  reg  [31:0]       entries_0_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [4:0]        entries_0_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [1:0]        entries_0_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [31:0]       entries_1_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [4:0]        entries_1_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [1:0]        entries_1_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [31:0]       entries_2_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [4:0]        entries_2_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [1:0]        entries_2_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [31:0]       entries_3_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [4:0]        entries_3_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [1:0]        entries_3_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [31:0]       entries_4_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [4:0]        entries_4_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [1:0]        entries_4_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [31:0]       entries_5_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [4:0]        entries_5_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [1:0]        entries_5_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [31:0]       entries_6_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [4:0]        entries_6_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [1:0]        entries_6_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [31:0]       entries_7_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [4:0]        entries_7_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [1:0]        entries_7_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [31:0]       entries_8_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [4:0]        entries_8_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [1:0]        entries_8_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [31:0]       entries_9_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [4:0]        entries_9_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [1:0]        entries_9_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [31:0]       entries_10_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [4:0]        entries_10_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [1:0]        entries_10_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [31:0]       entries_11_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [4:0]        entries_11_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [1:0]        entries_11_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [31:0]       entries_12_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [4:0]        entries_12_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [1:0]        entries_12_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [31:0]       entries_13_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [4:0]        entries_13_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [1:0]        entries_13_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [31:0]       entries_14_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [4:0]        entries_14_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [1:0]        entries_14_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [31:0]       entries_15_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [4:0]        entries_15_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [1:0]        entries_15_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-  reg  [3:0]        wrIdx;	// src/queen/scala/main/QueenQrdTracker.scala:34:32
-  reg  [3:0]        rdIdx;	// src/queen/scala/main/QueenQrdTracker.scala:35:32
-  reg  [4:0]        count;	// src/queen/scala/main/QueenQrdTracker.scala:36:32
-  wire [1:0]        _GEN = {1'h0, io_alloc_0_valid};	// src/queen/scala/main/QueenQrdTracker.scala:42:72
-  wire [1:0]        _GEN_0 = {1'h0, io_alloc_1_valid};	// src/queen/scala/main/QueenQrdTracker.scala:42:72
+  wire              fifos_2_io_enq_ready_layerCapture;	// src/queen/scala/main/QueenQrdTracker.scala:59:43
+  wire              fifos_1_io_enq_ready_layerCapture;	// src/queen/scala/main/QueenQrdTracker.scala:59:43
+  wire              fifos_0_io_enq_ready_layerCapture;	// src/queen/scala/main/QueenQrdTracker.scala:59:43
+  wire              io_retire_valid_0;	// src/queen/scala/main/QueenQrdTracker.scala:81:34
+  wire              _fifos_2_io_deq_valid;	// src/queen/scala/main/QueenQrdTracker.scala:59:43
+  wire [31:0]       _fifos_2_io_deq_bits_data;	// src/queen/scala/main/QueenQrdTracker.scala:59:43
+  wire              _fifos_2_io_deq_bits_err;	// src/queen/scala/main/QueenQrdTracker.scala:59:43
+  wire              _fifos_1_io_deq_valid;	// src/queen/scala/main/QueenQrdTracker.scala:59:43
+  wire [31:0]       _fifos_1_io_deq_bits_data;	// src/queen/scala/main/QueenQrdTracker.scala:59:43
+  wire              _fifos_1_io_deq_bits_err;	// src/queen/scala/main/QueenQrdTracker.scala:59:43
+  wire              _fifos_0_io_deq_valid;	// src/queen/scala/main/QueenQrdTracker.scala:59:43
+  wire [31:0]       _fifos_0_io_deq_bits_data;	// src/queen/scala/main/QueenQrdTracker.scala:59:43
+  wire              _fifos_0_io_deq_bits_err;	// src/queen/scala/main/QueenQrdTracker.scala:59:43
+  reg  [31:0]       entries_0_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [4:0]        entries_0_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [1:0]        entries_0_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg               entries_0_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [31:0]       entries_1_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [4:0]        entries_1_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [1:0]        entries_1_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg               entries_1_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [31:0]       entries_2_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [4:0]        entries_2_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [1:0]        entries_2_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg               entries_2_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [31:0]       entries_3_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [4:0]        entries_3_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [1:0]        entries_3_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg               entries_3_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [31:0]       entries_4_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [4:0]        entries_4_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [1:0]        entries_4_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg               entries_4_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [31:0]       entries_5_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [4:0]        entries_5_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [1:0]        entries_5_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg               entries_5_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [31:0]       entries_6_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [4:0]        entries_6_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [1:0]        entries_6_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg               entries_6_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [31:0]       entries_7_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [4:0]        entries_7_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [1:0]        entries_7_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg               entries_7_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [31:0]       entries_8_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [4:0]        entries_8_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [1:0]        entries_8_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg               entries_8_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [31:0]       entries_9_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [4:0]        entries_9_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [1:0]        entries_9_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg               entries_9_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [31:0]       entries_10_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [4:0]        entries_10_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [1:0]        entries_10_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg               entries_10_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [31:0]       entries_11_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [4:0]        entries_11_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [1:0]        entries_11_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg               entries_11_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [31:0]       entries_12_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [4:0]        entries_12_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [1:0]        entries_12_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg               entries_12_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [31:0]       entries_13_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [4:0]        entries_13_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [1:0]        entries_13_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg               entries_13_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [31:0]       entries_14_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [4:0]        entries_14_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [1:0]        entries_14_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg               entries_14_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [31:0]       entries_15_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [4:0]        entries_15_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [1:0]        entries_15_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg               entries_15_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+  reg  [3:0]        wrIdx;	// src/queen/scala/main/QueenQrdTracker.scala:38:32
+  reg  [3:0]        rdIdx;	// src/queen/scala/main/QueenQrdTracker.scala:39:32
+  reg  [4:0]        count;	// src/queen/scala/main/QueenQrdTracker.scala:40:32
+  wire [1:0]        _GEN = {1'h0, io_alloc_0_valid};	// src/queen/scala/main/QueenQrdTracker.scala:46:72
+  wire [1:0]        _GEN_0 = {1'h0, io_alloc_1_valid};	// src/queen/scala/main/QueenQrdTracker.scala:46:72
   wire [2:0]        allocCount =
-    {1'h0, _GEN + _GEN_0} + {1'h0, {1'h0, io_alloc_2_valid} + {1'h0, io_alloc_3_valid}};	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :43:38
-  wire [5:0]        _count_T_layerCapture = {1'h0, count} + {3'h0, allocCount};	// src/queen/scala/main/QueenQrdTracker.scala:36:32, :43:38, :49:18
-  wire              _fifos_2_io_deq_ready_T = io_retire_ready & io_retire_valid_0;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenQrdTracker.scala:73:34
+    {1'h0, _GEN + _GEN_0} + {1'h0, {1'h0, io_alloc_2_valid} + {1'h0, io_alloc_3_valid}};	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :47:38
+  wire [5:0]        _count_T_layerCapture = {1'h0, count} + {3'h0, allocCount};	// src/queen/scala/main/QueenQrdTracker.scala:40:32, :47:38, :53:18
+  wire              _fifos_2_io_deq_ready_T = io_retire_ready & io_retire_valid_0;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenQrdTracker.scala:81:34
   wire [15:0][31:0] _GEN_1 =
     {{entries_15_pc},
      {entries_14_pc},
@@ -172,7 +194,7 @@ module Queen_QueenQrdTracker(	// src/queen/scala/main/QueenQrdTracker.scala:17:7
      {entries_3_pc},
      {entries_2_pc},
      {entries_1_pc},
-     {entries_0_pc}};	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :67:39
+     {entries_0_pc}};	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :74:31
   wire [15:0][4:0]  _GEN_2 =
     {{entries_15_rdIndex},
      {entries_14_rdIndex},
@@ -189,8 +211,8 @@ module Queen_QueenQrdTracker(	// src/queen/scala/main/QueenQrdTracker.scala:17:7
      {entries_3_rdIndex},
      {entries_2_rdIndex},
      {entries_1_rdIndex},
-     {entries_0_rdIndex}};	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :67:39
-  wire [4:0]        io_asyncRd_bits_addr_0 = _GEN_2[rdIdx];	// src/queen/scala/main/QueenQrdTracker.scala:35:32, :67:39
+     {entries_0_rdIndex}};	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :74:31
+  wire [4:0]        io_asyncRd_bits_addr_0 = _GEN_2[rdIdx];	// src/queen/scala/main/QueenQrdTracker.scala:39:32, :74:31
   wire [15:0][1:0]  _GEN_3 =
     {{entries_15_source},
      {entries_14_source},
@@ -207,482 +229,795 @@ module Queen_QueenQrdTracker(	// src/queen/scala/main/QueenQrdTracker.scala:17:7
      {entries_3_source},
      {entries_2_source},
      {entries_1_source},
-     {entries_0_source}};	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :67:39
-  wire [1:0]        _GEN_4 = _GEN_3[rdIdx];	// src/queen/scala/main/QueenQrdTracker.scala:35:32, :67:39
-  wire [3:0]        _GEN_5 =
-    {{_fifos_0_io_deq_valid},
-     {_fifos_2_io_deq_valid},
-     {_fifos_1_io_deq_valid},
-     {_fifos_0_io_deq_valid}};	// src/queen/scala/main/QueenQrdTracker.scala:53:43, :67:39
-  wire              headReady = (|count) & _GEN_5[_GEN_4];	// src/queen/scala/main/QueenQrdTracker.scala:36:32, :63:35, :67:39
-  wire [3:0][31:0]  _GEN_6 =
+     {entries_0_source}};	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :74:31
+  wire [1:0]        _GEN_4 = _GEN_3[rdIdx];	// src/queen/scala/main/QueenQrdTracker.scala:39:32, :74:31
+  wire [15:0]       _GEN_5 =
+    {{entries_15_dummy},
+     {entries_14_dummy},
+     {entries_13_dummy},
+     {entries_12_dummy},
+     {entries_11_dummy},
+     {entries_10_dummy},
+     {entries_9_dummy},
+     {entries_8_dummy},
+     {entries_7_dummy},
+     {entries_6_dummy},
+     {entries_5_dummy},
+     {entries_4_dummy},
+     {entries_3_dummy},
+     {entries_2_dummy},
+     {entries_1_dummy},
+     {entries_0_dummy}};	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :74:31
+  wire              _GEN_6 = _GEN_5[rdIdx];	// src/queen/scala/main/QueenQrdTracker.scala:39:32, :74:31
+  wire [3:0][31:0]  _GEN_7 =
     {{_fifos_0_io_deq_bits_data},
      {_fifos_2_io_deq_bits_data},
      {_fifos_1_io_deq_bits_data},
-     {_fifos_0_io_deq_bits_data}};	// src/queen/scala/main/QueenQrdTracker.scala:53:43, :68:53
-  wire [3:0]        _GEN_7 =
+     {_fifos_0_io_deq_bits_data}};	// src/queen/scala/main/QueenQrdTracker.scala:59:43, :74:31
+  wire [3:0]        _GEN_8 =
     {{_fifos_0_io_deq_bits_err},
      {_fifos_2_io_deq_bits_err},
      {_fifos_1_io_deq_bits_err},
-     {_fifos_0_io_deq_bits_err}};	// src/queen/scala/main/QueenQrdTracker.scala:53:43, :68:53
-  wire              writeBack = (|io_asyncRd_bits_addr_0) & ~_GEN_7[_GEN_4];	// src/queen/scala/main/QueenQrdTracker.scala:67:39, :68:{42,50,53}
-  assign io_retire_valid_0 = headReady & (~writeBack | io_asyncRd_ready);	// src/queen/scala/main/QueenQrdTracker.scala:67:39, :68:50, :73:{34,38,49}
-  always @(posedge clock) begin	// src/queen/scala/main/QueenQrdTracker.scala:17:7
-    automatic logic [1:0] _GEN_8 = _GEN + _GEN_0;	// src/queen/scala/main/QueenQrdTracker.scala:42:72
-    automatic logic [3:0] _GEN_9;	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :46:32
-    automatic logic [3:0] _GEN_10;	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :46:32
-    automatic logic [3:0] _GEN_11;	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :46:32
-    _GEN_9 = {3'h0, io_alloc_0_valid} + wrIdx;	// src/queen/scala/main/QueenQrdTracker.scala:34:32, :42:72, :46:32
-    _GEN_10 = {2'h0, _GEN_8} + wrIdx;	// src/queen/scala/main/QueenQrdTracker.scala:34:32, :42:72, :46:32
-    _GEN_11 = {1'h0, {1'h0, _GEN_8} + {2'h0, io_alloc_2_valid}} + wrIdx;	// src/queen/scala/main/QueenQrdTracker.scala:34:32, :42:72, :46:32
-    if (io_alloc_3_valid & _GEN_11 == 4'h0) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_0_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_0_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_0_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_2_valid & _GEN_10 == 4'h0) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_0_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_0_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_0_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_1_valid & _GEN_9 == 4'h0) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_0_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_0_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_0_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_0_valid & wrIdx == 4'h0) begin	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :34:32, :45:33, :46:47
-      entries_0_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_0_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_0_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    if (io_alloc_3_valid & _GEN_11 == 4'h1) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_1_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_1_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_1_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_2_valid & _GEN_10 == 4'h1) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_1_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_1_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_1_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_1_valid & _GEN_9 == 4'h1) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_1_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_1_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_1_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_0_valid & wrIdx == 4'h1) begin	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :34:32, :45:33, :46:47
-      entries_1_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_1_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_1_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    if (io_alloc_3_valid & _GEN_11 == 4'h2) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_2_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_2_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_2_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_2_valid & _GEN_10 == 4'h2) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_2_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_2_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_2_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_1_valid & _GEN_9 == 4'h2) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_2_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_2_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_2_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_0_valid & wrIdx == 4'h2) begin	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :34:32, :45:33, :46:47
-      entries_2_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_2_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_2_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    if (io_alloc_3_valid & _GEN_11 == 4'h3) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_3_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_3_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_3_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_2_valid & _GEN_10 == 4'h3) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_3_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_3_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_3_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_1_valid & _GEN_9 == 4'h3) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_3_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_3_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_3_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_0_valid & wrIdx == 4'h3) begin	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :34:32, :45:33, :46:47
-      entries_3_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_3_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_3_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    if (io_alloc_3_valid & _GEN_11 == 4'h4) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_4_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_4_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_4_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_2_valid & _GEN_10 == 4'h4) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_4_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_4_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_4_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_1_valid & _GEN_9 == 4'h4) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_4_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_4_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_4_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_0_valid & wrIdx == 4'h4) begin	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :34:32, :45:33, :46:47
-      entries_4_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_4_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_4_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    if (io_alloc_3_valid & _GEN_11 == 4'h5) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_5_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_5_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_5_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_2_valid & _GEN_10 == 4'h5) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_5_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_5_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_5_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_1_valid & _GEN_9 == 4'h5) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_5_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_5_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_5_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_0_valid & wrIdx == 4'h5) begin	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :34:32, :45:33, :46:47
-      entries_5_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_5_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_5_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    if (io_alloc_3_valid & _GEN_11 == 4'h6) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_6_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_6_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_6_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_2_valid & _GEN_10 == 4'h6) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_6_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_6_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_6_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_1_valid & _GEN_9 == 4'h6) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_6_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_6_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_6_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_0_valid & wrIdx == 4'h6) begin	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :34:32, :45:33, :46:47
-      entries_6_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_6_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_6_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    if (io_alloc_3_valid & _GEN_11 == 4'h7) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_7_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_7_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_7_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_2_valid & _GEN_10 == 4'h7) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_7_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_7_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_7_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_1_valid & _GEN_9 == 4'h7) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_7_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_7_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_7_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_0_valid & wrIdx == 4'h7) begin	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :34:32, :45:33, :46:47
-      entries_7_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_7_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_7_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    if (io_alloc_3_valid & _GEN_11 == 4'h8) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_8_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_8_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_8_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_2_valid & _GEN_10 == 4'h8) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_8_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_8_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_8_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_1_valid & _GEN_9 == 4'h8) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_8_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_8_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_8_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_0_valid & wrIdx == 4'h8) begin	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :34:32, :45:33, :46:47
-      entries_8_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_8_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_8_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    if (io_alloc_3_valid & _GEN_11 == 4'h9) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_9_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_9_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_9_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_2_valid & _GEN_10 == 4'h9) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_9_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_9_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_9_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_1_valid & _GEN_9 == 4'h9) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_9_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_9_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_9_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_0_valid & wrIdx == 4'h9) begin	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :34:32, :45:33, :46:47
-      entries_9_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_9_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_9_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    if (io_alloc_3_valid & _GEN_11 == 4'hA) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_10_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_10_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_10_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_2_valid & _GEN_10 == 4'hA) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_10_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_10_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_10_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_1_valid & _GEN_9 == 4'hA) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_10_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_10_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_10_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_0_valid & wrIdx == 4'hA) begin	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :34:32, :45:33, :46:47
-      entries_10_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_10_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_10_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    if (io_alloc_3_valid & _GEN_11 == 4'hB) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_11_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_11_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_11_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_2_valid & _GEN_10 == 4'hB) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_11_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_11_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_11_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_1_valid & _GEN_9 == 4'hB) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_11_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_11_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_11_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_0_valid & wrIdx == 4'hB) begin	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :34:32, :45:33, :46:47
-      entries_11_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_11_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_11_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    if (io_alloc_3_valid & _GEN_11 == 4'hC) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_12_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_12_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_12_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_2_valid & _GEN_10 == 4'hC) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_12_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_12_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_12_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_1_valid & _GEN_9 == 4'hC) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_12_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_12_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_12_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_0_valid & wrIdx == 4'hC) begin	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :34:32, :45:33, :46:47
-      entries_12_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_12_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_12_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    if (io_alloc_3_valid & _GEN_11 == 4'hD) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_13_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_13_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_13_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_2_valid & _GEN_10 == 4'hD) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_13_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_13_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_13_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_1_valid & _GEN_9 == 4'hD) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_13_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_13_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_13_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_0_valid & wrIdx == 4'hD) begin	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :34:32, :45:33, :46:47
-      entries_13_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_13_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_13_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    if (io_alloc_3_valid & _GEN_11 == 4'hE) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_14_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_14_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_14_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_2_valid & _GEN_10 == 4'hE) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_14_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_14_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_14_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_1_valid & _GEN_9 == 4'hE) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_14_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_14_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_14_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_0_valid & wrIdx == 4'hE) begin	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :34:32, :45:33, :46:47
-      entries_14_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_14_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_14_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    if (io_alloc_3_valid & (&_GEN_11)) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_15_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_15_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_15_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_2_valid & (&_GEN_10)) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_15_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_15_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_15_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_1_valid & (&_GEN_9)) begin	// src/queen/scala/main/QueenQrdTracker.scala:42:72, :45:33, :46:{32,47}
-      entries_15_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_15_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_15_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    else if (io_alloc_0_valid & (&wrIdx)) begin	// src/queen/scala/main/QueenQrdTracker.scala:31:30, :34:32, :45:33, :46:47
-      entries_15_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_15_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-      entries_15_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:31:30
-    end
-    if (reset) begin	// src/queen/scala/main/QueenQrdTracker.scala:17:7
-      wrIdx <= 4'h0;	// src/queen/scala/main/QueenQrdTracker.scala:34:32
-      rdIdx <= 4'h0;	// src/queen/scala/main/QueenQrdTracker.scala:35:32
-      count <= 5'h0;	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :36:32
-    end
-    else begin	// src/queen/scala/main/QueenQrdTracker.scala:17:7
-      wrIdx <= wrIdx + {1'h0, allocCount};	// src/queen/scala/main/QueenQrdTracker.scala:34:32, :43:38, :50:25
+     {_fifos_0_io_deq_bits_err}};	// src/queen/scala/main/QueenQrdTracker.scala:59:43, :74:31
+  wire              headResp_err = ~_GEN_6 & _GEN_8[_GEN_4];	// src/queen/scala/main/QueenQrdTracker.scala:74:31
+  wire [3:0]        _GEN_9 =
+    {{_fifos_0_io_deq_valid},
+     {_fifos_2_io_deq_valid},
+     {_fifos_1_io_deq_valid},
+     {_fifos_0_io_deq_valid}};	// src/queen/scala/main/QueenQrdTracker.scala:59:43, :75:54
+  wire              headReady = (|count) & (_GEN_6 | _GEN_9[_GEN_4]);	// src/queen/scala/main/QueenQrdTracker.scala:40:32, :69:35, :74:31, :75:{39,54}
+  wire              writeBack = (|io_asyncRd_bits_addr_0) & ~headResp_err;	// src/queen/scala/main/QueenQrdTracker.scala:74:31, :76:{42,50,53}
+  assign io_retire_valid_0 = headReady & (~writeBack | io_asyncRd_ready);	// src/queen/scala/main/QueenQrdTracker.scala:75:39, :76:50, :81:{34,38,49}
+  always @(posedge clock) begin	// src/queen/scala/main/QueenQrdTracker.scala:19:7
+    automatic logic [1:0] _GEN_10 = _GEN + _GEN_0;	// src/queen/scala/main/QueenQrdTracker.scala:46:72
+    automatic logic       _GEN_11;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+    automatic logic       _GEN_12;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+    automatic logic       _GEN_13;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+    automatic logic       _GEN_14;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+    automatic logic       _GEN_15;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+    automatic logic       _GEN_16;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+    automatic logic       _GEN_17;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+    automatic logic       _GEN_18;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+    automatic logic       _GEN_19;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+    automatic logic       _GEN_20;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+    automatic logic       _GEN_21;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+    automatic logic       _GEN_22;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+    automatic logic       _GEN_23;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+    automatic logic       _GEN_24;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+    automatic logic       _GEN_25;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+    automatic logic       _GEN_26;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+    automatic logic [3:0] _GEN_27;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :50:32
+    automatic logic       _GEN_28;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_29;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_30;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_31;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_32;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_33;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_34;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_35;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_36;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_37;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_38;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_39;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_40;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_41;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_42;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_43;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic [3:0] _GEN_44;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :50:32
+    automatic logic       _GEN_45;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_46;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_47;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_48;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_49;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_50;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_51;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_52;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_53;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_54;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_55;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_56;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_57;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_58;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_59;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_60;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic [3:0] _GEN_61;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :50:32
+    automatic logic       _GEN_62;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_63;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_64;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_65;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_66;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_67;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_68;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_69;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_70;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_71;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_72;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_73;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_74;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_75;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_76;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    automatic logic       _GEN_77;	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+    _GEN_11 = io_alloc_0_valid & wrIdx == 4'h0;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :38:32, :49:33, :50:47
+    _GEN_12 = io_alloc_0_valid & wrIdx == 4'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :38:32, :49:33, :50:47
+    _GEN_13 = io_alloc_0_valid & wrIdx == 4'h2;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :38:32, :49:33, :50:47
+    _GEN_14 = io_alloc_0_valid & wrIdx == 4'h3;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :38:32, :49:33, :50:47
+    _GEN_15 = io_alloc_0_valid & wrIdx == 4'h4;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :38:32, :49:33, :50:47
+    _GEN_16 = io_alloc_0_valid & wrIdx == 4'h5;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :38:32, :49:33, :50:47
+    _GEN_17 = io_alloc_0_valid & wrIdx == 4'h6;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :38:32, :49:33, :50:47
+    _GEN_18 = io_alloc_0_valid & wrIdx == 4'h7;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :38:32, :49:33, :50:47
+    _GEN_19 = io_alloc_0_valid & wrIdx == 4'h8;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :38:32, :49:33, :50:47
+    _GEN_20 = io_alloc_0_valid & wrIdx == 4'h9;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :38:32, :49:33, :50:47
+    _GEN_21 = io_alloc_0_valid & wrIdx == 4'hA;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :38:32, :49:33, :50:47
+    _GEN_22 = io_alloc_0_valid & wrIdx == 4'hB;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :38:32, :49:33, :50:47
+    _GEN_23 = io_alloc_0_valid & wrIdx == 4'hC;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :38:32, :49:33, :50:47
+    _GEN_24 = io_alloc_0_valid & wrIdx == 4'hD;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :38:32, :49:33, :50:47
+    _GEN_25 = io_alloc_0_valid & wrIdx == 4'hE;	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :38:32, :49:33, :50:47
+    _GEN_26 = io_alloc_0_valid & (&wrIdx);	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :38:32, :49:33, :50:47
+    _GEN_27 = {3'h0, io_alloc_0_valid} + wrIdx;	// src/queen/scala/main/QueenQrdTracker.scala:38:32, :46:72, :50:32
+    _GEN_28 = io_alloc_1_valid & _GEN_27 == 4'h0;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_29 = io_alloc_1_valid & _GEN_27 == 4'h1;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_30 = io_alloc_1_valid & _GEN_27 == 4'h2;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_31 = io_alloc_1_valid & _GEN_27 == 4'h3;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_32 = io_alloc_1_valid & _GEN_27 == 4'h4;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_33 = io_alloc_1_valid & _GEN_27 == 4'h5;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_34 = io_alloc_1_valid & _GEN_27 == 4'h6;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_35 = io_alloc_1_valid & _GEN_27 == 4'h7;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_36 = io_alloc_1_valid & _GEN_27 == 4'h8;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_37 = io_alloc_1_valid & _GEN_27 == 4'h9;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_38 = io_alloc_1_valid & _GEN_27 == 4'hA;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_39 = io_alloc_1_valid & _GEN_27 == 4'hB;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_40 = io_alloc_1_valid & _GEN_27 == 4'hC;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_41 = io_alloc_1_valid & _GEN_27 == 4'hD;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_42 = io_alloc_1_valid & _GEN_27 == 4'hE;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_43 = io_alloc_1_valid & (&_GEN_27);	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_44 = {2'h0, _GEN_10} + wrIdx;	// src/queen/scala/main/QueenQrdTracker.scala:38:32, :46:72, :50:32
+    _GEN_45 = io_alloc_2_valid & _GEN_44 == 4'h0;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_46 = io_alloc_2_valid & _GEN_44 == 4'h1;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_47 = io_alloc_2_valid & _GEN_44 == 4'h2;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_48 = io_alloc_2_valid & _GEN_44 == 4'h3;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_49 = io_alloc_2_valid & _GEN_44 == 4'h4;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_50 = io_alloc_2_valid & _GEN_44 == 4'h5;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_51 = io_alloc_2_valid & _GEN_44 == 4'h6;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_52 = io_alloc_2_valid & _GEN_44 == 4'h7;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_53 = io_alloc_2_valid & _GEN_44 == 4'h8;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_54 = io_alloc_2_valid & _GEN_44 == 4'h9;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_55 = io_alloc_2_valid & _GEN_44 == 4'hA;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_56 = io_alloc_2_valid & _GEN_44 == 4'hB;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_57 = io_alloc_2_valid & _GEN_44 == 4'hC;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_58 = io_alloc_2_valid & _GEN_44 == 4'hD;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_59 = io_alloc_2_valid & _GEN_44 == 4'hE;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_60 = io_alloc_2_valid & (&_GEN_44);	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_61 = {1'h0, {1'h0, _GEN_10} + {2'h0, io_alloc_2_valid}} + wrIdx;	// src/queen/scala/main/QueenQrdTracker.scala:38:32, :46:72, :50:32
+    _GEN_62 = io_alloc_3_valid & _GEN_61 == 4'h0;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_63 = io_alloc_3_valid & _GEN_61 == 4'h1;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_64 = io_alloc_3_valid & _GEN_61 == 4'h2;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_65 = io_alloc_3_valid & _GEN_61 == 4'h3;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_66 = io_alloc_3_valid & _GEN_61 == 4'h4;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_67 = io_alloc_3_valid & _GEN_61 == 4'h5;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_68 = io_alloc_3_valid & _GEN_61 == 4'h6;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_69 = io_alloc_3_valid & _GEN_61 == 4'h7;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_70 = io_alloc_3_valid & _GEN_61 == 4'h8;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_71 = io_alloc_3_valid & _GEN_61 == 4'h9;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_72 = io_alloc_3_valid & _GEN_61 == 4'hA;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_73 = io_alloc_3_valid & _GEN_61 == 4'hB;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_74 = io_alloc_3_valid & _GEN_61 == 4'hC;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_75 = io_alloc_3_valid & _GEN_61 == 4'hD;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_76 = io_alloc_3_valid & _GEN_61 == 4'hE;	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    _GEN_77 = io_alloc_3_valid & (&_GEN_61);	// src/queen/scala/main/QueenQrdTracker.scala:46:72, :49:33, :50:{32,47}
+    if (_GEN_62) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_0_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_0_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_0_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_45) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_0_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_0_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_0_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_28) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_0_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_0_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_0_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_11) begin	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+      entries_0_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_0_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_0_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    if (_GEN_63) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_1_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_1_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_1_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_46) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_1_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_1_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_1_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_29) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_1_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_1_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_1_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_12) begin	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+      entries_1_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_1_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_1_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    if (_GEN_64) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_2_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_2_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_2_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_47) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_2_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_2_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_2_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_30) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_2_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_2_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_2_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_13) begin	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+      entries_2_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_2_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_2_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    if (_GEN_65) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_3_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_3_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_3_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_48) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_3_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_3_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_3_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_31) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_3_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_3_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_3_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_14) begin	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+      entries_3_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_3_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_3_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    if (_GEN_66) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_4_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_4_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_4_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_49) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_4_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_4_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_4_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_32) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_4_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_4_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_4_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_15) begin	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+      entries_4_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_4_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_4_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    if (_GEN_67) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_5_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_5_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_5_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_50) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_5_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_5_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_5_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_33) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_5_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_5_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_5_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_16) begin	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+      entries_5_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_5_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_5_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    if (_GEN_68) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_6_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_6_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_6_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_51) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_6_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_6_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_6_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_34) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_6_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_6_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_6_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_17) begin	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+      entries_6_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_6_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_6_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    if (_GEN_69) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_7_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_7_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_7_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_52) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_7_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_7_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_7_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_35) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_7_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_7_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_7_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_18) begin	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+      entries_7_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_7_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_7_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    if (_GEN_70) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_8_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_8_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_8_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_53) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_8_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_8_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_8_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_36) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_8_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_8_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_8_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_19) begin	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+      entries_8_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_8_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_8_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    if (_GEN_71) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_9_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_9_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_9_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_54) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_9_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_9_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_9_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_37) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_9_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_9_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_9_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_20) begin	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+      entries_9_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_9_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_9_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    if (_GEN_72) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_10_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_10_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_10_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_55) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_10_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_10_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_10_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_38) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_10_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_10_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_10_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_21) begin	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+      entries_10_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_10_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_10_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    if (_GEN_73) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_11_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_11_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_11_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_56) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_11_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_11_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_11_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_39) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_11_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_11_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_11_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_22) begin	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+      entries_11_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_11_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_11_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    if (_GEN_74) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_12_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_12_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_12_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_57) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_12_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_12_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_12_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_40) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_12_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_12_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_12_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_23) begin	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+      entries_12_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_12_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_12_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    if (_GEN_75) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_13_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_13_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_13_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_58) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_13_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_13_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_13_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_41) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_13_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_13_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_13_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_24) begin	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+      entries_13_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_13_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_13_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    if (_GEN_76) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_14_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_14_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_14_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_59) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_14_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_14_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_14_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_42) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_14_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_14_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_14_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_25) begin	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+      entries_14_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_14_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_14_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    if (_GEN_77) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_15_pc <= io_alloc_3_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_15_rdIndex <= io_alloc_3_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_15_source <= io_alloc_3_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_60) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_15_pc <= io_alloc_2_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_15_rdIndex <= io_alloc_2_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_15_source <= io_alloc_2_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_43) begin	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+      entries_15_pc <= io_alloc_1_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_15_rdIndex <= io_alloc_1_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_15_source <= io_alloc_1_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else if (_GEN_26) begin	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+      entries_15_pc <= io_alloc_0_bits_pc;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_15_rdIndex <= io_alloc_0_bits_rdIndex;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_15_source <= io_alloc_0_bits_source;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    if (io_markDummy) begin	// src/queen/scala/main/QueenQrdTracker.scala:19:7
+      entries_0_dummy <= 1'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_1_dummy <= 1'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_2_dummy <= 1'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_3_dummy <= 1'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_4_dummy <= 1'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_5_dummy <= 1'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_6_dummy <= 1'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_7_dummy <= 1'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_8_dummy <= 1'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_9_dummy <= 1'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_10_dummy <= 1'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_11_dummy <= 1'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_12_dummy <= 1'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_13_dummy <= 1'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_14_dummy <= 1'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      entries_15_dummy <= 1'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    else begin	// src/queen/scala/main/QueenQrdTracker.scala:19:7
+      if (_GEN_62)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_0_dummy <= io_alloc_3_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_45)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_0_dummy <= io_alloc_2_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_28)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_0_dummy <= io_alloc_1_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_11)	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+        entries_0_dummy <= io_alloc_0_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      if (_GEN_63)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_1_dummy <= io_alloc_3_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_46)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_1_dummy <= io_alloc_2_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_29)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_1_dummy <= io_alloc_1_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_12)	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+        entries_1_dummy <= io_alloc_0_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      if (_GEN_64)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_2_dummy <= io_alloc_3_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_47)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_2_dummy <= io_alloc_2_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_30)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_2_dummy <= io_alloc_1_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_13)	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+        entries_2_dummy <= io_alloc_0_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      if (_GEN_65)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_3_dummy <= io_alloc_3_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_48)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_3_dummy <= io_alloc_2_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_31)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_3_dummy <= io_alloc_1_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_14)	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+        entries_3_dummy <= io_alloc_0_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      if (_GEN_66)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_4_dummy <= io_alloc_3_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_49)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_4_dummy <= io_alloc_2_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_32)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_4_dummy <= io_alloc_1_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_15)	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+        entries_4_dummy <= io_alloc_0_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      if (_GEN_67)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_5_dummy <= io_alloc_3_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_50)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_5_dummy <= io_alloc_2_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_33)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_5_dummy <= io_alloc_1_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_16)	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+        entries_5_dummy <= io_alloc_0_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      if (_GEN_68)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_6_dummy <= io_alloc_3_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_51)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_6_dummy <= io_alloc_2_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_34)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_6_dummy <= io_alloc_1_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_17)	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+        entries_6_dummy <= io_alloc_0_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      if (_GEN_69)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_7_dummy <= io_alloc_3_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_52)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_7_dummy <= io_alloc_2_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_35)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_7_dummy <= io_alloc_1_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_18)	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+        entries_7_dummy <= io_alloc_0_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      if (_GEN_70)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_8_dummy <= io_alloc_3_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_53)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_8_dummy <= io_alloc_2_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_36)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_8_dummy <= io_alloc_1_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_19)	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+        entries_8_dummy <= io_alloc_0_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      if (_GEN_71)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_9_dummy <= io_alloc_3_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_54)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_9_dummy <= io_alloc_2_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_37)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_9_dummy <= io_alloc_1_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_20)	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+        entries_9_dummy <= io_alloc_0_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      if (_GEN_72)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_10_dummy <= io_alloc_3_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_55)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_10_dummy <= io_alloc_2_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_38)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_10_dummy <= io_alloc_1_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_21)	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+        entries_10_dummy <= io_alloc_0_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      if (_GEN_73)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_11_dummy <= io_alloc_3_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_56)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_11_dummy <= io_alloc_2_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_39)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_11_dummy <= io_alloc_1_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_22)	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+        entries_11_dummy <= io_alloc_0_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      if (_GEN_74)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_12_dummy <= io_alloc_3_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_57)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_12_dummy <= io_alloc_2_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_40)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_12_dummy <= io_alloc_1_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_23)	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+        entries_12_dummy <= io_alloc_0_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      if (_GEN_75)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_13_dummy <= io_alloc_3_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_58)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_13_dummy <= io_alloc_2_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_41)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_13_dummy <= io_alloc_1_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_24)	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+        entries_13_dummy <= io_alloc_0_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      if (_GEN_76)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_14_dummy <= io_alloc_3_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_59)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_14_dummy <= io_alloc_2_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_42)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_14_dummy <= io_alloc_1_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_25)	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+        entries_14_dummy <= io_alloc_0_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      if (_GEN_77)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_15_dummy <= io_alloc_3_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_60)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_15_dummy <= io_alloc_2_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_43)	// src/queen/scala/main/QueenQrdTracker.scala:49:33, :50:47
+        entries_15_dummy <= io_alloc_1_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+      else if (_GEN_26)	// src/queen/scala/main/QueenQrdTracker.scala:35:30, :49:33, :50:47
+        entries_15_dummy <= io_alloc_0_bits_dummy;	// src/queen/scala/main/QueenQrdTracker.scala:35:30
+    end
+    if (reset) begin	// src/queen/scala/main/QueenQrdTracker.scala:19:7
+      wrIdx <= 4'h0;	// src/queen/scala/main/QueenQrdTracker.scala:38:32
+      rdIdx <= 4'h0;	// src/queen/scala/main/QueenQrdTracker.scala:39:32
+      count <= 5'h0;	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :40:32
+    end
+    else begin	// src/queen/scala/main/QueenQrdTracker.scala:19:7
+      wrIdx <= wrIdx + {1'h0, allocCount};	// src/queen/scala/main/QueenQrdTracker.scala:38:32, :47:38, :56:25
       if (_fifos_2_io_deq_ready_T)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-        rdIdx <= rdIdx + 4'h1;	// src/queen/scala/main/QueenQrdTracker.scala:35:32, :83:48
-      count <= _count_T_layerCapture[4:0] - {4'h0, _fifos_2_io_deq_ready_T};	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenQrdTracker.scala:36:32, :49:18, :51:35
+        rdIdx <= rdIdx + 4'h1;	// src/queen/scala/main/QueenQrdTracker.scala:39:32, :92:48
+      count <= _count_T_layerCapture[4:0] - {4'h0, _fifos_2_io_deq_ready_T};	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenQrdTracker.scala:40:32, :53:18, :57:35
     end
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// src/queen/scala/main/QueenQrdTracker.scala:17:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/QueenQrdTracker.scala:17:7
-      `FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/QueenQrdTracker.scala:17:7
+  `ifdef ENABLE_INITIAL_REG_	// src/queen/scala/main/QueenQrdTracker.scala:19:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/QueenQrdTracker.scala:19:7
+      `FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/QueenQrdTracker.scala:19:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/queen/scala/main/QueenQrdTracker.scala:17:7
-      automatic logic [31:0] _RANDOM[0:19];	// src/queen/scala/main/QueenQrdTracker.scala:17:7
-      `ifdef INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenQrdTracker.scala:17:7
-        `INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenQrdTracker.scala:17:7
+    initial begin	// src/queen/scala/main/QueenQrdTracker.scala:19:7
+      automatic logic [31:0] _RANDOM[0:20];	// src/queen/scala/main/QueenQrdTracker.scala:19:7
+      `ifdef INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenQrdTracker.scala:19:7
+        `INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenQrdTracker.scala:19:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/queen/scala/main/QueenQrdTracker.scala:17:7
-        for (logic [4:0] i = 5'h0; i < 5'h14; i += 5'h1) begin
-          _RANDOM[i] = `RANDOM;	// src/queen/scala/main/QueenQrdTracker.scala:17:7
-        end	// src/queen/scala/main/QueenQrdTracker.scala:17:7
-        entries_0_pc = _RANDOM[5'h0];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_0_rdIndex = _RANDOM[5'h1][4:0];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_0_source = _RANDOM[5'h1][6:5];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_1_pc = {_RANDOM[5'h1][31:7], _RANDOM[5'h2][6:0]};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_1_rdIndex = _RANDOM[5'h2][11:7];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_1_source = _RANDOM[5'h2][13:12];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_2_pc = {_RANDOM[5'h2][31:14], _RANDOM[5'h3][13:0]};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_2_rdIndex = _RANDOM[5'h3][18:14];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_2_source = _RANDOM[5'h3][20:19];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_3_pc = {_RANDOM[5'h3][31:21], _RANDOM[5'h4][20:0]};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_3_rdIndex = _RANDOM[5'h4][25:21];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_3_source = _RANDOM[5'h4][27:26];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_4_pc = {_RANDOM[5'h4][31:28], _RANDOM[5'h5][27:0]};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_4_rdIndex = {_RANDOM[5'h5][31:28], _RANDOM[5'h6][0]};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_4_source = _RANDOM[5'h6][2:1];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_5_pc = {_RANDOM[5'h6][31:3], _RANDOM[5'h7][2:0]};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_5_rdIndex = _RANDOM[5'h7][7:3];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_5_source = _RANDOM[5'h7][9:8];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_6_pc = {_RANDOM[5'h7][31:10], _RANDOM[5'h8][9:0]};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_6_rdIndex = _RANDOM[5'h8][14:10];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_6_source = _RANDOM[5'h8][16:15];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_7_pc = {_RANDOM[5'h8][31:17], _RANDOM[5'h9][16:0]};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_7_rdIndex = _RANDOM[5'h9][21:17];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_7_source = _RANDOM[5'h9][23:22];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_8_pc = {_RANDOM[5'h9][31:24], _RANDOM[5'hA][23:0]};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_8_rdIndex = _RANDOM[5'hA][28:24];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_8_source = _RANDOM[5'hA][30:29];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_9_pc = {_RANDOM[5'hA][31], _RANDOM[5'hB][30:0]};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_9_rdIndex = {_RANDOM[5'hB][31], _RANDOM[5'hC][3:0]};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_9_source = _RANDOM[5'hC][5:4];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_10_pc = {_RANDOM[5'hC][31:6], _RANDOM[5'hD][5:0]};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_10_rdIndex = _RANDOM[5'hD][10:6];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_10_source = _RANDOM[5'hD][12:11];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_11_pc = {_RANDOM[5'hD][31:13], _RANDOM[5'hE][12:0]};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_11_rdIndex = _RANDOM[5'hE][17:13];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_11_source = _RANDOM[5'hE][19:18];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_12_pc = {_RANDOM[5'hE][31:20], _RANDOM[5'hF][19:0]};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_12_rdIndex = _RANDOM[5'hF][24:20];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_12_source = _RANDOM[5'hF][26:25];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_13_pc = {_RANDOM[5'hF][31:27], _RANDOM[5'h10][26:0]};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_13_rdIndex = _RANDOM[5'h10][31:27];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_13_source = _RANDOM[5'h11][1:0];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_14_pc = {_RANDOM[5'h11][31:2], _RANDOM[5'h12][1:0]};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_14_rdIndex = _RANDOM[5'h12][6:2];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_14_source = _RANDOM[5'h12][8:7];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_15_pc = {_RANDOM[5'h12][31:9], _RANDOM[5'h13][8:0]};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_15_rdIndex = _RANDOM[5'h13][13:9];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        entries_15_source = _RANDOM[5'h13][15:14];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30
-        wrIdx = _RANDOM[5'h13][19:16];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30, :34:32
-        rdIdx = _RANDOM[5'h13][23:20];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30, :35:32
-        count = _RANDOM[5'h13][28:24];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :31:30, :36:32
+      `ifdef RANDOMIZE_REG_INIT	// src/queen/scala/main/QueenQrdTracker.scala:19:7
+        for (logic [4:0] i = 5'h0; i < 5'h15; i += 5'h1) begin
+          _RANDOM[i] = `RANDOM;	// src/queen/scala/main/QueenQrdTracker.scala:19:7
+        end	// src/queen/scala/main/QueenQrdTracker.scala:19:7
+        entries_0_pc = _RANDOM[5'h0];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_0_rdIndex = _RANDOM[5'h1][4:0];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_0_source = _RANDOM[5'h1][6:5];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_0_dummy = _RANDOM[5'h1][7];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_1_pc = {_RANDOM[5'h1][31:8], _RANDOM[5'h2][7:0]};	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_1_rdIndex = _RANDOM[5'h2][12:8];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_1_source = _RANDOM[5'h2][14:13];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_1_dummy = _RANDOM[5'h2][15];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_2_pc = {_RANDOM[5'h2][31:16], _RANDOM[5'h3][15:0]};	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_2_rdIndex = _RANDOM[5'h3][20:16];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_2_source = _RANDOM[5'h3][22:21];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_2_dummy = _RANDOM[5'h3][23];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_3_pc = {_RANDOM[5'h3][31:24], _RANDOM[5'h4][23:0]};	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_3_rdIndex = _RANDOM[5'h4][28:24];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_3_source = _RANDOM[5'h4][30:29];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_3_dummy = _RANDOM[5'h4][31];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_4_pc = _RANDOM[5'h5];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_4_rdIndex = _RANDOM[5'h6][4:0];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_4_source = _RANDOM[5'h6][6:5];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_4_dummy = _RANDOM[5'h6][7];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_5_pc = {_RANDOM[5'h6][31:8], _RANDOM[5'h7][7:0]};	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_5_rdIndex = _RANDOM[5'h7][12:8];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_5_source = _RANDOM[5'h7][14:13];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_5_dummy = _RANDOM[5'h7][15];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_6_pc = {_RANDOM[5'h7][31:16], _RANDOM[5'h8][15:0]};	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_6_rdIndex = _RANDOM[5'h8][20:16];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_6_source = _RANDOM[5'h8][22:21];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_6_dummy = _RANDOM[5'h8][23];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_7_pc = {_RANDOM[5'h8][31:24], _RANDOM[5'h9][23:0]};	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_7_rdIndex = _RANDOM[5'h9][28:24];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_7_source = _RANDOM[5'h9][30:29];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_7_dummy = _RANDOM[5'h9][31];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_8_pc = _RANDOM[5'hA];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_8_rdIndex = _RANDOM[5'hB][4:0];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_8_source = _RANDOM[5'hB][6:5];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_8_dummy = _RANDOM[5'hB][7];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_9_pc = {_RANDOM[5'hB][31:8], _RANDOM[5'hC][7:0]};	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_9_rdIndex = _RANDOM[5'hC][12:8];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_9_source = _RANDOM[5'hC][14:13];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_9_dummy = _RANDOM[5'hC][15];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_10_pc = {_RANDOM[5'hC][31:16], _RANDOM[5'hD][15:0]};	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_10_rdIndex = _RANDOM[5'hD][20:16];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_10_source = _RANDOM[5'hD][22:21];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_10_dummy = _RANDOM[5'hD][23];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_11_pc = {_RANDOM[5'hD][31:24], _RANDOM[5'hE][23:0]};	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_11_rdIndex = _RANDOM[5'hE][28:24];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_11_source = _RANDOM[5'hE][30:29];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_11_dummy = _RANDOM[5'hE][31];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_12_pc = _RANDOM[5'hF];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_12_rdIndex = _RANDOM[5'h10][4:0];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_12_source = _RANDOM[5'h10][6:5];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_12_dummy = _RANDOM[5'h10][7];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_13_pc = {_RANDOM[5'h10][31:8], _RANDOM[5'h11][7:0]};	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_13_rdIndex = _RANDOM[5'h11][12:8];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_13_source = _RANDOM[5'h11][14:13];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_13_dummy = _RANDOM[5'h11][15];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_14_pc = {_RANDOM[5'h11][31:16], _RANDOM[5'h12][15:0]};	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_14_rdIndex = _RANDOM[5'h12][20:16];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_14_source = _RANDOM[5'h12][22:21];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_14_dummy = _RANDOM[5'h12][23];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_15_pc = {_RANDOM[5'h12][31:24], _RANDOM[5'h13][23:0]};	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_15_rdIndex = _RANDOM[5'h13][28:24];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_15_source = _RANDOM[5'h13][30:29];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        entries_15_dummy = _RANDOM[5'h13][31];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :35:30
+        wrIdx = _RANDOM[5'h14][3:0];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :38:32
+        rdIdx = _RANDOM[5'h14][7:4];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :38:32, :39:32
+        count = _RANDOM[5'h14][12:8];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :38:32, :40:32
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenQrdTracker.scala:17:7
-      `FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenQrdTracker.scala:17:7
+    `ifdef FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenQrdTracker.scala:19:7
+      `FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenQrdTracker.scala:19:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  Queen_Queue16_QueenDsaRegResp fifos_0 (	// src/queen/scala/main/QueenQrdTracker.scala:53:43
+  Queen_Queue16_QueenDsaRegResp fifos_0 (	// src/queen/scala/main/QueenQrdTracker.scala:59:43
     .clock            (clock),
     .reset            (reset),
     .io_enq_ready     (fifos_0_io_enq_ready_layerCapture),
-    .io_enq_valid     (io_resp_0_valid),
+    .io_enq_valid     (io_resp_0_valid & ~io_flushing),	// src/queen/scala/main/QueenQrdTracker.scala:61:{51,54}
     .io_enq_bits_data (io_resp_0_bits_data),
     .io_enq_bits_err  (io_resp_0_bits_err),
-    .io_deq_ready     (_fifos_2_io_deq_ready_T & _GEN_4 == 2'h0),	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenQrdTracker.scala:67:39, :81:{49,64}
+    .io_deq_ready     (io_flushing | _fifos_2_io_deq_ready_T & ~_GEN_6 & _GEN_4 == 2'h0),	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenQrdTracker.scala:74:31, :89:46, :90:{29,32,44,59}
     .io_deq_valid     (_fifos_0_io_deq_valid),
     .io_deq_bits_data (_fifos_0_io_deq_bits_data),
     .io_deq_bits_err  (_fifos_0_io_deq_bits_err)
-  );	// src/queen/scala/main/QueenQrdTracker.scala:53:43
-  Queen_Queue16_QueenDsaRegResp fifos_1 (	// src/queen/scala/main/QueenQrdTracker.scala:53:43
+  );	// src/queen/scala/main/QueenQrdTracker.scala:59:43
+  Queen_Queue16_QueenDsaRegResp fifos_1 (	// src/queen/scala/main/QueenQrdTracker.scala:59:43
     .clock            (clock),
     .reset            (reset),
     .io_enq_ready     (fifos_1_io_enq_ready_layerCapture),
-    .io_enq_valid     (io_resp_1_valid),
+    .io_enq_valid     (io_resp_1_valid & ~io_flushing),	// src/queen/scala/main/QueenQrdTracker.scala:61:{51,54}
     .io_enq_bits_data (io_resp_1_bits_data),
     .io_enq_bits_err  (io_resp_1_bits_err),
-    .io_deq_ready     (_fifos_2_io_deq_ready_T & _GEN_4 == 2'h1),	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenQrdTracker.scala:67:39, :81:{49,64}
+    .io_deq_ready     (io_flushing | _fifos_2_io_deq_ready_T & ~_GEN_6 & _GEN_4 == 2'h1),	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenQrdTracker.scala:74:31, :89:46, :90:{29,32,44,59}
     .io_deq_valid     (_fifos_1_io_deq_valid),
     .io_deq_bits_data (_fifos_1_io_deq_bits_data),
     .io_deq_bits_err  (_fifos_1_io_deq_bits_err)
-  );	// src/queen/scala/main/QueenQrdTracker.scala:53:43
-  Queen_Queue16_QueenDsaRegResp fifos_2 (	// src/queen/scala/main/QueenQrdTracker.scala:53:43
+  );	// src/queen/scala/main/QueenQrdTracker.scala:59:43
+  Queen_Queue16_QueenDsaRegResp fifos_2 (	// src/queen/scala/main/QueenQrdTracker.scala:59:43
     .clock            (clock),
     .reset            (reset),
     .io_enq_ready     (fifos_2_io_enq_ready_layerCapture),
-    .io_enq_valid     (io_resp_2_valid),
+    .io_enq_valid     (io_resp_2_valid & ~io_flushing),	// src/queen/scala/main/QueenQrdTracker.scala:61:{51,54}
     .io_enq_bits_data (io_resp_2_bits_data),
     .io_enq_bits_err  (io_resp_2_bits_err),
-    .io_deq_ready     (_fifos_2_io_deq_ready_T & _GEN_4 == 2'h2),	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenQrdTracker.scala:67:39, :81:{49,64}
+    .io_deq_ready     (io_flushing | _fifos_2_io_deq_ready_T & ~_GEN_6 & _GEN_4 == 2'h2),	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenQrdTracker.scala:74:31, :89:46, :90:{29,32,44,59}
     .io_deq_valid     (_fifos_2_io_deq_valid),
     .io_deq_bits_data (_fifos_2_io_deq_bits_data),
     .io_deq_bits_err  (_fifos_2_io_deq_bits_err)
-  );	// src/queen/scala/main/QueenQrdTracker.scala:53:43
-  assign io_used = count;	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :36:32
-  assign io_asyncRd_valid = headReady & writeBack;	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :67:39, :68:50, :70:35
-  assign io_asyncRd_bits_addr = io_asyncRd_bits_addr_0;	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :67:39
-  assign io_asyncRd_bits_data = _GEN_6[_GEN_4];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :67:39, :68:53
-  assign io_retire_valid = io_retire_valid_0;	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :73:34
-  assign io_retire_bits_pc = _GEN_1[rdIdx];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :35:32, :67:39
-  assign io_retire_bits_rdValid = writeBack;	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :68:50
-  assign io_retire_bits_rdIndex = io_asyncRd_bits_addr_0;	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :67:39
-  assign io_retire_bits_trap = _GEN_7[_GEN_4];	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :67:39, :68:53
-  assign io_retire_bits_trapCause = {4'h0, _GEN_7[_GEN_4] ? 4'h9 : 4'h0};	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :67:39, :68:53, :78:{30,36}
-  assign io_idle = count == 5'h0;	// src/queen/scala/main/QueenQrdTracker.scala:17:7, :36:32, :85:22
+  );	// src/queen/scala/main/QueenQrdTracker.scala:59:43
+  assign io_used = count;	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :40:32
+  assign io_asyncRd_valid = headReady & writeBack;	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :75:39, :76:50, :78:35
+  assign io_asyncRd_bits_addr = io_asyncRd_bits_addr_0;	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :74:31
+  assign io_asyncRd_bits_data = _GEN_6 ? 32'hDEADBEEF : _GEN_7[_GEN_4];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :73:20, :74:31
+  assign io_retire_valid = io_retire_valid_0;	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :81:34
+  assign io_retire_bits_pc = _GEN_1[rdIdx];	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :39:32, :74:31
+  assign io_retire_bits_rdValid = writeBack;	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :76:50
+  assign io_retire_bits_rdIndex = io_asyncRd_bits_addr_0;	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :74:31
+  assign io_retire_bits_trap = headResp_err;	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :74:31
+  assign io_retire_bits_trapCause = {4'h0, headResp_err ? 4'h9 : 4'h0};	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :74:31, :86:{30,36}
+  assign io_idle =
+    count == 5'h0
+    & {_fifos_2_io_deq_valid, _fifos_1_io_deq_valid, _fifos_0_io_deq_valid} == 3'h0;	// src/queen/scala/main/QueenQrdTracker.scala:19:7, :40:32, :59:43, :94:{22,30,44,51}
 endmodule
 
