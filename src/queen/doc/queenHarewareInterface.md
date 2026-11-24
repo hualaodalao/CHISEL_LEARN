@@ -1042,6 +1042,8 @@ elaboration 阶段至少检查：
 | `deviceIdle` | Output | 设备强 idle，供 Queen 合成顶层 idle 与 fence |
 | `resp` | Output `Decoupled` | **只承载 QRD 读数据与 err**；写不占此通道 |
 | `wrErr` | Output `Vec(nativeWidth, Bool())` | 写错误 per-lane pulse，无 ready，Queen 无条件采样并锁存为 fault（kind=1）。`QueenTop` 已提供对应输入端口 |
+| `flushReq` | Input `Bool` | Queen 发起的四相恢复请求（5.5）。设备必须丢弃已收未执行命令、终止或等完运行中工作 |
+| `flushAck` | Output `Bool` | 四相应答：`flushReq` 拉起后才能拉起，`flushReq` 落下后才能落下。拉起前不得残留旧 context 的 completion |
 
 这些端口是 Queen 获取设备状态的**唯一**通路：
 
@@ -1083,6 +1085,7 @@ QRD beat    : cmd.ready = 设备自己的读处理能力（能收下这条读并
 - `RUN` 被接受后，后续 `QWR` 不得改变该次已提交配置。
 - 若设备要求每条命令全量配置（如双 bank 不继承旧值），必须在自己的规格中写明；Queen ISA 默认允许增量配置。该要求只适用于设备私有区，公共契约区寄存器不参与 bank 切换（16.2）。
 - flush/reset 后 credit 与 Queen 重新对齐，公共区寄存器取复位值。
+- **flush 四相握手是硬义务**（时序见 5.5，设备侧动作见 16.10）：`flushReq` 拉起后必须丢弃已收未执行的命令、终止或等完运行中工作、不再产生属于旧 context 的 completion，然后才能拉 `flushAck`；`flushAck` 落下前不得开始新工作。不支持安全 abort 的设备必须等当前工作自然结束，不得提前回 ack。
 
 并行 beat 带来的设备侧义务（5.2 的切分规则是 Queen 侧保证）：
 
@@ -1101,6 +1104,89 @@ QCTRL RUN endpoint=DMA, cmdTag=0x11, swTag=0x2000  // 关闭配置组并启动�
 QWR1 endpoint=DMA, 0x00..0x22, ...      // 下一组配置，可与上一次执行重叠；信号目标无需重写
 QCTRL RUN endpoint=DMA, cmdTag=0x12
 ```
+
+### 16.10 设备侧集成清单
+
+本节是给 DSA 集成者的照做清单。契约本体在 16.1–16.9 与第 17 章，这里只回答「复用什么、自己写什么、怎么连、怎么验」。设备侧实现由设备团队自行对齐本规格，不属于 Queen 的交付范围。
+
+#### 16.10.1 复用与自研的分界
+
+| 部分 | 来源 | 说明 |
+|---|---|---|
+| 寄存器前端：shadow/live、中断四寄存器、公共契约区、单 ready、`wrErr`、`start` pulse、上下文与 `hwSignal` 组合输出 | **直接例化** `src/queen/scala/common/QueenDsaRegIf.scala` | 第 17 章；不必各自手写一套语义不一致的前端 |
+| `QueenNativeCmd` / `QueenDsaRegResp` / `QueenDsaCompletion` / `QueenHwSignal` | **直接复用** `queen/scala/common/` 与 `QueenDsaAdapter.scala` 里的 bundle | 不要自定义等价结构 |
+| 执行逻辑、`startReady`（credit）、`deviceIdle`、completion 生成与上下文采样、flush 四相状态机、`intrSrc`/`statusRegs` 源 | **设备自研** | RegIf 明确不含这些（17.5） |
+
+#### 16.10.2 逐步集成与验证路径
+
+最小可运行参考就在仓库里：`src/queen/scala/test/QueenConfigPathSpec.scala` 的 `QueenFakeDsa` + `QueenConfigPathDut`。它把 `QueenTop`、两个 `QueenDsaRegIf`、一个假设备连成整条闭环，是本章契约的可执行版本。
+
+1. 读 `QueenConfigPathDut` 的连线（`top.io.gemm <> gemmReg.io.cmd` 等），与 16.10.3 的表对照。
+2. 读 `QueenFakeDsa`：它示范了 `start` 当拍采样上下文、延迟若干拍回传 completion、四相 flush ack、`idle = 流水线全空`。**它不建模真实 abort 的等待语义**，真实设备必须自己补。
+3. 用 `QueenDsaRegIfConfig(numCfgRegs, numStatusRegs, intrWidth, qcfg = QueenConfig())` 例化自己的 RegIf，`cfgRegs` 接执行逻辑。
+4. 自研四件：`startReady`（credit）、`deviceIdle`（强 idle）、completion 生成（含采样副本）、flush 状态机。
+5. 跑闭环验证：
+
+```bash
+CPATH=/opt/homebrew/include LIBRARY_PATH=/opt/homebrew/lib \
+sbt -J-Xmx8G -J-Djava.io.tmpdir=<仓库绝对路径>/build/tmp \
+  "testOnly QueenConfigPathSpec QueenDsaRegIfSpec"
+```
+
+判读：必须看到 `Tests: succeeded N, failed 0` 与 `All tests passed.` 两行才算过；只看日志尾部会漏掉退出码。单 suite 至少 `-J-Xmx6G`，多 suite 用 8G。
+
+6. 验收 `deviceIdle` 与 flush：`deviceIdle` 必须覆盖命令队列空、无执行、无未完成内存请求/响应、无未回传 completion；`busy=0` 或输入 FIFO 空都不够。Queen 的 flush 会一直等两个 `deviceIdle` 都为 1，设备 idle 判据偏松会让 flush 提前完成并残留旧 context。
+
+#### 16.10.3 连线表（以 GEMM 为例，DMA 同构）
+
+| `QueenTop` 端口 | 方向（Queen 视角） | 接到 |
+|---|---|---|
+| `io.gemm` | 输出 | `regif.io.cmd` |
+| `io.gemmResp` | 输入 | `regif.io.resp` |
+| `io.gemmWrErr` | 输入 | `regif.io.wrErr` |
+| `io.gemmCompletion` | 输入 | 设备自己的 completion 生成逻辑（**不经 RegIf、不经 adapter**） |
+| `io.gemmDeviceIdle` | 输入 | 设备强 idle 判定 |
+| `io.gemmFlushReq` | 输出 | 设备 flush 状态机 |
+| `io.gemmFlushAck` | 输入 | 设备 flush 状态机 |
+
+RegIf 其余端口的去向：`cfgRegs` → 执行逻辑的配置输入（live 组）；`statusRegs` ← 设备状态源；`intrSrc` ← 设备硬件事件（含无命令归属的本地错误）；`irq` → 设备自己到 CPU 的中断（Queen 不消费）；`start`/`startPc`/`startTag`/`startSwTag`/`hwSignal` → 设备**当拍采样**；`startReady` ← 设备 credit 与队列余量。
+
+#### 16.10.4 completion 字段责任表
+
+| 字段 | 谁填 | 从哪取 | 何时有效 |
+|---|---|---|---|
+| `pc` | 设备 | `regif.io.startPc` | **`start` 当拍采样**，完成时原样带回 |
+| `cmdTag` | 设备 | `regif.io.startTag` | 同上 |
+| `swTag` | 设备 | `regif.io.startSwTag` | 同上 |
+| `hwSignal` | 设备 | `regif.io.hwSignal` | 同上 |
+| `error` | 设备 | 自己的执行结果 | 完成当拍 |
+| `code` | 设备 | 设备私有错误码 | `error=1` 时；Queen 原样透传进 `fault.code`，不瓜分设备码空间 |
+
+硬约束：
+
+- 每端点每拍至多一条；两端点可同拍各一条，Queen 必须全吸收。
+- `Valid` 无 ready，Queen 无条件接收：设备**不得**因为「Queen 可能不收」而缓存或重发同一条完成。
+- `error=1` 时 `hwSignal.enable` 必须为 0——失败工作不得发布 event/timeline 成功状态。
+- **采样时机是最容易接错的地方**：RegIf 的上下文与 `hwSignal` 都是组合输出、不锁存任何在途副本。晚一拍采样就会把下一次 `RUN` 的目标附到前一次 completion 上，而 Queen 不做 tag 校验、查不出来。设备能接受多少条在途 `RUN`，就必须自己保存多少份采样副本。
+
+#### 16.10.5 flush 四相的设备侧动作
+
+时序见 5.5：`req↑ → ack↑ → req↓ → ack↓`。设备在 `flushReq` 拉起后必须做完下列全部才能拉 `flushAck`：
+
+1. 丢弃已收下但尚未开始执行的命令；
+2. 终止运行中工作，或等它自然结束（不支持安全 abort 就必须等，不得提前回 ack）；
+3. 保证不再产生属于旧 context 的 completion，已采样未回传的副本一并作废；
+4. credit 与 Queen 重新对齐，公共契约区寄存器取复位值。
+
+`flushAck` 落下前不得开始新工作。
+
+**RegIf 不含 flush 处理**：它没有 flush 端口，shadow/live 与中断寄存器都不会因 flush 复位。第 4 条要设备自己加——给 RegIf 包一层复位门控，或自行维护公共区复位。
+
+#### 16.10.6 三个不能照抄的地方
+
+1. **READ beat 的 ready**：RegIf 用 `cmd.ready = resp.ready`，这对它成立是因为它**当拍组合应答**（`resp.valid := accept && hasRd`），没有读积压；Queen 侧 `resp.ready` 恒 1，故 RegIf 的读恒可收。**若你的设备不能当拍应答，必须改用自己的读处理容量**，否则会收下答不出的读，破坏「同端点按序回响应」这条硬义务（16.8）。
+2. **不要让 `resp.ready` 依赖 `resp.valid`**：RegIf 的 `resp.valid` 组合依赖 `cmd.fire`，而 `cmd.ready` 又取 `resp.ready`。Queen 侧恒 1 才没有环；设备侧若把 `resp.ready` 接到依赖 `resp.valid` 的信号上就成组合环。
+3. **写不占 `resp`**：写错误只走 `wrErr` pulse。把写回执塞进 `resp` 会让读响应反压连带停住配置写，违反 16.6。
 
 ---
 
@@ -1170,7 +1256,7 @@ setMask = 各 lane 对 INT_FORCE 的 W1S 数据按位或
 
 ### 17.5 边界
 
-本模块不含 completion 生成、上下文采样、`deviceIdle` 判定、trace 记录流与设备执行逻辑，这些属设备侧剩余工作。completion 由设备直接回 `QueenTop`，不经本模块也不经 adapter。两个现有 RegIf（`WorkerBeeRegIf`/`FbRegIf`）尚未迁移到本模块。
+本模块不含 completion 生成、上下文采样、`deviceIdle` 判定、flush 四相处理、trace 记录流与设备执行逻辑，这些属设备侧剩余工作。completion 由设备直接回 `QueenTop`，不经本模块也不经 adapter。各设备现有的自有 RegIf 是否改用本模块，由设备团队按 16.10 的清单自行对齐，Queen 不做代改。
 
 ---
 
