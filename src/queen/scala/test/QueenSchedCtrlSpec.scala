@@ -90,6 +90,9 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
         var addrErrs = 0
         var flushTrigs = 0
         var pollInterval = BigInt(8)
+        var pollTimeoutReg = BigInt(0)
+        var timeouts = 0
+        private var timeoutCnt = BigInt(0)
         private var pollBusy = false
         private var pollWait = false
         private var pollTimer = BigInt(0)
@@ -131,10 +134,11 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
             else if (addr == 0x6b) (BigInt(faultCode), false)
             else if (addr == 0x6c) (BigInt(if (idleIn && !active) 1 else 0), false)
             else if (addr == 0x02) (pollInterval, false)
+            else if (addr == 0x03) (pollTimeoutReg, false)
             else (BigInt(0), true)
 
         private def wrLegal(addr: Int, data: BigInt): Boolean =
-            addr == 0 || addr == 1 || (addr == 2 && data != 0)
+            addr == 0 || addr == 1 || addr == 3 || (addr == 2 && data != 0)
 
         private var cycleNo = 0
 
@@ -185,6 +189,7 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
             val wrSel = Vector.tabulate(lanes)(j => !alone && cand(j).nonEmpty && j < fwdLen)
 
             val interval0 = pollInterval
+            val tReg0 = pollTimeoutReg
             val expErr = Vector.tabulate(lanes) { j =>
                 if (!wrSel(j)) false else {
                     val c = cand(j).get
@@ -205,6 +210,8 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
                     val a0 = if (c.isW2) c.regBase else c.addr
                     if (a0 == 2 && c.rs1 != 0) pollInterval = c.rs1
                     if (c.isW2 && c.regBase + 1 == 2 && c.rs2 != 0) pollInterval = c.rs2
+                    if (a0 == 3) pollTimeoutReg = c.rs1
+                    if (c.isW2 && c.regBase + 1 == 3) pollTimeoutReg = c.rs2
                 }
             }
             for (j <- 0 until lanes) {
@@ -257,11 +264,15 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
             val pBusy0 = pollBusy
             val pWait0 = pollWait
             val pTimer0 = pollTimer
+            val tCnt0 = timeoutCnt
+            val timeoutEn = tReg0 != 0
+            val pollTimeout = pBusy0 && timeoutEn && tCnt0 == 0
             val pollStart = exec && isPoll && !pBusy0
             val pollMisalign = pollStart && head.get.rs1 % 4 != 0
-            val pollIssue = pBusy0 && !pWait0 && pTimer0 == 0
-            val pollMatch = pBusy0 && pWait0 && rdDataNext.contains(pollExp)
-            val pollMiss = pBusy0 && pWait0 && rdDataNext.exists(_ != pollExp)
+            val pollIssue = pBusy0 && !pWait0 && pTimer0 == 0 && !pollTimeout
+            val pollMatch = pBusy0 && pWait0 && rdDataNext.contains(pollExp) && !pollTimeout
+            val pollMiss = pBusy0 && pWait0 && rdDataNext.exists(_ != pollExp) && !pollTimeout
+            val pollAbort = pollTimeout && (!pWait0 || rdDataNext.nonEmpty)
             val atomicStart = exec && isAtomic && !pBusy0
             val atomicMisalign = atomicStart && head.get.rs1 % 4 != 0
             val memRoom = memInflight.size < cfg.memDepth
@@ -281,12 +292,14 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
             val expAddrErr = pollMisalign || atomicMisalign
             dut.io.addrErr.expect(expAddrErr.B)
             if (expAddrErr) addrErrs += 1
+            dut.io.timeout.expect(pollAbort.B)
+            if (pollAbort) timeouts += 1
             val expFlush = expRecover || (exec && isFlush)
             dut.io.flushTrig.expect(expFlush.B)
             if (expFlush) flushTrigs += 1
 
             val aloneDone =
-                if (isPoll) pollMatch || pollMisalign
+                if (isPoll) pollMatch || pollMisalign || pollAbort
                 else if (isAtomic) atomicMisalign || memFire
                 else if (isQrd) respFire
                 else exec
@@ -296,11 +309,14 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
             if (pollStart && !pollMisalign) {
                 pollBusy = true; pollWait = false; pollTimer = BigInt(0)
                 pollAddr = head.get.rs1; pollExp = head.get.rs2
+                timeoutCnt = tReg0
             }
             if (pollIssue && memFire) pollWait = true
             if (pollMatch) { pollBusy = false; pollWait = false }
             if (pollMiss) { pollWait = false; pollTimer = interval0 }
+            if (pollAbort) { pollBusy = false; pollWait = false }
             if (pBusy0 && !pWait0 && pTimer0 != 0) pollTimer = pTimer0 - 1
+            if (pBusy0 && timeoutEn && tCnt0 != 0) timeoutCnt = tCnt0 - 1
             if (memFire) {
                 memInflight = memInflight :+ pollIssue
                 memReqs = memReqs :+ ((expOp, expAddr, expOperand))
@@ -400,12 +416,17 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.wrErrs shouldBe Vector(Vector(2))
             d.clears shouldBe 1
             d.flushTrigs shouldBe 1
-            // QWR2 的第二个地址落在保留区，故整条 lane 报错。
-            d.cycle(Some(d.offer(0 -> qwr2(2, 4, 0))))
+            // QWR2 可以一拍同时写 POLL_INTERVAL 与 POLL_TIMEOUT，两个地址都合法。
+            d.cycle(Some(d.offer(0 -> qwr2(2, 4, 9))))
+            d.cycle()
+            d.wrErrs shouldBe Vector(Vector(2))
+            d.pollInterval shouldBe BigInt(4)
+            d.pollTimeoutReg shouldBe BigInt(9)
+            // 第二个地址落在保留区时整条 lane 报错。
+            d.cycle(Some(d.offer(0 -> qwr2(3, 0, 0))))
             d.cycle()
             d.wrErrs shouldBe Vector(Vector(2), Vector(0))
             d.clears shouldBe 1
-            d.pollInterval shouldBe BigInt(4)
             d.drain()
         }
     }
@@ -508,6 +529,88 @@ class QueenSchedCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.wrErrs shouldBe Vector(Vector(0))
             d.pollInterval shouldBe BigInt(3)
             d.drain()
+        }
+    }
+
+    it should "program POLL_TIMEOUT through 0x03 and read it back" in {
+        val cfg = QueenConfig()
+        simulate(new QueenSchedCtrl(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            d.cycle(Some(d.offer(0 -> qwr1(0x03, 20))))
+            d.drain()
+            d.pollTimeoutReg shouldBe BigInt(20)
+            d.cycle(Some(d.offer(0 -> qrd(0x03))))
+            d.drain()
+            d.resps shouldBe Vector((BigInt(20), false))
+            // 0 合法，表示禁用超时。
+            d.cycle(Some(d.offer(0 -> qwr1(0x03, 0))))
+            d.drain()
+            d.pollTimeoutReg shouldBe BigInt(0)
+            d.wrErrs shouldBe empty
+        }
+    }
+
+    it should "abort POLL_EQ on timeout but wait for the outstanding READ" in {
+        val cfg = QueenConfig()
+        simulate(new QueenSchedCtrl(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            d.cycle(Some(d.offer(0 -> qwr1(0x03, 4))))
+            d.drain()
+            d.cycle(Some(d.offer(0 -> pollEq(0x1000, 0x5a5a), 1 -> signalEvent(1, 0x1))))
+            d.cycle()
+            d.cycle()
+            d.memReqs.size shouldBe 1
+            for (_ <- 0 until 3) d.cycle()
+            d.timeouts shouldBe 0
+            // 计数到 0 但 READ 还没回：不得放行，否则陈旧响应会配到下一条 POLL_EQ。
+            d.cycle()
+            d.timeouts shouldBe 0
+            d.writes shouldBe empty
+            d.rdDataNext = Some(BigInt(1))
+            d.cycle()
+            d.timeouts shouldBe 1
+            d.drain()
+            d.writes shouldBe Vector(Sw(false, 1, false, false, BigInt(1)))
+            d.consumed.size shouldBe 3
+        }
+    }
+
+    it should "abort immediately when the timeout expires with no READ outstanding" in {
+        val cfg = QueenConfig()
+        simulate(new QueenSchedCtrl(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            d.cycle(Some(d.offer(0 -> qwr1(0x03, 6))))
+            d.drain()
+            d.cycle(Some(d.offer(0 -> pollEq(0x1000, 0x5a5a))))
+            d.cycle()
+            d.cycle()
+            d.rdDataNext = Some(BigInt(1))
+            d.cycle()
+            d.memReqs.size shouldBe 1
+            for (_ <- 0 until 4) d.cycle()
+            d.timeouts shouldBe 0
+            d.cycle()
+            d.timeouts shouldBe 1
+            // 超时后不得再发 READ。
+            d.memReqs.size shouldBe 1
+            d.drain()
+        }
+    }
+
+    it should "poll forever when POLL_TIMEOUT is zero" in {
+        val cfg = QueenConfig()
+        simulate(new QueenSchedCtrl(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            d.cycle(Some(d.offer(0 -> pollEq(0x1000, 0x5a5a))))
+            d.cycle()
+            d.cycle()
+            for (_ <- 0 until 30) d.cycle()
+            d.timeouts shouldBe 0
+            d.memReqs.size shouldBe 1
+            d.rdDataNext = Some(BigInt(0x5a5a))
+            d.cycle()
+            d.drain()
+            d.consumed.size shouldBe 1
         }
     }
 

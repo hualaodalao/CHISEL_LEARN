@@ -9,6 +9,7 @@ import chisel3.util._
   * 两者都不产生 CPU 可见完成通知：效果只体现为后续指令的顺序与内存副作用。
   *
   * 寄存器映射：0x00 FAULT_CLEAR(WO) / 0x01 RECOVER(WO) / 0x02 POLL_INTERVAL(RW,复位8) /
+  * 0x03 POLL_TIMEOUT(RW,复位0=禁用) /
   * 0x40..0x5F EVENT[0..31](RO) / 0x60..0x67 TIMELINE[0..7](RO) /
   * 0x68..0x6B FAULT_VALID/KIND/ENDPOINT/CODE(RO) / 0x6C IDLE(RO)。
   * 其余地址写回 wrErr、读回 err。
@@ -25,6 +26,7 @@ class QueenSchedCtrl(val cfg: QueenConfig) extends Module {
         val rdData = Flipped(Valid(UInt(32.W)))
         val memUsed = Input(UInt(log2Ceil(cfg.memDepth + 1).W))
         val addrErr = Output(Bool())
+        val timeout = Output(Bool())
         val events = Input(Vec(cfg.eventGroupCount, UInt(32.W)))
         val timelines = Input(Vec(cfg.timelineCount, UInt(32.W)))
         val faultValid = Input(Bool())
@@ -43,6 +45,7 @@ class QueenSchedCtrl(val cfg: QueenConfig) extends Module {
     private val pkt = Reg(Vec(lanes, Valid(new QueenDsaCommand(cfg))))
     private val base = RegInit(0.U(cntW.W))
     private val pollInterval = RegInit(8.U(32.W))
+    private val pollTimeoutReg = RegInit(0.U(32.W))
 
     private val done = active && base >= lanes.U
     io.in.ready := !active || done
@@ -93,7 +96,7 @@ class QueenSchedCtrl(val cfg: QueenConfig) extends Module {
     private val wrSel = VecInit((0 until lanes).map(j =>
         !alone && !io.flushing && cand(j).valid && j.U(cntW.W) < fwdLen))
     private def wrLegal(addr: UInt, data: UInt): Bool =
-        addr === 0.U || addr === 1.U || (addr === 2.U && data =/= 0.U)
+        addr === 0.U || addr === 1.U || addr === 3.U || (addr === 2.U && data =/= 0.U)
     private val clear = Wire(Vec(lanes, Bool()))
     private val recover = Wire(Vec(lanes, Bool()))
     for (j <- 0 until lanes) {
@@ -109,6 +112,8 @@ class QueenSchedCtrl(val cfg: QueenConfig) extends Module {
         // 同拍多 lane 写 POLL_INTERVAL 以 lane 序最后一条为准。
         when(wrSel(j) && addr0 === 2.U && b.rs1 =/= 0.U) { pollInterval := b.rs1 }
         when(wrSel(j) && isW2 && addr1 === 2.U && b.rs2 =/= 0.U) { pollInterval := b.rs2 }
+        when(wrSel(j) && addr0 === 3.U) { pollTimeoutReg := b.rs1 }
+        when(wrSel(j) && isW2 && addr1 === 3.U) { pollTimeoutReg := b.rs2 }
     }
     io.faultClear := clear.asUInt.orR
 
@@ -146,14 +151,20 @@ class QueenSchedCtrl(val cfg: QueenConfig) extends Module {
     private val pollTimer = RegInit(0.U(32.W))
     private val pollAddr = Reg(UInt(cfg.xlen.W))
     private val pollExp = Reg(UInt(32.W))
+    private val timeoutCnt = RegInit(0.U(32.W))
 
     private val pollStart = exec && isPollEq && !pollBusy
     private val pollMisalign = pollStart && rs1(1, 0) =/= 0.U
+    private val timeoutEn = pollTimeoutReg =/= 0.U
+    private val pollTimeout = pollBusy && timeoutEn && timeoutCnt === 0.U
     private val pollMatch = pollBusy && pollWait && io.rdData.valid &&
-        io.rdData.bits === pollExp
+        io.rdData.bits === pollExp && !pollTimeout
     private val pollMiss = pollBusy && pollWait && io.rdData.valid &&
-        io.rdData.bits =/= pollExp
-    private val pollIssue = pollBusy && !pollWait && pollTimer === 0.U
+        io.rdData.bits =/= pollExp && !pollTimeout
+    private val pollIssue = pollBusy && !pollWait && pollTimer === 0.U && !pollTimeout
+    // 超时中止前必须等已发出的那笔 READ 回来：无 transaction ID，陈旧响应否则会配到
+    // 下一条 POLL_EQ 的比较器上。pollWait 恰好标记「有一笔 READ 在途」。
+    private val pollAbort = pollTimeout && (!pollWait || io.rdData.valid)
 
     when(pollStart && !pollMisalign) {
         pollBusy := true.B
@@ -161,11 +172,15 @@ class QueenSchedCtrl(val cfg: QueenConfig) extends Module {
         pollTimer := 0.U
         pollAddr := rs1
         pollExp := rs2
+        timeoutCnt := pollTimeoutReg
     }
     when(pollIssue && io.memReq.fire) { pollWait := true.B }
     when(pollMatch) { pollBusy := false.B; pollWait := false.B }
     when(pollMiss) { pollWait := false.B; pollTimer := pollInterval }
+    when(pollAbort) { pollBusy := false.B; pollWait := false.B }
     when(pollBusy && !pollWait && pollTimer =/= 0.U) { pollTimer := pollTimer - 1.U }
+    when(pollBusy && timeoutEn && timeoutCnt =/= 0.U) { timeoutCnt := timeoutCnt - 1.U }
+    io.timeout := pollAbort && !io.flushing
 
     private val atomicOp = MuxLookup(inst(8, 7), QueenMemOp.READ.asUInt)(Seq(
         0.U -> QueenMemOp.ATOMIC_ADD.asUInt,
@@ -189,21 +204,23 @@ class QueenSchedCtrl(val cfg: QueenConfig) extends Module {
     private val isFault = rdAddr >= 0x68.U && rdAddr <= 0x6b.U
     private val isIdle = rdAddr === 0x6c.U
     private val isInterval = rdAddr === 0x02.U
+    private val isTimeoutReg = rdAddr === 0x03.U
     private val faultField = VecInit(Seq(
         Cat(0.U(32.W), io.faultValid)(31, 0),
         Cat(0.U(32.W), io.faultKind)(31, 0),
         Cat(0.U(32.W), io.faultEndpoint)(31, 0),
         Cat(0.U(32.W), io.faultCode)(31, 0)))(rdAddr(1, 0))
-    private val rdLegal = isEvent || isTimeline || isFault || isIdle || isInterval
+    private val rdLegal = isEvent || isTimeline || isFault || isIdle || isInterval || isTimeoutReg
     io.resp.valid := exec && isQrd
     io.resp.bits.err := !rdLegal
     io.resp.bits.data := Mux(!rdLegal, 0.U(32.W),
         Mux(isEvent, io.events(rdAddr(4, 0)),
             Mux(isTimeline, io.timelines(rdAddr(2, 0)),
                 Mux(isIdle, Cat(0.U(31.W), io.idleIn && io.idle),
-                    Mux(isInterval, pollInterval, faultField)))))
+                    Mux(isInterval, pollInterval,
+                        Mux(isTimeoutReg, pollTimeoutReg, faultField))))))
 
-    private val aloneDone = Mux(isPollEq, pollMatch || pollMisalign,
+    private val aloneDone = Mux(isPollEq, pollMatch || pollMisalign || pollAbort,
         Mux(isAtomic, atomicMisalign || io.memReq.fire,
             Mux(isQrd, io.resp.fire, exec)))
     private val advance = inRange && Mux(alone, aloneDone, !pollBusy)
@@ -221,5 +238,6 @@ class QueenSchedCtrl(val cfg: QueenConfig) extends Module {
         pollBusy := false.B
         pollWait := false.B
         pollTimer := 0.U
+        timeoutCnt := 0.U
     }
 }

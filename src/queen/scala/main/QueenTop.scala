@@ -137,7 +137,7 @@ class QueenTop(val cfg: QueenConfig = QueenConfig()) extends Module {
     private val faultCode = RegInit(0.U(cfg.faultCodeWidth.W))
 
     // kind: 0=设备执行错误（code 透传设备私有码）1=配置写非法地址 2=timeline 显式回退
-    //       3=polling/atomic 内存错误（code 0=总线错误 1=地址未对齐）
+    //       3=polling/atomic 内存错误（code 0=总线错误 1=地址未对齐 2=POLL_EQ 超时）
     // endpoint: 0=GEMM 1=DMA 3=SCHED
     private case class FaultSrc(cond: Bool, kind: Int, ep: Int, code: UInt)
     private val srcs = Seq(
@@ -148,8 +148,9 @@ class QueenTop(val cfg: QueenConfig = QueenConfig()) extends Module {
         FaultSrc(io.gemmWrErr.asUInt.orR, 1, 0, 0.U(cfg.faultCodeWidth.W)),
         FaultSrc(io.dmaWrErr.asUInt.orR, 1, 1, 0.U(cfg.faultCodeWidth.W)),
         FaultSrc(schedCtrl.io.wrErr.asUInt.orR, 1, 3, 0.U(cfg.faultCodeWidth.W)),
-        FaultSrc(schedCtrl.io.addrErr || mem.io.err, 3, 3,
-            Mux(schedCtrl.io.addrErr, 1.U, 0.U(cfg.faultCodeWidth.W))),
+        FaultSrc(schedCtrl.io.addrErr || mem.io.err || schedCtrl.io.timeout, 3, 3,
+            Mux(schedCtrl.io.addrErr, 1.U,
+                Mux(schedCtrl.io.timeout, 2.U, 0.U(cfg.faultCodeWidth.W)))),
         FaultSrc(sync.io.rollback, 2, 3, sync.io.rollbackId.pad(cfg.faultCodeWidth)))
     private val sel = VecInit(srcs.map(_.cond))
     private val idx = PriorityEncoder(sel)

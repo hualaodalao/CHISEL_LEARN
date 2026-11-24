@@ -74,9 +74,9 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
         if ((inst & 0x7f) != 0x0b) QueenTrapCause.opcode
         else if (funct3 > 3) QueenTrapCause.funct3
         else if (isCtrl && (cmd == 7 || cmd >= 11)) QueenTrapCause.cmd
-        else if (isCtrl && ((schedOnly && endpoint != 3) ||
+        else if (endpoint == 2 || (isCtrl && ((schedOnly && endpoint != 3) ||
             (gemmDmaOnly && endpoint != 0 && endpoint != 1) ||
-            (noSched && endpoint == 3))) QueenTrapCause.endpoint
+            (noSched && endpoint == 3)))) QueenTrapCause.endpoint
         else if ((funct3 == 0 && ((inst >> 7) & 15) != 0) ||
             (funct3 == 1 && aux != 0) ||
             (funct3 == 2 && ((inst >> 15) & 31) != 0) ||
@@ -458,6 +458,11 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
             Command(qrd(0, 5, rd = 1, rsv = 1)),
             Command(qctrl(0, 7)),
             Command(qctrl(0, 10)),
+            Command(qwr1(2, 0)),
+            Command(qwr2(2, 0)),
+            Command(qrd(2, 0, 1)),
+            Command(qctrl(2, 4)),
+            Command(qctrl(2, 9)),
             Command(qctrl(3, 0)),
             Command(qctrl(3, 1)),
             Command(qctrl(3, 2)),

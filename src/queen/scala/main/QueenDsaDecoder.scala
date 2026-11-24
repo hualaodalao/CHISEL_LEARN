@@ -149,9 +149,10 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
             cause := QueenTrapCause.funct3.U
         }.elsewhen(isCtrl && (cmd === 7.U || cmd >= 11.U)) {
             cause := QueenTrapCause.cmd.U
-        }.elsewhen(isCtrl && ((schedOnly && endpoint =/= SCHED.U) ||
+        }.elsewhen(endpoint === 2.U || (isCtrl && ((schedOnly && endpoint =/= SCHED.U) ||
             (gemmDmaOnly && endpoint =/= GEMM.U && endpoint =/= DMA.U) ||
-            (noSched && endpoint === SCHED.U))) {
+            (noSched && endpoint === SCHED.U)))) {
+            // endpoint=2 是 VPU，由 scalar decoder 直发，进 Queen 就没有队列可入。
             cause := QueenTrapCause.endpoint.U
         }.elsewhen((funct3 === 0.U && inst(10, 7) =/= 0.U) ||
             (funct3 === 1.U && aux =/= 0.U) ||
