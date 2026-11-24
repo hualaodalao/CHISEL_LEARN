@@ -177,6 +177,7 @@ qrd rd, endpoint, regAddr
 | `4'b0111` | Reserved | V2 必须解码为非法指令 |
 | `4'b1000` | `ATOMIC_RMW` | endpoint 固定 SCHED |
 | `4'b1001` | `RUN` | endpoint=GEMM/DMA，关闭当前配置组并启动设备；SCHED 非法，VPU 由 VPU 前端定义 |
+| `4'b1010` | `FLUSH` | endpoint 固定 SCHED，触发一次恢复流程（6.5） |
 | 其他 | Reserved | V2 必须解码为非法指令 |
 
 ### 6.3 `inst[25]` 按 cmd 复用
@@ -214,6 +215,29 @@ aux       = 0
 - ready 为 0 时该 `RUN` beat 停等。因为 `RUN` 独占 beat，同组的配置写已在更早的 beat 发出，不会被它拖住。该端点后续指令仍按程序序等待，另一端点不受影响。
 - 派发是并行的：只有 `QWR1/QWR2` 可以合并进一个 beat（至多 `nativeWidth` 条），任何 `QCTRL`/`QRD` 独占一个 beat。因此同端点一包内的多条 `RUN` 会分多个 beat 下发，设备同拍只会看到一条 `RUN`，且它不与任何配置写同拍。
 - 设备侧义务：`RUN` 被接受后，后续 `QWR` 不得改变该 `RUN` 已提交的配置；要重叠配置准备与执行，设备需自行保证这一点（通常需要双缓冲）。DSA 侧实现不在本文范围内。
+
+### 6.5 `FLUSH`：恢复流程触发
+
+```text
+endpoint = SCHED
+cmd      = 4'b1010
+aux      = 0
+flag     = 0
+rs1/rs2  = 忽略
+```
+
+`FLUSH` 与写 SCHED `0x01 RECOVER`、CPU 侧 `flushReq` 端口是**同一条恢复流程的三个触发源**，语义完全相同。四相 req/ack 握手、丢弃规则与完成条件见 `queenHarewareInterface.md` 第 5.5 节。
+
+软件可见效果：
+
+- 在途与 flush 期间新接收的 `QRD` 一律回 `rdValid=1, data=0xdeadbeef, trap=0`；
+- 已派发给设备的 queued 命令被丢弃，运行中工作由设备终止或等完；
+- event/timeline 清零、fault 清除、openGroup 清零；
+- `POLL_INTERVAL` 是软件配置旋钮，**不随 flush 复位**。
+
+**软件义务**：flush 期间 CPU 可以继续发指令——它们被接受并丢弃，QRD 立刻回 `0xdeadbeef`，不会挂死。但**持续不间断地发射会让静默窗永远重新计数、flush 永不完成**（`flushAck` 要求排空后连续 `flushQuietCycles` 拍无新指令）。软件最终必须安静下来；判别恢复是否结束看 QRD 是否还回 `0xdeadbeef`，或读 SCHED `IDLE` 是否为 1。
+
+`FLUSH` 指令与 `RECOVER` 写只触发 Queen 自己与两个设备的恢复；sys 级广播 `flushReq` 是第三条触发源，它有效期间 Queen 一直停在 flush 态，直到 sys 收齐所有模块的 ack 后落下 req。
 
 ---
 
@@ -396,13 +420,15 @@ rs2[31:0] = expected value
 aux        = 0
 ```
 
-⚠️ **完成感知通路待定**：POLL_EQ 由 Queen 自己执行，设备无从知晓其完成，不能靠设备中断。实现本指令前必须先定一条 CPU 可见通路（Queen 状态寄存器 + irq，或置 event 再配 event→irq），否则 CPU 只能轮询，与本指令的目的相悖。
+**完成语义（已裁定）**：`POLL_EQ` **不产生 CPU 可见完成通知**。它阻塞 SCHED 派发点直到读值相等，效果只体现为后续指令的顺序——与 `WAIT_EVENT` 同构。CPU 需要感知时读内存本身，这正是 polling 的语义。
 
-Scheduler polling 间隔 N 通过 Scheduler 配置寄存器设置，复位默认值为 8 cycle。N 为正整数，具体寄存器地址和字段宽度由 Scheduler 寄存器表定义，不在指令编码中携带。
+Scheduler polling 间隔 N 通过 SCHED `0x02 POLL_INTERVAL` 设置，复位默认值为 8 cycle，写 0 非法（报 `wrErr` 并保持原值）。N 为正整数，不在指令编码中携带。
 
-每 N cycle 最多发起一次 32-bit polling 读取；实际发起还受总线 ready 和前一笔读取状态限制。读值等于 `rs2` 时命令完成，否则继续 polling。实现必须定义该地址所在的物理地址空间、总线错误响应和超时寄存器。地址未 4-byte 对齐时产生异常。
+每 N cycle 最多发起一次 32-bit polling 读取；实际发起还受总线 ready 和内存主接口在途容量（`memDepth`，默认 8）限制。读值等于 `rs2` 时命令完成并放行后续，否则等满 N 拍再读。地址未 4-byte 对齐时不发请求，直接产生 kind=3/code=1 的 fault 并消费该命令。总线错误产生 kind=3/code=0 的 fault。
 
-V2 基础指令不携带 compare mask；需要 masked compare 时通过 Scheduler 配置寄存器扩展。
+**软件义务**：`POLL_EQ` 挡住 SCHED 派发点，所以清 fault 的 `QWR 0x00` 不得排在未完成的 `POLL_EQ` 之后。硬件不加旁路。
+
+V2 基础指令不携带 compare mask；需要 masked compare 时通过 Scheduler 配置寄存器扩展。超时机制尚未定义，待后续裁定。
 
 ---
 
@@ -427,7 +453,9 @@ flag       = 0
 
 Scheduler 必须通过具备原子语义的总线事务实现；若底层互连不支持与外部 CPU/cache 一致的 atomic，则该能力只能用于明确标记为 non-cacheable 且由 Scheduler 独占原子访问的地址区间。
 
-地址未对齐、总线拒绝或超时均产生异步错误。V2 基础指令不返回 old value。
+**完成语义（已裁定）**：`ATOMIC_RMW` **发出即放行**，不等待响应，也不产生 CPU 可见完成通知；效果只是内存副作用。最多 `memDepth`（默认 8）笔在途。总线按请求序返回响应，因此排在后续 `POLL_EQ` 之前的 `ATOMIC_RMW` 必然先落地，顺序无需额外握手。
+
+地址未对齐时不发请求，直接产生 kind=3/code=1 的 fault 并消费该命令；总线错误产生 kind=3/code=0 的异步 fault。V2 基础指令不返回 old value。
 
 ---
 
@@ -448,8 +476,8 @@ CPU 感知后端完成有两条通路：
 
 - `FENCE/WAIT_*` 只阻塞本端点后续派发，不产生任何 CPU 可见事件。软件不得把"指令已退休"当作设备工作已完成。
 - 设备中断是电平 + sticky 位，同一位在软件读走前多次完成会合并；需要计数时用设备私有的完成计数寄存器，Queen 不提供。
-- **`POLL_EQ`/`ATOMIC_RMW` 的完成感知通路尚未定义**，见第 13 章。这两条指令在该通路定下来之前不得实现为静默完成。
-- 同步状态的软件读通路已落地：`QRD endpoint=SCHED` 读 `0x40..0x5F EVENT[0..31]`、`0x60..0x67 TIMELINE[0..7]`、`0x68..0x6B FAULT_VALID/KIND/ENDPOINT/CODE`、`0x6C IDLE`；`QWR1 endpoint=SCHED, 0x00` 清 fault。完整映射见 `queenHarewareInterface.md` 第 18 章。
+- **`POLL_EQ`/`ATOMIC_RMW` 不产生 CPU 可见完成通知**（已裁定，见第 13/14 章）：`POLL_EQ` 阻塞 SCHED 派发点，`ATOMIC_RMW` 发出即放行。CPU 需要感知时读内存本身。
+- 同步状态的软件读通路已落地：`QRD endpoint=SCHED` 读 `0x02 POLL_INTERVAL`、`0x40..0x5F EVENT[0..31]`、`0x60..0x67 TIMELINE[0..7]`、`0x68..0x6B FAULT_VALID/KIND/ENDPOINT/CODE`、`0x6C IDLE`；`QWR1 endpoint=SCHED, 0x00` 清 fault、`0x01` 触发恢复。完整映射见 `queenHarewareInterface.md` 第 18 章。
 
 ---
 
@@ -482,7 +510,7 @@ CPU 感知后端完成有两条通路：
 - `QWR2.regBase=63`；
 - `RUN` 的 endpoint 不是 GEMM/DMA；
 - `RUN` 之前没有配置写（空配置组）；
-- `SIGNAL_TIMELINE/SIGNAL_EVENT/POLL_EQ/ATOMIC_RMW` 的 endpoint 不是 SCHED；
+- `SIGNAL_TIMELINE/SIGNAL_EVENT/POLL_EQ/ATOMIC_RMW/FLUSH` 的 endpoint 不是 SCHED；
 - Queen `FENCE` 的 endpoint 为 VPU 或 SCHED；
 - `WAIT_EVENT/WAIT_TIMELINE` 的 endpoint 为 SCHED；
 - `SIGNAL_TIMELINE/TRACE_TAG/ATOMIC_RMW` 的 `inst[25]` 非 0；
@@ -556,8 +584,8 @@ void queen_atomic_rmw(uint32_t address, uint32_t operand, unsigned op);
 11. 验证 TRACE_TAG 仅由 endpoint 选择 GEMM/DMA/VPU/SCHED 记录位置，flag 非 0 报非法指令。
 12. 验证跨端点多个 `QRD` 延迟不同时仍按请求顺序返回，混入异步写/控制不影响响应配对，不需要 transaction ID。
 13. 验证前端 queue full、后端阻塞、response backpressure 和异步 fault 不丢失。
-14. 验证 polling 间隔复位为 8 cycle，修改 Scheduler 配置寄存器后使用配置的 N cycle。
-15. 验证 polling/atomic 的地址对齐、总线错误与超时路径。
+14. 验证 polling 间隔复位为 8 cycle，写 SCHED `0x02` 后使用配置的 N cycle，写 0 报 `wrErr` 且保持原值。
+15. 验证 polling/atomic 的地址对齐与总线错误路径（kind=3，code 1=未对齐、0=总线错误）；超时路径尚未定义。
 16. 验证 `SIGNAL_EVENT` 的 bit25 两种取值均合法（set/clr）；其余全部 cmd 的 bit25 非 0 在前端报非法指令，且该检查先于空组 `RUN` 判定。
 17. 验证 `QCTRL.cmd=4'b0111` 在全部 endpoint、bit25 两种取值及不同操作数字段下均在前端报非法指令，不入队。
 18. 验证 `FENCE` 等目标设备强 idle、`WAIT_EVENT/WAIT_TIMELINE` 等同步条件，条件未满足时只停本端点队头，其后 lane 不越过，另一端点与 SCHED 不受影响。
@@ -566,7 +594,7 @@ void queen_atomic_rmw(uint32_t address, uint32_t operand, unsigned op);
 21. 验证 `SIGNAL_TIMELINE` 显式回退被抑制更新并报 fault（kind=2、code=timeline ID），同拍硬件自增仍生效。
 22. 验证 `TRACE_TAG` 被消费但不产生记录（记录流未落地），不停等派发通路。
 23. 验证 Queen 不产生任何完成通知 pulse：fence/wait 完成、RUN 完成均无 CPU 可见事件，设备中断是唯一的单引擎完成通路。
-24. 验证 `POLL_EQ/ATOMIC_RMW` 在完成感知通路定义前不被实现为静默完成。
+24. 验证 `POLL_EQ` 阻塞 SCHED 派发点直到读值相等、失配后等满 `POLL_INTERVAL` 才重读；`ATOMIC_RMW` 发出即放行、最多 `memDepth` 笔在途、按序响应保证它先于其后的 `POLL_EQ` 落地；两者均不产生 CPU 可见完成通知。
 25. 验证设备写非法地址经 `wrErr` 进入 Queen fault（kind=1），同拍与 completion 错误竞争时按固定优先级取一条。
 26. 验证 fault 只保留最新一条、`faultIrq` 电平保持到软件写 SCHED `0x00`、同拍新错误优先于清除。
 27. 验证 `RUN` 关闭配置组并启动设备：`RUN` 之前设备不得执行，`RUN` 之后的 `QWR` 不得修改已启动配置。
@@ -574,3 +602,7 @@ void queen_atomic_rmw(uint32_t address, uint32_t operand, unsigned op);
 29. 验证流控只门控 `RUN`：`RUN` beat 的 ready 为 0 时纯写 beat 仍可接受与转发、`RUN` 停等而非报错；`QRD` 只被 Queen 读响应缓存反压；设备按其声明的归还点返还 credit 后 `RUN` 恢复派发。
 30. 验证 `RUN` 的 `cmd_tag/sw_tag` 原样透传到设备命令，并由设备在 `start` 当拍采样后随 completion 回传。
 31. 验证 `QWR1` 的 `inst[11]` 非 0 报非法指令；`QWR2` 的 `inst[11]` 作为地址高位不报非法。
+32. 验证 `FLUSH`（cmd=10）、写 SCHED `0x01 RECOVER`、CPU `flushReq` 三个触发源走同一条恢复流程，效果一致。
+33. 验证两侧四相握手：`req` 拉起后必须等 `ack` 拉起才落下，`ack` 再随 `req` 落下；设备侧两路 `flushReq/flushAck` 都走完才进入排空。
+34. 验证 flush 期间前端接受并丢弃（合法指令照常 fire、不入队、不派发），在途与新收 `QRD` 一律回 `rdValid=1/data=0xdeadbeef/trap=0`，迟到 completion 不置同步状态也不记 fault。
+35. 验证 `flushAck` 只在内部全排空、两设备 `deviceIdle` 且连续 `flushQuietCycles` 拍无扰动后拉起；静默窗内 CPU 再发指令须重新计数；`flushReq` 有效期间 Queen 全程停在 flush 态（`idle=0`、新 QRD 仍回 dummy）；完成后 event/timeline/fault/openGroup 清零而 `POLL_INTERVAL` 保持。
