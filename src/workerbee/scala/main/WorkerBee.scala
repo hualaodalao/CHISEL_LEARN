@@ -23,6 +23,11 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
 
     val status = Output(new WorkerBeeStatus(cfg))
     val irq = Output(Bool())
+    // Queen §13.5 强 idle 与四相恢复握手：deviceIdle 覆盖命令空/无执行/无在途内存/无未回传 completion；
+    //   flushReq↑→等当前工作自然结束至 deviceIdle→flushAck↑→flushReq↓→flushAck↓（不支持安全 abort）。
+    val deviceIdle = Output(Bool())
+    val flushReq = Input(Bool())
+    val flushAck = Output(Bool())
     // 性能观测信号组（纯组合电平、无内部计数；外部 PMU 按拍采样，语义见 WorkerBeePerf）
     val perf = Output(new WorkerBeePerf)
   })
@@ -96,6 +101,9 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
   private val swTagCtx = RegInit(0.U(qcfg.xlen.W))
   private val hwSigCtx = RegInit(0.U.asTypeOf(new QueenHwSignal))
   private val errorCodeReg = RegInit(0.U(4.W))
+  // flush 四相状态（设备自研）：flushing 整个 flushReq 有效期间不落，期间 block 新 RUN。
+  private val flushing = RegInit(false.B)
+  private val flushAckReg = RegInit(false.B)
   when(startPulse) {
     inFlight := true.B
     swTagCtx := regIf.io.startSwTag
@@ -104,7 +112,7 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
   }
   when(donePulse || configError) { inFlight := false.B }
   when(configError) { errorCodeReg := calcConfig.io.errCode }
-  regIf.io.startReady := !inFlight
+  regIf.io.startReady := !inFlight && !flushing
 
   // DMA/总线错误属"与命令无关的总线错误"→ intrSrc（IntrRFMS4 @0x60），不占 completion。
   private val dmaErrors = Wire(Vec(8, Bool()))
@@ -415,6 +423,9 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
   // bias/rqM 取数器活动观测线：声明上提至类级，因 biasFState 作用域限于 hasMx 块内
   val perfBiasFetchActive = Wire(Bool())
   perfBiasFetchActive := false.B
+  // dmaScaleA 物理口在途计数观测（含 scaleA/bias/rqM 全部 owner），供 deviceIdle 强 idle 判定。
+  val biasPortBusy = Wire(Bool())
+  biasPortBusy := false.B
 
    if (cfg.hasMx) {
     // scaleA DMA：A 式三级遍历，基址直连 scaleAAddr，内层行数 = m
@@ -526,6 +537,7 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
     }
 
     perfBiasFetchActive := biasFState =/= sBiasFIDLE
+    biasPortBusy := biasPortInfl =/= 0.U
 
 
     // scaleB DMA：两级 nt×kb 遍历，基址直连 scaleBAddr，块内步进 = n
@@ -613,6 +625,26 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
   io.status.bOccupancy := scratchpad.io.bOccupancy
   io.status.cOccupancy := scratchpad.io.cOccupancy
   io.irq               := regIf.io.irq
+
+  // 强 idle（Queen §5.3/§6.3）：命令空 ∧ 无执行 ∧ 无在途内存 ∧ 无未回传 completion。
+  //   DMA.busy=state≠sIDLE，FSM 回 IDLE 前已 drain inflCnt ⟹ 覆盖在途内存事务；
+  //   biasPortBusy 覆盖 dmaScaleA 物理口全部 owner（scaleA/bias/rqM）的在途计数。
+  io.deviceIdle := !executor.io.busy && !inFlight && !executor.io.osActive &&
+    !aDma.io.busy && !bDma.io.busy && !cDma.io.busy &&
+    scratchpad.io.aOccupancy === 0.U && scratchpad.io.bOccupancy === 0.U &&
+    scratchpad.io.cOccupancy === 0.U && !perfBiasFetchActive && !biasPortBusy &&
+    (if (cfg.hasMx)
+      !cDmaScale.get.io.busy && !aDmaScale.get.io.busy && !bDmaScale.get.io.busy &&
+        scratchpad.io.scaleBOccupancy.get === 0.U
+     else true.B)
+
+  // flush 四相（无安全 abort ⟹ 等当前工作自然结束）：req↑→flushing（block 新 RUN）→
+  //   deviceIdle→ack↑→req↓→ack↓。flushing 整个 req 期间不落；completion 照常回传（Queen 丢弃迟到项），
+  //   不复位 RegIf、不触碰内部数据流（裁定 R-A/R-C/R-D）。
+  when(io.flushReq && !flushAckReg) { flushing := true.B }
+  when(flushing && io.deviceIdle && !flushAckReg) { flushAckReg := true.B }
+  when(!io.flushReq) { flushing := false.B; flushAckReg := false.B }
+  io.flushAck := flushAckReg
 
   // perf 观测端口：纯组合直连既有信号，计数由外部 PMU 按拍采样。dmaX/scaleX 为物理通道
   //   口径（scaleA 含 bias/rqM 取数盗用拍）。
