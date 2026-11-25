@@ -1,0 +1,115 @@
+package loom
+
+import java.nio.file.{Files, Paths}
+
+import chisel3._
+import chisel3.simulator.HasSimulator
+import chisel3.simulator.scalatest._
+import loom.chi._
+import loom.ir.{Ir, Json}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+
+class ChiNetworkSpec extends AnyFlatSpec with Matchers with ChiselSim {
+  implicit val plainVerilator: HasSimulator = HasSimulator.simulators.verilator(
+    verilatorSettings = svsim.verilator.Backend.CompilationSettings.default
+  )
+
+  private val ir = Ir.fromJson(Json.parse(
+    Files.readString(Paths.get("src/loom/examples/chain_4r.json"))))
+
+  private val ir1 = Ir.fromJson(Json.parse(
+    Files.readString(Paths.get("src/loom/examples/minimal_2x2.json"))))
+
+  "ChiNetworkParams" should "place RN at r0 and SN at r3 with BFS routes" in {
+    val p = ChiNetworkParams.fromIr(ir)
+    p.nRn shouldBe 2
+    p.nSn shouldBe 2
+    p.rn.foreach(_.router shouldBe 0)
+    p.sn.foreach(_.router shouldBe 3)
+    p.routers.length shouldBe 4
+    // r0 routes SN NodeIDs (2/3) to its link port toward r1.
+    val r0 = p.routers.head
+    r0.route(2) shouldBe r0.nLocal
+    r0.route(3) shouldBe r0.nLocal
+    // r3 routes SN NodeIDs to local ports.
+    val r3 = p.routers(3)
+    r3.route(2) should be < r3.nLocal
+  }
+
+  "ChiGates" should "pass G1 per class on a chain and conditionally include SNP" in {
+    val res = ChiGates.run(ir, snpEnable = true)
+    res.errors shouldBe empty
+    res.gates.toMap.apply("G1-REQ") shouldBe true
+    res.gates.toMap.contains("G1-SNP") shouldBe true
+    val noSnp = ChiGates.run(ir, snpEnable = false)
+    noSnp.gates.toMap.apply("G1-SNP") shouldBe true
+  }
+
+  private def init(dut: ChiNetworkTop, p: ChiNetworkParams): Unit = {
+    for (i <- 0 until p.nRn) {
+      dut.io.rn(i).req.valid.poke(false.B)
+      dut.io.rn(i).rsp.ready.poke(true.B)
+      dut.io.rn(i).dat.ready.poke(true.B)
+      dut.io.rn(i).snp.ready.poke(true.B)
+      dut.io.rn(i).txRsp.valid.poke(false.B)
+      dut.io.rn(i).txDat.valid.poke(false.B)
+    }
+    for (j <- 0 until p.nSn) {
+      dut.io.sn(j).req.ready.poke(true.B)
+      dut.io.sn(j).rsp.valid.poke(false.B)
+      dut.io.sn(j).dat.valid.poke(false.B)
+    }
+    dut.reset.poke(true.B); dut.clock.step(2); dut.reset.poke(false.B)
+  }
+
+  "ChiNetworkTop" should "route REQ forward RN->SN across the chain" in {
+    val p = ChiNetworkParams.fromIr(ir)
+    simulate(new ChiNetworkTop(p)) { dut =>
+      init(dut, p)
+      dut.io.rn(0).req.bits.tgtId.poke(2.U)
+      dut.io.rn(0).req.bits.txnId.poke(7.U)
+      dut.io.rn(0).req.valid.poke(true.B)
+      var n = 0
+      while (!dut.io.sn(0).req.valid.peek().litToBoolean && n < 60) { dut.clock.step(); n += 1 }
+      dut.io.sn(0).req.valid.expect(true.B)
+      dut.io.sn(0).req.bits.txnId.expect(7.U)
+    }
+  }
+
+  it should "route DAT backward SN->RN across the chain" in {
+    val p = ChiNetworkParams.fromIr(ir)
+    simulate(new ChiNetworkTop(p)) { dut =>
+      init(dut, p)
+      dut.io.sn(0).dat.bits.tgtId.poke(0.U)
+      dut.io.sn(0).dat.bits.data.poke(0xCAFEL.U)
+      dut.io.sn(0).dat.valid.poke(true.B)
+      var n = 0
+      while (!dut.io.rn(0).dat.valid.peek().litToBoolean && n < 60) { dut.clock.step(); n += 1 }
+      dut.io.rn(0).dat.valid.expect(true.B)
+      dut.io.rn(0).dat.bits.data.expect(0xCAFEL.U)
+    }
+  }
+
+  "ChiNetworkParams single router" should "elaborate one router with configurable queue depth (HW-03/07)" in {
+    val p = ChiNetworkParams.fromIr(ir1)
+    p.routers.length shouldBe 1
+    p.nRn shouldBe 2
+    p.nSn shouldBe 2
+    p.queueDepth shouldBe ChiConfig().lcreditDepth
+    p.routers.head.nLink shouldBe 0
+  }
+
+  it should "route REQ within a single router RN->SN" in {
+    val p = ChiNetworkParams.fromIr(ir1)
+    simulate(new ChiNetworkTop(p)) { dut =>
+      init(dut, p)
+      dut.io.rn(0).req.bits.tgtId.poke(2.U)
+      dut.io.rn(0).req.bits.txnId.poke(9.U)
+      dut.io.rn(0).req.valid.poke(true.B)
+      dut.clock.step(4)
+      dut.io.sn(0).req.valid.expect(true.B)
+      dut.io.sn(0).req.bits.txnId.expect(9.U)
+    }
+  }
+}
