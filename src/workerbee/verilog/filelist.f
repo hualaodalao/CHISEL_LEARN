@@ -1,4 +1,5 @@
-Wb_WorkerBeeRegIf.sv
+verification/assert/Wb_QueenDsaRegIf_Verification_Assert.sv
+Wb_QueenDsaRegIf.sv
 Wb_WorkerBeeCalcConfig.sv
 Wb_ram_64x256.sv
 Wb_Queue64_UInt256.sv

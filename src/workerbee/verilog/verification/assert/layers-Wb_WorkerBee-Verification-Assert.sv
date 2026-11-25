@@ -2,6 +2,7 @@
 `ifndef layers_Wb_WorkerBee_Verification_Assert	// src/workerbee/scala/main/WorkerBee.scala:4:7
   `define layers_Wb_WorkerBee_Verification_Assert
   `include "layers-Wb_WorkerBee-Verification.sv"	// src/workerbee/scala/main/WorkerBee.scala:4:7
+  `include "layers-Wb_QueenDsaRegIf-Verification-Assert.sv"	// src/workerbee/scala/main/WorkerBee.scala:4:7
   `include "layers-Wb_WorkerBeeExecutor2-Verification-Assert.sv"	// src/workerbee/scala/main/WorkerBee.scala:4:7
   `include "layers-Wb_WbComb-Verification-Assert.sv"	// src/workerbee/scala/main/WorkerBee.scala:4:7
   `include "layers-Wb_WbOsM1Sequencer-Verification-Assert.sv"	// src/workerbee/scala/main/WorkerBee.scala:4:7
