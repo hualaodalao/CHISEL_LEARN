@@ -7,6 +7,7 @@
   */
 
 import chisel3._
+import chisel3.util._
 import chisel3.simulator.HasSimulator
 import chisel3.simulator.scalatest.HasCliOptions
 import java.io._
@@ -197,14 +198,18 @@ object WbSimCommon {
   val RQM_REG_ADDR = 0x0A
   val RQ_PARAM_REG_ADDR = 0x0B
   // 状态/IRQ 区在 0x40 之后：超出 Queen QWR2 的 6-bit regBase 窗口，只能 QWR1/QRD 访问。
-  // 启动无寄存器地址，由 WorkerBeeOp.RUN 触发（原 START_REG_ADDR=0x10 已删除）。
+  // 启动无寄存器地址，由 QueenNativeOp.RUN 触发。中断走 Queen IntrRFMS4 公共契约区。
   val STATUS_REG_ADDR = 0x40
-  val IRQ_RAW_REG_ADDR = 0x41
-  val IRQ_MASK_REG_ADDR = 0x42
-  val IRQ_MASKED_REG_ADDR = 0x43
-  val IRQ_CLEAR_REG_ADDR = 0x44
-  val ERROR_CODE_REG_ADDR = 0x45
-  val IRQ_ALL = 0x7FF
+  val ERROR_CODE_REG_ADDR = 0x41   // status 区第 2 槽：最近配置错误码（configError 时锁存）
+  val IRQ_RAW_REG_ADDR = 0x60      // IntrRaw（W1C 清除）
+  val IRQ_FORCE_REG_ADDR = 0x64    // IntrForce（W1S 置位）
+  val IRQ_MASK_REG_ADDR = 0x68     // IntrMask（1=屏蔽，复位全 1）
+  val IRQ_MASKED_REG_ADDR = 0x6C   // IntrStatus = Raw & ~Mask
+  val IRQ_CLEAR_REG_ADDR = 0x60    // W1C 即写 IntrRaw 本身（无独立 CLEAR 地址）
+  val HW_SIGNAL_TARGET_REG_ADDR = 0x80
+  val HW_SIGNAL_MASK_REG_ADDR = 0x81
+  val TRACE_TAG_REG_ADDR = 0xA0
+  val IRQ_ALL = 0xFF               // intrWidth=8：DMA/总线错误源 bit0..7
   val POLL_PERIOD: Int = 16
 
   final case class WbStatusBits(busy: Boolean, inFlight: Boolean, progress: Int)
@@ -213,13 +218,11 @@ object WbSimCommon {
     progress = ((data >> 16) & 0xFFFF).toInt
   )
 
-  /** IRQ_RAW 独立解码；config code 必须另读 ERROR_CODE，不拼接伪 STATUS。 */
+  /** IntrRaw 独立解码：Phase 1 中断源仅 8 位 DMA/总线错误（bit0..7）。
+    * done/configError 不再进中断，改由 completion 流承载（见 WbQueenRegApi.completionPeek）。 */
   final case class WbIrqBits(raw: BigInt) {
-    def done: Boolean = raw.testBit(0)
-    def configError: Boolean = raw.testBit(1)
-    def dmaErrors: BigInt = (raw >> 2) & 0xFF
-    def writeConflict: Boolean = raw.testBit(10)
-    def anyError: Boolean = (raw & 0x7FE) != 0
+    def dmaErrors: BigInt = raw & 0xFF
+    def anyError: Boolean = (raw & 0xFF) != 0
   }
   def decodeIrq(data: BigInt): WbIrqBits = WbIrqBits(data)
 
@@ -1024,98 +1027,119 @@ object WbSimCommon {
   }
 }
 
-/** 命令握手及无额外 step 的轮询助手。DMA 主循环可独立轮询 STATUS 或 IRQ_RAW。
-  * RUN 不清 RAW：每次任务先 W1C 清除，再取消 mask，然后发 RUN。
+/** Queen 原生配置 beat 握手及轮询助手（单 ready、READ 的 resp 与 fire 同拍）。
+  * 写错误走 wrErr pulse（不占 resp）；done/configError 走 completion 流，中断只承载 DMA/总线错误。
+  * RUN 不清 IntrRaw：每次任务先 W1C 清除，再取消 mask，然后发 RUN。
   */
 trait WbStatusPollApi extends chisel3.simulator.PeekPokeAPI {
-  def pokeRegCommand(cmd: Stream[WorkerBeeCmd], op: WorkerBeeOp.Type,
-                     r0: Int, r1: Int = 0, d0: BigInt = 0, d1: BigInt = 0,
-                     pc: BigInt = 0, tag: Int = 0): Unit = {
-    cmd.valid.poke(true.B)
-    cmd.payload.op.poke(op)
-    cmd.payload.reg0Addr.poke(r0.U)
-    cmd.payload.reg1Addr.poke(r1.U)
-    cmd.payload.data0.poke(d0.U)
-    cmd.payload.data1.poke(d1.U)
-    cmd.payload.pc.poke(pc.U)
-    cmd.payload.tag.poke(tag.U)
+  type WbCmdBeat = DecoupledIO[Vec[Valid[QueenNativeCmd]]]
+  type WbRespBeat = DecoupledIO[QueenDsaRegResp]
+
+  private def idleCmd(cmd: WbCmdBeat): Unit = {
+    cmd.valid.poke(false.B); cmd.bits.foreach(_.valid.poke(false.B))
   }
 
-  /** 完整事务：采样有效响应后才消费，避免读回落在 resp.fire 后一拍。 */
-  def transactReg(clock: Clock, cmd: Stream[WorkerBeeCmd], resp: Stream[WorkerBeeResp],
-                  op: WorkerBeeOp.Type, r0: Int, r1: Int = 0,
-                  d0: BigInt = 0, d1: BigInt = 0, expectedErr: Boolean = false): BigInt = {
+  /** 驱动 lane-0 一条 native 命令，其余 lane 无效；Decoupled.valid 与 lane.valid 同时置位。 */
+  def pokeRegCommand(cmd: WbCmdBeat, op: QueenNativeOp.Type,
+                     r0: Int, r1: Int = 0, d0: BigInt = 0, d1: BigInt = 0,
+                     swTag: BigInt = 0): Unit = {
+    cmd.bits.foreach(_.valid.poke(false.B))
+    cmd.valid.poke(true.B)
+    val l = cmd.bits(0)
+    l.valid.poke(true.B)
+    l.bits.op.poke(op)
+    l.bits.reg0Addr.poke(r0.U)
+    l.bits.reg1Addr.poke(r1.U)
+    l.bits.data0.poke(d0.U)
+    l.bits.data1.poke(d1.U)
+    l.bits.swTag.poke(swTag.U)
+  }
+
+  /** 完整事务：单 ready beat。READ 的 resp 与 accept 同拍（组合），当场采样；写/RUN 无 resp。 */
+  def transactReg(clock: Clock, cmd: WbCmdBeat, resp: WbRespBeat,
+                  op: QueenNativeOp.Type, r0: Int, r1: Int = 0,
+                  d0: BigInt = 0, d1: BigInt = 0, expectedErr: Boolean = false,
+                  swTag: BigInt = 0): BigInt = {
     resp.ready.poke(true.B)
-    pokeRegCommand(cmd, op, r0, r1, d0, d1)
+    pokeRegCommand(cmd, op, r0, r1, d0, d1, swTag)
     var waited = 0
     while (!cmd.ready.peek().litToBoolean && waited < 100) { clock.step(); waited += 1 }
     assert(cmd.ready.peek().litToBoolean, "command handshake timeout")
+    var data = BigInt(0)
+    if (op == QueenNativeOp.READ) {
+      assert(resp.valid.peek().litToBoolean, "READ response must be valid on the accept cycle")
+      assert(resp.bits.err.peek().litToBoolean == expectedErr, s"unexpected response error at address $r0")
+      data = resp.bits.data.peek().litValue
+    }
     clock.step()
-    cmd.valid.poke(false.B)
-    waited = 0
-    while (!resp.valid.peek().litToBoolean && waited < 100) { clock.step(); waited += 1 }
-    assert(resp.valid.peek().litToBoolean, "response timeout")
-    assert(resp.payload.err.peek().litToBoolean == expectedErr, s"unexpected response error at address $r0")
-    val data = resp.payload.data.peek().litValue
-    clock.step()
+    idleCmd(cmd)
     data
   }
 
-  def readRegister(clock: Clock, cmd: Stream[WorkerBeeCmd], resp: Stream[WorkerBeeResp], addr: Int): BigInt =
-    transactReg(clock, cmd, resp, WorkerBeeOp.REG_READ, addr)
+  def readRegister(clock: Clock, cmd: WbCmdBeat, resp: WbRespBeat, addr: Int): BigInt =
+    transactReg(clock, cmd, resp, QueenNativeOp.READ, addr)
 
-  def prepareStart(clock: Clock, cmd: Stream[WorkerBeeCmd], resp: Stream[WorkerBeeResp]): Unit = {
-    transactReg(clock, cmd, resp, WorkerBeeOp.REG_WRITE1, WbSimCommon.IRQ_CLEAR_REG_ADDR,
+  def prepareStart(clock: Clock, cmd: WbCmdBeat, resp: WbRespBeat): Unit = {
+    transactReg(clock, cmd, resp, QueenNativeOp.WRITE1, WbSimCommon.IRQ_RAW_REG_ADDR,
       d0 = WbSimCommon.IRQ_ALL)
-    transactReg(clock, cmd, resp, WorkerBeeOp.REG_WRITE1, WbSimCommon.IRQ_MASK_REG_ADDR, d0 = 0)
+    transactReg(clock, cmd, resp, QueenNativeOp.WRITE1, WbSimCommon.IRQ_MASK_REG_ADDR, d0 = 0)
   }
 
   /** 只走到 RUN fire，后续拍由 DMA 主循环服务，避免漏掉首个 DMA 请求。
     * RUN 不携带配置：它把 shadow 组 dump 进 live 并启动，故配置必须先写完。 */
-  def launchStart(clock: Clock, cmd: Stream[WorkerBeeCmd]): Unit = {
-    pokeRegCommand(cmd, WorkerBeeOp.RUN, 0)
+  def launchStart(clock: Clock, cmd: WbCmdBeat): Unit = {
+    pokeRegCommand(cmd, QueenNativeOp.RUN, 0)
     var waited = 0
     while (!cmd.ready.peek().litToBoolean && waited < 100) { clock.step(); waited += 1 }
     assert(cmd.ready.peek().litToBoolean, "RUN handshake timeout")
     clock.step()
-    cmd.valid.poke(false.B)
+    idleCmd(cmd)
   }
 
-  def pokeStatusRead(cmd: Stream[WorkerBeeCmd]): Unit =
-    pokeRegCommand(cmd, WorkerBeeOp.REG_READ, WbSimCommon.STATUS_REG_ADDR)
+  def pokeStatusRead(cmd: WbCmdBeat): Unit =
+    pokeRegCommand(cmd, QueenNativeOp.READ, WbSimCommon.STATUS_REG_ADDR)
 
-  def pokeIrqRead(cmd: Stream[WorkerBeeCmd]): Unit =
-    pokeRegCommand(cmd, WorkerBeeOp.REG_READ, WbSimCommon.IRQ_RAW_REG_ADDR)
+  def pokeIrqRead(cmd: WbCmdBeat): Unit =
+    pokeRegCommand(cmd, QueenNativeOp.READ, WbSimCommon.IRQ_RAW_REG_ADDR)
 
-  private def pollRegisterStep(cmd: Stream[WorkerBeeCmd], resp: Stream[WorkerBeeResp],
+  /** 同拍 resp 轮询：st0 发 READ 并在 cmd.ready 当拍采样 resp，随后进入冷却；冷却结束回 st0。 */
+  private def pollRegisterStep(cmd: WbCmdBeat, resp: WbRespBeat,
                                pollSt: Int, pollCool: Int, addr: Int): (Int, Int, Option[BigInt]) = {
     if (pollSt == 0) {
-      pokeRegCommand(cmd, WorkerBeeOp.REG_READ, addr)
-      if (cmd.ready.peek().litToBoolean) (1, 0, None) else (0, 0, None)
-    } else if (pollSt == 1) {
-      cmd.valid.poke(false.B)
-      if (resp.valid.peek().litToBoolean) {
-        assert(!resp.payload.err.peek().litToBoolean, s"poll read failed at address $addr")
-        (2, WbSimCommon.POLL_PERIOD, Some(resp.payload.data.peek().litValue))
-      } else (1, 0, None)
+      pokeRegCommand(cmd, QueenNativeOp.READ, addr)
+      if (cmd.ready.peek().litToBoolean) {
+        assert(resp.valid.peek().litToBoolean, s"poll read resp not same-cycle at address $addr")
+        assert(!resp.bits.err.peek().litToBoolean, s"poll read failed at address $addr")
+        val data = resp.bits.data.peek().litValue
+        idleCmd(cmd)
+        (2, WbSimCommon.POLL_PERIOD, Some(data))
+      } else (0, 0, None)
     } else {
-      cmd.valid.poke(false.B)
+      idleCmd(cmd)
       val cool = pollCool - 1
       if (cool <= 0) (0, 0, None) else (2, cool, None)
     }
   }
 
-  def statusPollStep(cmd: Stream[WorkerBeeCmd], resp: Stream[WorkerBeeResp],
+  def statusPollStep(cmd: WbCmdBeat, resp: WbRespBeat,
                      pollSt: Int, pollCool: Int): (Int, Int, Option[WbSimCommon.WbStatusBits]) = {
     val (st, cool, data) = pollRegisterStep(cmd, resp, pollSt, pollCool, WbSimCommon.STATUS_REG_ADDR)
     (st, cool, data.map(WbSimCommon.decodeStatus))
   }
 
-  def irqPollStep(cmd: Stream[WorkerBeeCmd], resp: Stream[WorkerBeeResp],
+  def irqPollStep(cmd: WbCmdBeat, resp: WbRespBeat,
                   pollSt: Int, pollCool: Int): (Int, Int, Option[WbSimCommon.WbIrqBits]) = {
     val (st, cool, data) = pollRegisterStep(cmd, resp, pollSt, pollCool, WbSimCommon.IRQ_RAW_REG_ADDR)
     (st, cool, data.map(WbSimCommon.decodeIrq))
   }
+
+  /** 完成流采样：valid 当拍返回 (error, code, swTag)，否则 None。Queen 无条件接收，每拍至多一条。 */
+  def completionPeek(completion: Valid[QueenDsaCompletion]): Option[(Boolean, BigInt, BigInt)] =
+    if (completion.valid.peek().litToBoolean)
+      Some((completion.bits.error.peek().litToBoolean,
+            completion.bits.code.peek().litValue,
+            completion.bits.swTag.peek().litValue))
+    else None
 }
 
 /** ChiselSim FST 波形扩展 trait：与 ChiselSim 一起混入测试类。

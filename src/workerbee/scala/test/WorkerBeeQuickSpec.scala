@@ -946,7 +946,7 @@ abstract class WorkerBeeCaseSpec extends AnyFlatSpec with Matchers with ChiselSi
         Seq(dut.io.dmaC.rsp, dut.io.dmaCScale.get.rsp).foreach { r => r.valid.poke(false.B); r.payload.err.poke(false.B) }
         Seq(dut.io.dmaA.req, dut.io.dmaB.req, dut.io.dmaC.req, dut.io.dmaScaleA.get.req, dut.io.dmaScaleB.get.req,
           dut.io.dmaCScale.get.req).foreach(_.ready.poke(true.B))
-        dut.io.resp.ready.poke(true.B); dut.io.cmd.foreach(_.valid.poke(false.B))
+        dut.io.resp.ready.poke(true.B); dut.io.cmd.valid.poke(false.B); dut.io.cmd.bits.foreach(_.valid.poke(false.B))
         dut.reset.poke(true.B); dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
         ps.zipWithIndex.foreach { case (p, i) =>
           if (ps.size > 1) println(s"[$TAG] ───────── 任务 #$i/${ps.size}（同一 DUT，不复位）─────────")
@@ -1005,25 +1005,25 @@ abstract class WorkerBeeCaseSpec extends AnyFlatSpec with Matchers with ChiselSi
              rsp: (Boolean, BigInt) => Unit, at: Long => BigInt): Int =
       if (vld && cnt < exp.size) { val a = adr; chk(chan, cnt, a, exp); rsp(true, at(a)); cnt + 1 }
       else { rsp(false, BigInt(0)); cnt }
-    // ---- 命令 helper：等待真实 fire/response，再消费响应 ----
-    def cmd(op: WorkerBeeOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
-      transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
+    // ---- 命令 helper：单 ready beat，READ 的 resp 与 fire 同拍 ----
+    def cmd(op: QueenNativeOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
+      transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
     }
-    def readReg(a: Int): BigInt = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, a)
+    def readReg(a: Int): BigInt = readRegister(dut.clock, dut.io.cmd, dut.io.resp, a)
     // 配置索引 0..11 紧排：M/NK/A/B/C/CONTROL/ScaleA/ScaleB/ScaleC/Bias/RqM/RqParam。
-    // STATUS 在 0x40，IRQ 寄存器为 0x41..0x45；启动无寄存器地址，由 WorkerBeeOp.RUN 触发。
-    cmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, p.m, p.n.toLong | (p.k.toLong << 16))
+    // STATUS 在 0x40、ERROR_CODE 在 0x41；IRQ 走 IntrRFMS4(0x60/0x68)；启动由 QueenNativeOp.RUN 触发。
+    cmd(QueenNativeOp.WRITE2, 0x00, 0x01, p.m, p.n.toLong | (p.k.toLong << 16))
     // 基址取 p.aBase/p.bBase（与 Plan.prepare 内存镜像同源）；负例 ⑤ 借此把 bAddr%32!=0 送进守护。
-    cmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, p.aBase, p.bBase)
-    cmd(WorkerBeeOp.REG_WRITE2, 0x04, 0x05, C_BASE, p.controlWord5)
-    cmd(WorkerBeeOp.REG_WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE); cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
+    cmd(QueenNativeOp.WRITE2, 0x02, 0x03, p.aBase, p.bBase)
+    cmd(QueenNativeOp.WRITE2, 0x04, 0x05, C_BASE, p.controlWord5)
+    cmd(QueenNativeOp.WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE); cmd(QueenNativeOp.WRITE1, WbSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
     // reg9 = biasAddr（biasOn=false 时不写：硬件默认 0、该通路不激活）。
-    if (p.biasOn) cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.BIAS_REG_ADDR, 0x00, p.biasBase, 0L)
+    if (p.biasOn) cmd(QueenNativeOp.WRITE1, WbSimCommon.BIAS_REG_ADDR, 0x00, p.biasBase, 0L)
     // reg10 = rqMBase、reg11 = [31:16]zp + [5:0]shift（requantOn=false 时不写；
     //   reluOn 位在 reg5[15] 已随控制字写入，无独立槽位）。
     if (p.requantOn) {
-      cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.RQM_REG_ADDR, 0x00, p.rqMBase, 0L)
-      cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.RQ_PARAM_REG_ADDR, 0x00, p.controlWord14, 0L) }
+      cmd(QueenNativeOp.WRITE1, WbSimCommon.RQM_REG_ADDR, 0x00, p.rqMBase, 0L)
+      cmd(QueenNativeOp.WRITE1, WbSimCommon.RQ_PARAM_REG_ADDR, 0x00, p.controlWord14, 0L) }
     // ⑦ addrMode / 格式字回读对账：addrMode 无硬件消费者，只能靠回读证明「确实写进去了」。
     //   控制字全部收敛到 reg5 单寄存器 ⟹ 一次回读即覆盖全部控制位域。regRbOk 是硬断言。
     val rb5 = readReg(0x05).toLong
@@ -1046,10 +1046,10 @@ abstract class WorkerBeeCaseSpec extends AnyFlatSpec with Matchers with ChiselSi
       regRbMsg += f"; reg10 wr=0x${p.rqMBase & 0xFFFFFFFFL}%08X rd=0x$rb13%08X; " +
         f"reg11 wr=0x${p.controlWord14 & 0xFFFFFFFFL}%08X rd=0x$rb14%08X" }
     println(s"[$TAG] 寄存器回读对账：$regRbMsg → ${if (regRbOk) "一致 ✓" else "不一致 ✗"}")
-    // START 不清历史中断；每次任务显式 W1C 清 RAW 并 unmask。
-    prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
-    launchStart(dut.clock, dut.io.cmd(0))
-    var aS = 0; var bS = 0; var saS = 0; var sbS = 0; var cB = 0; var csB = 0; var pollSt = 0; var pollCool = 0
+    // START 不清历史中断；每次任务显式 W1C 清 IntrRaw 并 unmask。
+    prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
+    launchStart(dut.clock, dut.io.cmd)
+    var aS = 0; var bS = 0; var saS = 0; var sbS = 0; var cB = 0; var csB = 0
     // TB 代行外部 PMU：主循环逐拍采样 io.perf 各电平累加（采样窗 = EXECUTE 起至 done/err/超时）
     def perfPeek: Seq[Boolean] = Seq(
       dut.io.perf.dmaA.peek().litToBoolean, dut.io.perf.dmaB.peek().litToBoolean,
@@ -1102,10 +1102,11 @@ abstract class WorkerBeeCaseSpec extends AnyFlatSpec with Matchers with ChiselSi
       csB = wrCh("dmaCScale", csB, if (isMxAny(p.cFmt)) plan.expCScaleAddrSeq else Seq.empty,
         dut.io.dmaCScale.get.req.valid.peek().litToBoolean, dut.io.dmaCScale.get.req.payload.addr.peek().litValue.toLong,
         dut.io.dmaCScale.get.req.payload.data.peek().litValue, v => dut.io.dmaCScale.get.rsp.valid.poke(v.B), sLog)
-      val (ps, pc, st) = irqPollStep(dut.io.cmd(0), dut.io.resp, pollSt, pollCool); pollSt = ps; pollCool = pc
-      st.foreach { s =>
-        errSeen = s.anyError
-        done = s.done
+      // done/configError 由 completion 流承载（每拍采样）；DMA/总线错误另走 IRQ，不中止执行。
+      completionPeek(dut.io.completion).foreach { case (err, code, _) =>
+        errSeen = err
+        errCode = code.toInt
+        done = !err
       }
       val pv = perfPeek
       pv.zipWithIndex.foreach { case (b, i) => if (b) perfCnt(i) += 1 }
@@ -1118,10 +1119,11 @@ abstract class WorkerBeeCaseSpec extends AnyFlatSpec with Matchers with ChiselSi
     // 任务边界把六通道恢复为 idle（ready=1、rsp 无效），下一个任务从同一 TB 初态起跑。
     bpReqs.foreach(_.ready.poke(true.B))
     Seq(dut.io.dmaA.rsp, dut.io.dmaB.rsp, dut.io.dmaScaleA.get.rsp, dut.io.dmaScaleB.get.rsp).foreach(_.valid.poke(false.B))
-    dut.io.dmaC.rsp.valid.poke(false.B); dut.io.dmaCScale.get.rsp.valid.poke(false.B); dut.io.cmd.foreach(_.valid.poke(false.B))
+    dut.io.dmaC.rsp.valid.poke(false.B); dut.io.dmaCScale.get.rsp.valid.poke(false.B); dut.io.cmd.valid.poke(false.B); dut.io.cmd.bits.foreach(_.valid.poke(false.B))
     if (errSeen) errCode = readReg(WbSimCommon.ERROR_CODE_REG_ADDR).toInt
     if (predicted.isDefined && errSeen) {
-      readReg(WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
+      // configError 走 completion（已采 errCode），不再置 IRQ；无 DMA 错误 ⟹ IntrRaw=0。
+      readReg(WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(0))
       dut.io.status.inFlight.expect(false.B)
     } else if (done && !errSeen) dut.io.status.inFlight.expect(false.B)
     // dmaScaleA 跑后拆流对账（仅正向路径：负向路径硬件不进计算、无期望流量）。
@@ -1164,7 +1166,7 @@ abstract class WorkerBeeCaseSpec extends AnyFlatSpec with Matchers with ChiselSi
     var passed = false; var cmp: Option[plan.CmpSummary] = None
     if (predicted.isDefined) { passed = errSeen && errCode == predicted.get && !done && regRbOk
       println(s"[$TAG] 负向路径：体检预测 errCode=${predicted.get}，实测 err=$errSeen errCode=$errCode done=$done → ${if (passed) "符合预测 ✓" else "与预测不符 ✗"}") }
-    else if (!done) println(s"[$TAG] 超时：$maxCycles 拍内未观测到 IRQ_RAW.done")
+    else if (!done) println(s"[$TAG] 超时：$maxCycles 拍内未观测到 completion")
     else { val c = plan.compare(cLog.toSeq, sLog.toSeq); cmp = Some(c)
       println(f"[$TAG] C compare: elemMismatch=${c.mismatch}/${c.elems} laneViolations=${c.laneViolations} " +
         f"maxRelErr=${c.maxRelErr}%.3e maxAbsErr=${c.maxAbsErr}%.3e")

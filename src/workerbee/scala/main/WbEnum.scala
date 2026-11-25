@@ -90,10 +90,6 @@ object RoundingMode extends ChiselEnum {
       = Value
 }
 
-object WorkerBeeOp extends ChiselEnum {
-  val REG_WRITE1, REG_WRITE2, REG_READ, RUN = Value
-}
-
 /** 循环顺序枚举：loopMode 位域已被 aFmt/bFmt/mixFmtEn/outFmt 重新占用，本枚举仅防引用
   * 编译断裂。Executor 固定 weight-stationary N→K→M 遍历、C 写回顺序 = push FIFO 序，
   * 均与 loopMode 无关。

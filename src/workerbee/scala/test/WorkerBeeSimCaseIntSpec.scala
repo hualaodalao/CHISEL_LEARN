@@ -229,27 +229,26 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
           dut.io.dmaScaleA.get.req, dut.io.dmaScaleB.get.req,
           dut.io.dmaCScale.get.req).foreach(_.ready.poke(true.B))
         dut.io.resp.ready.poke(true.B)
-        dut.io.cmd.foreach(_.valid.poke(false.B))
+        dut.io.cmd.valid.poke(false.B); dut.io.cmd.bits.foreach(_.valid.poke(false.B))
         dut.reset.poke(true.B); dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
 
-        def cmd(op: WorkerBeeOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
-          transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
+        def cmd(op: QueenNativeOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
+          transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
         }
 
         // 配置索引 0..11 紧排：M/NK/A/B/C/CONTROL/ScaleA/ScaleB/ScaleC/Bias/RqM/RqParam。
-        cmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, m, n.toLong | (k.toLong << 16))
-        cmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, p.aBase, p.bBase)
-        cmd(WorkerBeeOp.REG_WRITE2, 0x04, 0x05, C_BASE, p.controlWord5)
-        cmd(WorkerBeeOp.REG_WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE)
-        cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
+        cmd(QueenNativeOp.WRITE2, 0x00, 0x01, m, n.toLong | (k.toLong << 16))
+        cmd(QueenNativeOp.WRITE2, 0x02, 0x03, p.aBase, p.bBase)
+        cmd(QueenNativeOp.WRITE2, 0x04, 0x05, C_BASE, p.controlWord5)
+        cmd(QueenNativeOp.WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE)
+        cmd(QueenNativeOp.WRITE1, WbSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
 
         println(s"[$TAG] regs: reg5(controlWord5)=0x${p.controlWord5.toHexString}")
 
-        prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
-        launchStart(dut.clock, dut.io.cmd(0))
+        prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
+        launchStart(dut.clock, dut.io.cmd)
 
         var aS = 0; var bS = 0; var saS = 0; var sbS = 0; var cB = 0; var csB = 0
-        var pollSt = 0; var pollCool = 0
 
         def rdA(v: Boolean, d: BigInt): Unit = {
           dut.io.dmaA.rsp.valid.poke(v.B); dut.io.dmaA.rsp.payload.data.poke(d.U)
@@ -294,16 +293,15 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
             dut.io.dmaCScale.get.req.payload.data.peek().litValue,
             v => dut.io.dmaCScale.get.rsp.valid.poke(v.B), sLog)
 
-          val (ps, pc, st) = irqPollStep(dut.io.cmd(0), dut.io.resp, pollSt, pollCool)
-          pollSt = ps; pollCool = pc
-          st.foreach { s => errSeen = s.anyError; done = s.done }
+          completionPeek(dut.io.completion).foreach { case (err, code, _) =>
+            errSeen = err; errCode = code.toInt; done = !err }
           dut.clock.step(); cycle += 1
         }
 
         dut.io.dmaC.rsp.valid.poke(false.B)
         dut.io.dmaCScale.get.rsp.valid.poke(false.B)
-        dut.io.cmd.foreach(_.valid.poke(false.B))
-        if (errSeen) errCode = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.ERROR_CODE_REG_ADDR).toInt
+        dut.io.cmd.valid.poke(false.B); dut.io.cmd.bits.foreach(_.valid.poke(false.B))
+        if (errSeen) errCode = readRegister(dut.clock, dut.io.cmd, dut.io.resp, WbSimCommon.ERROR_CODE_REG_ADDR).toInt
         if (done && !errSeen) dut.io.status.inFlight.expect(false.B)
 
         println(s"[$TAG] Done: cycles=$cycle done=$done err=$errSeen; " +
@@ -408,25 +406,24 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
           dut.io.dmaScaleA.get.req, dut.io.dmaScaleB.get.req,
           dut.io.dmaCScale.get.req).foreach(_.ready.poke(true.B))
         dut.io.resp.ready.poke(true.B)
-        dut.io.cmd.foreach(_.valid.poke(false.B))
+        dut.io.cmd.valid.poke(false.B); dut.io.cmd.bits.foreach(_.valid.poke(false.B))
         dut.reset.poke(true.B); dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
 
-        def cmd(op: WorkerBeeOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
-          transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
+        def cmd(op: QueenNativeOp.Type, r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
+          transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, r0, r1, BigInt(d0), BigInt(d1))
         }
 
         // 与正向运行器同一配置布局，只改变受测配置违约项。
-        cmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, m, n.toLong | (k.toLong << 16))
-        cmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
-        cmd(WorkerBeeOp.REG_WRITE2, 0x04, 0x05, cAddr, p.controlWord5)
-        cmd(WorkerBeeOp.REG_WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE)
-        cmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
+        cmd(QueenNativeOp.WRITE2, 0x00, 0x01, m, n.toLong | (k.toLong << 16))
+        cmd(QueenNativeOp.WRITE2, 0x02, 0x03, A_BASE, B_BASE)
+        cmd(QueenNativeOp.WRITE2, 0x04, 0x05, cAddr, p.controlWord5)
+        cmd(QueenNativeOp.WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE)
+        cmd(QueenNativeOp.WRITE1, WbSimCommon.SCALE_C_REG_ADDR, 0x00, SC_BASE, 0L)
 
-        prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
-        launchStart(dut.clock, dut.io.cmd(0))
+        prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
+        launchStart(dut.clock, dut.io.cmd)
 
         // ---- Poll for err (no data feeding; hardware should reject immediately) ----
-        var pollSt = 0; var pollCool = 0
         while (!done && !errSeen && cycle < p.maxCycles) {
           dut.io.dmaA.rsp.valid.poke(false.B)
           dut.io.dmaB.rsp.valid.poke(false.B)
@@ -436,13 +433,12 @@ class WorkerBeeSimCaseIntSpec extends AnyFlatSpec with Matchers with ChiselSim
           dut.io.dmaCScale.get.rsp.valid.poke(false.B)
           if (dut.io.dmaC.req.valid.peek().litToBoolean) cWrites += 1
 
-          val (ps, pc, st) = irqPollStep(dut.io.cmd(0), dut.io.resp, pollSt, pollCool)
-          pollSt = ps; pollCool = pc
-          st.foreach { s => errSeen = s.configError; done = s.done }
+          completionPeek(dut.io.completion).foreach { case (err, code, _) =>
+            errSeen = err; errCode = code.toInt; done = !err }
           dut.clock.step(); cycle += 1
         }
-        dut.io.cmd.foreach(_.valid.poke(false.B))
-        errCode = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.ERROR_CODE_REG_ADDR).toInt
+        dut.io.cmd.valid.poke(false.B); dut.io.cmd.bits.foreach(_.valid.poke(false.B))
+        errCode = readRegister(dut.clock, dut.io.cmd, dut.io.resp, WbSimCommon.ERROR_CODE_REG_ADDR).toInt
         dut.io.status.inFlight.expect(false.B)
         println(s"[$TAG] ErrCase end: cycles=$cycle err=$errSeen errCode=$errCode done=$done cWrites=$cWrites")
       }

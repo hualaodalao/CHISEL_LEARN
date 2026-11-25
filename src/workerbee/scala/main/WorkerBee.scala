@@ -3,9 +3,16 @@ import chisel3.util._
 
 class WorkerBee(cfg: WorkerBeeConfig) extends Module {
 
+  // Queen 原生配置契约（queenHarewareInterface.md §13/§14）：nativeWidth=4、xlen=32、faultCodeWidth=8。
+  val qcfg = QueenConfig()
+
   val io = IO(new Bundle {
-    val cmd = Vec(4, slave(Stream(new WorkerBeeCmd)))
-    val resp = master(Stream(new WorkerBeeResp))
+    // 单 ready 并行配置 beat（写恒可收、RUN 取 startReady、READ 取 resp.ready）；写错误走 wrErr pulse。
+    val cmd = Flipped(Decoupled(Vec(qcfg.nativeWidth, Valid(new QueenNativeCmd(qcfg)))))
+    val resp = Decoupled(new QueenDsaRegResp)   // 只承载 QRD 读数据/err，与被接受的读同拍
+    val wrErr = Output(Vec(qcfg.nativeWidth, Bool()))
+    // 完成流：Queen 无条件接收，每拍至多一条；start 当拍采样 swTag/hwSignal，完成时原样带回。
+    val completion = Valid(new QueenDsaCompletion(qcfg))
     val respForTracing = master(Flow(new WorkerBeeRespForTracing))
     val dmaA = WorkerBeeDMAExtReadOnlyIF(cfg, cfg.aExtW)
     val dmaC = new WorkerBeeDMAExtWriteOnlyIF(cfg, cfg.cDmaExtW)
@@ -16,16 +23,53 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
 
     val status = Output(new WorkerBeeStatus(cfg))
     val irq = Output(Bool())
-    // 配置 credit 电平：还能接受的 RUN 数。只门控 RUN，QWR/QRD 不受它限制。
-    val cfgCredit = Output(UInt(1.W))
     // 性能观测信号组（纯组合电平、无内部计数；外部 PMU 按拍采样，语义见 WorkerBeePerf）
     val perf = Output(new WorkerBeePerf)
   })
 
-  val regIf = Module(new WorkerBeeRegIf(cfg))
+  // 通用 Queen DSA 寄存器前端（直接例化）：shadow/live、单 ready、wrErr、IntrRFMS4(0x60)、
+  //   公共契约区 hwSignal(0x80/0x81)/traceTag(0xA0)、start/startSwTag/hwSignal 组合输出。
+  //   12 槽配置(0x00–0x0B) + 2 槽状态(0x40 status/0x41 errorCode) + 8 位中断源(DMA/总线错误)。
+  val regIf = Module(new QueenDsaRegIf(QueenDsaRegIfConfig(
+    numCfgRegs = 12, numStatusRegs = 2, intrWidth = 8, qcfg = qcfg)))
   regIf.io.cmd <> io.cmd
   io.resp <> regIf.io.resp
-  val regFile = regIf.io.regFile
+  io.wrErr := regIf.io.wrErr
+
+  // 配置译码层：cfgRegs(live 组) → WorkerBeeRegister，反演软件位打包；CalcConfig/Executor 零改动。
+  val regFile = Wire(new WorkerBeeRegister(cfg))
+  private val cr = regIf.io.cfgRegs
+  regFile.m := cr(0)(cfg.mnkWidth - 1, 0)
+  regFile.n := cr(1)(cfg.mnkWidth - 1, 0)
+  regFile.k := cr(1)(31, 16)
+  regFile.aAddr := cr(2)
+  regFile.bAddr := cr(3)
+  regFile.cAddr := cr(4)
+  regFile.aFmt := cr(5)(3, 0).asTypeOf(DataFormat())
+  regFile.bFmt := cr(5)(7, 4).asTypeOf(DataFormat())
+  regFile.cFmt := cr(5)(11, 8).asTypeOf(DataFormat())
+  regFile.aAddrMode := cr(5)(12).asTypeOf(AddrMode())
+  regFile.bAddrMode := cr(5)(13).asTypeOf(AddrMode())
+  regFile.cAddrMode := cr(5)(14).asTypeOf(AddrMode())
+  regFile.reluOn := cr(5)(15)
+  regFile.rnd := cr(5)(18, 16).asTypeOf(RoundingMode())
+  regFile.warmdown := cr(5)(20)
+  regFile.warmup := cr(5)(21)
+  regFile.aMxBlockSize := cr(5)(22).asTypeOf(MXBlockSize())
+  regFile.bMxBlockSize := cr(5)(24).asTypeOf(MXBlockSize())
+  regFile.cMxBlockSize := cr(5)(26).asTypeOf(MXBlockSize())
+  regFile.osFmtKeep := cr(5)(27)
+  regFile.loadWMode := cr(5)(28)
+  regFile.requantOn := cr(5)(29)
+  regFile.biasOn := cr(5)(30)
+  regFile.osM1 := cr(5)(31)
+  regFile.aScaleAddr := cr(6)
+  regFile.bScaleAddr := cr(7)
+  regFile.cScaleAddr := cr(8)
+  regFile.biasAddr := cr(9)
+  regFile.rqMBase := cr(10)
+  regFile.rqShift := cr(11)(5, 0)
+  regFile.rqZp := cr(11)(31, 16).asSInt
 
   val calcConfig = Module(new WorkerBeeCalcConfig(cfg))
   val scratchpad = Module(new WorkerBeeScratchpad(cfg))
@@ -44,19 +88,47 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
   val startPulse = regIf.io.start
   calcConfig.io.regFile := regFile
   calcConfig.io.startIn := startPulse
-  regIf.io.busy := executor.io.busy
-  regIf.io.progress := executor.io.progress
-  regIf.io.done := executor.io.done
-  regIf.io.configError := calcConfig.io.errPluse
-  regIf.io.configErrorCode := calcConfig.io.errCode
-  regIf.io.dmaErrors := VecInit(Seq.fill(8)(false.B))
-  regIf.io.dmaErrors(0) := io.dmaA.rsp.fire && io.dmaA.rsp.payload.err
-  regIf.io.dmaErrors(1) := io.dmaB.rsp.fire && io.dmaB.rsp.payload.err
-  regIf.io.dmaErrors(2) := io.dmaC.rsp.fire && io.dmaC.rsp.payload.err
-  if (cfg.hasMx) {
-    regIf.io.dmaErrors(4) := io.dmaScaleB.get.rsp.fire && io.dmaScaleB.get.rsp.payload.err
-    regIf.io.dmaErrors(5) := io.dmaCScale.get.rsp.fire && io.dmaCScale.get.rsp.payload.err
+
+  // 完成上下文：start 当拍采样 swTag/hwSignal（RegIf 组合输出），完成/配置错误时原样带回 completion。
+  private val donePulse = executor.io.done
+  private val configError = calcConfig.io.errPluse
+  private val inFlight = RegInit(false.B)
+  private val swTagCtx = RegInit(0.U(qcfg.xlen.W))
+  private val hwSigCtx = RegInit(0.U.asTypeOf(new QueenHwSignal))
+  private val errorCodeReg = RegInit(0.U(4.W))
+  when(startPulse) {
+    inFlight := true.B
+    swTagCtx := regIf.io.startSwTag
+    hwSigCtx := regIf.io.hwSignal
+    errorCodeReg := 0.U
   }
+  when(donePulse || configError) { inFlight := false.B }
+  when(configError) { errorCodeReg := calcConfig.io.errCode }
+  regIf.io.startReady := !inFlight
+
+  // DMA/总线错误属"与命令无关的总线错误"→ intrSrc（IntrRFMS4 @0x60），不占 completion。
+  private val dmaErrors = Wire(Vec(8, Bool()))
+  dmaErrors := VecInit(Seq.fill(8)(false.B))
+  dmaErrors(0) := io.dmaA.rsp.fire && io.dmaA.rsp.payload.err
+  dmaErrors(1) := io.dmaB.rsp.fire && io.dmaB.rsp.payload.err
+  dmaErrors(2) := io.dmaC.rsp.fire && io.dmaC.rsp.payload.err
+  if (cfg.hasMx) {
+    dmaErrors(4) := io.dmaScaleB.get.rsp.fire && io.dmaScaleB.get.rsp.payload.err
+    dmaErrors(5) := io.dmaCScale.get.rsp.fire && io.dmaCScale.get.rsp.payload.err
+  }
+  regIf.io.intrSrc := dmaErrors.asUInt
+
+  // 状态区：0x40 = status 字（busy/inFlight/progress），0x41 = 最近配置错误码。
+  regIf.io.statusRegs(0) := Cat(executor.io.progress, 0.U(13.W), inFlight, 0.U(1.W), executor.io.busy)
+  regIf.io.statusRegs(1) := errorCodeReg.pad(32)
+
+  // 完成流：done → 正常完成；configError → 带错误码完成。Queen 无条件接收，每拍至多一条。
+  io.completion.valid := donePulse || configError
+  io.completion.bits.swTag := swTagCtx
+  io.completion.bits.hwTag := 0.U
+  io.completion.bits.error := configError
+  io.completion.bits.code := Mux(configError, calcConfig.io.errCode.pad(qcfg.faultCodeWidth), 0.U(qcfg.faultCodeWidth.W))
+  io.completion.bits.hwSignal := Mux(configError, 0.U.asTypeOf(new QueenHwSignal), hwSigCtx)
 
 
   val tracingSt = RegInit(0.U(1.W))  
@@ -69,12 +141,12 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
   when(tracingSt === 0.U){
       when(startPulse){
         tracingSt := 1.U
-        tracingPcReg := regIf.io.startPc
-        tracingTagReg := regIf.io.startTag
+        tracingPcReg := 0.U
+        tracingTagReg := regIf.io.startSwTag(7, 0)
         io.respForTracing.valid := true.B
         io.respForTracing.payload.state := 0.U
-        io.respForTracing.payload.pc := regIf.io.startPc
-        io.respForTracing.payload.tag := regIf.io.startTag
+        io.respForTracing.payload.pc := 0.U
+        io.respForTracing.payload.tag := regIf.io.startSwTag(7, 0)
       }
   }.otherwise{
     io.respForTracing.valid := executor.io.done | calcConfig.io.errPluse
@@ -413,9 +485,9 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
       biasPortInfl := biasPortInfl - 1.U
     }
     val scalePortError = biasPortRsp.fire && biasPortRsp.payload.err
-    regIf.io.dmaErrors(3) := scalePortError && !rspToBias && !rspToM
-    regIf.io.dmaErrors(6) := scalePortError && rspToBias
-    regIf.io.dmaErrors(7) := scalePortError && rspToM
+    dmaErrors(3) := scalePortError && !rspToBias && !rspToM
+    dmaErrors(6) := scalePortError && rspToBias
+    dmaErrors(7) := scalePortError && rspToM
 
     // 取数器重入守卫：上一轮取数未回 IDLE 时新脉冲到达 = bias/rqM 字流会交错错序
     assert(!((executor.io.biasFetchReq.get || executor.io.rqMFetchReq.get) && biasFState =/= sBiasFIDLE),
@@ -535,8 +607,7 @@ class WorkerBee(cfg: WorkerBeeConfig) extends Module {
   }
 
   io.status.busy       := executor.io.busy
-  io.status.inFlight   := regIf.io.inFlight
-  io.cfgCredit         := regIf.io.cfgCredit
+  io.status.inFlight   := inFlight
   io.status.progress   := executor.io.progress
   io.status.aOccupancy := scratchpad.io.aOccupancy
   io.status.bOccupancy := scratchpad.io.bOccupancy

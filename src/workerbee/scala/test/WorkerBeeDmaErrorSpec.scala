@@ -35,12 +35,12 @@ class WorkerBeeDmaErrorSpec extends AnyFlatSpec with Matchers with ChiselSim wit
           }
         }
         quiesce(ready = true)
-        dut.io.cmd.foreach(_.valid.poke(false.B)); dut.io.resp.ready.poke(true.B)
+        dut.io.cmd.valid.poke(false.B); dut.io.cmd.bits.foreach(_.valid.poke(false.B)); dut.io.resp.ready.poke(true.B)
         dut.reset.poke(true.B); dut.clock.step(3); dut.reset.poke(false.B); dut.clock.step(2)
         def wr(a: Int, d: BigInt): Unit = {
-          transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, WorkerBeeOp.REG_WRITE1, a, d0 = d)
+          transactReg(dut.clock, dut.io.cmd, dut.io.resp, QueenNativeOp.WRITE1, a, d0 = d)
         }
-        def rd(a: Int): BigInt = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, a)
+        def rd(a: Int): BigInt = readRegister(dut.clock, dut.io.cmd, dut.io.resp, a)
         val intRun = source == 7
         val biasOn = source >= 6
         val inFmt = if (intRun) DataFormat.INT8 else DataFormat.MXE4M3
@@ -54,21 +54,21 @@ class WorkerBeeDmaErrorSpec extends AnyFlatSpec with Matchers with ChiselSim wit
         wr(CONTROL_REG_ADDR, control)
         wr(SCALE_A_REG_ADDR, saBase); wr(SCALE_B_REG_ADDR, sbBase); wr(SCALE_C_REG_ADDR, scBase)
         wr(BIAS_REG_ADDR, biasBase); wr(RQM_REG_ADDR, rqBase); wr(RQ_PARAM_REG_ADDR, 0)
-        prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
+        prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
         wr(IRQ_MASK_REG_ADDR, IRQ_ALL) // 错误必须在全屏蔽时也立即记录。
-        launchStart(dut.clock, dut.io.cmd(0))
+        launchStart(dut.clock, dut.io.cmd)
         var injected = false
         var checkedEarly = false
         var done = false
         var cycle = 0
         var pollSt = 0; var pollCool = 0
-        val expectedError = BigInt(1) << (source + 2)
+        val expectedError = BigInt(1) << source
 
         while (!done && cycle < 6000) {
           if (injected && !checkedEarly) {
             // 上一边沿已经发生错误 rsp.fire；排空命令响应并冻结全部 DMA，独立读 IRQ。
             quiesce(ready = false)
-            dut.io.cmd.foreach(_.valid.poke(false.B)); dut.clock.step(2)
+            dut.io.cmd.valid.poke(false.B); dut.io.cmd.bits.foreach(_.valid.poke(false.B)); dut.clock.step(2)
             rd(IRQ_RAW_REG_ADDR) should be(expectedError)
             rd(IRQ_MASKED_REG_ADDR) should be(BigInt(0)); dut.io.irq.expect(false.B)
             dut.io.status.inFlight.expect(true.B)
@@ -115,36 +115,38 @@ class WorkerBeeDmaErrorSpec extends AnyFlatSpec with Matchers with ChiselSim wit
           driveWrite(dut.io.dmaC, 2)
           driveWrite(dut.io.dmaCScale.get, 5)
           if (checkedEarly) {
-            val (st, cool, irq) = irqPollStep(dut.io.cmd(0), dut.io.resp, pollSt, pollCool)
+            val (st, cool, irq) = irqPollStep(dut.io.cmd, dut.io.resp, pollSt, pollCool)
             pollSt = st; pollCool = cool
-            irq.foreach { i =>
-              i.configError should be(false)
-              (i.raw & ~BigInt(1)) should be(expectedError)
-              done = i.done
-            }
+            irq.foreach { i => i.raw should be(expectedError) }
+          }
+          // done 由 completion 承载；DMA/总线错误不产生 configError。
+          completionPeek(dut.io.completion).foreach { case (err, _, _) =>
+            err should be(false); done = true
           }
           dut.clock.step(); cycle += 1
           if (injectedThisCycle) injected = true
         }
         quiesce(ready = false)
-        dut.io.cmd.foreach(_.valid.poke(false.B)); dut.clock.step(2)
+        dut.io.cmd.valid.poke(false.B); dut.io.cmd.bits.foreach(_.valid.poke(false.B)); dut.clock.step(2)
         withClue(s"$name injection/early/completion at cycle $cycle: ") {
           injected should be(true); checkedEarly should be(true); done should be(true)
         }
         dut.io.status.inFlight.expect(false.B)
-        rd(IRQ_RAW_REG_ADDR) should be(expectedError | 1)
-        rd(IRQ_MASKED_REG_ADDR) should be(expectedError | 1)
-        rd(ERROR_CODE_REG_ADDR) should be(BigInt(0))
-        // 清 done 不影响 DMA pending，屏蔽/解除屏蔽只改变 irq。
-        wr(IRQ_CLEAR_REG_ADDR, 1)
+        // done 走 completion（已消费），IRQ 仅余 DMA sticky 错误。
         rd(IRQ_RAW_REG_ADDR) should be(expectedError)
+        rd(IRQ_MASKED_REG_ADDR) should be(expectedError)
+        rd(ERROR_CODE_REG_ADDR) should be(BigInt(0))
+        // W1C 清 DMA pending；再用 IntrForce 置位以测屏蔽/解除屏蔽只改变 irq。
+        wr(IRQ_RAW_REG_ADDR, expectedError)
+        rd(IRQ_RAW_REG_ADDR) should be(BigInt(0))
+        wr(IRQ_FORCE_REG_ADDR, expectedError)
         wr(IRQ_MASK_REG_ADDR, IRQ_ALL); dut.io.irq.expect(false.B)
         wr(IRQ_MASK_REG_ADDR, 0); dut.io.irq.expect(true.B)
-        // 下一 START 不自动清旧错误；显式 W1C 后旧 DMA sticky err 不得反复置 RAW。
-        launchStart(dut.clock, dut.io.cmd(0))
+        // 下一 RUN 不自动清旧错误；显式 W1C 后旧 DMA sticky err 不得反复置 RAW。
+        launchStart(dut.clock, dut.io.cmd)
         rd(IRQ_RAW_REG_ADDR) should be(expectedError)
         dut.io.status.inFlight.expect(true.B)
-        wr(IRQ_CLEAR_REG_ADDR, IRQ_ALL)
+        wr(IRQ_RAW_REG_ADDR, IRQ_ALL)
         dut.clock.step(8)
         rd(IRQ_RAW_REG_ADDR) should be(BigInt(0)); dut.io.irq.expect(false.B)
       }

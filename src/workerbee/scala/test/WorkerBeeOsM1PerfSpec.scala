@@ -316,29 +316,26 @@ class WorkerBeeOsM1PerfSpec extends AnyFlatSpec with ChiselSim with WbStatusPoll
     dut.io.dmaCScale.get.rsp.valid.poke(false.B)
     dut.io.dmaCScale.get.rsp.payload.err.poke(false.B)
     dut.io.resp.ready.poke(true.B)
-    dut.io.cmd.foreach { cmd =>
-      pokeRegCommand(cmd, WorkerBeeOp.REG_WRITE1, 0)
-      cmd.valid.poke(false.B)
-    }
+    dut.io.cmd.valid.poke(false.B); dut.io.cmd.bits.foreach(_.valid.poke(false.B))
     dut.reset.poke(true.B)
     dut.clock.step(3)
     dut.reset.poke(false.B)
     dut.clock.step(2)
 
     def writePair(r0: Int, r1: Int, d0: Long, d1: Long): Unit = {
-      transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, WorkerBeeOp.REG_WRITE2,
+      transactReg(dut.clock, dut.io.cmd, dut.io.resp, QueenNativeOp.WRITE2,
         r0, r1, BigInt(d0), BigInt(d1))
     }
     writePair(WbSimCommon.M_REG_ADDR, WbSimCommon.NK_REG_ADDR, p.m, p.n.toLong | (p.k.toLong << 16))
     writePair(WbSimCommon.A_REG_ADDR, WbSimCommon.B_REG_ADDR, p.aBase, p.bBase)
     writePair(WbSimCommon.C_REG_ADDR, WbSimCommon.CONTROL_REG_ADDR, C_BASE, p.controlWord5)
     writePair(WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SA_BASE, SB_BASE)
-    transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, WorkerBeeOp.REG_WRITE1,
+    transactReg(dut.clock, dut.io.cmd, dut.io.resp, QueenNativeOp.WRITE1,
       WbSimCommon.SCALE_C_REG_ADDR, d0 = BigInt(SC_BASE))
-    assert(readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.CONTROL_REG_ADDR) ==
+    assert(readRegister(dut.clock, dut.io.cmd, dut.io.resp, WbSimCommon.CONTROL_REG_ADDR) ==
       BigInt(p.controlWord5), s"$tag 控制字回读不一致")
-    prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
-    launchStart(dut.clock, dut.io.cmd(0))
+    prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
+    launchStart(dut.clock, dut.io.cmd)
 
     var cycle = 0
     var measuring = false
@@ -368,7 +365,7 @@ class WorkerBeeOsM1PerfSpec extends AnyFlatSpec with ChiselSim with WbStatusPoll
         measuring = true
       }
       assert(!bool(dut.io.dmaCScale.get.req.valid), s"$tag 非量化输出不应请求 scaleC 写回")
-      if (bool(dut.io.resp.valid)) assert(!bool(dut.io.resp.payload.err), s"$tag 命令响应错误")
+      if (bool(dut.io.resp.valid)) assert(!bool(dut.io.resp.bits.err), s"$tag 命令响应错误")
       if (measuring) {
         val label = s"$tag 拍$cycle tile=$tileIndex"
         val row = tiles(math.min(tileIndex, tiles.size - 1))
@@ -545,9 +542,9 @@ class WorkerBeeOsM1PerfSpec extends AnyFlatSpec with ChiselSim with WbStatusPoll
       s"$tag C 事件必须完整包含在 execute/done 测量窗内")
     assert(totals.count("stallA") + totals.count("stallB") - totals.count("stallOverlap") <= totals.total,
       s"$tag 重叠停顿集合统计错误")
-    val irq = WbSimCommon.decodeIrq(readRegister(dut.clock, dut.io.cmd(0), dut.io.resp,
+    val irq = WbSimCommon.decodeIrq(readRegister(dut.clock, dut.io.cmd, dut.io.resp,
       WbSimCommon.IRQ_RAW_REG_ADDR))
-    assert(irq.done && !irq.anyError && !bool(dut.io.status.busy) && !bool(dut.io.status.inFlight),
+    assert(!irq.anyError && !bool(dut.io.status.busy) && !bool(dut.io.status.inFlight),
       s"$tag 完成后 IRQ/错误/忙碌状态不一致")
     val comparison = plan.compare(cLog.toSeq, Seq.empty)
     assert(comparison.elems == p.m * p.n && comparison.mismatch == 0 && comparison.laneViolations == 0,

@@ -496,7 +496,7 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
 
       // ===== Reset =====
       dut.reset.poke(true.B)
-      dut.io.cmd.foreach(_.valid.poke(false.B))
+      dut.io.cmd.valid.poke(false.B); dut.io.cmd.bits.foreach(_.valid.poke(false.B))
       dut.io.resp.ready.poke(true.B)
       dut.io.dmaA.req.ready.poke(true.B)
       dut.io.dmaA.rsp.valid.poke(false.B)
@@ -524,8 +524,8 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
       dut.reset.poke(false.B)
       dut.clock.step(2)
 
-      def sendCmd(op: WorkerBeeOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
-        transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
+      def sendCmd(op: QueenNativeOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
+        transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
       }
 
       // ===== 配置寄存器 =====
@@ -560,22 +560,20 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
           s"MXE4M3(${DataFormat.MXE4M3.litValue.toInt}) | MXE5M2(${DataFormat.MXE5M2.litValue.toInt})<<4")
       }
       // 写序列：reg0=m、reg1=n|k<<16、reg2/3/4 = a/b/cAddr、reg5 = 控制字。
-      sendCmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, M, N.toLong | (K.toLong << 16))
-      sendCmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
-      sendCmd(WorkerBeeOp.REG_WRITE2, 0x04, 0x05, C_BASE, controlWord5)
+      sendCmd(QueenNativeOp.WRITE2, 0x00, 0x01, M, N.toLong | (K.toLong << 16))
+      sendCmd(QueenNativeOp.WRITE2, 0x02, 0x03, A_BASE, B_BASE)
+      sendCmd(QueenNativeOp.WRITE2, 0x04, 0x05, C_BASE, controlWord5)
       println(s"debug1 controlWord5=0x${controlWord5.toHexString}")
-      sendCmd(WorkerBeeOp.REG_WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SCALE_A_BASE, SCALE_B_BASE)
+      sendCmd(QueenNativeOp.WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SCALE_A_BASE, SCALE_B_BASE)
       // 量化运行补写 0x08 cScaleAddr（ScaleWr 写通道基址源）；非量化运行该基址不被使用，保持不写。
-      if (isQuant) sendCmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.SCALE_C_REG_ADDR, 0x00, SCALE_C_BASE, 0L)
+      if (isQuant) sendCmd(QueenNativeOp.WRITE1, WbSimCommon.SCALE_C_REG_ADDR, 0x00, SCALE_C_BASE, 0L)
 
-      prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
-      launchStart(dut.clock, dut.io.cmd(0))
+      prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
+      launchStart(dut.clock, dut.io.cmd)
 
-      // 完成判定只读 IRQ_RAW.done；STATUS 仅报告 busy/inFlight/progress。
+      // 完成判定消费 completion 流；STATUS 仅报告 busy/inFlight/progress。
       var done = false
       var cycle = 0
-      var pollSt = 0
-      var pollCool = 0
       // 量化输出（cvt 量化支路 + dmaCScale 双通道写回）超时上限放宽（常规 16000 /
       // 带背压 24000）；fp32 为 8000。
       val maxCycles = if (!isQuant) 8000 else if (cScaleBackpressure) 24000 else 16000
@@ -745,12 +743,10 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
           dut.io.dmaScaleB.get.rsp.payload.data.poke(0.U)
         }
 
-        val (stNext, coolNext, irqOpt) = irqPollStep(dut.io.cmd(0), dut.io.resp, pollSt, pollCool)
-        pollSt = stNext
-        pollCool = coolNext
-        irqOpt.foreach { st =>
-          withClue(f"[MX] IRQ_RAW=0x${st.raw}%X: ") { st.anyError should be(false) }
-          if (st.done) done = true
+        // 完成判定消费 completion 流；正向路径 error 必为 false（DMA/总线错误另走 IRQ）。
+        completionPeek(dut.io.completion).foreach { case (err, _, _) =>
+          withClue("[MX] completion.error: ") { err should be(false) }
+          done = true
         }
 
         dut.clock.step()
@@ -759,7 +755,7 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
 
       dut.io.dmaC.rsp.valid.poke(false.B)
       dut.io.dmaCScale.get.rsp.valid.poke(false.B)
-      dut.io.cmd.foreach(_.valid.poke(false.B))   // 轮询命令用后拉低（防残留影响后续拍）
+      dut.io.cmd.valid.poke(false.B); dut.io.cmd.bits.foreach(_.valid.poke(false.B))   // 轮询命令用后拉低（防残留影响后续拍）
 
       if (!done) println(s"[MX] WARNING: timeout at $maxCycles cycles (A=$dmaABeatsSent B=$dmaBBeatsSent C=$dmaCStoreBeats sA=$scaleABeatsSent sB=$scaleBBeatsSent)")
 
@@ -999,7 +995,7 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
     simulate(new WorkerBee(cfg)) { dut =>
       // ---- Reset + DMA 端口拉到安全默认（本用例不喂数据，err 应在 execute 拍触发） ----
       dut.reset.poke(true.B)
-      dut.io.cmd.foreach(_.valid.poke(false.B))
+      dut.io.cmd.valid.poke(false.B); dut.io.cmd.bits.foreach(_.valid.poke(false.B))
       dut.io.resp.ready.poke(true.B)
       dut.io.dmaA.req.ready.poke(true.B)
       dut.io.dmaA.rsp.valid.poke(false.B)
@@ -1015,33 +1011,31 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
       dut.reset.poke(false.B)
       dut.clock.step(2)
 
-      def sendCmd(op: WorkerBeeOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
-        transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
+      def sendCmd(op: QueenNativeOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
+        transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
       }
 
       // 写序列：reg0=m、reg1=n|k<<16、reg2/3/4=a/b/cAddr、reg5=控制字。
-      sendCmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, M, N.toLong | (K.toLong << 16))
-      sendCmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
-      sendCmd(WorkerBeeOp.REG_WRITE2, 0x04, 0x05, C_BASE, ctl5)
-      sendCmd(WorkerBeeOp.REG_WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SCALE_A_BASE, SCALE_B_BASE)
+      sendCmd(QueenNativeOp.WRITE2, 0x00, 0x01, M, N.toLong | (K.toLong << 16))
+      sendCmd(QueenNativeOp.WRITE2, 0x02, 0x03, A_BASE, B_BASE)
+      sendCmd(QueenNativeOp.WRITE2, 0x04, 0x05, C_BASE, ctl5)
+      sendCmd(QueenNativeOp.WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SCALE_A_BASE, SCALE_B_BASE)
 
-      prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
-      launchStart(dut.clock, dut.io.cmd(0))
+      prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
+      launchStart(dut.clock, dut.io.cmd)
       dut.clock.step(200)
-      val raw = readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.IRQ_RAW_REG_ADDR)
-      withClue(s"[$caseName] config error only in IRQ_RAW: ") { raw should be(BigInt(2)) }
+      // configError 走 completion（脉冲），不置 IRQ；错误码锁存在 ERROR_CODE(0x41)。
+      readRegister(dut.clock, dut.io.cmd, dut.io.resp, WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(0))
       dut.io.status.inFlight.expect(false.B)
 
       val legalCtl5 = (1L << 28) |
         DataFormat.MXE4M3.litValue.toLong | (DataFormat.MXE5M2.litValue.toLong << 4)
-      sendCmd(WorkerBeeOp.REG_WRITE1, 0x05, 0x00, legalCtl5, 0L)
-      // START 不清 pending；合法重启后旧 configError 仍记录，须显式 W1C。
-      launchStart(dut.clock, dut.io.cmd(0))
+      sendCmd(QueenNativeOp.WRITE1, 0x05, 0x00, legalCtl5, 0L)
+      // 合法 RUN 在 start 当拍清 errorCodeReg；DMA/总线错误才进 IRQ。
+      launchStart(dut.clock, dut.io.cmd)
       dut.clock.step(100)
-      readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.IRQ_RAW_REG_ADDR) should be(raw)
-      sendCmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.IRQ_CLEAR_REG_ADDR, 0, 2L, 0L)
-      readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(0))
-      readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(0))
+      readRegister(dut.clock, dut.io.cmd, dut.io.resp, WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(0))
+      readRegister(dut.clock, dut.io.cmd, dut.io.resp, WbSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(0))
       dut.io.status.inFlight.expect(true.B)
     }
   }
@@ -1074,7 +1068,7 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
       simulate(new WorkerBee(cfg)) { dut =>
         // ---- Reset + DMA 端口拉到安全默认（不喂数据，err 应在 execute 拍触发） ----
         dut.reset.poke(true.B)
-        dut.io.cmd.foreach(_.valid.poke(false.B))
+        dut.io.cmd.valid.poke(false.B); dut.io.cmd.bits.foreach(_.valid.poke(false.B))
         dut.io.resp.ready.poke(true.B)
         dut.io.dmaA.req.ready.poke(true.B)
         dut.io.dmaA.rsp.valid.poke(false.B)
@@ -1092,52 +1086,49 @@ class WorkerBeeSimCaseMxSpec extends AnyFlatSpec with Matchers with ChiselSim wi
         dut.reset.poke(false.B)
         dut.clock.step(2)
 
-        def sendCmd(op: WorkerBeeOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
-          transactReg(dut.clock, dut.io.cmd(0), dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
+        def sendCmd(op: QueenNativeOp.Type, reg0Addr: Int, reg1Addr: Int, data0: Long, data1: Long): Unit = {
+          transactReg(dut.clock, dut.io.cmd, dut.io.resp, op, reg0Addr, reg1Addr, BigInt(data0), BigInt(data1))
         }
 
         // 写序列：reg0=m、reg1=n|k<<16、reg2/3/4=a/b/cAddr、reg5=控制字（含
         //   loadWMode；不写进 reg5 则格式字全为复位 0 = FP32 ⟹ errCode 5 抢跑、
         //   err 归因不再是 outFmt 族交叉）。
-        sendCmd(WorkerBeeOp.REG_WRITE2, 0x00, 0x01, M, N.toLong | (K.toLong << 16))
-        sendCmd(WorkerBeeOp.REG_WRITE2, 0x02, 0x03, A_BASE, B_BASE)
-        sendCmd(WorkerBeeOp.REG_WRITE2, 0x04, 0x05, C_BASE, controlWord5) // reg5[28]=loadWMode=1（保持 err 归因 = outFmt 族交叉）
-        sendCmd(WorkerBeeOp.REG_WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SCALE_A_BASE, SCALE_B_BASE)
+        sendCmd(QueenNativeOp.WRITE2, 0x00, 0x01, M, N.toLong | (K.toLong << 16))
+        sendCmd(QueenNativeOp.WRITE2, 0x02, 0x03, A_BASE, B_BASE)
+        sendCmd(QueenNativeOp.WRITE2, 0x04, 0x05, C_BASE, controlWord5) // reg5[28]=loadWMode=1（保持 err 归因 = outFmt 族交叉）
+        sendCmd(QueenNativeOp.WRITE2, WbSimCommon.SCALE_A_REG_ADDR, WbSimCommon.SCALE_B_REG_ADDR, SCALE_A_BASE, SCALE_B_BASE)
 
-        prepareStart(dut.clock, dut.io.cmd(0), dut.io.resp)
-        launchStart(dut.clock, dut.io.cmd(0))
-        var pollSt = 0; var pollCool = 0
+        prepareStart(dut.clock, dut.io.cmd, dut.io.resp)
+        launchStart(dut.clock, dut.io.cmd)
         var dmaCReqSeen = 0; var dmaCScaleReqSeen = 0
-        var raw = BigInt(0)
+        var errSeen = false; var errCode = 0
         for (_ <- 0 until 200) {
-          val (st, cool, irq) = irqPollStep(dut.io.cmd(0), dut.io.resp, pollSt, pollCool)
-          pollSt = st; pollCool = cool
-          irq.foreach(i => raw = i.raw)
+          completionPeek(dut.io.completion).foreach { case (err, code, _) =>
+            errSeen = err; errCode = code.toInt }
           if (dut.io.dmaC.req.valid.peek().litToBoolean) dmaCReqSeen += 1
           if (dut.io.dmaCScale.get.req.valid.peek().litToBoolean) dmaCScaleReqSeen += 1
           dut.clock.step()
         }
         // 结束轮询时先排空可能在途的读响应，再做同步寄存器读取。
-        dut.io.cmd.foreach(_.valid.poke(false.B))
+        dut.io.cmd.valid.poke(false.B); dut.io.cmd.bits.foreach(_.valid.poke(false.B))
         dut.clock.step(2)
-        withClue(s"[$caseName] configError only, no done/DMA errors: ") { raw should be(BigInt(2)) }
-        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
-        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(11))
+        withClue(s"[$caseName] configError via completion, no DMA errors: ") {
+          errSeen should be(true); errCode should be(11)
+        }
+        readRegister(dut.clock, dut.io.cmd, dut.io.resp, WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(0))
+        readRegister(dut.clock, dut.io.cmd, dut.io.resp, WbSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(11))
         dut.io.status.inFlight.expect(false.B)
         dmaCReqSeen should be(0)
         dmaCScaleReqSeen should be(0)
 
         val legalCtl5 = (1L << 28) |
           DataFormat.MXE4M3.litValue.toLong | (DataFormat.MXE5M2.litValue.toLong << 4)
-        sendCmd(WorkerBeeOp.REG_WRITE1, 0x05, 0x00, legalCtl5, 0L)
-        launchStart(dut.clock, dut.io.cmd(0))
+        sendCmd(QueenNativeOp.WRITE1, 0x05, 0x00, legalCtl5, 0L)
+        launchStart(dut.clock, dut.io.cmd)
         dut.clock.step(100)
-        // 合法 START 不清此前配置错误，也不自动清首次 code。
-        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(2))
-        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(11))
-        sendCmd(WorkerBeeOp.REG_WRITE1, WbSimCommon.IRQ_CLEAR_REG_ADDR, 0, 2L, 0L)
-        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(0))
-        readRegister(dut.clock, dut.io.cmd(0), dut.io.resp, WbSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(0))
+        // 合法 RUN 在 start 当拍清 errorCodeReg；configError 不进 IRQ。
+        readRegister(dut.clock, dut.io.cmd, dut.io.resp, WbSimCommon.IRQ_RAW_REG_ADDR) should be(BigInt(0))
+        readRegister(dut.clock, dut.io.cmd, dut.io.resp, WbSimCommon.ERROR_CODE_REG_ADDR) should be(BigInt(0))
         dut.io.status.inFlight.expect(true.B)
       }
     } finally {
