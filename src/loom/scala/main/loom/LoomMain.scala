@@ -5,6 +5,7 @@ import java.security.MessageDigest
 
 import _root_.circt.stage.ChiselStage
 import loom.check.Checks
+import loom.chi.{ChiConfig, ChiNetworkParams, ChiNetworkTop, ChiParams}
 import loom.graph.FabricGraph
 import loom.ir.{Canonical, Ir, JArr, JBool, JObj, JStr, JValue, Json}
 import loom.report.{Reports, Sram, TbGen}
@@ -28,6 +29,7 @@ object LoomMain {
     case "check" :: rest => runCheck(rest)
     case "estimate" :: rest => runEstimate(rest)
     case "emit" :: rest => runEmit(rest)
+    case "emit-chi" :: rest => runEmitChi(rest)
     case "blocks" :: rest => runBlocks(rest)
     case "formal" :: rest => runFormal(rest)
     case "diff" :: rest => runDiff(rest)
@@ -329,7 +331,12 @@ object LoomMain {
       ("token_rr8", "src/loom/formal/token_rr8.sv", 20, "P5 bounded progress"),
       ("token_response", "src/loom/formal/token_response.sv", 12, "P6/P8 no loss, exact-once"),
       ("token_cdc", "src/loom/formal/token_cdc.sv", 12, "P7 CDC credit"),
-      ("token_cdc_buf", "src/loom/formal/token_cdc_buf.sv", 12, "G9 async boundary buffer")
+      ("token_cdc_buf", "src/loom/formal/token_cdc_buf.sv", 12, "G9 async boundary buffer"),
+      ("token_chi_lcredit", "src/loom/formal/token_chi_lcredit.sv", 12, "CHI L-Credit conservation"),
+      ("token_chi_dbid", "src/loom/formal/token_chi_dbid.sv", 12, "CHI DBID exact-once"),
+      ("token_chi_pcrd", "src/loom/formal/token_chi_pcrd.sv", 12, "CHI P-Credit retry no-loss"),
+      ("token_chi_dvm", "src/loom/formal/token_chi_dvm.sv", 12, "CHI DVM collect completeness"),
+      ("token_chi_async_credit", "src/loom/formal/token_chi_async_credit.sv", 12, "CHI async link cross-domain credit")
     )
     val checks = models.map { case (top, src, depth, prop) =>
       val log = dir.resolve(s"${top}.log")
@@ -621,6 +628,50 @@ object LoomMain {
     val wsNote = workspace.get().map(p => s", workspace $p").getOrElse("")
     println(s"serving $dir at http://localhost:$port/ (Ctrl-C to stop)$wsNote")
     new java.util.concurrent.CountDownLatch(1).await()
+  }
+
+  /** CHI generation path (S2 skeleton). Reads the same loom/v1 IR; the user
+    * facing schema is unchanged (D7). Emits the CHI port skeleton plus the
+    * SAM-backed node model.
+    */
+  private def runEmitChi(xs: List[String]): Unit = {
+    val cfg = must(xs, "--config")
+    val out = must(xs, "--out")
+    val v = validate(readConfig(cfg))
+    if (v.errors.nonEmpty) {
+      v.errors.foreach(e => println(s"ERROR: $e"))
+      sys.exit(3)
+    }
+    val chiCfg = ChiConfig.fromIr(v.ir)
+    val params =
+      try ChiParams.fromIr(v.ir, chiCfg)
+      catch {
+        case e: Throwable =>
+          println(s"ERROR: ${e.getMessage}")
+          sys.exit(3)
+      }
+    Files.createDirectories(Paths.get(out))
+    val net = ChiNetworkParams.fromIr(v.ir, chiCfg, snpEnable = chiCfg.dvmEnable)
+    ChiselStage.emitSystemVerilogFile(new ChiNetworkTop(net), Array("--target-dir", out))
+    writeJson(out, "checks.json", Reports.checksJson(v.ir, v.hash, Nil, v.warnings, v.gates))
+    writeJson(out, "chi_nodes.json", chiNodesJson(params))
+    println(s"emitted CHI network ${params.name} (${params.nRn} RN x ${params.nSn} SN) to $out")
+    println(s"hash=${v.hash} datWidth=${chiCfg.datWidth} warnings=${v.warnings.size}")
+  }
+
+  private def chiNodesJson(p: ChiParams): JValue = {
+    def node(n: loom.chi.ChiNode): JValue =
+      JObj(Vector("id" -> JStr(n.id), "kind" -> JStr(n.kind.toString),
+        "nodeId" -> loom.ir.JNum(n.nodeId), "clock" -> JStr(n.clock)))
+    JObj(Vector(
+      "name" -> JStr(p.name),
+      "datWidth" -> loom.ir.JNum(p.cfg.datWidth),
+      "rn" -> JArr(p.rnNodes.map(node).toVector),
+      "sn" -> JArr(p.snNodes.map(node).toVector),
+      "sam" -> JArr(p.sam.map(e =>
+        JObj(Vector("base" -> loom.ir.JNum(e.base), "size" -> loom.ir.JNum(e.size),
+          "tgtId" -> loom.ir.JNum(e.tgtId)))).toVector)
+    ))
   }
 
   /** Emit the standalone CDC / width building blocks for review and reuse. */
