@@ -1,8 +1,8 @@
 # ForagerBee DMA 硬件规格
 
-文档版本：`v4.0.0`
+文档版本：`v6.0.0`
 
-修订日期：`2026-11-17`
+修订日期：`2026-11-25`
 
 ## 版本控制
 
@@ -16,6 +16,8 @@
 
 | 版本号 | 日期 | 修改内容 | 相关 Feature ID |
 |---|---|---|---|
+| v6.0.0 | 2026-11-25 | **顶层 ABI 变更（Queen 设备化）**：ForagerBee 顶层即 Queen 设备（镜像 WorkerBee），外露 native beat/resp/wrErr/completion/deviceIdle/flushReq/flushAck/irq；原始 Stream 核心降为内部 FbCore（新增每引擎 errPulse 输出），删除包装层 ForagerBeeReg；错误中断 errPulse→regIf.intrSrc（intrWidth=numPorts）；hwSignal/traceTag RUN 当拍采样随 completion 回传；发射入口 ForagerBeeElaborate 发射 Queen 顶层 | FB-F031 |
+| v5.0.0 | 2026-11-25 | **寄存器接口 ABI 变更（Queen 对齐）**：删除自研 FbRegIf，ForagerBeeReg 改为复用 Queen 公共模块 QueenDsaRegIf/QueenDsaCompletion；cmd 改 native beat（WRITE1/WRITE2/READ/RUN，单 ready）、resp 仅 QRD、非法写走 wrErr 脉冲；RUN 取代 START 寄存器并反压而非 err；完成走 completion 端口（swTag/hwTag/error/code/hwSignal），删除 DONE/DONE_CNT/CREDIT 寄存器；credit=N 上下文槽按完成归还、RUN 当拍采样延迟一拍发射；新增公共契约区（中断/hwSignal/TRACE_TAG）与核心最小 flush、flush 四相、强 deviceIdle | FB-F031 |
 | v4.0.0 | 2026-11-17 | **寄存器接口 ABI 变更**：cmd 由单 lane 改为 4 lane、resp 1 lane 带 laneId；batch 接收、4 路并行写、回执按 lane 优先级排空（读按 lane 序返回）；跨 lane 同址写冲突 err、同 batch 多 START 仅授权最低 lane；credit/双 bank 语义不变 | FB-F031 |
 | v3.1.0 | 2026-11-17 | 兼容新增：可选寄存器配置顶层 ForagerBeeReg/FbRegIf（WRITE1/WRITE2/READ/START、双 bank、credit=N 按 done 返还、配置 0x00–0x3F/状态 0x40+）；原 ForagerBee cmd/done Stream 契约与引擎零改动 | FB-F031 |
 | v3.0.0 | 2026-10-26 | **默认配置接口变更**：addressWidth 32→40，导出入口继承默认；命令地址/stride、总线地址和 SG 描述符默认字段宽度随之变化；显式 32 bit 配置仍可使用，操作/格式编码不变 | FB-F001/008/014/028 |
@@ -82,7 +84,7 @@ ForagerBee 是多引擎张量 DMA，经单一 `cmd` Stream 接收命令，按 sh
 
 | 外部对象 | 交互 | 外部责任 |
 |---|---|---|
-| 命令源 | 提交 `FbCmd`、消费 `FbDone`，观察 `busy/occupancy/idle` | 合法输入、未用字段清零、按 tag 关联、hazard 盲区串行化 |
+| Queen 上游 | 经 native beat 下发配置/RUN，消费 completion 与 irq，发起 flush | 合法配置、RUN 独占 beat、按 swTag 关联完成、无条件接收 completion、四相 flush |
 | 存储系统 | `bus[p]` 四条 Stream；SG 表复用读通道 | 覆盖 beat 可读、byte strobe 正确、请求/响应数量准确；共享写响应保序 |
 | 时钟/复位 | 单一隐式时钟与复位 | 跨域在外部处理；复位前排空事务 |
 
@@ -90,12 +92,20 @@ ForagerBee 是多引擎张量 DMA，经单一 `cmd` Stream 接收命令，按 sh
 
 ```text
                       clock / reset（单时钟域）
-cmd -> FbTile2LinearExpander -> FbDispatcher（FIFO + bbox hazard）
+ForagerBee（Queen 设备顶层）
+  cmd(native beat) -> QueenDsaRegIf（shadow/live、单 ready、wrErr、中断、hwSignal/traceTag）
+  RUN 当拍采样 swTag/hwSignal 入 N 上下文槽 -> 延迟一拍组装 FbCmd
+                                      |-> FbCore（原始 Stream 核心）
+  FbCore 内部：
+    cmd -> FbTile2LinearExpander -> FbDispatcher（FIFO + bbox hazard）
                                       |-> FbEngine[0]   <-> bus[0]
                                       |-> ...
                                       `-> FbEngine[N-1] <-> bus[N-1]
-done <- transaction-lock round-robin <- 各引擎 done
-busy = OR(engine.busy)；occupancy = FIFO 占用；idle = !busy && occupancy==0
+    done <- transaction-lock round-robin <- 各引擎 done
+    busy = OR(engine.busy)；occupancy = FIFO 占用；idle = !busy && occupancy==0
+  按 FbCmd.tag 取槽 -> completion（swTag/hwTag/error/code/hwSignal）
+  每引擎 done.err 脉冲 -> QueenDsaRegIf.intrSrc -> irq
+  deviceIdle = FbCore.idle && 无在途槽；flush 四相复位 RegIf + 核心最小 flush
 
 引擎普通搬运：ByteReader -> [FormatConverter/旁路] -> ByteWriter
 MX：ByteReader -> MxQuantizer -> ByteWriter；scale 累积后侧写
@@ -145,7 +155,7 @@ TRANSPOSE：ByteReader -> 原 tile buffer -> 专用带 strobe 写通路
 | FB-F028 | 物理 beat 对齐/逻辑非对齐及尾部 | 已实现 | 字节 reader/writer、精确转换字节计数、物理 burst 拆分与读队列整 burst credit 预留；源覆盖 beat 必须可访问 | 5.1.12、7.3.3、9.3 |
 | FB-F029 | IM2COL 水平边界与 dilation | 已实现 | `dW=1` 整窗有效则 burst，否则逐 kw fallback；无效元素不读源 | 5.1.6 |
 | FB-F030 | 可编程 `padValue` | 已实现 | 低目的元素位重复，转换后填充，不对 padValue 做数值转换 | 5.1.3、5.1.6 |
-| FB-F031 | 寄存器配置接口（ForagerBeeReg） | 已实现 | 可选包装层；4 lane cmd/1 lane resp（laneId）、WRITE1/WRITE2/READ/START、双 bank、credit=N 按 done 返还；原 cmd/done Stream 顶层保留 | 8.3 |
+| FB-F031 | 寄存器配置接口（ForagerBee 顶层） | 已实现 | ForagerBee 顶层即 Queen 设备，复用 Queen QueenDsaRegIf/QueenDsaCompletion；native beat（WRITE1/WRITE2/READ/RUN）单 ready、resp 仅 QRD、wrErr 脉冲；RUN 反压、credit=N 上下文槽按完成归还、completion 端口回传、errPulse→intrSrc 中断、核心最小 flush；raw Stream 降为内部 FbCore | 8.3 |
 
 功能表仅索引；详细合法域、限制和验证状态见对应章节及第 14 章。
 
@@ -193,8 +203,9 @@ TRANSPOSE：ByteReader -> 原 tile buffer -> 专用带 strobe 写通路
 | `FbScatterGatherCtrl`（能力及位宽条件） | 复用读口逐条 fetch，一个 beat 一个描述符，无预取 |
 | `FbWrPortArbiter`（可选） | 写数据选择与响应 owner 路由，无数据 FIFO |
 | done 仲裁 | transaction-lock round-robin，反压保持选中的回执 |
-| `FbRegIf`（可选包装） | 4 lane 寄存器堆双 bank、WRITE1/WRITE2/READ/START 解码、按 lane 序排空回执、credit 计数、FbCmd 组装；消费 done 更新状态 |
-| `ForagerBeeReg`（可选顶层） | FbRegIf + ForagerBee 内部连线，外露寄存器命令/回执与总线；引擎零改动 |
+| `QueenDsaRegIf`（复用 Queen 公共模块） | shadow/live 寄存器堆、native beat 单 ready 解码、wrErr 脉冲、QRD 组合读、中断四寄存器、hwSignal/TRACE_TAG 公共契约区、start/startSwTag 组合输出 |
+| `FbCore`（内部 Stream 核心） | expander + dispatcher + 多引擎 + 可选共享写仲裁 + done 仲裁；对外 cmd/done Stream + occupancy/busy/idle + 每引擎 errPulse；引擎除 flush 输入外零改动 |
+| `ForagerBee`（Queen 设备顶层） | QueenDsaRegIf + FbCore 内部连线；N 上下文槽采样/credit 按完成归还、延迟一拍组装 FbCmd、按 tag 乱序回传 completion、errPulse→intrSrc 中断、flush 四相与强 deviceIdle |
 
 ### 4.2 数据通路与控制通路
 
@@ -415,20 +426,25 @@ MX 反量化未实现；本轮对原 quantizer 不作额外数值正确性承诺
 
 ### 6.1 接口与信号总表
 
-方向以 ForagerBee 为参照，全部同一时钟域。
+方向以 ForagerBee（Queen 设备顶层）为参照，全部同一时钟域。
 
 | 接口/信号 | 方向 | 类型/宽度 | 含义与有效条件 |
 |---|---|---|---|
-| `cmd` | 输入 Stream | FbCmd | valid&&ready 接受，可排队；不是 Raw 二进制入口 |
-| `done` | 输出 Stream | FbDone | tag/err，全部路径可反压 |
-| `occupancy` | 输出 | log2Up(queueDepth+1) | FIFO 占用，不含执行或待消费回执 |
-| `busy` | 输出 | 1 | OR(engine.state!=IDLE)，包含 done 反压，不含 FIFO |
-| `idle` | 输出 | 1 | !busy && occupancy==0，无 cmd.valid 门控 |
+| `cmd` | 输入 Decoupled | Vec(nativeWidth, Valid(QueenNativeCmd)) | 单 ready 并行配置 beat；写恒可收、RUN 取 startReady、READ 取 resp.ready |
+| `resp` | 输出 Decoupled | QueenDsaRegResp{data(32),err(1)} | 仅承载 QRD 读数据，与被接受的读同拍组合返回 |
+| `wrErr` | 输出 | Vec(nativeWidth, Bool) | 非法写 per-lane 脉冲，不阻塞、不回 err 数据 |
+| `completion` | 输出 Valid | QueenDsaCompletion | swTag/hwTag/error/code/hwSignal；Queen 无条件接收，每拍 ≤1 条 |
+| `deviceIdle` | 输出 | 1 | 核心 idle 且无在途上下文槽（强 idle） |
+| `flushReq` | 输入 | 1 | flush 四相请求 |
+| `flushAck` | 输出 | 1 | 核心排空后 ack |
+| `irq` | 输出 | 1 | (intrRaw & ~intrMask).orR |
 | `bus[p]` | 主接口 | FbStreamBus × numPorts | 读独占，写可重映射 |
 | `bus[p].rd` | 输出 Stream | addr[addressWidth]、len[8] | 对齐物理地址，len+1 beat |
 | `bus[p].rdData` | 输入 Stream | data[dataWidth]、sof/eof/err 各 1 | 读数据及错误 |
 | `bus[p].wr` | 输出 Stream | addr、len[8]、data、strb[BB]、sof/eof | 地址/长度仅 SOF 有效；无 atomic 字段 |
 | `bus[p].wrResp` | 输入 Stream | err[1] | 每 burst 一次响应 |
+
+内部核心 `FbCore` 仍为结构化 `cmd`/`done` Stream（FbCmd/FbDone）+ `occupancy`/`busy`/`idle` + 每引擎 `errPulse`，供内部连线与测试直接驱动；**不再作为顶层对外契约**。寄存器映射、credit、completion 与 flush 语义见 8.3。
 
 chainBus、cvtScale、cvtZeroPoint 已不存在，不需绑零或保留占位端口。
 
@@ -639,24 +655,26 @@ SG 硬件额外要求 dataWidth>=addressWidth+16，否则该通道 SG 命令报�
 
 所有运行参数由 FbCmd 随命令传递，在引擎派发握手锁存；无全局活线、不需要静默期修改 cvt 参数。padValue 为每命令字段，不能修改已接受命令。idle 只是观测，不限制 cmd.valid 或命令连续提交。
 
-### 8.3 寄存器配置接口（FB-F031，ForagerBeeReg）
+### 8.3 寄存器配置接口（FB-F031，ForagerBee 顶层）
 
-基础 ForagerBee 顶层仍只有结构化 `cmd`/`done` Stream，无 MMIO。可选包装顶层 `ForagerBeeReg`（`FbRegIf` + ForagerBee）在其上增加寄存器配置接口，供 Queen 等上游以寄存器写下发命令；引擎、Dispatcher 与原 Stream 契约零改动，原 `cmd`/`done` 在包装内部连接。Queen 侧 adapter 非本模块交付，仅保证接口字段可对接 QueenCpuReq（dsaT=10/11 预留 DMA）。
+**ForagerBee 顶层即 Queen 设备**（镜像 WorkerBee）：直接复用 Queen 公共模块 `QueenDsaRegIf`（配置前端：shadow/live、单 ready、wrErr 脉冲、中断四寄存器、公共契约区）与 `QueenDsaCompletion`（完成回传），对齐 `queenHarewareInterface.md` 第 13/14 章设备契约。原始 Stream 核心降为内部子模块 `FbCore`（expander + dispatcher + 多引擎 + 可选共享写仲裁），引擎与 Dispatcher 除最小 flush 输入外零改动；`FbCore` 的 `cmd`/`done` Stream 仅供内部连线与测试驱动，不再外露。Queen 侧 adapter/端点控制器非本模块交付。
 
-#### 8.3.1 命令/回执接口
+#### 8.3.1 命令/回执/完成接口
 
-`FbRegCmd`：op(2 bit)、reg0Addr/reg1Addr(**7 bit**)、data0/data1(32)、pc(32)、tag(8)；**cmd 为 4 lane Stream**（`Vec(4)`，对齐 Queen 4 指令 lane）。`FbRegResp`：data(32)、err(1)、**laneId(2)**，**resp 为 1 lane**。
+配置命令直接消费 Queen 并行 native beat：`cmd = Flipped(Decoupled(Vec(nativeWidth, Valid(QueenNativeCmd))))`，`nativeWidth` 默认 4（对齐 Queen 4 指令 lane）。`QueenNativeCmd`：op(`QueenNativeOp`)、reg0Addr/reg1Addr(10 bit)、data0/data1(32)、swTag(32)。
 
-接收/排空仿 WorkerBeeRegIf：无 pending 回执时 `acceptBatch=1`，4 lane 同拍接受一个 batch（4 路可并行写）；每 lane 回执锁存进缓冲，由 `PriorityEncoder(respPending)` 按 lane 优先级逐拍排空，`resp.laneId` 标识来源 lane。**读因此严格按 lane 升序依次返回**。batch 未排空前 `cmd.ready=0`（各 lane 一致）。
+| op | 语义 |
+|---|---|
+| WRITE1 | 写 reg0Addr=data0 |
+| WRITE2 | 同拍写 reg0Addr=data0、reg1Addr=data1（reg1=reg0+1 由 Queen 给出） |
+| READ | QRD 读 reg0Addr，组合当拍经 resp 返回 |
+| RUN | 启动：采样上下文、组装命令入队（取代旧 START 寄存器，无 0x1F START 槽） |
 
-| op | 编码 | 语义 |
-|---|---|---|
-| WRITE1 | 0 | 写 reg0Addr=data0 |
-| WRITE2 | 1 | 同拍写 reg0Addr=data0、reg1Addr=data1；两地址相同或任一非法则整笔拒绝 err |
-| READ | 2 | 读 reg0Addr，data 返回；非法地址 err |
-| START | 3 | 组装当前 shadow bank 为 FbCmd 快照推入内部 cmd Stream；tag/pc 取自本命令；credit==0 或命令队列满则 err |
+**单 ready 流控**（QueenDsaRegIf）：写 beat 恒可收（`cmd.ready=1`）；RUN beat 取 `startReady`；READ beat 取 `resp.ready`。写不占 resp 通道，非法写经 per-lane `wrErr` 脉冲上报（不阻塞、不回 err 数据）。`resp = Decoupled(QueenDsaRegResp{data(32),err(1)})`，仅承载 QRD 读数据，组合当拍返回（Queen `resp.ready` 恒 1）；非法读地址 `err=1`。RUN/READ 须独占一个 beat（QueenDsaRegIf assert 守卫）。
 
-地址 7 bit：配置空间 0x00–0x3F（Queen 侧扩展为 64 槽），已实现 0x00–0x22，0x23–0x3F 保留（写/读均 err）；状态 0x40+ 只读（写 err）。未映射地址写/读均 err。
+**完成回传** `completion = Valid(QueenDsaCompletion)`：swTag(32)、hwTag(32)、error(1)、code(faultCodeWidth)、hwSignal(`QueenHwSignal`)。Queen 无条件接收（每端点每拍 ≤1 条）。`error=1` 时 `hwSignal.enable` 强制 0。**不设 DONE/DONE_CNT/CREDIT 状态寄存器**——完成与错误一律走 completion 端口。
+
+地址空间（`QueenDsaRegIfAddr`，10 bit）：私有配置 0x00–0x22（35 槽），0x23–0x3F 保留；状态 0x40 只读；公共契约区中断 0x60/0x64/0x68/0x6C、hwSignal 目标 0x80/掩码 0x81、TRACE_TAG 0xA0。保留/未映射写经 wrErr 脉冲拒绝、读 `err=1`；状态写 wrErr。
 
 #### 8.3.2 配置寄存器映射（32 bit/槽，addressWidth=40）
 
@@ -692,29 +710,38 @@ SG 硬件额外要求 dataWidth>=addressWidth+16，否则该通道 SG 命令报�
 | 0x21 | T2L_TILE_NROW | t2lTileCols[15:0]、t2lNumTileRows[31:16] |
 | 0x22 | T2L_NTCOL | t2lNumTileCols[15:0] |
 
-地址/stride 高 8 位拼槽要求 addressWidth<=40（FbRegIf require）；addressWidth<40 时高位字段写 0，组装按实际位宽截取。maxDims<5 时高维字段忽略。模式/开关位归 CTRL，参数值归专用槽。
+地址/stride 高 8 位拼槽要求 addressWidth<=40（ForagerBee require）；addressWidth<40 时高位字段写 0，组装按实际位宽截取。maxDims<5 时高维字段忽略。模式/开关位归 CTRL，参数值归专用槽。
 
-#### 8.3.3 状态寄存器（只读）
+#### 8.3.3 状态寄存器与公共契约区
+
+私有状态（只读，写 wrErr）：
 
 | 槽 | 名称 | 位域 |
 |---|---|---|
 | 0x40 | STATUS | busy[0]、idle[1]、occupancy[17:2] |
-| 0x41 | DONE | lastTag[7:0]、lastErr[8] |
-| 0x42 | DONE_CNT | 完成命令计数（32 bit，回绕） |
-| 0x43 | CREDIT | 当前 credit |
 
-#### 8.3.4 双 bank 与 credit 语义
+公共契约区由 QueenDsaRegIf 内建（非本模块私有，软件经 QRD/QWR 访问）：
 
-- 两套配置 bank。写永远落 shadow bank；START 当拍组装 shadow 为 FbCmd 快照入队，随后两 bank 角色互换。**新 shadow bank 不继承旧 bank 字段**，软件须为每条命令完整配置当前 bank（含 CTRL/ADDR_HI）。读回返回 shadow bank 当前值。
-- credit 初值 = numPorts（N）。START 被接受则 credit−1；每个引擎 done.fire 恢复 1（上限 N）。credit==0 时 START 回 err（N=1 即 START 后再 START 必错）。
-- credit 按**完成**而非派发返还：快照入队后即使 Dispatcher 因地址 hazard 迟迟不派发，credit 仍占用，直到该命令 done。命令队列满（fbCmd.ready=0）时 START 亦回 err，即使 credit>0。
-- 引擎在派发时锁存命令，故 active bank 在途期间写 shadow 安全。done 由 FbRegIf 消费（ready 恒 1），更新 lastTag/lastErr/DONE_CNT 并返还 credit；包装顶层不再外露 done Stream。
-- **4 路并行写**：一个 batch 内各 lane 的 WRITE1/WRITE2 同拍提交。**跨 lane 同址写冲突**（含某 lane WRITE2 的 reg0/reg1 与他 lane 目标同址）使相关 lane 回 err 且不写；单 lane WRITE2 自身 reg0==reg1 亦 err。
-- **同 batch 多条 START 仅授权最低 lane 一条入队**（PriorityEncoderOH），其余 START lane 回 err；fbCmd 单口每拍至多入队一条。获授权 lane 的 tag 进入组装命令。
+| 槽 | 名称 | 位域/语义 |
+|---|---|---|
+| 0x60/0x64/0x68/0x6C | IntrRaw/IntrForce/IntrMask/IntrStatus | 中断 IntrRFMS4（raw:=(raw&~clr)|set|intrSrc） |
+| 0x80 | HwSignalTarget | enable[0]、isTimeline[1]、group[6:2]、timeline[9:7] |
+| 0x81 | HwSignalMask | mask[31:0] |
+| 0xA0 | TraceTag | RUN rs2=0 时沿用的 swTag |
+
+#### 8.3.4 上下文采样、credit 与延迟发射
+
+- **shadow/live 双组**（QueenDsaRegIf）：写落 shadow，QRD 读 shadow；RUN 当拍 `live:=shadow` 整组 dump，`cfgRegs` 输出 live。
+- **credit = N=numPorts 个上下文槽，按完成归还**（13.7）。RUN 被接受（start fire）当拍：分配空闲槽、采样 `startSwTag`/`hwSignal` 入槽、槽号写入 `FbCmd.tag`、credit−1。**RUN 反压而非 err**：无空闲槽、命令队列满或 flush 中 → `startReady=0`，Queen 停等（13.6）。
+- **延迟一拍发射**：live 在 RUN 当拍寄存 dump，`cfgRegs` 下一拍才稳定，故命令在 RUN 下一拍组装入队（`pendingSlot` 记住槽号）；pending 未发射期间 `startReady=0`，防止 live 被新 RUN 覆盖。
+- **多引擎 done 可乱序**：按 `FbCmd.tag` 取槽回传 completion（swTag/hwTag/hwSignal 取自该槽采样副本），`done.fire` 清槽并归还 1 credit。能接受多少在途 RUN 就保存多少份采样副本（13.10.4）。
+- **swTag**：RUN rs2 非 0 覆盖，为 0 沿用 TRACE_TAG（QueenDsaRegIf `startSwTag`）；hwTag=槽号。hwSignal/swTag 均 RUN 当拍采样、随 completion 一并回传。
+- **错误中断**：每引擎错误完成脉冲（`FbCore.errPulse(p) = done.fire && err`）路由到 `regIf.intrSrc`（intrWidth=numPorts，每引擎一位），置位 IntrRaw（0x60），软件经 IntrMask（0x68）屏蔽/解除、IntrStatus（0x6C）观测、W1C 清 IntrRaw；`irq=(intrRaw&~intrMask).orR`。命令错误同时经 completion.error/code 回传。
+- **deviceIdle（强 idle）** = 核心 idle 且无在途上下文槽。**flush 四相** req↑→ack↑→req↓→ack↓：`flushReq` 拉起复位 RegIf（含公共契约区，`withReset`）、作废所有槽与 pending、核心最小 flush（FIFO flush + 派发门控 + 等引擎自然结束，无安全 abort）；核心 idle 后 `flushAck=1`。
 
 #### 8.3.5 验证状态
 
-FbRegIfSpec 11/11 通过：35 槽写读回环、WRITE2 同址/只读/保留/未映射 err、40 bit 高地址 COPY、双 bank 切换与忙时排队、N=1 credit 耗尽与恢复、hazard 阻塞下 credit 不提前返还、队满 START err、TRANSPOSE/PERMUTE/IM2COL/T2L/MX/SG/pad 组装与金锚等价、4 路并行写与读按 lane 序返回、跨 lane 同址写冲突 err、同 batch 多 START 仅授权最低 lane。基础 ForagerBee 既有回归不受影响（包装为附加层）。
+ForagerBeeRegSpec 9/9 通过（DUT 为 ForagerBee 顶层）：复位 idle 与 35 槽写读回环、非法写 wrErr 脉冲/保留读 err、40 bit 高地址 COPY 与 completion swTag、N=1 credit 耗尽 RUN 反压与完成恢复、多引擎乱序 completion 逐条 swTag 跟踪、hwSignal RUN 采样与 error 强制 enable=0、TRACE_TAG rs2=0 沿用/非 0 覆盖、命令错误路由中断 raw 与 W1C 清除、flush 四相丢弃排队命令。内部核心 FbCore 既有回归 ForagerBeeSpec 148/148 + ForagerBeeByteSpec 全绿不受影响（核心仅新增 flush 输入与 errPulse 输出）。
 
 ## 9. 时序与复位规范
 
@@ -767,18 +794,21 @@ FIFO 满则 cmd.ready=0，队首等待不出队。done 反压保持 busy/in-flig
 
 ### 11.1 状态输出（FB-F027）
 
+内部核心 `FbCore` 的状态定义如下；顶层经 STATUS 寄存器（0x40：busy[0]/idle[1]/occupancy[17:2]）与 `deviceIdle` 端口对外暴露，完成经 `completion` 端口（非 done Stream）。
+
 | 状态 | 属性 | 精确定义 |
 |---|---|---|
 | busy | 组合电平 | 任一 Engine state!=IDLE；含执行、响应等待、DONE/回执反压 |
 | occupancy | 电平计数 | Dispatcher FIFO 当前条目数，不含 in-flight |
-| idle | 组合电平 | **`!io.busy && io.occupancy===0`**；已接受工作及回执完全排空 |
-| done | Stream | 所属命令传输/响应结束，握手消费 tag/err |
+| idle | 组合电平 | **`!busy && occupancy===0`**；已接受工作及回执完全排空 |
+| deviceIdle | 组合电平（顶层） | FbCore.idle 且无在途上下文槽（强 idle，含已采样未回传副本） |
+| completion | Valid（顶层） | 所属命令传输/响应结束，按 tag 取槽回传 swTag/hwTag/error/code/hwSignal |
 
 idle 不额外与 `!cmd.valid` 相与，也不是 cmd.ready 门控。尚未握手的上游命令不算已接受工作；若要建立不会再进入新命令的静默窗口，命令源还须自己停止提交。只看 busy 可能忽略 FIFO；done 被反压时 busy=1、idle=0。此定义仅涵盖 ForagerBee，不证明外部系统所有主机/存储均空闲。
 
 ### 11.2 中断、性能事件与调试
 
-不适用：没有中断输出、内建性能计数器/事件、调试端口或 atomic 轮询通知。完成只有 done Stream。仿真内部信号、测试统计和仲裁 assert 不是产品观测 ABI。
+中断：每引擎错误完成脉冲（`FbCore.errPulse`）路由到 QueenDsaRegIf `intrSrc`（intrWidth=numPorts），经 IntrRFMS4 四寄存器（IntrRaw 0x60 / IntrForce 0x64 / IntrMask 0x68 / IntrStatus 0x6C）管理，顶层 `irq=(intrRaw&~intrMask).orR`；软件 W1C 清 IntrRaw。命令错误同时经 completion.error/code 回传。无内建性能计数器/事件、调试端口或 atomic 轮询通知。仿真内部信号、测试统计和仲裁 assert 不是产品观测 ABI。
 
 ## 12. 性能与资源规格
 
@@ -919,5 +949,5 @@ idle=!busy && occupancy==0（无 cmd.valid gate）
 - 接口峰值、局部稳态上限与端到端实测分开，不将功能机制、仿真设施或未来计划混入当前性能/debug 能力。
 - 当前字段、字节有效数、物理对齐、padValue、响应排空与 idle 均以主源码为准，规划与删除项不混入当前功能。
 - 既有完整回归 146/146；40 bit 默认配置定向 4/4、字节回归重跑 6/6 通过，范围与日期已记录到 14.2；已有生成 RTL 未刷新。
-- 寄存器接口 FbRegIfSpec 11/11 通过（8.3.5）；ForagerBeeReg 为附加包装层，基础 ForagerBee 契约与引擎零改动。
+- 寄存器接口 ForagerBeeRegSpec 9/9 通过（8.3.5，DUT 为 ForagerBee Queen 顶层）；ForagerBee 顶层复用 Queen QueenDsaRegIf/QueenDsaCompletion，内部 FbCore 既有回归 ForagerBeeSpec 148/148 + ForagerBeeByteSpec 全绿不受影响（核心仅新增 flush 输入与 errPulse 输出）。
 - 已通过回归检查 sentinel/邻字节不改、短行/跨 beat、bytes/last 稳定、SG 表/零长度错误、IM2COL pad 无源读、MX 行末 scale、共享响应路由、错误同拍聚合和 done 反压；数值/盲区/PPA 另有专项缺口。

@@ -704,7 +704,7 @@ class ForagerBeeByteSpec extends AnyFlatSpec {
       assert(s.jobs.size == 23)
       val score = new Scoreboard(s, cfg.beatBytes)
       implicit val testingDirectory: chisel3.testing.HasTestingDirectory = chisel3.testing.HasTestingDirectory.timestamp
-      (new chisel3.simulator.ChiselSim {}).simulateRaw(new ForagerBee(cfg)) { dut =>
+      (new chisel3.simulator.ChiselSim {}).simulateRaw(new FbCore(cfg)) { dut =>
         val slaves = Vector.tabulate(cfg.numPorts)(p => new Slave(cfg, p, score))
         val jobsByTag = s.jobs.map(j => j.cmd.tag -> j).toMap
         val completed = mutable.HashSet.empty[Int]

@@ -212,16 +212,16 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
 
   it should "elaborate all numPorts combinations" in {
     for (p <- Seq(1, 2, 3, 4)) {
-      val v = ChiselStage.emitSystemVerilog(new ForagerBee(ForagerBeeConfig(numPorts = p)))
-      v should include("module ForagerBee")
+      val v = ChiselStage.emitSystemVerilog(new FbCore(ForagerBeeConfig(numPorts = p)))
+      v should include("module FbCore")
     }
   }
 
   it should "elaborate with mixed channelTranspose" in {
-    val v = ChiselStage.emitSystemVerilog(new ForagerBee(ForagerBeeConfig(
+    val v = ChiselStage.emitSystemVerilog(new FbCore(ForagerBeeConfig(
       numPorts = 3, channelTranspose = Seq(true, false, true)
     )))
-    v should include("module ForagerBee")
+    v should include("module FbCore")
   }
 
   it should "reject illegal config parameters" in {
@@ -312,12 +312,12 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
         (m, bb) => new FbStreamMemSlave(m, bb),
       onDoneFire: Int => Unit = _ => (),
       doneReady: Int => Boolean = _ => true,
-      onCycle: (ForagerBee, Int) => Unit = (_, _) => ()
+      onCycle: (FbCore, Int) => Unit = (_, _) => ()
   ): (Seq[(Int, Boolean)], mutable.HashMap[BigInt, Byte]) = {
     val mem = prefill
     val dones = mutable.ArrayBuffer[(Int, Boolean)]() // (tag, err)
     implicit val testingDirectory: chisel3.testing.HasTestingDirectory = chisel3.testing.HasTestingDirectory.timestamp
-    (new chisel3.simulator.ChiselSim {}).simulateRaw(new ForagerBee(cfg)) { dut =>
+    (new chisel3.simulator.ChiselSim {}).simulateRaw(new FbCore(cfg)) { dut =>
       val models = Seq.fill(cfg.numPorts)(modelFactory(mem, cfg.beatBytes))
       val dummy = FbTestCmd()
       var cmdIdx = 0
@@ -980,7 +980,7 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
       shape = Seq(256), srcStride = Seq(256), dstStride = Seq(256),
       srcAddr = 0, dstAddr = 0x1000)
     implicit val testingDirectory: chisel3.testing.HasTestingDirectory = chisel3.testing.HasTestingDirectory.timestamp
-    (new chisel3.simulator.ChiselSim {}).simulateRaw(new ForagerBee(testCfg)) { dut =>
+    (new chisel3.simulator.ChiselSim {}).simulateRaw(new FbCore(testCfg)) { dut =>
       val models = Seq.fill(testCfg.numPorts)(new FbStreamMemSlave(mem, testCfg.beatBytes))
       pokeCmdPayload(dut.io.cmd.payload, cmd)
       dut.io.cmd.valid.poke(false.B)
@@ -1198,8 +1198,8 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   )
 
   it should "elaborate copy-only DMA (channelTranspose all false, channelPermute all false)" in {
-    val v = ChiselStage.emitSystemVerilog(new ForagerBee(copyOnlyCfg))
-    v should include("module ForagerBee")
+    val v = ChiselStage.emitSystemVerilog(new FbCore(copyOnlyCfg))
+    v should include("module FbCore")
   }
 
   it should "copy-only DMA rejects TRANSPOSE with err=true" in {
@@ -2458,22 +2458,22 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   private val sharedWrCfg = testCfg.copy(enableSharedWritePorts = true)
 
   it should "elaborate with enableSharedWritePorts=true (default numPorts=2)" in {
-    val v = ChiselStage.emitSystemVerilog(new ForagerBee(
+    val v = ChiselStage.emitSystemVerilog(new FbCore(
       ForagerBeeConfig(enableSharedWritePorts = true)))
-    v should include("module ForagerBee")
+    v should include("module FbCore")
   }
 
   it should "elaborate with enableSharedWritePorts=false (default) without FbWrPortArbiter" in {
     // 负向守卫：开关关闭时顶层保持 1:1 直连，仲裁器不应被例化/生成进 SV 文本
-    val v = ChiselStage.emitSystemVerilog(new ForagerBee(ForagerBeeConfig()))
+    val v = ChiselStage.emitSystemVerilog(new FbCore(ForagerBeeConfig()))
     v should not include "FbWrPortArbiter"
   }
 
   it should "elaborate enableSharedWritePorts=true with numPorts=1 (degenerate), 3 and 4" in {
     for (p <- Seq(1, 3, 4)) {
-      val v = ChiselStage.emitSystemVerilog(new ForagerBee(
+      val v = ChiselStage.emitSystemVerilog(new FbCore(
         ForagerBeeConfig(numPorts = p, enableSharedWritePorts = true)))
-      v should include("module ForagerBee")
+      v should include("module FbCore")
     }
   }
 
@@ -2652,22 +2652,22 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "nbwr: elaborate writeOutstandingDepth=4 (direct) and +enableSharedWritePorts=true" in {
-    val v1 = ChiselStage.emitSystemVerilog(new ForagerBee(nbwrCfg))
-    v1 should include("module ForagerBee")
+    val v1 = ChiselStage.emitSystemVerilog(new FbCore(nbwrCfg))
+    v1 should include("module FbCore")
     v1 should include regex """reg\s+\[2:0\]\s+outstanding;"""
-    val v2 = ChiselStage.emitSystemVerilog(new ForagerBee(nbwrSharedCfg))
-    v2 should include("module ForagerBee")
+    val v2 = ChiselStage.emitSystemVerilog(new FbCore(nbwrSharedCfg))
+    v2 should include("module FbCore")
     v2 should include regex """reg\s+\[2:0\]\s+outstanding;"""
     v2 should include("FbWrPortArbiter")
     v2 should include("ownerFifo")
   }
 
   it should "nbwr: default depth uses one-bit writer credit and no shared owner FIFO" in {
-    val v = ChiselStage.emitSystemVerilog(new ForagerBee(ForagerBeeConfig()))
-    v should include("module ForagerBee")
+    val v = ChiselStage.emitSystemVerilog(new FbCore(ForagerBeeConfig()))
+    v should include("module FbCore")
     v should include regex """reg\s+outstanding;"""
     v should not include "FbWrPortArbiter"
-    val v2 = ChiselStage.emitSystemVerilog(new ForagerBee(ForagerBeeConfig(enableSharedWritePorts = true)))
+    val v2 = ChiselStage.emitSystemVerilog(new FbCore(ForagerBeeConfig(enableSharedWritePorts = true)))
     v2 should include("FbWrPortArbiter")
     v2 should include regex """reg\s+outstanding;"""
     v2 should not include "ownerFifo"
@@ -3695,14 +3695,14 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
 
   it should "elaborate float conversion and MX quantization configurations" in {
     for (cfg <- Seq(cvtCfg, mxqCfg, dispCvtCfg)) {
-      val v = ChiselStage.emitSystemVerilog(new ForagerBee(cfg))
-      v should include("module ForagerBee")
+      val v = ChiselStage.emitSystemVerilog(new FbCore(cfg))
+      v should include("module FbCore")
     }
   }
 
   it should "not instantiate converters when enableConversion=false" in {
-    val v = ChiselStage.emitSystemVerilog(new ForagerBee(testCfg))
-    v should include("module ForagerBee")
+    val v = ChiselStage.emitSystemVerilog(new FbCore(testCfg))
+    v should include("module FbCore")
     v should not include ("FbMxQuantizer")
     v should not include ("FbFormatConverter")
   }

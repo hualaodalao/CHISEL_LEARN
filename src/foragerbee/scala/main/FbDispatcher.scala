@@ -53,11 +53,14 @@ class FbDispatcher(cfg: ForagerBeeConfig) extends Module {
 
     /** 每通道 done fire 信号（来自引擎，脉冲式，用于清除 in-flight 状态） */
     val chDone = Input(Vec(cfg.numPorts, Bool()))
+
+    /** flush：清空命令 FIFO 并门控派发；运行中引擎自然结束（无安全 abort） */
+    val flush = Input(Bool())
   })
 
   // --- 命令 FIFO ---
   val fifo = Module(new StreamFifo(new FbCmd(cfg), cfg.queueDepth))
-  fifo.io.flush := false.B
+  fifo.io.flush := io.flush
   fifo.io.push << io.push
   io.occupancy := fifo.io.occupancy
 
@@ -257,7 +260,7 @@ class FbDispatcher(cfg: ForagerBeeConfig) extends Module {
   val selectedChannel = PriorityEncoder(effectiveEligible)
 
   // --- 派发逻辑 ---
-  val canDispatch = cmdValid && !anyConflict && anyEligible
+  val canDispatch = cmdValid && !anyConflict && anyEligible && !io.flush
 
   // 默认：所有 pop 口无效
   for (p <- 0 until cfg.numPorts) {
