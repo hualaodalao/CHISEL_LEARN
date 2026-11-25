@@ -1,6 +1,6 @@
 # WorkerBee 硬件规格
 
-文档版本：`v6.0.0`
+文档版本：`v6.1.0`
 
 修订日期：`2026-11-25`
 
@@ -22,6 +22,7 @@
 
 | 版本号 | 日期 | 修改内容 | 相关 Feature ID |
 |---|---|---|---|
+| v6.1.0 | 2026-11-25 | 兼容新增（对齐 Queen 通用 DSA 契约 §5.3/§5.5/§13.5/§13.10.5，Phase 2）：顶层新增 `deviceIdle` 强 idle 输出（纯组合电平：命令空 ∧ 无执行 ∧ 无在途内存事务 ∧ 无未回传 completion，覆盖 executor busy/osActive、inFlight、A/B/C 与 scaleA/scaleB/scaleC DMA busy、A/B/C/scaleB 工作 FIFO occupancy、bias 取数 FSM 与共享 ScaleA 物理口在途计数 biasPortBusy）；新增 `flushReq/flushAck` 四相恢复握手（req↑→置 flushing 并 block 新 RUN→等当前工作自然结束至 deviceIdle→ack↑→req↓→ack↓）。`startReady` 由 `!inFlight` 改为 `!inFlight && !flushing`。裁定边界：flush 不复位 RegIf、不抑制 completion（等待自然结束期间 done/configError 照常回传）、不做安全 abort、不触碰内部数据流。新增第 6.10 节与 WB-F028；第 14.2 节移除原 Phase 2 待办项。全量回归 23 套件 261 例通过；数据通路计算子模块 RTL 逐字节零 diff，DmaRdOnly 仅引出既有 state 的 io_busy 观测口，顶层为 deviceIdle/flush 集成层 | WB-F028（新增）；WB-F021、WB-F022（startReady 门控）；6.8、6.10（新增）、14.2 |
 | v6.0.0 | 2026-11-25 | 不兼容端口变更（对齐 Queen 通用 DSA 契约，queenHarewareInterface.md §13/§14）：`cmd` 改为单 ready 并行 native beat `Flipped(Decoupled(Vec(4, Valid(QueenNativeCmd))))`，写 beat 恒可收、RUN 取 startReady、READ 取 resp.ready，RUN/READ 必须独占 beat；命令 payload 改用 QueenNativeCmd（op=WRITE1/WRITE2/READ/RUN，swTag 32-bit，无 pc）；`resp` 改为 `Decoupled(QueenDsaRegResp{data,err})`，只承载 QRD 读数据且与被接受读同拍，无 laneId、写不产生响应；新增 per-lane 写错误脉冲 `wrErr` 与完成流 `completion: Valid(QueenDsaCompletion)`——done/configError 不再置 IRQ，由 completion 携带 error/code/swTag/hwSignal（error=1 ⟹ hwSignal 全 0）；删除手写 WorkerBeeRegIf 类，直接例化 QueenDsaRegIf(12,2,8) 加纯组合译码层；删除 `cfgCredit` 端口（内部 startReady=!inFlight）；地址重映射：status 0x40、errorCode 0x41（替代旧 0x45），中断改 IntrRFMS4（0x60/0x64/0x68/0x6C），hwSignal 0x80/0x81、traceTag 0xA0，旧 IRQ 0x41–0x45、IRQ_CLEAR 0x44 与 WRITE_CONFLICT bit10 全部废除；中断源改为 8 位 DMA/总线错误 `intrSrc=dmaErrors(8)`（对原计划 intrWidth=1 的有意偏离，依据 §13.4 保留 DMA 错误 IRQ 覆盖）；普通配置写跨 lane 同址 last-wins，W1C/W1S 跨 lane 合并。CONTROL 位布局、数值、DMA、perf 与 errCode 判据/优先级契约不变；deviceIdle 强 idle 与 flush 四相握手留待 Phase 2。全量回归 22 套件 255 例通过，数据通路 RTL 零 diff | WB-F021、WB-F022、WB-F023；WB-F025/WB-D002（tracing 元数据）、WB-P006（口径）；4.2、5.1.5、6、8、9.1–9.2、10.4–10.5、11、13、14 |
 | v5.1.0 | 2026-11-20 | 细化 FP/MX 默认归约实现：默认归约器由窄化多操作数加法器改为三槽 lazy-40 `{C,S1,S2}`（`W=19` 窗口），MXFP4 四元素块和改由块内整数前端直接从 nibble 精确计算（单积 ≤144、块和 ≤576，11-bit 带符号，不经 fp32 乘积域），五槽 `{C,L0,L1,L2,L3}` 串行基线退为显式关闭窄化时的逐位参考、不属于默认交付；明确三段精度契约（J1 窗口无损逐位精确 / J2 相对误差 ≤`2^-18` / J3 宽幅相消绝对界兜底）及窗口参数契约（`W∈[8,28]` 默认 19、BF16 需 `W≥16`、`cEffW≥40`、J2 相对界 `2^-(W-1)`，编译期 require 强制）；新增 MXFP4 块级边界语义（underflow `e2+scale<2` 元素冲刷保号零、tiny-scale `scaleA+scaleB<121` 整块冲刷真零、块溢出 `scaleA+scaleB−120>254` 饱和到有限 ≈fp32max、非 Inf 非 sticky）；声明 MXFP8/BF16 三槽与五槽掩零逐位等价，MXFP4 单拍数值相等但 lazy 切分不同 ⟹ 多拍累加可能分叉（仍受精度契约约束）。既有非逐位归约契约、格式集、寄存器映射与端口位宽不变 | WB-F005、WB-F006、WB-F007、WB-F009、WB-F011、WB-F026；5.2.5、5.2.6 |
 | v5.0.0 | 2026-11-17 | 不兼容配置通路变更（对齐 Queen 接口语义）：WorkerBeeOp 新增 `RUN`（编码 3，原保留），启动不再经寄存器写，原 `START`=`0x10` 删除；配置寄存器拆为 shadow/live 两组——QWR/QRD 恒读写 shadow 且执行期不受限，`RUN` 接受拍把 shadow 整组 dump 进 live 并启动，`io.regFile` 恒取 live，故同批配置写属于下一次提交；新增 1-bit 电平输出 `cfgCredit`（=`!inFlight`）只门控 `RUN`，本批仅授权最低 valid 的 `RUN` lane，tracing 元数据改取该命令；命令地址由 6-bit 扩为 10-bit，状态/IRQ 区迁至 `0x40–0x45`（STATUS `0x40`、IRQ_RAW `0x41`、MASK `0x42`、MASKED `0x43`、CLEAR `0x44`、ERROR_CODE `0x45`），旧 `0x1E`/`0x30–0x34` 成为保留空洞；执行期配置写不再以 `resp.err` 拒绝。CONTROL 位布局、数值、DMA、IRQ 位定义与首次 tracing 配对限制不变。`hwSignal` 记录为待办，本版不实现。四路接口专项 26 例通过 | WB-F021、WB-F022、WB-F025、WB-D002；6.1–6.3、6.8（新增）、8.3、8.6、8.8、9.2、13.1–13.4、14.1–14.2 |
@@ -133,6 +134,7 @@ v4.0.0 起 Feature ID 前缀由 `HIVE-` 改为 `WB-`，`HIVE-Xnnn` 与 `WB-Xnnn`
 | WB-F025 | 首次执行 Tracing（历史 ID） | 已实现 | 历史功能索引；类别化 Debug 索引为 WB-D002 | 6.3、9.2、11.4 |
 | WB-F026 | BF16 计算 | 已实现 | 专用窄乘法器，不复用 MX remap；每 lane 单元素；输入与乘积下溢冲刷为零、上溢饱和为最大有限值；WS 两种 B 装载模式均合法，OS-M1 要求 mode1；不得与非 BF16 格式混配；可作为 C 输出格式 | 5.2.4、7.1–7.2、10.2 |
 | WB-F027 | OS-M1 单行输出驻留 | 已实现 | CONTROL[31] 显式使能，仅 M=1/loadWMode=1；首行 T 个 PE 本地累加，A/ScaleA 右传，B/ScaleB 升序送入每列双槽窗口；Run/Tail 按真实消费推进，全 K 后自然列序提交一次，沿用 epilogue 和完整 Nprog 写回 | 4.1–4.2、5.1.6、5.2.9、5.4.5、7.5–7.7、8.5、10.2 |
+| WB-F028 | 强 idle 与 flush 恢复握手 | 已实现 | `deviceIdle` 纯组合强 idle 电平（命令空 ∧ 无执行 ∧ 无在途内存 ∧ 无未回传 completion，覆盖 A/B/C/scale DMA busy、工作 FIFO occupancy、bias 取数与共享 ScaleA 口在途计数）；`flushReq/flushAck` 四相恢复（req↑→block 新 RUN→等自然结束至 deviceIdle→ack↑→req↓→ack↓）；不复位 RegIf、不抑制 completion、不做安全 abort | 6.8、6.10、14.2 |
 
 ### 3.3 性能清单
 
@@ -798,12 +800,13 @@ Scale 端口只在编译期包含 MX 硬件时存在。
 
 ### 6.8 执行准入（startReady 与 inFlight）
 
-原 1-bit 电平输出端口 `cfgCredit` **已删除**。执行准入改为设备内部信号 `startReady = !inFlight`，直接馈入 QueenDsaRegIf 的 `startReady` 输入，语义与原深度 1 的 credit 等价（一个执行上下文）：
+原 1-bit 电平输出端口 `cfgCredit` **已删除**。执行准入改为设备内部信号 `startReady = !inFlight && !flushing`，直接馈入 QueenDsaRegIf 的 `startReady` 输入，语义与原深度 1 的 credit 等价（一个执行上下文）；`flushing` 为 flush 恢复期间内部状态（第 6.10 节）：
 
 | 条件 | `startReady` | RUN beat `cmd.ready` |
 |---|---:|---:|
-| `inFlight=0` | 1 | 1 |
+| `inFlight=0 且 !flushing` | 1 | 1 |
 | `inFlight=1` | 0 | 0 |
+| `flushing=1`（flush 恢复期间） | 0 | 0 |
 
 契约：
 
@@ -833,6 +836,39 @@ Scale 端口只在编译期包含 MX 硬件时存在。
 - `error=1 ⟹ hwSignal.enable=0` 是硬规则：错误完成不得携带有效硬件信号目标。
 - 同拍清除 `inFlight`；configError 还把 errCode 锁存进 errorCodeReg（0x41，下次 start 清零）供 QRD 调试读取。
 - 正常完成（error=0）不表示无 DMA 错误：DMA/总线错误独立经 IntrRaw/irq 上报，软件必须两者都检查（第 13.1 节）。
+
+### 6.10 强 idle 与 flush 恢复握手（deviceIdle / flushReq / flushAck）
+
+对齐 Queen 通用 DSA 契约（queenHarewareInterface.md §5.3/§5.5/§13.5/§13.10.5）的恢复接口，三个端口：
+
+| 端口 | 方向 | 宽度 | 含义 |
+|---|---|---:|---|
+| `deviceIdle` | Output | 1 | 强 idle 电平：命令空 ∧ 无执行 ∧ 无在途内存事务 ∧ 无未回传 completion |
+| `flushReq` | Input | 1 | Queen 发起的恢复请求电平 |
+| `flushAck` | Output | 1 | 设备恢复完成应答电平 |
+
+**强 idle 判据**（`deviceIdle=1` 当且仅当全部成立）：
+
+- `!executor.busy && !inFlight && !executor.osActive`（无执行、无在途命令上下文）；
+- A/B/C 各读/写 DMA `!busy`，且 A/B/C 工作 FIFO occupancy 全 0；
+- MX 配置下 scaleA/scaleB/scaleC 各 DMA `!busy`、scaleB FIFO occupancy 为 0；
+- `!perfBiasFetchActive && !biasPortBusy`：bias 取数 FSM 空闲，且共享 ScaleA 物理口在途计数（覆盖 scaleA/bias/rqM 全部 owner）为 0。
+
+DMA `busy=state≠sIDLE`，其 FSM 回 IDLE 前已 drain 在途计数，故 `!busy` 覆盖该口无在途内存请求/响应。`deviceIdle` 是纯组合电平，强于 `busy=0` 或 FIFO 空：仅写 shadow 配置不执行时仍为 1，RUN 进入执行后落 0，completion 自然结束后回 1。
+
+**flush 四相握手**（无安全 abort ⟹ 等当前工作自然结束）：
+
+1. `flushReq↑`：设备置内部 `flushing`，整个 `flushReq` 有效期间不落；`flushing` 期间 `startReady=0`，新 RUN 停在 ready 低（第 6.8 节），不丢弃已接受配置、不复位 RegIf；
+2. 设备等待当前工作自然结束至 `deviceIdle=1`，置 `flushAck↑`；工作未结束不得提前回 ack；
+3. `flushReq↓`：设备清 `flushing` 与 `flushAck`；
+4. `flushAck↓`：握手结束，`startReady` 恢复，可接受新 RUN。
+
+契约边界（裁定 R-A/R-C/R-D）：
+
+- flush **不复位 RegIf**：shadow/live 配置寄存器与中断块保持，软件须自行按第 13.1/13.2 节重配与清错误；
+- flush **不抑制 completion**：等待自然结束期间 done/configError 照常经 completion 回传，Queen 侧丢弃迟到/旧上下文项；
+- flush **不做 abort**：不终止正在执行的任务、不撤销在途内存事务，只 block 新 RUN 并等自然排空；
+- `deviceIdle` 与 flush 不扩展计算/DMA 能力，不引入任务排队或第三组配置缓冲。
 
 ## 7. 数据表示规范
 
@@ -1601,8 +1637,7 @@ WorkerBee 接口本身不定义 cache coherence。若系统 DMA 与 CPU cache �
 
 - `AddrMode` 的 TILE 寻址、`warmup`、`warmdown` 的数据通路行为；当前仅保留字段读写；
 - A4×B8 反向混配、FP8 C 输出、自动 N 尾 tile 缩窄写回；
-- 执行任务排队、多批命令队列、四 lane 独立配置/执行上下文、第三组配置缓冲（执行期即提交下一个 RUN）、错误 fail-fast/事务撤销、未标记内存错误检测、多任务可靠 tracing；
-- **deviceIdle 强 idle 输出与 flush 四相握手**（Queen 契约要求的 Phase 2 项，本版未实现，留待后续版本定义）；
+- 执行任务排队、多批命令队列、四 lane 独立配置/执行上下文、第三组配置缓冲（执行期即提交下一个 RUN）、错误 fail-fast/事务撤销、未标记内存错误检测、多任务可靠 tracing；flush 恢复只 block 新 RUN 并等自然结束，不做安全 abort、不复位 RegIf、不抑制 completion（第 6.10 节）；
 - 可配置命令 lane count 或寄存器 count、将命令 lane 解释为 MAC 数据 lane、同 beat 多条 RUN/READ、写 ACK 响应、读旁路同拍写、跨 lane 同址写的位域合并或冲突事件、跨 lane WRITE2 两项共同获胜保证；上述非目标边界不扩展既有计算/DMA 能力；
 - 独立 IRQ ENABLE、自动启动清 IntrRaw、以正常 completion 表示无 DMA 错误或将断言转换为 IRQ；
 - 内建 PMU 计数器、cache coherence、SiLU/GELU 或外部 Scheduler 功能。
