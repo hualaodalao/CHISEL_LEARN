@@ -57,41 +57,41 @@
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
 // VCS coverage exclude_file
-module Queen_ring_64x516(	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
+module Queen_ring_64x388(	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
   input  [5:0]   R0_addr,
   input          R0_en,
                  R0_clk,
-  output [515:0] R0_data,
+  output [387:0] R0_data,
   input  [5:0]   R1_addr,
   input          R1_en,
                  R1_clk,
-  output [515:0] R1_data,
+  output [387:0] R1_data,
   input  [5:0]   W0_addr,
   input          W0_en,
                  W0_clk,
-  input  [515:0] W0_data
+  input  [387:0] W0_data
 );
 
-  reg [515:0] Memory[0:63];	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
-  always @(posedge W0_clk) begin	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
-    if (W0_en)	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
-      Memory[W0_addr] <= W0_data;	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
+  reg [387:0] Memory[0:63];	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
+  always @(posedge W0_clk) begin	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
+    if (W0_en)	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
+      Memory[W0_addr] <= W0_data;	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_MEM_	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
-    reg [543:0] _RANDOM_MEM;	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
-    initial begin	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
-      `INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
-      `ifdef RANDOMIZE_MEM_INIT	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
+  `ifdef ENABLE_INITIAL_MEM_	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
+    reg [415:0] _RANDOM_MEM;	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
+    initial begin	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
+      `INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
+      `ifdef RANDOMIZE_MEM_INIT	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
         for (logic [6:0] i = 7'h0; i < 7'h40; i += 7'h1) begin
-          for (logic [9:0] j = 10'h0; j < 10'h220; j += 10'h20) begin
-            _RANDOM_MEM[j +: 32] = `RANDOM;	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
+          for (logic [8:0] j = 9'h0; j < 9'h1A0; j += 9'h20) begin
+            _RANDOM_MEM[j +: 32] = `RANDOM;	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
           end
-          Memory[i[5:0]] = _RANDOM_MEM[515:0];	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
+          Memory[i[5:0]] = _RANDOM_MEM[387:0];	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
         end
       `endif // RANDOMIZE_MEM_INIT
     end // initial
   `endif // ENABLE_INITIAL_MEM_
-  assign R0_data = R0_en ? Memory[R0_addr] : 516'bx;	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
-  assign R1_data = R1_en ? Memory[R1_addr] : 516'bx;	// src/queen/scala/main/QueenDsaDecoder.scala:66:27
+  assign R0_data = R0_en ? Memory[R0_addr] : 388'bx;	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
+  assign R1_data = R1_en ? Memory[R1_addr] : 388'bx;	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
 endmodule
 

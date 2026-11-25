@@ -22,15 +22,15 @@ class QueenDsaRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim {
     private val IntrStatus = 0x6C
     private val SigTarget = 0x80
     private val SigMask = 0x81
-    private val TraceCtrl = 0xA0
+    private val TraceTag = 0xA0
 
     private case class NC(op: Int, reg0: Int, reg1: Int = 0, data0: BigInt = 0,
-                          data1: BigInt = 0, pc: BigInt = 0, cmdTag: Int = 0, swTag: BigInt = 0)
+                          data1: BigInt = 0, swTag: BigInt = 0)
 
     private def wr1(a: Int, d: BigInt) = NC(Write1, a, 0, d)
     private def wr2(a: Int, d0: BigInt, d1: BigInt) = NC(Write2, a, a + 1, d0, d1)
     private def rd(a: Int) = NC(Read, a)
-    private def run(tag: Int, sw: BigInt = 0, pc: BigInt = 0) = NC(Run, 0, 0, 0, 0, pc, tag, sw)
+    private def run(sw: BigInt = 0) = NC(Run, 0, 0, 0, 0, sw)
 
     private class Driver(dut: QueenDsaRegIf, cfg: QueenDsaRegIfConfig) {
         private val lanes = cfg.lanes
@@ -42,10 +42,10 @@ class QueenDsaRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim {
         private var intrMask = intrMaskRst
         private var sigTarget = BigInt(0)
         private var sigMask = BigInt(0)
-        private var traceCtrl = BigInt(0)
+        private var traceTag = BigInt(0)
         var accepted = 0
         var reads = Vector.empty[(Int, BigInt, Boolean)]
-        var starts = Vector.empty[(BigInt, Int, BigInt)]
+        var starts = Vector.empty[BigInt]
         var wrErrs = Vector.empty[Int]
 
         dut.io.cmd.valid.poke(false.B)
@@ -54,7 +54,7 @@ class QueenDsaRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim {
             l.bits.op.poke(QueenNativeOp.WRITE1)
             l.bits.reg0Addr.poke(0.U); l.bits.reg1Addr.poke(0.U)
             l.bits.data0.poke(0.U); l.bits.data1.poke(0.U)
-            l.bits.pc.poke(0.U); l.bits.cmdTag.poke(0.U); l.bits.swTag.poke(0.U)
+            l.bits.swTag.poke(0.U)
         }
         dut.io.resp.ready.poke(false.B)
         dut.io.startReady.poke(false.B)
@@ -73,12 +73,12 @@ class QueenDsaRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
         private def wrLegal(a: Int): Boolean =
             a < cfg.numCfgRegs || a == IntrRaw || a == IntrForce || a == IntrMask ||
-                a == SigTarget || a == SigMask || a == TraceCtrl
+                a == SigTarget || a == SigMask || a == TraceTag
 
         private def rdLegal(a: Int): Boolean =
             a < cfg.numCfgRegs || (a >= 0x40 && a < 0x40 + cfg.numStatusRegs) ||
                 a == IntrRaw || a == IntrForce || a == IntrMask || a == IntrStatus ||
-                a == SigTarget || a == SigMask || a == TraceCtrl
+                a == SigTarget || a == SigMask || a == TraceTag
 
         private def readReg(a: Int, status: Vector[BigInt]): BigInt =
             if (a < cfg.numCfgRegs) shadow(a)
@@ -89,7 +89,7 @@ class QueenDsaRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 case IntrStatus => intrRaw & ~intrMask & intrMaskRst
                 case SigTarget => sigTarget
                 case SigMask => sigMask
-                case TraceCtrl => traceCtrl
+                case TraceTag => traceTag
                 case _ => BigInt(0)
             }
 
@@ -111,8 +111,6 @@ class QueenDsaRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 l.bits.reg1Addr.poke(c.map(_.reg1).getOrElse(0).U)
                 l.bits.data0.poke(c.map(_.data0).getOrElse(BigInt(0)).U)
                 l.bits.data1.poke(c.map(_.data1).getOrElse(BigInt(0)).U)
-                l.bits.pc.poke(c.map(_.pc).getOrElse(BigInt(0)).U)
-                l.bits.cmdTag.poke(c.map(_.cmdTag).getOrElse(0).U)
                 l.bits.swTag.poke(c.map(_.swTag).getOrElse(BigInt(0)).U)
             }
             dut.io.resp.ready.poke(respReady.B)
@@ -151,10 +149,9 @@ class QueenDsaRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim {
             val runLane = b.flatten.find(_.op == Run)
             dut.io.start.expect((accept && hasRun).B)
             runLane.foreach { c =>
-                dut.io.startPc.expect(c.pc.U)
-                dut.io.startTag.expect(c.cmdTag.U)
-                dut.io.startSwTag.expect(c.swTag.U)
-                if (accept) starts = starts :+ ((c.pc, c.cmdTag, c.swTag))
+                val expSwTag = if (c.swTag != 0) c.swTag else traceTag
+                dut.io.startSwTag.expect(expSwTag.U)
+                if (accept) starts = starts :+ expSwTag
             }
 
             for (j <- 0 until cfg.numCfgRegs) dut.io.cfgRegs(j).expect(live(j).U)
@@ -174,7 +171,7 @@ class QueenDsaRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim {
                     else if (a == IntrMask) intrMask = d & intrMaskRst
                     else if (a == SigTarget) sigTarget = d & 0xffffffffL
                     else if (a == SigMask) sigMask = d & 0xffffffffL
-                    else if (a == TraceCtrl) traceCtrl = d & 0xffffffffL
+                    else if (a == TraceTag) traceTag = d & 0xffffffffL
                     if (a == IntrRaw) clr |= d & intrMaskRst
                     if (a == IntrForce) set |= d & intrMaskRst
                 }
@@ -255,27 +252,43 @@ class QueenDsaRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim {
         simulate(new QueenDsaRegIf(small)) { dut =>
             val d = new Driver(dut, small)
             d.cycle(d.beat(0 -> wr1(0, 0x10)), respReady = true)
-            d.cycle(d.beat(0 -> run(1)), startReady = true) shouldBe true
+            d.cycle(d.beat(0 -> run()), startReady = true) shouldBe true
             d.cycle(d.beat(0 -> wr1(0, 0x20)), respReady = true)
             d.cycle(d.beat(0 -> rd(0)), respReady = true)
             d.reads.last._2 shouldBe BigInt(0x20)
             dut.io.cfgRegs(0).expect(0x10.U)
-            d.cycle(d.beat(0 -> run(2)), startReady = true)
+            d.cycle(d.beat(0 -> run()), startReady = true)
             dut.io.cfgRegs(0).expect(0x20.U)
         }
     }
 
-    it should "gate RUN on startReady and emit one start pulse with tags" in {
+    it should "gate RUN on startReady and emit one start pulse with the sw tag" in {
         simulate(new QueenDsaRegIf(small)) { dut =>
             val d = new Driver(dut, small)
-            val b = d.beat(0 -> run(0x21, 0xdeadbeefL, pc = 0x400))
+            val b = d.beat(0 -> run(0xdeadbeefL))
             d.cycle(b, startReady = false) shouldBe false
             d.cycle(b, startReady = false) shouldBe false
             d.starts shouldBe empty
             d.cycle(b, startReady = true) shouldBe true
-            d.starts shouldBe Vector((BigInt(0x400), 0x21, BigInt(0xdeadbeefL)))
+            d.starts shouldBe Vector(BigInt(0xdeadbeefL))
             d.cycle(startReady = true)
             d.starts.size shouldBe 1
+        }
+    }
+
+    it should "fall back to the TRACE_TAG register when RUN rs2 is zero" in {
+        simulate(new QueenDsaRegIf(small)) { dut =>
+            val d = new Driver(dut, small)
+            d.cycle(d.beat(0 -> run()), startReady = true)
+            d.starts shouldBe Vector(BigInt(0))
+            d.cycle(d.beat(0 -> wr1(TraceTag, 0x1234abcdL)), respReady = true)
+            d.cycle(d.beat(0 -> run()), startReady = true)
+            d.starts.last shouldBe BigInt(0x1234abcdL)
+            // rs2 非 0 覆盖寄存器值，且不改写寄存器本身。
+            d.cycle(d.beat(0 -> run(0x55L)), startReady = true)
+            d.starts.last shouldBe BigInt(0x55)
+            d.cycle(d.beat(0 -> run()), startReady = true)
+            d.starts.last shouldBe BigInt(0x1234abcdL)
         }
     }
 
@@ -287,13 +300,13 @@ class QueenDsaRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim {
             dut.io.hwSignal.isTimeline.expect(false.B)
             dut.io.hwSignal.group.expect(3.U)
             dut.io.hwSignal.mask.expect(0x88.U)
-            d.cycle(d.beat(0 -> run(1)), startReady = true)
+            d.cycle(d.beat(0 -> run()), startReady = true)
             dut.io.hwSignal.group.expect(3.U)
             d.cycle(d.beat(0 -> wr1(SigTarget, 0x283)), respReady = true)
             // 目标改写立刻可见：锁存是设备的责任，不是 RegIf 的。
             dut.io.hwSignal.isTimeline.expect(true.B)
             dut.io.hwSignal.timeline.expect(5.U)
-            d.cycle(d.beat(0 -> run(2)), startReady = true)
+            d.cycle(d.beat(0 -> run()), startReady = true)
             dut.io.hwSignal.timeline.expect(5.U)
         }
     }
@@ -356,7 +369,7 @@ class QueenDsaRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim {
         val ex = intercept[Exception] {
             simulate(new QueenDsaRegIf(small)) { dut =>
                 val d = new Driver(dut, small)
-                d.cycle(d.beat(0 -> wr1(0, 1), 1 -> run(1)), startReady = true)
+                d.cycle(d.beat(0 -> wr1(0, 1), 1 -> run()), startReady = true)
             }
         }
         ex.getClass.getName should include("AssertionFailed")
@@ -369,7 +382,7 @@ class QueenDsaRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.cycle(d.beat(0 -> wr2(62, 0x62, 0x63)), respReady = true)
             d.cycle(d.beat(0 -> rd(63)), respReady = true)
             d.reads.last._2 shouldBe BigInt(0x63)
-            d.cycle(d.beat(0 -> run(1)), startReady = true)
+            d.cycle(d.beat(0 -> run()), startReady = true)
             dut.io.cfgRegs(63).expect(0x63.U)
             d.cycle(d.beat(0 -> rd(0x5f)), respReady = true,
                 status = Vector.tabulate(32)(i => BigInt(i + 1)))
@@ -385,7 +398,7 @@ class QueenDsaRegIfSpec extends AnyFlatSpec with Matchers with ChiselSim {
             for (_ <- 0 until 400) {
                 val kind = rng.nextInt(4)
                 val b = kind match {
-                    case 0 => d.beat(0 -> run(rng.nextInt(256), rng.nextInt(1 << 30), pc = rng.nextInt(1 << 16)))
+                    case 0 => d.beat(0 -> run(rng.nextInt(1 << 30)))
                     case 1 => d.beat(0 -> rd(rng.nextInt(0x100)))
                     case _ =>
                         val n = 1 + rng.nextInt(cfg.lanes)

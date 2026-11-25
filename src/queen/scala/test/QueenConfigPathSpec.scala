@@ -13,9 +13,8 @@ private class QueenFakeDsa(cfg: QueenConfig, latency: Int) extends Module {
     require(latency >= 1)
     val io = IO(new Bundle {
         val start = Input(Bool())
-        val pc = Input(UInt(cfg.pcWidth.W))
-        val tag = Input(UInt(8.W))
         val swTag = Input(UInt(cfg.xlen.W))
+        val hwTag = Input(UInt(cfg.xlen.W))
         val hw = Input(new QueenHwSignal)
         val faultEn = Input(Bool())
         val faultCode = Input(UInt(cfg.faultCodeWidth.W))
@@ -29,9 +28,8 @@ private class QueenFakeDsa(cfg: QueenConfig, latency: Int) extends Module {
         0.U.asTypeOf(Valid(new QueenDsaCompletion(cfg))))))
     private val entry = Wire(Valid(new QueenDsaCompletion(cfg)))
     entry.valid := io.start && !io.flushReq
-    entry.bits.pc := io.pc
-    entry.bits.cmdTag := io.tag
     entry.bits.swTag := io.swTag
+    entry.bits.hwTag := io.hwTag
     entry.bits.error := io.faultEn
     entry.bits.code := io.faultCode
     entry.bits.hwSignal := io.hw
@@ -54,11 +52,9 @@ private class QueenConfigPathDut(cfg: QueenConfig, rcfg: QueenDsaRegIfConfig,
                                  latency: Int = 3) extends Module {
     val io = IO(new Bundle {
         val inst = Vec(cfg.instructionLanes, Flipped(Decoupled(new QueenIssue(cfg))))
-        val rs1 = Vec(cfg.instructionLanes, Flipped(Valid(UInt(cfg.xlen.W))))
-        val rs2 = Vec(cfg.instructionLanes, Flipped(Valid(UInt(cfg.xlen.W))))
+        val regRead = Vec(2 * cfg.instructionLanes, Flipped(Valid(UInt(cfg.xlen.W))))
         val trap = Valid(new QueenTrap(cfg))
         val asyncRd = Decoupled(new QueenAsyncRd(cfg))
-        val qrdRetire = Decoupled(new QueenRetire(cfg))
         val memReq = Decoupled(new QueenMemReq(cfg))
         val memResp = Flipped(Decoupled(new QueenMemResp))
         val flushReq = Input(Bool())
@@ -75,21 +71,22 @@ private class QueenConfigPathDut(cfg: QueenConfig, rcfg: QueenDsaRegIfConfig,
         val dmaRegs = Output(Vec(rcfg.numCfgRegs, UInt(32.W)))
         val gemmStart = Output(Bool())
         val dmaStart = Output(Bool())
-        val gemmStartTag = Output(UInt(8.W))
-        val dmaStartTag = Output(UInt(8.W))
-        val gemmStartPc = Output(UInt(cfg.pcWidth.W))
-        val dmaStartPc = Output(UInt(cfg.pcWidth.W))
+        val gemmStartSwTag = Output(UInt(cfg.xlen.W))
+        val dmaStartSwTag = Output(UInt(cfg.xlen.W))
+        val gemmHwTag = Input(UInt(cfg.xlen.W))
+        val dmaHwTag = Input(UInt(cfg.xlen.W))
         val gemmHw = Output(new QueenHwSignal)
         val dmaHw = Output(new QueenHwSignal)
         val gemmWrErr = Output(Vec(cfg.nativeWidth, Bool()))
         val dmaWrErr = Output(Vec(cfg.nativeWidth, Bool()))
         val gemmCompletion = Valid(new QueenDsaCompletion(cfg))
         val dmaCompletion = Valid(new QueenDsaCompletion(cfg))
+        val vpuCompletion = Flipped(Valid(new QueenDsaCompletion(cfg)))
         val idle = Output(Bool())
         val events = Output(Vec(cfg.eventGroupCount, UInt(32.W)))
         val timelines = Output(Vec(cfg.timelineCount, UInt(32.W)))
         val faultValid = Output(Bool())
-        val faultKind = Output(UInt(2.W))
+        val faultKind = Output(UInt(3.W))
         val faultEndpoint = Output(UInt(2.W))
         val faultCode = Output(UInt(cfg.faultCodeWidth.W))
         val faultIrq = Output(Bool())
@@ -102,11 +99,9 @@ private class QueenConfigPathDut(cfg: QueenConfig, rcfg: QueenDsaRegIfConfig,
     private val dmaDev = Module(new QueenFakeDsa(cfg, latency))
 
     top.io.inst <> io.inst
-    top.io.rs1 <> io.rs1
-    top.io.rs2 <> io.rs2
+    top.io.regRead <> io.regRead
     io.trap <> top.io.trap
     io.asyncRd <> top.io.asyncRd
-    io.qrdRetire <> top.io.qrdRetire
     io.memReq <> top.io.memReq
     top.io.memResp <> io.memResp
     top.io.flushReq := io.flushReq
@@ -133,8 +128,6 @@ private class QueenConfigPathDut(cfg: QueenConfig, rcfg: QueenDsaRegIfConfig,
                            completion: Valid[QueenDsaCompletion],
                            deviceIdle: Bool, faultEn: Bool, faultCode: UInt): Unit = {
         dev.io.start := reg.io.start
-        dev.io.pc := reg.io.startPc
-        dev.io.tag := reg.io.startTag
         dev.io.swTag := reg.io.startSwTag
         dev.io.hw := reg.io.hwSignal
         dev.io.faultEn := faultEn
@@ -147,6 +140,9 @@ private class QueenConfigPathDut(cfg: QueenConfig, rcfg: QueenDsaRegIfConfig,
         io.gemmFaultEn, io.gemmFaultCode)
     hookDevice(dmaDev, dmaReg, top.io.dmaCompletion, top.io.dmaDeviceIdle,
         io.dmaFaultEn, io.dmaFaultCode)
+    gemmDev.io.hwTag := io.gemmHwTag
+    dmaDev.io.hwTag := io.dmaHwTag
+    top.io.vpuCompletion <> io.vpuCompletion
     top.io.gemmWrErr := gemmReg.io.wrErr
     top.io.dmaWrErr := dmaReg.io.wrErr
 
@@ -154,10 +150,8 @@ private class QueenConfigPathDut(cfg: QueenConfig, rcfg: QueenDsaRegIfConfig,
     io.dmaRegs := dmaReg.io.cfgRegs
     io.gemmStart := gemmReg.io.start
     io.dmaStart := dmaReg.io.start
-    io.gemmStartTag := gemmReg.io.startTag
-    io.dmaStartTag := dmaReg.io.startTag
-    io.gemmStartPc := gemmReg.io.startPc
-    io.dmaStartPc := dmaReg.io.startPc
+    io.gemmStartSwTag := gemmReg.io.startSwTag
+    io.dmaStartSwTag := dmaReg.io.startSwTag
     io.gemmHw := gemmReg.io.hwSignal
     io.dmaHw := dmaReg.io.hwSignal
     io.gemmWrErr := gemmReg.io.wrErr
@@ -197,9 +191,9 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
         Cmd((BigInt(ep) << 30) | (BigInt(addr) << 20) | (BigInt(1) << 15) |
             (BigInt(1) << 12) | 0x0b, rs1, 0, pc)
 
-    private def run(ep: Int, tag: Int, sw: BigInt = 0, pc: BigInt = 0) =
+    private def run(ep: Int, sw: BigInt = 0, pc: BigInt = 0) =
         Cmd((BigInt(ep) << 30) | (BigInt(9) << 26) | (BigInt(1) << 15) |
-            (BigInt(3) << 12) | 0x0b, tag, sw, pc)
+            (BigInt(3) << 12) | 0x0b, 0, sw, pc)
 
     private def waitEvent(ep: Int, group: Int, mask: BigInt, pc: BigInt = 0) =
         Cmd((BigInt(ep) << 30) | (BigInt(1) << 26) | (BigInt(1) << 15) |
@@ -218,26 +212,35 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
     private class Driver(dut: QueenConfigPathDut) {
         private val lanes = cfg.instructionLanes
-        var gemmStarts = Vector.empty[(Int, BigInt)]
-        var dmaStarts = Vector.empty[(Int, BigInt)]
+        var gemmStarts = Vector.empty[BigInt]
+        var dmaStarts = Vector.empty[BigInt]
         var wrErrCycles = 0
         var dualStartCycles = 0
-        var gemmCompletions = Vector.empty[(BigInt, Int, BigInt)]
-        var dmaCompletions = Vector.empty[(BigInt, Int, BigInt)]
-        var retires = Vector.empty[(BigInt, Boolean, Int, Boolean, Int)]
+        var gemmCompletions = Vector.empty[(BigInt, BigInt)]
+        var dmaCompletions = Vector.empty[(BigInt, BigInt)]
         var asyncWrites = Vector.empty[(Int, BigInt)]
 
         dut.io.inst.foreach { p => p.valid.poke(false.B); p.bits.inst.poke(0.U); p.bits.pc.poke(0.U) }
-        dut.io.rs1.foreach { p => p.valid.poke(false.B); p.bits.poke(0.U) }
-        dut.io.rs2.foreach { p => p.valid.poke(false.B); p.bits.poke(0.U) }
+        dut.io.regRead.foreach { p => p.valid.poke(false.B); p.bits.poke(0.U) }
         dut.io.gemmStartReady.poke(true.B)
         dut.io.dmaStartReady.poke(true.B)
         dut.io.gemmFaultEn.poke(false.B)
         dut.io.dmaFaultEn.poke(false.B)
         dut.io.gemmFaultCode.poke(0.U)
         dut.io.dmaFaultCode.poke(0.U)
+        dut.io.gemmHwTag.poke(0.U)
+        dut.io.dmaHwTag.poke(0.U)
+        dut.io.vpuCompletion.valid.poke(false.B)
+        dut.io.vpuCompletion.bits.swTag.poke(0.U)
+        dut.io.vpuCompletion.bits.hwTag.poke(0.U)
+        dut.io.vpuCompletion.bits.error.poke(false.B)
+        dut.io.vpuCompletion.bits.code.poke(0.U)
+        dut.io.vpuCompletion.bits.hwSignal.enable.poke(false.B)
+        dut.io.vpuCompletion.bits.hwSignal.isTimeline.poke(false.B)
+        dut.io.vpuCompletion.bits.hwSignal.group.poke(0.U)
+        dut.io.vpuCompletion.bits.hwSignal.mask.poke(0.U)
+        dut.io.vpuCompletion.bits.hwSignal.timeline.poke(0.U)
         dut.io.asyncRd.ready.poke(true.B)
-        dut.io.qrdRetire.ready.poke(true.B)
         dut.io.flushReq.poke(false.B)
         dut.io.memReq.ready.poke(true.B)
         dut.io.memResp.valid.poke(false.B)
@@ -266,10 +269,10 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
             for (i <- 0 until lanes) {
                 val c = if (accepted(i)) packet(i) else None
                 dut.io.inst(i).valid.poke(false.B)
-                dut.io.rs1(i).valid.poke(c.nonEmpty.B)
-                dut.io.rs1(i).bits.poke(c.map(_.rs1).getOrElse(BigInt(0)).U)
-                dut.io.rs2(i).valid.poke(c.nonEmpty.B)
-                dut.io.rs2(i).bits.poke(c.map(_.rs2).getOrElse(BigInt(0)).U)
+                dut.io.regRead(2 * i).valid.poke(c.nonEmpty.B)
+                dut.io.regRead(2 * i).bits.poke(c.map(_.rs1).getOrElse(BigInt(0)).U)
+                dut.io.regRead(2 * i + 1).valid.poke(c.nonEmpty.B)
+                dut.io.regRead(2 * i + 1).bits.poke(c.map(_.rs2).getOrElse(BigInt(0)).U)
             }
         }
 
@@ -279,35 +282,27 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
             val gStart = dut.io.gemmStart.peek().litToBoolean
             val dStart = dut.io.dmaStart.peek().litToBoolean
             if (gStart) {
-                gemmStarts = gemmStarts :+ ((dut.io.gemmStartTag.peek().litValue.toInt,
-                    dut.io.gemmStartPc.peek().litValue))
+                gemmStarts = gemmStarts :+ dut.io.gemmStartSwTag.peek().litValue
             }
             if (dStart) {
-                dmaStarts = dmaStarts :+ ((dut.io.dmaStartTag.peek().litValue.toInt,
-                    dut.io.dmaStartPc.peek().litValue))
+                dmaStarts = dmaStarts :+ dut.io.dmaStartSwTag.peek().litValue
             }
             if (gStart && dStart) dualStartCycles += 1
             if (dut.io.gemmCompletion.valid.peek().litToBoolean) {
                 val b = dut.io.gemmCompletion.bits
-                gemmCompletions = gemmCompletions :+ ((b.pc.peek().litValue,
-                    b.cmdTag.peek().litValue.toInt, b.swTag.peek().litValue))
+                gemmCompletions = gemmCompletions :+ ((b.swTag.peek().litValue,
+                    b.hwTag.peek().litValue))
             }
             if (dut.io.dmaCompletion.valid.peek().litToBoolean) {
                 val b = dut.io.dmaCompletion.bits
-                dmaCompletions = dmaCompletions :+ ((b.pc.peek().litValue,
-                    b.cmdTag.peek().litValue.toInt, b.swTag.peek().litValue))
+                dmaCompletions = dmaCompletions :+ ((b.swTag.peek().litValue,
+                    b.hwTag.peek().litValue))
             }
             if (dut.io.gemmWrErr.exists(_.peek().litToBoolean) ||
                 dut.io.dmaWrErr.exists(_.peek().litToBoolean)) wrErrCycles += 1
             if (dut.io.asyncRd.valid.peek().litToBoolean) {
                 asyncWrites = asyncWrites :+ ((dut.io.asyncRd.bits.addr.peek().litValue.toInt,
                     dut.io.asyncRd.bits.data.peek().litValue))
-            }
-            if (dut.io.qrdRetire.valid.peek().litToBoolean) {
-                val b = dut.io.qrdRetire.bits
-                retires = retires :+ ((b.pc.peek().litValue, b.rdValid.peek().litToBoolean,
-                    b.rdIndex.peek().litValue.toInt, b.trap.peek().litToBoolean,
-                    b.trapCause.peek().litValue.toInt))
             }
             dut.clock.step()
         }
@@ -369,7 +364,7 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.settle()
             d.regs(dut.io.gemmRegs) shouldBe Vector(BigInt(0x11), BigInt(0x22), BigInt(0x33),
                 BigInt(0x44), BigInt(0x55), BigInt(0x66), BigInt(0), BigInt(0))
-            d.gemmStarts shouldBe Vector((0x21, BigInt(0x110)))
+            d.gemmStarts shouldBe Vector(BigInt(0x21))
             d.dmaStarts shouldBe empty
         }
     }
@@ -390,7 +385,7 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.offer(0 -> run(Gemm, 2, pc = 0x20c))
             d.settle()
             d.regs(dut.io.gemmRegs).head shouldBe BigInt(0xbb)
-            d.gemmStarts.map(_._1) shouldBe Vector(1, 2)
+            d.gemmStarts shouldBe Vector(BigInt(1), BigInt(2))
         }
     }
 
@@ -404,7 +399,7 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.gemmStarts shouldBe empty
             d.regs(dut.io.gemmRegs).head shouldBe BigInt(0)
             d.settle(gemmStartReady = true)
-            d.gemmStarts shouldBe Vector((7, BigInt(0x304)))
+            d.gemmStarts shouldBe Vector(BigInt(7))
             d.regs(dut.io.gemmRegs).head shouldBe BigInt(0x5a)
         }
     }
@@ -450,11 +445,23 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
     it should "return the trace context the device sampled at start" in {
         simulate(new QueenConfigPathDut(cfg, rcfg)) { dut =>
             val d = new Driver(dut)
+            dut.io.gemmHwTag.poke(BigInt("ab000001", 16).U)
             d.offer(0 -> qwr1(Gemm, 0, 0x5a, pc = 0x700))
-            d.offer(0 -> run(Gemm, 0x3c, sw = BigInt("cafe0001", 16), pc = 0x704))
+            d.offer(0 -> run(Gemm, BigInt("cafe0001", 16), pc = 0x704))
             d.settle()
-            d.gemmCompletions shouldBe Vector((BigInt(0x704), 0x3c, BigInt("cafe0001", 16)))
+            d.gemmCompletions shouldBe Vector((BigInt("cafe0001", 16), BigInt("ab000001", 16)))
             d.dmaCompletions shouldBe empty
+        }
+    }
+
+    it should "take the sw tag from the TRACE_TAG register when RUN rs2 is zero" in {
+        simulate(new QueenConfigPathDut(cfg, rcfg)) { dut =>
+            val d = new Driver(dut)
+            d.offer(0 -> qwr1(Gemm, 0xA0, BigInt("a5a50001", 16), pc = 0x710))
+            d.offer(0 -> run(Gemm, pc = 0x714))
+            d.settle()
+            d.gemmStarts shouldBe Vector(BigInt("a5a50001", 16))
+            d.gemmCompletions.map(_._1) shouldBe Vector(BigInt("a5a50001", 16))
         }
     }
 
@@ -504,13 +511,13 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.settle()
             d.regs(dut.io.gemmRegs).take(2) shouldBe Vector(BigInt(0x11), BigInt(0x22))
             d.regs(dut.io.dmaRegs).take(2) shouldBe Vector(BigInt(0x33), BigInt(0x44))
-            d.gemmStarts.map(_._1) shouldBe Vector(0x10)
-            d.dmaStarts.map(_._1) shouldBe Vector(0x20)
+            d.gemmStarts shouldBe Vector(BigInt(0x10))
+            d.dmaStarts shouldBe Vector(BigInt(0x20))
             d.wrErrCycles shouldBe 0
             // 两端点同拍 start、同拍 completion：两条都必须被吸收。
             d.dualStartCycles shouldBe 1
-            d.gemmCompletions.map(_._2) shouldBe Vector(0x10)
-            d.dmaCompletions.map(_._2) shouldBe Vector(0x20)
+            d.gemmCompletions.map(_._1) shouldBe Vector(BigInt(0x10))
+            d.dmaCompletions.map(_._1) shouldBe Vector(BigInt(0x20))
         }
     }
 
@@ -541,13 +548,13 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 1 -> qwr1(Gemm, 0, 0xbb, pc = 0xa10),
                 2 -> run(Gemm, 2, pc = 0xa14))
             d.settle(cycles = 8)
-            d.gemmStarts.map(_._1) shouldBe Vector(1)
+            d.gemmStarts shouldBe Vector(BigInt(1))
             d.events(3) shouldBe BigInt(0)
             dut.io.idle.expect(false.B)
 
             d.settle(cycles = 60)
             d.events(3) shouldBe BigInt(0x08)
-            d.gemmStarts.map(_._1) shouldBe Vector(1, 2)
+            d.gemmStarts shouldBe Vector(BigInt(1), BigInt(2))
             d.regs(dut.io.gemmRegs).head shouldBe BigInt(0xbb)
             dut.io.idle.expect(true.B)
         }
@@ -561,7 +568,6 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.offer(0 -> qrd(Gemm, 0, 3, pc = 0xb04))
             d.settle()
             d.asyncWrites shouldBe Vector((3, BigInt(0x5a)))
-            d.retires shouldBe Vector((BigInt(0xb04), true, 3, false, 0))
             dut.io.idle.expect(true.B)
         }
     }
@@ -572,11 +578,10 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.offer(0 -> waitEvent(Gemm, 3, 0x08, pc = 0xc00), 1 -> qrd(Gemm, 0, 3, pc = 0xc04))
             d.offer(0 -> qrd(Sched, 0x40, 4, pc = 0xc08))
             d.settle(cycles = 8)
-            // SCHED 读已回，但队头 GEMM 读还没派发，不得提前退休。
-            d.retires shouldBe empty
+            // SCHED 读已回，但队头 GEMM 读还没派发，不得提前写回。
+            d.asyncWrites shouldBe empty
             d.offer(0 -> signalEvent(3, 0x08, pc = 0xc0c))
             d.settle()
-            d.retires.map(_._1) shouldBe Vector(BigInt(0xc04), BigInt(0xc08))
             d.asyncWrites shouldBe Vector((3, BigInt(0)), (4, BigInt(0)))
             dut.io.idle.expect(true.B)
         }
@@ -587,23 +592,25 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
             val d = new Driver(dut)
             d.offer(0 -> qrd(Gemm, 0x300, 5, pc = 0xd00))
             d.settle()
-            d.retires shouldBe Vector((BigInt(0xd00), false, 5, true, 9))
             d.asyncWrites shouldBe empty
+            dut.io.faultValid.expect(true.B)
+            dut.io.faultKind.expect(4.U)
+            dut.io.faultEndpoint.expect(Gemm.U)
+            dut.io.faultCode.expect(0.U)
+            dut.io.idle.expect(true.B)
         }
     }
 
-    it should "flush through the CPU four-phase port and retire in-flight QRDs as dummy" in {
+    it should "flush through the CPU four-phase port and return in-flight QRDs as dummy" in {
         simulate(new QueenConfigPathDut(cfg, rcfg)) { dut =>
             val d = new Driver(dut)
             d.offer(0 -> qwr1(Gemm, 0, 0), 1 -> run(Gemm, 1, pc = 4),
                 2 -> waitEvent(Gemm, 5, 1, pc = 8), 3 -> qrd(Gemm, 0, 1, pc = 12))
             d.settle(6)
             // WAIT 永不满足，QRD 卡在 ring 里，只在在途表占一个槽。
-            d.retires shouldBe empty
+            d.asyncWrites shouldBe empty
             dut.io.idle.expect(false.B)
             d.cpuFlush()
-            d.retires.map(r => (r._1, r._2, r._3, r._4)) shouldBe
-                Vector((BigInt(12), true, 1, false))
             d.asyncWrites shouldBe Vector((1, BigInt("deadbeef", 16)))
             d.settle()
             dut.io.idle.expect(true.B)
@@ -617,7 +624,7 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.offer(0 -> qwr1(Gemm, 0, 0), 1 -> run(Gemm, 2, pc = 4),
                 2 -> waitEvent(Gemm, 5, 1, pc = 8), 3 -> qrd(Gemm, 0, 2, pc = 12))
             d.settle(6)
-            d.retires shouldBe empty
+            d.asyncWrites shouldBe empty
             d.offer(0 -> flushCmd(pc = 0x20))
             d.settle(40)
             d.asyncWrites shouldBe Vector((2, BigInt("deadbeef", 16)))
@@ -668,6 +675,37 @@ class QueenConfigPathSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.events.forall(_ == 0) shouldBe true
             d.timelines.forall(_ == 0) shouldBe true
             dut.io.idle.expect(true.B)
+        }
+    }
+
+    it should "discard a VPU completion that arrives while flushing" in {
+        simulate(new QueenConfigPathDut(cfg, rcfg)) { dut =>
+            val d = new Driver(dut)
+            dut.io.flushReq.poke(true.B)
+            var acked = false
+            var n = 0
+            while (!acked && n < 200) {
+                // 前几拍灌入 VPU completion：既不得置同步状态，也不得记 fault。
+                val inject = n < 6
+                dut.io.vpuCompletion.valid.poke(inject.B)
+                dut.io.vpuCompletion.bits.error.poke(inject.B)
+                dut.io.vpuCompletion.bits.code.poke(0x33.U)
+                dut.io.vpuCompletion.bits.hwSignal.enable.poke(inject.B)
+                dut.io.vpuCompletion.bits.hwSignal.group.poke(6.U)
+                dut.io.vpuCompletion.bits.hwSignal.mask.poke(0xff.U)
+                d.step()
+                n += 1
+                acked = dut.io.flushAck.peek().litToBoolean
+            }
+            dut.io.vpuCompletion.valid.poke(false.B)
+            dut.io.vpuCompletion.bits.error.poke(false.B)
+            dut.io.vpuCompletion.bits.hwSignal.enable.poke(false.B)
+            acked shouldBe true
+            d.events(6) shouldBe BigInt(0)
+            dut.io.faultValid.expect(false.B)
+            dut.io.flushReq.poke(false.B)
+            d.settle(20)
+            dut.io.flushAck.expect(false.B)
         }
     }
 }

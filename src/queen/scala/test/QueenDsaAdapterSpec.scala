@@ -31,22 +31,21 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
     private def qrd(addr: Int, rd: Int, pc: BigInt = 0): Cmd =
         Cmd((BigInt(addr) << 20) | (BigInt(2) << 12) | (BigInt(rd) << 7) | 0x0b, pc, 0, 0)
 
-    private def run(cmdTag: Int, swTag: BigInt, pc: BigInt = 0): Cmd =
-        Cmd((BigInt(9) << 26) | (BigInt(1) << 15) | (BigInt(3) << 12) | 0x0b, pc, cmdTag, swTag)
+    private def run(swTag: BigInt, pc: BigInt = 0): Cmd =
+        Cmd((BigInt(9) << 26) | (BigInt(1) << 15) | (BigInt(3) << 12) | 0x0b, pc, 0, swTag)
 
     private val Write1 = 0
     private val Write2 = 1
     private val Read = 2
     private val Run = 3
 
-    private case class Native(op: Int, reg0: Int, reg1: Int, data0: BigInt, data1: BigInt,
-                              pc: BigInt, cmdTag: Int, swTag: BigInt)
+    private case class Native(op: Int, reg0: Int, reg1: Int, data0: BigInt, data1: BigInt, swTag: BigInt)
 
     private def expected(c: Cmd): Native =
-        if (c.isRun) Native(Run, 0, 0, 0, 0, c.pc, (c.rs1 & 0xff).toInt, c.rs2)
-        else if (c.isQrd) Native(Read, ((c.inst >> 20) & 1023).toInt, 0, 0, 0, c.pc, 0, 0)
-        else if (c.isQwr2) Native(Write2, c.base, c.base + 1, c.rs1, c.rs2, c.pc, 0, 0)
-        else Native(Write1, ((c.inst >> 20) & 1023).toInt, 0, c.rs1, 0, c.pc, 0, 0)
+        if (c.isRun) Native(Run, 0, 0, 0, 0, c.rs2)
+        else if (c.isQrd) Native(Read, ((c.inst >> 20) & 1023).toInt, 0, 0, 0, 0)
+        else if (c.isQwr2) Native(Write2, c.base, c.base + 1, c.rs1, c.rs2, 0)
+        else Native(Write1, ((c.inst >> 20) & 1023).toInt, 0, c.rs1, 0, 0)
 
     private class Driver(dut: QueenDsaAdapter, cfg: QueenConfig) {
         private val lanes = cfg.instructionLanes
@@ -129,8 +128,6 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
                     port.bits.reg1Addr.peek().litValue.toInt,
                     port.bits.data0.peek().litValue,
                     port.bits.data1.peek().litValue,
-                    port.bits.pc.peek().litValue,
-                    port.bits.cmdTag.peek().litValue.toInt,
                     port.bits.swTag.peek().litValue)
                 snapshot(j).foreach { e =>
                     withClue(s"cycle=$cycleNo base=$base lane=$j expected=$e actual=$actual ") {
@@ -182,13 +179,13 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
         simulate(new QueenDsaAdapter(cfg)) { dut =>
             val d = new Driver(dut, cfg)
             val packet = d.offer(0 -> qwr2(5, BigInt("aaaa0001", 16), BigInt("bbbb0002", 16), pc = 0x100),
-                1 -> run(0x12, BigInt("cccc0003", 16), pc = 0x104))
+                1 -> run(BigInt("cccc0003", 16), pc = 0x104))
             d.cycle(Some(packet), ready = true) shouldBe true
             d.cycle(ready = true)
             d.cycle(ready = true)
             d.emitted shouldBe Vector(
-                Native(Write2, 5, 6, BigInt("aaaa0001", 16), BigInt("bbbb0002", 16), 0x100, 0, 0),
-                Native(Run, 0, 0, 0, 0, 0x104, 0x12, BigInt("cccc0003", 16)))
+                Native(Write2, 5, 6, BigInt("aaaa0001", 16), BigInt("bbbb0002", 16), 0),
+                Native(Run, 0, 0, 0, 0, BigInt("cccc0003", 16)))
             d.beats.map(_.size) shouldBe Vector(1, 1)
             d.drain()
         }
@@ -202,7 +199,7 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.cycle(Some(packet), ready = true) shouldBe true
             d.cycle(ready = true)
             d.beats.size shouldBe 1
-            d.emitted shouldBe Vector.tabulate(4)(i => Native(Write1, 0x40 + i, 0, 0x100 + i, 0, i, 0, 0))
+            d.emitted shouldBe Vector.tabulate(4)(i => Native(Write1, 0x40 + i, 0, 0x100 + i, 0, 0))
             d.drain()
         }
     }
@@ -216,8 +213,8 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.cycle(Some(packet), ready = true) shouldBe true
             d.cycle(ready = true)
             d.emitted shouldBe Vector(
-                Native(Write2, 62, 63, 0x11, 0x22, 0x200, 0, 0),
-                Native(Write1, 0x321, 0, 0x33, 0, 0x204, 0, 0))
+                Native(Write2, 62, 63, 0x11, 0x22, 0),
+                Native(Write1, 0x321, 0, 0x33, 0, 0))
             d.beats.size shouldBe 1
             d.drain()
         }
@@ -227,8 +224,8 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
         val cfg = QueenConfig()
         simulate(new QueenDsaAdapter(cfg)) { dut =>
             val d = new Driver(dut, cfg)
-            val packet = d.offer(0 -> qwr2(3, 0x31, 0x32), 1 -> run(0x11, 0x1),
-                2 -> qwr1(9, 0x41), 3 -> run(0x22, 0x2))
+            val packet = d.offer(0 -> qwr2(3, 0x31, 0x32), 1 -> run(0x1),
+                2 -> qwr1(9, 0x41), 3 -> run(0x2))
             d.cycle(Some(packet), ready = true) shouldBe true
             for (_ <- 0 until 5) d.cycle(ready = true)
             d.beats.map(_.map(_.op)) shouldBe Vector(
@@ -242,7 +239,7 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
         val cfg = QueenConfig()
         simulate(new QueenDsaAdapter(cfg)) { dut =>
             val d = new Driver(dut, cfg)
-            val packet = d.offer(0 -> qwr1(1, 0x10), 2 -> qwr1(2, 0x20), 3 -> run(0x33, 0))
+            val packet = d.offer(0 -> qwr1(1, 0x10), 2 -> qwr1(2, 0x20), 3 -> run(0))
             d.cycle(Some(packet), ready = true) shouldBe true
             for (_ <- 0 until 3) d.cycle(ready = true)
             d.beats.map(_.size) shouldBe Vector(2, 1)
@@ -255,7 +252,7 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
         val cfg = QueenConfig()
         simulate(new QueenDsaAdapter(cfg)) { dut =>
             val d = new Driver(dut, cfg)
-            val packet = d.offer(0 -> qwr1(7, 0x60), 1 -> qwr1(8, 0x61), 2 -> run(0x55, 0x66))
+            val packet = d.offer(0 -> qwr1(7, 0x60), 1 -> qwr1(8, 0x61), 2 -> run(0x66))
             d.cycle(Some(packet), ready = true) shouldBe true
             d.cycle(ready = true)
             d.emitted.size shouldBe 2
@@ -263,7 +260,7 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.emitted.size shouldBe 2
             d.cycle(ready = true)
             d.emitted.size shouldBe 3
-            d.emitted.last shouldBe Native(Run, 0, 0, 0, 0, 0, 0x55, 0x66)
+            d.emitted.last shouldBe Native(Run, 0, 0, 0, 0, 0x66)
             d.drain()
         }
     }
@@ -276,7 +273,7 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.cycle(ready = true)
             d.cycle(ready = true)
             d.beats.size shouldBe 1
-            d.emitted shouldBe Vector(Native(Write1, 0x21, 0, 0x99, 0, 0, 0, 0))
+            d.emitted shouldBe Vector(Native(Write1, 0x21, 0, 0x99, 0, 0))
             d.drain()
         }
     }
@@ -285,7 +282,7 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
         val cfg = QueenConfig()
         simulate(new QueenDsaAdapter(cfg)) { dut =>
             val d = new Driver(dut, cfg)
-            val first = d.offer(0 -> qwr2(1, 0x10, 0x11), 2 -> run(1, 0))
+            val first = d.offer(0 -> qwr2(1, 0x10, 0x11), 2 -> run(0))
             val second = d.offer(1 -> qwr1(9, 0x20))
             d.cycle(Some(first), ready = false) shouldBe true
             d.cycle(Some(second), ready = false) shouldBe false
@@ -357,7 +354,7 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
                                         rng.nextInt(1 << 30), pc = total))
                                     case 1 => Some(qwr1(rng.nextInt(1024), rng.nextInt(1 << 30), pc = total))
                                     case 2 => Some(qrd(rng.nextInt(1024), rng.nextInt(32), pc = total))
-                                    case _ => Some(run(rng.nextInt(256), rng.nextInt(1 << 30), pc = total))
+                                    case _ => Some(run(rng.nextInt(1 << 30), pc = total))
                                 }
                             }
                         })

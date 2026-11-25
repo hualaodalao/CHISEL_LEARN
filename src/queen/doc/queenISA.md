@@ -23,7 +23,7 @@ VPU 不归 Scheduler 调度或管理。Scheduler 只调度 GEMM 和 DMA，并提
 - `SIGNAL_EVENT/SIGNAL_TIMELINE` 固定进入 Scheduler，更新集中管理的同步资源；同步资源的存放位置与 wait 指令的执行位置是两个不同概念。
 - event/timeline 资源由软件通过读取 Queen 资源寄存器申请，申请/分配/消费协议不在本 ISA 中定义。资源申请成功后的 signal/wait 由 ISA 触发。
 - 除 ISA signal 外，GEMM/DMA 完成也可以更新同一套 event/timeline。这类更新不占指令编码，目标由软件在提交前写入端点配置并由硬件在完成点应用，具体映射与可见性由 Queen 硬件规格定义；软件用同一条 wait 观察两类来源。
-- `TRACE_TAG` 通过 endpoint 选择记录位置，可直接派发给 GEMM、DMA、VPU 或 Scheduler。
+- `TRACE_TAG` 通过 endpoint 选择记录位置。GEMM/DMA/SCHED 的记录由 Queen 在该端点**派发口**消费指令时就地产生，指令本身不下发给设备；VPU 的记录由 VPU 前端自行产生。
 - **V2 不提供 Queen 侧完成通知机制**：没有 notify 位、没有 notify pulse、没有通知计数寄存器。`inst[25]` 除 `SIGNAL_EVENT` 的 set/clr 外一律为保留位，必须为 0。
 - CPU 感知完成走两条通路：单引擎完成由**设备自己的中断**上报；跨引擎条件由 event/timeline 表达，`WAIT_*` 在硬件里阻塞派发，CPU 不参与（见第 15 章）。
 - 除 `QRD` 外，Queen 指令均为异步操作，前端接受入队后即可退休。标量核 RISC-V `FENCE` 只约束 CPU 侧退休与规定的内存访问顺序，不等待已退休异步命令对应的 DSA/VPU 执行完成。等待 GEMM/DMA idle 必须另向 Queen 发送 DSA fence；VPU 完成等待由 VPU 侧机制保证。
@@ -134,13 +134,13 @@ qwr1 endpoint, regAddr, rs1
 | `inst[11:7]` | 5 | rd | CPU 目的寄存器 |
 | `inst[6:0]` | 7 | opcode | 固定 `7'b0001011` |
 
-CPU 必须在 Queen 返回读响应或异常后才能退休该指令。CPU 顺序发送请求，Queen 按 `QRD` 请求顺序返回读响应，包括错误响应，因此请求/响应接口不需要 transaction ID。
+`QRD` 的完成由 `asyncRd` 写回表达——CPU 用 rd 记分板清依赖即可，**Queen 不提供退休通告端口**。`rd=x0` 的读没有写回，按 fire-and-forget 处理；读错误也不写回，改记 fault。CPU 顺序发送请求，Queen 按 `QRD` 请求顺序返回，因此请求/响应接口不需要 transaction ID。
 
 即使允许多个 `QRD` 在途，CPU 也只需按顺序保留目的 `rd`，将第 N 个读响应对应到第 N 个读请求。不同端点的读延迟可以不同，但 Queen 不得将后发请求的响应提前返回；实现可以串行处理读请求，或在内部缓存早到响应以维持顺序。写与控制指令不产生读响应，不占用该响应顺序。
 
 读取 DSA 配置寄存器时，读请求不得越过同端点此前的配置写入；配置值由设备按序返回，Queen 不缓存配置影子。读取资源分配寄存器可能包含申请副作用，其协议由 Queen 寄存器表定义；对 `rd=x0` 的读请求也必须执行一次，只有 CPU 写回结果被丢弃。
 
-实现口径：Queen 在**前端接受**时就把 QRD 压入在途表（默认 `qrdDepth=16`，可配），按程序序退休；GEMM/DMA/SCHED 三个来源各有一个响应 FIFO 吸收跨端点乱序。**同端点读响应必须按请求序返回是设备硬义务**——Queen 的表项不存寄存器地址、不打 tag，队头只按来源配对，设备乱序返回会把数据写进错误的 `rd` 且无法检测。SCHED 端点的寄存器映射见 `queenHarewareInterface.md` 第 18 章。
+实现口径：Queen 在**前端接受**时就把 QRD 压入在途表（默认 `qrdDepth=16`，可配），按程序序写回并内部出队；GEMM/DMA/SCHED 三个来源各有一个响应 FIFO 吸收跨端点乱序。**同端点读响应必须按请求序返回是设备硬义务**——Queen 的表项不存寄存器地址、不打 tag，队头只按来源配对，设备乱序返回会把数据写进错误的 `rd` 且无法检测。SCHED 端点的寄存器映射见 `queenHarewareInterface.md` 第 15 章。
 
 伪汇编：
 
@@ -174,7 +174,7 @@ qrd rd, endpoint, regAddr
 | `4'b0010` | `WAIT_TIMELINE` | GEMM/DMA 命令队列或 VPU 后端派发队列；SCHED 非法 |
 | `4'b0011` | `SIGNAL_TIMELINE` | endpoint 固定 SCHED，更新同步资源 |
 | `4'b0100` | `SIGNAL_EVENT` | endpoint 固定 SCHED，更新同步资源 |
-| `4'b0101` | `TRACE_TAG` | endpoint 指定 GEMM/DMA/VPU/SCHED 记录位置 |
+| `4'b0101` | `TRACE_TAG` | endpoint 指定 GEMM/DMA/SCHED 记录位置，Queen 派发口消费；VPU 由 VPU 前端定义 |
 | `4'b0110` | `POLL_EQ` | endpoint 固定 SCHED |
 | `4'b0111` | Reserved | V2 必须解码为非法指令 |
 | `4'b1000` | `ATOMIC_RMW` | endpoint 固定 SCHED |
@@ -198,16 +198,16 @@ V2 删除了完成通知机制，因此除 `SIGNAL_EVENT` 外 bit25 不再承载
 ```text
 endpoint  = GEMM / DMA
 cmd       = 4'b1001
-rs1[7:0]  = cmdTag（可选，0 表示不使用；高 24 位忽略）
-rs2       = swTag（可选，原样透传，0 表示不使用）
+rs1       = 忽略（保留，建议 x0）
+rs2       = swTag（可选，原样透传；0 表示沿用设备 TRACE_TAG 寄存器值）
 aux       = 0
 ```
 
 - `RUN` 关闭当前配置组并启动目标设备；设备在收到 `RUN` 之前不得执行该组配置。
 - `RUN` 按序派发，不得越过同端点此前的 `QWR`；同端点的 `FENCE/WAIT_*` 仍按队头阻塞规则处理。
-- `cmdTag` 取 `rs1` 值的低 8 位，高 24 位忽略；`swTag` 取整个 `rs2` 值。两者透传到设备命令标签与 trace/fault 关联字段，不影响执行语义。操作数在次拍才返回，因此它们的取值不构成前端非法指令条件。
+- `swTag` 取整个 `rs2` 值，透传为 completion 的 trace 字段，不影响执行语义。`rs2` 为 0 时设备沿用其公共区 `TRACE_TAG` 寄存器（`0x0A0`）的当前值。**不设 8-bit `cmdTag`，`rs1` 不参与执行**。操作数在次拍才返回，因此它们的取值不构成前端非法指令条件。
 - `endpoint=SCHED` 为非法编码。VPU 的启动由 VPU 前端自行定义，不进入 Queen。
-- 硬件完成信号目标 `HW_SIGNAL_TARGET/HW_SIGNAL_MASK` 是设备公共契约区寄存器（固定地址 `0x080/0x081`，见 Queen 硬件接口约束第 16 章），由 `QWR` 在 `RUN` 之前写入；设备在 `RUN` 被接受（`start`）当拍采样，完成时随 completion 回传，Queen 不保存副本。
+- 硬件完成信号目标 `HW_SIGNAL_TARGET/HW_SIGNAL_MASK` 是设备公共契约区寄存器（固定地址 `0x080/0x081`，见 Queen 硬件接口约束第 13 章），由 `QWR` 在 `RUN` 之前写入；设备在 `RUN` 被接受（`start`）当拍采样，完成时随 completion 回传，Queen 不保存副本。
 
 配置组与 credit：
 
@@ -232,7 +232,7 @@ rs1/rs2  = 忽略
 
 软件可见效果：
 
-- 在途与 flush 期间新接收的 `QRD` 一律回 `rdValid=1, data=0xdeadbeef, trap=0`；
+- 在途与 flush 期间新接收的 `QRD` 一律以 `asyncRd` 回 `data=0xdeadbeef`（`rd=x0` 则不回写），不记 fault；
 - 已派发给设备的 queued 命令被丢弃，运行中工作由设备终止或等完；
 - event/timeline 清零、fault 清除、openGroup 清零；
 - `POLL_INTERVAL` 是软件配置旋钮，**不随 flush 复位**。
@@ -405,10 +405,14 @@ aux        = 0
 
 `TRACE_TAG` 不使用 flag，直接通过 `endpoint` 选择记录位置：
 
-- `endpoint=GEMM`：进入 GEMM 队列，在 GEMM 实际派发点记录。
-- `endpoint=DMA`：进入 DMA 队列，在 DMA 实际派发点记录。
+- `endpoint=GEMM`：进入 GEMM 队列，在 GEMM 实际派发点消费并从 `gemmTrace` 吐出记录。
+- `endpoint=DMA`：进入 DMA 队列，在 DMA 实际派发点消费并从 `dmaTrace` 吐出记录。
+- `endpoint=SCHED`：进入 Scheduler 暂存，在 Scheduler 实际执行点消费并从 `schedTrace` 吐出记录。
 - `endpoint=VPU`：由 Scalar Core decoder 直接送入 VPU 队列，在 VPU 实际派发点记录，不进入 Queen。
-- `endpoint=SCHED`：进入 Scheduler 暂存，在 Scheduler 实际执行点记录。
+
+记录只有两个 xlen 字段：`swTag` 取自本条指令的 `rs1`，`hwTag` 当前恒 0（预留给未来 trace 管理）。三个端口独立、无 ready，可同拍各吐一条。
+
+**该指令永不下发给设备**：设备看不到 `TRACE_TAG` 编码，因此设备侧没有任何 enable 位能门控它。设备公共区的同名寄存器 `TRACE_TAG`（`0x0A0`）是另一件事——它只决定 completion 带回的 `swTag`（见第 11 章）。记录流下游的协议与格式仍未定。
 
 ---
 
@@ -487,7 +491,7 @@ CPU 感知后端完成有两条通路：
 - `FENCE/WAIT_*` 只阻塞本端点后续派发，不产生任何 CPU 可见事件。软件不得把"指令已退休"当作设备工作已完成。
 - 设备中断是电平 + sticky 位，同一位在软件读走前多次完成会合并；需要计数时用设备私有的完成计数寄存器，Queen 不提供。
 - **`POLL_EQ`/`ATOMIC_RMW` 不产生 CPU 可见完成通知**（已裁定，见第 13/14 章）：`POLL_EQ` 阻塞 SCHED 派发点，`ATOMIC_RMW` 发出即放行。CPU 需要感知时读内存本身。
-- 同步状态的软件读通路已落地：`QRD endpoint=SCHED` 读 `0x02 POLL_INTERVAL`、`0x03 POLL_TIMEOUT`、`0x40..0x5F EVENT[0..31]`、`0x60..0x67 TIMELINE[0..7]`、`0x68..0x6B FAULT_VALID/KIND/ENDPOINT/CODE`、`0x6C IDLE`；`QWR1 endpoint=SCHED, 0x00` 清 fault、`0x01` 触发恢复。完整映射见 `queenHarewareInterface.md` 第 18 章。
+- 同步状态的软件读通路已落地：`QRD endpoint=SCHED` 读 `0x02 POLL_INTERVAL`、`0x03 POLL_TIMEOUT`、`0x40..0x5F EVENT[0..31]`、`0x60..0x67 TIMELINE[0..7]`、`0x68..0x6B FAULT_VALID/KIND/ENDPOINT/CODE`、`0x6C IDLE`；`QWR1 endpoint=SCHED, 0x00` 清 fault、`0x01` 触发恢复。完整映射见 `queenHarewareInterface.md` 第 15 章。
 
 ---
 
@@ -500,7 +504,7 @@ CPU 感知后端完成有两条通路：
 - 配置写与 `RUN` 都在前端入队后退休，不等待设备应用配置、启动执行或设备 idle。
 - fence/wait/polling 指令同样在前端入队后退休，其等待/比较条件在对应后端执行。CPU 可继续发送后续指令，直至前端队列背压。
 - fence/wait 完成不产生 CPU 可见事件；设备工作完成由设备自己的中断上报。
-- `QRD` 必须等待顺序返回的数据或异常后才能退休。读响应只对应读请求，接口不要求 transaction ID。
+- `QRD` 的 rd 依赖由 `asyncRd` 写回清除，没有独立的退休通告。`rd=x0` 与读错误都不写回：前者按 fire-and-forget，后者记 fault kind=4。读响应只对应读请求，接口不要求 transaction ID。
 
 ### 16.2 Backpressure
 
@@ -531,7 +535,7 @@ CPU 感知后端完成有两条通路：
 
 只有 `SIGNAL_EVENT` 的 `inst[25]` 承载语义（set/clr，两种取值均合法）；其余全部 cmd 的该位为保留位，非 0 报非法指令。
 
-同步编码错误必须在前端接受/退休之前检测。只有后端才能判定的寄存器访问或执行错误，不能回溯撤销已退休异步指令，必须走异步 fault；`QRD` 的访问错误通过按序读响应返回，并在退休时以 `qrdRetire.trap=1`、cause 9（`rdError`）上报——该 cause 不占用前端同步 trap 通路。
+同步编码错误必须在前端接受/退休之前检测。只有后端才能判定的寄存器访问或执行错误，不能回溯撤销已退休异步指令，必须走异步 fault；`QRD` 的访问错误通过按序读响应返回，记入异步 fault（kind=4、endpoint=读来源、code=0）并拉 `faultIrq`，**不产生 trap**——指令早已退休，带旧 pc 的同步异常无法精确恢复。软件读 SCHED `FAULT_*` 判因。
 
 DSA 执行错误、polling/atomic 总线错误属于异步错误，由 Scheduler 状态寄存器记录：
 
@@ -592,7 +596,7 @@ void queen_atomic_rmw(uint32_t address, uint32_t operand, unsigned op);
 8. 验证 wait endpoint 路由：GEMM/DMA 命令队列与 VPU 后端派发队列分别执行等待，SCHED 为非法编码。
 9. 验证 `WAIT_EVENT` 只查询、不申请/消费/修改资源；资源申请由 Queen 寄存器协议处理，不在 wait ISA 中实现。
 10. 验证 `SIGNAL_TIMELINE rs1=x0` 自增（按寄存器索引判定，不看读回值）、显式赋值、回绕比较、禁止回退和资源安全 reset。
-11. 验证 TRACE_TAG 仅由 endpoint 选择 GEMM/DMA/VPU/SCHED 记录位置，flag 非 0 报非法指令。
+11. 验证 TRACE_TAG 仅由 endpoint 选择 GEMM/DMA/SCHED 记录位置（VPU 由 VPU 前端定义），flag 非 0 报非法指令。
 12. 验证跨端点多个 `QRD` 延迟不同时仍按请求顺序返回，混入异步写/控制不影响响应配对，不需要 transaction ID。
 13. 验证前端 queue full、后端阻塞、response backpressure 和异步 fault 不丢失。
 14. 验证 polling 间隔复位为 8 cycle，写 SCHED `0x02` 后使用配置的 N cycle，写 0 报 `wrErr` 且保持原值。
@@ -601,19 +605,19 @@ void queen_atomic_rmw(uint32_t address, uint32_t operand, unsigned op);
 17. 验证 `QCTRL.cmd=4'b0111` 在全部 endpoint、bit25 两种取值及不同操作数字段下均在前端报非法指令，不入队。
 18. 验证 `FENCE` 等目标设备强 idle、`WAIT_EVENT/WAIT_TIMELINE` 等同步条件，条件未满足时只停本端点队头，其后 lane 不越过，另一端点与 SCHED 不受影响。
 19. 验证 `WAIT_TIMELINE` 用 signed 距离判定：计数回绕后仍能正确判满足，且不会把回绕误判为回退。
-20. 验证 `SIGNAL_EVENT` 与硬件置位同拍冲突时逐位置位优先；`SIGNAL_TIMELINE` 软件自增与两端点硬件自增同拍按次数累加。
+20. 验证 `SIGNAL_EVENT` 与硬件置位同拍冲突时逐位置位优先；`SIGNAL_TIMELINE` 软件自增与三端点硬件自增同拍按次数累加。
 21. 验证 `SIGNAL_TIMELINE` 显式回退被抑制更新并报 fault（kind=2、code=timeline ID），同拍硬件自增仍生效。
-22. 验证 `TRACE_TAG` 被消费但不产生记录（记录流未落地），不停等派发通路。
+22. 验证 `TRACE_TAG` 在派发口消费当拍从对应 trace 端口吐出一条 `swTag=rs1`、`hwTag=0` 的记录，不停等派发通路，也不出现在设备命令流上；三端点同拍各一条时都不丢。
 23. 验证 Queen 不产生任何完成通知 pulse：fence/wait 完成、RUN 完成均无 CPU 可见事件，设备中断是唯一的单引擎完成通路。
 24. 验证 `POLL_EQ` 阻塞 SCHED 派发点直到读值相等、失配后等满 `POLL_INTERVAL` 才重读；`ATOMIC_RMW` 发出即放行、最多 `memDepth` 笔在途、按序响应保证它先于其后的 `POLL_EQ` 落地；两者均不产生 CPU 可见完成通知。
 25. 验证设备写非法地址经 `wrErr` 进入 Queen fault（kind=1），同拍与 completion 错误竞争时按固定优先级取一条。
 26. 验证 fault 只保留最新一条、`faultIrq` 电平保持到软件写 SCHED `0x00`、同拍新错误优先于清除。
 27. 验证 `RUN` 关闭配置组并启动设备：`RUN` 之前设备不得执行，`RUN` 之后的 `QWR` 不得修改已启动配置。
-28. 验证空配置组 `RUN`、`RUN endpoint=SCHED`、`RUN aux` 非 0 均在前端报非法指令；`rs1` 高 24 位非 0 不报非法，只取低 8 位作 `cmdTag`。
+28. 验证空配置组 `RUN`、`RUN endpoint=SCHED`、`RUN aux` 非 0 均在前端报非法指令；`rs1` 任意取值都不报非法也不影响执行，`rs2` 为 0 时 completion 的 `swTag` 取设备 `TRACE_TAG` 寄存器值。
 29. 验证流控只门控 `RUN`：`RUN` beat 的 ready 为 0 时纯写 beat 仍可接受与转发、`RUN` 停等而非报错；`QRD` 只被 Queen 读响应缓存反压；设备按其声明的归还点返还 credit 后 `RUN` 恢复派发。
 30. 验证 `RUN` 的 `cmd_tag/sw_tag` 原样透传到设备命令，并由设备在 `start` 当拍采样后随 completion 回传。
 31. 验证 `QWR1` 的 `inst[11]` 非 0 报非法指令；`QWR2` 的 `inst[11]` 作为地址高位不报非法。
 32. 验证 `FLUSH`（cmd=10）、写 SCHED `0x01 RECOVER`、CPU `flushReq` 三个触发源走同一条恢复流程，效果一致。
 33. 验证两侧四相握手：`req` 拉起后必须等 `ack` 拉起才落下，`ack` 再随 `req` 落下；设备侧两路 `flushReq/flushAck` 都走完才进入排空。
-34. 验证 flush 期间前端接受并丢弃（合法指令照常 fire、不入队、不派发），在途与新收 `QRD` 一律回 `rdValid=1/data=0xdeadbeef/trap=0`，迟到 completion 不置同步状态也不记 fault。
+34. 验证 flush 期间前端接受并丢弃（合法指令照常 fire、不入队、不派发），在途与新收 `QRD` 一律以 `asyncRd` 回 `data=0xdeadbeef`（`rd=x0` 不回写）、不记 fault，迟到 completion 不置同步状态也不记 fault。
 35. 验证 `flushAck` 只在内部全排空、两设备 `deviceIdle` 且连续 `flushQuietCycles` 拍无扰动后拉起；静默窗内 CPU 再发指令须重新计数；`flushReq` 有效期间 Queen 全程停在 flush 态（`idle=0`、新 QRD 仍回 dummy）；完成后 event/timeline/fault/openGroup 清零而 `POLL_INTERVAL` 保持。

@@ -43,160 +43,138 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module Queen_QueenDsaAdapter(	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
-  input         clock,	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
-                reset,	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
-  output        io_in_ready,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  input         io_in_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_in_bits_0_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  input  [31:0] io_in_bits_0_bits_inst,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_in_bits_0_bits_pc,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_in_bits_0_bits_rs1,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_in_bits_0_bits_rs2,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  input         io_in_bits_1_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  input  [31:0] io_in_bits_1_bits_inst,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_in_bits_1_bits_pc,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_in_bits_1_bits_rs1,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_in_bits_1_bits_rs2,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  input         io_in_bits_2_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  input  [31:0] io_in_bits_2_bits_inst,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_in_bits_2_bits_pc,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_in_bits_2_bits_rs1,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_in_bits_2_bits_rs2,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  input         io_in_bits_3_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  input  [31:0] io_in_bits_3_bits_inst,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_in_bits_3_bits_pc,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_in_bits_3_bits_rs1,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_in_bits_3_bits_rs2,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  input         io_out_ready,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output        io_out_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_out_bits_0_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [1:0]  io_out_bits_0_bits_op,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [9:0]  io_out_bits_0_bits_reg0Addr,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_out_bits_0_bits_reg1Addr,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [31:0] io_out_bits_0_bits_data0,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_out_bits_0_bits_data1,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_out_bits_0_bits_pc,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [7:0]  io_out_bits_0_bits_cmdTag,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [31:0] io_out_bits_0_bits_swTag,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output        io_out_bits_1_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [1:0]  io_out_bits_1_bits_op,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [9:0]  io_out_bits_1_bits_reg0Addr,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_out_bits_1_bits_reg1Addr,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [31:0] io_out_bits_1_bits_data0,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_out_bits_1_bits_data1,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_out_bits_1_bits_pc,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [7:0]  io_out_bits_1_bits_cmdTag,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [31:0] io_out_bits_1_bits_swTag,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output        io_out_bits_2_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [1:0]  io_out_bits_2_bits_op,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [9:0]  io_out_bits_2_bits_reg0Addr,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_out_bits_2_bits_reg1Addr,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [31:0] io_out_bits_2_bits_data0,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_out_bits_2_bits_data1,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_out_bits_2_bits_pc,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [7:0]  io_out_bits_2_bits_cmdTag,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [31:0] io_out_bits_2_bits_swTag,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output        io_out_bits_3_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [1:0]  io_out_bits_3_bits_op,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [9:0]  io_out_bits_3_bits_reg0Addr,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_out_bits_3_bits_reg1Addr,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [31:0] io_out_bits_3_bits_data0,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_out_bits_3_bits_data1,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_out_bits_3_bits_pc,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [7:0]  io_out_bits_3_bits_cmdTag,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output [31:0] io_out_bits_3_bits_swTag,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  input         io_deviceIdle,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-                io_flushing,	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
-  output        io_idle	// src/queen/scala/main/QueenDsaAdapter.scala:24:16
+module Queen_QueenDsaAdapter(	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
+  input         clock,	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
+                reset,	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
+  output        io_in_ready,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  input         io_in_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_in_bits_0_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  input  [31:0] io_in_bits_0_bits_inst,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_in_bits_0_bits_rs1,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_in_bits_0_bits_rs2,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  input         io_in_bits_1_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  input  [31:0] io_in_bits_1_bits_inst,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_in_bits_1_bits_rs1,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_in_bits_1_bits_rs2,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  input         io_in_bits_2_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  input  [31:0] io_in_bits_2_bits_inst,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_in_bits_2_bits_rs1,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_in_bits_2_bits_rs2,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  input         io_in_bits_3_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  input  [31:0] io_in_bits_3_bits_inst,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_in_bits_3_bits_rs1,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_in_bits_3_bits_rs2,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  input         io_out_ready,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  output        io_out_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_out_bits_0_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  output [1:0]  io_out_bits_0_bits_op,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  output [9:0]  io_out_bits_0_bits_reg0Addr,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_out_bits_0_bits_reg1Addr,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  output [31:0] io_out_bits_0_bits_data0,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_out_bits_0_bits_data1,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_out_bits_0_bits_swTag,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  output        io_out_bits_1_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  output [1:0]  io_out_bits_1_bits_op,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  output [9:0]  io_out_bits_1_bits_reg0Addr,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_out_bits_1_bits_reg1Addr,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  output [31:0] io_out_bits_1_bits_data0,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_out_bits_1_bits_data1,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_out_bits_1_bits_swTag,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  output        io_out_bits_2_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  output [1:0]  io_out_bits_2_bits_op,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  output [9:0]  io_out_bits_2_bits_reg0Addr,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_out_bits_2_bits_reg1Addr,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  output [31:0] io_out_bits_2_bits_data0,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_out_bits_2_bits_data1,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_out_bits_2_bits_swTag,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  output        io_out_bits_3_valid,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  output [1:0]  io_out_bits_3_bits_op,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  output [9:0]  io_out_bits_3_bits_reg0Addr,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_out_bits_3_bits_reg1Addr,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  output [31:0] io_out_bits_3_bits_data0,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_out_bits_3_bits_data1,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_out_bits_3_bits_swTag,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  input         io_deviceIdle,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+                io_flushing,	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
+  output        io_idle	// src/queen/scala/main/QueenDsaAdapter.scala:22:16
 );
 
-  reg              active;	// src/queen/scala/main/QueenDsaAdapter.scala:35:33
-  reg              pkt_0_valid;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg  [31:0]      pkt_0_bits_inst;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg  [31:0]      pkt_0_bits_pc;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg  [31:0]      pkt_0_bits_rs1;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg  [31:0]      pkt_0_bits_rs2;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg              pkt_1_valid;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg  [31:0]      pkt_1_bits_inst;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg  [31:0]      pkt_1_bits_pc;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg  [31:0]      pkt_1_bits_rs1;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg  [31:0]      pkt_1_bits_rs2;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg              pkt_2_valid;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg  [31:0]      pkt_2_bits_inst;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg  [31:0]      pkt_2_bits_pc;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg  [31:0]      pkt_2_bits_rs1;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg  [31:0]      pkt_2_bits_rs2;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg              pkt_3_valid;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg  [31:0]      pkt_3_bits_inst;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg  [31:0]      pkt_3_bits_pc;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg  [31:0]      pkt_3_bits_rs1;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg  [31:0]      pkt_3_bits_rs2;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-  reg  [2:0]       base;	// src/queen/scala/main/QueenDsaAdapter.scala:37:31
-  wire             done = active & base[2];	// src/queen/scala/main/QueenDsaAdapter.scala:35:33, :37:31, :39:{31,39}
-  wire             io_in_ready_0 = ~active | done;	// src/queen/scala/main/QueenDsaAdapter.scala:35:33, :39:31, :40:{20,28}
-  wire             inRange = active & ~(base[2]);	// src/queen/scala/main/QueenDsaAdapter.scala:35:33, :37:31, :42:{34,42}
-  wire [3:0]       _GEN = {1'h0, base};	// src/queen/scala/main/QueenDsaAdapter.scala:35:33, :37:31, :53:24
-  wire [3:0]       _GEN_0 = {{pkt_3_valid}, {pkt_2_valid}, {pkt_1_valid}, {pkt_0_valid}};	// src/queen/scala/main/QueenDsaAdapter.scala:36:26, :55:36
+  reg              active;	// src/queen/scala/main/QueenDsaAdapter.scala:33:33
+  reg              pkt_0_valid;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+  reg  [31:0]      pkt_0_bits_inst;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+  reg  [31:0]      pkt_0_bits_rs1;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+  reg  [31:0]      pkt_0_bits_rs2;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+  reg              pkt_1_valid;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+  reg  [31:0]      pkt_1_bits_inst;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+  reg  [31:0]      pkt_1_bits_rs1;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+  reg  [31:0]      pkt_1_bits_rs2;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+  reg              pkt_2_valid;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+  reg  [31:0]      pkt_2_bits_inst;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+  reg  [31:0]      pkt_2_bits_rs1;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+  reg  [31:0]      pkt_2_bits_rs2;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+  reg              pkt_3_valid;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+  reg  [31:0]      pkt_3_bits_inst;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+  reg  [31:0]      pkt_3_bits_rs1;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+  reg  [31:0]      pkt_3_bits_rs2;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+  reg  [2:0]       base;	// src/queen/scala/main/QueenDsaAdapter.scala:35:31
+  wire             done = active & base[2];	// src/queen/scala/main/QueenDsaAdapter.scala:33:33, :35:31, :37:{31,39}
+  wire             io_in_ready_0 = ~active | done;	// src/queen/scala/main/QueenDsaAdapter.scala:33:33, :37:31, :38:{20,28}
+  wire             inRange = active & ~(base[2]);	// src/queen/scala/main/QueenDsaAdapter.scala:33:33, :35:31, :40:{34,42}
+  wire [3:0]       _GEN = {1'h0, base};	// src/queen/scala/main/QueenDsaAdapter.scala:33:33, :35:31, :51:24
+  wire [3:0]       _GEN_0 = {{pkt_3_valid}, {pkt_2_valid}, {pkt_1_valid}, {pkt_0_valid}};	// src/queen/scala/main/QueenDsaAdapter.scala:34:26, :53:36
   wire [3:0][31:0] _GEN_1 =
-    {{pkt_3_bits_inst}, {pkt_2_bits_inst}, {pkt_1_bits_inst}, {pkt_0_bits_inst}};	// src/queen/scala/main/QueenDsaAdapter.scala:36:26, :55:36
-  wire [31:0]      _GEN_2 = _GEN_1[base[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:37:31, :45:42, :55:36
+    {{pkt_3_bits_inst}, {pkt_2_bits_inst}, {pkt_1_bits_inst}, {pkt_0_bits_inst}};	// src/queen/scala/main/QueenDsaAdapter.scala:34:26, :53:36
+  wire [31:0]      _GEN_2 = _GEN_1[base[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:35:31, :43:42, :53:36
   wire [3:0][31:0] _GEN_3 =
-    {{pkt_3_bits_pc}, {pkt_2_bits_pc}, {pkt_1_bits_pc}, {pkt_0_bits_pc}};	// src/queen/scala/main/QueenDsaAdapter.scala:36:26, :55:36
+    {{pkt_3_bits_rs1}, {pkt_2_bits_rs1}, {pkt_1_bits_rs1}, {pkt_0_bits_rs1}};	// src/queen/scala/main/QueenDsaAdapter.scala:34:26, :53:36
   wire [3:0][31:0] _GEN_4 =
-    {{pkt_3_bits_rs1}, {pkt_2_bits_rs1}, {pkt_1_bits_rs1}, {pkt_0_bits_rs1}};	// src/queen/scala/main/QueenDsaAdapter.scala:36:26, :55:36
-  wire [31:0]      _GEN_5 = _GEN_4[base[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:37:31, :45:42, :55:36
-  wire [3:0][31:0] _GEN_6 =
-    {{pkt_3_bits_rs2}, {pkt_2_bits_rs2}, {pkt_1_bits_rs2}, {pkt_0_bits_rs2}};	// src/queen/scala/main/QueenDsaAdapter.scala:36:26, :55:36
-  wire [31:0]      _GEN_7 = _GEN_6[base[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:37:31, :45:42, :55:36
-  wire             cand_0_valid_layerCapture = inRange & _GEN < 4'h4 & _GEN_0[base[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:35:33, :37:31, :42:34, :45:42, :53:24, :55:36, :56:{34,41,51}
+    {{pkt_3_bits_rs2}, {pkt_2_bits_rs2}, {pkt_1_bits_rs2}, {pkt_0_bits_rs2}};	// src/queen/scala/main/QueenDsaAdapter.scala:34:26, :53:36
+  wire [31:0]      _GEN_5 = _GEN_4[base[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:35:31, :43:42, :53:36
+  wire             cand_0_valid_layerCapture = inRange & _GEN < 4'h4 & _GEN_0[base[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:33:33, :35:31, :40:34, :43:42, :51:24, :53:36, :54:{34,41,51}
   wire             candWr_0 =
-    cand_0_valid_layerCapture & (_GEN_2[14:12] == 3'h0 | _GEN_2[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaAdapter.scala:55:36, :56:51, :58:{36,47,55,65}, :67:32
-  wire             candOther_0 = cand_0_valid_layerCapture & ~candWr_0;	// src/queen/scala/main/QueenDsaAdapter.scala:56:51, :58:36, :59:{39,42}
+    cand_0_valid_layerCapture & (_GEN_2[14:12] == 3'h0 | _GEN_2[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :54:51, :56:{36,47,55,65}, :65:32
+  wire             candOther_0 = cand_0_valid_layerCapture & ~candWr_0;	// src/queen/scala/main/QueenDsaAdapter.scala:54:51, :56:36, :57:{39,42}
   wire             candRun_0_layerCapture =
-    candOther_0 & _GEN_2[14:12] == 3'h3 & _GEN_2[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaAdapter.scala:55:36, :59:39, :60:{36,46,54,71,80}, :67:32
-  wire             candRd_0_layerCapture = candOther_0 & _GEN_2[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:55:36, :59:39, :61:{35,45}, :67:32
-  wire [3:0]       idx_1 = _GEN + 4'h1;	// src/queen/scala/main/QueenDsaAdapter.scala:35:33, :53:24
-  wire [31:0]      _GEN_8 = _GEN_1[idx_1[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:45:42, :53:24, :55:36
-  wire [31:0]      _GEN_9 = _GEN_4[idx_1[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:45:42, :53:24, :55:36
-  wire [31:0]      _GEN_10 = _GEN_6[idx_1[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:45:42, :53:24, :55:36
+    candOther_0 & _GEN_2[14:12] == 3'h3 & _GEN_2[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :57:39, :58:{36,46,54,71,80}, :65:32
+  wire             candRd_0_layerCapture = candOther_0 & _GEN_2[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :57:39, :59:{35,45}, :65:32
+  wire [3:0]       idx_1 = _GEN + 4'h1;	// src/queen/scala/main/QueenDsaAdapter.scala:33:33, :51:24
+  wire [31:0]      _GEN_6 = _GEN_1[idx_1[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:43:42, :51:24, :53:36
+  wire [31:0]      _GEN_7 = _GEN_4[idx_1[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:43:42, :51:24, :53:36
   wire             cand_1_valid_layerCapture =
-    inRange & idx_1 < 4'h4 & _GEN_0[idx_1[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:42:34, :45:42, :53:24, :55:36, :56:{34,41,51}
+    inRange & idx_1 < 4'h4 & _GEN_0[idx_1[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:40:34, :43:42, :51:24, :53:36, :54:{34,41,51}
   wire             candWr_1 =
-    cand_1_valid_layerCapture & (_GEN_8[14:12] == 3'h0 | _GEN_8[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaAdapter.scala:55:36, :56:51, :58:{36,47,55,65}, :67:32
-  wire             candOther_1 = cand_1_valid_layerCapture & ~candWr_1;	// src/queen/scala/main/QueenDsaAdapter.scala:56:51, :58:36, :59:{39,42}
+    cand_1_valid_layerCapture & (_GEN_6[14:12] == 3'h0 | _GEN_6[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :54:51, :56:{36,47,55,65}, :65:32
+  wire             candOther_1 = cand_1_valid_layerCapture & ~candWr_1;	// src/queen/scala/main/QueenDsaAdapter.scala:54:51, :56:36, :57:{39,42}
   wire             candRun_1_layerCapture =
-    candOther_1 & _GEN_8[14:12] == 3'h3 & _GEN_8[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaAdapter.scala:55:36, :59:39, :60:{36,46,54,71,80}, :67:32
-  wire             candRd_1_layerCapture = candOther_1 & _GEN_8[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:55:36, :59:39, :61:{35,45}, :67:32
-  wire [3:0]       idx_2 = _GEN + 4'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:35:33, :53:24
-  wire [31:0]      _GEN_11 = _GEN_1[idx_2[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:45:42, :53:24, :55:36
-  wire [31:0]      _GEN_12 = _GEN_4[idx_2[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:45:42, :53:24, :55:36
-  wire [31:0]      _GEN_13 = _GEN_6[idx_2[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:45:42, :53:24, :55:36
+    candOther_1 & _GEN_6[14:12] == 3'h3 & _GEN_6[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :57:39, :58:{36,46,54,71,80}, :65:32
+  wire             candRd_1_layerCapture = candOther_1 & _GEN_6[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :57:39, :59:{35,45}, :65:32
+  wire [3:0]       idx_2 = _GEN + 4'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:33:33, :51:24
+  wire [31:0]      _GEN_8 = _GEN_1[idx_2[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:43:42, :51:24, :53:36
+  wire [31:0]      _GEN_9 = _GEN_4[idx_2[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:43:42, :51:24, :53:36
   wire             cand_2_valid_layerCapture =
-    inRange & idx_2 < 4'h4 & _GEN_0[idx_2[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:42:34, :45:42, :53:24, :55:36, :56:{34,41,51}
+    inRange & idx_2 < 4'h4 & _GEN_0[idx_2[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:40:34, :43:42, :51:24, :53:36, :54:{34,41,51}
   wire             candWr_2 =
-    cand_2_valid_layerCapture & (_GEN_11[14:12] == 3'h0 | _GEN_11[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaAdapter.scala:55:36, :56:51, :58:{36,47,55,65}, :67:32
-  wire             candOther_2 = cand_2_valid_layerCapture & ~candWr_2;	// src/queen/scala/main/QueenDsaAdapter.scala:56:51, :58:36, :59:{39,42}
+    cand_2_valid_layerCapture & (_GEN_8[14:12] == 3'h0 | _GEN_8[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :54:51, :56:{36,47,55,65}, :65:32
+  wire             candOther_2 = cand_2_valid_layerCapture & ~candWr_2;	// src/queen/scala/main/QueenDsaAdapter.scala:54:51, :56:36, :57:{39,42}
   wire             candRun_2_layerCapture =
-    candOther_2 & _GEN_11[14:12] == 3'h3 & _GEN_11[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaAdapter.scala:55:36, :59:39, :60:{36,46,54,71,80}, :67:32
-  wire             candRd_2_layerCapture = candOther_2 & _GEN_11[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:55:36, :59:39, :61:{35,45}, :67:32
-  wire [3:0]       idx_3 = _GEN + 4'h3;	// src/queen/scala/main/QueenDsaAdapter.scala:35:33, :53:24
-  wire [31:0]      _GEN_14 = _GEN_1[idx_3[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:45:42, :53:24, :55:36
-  wire [31:0]      _GEN_15 = _GEN_4[idx_3[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:45:42, :53:24, :55:36
-  wire [31:0]      _GEN_16 = _GEN_6[idx_3[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:45:42, :53:24, :55:36
+    candOther_2 & _GEN_8[14:12] == 3'h3 & _GEN_8[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :57:39, :58:{36,46,54,71,80}, :65:32
+  wire             candRd_2_layerCapture = candOther_2 & _GEN_8[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :57:39, :59:{35,45}, :65:32
+  wire [3:0]       idx_3 = _GEN + 4'h3;	// src/queen/scala/main/QueenDsaAdapter.scala:33:33, :51:24
+  wire [31:0]      _GEN_10 = _GEN_1[idx_3[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:43:42, :51:24, :53:36
+  wire [31:0]      _GEN_11 = _GEN_4[idx_3[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:43:42, :51:24, :53:36
   wire             cand_3_valid_layerCapture =
-    inRange & idx_3 < 4'h4 & _GEN_0[idx_3[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:42:34, :45:42, :53:24, :55:36, :56:{34,41,51}
+    inRange & idx_3 < 4'h4 & _GEN_0[idx_3[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:40:34, :43:42, :51:24, :53:36, :54:{34,41,51}
   wire             candWr_3 =
-    cand_3_valid_layerCapture & (_GEN_14[14:12] == 3'h0 | _GEN_14[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaAdapter.scala:55:36, :56:51, :58:{36,47,55,65}, :67:32
-  wire             candOther_3 = cand_3_valid_layerCapture & ~candWr_3;	// src/queen/scala/main/QueenDsaAdapter.scala:56:51, :58:36, :59:{39,42}
+    cand_3_valid_layerCapture & (_GEN_10[14:12] == 3'h0 | _GEN_10[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :54:51, :56:{36,47,55,65}, :65:32
+  wire             candOther_3 = cand_3_valid_layerCapture & ~candWr_3;	// src/queen/scala/main/QueenDsaAdapter.scala:54:51, :56:36, :57:{39,42}
   wire             candRun_3_layerCapture =
-    candOther_3 & _GEN_14[14:12] == 3'h3 & _GEN_14[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaAdapter.scala:55:36, :59:39, :60:{36,46,54,71,80}, :67:32
-  wire             candRd_3_layerCapture = candOther_3 & _GEN_14[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:55:36, :59:39, :61:{35,45}, :67:32
+    candOther_3 & _GEN_10[14:12] == 3'h3 & _GEN_10[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :57:39, :58:{36,46,54,71,80}, :65:32
+  wire             candRd_3_layerCapture = candOther_3 & _GEN_10[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :57:39, :59:{35,45}, :65:32
   wire [2:0]       firstOtherIdx =
     candOther_0
       ? 3'h0
-      : candOther_1 ? 3'h1 : candOther_2 ? 3'h2 : candOther_3 ? 3'h3 : 3'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:59:39, :65:30, :67:{26,32}
-  wire [2:0]       _room_T = 3'h4 - base;	// src/queen/scala/main/QueenDsaAdapter.scala:37:31, :77:40
+      : candOther_1 ? 3'h1 : candOther_2 ? 3'h2 : candOther_3 ? 3'h3 : 3'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:57:39, :63:30, :65:{26,32}
+  wire [2:0]       _room_T = 3'h4 - base;	// src/queen/scala/main/QueenDsaAdapter.scala:35:31, :75:40
   wire [2:0]       beatLen =
     (|{candOther_3, candOther_2, candOther_1, candOther_0})
       ? firstOtherIdx
@@ -208,176 +186,160 @@ module Queen_QueenDsaAdapter(	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
                   : cand_2_valid_layerCapture
                       ? 3'h2
                       : cand_3_valid_layerCapture ? 3'h3 : 3'h0) == firstOtherIdx}
-      : _room_T[2] ? 3'h4 : _room_T;	// src/queen/scala/main/QueenDsaAdapter.scala:56:51, :59:39, :65:30, :67:{26,32}, :72:{38,45}, :76:39, :77:40, :78:{27,33}, :79:{30,55}
-  wire             inBeat_0 = cand_0_valid_layerCapture & (|beatLen);	// src/queen/scala/main/QueenDsaAdapter.scala:56:51, :79:30, :80:{65,80}
-  wire             inBeat_1 = cand_1_valid_layerCapture & (|(beatLen[2:1]));	// src/queen/scala/main/QueenDsaAdapter.scala:56:51, :79:30, :80:{65,80}
-  wire             inBeat_2 = cand_2_valid_layerCapture & beatLen > 3'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:56:51, :67:32, :79:30, :80:{65,80}
-  wire             inBeat_3 = cand_3_valid_layerCapture & beatLen[2];	// src/queen/scala/main/QueenDsaAdapter.scala:56:51, :79:30, :80:{65,80}
-  wire             beatValid = inBeat_0 | inBeat_1 | inBeat_2 | inBeat_3;	// src/queen/scala/main/QueenDsaAdapter.scala:80:65, :81:45
-  wire [2:0]       funct3_4_layerCapture = _GEN_2[14:12];	// src/queen/scala/main/QueenDsaAdapter.scala:55:36, :87:28
-  wire             isW2_layerCapture = funct3_4_layerCapture == 3'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:87:28, :88:27
-  wire [2:0]       funct3_5_layerCapture = _GEN_8[14:12];	// src/queen/scala/main/QueenDsaAdapter.scala:55:36, :87:28
-  wire             isW2_1_layerCapture = funct3_5_layerCapture == 3'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:87:28, :88:27
-  wire [2:0]       funct3_6_layerCapture = _GEN_11[14:12];	// src/queen/scala/main/QueenDsaAdapter.scala:55:36, :87:28
-  wire             isW2_2_layerCapture = funct3_6_layerCapture == 3'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:87:28, :88:27
-  wire [2:0]       funct3_7_layerCapture = _GEN_14[14:12];	// src/queen/scala/main/QueenDsaAdapter.scala:55:36, :87:28
-  wire             isW2_3_layerCapture = funct3_7_layerCapture == 3'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:87:28, :88:27
+      : _room_T[2] ? 3'h4 : _room_T;	// src/queen/scala/main/QueenDsaAdapter.scala:54:51, :57:39, :63:30, :65:{26,32}, :70:{38,45}, :74:39, :75:40, :76:{27,33}, :77:{30,55}
+  wire             inBeat_0 = cand_0_valid_layerCapture & (|beatLen);	// src/queen/scala/main/QueenDsaAdapter.scala:54:51, :77:30, :78:{65,80}
+  wire             inBeat_1 = cand_1_valid_layerCapture & (|(beatLen[2:1]));	// src/queen/scala/main/QueenDsaAdapter.scala:54:51, :77:30, :78:{65,80}
+  wire             inBeat_2 = cand_2_valid_layerCapture & beatLen > 3'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:54:51, :65:32, :77:30, :78:{65,80}
+  wire             inBeat_3 = cand_3_valid_layerCapture & beatLen[2];	// src/queen/scala/main/QueenDsaAdapter.scala:54:51, :77:30, :78:{65,80}
+  wire             beatValid = inBeat_0 | inBeat_1 | inBeat_2 | inBeat_3;	// src/queen/scala/main/QueenDsaAdapter.scala:78:65, :79:45
+  wire [2:0]       funct3_4_layerCapture = _GEN_2[14:12];	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :85:28
+  wire             isW2_layerCapture = funct3_4_layerCapture == 3'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:85:28, :86:27
+  wire [2:0]       funct3_5_layerCapture = _GEN_6[14:12];	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :85:28
+  wire             isW2_1_layerCapture = funct3_5_layerCapture == 3'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:85:28, :86:27
+  wire [2:0]       funct3_6_layerCapture = _GEN_8[14:12];	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :85:28
+  wire             isW2_2_layerCapture = funct3_6_layerCapture == 3'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:85:28, :86:27
+  wire [2:0]       funct3_7_layerCapture = _GEN_10[14:12];	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :85:28
+  wire             isW2_3_layerCapture = funct3_7_layerCapture == 3'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:85:28, :86:27
   wire             io_out_valid_0 =
     beatValid & (~inBeat_0 | candWr_0 | candRun_0_layerCapture | candRd_0_layerCapture)
     & (~inBeat_1 | candWr_1 | candRun_1_layerCapture | candRd_1_layerCapture)
     & (~inBeat_2 | candWr_2 | candRun_2_layerCapture | candRd_2_layerCapture)
     & (~inBeat_3 | candWr_3 | candRun_3_layerCapture | candRd_3_layerCapture)
-    & ~io_flushing;	// src/queen/scala/main/QueenDsaAdapter.scala:58:36, :60:54, :61:35, :80:65, :81:45, :83:{19,30,43,57,80}, :109:{31,48,51}
-  always @(posedge clock) begin	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
-    automatic logic _GEN_17;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-    automatic logic _GEN_18;	// src/queen/scala/main/QueenDsaAdapter.scala:118:21
-    _GEN_17 = io_in_ready_0 & io_in_valid;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaAdapter.scala:40:28
-    _GEN_18 = _GEN_17 & ~io_flushing;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaAdapter.scala:109:51, :118:21
-    if (reset) begin	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
-      active <= 1'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:35:33
-      base <= 3'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:37:31
+    & ~io_flushing;	// src/queen/scala/main/QueenDsaAdapter.scala:56:36, :58:54, :59:35, :78:65, :79:45, :81:{19,30,43,57,80}, :105:{31,48,51}
+  always @(posedge clock) begin	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
+    automatic logic _GEN_12;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+    automatic logic _GEN_13;	// src/queen/scala/main/QueenDsaAdapter.scala:114:21
+    _GEN_12 = io_in_ready_0 & io_in_valid;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaAdapter.scala:38:28
+    _GEN_13 = _GEN_12 & ~io_flushing;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaAdapter.scala:105:51, :114:21
+    if (reset) begin	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
+      active <= 1'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:33:33
+      base <= 3'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:35:31
     end
-    else begin	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
-      active <= ~io_flushing & (_GEN_18 | ~(done & ~_GEN_17) & active);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaAdapter.scala:35:33, :39:31, :115:{15,18,31}, :116:16, :118:{21,38}, :121:16, :124:23, :125:16
-      if (io_flushing | _GEN_18)	// src/queen/scala/main/QueenDsaAdapter.scala:112:50, :118:{21,38}, :120:14, :124:23, :126:14
-        base <= 3'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:37:31
-      else if (inRange & (io_out_ready & io_out_valid_0 | ~beatValid))	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaAdapter.scala:42:34, :81:45, :83:80, :109:{31,48}, :112:{18,34,37}
-        base <= base + beatLen;	// src/queen/scala/main/QueenDsaAdapter.scala:37:31, :79:30, :113:22
+    else begin	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
+      active <= ~io_flushing & (_GEN_13 | ~(done & ~_GEN_12) & active);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaAdapter.scala:33:33, :37:31, :111:{15,18,31}, :112:16, :114:{21,38}, :117:16, :120:23, :121:16
+      if (io_flushing | _GEN_13)	// src/queen/scala/main/QueenDsaAdapter.scala:108:50, :114:{21,38}, :116:14, :120:23, :122:14
+        base <= 3'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:35:31
+      else if (inRange & (io_out_ready & io_out_valid_0 | ~beatValid))	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenDsaAdapter.scala:40:34, :79:45, :81:80, :105:{31,48}, :108:{18,34,37}
+        base <= base + beatLen;	// src/queen/scala/main/QueenDsaAdapter.scala:35:31, :77:30, :109:22
     end
-    if (_GEN_18) begin	// src/queen/scala/main/QueenDsaAdapter.scala:118:21
-      pkt_0_valid <= io_in_bits_0_valid;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_0_bits_inst <= io_in_bits_0_bits_inst;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_0_bits_pc <= io_in_bits_0_bits_pc;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_0_bits_rs1 <= io_in_bits_0_bits_rs1;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_0_bits_rs2 <= io_in_bits_0_bits_rs2;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_1_valid <= io_in_bits_1_valid;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_1_bits_inst <= io_in_bits_1_bits_inst;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_1_bits_pc <= io_in_bits_1_bits_pc;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_1_bits_rs1 <= io_in_bits_1_bits_rs1;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_1_bits_rs2 <= io_in_bits_1_bits_rs2;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_2_valid <= io_in_bits_2_valid;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_2_bits_inst <= io_in_bits_2_bits_inst;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_2_bits_pc <= io_in_bits_2_bits_pc;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_2_bits_rs1 <= io_in_bits_2_bits_rs1;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_2_bits_rs2 <= io_in_bits_2_bits_rs2;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_3_valid <= io_in_bits_3_valid;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_3_bits_inst <= io_in_bits_3_bits_inst;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_3_bits_pc <= io_in_bits_3_bits_pc;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_3_bits_rs1 <= io_in_bits_3_bits_rs1;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
-      pkt_3_bits_rs2 <= io_in_bits_3_bits_rs2;	// src/queen/scala/main/QueenDsaAdapter.scala:36:26
+    if (_GEN_13) begin	// src/queen/scala/main/QueenDsaAdapter.scala:114:21
+      pkt_0_valid <= io_in_bits_0_valid;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+      pkt_0_bits_inst <= io_in_bits_0_bits_inst;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+      pkt_0_bits_rs1 <= io_in_bits_0_bits_rs1;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+      pkt_0_bits_rs2 <= io_in_bits_0_bits_rs2;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+      pkt_1_valid <= io_in_bits_1_valid;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+      pkt_1_bits_inst <= io_in_bits_1_bits_inst;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+      pkt_1_bits_rs1 <= io_in_bits_1_bits_rs1;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+      pkt_1_bits_rs2 <= io_in_bits_1_bits_rs2;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+      pkt_2_valid <= io_in_bits_2_valid;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+      pkt_2_bits_inst <= io_in_bits_2_bits_inst;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+      pkt_2_bits_rs1 <= io_in_bits_2_bits_rs1;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+      pkt_2_bits_rs2 <= io_in_bits_2_bits_rs2;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+      pkt_3_valid <= io_in_bits_3_valid;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+      pkt_3_bits_inst <= io_in_bits_3_bits_inst;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+      pkt_3_bits_rs1 <= io_in_bits_3_bits_rs1;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
+      pkt_3_bits_rs2 <= io_in_bits_3_bits_rs2;	// src/queen/scala/main/QueenDsaAdapter.scala:34:26
     end
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
-      `FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
+  `ifdef ENABLE_INITIAL_REG_	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
+      `FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
-      automatic logic [31:0] _RANDOM[0:16];	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
-      `ifdef INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
-        `INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
+    initial begin	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
+      automatic logic [31:0] _RANDOM[0:16];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
+      `ifdef INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
+        `INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
+      `ifdef RANDOMIZE_REG_INIT	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
         for (logic [4:0] i = 5'h0; i < 5'h11; i += 5'h1) begin
-          _RANDOM[i] = `RANDOM;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
-        end	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
-        active = _RANDOM[5'h0][0];	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :35:33
-        pkt_0_valid = _RANDOM[5'h0][1];	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :35:33, :36:26
-        pkt_0_bits_inst = {_RANDOM[5'h0][31:2], _RANDOM[5'h1][1:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :35:33, :36:26
-        pkt_0_bits_pc = {_RANDOM[5'h1][31:2], _RANDOM[5'h2][1:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        pkt_0_bits_rs1 = {_RANDOM[5'h2][31:2], _RANDOM[5'h3][1:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        pkt_0_bits_rs2 = {_RANDOM[5'h3][31:2], _RANDOM[5'h4][1:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        pkt_1_valid = _RANDOM[5'h4][2];	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        pkt_1_bits_inst = {_RANDOM[5'h4][31:3], _RANDOM[5'h5][2:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        pkt_1_bits_pc = {_RANDOM[5'h5][31:3], _RANDOM[5'h6][2:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        pkt_1_bits_rs1 = {_RANDOM[5'h6][31:3], _RANDOM[5'h7][2:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        pkt_1_bits_rs2 = {_RANDOM[5'h7][31:3], _RANDOM[5'h8][2:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        pkt_2_valid = _RANDOM[5'h8][3];	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        pkt_2_bits_inst = {_RANDOM[5'h8][31:4], _RANDOM[5'h9][3:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        pkt_2_bits_pc = {_RANDOM[5'h9][31:4], _RANDOM[5'hA][3:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        pkt_2_bits_rs1 = {_RANDOM[5'hA][31:4], _RANDOM[5'hB][3:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        pkt_2_bits_rs2 = {_RANDOM[5'hB][31:4], _RANDOM[5'hC][3:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        pkt_3_valid = _RANDOM[5'hC][4];	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        pkt_3_bits_inst = {_RANDOM[5'hC][31:5], _RANDOM[5'hD][4:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        pkt_3_bits_pc = {_RANDOM[5'hD][31:5], _RANDOM[5'hE][4:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        pkt_3_bits_rs1 = {_RANDOM[5'hE][31:5], _RANDOM[5'hF][4:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        pkt_3_bits_rs2 = {_RANDOM[5'hF][31:5], _RANDOM[5'h10][4:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26
-        base = _RANDOM[5'h10][7:5];	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :36:26, :37:31
+          _RANDOM[i] = `RANDOM;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
+        end	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
+        active = _RANDOM[5'h0][0];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :33:33
+        pkt_0_valid = _RANDOM[5'h0][1];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :33:33, :34:26
+        pkt_0_bits_inst = {_RANDOM[5'h0][31:2], _RANDOM[5'h1][1:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :33:33, :34:26
+        pkt_0_bits_rs1 = {_RANDOM[5'h2][31:2], _RANDOM[5'h3][1:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_0_bits_rs2 = {_RANDOM[5'h3][31:2], _RANDOM[5'h4][1:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_1_valid = _RANDOM[5'h4][2];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_1_bits_inst = {_RANDOM[5'h4][31:3], _RANDOM[5'h5][2:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_1_bits_rs1 = {_RANDOM[5'h6][31:3], _RANDOM[5'h7][2:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_1_bits_rs2 = {_RANDOM[5'h7][31:3], _RANDOM[5'h8][2:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_2_valid = _RANDOM[5'h8][3];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_2_bits_inst = {_RANDOM[5'h8][31:4], _RANDOM[5'h9][3:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_2_bits_rs1 = {_RANDOM[5'hA][31:4], _RANDOM[5'hB][3:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_2_bits_rs2 = {_RANDOM[5'hB][31:4], _RANDOM[5'hC][3:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_3_valid = _RANDOM[5'hC][4];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_3_bits_inst = {_RANDOM[5'hC][31:5], _RANDOM[5'hD][4:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_3_bits_rs1 = {_RANDOM[5'hE][31:5], _RANDOM[5'hF][4:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_3_bits_rs2 = {_RANDOM[5'hF][31:5], _RANDOM[5'h10][4:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        base = _RANDOM[5'h10][7:5];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26, :35:31
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
-      `FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenDsaAdapter.scala:23:7
+    `ifdef FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
+      `FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_in_ready = io_in_ready_0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :40:28
-  assign io_out_valid = io_out_valid_0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :83:80, :109:{31,48}
-  assign io_out_bits_0_valid = inBeat_0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :80:65
+  assign io_in_ready = io_in_ready_0;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :38:28
+  assign io_out_valid = io_out_valid_0;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :81:80, :105:{31,48}
+  assign io_out_bits_0_valid = inBeat_0;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :78:65
   assign io_out_bits_0_bits_op =
     candRun_0_layerCapture
       ? 2'h3
-      : candRd_0_layerCapture ? 2'h2 : {1'h0, isW2_layerCapture};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :60:{46,54}, :61:{35,45}, :88:27, :94:25, :95:16, :96:20
+      : candRd_0_layerCapture ? 2'h2 : {1'h0, isW2_layerCapture};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :58:{46,54}, :59:{35,45}, :86:27, :92:25, :93:16, :94:20
   assign io_out_bits_0_bits_reg0Addr =
     candRun_0_layerCapture
       ? 10'h0
-      : isW2_layerCapture ? {4'h0, _GEN_2[11], _GEN_2[29:25]} : _GEN_2[29:20];	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :60:54, :88:27, :91:{26,47,59}, :98:{31,53,75}
+      : isW2_layerCapture ? {4'h0, _GEN_2[11], _GEN_2[29:25]} : _GEN_2[29:20];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :58:54, :86:27, :89:{26,47,59}, :96:{31,53,75}
   assign io_out_bits_0_bits_reg1Addr =
-    isW2_layerCapture ? {4'h0, _GEN_2[11], _GEN_2[29:25]} + 10'h1 : 10'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :88:27, :91:{47,59}, :98:31, :99:{31,46}
+    isW2_layerCapture ? {4'h0, _GEN_2[11], _GEN_2[29:25]} + 10'h1 : 10'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :86:27, :89:{47,59}, :96:31, :97:{31,46}
   assign io_out_bits_0_bits_data0 =
-    candRun_0_layerCapture | candRd_0_layerCapture ? 32'h0 : _GEN_5;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :60:54, :61:35, :100:{28,35}
-  assign io_out_bits_0_bits_data1 = isW2_layerCapture ? _GEN_7 : 32'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :88:27, :100:28, :101:28
-  assign io_out_bits_0_bits_pc = _GEN_3[base[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :37:31, :45:42, :55:36
-  assign io_out_bits_0_bits_cmdTag = candRun_0_layerCapture ? _GEN_5[7:0] : 8'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :60:54, :103:{29,42}
-  assign io_out_bits_0_bits_swTag = candRun_0_layerCapture ? _GEN_7 : 32'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :60:54, :100:28, :104:28
-  assign io_out_bits_1_valid = inBeat_1;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :80:65
+    candRun_0_layerCapture | candRd_0_layerCapture ? 32'h0 : _GEN_3[base[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :35:31, :43:42, :53:36, :58:54, :59:35, :98:{28,35}
+  assign io_out_bits_0_bits_data1 = isW2_layerCapture ? _GEN_5 : 32'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :86:27, :98:28, :99:28
+  assign io_out_bits_0_bits_swTag = candRun_0_layerCapture ? _GEN_5 : 32'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :58:54, :98:28, :100:28
+  assign io_out_bits_1_valid = inBeat_1;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :78:65
   assign io_out_bits_1_bits_op =
     candRun_1_layerCapture
       ? 2'h3
-      : candRd_1_layerCapture ? 2'h2 : {1'h0, isW2_1_layerCapture};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :60:{46,54}, :61:{35,45}, :88:27, :94:25, :95:16, :96:20
+      : candRd_1_layerCapture ? 2'h2 : {1'h0, isW2_1_layerCapture};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :58:{46,54}, :59:{35,45}, :86:27, :92:25, :93:16, :94:20
   assign io_out_bits_1_bits_reg0Addr =
     candRun_1_layerCapture
       ? 10'h0
-      : isW2_1_layerCapture ? {4'h0, _GEN_8[11], _GEN_8[29:25]} : _GEN_8[29:20];	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :60:54, :88:27, :91:{26,47,59}, :98:{31,53,75}
+      : isW2_1_layerCapture ? {4'h0, _GEN_6[11], _GEN_6[29:25]} : _GEN_6[29:20];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :58:54, :86:27, :89:{26,47,59}, :96:{31,53,75}
   assign io_out_bits_1_bits_reg1Addr =
-    isW2_1_layerCapture ? {4'h0, _GEN_8[11], _GEN_8[29:25]} + 10'h1 : 10'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :88:27, :91:{47,59}, :98:31, :99:{31,46}
+    isW2_1_layerCapture ? {4'h0, _GEN_6[11], _GEN_6[29:25]} + 10'h1 : 10'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :86:27, :89:{47,59}, :96:31, :97:{31,46}
   assign io_out_bits_1_bits_data0 =
-    candRun_1_layerCapture | candRd_1_layerCapture ? 32'h0 : _GEN_9;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :60:54, :61:35, :100:{28,35}
-  assign io_out_bits_1_bits_data1 = isW2_1_layerCapture ? _GEN_10 : 32'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :88:27, :100:28, :101:28
-  assign io_out_bits_1_bits_pc = _GEN_3[idx_1[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :45:42, :53:24, :55:36
-  assign io_out_bits_1_bits_cmdTag = candRun_1_layerCapture ? _GEN_9[7:0] : 8'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :60:54, :103:{29,42}
-  assign io_out_bits_1_bits_swTag = candRun_1_layerCapture ? _GEN_10 : 32'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :60:54, :100:28, :104:28
-  assign io_out_bits_2_valid = inBeat_2;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :80:65
+    candRun_1_layerCapture | candRd_1_layerCapture ? 32'h0 : _GEN_3[idx_1[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :43:42, :51:24, :53:36, :58:54, :59:35, :98:{28,35}
+  assign io_out_bits_1_bits_data1 = isW2_1_layerCapture ? _GEN_7 : 32'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :86:27, :98:28, :99:28
+  assign io_out_bits_1_bits_swTag = candRun_1_layerCapture ? _GEN_7 : 32'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :58:54, :98:28, :100:28
+  assign io_out_bits_2_valid = inBeat_2;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :78:65
   assign io_out_bits_2_bits_op =
     candRun_2_layerCapture
       ? 2'h3
-      : candRd_2_layerCapture ? 2'h2 : {1'h0, isW2_2_layerCapture};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :60:{46,54}, :61:{35,45}, :88:27, :94:25, :95:16, :96:20
+      : candRd_2_layerCapture ? 2'h2 : {1'h0, isW2_2_layerCapture};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :58:{46,54}, :59:{35,45}, :86:27, :92:25, :93:16, :94:20
   assign io_out_bits_2_bits_reg0Addr =
     candRun_2_layerCapture
       ? 10'h0
-      : isW2_2_layerCapture ? {4'h0, _GEN_11[11], _GEN_11[29:25]} : _GEN_11[29:20];	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :60:54, :88:27, :91:{26,47,59}, :98:{31,53,75}
+      : isW2_2_layerCapture ? {4'h0, _GEN_8[11], _GEN_8[29:25]} : _GEN_8[29:20];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :58:54, :86:27, :89:{26,47,59}, :96:{31,53,75}
   assign io_out_bits_2_bits_reg1Addr =
-    isW2_2_layerCapture ? {4'h0, _GEN_11[11], _GEN_11[29:25]} + 10'h1 : 10'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :88:27, :91:{47,59}, :98:31, :99:{31,46}
+    isW2_2_layerCapture ? {4'h0, _GEN_8[11], _GEN_8[29:25]} + 10'h1 : 10'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :86:27, :89:{47,59}, :96:31, :97:{31,46}
   assign io_out_bits_2_bits_data0 =
-    candRun_2_layerCapture | candRd_2_layerCapture ? 32'h0 : _GEN_12;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :60:54, :61:35, :100:{28,35}
-  assign io_out_bits_2_bits_data1 = isW2_2_layerCapture ? _GEN_13 : 32'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :88:27, :100:28, :101:28
-  assign io_out_bits_2_bits_pc = _GEN_3[idx_2[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :45:42, :53:24, :55:36
-  assign io_out_bits_2_bits_cmdTag = candRun_2_layerCapture ? _GEN_12[7:0] : 8'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :60:54, :103:{29,42}
-  assign io_out_bits_2_bits_swTag = candRun_2_layerCapture ? _GEN_13 : 32'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :60:54, :100:28, :104:28
-  assign io_out_bits_3_valid = inBeat_3;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :80:65
+    candRun_2_layerCapture | candRd_2_layerCapture ? 32'h0 : _GEN_3[idx_2[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :43:42, :51:24, :53:36, :58:54, :59:35, :98:{28,35}
+  assign io_out_bits_2_bits_data1 = isW2_2_layerCapture ? _GEN_9 : 32'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :86:27, :98:28, :99:28
+  assign io_out_bits_2_bits_swTag = candRun_2_layerCapture ? _GEN_9 : 32'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :58:54, :98:28, :100:28
+  assign io_out_bits_3_valid = inBeat_3;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :78:65
   assign io_out_bits_3_bits_op =
     candRun_3_layerCapture
       ? 2'h3
-      : candRd_3_layerCapture ? 2'h2 : {1'h0, isW2_3_layerCapture};	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :60:{46,54}, :61:{35,45}, :88:27, :94:25, :95:16, :96:20
+      : candRd_3_layerCapture ? 2'h2 : {1'h0, isW2_3_layerCapture};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :58:{46,54}, :59:{35,45}, :86:27, :92:25, :93:16, :94:20
   assign io_out_bits_3_bits_reg0Addr =
     candRun_3_layerCapture
       ? 10'h0
-      : isW2_3_layerCapture ? {4'h0, _GEN_14[11], _GEN_14[29:25]} : _GEN_14[29:20];	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :60:54, :88:27, :91:{26,47,59}, :98:{31,53,75}
+      : isW2_3_layerCapture ? {4'h0, _GEN_10[11], _GEN_10[29:25]} : _GEN_10[29:20];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :58:54, :86:27, :89:{26,47,59}, :96:{31,53,75}
   assign io_out_bits_3_bits_reg1Addr =
-    isW2_3_layerCapture ? {4'h0, _GEN_14[11], _GEN_14[29:25]} + 10'h1 : 10'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :88:27, :91:{47,59}, :98:31, :99:{31,46}
+    isW2_3_layerCapture ? {4'h0, _GEN_10[11], _GEN_10[29:25]} + 10'h1 : 10'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :86:27, :89:{47,59}, :96:31, :97:{31,46}
   assign io_out_bits_3_bits_data0 =
-    candRun_3_layerCapture | candRd_3_layerCapture ? 32'h0 : _GEN_15;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :60:54, :61:35, :100:{28,35}
-  assign io_out_bits_3_bits_data1 = isW2_3_layerCapture ? _GEN_16 : 32'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :88:27, :100:28, :101:28
-  assign io_out_bits_3_bits_pc = _GEN_3[idx_3[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :45:42, :53:24, :55:36
-  assign io_out_bits_3_bits_cmdTag = candRun_3_layerCapture ? _GEN_15[7:0] : 8'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :60:54, :103:{29,42}
-  assign io_out_bits_3_bits_swTag = candRun_3_layerCapture ? _GEN_16 : 32'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :55:36, :60:54, :100:28, :104:28
-  assign io_idle = ~active & io_deviceIdle;	// src/queen/scala/main/QueenDsaAdapter.scala:23:7, :35:33, :40:20, :110:24
+    candRun_3_layerCapture | candRd_3_layerCapture ? 32'h0 : _GEN_3[idx_3[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :43:42, :51:24, :53:36, :58:54, :59:35, :98:{28,35}
+  assign io_out_bits_3_bits_data1 = isW2_3_layerCapture ? _GEN_11 : 32'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :86:27, :98:28, :99:28
+  assign io_out_bits_3_bits_swTag = candRun_3_layerCapture ? _GEN_11 : 32'h0;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :58:54, :98:28, :100:28
+  assign io_idle = ~active & io_deviceIdle;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :33:33, :38:20, :106:24
 endmodule
 

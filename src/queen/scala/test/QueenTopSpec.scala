@@ -60,20 +60,18 @@ class QueenTopSpec extends AnyFlatSpec with Matchers with ChiselSim {
         Cmd((BigInt(ep) << 30) | (BigInt(1) << 26) | (BigInt(1) << 15) |
             (BigInt(group) << 7) | (BigInt(3) << 12) | 0x0b, mask, 0, pc)
 
-    private case class Native(op: Int, reg0: Int, reg1: Int, data0: BigInt, data1: BigInt,
-                              pc: BigInt, cmdTag: Int, swTag: BigInt)
+    private case class Native(op: Int, reg0: Int, reg1: Int, data0: BigInt, data1: BigInt, swTag: BigInt)
 
     private case class Comp(enable: Boolean = true, isTimeline: Boolean = false, group: Int = 0,
                             mask: BigInt = 0, timeline: Int = 0, error: Boolean = false,
-                            code: Int = 0, pc: BigInt = 0, cmdTag: Int = 0, swTag: BigInt = 0)
+                            code: Int = 0, swTag: BigInt = 0, hwTag: BigInt = 0)
 
-    private case class Retire(pc: BigInt, rdValid: Boolean, rdIndex: Int, trap: Boolean, cause: Int)
 
     private def expected(c: Cmd): Native =
-        if (c.isRun) Native(Run, 0, 0, 0, 0, c.pc, (c.rs1 & 0xff).toInt, c.rs2)
-        else if (c.funct3 == 2) Native(Read, ((c.inst >> 20) & 1023).toInt, 0, 0, 0, c.pc, 0, 0)
-        else if (c.funct3 == 0) Native(Write2, c.base, c.base + 1, c.rs1, c.rs2, c.pc, 0, 0)
-        else Native(Write1, ((c.inst >> 20) & 1023).toInt, 0, c.rs1, 0, c.pc, 0, 0)
+        if (c.isRun) Native(Run, 0, 0, 0, 0, c.rs2)
+        else if (c.funct3 == 2) Native(Read, ((c.inst >> 20) & 1023).toInt, 0, 0, 0, 0)
+        else if (c.funct3 == 0) Native(Write2, c.base, c.base + 1, c.rs1, c.rs2, 0)
+        else Native(Write1, ((c.inst >> 20) & 1023).toInt, 0, c.rs1, 0, 0)
 
     private class Driver(dut: QueenTop, cfg: QueenConfig) {
         private val lanes = cfg.instructionLanes
@@ -81,19 +79,19 @@ class QueenTopSpec extends AnyFlatSpec with Matchers with ChiselSim {
         var gemmBeats = Vector.empty[Vector[Native]]
         var dmaBeats = Vector.empty[Vector[Native]]
         var traps = Vector.empty[(BigInt, BigInt, Int)]
-        var retires = Vector.empty[Retire]
         var asyncWrites = Vector.empty[(Int, BigInt)]
+        var gemmTraces = Vector.empty[(BigInt, BigInt)]
+        var dmaTraces = Vector.empty[(BigInt, BigInt)]
+        var schedTraces = Vector.empty[(BigInt, BigInt)]
         var asyncReady = true
-        var retireReady = true
 
         dut.io.inst.foreach { p => p.valid.poke(false.B); p.bits.inst.poke(0.U); p.bits.pc.poke(0.U) }
-        dut.io.rs1.foreach { p => p.valid.poke(false.B); p.bits.poke(0.U) }
-        dut.io.rs2.foreach { p => p.valid.poke(false.B); p.bits.poke(0.U) }
+        dut.io.regRead.foreach { p => p.valid.poke(false.B); p.bits.poke(0.U) }
         dut.io.gemm.ready.poke(false.B)
         dut.io.dma.ready.poke(false.B)
-        for (c <- Seq(dut.io.gemmCompletion, dut.io.dmaCompletion)) {
+        for (c <- Seq(dut.io.gemmCompletion, dut.io.dmaCompletion, dut.io.vpuCompletion)) {
             c.valid.poke(false.B)
-            c.bits.pc.poke(0.U); c.bits.cmdTag.poke(0.U); c.bits.swTag.poke(0.U)
+            c.bits.swTag.poke(0.U); c.bits.hwTag.poke(0.U)
             c.bits.error.poke(false.B); c.bits.code.poke(0.U)
             c.bits.hwSignal.enable.poke(false.B)
             c.bits.hwSignal.isTimeline.poke(false.B)
@@ -109,7 +107,6 @@ class QueenTopSpec extends AnyFlatSpec with Matchers with ChiselSim {
             r.valid.poke(false.B); r.bits.data.poke(0.U); r.bits.err.poke(false.B)
         }
         dut.io.asyncRd.ready.poke(true.B)
-        dut.io.qrdRetire.ready.poke(true.B)
         dut.reset.poke(true.B)
         dut.clock.step(2)
         dut.reset.poke(false.B)
@@ -117,9 +114,10 @@ class QueenTopSpec extends AnyFlatSpec with Matchers with ChiselSim {
         private def readBeat(port: Vec[Valid[QueenNativeCmd]]): Vector[Native] =
             port.filter(_.valid.peek().litToBoolean).map { l =>
                 Native(l.bits.op.peek().litValue.toInt,
-                    l.bits.reg0Addr.peek().litValue.toInt, l.bits.reg1Addr.peek().litValue.toInt,
-                    l.bits.data0.peek().litValue, l.bits.data1.peek().litValue,
-                    l.bits.pc.peek().litValue, l.bits.cmdTag.peek().litValue.toInt,
+                    l.bits.reg0Addr.peek().litValue.toInt,
+                    l.bits.reg1Addr.peek().litValue.toInt,
+                    l.bits.data0.peek().litValue,
+                    l.bits.data1.peek().litValue,
                     l.bits.swTag.peek().litValue)
             }.toVector
 
@@ -147,10 +145,10 @@ class QueenTopSpec extends AnyFlatSpec with Matchers with ChiselSim {
             for (i <- 0 until lanes) {
                 val c = if (accepted(i)) packet(i) else None
                 dut.io.inst(i).valid.poke(false.B)
-                dut.io.rs1(i).valid.poke(c.nonEmpty.B)
-                dut.io.rs1(i).bits.poke(c.map(_.rs1).getOrElse(BigInt(0)).U)
-                dut.io.rs2(i).valid.poke(c.nonEmpty.B)
-                dut.io.rs2(i).bits.poke(c.map(_.rs2).getOrElse(BigInt(0)).U)
+                dut.io.regRead(2 * i).valid.poke(c.nonEmpty.B)
+                dut.io.regRead(2 * i).bits.poke(c.map(_.rs1).getOrElse(BigInt(0)).U)
+                dut.io.regRead(2 * i + 1).valid.poke(c.nonEmpty.B)
+                dut.io.regRead(2 * i + 1).bits.poke(c.map(_.rs2).getOrElse(BigInt(0)).U)
             }
             accepted
         }
@@ -159,7 +157,6 @@ class QueenTopSpec extends AnyFlatSpec with Matchers with ChiselSim {
             dut.io.gemm.ready.poke(gemmReady.B)
             dut.io.dma.ready.poke(dmaReady.B)
             dut.io.asyncRd.ready.poke(asyncReady.B)
-            dut.io.qrdRetire.ready.poke(retireReady.B)
             if (dut.io.trap.valid.peek().litToBoolean) {
                 traps = traps :+ ((dut.io.trap.bits.pc.peek().litValue,
                     dut.io.trap.bits.inst.peek().litValue,
@@ -169,18 +166,23 @@ class QueenTopSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 asyncWrites = asyncWrites :+ ((dut.io.asyncRd.bits.addr.peek().litValue.toInt,
                     dut.io.asyncRd.bits.data.peek().litValue))
             }
-            if (retireReady && dut.io.qrdRetire.valid.peek().litToBoolean) {
-                retires = retires :+ Retire(dut.io.qrdRetire.bits.pc.peek().litValue,
-                    dut.io.qrdRetire.bits.rdValid.peek().litToBoolean,
-                    dut.io.qrdRetire.bits.rdIndex.peek().litValue.toInt,
-                    dut.io.qrdRetire.bits.trap.peek().litToBoolean,
-                    dut.io.qrdRetire.bits.trapCause.peek().litValue.toInt)
-            }
             if (gemmReady && dut.io.gemm.valid.peek().litToBoolean) {
                 gemmBeats = gemmBeats :+ readBeat(dut.io.gemm.bits)
             }
             if (dmaReady && dut.io.dma.valid.peek().litToBoolean) {
                 dmaBeats = dmaBeats :+ readBeat(dut.io.dma.bits)
+            }
+            if (dut.io.gemmTrace.valid.peek().litToBoolean) {
+                gemmTraces = gemmTraces :+ ((dut.io.gemmTrace.bits.swTag.peek().litValue,
+                    dut.io.gemmTrace.bits.hwTag.peek().litValue))
+            }
+            if (dut.io.dmaTrace.valid.peek().litToBoolean) {
+                dmaTraces = dmaTraces :+ ((dut.io.dmaTrace.bits.swTag.peek().litValue,
+                    dut.io.dmaTrace.bits.hwTag.peek().litValue))
+            }
+            if (dut.io.schedTrace.valid.peek().litToBoolean) {
+                schedTraces = schedTraces :+ ((dut.io.schedTrace.bits.swTag.peek().litValue,
+                    dut.io.schedTrace.bits.hwTag.peek().litValue))
             }
             dut.clock.step()
         }
@@ -189,9 +191,8 @@ class QueenTopSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
         private def pokeCompletion(port: Valid[QueenDsaCompletion], c: Option[Comp]): Unit = {
             port.valid.poke(c.nonEmpty.B)
-            port.bits.pc.poke(c.map(_.pc).getOrElse(BigInt(0)).U)
-            port.bits.cmdTag.poke(c.map(_.cmdTag).getOrElse(0).U)
             port.bits.swTag.poke(c.map(_.swTag).getOrElse(BigInt(0)).U)
+            port.bits.hwTag.poke(c.map(_.hwTag).getOrElse(BigInt(0)).U)
             port.bits.error.poke(c.exists(_.error).B)
             port.bits.code.poke(c.map(_.code).getOrElse(0).U)
             port.bits.hwSignal.enable.poke(c.exists(_.enable).B)
@@ -202,12 +203,15 @@ class QueenTopSpec extends AnyFlatSpec with Matchers with ChiselSim {
         }
 
         /** completion 只有 valid：Queen 无条件接收，故这里给一拍脉冲。 */
-        def complete(gemm: Option[Comp] = None, dma: Option[Comp] = None): Unit = {
+        def complete(gemm: Option[Comp] = None, dma: Option[Comp] = None,
+                     vpu: Option[Comp] = None): Unit = {
             pokeCompletion(dut.io.gemmCompletion, gemm)
             pokeCompletion(dut.io.dmaCompletion, dma)
+            pokeCompletion(dut.io.vpuCompletion, vpu)
             step()
             pokeCompletion(dut.io.gemmCompletion, None)
             pokeCompletion(dut.io.dmaCompletion, None)
+            pokeCompletion(dut.io.vpuCompletion, None)
         }
 
         def devices(gemmIdle: Boolean, dmaIdle: Boolean): Unit = {
@@ -270,7 +274,7 @@ class QueenTopSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.offer(2 -> c)
             d.settle()
             d.dmaBeats shouldBe Vector(Vector(
-                Native(Write2, 62, 63, BigInt("aaaa0001", 16), BigInt("bbbb0002", 16), 0x40, 0, 0)))
+                Native(Write2, 62, 63, BigInt("aaaa0001", 16), BigInt("bbbb0002", 16), 0)))
             d.gemmBeats shouldBe empty
         }
     }
@@ -399,6 +403,43 @@ class QueenTopSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 dma = Some(Comp(group = 2, mask = 0x2)))
             d.events(1) shouldBe BigInt(1)
             d.events(2) shouldBe BigInt(2)
+        }
+    }
+
+    it should "absorb a VPU completion for signal and fault without a VPU command port" in {
+        val cfg = QueenConfig()
+        simulate(new QueenTop(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            d.complete(vpu = Some(Comp(group = 9, mask = 0x21)))
+            d.events(9) shouldBe BigInt(0x21)
+            d.complete(gemm = Some(Comp(isTimeline = true, timeline = 4)),
+                dma = Some(Comp(isTimeline = true, timeline = 4)),
+                vpu = Some(Comp(isTimeline = true, timeline = 4)))
+            d.timelines(4) shouldBe BigInt(3)
+            d.complete(vpu = Some(Comp(error = true, code = 0x5a)))
+            dut.io.faultValid.expect(true.B)
+            dut.io.faultKind.expect(0.U)
+            dut.io.faultEndpoint.expect(2.U)
+            dut.io.faultCode.expect(0x5a.U)
+        }
+    }
+
+    it should "emit one trace record per endpoint at the dispatch point, never to the device" in {
+        val cfg = QueenConfig()
+        simulate(new QueenTop(cfg)) { dut =>
+            val d = new Driver(dut, cfg)
+            d.offer(0 -> traceTag(Gemm, 0x1234, pc = 0x900),
+                1 -> traceTag(Dma, 0x5678, pc = 0x904),
+                2 -> traceTag(Sched, 0x9abc, pc = 0x908))
+            d.settle()
+            d.gemmTraces shouldBe Vector((BigInt(0x1234), BigInt(0)))
+            d.dmaTraces shouldBe Vector((BigInt(0x5678), BigInt(0)))
+            d.schedTraces shouldBe Vector((BigInt(0x9abc), BigInt(0)))
+            // TRACE_TAG 不进 adapter：设备侧一条命令都不该看到。
+            d.gemmBeats shouldBe empty
+            d.dmaBeats shouldBe empty
+            d.traps shouldBe empty
+            dut.io.idle.expect(true.B)
         }
     }
 
@@ -544,7 +585,7 @@ class QueenTopSpec extends AnyFlatSpec with Matchers with ChiselSim {
         }
     }
 
-    it should "retire cross-endpoint QRDs in program order when responses arrive out of order" in {
+    it should "write back cross-endpoint QRDs in program order when responses arrive out of order" in {
         val cfg = QueenConfig()
         simulate(new QueenTop(cfg)) { dut =>
             val d = new Driver(dut, cfg)
@@ -553,45 +594,50 @@ class QueenTopSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.offer(0 -> g, 1 -> s)
             d.settle(8)
             d.gemmBeats shouldBe Vector(Vector(expected(g)))
-            // SCHED 读已回，但队头是 GEMM，不得提前退休。
-            d.retires shouldBe empty
+            // SCHED 读已回，但队头是 GEMM，不得提前写回。
+            d.asyncWrites shouldBe empty
             d.resp(gemm = Some((BigInt(0xdead), false)))
             d.step()
             d.step()
-            d.retires shouldBe Vector(Retire(0x100, true, 3, false, 0), Retire(0x104, true, 4, false, 0))
             d.asyncWrites shouldBe Vector((3, BigInt(0xdead)), (4, BigInt(0)))
             d.traps shouldBe empty
             dut.io.idle.expect(true.B)
         }
     }
 
-    it should "retire a rd=x0 QRD without a register writeback" in {
+    it should "pop a rd=x0 QRD without a register writeback or any CPU notification" in {
         val cfg = QueenConfig()
         simulate(new QueenTop(cfg)) { dut =>
             val d = new Driver(dut, cfg)
             d.offer(0 -> qrd(Sched, 0x6c, 0, pc = 0x110))
             d.settle()
-            d.retires shouldBe Vector(Retire(0x110, false, 0, false, 0))
             d.asyncWrites shouldBe empty
+            d.traps shouldBe empty
+            dut.io.faultValid.expect(false.B)
+            dut.io.idle.expect(true.B)
         }
     }
 
-    it should "turn a read error into a cause-9 retire without a writeback" in {
+    it should "turn a read error into a kind-4 fault without a writeback or a trap" in {
         val cfg = QueenConfig()
         simulate(new QueenTop(cfg)) { dut =>
             val d = new Driver(dut, cfg)
             d.offer(0 -> qrd(Gemm, 0x10, 5, pc = 0x120))
             d.settle(6)
-            d.retires shouldBe empty
+            d.asyncWrites shouldBe empty
             d.resp(gemm = Some((BigInt(0), true)))
             d.step()
-            d.retires shouldBe Vector(Retire(0x120, false, 5, true, 9))
             d.asyncWrites shouldBe empty
             d.traps shouldBe empty
+            dut.io.faultValid.expect(true.B)
+            dut.io.faultKind.expect(4.U)
+            dut.io.faultEndpoint.expect(Gemm.U)
+            dut.io.faultCode.expect(0.U)
+            dut.io.idle.expect(true.B)
         }
     }
 
-    it should "hold the retire head while the CPU writeback port is backpressured" in {
+    it should "hold the QRD head while the CPU writeback port is backpressured" in {
         val cfg = QueenConfig()
         simulate(new QueenTop(cfg)) { dut =>
             val d = new Driver(dut, cfg)
@@ -602,12 +648,10 @@ class QueenTopSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.resp(gemm = Some((BigInt(0xbb), false)))
             d.step()
             d.step()
-            d.retires shouldBe empty
             d.asyncWrites shouldBe empty
             d.asyncReady = true
             d.step()
             d.step()
-            d.retires shouldBe Vector(Retire(0x130, true, 3, false, 0), Retire(0x134, true, 4, false, 0))
             d.asyncWrites shouldBe Vector((3, BigInt(0xaa)), (4, BigInt(0xbb)))
         }
     }

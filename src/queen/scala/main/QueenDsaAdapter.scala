@@ -11,8 +11,6 @@ class QueenNativeCmd(val cfg: QueenConfig) extends Bundle {
     val reg1Addr = UInt(10.W)
     val data0 = UInt(cfg.xlen.W)
     val data1 = UInt(cfg.xlen.W)
-    val pc = UInt(cfg.pcWidth.W)
-    val cmdTag = UInt(8.W)
     val swTag = UInt(cfg.xlen.W)
 }
 
@@ -99,8 +97,6 @@ class QueenDsaAdapter(val cfg: QueenConfig) extends Module {
         o.bits.reg1Addr := Mux(isW2, regBase + 1.U(10.W), 0.U(10.W))
         o.bits.data0 := Mux(isRun || isRd, 0.U(cfg.xlen.W), b.rs1)
         o.bits.data1 := Mux(isW2, b.rs2, 0.U(cfg.xlen.W))
-        o.bits.pc := b.pc
-        o.bits.cmdTag := Mux(isRun, b.rs1(7, 0), 0.U(8.W))
         o.bits.swTag := Mux(isRun, b.rs2, 0.U(cfg.xlen.W))
         assert(!cand(j).valid || isW2 || funct3 === 1.U || isRun || isRd,
             "QueenDsaAdapter: only QWR1/QWR2/QRD/RUN are supported at this stage")

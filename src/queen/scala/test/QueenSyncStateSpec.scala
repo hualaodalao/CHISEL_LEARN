@@ -31,7 +31,7 @@ class QueenSyncStateSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
         private def pokeHw(port: Valid[QueenDsaCompletion], c: Option[Hw]): Unit = {
             port.valid.poke(c.nonEmpty.B)
-            port.bits.pc.poke(0.U); port.bits.cmdTag.poke(0.U); port.bits.swTag.poke(0.U)
+            port.bits.swTag.poke(0.U); port.bits.hwTag.poke(0.U)
             port.bits.error.poke(false.B); port.bits.code.poke(0.U)
             port.bits.hwSignal.enable.poke(c.exists(_.enable).B)
             port.bits.hwSignal.isTimeline.poke(c.exists(_.isTimeline).B)
@@ -40,8 +40,7 @@ class QueenSyncStateSpec extends AnyFlatSpec with Matchers with ChiselSim {
             port.bits.hwSignal.timeline.poke(c.map(_.timeline).getOrElse(0).U)
         }
 
-        pokeHw(dut.io.completion(0), None)
-        pokeHw(dut.io.completion(1), None)
+        dut.io.completion.foreach(pokeHw(_, None))
         dut.io.sw.valid.poke(false.B)
         dut.io.sw.isTimeline.poke(false.B)
         dut.io.sw.index.poke(0.U)
@@ -52,9 +51,11 @@ class QueenSyncStateSpec extends AnyFlatSpec with Matchers with ChiselSim {
         dut.clock.step(2)
         dut.reset.poke(false.B)
 
-        def cycle(gemm: Option[Hw] = None, dma: Option[Hw] = None, sw: Option[Sw] = None): Unit = {
+        def cycle(gemm: Option[Hw] = None, dma: Option[Hw] = None, sw: Option[Sw] = None,
+                  vpu: Option[Hw] = None): Unit = {
             pokeHw(dut.io.completion(0), gemm)
             pokeHw(dut.io.completion(1), dma)
+            pokeHw(dut.io.completion(2), vpu)
             dut.io.sw.valid.poke(sw.nonEmpty.B)
             dut.io.sw.isTimeline.poke(sw.exists(_.isTimeline).B)
             dut.io.sw.index.poke(sw.map(_.index).getOrElse(0).U)
@@ -65,7 +66,7 @@ class QueenSyncStateSpec extends AnyFlatSpec with Matchers with ChiselSim {
             for (g <- 0 until cfg.eventGroupCount) dut.io.events(g).expect(events(g).U)
             for (t <- 0 until cfg.timelineCount) dut.io.timelines(t).expect(timelines(t).U)
 
-            val hw = Seq(gemm, dma).flatten.filter(_.enable)
+            val hw = Seq(gemm, dma, vpu).flatten.filter(_.enable)
             val swTl = sw.exists(_.isTimeline)
             val idx = sw.map(_.index).getOrElse(0)
             val rollback = swTl && sw.exists(_.assign) &&
@@ -106,6 +107,20 @@ class QueenSyncStateSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.cycle(gemm = Some(Hw(group = 1, mask = 0x1)), dma = Some(Hw(group = 2, mask = 0x2)))
             d.event(1) shouldBe BigInt(1)
             d.event(2) shouldBe BigInt(2)
+        }
+    }
+
+    it should "absorb a VPU completion alongside GEMM and DMA in one cycle" in {
+        simulate(new QueenSyncState(cfg)) { dut =>
+            val d = new Driver(dut)
+            d.cycle(gemm = Some(Hw(group = 7, mask = 0x01)),
+                dma = Some(Hw(group = 7, mask = 0x02)),
+                vpu = Some(Hw(group = 7, mask = 0x04)))
+            d.event(7) shouldBe BigInt(0x07)
+            d.cycle(gemm = Some(Hw(isTimeline = true, timeline = 3)),
+                dma = Some(Hw(isTimeline = true, timeline = 3)),
+                vpu = Some(Hw(isTimeline = true, timeline = 3)))
+            d.timeline(3) shouldBe BigInt(3)
         }
     }
 

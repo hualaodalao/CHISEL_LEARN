@@ -15,6 +15,7 @@ class QueenEndpointCtrl(val cfg: QueenConfig) extends Module {
         val timelines = Input(Vec(cfg.timelineCount, UInt(32.W)))
         val backendIdle = Input(Bool())
         val flushing = Input(Bool())
+        val trace = Valid(new QueenTraceRecord(cfg))
         val idle = Output(Bool())
     })
 
@@ -101,6 +102,10 @@ class QueenEndpointCtrl(val cfg: QueenConfig) extends Module {
 
     assert(!alone || isFence || isWaitEvent || isWaitTimeline || isTrace,
         "QueenEndpointCtrl: only FENCE/WAIT/TRACE are consumed at this stage")
+
+    io.trace.valid := inRange && alone && isTrace && !io.flushing
+    io.trace.bits.swTag := ctrlRs1
+    io.trace.bits.hwTag := 0.U(cfg.xlen.W)
 
     private val advance = inRange && (io.out.fire || (alone && cond) || (!alone && !io.out.valid))
     when(advance) { base := base + beatLen }

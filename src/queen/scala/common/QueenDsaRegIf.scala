@@ -1,7 +1,7 @@
 import chisel3._
 import chisel3.util._
 
-/** Queen 硬件接口约束 9.1 的硬件完成信号目标：start 当拍组合给出，由设备自行采样并随 completion 回传。 */
+/** Queen 硬件接口约束 7.1 的硬件完成信号目标：start 当拍组合给出，由设备自行采样并随 completion 回传。 */
 class QueenHwSignal extends Bundle {
     val enable = Bool()
     val isTimeline = Bool()
@@ -20,7 +20,7 @@ object QueenDsaRegIfAddr {
     val IntrStatus = 0x6C
     val HwSignalTarget = 0x80
     val HwSignalMask = 0x81
-    val TraceCtrl = 0xA0
+    val TraceTag = 0xA0
     val SpaceLimit = 0x400
 }
 
@@ -68,8 +68,6 @@ class QueenDsaRegIf(cfg: QueenDsaRegIfConfig) extends Module {
         val irq = Output(Bool())
         val start = Output(Bool())
         val startReady = Input(Bool())
-        val startPc = Output(UInt(cfg.qcfg.pcWidth.W))
-        val startTag = Output(UInt(8.W))
         val startSwTag = Output(UInt(cfg.qcfg.xlen.W))
         val hwSignal = Output(new QueenHwSignal)
     })
@@ -80,7 +78,7 @@ class QueenDsaRegIf(cfg: QueenDsaRegIfConfig) extends Module {
     private val intrMask = RegInit(((BigInt(1) << intrW) - 1).U(intrW.W))
     private val sigTarget = RegInit(0.U(32.W))
     private val sigMask = RegInit(0.U(32.W))
-    private val traceCtrl = RegInit(0.U(32.W))
+    private val traceTag = RegInit(0.U(32.W))
 
     io.cfgRegs := live
     io.hwSignal.enable := sigTarget(0)
@@ -120,14 +118,14 @@ class QueenDsaRegIf(cfg: QueenDsaRegIfConfig) extends Module {
     private def wrLegal(a: UInt): Bool =
         a < cfg.numCfgRegs.U || a === A.IntrRaw.U || a === A.IntrForce.U ||
             a === A.IntrMask.U || a === A.HwSignalTarget.U || a === A.HwSignalMask.U ||
-            a === A.TraceCtrl.U
+            a === A.TraceTag.U
 
     private def rdLegal(a: UInt): Bool =
         a < cfg.numCfgRegs.U ||
             (a >= A.StatusBase.U && a < (A.StatusBase + cfg.numStatusRegs).U) ||
             a === A.IntrRaw.U || a === A.IntrForce.U || a === A.IntrMask.U ||
             a === A.IntrStatus.U || a === A.HwSignalTarget.U || a === A.HwSignalMask.U ||
-            a === A.TraceCtrl.U
+            a === A.TraceTag.U
 
     private def readReg(a: UInt): UInt = Mux(a < cfg.numCfgRegs.U,
         vecAt(shadow, a, cfg.numCfgRegs),
@@ -140,7 +138,7 @@ class QueenDsaRegIf(cfg: QueenDsaRegIfConfig) extends Module {
                 addr(A.IntrStatus) -> (intrRaw & ~intrMask).pad(32),
                 addr(A.HwSignalTarget) -> sigTarget,
                 addr(A.HwSignalMask) -> sigMask,
-                addr(A.TraceCtrl) -> traceCtrl))))
+                addr(A.TraceTag) -> traceTag))))
 
     private val wrOk = VecInit(lane.map { l =>
         wrLegal(l.bits.reg0Addr) &&
@@ -160,7 +158,7 @@ class QueenDsaRegIf(cfg: QueenDsaRegIfConfig) extends Module {
             when(a === A.IntrMask.U) { intrMask := d(intrW - 1, 0) }
             when(a === A.HwSignalTarget.U) { sigTarget := d }
             when(a === A.HwSignalMask.U) { sigMask := d }
-            when(a === A.TraceCtrl.U) { traceCtrl := d }
+            when(a === A.TraceTag.U) { traceTag := d }
         }
         clrTerms += ((en && a === A.IntrRaw.U, d))
         setTerms += ((en && a === A.IntrForce.U, d))
@@ -193,9 +191,9 @@ class QueenDsaRegIf(cfg: QueenDsaRegIfConfig) extends Module {
     io.resp.bits.err := !rdLegal(rdAddr)
 
     io.start := accept && hasRun
-    io.startPc := pick(isRun, j => lane(j).bits.pc, 0.U(cfg.qcfg.pcWidth.W))
-    io.startTag := pick(isRun, j => lane(j).bits.cmdTag, 0.U(8.W))
-    io.startSwTag := pick(isRun, j => lane(j).bits.swTag, 0.U(cfg.qcfg.xlen.W))
+    // RUN 的 rs2 非 0 时覆盖寄存器值，为 0 表示沿用软件此前写入的 TRACE_TAG。
+    private val runSwTag = pick(isRun, j => lane(j).bits.swTag, 0.U(cfg.qcfg.xlen.W))
+    io.startSwTag := Mux(runSwTag =/= 0.U, runSwTag, traceTag)
 
     when(accept && hasRun) {
         live := shadow

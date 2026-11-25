@@ -14,7 +14,8 @@ class QueenQrdEntry(val cfg: QueenConfig) extends Bundle {
   * 同端点响应必须按请求序返回（设备义务），故 entry 不存 regAddr，队头只认来源。
   * 三个来源各自缓存早到响应，跨端点乱序到达仍按程序序退休。
   * 准入已为每条在途 QRD 预留一个响应槽，故 resp.ready 恒 1。
-  * flush 期间所有 entry 回 dummy（`0xdeadbeef`，不报 trap），旧响应被排空丢弃。
+  * flush 期间所有 entry 回 dummy（`0xdeadbeef`，不报错误），旧响应被排空丢弃。
+  * 无标量退休端口：写回走 asyncRd，rd=x0 与读错误只内部出队；读错误另走 rdError 供顶层记 fault。
   */
 class QueenQrdTracker(val cfg: QueenConfig) extends Module {
     val io = IO(new Bundle {
@@ -22,7 +23,8 @@ class QueenQrdTracker(val cfg: QueenConfig) extends Module {
         val used = Output(UInt(log2Ceil(cfg.qrdDepth + 1).W))
         val resp = Vec(3, Flipped(Decoupled(new QueenDsaRegResp)))
         val asyncRd = Decoupled(new QueenAsyncRd(cfg))
-        val retire = Decoupled(new QueenRetire(cfg))
+        // bits 为来源编码 0=GEMM 1=DMA 2=SCHED，由顶层映射成 fault endpoint。
+        val rdError = Valid(UInt(2.W))
         val markDummy = Input(Bool())
         val flushing = Input(Bool())
         val idle = Output(Bool())
@@ -54,7 +56,6 @@ class QueenQrdTracker(val cfg: QueenConfig) extends Module {
     // 覆盖同拍新分配的 entry：它在 flush 生效后被丢弃，永远等不到真实响应。
     when(io.markDummy) { entries.foreach(_.dummy := true.B) }
     wrIdx := slot(wrIdx +& allocCount)
-    count := (count +& allocCount - io.retire.fire.asUInt)(cntW - 1, 0)
 
     private val fifos = Seq.fill(3)(Module(new Queue(new QueenDsaRegResp, depth)))
     for (s <- 0 until 3) {
@@ -78,18 +79,17 @@ class QueenQrdTracker(val cfg: QueenConfig) extends Module {
     io.asyncRd.valid := headReady && writeBack
     io.asyncRd.bits.addr := head.rdIndex
     io.asyncRd.bits.data := headResp.data
-    io.retire.valid := headReady && (!writeBack || io.asyncRd.ready)
-    io.retire.bits.pc := head.pc
-    io.retire.bits.rdValid := writeBack
-    io.retire.bits.rdIndex := head.rdIndex
-    io.retire.bits.trap := headResp.err
-    io.retire.bits.trapCause := Mux(headResp.err, QueenTrapCause.rdError.U, QueenTrapCause.none.U)
+
+    // 没有写回的情形（rd=x0、读错误）无需等 CPU，直接出队。
+    private val pop = headReady && (!writeBack || io.asyncRd.ready)
+    io.rdError.valid := pop && headResp.err && !io.flushing
+    io.rdError.bits := head.source
 
     for (s <- 0 until 3) {
-        fifos(s).io.deq.ready := io.flushing ||
-            (io.retire.fire && !head.dummy && head.source === s.U)
+        fifos(s).io.deq.ready := io.flushing || (pop && !head.dummy && head.source === s.U)
     }
-    when(io.retire.fire) { rdIdx := slot(rdIdx + 1.U) }
+    when(pop) { rdIdx := slot(rdIdx + 1.U) }
+    count := (count +& allocCount - pop.asUInt)(cntW - 1, 0)
 
     io.idle := count === 0.U && !respValid.asUInt.orR
 }

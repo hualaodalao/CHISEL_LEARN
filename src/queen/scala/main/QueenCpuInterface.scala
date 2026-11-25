@@ -12,19 +12,11 @@ class QueenTrap(val cfg: QueenConfig) extends Bundle {
     val cause = UInt(cfg.trapCauseWidth.W)
 }
 
-/** QRD 写回：按程序序一次一条，与 qrdRetire 同拍有效。 */
+/** QRD 写回：按程序序一次一条。Queen 不设标量退休端口——QWR/QCTRL 在 inst.fire 即退休，
+  * QRD 的结果只由本通路表达；rd=x0 与读错误不写 GPR，出队是 Queen 内部动作。 */
 class QueenAsyncRd(val cfg: QueenConfig) extends Bundle {
     val addr = UInt(5.W)
     val data = UInt(cfg.xlen.W)
-}
-
-/** QRD 退休：读数据写回（rd=x0 时 rdValid=0）或读错误转同步异常。 */
-class QueenRetire(val cfg: QueenConfig) extends Bundle {
-    val pc = UInt(cfg.pcWidth.W)
-    val rdValid = Bool()
-    val rdIndex = UInt(5.W)
-    val trap = Bool()
-    val trapCause = UInt(cfg.trapCauseWidth.W)
 }
 
 object QueenTrapCause {
@@ -37,5 +29,4 @@ object QueenTrapCause {
     val regBase = 6
     val bit25 = 7
     val emptyRun = 8
-    val rdError = 9
 }

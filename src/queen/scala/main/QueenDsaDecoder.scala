@@ -11,8 +11,8 @@ class QueenDsaCommand(val cfg: QueenConfig) extends Bundle {
 class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
     val io = IO(new Bundle {
         val inst = Vec(cfg.instructionLanes, Flipped(Decoupled(new QueenIssue(cfg))))
-        val rs1 = Vec(cfg.instructionLanes, Flipped(Valid(UInt(cfg.xlen.W))))
-        val rs2 = Vec(cfg.instructionLanes, Flipped(Valid(UInt(cfg.xlen.W))))
+        // 与 scalar core 的 reg_read 总线同形：每 lane 两个槽，[2i]=rs1、[2i+1]=rs2。
+        val regRead = Vec(2 * cfg.instructionLanes, Flipped(Valid(UInt(cfg.xlen.W))))
         val gemm = Decoupled(Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg))))
         val dma = Decoupled(Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg))))
         val scheduler = Decoupled(Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg))))
@@ -54,8 +54,10 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
         batch(i).valid := pending(i)
         batch(i).bits.inst := Mux(pending(i), pendingInst(i), 0.U)
         batch(i).bits.pc := Mux(pending(i), pendingPc(i), 0.U)
-        batch(i).bits.rs1 := Mux(pending(i) && io.rs1(i).valid, io.rs1(i).bits, 0.U)
-        batch(i).bits.rs2 := Mux(pending(i) && io.rs2(i).valid, io.rs2(i).bits, 0.U)
+        val r1 = io.regRead(2 * i)
+        val r2 = io.regRead(2 * i + 1)
+        batch(i).bits.rs1 := Mux(pending(i) && r1.valid, r1.bits, 0.U)
+        batch(i).bits.rs2 := Mux(pending(i) && r2.valid, r2.bits, 0.U)
     }
 
     // GEMM and DMA share one command ring so that a stalled consumer only pins the

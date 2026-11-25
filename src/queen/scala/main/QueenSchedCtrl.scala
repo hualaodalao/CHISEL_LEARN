@@ -27,10 +27,11 @@ class QueenSchedCtrl(val cfg: QueenConfig) extends Module {
         val memUsed = Input(UInt(log2Ceil(cfg.memDepth + 1).W))
         val addrErr = Output(Bool())
         val timeout = Output(Bool())
+        val trace = Valid(new QueenTraceRecord(cfg))
         val events = Input(Vec(cfg.eventGroupCount, UInt(32.W)))
         val timelines = Input(Vec(cfg.timelineCount, UInt(32.W)))
         val faultValid = Input(Bool())
-        val faultKind = Input(UInt(2.W))
+        val faultKind = Input(UInt(3.W))
         val faultEndpoint = Input(UInt(2.W))
         val faultCode = Input(UInt(cfg.faultCodeWidth.W))
         // 不含本模块与在途 QRD：读 IDLE 的那条 QRD 若计入自身，读回值恒 0。
@@ -144,6 +145,10 @@ class QueenSchedCtrl(val cfg: QueenConfig) extends Module {
     // 自增/赋值取决于 rs1 的寄存器索引是否为 x0，不是读回值。
     io.sw.assign := isSignalTimeline && inst(19, 15) =/= 0.U
     io.sw.data := rs1
+
+    io.trace.valid := exec && isTrace
+    io.trace.bits.swTag := rs1
+    io.trace.bits.hwTag := 0.U(cfg.xlen.W)
 
     // ---- polling 执行点：POLL_EQ 跨多拍持有队头，期间不执行其它命令 ----
     private val pollBusy = RegInit(false.B)

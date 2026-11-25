@@ -53,8 +53,8 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
         rs1, rs2, hasRs1, hasRs2
     )
 
-    private def run(endpoint: Int, cmdTag: Int = 0, swTag: BigInt = 0): Command =
-        control(endpoint, 9, rs1 = cmdTag, rs2 = swTag, hasRs2 = swTag != 0)
+    private def run(endpoint: Int, rs1: Int = 0, swTag: BigInt = 0): Command =
+        control(endpoint, 9, rs1 = rs1, rs2 = swTag, hasRs2 = swTag != 0)
 
     private def illegalCause(c: Command, gOpen: Boolean, dOpen: Boolean): Int = {
         val inst = c.inst
@@ -113,8 +113,7 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
         dut.io.inst.foreach { p =>
             p.valid.poke(false.B); p.bits.inst.poke(0.U); p.bits.pc.poke(0.U)
         }
-        dut.io.rs1.foreach { p => p.valid.poke(false.B); p.bits.poke(0.U) }
-        dut.io.rs2.foreach { p => p.valid.poke(false.B); p.bits.poke(0.U) }
+        dut.io.regRead.foreach { p => p.valid.poke(false.B); p.bits.poke(0.U) }
         dut.io.qrdUsed.poke(0.U)
         ports.foreach(_.ready.poke(false.B))
         dut.reset.poke(true.B)
@@ -144,10 +143,10 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 dut.io.inst(i).valid.poke(offered(i).nonEmpty.B)
                 dut.io.inst(i).bits.inst.poke(offered(i).map(_.inst).getOrElse(BigInt(0)).U)
                 dut.io.inst(i).bits.pc.poke(offered(i).map(_.pc).getOrElse(BigInt(0)).U)
-                dut.io.rs1(i).valid.poke(pending(i).exists(_.rs1Valid).B)
-                dut.io.rs1(i).bits.poke(pending(i).map(_.rs1).getOrElse(BigInt(0)).U)
-                dut.io.rs2(i).valid.poke(pending(i).exists(_.rs2Valid).B)
-                dut.io.rs2(i).bits.poke(pending(i).map(_.rs2).getOrElse(BigInt(0)).U)
+                dut.io.regRead(2 * i).valid.poke(pending(i).exists(_.rs1Valid).B)
+                dut.io.regRead(2 * i).bits.poke(pending(i).map(_.rs1).getOrElse(BigInt(0)).U)
+                dut.io.regRead(2 * i + 1).valid.poke(pending(i).exists(_.rs2Valid).B)
+                dut.io.regRead(2 * i + 1).bits.poke(pending(i).map(_.rs2).getOrElse(BigInt(0)).U)
             }
             ports.zip(ready).foreach { case (port, value) => port.ready.poke(value.B) }
             dut.io.qrdUsed.poke(qrdUsed.U)
@@ -510,16 +509,16 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 Vector(false, false, false, false)
             d.cycle(d.offer(0 -> write2(0, 1)), Vector(true, true, true)) shouldBe
                 Vector(true, false, false, false)
-            d.cycle(d.offer(0 -> run(0, cmdTag = 0x12)), Vector(true, true, true)) shouldBe
+            d.cycle(d.offer(0 -> run(0, rs1 = 0x12)), Vector(true, true, true)) shouldBe
                 Vector(true, false, false, false)
             d.cycle(d.offer(0 -> run(0)), Vector(true, true, true)) shouldBe
                 Vector(false, false, false, false)
             // GEMM closing its group does not open DMA's.
             d.cycle(d.offer(0 -> run(1)), Vector(true, true, true)) shouldBe
                 Vector(false, false, false, false)
-            d.cycle(d.offer(0 -> write2(1, 2), 1 -> run(1, cmdTag = 0x34)),
+            d.cycle(d.offer(0 -> write2(1, 2), 1 -> run(1, rs1 = 0x34)),
                 Vector(true, true, true)) shouldBe Vector(true, true, false, false)
-            d.cycle(d.offer(0 -> write2(0, 3), 1 -> run(0, cmdTag = 0x56)),
+            d.cycle(d.offer(0 -> write2(0, 3), 1 -> run(0, rs1 = 0x56)),
                 Vector(true, true, true)) shouldBe Vector(true, true, false, false)
             // An illegal lane blocks the QWR behind it, so the RUN still sees an empty group.
             d.cycle(d.offer(0 -> Command(0x0c), 1 -> write2(0, 4), 2 -> run(0)),

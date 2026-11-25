@@ -89,6 +89,8 @@ module Queen_QueenSchedCtrl(	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
   input  [3:0]  io_memUsed,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
   output        io_addrErr,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
                 io_timeout,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
+                io_trace_valid,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
+  output [31:0] io_trace_bits_swTag,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
   input  [31:0] io_events_0,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
                 io_events_1,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
                 io_events_2,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
@@ -130,192 +132,192 @@ module Queen_QueenSchedCtrl(	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
                 io_timelines_6,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
                 io_timelines_7,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
   input         io_faultValid,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
-  input  [1:0]  io_faultKind,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
-                io_faultEndpoint,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
+  input  [2:0]  io_faultKind,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
+  input  [1:0]  io_faultEndpoint,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
   input  [7:0]  io_faultCode,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
   input         io_idleIn,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
                 io_flushing,	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
   output        io_idle	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
 );
 
-  reg               active;	// src/queen/scala/main/QueenSchedCtrl.scala:44:33
-  reg               pkt_0_valid;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-  reg  [31:0]       pkt_0_bits_inst;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-  reg  [31:0]       pkt_0_bits_rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-  reg  [31:0]       pkt_0_bits_rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-  reg               pkt_1_valid;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-  reg  [31:0]       pkt_1_bits_inst;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-  reg  [31:0]       pkt_1_bits_rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-  reg  [31:0]       pkt_1_bits_rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-  reg               pkt_2_valid;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-  reg  [31:0]       pkt_2_bits_inst;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-  reg  [31:0]       pkt_2_bits_rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-  reg  [31:0]       pkt_2_bits_rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-  reg               pkt_3_valid;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-  reg  [31:0]       pkt_3_bits_inst;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-  reg  [31:0]       pkt_3_bits_rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-  reg  [31:0]       pkt_3_bits_rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-  reg  [2:0]        base;	// src/queen/scala/main/QueenSchedCtrl.scala:46:31
-  reg  [31:0]       pollInterval;	// src/queen/scala/main/QueenSchedCtrl.scala:47:39
-  reg  [31:0]       pollTimeoutReg;	// src/queen/scala/main/QueenSchedCtrl.scala:48:41
-  wire              done = active & base[2];	// src/queen/scala/main/QueenSchedCtrl.scala:44:33, :46:31, :50:{31,39}
-  wire              io_in_ready_0 = ~active | done;	// src/queen/scala/main/QueenSchedCtrl.scala:44:33, :50:31, :51:{20,28}
-  wire              inRange = active & ~(base[2]);	// src/queen/scala/main/QueenSchedCtrl.scala:44:33, :46:31, :54:{34,42}
-  wire [3:0]        _GEN = {1'h0, base};	// src/queen/scala/main/QueenSchedCtrl.scala:44:33, :46:31, :62:24
-  wire [3:0]        _GEN_0 = {{pkt_3_valid}, {pkt_2_valid}, {pkt_1_valid}, {pkt_0_valid}};	// src/queen/scala/main/QueenSchedCtrl.scala:45:26, :64:36
+  reg               active;	// src/queen/scala/main/QueenSchedCtrl.scala:45:33
+  reg               pkt_0_valid;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+  reg  [31:0]       pkt_0_bits_inst;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+  reg  [31:0]       pkt_0_bits_rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+  reg  [31:0]       pkt_0_bits_rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+  reg               pkt_1_valid;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+  reg  [31:0]       pkt_1_bits_inst;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+  reg  [31:0]       pkt_1_bits_rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+  reg  [31:0]       pkt_1_bits_rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+  reg               pkt_2_valid;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+  reg  [31:0]       pkt_2_bits_inst;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+  reg  [31:0]       pkt_2_bits_rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+  reg  [31:0]       pkt_2_bits_rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+  reg               pkt_3_valid;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+  reg  [31:0]       pkt_3_bits_inst;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+  reg  [31:0]       pkt_3_bits_rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+  reg  [31:0]       pkt_3_bits_rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+  reg  [2:0]        base;	// src/queen/scala/main/QueenSchedCtrl.scala:47:31
+  reg  [31:0]       pollInterval;	// src/queen/scala/main/QueenSchedCtrl.scala:48:39
+  reg  [31:0]       pollTimeoutReg;	// src/queen/scala/main/QueenSchedCtrl.scala:49:41
+  wire              done = active & base[2];	// src/queen/scala/main/QueenSchedCtrl.scala:45:33, :47:31, :51:{31,39}
+  wire              io_in_ready_0 = ~active | done;	// src/queen/scala/main/QueenSchedCtrl.scala:45:33, :51:31, :52:{20,28}
+  wire              inRange = active & ~(base[2]);	// src/queen/scala/main/QueenSchedCtrl.scala:45:33, :47:31, :55:{34,42}
+  wire [3:0]        _GEN = {1'h0, base};	// src/queen/scala/main/QueenSchedCtrl.scala:45:33, :47:31, :63:24
+  wire [3:0]        _GEN_0 = {{pkt_3_valid}, {pkt_2_valid}, {pkt_1_valid}, {pkt_0_valid}};	// src/queen/scala/main/QueenSchedCtrl.scala:46:26, :65:36
   wire [3:0][31:0]  _GEN_1 =
-    {{pkt_3_bits_inst}, {pkt_2_bits_inst}, {pkt_1_bits_inst}, {pkt_0_bits_inst}};	// src/queen/scala/main/QueenSchedCtrl.scala:45:26, :64:36
-  wire [31:0]       _GEN_2 = _GEN_1[base[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:46:31, :56:42, :64:36
+    {{pkt_3_bits_inst}, {pkt_2_bits_inst}, {pkt_1_bits_inst}, {pkt_0_bits_inst}};	// src/queen/scala/main/QueenSchedCtrl.scala:46:26, :65:36
+  wire [31:0]       _GEN_2 = _GEN_1[base[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:47:31, :57:42, :65:36
   wire [3:0][31:0]  _GEN_3 =
-    {{pkt_3_bits_rs1}, {pkt_2_bits_rs1}, {pkt_1_bits_rs1}, {pkt_0_bits_rs1}};	// src/queen/scala/main/QueenSchedCtrl.scala:45:26, :64:36
-  wire [31:0]       _GEN_4 = _GEN_3[base[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:46:31, :56:42, :64:36
+    {{pkt_3_bits_rs1}, {pkt_2_bits_rs1}, {pkt_1_bits_rs1}, {pkt_0_bits_rs1}};	// src/queen/scala/main/QueenSchedCtrl.scala:46:26, :65:36
+  wire [31:0]       _GEN_4 = _GEN_3[base[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:47:31, :57:42, :65:36
   wire [3:0][31:0]  _GEN_5 =
-    {{pkt_3_bits_rs2}, {pkt_2_bits_rs2}, {pkt_1_bits_rs2}, {pkt_0_bits_rs2}};	// src/queen/scala/main/QueenSchedCtrl.scala:45:26, :64:36
-  wire [31:0]       _GEN_6 = _GEN_5[base[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:46:31, :56:42, :64:36
-  wire              cand_0_valid = inRange & _GEN < 4'h4 & _GEN_0[base[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:44:33, :46:31, :54:34, :56:42, :62:24, :64:36, :65:{34,41,51}
+    {{pkt_3_bits_rs2}, {pkt_2_bits_rs2}, {pkt_1_bits_rs2}, {pkt_0_bits_rs2}};	// src/queen/scala/main/QueenSchedCtrl.scala:46:26, :65:36
+  wire [31:0]       _GEN_6 = _GEN_5[base[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:47:31, :57:42, :65:36
+  wire              cand_0_valid = inRange & _GEN < 4'h4 & _GEN_0[base[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:45:33, :47:31, :55:34, :57:42, :63:24, :65:36, :66:{34,41,51}
   wire              candOther_0 =
-    cand_0_valid & ~(cand_0_valid & (_GEN_2[14:12] == 3'h0 | _GEN_2[14:12] == 3'h1));	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :65:{34,51}, :67:{36,47,55,65}, :68:{39,42}
-  wire [3:0]        idx_1 = _GEN + 4'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:44:33, :62:24
-  wire [31:0]       _GEN_7 = _GEN_1[idx_1[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:56:42, :62:24, :64:36
-  wire [31:0]       _GEN_8 = _GEN_3[idx_1[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:56:42, :62:24, :64:36
-  wire [31:0]       _GEN_9 = _GEN_5[idx_1[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:56:42, :62:24, :64:36
-  wire              cand_1_valid = inRange & idx_1 < 4'h4 & _GEN_0[idx_1[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:54:34, :56:42, :62:24, :64:36, :65:{34,41,51}
+    cand_0_valid & ~(cand_0_valid & (_GEN_2[14:12] == 3'h0 | _GEN_2[14:12] == 3'h1));	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :66:{34,51}, :68:{36,47,55,65}, :69:{39,42}
+  wire [3:0]        idx_1 = _GEN + 4'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:45:33, :63:24
+  wire [31:0]       _GEN_7 = _GEN_1[idx_1[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:57:42, :63:24, :65:36
+  wire [31:0]       _GEN_8 = _GEN_3[idx_1[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:57:42, :63:24, :65:36
+  wire [31:0]       _GEN_9 = _GEN_5[idx_1[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:57:42, :63:24, :65:36
+  wire              cand_1_valid = inRange & idx_1 < 4'h4 & _GEN_0[idx_1[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:55:34, :57:42, :63:24, :65:36, :66:{34,41,51}
   wire              candOther_1 =
-    cand_1_valid & ~(cand_1_valid & (_GEN_7[14:12] == 3'h0 | _GEN_7[14:12] == 3'h1));	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :65:{34,51}, :67:{36,47,55,65}, :68:{39,42}
-  wire [3:0]        idx_2 = _GEN + 4'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:44:33, :62:24
-  wire [31:0]       _GEN_10 = _GEN_1[idx_2[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:56:42, :62:24, :64:36
-  wire [31:0]       _GEN_11 = _GEN_3[idx_2[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:56:42, :62:24, :64:36
-  wire [31:0]       _GEN_12 = _GEN_5[idx_2[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:56:42, :62:24, :64:36
-  wire              cand_2_valid = inRange & idx_2 < 4'h4 & _GEN_0[idx_2[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:54:34, :56:42, :62:24, :64:36, :65:{34,41,51}
+    cand_1_valid & ~(cand_1_valid & (_GEN_7[14:12] == 3'h0 | _GEN_7[14:12] == 3'h1));	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :66:{34,51}, :68:{36,47,55,65}, :69:{39,42}
+  wire [3:0]        idx_2 = _GEN + 4'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:45:33, :63:24
+  wire [31:0]       _GEN_10 = _GEN_1[idx_2[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:57:42, :63:24, :65:36
+  wire [31:0]       _GEN_11 = _GEN_3[idx_2[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:57:42, :63:24, :65:36
+  wire [31:0]       _GEN_12 = _GEN_5[idx_2[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:57:42, :63:24, :65:36
+  wire              cand_2_valid = inRange & idx_2 < 4'h4 & _GEN_0[idx_2[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:55:34, :57:42, :63:24, :65:36, :66:{34,41,51}
   wire              candOther_2 =
-    cand_2_valid & ~(cand_2_valid & (_GEN_10[14:12] == 3'h0 | _GEN_10[14:12] == 3'h1));	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :65:{34,51}, :67:{36,47,55,65}, :68:{39,42}
-  wire [3:0]        idx_3 = _GEN + 4'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:44:33, :62:24
-  wire [31:0]       _GEN_13 = _GEN_1[idx_3[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:56:42, :62:24, :64:36
-  wire [31:0]       _GEN_14 = _GEN_3[idx_3[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:56:42, :62:24, :64:36
-  wire [31:0]       _GEN_15 = _GEN_5[idx_3[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:56:42, :62:24, :64:36
-  wire              cand_3_valid = inRange & idx_3 < 4'h4 & _GEN_0[idx_3[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:54:34, :56:42, :62:24, :64:36, :65:{34,41,51}
+    cand_2_valid & ~(cand_2_valid & (_GEN_10[14:12] == 3'h0 | _GEN_10[14:12] == 3'h1));	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :66:{34,51}, :68:{36,47,55,65}, :69:{39,42}
+  wire [3:0]        idx_3 = _GEN + 4'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:45:33, :63:24
+  wire [31:0]       _GEN_13 = _GEN_1[idx_3[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:57:42, :63:24, :65:36
+  wire [31:0]       _GEN_14 = _GEN_3[idx_3[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:57:42, :63:24, :65:36
+  wire [31:0]       _GEN_15 = _GEN_5[idx_3[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:57:42, :63:24, :65:36
+  wire              cand_3_valid = inRange & idx_3 < 4'h4 & _GEN_0[idx_3[1:0]];	// src/queen/scala/main/QueenSchedCtrl.scala:55:34, :57:42, :63:24, :65:36, :66:{34,41,51}
   wire              candOther_3 =
-    cand_3_valid & ~(cand_3_valid & (_GEN_13[14:12] == 3'h0 | _GEN_13[14:12] == 3'h1));	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :65:{34,51}, :67:{36,47,55,65}, :68:{39,42}
-  wire [3:0]        _hasOther_T = {candOther_3, candOther_2, candOther_1, candOther_0};	// src/queen/scala/main/QueenSchedCtrl.scala:68:39, :87:38
+    cand_3_valid & ~(cand_3_valid & (_GEN_13[14:12] == 3'h0 | _GEN_13[14:12] == 3'h1));	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :66:{34,51}, :68:{36,47,55,65}, :69:{39,42}
+  wire [3:0]        _hasOther_T = {candOther_3, candOther_2, candOther_1, candOther_0};	// src/queen/scala/main/QueenSchedCtrl.scala:69:39, :88:38
   wire [2:0]        firstOtherIdx =
     candOther_0
       ? 3'h0
-      : candOther_1 ? 3'h1 : candOther_2 ? 3'h2 : candOther_3 ? 3'h3 : 3'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:68:39, :72:30, :74:{26,32}
+      : candOther_1 ? 3'h1 : candOther_2 ? 3'h2 : candOther_3 ? 3'h3 : 3'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:69:39, :73:30, :75:{26,32}
   wire              alone =
     (|_hasOther_T)
     & (cand_0_valid
          ? 3'h0
          : cand_1_valid
              ? 3'h1
-             : cand_2_valid ? 3'h2 : cand_3_valid ? 3'h3 : 3'h0) == firstOtherIdx;	// src/queen/scala/main/QueenSchedCtrl.scala:65:{34,51}, :72:30, :74:{26,32}, :87:{38,45}, :91:{34,51}
-  wire [2:0]        fwdLen = (|_hasOther_T) ? firstOtherIdx : 3'h4 - base;	// src/queen/scala/main/QueenSchedCtrl.scala:46:31, :65:41, :74:{26,32}, :87:{38,45}, :92:40, :93:29
-  wire              _wrSel_T_18_layerCapture = ~alone;	// src/queen/scala/main/QueenSchedCtrl.scala:91:34, :97:9
+             : cand_2_valid ? 3'h2 : cand_3_valid ? 3'h3 : 3'h0) == firstOtherIdx;	// src/queen/scala/main/QueenSchedCtrl.scala:66:{34,51}, :73:30, :75:{26,32}, :88:{38,45}, :92:{34,51}
+  wire [2:0]        fwdLen = (|_hasOther_T) ? firstOtherIdx : 3'h4 - base;	// src/queen/scala/main/QueenSchedCtrl.scala:47:31, :66:41, :75:{26,32}, :88:{38,45}, :93:40, :94:29
+  wire              _wrSel_T_18_layerCapture = ~alone;	// src/queen/scala/main/QueenSchedCtrl.scala:92:34, :98:9
   wire              wrSel_0 =
-    _wrSel_T_18_layerCapture & ~io_flushing & cand_0_valid & (|fwdLen);	// src/queen/scala/main/QueenSchedCtrl.scala:65:{34,51}, :93:29, :97:{9,16,19,32,49,64}
+    _wrSel_T_18_layerCapture & ~io_flushing & cand_0_valid & (|fwdLen);	// src/queen/scala/main/QueenSchedCtrl.scala:66:{34,51}, :94:29, :98:{9,16,19,32,49,64}
   wire              wrSel_1 =
-    _wrSel_T_18_layerCapture & ~io_flushing & cand_1_valid & (|(fwdLen[2:1]));	// src/queen/scala/main/QueenSchedCtrl.scala:65:{34,51}, :93:29, :97:{9,16,19,32,49,64}
+    _wrSel_T_18_layerCapture & ~io_flushing & cand_1_valid & (|(fwdLen[2:1]));	// src/queen/scala/main/QueenSchedCtrl.scala:66:{34,51}, :94:29, :98:{9,16,19,32,49,64}
   wire              wrSel_2 =
-    _wrSel_T_18_layerCapture & ~io_flushing & cand_2_valid & fwdLen > 3'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:65:{34,51}, :74:32, :93:29, :97:{9,16,19,32,49,64}
+    _wrSel_T_18_layerCapture & ~io_flushing & cand_2_valid & fwdLen > 3'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:66:{34,51}, :75:32, :94:29, :98:{9,16,19,32,49,64}
   wire              wrSel_3 =
-    _wrSel_T_18_layerCapture & ~io_flushing & cand_3_valid & fwdLen[2];	// src/queen/scala/main/QueenSchedCtrl.scala:65:{34,51}, :93:29, :97:{9,16,19,32,49,64}
-  wire              isW2 = _GEN_2[14:12] == 3'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :104:{26,35}
-  wire [9:0]        addr0 = isW2 ? {4'h0, _GEN_2[11], _GEN_2[29:25]} : _GEN_2[29:20];	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :104:35, :105:{26,47,59}, :106:{24,46}
-  wire [9:0]        _addr1_T = {4'h0, _GEN_2[11], _GEN_2[29:25]} + 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :105:{47,59}, :107:29
-  wire              _clear_0_T = addr0 == 10'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:99:14, :106:24
-  wire              _recover_0_T = addr0 == 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:99:30, :106:24
-  wire              _io_wrErr_0_T_3 = addr0 == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:99:46, :106:24
-  wire              _io_wrErr_0_T_5 = addr0 == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:99:63, :106:24
-  wire              _clear_0_T_1 = _addr1_T == 10'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:99:14, :107:29
-  wire              _recover_0_T_1 = _addr1_T == 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:99:30, :107:29
-  wire              _io_wrErr_0_T_13 = _addr1_T == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:99:46, :107:29
-  wire              _io_wrErr_0_T_15 = _addr1_T == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:99:63, :107:29
-  wire              isW2_1 = _GEN_7[14:12] == 3'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :104:{26,35}
-  wire [9:0]        addr0_1 = isW2_1 ? {4'h0, _GEN_7[11], _GEN_7[29:25]} : _GEN_7[29:20];	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :104:35, :105:{26,47,59}, :106:{24,46}
-  wire [9:0]        _addr1_T_1 = {4'h0, _GEN_7[11], _GEN_7[29:25]} + 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :105:{47,59}, :107:29
-  wire              _clear_1_T = addr0_1 == 10'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:99:14, :106:24
-  wire              _recover_1_T = addr0_1 == 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:99:30, :106:24
-  wire              _io_wrErr_1_T_3 = addr0_1 == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:99:46, :106:24
-  wire              _io_wrErr_1_T_5 = addr0_1 == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:99:63, :106:24
-  wire              _clear_1_T_1 = _addr1_T_1 == 10'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:99:14, :107:29
-  wire              _recover_1_T_1 = _addr1_T_1 == 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:99:30, :107:29
-  wire              _io_wrErr_1_T_13 = _addr1_T_1 == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:99:46, :107:29
-  wire              _io_wrErr_1_T_15 = _addr1_T_1 == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:99:63, :107:29
-  wire              isW2_2 = _GEN_10[14:12] == 3'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :104:{26,35}
+    _wrSel_T_18_layerCapture & ~io_flushing & cand_3_valid & fwdLen[2];	// src/queen/scala/main/QueenSchedCtrl.scala:66:{34,51}, :94:29, :98:{9,16,19,32,49,64}
+  wire              isW2 = _GEN_2[14:12] == 3'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :105:{26,35}
+  wire [9:0]        addr0 = isW2 ? {4'h0, _GEN_2[11], _GEN_2[29:25]} : _GEN_2[29:20];	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :105:35, :106:{26,47,59}, :107:{24,46}
+  wire [9:0]        _addr1_T = {4'h0, _GEN_2[11], _GEN_2[29:25]} + 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :106:{47,59}, :108:29
+  wire              _clear_0_T = addr0 == 10'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:100:14, :107:24
+  wire              _recover_0_T = addr0 == 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:100:30, :107:24
+  wire              _io_wrErr_0_T_3 = addr0 == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:100:46, :107:24
+  wire              _io_wrErr_0_T_5 = addr0 == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:100:63, :107:24
+  wire              _clear_0_T_1 = _addr1_T == 10'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:100:14, :108:29
+  wire              _recover_0_T_1 = _addr1_T == 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:100:30, :108:29
+  wire              _io_wrErr_0_T_13 = _addr1_T == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:100:46, :108:29
+  wire              _io_wrErr_0_T_15 = _addr1_T == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:100:63, :108:29
+  wire              isW2_1 = _GEN_7[14:12] == 3'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :105:{26,35}
+  wire [9:0]        addr0_1 = isW2_1 ? {4'h0, _GEN_7[11], _GEN_7[29:25]} : _GEN_7[29:20];	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :105:35, :106:{26,47,59}, :107:{24,46}
+  wire [9:0]        _addr1_T_1 = {4'h0, _GEN_7[11], _GEN_7[29:25]} + 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :106:{47,59}, :108:29
+  wire              _clear_1_T = addr0_1 == 10'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:100:14, :107:24
+  wire              _recover_1_T = addr0_1 == 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:100:30, :107:24
+  wire              _io_wrErr_1_T_3 = addr0_1 == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:100:46, :107:24
+  wire              _io_wrErr_1_T_5 = addr0_1 == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:100:63, :107:24
+  wire              _clear_1_T_1 = _addr1_T_1 == 10'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:100:14, :108:29
+  wire              _recover_1_T_1 = _addr1_T_1 == 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:100:30, :108:29
+  wire              _io_wrErr_1_T_13 = _addr1_T_1 == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:100:46, :108:29
+  wire              _io_wrErr_1_T_15 = _addr1_T_1 == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:100:63, :108:29
+  wire              isW2_2 = _GEN_10[14:12] == 3'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :105:{26,35}
   wire [9:0]        addr0_2 =
-    isW2_2 ? {4'h0, _GEN_10[11], _GEN_10[29:25]} : _GEN_10[29:20];	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :104:35, :105:{26,47,59}, :106:{24,46}
-  wire [9:0]        _addr1_T_2 = {4'h0, _GEN_10[11], _GEN_10[29:25]} + 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :105:{47,59}, :107:29
-  wire              _clear_2_T = addr0_2 == 10'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:99:14, :106:24
-  wire              _recover_2_T = addr0_2 == 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:99:30, :106:24
-  wire              _io_wrErr_2_T_3 = addr0_2 == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:99:46, :106:24
-  wire              _io_wrErr_2_T_5 = addr0_2 == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:99:63, :106:24
-  wire              _clear_2_T_1 = _addr1_T_2 == 10'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:99:14, :107:29
-  wire              _recover_2_T_1 = _addr1_T_2 == 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:99:30, :107:29
-  wire              _io_wrErr_2_T_13 = _addr1_T_2 == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:99:46, :107:29
-  wire              _io_wrErr_2_T_15 = _addr1_T_2 == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:99:63, :107:29
-  wire              isW2_3 = _GEN_13[14:12] == 3'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :104:{26,35}
+    isW2_2 ? {4'h0, _GEN_10[11], _GEN_10[29:25]} : _GEN_10[29:20];	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :105:35, :106:{26,47,59}, :107:{24,46}
+  wire [9:0]        _addr1_T_2 = {4'h0, _GEN_10[11], _GEN_10[29:25]} + 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :106:{47,59}, :108:29
+  wire              _clear_2_T = addr0_2 == 10'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:100:14, :107:24
+  wire              _recover_2_T = addr0_2 == 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:100:30, :107:24
+  wire              _io_wrErr_2_T_3 = addr0_2 == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:100:46, :107:24
+  wire              _io_wrErr_2_T_5 = addr0_2 == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:100:63, :107:24
+  wire              _clear_2_T_1 = _addr1_T_2 == 10'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:100:14, :108:29
+  wire              _recover_2_T_1 = _addr1_T_2 == 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:100:30, :108:29
+  wire              _io_wrErr_2_T_13 = _addr1_T_2 == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:100:46, :108:29
+  wire              _io_wrErr_2_T_15 = _addr1_T_2 == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:100:63, :108:29
+  wire              isW2_3 = _GEN_13[14:12] == 3'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :105:{26,35}
   wire [9:0]        addr0_3 =
-    isW2_3 ? {4'h0, _GEN_13[11], _GEN_13[29:25]} : _GEN_13[29:20];	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :104:35, :105:{26,47,59}, :106:{24,46}
-  wire [9:0]        _addr1_T_3 = {4'h0, _GEN_13[11], _GEN_13[29:25]} + 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :105:{47,59}, :107:29
-  wire              _clear_3_T = addr0_3 == 10'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:99:14, :106:24
-  wire              _recover_3_T = addr0_3 == 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:99:30, :106:24
-  wire              _io_wrErr_3_T_3 = addr0_3 == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:99:46, :106:24
-  wire              _io_wrErr_3_T_5 = addr0_3 == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:99:63, :106:24
-  wire              _clear_3_T_1 = _addr1_T_3 == 10'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:99:14, :107:29
-  wire              _recover_3_T_1 = _addr1_T_3 == 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:99:30, :107:29
-  wire              _io_wrErr_3_T_13 = _addr1_T_3 == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:99:46, :107:29
-  wire              _io_wrErr_3_T_15 = _addr1_T_3 == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:99:63, :107:29
-  wire              sel_0 = alone & firstOtherIdx[1:0] == 2'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:74:{26,32}, :91:34, :120:{62,77}
-  wire              sel_1 = alone & firstOtherIdx[1:0] == 2'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:74:{26,32}, :91:34, :120:{62,77}
-  wire              sel_2 = alone & firstOtherIdx[1:0] == 2'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:74:{26,32}, :91:34, :120:{62,77}
-  wire              sel_3 = alone & (&(firstOtherIdx[1:0]));	// src/queen/scala/main/QueenSchedCtrl.scala:74:{26,32}, :91:34, :120:{62,77}
+    isW2_3 ? {4'h0, _GEN_13[11], _GEN_13[29:25]} : _GEN_13[29:20];	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :105:35, :106:{26,47,59}, :107:{24,46}
+  wire [9:0]        _addr1_T_3 = {4'h0, _GEN_13[11], _GEN_13[29:25]} + 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :106:{47,59}, :108:29
+  wire              _clear_3_T = addr0_3 == 10'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:100:14, :107:24
+  wire              _recover_3_T = addr0_3 == 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:100:30, :107:24
+  wire              _io_wrErr_3_T_3 = addr0_3 == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:100:46, :107:24
+  wire              _io_wrErr_3_T_5 = addr0_3 == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:100:63, :107:24
+  wire              _clear_3_T_1 = _addr1_T_3 == 10'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:100:14, :108:29
+  wire              _recover_3_T_1 = _addr1_T_3 == 10'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:100:30, :108:29
+  wire              _io_wrErr_3_T_13 = _addr1_T_3 == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:100:46, :108:29
+  wire              _io_wrErr_3_T_15 = _addr1_T_3 == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:100:63, :108:29
+  wire              sel_0 = alone & firstOtherIdx[1:0] == 2'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:75:{26,32}, :92:34, :121:{62,77}
+  wire              sel_1 = alone & firstOtherIdx[1:0] == 2'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:75:{26,32}, :92:34, :121:{62,77}
+  wire              sel_2 = alone & firstOtherIdx[1:0] == 2'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:75:{26,32}, :92:34, :121:{62,77}
+  wire              sel_3 = alone & (&(firstOtherIdx[1:0]));	// src/queen/scala/main/QueenSchedCtrl.scala:75:{26,32}, :92:34, :121:{62,77}
   wire [22:0]       inst =
     sel_0
       ? _GEN_2[29:7]
-      : sel_1 ? _GEN_7[29:7] : sel_2 ? _GEN_10[29:7] : sel_3 ? _GEN_13[29:7] : 23'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :80:30, :82:{26,32}, :120:62
+      : sel_1 ? _GEN_7[29:7] : sel_2 ? _GEN_10[29:7] : sel_3 ? _GEN_13[29:7] : 23'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :81:30, :83:{26,32}, :121:62
   wire [31:0]       rs1 =
-    sel_0 ? _GEN_4 : sel_1 ? _GEN_8 : sel_2 ? _GEN_11 : sel_3 ? _GEN_14 : 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :80:30, :82:{26,32}, :120:62
+    sel_0 ? _GEN_4 : sel_1 ? _GEN_8 : sel_2 ? _GEN_11 : sel_3 ? _GEN_14 : 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :81:30, :83:{26,32}, :121:62
   wire [31:0]       rs2 =
-    sel_0 ? _GEN_6 : sel_1 ? _GEN_9 : sel_2 ? _GEN_12 : sel_3 ? _GEN_15 : 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :80:30, :82:{26,32}, :120:62
-  wire              isQrd = inst[7:5] == 3'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:74:32, :82:{26,32}, :125:{29,38}
-  wire              isCtrl = inst[7:5] == 3'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:74:32, :82:{26,32}, :125:29, :126:39
-  wire              isSignalEvent = isCtrl & inst[22:19] == 4'h4;	// src/queen/scala/main/QueenSchedCtrl.scala:65:41, :82:{26,32}, :124:27, :126:39, :127:{40,47}
-  wire              isSignalTimeline = isCtrl & inst[22:19] == 4'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:62:24, :82:{26,32}, :124:27, :126:39, :128:{43,50}
-  wire              isPollEq = isCtrl & inst[22:19] == 4'h6;	// src/queen/scala/main/QueenSchedCtrl.scala:82:{26,32}, :124:27, :126:39, :130:{35,42}
-  wire              isAtomic = isCtrl & inst[22:19] == 4'h8;	// src/queen/scala/main/QueenSchedCtrl.scala:82:{26,32}, :124:27, :126:39, :131:{35,42}
-  wire              isFlush = isCtrl & inst[22:19] == 4'hA;	// src/queen/scala/main/QueenSchedCtrl.scala:82:{26,32}, :124:27, :126:39, :132:{34,41}
+    sel_0 ? _GEN_6 : sel_1 ? _GEN_9 : sel_2 ? _GEN_12 : sel_3 ? _GEN_15 : 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :81:30, :83:{26,32}, :121:62
+  wire              isQrd = inst[7:5] == 3'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:75:32, :83:{26,32}, :126:{29,38}
+  wire              isCtrl = inst[7:5] == 3'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:75:32, :83:{26,32}, :126:29, :127:39
+  wire              isSignalEvent = isCtrl & inst[22:19] == 4'h4;	// src/queen/scala/main/QueenSchedCtrl.scala:66:41, :83:{26,32}, :125:27, :127:39, :128:{40,47}
+  wire              isSignalTimeline = isCtrl & inst[22:19] == 4'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:63:24, :83:{26,32}, :125:27, :127:39, :129:{43,50}
+  wire              isTrace = isCtrl & inst[22:19] == 4'h5;	// src/queen/scala/main/QueenSchedCtrl.scala:83:{26,32}, :125:27, :127:39, :130:{34,41}
+  wire              isPollEq = isCtrl & inst[22:19] == 4'h6;	// src/queen/scala/main/QueenSchedCtrl.scala:83:{26,32}, :125:27, :127:39, :131:{35,42}
+  wire              isAtomic = isCtrl & inst[22:19] == 4'h8;	// src/queen/scala/main/QueenSchedCtrl.scala:83:{26,32}, :125:27, :127:39, :132:{35,42}
+  wire              isFlush = isCtrl & inst[22:19] == 4'hA;	// src/queen/scala/main/QueenSchedCtrl.scala:83:{26,32}, :125:27, :127:39, :133:{34,41}
   wire              supported_layerCapture =
-    isQrd | isSignalEvent | isSignalTimeline | isCtrl & inst[22:19] == 4'h5 | isPollEq
-    | isAtomic | isFlush;	// src/queen/scala/main/QueenSchedCtrl.scala:82:{26,32}, :124:27, :125:38, :126:39, :127:40, :128:43, :129:{34,41}, :130:35, :131:35, :132:34, :133:{35,52,72,83}, :134:{18,30}
-  wire              exec = alone & supported_layerCapture & ~io_flushing;	// src/queen/scala/main/QueenSchedCtrl.scala:91:34, :97:19, :134:30, :135:{30,43}
-  reg               pollBusy;	// src/queen/scala/main/QueenSchedCtrl.scala:149:35
-  reg               pollWait;	// src/queen/scala/main/QueenSchedCtrl.scala:150:35
-  reg  [31:0]       pollTimer;	// src/queen/scala/main/QueenSchedCtrl.scala:151:36
-  reg  [31:0]       pollAddr;	// src/queen/scala/main/QueenSchedCtrl.scala:152:31
-  reg  [31:0]       pollExp;	// src/queen/scala/main/QueenSchedCtrl.scala:153:30
-  reg  [31:0]       timeoutCnt;	// src/queen/scala/main/QueenSchedCtrl.scala:154:37
-  wire              pollStart = exec & isPollEq & ~pollBusy;	// src/queen/scala/main/QueenSchedCtrl.scala:130:35, :135:{30,43}, :149:35, :156:{34,46,49}
-  wire              pollMisalign = pollStart & (|(rs1[1:0]));	// src/queen/scala/main/QueenSchedCtrl.scala:82:{26,32}, :156:{34,46}, :157:{42,48,55}
-  wire              _pollTimeout_T = pollBusy & (|pollTimeoutReg);	// src/queen/scala/main/QueenSchedCtrl.scala:48:41, :149:35, :158:44, :159:40
-  wire              pollTimeout = _pollTimeout_T & ~(|timeoutCnt);	// src/queen/scala/main/QueenSchedCtrl.scala:154:37, :159:{40,53,67}
-  wire              pollIssue = pollBusy & ~pollWait & ~(|pollTimer) & ~pollTimeout;	// src/queen/scala/main/QueenSchedCtrl.scala:149:35, :150:35, :151:36, :159:53, :161:39, :164:{38,41,51,64,72}
-  wire              pollAbort = pollTimeout & (~pollWait | io_rdData_valid);	// src/queen/scala/main/QueenSchedCtrl.scala:150:35, :159:53, :164:41, :167:{41,55}
-  wire              atomicStart = exec & isAtomic & ~pollBusy;	// src/queen/scala/main/QueenSchedCtrl.scala:131:35, :135:{30,43}, :149:35, :156:49, :189:{36,48}
-  wire              atomicMisalign = atomicStart & (|(rs1[1:0]));	// src/queen/scala/main/QueenSchedCtrl.scala:82:{26,32}, :157:48, :189:{36,48}, :190:{46,59}
+    isQrd | isSignalEvent | isSignalTimeline | isTrace | isPollEq | isAtomic | isFlush;	// src/queen/scala/main/QueenSchedCtrl.scala:126:38, :128:40, :129:43, :130:34, :131:35, :132:35, :133:34, :134:{35,52,72,83}, :135:{18,30}
+  wire              exec = alone & supported_layerCapture & ~io_flushing;	// src/queen/scala/main/QueenSchedCtrl.scala:92:34, :98:19, :135:30, :136:{30,43}
+  reg               pollBusy;	// src/queen/scala/main/QueenSchedCtrl.scala:154:35
+  reg               pollWait;	// src/queen/scala/main/QueenSchedCtrl.scala:155:35
+  reg  [31:0]       pollTimer;	// src/queen/scala/main/QueenSchedCtrl.scala:156:36
+  reg  [31:0]       pollAddr;	// src/queen/scala/main/QueenSchedCtrl.scala:157:31
+  reg  [31:0]       pollExp;	// src/queen/scala/main/QueenSchedCtrl.scala:158:30
+  reg  [31:0]       timeoutCnt;	// src/queen/scala/main/QueenSchedCtrl.scala:159:37
+  wire              pollStart = exec & isPollEq & ~pollBusy;	// src/queen/scala/main/QueenSchedCtrl.scala:131:35, :136:{30,43}, :154:35, :161:{34,46,49}
+  wire              pollMisalign = pollStart & (|(rs1[1:0]));	// src/queen/scala/main/QueenSchedCtrl.scala:83:{26,32}, :161:{34,46}, :162:{42,48,55}
+  wire              _pollTimeout_T = pollBusy & (|pollTimeoutReg);	// src/queen/scala/main/QueenSchedCtrl.scala:49:41, :154:35, :163:44, :164:40
+  wire              pollTimeout = _pollTimeout_T & ~(|timeoutCnt);	// src/queen/scala/main/QueenSchedCtrl.scala:159:37, :164:{40,53,67}
+  wire              pollIssue = pollBusy & ~pollWait & ~(|pollTimer) & ~pollTimeout;	// src/queen/scala/main/QueenSchedCtrl.scala:154:35, :155:35, :156:36, :164:53, :166:39, :169:{38,41,51,64,72}
+  wire              pollAbort = pollTimeout & (~pollWait | io_rdData_valid);	// src/queen/scala/main/QueenSchedCtrl.scala:155:35, :164:53, :169:41, :172:{41,55}
+  wire              atomicStart = exec & isAtomic & ~pollBusy;	// src/queen/scala/main/QueenSchedCtrl.scala:132:35, :136:{30,43}, :154:35, :161:49, :194:{36,48}
+  wire              atomicMisalign = atomicStart & (|(rs1[1:0]));	// src/queen/scala/main/QueenSchedCtrl.scala:83:{26,32}, :162:48, :194:{36,48}, :195:{46,59}
   wire              io_memReq_valid_0 =
-    (pollIssue | atomicStart & ~atomicMisalign) & ~(io_memUsed[3]) & ~io_flushing;	// src/queen/scala/main/QueenSchedCtrl.scala:97:19, :164:{38,51,72}, :189:{36,48}, :190:46, :191:38, :193:{35,51,54,72,83}
-  wire              isEvent = (|(inst[22:19])) & inst[22:13] < 10'h60;	// src/queen/scala/main/QueenSchedCtrl.scala:82:{26,32}, :201:30, :202:{34,44,54}
-  wire              isTimeline = inst[22:13] > 10'h5F & inst[22:13] < 10'h68;	// src/queen/scala/main/QueenSchedCtrl.scala:82:{26,32}, :201:30, :203:{37,47,57}
-  wire              isIdle = inst[22:13] == 10'h6C;	// src/queen/scala/main/QueenSchedCtrl.scala:82:{26,32}, :201:30, :205:33
-  wire              isInterval = inst[22:13] == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:82:{26,32}, :99:63, :201:30, :206:37
-  wire              isTimeoutReg = inst[22:13] == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:82:{26,32}, :99:46, :201:30, :207:39
+    (pollIssue | atomicStart & ~atomicMisalign) & ~(io_memUsed[3]) & ~io_flushing;	// src/queen/scala/main/QueenSchedCtrl.scala:98:19, :169:{38,51,72}, :194:{36,48}, :195:46, :196:38, :198:{35,51,54,72,83}
+  wire              isEvent = (|(inst[22:19])) & inst[22:13] < 10'h60;	// src/queen/scala/main/QueenSchedCtrl.scala:83:{26,32}, :206:30, :207:{34,44,54}
+  wire              isTimeline = inst[22:13] > 10'h5F & inst[22:13] < 10'h68;	// src/queen/scala/main/QueenSchedCtrl.scala:83:{26,32}, :206:30, :208:{37,47,57}
+  wire              isIdle = inst[22:13] == 10'h6C;	// src/queen/scala/main/QueenSchedCtrl.scala:83:{26,32}, :206:30, :210:33
+  wire              isInterval = inst[22:13] == 10'h2;	// src/queen/scala/main/QueenSchedCtrl.scala:83:{26,32}, :100:63, :206:30, :211:37
+  wire              isTimeoutReg = inst[22:13] == 10'h3;	// src/queen/scala/main/QueenSchedCtrl.scala:83:{26,32}, :100:46, :206:30, :212:39
   wire              rdLegal =
     isEvent | isTimeline | inst[22:13] > 10'h67 & inst[22:13] < 10'h6C | isIdle
-    | isInterval | isTimeoutReg;	// src/queen/scala/main/QueenSchedCtrl.scala:82:{26,32}, :201:30, :202:44, :203:47, :204:{34,44,54}, :205:33, :206:37, :207:39, :213:{35,49,60,70,84}
+    | isInterval | isTimeoutReg;	// src/queen/scala/main/QueenSchedCtrl.scala:83:{26,32}, :206:30, :207:44, :208:47, :209:{34,44,54}, :210:33, :211:37, :212:39, :218:{35,49,60,70,84}
   wire [3:0][31:0]  _GEN_16 =
     {{{24'h0, io_faultCode}},
      {{30'h0, io_faultEndpoint}},
-     {{30'h0, io_faultKind}},
-     {{31'h0, io_faultValid}}};	// src/queen/scala/main/QueenSchedCtrl.scala:209:38, :210:37, :211:41, :212:37, :221:28
+     {{29'h0, io_faultKind}},
+     {{31'h0, io_faultValid}}};	// src/queen/scala/main/QueenSchedCtrl.scala:214:38, :215:37, :216:41, :217:37, :226:28
   wire [7:0][31:0]  _GEN_17 =
     {{io_timelines_7},
      {io_timelines_6},
@@ -324,7 +326,7 @@ module Queen_QueenSchedCtrl(	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
      {io_timelines_3},
      {io_timelines_2},
      {io_timelines_1},
-     {io_timelines_0}};	// src/queen/scala/main/QueenSchedCtrl.scala:218:16
+     {io_timelines_0}};	// src/queen/scala/main/QueenSchedCtrl.scala:223:16
   wire [31:0][31:0] _GEN_18 =
     {{io_events_31},
      {io_events_30},
@@ -357,125 +359,125 @@ module Queen_QueenSchedCtrl(	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
      {io_events_3},
      {io_events_2},
      {io_events_1},
-     {io_events_0}};	// src/queen/scala/main/QueenSchedCtrl.scala:217:12
+     {io_events_0}};	// src/queen/scala/main/QueenSchedCtrl.scala:222:12
   always @(posedge clock) begin	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
-    automatic logic _GEN_19;	// src/queen/scala/main/QueenSchedCtrl.scala:169:20
+    automatic logic _GEN_19;	// src/queen/scala/main/QueenSchedCtrl.scala:174:20
     automatic logic _GEN_20;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-    automatic logic _GEN_21;	// src/queen/scala/main/QueenSchedCtrl.scala:229:21
-    _GEN_19 = pollStart & ~pollMisalign;	// src/queen/scala/main/QueenSchedCtrl.scala:156:{34,46}, :157:42, :169:{20,23}
-    _GEN_20 = io_in_ready_0 & io_in_valid;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenSchedCtrl.scala:51:28
-    _GEN_21 = _GEN_20 & ~io_flushing;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenSchedCtrl.scala:97:19, :229:21
+    automatic logic _GEN_21;	// src/queen/scala/main/QueenSchedCtrl.scala:234:21
+    _GEN_19 = pollStart & ~pollMisalign;	// src/queen/scala/main/QueenSchedCtrl.scala:161:{34,46}, :162:42, :174:{20,23}
+    _GEN_20 = io_in_ready_0 & io_in_valid;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenSchedCtrl.scala:52:28
+    _GEN_21 = _GEN_20 & ~io_flushing;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenSchedCtrl.scala:98:19, :234:21
     if (reset) begin	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
-      active <= 1'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:44:33
-      base <= 3'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:46:31
-      pollInterval <= 32'h8;	// src/queen/scala/main/QueenSchedCtrl.scala:47:39
-      pollTimeoutReg <= 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:48:41
-      pollBusy <= 1'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:149:35
-      pollWait <= 1'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:150:35
-      pollTimer <= 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:151:36
-      timeoutCnt <= 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:154:37
+      active <= 1'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:45:33
+      base <= 3'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:47:31
+      pollInterval <= 32'h8;	// src/queen/scala/main/QueenSchedCtrl.scala:48:39
+      pollTimeoutReg <= 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:49:41
+      pollBusy <= 1'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:154:35
+      pollWait <= 1'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:155:35
+      pollTimer <= 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:156:36
+      timeoutCnt <= 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:159:37
     end
     else begin	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
-      automatic logic _GEN_22;	// src/queen/scala/main/QueenSchedCtrl.scala:114:23
-      automatic logic _GEN_23;	// src/queen/scala/main/QueenSchedCtrl.scala:114:23
-      automatic logic _GEN_24;	// src/queen/scala/main/QueenSchedCtrl.scala:114:23
-      automatic logic _GEN_25 = wrSel_3 & isW2_3;	// src/queen/scala/main/QueenSchedCtrl.scala:97:{16,32,49}, :104:35, :114:23
-      automatic logic _pollMiss_T;	// src/queen/scala/main/QueenSchedCtrl.scala:160:38
-      automatic logic pollMatch;	// src/queen/scala/main/QueenSchedCtrl.scala:160:{50,69}, :161:36
-      automatic logic pollMiss;	// src/queen/scala/main/QueenSchedCtrl.scala:162:{49,68}, :163:36
+      automatic logic _GEN_22;	// src/queen/scala/main/QueenSchedCtrl.scala:115:23
+      automatic logic _GEN_23;	// src/queen/scala/main/QueenSchedCtrl.scala:115:23
+      automatic logic _GEN_24;	// src/queen/scala/main/QueenSchedCtrl.scala:115:23
+      automatic logic _GEN_25 = wrSel_3 & isW2_3;	// src/queen/scala/main/QueenSchedCtrl.scala:98:{16,32,49}, :105:35, :115:23
+      automatic logic _pollMiss_T;	// src/queen/scala/main/QueenSchedCtrl.scala:165:38
+      automatic logic pollMatch;	// src/queen/scala/main/QueenSchedCtrl.scala:165:{50,69}, :166:36
+      automatic logic pollMiss;	// src/queen/scala/main/QueenSchedCtrl.scala:167:{49,68}, :168:36
       automatic logic _aloneDone_T_2;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      _GEN_22 = wrSel_0 & isW2;	// src/queen/scala/main/QueenSchedCtrl.scala:97:{16,32,49}, :104:35, :114:23
-      _GEN_23 = wrSel_1 & isW2_1;	// src/queen/scala/main/QueenSchedCtrl.scala:97:{16,32,49}, :104:35, :114:23
-      _GEN_24 = wrSel_2 & isW2_2;	// src/queen/scala/main/QueenSchedCtrl.scala:97:{16,32,49}, :104:35, :114:23
-      _pollMiss_T = pollBusy & pollWait;	// src/queen/scala/main/QueenSchedCtrl.scala:149:35, :150:35, :160:38
+      _GEN_22 = wrSel_0 & isW2;	// src/queen/scala/main/QueenSchedCtrl.scala:98:{16,32,49}, :105:35, :115:23
+      _GEN_23 = wrSel_1 & isW2_1;	// src/queen/scala/main/QueenSchedCtrl.scala:98:{16,32,49}, :105:35, :115:23
+      _GEN_24 = wrSel_2 & isW2_2;	// src/queen/scala/main/QueenSchedCtrl.scala:98:{16,32,49}, :105:35, :115:23
+      _pollMiss_T = pollBusy & pollWait;	// src/queen/scala/main/QueenSchedCtrl.scala:154:35, :155:35, :165:38
       pollMatch =
-        _pollMiss_T & io_rdData_valid & io_rdData_bits == pollExp & ~pollTimeout;	// src/queen/scala/main/QueenSchedCtrl.scala:153:30, :159:53, :160:{38,50,69}, :161:{24,36,39}
-      pollMiss = _pollMiss_T & io_rdData_valid & io_rdData_bits != pollExp & ~pollTimeout;	// src/queen/scala/main/QueenSchedCtrl.scala:153:30, :159:53, :160:38, :161:39, :162:{49,68}, :163:{24,36}
-      _aloneDone_T_2 = io_memReq_ready & io_memReq_valid_0;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenSchedCtrl.scala:193:{72,83}
-      active <= ~io_flushing & (_GEN_21 | ~(done & ~_GEN_20) & active);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenSchedCtrl.scala:44:33, :50:31, :228:{15,18,31,40}, :229:{21,38}, :232:16, :235:23, :236:16
-      if (io_flushing | _GEN_21)	// src/queen/scala/main/QueenSchedCtrl.scala:227:19, :229:{21,38}, :231:14, :235:23, :237:14
-        base <= 3'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:46:31
+        _pollMiss_T & io_rdData_valid & io_rdData_bits == pollExp & ~pollTimeout;	// src/queen/scala/main/QueenSchedCtrl.scala:158:30, :164:53, :165:{38,50,69}, :166:{24,36,39}
+      pollMiss = _pollMiss_T & io_rdData_valid & io_rdData_bits != pollExp & ~pollTimeout;	// src/queen/scala/main/QueenSchedCtrl.scala:158:30, :164:53, :165:38, :166:39, :167:{49,68}, :168:{24,36}
+      _aloneDone_T_2 = io_memReq_ready & io_memReq_valid_0;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenSchedCtrl.scala:198:{72,83}
+      active <= ~io_flushing & (_GEN_21 | ~(done & ~_GEN_20) & active);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenSchedCtrl.scala:45:33, :51:31, :233:{15,18,31,40}, :234:{21,38}, :237:16, :240:23, :241:16
+      if (io_flushing | _GEN_21)	// src/queen/scala/main/QueenSchedCtrl.scala:232:19, :234:{21,38}, :236:14, :240:23, :242:14
+        base <= 3'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:47:31
       else if (inRange
                & (alone
                     ? (isPollEq
                          ? pollMatch | pollMisalign | pollAbort
                          : isAtomic ? atomicMisalign | _aloneDone_T_2 : exec)
-                    : ~pollBusy))	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenSchedCtrl.scala:54:34, :91:34, :130:35, :131:35, :135:{30,43}, :149:35, :156:49, :157:42, :160:{50,69}, :161:36, :167:41, :190:46, :223:{32,53,69}, :224:{12,38}, :226:{35,41}
-        base <= base + (alone ? firstOtherIdx + 3'h1 : fwdLen);	// src/queen/scala/main/QueenSchedCtrl.scala:46:31, :74:{26,32}, :91:34, :93:29, :94:{30,52}, :227:34
-      if (_GEN_25 & _io_wrErr_3_T_15 & (|_GEN_15))	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :99:{63,79}, :114:{23,31,48}
-        pollInterval <= _GEN_15;	// src/queen/scala/main/QueenSchedCtrl.scala:47:39, :64:36
-      else if (wrSel_3 & _io_wrErr_3_T_5 & (|_GEN_14))	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :97:{16,32,49}, :99:{63,79}, :113:{23,40}
-        pollInterval <= _GEN_14;	// src/queen/scala/main/QueenSchedCtrl.scala:47:39, :64:36
-      else if (_GEN_24 & _io_wrErr_2_T_15 & (|_GEN_12))	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :99:{63,79}, :114:{23,31,48}
-        pollInterval <= _GEN_12;	// src/queen/scala/main/QueenSchedCtrl.scala:47:39, :64:36
-      else if (wrSel_2 & _io_wrErr_2_T_5 & (|_GEN_11))	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :97:{16,32,49}, :99:{63,79}, :113:{23,40}
-        pollInterval <= _GEN_11;	// src/queen/scala/main/QueenSchedCtrl.scala:47:39, :64:36
-      else if (_GEN_23 & _io_wrErr_1_T_15 & (|_GEN_9))	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :99:{63,79}, :114:{23,31,48}
-        pollInterval <= _GEN_9;	// src/queen/scala/main/QueenSchedCtrl.scala:47:39, :64:36
-      else if (wrSel_1 & _io_wrErr_1_T_5 & (|_GEN_8))	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :97:{16,32,49}, :99:{63,79}, :113:{23,40}
-        pollInterval <= _GEN_8;	// src/queen/scala/main/QueenSchedCtrl.scala:47:39, :64:36
-      else if (_GEN_22 & _io_wrErr_0_T_15 & (|_GEN_6))	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :99:{63,79}, :114:{23,31,48}
-        pollInterval <= _GEN_6;	// src/queen/scala/main/QueenSchedCtrl.scala:47:39, :64:36
-      else if (wrSel_0 & _io_wrErr_0_T_5 & (|_GEN_4))	// src/queen/scala/main/QueenSchedCtrl.scala:64:36, :97:{16,32,49}, :99:{63,79}, :113:{23,40}
-        pollInterval <= _GEN_4;	// src/queen/scala/main/QueenSchedCtrl.scala:47:39, :64:36
-      if (_GEN_25 & _io_wrErr_3_T_13)	// src/queen/scala/main/QueenSchedCtrl.scala:99:46, :114:23, :116:31
-        pollTimeoutReg <= _GEN_15;	// src/queen/scala/main/QueenSchedCtrl.scala:48:41, :64:36
-      else if (wrSel_3 & _io_wrErr_3_T_3)	// src/queen/scala/main/QueenSchedCtrl.scala:97:{16,32,49}, :99:46, :115:23
-        pollTimeoutReg <= _GEN_14;	// src/queen/scala/main/QueenSchedCtrl.scala:48:41, :64:36
-      else if (_GEN_24 & _io_wrErr_2_T_13)	// src/queen/scala/main/QueenSchedCtrl.scala:99:46, :114:23, :116:31
-        pollTimeoutReg <= _GEN_12;	// src/queen/scala/main/QueenSchedCtrl.scala:48:41, :64:36
-      else if (wrSel_2 & _io_wrErr_2_T_3)	// src/queen/scala/main/QueenSchedCtrl.scala:97:{16,32,49}, :99:46, :115:23
-        pollTimeoutReg <= _GEN_11;	// src/queen/scala/main/QueenSchedCtrl.scala:48:41, :64:36
-      else if (_GEN_23 & _io_wrErr_1_T_13)	// src/queen/scala/main/QueenSchedCtrl.scala:99:46, :114:23, :116:31
-        pollTimeoutReg <= _GEN_9;	// src/queen/scala/main/QueenSchedCtrl.scala:48:41, :64:36
-      else if (wrSel_1 & _io_wrErr_1_T_3)	// src/queen/scala/main/QueenSchedCtrl.scala:97:{16,32,49}, :99:46, :115:23
-        pollTimeoutReg <= _GEN_8;	// src/queen/scala/main/QueenSchedCtrl.scala:48:41, :64:36
-      else if (_GEN_22 & _io_wrErr_0_T_13)	// src/queen/scala/main/QueenSchedCtrl.scala:99:46, :114:23, :116:31
-        pollTimeoutReg <= _GEN_6;	// src/queen/scala/main/QueenSchedCtrl.scala:48:41, :64:36
-      else if (wrSel_0 & _io_wrErr_0_T_3)	// src/queen/scala/main/QueenSchedCtrl.scala:97:{16,32,49}, :99:46, :115:23
-        pollTimeoutReg <= _GEN_4;	// src/queen/scala/main/QueenSchedCtrl.scala:48:41, :64:36
-      pollBusy <= ~(io_flushing | pollAbort | pollMatch) & (_GEN_19 | pollBusy);	// src/queen/scala/main/QueenSchedCtrl.scala:149:35, :160:{50,69}, :161:36, :167:41, :169:{20,38}, :170:18, :178:{21,32}, :180:{21,32}, :235:23, :238:18
+                    : ~pollBusy))	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenSchedCtrl.scala:55:34, :92:34, :131:35, :132:35, :136:{30,43}, :154:35, :161:49, :162:42, :165:{50,69}, :166:36, :172:41, :195:46, :228:{32,53,69}, :229:{12,38}, :231:{35,41}
+        base <= base + (alone ? firstOtherIdx + 3'h1 : fwdLen);	// src/queen/scala/main/QueenSchedCtrl.scala:47:31, :75:{26,32}, :92:34, :94:29, :95:{30,52}, :232:34
+      if (_GEN_25 & _io_wrErr_3_T_15 & (|_GEN_15))	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :100:{63,79}, :115:{23,31,48}
+        pollInterval <= _GEN_15;	// src/queen/scala/main/QueenSchedCtrl.scala:48:39, :65:36
+      else if (wrSel_3 & _io_wrErr_3_T_5 & (|_GEN_14))	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :98:{16,32,49}, :100:{63,79}, :114:{23,40}
+        pollInterval <= _GEN_14;	// src/queen/scala/main/QueenSchedCtrl.scala:48:39, :65:36
+      else if (_GEN_24 & _io_wrErr_2_T_15 & (|_GEN_12))	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :100:{63,79}, :115:{23,31,48}
+        pollInterval <= _GEN_12;	// src/queen/scala/main/QueenSchedCtrl.scala:48:39, :65:36
+      else if (wrSel_2 & _io_wrErr_2_T_5 & (|_GEN_11))	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :98:{16,32,49}, :100:{63,79}, :114:{23,40}
+        pollInterval <= _GEN_11;	// src/queen/scala/main/QueenSchedCtrl.scala:48:39, :65:36
+      else if (_GEN_23 & _io_wrErr_1_T_15 & (|_GEN_9))	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :100:{63,79}, :115:{23,31,48}
+        pollInterval <= _GEN_9;	// src/queen/scala/main/QueenSchedCtrl.scala:48:39, :65:36
+      else if (wrSel_1 & _io_wrErr_1_T_5 & (|_GEN_8))	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :98:{16,32,49}, :100:{63,79}, :114:{23,40}
+        pollInterval <= _GEN_8;	// src/queen/scala/main/QueenSchedCtrl.scala:48:39, :65:36
+      else if (_GEN_22 & _io_wrErr_0_T_15 & (|_GEN_6))	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :100:{63,79}, :115:{23,31,48}
+        pollInterval <= _GEN_6;	// src/queen/scala/main/QueenSchedCtrl.scala:48:39, :65:36
+      else if (wrSel_0 & _io_wrErr_0_T_5 & (|_GEN_4))	// src/queen/scala/main/QueenSchedCtrl.scala:65:36, :98:{16,32,49}, :100:{63,79}, :114:{23,40}
+        pollInterval <= _GEN_4;	// src/queen/scala/main/QueenSchedCtrl.scala:48:39, :65:36
+      if (_GEN_25 & _io_wrErr_3_T_13)	// src/queen/scala/main/QueenSchedCtrl.scala:100:46, :115:23, :117:31
+        pollTimeoutReg <= _GEN_15;	// src/queen/scala/main/QueenSchedCtrl.scala:49:41, :65:36
+      else if (wrSel_3 & _io_wrErr_3_T_3)	// src/queen/scala/main/QueenSchedCtrl.scala:98:{16,32,49}, :100:46, :116:23
+        pollTimeoutReg <= _GEN_14;	// src/queen/scala/main/QueenSchedCtrl.scala:49:41, :65:36
+      else if (_GEN_24 & _io_wrErr_2_T_13)	// src/queen/scala/main/QueenSchedCtrl.scala:100:46, :115:23, :117:31
+        pollTimeoutReg <= _GEN_12;	// src/queen/scala/main/QueenSchedCtrl.scala:49:41, :65:36
+      else if (wrSel_2 & _io_wrErr_2_T_3)	// src/queen/scala/main/QueenSchedCtrl.scala:98:{16,32,49}, :100:46, :116:23
+        pollTimeoutReg <= _GEN_11;	// src/queen/scala/main/QueenSchedCtrl.scala:49:41, :65:36
+      else if (_GEN_23 & _io_wrErr_1_T_13)	// src/queen/scala/main/QueenSchedCtrl.scala:100:46, :115:23, :117:31
+        pollTimeoutReg <= _GEN_9;	// src/queen/scala/main/QueenSchedCtrl.scala:49:41, :65:36
+      else if (wrSel_1 & _io_wrErr_1_T_3)	// src/queen/scala/main/QueenSchedCtrl.scala:98:{16,32,49}, :100:46, :116:23
+        pollTimeoutReg <= _GEN_8;	// src/queen/scala/main/QueenSchedCtrl.scala:49:41, :65:36
+      else if (_GEN_22 & _io_wrErr_0_T_13)	// src/queen/scala/main/QueenSchedCtrl.scala:100:46, :115:23, :117:31
+        pollTimeoutReg <= _GEN_6;	// src/queen/scala/main/QueenSchedCtrl.scala:49:41, :65:36
+      else if (wrSel_0 & _io_wrErr_0_T_3)	// src/queen/scala/main/QueenSchedCtrl.scala:98:{16,32,49}, :100:46, :116:23
+        pollTimeoutReg <= _GEN_4;	// src/queen/scala/main/QueenSchedCtrl.scala:49:41, :65:36
+      pollBusy <= ~(io_flushing | pollAbort | pollMatch) & (_GEN_19 | pollBusy);	// src/queen/scala/main/QueenSchedCtrl.scala:154:35, :165:{50,69}, :166:36, :172:41, :174:{20,38}, :175:18, :183:{21,32}, :185:{21,32}, :240:23, :243:18
       pollWait <=
         ~(io_flushing | pollAbort | pollMiss | pollMatch)
-        & (pollIssue & _aloneDone_T_2 | ~_GEN_19 & pollWait);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenSchedCtrl.scala:150:35, :160:{50,69}, :161:36, :162:{49,68}, :163:36, :164:{38,51,72}, :167:41, :169:{20,38}, :171:18, :177:{20,39,50}, :178:{21,53}, :179:{20,31}, :180:{21,53}, :235:23, :239:18
+        & (pollIssue & _aloneDone_T_2 | ~_GEN_19 & pollWait);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenSchedCtrl.scala:155:35, :165:{50,69}, :166:36, :167:{49,68}, :168:36, :169:{38,51,72}, :172:41, :174:{20,38}, :176:18, :182:{20,39,50}, :183:{21,53}, :184:{20,31}, :185:{21,53}, :240:23, :244:18
       if (io_flushing) begin	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
-        pollTimer <= 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:151:36
-        timeoutCnt <= 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:154:37
+        pollTimer <= 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:156:36
+        timeoutCnt <= 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:159:37
       end
       else begin	// src/queen/scala/main/QueenSchedCtrl.scala:18:16
-        if (pollBusy & ~pollWait & (|pollTimer))	// src/queen/scala/main/QueenSchedCtrl.scala:149:35, :150:35, :151:36, :164:{41,64}, :181:{19,32}
-          pollTimer <= pollTimer - 32'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:151:36, :181:79
-        else if (pollMiss)	// src/queen/scala/main/QueenSchedCtrl.scala:162:{49,68}, :163:36
-          pollTimer <= pollInterval;	// src/queen/scala/main/QueenSchedCtrl.scala:47:39, :151:36
-        else if (_GEN_19)	// src/queen/scala/main/QueenSchedCtrl.scala:169:20
-          pollTimer <= 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:151:36
-        if (_pollTimeout_T & (|timeoutCnt))	// src/queen/scala/main/QueenSchedCtrl.scala:154:37, :159:{40,67}, :182:32
-          timeoutCnt <= timeoutCnt - 32'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:154:37, :182:82
-        else if (_GEN_19)	// src/queen/scala/main/QueenSchedCtrl.scala:169:20
-          timeoutCnt <= pollTimeoutReg;	// src/queen/scala/main/QueenSchedCtrl.scala:48:41, :154:37
+        if (pollBusy & ~pollWait & (|pollTimer))	// src/queen/scala/main/QueenSchedCtrl.scala:154:35, :155:35, :156:36, :169:{41,64}, :186:{19,32}
+          pollTimer <= pollTimer - 32'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:156:36, :186:79
+        else if (pollMiss)	// src/queen/scala/main/QueenSchedCtrl.scala:167:{49,68}, :168:36
+          pollTimer <= pollInterval;	// src/queen/scala/main/QueenSchedCtrl.scala:48:39, :156:36
+        else if (_GEN_19)	// src/queen/scala/main/QueenSchedCtrl.scala:174:20
+          pollTimer <= 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:156:36
+        if (_pollTimeout_T & (|timeoutCnt))	// src/queen/scala/main/QueenSchedCtrl.scala:159:37, :164:{40,67}, :187:32
+          timeoutCnt <= timeoutCnt - 32'h1;	// src/queen/scala/main/QueenSchedCtrl.scala:159:37, :187:82
+        else if (_GEN_19)	// src/queen/scala/main/QueenSchedCtrl.scala:174:20
+          timeoutCnt <= pollTimeoutReg;	// src/queen/scala/main/QueenSchedCtrl.scala:49:41, :159:37
       end
     end
-    if (_GEN_21) begin	// src/queen/scala/main/QueenSchedCtrl.scala:229:21
-      pkt_0_valid <= io_in_bits_0_valid;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-      pkt_0_bits_inst <= io_in_bits_0_bits_inst;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-      pkt_0_bits_rs1 <= io_in_bits_0_bits_rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-      pkt_0_bits_rs2 <= io_in_bits_0_bits_rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-      pkt_1_valid <= io_in_bits_1_valid;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-      pkt_1_bits_inst <= io_in_bits_1_bits_inst;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-      pkt_1_bits_rs1 <= io_in_bits_1_bits_rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-      pkt_1_bits_rs2 <= io_in_bits_1_bits_rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-      pkt_2_valid <= io_in_bits_2_valid;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-      pkt_2_bits_inst <= io_in_bits_2_bits_inst;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-      pkt_2_bits_rs1 <= io_in_bits_2_bits_rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-      pkt_2_bits_rs2 <= io_in_bits_2_bits_rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-      pkt_3_valid <= io_in_bits_3_valid;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-      pkt_3_bits_inst <= io_in_bits_3_bits_inst;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-      pkt_3_bits_rs1 <= io_in_bits_3_bits_rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
-      pkt_3_bits_rs2 <= io_in_bits_3_bits_rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:45:26
+    if (_GEN_21) begin	// src/queen/scala/main/QueenSchedCtrl.scala:234:21
+      pkt_0_valid <= io_in_bits_0_valid;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+      pkt_0_bits_inst <= io_in_bits_0_bits_inst;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+      pkt_0_bits_rs1 <= io_in_bits_0_bits_rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+      pkt_0_bits_rs2 <= io_in_bits_0_bits_rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+      pkt_1_valid <= io_in_bits_1_valid;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+      pkt_1_bits_inst <= io_in_bits_1_bits_inst;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+      pkt_1_bits_rs1 <= io_in_bits_1_bits_rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+      pkt_1_bits_rs2 <= io_in_bits_1_bits_rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+      pkt_2_valid <= io_in_bits_2_valid;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+      pkt_2_bits_inst <= io_in_bits_2_bits_inst;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+      pkt_2_bits_rs1 <= io_in_bits_2_bits_rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+      pkt_2_bits_rs2 <= io_in_bits_2_bits_rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+      pkt_3_valid <= io_in_bits_3_valid;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+      pkt_3_bits_inst <= io_in_bits_3_bits_inst;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+      pkt_3_bits_rs1 <= io_in_bits_3_bits_rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
+      pkt_3_bits_rs2 <= io_in_bits_3_bits_rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:46:26
     end
-    if (_GEN_19) begin	// src/queen/scala/main/QueenSchedCtrl.scala:169:20
-      pollAddr <= rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:82:{26,32}, :152:31
-      pollExp <= rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:82:{26,32}, :153:30
+    if (_GEN_19) begin	// src/queen/scala/main/QueenSchedCtrl.scala:174:20
+      pollAddr <= rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:83:{26,32}, :157:31
+      pollExp <= rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:83:{26,32}, :158:30
     end
   end // always @(posedge)
   `ifdef ENABLE_INITIAL_REG_	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
@@ -491,46 +493,46 @@ module Queen_QueenSchedCtrl(	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
         for (logic [4:0] i = 5'h0; i < 5'h17; i += 5'h1) begin
           _RANDOM[i] = `RANDOM;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
         end	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
-        active = _RANDOM[5'h0][0];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :44:33
-        pkt_0_valid = _RANDOM[5'h0][1];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :44:33, :45:26
-        pkt_0_bits_inst = {_RANDOM[5'h0][31:2], _RANDOM[5'h1][1:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :44:33, :45:26
-        pkt_0_bits_rs1 = {_RANDOM[5'h2][31:2], _RANDOM[5'h3][1:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:26
-        pkt_0_bits_rs2 = {_RANDOM[5'h3][31:2], _RANDOM[5'h4][1:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:26
-        pkt_1_valid = _RANDOM[5'h4][2];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:26
-        pkt_1_bits_inst = {_RANDOM[5'h4][31:3], _RANDOM[5'h5][2:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:26
-        pkt_1_bits_rs1 = {_RANDOM[5'h6][31:3], _RANDOM[5'h7][2:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:26
-        pkt_1_bits_rs2 = {_RANDOM[5'h7][31:3], _RANDOM[5'h8][2:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:26
-        pkt_2_valid = _RANDOM[5'h8][3];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:26
-        pkt_2_bits_inst = {_RANDOM[5'h8][31:4], _RANDOM[5'h9][3:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:26
-        pkt_2_bits_rs1 = {_RANDOM[5'hA][31:4], _RANDOM[5'hB][3:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:26
-        pkt_2_bits_rs2 = {_RANDOM[5'hB][31:4], _RANDOM[5'hC][3:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:26
-        pkt_3_valid = _RANDOM[5'hC][4];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:26
-        pkt_3_bits_inst = {_RANDOM[5'hC][31:5], _RANDOM[5'hD][4:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:26
-        pkt_3_bits_rs1 = {_RANDOM[5'hE][31:5], _RANDOM[5'hF][4:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:26
-        pkt_3_bits_rs2 = {_RANDOM[5'hF][31:5], _RANDOM[5'h10][4:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:26
-        base = _RANDOM[5'h10][7:5];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:26, :46:31
-        pollInterval = {_RANDOM[5'h10][31:8], _RANDOM[5'h11][7:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:26, :47:39
-        pollTimeoutReg = {_RANDOM[5'h11][31:8], _RANDOM[5'h12][7:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :47:39, :48:41
-        pollBusy = _RANDOM[5'h12][8];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :48:41, :149:35
-        pollWait = _RANDOM[5'h12][9];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :48:41, :150:35
-        pollTimer = {_RANDOM[5'h12][31:10], _RANDOM[5'h13][9:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :48:41, :151:36
-        pollAddr = {_RANDOM[5'h13][31:10], _RANDOM[5'h14][9:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :151:36, :152:31
-        pollExp = {_RANDOM[5'h14][31:10], _RANDOM[5'h15][9:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :152:31, :153:30
-        timeoutCnt = {_RANDOM[5'h15][31:10], _RANDOM[5'h16][9:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :153:30, :154:37
+        active = _RANDOM[5'h0][0];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:33
+        pkt_0_valid = _RANDOM[5'h0][1];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:33, :46:26
+        pkt_0_bits_inst = {_RANDOM[5'h0][31:2], _RANDOM[5'h1][1:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:33, :46:26
+        pkt_0_bits_rs1 = {_RANDOM[5'h2][31:2], _RANDOM[5'h3][1:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_0_bits_rs2 = {_RANDOM[5'h3][31:2], _RANDOM[5'h4][1:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_1_valid = _RANDOM[5'h4][2];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_1_bits_inst = {_RANDOM[5'h4][31:3], _RANDOM[5'h5][2:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_1_bits_rs1 = {_RANDOM[5'h6][31:3], _RANDOM[5'h7][2:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_1_bits_rs2 = {_RANDOM[5'h7][31:3], _RANDOM[5'h8][2:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_2_valid = _RANDOM[5'h8][3];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_2_bits_inst = {_RANDOM[5'h8][31:4], _RANDOM[5'h9][3:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_2_bits_rs1 = {_RANDOM[5'hA][31:4], _RANDOM[5'hB][3:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_2_bits_rs2 = {_RANDOM[5'hB][31:4], _RANDOM[5'hC][3:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_3_valid = _RANDOM[5'hC][4];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_3_bits_inst = {_RANDOM[5'hC][31:5], _RANDOM[5'hD][4:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_3_bits_rs1 = {_RANDOM[5'hE][31:5], _RANDOM[5'hF][4:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_3_bits_rs2 = {_RANDOM[5'hF][31:5], _RANDOM[5'h10][4:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        base = _RANDOM[5'h10][7:5];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26, :47:31
+        pollInterval = {_RANDOM[5'h10][31:8], _RANDOM[5'h11][7:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26, :48:39
+        pollTimeoutReg = {_RANDOM[5'h11][31:8], _RANDOM[5'h12][7:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :48:39, :49:41
+        pollBusy = _RANDOM[5'h12][8];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :49:41, :154:35
+        pollWait = _RANDOM[5'h12][9];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :49:41, :155:35
+        pollTimer = {_RANDOM[5'h12][31:10], _RANDOM[5'h13][9:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :49:41, :156:36
+        pollAddr = {_RANDOM[5'h13][31:10], _RANDOM[5'h14][9:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :156:36, :157:31
+        pollExp = {_RANDOM[5'h14][31:10], _RANDOM[5'h15][9:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :157:31, :158:30
+        timeoutCnt = {_RANDOM[5'h15][31:10], _RANDOM[5'h16][9:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :158:30, :159:37
       `endif // RANDOMIZE_REG_INIT
     end // initial
     `ifdef FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
       `FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_in_ready = io_in_ready_0;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :51:28
-  assign io_sw_valid = exec & (isSignalEvent | isSignalTimeline);	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :127:40, :128:43, :135:{30,43}, :140:{25,43}
-  assign io_sw_isTimeline = isSignalTimeline;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :128:43
-  assign io_sw_index = inst[4:0];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :82:{26,32}, :142:24
-  assign io_sw_clr = isSignalEvent & ~(inst[18]);	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :82:{26,32}, :127:40, :143:{32,35,40}
-  assign io_sw_assign = isSignalTimeline & (|(inst[12:8]));	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :82:{26,32}, :128:43, :145:{38,45,54}
-  assign io_sw_data = rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :82:{26,32}
-  assign io_resp_valid = exec & isQrd;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :125:38, :135:{30,43}, :214:27
+  assign io_in_ready = io_in_ready_0;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :52:28
+  assign io_sw_valid = exec & (isSignalEvent | isSignalTimeline);	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :128:40, :129:43, :136:{30,43}, :141:{25,43}
+  assign io_sw_isTimeline = isSignalTimeline;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :129:43
+  assign io_sw_index = inst[4:0];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :83:{26,32}, :143:24
+  assign io_sw_clr = isSignalEvent & ~(inst[18]);	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :83:{26,32}, :128:40, :144:{32,35,40}
+  assign io_sw_assign = isSignalTimeline & (|(inst[12:8]));	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :83:{26,32}, :129:43, :146:{38,45,54}
+  assign io_sw_data = rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :83:{26,32}
+  assign io_resp_valid = exec & isQrd;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :126:38, :136:{30,43}, :219:27
   assign io_resp_bits_data =
     rdLegal
       ? (isEvent
@@ -542,50 +544,52 @@ module Queen_QueenSchedCtrl(	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
                    : isInterval
                        ? pollInterval
                        : isTimeoutReg ? pollTimeoutReg : _GEN_16[inst[14:13]])
-      : 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :44:33, :47:39, :48:41, :51:20, :82:{26,32}, :201:30, :202:44, :203:47, :205:33, :206:37, :207:39, :212:53, :213:{35,49,60,70,84}, :216:29, :217:{12,38}, :218:{16,48}, :219:{20,32,54}, :220:24, :221:28
-  assign io_resp_bits_err = ~rdLegal;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :213:{35,49,60,70,84}, :215:25
+      : 32'h0;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:33, :48:39, :49:41, :52:20, :83:{26,32}, :206:30, :207:44, :208:47, :210:33, :211:37, :212:39, :217:53, :218:{35,49,60,70,84}, :221:29, :222:{12,38}, :223:{16,48}, :224:{20,32,54}, :225:24, :226:28
+  assign io_resp_bits_err = ~rdLegal;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :218:{35,49,60,70,84}, :220:25
   assign io_wrErr_0 =
     wrSel_0
     & (~(_clear_0_T | _recover_0_T | _io_wrErr_0_T_3 | _io_wrErr_0_T_5 & (|_GEN_4)) | isW2
        & ~(_clear_0_T_1 | _recover_0_T_1 | _io_wrErr_0_T_13 | _io_wrErr_0_T_15
-           & (|_GEN_6)));	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :64:36, :97:{16,32,49}, :99:{14,22,30,38,46,54,63,71,79}, :104:35, :108:33, :109:{14,37,46,49}
+           & (|_GEN_6)));	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :65:36, :98:{16,32,49}, :100:{14,22,30,38,46,54,63,71,79}, :105:35, :109:33, :110:{14,37,46,49}
   assign io_wrErr_1 =
     wrSel_1
     & (~(_clear_1_T | _recover_1_T | _io_wrErr_1_T_3 | _io_wrErr_1_T_5 & (|_GEN_8))
        | isW2_1
        & ~(_clear_1_T_1 | _recover_1_T_1 | _io_wrErr_1_T_13 | _io_wrErr_1_T_15
-           & (|_GEN_9)));	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :64:36, :97:{16,32,49}, :99:{14,22,30,38,46,54,63,71,79}, :104:35, :108:33, :109:{14,37,46,49}
+           & (|_GEN_9)));	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :65:36, :98:{16,32,49}, :100:{14,22,30,38,46,54,63,71,79}, :105:35, :109:33, :110:{14,37,46,49}
   assign io_wrErr_2 =
     wrSel_2
     & (~(_clear_2_T | _recover_2_T | _io_wrErr_2_T_3 | _io_wrErr_2_T_5 & (|_GEN_11))
        | isW2_2
        & ~(_clear_2_T_1 | _recover_2_T_1 | _io_wrErr_2_T_13 | _io_wrErr_2_T_15
-           & (|_GEN_12)));	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :64:36, :97:{16,32,49}, :99:{14,22,30,38,46,54,63,71,79}, :104:35, :108:33, :109:{14,37,46,49}
+           & (|_GEN_12)));	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :65:36, :98:{16,32,49}, :100:{14,22,30,38,46,54,63,71,79}, :105:35, :109:33, :110:{14,37,46,49}
   assign io_wrErr_3 =
     wrSel_3
     & (~(_clear_3_T | _recover_3_T | _io_wrErr_3_T_3 | _io_wrErr_3_T_5 & (|_GEN_14))
        | isW2_3
        & ~(_clear_3_T_1 | _recover_3_T_1 | _io_wrErr_3_T_13 | _io_wrErr_3_T_15
-           & (|_GEN_15)));	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :64:36, :97:{16,32,49}, :99:{14,22,30,38,46,54,63,71,79}, :104:35, :108:33, :109:{14,37,46,49}
+           & (|_GEN_15)));	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :65:36, :98:{16,32,49}, :100:{14,22,30,38,46,54,63,71,79}, :105:35, :109:33, :110:{14,37,46,49}
   assign io_faultClear =
     |{wrSel_3 & (_clear_3_T | isW2_3 & _clear_3_T_1),
       wrSel_2 & (_clear_2_T | isW2_2 & _clear_2_T_1),
       wrSel_1 & (_clear_1_T | isW2_1 & _clear_1_T_1),
-      wrSel_0 & (_clear_0_T | isW2 & _clear_0_T_1)};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :97:{16,32,49}, :99:14, :104:35, :110:{30,48,57}, :118:{28,35}
+      wrSel_0 & (_clear_0_T | isW2 & _clear_0_T_1)};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :98:{16,32,49}, :100:14, :105:35, :111:{30,48,57}, :119:{28,35}
   assign io_flushTrig =
     (|{wrSel_3 & (_recover_3_T | isW2_3 & _recover_3_T_1),
        wrSel_2 & (_recover_2_T | isW2_2 & _recover_2_T_1),
        wrSel_1 & (_recover_1_T | isW2_1 & _recover_1_T_1),
-       wrSel_0 & (_recover_0_T | isW2 & _recover_0_T_1)}) | exec & isFlush;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :97:{16,32,49}, :99:30, :104:35, :111:{32,50,59}, :132:34, :135:{30,43}, :199:{29,36,40,49}
-  assign io_memReq_valid = io_memReq_valid_0;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :193:{72,83}
+       wrSel_0 & (_recover_0_T | isW2 & _recover_0_T_1)}) | exec & isFlush;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :98:{16,32,49}, :100:30, :105:35, :112:{32,50,59}, :133:34, :136:{30,43}, :204:{29,36,40,49}
+  assign io_memReq_valid = io_memReq_valid_0;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :198:{72,83}
   assign io_memReq_bits_op =
     pollIssue
       ? 2'h0
-      : inst[1:0] == 2'h2 ? 2'h3 : inst[1:0] == 2'h1 ? 2'h2 : {1'h0, inst[1:0] == 2'h0};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :82:{26,32}, :164:{38,51,72}, :185:{42,73}, :194:29
-  assign io_memReq_bits_address = pollIssue ? pollAddr : rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :82:{26,32}, :152:31, :164:{38,51,72}, :196:34
-  assign io_memReq_bits_operand = pollIssue ? 32'h0 : rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :82:{26,32}, :164:{38,51,72}, :197:34
-  assign io_addrErr = pollMisalign | atomicMisalign;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :157:42, :190:46, :198:32
-  assign io_timeout = pollAbort & ~io_flushing;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :97:19, :167:41, :183:29
-  assign io_idle = ~active;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :44:33, :51:20
+      : inst[1:0] == 2'h2 ? 2'h3 : inst[1:0] == 2'h1 ? 2'h2 : {1'h0, inst[1:0] == 2'h0};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :83:{26,32}, :169:{38,51,72}, :190:{42,73}, :199:29
+  assign io_memReq_bits_address = pollIssue ? pollAddr : rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :83:{26,32}, :157:31, :169:{38,51,72}, :201:34
+  assign io_memReq_bits_operand = pollIssue ? 32'h0 : rs2;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :83:{26,32}, :169:{38,51,72}, :202:34
+  assign io_addrErr = pollMisalign | atomicMisalign;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :162:42, :195:46, :203:32
+  assign io_timeout = pollAbort & ~io_flushing;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :98:19, :172:41, :188:29
+  assign io_trace_valid = exec & isTrace;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :130:34, :136:{30,43}, :149:28
+  assign io_trace_bits_swTag = rs1;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :83:{26,32}
+  assign io_idle = ~active;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:33, :52:20
 endmodule
 

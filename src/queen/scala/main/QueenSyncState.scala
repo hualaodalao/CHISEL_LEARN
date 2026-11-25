@@ -13,13 +13,13 @@ class QueenSyncWrite(val cfg: QueenConfig) extends Bundle {
 
 /** Queen 内部同步状态：硬件完成源 + 软件 SIGNAL 指令两个更新源。
   *
-  * 两个端点同拍各回一条 completion 时按位或（事件）与计数相加（时间线）合并，不丢任何一条。
+  * GEMM/DMA/VPU 同拍各回一条 completion 时按位或（事件）与计数相加（时间线）合并，不丢任何一条。
   * 同一 event bit 上软件清除与硬件/软件置位同拍冲突时**置位优先**。
   * timeline 显式赋值不得回退（signed 距离为负）：该拍抑制更新并报 rollback。
   */
 class QueenSyncState(val cfg: QueenConfig) extends Module {
     val io = IO(new Bundle {
-        val completion = Input(Vec(2, Valid(new QueenDsaCompletion(cfg))))
+        val completion = Input(Vec(3, Valid(new QueenDsaCompletion(cfg))))
         val sw = Input(new QueenSyncWrite(cfg))
         val events = Output(Vec(cfg.eventGroupCount, UInt(32.W)))
         val timelines = Output(Vec(cfg.timelineCount, UInt(32.W)))

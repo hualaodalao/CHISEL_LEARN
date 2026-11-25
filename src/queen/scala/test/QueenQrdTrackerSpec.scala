@@ -13,7 +13,7 @@ class QueenQrdTrackerSpec extends AnyFlatSpec with Matchers with ChiselSim {
     )
 
     private case class Entry(pc: BigInt, rd: Int, source: Int)
-    private case class Retire(pc: BigInt, rdValid: Boolean, rdIndex: Int, trap: Boolean, cause: Int)
+    private case class Pop(pc: BigInt, rdValid: Boolean, rdIndex: Int, err: Boolean)
 
     private class Driver(dut: QueenQrdTracker, cfg: QueenConfig) {
         private val lanes = cfg.instructionLanes
@@ -22,8 +22,8 @@ class QueenQrdTrackerSpec extends AnyFlatSpec with Matchers with ChiselSim {
         private val fifos = Vector.fill(3)(mutable.Queue.empty[(BigInt, Boolean)])
         private val pendingResp = Array.fill(3)(0)
         var asyncReady = true
-        var retireReady = true
-        var retires = Vector.empty[Retire]
+        var pops = Vector.empty[Pop]
+        var rdErrors = Vector.empty[Int]
         var asyncWrites = Vector.empty[(Int, BigInt)]
         var allocCount = 0
 
@@ -33,7 +33,6 @@ class QueenQrdTrackerSpec extends AnyFlatSpec with Matchers with ChiselSim {
         }
         dut.io.resp.foreach { r => r.valid.poke(false.B); r.bits.data.poke(0.U); r.bits.err.poke(false.B) }
         dut.io.asyncRd.ready.poke(true.B)
-        dut.io.retire.ready.poke(true.B)
         dut.reset.poke(true.B)
         dut.clock.step(2)
         dut.reset.poke(false.B)
@@ -64,7 +63,6 @@ class QueenQrdTrackerSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 r.ready.expect(true.B)
             }
             dut.io.asyncRd.ready.poke(asyncReady.B)
-            dut.io.retire.ready.poke(retireReady.B)
             dut.io.used.expect(entries.size.U)
             dut.io.idle.expect(entries.isEmpty.B)
 
@@ -73,30 +71,23 @@ class QueenQrdTrackerSpec extends AnyFlatSpec with Matchers with ChiselSim {
             val headReady = head.nonEmpty && headResp.nonEmpty
             val writeBack = head.exists(_.rd != 0) && headResp.exists(!_._2)
             val asyncValid = headReady && writeBack
-            val retireValid = headReady && (!writeBack || asyncReady)
+            val pop = headReady && (!writeBack || asyncReady)
             dut.io.asyncRd.valid.expect(asyncValid.B)
-            dut.io.retire.valid.expect(retireValid.B)
+            val expErr = pop && headResp.exists(_._2)
+            dut.io.rdError.valid.expect(expErr.B)
+            if (expErr) {
+                dut.io.rdError.bits.expect(head.get.source.U)
+                rdErrors = rdErrors :+ head.get.source
+            }
             if (asyncValid) {
                 dut.io.asyncRd.bits.addr.expect(head.get.rd.U)
                 dut.io.asyncRd.bits.data.expect(headResp.get._1.U)
             }
-            if (retireValid) {
-                val exp = Retire(head.get.pc, writeBack, head.get.rd, headResp.get._2,
-                    if (headResp.get._2) 9 else 0)
-                val act = Retire(dut.io.retire.bits.pc.peek().litValue,
-                    dut.io.retire.bits.rdValid.peek().litToBoolean,
-                    dut.io.retire.bits.rdIndex.peek().litValue.toInt,
-                    dut.io.retire.bits.trap.peek().litToBoolean,
-                    dut.io.retire.bits.trapCause.peek().litValue.toInt)
-                withClue(s"cycle=$cycleNo retire ") { act shouldBe exp }
-            }
             if (asyncValid && asyncReady) {
                 asyncWrites = asyncWrites :+ ((head.get.rd, headResp.get._1))
             }
-            val retireFire = retireValid && retireReady
-            if (retireFire) {
-                retires = retires :+ Retire(head.get.pc, writeBack, head.get.rd,
-                    headResp.get._2, if (headResp.get._2) 9 else 0)
+            if (pop) {
+                pops = pops :+ Pop(head.get.pc, writeBack, head.get.rd, headResp.get._2)
                 fifos(head.get.source).dequeue()
                 entries = entries.tail
             }
@@ -136,7 +127,7 @@ class QueenQrdTrackerSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
     behavior of "QueenQrdTracker"
 
-    it should "retire a single source in request order" in {
+    it should "pop a single source in request order" in {
         val cfg = QueenConfig()
         simulate(new QueenQrdTracker(cfg)) { dut =>
             val d = new Driver(dut, cfg)
@@ -144,12 +135,12 @@ class QueenQrdTrackerSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.respond(0, 0xaa)
             d.respond(0, 0xbb)
             d.settle(4)
-            d.retires shouldBe Vector(Retire(0x100, true, 3, false, 0), Retire(0x104, true, 4, false, 0))
+            d.pops shouldBe Vector(Pop(0x100, true, 3, false), Pop(0x104, true, 4, false))
             d.asyncWrites shouldBe Vector((3, BigInt(0xaa)), (4, BigInt(0xbb)))
         }
     }
 
-    it should "retire in program order when three sources respond out of order" in {
+    it should "pop in program order when three sources respond out of order" in {
         val cfg = QueenConfig()
         simulate(new QueenQrdTracker(cfg)) { dut =>
             val d = new Driver(dut, cfg)
@@ -157,11 +148,11 @@ class QueenQrdTrackerSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.respond(2, 0xcc)
             d.respond(1, 0xbb)
             d.settle(2)
-            d.retires shouldBe empty
+            d.pops shouldBe empty
             d.respond(0, 0xaa)
             d.settle(4)
-            d.retires shouldBe Vector(Retire(0x200, true, 1, false, 0), Retire(0x204, true, 2, false, 0),
-                Retire(0x208, true, 3, false, 0))
+            d.pops shouldBe Vector(Pop(0x200, true, 1, false), Pop(0x204, true, 2, false),
+                Pop(0x208, true, 3, false))
             d.asyncWrites shouldBe Vector((1, BigInt(0xaa)), (2, BigInt(0xcc)), (3, BigInt(0xbb)))
         }
     }
@@ -176,7 +167,7 @@ class QueenQrdTrackerSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 d.drain()
             }
             d.allocCount shouldBe 16
-            d.retires.map(_.pc) shouldBe (0 until 4).flatMap(r =>
+            d.pops.map(_.pc) shouldBe (0 until 4).flatMap(r =>
                 (0 until 4).map(i => BigInt(0x300 + r * 16 + i * 4)))
         }
     }
@@ -189,7 +180,7 @@ class QueenQrdTrackerSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.respond(2, 0x22)
             d.respond(1, 0x11)
             d.settle(4)
-            d.retires shouldBe Vector(Retire(0x400, true, 5, false, 0), Retire(0x404, true, 6, false, 0))
+            d.pops shouldBe Vector(Pop(0x400, true, 5, false), Pop(0x404, true, 6, false))
         }
     }
 
@@ -202,31 +193,31 @@ class QueenQrdTrackerSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.respond(0, 0xaa)
             d.respond(0, 0xbb)
             d.settle(4)
-            d.retires shouldBe empty
+            d.pops shouldBe empty
             d.asyncWrites shouldBe empty
             d.asyncReady = true
             d.settle(4)
-            d.retires.map(_.pc) shouldBe Vector(BigInt(0x500), BigInt(0x504))
+            d.pops.map(_.pc) shouldBe Vector(BigInt(0x500), BigInt(0x504))
         }
     }
 
-    it should "hold the head while the retire port is backpressured" in {
+    it should "hold the head while the writeback port is backpressured" in {
         val cfg = QueenConfig()
         simulate(new QueenQrdTracker(cfg)) { dut =>
             val d = new Driver(dut, cfg)
-            d.cycle(d.alloc(0 -> Entry(0x600, 0, 0)))
-            d.retireReady = false
+            d.cycle(d.alloc(0 -> Entry(0x600, 5, 0)))
+            d.asyncReady = false
             d.respond(0, 0xaa)
             d.settle(4)
-            d.retires shouldBe empty
+            d.pops shouldBe empty
             d.asyncWrites shouldBe empty
-            d.retireReady = true
+            d.asyncReady = true
             d.settle(2)
-            d.retires shouldBe Vector(Retire(0x600, false, 0, false, 0))
+            d.pops shouldBe Vector(Pop(0x600, true, 5, false))
         }
     }
 
-    it should "retire rd=x0 without a writeback and turn err into a cause-9 trap" in {
+    it should "pop rd=x0 without a writeback and report err on rdError instead of a trap" in {
         val cfg = QueenConfig()
         simulate(new QueenQrdTracker(cfg)) { dut =>
             val d = new Driver(dut, cfg)
@@ -234,8 +225,9 @@ class QueenQrdTrackerSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.respond(0, 0xaa)
             d.respond(1, 0xbb, err = true)
             d.settle(4)
-            d.retires shouldBe Vector(Retire(0x700, false, 0, false, 0), Retire(0x704, false, 7, true, 9))
+            d.pops shouldBe Vector(Pop(0x700, false, 0, false), Pop(0x704, false, 7, true))
             d.asyncWrites shouldBe empty
+            d.rdErrors shouldBe Vector(1)
         }
     }
 
@@ -251,7 +243,7 @@ class QueenQrdTrackerSpec extends AnyFlatSpec with Matchers with ChiselSim {
             dut.io.used.expect(2.U)
             d.cycle(d.alloc(0 -> Entry(0x80c, 4, 0)))
             d.drain()
-            d.retires.map(_.pc) shouldBe Vector(BigInt(0x800), BigInt(0x804), BigInt(0x808), BigInt(0x80c))
+            d.pops.map(_.pc) shouldBe Vector(BigInt(0x800), BigInt(0x804), BigInt(0x808), BigInt(0x80c))
         }
     }
 
@@ -277,13 +269,13 @@ class QueenQrdTrackerSpec extends AnyFlatSpec with Matchers with ChiselSim {
                     }
                     d.cycle(allocs, resp)
                     d.asyncReady = rng.nextInt(4) != 0
-                    d.retireReady = rng.nextInt(4) != 0
+                    d.asyncReady = rng.nextInt(4) != 0
                 }
                 d.asyncReady = true
-                d.retireReady = true
+                d.asyncReady = true
                 d.drain()
-                d.allocCount shouldBe d.retires.size
-                d.retires.map(_.pc) shouldBe (0 until d.allocCount).map(i => BigInt(0x1004 + i * 4))
+                d.allocCount shouldBe d.pops.size
+                d.pops.map(_.pc) shouldBe (0 until d.allocCount).map(i => BigInt(0x1004 + i * 4))
             }
         }
     }

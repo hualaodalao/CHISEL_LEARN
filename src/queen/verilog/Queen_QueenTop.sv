@@ -43,550 +43,562 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
-  input         clock,	// src/queen/scala/main/QueenTop.scala:11:7
-                reset,	// src/queen/scala/main/QueenTop.scala:11:7
-  output        io_inst_0_ready,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_inst_0_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_inst_0_bits_pc,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_inst_0_bits_inst,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_inst_1_ready,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_inst_1_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_inst_1_bits_pc,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_inst_1_bits_inst,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_inst_2_ready,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_inst_2_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_inst_2_bits_pc,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_inst_2_bits_inst,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_inst_3_ready,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_inst_3_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_inst_3_bits_pc,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_inst_3_bits_inst,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_rs1_0_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_rs1_0_bits,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_rs1_1_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_rs1_1_bits,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_rs1_2_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_rs1_2_bits,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_rs1_3_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_rs1_3_bits,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_rs2_0_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_rs2_0_bits,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_rs2_1_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_rs2_1_bits,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_rs2_2_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_rs2_2_bits,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_rs2_3_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_rs2_3_bits,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_trap_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_trap_bits_pc,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_trap_bits_inst,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [7:0]  io_trap_bits_cause,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_asyncRd_ready,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_asyncRd_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [4:0]  io_asyncRd_bits_addr,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_asyncRd_bits_data,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_qrdRetire_ready,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_qrdRetire_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_qrdRetire_bits_pc,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_qrdRetire_bits_rdValid,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [4:0]  io_qrdRetire_bits_rdIndex,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_qrdRetire_bits_trap,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [7:0]  io_qrdRetire_bits_trapCause,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_gemm_ready,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_gemm_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemm_bits_0_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [1:0]  io_gemm_bits_0_bits_op,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [9:0]  io_gemm_bits_0_bits_reg0Addr,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemm_bits_0_bits_reg1Addr,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_gemm_bits_0_bits_data0,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemm_bits_0_bits_data1,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemm_bits_0_bits_pc,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [7:0]  io_gemm_bits_0_bits_cmdTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_gemm_bits_0_bits_swTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_gemm_bits_1_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [1:0]  io_gemm_bits_1_bits_op,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [9:0]  io_gemm_bits_1_bits_reg0Addr,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemm_bits_1_bits_reg1Addr,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_gemm_bits_1_bits_data0,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemm_bits_1_bits_data1,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemm_bits_1_bits_pc,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [7:0]  io_gemm_bits_1_bits_cmdTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_gemm_bits_1_bits_swTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_gemm_bits_2_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [1:0]  io_gemm_bits_2_bits_op,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [9:0]  io_gemm_bits_2_bits_reg0Addr,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemm_bits_2_bits_reg1Addr,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_gemm_bits_2_bits_data0,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemm_bits_2_bits_data1,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemm_bits_2_bits_pc,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [7:0]  io_gemm_bits_2_bits_cmdTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_gemm_bits_2_bits_swTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_gemm_bits_3_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [1:0]  io_gemm_bits_3_bits_op,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [9:0]  io_gemm_bits_3_bits_reg0Addr,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemm_bits_3_bits_reg1Addr,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_gemm_bits_3_bits_data0,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemm_bits_3_bits_data1,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemm_bits_3_bits_pc,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [7:0]  io_gemm_bits_3_bits_cmdTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_gemm_bits_3_bits_swTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_dma_ready,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_dma_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dma_bits_0_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [1:0]  io_dma_bits_0_bits_op,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [9:0]  io_dma_bits_0_bits_reg0Addr,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dma_bits_0_bits_reg1Addr,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_dma_bits_0_bits_data0,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dma_bits_0_bits_data1,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dma_bits_0_bits_pc,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [7:0]  io_dma_bits_0_bits_cmdTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_dma_bits_0_bits_swTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_dma_bits_1_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [1:0]  io_dma_bits_1_bits_op,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [9:0]  io_dma_bits_1_bits_reg0Addr,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dma_bits_1_bits_reg1Addr,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_dma_bits_1_bits_data0,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dma_bits_1_bits_data1,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dma_bits_1_bits_pc,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [7:0]  io_dma_bits_1_bits_cmdTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_dma_bits_1_bits_swTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_dma_bits_2_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [1:0]  io_dma_bits_2_bits_op,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [9:0]  io_dma_bits_2_bits_reg0Addr,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dma_bits_2_bits_reg1Addr,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_dma_bits_2_bits_data0,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dma_bits_2_bits_data1,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dma_bits_2_bits_pc,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [7:0]  io_dma_bits_2_bits_cmdTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_dma_bits_2_bits_swTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_dma_bits_3_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [1:0]  io_dma_bits_3_bits_op,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [9:0]  io_dma_bits_3_bits_reg0Addr,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dma_bits_3_bits_reg1Addr,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_dma_bits_3_bits_data0,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dma_bits_3_bits_data1,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dma_bits_3_bits_pc,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [7:0]  io_dma_bits_3_bits_cmdTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_dma_bits_3_bits_swTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_gemmResp_ready,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_gemmResp_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_gemmResp_bits_data,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_gemmResp_bits_err,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_dmaResp_ready,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_dmaResp_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_dmaResp_bits_data,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_dmaResp_bits_err,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemmCompletion_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_gemmCompletion_bits_pc,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [7:0]  io_gemmCompletion_bits_cmdTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_gemmCompletion_bits_swTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_gemmCompletion_bits_error,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [7:0]  io_gemmCompletion_bits_code,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_gemmCompletion_bits_hwSignal_enable,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemmCompletion_bits_hwSignal_isTimeline,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [4:0]  io_gemmCompletion_bits_hwSignal_group,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_gemmCompletion_bits_hwSignal_mask,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [2:0]  io_gemmCompletion_bits_hwSignal_timeline,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_dmaCompletion_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_dmaCompletion_bits_pc,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [7:0]  io_dmaCompletion_bits_cmdTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_dmaCompletion_bits_swTag,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_dmaCompletion_bits_error,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [7:0]  io_dmaCompletion_bits_code,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_dmaCompletion_bits_hwSignal_enable,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dmaCompletion_bits_hwSignal_isTimeline,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [4:0]  io_dmaCompletion_bits_hwSignal_group,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_dmaCompletion_bits_hwSignal_mask,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [2:0]  io_dmaCompletion_bits_hwSignal_timeline,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_gemmWrErr_0,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemmWrErr_1,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemmWrErr_2,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemmWrErr_3,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dmaWrErr_0,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dmaWrErr_1,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dmaWrErr_2,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dmaWrErr_3,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemmDeviceIdle,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_dmaDeviceIdle,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_memReq_ready,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_memReq_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [1:0]  io_memReq_bits_op,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_memReq_bits_address,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_memReq_bits_operand,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_memResp_ready,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_memResp_valid,	// src/queen/scala/main/QueenTop.scala:12:16
-  input  [31:0] io_memResp_bits_data,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_memResp_bits_error,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_flushReq,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_flushAck,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_gemmFlushReq,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_gemmFlushAck,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_dmaFlushReq,	// src/queen/scala/main/QueenTop.scala:12:16
-  input         io_dmaFlushAck,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_idle,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [31:0] io_events_0,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_1,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_2,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_3,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_4,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_5,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_6,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_7,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_8,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_9,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_10,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_11,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_12,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_13,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_14,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_15,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_16,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_17,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_18,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_19,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_20,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_21,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_22,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_23,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_24,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_25,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_26,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_27,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_28,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_29,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_30,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_events_31,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_timelines_0,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_timelines_1,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_timelines_2,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_timelines_3,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_timelines_4,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_timelines_5,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_timelines_6,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_timelines_7,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_faultValid,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [1:0]  io_faultKind,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_faultEndpoint,	// src/queen/scala/main/QueenTop.scala:12:16
-  output [7:0]  io_faultCode,	// src/queen/scala/main/QueenTop.scala:12:16
-  output        io_faultIrq,	// src/queen/scala/main/QueenTop.scala:12:16
-                io_irq	// src/queen/scala/main/QueenTop.scala:12:16
+module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:12:7
+  input         clock,	// src/queen/scala/main/QueenTop.scala:12:7
+                reset,	// src/queen/scala/main/QueenTop.scala:12:7
+  output        io_inst_0_ready,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_inst_0_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_inst_0_bits_pc,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_inst_0_bits_inst,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_inst_1_ready,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_inst_1_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_inst_1_bits_pc,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_inst_1_bits_inst,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_inst_2_ready,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_inst_2_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_inst_2_bits_pc,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_inst_2_bits_inst,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_inst_3_ready,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_inst_3_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_inst_3_bits_pc,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_inst_3_bits_inst,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_regRead_0_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_regRead_0_bits,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_regRead_1_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_regRead_1_bits,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_regRead_2_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_regRead_2_bits,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_regRead_3_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_regRead_3_bits,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_regRead_4_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_regRead_4_bits,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_regRead_5_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_regRead_5_bits,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_regRead_6_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_regRead_6_bits,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_regRead_7_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_regRead_7_bits,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_trap_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [31:0] io_trap_bits_pc,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_trap_bits_inst,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [7:0]  io_trap_bits_cause,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_asyncRd_ready,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_asyncRd_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [4:0]  io_asyncRd_bits_addr,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [31:0] io_asyncRd_bits_data,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_gemm_ready,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_gemm_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemm_bits_0_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [1:0]  io_gemm_bits_0_bits_op,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [9:0]  io_gemm_bits_0_bits_reg0Addr,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemm_bits_0_bits_reg1Addr,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [31:0] io_gemm_bits_0_bits_data0,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemm_bits_0_bits_data1,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemm_bits_0_bits_swTag,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_gemm_bits_1_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [1:0]  io_gemm_bits_1_bits_op,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [9:0]  io_gemm_bits_1_bits_reg0Addr,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemm_bits_1_bits_reg1Addr,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [31:0] io_gemm_bits_1_bits_data0,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemm_bits_1_bits_data1,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemm_bits_1_bits_swTag,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_gemm_bits_2_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [1:0]  io_gemm_bits_2_bits_op,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [9:0]  io_gemm_bits_2_bits_reg0Addr,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemm_bits_2_bits_reg1Addr,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [31:0] io_gemm_bits_2_bits_data0,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemm_bits_2_bits_data1,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemm_bits_2_bits_swTag,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_gemm_bits_3_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [1:0]  io_gemm_bits_3_bits_op,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [9:0]  io_gemm_bits_3_bits_reg0Addr,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemm_bits_3_bits_reg1Addr,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [31:0] io_gemm_bits_3_bits_data0,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemm_bits_3_bits_data1,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemm_bits_3_bits_swTag,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_dma_ready,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_dma_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dma_bits_0_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [1:0]  io_dma_bits_0_bits_op,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [9:0]  io_dma_bits_0_bits_reg0Addr,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dma_bits_0_bits_reg1Addr,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [31:0] io_dma_bits_0_bits_data0,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dma_bits_0_bits_data1,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dma_bits_0_bits_swTag,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_dma_bits_1_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [1:0]  io_dma_bits_1_bits_op,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [9:0]  io_dma_bits_1_bits_reg0Addr,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dma_bits_1_bits_reg1Addr,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [31:0] io_dma_bits_1_bits_data0,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dma_bits_1_bits_data1,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dma_bits_1_bits_swTag,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_dma_bits_2_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [1:0]  io_dma_bits_2_bits_op,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [9:0]  io_dma_bits_2_bits_reg0Addr,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dma_bits_2_bits_reg1Addr,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [31:0] io_dma_bits_2_bits_data0,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dma_bits_2_bits_data1,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dma_bits_2_bits_swTag,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_dma_bits_3_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [1:0]  io_dma_bits_3_bits_op,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [9:0]  io_dma_bits_3_bits_reg0Addr,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dma_bits_3_bits_reg1Addr,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [31:0] io_dma_bits_3_bits_data0,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dma_bits_3_bits_data1,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dma_bits_3_bits_swTag,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_gemmResp_ready,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_gemmResp_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_gemmResp_bits_data,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_gemmResp_bits_err,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_dmaResp_ready,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_dmaResp_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_dmaResp_bits_data,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_dmaResp_bits_err,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemmCompletion_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_gemmCompletion_bits_swTag,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemmCompletion_bits_hwTag,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_gemmCompletion_bits_error,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [7:0]  io_gemmCompletion_bits_code,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_gemmCompletion_bits_hwSignal_enable,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemmCompletion_bits_hwSignal_isTimeline,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [4:0]  io_gemmCompletion_bits_hwSignal_group,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_gemmCompletion_bits_hwSignal_mask,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [2:0]  io_gemmCompletion_bits_hwSignal_timeline,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_dmaCompletion_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_dmaCompletion_bits_swTag,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dmaCompletion_bits_hwTag,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_dmaCompletion_bits_error,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [7:0]  io_dmaCompletion_bits_code,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_dmaCompletion_bits_hwSignal_enable,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dmaCompletion_bits_hwSignal_isTimeline,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [4:0]  io_dmaCompletion_bits_hwSignal_group,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_dmaCompletion_bits_hwSignal_mask,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [2:0]  io_dmaCompletion_bits_hwSignal_timeline,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_vpuCompletion_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_vpuCompletion_bits_swTag,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_vpuCompletion_bits_hwTag,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_vpuCompletion_bits_error,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [7:0]  io_vpuCompletion_bits_code,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_vpuCompletion_bits_hwSignal_enable,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_vpuCompletion_bits_hwSignal_isTimeline,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [4:0]  io_vpuCompletion_bits_hwSignal_group,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_vpuCompletion_bits_hwSignal_mask,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [2:0]  io_vpuCompletion_bits_hwSignal_timeline,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_gemmWrErr_0,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemmWrErr_1,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemmWrErr_2,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemmWrErr_3,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dmaWrErr_0,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dmaWrErr_1,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dmaWrErr_2,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dmaWrErr_3,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemmDeviceIdle,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dmaDeviceIdle,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_gemmTrace_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [31:0] io_gemmTrace_bits_swTag,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemmTrace_bits_hwTag,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_dmaTrace_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [31:0] io_dmaTrace_bits_swTag,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_dmaTrace_bits_hwTag,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_schedTrace_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [31:0] io_schedTrace_bits_swTag,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_schedTrace_bits_hwTag,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_memReq_ready,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_memReq_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [1:0]  io_memReq_bits_op,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [31:0] io_memReq_bits_address,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_memReq_bits_operand,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_memResp_ready,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_memResp_valid,	// src/queen/scala/main/QueenTop.scala:13:16
+  input  [31:0] io_memResp_bits_data,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_memResp_bits_error,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_flushReq,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_flushAck,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_gemmFlushReq,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_gemmFlushAck,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_dmaFlushReq,	// src/queen/scala/main/QueenTop.scala:13:16
+  input         io_dmaFlushAck,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_idle,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [31:0] io_events_0,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_1,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_2,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_3,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_4,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_5,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_6,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_7,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_8,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_9,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_10,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_11,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_12,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_13,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_14,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_15,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_16,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_17,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_18,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_19,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_20,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_21,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_22,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_23,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_24,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_25,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_26,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_27,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_28,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_29,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_30,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_events_31,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_timelines_0,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_timelines_1,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_timelines_2,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_timelines_3,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_timelines_4,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_timelines_5,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_timelines_6,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_timelines_7,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_faultValid,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [2:0]  io_faultKind,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [1:0]  io_faultEndpoint,	// src/queen/scala/main/QueenTop.scala:13:16
+  output [7:0]  io_faultCode,	// src/queen/scala/main/QueenTop.scala:13:16
+  output        io_faultIrq,	// src/queen/scala/main/QueenTop.scala:13:16
+                io_irq	// src/queen/scala/main/QueenTop.scala:13:16
 );
 
-  wire        _flush_io_flushing;	// src/queen/scala/main/QueenTop.scala:57:31
-  wire        _flush_io_start;	// src/queen/scala/main/QueenTop.scala:57:31
-  wire        _flush_io_clearState;	// src/queen/scala/main/QueenTop.scala:57:31
-  wire        _flush_io_idle;	// src/queen/scala/main/QueenTop.scala:57:31
-  wire        _mem_io_req_ready;	// src/queen/scala/main/QueenTop.scala:56:29
-  wire        _mem_io_rdData_valid;	// src/queen/scala/main/QueenTop.scala:56:29
-  wire [31:0] _mem_io_rdData_bits;	// src/queen/scala/main/QueenTop.scala:56:29
-  wire        _mem_io_err;	// src/queen/scala/main/QueenTop.scala:56:29
-  wire [3:0]  _mem_io_used;	// src/queen/scala/main/QueenTop.scala:56:29
-  wire        _mem_io_idle;	// src/queen/scala/main/QueenTop.scala:56:29
-  wire [4:0]  _qrd_io_used;	// src/queen/scala/main/QueenTop.scala:55:29
-  wire        _qrd_io_idle;	// src/queen/scala/main/QueenTop.scala:55:29
-  wire [31:0] _sync_io_events_0;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_1;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_2;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_3;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_4;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_5;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_6;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_7;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_8;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_9;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_10;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_11;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_12;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_13;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_14;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_15;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_16;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_17;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_18;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_19;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_20;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_21;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_22;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_23;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_24;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_25;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_26;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_27;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_28;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_29;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_30;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_events_31;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_timelines_0;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_timelines_1;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_timelines_2;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_timelines_3;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_timelines_4;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_timelines_5;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_timelines_6;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [31:0] _sync_io_timelines_7;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire        _sync_io_rollback;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire [2:0]  _sync_io_rollbackId;	// src/queen/scala/main/QueenTop.scala:54:30
-  wire        _schedCtrl_io_in_ready;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire        _schedCtrl_io_sw_valid;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire        _schedCtrl_io_sw_isTimeline;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire [4:0]  _schedCtrl_io_sw_index;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire        _schedCtrl_io_sw_clr;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire        _schedCtrl_io_sw_assign;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire [31:0] _schedCtrl_io_sw_data;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire        _schedCtrl_io_resp_valid;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire [31:0] _schedCtrl_io_resp_bits_data;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire        _schedCtrl_io_resp_bits_err;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire        _schedCtrl_io_wrErr_0;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire        _schedCtrl_io_wrErr_1;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire        _schedCtrl_io_wrErr_2;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire        _schedCtrl_io_wrErr_3;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire        _schedCtrl_io_faultClear;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire        _schedCtrl_io_flushTrig;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire        _schedCtrl_io_memReq_valid;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire [1:0]  _schedCtrl_io_memReq_bits_op;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire [31:0] _schedCtrl_io_memReq_bits_address;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire [31:0] _schedCtrl_io_memReq_bits_operand;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire        _schedCtrl_io_addrErr;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire        _schedCtrl_io_timeout;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire        _schedCtrl_io_idle;	// src/queen/scala/main/QueenTop.scala:53:35
-  wire        _dmaAdapter_io_in_ready;	// src/queen/scala/main/QueenTop.scala:52:36
-  wire        _dmaAdapter_io_idle;	// src/queen/scala/main/QueenTop.scala:52:36
-  wire        _gemmAdapter_io_in_ready;	// src/queen/scala/main/QueenTop.scala:51:37
-  wire        _gemmAdapter_io_idle;	// src/queen/scala/main/QueenTop.scala:51:37
-  wire        _dmaCtrl_io_in_ready;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire        _dmaCtrl_io_out_valid;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire        _dmaCtrl_io_out_bits_0_valid;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire [31:0] _dmaCtrl_io_out_bits_0_bits_inst;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire [31:0] _dmaCtrl_io_out_bits_0_bits_pc;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire [31:0] _dmaCtrl_io_out_bits_0_bits_rs1;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire [31:0] _dmaCtrl_io_out_bits_0_bits_rs2;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire        _dmaCtrl_io_out_bits_1_valid;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire [31:0] _dmaCtrl_io_out_bits_1_bits_inst;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire [31:0] _dmaCtrl_io_out_bits_1_bits_pc;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire [31:0] _dmaCtrl_io_out_bits_1_bits_rs1;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire [31:0] _dmaCtrl_io_out_bits_1_bits_rs2;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire        _dmaCtrl_io_out_bits_2_valid;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire [31:0] _dmaCtrl_io_out_bits_2_bits_inst;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire [31:0] _dmaCtrl_io_out_bits_2_bits_pc;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire [31:0] _dmaCtrl_io_out_bits_2_bits_rs1;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire [31:0] _dmaCtrl_io_out_bits_2_bits_rs2;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire        _dmaCtrl_io_out_bits_3_valid;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire [31:0] _dmaCtrl_io_out_bits_3_bits_inst;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire [31:0] _dmaCtrl_io_out_bits_3_bits_pc;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire [31:0] _dmaCtrl_io_out_bits_3_bits_rs1;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire [31:0] _dmaCtrl_io_out_bits_3_bits_rs2;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire        _dmaCtrl_io_idle;	// src/queen/scala/main/QueenTop.scala:50:33
-  wire        _gemmCtrl_io_in_ready;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire        _gemmCtrl_io_out_valid;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire        _gemmCtrl_io_out_bits_0_valid;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire [31:0] _gemmCtrl_io_out_bits_0_bits_inst;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire [31:0] _gemmCtrl_io_out_bits_0_bits_pc;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire [31:0] _gemmCtrl_io_out_bits_0_bits_rs1;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire [31:0] _gemmCtrl_io_out_bits_0_bits_rs2;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire        _gemmCtrl_io_out_bits_1_valid;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire [31:0] _gemmCtrl_io_out_bits_1_bits_inst;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire [31:0] _gemmCtrl_io_out_bits_1_bits_pc;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire [31:0] _gemmCtrl_io_out_bits_1_bits_rs1;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire [31:0] _gemmCtrl_io_out_bits_1_bits_rs2;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire        _gemmCtrl_io_out_bits_2_valid;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire [31:0] _gemmCtrl_io_out_bits_2_bits_inst;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire [31:0] _gemmCtrl_io_out_bits_2_bits_pc;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire [31:0] _gemmCtrl_io_out_bits_2_bits_rs1;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire [31:0] _gemmCtrl_io_out_bits_2_bits_rs2;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire        _gemmCtrl_io_out_bits_3_valid;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire [31:0] _gemmCtrl_io_out_bits_3_bits_inst;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire [31:0] _gemmCtrl_io_out_bits_3_bits_pc;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire [31:0] _gemmCtrl_io_out_bits_3_bits_rs1;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire [31:0] _gemmCtrl_io_out_bits_3_bits_rs2;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire        _gemmCtrl_io_idle;	// src/queen/scala/main/QueenTop.scala:49:34
-  wire        _decoder_io_inst_0_ready;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_inst_1_ready;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_inst_2_ready;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_inst_3_ready;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_gemm_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_gemm_bits_0_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_gemm_bits_0_bits_inst;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_gemm_bits_0_bits_pc;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_gemm_bits_0_bits_rs1;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_gemm_bits_0_bits_rs2;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_gemm_bits_1_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_gemm_bits_1_bits_inst;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_gemm_bits_1_bits_pc;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_gemm_bits_1_bits_rs1;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_gemm_bits_1_bits_rs2;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_gemm_bits_2_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_gemm_bits_2_bits_inst;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_gemm_bits_2_bits_pc;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_gemm_bits_2_bits_rs1;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_gemm_bits_2_bits_rs2;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_gemm_bits_3_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_gemm_bits_3_bits_inst;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_gemm_bits_3_bits_pc;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_gemm_bits_3_bits_rs1;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_gemm_bits_3_bits_rs2;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_dma_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_dma_bits_0_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_dma_bits_0_bits_inst;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_dma_bits_0_bits_pc;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_dma_bits_0_bits_rs1;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_dma_bits_0_bits_rs2;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_dma_bits_1_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_dma_bits_1_bits_inst;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_dma_bits_1_bits_pc;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_dma_bits_1_bits_rs1;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_dma_bits_1_bits_rs2;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_dma_bits_2_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_dma_bits_2_bits_inst;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_dma_bits_2_bits_pc;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_dma_bits_2_bits_rs1;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_dma_bits_2_bits_rs2;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_dma_bits_3_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_dma_bits_3_bits_inst;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_dma_bits_3_bits_pc;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_dma_bits_3_bits_rs1;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_dma_bits_3_bits_rs2;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_scheduler_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_scheduler_bits_0_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_scheduler_bits_0_bits_inst;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_scheduler_bits_0_bits_rs1;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_scheduler_bits_0_bits_rs2;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_scheduler_bits_1_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_scheduler_bits_1_bits_inst;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_scheduler_bits_1_bits_rs1;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_scheduler_bits_1_bits_rs2;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_scheduler_bits_2_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_scheduler_bits_2_bits_inst;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_scheduler_bits_2_bits_rs1;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_scheduler_bits_2_bits_rs2;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_scheduler_bits_3_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_scheduler_bits_3_bits_inst;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_scheduler_bits_3_bits_rs1;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_scheduler_bits_3_bits_rs2;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_qrdAlloc_0_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_qrdAlloc_0_bits_pc;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [4:0]  _decoder_io_qrdAlloc_0_bits_rdIndex;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [1:0]  _decoder_io_qrdAlloc_0_bits_source;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_qrdAlloc_0_bits_dummy;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_qrdAlloc_1_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_qrdAlloc_1_bits_pc;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [4:0]  _decoder_io_qrdAlloc_1_bits_rdIndex;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [1:0]  _decoder_io_qrdAlloc_1_bits_source;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_qrdAlloc_1_bits_dummy;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_qrdAlloc_2_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_qrdAlloc_2_bits_pc;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [4:0]  _decoder_io_qrdAlloc_2_bits_rdIndex;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [1:0]  _decoder_io_qrdAlloc_2_bits_source;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_qrdAlloc_2_bits_dummy;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_qrdAlloc_3_valid;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [31:0] _decoder_io_qrdAlloc_3_bits_pc;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [4:0]  _decoder_io_qrdAlloc_3_bits_rdIndex;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire [1:0]  _decoder_io_qrdAlloc_3_bits_source;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_qrdAlloc_3_bits_dummy;	// src/queen/scala/main/QueenTop.scala:48:33
-  wire        _decoder_io_idle;	// src/queen/scala/main/QueenTop.scala:48:33
+  wire        _flush_io_flushing;	// src/queen/scala/main/QueenTop.scala:60:31
+  wire        _flush_io_start;	// src/queen/scala/main/QueenTop.scala:60:31
+  wire        _flush_io_clearState;	// src/queen/scala/main/QueenTop.scala:60:31
+  wire        _flush_io_idle;	// src/queen/scala/main/QueenTop.scala:60:31
+  wire        _mem_io_req_ready;	// src/queen/scala/main/QueenTop.scala:59:29
+  wire        _mem_io_rdData_valid;	// src/queen/scala/main/QueenTop.scala:59:29
+  wire [31:0] _mem_io_rdData_bits;	// src/queen/scala/main/QueenTop.scala:59:29
+  wire        _mem_io_err;	// src/queen/scala/main/QueenTop.scala:59:29
+  wire [3:0]  _mem_io_used;	// src/queen/scala/main/QueenTop.scala:59:29
+  wire        _mem_io_idle;	// src/queen/scala/main/QueenTop.scala:59:29
+  wire [4:0]  _qrd_io_used;	// src/queen/scala/main/QueenTop.scala:58:29
+  wire        _qrd_io_rdError_valid;	// src/queen/scala/main/QueenTop.scala:58:29
+  wire [1:0]  _qrd_io_rdError_bits;	// src/queen/scala/main/QueenTop.scala:58:29
+  wire        _qrd_io_idle;	// src/queen/scala/main/QueenTop.scala:58:29
+  wire [31:0] _sync_io_events_0;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_1;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_2;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_3;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_4;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_5;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_6;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_7;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_8;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_9;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_10;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_11;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_12;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_13;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_14;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_15;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_16;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_17;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_18;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_19;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_20;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_21;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_22;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_23;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_24;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_25;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_26;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_27;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_28;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_29;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_30;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_events_31;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_timelines_0;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_timelines_1;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_timelines_2;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_timelines_3;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_timelines_4;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_timelines_5;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_timelines_6;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [31:0] _sync_io_timelines_7;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire        _sync_io_rollback;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire [2:0]  _sync_io_rollbackId;	// src/queen/scala/main/QueenTop.scala:57:30
+  wire        _schedCtrl_io_in_ready;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire        _schedCtrl_io_sw_valid;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire        _schedCtrl_io_sw_isTimeline;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire [4:0]  _schedCtrl_io_sw_index;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire        _schedCtrl_io_sw_clr;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire        _schedCtrl_io_sw_assign;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire [31:0] _schedCtrl_io_sw_data;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire        _schedCtrl_io_resp_valid;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire [31:0] _schedCtrl_io_resp_bits_data;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire        _schedCtrl_io_resp_bits_err;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire        _schedCtrl_io_wrErr_0;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire        _schedCtrl_io_wrErr_1;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire        _schedCtrl_io_wrErr_2;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire        _schedCtrl_io_wrErr_3;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire        _schedCtrl_io_faultClear;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire        _schedCtrl_io_flushTrig;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire        _schedCtrl_io_memReq_valid;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire [1:0]  _schedCtrl_io_memReq_bits_op;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire [31:0] _schedCtrl_io_memReq_bits_address;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire [31:0] _schedCtrl_io_memReq_bits_operand;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire        _schedCtrl_io_addrErr;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire        _schedCtrl_io_timeout;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire        _schedCtrl_io_idle;	// src/queen/scala/main/QueenTop.scala:56:35
+  wire        _dmaAdapter_io_in_ready;	// src/queen/scala/main/QueenTop.scala:55:36
+  wire        _dmaAdapter_io_idle;	// src/queen/scala/main/QueenTop.scala:55:36
+  wire        _gemmAdapter_io_in_ready;	// src/queen/scala/main/QueenTop.scala:54:37
+  wire        _gemmAdapter_io_idle;	// src/queen/scala/main/QueenTop.scala:54:37
+  wire        _dmaCtrl_io_in_ready;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire        _dmaCtrl_io_out_valid;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire        _dmaCtrl_io_out_bits_0_valid;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire [31:0] _dmaCtrl_io_out_bits_0_bits_inst;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire [31:0] _dmaCtrl_io_out_bits_0_bits_rs1;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire [31:0] _dmaCtrl_io_out_bits_0_bits_rs2;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire        _dmaCtrl_io_out_bits_1_valid;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire [31:0] _dmaCtrl_io_out_bits_1_bits_inst;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire [31:0] _dmaCtrl_io_out_bits_1_bits_rs1;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire [31:0] _dmaCtrl_io_out_bits_1_bits_rs2;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire        _dmaCtrl_io_out_bits_2_valid;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire [31:0] _dmaCtrl_io_out_bits_2_bits_inst;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire [31:0] _dmaCtrl_io_out_bits_2_bits_rs1;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire [31:0] _dmaCtrl_io_out_bits_2_bits_rs2;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire        _dmaCtrl_io_out_bits_3_valid;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire [31:0] _dmaCtrl_io_out_bits_3_bits_inst;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire [31:0] _dmaCtrl_io_out_bits_3_bits_rs1;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire [31:0] _dmaCtrl_io_out_bits_3_bits_rs2;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire        _dmaCtrl_io_idle;	// src/queen/scala/main/QueenTop.scala:53:33
+  wire        _gemmCtrl_io_in_ready;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire        _gemmCtrl_io_out_valid;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire        _gemmCtrl_io_out_bits_0_valid;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire [31:0] _gemmCtrl_io_out_bits_0_bits_inst;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire [31:0] _gemmCtrl_io_out_bits_0_bits_rs1;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire [31:0] _gemmCtrl_io_out_bits_0_bits_rs2;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire        _gemmCtrl_io_out_bits_1_valid;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire [31:0] _gemmCtrl_io_out_bits_1_bits_inst;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire [31:0] _gemmCtrl_io_out_bits_1_bits_rs1;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire [31:0] _gemmCtrl_io_out_bits_1_bits_rs2;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire        _gemmCtrl_io_out_bits_2_valid;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire [31:0] _gemmCtrl_io_out_bits_2_bits_inst;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire [31:0] _gemmCtrl_io_out_bits_2_bits_rs1;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire [31:0] _gemmCtrl_io_out_bits_2_bits_rs2;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire        _gemmCtrl_io_out_bits_3_valid;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire [31:0] _gemmCtrl_io_out_bits_3_bits_inst;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire [31:0] _gemmCtrl_io_out_bits_3_bits_rs1;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire [31:0] _gemmCtrl_io_out_bits_3_bits_rs2;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire        _gemmCtrl_io_idle;	// src/queen/scala/main/QueenTop.scala:52:34
+  wire        _decoder_io_inst_0_ready;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_inst_1_ready;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_inst_2_ready;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_inst_3_ready;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_gemm_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_gemm_bits_0_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_gemm_bits_0_bits_inst;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_gemm_bits_0_bits_rs1;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_gemm_bits_0_bits_rs2;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_gemm_bits_1_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_gemm_bits_1_bits_inst;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_gemm_bits_1_bits_rs1;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_gemm_bits_1_bits_rs2;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_gemm_bits_2_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_gemm_bits_2_bits_inst;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_gemm_bits_2_bits_rs1;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_gemm_bits_2_bits_rs2;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_gemm_bits_3_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_gemm_bits_3_bits_inst;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_gemm_bits_3_bits_rs1;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_gemm_bits_3_bits_rs2;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_dma_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_dma_bits_0_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_dma_bits_0_bits_inst;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_dma_bits_0_bits_rs1;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_dma_bits_0_bits_rs2;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_dma_bits_1_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_dma_bits_1_bits_inst;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_dma_bits_1_bits_rs1;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_dma_bits_1_bits_rs2;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_dma_bits_2_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_dma_bits_2_bits_inst;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_dma_bits_2_bits_rs1;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_dma_bits_2_bits_rs2;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_dma_bits_3_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_dma_bits_3_bits_inst;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_dma_bits_3_bits_rs1;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_dma_bits_3_bits_rs2;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_scheduler_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_scheduler_bits_0_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_scheduler_bits_0_bits_inst;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_scheduler_bits_0_bits_rs1;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_scheduler_bits_0_bits_rs2;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_scheduler_bits_1_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_scheduler_bits_1_bits_inst;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_scheduler_bits_1_bits_rs1;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_scheduler_bits_1_bits_rs2;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_scheduler_bits_2_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_scheduler_bits_2_bits_inst;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_scheduler_bits_2_bits_rs1;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_scheduler_bits_2_bits_rs2;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_scheduler_bits_3_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_scheduler_bits_3_bits_inst;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_scheduler_bits_3_bits_rs1;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [31:0] _decoder_io_scheduler_bits_3_bits_rs2;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_qrdAlloc_0_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [4:0]  _decoder_io_qrdAlloc_0_bits_rdIndex;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [1:0]  _decoder_io_qrdAlloc_0_bits_source;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_qrdAlloc_0_bits_dummy;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_qrdAlloc_1_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [4:0]  _decoder_io_qrdAlloc_1_bits_rdIndex;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [1:0]  _decoder_io_qrdAlloc_1_bits_source;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_qrdAlloc_1_bits_dummy;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_qrdAlloc_2_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [4:0]  _decoder_io_qrdAlloc_2_bits_rdIndex;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [1:0]  _decoder_io_qrdAlloc_2_bits_source;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_qrdAlloc_2_bits_dummy;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_qrdAlloc_3_valid;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [4:0]  _decoder_io_qrdAlloc_3_bits_rdIndex;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire [1:0]  _decoder_io_qrdAlloc_3_bits_source;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_qrdAlloc_3_bits_dummy;	// src/queen/scala/main/QueenTop.scala:51:33
+  wire        _decoder_io_idle;	// src/queen/scala/main/QueenTop.scala:51:33
   wire        dispatchIdle =
     _decoder_io_idle & _gemmCtrl_io_idle & _gemmAdapter_io_idle & _dmaCtrl_io_idle
-    & _dmaAdapter_io_idle;	// src/queen/scala/main/QueenTop.scala:48:33, :49:34, :50:33, :51:37, :52:36, :103:48, :104:{26,49,68}
-  wire        _flush_io_drained_T = dispatchIdle & _schedCtrl_io_idle;	// src/queen/scala/main/QueenTop.scala:53:35, :103:48, :104:{26,49,68}, :106:29
-  wire        gemmCompValid = io_gemmCompletion_valid & ~_flush_io_flushing;	// src/queen/scala/main/QueenTop.scala:57:31, :121:{57,60}
-  wire        dmaCompValid = io_dmaCompletion_valid & ~_flush_io_flushing;	// src/queen/scala/main/QueenTop.scala:57:31, :121:60, :122:55
-  reg         faultValid;	// src/queen/scala/main/QueenTop.scala:134:37
-  reg  [1:0]  faultKind;	// src/queen/scala/main/QueenTop.scala:135:36
-  reg  [1:0]  faultEndpoint;	// src/queen/scala/main/QueenTop.scala:136:40
-  reg  [7:0]  faultCode;	// src/queen/scala/main/QueenTop.scala:137:36
-  always @(posedge clock) begin	// src/queen/scala/main/QueenTop.scala:11:7
-    if (reset) begin	// src/queen/scala/main/QueenTop.scala:11:7
-      faultValid <= 1'h0;	// src/queen/scala/main/QueenTop.scala:11:7, :134:37
-      faultKind <= 2'h0;	// src/queen/scala/main/QueenTop.scala:135:36
-      faultEndpoint <= 2'h0;	// src/queen/scala/main/QueenTop.scala:136:40
-      faultCode <= 8'h0;	// src/queen/scala/main/QueenTop.scala:137:36
+    & _dmaAdapter_io_idle;	// src/queen/scala/main/QueenTop.scala:51:33, :52:34, :53:33, :54:37, :55:36, :107:48, :108:{26,49,68}
+  wire        _flush_io_drained_T = dispatchIdle & _schedCtrl_io_idle;	// src/queen/scala/main/QueenTop.scala:56:35, :107:48, :108:{26,49,68}, :110:29
+  wire        gemmCompValid = io_gemmCompletion_valid & ~_flush_io_flushing;	// src/queen/scala/main/QueenTop.scala:60:31, :126:{57,60}
+  wire        dmaCompValid = io_dmaCompletion_valid & ~_flush_io_flushing;	// src/queen/scala/main/QueenTop.scala:60:31, :126:60, :127:55
+  wire        vpuCompValid = io_vpuCompletion_valid & ~_flush_io_flushing;	// src/queen/scala/main/QueenTop.scala:60:31, :126:60, :128:55
+  reg         faultValid;	// src/queen/scala/main/QueenTop.scala:142:37
+  reg  [2:0]  faultKind;	// src/queen/scala/main/QueenTop.scala:143:36
+  reg  [1:0]  faultEndpoint;	// src/queen/scala/main/QueenTop.scala:144:40
+  reg  [7:0]  faultCode;	// src/queen/scala/main/QueenTop.scala:145:36
+  always @(posedge clock) begin	// src/queen/scala/main/QueenTop.scala:12:7
+    if (reset) begin	// src/queen/scala/main/QueenTop.scala:12:7
+      faultValid <= 1'h0;	// src/queen/scala/main/QueenTop.scala:12:7, :142:37
+      faultKind <= 3'h0;	// src/queen/scala/main/QueenTop.scala:143:36
+      faultEndpoint <= 2'h0;	// src/queen/scala/main/QueenTop.scala:144:40
+      faultCode <= 8'h0;	// src/queen/scala/main/QueenTop.scala:145:36
     end
-    else begin	// src/queen/scala/main/QueenTop.scala:11:7
-      automatic logic       sel_0;	// src/queen/scala/main/QueenTop.scala:144:32
-      automatic logic       sel_1;	// src/queen/scala/main/QueenTop.scala:146:31
-      automatic logic [3:0] _GEN;	// src/queen/scala/main/QueenTop.scala:148:31
-      automatic logic [3:0] _GEN_0;	// src/queen/scala/main/QueenTop.scala:149:30
-      automatic logic [3:0] _GEN_1;	// src/queen/scala/main/QueenTop.scala:150:37
-      automatic logic       sel_5;	// src/queen/scala/main/QueenTop.scala:151:{39,53}
-      automatic logic [6:0] _GEN_2;	// src/queen/scala/main/QueenTop.scala:161:14
-      sel_0 = gemmCompValid & io_gemmCompletion_bits_error;	// src/queen/scala/main/QueenTop.scala:121:57, :144:32
-      sel_1 = dmaCompValid & io_dmaCompletion_bits_error;	// src/queen/scala/main/QueenTop.scala:122:55, :146:31
-      _GEN = {io_gemmWrErr_3, io_gemmWrErr_2, io_gemmWrErr_1, io_gemmWrErr_0};	// src/queen/scala/main/QueenTop.scala:148:31
-      _GEN_0 = {io_dmaWrErr_3, io_dmaWrErr_2, io_dmaWrErr_1, io_dmaWrErr_0};	// src/queen/scala/main/QueenTop.scala:149:30
+    else begin	// src/queen/scala/main/QueenTop.scala:12:7
+      automatic logic       sel_0;	// src/queen/scala/main/QueenTop.scala:153:32
+      automatic logic       sel_1;	// src/queen/scala/main/QueenTop.scala:155:31
+      automatic logic       sel_2;	// src/queen/scala/main/QueenTop.scala:157:31
+      automatic logic [3:0] _GEN;	// src/queen/scala/main/QueenTop.scala:159:31
+      automatic logic [3:0] _GEN_0;	// src/queen/scala/main/QueenTop.scala:160:30
+      automatic logic [3:0] _GEN_1;	// src/queen/scala/main/QueenTop.scala:161:37
+      automatic logic       sel_6;	// src/queen/scala/main/QueenTop.scala:162:{39,53}
+      automatic logic [8:0] _GEN_2;	// src/queen/scala/main/QueenTop.scala:176:14
+      sel_0 = gemmCompValid & io_gemmCompletion_bits_error;	// src/queen/scala/main/QueenTop.scala:126:57, :153:32
+      sel_1 = dmaCompValid & io_dmaCompletion_bits_error;	// src/queen/scala/main/QueenTop.scala:127:55, :155:31
+      sel_2 = vpuCompValid & io_vpuCompletion_bits_error;	// src/queen/scala/main/QueenTop.scala:128:55, :157:31
+      _GEN = {io_gemmWrErr_3, io_gemmWrErr_2, io_gemmWrErr_1, io_gemmWrErr_0};	// src/queen/scala/main/QueenTop.scala:159:31
+      _GEN_0 = {io_dmaWrErr_3, io_dmaWrErr_2, io_dmaWrErr_1, io_dmaWrErr_0};	// src/queen/scala/main/QueenTop.scala:160:30
       _GEN_1 =
         {_schedCtrl_io_wrErr_3,
          _schedCtrl_io_wrErr_2,
          _schedCtrl_io_wrErr_1,
-         _schedCtrl_io_wrErr_0};	// src/queen/scala/main/QueenTop.scala:53:35, :150:37
-      sel_5 = _schedCtrl_io_addrErr | _mem_io_err | _schedCtrl_io_timeout;	// src/queen/scala/main/QueenTop.scala:53:35, :56:29, :151:{39,53}
-      _GEN_2 = {_sync_io_rollback, sel_5, |_GEN_1, |_GEN_0, |_GEN, sel_1, sel_0};	// src/queen/scala/main/QueenTop.scala:54:30, :144:32, :146:31, :148:{31,38}, :149:{30,37}, :150:{37,44}, :151:{39,53}, :161:14
+         _schedCtrl_io_wrErr_0};	// src/queen/scala/main/QueenTop.scala:56:35, :161:37
+      sel_6 = _schedCtrl_io_addrErr | _mem_io_err | _schedCtrl_io_timeout;	// src/queen/scala/main/QueenTop.scala:56:35, :59:29, :162:{39,53}
+      _GEN_2 =
+        {_sync_io_rollback,
+         _qrd_io_rdError_valid,
+         sel_6,
+         |_GEN_1,
+         |_GEN_0,
+         |_GEN,
+         sel_2,
+         sel_1,
+         sel_0};	// src/queen/scala/main/QueenTop.scala:57:30, :58:29, :153:32, :155:31, :157:31, :159:{31,38}, :160:{30,37}, :161:{37,44}, :162:{39,53}, :176:14
       faultValid <=
-        (|_GEN_2) | ~(_flush_io_clearState | _schedCtrl_io_faultClear) & faultValid;	// src/queen/scala/main/QueenTop.scala:53:35, :57:31, :134:37, :161:{14,21,26}, :162:20, :166:37, :167:20, :168:41, :169:20
-      if (|_GEN_2) begin	// src/queen/scala/main/QueenTop.scala:161:{14,21}
-        automatic logic [2:0]      idx;	// src/main/scala/chisel3/util/Mux.scala:58:84
-        automatic logic            _faultCode_T_4;	// src/queen/scala/main/QueenTop.scala:158:28
-        automatic logic            _faultCode_T_6;	// src/queen/scala/main/QueenTop.scala:158:28
-        automatic logic            _faultCode_T_8;	// src/queen/scala/main/QueenTop.scala:158:28
-        automatic logic            _faultCode_T_10;	// src/queen/scala/main/QueenTop.scala:158:28
-        automatic logic            _faultCode_T_12;	// src/queen/scala/main/QueenTop.scala:158:28
-        automatic logic [7:0][7:0] _GEN_3 =
-          {{8'h0},
-           {{5'h0, _sync_io_rollbackId}},
-           {_schedCtrl_io_addrErr ? 8'h1 : {6'h0, _schedCtrl_io_timeout, 1'h0}},
-           {8'h0},
-           {8'h0},
-           {8'h0},
-           {io_dmaCompletion_bits_code},
-           {io_gemmCompletion_bits_code}};	// src/queen/scala/main/QueenTop.scala:11:7, :53:35, :54:30, :152:16, :153:20, :154:64, :158:28
+        (|_GEN_2) | ~(_flush_io_clearState | _schedCtrl_io_faultClear) & faultValid;	// src/queen/scala/main/QueenTop.scala:56:35, :60:31, :142:37, :176:{14,21,26}, :177:20, :181:37, :182:20, :183:41, :184:20
+      if (|_GEN_2) begin	// src/queen/scala/main/QueenTop.scala:176:{14,21}
+        automatic logic [3:0] idx;	// src/main/scala/chisel3/util/Mux.scala:58:84
+        automatic logic       _faultCode_T_2;	// src/queen/scala/main/QueenTop.scala:173:28
+        automatic logic       _faultCode_T_4;	// src/queen/scala/main/QueenTop.scala:173:28
+        automatic logic       _faultCode_T_6;	// src/queen/scala/main/QueenTop.scala:173:28
+        automatic logic       _faultCode_T_8;	// src/queen/scala/main/QueenTop.scala:173:28
+        automatic logic       _faultCode_T_10;	// src/queen/scala/main/QueenTop.scala:173:28
+        automatic logic       _GEN_3;	// src/queen/scala/main/QueenTop.scala:173:28
+        automatic logic       _faultCode_T_12;	// src/queen/scala/main/QueenTop.scala:173:28
+        automatic logic       _faultCode_T_14;	// src/queen/scala/main/QueenTop.scala:173:28
+        automatic logic       _faultCode_T_16;	// src/queen/scala/main/QueenTop.scala:173:28
         idx =
           sel_0
-            ? 3'h0
+            ? 4'h0
             : sel_1
-                ? 3'h1
-                : (|_GEN)
-                    ? 3'h2
-                    : (|_GEN_0) ? 3'h3 : (|_GEN_1) ? 3'h4 : sel_5 ? 3'h5 : 3'h6;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:144:32, :146:31, :148:{31,38}, :149:{30,37}, :150:{37,44}, :151:{39,53}
-        _faultCode_T_4 = idx == 3'h2;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:158:28
-        _faultCode_T_6 = idx == 3'h3;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:158:28
-        _faultCode_T_8 = idx == 3'h4;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:158:28
-        _faultCode_T_10 = idx == 3'h5;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:158:28
-        _faultCode_T_12 = idx == 3'h6;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:158:28
+                ? 4'h1
+                : sel_2
+                    ? 4'h2
+                    : (|_GEN)
+                        ? 4'h3
+                        : (|_GEN_0)
+                            ? 4'h4
+                            : (|_GEN_1)
+                                ? 4'h5
+                                : sel_6 ? 4'h6 : _qrd_io_rdError_valid ? 4'h7 : 4'h8;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:58:29, :153:32, :155:31, :157:31, :159:{31,38}, :160:{30,37}, :161:{37,44}, :162:{39,53}
+        _faultCode_T_2 = idx == 4'h1;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:173:28
+        _faultCode_T_4 = idx == 4'h2;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:173:28
+        _faultCode_T_6 = idx == 4'h3;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:173:28
+        _faultCode_T_8 = idx == 4'h4;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:173:28
+        _faultCode_T_10 = idx == 4'h5;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:173:28
+        _GEN_3 = _faultCode_T_10 | _faultCode_T_8 | _faultCode_T_6;	// src/queen/scala/main/QueenTop.scala:173:28
+        _faultCode_T_12 = idx == 4'h6;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:173:28
+        _faultCode_T_14 = idx == 4'h7;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:173:28
+        _faultCode_T_16 = idx == 4'h8;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:173:28
         faultKind <=
-          _faultCode_T_12
-            ? 2'h2
-            : _faultCode_T_10
-                ? 2'h3
-                : {1'h0, _faultCode_T_8 | _faultCode_T_6 | _faultCode_T_4};	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:11:7, :135:36, :153:20, :158:28
+          _faultCode_T_16
+            ? 3'h2
+            : _faultCode_T_14 ? 3'h4 : _faultCode_T_12 ? 3'h3 : {2'h0, _GEN_3};	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:143:36, :173:28
         faultEndpoint <=
-          _faultCode_T_12 | _faultCode_T_10 | _faultCode_T_8
+          _faultCode_T_16
             ? 2'h3
-            : _faultCode_T_6 ? 2'h1 : _faultCode_T_4 ? 2'h0 : {1'h0, idx == 3'h1};	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:11:7, :136:40, :158:28
-        faultCode <= _GEN_3[idx];	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:137:36, :158:28
+            : _faultCode_T_14
+                ? (_qrd_io_rdError_bits == 2'h2 ? 2'h3 : _qrd_io_rdError_bits)
+                : _faultCode_T_12 | _faultCode_T_10
+                    ? 2'h3
+                    : _faultCode_T_8
+                        ? 2'h1
+                        : _faultCode_T_6
+                            ? 2'h0
+                            : _faultCode_T_4 ? 2'h2 : {1'h0, _faultCode_T_2};	// src/queen/scala/main/QueenTop.scala:12:7, :58:29, :144:40, :164:20, :167:{16,37}, :173:28
+        faultCode <=
+          _faultCode_T_16
+            ? {5'h0, _sync_io_rollbackId}
+            : _faultCode_T_14
+                ? 8'h0
+                : _faultCode_T_12
+                    ? (_schedCtrl_io_addrErr ? 8'h1 : {6'h0, _schedCtrl_io_timeout, 1'h0})
+                    : _GEN_3
+                        ? 8'h0
+                        : _faultCode_T_4
+                            ? io_vpuCompletion_bits_code
+                            : _faultCode_T_2
+                                ? io_dmaCompletion_bits_code
+                                : idx == 4'h0 ? io_gemmCompletion_bits_code : 8'h0;	// src/main/scala/chisel3/util/Mux.scala:58:84, src/queen/scala/main/QueenTop.scala:12:7, :56:35, :57:30, :145:36, :163:16, :164:20, :169:66, :173:28
       end
     end
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// src/queen/scala/main/QueenTop.scala:11:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/QueenTop.scala:11:7
-      `FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/QueenTop.scala:11:7
+  `ifdef ENABLE_INITIAL_REG_	// src/queen/scala/main/QueenTop.scala:12:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/QueenTop.scala:12:7
+      `FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/QueenTop.scala:12:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/queen/scala/main/QueenTop.scala:11:7
-      automatic logic [31:0] _RANDOM[0:0];	// src/queen/scala/main/QueenTop.scala:11:7
-      `ifdef INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenTop.scala:11:7
-        `INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenTop.scala:11:7
+    initial begin	// src/queen/scala/main/QueenTop.scala:12:7
+      automatic logic [31:0] _RANDOM[0:0];	// src/queen/scala/main/QueenTop.scala:12:7
+      `ifdef INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenTop.scala:12:7
+        `INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenTop.scala:12:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/queen/scala/main/QueenTop.scala:11:7
-        _RANDOM[/*Zero width*/ 1'b0] = `RANDOM;	// src/queen/scala/main/QueenTop.scala:11:7
-        faultValid = _RANDOM[/*Zero width*/ 1'b0][0];	// src/queen/scala/main/QueenTop.scala:11:7, :134:37
-        faultKind = _RANDOM[/*Zero width*/ 1'b0][2:1];	// src/queen/scala/main/QueenTop.scala:11:7, :134:37, :135:36
-        faultEndpoint = _RANDOM[/*Zero width*/ 1'b0][4:3];	// src/queen/scala/main/QueenTop.scala:11:7, :134:37, :136:40
-        faultCode = _RANDOM[/*Zero width*/ 1'b0][12:5];	// src/queen/scala/main/QueenTop.scala:11:7, :134:37, :137:36
+      `ifdef RANDOMIZE_REG_INIT	// src/queen/scala/main/QueenTop.scala:12:7
+        _RANDOM[/*Zero width*/ 1'b0] = `RANDOM;	// src/queen/scala/main/QueenTop.scala:12:7
+        faultValid = _RANDOM[/*Zero width*/ 1'b0][0];	// src/queen/scala/main/QueenTop.scala:12:7, :142:37
+        faultKind = _RANDOM[/*Zero width*/ 1'b0][3:1];	// src/queen/scala/main/QueenTop.scala:12:7, :142:37, :143:36
+        faultEndpoint = _RANDOM[/*Zero width*/ 1'b0][5:4];	// src/queen/scala/main/QueenTop.scala:12:7, :142:37, :144:40
+        faultCode = _RANDOM[/*Zero width*/ 1'b0][13:6];	// src/queen/scala/main/QueenTop.scala:12:7, :142:37, :145:36
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenTop.scala:11:7
-      `FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenTop.scala:11:7
+    `ifdef FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenTop.scala:12:7
+      `FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenTop.scala:12:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  Queen_QueenDsaDecoder decoder (	// src/queen/scala/main/QueenTop.scala:48:33
+  Queen_QueenDsaDecoder decoder (	// src/queen/scala/main/QueenTop.scala:51:33
     .clock                         (clock),
     .reset                         (reset),
     .io_inst_0_ready               (_decoder_io_inst_0_ready),
@@ -605,67 +617,59 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
     .io_inst_3_valid               (io_inst_3_valid),
     .io_inst_3_bits_pc             (io_inst_3_bits_pc),
     .io_inst_3_bits_inst           (io_inst_3_bits_inst),
-    .io_rs1_0_valid                (io_rs1_0_valid),
-    .io_rs1_0_bits                 (io_rs1_0_bits),
-    .io_rs1_1_valid                (io_rs1_1_valid),
-    .io_rs1_1_bits                 (io_rs1_1_bits),
-    .io_rs1_2_valid                (io_rs1_2_valid),
-    .io_rs1_2_bits                 (io_rs1_2_bits),
-    .io_rs1_3_valid                (io_rs1_3_valid),
-    .io_rs1_3_bits                 (io_rs1_3_bits),
-    .io_rs2_0_valid                (io_rs2_0_valid),
-    .io_rs2_0_bits                 (io_rs2_0_bits),
-    .io_rs2_1_valid                (io_rs2_1_valid),
-    .io_rs2_1_bits                 (io_rs2_1_bits),
-    .io_rs2_2_valid                (io_rs2_2_valid),
-    .io_rs2_2_bits                 (io_rs2_2_bits),
-    .io_rs2_3_valid                (io_rs2_3_valid),
-    .io_rs2_3_bits                 (io_rs2_3_bits),
-    .io_gemm_ready                 (_gemmCtrl_io_in_ready),	// src/queen/scala/main/QueenTop.scala:49:34
+    .io_regRead_0_valid            (io_regRead_0_valid),
+    .io_regRead_0_bits             (io_regRead_0_bits),
+    .io_regRead_1_valid            (io_regRead_1_valid),
+    .io_regRead_1_bits             (io_regRead_1_bits),
+    .io_regRead_2_valid            (io_regRead_2_valid),
+    .io_regRead_2_bits             (io_regRead_2_bits),
+    .io_regRead_3_valid            (io_regRead_3_valid),
+    .io_regRead_3_bits             (io_regRead_3_bits),
+    .io_regRead_4_valid            (io_regRead_4_valid),
+    .io_regRead_4_bits             (io_regRead_4_bits),
+    .io_regRead_5_valid            (io_regRead_5_valid),
+    .io_regRead_5_bits             (io_regRead_5_bits),
+    .io_regRead_6_valid            (io_regRead_6_valid),
+    .io_regRead_6_bits             (io_regRead_6_bits),
+    .io_regRead_7_valid            (io_regRead_7_valid),
+    .io_regRead_7_bits             (io_regRead_7_bits),
+    .io_gemm_ready                 (_gemmCtrl_io_in_ready),	// src/queen/scala/main/QueenTop.scala:52:34
     .io_gemm_valid                 (_decoder_io_gemm_valid),
     .io_gemm_bits_0_valid          (_decoder_io_gemm_bits_0_valid),
     .io_gemm_bits_0_bits_inst      (_decoder_io_gemm_bits_0_bits_inst),
-    .io_gemm_bits_0_bits_pc        (_decoder_io_gemm_bits_0_bits_pc),
     .io_gemm_bits_0_bits_rs1       (_decoder_io_gemm_bits_0_bits_rs1),
     .io_gemm_bits_0_bits_rs2       (_decoder_io_gemm_bits_0_bits_rs2),
     .io_gemm_bits_1_valid          (_decoder_io_gemm_bits_1_valid),
     .io_gemm_bits_1_bits_inst      (_decoder_io_gemm_bits_1_bits_inst),
-    .io_gemm_bits_1_bits_pc        (_decoder_io_gemm_bits_1_bits_pc),
     .io_gemm_bits_1_bits_rs1       (_decoder_io_gemm_bits_1_bits_rs1),
     .io_gemm_bits_1_bits_rs2       (_decoder_io_gemm_bits_1_bits_rs2),
     .io_gemm_bits_2_valid          (_decoder_io_gemm_bits_2_valid),
     .io_gemm_bits_2_bits_inst      (_decoder_io_gemm_bits_2_bits_inst),
-    .io_gemm_bits_2_bits_pc        (_decoder_io_gemm_bits_2_bits_pc),
     .io_gemm_bits_2_bits_rs1       (_decoder_io_gemm_bits_2_bits_rs1),
     .io_gemm_bits_2_bits_rs2       (_decoder_io_gemm_bits_2_bits_rs2),
     .io_gemm_bits_3_valid          (_decoder_io_gemm_bits_3_valid),
     .io_gemm_bits_3_bits_inst      (_decoder_io_gemm_bits_3_bits_inst),
-    .io_gemm_bits_3_bits_pc        (_decoder_io_gemm_bits_3_bits_pc),
     .io_gemm_bits_3_bits_rs1       (_decoder_io_gemm_bits_3_bits_rs1),
     .io_gemm_bits_3_bits_rs2       (_decoder_io_gemm_bits_3_bits_rs2),
-    .io_dma_ready                  (_dmaCtrl_io_in_ready),	// src/queen/scala/main/QueenTop.scala:50:33
+    .io_dma_ready                  (_dmaCtrl_io_in_ready),	// src/queen/scala/main/QueenTop.scala:53:33
     .io_dma_valid                  (_decoder_io_dma_valid),
     .io_dma_bits_0_valid           (_decoder_io_dma_bits_0_valid),
     .io_dma_bits_0_bits_inst       (_decoder_io_dma_bits_0_bits_inst),
-    .io_dma_bits_0_bits_pc         (_decoder_io_dma_bits_0_bits_pc),
     .io_dma_bits_0_bits_rs1        (_decoder_io_dma_bits_0_bits_rs1),
     .io_dma_bits_0_bits_rs2        (_decoder_io_dma_bits_0_bits_rs2),
     .io_dma_bits_1_valid           (_decoder_io_dma_bits_1_valid),
     .io_dma_bits_1_bits_inst       (_decoder_io_dma_bits_1_bits_inst),
-    .io_dma_bits_1_bits_pc         (_decoder_io_dma_bits_1_bits_pc),
     .io_dma_bits_1_bits_rs1        (_decoder_io_dma_bits_1_bits_rs1),
     .io_dma_bits_1_bits_rs2        (_decoder_io_dma_bits_1_bits_rs2),
     .io_dma_bits_2_valid           (_decoder_io_dma_bits_2_valid),
     .io_dma_bits_2_bits_inst       (_decoder_io_dma_bits_2_bits_inst),
-    .io_dma_bits_2_bits_pc         (_decoder_io_dma_bits_2_bits_pc),
     .io_dma_bits_2_bits_rs1        (_decoder_io_dma_bits_2_bits_rs1),
     .io_dma_bits_2_bits_rs2        (_decoder_io_dma_bits_2_bits_rs2),
     .io_dma_bits_3_valid           (_decoder_io_dma_bits_3_valid),
     .io_dma_bits_3_bits_inst       (_decoder_io_dma_bits_3_bits_inst),
-    .io_dma_bits_3_bits_pc         (_decoder_io_dma_bits_3_bits_pc),
     .io_dma_bits_3_bits_rs1        (_decoder_io_dma_bits_3_bits_rs1),
     .io_dma_bits_3_bits_rs2        (_decoder_io_dma_bits_3_bits_rs2),
-    .io_scheduler_ready            (_schedCtrl_io_in_ready),	// src/queen/scala/main/QueenTop.scala:53:35
+    .io_scheduler_ready            (_schedCtrl_io_in_ready),	// src/queen/scala/main/QueenTop.scala:56:35
     .io_scheduler_valid            (_decoder_io_scheduler_valid),
     .io_scheduler_bits_0_valid     (_decoder_io_scheduler_bits_0_valid),
     .io_scheduler_bits_0_bits_inst (_decoder_io_scheduler_bits_0_bits_inst),
@@ -687,238 +691,218 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
     .io_trap_bits_pc               (io_trap_bits_pc),
     .io_trap_bits_inst             (io_trap_bits_inst),
     .io_trap_bits_cause            (io_trap_bits_cause),
-    .io_qrdUsed                    (_qrd_io_used),	// src/queen/scala/main/QueenTop.scala:55:29
+    .io_qrdUsed                    (_qrd_io_used),	// src/queen/scala/main/QueenTop.scala:58:29
     .io_qrdAlloc_0_valid           (_decoder_io_qrdAlloc_0_valid),
-    .io_qrdAlloc_0_bits_pc         (_decoder_io_qrdAlloc_0_bits_pc),
     .io_qrdAlloc_0_bits_rdIndex    (_decoder_io_qrdAlloc_0_bits_rdIndex),
     .io_qrdAlloc_0_bits_source     (_decoder_io_qrdAlloc_0_bits_source),
     .io_qrdAlloc_0_bits_dummy      (_decoder_io_qrdAlloc_0_bits_dummy),
     .io_qrdAlloc_1_valid           (_decoder_io_qrdAlloc_1_valid),
-    .io_qrdAlloc_1_bits_pc         (_decoder_io_qrdAlloc_1_bits_pc),
     .io_qrdAlloc_1_bits_rdIndex    (_decoder_io_qrdAlloc_1_bits_rdIndex),
     .io_qrdAlloc_1_bits_source     (_decoder_io_qrdAlloc_1_bits_source),
     .io_qrdAlloc_1_bits_dummy      (_decoder_io_qrdAlloc_1_bits_dummy),
     .io_qrdAlloc_2_valid           (_decoder_io_qrdAlloc_2_valid),
-    .io_qrdAlloc_2_bits_pc         (_decoder_io_qrdAlloc_2_bits_pc),
     .io_qrdAlloc_2_bits_rdIndex    (_decoder_io_qrdAlloc_2_bits_rdIndex),
     .io_qrdAlloc_2_bits_source     (_decoder_io_qrdAlloc_2_bits_source),
     .io_qrdAlloc_2_bits_dummy      (_decoder_io_qrdAlloc_2_bits_dummy),
     .io_qrdAlloc_3_valid           (_decoder_io_qrdAlloc_3_valid),
-    .io_qrdAlloc_3_bits_pc         (_decoder_io_qrdAlloc_3_bits_pc),
     .io_qrdAlloc_3_bits_rdIndex    (_decoder_io_qrdAlloc_3_bits_rdIndex),
     .io_qrdAlloc_3_bits_source     (_decoder_io_qrdAlloc_3_bits_source),
     .io_qrdAlloc_3_bits_dummy      (_decoder_io_qrdAlloc_3_bits_dummy),
-    .io_flushing                   (_flush_io_flushing),	// src/queen/scala/main/QueenTop.scala:57:31
-    .io_flushStart                 (_flush_io_start),	// src/queen/scala/main/QueenTop.scala:57:31
+    .io_flushing                   (_flush_io_flushing),	// src/queen/scala/main/QueenTop.scala:60:31
+    .io_flushStart                 (_flush_io_start),	// src/queen/scala/main/QueenTop.scala:60:31
     .io_idle                       (_decoder_io_idle)
-  );	// src/queen/scala/main/QueenTop.scala:48:33
-  Queen_QueenEndpointCtrl gemmCtrl (	// src/queen/scala/main/QueenTop.scala:49:34
+  );	// src/queen/scala/main/QueenTop.scala:51:33
+  Queen_QueenEndpointCtrl gemmCtrl (	// src/queen/scala/main/QueenTop.scala:52:34
     .clock                   (clock),
     .reset                   (reset),
     .io_in_ready             (_gemmCtrl_io_in_ready),
-    .io_in_valid             (_decoder_io_gemm_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_0_valid      (_decoder_io_gemm_bits_0_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_0_bits_inst  (_decoder_io_gemm_bits_0_bits_inst),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_0_bits_pc    (_decoder_io_gemm_bits_0_bits_pc),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_0_bits_rs1   (_decoder_io_gemm_bits_0_bits_rs1),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_0_bits_rs2   (_decoder_io_gemm_bits_0_bits_rs2),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_1_valid      (_decoder_io_gemm_bits_1_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_1_bits_inst  (_decoder_io_gemm_bits_1_bits_inst),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_1_bits_pc    (_decoder_io_gemm_bits_1_bits_pc),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_1_bits_rs1   (_decoder_io_gemm_bits_1_bits_rs1),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_1_bits_rs2   (_decoder_io_gemm_bits_1_bits_rs2),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_2_valid      (_decoder_io_gemm_bits_2_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_2_bits_inst  (_decoder_io_gemm_bits_2_bits_inst),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_2_bits_pc    (_decoder_io_gemm_bits_2_bits_pc),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_2_bits_rs1   (_decoder_io_gemm_bits_2_bits_rs1),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_2_bits_rs2   (_decoder_io_gemm_bits_2_bits_rs2),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_3_valid      (_decoder_io_gemm_bits_3_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_3_bits_inst  (_decoder_io_gemm_bits_3_bits_inst),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_3_bits_pc    (_decoder_io_gemm_bits_3_bits_pc),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_3_bits_rs1   (_decoder_io_gemm_bits_3_bits_rs1),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_3_bits_rs2   (_decoder_io_gemm_bits_3_bits_rs2),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_out_ready            (_gemmAdapter_io_in_ready),	// src/queen/scala/main/QueenTop.scala:51:37
+    .io_in_valid             (_decoder_io_gemm_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_0_valid      (_decoder_io_gemm_bits_0_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_0_bits_inst  (_decoder_io_gemm_bits_0_bits_inst),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_0_bits_rs1   (_decoder_io_gemm_bits_0_bits_rs1),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_0_bits_rs2   (_decoder_io_gemm_bits_0_bits_rs2),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_1_valid      (_decoder_io_gemm_bits_1_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_1_bits_inst  (_decoder_io_gemm_bits_1_bits_inst),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_1_bits_rs1   (_decoder_io_gemm_bits_1_bits_rs1),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_1_bits_rs2   (_decoder_io_gemm_bits_1_bits_rs2),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_2_valid      (_decoder_io_gemm_bits_2_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_2_bits_inst  (_decoder_io_gemm_bits_2_bits_inst),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_2_bits_rs1   (_decoder_io_gemm_bits_2_bits_rs1),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_2_bits_rs2   (_decoder_io_gemm_bits_2_bits_rs2),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_3_valid      (_decoder_io_gemm_bits_3_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_3_bits_inst  (_decoder_io_gemm_bits_3_bits_inst),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_3_bits_rs1   (_decoder_io_gemm_bits_3_bits_rs1),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_3_bits_rs2   (_decoder_io_gemm_bits_3_bits_rs2),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_out_ready            (_gemmAdapter_io_in_ready),	// src/queen/scala/main/QueenTop.scala:54:37
     .io_out_valid            (_gemmCtrl_io_out_valid),
     .io_out_bits_0_valid     (_gemmCtrl_io_out_bits_0_valid),
     .io_out_bits_0_bits_inst (_gemmCtrl_io_out_bits_0_bits_inst),
-    .io_out_bits_0_bits_pc   (_gemmCtrl_io_out_bits_0_bits_pc),
     .io_out_bits_0_bits_rs1  (_gemmCtrl_io_out_bits_0_bits_rs1),
     .io_out_bits_0_bits_rs2  (_gemmCtrl_io_out_bits_0_bits_rs2),
     .io_out_bits_1_valid     (_gemmCtrl_io_out_bits_1_valid),
     .io_out_bits_1_bits_inst (_gemmCtrl_io_out_bits_1_bits_inst),
-    .io_out_bits_1_bits_pc   (_gemmCtrl_io_out_bits_1_bits_pc),
     .io_out_bits_1_bits_rs1  (_gemmCtrl_io_out_bits_1_bits_rs1),
     .io_out_bits_1_bits_rs2  (_gemmCtrl_io_out_bits_1_bits_rs2),
     .io_out_bits_2_valid     (_gemmCtrl_io_out_bits_2_valid),
     .io_out_bits_2_bits_inst (_gemmCtrl_io_out_bits_2_bits_inst),
-    .io_out_bits_2_bits_pc   (_gemmCtrl_io_out_bits_2_bits_pc),
     .io_out_bits_2_bits_rs1  (_gemmCtrl_io_out_bits_2_bits_rs1),
     .io_out_bits_2_bits_rs2  (_gemmCtrl_io_out_bits_2_bits_rs2),
     .io_out_bits_3_valid     (_gemmCtrl_io_out_bits_3_valid),
     .io_out_bits_3_bits_inst (_gemmCtrl_io_out_bits_3_bits_inst),
-    .io_out_bits_3_bits_pc   (_gemmCtrl_io_out_bits_3_bits_pc),
     .io_out_bits_3_bits_rs1  (_gemmCtrl_io_out_bits_3_bits_rs1),
     .io_out_bits_3_bits_rs2  (_gemmCtrl_io_out_bits_3_bits_rs2),
-    .io_events_0             (_sync_io_events_0),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_1             (_sync_io_events_1),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_2             (_sync_io_events_2),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_3             (_sync_io_events_3),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_4             (_sync_io_events_4),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_5             (_sync_io_events_5),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_6             (_sync_io_events_6),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_7             (_sync_io_events_7),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_8             (_sync_io_events_8),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_9             (_sync_io_events_9),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_10            (_sync_io_events_10),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_11            (_sync_io_events_11),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_12            (_sync_io_events_12),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_13            (_sync_io_events_13),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_14            (_sync_io_events_14),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_15            (_sync_io_events_15),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_16            (_sync_io_events_16),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_17            (_sync_io_events_17),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_18            (_sync_io_events_18),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_19            (_sync_io_events_19),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_20            (_sync_io_events_20),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_21            (_sync_io_events_21),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_22            (_sync_io_events_22),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_23            (_sync_io_events_23),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_24            (_sync_io_events_24),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_25            (_sync_io_events_25),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_26            (_sync_io_events_26),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_27            (_sync_io_events_27),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_28            (_sync_io_events_28),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_29            (_sync_io_events_29),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_30            (_sync_io_events_30),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_31            (_sync_io_events_31),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_0          (_sync_io_timelines_0),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_1          (_sync_io_timelines_1),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_2          (_sync_io_timelines_2),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_3          (_sync_io_timelines_3),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_4          (_sync_io_timelines_4),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_5          (_sync_io_timelines_5),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_6          (_sync_io_timelines_6),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_7          (_sync_io_timelines_7),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_backendIdle          (_gemmAdapter_io_idle),	// src/queen/scala/main/QueenTop.scala:51:37
-    .io_flushing             (_flush_io_flushing),	// src/queen/scala/main/QueenTop.scala:57:31
+    .io_events_0             (_sync_io_events_0),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_1             (_sync_io_events_1),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_2             (_sync_io_events_2),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_3             (_sync_io_events_3),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_4             (_sync_io_events_4),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_5             (_sync_io_events_5),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_6             (_sync_io_events_6),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_7             (_sync_io_events_7),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_8             (_sync_io_events_8),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_9             (_sync_io_events_9),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_10            (_sync_io_events_10),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_11            (_sync_io_events_11),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_12            (_sync_io_events_12),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_13            (_sync_io_events_13),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_14            (_sync_io_events_14),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_15            (_sync_io_events_15),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_16            (_sync_io_events_16),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_17            (_sync_io_events_17),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_18            (_sync_io_events_18),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_19            (_sync_io_events_19),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_20            (_sync_io_events_20),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_21            (_sync_io_events_21),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_22            (_sync_io_events_22),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_23            (_sync_io_events_23),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_24            (_sync_io_events_24),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_25            (_sync_io_events_25),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_26            (_sync_io_events_26),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_27            (_sync_io_events_27),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_28            (_sync_io_events_28),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_29            (_sync_io_events_29),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_30            (_sync_io_events_30),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_31            (_sync_io_events_31),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_0          (_sync_io_timelines_0),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_1          (_sync_io_timelines_1),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_2          (_sync_io_timelines_2),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_3          (_sync_io_timelines_3),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_4          (_sync_io_timelines_4),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_5          (_sync_io_timelines_5),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_6          (_sync_io_timelines_6),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_7          (_sync_io_timelines_7),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_backendIdle          (_gemmAdapter_io_idle),	// src/queen/scala/main/QueenTop.scala:54:37
+    .io_flushing             (_flush_io_flushing),	// src/queen/scala/main/QueenTop.scala:60:31
+    .io_trace_valid          (io_gemmTrace_valid),
+    .io_trace_bits_swTag     (io_gemmTrace_bits_swTag),
     .io_idle                 (_gemmCtrl_io_idle)
-  );	// src/queen/scala/main/QueenTop.scala:49:34
-  Queen_QueenEndpointCtrl dmaCtrl (	// src/queen/scala/main/QueenTop.scala:50:33
+  );	// src/queen/scala/main/QueenTop.scala:52:34
+  Queen_QueenEndpointCtrl dmaCtrl (	// src/queen/scala/main/QueenTop.scala:53:33
     .clock                   (clock),
     .reset                   (reset),
     .io_in_ready             (_dmaCtrl_io_in_ready),
-    .io_in_valid             (_decoder_io_dma_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_0_valid      (_decoder_io_dma_bits_0_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_0_bits_inst  (_decoder_io_dma_bits_0_bits_inst),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_0_bits_pc    (_decoder_io_dma_bits_0_bits_pc),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_0_bits_rs1   (_decoder_io_dma_bits_0_bits_rs1),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_0_bits_rs2   (_decoder_io_dma_bits_0_bits_rs2),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_1_valid      (_decoder_io_dma_bits_1_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_1_bits_inst  (_decoder_io_dma_bits_1_bits_inst),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_1_bits_pc    (_decoder_io_dma_bits_1_bits_pc),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_1_bits_rs1   (_decoder_io_dma_bits_1_bits_rs1),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_1_bits_rs2   (_decoder_io_dma_bits_1_bits_rs2),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_2_valid      (_decoder_io_dma_bits_2_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_2_bits_inst  (_decoder_io_dma_bits_2_bits_inst),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_2_bits_pc    (_decoder_io_dma_bits_2_bits_pc),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_2_bits_rs1   (_decoder_io_dma_bits_2_bits_rs1),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_2_bits_rs2   (_decoder_io_dma_bits_2_bits_rs2),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_3_valid      (_decoder_io_dma_bits_3_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_3_bits_inst  (_decoder_io_dma_bits_3_bits_inst),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_3_bits_pc    (_decoder_io_dma_bits_3_bits_pc),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_3_bits_rs1   (_decoder_io_dma_bits_3_bits_rs1),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_3_bits_rs2   (_decoder_io_dma_bits_3_bits_rs2),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_out_ready            (_dmaAdapter_io_in_ready),	// src/queen/scala/main/QueenTop.scala:52:36
+    .io_in_valid             (_decoder_io_dma_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_0_valid      (_decoder_io_dma_bits_0_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_0_bits_inst  (_decoder_io_dma_bits_0_bits_inst),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_0_bits_rs1   (_decoder_io_dma_bits_0_bits_rs1),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_0_bits_rs2   (_decoder_io_dma_bits_0_bits_rs2),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_1_valid      (_decoder_io_dma_bits_1_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_1_bits_inst  (_decoder_io_dma_bits_1_bits_inst),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_1_bits_rs1   (_decoder_io_dma_bits_1_bits_rs1),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_1_bits_rs2   (_decoder_io_dma_bits_1_bits_rs2),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_2_valid      (_decoder_io_dma_bits_2_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_2_bits_inst  (_decoder_io_dma_bits_2_bits_inst),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_2_bits_rs1   (_decoder_io_dma_bits_2_bits_rs1),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_2_bits_rs2   (_decoder_io_dma_bits_2_bits_rs2),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_3_valid      (_decoder_io_dma_bits_3_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_3_bits_inst  (_decoder_io_dma_bits_3_bits_inst),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_3_bits_rs1   (_decoder_io_dma_bits_3_bits_rs1),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_3_bits_rs2   (_decoder_io_dma_bits_3_bits_rs2),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_out_ready            (_dmaAdapter_io_in_ready),	// src/queen/scala/main/QueenTop.scala:55:36
     .io_out_valid            (_dmaCtrl_io_out_valid),
     .io_out_bits_0_valid     (_dmaCtrl_io_out_bits_0_valid),
     .io_out_bits_0_bits_inst (_dmaCtrl_io_out_bits_0_bits_inst),
-    .io_out_bits_0_bits_pc   (_dmaCtrl_io_out_bits_0_bits_pc),
     .io_out_bits_0_bits_rs1  (_dmaCtrl_io_out_bits_0_bits_rs1),
     .io_out_bits_0_bits_rs2  (_dmaCtrl_io_out_bits_0_bits_rs2),
     .io_out_bits_1_valid     (_dmaCtrl_io_out_bits_1_valid),
     .io_out_bits_1_bits_inst (_dmaCtrl_io_out_bits_1_bits_inst),
-    .io_out_bits_1_bits_pc   (_dmaCtrl_io_out_bits_1_bits_pc),
     .io_out_bits_1_bits_rs1  (_dmaCtrl_io_out_bits_1_bits_rs1),
     .io_out_bits_1_bits_rs2  (_dmaCtrl_io_out_bits_1_bits_rs2),
     .io_out_bits_2_valid     (_dmaCtrl_io_out_bits_2_valid),
     .io_out_bits_2_bits_inst (_dmaCtrl_io_out_bits_2_bits_inst),
-    .io_out_bits_2_bits_pc   (_dmaCtrl_io_out_bits_2_bits_pc),
     .io_out_bits_2_bits_rs1  (_dmaCtrl_io_out_bits_2_bits_rs1),
     .io_out_bits_2_bits_rs2  (_dmaCtrl_io_out_bits_2_bits_rs2),
     .io_out_bits_3_valid     (_dmaCtrl_io_out_bits_3_valid),
     .io_out_bits_3_bits_inst (_dmaCtrl_io_out_bits_3_bits_inst),
-    .io_out_bits_3_bits_pc   (_dmaCtrl_io_out_bits_3_bits_pc),
     .io_out_bits_3_bits_rs1  (_dmaCtrl_io_out_bits_3_bits_rs1),
     .io_out_bits_3_bits_rs2  (_dmaCtrl_io_out_bits_3_bits_rs2),
-    .io_events_0             (_sync_io_events_0),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_1             (_sync_io_events_1),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_2             (_sync_io_events_2),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_3             (_sync_io_events_3),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_4             (_sync_io_events_4),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_5             (_sync_io_events_5),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_6             (_sync_io_events_6),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_7             (_sync_io_events_7),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_8             (_sync_io_events_8),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_9             (_sync_io_events_9),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_10            (_sync_io_events_10),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_11            (_sync_io_events_11),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_12            (_sync_io_events_12),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_13            (_sync_io_events_13),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_14            (_sync_io_events_14),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_15            (_sync_io_events_15),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_16            (_sync_io_events_16),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_17            (_sync_io_events_17),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_18            (_sync_io_events_18),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_19            (_sync_io_events_19),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_20            (_sync_io_events_20),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_21            (_sync_io_events_21),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_22            (_sync_io_events_22),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_23            (_sync_io_events_23),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_24            (_sync_io_events_24),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_25            (_sync_io_events_25),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_26            (_sync_io_events_26),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_27            (_sync_io_events_27),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_28            (_sync_io_events_28),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_29            (_sync_io_events_29),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_30            (_sync_io_events_30),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_31            (_sync_io_events_31),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_0          (_sync_io_timelines_0),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_1          (_sync_io_timelines_1),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_2          (_sync_io_timelines_2),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_3          (_sync_io_timelines_3),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_4          (_sync_io_timelines_4),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_5          (_sync_io_timelines_5),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_6          (_sync_io_timelines_6),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_7          (_sync_io_timelines_7),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_backendIdle          (_dmaAdapter_io_idle),	// src/queen/scala/main/QueenTop.scala:52:36
-    .io_flushing             (_flush_io_flushing),	// src/queen/scala/main/QueenTop.scala:57:31
+    .io_events_0             (_sync_io_events_0),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_1             (_sync_io_events_1),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_2             (_sync_io_events_2),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_3             (_sync_io_events_3),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_4             (_sync_io_events_4),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_5             (_sync_io_events_5),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_6             (_sync_io_events_6),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_7             (_sync_io_events_7),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_8             (_sync_io_events_8),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_9             (_sync_io_events_9),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_10            (_sync_io_events_10),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_11            (_sync_io_events_11),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_12            (_sync_io_events_12),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_13            (_sync_io_events_13),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_14            (_sync_io_events_14),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_15            (_sync_io_events_15),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_16            (_sync_io_events_16),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_17            (_sync_io_events_17),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_18            (_sync_io_events_18),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_19            (_sync_io_events_19),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_20            (_sync_io_events_20),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_21            (_sync_io_events_21),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_22            (_sync_io_events_22),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_23            (_sync_io_events_23),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_24            (_sync_io_events_24),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_25            (_sync_io_events_25),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_26            (_sync_io_events_26),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_27            (_sync_io_events_27),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_28            (_sync_io_events_28),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_29            (_sync_io_events_29),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_30            (_sync_io_events_30),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_31            (_sync_io_events_31),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_0          (_sync_io_timelines_0),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_1          (_sync_io_timelines_1),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_2          (_sync_io_timelines_2),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_3          (_sync_io_timelines_3),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_4          (_sync_io_timelines_4),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_5          (_sync_io_timelines_5),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_6          (_sync_io_timelines_6),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_7          (_sync_io_timelines_7),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_backendIdle          (_dmaAdapter_io_idle),	// src/queen/scala/main/QueenTop.scala:55:36
+    .io_flushing             (_flush_io_flushing),	// src/queen/scala/main/QueenTop.scala:60:31
+    .io_trace_valid          (io_dmaTrace_valid),
+    .io_trace_bits_swTag     (io_dmaTrace_bits_swTag),
     .io_idle                 (_dmaCtrl_io_idle)
-  );	// src/queen/scala/main/QueenTop.scala:50:33
-  Queen_QueenDsaAdapter gemmAdapter (	// src/queen/scala/main/QueenTop.scala:51:37
+  );	// src/queen/scala/main/QueenTop.scala:53:33
+  Queen_QueenDsaAdapter gemmAdapter (	// src/queen/scala/main/QueenTop.scala:54:37
     .clock                       (clock),
     .reset                       (reset),
     .io_in_ready                 (_gemmAdapter_io_in_ready),
-    .io_in_valid                 (_gemmCtrl_io_out_valid),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_0_valid          (_gemmCtrl_io_out_bits_0_valid),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_0_bits_inst      (_gemmCtrl_io_out_bits_0_bits_inst),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_0_bits_pc        (_gemmCtrl_io_out_bits_0_bits_pc),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_0_bits_rs1       (_gemmCtrl_io_out_bits_0_bits_rs1),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_0_bits_rs2       (_gemmCtrl_io_out_bits_0_bits_rs2),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_1_valid          (_gemmCtrl_io_out_bits_1_valid),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_1_bits_inst      (_gemmCtrl_io_out_bits_1_bits_inst),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_1_bits_pc        (_gemmCtrl_io_out_bits_1_bits_pc),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_1_bits_rs1       (_gemmCtrl_io_out_bits_1_bits_rs1),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_1_bits_rs2       (_gemmCtrl_io_out_bits_1_bits_rs2),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_2_valid          (_gemmCtrl_io_out_bits_2_valid),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_2_bits_inst      (_gemmCtrl_io_out_bits_2_bits_inst),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_2_bits_pc        (_gemmCtrl_io_out_bits_2_bits_pc),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_2_bits_rs1       (_gemmCtrl_io_out_bits_2_bits_rs1),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_2_bits_rs2       (_gemmCtrl_io_out_bits_2_bits_rs2),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_3_valid          (_gemmCtrl_io_out_bits_3_valid),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_3_bits_inst      (_gemmCtrl_io_out_bits_3_bits_inst),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_3_bits_pc        (_gemmCtrl_io_out_bits_3_bits_pc),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_3_bits_rs1       (_gemmCtrl_io_out_bits_3_bits_rs1),	// src/queen/scala/main/QueenTop.scala:49:34
-    .io_in_bits_3_bits_rs2       (_gemmCtrl_io_out_bits_3_bits_rs2),	// src/queen/scala/main/QueenTop.scala:49:34
+    .io_in_valid                 (_gemmCtrl_io_out_valid),	// src/queen/scala/main/QueenTop.scala:52:34
+    .io_in_bits_0_valid          (_gemmCtrl_io_out_bits_0_valid),	// src/queen/scala/main/QueenTop.scala:52:34
+    .io_in_bits_0_bits_inst      (_gemmCtrl_io_out_bits_0_bits_inst),	// src/queen/scala/main/QueenTop.scala:52:34
+    .io_in_bits_0_bits_rs1       (_gemmCtrl_io_out_bits_0_bits_rs1),	// src/queen/scala/main/QueenTop.scala:52:34
+    .io_in_bits_0_bits_rs2       (_gemmCtrl_io_out_bits_0_bits_rs2),	// src/queen/scala/main/QueenTop.scala:52:34
+    .io_in_bits_1_valid          (_gemmCtrl_io_out_bits_1_valid),	// src/queen/scala/main/QueenTop.scala:52:34
+    .io_in_bits_1_bits_inst      (_gemmCtrl_io_out_bits_1_bits_inst),	// src/queen/scala/main/QueenTop.scala:52:34
+    .io_in_bits_1_bits_rs1       (_gemmCtrl_io_out_bits_1_bits_rs1),	// src/queen/scala/main/QueenTop.scala:52:34
+    .io_in_bits_1_bits_rs2       (_gemmCtrl_io_out_bits_1_bits_rs2),	// src/queen/scala/main/QueenTop.scala:52:34
+    .io_in_bits_2_valid          (_gemmCtrl_io_out_bits_2_valid),	// src/queen/scala/main/QueenTop.scala:52:34
+    .io_in_bits_2_bits_inst      (_gemmCtrl_io_out_bits_2_bits_inst),	// src/queen/scala/main/QueenTop.scala:52:34
+    .io_in_bits_2_bits_rs1       (_gemmCtrl_io_out_bits_2_bits_rs1),	// src/queen/scala/main/QueenTop.scala:52:34
+    .io_in_bits_2_bits_rs2       (_gemmCtrl_io_out_bits_2_bits_rs2),	// src/queen/scala/main/QueenTop.scala:52:34
+    .io_in_bits_3_valid          (_gemmCtrl_io_out_bits_3_valid),	// src/queen/scala/main/QueenTop.scala:52:34
+    .io_in_bits_3_bits_inst      (_gemmCtrl_io_out_bits_3_bits_inst),	// src/queen/scala/main/QueenTop.scala:52:34
+    .io_in_bits_3_bits_rs1       (_gemmCtrl_io_out_bits_3_bits_rs1),	// src/queen/scala/main/QueenTop.scala:52:34
+    .io_in_bits_3_bits_rs2       (_gemmCtrl_io_out_bits_3_bits_rs2),	// src/queen/scala/main/QueenTop.scala:52:34
     .io_out_ready                (io_gemm_ready),
     .io_out_valid                (io_gemm_valid),
     .io_out_bits_0_valid         (io_gemm_bits_0_valid),
@@ -927,8 +911,6 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
     .io_out_bits_0_bits_reg1Addr (io_gemm_bits_0_bits_reg1Addr),
     .io_out_bits_0_bits_data0    (io_gemm_bits_0_bits_data0),
     .io_out_bits_0_bits_data1    (io_gemm_bits_0_bits_data1),
-    .io_out_bits_0_bits_pc       (io_gemm_bits_0_bits_pc),
-    .io_out_bits_0_bits_cmdTag   (io_gemm_bits_0_bits_cmdTag),
     .io_out_bits_0_bits_swTag    (io_gemm_bits_0_bits_swTag),
     .io_out_bits_1_valid         (io_gemm_bits_1_valid),
     .io_out_bits_1_bits_op       (io_gemm_bits_1_bits_op),
@@ -936,8 +918,6 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
     .io_out_bits_1_bits_reg1Addr (io_gemm_bits_1_bits_reg1Addr),
     .io_out_bits_1_bits_data0    (io_gemm_bits_1_bits_data0),
     .io_out_bits_1_bits_data1    (io_gemm_bits_1_bits_data1),
-    .io_out_bits_1_bits_pc       (io_gemm_bits_1_bits_pc),
-    .io_out_bits_1_bits_cmdTag   (io_gemm_bits_1_bits_cmdTag),
     .io_out_bits_1_bits_swTag    (io_gemm_bits_1_bits_swTag),
     .io_out_bits_2_valid         (io_gemm_bits_2_valid),
     .io_out_bits_2_bits_op       (io_gemm_bits_2_bits_op),
@@ -945,8 +925,6 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
     .io_out_bits_2_bits_reg1Addr (io_gemm_bits_2_bits_reg1Addr),
     .io_out_bits_2_bits_data0    (io_gemm_bits_2_bits_data0),
     .io_out_bits_2_bits_data1    (io_gemm_bits_2_bits_data1),
-    .io_out_bits_2_bits_pc       (io_gemm_bits_2_bits_pc),
-    .io_out_bits_2_bits_cmdTag   (io_gemm_bits_2_bits_cmdTag),
     .io_out_bits_2_bits_swTag    (io_gemm_bits_2_bits_swTag),
     .io_out_bits_3_valid         (io_gemm_bits_3_valid),
     .io_out_bits_3_bits_op       (io_gemm_bits_3_bits_op),
@@ -954,38 +932,32 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
     .io_out_bits_3_bits_reg1Addr (io_gemm_bits_3_bits_reg1Addr),
     .io_out_bits_3_bits_data0    (io_gemm_bits_3_bits_data0),
     .io_out_bits_3_bits_data1    (io_gemm_bits_3_bits_data1),
-    .io_out_bits_3_bits_pc       (io_gemm_bits_3_bits_pc),
-    .io_out_bits_3_bits_cmdTag   (io_gemm_bits_3_bits_cmdTag),
     .io_out_bits_3_bits_swTag    (io_gemm_bits_3_bits_swTag),
     .io_deviceIdle               (io_gemmDeviceIdle),
-    .io_flushing                 (_flush_io_flushing),	// src/queen/scala/main/QueenTop.scala:57:31
+    .io_flushing                 (_flush_io_flushing),	// src/queen/scala/main/QueenTop.scala:60:31
     .io_idle                     (_gemmAdapter_io_idle)
-  );	// src/queen/scala/main/QueenTop.scala:51:37
-  Queen_QueenDsaAdapter dmaAdapter (	// src/queen/scala/main/QueenTop.scala:52:36
+  );	// src/queen/scala/main/QueenTop.scala:54:37
+  Queen_QueenDsaAdapter dmaAdapter (	// src/queen/scala/main/QueenTop.scala:55:36
     .clock                       (clock),
     .reset                       (reset),
     .io_in_ready                 (_dmaAdapter_io_in_ready),
-    .io_in_valid                 (_dmaCtrl_io_out_valid),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_0_valid          (_dmaCtrl_io_out_bits_0_valid),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_0_bits_inst      (_dmaCtrl_io_out_bits_0_bits_inst),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_0_bits_pc        (_dmaCtrl_io_out_bits_0_bits_pc),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_0_bits_rs1       (_dmaCtrl_io_out_bits_0_bits_rs1),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_0_bits_rs2       (_dmaCtrl_io_out_bits_0_bits_rs2),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_1_valid          (_dmaCtrl_io_out_bits_1_valid),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_1_bits_inst      (_dmaCtrl_io_out_bits_1_bits_inst),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_1_bits_pc        (_dmaCtrl_io_out_bits_1_bits_pc),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_1_bits_rs1       (_dmaCtrl_io_out_bits_1_bits_rs1),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_1_bits_rs2       (_dmaCtrl_io_out_bits_1_bits_rs2),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_2_valid          (_dmaCtrl_io_out_bits_2_valid),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_2_bits_inst      (_dmaCtrl_io_out_bits_2_bits_inst),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_2_bits_pc        (_dmaCtrl_io_out_bits_2_bits_pc),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_2_bits_rs1       (_dmaCtrl_io_out_bits_2_bits_rs1),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_2_bits_rs2       (_dmaCtrl_io_out_bits_2_bits_rs2),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_3_valid          (_dmaCtrl_io_out_bits_3_valid),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_3_bits_inst      (_dmaCtrl_io_out_bits_3_bits_inst),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_3_bits_pc        (_dmaCtrl_io_out_bits_3_bits_pc),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_3_bits_rs1       (_dmaCtrl_io_out_bits_3_bits_rs1),	// src/queen/scala/main/QueenTop.scala:50:33
-    .io_in_bits_3_bits_rs2       (_dmaCtrl_io_out_bits_3_bits_rs2),	// src/queen/scala/main/QueenTop.scala:50:33
+    .io_in_valid                 (_dmaCtrl_io_out_valid),	// src/queen/scala/main/QueenTop.scala:53:33
+    .io_in_bits_0_valid          (_dmaCtrl_io_out_bits_0_valid),	// src/queen/scala/main/QueenTop.scala:53:33
+    .io_in_bits_0_bits_inst      (_dmaCtrl_io_out_bits_0_bits_inst),	// src/queen/scala/main/QueenTop.scala:53:33
+    .io_in_bits_0_bits_rs1       (_dmaCtrl_io_out_bits_0_bits_rs1),	// src/queen/scala/main/QueenTop.scala:53:33
+    .io_in_bits_0_bits_rs2       (_dmaCtrl_io_out_bits_0_bits_rs2),	// src/queen/scala/main/QueenTop.scala:53:33
+    .io_in_bits_1_valid          (_dmaCtrl_io_out_bits_1_valid),	// src/queen/scala/main/QueenTop.scala:53:33
+    .io_in_bits_1_bits_inst      (_dmaCtrl_io_out_bits_1_bits_inst),	// src/queen/scala/main/QueenTop.scala:53:33
+    .io_in_bits_1_bits_rs1       (_dmaCtrl_io_out_bits_1_bits_rs1),	// src/queen/scala/main/QueenTop.scala:53:33
+    .io_in_bits_1_bits_rs2       (_dmaCtrl_io_out_bits_1_bits_rs2),	// src/queen/scala/main/QueenTop.scala:53:33
+    .io_in_bits_2_valid          (_dmaCtrl_io_out_bits_2_valid),	// src/queen/scala/main/QueenTop.scala:53:33
+    .io_in_bits_2_bits_inst      (_dmaCtrl_io_out_bits_2_bits_inst),	// src/queen/scala/main/QueenTop.scala:53:33
+    .io_in_bits_2_bits_rs1       (_dmaCtrl_io_out_bits_2_bits_rs1),	// src/queen/scala/main/QueenTop.scala:53:33
+    .io_in_bits_2_bits_rs2       (_dmaCtrl_io_out_bits_2_bits_rs2),	// src/queen/scala/main/QueenTop.scala:53:33
+    .io_in_bits_3_valid          (_dmaCtrl_io_out_bits_3_valid),	// src/queen/scala/main/QueenTop.scala:53:33
+    .io_in_bits_3_bits_inst      (_dmaCtrl_io_out_bits_3_bits_inst),	// src/queen/scala/main/QueenTop.scala:53:33
+    .io_in_bits_3_bits_rs1       (_dmaCtrl_io_out_bits_3_bits_rs1),	// src/queen/scala/main/QueenTop.scala:53:33
+    .io_in_bits_3_bits_rs2       (_dmaCtrl_io_out_bits_3_bits_rs2),	// src/queen/scala/main/QueenTop.scala:53:33
     .io_out_ready                (io_dma_ready),
     .io_out_valid                (io_dma_valid),
     .io_out_bits_0_valid         (io_dma_bits_0_valid),
@@ -994,8 +966,6 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
     .io_out_bits_0_bits_reg1Addr (io_dma_bits_0_bits_reg1Addr),
     .io_out_bits_0_bits_data0    (io_dma_bits_0_bits_data0),
     .io_out_bits_0_bits_data1    (io_dma_bits_0_bits_data1),
-    .io_out_bits_0_bits_pc       (io_dma_bits_0_bits_pc),
-    .io_out_bits_0_bits_cmdTag   (io_dma_bits_0_bits_cmdTag),
     .io_out_bits_0_bits_swTag    (io_dma_bits_0_bits_swTag),
     .io_out_bits_1_valid         (io_dma_bits_1_valid),
     .io_out_bits_1_bits_op       (io_dma_bits_1_bits_op),
@@ -1003,8 +973,6 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
     .io_out_bits_1_bits_reg1Addr (io_dma_bits_1_bits_reg1Addr),
     .io_out_bits_1_bits_data0    (io_dma_bits_1_bits_data0),
     .io_out_bits_1_bits_data1    (io_dma_bits_1_bits_data1),
-    .io_out_bits_1_bits_pc       (io_dma_bits_1_bits_pc),
-    .io_out_bits_1_bits_cmdTag   (io_dma_bits_1_bits_cmdTag),
     .io_out_bits_1_bits_swTag    (io_dma_bits_1_bits_swTag),
     .io_out_bits_2_valid         (io_dma_bits_2_valid),
     .io_out_bits_2_bits_op       (io_dma_bits_2_bits_op),
@@ -1012,8 +980,6 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
     .io_out_bits_2_bits_reg1Addr (io_dma_bits_2_bits_reg1Addr),
     .io_out_bits_2_bits_data0    (io_dma_bits_2_bits_data0),
     .io_out_bits_2_bits_data1    (io_dma_bits_2_bits_data1),
-    .io_out_bits_2_bits_pc       (io_dma_bits_2_bits_pc),
-    .io_out_bits_2_bits_cmdTag   (io_dma_bits_2_bits_cmdTag),
     .io_out_bits_2_bits_swTag    (io_dma_bits_2_bits_swTag),
     .io_out_bits_3_valid         (io_dma_bits_3_valid),
     .io_out_bits_3_bits_op       (io_dma_bits_3_bits_op),
@@ -1021,34 +987,32 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
     .io_out_bits_3_bits_reg1Addr (io_dma_bits_3_bits_reg1Addr),
     .io_out_bits_3_bits_data0    (io_dma_bits_3_bits_data0),
     .io_out_bits_3_bits_data1    (io_dma_bits_3_bits_data1),
-    .io_out_bits_3_bits_pc       (io_dma_bits_3_bits_pc),
-    .io_out_bits_3_bits_cmdTag   (io_dma_bits_3_bits_cmdTag),
     .io_out_bits_3_bits_swTag    (io_dma_bits_3_bits_swTag),
     .io_deviceIdle               (io_dmaDeviceIdle),
-    .io_flushing                 (_flush_io_flushing),	// src/queen/scala/main/QueenTop.scala:57:31
+    .io_flushing                 (_flush_io_flushing),	// src/queen/scala/main/QueenTop.scala:60:31
     .io_idle                     (_dmaAdapter_io_idle)
-  );	// src/queen/scala/main/QueenTop.scala:52:36
-  Queen_QueenSchedCtrl schedCtrl (	// src/queen/scala/main/QueenTop.scala:53:35
+  );	// src/queen/scala/main/QueenTop.scala:55:36
+  Queen_QueenSchedCtrl schedCtrl (	// src/queen/scala/main/QueenTop.scala:56:35
     .clock                  (clock),
     .reset                  (reset),
     .io_in_ready            (_schedCtrl_io_in_ready),
-    .io_in_valid            (_decoder_io_scheduler_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_0_valid     (_decoder_io_scheduler_bits_0_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_0_bits_inst (_decoder_io_scheduler_bits_0_bits_inst),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_0_bits_rs1  (_decoder_io_scheduler_bits_0_bits_rs1),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_0_bits_rs2  (_decoder_io_scheduler_bits_0_bits_rs2),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_1_valid     (_decoder_io_scheduler_bits_1_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_1_bits_inst (_decoder_io_scheduler_bits_1_bits_inst),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_1_bits_rs1  (_decoder_io_scheduler_bits_1_bits_rs1),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_1_bits_rs2  (_decoder_io_scheduler_bits_1_bits_rs2),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_2_valid     (_decoder_io_scheduler_bits_2_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_2_bits_inst (_decoder_io_scheduler_bits_2_bits_inst),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_2_bits_rs1  (_decoder_io_scheduler_bits_2_bits_rs1),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_2_bits_rs2  (_decoder_io_scheduler_bits_2_bits_rs2),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_3_valid     (_decoder_io_scheduler_bits_3_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_3_bits_inst (_decoder_io_scheduler_bits_3_bits_inst),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_3_bits_rs1  (_decoder_io_scheduler_bits_3_bits_rs1),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_in_bits_3_bits_rs2  (_decoder_io_scheduler_bits_3_bits_rs2),	// src/queen/scala/main/QueenTop.scala:48:33
+    .io_in_valid            (_decoder_io_scheduler_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_0_valid     (_decoder_io_scheduler_bits_0_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_0_bits_inst (_decoder_io_scheduler_bits_0_bits_inst),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_0_bits_rs1  (_decoder_io_scheduler_bits_0_bits_rs1),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_0_bits_rs2  (_decoder_io_scheduler_bits_0_bits_rs2),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_1_valid     (_decoder_io_scheduler_bits_1_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_1_bits_inst (_decoder_io_scheduler_bits_1_bits_inst),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_1_bits_rs1  (_decoder_io_scheduler_bits_1_bits_rs1),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_1_bits_rs2  (_decoder_io_scheduler_bits_1_bits_rs2),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_2_valid     (_decoder_io_scheduler_bits_2_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_2_bits_inst (_decoder_io_scheduler_bits_2_bits_inst),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_2_bits_rs1  (_decoder_io_scheduler_bits_2_bits_rs1),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_2_bits_rs2  (_decoder_io_scheduler_bits_2_bits_rs2),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_3_valid     (_decoder_io_scheduler_bits_3_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_3_bits_inst (_decoder_io_scheduler_bits_3_bits_inst),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_3_bits_rs1  (_decoder_io_scheduler_bits_3_bits_rs1),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_in_bits_3_bits_rs2  (_decoder_io_scheduler_bits_3_bits_rs2),	// src/queen/scala/main/QueenTop.scala:51:33
     .io_sw_valid            (_schedCtrl_io_sw_valid),
     .io_sw_isTimeline       (_schedCtrl_io_sw_isTimeline),
     .io_sw_index            (_schedCtrl_io_sw_index),
@@ -1064,86 +1028,94 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
     .io_wrErr_3             (_schedCtrl_io_wrErr_3),
     .io_faultClear          (_schedCtrl_io_faultClear),
     .io_flushTrig           (_schedCtrl_io_flushTrig),
-    .io_memReq_ready        (_mem_io_req_ready),	// src/queen/scala/main/QueenTop.scala:56:29
+    .io_memReq_ready        (_mem_io_req_ready),	// src/queen/scala/main/QueenTop.scala:59:29
     .io_memReq_valid        (_schedCtrl_io_memReq_valid),
     .io_memReq_bits_op      (_schedCtrl_io_memReq_bits_op),
     .io_memReq_bits_address (_schedCtrl_io_memReq_bits_address),
     .io_memReq_bits_operand (_schedCtrl_io_memReq_bits_operand),
-    .io_rdData_valid        (_mem_io_rdData_valid),	// src/queen/scala/main/QueenTop.scala:56:29
-    .io_rdData_bits         (_mem_io_rdData_bits),	// src/queen/scala/main/QueenTop.scala:56:29
-    .io_memUsed             (_mem_io_used),	// src/queen/scala/main/QueenTop.scala:56:29
+    .io_rdData_valid        (_mem_io_rdData_valid),	// src/queen/scala/main/QueenTop.scala:59:29
+    .io_rdData_bits         (_mem_io_rdData_bits),	// src/queen/scala/main/QueenTop.scala:59:29
+    .io_memUsed             (_mem_io_used),	// src/queen/scala/main/QueenTop.scala:59:29
     .io_addrErr             (_schedCtrl_io_addrErr),
     .io_timeout             (_schedCtrl_io_timeout),
-    .io_events_0            (_sync_io_events_0),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_1            (_sync_io_events_1),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_2            (_sync_io_events_2),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_3            (_sync_io_events_3),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_4            (_sync_io_events_4),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_5            (_sync_io_events_5),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_6            (_sync_io_events_6),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_7            (_sync_io_events_7),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_8            (_sync_io_events_8),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_9            (_sync_io_events_9),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_10           (_sync_io_events_10),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_11           (_sync_io_events_11),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_12           (_sync_io_events_12),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_13           (_sync_io_events_13),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_14           (_sync_io_events_14),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_15           (_sync_io_events_15),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_16           (_sync_io_events_16),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_17           (_sync_io_events_17),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_18           (_sync_io_events_18),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_19           (_sync_io_events_19),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_20           (_sync_io_events_20),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_21           (_sync_io_events_21),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_22           (_sync_io_events_22),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_23           (_sync_io_events_23),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_24           (_sync_io_events_24),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_25           (_sync_io_events_25),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_26           (_sync_io_events_26),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_27           (_sync_io_events_27),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_28           (_sync_io_events_28),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_29           (_sync_io_events_29),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_30           (_sync_io_events_30),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_events_31           (_sync_io_events_31),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_0         (_sync_io_timelines_0),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_1         (_sync_io_timelines_1),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_2         (_sync_io_timelines_2),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_3         (_sync_io_timelines_3),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_4         (_sync_io_timelines_4),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_5         (_sync_io_timelines_5),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_6         (_sync_io_timelines_6),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_timelines_7         (_sync_io_timelines_7),	// src/queen/scala/main/QueenTop.scala:54:30
-    .io_faultValid          (faultValid),	// src/queen/scala/main/QueenTop.scala:134:37
-    .io_faultKind           (faultKind),	// src/queen/scala/main/QueenTop.scala:135:36
-    .io_faultEndpoint       (faultEndpoint),	// src/queen/scala/main/QueenTop.scala:136:40
-    .io_faultCode           (faultCode),	// src/queen/scala/main/QueenTop.scala:137:36
-    .io_idleIn              (dispatchIdle),	// src/queen/scala/main/QueenTop.scala:103:48, :104:{26,49,68}
-    .io_flushing            (_flush_io_flushing),	// src/queen/scala/main/QueenTop.scala:57:31
+    .io_trace_valid         (io_schedTrace_valid),
+    .io_trace_bits_swTag    (io_schedTrace_bits_swTag),
+    .io_events_0            (_sync_io_events_0),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_1            (_sync_io_events_1),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_2            (_sync_io_events_2),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_3            (_sync_io_events_3),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_4            (_sync_io_events_4),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_5            (_sync_io_events_5),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_6            (_sync_io_events_6),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_7            (_sync_io_events_7),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_8            (_sync_io_events_8),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_9            (_sync_io_events_9),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_10           (_sync_io_events_10),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_11           (_sync_io_events_11),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_12           (_sync_io_events_12),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_13           (_sync_io_events_13),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_14           (_sync_io_events_14),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_15           (_sync_io_events_15),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_16           (_sync_io_events_16),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_17           (_sync_io_events_17),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_18           (_sync_io_events_18),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_19           (_sync_io_events_19),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_20           (_sync_io_events_20),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_21           (_sync_io_events_21),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_22           (_sync_io_events_22),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_23           (_sync_io_events_23),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_24           (_sync_io_events_24),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_25           (_sync_io_events_25),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_26           (_sync_io_events_26),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_27           (_sync_io_events_27),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_28           (_sync_io_events_28),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_29           (_sync_io_events_29),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_30           (_sync_io_events_30),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_events_31           (_sync_io_events_31),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_0         (_sync_io_timelines_0),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_1         (_sync_io_timelines_1),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_2         (_sync_io_timelines_2),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_3         (_sync_io_timelines_3),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_4         (_sync_io_timelines_4),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_5         (_sync_io_timelines_5),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_6         (_sync_io_timelines_6),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_timelines_7         (_sync_io_timelines_7),	// src/queen/scala/main/QueenTop.scala:57:30
+    .io_faultValid          (faultValid),	// src/queen/scala/main/QueenTop.scala:142:37
+    .io_faultKind           (faultKind),	// src/queen/scala/main/QueenTop.scala:143:36
+    .io_faultEndpoint       (faultEndpoint),	// src/queen/scala/main/QueenTop.scala:144:40
+    .io_faultCode           (faultCode),	// src/queen/scala/main/QueenTop.scala:145:36
+    .io_idleIn              (dispatchIdle),	// src/queen/scala/main/QueenTop.scala:107:48, :108:{26,49,68}
+    .io_flushing            (_flush_io_flushing),	// src/queen/scala/main/QueenTop.scala:60:31
     .io_idle                (_schedCtrl_io_idle)
-  );	// src/queen/scala/main/QueenTop.scala:53:35
-  Queen_QueenSyncState sync (	// src/queen/scala/main/QueenTop.scala:54:30
+  );	// src/queen/scala/main/QueenTop.scala:56:35
+  Queen_QueenSyncState sync (	// src/queen/scala/main/QueenTop.scala:57:30
     .clock                                    (clock),
     .reset                                    (reset),
-    .io_completion_0_valid                    (gemmCompValid),	// src/queen/scala/main/QueenTop.scala:121:57
+    .io_completion_0_valid                    (gemmCompValid),	// src/queen/scala/main/QueenTop.scala:126:57
     .io_completion_0_bits_hwSignal_enable     (io_gemmCompletion_bits_hwSignal_enable),
     .io_completion_0_bits_hwSignal_isTimeline
       (io_gemmCompletion_bits_hwSignal_isTimeline),
     .io_completion_0_bits_hwSignal_group      (io_gemmCompletion_bits_hwSignal_group),
     .io_completion_0_bits_hwSignal_mask       (io_gemmCompletion_bits_hwSignal_mask),
     .io_completion_0_bits_hwSignal_timeline   (io_gemmCompletion_bits_hwSignal_timeline),
-    .io_completion_1_valid                    (dmaCompValid),	// src/queen/scala/main/QueenTop.scala:122:55
+    .io_completion_1_valid                    (dmaCompValid),	// src/queen/scala/main/QueenTop.scala:127:55
     .io_completion_1_bits_hwSignal_enable     (io_dmaCompletion_bits_hwSignal_enable),
     .io_completion_1_bits_hwSignal_isTimeline (io_dmaCompletion_bits_hwSignal_isTimeline),
     .io_completion_1_bits_hwSignal_group      (io_dmaCompletion_bits_hwSignal_group),
     .io_completion_1_bits_hwSignal_mask       (io_dmaCompletion_bits_hwSignal_mask),
     .io_completion_1_bits_hwSignal_timeline   (io_dmaCompletion_bits_hwSignal_timeline),
-    .io_sw_valid                              (_schedCtrl_io_sw_valid),	// src/queen/scala/main/QueenTop.scala:53:35
-    .io_sw_isTimeline                         (_schedCtrl_io_sw_isTimeline),	// src/queen/scala/main/QueenTop.scala:53:35
-    .io_sw_index                              (_schedCtrl_io_sw_index),	// src/queen/scala/main/QueenTop.scala:53:35
-    .io_sw_clr                                (_schedCtrl_io_sw_clr),	// src/queen/scala/main/QueenTop.scala:53:35
-    .io_sw_assign                             (_schedCtrl_io_sw_assign),	// src/queen/scala/main/QueenTop.scala:53:35
-    .io_sw_data                               (_schedCtrl_io_sw_data),	// src/queen/scala/main/QueenTop.scala:53:35
+    .io_completion_2_valid                    (vpuCompValid),	// src/queen/scala/main/QueenTop.scala:128:55
+    .io_completion_2_bits_hwSignal_enable     (io_vpuCompletion_bits_hwSignal_enable),
+    .io_completion_2_bits_hwSignal_isTimeline (io_vpuCompletion_bits_hwSignal_isTimeline),
+    .io_completion_2_bits_hwSignal_group      (io_vpuCompletion_bits_hwSignal_group),
+    .io_completion_2_bits_hwSignal_mask       (io_vpuCompletion_bits_hwSignal_mask),
+    .io_completion_2_bits_hwSignal_timeline   (io_vpuCompletion_bits_hwSignal_timeline),
+    .io_sw_valid                              (_schedCtrl_io_sw_valid),	// src/queen/scala/main/QueenTop.scala:56:35
+    .io_sw_isTimeline                         (_schedCtrl_io_sw_isTimeline),	// src/queen/scala/main/QueenTop.scala:56:35
+    .io_sw_index                              (_schedCtrl_io_sw_index),	// src/queen/scala/main/QueenTop.scala:56:35
+    .io_sw_clr                                (_schedCtrl_io_sw_clr),	// src/queen/scala/main/QueenTop.scala:56:35
+    .io_sw_assign                             (_schedCtrl_io_sw_assign),	// src/queen/scala/main/QueenTop.scala:56:35
+    .io_sw_data                               (_schedCtrl_io_sw_data),	// src/queen/scala/main/QueenTop.scala:56:35
     .io_events_0                              (_sync_io_events_0),
     .io_events_1                              (_sync_io_events_1),
     .io_events_2                              (_sync_io_events_2),
@@ -1186,64 +1158,55 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
     .io_timelines_7                           (_sync_io_timelines_7),
     .io_rollback                              (_sync_io_rollback),
     .io_rollbackId                            (_sync_io_rollbackId),
-    .io_clear                                 (_flush_io_clearState)	// src/queen/scala/main/QueenTop.scala:57:31
-  );	// src/queen/scala/main/QueenTop.scala:54:30
-  Queen_QueenQrdTracker qrd (	// src/queen/scala/main/QueenTop.scala:55:29
-    .clock                    (clock),
-    .reset                    (reset),
-    .io_alloc_0_valid         (_decoder_io_qrdAlloc_0_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_0_bits_pc       (_decoder_io_qrdAlloc_0_bits_pc),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_0_bits_rdIndex  (_decoder_io_qrdAlloc_0_bits_rdIndex),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_0_bits_source   (_decoder_io_qrdAlloc_0_bits_source),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_0_bits_dummy    (_decoder_io_qrdAlloc_0_bits_dummy),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_1_valid         (_decoder_io_qrdAlloc_1_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_1_bits_pc       (_decoder_io_qrdAlloc_1_bits_pc),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_1_bits_rdIndex  (_decoder_io_qrdAlloc_1_bits_rdIndex),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_1_bits_source   (_decoder_io_qrdAlloc_1_bits_source),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_1_bits_dummy    (_decoder_io_qrdAlloc_1_bits_dummy),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_2_valid         (_decoder_io_qrdAlloc_2_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_2_bits_pc       (_decoder_io_qrdAlloc_2_bits_pc),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_2_bits_rdIndex  (_decoder_io_qrdAlloc_2_bits_rdIndex),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_2_bits_source   (_decoder_io_qrdAlloc_2_bits_source),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_2_bits_dummy    (_decoder_io_qrdAlloc_2_bits_dummy),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_3_valid         (_decoder_io_qrdAlloc_3_valid),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_3_bits_pc       (_decoder_io_qrdAlloc_3_bits_pc),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_3_bits_rdIndex  (_decoder_io_qrdAlloc_3_bits_rdIndex),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_3_bits_source   (_decoder_io_qrdAlloc_3_bits_source),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_alloc_3_bits_dummy    (_decoder_io_qrdAlloc_3_bits_dummy),	// src/queen/scala/main/QueenTop.scala:48:33
-    .io_used                  (_qrd_io_used),
-    .io_resp_0_valid          (io_gemmResp_valid),
-    .io_resp_0_bits_data      (io_gemmResp_bits_data),
-    .io_resp_0_bits_err       (io_gemmResp_bits_err),
-    .io_resp_1_valid          (io_dmaResp_valid),
-    .io_resp_1_bits_data      (io_dmaResp_bits_data),
-    .io_resp_1_bits_err       (io_dmaResp_bits_err),
-    .io_resp_2_valid          (_schedCtrl_io_resp_valid),	// src/queen/scala/main/QueenTop.scala:53:35
-    .io_resp_2_bits_data      (_schedCtrl_io_resp_bits_data),	// src/queen/scala/main/QueenTop.scala:53:35
-    .io_resp_2_bits_err       (_schedCtrl_io_resp_bits_err),	// src/queen/scala/main/QueenTop.scala:53:35
-    .io_asyncRd_ready         (io_asyncRd_ready),
-    .io_asyncRd_valid         (io_asyncRd_valid),
-    .io_asyncRd_bits_addr     (io_asyncRd_bits_addr),
-    .io_asyncRd_bits_data     (io_asyncRd_bits_data),
-    .io_retire_ready          (io_qrdRetire_ready),
-    .io_retire_valid          (io_qrdRetire_valid),
-    .io_retire_bits_pc        (io_qrdRetire_bits_pc),
-    .io_retire_bits_rdValid   (io_qrdRetire_bits_rdValid),
-    .io_retire_bits_rdIndex   (io_qrdRetire_bits_rdIndex),
-    .io_retire_bits_trap      (io_qrdRetire_bits_trap),
-    .io_retire_bits_trapCause (io_qrdRetire_bits_trapCause),
-    .io_markDummy             (_flush_io_start),	// src/queen/scala/main/QueenTop.scala:57:31
-    .io_flushing              (_flush_io_flushing),	// src/queen/scala/main/QueenTop.scala:57:31
-    .io_idle                  (_qrd_io_idle)
-  );	// src/queen/scala/main/QueenTop.scala:55:29
-  Queen_QueenMemMaster mem (	// src/queen/scala/main/QueenTop.scala:56:29
+    .io_clear                                 (_flush_io_clearState)	// src/queen/scala/main/QueenTop.scala:60:31
+  );	// src/queen/scala/main/QueenTop.scala:57:30
+  Queen_QueenQrdTracker qrd (	// src/queen/scala/main/QueenTop.scala:58:29
+    .clock                   (clock),
+    .reset                   (reset),
+    .io_alloc_0_valid        (_decoder_io_qrdAlloc_0_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_alloc_0_bits_rdIndex (_decoder_io_qrdAlloc_0_bits_rdIndex),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_alloc_0_bits_source  (_decoder_io_qrdAlloc_0_bits_source),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_alloc_0_bits_dummy   (_decoder_io_qrdAlloc_0_bits_dummy),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_alloc_1_valid        (_decoder_io_qrdAlloc_1_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_alloc_1_bits_rdIndex (_decoder_io_qrdAlloc_1_bits_rdIndex),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_alloc_1_bits_source  (_decoder_io_qrdAlloc_1_bits_source),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_alloc_1_bits_dummy   (_decoder_io_qrdAlloc_1_bits_dummy),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_alloc_2_valid        (_decoder_io_qrdAlloc_2_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_alloc_2_bits_rdIndex (_decoder_io_qrdAlloc_2_bits_rdIndex),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_alloc_2_bits_source  (_decoder_io_qrdAlloc_2_bits_source),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_alloc_2_bits_dummy   (_decoder_io_qrdAlloc_2_bits_dummy),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_alloc_3_valid        (_decoder_io_qrdAlloc_3_valid),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_alloc_3_bits_rdIndex (_decoder_io_qrdAlloc_3_bits_rdIndex),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_alloc_3_bits_source  (_decoder_io_qrdAlloc_3_bits_source),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_alloc_3_bits_dummy   (_decoder_io_qrdAlloc_3_bits_dummy),	// src/queen/scala/main/QueenTop.scala:51:33
+    .io_used                 (_qrd_io_used),
+    .io_resp_0_valid         (io_gemmResp_valid),
+    .io_resp_0_bits_data     (io_gemmResp_bits_data),
+    .io_resp_0_bits_err      (io_gemmResp_bits_err),
+    .io_resp_1_valid         (io_dmaResp_valid),
+    .io_resp_1_bits_data     (io_dmaResp_bits_data),
+    .io_resp_1_bits_err      (io_dmaResp_bits_err),
+    .io_resp_2_valid         (_schedCtrl_io_resp_valid),	// src/queen/scala/main/QueenTop.scala:56:35
+    .io_resp_2_bits_data     (_schedCtrl_io_resp_bits_data),	// src/queen/scala/main/QueenTop.scala:56:35
+    .io_resp_2_bits_err      (_schedCtrl_io_resp_bits_err),	// src/queen/scala/main/QueenTop.scala:56:35
+    .io_asyncRd_ready        (io_asyncRd_ready),
+    .io_asyncRd_valid        (io_asyncRd_valid),
+    .io_asyncRd_bits_addr    (io_asyncRd_bits_addr),
+    .io_asyncRd_bits_data    (io_asyncRd_bits_data),
+    .io_rdError_valid        (_qrd_io_rdError_valid),
+    .io_rdError_bits         (_qrd_io_rdError_bits),
+    .io_markDummy            (_flush_io_start),	// src/queen/scala/main/QueenTop.scala:60:31
+    .io_flushing             (_flush_io_flushing),	// src/queen/scala/main/QueenTop.scala:60:31
+    .io_idle                 (_qrd_io_idle)
+  );	// src/queen/scala/main/QueenTop.scala:58:29
+  Queen_QueenMemMaster mem (	// src/queen/scala/main/QueenTop.scala:59:29
     .clock                  (clock),
     .reset                  (reset),
     .io_req_ready           (_mem_io_req_ready),
-    .io_req_valid           (_schedCtrl_io_memReq_valid),	// src/queen/scala/main/QueenTop.scala:53:35
-    .io_req_bits_op         (_schedCtrl_io_memReq_bits_op),	// src/queen/scala/main/QueenTop.scala:53:35
-    .io_req_bits_address    (_schedCtrl_io_memReq_bits_address),	// src/queen/scala/main/QueenTop.scala:53:35
-    .io_req_bits_operand    (_schedCtrl_io_memReq_bits_operand),	// src/queen/scala/main/QueenTop.scala:53:35
+    .io_req_valid           (_schedCtrl_io_memReq_valid),	// src/queen/scala/main/QueenTop.scala:56:35
+    .io_req_bits_op         (_schedCtrl_io_memReq_bits_op),	// src/queen/scala/main/QueenTop.scala:56:35
+    .io_req_bits_address    (_schedCtrl_io_memReq_bits_address),	// src/queen/scala/main/QueenTop.scala:56:35
+    .io_req_bits_operand    (_schedCtrl_io_memReq_bits_operand),	// src/queen/scala/main/QueenTop.scala:56:35
     .io_memReq_ready        (io_memReq_ready),
     .io_memReq_valid        (io_memReq_valid),
     .io_memReq_bits_op      (io_memReq_bits_op),
@@ -1255,84 +1218,87 @@ module Queen_QueenTop(	// src/queen/scala/main/QueenTop.scala:11:7
     .io_rdData_valid        (_mem_io_rdData_valid),
     .io_rdData_bits         (_mem_io_rdData_bits),
     .io_err                 (_mem_io_err),
-    .io_drop                (_flush_io_flushing),	// src/queen/scala/main/QueenTop.scala:57:31
+    .io_drop                (_flush_io_flushing),	// src/queen/scala/main/QueenTop.scala:60:31
     .io_used                (_mem_io_used),
     .io_idle                (_mem_io_idle)
-  );	// src/queen/scala/main/QueenTop.scala:56:29
-  Queen_QueenFlushCtrl flush (	// src/queen/scala/main/QueenTop.scala:57:31
+  );	// src/queen/scala/main/QueenTop.scala:59:29
+  Queen_QueenFlushCtrl flush (	// src/queen/scala/main/QueenTop.scala:60:31
     .clock         (clock),
     .reset         (reset),
-    .io_trig       (_schedCtrl_io_flushTrig),	// src/queen/scala/main/QueenTop.scala:53:35
+    .io_trig       (_schedCtrl_io_flushTrig),	// src/queen/scala/main/QueenTop.scala:56:35
     .io_cpuReq     (io_flushReq),
     .io_cpuAck     (io_flushAck),
     .io_devReq_0   (io_gemmFlushReq),
     .io_devReq_1   (io_dmaFlushReq),
     .io_devAck_0   (io_gemmFlushAck),
     .io_devAck_1   (io_dmaFlushAck),
-    .io_drained    (_flush_io_drained_T & _qrd_io_idle & _mem_io_idle),	// src/queen/scala/main/QueenTop.scala:55:29, :56:29, :106:29, :115:{59,74}
+    .io_drained    (_flush_io_drained_T & _qrd_io_idle & _mem_io_idle),	// src/queen/scala/main/QueenTop.scala:58:29, :59:29, :110:29, :119:{59,74}
     .io_disturb
       (_decoder_io_inst_0_ready & io_inst_0_valid | _decoder_io_inst_1_ready
        & io_inst_1_valid | _decoder_io_inst_2_ready & io_inst_2_valid
        | _decoder_io_inst_3_ready & io_inst_3_valid | io_gemmCompletion_valid
-       | io_dmaCompletion_valid | io_memResp_valid),	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenTop.scala:48:33, :117:{54,60}, :118:{33,59}
+       | io_dmaCompletion_valid | io_vpuCompletion_valid | io_memResp_valid),	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/main/QueenTop.scala:51:33, :121:{54,60}, :122:{33,59,85}
     .io_flushing   (_flush_io_flushing),
     .io_start      (_flush_io_start),
     .io_clearState (_flush_io_clearState),
     .io_idle       (_flush_io_idle)
-  );	// src/queen/scala/main/QueenTop.scala:57:31
-  assign io_inst_0_ready = _decoder_io_inst_0_ready;	// src/queen/scala/main/QueenTop.scala:11:7, :48:33
-  assign io_inst_1_ready = _decoder_io_inst_1_ready;	// src/queen/scala/main/QueenTop.scala:11:7, :48:33
-  assign io_inst_2_ready = _decoder_io_inst_2_ready;	// src/queen/scala/main/QueenTop.scala:11:7, :48:33
-  assign io_inst_3_ready = _decoder_io_inst_3_ready;	// src/queen/scala/main/QueenTop.scala:11:7, :48:33
-  assign io_gemmResp_ready = 1'h1;	// src/queen/scala/main/QueenTop.scala:11:7
-  assign io_dmaResp_ready = 1'h1;	// src/queen/scala/main/QueenTop.scala:11:7
-  assign io_memResp_ready = 1'h1;	// src/queen/scala/main/QueenTop.scala:11:7
-  assign io_idle = _flush_io_drained_T & _qrd_io_idle & _mem_io_idle & _flush_io_idle;	// src/queen/scala/main/QueenTop.scala:11:7, :55:29, :56:29, :57:31, :106:{29,50,65,80}
-  assign io_events_0 = _sync_io_events_0;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_1 = _sync_io_events_1;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_2 = _sync_io_events_2;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_3 = _sync_io_events_3;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_4 = _sync_io_events_4;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_5 = _sync_io_events_5;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_6 = _sync_io_events_6;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_7 = _sync_io_events_7;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_8 = _sync_io_events_8;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_9 = _sync_io_events_9;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_10 = _sync_io_events_10;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_11 = _sync_io_events_11;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_12 = _sync_io_events_12;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_13 = _sync_io_events_13;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_14 = _sync_io_events_14;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_15 = _sync_io_events_15;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_16 = _sync_io_events_16;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_17 = _sync_io_events_17;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_18 = _sync_io_events_18;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_19 = _sync_io_events_19;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_20 = _sync_io_events_20;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_21 = _sync_io_events_21;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_22 = _sync_io_events_22;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_23 = _sync_io_events_23;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_24 = _sync_io_events_24;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_25 = _sync_io_events_25;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_26 = _sync_io_events_26;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_27 = _sync_io_events_27;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_28 = _sync_io_events_28;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_29 = _sync_io_events_29;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_30 = _sync_io_events_30;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_events_31 = _sync_io_events_31;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_timelines_0 = _sync_io_timelines_0;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_timelines_1 = _sync_io_timelines_1;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_timelines_2 = _sync_io_timelines_2;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_timelines_3 = _sync_io_timelines_3;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_timelines_4 = _sync_io_timelines_4;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_timelines_5 = _sync_io_timelines_5;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_timelines_6 = _sync_io_timelines_6;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_timelines_7 = _sync_io_timelines_7;	// src/queen/scala/main/QueenTop.scala:11:7, :54:30
-  assign io_faultValid = faultValid;	// src/queen/scala/main/QueenTop.scala:11:7, :134:37
-  assign io_faultKind = faultKind;	// src/queen/scala/main/QueenTop.scala:11:7, :135:36
-  assign io_faultEndpoint = faultEndpoint;	// src/queen/scala/main/QueenTop.scala:11:7, :136:40
-  assign io_faultCode = faultCode;	// src/queen/scala/main/QueenTop.scala:11:7, :137:36
-  assign io_faultIrq = faultValid;	// src/queen/scala/main/QueenTop.scala:11:7, :134:37
-  assign io_irq = faultValid;	// src/queen/scala/main/QueenTop.scala:11:7, :134:37
+  );	// src/queen/scala/main/QueenTop.scala:60:31
+  assign io_inst_0_ready = _decoder_io_inst_0_ready;	// src/queen/scala/main/QueenTop.scala:12:7, :51:33
+  assign io_inst_1_ready = _decoder_io_inst_1_ready;	// src/queen/scala/main/QueenTop.scala:12:7, :51:33
+  assign io_inst_2_ready = _decoder_io_inst_2_ready;	// src/queen/scala/main/QueenTop.scala:12:7, :51:33
+  assign io_inst_3_ready = _decoder_io_inst_3_ready;	// src/queen/scala/main/QueenTop.scala:12:7, :51:33
+  assign io_gemmResp_ready = 1'h1;	// src/queen/scala/main/QueenTop.scala:12:7
+  assign io_dmaResp_ready = 1'h1;	// src/queen/scala/main/QueenTop.scala:12:7
+  assign io_gemmTrace_bits_hwTag = 32'h0;	// src/queen/scala/main/QueenTop.scala:12:7, :52:34, :53:33, :56:35
+  assign io_dmaTrace_bits_hwTag = 32'h0;	// src/queen/scala/main/QueenTop.scala:12:7, :52:34, :53:33, :56:35
+  assign io_schedTrace_bits_hwTag = 32'h0;	// src/queen/scala/main/QueenTop.scala:12:7, :52:34, :53:33, :56:35
+  assign io_memResp_ready = 1'h1;	// src/queen/scala/main/QueenTop.scala:12:7
+  assign io_idle = _flush_io_drained_T & _qrd_io_idle & _mem_io_idle & _flush_io_idle;	// src/queen/scala/main/QueenTop.scala:12:7, :58:29, :59:29, :60:31, :110:{29,50,65,80}
+  assign io_events_0 = _sync_io_events_0;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_1 = _sync_io_events_1;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_2 = _sync_io_events_2;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_3 = _sync_io_events_3;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_4 = _sync_io_events_4;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_5 = _sync_io_events_5;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_6 = _sync_io_events_6;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_7 = _sync_io_events_7;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_8 = _sync_io_events_8;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_9 = _sync_io_events_9;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_10 = _sync_io_events_10;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_11 = _sync_io_events_11;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_12 = _sync_io_events_12;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_13 = _sync_io_events_13;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_14 = _sync_io_events_14;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_15 = _sync_io_events_15;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_16 = _sync_io_events_16;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_17 = _sync_io_events_17;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_18 = _sync_io_events_18;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_19 = _sync_io_events_19;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_20 = _sync_io_events_20;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_21 = _sync_io_events_21;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_22 = _sync_io_events_22;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_23 = _sync_io_events_23;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_24 = _sync_io_events_24;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_25 = _sync_io_events_25;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_26 = _sync_io_events_26;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_27 = _sync_io_events_27;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_28 = _sync_io_events_28;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_29 = _sync_io_events_29;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_30 = _sync_io_events_30;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_events_31 = _sync_io_events_31;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_timelines_0 = _sync_io_timelines_0;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_timelines_1 = _sync_io_timelines_1;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_timelines_2 = _sync_io_timelines_2;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_timelines_3 = _sync_io_timelines_3;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_timelines_4 = _sync_io_timelines_4;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_timelines_5 = _sync_io_timelines_5;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_timelines_6 = _sync_io_timelines_6;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_timelines_7 = _sync_io_timelines_7;	// src/queen/scala/main/QueenTop.scala:12:7, :57:30
+  assign io_faultValid = faultValid;	// src/queen/scala/main/QueenTop.scala:12:7, :142:37
+  assign io_faultKind = faultKind;	// src/queen/scala/main/QueenTop.scala:12:7, :143:36
+  assign io_faultEndpoint = faultEndpoint;	// src/queen/scala/main/QueenTop.scala:12:7, :144:40
+  assign io_faultCode = faultCode;	// src/queen/scala/main/QueenTop.scala:12:7, :145:36
+  assign io_faultIrq = faultValid;	// src/queen/scala/main/QueenTop.scala:12:7, :142:37
+  assign io_irq = faultValid;	// src/queen/scala/main/QueenTop.scala:12:7, :142:37
 endmodule
 
