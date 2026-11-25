@@ -47,7 +47,8 @@ module Wb_WorkerBeeDmaRdOnly_1(	// src/workerbee/scala/main/WorkerBeeDmaRdOnly.s
   input          clock,	// src/workerbee/scala/main/WorkerBeeDmaRdOnly.scala:90:7
                  reset,	// src/workerbee/scala/main/WorkerBeeDmaRdOnly.scala:90:7
                  io_start,	// src/workerbee/scala/main/WorkerBeeDmaRdOnly.scala:101:14
-                 io_dmaExtRdIF_rsp_valid,	// src/workerbee/scala/main/WorkerBeeDmaRdOnly.scala:101:14
+  output         io_busy,	// src/workerbee/scala/main/WorkerBeeDmaRdOnly.scala:101:14
+  input          io_dmaExtRdIF_rsp_valid,	// src/workerbee/scala/main/WorkerBeeDmaRdOnly.scala:101:14
   input  [255:0] io_dmaExtRdIF_rsp_payload_data,	// src/workerbee/scala/main/WorkerBeeDmaRdOnly.scala:101:14
   output         io_dmaExtRdIF_req_valid,	// src/workerbee/scala/main/WorkerBeeDmaRdOnly.scala:101:14
   input          io_dmaExtRdIF_req_ready,	// src/workerbee/scala/main/WorkerBeeDmaRdOnly.scala:101:14
@@ -671,6 +672,7 @@ module Wb_WorkerBeeDmaRdOnly_1(	// src/workerbee/scala/main/WorkerBeeDmaRdOnly.s
       `FIRRTL_AFTER_INITIAL	// src/workerbee/scala/main/WorkerBeeDmaRdOnly.scala:90:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
+  assign io_busy = |state;	// src/workerbee/scala/main/WorkerBeeDmaRdOnly.scala:90:7, :139:22, :426:20
   assign io_dmaExtRdIF_req_valid = io_dmaExtRdIF_req_valid_0;	// src/workerbee/scala/main/WorkerBeeDmaRdOnly.scala:90:7, :371:50, :377:18
   assign io_dmaExtRdIF_req_payload_addr =
     _alignedRspPush_T & unaligned
