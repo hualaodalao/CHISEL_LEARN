@@ -86,7 +86,7 @@ private class QueenConfigPathDut(cfg: QueenConfig, rcfg: QueenDsaRegIfConfig,
         val events = Output(Vec(cfg.eventGroupCount, UInt(32.W)))
         val timelines = Output(Vec(cfg.timelineCount, UInt(32.W)))
         val faultValid = Output(Bool())
-        val faultKind = Output(UInt(3.W))
+        val faultKind = Output(UInt(cfg.faultKindWidth.W))
         val faultEndpoint = Output(UInt(2.W))
         val faultCode = Output(UInt(cfg.faultCodeWidth.W))
         val faultIrq = Output(Bool())

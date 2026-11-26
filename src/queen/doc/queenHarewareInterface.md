@@ -532,7 +532,7 @@ flush 期间（`flushing` 电平有效）的行为：
 - 两设备 `deviceIdle` 为 1；
 - 以上条件连续成立且**无任何扰动**满 `flushQuietCycles` 拍。
 
-设备侧义务（实现不在本文范围内）：收到 `flushReq` 后必须丢弃已收未执行的命令、终止或等完运行中工作、不再产生属于旧 context 的 completion，然后才能回 `flushAck`；不支持安全 abort 的 DSA 必须等当前工作自然结束。`flushAck` 落下前不得开始新工作。flush 后 credit 必须与 Queen 重新对齐。
+设备侧义务（实现不在本文范围内）：收到 `flushReq` 后必须丢弃已收未执行的命令、终止或等完运行中工作、不再产生属于旧 context 的 completion，然后才能回 `flushAck`；不支持安全 abort 的 DSA 必须等当前工作自然结束。`flushAck` 落下前不得开始新工作。flush 后 credit 必须与 Queen 重新对齐；**寄存器不由 flush 复位**，只有 reset 才复位（13.8）。
 
 **软件义务**：flush 期间 CPU 可以继续发指令（接受并丢弃，QRD 立刻回 `0xdeadbeef`，不会挂死），但**持续不间断地发射会让静默窗永远重新计数、flush 永不完成**。软件最终必须安静下来；判别恢复是否结束看 QRD 是否还回 `0xdeadbeef`，或读 SCHED `IDLE` 是否为 1。sys 侧则看 `flushAck`。
 
@@ -756,7 +756,8 @@ val memResp = Flipped(Decoupled(new QueenMemResp))
 
 ```scala
 class QueenFault(cfg: QueenConfig) extends Bundle {
-  val kind     = UInt(3.W)   // 0=设备执行错误 1=配置写非法地址 2=timeline 显式回退
+  val kind     = UInt(cfg.faultKindWidth.W)  // 默认 3 bit
+                             // 0=设备执行错误 1=配置写非法地址 2=timeline 显式回退
                              // 3=polling/atomic 内存错误 4=QRD 读错误
   val endpoint = UInt(2.W)   // GEMM=0, DMA=1, VPU=2, SCHED=3
   val code     = UInt(cfg.faultCodeWidth.W)
@@ -809,6 +810,7 @@ case class QueenConfig(
   timelineCount: Int = 8,
   eventGroupCount: Int = 32,
   faultCodeWidth: Int = 8,
+  faultKindWidth: Int = 3,
   trapCauseWidth: Int = 8
 )
 ```
@@ -818,11 +820,11 @@ elaboration 阶段至少检查：
 - `instructionLanes >= 1`；
 - `nativeLanes >= 0` 且派生的 `nativeWidth`（0 表示等于 `instructionLanes`）落在 `1..instructionLanes`；
 - 所有 depth >= 1，`cmdRingDepth >= 2`；
-- `xlen == 32`；
+- `xlen == 32`（数据通路固定 32 位）；
 - `timelineCount == 8`（`hwSignal.timeline` 为 3-bit）；
 - `eventGroupCount == 32`（`hwSignal.group` 为 5-bit）；
 - `addressWidth <= xlen`；
-- fault/trap 字段足以覆盖寄存器规范。
+- `faultKindWidth >= 3`（当前定义 kind 0..4）；fault/trap 字段足以覆盖寄存器规范。
 
 当前 RTL 的 `QueenConfig` 已实现 `qrdDepth = 16`（`require(qrdDepth >= 1)`），它既是 QRD 在途表 entry 数，也是每个来源响应 FIFO 的深度；深度不必是 2 的幂（物理索引用 `% qrdDepth` 取槽，与计数寄存器分离）。已实现 `memDepth = 8`（`require(memDepth >= 1)`），为 polling/atomic 内存主接口的在途事务数。已实现 `flushQuietCycles = 8`（`require(flushQuietCycles >= 1)`），为 flush 排空后到拉 `flushAck` 之间要求连续无扰动的拍数。`frontendDepth`/`addressWidth` 仍是目标契约字段，当前 RTL 无对应参数（内存地址宽度直接用 `xlen`）。
 
@@ -957,7 +959,7 @@ elaboration 阶段至少检查：
 7. `error=1` 的 completion 不得携带有效目标（5.4）。
 8. 设备不做 `group`/`timeline` 的范围检查（它不知道 Queen 的 `eventGroupCount`）。越界目标由 Queen 在应用时丢弃并上报 fault。
 9. 一条 `RUN` 只能指向**一个** group 或一个 timeline；同组内可用 mask 一次置多位。跨多 group 置位需要多条 `RUN` 或软件 `SIGNAL_EVENT`。
-10. flush/reset 后两个寄存器取复位值 0，已采样但未应用的信号一律作废。
+10. **reset** 后两个寄存器取复位值 0。**flush 不复位寄存器**——它们保持软件写入的值；但已采样未应用的信号一律作废（在途工作被丢弃或终止，其 completion 不再被 Queen 接受）。
 
 ### 13.3 块 1：trace 契约（QN-F020）
 
@@ -1038,7 +1040,7 @@ QRD beat    : cmd.ready = 设备自己的读处理能力（能收下这条读并
 - **同端点读响应必须按请求序返回**（硬义务）。Queen 的在途表 entry 不存 `regAddr`、不打 tag，队头只按来源配对响应；设备若乱序返回，数据会被写进错误的 `rd` 且 Queen 无法检测。跨端点乱序是允许的，由 Queen 三个来源 FIFO 吸收。
 - `RUN` 被接受后，后续 `QWR` 不得改变该次已提交配置。
 - 若设备要求每条命令全量配置（如双 bank 不继承旧值），必须在自己的规格中写明；Queen ISA 默认允许增量配置。该要求只适用于设备私有区，公共契约区寄存器不参与 bank 切换（13.2）。
-- flush/reset 后 credit 与 Queen 重新对齐，公共区寄存器取复位值。
+- flush 后 credit 必须与 Queen 重新对齐。**flush 不复位任何寄存器**（公共区与私有区都不复位），只有 reset 才把寄存器取复位值。flush 要清的是在途工作与已采样未应用的上下文，不是配置。
 - **flush 四相握手是硬义务**（时序见 5.5，设备侧动作见 13.10）：`flushReq` 拉起后必须丢弃已收未执行的命令、终止或等完运行中工作、不再产生属于旧 context 的 completion，然后才能拉 `flushAck`；`flushAck` 落下前不得开始新工作。不支持安全 abort 的设备必须等当前工作自然结束，不得提前回 ack。
 
 并行 beat 带来的设备侧义务（5.2 的切分规则是 Queen 侧保证）：
@@ -1129,11 +1131,11 @@ RegIf 其余端口的去向：`cfgRegs` → 执行逻辑的配置输入（live �
 1. 丢弃已收下但尚未开始执行的命令；
 2. 终止运行中工作，或等它自然结束（不支持安全 abort 就必须等，不得提前回 ack）；
 3. 保证不再产生属于旧 context 的 completion，已采样未回传的副本一并作废；
-4. credit 与 Queen 重新对齐，公共契约区寄存器取复位值。
+4. credit 与 Queen 重新对齐。**不要复位寄存器**——flush 只丢弃在途工作与已采样上下文，配置保持软件写入的值。
 
 `flushAck` 落下前不得开始新工作。
 
-**RegIf 不含 flush 处理**：它没有 flush 端口，shadow/live 与中断寄存器都不会因 flush 复位。第 4 条要设备自己加——给 RegIf 包一层复位门控，或自行维护公共区复位。
+**RegIf 不需要 flush 端口**：flush 不复位寄存器，shadow/live、公共区与中断寄存器都保持原值，这正是契约要求的行为。设备只需在自己的执行侧丢弃在途工作与已采样上下文，不必给 RegIf 包复位门控。
 
 #### 13.10.6 三个不能照抄的地方
 

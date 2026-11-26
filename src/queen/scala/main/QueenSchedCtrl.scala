@@ -31,7 +31,7 @@ class QueenSchedCtrl(val cfg: QueenConfig) extends Module {
         val events = Input(Vec(cfg.eventGroupCount, UInt(32.W)))
         val timelines = Input(Vec(cfg.timelineCount, UInt(32.W)))
         val faultValid = Input(Bool())
-        val faultKind = Input(UInt(3.W))
+        val faultKind = Input(UInt(cfg.faultKindWidth.W))
         val faultEndpoint = Input(UInt(2.W))
         val faultCode = Input(UInt(cfg.faultCodeWidth.W))
         // 不含本模块与在途 QRD：读 IDLE 的那条 QRD 若计入自身，读回值恒 0。

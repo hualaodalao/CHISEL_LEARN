@@ -36,7 +36,6 @@ case class QueenDsaRegIfConfig(
         s"QueenDsaRegIf: numStatusRegs($numStatusRegs) 须落在 0..32")
     require(intrWidth >= 1 && intrWidth <= 32,
         s"QueenDsaRegIf: intrWidth($intrWidth) 须落在 1..32")
-    require(qcfg.xlen == 32, s"QueenDsaRegIf: 寄存器宽度固定 32，xlen(${qcfg.xlen}) 须为 32")
 
     def lanes: Int = qcfg.nativeWidth
 }

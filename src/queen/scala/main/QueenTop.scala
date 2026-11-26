@@ -41,7 +41,7 @@ class QueenTop(val cfg: QueenConfig = QueenConfig()) extends Module {
         val events = Output(Vec(cfg.eventGroupCount, UInt(32.W)))
         val timelines = Output(Vec(cfg.timelineCount, UInt(32.W)))
         val faultValid = Output(Bool())
-        val faultKind = Output(UInt(3.W))
+        val faultKind = Output(UInt(cfg.faultKindWidth.W))
         val faultEndpoint = Output(UInt(2.W))
         val faultCode = Output(UInt(cfg.faultCodeWidth.W))
         val faultIrq = Output(Bool())
@@ -140,7 +140,7 @@ class QueenTop(val cfg: QueenConfig = QueenConfig()) extends Module {
     schedCtrl.io.timelines := sync.io.timelines
 
     private val faultValid = RegInit(false.B)
-    private val faultKind = RegInit(0.U(3.W))
+    private val faultKind = RegInit(0.U(cfg.faultKindWidth.W))
     private val faultEndpoint = RegInit(0.U(2.W))
     private val faultCode = RegInit(0.U(cfg.faultCodeWidth.W))
 
@@ -175,7 +175,7 @@ class QueenTop(val cfg: QueenConfig = QueenConfig()) extends Module {
     // 只保留最新一条；同拍多源按固定优先级取一条。新错误优先于清除。
     when(sel.asUInt.orR) {
         faultValid := true.B
-        faultKind := field(s => s.kind.U(3.W))
+        faultKind := field(s => s.kind.U(cfg.faultKindWidth.W))
         faultEndpoint := field(s => s.ep)
         faultCode := field(_.code)
     }.elsewhen(flush.io.clearState) {
