@@ -16,7 +16,7 @@ class LmRouter8x8Spec extends AnyFlatSpec with Matchers with ChiselSim {
   )
 
   private val ir = Ir.fromJson(
-    Json.parse(Files.readString(Paths.get("src/loom/examples/minimal_8x8.json"))))
+    Json.parse(Files.readString(Paths.get("src/loom/testdata/v1/minimal_8x8.json"))))
   private val p = FabricParams.fromIr(ir)
 
   private def init(dut: LmTop): Unit = {

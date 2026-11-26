@@ -1,5 +1,10 @@
 package loom
 
+import java.io.{ByteArrayOutputStream, PrintStream}
+import java.nio.file.{Files, Paths}
+
+import loom.chi.ChiWidths
+import loom.ir.ChiBlockV2
 import loom.report.TbGen
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -60,5 +65,69 @@ class TbGenSpec extends AnyFlatSpec with Matchers {
     tb should not include "io_perf_returnSlots_0 = '0;"
     tb should include("$finish;")
     TbGen.testbench("LmDemoTop", sample) shouldBe tb
+  }
+
+  // ==========================================================================
+  // CHI stimulus skeleton (S5, GEN-17 tb row). The v1 block above stays green:
+  // TbGen.testbench is kept for legacy tests until S6.
+  // ==========================================================================
+  behavior of "TbGen (CHI stimulus skeleton, GEN-17 tb row)"
+
+  it should "generate ReadNoSnp/WriteNoSnpFull transaction skeletons with TxnID/NodeID fields" in {
+    val tb = TbGen.testbenchV2("LmDemoTop", sample, ChiBlockV2())
+    tb should include("module LmDemoTop_tb;")
+    // REQ -> DBIDResp -> DAT -> Comp sequences (PS §5 flows).
+    tb should include("task automatic chi_read_no_snp(")
+    tb should include("task automatic chi_write_no_snp_full(")
+    tb should include("OP_READ_NO_SNP")
+    tb should include("OP_WRITE_NO_SNP_FULL")
+    tb should include("OP_DBID_RESP")
+    tb should include("OP_COMP")
+    tb should include("OP_COMP_DATA")
+    tb should include("OP_NON_COPY_BACK_WR_DATA")
+    tb should include("TxnID=DBID")
+    // ENC-04/05: TxnID/DBID and SrcID/TgtID field widths.
+    tb should include("localparam int TXN_ID_WIDTH = 8;")
+    tb should include("localparam int NODE_ID_WIDTH = 7;")
+    tb should include("[TXN_ID_WIDTH-1:0] txn_id")
+    tb should include("[NODE_ID_WIDTH-1:0] src_id")
+    tb should include("[NODE_ID_WIDTH-1:0] tgt_id")
+  }
+
+  it should "derive the 64B DAT flit count from chi.datWidth (ENC-01 golden anchor)" in {
+    Seq(128, 256, 512).foreach { w =>
+      val tb = TbGen.testbenchV2("LmDemoTop", sample, ChiBlockV2(datWidth = w))
+      tb should include(s"localparam int DAT_WIDTH = $w;")
+      tb should include(s"localparam int BE_WIDTH = ${ChiWidths.beWidth(w)};")
+      tb should include(s"localparam int FLITS_64B = ${ChiWidths.flitCount(64, w)};")
+    }
+    // 128->4, 256->2, 512->1 (no 64b tier, D5).
+    ChiWidths.flitCount(64, 128) shouldBe 4
+    ChiWidths.flitCount(64, 256) shouldBe 2
+    ChiWidths.flitCount(64, 512) shouldBe 1
+  }
+
+  it should "keep zeroed inputs and stay deterministic" in {
+    val tb = TbGen.testbenchV2("LmDemoTop", sample, ChiBlockV2())
+    tb should include("io_master_0_valid = '0;")
+    tb should include("io_master_0_bits_addr = '0;")
+    tb should not include "io_master_0_ready = '0;"
+    tb should include("chi_read_no_snp('0, '0, '0, '0);")
+    tb should include("chi_write_no_snp_full('0, '0, '0, '0);")
+    tb should include("$finish;")
+    TbGen.testbenchV2("LmDemoTop", sample, ChiBlockV2()) shouldBe tb
+  }
+
+  it should "wire the CHI skeleton into loom emit tb output (GEN-17 tb row, S5)" in {
+    val out = Files.createTempDirectory("loom-tbgen-v2")
+    val buf = new ByteArrayOutputStream()
+    Console.withOut(new PrintStream(buf, true, "UTF-8")) {
+      LoomMain.runEmit(List("--config", "src/loom/examples/ring_4.json", "--out", out.toString))
+    }
+    val tb = Files.readString(out.resolve("tb/ChiNetworkTop_tb.sv"))
+    tb should include("task automatic chi_read_no_snp(")
+    tb should include("task automatic chi_write_no_snp_full(")
+    tb should include("localparam int FLITS_64B = 2;")
+    tb should include("localparam int TXN_ID_WIDTH = 8;")
   }
 }

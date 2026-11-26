@@ -16,7 +16,7 @@ class LmWrapperSpec extends AnyFlatSpec with Matchers with ChiselSim {
   )
 
   private val ir = Ir.fromJson(
-    Json.parse(Files.readString(Paths.get("src/loom/examples/chain_split.json"))))
+    Json.parse(Files.readString(Paths.get("src/loom/testdata/v1/chain_split.json"))))
   private val net = NetworkParams.fromIr(ir)
   private val front = PartitionParams.fromIr(ir, net, ir.partitions.find(_.name == "front").get)
   private val back = PartitionParams.fromIr(ir, net, ir.partitions.find(_.name == "back").get)

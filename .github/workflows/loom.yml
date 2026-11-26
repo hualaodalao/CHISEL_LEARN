@@ -26,7 +26,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y verilator yosys
       - name: compile
         run: sbt -batch Test/compile
-      - name: unit and simulation tests
+      # S6/MIG-11: the legacy four-channel suites live in src/loom/legacy/
+      # (outside the compiled source paths) and are intentionally not run here.
+      - name: unit and simulation tests (loom/v2 CHI caliber)
         run: sbt -J-Xmx6G -batch "testOnly loom.*"
-      - name: CI matrix
+      - name: CI matrix (v2 examples, CHI tops)
         run: ./src/loom/scripts/ci_matrix.sh

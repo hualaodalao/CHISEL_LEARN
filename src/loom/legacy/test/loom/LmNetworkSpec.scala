@@ -17,7 +17,7 @@ class LmNetworkSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
   private def load(name: String): NetworkParams =
     NetworkParams.fromIr(Ir.fromJson(
-      Json.parse(Files.readString(Paths.get(s"src/loom/examples/$name.json")))))
+      Json.parse(Files.readString(Paths.get(s"src/loom/testdata/v1/$name.json")))))
 
   private def init(dut: LmNetworkTop, p: NetworkParams): Unit = {
     for (i <- 0 until p.nMaster) {

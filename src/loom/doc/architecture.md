@@ -1,6 +1,15 @@
 # Loom 互联生成套件架构规范 v1.1
 
-> 状态：v1.1 发布（2026-11-20） | 发布记录见 [release_notes_v1.0.md](release_notes_v1.0.md)、[release_notes_v1.1.md](release_notes_v1.1.md) | 范围：可重构、可自动化、构造性无死锁的片内互联生成套件
+> **口径更新（S6，2026-11-25）**：用户配置与生成管线已切换为 CHI 原生口径（`loom/v2`）。
+> 本文的 v1.1 正文按历史保留：其中 **MNet/SNet、四通道（rreq/wdata/rdata/wresp）、
+> burst/beat 信用、(src,id)、native/AxiLite4/TL-UL 协议壳、banked switch** 等概念已退役，
+> 不再是用户口径（对应实现隔离于 `src/loom/legacy/`）。现行权威规格：
+> [ir_gen_spec.md](ir_gen_spec.md)（IR v2 / 门禁 / GEN 管线 / CLI）与
+> [protocol_spec.md](protocol_spec.md)（CHI 硬件）。节点角色（RN/SN/HN/MN）+ NodeID、
+> SAM、REQ/RSP/DAT/SNP 通道类、QoS(4b)→VC、三级流控为现行术语。
+> 方法论（IR→门禁→CDG 无环证明→发射→形式化/签核）不变。
+
+> 状态：v1.1 发布（2026-11-20，历史正文） | 发布记录见 [release_notes_v1.0.md](release_notes_v1.0.md)、[release_notes_v1.1.md](release_notes_v1.1.md) | 范围：可重构、可自动化、构造性无死锁的片内互联生成套件
 > 上游调研：[DEEP_RESEARCH_selfdeveloped_interconnect.md](../../../DEEP_RESEARCH_selfdeveloped_interconnect.md)
 
 ## 0. 范围、裁定与术语

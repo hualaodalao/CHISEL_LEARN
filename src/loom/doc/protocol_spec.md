@@ -18,7 +18,7 @@
 
 ### 1.1 目的
 
-本文定义 Loom CHI 互连生成层（`loom.chi` 包）的协议层 feature、各 block 的接口/用法/功能、flit 数据表示、配置约束、时序复位、异常处理与实现限制。Loom 把 loom/v1 IR 描述的拓扑编译为 CHI 原生互连 RTL；本文是生成产物对外契约与内部 block 行为的权威依据。
+本文定义 Loom CHI 互连生成层（`loom.chi` 包）的协议层 feature、各 block 的接口/用法/功能、flit 数据表示、配置约束、时序复位、异常处理与实现限制。Loom 把 loom/v2 IR（loom/v1 输入自动升级，见 ir_gen_spec.md MIG-01–09）描述的拓扑编译为 CHI 原生互连 RTL；本文是生成产物对外契约与内部 block 行为的权威依据。
 
 ### 1.2 范围
 

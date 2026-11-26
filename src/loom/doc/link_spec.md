@@ -1,6 +1,16 @@
 # Loom Link / Transaction Spec（草案 v0.1）
 
-> 日期：2026-11-20 | 状态：评审中 | 适用范围：`src/loom` 的 Router 直连 link、MNet/SNet 端口与 shell 边界
+> **⚠ 已废弃（S6，2026-11-25，ir_gen_spec.md MIG-11）**：本文定义的四通道运输口径
+> （rreq/wdata/rdata/wresp、burst/beat、(src,id)、MNet/SNet 共享端口、burst 信用）已随
+> `loom/v1` 退役，不再是用户契约。权威规格：
+> - **CHI 协议与链路层**：[protocol_spec.md](protocol_spec.md)（REQ/RSP/DAT/SNP 通道类、
+>   L-Credit/P-Credit/DBID 三级流控、flit 编码）；
+> - **用户配置与生成管线（loom/v2）**：[ir_gen_spec.md](ir_gen_spec.md)。
+>
+> 本文内容仅作历史参考保留一个版本，对应实现已隔离至 `src/loom/legacy/`（见其 README），
+> 随后删除。请勿依据本文新增配置或 RTL。
+
+> 日期：2026-11-20 | 状态：已废弃（历史保留） | 适用范围：`src/loom` 的 Router 直连 link、MNet/SNet 端口与 shell 边界
 >
 > 本文与 `architecture.md` 配套：架构文档定义系统级约束，本文定义一条 link 上"传什么、怎么传、何时算完成"。
 

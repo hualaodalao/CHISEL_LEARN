@@ -1,0 +1,184 @@
+{
+  "schema": "loom/v1",
+  "meta": {
+    "name": "ring_3_bidir"
+  },
+  "clockDomains": [
+    {
+      "id": "core",
+      "freqMHz": 1000
+    }
+  ],
+  "qos": {
+    "classes": [
+      {
+        "name": "ctl",
+        "vcs": 1,
+        "depth": 4,
+        "arbitration": "wrr",
+        "weight": 4,
+        "maxPacketBeats": 1
+      },
+      {
+        "name": "lat",
+        "vcs": 1,
+        "depth": 8,
+        "arbitration": "wrr",
+        "weight": 2,
+        "maxPacketBeats": 2
+      },
+      {
+        "name": "bulk",
+        "vcs": 2,
+        "depth": 16,
+        "arbitration": "wrr",
+        "weight": 1,
+        "maxPacketBeats": 4
+      }
+    ]
+  },
+  "endpoints": [
+    {
+      "id": "m0",
+      "role": "master",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "outstanding": 4,
+      "clock": "core",
+      "qos": "bulk",
+      "attach": "mnet0"
+    },
+    {
+      "id": "m1",
+      "role": "master",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "outstanding": 4,
+      "clock": "core",
+      "qos": "lat",
+      "attach": "mnet1"
+    },
+    {
+      "id": "s0",
+      "role": "slave",
+      "protocol": "native",
+      "dataWidth": 128,
+      "addrWidth": 32,
+      "clock": "core",
+      "attach": "snet0"
+    }
+  ],
+  "fabric": {
+    "mnet": [
+      {
+        "name": "mnet0",
+        "clock": "core"
+      },
+      {
+        "name": "mnet1",
+        "clock": "core"
+      }
+    ],
+    "snet": [
+      {
+        "name": "snet0",
+        "clock": "core"
+      }
+    ],
+    "routers": [
+      {
+        "name": "r0",
+        "in": 2,
+        "out": 2,
+        "clock": "core",
+        "switch": {
+          "kind": "flat",
+          "banks": 1
+        }
+      },
+      {
+        "name": "r1",
+        "in": 2,
+        "out": 2,
+        "clock": "core",
+        "switch": {
+          "kind": "flat",
+          "banks": 1
+        }
+      },
+      {
+        "name": "r2",
+        "in": 2,
+        "out": 2,
+        "clock": "core",
+        "switch": {
+          "kind": "flat",
+          "banks": 1
+        }
+      }
+    ],
+    "links": [
+      {
+        "from": "mnet0",
+        "to": "r0",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "mnet1",
+        "to": "r2",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "r1",
+        "to": "snet0",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "r0",
+        "to": "r1",
+        "width": 128,
+        "pipe": 0,
+        "dateline": true
+      },
+      {
+        "from": "r1",
+        "to": "r2",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "r2",
+        "to": "r0",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "r1",
+        "to": "r0",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "r2",
+        "to": "r1",
+        "width": 128,
+        "pipe": 0
+      },
+      {
+        "from": "r0",
+        "to": "r2",
+        "width": 128,
+        "pipe": 0
+      }
+    ],
+    "timing": {
+      "maxFanin": 8,
+      "maxCombDepth": 12
+    }
+  }
+}

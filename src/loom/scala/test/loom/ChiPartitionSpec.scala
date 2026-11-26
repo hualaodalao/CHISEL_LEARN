@@ -18,7 +18,7 @@ class ChiPartitionSpec extends AnyFlatSpec with Matchers with ChiselSim {
   )
 
   private val ir = Ir.fromJson(Json.parse(
-    Files.readString(Paths.get("src/loom/examples/chain_4r.json"))))
+    Files.readString(Paths.get("src/loom/testdata/v1/chain_4r.json"))))
   private val full = ChiNetworkParams.fromIr(ir)
   private val ppA = ChiPartitionParams("A", full, Seq(0, 1), pipe = 1)
   private val ppB = ChiPartitionParams("B", full, Seq(2, 3), pipe = 1)

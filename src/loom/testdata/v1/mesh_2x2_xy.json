@@ -1,0 +1,41 @@
+{
+  "schema": "loom/v1",
+  "meta": { "name": "mesh_2x2_xy" },
+  "clockDomains": [ { "id": "core", "freqMHz": 1000 } ],
+  "qos": {
+    "classes": [
+      { "name": "ctl",  "vcs": 1, "depth": 4,  "arbitration": "wrr", "weight": 4, "maxPacketBeats": 1 },
+      { "name": "lat",  "vcs": 1, "depth": 8,  "arbitration": "wrr", "weight": 2, "maxPacketBeats": 2 },
+      { "name": "bulk", "vcs": 2, "depth": 16, "arbitration": "wrr", "weight": 1, "maxPacketBeats": 4 }
+    ]
+  },
+  "endpoints": [
+    { "id": "m0", "role": "master", "protocol": "native", "dataWidth": 128, "addrWidth": 32, "outstanding": 4, "clock": "core", "qos": "bulk", "attach": "mnet0" },
+    { "id": "m1", "role": "master", "protocol": "native", "dataWidth": 128, "addrWidth": 32, "outstanding": 4, "clock": "core", "qos": "ctl",  "attach": "mnet0" },
+    { "id": "s0", "role": "slave",  "protocol": "native", "dataWidth": 128, "addrWidth": 32, "clock": "core", "attach": "snet0" },
+    { "id": "s1", "role": "slave",  "protocol": "native", "dataWidth": 128, "addrWidth": 32, "clock": "core", "attach": "snet0" }
+  ],
+  "fabric": {
+    "mnet": [ { "name": "mnet0", "clock": "core" } ],
+    "snet": [ { "name": "snet0", "clock": "core" } ],
+    "routers": [
+      { "name": "r00", "in": 3, "out": 2, "clock": "core", "switch": { "kind": "flat", "banks": 1 }, "pos": { "x": 0, "y": 0 }, "routing": "xy" },
+      { "name": "r10", "in": 2, "out": 2, "clock": "core", "switch": { "kind": "flat", "banks": 1 }, "pos": { "x": 1, "y": 0 }, "routing": "xy" },
+      { "name": "r01", "in": 2, "out": 2, "clock": "core", "switch": { "kind": "flat", "banks": 1 }, "pos": { "x": 0, "y": 1 }, "routing": "xy" },
+      { "name": "r11", "in": 2, "out": 3, "clock": "core", "switch": { "kind": "flat", "banks": 1 }, "pos": { "x": 1, "y": 1 }, "routing": "xy" }
+    ],
+    "links": [
+      { "from": "mnet0", "to": "r00", "width": 128, "cdc": "sync", "pipe": 0 },
+      { "from": "r00", "to": "r10", "width": 128, "cdc": "sync", "pipe": 1 },
+      { "from": "r10", "to": "r00", "width": 128, "cdc": "sync", "pipe": 1 },
+      { "from": "r00", "to": "r01", "width": 128, "cdc": "sync", "pipe": 1 },
+      { "from": "r01", "to": "r00", "width": 128, "cdc": "sync", "pipe": 1 },
+      { "from": "r10", "to": "r11", "width": 128, "cdc": "sync", "pipe": 1 },
+      { "from": "r11", "to": "r10", "width": 128, "cdc": "sync", "pipe": 1 },
+      { "from": "r01", "to": "r11", "width": 128, "cdc": "sync", "pipe": 1 },
+      { "from": "r11", "to": "r01", "width": 128, "cdc": "sync", "pipe": 1 },
+      { "from": "r11", "to": "snet0", "width": 128, "cdc": "sync", "pipe": 0 }
+    ],
+    "timing": { "maxFanin": 8, "maxCombDepth": 12 }
+  }
+}

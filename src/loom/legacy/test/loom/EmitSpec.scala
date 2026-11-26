@@ -10,7 +10,7 @@ import org.scalatest.matchers.should.Matchers
 import scala.jdk.CollectionConverters._
 
 class EmitSpec extends AnyFlatSpec with Matchers {
-  private val text = Files.readString(Paths.get("src/loom/examples/minimal_4x4.json"))
+  private val text = Files.readString(Paths.get("src/loom/testdata/v1/minimal_4x4.json"))
   private val params = FabricParams.fromIr(Ir.fromJson(Json.parse(text)))
 
   "Loom emission" should "produce identical RTL for the same IR" in {

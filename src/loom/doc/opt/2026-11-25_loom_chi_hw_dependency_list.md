@@ -19,6 +19,7 @@
 | HW-05 | SAM 未命中译码到 NodeID 0 | `chi/ChiParams.scala` ChiSamDecode：unmapped → NodeID 0，无 NDERR 响应 | NI 包装或协议引擎对未命中地址返回 NDERR（Comp/DBIDResp 携带 RespErr=NDERR），不得静默路由到 0 号节点 | SEM-05、ENC-07（OQ-09） | 首版 SEM-05 标注"协议层预留"；校验保证配置不产生未命中（全覆盖窗口或显式 default 窗口） |
 | HW-06 | CHI 分区发射顶层缺失 | v1 有 LmPartitionTop/LmWrapperTop/LmPartitionStub；`chi/` 无对应物 | ChiPartitionTop（边界 link 变登记过的 CHI 端口，每通道类 ≥1 pipe）、ChiWrapperTop（回接整网，async 边界依赖 HW-04）、ChiPartitionStub（对端占位） | SEM-16、GEN-01 阶段8、GEN-17 ports.json（OQ-08） | S4 交付分区门禁 + ports 报告；partitions 非空时发射报错指引，待 HW-06 闭合后接通 |
 | HW-07 | fabric 参数不被 CHI 硬件消费 | `chi/ChiNetwork.scala` ChiNetworkParams 忽略 link.width/direction；`ChiRouter4` 队列 depth=2 固定 | 确认消费边界：width 应由 chi.datWidth 派生（GEN 可收敛）；direction=forward 的单向链路 CHI 路由是否支持须硬件表态；队列 depth 是否随 lcreditDepth/BDP 可配 | IR-48–51、IR-56、CHK-20/31（OQ-05 余项） | width 由 datWidth 派生校验；direction 保留（G1 需要）；depth 固定值写入报告口径 |
+| HW-08 | 分区顶层无 MN/DVM 逻辑 | `chi/ChiPartition.scala` ChiPartitionTop 本地口仅 RN/SN，hn-i/mn 被丢弃（S4 勘查发现；ChiNetworkTop 已接 ChiDvmMn，分区侧未对标） | ChiPartitionTop 补 MN 实例化与 SNP 广播/收集接线（对标 ChiNetworkTop L70–89），HN-I 占位口对齐 | SEM-16、GEN-17（S4 发现） | GEN 守护：partitions 非空且含 rn-d/mn/hn-i 时 elaboration 显式报错（ChiAssemble.partitionParams），不静默发射 |
 
 ## 2. 硬件疑问（HQ）
 
@@ -76,7 +77,7 @@ formal 10/10 PASS。网络级 async/NI/分区 CLI 集成为 GEN 消费点（IR c
 **AQ-01**：
 1. 用现有 `nodes[].kind`（IR-14，六值集合已含 hn-i/mn），不新增 role/nodeKind 第二字段；v1 role 由升级器折算（MIG-02）。HW-01 闭合前 elaboration 报"暂不支持"，schema 不挡。
 2. 同意 **RN→SN→HN→MN** 段序，段内按节点声明序确定性分配；显式 `nodeId` 覆盖优先（SEM-03），冲突/越界报 CHK；总节点数 ≤ 2^nodeIdWidth。
-3. 同意 **SAM 仅 SN**（IR-24/CHK-17 已如此）；hn-i 一期端口+路由占位不进 SAM；MN 由 DVMOp TgtID 直达。增补：dvmEnable=true 时要求**恰好 1 个 mn**（CHK-19 变体），GEN 派生其 NodeID 作 elaboration 参数传 RN-D/MN，不走 SAM。
+3. 同意 **SAM 仅 SN**（IR-24/CHK-17 已如此）；hn-i 一期端口+路由占位不进 SAM；MN 由 DVMOp TgtID 直达。增补：**存在 rn-d 时须恰好 1 个 mn，mn 恒 ≤1**（CHK-19 变体；dvmEnable=true 本身不强制 mn），GEN 派生其 NodeID 作 elaboration 参数传 RN-D/MN，不走 SAM。
 
 **AQ-02**：
 1. CDG 按 D11 条件展开：**dateline 环上 link 展全 VC 顶点，非环 link 只展 half0**（不造不存在的 half1 路径）；通道类按生成配置纳入（snp 仅 dvmEnable）。依赖边：router 内同 (通道类,vc) 输入→输出；cut link 上 half0→half1 过渡边，half1 永不回 half0。

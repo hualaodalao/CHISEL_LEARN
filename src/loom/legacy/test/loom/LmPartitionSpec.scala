@@ -7,7 +7,7 @@ import chisel3.util._
 import chisel3.simulator.HasSimulator
 import chisel3.simulator.scalatest._
 import loom.ir.{Canonical, Ir, Json}
-import loom.report.Reports
+import loom.report.ReportsV1
 import loom.rtl._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -58,7 +58,7 @@ class LmPartitionSpec extends AnyFlatSpec with Matchers with ChiselSim {
   )
 
   private val ir = Ir.fromJson(
-    Json.parse(Files.readString(Paths.get("src/loom/examples/chain_split.json"))))
+    Json.parse(Files.readString(Paths.get("src/loom/testdata/v1/chain_split.json"))))
   private val net = NetworkParams.fromIr(ir)
   private val frontSpec = ir.partitions.find(_.name == "front").get
   private val backSpec = ir.partitions.find(_.name == "back").get
@@ -96,15 +96,15 @@ class LmPartitionSpec extends AnyFlatSpec with Matchers with ChiselSim {
     back.slaves shouldBe Seq(0, 1)
     front.hash should not be back.hash
 
-    val ports = Reports.portsJson(ir, net, front, "cfg")
-    Canonical.render(ports) shouldBe Canonical.render(Reports.portsJson(ir, net, front, "cfg"))
+    val ports = ReportsV1.portsJson(ir, net, front, "cfg")
+    Canonical.render(ports) shouldBe Canonical.render(ReportsV1.portsJson(ir, net, front, "cfg"))
 
     val asyncIr = Ir.fromJson(
-      Json.parse(Files.readString(Paths.get("src/loom/examples/chain_split_async.json"))))
+      Json.parse(Files.readString(Paths.get("src/loom/testdata/v1/chain_split_async.json"))))
     val asyncNet = NetworkParams.fromIr(asyncIr)
     val asyncFront = PartitionParams.fromIr(asyncIr, asyncNet,
       asyncIr.partitions.find(_.name == "front").get)
-    val asyncPorts = Canonical.render(Reports.portsJson(asyncIr, asyncNet, asyncFront, "cfg"))
+    val asyncPorts = Canonical.render(ReportsV1.portsJson(asyncIr, asyncNet, asyncFront, "cfg"))
     asyncPorts should include("\"localClock\":\"core\"")
     asyncPorts should include("\"peerClock\":\"slow\"")
     asyncPorts should include("\"async\":true")

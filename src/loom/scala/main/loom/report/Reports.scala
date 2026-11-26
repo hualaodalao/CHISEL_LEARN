@@ -1,7 +1,8 @@
 package loom.report
 
+import loom.chi.{ChiNetNode, ChiNetworkParams, ChiNodeKind, ChiPartitionParams, ChiWidths}
+import loom.gen.ChiAssemble
 import loom.ir._
-import loom.rtl.{NetworkParams, PartitionParams}
 
 /** Deterministic report documents written next to emitted RTL.
   * No timestamps and no absolute paths: the same IR must yield the same bytes.
@@ -169,66 +170,9 @@ object Reports {
   private def rounded(x: Double): JNum =
     JNum(BigDecimal(x).setScale(3, BigDecimal.RoundingMode.HALF_UP))
 
-  /** Stable port contract for one partition. Names and ordering are derived
-    * from the IR only, so the file is reproducible across emissions.
-    */
-  def portsJson(
-      ir: Ir,
-      net: NetworkParams,
-      pp: PartitionParams,
-      configHash: String
-  ): JValue = {
-    val masters = ir.endpoints.filter(_.role == "master")
-    val slaves = ir.endpoints.filter(_.role == "slave")
-
-    def epObj(id: String, router: String, port: Int): JValue =
-      JObj(Vector(
-        "id" -> JStr(id),
-        "router" -> JStr(router),
-        "port" -> JNum(BigDecimal(port))
-      ))
-
-    def boundaryEntry(l: loom.rtl.NetLinkSpec, dir: String): (Int, JValue) = {
-      val local = if (dir == "out") l.fromRouter else l.toRouter
-      val peer = if (dir == "out") l.toRouter else l.fromRouter
-      val peerClock = ir.routers.find(_.name == net.routers(peer).name).map(_.clock).getOrElse("?")
-      l.id -> JObj(Vector(
-        "link" -> JNum(BigDecimal(l.id)),
-        "direction" -> JStr(dir),
-        "localRouter" -> JStr(net.routers(local).name),
-        "peerRouter" -> JStr(net.routers(peer).name),
-        "localPort" -> JNum(BigDecimal(if (dir == "out") l.fromPort else l.toPort)),
-        "peerPort" -> JNum(BigDecimal(if (dir == "out") l.toPort else l.fromPort)),
-        "width" -> JNum(BigDecimal(l.width)),
-        "pipe" -> JNum(BigDecimal(l.pipe)),
-        "localClock" -> JStr(pp.clock),
-        "peerClock" -> JStr(peerClock),
-        "async" -> JBool(l.async)
-      ))
-    }
-
-    val boundaryObjs = (pp.outLinks.map(boundaryEntry(_, "out")) ++
-      pp.inLinks.map(boundaryEntry(_, "in")))
-      .sortBy(_._1)
-      .map(_._2)
-
-    JObj(Vector(
-      "schema" -> JStr("loom/ports/v1"),
-      "name" -> JStr(ir.meta.name),
-      "partition" -> JStr(pp.name),
-      "configHash" -> JStr(configHash),
-      "partitionHash" -> JStr(pp.hash),
-      "clock" -> JStr(pp.clock),
-      "boundaryPipe" -> JNum(BigDecimal(pp.pipe)),
-      "masters" -> JArr(pp.masters.map { i =>
-        epObj(masters(i).id, net.routers(net.masterRouter(i)).name, net.masterPort(i))
-      }.toVector),
-      "slaves" -> JArr(pp.slaves.map { j =>
-        epObj(slaves(j).id, net.routers(net.slaveRouter(j)).name, net.slavePort(j))
-      }.toVector),
-      "boundary" -> JArr(boundaryObjs.toVector)
-    ))
-  }
+  // MIG-11 (S6): the v1 partition portsJson moved to
+  // legacy/main/loom/report/ReportsV1.scala with the four-channel fabric;
+  // the CHI caliber replacement is portsJsonV2 below.
 
   /** Artifact manifest: relative path plus SHA-256 for every emitted file. */
   def manifestJson(
@@ -382,5 +326,551 @@ object Reports {
       Seq((l.asyncFifoDepth, reqW), (l.asyncFifoDepth, rspW))
     }
     (vc ++ cdc).toVector
+  }
+
+  // ==========================================================================
+  // loom/v2 report caliber (S4/S5, GEN-17). Additive functions only: the v1
+  // functions above stay for legacy consumers until the next major version
+  // (MIG-10).
+  // ==========================================================================
+
+  /** Derived router port counts (IR-48/49): nLocal + router-facing links per
+    * direction; links are always bidirectional (SEM-13).
+    */
+  def derivedPortsV2(v2: IrV2, router: String): (Int, Int) = {
+    val routerNames = v2.routers.map(_.name).toSet
+    val nLocal = v2.nodes.count(_.attach == router)
+    val in = nLocal + v2.links.count(l => l.to == router && routerNames.contains(l.from))
+    val out = nLocal + v2.links.count(l => l.from == router && routerNames.contains(l.to))
+    (in, out)
+  }
+
+  /** LM-W-TIMING wording preserved (GEN-18) over derived v2 port counts. */
+  def timingWarningsV2(v2: IrV2): List[String] =
+    v2.routers.toList.flatMap { r =>
+      val (in, out) = derivedPortsV2(v2, r.name)
+      if (in > v2.timing.maxFanin || out > v2.timing.maxFanin) {
+        val need = math.max(in, out)
+        val groups = math.max(1, (need + v2.timing.maxFanin - 1) / v2.timing.maxFanin)
+        val suggested = math.max(2, nextPow2(groups))
+        List(
+          s"LM-W-TIMING router ${r.name}: in=$in, out=$out, maxFanin=${v2.timing.maxFanin}; " +
+            s"suggested banks=$suggested (config unchanged)"
+        )
+      } else Nil
+    }
+
+  /** Generated channel classes (SEM-07/D11): snp only when DVM is generated. */
+  def channelsV2(v2: IrV2): Seq[String] =
+    Seq("req", "rsp", "dat") ++ (if (v2.chi.dvmEnable) Seq("snp") else Nil)
+
+  /** chi configuration snapshot plus the ENC-01/05 derived quantities. */
+  def chiSnapshotJson(v2: IrV2): JValue = {
+    val c = v2.chi
+    JObj(Vector(
+      "datWidth" -> JNum(BigDecimal(c.datWidth)),
+      "txnIdWidth" -> JNum(BigDecimal(c.txnIdWidth)),
+      "nodeIdWidth" -> JNum(BigDecimal(c.nodeIdWidth)),
+      "addrWidth" -> JNum(BigDecimal(c.addrWidth)),
+      "outstanding" -> JNum(BigDecimal(c.outstanding)),
+      "atomicEnable" -> JBool(c.atomicEnable),
+      "atomicEntries" -> JNum(BigDecimal(c.atomicEntries)),
+      "dvmEnable" -> JBool(c.dvmEnable),
+      "portMode" -> JStr(c.portMode),
+      "pcrdTypes" -> JNum(BigDecimal(c.pcrdTypes)),
+      "lcreditDepth" -> JNum(BigDecimal(c.lcreditDepth)),
+      "beWidth" -> JNum(BigDecimal(ChiWidths.beWidth(c.datWidth))),
+      "flitCount64B" -> JNum(BigDecimal(ChiWidths.flitCount(64, c.datWidth))),
+      "maxNodes" -> JNum(BigDecimal(1 << c.nodeIdWidth))
+    ))
+  }
+
+  private def kindName(k: ChiNodeKind.Value): String = k match {
+    case ChiNodeKind.RnI => "rn-i"
+    case ChiNodeKind.RnD => "rn-d"
+    case ChiNodeKind.SnF => "sn-f"
+    case ChiNodeKind.SnI => "sn-i"
+    case ChiNodeKind.HnI => "hn-i"
+    case ChiNodeKind.Mn  => "mn"
+    case other           => other.toString
+  }
+
+  /** CHI flit widths derived from the IR tiers; mirrors chi/ChiFlit.scala. */
+  private def flitWidthsV2(v2: IrV2): Seq[(String, Int)] = {
+    val c = v2.chi
+    val nw = c.nodeIdWidth; val tw = c.txnIdWidth; val aw = c.addrWidth
+    val base = Seq(
+      "req" -> (27 + 3 * nw + 2 * tw + aw),
+      "rsp" -> (18 + 2 * nw + 2 * tw),
+      "dat" -> (15 + 3 * nw + tw + ChiWidths.beWidth(c.datWidth) + c.datWidth))
+    if (c.dvmEnable) base :+ ("snp" -> (9 + 3 * nw + 2 * tw + aw)) else base
+  }
+
+  /** v2 SRAM needs: one queue per (router input port, class, VC half) at the
+    * configured L-Credit depth, plus per-direction async FIFOs. Depths are
+    * rounded up to powers of two for macro planning (Sram.singlePort).
+    */
+  def sramNeedsOfV2(v2: IrV2): Vector[(Int, Int)] = {
+    val vcWidth = log2Ceil(3 * 2) // nClasses * nHalf (SEM-08, ring dateline)
+    val widths = flitWidthsV2(v2)
+    val depth = nextPow2(math.max(2, v2.chi.lcreditDepth))
+    val vc = v2.routers.flatMap { r =>
+      val (in, _) = derivedPortsV2(v2, r.name)
+      (0 until in).flatMap(_ => widths.flatMap { case (_, w) =>
+        Seq.fill(2)((depth, w + vcWidth))
+      })
+    }
+    val cdc = v2.links.filter(_.cdc == "async").flatMap { l =>
+      val d = nextPow2(math.max(2, l.asyncFifoDepth))
+      widths.flatMap { case (_, w) => Seq((d, w + vcWidth), (d, w + vcWidth)) }
+    }
+    (vc ++ cdc).toVector
+  }
+
+  /** Shared node/SAM tables (GEN-05 ordering: nodes by NodeID, SAM by base).
+    * Used by estimateJsonV2 and the IR-only chi_nodes rendering.
+    */
+  private def nodeSamTablesV2(v2: IrV2, ids: Seq[Int]): (JValue, JValue) = {
+    val idOf = v2.nodes.map(_.id).zip(ids).toMap
+    def nodeObj(n: NodeV2): JValue =
+      JObj(Vector(
+        "id" -> JStr(n.id), "kind" -> JStr(n.kind),
+        "nodeId" -> JNum(BigDecimal(idOf(n.id))),
+        "clock" -> JStr(n.clock), "attach" -> JStr(n.attach)))
+    val nodesBySeg = v2.nodes.zip(ids).sortBy(_._2).map(_._1)
+    val nodeTable = JObj(Vector(
+      "rn" -> JArr(nodesBySeg.filter(n => n.kind == "rn-i" || n.kind == "rn-d").map(nodeObj).toVector),
+      "sn" -> JArr(nodesBySeg.filter(n => n.kind == "sn-f" || n.kind == "sn-i").map(nodeObj).toVector),
+      "hn" -> JArr(nodesBySeg.filter(_.kind == "hn-i").map(nodeObj).toVector),
+      "mn" -> JArr(nodesBySeg.filter(_.kind == "mn").map(nodeObj).toVector)))
+    val samObjs = v2.sam.sortBy(_.base).map { w =>
+      JObj(Vector(
+        "base" -> JNum(BigDecimal(w.base)), "size" -> JNum(BigDecimal(w.size)),
+        "tgtNode" -> JStr(w.tgtNode), "tgtId" -> JNum(BigDecimal(idOf.getOrElse(w.tgtNode, 0)))))
+    }
+    (nodeTable, JArr(samObjs.toVector))
+  }
+
+  /** GEN-17 estimate row: CHI caliber. Capacity is the DAT flit line rate
+    * (`datWidth/8 * MHz/1000 GB/s`); node/SAM tables, flit widths, three-level
+    * flow-control parameters and the generated channel classes are reported.
+    * The area fit stays the v1 four-channel calibration until CHI PPA (D10).
+    */
+  def estimateJsonV2(v2: IrV2, configHash: String): JValue = {
+    val clockOf: Map[String, String] =
+      v2.routers.map(r => r.name -> r.clock).toMap ++ v2.nodes.map(n => n.id -> n.clock)
+    val freqOf: Map[String, Double] = v2.clockDomains.map(c => c.id -> c.freqMHz).toMap
+    val datWidth = v2.chi.datWidth
+    def capacityGBps(node: String): Double = {
+      val freq = clockOf.get(node).flatMap(freqOf.get).getOrElse(0.0)
+      datWidth / 8.0 * freq / 1000.0
+    }
+
+    val linkObjs = v2.links.map { l =>
+      JObj(Vector(
+        "from" -> JStr(l.from),
+        "to" -> JStr(l.to),
+        "width" -> JNum(BigDecimal(l.width)),
+        "cdc" -> JStr(l.cdc),
+        "pipe" -> JNum(BigDecimal(l.pipe)),
+        "direction" -> JStr("bidirectional"),
+        "dateline" -> JBool(l.dateline),
+        "channels" -> JArr(l.channels.map(JStr(_)).toVector),
+        "lcreditDepth" -> JNum(BigDecimal(l.lcreditDepth)),
+        "capacityGBps" -> rounded(capacityGBps(l.from))
+      ))
+    }
+
+    val ports = v2.routers.map(r => r.name -> derivedPortsV2(v2, r.name)).toMap
+    val routerObjs = v2.routers.map { r =>
+      val (in, out) = ports(r.name)
+      JObj(Vector(
+        "name" -> JStr(r.name),
+        "in" -> JNum(BigDecimal(in)),
+        "out" -> JNum(BigDecimal(out)),
+        "switch" -> JStr("flat"),
+        "banks" -> JNum(BigDecimal(1)),
+        "crosspoints" -> JNum(BigDecimal(in * out))
+      ))
+    }
+
+    val (nodeTable, samJ) = nodeSamTablesV2(v2, ChiAssemble.nodeIds(v2))
+    val flowControl = JObj(Vector(
+      "pcrdTypes" -> JNum(BigDecimal(v2.chi.pcrdTypes)),
+      "outstanding" -> JNum(BigDecimal(v2.chi.outstanding)),
+      "txnIdWidth" -> JNum(BigDecimal(v2.chi.txnIdWidth)),
+      "txnIdSpace" -> JNum(BigDecimal(1 << v2.chi.txnIdWidth)),
+      "dbidWidth" -> JNum(BigDecimal(v2.chi.txnIdWidth)),
+      "lcreditDepth" -> JNum(BigDecimal(v2.chi.lcreditDepth))))
+
+    val crosspoints = ports.values.map { case (in, out) => in * out }.sum
+    val totalPipe = v2.links.map(_.pipe).sum
+    val maxCapacity = if (v2.links.isEmpty) 0.0 else v2.links.map(l => capacityGBps(l.from)).max
+    val latencyProxy = 2 * math.max(1, v2.routers.length) + totalPipe
+
+    val sramShapes = sramNeedsOfV2(v2).filter { case (d, w) => d * w >= Sram.ThresholdBits }
+    val sramBits = sramShapes.map { case (d, w) => d * w }.sum
+    val sramArea = sramBits * Sram.AreaPerBitUm2
+
+    // Same nangate45 fit as v1; banked routers are retired (CHI router flat).
+    val areaFixed = 16694.5
+    val areaPerCrosspoint = 3264.5
+    val areaProxy = areaFixed + areaPerCrosspoint * crosspoints
+    val areaTerms = Seq(
+      "crosspoints" -> areaPerCrosspoint * crosspoints,
+      "fixed" -> areaFixed
+    ).sortBy(-_._2)
+
+    JObj(Vector(
+      "schema" -> JStr("loom/estimate/v1"),
+      "name" -> JStr(v2.meta.name),
+      "configHash" -> JStr(configHash),
+      "links" -> JArr(linkObjs.toVector),
+      "routers" -> JArr(routerObjs.toVector),
+      "nodes" -> nodeTable,
+      "sam" -> samJ,
+      "chi" -> chiSnapshotJson(v2),
+      "flowControl" -> flowControl,
+      "channels" -> JArr(channelsV2(v2).map(JStr(_)).toVector),
+      "totals" -> JObj(Vector(
+        "routers" -> JNum(BigDecimal(v2.routers.length)),
+        "links" -> JNum(BigDecimal(v2.links.length)),
+        "crosspoints" -> JNum(BigDecimal(crosspoints)),
+        "maxLinkCapacityGBps" -> rounded(maxCapacity),
+        "latencyProxyCycles" -> JNum(BigDecimal(latencyProxy)),
+        "areaProxyUm2" -> rounded(areaProxy),
+        "sramBits" -> JNum(BigDecimal(sramBits)),
+        "sramBlocks" -> JNum(BigDecimal(sramShapes.distinct.size)),
+        "sramAreaProxyUm2" -> rounded(sramArea),
+        "totalAreaProxyUm2" -> rounded(areaProxy + sramArea),
+        "datWidth" -> JNum(BigDecimal(datWidth)),
+        "txnIdWidth" -> JNum(BigDecimal(v2.chi.txnIdWidth)),
+        "nodeIdWidth" -> JNum(BigDecimal(v2.chi.nodeIdWidth)),
+        "addrWidth" -> JNum(BigDecimal(v2.chi.addrWidth)),
+        "flitCount64B" -> JNum(BigDecimal(ChiWidths.flitCount(64, datWidth))),
+        "maxNodes" -> JNum(BigDecimal(1 << v2.chi.nodeIdWidth))
+      )),
+      "assumptions" -> JArr(Vector(
+        "capacity = datWidth/8 * clockMHz / 1000 GB/s per direction (DAT flit line rate; REQ/RSP/SNP are narrow flits)",
+        "latency proxy = 2 cycles per router + 1 cycle per pipe stage; excludes arbitration and queueing",
+        "crosspoints = derivedIn * derivedOut; CHI router is flat with one register stage per output",
+        "area proxy = 16694.5 + 3264.5*crosspoints um^2, v1 four-channel nangate45 calibration; CHI calibration pending PPA (D10)",
+        s"SRAM proxy = ${Sram.AreaPerBitUm2} um^2/bit placeholder over memories with depth*width >= ${Sram.ThresholdBits}; not calibrated",
+        "estimate only; not signoff"
+      ).map(JStr(_))),
+      "areaSensitivity" -> JArr(areaTerms.map { case (k, v) =>
+        JObj(Vector("term" -> JStr(k), "um2" -> rounded(v)))
+      }.toVector),
+      "warnings" -> JArr(timingWarningsV2(v2).map(JStr(_)).toVector)
+    ))
+  }
+
+  /** GEN-17 chi_nodes.json: rn/sn/hn/mn tables with attach/localPort, SAM with
+    * tgtNode, and the snpEnable flag.
+    */
+  def chiNodesJsonV2(v2: IrV2, net: ChiNetworkParams): JValue = {
+    val ids = ChiAssemble.nodeIds(v2)
+    val idOfString = v2.nodes.map(_.id).zip(ids).toMap
+    val nodeById = v2.nodes.zip(ids).map { case (n, id) => id -> n }.toMap
+    val routerName = net.routers.map(r => r.index -> r.name).toMap
+    def nodeObj(n: ChiNetNode): JValue = {
+      val src = nodeById(n.nodeId)
+      JObj(Vector(
+        "id" -> JStr(src.id), "kind" -> JStr(kindName(n.kind)),
+        "nodeId" -> JNum(BigDecimal(n.nodeId)), "clock" -> JStr(src.clock),
+        "attach" -> JStr(routerName(n.router)), "localPort" -> JNum(BigDecimal(n.localPort))))
+    }
+    val samObjs = v2.sam.map { w =>
+      JObj(Vector(
+        "base" -> JNum(BigDecimal(w.base)), "size" -> JNum(BigDecimal(w.size)),
+        "tgtNode" -> JStr(w.tgtNode),
+        "tgtId" -> JNum(BigDecimal(idOfString.getOrElse(w.tgtNode, 0)))))
+    }
+    JObj(Vector(
+      "name" -> JStr(net.name),
+      "datWidth" -> JNum(BigDecimal(net.cfg.datWidth)),
+      "rn" -> JArr(net.rn.map(nodeObj).toVector),
+      "sn" -> JArr(net.sn.map(nodeObj).toVector),
+      "hn" -> JArr(net.hn.map(nodeObj).toVector),
+      "mn" -> JArr(net.mn.map(nodeObj).toVector),
+      "sam" -> JArr(samObjs.toVector),
+      "snpEnable" -> JBool(net.snpEnable)
+    ))
+  }
+
+  /** IR-only chi_nodes rendering (no elaboration): the API fallback when
+    * ChiNetworkParams cannot be assembled. localPort is elaboration-owned and
+    * simply absent here; every other GEN-17 chi_nodes key is present.
+    */
+  def chiNodesJsonV2(v2: IrV2): JValue = {
+    val ids =
+      try ChiAssemble.nodeIds(v2)
+      catch { case _: Throwable => v2.nodes.indices }
+    val (nodeTable, samJ) = nodeSamTablesV2(v2, ids)
+    val nodeFields = nodeTable match {
+      case JObj(fs) => fs
+      case _        => Vector.empty[(String, JValue)]
+    }
+    JObj(Vector(
+      "name" -> JStr(v2.meta.name),
+      "datWidth" -> JNum(BigDecimal(v2.chi.datWidth))) ++ nodeFields ++ Vector(
+      "sam" -> samJ,
+      "snpEnable" -> JBool(v2.chi.dvmEnable)))
+  }
+
+  /** GEN-15 addressMap row / GEN-17: the address map IS the SAM. The legacy
+    * v1 keys (explicit/routeShift/stride/slaves[]{id,index,base,size,end})
+    * stay derivable for one version (MIG-10, the GUI reads them unchanged);
+    * the additive `sam[]{base,size,tgtNode,tgtId}` carries the CHI caliber.
+    * `explicit` reflects whether the input declared windows (v2 `sam` key /
+    * v1 slave base/size) as opposed to the derived 4 KB stride layout.
+    */
+  def addressMapJsonV2(v2: IrV2, explicit: Boolean): JValue = {
+    val ids =
+      try ChiAssemble.nodeIds(v2)
+      catch { case _: Throwable => v2.nodes.indices }
+    val idOf = v2.nodes.map(_.id).zip(ids).toMap
+    val wins = v2.sam.sortBy(_.base)
+    val slaveItems = wins.zipWithIndex.map { case (w, i) =>
+      JObj(Vector(
+        "id" -> JStr(w.tgtNode),
+        "index" -> JNum(BigDecimal(i)),
+        "base" -> JStr(f"0x${w.base}%x"),
+        "size" -> JNum(BigDecimal(w.size)),
+        "end" -> JStr(f"0x${w.base + w.size - 1}%x")
+      ))
+    }
+    val samItems = wins.map { w =>
+      JObj(Vector(
+        "base" -> JNum(BigDecimal(w.base)),
+        "size" -> JNum(BigDecimal(w.size)),
+        "tgtNode" -> JStr(w.tgtNode),
+        "tgtId" -> JNum(BigDecimal(idOf.getOrElse(w.tgtNode, 0)))
+      ))
+    }
+    JObj(Vector(
+      "explicit" -> JBool(explicit),
+      "routeShift" -> JNum(BigDecimal(LoomDefaults.RouteShift)),
+      "stride" -> JNum(BigDecimal(AddressMap.DefaultSize)),
+      "slaves" -> JArr(slaveItems.toVector),
+      "sam" -> JArr(samItems.toVector)
+    ))
+  }
+
+  /** GEN-17 checks.json row: the loom/checks/v1 keys (name/configHash/ok/
+    * errors/warnings/gates) over the v2 gate set (G1-REQ/RSP/DAT/SNP, retired
+    * G7 constant true). The S2 interim `hash` key stays one version (MIG-10).
+    */
+  def checksJsonV2(
+      v2: IrV2,
+      configHash: String,
+      errors: List[String],
+      warnings: List[String],
+      gates: Vector[(String, Boolean)]
+  ): JValue =
+    JObj(Vector(
+      "schema" -> JStr("loom/checks/v1"),
+      "name" -> JStr(v2.meta.name),
+      "configHash" -> JStr(configHash),
+      "hash" -> JStr(configHash),
+      "ok" -> JBool(errors.isEmpty),
+      "errors" -> JArr(errors.map(JStr(_)).toVector),
+      "warnings" -> JArr(warnings.map(JStr(_)).toVector),
+      "gates" -> JObj(gates.map { case (k, v) => (k, JBool(v): JValue) })
+    ))
+
+  /** GEN-17 ports.json (partition): v1 keys preserved (masters/slaves map to
+    * RN/SN), plus nodes[] and boundary channels/lcreditDepth.
+    */
+  def portsJsonV2(
+      v2: IrV2,
+      net: ChiNetworkParams,
+      pp: ChiPartitionParams,
+      spec: PartitionSpec,
+      configHash: String
+  ): JValue = {
+    val ids = ChiAssemble.nodeIds(v2)
+    val nodeById = v2.nodes.zip(ids).map { case (n, id) => id -> n }.toMap
+    val routerName = net.routers.map(r => r.index -> r.name).toMap
+    val routerClock = v2.routers.map(r => r.name -> r.clock).toMap
+    val globalLinks = ChiAssemble.routerLinks(v2)
+
+    def nodeObj(n: ChiNetNode): JValue =
+      JObj(Vector(
+        "id" -> JStr(nodeById(n.nodeId).id),
+        "kind" -> JStr(kindName(n.kind)),
+        "nodeId" -> JNum(BigDecimal(n.nodeId)),
+        "router" -> JStr(routerName(n.router)),
+        "port" -> JNum(BigDecimal(n.localPort))))
+
+    def epObj(n: ChiNetNode): JValue =
+      JObj(Vector(
+        "id" -> JStr(nodeById(n.nodeId).id),
+        "router" -> JStr(routerName(n.router)),
+        "port" -> JNum(BigDecimal(n.localPort))))
+
+    val partitionHash = Canonical.hash(JObj(Vector(
+      "name" -> JStr(spec.name), "clock" -> JStr(spec.clock),
+      "members" -> JArr(spec.members.map(JStr(_)).toVector),
+      "boundaryPipe" -> JNum(BigDecimal(spec.boundaryPipe)))))
+
+    val outIds = pp.outLinks.map(_.id).toSet
+    val boundaryObjs = pp.boundary.map { l =>
+      val dir = if (outIds.contains(l.id)) "out" else "in"
+      val local = if (dir == "out") l.fromRouter else l.toRouter
+      val peer = if (dir == "out") l.toRouter else l.fromRouter
+      val src = globalLinks(l.id)
+      JObj(Vector(
+        "link" -> JNum(BigDecimal(l.id)),
+        "direction" -> JStr(dir),
+        "localRouter" -> JStr(routerName(local)),
+        "peerRouter" -> JStr(routerName(peer)),
+        "localPort" -> JNum(BigDecimal(if (dir == "out") l.fromPort else l.toPort)),
+        "peerPort" -> JNum(BigDecimal(if (dir == "out") l.toPort else l.fromPort)),
+        "width" -> JNum(BigDecimal(net.cfg.datWidth)),
+        "pipe" -> JNum(BigDecimal(l.pipe)),
+        "localClock" -> JStr(spec.clock),
+        "peerClock" -> JStr(routerClock.getOrElse(routerName(peer), "?")),
+        "async" -> JBool(src.cdc == "async"),
+        "channels" -> JArr(src.channels.map(JStr(_)).toVector),
+        "lcreditDepth" -> JNum(BigDecimal(src.lcreditDepth))
+      ))
+    }
+
+    JObj(Vector(
+      "schema" -> JStr("loom/ports/v1"),
+      "name" -> JStr(v2.meta.name),
+      "partition" -> JStr(pp.name),
+      "configHash" -> JStr(configHash),
+      "partitionHash" -> JStr(partitionHash),
+      "clock" -> JStr(spec.clock),
+      "boundaryPipe" -> JNum(BigDecimal(pp.pipe)),
+      "masters" -> JArr(pp.rn.map(epObj).toVector),
+      "slaves" -> JArr(pp.sn.map(epObj).toVector),
+      "nodes" -> JArr(pp.nodes.sortBy(_.nodeId).map(nodeObj).toVector),
+      "boundary" -> JArr(boundaryObjs.toVector)
+    ))
+  }
+
+  /** GEN-09: manifest plus the additive irSchema/chi keys. */
+  def manifestJsonV2(
+      name: String,
+      configHash: String,
+      version: String,
+      files: Seq[(String, String)],
+      chi: JValue
+  ): JValue =
+    manifestJson(name, configHash, version, files) match {
+      case JObj(fs) => JObj(fs ++ Vector("irSchema" -> JStr("loom/v2"), "chi" -> chi))
+      case other    => other
+    }
+
+  /** GEN-17/GEN-19: formal report plus the D11 channel-class limitation. */
+  def formalJsonV2(
+      name: String,
+      configHash: String,
+      checks: Seq[(String, String, Boolean, String)]
+  ): JValue =
+    formalJson(name, configHash, checks) match {
+      case JObj(fs) => JObj(fs.map {
+        case ("limitations", JArr(xs)) =>
+          "limitations" -> JArr(xs :+ JStr("proofs cover only the generated channel classes (D11)"))
+        case other => other
+      })
+      case other => other
+    }
+
+  /** GEN-17 signoff: Schema loom/v2, G1 four-key gate table, node/SAM summary. */
+  def signoffMarkdownV2(
+      v2: IrV2,
+      configHash: String,
+      gates: Vector[(String, Boolean)],
+      warnings: List[String],
+      artifactCounts: (Int, Int, Int),
+      formal: Option[JValue]
+  ): String = {
+    val (rtlCount, assertCount, tbCount) = artifactCounts
+    val gateRows = gates.map { case (g, ok) => s"| $g | ${if (ok) "PASS" else "FAIL"} |" }
+    val warnBlock =
+      if (warnings.isEmpty) "- none"
+      else warnings.map(w => s"- $w").mkString("\n")
+    val formalBlock = formal match {
+      case Some(JObj(fields)) =>
+        val checks = fields.toMap.get("checks").collect { case JArr(xs) => xs }.getOrElse(Vector.empty)
+        val rows = checks.map {
+          case JObj(f) =>
+            val m = f.toMap
+            def s(k: String) = m.get(k).collect { case JStr(x) => x }.getOrElse("?")
+            s"| ${s("model")} | ${s("property")} | ${s("result")} |"
+          case _ => "| ? | ? | ? |"
+        }
+        ("| model | property | result |\n|---|---|---|\n" + rows.mkString("\n")) +
+          "\n\nSee formal/formal.json and formal/*.log."
+      case _ =>
+        "Not run. Execute `loom formal --config <cfg> --out <dir>` to add bounded proofs."
+    }
+    val ids = ChiAssemble.nodeIds(v2)
+    val idOf = v2.nodes.map(_.id).zip(ids).toMap
+    val nodeRows = v2.nodes.zip(ids).sortBy(_._2).map { case (n, id) =>
+      s"| ${n.id} | ${n.kind} | $id | ${n.attach} |"
+    }
+    val samRows = v2.sam.sortBy(_.base).map { w =>
+      s"| 0x${w.base.toHexString} | ${w.size} | ${w.tgtNode} | ${idOf.getOrElse(w.tgtNode, "?")} |"
+    }
+
+    val lines = Seq(
+      s"# Loom Signoff - ${v2.meta.name}",
+      "",
+      s"Config hash: `$configHash`",
+      "Schema: `loom/v2`",
+      "",
+      "## Static gates",
+      "",
+      "| gate | result |",
+      "|---|---|"
+    ) ++ gateRows ++ Seq(
+      "",
+      "## Nodes",
+      "",
+      "| id | kind | nodeId | attach |",
+      "|---|---|---|---|"
+    ) ++ nodeRows ++ Seq(
+      "",
+      "## SAM",
+      "",
+      "| base | size | tgtNode | tgtId |",
+      "|---|---|---|---|"
+    ) ++ samRows ++ Seq(
+      "",
+      "## Warnings",
+      "",
+      warnBlock,
+      "",
+      "## Artifacts",
+      "",
+      s"- RTL files: $rtlCount",
+      s"- Assertion files: $assertCount",
+      s"- Testbench skeletons: $tbCount",
+      "",
+      "## Formal (bounded)",
+      "",
+      formalBlock,
+      "",
+      "## Signoff checklist",
+      "",
+      "- [x] Static gates evaluated (table above)",
+      "- [x] Artifacts hashed in manifest.json",
+      "- [x] TB skeleton and assertion list emitted",
+      "- [ ] Bounded formal proofs attached (run `loom formal`)",
+      "- [ ] Area proxy reviewed against the target budget",
+      "- [ ] Integration-level simulation signed by the owner",
+      "",
+      "## Limitations",
+      "",
+      "- The estimate is a planning proxy, not a timing or area signoff.",
+      "- Formal results cover the abstract token models; simulation covers the RTL.",
+      "- Any IR change invalidates this report: re-run `loom emit`."
+    )
+    lines.mkString("\n") + "\n"
   }
 }

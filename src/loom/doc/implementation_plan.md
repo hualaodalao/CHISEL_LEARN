@@ -1,5 +1,11 @@
 # Loom 实施计划 v1.0
 
+> **历史文档（S6，2026-11-25）**：本计划覆盖 v1.0/v1.1 的四通道运输层交付，已完成并归档。
+> 其中的用户口径（MNet/SNet、四通道、burst 信用、协议壳、banked、`blocks` 命令）已随
+> `loom/v1` 退役（ir_gen_spec.md MIG-06/11）。现行计划与规格：
+> [opt/2026-11-25_loom_ir_gen_chi_adaptation_plan.md](opt/2026-11-25_loom_ir_gen_chi_adaptation_plan.md)、
+> [ir_gen_spec.md](ir_gen_spec.md)、[protocol_spec.md](protocol_spec.md)。
+
 > 依据：[architecture.md](architecture.md) v0.1 | 更新：2026-11-19 | 目标：40 周交付 v1.0
 > 估算口径：人月（PM），含设计、编码、单测与文档，不含跨团队评审等待。
 > 当前状态：**S1–S20 全部完成；M0/M1/M2/M3 已过门；v1.0.0 已发布**。v1.1 已实施完成（2026-11-20，见 [v1.1_plan.md](v1.1_plan.md) §7）：async 分区 + 多时钟 wrapper、AXI4 ID、SRAM block/面积拆分、G9 模型；回归 22 suite / **92 用例**全绿；`loom 1.1.0`。

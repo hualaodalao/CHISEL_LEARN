@@ -1,38 +1,65 @@
 {
-  "schema": "loom/v1",
+  "schema": "loom/v2",
   "meta": { "name": "tree_3r" },
   "clockDomains": [ { "id": "core", "freqMHz": 1000 } ],
+  "chi": {
+    "datWidth": 256, "txnIdWidth": 8, "nodeIdWidth": 7, "addrWidth": 32,
+    "outstanding": 64, "atomicEnable": true, "atomicEntries": 4,
+    "dvmEnable": true, "portMode": "chi", "pcrdTypes": 1, "lcreditDepth": 4
+  },
+  "nodes": [
+    { "id": "m0", "kind": "rn-i", "clock": "core", "attach": "r0",
+      "protocol": "chi", "dataWidth": 128, "outstanding": 4, "qos": 0 },
+    { "id": "m1", "kind": "rn-i", "clock": "core", "attach": "r0",
+      "protocol": "chi", "dataWidth": 128, "outstanding": 4, "qos": 0 },
+    { "id": "m2", "kind": "rn-i", "clock": "core", "attach": "r0",
+      "protocol": "chi", "dataWidth": 128, "outstanding": 4, "qos": 4 },
+    { "id": "m3", "kind": "rn-i", "clock": "core", "attach": "r0",
+      "protocol": "chi", "dataWidth": 128, "outstanding": 4, "qos": 8 },
+    { "id": "s0", "kind": "sn-f", "clock": "core", "attach": "r1",
+      "protocol": "chi", "dataWidth": 128, "outstanding": 1 },
+    { "id": "s1", "kind": "sn-f", "clock": "core", "attach": "r1",
+      "protocol": "chi", "dataWidth": 128, "outstanding": 1 },
+    { "id": "s2", "kind": "sn-f", "clock": "core", "attach": "r2",
+      "protocol": "chi", "dataWidth": 128, "outstanding": 1 },
+    { "id": "s3", "kind": "sn-f", "clock": "core", "attach": "r2",
+      "protocol": "chi", "dataWidth": 128, "outstanding": 1 }
+  ],
+  "sam": [
+    { "base": 0,     "size": 4096, "tgtNode": "s0" },
+    { "base": 4096,  "size": 4096, "tgtNode": "s1" },
+    { "base": 8192,  "size": 4096, "tgtNode": "s2" },
+    { "base": 12288, "size": 4096, "tgtNode": "s3" }
+  ],
   "qos": {
+    "mapping": [
+      { "qosMin": 8, "qosMax": 15, "class": "ctl" },
+      { "qosMin": 4, "qosMax": 7,  "class": "lat" },
+      { "qosMin": 0, "qosMax": 3,  "class": "bulk" }
+    ],
     "classes": [
-      { "name": "ctl",  "vcs": 1, "depth": 4,  "arbitration": "wrr", "weight": 4, "maxPacketBeats": 1 },
-      { "name": "lat",  "vcs": 1, "depth": 8,  "arbitration": "wrr", "weight": 2, "maxPacketBeats": 2 },
-      { "name": "bulk", "vcs": 2, "depth": 16, "arbitration": "wrr", "weight": 1, "maxPacketBeats": 4 }
+      { "name": "ctl",  "vcs": 1, "depth": 4,  "arbitration": "wrr", "weight": 4 },
+      { "name": "lat",  "vcs": 1, "depth": 8,  "arbitration": "wrr", "weight": 2 },
+      { "name": "bulk", "vcs": 2, "depth": 16, "arbitration": "wrr", "weight": 1 }
     ]
   },
-  "endpoints": [
-    { "id": "m0", "role": "master", "protocol": "native", "dataWidth": 128, "addrWidth": 32, "outstanding": 4, "clock": "core", "qos": "bulk", "attach": "mnet0" },
-    { "id": "m1", "role": "master", "protocol": "native", "dataWidth": 128, "addrWidth": 32, "outstanding": 4, "clock": "core", "qos": "bulk", "attach": "mnet0" },
-    { "id": "m2", "role": "master", "protocol": "native", "dataWidth": 128, "addrWidth": 32, "outstanding": 4, "clock": "core", "qos": "lat",  "attach": "mnet0" },
-    { "id": "m3", "role": "master", "protocol": "native", "dataWidth": 128, "addrWidth": 32, "outstanding": 4, "clock": "core", "qos": "ctl",  "attach": "mnet0" },
-    { "id": "s0", "role": "slave",  "protocol": "native", "dataWidth": 128, "addrWidth": 32, "clock": "core", "attach": "snet0" },
-    { "id": "s1", "role": "slave",  "protocol": "native", "dataWidth": 128, "addrWidth": 32, "clock": "core", "attach": "snet0" },
-    { "id": "s2", "role": "slave",  "protocol": "native", "dataWidth": 128, "addrWidth": 32, "clock": "core", "attach": "snet1" },
-    { "id": "s3", "role": "slave",  "protocol": "native", "dataWidth": 128, "addrWidth": 32, "clock": "core", "attach": "snet1" }
-  ],
   "fabric": {
-    "mnet": [ { "name": "mnet0", "clock": "core" } ],
-    "snet": [ { "name": "snet0", "clock": "core" }, { "name": "snet1", "clock": "core" } ],
     "routers": [
-      { "name": "r0", "in": 4, "out": 2, "clock": "core", "switch": { "kind": "flat", "banks": 1 } },
-      { "name": "r1", "in": 1, "out": 2, "clock": "core", "switch": { "kind": "flat", "banks": 1 } },
-      { "name": "r2", "in": 1, "out": 2, "clock": "core", "switch": { "kind": "flat", "banks": 1 } }
+      { "name": "r0", "clock": "core" },
+      { "name": "r1", "clock": "core" },
+      { "name": "r2", "clock": "core" }
     ],
     "links": [
-      { "from": "mnet0", "to": "r0", "width": 128, "cdc": "sync", "pipe": 0 },
-      { "from": "r0", "to": "r1", "width": 128, "cdc": "sync", "pipe": 1 },
-      { "from": "r0", "to": "r2", "width": 128, "cdc": "sync", "pipe": 1 },
-      { "from": "r1", "to": "snet0", "width": 128, "cdc": "sync", "pipe": 0 },
-      { "from": "r2", "to": "snet1", "width": 128, "cdc": "sync", "pipe": 0 }
+      { "from": "m0", "to": "r0", "channels": ["req","rsp","dat","snp"] },
+      { "from": "m1", "to": "r0", "channels": ["req","rsp","dat","snp"] },
+      { "from": "m2", "to": "r0", "channels": ["req","rsp","dat","snp"] },
+      { "from": "m3", "to": "r0", "channels": ["req","rsp","dat","snp"] },
+      { "from": "r0", "to": "r1", "channels": ["req","rsp","dat","snp"], "pipe": 1 },
+      { "from": "r0", "to": "r2", "channels": ["req","rsp","dat","snp"], "pipe": 1 },
+      { "from": "r1", "to": "s0", "channels": ["req","rsp","dat","snp"] },
+      { "from": "r1", "to": "s1", "channels": ["req","rsp","dat","snp"] },
+      { "from": "r2", "to": "s2", "channels": ["req","rsp","dat","snp"] },
+      { "from": "r2", "to": "s3", "channels": ["req","rsp","dat","snp"] }
     ],
     "timing": { "maxFanin": 8, "maxCombDepth": 12 }
   }

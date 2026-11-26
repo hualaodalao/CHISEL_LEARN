@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Loom CI matrix: static gates, emission, determinism, report baseline and
-# artifact integrity. Pass --formal to include bounded proofs (nightly).
+# Loom CI matrix (loom/v2 CHI caliber, S6/MIG-12): static gates, emission,
+# determinism, report baseline and artifact integrity over the v2 user
+# examples. Pass --formal to include bounded proofs (nightly).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 FORMAL="${1:-}"
 cd "$ROOT"
 
-EXAMPLES=(minimal_2x2 minimal_4x4 minimal_4x4_banked minimal_8x8 tree_3r chain_4r chain_split chain_split_async mesh_2x2_xy)
+EXAMPLES=(minimal_2x2 minimal_4x4 minimal_4x4_banked minimal_8x8 ring_4 ring_3_bidir tree_3r chain_4r chain_split chain_split_async mesh_2x2_xy)
 
 run() {
   sbt -J-Xmx6G -batch -Dsbt.supershell=false "$@" >/dev/null
@@ -19,7 +20,7 @@ for e in "${EXAMPLES[@]}"; do
 done
 
 echo "[CG2] deterministic emission for representatives"
-for e in minimal_4x4 tree_3r chain_split chain_split_async; do
+for e in minimal_4x4 ring_4 tree_3r chain_split chain_split_async; do
   ./src/loom/scripts/cg2_determinism.sh "src/loom/examples/$e.json" | tail -1
 done
 

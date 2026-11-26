@@ -214,53 +214,53 @@ object Ir {
       FabricNode(str(o, "name", p), str(o, "clock", p))
     }
 
-  private def asObj(v: JValue, path: String): JObj = v match {
+  private[ir] def asObj(v: JValue, path: String): JObj = v match {
     case o: JObj => o
     case _ => throw IrException(s"$path must be an object")
   }
 
-  private def arrOf(v: JValue, path: String): Vector[JValue] = v match {
+  private[ir] def arrOf(v: JValue, path: String): Vector[JValue] = v match {
     case a: JArr => a.items
     case _ => throw IrException(s"$path must be an array")
   }
 
-  private def field(o: JObj, key: String, path: String): JValue =
+  private[ir] def field(o: JObj, key: String, path: String): JValue =
     o.get(key).getOrElse(throw IrException(s"$path.$key is required"))
 
-  private def str(o: JObj, key: String, path: String): String = field(o, key, path) match {
+  private[ir] def str(o: JObj, key: String, path: String): String = field(o, key, path) match {
     case JStr(s) => s
     case _ => throw IrException(s"$path.$key must be a string")
   }
 
-  private def int(o: JObj, key: String, path: String): Int = field(o, key, path) match {
+  private[ir] def int(o: JObj, key: String, path: String): Int = field(o, key, path) match {
     case JNum(n) if n.isValidInt => n.toInt
     case _ => throw IrException(s"$path.$key must be an integer")
   }
 
-  private def num(o: JObj, key: String, path: String): Double = field(o, key, path) match {
+  private[ir] def num(o: JObj, key: String, path: String): Double = field(o, key, path) match {
     case JNum(n) => n.toDouble
     case _ => throw IrException(s"$path.$key must be a number")
   }
 
-  private def optStr(o: JObj, key: String, default: String): String = o.get(key) match {
+  private[ir] def optStr(o: JObj, key: String, default: String): String = o.get(key) match {
     case None => default
     case Some(JStr(s)) => s
     case Some(_) => throw IrException(s"$$.$key must be a string")
   }
 
-  private def optInt(o: JObj, key: String, default: Int): Int = o.get(key) match {
+  private[ir] def optInt(o: JObj, key: String, default: Int): Int = o.get(key) match {
     case None => default
     case Some(JNum(n)) if n.isValidInt => n.toInt
     case Some(_) => throw IrException(s"$$.$key must be an integer")
   }
 
-  private def optLong(o: JObj, key: String, default: Long): Long = o.get(key) match {
+  private[ir] def optLong(o: JObj, key: String, default: Long): Long = o.get(key) match {
     case None => default
     case Some(JNum(n)) if n.isValidLong => n.toLong
     case Some(_) => throw IrException(s"$$.$key must be an integer")
   }
 
-  private def optBool(o: JObj, key: String, default: Boolean): Boolean = o.get(key) match {
+  private[ir] def optBool(o: JObj, key: String, default: Boolean): Boolean = o.get(key) match {
     case None => default
     case Some(JBool(b)) => b
     case Some(_) => throw IrException(s"$$.$key must be a boolean")

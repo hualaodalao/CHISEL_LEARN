@@ -16,10 +16,10 @@ class ChiNetworkSpec extends AnyFlatSpec with Matchers with ChiselSim {
   )
 
   private val ir = Ir.fromJson(Json.parse(
-    Files.readString(Paths.get("src/loom/examples/chain_4r.json"))))
+    Files.readString(Paths.get("src/loom/testdata/v1/chain_4r.json"))))
 
   private val ir1 = Ir.fromJson(Json.parse(
-    Files.readString(Paths.get("src/loom/examples/minimal_2x2.json"))))
+    Files.readString(Paths.get("src/loom/testdata/v1/minimal_2x2.json"))))
 
   "ChiNetworkParams" should "place RN at r0 and SN at r3 with BFS routes" in {
     val p = ChiNetworkParams.fromIr(ir)

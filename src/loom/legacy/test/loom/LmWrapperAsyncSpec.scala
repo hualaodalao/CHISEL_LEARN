@@ -21,7 +21,7 @@ class LmWrapperAsyncSpec extends AnyFlatSpec with Matchers with ChiselSim {
   )
 
   private val ir = Ir.fromJson(
-    Json.parse(Files.readString(Paths.get("src/loom/examples/chain_split_async.json"))))
+    Json.parse(Files.readString(Paths.get("src/loom/testdata/v1/chain_split_async.json"))))
   private val net = NetworkParams.fromIr(ir)
   private val parts = ir.partitions.map(s => PartitionParams.fromIr(ir, net, s))
 

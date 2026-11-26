@@ -8,7 +8,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 class IrSpec extends AnyFlatSpec with Matchers {
-  private val examplePath = Paths.get("src/loom/examples/minimal_2x2.json")
+  private val examplePath = Paths.get("src/loom/testdata/v1/minimal_2x2.json")
   private def exampleText: String = Files.readString(examplePath)
   private def exampleJson: JValue = Json.parse(exampleText)
 
@@ -150,7 +150,7 @@ class IrSpec extends AnyFlatSpec with Matchers {
   }
 
   "C0 switch checks" should "accept banked only with a dividing power-of-two bank count" in {
-    val text = Files.readString(Paths.get("src/loom/examples/minimal_4x4.json"))
+    val text = Files.readString(Paths.get("src/loom/testdata/v1/minimal_4x4.json"))
     def withSwitch(kind: String, banks: Int): JValue =
       Json.parse(text.replaceAll(
         "\"kind\"\\s*:\\s*\"flat\"\\s*,\\s*\"banks\"\\s*:\\s*1",
@@ -162,7 +162,7 @@ class IrSpec extends AnyFlatSpec with Matchers {
   }
 
   "C0 AXI ID width" should "accept 1..8 and reject anything else" in {
-    val text = Files.readString(Paths.get("src/loom/examples/minimal_4x4.json"))
+    val text = Files.readString(Paths.get("src/loom/testdata/v1/minimal_4x4.json"))
     Ir.fromJson(Json.parse(text)).axiIdWidth shouldBe 4
     Checks.run(Json.parse(text)) shouldBe List.empty
 
@@ -178,7 +178,7 @@ class IrSpec extends AnyFlatSpec with Matchers {
 
   "S1-S3 checks" should "reject unassigned and duplicate partition members" in {
     val ir = Ir.fromJson(Json.parse(
-      Files.readString(Paths.get("src/loom/examples/chain_split.json"))))
+      Files.readString(Paths.get("src/loom/testdata/v1/chain_split.json"))))
     Checks.runS1(ir) shouldBe List.empty
 
     val missing = ir.copy(partitions = ir.partitions.map { p =>
@@ -194,7 +194,7 @@ class IrSpec extends AnyFlatSpec with Matchers {
 
   it should "keep one clock per partition and spend async links on real boundaries" in {
     val ir = Ir.fromJson(Json.parse(
-      Files.readString(Paths.get("src/loom/examples/chain_split_async.json"))))
+      Files.readString(Paths.get("src/loom/testdata/v1/chain_split_async.json"))))
     Checks.runS1(ir) shouldBe List.empty
     Checks.runS2(ir) shouldBe List.empty
     Checks.runS3(ir) shouldBe List.empty
@@ -212,7 +212,7 @@ class IrSpec extends AnyFlatSpec with Matchers {
 
   it should "reject cutting an attachment link and a router-less partition" in {
     val ir = Ir.fromJson(Json.parse(
-      Files.readString(Paths.get("src/loom/examples/chain_split.json"))))
+      Files.readString(Paths.get("src/loom/testdata/v1/chain_split.json"))))
     val split = ir.copy(partitions = Seq(
       PartitionSpec("a", "core", Seq("mnet0", "r1", "r2", "r3")),
       PartitionSpec("b", "core", Seq("r0", "snet0"))
@@ -224,5 +224,175 @@ class IrSpec extends AnyFlatSpec with Matchers {
       PartitionSpec("b", "core", Seq("snet0", "r0", "r1", "r2", "r3"))
     ))
     Checks.runS2(noRouter).exists(_.contains("has no router")) shouldBe true
+  }
+
+  // ---- loom/v2 schema + upgrade (ir_gen_spec S1: IR-01–IR-69, MIG-01–MIG-09) ----
+
+  private val v2ExamplePath = Paths.get("src/loom/examples/ring_4.json")
+  private def v2Example: IrV2 = IrV2.load(v2ExamplePath)
+
+  private val upgradeExamples = Seq(
+    "minimal_2x2", "minimal_4x4", "minimal_4x4_banked", "minimal_8x8",
+    "ring_3_bidir", "ring_4", "chain_4r", "tree_3r", "mesh_2x2_xy",
+    "chain_split", "chain_split_async")
+
+  behavior of "IrV2"
+
+  it should "parse the ring_4 v2 example with explicit fields (IR-01–IR-69)" in {
+    val v = v2Example
+    v.unknown shouldBe Nil
+    v.nodes.map(_.id) shouldBe Seq("m0", "m1", "s0", "s1")
+    v.chi.dvmEnable shouldBe false
+    v.chi.addrWidth shouldBe 32
+    v.sam.map(w => (w.base, w.size, w.tgtNode)) shouldBe
+      Seq((0L, 4096L, "s0"), (4096L, 4096L, "s1"))
+    v.links.find(l => l.from == "r3" && l.to == "r0").get.dateline shouldBe true
+    v.links.foreach(_.channels shouldBe Seq("req", "rsp", "dat"))
+    v.nodes.find(_.id == "m1").get.qos shouldBe 4
+  }
+
+  it should "fill defaults and derive SAM when blocks are omitted (GEN-03, IR-05)" in {
+    val minimal = Json.parse(
+      """{ "schema": "loom/v2", "meta": { "name": "min" },
+        |  "clockDomains": [ { "id": "c", "freqMHz": 100 } ],
+        |  "nodes": [
+        |    { "id": "m0", "kind": "rn-i", "clock": "c", "attach": "r0" },
+        |    { "id": "s0", "kind": "sn-f", "clock": "c", "attach": "r0" } ],
+        |  "fabric": { "routers": [ { "name": "r0", "clock": "c" } ],
+        |              "links": [ { "from": "r0", "to": "r0" } ] } }""".stripMargin)
+    val v = IrV2.fromJson(minimal)
+    v.chi shouldBe ChiBlockV2()
+    v.sam shouldBe Seq(SamWindowV2(0L, 4096L, "s0"))
+    v.qos.mapping shouldBe V2Defaults.QosMapping
+    v.qos.classes shouldBe V2Defaults.QosClasses
+    val l = v.links.head
+    l.width shouldBe 256
+    l.channels shouldBe Seq("req", "rsp", "dat", "snp")
+    l.lcreditDepth shouldBe 4
+    val m0 = v.nodes.head
+    m0.protocol shouldBe "axi4"
+    m0.dataWidth shouldBe 256
+    m0.outstanding shouldBe 64
+    m0.qos shouldBe 0
+  }
+
+  it should "collect unknown and retired keys for the C0 gate (MIG-06)" in {
+    val text = Files.readString(v2ExamplePath)
+    val withUnknown = Json.parse(text.replaceFirst("\"meta\"", "\"bogus\": 1, \"meta\""))
+    IrV2.fromJson(withUnknown).unknown should contain("$.bogus")
+    val withDirection = Json.parse(text.replaceFirst(
+      "\"from\": \"r0\", \"to\": \"r1\"", "\"from\": \"r0\", \"to\": \"r1\", \"direction\": \"forward\""))
+    IrV2.fromJson(withDirection).unknown should contain("$.fabric.links[4].direction")
+    val withSwitch = Json.parse(text.replaceFirst(
+      "\"name\": \"r0\", \"clock\": \"core\"",
+      "\"name\": \"r0\", \"clock\": \"core\", \"switch\": { \"kind\": \"flat\", \"banks\": 1 }"))
+    IrV2.fromJson(withSwitch).unknown should contain("$.fabric.routers[0].switch")
+  }
+
+  it should "reject a v1 schema and missing required fields (IR-01/IR-04)" in {
+    val v1 = Json.parse("""{ "schema": "loom/v1" }""")
+    an[Ir.IrException] should be thrownBy IrV2.fromJson(v1)
+    val noNodes = Json.parse(
+      """{ "schema": "loom/v2", "meta": { "name": "x" },
+        |  "clockDomains": [ { "id": "c", "freqMHz": 1 } ] }""".stripMargin)
+    an[Ir.IrException] should be thrownBy IrV2.fromJson(noNodes)
+  }
+
+  it should "round-trip through the normalized rendering with a stable hash (GEN-06)" in {
+    val v = v2Example
+    val rendered = IrV2.toJson(v)
+    IrV2.fromJson(rendered) shouldBe v
+    IrV2.hash(v) shouldBe Canonical.hash(rendered)
+    IrV2.hash(IrV2.fromJson(Json.parse(Files.readString(v2ExamplePath)))) shouldBe IrV2.hash(v)
+  }
+
+  behavior of "Upgrade.v1ToV2"
+
+  it should "preserve ChiParams elaboration across all v1 examples (MIG-01)" in {
+    upgradeExamples.foreach { name =>
+      val ir = Ir.fromJson(Json.parse(
+        Files.readString(Paths.get(s"src/loom/testdata/v1/$name.json"))))
+      val legacy = loom.chi.ChiParams.fromIr(ir, loom.chi.ChiConfig.fromIr(ir))
+      val upgraded = loom.gen.ChiAssemble.chiParams(Upgrade.v1ToV2(ir).ir)
+      withClue(s"example $name: ") {
+        upgraded.rnNodes.map(n => (n.id, n.nodeId, n.clock)) shouldBe
+          legacy.rnNodes.map(n => (n.id, n.nodeId, n.clock))
+        upgraded.snNodes.map(n => (n.id, n.nodeId, n.clock)) shouldBe
+          legacy.snNodes.map(n => (n.id, n.nodeId, n.clock))
+        upgraded.sam.map(e => (e.base, e.size, e.tgtId)) shouldBe
+          legacy.sam.map(e => (e.base, e.size, e.tgtId))
+        // MIG-01 scope is nodes/NodeID/SAM; portMode converges from the v1
+        // protocol set (IR-43) while legacy ChiConfig.fromIr keeps 'axi4'.
+        upgraded.cfg.copy(portMode = legacy.cfg.portMode) shouldBe legacy.cfg
+      }
+    }
+  }
+
+  it should "converge portMode from the v1 protocol set (MIG-02, IR-43)" in {
+    val ir = Ir.fromJson(Json.parse(
+      Files.readString(Paths.get("src/loom/testdata/v1/minimal_2x2.json"))))
+    Upgrade.v1ToV2(ir).ir.chi.portMode shouldBe "chi" // all native
+    val mixed = ir.copy(endpoints = ir.endpoints.map(e =>
+      if (e.id == "m0") e.copy(protocol = "axi4") else e))
+    Upgrade.v1ToV2(mixed).ir.chi.portMode shouldBe "both"
+    val allAxi = ir.copy(endpoints = ir.endpoints.map(_.copy(protocol = "axi4")))
+    Upgrade.v1ToV2(allAxi).ir.chi.portMode shouldBe "axi4"
+  }
+
+  it should "emit the fixed MIG-07 warnings verbatim for ring_4" in {
+    val ir = Ir.fromJson(Json.parse(
+      Files.readString(Paths.get("src/loom/testdata/v1/ring_4.json"))))
+    val ws = Upgrade.v1ToV2(ir).warnings
+    ws.head shouldBe Upgrade.SchemaWarning
+    ws should contain(Upgrade.linkWidthWarning("mnet0", "r0", 128, 256))
+    ws should contain(Upgrade.directionWarning("r0", "r1", "forward"))
+    ws.count(_.startsWith("LM-W-DEPRECATED: link")) shouldBe 12 // 8 width + 4 direction
+    ws.size shouldBe 13
+  }
+
+  it should "warn on banked switch and non-standard addrWidth (MIG-06/09)" in {
+    val banked = Ir.fromJson(Json.parse(
+      Files.readString(Paths.get("src/loom/testdata/v1/minimal_4x4_banked.json"))))
+    Upgrade.v1ToV2(banked).warnings.exists(_.contains("switch block is retired")) shouldBe true
+    val wide = banked.copy(endpoints = banked.endpoints.map(e => e.copy(addrWidth = 64)))
+    val ws = Upgrade.v1ToV2(wide).warnings
+    ws should contain(Upgrade.addrWidthWarning(wide.endpoints.head.id, 64))
+    Upgrade.v1ToV2(wide).ir.chi.addrWidth shouldBe 48
+  }
+
+  it should "reject retired protocols that cannot be upgraded (MIG-06)" in {
+    val ir = Ir.fromJson(Json.parse(
+      Files.readString(Paths.get("src/loom/testdata/v1/minimal_2x2.json"))))
+    val bad = ir.copy(endpoints = ir.endpoints.map(e =>
+      if (e.id == "m0") e.copy(protocol = "axilite") else e))
+    val ex = the[Ir.IrException] thrownBy Upgrade.v1ToV2(bad)
+    ex.getMessage should include("retired")
+  }
+
+  it should "expand a shared mnet into per-node access links (MIG-05)" in {
+    val ir = Ir.fromJson(Json.parse(
+      Files.readString(Paths.get("src/loom/testdata/v1/minimal_2x2.json"))))
+    val shared = ir.copy(endpoints = ir.endpoints.map(e =>
+      if (e.id == "m1") e.copy(attach = "mnet0") else e))
+    val v2 = Upgrade.v1ToV2(shared).ir
+    val access = v2.links.filter(l => l.from == "m0" || l.from == "m1")
+    access.size shouldBe 2
+    access.map(_.to).distinct shouldBe Seq("r0")
+    v2.links.exists(_.from == "mnet1") shouldBe false
+  }
+
+  it should "upgrade explicit slave windows into sam and drop maxPacketBeats (MIG-03/04)" in {
+    val ir = Ir.fromJson(Json.parse(
+      Files.readString(Paths.get("src/loom/testdata/v1/minimal_2x2.json"))))
+    val explicit = ir.copy(endpoints = ir.endpoints.map { e =>
+      if (e.id == "s0") e.copy(base = 0x10000L, size = 4096L)
+      else if (e.id == "s1") e.copy(base = 0x20000L, size = 8192L)
+      else e
+    })
+    val v2 = Upgrade.v1ToV2(explicit).ir
+    v2.sam.map(w => (w.base, w.size, w.tgtNode)) shouldBe
+      Seq((0x10000L, 4096L, "s0"), (0x20000L, 8192L, "s1"))
+    v2.qos.classes.map(_.name) shouldBe Seq("ctl", "lat", "bulk")
+    v2.nodes.find(_.id == "m0").get.qos shouldBe 0
   }
 }

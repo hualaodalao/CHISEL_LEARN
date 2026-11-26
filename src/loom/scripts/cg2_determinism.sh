@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# CG2: the same IR must emit byte-identical artifacts in two independent runs.
+# CG2 (GEN-07): the same normalized loom/v2 IR must emit byte-identical CHI
+# artifacts in two independent runs. Default input is a v2 user example.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"

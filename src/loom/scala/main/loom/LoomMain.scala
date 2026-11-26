@@ -4,25 +4,23 @@ import java.nio.file.{Files, Path, Paths}
 import java.security.MessageDigest
 
 import _root_.circt.stage.ChiselStage
-import loom.check.Checks
-import loom.chi.{ChiConfig, ChiNetworkParams, ChiNetworkTop, ChiParams}
+import loom.chi.{ChiNetworkTop, ChiPartitionStub, ChiPartitionTop, ChiWrapperTop}
+import loom.gen.ChiAssemble
 import loom.graph.FabricGraph
-import loom.ir.{Canonical, Ir, JArr, JBool, JObj, JStr, JValue, Json}
+import loom.ir.{Canonical, Ir, IrV2, JArr, JBool, JObj, JStr, JValue, Json, Upgrade}
 import loom.report.{Reports, Sram, TbGen}
-import loom.rtl.{
-  FabricParams, LmAsyncFifo, LmAsyncLink, LmCdcCredit, LmNetworkTop, LmPartitionStub,
-  LmPartitionTop, LmTop, LmWidthAdapter, LmWrapperTop, NetworkParams, PartitionParams
-}
 
 object LoomMain {
-  private val ToolVersion = "1.1.0"
+  // GEN-20: 2.0.0 with the single CHI generation path (GEN-02).
+  private val ToolVersion = "2.0.0"
 
-  private final case class Validated(
-      ir: Ir,
+  private[loom] final case class Validated(
+      ir: IrV2,
       hash: String,
       gates: Vector[(String, Boolean)],
       errors: List[String],
-      warnings: List[String]
+      warnings: List[String],
+      upgraded: Boolean
   )
 
   def main(args: Array[String]): Unit = args.toList match {
@@ -30,12 +28,11 @@ object LoomMain {
     case "estimate" :: rest => runEstimate(rest)
     case "emit" :: rest => runEmit(rest)
     case "emit-chi" :: rest => runEmitChi(rest)
-    case "blocks" :: rest => runBlocks(rest)
     case "formal" :: rest => runFormal(rest)
     case "diff" :: rest => runDiff(rest)
     case "serve" :: rest => runServe(rest)
     case "version" :: _ =>
-      println(s"loom $ToolVersion (schema loom/v1)")
+      println(s"loom $ToolVersion (schema loom/v2, loom/v1 auto-upgrade)")
     case _ => usage()
   }
 
@@ -44,10 +41,10 @@ object LoomMain {
     println("  loom check    --config <file> [--out <dir>]")
     println("  loom estimate --config <file> --out <dir>")
     println("  loom emit     --config <file> --out <dir> [--cache] [--formal]")
+    println("  loom emit-chi (deprecated alias of emit; removed next version)")
     println("  loom formal   --config <file> --out <dir>")
     println("  loom diff     --a <file|dir> --b <file|dir>")
     println("  loom serve    --dir <dir> [--port <n>] [--examples <dir>] [--work <dir>]")
-    println("  loom blocks   --out <dir>")
     println("  loom version")
     sys.exit(2)
   }
@@ -85,30 +82,63 @@ object LoomMain {
       .sortBy(p => root.relativize(p).toString.replace('\\', '/'))
   }
 
-  private def validate(root: JValue): Validated = {
-    val hash = Canonical.hash(root)
-    val c0 = Checks.run(root)
-    if (c0.nonEmpty) {
-      c0.foreach(e => println(s"ERROR: $e"))
-      sys.exit(3)
+  /** GEN-01 single validation path: schema dispatch (loom/v1 -> Ir.fromJson +
+    * Upgrade.v1ToV2 with MIG-07 warnings; loom/v2 -> IrV2.fromJson), then
+    * ChecksV2 gates. hash = IrV2.hash of the normalized v2 object (GEN-06),
+    * so the chi block is included and equivalent v1/v2 spellings agree.
+    */
+  private[loom] def validateV2(root: JValue): Validated = {
+    val schema = root match {
+      case o: JObj => o.get("schema").collect { case JStr(s) => s }
+      case _ => None
     }
-    val ir = Ir.fromJson(root)
-    val g = loom.check.Gates.run(ir)
+    val (v2, upgradeWarnings) = schema match {
+      case Some("loom/v1") =>
+        val up =
+          try Upgrade.v1ToV2(Ir.fromJson(root))
+          catch {
+            case e: Ir.IrException =>
+              println(s"ERROR: ${e.getMessage}")
+              sys.exit(3)
+          }
+        (up.ir, up.warnings.toList)
+      case Some("loom/v2") =>
+        val v2 =
+          try IrV2.fromJson(root)
+          catch {
+            case e: Ir.IrException =>
+              println(s"ERROR: ${e.getMessage}")
+              sys.exit(3)
+          }
+        (v2, Nil)
+      case other =>
+        println(s"ERROR: C0: [CHK-01] schema must be 'loom/v2' (or 'loom/v1' for upgrade), got '${other.getOrElse("")}'")
+        sys.exit(3)
+    }
+    val res = loom.check.ChecksV2.run(v2)
     Validated(
-      ir = ir,
-      hash = hash,
-      gates = g.gates,
-      errors = c0 ++ g.errors,
-      warnings = Reports.timingWarnings(ir)
+      ir = v2,
+      hash = IrV2.hash(v2),
+      gates = res.gates,
+      errors = res.errors,
+      warnings = upgradeWarnings ++ Reports.timingWarningsV2(v2),
+      upgraded = schema.contains("loom/v1")
     )
   }
 
-  private def runCheck(xs: List[String]): Unit = {
+  /** GEN-17 checks.json caliber (S5): loom/checks/v1 keys + G1 four-key gates;
+    * the S2 interim `hash` key stays one version (MIG-10). Warnings carry the
+    * MIG-07 upgrade deprecations.
+    */
+  private def checksJsonV2(v: Validated): JValue =
+    Reports.checksJsonV2(v.ir, v.hash, v.errors, v.warnings, v.gates)
+
+  private[loom] def runCheck(xs: List[String]): Unit = {
     val cfg = must(xs, "--config")
-    val v = validate(readConfig(cfg))
+    val v = validateV2(readConfig(cfg))
     opt(xs, "--out").foreach { dir =>
-      writeJson(dir, "checks.json", Reports.checksJson(v.ir, v.hash, v.errors, v.warnings, v.gates))
-      writeJson(dir, "graph.json", FabricGraph.fromIr(v.ir).toJson)
+      writeJson(dir, "checks.json", checksJsonV2(v))
+      writeJson(dir, "graph.json", FabricGraph.fromV2(v.ir).toJson)
     }
     if (v.errors.nonEmpty) {
       v.errors.foreach(e => println(s"ERROR: $e"))
@@ -118,16 +148,17 @@ object LoomMain {
     v.warnings.foreach(w => println(s"WARN: $w"))
   }
 
-  private def runEstimate(xs: List[String]): Unit = {
+  private[loom] def runEstimate(xs: List[String]): Unit = {
     val cfg = must(xs, "--config")
     val out = must(xs, "--out")
-    val v = validate(readConfig(cfg))
+    val v = validateV2(readConfig(cfg))
     if (v.errors.nonEmpty) {
       v.errors.foreach(e => println(s"ERROR: $e"))
       sys.exit(3)
     }
-    writeJson(out, "estimate.json", Reports.estimateJson(v.ir, v.hash))
+    writeJson(out, "estimate.json", Reports.estimateJsonV2(v.ir, v.hash))
     println(s"estimate written to $out/estimate.json hash=${v.hash} warnings=${v.warnings.size}")
+    v.warnings.foreach(w => println(s"WARN: $w"))
   }
 
   private def manifestMatches(out: String, hash: String): Boolean = {
@@ -155,13 +186,19 @@ object LoomMain {
     }
   }
 
-  private def runEmit(xs: List[String]): Unit = {
+  /** GEN-01 stage 8 / GEN-02: the single CHI emission path. Flat networks emit
+    * ChiNetworkTop (single router included, HW-03); partitioned configs emit
+    * ChiWrapperTop under tops/, one ChiPartitionTop + ports.json per partition
+    * and a ChiPartitionStub under partitions/<name>/stub (HW-06). Async cuts
+    * (cdc=async boundary links) insert ChiAsyncLink per channel (HW-04).
+    */
+  private[loom] def runEmit(xs: List[String]): Unit = {
     val cfg = must(xs, "--config")
     val out = must(xs, "--out")
-    val v = validate(readConfig(cfg))
+    val v = validateV2(readConfig(cfg))
 
     if (v.errors.nonEmpty) {
-      writeJson(out, "checks.json", Reports.checksJson(v.ir, v.hash, v.errors, v.warnings, v.gates))
+      writeJson(out, "checks.json", checksJsonV2(v))
       v.errors.foreach(e => println(s"ERROR: $e"))
       sys.exit(3)
     }
@@ -173,81 +210,80 @@ object LoomMain {
 
     Files.createDirectories(Paths.get(out))
 
-    val (emittedName, emittedMasters, emittedSlaves) =
-      if (v.ir.routers.length == 1) {
-        val params =
-          try FabricParams.fromIr(v.ir)
-          catch {
-            case e: Throwable =>
-              println(s"ERROR: ${e.getMessage}")
-              sys.exit(3)
-          }
-        ChiselStage.emitSystemVerilogFile(new LmTop(params), Array("--target-dir", out))
-        (params.name, params.nMaster, params.nSlave)
-      } else {
-        val net =
-          try NetworkParams.fromIr(v.ir)
-          catch {
-            case e: Throwable =>
-              println(s"ERROR: ${e.getMessage}")
-              sys.exit(3)
-          }
-        // The flat network top is single-clock; async cuts only exist on the
-        // partitioned wrapper, so that emission is skipped in async configs.
-        if (!(v.ir.partitions.nonEmpty && net.links.exists(_.async)))
-          ChiselStage.emitSystemVerilogFile(new LmNetworkTop(net), Array("--target-dir", out))
-        (net.name, net.nMaster, net.nSlave)
+    val net =
+      try ChiAssemble.networkParams(v.ir)
+      catch {
+        case e: Throwable =>
+          println(s"ERROR: ${e.getMessage}")
+          sys.exit(3)
       }
+    val asyncCuts = ChiAssemble.asyncCuts(v.ir)
+    if (v.ir.partitions.isEmpty && asyncCuts.nonEmpty) {
+      ChiAssemble.routerLinks(v.ir).filter(_.cdc == "async").foreach { l =>
+        println(s"ERROR: async link '${l.from}->${l.to}' needs a partition boundary; " +
+          "the flat ChiNetworkTop is single-clock (declare partitions or use cdc \"sync\")")
+      }
+      sys.exit(3)
+    }
 
-    writeJson(out, "checks.json", Reports.checksJson(v.ir, v.hash, Nil, v.warnings, v.gates))
-    writeJson(out, "estimate.json", Reports.estimateJson(v.ir, v.hash))
-    writeJson(out, "graph.json", FabricGraph.fromIr(v.ir).toJson)
+    // The flat network top is single-clock; async cuts only exist on the
+    // partitioned wrapper, so flat emission is skipped in async configs.
+    val emitFlat = v.ir.partitions.isEmpty || asyncCuts.isEmpty
+    if (emitFlat)
+      ChiselStage.emitSystemVerilogFile(new ChiNetworkTop(net), Array("--target-dir", out))
+
+    writeJson(out, "checks.json", checksJsonV2(v.copy(errors = Nil)))
+    writeJson(out, "estimate.json", Reports.estimateJsonV2(v.ir, v.hash))
+    writeJson(out, "graph.json", FabricGraph.fromV2(v.ir).toJson)
+    writeJson(out, "chi_nodes.json", Reports.chiNodesJsonV2(v.ir, net))
 
     if (v.ir.partitions.nonEmpty) {
-      val net = NetworkParams.fromIr(v.ir)
-      val pps = v.ir.partitions.map(spec => PartitionParams.fromIr(v.ir, net, spec))
+      val pps =
+        try ChiAssemble.partitionParams(v.ir, net)
+        catch {
+          case e: Throwable =>
+            println(s"ERROR: ${e.getMessage}")
+            sys.exit(3)
+        }
       val topsDir = Paths.get(out, "tops")
       Files.createDirectories(topsDir)
-      ChiselStage.emitSystemVerilogFile(new LmWrapperTop(net, pps), Array("--target-dir", topsDir.toString))
-      v.ir.partitions.zip(pps).foreach { case (spec, pp) =>
+      ChiselStage.emitSystemVerilogFile(
+        new ChiWrapperTop(net, pps.map(_._2), asyncCuts), Array("--target-dir", topsDir.toString))
+      pps.foreach { case (spec, pp) =>
         val pdir = Paths.get(out, "partitions", spec.name)
         val stubDir = pdir.resolve("stub")
         Files.createDirectories(pdir)
         Files.createDirectories(stubDir)
         ChiselStage.emitSystemVerilogFile(
-          new LmPartitionTop(net, pp), Array("--target-dir", pdir.toString))
-        writeJson(pdir.toString, "ports.json", Reports.portsJson(v.ir, net, pp, v.hash))
+          new ChiPartitionTop(pp), Array("--target-dir", pdir.toString))
+        writeJson(pdir.toString, "ports.json", Reports.portsJsonV2(v.ir, net, pp, spec, v.hash))
         ChiselStage.emitSystemVerilogFile(
-          new LmPartitionStub(net, pp), Array("--target-dir", stubDir.toString))
+          new ChiPartitionStub(pp), Array("--target-dir", stubDir.toString))
       }
       println(s"emitted ${v.ir.partitions.size} partition top(s), wrapper and stubs")
     }
 
     writeSramBlocks(out, v.ir)
 
-    val flatTop =
-      if (v.ir.routers.length == 1) Some("LmTop")
-      else if (v.ir.partitions.nonEmpty &&
-        NetworkParams.fromIr(v.ir).links.exists(_.async)) None
-      else Some("LmNetworkTop")
+    val flatTop = if (emitFlat) Some("ChiNetworkTop") else None
     val extraTops =
-      if (v.ir.partitions.nonEmpty && flatTop.nonEmpty) Seq("LmWrapperTop") else Nil
-    writeTestbenches(out, flatTop.getOrElse("LmWrapperTop"), extraTops)
+      if (v.ir.partitions.nonEmpty && flatTop.nonEmpty) Seq("ChiWrapperTop") else Nil
+    writeTestbenches(out, flatTop.getOrElse("ChiWrapperTop"), extraTops, v.ir.chi)
     writeAssertionList(out)
     val formal = if (has(xs, "--formal")) Some(runFormalModels(out, v)) else None
     writeSignoff(out, v, formal)
     writeManifest(out, v)
 
-    println(s"emitted $emittedName (${emittedMasters}x${emittedSlaves}) to $out")
-    println(s"hash=${v.hash} warnings=${v.warnings.size}")
+    println(s"emitted ${net.name} (${net.nRn} RN x ${net.nSn} SN) to $out")
+    println(s"hash=${v.hash} datWidth=${net.cfg.datWidth} warnings=${v.warnings.size}")
     v.warnings.foreach(w => println(s"WARN: $w"))
   }
 
   /** Behavioral SRAM macros for planning. The emitted fabric RTL keeps its
     * inferred memories and nothing is rewritten to use these files.
     */
-  private def writeSramBlocks(out: String, ir: Ir): Unit = {
-    val shapes = Reports.sramNeedsOf(ir)
+  private def writeSramBlocks(out: String, ir: IrV2): Unit = {
+    val shapes = Reports.sramNeedsOfV2(ir)
       .filter { case (d, w) => d * w >= Sram.ThresholdBits }
       .distinct
       .sortBy(s => (s._1, s._2))
@@ -262,7 +298,11 @@ object LoomMain {
     println(s"emitted ${shapes.size} SRAM block(s) to $dir")
   }
 
-  private def writeTestbenches(out: String, top: String, extraTops: Seq[String]): Unit = {    val tbDir = Paths.get(out, "tb")
+  /** GEN-17 tb row (S5): CHI stimulus skeletons via TbGen.testbenchV2; flit
+    * counts and ID widths come from the chi block (ENC-01/04/05).
+    */
+  private def writeTestbenches(out: String, top: String, extraTops: Seq[String], chi: loom.ir.ChiBlockV2): Unit = {
+    val tbDir = Paths.get(out, "tb")
     Files.createDirectories(tbDir)
     // A partitioned config emits its wrapper under tops/, which can be the
     // primary top when the flat network is skipped.
@@ -274,7 +314,7 @@ object LoomMain {
     candidates.foreach { case (name, sv) =>
       if (Files.exists(sv)) {
         val text = Files.readString(sv)
-        Files.writeString(tbDir.resolve(s"${name}_tb.sv"), TbGen.testbench(name, text))
+        Files.writeString(tbDir.resolve(s"${name}_tb.sv"), TbGen.testbenchV2(name, text, chi))
       }
     }
   }
@@ -305,7 +345,7 @@ object LoomMain {
   }
 
   private def writeSignoff(out: String, v: Validated, formal: Option[JValue]): Unit = {
-    val md = Reports.signoffMarkdown(v.ir, v.hash, v.gates, v.warnings,
+    val md = Reports.signoffMarkdownV2(v.ir, v.hash, v.gates, v.warnings,
       artifactCounts(out), formal)
     Files.writeString(Paths.get(out, "signoff.md"), md)
   }
@@ -317,7 +357,8 @@ object LoomMain {
       rel == "manifest.json" || rel.startsWith("formal/")
     }).map(p => root.relativize(p).toString.replace('\\', '/') -> sha256(p))
     writeJson(out, "manifest.json",
-      Reports.manifestJson(v.ir.meta.name, v.hash, ToolVersion, files))
+      Reports.manifestJsonV2(v.ir.meta.name, v.hash, ToolVersion, files,
+        Reports.chiSnapshotJson(v.ir)))
   }
 
   /** Bounded proofs over the control-token models. The models are independent
@@ -358,15 +399,15 @@ object LoomMain {
       println(s"formal $top ($prop, depth $depth): ${if (ok) "PASS" else "FAIL"}")
       (top, prop, ok, s"formal/${top}.log")
     }
-    val j = Reports.formalJson(v.ir.meta.name, v.hash, checks)
+    val j = Reports.formalJsonV2(v.ir.meta.name, v.hash, checks)
     Files.writeString(dir.resolve("formal.json"), Canonical.pretty(j) + "\n")
     j
   }
 
-  private def runFormal(xs: List[String]): Unit = {
+  private[loom] def runFormal(xs: List[String]): Unit = {
     val cfg = must(xs, "--config")
     val out = must(xs, "--out")
-    val v = validate(readConfig(cfg))
+    val v = validateV2(readConfig(cfg))
     if (v.errors.nonEmpty) {
       v.errors.foreach(e => println(s"ERROR: $e"))
       sys.exit(3)
@@ -404,7 +445,7 @@ object LoomMain {
     }
   }
 
-  private def runDiff(xs: List[String]): Unit = {
+  private[loom] def runDiff(xs: List[String]): Unit = {
     val aPath = Paths.get(must(xs, "--a"))
     val bPath = Paths.get(must(xs, "--b"))
     if (Files.isDirectory(aPath) && Files.isDirectory(bPath)) {
@@ -412,24 +453,31 @@ object LoomMain {
       return
     }
 
-    val a = validate(readConfig(aPath.toString))
-    val b = validate(readConfig(bPath.toString))
+    val a = validateV2(readConfig(aPath.toString))
+    val b = validateV2(readConfig(bPath.toString))
     if (a.errors.nonEmpty || b.errors.nonEmpty) {
       (a.errors ++ b.errors).foreach(e => println(s"ERROR: $e"))
       sys.exit(3)
     }
 
-    def endpoints(ir: Ir) =
-      ir.endpoints.map(e => s"${e.role}:${e.id}").sorted
-    def routers(ir: Ir) =
-      ir.routers.map(r => s"${r.name}:${r.in}x${r.out}:${r.switchKind}/${r.banks}").sorted
-    def links(ir: Ir) =
-      ir.links.map(l => s"${l.from}->${l.to}:${l.width}:${l.cdc}:${l.pipe}").sorted
+    // GEN-12 file mode: nodes (kind:id:nodeId) / routers / links contract
+    // summaries; the v1 endpoints summary is retired.
+    def nodes(v: Validated) = {
+      val ids = ChiAssemble.nodeIds(v.ir)
+      v.ir.nodes.zip(ids).map { case (n, id) => s"${n.kind}:${n.id}:$id" }.sorted
+    }
+    def routers(v: Validated) =
+      v.ir.routers.map { r =>
+        val (in, out) = Reports.derivedPortsV2(v.ir, r.name)
+        s"${r.name}:${in}x${out}:${r.routing}"
+      }.sorted
+    def links(v: Validated) =
+      v.ir.links.map(l => s"${l.from}->${l.to}:${l.width}:${l.cdc}:${l.pipe}").sorted
 
     val diffs = Seq(
-      "endpoints" -> (endpoints(a.ir), endpoints(b.ir)),
-      "routers" -> (routers(a.ir), routers(b.ir)),
-      "links" -> (links(a.ir), links(b.ir))
+      "nodes" -> (nodes(a), nodes(b)),
+      "routers" -> (routers(a), routers(b)),
+      "links" -> (links(a), links(b))
     ).collect { case (k, (l, r)) if l != r => k }
 
     val pa = a.ir.partitions.map(_.name)
@@ -443,15 +491,15 @@ object LoomMain {
       diffs.foreach { d =>
         println(s"DIFF $d")
         d match {
-          case "endpoints" =>
-            println(s"  A: ${endpoints(a.ir).mkString(", ")}")
-            println(s"  B: ${endpoints(b.ir).mkString(", ")}")
+          case "nodes" =>
+            println(s"  A: ${nodes(a).mkString(", ")}")
+            println(s"  B: ${nodes(b).mkString(", ")}")
           case "routers" =>
-            println(s"  A: ${routers(a.ir).mkString(", ")}")
-            println(s"  B: ${routers(b.ir).mkString(", ")}")
+            println(s"  A: ${routers(a).mkString(", ")}")
+            println(s"  B: ${routers(b).mkString(", ")}")
           case _ =>
-            println(s"  A: ${links(a.ir).mkString(", ")}")
-            println(s"  B: ${links(b.ir).mkString(", ")}")
+            println(s"  A: ${links(a).mkString(", ")}")
+            println(s"  B: ${links(b).mkString(", ")}")
         }
       }
       sys.exit(4)
@@ -630,65 +678,16 @@ object LoomMain {
     new java.util.concurrent.CountDownLatch(1).await()
   }
 
-  /** CHI generation path (S2 skeleton). Reads the same loom/v1 IR; the user
-    * facing schema is unchanged (D7). Emits the CHI port skeleton plus the
-    * SAM-backed node model.
+  /** MIG-07: emit-chi is a deprecated alias of emit, kept for one version.
+    * The warning string is fixed (tests assert it verbatim).
     */
-  private def runEmitChi(xs: List[String]): Unit = {
-    val cfg = must(xs, "--config")
-    val out = must(xs, "--out")
-    val v = validate(readConfig(cfg))
-    if (v.errors.nonEmpty) {
-      v.errors.foreach(e => println(s"ERROR: $e"))
-      sys.exit(3)
-    }
-    val chiCfg = ChiConfig.fromIr(v.ir)
-    val params =
-      try ChiParams.fromIr(v.ir, chiCfg)
-      catch {
-        case e: Throwable =>
-          println(s"ERROR: ${e.getMessage}")
-          sys.exit(3)
-      }
-    Files.createDirectories(Paths.get(out))
-    val net = ChiNetworkParams.fromIr(v.ir, chiCfg, snpEnable = chiCfg.dvmEnable)
-    ChiselStage.emitSystemVerilogFile(new ChiNetworkTop(net), Array("--target-dir", out))
-    writeJson(out, "checks.json", Reports.checksJson(v.ir, v.hash, Nil, v.warnings, v.gates))
-    writeJson(out, "chi_nodes.json", chiNodesJson(params))
-    println(s"emitted CHI network ${params.name} (${params.nRn} RN x ${params.nSn} SN) to $out")
-    println(s"hash=${v.hash} datWidth=${chiCfg.datWidth} warnings=${v.warnings.size}")
+  private[loom] def runEmitChi(xs: List[String]): Unit = {
+    println("WARN: LM-W-DEPRECATED: command 'emit-chi' is deprecated; use 'emit' (alias removed next version)")
+    runEmit(xs)
   }
 
-  private def chiNodesJson(p: ChiParams): JValue = {
-    def node(n: loom.chi.ChiNode): JValue =
-      JObj(Vector("id" -> JStr(n.id), "kind" -> JStr(n.kind.toString),
-        "nodeId" -> loom.ir.JNum(n.nodeId), "clock" -> JStr(n.clock)))
-    JObj(Vector(
-      "name" -> JStr(p.name),
-      "datWidth" -> loom.ir.JNum(p.cfg.datWidth),
-      "rn" -> JArr(p.rnNodes.map(node).toVector),
-      "sn" -> JArr(p.snNodes.map(node).toVector),
-      "sam" -> JArr(p.sam.map(e =>
-        JObj(Vector("base" -> loom.ir.JNum(e.base), "size" -> loom.ir.JNum(e.size),
-          "tgtId" -> loom.ir.JNum(e.tgtId)))).toVector)
-    ))
-  }
-
-  /** Emit the standalone CDC / width building blocks for review and reuse. */
-  private def runBlocks(xs: List[String]): Unit = {
-    val out = must(xs, "--out")
-    Files.createDirectories(Paths.get(out))
-    val opts = Array("--target-dir", out)
-    ChiselStage.emitSystemVerilogFile(new LmAsyncFifo(64, 8), opts)
-    ChiselStage.emitSystemVerilogFile(new LmCdcCredit(8), opts)
-    ChiselStage.emitSystemVerilogFile(new LmAsyncLink(64, 8), opts)
-    ChiselStage.emitSystemVerilogFile(new LmWidthAdapter(256, 128), opts)
-
-    import scala.jdk.CollectionConverters._
-    val sv = Files.list(Paths.get(out)).iterator().asScala
-      .filter(p => p.getFileName.toString.endsWith(".sv"))
-      .map(_.getFileName.toString).toSeq.sorted
-    Files.writeString(Paths.get(out, "filelist.f"), sv.mkString("\n") + "\n")
-    println(s"emitted CDC/width blocks to $out")
-  }
+  // MIG-11/GEN-12 (S6): the `blocks` command (legacy CDC/width building-block
+  // emission) is retired together with the four-channel fabric. The CDC
+  // primitives remain compiled in loom/rtl/LmCdc.scala for ChiAsyncLink; the
+  // width adapter lives in src/loom/legacy/ for one version.
 }

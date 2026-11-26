@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Elaboration/CDC lint: Verilator parses every emitted representative top and
-# its TB skeleton. Warnings are tolerated; errors fail the gate.
+# Elaboration/CDC lint (CHI caliber, S6/MIG-12): Verilator parses every emitted
+# representative top and its TB skeleton. Warnings are tolerated; errors fail
+# the gate. Inputs are the loom/v2 user examples; tops are the CHI generation
+# layer (ChiNetworkTop / ChiWrapperTop / ChiPartitionTop).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
@@ -30,7 +32,7 @@ emit() {
 }
 
 emit minimal_4x4
-lint "$WORK/minimal_4x4" LmTop
+lint "$WORK/minimal_4x4" ChiNetworkTop
 if [ -d "$WORK/minimal_4x4/sram" ]; then
   ( cd "$WORK/minimal_4x4/sram" && verilator --lint-only -Wno-fatal -f filelist.f >/dev/null 2>&1 ) \
     || { echo "LINT FAILED: SRAM blocks"; exit 1; }
@@ -38,31 +40,32 @@ if [ -d "$WORK/minimal_4x4/sram" ]; then
 fi
 
 emit minimal_8x8
-lint "$WORK/minimal_8x8" LmTop
+lint "$WORK/minimal_8x8" ChiNetworkTop
 
 emit mesh_2x2_xy
-lint "$WORK/mesh_2x2_xy" LmNetworkTop
+lint "$WORK/mesh_2x2_xy" ChiNetworkTop
+
+emit ring_4
+lint "$WORK/ring_4" ChiNetworkTop
 
 emit chain_split
-( cd "$WORK/chain_split/tops" && verilator --lint-only -Wno-fatal --top-module LmWrapperTop_tb \
-  -f filelist.f "$WORK/chain_split/tb/LmWrapperTop_tb.sv" >/dev/null 2>"$WORK/chain_split/tops/lint.err" ) || {
-    echo "LINT FAILED: LmWrapperTop"; tail -20 "$WORK/chain_split/tops/lint.err"; exit 1; }
-echo "lint OK: LmWrapperTop"
+lint "$WORK/chain_split" ChiNetworkTop
+( cd "$WORK/chain_split/tops" && verilator --lint-only -Wno-fatal --top-module ChiWrapperTop_tb \
+  -f filelist.f "$WORK/chain_split/tb/ChiWrapperTop_tb.sv" >/dev/null 2>"$WORK/chain_split/tops/lint.err" ) || {
+    echo "LINT FAILED: ChiWrapperTop"; tail -20 "$WORK/chain_split/tops/lint.err"; exit 1; }
+echo "lint OK: ChiWrapperTop"
 for part in front back; do
   ( cd "$WORK/chain_split/partitions/$part" && verilator --lint-only -Wno-fatal \
-    --top-module LmPartitionTop -f filelist.f >/dev/null 2>&1 ) || {
+    --top-module ChiPartitionTop -f filelist.f >/dev/null 2>&1 ) || {
       echo "LINT FAILED: partition $part"; exit 1; }
   echo "lint OK: partition $part"
 done
 
-sbt -J-Xmx6G -batch -Dsbt.supershell=false \
-  "runMain loom.LoomMain blocks --out $WORK/blocks" >/dev/null
-( cd "$WORK/blocks" && verilator --lint-only -Wno-fatal --top-module LmAsyncLink \
-  -f filelist.f >/dev/null 2>&1 ) || { echo "LINT FAILED: LmAsyncLink"; exit 1; }
-echo "lint OK: LmAsyncLink"
-
+# MIG-11 (S6): the legacy `blocks` emission (LmAsyncFifo/LmCdcCredit/
+# LmWidthAdapter) is retired. The CDC path stays linted through ChiAsyncLink
+# inside the async wrapper below.
 emit chain_split_async
-( cd "$WORK/chain_split_async/tops" && verilator --lint-only -Wno-fatal --top-module LmWrapperTop_tb \
-  -f filelist.f "$WORK/chain_split_async/tb/LmWrapperTop_tb.sv" >/dev/null 2>"$WORK/chain_split_async/tops/lint.err" ) || {
-    echo "LINT FAILED: LmWrapperTop (async)"; tail -20 "$WORK/chain_split_async/tops/lint.err"; exit 1; }
-echo "lint OK: LmWrapperTop (async)"
+( cd "$WORK/chain_split_async/tops" && verilator --lint-only -Wno-fatal --top-module ChiWrapperTop_tb \
+  -f filelist.f "$WORK/chain_split_async/tb/ChiWrapperTop_tb.sv" >/dev/null 2>"$WORK/chain_split_async/tops/lint.err" ) || {
+    echo "LINT FAILED: ChiWrapperTop (async)"; tail -20 "$WORK/chain_split_async/tops/lint.err"; exit 1; }
+echo "lint OK: ChiWrapperTop (async)"
