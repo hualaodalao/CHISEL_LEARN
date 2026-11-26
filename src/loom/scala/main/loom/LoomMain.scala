@@ -4,7 +4,7 @@ import java.nio.file.{Files, Path, Paths}
 import java.security.MessageDigest
 
 import _root_.circt.stage.ChiselStage
-import loom.chi.{ChiNetworkTop, ChiPartitionStub, ChiPartitionTop, ChiWrapperTop}
+import loom.chi.{ChiAxiNetworkTop, ChiNetworkTop, ChiPartitionStub, ChiPartitionTop, ChiWrapperTop}
 import loom.gen.ChiAssemble
 import loom.graph.FabricGraph
 import loom.ir.{Canonical, Ir, IrV2, JArr, JBool, JObj, JStr, JValue, Json, Upgrade}
@@ -187,10 +187,12 @@ object LoomMain {
   }
 
   /** GEN-01 stage 8 / GEN-02: the single CHI emission path. Flat networks emit
-    * ChiNetworkTop (single router included, HW-03); partitioned configs emit
-    * ChiWrapperTop under tops/, one ChiPartitionTop + ports.json per partition
-    * and a ChiPartitionStub under partitions/<name>/stub (HW-06). Async cuts
-    * (cdc=async boundary links) insert ChiAsyncLink per channel (HW-04).
+    * ChiNetworkTop (single router included, HW-03), or ChiAxiNetworkTop when
+    * any node.protocol=axi4 (GEN-22); partitioned configs emit ChiWrapperTop
+    * under tops/, one ChiPartitionTop + ports.json per partition and a
+    * ChiPartitionStub under partitions/<name>/stub (HW-06, MN/DVM parity per
+    * HW-08). Async cuts (cdc=async boundary links) insert ChiAsyncLink per
+    * channel (HW-04); flat+async stays refused pending HW-14.
     */
   private[loom] def runEmit(xs: List[String]): Unit = {
     val cfg = must(xs, "--config")
@@ -228,9 +230,16 @@ object LoomMain {
 
     // The flat network top is single-clock; async cuts only exist on the
     // partitioned wrapper, so flat emission is skipped in async configs.
+    // GEN-22 (HW-09/A3): any axi4 node selects the per-node mixed-protocol
+    // ChiAxiNetworkTop (rnAxi/rnChi/snAxi/snChi split by node protocol);
+    // an all-chi fabric keeps the native ChiNetworkTop.
     val emitFlat = v.ir.partitions.isEmpty || asyncCuts.isEmpty
+    val anyAxi = v.ir.nodes.exists(_.protocol == "axi4")
+    val flatTopName = if (anyAxi) "ChiAxiNetworkTop" else "ChiNetworkTop"
     if (emitFlat)
-      ChiselStage.emitSystemVerilogFile(new ChiNetworkTop(net), Array("--target-dir", out))
+      ChiselStage.emitSystemVerilogFile(
+        if (anyAxi) new ChiAxiNetworkTop(net) else new ChiNetworkTop(net),
+        Array("--target-dir", out))
 
     writeJson(out, "checks.json", checksJsonV2(v.copy(errors = Nil)))
     writeJson(out, "estimate.json", Reports.estimateJsonV2(v.ir, v.hash))
@@ -265,7 +274,7 @@ object LoomMain {
 
     writeSramBlocks(out, v.ir)
 
-    val flatTop = if (emitFlat) Some("ChiNetworkTop") else None
+    val flatTop = if (emitFlat) Some(flatTopName) else None
     val extraTops =
       if (v.ir.partitions.nonEmpty && flatTop.nonEmpty) Seq("ChiWrapperTop") else Nil
     writeTestbenches(out, flatTop.getOrElse("ChiWrapperTop"), extraTops, v.ir.chi)
@@ -538,7 +547,7 @@ object LoomMain {
       Files.createDirectories(p)
     }
 
-    val assets = Set("index.html", "app.js", "style.css")
+    val assets = Set("index.html", "app.js", "model.mjs", "api.mjs", "style.css")
 
     def asset(name: String): Option[Array[Byte]] = {
       val live = Paths.get("src/loom/gui", name)
@@ -564,7 +573,7 @@ object LoomMain {
     def contentType(name: String): String = name.split('.').lastOption.getOrElse("") match {
       case "html" => "text/html; charset=utf-8"
       case "json" => "application/json"
-      case "js" => "text/javascript; charset=utf-8"
+      case "js" | "mjs" => "text/javascript; charset=utf-8"
       case "css" => "text/css; charset=utf-8"
       case "md" => "text/markdown; charset=utf-8"
       case "sv" | "f" | "tcl" => "text/plain; charset=utf-8"

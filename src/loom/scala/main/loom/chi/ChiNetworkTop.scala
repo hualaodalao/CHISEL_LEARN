@@ -51,8 +51,32 @@ class ChiNetworkTop(p: ChiNetworkParams) extends Module {
       val port = rt.io.port(pIdx)
       if (ChiNodeKind.isRequest(n.kind)) {
         val i = rnIndex(n.nodeId)
-        inject(new ChiReqFlit(c), io.rn(i).req, port.rxReq, (f: ChiReqFlit) => f.qos)
-        eject(new ChiRspFlit(c), port.txRsp, io.rn(i).rsp)
+        val samTable = if (p.samByRn.nonEmpty) p.samByRn(i) else p.sam
+        if (samTable.nonEmpty) {
+          // NI ingress: SAM decode addr -> TgtID + hit; unmapped answered NDERR
+          // locally (HW-05/HW-13), mapped forwarded with decoded TgtID. Per-RN
+          // tables (samByRn) give per-source filtering / forbid pairs (A4).
+          val (tgt, hit) = ChiSamDecode.withHit(io.rn(i).req.bits.addr, c.addrWidth, samTable, c.nodeIdWidth)
+          val ni = Module(new ChiNiError(c))
+          LmWire.link(io.rn(i).req, ni.io.req)
+          ni.io.hit := hit
+          val reqInj = Module(new ChiVcInject(new ChiReqFlit(c), qm, (f: ChiReqFlit) => f.qos))
+          reqInj.io.in.valid := ni.io.fwd.valid
+          reqInj.io.in.bits := ni.io.fwd.bits
+          reqInj.io.in.bits.tgtId := tgt
+          ni.io.fwd.ready := reqInj.io.in.ready
+          LmWire.link(reqInj.io.out, port.rxReq)
+          val rspEj = Module(new ChiVcEject(new ChiRspFlit(c), vw))
+          LmWire.link(port.txRsp, rspEj.io.in)
+          val niRspValid = ni.io.rsp.valid
+          io.rn(i).rsp.valid := niRspValid || rspEj.io.out.valid
+          io.rn(i).rsp.bits := Mux(niRspValid, ni.io.rsp.bits, rspEj.io.out.bits)
+          ni.io.rsp.ready := io.rn(i).rsp.ready && niRspValid
+          rspEj.io.out.ready := io.rn(i).rsp.ready && !niRspValid
+        } else {
+          inject(new ChiReqFlit(c), io.rn(i).req, port.rxReq, (f: ChiReqFlit) => f.qos)
+          eject(new ChiRspFlit(c), port.txRsp, io.rn(i).rsp)
+        }
         eject(new ChiDatFlit(c), port.txDat, io.rn(i).dat)
         eject(new ChiSnpFlit(c), port.txSnp, io.rn(i).snp)
         inject(new ChiRspFlit(c), io.rn(i).txRsp, port.rxRsp, (f: ChiRspFlit) => f.qos)
@@ -64,9 +88,10 @@ class ChiNetworkTop(p: ChiNetworkParams) extends Module {
         eject(new ChiReqFlit(c), port.txReq, io.sn(j).req)
         inject(new ChiRspFlit(c), io.sn(j).rsp, port.rxRsp, (f: ChiRspFlit) => f.qos)
         inject(new ChiDatFlit(c), io.sn(j).dat, port.rxDat, (f: ChiDatFlit) => f.qos)
+        eject(new ChiDatFlit(c), port.txDat, io.sn(j).rxDat)
         port.rxReq.valid := false.B; port.rxReq.bits := 0.U.asTypeOf(vcReq)
         port.rxSnp.valid := false.B; port.rxSnp.bits := 0.U.asTypeOf(vcSnp)
-        port.txRsp.ready := true.B; port.txDat.ready := true.B; port.txSnp.ready := true.B
+        port.txRsp.ready := true.B; port.txSnp.ready := true.B
       } else if (n.kind == ChiNodeKind.Mn) {
         val targets = p.rn.filter(_.kind == ChiNodeKind.RnD).map(_.nodeId)
         if (targets.nonEmpty) {

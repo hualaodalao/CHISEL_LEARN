@@ -35,7 +35,17 @@ object ChiAssemble {
       qosCtlThreshold = threshold("ctl"),
       qosLatThreshold = threshold("lat"),
       qosWeights = Seq("ctl", "lat", "bulk").map(weightOf),
-      nHalf = 2
+      // AQ-02/GEN-22 (v1.2.0): nHalf is topology-derived — a dateline cut
+      // needs both VC halves, an acyclic topology only half 0. vcWidth
+      // follows via ChiConfig. FabricGraph reports invalid configs through
+      // `errors` (datelines empty ⇒ nHalf=1); the catch keeps config() total
+      // for direct unit calls on unvalidated IR.
+      nHalf = {
+        val hasDateline =
+          try FabricGraph.fromV2(v2).datelines.nonEmpty
+          catch { case _: Throwable => false }
+        if (hasDateline) 2 else 1
+      }
     )
   }
 
@@ -107,7 +117,8 @@ object ChiAssemble {
     val all = v2.nodes.zip(ids).map { case (n, id) =>
       ChiNetNode(id, kindOf(n.kind),
         routerIndex.getOrElse(n.attach,
-          throw Ir.IrException(s"node '${n.id}' attaches to unknown router '${n.attach}'")), 0)
+          throw Ir.IrException(s"node '${n.id}' attaches to unknown router '${n.attach}'")), 0,
+        protocol = n.protocol)
     }
 
     // Local port order: RN group then SN (then HN/MN) by NodeID (GEN-05).
@@ -162,7 +173,7 @@ object ChiAssemble {
     // VC half 0->1 only on marked output ports (AQ-02②).
     val datelines = FabricGraph.fromV2(v2).datelines.toSet
 
-    val routers = routerNames.indices.map { k =>
+    val routeTables = routerNames.indices.map { k =>
       val route = Array.fill(maxNodes)(0)
       for (nid <- 0 until maxNodes if nodeRouter.contains(nid)) {
         val owner = nodeRouter(nid)
@@ -170,35 +181,195 @@ object ChiAssemble {
           if (owner == k) nodeLocalPort(nid)
           else firstHop(k, owner).map(id => linkPort(k, id)).getOrElse(0)
       }
+      route
+    }
+
+    // GEN-21/SEM-17 (UP-01): explicit paths override the BFS fill. Forward:
+    // each path router p_i (i < last) routes the target SN via p_i -> p_i+1;
+    // reverse: each p_i (i > 0) routes the source RN via p_i -> p_i-1 (the
+    // reversed path). Endpoint local-port entries stay as BFS set them.
+    // forbid entries never touch the route tables: since v1.2.0 they execute
+    // through the per-source SAM below (CHK-51 retired).
+    val idOf = v2.nodes.map(_.id).zip(ids).toMap
+    def hopLink(a: Int, b: Int): Int =
+      graphLinks.indices.find { id =>
+        val l = graphLinks(id)
+        val f = routerIndex(l.from); val t = routerIndex(l.to)
+        (f == a && t == b) || (f == b && t == a)
+      }.getOrElse(throw Ir.IrException(
+        s"explicit route hop '${routerNames(a)}'->'${routerNames(b)}' has no link (CHK-50)"))
+    v2.routes.filter(r => !r.forbid && r.path.nonEmpty).foreach { r =>
+      val pathIdx = r.path.map(p => routerIndex.getOrElse(p,
+        throw Ir.IrException(s"explicit route path router '$p' is not declared (CHK-49)")))
+      val toId = idOf.getOrElse(r.to, throw Ir.IrException(s"route to '${r.to}' is not a declared node"))
+      val fromId = idOf.getOrElse(r.from, throw Ir.IrException(s"route from '${r.from}' is not a declared node"))
+      pathIdx.indices.foreach { i =>
+        if (i < pathIdx.length - 1)
+          routeTables(pathIdx(i))(toId) = linkPort(pathIdx(i), hopLink(pathIdx(i), pathIdx(i + 1)))
+        if (i > 0)
+          routeTables(pathIdx(i))(fromId) = linkPort(pathIdx(i), hopLink(pathIdx(i), pathIdx(i - 1)))
+      }
+    }
+
+    val routers = routerNames.indices.map { k =>
       val linkOfPort = incident(k).map(id => id)
       val outCut = Seq.fill(localOf(k).size)(false) ++ incident(k).map { id =>
         val l = graphLinks(id)
         val peer = if (l.from == routerNames(k)) l.to else l.from
         datelines.contains(s"${routerNames(k)}->$peer")
       }
-      ChiNetRouter(k, routerNames(k), localOf(k).size, incident(k).size, route.toSeq, linkOfPort, outCut)
+      ChiNetRouter(k, routerNames(k), localOf(k).size, incident(k).size, routeTables(k).toSeq, linkOfPort, outCut)
     }
 
+    // GEN-21/SEM-05 (HW-13/A4): the global SAM window table (the chiParams
+    // entries: window base/size + target NodeID) drives addr-based decode at
+    // the RN entry with NDERR on miss. When forbid pairs exist (SEM-17
+    // v1.2.0: executed, CHK-51 retired) each RN gets its own table in rnFinal
+    // order — the global windows minus those targeting an SN forbidden for
+    // that RN; an RN without forbids keeps the full global table. No forbids
+    // ⇒ samByRn stays empty and the hardware uses the global sam.
+    val sam = v2.sam.map(w => ChiSamEntry(w.base, w.size,
+      idOf.getOrElse(w.tgtNode,
+        throw Ir.IrException(s"sam tgtNode '${w.tgtNode}' is not a declared node"))))
+    val nameOfId = v2.nodes.map(_.id).zip(ids).map { case (n, i) => i -> n }.toMap
+    val forbiddenTargets: Map[String, Set[Int]] =
+      v2.routes.filter(_.forbid).groupBy(_.from).map { case (rn, rs) =>
+        rn -> rs.map(r => idOf.getOrElse(r.to,
+          throw Ir.IrException(s"route to '${r.to}' is not a declared node"))).toSet
+      }
+    val samByRn: Seq[Seq[ChiSamEntry]] =
+      if (forbiddenTargets.isEmpty) Seq.empty
+      else rnFinal.map { n =>
+        val banned = forbiddenTargets.getOrElse(nameOfId(n.nodeId), Set.empty[Int])
+        sam.filterNot(e => banned.contains(e.tgtId))
+      }
+
     ChiNetworkParams(v2.meta.name, cfg, rnFinal, snFinal, routers, links,
-      snpEnable = v2.chi.dvmEnable, queueDepth = cfg.lcreditDepth, hn = hnFinal, mn = mnFinal)
+      snpEnable = v2.chi.dvmEnable, queueDepth = cfg.lcreditDepth, hn = hnFinal, mn = mnFinal,
+      sam = sam, samByRn = samByRn)
+  }
+
+  /** GEN-21 (UP-01): one RN x SN reachability row derived from the FINAL
+    * route tables (BFS + explicit overrides). `path` lists the router names
+    * traversed for a reachable pair; unreachable pairs carry an empty path.
+    */
+  final case class ConnectivityRow(from: String, to: String, reachable: Boolean, path: Seq[String])
+
+  /** Walk the assembled TgtID route tables from each RN's attach router;
+    * bounded by the router count, a revisited router (loop) ⇒ unreachable.
+    */
+  def connectivity(v2: IrV2, params: ChiNetworkParams): Seq[ConnectivityRow] = {
+    val routerOf = params.routers.map(r => r.index -> r).toMap
+    val all = params.rn ++ params.sn ++ params.hn ++ params.mn
+    val nameOfId = v2.nodes.map(_.id).zip(nodeIds(v2)).map { case (n, i) => i -> n }.toMap
+    val netOf = all.map(n => nameOfId(n.nodeId) -> n).toMap
+    // Local-port occupants per router: NodeID order (GEN-05 local layout).
+    val localOccupant: Map[(Int, Int), Int] =
+      all.groupBy(_.router).flatMap { case (k, ns) =>
+        ns.sortBy(_.nodeId).zipWithIndex.map { case (n, p) => (k, p) -> n.nodeId }
+      }
+    def walk(src: ChiNetNode, dst: ChiNetNode): Option[Seq[String]] = {
+      var cur = src.router
+      val trail = mutable.ArrayBuffer.empty[String]
+      val seen = mutable.Set.empty[Int]
+      var steps = 0
+      while (steps <= params.routers.size) {
+        if (!seen.add(cur)) return None // loop ⇒ unreachable
+        val r = routerOf(cur)
+        trail += r.name
+        val port = r.route(dst.nodeId)
+        if (port < 0 || port >= r.nPort) return None
+        if (port < r.nLocal)
+          return if (localOccupant.get((cur, port)).contains(dst.nodeId)) Some(trail.toSeq) else None
+        val linkId = r.linkOfPort(port - r.nLocal)
+        val linkOpt = params.links.find(_.id == linkId)
+        if (linkOpt.isEmpty) return None
+        val link = linkOpt.get
+        cur = if (link.fromRouter == cur) link.toRouter else link.fromRouter
+        steps += 1
+      }
+      None
+    }
+    val rns = v2.nodes.filter(n => ChiNodeKind.isRequest(kindOf(n.kind)))
+    val sns = v2.nodes.filter(n => ChiNodeKind.isSubordinate(kindOf(n.kind)))
+    // SEM-17 (v1.2.0): forbid pairs execute at the source NI (per-source SAM
+    // miss ⇒ NDERR, never enters the fabric), so they report unreachable with
+    // an empty path even when the topology connects them.
+    val forbiddenPairs = v2.routes.filter(_.forbid).map(r => (r.from, r.to)).toSet
+    for (rn <- rns; sn <- sns) yield {
+      val path =
+        if (forbiddenPairs.contains((rn.id, sn.id))) None
+        else walk(netOf(rn.id), netOf(sn.id))
+      ConnectivityRow(rn.id, sn.id, path.isDefined, path.getOrElse(Nil))
+    }
   }
 
   /** Partition assembly (HW-06): router members map to full-network indices;
     * node members follow their attach router inside ChiPartitionParams.
+    * HW-08 closed (v1.2.0/GEN-22): ChiPartitionTop has MN/DVM parity with the
+    * network top, so rn-d/mn/hn-i members are legal — the former guard is
+    * lifted.
     */
   def partitionParams(v2: IrV2, full: ChiNetworkParams): Seq[(PartitionSpec, ChiPartitionParams)] = {
-    // ChiPartitionTop has no MN/DVM logic and drops hn-i placeholders (HW-08);
-    // refuse rather than silently emit a partitioned fabric without them.
-    val unsupported = v2.nodes.filter(n =>
-      n.kind == "rn-d" || n.kind == "mn" || n.kind == "hn-i")
-    if (v2.partitions.nonEmpty && unsupported.nonEmpty)
-      throw Ir.IrException(
-        s"partitioned emission with ${unsupported.map(n => s"${n.kind} '${n.id}'").mkString(", ")} " +
-          "requires HW-08 (ChiPartitionTop MN/DVM wiring); use a flat config or remove these nodes")
     val idxOf = full.routers.map(r => r.name -> r.index).toMap
     v2.partitions.map { spec =>
       val members = spec.members.filter(idxOf.contains).map(idxOf)
       (spec, ChiPartitionParams(spec.name, full, members, spec.boundaryPipe))
+    }
+  }
+
+  /** GEN-23 (UP-02, SEM-18): assembled qosGen declaration parameters for the
+    * future HW-10 injection logic. Declaration-only in this version — no RTL
+    * effect and no bandwidth guarantee.
+    */
+  final case class QosGenParams(nodeId: Int, kind: String, bytesPerCycle: Double, saturationBytes: Int)
+
+  /** GEN-24 (UP-08, SEM-19): frozen NIU store&fwd adaptation parameters for
+    * the future HW-12 logic. Declaration-only — AXI boundary width adaptation
+    * stays with the bridge layer (PS §5 F8).
+    */
+  final case class AdaptParams(
+      nodeId: Int,
+      dataWidth: Int,
+      datWidth: Int,
+      clock: String,
+      routerClock: String,
+      fifoDepth: Int,
+      mismatch: Boolean)
+
+  /** SEM-18 conversion: bytesPerCycle = bandwidth(MB/s) / freqMHz of the
+    * node clock (1 MB/s ÷ 1 MHz = 1 B/cycle). Only nodes declaring qosGen
+    * appear; NodeID order (GEN-05).
+    */
+  def qosGenParams(v2: IrV2): Seq[QosGenParams] = {
+    val ids = nodeIds(v2)
+    val freqOf = v2.clockDomains.map(c => c.id -> c.freqMHz).toMap
+    v2.nodes.zip(ids).sortBy(_._2).flatMap { case (n, id) =>
+      n.qosGen.map { q =>
+        val freqMHz = freqOf.getOrElse(n.clock,
+          throw Ir.IrException(s"node '${n.id}' clock '${n.clock}' is not declared"))
+        QosGenParams(id, q.kind, q.bandwidth.toDouble / freqMHz, q.saturation)
+      }
+    }
+  }
+
+  /** SEM-19 mismatch list + frozen FIFO depths: a node needs store&fwd
+    * adaptation when dataWidth != chi.datWidth or node.clock != attach
+    * router.clock. Rows cover every mismatched node plus any node with an
+    * explicit adaptFifoDepth freeze; the IR-79 default 4 is applied here
+    * (never in the IR rendering). Empty when nothing is declared/mismatched.
+    */
+  def adaptParams(v2: IrV2): Seq[AdaptParams] = {
+    val ids = nodeIds(v2)
+    val routerClock = v2.routers.map(r => r.name -> r.clock).toMap
+    v2.nodes.zip(ids).sortBy(_._2).flatMap { case (n, id) =>
+      val rc = routerClock.getOrElse(n.attach,
+        throw Ir.IrException(s"node '${n.id}' attach '${n.attach}' is not a declared router"))
+      val mismatch = n.dataWidth != v2.chi.datWidth || n.clock != rc
+      if (mismatch || n.adaptFifoDepth.isDefined)
+        Some(AdaptParams(id, n.dataWidth, v2.chi.datWidth, n.clock, rc,
+          n.adaptFifoDepth.getOrElse(4), mismatch))
+      else None
     }
   }
 }

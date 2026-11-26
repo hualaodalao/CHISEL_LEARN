@@ -49,11 +49,27 @@
 
     <section class="block">
       <div class="block-head">
+        <h2>CHI</h2>
+        <span id="chi-derived" class="subtle"></span>
+      </div>
+      <div id="chi" class="field-grid"></div>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>QoS</h2>
+        <span class="subtle">mapping locked (CHK-34)</span>
+      </div>
+      <div id="qos"></div>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
         <h2>Clocks</h2>
         <button id="add-clock" class="ghost">+ clock</button>
       </div>
       <div id="clocks" class="chip-list"></div>
-      <p class="hint">Router, MNet and SNet clocks can only use these domains.</p>
+      <p class="hint">Router and node clocks can only use these domains.</p>
     </section>
 
     <section class="block">
@@ -62,7 +78,7 @@
         <button id="add-partition" class="ghost">+ partition</button>
       </div>
       <div id="structure" class="tree"></div>
-      <p class="hint">MNet → router and router → SNet links are generated automatically. A network is one shared port: its endpoints share one transaction per cycle in each direction.</p>
+      <p class="hint">Node ↔ router attachment links are generated automatically: RN injects (node → router), SN receives (router → node). CHI links are bidirectional.</p>
     </section>
 
     <section class="block">
@@ -75,15 +91,15 @@
 
     <section class="block">
       <div class="block-head">
-        <h2>Endpoints</h2>
-        <button id="add-endpoint" class="ghost">+ endpoint</button>
+        <h2>Nodes</h2>
+        <button id="add-node" class="ghost">+ node</button>
       </div>
-      <div id="endpoints"></div>
+      <div id="nodes"></div>
     </section>
 
     <section class="block">
       <div class="block-head">
-        <h2>Address map</h2>
+        <h2>SAM</h2>
         <button id="addr-auto" class="ghost">auto 4K</button>
       </div>
       <div id="address-map" class="addr-map"></div>
@@ -123,7 +139,12 @@
     <details class="panel matrix-panel" open>
       <summary>Connection matrix</summary>
       <div class="matrix-wrap"><table id="matrix" class="matrix"></table></div>
-      <p class="hint">Cell = router hops from initiator to target; — = unreachable. Bandwidth of shared MNet/SNet ports is not shown here.</p>
+      <p class="hint">Cell = router hops from RN to SN; — = unreachable. CHI links are bidirectional.</p>
+    </details>
+
+    <details class="panel nodes-panel" open>
+      <summary>Nodes (CHI report)</summary>
+      <div id="nodes-report"></div>
     </details>
 
     <details class="panel ir-panel">
@@ -154,6 +175,6 @@
   </div>
 </dialog>
 
-<script src="app.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>

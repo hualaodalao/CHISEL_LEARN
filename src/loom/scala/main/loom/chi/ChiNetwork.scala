@@ -26,8 +26,9 @@ class ChiQosMap(c: ChiConfig) {
 /** One router-to-router link in the CHI network. */
 final case class ChiNetLink(id: Int, fromRouter: Int, toRouter: Int, fromPort: Int, toPort: Int, pipe: Int)
 
-/** A node attached to a router local port. */
-final case class ChiNetNode(nodeId: Int, kind: ChiNodeKind.Value, router: Int, localPort: Int)
+/** A node attached to a router local port. `protocol` selects the boundary
+  * form at the AXI network top (chi = native flit, axi4 = AXI bridge). */
+final case class ChiNetNode(nodeId: Int, kind: ChiNodeKind.Value, router: Int, localPort: Int, protocol: String = "chi")
 
 /** Per-router port layout and a TgtID -> port route table (class-independent). */
 final case class ChiNetRouter(index: Int, name: String, nLocal: Int, nLink: Int, route: Seq[Int], linkOfPort: Seq[Int], outCut: Seq[Boolean] = Seq.empty) {
@@ -44,8 +45,12 @@ final case class ChiNetworkParams(
     snpEnable: Boolean,
     queueDepth: Int = 2,
     hn: Seq[ChiNetNode] = Seq.empty,
-    mn: Seq[ChiNetNode] = Seq.empty
+    mn: Seq[ChiNetNode] = Seq.empty,
+    sam: Seq[ChiSamEntry] = Seq.empty,
+    samByRn: Seq[Seq[ChiSamEntry]] = Seq.empty
 ) {
+  require(samByRn.isEmpty || samByRn.length == rn.length,
+    "samByRn must provide one table per RN")
   def nRn: Int = rn.length
   def nSn: Int = sn.length
   def nHn: Int = hn.length
@@ -75,13 +80,14 @@ object ChiNetworkParams {
 
     val masters = ir.endpoints.filter(_.role == "master")
     val slaves = ir.endpoints.filter(_.role == "slave")
+    def normProto(p: String): String = if (p == "axi4") "axi4" else "chi"
     val rn = base.rnNodes.zip(masters).map { case (n, e) =>
       require(mnetNames.contains(e.attach), s"master '${e.id}' attaches to unknown mnet")
-      ChiNetNode(n.nodeId, n.kind, mnetRouter(e.attach), 0)
+      ChiNetNode(n.nodeId, n.kind, mnetRouter(e.attach), 0, normProto(e.protocol))
     }
     val sn = base.snNodes.zip(slaves).map { case (n, e) =>
       require(snetNames.contains(e.attach), s"slave '${e.id}' attaches to unknown snet")
-      ChiNetNode(n.nodeId, n.kind, snetRouter(e.attach), 0)
+      ChiNetNode(n.nodeId, n.kind, snetRouter(e.attach), 0, normProto(e.protocol))
     }
 
     // Local port order: RN nodes then SN nodes, by NodeID.
@@ -146,6 +152,6 @@ object ChiNetworkParams {
       ChiNetRouter(k, routerNames(k), localOf(k).size, incident(k).size, route.toSeq, linkOfPort)
     }
 
-    ChiNetworkParams(ir.meta.name, cfg, rnFinal, snFinal, routers, links, snpEnable, queueDepth = cfg.lcreditDepth)
+    ChiNetworkParams(ir.meta.name, cfg, rnFinal, snFinal, routers, links, snpEnable, queueDepth = cfg.lcreditDepth, sam = base.sam)
   }
 }

@@ -99,18 +99,24 @@ class LoomApiSpec extends AnyFlatSpec with Matchers {
   it should "ship a zero-build GUI wired to the evaluate API" in {
     val html = Files.readString(Paths.get("src/loom/gui/index.html"))
     html should include("app.js")
+    html should include("type=\"module\"")
     html should include("editor")
     html should include("structure")
     val js = Files.readString(Paths.get("src/loom/gui/app.js"))
-    js should include("/api/evaluate")
-    js should include("/api/examples")
-    js should include("/api/example?name=")
     js should include("add-partition")
     js should include("add-clock")
-    js should include("/api/workspace")
-    js should include("/api/draft")
+    js should include("./model.mjs")
+    js should include("./api.mjs")
+    // G7: the network layer lives in api.mjs (ES module split, still zero-build).
+    val api = Files.readString(Paths.get("src/loom/gui/api.mjs"))
+    api should include("/api/evaluate")
+    api should include("/api/examples")
+    api should include("/api/example?name=")
+    api should include("/api/workspace")
+    api should include("/api/draft")
     html should include("ws-dialog")
     Files.exists(Paths.get("src/loom/gui/style.css")) shouldBe true
+    Files.exists(Paths.get("src/loom/gui/model.mjs")) shouldBe true
   }
 
   behavior of "LoomApi (loom/v2 caliber, GEN-14-GEN-17)"
@@ -221,5 +227,137 @@ class LoomApiSpec extends AnyFlatSpec with Matchers {
     r.keySet shouldBe Set("schema", "ok", "hash", "errors", "warnings")
     strs(r("errors")).exists(_.contains("[CHK-13]")) shouldBe true
     r("hash").asInstanceOf[JStr].value should not be empty
+  }
+
+  // ---- UP-01 additive routes/connectivity keys (GEN-21, MIG-10) ----
+
+  behavior of "LoomApi routes/connectivity (GEN-21, UP-01)"
+
+  it should "expose connectivity and keep every existing key on a routes-free config" in {
+    val r = fields(LoomApi.evaluate(v2Text))
+    r.contains("routes") shouldBe false // §3.12: omitted when empty
+    val conn = r("connectivity").asInstanceOf[JArr].items.map(fields)
+    conn.length shouldBe 4
+    conn.foreach { c =>
+      Seq("from", "to", "reachable", "path").foreach(k => c.contains(k) shouldBe true)
+      c("reachable") shouldBe JBool(true)
+    }
+    val m0s0 = conn.find(c => c("from") == JStr("m0") && c("to") == JStr("s0")).get
+    strs(m0s0("path")) shouldBe Seq("r0", "r1", "r2")
+    // additive only: every pre-UP-01 key stays (MIG-10)
+    Seq("schema", "ok", "hash", "errors", "warnings", "checks", "estimate",
+      "addressMap", "graph", "canonical", "upgraded", "irSchema", "nodes", "chi",
+      "channels").foreach(k => r.contains(k) shouldBe true)
+    r("hash") shouldBe JStr(IrV2.hash(IrV2.load(Paths.get("src/loom/examples/ring_4.json"))))
+  }
+
+  it should "echo normalized routes and reroute connectivity for an explicit path" in {
+    val withRoutes = v2Text.replaceFirst("\"meta\"",
+      "\"routes\": [ { \"from\": \"m0\", \"to\": \"s0\", \"path\": [\"r0\", \"r3\", \"r2\"] } ], \"meta\"")
+    val r = fields(LoomApi.evaluate(withRoutes))
+    r("ok") shouldBe JBool(true)
+    val routes = r("routes").asInstanceOf[JArr].items.map(fields)
+    routes.length shouldBe 1
+    routes.head("from") shouldBe JStr("m0")
+    routes.head("to") shouldBe JStr("s0")
+    strs(routes.head("path")) shouldBe Seq("r0", "r3", "r2")
+    routes.head("forbid") shouldBe JBool(false) // normalized default echo
+    val conn = r("connectivity").asInstanceOf[JArr].items.map(fields)
+    val m0s0 = conn.find(c => c("from") == JStr("m0") && c("to") == JStr("s0")).get
+    strs(m0s0("path")) shouldBe Seq("r0", "r3", "r2")
+    // canonical carries the routes block; the hash moves off the empty baseline
+    r("canonical").asInstanceOf[JStr].value should include("\"routes\"")
+    r("hash").asInstanceOf[JStr].value should not be
+      IrV2.hash(IrV2.load(Paths.get("src/loom/examples/ring_4.json")))
+  }
+
+  // CHK-51 retired (ir_gen_spec v1.2.0, SEM-17): a reachable forbid is legal
+  // (executed via per-source SAM + NDERR); connectivity reports it unreachable.
+  it should "accept a reachable forbid and report it unreachable in connectivity (v1.2.0)" in {
+    val cfg = v2Text.replaceFirst("\"meta\"",
+      "\"routes\": [ { \"from\": \"m0\", \"to\": \"s0\", \"forbid\": true } ], \"meta\"")
+    val r = fields(LoomApi.evaluate(cfg))
+    r("ok") shouldBe JBool(true)
+    strs(r("errors")) shouldBe Nil
+    r.contains("connectivity") shouldBe true
+    r.contains("routes") shouldBe true
+    val forbid = r("routes").asInstanceOf[JArr].items.map(fields).head
+    forbid("forbid") shouldBe JBool(true)
+    forbid.contains("path") shouldBe false
+    val conn = r("connectivity").asInstanceOf[JArr].items.map(fields)
+    val m0s0 = conn.find(c => c("from") == JStr("m0") && c("to") == JStr("s0")).get
+    m0s0("reachable") shouldBe JBool(false)
+    strs(m0s0("path")) shouldBe Nil
+    // every other pair keeps its BFS reachability
+    conn.filterNot(c => c("from") == JStr("m0") && c("to") == JStr("s0"))
+      .foreach(c => c("reachable") shouldBe JBool(true))
+  }
+
+  // ---- S8 additive qosGen/adapt keys (GEN-23/GEN-24, UP-02/UP-08) ----
+
+  behavior of "LoomApi qosGen/adapt (GEN-23/GEN-24, S8)"
+
+  it should "expose empty qosGen and the SEM-19 mismatch list additively on the baseline" in {
+    val r = fields(LoomApi.evaluate(v2Text))
+    r("ok") shouldBe JBool(true)
+    // no qosGen declared: empty array, key still present (additive contract)
+    r("qosGen").asInstanceOf[JArr].items shouldBe empty
+    // ring_4 nodes are 128-bit on a 256-bit DAT fabric: all four mismatch,
+    // frozen at the IR-79 default depth 4 (assembly caliber, not rendered IR)
+    val adapt = r("adapt").asInstanceOf[JArr].items.map(fields)
+    adapt.length shouldBe 4
+    adapt.foreach { a =>
+      Seq("node", "dataWidth", "datWidth", "clock", "routerClock", "fifoDepth", "mismatch")
+        .foreach(k => a.contains(k) shouldBe true)
+      a("dataWidth") shouldBe JNum(BigDecimal(128))
+      a("datWidth") shouldBe JNum(BigDecimal(256))
+      a("fifoDepth") shouldBe JNum(BigDecimal(4))
+      a("mismatch") shouldBe JBool(true)
+    }
+    // estimate carries the same two keys with identical content
+    val estimate = fields(r("estimate"))
+    estimate("qosGen") shouldBe r("qosGen")
+    estimate("adapt") shouldBe r("adapt")
+    // additive only: every pre-S8 key stays and the hash baseline is unchanged
+    Seq("schema", "ok", "hash", "errors", "warnings", "checks", "estimate",
+      "addressMap", "graph", "canonical", "upgraded", "irSchema", "nodes", "chi",
+      "channels", "connectivity").foreach(k => r.contains(k) shouldBe true)
+    r("hash") shouldBe JStr(IrV2.hash(IrV2.load(Paths.get("src/loom/examples/ring_4.json"))))
+    r("canonical").asInstanceOf[JStr].value should not include "qosGen"
+    r("canonical").asInstanceOf[JStr].value should not include "adaptFifoDepth"
+  }
+
+  it should "echo declared qosGen/adaptFifoDepth with declaration-only assumptions (HW-10/HW-12)" in {
+    val cfg = v2Text
+      .replaceFirst("\"attach\": \"r0\"",
+        "\"attach\": \"r0\", \"qosGen\": { \"kind\": \"limiter\", \"bandwidth\": 1000, \"saturation\": 4096 }")
+      .replaceFirst("\"attach\": \"r1\"", "\"attach\": \"r1\", \"adaptFifoDepth\": 8")
+    val r = fields(LoomApi.evaluate(cfg))
+    r("ok") shouldBe JBool(true)
+    val qos = r("qosGen").asInstanceOf[JArr].items.map(fields)
+    qos.length shouldBe 1
+    qos.head("node") shouldBe JStr("m0")
+    qos.head("kind") shouldBe JStr("limiter")
+    qos.head("bandwidth") shouldBe JNum(BigDecimal(1000))
+    qos.head("saturation") shouldBe JNum(BigDecimal(4096))
+    val m1 = r("adapt").asInstanceOf[JArr].items.map(fields)
+      .find(a => a("node") == JStr("m1")).get
+    m1("fifoDepth") shouldBe JNum(BigDecimal(8))
+    m1("mismatch") shouldBe JBool(true) // width mismatch stays (128 vs 256)
+    val assumptions = strs(fields(r("estimate"))("assumptions"))
+    assumptions.exists(s => s.contains("HW-10") && s.contains("no RTL effect")) shouldBe true
+    assumptions.exists(s => s.contains("HW-12") && s.contains("no RTL effect")) shouldBe true
+    // the declaration is a real IR change: hash moves off the empty baseline
+    r("hash").asInstanceOf[JStr].value should not be
+      IrV2.hash(IrV2.load(Paths.get("src/loom/examples/ring_4.json")))
+  }
+
+  it should "keep adapt empty on a fully matched fabric without declarations" in {
+    val v0 = IrV2.load(Paths.get("src/loom/examples/ring_4.json"))
+    val matched = v0.copy(nodes = v0.nodes.map(_.copy(dataWidth = 256)))
+    val r = fields(LoomApi.evaluate(loom.ir.Canonical.pretty(IrV2.toJson(matched))))
+    r("ok") shouldBe JBool(true)
+    r("qosGen").asInstanceOf[JArr].items shouldBe empty
+    r("adapt").asInstanceOf[JArr].items shouldBe empty
   }
 }

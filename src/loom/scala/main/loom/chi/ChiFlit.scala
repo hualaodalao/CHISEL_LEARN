@@ -73,9 +73,12 @@ class ChiRnPort(c: ChiConfig) extends Bundle {
   val txDat = Decoupled(new ChiDatFlit(c))
 }
 
-/** Subordinate-node facing port: RX REQ, TX RSP/DAT. */
+/** Subordinate-node facing port: RX REQ + RX DAT (write data), TX RSP + TX DAT
+  * (read data). DAT is split by direction: `dat` is SN->RN read data, `rxDat`
+  * is RN->SN write data delivered by the fabric. */
 class ChiSnPort(c: ChiConfig) extends Bundle {
   val req = Flipped(Decoupled(new ChiReqFlit(c)))
   val rsp = Decoupled(new ChiRspFlit(c))
   val dat = Decoupled(new ChiDatFlit(c))
+  val rxDat = Flipped(Decoupled(new ChiDatFlit(c)))
 }

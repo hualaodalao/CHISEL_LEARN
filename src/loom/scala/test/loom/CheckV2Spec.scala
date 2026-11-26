@@ -699,4 +699,171 @@ class CheckV2Spec extends AnyFlatSpec with Matchers {
       withClue(s"example $name S3: ") { ChecksV2.runS3(v2) shouldBe Nil }
     }
   }
+
+  // ---- UP-01 explicit routes / connectivity constraints (CHK-49–CHK-51) ----
+
+  behavior of "ChecksV2 routes (CHK-49–CHK-51, UP-01)"
+
+  private def withRoutes(rs: RouteSpec*): IrV2 = base.copy(routes = rs.toSeq)
+
+  /** ring_4 cut into two chains: r0-r1 and r2-r3 (m0/m1 isolated from s0/s1). */
+  private def disconnected: IrV2 = {
+    val v = base
+    v.copy(links = v.links.filterNot(l =>
+      (l.from == "r1" && l.to == "r2") || (l.from == "r3" && l.to == "r0")))
+  }
+
+  it should "reject unknown or wrong-kind route endpoints with CHK-49" in {
+    ChecksV2.runC0(withRoutes(RouteSpec("ghost", "s0", Seq("r0", "r1", "r2"), false))) should contain(
+      "C0: [CHK-49] route 'ghost->s0' from 'ghost' is not a declared node")
+    ChecksV2.runC0(withRoutes(RouteSpec("s0", "s1", Nil, true))) should contain(
+      "C0: [CHK-49] route 's0->s1' from 's0' kind 'sn-f' must be rn-i or rn-d")
+    ChecksV2.runC0(withRoutes(RouteSpec("m0", "ghost", Nil, true))) should contain(
+      "C0: [CHK-49] route 'm0->ghost' to 'ghost' is not a declared node")
+    ChecksV2.runC0(withRoutes(RouteSpec("m0", "m1", Nil, true))) should contain(
+      "C0: [CHK-49] route 'm0->m1' to 'm1' kind 'rn-i' must be sn-f or sn-i")
+  }
+
+  it should "reject duplicate pairs, undeclared path routers and forbid-with-path with CHK-49" in {
+    val r = RouteSpec("m0", "s0", Seq("r0", "r1", "r2"), false)
+    ChecksV2.runC0(withRoutes(r, r)) should contain(
+      "C0: [CHK-49] route 'm0->s0' duplicate (from,to) pair")
+    ChecksV2.runC0(withRoutes(RouteSpec("m0", "s0", Seq("r0", "rX", "r2"), false))) should contain(
+      "C0: [CHK-49] route 'm0->s0' path router 'rX' is not declared")
+    ChecksV2.runC0(withRoutes(RouteSpec("m0", "s0", Seq("r0", "r1", "r2"), true))) should contain(
+      "C0: [CHK-49] route 'm0->s0' forbid=true must not carry a path")
+  }
+
+  it should "accept a well-formed explicit route and forbid entry with zero C0 errors (P-C0 routes)" in {
+    ChecksV2.runC0(withRoutes(
+      RouteSpec("m0", "s0", Seq("r0", "r3", "r2"), false),
+      RouteSpec("m1", "s1", Nil, true))) shouldBe Nil
+  }
+
+  it should "reject path endpoint mismatches and an empty explicit path with CHK-50" in {
+    ChecksV2.runC1(withRoutes(RouteSpec("m0", "s0", Seq("r1", "r2"), false))) should contain(
+      "C1: [CHK-50] route 'm0->s0' path head 'r1' is not from.attach 'r0'")
+    ChecksV2.runC1(withRoutes(RouteSpec("m0", "s0", Seq("r0", "r1"), false))) should contain(
+      "C1: [CHK-50] route 'm0->s0' path tail 'r1' is not to.attach 'r2'")
+    ChecksV2.runC1(withRoutes(RouteSpec("m0", "s0", Nil, false))) should contain(
+      "C1: [CHK-50] route 'm0->s0' path must not be empty")
+  }
+
+  it should "reject missing hops and repeated routers in a path with CHK-50" in {
+    ChecksV2.runC1(withRoutes(RouteSpec("m0", "s0", Seq("r0", "r2"), false))) should contain(
+      "C1: [CHK-50] route 'm0->s0' no link between path routers 'r0' and 'r2'")
+    val errs = ChecksV2.runC1(withRoutes(
+      RouteSpec("m0", "s0", Seq("r0", "r1", "r0", "r1", "r2"), false)))
+    errs should contain("C1: [CHK-50] route 'm0->s0' path repeats router 'r0'")
+    errs should contain("C1: [CHK-50] route 'm0->s0' path repeats router 'r1'")
+  }
+
+  it should "reject conflicting next hops at shared routers for one SN with CHK-50 (SEM-17)" in {
+    val errs = ChecksV2.runC1(withRoutes(
+      RouteSpec("m0", "s0", Seq("r0", "r1", "r2"), false),
+      RouteSpec("m1", "s0", Seq("r1", "r0", "r3", "r2"), false)))
+    errs should contain(
+      "C1: [CHK-50] route 'm1->s0' next hop for target 's0' at router 'r1' conflicts with route 'm0->s0' ('r0' vs 'r2')")
+    errs should contain(
+      "C1: [CHK-50] route 'm1->s0' next hop for target 's0' at router 'r0' conflicts with route 'm0->s0' ('r3' vs 'r1')")
+    errs.size shouldBe 2
+  }
+
+  it should "accept consistent explicit paths sharing routers with zero C1 errors (P-C1 routes)" in {
+    ChecksV2.runC1(withRoutes(RouteSpec("m0", "s0", Seq("r0", "r3", "r2"), false))) shouldBe Nil
+    ChecksV2.runC1(withRoutes(
+      RouteSpec("m0", "s0", Seq("r0", "r1", "r2"), false),
+      RouteSpec("m1", "s0", Seq("r1", "r2"), false))) shouldBe Nil
+  }
+
+  it should "reject conflicting reverse next hops for one RN with CHK-50 (SEM-17)" in {
+    val base = IrV2.load(Paths.get("src/loom/examples/ring_4.json"))
+    val twoSn = base.copy(
+      nodes = base.nodes.map(n => if (n.id == "s1") n.copy(attach = "r2") else n),
+      links = base.links.map(l => if (l.from == "r3" && l.to == "s1") l.copy(from = "r2") else l),
+      routes = Seq(
+        RouteSpec("m0", "s0", Seq("r0", "r1", "r2"), false),
+        RouteSpec("m0", "s1", Seq("r0", "r3", "r2"), false)))
+    ChecksV2.runC1(twoSn) should contain(
+      "C1: [CHK-50] route 'm0->s1' next hop for target 'm0' at router 'r2' conflicts with route 'm0->s0' ('r3' vs 'r1')")
+  }
+
+  // CHK-51 RETIRED (ir_gen_spec v1.2.0, SEM-17): forbid is executed via
+  // per-source SAM filtering (samByRn + source-NI NDERR), so a reachable
+  // forbidden pair is now LEGAL. The former negative cases are inverted.
+  it should "accept a reachable forbidden pair with zero C1 errors (CHK-51 retired, v1.2.0)" in {
+    ChecksV2.runC1(withRoutes(RouteSpec("m0", "s0", Nil, true))) shouldBe Nil
+    ChecksV2.run(withRoutes(RouteSpec("m0", "s0", Nil, true))).errors shouldBe Nil
+    // same attach router (formerly "reachable") is legal too
+    val v = base
+    val colocated = v.copy(
+      nodes = v.nodes.map(n => if (n.id == "s0") n.copy(attach = "r0") else n),
+      links = v.links.map(l =>
+        if (l.from == "r2" && l.to == "s0") l.copy(from = "r0") else l),
+      routes = Seq(RouteSpec("m0", "s0", Nil, true)))
+    ChecksV2.runC1(colocated) shouldBe Nil
+    ChecksV2.run(colocated).errors shouldBe Nil
+  }
+
+  it should "still accept a forbidden pair on a disconnected topology (P-C1, CHK-51 retired)" in {
+    val v = disconnected.copy(routes = Seq(RouteSpec("m0", "s0", Nil, true)))
+    ChecksV2.runC0(v) shouldBe Nil
+    ChecksV2.runC1(v) shouldBe Nil
+    ChecksV2.run(v).errors shouldBe Nil
+  }
+
+  // ---- S8: qosGen / adaptFifoDepth domains (CHK-52/CHK-53, UP-02/UP-08) ----
+
+  behavior of "ChecksV2 qosGen/adaptFifoDepth (CHK-52/CHK-53, UP-02/UP-08)"
+
+  private def withQosGen(q: QosGenSpec): IrV2 =
+    withNode("m0")(_.copy(qosGen = Some(q)))
+
+  it should "reject an unknown qosGen.kind with CHK-52" in {
+    ChecksV2.runC0(withQosGen(QosGenSpec("bogus", 100, 0))) should contain(
+      "C0: [CHK-52] node 'm0' qosGen kind 'bogus' must be fixed, limiter or regulator")
+  }
+
+  it should "reject qosGen.bandwidth outside [1,1048576] with CHK-52" in {
+    ChecksV2.runC0(withQosGen(QosGenSpec("limiter", 0, 0))) should contain(
+      "C0: [CHK-52] node 'm0' qosGen bandwidth 0 must be in [1,1048576]")
+    ChecksV2.runC0(withQosGen(QosGenSpec("limiter", 1048577, 0))) should contain(
+      "C0: [CHK-52] node 'm0' qosGen bandwidth 1048577 must be in [1,1048576]")
+  }
+
+  it should "reject qosGen.saturation outside [0,1048576] with CHK-52" in {
+    ChecksV2.runC0(withQosGen(QosGenSpec("limiter", 100, -1))) should contain(
+      "C0: [CHK-52] node 'm0' qosGen saturation -1 must be in [0,1048576]")
+    ChecksV2.runC0(withQosGen(QosGenSpec("regulator", 100, 1048577))) should contain(
+      "C0: [CHK-52] node 'm0' qosGen saturation 1048577 must be in [0,1048576]")
+  }
+
+  it should "reject a fixed qosGen with a burst allowance with CHK-52 (SEM-18)" in {
+    ChecksV2.runC0(withQosGen(QosGenSpec("fixed", 100, 64))) should contain(
+      "C0: [CHK-52] node 'm0' qosGen fixed kind requires saturation 0, got 64")
+  }
+
+  it should "accept every legal qosGen kind at the domain boundaries (P-C0 qosGen)" in {
+    ChecksV2.runC0(withQosGen(QosGenSpec("fixed", 1, 0))) shouldBe Nil
+    ChecksV2.runC0(withQosGen(QosGenSpec("limiter", 1048576, 1048576))) shouldBe Nil
+    ChecksV2.runC0(withQosGen(QosGenSpec("regulator", 1000, 0))) shouldBe Nil
+    // declaration-only: a legal qosGen never disturbs the other gates
+    ChecksV2.run(withQosGen(QosGenSpec("limiter", 1000, 4096))).errors shouldBe Nil
+  }
+
+  it should "reject adaptFifoDepth outside [2,64] with CHK-53" in {
+    ChecksV2.runC0(withNode("m0")(_.copy(adaptFifoDepth = Some(1)))) should contain(
+      "C0: [CHK-53] node 'm0' adaptFifoDepth 1 must be in [2,64]")
+    ChecksV2.runC0(withNode("m0")(_.copy(adaptFifoDepth = Some(65)))) should contain(
+      "C0: [CHK-53] node 'm0' adaptFifoDepth 65 must be in [2,64]")
+    ChecksV2.runC0(withNode("s0")(_.copy(adaptFifoDepth = Some(0)))) should contain(
+      "C0: [CHK-53] node 's0' adaptFifoDepth 0 must be in [2,64]")
+  }
+
+  it should "accept adaptFifoDepth at the domain boundaries and when omitted (P-C0 adapt)" in {
+    ChecksV2.runC0(withNode("m0")(_.copy(adaptFifoDepth = Some(2)))) shouldBe Nil
+    ChecksV2.runC0(withNode("m0")(_.copy(adaptFifoDepth = Some(64)))) shouldBe Nil
+    ChecksV2.runC0(base) shouldBe Nil // omitted key: no CHK-53 domain applies
+    ChecksV2.run(withNode("m0")(_.copy(adaptFifoDepth = Some(8)))).errors shouldBe Nil
+  }
 }

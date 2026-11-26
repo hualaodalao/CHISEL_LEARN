@@ -9,7 +9,7 @@ import chisel3.util._
   * held from grant until completion (ChiIdPool backpressure when full).
   * S6 handles full 64B transactions; variable size lands with the bridge.
   */
-class ChiWriteSink(c: ChiConfig, depth: Int) extends Module {
+class ChiWriteSink(c: ChiConfig, depth: Int, nodeId: Int = 0) extends Module {
   private val nFlits = ChiWidths.flitCount(64, c.datWidth)
   private val bw = math.max(1, log2Ceil(nFlits))
 
@@ -36,6 +36,7 @@ class ChiWriteSink(c: ChiConfig, depth: Int) extends Module {
 
   io.rsp.valid := false.B
   io.rsp.bits := 0.U.asTypeOf(new ChiRspFlit(c))
+  io.rsp.bits.srcId := nodeId.U
   io.dat.ready := st === sData
   io.wrDone.valid := st === sComp
   io.wrDone.bits := dataBuf

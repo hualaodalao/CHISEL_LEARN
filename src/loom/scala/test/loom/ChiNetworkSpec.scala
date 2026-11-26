@@ -59,6 +59,7 @@ class ChiNetworkSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.io.sn(j).req.ready.poke(true.B)
       dut.io.sn(j).rsp.valid.poke(false.B)
       dut.io.sn(j).dat.valid.poke(false.B)
+      dut.io.sn(j).rxDat.ready.poke(true.B)
     }
     dut.reset.poke(true.B); dut.clock.step(2); dut.reset.poke(false.B)
   }
@@ -110,6 +111,80 @@ class ChiNetworkSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.clock.step(4)
       dut.io.sn(0).req.valid.expect(true.B)
       dut.io.sn(0).req.bits.txnId.expect(9.U)
+    }
+  }
+
+  "ChiNetworkTop with SAM" should "answer an unmapped address NDERR locally (HW-13/HW-05)" in {
+    val p = ChiNetworkParams.fromIr(ir)
+    p.sam should not be empty
+    simulate(new ChiNetworkTop(p)) { dut =>
+      init(dut, p)
+      // 0x100000 lies outside both 4K slave windows -> SAM miss.
+      dut.io.rn(0).req.bits.addr.poke(0x100000L.U)
+      dut.io.rn(0).req.bits.txnId.poke(5.U)
+      dut.io.rn(0).req.bits.srcId.poke(0.U)
+      dut.io.rn(0).req.valid.poke(true.B)
+      var n = 0
+      while (!dut.io.rn(0).rsp.valid.peek().litToBoolean && n < 40) { dut.clock.step(); n += 1 }
+      dut.io.rn(0).rsp.valid.expect(true.B)
+      dut.io.rn(0).rsp.bits.opcode.expect(ChiOp.RspComp.U)
+      dut.io.rn(0).rsp.bits.respErr.expect(ChiRespErr.NDERR.U)
+      dut.io.rn(0).rsp.bits.txnId.expect(5.U)
+      // The miss must never reach the fabric.
+      dut.io.sn(0).req.valid.expect(false.B)
+      dut.io.sn(1).req.valid.expect(false.B)
+    }
+  }
+
+  it should "decode a mapped address to the SAM target TgtID (HW-13)" in {
+    val p = ChiNetworkParams.fromIr(ir)
+    simulate(new ChiNetworkTop(p)) { dut =>
+      init(dut, p)
+      // Second 4K window maps to sn1 (NodeID 3); requester drives no TgtID.
+      dut.io.rn(0).req.bits.addr.poke(0x1000L.U)
+      dut.io.rn(0).req.bits.tgtId.poke(0.U)
+      dut.io.rn(0).req.bits.txnId.poke(8.U)
+      dut.io.rn(0).req.valid.poke(true.B)
+      var n = 0
+      while (!dut.io.sn(1).req.valid.peek().litToBoolean && n < 60) { dut.clock.step(); n += 1 }
+      dut.io.sn(1).req.valid.expect(true.B)
+      dut.io.sn(1).req.bits.txnId.expect(8.U)
+    }
+  }
+
+  "ChiNetworkTop with per-RN SAM" should "filter per source and NDERR forbid pairs (A4)" in {
+    val base = ChiNetworkParams.fromIr(ir)
+    // RN0: 0x1000 -> sn1(3); RN1: 0x1000 -> sn0(2), 0x2000 unmapped (forbid).
+    val p = base.copy(samByRn = Seq(
+      Seq(ChiSamEntry(0x1000L, 0x1000L, 3)),
+      Seq(ChiSamEntry(0x1000L, 0x1000L, 2))))
+    simulate(new ChiNetworkTop(p)) { dut =>
+      init(dut, p)
+      dut.io.rn(0).req.bits.addr.poke(0x1000L.U)
+      dut.io.rn(0).req.bits.txnId.poke(20.U); dut.io.rn(0).req.bits.srcId.poke(0.U)
+      dut.io.rn(0).req.valid.poke(true.B)
+      var n = 0
+      while (!dut.io.sn(1).req.valid.peek().litToBoolean && n < 60) { dut.clock.step(); n += 1 }
+      dut.io.sn(1).req.valid.expect(true.B); dut.io.sn(1).req.bits.txnId.expect(20.U)
+      dut.io.rn(0).req.valid.poke(false.B); dut.clock.step()
+
+      dut.io.rn(1).req.bits.addr.poke(0x1000L.U)
+      dut.io.rn(1).req.bits.txnId.poke(21.U); dut.io.rn(1).req.bits.srcId.poke(1.U)
+      dut.io.rn(1).req.valid.poke(true.B)
+      n = 0
+      while (!dut.io.sn(0).req.valid.peek().litToBoolean && n < 60) { dut.clock.step(); n += 1 }
+      dut.io.sn(0).req.valid.expect(true.B); dut.io.sn(0).req.bits.txnId.expect(21.U)
+      dut.io.rn(1).req.valid.poke(false.B); dut.clock.step()
+
+      // Same address 0x2000 is forbidden for RN1 (unmapped) -> local NDERR.
+      dut.io.rn(1).req.bits.addr.poke(0x2000L.U)
+      dut.io.rn(1).req.bits.txnId.poke(22.U)
+      dut.io.rn(1).req.valid.poke(true.B)
+      n = 0
+      while (!dut.io.rn(1).rsp.valid.peek().litToBoolean && n < 40) { dut.clock.step(); n += 1 }
+      dut.io.rn(1).rsp.bits.opcode.expect(ChiOp.RspComp.U)
+      dut.io.rn(1).rsp.bits.respErr.expect(ChiRespErr.NDERR.U)
+      dut.io.rn(1).rsp.bits.txnId.expect(22.U)
     }
   }
 }

@@ -47,6 +47,7 @@ class ChiPartitionSpec extends AnyFlatSpec with Matchers with ChiselSim {
         dut.io.sn(j).req.ready.poke(true.B)
         dut.io.sn(j).rsp.valid.poke(false.B)
         dut.io.sn(j).dat.valid.poke(false.B)
+        dut.io.sn(j).rxDat.ready.poke(true.B)
       }
       dut.reset.poke(true.B); dut.clock.step(2); dut.reset.poke(false.B)
 
@@ -73,5 +74,69 @@ class ChiPartitionSpec extends AnyFlatSpec with Matchers with ChiselSim {
     a should not be empty
     a shouldBe sv(d2)
     a.keys.exists(_.contains("ChiPartitionStub")) shouldBe true
+  }
+
+  "ChiPartitionTop with MN" should "run DVM end-to-end inside a partition (HW-08)" in {
+    val c = ChiConfig()
+    val rn0 = ChiNetNode(0, ChiNodeKind.RnD, 0, 0)
+    val rn1 = ChiNetNode(1, ChiNodeKind.RnD, 0, 1)
+    val mn = ChiNetNode(2, ChiNodeKind.Mn, 0, 2)
+    val route = Seq.tabulate(c.maxNodes)(id => if (id < 3) id else 0)
+    val r0 = ChiNetRouter(0, "r0", nLocal = 3, nLink = 0, route, Seq.empty)
+    val net = ChiNetworkParams("dvmPart", c, Seq(rn0, rn1), Seq.empty, Seq(r0),
+      Seq.empty, snpEnable = true, queueDepth = 2, hn = Seq.empty, mn = Seq(mn))
+    val pp = ChiPartitionParams("P", net, Seq(0), pipe = 1)
+    simulate(new ChiPartitionTop(pp)) { dut =>
+      for (i <- 0 until 2) {
+        dut.io.rn(i).req.valid.poke(false.B)
+        dut.io.rn(i).rsp.ready.poke(true.B)
+        dut.io.rn(i).dat.ready.poke(true.B)
+        dut.io.rn(i).snp.ready.poke(true.B)
+        dut.io.rn(i).txRsp.valid.poke(false.B)
+        dut.io.rn(i).txDat.valid.poke(false.B)
+      }
+      dut.reset.poke(true.B); dut.clock.step(2); dut.reset.poke(false.B)
+
+      dut.io.rn(0).req.bits.opcode.poke(ChiOp.DVMOp.U)
+      dut.io.rn(0).req.bits.tgtId.poke(2.U)
+      dut.io.rn(0).req.bits.txnId.poke(4.U)
+      dut.io.rn(0).req.bits.srcId.poke(0.U)
+      dut.io.rn(0).req.valid.poke(true.B)
+      var n = 0
+      while (!dut.io.rn(0).rsp.valid.peek().litToBoolean && n < 40) { dut.clock.step(); n += 1 }
+      dut.io.rn(0).rsp.bits.opcode.expect(ChiOp.RspDBIDResp.U)
+      dut.io.rn(0).req.valid.poke(false.B)
+      dut.clock.step()
+
+      dut.io.rn(0).txDat.bits.data.poke(0x1000L.U)
+      dut.io.rn(0).txDat.bits.tgtId.poke(2.U)
+      dut.io.rn(0).txDat.bits.txnId.poke(4.U)
+      dut.io.rn(0).txDat.valid.poke(true.B)
+      dut.clock.step(2)
+      dut.io.rn(0).txDat.valid.poke(false.B)
+
+      n = 0
+      while (!dut.io.rn(0).snp.valid.peek().litToBoolean && n < 40) { dut.clock.step(); n += 1 }
+      dut.io.rn(0).snp.bits.opcode.expect(ChiOp.SnpDVMOp.U)
+      dut.clock.step()
+      n = 0
+      while (!dut.io.rn(1).snp.valid.peek().litToBoolean && n < 40) { dut.clock.step(); n += 1 }
+      dut.clock.step()
+
+      dut.io.rn(0).txRsp.bits.opcode.poke(ChiOp.RspSnpResp.U)
+      dut.io.rn(0).txRsp.bits.srcId.poke(0.U)
+      dut.io.rn(0).txRsp.bits.tgtId.poke(2.U)
+      dut.io.rn(0).txRsp.valid.poke(true.B)
+      dut.io.rn(1).txRsp.bits.opcode.poke(ChiOp.RspSnpResp.U)
+      dut.io.rn(1).txRsp.bits.srcId.poke(1.U)
+      dut.io.rn(1).txRsp.bits.tgtId.poke(2.U)
+      dut.io.rn(1).txRsp.valid.poke(true.B)
+      n = 0
+      while (!dut.io.rn(0).rsp.valid.peek().litToBoolean && n < 40) { dut.clock.step(); n += 1 }
+      dut.io.rn(0).txRsp.valid.poke(false.B)
+      dut.io.rn(1).txRsp.valid.poke(false.B)
+      dut.io.rn(0).rsp.bits.opcode.expect(ChiOp.RspComp.U)
+      dut.io.rn(0).rsp.bits.txnId.expect(4.U)
+    }
   }
 }

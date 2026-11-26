@@ -64,10 +64,22 @@ object LoomApi {
     else {
       // chi_nodes.json caliber (GEN-17); fall back to the IR-only rendering
       // when elaboration is unavailable (gate failures must not throw).
-      val nodesJ =
-        try Reports.chiNodesJsonV2(v2, ChiAssemble.networkParams(v2))
-        catch { case _: Throwable => Reports.chiNodesJsonV2(v2) }
-      JObj(Vector(
+      val params =
+        try Some(ChiAssemble.networkParams(v2))
+        catch { case _: Throwable => None }
+      val nodesJ = params.fold(Reports.chiNodesJsonV2(v2))(Reports.chiNodesJsonV2(v2, _))
+      // GEN-21 (UP-01): connectivity is the RN x SN reachability matrix from
+      // the final route tables; empty when elaboration is unavailable.
+      val connectivityJ = JArr(params.toSeq.flatMap { p =>
+        ChiAssemble.connectivity(v2, p).map { row =>
+          JObj(Vector(
+            "from" -> JStr(row.from),
+            "to" -> JStr(row.to),
+            "reachable" -> JBool(row.reachable),
+            "path" -> JArr(row.path.map(JStr(_)).toVector)))
+        }
+      }.toVector)
+      val base = Vector(
         "schema" -> JStr("loom/api/v1"),
         "ok" -> JBool(res.errors.isEmpty),
         "hash" -> JStr(hash),
@@ -82,8 +94,17 @@ object LoomApi {
         "irSchema" -> JStr("loom/v2"),
         "nodes" -> nodesJ,
         "chi" -> Reports.chiSnapshotJson(v2),
-        "channels" -> JArr(Reports.channelsV2(v2).map(JStr(_)).toVector)
-      ))
+        "channels" -> JArr(Reports.channelsV2(v2).map(JStr(_)).toVector),
+        "connectivity" -> connectivityJ,
+        // GEN-23/GEN-24 (S8, v1.3.0): additive declaration-only qosGen/adapt
+        // rows, same caliber as the estimate keys (HW-10/HW-12 pending).
+        "qosGen" -> Reports.qosGenJsonV2(v2),
+        "adapt" -> Reports.adaptJsonV2(v2)
+      )
+      // GEN-21: normalized routes echo, omitted when empty (§3.12 rendering
+      // rule); additive only, every existing GUI key stays (MIG-10).
+      JObj(if (v2.routes.isEmpty) base
+        else base :+ ("routes" -> JArr(v2.routes.map(IrV2.routeJson).toVector)))
     }
   }
 

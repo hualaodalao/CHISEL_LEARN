@@ -594,6 +594,7 @@ label {
 
 .edge { stroke: #8e8676; stroke-width: 1.1; }
 .edge.async { stroke: var(--copper); stroke-dasharray: 5 4; }
+.edge.dateline { stroke: #2b6f63; stroke-width: 2; stroke-dasharray: 2 3; }
 
 .node-label {
   font-family: var(--font-mono);
@@ -617,6 +618,8 @@ label {
 .legend .dash { width: 18px; height: 0; border-top: 2px dashed var(--copper); display: inline-block; }
 
 /* ---------- gates & estimate ---------- */
+
+.group-head { font-weight: 700; color: var(--copper); padding-top: 6px; font-size: 11px; letter-spacing: 0.04em; }
 
 .gate-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; }
 

@@ -20,6 +20,12 @@
 | HW-06 | CHI 分区发射顶层缺失 | v1 有 LmPartitionTop/LmWrapperTop/LmPartitionStub；`chi/` 无对应物 | ChiPartitionTop（边界 link 变登记过的 CHI 端口，每通道类 ≥1 pipe）、ChiWrapperTop（回接整网，async 边界依赖 HW-04）、ChiPartitionStub（对端占位） | SEM-16、GEN-01 阶段8、GEN-17 ports.json（OQ-08） | S4 交付分区门禁 + ports 报告；partitions 非空时发射报错指引，待 HW-06 闭合后接通 |
 | HW-07 | fabric 参数不被 CHI 硬件消费 | `chi/ChiNetwork.scala` ChiNetworkParams 忽略 link.width/direction；`ChiRouter4` 队列 depth=2 固定 | 确认消费边界：width 应由 chi.datWidth 派生（GEN 可收敛）；direction=forward 的单向链路 CHI 路由是否支持须硬件表态；队列 depth 是否随 lcreditDepth/BDP 可配 | IR-48–51、IR-56、CHK-20/31（OQ-05 余项） | width 由 datWidth 派生校验；direction 保留（G1 需要）；depth 固定值写入报告口径 |
 | HW-08 | 分区顶层无 MN/DVM 逻辑 | `chi/ChiPartition.scala` ChiPartitionTop 本地口仅 RN/SN，hn-i/mn 被丢弃（S4 勘查发现；ChiNetworkTop 已接 ChiDvmMn，分区侧未对标） | ChiPartitionTop 补 MN 实例化与 SNP 广播/收集接线（对标 ChiNetworkTop L70–89），HN-I 占位口对齐 | SEM-16、GEN-17（S4 发现） | GEN 守护：partitions 非空且含 rn-d/mn/hn-i 时 elaboration 显式报错（ChiAssemble.partitionParams），不静默发射 |
+| HW-09 | portMode 不改变发射端口形态（GUI UP-04，高优先） | `ChiNetworkTop` io 恒为 CHI flit VC bundle；`ChiAxiBridge` 输出裸 flit，无 VC 适配；portMode 仅影响 node.protocol 默认与 CHK-40 | 硬件提供 AXI 边界网络顶层（或桥的 VC bundle 适配），按 portMode=axi4/both 在 RN/SN 边界实例化 ChiAxiReadBridge/WriteBridge；对标 HW-04/06"硬件出模块、GEN 例化" | IR-18/43、CHK-40、GEN-17 estimate（UP-04） | GEN 待 HW-09 闭合后做 portMode 装配分派 + estimate 桥接开销；当前 portMode 仅校验/报告口径 |
+| HW-10 | NIU 无 QoS 带宽调节（GUI UP-02） | IR-25–34 仅优先级+VC；NI 注入无 fixed/limiter/regulator 逻辑 | NIU 注入侧 per-node QoS generator（kind:fixed/limiter/regulator，bandwidth/saturation 参数化），GEN 按 IR qosGen 例化 | IR-25–34 扩展、CHK-34（UP-02） | GEN 先落 IR qosGen 字段+CHK 范围校验+传参；调节逻辑待 HW-10 |
+| HW-11 | 无 NoC 间桥（GUI UP-07，低优先） | Loom 单 fabric；无层次子系统发射 | NoC 间桥 RTL（协议/时钟/地址域 crossing），GEN 分层发射例化 | 层次 IR（UP-07） | 待立项；IR subsystems schema 先行设计 |
+| HW-12 | ChiNi 无速率适配（GUI UP-08，低优先） | node.dataWidth≠chi.datWidth 时 NIU 无 store&fwd 宽度/频率适配（ChiNi.scala 直通） | ChiNi 增宽度/频率失配 store&fwd 适配，参数化深度 | IR-19、ENC-01（UP-08） | GEN 暴露适配参数+estimate 面积；适配逻辑待 HW-12 |
+| HW-13 | 网络顶层无 SAM 译码（UP-01 勘查发现） | `ChiSamDecode` 仅被已退役的 ChiTop 消费；ChiNetworkTop 的 TgtID 由请求方驱动，ChiNi（含 HW-05 NDERR）未接入网络顶层 | ChiNetworkTop RN 本地口接入 ChiNi/ChiSamDecode（per-RN SAM 表参数化），发射 fabric 自含地址译码与未命中 NDERR | SEM-04/05、UP-01 forbid 语义 | UP-01 首版 forbid 为**校验型约束**（CHK-51：禁止对必须拓扑不可达）；per-source SAM 过滤待 HW-13 |
+| HW-14 | flat 配置 async link 无插入钩子（S7 勘查发现） | ChiNetworkTop/ChiNetworkParams 无 per-link async 字段/钩子；ChiAsyncLink 仅 ChiWrapperTop 分区边界消费；flat+cdc=async 发射 GEN 报明确错误 | ChiNetworkTop 内部 link 级 async 插入（ChiNetLink 增 asyncFifoDepth 消费 ChiAsyncLink），或提供 router-chunk 发射 API 供 GEN 边界例化 | IR-57/59、SEM-14（HW-04 余项） | GEN 维持 flat+async 显式报错；分区 async 已经 asyncCuts 工作 |
 
 ## 2. 硬件疑问（HQ）
 
@@ -69,8 +75,22 @@
 | HW-05 NI NDERR | ChiSamDecode.withHit + ChiNiError | ChiNiSpec 绿（网络级集成待 GEN） |
 | HW-04 CDC | ChiAsyncLink（复用 LmAsyncLink）+ token_chi_async_credit | ChiLinkSpec 双时钟绿 + formal PASS（网络级插入待 GEN） |
 | HW-06 分区 | ChiPartitionTop/Stub/WrapperTop | ChiPartitionSpec 跨分区回接 + stub 确定性绿（CLI 发射待 GEN） |
+| HW-08 分区 MN/DVM | ChiPartitionTop 增 MN 分支（ChiDvmMn 广播/收集）+ HN-I 占位，对标 ChiNetworkTop | ChiPartitionSpec 含 MN 分区 DVM 端到端绿（2026-11-26 wave2） |
+| HW-13 网络 SAM/NI | ChiNetworkParams.sam（fromIr 派生）；ChiNetworkTop RN 入口 sam 非空时 addr→ChiSamDecode.withHit→ChiNiError，命中填 TgtID 进 fabric、未命中就地 NDERR；sam 空退回 TgtID 直通 | ChiNetworkSpec 未命中 NDERR + 命中译码到 sn1 绿（2026-11-26 wave2，方案 A addr 驱动） |
+| HW-09 AXI 边界顶层 | ChiAxiNetworkTop（内含 ChiNetworkTop，per-node 混合边界，见 §6.1 A2/A3） | ChiAxiNetworkSpec AXI 读/写 + 混合端到端绿（wave2 起，wave3 补 SN 反向桥/per-node/RX DAT）。**硬件侧余项已闭合**；GEN portMode/protocol 装配分派 + estimate 桥接开销待接（见 §7） |
 
-formal 10/10 PASS。网络级 async/NI/分区 CLI 集成为 GEN 消费点（IR cdc/partitions/addr 驱动）。
+formal 10/10 PASS（v1 5 + CHI 5）。wave2 后全量 23 suite/253 test 绿。网络级 async/分区 CLI 集成为 GEN 消费点（IR cdc/partitions 驱动）；网络 SAM/NI 已硬件自含（HW-13），per-source 过滤待后续。
+
+### 6.1 Wave3 落地（2026-11-26，用户裁定 A1～A4 硬件侧一起做）
+
+| 项 | 落地 | 验证 |
+|---|---|---|
+| A1 SN 写数据投递 | ChiSnPort 增 rxDat（SN RX 写数据）；ChiNetworkTop/ChiPartitionTop SN 分支 eject port.txDat→sn.rxDat；Stub/ChiTop/Wrapper/AxiNetworkTop 接线；ChiAxiWriteBridge dat.tgtId 从 DBIDResp.srcId 捕获；ChiWriteSink 增 nodeId 填 rsp.srcId | ChiAxiNetworkSpec 写用例经 fabric 投递写数据到 SN sink 并重组校验绿 |
+| A2 SN CHI→AXI 反向桥 | ChiAxiSnBridge(c,snNodeId)：ReadNoSnp→AR→R→CompData；WriteNoSnp→DBIDResp→收 rxDat→AW/W→B→Comp | ChiAxiSnBridgeSpec 读/写绿（配 AXI 从模型） |
+| A3 per-node 混合协议 | ChiNetNode.protocol（fromIr 归一 native→chi）；ChiAxiNetworkTop 按 protocol 拆 rnAxi/rnChi/snAxi/snChi 端口向量，axi4 挂桥/chi 直通，只暴露活跃端口 | ChiAxiNetworkSpec 混合（RN0/SN0 axi4 + RN1/SN1 chi）AXI 主→fabric→AXI 从端到端读/写含数据完整性绿 |
+| A4 per-source SAM 过滤 | ChiNetworkParams.samByRn（每 RN 一份表，require 长度==nRn）；ChiNetworkTop RN 入口按源取表，空回退共享 sam；禁止对（未映射）→NDERR | ChiNetworkSpec per-source 用例：同 addr 不同 RN 译码不同 SN + 禁止对 NDERR 绿 |
+
+wave3 后全量 **24 suite/258 test 绿**，formal 10/10 PASS。GEN 消费点：节点 protocol IR 表达/装配分派、per-source routes/forbid IR、estimate 桥接开销、网络级 async/分区 CLI 发射。HW-10/12/11 仍为 GEN 阻塞/待立项条件项。
 
 ### 5.1 GEN 答复（2026-11-25，用户确认；同步 ir_gen_spec.md §9.2）
 
@@ -85,3 +105,45 @@ formal 10/10 PASS。网络级 async/NI/分区 CLI 集成为 GEN 消费点（IR c
 3. 权重/阈值**单一真源 = IR qos 块**（IR-25–28 mapping + classes[].weight，默认 8/4、4:2:1），GEN 装配传 ChiConfig，硬件吃 cfg——IR 是用户界面、ChiConfig 是硬件参数界面，非二选一。首版 CHK-34 锁默认表；硬件 S3 cfg 消费落地后次版本放开自定义（分段无洞无重叠、weight∈[1,64]）。
 
 **VC 编号泛化（用户裁定，硬件 S3 必须遵守）**：`vc = classIndex*nHalf + half`，**nHalf 由拓扑路由规则派生，不得写死 ×2**——首版环 dateline nHalf=2，未来 mesh 特殊路由规则可能需要更多道数；`vcWidth = log2Ceil(nClasses×nHalf)` 随之派生。`ChiQosMap.vcOf` 现写死 `*2`/`vcWidth=3`，须参数化 nHalf/vcWidth（GEN 传入）。ir_gen_spec SEM-08/ENC-08 已按此改写。
+
+## 7. 致 IR/GEN agent：硬件交付通知（2026-11-26，wave1+2+3 闭合）
+
+> 硬件 owner 通知：HW-01…09/13 + HQ-01 + A1～A4 已全部落地并验证（**24 suite/258 test 绿，formal 10/10 PASS**，规格 protocol_spec v1.4.0）。下列模块已可供 GEN 装配例化；**GEN/IR 侧行动项**列于 §7.2，硬件不再阻塞这些项的 GEN 消费。HW-10/12/11 仍待 GEN IR 参数/立项（§7.3）。
+
+### 7.1 已交付、可例化的硬件模块（契约入口）
+
+| 模块 | 构造签名 | GEN 例化要点 |
+|---|---|---|
+| ChiNetworkTop | `new ChiNetworkTop(p: ChiNetworkParams)` | 全网顶层（≥1 router）。`p.sam` 非空→RN 入口 addr 驱动 SAM+NDERR（HW-13）；`p.samByRn` 非空→per-source 过滤（A4，长度须==nRn）；两者空→TgtID 直通。`p.queueDepth` 随 lcreditDepth；`ChiNetRouter.outCut` 由 GEN 拓扑派生（dateline 翻半区）。 |
+| ChiNetworkParams | `fromIr(ir, cfg, snpEnable)` 或手工 copy | 字段：rn/sn/hn/mn（ChiNetNode 含 **protocol**）、routers、links、snpEnable、queueDepth、**sam**、**samByRn**。`ChiNetNode.protocol`∈{chi,axi4}（fromIr 归一 native→chi）；GEN 按 IR node.protocol 装配。 |
+| ChiAxiNetworkTop | `new ChiAxiNetworkTop(p)` | **per-node 混合协议边界**（A3）。按 p.rn/p.sn 各节点 protocol 自动拆 `io.rnAxi/rnChi/snAxi/snChi` 端口向量；`rnAxiIdx/rnChiIdx/snAxiIdx/snChiIdx` 给各端口对应全局节点序。axi4 RN 挂读/写桥（REQ 经 Arbiter 仲裁），axi4 SN 挂 ChiAxiSnBridge，chi 节点直通。**GEN 按 portMode/protocol 选择例化 ChiAxiNetworkTop（含 axi4 节点）或 ChiNetworkTop（全 chi）**，并连接活跃端口子集。 |
+| ChiAxiSnBridge | `new ChiAxiSnBridge(c, snNodeId)` | SN CHI→AXI 反向桥（A2），已由 ChiAxiNetworkTop 内部例化；snNodeId 填 rsp/dat.srcId。 |
+| ChiPartitionTop / Stub / WrapperTop | `new ChiPartitionTop(pp)` / `ChiPartitionStub(pp)` / `ChiWrapperTop(full, parts, asyncCuts)` | 分区发射（HW-06/08）。`ChiPartitionParams(name, full, members, pipe≥1)`；分区内 MN/DVM 已对标网络。asyncCuts 内 cut 每通道插 ChiAsyncLink。**LoomMain partitions CLI 发射 + ports.json 报告待 GEN 接 IR partitions**。 |
+| ChiAsyncLink | `new ChiAsyncLink(gen, depth)` | 每通道类 flit CDC（HW-04），dstClk/dstReset Bool。**网络级 async 插入待 GEN 按 IR cdc/asyncFifoDepth 例化接线**。 |
+| ChiNiError / ChiSamDecode.withHit | `new ChiNiError(c)` / `withHit(addr,aw,sam,outW):(UInt,Bool)` | 已集成进 ChiNetworkTop RN 入口；GEN 无需外套 NI wrapper（HW-13 方案 A 自含）。 |
+| ChiNodeIds.assign | `assign(kinds, overrides, nodeIdWidth)` | RN→SN→HN→MN 段序 + 覆盖优先（AQ-01）。 |
+
+端口形态变更（GEN 接线须对齐）：
+- **ChiSnPort 增 `rxDat = Flipped(Decoupled(ChiDatFlit))`**（SN RX 写数据，A1）；`dat` 仍为 SN TX 读数据。ChiNetworkTop/PartitionTop/Stub/Wrapper 已接线，GEN 若外套 SN 逻辑须消费 rxDat。
+- **ChiRnPort 含 `txRsp/txDat`**（wave1，RN TX CompAck/SnpResp/写数据）。
+- ChiAxiWriteBridge 写数据 `dat.tgtId` 从 DBIDResp.srcId 捕获（A1）；SN 侧 DBIDResp/Comp 须填 `srcId=SN NodeID`（ChiWriteSink 已增 nodeId 参数）。
+
+### 7.2 GEN/IR 侧行动项（硬件已就绪，待 GEN 消费）
+
+> **GEN 落地状态（2026-11-26，S7，ir_gen_spec v1.2.0）**：项 1/2/4/5 已消费落地（24 suite/262 test 绿）——portMode/protocol 分派 ChiAxiNetworkTop/ChiNetworkTop + estimate bridges 代理计数；sam/samByRn 装配（forbid 升级执行型，CHK-51 退役，connectivity 禁止对记 unreachable）；分区守护解除（HW-08 parity，含 MN 分区发射用例绿）；nHalf 拓扑派生（dateline 有=2/无=1）。**项 3 flat async 阻塞于新立 HW-14**（ChiNetworkTop 无 link 级 async 钩子；分区 async 经 asyncCuts 已工作），GEN 维持 flat+async 显式报错，未手写粘合 RTL。
+
+1. **portMode/protocol 装配分派（HW-09/A3，高优先）**：`gen/ChiAssemble.scala` 按 IR chi.portMode + node.protocol 选择例化 ChiAxiNetworkTop 或 ChiNetworkTop，逐节点传 protocol；estimate 增桥接开销代理指标。硬件端口已按 protocol 拆分就绪。
+2. **per-source SAM / routes / forbid（A4 / UP-01）**：硬件 `samByRn` 已支持每 RN 一份表 + 禁止对 NDERR；GEN 把 IR routes/forbid（ir_gen_spec v1.1.0 IR-70–74/CHK-49–51）装配成 samByRn 传入。当前 GUI UP-01 forbid 为校验型，per-source 过滤硬件已就绪可消费。
+3. **网络级 async 插入（HW-04）**：GEN 按 IR cdc/asyncFifoDepth 在 link 例化 ChiAsyncLink（模块+formal 已绿）。
+4. **分区 CLI 发射（HW-06/08）**：GEN 按 IR partitions 例化 ChiPartitionTop/Wrapper，发射 ports.json；含 rn-d/mn 分区守护可解除（硬件 MN/DVM 已 parity）。
+5. **dateline cut / QoS cfg（HQ-01/AQ-02）**：GEN 拓扑派生 outCut 与 nHalf/vcWidth、qos 阈值/权重传 ChiConfig（硬件已参数化消费）。
+
+### 7.3 仍待 GEN/立项的条件项（硬件不先行）
+
+> **GEN 先行状态（2026-11-26，S8，ir_gen_spec v1.3.0）**：HW-10/HW-12 的 GEN 侧参数已落地——IR node.qosGen{kind,bandwidth,saturation}（IR-75–78/CHK-52）+ `ChiAssemble.qosGenParams`（bytesPerCycle 换算）；node.adaptFifoDepth（IR-79/CHK-53）+ `ChiAssemble.adaptParams`（失配判定）；estimate/API additive qosGen/adapt 键（声明口径，无 RTL 效果）。**硬件可开工 HW-10/HW-12**，消费上述参数。HW-11 仍待立项。
+
+- **HW-10 NIU QoS regulator/limiter**（UP-02）：~~待 GEN 先落 IR qosGen~~ **GEN 参数已就绪（S8）**，硬件做注入调节，消费 QosGenParams。
+- **HW-12 ChiNi 速率适配**（UP-08）：~~待 GEN 暴露适配参数~~ **GEN 参数已就绪（S8）**，硬件做 store&fwd，消费 AdaptParams。
+- **HW-11 NoC 间桥**（UP-07）：待立项，IR subsystems schema 先行。
+
+> 对齐口径冻结见 §5.1（AQ-01/02）；硬件实施细节见 protocol_spec v1.4.0 §6.9/6.17/6.18/6.20/6.21。GEN 落地后请回写本表 §6/§7 对应项状态。

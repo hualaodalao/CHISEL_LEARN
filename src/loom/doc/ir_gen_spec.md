@@ -26,6 +26,9 @@
 | 版本号 | 日期 | 修改内容 | 相关条目 |
 |---|---|---|---|
 | v1.0.0 | 2026-11-25 | 建立首个编号基线（IR/GEN 迁移计划 S0）：定义 `loom/v2` 全字段表与 v1 映射、节点/NodeID/SAM/通道类/QoS/三级流控语义、GEN 单路径管线契约（parse→upgrade→C0/C1/C2→graph/G1→elaboration→emit→reports）、C/G/S 门禁全表（含错误码与消息模板、正/负例）、位宽编码表（交叉引用 protocol_spec）、v1→v2 升级与退役策略、现状代码与目标差异的待裁定清单 | IR-01–IR-69、SEM-01–SEM-16、GEN-01–GEN-20、CHK-01–CHK-48、ENC-01–ENC-10、MIG-01–MIG-13、OQ-01–OQ-09 |
+| v1.1.0 | 2026-11-26 | UP-01 显式路由/连接约束（GUI FlexNoC 布局计划 §6）：routes[] 可选块、显式路径覆盖 BFS+反向自动逆序、forbid 校验型约束（per-source 过滤待 HW-13）、connectivity additive API；空 routes 省略渲染保 hash 基线 | IR-70–IR-74、SEM-17、GEN-21、CHK-49–CHK-51 |
+| v1.2.0 | 2026-11-26 | 硬件 wave1–3 消费（依赖清单 §7.2）：forbid 升级执行型（samByRn per-source 过滤+NDERR，CHK-51 退役）；SEM-05 未命中 NDERR 已落地；GEN-22 portMode/protocol 分派 ChiAxiNetworkTop/ChiNetworkTop + estimate bridges；分区守护解除（HW-08 parity）；nHalf 拓扑派生（有 dateline=2，否则 1） | SEM-05/SEM-17、GEN-21/GEN-22、CHK-51（退役） |
+| v1.3.0 | 2026-11-26 | UP-02/UP-08 GEN 先行（依赖清单 §7.3）：node.qosGen{kind,bandwidth,saturation} 声明+CHK-52+QosGenParams 装配（注入逻辑待 HW-10）；node.adaptFifoDepth+CHK-53+AdaptParams 装配（store&fwd 待 HW-12）；estimate/API additive qosGen/adapt 键；省略渲染保 hash 基线 | IR-75–IR-79、SEM-18/SEM-19、GEN-23/GEN-24、CHK-52/CHK-53 |
 
 ## 1. 文档说明
 
@@ -255,6 +258,37 @@ link 是 fabric 内部运输边；v2 保留 v1 链路参数并新增通道类与
 | IR-68 | `members` | array[string] | node id / router name；全网 fabric 对象必须被恰好一个分区覆盖（CHK-44） | — | 是 | 分区成员；node 必须与其 attach router 同分区（CHK-45） | `partitions[].members`（mnet/snet 成员折算为 node） |
 | IR-69 | `boundaryPipe` | int | [1,8] | 1 | 否 | 分区边界寄存级数 | `partitions[].boundaryPipe` |
 
+### 3.12 routes[]（UP-01，v1.1.0 增补）
+
+显式路由/连接约束，additive 可选块；省略时路由完全由 SAM+拓扑 BFS 派生（SEM-06 不变）。
+
+| ID | 字段 | 类型 | 取值域 | 默认 | 必填 | 语义 | v1 映射 |
+|---|---|---|---|---|---|---|---|
+| IR-70 | `routes` | array | §IR-71–74 条目；(from,to) 对唯一（CHK-49） | `[]` | 否 | 显式路由/禁止对表 | （新增） |
+| IR-71 | `routes[].from` | string | 已声明 node id，kind ∈ {rn-i, rn-d} | — | 是 | 请求源 RN | （新增） |
+| IR-72 | `routes[].to` | string | 已声明 node id，kind ∈ {sn-f, sn-i} | — | 是 | 目标 SN | （新增） |
+| IR-73 | `routes[].path` | array[string] | router name 序列；首=from.attach、尾=to.attach、相邻 hop 有 link、无重复（CHK-50）；forbid=true 时必须省略 | — | 显式路由时必填 | RN→SN 显式路径 | （新增） |
+| IR-74 | `routes[].forbid` | bool | true/false | false | 否 | 禁止对声明（校验型，SEM-17） | （新增） |
+
+渲染规则：`routes` 为空时规范化 JSON **省略该键**（与 nodeId 同例），保持既有 hash 基线不变。
+
+### 3.13 node.qosGen（UP-02，v1.3.0 增补，GEN 先行/HW-10 待硬件）
+
+per-node 可选 QoS 带宽调节声明（FlexNoC generator 范式）。**首版仅 IR/校验/装配参数/报告口径生效，注入调节逻辑待 HW-10**；省略时节点无调节（现状行为不变）。
+
+| ID | 字段 | 类型 | 取值域 | 默认 | 必填 | 语义 | v1 映射 |
+|---|---|---|---|---|---|---|---|
+| IR-75 | `nodes[].qosGen` | object | §IR-76–78 | 无（省略渲染） | 否 | 带宽调节声明 | （新增） |
+| IR-76 | `qosGen.kind` | string | `fixed` / `limiter` / `regulator` | — | 是（声明 qosGen 时） | fixed=恒定速率上限；limiter=峰值上限+突发；regulator=持续速率+突发 | （新增） |
+| IR-77 | `qosGen.bandwidth` | int | [1, 1048576]（MB/s） | — | 是 | 持续/峰值带宽声明 | （新增） |
+| IR-78 | `qosGen.saturation` | int | [0, 1048576]（字节）；fixed⇒必须 0 | 0 | 否 | 突发 allowance（limiter/regulator） | （新增） |
+
+### 3.14 node.adaptFifoDepth（UP-08，v1.3.0 增补，GEN 先行/HW-12 待硬件）
+
+| ID | 字段 | 类型 | 取值域 | 默认 | 必填 | 语义 | v1 映射 |
+|---|---|---|---|---|---|---|---|
+| IR-79 | `nodes[].adaptFifoDepth` | int | [2,64] | 4 | 否 | NIU 宽度/频率失配 store&fwd FIFO 深度参数；失配判定= node.dataWidth≠chi.datWidth 或 node.clock≠attach router.clock。**适配逻辑待 HW-12**，首版仅参数冻结+报告 | （新增） |
+
 ## 4. 语义规范（SEM）
 
 ### 4.1 节点与 NodeID
@@ -279,7 +313,7 @@ link 是 fabric 内部运输边；v2 保留 v1 链路参数并新增通道类与
 
 **SEM-04 NI 一次译码**。请求发起侧 NI 用 `sam[]` 把 REQ.Addr 一次译码为 TgtID；fabric 逐跳只按 TgtID 查表路由，不再逐拍译码地址（PS §2 SAM、§5 F7）。sam 条目在 elaboration 中折算为 `{base, size, tgtId=NodeID(tgtNode)}`（CURRENT `ChiSamEntry`）。
 
-**SEM-05 未命中行为**。地址不落入任何窗口时，TARGET 行为是由 NI 产生 NDERR 错误响应（RespErr=11，PS §2），事务不进入 fabric。CURRENT `ChiSamDecode` 骨架把未命中译码为 NodeID 0（源码注释明确错误响应后补）——差异见 OQ-09；v2 校验不因此放行重叠/未覆盖配置。
+**SEM-05 未命中行为**。地址不落入任何窗口时，由 NI 产生 NDERR 错误响应（RespErr=11，PS §2），事务不进入 fabric。**已落地（HW-13/A4，2026-11-26）**：ChiNetworkTop RN 入口在 `sam`/`samByRn` 非空时 addr 驱动 ChiSamDecode.withHit→ChiNiError 就地 NDERR；GEN 装配必须传 sam（§GEN-21）。两表皆空退回 TgtID 直通（仅供 TB 驱动场景）。v2 校验不因此放行重叠/未覆盖配置。
 
 **SEM-06 派生窗口**。`sam` 省略时按 SN 声明序派生 `base=i*4096, size=4096`（`AddressMap.windows` 隐式布局）；派生结果必须与显式书写等价配置的 elaboration 完全一致（升级等价性测试，MIG-01）。
 
@@ -314,6 +348,12 @@ link 是 fabric 内部运输边；v2 保留 v1 链路参数并新增通道类与
 **SEM-15 事务粒度**。CHI 单笔 ≤64B（协议常量，PS §2）；AXI 长 burst 在桥接层拆分为多笔（PS §5 F8）。用户口径不再配置 burst/beat；DAT flit 数 = `ceil(64 / (chi.datWidth/8))`（ENC-01，CHK-41 一致性门禁）。
 
 **SEM-16 分区**。分区是单时钟物理切分：成员全覆盖且唯一、成员时钟等于分区时钟、node 与 attach router 同分区、跨分区边只能是 router↔router（CHK-44–48）。CHI 分区发射路径现状缺失，见 OQ-08。
+
+**SEM-17 显式路由与禁止对（UP-01，v1.2.0 升级）**。显式 `path` 覆盖 BFS 派生：沿 path 的每个 router 对 to 的 NodeID 路由表项指向 path 下一 hop；**反向（SN→RN）自动取 path 逆序**（路由表类无关，两方向一致约束）。共享 TgtID 表的物理事实：同一 router 对同一目标 NodeID 只有一个表项 ⇒ 多条显式路径在共享 router 处必须下一 hop 一致，否则 CHK-50 冲突——**正向（同目标 SN）与反向（同源 RN，逆序 path 对 route[from] 的约束）均适用**。`forbid=true` 自 v1.2.0 起为**执行型约束（A4/HW-13 已落地）**：GEN 装配 per-source SAM（`samByRn`，每 RN 一份表，剔除禁止对目标 SN 的窗口），被禁请求在源 NI 未命中→NDERR，不进 fabric；**拓扑可达的禁止对合法**（CHK-51 退役，编号保留）。connectivity 矩阵中禁止对记 unreachable（NDERR 语义）。
+
+**SEM-18 QoS 带宽调节（UP-02）**。qosGen 声明节点注入带宽约束：换算 `bytesPerCycle = bandwidth(MB/s) / freqMHz(节点时钟)`（1 MB/s ÷ 1 MHz = 1 B/cycle），GEN 装配为 `QosGenParams(nodeId, kind, bytesPerCycle, saturationBytes)` 供 HW-10 注入逻辑消费。**首版无 RTL 效果**（硬件未落地），estimate/API 如实标注"声明口径，调节待 HW-10"，不做虚假带宽承诺。fixed 不允许 saturation。
+
+**SEM-19 NIU 速率适配（UP-08）**。宽度失配（node.dataWidth≠chi.datWidth）或频率失配（node.clock≠attach router.clock）时 NIU 需 store&fwd 适配（HW-12）；`adaptFifoDepth` 冻结 FIFO 深度参数，GEN 装配 `AdaptParams(nodeId, dataWidth, datWidth, clock, routerClock, fifoDepth, mismatch)` 并报告失配节点清单（含显式深度冻结节点）。**首版无 RTL 效果**，AXI 边界宽度适配仍由桥接层承担（PS §5 F8）。
 
 ## 5. GEN 管线契约（GEN）
 
@@ -446,6 +486,14 @@ C0 失败时返回仅含 `schema/ok/hash/errors/warnings` 的失败对象（CURR
 
 **GEN-20 版本标识**。ToolVersion `1.1.0 → 2.0.0` 于 S4 切换；`version` 命令、manifest.version、缓存键同步（GEN-08）。S1–S3 期间 ToolVersion 不变，v2 解析能力以 schema 字段判别。
 
+**GEN-21 显式路由装配（UP-01，v1.2.0 升级）**。`ChiAssemble.networkParams` 路由表装配：显式 path 沿程覆盖 BFS 表项（to 的 NodeID），反向按逆序 path 覆盖 from 的 NodeID 表项；覆盖前做共享 router 一致性检查（CHK-50）。**SAM 装配（HW-13/A4）**：`sam` = 全局窗口表（ChiSamEntry，tgtId=NodeID）；存在 forbid 时装配 `samByRn`（每 RN 一份 = 全局表剔除该 RN 禁止对目标 SN 的窗口；无禁止对的 RN 沿用全局表），长度==nRn。`LoomApi` additive 暴露 `routes`（规范化回显）与 `connectivity[]{from,to,reachable,path}`（由最终路由表派生，**forbid 对记 unreachable**）；旧键不删（MIG-10）。routes 为空时 hash 基线不变（§3.12 渲染规则）。
+
+**GEN-22 portMode/protocol 装配分派（UP-04，HW-09/A3）**。发射顶层选择：任一 node.protocol=axi4 ⇒ `ChiAxiNetworkTop`（per-node 混合边界，rnAxi/rnChi/snAxi/snChi 端口向量按 protocol 拆分），全 chi ⇒ `ChiNetworkTop`。`ChiNetNode.protocol` 逐节点从 IR node.protocol 传入。chi.portMode 与 node.protocol 兼容性由 CHK-40 保证（both 恒兼容）。estimate additive 增 `bridges{rnAxi,snAxi}` 计数与桥接代理指标（口径写入 estimate.assumptions，不做虚假 PPA 承诺）。分区发射守护解除（HW-08 已 parity）：partitions 含 rn-d/mn/hn-i 合法。
+
+**GEN-23 qosGen 装配（UP-02，GEN 先行）**。`ChiAssemble.qosGenParams(v2): Seq[QosGenParams]`（nodeId/kind/bytesPerCycle/saturationBytes，按 SEM-18 换算，节点时钟 freqMHz 取自 clockDomains）；estimate additive `qosGen[]{node,kind,bandwidth,saturation}` + assumptions 标注"声明口径，注入调节待 HW-10"；LoomApi additive 同键。qosGen 省略时节点渲染不含该键（hash 基线不变）。
+
+**GEN-24 适配参数装配（UP-08，GEN 先行）**。`ChiAssemble.adaptParams(v2): Seq[AdaptParams]`（nodeId/widthRatio/freqRatio/fifoDepth，失配判定见 SEM-19）；estimate additive `adapt[]{node,dataWidth,datWidth,clock,routerClock,fifoDepth,mismatch}`；LoomApi additive 同键。adaptFifoDepth 省略时渲染省略（默认 4 仅在装配/报告体现，hash 基线不变）。
+
 ## 6. 校验规则表（CHK）
 
 ### 6.1 门禁总表与错误码约定
@@ -553,6 +601,11 @@ G1 通过判据：对每个生成通道类 c ∈ {req,rsp,dat} ∪ ({snp} 若 dv
 | CHK-46 | async link 两端同时钟域 | `LM-S1: [CHK-46] async link '<f>' -> '<t>' joins clock domain '<a>'; use cdc "sync"` | §6.10 |
 | CHK-47 | boundaryPipe∉[1,8]；分区无 router 成员 | `LM-S2: [CHK-47] partition '<p>' boundaryPipe must be in [1,8] / has no router` | §6.11 |
 | CHK-48 | 跨分区 link 不是 router↔router | `LM-S3: [CHK-48] cut link '<f>' -> '<t>' is not router-to-router` | §6.12 |
+| CHK-49 | routes[].from/to 不存在或 kind 不符（from 须 RN、to 须 SN）；(from,to) 对重复；path 含未声明 router；forbid=true 且带 path | `C0: [CHK-49] route '<from>-><to>' <violation>` | §3.12 |
+| CHK-50 | path 首≠from.attach 或尾≠to.attach；相邻 hop 无 link；path 重复 router；多条显式路径在共享 router 对同一目标下一 hop 冲突（正向同 SN / 反向同 RN） | `C1: [CHK-50] route '<from>-><to>' <violation>` | §3.12 |
+| CHK-51 | **退役（v1.2.0）**：forbid 改 per-source SAM 过滤执行（SEM-17），可达禁止对合法；编号保留不复用 | — | §3.12 |
+| CHK-52 | qosGen.kind ∉ {fixed,limiter,regulator}；bandwidth ∉ [1,1048576]；saturation ∉ [0,1048576]；fixed 且 saturation>0 | `C0: [CHK-52] node '<id>' qosGen <violation>` | §3.13 |
+| CHK-53 | adaptFifoDepth ∉ [2,64] | `C0: [CHK-53] node '<id>' adaptFifoDepth <v> must be in [2,64]` | §3.14 |
 
 ### 6.3 C0 正/负例
 

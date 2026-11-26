@@ -451,6 +451,42 @@ object Reports {
     (nodeTable, JArr(samObjs.toVector))
   }
 
+  /** GEN-23 (UP-02): additive estimate/API qosGen rows — the raw declaration
+    * caliber (bandwidth MB/s, saturation bytes). Empty when no node declares
+    * qosGen. Declaration-only: injection logic pending HW-10 (SEM-18).
+    */
+  def qosGenJsonV2(v2: IrV2): JValue = {
+    val ids = ChiAssemble.nodeIds(v2)
+    JArr(v2.nodes.zip(ids).sortBy(_._2).flatMap { case (n, _) =>
+      n.qosGen.map { q =>
+        JObj(Vector(
+          "node" -> JStr(n.id),
+          "kind" -> JStr(q.kind),
+          "bandwidth" -> JNum(BigDecimal(q.bandwidth)),
+          "saturation" -> JNum(BigDecimal(q.saturation))))
+      }
+    }.toVector)
+  }
+
+  /** GEN-24 (UP-08): additive estimate/API adapt rows from the assembled
+    * AdaptParams (mismatch list + explicit depth freezes, SEM-19). Empty
+    * when nothing is declared/mismatched. Declaration-only: store&fwd
+    * adaptation logic pending HW-12.
+    */
+  def adaptJsonV2(v2: IrV2): JValue = {
+    val nameOfId = v2.nodes.map(_.id).zip(ChiAssemble.nodeIds(v2)).map { case (n, i) => i -> n }.toMap
+    JArr(ChiAssemble.adaptParams(v2).map { p =>
+      JObj(Vector(
+        "node" -> JStr(nameOfId(p.nodeId)),
+        "dataWidth" -> JNum(BigDecimal(p.dataWidth)),
+        "datWidth" -> JNum(BigDecimal(p.datWidth)),
+        "clock" -> JStr(p.clock),
+        "routerClock" -> JStr(p.routerClock),
+        "fifoDepth" -> JNum(BigDecimal(p.fifoDepth)),
+        "mismatch" -> JBool(p.mismatch)))
+    }.toVector)
+  }
+
   /** GEN-17 estimate row: CHI caliber. Capacity is the DAT flit line rate
     * (`datWidth/8 * MHz/1000 GB/s`); node/SAM tables, flit widths, three-level
     * flow-control parameters and the generated channel classes are reported.
@@ -495,6 +531,13 @@ object Reports {
     }
 
     val (nodeTable, samJ) = nodeSamTablesV2(v2, ChiAssemble.nodeIds(v2))
+    // GEN-22 (HW-09/A3): additive bridge proxy counts — one AXI read/write
+    // bridge pair per axi4 RN, one CHI->AXI reverse bridge per axi4 SN.
+    // Counts only, no PPA claim (caliber recorded in assumptions).
+    val rnAxiCount = v2.nodes.count(n =>
+      (n.kind == "rn-i" || n.kind == "rn-d") && n.protocol == "axi4")
+    val snAxiCount = v2.nodes.count(n =>
+      (n.kind == "sn-f" || n.kind == "sn-i") && n.protocol == "axi4")
     val flowControl = JObj(Vector(
       "pcrdTypes" -> JNum(BigDecimal(v2.chi.pcrdTypes)),
       "outstanding" -> JNum(BigDecimal(v2.chi.outstanding)),
@@ -532,6 +575,13 @@ object Reports {
       "chi" -> chiSnapshotJson(v2),
       "flowControl" -> flowControl,
       "channels" -> JArr(channelsV2(v2).map(JStr(_)).toVector),
+      "bridges" -> JObj(Vector(
+        "rnAxi" -> JNum(BigDecimal(rnAxiCount)),
+        "snAxi" -> JNum(BigDecimal(snAxiCount)))),
+      // GEN-23/GEN-24 (S8, v1.3.0): additive declaration-only rows; empty
+      // arrays when nothing is declared/mismatched. No RTL effect yet.
+      "qosGen" -> qosGenJsonV2(v2),
+      "adapt" -> adaptJsonV2(v2),
       "totals" -> JObj(Vector(
         "routers" -> JNum(BigDecimal(v2.routers.length)),
         "links" -> JNum(BigDecimal(v2.links.length)),
@@ -556,6 +606,9 @@ object Reports {
         "crosspoints = derivedIn * derivedOut; CHI router is flat with one register stage per output",
         "area proxy = 16694.5 + 3264.5*crosspoints um^2, v1 four-channel nangate45 calibration; CHI calibration pending PPA (D10)",
         s"SRAM proxy = ${Sram.AreaPerBitUm2} um^2/bit placeholder over memories with depth*width >= ${Sram.ThresholdBits}; not calibrated",
+        "bridges{rnAxi,snAxi} = proxy counts of AXI4 boundary bridges per node protocol (GEN-22); count-only, no PPA claim",
+        "qosGen = declaration-only bandwidth shaping (SEM-18: bytesPerCycle = bandwidth MB/s / node freqMHz); injection logic pending HW-10, no RTL effect",
+        "adapt = declaration-only NIU store&fwd parameters (SEM-19: mismatch = dataWidth != chi.datWidth or node.clock != attach router.clock; fifoDepth default 4); adaptation logic pending HW-12, no RTL effect",
         "estimate only; not signoff"
       ).map(JStr(_))),
       "areaSensitivity" -> JArr(areaTerms.map { case (k, v) =>

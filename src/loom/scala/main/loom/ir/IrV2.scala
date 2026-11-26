@@ -4,7 +4,16 @@ import java.nio.file.{Files, Path}
 
 import scala.collection.mutable
 
-/** loom/v2 node (IR-13–IR-21). One CHI port: NodeID + REQ/RSP/DAT (+SNP). */
+/** Per-node QoS bandwidth regulator declaration (IR-75–IR-78, UP-02).
+  * Declaration-only in the first version: injection logic pending HW-10
+  * (SEM-18). bandwidth is MB/s, saturation is the burst allowance in bytes.
+  */
+final case class QosGenSpec(kind: String, bandwidth: Int, saturation: Int)
+
+/** loom/v2 node (IR-13–IR-21). One CHI port: NodeID + REQ/RSP/DAT (+SNP).
+  * qosGen/adaptFifoDepth (IR-75–IR-79, v1.3.0) are appended with defaults so
+  * existing positional constructions stay source-compatible.
+  */
 final case class NodeV2(
     id: String,
     kind: String,
@@ -14,7 +23,9 @@ final case class NodeV2(
     protocol: String,
     dataWidth: Int,
     outstanding: Int,
-    qos: Int
+    qos: Int,
+    qosGen: Option[QosGenSpec] = None,
+    adaptFifoDepth: Option[Int] = None
 )
 
 /** SAM window (IR-22–IR-24). */
@@ -53,6 +64,13 @@ final case class RouterV2(
     routing: String
 )
 
+/** Explicit route / connectivity constraint (IR-70–IR-74, UP-01). `path` is
+  * the RN->SN router sequence (empty for forbid-only entries); `forbid` is a
+  * validation-only declaration (SEM-17): the pair must be topologically
+  * unreachable (CHK-51), it never filters the generated SAM/routes.
+  */
+final case class RouteSpec(from: String, to: String, path: Seq[String], forbid: Boolean)
+
 /** Fabric link (IR-54–IR-63); direction retired (HW-07, always bidirectional). */
 final case class LinkV2(
     from: String,
@@ -80,6 +98,7 @@ final case class IrV2(
     links: Seq[LinkV2],
     timing: TimingSpec,
     partitions: Seq[PartitionSpec],
+    routes: Seq[RouteSpec] = Nil,
     unknown: Seq[String] = Nil
 )
 
@@ -122,7 +141,7 @@ object IrV2 {
 
     val rootObj = asObj(root, "$")
     keys(rootObj, "$", Set("schema", "meta", "clockDomains", "nodes", "sam", "qos", "chi",
-      "fabric", "partitions"))
+      "fabric", "partitions", "routes"))
     val schema = str(rootObj, "schema", "$")
     if (schema != "loom/v2")
       throw Ir.IrException(s"$$ schema must be 'loom/v2', got '$schema' (use Upgrade.v1ToV2 for loom/v1)")
@@ -165,7 +184,18 @@ object IrV2 {
         val p = s"$$.nodes[$i]"
         val o = asObj(v, p)
         keys(o, p, Set("id", "kind", "nodeId", "clock", "attach", "protocol", "dataWidth",
-          "outstanding", "qos"))
+          "outstanding", "qos", "qosGen", "adaptFifoDepth"))
+        // IR-75–IR-78 (UP-02): optional qosGen declaration; saturation
+        // defaults to 0, unknown subkeys go through the C0 unknown-key gate.
+        val qosGen = o.get("qosGen") match {
+          case Some(q: JObj) =>
+            val qp = s"$p.qosGen"
+            keys(q, qp, Set("kind", "bandwidth", "saturation"))
+            Some(QosGenSpec(str(q, "kind", qp), int(q, "bandwidth", qp),
+              optInt(q, "saturation", 0)))
+          case Some(_) => throw Ir.IrException(s"$p.qosGen must be an object")
+          case None => None
+        }
         NodeV2(
           id = str(o, "id", p),
           kind = str(o, "kind", p),
@@ -175,7 +205,11 @@ object IrV2 {
           protocol = optStr(o, "protocol", V2Defaults.protocolOf(chi.portMode)),
           dataWidth = optInt(o, "dataWidth", chi.datWidth),
           outstanding = optInt(o, "outstanding", chi.outstanding),
-          qos = optInt(o, "qos", 0)
+          qos = optInt(o, "qos", 0),
+          qosGen = qosGen,
+          // IR-79 (UP-08): the default depth 4 lives in assembly/report only;
+          // an omitted key stays None so the normalized rendering omits it.
+          adaptFifoDepth = o.get("adaptFifoDepth").map(_ => int(o, "adaptFifoDepth", p))
         )
     }
 
@@ -309,8 +343,39 @@ object IrV2 {
       case None => Vector.empty
     }
 
+    // IR-70–IR-74 (UP-01): optional explicit routes / forbidden pairs.
+    val routes = rootObj.get("routes") match {
+      case Some(a: JArr) =>
+        a.items.zipWithIndex.map { case (v, i) =>
+          val p = s"$$.routes[$i]"
+          val o = asObj(v, p)
+          keys(o, p, Set("from", "to", "path", "forbid"))
+          val path = o.get("path") match {
+            case Some(pa: JArr) => pa.items.map {
+              case JStr(s) => s
+              case _ => throw Ir.IrException(s"$p.path must contain strings")
+            }
+            case Some(_) => throw Ir.IrException(s"$p.path must be an array")
+            case None => Vector.empty
+          }
+          RouteSpec(str(o, "from", p), str(o, "to", p), path, optBool(o, "forbid", false))
+        }
+      case Some(_) => throw Ir.IrException("$.routes must be an array")
+      case None => Vector.empty
+    }
+
     IrV2(meta, clocks, nodes, sam, QosV2(mapping, classes), chi, routers, links, timing,
-      partitions, unknown.toSeq)
+      partitions, routes, unknown.toSeq)
+  }
+
+  /** Normalized route entry rendering (IR-70–74): `path` is omitted when
+    * empty (forbid-only entries); `forbid` is always explicit (GEN-03).
+    */
+  def routeJson(r: RouteSpec): JValue = {
+    val base = Vector("from" -> JStr(r.from), "to" -> JStr(r.to))
+    val withPath =
+      if (r.path.nonEmpty) base :+ ("path" -> JArr(r.path.map(JStr(_)).toVector)) else base
+    JObj(withPath :+ ("forbid" -> JBool(r.forbid)))
   }
 
   /** Fully-explicit normalized rendering (GEN-03/GEN-06): hash and canonical
@@ -328,7 +393,14 @@ object IrV2 {
         "id" -> s(x.id), "kind" -> s(x.kind), "clock" -> s(x.clock), "attach" -> s(x.attach),
         "protocol" -> s(x.protocol), "dataWidth" -> n(x.dataWidth),
         "outstanding" -> n(x.outstanding), "qos" -> n(x.qos))
-      JObj(x.nodeId.fold(base)(id => base :+ ("nodeId" -> n(id))))
+      val withId = x.nodeId.fold(base)(id => base :+ ("nodeId" -> n(id)))
+      // §3.13/§3.14 rendering rule: qosGen/adaptFifoDepth are omitted when
+      // absent (same conditional rule as nodeId/routes) so pre-v1.3.0 hash
+      // baselines stay identical; the adaptFifoDepth default 4 is an
+      // assembly/report caliber, never rendered.
+      val withQosGen = x.qosGen.fold(withId)(q => withId :+ ("qosGen" ->
+        obj("kind" -> s(q.kind), "bandwidth" -> n(q.bandwidth), "saturation" -> n(q.saturation))))
+      JObj(x.adaptFifoDepth.fold(withQosGen)(d => withQosGen :+ ("adaptFifoDepth" -> n(d))))
     }
     val samJ = v.sam.map(w => obj("base" -> n(w.base), "size" -> n(w.size), "tgtNode" -> s(w.tgtNode)))
     val mappingJ = v.qos.mapping.map(m =>
@@ -357,7 +429,7 @@ object IrV2 {
       "name" -> s(p.name), "clock" -> s(p.clock), "members" -> arr(p.members.map(s)),
       "boundaryPipe" -> n(p.boundaryPipe)))
 
-    obj(
+    val base = Vector(
       "schema" -> s("loom/v2"),
       "meta" -> obj("name" -> s(v.meta.name)),
       "clockDomains" -> arr(v.clockDomains.map(c => obj("id" -> s(c.id), "freqMHz" -> JNum(BigDecimal(c.freqMHz))))),
@@ -371,6 +443,9 @@ object IrV2 {
         "timing" -> obj("maxFanin" -> n(v.timing.maxFanin), "maxCombDepth" -> n(v.timing.maxCombDepth))),
       "partitions" -> arr(partsJ)
     )
+    // §3.12 rendering rule: an empty routes block is omitted entirely (same
+    // conditional rule as nodeId) so pre-UP-01 hash baselines stay identical.
+    JObj(if (v.routes.isEmpty) base else base :+ ("routes" -> arr(v.routes.map(routeJson))))
   }
 
   def hash(v: IrV2): String = Canonical.hash(toJson(v))

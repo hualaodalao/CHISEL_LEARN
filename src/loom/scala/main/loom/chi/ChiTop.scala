@@ -37,5 +37,7 @@ class ChiTop(p: ChiParams) extends Module {
     io.sn(j).req.bits := 0.U.asTypeOf(new ChiReqFlit(c))
     io.sn(j).rsp.ready := true.B
     io.sn(j).dat.ready := true.B
+    io.sn(j).rxDat.valid := false.B
+    io.sn(j).rxDat.bits := 0.U.asTypeOf(new ChiDatFlit(c))
   }
 }

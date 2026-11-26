@@ -13,6 +13,8 @@
 | 1.0.0 | 2026-11-25 | 首版：合并 chi_target_spec 与 protocol_spec，按完整硬件规格结构重写；S1–S12 落地，34 suite/143 test 绿，formal 9/9 PASS |
 | 1.1.0 | 2026-11-25 | 第 6 章扩为逐子模块规格（功能/参数/接口/行为/用法/限制），覆盖全部 17 个 block |
 | 1.2.0 | 2026-11-25 | HW-01…07 + HQ-01 落地：HN-I/MN elaboration + DVM 接入网络、SAM 1:1 约束删除、ChiTop 退役、depth 可配、QoS/VC 三级仲裁（nHalf 参数化）、NI 未命中 NDERR、ChiAsyncLink CDC、分区三件套；ChiRnPort 补 TX RSP/DAT |
+| 1.3.0 | 2026-11-26 | Wave2 HW-08/13/09 落地：分区 MN/DVM parity（HW-08）、ChiNetworkTop RN 入口 addr 驱动 SAM+NI 就地 NDERR（HW-13）、ChiAxiNetworkTop AXI 边界网络顶层（HW-09，RN 读/写桥+REQ 仲裁）；23 suite/253 test 绿，formal 10/10 PASS |
+| 1.4.0 | 2026-11-26 | Wave3 A1～A4 落地：ChiSnPort 补 RX DAT 写数据投递 + 写桥 dat.tgtId 从 DBIDResp.srcId 捕获（A1）、ChiAxiSnBridge SN CHI→AXI 反向桥（A2）、ChiAxiNetworkTop per-node 混合协议边界（按 node.protocol 拆分 rnAxi/rnChi/snAxi/snChi，A3）、ChiNetworkParams.samByRn per-source SAM 过滤/禁止对 NDERR（A4） |
 
 ## 1. 文档说明
 
@@ -78,14 +80,18 @@ ID 不是 opcode/地址/错误码，不重排不复用。性能条目只索引�
 | LM-F010 | 链路 L-Credit + 激活 FSM | 已实现 | flit 信用≤15，四态 STOP/ACTIVATE/RUN/DEACTIVATE；ChiTxLink RUN+信用双门控 | 5.6、6.6 |
 | LM-F011 | 事务 P-Credit | 已实现 | 满→RetryAck，释放→PCrdGrant，AllowRetry=0 重发 | 5.6、6.11 |
 | LM-F012 | TxnID/DBID 池 | 已实现 | ChiIdPool 自由列表，耗尽反压+回收断言 | 5.6、6.11 |
-| LM-F013 | AXI4 桥接 | 已实现 | ChiAxiReadBridge/ChiAxiWriteBridge，64B↔nFlits beat；portMode 可配 | 5.8、6.17 |
+| LM-F013 | AXI4 桥接 | 已实现 | ChiAxiReadBridge/ChiAxiWriteBridge，64B↔nFlits beat；ChiAxiNetworkTop 按 portMode 在 RN 边界例化桥（HW-09） | 5.8、6.17、6.21 |
 | LM-F014 | 一致性预留 + 使用门禁 | 预留 | ChiRnFPort/ChiHnFPort 端口占位；ChiReserved.checkOpcode 拒绝 reserved/unsupported | 6.16、14 |
 | LM-F015 | QoS/VC 调度 | 已实现 | per-VC 队列 + 三级仲裁（input RR/half RR/class WRR）+ cut 翻半区；vc=class×nHalf+half，nHalf/vcWidth 参数化（GEN 传入）；阈值/权重 IR→cfg | 5.7、6.7、6.8、7.6 |
 | LM-F016 | burst 事务化 | 已实现 | ChiBurstSplit 把字节 span 拆 ≤64B 事务 | 5.8、6.12 |
 | LM-F017 | CDC 异步链路 | 已实现 | ChiAsyncLink 每通道类异步 FIFO + 保守跨域信用（复用 v1 LmAsyncLink）；formal token_chi_async_credit | 6.19 |
-| LM-F018 | 分区发射 | 已实现 | ChiPartitionTop/Stub/Wrapper，边界口每通道 ≥1 pipe，async cut 插 ChiAsyncLink | 6.20 |
-| LM-F019 | NI 未命中 NDERR | 已实现 | ChiSamDecode.withHit + ChiNiError 未命中就地 Comp NDERR 不进 fabric（网络级集成待 GEN） | 6.18 |
+| LM-F018 | 分区发射 | 已实现 | ChiPartitionTop/Stub/Wrapper，边界口每通道 ≥1 pipe，async cut 插 ChiAsyncLink；分区内 MN/DVM 接线对标网络（HW-08） | 6.20 |
+| LM-F019 | NI 未命中 NDERR | 已实现 | ChiSamDecode.withHit + ChiNiError 未命中就地 Comp NDERR 不进 fabric；已集成 ChiNetworkTop RN 入口（addr 驱动，HW-13） | 6.9、6.18 |
 | LM-F020 | NodeID 段序装配 | 已实现 | ChiNodeIds.assign RN→SN→HN→MN 段序 + 显式覆盖优先 + 冲突/越界校验 | 6.4 |
+| LM-F021 | AXI 边界网络顶层 | 已实现 | ChiAxiNetworkTop 内含 ChiNetworkTop，按 node.protocol per-node 拆分 rnAxi/rnChi/snAxi/snChi 边界（RN 读/写桥+REQ 仲裁，SN 反向桥），混合协议端到端（HW-09/A3） | 6.21 |
+| LM-F022 | SN CHI→AXI 反向桥 | 已实现 | ChiAxiSnBridge：CHI ReadNoSnp→AXI AR→R→CompData；WriteNoSnp→DBIDResp→收 CHI 写数据→AXI AW/W→B→Comp（A2） | 6.17.4 |
+| LM-F023 | per-source SAM 过滤 | 已实现 | ChiNetworkParams.samByRn 每 RN 一份译码表，禁止对（未映射）就地 NDERR；空回退全网共享 sam（A4） | 6.9、6.18 |
+| LM-F024 | SN 写数据投递 | 已实现 | ChiSnPort.rxDat（SN RX 写数据），NetworkTop/PartitionTop SN 分支 eject port.txDat→sn.rxDat；写桥 dat.tgtId 从 DBIDResp.srcId 捕获（A1） | 6.3、6.9、6.17.3 |
 
 ### 3.3 性能清单
 
@@ -140,10 +146,11 @@ ID 不是 opcode/地址/错误码，不重排不复用。性能条目只索引�
 | ChiAtomic | ChiAtomicOp（金锚）/ChiAtomicAlu/ChiAtomicEngine | 6.14 |
 | ChiDvm | ChiDvmMsg/ChiDvmMn | 6.15 |
 | ChiReserved | 使用门禁/Resp 编码/Snp* 空间/ChiRnFPort/ChiHnFPort | 6.16 |
-| ChiAxiBridge | ChiAxiAddr/R/W/B bundle + ChiAxiReadBridge/ChiAxiWriteBridge | 6.17 |
+| ChiAxiBridge | ChiAxiAddr/R/W/B bundle + ChiAxiReadBridge/ChiAxiWriteBridge（RN）+ ChiAxiSnBridge（SN 反向） | 6.17 |
 | ChiNi | ChiSamDecode.withHit + ChiNiError（未命中 NDERR） | 6.18 |
 | ChiAsyncLink | 每通道类 flit CDC（复用 LmAsyncLink） | 6.19 |
 | ChiPartition | ChiPartitionParams/Top/Stub/WrapperTop | 6.20 |
+| ChiAxiNetworkTop | per-node 混合协议网络顶层（rnAxi/rnChi/snAxi/snChi，内含 ChiNetworkTop） | 6.21 |
 | ChiNodeIds | NodeID 段序装配（RN→SN→HN→MN + 覆盖） | 6.4 |
 
 ## 5. 功能行为规范
@@ -201,7 +208,7 @@ ChiOrderRule：`Device→RequestOrder`，`Normal→NoOrder`。ChiOrderCtrl FSM�
 
 ### 5.7 路由与网络（LM-F002/F003/F004/F015）
 
-- SAM：ChiSamDecode 按窗口 `base<=addr<=end` 译码出 TgtID（未命中暂译 0，错误响应待协议引擎完善）。
+- SAM：ChiSamDecode.withHit 按窗口 `base<=addr<=end` 译码出 TgtID + hit；ChiNetworkTop RN 入口（sam 非空）命中填 TgtID 进 fabric，未命中由 ChiNiError 就地回 Comp(NDERR)，不进 fabric（HW-13/HW-05）。
 - ChiChannelRouter：每输入 Queue（破组合环），routeVec[TgtID]→输出端口，每输出 RR 仲裁（LmRrArbiterN）。
 - ChiRouter4：四类各一个 ChiChannelRouter，独立队列/仲裁；SNP 按 snpEnable 条件实例化，否则 tie-off。
 - ChiNetworkParams：BFS 求每 router 到各 NodeID 的首跳→路由表（四类共享）；本地端口=RN 后 SN（按 NodeID），link 端口按 incident link。
@@ -461,13 +468,15 @@ rxReq/rxRsp/rxSnp/rxDat=Flipped(Decoupled)；txReq/txRsp/txSnp/txDat=Decoupled�
 **接口**：`rn=Vec(nRn, Flipped(ChiRnPort))`、`sn=Vec(nSn, Flipped(ChiSnPort))`。
 
 **行为规则**：
-- 本地 RN 端口：rn.req→port.rxReq，port.txRsp/txDat/txSnp→rn.rsp/dat/snp；port.rxRsp/rxDat/rxSnp tie-off，port.txReq.ready=1。
-- 本地 SN 端口：port.txReq→sn.req，sn.rsp/dat→port.rxRsp/rxDat；port.rxReq/rxSnp tie-off，port.txRsp/txDat/txSnp.ready=1。
+- 本地 RN 端口（SAM 表非空，addr 驱动，HW-13）：取译码表 `samTable = if (p.samByRn.nonEmpty) p.samByRn(i) else p.sam`（per-source 过滤/禁止对，A4）；rn.req.addr→`ChiSamDecode.withHit`→`ChiNiError`；命中 fwd 填译码 TgtID 经 ChiVcInject→port.rxReq，未命中就地回 Comp(NDERR) 到 rn.rsp（不进 fabric）；rn.rsp 在 NI 错误响应与 fabric eject 间 mux（NI 优先，按事务互斥）。表为空时退回 TgtID 直通（rn.req→inject，port.txRsp→eject→rn.rsp），兼容手工 TgtID 驱动测试。
+- 本地 RN 其余通道：port.txDat/txSnp→rn.dat/snp；rn.txRsp/txDat→port.rxRsp/rxDat；port.rxSnp tie-off，port.txReq.ready=1。
+- 本地 SN 端口：port.txReq→sn.req，sn.rsp/dat→port.rxRsp/rxDat，**port.txDat→sn.rxDat（写数据投递，A1）**；port.rxReq/rxSnp tie-off，port.txRsp/txSnp.ready=1。
+- 本地 MN 端口（HW-01）：例化 ChiDvmMn（targets=本地 RN-D NodeID），eject REQ/DAT、inject RSP/SNP、eject SnpResp，DVM 广播/收集闭环。HN-I/未知 kind 安全 tie-off。
 - link：a.txReq→b.rxReq 且 b.txReq→a.rxReq（RSP/DAT/SNP 同理），双向交叉。
 
-**用法**：`loom emit-chi` ≥2 router 分支发射；chain_4r.json 验证多跳 REQ 正向/DAT 反向。
+**用法**：`loom emit-chi` ≥2 router 分支发射；chain_4r.json 验证多跳 REQ 正向/DAT 反向；ChiNetworkSpec 验证未命中 NDERR 与命中译码到 SAM 目标。
 
-**限制**：link 为直连导线，未插 ChiTxLink（无 L-Credit/FSM/pipe）；本地端口 tie-off 意味着 RN 只发 REQ、SN 只发 RSP/DAT 的简化视图。
+**限制**：link 为直连导线，未插 ChiTxLink（无 L-Credit/FSM/pipe）；SN 端口无 RX DAT（写数据到 SN 的投递待硬件补全，见 14.1）。
 
 ### 6.10 ChiGates —— 静态门禁
 
@@ -684,11 +693,31 @@ families=TLBI/BPI/VIC/SYNC；tlbiSubtypes=VMALL/VMALLS1/ASID/VA/VAA/IPAS2/IPA；
 | rsp | Flipped(Decoupled(ChiRspFlit)) | CHI DBIDResp/Comp |
 | dat | Decoupled(ChiDatFlit) | CHI NonCopyBackWrData |
 
-**行为（FSM Idle/Wcollect/Req/Grant/Data/Comp/Resp）**：aw.ready=Idle，w.ready=Wcollect（**AW 接受后 W 才 ready**）；Idle 收 AW 锁存 txn/addr；Wcollect 收 W `dataBuf |= data.pad(512)<<(wCnt*datWidth)`，last→Req；Req 发 WriteNoSnpFull(size=64)；Grant 收 DBIDResp 锁存 dbid；Data 逐拍发 DAT(txnId=dbid,dataId=beatIdx*idStep,BE 全 1)，计满→Comp；Comp 收 Comp→Resp；Resp 发 B(id=txn,resp=OK) 回 Idle。
+**行为（FSM Idle/Wcollect/Req/Grant/Data/Comp/Resp）**：aw.ready=Idle，w.ready=Wcollect（**AW 接受后 W 才 ready**）；Idle 收 AW 锁存 txn/addr；Wcollect 收 W `dataBuf |= data.pad(512)<<(wCnt*datWidth)`，last→Req；Req 发 WriteNoSnpFull(size=64)；Grant 收 DBIDResp 锁存 dbid **与 tgt=srcId（授予 SN 的 NodeID，A1）**；Data 逐拍发 DAT(txnId=dbid,**tgtId=tgt**,dataId=beatIdx*idStep,BE 全 1)，计满→Comp；Comp 收 Comp→Resp；Resp 发 B(id=txn,resp=OK) 回 Idle。
 
 **用法**：AXI 主接 ar/aw/w/r/b；桥 CHI 侧接网络 RN 端口；SN 侧配 ChiReadSource/ChiWriteSink 成端到端通路（13.2）。
 
 **限制**：单 burst、固定 64B；忽略 len/strb；resp 恒 OK（不透传 RespErr）；多 burst/非对齐/错误透传待完善。
+
+#### 6.17.4 ChiAxiSnBridge（SN 侧 CHI→AXI 反向桥，A2）
+
+**参数**：c、snNodeId（本 SN NodeID，填 rsp/dat.srcId）；nFlits、idStep。
+
+| 端口 | 方向 | 含义 |
+|---|---|---|
+| req | Flipped(Decoupled(ChiReqFlit)) | CHI ReadNoSnp/WriteNoSnpFull |
+| rsp | Decoupled(ChiRspFlit) | CHI DBIDResp/Comp |
+| dat | Decoupled(ChiDatFlit) | CHI CompData（读） |
+| rxDat | Flipped(Decoupled(ChiDatFlit)) | CHI 写数据（NonCopyBackWrData） |
+| ar/aw | Decoupled(ChiAxiAddr) | AXI 读/写地址（SN 作 AXI 主） |
+| w | Decoupled(ChiAxiW) | AXI 写数据 |
+| r/b | Flipped(Decoupled(ChiAxiR/ChiAxiB)) | AXI 读数据/写响应 |
+
+**行为（FSM Idle/Dbid/WrCollect/WrAw/WrW/WrB/WrComp/RdAr/RdData/RdComp）**：Idle 收 req 锁存 txn/src/addr，按 opcode 分流——读→RdAr 发 AR→RdData 收 R beat 重组→RdComp 逐拍发 CompData(dataId=beat*idStep,tgtId=src)；写→Dbid 发 DBIDResp(dbid=txn,srcId=snNodeId)→WrCollect 收 rxDat 重组(dataId*128)→WrAw 发 AW→WrW 逐拍发 W(last 末拍)→WrB 收 B→WrComp 发 Comp 回 Idle。
+
+**用法**：SN 边界 axi4 时由 ChiAxiNetworkTop 例化；ChiAxiSnBridgeSpec 配 AXI 从模型验证读/写。
+
+**限制**：单 outstanding、固定 64B；resp 恒 OK；多 burst/错误透传待完善。
 
 ### 6.18 ChiNi —— NI 错误门禁（HW-05）
 
@@ -707,7 +736,7 @@ families=TLBI/BPI/VIC/SYNC；tlbiSubtypes=VMALL/VMALLS1/ASID/VA/VAA/IPAS2/IPA；
 
 **行为**：fwd.valid=req.valid&&hit；req.ready=Mux(hit, fwd.ready, st==Idle)。req.fire&&!hit→锁存 txnId/srcId→sComp；sComp 发 Comp(respErr=NDERR,txnId,tgtId=srcId)，fire→Idle。
 
-**用法**：RN 注入点接 withHit(req.addr)→hit，ChiNiError 串在 req 与 fabric 之间。网络级集成待 GEN/NI 包装（14.1）。
+**用法**：RN 注入点接 withHit(req.addr)→hit，ChiNiError 串在 req 与 fabric 之间。**已集成进 ChiNetworkTop**（`p.sam` 非空时 addr 驱动，HW-13）：命中填译码 TgtID 进 fabric，未命中就地 NDERR；网络级用例见 ChiNetworkSpec。
 
 ### 6.19 ChiAsyncLink —— 每通道 CDC 链路（HW-04）
 
@@ -740,13 +769,32 @@ families=TLBI/BPI/VIC/SYNC；tlbiSubtypes=VMALL/VMALLS1/ASID/VA/VAA/IPAS2/IPA；
 | sn | Vec(本地 SN, Flipped(ChiSnPort)) | 本地从节点 |
 | boundary | Vec(boundary, ChiRouterPort) | 边界 CHI 口（VC sideband） |
 
-**行为**：本地 router 各一个 ChiRouter4（路由表继承全网）；本地节点 inject/eject 接线；internalLinks 交叉；boundary 每通道经 LmPipe(≥pipe) 寄存到边界口。
+**行为**：本地 router 各一个 ChiRouter4（路由表继承全网）；本地 RN/SN 节点 inject/eject 接线；**MN 节点例化 ChiDvmMn（targets=全网 RN-D NodeID）做 DVM 广播/收集，HN-I/未知 kind 安全 tie-off（HW-08，对标 ChiNetworkTop）**；internalLinks 交叉；boundary 每通道经 LmPipe(≥pipe) 寄存到边界口。
 
 **ChiPartitionStub(pp)**：同端口契约，节点口/边界口安全 tie-off（rx 驱 ready、tx 驱 valid=0），用于孤立 elaborate/仿真。
 
 **ChiWrapperTop(full, parts, asyncCuts)**：例化各 ChiPartitionTop，本地节点口接全网 io.rn/sn；按全局 link id 匹配两分区边界口交叉回接；asyncCuts 内的 cut 每通道插 ChiAsyncLink，否则直连。
 
-**用法**：分区发射 + 回接整网；LoomMain partitions 发射待 GEN 接入（14.1）。
+**用法**：分区发射 + 回接整网；ChiPartitionSpec 验证跨分区 REQ 回接、stub 确定性、含 MN 分区 DVM 端到端（HW-08）。LoomMain partitions 发射待 GEN 接入（14.1）。
+
+### 6.21 ChiAxiNetworkTop —— per-node 混合协议网络顶层（HW-09/A2/A3）
+
+**功能**：内含 ChiNetworkTop，按各节点 `protocol` 把边界拆成 AXI 与原生 CHI 两组端口向量；axi4 节点挂桥，chi 节点直通。只暴露活跃端口（无未用输入需 tie）。
+
+**参数**：`p:ChiNetworkParams`（节点 protocol 由 fromIr 从 endpoint.protocol 归一：native→chi、axi4→axi4；GEN 装配可逐节点覆盖）。
+
+**接口**：`rnAxi=Vec(nRnAxi, ChiAxiRnPort)`、`rnChi=Vec(nRnChi, Flipped(ChiRnPort))`、`snAxi=Vec(nSnAxi, ChiAxiSnPort)`、`snChi=Vec(nSnChi, Flipped(ChiSnPort))`。`rnAxiIdx/rnChiIdx/snAxiIdx/snChiIdx` 给出各端口对应的全局节点序。ChiAxiSnPort 为 SN 桥 AXI 主侧（top 驱 ar/aw/w、收 r/b）。
+
+**行为**：
+- axi4 RN：例化 ChiAxiReadBridge + ChiAxiWriteBridge，两桥 REQ 经 `Arbiter(ChiReqFlit,2)` 轮询仲裁接 net.rn.req；fabric RSP→写桥、DAT→读桥、写桥 DAT→net.rn.txDat；net.rn.snp.ready=1、txRsp tie-off。
+- chi RN：io.rnChi ↔ net.rn 六通道直通。
+- axi4 SN：例化 ChiAxiSnBridge(c, nodeId)，CHI 侧 req/rsp/dat/rxDat ↔ net.sn，AXI 侧 ↔ io.snAxi。
+- chi SN：io.snChi ↔ net.sn 直通（含 rxDat 写数据）。
+- 桥发裸 flit，VC 调度仍在 fabric 内。
+
+**用法**：ChiAxiNetworkSpec 验证 RN-AXI/SN-chi 读写、以及混合（RN0/SN0 axi4 + RN1/SN1 chi）AXI 主→fabric→AXI 从端到端读/写含数据完整性。
+
+**限制**：节点 protocol 的 IR 表达与装配分派归 GEN（per-node protocol 传入）；estimate 桥接开销归 GEN。
 
 ## 7. 数据表示规范
 
@@ -891,8 +939,9 @@ chain_4r.json（4 router 链，RN@r0/SN@r3）验证多跳 REQ 正向/DAT 反向�
 - 读写引擎固定 64B 事务（Size 恒 encode(64)）；变长 Size 待完善。
 - ChiAxiBridge 忽略 `ar.len`/`aw.len`（按 64B 处理）、忽略 `w.strb`（BE 恒全 1）、`r.resp`/`b.resp` 恒 OK（不透传 RespErr）；多 burst/非对齐/错误透传待完善。
 - ChiNetworkTop 同步 link 为直连导线（VC sideband 贯穿）；**每 link ChiTxLink（L-Credit/FSM）与 async link 的 ChiAsyncLink 插入待 GEN 提供 IR cdc/pipe/clock 映射**（模块已验证）。IR link `pipe` 字段当前被忽略。
-- ChiNiError（未命中 NDERR）已验证为独立模块；**网络级 RN 注入点集成（addr 驱动 SAM + 就地错误响应）待 GEN/NI 包装**，届时网络测试须改由 addr 驱动。
-- ChiPartitionTop/Stub/Wrapper 已验证；**LoomMain partitions 发射 + ports 报告待 GEN IR partitions 接入**。
+- ChiNiError（未命中 NDERR）**已集成进 ChiNetworkTop RN 入口**（SAM 表非空时 addr 驱动译码 + 就地 NDERR，HW-13）；表为空退回 TgtID 直通。**per-source SAM 过滤已落地**（`samByRn` 每 RN 一份表，禁止对未映射→NDERR，A4）；per-source 表的 IR routes/forbid 表达与装配归 GEN。
+- ChiPartitionTop/Stub/Wrapper 已验证，**分区内 MN/DVM 接线已对标网络（HW-08）**；**LoomMain partitions 发射 + ports 报告待 GEN IR partitions 接入**。
+- ChiAxiNetworkTop（HW-09/A2/A3）已落地 per-node 混合协议边界：RN 读/写桥、**SN CHI→AXI 反向桥（ChiAxiSnBridge）**、按 node.protocol 拆分 rnAxi/rnChi/snAxi/snChi；**ChiSnPort 已补 RX DAT，写数据经 fabric 投递到 SN 并重组校验（A1）**，写桥 dat.tgtId 从 DBIDResp.srcId 捕获。节点 protocol 的 IR 表达/装配分派 + estimate 桥接开销归 GEN。
 - ChiAtomicEngine 为 cmd 式单字 RMW（内部存储字、cmd.ready 恒 1），未接完整 REQ/DAT 拉流。
 - ChiTop 已退役（emit-chi 单/多 router 统一 ChiNetworkTop）；源码保留作 building-block 单测。
 - `LoomMain.usage()` 尚未列出 `emit-chi` 子命令（命令本身可用）。

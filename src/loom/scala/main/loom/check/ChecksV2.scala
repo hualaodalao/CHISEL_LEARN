@@ -33,6 +33,7 @@ object ChecksV2 {
   private val ChannelNames = Set("req", "rsp", "dat", "snp")
   private val RequiredChannels = Seq("req", "rsp", "dat")
   private val ClassNames = Seq("ctl", "lat", "bulk")
+  private val QosGenKinds = Set("fixed", "limiter", "regulator")
 
   private val LinkPath = """\$\.fabric\.links\[(\d+)\]\.(.+)""".r
   private val RouterPath = """\$\.fabric\.routers\[(\d+)\]\.(.+)""".r
@@ -298,6 +299,55 @@ object ChecksV2 {
       !v2.nodes.exists(n => SubordinateKinds.contains(n.kind)))
       errs += "C0: [CHK-23] at least one request node and one subordinate node are required"
 
+    // CHK-49 (UP-01, §3.12): route endpoint references/kinds, unique
+    // (from,to) pairs, declared path routers, forbid/path exclusivity.
+    val seenRoutePairs = scala.collection.mutable.Set.empty[(String, String)]
+    v2.routes.foreach { r =>
+      val p = s"C0: [CHK-49] route '${r.from}->${r.to}'"
+      nodeById.get(r.from) match {
+        case None => errs += s"$p from '${r.from}' is not a declared node"
+        case Some(n) if !RequestKinds.contains(n.kind) =>
+          errs += s"$p from '${r.from}' kind '${n.kind}' must be rn-i or rn-d"
+        case _ =>
+      }
+      nodeById.get(r.to) match {
+        case None => errs += s"$p to '${r.to}' is not a declared node"
+        case Some(n) if !SubordinateKinds.contains(n.kind) =>
+          errs += s"$p to '${r.to}' kind '${n.kind}' must be sn-f or sn-i"
+        case _ =>
+      }
+      if (!seenRoutePairs.add((r.from, r.to)))
+        errs += s"$p duplicate (from,to) pair"
+      r.path.distinct.foreach(h =>
+        if (!routerNames.contains(h)) errs += s"$p path router '$h' is not declared")
+      if (r.forbid && r.path.nonEmpty)
+        errs += s"$p forbid=true must not carry a path"
+    }
+
+    // CHK-52 (UP-02, §3.13): qosGen declaration domains; fixed forbids a
+    // burst allowance (SEM-18). Declaration-only — injection logic is HW-10.
+    v2.nodes.foreach { n =>
+      n.qosGen.foreach { q =>
+        val p = s"C0: [CHK-52] node '${n.id}' qosGen"
+        if (!QosGenKinds.contains(q.kind))
+          errs += s"$p kind '${q.kind}' must be fixed, limiter or regulator"
+        if (q.bandwidth < 1 || q.bandwidth > 1048576)
+          errs += s"$p bandwidth ${q.bandwidth} must be in [1,1048576]"
+        if (q.saturation < 0 || q.saturation > 1048576)
+          errs += s"$p saturation ${q.saturation} must be in [0,1048576]"
+        if (q.kind == "fixed" && q.saturation > 0)
+          errs += s"$p fixed kind requires saturation 0, got ${q.saturation}"
+      }
+    }
+
+    // CHK-53 (UP-08, §3.14): NIU store&fwd FIFO depth domain (HW-12 pending).
+    v2.nodes.foreach { n =>
+      n.adaptFifoDepth.foreach { d =>
+        if (d < 2 || d > 64)
+          errs += s"C0: [CHK-53] node '${n.id}' adaptFifoDepth $d must be in [2,64]"
+      }
+    }
+
     // Remaining unknown keys keep the S1 generic C0 error (spec §3: unknown
     // fields must be rejected; retired direction/switch already mapped above).
     v2.unknown.foreach {
@@ -396,6 +446,62 @@ object ChecksV2 {
       r.out.foreach(v =>
         if (v != derivedOut) errs += s"C1: [CHK-31] router '${r.name}' out=$v does not match derived $derivedOut")
     }
+
+    // CHK-50 (UP-01, SEM-17): explicit path structure + shared-TgtID-table
+    // consistency. One router holds one table entry per target NodeID, so
+    // two explicit paths to the same SN must agree on the next hop at every
+    // shared router.
+    val linkPairs = v2.links.map(l => (l.from, l.to)).toSet
+    def connected(a: String, b: String): Boolean =
+      linkPairs.contains((a, b)) || linkPairs.contains((b, a))
+    // (router, target node id) -> (next router, first declaring route label)
+    val hopDemand = scala.collection.mutable.Map.empty[(String, String), (String, String)]
+    v2.routes.filterNot(_.forbid).foreach { r =>
+      val p = s"C1: [CHK-50] route '${r.from}->${r.to}'"
+      if (r.path.isEmpty) errs += s"$p path must not be empty"
+      else {
+        nodeById.get(r.from).foreach { n =>
+          if (r.path.head != n.attach)
+            errs += s"$p path head '${r.path.head}' is not from.attach '${n.attach}'"
+        }
+        nodeById.get(r.to).foreach { n =>
+          if (r.path.last != n.attach)
+            errs += s"$p path tail '${r.path.last}' is not to.attach '${n.attach}'"
+        }
+        duplicates(r.path).foreach(h => errs += s"$p path repeats router '$h'")
+        r.path.sliding(2).foreach {
+          case Seq(a, b) if routerNames.contains(a) && routerNames.contains(b) && !connected(a, b) =>
+            errs += s"$p no link between path routers '$a' and '$b'"
+          case _ =>
+        }
+        r.path.sliding(2).foreach {
+          case Seq(a, b) if routerNames.contains(a) && routerNames.contains(b) =>
+            hopDemand.get((a, r.to)) match {
+              case Some((prev, owner)) if prev != b =>
+                errs += s"$p next hop for target '${r.to}' at router '$a' conflicts with route '$owner' ('$b' vs '$prev')"
+              case _ => hopDemand((a, r.to)) = (b, s"${r.from}->${r.to}")
+            }
+          case _ =>
+        }
+        // Reverse direction (SEM-17): the reversed path constrains route[from]
+        // at each downstream router; same shared-table consistency rule.
+        r.path.sliding(2).foreach {
+          case Seq(a, b) if routerNames.contains(a) && routerNames.contains(b) =>
+            hopDemand.get((b, r.from)) match {
+              case Some((prev, owner)) if prev != a =>
+                errs += s"$p next hop for target '${r.from}' at router '$b' conflicts with route '$owner' ('$a' vs '$prev')"
+              case _ => hopDemand((b, r.from)) = (a, s"${r.from}->${r.to}")
+            }
+          case _ =>
+        }
+      }
+    }
+
+    // CHK-51 is RETIRED (ir_gen_spec v1.2.0, SEM-17): forbid is now an
+    // executed constraint — GEN assembles per-source SAM tables (samByRn)
+    // and the source NI returns NDERR for forbidden targets, so a
+    // topology-reachable forbidden pair is legal. The number is reserved
+    // and never reused; reachability is no longer checked here.
 
     errs.toList
   }

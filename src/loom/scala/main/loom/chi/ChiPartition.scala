@@ -93,10 +93,32 @@ class ChiPartitionTop(pp: ChiPartitionParams) extends Module {
         eject(new ChiReqFlit(c), port.txReq, io.sn(j).req)
         inject(new ChiRspFlit(c), io.sn(j).rsp, port.rxRsp, (f: ChiRspFlit) => f.qos)
         inject(new ChiDatFlit(c), io.sn(j).dat, port.rxDat, (f: ChiDatFlit) => f.qos)
+        eject(new ChiDatFlit(c), port.txDat, io.sn(j).rxDat)
         port.rxReq.valid := false.B; port.rxReq.bits := 0.U.asTypeOf(vcReq)
         port.rxSnp.valid := false.B; port.rxSnp.bits := 0.U.asTypeOf(vcSnp)
-        port.txRsp.ready := true.B; port.txDat.ready := true.B; port.txSnp.ready := true.B
+        port.txRsp.ready := true.B; port.txSnp.ready := true.B
+      } else if (n.kind == ChiNodeKind.Mn) {
+        val targets = pp.full.rn.filter(_.kind == ChiNodeKind.RnD).map(_.nodeId)
+        if (targets.nonEmpty) {
+          val mn = Module(new ChiDvmMn(c, n.nodeId, targets))
+          eject(new ChiReqFlit(c), port.txReq, mn.io.req)
+          inject(new ChiRspFlit(c), mn.io.rsp, port.rxRsp, (f: ChiRspFlit) => f.qos)
+          eject(new ChiDatFlit(c), port.txDat, mn.io.dat)
+          inject(new ChiSnpFlit(c), mn.io.snp, port.rxSnp, (f: ChiSnpFlit) => f.qos)
+          eject(new ChiRspFlit(c), port.txRsp, mn.io.snpResp)
+          port.rxReq.valid := false.B; port.rxReq.bits := 0.U.asTypeOf(vcReq)
+          port.rxDat.valid := false.B; port.rxDat.bits := 0.U.asTypeOf(vcDat)
+          port.txSnp.ready := true.B
+        } else {
+          port.rxReq.valid := false.B; port.rxReq.bits := 0.U.asTypeOf(vcReq)
+          port.rxRsp.valid := false.B; port.rxRsp.bits := 0.U.asTypeOf(vcRsp)
+          port.rxSnp.valid := false.B; port.rxSnp.bits := 0.U.asTypeOf(vcSnp)
+          port.rxDat.valid := false.B; port.rxDat.bits := 0.U.asTypeOf(vcDat)
+          port.txReq.ready := true.B; port.txRsp.ready := true.B
+          port.txSnp.ready := true.B; port.txDat.ready := true.B
+        }
       } else {
+        // HN-I placeholder / unknown kind: no logic, safe tie-off.
         port.rxReq.valid := false.B; port.rxReq.bits := 0.U.asTypeOf(vcReq)
         port.rxRsp.valid := false.B; port.rxRsp.bits := 0.U.asTypeOf(vcRsp)
         port.rxSnp.valid := false.B; port.rxSnp.bits := 0.U.asTypeOf(vcSnp)
@@ -153,6 +175,7 @@ class ChiPartitionStub(pp: ChiPartitionParams) extends Module {
   for (j <- 0 until pp.sn.length) {
     io.sn(j).req.valid := false.B; io.sn(j).req.bits := 0.U.asTypeOf(new ChiReqFlit(c))
     io.sn(j).rsp.ready := true.B; io.sn(j).dat.ready := true.B
+    io.sn(j).rxDat.valid := false.B; io.sn(j).rxDat.bits := 0.U.asTypeOf(new ChiDatFlit(c))
   }
   for (b <- 0 until pp.boundary.length) {
     val bp = io.boundary(b)
@@ -199,6 +222,7 @@ class ChiWrapperTop(full: ChiNetworkParams, parts: Seq[ChiPartitionParams], asyn
       LmWire.link(t.io.sn(li).req, io.sn(g).req)
       LmWire.link(io.sn(g).rsp, t.io.sn(li).rsp)
       LmWire.link(io.sn(g).dat, t.io.sn(li).dat)
+      LmWire.link(t.io.sn(li).rxDat, io.sn(g).rxDat)
     }
   }
 

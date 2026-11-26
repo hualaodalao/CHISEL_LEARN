@@ -323,7 +323,9 @@ class IrSpec extends AnyFlatSpec with Matchers {
           legacy.sam.map(e => (e.base, e.size, e.tgtId))
         // MIG-01 scope is nodes/NodeID/SAM; portMode converges from the v1
         // protocol set (IR-43) while legacy ChiConfig.fromIr keeps 'axi4'.
-        upgraded.cfg.copy(portMode = legacy.cfg.portMode) shouldBe legacy.cfg
+        // nHalf is topology-derived since ir_gen_spec v1.2.0 (AQ-02/GEN-22:
+        // dateline ⇒ 2, else 1) while read-only legacy fromIr keeps default 2.
+        upgraded.cfg.copy(portMode = legacy.cfg.portMode, nHalf = legacy.cfg.nHalf) shouldBe legacy.cfg
       }
     }
   }
@@ -394,5 +396,112 @@ class IrSpec extends AnyFlatSpec with Matchers {
       Seq((0x10000L, 4096L, "s0"), (0x20000L, 8192L, "s1"))
     v2.qos.classes.map(_.name) shouldBe Seq("ctl", "lat", "bulk")
     v2.nodes.find(_.id == "m0").get.qos shouldBe 0
+  }
+
+  // ---- UP-01 routes[] (IR-70–IR-74, §3.12 rendering rule) ----
+
+  behavior of "IrV2 routes (UP-01)"
+
+  it should "parse routes entries with defaults and collect unknown route keys (IR-70–74)" in {
+    val text = Files.readString(v2ExamplePath)
+    val withRoutes = text.replaceFirst("\"meta\"",
+      "\"routes\": [ { \"from\": \"m0\", \"to\": \"s0\", \"path\": [\"r0\", \"r3\", \"r2\"] }," +
+      " { \"from\": \"m1\", \"to\": \"s1\", \"forbid\": true } ], \"meta\"")
+    val v = IrV2.fromJson(Json.parse(withRoutes))
+    v.routes shouldBe Seq(
+      RouteSpec("m0", "s0", Seq("r0", "r3", "r2"), false),
+      RouteSpec("m1", "s1", Nil, true))
+    v.unknown shouldBe Nil
+    val withBogus = text.replaceFirst("\"meta\"",
+      "\"routes\": [ { \"from\": \"m0\", \"to\": \"s0\", \"bogus\": 1 } ], \"meta\"")
+    IrV2.fromJson(Json.parse(withBogus)).unknown should contain("$.routes[0].bogus")
+    v2Example.routes shouldBe Nil // omitted block defaults to empty
+  }
+
+  it should "round-trip routes through the normalized rendering with a stable hash" in {
+    val v = v2Example.copy(routes = Seq(
+      RouteSpec("m0", "s0", Seq("r0", "r3", "r2"), false),
+      RouteSpec("m1", "s1", Nil, true)))
+    val rendered = IrV2.toJson(v)
+    IrV2.fromJson(rendered) shouldBe v
+    IrV2.hash(v) shouldBe Canonical.hash(rendered)
+    IrV2.hash(IrV2.fromJson(rendered)) shouldBe IrV2.hash(v)
+  }
+
+  it should "omit an empty routes block so existing hash baselines stay unchanged (§3.12)" in {
+    val v = v2Example
+    val rendered = IrV2.toJson(v)
+    rendered.asInstanceOf[JObj].get("routes") shouldBe None
+    val withEmpty = Json.parse(Files.readString(v2ExamplePath)
+      .replaceFirst("\"meta\"", "\"routes\": [], \"meta\""))
+    val ve = IrV2.fromJson(withEmpty)
+    ve.routes shouldBe Nil
+    IrV2.hash(ve) shouldBe IrV2.hash(v)
+    IrV2.toJson(ve) shouldBe rendered
+    // forbid-only entries render without a path key (IR-73)
+    val f = v.copy(routes = Seq(RouteSpec("m1", "s1", Nil, true)))
+    IrV2.toJson(f).asInstanceOf[JObj].get("routes") match {
+      case Some(JArr(items)) =>
+        items.head.asInstanceOf[JObj].get("path") shouldBe None
+        items.head.asInstanceOf[JObj].get("forbid") shouldBe Some(JBool(true))
+      case other => fail(s"unexpected routes rendering: $other")
+    }
+  }
+
+  // ---- S8: node.qosGen / node.adaptFifoDepth (IR-75–IR-79, UP-02/UP-08) ----
+
+  behavior of "IrV2 qosGen/adaptFifoDepth (UP-02/UP-08)"
+
+  it should "parse qosGen with required kind/bandwidth and defaulted saturation (IR-75–78)" in {
+    val text = Files.readString(v2ExamplePath)
+    val withQos = text
+      .replaceFirst("\"attach\": \"r0\"",
+        "\"attach\": \"r0\", \"qosGen\": { \"kind\": \"limiter\", \"bandwidth\": 1000, \"saturation\": 4096 }")
+      .replaceFirst("\"attach\": \"r2\"",
+        "\"attach\": \"r2\", \"qosGen\": { \"kind\": \"fixed\", \"bandwidth\": 500 }")
+      .replaceFirst("\"attach\": \"r1\"", "\"attach\": \"r1\", \"adaptFifoDepth\": 8")
+    val v = IrV2.fromJson(Json.parse(withQos))
+    v.unknown shouldBe Nil
+    v.nodes.find(_.id == "m0").get.qosGen shouldBe Some(QosGenSpec("limiter", 1000, 4096))
+    v.nodes.find(_.id == "s0").get.qosGen shouldBe Some(QosGenSpec("fixed", 500, 0))
+    v.nodes.find(_.id == "m1").get.adaptFifoDepth shouldBe Some(8)
+    v.nodes.find(_.id == "s1").get.qosGen shouldBe None
+    v.nodes.find(_.id == "s1").get.adaptFifoDepth shouldBe None
+    // unknown qosGen subkeys are collected for the C0 unknown-key gate
+    val withBogus = text.replaceFirst("\"attach\": \"r0\"",
+      "\"attach\": \"r0\", \"qosGen\": { \"kind\": \"fixed\", \"bandwidth\": 1, \"bogus\": 2 }")
+    IrV2.fromJson(Json.parse(withBogus)).unknown should contain("$.nodes[0].qosGen.bogus")
+  }
+
+  it should "round-trip qosGen/adaptFifoDepth through the normalized rendering with a stable hash" in {
+    val v0 = v2Example
+    val v = v0.copy(nodes = v0.nodes.map { n =>
+      if (n.id == "m0") n.copy(qosGen = Some(QosGenSpec("regulator", 2000, 1024)), adaptFifoDepth = Some(16))
+      else n
+    })
+    val rendered = IrV2.toJson(v)
+    IrV2.fromJson(rendered) shouldBe v
+    IrV2.hash(v) shouldBe Canonical.hash(rendered)
+    IrV2.hash(IrV2.fromJson(rendered)) shouldBe IrV2.hash(v)
+    // a declared qosGen renders all three subkeys (saturation explicit, GEN-03)
+    val m0 = rendered.asInstanceOf[JObj].get("nodes").get.asInstanceOf[JArr].items.head
+      .asInstanceOf[JObj].get("qosGen").get.asInstanceOf[JObj]
+    m0.get("kind") shouldBe Some(JStr("regulator"))
+    m0.get("saturation") shouldBe Some(JNum(BigDecimal(1024)))
+  }
+
+  it should "omit absent qosGen/adaptFifoDepth keys so the ring_4 hash baseline stays unchanged (§3.13/§3.14)" in {
+    val v = v2Example
+    val rendered = IrV2.toJson(v)
+    rendered.asInstanceOf[JObj].get("nodes").get.asInstanceOf[JArr].items.foreach { n =>
+      n.asInstanceOf[JObj].get("qosGen") shouldBe None
+      n.asInstanceOf[JObj].get("adaptFifoDepth") shouldBe None
+    }
+    // explicit default-depth declaration is a real IR change (hash moves);
+    // absence keeps the pre-v1.3.0 baseline byte-for-byte.
+    IrV2.hash(v) shouldBe IrV2.hash(IrV2.fromJson(Json.parse(Files.readString(v2ExamplePath))))
+    val withDepth = v.copy(nodes = v.nodes.map(n =>
+      if (n.id == "m0") n.copy(adaptFifoDepth = Some(4)) else n))
+    IrV2.hash(withDepth) should not be IrV2.hash(v)
   }
 }
