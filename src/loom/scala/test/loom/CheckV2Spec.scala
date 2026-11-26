@@ -1050,4 +1050,111 @@ class CheckV2Spec extends AnyFlatSpec with Matchers {
     // the flat gates still run on the (empty) top level without firing
     r.errors.exists(e => !e.startsWith("subsystem '")) shouldBe false
   }
+
+  // ---- UP-07 phase 2: bridge v1 limits + uniform chi (CHK-59/CHK-60) ----
+
+  behavior of "ChecksV2 nocLink v1 limits / uniform chi (CHK-59/CHK-60, UP-07 phase 2)"
+
+  it should "reject dvmForward=true and non-power-of-two async depth with CHK-59" in {
+    ChecksV2.runC0(withNocLink(_.copy(dvmForward = true))) should contain(
+      "C0: [CHK-59] nocLink 'A->B' dvmForward=true is not supported (HW-11 v1 keeps per-NoC MN autonomy)")
+    ChecksV2.runC0(withNocLink(_.copy(cdc = "async", asyncFifoDepth = 3))) should contain(
+      "C0: [CHK-59] nocLink 'A->B' asyncFifoDepth 3 must be a power of two for cdc async")
+    // positive: sync default and legal async depths pass the check gate
+    // (async emission is a separate pure guard, HW-15)
+    ChecksV2.runC0(hierarchical) shouldBe Nil
+    ChecksV2.runC0(withNocLink(_.copy(cdc = "async", asyncFifoDepth = 4))) shouldBe Nil
+    ChecksV2.runC0(withNocLink(_.copy(cdc = "async", asyncFifoDepth = 8))) shouldBe Nil
+  }
+
+  it should "reject non-uniform subsystem chi blocks with CHK-60 (reference = first)" in {
+    val mismatch = hierarchical.copy(subsystems =
+      Seq(subA, subB.copy(chi = subB.chi.copy(datWidth = 512))))
+    ChecksV2.runC0(mismatch) should contain(
+      "C0: [CHK-60] subsystem 'B' chi differs from subsystem 'A'; uniform ChiConfig required (per-subsystem DAT width is a follow-up)")
+    // any non-datWidth field difference is also non-uniform
+    val txnMismatch = hierarchical.copy(subsystems =
+      Seq(subA, subB.copy(chi = subB.chi.copy(txnIdWidth = 12))))
+    ChecksV2.runC0(txnMismatch) should contain(
+      "C0: [CHK-60] subsystem 'B' chi differs from subsystem 'A'; uniform ChiConfig required (per-subsystem DAT width is a follow-up)")
+    ChecksV2.runC0(hierarchical) shouldBe Nil
+  }
+
+  /** Minimal hierarchical JSON where subsystem A omits chi (falls back to the
+    * top-level block at parse time) and B spells its chi out explicitly. */
+  private def chi60Cfg(bChi: String): IrV2 = {
+    def sub(name: String, rn: String, sn: String, r: String, chiLine: String): String =
+      s"""{"name": "$name",$chiLine
+         | "nodes": [{"id": "$rn", "kind": "rn-i", "clock": "core", "attach": "$r"},
+         |           {"id": "$sn", "kind": "sn-f", "clock": "core", "attach": "$r"}],
+         | "fabric": {"routers": [{"name": "$r", "clock": "core"}],
+         |            "links": [{"from": "$rn", "to": "$r"}, {"from": "$r", "to": "$sn"}]}}""".stripMargin
+    val text =
+      s"""{"schema": "loom/v2", "meta": {"name": "hier_chi60"},
+         | "clockDomains": [{"id": "core", "freqMHz": 1000}],
+         | "chi": {"datWidth": 512, "dvmEnable": false, "portMode": "chi"},
+         | "subsystems": [${sub("A", "mA", "sA", "rA0", "")},
+         |                ${sub("B", "mB", "sB", "rB0", s""" "chi": $bChi,""")}],
+         | "nocLinks": [{"from": "A", "to": "B", "fromRouter": "rA0", "toRouter": "rB0",
+         |               "windows": [{"base": 0, "size": 4096}]}]}""".stripMargin
+    IrV2.fromJson(Json.parse(text))
+  }
+
+  it should "accept omitted-default vs explicit-default chi after resolution (CHK-60)" in {
+    // B explicitly declares exactly the top-level values A inherits: the
+    // parser-resolved blocks are equal, so CHK-60 must not false-positive.
+    val same = chi60Cfg("""{"datWidth": 512, "dvmEnable": false, "portMode": "chi"}""")
+    same.subsystems.head.chi shouldBe same.subsystems(1).chi
+    ChecksV2.runC0(same) shouldBe Nil
+    // a real difference against the resolved reference is still rejected
+    val diff = chi60Cfg("""{"datWidth": 256, "dvmEnable": false, "portMode": "chi"}""")
+    ChecksV2.runC0(diff) should contain(
+      "C0: [CHK-60] subsystem 'B' chi differs from subsystem 'A'; uniform ChiConfig required (per-subsystem DAT width is a follow-up)")
+  }
+
+  it should "reject topology-derived nHalf divergence even with identical chi blocks (CHK-60)" in {
+    // B gains a 3-router dateline ring (nHalf=2) while A stays a chain
+    // (nHalf=1): ChiSystemTop's uniform-cfg require covers nHalf, so the
+    // check must too. (A 2-router "ring" is all U-turns in the CDG and
+    // detects no ring, hence three routers.)
+    def subRing(name: String, rn: String, sn: String, samBase: Long): SubsystemSpec = {
+      val v = base
+      val r0 = s"${name}r0"; val r1 = s"${name}r1"; val r2 = s"${name}r2"
+      SubsystemSpec(name, v.clockDomains,
+        Seq(NodeV2(rn, "rn-i", None, "core", r0, "chi", 256, 64, 0),
+          NodeV2(sn, "sn-f", None, "core", r1, "chi", 256, 64, 0)),
+        Seq(SamWindowV2(samBase, 4096L, sn)),
+        v.qos, v.chi,
+        Seq(RouterV2(r0, "core", None, None, None, "any"),
+          RouterV2(r1, "core", None, None, None, "any"),
+          RouterV2(r2, "core", None, None, None, "any")),
+        Seq(LinkV2(rn, r0, 256, "sync", 0, 0, false, Seq("req", "rsp", "dat"), 4),
+          LinkV2(r0, r1, 256, "sync", 0, 0, false, Seq("req", "rsp", "dat"), 4),
+          LinkV2(r1, r2, 256, "sync", 0, 0, false, Seq("req", "rsp", "dat"), 4),
+          LinkV2(r2, r0, 256, "sync", 0, 0, true, Seq("req", "rsp", "dat"), 4),
+          LinkV2(r1, sn, 256, "sync", 0, 0, false, Seq("req", "rsp", "dat"), 4)),
+        v.timing)
+    }
+    val ringB = subRing("B", "m1", "s1", 65536L)
+    loom.gen.ChiAssemble.config(IrV2.projectSubsystem(hierarchical, ringB)).nHalf shouldBe 2
+    val divergent = hierarchical.copy(subsystems = Seq(subA, ringB))
+    divergent.subsystems.head.chi shouldBe divergent.subsystems(1).chi
+    ChecksV2.runC0(divergent) should contain(
+      "C0: [CHK-60] subsystem 'B' chi differs from subsystem 'A'; uniform ChiConfig required (per-subsystem DAT width is a follow-up)")
+    // both ringed ⇒ uniform nHalf ⇒ no CHK-60
+    val uniform = hierarchical.copy(subsystems =
+      Seq(subRing("A", "m0", "s0", 0L), ringB))
+    ChecksV2.runC0(uniform).filter(_.contains("[CHK-60]")) shouldBe Nil
+  }
+
+  it should "bound nocLink outstanding by the from-side TxnID space (CHK-61, IR-94)" in {
+    val max = 1 << subA.chi.txnIdWidth
+    ChecksV2.runC0(withNocLink(_.copy(outstanding = 0))) should contain(
+      s"C0: [CHK-61] nocLink 'A->B' outstanding 0 must be in [1, $max] (2^txnIdWidth)")
+    ChecksV2.runC0(withNocLink(_.copy(outstanding = max + 1))) should contain(
+      s"C0: [CHK-61] nocLink 'A->B' outstanding ${max + 1} must be in [1, $max] (2^txnIdWidth)")
+    ChecksV2.runC0(withNocLink(_.copy(outstanding = 1))) shouldBe Nil
+    ChecksV2.runC0(withNocLink(_.copy(outstanding = 4))) shouldBe Nil
+    ChecksV2.runC0(withNocLink(_.copy(outstanding = max))) shouldBe Nil
+  }
 }

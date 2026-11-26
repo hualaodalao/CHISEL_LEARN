@@ -559,15 +559,38 @@ class EmitV2Spec extends AnyFlatSpec with Matchers {
         Seq((65536L, 4096L)), "sync", 0, false)))
   }
 
-  it should "guard hierarchical emission with the HW-11 error; flat still emits" in {
+  it should "guard async inter-NoC bridges with HW-15; sync hierarchical and flat pass (GEN-25a)" in {
     // Guard is a pure function (sys.exit cannot be trapped on modern JDKs).
-    LoomMain.hierarchicalEmitGuard(hierCfg) shouldBe Some(
-      "ERROR: hierarchical emission requires HW-11 (ChiNocBridge); check/estimate available")
+    // HW-11 closed: sync hierarchical configs now emit.
+    LoomMain.hierarchicalEmitGuard(hierCfg) shouldBe None
     LoomMain.hierarchicalEmitGuard(loom.ir.IrV2.load(Paths.get(v2Cfg))) shouldBe None
+    val async = hierCfg.copy(nocLinks =
+      Seq(hierCfg.nocLinks.head.copy(cdc = "async", asyncFifoDepth = 4)))
+    val g = LoomMain.hierarchicalEmitGuard(async)
+    g.isDefined shouldBe true
+    g.get should include("HW-15")
     // flat configs keep emitting through the same command
     val flatOut = Files.createTempDirectory("loom-emitv2-hier-flat")
     capture(LoomMain.runEmit(List("--config", v2Cfg, "--out", flatOut.toString)))
     Files.exists(flatOut.resolve("ChiNetworkTop.sv")) shouldBe true
+  }
+
+  it should "guard subsystem node width adaptation with HW-16; matched widths pass (GEN-25a)" in {
+    LoomMain.hierarchicalAdaptGuard(hierCfg) shouldBe None
+    LoomMain.hierarchicalAdaptGuard(loom.ir.IrV2.load(Paths.get(v2Cfg))) shouldBe None
+    val a = hierCfg.subsystems.head
+    val mismatched = hierCfg.copy(subsystems = Seq(
+      a.copy(nodes = a.nodes.map(n => if (n.id == "m0") n.copy(dataWidth = 128) else n)),
+      hierCfg.subsystems(1)))
+    val g = LoomMain.hierarchicalAdaptGuard(mismatched)
+    g.isDefined shouldBe true
+    g.get should include("HW-16")
+  }
+
+  it should "carry nocLink outstanding into BridgeParams (IR-94, wave6 declaration caliber)" in {
+    loom.gen.ChiAssemble.bridgeParams(hierCfg).head.outstanding shouldBe 1
+    val multi = hierCfg.copy(nocLinks = Seq(hierCfg.nocLinks.head.copy(outstanding = 4)))
+    loom.gen.ChiAssemble.bridgeParams(multi).head.outstanding shouldBe 4
   }
 
   it should "assemble subsystemParams projections and BridgeParams for HW-11 (GEN-25)" in {
@@ -621,5 +644,104 @@ class EmitV2Spec extends AnyFlatSpec with Matchers {
     flat.get("nocLinks") shouldBe None
     flat.get("gatesBySubsystem") shouldBe None
     flat.get("bridges").get.asInstanceOf[JObj].get("noc") shouldBe None
+  }
+
+  // ---- UP-07 phase 2: SEM-20a bridge endpoint assembly + GEN-25a emission ----
+
+  behavior of "loom hierarchical emission (GEN-25a/SEM-20a, UP-07 phase 2)"
+
+  it should "assemble systemParams with synthetic bridge endpoints and final-vector slot indices (SEM-20a)" in {
+    val (nets, bridges) = loom.gen.ChiAssemble.systemParams(hierCfg)
+    nets.map(_.name) shouldBe Seq("A", "B")
+    // A gains the bridge SN slot, B gains the bridge RN slot
+    nets(0).nRn shouldBe 1
+    nets(0).nSn shouldBe 2
+    nets(1).nRn shouldBe 2
+    nets(1).nSn shouldBe 1
+    // NodeIDs continue within each segment (RN -> SN): A's bridge SN extends
+    // the SN segment (s0=1, bridge=2); B's bridge RN extends the RN segment
+    // (m1=0, bridge=1), shifting s1 to 2.
+    nets(0).sn.map(_.nodeId) shouldBe Seq(1, 2)
+    nets(1).rn.map(_.nodeId) shouldBe Seq(0, 1)
+    nets(1).sn.map(_.nodeId) shouldBe Seq(2)
+    // from-side SAM augmentation targets the synthetic SN; to-side SAM unchanged
+    nets(0).sam.map(e => (e.base, e.size, e.tgtId)) should contain((65536L, 4096L, 2))
+    nets(1).sam.map(e => (e.base, e.size)) shouldBe Seq((65536L, 4096L))
+    // slot indices are looked up in the FINAL NodeID-sorted vectors
+    bridges shouldBe Seq(loom.chi.ChiBridgeLink(0, 1, 1, 1, Seq((65536L, 4096L)), 0, 0, false))
+    // phase-1 subsystemParams stays the declared projection (no synthetics)
+    loom.gen.ChiAssemble.subsystemParams(hierCfg).foreach { case (_, n) =>
+      n.nRn shouldBe 1
+      n.nSn shouldBe 1
+    }
+  }
+
+  it should "reject synthetic endpoint name collisions with declared nodes (SEM-20a)" in {
+    val subA = hierCfg.subsystems.head
+    val clash = hierCfg.copy(subsystems = Seq(
+      subA.copy(nodes = subA.nodes :+
+        loom.ir.NodeV2("__noc_A_B_0_sn", "sn-f", None, "core", "rA1", "chi", 256, 64, 0)),
+      hierCfg.subsystems(1)))
+    val e = intercept[loom.ir.Ir.IrException](loom.gen.ChiAssemble.systemParams(clash))
+    e.getMessage should include("collides")
+  }
+
+  it should "emit ChiSystemTop with bridge-consumed slots excluded from ports (GEN-25a)" in {
+    val out = Files.createTempDirectory("loom-emitv2-hier-emit")
+    val log = capture(LoomMain.runEmit(List("--config", writeCfg(hierCfg), "--out", out.toString)))
+    log should include("emitted hier_ok (2 subsystem(s), 1 inter-NoC bridge(s))")
+    val top = out.resolve("ChiSystemTop.sv")
+    Files.exists(top) shouldBe true
+    val sv = Files.readString(top)
+    sv should include("module ChiSystemTop")
+    sv should include("ChiNocBridge")
+    Files.exists(out.resolve("tb/ChiSystemTop_tb.sv")) shouldBe true
+
+    val ports = Json.parse(Files.readString(out.resolve("ports.json"))).asInstanceOf[JObj]
+    def ids(key: String): Seq[String] =
+      ports.get(key).get.asInstanceOf[loom.ir.JArr].items.map(_.asInstanceOf[JObj])
+        .flatMap(_.get("id")).collect { case JStr(s) => s }
+    // free ports exclude the synthetic bridge slots on both subsystems
+    ids("freeRn") shouldBe Seq("m0", "m1")
+    ids("freeSn") shouldBe Seq("s0", "s1")
+    val br = ports.get("bridges").get.asInstanceOf[loom.ir.JArr].items.head.asInstanceOf[JObj]
+    br.get("fromSub") shouldBe Some(JStr("A"))
+    br.get("fromSn") shouldBe Some(JNum(BigDecimal(1)))
+    br.get("toSub") shouldBe Some(JStr("B"))
+    br.get("toRn") shouldBe Some(JNum(BigDecimal(1)))
+    br.get("fromNode").collect { case JStr(s) => s }.get should include("__noc_")
+    // single-domain subsystems: no domClk/domReset note (SEM-14 convention)
+    ports.get("clocking") shouldBe None
+
+    // per-subsystem chi_nodes carry the elaborated synthetic endpoints
+    val chiA = Json.parse(Files.readString(out.resolve("subsystems/A/chi_nodes.json"))).asInstanceOf[JObj]
+    chiA.get("sn").get.asInstanceOf[loom.ir.JArr].items.length shouldBe 2
+    val chiB = Json.parse(Files.readString(out.resolve("subsystems/B/chi_nodes.json"))).asInstanceOf[JObj]
+    chiB.get("rn").get.asInstanceOf[loom.ir.JArr].items.length shouldBe 2
+    // estimate subsystems echo stays the DECLARED IR (no synthetic nodes)
+    val est = Json.parse(Files.readString(out.resolve("estimate.json"))).asInstanceOf[JObj]
+    val subs = est.get("subsystems").get.asInstanceOf[loom.ir.JArr].items.map(_.asInstanceOf[JObj])
+    subs.head.get("nodes") shouldBe Some(JNum(BigDecimal(2)))
+    est.get("bridges").get.asInstanceOf[JObj].get("noc") shouldBe Some(JNum(BigDecimal(1)))
+
+    val manifest = Json.parse(Files.readString(out.resolve("manifest.json"))).asInstanceOf[JObj]
+    manifest.get("configHash") shouldBe Some(JStr(loom.ir.IrV2.hash(hierCfg)))
+    manifest.get("irSchema") shouldBe Some(JStr("loom/v2"))
+    Seq("checks.json", "graph.json", "signoff.md").foreach(f => Files.exists(out.resolve(f)) shouldBe true)
+  }
+
+  it should "be byte-identical across two hierarchical emissions (CG2, GEN-25a)" in {
+    val cfg = writeCfg(hierCfg)
+    val d1 = Files.createTempDirectory("loom-emitv2-hier-cg2-a")
+    val d2 = Files.createTempDirectory("loom-emitv2-hier-cg2-b")
+    capture(LoomMain.runEmit(List("--config", cfg, "--out", d1.toString)))
+    capture(LoomMain.runEmit(List("--config", cfg, "--out", d2.toString)))
+    val a = filesRec(d1)
+    val b = filesRec(d2)
+    a should not be empty
+    a.keySet shouldBe b.keySet
+    a.foreach { case (rel, bytes) =>
+      withClue(s"file $rel: ") { bytes shouldBe b(rel) }
+    }
   }
 }

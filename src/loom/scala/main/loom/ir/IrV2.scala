@@ -116,7 +116,8 @@ final case class NocLinkSpec(
     windows: Seq[(Long, Long)],
     cdc: String,
     asyncFifoDepth: Int,
-    dvmForward: Boolean)
+    dvmForward: Boolean,
+    outstanding: Int = 1)
 
 /** Normalized loom/v2 object: every optional field filled per GEN-03.
   * `unknown` collects unrecognized field paths for the C0 unknown-key gate.
@@ -474,7 +475,7 @@ object IrV2 {
           val p = s"$$.nocLinks[$i]"
           val o = asObj(v, p)
           keys(o, p, Set("from", "to", "fromRouter", "toRouter", "windows", "cdc",
-            "asyncFifoDepth", "dvmForward"))
+            "asyncFifoDepth", "dvmForward", "outstanding"))
           val windows = arrOf(field(o, "windows", p), s"$p.windows").zipWithIndex.map {
             case (wv, j) =>
               val wp = s"$p.windows[$j]"
@@ -491,7 +492,8 @@ object IrV2 {
             windows = windows,
             cdc = cdc,
             asyncFifoDepth = optInt(o, "asyncFifoDepth", if (cdc == "async") 2 else 0),
-            dvmForward = optBool(o, "dvmForward", false))
+            dvmForward = optBool(o, "dvmForward", false),
+            outstanding = optInt(o, "outstanding", 1))
         }
       case Some(_) => throw Ir.IrException("$.nocLinks must be an array")
       case None => Nil
@@ -520,8 +522,9 @@ object IrV2 {
     JObj(withPath :+ ("forbid" -> JBool(r.forbid)))
   }
 
-  /** Normalized nocLink entry rendering (IR-88–93): windows are {base,size}
-    * objects; cdc/asyncFifoDepth/dvmForward are always explicit (GEN-03).
+  /** Normalized nocLink entry rendering (IR-88–94): windows are {base,size}
+    * objects; cdc/asyncFifoDepth/dvmForward are always explicit (GEN-03);
+    * outstanding renders only when ≠1 so default bridges keep their hash.
     */
   def nocLinkJson(l: NocLinkSpec): JValue =
     JObj(Vector(
@@ -532,7 +535,9 @@ object IrV2 {
       }.toVector),
       "cdc" -> JStr(l.cdc),
       "asyncFifoDepth" -> JNum(BigDecimal(l.asyncFifoDepth)),
-      "dvmForward" -> JBool(l.dvmForward)))
+      "dvmForward" -> JBool(l.dvmForward)) ++
+      (if (l.outstanding != 1) Vector("outstanding" -> JNum(BigDecimal(l.outstanding)))
+       else Vector.empty))
 
   /** Fully-explicit normalized rendering (GEN-03/GEN-06): hash and canonical
     * reports consume this, never the raw input root.

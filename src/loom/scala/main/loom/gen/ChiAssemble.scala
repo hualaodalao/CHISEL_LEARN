@@ -3,11 +3,11 @@ package loom.gen
 import scala.collection.mutable
 
 import loom.chi.{
-  ChiAdapt, ChiConfig, ChiNetLink, ChiNetNode, ChiNetRouter, ChiNetworkParams, ChiNode, ChiNodeKind,
-  ChiNodeIds, ChiParams, ChiPartitionParams, ChiQosGen, ChiSamEntry
+  ChiAdapt, ChiBridgeLink, ChiConfig, ChiNetLink, ChiNetNode, ChiNetRouter, ChiNetworkParams,
+  ChiNode, ChiNodeKind, ChiNodeIds, ChiParams, ChiPartitionParams, ChiQosGen, ChiSamEntry
 }
 import loom.graph.FabricGraph
-import loom.ir.{Ir, IrV2, LinkV2, PartitionSpec}
+import loom.ir.{Ir, IrV2, LinkV2, NodeV2, PartitionSpec, SamWindowV2}
 
 /** GEN-side parameter assembly: normalized IrV2 -> CHI elaboration models.
   * Hardware keeps its v1 `fromIr` entry for legacy tests; GEN assembles the
@@ -403,8 +403,9 @@ object ChiAssemble {
   /** GEN-25 (UP-07, SEM-20): each subsystem projects to an independent flat
     * IrV2 (meta.name = subsystem name; clockDomains/qos/chi defaults already
     * resolved by the parser; partitions/routes empty per phase-1 CHK-58) and
-    * goes through the existing networkParams path unchanged. Hierarchical
-    * emission is pending HW-11; check/estimate/API consume these params.
+    * goes through the existing networkParams path unchanged. This stays the
+    * declared-IR projection (check/estimate/API caliber); emission consumes
+    * systemParams, which adds the SEM-20a synthetic bridge endpoints.
     */
   def subsystemParams(v2: IrV2): Seq[(String, ChiNetworkParams)] =
     v2.subsystems.map(s => s.name -> networkParams(IrV2.projectSubsystem(v2, s)))
@@ -424,7 +425,8 @@ object ChiAssemble {
       asyncFifoDepth: Int,
       dvmForward: Boolean,
       fromDatWidth: Int,
-      toDatWidth: Int)
+      toDatWidth: Int,
+      outstanding: Int = 1)
 
   def bridgeParams(v2: IrV2): Seq[BridgeParams] = {
     val subByName = v2.subsystems.map(s => s.name -> s).toMap
@@ -434,7 +436,89 @@ object ChiAssemble {
       val t = subByName.getOrElse(l.to,
         throw Ir.IrException(s"nocLink to '${l.to}' is not a declared subsystem (CHK-55)"))
       BridgeParams(l.from, l.to, l.fromRouter, l.toRouter, l.windows,
-        l.asyncFifoDepth, l.dvmForward, f.chi.datWidth, t.chi.datWidth)
+        l.asyncFifoDepth, l.dvmForward, f.chi.datWidth, t.chi.datWidth, l.outstanding)
     }
+  }
+
+  // SEM-20a synthetic endpoint names: reserved `__noc_` prefix; the nocLink
+  // declaration index keeps names unique when several bridges share a
+  // (from,to) subsystem pair.
+  private def nocSnName(l: loom.ir.NocLinkSpec, i: Int): String =
+    s"__noc_${l.from}_${l.to}_${i}_sn"
+  private def nocRnName(l: loom.ir.NocLinkSpec, i: Int): String =
+    s"__noc_${l.from}_${l.to}_${i}_rn"
+
+  /** SEM-20a (UP-07 phase 2): subsystem projections augmented with synthetic
+    * bridge endpoints — each nocLink adds an sn-f slot on fromRouter in the
+    * from subsystem and an rn-i slot on toRouter in the to subsystem, plus
+    * the forwarding windows in the from-side SAM targeting the synthetic SN.
+    * Synthetics are appended after declared nodes with no explicit nodeId,
+    * so ChiNodeIds continues each segment deterministically; they run native
+    * chi at the fabric DAT width on the attach router's clock (no adapt row).
+    */
+  def systemProjections(v2: IrV2): Seq[IrV2] =
+    v2.subsystems.map { s =>
+      val p = IrV2.projectSubsystem(v2, s)
+      val declared = (s.nodes.map(_.id) ++ s.routers.map(_.name)).toSet
+      val routerClock = s.routers.map(r => r.name -> r.clock).toMap
+      def clockOf(router: String, l: loom.ir.NocLinkSpec): String =
+        routerClock.getOrElse(router,
+          throw Ir.IrException(s"nocLink '${l.from}->${l.to}' router '$router' is not declared in subsystem '${s.name}' (CHK-57)"))
+      def fresh(name: String, l: loom.ir.NocLinkSpec): String = {
+        if (declared.contains(name))
+          throw Ir.IrException(
+            s"nocLink '${l.from}->${l.to}' synthetic endpoint name '$name' collides with a declared node/router in subsystem '${s.name}'")
+        name
+      }
+      val extraNodes = mutable.ArrayBuffer.empty[NodeV2]
+      val extraSam = mutable.ArrayBuffer.empty[SamWindowV2]
+      v2.nocLinks.zipWithIndex.foreach { case (l, i) =>
+        if (l.from == s.name) {
+          val name = fresh(nocSnName(l, i), l)
+          extraNodes += NodeV2(name, "sn-f", None, clockOf(l.fromRouter, l), l.fromRouter,
+            "chi", p.chi.datWidth, p.chi.outstanding, 0)
+          extraSam ++= l.windows.map { case (b, sz) => SamWindowV2(b, sz, name) }
+        }
+        if (l.to == s.name) {
+          val name = fresh(nocRnName(l, i), l)
+          extraNodes += NodeV2(name, "rn-i", None, clockOf(l.toRouter, l), l.toRouter,
+            "chi", p.chi.datWidth, p.chi.outstanding, 0)
+        }
+      }
+      p.copy(nodes = p.nodes ++ extraNodes.toSeq, sam = p.sam ++ extraSam.toSeq)
+    }
+
+  /** GEN-25a (UP-07 phase 2, SEM-20a): hierarchical system assembly for
+    * ChiSystemTop. Subsystem order = declaration order; bridge slot indices
+    * are looked up by synthetic name in the FINAL params.sn/rn vectors
+    * (networkParams sorts by NodeID, never insertion order). toDatWidth=0
+    * (uniform cfg, CHK-60) and dvmForward=false are the HW-11 v1 contract;
+    * asyncFifoDepth passes through (emit guards async, HW-15). outstanding
+    * stays at the ChiBridgeLink default 1 until HW-17 adds the field there;
+    * the declared value is carried by bridgeParams (IR-94/CHK-61).
+    */
+  def systemParams(v2: IrV2): (Seq[ChiNetworkParams], Seq[ChiBridgeLink]) = {
+    val projs = systemProjections(v2)
+    val nets = projs.map(networkParams)
+    val subIdx = v2.subsystems.map(_.name).zipWithIndex.toMap
+    def slot(sub: Int, name: String, vec: Seq[ChiNetNode]): Int = {
+      val ids = nodeIds(projs(sub))
+      val id = projs(sub).nodes.map(_.id).zip(ids).toMap.getOrElse(name,
+        throw Ir.IrException(s"synthetic bridge endpoint '$name' missing from subsystem projection"))
+      val idx = vec.indexWhere(_.nodeId == id)
+      if (idx < 0)
+        throw Ir.IrException(s"synthetic bridge endpoint '$name' (nodeId $id) missing from assembled ports")
+      idx
+    }
+    val bridges = v2.nocLinks.zipWithIndex.map { case (l, i) =>
+      val fi = subIdx.getOrElse(l.from,
+        throw Ir.IrException(s"nocLink from '${l.from}' is not a declared subsystem (CHK-55)"))
+      val ti = subIdx.getOrElse(l.to,
+        throw Ir.IrException(s"nocLink to '${l.to}' is not a declared subsystem (CHK-55)"))
+      ChiBridgeLink(fi, slot(fi, nocSnName(l, i), nets(fi).sn),
+        ti, slot(ti, nocRnName(l, i), nets(ti).rn),
+        l.windows, asyncFifoDepth = l.asyncFifoDepth, toDatWidth = 0, dvmForward = false)
+    }
+    (nets, bridges)
   }
 }

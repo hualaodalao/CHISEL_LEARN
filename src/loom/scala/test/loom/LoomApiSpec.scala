@@ -452,4 +452,19 @@ class LoomApiSpec extends AnyFlatSpec with Matchers {
     strs(r("errors")) should contain(
       "subsystem 'B': C0: [CHK-12] node 's1' attach 'rX' is not a declared router")
   }
+
+  it should "carry bridges.noc plus the phase-2 bridge assumptions on the hierarchical estimate (GEN-25a)" in {
+    val r = fields(LoomApi.evaluate(hierText))
+    val est = fields(r("estimate"))
+    fields(est("bridges"))("noc") shouldBe JNum(BigDecimal(1))
+    fields(est("bridges"))("rnAxi") shouldBe JNum(BigDecimal(0))
+    fields(est("bridges"))("snAxi") shouldBe JNum(BigDecimal(0))
+    val assumptions = strs(est("assumptions"))
+    assumptions.exists(s => s.contains("single-outstanding") &&
+      s.contains("uniform ChiConfig") && s.contains("HW-15")) shouldBe true
+    // flat configs keep neither the noc count nor the hierarchical note
+    val flat = fields(fields(LoomApi.evaluate(v2Text))("estimate"))
+    fields(flat("bridges")).contains("noc") shouldBe false
+    strs(flat("assumptions")).exists(_.contains("single-outstanding")) shouldBe false
+  }
 }

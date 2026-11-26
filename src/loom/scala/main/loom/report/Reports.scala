@@ -1,7 +1,7 @@
 package loom.report
 
 import loom.check.ChecksV2
-import loom.chi.{ChiNetNode, ChiNetworkParams, ChiNodeKind, ChiPartitionParams, ChiWidths}
+import loom.chi.{ChiBridgeLink, ChiNetNode, ChiNetworkParams, ChiNodeKind, ChiPartitionParams, ChiWidths}
 import loom.gen.ChiAssemble
 import loom.ir._
 
@@ -614,7 +614,9 @@ object Reports {
       else Vector(
         "subsystems = independent NoCs (SEM-20: local NodeID/SAM/chi/clock domains); nocLinks = " +
           "dependency-terminating bridge endpoints, bridges.noc is a count-only proxy; " +
-          "hierarchical emission pending HW-11 ChiNocBridge (check/estimate only)")
+          "hierarchical emission emits ChiSystemTop (HW-11/GEN-25a): each bridge is a " +
+          "single-outstanding terminating proxy, v1 requires a uniform ChiConfig across " +
+          "subsystems (CHK-60) and emits sync bridges only (async emission pending HW-15)")
 
     JObj(Vector(
       "schema" -> JStr("loom/estimate/v1"),
@@ -871,6 +873,70 @@ object Reports {
       "slaves" -> JArr(pp.sn.map(epObj).toVector),
       "nodes" -> JArr(pp.nodes.sortBy(_.nodeId).map(nodeObj).toVector),
       "boundary" -> JArr(boundaryObjs.toVector)
+    ) ++ clockingField)
+  }
+
+  /** GEN-25a (UP-07 phase 2): system-level ports.json for the hierarchical
+    * ChiSystemTop emission. freeRn/freeSn mirror the hardware aggregation
+    * order (subsystem declaration order, NodeID-sorted vectors) and exclude
+    * the bridge-consumed slots; bridges[] carries the ChiBridgeLink index
+    * mapping plus the synthetic endpoint names. domClk/domReset follow the
+    * SEM-14 convention: flattened per-subsystem extra domains, integrator-
+    * supplied inputs, no GEN clock wrapper.
+    */
+  def systemPortsJsonV2(
+      v2: IrV2,
+      projs: Seq[IrV2],
+      nets: Seq[ChiNetworkParams],
+      bridges: Seq[ChiBridgeLink],
+      configHash: String
+  ): JValue = {
+    val usedSn = bridges.map(b => (b.fromSub, b.fromSn)).toSet
+    val usedRn = bridges.map(b => (b.toSub, b.toRn)).toSet
+    val nameOfId = projs.map { p =>
+      p.nodes.map(_.id).zip(ChiAssemble.nodeIds(p)).map { case (n, i) => i -> n }.toMap
+    }
+    def epObj(s: Int, n: ChiNetNode): JValue = {
+      val routerName = nets(s).routers.map(r => r.index -> r.name).toMap
+      JObj(Vector(
+        "subsystem" -> JStr(v2.subsystems(s).name),
+        "id" -> JStr(nameOfId(s).getOrElse(n.nodeId, "?")),
+        "kind" -> JStr(kindName(n.kind)),
+        "nodeId" -> JNum(BigDecimal(n.nodeId)),
+        "router" -> JStr(routerName(n.router)),
+        "port" -> JNum(BigDecimal(n.localPort))))
+    }
+    val freeRn = for (s <- nets.indices; i <- nets(s).rn.indices if !usedRn((s, i)))
+      yield epObj(s, nets(s).rn(i))
+    val freeSn = for (s <- nets.indices; j <- nets(s).sn.indices if !usedSn((s, j)))
+      yield epObj(s, nets(s).sn(j))
+    val bridgeObjs = bridges.map { b =>
+      JObj(Vector(
+        "fromSub" -> JStr(v2.subsystems(b.fromSub).name),
+        "fromSn" -> JNum(BigDecimal(b.fromSn)),
+        "fromNode" -> JStr(nameOfId(b.fromSub).getOrElse(nets(b.fromSub).sn(b.fromSn).nodeId, "?")),
+        "toSub" -> JStr(v2.subsystems(b.toSub).name),
+        "toRn" -> JNum(BigDecimal(b.toRn)),
+        "toNode" -> JStr(nameOfId(b.toSub).getOrElse(nets(b.toSub).rn(b.toRn).nodeId, "?")),
+        "windows" -> JArr(b.windows.map { case (base, size) =>
+          JObj(Vector("base" -> JNum(BigDecimal(base)), "size" -> JNum(BigDecimal(size))))
+        }.toVector),
+        "asyncFifoDepth" -> JNum(BigDecimal(b.asyncFifoDepth)),
+        "dvmForward" -> JBool(b.dvmForward)))
+    }
+    val nDomExtra = nets.map(_.nDomain - 1).sum
+    val clockingField =
+      if (nDomExtra > 0) Vector(
+        "clocking" -> JStr(s"system exposes $nDomExtra domClk/domReset input pair(s) (per-subsystem domains 1..n-1 flattened in subsystem declaration order; domain 0 of each subsystem is its top module clock); integrator-supplied, no GEN clock wrapper (SEM-14/HW-14)"))
+      else Vector.empty
+    JObj(Vector(
+      "schema" -> JStr("loom/ports/v1"),
+      "name" -> JStr(v2.meta.name),
+      "configHash" -> JStr(configHash),
+      "top" -> JStr("ChiSystemTop"),
+      "freeRn" -> JArr(freeRn.toVector),
+      "freeSn" -> JArr(freeSn.toVector),
+      "bridges" -> JArr(bridgeObjs.toVector)
     ) ++ clockingField)
   }
 

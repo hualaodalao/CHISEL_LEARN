@@ -4,7 +4,7 @@ import java.nio.file.{Files, Path, Paths}
 import java.security.MessageDigest
 
 import _root_.circt.stage.ChiselStage
-import loom.chi.{ChiAxiNetworkTop, ChiNetworkTop, ChiPartitionStub, ChiPartitionTop, ChiWrapperTop}
+import loom.chi.{ChiAxiNetworkTop, ChiNetworkTop, ChiPartitionStub, ChiPartitionTop, ChiSystemTop, ChiWrapperTop}
 import loom.gen.{ChiAdaptedNetworkTop, ChiAssemble}
 import loom.graph.FabricGraph
 import loom.ir.{Canonical, Ir, IrV2, JArr, JBool, JObj, JStr, JValue, Json, Upgrade}
@@ -198,12 +198,27 @@ object LoomMain {
     * GEN-owned ChiAdaptedNetworkTop wraps the network with ChiNiAdapt
     * gearboxes (HW-12 §9.3, GEN-24).
     */
-  /** GEN-25 emit guard, pure for testability (sys.exit is not trap-able on
-    * modern JDKs). Some(message) ⇒ refuse hierarchical emission (HW-11).
+  /** GEN-25a emit guard, pure for testability (sys.exit is not trap-able on
+    * modern JDKs). HW-11 closed the hierarchical guard; the remaining v1
+    * limit is async bridges: ChiSystemTop hardwires the bridge dstClk to
+    * io.domClk(0), which is empty on all-single-domain systems and is not
+    * generally the to-side clock (HW-15). Some(message) ⇒ refuse emission;
+    * check/estimate still accept async declarations.
     */
   private[loom] def hierarchicalEmitGuard(v2: IrV2): Option[String] =
-    if (v2.subsystems.nonEmpty)
-      Some("ERROR: hierarchical emission requires HW-11 (ChiNocBridge); check/estimate available")
+    if (v2.nocLinks.exists(_.asyncFifoDepth >= 2))
+      Some("ERROR: async inter-NoC bridge emission requires HW-15 (ChiSystemTop dstClk wiring); v1 emits sync bridges only, check/estimate accept async declarations")
+    else None
+
+  /** GEN-25a: ChiSystemTop instantiates ChiNetworkTop directly, so the flat
+    * path's ChiAdaptedNetworkTop gearboxes have no hierarchical equivalent
+    * yet (HW-16). Refuse emission rather than silently drop node width
+    * adaptation; matched-width subsystems are unaffected.
+    */
+  private[loom] def hierarchicalAdaptGuard(v2: IrV2): Option[String] =
+    if (v2.subsystems.exists(s =>
+      ChiAdaptedNetworkTop.needed(ChiAssemble.networkParams(IrV2.projectSubsystem(v2, s)))))
+      Some("ERROR: node width adaptation inside subsystems requires HW-16 (ChiSystemTop adapt integration); v1 hierarchical emission supports matched-width chi nodes only")
     else None
 
   private[loom] def runEmit(xs: List[String]): Unit = {
@@ -217,10 +232,13 @@ object LoomMain {
       sys.exit(3)
     }
 
-    // GEN-25 (UP-07) emit guard: hierarchical multi-NoC emission needs the
-    // HW-11 ChiNocBridge hardware, which does not exist yet. Never silently
-    // emit a flat subset — check/estimate/API are the phase-1 deliverables.
+    // GEN-25a (UP-07 phase 2): sync hierarchical systems emit ChiSystemTop;
+    // async nocLinks stay guarded until HW-15 fixes the dstClk wiring.
     hierarchicalEmitGuard(v.ir).foreach { msg =>
+      println(msg)
+      sys.exit(3)
+    }
+    hierarchicalAdaptGuard(v.ir).foreach { msg =>
       println(msg)
       sys.exit(3)
     }
@@ -231,6 +249,11 @@ object LoomMain {
     }
 
     Files.createDirectories(Paths.get(out))
+
+    if (v.ir.subsystems.nonEmpty) {
+      emitSystem(xs, out, v)
+      return
+    }
 
     val net =
       try ChiAssemble.networkParams(v.ir)
@@ -312,6 +335,53 @@ object LoomMain {
 
     println(s"emitted ${net.name} (${net.nRn} RN x ${net.nSn} SN) to $out")
     println(s"hash=${v.hash} datWidth=${net.cfg.datWidth} warnings=${v.warnings.size}")
+    v.warnings.foreach(w => println(s"WARN: $w"))
+  }
+
+  /** GEN-25a (UP-07 phase 2): hierarchical emission — one ChiSystemTop over
+    * the SEM-20a augmented subsystem params (synthetic bridge endpoints are
+    * consumed internally, freeRn/freeSn aggregate the rest). Reports follow
+    * the flat caliber: per-subsystem chi_nodes under subsystems/<name>/, a
+    * system ports.json (bridge slots excluded), manifest/signoff/tb as usual.
+    * The estimate subsystems echo stays the DECLARED IR (no synthetics).
+    */
+  private def emitSystem(xs: List[String], out: String, v: Validated): Unit = {
+    val (nets, bridges) =
+      try ChiAssemble.systemParams(v.ir)
+      catch {
+        case e: Throwable =>
+          println(s"ERROR: ${e.getMessage}")
+          sys.exit(3)
+      }
+    // ChiSystemTop requires a uniform ChiConfig (CHK-60 covers the chi block;
+    // topology-derived cfg fields such as nHalf surface here as a clear error).
+    try ChiselStage.emitSystemVerilogFile(
+      new ChiSystemTop(nets, bridges), Array("--target-dir", out))
+    catch {
+      case e: Throwable =>
+        println(s"ERROR: ${e.getMessage}")
+        sys.exit(3)
+    }
+
+    writeJson(out, "checks.json", checksJsonV2(v.copy(errors = Nil)))
+    writeJson(out, "estimate.json", Reports.estimateJsonV2(v.ir, v.hash))
+    writeJson(out, "graph.json", FabricGraph.fromV2(v.ir).toJson)
+    val projs = ChiAssemble.systemProjections(v.ir)
+    v.ir.subsystems.zipWithIndex.foreach { case (s, i) =>
+      val dir = Paths.get(out, "subsystems", s.name)
+      Files.createDirectories(dir)
+      writeJson(dir.toString, "chi_nodes.json", Reports.chiNodesJsonV2(projs(i), nets(i)))
+    }
+    writeJson(out, "ports.json", Reports.systemPortsJsonV2(v.ir, projs, nets, bridges, v.hash))
+
+    writeTestbenches(out, "ChiSystemTop", Nil, v.ir.chi)
+    writeAssertionList(out)
+    val formal = if (has(xs, "--formal")) Some(runFormalModels(out, v)) else None
+    writeSignoff(out, v, formal)
+    writeManifest(out, v)
+
+    println(s"emitted ${v.ir.meta.name} (${nets.size} subsystem(s), ${bridges.size} inter-NoC bridge(s)) to $out")
+    println(s"hash=${v.hash} datWidth=${nets.head.cfg.datWidth} warnings=${v.warnings.size}")
     v.warnings.foreach(w => println(s"WARN: $w"))
   }
 

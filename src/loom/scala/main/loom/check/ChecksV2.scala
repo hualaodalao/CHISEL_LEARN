@@ -380,6 +380,47 @@ object ChecksV2 {
     if (v2.subsystems.nonEmpty && (v2.partitions.nonEmpty || v2.routes.nonEmpty))
       errs += "C0: [CHK-58] partitions/routes are not supported with subsystems yet"
 
+    // CHK-59 (UP-07 phase 2, IR-92/93): HW-11 v1 bridge limits — dvmForward
+    // is require(false) in ChiNocBridge; async FIFO depths must be powers of
+    // two (ChiAsyncLink). Async declarations stay check-legal; the sync-only
+    // restriction is an emit guard (HW-15), not a check gate.
+    v2.nocLinks.foreach { l =>
+      val p = s"C0: [CHK-59] nocLink '${l.from}->${l.to}'"
+      if (l.dvmForward)
+        errs += s"$p dvmForward=true is not supported (HW-11 v1 keeps per-NoC MN autonomy)"
+      if (l.cdc == "async" && !pow2(l.asyncFifoDepth.toLong))
+        errs += s"$p asyncFifoDepth ${l.asyncFifoDepth} must be a power of two for cdc async"
+    }
+
+    // CHK-60 (UP-07 phase 2, IR-86): ChiSystemTop v1 requires a uniform
+    // ChiConfig — including topology-derived fields (nHalf), so compare the
+    // assembled config; fall back to the resolved chi blocks when a
+    // projection cannot assemble (other gates report those errors).
+    if (v2.subsystems.nonEmpty) {
+      val ref = v2.subsystems.head
+      def cfgOf(s: loom.ir.SubsystemSpec): Option[loom.chi.ChiConfig] =
+        scala.util.Try(ChiAssemble.config(IrV2.projectSubsystem(v2, s))).toOption
+      val refCfg = cfgOf(ref)
+      v2.subsystems.tail.foreach { s =>
+        val differs = (refCfg, cfgOf(s)) match {
+          case (Some(a), Some(b)) => a != b
+          case _ => s.chi != ref.chi
+        }
+        if (differs)
+          errs += s"C0: [CHK-60] subsystem '${s.name}' chi differs from subsystem '${ref.name}'; uniform ChiConfig required (per-subsystem DAT width is a follow-up)"
+      }
+    }
+
+    // CHK-61 (IR-94, wave6): bridge outstanding pool depth must fit the
+    // from-side TxnID space; >1 also requires matched DAT width, which the
+    // CHK-60 uniform-cfg gate already guarantees in v1.
+    v2.nocLinks.foreach { l =>
+      val max = 1 << v2.subsystems.find(_.name == l.from)
+        .map(_.chi.txnIdWidth).getOrElse(v2.chi.txnIdWidth)
+      if (l.outstanding < 1 || l.outstanding > max)
+        errs += s"C0: [CHK-61] nocLink '${l.from}->${l.to}' outstanding ${l.outstanding} must be in [1, $max] (2^txnIdWidth)"
+    }
+
     // Remaining unknown keys keep the S1 generic C0 error (spec §3: unknown
     // fields must be rejected; retired direction/switch already mapped above).
     v2.unknown.foreach {

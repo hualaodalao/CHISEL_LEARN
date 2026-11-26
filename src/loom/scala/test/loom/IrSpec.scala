@@ -582,6 +582,22 @@ class IrSpec extends AnyFlatSpec with Matchers {
     nl.get("cdc") shouldBe Some(JStr("sync"))
     nl.get("asyncFifoDepth") shouldBe Some(JNum(BigDecimal(0)))
     nl.get("dvmForward") shouldBe Some(JBool(false))
+    // outstanding=1 is the default and stays omitted (hash baseline, IR-94)
+    nl.get("outstanding") shouldBe None
+  }
+
+  it should "parse and render nocLink outstanding only when non-default (IR-94)" in {
+    val text = twoSubText.replaceFirst("\"windows\": \\[ \\{ \"base\": 65536, \"size\": 4096 \\} \\]",
+      "\"windows\": [ { \"base\": 65536, \"size\": 4096 } ], \"outstanding\": 4")
+    val v = IrV2.fromJson(Json.parse(text))
+    v.unknown shouldBe Nil
+    v.nocLinks.head.outstanding shouldBe 4
+    val rendered = IrV2.toJson(v)
+    IrV2.fromJson(rendered) shouldBe v
+    val nl = rendered.asInstanceOf[JObj].get("nocLinks").get.asInstanceOf[JArr].items.head
+      .asInstanceOf[JObj]
+    nl.get("outstanding") shouldBe Some(JNum(BigDecimal(4)))
+    IrV2.hash(v) should not be IrV2.hash(IrV2.fromJson(Json.parse(twoSubText)))
   }
 
   it should "omit empty subsystems/nocLinks keys so the ring_4 hash baseline is unchanged (§3.15)" in {
