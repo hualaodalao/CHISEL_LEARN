@@ -15,6 +15,7 @@
 | 1.2.0 | 2026-11-25 | HW-01…07 + HQ-01 落地：HN-I/MN elaboration + DVM 接入网络、SAM 1:1 约束删除、ChiTop 退役、depth 可配、QoS/VC 三级仲裁（nHalf 参数化）、NI 未命中 NDERR、ChiAsyncLink CDC、分区三件套；ChiRnPort 补 TX RSP/DAT |
 | 1.3.0 | 2026-11-26 | Wave2 HW-08/13/09 落地：分区 MN/DVM parity（HW-08）、ChiNetworkTop RN 入口 addr 驱动 SAM+NI 就地 NDERR（HW-13）、ChiAxiNetworkTop AXI 边界网络顶层（HW-09，RN 读/写桥+REQ 仲裁）；23 suite/253 test 绿，formal 10/10 PASS |
 | 1.4.0 | 2026-11-26 | Wave3 A1～A4 落地：ChiSnPort 补 RX DAT 写数据投递 + 写桥 dat.tgtId 从 DBIDResp.srcId 捕获（A1）、ChiAxiSnBridge SN CHI→AXI 反向桥（A2）、ChiAxiNetworkTop per-node 混合协议边界（按 node.protocol 拆分 rnAxi/rnChi/snAxi/snChi，A3）、ChiNetworkParams.samByRn per-source SAM 过滤/禁止对 NDERR（A4） |
+| 1.5.0 | 2026-11-26 | Wave4 HW-14/10/12 落地（GEN §8 解阻塞）：ChiNetLink.asyncFifoDepth + ChiNetworkParams.routerDomain，ChiNetworkTop 按域 withClockAndReset + link 级 ChiAsyncLink（HW-14 方案①，首版节点挂 domain 0）；ChiQosRegulator NIU 令牌桶带宽调节 fixed/limiter/regulator（HW-10）；ChiNiWidth/ChiNiAdapt store&fwd 宽度 gearbox + 频率异步 FIFO（HW-12，GEN 例化）；ChiNetworkParams.qosGen/adapt 参数 |
 
 ## 1. 文档说明
 
@@ -92,6 +93,9 @@ ID 不是 opcode/地址/错误码，不重排不复用。性能条目只索引�
 | LM-F022 | SN CHI→AXI 反向桥 | 已实现 | ChiAxiSnBridge：CHI ReadNoSnp→AXI AR→R→CompData；WriteNoSnp→DBIDResp→收 CHI 写数据→AXI AW/W→B→Comp（A2） | 6.17.4 |
 | LM-F023 | per-source SAM 过滤 | 已实现 | ChiNetworkParams.samByRn 每 RN 一份译码表，禁止对（未映射）就地 NDERR；空回退全网共享 sam（A4） | 6.9、6.18 |
 | LM-F024 | SN 写数据投递 | 已实现 | ChiSnPort.rxDat（SN RX 写数据），NetworkTop/PartitionTop SN 分支 eject port.txDat→sn.rxDat；写桥 dat.tgtId 从 DBIDResp.srcId 捕获（A1） | 6.3、6.9、6.17.3 |
+| LM-F025 | flat link 级 CDC | 已实现 | ChiNetLink.asyncFifoDepth + routerDomain，ChiNetworkTop 按域 withClockAndReset + 跨域 link 每通道 ChiAsyncLink（HW-14 方案①；首版节点挂 domain 0） | 6.9、6.19 |
+| LM-F026 | NIU QoS 带宽调节 | 已实现 | ChiQosRegulator 令牌桶（fixed/limiter/regulator，bytesPerCycle 定点累加 + saturationBytes 突发），反压不丢 flit、速率收敛；ChiNetworkParams.qosGen 按 nodeId 串入 RN 入口（HW-10） | 6.22 |
+| LM-F027 | NIU 速率适配 | 已实现 | ChiNiWidth store&fwd 宽度 gearbox（任意 2 幂比，逐位一致）+ ChiNiAdapt 频率异步 FIFO（fifoDepth）；ChiNetworkParams.adapt，GEN 在失配节点 DAT 边界例化（HW-12） | 6.23 |
 
 ### 3.3 性能清单
 
@@ -151,6 +155,8 @@ ID 不是 opcode/地址/错误码，不重排不复用。性能条目只索引�
 | ChiAsyncLink | 每通道类 flit CDC（复用 LmAsyncLink） | 6.19 |
 | ChiPartition | ChiPartitionParams/Top/Stub/WrapperTop | 6.20 |
 | ChiAxiNetworkTop | per-node 混合协议网络顶层（rnAxi/rnChi/snAxi/snChi，内含 ChiNetworkTop） | 6.21 |
+| ChiQosRegulator | NIU 令牌桶带宽调节（fixed/limiter/regulator） | 6.22 |
+| ChiNiAdapt | ChiNiBeat + ChiNiWidth 宽度 gearbox + ChiNiAdapt 频率异步 FIFO | 6.23 |
 | ChiNodeIds | NodeID 段序装配（RN→SN→HN→MN + 覆盖） | 6.4 |
 
 ## 5. 功能行为规范
@@ -472,11 +478,11 @@ rxReq/rxRsp/rxSnp/rxDat=Flipped(Decoupled)；txReq/txRsp/txSnp/txDat=Decoupled�
 - 本地 RN 其余通道：port.txDat/txSnp→rn.dat/snp；rn.txRsp/txDat→port.rxRsp/rxDat；port.rxSnp tie-off，port.txReq.ready=1。
 - 本地 SN 端口：port.txReq→sn.req，sn.rsp/dat→port.rxRsp/rxDat，**port.txDat→sn.rxDat（写数据投递，A1）**；port.rxReq/rxSnp tie-off，port.txRsp/txSnp.ready=1。
 - 本地 MN 端口（HW-01）：例化 ChiDvmMn（targets=本地 RN-D NodeID），eject REQ/DAT、inject RSP/SNP、eject SnpResp，DVM 广播/收集闭环。HN-I/未知 kind 安全 tie-off。
-- link：a.txReq→b.rxReq 且 b.txReq→a.rxReq（RSP/DAT/SNP 同理），双向交叉。
+- link：asyncFifoDepth=0 时 a.txReq→b.rxReq 且 b.txReq→a.rxReq（RSP/DAT/SNP 同理）双向直连；asyncFifoDepth≥2 时每方向每通道类插 ChiAsyncLink，源域=TX router 域、dstClk=RX router 域（HW-14）。router 按 routerDomain 经 withClockAndReset 例化；domClk/domReset 暴露非 0 域时钟。
 
-**用法**：`loom emit-chi` ≥2 router 分支发射；chain_4r.json 验证多跳 REQ 正向/DAT 反向；ChiNetworkSpec 验证未命中 NDERR 与命中译码到 SAM 目标。
+**用法**：`loom emit-chi` ≥2 router 分支发射；chain_4r.json 验证多跳 REQ 正向/DAT 反向；ChiNetworkSpec 验证未命中 NDERR、命中译码、per-source 过滤、flat 双时钟 chain 跨域。
 
-**限制**：link 为直连导线，未插 ChiTxLink（无 L-Credit/FSM/pipe）；SN 端口无 RX DAT（写数据到 SN 的投递待硬件补全，见 14.1）。
+**限制**：sync link 为直连导线，未插 ChiTxLink（无 L-Credit/FSM/pipe）；flat async 首版本地节点仅挂 domain 0（非 0 域节点边界 CDC 待后续）。
 
 ### 6.10 ChiGates —— 静态门禁
 
@@ -796,6 +802,37 @@ families=TLBI/BPI/VIC/SYNC；tlbiSubtypes=VMALL/VMALLS1/ASID/VA/VAA/IPAS2/IPA；
 
 **限制**：节点 protocol 的 IR 表达与装配分派归 GEN（per-node protocol 传入）；estimate 桥接开销归 GEN。
 
+### 6.22 ChiQosRegulator —— NIU 带宽调节（HW-10）
+
+**功能**：RN REQ 注入侧 per-node 令牌桶速率调节，长期速率收敛于声明 bytesPerCycle，反压不丢 flit。
+
+**参数**：c、bytesPerCycle（Double，GEN 已换算 bandwidth÷freqMHz）、saturationBytes（突发 allowance，fixed=0）。
+
+| 端口 | 方向 | 含义 |
+|---|---|---|
+| in | Flipped(Decoupled(ChiReqFlit)) | 注入请求 |
+| out | Decoupled(ChiReqFlit) | 调节后请求 |
+
+**行为**：定点 scale=2^10，rate=round(bytesPerCycle×scale)（≥1）；桶容量 capacityBytes=max(perFlit, saturationBytes)，perFlit=datWidth/8。每拍 token 累加 rate 并 cap；canSend=本拍累加值≥perFlit×scale（消除寄存延迟）；out.fire 消耗 perFlit 令牌。fixed（sat=0）容量=perFlit 严格速率；limiter/regulator 容量=saturationBytes 允许突发。out.valid=in.valid&&canSend，in.ready=out.ready&&canSend。
+
+**用法**：ChiNetworkTop RN 入口按 p.qosGen 匹配 nodeId 串入（SAM/NI 之后、inject 之前）；未声明节点直通。ChiQosRegulatorSpec 对拍速率收敛/缩放/突发。
+
+**限制**：单令牌桶 REQ 侧调节；DAT 侧带宽随 REQ 事务率间接约束；多节点共享带宽仲裁待后续。
+
+### 6.23 ChiNiAdapt —— NIU 速率适配（HW-12）
+
+**功能**：节点宽度/频率失配的 store&fwd 适配。ChiNiWidth 做宽度 gearbox，ChiNiAdapt 叠加频率异步 FIFO。
+
+**ChiNiBeat(w)**：data(UInt(w)) + last(Bool)。
+
+**ChiNiWidth(inW, outW)**：inW==outW 直通；inW>outW 降宽（一宽 beat 拆 inW/outW 窄 beat，低位先，last 随末拍）；inW<outW 升宽（outW/inW 窄 beat 拼一宽 beat，低位先，完成拍清 buf）。任意整数比（2 幂），逐位一致无丢 beat。
+
+**ChiNiAdapt(inW, outW, fifoDepth, async)**：ChiNiWidth 后接可选 ChiAsyncLink(ChiNiBeat(outW), fifoDepth)（async=true 跨频，dstClk/dstReset）；async=false 仅宽度适配。fifoDepth 2 幂≥2。
+
+**用法**：GEN 按 ChiNetworkParams.adapt（镜像 GEN AdaptParams）在失配节点 DAT 边界例化；匹配节点零开销直通。AXI 边界宽度适配归桥接层（不重复）。ChiNiAdaptSpec 验证 256↔128、512↔128、匹配直通逐位一致。
+
+**限制**：beat 流适配（data+last），GEN 负责节点 DAT flit↔beat 映射与 dataId 对齐；网络顶层自动插入待 GEN 装配（per-node 宽度端口）。
+
 ## 7. 数据表示规范
 
 ### 7.1 位宽与 flit 数
@@ -938,7 +975,7 @@ chain_4r.json（4 router 链，RN@r0/SN@r3）验证多跳 REQ 正向/DAT 反向�
 - ChiReadSource/ChiWriteSink/ChiAtomicEngine/ChiDvmMn/ChiOrderCtrl/ChiAxiBridge 为**单 outstanding/单事务**引擎；多 outstanding 流水化待后续。
 - 读写引擎固定 64B 事务（Size 恒 encode(64)）；变长 Size 待完善。
 - ChiAxiBridge 忽略 `ar.len`/`aw.len`（按 64B 处理）、忽略 `w.strb`（BE 恒全 1）、`r.resp`/`b.resp` 恒 OK（不透传 RespErr）；多 burst/非对齐/错误透传待完善。
-- ChiNetworkTop 同步 link 为直连导线（VC sideband 贯穿）；**每 link ChiTxLink（L-Credit/FSM）与 async link 的 ChiAsyncLink 插入待 GEN 提供 IR cdc/pipe/clock 映射**（模块已验证）。IR link `pipe` 字段当前被忽略。
+- ChiNetworkTop sync link 为直连导线（VC sideband 贯穿）；**flat link 级 async 已落地**（ChiNetLink.asyncFifoDepth + routerDomain，跨域 link 自动插 ChiAsyncLink，HW-14 方案①；首版节点挂 domain 0）。每 link ChiTxLink（L-Credit/FSM）与 IR pipe 字段仍待 GEN 映射。NIU 带宽调节（ChiQosRegulator，HW-10）已落地；NIU 宽度/频率适配（ChiNiAdapt，HW-12）模块已验证，GEN 在失配节点 DAT 边界例化。
 - ChiNiError（未命中 NDERR）**已集成进 ChiNetworkTop RN 入口**（SAM 表非空时 addr 驱动译码 + 就地 NDERR，HW-13）；表为空退回 TgtID 直通。**per-source SAM 过滤已落地**（`samByRn` 每 RN 一份表，禁止对未映射→NDERR，A4）；per-source 表的 IR routes/forbid 表达与装配归 GEN。
 - ChiPartitionTop/Stub/Wrapper 已验证，**分区内 MN/DVM 接线已对标网络（HW-08）**；**LoomMain partitions 发射 + ports 报告待 GEN IR partitions 接入**。
 - ChiAxiNetworkTop（HW-09/A2/A3）已落地 per-node 混合协议边界：RN 读/写桥、**SN CHI→AXI 反向桥（ChiAxiSnBridge）**、按 node.protocol 拆分 rnAxi/rnChi/snAxi/snChi；**ChiSnPort 已补 RX DAT，写数据经 fabric 投递到 SN 并重组校验（A1）**，写桥 dat.tgtId 从 DBIDResp.srcId 捕获。节点 protocol 的 IR 表达/装配分派 + estimate 桥接开销归 GEN。

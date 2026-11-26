@@ -504,4 +504,97 @@ class IrSpec extends AnyFlatSpec with Matchers {
       if (n.id == "m0") n.copy(adaptFifoDepth = Some(4)) else n))
     IrV2.hash(withDepth) should not be IrV2.hash(v)
   }
+
+  // ---- UP-07 subsystems[]/nocLinks[] (IR-80–IR-93, §3.15 rendering rule) ----
+
+  behavior of "IrV2 subsystems/nocLinks (UP-07)"
+
+  private val twoSubText =
+    """{ "schema": "loom/v2", "meta": { "name": "hier" },
+      |  "clockDomains": [ { "id": "core", "freqMHz": 1000 } ],
+      |  "chi": { "datWidth": 256, "dvmEnable": false, "portMode": "chi", "addrWidth": 32 },
+      |  "subsystems": [
+      |    { "name": "A",
+      |      "nodes": [
+      |        { "id": "m0", "kind": "rn-i", "clock": "core", "attach": "rA0" },
+      |        { "id": "s0", "kind": "sn-f", "clock": "core", "attach": "rA1" } ],
+      |      "fabric": {
+      |        "routers": [ { "name": "rA0", "clock": "core" }, { "name": "rA1", "clock": "core" } ],
+      |        "links": [ { "from": "m0", "to": "rA0" }, { "from": "rA0", "to": "rA1" },
+      |                   { "from": "rA1", "to": "s0" } ] } },
+      |    { "name": "B",
+      |      "clockDomains": [ { "id": "io", "freqMHz": 500 } ],
+      |      "chi": { "datWidth": 512 },
+      |      "nodes": [
+      |        { "id": "m1", "kind": "rn-i", "clock": "io", "attach": "rB0" },
+      |        { "id": "s1", "kind": "sn-f", "clock": "io", "attach": "rB1" } ],
+      |      "sam": [ { "base": 65536, "size": 4096, "tgtNode": "s1" } ],
+      |      "fabric": {
+      |        "routers": [ { "name": "rB0", "clock": "io" }, { "name": "rB1", "clock": "io" } ],
+      |        "links": [ { "from": "m1", "to": "rB0" }, { "from": "rB0", "to": "rB1" },
+      |                   { "from": "rB1", "to": "s1" } ] } } ],
+      |  "nocLinks": [
+      |    { "from": "A", "to": "B", "fromRouter": "rA0", "toRouter": "rB1",
+      |      "windows": [ { "base": 65536, "size": 4096 } ] } ] }""".stripMargin
+
+  it should "parse two subsystems with top-level defaults fallback and derived SAM (IR-80–93)" in {
+    val v = IrV2.fromJson(Json.parse(twoSubText))
+    v.unknown shouldBe Nil
+    v.nodes shouldBe Nil
+    v.routers shouldBe Nil
+    v.links shouldBe Nil
+    v.subsystems.map(_.name) shouldBe Seq("A", "B")
+    val a = v.subsystems.head
+    // omitted clockDomains/qos/chi fall back to the top-level blocks
+    a.clockDomains shouldBe v.clockDomains
+    a.qos shouldBe v.qos
+    a.chi shouldBe v.chi
+    // omitted sam derives per subsystem SN order (SEM-06)
+    a.sam shouldBe Seq(SamWindowV2(0L, 4096L, "s0"))
+    a.nodes.head.protocol shouldBe "chi"
+    a.links.head.width shouldBe 256
+    val b = v.subsystems(1)
+    b.clockDomains shouldBe Seq(ClockDomain("io", 500))
+    b.chi.datWidth shouldBe 512
+    b.chi.dvmEnable shouldBe false // partial chi block: per-field top fallback
+    b.links.head.width shouldBe 512 // link width defaults to the subsystem chi
+    b.sam shouldBe Seq(SamWindowV2(65536L, 4096L, "s1"))
+    v.nocLinks shouldBe Seq(NocLinkSpec("A", "B", "rA0", "rB1",
+      Seq((65536L, 4096L)), "sync", 0, false))
+    // unknown keys inside subsystem entries are collected as usual
+    val withBogus = twoSubText.replaceFirst("\"name\": \"A\"", "\"name\": \"A\", \"bogus\": 1")
+    IrV2.fromJson(Json.parse(withBogus)).unknown should contain("$.subsystems[0].bogus")
+    val withWinBogus = twoSubText.replaceFirst(
+      "\"windows\": \\[ \\{ \"base\": 65536, \"size\": 4096 \\} \\]",
+      "\"windows\": [ { \"base\": 65536, \"size\": 4096, \"bogus\": 2 } ]")
+    IrV2.fromJson(Json.parse(withWinBogus)).unknown should contain("$.nocLinks[0].windows[0].bogus")
+  }
+
+  it should "round-trip subsystems/nocLinks through the normalized rendering (GEN-06)" in {
+    val v = IrV2.fromJson(Json.parse(twoSubText))
+    val rendered = IrV2.toJson(v)
+    IrV2.fromJson(rendered) shouldBe v
+    IrV2.hash(v) shouldBe Canonical.hash(rendered)
+    IrV2.hash(IrV2.fromJson(rendered)) shouldBe IrV2.hash(v)
+    // nocLink defaults render fully explicit (GEN-03)
+    val nl = rendered.asInstanceOf[JObj].get("nocLinks").get.asInstanceOf[JArr].items.head
+      .asInstanceOf[JObj]
+    nl.get("cdc") shouldBe Some(JStr("sync"))
+    nl.get("asyncFifoDepth") shouldBe Some(JNum(BigDecimal(0)))
+    nl.get("dvmForward") shouldBe Some(JBool(false))
+  }
+
+  it should "omit empty subsystems/nocLinks keys so the ring_4 hash baseline is unchanged (§3.15)" in {
+    val v = v2Example
+    val withEmpty = Json.parse(Files.readString(v2ExamplePath)
+      .replaceFirst("\"meta\"", "\"subsystems\": [], \"nocLinks\": [], \"meta\""))
+    val ve = IrV2.fromJson(withEmpty)
+    ve.subsystems shouldBe Nil
+    ve.nocLinks shouldBe Nil
+    IrV2.hash(ve) shouldBe IrV2.hash(v)
+    val rendered = IrV2.toJson(ve)
+    rendered.asInstanceOf[JObj].get("subsystems") shouldBe None
+    rendered.asInstanceOf[JObj].get("nocLinks") shouldBe None
+    IrV2.toJson(ve) shouldBe IrV2.toJson(v)
+  }
 }

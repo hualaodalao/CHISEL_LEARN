@@ -152,6 +152,40 @@ class ChiNetworkSpec extends AnyFlatSpec with Matchers with ChiselSim {
     }
   }
 
+  "ChiNetworkTop flat async" should "cross a dual-clock chain RN->SN via async links (HW-14)" in {
+    val base = ChiNetworkParams.fromIr(ir)
+    val dom = Seq(0, 1, 1, 0) // r1/r2 transit domain 1; RN(r0)/SN(r3) domain 0
+    val links = base.links.map { l =>
+      if (dom(l.fromRouter) != dom(l.toRouter)) l.copy(asyncFifoDepth = 4) else l
+    }
+    val p = base.copy(routerDomain = dom, links = links)
+    simulate(new ChiNetworkTop(p)) { dut =>
+      dut.io.domReset(0).poke(true.B); dut.reset.poke(true.B)
+      for (i <- 0 until 4) { dut.io.domClk(0).poke((i % 2 == 0).B); dut.clock.step() }
+      dut.reset.poke(false.B); dut.io.domReset(0).poke(false.B)
+      for (i <- 0 until p.nRn) {
+        dut.io.rn(i).req.valid.poke(false.B)
+        dut.io.rn(i).rsp.ready.poke(true.B); dut.io.rn(i).dat.ready.poke(true.B)
+        dut.io.rn(i).snp.ready.poke(true.B)
+        dut.io.rn(i).txRsp.valid.poke(false.B); dut.io.rn(i).txDat.valid.poke(false.B)
+      }
+      for (j <- 0 until p.nSn) {
+        dut.io.sn(j).req.ready.poke(true.B)
+        dut.io.sn(j).rsp.valid.poke(false.B); dut.io.sn(j).dat.valid.poke(false.B)
+        dut.io.sn(j).rxDat.ready.poke(true.B)
+      }
+      dut.io.rn(0).req.bits.addr.poke(0.U)
+      dut.io.rn(0).req.bits.txnId.poke(30.U)
+      dut.io.rn(0).req.valid.poke(true.B)
+      var dst = false; var n = 0
+      while (!dut.io.sn(0).req.valid.peek().litToBoolean && n < 400) {
+        dut.io.domClk(0).poke(dst.B); dut.clock.step(); dst = !dst; n += 1
+      }
+      dut.io.sn(0).req.valid.expect(true.B)
+      dut.io.sn(0).req.bits.txnId.expect(30.U)
+    }
+  }
+
   "ChiNetworkTop with per-RN SAM" should "filter per source and NDERR forbid pairs (A4)" in {
     val base = ChiNetworkParams.fromIr(ir)
     // RN0: 0x1000 -> sn1(3); RN1: 0x1000 -> sn0(2), 0x2000 unmapped (forbid).

@@ -294,9 +294,11 @@ object ChecksV2 {
     if (v2.timing.maxCombDepth < 1 || v2.timing.maxCombDepth > 256)
       errs += "C0: [CHK-22] fabric.timing.maxCombDepth must be in [1,256]"
 
-    // CHK-23
-    if (!v2.nodes.exists(n => RequestKinds.contains(n.kind)) ||
-      !v2.nodes.exists(n => SubordinateKinds.contains(n.kind)))
+    // CHK-23 (UP-07: with subsystems declared the RN/SN requirement applies
+    // per subsystem via CHK-55 + the projected run, not to the empty top level)
+    if (v2.subsystems.isEmpty &&
+      (!v2.nodes.exists(n => RequestKinds.contains(n.kind)) ||
+        !v2.nodes.exists(n => SubordinateKinds.contains(n.kind))))
       errs += "C0: [CHK-23] at least one request node and one subordinate node are required"
 
     // CHK-49 (UP-01, §3.12): route endpoint references/kinds, unique
@@ -347,6 +349,36 @@ object ChecksV2 {
           errs += s"C0: [CHK-53] node '${n.id}' adaptFifoDepth $d must be in [2,64]"
       }
     }
+
+    // CHK-55 (UP-07, §3.15): subsystems/nocLinks declaration consistency.
+    if (v2.subsystems.nonEmpty) {
+      if (v2.nodes.nonEmpty || v2.routers.nonEmpty || v2.links.nonEmpty || v2.sam.nonEmpty)
+        errs += "C0: [CHK-55] subsystems/nocLinks top-level nodes/fabric.routers/fabric.links/sam must be omitted when subsystems are declared"
+      duplicates(v2.subsystems.map(_.name)).foreach(n =>
+        errs += s"C0: [CHK-55] subsystems/nocLinks duplicate subsystem name '$n'")
+      v2.subsystems.foreach { s =>
+        if (!NamePattern.matches(s.name))
+          errs += s"C0: [CHK-55] subsystems/nocLinks subsystem name '${s.name}' must match [A-Za-z0-9_.-]+"
+        if (!s.nodes.exists(n => RequestKinds.contains(n.kind)) ||
+          !s.nodes.exists(n => SubordinateKinds.contains(n.kind)))
+          errs += s"C0: [CHK-55] subsystems/nocLinks subsystem '${s.name}' requires at least one request node and one subordinate node"
+      }
+    }
+    if (v2.nocLinks.nonEmpty && v2.subsystems.isEmpty)
+      errs += "C0: [CHK-55] subsystems/nocLinks nocLinks require subsystems to be declared"
+    val subNames = v2.subsystems.map(_.name).toSet
+    v2.nocLinks.foreach { l =>
+      if (!subNames.contains(l.from))
+        errs += s"C0: [CHK-55] subsystems/nocLinks nocLink from '${l.from}' is not a declared subsystem"
+      if (!subNames.contains(l.to))
+        errs += s"C0: [CHK-55] subsystems/nocLinks nocLink to '${l.to}' is not a declared subsystem"
+      if (l.from == l.to)
+        errs += s"C0: [CHK-55] subsystems/nocLinks nocLink from and to must differ ('${l.from}')"
+    }
+
+    // CHK-58 (UP-07 phase-1 limit): no partitions/routes alongside subsystems.
+    if (v2.subsystems.nonEmpty && (v2.partitions.nonEmpty || v2.routes.nonEmpty))
+      errs += "C0: [CHK-58] partitions/routes are not supported with subsystems yet"
 
     // Remaining unknown keys keep the S1 generic C0 error (spec §3: unknown
     // fields must be rejected; retired direction/switch already mapped above).
@@ -503,9 +535,97 @@ object ChecksV2 {
     // topology-reachable forbidden pair is legal. The number is reserved
     // and never reused; reachability is no longer checked here.
 
+    // CHK-54 (SEM-14, HW-14 first version): in FLAT configs local nodes may
+    // only attach to domain-0 routers — domain 0 = clockDomains.head (the
+    // top module clock), domain index = clockDomains declaration order.
+    // Non-0-domain node boundary CDC is pending in ChiNetworkTop. Partitioned
+    // configs take the ChiWrapperTop path (CHK-44–48) and are exempt.
+    if (v2.partitions.isEmpty) {
+      val d0 = v2.clockDomains.headOption.map(_.id).getOrElse("")
+      val domainOfClock = v2.clockDomains.map(_.id).zipWithIndex.toMap
+      val routerClock = v2.routers.map(r => r.name -> r.clock).toMap
+      v2.nodes.foreach { n =>
+        val dom = routerClock.get(n.attach).flatMap(domainOfClock.get).getOrElse(0)
+        if (dom != 0)
+          errs += s"C1: [CHK-54] node '${n.id}' attaches to router '${n.attach}' outside clock domain '$d0'; node boundary CDC pending"
+      }
+    }
+
+    // CHK-56/CHK-57 (UP-07, §3.15/SEM-20): hierarchical global address map
+    // and nocLink bridge windows. Only meaningful with subsystems declared.
+    if (v2.subsystems.nonEmpty) {
+      val subByName = v2.subsystems.map(s => s.name -> s).toMap
+
+      // Merged disjoint union of one subsystem's SAM windows (per-subsystem
+      // non-overlap is CHK-29 on the projection); used for ⊆ coverage.
+      def unionOf(sam: Seq[loom.ir.SamWindowV2]): Seq[(Long, Long)] = {
+        val sorted = sam.map(w => (w.base, w.base + w.size)).sortBy(_._1)
+        sorted.foldLeft(Vector.empty[(Long, Long)]) {
+          case (acc, (b, e)) if acc.nonEmpty && b <= acc.last._2 =>
+            acc.init :+ ((acc.last._1, math.max(acc.last._2, e)))
+          case (acc, be) => acc :+ be
+        }
+      }
+      def covered(union: Seq[(Long, Long)], base: Long, size: Long): Boolean =
+        size > 0 && union.exists { case (b, e) => b <= base && base + size <= e }
+
+      // CHK-57: bridge attach routers, window math and to-subsystem coverage.
+      v2.nocLinks.foreach { l =>
+        val p = s"C1: [CHK-57] nocLink '${l.from}->${l.to}'"
+        subByName.get(l.from).foreach { s =>
+          if (!s.routers.exists(_.name == l.fromRouter))
+            errs += s"$p fromRouter '${l.fromRouter}' is not declared in subsystem '${l.from}'"
+        }
+        subByName.get(l.to).foreach { s =>
+          if (!s.routers.exists(_.name == l.toRouter))
+            errs += s"$p toRouter '${l.toRouter}' is not declared in subsystem '${l.to}'"
+        }
+        if (l.windows.isEmpty) errs += s"$p windows must not be empty"
+        val toUnion = subByName.get(l.to).map(s => unionOf(s.sam)).getOrElse(Nil)
+        l.windows.foreach { case (base, size) =>
+          if (base < 0) errs += s"$p window base $base must be >= 0"
+          if (!pow2(size)) errs += s"$p window base $base size $size must be a power of two"
+          if (size < AddressMap.DefaultSize)
+            errs += s"$p window base $base size $size must be >= ${AddressMap.DefaultSize}"
+          if (size > 0 && base >= 0 && base % size != 0)
+            errs += s"$p window base $base must be aligned to size $size"
+          if (subByName.contains(l.to) && !covered(toUnion, base, size))
+            errs += s"$p window base $base size $size is not covered by subsystem '${l.to}' SAM"
+        }
+        // IR-92 mirrors IR-57/59: sync/async domain, async depth >= 2.
+        if (l.cdc != "sync" && l.cdc != "async")
+          errs += s"$p cdc '${l.cdc}' must be sync or async"
+        if (l.cdc == "async" && l.asyncFifoDepth < 2)
+          errs += s"$p asyncFifoDepth ${l.asyncFifoDepth} must be >= 2 for cdc async"
+      }
+
+      // CHK-56: (a) all subsystem local SAM windows are pairwise disjoint
+      // (global local map); (b) per source subsystem the effective map =
+      // local SAM ∪ outgoing nocLink forwarding windows must be pairwise
+      // disjoint. Covered windows alias remote regions (CHK-57), but two
+      // bridges claiming the same source region, or a forward shadowing a
+      // local window, is an ambiguous decode.
+      val samWins = v2.subsystems.flatMap { s =>
+        s.sam.map(w => (s"${s.name}.${w.tgtNode}", w.base, w.size))
+      }
+      def sweep(wins: Seq[(String, Long, Long)]): Unit =
+        wins.sortBy { case (_, base, size) => (base, size) }.sliding(2).foreach {
+          case Seq((la, ba, sa), (lb, bb, _)) if ba + sa > bb =>
+            errs += s"C1: [CHK-56] address windows '$la' and '$lb' overlap in the global map"
+          case _ =>
+        }
+      sweep(samWins)
+      v2.subsystems.foreach { s =>
+        val local = s.sam.map(w => (s"${s.name}.${w.tgtNode}", w.base, w.size))
+        val fwd = v2.nocLinks.filter(_.from == s.name).flatMap { l =>
+          l.windows.map { case (base, size) => (s"nocLink:${l.from}->${l.to}", base, size) }
+        }
+        sweep(local ++ fwd)
+      }
+    }
+
     errs.toList
   }
-
   /** C2: QoS mapping completeness (CHK-32–CHK-34). */
   def runC2(v2: IrV2): List[String] = {
     val errs = ListBuffer.empty[String]
@@ -712,6 +832,14 @@ object ChecksV2 {
     * C0 failure terminates immediately; the other gates collect all errors.
     * G1 (CHK-35–39) goes through ChiGates.runV2, the sole v2 entry (GEN-11).
     * G7 is retired but its key stays constant true for one version (GEN-17).
+    *
+    * UP-07 (GEN-25/SEM-20): with subsystems declared, each subsystem is
+    * projected to an independent flat IrV2 and validated by this same full
+    * aggregate (reuse, not reimplementation); its errors are prefixed with
+    * `subsystem '<name>': ` and every top-level gate key is ANDed with the
+    * per-subsystem results — in particular the G1 keys become the AND over
+    * the per-subsystem ChiGates.runV2 proofs (bridges terminate dependencies,
+    * so no cross-NoC CDG is built).
     */
   def run(v2: IrV2): Result = {
     val c0 = runC0(v2)
@@ -725,21 +853,36 @@ object ChecksV2 {
     val s1 = runS1(v2)
     val s2 = runS2(v2)
     val s3 = runS3(v2)
-    Result(
-      gates = Vector(
-        "C0" -> true,
-        "C1" -> c1.isEmpty
-      ) ++ g1.gates ++ Vector(
-        "C2" -> c2.isEmpty,
-        "G4" -> g4.isEmpty,
-        "G6" -> g6.isEmpty,
-        "G7" -> true,
-        "G8" -> g8.isEmpty,
-        "S1" -> s1.isEmpty,
-        "S2" -> s2.isEmpty,
-        "S3" -> s3.isEmpty
-      ),
-      errors = c1 ++ g1.errors ++ c2 ++ g4 ++ g6 ++ g8 ++ s1 ++ s2 ++ s3
+    val flatGates = Vector(
+      "C0" -> true,
+      "C1" -> c1.isEmpty
+    ) ++ g1.gates ++ Vector(
+      "C2" -> c2.isEmpty,
+      "G4" -> g4.isEmpty,
+      "G6" -> g6.isEmpty,
+      "G7" -> true,
+      "G8" -> g8.isEmpty,
+      "S1" -> s1.isEmpty,
+      "S2" -> s2.isEmpty,
+      "S3" -> s3.isEmpty
     )
+    val flatErrors = c1 ++ g1.errors ++ c2 ++ g4 ++ g6 ++ g8 ++ s1 ++ s2 ++ s3
+    if (v2.subsystems.isEmpty) return Result(flatGates, flatErrors)
+
+    val subRuns = v2.subsystems.map(s => s.name -> run(IrV2.projectSubsystem(v2, s)))
+    val subErrors = subRuns.toList.flatMap { case (name, r) =>
+      r.errors.map(e => s"subsystem '$name': $e")
+    }
+    val gates = flatGates.map { case (k, ok) =>
+      k -> (ok && subRuns.forall { case (_, r) => r.gates.toMap.getOrElse(k, false) })
+    }
+    Result(gates, flatErrors ++ subErrors)
   }
+
+  /** GEN-25 (UP-07): per-subsystem gate vectors for the additive
+    * `gatesBySubsystem` report key (checks.json/estimate/API). Each entry is
+    * the full ChecksV2.run gate set of the subsystem projection.
+    */
+  def gatesBySubsystem(v2: IrV2): Seq[(String, Vector[(String, Boolean)])] =
+    v2.subsystems.map(s => s.name -> run(IrV2.projectSubsystem(v2, s)).gates)
 }

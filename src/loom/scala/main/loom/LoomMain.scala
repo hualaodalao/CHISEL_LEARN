@@ -5,7 +5,7 @@ import java.security.MessageDigest
 
 import _root_.circt.stage.ChiselStage
 import loom.chi.{ChiAxiNetworkTop, ChiNetworkTop, ChiPartitionStub, ChiPartitionTop, ChiWrapperTop}
-import loom.gen.ChiAssemble
+import loom.gen.{ChiAdaptedNetworkTop, ChiAssemble}
 import loom.graph.FabricGraph
 import loom.ir.{Canonical, Ir, IrV2, JArr, JBool, JObj, JStr, JValue, Json, Upgrade}
 import loom.report.{Reports, Sram, TbGen}
@@ -192,8 +192,20 @@ object LoomMain {
     * under tops/, one ChiPartitionTop + ports.json per partition and a
     * ChiPartitionStub under partitions/<name>/stub (HW-06, MN/DVM parity per
     * HW-08). Async cuts (cdc=async boundary links) insert ChiAsyncLink per
-    * channel (HW-04); flat+async stays refused pending HW-14.
+    * channel (HW-04); flat async cuts are consumed by the multi-domain
+    * ChiNetworkTop (HW-14, domClk/domReset exposed as top inputs). When a
+    * chi-protocol node's DAT width mismatches the fabric flit width, the
+    * GEN-owned ChiAdaptedNetworkTop wraps the network with ChiNiAdapt
+    * gearboxes (HW-12 §9.3, GEN-24).
     */
+  /** GEN-25 emit guard, pure for testability (sys.exit is not trap-able on
+    * modern JDKs). Some(message) ⇒ refuse hierarchical emission (HW-11).
+    */
+  private[loom] def hierarchicalEmitGuard(v2: IrV2): Option[String] =
+    if (v2.subsystems.nonEmpty)
+      Some("ERROR: hierarchical emission requires HW-11 (ChiNocBridge); check/estimate available")
+    else None
+
   private[loom] def runEmit(xs: List[String]): Unit = {
     val cfg = must(xs, "--config")
     val out = must(xs, "--out")
@@ -202,6 +214,14 @@ object LoomMain {
     if (v.errors.nonEmpty) {
       writeJson(out, "checks.json", checksJsonV2(v))
       v.errors.foreach(e => println(s"ERROR: $e"))
+      sys.exit(3)
+    }
+
+    // GEN-25 (UP-07) emit guard: hierarchical multi-NoC emission needs the
+    // HW-11 ChiNocBridge hardware, which does not exist yet. Never silently
+    // emit a flat subset — check/estimate/API are the phase-1 deliverables.
+    hierarchicalEmitGuard(v.ir).foreach { msg =>
+      println(msg)
       sys.exit(3)
     }
 
@@ -220,25 +240,32 @@ object LoomMain {
           sys.exit(3)
       }
     val asyncCuts = ChiAssemble.asyncCuts(v.ir)
-    if (v.ir.partitions.isEmpty && asyncCuts.nonEmpty) {
-      ChiAssemble.routerLinks(v.ir).filter(_.cdc == "async").foreach { l =>
-        println(s"ERROR: async link '${l.from}->${l.to}' needs a partition boundary; " +
-          "the flat ChiNetworkTop is single-clock (declare partitions or use cdc \"sync\")")
-      }
-      sys.exit(3)
-    }
 
-    // The flat network top is single-clock; async cuts only exist on the
-    // partitioned wrapper, so flat emission is skipped in async configs.
+    // Async cuts on partition boundaries go to the wrapper; otherwise the
+    // flat ChiNetworkTop consumes them itself (HW-14: routerDomain clocks +
+    // ChiAsyncLink per crossing link, domClk/domReset exposed as inputs).
     // GEN-22 (HW-09/A3): any axi4 node selects the per-node mixed-protocol
     // ChiAxiNetworkTop (rnAxi/rnChi/snAxi/snChi split by node protocol);
-    // an all-chi fabric keeps the native ChiNetworkTop.
+    // an all-chi fabric keeps the native ChiNetworkTop. GEN-24 (HW-12 §9.3):
+    // width-mismatched chi DAT boundaries select the GEN-owned adaptation
+    // wrapper around either inner top.
     val emitFlat = v.ir.partitions.isEmpty || asyncCuts.isEmpty
     val anyAxi = v.ir.nodes.exists(_.protocol == "axi4")
-    val flatTopName = if (anyAxi) "ChiAxiNetworkTop" else "ChiNetworkTop"
+    if (emitFlat && anyAxi && net.nDomain > 1) {
+      println("ERROR: flat multi-clock fabric with axi4 nodes needs ChiAxiNetworkTop " +
+        "domClk/domReset exposure (pending); use partitions for async cuts or a single clock domain")
+      sys.exit(3)
+    }
+    val adapted = emitFlat && ChiAdaptedNetworkTop.needed(net)
+    val flatTopName =
+      if (adapted) "ChiAdaptedNetworkTop"
+      else if (anyAxi) "ChiAxiNetworkTop"
+      else "ChiNetworkTop"
     if (emitFlat)
       ChiselStage.emitSystemVerilogFile(
-        if (anyAxi) new ChiAxiNetworkTop(net) else new ChiNetworkTop(net),
+        if (adapted) new ChiAdaptedNetworkTop(net)
+        else if (anyAxi) new ChiAxiNetworkTop(net)
+        else new ChiNetworkTop(net),
         Array("--target-dir", out))
 
     writeJson(out, "checks.json", checksJsonV2(v.copy(errors = Nil)))

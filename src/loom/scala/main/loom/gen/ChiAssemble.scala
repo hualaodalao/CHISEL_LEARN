@@ -3,8 +3,8 @@ package loom.gen
 import scala.collection.mutable
 
 import loom.chi.{
-  ChiConfig, ChiNetLink, ChiNetNode, ChiNetRouter, ChiNetworkParams, ChiNode, ChiNodeKind,
-  ChiNodeIds, ChiParams, ChiPartitionParams, ChiSamEntry
+  ChiAdapt, ChiConfig, ChiNetLink, ChiNetNode, ChiNetRouter, ChiNetworkParams, ChiNode, ChiNodeKind,
+  ChiNodeIds, ChiParams, ChiPartitionParams, ChiQosGen, ChiSamEntry
 }
 import loom.graph.FabricGraph
 import loom.ir.{Ir, IrV2, LinkV2, PartitionSpec}
@@ -141,7 +141,11 @@ object ChiAssemble {
 
     val links = graphLinks.zipWithIndex.map { case (l, id) =>
       val from = routerIndex(l.from); val to = routerIndex(l.to)
-      ChiNetLink(id, from, to, linkPort(from, id), linkPort(to, id), l.pipe)
+      // SEM-14/HW-14: cdc=async fills the link-level async FIFO depth (the
+      // flat ChiNetworkTop inserts one ChiAsyncLink per channel/direction);
+      // sync links stay direct (depth 0).
+      ChiNetLink(id, from, to, linkPort(from, id), linkPort(to, id), l.pipe,
+        asyncFifoDepth = if (l.cdc == "async") l.asyncFifoDepth else 0)
     }
 
     // Router adjacency for BFS (bidirectional links, SEM-13).
@@ -244,9 +248,31 @@ object ChiAssemble {
         sam.filterNot(e => banned.contains(e.tgtId))
       }
 
+    // SEM-14/HW-14 clock-domain mapping (deterministic): router.clock maps to
+    // its DECLARATION INDEX in v2.clockDomains — domain 0 = clockDomains.head
+    // (the top module clock), domain k = clockDomains(k). routerDomain follows
+    // the GEN-05 router order (name-sorted). ChiNetworkTop clocks each router
+    // withClockAndReset and exposes io.domClk/domReset for domains 1..n-1;
+    // local nodes must attach to domain-0 routers (CHK-54, HW-14 first version).
+    val domainOfClock = v2.clockDomains.map(_.id).zipWithIndex.toMap
+    val clockOfRouter = v2.routers.map(r => r.name -> r.clock).toMap
+    val routerDomain = routerNames.map { n =>
+      val clk = clockOfRouter(n)
+      domainOfClock.getOrElse(clk,
+        throw Ir.IrException(s"router '$n' clock '$clk' is not declared"))
+    }
+
     ChiNetworkParams(v2.meta.name, cfg, rnFinal, snFinal, routers, links,
       snpEnable = v2.chi.dvmEnable, queueDepth = cfg.lcreditDepth, hn = hnFinal, mn = mnFinal,
-      sam = sam, samByRn = samByRn)
+      sam = sam, samByRn = samByRn,
+      routerDomain = routerDomain,
+      // HW-10/SEM-18: mirror the GEN declaration params into the chi-side
+      // case classes; ChiNetworkTop strings the token-bucket regulator into
+      // the RN injection path by nodeId.
+      qosGen = qosGenParams(v2).map(q => ChiQosGen(q.nodeId, q.kind, q.bytesPerCycle, q.saturationBytes)),
+      // HW-12/SEM-19: mirror the adaptation rows; GEN instantiates ChiNiAdapt
+      // at mismatched chi-node DAT boundaries (ChiAdaptedNetworkTop).
+      adapt = adaptParams(v2).map(a => ChiAdapt(a.nodeId, a.dataWidth, a.datWidth, a.fifoDepth, a.mismatch)))
   }
 
   /** GEN-21 (UP-01): one RN x SN reachability row derived from the FINAL
@@ -318,15 +344,16 @@ object ChiAssemble {
     }
   }
 
-  /** GEN-23 (UP-02, SEM-18): assembled qosGen declaration parameters for the
-    * future HW-10 injection logic. Declaration-only in this version — no RTL
-    * effect and no bandwidth guarantee.
+  /** GEN-23 (UP-02, SEM-18): assembled qosGen parameters, consumed by HW-10
+    * (ChiQosRegulator token bucket at the RN injection path, wave4). Scope:
+    * regulation at RN injection only — no end-to-end bandwidth guarantee.
     */
   final case class QosGenParams(nodeId: Int, kind: String, bytesPerCycle: Double, saturationBytes: Int)
 
-  /** GEN-24 (UP-08, SEM-19): frozen NIU store&fwd adaptation parameters for
-    * the future HW-12 logic. Declaration-only — AXI boundary width adaptation
-    * stays with the bridge layer (PS §5 F8).
+  /** GEN-24 (UP-08, SEM-19): frozen NIU store&fwd adaptation parameters,
+    * consumed by HW-12 (ChiNiWidth gearbox + ChiNiAdapt, wave4). GEN
+    * instantiates ChiNiAdapt at mismatched chi-node DAT boundaries; AXI
+    * boundary width adaptation stays with the bridge layer (PS §5 F8).
     */
   final case class AdaptParams(
       nodeId: Int,
@@ -370,6 +397,44 @@ object ChiAssemble {
         Some(AdaptParams(id, n.dataWidth, v2.chi.datWidth, n.clock, rc,
           n.adaptFifoDepth.getOrElse(4), mismatch))
       else None
+    }
+  }
+
+  /** GEN-25 (UP-07, SEM-20): each subsystem projects to an independent flat
+    * IrV2 (meta.name = subsystem name; clockDomains/qos/chi defaults already
+    * resolved by the parser; partitions/routes empty per phase-1 CHK-58) and
+    * goes through the existing networkParams path unchanged. Hierarchical
+    * emission is pending HW-11; check/estimate/API consume these params.
+    */
+  def subsystemParams(v2: IrV2): Seq[(String, ChiNetworkParams)] =
+    v2.subsystems.map(s => s.name -> networkParams(IrV2.projectSubsystem(v2, s)))
+
+  /** GEN-25 (UP-07): frozen inter-NoC bridge parameters for HW-11
+    * (ChiNocBridge): protocol proxy (TxnID/NodeID remap), window forwarding,
+    * cross-clock/width adaptation, store&fwd flow-control isolation and the
+    * DVM policy. fromDatWidth/toDatWidth are the two subsystems' chi.datWidth
+    * tiers (they may differ; the bridge adapts).
+    */
+  final case class BridgeParams(
+      fromSub: String,
+      toSub: String,
+      fromRouter: String,
+      toRouter: String,
+      windows: Seq[(Long, Long)],
+      asyncFifoDepth: Int,
+      dvmForward: Boolean,
+      fromDatWidth: Int,
+      toDatWidth: Int)
+
+  def bridgeParams(v2: IrV2): Seq[BridgeParams] = {
+    val subByName = v2.subsystems.map(s => s.name -> s).toMap
+    v2.nocLinks.map { l =>
+      val f = subByName.getOrElse(l.from,
+        throw Ir.IrException(s"nocLink from '${l.from}' is not a declared subsystem (CHK-55)"))
+      val t = subByName.getOrElse(l.to,
+        throw Ir.IrException(s"nocLink to '${l.to}' is not a declared subsystem (CHK-55)"))
+      BridgeParams(l.from, l.to, l.fromRouter, l.toRouter, l.windows,
+        l.asyncFifoDepth, l.dvmForward, f.chi.datWidth, t.chi.datWidth)
     }
   }
 }

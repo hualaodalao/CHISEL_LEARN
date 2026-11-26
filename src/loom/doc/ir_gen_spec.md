@@ -1,8 +1,8 @@
 # Loom IR / GEN 规格（loom/v2 用户口径 + CHI 生成管线）
 
-文档版本：`v1.0.0`
+文档版本：`v1.4.0`
 
-修订日期：`2026-11-25`
+修订日期：`2026-11-26`
 
 > 状态：S0 评审门禁稿。本文是 `doc/opt/2026-11-25_loom_ir_gen_chi_adaptation_plan.md` S1–S6 的**唯一契约来源**：
 > S1–S6 的字段、门禁、报告字段必须引用本文编号条目（IR-xx / SEM-xx / GEN-xx / CHK-xx / ENC-xx / MIG-xx），无编号即视为未覆盖。
@@ -29,6 +29,8 @@
 | v1.1.0 | 2026-11-26 | UP-01 显式路由/连接约束（GUI FlexNoC 布局计划 §6）：routes[] 可选块、显式路径覆盖 BFS+反向自动逆序、forbid 校验型约束（per-source 过滤待 HW-13）、connectivity additive API；空 routes 省略渲染保 hash 基线 | IR-70–IR-74、SEM-17、GEN-21、CHK-49–CHK-51 |
 | v1.2.0 | 2026-11-26 | 硬件 wave1–3 消费（依赖清单 §7.2）：forbid 升级执行型（samByRn per-source 过滤+NDERR，CHK-51 退役）；SEM-05 未命中 NDERR 已落地；GEN-22 portMode/protocol 分派 ChiAxiNetworkTop/ChiNetworkTop + estimate bridges；分区守护解除（HW-08 parity）；nHalf 拓扑派生（有 dateline=2，否则 1） | SEM-05/SEM-17、GEN-21/GEN-22、CHK-51（退役） |
 | v1.3.0 | 2026-11-26 | UP-02/UP-08 GEN 先行（依赖清单 §7.3）：node.qosGen{kind,bandwidth,saturation} 声明+CHK-52+QosGenParams 装配（注入逻辑待 HW-10）；node.adaptFifoDepth+CHK-53+AdaptParams 装配（store&fwd 待 HW-12）；estimate/API additive qosGen/adapt 键；省略渲染保 hash 基线 | IR-75–IR-79、SEM-18/SEM-19、GEN-23/GEN-24、CHK-52/CHK-53 |
+| v1.4.0 | 2026-11-26 | 硬件 wave4 消费（依赖清单 §9）：SEM-14 平铺 async 落地（HW-14：routerDomain=clockDomains 声明序、cdc=async ⇒ ChiNetLink.asyncFifoDepth、domClk/domReset 顶层输入、flat+async 拒绝解除）；新增 CHK-54（平铺本地节点限域 0，节点边界 CDC 待硬件）；SEM-18/HW-10 qosGen 消费（ChiQosRegulator RN 注入令牌桶）；SEM-19/HW-12 宽度失配消费（GEN 侧 ChiAdaptedNetworkTop 包装 ChiNiAdapt，128/256/512 档；频率失配节点 CDC 待硬件）；estimate/ports assumptions 更新 | SEM-14/SEM-18/SEM-19、GEN-22/GEN-23/GEN-24、CHK-54 |
+| v1.5.0 | 2026-11-26 | UP-07 立项 GEN 先行：subsystems[]/nocLinks[] 层次 multi-NoC schema（独立 NodeID/SAM/chi/时钟域，桥为终结依赖端点），全局地址不重叠/窗口覆盖校验，subsystemParams/BridgeParams 装配，gatesBySubsystem/estimate/API additive；分层发射守护待 HW-11；phase 1 禁 partitions/routes 与 subsystems 并存 | IR-80–IR-93、SEM-20、GEN-25、CHK-55–CHK-58 |
 
 ## 1. 文档说明
 
@@ -289,6 +291,29 @@ per-node 可选 QoS 带宽调节声明（FlexNoC generator 范式）。**首版�
 |---|---|---|---|---|---|---|---|
 | IR-79 | `nodes[].adaptFifoDepth` | int | [2,64] | 4 | 否 | NIU 宽度/频率失配 store&fwd FIFO 深度参数；失配判定= node.dataWidth≠chi.datWidth 或 node.clock≠attach router.clock。**适配逻辑待 HW-12**，首版仅参数冻结+报告 | （新增） |
 
+### 3.15 subsystems[] / nocLinks[]（UP-07，v1.5.0 增补，GEN 先行/HW-11 待硬件桥）
+
+层次 multi-NoC：每个 subsystem 是一张独立 NoC（独立 NodeID 空间/SAM/chi 配置/时钟域），NoC 间经 nocLink 声明的桥互连。**首版 GEN 交付 schema/校验/装配参数/报告；分层发射待 HW-11 ChiNocBridge**（subsystems 非空时 emit 报明确错误）。
+
+| ID | 字段 | 类型 | 取值域 | 默认 | 必填 | 语义 |
+|---|---|---|---|---|---|---|
+| IR-80 | `subsystems` | array | §IR-81–87；非空时顶层 nodes/fabric.routers/fabric.links/sam 必须省略（CHK-55） | `[]` | 否 | 子系统 NoC 表 |
+| IR-81 | `subsystems[].name` | string | 名字规则；全表唯一 | — | 是 | 子系统标识 |
+| IR-82 | `subsystems[].clockDomains` | array | §3.3 | 顶层 clockDomains | 否 | 子系统时钟域 |
+| IR-83 | `subsystems[].nodes` | array | §3.4（≥1 RN + ≥1 SN） | — | 是 | 子系统节点 |
+| IR-84 | `subsystems[].sam` | array | §3.5 | 按 SN 序派生 | 否 | 子系统本地 SAM |
+| IR-85 | `subsystems[].qos` | object | §3.6 | 顶层 qos | 否 | 子系统 QoS |
+| IR-86 | `subsystems[].chi` | object | §3.7 | 顶层 chi | 否 | 子系统 CHI 配置（datWidth 可与顶层不同，桥适配） |
+| IR-87 | `subsystems[].fabric` | object | §3.8–3.10 | — | 是 | 子系统拓扑 |
+| IR-88 | `nocLinks` | array | §IR-89–93；仅 subsystems 非空时合法（CHK-55） | `[]` | 否 | NoC 间桥声明 |
+| IR-89 | `nocLinks[].from/to` | string | 已声明 subsystem name；from≠to | — | 是 | 桥两端子系统（方向=地址转发方向） |
+| IR-90 | `nocLinks[].fromRouter/toRouter` | string | 对应子系统内已声明 router name | — | 是 | 桥挂接路由器（桥在该 NoC 内是终结依赖的端点，非 router） |
+| IR-91 | `nocLinks[].windows` | array | {base,size}，size 2 幂 ≥4096，base 对齐；⊆ to 子系统 SAM 并集（CHK-57）；全局两两不重叠（CHK-56） | — | 是 | from 侧转发到 to 的地址窗口 |
+| IR-92 | `nocLinks[].cdc/asyncFifoDepth` | string/int | 同 IR-57/59 | sync/0 | 否 | 桥跨时钟（两端子系统时钟域可不同） |
+| IR-93 | `nocLinks[].dvmForward` | bool | true/false | false | 否 | DVMOp 是否跨桥转发（默认各 NoC 自治） |
+
+Phase 1 限制（CHK-58）：subsystems 非空时 partitions/routes 必须省略（层次分区/显式路由后续版本）；节点级 qosGen/adaptFifoDepth 随子系统投影生效。渲染：subsystems/nocLinks 为空省略键（hash 基线不变）。
+
 ## 4. 语义规范（SEM）
 
 ### 4.1 节点与 NodeID
@@ -343,7 +368,7 @@ per-node 可选 QoS 带宽调节声明（FlexNoC generator 范式）。**首版�
 
 **SEM-13 恒双向**（HW-07 裁定）。CHI link 恒实例化两个方向，CDG 必须为每个 link 的两个方向分别建顶点（TARGET；CURRENT FabricGraph 只建 from→to 单顶点，见 OQ-03）。`direction` 字段退役（MIG-06），v1 forward 配置升级后按双向处理并告警。node↔router 接入边必须覆盖该 node 的注入/接收方向。
 
-**SEM-14 cdc**。sync 边两端必须同时钟域；async 边两端必须异域且 `asyncFifoDepth≥2`。分区边界即 async 切割点（S1/S3 门禁）。
+**SEM-14 cdc**。sync 边两端必须同时钟域；async 边两端必须异域且 `asyncFifoDepth≥2`。分区边界即 async 切割点（S1/S3 门禁）。**平铺 async 已消费（HW-14，v1.4.0）**：GEN 装配 `routerDomain`（router.clock → `clockDomains` **声明序索引**；域 0 = `clockDomains.head` = 顶层模块时钟，routerDomain 按 GEN-05 名称序 router 排列）；`cdc=async` ⇒ `ChiNetLink.asyncFifoDepth`（sync ⇒ 0），硬件按域时钟 router 并在跨域链路逐通道插 `ChiAsyncLink`。非 0 域时钟/复位经顶层 `domClk/domReset` 输入向量（长度 nDomain-1）由集成方供给，**GEN 不生成时钟包装**。首版本地节点只能挂域 0 router（CHK-54），节点边界 CDC 待硬件。
 
 **SEM-15 事务粒度**。CHI 单笔 ≤64B（协议常量，PS §2）；AXI 长 burst 在桥接层拆分为多笔（PS §5 F8）。用户口径不再配置 burst/beat；DAT flit 数 = `ceil(64 / (chi.datWidth/8))`（ENC-01，CHK-41 一致性门禁）。
 
@@ -351,9 +376,11 @@ per-node 可选 QoS 带宽调节声明（FlexNoC generator 范式）。**首版�
 
 **SEM-17 显式路由与禁止对（UP-01，v1.2.0 升级）**。显式 `path` 覆盖 BFS 派生：沿 path 的每个 router 对 to 的 NodeID 路由表项指向 path 下一 hop；**反向（SN→RN）自动取 path 逆序**（路由表类无关，两方向一致约束）。共享 TgtID 表的物理事实：同一 router 对同一目标 NodeID 只有一个表项 ⇒ 多条显式路径在共享 router 处必须下一 hop 一致，否则 CHK-50 冲突——**正向（同目标 SN）与反向（同源 RN，逆序 path 对 route[from] 的约束）均适用**。`forbid=true` 自 v1.2.0 起为**执行型约束（A4/HW-13 已落地）**：GEN 装配 per-source SAM（`samByRn`，每 RN 一份表，剔除禁止对目标 SN 的窗口），被禁请求在源 NI 未命中→NDERR，不进 fabric；**拓扑可达的禁止对合法**（CHK-51 退役，编号保留）。connectivity 矩阵中禁止对记 unreachable（NDERR 语义）。
 
-**SEM-18 QoS 带宽调节（UP-02）**。qosGen 声明节点注入带宽约束：换算 `bytesPerCycle = bandwidth(MB/s) / freqMHz(节点时钟)`（1 MB/s ÷ 1 MHz = 1 B/cycle），GEN 装配为 `QosGenParams(nodeId, kind, bytesPerCycle, saturationBytes)` 供 HW-10 注入逻辑消费。**首版无 RTL 效果**（硬件未落地），estimate/API 如实标注"声明口径，调节待 HW-10"，不做虚假带宽承诺。fixed 不允许 saturation。
+**SEM-18 QoS 带宽调节（UP-02）**。qosGen 声明节点注入带宽约束：换算 `bytesPerCycle = bandwidth(MB/s) / freqMHz(节点时钟)`（1 MB/s ÷ 1 MHz = 1 B/cycle），GEN 装配为 `QosGenParams(nodeId, kind, bytesPerCycle, saturationBytes)` 并映射 `chi.ChiQosGen` 注入 `ChiNetworkParams.qosGen`。**已消费（HW-10，v1.4.0）**：硬件在 RN 入口（SAM/NI 之后、注入之前）按 nodeId 串接 `ChiQosRegulator` 令牌桶；**调节范围仅 RN 注入**，fabric 仲裁不变。estimate/API 如实标注该口径，不做虚假带宽承诺。fixed 不允许 saturation。
 
-**SEM-19 NIU 速率适配（UP-08）**。宽度失配（node.dataWidth≠chi.datWidth）或频率失配（node.clock≠attach router.clock）时 NIU 需 store&fwd 适配（HW-12）；`adaptFifoDepth` 冻结 FIFO 深度参数，GEN 装配 `AdaptParams(nodeId, dataWidth, datWidth, clock, routerClock, fifoDepth, mismatch)` 并报告失配节点清单（含显式深度冻结节点）。**首版无 RTL 效果**，AXI 边界宽度适配仍由桥接层承担（PS §5 F8）。
+**SEM-19 NIU 速率适配（UP-08）**。宽度失配（node.dataWidth≠chi.datWidth）或频率失配（node.clock≠attach router.clock）时 NIU 需 store&fwd 适配（HW-12）；`adaptFifoDepth` 冻结 FIFO 深度参数，GEN 装配 `AdaptParams(nodeId, dataWidth, datWidth, clock, routerClock, fifoDepth, mismatch)` 并报告失配节点清单（含显式深度冻结节点）。**宽度失配已消费（HW-12，v1.4.0，依赖清单 §9.3 GEN 实例化义务）**：chi 协议节点宽度 ∈{128,256,512}（DataID 16B 单位可表达档）且 ≠ chi.datWidth 时，GEN 侧 `ChiAdaptedNetworkTop` 包装内部网络顶层，在该节点 DAT 边界（TX/RX 两向）插 `ChiNiAdapt` 齿轮箱（flit↔ChiNiBeat：DataID 16B 单位对齐、BE 按 lane 拼/拆、last=线末 chunk），其余端口直通；深度向上取 2 的幂（CHK-53 允许任意 [2,64]）。AXI 边界宽度适配仍由桥接层承担（PS §5 F8），不双重适配。**频率失配节点边界 CDC 待硬件**（本地节点限域 0，CHK-54）；非 {128,256,512} 档节点宽度暂不插适配（fabric 宽度直通，报告如实标注）。
+
+**SEM-20 层次 multi-NoC（UP-07）**。subsystems 非空时每个子系统是独立 NoC：NodeID 空间各自从 0 分配（桥做映射，不要求全局唯一）、SAM/chi/时钟域独立；全局地址地图 = 各子系统 SAM ∪ nocLink 转发窗口，两两不重叠（CHK-56）。nocLink 桥在两端 NoC 内是**终结依赖的端点**（挂 fromRouter/toRouter 本地口，非 router）：G1 按子系统独立证明（复用 fromV2 投影），桥切断跨 NoC 依赖环。桥职责（HW-11）：协议代理（TxnID/NodeID 重映射）、窗口转发、跨时钟/宽度适配、流控域隔离（store&fwd）、DVM 策略（dvmForward 默认 false，各 NoC 自治）。**首版无分层发射**（HW-11 待硬件），check/estimate/API 先行。
 
 ## 5. GEN 管线契约（GEN）
 
@@ -490,9 +517,11 @@ C0 失败时返回仅含 `schema/ok/hash/errors/warnings` 的失败对象（CURR
 
 **GEN-22 portMode/protocol 装配分派（UP-04，HW-09/A3）**。发射顶层选择：任一 node.protocol=axi4 ⇒ `ChiAxiNetworkTop`（per-node 混合边界，rnAxi/rnChi/snAxi/snChi 端口向量按 protocol 拆分），全 chi ⇒ `ChiNetworkTop`。`ChiNetNode.protocol` 逐节点从 IR node.protocol 传入。chi.portMode 与 node.protocol 兼容性由 CHK-40 保证（both 恒兼容）。estimate additive 增 `bridges{rnAxi,snAxi}` 计数与桥接代理指标（口径写入 estimate.assumptions，不做虚假 PPA 承诺）。分区发射守护解除（HW-08 已 parity）：partitions 含 rn-d/mn/hn-i 合法。
 
-**GEN-23 qosGen 装配（UP-02，GEN 先行）**。`ChiAssemble.qosGenParams(v2): Seq[QosGenParams]`（nodeId/kind/bytesPerCycle/saturationBytes，按 SEM-18 换算，节点时钟 freqMHz 取自 clockDomains）；estimate additive `qosGen[]{node,kind,bandwidth,saturation}` + assumptions 标注"声明口径，注入调节待 HW-10"；LoomApi additive 同键。qosGen 省略时节点渲染不含该键（hash 基线不变）。
+**GEN-23 qosGen 装配（UP-02，HW-10 已消费）**。`ChiAssemble.qosGenParams(v2): Seq[QosGenParams]`（nodeId/kind/bytesPerCycle/saturationBytes，按 SEM-18 换算，节点时钟 freqMHz 取自 clockDomains），并映射 `chi.ChiQosGen` 填入 `ChiNetworkParams.qosGen`（硬件 RN 注入令牌桶，SEM-18）；estimate additive `qosGen[]{node,kind,bandwidth,saturation}` + assumptions 标注"RN 注入调节已生效（HW-10），范围仅注入"；LoomApi additive 同键。qosGen 省略时节点渲染不含该键（hash 基线不变）。
 
-**GEN-24 适配参数装配（UP-08，GEN 先行）**。`ChiAssemble.adaptParams(v2): Seq[AdaptParams]`（nodeId/widthRatio/freqRatio/fifoDepth，失配判定见 SEM-19）；estimate additive `adapt[]{node,dataWidth,datWidth,clock,routerClock,fifoDepth,mismatch}`；LoomApi additive 同键。adaptFifoDepth 省略时渲染省略（默认 4 仅在装配/报告体现，hash 基线不变）。
+**GEN-24 适配参数装配（UP-08，HW-12 宽度失配已消费）**。`ChiAssemble.adaptParams(v2): Seq[AdaptParams]`（nodeId/dataWidth/datWidth/clock/routerClock/fifoDepth/mismatch，失配判定见 SEM-19），并映射 `chi.ChiAdapt` 填入 `ChiNetworkParams.adapt`；存在可适配宽度失配 chi 节点时发射顶层切换为 GEN 侧 `ChiAdaptedNetworkTop`（包装 ChiNetworkTop/ChiAxiNetworkTop + 每失配 DAT 边界 ChiNiAdapt，SEM-19；GEN-22 分派之上叠加）；estimate additive `adapt[]{node,dataWidth,datWidth,clock,routerClock,fifoDepth,mismatch}`；LoomApi additive 同键。adaptFifoDepth 省略时渲染省略（默认 4 仅在装配/报告体现，hash 基线不变）。
+
+**GEN-25 层次装配（UP-07，GEN 先行）**。`ChiAssemble.subsystemParams(v2): Seq[(String, ChiNetworkParams)]`——每子系统投影为独立 IrV2（meta.name=子系统名，clockDomains/nodes/sam/qos/chi/fabric 取子系统值或顶层默认，partitions/routes 空）后走既有 networkParams；`BridgeParams(fromSub, toSub, fromRouter, toRouter, windows, asyncFifoDepth, dvmForward, fromDatWidth, toDatWidth)` 供 HW-11 消费。G1 门禁按子系统出 `gatesBySubsystem`（additive），顶层 G1 键 = 各子系统 AND。estimate additive `subsystems[]{name,nodes,routers,sam,chi}` + `nocLinks` 回显 + bridges 计数；LoomApi additive 同键。**emit 守护**：subsystems 非空 ⇒ 明确报错"分层发射待 HW-11 ChiNocBridge"，不静默发射平坦子集。
 
 ## 6. 校验规则表（CHK）
 
@@ -550,6 +579,11 @@ C0 失败时返回仅含 `schema/ok/hash/errors/warnings` 的失败对象（CURR
 | CHK-29 | sam 窗口两两重叠（按 base 排序后 `a.base+a.size > b.base`，窗口数学复用 AddressMap） | `C1: [CHK-29] sam windows of '<t1>' and '<t2>' overlap` | §6.4 b |
 | CHK-30 | 某 SN 节点无任何 sam 条目覆盖 | `C1: [CHK-30] subordinate node '<id>' has no SAM window` | §6.4 b |
 | CHK-31 | 显式 router.in/out ≠ 派生端口数（nLocal+入/出向 link 数；bidirectional 计入两向） | `C1: [CHK-31] router '<r>' in=<v> does not match derived <d>` | §6.4 a |
+| CHK-54 | 平铺配置（partitions 为空）本地节点 attach router 的时钟域 ≠ 域 0（域索引 = clockDomains 声明序，域 0 = clockDomains.head；SEM-14/HW-14 首版节点边界 CDC 待硬件）。分区配置走 ChiWrapperTop 路径（CHK-44–48），豁免 | `C1: [CHK-54] node '<id>' attaches to router '<r>' outside clock domain '<d0>'; node boundary CDC pending` | SEM-14 |
+| CHK-55 | subsystems 非空且顶层 nodes/fabric.routers/fabric.links/sam 任一出现；nocLinks 出现而 subsystems 空；子系统名重复；子系统缺 RN 或 SN；nocLinks from/to 未声明或 from==to | `C0: [CHK-55] subsystems/nocLinks <violation>` | §3.15 |
+| CHK-56 | 各子系统本地 SAM 窗口两两重叠；或**同源子系统有效地图**（本地 SAM ∪ 其出向 nocLink 转发窗口）两两重叠（转发歧义/转发压本地）。nocLink 窗口被 to 子系统 SAM 覆盖时是远端区域别名（CHK-57），不与本地 SAM 全局扫重叠 | `C1: [CHK-56] address windows '<a>' and '<b>' overlap in the global map` | §3.15 |
+| CHK-57 | nocLink.windows 不被 to 子系统 SAM 并集覆盖；fromRouter/toRouter 在对应子系统未声明；windows 空/size 非 2 幂/base 未对齐 | `C1: [CHK-57] nocLink '<from>-><to>' <violation>` | §3.15 |
+| CHK-58 | subsystems 非空且 partitions 或 routes 出现（phase 1 限制） | `C0: [CHK-58] partitions/routes are not supported with subsystems yet` | §3.15 |
 
 #### C2：QoS 映射完整性（S2）
 
@@ -917,7 +951,7 @@ WARN: LM-W-DEPRECATED: link '<f>-><t>' direction='<v>' is retired (CHI links are
 
 用户裁定：
 1. **需修正硬件的项统一收录** `doc/opt/2026-11-25_loom_chi_hw_dependency_list.md`（HW-01–07 / HQ-01），本任务作者**不做 RTL 修正**；GEN 侧按该清单"临时行为"列执行。映射：OQ-01→HW-01、OQ-02→HW-02、OQ-04→HW-03、OQ-05(cdc)→HW-04、OQ-09→HW-05、OQ-08→HW-06、OQ-05(余项)→HW-07。
-2. **CDC 保留**：IR-57/59、SEM-14、CHK-28/46 维持 TARGET 生效；CHI 路径的 async link 发射在 HW-04 闭合前报明确错误（校验与报告口径先行）。
+2. **CDC 保留**：IR-57/59、SEM-14、CHK-28/46 维持 TARGET 生效；CHI 路径的 async link 发射在 HW-04 闭合前报明确错误（校验与报告口径先行）。**更新（v1.4.0）**：HW-04（分区切割）与 HW-14（平铺多域）均已闭合——平铺 async 由 ChiNetworkTop 消费（routerDomain + domClk/domReset 顶层输入），flat+async 拒绝已解除；本地节点限域 0（CHK-54），节点边界 CDC 待硬件。
 3. **ChiQosMap 8/4 硬编码**入硬件疑问清单 HQ-01（8/4 是实现选择而非 CHI 协议要求，CHI 标准不定义 QoS 类分段）；GEN 首版按 CHK-34 锁定默认表。
 
 待确认（已答复用途，裁定未落）：

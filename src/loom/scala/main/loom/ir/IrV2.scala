@@ -5,8 +5,8 @@ import java.nio.file.{Files, Path}
 import scala.collection.mutable
 
 /** Per-node QoS bandwidth regulator declaration (IR-75–IR-78, UP-02).
-  * Declaration-only in the first version: injection logic pending HW-10
-  * (SEM-18). bandwidth is MB/s, saturation is the burst allowance in bytes.
+  * Consumed by HW-10 (SEM-18): ChiQosRegulator token bucket at RN injection.
+  * bandwidth is MB/s, saturation is the burst allowance in bytes.
   */
 final case class QosGenSpec(kind: String, bandwidth: Int, saturation: Int)
 
@@ -84,8 +84,44 @@ final case class LinkV2(
     lcreditDepth: Int
 )
 
+/** One independent subsystem NoC (IR-80–IR-87, UP-07/SEM-20). NodeID space,
+  * SAM, chi configuration and clock domains are local to the subsystem;
+  * omitted clockDomains/qos/chi blocks fall back to the top-level values at
+  * parse time, and an omitted sam is derived per subsystem SN order (SEM-06).
+  * Hierarchical emission is pending HW-11 (ChiNocBridge); check/estimate/API
+  * consume the projection `IrV2.projectSubsystem`.
+  */
+final case class SubsystemSpec(
+    name: String,
+    clockDomains: Seq[ClockDomain],
+    nodes: Seq[NodeV2],
+    sam: Seq[SamWindowV2],
+    qos: QosV2,
+    chi: ChiBlockV2,
+    routers: Seq[RouterV2],
+    links: Seq[LinkV2],
+    timing: TimingSpec)
+
+/** Inter-NoC bridge declaration (IR-88–IR-93, UP-07). The bridge is a
+  * dependency-terminating endpoint attached to local ports of fromRouter/
+  * toRouter (not a router); `windows` are the from-side address windows
+  * forwarded into the to subsystem (base, size). HW-11 consumes the
+  * assembled ChiAssemble.BridgeParams.
+  */
+final case class NocLinkSpec(
+    from: String,
+    to: String,
+    fromRouter: String,
+    toRouter: String,
+    windows: Seq[(Long, Long)],
+    cdc: String,
+    asyncFifoDepth: Int,
+    dvmForward: Boolean)
+
 /** Normalized loom/v2 object: every optional field filled per GEN-03.
   * `unknown` collects unrecognized field paths for the C0 unknown-key gate.
+  * subsystems/nocLinks (IR-80–IR-93, v1.5.0) are appended with defaults so
+  * existing positional constructions stay source-compatible.
   */
 final case class IrV2(
     meta: Meta,
@@ -99,8 +135,9 @@ final case class IrV2(
     timing: TimingSpec,
     partitions: Seq[PartitionSpec],
     routes: Seq[RouteSpec] = Nil,
-    unknown: Seq[String] = Nil
-)
+    unknown: Seq[String] = Nil,
+    subsystems: Seq[SubsystemSpec] = Nil,
+    nocLinks: Seq[NocLinkSpec] = Nil)
 
 object V2Defaults {
   val QosMapping: Seq[QosMappingV2] = Seq(
@@ -139,49 +176,45 @@ object IrV2 {
     def keys(o: JObj, path: String, allowed: Set[String]): Unit =
       o.fields.foreach { case (k, _) => if (!allowed.contains(k)) unknown += s"$path.$k" }
 
-    val rootObj = asObj(root, "$")
-    keys(rootObj, "$", Set("schema", "meta", "clockDomains", "nodes", "sam", "qos", "chi",
-      "fabric", "partitions", "routes"))
-    val schema = str(rootObj, "schema", "$")
-    if (schema != "loom/v2")
-      throw Ir.IrException(s"$$ schema must be 'loom/v2', got '$schema' (use Upgrade.v1ToV2 for loom/v1)")
+    // ---- Shared block parsers (UP-07 refactor): subsystem entries reuse the
+    // exact top-level node/sam/qos/chi/fabric logic; omitted subsystem blocks
+    // fall back to the top-level values (IR-82/85/86), sam derives per
+    // subsystem SN order (IR-84/SEM-06).
+    def objBlock(parent: JObj, key: String, path: String): JObj = parent.get(key) match {
+      case Some(o: JObj) => o
+      case Some(_) => throw Ir.IrException(s"$path.$key must be an object")
+      case None => JObj(Vector.empty)
+    }
 
-    val metaObj = asObj(field(rootObj, "meta", "$"), "$.meta")
-    keys(metaObj, "$.meta", Set("name"))
-    val meta = Meta(str(metaObj, "name", "$.meta"), schema)
-
-    val clocks = arrOf(field(rootObj, "clockDomains", "$"), "$.clockDomains").zipWithIndex.map {
-      case (v, i) =>
-        val p = s"$$.clockDomains[$i]"
+    def clocksOf(items: Vector[JValue], path: String): Seq[ClockDomain] =
+      items.zipWithIndex.map { case (v, i) =>
+        val p = s"$path[$i]"
         val o = asObj(v, p)
         keys(o, p, Set("id", "freqMHz"))
         ClockDomain(str(o, "id", p), num(o, "freqMHz", p))
+      }
+
+    def chiOf(o: JObj, path: String, dflt: ChiBlockV2): ChiBlockV2 = {
+      keys(o, path, Set("datWidth", "txnIdWidth", "nodeIdWidth", "addrWidth", "outstanding",
+        "atomicEnable", "atomicEntries", "dvmEnable", "portMode", "pcrdTypes", "lcreditDepth"))
+      ChiBlockV2(
+        datWidth = optInt(o, "datWidth", dflt.datWidth),
+        txnIdWidth = optInt(o, "txnIdWidth", dflt.txnIdWidth),
+        nodeIdWidth = optInt(o, "nodeIdWidth", dflt.nodeIdWidth),
+        addrWidth = optInt(o, "addrWidth", dflt.addrWidth),
+        outstanding = optInt(o, "outstanding", dflt.outstanding),
+        atomicEnable = optBool(o, "atomicEnable", dflt.atomicEnable),
+        atomicEntries = optInt(o, "atomicEntries", dflt.atomicEntries),
+        dvmEnable = optBool(o, "dvmEnable", dflt.dvmEnable),
+        portMode = optStr(o, "portMode", dflt.portMode),
+        pcrdTypes = optInt(o, "pcrdTypes", dflt.pcrdTypes),
+        lcreditDepth = optInt(o, "lcreditDepth", dflt.lcreditDepth)
+      )
     }
 
-    val chiObj = rootObj.get("chi") match {
-      case Some(o: JObj) => o
-      case Some(_) => throw Ir.IrException("$.chi must be an object")
-      case None => JObj(Vector.empty)
-    }
-    keys(chiObj, "$.chi", Set("datWidth", "txnIdWidth", "nodeIdWidth", "addrWidth", "outstanding",
-      "atomicEnable", "atomicEntries", "dvmEnable", "portMode", "pcrdTypes", "lcreditDepth"))
-    val chi = ChiBlockV2(
-      datWidth = optInt(chiObj, "datWidth", 256),
-      txnIdWidth = optInt(chiObj, "txnIdWidth", 8),
-      nodeIdWidth = optInt(chiObj, "nodeIdWidth", 7),
-      addrWidth = optInt(chiObj, "addrWidth", 48),
-      outstanding = optInt(chiObj, "outstanding", 64),
-      atomicEnable = optBool(chiObj, "atomicEnable", true),
-      atomicEntries = optInt(chiObj, "atomicEntries", 4),
-      dvmEnable = optBool(chiObj, "dvmEnable", true),
-      portMode = optStr(chiObj, "portMode", "axi4"),
-      pcrdTypes = optInt(chiObj, "pcrdTypes", 1),
-      lcreditDepth = optInt(chiObj, "lcreditDepth", 4)
-    )
-
-    val nodes = arrOf(field(rootObj, "nodes", "$"), "$.nodes").zipWithIndex.map {
-      case (v, i) =>
-        val p = s"$$.nodes[$i]"
+    def nodesOf(items: Vector[JValue], path: String, chi: ChiBlockV2): Seq[NodeV2] =
+      items.zipWithIndex.map { case (v, i) =>
+        val p = s"$path[$i]"
         val o = asObj(v, p)
         keys(o, p, Set("id", "kind", "nodeId", "clock", "attach", "protocol", "dataWidth",
           "outstanding", "qos", "qosGen", "adaptFifoDepth"))
@@ -211,66 +244,63 @@ object IrV2 {
           // an omitted key stays None so the normalized rendering omits it.
           adaptFifoDepth = o.get("adaptFifoDepth").map(_ => int(o, "adaptFifoDepth", p))
         )
+      }
+
+    def samOf(parent: JObj, path: String, nodes: Seq[NodeV2]): Seq[SamWindowV2] = {
+      val snIds = nodes.filter(n => n.kind == "sn-f" || n.kind == "sn-i").map(_.id)
+      parent.get("sam") match {
+        case Some(a: JArr) =>
+          a.items.zipWithIndex.map { case (v, i) =>
+            val p = s"$path.sam[$i]"
+            val o = asObj(v, p)
+            keys(o, p, Set("base", "size", "tgtNode"))
+            SamWindowV2(optLong(o, "base", 0L), optLong(o, "size", AddressMap.DefaultSize),
+              str(o, "tgtNode", p))
+          }
+        case Some(_) => throw Ir.IrException(s"$path.sam must be an array")
+        case None =>
+          snIds.zipWithIndex.map { case (id, i) =>
+            SamWindowV2(i.toLong * AddressMap.DefaultSize, AddressMap.DefaultSize, id)
+          }
+      }
     }
 
-    val snIds = nodes.filter(n => n.kind == "sn-f" || n.kind == "sn-i").map(_.id)
-    val sam = rootObj.get("sam") match {
-      case Some(a: JArr) =>
-        a.items.zipWithIndex.map { case (v, i) =>
-          val p = s"$$.sam[$i]"
-          val o = asObj(v, p)
-          keys(o, p, Set("base", "size", "tgtNode"))
-          SamWindowV2(optLong(o, "base", 0L), optLong(o, "size", AddressMap.DefaultSize),
-            str(o, "tgtNode", p))
-        }
-      case Some(_) => throw Ir.IrException("$.sam must be an array")
-      case None =>
-        snIds.zipWithIndex.map { case (id, i) =>
-          SamWindowV2(i.toLong * AddressMap.DefaultSize, AddressMap.DefaultSize, id)
-        }
+    def qosOf(o: JObj, path: String): QosV2 = {
+      keys(o, path, Set("mapping", "classes"))
+      val mapping = o.get("mapping") match {
+        case Some(a: JArr) =>
+          a.items.zipWithIndex.map { case (v, i) =>
+            val p = s"$path.mapping[$i]"
+            val mo = asObj(v, p)
+            keys(mo, p, Set("qosMin", "qosMax", "class"))
+            QosMappingV2(int(mo, "qosMin", p), int(mo, "qosMax", p), str(mo, "class", p))
+          }
+        case Some(_) => throw Ir.IrException(s"$path.mapping must be an array")
+        case None => V2Defaults.QosMapping
+      }
+      val classes = o.get("classes") match {
+        case Some(a: JArr) =>
+          a.items.zipWithIndex.map { case (v, i) =>
+            val p = s"$path.classes[$i]"
+            val co = asObj(v, p)
+            keys(co, p, Set("name", "vcs", "depth", "arbitration", "weight"))
+            QosClassV2(
+              name = str(co, "name", p),
+              vcs = optInt(co, "vcs", 1),
+              depth = optInt(co, "depth", 8),
+              arbitration = optStr(co, "arbitration", "wrr"),
+              weight = optInt(co, "weight", 1)
+            )
+          }
+        case Some(_) => throw Ir.IrException(s"$path.classes must be an array")
+        case None => V2Defaults.QosClasses
+      }
+      QosV2(mapping, classes)
     }
 
-    val qosObj = rootObj.get("qos") match {
-      case Some(o: JObj) => o
-      case Some(_) => throw Ir.IrException("$.qos must be an object")
-      case None => JObj(Vector.empty)
-    }
-    keys(qosObj, "$.qos", Set("mapping", "classes"))
-    val mapping = qosObj.get("mapping") match {
-      case Some(a: JArr) =>
-        a.items.zipWithIndex.map { case (v, i) =>
-          val p = s"$$.qos.mapping[$i]"
-          val o = asObj(v, p)
-          keys(o, p, Set("qosMin", "qosMax", "class"))
-          QosMappingV2(int(o, "qosMin", p), int(o, "qosMax", p), str(o, "class", p))
-        }
-      case Some(_) => throw Ir.IrException("$.qos.mapping must be an array")
-      case None => V2Defaults.QosMapping
-    }
-    val classes = qosObj.get("classes") match {
-      case Some(a: JArr) =>
-        a.items.zipWithIndex.map { case (v, i) =>
-          val p = s"$$.qos.classes[$i]"
-          val o = asObj(v, p)
-          keys(o, p, Set("name", "vcs", "depth", "arbitration", "weight"))
-          QosClassV2(
-            name = str(o, "name", p),
-            vcs = optInt(o, "vcs", 1),
-            depth = optInt(o, "depth", 8),
-            arbitration = optStr(o, "arbitration", "wrr"),
-            weight = optInt(o, "weight", 1)
-          )
-        }
-      case Some(_) => throw Ir.IrException("$.qos.classes must be an array")
-      case None => V2Defaults.QosClasses
-    }
-
-    val fab = asObj(field(rootObj, "fabric", "$"), "$.fabric")
-    keys(fab, "$.fabric", Set("routers", "links", "timing"))
-
-    val routers = arrOf(field(fab, "routers", "$.fabric"), "$.fabric.routers").zipWithIndex.map {
-      case (v, i) =>
-        val p = s"$$.fabric.routers[$i]"
+    def routersOf(items: Vector[JValue], path: String): Seq[RouterV2] =
+      items.zipWithIndex.map { case (v, i) =>
+        val p = s"$path[$i]"
         val o = asObj(v, p)
         keys(o, p, Set("name", "clock", "in", "out", "pos", "routing"))
         val pos = o.get("pos") match {
@@ -288,11 +318,11 @@ object IrV2 {
           pos = pos,
           routing = optStr(o, "routing", "any")
         )
-    }
+      }
 
-    val links = arrOf(field(fab, "links", "$.fabric"), "$.fabric.links").zipWithIndex.map {
-      case (v, i) =>
-        val p = s"$$.fabric.links[$i]"
+    def linksOf(items: Vector[JValue], path: String, chi: ChiBlockV2): Seq[LinkV2] =
+      items.zipWithIndex.map { case (v, i) =>
+        val p = s"$path[$i]"
         val o = asObj(v, p)
         keys(o, p, Set("from", "to", "width", "cdc", "pipe", "asyncFifoDepth", "dateline",
           "channels", "lcreditDepth"))
@@ -316,15 +346,53 @@ object IrV2 {
           channels = channels,
           lcreditDepth = optInt(o, "lcreditDepth", chi.lcreditDepth)
         )
-    }
+      }
 
-    val timing = fab.get("timing") match {
+    def timingOf(fab: JObj, path: String): TimingSpec = fab.get("timing") match {
       case Some(o: JObj) =>
-        keys(o, "$.fabric.timing", Set("maxFanin", "maxCombDepth"))
+        keys(o, s"$path.timing", Set("maxFanin", "maxCombDepth"))
         TimingSpec(optInt(o, "maxFanin", 8), optInt(o, "maxCombDepth", 12))
-      case Some(_) => throw Ir.IrException("$.fabric.timing must be an object")
+      case Some(_) => throw Ir.IrException(s"$path.timing must be an object")
       case None => TimingSpec(8, 12)
     }
+
+    val rootObj = asObj(root, "$")
+    keys(rootObj, "$", Set("schema", "meta", "clockDomains", "nodes", "sam", "qos", "chi",
+      "fabric", "partitions", "routes", "subsystems", "nocLinks"))
+    val schema = str(rootObj, "schema", "$")
+    if (schema != "loom/v2")
+      throw Ir.IrException(s"$$ schema must be 'loom/v2', got '$schema' (use Upgrade.v1ToV2 for loom/v1)")
+
+    val metaObj = asObj(field(rootObj, "meta", "$"), "$.meta")
+    keys(metaObj, "$.meta", Set("name"))
+    val meta = Meta(str(metaObj, "name", "$.meta"), schema)
+
+    val clocks = clocksOf(
+      arrOf(field(rootObj, "clockDomains", "$"), "$.clockDomains"), "$.clockDomains")
+    val chi = chiOf(objBlock(rootObj, "chi", "$"), "$.chi", ChiBlockV2())
+
+    // IR-80 (UP-07): a non-empty subsystems[] replaces the top-level fabric;
+    // nodes/fabric become optional (CHK-55 forbids them alongside subsystems).
+    val hierarchical = rootObj.get("subsystems").exists {
+      case a: JArr => a.items.nonEmpty
+      case _ => false
+    }
+    val nodes =
+      if (rootObj.get("nodes").isEmpty && hierarchical) Nil
+      else nodesOf(arrOf(field(rootObj, "nodes", "$"), "$.nodes"), "$.nodes", chi)
+    val sam = samOf(rootObj, "$", nodes)
+    val qos = qosOf(objBlock(rootObj, "qos", "$"), "$.qos")
+
+    val fabOpt = rootObj.get("fabric") match {
+      case None if hierarchical => None
+      case _ => Some(asObj(field(rootObj, "fabric", "$"), "$.fabric"))
+    }
+    fabOpt.foreach(f => keys(f, "$.fabric", Set("routers", "links", "timing")))
+    val routers = fabOpt.fold(Seq.empty[RouterV2])(f =>
+      routersOf(arrOf(field(f, "routers", "$.fabric"), "$.fabric.routers"), "$.fabric.routers"))
+    val links = fabOpt.fold(Seq.empty[LinkV2])(f =>
+      linksOf(arrOf(field(f, "links", "$.fabric"), "$.fabric.links"), "$.fabric.links", chi))
+    val timing = fabOpt.fold(TimingSpec(8, 12))(f => timingOf(f, "$.fabric"))
 
     val partitions = rootObj.get("partitions") match {
       case Some(a: JArr) =>
@@ -364,9 +432,83 @@ object IrV2 {
       case None => Vector.empty
     }
 
-    IrV2(meta, clocks, nodes, sam, QosV2(mapping, classes), chi, routers, links, timing,
-      partitions, routes, unknown.toSeq)
+    // IR-80–IR-87 (UP-07): subsystem NoCs; defaults resolved against the
+    // top-level blocks so the projection is a self-contained flat IrV2.
+    val subsystems = rootObj.get("subsystems") match {
+      case Some(a: JArr) =>
+        a.items.zipWithIndex.map { case (v, i) =>
+          val p = s"$$.subsystems[$i]"
+          val o = asObj(v, p)
+          keys(o, p, Set("name", "clockDomains", "nodes", "sam", "qos", "chi", "fabric"))
+          val sClocks = o.get("clockDomains") match {
+            case Some(_) => clocksOf(
+              arrOf(field(o, "clockDomains", p), s"$p.clockDomains"), s"$p.clockDomains")
+            case None => clocks
+          }
+          val sChi = chiOf(objBlock(o, "chi", p), s"$p.chi", chi)
+          val sNodes = nodesOf(arrOf(field(o, "nodes", p), s"$p.nodes"), s"$p.nodes", sChi)
+          val sSam = samOf(o, p, sNodes)
+          val sQos = o.get("qos") match {
+            case Some(_) => qosOf(objBlock(o, "qos", p), s"$p.qos")
+            case None => qos
+          }
+          val sFab = asObj(field(o, "fabric", p), s"$p.fabric")
+          keys(sFab, s"$p.fabric", Set("routers", "links", "timing"))
+          val sRouters = routersOf(
+            arrOf(field(sFab, "routers", s"$p.fabric"), s"$p.fabric.routers"), s"$p.fabric.routers")
+          val sLinks = linksOf(
+            arrOf(field(sFab, "links", s"$p.fabric"), s"$p.fabric.links"), s"$p.fabric.links", sChi)
+          SubsystemSpec(str(o, "name", p), sClocks, sNodes, sSam, sQos, sChi,
+            sRouters, sLinks, timingOf(sFab, s"$p.fabric"))
+        }
+      case Some(_) => throw Ir.IrException("$.subsystems must be an array")
+      case None => Nil
+    }
+
+    // IR-88–IR-93 (UP-07): inter-NoC bridge declarations; windows are
+    // {base,size} pairs, cdc/asyncFifoDepth mirror IR-57/59, dvmForward
+    // defaults to false (each NoC stays DVM-autonomous, SEM-20).
+    val nocLinks = rootObj.get("nocLinks") match {
+      case Some(a: JArr) =>
+        a.items.zipWithIndex.map { case (v, i) =>
+          val p = s"$$.nocLinks[$i]"
+          val o = asObj(v, p)
+          keys(o, p, Set("from", "to", "fromRouter", "toRouter", "windows", "cdc",
+            "asyncFifoDepth", "dvmForward"))
+          val windows = arrOf(field(o, "windows", p), s"$p.windows").zipWithIndex.map {
+            case (wv, j) =>
+              val wp = s"$p.windows[$j]"
+              val wo = asObj(wv, wp)
+              keys(wo, wp, Set("base", "size"))
+              (optLong(wo, "base", 0L), optLong(wo, "size", AddressMap.DefaultSize))
+          }
+          val cdc = optStr(o, "cdc", "sync")
+          NocLinkSpec(
+            from = str(o, "from", p),
+            to = str(o, "to", p),
+            fromRouter = str(o, "fromRouter", p),
+            toRouter = str(o, "toRouter", p),
+            windows = windows,
+            cdc = cdc,
+            asyncFifoDepth = optInt(o, "asyncFifoDepth", if (cdc == "async") 2 else 0),
+            dvmForward = optBool(o, "dvmForward", false))
+        }
+      case Some(_) => throw Ir.IrException("$.nocLinks must be an array")
+      case None => Nil
+    }
+
+    IrV2(meta, clocks, nodes, sam, qos, chi, routers, links, timing,
+      partitions, routes, unknown.toSeq, subsystems, nocLinks)
   }
+
+  /** GEN-25/SEM-20 (UP-07): project one subsystem into an independent flat
+    * IrV2 (meta.name = subsystem name; defaults already resolved by the
+    * parser; partitions/routes empty per the phase-1 CHK-58 limit). The full
+    * ChecksV2/ChiGates/ChiAssemble pipeline runs on the projection unchanged.
+    */
+  def projectSubsystem(v2: IrV2, s: SubsystemSpec): IrV2 =
+    IrV2(Meta(s.name, v2.meta.schema), s.clockDomains, s.nodes, s.sam, s.qos, s.chi,
+      s.routers, s.links, s.timing, partitions = Nil)
 
   /** Normalized route entry rendering (IR-70–74): `path` is omitted when
     * empty (forbid-only entries); `forbid` is always explicit (GEN-03).
@@ -378,6 +520,20 @@ object IrV2 {
     JObj(withPath :+ ("forbid" -> JBool(r.forbid)))
   }
 
+  /** Normalized nocLink entry rendering (IR-88–93): windows are {base,size}
+    * objects; cdc/asyncFifoDepth/dvmForward are always explicit (GEN-03).
+    */
+  def nocLinkJson(l: NocLinkSpec): JValue =
+    JObj(Vector(
+      "from" -> JStr(l.from), "to" -> JStr(l.to),
+      "fromRouter" -> JStr(l.fromRouter), "toRouter" -> JStr(l.toRouter),
+      "windows" -> JArr(l.windows.map { case (b, sz) =>
+        JObj(Vector("base" -> JNum(BigDecimal(b)), "size" -> JNum(BigDecimal(sz))))
+      }.toVector),
+      "cdc" -> JStr(l.cdc),
+      "asyncFifoDepth" -> JNum(BigDecimal(l.asyncFifoDepth)),
+      "dvmForward" -> JBool(l.dvmForward)))
+
   /** Fully-explicit normalized rendering (GEN-03/GEN-06): hash and canonical
     * reports consume this, never the raw input root.
     */
@@ -388,7 +544,9 @@ object IrV2 {
     def obj(fs: (String, JValue)*): JValue = JObj(fs.toVector)
     def arr(xs: Seq[JValue]): JValue = JArr(xs.toVector)
 
-    val nodesJ = v.nodes.map { x =>
+    // Shared block renderers (UP-07 refactor): subsystem entries render with
+    // the exact same normalized shapes as the top-level blocks.
+    def nodeJson(x: NodeV2): JValue = {
       val base = Vector(
         "id" -> s(x.id), "kind" -> s(x.kind), "clock" -> s(x.clock), "attach" -> s(x.attach),
         "protocol" -> s(x.protocol), "dataWidth" -> n(x.dataWidth),
@@ -402,29 +560,47 @@ object IrV2 {
         obj("kind" -> s(q.kind), "bandwidth" -> n(q.bandwidth), "saturation" -> n(q.saturation))))
       JObj(x.adaptFifoDepth.fold(withQosGen)(d => withQosGen :+ ("adaptFifoDepth" -> n(d))))
     }
-    val samJ = v.sam.map(w => obj("base" -> n(w.base), "size" -> n(w.size), "tgtNode" -> s(w.tgtNode)))
-    val mappingJ = v.qos.mapping.map(m =>
-      obj("qosMin" -> n(m.qosMin), "qosMax" -> n(m.qosMax), "class" -> s(m.className)))
-    val classesJ = v.qos.classes.map(c =>
-      obj("name" -> s(c.name), "vcs" -> n(c.vcs), "depth" -> n(c.depth),
-        "arbitration" -> s(c.arbitration), "weight" -> n(c.weight)))
-    val chiJ = obj(
-      "datWidth" -> n(v.chi.datWidth), "txnIdWidth" -> n(v.chi.txnIdWidth),
-      "nodeIdWidth" -> n(v.chi.nodeIdWidth), "addrWidth" -> n(v.chi.addrWidth),
-      "outstanding" -> n(v.chi.outstanding), "atomicEnable" -> b(v.chi.atomicEnable),
-      "atomicEntries" -> n(v.chi.atomicEntries), "dvmEnable" -> b(v.chi.dvmEnable),
-      "portMode" -> s(v.chi.portMode), "pcrdTypes" -> n(v.chi.pcrdTypes),
-      "lcreditDepth" -> n(v.chi.lcreditDepth))
-    val routersJ = v.routers.map { r =>
+    def samJson(w: SamWindowV2): JValue =
+      obj("base" -> n(w.base), "size" -> n(w.size), "tgtNode" -> s(w.tgtNode))
+    def clocksJson(cs: Seq[ClockDomain]): JValue =
+      arr(cs.map(c => obj("id" -> s(c.id), "freqMHz" -> JNum(BigDecimal(c.freqMHz)))))
+    def qosJson(q: QosV2): JValue = obj(
+      "mapping" -> arr(q.mapping.map(m =>
+        obj("qosMin" -> n(m.qosMin), "qosMax" -> n(m.qosMax), "class" -> s(m.className)))),
+      "classes" -> arr(q.classes.map(c =>
+        obj("name" -> s(c.name), "vcs" -> n(c.vcs), "depth" -> n(c.depth),
+          "arbitration" -> s(c.arbitration), "weight" -> n(c.weight)))))
+    def chiJson(c: ChiBlockV2): JValue = obj(
+      "datWidth" -> n(c.datWidth), "txnIdWidth" -> n(c.txnIdWidth),
+      "nodeIdWidth" -> n(c.nodeIdWidth), "addrWidth" -> n(c.addrWidth),
+      "outstanding" -> n(c.outstanding), "atomicEnable" -> b(c.atomicEnable),
+      "atomicEntries" -> n(c.atomicEntries), "dvmEnable" -> b(c.dvmEnable),
+      "portMode" -> s(c.portMode), "pcrdTypes" -> n(c.pcrdTypes),
+      "lcreditDepth" -> n(c.lcreditDepth))
+    def routerJson(r: RouterV2): JValue = {
       val base = Vector("name" -> s(r.name), "clock" -> s(r.clock), "routing" -> s(r.routing))
       val withIn = r.in.fold(base)(x => base :+ ("in" -> n(x)))
       val withOut = r.out.fold(withIn)(x => withIn :+ ("out" -> n(x)))
       JObj(r.pos.fold(withOut) { case (x, y) => withOut :+ ("pos" -> obj("x" -> n(x), "y" -> n(y))) })
     }
-    val linksJ = v.links.map(l => obj(
+    def linkJson(l: LinkV2): JValue = obj(
       "from" -> s(l.from), "to" -> s(l.to), "width" -> n(l.width), "cdc" -> s(l.cdc),
       "pipe" -> n(l.pipe), "asyncFifoDepth" -> n(l.asyncFifoDepth), "dateline" -> b(l.dateline),
-      "channels" -> arr(l.channels.map(s)), "lcreditDepth" -> n(l.lcreditDepth)))
+      "channels" -> arr(l.channels.map(s)), "lcreditDepth" -> n(l.lcreditDepth))
+    def timingJson(t: TimingSpec): JValue =
+      obj("maxFanin" -> n(t.maxFanin), "maxCombDepth" -> n(t.maxCombDepth))
+    def fabricJson(routers: Seq[RouterV2], links: Seq[LinkV2], t: TimingSpec): JValue =
+      obj("routers" -> arr(routers.map(routerJson)), "links" -> arr(links.map(linkJson)),
+        "timing" -> timingJson(t))
+    def subsystemJson(x: SubsystemSpec): JValue = obj(
+      "name" -> s(x.name),
+      "clockDomains" -> clocksJson(x.clockDomains),
+      "nodes" -> arr(x.nodes.map(nodeJson)),
+      "sam" -> arr(x.sam.map(samJson)),
+      "qos" -> qosJson(x.qos),
+      "chi" -> chiJson(x.chi),
+      "fabric" -> fabricJson(x.routers, x.links, x.timing))
+
     val partsJ = v.partitions.map(p => obj(
       "name" -> s(p.name), "clock" -> s(p.clock), "members" -> arr(p.members.map(s)),
       "boundaryPipe" -> n(p.boundaryPipe)))
@@ -432,20 +608,25 @@ object IrV2 {
     val base = Vector(
       "schema" -> s("loom/v2"),
       "meta" -> obj("name" -> s(v.meta.name)),
-      "clockDomains" -> arr(v.clockDomains.map(c => obj("id" -> s(c.id), "freqMHz" -> JNum(BigDecimal(c.freqMHz))))),
-      "nodes" -> arr(nodesJ),
-      "sam" -> arr(samJ),
-      "qos" -> obj("mapping" -> arr(mappingJ), "classes" -> arr(classesJ)),
-      "chi" -> chiJ,
-      "fabric" -> obj(
-        "routers" -> arr(routersJ),
-        "links" -> arr(linksJ),
-        "timing" -> obj("maxFanin" -> n(v.timing.maxFanin), "maxCombDepth" -> n(v.timing.maxCombDepth))),
+      "clockDomains" -> clocksJson(v.clockDomains),
+      "nodes" -> arr(v.nodes.map(nodeJson)),
+      "sam" -> arr(v.sam.map(samJson)),
+      "qos" -> qosJson(v.qos),
+      "chi" -> chiJson(v.chi),
+      "fabric" -> fabricJson(v.routers, v.links, v.timing),
       "partitions" -> arr(partsJ)
     )
     // §3.12 rendering rule: an empty routes block is omitted entirely (same
     // conditional rule as nodeId) so pre-UP-01 hash baselines stay identical.
-    JObj(if (v.routes.isEmpty) base else base :+ ("routes" -> arr(v.routes.map(routeJson))))
+    val withRoutes =
+      if (v.routes.isEmpty) base else base :+ ("routes" -> arr(v.routes.map(routeJson)))
+    // §3.15 rendering rule (UP-07): empty subsystems/nocLinks blocks are
+    // omitted so pre-v1.5.0 hash baselines stay identical.
+    val withSubs =
+      if (v.subsystems.isEmpty) withRoutes
+      else withRoutes :+ ("subsystems" -> arr(v.subsystems.map(subsystemJson)))
+    JObj(if (v.nocLinks.isEmpty) withSubs
+      else withSubs :+ ("nocLinks" -> arr(v.nocLinks.map(nocLinkJson))))
   }
 
   def hash(v: IrV2): String = Canonical.hash(toJson(v))

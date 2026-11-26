@@ -347,6 +347,42 @@ class CheckV2Spec extends AnyFlatSpec with Matchers {
       "C1: [CHK-28] sync link 'r0'(core) -> 'r1'(slow) crosses clock domains")
   }
 
+  /** HW-14 flat dual-clock fixture: chain_4r with transit routers r1/r2 on a
+    * second declared domain and async boundary links; nodes stay on domain-0
+    * routers r0/r3 (SEM-14 first version).
+    */
+  private def dualClockChain: IrV2 = {
+    val v = IrV2.load(Paths.get("src/loom/examples/chain_4r.json"))
+    v.copy(
+      clockDomains = v.clockDomains :+ ClockDomain("io", 500),
+      routers = v.routers.map(r =>
+        if (r.name == "r1" || r.name == "r2") r.copy(clock = "io") else r),
+      links = v.links.map(l =>
+        if ((l.from == "r0" && l.to == "r1") || (l.from == "r2" && l.to == "r3"))
+          l.copy(cdc = "async", asyncFifoDepth = 4) else l))
+  }
+
+  it should "accept a flat dual-clock chain with nodes on domain-0 routers (CHK-54 positive, SEM-14)" in {
+    ChecksV2.runC1(dualClockChain) shouldBe Nil
+    ChecksV2.run(dualClockChain).errors shouldBe Nil
+  }
+
+  it should "reject a flat node on a non-0-domain router with CHK-54 (SEM-14/HW-14)" in {
+    val v = dualClockChain
+    val bad = v.copy(
+      nodes = v.nodes.map(n =>
+        if (n.id == "m0") n.copy(clock = "io", attach = "r1") else n),
+      links = v.links.map(l =>
+        if (l.from == "m0" && l.to == "r0") l.copy(to = "r1") else l))
+    ChecksV2.runC1(bad) should contain(
+      "C1: [CHK-54] node 'm0' attaches to router 'r1' outside clock domain 'core'; node boundary CDC pending")
+  }
+
+  it should "exempt partitioned configs from CHK-54 (wrapper path, CHK-44–48)" in {
+    // s0 sits on domain-1 router r1, legal on the ChiWrapperTop path
+    ChecksV2.runC1(partitioned).filter(_.contains("CHK-54")) shouldBe Nil
+  }
+
   it should "reject overlapping sam windows with CHK-29 (N-C1-b)" in {
     val v = base
     val bad = v.copy(sam = Seq(SamWindowV2(0L, 8192L, "s0"), SamWindowV2(4096L, 4096L, "s0")))
@@ -865,5 +901,153 @@ class CheckV2Spec extends AnyFlatSpec with Matchers {
     ChecksV2.runC0(withNode("m0")(_.copy(adaptFifoDepth = Some(64)))) shouldBe Nil
     ChecksV2.runC0(base) shouldBe Nil // omitted key: no CHK-53 domain applies
     ChecksV2.run(withNode("m0")(_.copy(adaptFifoDepth = Some(8)))).errors shouldBe Nil
+  }
+
+  // ---- UP-07 hierarchical multi-NoC (CHK-55–CHK-58, §3.15/SEM-20/GEN-25) ----
+
+  behavior of "ChecksV2 subsystems/nocLinks (CHK-55–CHK-58, UP-07)"
+
+  /** One independent subsystem chain: rn@r0 - r0 - r1 - sn@r1, one SAM
+    * window at samBase. Defaults mirror the ring_4 top-level blocks.
+    */
+  private def subChain(name: String, rn: String, sn: String, r0: String, r1: String,
+      samBase: Long): SubsystemSpec = {
+    val v = base
+    SubsystemSpec(name, v.clockDomains,
+      Seq(NodeV2(rn, "rn-i", None, "core", r0, "chi", 256, 64, 0),
+        NodeV2(sn, "sn-f", None, "core", r1, "chi", 256, 64, 0)),
+      Seq(SamWindowV2(samBase, 4096L, sn)),
+      v.qos, v.chi,
+      Seq(RouterV2(r0, "core", None, None, None, "any"),
+        RouterV2(r1, "core", None, None, None, "any")),
+      Seq(LinkV2(rn, r0, 256, "sync", 0, 0, false, Seq("req", "rsp", "dat"), 4),
+        LinkV2(r0, r1, 256, "sync", 0, 0, false, Seq("req", "rsp", "dat"), 4),
+        LinkV2(r1, sn, 256, "sync", 0, 0, false, Seq("req", "rsp", "dat"), 4)),
+      v.timing)
+  }
+
+  private def subA: SubsystemSpec = subChain("A", "m0", "s0", "rA0", "rA1", 0L)
+  private def subB: SubsystemSpec = subChain("B", "m1", "s1", "rB0", "rB1", 65536L)
+  private def bridgeAB: NocLinkSpec =
+    NocLinkSpec("A", "B", "rA0", "rB1", Seq((65536L, 4096L)), "sync", 0, false)
+
+  private def hierarchical: IrV2 = {
+    val v = base
+    v.copy(meta = v.meta.copy(name = "hier_ok"),
+      nodes = Nil, sam = Nil, routers = Nil, links = Nil,
+      subsystems = Seq(subA, subB), nocLinks = Seq(bridgeAB))
+  }
+
+  private def withNocLink(f: NocLinkSpec => NocLinkSpec): IrV2 =
+    hierarchical.copy(nocLinks = Seq(f(bridgeAB)))
+
+  it should "accept a valid two-subsystem config with one nocLink at zero errors (P-UP07)" in {
+    val r = ChecksV2.run(hierarchical)
+    r.errors shouldBe Nil
+    r.gates shouldBe Vector(
+      "C0" -> true, "C1" -> true,
+      "G1-REQ" -> true, "G1-RSP" -> true, "G1-DAT" -> true, "G1-SNP" -> true,
+      "C2" -> true, "G4" -> true, "G6" -> true, "G7" -> true, "G8" -> true,
+      "S1" -> true, "S2" -> true, "S3" -> true)
+    // GEN-25: per-subsystem gate vectors; top-level G1 = AND over subsystems
+    val bySub = ChecksV2.gatesBySubsystem(hierarchical)
+    bySub.map(_._1) shouldBe Seq("A", "B")
+    bySub.foreach { case (_, gs) => gs.foreach { case (_, ok) => ok shouldBe true } }
+    // top-level CHK-23 must not fire on the empty top-level node list
+    ChecksV2.runC0(hierarchical) shouldBe Nil
+  }
+
+  it should "reject top-level fabric alongside subsystems and orphan nocLinks with CHK-55" in {
+    ChecksV2.runC0(hierarchical.copy(nodes = base.nodes)) should contain(
+      "C0: [CHK-55] subsystems/nocLinks top-level nodes/fabric.routers/fabric.links/sam must be omitted when subsystems are declared")
+    ChecksV2.runC0(hierarchical.copy(routers = base.routers)) should contain(
+      "C0: [CHK-55] subsystems/nocLinks top-level nodes/fabric.routers/fabric.links/sam must be omitted when subsystems are declared")
+    ChecksV2.runC0(base.copy(nocLinks = Seq(bridgeAB))) should contain(
+      "C0: [CHK-55] subsystems/nocLinks nocLinks require subsystems to be declared")
+  }
+
+  it should "reject duplicate subsystem names and a subsystem missing RN or SN with CHK-55" in {
+    ChecksV2.runC0(hierarchical.copy(subsystems = Seq(subA, subA))) should contain(
+      "C0: [CHK-55] subsystems/nocLinks duplicate subsystem name 'A'")
+    val noSn = subChain("C", "m2", "s2", "rC0", "rC1", 0L)
+    val rnOnly = noSn.copy(nodes = noSn.nodes.filter(_.kind == "rn-i"), sam = Nil)
+    ChecksV2.runC0(hierarchical.copy(subsystems = Seq(subA, rnOnly))) should contain(
+      "C0: [CHK-55] subsystems/nocLinks subsystem 'C' requires at least one request node and one subordinate node")
+    val snOnly = noSn.copy(nodes = noSn.nodes.filter(_.kind == "sn-f"))
+    ChecksV2.runC0(hierarchical.copy(subsystems = Seq(subA, snOnly))) should contain(
+      "C0: [CHK-55] subsystems/nocLinks subsystem 'C' requires at least one request node and one subordinate node")
+  }
+
+  it should "reject undeclared or equal nocLink endpoints with CHK-55" in {
+    ChecksV2.runC0(withNocLink(_.copy(from = "X"))) should contain(
+      "C0: [CHK-55] subsystems/nocLinks nocLink from 'X' is not a declared subsystem")
+    ChecksV2.runC0(withNocLink(_.copy(to = "X"))) should contain(
+      "C0: [CHK-55] subsystems/nocLinks nocLink to 'X' is not a declared subsystem")
+    ChecksV2.runC0(withNocLink(_.copy(to = "A"))) should contain(
+      "C0: [CHK-55] subsystems/nocLinks nocLink from and to must differ ('A')")
+  }
+
+  it should "reject cross-subsystem SAM overlap in the global map with CHK-56" in {
+    val clash = hierarchical.copy(subsystems = Seq(subA, subChain("B", "m1", "s1", "rB0", "rB1", 0L)))
+    ChecksV2.runC1(clash) should contain(
+      "C1: [CHK-56] address windows 'A.s0' and 'B.s1' overlap in the global map")
+    // an uncovered nocLink window overlapping the source's own SAM is an
+    // ambiguous effective map at the source subsystem
+    val wild = withNocLink(_.copy(windows = Seq((0L, 4096L))))
+    ChecksV2.runC1(wild) should contain(
+      "C1: [CHK-56] address windows 'A.s0' and 'nocLink:A->B' overlap in the global map")
+  }
+
+  it should "reject duplicate forwarding windows from one source with CHK-56" in {
+    val dup = hierarchical.copy(nocLinks = Seq(bridgeAB, bridgeAB.copy(toRouter = "rB0")))
+    ChecksV2.runC1(dup) should contain(
+      "C1: [CHK-56] address windows 'nocLink:A->B' and 'nocLink:A->B' overlap in the global map")
+  }
+
+  it should "reject uncovered nocLink windows and bad window math with CHK-57" in {
+    ChecksV2.runC1(withNocLink(_.copy(windows = Seq((131072L, 4096L))))) should contain(
+      "C1: [CHK-57] nocLink 'A->B' window base 131072 size 4096 is not covered by subsystem 'B' SAM")
+    ChecksV2.runC1(withNocLink(_.copy(windows = Nil))) should contain(
+      "C1: [CHK-57] nocLink 'A->B' windows must not be empty")
+    ChecksV2.runC1(withNocLink(_.copy(windows = Seq((65536L, 3000L))))) should contain(
+      "C1: [CHK-57] nocLink 'A->B' window base 65536 size 3000 must be a power of two")
+    ChecksV2.runC1(withNocLink(_.copy(windows = Seq((65536L, 2048L))))) should contain(
+      "C1: [CHK-57] nocLink 'A->B' window base 65536 size 2048 must be >= 4096")
+    ChecksV2.runC1(withNocLink(_.copy(windows = Seq((67584L, 4096L))))) should contain(
+      "C1: [CHK-57] nocLink 'A->B' window base 67584 must be aligned to size 4096")
+  }
+
+  it should "reject undeclared bridge attach routers and bad cdc with CHK-57" in {
+    ChecksV2.runC1(withNocLink(_.copy(fromRouter = "rX"))) should contain(
+      "C1: [CHK-57] nocLink 'A->B' fromRouter 'rX' is not declared in subsystem 'A'")
+    ChecksV2.runC1(withNocLink(_.copy(toRouter = "rX"))) should contain(
+      "C1: [CHK-57] nocLink 'A->B' toRouter 'rX' is not declared in subsystem 'B'")
+    ChecksV2.runC1(withNocLink(_.copy(cdc = "weird"))) should contain(
+      "C1: [CHK-57] nocLink 'A->B' cdc 'weird' must be sync or async")
+    ChecksV2.runC1(withNocLink(_.copy(cdc = "async", asyncFifoDepth = 1))) should contain(
+      "C1: [CHK-57] nocLink 'A->B' asyncFifoDepth 1 must be >= 2 for cdc async")
+    // positive: async bridge across domains with a legal depth
+    ChecksV2.runC1(withNocLink(_.copy(cdc = "async", asyncFifoDepth = 4))) shouldBe Nil
+  }
+
+  it should "reject partitions or routes alongside subsystems with CHK-58 (phase 1)" in {
+    ChecksV2.runC0(hierarchical.copy(routes = Seq(RouteSpec("m0", "s1", Nil, true)))) should contain(
+      "C0: [CHK-58] partitions/routes are not supported with subsystems yet")
+    ChecksV2.runC0(hierarchical.copy(
+      partitions = Seq(PartitionSpec("p0", "core", Seq("rA0"), 1)))) should contain(
+      "C0: [CHK-58] partitions/routes are not supported with subsystems yet")
+  }
+
+  it should "prefix subsystem-internal errors with the subsystem name (GEN-25 projection)" in {
+    val brokenB = subB.copy(nodes = subB.nodes.map(n =>
+      if (n.id == "s1") n.copy(attach = "rX") else n))
+    val v = hierarchical.copy(subsystems = Seq(subA, brokenB))
+    val r = ChecksV2.run(v)
+    r.errors should contain(
+      "subsystem 'B': C0: [CHK-12] node 's1' attach 'rX' is not a declared router")
+    r.errors.exists(_.startsWith("subsystem 'A':")) shouldBe false
+    r.gates.toMap.apply("C0") shouldBe false
+    // the flat gates still run on the (empty) top level without firing
+    r.errors.exists(e => !e.startsWith("subsystem '")) shouldBe false
   }
 }

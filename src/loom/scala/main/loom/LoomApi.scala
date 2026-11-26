@@ -96,15 +96,24 @@ object LoomApi {
         "chi" -> Reports.chiSnapshotJson(v2),
         "channels" -> JArr(Reports.channelsV2(v2).map(JStr(_)).toVector),
         "connectivity" -> connectivityJ,
-        // GEN-23/GEN-24 (S8, v1.3.0): additive declaration-only qosGen/adapt
-        // rows, same caliber as the estimate keys (HW-10/HW-12 pending).
+        // GEN-23/GEN-24 (wave4): additive qosGen/adapt declaration-caliber
+        // rows, same caliber as the estimate keys; consumed by HW-10 (RN
+        // token buckets) and HW-12 (GEN ChiNiAdapt wrapper).
         "qosGen" -> Reports.qosGenJsonV2(v2),
         "adapt" -> Reports.adaptJsonV2(v2)
       )
       // GEN-21: normalized routes echo, omitted when empty (§3.12 rendering
       // rule); additive only, every existing GUI key stays (MIG-10).
-      JObj(if (v2.routes.isEmpty) base
-        else base :+ ("routes" -> JArr(v2.routes.map(IrV2.routeJson).toVector)))
+      val withRoutes =
+        if (v2.routes.isEmpty) base
+        else base :+ ("routes" -> JArr(v2.routes.map(IrV2.routeJson).toVector))
+      // GEN-25 (UP-07): additive hierarchical keys, same caliber as the
+      // estimate rows; omitted on flat configs (§3.15 rendering rule).
+      JObj(if (v2.subsystems.isEmpty) withRoutes
+        else withRoutes ++ Vector(
+          "subsystems" -> Reports.subsystemsJsonV2(v2),
+          "nocLinks" -> JArr(v2.nocLinks.map(IrV2.nocLinkJson).toVector),
+          "gatesBySubsystem" -> Reports.gatesBySubsystemJsonV2(v2)))
     }
   }
 

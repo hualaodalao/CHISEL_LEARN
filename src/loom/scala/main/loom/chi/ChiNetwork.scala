@@ -23,8 +23,10 @@ class ChiQosMap(c: ChiConfig) {
   def weightOf(cls: Int): Int = c.qosWeights(cls)
 }
 
-/** One router-to-router link in the CHI network. */
-final case class ChiNetLink(id: Int, fromRouter: Int, toRouter: Int, fromPort: Int, toPort: Int, pipe: Int)
+/** One router-to-router link in the CHI network. `asyncFifoDepth` 0 = sync
+  * direct connect; >=2 (power of two) inserts a per-channel ChiAsyncLink CDC
+  * crossing into the destination router's clock domain (HW-14). */
+final case class ChiNetLink(id: Int, fromRouter: Int, toRouter: Int, fromPort: Int, toPort: Int, pipe: Int, asyncFifoDepth: Int = 0)
 
 /** A node attached to a router local port. `protocol` selects the boundary
   * form at the AXI network top (chi = native flit, axi4 = AXI bridge). */
@@ -34,6 +36,17 @@ final case class ChiNetNode(nodeId: Int, kind: ChiNodeKind.Value, router: Int, l
 final case class ChiNetRouter(index: Int, name: String, nLocal: Int, nLink: Int, route: Seq[Int], linkOfPort: Seq[Int], outCut: Seq[Boolean] = Seq.empty) {
   def nPort: Int = nLocal + nLink
 }
+
+/** Per-node QoS bandwidth generator (HW-10/SEM-18, mirrors GEN QosGenParams).
+  * kind ∈ fixed/limiter/regulator; bytesPerCycle = bandwidth(MB/s)/freqMHz (GEN
+  * pre-converts); saturationBytes = burst allowance (fixed => 0). */
+final case class ChiQosGen(nodeId: Int, kind: String, bytesPerCycle: Double, saturationBytes: Int)
+
+/** Per-node NIU rate adaptation (HW-12/SEM-19, mirrors GEN AdaptParams).
+  * dataWidth = node bus width, datWidth = fabric flit width; mismatch triggers
+  * store&fwd width gearbox + (clock mismatch) async FIFO of fifoDepth. GEN
+  * instantiates ChiNiAdapt at the mismatched node's DAT boundary. */
+final case class ChiAdapt(nodeId: Int, dataWidth: Int, datWidth: Int, fifoDepth: Int, mismatch: Boolean)
 
 final case class ChiNetworkParams(
     name: String,
@@ -47,10 +60,20 @@ final case class ChiNetworkParams(
     hn: Seq[ChiNetNode] = Seq.empty,
     mn: Seq[ChiNetNode] = Seq.empty,
     sam: Seq[ChiSamEntry] = Seq.empty,
-    samByRn: Seq[Seq[ChiSamEntry]] = Seq.empty
+    samByRn: Seq[Seq[ChiSamEntry]] = Seq.empty,
+    routerDomain: Seq[Int] = Seq.empty,
+    qosGen: Seq[ChiQosGen] = Seq.empty,
+    adapt: Seq[ChiAdapt] = Seq.empty
 ) {
   require(samByRn.isEmpty || samByRn.length == rn.length,
     "samByRn must provide one table per RN")
+  require(routerDomain.isEmpty || routerDomain.length == routers.length,
+    "routerDomain must provide one domain per router")
+  /** Clock domain index per router (0 = top module clock). */
+  def domainOf: Seq[Int] =
+    if (routerDomain.nonEmpty) routerDomain else Seq.fill(routers.length)(0)
+  def nDomain: Int = domainOf.maxOption.getOrElse(0) + 1
+  def hasAsync: Boolean = links.exists(_.asyncFifoDepth >= 2)
   def nRn: Int = rn.length
   def nSn: Int = sn.length
   def nHn: Int = hn.length

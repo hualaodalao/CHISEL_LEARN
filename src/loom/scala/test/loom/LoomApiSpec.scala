@@ -327,7 +327,7 @@ class LoomApiSpec extends AnyFlatSpec with Matchers {
     r("canonical").asInstanceOf[JStr].value should not include "adaptFifoDepth"
   }
 
-  it should "echo declared qosGen/adaptFifoDepth with declaration-only assumptions (HW-10/HW-12)" in {
+  it should "echo declared qosGen/adaptFifoDepth with consumed HW-10/HW-12 assumptions" in {
     val cfg = v2Text
       .replaceFirst("\"attach\": \"r0\"",
         "\"attach\": \"r0\", \"qosGen\": { \"kind\": \"limiter\", \"bandwidth\": 1000, \"saturation\": 4096 }")
@@ -345,8 +345,8 @@ class LoomApiSpec extends AnyFlatSpec with Matchers {
     m1("fifoDepth") shouldBe JNum(BigDecimal(8))
     m1("mismatch") shouldBe JBool(true) // width mismatch stays (128 vs 256)
     val assumptions = strs(fields(r("estimate"))("assumptions"))
-    assumptions.exists(s => s.contains("HW-10") && s.contains("no RTL effect")) shouldBe true
-    assumptions.exists(s => s.contains("HW-12") && s.contains("no RTL effect")) shouldBe true
+    assumptions.exists(s => s.contains("HW-10") && s.contains("RN-injection")) shouldBe true
+    assumptions.exists(s => s.contains("HW-12") && s.contains("ChiNiAdapt")) shouldBe true
     // the declaration is a real IR change: hash moves off the empty baseline
     r("hash").asInstanceOf[JStr].value should not be
       IrV2.hash(IrV2.load(Paths.get("src/loom/examples/ring_4.json")))
@@ -359,5 +359,97 @@ class LoomApiSpec extends AnyFlatSpec with Matchers {
     r("ok") shouldBe JBool(true)
     r("qosGen").asInstanceOf[JArr].items shouldBe empty
     r("adapt").asInstanceOf[JArr].items shouldBe empty
+  }
+
+  // ---- UP-07 additive subsystems/nocLinks/gatesBySubsystem keys (GEN-25) ----
+
+  behavior of "LoomApi subsystems/nocLinks (GEN-25, UP-07)"
+
+  private def hierText: String = {
+    val v0 = IrV2.load(Paths.get("src/loom/examples/ring_4.json"))
+    def sub(name: String, rn: String, sn: String, r0: String, r1: String, samBase: Long) =
+      loom.ir.SubsystemSpec(name, v0.clockDomains,
+        Seq(loom.ir.NodeV2(rn, "rn-i", None, "core", r0, "chi", 256, 64, 0),
+          loom.ir.NodeV2(sn, "sn-f", None, "core", r1, "chi", 256, 64, 0)),
+        Seq(loom.ir.SamWindowV2(samBase, 4096L, sn)),
+        v0.qos, v0.chi,
+        Seq(loom.ir.RouterV2(r0, "core", None, None, None, "any"),
+          loom.ir.RouterV2(r1, "core", None, None, None, "any")),
+        Seq(loom.ir.LinkV2(rn, r0, 256, "sync", 0, 0, false, Seq("req", "rsp", "dat"), 4),
+          loom.ir.LinkV2(r0, r1, 256, "sync", 0, 0, false, Seq("req", "rsp", "dat"), 4),
+          loom.ir.LinkV2(r1, sn, 256, "sync", 0, 0, false, Seq("req", "rsp", "dat"), 4)),
+        v0.timing)
+    val v = v0.copy(meta = v0.meta.copy(name = "hier_api"),
+      nodes = Nil, sam = Nil, routers = Nil, links = Nil,
+      subsystems = Seq(sub("A", "m0", "s0", "rA0", "rA1", 0L),
+        sub("B", "m1", "s1", "rB0", "rB1", 65536L)),
+      nocLinks = Seq(loom.ir.NocLinkSpec("A", "B", "rA0", "rB1",
+        Seq((65536L, 4096L)), "sync", 0, false)))
+    loom.ir.Canonical.pretty(IrV2.toJson(v))
+  }
+
+  it should "expose subsystems/nocLinks/gatesBySubsystem additively on a hierarchical config" in {
+    val r = fields(LoomApi.evaluate(hierText))
+    r("ok") shouldBe JBool(true)
+    strs(r("errors")) shouldBe Nil
+    val subs = r("subsystems").asInstanceOf[JArr].items.map(fields)
+    subs.length shouldBe 2
+    subs.head("name") shouldBe JStr("A")
+    subs.head("nodes") shouldBe JNum(BigDecimal(2))
+    subs.head("routers") shouldBe JNum(BigDecimal(2))
+    subs.head("sam") shouldBe JNum(BigDecimal(1))
+    fields(subs.head("chi"))("datWidth") shouldBe JNum(BigDecimal(256))
+    val nl = r("nocLinks").asInstanceOf[JArr].items.map(fields)
+    nl.length shouldBe 1
+    nl.head("from") shouldBe JStr("A")
+    nl.head("to") shouldBe JStr("B")
+    nl.head("fromRouter") shouldBe JStr("rA0")
+    nl.head("toRouter") shouldBe JStr("rB1")
+    nl.head("dvmForward") shouldBe JBool(false)
+    val win = fields(nl.head("windows").asInstanceOf[JArr].items.head)
+    win("base") shouldBe JNum(BigDecimal(65536))
+    win("size") shouldBe JNum(BigDecimal(4096))
+    val bySub = fields(r("gatesBySubsystem"))
+    bySub.keySet shouldBe Set("A", "B")
+    fields(bySub("A"))("G1-REQ") shouldBe JBool(true)
+    fields(bySub("B"))("G1-SNP") shouldBe JBool(true)
+    // top-level G1 keys are the AND over the subsystem proofs (SEM-20)
+    val gates = fields(fields(r("checks"))("gates"))
+    gates("G1-REQ") shouldBe JBool(true)
+    gates("G1-DAT") shouldBe JBool(true)
+    fields(r("checks")).contains("gatesBySubsystem") shouldBe true
+    // estimate carries the same additive keys, plus the bridges.noc count
+    val estimate = fields(r("estimate"))
+    estimate("subsystems") shouldBe r("subsystems")
+    estimate("nocLinks") shouldBe r("nocLinks")
+    estimate("gatesBySubsystem") shouldBe r("gatesBySubsystem")
+    fields(estimate("bridges"))("noc") shouldBe JNum(BigDecimal(1))
+    // additive only: every pre-UP-07 key stays on the hierarchical response
+    Seq("schema", "ok", "hash", "errors", "warnings", "checks", "estimate",
+      "addressMap", "graph", "canonical", "upgraded", "irSchema", "nodes", "chi",
+      "channels", "connectivity", "qosGen", "adapt").foreach(k => r.contains(k) shouldBe true)
+    r("canonical").asInstanceOf[JStr].value should include("\"subsystems\"")
+  }
+
+  it should "omit the hierarchical keys on flat configs and keep the hash baseline" in {
+    val r = fields(LoomApi.evaluate(v2Text))
+    r.contains("subsystems") shouldBe false
+    r.contains("nocLinks") shouldBe false
+    r.contains("gatesBySubsystem") shouldBe false
+    fields(r("checks")).contains("gatesBySubsystem") shouldBe false
+    fields(r("estimate")).contains("subsystems") shouldBe false
+    r("hash") shouldBe JStr(IrV2.hash(IrV2.load(Paths.get("src/loom/examples/ring_4.json"))))
+  }
+
+  it should "surface prefixed subsystem errors as a normal gate-failure response" in {
+    val v0 = IrV2.fromJson(Json.parse(hierText))
+    val brokenB = v0.subsystems(1)
+    val bad = v0.copy(subsystems = Seq(v0.subsystems.head,
+      brokenB.copy(nodes = brokenB.nodes.map(n =>
+        if (n.id == "s1") n.copy(attach = "rX") else n))))
+    val r = fields(LoomApi.evaluate(loom.ir.Canonical.pretty(IrV2.toJson(bad))))
+    r("ok") shouldBe JBool(false)
+    strs(r("errors")) should contain(
+      "subsystem 'B': C0: [CHK-12] node 's1' attach 'rX' is not a declared router")
   }
 }

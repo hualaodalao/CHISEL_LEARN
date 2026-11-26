@@ -15,10 +15,24 @@ class ChiNetworkTop(p: ChiNetworkParams) extends Module {
   private val qm = new ChiQosMap(c)
   private val vw = c.vcWidth
 
+  private val domOf = p.domainOf
+  private val nDom = p.nDomain
+  // First version: local nodes attach only to domain-0 routers; non-zero-domain
+  // routers are transit (node-boundary CDC for clocked nodes is a follow-up).
+  require(p.allNodes.forall(n => domOf(n.router) == 0),
+    "flat async: local nodes must attach to domain-0 routers (HW-14 first version)")
+
   val io = IO(new Bundle {
     val rn = Vec(p.nRn, Flipped(new ChiRnPort(c)))
     val sn = Vec(p.nSn, Flipped(new ChiSnPort(c)))
+    val domClk = Vec(nDom - 1, Input(Bool()))
+    val domReset = Vec(nDom - 1, Input(Bool()))
   })
+
+  private def clkOf(d: Int): Clock = if (d == 0) clock else io.domClk(d - 1).asClock
+  private def rstOf(d: Int): Reset = if (d == 0) reset else io.domReset(d - 1).asAsyncReset
+  private def clkBoolOf(d: Int): Bool = if (d == 0) clock.asBool else io.domClk(d - 1)
+  private def rstBoolOf(d: Int): Bool = if (d == 0) reset.asBool else io.domReset(d - 1)
 
   private def inject[T <: Data](gen: T, src: DecoupledIO[T], dst: DecoupledIO[ChiVcBundle[T]], qosOf: T => UInt): Unit = {
     val a = Module(new ChiVcInject(gen, qm, qosOf))
@@ -28,14 +42,23 @@ class ChiNetworkTop(p: ChiNetworkParams) extends Module {
     val a = Module(new ChiVcEject(gen, vw))
     LmWire.link(src, a.io.in); LmWire.link(a.io.out, dst)
   }
+  private def regulate(src: DecoupledIO[ChiReqFlit], qg: Option[ChiQosGen]): DecoupledIO[ChiReqFlit] =
+    qg match {
+      case Some(g) =>
+        val r = Module(new ChiQosRegulator(c, g.bytesPerCycle, g.saturationBytes))
+        LmWire.link(src, r.io.in); r.io.out
+      case None => src
+    }
   private def vcReq = new ChiVcBundle(new ChiReqFlit(c), vw)
   private def vcRsp = new ChiVcBundle(new ChiRspFlit(c), vw)
   private def vcSnp = new ChiVcBundle(new ChiSnpFlit(c), vw)
   private def vcDat = new ChiVcBundle(new ChiDatFlit(c), vw)
 
-  private val routers = p.routers.map { r =>
-    Module(new ChiRouter4(c, r.nPort, r.route, r.route, r.route, r.route,
-      depth = p.queueDepth, snpEnable = p.snpEnable, cutOut = r.outCut))
+  private val routers = p.routers.zipWithIndex.map { case (r, k) =>
+    withClockAndReset(clkOf(domOf(k)), rstOf(domOf(k))) {
+      Module(new ChiRouter4(c, r.nPort, r.route, r.route, r.route, r.route,
+        depth = p.queueDepth, snpEnable = p.snpEnable, cutOut = r.outCut))
+    }
   }
 
   private val rnIndex = p.rn.zipWithIndex.map { case (n, i) => n.nodeId -> i }.toMap
@@ -51,6 +74,7 @@ class ChiNetworkTop(p: ChiNetworkParams) extends Module {
       val port = rt.io.port(pIdx)
       if (ChiNodeKind.isRequest(n.kind)) {
         val i = rnIndex(n.nodeId)
+        val qg = p.qosGen.find(_.nodeId == n.nodeId)
         val samTable = if (p.samByRn.nonEmpty) p.samByRn(i) else p.sam
         if (samTable.nonEmpty) {
           // NI ingress: SAM decode addr -> TgtID + hit; unmapped answered NDERR
@@ -60,11 +84,12 @@ class ChiNetworkTop(p: ChiNetworkParams) extends Module {
           val ni = Module(new ChiNiError(c))
           LmWire.link(io.rn(i).req, ni.io.req)
           ni.io.hit := hit
+          val regOut = regulate(ni.io.fwd, qg)
           val reqInj = Module(new ChiVcInject(new ChiReqFlit(c), qm, (f: ChiReqFlit) => f.qos))
-          reqInj.io.in.valid := ni.io.fwd.valid
-          reqInj.io.in.bits := ni.io.fwd.bits
+          reqInj.io.in.valid := regOut.valid
+          reqInj.io.in.bits := regOut.bits
           reqInj.io.in.bits.tgtId := tgt
-          ni.io.fwd.ready := reqInj.io.in.ready
+          regOut.ready := reqInj.io.in.ready
           LmWire.link(reqInj.io.out, port.rxReq)
           val rspEj = Module(new ChiVcEject(new ChiRspFlit(c), vw))
           LmWire.link(port.txRsp, rspEj.io.in)
@@ -74,7 +99,7 @@ class ChiNetworkTop(p: ChiNetworkParams) extends Module {
           ni.io.rsp.ready := io.rn(i).rsp.ready && niRspValid
           rspEj.io.out.ready := io.rn(i).rsp.ready && !niRspValid
         } else {
-          inject(new ChiReqFlit(c), io.rn(i).req, port.rxReq, (f: ChiReqFlit) => f.qos)
+          inject(new ChiReqFlit(c), regulate(io.rn(i).req, qg), port.rxReq, (f: ChiReqFlit) => f.qos)
           eject(new ChiRspFlit(c), port.txRsp, io.rn(i).rsp)
         }
         eject(new ChiDatFlit(c), port.txDat, io.rn(i).dat)
@@ -124,13 +149,31 @@ class ChiNetworkTop(p: ChiNetworkParams) extends Module {
     }
   }
 
-  // Router-router links: cross-connect TX -> RX (VC sideband preserved).
+  // Router-router links: cross-connect TX -> RX (VC sideband preserved). An
+  // async link (asyncFifoDepth>=2) inserts a per-channel ChiAsyncLink CDC per
+  // direction, sourced in the TX router's domain and crossing into the RX
+  // router's domain (HW-14). Sync links wire directly.
   for (l <- p.links) {
     val a = routers(l.fromRouter).io.port(l.fromPort)
     val b = routers(l.toRouter).io.port(l.toPort)
-    LmWire.link(a.txReq, b.rxReq); LmWire.link(b.txReq, a.rxReq)
-    LmWire.link(a.txRsp, b.rxRsp); LmWire.link(b.txRsp, a.rxRsp)
-    LmWire.link(a.txDat, b.rxDat); LmWire.link(b.txDat, a.rxDat)
-    LmWire.link(a.txSnp, b.rxSnp); LmWire.link(b.txSnp, a.rxSnp)
+    val da = domOf(l.fromRouter); val db = domOf(l.toRouter)
+    if (l.asyncFifoDepth >= 2) {
+      def cross[T <: Data](gen: T, src: DecoupledIO[ChiVcBundle[T]], dst: DecoupledIO[ChiVcBundle[T]], sd: Int, dd: Int): Unit = {
+        withClockAndReset(clkOf(sd), rstOf(sd)) {
+          val al = Module(new ChiAsyncLink(new ChiVcBundle(gen, vw), l.asyncFifoDepth))
+          al.io.dstClk := clkBoolOf(dd); al.io.dstReset := rstBoolOf(dd)
+          LmWire.link(src, al.io.in); LmWire.link(al.io.out, dst)
+        }
+      }
+      cross(new ChiReqFlit(c), a.txReq, b.rxReq, da, db); cross(new ChiReqFlit(c), b.txReq, a.rxReq, db, da)
+      cross(new ChiRspFlit(c), a.txRsp, b.rxRsp, da, db); cross(new ChiRspFlit(c), b.txRsp, a.rxRsp, db, da)
+      cross(new ChiDatFlit(c), a.txDat, b.rxDat, da, db); cross(new ChiDatFlit(c), b.txDat, a.rxDat, db, da)
+      cross(new ChiSnpFlit(c), a.txSnp, b.rxSnp, da, db); cross(new ChiSnpFlit(c), b.txSnp, a.rxSnp, db, da)
+    } else {
+      LmWire.link(a.txReq, b.rxReq); LmWire.link(b.txReq, a.rxReq)
+      LmWire.link(a.txRsp, b.rxRsp); LmWire.link(b.txRsp, a.rxRsp)
+      LmWire.link(a.txDat, b.rxDat); LmWire.link(b.txDat, a.rxDat)
+      LmWire.link(a.txSnp, b.rxSnp); LmWire.link(b.txSnp, a.rxSnp)
+    }
   }
 }

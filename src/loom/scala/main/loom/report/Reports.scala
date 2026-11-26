@@ -1,5 +1,6 @@
 package loom.report
 
+import loom.check.ChecksV2
 import loom.chi.{ChiNetNode, ChiNetworkParams, ChiNodeKind, ChiPartitionParams, ChiWidths}
 import loom.gen.ChiAssemble
 import loom.ir._
@@ -453,7 +454,8 @@ object Reports {
 
   /** GEN-23 (UP-02): additive estimate/API qosGen rows — the raw declaration
     * caliber (bandwidth MB/s, saturation bytes). Empty when no node declares
-    * qosGen. Declaration-only: injection logic pending HW-10 (SEM-18).
+    * qosGen. Consumed by HW-10 (SEM-18): ChiQosRegulator token buckets at RN
+    * injection; rows keep the declaration caliber for the report.
     */
   def qosGenJsonV2(v2: IrV2): JValue = {
     val ids = ChiAssemble.nodeIds(v2)
@@ -470,8 +472,10 @@ object Reports {
 
   /** GEN-24 (UP-08): additive estimate/API adapt rows from the assembled
     * AdaptParams (mismatch list + explicit depth freezes, SEM-19). Empty
-    * when nothing is declared/mismatched. Declaration-only: store&fwd
-    * adaptation logic pending HW-12.
+    * when nothing is declared/mismatched. Width mismatches at chi-node DAT
+    * tiers (128/256/512) are consumed by HW-12 via the GEN wrapper
+    * ChiAdaptedNetworkTop (ChiNiAdapt gearboxes); frequency-mismatch
+    * node-boundary CDC is pending.
     */
   def adaptJsonV2(v2: IrV2): JValue = {
     val nameOfId = v2.nodes.map(_.id).zip(ChiAssemble.nodeIds(v2)).map { case (n, i) => i -> n }.toMap
@@ -486,6 +490,29 @@ object Reports {
         "mismatch" -> JBool(p.mismatch)))
     }.toVector)
   }
+
+  /** GEN-25 (UP-07): additive subsystem summary rows — per-subsystem node/
+    * router/SAM counts plus the chi snapshot of the independent projection
+    * (datWidth tiers may differ; the HW-11 bridge adapts).
+    */
+  def subsystemsJsonV2(v2: IrV2): JValue =
+    JArr(v2.subsystems.map { s =>
+      JObj(Vector(
+        "name" -> JStr(s.name),
+        "nodes" -> JNum(BigDecimal(s.nodes.size)),
+        "routers" -> JNum(BigDecimal(s.routers.size)),
+        "sam" -> JNum(BigDecimal(s.sam.size)),
+        "chi" -> chiSnapshotJson(IrV2.projectSubsystem(v2, s))))
+    }.toVector)
+
+  /** GEN-25 (UP-07): additive gatesBySubsystem key — subsystem name → the
+    * full per-subsystem gate vector (ChecksV2.run on the projection). The
+    * top-level G1 keys are the AND over these results (SEM-20).
+    */
+  def gatesBySubsystemJsonV2(v2: IrV2): JValue =
+    JObj(ChecksV2.gatesBySubsystem(v2).map { case (name, gates) =>
+      name -> (JObj(gates.map { case (k, ok) => (k, JBool(ok): JValue) }): JValue)
+    }.toVector)
 
   /** GEN-17 estimate row: CHI caliber. Capacity is the DAT flit line rate
     * (`datWidth/8 * MHz/1000 GB/s`); node/SAM tables, flit widths, three-level
@@ -564,6 +591,31 @@ object Reports {
       "fixed" -> areaFixed
     ).sortBy(-_._2)
 
+    // SEM-14 (HW-14): domain index = clockDomains declaration order; domain 0
+    // is the top module clock. Multi-domain flat tops expose domClk/domReset
+    // as inputs — the integrator supplies them, GEN emits no clock wrapper.
+    val domainOfClock = v2.clockDomains.map(_.id).zipWithIndex.toMap
+    val usedDomains = v2.routers.flatMap(r => domainOfClock.get(r.clock)).distinct
+    val clockingNotes =
+      if (usedDomains.size > 1) Vector(
+        s"clocking = ${usedDomains.size} router clock domains (index = clockDomains declaration order; domain 0 '${v2.clockDomains.headOption.map(_.id).getOrElse("")}' is the top module clock); domClk/domReset are exposed top-level inputs supplied by the integrator (no GEN clock wrapper); cdc=async links insert ChiAsyncLink (SEM-14/HW-14); local nodes stay on domain-0 routers (CHK-54)")
+      else Vector.empty
+
+    // GEN-25 (UP-07): additive hierarchical keys, present only when
+    // subsystems are declared so flat estimate baselines stay byte-identical.
+    val hierFields =
+      if (v2.subsystems.isEmpty) Vector.empty[(String, JValue)]
+      else Vector(
+        "subsystems" -> subsystemsJsonV2(v2),
+        "nocLinks" -> JArr(v2.nocLinks.map(IrV2.nocLinkJson).toVector),
+        "gatesBySubsystem" -> gatesBySubsystemJsonV2(v2))
+    val hierNotes =
+      if (v2.subsystems.isEmpty) Vector.empty[String]
+      else Vector(
+        "subsystems = independent NoCs (SEM-20: local NodeID/SAM/chi/clock domains); nocLinks = " +
+          "dependency-terminating bridge endpoints, bridges.noc is a count-only proxy; " +
+          "hierarchical emission pending HW-11 ChiNocBridge (check/estimate only)")
+
     JObj(Vector(
       "schema" -> JStr("loom/estimate/v1"),
       "name" -> JStr(v2.meta.name),
@@ -577,9 +629,13 @@ object Reports {
       "channels" -> JArr(channelsV2(v2).map(JStr(_)).toVector),
       "bridges" -> JObj(Vector(
         "rnAxi" -> JNum(BigDecimal(rnAxiCount)),
-        "snAxi" -> JNum(BigDecimal(snAxiCount)))),
-      // GEN-23/GEN-24 (S8, v1.3.0): additive declaration-only rows; empty
-      // arrays when nothing is declared/mismatched. No RTL effect yet.
+        "snAxi" -> JNum(BigDecimal(snAxiCount))) ++
+        // GEN-25 (UP-07): nocLink bridge count, additive only when declared.
+        (if (v2.nocLinks.isEmpty) Vector.empty[(String, JValue)]
+         else Vector("noc" -> JNum(BigDecimal(v2.nocLinks.size))))),
+      // GEN-23/GEN-24 (wave4): declaration caliber rows; qosGen drives RN
+      // token buckets (HW-10) and chi-node width mismatches drive the GEN
+      // ChiNiAdapt wrapper (HW-12). Empty arrays when nothing is declared.
       "qosGen" -> qosGenJsonV2(v2),
       "adapt" -> adaptJsonV2(v2),
       "totals" -> JObj(Vector(
@@ -600,22 +656,22 @@ object Reports {
         "flitCount64B" -> JNum(BigDecimal(ChiWidths.flitCount(64, datWidth))),
         "maxNodes" -> JNum(BigDecimal(1 << v2.chi.nodeIdWidth))
       )),
-      "assumptions" -> JArr(Vector(
+      "assumptions" -> JArr((Vector(
         "capacity = datWidth/8 * clockMHz / 1000 GB/s per direction (DAT flit line rate; REQ/RSP/SNP are narrow flits)",
         "latency proxy = 2 cycles per router + 1 cycle per pipe stage; excludes arbitration and queueing",
         "crosspoints = derivedIn * derivedOut; CHI router is flat with one register stage per output",
         "area proxy = 16694.5 + 3264.5*crosspoints um^2, v1 four-channel nangate45 calibration; CHI calibration pending PPA (D10)",
         s"SRAM proxy = ${Sram.AreaPerBitUm2} um^2/bit placeholder over memories with depth*width >= ${Sram.ThresholdBits}; not calibrated",
         "bridges{rnAxi,snAxi} = proxy counts of AXI4 boundary bridges per node protocol (GEN-22); count-only, no PPA claim",
-        "qosGen = declaration-only bandwidth shaping (SEM-18: bytesPerCycle = bandwidth MB/s / node freqMHz); injection logic pending HW-10, no RTL effect",
-        "adapt = declaration-only NIU store&fwd parameters (SEM-19: mismatch = dataWidth != chi.datWidth or node.clock != attach router.clock; fifoDepth default 4); adaptation logic pending HW-12, no RTL effect",
+        "qosGen = active RN-injection token-bucket regulation (SEM-18/HW-10: bytesPerCycle = bandwidth MB/s / node freqMHz; ChiQosRegulator at RN entry after SAM/NI); scope: regulation at RN injection only, fabric arbitration unchanged",
+        "adapt = active NIU DAT width adaptation (SEM-19/HW-12: mismatch = dataWidth != chi.datWidth or node.clock != attach router.clock; fifoDepth default 4); ChiNiAdapt gearboxes inserted by the GEN wrapper ChiAdaptedNetworkTop at mismatched chi-node DAT boundaries (128/256/512 tiers); AXI nodes keep bridge-layer adaptation; frequency-mismatch node CDC pending",
         "estimate only; not signoff"
-      ).map(JStr(_))),
+      ) ++ clockingNotes ++ hierNotes).map(JStr(_))),
       "areaSensitivity" -> JArr(areaTerms.map { case (k, v) =>
         JObj(Vector("term" -> JStr(k), "um2" -> rounded(v)))
       }.toVector),
       "warnings" -> JArr(timingWarningsV2(v2).map(JStr(_)).toVector)
-    ))
+    ) ++ hierFields)
   }
 
   /** GEN-17 chi_nodes.json: rn/sn/hn/mn tables with attach/localPort, SAM with
@@ -720,8 +776,8 @@ object Reports {
       errors: List[String],
       warnings: List[String],
       gates: Vector[(String, Boolean)]
-  ): JValue =
-    JObj(Vector(
+  ): JValue = {
+    val base = Vector(
       "schema" -> JStr("loom/checks/v1"),
       "name" -> JStr(v2.meta.name),
       "configHash" -> JStr(configHash),
@@ -730,7 +786,12 @@ object Reports {
       "errors" -> JArr(errors.map(JStr(_)).toVector),
       "warnings" -> JArr(warnings.map(JStr(_)).toVector),
       "gates" -> JObj(gates.map { case (k, v) => (k, JBool(v): JValue) })
-    ))
+    )
+    // GEN-25 (UP-07): additive per-subsystem gate vectors, present only when
+    // subsystems are declared (flat checks.json baselines stay unchanged).
+    JObj(if (v2.subsystems.isEmpty) base
+      else base :+ ("gatesBySubsystem" -> gatesBySubsystemJsonV2(v2)))
+  }
 
   /** GEN-17 ports.json (partition): v1 keys preserved (masters/slaves map to
     * RN/SN), plus nodes[] and boundary channels/lcreditDepth.
@@ -790,6 +851,14 @@ object Reports {
       ))
     }
 
+    // SEM-14 (HW-14): when the flat fabric spans multiple clock domains,
+    // note the exposed domClk/domReset inputs (integrator-supplied; domain
+    // index = clockDomains declaration order, domain 0 = top module clock).
+    val clockingField =
+      if (net.nDomain > 1) Vector(
+        "clocking" -> JStr(s"flat fabric spans ${net.nDomain} clock domains (index = clockDomains declaration order, domain 0 = top module clock); domClk/domReset are exposed top-level inputs supplied by the integrator, no GEN clock wrapper (SEM-14/HW-14)"))
+      else Vector.empty
+
     JObj(Vector(
       "schema" -> JStr("loom/ports/v1"),
       "name" -> JStr(v2.meta.name),
@@ -802,7 +871,7 @@ object Reports {
       "slaves" -> JArr(pp.sn.map(epObj).toVector),
       "nodes" -> JArr(pp.nodes.sortBy(_.nodeId).map(nodeObj).toVector),
       "boundary" -> JArr(boundaryObjs.toVector)
-    ))
+    ) ++ clockingField)
   }
 
   /** GEN-09: manifest plus the additive irSchema/chi keys. */

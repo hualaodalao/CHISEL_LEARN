@@ -124,7 +124,10 @@ class TbGenSpec extends AnyFlatSpec with Matchers {
     Console.withOut(new PrintStream(buf, true, "UTF-8")) {
       LoomMain.runEmit(List("--config", "src/loom/examples/ring_4.json", "--out", out.toString))
     }
-    val tb = Files.readString(out.resolve("tb/ChiNetworkTop_tb.sv"))
+    // ring_4 has 128-bit chi nodes on a 256-bit fabric: since wave4 (HW-12
+    // §9.3) the emitted top is the GEN adaptation wrapper, and the tb
+    // skeleton targets the selected top (GEN-17 tb row).
+    val tb = Files.readString(out.resolve("tb/ChiAdaptedNetworkTop_tb.sv"))
     tb should include("task automatic chi_read_no_snp(")
     tb should include("task automatic chi_write_no_snp_full(")
     tb should include("localparam int FLITS_64B = 2;")

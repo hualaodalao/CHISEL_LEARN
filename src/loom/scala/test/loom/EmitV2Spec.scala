@@ -385,7 +385,7 @@ class EmitV2Spec extends AnyFlatSpec with Matchers {
     frozenRows.head.fifoDepth shouldBe 16
   }
 
-  it should "carry declaration-only qosGen/adapt estimate rows with HW-10/HW-12 assumptions (GEN-23/24)" in {
+  it should "carry qosGen/adapt estimate rows with consumed HW-10/HW-12 assumptions (GEN-23/24)" in {
     val base = loom.ir.IrV2.load(Paths.get(v2Cfg))
     val v = base.copy(nodes = base.nodes.map(n =>
       if (n.id == "m0") n.copy(qosGen = Some(loom.ir.QosGenSpec("limiter", 1000, 4096)),
@@ -408,8 +408,8 @@ class EmitV2Spec extends AnyFlatSpec with Matchers {
     m0.get("mismatch") shouldBe Some(JBool(true))
     val assumptions = est.get("assumptions").get.asInstanceOf[loom.ir.JArr].items
       .collect { case JStr(s) => s }
-    assumptions.exists(s => s.contains("HW-10") && s.contains("no RTL effect")) shouldBe true
-    assumptions.exists(s => s.contains("HW-12") && s.contains("no RTL effect")) shouldBe true
+    assumptions.exists(s => s.contains("HW-10") && s.contains("RN-injection")) shouldBe true
+    assumptions.exists(s => s.contains("HW-12") && s.contains("ChiNiAdapt")) shouldBe true
     // baseline without declarations: qosGen empty, existing keys untouched
     val plainOut = Files.createTempDirectory("loom-emitv2-s8-plain")
     capture(LoomMain.runEmit(List("--config", v2Cfg, "--out", plainOut.toString)))
@@ -417,5 +417,209 @@ class EmitV2Spec extends AnyFlatSpec with Matchers {
     plain.get("qosGen") shouldBe Some(loom.ir.JArr(Vector.empty))
     plain.get("bridges").isDefined shouldBe true
     plain.get("totals").isDefined shouldBe true
+  }
+
+  // ---- S9: hardware wave4 consumption (SEM-14/18/19, GEN-23/24, CHK-54) ----
+
+  behavior of "loom emit wave4 (HW-14 flat async, HW-10 qosGen, HW-12 adapt wrapper)"
+
+  /** Same fixture as CheckV2Spec: chain_4r with r1/r2 on a second domain and
+    * async boundary links; nodes stay on domain-0 routers r0/r3.
+    */
+  private def dualClockChain: loom.ir.IrV2 = {
+    val v = loom.ir.IrV2.load(Paths.get("src/loom/examples/chain_4r.json"))
+    v.copy(
+      clockDomains = v.clockDomains :+ loom.ir.ClockDomain("io", 500),
+      routers = v.routers.map(r =>
+        if (r.name == "r1" || r.name == "r2") r.copy(clock = "io") else r),
+      links = v.links.map(l =>
+        if ((l.from == "r0" && l.to == "r1") || (l.from == "r2" && l.to == "r3"))
+          l.copy(cdc = "async", asyncFifoDepth = 4) else l))
+  }
+
+  it should "assemble routerDomain by clockDomains declaration order and async depths (SEM-14)" in {
+    val net = loom.gen.ChiAssemble.networkParams(dualClockChain)
+    // GEN-05 name-sorted routers r0,r1,r2,r3; core=0 (head), io=1
+    net.routerDomain shouldBe Seq(0, 1, 1, 0)
+    net.nDomain shouldBe 2
+    net.hasAsync shouldBe true
+    val nameOf = net.routers.map(r => r.index -> r.name).toMap
+    val byPair = net.links.map(l => (nameOf(l.fromRouter), nameOf(l.toRouter)) -> l).toMap
+    byPair(("r0", "r1")).asyncFifoDepth shouldBe 4
+    byPair(("r2", "r3")).asyncFifoDepth shouldBe 4
+    byPair(("r1", "r2")).asyncFifoDepth shouldBe 0 // sync inside domain io
+    // single-clock baseline: all routers on domain 0, no async
+    val plain = loom.gen.ChiAssemble.networkParams(routeBase)
+    plain.routerDomain shouldBe Seq(0, 0, 0, 0)
+    plain.links.foreach(_.asyncFifoDepth shouldBe 0)
+  }
+
+  it should "emit a flat dual-clock ChiNetworkTop with domClk inputs and async links (HW-14)" in {
+    val v0 = dualClockChain
+    val v = v0.copy(nodes = v0.nodes.map(_.copy(dataWidth = 256))) // matched: no wrapper
+    val out = Files.createTempDirectory("loom-emitv2-flatasync")
+    val log = capture(LoomMain.runEmit(List("--config", writeCfg(v), "--out", out.toString)))
+    log should not include "ERROR"
+    val top = out.resolve("ChiNetworkTop.sv")
+    Files.exists(top) shouldBe true
+    val sv = Files.readString(top)
+    sv should include("io_domClk_0")
+    sv should include("io_domReset_0")
+    sv should include("ChiAsyncLink")
+    Files.exists(out.resolve("tb/ChiNetworkTop_tb.sv")) shouldBe true
+    // estimate carries the integrator-supplied clocking note (nDomain > 1)
+    val est = Json.parse(Files.readString(out.resolve("estimate.json"))).asInstanceOf[JObj]
+    val assumptions = est.get("assumptions").get.asInstanceOf[loom.ir.JArr].items
+      .collect { case JStr(s) => s }
+    assumptions.exists(s => s.contains("clocking = 2 router clock domains") &&
+      s.contains("domClk/domReset")) shouldBe true
+  }
+
+  it should "map qosGen declarations into ChiNetworkParams.qosGen (SEM-18/HW-10)" in {
+    val base = routeBase
+    loom.gen.ChiAssemble.networkParams(base).qosGen shouldBe Nil
+    val v = base.copy(nodes = base.nodes.map(n =>
+      if (n.id == "m0") n.copy(qosGen = Some(loom.ir.QosGenSpec("limiter", 1000, 4096))) else n))
+    loom.gen.ChiAssemble.networkParams(v).qosGen shouldBe
+      Seq(loom.chi.ChiQosGen(0, "limiter", 1.0, 4096))
+  }
+
+  it should "map adapt rows into ChiNetworkParams.adapt and select the GEN wrapper (SEM-19/HW-12)" in {
+    val net = loom.gen.ChiAssemble.networkParams(routeBase) // 128-bit nodes, 256-bit fabric
+    net.adapt.length shouldBe 4
+    net.adapt.foreach { a =>
+      a.dataWidth shouldBe 128
+      a.datWidth shouldBe 256
+      a.fifoDepth shouldBe 4
+      a.mismatch shouldBe true
+    }
+    loom.gen.ChiAdaptedNetworkTop.needed(net) shouldBe true
+    // matched fabric: no adaptation, native top stays
+    val matched = routeBase.copy(nodes = routeBase.nodes.map(_.copy(dataWidth = 256)))
+    loom.gen.ChiAdaptedNetworkTop.needed(loom.gen.ChiAssemble.networkParams(matched)) shouldBe false
+    // axi4 nodes keep bridge-layer adaptation: no double adapt
+    val allAxi = routeBase.copy(
+      chi = routeBase.chi.copy(portMode = "axi4"),
+      nodes = routeBase.nodes.map(_.copy(protocol = "axi4")))
+    loom.gen.ChiAdaptedNetworkTop.needed(loom.gen.ChiAssemble.networkParams(allAxi)) shouldBe false
+  }
+
+  it should "emit ChiAdaptedNetworkTop with ChiNiAdapt for width-mismatched chi nodes (HW-12 §9.3)" in {
+    val out = Files.createTempDirectory("loom-emitv2-adapt")
+    capture(LoomMain.runEmit(List("--config", v2Cfg, "--out", out.toString)))
+    val top = out.resolve("ChiAdaptedNetworkTop.sv")
+    Files.exists(top) shouldBe true
+    val sv = Files.readString(top)
+    sv should include("module ChiAdaptedNetworkTop")
+    sv should include("ChiNiAdapt")
+    // inner network still emitted as a child file; tb targets the wrapper
+    Files.exists(out.resolve("ChiNetworkTop.sv")) shouldBe true
+    Files.exists(out.resolve("tb/ChiAdaptedNetworkTop_tb.sv")) shouldBe true
+    Files.exists(out.resolve("tb/ChiNetworkTop_tb.sv")) shouldBe false
+  }
+
+  it should "forward domClk through the adaptation wrapper on a dual-clock chain (HW-14 + HW-12)" in {
+    val out = Files.createTempDirectory("loom-emitv2-adapt-async")
+    capture(LoomMain.runEmit(List("--config", writeCfg(dualClockChain), "--out", out.toString)))
+    val top = out.resolve("ChiAdaptedNetworkTop.sv")
+    Files.exists(top) shouldBe true
+    val sv = Files.readString(top)
+    sv should include("io_domClk_0")
+    sv should include("ChiNiAdapt")
+    Files.readString(out.resolve("ChiNetworkTop.sv")) should include("ChiAsyncLink")
+  }
+
+  // ---- UP-07 GEN-25: subsystem/bridge assembly + hierarchical emit guard ----
+
+  behavior of "loom hierarchical multi-NoC (GEN-25, UP-07)"
+
+  private def subChain(name: String, rn: String, sn: String, r0: String, r1: String,
+      samBase: Long): loom.ir.SubsystemSpec = {
+    val v = loom.ir.IrV2.load(Paths.get(v2Cfg))
+    loom.ir.SubsystemSpec(name, v.clockDomains,
+      Seq(loom.ir.NodeV2(rn, "rn-i", None, "core", r0, "chi", 256, 64, 0),
+        loom.ir.NodeV2(sn, "sn-f", None, "core", r1, "chi", 256, 64, 0)),
+      Seq(loom.ir.SamWindowV2(samBase, 4096L, sn)),
+      v.qos, v.chi,
+      Seq(loom.ir.RouterV2(r0, "core", None, None, None, "any"),
+        loom.ir.RouterV2(r1, "core", None, None, None, "any")),
+      Seq(loom.ir.LinkV2(rn, r0, 256, "sync", 0, 0, false, Seq("req", "rsp", "dat"), 4),
+        loom.ir.LinkV2(r0, r1, 256, "sync", 0, 0, false, Seq("req", "rsp", "dat"), 4),
+        loom.ir.LinkV2(r1, sn, 256, "sync", 0, 0, false, Seq("req", "rsp", "dat"), 4)),
+      v.timing)
+  }
+
+  private def hierCfg: loom.ir.IrV2 = {
+    val v = loom.ir.IrV2.load(Paths.get(v2Cfg))
+    v.copy(meta = v.meta.copy(name = "hier_ok"),
+      nodes = Nil, sam = Nil, routers = Nil, links = Nil,
+      subsystems = Seq(subChain("A", "m0", "s0", "rA0", "rA1", 0L),
+        subChain("B", "m1", "s1", "rB0", "rB1", 65536L)),
+      nocLinks = Seq(loom.ir.NocLinkSpec("A", "B", "rA0", "rB1",
+        Seq((65536L, 4096L)), "sync", 0, false)))
+  }
+
+  it should "guard hierarchical emission with the HW-11 error; flat still emits" in {
+    // Guard is a pure function (sys.exit cannot be trapped on modern JDKs).
+    LoomMain.hierarchicalEmitGuard(hierCfg) shouldBe Some(
+      "ERROR: hierarchical emission requires HW-11 (ChiNocBridge); check/estimate available")
+    LoomMain.hierarchicalEmitGuard(loom.ir.IrV2.load(Paths.get(v2Cfg))) shouldBe None
+    // flat configs keep emitting through the same command
+    val flatOut = Files.createTempDirectory("loom-emitv2-hier-flat")
+    capture(LoomMain.runEmit(List("--config", v2Cfg, "--out", flatOut.toString)))
+    Files.exists(flatOut.resolve("ChiNetworkTop.sv")) shouldBe true
+  }
+
+  it should "assemble subsystemParams projections and BridgeParams for HW-11 (GEN-25)" in {
+    val v = hierCfg
+    val ps = loom.gen.ChiAssemble.subsystemParams(v)
+    ps.map(_._1) shouldBe Seq("A", "B")
+    ps.foreach { case (name, net) =>
+      net.name shouldBe name
+      net.nRn shouldBe 1
+      net.nSn shouldBe 1
+      net.routers.length shouldBe 2
+    }
+    ps.head._2.sam.map(e => (e.base, e.size)) shouldBe Seq((0L, 4096L))
+    ps(1)._2.sam.map(e => (e.base, e.size)) shouldBe Seq((65536L, 4096L))
+    loom.gen.ChiAssemble.bridgeParams(v) shouldBe Seq(
+      loom.gen.ChiAssemble.BridgeParams("A", "B", "rA0", "rB1",
+        Seq((65536L, 4096L)), 0, false, 256, 256))
+    // flat configs assemble nothing hierarchical
+    loom.gen.ChiAssemble.subsystemParams(loom.ir.IrV2.load(Paths.get(v2Cfg))) shouldBe Nil
+    loom.gen.ChiAssemble.bridgeParams(loom.ir.IrV2.load(Paths.get(v2Cfg))) shouldBe Nil
+  }
+
+  it should "check and estimate a hierarchical config with additive GEN-25 keys" in {
+    val cfgFile = Files.createTempFile("loom-emitv2-hier-chk", ".json")
+    Files.writeString(cfgFile, loom.ir.Canonical.pretty(loom.ir.IrV2.toJson(hierCfg)))
+    val out = Files.createTempDirectory("loom-emitv2-hier-chk-out")
+    val log = capture(LoomMain.runCheck(List("--config", cfgFile.toString, "--out", out.toString)))
+    log should include("OK name=hier_ok")
+    val checks = Json.parse(Files.readString(out.resolve("checks.json"))).asInstanceOf[JObj]
+    checks.get("ok") shouldBe Some(JBool(true))
+    val bySub = checks.get("gatesBySubsystem").get.asInstanceOf[JObj]
+    bySub.get("A").get.asInstanceOf[JObj].get("G1-REQ") shouldBe Some(JBool(true))
+    bySub.get("B").get.asInstanceOf[JObj].get("G1-DAT") shouldBe Some(JBool(true))
+    capture(LoomMain.runEstimate(List("--config", cfgFile.toString, "--out", out.toString)))
+    val est = Json.parse(Files.readString(out.resolve("estimate.json"))).asInstanceOf[JObj]
+    val subs = est.get("subsystems").get.asInstanceOf[loom.ir.JArr].items.map(_.asInstanceOf[JObj])
+    subs.length shouldBe 2
+    subs.head.get("name") shouldBe Some(JStr("A"))
+    subs.head.get("nodes") shouldBe Some(JNum(BigDecimal(2)))
+    subs.head.get("routers") shouldBe Some(JNum(BigDecimal(2)))
+    subs.head.get("sam") shouldBe Some(JNum(BigDecimal(1)))
+    subs.head.get("chi").get.asInstanceOf[JObj].get("datWidth") shouldBe Some(JNum(BigDecimal(256)))
+    est.get("nocLinks").get.asInstanceOf[loom.ir.JArr].items.length shouldBe 1
+    est.get("bridges").get.asInstanceOf[JObj].get("noc") shouldBe Some(JNum(BigDecimal(1)))
+    est.get("gatesBySubsystem").isDefined shouldBe true
+    // flat estimate baseline: none of the hierarchical keys appear
+    val flatOut = Files.createTempDirectory("loom-emitv2-hier-est-flat")
+    capture(LoomMain.runEstimate(List("--config", v2Cfg, "--out", flatOut.toString)))
+    val flat = Json.parse(Files.readString(flatOut.resolve("estimate.json"))).asInstanceOf[JObj]
+    flat.get("subsystems") shouldBe None
+    flat.get("nocLinks") shouldBe None
+    flat.get("gatesBySubsystem") shouldBe None
+    flat.get("bridges").get.asInstanceOf[JObj].get("noc") shouldBe None
   }
 }
