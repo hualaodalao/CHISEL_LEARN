@@ -413,7 +413,8 @@ object LoomMain {
       ("token_chi_dbid", "src/loom/formal/token_chi_dbid.sv", 12, "CHI DBID exact-once"),
       ("token_chi_pcrd", "src/loom/formal/token_chi_pcrd.sv", 12, "CHI P-Credit retry no-loss"),
       ("token_chi_dvm", "src/loom/formal/token_chi_dvm.sv", 12, "CHI DVM collect completeness"),
-      ("token_chi_async_credit", "src/loom/formal/token_chi_async_credit.sv", 12, "CHI async link cross-domain credit")
+      ("token_chi_async_credit", "src/loom/formal/token_chi_async_credit.sv", 12, "CHI async link cross-domain credit"),
+      ("token_chi_noc_bridge", "src/loom/formal/token_chi_noc_bridge.sv", 12, "CHI inter-NoC bridge cross-domain deadlock freedom")
     )
     val checks = models.map { case (top, src, depth, prop) =>
       val log = dir.resolve(s"${top}.log")

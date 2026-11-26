@@ -8,7 +8,7 @@
 > 硬件 owner 裁定（2026-11-25，详见 §4）：HW-01…HW-07 全部已确认（HW-01 HN-I/MN 都需要；HW-02 删约束；HW-03 ChiTop 退役；HW-04/06 硬件侧提供模块 GEN 例化；HW-05 NI 就地 NDERR；HW-07 恒双向+depth 可配）；HQ-01 已答复。
 > 待 GEN 回答（详见 §5）：AQ-01/AQ-02 **已答复并经用户确认（2026-11-25，见 §5.1）**，S2/S3 对齐口径已冻结。
 >
-> **硬件总体完成状态（2026-11-26，wave1+2+3+4 闭合）**：HW-01…HW-10、HW-12、HW-13、HW-14 + HQ-01 + A1～A4 **全部硬件落地并验证**；**HW-11（NoC 间桥/UP-07）仍待用户立项**。全量 loom.* **26 suite/288 test 绿**，formal **10/10 PASS**，protocol_spec **v1.5.0**。落地明细见 §6（wave1）/§6.1（wave3）/§9（wave4 答复 GEN §8）；可例化模块契约见 §7.1，GEN 行动项见 §7.2/§9。剩余均为 GEN 装配消费点（portMode/protocol 分派、per-source routes/forbid、qosGen/adapt 传参、flat async/分区 CLI 发射、estimate），硬件不再阻塞。
+> **硬件总体完成状态（2026-11-26，wave1+2+3+4+5 闭合）**：HW-01…HW-14 + HQ-01 + A1～A4 + **HW-11（NoC 间桥/UP-07）全部硬件落地并验证**。loom.Chi* **23 suite/85 test 绿**，formal **11/11 PASS**（含 token_chi_noc_bridge 死锁自由），protocol_spec **v1.6.0**。HW-11 落地明细见 §11（答复 GEN §10）；wave1 见 §6、wave3 见 §6.1、wave4 见 §9；可例化模块契约见 §7.1/§11.1，GEN phase 2 行动项见 §11.2。剩余均为 GEN 装配消费点（portMode/protocol 分派、per-source routes/forbid、qosGen/adapt 传参、flat async/分区 CLI 发射、分层发射/estimate）+ 已记录后续（桥多 outstanding、dvmForward=true、异 cfg 子系统），硬件不再阻塞。
 
 ## 1. 修正/新增项（HW）
 
@@ -24,7 +24,7 @@
 | HW-08 | 分区顶层无 MN/DVM 逻辑 | `chi/ChiPartition.scala` ChiPartitionTop 本地口仅 RN/SN，hn-i/mn 被丢弃（S4 勘查发现；ChiNetworkTop 已接 ChiDvmMn，分区侧未对标） | ChiPartitionTop 补 MN 实例化与 SNP 广播/收集接线（对标 ChiNetworkTop L70–89），HN-I 占位口对齐 | SEM-16、GEN-17（S4 发现） | GEN 守护：partitions 非空且含 rn-d/mn/hn-i 时 elaboration 显式报错（ChiAssemble.partitionParams），不静默发射 |
 | HW-09 | portMode 不改变发射端口形态（GUI UP-04，高优先） | `ChiNetworkTop` io 恒为 CHI flit VC bundle；`ChiAxiBridge` 输出裸 flit，无 VC 适配；portMode 仅影响 node.protocol 默认与 CHK-40 | 硬件提供 AXI 边界网络顶层（或桥的 VC bundle 适配），按 portMode=axi4/both 在 RN/SN 边界实例化 ChiAxiReadBridge/WriteBridge；对标 HW-04/06"硬件出模块、GEN 例化" | IR-18/43、CHK-40、GEN-17 estimate（UP-04） | **硬件已闭合（wave2+wave3，§6/§6.1）**：ChiAxiNetworkTop per-node 混合边界（RN 读/写桥 + SN 反向桥 ChiAxiSnBridge）；GEN 做 portMode/protocol 装配分派 + estimate 桥接开销 |
 | HW-10 | NIU 无 QoS 带宽调节（GUI UP-02） | IR-25–34 仅优先级+VC；NI 注入无 fixed/limiter/regulator 逻辑 | NIU 注入侧 per-node QoS generator（kind:fixed/limiter/regulator，bandwidth/saturation 参数化），GEN 按 IR qosGen 例化 | IR-25–34 扩展、CHK-34（UP-02） | **硬件已闭合（wave4，§9.2）**：ChiQosRegulator 令牌桶 + ChiNetworkParams.qosGen 自动串入 RN 入口；GEN 映射 qosGenParams 传参即可 |
-| HW-11 | 无 NoC 间桥（GUI UP-07，低优先） | Loom 单 fabric；无层次子系统发射 | NoC 间桥 RTL（协议/时钟/地址域 crossing），GEN 分层发射例化 | 层次 IR（UP-07） | 待立项；IR subsystems schema 先行设计 |
+| HW-11 | 无 NoC 间桥（GUI UP-07，低优先） | Loom 单 fabric；无层次子系统发射 | NoC 间桥 RTL（协议/时钟/地址域 crossing），GEN 分层发射例化 | 层次 IR（UP-07） | **硬件已闭合（wave5 W11/W12/W13，§11）**：ChiNocBridge 终结型代理（窗口转发+TxnID/NodeID 重映射+DBID 拉模型+未命中 NDERR）+ 跨时钟/异宽齿轮/store&fwd 流控隔离 + ChiDatWidth + ChiSystemTop；formal token_chi_noc_bridge 死锁自由 PASS；GEN 接 phase 2 分层发射。后续：多 outstanding、dvmForward=true |
 | HW-12 | ChiNi 无速率适配（GUI UP-08，低优先） | node.dataWidth≠chi.datWidth 时 NIU 无 store&fwd 宽度/频率适配（ChiNi.scala 直通） | ChiNi 增宽度/频率失配 store&fwd 适配，参数化深度 | IR-19、ENC-01（UP-08） | **硬件已闭合（wave4，§9.3）**：ChiNiWidth 宽度 gearbox + ChiNiAdapt 频率 FIFO + ChiNetworkParams.adapt；GEN 在失配节点 DAT 边界例化接线 |
 | HW-13 | 网络顶层无 SAM 译码（UP-01 勘查发现） | `ChiSamDecode` 仅被已退役的 ChiTop 消费；ChiNetworkTop 的 TgtID 由请求方驱动，ChiNi（含 HW-05 NDERR）未接入网络顶层 | ChiNetworkTop RN 本地口接入 ChiNi/ChiSamDecode（per-RN SAM 表参数化），发射 fabric 自含地址译码与未命中 NDERR | SEM-04/05、UP-01 forbid 语义 | **硬件已闭合（wave2 方案 A + wave3 A4，§6/§6.1）**：RN 入口 addr 驱动 SAM+NI 就地 NDERR；samByRn per-source 过滤/禁止对；GEN 装配 per-source routes/forbid |
 | HW-14 | flat 配置 async link 无插入钩子（S7 勘查发现） | ChiNetworkTop/ChiNetworkParams 无 per-link async 字段/钩子；ChiAsyncLink 仅 ChiWrapperTop 分区边界消费；flat+cdc=async 发射 GEN 报明确错误 | ChiNetworkTop 内部 link 级 async 插入（ChiNetLink 增 asyncFifoDepth 消费 ChiAsyncLink），或提供 router-chunk 发射 API 供 GEN 边界例化 | IR-57/59、SEM-14（HW-04 余项） | **硬件已闭合（wave4 方案①，§9.1）**：ChiNetLink.asyncFifoDepth + routerDomain，ChiNetworkTop 按域 withClock + 跨域 link 自动插 ChiAsyncLink（首版节点挂 domain 0）；GEN 解除 flat+async 报错并装配 |
@@ -226,3 +226,29 @@ wave3 后全量 **24 suite/258 test 绿**，formal 10/10 PASS。GEN 消费点：
 - protocol_spec 增桥 block 规格（逐子模块六要素）；落地后回写本清单 §6/§10 并通知 GEN 解除发射守护、接 phase 2。
 
 > GEN phase 2（HW-11 闭合后）：LoomMain 分层发射（subsystem tops + 桥 + 系统顶层 + ports/manifest）、estimate 桥接开销、GUI F7 subsystem 层消费。
+
+## 11. 硬件答复：HW-11 闭合（2026-11-26，wave5 W11/W12/W13 落地，回应 §10）
+
+> **HW-11（UP-07）硬件全部落地并验证**。GEN 可解除分层发射守护、接 phase 2。protocol_spec **v1.6.0**（新增 LM-F028/F029/F030 + §6.24/6.25/6.26）。
+
+### 11.1 已交付模块（契约入口，chi 侧镜像 GEN 参数）
+
+- `chi.ChiNocBridge(c, windows: Seq[(Long,Long)], fromNodeId, toNodeId, asyncFifoDepth=0, toDatWidth=0, dvmForward=false)`：from=ChiSnPort(c)、to=ChiRnPort(toCfg)、dstClk/dstReset。终结型代理：窗口转发（地址不重映射）+ TxnID/NodeID 重映射 + DBID 拉模型写 + 未命中就地 NDERR。asyncFifoDepth≥2 每 to 侧通道类 ChiAsyncLink（TX from 域跨出、RX dstClk 域跨回）；toDatWidth≠c.datWidth 时 DAT 路径 ChiDatWidth 齿轮；store&fwd 两域独立反压。**单 outstanding**（多 outstanding ID 池为后续阶段，用户裁定分阶段）。**dvmForward=false**（各 NoC MN 自治；require 拒绝 true，跨桥 DVM 转发为后续）。
+- `chi.ChiDatWidth(inCfg, outCfg)`：DAT flit 宽度齿轮，store&fwd 64B 字重组 + DataID 重算，元数据逐字段保留，128/256/512 任意比逐位一致。
+- `chi.ChiSystemTop(subsystems: Seq[ChiNetworkParams], bridges: Seq[ChiBridgeLink])`：聚合子系统 ChiNetworkTop + 桥 + 端口聚合（freeRn/freeSn 扁平 Vec + domClk/domReset）。`chi.ChiBridgeLink(fromSub: Int, fromSn: Int, toSub: Int, toRn: Int, windows, asyncFifoDepth=0, toDatWidth=0, dvmForward=false)` 镜像 GEN BridgeParams（GEN 用 String 子系统名/路由器名，硬件用序号索引；GEN 装配时映射）。桥消费 fromSub.sn[fromSn] 与 toSub.rn[toRn] 两槽，不外露。**v1 各子系统 uniform ChiConfig**（DAT 宽差由桥 toDatWidth 承载）。
+
+### 11.2 GEN 行动项（phase 2 解守护）
+
+1. **桥端点节点装配**：GEN 在子系统 params 增桥从/至端点节点（fromSub 增 SN 槽、toSub 增 RN 槽），分配 NodeID/localPort，接 ChiSystemTop.bridges 的 fromSn/toRn 序号（HW-04/06 分工：硬件出顶层模块，GEN 例化接线）。
+2. **分层发射**：LoomMain 发射 subsystem tops + ChiNocBridge + ChiSystemTop + ports/manifest；estimate 桥接开销；GUI F7 subsystem 层消费。
+3. **参数映射**：BridgeParams(String 名) → ChiBridgeLink(Int 序号)；subsystemParams 序与 bridges.fromSub/toSub 索引对齐。
+
+### 11.3 验证
+
+- ChiNocBridgeSpec 5 例（读代理/写 DBID 拉模型逐位一致/窗口未命中 NDERR/异宽 256→128 端到端/异频双时钟读）；ChiDatWidthSpec 4 例（128↔256、512↔128 逐位一致）；ChiSystemSpec 2 例（双子系统经桥端到端读 + 写）。
+- formal **token_chi_noc_bridge.sv**：两域缓冲有界 + 响应路径独立于请求缓冲（无循环等待=死锁自由），yosys SAT PASS（已入 LoomMain formal 清单，11/11）。
+- 未声明桥的子系统行为不回退（ChiSystemTop 仅消费声明槽，其余端口直通）。
+
+### 11.4 后续（非阻塞，已记录 protocol_spec §14.1）
+
+- 桥多 outstanding（ID 池深度参数化）；dvmForward=true 跨桥 SnpDVMOp 转发 + 对侧 SnpResp 收集（需 from 侧 SNP 注入路径）；ChiSystemTop 异 cfg 子系统（per-subsystem DAT 宽端口）。
