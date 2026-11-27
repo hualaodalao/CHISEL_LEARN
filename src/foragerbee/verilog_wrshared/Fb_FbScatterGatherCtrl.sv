@@ -47,40 +47,40 @@ module Fb_FbScatterGatherCtrl(	// src/foragerbee/scala/main/FbScatterGatherCtrl.
   input          clock,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7
                  reset,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7
                  io_start,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
-  input  [31:0]  io_listAddr,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
+  input  [39:0]  io_listAddr,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
   input  [15:0]  io_entryCount,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
   output         io_fetchRd_valid,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
   input          io_fetchRd_ready,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
-  output [31:0]  io_fetchRd_payload_addr,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
+  output [39:0]  io_fetchRd_payload_addr,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
   input          io_fetchRdData_valid,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
   output         io_fetchRdData_ready,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
   input  [255:0] io_fetchRdData_payload_data,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
   output         io_valid,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
   input          io_advance,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
-  output [31:0]  io_curAddr,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
+  output [39:0]  io_curAddr,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
   output [15:0]  io_curLen,	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
   output         io_done	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
 );
 
   reg  [1:0]  state;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:64:24
-  reg  [31:0] listAddrReg;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:69:30
+  reg  [39:0] listAddrReg;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:69:30
   reg  [15:0] entryCountReg;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:70:30
   reg  [15:0] entryIdxReg;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:71:30
-  reg  [31:0] curAddrReg;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:74:27
+  reg  [39:0] curAddrReg;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:74:27
   reg  [15:0] curLenReg;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:75:27
   reg         arIssued;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:78:25
   reg         doneReg;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:81:24
-  wire        io_valid_0 = state == 2'h2;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :64:24, :91:24
-  wire        _GEN = state == 2'h1;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :64:24, :120:14
+  wire        io_valid_0 = state == 2'h2;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:64:24, :91:24
+  wire        _GEN = state == 2'h1;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:64:24, :111:13, :120:14
   wire        io_fetchRd_valid_0 = _GEN & ~arIssued;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:78:25, :86:30, :120:{14,26}, :125:{29,32}
   wire        io_fetchRdData_ready_0 = _GEN & arIssued;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:78:25, :89:30, :120:{14,26}, :133:26
   always @(posedge clock) begin	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7
     if (reset) begin	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7
-      state <= 2'h0;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :64:24
-      listAddrReg <= 32'h0;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:69:30
+      state <= 2'h0;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:64:24
+      listAddrReg <= 40'h0;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:69:30
       entryCountReg <= 16'h0;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:70:30
       entryIdxReg <= 16'h0;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:71:30
-      curAddrReg <= 32'h0;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:69:30, :74:27
+      curAddrReg <= 40'h0;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:69:30, :74:27
       curLenReg <= 16'h0;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:75:27
       arIssued <= 1'h0;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:78:25
       doneReg <= 1'h0;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:81:24
@@ -103,7 +103,7 @@ module Fb_FbScatterGatherCtrl(	// src/foragerbee/scala/main/FbScatterGatherCtrl.
       if (_GEN_4)	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:100:18, :145:27, :146:22, :148:20
         state <= {1'h0, ~isLast};	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:64:24, :147:40, :148:20, :151:17, :156:21
       else if (_GEN_3)	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:74:27, :120:26, :134:31, :135:18
-        state <= 2'h2;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :64:24
+        state <= 2'h2;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:64:24, :91:24
       else if (io_start)	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
         state <= {1'h0, ~_GEN_1};	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:64:24, :107:{24,33}, :109:15, :111:13
       if (io_start) begin	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:39:14
@@ -117,8 +117,8 @@ module Fb_FbScatterGatherCtrl(	// src/foragerbee/scala/main/FbScatterGatherCtrl.
       else	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:100:18, :145:27, :146:22, :148:20
         entryIdxReg <= _entryIdxReg_T;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:71:30, :147:33
       if (_GEN_3) begin	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:74:27, :120:26, :134:31, :135:18
-        curAddrReg <= io_fetchRdData_payload_data[31:0];	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:74:27, :135:48
-        curLenReg <= io_fetchRdData_payload_data[47:32];	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:75:27, :136:48
+        curAddrReg <= io_fetchRdData_payload_data[39:0];	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:74:27, :135:48
+        curLenReg <= io_fetchRdData_payload_data[55:40];	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:75:27, :136:48
       end
       arIssued <=
         _GEN_5
@@ -131,22 +131,22 @@ module Fb_FbScatterGatherCtrl(	// src/foragerbee/scala/main/FbScatterGatherCtrl.
       `FIRRTL_BEFORE_INITIAL	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7
     `endif // FIRRTL_BEFORE_INITIAL
     initial begin	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7
-      automatic logic [31:0] _RANDOM[0:3];	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7
+      automatic logic [31:0] _RANDOM[0:4];	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7
       `ifdef INIT_RANDOM_PROLOG_	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7
         `INIT_RANDOM_PROLOG_	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7
       `endif // INIT_RANDOM_PROLOG_
       `ifdef RANDOMIZE_REG_INIT	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7
-        for (logic [2:0] i = 3'h0; i < 3'h4; i += 3'h1) begin
-          _RANDOM[i[1:0]] = `RANDOM;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7
+        for (logic [2:0] i = 3'h0; i < 3'h5; i += 3'h1) begin
+          _RANDOM[i] = `RANDOM;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7
         end	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7
-        state = _RANDOM[2'h0][1:0];	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :64:24
-        listAddrReg = {_RANDOM[2'h0][31:2], _RANDOM[2'h1][1:0]};	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :64:24, :69:30
-        entryCountReg = _RANDOM[2'h1][17:2];	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :69:30, :70:30
-        entryIdxReg = {_RANDOM[2'h1][31:18], _RANDOM[2'h2][1:0]};	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :69:30, :71:30
-        curAddrReg = {_RANDOM[2'h2][31:2], _RANDOM[2'h3][1:0]};	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :71:30, :74:27
-        curLenReg = _RANDOM[2'h3][17:2];	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :74:27, :75:27
-        arIssued = _RANDOM[2'h3][18];	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :74:27, :78:25
-        doneReg = _RANDOM[2'h3][19];	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :74:27, :81:24
+        state = _RANDOM[3'h0][1:0];	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :64:24
+        listAddrReg = {_RANDOM[3'h0][31:2], _RANDOM[3'h1][9:0]};	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :64:24, :69:30
+        entryCountReg = _RANDOM[3'h1][25:10];	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :69:30, :70:30
+        entryIdxReg = {_RANDOM[3'h1][31:26], _RANDOM[3'h2][9:0]};	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :69:30, :71:30
+        curAddrReg = {_RANDOM[3'h2][31:10], _RANDOM[3'h3][17:0]};	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :71:30, :74:27
+        curLenReg = {_RANDOM[3'h3][31:18], _RANDOM[3'h4][1:0]};	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :74:27, :75:27
+        arIssued = _RANDOM[3'h4][2];	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :75:27, :78:25
+        doneReg = _RANDOM[3'h4][3];	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :75:27, :81:24
       `endif // RANDOMIZE_REG_INIT
     end // initial
     `ifdef FIRRTL_AFTER_INITIAL	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7
@@ -154,7 +154,7 @@ module Fb_FbScatterGatherCtrl(	// src/foragerbee/scala/main/FbScatterGatherCtrl.
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
   assign io_fetchRd_valid = io_fetchRd_valid_0;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :86:30, :120:26, :125:29
-  assign io_fetchRd_payload_addr = {11'h0, entryIdxReg, 5'h0} + listAddrReg;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :69:30, :71:30, :122:{36,54}, :123:54
+  assign io_fetchRd_payload_addr = {19'h0, entryIdxReg, 5'h0} + listAddrReg;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :69:30, :71:30, :122:{36,54}, :123:54
   assign io_fetchRdData_ready = io_fetchRdData_ready_0;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :89:30, :120:26, :133:26
   assign io_valid = io_valid_0;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :91:24
   assign io_curAddr = curAddrReg;	// src/foragerbee/scala/main/FbScatterGatherCtrl.scala:29:7, :74:27

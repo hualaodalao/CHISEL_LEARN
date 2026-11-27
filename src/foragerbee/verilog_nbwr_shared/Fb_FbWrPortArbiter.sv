@@ -48,7 +48,7 @@ module Fb_FbWrPortArbiter(	// src/foragerbee/scala/main/FbWrPortArbiter.scala:42
                  reset,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:42:7
                  io_engWr_0_valid,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
   output         io_engWr_0_ready,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
-  input  [31:0]  io_engWr_0_payload_addr,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
+  input  [39:0]  io_engWr_0_payload_addr,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
   input  [7:0]   io_engWr_0_payload_len,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
   input  [255:0] io_engWr_0_payload_data,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
   input  [31:0]  io_engWr_0_payload_strb,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
@@ -56,7 +56,7 @@ module Fb_FbWrPortArbiter(	// src/foragerbee/scala/main/FbWrPortArbiter.scala:42
                  io_engWr_0_payload_eof,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
                  io_engWr_1_valid,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
   output         io_engWr_1_ready,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
-  input  [31:0]  io_engWr_1_payload_addr,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
+  input  [39:0]  io_engWr_1_payload_addr,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
   input  [7:0]   io_engWr_1_payload_len,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
   input  [255:0] io_engWr_1_payload_data,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
   input  [31:0]  io_engWr_1_payload_strb,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
@@ -70,7 +70,7 @@ module Fb_FbWrPortArbiter(	// src/foragerbee/scala/main/FbWrPortArbiter.scala:42
   output         io_engWrResp_1_payload_err,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
                  io_portWr_0_valid,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
   input          io_portWr_0_ready,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
-  output [31:0]  io_portWr_0_payload_addr,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
+  output [39:0]  io_portWr_0_payload_addr,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
   output [7:0]   io_portWr_0_payload_len,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
   output [255:0] io_portWr_0_payload_data,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
   output [31:0]  io_portWr_0_payload_strb,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
@@ -78,7 +78,7 @@ module Fb_FbWrPortArbiter(	// src/foragerbee/scala/main/FbWrPortArbiter.scala:42
                  io_portWr_0_payload_eof,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
                  io_portWr_1_valid,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
   input          io_portWr_1_ready,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
-  output [31:0]  io_portWr_1_payload_addr,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
+  output [39:0]  io_portWr_1_payload_addr,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
   output [7:0]   io_portWr_1_payload_len,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
   output [255:0] io_portWr_1_payload_data,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14
   output [31:0]  io_portWr_1_payload_strb,	// src/foragerbee/scala/main/FbWrPortArbiter.scala:47:14

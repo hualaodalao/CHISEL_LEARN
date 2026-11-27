@@ -47,7 +47,7 @@ module Fb_FbIm2colAddrGen(	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15
   input         clock,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7
                 reset,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7
                 io_start,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
-  input  [31:0] io_srcBase,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
+  input  [39:0] io_srcBase,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
                 io_dstBase,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
   input  [1:0]  io_srcElemBytesLog2,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
                 io_dstElemBytesLog2,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
@@ -62,133 +62,169 @@ module Fb_FbIm2colAddrGen(	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15
   input  [15:0] io_inShape_0,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
                 io_inShape_1,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
                 io_inShape_2,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
+  input  [7:0]  io_kw,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
   output        io_valid,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
   input         io_advance,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
-  output [31:0] io_srcAddr,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
-                io_dstAddr,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
+  output [39:0] io_srcAddr,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
+                io_elemSrcAddr,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
+  output        io_elemIsPad,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
+  output [39:0] io_dstAddr,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
   output        io_isPad,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
+  output [7:0]  io_microRowElems,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
+  output        io_burstable,	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
                 io_done	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
 );
 
-  reg  [7:0]  kH;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:47:21
-  reg  [7:0]  kW;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:48:21
-  reg  [7:0]  sH;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:49:21
-  reg  [7:0]  sW;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:50:21
-  reg  [7:0]  pH;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:51:21
-  reg  [7:0]  pW;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:52:21
-  reg  [7:0]  dH;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:53:21
-  reg  [15:0] C;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:55:21
-  reg  [15:0] H;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:56:21
-  reg  [15:0] W;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:57:21
-  reg  [15:0] outH;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:58:21
-  reg  [15:0] outW;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:59:21
-  reg  [3:0]  srcElemBytes;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:60:29
-  reg  [3:0]  dstElemBytes;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:61:29
-  reg  [31:0] srcBaseReg;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:63:27
-  reg  [31:0] dstBaseReg;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:64:27
-  reg  [7:0]  cntKh;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:69:22
-  reg  [15:0] cntC;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:70:22
-  reg  [15:0] cntOw;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:71:22
-  reg  [15:0] cntOh;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:72:22
-  reg         running;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:77:25
-  reg         doneReg;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:78:25
-  reg  [31:0] dstOffset;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:81:26
-  wire [23:0] _ihRaw_T_3 =
-    {8'h0, {8'h0, cntKh} * {8'h0, dH}} + {8'h0, cntOh} * {16'h0, sH};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:49:21, :53:21, :69:22, :72:22, :171:{25,39,48,57}
-  wire [23:0] _GEN = {16'h0, pH};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:51:21, :172:24
-  wire [23:0] _ihVal_T_1 = _ihRaw_T_3 - _GEN;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:171:{39,57}, :172:{24,32}, :173:24
-  wire [31:0] _GEN_0 = {16'h0, W};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:57:21, :191:63
+  reg  [7:0]  kH;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:50:21
+  reg  [7:0]  kW;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:51:21
+  reg  [7:0]  sH;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:52:21
+  reg  [7:0]  sW;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:53:21
+  reg  [7:0]  pH;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:54:21
+  reg  [7:0]  pW;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:55:21
+  reg  [7:0]  dH;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:56:21
+  reg  [7:0]  dW;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:57:21
+  reg  [15:0] C;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:58:21
+  reg  [15:0] H;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:59:21
+  reg  [15:0] W;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:60:21
+  reg  [16:0] outH;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:62:21
+  reg  [16:0] outW;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:63:21
+  reg  [3:0]  srcElemBytes;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:64:29
+  reg  [3:0]  dstElemBytes;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:65:29
+  reg  [39:0] srcBaseReg;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:67:27
+  reg  [39:0] dstBaseReg;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:68:27
+  reg  [7:0]  cntKh;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:73:22
+  reg  [15:0] cntC;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:74:22
+  reg  [16:0] cntOw;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:75:22
+  reg  [16:0] cntOh;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:76:22
+  reg         running;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:81:25
+  reg         doneReg;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:82:25
+  reg  [39:0] dstOffset;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:85:26
+  wire [26:0] _ihVal_T_2 =
+    {1'h0, {1'h0, {8'h0, cntOh} * {17'h0, sH}} + {10'h0, {8'h0, cntKh} * {8'h0, dH}}}
+    - {19'h0, pH};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:52:21, :54:21, :56:21, :73:22, :76:22, :182:{25,31,41}, :183:29
+  wire        ihInvalid =
+    $signed(_ihVal_T_2) < 27'sh0 | $signed(_ihVal_T_2) >= $signed({11'h0, H});	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:59:21, :183:29, :184:24, :185:24, :186:25
+  wire [25:0] _GEN = {1'h0, {8'h0, cntOw} * {17'h0, sW}};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:53:21, :75:22, :189:24, :190:24
+  wire [25:0] _iwVal_T_2 = _GEN - {18'h0, pW};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:55:21, :190:{24,29}
+  wire [15:0] _GEN_0 = {8'h0, dW};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:57:21, :193:35
+  wire [26:0] _elemIwVal_T_2 =
+    {1'h0, _GEN + {10'h0, {8'h0, io_kw} * _GEN_0}} - {19'h0, pW};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:55:21, :182:31, :190:24, :193:35, :197:{25,35}, :198:34
+  wire [26:0] _GEN_1 = {11'h0, W};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:60:21, :199:55
+  wire [39:0] _GEN_2 = {24'h0, W};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:60:21, :210:29
+  wire [39:0] srcRowIdx =
+    {8'h0, {16'h0, cntC} * {16'h0, H}} * _GEN_2 + {{13{_ihVal_T_2[26]}}, _ihVal_T_2}
+    * _GEN_2;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:59:21, :74:22, :183:29, :210:{25,29,39,49}
+  wire [39:0] _GEN_3 = {36'h0, srcElemBytes};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:64:29, :213:45
   always @(posedge clock) begin	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7
     if (reset) begin	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7
-      kH <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:47:21
-      kW <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:48:21
-      sH <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:49:21
-      sW <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:50:21
-      pH <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:51:21
-      pW <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:52:21
-      dH <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:53:21
-      C <= 16'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:55:21
-      H <= 16'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:56:21
-      W <= 16'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:57:21
-      outH <= 16'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:58:21
-      outW <= 16'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:59:21
-      srcElemBytes <= 4'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :60:29
-      dstElemBytes <= 4'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :61:29
-      srcBaseReg <= 32'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:63:27
-      dstBaseReg <= 32'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:64:27
-      cntKh <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:69:22
-      cntC <= 16'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:70:22
-      cntOw <= 16'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:71:22
-      cntOh <= 16'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:72:22
-      running <= 1'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:77:25
-      doneReg <= 1'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:77:25, :78:25
-      dstOffset <= 32'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:81:26
+      kH <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:50:21
+      kW <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:51:21
+      sH <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:52:21
+      sW <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:53:21
+      pH <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:54:21
+      pW <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:55:21
+      dH <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:56:21
+      dW <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:57:21
+      C <= 16'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:58:21
+      H <= 16'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:59:21
+      W <= 16'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:60:21
+      outH <= 17'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:62:21
+      outW <= 17'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:63:21
+      srcElemBytes <= 4'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :64:29
+      dstElemBytes <= 4'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :65:29
+      srcBaseReg <= 40'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:67:27
+      dstBaseReg <= 40'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:68:27
+      cntKh <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:73:22
+      cntC <= 16'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:74:22
+      cntOw <= 17'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:75:22
+      cntOh <= 17'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:76:22
+      running <= 1'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:81:25
+      doneReg <= 1'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:82:25
+      dstOffset <= 40'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:85:26
     end
     else begin	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7
-      automatic logic _GEN_1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:130:{16,30}
-      automatic logic khWrap;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:131:24
-      automatic logic cWrap;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:132:23
-      automatic logic owWrap;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:133:24
-      automatic logic ohWrap;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:134:24
-      automatic logic _GEN_2;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:86:18, :130:43, :137:18, :140:19, :143:22, :146:24, :147:21
-      _GEN_1 = running & io_advance & ~doneReg;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:77:25, :78:25, :130:{16,30,33}
-      khWrap = cntKh == kH - 8'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:47:21, :69:22, :131:{24,32}
-      cWrap = cntC == C - 16'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:55:21, :70:22, :132:{23,30}
-      owWrap = cntOw == outW - 16'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:59:21, :71:22, :133:{24,34}
-      ohWrap = cntOh == outH - 16'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:58:21, :72:22, :134:{24,34}
-      _GEN_2 = _GEN_1 & khWrap & cWrap & owWrap & ohWrap;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:86:18, :130:{16,30,43}, :131:24, :132:23, :133:24, :134:24, :137:18, :140:19, :143:22, :146:24, :147:21
+      automatic logic [16:0] hEffective;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:111:46
+      automatic logic [16:0] wEffective;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:112:46
+      automatic logic [16:0] hPadded;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:113:33
+      automatic logic [16:0] wPadded;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:114:33
+      automatic logic        geometryValid;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:115:49, :116:{31,58}, :117:{30,56}, :118:{30,56}, :119:{32,60}, :120:31
+      automatic logic        _GEN_4;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:141:{16,30}
+      automatic logic        khWrap;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:142:24
+      automatic logic        cWrap;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:143:23
+      automatic logic        owWrap;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:144:24
+      automatic logic        ohWrap;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:145:24
+      automatic logic        _GEN_5;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:90:18, :141:43, :148:18, :151:19, :154:22, :157:24, :158:21
+      hEffective =
+        {1'h0, {8'h0, io_dilation_0} * {8'h0, (|io_kernel_0) ? io_kernel_0 - 8'h1 : 8'h0}}
+        + 17'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:109:{19,33,55}, :111:{38,46}
+      wEffective =
+        {1'h0, {8'h0, io_dilation_1} * {8'h0, (|io_kernel_1) ? io_kernel_1 - 8'h1 : 8'h0}}
+        + 17'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:110:{19,33,55}, :112:{38,46}
+      hPadded = {1'h0, io_inShape_1} + {8'h0, io_pad_0, 1'h0};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:113:33
+      wPadded = {1'h0, io_inShape_2} + {8'h0, io_pad_1, 1'h0};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:114:33
+      geometryValid =
+        (|io_inShape_0) & (|io_inShape_1) & (|io_inShape_2) & (|io_kernel_0)
+        & (|io_kernel_1) & (|io_stride_0) & (|io_stride_1) & (|io_dilation_0)
+        & (|io_dilation_1) & hPadded >= hEffective & wPadded >= wEffective;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:109:33, :110:33, :111:46, :112:46, :113:33, :114:33, :115:{40,49}, :116:{22,31,49,58}, :117:{30,56}, :118:{21,30,47,56}, :119:{23,32,51,60}, :120:{16,31,43}
+      _GEN_4 = running & io_advance & ~doneReg;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:81:25, :82:25, :141:{16,30,33}
+      khWrap = cntKh == kH - 8'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:50:21, :73:22, :142:{24,32}
+      cWrap = cntC == C - 16'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:58:21, :74:22, :143:{23,30}
+      owWrap = cntOw == outW - 17'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:63:21, :75:22, :144:{24,34}
+      ohWrap = cntOh == outH - 17'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:62:21, :76:22, :145:{24,34}
+      _GEN_5 = _GEN_4 & khWrap & cWrap & owWrap & ohWrap;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:90:18, :141:{16,30,43}, :142:24, :143:23, :144:24, :145:24, :148:18, :151:19, :154:22, :157:24, :158:21
       if (io_start) begin	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
-        automatic logic [39:0] _outH_T_1 =
-          ({19'h0, {5'h0, io_inShape_1} + {12'h0, io_pad_0, 1'h0}}
-           - {32'h0, io_dilation_0} * {31'h0, {1'h0, io_kernel_0} - 9'h1} - 40'h1)
-          / {32'h0, io_stride_0};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:77:25, :104:33, :106:{40,59,64}, :107:{24,30,38}, :108:22
-        automatic logic [39:0] _outW_T_1 =
-          ({19'h0, {5'h0, io_inShape_2} + {12'h0, io_pad_1, 1'h0}}
-           - {32'h0, io_dilation_1} * {31'h0, {1'h0, io_kernel_1} - 9'h1} - 40'h1)
-          / {32'h0, io_stride_1};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:77:25, :111:33, :113:{40,59,64}, :114:{24,30,38}, :115:22
-        automatic logic [6:0]  _srcElemBytes_T = 7'h1 << io_srcElemBytesLog2;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:98:30
-        automatic logic [6:0]  _dstElemBytes_T = 7'h1 << io_dstElemBytesLog2;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:98:30, :99:30
-        kH <= io_kernel_0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:47:21
-        kW <= io_kernel_1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:48:21
-        sH <= io_stride_0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:49:21
-        sW <= io_stride_1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:50:21
-        pH <= io_pad_0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:51:21
-        pW <= io_pad_1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:52:21
-        dH <= io_dilation_0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:53:21
-        C <= io_inShape_0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:55:21
-        H <= io_inShape_1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:56:21
-        W <= io_inShape_2;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:57:21
-        outH <= _outH_T_1[15:0] + 16'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:58:21, :108:{22,45,53}
-        outW <= _outW_T_1[15:0] + 16'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:59:21, :115:{22,45,53}
-        srcElemBytes <= _srcElemBytes_T[3:0];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:60:29, :98:{18,30}
-        dstElemBytes <= _dstElemBytes_T[3:0];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:61:29, :99:{18,30}
-        srcBaseReg <= io_srcBase;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:63:27
-        dstBaseReg <= io_dstBase;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:64:27
+        automatic logic [6:0] _srcElemBytes_T = 7'h1 << io_srcElemBytesLog2;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:102:30
+        automatic logic [6:0] _dstElemBytes_T = 7'h1 << io_dstElemBytesLog2;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:102:30, :103:30
+        kH <= io_kernel_0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:50:21
+        kW <= io_kernel_1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:51:21
+        sH <= io_stride_0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:52:21
+        sW <= io_stride_1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:53:21
+        pH <= io_pad_0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:54:21
+        pW <= io_pad_1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:55:21
+        dH <= io_dilation_0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:56:21
+        dW <= io_dilation_1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:57:21
+        C <= io_inShape_0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:58:21
+        H <= io_inShape_1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:59:21
+        W <= io_inShape_2;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:60:21
+        outH <=
+          geometryValid
+            ? ((geometryValid ? hPadded : hEffective) - hEffective)
+              / {9'h0, (|io_stride_0) ? io_stride_0 : 8'h1} + 17'h1
+            : 17'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:62:21, :111:46, :113:33, :115:49, :116:{31,58}, :117:{30,56}, :118:{21,30,56}, :119:{32,60}, :120:31, :121:{22,59}, :123:21, :125:{16,40,49}
+        outW <=
+          geometryValid
+            ? ((geometryValid ? wPadded : wEffective) - wEffective)
+              / {9'h0, (|io_stride_1) ? io_stride_1 : 8'h1} + 17'h1
+            : 17'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:63:21, :112:46, :114:33, :115:49, :116:{31,58}, :117:{30,56}, :118:{30,47,56}, :119:{32,60}, :120:31, :122:{22,59}, :124:21, :125:40, :126:{16,40,49}
+        srcElemBytes <= _srcElemBytes_T[3:0];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:64:29, :102:{18,30}
+        dstElemBytes <= _dstElemBytes_T[3:0];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:65:29, :103:{18,30}
+        srcBaseReg <= io_srcBase;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:67:27
+        dstBaseReg <= io_dstBase;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:68:27
       end
-      if (_GEN_1) begin	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:130:{16,30}
-        cntKh <= khWrap ? 8'h0 : cntKh + 8'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:69:22, :106:{59,64}, :131:24, :137:18, :138:13, :159:{13,22}
-        dstOffset <= dstOffset + {20'h0, {4'h0, kW} * {8'h0, dstElemBytes}};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :48:21, :61:29, :81:26, :163:{28,33}
+      if (_GEN_4) begin	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:141:{16,30}
+        cntKh <= khWrap ? 8'h0 : cntKh + 8'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:73:22, :142:24, :148:18, :149:13, :170:{13,22}
+        dstOffset <= dstOffset + {28'h0, {4'h0, kW} * {8'h0, dstElemBytes}};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :51:21, :65:29, :85:26, :174:{28,33}
       end
       else if (io_start) begin	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
-        cntKh <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:69:22
-        dstOffset <= 32'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:81:26
+        cntKh <= 8'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:73:22
+        dstOffset <= 40'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:85:26
       end
-      if (_GEN_1 & khWrap)	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:86:18, :130:{16,30,43}, :131:24, :137:18, :140:19
-        cntC <= cWrap ? 16'h0 : cntC + 16'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:70:22, :132:23, :140:19, :141:14, :156:{14,22}
+      if (_GEN_4 & khWrap)	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:90:18, :141:{16,30,43}, :142:24, :148:18, :151:19
+        cntC <= cWrap ? 16'h0 : cntC + 16'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:74:22, :111:46, :143:23, :151:19, :152:14, :167:{14,22}
       else if (io_start)	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
-        cntC <= 16'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:70:22
-      if (_GEN_1 & khWrap & cWrap)	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:86:18, :130:{16,30,43}, :131:24, :132:23, :137:18, :140:19, :143:22
-        cntOw <= owWrap ? 16'h0 : cntOw + 16'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:71:22, :133:24, :143:22, :144:17, :153:{17,26}
+        cntC <= 16'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:74:22
+      if (_GEN_4 & khWrap & cWrap)	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:90:18, :141:{16,30,43}, :142:24, :143:23, :148:18, :151:19, :154:22
+        cntOw <= owWrap ? 17'h0 : cntOw + 17'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:75:22, :144:24, :154:22, :155:17, :164:{17,26}
       else if (io_start)	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
-        cntOw <= 16'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:71:22
-      if (~(_GEN_1 & khWrap & cWrap & owWrap) | ohWrap) begin	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:86:18, :130:{16,30,43}, :131:24, :132:23, :133:24, :134:24, :137:18, :140:19, :143:22, :146:24
+        cntOw <= 17'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:75:22
+      if (~(_GEN_4 & khWrap & cWrap & owWrap) | ohWrap) begin	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:90:18, :141:{16,30,43}, :142:24, :143:23, :144:24, :145:24, :148:18, :151:19, :154:22, :157:24
         if (io_start)	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:17:14
-          cntOh <= 16'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:72:22
+          cntOh <= 17'h0;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:76:22
       end
-      else	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:86:18, :130:43, :137:18, :140:19, :143:22, :146:24
-        cntOh <= cntOh + 16'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:72:22, :150:28
-      running <= ~_GEN_2 & (io_start | running);	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:77:25, :86:18, :123:13, :130:43, :137:18, :140:19, :143:22, :146:24, :147:21, :148:21
-      doneReg <= _GEN_2 | ~io_start & doneReg;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:78:25, :86:18, :124:13, :130:43, :137:18, :140:19, :143:22, :146:24, :147:21
+      else	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:90:18, :141:43, :148:18, :151:19, :154:22, :157:24
+        cntOh <= cntOh + 17'h1;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:76:22, :161:28
+      running <= ~_GEN_5 & (io_start ? geometryValid : running);	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:81:25, :90:18, :115:49, :116:{31,58}, :117:{30,56}, :118:{30,56}, :119:{32,60}, :120:31, :134:13, :141:43, :148:18, :151:19, :154:22, :157:24, :158:21, :159:21
+      doneReg <= _GEN_5 | (io_start ? ~geometryValid : doneReg);	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:82:25, :90:18, :115:49, :116:{31,58}, :117:{30,56}, :118:{30,56}, :119:{32,60}, :120:31, :135:{13,16}, :141:43, :148:18, :151:19, :154:22, :157:24, :158:21
     end
   end // always @(posedge)
   `ifdef ENABLE_INITIAL_REG_	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7
@@ -196,50 +232,59 @@ module Fb_FbIm2colAddrGen(	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15
       `FIRRTL_BEFORE_INITIAL	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7
     `endif // FIRRTL_BEFORE_INITIAL
     initial begin	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7
-      automatic logic [31:0] _RANDOM[0:9];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7
+      automatic logic [31:0] _RANDOM[0:10];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7
       `ifdef INIT_RANDOM_PROLOG_	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7
         `INIT_RANDOM_PROLOG_	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7
       `endif // INIT_RANDOM_PROLOG_
       `ifdef RANDOMIZE_REG_INIT	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7
-        for (logic [3:0] i = 4'h0; i < 4'hA; i += 4'h1) begin
+        for (logic [3:0] i = 4'h0; i < 4'hB; i += 4'h1) begin
           _RANDOM[i] = `RANDOM;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7
         end	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7
-        kH = _RANDOM[4'h0][7:0];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :47:21
-        kW = _RANDOM[4'h0][15:8];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :47:21, :48:21
-        sH = _RANDOM[4'h0][23:16];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :47:21, :49:21
-        sW = _RANDOM[4'h0][31:24];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :47:21, :50:21
-        pH = _RANDOM[4'h1][7:0];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :51:21
-        pW = _RANDOM[4'h1][15:8];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :51:21, :52:21
-        dH = _RANDOM[4'h1][23:16];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :51:21, :53:21
-        C = _RANDOM[4'h2][15:0];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :55:21
-        H = _RANDOM[4'h2][31:16];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :55:21, :56:21
-        W = _RANDOM[4'h3][15:0];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :57:21
-        outH = _RANDOM[4'h3][31:16];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :57:21, :58:21
-        outW = _RANDOM[4'h4][15:0];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :59:21
-        srcElemBytes = _RANDOM[4'h4][19:16];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :59:21, :60:29
-        dstElemBytes = _RANDOM[4'h4][23:20];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :59:21, :61:29
-        srcBaseReg = {_RANDOM[4'h4][31:24], _RANDOM[4'h5][23:0]};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :59:21, :63:27
-        dstBaseReg = {_RANDOM[4'h5][31:24], _RANDOM[4'h6][23:0]};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :63:27, :64:27
-        cntKh = _RANDOM[4'h6][31:24];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :64:27, :69:22
-        cntC = _RANDOM[4'h7][15:0];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :70:22
-        cntOw = _RANDOM[4'h7][31:16];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :70:22, :71:22
-        cntOh = _RANDOM[4'h8][15:0];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :72:22
-        running = _RANDOM[4'h8][16];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :72:22, :77:25
-        doneReg = _RANDOM[4'h8][17];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :72:22, :78:25
-        dstOffset = {_RANDOM[4'h8][31:18], _RANDOM[4'h9][17:0]};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :72:22, :81:26
+        kH = _RANDOM[4'h0][7:0];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :50:21
+        kW = _RANDOM[4'h0][15:8];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :50:21, :51:21
+        sH = _RANDOM[4'h0][23:16];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :50:21, :52:21
+        sW = _RANDOM[4'h0][31:24];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :50:21, :53:21
+        pH = _RANDOM[4'h1][7:0];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :54:21
+        pW = _RANDOM[4'h1][15:8];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :54:21, :55:21
+        dH = _RANDOM[4'h1][23:16];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :54:21, :56:21
+        dW = _RANDOM[4'h1][31:24];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :54:21, :57:21
+        C = _RANDOM[4'h2][15:0];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :58:21
+        H = _RANDOM[4'h2][31:16];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :58:21, :59:21
+        W = _RANDOM[4'h3][15:0];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :60:21
+        outH = {_RANDOM[4'h3][31:16], _RANDOM[4'h4][0]};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :60:21, :62:21
+        outW = _RANDOM[4'h4][17:1];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :62:21, :63:21
+        srcElemBytes = _RANDOM[4'h4][21:18];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :62:21, :64:29
+        dstElemBytes = _RANDOM[4'h4][25:22];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :62:21, :65:29
+        srcBaseReg = {_RANDOM[4'h4][31:26], _RANDOM[4'h5], _RANDOM[4'h6][1:0]};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :62:21, :67:27
+        dstBaseReg = {_RANDOM[4'h6][31:2], _RANDOM[4'h7][9:0]};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :67:27, :68:27
+        cntKh = _RANDOM[4'h7][17:10];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :68:27, :73:22
+        cntC = {_RANDOM[4'h7][31:18], _RANDOM[4'h8][1:0]};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :68:27, :74:22
+        cntOw = _RANDOM[4'h8][18:2];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :74:22, :75:22
+        cntOh = {_RANDOM[4'h8][31:19], _RANDOM[4'h9][3:0]};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :74:22, :76:22
+        running = _RANDOM[4'h9][4];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :76:22, :81:25
+        doneReg = _RANDOM[4'h9][5];	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :76:22, :82:25
+        dstOffset = {_RANDOM[4'h9][31:6], _RANDOM[4'hA][13:0]};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :76:22, :85:26
       `endif // RANDOMIZE_REG_INIT
     end // initial
     `ifdef FIRRTL_AFTER_INITIAL	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7
       `FIRRTL_AFTER_INITIAL	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_valid = running & ~doneReg;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :77:25, :78:25, :130:33, :203:23
+  assign io_valid = running & ~doneReg;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :81:25, :82:25, :141:33, :223:23
   assign io_srcAddr =
-    srcBaseReg
-    + ({16'h0, cntOw * {8'h0, sW} - {8'h0, pW}} + {16'h0, cntC} * {16'h0, H} * _GEN_0
-       + {16'h0, _ihVal_T_1[15:0]} * _GEN_0) * {28'h0, srcElemBytes};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :50:21, :52:21, :56:21, :60:29, :63:27, :70:22, :71:22, :172:32, :173:24, :178:25, :179:32, :180:24, :191:{41,63,86}, :192:{23,49,72}, :193:33, :194:{28,38}
-  assign io_dstAddr = dstBaseReg + dstOffset;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :64:27, :81:26, :197:28
-  assign io_isPad = _ihRaw_T_3 < _GEN | _ihVal_T_1 >= {8'h0, H};	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :56:21, :171:{39,57}, :172:{24,32}, :173:24, :174:24, :175:25
-  assign io_done = doneReg;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :78:25
+    srcBaseReg + (srcRowIdx + {{14{_iwVal_T_2[25]}}, _iwVal_T_2}) * _GEN_3;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :67:27, :190:29, :193:24, :210:39, :211:27, :213:{34,45}
+  assign io_elemSrcAddr =
+    srcBaseReg + (srcRowIdx + {{13{_elemIwVal_T_2[26]}}, _elemIwVal_T_2}) * _GEN_3;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :67:27, :198:34, :210:39, :212:31, :213:45, :214:{38,53}
+  assign io_elemIsPad =
+    ihInvalid | $signed(_elemIwVal_T_2) < 27'sh0
+    | $signed(_elemIwVal_T_2) >= $signed(_GEN_1);	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :184:24, :186:25, :198:34, :199:{34,41,55}, :200:29
+  assign io_dstAddr = dstBaseReg + dstOffset;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :68:27, :85:26, :217:28
+  assign io_isPad = ihInvalid;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :186:25
+  assign io_microRowElems = kW;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :51:21
+  assign io_burstable =
+    ~ihInvalid & dW == 8'h1 & $signed(_iwVal_T_2) > -26'sh1
+    & $signed({_iwVal_T_2[25], _iwVal_T_2}
+              + {11'h0, {8'h0, (|kW) ? kW - 8'h1 : 8'h0} * _GEN_0}) < $signed(_GEN_1);	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :51:21, :57:21, :186:25, :190:29, :191:24, :192:{21,25,37}, :193:{24,35}, :194:25, :199:55, :206:{19,30,37,46,49,56,59}
+  assign io_done = doneReg;	// src/foragerbee/scala/main/FbIm2colAddrGen.scala:15:7, :82:25
 endmodule
 

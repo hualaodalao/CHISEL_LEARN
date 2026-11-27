@@ -43,3803 +43,977 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module Fb_FbFormatConverter(	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
-  input          clock,	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
-                 reset,	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
-  output         io_in_ready,	// src/foragerbee/scala/main/FbFormatConverter.scala:25:14
-  input          io_in_valid,	// src/foragerbee/scala/main/FbFormatConverter.scala:25:14
-  input  [255:0] io_in_bits,	// src/foragerbee/scala/main/FbFormatConverter.scala:25:14
-  input          io_out_ready,	// src/foragerbee/scala/main/FbFormatConverter.scala:25:14
-  output         io_out_valid,	// src/foragerbee/scala/main/FbFormatConverter.scala:25:14
-  output [255:0] io_out_bits,	// src/foragerbee/scala/main/FbFormatConverter.scala:25:14
-  input  [3:0]   io_cfg_srcFmt,	// src/foragerbee/scala/main/FbFormatConverter.scala:25:14
-                 io_cfg_dstFmt,	// src/foragerbee/scala/main/FbFormatConverter.scala:25:14
-  input  [31:0]  io_cfg_scale,	// src/foragerbee/scala/main/FbFormatConverter.scala:25:14
-                 io_cfg_zeroPoint,	// src/foragerbee/scala/main/FbFormatConverter.scala:25:14
-  input          io_cfg_enable,	// src/foragerbee/scala/main/FbFormatConverter.scala:25:14
-                 io_flush	// src/foragerbee/scala/main/FbFormatConverter.scala:25:14
+module Fb_FbFormatConverter(	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
+  input          clock,	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
+                 reset,	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
+  output         io_in_ready,	// src/foragerbee/scala/main/FbFormatConverter.scala:81:14
+  input          io_in_valid,	// src/foragerbee/scala/main/FbFormatConverter.scala:81:14
+  input  [255:0] io_in_bits,	// src/foragerbee/scala/main/FbFormatConverter.scala:81:14
+  input  [5:0]   io_inBytes,	// src/foragerbee/scala/main/FbFormatConverter.scala:81:14
+  input          io_inLast,	// src/foragerbee/scala/main/FbFormatConverter.scala:81:14
+                 io_out_ready,	// src/foragerbee/scala/main/FbFormatConverter.scala:81:14
+  output         io_out_valid,	// src/foragerbee/scala/main/FbFormatConverter.scala:81:14
+  output [255:0] io_out_bits,	// src/foragerbee/scala/main/FbFormatConverter.scala:81:14
+  output [5:0]   io_outBytes,	// src/foragerbee/scala/main/FbFormatConverter.scala:81:14
+  input  [3:0]   io_cfg_srcFmt,	// src/foragerbee/scala/main/FbFormatConverter.scala:81:14
+                 io_cfg_dstFmt,	// src/foragerbee/scala/main/FbFormatConverter.scala:81:14
+  input          io_cfg_enable,	// src/foragerbee/scala/main/FbFormatConverter.scala:81:14
+                 io_flush	// src/foragerbee/scala/main/FbFormatConverter.scala:81:14
 );
 
-  wire              effectiveBypass = ~io_cfg_enable | io_cfg_srcFmt == io_cfg_dstFmt;	// src/foragerbee/scala/main/FbFormatConverter.scala:42:{33,48,66}
-  wire [5:0]        srcElemBits =
+  wire         _dstVec_15_T_1 = io_cfg_srcFmt == io_cfg_dstFmt;	// src/foragerbee/scala/main/FbFormatConverter.scala:94:65
+  wire         _dstVec_15_T_2 = io_cfg_srcFmt == 4'h0;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:162:44
+  wire         _dstVec_15_T_3 = io_cfg_srcFmt == 4'h1;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:162:58, :174:66
+  wire         _dstVec_15_T_5 = io_cfg_srcFmt == 4'h2;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:162:72, :174:66
+  wire         _dstVec_15_T_9 = io_cfg_dstFmt == 4'h0;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:162:44
+  wire         _dstVec_15_T_10 = io_cfg_dstFmt == 4'h1;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:162:58, :174:66
+  wire         _dstVec_15_T_12 = io_cfg_dstFmt == 4'h2;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:162:72, :174:66
+  wire         effectiveBypass =
+    ~io_cfg_enable | _dstVec_15_T_1 | ~(_dstVec_15_T_2 | _dstVec_15_T_3 | _dstVec_15_T_5)
+    | ~(_dstVec_15_T_9 | _dstVec_15_T_10 | _dstVec_15_T_12);	// src/foragerbee/scala/main/FbFormatConverter.scala:94:{33,48,65,83}, :95:{5,39,42}, src/foragerbee/scala/main/ForagerBeeConfig.scala:162:{44,53,58,67,72}
+  wire [5:0]   srcElemBits =
     io_cfg_srcFmt == 4'hA
       ? 6'h4
       : io_cfg_srcFmt == 4'h5 | io_cfg_srcFmt == 4'h4 | io_cfg_srcFmt == 4'h3
           ? 6'h8
           : io_cfg_srcFmt == 4'h9 | io_cfg_srcFmt == 4'h2 | io_cfg_srcFmt == 4'h1
               ? 6'h10
-              : 6'h20;	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [5:0]        dstElemBits =
+              : 6'h20;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [5:0]   dstElemBits =
     io_cfg_dstFmt == 4'hA
       ? 6'h4
       : io_cfg_dstFmt == 4'h5 | io_cfg_dstFmt == 4'h4 | io_cfg_dstFmt == 4'h3
           ? 6'h8
           : io_cfg_dstFmt == 4'h9 | io_cfg_dstFmt == 4'h2 | io_cfg_dstFmt == 4'h1
               ? 6'h10
-              : 6'h20;	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire              isCompression = srcElemBits > dstElemBits;	// src/foragerbee/scala/main/FbFormatConverter.scala:166:35, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire              isExpansion = srcElemBits < dstElemBits;	// src/foragerbee/scala/main/FbFormatConverter.scala:167:35, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire              _compRatio_T_3 = srcElemBits[5:2] == 4'h8;	// src/foragerbee/scala/main/FbFormatConverter.scala:168:35, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire              _compRatio_T_7 = dstElemBits[5:2] == 4'h2;	// src/foragerbee/scala/main/FbFormatConverter.scala:168:59, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire              _expRatio_T_6 = dstElemBits[5:2] == 4'h4;	// src/foragerbee/scala/main/FbFormatConverter.scala:169:59, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire              _expRatio_T_4 = srcElemBits[5:2] == 4'h4;	// src/foragerbee/scala/main/FbFormatConverter.scala:170:35, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [2:0]        compRatio =
-    _compRatio_T_3 & _compRatio_T_7
-      ? 3'h4
-      : _compRatio_T_3 & _expRatio_T_6 | _expRatio_T_4 & _compRatio_T_7 ? 3'h2 : 3'h1;	// src/foragerbee/scala/main/FbFormatConverter.scala:168:{22,35,44,59}, :169:{22,44,59}, :170:{22,35,44}
-  wire              _fp32Vec_0_T = io_in_bits[14:10] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:51:17, :53:26, :182:51
-  wire [8:0]        _GEN = {io_cfg_zeroPoint[7], io_cfg_zeroPoint[7:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:151:22, :152:29
-  wire [8:0]        _fp32Vec_0_diff_T = {io_in_bits[7], io_in_bits[7:0]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _GEN_0 = {42'h0, io_cfg_scale[4:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:149:25, :153:33
-  wire [46:0]       _fp32Vec_0_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_0_diff_T[8]}}, _fp32Vec_0_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_0_absVal =
-    _fp32Vec_0_shifted_T_1[31]
-      ? ~(_fp32Vec_0_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_0_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_0_isZero = fp32Vec_0_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_0_leadPos_T_52 =
-    (|(fp32Vec_0_absVal[31:16]))
-      ? {|(fp32Vec_0_absVal[31:24]),
-         (|(fp32Vec_0_absVal[31:24]))
-           ? {|(fp32Vec_0_absVal[31:28]),
-              (|(fp32Vec_0_absVal[31:28]))
-                ? (fp32Vec_0_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_0_absVal[30] ? 2'h2 : {1'h0, fp32Vec_0_absVal[29]})
-                : fp32Vec_0_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_0_absVal[26] ? 2'h2 : {1'h0, fp32Vec_0_absVal[25]}}
-           : {|(fp32Vec_0_absVal[23:20]),
-              (|(fp32Vec_0_absVal[23:20]))
-                ? (fp32Vec_0_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_0_absVal[22] ? 2'h2 : {1'h0, fp32Vec_0_absVal[21]})
-                : fp32Vec_0_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_0_absVal[18] ? 2'h2 : {1'h0, fp32Vec_0_absVal[17]}}}
-      : {|(fp32Vec_0_absVal[15:8]),
-         (|(fp32Vec_0_absVal[15:8]))
-           ? {|(fp32Vec_0_absVal[15:12]),
-              (|(fp32Vec_0_absVal[15:12]))
-                ? (fp32Vec_0_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_0_absVal[14] ? 2'h2 : {1'h0, fp32Vec_0_absVal[13]})
-                : fp32Vec_0_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_0_absVal[10] ? 2'h2 : {1'h0, fp32Vec_0_absVal[9]}}
-           : {|(fp32Vec_0_absVal[7:4]),
-              (|(fp32Vec_0_absVal[7:4]))
-                ? (fp32Vec_0_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_0_absVal[6] ? 2'h2 : {1'h0, fp32Vec_0_absVal[5]})
-                : fp32Vec_0_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_0_absVal[2] ? 2'h2 : {1'h0, fp32Vec_0_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_1 = {|(fp32Vec_0_absVal[31:16]), _fp32Vec_0_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_0_aligned_T_1 = {31'h0, fp32Vec_0_absVal} << 5'h17 - _GEN_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_0_aligned_T_4 = fp32Vec_0_absVal >> _GEN_1 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_0 =
-    io_cfg_srcFmt == 4'h3
-      ? (fp32Vec_0_isZero
-           ? 32'h0
-           : {_fp32Vec_0_shifted_T_1[31],
-              fp32Vec_0_isZero
-                ? 8'h0
-                : {3'h0, |(fp32Vec_0_absVal[31:16]), _fp32Vec_0_leadPos_T_52} + 8'h7F,
-              {|(fp32Vec_0_absVal[31:16]), _fp32Vec_0_leadPos_T_52[3]} != 2'h3
-                ? _fp32Vec_0_aligned_T_1[22:0]
-                : _fp32Vec_0_aligned_T_4[22:0]})
-      : io_cfg_srcFmt == 4'h2
-          ? {io_in_bits[15:0], 16'h0}
-          : io_cfg_srcFmt == 4'h1
-              ? {io_in_bits[15],
-                 _fp32Vec_0_T & io_in_bits[9:0] == 10'h0
-                   ? 31'h0
-                   : {_fp32Vec_0_T
-                        ? 8'h0
-                        : (&(io_in_bits[14:10]))
-                            ? 8'hFF
-                            : {3'h0, io_in_bits[14:10]} + 8'h70,
-                      io_in_bits[9:0],
-                      13'h0}}
-              : io_in_bits[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:50:17, :51:17, :52:17, :53:{21,26}, :54:{21,26}, :55:23, :56:21, :57:{8,21,28,40}, :58:12, :62:46, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:{8,31}, :153:{33,45}, :181:51, :182:51, :185:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire              _fp32Vec_1_T = io_in_bits[30:26] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:51:17, :53:26, :182:51
-  wire [8:0]        _fp32Vec_1_diff_T = {io_in_bits[15], io_in_bits[15:8]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_1_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_1_diff_T[8]}}, _fp32Vec_1_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_1_absVal =
-    _fp32Vec_1_shifted_T_1[31]
-      ? ~(_fp32Vec_1_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_1_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_1_isZero = fp32Vec_1_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_1_leadPos_T_52 =
-    (|(fp32Vec_1_absVal[31:16]))
-      ? {|(fp32Vec_1_absVal[31:24]),
-         (|(fp32Vec_1_absVal[31:24]))
-           ? {|(fp32Vec_1_absVal[31:28]),
-              (|(fp32Vec_1_absVal[31:28]))
-                ? (fp32Vec_1_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_1_absVal[30] ? 2'h2 : {1'h0, fp32Vec_1_absVal[29]})
-                : fp32Vec_1_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_1_absVal[26] ? 2'h2 : {1'h0, fp32Vec_1_absVal[25]}}
-           : {|(fp32Vec_1_absVal[23:20]),
-              (|(fp32Vec_1_absVal[23:20]))
-                ? (fp32Vec_1_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_1_absVal[22] ? 2'h2 : {1'h0, fp32Vec_1_absVal[21]})
-                : fp32Vec_1_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_1_absVal[18] ? 2'h2 : {1'h0, fp32Vec_1_absVal[17]}}}
-      : {|(fp32Vec_1_absVal[15:8]),
-         (|(fp32Vec_1_absVal[15:8]))
-           ? {|(fp32Vec_1_absVal[15:12]),
-              (|(fp32Vec_1_absVal[15:12]))
-                ? (fp32Vec_1_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_1_absVal[14] ? 2'h2 : {1'h0, fp32Vec_1_absVal[13]})
-                : fp32Vec_1_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_1_absVal[10] ? 2'h2 : {1'h0, fp32Vec_1_absVal[9]}}
-           : {|(fp32Vec_1_absVal[7:4]),
-              (|(fp32Vec_1_absVal[7:4]))
-                ? (fp32Vec_1_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_1_absVal[6] ? 2'h2 : {1'h0, fp32Vec_1_absVal[5]})
-                : fp32Vec_1_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_1_absVal[2] ? 2'h2 : {1'h0, fp32Vec_1_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_2 = {|(fp32Vec_1_absVal[31:16]), _fp32Vec_1_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_1_aligned_T_1 = {31'h0, fp32Vec_1_absVal} << 5'h17 - _GEN_2;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_1_aligned_T_4 = fp32Vec_1_absVal >> _GEN_2 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_1 =
-    io_cfg_srcFmt == 4'h3
-      ? (fp32Vec_1_isZero
-           ? 32'h0
-           : {_fp32Vec_1_shifted_T_1[31],
-              fp32Vec_1_isZero
-                ? 8'h0
-                : {3'h0, |(fp32Vec_1_absVal[31:16]), _fp32Vec_1_leadPos_T_52} + 8'h7F,
-              {|(fp32Vec_1_absVal[31:16]), _fp32Vec_1_leadPos_T_52[3]} != 2'h3
-                ? _fp32Vec_1_aligned_T_1[22:0]
-                : _fp32Vec_1_aligned_T_4[22:0]})
-      : io_cfg_srcFmt == 4'h2
-          ? {io_in_bits[31:16], 16'h0}
-          : io_cfg_srcFmt == 4'h1
-              ? {io_in_bits[31],
-                 _fp32Vec_1_T & io_in_bits[25:16] == 10'h0
-                   ? 31'h0
-                   : {_fp32Vec_1_T
-                        ? 8'h0
-                        : (&(io_in_bits[30:26]))
-                            ? 8'hFF
-                            : {3'h0, io_in_bits[30:26]} + 8'h70,
-                      io_in_bits[25:16],
-                      13'h0}}
-              : io_in_bits[63:32];	// src/foragerbee/scala/main/FbFormatConverter.scala:50:17, :51:17, :52:17, :53:{21,26}, :54:{21,26}, :55:23, :56:21, :57:{8,21,28,40}, :58:12, :62:46, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:{8,31}, :153:{33,45}, :181:51, :182:51, :185:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire              _fp32Vec_2_T = io_in_bits[46:42] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:51:17, :53:26, :182:51
-  wire [8:0]        _fp32Vec_2_diff_T = {io_in_bits[23], io_in_bits[23:16]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_2_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_2_diff_T[8]}}, _fp32Vec_2_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_2_absVal =
-    _fp32Vec_2_shifted_T_1[31]
-      ? ~(_fp32Vec_2_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_2_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_2_isZero = fp32Vec_2_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_2_leadPos_T_52 =
-    (|(fp32Vec_2_absVal[31:16]))
-      ? {|(fp32Vec_2_absVal[31:24]),
-         (|(fp32Vec_2_absVal[31:24]))
-           ? {|(fp32Vec_2_absVal[31:28]),
-              (|(fp32Vec_2_absVal[31:28]))
-                ? (fp32Vec_2_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_2_absVal[30] ? 2'h2 : {1'h0, fp32Vec_2_absVal[29]})
-                : fp32Vec_2_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_2_absVal[26] ? 2'h2 : {1'h0, fp32Vec_2_absVal[25]}}
-           : {|(fp32Vec_2_absVal[23:20]),
-              (|(fp32Vec_2_absVal[23:20]))
-                ? (fp32Vec_2_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_2_absVal[22] ? 2'h2 : {1'h0, fp32Vec_2_absVal[21]})
-                : fp32Vec_2_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_2_absVal[18] ? 2'h2 : {1'h0, fp32Vec_2_absVal[17]}}}
-      : {|(fp32Vec_2_absVal[15:8]),
-         (|(fp32Vec_2_absVal[15:8]))
-           ? {|(fp32Vec_2_absVal[15:12]),
-              (|(fp32Vec_2_absVal[15:12]))
-                ? (fp32Vec_2_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_2_absVal[14] ? 2'h2 : {1'h0, fp32Vec_2_absVal[13]})
-                : fp32Vec_2_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_2_absVal[10] ? 2'h2 : {1'h0, fp32Vec_2_absVal[9]}}
-           : {|(fp32Vec_2_absVal[7:4]),
-              (|(fp32Vec_2_absVal[7:4]))
-                ? (fp32Vec_2_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_2_absVal[6] ? 2'h2 : {1'h0, fp32Vec_2_absVal[5]})
-                : fp32Vec_2_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_2_absVal[2] ? 2'h2 : {1'h0, fp32Vec_2_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_3 = {|(fp32Vec_2_absVal[31:16]), _fp32Vec_2_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_2_aligned_T_1 = {31'h0, fp32Vec_2_absVal} << 5'h17 - _GEN_3;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_2_aligned_T_4 = fp32Vec_2_absVal >> _GEN_3 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_2 =
-    io_cfg_srcFmt == 4'h3
-      ? (fp32Vec_2_isZero
-           ? 32'h0
-           : {_fp32Vec_2_shifted_T_1[31],
-              fp32Vec_2_isZero
-                ? 8'h0
-                : {3'h0, |(fp32Vec_2_absVal[31:16]), _fp32Vec_2_leadPos_T_52} + 8'h7F,
-              {|(fp32Vec_2_absVal[31:16]), _fp32Vec_2_leadPos_T_52[3]} != 2'h3
-                ? _fp32Vec_2_aligned_T_1[22:0]
-                : _fp32Vec_2_aligned_T_4[22:0]})
-      : io_cfg_srcFmt == 4'h2
-          ? {io_in_bits[47:32], 16'h0}
-          : io_cfg_srcFmt == 4'h1
-              ? {io_in_bits[47],
-                 _fp32Vec_2_T & io_in_bits[41:32] == 10'h0
-                   ? 31'h0
-                   : {_fp32Vec_2_T
-                        ? 8'h0
-                        : (&(io_in_bits[46:42]))
-                            ? 8'hFF
-                            : {3'h0, io_in_bits[46:42]} + 8'h70,
-                      io_in_bits[41:32],
-                      13'h0}}
-              : io_in_bits[95:64];	// src/foragerbee/scala/main/FbFormatConverter.scala:50:17, :51:17, :52:17, :53:{21,26}, :54:{21,26}, :55:23, :56:21, :57:{8,21,28,40}, :58:12, :62:46, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:{8,31}, :153:{33,45}, :181:51, :182:51, :185:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire              _fp32Vec_3_T = io_in_bits[62:58] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:51:17, :53:26, :182:51
-  wire [8:0]        _fp32Vec_3_diff_T = {io_in_bits[31], io_in_bits[31:24]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_3_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_3_diff_T[8]}}, _fp32Vec_3_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_3_absVal =
-    _fp32Vec_3_shifted_T_1[31]
-      ? ~(_fp32Vec_3_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_3_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_3_isZero = fp32Vec_3_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_3_leadPos_T_52 =
-    (|(fp32Vec_3_absVal[31:16]))
-      ? {|(fp32Vec_3_absVal[31:24]),
-         (|(fp32Vec_3_absVal[31:24]))
-           ? {|(fp32Vec_3_absVal[31:28]),
-              (|(fp32Vec_3_absVal[31:28]))
-                ? (fp32Vec_3_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_3_absVal[30] ? 2'h2 : {1'h0, fp32Vec_3_absVal[29]})
-                : fp32Vec_3_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_3_absVal[26] ? 2'h2 : {1'h0, fp32Vec_3_absVal[25]}}
-           : {|(fp32Vec_3_absVal[23:20]),
-              (|(fp32Vec_3_absVal[23:20]))
-                ? (fp32Vec_3_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_3_absVal[22] ? 2'h2 : {1'h0, fp32Vec_3_absVal[21]})
-                : fp32Vec_3_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_3_absVal[18] ? 2'h2 : {1'h0, fp32Vec_3_absVal[17]}}}
-      : {|(fp32Vec_3_absVal[15:8]),
-         (|(fp32Vec_3_absVal[15:8]))
-           ? {|(fp32Vec_3_absVal[15:12]),
-              (|(fp32Vec_3_absVal[15:12]))
-                ? (fp32Vec_3_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_3_absVal[14] ? 2'h2 : {1'h0, fp32Vec_3_absVal[13]})
-                : fp32Vec_3_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_3_absVal[10] ? 2'h2 : {1'h0, fp32Vec_3_absVal[9]}}
-           : {|(fp32Vec_3_absVal[7:4]),
-              (|(fp32Vec_3_absVal[7:4]))
-                ? (fp32Vec_3_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_3_absVal[6] ? 2'h2 : {1'h0, fp32Vec_3_absVal[5]})
-                : fp32Vec_3_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_3_absVal[2] ? 2'h2 : {1'h0, fp32Vec_3_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_4 = {|(fp32Vec_3_absVal[31:16]), _fp32Vec_3_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_3_aligned_T_1 = {31'h0, fp32Vec_3_absVal} << 5'h17 - _GEN_4;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_3_aligned_T_4 = fp32Vec_3_absVal >> _GEN_4 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_3 =
-    io_cfg_srcFmt == 4'h3
-      ? (fp32Vec_3_isZero
-           ? 32'h0
-           : {_fp32Vec_3_shifted_T_1[31],
-              fp32Vec_3_isZero
-                ? 8'h0
-                : {3'h0, |(fp32Vec_3_absVal[31:16]), _fp32Vec_3_leadPos_T_52} + 8'h7F,
-              {|(fp32Vec_3_absVal[31:16]), _fp32Vec_3_leadPos_T_52[3]} != 2'h3
-                ? _fp32Vec_3_aligned_T_1[22:0]
-                : _fp32Vec_3_aligned_T_4[22:0]})
-      : io_cfg_srcFmt == 4'h2
-          ? {io_in_bits[63:48], 16'h0}
-          : io_cfg_srcFmt == 4'h1
-              ? {io_in_bits[63],
-                 _fp32Vec_3_T & io_in_bits[57:48] == 10'h0
-                   ? 31'h0
-                   : {_fp32Vec_3_T
-                        ? 8'h0
-                        : (&(io_in_bits[62:58]))
-                            ? 8'hFF
-                            : {3'h0, io_in_bits[62:58]} + 8'h70,
-                      io_in_bits[57:48],
-                      13'h0}}
-              : io_in_bits[127:96];	// src/foragerbee/scala/main/FbFormatConverter.scala:50:17, :51:17, :52:17, :53:{21,26}, :54:{21,26}, :55:23, :56:21, :57:{8,21,28,40}, :58:12, :62:46, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:{8,31}, :153:{33,45}, :181:51, :182:51, :185:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire              _fp32Vec_4_T = io_in_bits[78:74] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:51:17, :53:26, :182:51
-  wire [8:0]        _fp32Vec_4_diff_T = {io_in_bits[39], io_in_bits[39:32]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_4_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_4_diff_T[8]}}, _fp32Vec_4_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_4_absVal =
-    _fp32Vec_4_shifted_T_1[31]
-      ? ~(_fp32Vec_4_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_4_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_4_isZero = fp32Vec_4_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_4_leadPos_T_52 =
-    (|(fp32Vec_4_absVal[31:16]))
-      ? {|(fp32Vec_4_absVal[31:24]),
-         (|(fp32Vec_4_absVal[31:24]))
-           ? {|(fp32Vec_4_absVal[31:28]),
-              (|(fp32Vec_4_absVal[31:28]))
-                ? (fp32Vec_4_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_4_absVal[30] ? 2'h2 : {1'h0, fp32Vec_4_absVal[29]})
-                : fp32Vec_4_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_4_absVal[26] ? 2'h2 : {1'h0, fp32Vec_4_absVal[25]}}
-           : {|(fp32Vec_4_absVal[23:20]),
-              (|(fp32Vec_4_absVal[23:20]))
-                ? (fp32Vec_4_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_4_absVal[22] ? 2'h2 : {1'h0, fp32Vec_4_absVal[21]})
-                : fp32Vec_4_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_4_absVal[18] ? 2'h2 : {1'h0, fp32Vec_4_absVal[17]}}}
-      : {|(fp32Vec_4_absVal[15:8]),
-         (|(fp32Vec_4_absVal[15:8]))
-           ? {|(fp32Vec_4_absVal[15:12]),
-              (|(fp32Vec_4_absVal[15:12]))
-                ? (fp32Vec_4_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_4_absVal[14] ? 2'h2 : {1'h0, fp32Vec_4_absVal[13]})
-                : fp32Vec_4_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_4_absVal[10] ? 2'h2 : {1'h0, fp32Vec_4_absVal[9]}}
-           : {|(fp32Vec_4_absVal[7:4]),
-              (|(fp32Vec_4_absVal[7:4]))
-                ? (fp32Vec_4_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_4_absVal[6] ? 2'h2 : {1'h0, fp32Vec_4_absVal[5]})
-                : fp32Vec_4_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_4_absVal[2] ? 2'h2 : {1'h0, fp32Vec_4_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_5 = {|(fp32Vec_4_absVal[31:16]), _fp32Vec_4_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_4_aligned_T_1 = {31'h0, fp32Vec_4_absVal} << 5'h17 - _GEN_5;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_4_aligned_T_4 = fp32Vec_4_absVal >> _GEN_5 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_4 =
-    io_cfg_srcFmt == 4'h3
-      ? (fp32Vec_4_isZero
-           ? 32'h0
-           : {_fp32Vec_4_shifted_T_1[31],
-              fp32Vec_4_isZero
-                ? 8'h0
-                : {3'h0, |(fp32Vec_4_absVal[31:16]), _fp32Vec_4_leadPos_T_52} + 8'h7F,
-              {|(fp32Vec_4_absVal[31:16]), _fp32Vec_4_leadPos_T_52[3]} != 2'h3
-                ? _fp32Vec_4_aligned_T_1[22:0]
-                : _fp32Vec_4_aligned_T_4[22:0]})
-      : io_cfg_srcFmt == 4'h2
-          ? {io_in_bits[79:64], 16'h0}
-          : io_cfg_srcFmt == 4'h1
-              ? {io_in_bits[79],
-                 _fp32Vec_4_T & io_in_bits[73:64] == 10'h0
-                   ? 31'h0
-                   : {_fp32Vec_4_T
-                        ? 8'h0
-                        : (&(io_in_bits[78:74]))
-                            ? 8'hFF
-                            : {3'h0, io_in_bits[78:74]} + 8'h70,
-                      io_in_bits[73:64],
-                      13'h0}}
-              : io_in_bits[159:128];	// src/foragerbee/scala/main/FbFormatConverter.scala:50:17, :51:17, :52:17, :53:{21,26}, :54:{21,26}, :55:23, :56:21, :57:{8,21,28,40}, :58:12, :62:46, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:{8,31}, :153:{33,45}, :181:51, :182:51, :185:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire              _fp32Vec_5_T = io_in_bits[94:90] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:51:17, :53:26, :182:51
-  wire [8:0]        _fp32Vec_5_diff_T = {io_in_bits[47], io_in_bits[47:40]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_5_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_5_diff_T[8]}}, _fp32Vec_5_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_5_absVal =
-    _fp32Vec_5_shifted_T_1[31]
-      ? ~(_fp32Vec_5_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_5_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_5_isZero = fp32Vec_5_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_5_leadPos_T_52 =
-    (|(fp32Vec_5_absVal[31:16]))
-      ? {|(fp32Vec_5_absVal[31:24]),
-         (|(fp32Vec_5_absVal[31:24]))
-           ? {|(fp32Vec_5_absVal[31:28]),
-              (|(fp32Vec_5_absVal[31:28]))
-                ? (fp32Vec_5_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_5_absVal[30] ? 2'h2 : {1'h0, fp32Vec_5_absVal[29]})
-                : fp32Vec_5_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_5_absVal[26] ? 2'h2 : {1'h0, fp32Vec_5_absVal[25]}}
-           : {|(fp32Vec_5_absVal[23:20]),
-              (|(fp32Vec_5_absVal[23:20]))
-                ? (fp32Vec_5_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_5_absVal[22] ? 2'h2 : {1'h0, fp32Vec_5_absVal[21]})
-                : fp32Vec_5_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_5_absVal[18] ? 2'h2 : {1'h0, fp32Vec_5_absVal[17]}}}
-      : {|(fp32Vec_5_absVal[15:8]),
-         (|(fp32Vec_5_absVal[15:8]))
-           ? {|(fp32Vec_5_absVal[15:12]),
-              (|(fp32Vec_5_absVal[15:12]))
-                ? (fp32Vec_5_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_5_absVal[14] ? 2'h2 : {1'h0, fp32Vec_5_absVal[13]})
-                : fp32Vec_5_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_5_absVal[10] ? 2'h2 : {1'h0, fp32Vec_5_absVal[9]}}
-           : {|(fp32Vec_5_absVal[7:4]),
-              (|(fp32Vec_5_absVal[7:4]))
-                ? (fp32Vec_5_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_5_absVal[6] ? 2'h2 : {1'h0, fp32Vec_5_absVal[5]})
-                : fp32Vec_5_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_5_absVal[2] ? 2'h2 : {1'h0, fp32Vec_5_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_6 = {|(fp32Vec_5_absVal[31:16]), _fp32Vec_5_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_5_aligned_T_1 = {31'h0, fp32Vec_5_absVal} << 5'h17 - _GEN_6;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_5_aligned_T_4 = fp32Vec_5_absVal >> _GEN_6 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_5 =
-    io_cfg_srcFmt == 4'h3
-      ? (fp32Vec_5_isZero
-           ? 32'h0
-           : {_fp32Vec_5_shifted_T_1[31],
-              fp32Vec_5_isZero
-                ? 8'h0
-                : {3'h0, |(fp32Vec_5_absVal[31:16]), _fp32Vec_5_leadPos_T_52} + 8'h7F,
-              {|(fp32Vec_5_absVal[31:16]), _fp32Vec_5_leadPos_T_52[3]} != 2'h3
-                ? _fp32Vec_5_aligned_T_1[22:0]
-                : _fp32Vec_5_aligned_T_4[22:0]})
-      : io_cfg_srcFmt == 4'h2
-          ? {io_in_bits[95:80], 16'h0}
-          : io_cfg_srcFmt == 4'h1
-              ? {io_in_bits[95],
-                 _fp32Vec_5_T & io_in_bits[89:80] == 10'h0
-                   ? 31'h0
-                   : {_fp32Vec_5_T
-                        ? 8'h0
-                        : (&(io_in_bits[94:90]))
-                            ? 8'hFF
-                            : {3'h0, io_in_bits[94:90]} + 8'h70,
-                      io_in_bits[89:80],
-                      13'h0}}
-              : io_in_bits[191:160];	// src/foragerbee/scala/main/FbFormatConverter.scala:50:17, :51:17, :52:17, :53:{21,26}, :54:{21,26}, :55:23, :56:21, :57:{8,21,28,40}, :58:12, :62:46, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:{8,31}, :153:{33,45}, :181:51, :182:51, :185:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire              _fp32Vec_6_T = io_in_bits[110:106] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:51:17, :53:26, :182:51
-  wire [8:0]        _fp32Vec_6_diff_T = {io_in_bits[55], io_in_bits[55:48]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_6_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_6_diff_T[8]}}, _fp32Vec_6_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_6_absVal =
-    _fp32Vec_6_shifted_T_1[31]
-      ? ~(_fp32Vec_6_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_6_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_6_isZero = fp32Vec_6_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_6_leadPos_T_52 =
-    (|(fp32Vec_6_absVal[31:16]))
-      ? {|(fp32Vec_6_absVal[31:24]),
-         (|(fp32Vec_6_absVal[31:24]))
-           ? {|(fp32Vec_6_absVal[31:28]),
-              (|(fp32Vec_6_absVal[31:28]))
-                ? (fp32Vec_6_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_6_absVal[30] ? 2'h2 : {1'h0, fp32Vec_6_absVal[29]})
-                : fp32Vec_6_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_6_absVal[26] ? 2'h2 : {1'h0, fp32Vec_6_absVal[25]}}
-           : {|(fp32Vec_6_absVal[23:20]),
-              (|(fp32Vec_6_absVal[23:20]))
-                ? (fp32Vec_6_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_6_absVal[22] ? 2'h2 : {1'h0, fp32Vec_6_absVal[21]})
-                : fp32Vec_6_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_6_absVal[18] ? 2'h2 : {1'h0, fp32Vec_6_absVal[17]}}}
-      : {|(fp32Vec_6_absVal[15:8]),
-         (|(fp32Vec_6_absVal[15:8]))
-           ? {|(fp32Vec_6_absVal[15:12]),
-              (|(fp32Vec_6_absVal[15:12]))
-                ? (fp32Vec_6_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_6_absVal[14] ? 2'h2 : {1'h0, fp32Vec_6_absVal[13]})
-                : fp32Vec_6_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_6_absVal[10] ? 2'h2 : {1'h0, fp32Vec_6_absVal[9]}}
-           : {|(fp32Vec_6_absVal[7:4]),
-              (|(fp32Vec_6_absVal[7:4]))
-                ? (fp32Vec_6_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_6_absVal[6] ? 2'h2 : {1'h0, fp32Vec_6_absVal[5]})
-                : fp32Vec_6_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_6_absVal[2] ? 2'h2 : {1'h0, fp32Vec_6_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_7 = {|(fp32Vec_6_absVal[31:16]), _fp32Vec_6_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_6_aligned_T_1 = {31'h0, fp32Vec_6_absVal} << 5'h17 - _GEN_7;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_6_aligned_T_4 = fp32Vec_6_absVal >> _GEN_7 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_6 =
-    io_cfg_srcFmt == 4'h3
-      ? (fp32Vec_6_isZero
-           ? 32'h0
-           : {_fp32Vec_6_shifted_T_1[31],
-              fp32Vec_6_isZero
-                ? 8'h0
-                : {3'h0, |(fp32Vec_6_absVal[31:16]), _fp32Vec_6_leadPos_T_52} + 8'h7F,
-              {|(fp32Vec_6_absVal[31:16]), _fp32Vec_6_leadPos_T_52[3]} != 2'h3
-                ? _fp32Vec_6_aligned_T_1[22:0]
-                : _fp32Vec_6_aligned_T_4[22:0]})
-      : io_cfg_srcFmt == 4'h2
-          ? {io_in_bits[111:96], 16'h0}
-          : io_cfg_srcFmt == 4'h1
-              ? {io_in_bits[111],
-                 _fp32Vec_6_T & io_in_bits[105:96] == 10'h0
-                   ? 31'h0
-                   : {_fp32Vec_6_T
-                        ? 8'h0
-                        : (&(io_in_bits[110:106]))
-                            ? 8'hFF
-                            : {3'h0, io_in_bits[110:106]} + 8'h70,
-                      io_in_bits[105:96],
-                      13'h0}}
-              : io_in_bits[223:192];	// src/foragerbee/scala/main/FbFormatConverter.scala:50:17, :51:17, :52:17, :53:{21,26}, :54:{21,26}, :55:23, :56:21, :57:{8,21,28,40}, :58:12, :62:46, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:{8,31}, :153:{33,45}, :181:51, :182:51, :185:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire              _fp32Vec_7_T = io_in_bits[126:122] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:51:17, :53:26, :182:51
-  wire [8:0]        _fp32Vec_7_diff_T = {io_in_bits[63], io_in_bits[63:56]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_7_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_7_diff_T[8]}}, _fp32Vec_7_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_7_absVal =
-    _fp32Vec_7_shifted_T_1[31]
-      ? ~(_fp32Vec_7_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_7_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_7_isZero = fp32Vec_7_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_7_leadPos_T_52 =
-    (|(fp32Vec_7_absVal[31:16]))
-      ? {|(fp32Vec_7_absVal[31:24]),
-         (|(fp32Vec_7_absVal[31:24]))
-           ? {|(fp32Vec_7_absVal[31:28]),
-              (|(fp32Vec_7_absVal[31:28]))
-                ? (fp32Vec_7_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_7_absVal[30] ? 2'h2 : {1'h0, fp32Vec_7_absVal[29]})
-                : fp32Vec_7_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_7_absVal[26] ? 2'h2 : {1'h0, fp32Vec_7_absVal[25]}}
-           : {|(fp32Vec_7_absVal[23:20]),
-              (|(fp32Vec_7_absVal[23:20]))
-                ? (fp32Vec_7_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_7_absVal[22] ? 2'h2 : {1'h0, fp32Vec_7_absVal[21]})
-                : fp32Vec_7_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_7_absVal[18] ? 2'h2 : {1'h0, fp32Vec_7_absVal[17]}}}
-      : {|(fp32Vec_7_absVal[15:8]),
-         (|(fp32Vec_7_absVal[15:8]))
-           ? {|(fp32Vec_7_absVal[15:12]),
-              (|(fp32Vec_7_absVal[15:12]))
-                ? (fp32Vec_7_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_7_absVal[14] ? 2'h2 : {1'h0, fp32Vec_7_absVal[13]})
-                : fp32Vec_7_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_7_absVal[10] ? 2'h2 : {1'h0, fp32Vec_7_absVal[9]}}
-           : {|(fp32Vec_7_absVal[7:4]),
-              (|(fp32Vec_7_absVal[7:4]))
-                ? (fp32Vec_7_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_7_absVal[6] ? 2'h2 : {1'h0, fp32Vec_7_absVal[5]})
-                : fp32Vec_7_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_7_absVal[2] ? 2'h2 : {1'h0, fp32Vec_7_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_8 = {|(fp32Vec_7_absVal[31:16]), _fp32Vec_7_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_7_aligned_T_1 = {31'h0, fp32Vec_7_absVal} << 5'h17 - _GEN_8;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_7_aligned_T_4 = fp32Vec_7_absVal >> _GEN_8 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_7 =
-    io_cfg_srcFmt == 4'h3
-      ? (fp32Vec_7_isZero
-           ? 32'h0
-           : {_fp32Vec_7_shifted_T_1[31],
-              fp32Vec_7_isZero
-                ? 8'h0
-                : {3'h0, |(fp32Vec_7_absVal[31:16]), _fp32Vec_7_leadPos_T_52} + 8'h7F,
-              {|(fp32Vec_7_absVal[31:16]), _fp32Vec_7_leadPos_T_52[3]} != 2'h3
-                ? _fp32Vec_7_aligned_T_1[22:0]
-                : _fp32Vec_7_aligned_T_4[22:0]})
-      : io_cfg_srcFmt == 4'h2
-          ? {io_in_bits[127:112], 16'h0}
-          : io_cfg_srcFmt == 4'h1
-              ? {io_in_bits[127],
-                 _fp32Vec_7_T & io_in_bits[121:112] == 10'h0
-                   ? 31'h0
-                   : {_fp32Vec_7_T
-                        ? 8'h0
-                        : (&(io_in_bits[126:122]))
-                            ? 8'hFF
-                            : {3'h0, io_in_bits[126:122]} + 8'h70,
-                      io_in_bits[121:112],
-                      13'h0}}
-              : io_in_bits[255:224];	// src/foragerbee/scala/main/FbFormatConverter.scala:50:17, :51:17, :52:17, :53:{21,26}, :54:{21,26}, :55:23, :56:21, :57:{8,21,28,40}, :58:12, :62:46, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:{8,31}, :153:{33,45}, :181:51, :182:51, :185:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire              _fp32Vec_8_T = io_in_bits[142:138] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:51:17, :53:26, :182:51
-  wire [8:0]        _fp32Vec_8_diff_T = {io_in_bits[71], io_in_bits[71:64]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_8_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_8_diff_T[8]}}, _fp32Vec_8_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_8_absVal =
-    _fp32Vec_8_shifted_T_1[31]
-      ? ~(_fp32Vec_8_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_8_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_8_isZero = fp32Vec_8_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_8_leadPos_T_52 =
-    (|(fp32Vec_8_absVal[31:16]))
-      ? {|(fp32Vec_8_absVal[31:24]),
-         (|(fp32Vec_8_absVal[31:24]))
-           ? {|(fp32Vec_8_absVal[31:28]),
-              (|(fp32Vec_8_absVal[31:28]))
-                ? (fp32Vec_8_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_8_absVal[30] ? 2'h2 : {1'h0, fp32Vec_8_absVal[29]})
-                : fp32Vec_8_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_8_absVal[26] ? 2'h2 : {1'h0, fp32Vec_8_absVal[25]}}
-           : {|(fp32Vec_8_absVal[23:20]),
-              (|(fp32Vec_8_absVal[23:20]))
-                ? (fp32Vec_8_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_8_absVal[22] ? 2'h2 : {1'h0, fp32Vec_8_absVal[21]})
-                : fp32Vec_8_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_8_absVal[18] ? 2'h2 : {1'h0, fp32Vec_8_absVal[17]}}}
-      : {|(fp32Vec_8_absVal[15:8]),
-         (|(fp32Vec_8_absVal[15:8]))
-           ? {|(fp32Vec_8_absVal[15:12]),
-              (|(fp32Vec_8_absVal[15:12]))
-                ? (fp32Vec_8_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_8_absVal[14] ? 2'h2 : {1'h0, fp32Vec_8_absVal[13]})
-                : fp32Vec_8_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_8_absVal[10] ? 2'h2 : {1'h0, fp32Vec_8_absVal[9]}}
-           : {|(fp32Vec_8_absVal[7:4]),
-              (|(fp32Vec_8_absVal[7:4]))
-                ? (fp32Vec_8_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_8_absVal[6] ? 2'h2 : {1'h0, fp32Vec_8_absVal[5]})
-                : fp32Vec_8_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_8_absVal[2] ? 2'h2 : {1'h0, fp32Vec_8_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_9 = {|(fp32Vec_8_absVal[31:16]), _fp32Vec_8_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_8_aligned_T_1 = {31'h0, fp32Vec_8_absVal} << 5'h17 - _GEN_9;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_8_aligned_T_4 = fp32Vec_8_absVal >> _GEN_9 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_8 =
-    io_cfg_srcFmt == 4'h3
-      ? (fp32Vec_8_isZero
-           ? 32'h0
-           : {_fp32Vec_8_shifted_T_1[31],
-              fp32Vec_8_isZero
-                ? 8'h0
-                : {3'h0, |(fp32Vec_8_absVal[31:16]), _fp32Vec_8_leadPos_T_52} + 8'h7F,
-              {|(fp32Vec_8_absVal[31:16]), _fp32Vec_8_leadPos_T_52[3]} != 2'h3
-                ? _fp32Vec_8_aligned_T_1[22:0]
-                : _fp32Vec_8_aligned_T_4[22:0]})
-      : io_cfg_srcFmt == 4'h2
-          ? {io_in_bits[143:128], 16'h0}
-          : io_cfg_srcFmt == 4'h1
-              ? {io_in_bits[143],
-                 _fp32Vec_8_T & io_in_bits[137:128] == 10'h0
-                   ? 31'h0
-                   : {_fp32Vec_8_T
-                        ? 8'h0
-                        : (&(io_in_bits[142:138]))
-                            ? 8'hFF
-                            : {3'h0, io_in_bits[142:138]} + 8'h70,
-                      io_in_bits[137:128],
-                      13'h0}}
-              : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:50:17, :51:17, :52:17, :53:{21,26}, :54:{21,26}, :55:23, :56:21, :57:{8,21,28,40}, :58:12, :62:46, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:{8,31}, :153:{33,45}, :182:51, :185:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire              _fp32Vec_9_T = io_in_bits[158:154] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:51:17, :53:26, :182:51
-  wire [8:0]        _fp32Vec_9_diff_T = {io_in_bits[79], io_in_bits[79:72]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_9_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_9_diff_T[8]}}, _fp32Vec_9_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_9_absVal =
-    _fp32Vec_9_shifted_T_1[31]
-      ? ~(_fp32Vec_9_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_9_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_9_isZero = fp32Vec_9_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_9_leadPos_T_52 =
-    (|(fp32Vec_9_absVal[31:16]))
-      ? {|(fp32Vec_9_absVal[31:24]),
-         (|(fp32Vec_9_absVal[31:24]))
-           ? {|(fp32Vec_9_absVal[31:28]),
-              (|(fp32Vec_9_absVal[31:28]))
-                ? (fp32Vec_9_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_9_absVal[30] ? 2'h2 : {1'h0, fp32Vec_9_absVal[29]})
-                : fp32Vec_9_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_9_absVal[26] ? 2'h2 : {1'h0, fp32Vec_9_absVal[25]}}
-           : {|(fp32Vec_9_absVal[23:20]),
-              (|(fp32Vec_9_absVal[23:20]))
-                ? (fp32Vec_9_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_9_absVal[22] ? 2'h2 : {1'h0, fp32Vec_9_absVal[21]})
-                : fp32Vec_9_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_9_absVal[18] ? 2'h2 : {1'h0, fp32Vec_9_absVal[17]}}}
-      : {|(fp32Vec_9_absVal[15:8]),
-         (|(fp32Vec_9_absVal[15:8]))
-           ? {|(fp32Vec_9_absVal[15:12]),
-              (|(fp32Vec_9_absVal[15:12]))
-                ? (fp32Vec_9_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_9_absVal[14] ? 2'h2 : {1'h0, fp32Vec_9_absVal[13]})
-                : fp32Vec_9_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_9_absVal[10] ? 2'h2 : {1'h0, fp32Vec_9_absVal[9]}}
-           : {|(fp32Vec_9_absVal[7:4]),
-              (|(fp32Vec_9_absVal[7:4]))
-                ? (fp32Vec_9_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_9_absVal[6] ? 2'h2 : {1'h0, fp32Vec_9_absVal[5]})
-                : fp32Vec_9_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_9_absVal[2] ? 2'h2 : {1'h0, fp32Vec_9_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_10 = {|(fp32Vec_9_absVal[31:16]), _fp32Vec_9_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_9_aligned_T_1 = {31'h0, fp32Vec_9_absVal} << 5'h17 - _GEN_10;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_9_aligned_T_4 = fp32Vec_9_absVal >> _GEN_10 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_9 =
-    io_cfg_srcFmt == 4'h3
-      ? (fp32Vec_9_isZero
-           ? 32'h0
-           : {_fp32Vec_9_shifted_T_1[31],
-              fp32Vec_9_isZero
-                ? 8'h0
-                : {3'h0, |(fp32Vec_9_absVal[31:16]), _fp32Vec_9_leadPos_T_52} + 8'h7F,
-              {|(fp32Vec_9_absVal[31:16]), _fp32Vec_9_leadPos_T_52[3]} != 2'h3
-                ? _fp32Vec_9_aligned_T_1[22:0]
-                : _fp32Vec_9_aligned_T_4[22:0]})
-      : io_cfg_srcFmt == 4'h2
-          ? {io_in_bits[159:144], 16'h0}
-          : io_cfg_srcFmt == 4'h1
-              ? {io_in_bits[159],
-                 _fp32Vec_9_T & io_in_bits[153:144] == 10'h0
-                   ? 31'h0
-                   : {_fp32Vec_9_T
-                        ? 8'h0
-                        : (&(io_in_bits[158:154]))
-                            ? 8'hFF
-                            : {3'h0, io_in_bits[158:154]} + 8'h70,
-                      io_in_bits[153:144],
-                      13'h0}}
-              : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:50:17, :51:17, :52:17, :53:{21,26}, :54:{21,26}, :55:23, :56:21, :57:{8,21,28,40}, :58:12, :62:46, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:{8,31}, :153:{33,45}, :182:51, :185:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire              _fp32Vec_10_T = io_in_bits[174:170] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:51:17, :53:26, :182:51
-  wire [8:0]        _fp32Vec_10_diff_T = {io_in_bits[87], io_in_bits[87:80]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_10_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_10_diff_T[8]}}, _fp32Vec_10_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_10_absVal =
-    _fp32Vec_10_shifted_T_1[31]
-      ? ~(_fp32Vec_10_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_10_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_10_isZero = fp32Vec_10_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_10_leadPos_T_52 =
-    (|(fp32Vec_10_absVal[31:16]))
-      ? {|(fp32Vec_10_absVal[31:24]),
-         (|(fp32Vec_10_absVal[31:24]))
-           ? {|(fp32Vec_10_absVal[31:28]),
-              (|(fp32Vec_10_absVal[31:28]))
-                ? (fp32Vec_10_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_10_absVal[30] ? 2'h2 : {1'h0, fp32Vec_10_absVal[29]})
-                : fp32Vec_10_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_10_absVal[26] ? 2'h2 : {1'h0, fp32Vec_10_absVal[25]}}
-           : {|(fp32Vec_10_absVal[23:20]),
-              (|(fp32Vec_10_absVal[23:20]))
-                ? (fp32Vec_10_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_10_absVal[22] ? 2'h2 : {1'h0, fp32Vec_10_absVal[21]})
-                : fp32Vec_10_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_10_absVal[18] ? 2'h2 : {1'h0, fp32Vec_10_absVal[17]}}}
-      : {|(fp32Vec_10_absVal[15:8]),
-         (|(fp32Vec_10_absVal[15:8]))
-           ? {|(fp32Vec_10_absVal[15:12]),
-              (|(fp32Vec_10_absVal[15:12]))
-                ? (fp32Vec_10_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_10_absVal[14] ? 2'h2 : {1'h0, fp32Vec_10_absVal[13]})
-                : fp32Vec_10_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_10_absVal[10] ? 2'h2 : {1'h0, fp32Vec_10_absVal[9]}}
-           : {|(fp32Vec_10_absVal[7:4]),
-              (|(fp32Vec_10_absVal[7:4]))
-                ? (fp32Vec_10_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_10_absVal[6] ? 2'h2 : {1'h0, fp32Vec_10_absVal[5]})
-                : fp32Vec_10_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_10_absVal[2] ? 2'h2 : {1'h0, fp32Vec_10_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_11 = {|(fp32Vec_10_absVal[31:16]), _fp32Vec_10_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_10_aligned_T_1 =
-    {31'h0, fp32Vec_10_absVal} << 5'h17 - _GEN_11;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_10_aligned_T_4 = fp32Vec_10_absVal >> _GEN_11 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_10 =
-    io_cfg_srcFmt == 4'h3
-      ? (fp32Vec_10_isZero
-           ? 32'h0
-           : {_fp32Vec_10_shifted_T_1[31],
-              fp32Vec_10_isZero
-                ? 8'h0
-                : {3'h0, |(fp32Vec_10_absVal[31:16]), _fp32Vec_10_leadPos_T_52} + 8'h7F,
-              {|(fp32Vec_10_absVal[31:16]), _fp32Vec_10_leadPos_T_52[3]} != 2'h3
-                ? _fp32Vec_10_aligned_T_1[22:0]
-                : _fp32Vec_10_aligned_T_4[22:0]})
-      : io_cfg_srcFmt == 4'h2
-          ? {io_in_bits[175:160], 16'h0}
-          : io_cfg_srcFmt == 4'h1
-              ? {io_in_bits[175],
-                 _fp32Vec_10_T & io_in_bits[169:160] == 10'h0
-                   ? 31'h0
-                   : {_fp32Vec_10_T
-                        ? 8'h0
-                        : (&(io_in_bits[174:170]))
-                            ? 8'hFF
-                            : {3'h0, io_in_bits[174:170]} + 8'h70,
-                      io_in_bits[169:160],
-                      13'h0}}
-              : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:50:17, :51:17, :52:17, :53:{21,26}, :54:{21,26}, :55:23, :56:21, :57:{8,21,28,40}, :58:12, :62:46, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:{8,31}, :153:{33,45}, :182:51, :185:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire              _fp32Vec_11_T = io_in_bits[190:186] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:51:17, :53:26, :182:51
-  wire [8:0]        _fp32Vec_11_diff_T = {io_in_bits[95], io_in_bits[95:88]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_11_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_11_diff_T[8]}}, _fp32Vec_11_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_11_absVal =
-    _fp32Vec_11_shifted_T_1[31]
-      ? ~(_fp32Vec_11_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_11_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_11_isZero = fp32Vec_11_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_11_leadPos_T_52 =
-    (|(fp32Vec_11_absVal[31:16]))
-      ? {|(fp32Vec_11_absVal[31:24]),
-         (|(fp32Vec_11_absVal[31:24]))
-           ? {|(fp32Vec_11_absVal[31:28]),
-              (|(fp32Vec_11_absVal[31:28]))
-                ? (fp32Vec_11_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_11_absVal[30] ? 2'h2 : {1'h0, fp32Vec_11_absVal[29]})
-                : fp32Vec_11_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_11_absVal[26] ? 2'h2 : {1'h0, fp32Vec_11_absVal[25]}}
-           : {|(fp32Vec_11_absVal[23:20]),
-              (|(fp32Vec_11_absVal[23:20]))
-                ? (fp32Vec_11_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_11_absVal[22] ? 2'h2 : {1'h0, fp32Vec_11_absVal[21]})
-                : fp32Vec_11_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_11_absVal[18] ? 2'h2 : {1'h0, fp32Vec_11_absVal[17]}}}
-      : {|(fp32Vec_11_absVal[15:8]),
-         (|(fp32Vec_11_absVal[15:8]))
-           ? {|(fp32Vec_11_absVal[15:12]),
-              (|(fp32Vec_11_absVal[15:12]))
-                ? (fp32Vec_11_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_11_absVal[14] ? 2'h2 : {1'h0, fp32Vec_11_absVal[13]})
-                : fp32Vec_11_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_11_absVal[10] ? 2'h2 : {1'h0, fp32Vec_11_absVal[9]}}
-           : {|(fp32Vec_11_absVal[7:4]),
-              (|(fp32Vec_11_absVal[7:4]))
-                ? (fp32Vec_11_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_11_absVal[6] ? 2'h2 : {1'h0, fp32Vec_11_absVal[5]})
-                : fp32Vec_11_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_11_absVal[2] ? 2'h2 : {1'h0, fp32Vec_11_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_12 = {|(fp32Vec_11_absVal[31:16]), _fp32Vec_11_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_11_aligned_T_1 =
-    {31'h0, fp32Vec_11_absVal} << 5'h17 - _GEN_12;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_11_aligned_T_4 = fp32Vec_11_absVal >> _GEN_12 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_11 =
-    io_cfg_srcFmt == 4'h3
-      ? (fp32Vec_11_isZero
-           ? 32'h0
-           : {_fp32Vec_11_shifted_T_1[31],
-              fp32Vec_11_isZero
-                ? 8'h0
-                : {3'h0, |(fp32Vec_11_absVal[31:16]), _fp32Vec_11_leadPos_T_52} + 8'h7F,
-              {|(fp32Vec_11_absVal[31:16]), _fp32Vec_11_leadPos_T_52[3]} != 2'h3
-                ? _fp32Vec_11_aligned_T_1[22:0]
-                : _fp32Vec_11_aligned_T_4[22:0]})
-      : io_cfg_srcFmt == 4'h2
-          ? {io_in_bits[191:176], 16'h0}
-          : io_cfg_srcFmt == 4'h1
-              ? {io_in_bits[191],
-                 _fp32Vec_11_T & io_in_bits[185:176] == 10'h0
-                   ? 31'h0
-                   : {_fp32Vec_11_T
-                        ? 8'h0
-                        : (&(io_in_bits[190:186]))
-                            ? 8'hFF
-                            : {3'h0, io_in_bits[190:186]} + 8'h70,
-                      io_in_bits[185:176],
-                      13'h0}}
-              : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:50:17, :51:17, :52:17, :53:{21,26}, :54:{21,26}, :55:23, :56:21, :57:{8,21,28,40}, :58:12, :62:46, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:{8,31}, :153:{33,45}, :182:51, :185:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire              _fp32Vec_12_T = io_in_bits[206:202] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:51:17, :53:26, :182:51
-  wire [8:0]        _fp32Vec_12_diff_T = {io_in_bits[103], io_in_bits[103:96]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_12_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_12_diff_T[8]}}, _fp32Vec_12_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_12_absVal =
-    _fp32Vec_12_shifted_T_1[31]
-      ? ~(_fp32Vec_12_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_12_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_12_isZero = fp32Vec_12_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_12_leadPos_T_52 =
-    (|(fp32Vec_12_absVal[31:16]))
-      ? {|(fp32Vec_12_absVal[31:24]),
-         (|(fp32Vec_12_absVal[31:24]))
-           ? {|(fp32Vec_12_absVal[31:28]),
-              (|(fp32Vec_12_absVal[31:28]))
-                ? (fp32Vec_12_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_12_absVal[30] ? 2'h2 : {1'h0, fp32Vec_12_absVal[29]})
-                : fp32Vec_12_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_12_absVal[26] ? 2'h2 : {1'h0, fp32Vec_12_absVal[25]}}
-           : {|(fp32Vec_12_absVal[23:20]),
-              (|(fp32Vec_12_absVal[23:20]))
-                ? (fp32Vec_12_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_12_absVal[22] ? 2'h2 : {1'h0, fp32Vec_12_absVal[21]})
-                : fp32Vec_12_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_12_absVal[18] ? 2'h2 : {1'h0, fp32Vec_12_absVal[17]}}}
-      : {|(fp32Vec_12_absVal[15:8]),
-         (|(fp32Vec_12_absVal[15:8]))
-           ? {|(fp32Vec_12_absVal[15:12]),
-              (|(fp32Vec_12_absVal[15:12]))
-                ? (fp32Vec_12_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_12_absVal[14] ? 2'h2 : {1'h0, fp32Vec_12_absVal[13]})
-                : fp32Vec_12_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_12_absVal[10] ? 2'h2 : {1'h0, fp32Vec_12_absVal[9]}}
-           : {|(fp32Vec_12_absVal[7:4]),
-              (|(fp32Vec_12_absVal[7:4]))
-                ? (fp32Vec_12_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_12_absVal[6] ? 2'h2 : {1'h0, fp32Vec_12_absVal[5]})
-                : fp32Vec_12_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_12_absVal[2] ? 2'h2 : {1'h0, fp32Vec_12_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_13 = {|(fp32Vec_12_absVal[31:16]), _fp32Vec_12_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_12_aligned_T_1 =
-    {31'h0, fp32Vec_12_absVal} << 5'h17 - _GEN_13;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_12_aligned_T_4 = fp32Vec_12_absVal >> _GEN_13 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_12 =
-    io_cfg_srcFmt == 4'h3
-      ? (fp32Vec_12_isZero
-           ? 32'h0
-           : {_fp32Vec_12_shifted_T_1[31],
-              fp32Vec_12_isZero
-                ? 8'h0
-                : {3'h0, |(fp32Vec_12_absVal[31:16]), _fp32Vec_12_leadPos_T_52} + 8'h7F,
-              {|(fp32Vec_12_absVal[31:16]), _fp32Vec_12_leadPos_T_52[3]} != 2'h3
-                ? _fp32Vec_12_aligned_T_1[22:0]
-                : _fp32Vec_12_aligned_T_4[22:0]})
-      : io_cfg_srcFmt == 4'h2
-          ? {io_in_bits[207:192], 16'h0}
-          : io_cfg_srcFmt == 4'h1
-              ? {io_in_bits[207],
-                 _fp32Vec_12_T & io_in_bits[201:192] == 10'h0
-                   ? 31'h0
-                   : {_fp32Vec_12_T
-                        ? 8'h0
-                        : (&(io_in_bits[206:202]))
-                            ? 8'hFF
-                            : {3'h0, io_in_bits[206:202]} + 8'h70,
-                      io_in_bits[201:192],
-                      13'h0}}
-              : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:50:17, :51:17, :52:17, :53:{21,26}, :54:{21,26}, :55:23, :56:21, :57:{8,21,28,40}, :58:12, :62:46, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:{8,31}, :153:{33,45}, :182:51, :185:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire              _fp32Vec_13_T = io_in_bits[222:218] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:51:17, :53:26, :182:51
-  wire [8:0]        _fp32Vec_13_diff_T = {io_in_bits[111], io_in_bits[111:104]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_13_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_13_diff_T[8]}}, _fp32Vec_13_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_13_absVal =
-    _fp32Vec_13_shifted_T_1[31]
-      ? ~(_fp32Vec_13_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_13_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_13_isZero = fp32Vec_13_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_13_leadPos_T_52 =
-    (|(fp32Vec_13_absVal[31:16]))
-      ? {|(fp32Vec_13_absVal[31:24]),
-         (|(fp32Vec_13_absVal[31:24]))
-           ? {|(fp32Vec_13_absVal[31:28]),
-              (|(fp32Vec_13_absVal[31:28]))
-                ? (fp32Vec_13_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_13_absVal[30] ? 2'h2 : {1'h0, fp32Vec_13_absVal[29]})
-                : fp32Vec_13_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_13_absVal[26] ? 2'h2 : {1'h0, fp32Vec_13_absVal[25]}}
-           : {|(fp32Vec_13_absVal[23:20]),
-              (|(fp32Vec_13_absVal[23:20]))
-                ? (fp32Vec_13_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_13_absVal[22] ? 2'h2 : {1'h0, fp32Vec_13_absVal[21]})
-                : fp32Vec_13_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_13_absVal[18] ? 2'h2 : {1'h0, fp32Vec_13_absVal[17]}}}
-      : {|(fp32Vec_13_absVal[15:8]),
-         (|(fp32Vec_13_absVal[15:8]))
-           ? {|(fp32Vec_13_absVal[15:12]),
-              (|(fp32Vec_13_absVal[15:12]))
-                ? (fp32Vec_13_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_13_absVal[14] ? 2'h2 : {1'h0, fp32Vec_13_absVal[13]})
-                : fp32Vec_13_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_13_absVal[10] ? 2'h2 : {1'h0, fp32Vec_13_absVal[9]}}
-           : {|(fp32Vec_13_absVal[7:4]),
-              (|(fp32Vec_13_absVal[7:4]))
-                ? (fp32Vec_13_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_13_absVal[6] ? 2'h2 : {1'h0, fp32Vec_13_absVal[5]})
-                : fp32Vec_13_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_13_absVal[2] ? 2'h2 : {1'h0, fp32Vec_13_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_14 = {|(fp32Vec_13_absVal[31:16]), _fp32Vec_13_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_13_aligned_T_1 =
-    {31'h0, fp32Vec_13_absVal} << 5'h17 - _GEN_14;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_13_aligned_T_4 = fp32Vec_13_absVal >> _GEN_14 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_13 =
-    io_cfg_srcFmt == 4'h3
-      ? (fp32Vec_13_isZero
-           ? 32'h0
-           : {_fp32Vec_13_shifted_T_1[31],
-              fp32Vec_13_isZero
-                ? 8'h0
-                : {3'h0, |(fp32Vec_13_absVal[31:16]), _fp32Vec_13_leadPos_T_52} + 8'h7F,
-              {|(fp32Vec_13_absVal[31:16]), _fp32Vec_13_leadPos_T_52[3]} != 2'h3
-                ? _fp32Vec_13_aligned_T_1[22:0]
-                : _fp32Vec_13_aligned_T_4[22:0]})
-      : io_cfg_srcFmt == 4'h2
-          ? {io_in_bits[223:208], 16'h0}
-          : io_cfg_srcFmt == 4'h1
-              ? {io_in_bits[223],
-                 _fp32Vec_13_T & io_in_bits[217:208] == 10'h0
-                   ? 31'h0
-                   : {_fp32Vec_13_T
-                        ? 8'h0
-                        : (&(io_in_bits[222:218]))
-                            ? 8'hFF
-                            : {3'h0, io_in_bits[222:218]} + 8'h70,
-                      io_in_bits[217:208],
-                      13'h0}}
-              : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:50:17, :51:17, :52:17, :53:{21,26}, :54:{21,26}, :55:23, :56:21, :57:{8,21,28,40}, :58:12, :62:46, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:{8,31}, :153:{33,45}, :182:51, :185:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire              _fp32Vec_14_T = io_in_bits[238:234] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:51:17, :53:26, :182:51
-  wire [8:0]        _fp32Vec_14_diff_T = {io_in_bits[119], io_in_bits[119:112]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_14_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_14_diff_T[8]}}, _fp32Vec_14_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_14_absVal =
-    _fp32Vec_14_shifted_T_1[31]
-      ? ~(_fp32Vec_14_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_14_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_14_isZero = fp32Vec_14_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_14_leadPos_T_52 =
-    (|(fp32Vec_14_absVal[31:16]))
-      ? {|(fp32Vec_14_absVal[31:24]),
-         (|(fp32Vec_14_absVal[31:24]))
-           ? {|(fp32Vec_14_absVal[31:28]),
-              (|(fp32Vec_14_absVal[31:28]))
-                ? (fp32Vec_14_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_14_absVal[30] ? 2'h2 : {1'h0, fp32Vec_14_absVal[29]})
-                : fp32Vec_14_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_14_absVal[26] ? 2'h2 : {1'h0, fp32Vec_14_absVal[25]}}
-           : {|(fp32Vec_14_absVal[23:20]),
-              (|(fp32Vec_14_absVal[23:20]))
-                ? (fp32Vec_14_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_14_absVal[22] ? 2'h2 : {1'h0, fp32Vec_14_absVal[21]})
-                : fp32Vec_14_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_14_absVal[18] ? 2'h2 : {1'h0, fp32Vec_14_absVal[17]}}}
-      : {|(fp32Vec_14_absVal[15:8]),
-         (|(fp32Vec_14_absVal[15:8]))
-           ? {|(fp32Vec_14_absVal[15:12]),
-              (|(fp32Vec_14_absVal[15:12]))
-                ? (fp32Vec_14_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_14_absVal[14] ? 2'h2 : {1'h0, fp32Vec_14_absVal[13]})
-                : fp32Vec_14_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_14_absVal[10] ? 2'h2 : {1'h0, fp32Vec_14_absVal[9]}}
-           : {|(fp32Vec_14_absVal[7:4]),
-              (|(fp32Vec_14_absVal[7:4]))
-                ? (fp32Vec_14_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_14_absVal[6] ? 2'h2 : {1'h0, fp32Vec_14_absVal[5]})
-                : fp32Vec_14_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_14_absVal[2] ? 2'h2 : {1'h0, fp32Vec_14_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_15 = {|(fp32Vec_14_absVal[31:16]), _fp32Vec_14_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_14_aligned_T_1 =
-    {31'h0, fp32Vec_14_absVal} << 5'h17 - _GEN_15;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_14_aligned_T_4 = fp32Vec_14_absVal >> _GEN_15 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_14 =
-    io_cfg_srcFmt == 4'h3
-      ? (fp32Vec_14_isZero
-           ? 32'h0
-           : {_fp32Vec_14_shifted_T_1[31],
-              fp32Vec_14_isZero
-                ? 8'h0
-                : {3'h0, |(fp32Vec_14_absVal[31:16]), _fp32Vec_14_leadPos_T_52} + 8'h7F,
-              {|(fp32Vec_14_absVal[31:16]), _fp32Vec_14_leadPos_T_52[3]} != 2'h3
-                ? _fp32Vec_14_aligned_T_1[22:0]
-                : _fp32Vec_14_aligned_T_4[22:0]})
-      : io_cfg_srcFmt == 4'h2
-          ? {io_in_bits[239:224], 16'h0}
-          : io_cfg_srcFmt == 4'h1
-              ? {io_in_bits[239],
-                 _fp32Vec_14_T & io_in_bits[233:224] == 10'h0
-                   ? 31'h0
-                   : {_fp32Vec_14_T
-                        ? 8'h0
-                        : (&(io_in_bits[238:234]))
-                            ? 8'hFF
-                            : {3'h0, io_in_bits[238:234]} + 8'h70,
-                      io_in_bits[233:224],
-                      13'h0}}
-              : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:50:17, :51:17, :52:17, :53:{21,26}, :54:{21,26}, :55:23, :56:21, :57:{8,21,28,40}, :58:12, :62:46, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:{8,31}, :153:{33,45}, :182:51, :185:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire              _fp32Vec_15_T = io_in_bits[254:250] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:51:17, :53:26, :182:51
-  wire [8:0]        _fp32Vec_15_diff_T = {io_in_bits[127], io_in_bits[127:120]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_15_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_15_diff_T[8]}}, _fp32Vec_15_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_15_absVal =
-    _fp32Vec_15_shifted_T_1[31]
-      ? ~(_fp32Vec_15_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_15_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_15_isZero = fp32Vec_15_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_15_leadPos_T_52 =
-    (|(fp32Vec_15_absVal[31:16]))
-      ? {|(fp32Vec_15_absVal[31:24]),
-         (|(fp32Vec_15_absVal[31:24]))
-           ? {|(fp32Vec_15_absVal[31:28]),
-              (|(fp32Vec_15_absVal[31:28]))
-                ? (fp32Vec_15_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_15_absVal[30] ? 2'h2 : {1'h0, fp32Vec_15_absVal[29]})
-                : fp32Vec_15_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_15_absVal[26] ? 2'h2 : {1'h0, fp32Vec_15_absVal[25]}}
-           : {|(fp32Vec_15_absVal[23:20]),
-              (|(fp32Vec_15_absVal[23:20]))
-                ? (fp32Vec_15_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_15_absVal[22] ? 2'h2 : {1'h0, fp32Vec_15_absVal[21]})
-                : fp32Vec_15_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_15_absVal[18] ? 2'h2 : {1'h0, fp32Vec_15_absVal[17]}}}
-      : {|(fp32Vec_15_absVal[15:8]),
-         (|(fp32Vec_15_absVal[15:8]))
-           ? {|(fp32Vec_15_absVal[15:12]),
-              (|(fp32Vec_15_absVal[15:12]))
-                ? (fp32Vec_15_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_15_absVal[14] ? 2'h2 : {1'h0, fp32Vec_15_absVal[13]})
-                : fp32Vec_15_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_15_absVal[10] ? 2'h2 : {1'h0, fp32Vec_15_absVal[9]}}
-           : {|(fp32Vec_15_absVal[7:4]),
-              (|(fp32Vec_15_absVal[7:4]))
-                ? (fp32Vec_15_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_15_absVal[6] ? 2'h2 : {1'h0, fp32Vec_15_absVal[5]})
-                : fp32Vec_15_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_15_absVal[2] ? 2'h2 : {1'h0, fp32Vec_15_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_16 = {|(fp32Vec_15_absVal[31:16]), _fp32Vec_15_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_15_aligned_T_1 =
-    {31'h0, fp32Vec_15_absVal} << 5'h17 - _GEN_16;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_15_aligned_T_4 = fp32Vec_15_absVal >> _GEN_16 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_15 =
-    io_cfg_srcFmt == 4'h3
-      ? (fp32Vec_15_isZero
-           ? 32'h0
-           : {_fp32Vec_15_shifted_T_1[31],
-              fp32Vec_15_isZero
-                ? 8'h0
-                : {3'h0, |(fp32Vec_15_absVal[31:16]), _fp32Vec_15_leadPos_T_52} + 8'h7F,
-              {|(fp32Vec_15_absVal[31:16]), _fp32Vec_15_leadPos_T_52[3]} != 2'h3
-                ? _fp32Vec_15_aligned_T_1[22:0]
-                : _fp32Vec_15_aligned_T_4[22:0]})
-      : io_cfg_srcFmt == 4'h2
-          ? {io_in_bits[255:240], 16'h0}
-          : io_cfg_srcFmt == 4'h1
-              ? {io_in_bits[255],
-                 _fp32Vec_15_T & io_in_bits[249:240] == 10'h0
-                   ? 31'h0
-                   : {_fp32Vec_15_T
-                        ? 8'h0
-                        : (&(io_in_bits[254:250]))
-                            ? 8'hFF
-                            : {3'h0, io_in_bits[254:250]} + 8'h70,
-                      io_in_bits[249:240],
-                      13'h0}}
-              : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:50:17, :51:17, :52:17, :53:{21,26}, :54:{21,26}, :55:23, :56:21, :57:{8,21,28,40}, :58:12, :62:46, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:{8,31}, :153:{33,45}, :182:51, :185:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [8:0]        _fp32Vec_16_diff_T = {io_in_bits[135], io_in_bits[135:128]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_16_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_16_diff_T[8]}}, _fp32Vec_16_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_16_absVal =
-    _fp32Vec_16_shifted_T_1[31]
-      ? ~(_fp32Vec_16_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_16_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_16_isZero = fp32Vec_16_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_16_leadPos_T_52 =
-    (|(fp32Vec_16_absVal[31:16]))
-      ? {|(fp32Vec_16_absVal[31:24]),
-         (|(fp32Vec_16_absVal[31:24]))
-           ? {|(fp32Vec_16_absVal[31:28]),
-              (|(fp32Vec_16_absVal[31:28]))
-                ? (fp32Vec_16_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_16_absVal[30] ? 2'h2 : {1'h0, fp32Vec_16_absVal[29]})
-                : fp32Vec_16_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_16_absVal[26] ? 2'h2 : {1'h0, fp32Vec_16_absVal[25]}}
-           : {|(fp32Vec_16_absVal[23:20]),
-              (|(fp32Vec_16_absVal[23:20]))
-                ? (fp32Vec_16_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_16_absVal[22] ? 2'h2 : {1'h0, fp32Vec_16_absVal[21]})
-                : fp32Vec_16_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_16_absVal[18] ? 2'h2 : {1'h0, fp32Vec_16_absVal[17]}}}
-      : {|(fp32Vec_16_absVal[15:8]),
-         (|(fp32Vec_16_absVal[15:8]))
-           ? {|(fp32Vec_16_absVal[15:12]),
-              (|(fp32Vec_16_absVal[15:12]))
-                ? (fp32Vec_16_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_16_absVal[14] ? 2'h2 : {1'h0, fp32Vec_16_absVal[13]})
-                : fp32Vec_16_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_16_absVal[10] ? 2'h2 : {1'h0, fp32Vec_16_absVal[9]}}
-           : {|(fp32Vec_16_absVal[7:4]),
-              (|(fp32Vec_16_absVal[7:4]))
-                ? (fp32Vec_16_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_16_absVal[6] ? 2'h2 : {1'h0, fp32Vec_16_absVal[5]})
-                : fp32Vec_16_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_16_absVal[2] ? 2'h2 : {1'h0, fp32Vec_16_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_17 = {|(fp32Vec_16_absVal[31:16]), _fp32Vec_16_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_16_aligned_T_1 =
-    {31'h0, fp32Vec_16_absVal} << 5'h17 - _GEN_17;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_16_aligned_T_4 = fp32Vec_16_absVal >> _GEN_17 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire              _GEN_18 = io_cfg_srcFmt != 4'h3;	// src/foragerbee/scala/main/FbFormatConverter.scala:185:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [31:0]       fp32Vec_16 =
-    _GEN_18 | fp32Vec_16_isZero
-      ? 32'h0
-      : {_fp32Vec_16_shifted_T_1[31],
-         fp32Vec_16_isZero
-           ? 8'h0
-           : {3'h0, |(fp32Vec_16_absVal[31:16]), _fp32Vec_16_leadPos_T_52} + 8'h7F,
-         {|(fp32Vec_16_absVal[31:16]), _fp32Vec_16_leadPos_T_52[3]} != 2'h3
-           ? _fp32Vec_16_aligned_T_1[22:0]
-           : _fp32Vec_16_aligned_T_4[22:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:53:21, :55:23, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:31, :153:{33,45}, :185:50, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [8:0]        _fp32Vec_17_diff_T = {io_in_bits[143], io_in_bits[143:136]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_17_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_17_diff_T[8]}}, _fp32Vec_17_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_17_absVal =
-    _fp32Vec_17_shifted_T_1[31]
-      ? ~(_fp32Vec_17_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_17_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_17_isZero = fp32Vec_17_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_17_leadPos_T_52 =
-    (|(fp32Vec_17_absVal[31:16]))
-      ? {|(fp32Vec_17_absVal[31:24]),
-         (|(fp32Vec_17_absVal[31:24]))
-           ? {|(fp32Vec_17_absVal[31:28]),
-              (|(fp32Vec_17_absVal[31:28]))
-                ? (fp32Vec_17_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_17_absVal[30] ? 2'h2 : {1'h0, fp32Vec_17_absVal[29]})
-                : fp32Vec_17_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_17_absVal[26] ? 2'h2 : {1'h0, fp32Vec_17_absVal[25]}}
-           : {|(fp32Vec_17_absVal[23:20]),
-              (|(fp32Vec_17_absVal[23:20]))
-                ? (fp32Vec_17_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_17_absVal[22] ? 2'h2 : {1'h0, fp32Vec_17_absVal[21]})
-                : fp32Vec_17_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_17_absVal[18] ? 2'h2 : {1'h0, fp32Vec_17_absVal[17]}}}
-      : {|(fp32Vec_17_absVal[15:8]),
-         (|(fp32Vec_17_absVal[15:8]))
-           ? {|(fp32Vec_17_absVal[15:12]),
-              (|(fp32Vec_17_absVal[15:12]))
-                ? (fp32Vec_17_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_17_absVal[14] ? 2'h2 : {1'h0, fp32Vec_17_absVal[13]})
-                : fp32Vec_17_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_17_absVal[10] ? 2'h2 : {1'h0, fp32Vec_17_absVal[9]}}
-           : {|(fp32Vec_17_absVal[7:4]),
-              (|(fp32Vec_17_absVal[7:4]))
-                ? (fp32Vec_17_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_17_absVal[6] ? 2'h2 : {1'h0, fp32Vec_17_absVal[5]})
-                : fp32Vec_17_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_17_absVal[2] ? 2'h2 : {1'h0, fp32Vec_17_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_19 = {|(fp32Vec_17_absVal[31:16]), _fp32Vec_17_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_17_aligned_T_1 =
-    {31'h0, fp32Vec_17_absVal} << 5'h17 - _GEN_19;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_17_aligned_T_4 = fp32Vec_17_absVal >> _GEN_19 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_17 =
-    _GEN_18 | fp32Vec_17_isZero
-      ? 32'h0
-      : {_fp32Vec_17_shifted_T_1[31],
-         fp32Vec_17_isZero
-           ? 8'h0
-           : {3'h0, |(fp32Vec_17_absVal[31:16]), _fp32Vec_17_leadPos_T_52} + 8'h7F,
-         {|(fp32Vec_17_absVal[31:16]), _fp32Vec_17_leadPos_T_52[3]} != 2'h3
-           ? _fp32Vec_17_aligned_T_1[22:0]
-           : _fp32Vec_17_aligned_T_4[22:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:53:21, :55:23, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:31, :153:{33,45}, :185:50, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [8:0]        _fp32Vec_18_diff_T = {io_in_bits[151], io_in_bits[151:144]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_18_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_18_diff_T[8]}}, _fp32Vec_18_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_18_absVal =
-    _fp32Vec_18_shifted_T_1[31]
-      ? ~(_fp32Vec_18_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_18_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_18_isZero = fp32Vec_18_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_18_leadPos_T_52 =
-    (|(fp32Vec_18_absVal[31:16]))
-      ? {|(fp32Vec_18_absVal[31:24]),
-         (|(fp32Vec_18_absVal[31:24]))
-           ? {|(fp32Vec_18_absVal[31:28]),
-              (|(fp32Vec_18_absVal[31:28]))
-                ? (fp32Vec_18_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_18_absVal[30] ? 2'h2 : {1'h0, fp32Vec_18_absVal[29]})
-                : fp32Vec_18_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_18_absVal[26] ? 2'h2 : {1'h0, fp32Vec_18_absVal[25]}}
-           : {|(fp32Vec_18_absVal[23:20]),
-              (|(fp32Vec_18_absVal[23:20]))
-                ? (fp32Vec_18_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_18_absVal[22] ? 2'h2 : {1'h0, fp32Vec_18_absVal[21]})
-                : fp32Vec_18_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_18_absVal[18] ? 2'h2 : {1'h0, fp32Vec_18_absVal[17]}}}
-      : {|(fp32Vec_18_absVal[15:8]),
-         (|(fp32Vec_18_absVal[15:8]))
-           ? {|(fp32Vec_18_absVal[15:12]),
-              (|(fp32Vec_18_absVal[15:12]))
-                ? (fp32Vec_18_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_18_absVal[14] ? 2'h2 : {1'h0, fp32Vec_18_absVal[13]})
-                : fp32Vec_18_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_18_absVal[10] ? 2'h2 : {1'h0, fp32Vec_18_absVal[9]}}
-           : {|(fp32Vec_18_absVal[7:4]),
-              (|(fp32Vec_18_absVal[7:4]))
-                ? (fp32Vec_18_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_18_absVal[6] ? 2'h2 : {1'h0, fp32Vec_18_absVal[5]})
-                : fp32Vec_18_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_18_absVal[2] ? 2'h2 : {1'h0, fp32Vec_18_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_20 = {|(fp32Vec_18_absVal[31:16]), _fp32Vec_18_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_18_aligned_T_1 =
-    {31'h0, fp32Vec_18_absVal} << 5'h17 - _GEN_20;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_18_aligned_T_4 = fp32Vec_18_absVal >> _GEN_20 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_18 =
-    _GEN_18 | fp32Vec_18_isZero
-      ? 32'h0
-      : {_fp32Vec_18_shifted_T_1[31],
-         fp32Vec_18_isZero
-           ? 8'h0
-           : {3'h0, |(fp32Vec_18_absVal[31:16]), _fp32Vec_18_leadPos_T_52} + 8'h7F,
-         {|(fp32Vec_18_absVal[31:16]), _fp32Vec_18_leadPos_T_52[3]} != 2'h3
-           ? _fp32Vec_18_aligned_T_1[22:0]
-           : _fp32Vec_18_aligned_T_4[22:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:53:21, :55:23, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:31, :153:{33,45}, :185:50, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [8:0]        _fp32Vec_19_diff_T = {io_in_bits[159], io_in_bits[159:152]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_19_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_19_diff_T[8]}}, _fp32Vec_19_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_19_absVal =
-    _fp32Vec_19_shifted_T_1[31]
-      ? ~(_fp32Vec_19_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_19_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_19_isZero = fp32Vec_19_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_19_leadPos_T_52 =
-    (|(fp32Vec_19_absVal[31:16]))
-      ? {|(fp32Vec_19_absVal[31:24]),
-         (|(fp32Vec_19_absVal[31:24]))
-           ? {|(fp32Vec_19_absVal[31:28]),
-              (|(fp32Vec_19_absVal[31:28]))
-                ? (fp32Vec_19_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_19_absVal[30] ? 2'h2 : {1'h0, fp32Vec_19_absVal[29]})
-                : fp32Vec_19_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_19_absVal[26] ? 2'h2 : {1'h0, fp32Vec_19_absVal[25]}}
-           : {|(fp32Vec_19_absVal[23:20]),
-              (|(fp32Vec_19_absVal[23:20]))
-                ? (fp32Vec_19_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_19_absVal[22] ? 2'h2 : {1'h0, fp32Vec_19_absVal[21]})
-                : fp32Vec_19_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_19_absVal[18] ? 2'h2 : {1'h0, fp32Vec_19_absVal[17]}}}
-      : {|(fp32Vec_19_absVal[15:8]),
-         (|(fp32Vec_19_absVal[15:8]))
-           ? {|(fp32Vec_19_absVal[15:12]),
-              (|(fp32Vec_19_absVal[15:12]))
-                ? (fp32Vec_19_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_19_absVal[14] ? 2'h2 : {1'h0, fp32Vec_19_absVal[13]})
-                : fp32Vec_19_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_19_absVal[10] ? 2'h2 : {1'h0, fp32Vec_19_absVal[9]}}
-           : {|(fp32Vec_19_absVal[7:4]),
-              (|(fp32Vec_19_absVal[7:4]))
-                ? (fp32Vec_19_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_19_absVal[6] ? 2'h2 : {1'h0, fp32Vec_19_absVal[5]})
-                : fp32Vec_19_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_19_absVal[2] ? 2'h2 : {1'h0, fp32Vec_19_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_21 = {|(fp32Vec_19_absVal[31:16]), _fp32Vec_19_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_19_aligned_T_1 =
-    {31'h0, fp32Vec_19_absVal} << 5'h17 - _GEN_21;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_19_aligned_T_4 = fp32Vec_19_absVal >> _GEN_21 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_19 =
-    _GEN_18 | fp32Vec_19_isZero
-      ? 32'h0
-      : {_fp32Vec_19_shifted_T_1[31],
-         fp32Vec_19_isZero
-           ? 8'h0
-           : {3'h0, |(fp32Vec_19_absVal[31:16]), _fp32Vec_19_leadPos_T_52} + 8'h7F,
-         {|(fp32Vec_19_absVal[31:16]), _fp32Vec_19_leadPos_T_52[3]} != 2'h3
-           ? _fp32Vec_19_aligned_T_1[22:0]
-           : _fp32Vec_19_aligned_T_4[22:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:53:21, :55:23, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:31, :153:{33,45}, :185:50, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [8:0]        _fp32Vec_20_diff_T = {io_in_bits[167], io_in_bits[167:160]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_20_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_20_diff_T[8]}}, _fp32Vec_20_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_20_absVal =
-    _fp32Vec_20_shifted_T_1[31]
-      ? ~(_fp32Vec_20_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_20_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_20_isZero = fp32Vec_20_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_20_leadPos_T_52 =
-    (|(fp32Vec_20_absVal[31:16]))
-      ? {|(fp32Vec_20_absVal[31:24]),
-         (|(fp32Vec_20_absVal[31:24]))
-           ? {|(fp32Vec_20_absVal[31:28]),
-              (|(fp32Vec_20_absVal[31:28]))
-                ? (fp32Vec_20_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_20_absVal[30] ? 2'h2 : {1'h0, fp32Vec_20_absVal[29]})
-                : fp32Vec_20_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_20_absVal[26] ? 2'h2 : {1'h0, fp32Vec_20_absVal[25]}}
-           : {|(fp32Vec_20_absVal[23:20]),
-              (|(fp32Vec_20_absVal[23:20]))
-                ? (fp32Vec_20_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_20_absVal[22] ? 2'h2 : {1'h0, fp32Vec_20_absVal[21]})
-                : fp32Vec_20_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_20_absVal[18] ? 2'h2 : {1'h0, fp32Vec_20_absVal[17]}}}
-      : {|(fp32Vec_20_absVal[15:8]),
-         (|(fp32Vec_20_absVal[15:8]))
-           ? {|(fp32Vec_20_absVal[15:12]),
-              (|(fp32Vec_20_absVal[15:12]))
-                ? (fp32Vec_20_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_20_absVal[14] ? 2'h2 : {1'h0, fp32Vec_20_absVal[13]})
-                : fp32Vec_20_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_20_absVal[10] ? 2'h2 : {1'h0, fp32Vec_20_absVal[9]}}
-           : {|(fp32Vec_20_absVal[7:4]),
-              (|(fp32Vec_20_absVal[7:4]))
-                ? (fp32Vec_20_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_20_absVal[6] ? 2'h2 : {1'h0, fp32Vec_20_absVal[5]})
-                : fp32Vec_20_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_20_absVal[2] ? 2'h2 : {1'h0, fp32Vec_20_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_22 = {|(fp32Vec_20_absVal[31:16]), _fp32Vec_20_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_20_aligned_T_1 =
-    {31'h0, fp32Vec_20_absVal} << 5'h17 - _GEN_22;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_20_aligned_T_4 = fp32Vec_20_absVal >> _GEN_22 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_20 =
-    _GEN_18 | fp32Vec_20_isZero
-      ? 32'h0
-      : {_fp32Vec_20_shifted_T_1[31],
-         fp32Vec_20_isZero
-           ? 8'h0
-           : {3'h0, |(fp32Vec_20_absVal[31:16]), _fp32Vec_20_leadPos_T_52} + 8'h7F,
-         {|(fp32Vec_20_absVal[31:16]), _fp32Vec_20_leadPos_T_52[3]} != 2'h3
-           ? _fp32Vec_20_aligned_T_1[22:0]
-           : _fp32Vec_20_aligned_T_4[22:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:53:21, :55:23, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:31, :153:{33,45}, :185:50, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [8:0]        _fp32Vec_21_diff_T = {io_in_bits[175], io_in_bits[175:168]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_21_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_21_diff_T[8]}}, _fp32Vec_21_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_21_absVal =
-    _fp32Vec_21_shifted_T_1[31]
-      ? ~(_fp32Vec_21_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_21_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_21_isZero = fp32Vec_21_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_21_leadPos_T_52 =
-    (|(fp32Vec_21_absVal[31:16]))
-      ? {|(fp32Vec_21_absVal[31:24]),
-         (|(fp32Vec_21_absVal[31:24]))
-           ? {|(fp32Vec_21_absVal[31:28]),
-              (|(fp32Vec_21_absVal[31:28]))
-                ? (fp32Vec_21_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_21_absVal[30] ? 2'h2 : {1'h0, fp32Vec_21_absVal[29]})
-                : fp32Vec_21_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_21_absVal[26] ? 2'h2 : {1'h0, fp32Vec_21_absVal[25]}}
-           : {|(fp32Vec_21_absVal[23:20]),
-              (|(fp32Vec_21_absVal[23:20]))
-                ? (fp32Vec_21_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_21_absVal[22] ? 2'h2 : {1'h0, fp32Vec_21_absVal[21]})
-                : fp32Vec_21_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_21_absVal[18] ? 2'h2 : {1'h0, fp32Vec_21_absVal[17]}}}
-      : {|(fp32Vec_21_absVal[15:8]),
-         (|(fp32Vec_21_absVal[15:8]))
-           ? {|(fp32Vec_21_absVal[15:12]),
-              (|(fp32Vec_21_absVal[15:12]))
-                ? (fp32Vec_21_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_21_absVal[14] ? 2'h2 : {1'h0, fp32Vec_21_absVal[13]})
-                : fp32Vec_21_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_21_absVal[10] ? 2'h2 : {1'h0, fp32Vec_21_absVal[9]}}
-           : {|(fp32Vec_21_absVal[7:4]),
-              (|(fp32Vec_21_absVal[7:4]))
-                ? (fp32Vec_21_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_21_absVal[6] ? 2'h2 : {1'h0, fp32Vec_21_absVal[5]})
-                : fp32Vec_21_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_21_absVal[2] ? 2'h2 : {1'h0, fp32Vec_21_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_23 = {|(fp32Vec_21_absVal[31:16]), _fp32Vec_21_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_21_aligned_T_1 =
-    {31'h0, fp32Vec_21_absVal} << 5'h17 - _GEN_23;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_21_aligned_T_4 = fp32Vec_21_absVal >> _GEN_23 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_21 =
-    _GEN_18 | fp32Vec_21_isZero
-      ? 32'h0
-      : {_fp32Vec_21_shifted_T_1[31],
-         fp32Vec_21_isZero
-           ? 8'h0
-           : {3'h0, |(fp32Vec_21_absVal[31:16]), _fp32Vec_21_leadPos_T_52} + 8'h7F,
-         {|(fp32Vec_21_absVal[31:16]), _fp32Vec_21_leadPos_T_52[3]} != 2'h3
-           ? _fp32Vec_21_aligned_T_1[22:0]
-           : _fp32Vec_21_aligned_T_4[22:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:53:21, :55:23, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:31, :153:{33,45}, :185:50, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [8:0]        _fp32Vec_22_diff_T = {io_in_bits[183], io_in_bits[183:176]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_22_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_22_diff_T[8]}}, _fp32Vec_22_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_22_absVal =
-    _fp32Vec_22_shifted_T_1[31]
-      ? ~(_fp32Vec_22_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_22_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_22_isZero = fp32Vec_22_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_22_leadPos_T_52 =
-    (|(fp32Vec_22_absVal[31:16]))
-      ? {|(fp32Vec_22_absVal[31:24]),
-         (|(fp32Vec_22_absVal[31:24]))
-           ? {|(fp32Vec_22_absVal[31:28]),
-              (|(fp32Vec_22_absVal[31:28]))
-                ? (fp32Vec_22_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_22_absVal[30] ? 2'h2 : {1'h0, fp32Vec_22_absVal[29]})
-                : fp32Vec_22_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_22_absVal[26] ? 2'h2 : {1'h0, fp32Vec_22_absVal[25]}}
-           : {|(fp32Vec_22_absVal[23:20]),
-              (|(fp32Vec_22_absVal[23:20]))
-                ? (fp32Vec_22_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_22_absVal[22] ? 2'h2 : {1'h0, fp32Vec_22_absVal[21]})
-                : fp32Vec_22_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_22_absVal[18] ? 2'h2 : {1'h0, fp32Vec_22_absVal[17]}}}
-      : {|(fp32Vec_22_absVal[15:8]),
-         (|(fp32Vec_22_absVal[15:8]))
-           ? {|(fp32Vec_22_absVal[15:12]),
-              (|(fp32Vec_22_absVal[15:12]))
-                ? (fp32Vec_22_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_22_absVal[14] ? 2'h2 : {1'h0, fp32Vec_22_absVal[13]})
-                : fp32Vec_22_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_22_absVal[10] ? 2'h2 : {1'h0, fp32Vec_22_absVal[9]}}
-           : {|(fp32Vec_22_absVal[7:4]),
-              (|(fp32Vec_22_absVal[7:4]))
-                ? (fp32Vec_22_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_22_absVal[6] ? 2'h2 : {1'h0, fp32Vec_22_absVal[5]})
-                : fp32Vec_22_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_22_absVal[2] ? 2'h2 : {1'h0, fp32Vec_22_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_24 = {|(fp32Vec_22_absVal[31:16]), _fp32Vec_22_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_22_aligned_T_1 =
-    {31'h0, fp32Vec_22_absVal} << 5'h17 - _GEN_24;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_22_aligned_T_4 = fp32Vec_22_absVal >> _GEN_24 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_22 =
-    _GEN_18 | fp32Vec_22_isZero
-      ? 32'h0
-      : {_fp32Vec_22_shifted_T_1[31],
-         fp32Vec_22_isZero
-           ? 8'h0
-           : {3'h0, |(fp32Vec_22_absVal[31:16]), _fp32Vec_22_leadPos_T_52} + 8'h7F,
-         {|(fp32Vec_22_absVal[31:16]), _fp32Vec_22_leadPos_T_52[3]} != 2'h3
-           ? _fp32Vec_22_aligned_T_1[22:0]
-           : _fp32Vec_22_aligned_T_4[22:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:53:21, :55:23, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:31, :153:{33,45}, :185:50, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [8:0]        _fp32Vec_23_diff_T = {io_in_bits[191], io_in_bits[191:184]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_23_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_23_diff_T[8]}}, _fp32Vec_23_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_23_absVal =
-    _fp32Vec_23_shifted_T_1[31]
-      ? ~(_fp32Vec_23_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_23_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_23_isZero = fp32Vec_23_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_23_leadPos_T_52 =
-    (|(fp32Vec_23_absVal[31:16]))
-      ? {|(fp32Vec_23_absVal[31:24]),
-         (|(fp32Vec_23_absVal[31:24]))
-           ? {|(fp32Vec_23_absVal[31:28]),
-              (|(fp32Vec_23_absVal[31:28]))
-                ? (fp32Vec_23_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_23_absVal[30] ? 2'h2 : {1'h0, fp32Vec_23_absVal[29]})
-                : fp32Vec_23_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_23_absVal[26] ? 2'h2 : {1'h0, fp32Vec_23_absVal[25]}}
-           : {|(fp32Vec_23_absVal[23:20]),
-              (|(fp32Vec_23_absVal[23:20]))
-                ? (fp32Vec_23_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_23_absVal[22] ? 2'h2 : {1'h0, fp32Vec_23_absVal[21]})
-                : fp32Vec_23_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_23_absVal[18] ? 2'h2 : {1'h0, fp32Vec_23_absVal[17]}}}
-      : {|(fp32Vec_23_absVal[15:8]),
-         (|(fp32Vec_23_absVal[15:8]))
-           ? {|(fp32Vec_23_absVal[15:12]),
-              (|(fp32Vec_23_absVal[15:12]))
-                ? (fp32Vec_23_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_23_absVal[14] ? 2'h2 : {1'h0, fp32Vec_23_absVal[13]})
-                : fp32Vec_23_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_23_absVal[10] ? 2'h2 : {1'h0, fp32Vec_23_absVal[9]}}
-           : {|(fp32Vec_23_absVal[7:4]),
-              (|(fp32Vec_23_absVal[7:4]))
-                ? (fp32Vec_23_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_23_absVal[6] ? 2'h2 : {1'h0, fp32Vec_23_absVal[5]})
-                : fp32Vec_23_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_23_absVal[2] ? 2'h2 : {1'h0, fp32Vec_23_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_25 = {|(fp32Vec_23_absVal[31:16]), _fp32Vec_23_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_23_aligned_T_1 =
-    {31'h0, fp32Vec_23_absVal} << 5'h17 - _GEN_25;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_23_aligned_T_4 = fp32Vec_23_absVal >> _GEN_25 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_23 =
-    _GEN_18 | fp32Vec_23_isZero
-      ? 32'h0
-      : {_fp32Vec_23_shifted_T_1[31],
-         fp32Vec_23_isZero
-           ? 8'h0
-           : {3'h0, |(fp32Vec_23_absVal[31:16]), _fp32Vec_23_leadPos_T_52} + 8'h7F,
-         {|(fp32Vec_23_absVal[31:16]), _fp32Vec_23_leadPos_T_52[3]} != 2'h3
-           ? _fp32Vec_23_aligned_T_1[22:0]
-           : _fp32Vec_23_aligned_T_4[22:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:53:21, :55:23, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:31, :153:{33,45}, :185:50, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [8:0]        _fp32Vec_24_diff_T = {io_in_bits[199], io_in_bits[199:192]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_24_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_24_diff_T[8]}}, _fp32Vec_24_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_24_absVal =
-    _fp32Vec_24_shifted_T_1[31]
-      ? ~(_fp32Vec_24_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_24_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_24_isZero = fp32Vec_24_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_24_leadPos_T_52 =
-    (|(fp32Vec_24_absVal[31:16]))
-      ? {|(fp32Vec_24_absVal[31:24]),
-         (|(fp32Vec_24_absVal[31:24]))
-           ? {|(fp32Vec_24_absVal[31:28]),
-              (|(fp32Vec_24_absVal[31:28]))
-                ? (fp32Vec_24_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_24_absVal[30] ? 2'h2 : {1'h0, fp32Vec_24_absVal[29]})
-                : fp32Vec_24_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_24_absVal[26] ? 2'h2 : {1'h0, fp32Vec_24_absVal[25]}}
-           : {|(fp32Vec_24_absVal[23:20]),
-              (|(fp32Vec_24_absVal[23:20]))
-                ? (fp32Vec_24_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_24_absVal[22] ? 2'h2 : {1'h0, fp32Vec_24_absVal[21]})
-                : fp32Vec_24_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_24_absVal[18] ? 2'h2 : {1'h0, fp32Vec_24_absVal[17]}}}
-      : {|(fp32Vec_24_absVal[15:8]),
-         (|(fp32Vec_24_absVal[15:8]))
-           ? {|(fp32Vec_24_absVal[15:12]),
-              (|(fp32Vec_24_absVal[15:12]))
-                ? (fp32Vec_24_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_24_absVal[14] ? 2'h2 : {1'h0, fp32Vec_24_absVal[13]})
-                : fp32Vec_24_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_24_absVal[10] ? 2'h2 : {1'h0, fp32Vec_24_absVal[9]}}
-           : {|(fp32Vec_24_absVal[7:4]),
-              (|(fp32Vec_24_absVal[7:4]))
-                ? (fp32Vec_24_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_24_absVal[6] ? 2'h2 : {1'h0, fp32Vec_24_absVal[5]})
-                : fp32Vec_24_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_24_absVal[2] ? 2'h2 : {1'h0, fp32Vec_24_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_26 = {|(fp32Vec_24_absVal[31:16]), _fp32Vec_24_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_24_aligned_T_1 =
-    {31'h0, fp32Vec_24_absVal} << 5'h17 - _GEN_26;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_24_aligned_T_4 = fp32Vec_24_absVal >> _GEN_26 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_24 =
-    _GEN_18 | fp32Vec_24_isZero
-      ? 32'h0
-      : {_fp32Vec_24_shifted_T_1[31],
-         fp32Vec_24_isZero
-           ? 8'h0
-           : {3'h0, |(fp32Vec_24_absVal[31:16]), _fp32Vec_24_leadPos_T_52} + 8'h7F,
-         {|(fp32Vec_24_absVal[31:16]), _fp32Vec_24_leadPos_T_52[3]} != 2'h3
-           ? _fp32Vec_24_aligned_T_1[22:0]
-           : _fp32Vec_24_aligned_T_4[22:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:53:21, :55:23, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:31, :153:{33,45}, :185:50, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [8:0]        _fp32Vec_25_diff_T = {io_in_bits[207], io_in_bits[207:200]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_25_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_25_diff_T[8]}}, _fp32Vec_25_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_25_absVal =
-    _fp32Vec_25_shifted_T_1[31]
-      ? ~(_fp32Vec_25_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_25_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_25_isZero = fp32Vec_25_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_25_leadPos_T_52 =
-    (|(fp32Vec_25_absVal[31:16]))
-      ? {|(fp32Vec_25_absVal[31:24]),
-         (|(fp32Vec_25_absVal[31:24]))
-           ? {|(fp32Vec_25_absVal[31:28]),
-              (|(fp32Vec_25_absVal[31:28]))
-                ? (fp32Vec_25_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_25_absVal[30] ? 2'h2 : {1'h0, fp32Vec_25_absVal[29]})
-                : fp32Vec_25_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_25_absVal[26] ? 2'h2 : {1'h0, fp32Vec_25_absVal[25]}}
-           : {|(fp32Vec_25_absVal[23:20]),
-              (|(fp32Vec_25_absVal[23:20]))
-                ? (fp32Vec_25_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_25_absVal[22] ? 2'h2 : {1'h0, fp32Vec_25_absVal[21]})
-                : fp32Vec_25_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_25_absVal[18] ? 2'h2 : {1'h0, fp32Vec_25_absVal[17]}}}
-      : {|(fp32Vec_25_absVal[15:8]),
-         (|(fp32Vec_25_absVal[15:8]))
-           ? {|(fp32Vec_25_absVal[15:12]),
-              (|(fp32Vec_25_absVal[15:12]))
-                ? (fp32Vec_25_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_25_absVal[14] ? 2'h2 : {1'h0, fp32Vec_25_absVal[13]})
-                : fp32Vec_25_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_25_absVal[10] ? 2'h2 : {1'h0, fp32Vec_25_absVal[9]}}
-           : {|(fp32Vec_25_absVal[7:4]),
-              (|(fp32Vec_25_absVal[7:4]))
-                ? (fp32Vec_25_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_25_absVal[6] ? 2'h2 : {1'h0, fp32Vec_25_absVal[5]})
-                : fp32Vec_25_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_25_absVal[2] ? 2'h2 : {1'h0, fp32Vec_25_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_27 = {|(fp32Vec_25_absVal[31:16]), _fp32Vec_25_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_25_aligned_T_1 =
-    {31'h0, fp32Vec_25_absVal} << 5'h17 - _GEN_27;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_25_aligned_T_4 = fp32Vec_25_absVal >> _GEN_27 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_25 =
-    _GEN_18 | fp32Vec_25_isZero
-      ? 32'h0
-      : {_fp32Vec_25_shifted_T_1[31],
-         fp32Vec_25_isZero
-           ? 8'h0
-           : {3'h0, |(fp32Vec_25_absVal[31:16]), _fp32Vec_25_leadPos_T_52} + 8'h7F,
-         {|(fp32Vec_25_absVal[31:16]), _fp32Vec_25_leadPos_T_52[3]} != 2'h3
-           ? _fp32Vec_25_aligned_T_1[22:0]
-           : _fp32Vec_25_aligned_T_4[22:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:53:21, :55:23, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:31, :153:{33,45}, :185:50, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [8:0]        _fp32Vec_26_diff_T = {io_in_bits[215], io_in_bits[215:208]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_26_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_26_diff_T[8]}}, _fp32Vec_26_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_26_absVal =
-    _fp32Vec_26_shifted_T_1[31]
-      ? ~(_fp32Vec_26_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_26_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_26_isZero = fp32Vec_26_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_26_leadPos_T_52 =
-    (|(fp32Vec_26_absVal[31:16]))
-      ? {|(fp32Vec_26_absVal[31:24]),
-         (|(fp32Vec_26_absVal[31:24]))
-           ? {|(fp32Vec_26_absVal[31:28]),
-              (|(fp32Vec_26_absVal[31:28]))
-                ? (fp32Vec_26_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_26_absVal[30] ? 2'h2 : {1'h0, fp32Vec_26_absVal[29]})
-                : fp32Vec_26_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_26_absVal[26] ? 2'h2 : {1'h0, fp32Vec_26_absVal[25]}}
-           : {|(fp32Vec_26_absVal[23:20]),
-              (|(fp32Vec_26_absVal[23:20]))
-                ? (fp32Vec_26_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_26_absVal[22] ? 2'h2 : {1'h0, fp32Vec_26_absVal[21]})
-                : fp32Vec_26_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_26_absVal[18] ? 2'h2 : {1'h0, fp32Vec_26_absVal[17]}}}
-      : {|(fp32Vec_26_absVal[15:8]),
-         (|(fp32Vec_26_absVal[15:8]))
-           ? {|(fp32Vec_26_absVal[15:12]),
-              (|(fp32Vec_26_absVal[15:12]))
-                ? (fp32Vec_26_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_26_absVal[14] ? 2'h2 : {1'h0, fp32Vec_26_absVal[13]})
-                : fp32Vec_26_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_26_absVal[10] ? 2'h2 : {1'h0, fp32Vec_26_absVal[9]}}
-           : {|(fp32Vec_26_absVal[7:4]),
-              (|(fp32Vec_26_absVal[7:4]))
-                ? (fp32Vec_26_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_26_absVal[6] ? 2'h2 : {1'h0, fp32Vec_26_absVal[5]})
-                : fp32Vec_26_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_26_absVal[2] ? 2'h2 : {1'h0, fp32Vec_26_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_28 = {|(fp32Vec_26_absVal[31:16]), _fp32Vec_26_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_26_aligned_T_1 =
-    {31'h0, fp32Vec_26_absVal} << 5'h17 - _GEN_28;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_26_aligned_T_4 = fp32Vec_26_absVal >> _GEN_28 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_26 =
-    _GEN_18 | fp32Vec_26_isZero
-      ? 32'h0
-      : {_fp32Vec_26_shifted_T_1[31],
-         fp32Vec_26_isZero
-           ? 8'h0
-           : {3'h0, |(fp32Vec_26_absVal[31:16]), _fp32Vec_26_leadPos_T_52} + 8'h7F,
-         {|(fp32Vec_26_absVal[31:16]), _fp32Vec_26_leadPos_T_52[3]} != 2'h3
-           ? _fp32Vec_26_aligned_T_1[22:0]
-           : _fp32Vec_26_aligned_T_4[22:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:53:21, :55:23, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:31, :153:{33,45}, :185:50, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [8:0]        _fp32Vec_27_diff_T = {io_in_bits[223], io_in_bits[223:216]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_27_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_27_diff_T[8]}}, _fp32Vec_27_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_27_absVal =
-    _fp32Vec_27_shifted_T_1[31]
-      ? ~(_fp32Vec_27_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_27_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_27_isZero = fp32Vec_27_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_27_leadPos_T_52 =
-    (|(fp32Vec_27_absVal[31:16]))
-      ? {|(fp32Vec_27_absVal[31:24]),
-         (|(fp32Vec_27_absVal[31:24]))
-           ? {|(fp32Vec_27_absVal[31:28]),
-              (|(fp32Vec_27_absVal[31:28]))
-                ? (fp32Vec_27_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_27_absVal[30] ? 2'h2 : {1'h0, fp32Vec_27_absVal[29]})
-                : fp32Vec_27_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_27_absVal[26] ? 2'h2 : {1'h0, fp32Vec_27_absVal[25]}}
-           : {|(fp32Vec_27_absVal[23:20]),
-              (|(fp32Vec_27_absVal[23:20]))
-                ? (fp32Vec_27_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_27_absVal[22] ? 2'h2 : {1'h0, fp32Vec_27_absVal[21]})
-                : fp32Vec_27_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_27_absVal[18] ? 2'h2 : {1'h0, fp32Vec_27_absVal[17]}}}
-      : {|(fp32Vec_27_absVal[15:8]),
-         (|(fp32Vec_27_absVal[15:8]))
-           ? {|(fp32Vec_27_absVal[15:12]),
-              (|(fp32Vec_27_absVal[15:12]))
-                ? (fp32Vec_27_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_27_absVal[14] ? 2'h2 : {1'h0, fp32Vec_27_absVal[13]})
-                : fp32Vec_27_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_27_absVal[10] ? 2'h2 : {1'h0, fp32Vec_27_absVal[9]}}
-           : {|(fp32Vec_27_absVal[7:4]),
-              (|(fp32Vec_27_absVal[7:4]))
-                ? (fp32Vec_27_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_27_absVal[6] ? 2'h2 : {1'h0, fp32Vec_27_absVal[5]})
-                : fp32Vec_27_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_27_absVal[2] ? 2'h2 : {1'h0, fp32Vec_27_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_29 = {|(fp32Vec_27_absVal[31:16]), _fp32Vec_27_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_27_aligned_T_1 =
-    {31'h0, fp32Vec_27_absVal} << 5'h17 - _GEN_29;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_27_aligned_T_4 = fp32Vec_27_absVal >> _GEN_29 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_27 =
-    _GEN_18 | fp32Vec_27_isZero
-      ? 32'h0
-      : {_fp32Vec_27_shifted_T_1[31],
-         fp32Vec_27_isZero
-           ? 8'h0
-           : {3'h0, |(fp32Vec_27_absVal[31:16]), _fp32Vec_27_leadPos_T_52} + 8'h7F,
-         {|(fp32Vec_27_absVal[31:16]), _fp32Vec_27_leadPos_T_52[3]} != 2'h3
-           ? _fp32Vec_27_aligned_T_1[22:0]
-           : _fp32Vec_27_aligned_T_4[22:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:53:21, :55:23, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:31, :153:{33,45}, :185:50, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [8:0]        _fp32Vec_28_diff_T = {io_in_bits[231], io_in_bits[231:224]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_28_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_28_diff_T[8]}}, _fp32Vec_28_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_28_absVal =
-    _fp32Vec_28_shifted_T_1[31]
-      ? ~(_fp32Vec_28_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_28_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_28_isZero = fp32Vec_28_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_28_leadPos_T_52 =
-    (|(fp32Vec_28_absVal[31:16]))
-      ? {|(fp32Vec_28_absVal[31:24]),
-         (|(fp32Vec_28_absVal[31:24]))
-           ? {|(fp32Vec_28_absVal[31:28]),
-              (|(fp32Vec_28_absVal[31:28]))
-                ? (fp32Vec_28_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_28_absVal[30] ? 2'h2 : {1'h0, fp32Vec_28_absVal[29]})
-                : fp32Vec_28_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_28_absVal[26] ? 2'h2 : {1'h0, fp32Vec_28_absVal[25]}}
-           : {|(fp32Vec_28_absVal[23:20]),
-              (|(fp32Vec_28_absVal[23:20]))
-                ? (fp32Vec_28_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_28_absVal[22] ? 2'h2 : {1'h0, fp32Vec_28_absVal[21]})
-                : fp32Vec_28_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_28_absVal[18] ? 2'h2 : {1'h0, fp32Vec_28_absVal[17]}}}
-      : {|(fp32Vec_28_absVal[15:8]),
-         (|(fp32Vec_28_absVal[15:8]))
-           ? {|(fp32Vec_28_absVal[15:12]),
-              (|(fp32Vec_28_absVal[15:12]))
-                ? (fp32Vec_28_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_28_absVal[14] ? 2'h2 : {1'h0, fp32Vec_28_absVal[13]})
-                : fp32Vec_28_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_28_absVal[10] ? 2'h2 : {1'h0, fp32Vec_28_absVal[9]}}
-           : {|(fp32Vec_28_absVal[7:4]),
-              (|(fp32Vec_28_absVal[7:4]))
-                ? (fp32Vec_28_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_28_absVal[6] ? 2'h2 : {1'h0, fp32Vec_28_absVal[5]})
-                : fp32Vec_28_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_28_absVal[2] ? 2'h2 : {1'h0, fp32Vec_28_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_30 = {|(fp32Vec_28_absVal[31:16]), _fp32Vec_28_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_28_aligned_T_1 =
-    {31'h0, fp32Vec_28_absVal} << 5'h17 - _GEN_30;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_28_aligned_T_4 = fp32Vec_28_absVal >> _GEN_30 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_28 =
-    _GEN_18 | fp32Vec_28_isZero
-      ? 32'h0
-      : {_fp32Vec_28_shifted_T_1[31],
-         fp32Vec_28_isZero
-           ? 8'h0
-           : {3'h0, |(fp32Vec_28_absVal[31:16]), _fp32Vec_28_leadPos_T_52} + 8'h7F,
-         {|(fp32Vec_28_absVal[31:16]), _fp32Vec_28_leadPos_T_52[3]} != 2'h3
-           ? _fp32Vec_28_aligned_T_1[22:0]
-           : _fp32Vec_28_aligned_T_4[22:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:53:21, :55:23, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:31, :153:{33,45}, :185:50, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [8:0]        _fp32Vec_29_diff_T = {io_in_bits[239], io_in_bits[239:232]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_29_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_29_diff_T[8]}}, _fp32Vec_29_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_29_absVal =
-    _fp32Vec_29_shifted_T_1[31]
-      ? ~(_fp32Vec_29_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_29_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_29_isZero = fp32Vec_29_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_29_leadPos_T_52 =
-    (|(fp32Vec_29_absVal[31:16]))
-      ? {|(fp32Vec_29_absVal[31:24]),
-         (|(fp32Vec_29_absVal[31:24]))
-           ? {|(fp32Vec_29_absVal[31:28]),
-              (|(fp32Vec_29_absVal[31:28]))
-                ? (fp32Vec_29_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_29_absVal[30] ? 2'h2 : {1'h0, fp32Vec_29_absVal[29]})
-                : fp32Vec_29_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_29_absVal[26] ? 2'h2 : {1'h0, fp32Vec_29_absVal[25]}}
-           : {|(fp32Vec_29_absVal[23:20]),
-              (|(fp32Vec_29_absVal[23:20]))
-                ? (fp32Vec_29_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_29_absVal[22] ? 2'h2 : {1'h0, fp32Vec_29_absVal[21]})
-                : fp32Vec_29_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_29_absVal[18] ? 2'h2 : {1'h0, fp32Vec_29_absVal[17]}}}
-      : {|(fp32Vec_29_absVal[15:8]),
-         (|(fp32Vec_29_absVal[15:8]))
-           ? {|(fp32Vec_29_absVal[15:12]),
-              (|(fp32Vec_29_absVal[15:12]))
-                ? (fp32Vec_29_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_29_absVal[14] ? 2'h2 : {1'h0, fp32Vec_29_absVal[13]})
-                : fp32Vec_29_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_29_absVal[10] ? 2'h2 : {1'h0, fp32Vec_29_absVal[9]}}
-           : {|(fp32Vec_29_absVal[7:4]),
-              (|(fp32Vec_29_absVal[7:4]))
-                ? (fp32Vec_29_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_29_absVal[6] ? 2'h2 : {1'h0, fp32Vec_29_absVal[5]})
-                : fp32Vec_29_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_29_absVal[2] ? 2'h2 : {1'h0, fp32Vec_29_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_31 = {|(fp32Vec_29_absVal[31:16]), _fp32Vec_29_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_29_aligned_T_1 =
-    {31'h0, fp32Vec_29_absVal} << 5'h17 - _GEN_31;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_29_aligned_T_4 = fp32Vec_29_absVal >> _GEN_31 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_29 =
-    _GEN_18 | fp32Vec_29_isZero
-      ? 32'h0
-      : {_fp32Vec_29_shifted_T_1[31],
-         fp32Vec_29_isZero
-           ? 8'h0
-           : {3'h0, |(fp32Vec_29_absVal[31:16]), _fp32Vec_29_leadPos_T_52} + 8'h7F,
-         {|(fp32Vec_29_absVal[31:16]), _fp32Vec_29_leadPos_T_52[3]} != 2'h3
-           ? _fp32Vec_29_aligned_T_1[22:0]
-           : _fp32Vec_29_aligned_T_4[22:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:53:21, :55:23, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:31, :153:{33,45}, :185:50, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [8:0]        _fp32Vec_30_diff_T = {io_in_bits[247], io_in_bits[247:240]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_30_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_30_diff_T[8]}}, _fp32Vec_30_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_30_absVal =
-    _fp32Vec_30_shifted_T_1[31]
-      ? ~(_fp32Vec_30_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_30_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_30_isZero = fp32Vec_30_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_30_leadPos_T_52 =
-    (|(fp32Vec_30_absVal[31:16]))
-      ? {|(fp32Vec_30_absVal[31:24]),
-         (|(fp32Vec_30_absVal[31:24]))
-           ? {|(fp32Vec_30_absVal[31:28]),
-              (|(fp32Vec_30_absVal[31:28]))
-                ? (fp32Vec_30_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_30_absVal[30] ? 2'h2 : {1'h0, fp32Vec_30_absVal[29]})
-                : fp32Vec_30_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_30_absVal[26] ? 2'h2 : {1'h0, fp32Vec_30_absVal[25]}}
-           : {|(fp32Vec_30_absVal[23:20]),
-              (|(fp32Vec_30_absVal[23:20]))
-                ? (fp32Vec_30_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_30_absVal[22] ? 2'h2 : {1'h0, fp32Vec_30_absVal[21]})
-                : fp32Vec_30_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_30_absVal[18] ? 2'h2 : {1'h0, fp32Vec_30_absVal[17]}}}
-      : {|(fp32Vec_30_absVal[15:8]),
-         (|(fp32Vec_30_absVal[15:8]))
-           ? {|(fp32Vec_30_absVal[15:12]),
-              (|(fp32Vec_30_absVal[15:12]))
-                ? (fp32Vec_30_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_30_absVal[14] ? 2'h2 : {1'h0, fp32Vec_30_absVal[13]})
-                : fp32Vec_30_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_30_absVal[10] ? 2'h2 : {1'h0, fp32Vec_30_absVal[9]}}
-           : {|(fp32Vec_30_absVal[7:4]),
-              (|(fp32Vec_30_absVal[7:4]))
-                ? (fp32Vec_30_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_30_absVal[6] ? 2'h2 : {1'h0, fp32Vec_30_absVal[5]})
-                : fp32Vec_30_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_30_absVal[2] ? 2'h2 : {1'h0, fp32Vec_30_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_32 = {|(fp32Vec_30_absVal[31:16]), _fp32Vec_30_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_30_aligned_T_1 =
-    {31'h0, fp32Vec_30_absVal} << 5'h17 - _GEN_32;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_30_aligned_T_4 = fp32Vec_30_absVal >> _GEN_32 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_30 =
-    _GEN_18 | fp32Vec_30_isZero
-      ? 32'h0
-      : {_fp32Vec_30_shifted_T_1[31],
-         fp32Vec_30_isZero
-           ? 8'h0
-           : {3'h0, |(fp32Vec_30_absVal[31:16]), _fp32Vec_30_leadPos_T_52} + 8'h7F,
-         {|(fp32Vec_30_absVal[31:16]), _fp32Vec_30_leadPos_T_52[3]} != 2'h3
-           ? _fp32Vec_30_aligned_T_1[22:0]
-           : _fp32Vec_30_aligned_T_4[22:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:53:21, :55:23, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:31, :153:{33,45}, :185:50, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [8:0]        _fp32Vec_31_diff_T = {io_in_bits[255], io_in_bits[255:248]} - _GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:152:29, :183:27
-  wire [46:0]       _fp32Vec_31_shifted_T_1 =
-    {31'h0, {7{_fp32Vec_31_diff_T[8]}}, _fp32Vec_31_diff_T} << _GEN_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :152:{29,45}, :153:33
-  wire [31:0]       fp32Vec_31_absVal =
-    _fp32Vec_31_shifted_T_1[31]
-      ? ~(_fp32Vec_31_shifted_T_1[31:0]) + 32'h1
-      : _fp32Vec_31_shifted_T_1[31:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:103:19, :104:{21,29,46}, :153:{33,45}
-  wire              fp32Vec_31_isZero = fp32Vec_31_absVal == 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :105:25
-  wire [3:0]        _fp32Vec_31_leadPos_T_52 =
-    (|(fp32Vec_31_absVal[31:16]))
-      ? {|(fp32Vec_31_absVal[31:24]),
-         (|(fp32Vec_31_absVal[31:24]))
-           ? {|(fp32Vec_31_absVal[31:28]),
-              (|(fp32Vec_31_absVal[31:28]))
-                ? (fp32Vec_31_absVal[31]
-                     ? 2'h3
-                     : fp32Vec_31_absVal[30] ? 2'h2 : {1'h0, fp32Vec_31_absVal[29]})
-                : fp32Vec_31_absVal[27]
-                    ? 2'h3
-                    : fp32Vec_31_absVal[26] ? 2'h2 : {1'h0, fp32Vec_31_absVal[25]}}
-           : {|(fp32Vec_31_absVal[23:20]),
-              (|(fp32Vec_31_absVal[23:20]))
-                ? (fp32Vec_31_absVal[23]
-                     ? 2'h3
-                     : fp32Vec_31_absVal[22] ? 2'h2 : {1'h0, fp32Vec_31_absVal[21]})
-                : fp32Vec_31_absVal[19]
-                    ? 2'h3
-                    : fp32Vec_31_absVal[18] ? 2'h2 : {1'h0, fp32Vec_31_absVal[17]}}}
-      : {|(fp32Vec_31_absVal[15:8]),
-         (|(fp32Vec_31_absVal[15:8]))
-           ? {|(fp32Vec_31_absVal[15:12]),
-              (|(fp32Vec_31_absVal[15:12]))
-                ? (fp32Vec_31_absVal[15]
-                     ? 2'h3
-                     : fp32Vec_31_absVal[14] ? 2'h2 : {1'h0, fp32Vec_31_absVal[13]})
-                : fp32Vec_31_absVal[11]
-                    ? 2'h3
-                    : fp32Vec_31_absVal[10] ? 2'h2 : {1'h0, fp32Vec_31_absVal[9]}}
-           : {|(fp32Vec_31_absVal[7:4]),
-              (|(fp32Vec_31_absVal[7:4]))
-                ? (fp32Vec_31_absVal[7]
-                     ? 2'h3
-                     : fp32Vec_31_absVal[6] ? 2'h2 : {1'h0, fp32Vec_31_absVal[5]})
-                : fp32Vec_31_absVal[3]
-                    ? 2'h3
-                    : fp32Vec_31_absVal[2] ? 2'h2 : {1'h0, fp32Vec_31_absVal[1]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, src/main/scala/chisel3/util/CircuitMath.scala:28:8, :30:{10,12}, :33:17, :34:17, :35:22, :36:{10,21}
-  wire [4:0]        _GEN_33 = {|(fp32Vec_31_absVal[31:16]), _fp32Vec_31_leadPos_T_52};	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [62:0]       _fp32Vec_31_aligned_T_1 =
-    {31'h0, fp32Vec_31_absVal} << 5'h17 - _GEN_33;	// src/foragerbee/scala/main/FbFormatConverter.scala:57:40, :104:21, :111:24, :114:31
-  wire [31:0]       _fp32Vec_31_aligned_T_4 = fp32Vec_31_absVal >> _GEN_33 + 5'h9;	// src/foragerbee/scala/main/FbFormatConverter.scala:104:21, :111:24, :112:27, :115:31
-  wire [31:0]       fp32Vec_31 =
-    _GEN_18 | fp32Vec_31_isZero
-      ? 32'h0
-      : {_fp32Vec_31_shifted_T_1[31],
-         fp32Vec_31_isZero
-           ? 8'h0
-           : {3'h0, |(fp32Vec_31_absVal[31:16]), _fp32Vec_31_leadPos_T_52} + 8'h7F,
-         {|(fp32Vec_31_absVal[31:16]), _fp32Vec_31_leadPos_T_52[3]} != 2'h3
-           ? _fp32Vec_31_aligned_T_1[22:0]
-           : _fp32Vec_31_aligned_T_4[22:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:53:21, :55:23, :103:19, :104:21, :105:25, :108:{22,48}, :113:{22,31}, :114:{31,41}, :115:31, :117:31, :153:{33,45}, :185:50, src/main/scala/chisel3/util/CircuitMath.scala:33:17, :35:22, :36:21
-  wire [10:0]       dstVec_0_manRnd =
-    {1'h0, fp32Vec_0[22:13]}
-    + {10'h0, fp32Vec_0[12] & ((|(fp32Vec_0[11:0])) | fp32Vec_0[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _GEN_34 = {4'h0, io_cfg_scale[4:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:132:28, :149:25
-  wire [8:0]        _dstVec_0_totalShift_T_1 = _GEN_34 + 9'h96 - {1'h0, fp32Vec_0[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_0_absInt_T_6 =
-    {1'h1, fp32Vec_0[22:0]} >> _dstVec_0_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_0_absInt =
-    ~(|(fp32Vec_0[30:23])) | fp32Vec_0[30:23] < 8'h68 | _dstVec_0_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_0_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_0_signedVal =
-    fp32Vec_0[31] ? ~dstVec_0_absInt + 16'h1 : dstVec_0_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       _GEN_35 = {{9{io_cfg_zeroPoint[7]}}, io_cfg_zeroPoint[7:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :139:28, :151:22, :152:29
-  wire [16:0]       dstVec_0_withZp =
-    _GEN_35 + {dstVec_0_signedVal[15], dstVec_0_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_0 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_0_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_0_withZp) < -17'sh80 ? 8'h80 : dstVec_0_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_0[31:16]
-               + {15'h0, fp32Vec_0[15] & ((|(fp32Vec_0[14:0])) | fp32Vec_0[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_0[31],
-                 ~(|(fp32Vec_0[30:23])) | fp32Vec_0[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_0[30:23])) & fp32Vec_0[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_0[30:23]))
-                           ? {6'h3F, fp32Vec_0[21:13]}
-                           : fp32Vec_0[30:23] > 8'h8E | fp32Vec_0[30:23] == 8'h8E
-                             & dstVec_0_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_0[27:23] + {4'h0, dstVec_0_manRnd[10]} - 5'h10,
-                                  dstVec_0_manRnd[10] ? 10'h0 : dstVec_0_manRnd[9:0]}}
-              : fp32Vec_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_1_manRnd =
-    {1'h0, fp32Vec_1[22:13]}
-    + {10'h0, fp32Vec_1[12] & ((|(fp32Vec_1[11:0])) | fp32Vec_1[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_1_totalShift_T_1 = _GEN_34 + 9'h96 - {1'h0, fp32Vec_1[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_1_absInt_T_6 =
-    {1'h1, fp32Vec_1[22:0]} >> _dstVec_1_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_1_absInt =
-    ~(|(fp32Vec_1[30:23])) | fp32Vec_1[30:23] < 8'h68 | _dstVec_1_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_1_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_1_signedVal =
-    fp32Vec_1[31] ? ~dstVec_1_absInt + 16'h1 : dstVec_1_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_1_withZp =
-    _GEN_35 + {dstVec_1_signedVal[15], dstVec_1_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_1 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_1_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_1_withZp) < -17'sh80 ? 8'h80 : dstVec_1_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_1[31:16]
-               + {15'h0, fp32Vec_1[15] & ((|(fp32Vec_1[14:0])) | fp32Vec_1[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_1[31],
-                 ~(|(fp32Vec_1[30:23])) | fp32Vec_1[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_1[30:23])) & fp32Vec_1[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_1[30:23]))
-                           ? {6'h3F, fp32Vec_1[21:13]}
-                           : fp32Vec_1[30:23] > 8'h8E | fp32Vec_1[30:23] == 8'h8E
-                             & dstVec_1_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_1[27:23] + {4'h0, dstVec_1_manRnd[10]} - 5'h10,
-                                  dstVec_1_manRnd[10] ? 10'h0 : dstVec_1_manRnd[9:0]}}
-              : fp32Vec_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_2_manRnd =
-    {1'h0, fp32Vec_2[22:13]}
-    + {10'h0, fp32Vec_2[12] & ((|(fp32Vec_2[11:0])) | fp32Vec_2[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_2_totalShift_T_1 = _GEN_34 + 9'h96 - {1'h0, fp32Vec_2[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_2_absInt_T_6 =
-    {1'h1, fp32Vec_2[22:0]} >> _dstVec_2_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_2_absInt =
-    ~(|(fp32Vec_2[30:23])) | fp32Vec_2[30:23] < 8'h68 | _dstVec_2_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_2_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_2_signedVal =
-    fp32Vec_2[31] ? ~dstVec_2_absInt + 16'h1 : dstVec_2_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_2_withZp =
-    _GEN_35 + {dstVec_2_signedVal[15], dstVec_2_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_2 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_2_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_2_withZp) < -17'sh80 ? 8'h80 : dstVec_2_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_2[31:16]
-               + {15'h0, fp32Vec_2[15] & ((|(fp32Vec_2[14:0])) | fp32Vec_2[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_2[31],
-                 ~(|(fp32Vec_2[30:23])) | fp32Vec_2[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_2[30:23])) & fp32Vec_2[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_2[30:23]))
-                           ? {6'h3F, fp32Vec_2[21:13]}
-                           : fp32Vec_2[30:23] > 8'h8E | fp32Vec_2[30:23] == 8'h8E
-                             & dstVec_2_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_2[27:23] + {4'h0, dstVec_2_manRnd[10]} - 5'h10,
-                                  dstVec_2_manRnd[10] ? 10'h0 : dstVec_2_manRnd[9:0]}}
-              : fp32Vec_2;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_3_manRnd =
-    {1'h0, fp32Vec_3[22:13]}
-    + {10'h0, fp32Vec_3[12] & ((|(fp32Vec_3[11:0])) | fp32Vec_3[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_3_totalShift_T_1 = _GEN_34 + 9'h96 - {1'h0, fp32Vec_3[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_3_absInt_T_6 =
-    {1'h1, fp32Vec_3[22:0]} >> _dstVec_3_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_3_absInt =
-    ~(|(fp32Vec_3[30:23])) | fp32Vec_3[30:23] < 8'h68 | _dstVec_3_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_3_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_3_signedVal =
-    fp32Vec_3[31] ? ~dstVec_3_absInt + 16'h1 : dstVec_3_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_3_withZp =
-    _GEN_35 + {dstVec_3_signedVal[15], dstVec_3_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_3 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_3_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_3_withZp) < -17'sh80 ? 8'h80 : dstVec_3_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_3[31:16]
-               + {15'h0, fp32Vec_3[15] & ((|(fp32Vec_3[14:0])) | fp32Vec_3[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_3[31],
-                 ~(|(fp32Vec_3[30:23])) | fp32Vec_3[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_3[30:23])) & fp32Vec_3[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_3[30:23]))
-                           ? {6'h3F, fp32Vec_3[21:13]}
-                           : fp32Vec_3[30:23] > 8'h8E | fp32Vec_3[30:23] == 8'h8E
-                             & dstVec_3_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_3[27:23] + {4'h0, dstVec_3_manRnd[10]} - 5'h10,
-                                  dstVec_3_manRnd[10] ? 10'h0 : dstVec_3_manRnd[9:0]}}
-              : fp32Vec_3;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_4_manRnd =
-    {1'h0, fp32Vec_4[22:13]}
-    + {10'h0, fp32Vec_4[12] & ((|(fp32Vec_4[11:0])) | fp32Vec_4[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_4_totalShift_T_1 = _GEN_34 + 9'h96 - {1'h0, fp32Vec_4[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_4_absInt_T_6 =
-    {1'h1, fp32Vec_4[22:0]} >> _dstVec_4_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_4_absInt =
-    ~(|(fp32Vec_4[30:23])) | fp32Vec_4[30:23] < 8'h68 | _dstVec_4_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_4_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_4_signedVal =
-    fp32Vec_4[31] ? ~dstVec_4_absInt + 16'h1 : dstVec_4_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_4_withZp =
-    _GEN_35 + {dstVec_4_signedVal[15], dstVec_4_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_4 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_4_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_4_withZp) < -17'sh80 ? 8'h80 : dstVec_4_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_4[31:16]
-               + {15'h0, fp32Vec_4[15] & ((|(fp32Vec_4[14:0])) | fp32Vec_4[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_4[31],
-                 ~(|(fp32Vec_4[30:23])) | fp32Vec_4[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_4[30:23])) & fp32Vec_4[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_4[30:23]))
-                           ? {6'h3F, fp32Vec_4[21:13]}
-                           : fp32Vec_4[30:23] > 8'h8E | fp32Vec_4[30:23] == 8'h8E
-                             & dstVec_4_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_4[27:23] + {4'h0, dstVec_4_manRnd[10]} - 5'h10,
-                                  dstVec_4_manRnd[10] ? 10'h0 : dstVec_4_manRnd[9:0]}}
-              : fp32Vec_4;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_5_manRnd =
-    {1'h0, fp32Vec_5[22:13]}
-    + {10'h0, fp32Vec_5[12] & ((|(fp32Vec_5[11:0])) | fp32Vec_5[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_5_totalShift_T_1 = _GEN_34 + 9'h96 - {1'h0, fp32Vec_5[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_5_absInt_T_6 =
-    {1'h1, fp32Vec_5[22:0]} >> _dstVec_5_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_5_absInt =
-    ~(|(fp32Vec_5[30:23])) | fp32Vec_5[30:23] < 8'h68 | _dstVec_5_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_5_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_5_signedVal =
-    fp32Vec_5[31] ? ~dstVec_5_absInt + 16'h1 : dstVec_5_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_5_withZp =
-    _GEN_35 + {dstVec_5_signedVal[15], dstVec_5_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_5 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_5_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_5_withZp) < -17'sh80 ? 8'h80 : dstVec_5_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_5[31:16]
-               + {15'h0, fp32Vec_5[15] & ((|(fp32Vec_5[14:0])) | fp32Vec_5[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_5[31],
-                 ~(|(fp32Vec_5[30:23])) | fp32Vec_5[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_5[30:23])) & fp32Vec_5[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_5[30:23]))
-                           ? {6'h3F, fp32Vec_5[21:13]}
-                           : fp32Vec_5[30:23] > 8'h8E | fp32Vec_5[30:23] == 8'h8E
-                             & dstVec_5_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_5[27:23] + {4'h0, dstVec_5_manRnd[10]} - 5'h10,
-                                  dstVec_5_manRnd[10] ? 10'h0 : dstVec_5_manRnd[9:0]}}
-              : fp32Vec_5;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_6_manRnd =
-    {1'h0, fp32Vec_6[22:13]}
-    + {10'h0, fp32Vec_6[12] & ((|(fp32Vec_6[11:0])) | fp32Vec_6[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_6_totalShift_T_1 = _GEN_34 + 9'h96 - {1'h0, fp32Vec_6[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_6_absInt_T_6 =
-    {1'h1, fp32Vec_6[22:0]} >> _dstVec_6_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_6_absInt =
-    ~(|(fp32Vec_6[30:23])) | fp32Vec_6[30:23] < 8'h68 | _dstVec_6_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_6_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_6_signedVal =
-    fp32Vec_6[31] ? ~dstVec_6_absInt + 16'h1 : dstVec_6_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_6_withZp =
-    _GEN_35 + {dstVec_6_signedVal[15], dstVec_6_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_6 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_6_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_6_withZp) < -17'sh80 ? 8'h80 : dstVec_6_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_6[31:16]
-               + {15'h0, fp32Vec_6[15] & ((|(fp32Vec_6[14:0])) | fp32Vec_6[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_6[31],
-                 ~(|(fp32Vec_6[30:23])) | fp32Vec_6[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_6[30:23])) & fp32Vec_6[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_6[30:23]))
-                           ? {6'h3F, fp32Vec_6[21:13]}
-                           : fp32Vec_6[30:23] > 8'h8E | fp32Vec_6[30:23] == 8'h8E
-                             & dstVec_6_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_6[27:23] + {4'h0, dstVec_6_manRnd[10]} - 5'h10,
-                                  dstVec_6_manRnd[10] ? 10'h0 : dstVec_6_manRnd[9:0]}}
-              : fp32Vec_6;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_7_manRnd =
-    {1'h0, fp32Vec_7[22:13]}
-    + {10'h0, fp32Vec_7[12] & ((|(fp32Vec_7[11:0])) | fp32Vec_7[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_7_totalShift_T_1 = _GEN_34 + 9'h96 - {1'h0, fp32Vec_7[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_7_absInt_T_6 =
-    {1'h1, fp32Vec_7[22:0]} >> _dstVec_7_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_7_absInt =
-    ~(|(fp32Vec_7[30:23])) | fp32Vec_7[30:23] < 8'h68 | _dstVec_7_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_7_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_7_signedVal =
-    fp32Vec_7[31] ? ~dstVec_7_absInt + 16'h1 : dstVec_7_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_7_withZp =
-    _GEN_35 + {dstVec_7_signedVal[15], dstVec_7_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_7 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_7_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_7_withZp) < -17'sh80 ? 8'h80 : dstVec_7_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_7[31:16]
-               + {15'h0, fp32Vec_7[15] & ((|(fp32Vec_7[14:0])) | fp32Vec_7[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_7[31],
-                 ~(|(fp32Vec_7[30:23])) | fp32Vec_7[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_7[30:23])) & fp32Vec_7[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_7[30:23]))
-                           ? {6'h3F, fp32Vec_7[21:13]}
-                           : fp32Vec_7[30:23] > 8'h8E | fp32Vec_7[30:23] == 8'h8E
-                             & dstVec_7_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_7[27:23] + {4'h0, dstVec_7_manRnd[10]} - 5'h10,
-                                  dstVec_7_manRnd[10] ? 10'h0 : dstVec_7_manRnd[9:0]}}
-              : fp32Vec_7;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_8_manRnd =
-    {1'h0, fp32Vec_8[22:13]}
-    + {10'h0, fp32Vec_8[12] & ((|(fp32Vec_8[11:0])) | fp32Vec_8[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_8_totalShift_T_1 = _GEN_34 + 9'h96 - {1'h0, fp32Vec_8[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_8_absInt_T_6 =
-    {1'h1, fp32Vec_8[22:0]} >> _dstVec_8_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_8_absInt =
-    ~(|(fp32Vec_8[30:23])) | fp32Vec_8[30:23] < 8'h68 | _dstVec_8_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_8_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_8_signedVal =
-    fp32Vec_8[31] ? ~dstVec_8_absInt + 16'h1 : dstVec_8_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_8_withZp =
-    _GEN_35 + {dstVec_8_signedVal[15], dstVec_8_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_8 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_8_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_8_withZp) < -17'sh80 ? 8'h80 : dstVec_8_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_8[31:16]
-               + {15'h0, fp32Vec_8[15] & ((|(fp32Vec_8[14:0])) | fp32Vec_8[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_8[31],
-                 ~(|(fp32Vec_8[30:23])) | fp32Vec_8[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_8[30:23])) & fp32Vec_8[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_8[30:23]))
-                           ? {6'h3F, fp32Vec_8[21:13]}
-                           : fp32Vec_8[30:23] > 8'h8E | fp32Vec_8[30:23] == 8'h8E
-                             & dstVec_8_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_8[27:23] + {4'h0, dstVec_8_manRnd[10]} - 5'h10,
-                                  dstVec_8_manRnd[10] ? 10'h0 : dstVec_8_manRnd[9:0]}}
-              : fp32Vec_8;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_9_manRnd =
-    {1'h0, fp32Vec_9[22:13]}
-    + {10'h0, fp32Vec_9[12] & ((|(fp32Vec_9[11:0])) | fp32Vec_9[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_9_totalShift_T_1 = _GEN_34 + 9'h96 - {1'h0, fp32Vec_9[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_9_absInt_T_6 =
-    {1'h1, fp32Vec_9[22:0]} >> _dstVec_9_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_9_absInt =
-    ~(|(fp32Vec_9[30:23])) | fp32Vec_9[30:23] < 8'h68 | _dstVec_9_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_9_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_9_signedVal =
-    fp32Vec_9[31] ? ~dstVec_9_absInt + 16'h1 : dstVec_9_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_9_withZp =
-    _GEN_35 + {dstVec_9_signedVal[15], dstVec_9_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_9 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_9_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_9_withZp) < -17'sh80 ? 8'h80 : dstVec_9_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_9[31:16]
-               + {15'h0, fp32Vec_9[15] & ((|(fp32Vec_9[14:0])) | fp32Vec_9[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_9[31],
-                 ~(|(fp32Vec_9[30:23])) | fp32Vec_9[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_9[30:23])) & fp32Vec_9[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_9[30:23]))
-                           ? {6'h3F, fp32Vec_9[21:13]}
-                           : fp32Vec_9[30:23] > 8'h8E | fp32Vec_9[30:23] == 8'h8E
-                             & dstVec_9_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_9[27:23] + {4'h0, dstVec_9_manRnd[10]} - 5'h10,
-                                  dstVec_9_manRnd[10] ? 10'h0 : dstVec_9_manRnd[9:0]}}
-              : fp32Vec_9;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_10_manRnd =
-    {1'h0, fp32Vec_10[22:13]}
-    + {10'h0, fp32Vec_10[12] & ((|(fp32Vec_10[11:0])) | fp32Vec_10[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_10_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_10[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_10_absInt_T_6 =
-    {1'h1, fp32Vec_10[22:0]} >> _dstVec_10_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_10_absInt =
-    ~(|(fp32Vec_10[30:23])) | fp32Vec_10[30:23] < 8'h68
-    | _dstVec_10_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_10_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_10_signedVal =
-    fp32Vec_10[31] ? ~dstVec_10_absInt + 16'h1 : dstVec_10_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_10_withZp =
-    _GEN_35 + {dstVec_10_signedVal[15], dstVec_10_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_10 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_10_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_10_withZp) < -17'sh80 ? 8'h80 : dstVec_10_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_10[31:16]
-               + {15'h0, fp32Vec_10[15] & ((|(fp32Vec_10[14:0])) | fp32Vec_10[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_10[31],
-                 ~(|(fp32Vec_10[30:23])) | fp32Vec_10[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_10[30:23])) & fp32Vec_10[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_10[30:23]))
-                           ? {6'h3F, fp32Vec_10[21:13]}
-                           : fp32Vec_10[30:23] > 8'h8E | fp32Vec_10[30:23] == 8'h8E
-                             & dstVec_10_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_10[27:23] + {4'h0, dstVec_10_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_10_manRnd[10] ? 10'h0 : dstVec_10_manRnd[9:0]}}
-              : fp32Vec_10;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_11_manRnd =
-    {1'h0, fp32Vec_11[22:13]}
-    + {10'h0, fp32Vec_11[12] & ((|(fp32Vec_11[11:0])) | fp32Vec_11[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_11_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_11[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_11_absInt_T_6 =
-    {1'h1, fp32Vec_11[22:0]} >> _dstVec_11_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_11_absInt =
-    ~(|(fp32Vec_11[30:23])) | fp32Vec_11[30:23] < 8'h68
-    | _dstVec_11_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_11_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_11_signedVal =
-    fp32Vec_11[31] ? ~dstVec_11_absInt + 16'h1 : dstVec_11_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_11_withZp =
-    _GEN_35 + {dstVec_11_signedVal[15], dstVec_11_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_11 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_11_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_11_withZp) < -17'sh80 ? 8'h80 : dstVec_11_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_11[31:16]
-               + {15'h0, fp32Vec_11[15] & ((|(fp32Vec_11[14:0])) | fp32Vec_11[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_11[31],
-                 ~(|(fp32Vec_11[30:23])) | fp32Vec_11[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_11[30:23])) & fp32Vec_11[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_11[30:23]))
-                           ? {6'h3F, fp32Vec_11[21:13]}
-                           : fp32Vec_11[30:23] > 8'h8E | fp32Vec_11[30:23] == 8'h8E
-                             & dstVec_11_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_11[27:23] + {4'h0, dstVec_11_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_11_manRnd[10] ? 10'h0 : dstVec_11_manRnd[9:0]}}
-              : fp32Vec_11;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_12_manRnd =
-    {1'h0, fp32Vec_12[22:13]}
-    + {10'h0, fp32Vec_12[12] & ((|(fp32Vec_12[11:0])) | fp32Vec_12[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_12_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_12[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_12_absInt_T_6 =
-    {1'h1, fp32Vec_12[22:0]} >> _dstVec_12_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_12_absInt =
-    ~(|(fp32Vec_12[30:23])) | fp32Vec_12[30:23] < 8'h68
-    | _dstVec_12_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_12_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_12_signedVal =
-    fp32Vec_12[31] ? ~dstVec_12_absInt + 16'h1 : dstVec_12_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_12_withZp =
-    _GEN_35 + {dstVec_12_signedVal[15], dstVec_12_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_12 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_12_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_12_withZp) < -17'sh80 ? 8'h80 : dstVec_12_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_12[31:16]
-               + {15'h0, fp32Vec_12[15] & ((|(fp32Vec_12[14:0])) | fp32Vec_12[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_12[31],
-                 ~(|(fp32Vec_12[30:23])) | fp32Vec_12[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_12[30:23])) & fp32Vec_12[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_12[30:23]))
-                           ? {6'h3F, fp32Vec_12[21:13]}
-                           : fp32Vec_12[30:23] > 8'h8E | fp32Vec_12[30:23] == 8'h8E
-                             & dstVec_12_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_12[27:23] + {4'h0, dstVec_12_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_12_manRnd[10] ? 10'h0 : dstVec_12_manRnd[9:0]}}
-              : fp32Vec_12;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_13_manRnd =
-    {1'h0, fp32Vec_13[22:13]}
-    + {10'h0, fp32Vec_13[12] & ((|(fp32Vec_13[11:0])) | fp32Vec_13[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_13_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_13[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_13_absInt_T_6 =
-    {1'h1, fp32Vec_13[22:0]} >> _dstVec_13_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_13_absInt =
-    ~(|(fp32Vec_13[30:23])) | fp32Vec_13[30:23] < 8'h68
-    | _dstVec_13_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_13_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_13_signedVal =
-    fp32Vec_13[31] ? ~dstVec_13_absInt + 16'h1 : dstVec_13_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_13_withZp =
-    _GEN_35 + {dstVec_13_signedVal[15], dstVec_13_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_13 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_13_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_13_withZp) < -17'sh80 ? 8'h80 : dstVec_13_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_13[31:16]
-               + {15'h0, fp32Vec_13[15] & ((|(fp32Vec_13[14:0])) | fp32Vec_13[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_13[31],
-                 ~(|(fp32Vec_13[30:23])) | fp32Vec_13[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_13[30:23])) & fp32Vec_13[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_13[30:23]))
-                           ? {6'h3F, fp32Vec_13[21:13]}
-                           : fp32Vec_13[30:23] > 8'h8E | fp32Vec_13[30:23] == 8'h8E
-                             & dstVec_13_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_13[27:23] + {4'h0, dstVec_13_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_13_manRnd[10] ? 10'h0 : dstVec_13_manRnd[9:0]}}
-              : fp32Vec_13;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_14_manRnd =
-    {1'h0, fp32Vec_14[22:13]}
-    + {10'h0, fp32Vec_14[12] & ((|(fp32Vec_14[11:0])) | fp32Vec_14[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_14_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_14[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_14_absInt_T_6 =
-    {1'h1, fp32Vec_14[22:0]} >> _dstVec_14_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_14_absInt =
-    ~(|(fp32Vec_14[30:23])) | fp32Vec_14[30:23] < 8'h68
-    | _dstVec_14_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_14_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_14_signedVal =
-    fp32Vec_14[31] ? ~dstVec_14_absInt + 16'h1 : dstVec_14_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_14_withZp =
-    _GEN_35 + {dstVec_14_signedVal[15], dstVec_14_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_14 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_14_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_14_withZp) < -17'sh80 ? 8'h80 : dstVec_14_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_14[31:16]
-               + {15'h0, fp32Vec_14[15] & ((|(fp32Vec_14[14:0])) | fp32Vec_14[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_14[31],
-                 ~(|(fp32Vec_14[30:23])) | fp32Vec_14[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_14[30:23])) & fp32Vec_14[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_14[30:23]))
-                           ? {6'h3F, fp32Vec_14[21:13]}
-                           : fp32Vec_14[30:23] > 8'h8E | fp32Vec_14[30:23] == 8'h8E
-                             & dstVec_14_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_14[27:23] + {4'h0, dstVec_14_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_14_manRnd[10] ? 10'h0 : dstVec_14_manRnd[9:0]}}
-              : fp32Vec_14;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_15_manRnd =
-    {1'h0, fp32Vec_15[22:13]}
-    + {10'h0, fp32Vec_15[12] & ((|(fp32Vec_15[11:0])) | fp32Vec_15[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_15_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_15[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_15_absInt_T_6 =
-    {1'h1, fp32Vec_15[22:0]} >> _dstVec_15_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_15_absInt =
-    ~(|(fp32Vec_15[30:23])) | fp32Vec_15[30:23] < 8'h68
-    | _dstVec_15_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_15_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_15_signedVal =
-    fp32Vec_15[31] ? ~dstVec_15_absInt + 16'h1 : dstVec_15_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_15_withZp =
-    _GEN_35 + {dstVec_15_signedVal[15], dstVec_15_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_15 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_15_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_15_withZp) < -17'sh80 ? 8'h80 : dstVec_15_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_15[31:16]
-               + {15'h0, fp32Vec_15[15] & ((|(fp32Vec_15[14:0])) | fp32Vec_15[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_15[31],
-                 ~(|(fp32Vec_15[30:23])) | fp32Vec_15[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_15[30:23])) & fp32Vec_15[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_15[30:23]))
-                           ? {6'h3F, fp32Vec_15[21:13]}
-                           : fp32Vec_15[30:23] > 8'h8E | fp32Vec_15[30:23] == 8'h8E
-                             & dstVec_15_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_15[27:23] + {4'h0, dstVec_15_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_15_manRnd[10] ? 10'h0 : dstVec_15_manRnd[9:0]}}
-              : fp32Vec_15;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_16_manRnd =
-    {1'h0, fp32Vec_16[22:13]}
-    + {10'h0, fp32Vec_16[12] & ((|(fp32Vec_16[11:0])) | fp32Vec_16[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_16_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_16[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_16_absInt_T_6 =
-    {1'h1, fp32Vec_16[22:0]} >> _dstVec_16_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_16_absInt =
-    ~(|(fp32Vec_16[30:23])) | fp32Vec_16[30:23] < 8'h68
-    | _dstVec_16_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_16_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_16_signedVal =
-    fp32Vec_16[31] ? ~dstVec_16_absInt + 16'h1 : dstVec_16_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_16_withZp =
-    _GEN_35 + {dstVec_16_signedVal[15], dstVec_16_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_16 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_16_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_16_withZp) < -17'sh80 ? 8'h80 : dstVec_16_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_16[31:16]
-               + {15'h0, fp32Vec_16[15] & ((|(fp32Vec_16[14:0])) | fp32Vec_16[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_16[31],
-                 ~(|(fp32Vec_16[30:23])) | fp32Vec_16[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_16[30:23])) & fp32Vec_16[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_16[30:23]))
-                           ? {6'h3F, fp32Vec_16[21:13]}
-                           : fp32Vec_16[30:23] > 8'h8E | fp32Vec_16[30:23] == 8'h8E
-                             & dstVec_16_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_16[27:23] + {4'h0, dstVec_16_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_16_manRnd[10] ? 10'h0 : dstVec_16_manRnd[9:0]}}
-              : fp32Vec_16;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_17_manRnd =
-    {1'h0, fp32Vec_17[22:13]}
-    + {10'h0, fp32Vec_17[12] & ((|(fp32Vec_17[11:0])) | fp32Vec_17[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_17_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_17[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_17_absInt_T_6 =
-    {1'h1, fp32Vec_17[22:0]} >> _dstVec_17_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_17_absInt =
-    ~(|(fp32Vec_17[30:23])) | fp32Vec_17[30:23] < 8'h68
-    | _dstVec_17_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_17_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_17_signedVal =
-    fp32Vec_17[31] ? ~dstVec_17_absInt + 16'h1 : dstVec_17_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_17_withZp =
-    _GEN_35 + {dstVec_17_signedVal[15], dstVec_17_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_17 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_17_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_17_withZp) < -17'sh80 ? 8'h80 : dstVec_17_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_17[31:16]
-               + {15'h0, fp32Vec_17[15] & ((|(fp32Vec_17[14:0])) | fp32Vec_17[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_17[31],
-                 ~(|(fp32Vec_17[30:23])) | fp32Vec_17[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_17[30:23])) & fp32Vec_17[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_17[30:23]))
-                           ? {6'h3F, fp32Vec_17[21:13]}
-                           : fp32Vec_17[30:23] > 8'h8E | fp32Vec_17[30:23] == 8'h8E
-                             & dstVec_17_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_17[27:23] + {4'h0, dstVec_17_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_17_manRnd[10] ? 10'h0 : dstVec_17_manRnd[9:0]}}
-              : fp32Vec_17;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_18_manRnd =
-    {1'h0, fp32Vec_18[22:13]}
-    + {10'h0, fp32Vec_18[12] & ((|(fp32Vec_18[11:0])) | fp32Vec_18[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_18_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_18[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_18_absInt_T_6 =
-    {1'h1, fp32Vec_18[22:0]} >> _dstVec_18_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_18_absInt =
-    ~(|(fp32Vec_18[30:23])) | fp32Vec_18[30:23] < 8'h68
-    | _dstVec_18_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_18_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_18_signedVal =
-    fp32Vec_18[31] ? ~dstVec_18_absInt + 16'h1 : dstVec_18_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_18_withZp =
-    _GEN_35 + {dstVec_18_signedVal[15], dstVec_18_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_18 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_18_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_18_withZp) < -17'sh80 ? 8'h80 : dstVec_18_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_18[31:16]
-               + {15'h0, fp32Vec_18[15] & ((|(fp32Vec_18[14:0])) | fp32Vec_18[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_18[31],
-                 ~(|(fp32Vec_18[30:23])) | fp32Vec_18[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_18[30:23])) & fp32Vec_18[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_18[30:23]))
-                           ? {6'h3F, fp32Vec_18[21:13]}
-                           : fp32Vec_18[30:23] > 8'h8E | fp32Vec_18[30:23] == 8'h8E
-                             & dstVec_18_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_18[27:23] + {4'h0, dstVec_18_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_18_manRnd[10] ? 10'h0 : dstVec_18_manRnd[9:0]}}
-              : fp32Vec_18;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_19_manRnd =
-    {1'h0, fp32Vec_19[22:13]}
-    + {10'h0, fp32Vec_19[12] & ((|(fp32Vec_19[11:0])) | fp32Vec_19[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_19_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_19[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_19_absInt_T_6 =
-    {1'h1, fp32Vec_19[22:0]} >> _dstVec_19_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_19_absInt =
-    ~(|(fp32Vec_19[30:23])) | fp32Vec_19[30:23] < 8'h68
-    | _dstVec_19_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_19_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_19_signedVal =
-    fp32Vec_19[31] ? ~dstVec_19_absInt + 16'h1 : dstVec_19_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_19_withZp =
-    _GEN_35 + {dstVec_19_signedVal[15], dstVec_19_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_19 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_19_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_19_withZp) < -17'sh80 ? 8'h80 : dstVec_19_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_19[31:16]
-               + {15'h0, fp32Vec_19[15] & ((|(fp32Vec_19[14:0])) | fp32Vec_19[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_19[31],
-                 ~(|(fp32Vec_19[30:23])) | fp32Vec_19[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_19[30:23])) & fp32Vec_19[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_19[30:23]))
-                           ? {6'h3F, fp32Vec_19[21:13]}
-                           : fp32Vec_19[30:23] > 8'h8E | fp32Vec_19[30:23] == 8'h8E
-                             & dstVec_19_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_19[27:23] + {4'h0, dstVec_19_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_19_manRnd[10] ? 10'h0 : dstVec_19_manRnd[9:0]}}
-              : fp32Vec_19;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_20_manRnd =
-    {1'h0, fp32Vec_20[22:13]}
-    + {10'h0, fp32Vec_20[12] & ((|(fp32Vec_20[11:0])) | fp32Vec_20[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_20_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_20[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_20_absInt_T_6 =
-    {1'h1, fp32Vec_20[22:0]} >> _dstVec_20_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_20_absInt =
-    ~(|(fp32Vec_20[30:23])) | fp32Vec_20[30:23] < 8'h68
-    | _dstVec_20_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_20_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_20_signedVal =
-    fp32Vec_20[31] ? ~dstVec_20_absInt + 16'h1 : dstVec_20_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_20_withZp =
-    _GEN_35 + {dstVec_20_signedVal[15], dstVec_20_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_20 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_20_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_20_withZp) < -17'sh80 ? 8'h80 : dstVec_20_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_20[31:16]
-               + {15'h0, fp32Vec_20[15] & ((|(fp32Vec_20[14:0])) | fp32Vec_20[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_20[31],
-                 ~(|(fp32Vec_20[30:23])) | fp32Vec_20[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_20[30:23])) & fp32Vec_20[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_20[30:23]))
-                           ? {6'h3F, fp32Vec_20[21:13]}
-                           : fp32Vec_20[30:23] > 8'h8E | fp32Vec_20[30:23] == 8'h8E
-                             & dstVec_20_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_20[27:23] + {4'h0, dstVec_20_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_20_manRnd[10] ? 10'h0 : dstVec_20_manRnd[9:0]}}
-              : fp32Vec_20;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_21_manRnd =
-    {1'h0, fp32Vec_21[22:13]}
-    + {10'h0, fp32Vec_21[12] & ((|(fp32Vec_21[11:0])) | fp32Vec_21[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_21_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_21[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_21_absInt_T_6 =
-    {1'h1, fp32Vec_21[22:0]} >> _dstVec_21_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_21_absInt =
-    ~(|(fp32Vec_21[30:23])) | fp32Vec_21[30:23] < 8'h68
-    | _dstVec_21_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_21_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_21_signedVal =
-    fp32Vec_21[31] ? ~dstVec_21_absInt + 16'h1 : dstVec_21_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_21_withZp =
-    _GEN_35 + {dstVec_21_signedVal[15], dstVec_21_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_21 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_21_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_21_withZp) < -17'sh80 ? 8'h80 : dstVec_21_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_21[31:16]
-               + {15'h0, fp32Vec_21[15] & ((|(fp32Vec_21[14:0])) | fp32Vec_21[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_21[31],
-                 ~(|(fp32Vec_21[30:23])) | fp32Vec_21[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_21[30:23])) & fp32Vec_21[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_21[30:23]))
-                           ? {6'h3F, fp32Vec_21[21:13]}
-                           : fp32Vec_21[30:23] > 8'h8E | fp32Vec_21[30:23] == 8'h8E
-                             & dstVec_21_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_21[27:23] + {4'h0, dstVec_21_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_21_manRnd[10] ? 10'h0 : dstVec_21_manRnd[9:0]}}
-              : fp32Vec_21;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_22_manRnd =
-    {1'h0, fp32Vec_22[22:13]}
-    + {10'h0, fp32Vec_22[12] & ((|(fp32Vec_22[11:0])) | fp32Vec_22[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_22_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_22[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_22_absInt_T_6 =
-    {1'h1, fp32Vec_22[22:0]} >> _dstVec_22_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_22_absInt =
-    ~(|(fp32Vec_22[30:23])) | fp32Vec_22[30:23] < 8'h68
-    | _dstVec_22_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_22_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_22_signedVal =
-    fp32Vec_22[31] ? ~dstVec_22_absInt + 16'h1 : dstVec_22_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_22_withZp =
-    _GEN_35 + {dstVec_22_signedVal[15], dstVec_22_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_22 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_22_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_22_withZp) < -17'sh80 ? 8'h80 : dstVec_22_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_22[31:16]
-               + {15'h0, fp32Vec_22[15] & ((|(fp32Vec_22[14:0])) | fp32Vec_22[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_22[31],
-                 ~(|(fp32Vec_22[30:23])) | fp32Vec_22[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_22[30:23])) & fp32Vec_22[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_22[30:23]))
-                           ? {6'h3F, fp32Vec_22[21:13]}
-                           : fp32Vec_22[30:23] > 8'h8E | fp32Vec_22[30:23] == 8'h8E
-                             & dstVec_22_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_22[27:23] + {4'h0, dstVec_22_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_22_manRnd[10] ? 10'h0 : dstVec_22_manRnd[9:0]}}
-              : fp32Vec_22;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_23_manRnd =
-    {1'h0, fp32Vec_23[22:13]}
-    + {10'h0, fp32Vec_23[12] & ((|(fp32Vec_23[11:0])) | fp32Vec_23[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_23_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_23[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_23_absInt_T_6 =
-    {1'h1, fp32Vec_23[22:0]} >> _dstVec_23_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_23_absInt =
-    ~(|(fp32Vec_23[30:23])) | fp32Vec_23[30:23] < 8'h68
-    | _dstVec_23_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_23_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_23_signedVal =
-    fp32Vec_23[31] ? ~dstVec_23_absInt + 16'h1 : dstVec_23_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_23_withZp =
-    _GEN_35 + {dstVec_23_signedVal[15], dstVec_23_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_23 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_23_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_23_withZp) < -17'sh80 ? 8'h80 : dstVec_23_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_23[31:16]
-               + {15'h0, fp32Vec_23[15] & ((|(fp32Vec_23[14:0])) | fp32Vec_23[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_23[31],
-                 ~(|(fp32Vec_23[30:23])) | fp32Vec_23[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_23[30:23])) & fp32Vec_23[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_23[30:23]))
-                           ? {6'h3F, fp32Vec_23[21:13]}
-                           : fp32Vec_23[30:23] > 8'h8E | fp32Vec_23[30:23] == 8'h8E
-                             & dstVec_23_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_23[27:23] + {4'h0, dstVec_23_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_23_manRnd[10] ? 10'h0 : dstVec_23_manRnd[9:0]}}
-              : fp32Vec_23;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_24_manRnd =
-    {1'h0, fp32Vec_24[22:13]}
-    + {10'h0, fp32Vec_24[12] & ((|(fp32Vec_24[11:0])) | fp32Vec_24[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_24_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_24[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_24_absInt_T_6 =
-    {1'h1, fp32Vec_24[22:0]} >> _dstVec_24_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_24_absInt =
-    ~(|(fp32Vec_24[30:23])) | fp32Vec_24[30:23] < 8'h68
-    | _dstVec_24_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_24_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_24_signedVal =
-    fp32Vec_24[31] ? ~dstVec_24_absInt + 16'h1 : dstVec_24_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_24_withZp =
-    _GEN_35 + {dstVec_24_signedVal[15], dstVec_24_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_24 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_24_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_24_withZp) < -17'sh80 ? 8'h80 : dstVec_24_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_24[31:16]
-               + {15'h0, fp32Vec_24[15] & ((|(fp32Vec_24[14:0])) | fp32Vec_24[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_24[31],
-                 ~(|(fp32Vec_24[30:23])) | fp32Vec_24[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_24[30:23])) & fp32Vec_24[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_24[30:23]))
-                           ? {6'h3F, fp32Vec_24[21:13]}
-                           : fp32Vec_24[30:23] > 8'h8E | fp32Vec_24[30:23] == 8'h8E
-                             & dstVec_24_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_24[27:23] + {4'h0, dstVec_24_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_24_manRnd[10] ? 10'h0 : dstVec_24_manRnd[9:0]}}
-              : fp32Vec_24;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_25_manRnd =
-    {1'h0, fp32Vec_25[22:13]}
-    + {10'h0, fp32Vec_25[12] & ((|(fp32Vec_25[11:0])) | fp32Vec_25[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_25_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_25[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_25_absInt_T_6 =
-    {1'h1, fp32Vec_25[22:0]} >> _dstVec_25_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_25_absInt =
-    ~(|(fp32Vec_25[30:23])) | fp32Vec_25[30:23] < 8'h68
-    | _dstVec_25_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_25_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_25_signedVal =
-    fp32Vec_25[31] ? ~dstVec_25_absInt + 16'h1 : dstVec_25_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_25_withZp =
-    _GEN_35 + {dstVec_25_signedVal[15], dstVec_25_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_25 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_25_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_25_withZp) < -17'sh80 ? 8'h80 : dstVec_25_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_25[31:16]
-               + {15'h0, fp32Vec_25[15] & ((|(fp32Vec_25[14:0])) | fp32Vec_25[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_25[31],
-                 ~(|(fp32Vec_25[30:23])) | fp32Vec_25[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_25[30:23])) & fp32Vec_25[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_25[30:23]))
-                           ? {6'h3F, fp32Vec_25[21:13]}
-                           : fp32Vec_25[30:23] > 8'h8E | fp32Vec_25[30:23] == 8'h8E
-                             & dstVec_25_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_25[27:23] + {4'h0, dstVec_25_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_25_manRnd[10] ? 10'h0 : dstVec_25_manRnd[9:0]}}
-              : fp32Vec_25;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_26_manRnd =
-    {1'h0, fp32Vec_26[22:13]}
-    + {10'h0, fp32Vec_26[12] & ((|(fp32Vec_26[11:0])) | fp32Vec_26[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_26_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_26[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_26_absInt_T_6 =
-    {1'h1, fp32Vec_26[22:0]} >> _dstVec_26_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_26_absInt =
-    ~(|(fp32Vec_26[30:23])) | fp32Vec_26[30:23] < 8'h68
-    | _dstVec_26_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_26_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_26_signedVal =
-    fp32Vec_26[31] ? ~dstVec_26_absInt + 16'h1 : dstVec_26_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_26_withZp =
-    _GEN_35 + {dstVec_26_signedVal[15], dstVec_26_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_26 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_26_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_26_withZp) < -17'sh80 ? 8'h80 : dstVec_26_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_26[31:16]
-               + {15'h0, fp32Vec_26[15] & ((|(fp32Vec_26[14:0])) | fp32Vec_26[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_26[31],
-                 ~(|(fp32Vec_26[30:23])) | fp32Vec_26[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_26[30:23])) & fp32Vec_26[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_26[30:23]))
-                           ? {6'h3F, fp32Vec_26[21:13]}
-                           : fp32Vec_26[30:23] > 8'h8E | fp32Vec_26[30:23] == 8'h8E
-                             & dstVec_26_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_26[27:23] + {4'h0, dstVec_26_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_26_manRnd[10] ? 10'h0 : dstVec_26_manRnd[9:0]}}
-              : fp32Vec_26;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_27_manRnd =
-    {1'h0, fp32Vec_27[22:13]}
-    + {10'h0, fp32Vec_27[12] & ((|(fp32Vec_27[11:0])) | fp32Vec_27[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_27_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_27[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_27_absInt_T_6 =
-    {1'h1, fp32Vec_27[22:0]} >> _dstVec_27_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_27_absInt =
-    ~(|(fp32Vec_27[30:23])) | fp32Vec_27[30:23] < 8'h68
-    | _dstVec_27_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_27_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_27_signedVal =
-    fp32Vec_27[31] ? ~dstVec_27_absInt + 16'h1 : dstVec_27_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_27_withZp =
-    _GEN_35 + {dstVec_27_signedVal[15], dstVec_27_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_27 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_27_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_27_withZp) < -17'sh80 ? 8'h80 : dstVec_27_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_27[31:16]
-               + {15'h0, fp32Vec_27[15] & ((|(fp32Vec_27[14:0])) | fp32Vec_27[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_27[31],
-                 ~(|(fp32Vec_27[30:23])) | fp32Vec_27[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_27[30:23])) & fp32Vec_27[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_27[30:23]))
-                           ? {6'h3F, fp32Vec_27[21:13]}
-                           : fp32Vec_27[30:23] > 8'h8E | fp32Vec_27[30:23] == 8'h8E
-                             & dstVec_27_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_27[27:23] + {4'h0, dstVec_27_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_27_manRnd[10] ? 10'h0 : dstVec_27_manRnd[9:0]}}
-              : fp32Vec_27;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_28_manRnd =
-    {1'h0, fp32Vec_28[22:13]}
-    + {10'h0, fp32Vec_28[12] & ((|(fp32Vec_28[11:0])) | fp32Vec_28[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_28_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_28[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_28_absInt_T_6 =
-    {1'h1, fp32Vec_28[22:0]} >> _dstVec_28_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_28_absInt =
-    ~(|(fp32Vec_28[30:23])) | fp32Vec_28[30:23] < 8'h68
-    | _dstVec_28_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_28_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_28_signedVal =
-    fp32Vec_28[31] ? ~dstVec_28_absInt + 16'h1 : dstVec_28_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_28_withZp =
-    _GEN_35 + {dstVec_28_signedVal[15], dstVec_28_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_28 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_28_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_28_withZp) < -17'sh80 ? 8'h80 : dstVec_28_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_28[31:16]
-               + {15'h0, fp32Vec_28[15] & ((|(fp32Vec_28[14:0])) | fp32Vec_28[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_28[31],
-                 ~(|(fp32Vec_28[30:23])) | fp32Vec_28[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_28[30:23])) & fp32Vec_28[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_28[30:23]))
-                           ? {6'h3F, fp32Vec_28[21:13]}
-                           : fp32Vec_28[30:23] > 8'h8E | fp32Vec_28[30:23] == 8'h8E
-                             & dstVec_28_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_28[27:23] + {4'h0, dstVec_28_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_28_manRnd[10] ? 10'h0 : dstVec_28_manRnd[9:0]}}
-              : fp32Vec_28;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_29_manRnd =
-    {1'h0, fp32Vec_29[22:13]}
-    + {10'h0, fp32Vec_29[12] & ((|(fp32Vec_29[11:0])) | fp32Vec_29[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_29_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_29[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_29_absInt_T_6 =
-    {1'h1, fp32Vec_29[22:0]} >> _dstVec_29_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_29_absInt =
-    ~(|(fp32Vec_29[30:23])) | fp32Vec_29[30:23] < 8'h68
-    | _dstVec_29_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_29_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_29_signedVal =
-    fp32Vec_29[31] ? ~dstVec_29_absInt + 16'h1 : dstVec_29_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_29_withZp =
-    _GEN_35 + {dstVec_29_signedVal[15], dstVec_29_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_29 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_29_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_29_withZp) < -17'sh80 ? 8'h80 : dstVec_29_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_29[31:16]
-               + {15'h0, fp32Vec_29[15] & ((|(fp32Vec_29[14:0])) | fp32Vec_29[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_29[31],
-                 ~(|(fp32Vec_29[30:23])) | fp32Vec_29[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_29[30:23])) & fp32Vec_29[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_29[30:23]))
-                           ? {6'h3F, fp32Vec_29[21:13]}
-                           : fp32Vec_29[30:23] > 8'h8E | fp32Vec_29[30:23] == 8'h8E
-                             & dstVec_29_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_29[27:23] + {4'h0, dstVec_29_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_29_manRnd[10] ? 10'h0 : dstVec_29_manRnd[9:0]}}
-              : fp32Vec_29;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_30_manRnd =
-    {1'h0, fp32Vec_30[22:13]}
-    + {10'h0, fp32Vec_30[12] & ((|(fp32Vec_30[11:0])) | fp32Vec_30[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_30_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_30[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_30_absInt_T_6 =
-    {1'h1, fp32Vec_30[22:0]} >> _dstVec_30_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_30_absInt =
-    ~(|(fp32Vec_30[30:23])) | fp32Vec_30[30:23] < 8'h68
-    | _dstVec_30_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_30_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_30_signedVal =
-    fp32Vec_30[31] ? ~dstVec_30_absInt + 16'h1 : dstVec_30_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_30_withZp =
-    _GEN_35 + {dstVec_30_signedVal[15], dstVec_30_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_30 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_30_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_30_withZp) < -17'sh80 ? 8'h80 : dstVec_30_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_30[31:16]
-               + {15'h0, fp32Vec_30[15] & ((|(fp32Vec_30[14:0])) | fp32Vec_30[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_30[31],
-                 ~(|(fp32Vec_30[30:23])) | fp32Vec_30[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_30[30:23])) & fp32Vec_30[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_30[30:23]))
-                           ? {6'h3F, fp32Vec_30[21:13]}
-                           : fp32Vec_30[30:23] > 8'h8E | fp32Vec_30[30:23] == 8'h8E
-                             & dstVec_30_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_30[27:23] + {4'h0, dstVec_30_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_30_manRnd[10] ? 10'h0 : dstVec_30_manRnd[9:0]}}
-              : fp32Vec_30;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [10:0]       dstVec_31_manRnd =
-    {1'h0, fp32Vec_31[22:13]}
-    + {10'h0, fp32Vec_31[12] & ((|(fp32Vec_31[11:0])) | fp32Vec_31[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :68:17, :70:23, :71:{23,31}, :72:23, :73:{29,40,49}, :74:27, :185:50
-  wire [8:0]        _dstVec_31_totalShift_T_1 =
-    _GEN_34 + 9'h96 - {1'h0, fp32Vec_31[30:23]};	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :132:{28,40}, :185:50
-  wire [23:0]       _dstVec_31_absInt_T_6 =
-    {1'h1, fp32Vec_31[22:0]} >> _dstVec_31_totalShift_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:68:17, :128:23, :132:40, :135:29, :185:50
-  wire [15:0]       dstVec_31_absInt =
-    ~(|(fp32Vec_31[30:23])) | fp32Vec_31[30:23] < 8'h68
-    | _dstVec_31_totalShift_T_1 > 9'h17
-      ? 16'h0
-      : _dstVec_31_absInt_T_6[15:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:67:17, :81:25, :129:24, :132:40, :133:{23,31,38}, :134:{23,35}, :135:29, :185:50
-  wire [15:0]       dstVec_31_signedVal =
-    fp32Vec_31[31] ? ~dstVec_31_absInt + 16'h1 : dstVec_31_absInt;	// src/foragerbee/scala/main/FbFormatConverter.scala:66:17, :133:23, :134:23, :137:{24,32,40}, :185:50
-  wire [16:0]       dstVec_31_withZp =
-    _GEN_35 + {dstVec_31_signedVal[15], dstVec_31_signedVal};	// src/foragerbee/scala/main/FbFormatConverter.scala:125:39, :137:24, :139:28
-  wire [31:0]       dstVec_31 =
-    io_cfg_dstFmt == 4'h3
-      ? {24'h0,
-         $signed(dstVec_31_withZp) > 17'sh7F
-           ? 8'h7F
-           : $signed(dstVec_31_withZp) < -17'sh80 ? 8'h80 : dstVec_31_withZp[7:0]}
-      : io_cfg_dstFmt == 4'h2
-          ? {16'h0,
-             fp32Vec_31[31:16]
-               + {15'h0, fp32Vec_31[15] & ((|(fp32Vec_31[14:0])) | fp32Vec_31[16])}}
-          : io_cfg_dstFmt == 4'h1
-              ? {16'h0,
-                 fp32Vec_31[31],
-                 ~(|(fp32Vec_31[30:23])) | fp32Vec_31[30:23] < 8'h71
-                   ? 15'h0
-                   : (&(fp32Vec_31[30:23])) & fp32Vec_31[22:0] == 23'h0
-                       ? 15'h7C00
-                       : (&(fp32Vec_31[30:23]))
-                           ? {6'h3F, fp32Vec_31[21:13]}
-                           : fp32Vec_31[30:23] > 8'h8E | fp32Vec_31[30:23] == 8'h8E
-                             & dstVec_31_manRnd[10]
-                               ? 15'h7C00
-                               : {fp32Vec_31[27:23] + {4'h0, dstVec_31_manRnd[10]}
-                                    - 5'h10,
-                                  dstVec_31_manRnd[10] ? 10'h0 : dstVec_31_manRnd[9:0]}}
-              : fp32Vec_31;	// src/foragerbee/scala/main/FbFormatConverter.scala:56:21, :66:17, :67:17, :68:17, :74:27, :75:26, :76:{23,51}, :77:{25,38}, :79:{25,33,41,51}, :80:25, :81:25, :82:25, :83:{8,16}, :84:{8,18,25}, :85:{8,22,59}, :86:8, :87:12, :92:21, :93:{21,29}, :94:21, :95:{29,40}, :96:21, :98:12, :125:39, :134:23, :139:28, :141:{22,30,54,62}, :185:50, :197:54, :199:51, :200:51, :201:83, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  wire [1023:0]     convertedWide =
-    io_cfg_dstFmt == 4'h3
-      ? {768'h0,
-         dstVec_31[7:0],
-         dstVec_30[7:0],
-         dstVec_29[7:0],
-         dstVec_28[7:0],
-         dstVec_27[7:0],
-         dstVec_26[7:0],
-         dstVec_25[7:0],
-         dstVec_24[7:0],
-         dstVec_23[7:0],
-         dstVec_22[7:0],
-         dstVec_21[7:0],
-         dstVec_20[7:0],
-         dstVec_19[7:0],
-         dstVec_18[7:0],
-         dstVec_17[7:0],
-         dstVec_16[7:0],
-         dstVec_15[7:0],
-         dstVec_14[7:0],
-         dstVec_13[7:0],
-         dstVec_12[7:0],
-         dstVec_11[7:0],
-         dstVec_10[7:0],
-         dstVec_9[7:0],
-         dstVec_8[7:0],
-         dstVec_7[7:0],
-         dstVec_6[7:0],
-         dstVec_5[7:0],
-         dstVec_4[7:0],
-         dstVec_3[7:0],
-         dstVec_2[7:0],
-         dstVec_1[7:0],
-         dstVec_0[7:0]}
-      : io_cfg_dstFmt == 4'h2 | io_cfg_dstFmt == 4'h1
-          ? {512'h0,
-             dstVec_31[15:0],
-             dstVec_30[15:0],
-             dstVec_29[15:0],
-             dstVec_28[15:0],
-             dstVec_27[15:0],
-             dstVec_26[15:0],
-             dstVec_25[15:0],
-             dstVec_24[15:0],
-             dstVec_23[15:0],
-             dstVec_22[15:0],
-             dstVec_21[15:0],
-             dstVec_20[15:0],
-             dstVec_19[15:0],
-             dstVec_18[15:0],
-             dstVec_17[15:0],
-             dstVec_16[15:0],
-             dstVec_15[15:0],
-             dstVec_14[15:0],
-             dstVec_13[15:0],
-             dstVec_12[15:0],
-             dstVec_11[15:0],
-             dstVec_10[15:0],
-             dstVec_9[15:0],
-             dstVec_8[15:0],
-             dstVec_7[15:0],
-             dstVec_6[15:0],
-             dstVec_5[15:0],
-             dstVec_4[15:0],
-             dstVec_3[15:0],
-             dstVec_2[15:0],
-             dstVec_1[15:0],
-             dstVec_0[15:0]}
-          : {dstVec_31,
-             dstVec_30,
-             dstVec_29,
-             dstVec_28,
-             dstVec_27,
-             dstVec_26,
-             dstVec_25,
-             dstVec_24,
-             dstVec_23,
-             dstVec_22,
-             dstVec_21,
-             dstVec_20,
-             dstVec_19,
-             dstVec_18,
-             dstVec_17,
-             dstVec_16,
-             dstVec_15,
-             dstVec_14,
-             dstVec_13,
-             dstVec_12,
-             dstVec_11,
-             dstVec_10,
-             dstVec_9,
-             dstVec_8,
-             dstVec_7,
-             dstVec_6,
-             dstVec_5,
-             dstVec_4,
-             dstVec_3,
-             dstVec_2,
-             dstVec_1,
-             dstVec_0};	// src/foragerbee/scala/main/FbFormatConverter.scala:197:54, :207:23, :208:69, :209:69, :217:56, :219:37, :221:36, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-  reg  [255:0]      accumReg;	// src/foragerbee/scala/main/FbFormatConverter.scala:228:27
-  reg  [1:0]        accumCount;	// src/foragerbee/scala/main/FbFormatConverter.scala:229:27
-  reg  [1023:0]     expandReg;	// src/foragerbee/scala/main/FbFormatConverter.scala:231:28
-  reg  [1:0]        expandCount;	// src/foragerbee/scala/main/FbFormatConverter.scala:232:28
-  reg               expanding;	// src/foragerbee/scala/main/FbFormatConverter.scala:233:28
-  wire              isLast = {1'h0, accumCount} == compRatio - 3'h1;	// src/foragerbee/scala/main/FbFormatConverter.scala:168:22, :229:27, :250:{29,44}
-  wire              _chunkBits_T_7 = compRatio == 3'h2;	// src/foragerbee/scala/main/FbFormatConverter.scala:168:22, :170:22, :258:71
-  wire [3:0][255:0] _GEN_36 =
-    {{expandReg[1023:768]},
-     {expandReg[767:512]},
-     {expandReg[511:256]},
-     {expandReg[255:0]}};	// src/foragerbee/scala/main/FbFormatConverter.scala:231:28, :299:{54,73}, :300:46
-  wire              io_out_valid_0 =
+              : 6'h20;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire         isCompression = srcElemBits > dstElemBits;	// src/foragerbee/scala/main/FbFormatConverter.scala:99:35, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire         isExpansion = srcElemBits < dstElemBits;	// src/foragerbee/scala/main/FbFormatConverter.scala:100:33, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire         _raw_T_30 = srcElemBits[5:2] == 4'h8;	// src/foragerbee/scala/main/FbFormatConverter.scala:101:34, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [4:0]   srcElems = _raw_T_30 ? {1'h0, io_inBytes[5:2]} : io_inBytes[5:1];	// src/foragerbee/scala/main/FbFormatConverter.scala:94:33, :101:{21,34,55,72}
+  wire [31:0]  raw = _raw_T_30 ? io_in_bits[31:0] : {16'h0, io_in_bits[15:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:23:46, :101:34, :105:51, :106:27, :107:{18,57}
+  wire         _dstVec_0_fp32_T_1 = raw[14:10] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:13:16, :15:26, :61:39, :73:7, :107:18
+  wire [31:0]  dstVec_0_fp32 =
+    io_cfg_srcFmt == 4'h2
+      ? {raw[15:0], 16'h0}
+      : io_cfg_srcFmt == 4'h1
+          ? {raw[15],
+             _dstVec_0_fp32_T_1 & raw[9:0] == 10'h0
+               ? 31'h0
+               : {_dstVec_0_fp32_T_1
+                    ? 8'h0
+                    : (&(raw[14:10])) ? 8'hFF : {3'h0, raw[14:10]} + 8'h70,
+                  raw[9:0],
+                  13'h0}}
+          : raw;	// src/foragerbee/scala/main/FbFormatConverter.scala:12:17, :13:16, :14:16, :15:{21,26}, :16:{21,26}, :17:23, :18:21, :19:{8,21,28,40}, :20:12, :23:46, :35:23, :59:35, :61:39, :107:18, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [10:0]  dstVec_0_converted_manRnd =
+    {1'h0, dstVec_0_fp32[22:13]}
+    + {10'h0, dstVec_0_fp32[12] & ((|(dstVec_0_fp32[11:0])) | dstVec_0_fp32[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:28:16, :29:23, :30:{21,29}, :31:21, :32:{28,39,48}, :33:25, :35:23, :59:35, :94:33
+  wire [31:0]  dstVec_0 =
+    (|srcElems)
+      ? (_dstVec_15_T_1 | ~(_dstVec_15_T_2 | _dstVec_15_T_3 | _dstVec_15_T_5)
+         | ~(_dstVec_15_T_9 | _dstVec_15_T_10 | _dstVec_15_T_12)
+           ? raw
+           : io_cfg_dstFmt == 4'h2
+               ? {16'h0,
+                  dstVec_0_fp32[31:16]
+                    + {15'h0,
+                       dstVec_0_fp32[15]
+                         & ((|(dstVec_0_fp32[14:0])) | dstVec_0_fp32[16])}}
+               : io_cfg_dstFmt == 4'h1
+                   ? {16'h0,
+                      dstVec_0_fp32[31],
+                      dstVec_0_fp32[30:23] == 8'h0 | dstVec_0_fp32[30:23] < 8'h71
+                        ? 15'h0
+                        : (&(dstVec_0_fp32[30:23])) & dstVec_0_fp32[22:0] == 23'h0
+                            ? 15'h7C00
+                            : (&(dstVec_0_fp32[30:23]))
+                                ? {6'h3F, dstVec_0_fp32[21:13]}
+                                : dstVec_0_fp32[30:23] > 8'h8E
+                                  | dstVec_0_fp32[30:23] == 8'h8E
+                                  & dstVec_0_converted_manRnd[10]
+                                    ? 15'h7C00
+                                    : {dstVec_0_fp32[27:23]
+                                         + {4'h0, dstVec_0_converted_manRnd[10]} - 5'h10,
+                                       dstVec_0_converted_manRnd[10]
+                                         ? 10'h0
+                                         : dstVec_0_converted_manRnd[9:0]}}
+                   : dstVec_0_fp32)
+      : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:15:21, :23:46, :26:17, :27:16, :28:16, :33:25, :34:26, :35:{23,51}, :36:{23,36}, :37:{24,32,40,50}, :38:25, :39:22, :40:24, :41:{8,16}, :42:{8,18,25}, :43:{8,22,59}, :44:8, :45:12, :49:21, :50:{19,27}, :51:16, :52:{28,39}, :53:18, :54:12, :59:35, :64:41, :66:45, :67:45, :69:{8,21,24,48,51}, :94:65, :101:21, :107:18, :108:{21,26}, src/foragerbee/scala/main/ForagerBeeConfig.scala:162:{44,53,58,67,72}, :174:66
+  wire [31:0]  raw_1 = _raw_T_30 ? io_in_bits[63:32] : {16'h0, io_in_bits[31:16]};	// src/foragerbee/scala/main/FbFormatConverter.scala:23:46, :101:34, :105:51, :106:27, :107:{18,57}
+  wire         _dstVec_1_fp32_T_1 = raw_1[14:10] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:13:16, :15:26, :61:39, :73:7, :107:18
+  wire [31:0]  dstVec_1_fp32 =
+    io_cfg_srcFmt == 4'h2
+      ? {raw_1[15:0], 16'h0}
+      : io_cfg_srcFmt == 4'h1
+          ? {raw_1[15],
+             _dstVec_1_fp32_T_1 & raw_1[9:0] == 10'h0
+               ? 31'h0
+               : {_dstVec_1_fp32_T_1
+                    ? 8'h0
+                    : (&(raw_1[14:10])) ? 8'hFF : {3'h0, raw_1[14:10]} + 8'h70,
+                  raw_1[9:0],
+                  13'h0}}
+          : raw_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:12:17, :13:16, :14:16, :15:{21,26}, :16:{21,26}, :17:23, :18:21, :19:{8,21,28,40}, :20:12, :23:46, :35:23, :59:35, :61:39, :107:18, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [10:0]  dstVec_1_converted_manRnd =
+    {1'h0, dstVec_1_fp32[22:13]}
+    + {10'h0, dstVec_1_fp32[12] & ((|(dstVec_1_fp32[11:0])) | dstVec_1_fp32[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:28:16, :29:23, :30:{21,29}, :31:21, :32:{28,39,48}, :33:25, :35:23, :59:35, :94:33
+  wire [31:0]  dstVec_1 =
+    (|(srcElems[4:1]))
+      ? (_dstVec_15_T_1 | ~(_dstVec_15_T_2 | _dstVec_15_T_3 | _dstVec_15_T_5)
+         | ~(_dstVec_15_T_9 | _dstVec_15_T_10 | _dstVec_15_T_12)
+           ? raw_1
+           : io_cfg_dstFmt == 4'h2
+               ? {16'h0,
+                  dstVec_1_fp32[31:16]
+                    + {15'h0,
+                       dstVec_1_fp32[15]
+                         & ((|(dstVec_1_fp32[14:0])) | dstVec_1_fp32[16])}}
+               : io_cfg_dstFmt == 4'h1
+                   ? {16'h0,
+                      dstVec_1_fp32[31],
+                      dstVec_1_fp32[30:23] == 8'h0 | dstVec_1_fp32[30:23] < 8'h71
+                        ? 15'h0
+                        : (&(dstVec_1_fp32[30:23])) & dstVec_1_fp32[22:0] == 23'h0
+                            ? 15'h7C00
+                            : (&(dstVec_1_fp32[30:23]))
+                                ? {6'h3F, dstVec_1_fp32[21:13]}
+                                : dstVec_1_fp32[30:23] > 8'h8E
+                                  | dstVec_1_fp32[30:23] == 8'h8E
+                                  & dstVec_1_converted_manRnd[10]
+                                    ? 15'h7C00
+                                    : {dstVec_1_fp32[27:23]
+                                         + {4'h0, dstVec_1_converted_manRnd[10]} - 5'h10,
+                                       dstVec_1_converted_manRnd[10]
+                                         ? 10'h0
+                                         : dstVec_1_converted_manRnd[9:0]}}
+                   : dstVec_1_fp32)
+      : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:15:21, :23:46, :26:17, :27:16, :28:16, :33:25, :34:26, :35:{23,51}, :36:{23,36}, :37:{24,32,40,50}, :38:25, :39:22, :40:24, :41:{8,16}, :42:{8,18,25}, :43:{8,22,59}, :44:8, :45:12, :49:21, :50:{19,27}, :51:16, :52:{28,39}, :53:18, :54:12, :59:35, :64:41, :66:45, :67:45, :69:{8,21,24,48,51}, :94:65, :101:21, :107:18, :108:{21,26}, src/foragerbee/scala/main/ForagerBeeConfig.scala:162:{44,53,58,67,72}, :174:66
+  wire [31:0]  raw_2 = _raw_T_30 ? io_in_bits[95:64] : {16'h0, io_in_bits[47:32]};	// src/foragerbee/scala/main/FbFormatConverter.scala:23:46, :101:34, :105:51, :106:27, :107:{18,57}
+  wire         _dstVec_2_fp32_T_1 = raw_2[14:10] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:13:16, :15:26, :61:39, :73:7, :107:18
+  wire [31:0]  dstVec_2_fp32 =
+    io_cfg_srcFmt == 4'h2
+      ? {raw_2[15:0], 16'h0}
+      : io_cfg_srcFmt == 4'h1
+          ? {raw_2[15],
+             _dstVec_2_fp32_T_1 & raw_2[9:0] == 10'h0
+               ? 31'h0
+               : {_dstVec_2_fp32_T_1
+                    ? 8'h0
+                    : (&(raw_2[14:10])) ? 8'hFF : {3'h0, raw_2[14:10]} + 8'h70,
+                  raw_2[9:0],
+                  13'h0}}
+          : raw_2;	// src/foragerbee/scala/main/FbFormatConverter.scala:12:17, :13:16, :14:16, :15:{21,26}, :16:{21,26}, :17:23, :18:21, :19:{8,21,28,40}, :20:12, :23:46, :35:23, :59:35, :61:39, :107:18, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [10:0]  dstVec_2_converted_manRnd =
+    {1'h0, dstVec_2_fp32[22:13]}
+    + {10'h0, dstVec_2_fp32[12] & ((|(dstVec_2_fp32[11:0])) | dstVec_2_fp32[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:28:16, :29:23, :30:{21,29}, :31:21, :32:{28,39,48}, :33:25, :35:23, :59:35, :94:33
+  wire [31:0]  dstVec_2 =
+    srcElems > 5'h2
+      ? (_dstVec_15_T_1 | ~(_dstVec_15_T_2 | _dstVec_15_T_3 | _dstVec_15_T_5)
+         | ~(_dstVec_15_T_9 | _dstVec_15_T_10 | _dstVec_15_T_12)
+           ? raw_2
+           : io_cfg_dstFmt == 4'h2
+               ? {16'h0,
+                  dstVec_2_fp32[31:16]
+                    + {15'h0,
+                       dstVec_2_fp32[15]
+                         & ((|(dstVec_2_fp32[14:0])) | dstVec_2_fp32[16])}}
+               : io_cfg_dstFmt == 4'h1
+                   ? {16'h0,
+                      dstVec_2_fp32[31],
+                      dstVec_2_fp32[30:23] == 8'h0 | dstVec_2_fp32[30:23] < 8'h71
+                        ? 15'h0
+                        : (&(dstVec_2_fp32[30:23])) & dstVec_2_fp32[22:0] == 23'h0
+                            ? 15'h7C00
+                            : (&(dstVec_2_fp32[30:23]))
+                                ? {6'h3F, dstVec_2_fp32[21:13]}
+                                : dstVec_2_fp32[30:23] > 8'h8E
+                                  | dstVec_2_fp32[30:23] == 8'h8E
+                                  & dstVec_2_converted_manRnd[10]
+                                    ? 15'h7C00
+                                    : {dstVec_2_fp32[27:23]
+                                         + {4'h0, dstVec_2_converted_manRnd[10]} - 5'h10,
+                                       dstVec_2_converted_manRnd[10]
+                                         ? 10'h0
+                                         : dstVec_2_converted_manRnd[9:0]}}
+                   : dstVec_2_fp32)
+      : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:15:21, :23:46, :26:17, :27:16, :28:16, :33:25, :34:26, :35:{23,51}, :36:{23,36}, :37:{24,32,40,50}, :38:25, :39:22, :40:24, :41:{8,16}, :42:{8,18,25}, :43:{8,22,59}, :44:8, :45:12, :49:21, :50:{19,27}, :51:16, :52:{28,39}, :53:18, :54:12, :59:35, :64:41, :66:45, :67:45, :69:{8,21,24,48,51}, :73:7, :94:65, :101:21, :107:18, :108:{21,26}, src/foragerbee/scala/main/ForagerBeeConfig.scala:162:{44,53,58,67,72}, :174:66
+  wire [31:0]  raw_3 = _raw_T_30 ? io_in_bits[127:96] : {16'h0, io_in_bits[63:48]};	// src/foragerbee/scala/main/FbFormatConverter.scala:23:46, :101:34, :105:51, :106:27, :107:{18,57}
+  wire         _dstVec_3_fp32_T_1 = raw_3[14:10] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:13:16, :15:26, :61:39, :73:7, :107:18
+  wire [31:0]  dstVec_3_fp32 =
+    io_cfg_srcFmt == 4'h2
+      ? {raw_3[15:0], 16'h0}
+      : io_cfg_srcFmt == 4'h1
+          ? {raw_3[15],
+             _dstVec_3_fp32_T_1 & raw_3[9:0] == 10'h0
+               ? 31'h0
+               : {_dstVec_3_fp32_T_1
+                    ? 8'h0
+                    : (&(raw_3[14:10])) ? 8'hFF : {3'h0, raw_3[14:10]} + 8'h70,
+                  raw_3[9:0],
+                  13'h0}}
+          : raw_3;	// src/foragerbee/scala/main/FbFormatConverter.scala:12:17, :13:16, :14:16, :15:{21,26}, :16:{21,26}, :17:23, :18:21, :19:{8,21,28,40}, :20:12, :23:46, :35:23, :59:35, :61:39, :107:18, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [10:0]  dstVec_3_converted_manRnd =
+    {1'h0, dstVec_3_fp32[22:13]}
+    + {10'h0, dstVec_3_fp32[12] & ((|(dstVec_3_fp32[11:0])) | dstVec_3_fp32[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:28:16, :29:23, :30:{21,29}, :31:21, :32:{28,39,48}, :33:25, :35:23, :59:35, :94:33
+  wire [31:0]  dstVec_3 =
+    (|(srcElems[4:2]))
+      ? (_dstVec_15_T_1 | ~(_dstVec_15_T_2 | _dstVec_15_T_3 | _dstVec_15_T_5)
+         | ~(_dstVec_15_T_9 | _dstVec_15_T_10 | _dstVec_15_T_12)
+           ? raw_3
+           : io_cfg_dstFmt == 4'h2
+               ? {16'h0,
+                  dstVec_3_fp32[31:16]
+                    + {15'h0,
+                       dstVec_3_fp32[15]
+                         & ((|(dstVec_3_fp32[14:0])) | dstVec_3_fp32[16])}}
+               : io_cfg_dstFmt == 4'h1
+                   ? {16'h0,
+                      dstVec_3_fp32[31],
+                      dstVec_3_fp32[30:23] == 8'h0 | dstVec_3_fp32[30:23] < 8'h71
+                        ? 15'h0
+                        : (&(dstVec_3_fp32[30:23])) & dstVec_3_fp32[22:0] == 23'h0
+                            ? 15'h7C00
+                            : (&(dstVec_3_fp32[30:23]))
+                                ? {6'h3F, dstVec_3_fp32[21:13]}
+                                : dstVec_3_fp32[30:23] > 8'h8E
+                                  | dstVec_3_fp32[30:23] == 8'h8E
+                                  & dstVec_3_converted_manRnd[10]
+                                    ? 15'h7C00
+                                    : {dstVec_3_fp32[27:23]
+                                         + {4'h0, dstVec_3_converted_manRnd[10]} - 5'h10,
+                                       dstVec_3_converted_manRnd[10]
+                                         ? 10'h0
+                                         : dstVec_3_converted_manRnd[9:0]}}
+                   : dstVec_3_fp32)
+      : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:15:21, :23:46, :26:17, :27:16, :28:16, :33:25, :34:26, :35:{23,51}, :36:{23,36}, :37:{24,32,40,50}, :38:25, :39:22, :40:24, :41:{8,16}, :42:{8,18,25}, :43:{8,22,59}, :44:8, :45:12, :49:21, :50:{19,27}, :51:16, :52:{28,39}, :53:18, :54:12, :59:35, :64:41, :66:45, :67:45, :69:{8,21,24,48,51}, :94:65, :101:21, :107:18, :108:{21,26}, src/foragerbee/scala/main/ForagerBeeConfig.scala:162:{44,53,58,67,72}, :174:66
+  wire [31:0]  raw_4 = _raw_T_30 ? io_in_bits[159:128] : {16'h0, io_in_bits[79:64]};	// src/foragerbee/scala/main/FbFormatConverter.scala:23:46, :101:34, :105:51, :106:27, :107:{18,57}
+  wire         _dstVec_4_fp32_T_1 = raw_4[14:10] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:13:16, :15:26, :61:39, :73:7, :107:18
+  wire [31:0]  dstVec_4_fp32 =
+    io_cfg_srcFmt == 4'h2
+      ? {raw_4[15:0], 16'h0}
+      : io_cfg_srcFmt == 4'h1
+          ? {raw_4[15],
+             _dstVec_4_fp32_T_1 & raw_4[9:0] == 10'h0
+               ? 31'h0
+               : {_dstVec_4_fp32_T_1
+                    ? 8'h0
+                    : (&(raw_4[14:10])) ? 8'hFF : {3'h0, raw_4[14:10]} + 8'h70,
+                  raw_4[9:0],
+                  13'h0}}
+          : raw_4;	// src/foragerbee/scala/main/FbFormatConverter.scala:12:17, :13:16, :14:16, :15:{21,26}, :16:{21,26}, :17:23, :18:21, :19:{8,21,28,40}, :20:12, :23:46, :35:23, :59:35, :61:39, :107:18, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [10:0]  dstVec_4_converted_manRnd =
+    {1'h0, dstVec_4_fp32[22:13]}
+    + {10'h0, dstVec_4_fp32[12] & ((|(dstVec_4_fp32[11:0])) | dstVec_4_fp32[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:28:16, :29:23, :30:{21,29}, :31:21, :32:{28,39,48}, :33:25, :35:23, :59:35, :94:33
+  wire [31:0]  dstVec_4 =
+    srcElems > 5'h4
+      ? (_dstVec_15_T_1 | ~(_dstVec_15_T_2 | _dstVec_15_T_3 | _dstVec_15_T_5)
+         | ~(_dstVec_15_T_9 | _dstVec_15_T_10 | _dstVec_15_T_12)
+           ? raw_4
+           : io_cfg_dstFmt == 4'h2
+               ? {16'h0,
+                  dstVec_4_fp32[31:16]
+                    + {15'h0,
+                       dstVec_4_fp32[15]
+                         & ((|(dstVec_4_fp32[14:0])) | dstVec_4_fp32[16])}}
+               : io_cfg_dstFmt == 4'h1
+                   ? {16'h0,
+                      dstVec_4_fp32[31],
+                      dstVec_4_fp32[30:23] == 8'h0 | dstVec_4_fp32[30:23] < 8'h71
+                        ? 15'h0
+                        : (&(dstVec_4_fp32[30:23])) & dstVec_4_fp32[22:0] == 23'h0
+                            ? 15'h7C00
+                            : (&(dstVec_4_fp32[30:23]))
+                                ? {6'h3F, dstVec_4_fp32[21:13]}
+                                : dstVec_4_fp32[30:23] > 8'h8E
+                                  | dstVec_4_fp32[30:23] == 8'h8E
+                                  & dstVec_4_converted_manRnd[10]
+                                    ? 15'h7C00
+                                    : {dstVec_4_fp32[27:23]
+                                         + {4'h0, dstVec_4_converted_manRnd[10]} - 5'h10,
+                                       dstVec_4_converted_manRnd[10]
+                                         ? 10'h0
+                                         : dstVec_4_converted_manRnd[9:0]}}
+                   : dstVec_4_fp32)
+      : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:15:21, :23:46, :26:17, :27:16, :28:16, :33:25, :34:26, :35:{23,51}, :36:{23,36}, :37:{24,32,40,50}, :38:25, :39:22, :40:24, :41:{8,16}, :42:{8,18,25}, :43:{8,22,59}, :44:8, :45:12, :49:21, :50:{19,27}, :51:16, :52:{28,39}, :53:18, :54:12, :59:35, :64:41, :66:45, :67:45, :69:{8,21,24,48,51}, :73:7, :94:65, :101:21, :107:18, :108:{21,26}, src/foragerbee/scala/main/ForagerBeeConfig.scala:162:{44,53,58,67,72}, :174:66
+  wire [31:0]  raw_5 = _raw_T_30 ? io_in_bits[191:160] : {16'h0, io_in_bits[95:80]};	// src/foragerbee/scala/main/FbFormatConverter.scala:23:46, :101:34, :105:51, :106:27, :107:{18,57}
+  wire         _dstVec_5_fp32_T_1 = raw_5[14:10] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:13:16, :15:26, :61:39, :73:7, :107:18
+  wire [31:0]  dstVec_5_fp32 =
+    io_cfg_srcFmt == 4'h2
+      ? {raw_5[15:0], 16'h0}
+      : io_cfg_srcFmt == 4'h1
+          ? {raw_5[15],
+             _dstVec_5_fp32_T_1 & raw_5[9:0] == 10'h0
+               ? 31'h0
+               : {_dstVec_5_fp32_T_1
+                    ? 8'h0
+                    : (&(raw_5[14:10])) ? 8'hFF : {3'h0, raw_5[14:10]} + 8'h70,
+                  raw_5[9:0],
+                  13'h0}}
+          : raw_5;	// src/foragerbee/scala/main/FbFormatConverter.scala:12:17, :13:16, :14:16, :15:{21,26}, :16:{21,26}, :17:23, :18:21, :19:{8,21,28,40}, :20:12, :23:46, :35:23, :59:35, :61:39, :107:18, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [10:0]  dstVec_5_converted_manRnd =
+    {1'h0, dstVec_5_fp32[22:13]}
+    + {10'h0, dstVec_5_fp32[12] & ((|(dstVec_5_fp32[11:0])) | dstVec_5_fp32[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:28:16, :29:23, :30:{21,29}, :31:21, :32:{28,39,48}, :33:25, :35:23, :59:35, :94:33
+  wire [31:0]  dstVec_5 =
+    srcElems > 5'h5
+      ? (_dstVec_15_T_1 | ~(_dstVec_15_T_2 | _dstVec_15_T_3 | _dstVec_15_T_5)
+         | ~(_dstVec_15_T_9 | _dstVec_15_T_10 | _dstVec_15_T_12)
+           ? raw_5
+           : io_cfg_dstFmt == 4'h2
+               ? {16'h0,
+                  dstVec_5_fp32[31:16]
+                    + {15'h0,
+                       dstVec_5_fp32[15]
+                         & ((|(dstVec_5_fp32[14:0])) | dstVec_5_fp32[16])}}
+               : io_cfg_dstFmt == 4'h1
+                   ? {16'h0,
+                      dstVec_5_fp32[31],
+                      dstVec_5_fp32[30:23] == 8'h0 | dstVec_5_fp32[30:23] < 8'h71
+                        ? 15'h0
+                        : (&(dstVec_5_fp32[30:23])) & dstVec_5_fp32[22:0] == 23'h0
+                            ? 15'h7C00
+                            : (&(dstVec_5_fp32[30:23]))
+                                ? {6'h3F, dstVec_5_fp32[21:13]}
+                                : dstVec_5_fp32[30:23] > 8'h8E
+                                  | dstVec_5_fp32[30:23] == 8'h8E
+                                  & dstVec_5_converted_manRnd[10]
+                                    ? 15'h7C00
+                                    : {dstVec_5_fp32[27:23]
+                                         + {4'h0, dstVec_5_converted_manRnd[10]} - 5'h10,
+                                       dstVec_5_converted_manRnd[10]
+                                         ? 10'h0
+                                         : dstVec_5_converted_manRnd[9:0]}}
+                   : dstVec_5_fp32)
+      : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:15:21, :23:46, :26:17, :27:16, :28:16, :33:25, :34:26, :35:{23,51}, :36:{23,36}, :37:{24,32,40,50}, :38:25, :39:22, :40:24, :41:{8,16}, :42:{8,18,25}, :43:{8,22,59}, :44:8, :45:12, :49:21, :50:{19,27}, :51:16, :52:{28,39}, :53:18, :54:12, :59:35, :64:41, :66:45, :67:45, :69:{8,21,24,48,51}, :73:7, :94:65, :101:21, :107:18, :108:{21,26}, src/foragerbee/scala/main/ForagerBeeConfig.scala:162:{44,53,58,67,72}, :174:66
+  wire [31:0]  raw_6 = _raw_T_30 ? io_in_bits[223:192] : {16'h0, io_in_bits[111:96]};	// src/foragerbee/scala/main/FbFormatConverter.scala:23:46, :101:34, :105:51, :106:27, :107:{18,57}
+  wire         _dstVec_6_fp32_T_1 = raw_6[14:10] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:13:16, :15:26, :61:39, :73:7, :107:18
+  wire [31:0]  dstVec_6_fp32 =
+    io_cfg_srcFmt == 4'h2
+      ? {raw_6[15:0], 16'h0}
+      : io_cfg_srcFmt == 4'h1
+          ? {raw_6[15],
+             _dstVec_6_fp32_T_1 & raw_6[9:0] == 10'h0
+               ? 31'h0
+               : {_dstVec_6_fp32_T_1
+                    ? 8'h0
+                    : (&(raw_6[14:10])) ? 8'hFF : {3'h0, raw_6[14:10]} + 8'h70,
+                  raw_6[9:0],
+                  13'h0}}
+          : raw_6;	// src/foragerbee/scala/main/FbFormatConverter.scala:12:17, :13:16, :14:16, :15:{21,26}, :16:{21,26}, :17:23, :18:21, :19:{8,21,28,40}, :20:12, :23:46, :35:23, :59:35, :61:39, :107:18, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [10:0]  dstVec_6_converted_manRnd =
+    {1'h0, dstVec_6_fp32[22:13]}
+    + {10'h0, dstVec_6_fp32[12] & ((|(dstVec_6_fp32[11:0])) | dstVec_6_fp32[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:28:16, :29:23, :30:{21,29}, :31:21, :32:{28,39,48}, :33:25, :35:23, :59:35, :94:33
+  wire [31:0]  dstVec_6 =
+    srcElems > 5'h6
+      ? (_dstVec_15_T_1 | ~(_dstVec_15_T_2 | _dstVec_15_T_3 | _dstVec_15_T_5)
+         | ~(_dstVec_15_T_9 | _dstVec_15_T_10 | _dstVec_15_T_12)
+           ? raw_6
+           : io_cfg_dstFmt == 4'h2
+               ? {16'h0,
+                  dstVec_6_fp32[31:16]
+                    + {15'h0,
+                       dstVec_6_fp32[15]
+                         & ((|(dstVec_6_fp32[14:0])) | dstVec_6_fp32[16])}}
+               : io_cfg_dstFmt == 4'h1
+                   ? {16'h0,
+                      dstVec_6_fp32[31],
+                      dstVec_6_fp32[30:23] == 8'h0 | dstVec_6_fp32[30:23] < 8'h71
+                        ? 15'h0
+                        : (&(dstVec_6_fp32[30:23])) & dstVec_6_fp32[22:0] == 23'h0
+                            ? 15'h7C00
+                            : (&(dstVec_6_fp32[30:23]))
+                                ? {6'h3F, dstVec_6_fp32[21:13]}
+                                : dstVec_6_fp32[30:23] > 8'h8E
+                                  | dstVec_6_fp32[30:23] == 8'h8E
+                                  & dstVec_6_converted_manRnd[10]
+                                    ? 15'h7C00
+                                    : {dstVec_6_fp32[27:23]
+                                         + {4'h0, dstVec_6_converted_manRnd[10]} - 5'h10,
+                                       dstVec_6_converted_manRnd[10]
+                                         ? 10'h0
+                                         : dstVec_6_converted_manRnd[9:0]}}
+                   : dstVec_6_fp32)
+      : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:15:21, :23:46, :26:17, :27:16, :28:16, :33:25, :34:26, :35:{23,51}, :36:{23,36}, :37:{24,32,40,50}, :38:25, :39:22, :40:24, :41:{8,16}, :42:{8,18,25}, :43:{8,22,59}, :44:8, :45:12, :49:21, :50:{19,27}, :51:16, :52:{28,39}, :53:18, :54:12, :59:35, :64:41, :66:45, :67:45, :69:{8,21,24,48,51}, :73:7, :94:65, :101:21, :107:18, :108:{21,26}, src/foragerbee/scala/main/ForagerBeeConfig.scala:162:{44,53,58,67,72}, :174:66
+  wire [31:0]  raw_7 = _raw_T_30 ? io_in_bits[255:224] : {16'h0, io_in_bits[127:112]};	// src/foragerbee/scala/main/FbFormatConverter.scala:23:46, :101:34, :105:51, :106:27, :107:{18,57}
+  wire         _dstVec_7_fp32_T_1 = raw_7[14:10] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:13:16, :15:26, :61:39, :73:7, :107:18
+  wire [31:0]  dstVec_7_fp32 =
+    io_cfg_srcFmt == 4'h2
+      ? {raw_7[15:0], 16'h0}
+      : io_cfg_srcFmt == 4'h1
+          ? {raw_7[15],
+             _dstVec_7_fp32_T_1 & raw_7[9:0] == 10'h0
+               ? 31'h0
+               : {_dstVec_7_fp32_T_1
+                    ? 8'h0
+                    : (&(raw_7[14:10])) ? 8'hFF : {3'h0, raw_7[14:10]} + 8'h70,
+                  raw_7[9:0],
+                  13'h0}}
+          : raw_7;	// src/foragerbee/scala/main/FbFormatConverter.scala:12:17, :13:16, :14:16, :15:{21,26}, :16:{21,26}, :17:23, :18:21, :19:{8,21,28,40}, :20:12, :23:46, :35:23, :59:35, :61:39, :107:18, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [10:0]  dstVec_7_converted_manRnd =
+    {1'h0, dstVec_7_fp32[22:13]}
+    + {10'h0, dstVec_7_fp32[12] & ((|(dstVec_7_fp32[11:0])) | dstVec_7_fp32[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:28:16, :29:23, :30:{21,29}, :31:21, :32:{28,39,48}, :33:25, :35:23, :59:35, :94:33
+  wire [31:0]  dstVec_7 =
+    (|(srcElems[4:3]))
+      ? (_dstVec_15_T_1 | ~(_dstVec_15_T_2 | _dstVec_15_T_3 | _dstVec_15_T_5)
+         | ~(_dstVec_15_T_9 | _dstVec_15_T_10 | _dstVec_15_T_12)
+           ? raw_7
+           : io_cfg_dstFmt == 4'h2
+               ? {16'h0,
+                  dstVec_7_fp32[31:16]
+                    + {15'h0,
+                       dstVec_7_fp32[15]
+                         & ((|(dstVec_7_fp32[14:0])) | dstVec_7_fp32[16])}}
+               : io_cfg_dstFmt == 4'h1
+                   ? {16'h0,
+                      dstVec_7_fp32[31],
+                      dstVec_7_fp32[30:23] == 8'h0 | dstVec_7_fp32[30:23] < 8'h71
+                        ? 15'h0
+                        : (&(dstVec_7_fp32[30:23])) & dstVec_7_fp32[22:0] == 23'h0
+                            ? 15'h7C00
+                            : (&(dstVec_7_fp32[30:23]))
+                                ? {6'h3F, dstVec_7_fp32[21:13]}
+                                : dstVec_7_fp32[30:23] > 8'h8E
+                                  | dstVec_7_fp32[30:23] == 8'h8E
+                                  & dstVec_7_converted_manRnd[10]
+                                    ? 15'h7C00
+                                    : {dstVec_7_fp32[27:23]
+                                         + {4'h0, dstVec_7_converted_manRnd[10]} - 5'h10,
+                                       dstVec_7_converted_manRnd[10]
+                                         ? 10'h0
+                                         : dstVec_7_converted_manRnd[9:0]}}
+                   : dstVec_7_fp32)
+      : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:15:21, :23:46, :26:17, :27:16, :28:16, :33:25, :34:26, :35:{23,51}, :36:{23,36}, :37:{24,32,40,50}, :38:25, :39:22, :40:24, :41:{8,16}, :42:{8,18,25}, :43:{8,22,59}, :44:8, :45:12, :49:21, :50:{19,27}, :51:16, :52:{28,39}, :53:18, :54:12, :59:35, :64:41, :66:45, :67:45, :69:{8,21,24,48,51}, :94:65, :101:21, :107:18, :108:{21,26}, src/foragerbee/scala/main/ForagerBeeConfig.scala:162:{44,53,58,67,72}, :174:66
+  wire [31:0]  raw_8 = _raw_T_30 ? 32'h0 : {16'h0, io_in_bits[143:128]};	// src/foragerbee/scala/main/FbFormatConverter.scala:23:46, :101:34, :106:27, :107:{18,57}, :108:21
+  wire         _dstVec_8_fp32_T_1 = raw_8[14:10] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:13:16, :15:26, :61:39, :73:7, :107:18
+  wire [31:0]  dstVec_8_fp32 =
+    io_cfg_srcFmt == 4'h2
+      ? {raw_8[15:0], 16'h0}
+      : io_cfg_srcFmt == 4'h1
+          ? {raw_8[15],
+             _dstVec_8_fp32_T_1 & raw_8[9:0] == 10'h0
+               ? 31'h0
+               : {_dstVec_8_fp32_T_1
+                    ? 8'h0
+                    : (&(raw_8[14:10])) ? 8'hFF : {3'h0, raw_8[14:10]} + 8'h70,
+                  raw_8[9:0],
+                  13'h0}}
+          : raw_8;	// src/foragerbee/scala/main/FbFormatConverter.scala:12:17, :13:16, :14:16, :15:{21,26}, :16:{21,26}, :17:23, :18:21, :19:{8,21,28,40}, :20:12, :23:46, :35:23, :59:35, :61:39, :107:18, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [10:0]  dstVec_8_converted_manRnd =
+    {1'h0, dstVec_8_fp32[22:13]}
+    + {10'h0, dstVec_8_fp32[12] & ((|(dstVec_8_fp32[11:0])) | dstVec_8_fp32[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:28:16, :29:23, :30:{21,29}, :31:21, :32:{28,39,48}, :33:25, :35:23, :59:35, :94:33
+  wire [31:0]  dstVec_8 =
+    srcElems > 5'h8
+      ? (_dstVec_15_T_1 | ~(_dstVec_15_T_2 | _dstVec_15_T_3 | _dstVec_15_T_5)
+         | ~(_dstVec_15_T_9 | _dstVec_15_T_10 | _dstVec_15_T_12)
+           ? raw_8
+           : io_cfg_dstFmt == 4'h2
+               ? {16'h0,
+                  dstVec_8_fp32[31:16]
+                    + {15'h0,
+                       dstVec_8_fp32[15]
+                         & ((|(dstVec_8_fp32[14:0])) | dstVec_8_fp32[16])}}
+               : io_cfg_dstFmt == 4'h1
+                   ? {16'h0,
+                      dstVec_8_fp32[31],
+                      dstVec_8_fp32[30:23] == 8'h0 | dstVec_8_fp32[30:23] < 8'h71
+                        ? 15'h0
+                        : (&(dstVec_8_fp32[30:23])) & dstVec_8_fp32[22:0] == 23'h0
+                            ? 15'h7C00
+                            : (&(dstVec_8_fp32[30:23]))
+                                ? {6'h3F, dstVec_8_fp32[21:13]}
+                                : dstVec_8_fp32[30:23] > 8'h8E
+                                  | dstVec_8_fp32[30:23] == 8'h8E
+                                  & dstVec_8_converted_manRnd[10]
+                                    ? 15'h7C00
+                                    : {dstVec_8_fp32[27:23]
+                                         + {4'h0, dstVec_8_converted_manRnd[10]} - 5'h10,
+                                       dstVec_8_converted_manRnd[10]
+                                         ? 10'h0
+                                         : dstVec_8_converted_manRnd[9:0]}}
+                   : dstVec_8_fp32)
+      : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:15:21, :23:46, :26:17, :27:16, :28:16, :33:25, :34:26, :35:{23,51}, :36:{23,36}, :37:{24,32,40,50}, :38:25, :39:22, :40:24, :41:{8,16}, :42:{8,18,25}, :43:{8,22,59}, :44:8, :45:12, :49:21, :50:{19,27}, :51:16, :52:{28,39}, :53:18, :54:12, :59:35, :64:41, :66:45, :67:45, :69:{8,21,24,48,51}, :73:7, :94:65, :101:21, :107:18, :108:{21,26}, src/foragerbee/scala/main/ForagerBeeConfig.scala:162:{44,53,58,67,72}, :174:66
+  wire [31:0]  raw_9 = _raw_T_30 ? 32'h0 : {16'h0, io_in_bits[159:144]};	// src/foragerbee/scala/main/FbFormatConverter.scala:23:46, :101:34, :106:27, :107:{18,57}, :108:21
+  wire         _dstVec_9_fp32_T_1 = raw_9[14:10] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:13:16, :15:26, :61:39, :73:7, :107:18
+  wire [31:0]  dstVec_9_fp32 =
+    io_cfg_srcFmt == 4'h2
+      ? {raw_9[15:0], 16'h0}
+      : io_cfg_srcFmt == 4'h1
+          ? {raw_9[15],
+             _dstVec_9_fp32_T_1 & raw_9[9:0] == 10'h0
+               ? 31'h0
+               : {_dstVec_9_fp32_T_1
+                    ? 8'h0
+                    : (&(raw_9[14:10])) ? 8'hFF : {3'h0, raw_9[14:10]} + 8'h70,
+                  raw_9[9:0],
+                  13'h0}}
+          : raw_9;	// src/foragerbee/scala/main/FbFormatConverter.scala:12:17, :13:16, :14:16, :15:{21,26}, :16:{21,26}, :17:23, :18:21, :19:{8,21,28,40}, :20:12, :23:46, :35:23, :59:35, :61:39, :107:18, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [10:0]  dstVec_9_converted_manRnd =
+    {1'h0, dstVec_9_fp32[22:13]}
+    + {10'h0, dstVec_9_fp32[12] & ((|(dstVec_9_fp32[11:0])) | dstVec_9_fp32[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:28:16, :29:23, :30:{21,29}, :31:21, :32:{28,39,48}, :33:25, :35:23, :59:35, :94:33
+  wire [31:0]  dstVec_9 =
+    srcElems > 5'h9
+      ? (_dstVec_15_T_1 | ~(_dstVec_15_T_2 | _dstVec_15_T_3 | _dstVec_15_T_5)
+         | ~(_dstVec_15_T_9 | _dstVec_15_T_10 | _dstVec_15_T_12)
+           ? raw_9
+           : io_cfg_dstFmt == 4'h2
+               ? {16'h0,
+                  dstVec_9_fp32[31:16]
+                    + {15'h0,
+                       dstVec_9_fp32[15]
+                         & ((|(dstVec_9_fp32[14:0])) | dstVec_9_fp32[16])}}
+               : io_cfg_dstFmt == 4'h1
+                   ? {16'h0,
+                      dstVec_9_fp32[31],
+                      dstVec_9_fp32[30:23] == 8'h0 | dstVec_9_fp32[30:23] < 8'h71
+                        ? 15'h0
+                        : (&(dstVec_9_fp32[30:23])) & dstVec_9_fp32[22:0] == 23'h0
+                            ? 15'h7C00
+                            : (&(dstVec_9_fp32[30:23]))
+                                ? {6'h3F, dstVec_9_fp32[21:13]}
+                                : dstVec_9_fp32[30:23] > 8'h8E
+                                  | dstVec_9_fp32[30:23] == 8'h8E
+                                  & dstVec_9_converted_manRnd[10]
+                                    ? 15'h7C00
+                                    : {dstVec_9_fp32[27:23]
+                                         + {4'h0, dstVec_9_converted_manRnd[10]} - 5'h10,
+                                       dstVec_9_converted_manRnd[10]
+                                         ? 10'h0
+                                         : dstVec_9_converted_manRnd[9:0]}}
+                   : dstVec_9_fp32)
+      : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:15:21, :23:46, :26:17, :27:16, :28:16, :33:25, :34:26, :35:{23,51}, :36:{23,36}, :37:{24,32,40,50}, :38:25, :39:22, :40:24, :41:{8,16}, :42:{8,18,25}, :43:{8,22,59}, :44:8, :45:12, :49:21, :50:{19,27}, :51:16, :52:{28,39}, :53:18, :54:12, :59:35, :64:41, :66:45, :67:45, :69:{8,21,24,48,51}, :73:7, :94:65, :101:21, :107:18, :108:{21,26}, src/foragerbee/scala/main/ForagerBeeConfig.scala:162:{44,53,58,67,72}, :174:66
+  wire [31:0]  raw_10 = _raw_T_30 ? 32'h0 : {16'h0, io_in_bits[175:160]};	// src/foragerbee/scala/main/FbFormatConverter.scala:23:46, :101:34, :106:27, :107:{18,57}, :108:21
+  wire         _dstVec_10_fp32_T_1 = raw_10[14:10] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:13:16, :15:26, :61:39, :73:7, :107:18
+  wire [31:0]  dstVec_10_fp32 =
+    io_cfg_srcFmt == 4'h2
+      ? {raw_10[15:0], 16'h0}
+      : io_cfg_srcFmt == 4'h1
+          ? {raw_10[15],
+             _dstVec_10_fp32_T_1 & raw_10[9:0] == 10'h0
+               ? 31'h0
+               : {_dstVec_10_fp32_T_1
+                    ? 8'h0
+                    : (&(raw_10[14:10])) ? 8'hFF : {3'h0, raw_10[14:10]} + 8'h70,
+                  raw_10[9:0],
+                  13'h0}}
+          : raw_10;	// src/foragerbee/scala/main/FbFormatConverter.scala:12:17, :13:16, :14:16, :15:{21,26}, :16:{21,26}, :17:23, :18:21, :19:{8,21,28,40}, :20:12, :23:46, :35:23, :59:35, :61:39, :107:18, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [10:0]  dstVec_10_converted_manRnd =
+    {1'h0, dstVec_10_fp32[22:13]}
+    + {10'h0, dstVec_10_fp32[12] & ((|(dstVec_10_fp32[11:0])) | dstVec_10_fp32[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:28:16, :29:23, :30:{21,29}, :31:21, :32:{28,39,48}, :33:25, :35:23, :59:35, :94:33
+  wire [31:0]  dstVec_10 =
+    srcElems > 5'hA
+      ? (_dstVec_15_T_1 | ~(_dstVec_15_T_2 | _dstVec_15_T_3 | _dstVec_15_T_5)
+         | ~(_dstVec_15_T_9 | _dstVec_15_T_10 | _dstVec_15_T_12)
+           ? raw_10
+           : io_cfg_dstFmt == 4'h2
+               ? {16'h0,
+                  dstVec_10_fp32[31:16]
+                    + {15'h0,
+                       dstVec_10_fp32[15]
+                         & ((|(dstVec_10_fp32[14:0])) | dstVec_10_fp32[16])}}
+               : io_cfg_dstFmt == 4'h1
+                   ? {16'h0,
+                      dstVec_10_fp32[31],
+                      dstVec_10_fp32[30:23] == 8'h0 | dstVec_10_fp32[30:23] < 8'h71
+                        ? 15'h0
+                        : (&(dstVec_10_fp32[30:23])) & dstVec_10_fp32[22:0] == 23'h0
+                            ? 15'h7C00
+                            : (&(dstVec_10_fp32[30:23]))
+                                ? {6'h3F, dstVec_10_fp32[21:13]}
+                                : dstVec_10_fp32[30:23] > 8'h8E
+                                  | dstVec_10_fp32[30:23] == 8'h8E
+                                  & dstVec_10_converted_manRnd[10]
+                                    ? 15'h7C00
+                                    : {dstVec_10_fp32[27:23]
+                                         + {4'h0, dstVec_10_converted_manRnd[10]} - 5'h10,
+                                       dstVec_10_converted_manRnd[10]
+                                         ? 10'h0
+                                         : dstVec_10_converted_manRnd[9:0]}}
+                   : dstVec_10_fp32)
+      : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:15:21, :23:46, :26:17, :27:16, :28:16, :33:25, :34:26, :35:{23,51}, :36:{23,36}, :37:{24,32,40,50}, :38:25, :39:22, :40:24, :41:{8,16}, :42:{8,18,25}, :43:{8,22,59}, :44:8, :45:12, :49:21, :50:{19,27}, :51:16, :52:{28,39}, :53:18, :54:12, :59:35, :64:41, :66:45, :67:45, :69:{8,21,24,48,51}, :73:7, :94:65, :101:21, :107:18, :108:{21,26}, src/foragerbee/scala/main/ForagerBeeConfig.scala:162:{44,53,58,67,72}, :174:66
+  wire [31:0]  raw_11 = _raw_T_30 ? 32'h0 : {16'h0, io_in_bits[191:176]};	// src/foragerbee/scala/main/FbFormatConverter.scala:23:46, :101:34, :106:27, :107:{18,57}, :108:21
+  wire         _dstVec_11_fp32_T_1 = raw_11[14:10] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:13:16, :15:26, :61:39, :73:7, :107:18
+  wire [31:0]  dstVec_11_fp32 =
+    io_cfg_srcFmt == 4'h2
+      ? {raw_11[15:0], 16'h0}
+      : io_cfg_srcFmt == 4'h1
+          ? {raw_11[15],
+             _dstVec_11_fp32_T_1 & raw_11[9:0] == 10'h0
+               ? 31'h0
+               : {_dstVec_11_fp32_T_1
+                    ? 8'h0
+                    : (&(raw_11[14:10])) ? 8'hFF : {3'h0, raw_11[14:10]} + 8'h70,
+                  raw_11[9:0],
+                  13'h0}}
+          : raw_11;	// src/foragerbee/scala/main/FbFormatConverter.scala:12:17, :13:16, :14:16, :15:{21,26}, :16:{21,26}, :17:23, :18:21, :19:{8,21,28,40}, :20:12, :23:46, :35:23, :59:35, :61:39, :107:18, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [10:0]  dstVec_11_converted_manRnd =
+    {1'h0, dstVec_11_fp32[22:13]}
+    + {10'h0, dstVec_11_fp32[12] & ((|(dstVec_11_fp32[11:0])) | dstVec_11_fp32[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:28:16, :29:23, :30:{21,29}, :31:21, :32:{28,39,48}, :33:25, :35:23, :59:35, :94:33
+  wire [31:0]  dstVec_11 =
+    srcElems > 5'hB
+      ? (_dstVec_15_T_1 | ~(_dstVec_15_T_2 | _dstVec_15_T_3 | _dstVec_15_T_5)
+         | ~(_dstVec_15_T_9 | _dstVec_15_T_10 | _dstVec_15_T_12)
+           ? raw_11
+           : io_cfg_dstFmt == 4'h2
+               ? {16'h0,
+                  dstVec_11_fp32[31:16]
+                    + {15'h0,
+                       dstVec_11_fp32[15]
+                         & ((|(dstVec_11_fp32[14:0])) | dstVec_11_fp32[16])}}
+               : io_cfg_dstFmt == 4'h1
+                   ? {16'h0,
+                      dstVec_11_fp32[31],
+                      dstVec_11_fp32[30:23] == 8'h0 | dstVec_11_fp32[30:23] < 8'h71
+                        ? 15'h0
+                        : (&(dstVec_11_fp32[30:23])) & dstVec_11_fp32[22:0] == 23'h0
+                            ? 15'h7C00
+                            : (&(dstVec_11_fp32[30:23]))
+                                ? {6'h3F, dstVec_11_fp32[21:13]}
+                                : dstVec_11_fp32[30:23] > 8'h8E
+                                  | dstVec_11_fp32[30:23] == 8'h8E
+                                  & dstVec_11_converted_manRnd[10]
+                                    ? 15'h7C00
+                                    : {dstVec_11_fp32[27:23]
+                                         + {4'h0, dstVec_11_converted_manRnd[10]} - 5'h10,
+                                       dstVec_11_converted_manRnd[10]
+                                         ? 10'h0
+                                         : dstVec_11_converted_manRnd[9:0]}}
+                   : dstVec_11_fp32)
+      : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:15:21, :23:46, :26:17, :27:16, :28:16, :33:25, :34:26, :35:{23,51}, :36:{23,36}, :37:{24,32,40,50}, :38:25, :39:22, :40:24, :41:{8,16}, :42:{8,18,25}, :43:{8,22,59}, :44:8, :45:12, :49:21, :50:{19,27}, :51:16, :52:{28,39}, :53:18, :54:12, :59:35, :64:41, :66:45, :67:45, :69:{8,21,24,48,51}, :73:7, :94:65, :101:21, :107:18, :108:{21,26}, src/foragerbee/scala/main/ForagerBeeConfig.scala:162:{44,53,58,67,72}, :174:66
+  wire [31:0]  raw_12 = _raw_T_30 ? 32'h0 : {16'h0, io_in_bits[207:192]};	// src/foragerbee/scala/main/FbFormatConverter.scala:23:46, :101:34, :106:27, :107:{18,57}, :108:21
+  wire         _dstVec_12_fp32_T_1 = raw_12[14:10] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:13:16, :15:26, :61:39, :73:7, :107:18
+  wire [31:0]  dstVec_12_fp32 =
+    io_cfg_srcFmt == 4'h2
+      ? {raw_12[15:0], 16'h0}
+      : io_cfg_srcFmt == 4'h1
+          ? {raw_12[15],
+             _dstVec_12_fp32_T_1 & raw_12[9:0] == 10'h0
+               ? 31'h0
+               : {_dstVec_12_fp32_T_1
+                    ? 8'h0
+                    : (&(raw_12[14:10])) ? 8'hFF : {3'h0, raw_12[14:10]} + 8'h70,
+                  raw_12[9:0],
+                  13'h0}}
+          : raw_12;	// src/foragerbee/scala/main/FbFormatConverter.scala:12:17, :13:16, :14:16, :15:{21,26}, :16:{21,26}, :17:23, :18:21, :19:{8,21,28,40}, :20:12, :23:46, :35:23, :59:35, :61:39, :107:18, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [10:0]  dstVec_12_converted_manRnd =
+    {1'h0, dstVec_12_fp32[22:13]}
+    + {10'h0, dstVec_12_fp32[12] & ((|(dstVec_12_fp32[11:0])) | dstVec_12_fp32[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:28:16, :29:23, :30:{21,29}, :31:21, :32:{28,39,48}, :33:25, :35:23, :59:35, :94:33
+  wire [31:0]  dstVec_12 =
+    srcElems > 5'hC
+      ? (_dstVec_15_T_1 | ~(_dstVec_15_T_2 | _dstVec_15_T_3 | _dstVec_15_T_5)
+         | ~(_dstVec_15_T_9 | _dstVec_15_T_10 | _dstVec_15_T_12)
+           ? raw_12
+           : io_cfg_dstFmt == 4'h2
+               ? {16'h0,
+                  dstVec_12_fp32[31:16]
+                    + {15'h0,
+                       dstVec_12_fp32[15]
+                         & ((|(dstVec_12_fp32[14:0])) | dstVec_12_fp32[16])}}
+               : io_cfg_dstFmt == 4'h1
+                   ? {16'h0,
+                      dstVec_12_fp32[31],
+                      dstVec_12_fp32[30:23] == 8'h0 | dstVec_12_fp32[30:23] < 8'h71
+                        ? 15'h0
+                        : (&(dstVec_12_fp32[30:23])) & dstVec_12_fp32[22:0] == 23'h0
+                            ? 15'h7C00
+                            : (&(dstVec_12_fp32[30:23]))
+                                ? {6'h3F, dstVec_12_fp32[21:13]}
+                                : dstVec_12_fp32[30:23] > 8'h8E
+                                  | dstVec_12_fp32[30:23] == 8'h8E
+                                  & dstVec_12_converted_manRnd[10]
+                                    ? 15'h7C00
+                                    : {dstVec_12_fp32[27:23]
+                                         + {4'h0, dstVec_12_converted_manRnd[10]} - 5'h10,
+                                       dstVec_12_converted_manRnd[10]
+                                         ? 10'h0
+                                         : dstVec_12_converted_manRnd[9:0]}}
+                   : dstVec_12_fp32)
+      : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:15:21, :23:46, :26:17, :27:16, :28:16, :33:25, :34:26, :35:{23,51}, :36:{23,36}, :37:{24,32,40,50}, :38:25, :39:22, :40:24, :41:{8,16}, :42:{8,18,25}, :43:{8,22,59}, :44:8, :45:12, :49:21, :50:{19,27}, :51:16, :52:{28,39}, :53:18, :54:12, :59:35, :64:41, :66:45, :67:45, :69:{8,21,24,48,51}, :73:7, :94:65, :101:21, :107:18, :108:{21,26}, src/foragerbee/scala/main/ForagerBeeConfig.scala:162:{44,53,58,67,72}, :174:66
+  wire [31:0]  raw_13 = _raw_T_30 ? 32'h0 : {16'h0, io_in_bits[223:208]};	// src/foragerbee/scala/main/FbFormatConverter.scala:23:46, :101:34, :106:27, :107:{18,57}, :108:21
+  wire         _dstVec_13_fp32_T_1 = raw_13[14:10] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:13:16, :15:26, :61:39, :73:7, :107:18
+  wire [31:0]  dstVec_13_fp32 =
+    io_cfg_srcFmt == 4'h2
+      ? {raw_13[15:0], 16'h0}
+      : io_cfg_srcFmt == 4'h1
+          ? {raw_13[15],
+             _dstVec_13_fp32_T_1 & raw_13[9:0] == 10'h0
+               ? 31'h0
+               : {_dstVec_13_fp32_T_1
+                    ? 8'h0
+                    : (&(raw_13[14:10])) ? 8'hFF : {3'h0, raw_13[14:10]} + 8'h70,
+                  raw_13[9:0],
+                  13'h0}}
+          : raw_13;	// src/foragerbee/scala/main/FbFormatConverter.scala:12:17, :13:16, :14:16, :15:{21,26}, :16:{21,26}, :17:23, :18:21, :19:{8,21,28,40}, :20:12, :23:46, :35:23, :59:35, :61:39, :107:18, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [10:0]  dstVec_13_converted_manRnd =
+    {1'h0, dstVec_13_fp32[22:13]}
+    + {10'h0, dstVec_13_fp32[12] & ((|(dstVec_13_fp32[11:0])) | dstVec_13_fp32[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:28:16, :29:23, :30:{21,29}, :31:21, :32:{28,39,48}, :33:25, :35:23, :59:35, :94:33
+  wire [31:0]  dstVec_13 =
+    srcElems > 5'hD
+      ? (_dstVec_15_T_1 | ~(_dstVec_15_T_2 | _dstVec_15_T_3 | _dstVec_15_T_5)
+         | ~(_dstVec_15_T_9 | _dstVec_15_T_10 | _dstVec_15_T_12)
+           ? raw_13
+           : io_cfg_dstFmt == 4'h2
+               ? {16'h0,
+                  dstVec_13_fp32[31:16]
+                    + {15'h0,
+                       dstVec_13_fp32[15]
+                         & ((|(dstVec_13_fp32[14:0])) | dstVec_13_fp32[16])}}
+               : io_cfg_dstFmt == 4'h1
+                   ? {16'h0,
+                      dstVec_13_fp32[31],
+                      dstVec_13_fp32[30:23] == 8'h0 | dstVec_13_fp32[30:23] < 8'h71
+                        ? 15'h0
+                        : (&(dstVec_13_fp32[30:23])) & dstVec_13_fp32[22:0] == 23'h0
+                            ? 15'h7C00
+                            : (&(dstVec_13_fp32[30:23]))
+                                ? {6'h3F, dstVec_13_fp32[21:13]}
+                                : dstVec_13_fp32[30:23] > 8'h8E
+                                  | dstVec_13_fp32[30:23] == 8'h8E
+                                  & dstVec_13_converted_manRnd[10]
+                                    ? 15'h7C00
+                                    : {dstVec_13_fp32[27:23]
+                                         + {4'h0, dstVec_13_converted_manRnd[10]} - 5'h10,
+                                       dstVec_13_converted_manRnd[10]
+                                         ? 10'h0
+                                         : dstVec_13_converted_manRnd[9:0]}}
+                   : dstVec_13_fp32)
+      : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:15:21, :23:46, :26:17, :27:16, :28:16, :33:25, :34:26, :35:{23,51}, :36:{23,36}, :37:{24,32,40,50}, :38:25, :39:22, :40:24, :41:{8,16}, :42:{8,18,25}, :43:{8,22,59}, :44:8, :45:12, :49:21, :50:{19,27}, :51:16, :52:{28,39}, :53:18, :54:12, :59:35, :64:41, :66:45, :67:45, :69:{8,21,24,48,51}, :73:7, :94:65, :101:21, :107:18, :108:{21,26}, src/foragerbee/scala/main/ForagerBeeConfig.scala:162:{44,53,58,67,72}, :174:66
+  wire [31:0]  raw_14 = _raw_T_30 ? 32'h0 : {16'h0, io_in_bits[239:224]};	// src/foragerbee/scala/main/FbFormatConverter.scala:23:46, :101:34, :106:27, :107:{18,57}, :108:21
+  wire         _dstVec_14_fp32_T_1 = raw_14[14:10] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:13:16, :15:26, :61:39, :73:7, :107:18
+  wire [31:0]  dstVec_14_fp32 =
+    io_cfg_srcFmt == 4'h2
+      ? {raw_14[15:0], 16'h0}
+      : io_cfg_srcFmt == 4'h1
+          ? {raw_14[15],
+             _dstVec_14_fp32_T_1 & raw_14[9:0] == 10'h0
+               ? 31'h0
+               : {_dstVec_14_fp32_T_1
+                    ? 8'h0
+                    : (&(raw_14[14:10])) ? 8'hFF : {3'h0, raw_14[14:10]} + 8'h70,
+                  raw_14[9:0],
+                  13'h0}}
+          : raw_14;	// src/foragerbee/scala/main/FbFormatConverter.scala:12:17, :13:16, :14:16, :15:{21,26}, :16:{21,26}, :17:23, :18:21, :19:{8,21,28,40}, :20:12, :23:46, :35:23, :59:35, :61:39, :107:18, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [10:0]  dstVec_14_converted_manRnd =
+    {1'h0, dstVec_14_fp32[22:13]}
+    + {10'h0, dstVec_14_fp32[12] & ((|(dstVec_14_fp32[11:0])) | dstVec_14_fp32[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:28:16, :29:23, :30:{21,29}, :31:21, :32:{28,39,48}, :33:25, :35:23, :59:35, :94:33
+  wire [31:0]  dstVec_14 =
+    srcElems > 5'hE
+      ? (_dstVec_15_T_1 | ~(_dstVec_15_T_2 | _dstVec_15_T_3 | _dstVec_15_T_5)
+         | ~(_dstVec_15_T_9 | _dstVec_15_T_10 | _dstVec_15_T_12)
+           ? raw_14
+           : io_cfg_dstFmt == 4'h2
+               ? {16'h0,
+                  dstVec_14_fp32[31:16]
+                    + {15'h0,
+                       dstVec_14_fp32[15]
+                         & ((|(dstVec_14_fp32[14:0])) | dstVec_14_fp32[16])}}
+               : io_cfg_dstFmt == 4'h1
+                   ? {16'h0,
+                      dstVec_14_fp32[31],
+                      dstVec_14_fp32[30:23] == 8'h0 | dstVec_14_fp32[30:23] < 8'h71
+                        ? 15'h0
+                        : (&(dstVec_14_fp32[30:23])) & dstVec_14_fp32[22:0] == 23'h0
+                            ? 15'h7C00
+                            : (&(dstVec_14_fp32[30:23]))
+                                ? {6'h3F, dstVec_14_fp32[21:13]}
+                                : dstVec_14_fp32[30:23] > 8'h8E
+                                  | dstVec_14_fp32[30:23] == 8'h8E
+                                  & dstVec_14_converted_manRnd[10]
+                                    ? 15'h7C00
+                                    : {dstVec_14_fp32[27:23]
+                                         + {4'h0, dstVec_14_converted_manRnd[10]} - 5'h10,
+                                       dstVec_14_converted_manRnd[10]
+                                         ? 10'h0
+                                         : dstVec_14_converted_manRnd[9:0]}}
+                   : dstVec_14_fp32)
+      : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:15:21, :23:46, :26:17, :27:16, :28:16, :33:25, :34:26, :35:{23,51}, :36:{23,36}, :37:{24,32,40,50}, :38:25, :39:22, :40:24, :41:{8,16}, :42:{8,18,25}, :43:{8,22,59}, :44:8, :45:12, :49:21, :50:{19,27}, :51:16, :52:{28,39}, :53:18, :54:12, :59:35, :64:41, :66:45, :67:45, :69:{8,21,24,48,51}, :73:7, :94:65, :101:21, :107:18, :108:{21,26}, src/foragerbee/scala/main/ForagerBeeConfig.scala:162:{44,53,58,67,72}, :174:66
+  wire [31:0]  raw_15 = _raw_T_30 ? 32'h0 : {16'h0, io_in_bits[255:240]};	// src/foragerbee/scala/main/FbFormatConverter.scala:23:46, :101:34, :106:27, :107:{18,57}, :108:21
+  wire         _dstVec_15_fp32_T_1 = raw_15[14:10] == 5'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:13:16, :15:26, :61:39, :73:7, :107:18
+  wire [31:0]  dstVec_15_fp32 =
+    io_cfg_srcFmt == 4'h2
+      ? {raw_15[15:0], 16'h0}
+      : io_cfg_srcFmt == 4'h1
+          ? {raw_15[15],
+             _dstVec_15_fp32_T_1 & raw_15[9:0] == 10'h0
+               ? 31'h0
+               : {_dstVec_15_fp32_T_1
+                    ? 8'h0
+                    : (&(raw_15[14:10])) ? 8'hFF : {3'h0, raw_15[14:10]} + 8'h70,
+                  raw_15[9:0],
+                  13'h0}}
+          : raw_15;	// src/foragerbee/scala/main/FbFormatConverter.scala:12:17, :13:16, :14:16, :15:{21,26}, :16:{21,26}, :17:23, :18:21, :19:{8,21,28,40}, :20:12, :23:46, :35:23, :59:35, :61:39, :107:18, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  wire [10:0]  dstVec_15_converted_manRnd =
+    {1'h0, dstVec_15_fp32[22:13]}
+    + {10'h0, dstVec_15_fp32[12] & ((|(dstVec_15_fp32[11:0])) | dstVec_15_fp32[13])};	// src/foragerbee/scala/main/FbFormatConverter.scala:28:16, :29:23, :30:{21,29}, :31:21, :32:{28,39,48}, :33:25, :35:23, :59:35, :94:33
+  wire [31:0]  dstVec_15 =
+    srcElems[4]
+      ? (_dstVec_15_T_1 | ~(_dstVec_15_T_2 | _dstVec_15_T_3 | _dstVec_15_T_5)
+         | ~(_dstVec_15_T_9 | _dstVec_15_T_10 | _dstVec_15_T_12)
+           ? raw_15
+           : io_cfg_dstFmt == 4'h2
+               ? {16'h0,
+                  dstVec_15_fp32[31:16]
+                    + {15'h0,
+                       dstVec_15_fp32[15]
+                         & ((|(dstVec_15_fp32[14:0])) | dstVec_15_fp32[16])}}
+               : io_cfg_dstFmt == 4'h1
+                   ? {16'h0,
+                      dstVec_15_fp32[31],
+                      dstVec_15_fp32[30:23] == 8'h0 | dstVec_15_fp32[30:23] < 8'h71
+                        ? 15'h0
+                        : (&(dstVec_15_fp32[30:23])) & dstVec_15_fp32[22:0] == 23'h0
+                            ? 15'h7C00
+                            : (&(dstVec_15_fp32[30:23]))
+                                ? {6'h3F, dstVec_15_fp32[21:13]}
+                                : dstVec_15_fp32[30:23] > 8'h8E
+                                  | dstVec_15_fp32[30:23] == 8'h8E
+                                  & dstVec_15_converted_manRnd[10]
+                                    ? 15'h7C00
+                                    : {dstVec_15_fp32[27:23]
+                                         + {4'h0, dstVec_15_converted_manRnd[10]} - 5'h10,
+                                       dstVec_15_converted_manRnd[10]
+                                         ? 10'h0
+                                         : dstVec_15_converted_manRnd[9:0]}}
+                   : dstVec_15_fp32)
+      : 32'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:15:21, :23:46, :26:17, :27:16, :28:16, :33:25, :34:26, :35:{23,51}, :36:{23,36}, :37:{24,32,40,50}, :38:25, :39:22, :40:24, :41:{8,16}, :42:{8,18,25}, :43:{8,22,59}, :44:8, :45:12, :49:21, :50:{19,27}, :51:16, :52:{28,39}, :53:18, :54:12, :59:35, :64:41, :66:45, :67:45, :69:{8,21,24,48,51}, :94:65, :101:21, :107:18, :108:{21,26}, src/foragerbee/scala/main/ForagerBeeConfig.scala:162:{44,53,58,67,72}, :174:66
+  wire [511:0] convertedWide =
+    dstElemBits[5:2] == 4'h8
+      ? {dstVec_15,
+         dstVec_14,
+         dstVec_13,
+         dstVec_12,
+         dstVec_11,
+         dstVec_10,
+         dstVec_9,
+         dstVec_8,
+         dstVec_7,
+         dstVec_6,
+         dstVec_5,
+         dstVec_4,
+         dstVec_3,
+         dstVec_2,
+         dstVec_1,
+         dstVec_0}
+      : {256'h0,
+         dstVec_15[15:0],
+         dstVec_14[15:0],
+         dstVec_13[15:0],
+         dstVec_12[15:0],
+         dstVec_11[15:0],
+         dstVec_10[15:0],
+         dstVec_9[15:0],
+         dstVec_8[15:0],
+         dstVec_7[15:0],
+         dstVec_6[15:0],
+         dstVec_5[15:0],
+         dstVec_4[15:0],
+         dstVec_3[15:0],
+         dstVec_2[15:0],
+         dstVec_1[15:0],
+         dstVec_0[15:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:108:21, :111:23, :112:69, :113:{26,39,75}, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66
+  reg  [511:0] bufferedData;	// src/foragerbee/scala/main/FbFormatConverter.scala:118:29
+  reg  [6:0]   bufferedBytes;	// src/foragerbee/scala/main/FbFormatConverter.scala:119:30
+  reg          bufferedLast;	// src/foragerbee/scala/main/FbFormatConverter.scala:120:29
+  wire         _GEN = isCompression | isExpansion;	// src/foragerbee/scala/main/FbFormatConverter.scala:99:35, :100:33, :128:29
+  wire         _GEN_0 = effectiveBypass | ~_GEN;	// src/foragerbee/scala/main/FbFormatConverter.scala:94:{48,83}, :95:39, :120:29, :122:25, :128:{29,45}
+  wire         io_out_valid_0 =
     effectiveBypass
-      ? io_in_valid
-      : isCompression ? io_in_valid & isLast : isExpansion ? expanding : io_in_valid;	// src/foragerbee/scala/main/FbFormatConverter.scala:42:48, :166:35, :167:35, :233:28, :243:25, :245:18, :248:30, :250:29, :253:{18,33}, :283:28, :287:22, :313:18
-  wire              io_in_ready_0 =
+      ? io_in_valid & ~io_flush
+      : _GEN
+          ? ~io_flush
+            & ((|(bufferedBytes[6:5])) | bufferedLast | isExpansion & (|bufferedBytes))
+          : io_in_valid & ~io_flush;	// src/foragerbee/scala/main/FbFormatConverter.scala:94:{48,83}, :95:39, :100:33, :119:30, :120:29, :122:25, :123:{18,33,36}, :128:{29,45}, :129:{18,21,31,49,64,80}, :130:{20,37}, :153:{18,33,36}
+  wire         io_in_ready_0 =
     effectiveBypass
-      ? io_out_ready
-      : isCompression ? ~isLast | io_out_ready : isExpansion ? ~expanding : io_out_ready;	// src/foragerbee/scala/main/FbFormatConverter.scala:42:48, :166:35, :167:35, :233:28, :243:25, :247:18, :248:30, :250:29, :254:{18,24}, :283:28, :285:{17,20}, :315:18
-  always @(posedge clock) begin	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
-    if (reset) begin	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
-      accumReg <= 256'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:228:27
-      accumCount <= 2'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:229:27
-      expandReg <= 1024'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:231:28
-      expandCount <= 2'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:232:28
-      expanding <= 1'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:233:28
+      ? io_out_ready & ~io_flush
+      : _GEN
+          ? ~io_flush & ~bufferedLast
+            & (isExpansion ? bufferedBytes == 7'h0 : bufferedBytes < 7'h20)
+          : io_out_ready & ~io_flush;	// src/foragerbee/scala/main/FbFormatConverter.scala:94:{48,83}, :95:39, :100:33, :119:30, :120:29, :122:25, :123:36, :127:{17,33}, :128:{29,45}, :129:21, :132:23, :134:{17,30,33,47}, :135:{10,38,61}, :153:36, :157:{17,33}
+  always @(posedge clock) begin	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
+    if (reset) begin	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
+      bufferedData <= 512'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:118:29
+      bufferedBytes <= 7'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:119:30
+      bufferedLast <= 1'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:94:33, :120:29
     end
-    else begin	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
-      automatic logic _GEN_37;	// src/foragerbee/scala/main/FbFormatConverter.scala:233:28, :236:18, :239:15
-      automatic logic _GEN_38;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      automatic logic _GEN_39 = effectiveBypass | isCompression;	// src/foragerbee/scala/main/FbFormatConverter.scala:42:48, :166:35, :231:28, :243:25, :248:30, :283:28
-      _GEN_37 = ~io_flush & expanding;	// src/foragerbee/scala/main/FbFormatConverter.scala:233:28, :236:18, :239:15
-      _GEN_38 = io_in_ready_0 & io_in_valid;	// src/foragerbee/scala/main/FbFormatConverter.scala:243:25, :247:18, :248:30, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      if (effectiveBypass | ~(isCompression & _GEN_38)) begin	// src/foragerbee/scala/main/FbFormatConverter.scala:42:48, :166:35, :228:27, :236:18, :243:25, :248:30, :264:22, :265:20, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-        if (io_flush)	// src/foragerbee/scala/main/FbFormatConverter.scala:25:14
-          accumCount <= 2'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:229:27
+    else begin	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
+      automatic logic _io_outLast_T;	// src/foragerbee/scala/main/FbFormatConverter.scala:133:49
+      automatic logic _GEN_1;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      automatic logic _GEN_2;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      _io_outLast_T = bufferedBytes < 7'h21;	// src/foragerbee/scala/main/FbFormatConverter.scala:119:30, :133:49
+      _GEN_1 = io_in_ready_0 & io_in_valid;	// src/foragerbee/scala/main/FbFormatConverter.scala:122:25, :127:17, :128:45, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      _GEN_2 = io_out_ready & io_out_valid_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:122:25, :123:18, :128:45, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (io_flush) begin	// src/foragerbee/scala/main/FbFormatConverter.scala:81:14
+        bufferedData <= 512'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:118:29
+        bufferedBytes <= 7'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:119:30
       end
-      else begin	// src/foragerbee/scala/main/FbFormatConverter.scala:236:18, :243:25, :248:30
-        if (isLast)	// src/foragerbee/scala/main/FbFormatConverter.scala:250:29
-          accumReg <= 256'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:228:27
-        else if (_chunkBits_T_7)	// src/foragerbee/scala/main/FbFormatConverter.scala:258:71
-          accumReg <= {128'h0, convertedWide[127:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:217:56, :228:27, :259:31, :272:54, :276:38
-        else begin	// src/foragerbee/scala/main/FbFormatConverter.scala:258:71
-          automatic logic [3:0][255:0] _GEN_40;	// src/foragerbee/scala/main/FbFormatConverter.scala:228:27, :274:30, :275:32, :276:32, :277:32
-          _GEN_40 =
-            {{accumReg},
-             {{64'h0, convertedWide[63:0], accumReg[127:0]}},
-             {{128'h0, convertedWide[63:0], accumReg[63:0]}},
-             {{192'h0, convertedWide[63:0]}}};	// src/foragerbee/scala/main/FbFormatConverter.scala:217:56, :228:27, :259:55, :260:31, :274:30, :275:{32,69}, :276:{32,38,93}, :277:{32,38}
-          accumReg <= _GEN_40[accumCount];	// src/foragerbee/scala/main/FbFormatConverter.scala:228:27, :229:27, :274:30, :275:32, :276:32, :277:32
-        end
-        accumCount <= isLast ? 2'h0 : accumCount + 2'h1;	// src/foragerbee/scala/main/FbFormatConverter.scala:229:27, :250:29, :265:20, :266:20, :280:{20,34}
+      else if (_GEN_0) begin	// src/foragerbee/scala/main/FbFormatConverter.scala:119:30, :120:29, :122:25, :128:45
       end
-      if (_GEN_39 | ~(isExpansion & ~expanding & _GEN_38)) begin	// src/foragerbee/scala/main/FbFormatConverter.scala:167:35, :231:28, :233:28, :243:25, :248:30, :283:28, :285:20, :287:22, :291:24, :292:19, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      else begin	// src/foragerbee/scala/main/FbFormatConverter.scala:119:30, :122:25, :128:45
+        automatic logic [1534:0] _bufferedData_T_1;	// src/foragerbee/scala/main/FbFormatConverter.scala:138:53
+        _bufferedData_T_1 = {1023'h0, convertedWide} << {1525'h0, bufferedBytes, 3'h0};	// src/foragerbee/scala/main/FbFormatConverter.scala:113:26, :119:30, :138:53
+        bufferedData <=
+          _GEN_2
+            ? (_io_outLast_T ? 512'h0 : {256'h0, bufferedData[511:256]})
+            : {512{_GEN_1}} & _bufferedData_T_1[511:0] | bufferedData;	// src/foragerbee/scala/main/FbFormatConverter.scala:113:75, :118:29, :133:49, :137:22, :138:{20,53,77}, :142:23, :143:42, :144:22, :148:{22,38}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+        if (_GEN_2)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+          bufferedBytes <= _io_outLast_T ? 7'h0 : bufferedBytes - 7'h20;	// src/foragerbee/scala/main/FbFormatConverter.scala:119:30, :133:49, :143:42, :145:23, :149:{23,40}
+        else if (_GEN_1)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+          bufferedBytes <=
+            bufferedBytes
+            + (isCompression
+                 ? {2'h0, io_inBytes[5:1]}
+                 : isExpansion ? {io_inBytes, 1'h0} : {1'h0, io_inBytes});	// src/foragerbee/scala/main/FbFormatConverter.scala:94:33, :99:35, :100:33, :101:72, :115:24, :116:{24,49}, :119:30, :139:38
       end
-      else	// src/foragerbee/scala/main/FbFormatConverter.scala:231:28, :243:25, :248:30, :283:28
-        expandReg <= convertedWide;	// src/foragerbee/scala/main/FbFormatConverter.scala:217:56, :231:28
-      if (_GEN_39 | ~isExpansion) begin	// src/foragerbee/scala/main/FbFormatConverter.scala:167:35, :231:28, :236:18, :243:25, :248:30, :283:28
-        if (io_flush)	// src/foragerbee/scala/main/FbFormatConverter.scala:25:14
-          expandCount <= 2'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:232:28
-        expanding <= _GEN_37;	// src/foragerbee/scala/main/FbFormatConverter.scala:233:28, :236:18, :239:15
-      end
-      else if (expanding) begin	// src/foragerbee/scala/main/FbFormatConverter.scala:233:28
-        automatic logic _expRatio_T_3 = dstElemBits[5:2] == 4'h8;	// src/foragerbee/scala/main/FbFormatConverter.scala:172:35, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-        automatic logic _expRatio_T_7 = srcElemBits[5:2] == 4'h2;	// src/foragerbee/scala/main/FbFormatConverter.scala:172:59, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66
-        automatic logic _GEN_41 = io_out_ready & io_out_valid_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:243:25, :245:18, :248:30, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-        automatic logic _GEN_42;	// src/foragerbee/scala/main/FbFormatConverter.scala:303:26
-        _GEN_42 =
-          {1'h0,
-           expandCount} == (_expRatio_T_3 & _expRatio_T_7
-                              ? 3'h4
-                              : _expRatio_T_3 & _expRatio_T_4 | _expRatio_T_6
-                                & _expRatio_T_7
-                                  ? 3'h2
-                                  : 3'h1) - 3'h1;	// src/foragerbee/scala/main/FbFormatConverter.scala:168:22, :169:59, :170:{22,35}, :172:{22,35,44,59}, :173:{22,44}, :174:{22,44}, :232:28, :303:{26,40}
-        if (_GEN_41)	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-          expandCount <= _GEN_42 ? 2'h0 : expandCount + 2'h1;	// src/foragerbee/scala/main/FbFormatConverter.scala:232:28, :303:{26,48}, :305:23, :307:{23,38}
-        else if (io_flush)	// src/foragerbee/scala/main/FbFormatConverter.scala:25:14
-          expandCount <= 2'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:232:28
-        expanding <= _GEN_41 ? ~(_GEN_42 | io_flush) & expanding : _GEN_37;	// src/foragerbee/scala/main/FbFormatConverter.scala:233:28, :236:18, :239:15, :302:25, :303:{26,48}, :304:21, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      end
-      else begin	// src/foragerbee/scala/main/FbFormatConverter.scala:233:28
-        if (_GEN_38 | io_flush)	// src/foragerbee/scala/main/FbFormatConverter.scala:232:28, :236:18, :238:17, :291:24, :293:21, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-          expandCount <= 2'h0;	// src/foragerbee/scala/main/FbFormatConverter.scala:232:28
-        expanding <= _GEN_38 | _GEN_37;	// src/foragerbee/scala/main/FbFormatConverter.scala:233:28, :236:18, :239:15, :291:24, :294:19, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      end
+      bufferedLast <=
+        ~io_flush
+        & (_GEN_0
+             ? bufferedLast
+             : ~(_GEN_2 & _io_outLast_T) & (_GEN_1 ? io_inLast : bufferedLast));	// src/foragerbee/scala/main/FbFormatConverter.scala:120:29, :122:25, :128:45, :133:49, :137:22, :140:20, :142:23, :143:42, :146:22, :160:18, :163:18, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
     end
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
-      `FIRRTL_BEFORE_INITIAL	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
+  `ifdef ENABLE_INITIAL_REG_	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
+      `FIRRTL_BEFORE_INITIAL	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
-      automatic logic [31:0] _RANDOM[0:40];	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
-      `ifdef INIT_RANDOM_PROLOG_	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
-        `INIT_RANDOM_PROLOG_	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
+    initial begin	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
+      automatic logic [31:0] _RANDOM[0:16];	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
+      `ifdef INIT_RANDOM_PROLOG_	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
+        `INIT_RANDOM_PROLOG_	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
-        for (logic [5:0] i = 6'h0; i < 6'h29; i += 6'h1) begin
-          _RANDOM[i] = `RANDOM;	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
-        end	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
-        accumReg =
-          {_RANDOM[6'h0],
-           _RANDOM[6'h1],
-           _RANDOM[6'h2],
-           _RANDOM[6'h3],
-           _RANDOM[6'h4],
-           _RANDOM[6'h5],
-           _RANDOM[6'h6],
-           _RANDOM[6'h7]};	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7, :228:27
-        accumCount = _RANDOM[6'h8][1:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7, :229:27
-        expandReg =
-          {_RANDOM[6'h8][31:2],
-           _RANDOM[6'h9],
-           _RANDOM[6'hA],
-           _RANDOM[6'hB],
-           _RANDOM[6'hC],
-           _RANDOM[6'hD],
-           _RANDOM[6'hE],
-           _RANDOM[6'hF],
-           _RANDOM[6'h10],
-           _RANDOM[6'h11],
-           _RANDOM[6'h12],
-           _RANDOM[6'h13],
-           _RANDOM[6'h14],
-           _RANDOM[6'h15],
-           _RANDOM[6'h16],
-           _RANDOM[6'h17],
-           _RANDOM[6'h18],
-           _RANDOM[6'h19],
-           _RANDOM[6'h1A],
-           _RANDOM[6'h1B],
-           _RANDOM[6'h1C],
-           _RANDOM[6'h1D],
-           _RANDOM[6'h1E],
-           _RANDOM[6'h1F],
-           _RANDOM[6'h20],
-           _RANDOM[6'h21],
-           _RANDOM[6'h22],
-           _RANDOM[6'h23],
-           _RANDOM[6'h24],
-           _RANDOM[6'h25],
-           _RANDOM[6'h26],
-           _RANDOM[6'h27],
-           _RANDOM[6'h28][1:0]};	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7, :229:27, :231:28
-        expandCount = _RANDOM[6'h28][3:2];	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7, :231:28, :232:28
-        expanding = _RANDOM[6'h28][4];	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7, :231:28, :233:28
+      `ifdef RANDOMIZE_REG_INIT	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
+        for (logic [4:0] i = 5'h0; i < 5'h11; i += 5'h1) begin
+          _RANDOM[i] = `RANDOM;	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
+        end	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
+        bufferedData =
+          {_RANDOM[5'h0],
+           _RANDOM[5'h1],
+           _RANDOM[5'h2],
+           _RANDOM[5'h3],
+           _RANDOM[5'h4],
+           _RANDOM[5'h5],
+           _RANDOM[5'h6],
+           _RANDOM[5'h7],
+           _RANDOM[5'h8],
+           _RANDOM[5'h9],
+           _RANDOM[5'hA],
+           _RANDOM[5'hB],
+           _RANDOM[5'hC],
+           _RANDOM[5'hD],
+           _RANDOM[5'hE],
+           _RANDOM[5'hF]};	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7, :118:29
+        bufferedBytes = _RANDOM[5'h10][6:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7, :119:30
+        bufferedLast = _RANDOM[5'h10][7];	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7, :119:30, :120:29
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
-      `FIRRTL_AFTER_INITIAL	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7
+    `ifdef FIRRTL_AFTER_INITIAL	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
+      `FIRRTL_AFTER_INITIAL	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_in_ready = io_in_ready_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7, :243:25, :247:18, :248:30
-  assign io_out_valid = io_out_valid_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7, :243:25, :245:18, :248:30
+  assign io_in_ready = io_in_ready_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7, :122:25, :127:17, :128:45
+  assign io_out_valid = io_out_valid_0;	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7, :122:25, :123:18, :128:45
   assign io_out_bits =
-    effectiveBypass
-      ? io_in_bits
-      : isCompression
-          ? (compRatio == 3'h4
-               ? {convertedWide[63:0], accumReg[191:0]}
-               : _chunkBits_T_7
-                   ? {convertedWide[127:0], accumReg[127:0]}
-                   : convertedWide[255:0])
-          : isExpansion
-              ? (expanding ? _GEN_36[expandCount] : 256'h0)
-              : convertedWide[255:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:22:7, :42:48, :166:35, :167:35, :168:22, :217:56, :228:27, :232:28, :233:28, :243:25, :246:18, :248:30, :258:{52,71}, :259:{17,31,55}, :260:{17,31,58}, :262:17, :283:28, :287:22, :290:20, :299:{19,73}, :314:{18,34}
+    effectiveBypass ? io_in_bits : _GEN ? bufferedData[255:0] : convertedWide[255:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7, :94:{48,83}, :95:39, :113:26, :118:29, :122:25, :124:17, :128:{29,45}, :131:{17,32}, :154:{17,33}
+  assign io_outBytes =
+    _GEN_0 ? io_inBytes : (|(bufferedBytes[6:5])) ? 6'h20 : bufferedBytes[5:0];	// src/foragerbee/scala/main/FbFormatConverter.scala:73:7, :119:30, :120:29, :122:25, :125:17, :128:45, :129:49, :132:23
 endmodule
 

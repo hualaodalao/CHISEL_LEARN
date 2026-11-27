@@ -12,7 +12,7 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
                 io_push_payload_shape_2,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_shape_3,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_shape_4,	// src/utils/Stream/Stream.scala:363:14
-  input  [31:0] io_push_payload_srcStride_0,	// src/utils/Stream/Stream.scala:363:14
+  input  [39:0] io_push_payload_srcStride_0,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_srcStride_1,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_srcStride_2,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_srcStride_3,	// src/utils/Stream/Stream.scala:363:14
@@ -32,7 +32,7 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
                 io_push_payload_t2lTileCols,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_t2lNumTileRows,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_t2lNumTileCols,	// src/utils/Stream/Stream.scala:363:14
-  input  [31:0] io_push_payload_srcAddr,	// src/utils/Stream/Stream.scala:363:14
+  input  [39:0] io_push_payload_srcAddr,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_dstAddr,	// src/utils/Stream/Stream.scala:363:14
   input  [2:0]  io_push_payload_permVec_0,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_permVec_1,	// src/utils/Stream/Stream.scala:363:14
@@ -43,8 +43,7 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
                 io_push_payload_padBefore_1,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_padAfter_0,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_padAfter_1,	// src/utils/Stream/Stream.scala:363:14
-  input  [31:0] io_push_payload_nextDescAddr,	// src/utils/Stream/Stream.scala:363:14
-  input         io_push_payload_chainMode,	// src/utils/Stream/Stream.scala:363:14
+  input  [31:0] io_push_payload_padValue,	// src/utils/Stream/Stream.scala:363:14
   input  [3:0]  io_push_payload_srcFmt,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_dstFmt,	// src/utils/Stream/Stream.scala:363:14
   input  [7:0]  io_push_payload_im2colKernel_0,	// src/utils/Stream/Stream.scala:363:14
@@ -58,9 +57,9 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
   input  [15:0] io_push_payload_im2colInShape_0,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_im2colInShape_1,	// src/utils/Stream/Stream.scala:363:14
                 io_push_payload_im2colInShape_2,	// src/utils/Stream/Stream.scala:363:14
-  input  [31:0] io_push_payload_sgListAddr,	// src/utils/Stream/Stream.scala:363:14
+  input  [39:0] io_push_payload_sgListAddr,	// src/utils/Stream/Stream.scala:363:14
   input  [15:0] io_push_payload_sgEntryCount,	// src/utils/Stream/Stream.scala:363:14
-  input  [31:0] io_push_payload_scaleAddr,	// src/utils/Stream/Stream.scala:363:14
+  input  [39:0] io_push_payload_scaleAddr,	// src/utils/Stream/Stream.scala:363:14
   input  [1:0]  io_push_payload_scaleBlockSize,	// src/utils/Stream/Stream.scala:363:14
   output        io_pop_valid,	// src/utils/Stream/Stream.scala:363:14
   input         io_pop_ready,	// src/utils/Stream/Stream.scala:363:14
@@ -72,7 +71,7 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
                 io_pop_payload_shape_2,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_shape_3,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_shape_4,	// src/utils/Stream/Stream.scala:363:14
-  output [31:0] io_pop_payload_srcStride_0,	// src/utils/Stream/Stream.scala:363:14
+  output [39:0] io_pop_payload_srcStride_0,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_srcStride_1,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_srcStride_2,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_srcStride_3,	// src/utils/Stream/Stream.scala:363:14
@@ -87,7 +86,7 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
                 io_pop_payload_srcStartIdx_2,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_srcStartIdx_3,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_srcStartIdx_4,	// src/utils/Stream/Stream.scala:363:14
-  output [31:0] io_pop_payload_srcAddr,	// src/utils/Stream/Stream.scala:363:14
+  output [39:0] io_pop_payload_srcAddr,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_dstAddr,	// src/utils/Stream/Stream.scala:363:14
   output [2:0]  io_pop_payload_permVec_0,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_permVec_1,	// src/utils/Stream/Stream.scala:363:14
@@ -98,6 +97,7 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
                 io_pop_payload_padBefore_1,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_padAfter_0,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_padAfter_1,	// src/utils/Stream/Stream.scala:363:14
+  output [31:0] io_pop_payload_padValue,	// src/utils/Stream/Stream.scala:363:14
   output [3:0]  io_pop_payload_srcFmt,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_dstFmt,	// src/utils/Stream/Stream.scala:363:14
   output [7:0]  io_pop_payload_im2colKernel_0,	// src/utils/Stream/Stream.scala:363:14
@@ -111,10 +111,11 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
   output [15:0] io_pop_payload_im2colInShape_0,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_im2colInShape_1,	// src/utils/Stream/Stream.scala:363:14
                 io_pop_payload_im2colInShape_2,	// src/utils/Stream/Stream.scala:363:14
-  output [31:0] io_pop_payload_sgListAddr,	// src/utils/Stream/Stream.scala:363:14
+  output [39:0] io_pop_payload_sgListAddr,	// src/utils/Stream/Stream.scala:363:14
   output [15:0] io_pop_payload_sgEntryCount,	// src/utils/Stream/Stream.scala:363:14
-  output [31:0] io_pop_payload_scaleAddr,	// src/utils/Stream/Stream.scala:363:14
+  output [39:0] io_pop_payload_scaleAddr,	// src/utils/Stream/Stream.scala:363:14
   output [1:0]  io_pop_payload_scaleBlockSize,	// src/utils/Stream/Stream.scala:363:14
+  input         io_flush,	// src/utils/Stream/Stream.scala:363:14
   output [2:0]  io_occupancy	// src/utils/Stream/Stream.scala:363:14
 );
 
@@ -162,8 +163,7 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
     .io_enq_bits_padBefore_1      (io_push_payload_padBefore_1),
     .io_enq_bits_padAfter_0       (io_push_payload_padAfter_0),
     .io_enq_bits_padAfter_1       (io_push_payload_padAfter_1),
-    .io_enq_bits_nextDescAddr     (io_push_payload_nextDescAddr),
-    .io_enq_bits_chainMode        (io_push_payload_chainMode),
+    .io_enq_bits_padValue         (io_push_payload_padValue),
     .io_enq_bits_srcFmt           (io_push_payload_srcFmt),
     .io_enq_bits_dstFmt           (io_push_payload_dstFmt),
     .io_enq_bits_im2colKernel_0   (io_push_payload_im2colKernel_0),
@@ -217,6 +217,7 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
     .io_deq_bits_padBefore_1      (io_pop_payload_padBefore_1),
     .io_deq_bits_padAfter_0       (io_pop_payload_padAfter_0),
     .io_deq_bits_padAfter_1       (io_pop_payload_padAfter_1),
+    .io_deq_bits_padValue         (io_pop_payload_padValue),
     .io_deq_bits_srcFmt           (io_pop_payload_srcFmt),
     .io_deq_bits_dstFmt           (io_pop_payload_dstFmt),
     .io_deq_bits_im2colKernel_0   (io_pop_payload_im2colKernel_0),
@@ -234,7 +235,8 @@ module Fb_StreamFifo(	// src/utils/Stream/Stream.scala:361:7
     .io_deq_bits_sgEntryCount     (io_pop_payload_sgEntryCount),
     .io_deq_bits_scaleAddr        (io_pop_payload_scaleAddr),
     .io_deq_bits_scaleBlockSize   (io_pop_payload_scaleBlockSize),
-    .io_count                     (io_occupancy)
+    .io_count                     (io_occupancy),
+    .io_flush                     (io_flush)
   );	// src/utils/Stream/Stream.scala:371:21
 endmodule
 

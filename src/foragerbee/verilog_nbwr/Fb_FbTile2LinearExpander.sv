@@ -10,7 +10,7 @@ module Fb_FbTile2LinearExpander(	// src/foragerbee/scala/main/FbTile2LinearExpan
                 io_in_payload_shape_2,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_in_payload_shape_3,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_in_payload_shape_4,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
-  input  [31:0] io_in_payload_srcStride_0,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
+  input  [39:0] io_in_payload_srcStride_0,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_in_payload_srcStride_1,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_in_payload_srcStride_2,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_in_payload_srcStride_3,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
@@ -30,7 +30,7 @@ module Fb_FbTile2LinearExpander(	// src/foragerbee/scala/main/FbTile2LinearExpan
                 io_in_payload_t2lTileCols,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_in_payload_t2lNumTileRows,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_in_payload_t2lNumTileCols,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
-  input  [31:0] io_in_payload_srcAddr,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
+  input  [39:0] io_in_payload_srcAddr,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_in_payload_dstAddr,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
   input  [2:0]  io_in_payload_permVec_0,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_in_payload_permVec_1,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
@@ -41,8 +41,7 @@ module Fb_FbTile2LinearExpander(	// src/foragerbee/scala/main/FbTile2LinearExpan
                 io_in_payload_padBefore_1,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_in_payload_padAfter_0,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_in_payload_padAfter_1,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
-  input  [31:0] io_in_payload_nextDescAddr,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
-  input         io_in_payload_chainMode,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
+  input  [31:0] io_in_payload_padValue,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
   input  [3:0]  io_in_payload_srcFmt,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_in_payload_dstFmt,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
   input  [7:0]  io_in_payload_im2colKernel_0,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
@@ -56,9 +55,9 @@ module Fb_FbTile2LinearExpander(	// src/foragerbee/scala/main/FbTile2LinearExpan
   input  [15:0] io_in_payload_im2colInShape_0,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_in_payload_im2colInShape_1,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_in_payload_im2colInShape_2,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
-  input  [31:0] io_in_payload_sgListAddr,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
+  input  [39:0] io_in_payload_sgListAddr,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
   input  [15:0] io_in_payload_sgEntryCount,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
-  input  [31:0] io_in_payload_scaleAddr,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
+  input  [39:0] io_in_payload_scaleAddr,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
   input  [1:0]  io_in_payload_scaleBlockSize,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
   output        io_out_valid,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
   input         io_out_ready,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
@@ -70,7 +69,7 @@ module Fb_FbTile2LinearExpander(	// src/foragerbee/scala/main/FbTile2LinearExpan
                 io_out_payload_shape_2,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_out_payload_shape_3,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_out_payload_shape_4,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
-  output [31:0] io_out_payload_srcStride_0,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
+  output [39:0] io_out_payload_srcStride_0,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_out_payload_srcStride_1,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_out_payload_srcStride_2,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_out_payload_srcStride_3,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
@@ -90,7 +89,7 @@ module Fb_FbTile2LinearExpander(	// src/foragerbee/scala/main/FbTile2LinearExpan
                 io_out_payload_t2lTileCols,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_out_payload_t2lNumTileRows,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_out_payload_t2lNumTileCols,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
-  output [31:0] io_out_payload_srcAddr,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
+  output [39:0] io_out_payload_srcAddr,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_out_payload_dstAddr,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
   output [2:0]  io_out_payload_permVec_0,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_out_payload_permVec_1,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
@@ -101,8 +100,7 @@ module Fb_FbTile2LinearExpander(	// src/foragerbee/scala/main/FbTile2LinearExpan
                 io_out_payload_padBefore_1,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_out_payload_padAfter_0,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_out_payload_padAfter_1,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
-  output [31:0] io_out_payload_nextDescAddr,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
-  output        io_out_payload_chainMode,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
+  output [31:0] io_out_payload_padValue,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
   output [3:0]  io_out_payload_srcFmt,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_out_payload_dstFmt,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
   output [7:0]  io_out_payload_im2colKernel_0,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
@@ -116,17 +114,17 @@ module Fb_FbTile2LinearExpander(	// src/foragerbee/scala/main/FbTile2LinearExpan
   output [15:0] io_out_payload_im2colInShape_0,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_out_payload_im2colInShape_1,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
                 io_out_payload_im2colInShape_2,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
-  output [31:0] io_out_payload_sgListAddr,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
+  output [39:0] io_out_payload_sgListAddr,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
   output [15:0] io_out_payload_sgEntryCount,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
-  output [31:0] io_out_payload_scaleAddr,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
+  output [39:0] io_out_payload_scaleAddr,	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
   output [1:0]  io_out_payload_scaleBlockSize	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:28:14
 );
 
   wire        isT2L = io_in_payload_op == 3'h6;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:44:30
   wire        _GEN = isT2L | (&io_in_payload_op);	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:44:30, :45:30, :47:14
-  wire        _e_T = io_in_payload_srcFmt == 4'hA;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:248:11
-  wire [31:0] _GEN_0 =
-    {29'h0,
+  wire        _e_T = io_in_payload_srcFmt == 4'hA;	// src/foragerbee/scala/main/ForagerBeeConfig.scala:193:11
+  wire [39:0] _GEN_0 =
+    {37'h0,
      _e_T
        ? 3'h1
        : io_in_payload_srcFmt == 4'hA
@@ -137,13 +135,13 @@ module Fb_FbTile2LinearExpander(	// src/foragerbee/scala/main/FbTile2LinearExpan
                : io_in_payload_srcFmt == 4'h9 | io_in_payload_srcFmt == 4'h2
                  | io_in_payload_srcFmt == 4'h1
                    ? 3'h2
-                   : 3'h4};	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:60:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:229:66, :248:{8,11}
-  wire [31:0] Ne = {16'h0, io_in_payload_t2lMatCols} * _GEN_0;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:60:50, :63:19
-  wire [31:0] Tne = {16'h0, io_in_payload_t2lTileCols} * _GEN_0;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:60:50, :64:20
-  wire [31:0] _GEN_1 = {16'h0, io_in_payload_t2lTileRows};	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:65:20
-  wire [31:0] TmNe = _GEN_1 * Ne;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:63:19, :65:20
-  wire [31:0] TmTne = _GEN_1 * Tne;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:64:20, :65:20, :66:20
-  wire [31:0] NtTmTne = {16'h0, io_in_payload_t2lNumTileCols} * TmTne;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:66:20, :67:22
+                   : 3'h4};	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:60:50, src/foragerbee/scala/main/ForagerBeeConfig.scala:174:66, :193:{8,11}
+  wire [39:0] Ne = {24'h0, io_in_payload_t2lMatCols} * _GEN_0;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:60:50, :63:19
+  wire [39:0] Tne = {24'h0, io_in_payload_t2lTileCols} * _GEN_0;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:60:50, :64:20
+  wire [39:0] _GEN_1 = {24'h0, io_in_payload_t2lTileRows};	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:65:20
+  wire [39:0] TmNe = _GEN_1 * Ne;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:63:19, :65:20
+  wire [39:0] TmTne = _GEN_1 * Tne;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:64:20, :65:20, :66:20
+  wire [39:0] NtTmTne = {24'h0, io_in_payload_t2lNumTileCols} * TmTne;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:66:20, :67:22
   assign io_in_ready = io_out_ready;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:27:7
   assign io_out_valid = io_in_valid;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:27:7
   assign io_out_payload_op = _GEN ? 3'h0 : io_in_payload_op;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:27:7, :38:18, :47:{14,24}, :79:29
@@ -156,7 +154,7 @@ module Fb_FbTile2LinearExpander(	// src/foragerbee/scala/main/FbTile2LinearExpan
            | io_in_payload_t2lTileRows == 16'h0 | io_in_payload_t2lNumTileCols == 16'h0
            | io_in_payload_t2lNumTileRows == 16'h0),
          2'h0}
-      : io_in_payload_dimCount;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:27:7, :38:18, :47:{14,24}, :80:29, :99:{25,33,52,60,79,87}, :100:{29,37,59,68}, :101:31, :108:{42,77}, :109:{22,39}, :110:31, src/foragerbee/scala/main/ForagerBeeConfig.scala:244:46, :248:11
+      : io_in_payload_dimCount;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:27:7, :38:18, :47:{14,24}, :80:29, :99:{25,33,52,60,79,87}, :100:{29,37,59,68}, :101:31, :108:{42,77}, :109:{22,39}, :110:31, src/foragerbee/scala/main/ForagerBeeConfig.scala:189:46, :193:11
   assign io_out_payload_shape_0 =
     _GEN ? io_in_payload_t2lTileCols : io_in_payload_shape_0;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:27:7, :38:18, :47:{14,24}, :83:29
   assign io_out_payload_shape_1 =
@@ -203,8 +201,7 @@ module Fb_FbTile2LinearExpander(	// src/foragerbee/scala/main/FbTile2LinearExpan
   assign io_out_payload_padBefore_1 = io_in_payload_padBefore_1;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:27:7
   assign io_out_payload_padAfter_0 = io_in_payload_padAfter_0;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:27:7
   assign io_out_payload_padAfter_1 = io_in_payload_padAfter_1;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:27:7
-  assign io_out_payload_nextDescAddr = io_in_payload_nextDescAddr;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:27:7
-  assign io_out_payload_chainMode = io_in_payload_chainMode;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:27:7
+  assign io_out_payload_padValue = io_in_payload_padValue;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:27:7
   assign io_out_payload_srcFmt = io_in_payload_srcFmt;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:27:7
   assign io_out_payload_dstFmt = io_in_payload_dstFmt;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:27:7
   assign io_out_payload_im2colKernel_0 = io_in_payload_im2colKernel_0;	// src/foragerbee/scala/main/FbTile2LinearExpander.scala:27:7

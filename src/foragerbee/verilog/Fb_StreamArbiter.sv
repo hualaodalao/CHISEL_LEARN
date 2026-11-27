@@ -55,20 +55,16 @@ module Fb_StreamArbiter(	// src/utils/Stream/Stream.scala:388:7
   input  [7:0] io_inputs_1_payload_tag,	// src/utils/Stream/Stream.scala:393:14
   input        io_inputs_1_payload_err,	// src/utils/Stream/Stream.scala:393:14
   output       io_output_valid,	// src/utils/Stream/Stream.scala:393:14
-  input        io_output_ready,	// src/utils/Stream/Stream.scala:393:14
   output [7:0] io_output_payload_tag,	// src/utils/Stream/Stream.scala:393:14
   output       io_output_payload_err	// src/utils/Stream/Stream.scala:393:14
 );
 
   wire       maskProposal_1;	// src/utils/Stream/Stream.scala:435:79
   wire       maskProposal_0;	// src/utils/Stream/Stream.scala:435:79
-  reg        locked;	// src/utils/Stream/Stream.scala:400:23
   reg        maskLocked_0;	// src/utils/Stream/Stream.scala:402:27
   reg        maskLocked_1;	// src/utils/Stream/Stream.scala:402:27
-  wire       maskRouted_0 = locked ? maskLocked_0 : maskProposal_0;	// src/utils/Stream/Stream.scala:400:23, :402:27, :403:23, :435:79
-  wire       maskRouted_1 = locked ? maskLocked_1 : maskProposal_1;	// src/utils/Stream/Stream.scala:400:23, :402:27, :403:23, :435:79
   wire       io_output_valid_0 =
-    io_inputs_0_valid & maskRouted_0 | io_inputs_1_valid & maskRouted_1;	// src/utils/Stream/Stream.scala:403:23, :407:{79,95}
+    io_inputs_0_valid & maskProposal_0 | io_inputs_1_valid & maskProposal_1;	// src/utils/Stream/Stream.scala:407:{79,95}, :435:79
   wire [3:0] _doubleGrants_T_2 =
     ~({io_inputs_1_valid, io_inputs_0_valid, io_inputs_1_valid, io_inputs_0_valid}
       - {2'h0, maskLocked_0, maskLocked_1});	// src/utils/Stream/Stream.scala:352:{41,58}, :402:27
@@ -78,18 +74,12 @@ module Fb_StreamArbiter(	// src/utils/Stream/Stream.scala:388:7
   assign maskProposal_1 = _GEN_0[1];	// src/utils/Stream/Stream.scala:353:40, :435:79
   always @(posedge clock) begin	// src/utils/Stream/Stream.scala:388:7
     if (reset) begin	// src/utils/Stream/Stream.scala:388:7
-      locked <= 1'h0;	// src/utils/Stream/Stream.scala:388:7, :400:23
       maskLocked_0 <= 1'h1;	// src/utils/Stream/Stream.scala:388:7, :402:27
       maskLocked_1 <= 1'h0;	// src/utils/Stream/Stream.scala:388:7, :402:27
     end
-    else begin	// src/utils/Stream/Stream.scala:388:7
-      locked <= ~(io_output_valid_0 & io_output_ready) & (io_output_valid_0 | locked);	// src/utils/Stream/Stream.scala:43:26, :400:23, :407:95, :460:{34,48}, :461:{33,47}
-      if (~io_output_valid_0 | locked) begin	// src/utils/Stream/Stream.scala:400:23, :402:27, :405:{25,38}, :407:95
-      end
-      else begin	// src/utils/Stream/Stream.scala:402:27, :405:{25,38}
-        maskLocked_0 <= maskProposal_0;	// src/utils/Stream/Stream.scala:402:27, :435:79
-        maskLocked_1 <= maskProposal_1;	// src/utils/Stream/Stream.scala:402:27, :435:79
-      end
+    else if (io_output_valid_0) begin	// src/utils/Stream/Stream.scala:407:95
+      maskLocked_0 <= maskProposal_0;	// src/utils/Stream/Stream.scala:402:27, :435:79
+      maskLocked_1 <= maskProposal_1;	// src/utils/Stream/Stream.scala:402:27, :435:79
     end
   end // always @(posedge)
   `ifdef ENABLE_INITIAL_REG_	// src/utils/Stream/Stream.scala:388:7
@@ -103,22 +93,21 @@ module Fb_StreamArbiter(	// src/utils/Stream/Stream.scala:388:7
       `endif // INIT_RANDOM_PROLOG_
       `ifdef RANDOMIZE_REG_INIT	// src/utils/Stream/Stream.scala:388:7
         _RANDOM[/*Zero width*/ 1'b0] = `RANDOM;	// src/utils/Stream/Stream.scala:388:7
-        locked = _RANDOM[/*Zero width*/ 1'b0][0];	// src/utils/Stream/Stream.scala:388:7, :400:23
-        maskLocked_0 = _RANDOM[/*Zero width*/ 1'b0][1];	// src/utils/Stream/Stream.scala:388:7, :400:23, :402:27
-        maskLocked_1 = _RANDOM[/*Zero width*/ 1'b0][2];	// src/utils/Stream/Stream.scala:388:7, :400:23, :402:27
+        maskLocked_0 = _RANDOM[/*Zero width*/ 1'b0][1];	// src/utils/Stream/Stream.scala:388:7, :402:27
+        maskLocked_1 = _RANDOM[/*Zero width*/ 1'b0][2];	// src/utils/Stream/Stream.scala:388:7, :402:27
       `endif // RANDOMIZE_REG_INIT
     end // initial
     `ifdef FIRRTL_AFTER_INITIAL	// src/utils/Stream/Stream.scala:388:7
       `FIRRTL_AFTER_INITIAL	// src/utils/Stream/Stream.scala:388:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_inputs_0_ready = maskRouted_0 & io_output_ready;	// src/utils/Stream/Stream.scala:388:7, :403:23, :410:27
-  assign io_inputs_1_ready = maskRouted_1 & io_output_ready;	// src/utils/Stream/Stream.scala:388:7, :403:23, :410:27
+  assign io_inputs_0_ready = maskProposal_0;	// src/utils/Stream/Stream.scala:388:7, :435:79
+  assign io_inputs_1_ready = maskProposal_1;	// src/utils/Stream/Stream.scala:388:7, :435:79
   assign io_output_valid = io_output_valid_0;	// src/utils/Stream/Stream.scala:388:7, :407:95
   assign io_output_payload_tag =
-    (maskRouted_0 ? io_inputs_0_payload_tag : 8'h0)
-    | (maskRouted_1 ? io_inputs_1_payload_tag : 8'h0);	// src/utils/Stream/Stream.scala:388:7, :403:23, :408:29
+    (maskProposal_0 ? io_inputs_0_payload_tag : 8'h0)
+    | (maskProposal_1 ? io_inputs_1_payload_tag : 8'h0);	// src/utils/Stream/Stream.scala:388:7, :408:29, :435:79
   assign io_output_payload_err =
-    maskRouted_0 & io_inputs_0_payload_err | maskRouted_1 & io_inputs_1_payload_err;	// src/utils/Stream/Stream.scala:388:7, :403:23, :408:29
+    maskProposal_0 & io_inputs_0_payload_err | maskProposal_1 & io_inputs_1_payload_err;	// src/utils/Stream/Stream.scala:388:7, :408:29, :435:79
 endmodule
 

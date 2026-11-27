@@ -43,146 +43,152 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
-  input          clock,	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
-                 reset,	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
-  output         io_in_ready,	// src/foragerbee/scala/main/FbMxQuantizer.scala:35:14
-  input          io_in_valid,	// src/foragerbee/scala/main/FbMxQuantizer.scala:35:14
-  input  [255:0] io_in_bits,	// src/foragerbee/scala/main/FbMxQuantizer.scala:35:14
-  input          io_outData_ready,	// src/foragerbee/scala/main/FbMxQuantizer.scala:35:14
-  output         io_outData_valid,	// src/foragerbee/scala/main/FbMxQuantizer.scala:35:14
-  output [255:0] io_outData_bits,	// src/foragerbee/scala/main/FbMxQuantizer.scala:35:14
-  input          io_outScale_ready,	// src/foragerbee/scala/main/FbMxQuantizer.scala:35:14
-  output         io_outScale_valid,	// src/foragerbee/scala/main/FbMxQuantizer.scala:35:14
-  output [7:0]   io_outScale_bits,	// src/foragerbee/scala/main/FbMxQuantizer.scala:35:14
-  input  [3:0]   io_cfg_srcFmt,	// src/foragerbee/scala/main/FbMxQuantizer.scala:35:14
-                 io_cfg_dstFmt,	// src/foragerbee/scala/main/FbMxQuantizer.scala:35:14
-  input  [6:0]   io_cfg_blockSize,	// src/foragerbee/scala/main/FbMxQuantizer.scala:35:14
-  input          io_flush	// src/foragerbee/scala/main/FbMxQuantizer.scala:35:14
+module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
+  input          clock,	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
+                 reset,	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
+  output         io_in_ready,	// src/foragerbee/scala/main/FbMxQuantizer.scala:36:14
+  input          io_in_valid,	// src/foragerbee/scala/main/FbMxQuantizer.scala:36:14
+  input  [255:0] io_in_bits,	// src/foragerbee/scala/main/FbMxQuantizer.scala:36:14
+  input          io_outData_ready,	// src/foragerbee/scala/main/FbMxQuantizer.scala:36:14
+  output         io_outData_valid,	// src/foragerbee/scala/main/FbMxQuantizer.scala:36:14
+  output [255:0] io_outData_bits,	// src/foragerbee/scala/main/FbMxQuantizer.scala:36:14
+  input          io_outScale_ready,	// src/foragerbee/scala/main/FbMxQuantizer.scala:36:14
+  output         io_outScale_valid,	// src/foragerbee/scala/main/FbMxQuantizer.scala:36:14
+  output [7:0]   io_outScale_bits,	// src/foragerbee/scala/main/FbMxQuantizer.scala:36:14
+  input  [3:0]   io_cfg_srcFmt,	// src/foragerbee/scala/main/FbMxQuantizer.scala:36:14
+                 io_cfg_dstFmt,	// src/foragerbee/scala/main/FbMxQuantizer.scala:36:14
+  input  [6:0]   io_cfg_blockSize,	// src/foragerbee/scala/main/FbMxQuantizer.scala:36:14
+  input          io_flush	// src/foragerbee/scala/main/FbMxQuantizer.scala:36:14
 );
 
-  reg  [1:0]   state;	// src/foragerbee/scala/main/FbMxQuantizer.scala:160:22
-  reg  [255:0] blockBuf_0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23
-  reg  [255:0] blockBuf_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23
-  reg  [255:0] blockBuf_2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23
-  reg  [255:0] blockBuf_3;	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23
-  reg  [255:0] blockBuf_4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23
-  reg  [255:0] blockBuf_5;	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23
-  reg  [255:0] blockBuf_6;	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23
-  reg  [255:0] blockBuf_7;	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23
-  reg  [2:0]   beatCnt;	// src/foragerbee/scala/main/FbMxQuantizer.scala:163:27
-  reg  [7:0]   elemCnt;	// src/foragerbee/scala/main/FbMxQuantizer.scala:164:27
-  reg  [8:0]   maxExp;	// src/foragerbee/scala/main/FbMxQuantizer.scala:165:27
-  reg  [6:0]   elemIdx;	// src/foragerbee/scala/main/FbMxQuantizer.scala:166:27
-  reg  [255:0] outBeatReg;	// src/foragerbee/scala/main/FbMxQuantizer.scala:167:27
-  reg          outDataValid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:168:29
-  reg          scaleValid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:169:27
-  reg  [7:0]   scaleReg;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:27
-  wire         _io_in_ready_T = state == 2'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:160:22, :182:30
-  wire         _GEN = state == 2'h1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:160:22, :224:20, :233:14
-  wire         _GEN_0 = state == 2'h2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:98:37, :160:22, :278:14
-  wire         io_in_ready_0 = ~(_GEN_0 | _GEN) & _io_in_ready_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:182:{21,30}, :233:{14,26}, :234:17, :278:{14,26}, :279:17
-  always @(posedge clock) begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
+  reg  [1:0]   state;	// src/foragerbee/scala/main/FbMxQuantizer.scala:168:22
+  reg  [255:0] blockBuf_0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23
+  reg  [255:0] blockBuf_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23
+  reg  [255:0] blockBuf_2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23
+  reg  [255:0] blockBuf_3;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23
+  reg  [255:0] blockBuf_4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23
+  reg  [255:0] blockBuf_5;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23
+  reg  [255:0] blockBuf_6;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23
+  reg  [255:0] blockBuf_7;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23
+  reg  [2:0]   beatCnt;	// src/foragerbee/scala/main/FbMxQuantizer.scala:171:27
+  reg  [7:0]   elemCnt;	// src/foragerbee/scala/main/FbMxQuantizer.scala:172:27
+  reg  [8:0]   maxExp;	// src/foragerbee/scala/main/FbMxQuantizer.scala:173:27
+  reg  [6:0]   elemIdx;	// src/foragerbee/scala/main/FbMxQuantizer.scala:174:27
+  reg  [255:0] outBeatReg;	// src/foragerbee/scala/main/FbMxQuantizer.scala:175:27
+  reg          outDataValid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:176:29
+  reg          scaleValid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:177:27
+  reg  [7:0]   scaleReg;	// src/foragerbee/scala/main/FbMxQuantizer.scala:178:27
+  wire         _io_in_ready_T = state == 2'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:168:22, :190:30
+  wire         _GEN = state == 2'h1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:168:22, :231:20, :240:14
+  wire         _GEN_0 = state == 2'h2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:99:37, :168:22, :292:14
+  wire         io_in_ready_0 = ~(_GEN_0 | _GEN) & _io_in_ready_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:190:{21,30}, :240:{14,26}, :241:17, :292:{14,26}, :293:17
+  always @(posedge clock) begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
     automatic logic _GEN_1;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-    _GEN_1 = io_in_ready_0 & io_in_valid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:182:21, :233:26, :234:17, :278:26, :279:17, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-    if (reset) begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
-      state <= 2'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:160:22
-      beatCnt <= 3'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:163:27
-      elemCnt <= 8'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:164:27
-      maxExp <= 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:165:27
-      elemIdx <= 7'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :166:27
-      outBeatReg <= 256'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:167:27
-      outDataValid <= 1'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:168:29
-      scaleValid <= 1'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:169:27
-      scaleReg <= 8'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:27
+    _GEN_1 = io_in_ready_0 & io_in_valid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:190:21, :240:26, :241:17, :292:26, :293:17, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+    if (reset) begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
+      state <= 2'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:168:22
+      beatCnt <= 3'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:171:27
+      elemCnt <= 8'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:172:27
+      maxExp <= 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:173:27
+      elemIdx <= 7'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :174:27
+      outBeatReg <= 256'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:175:27
+      outDataValid <= 1'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:176:29
+      scaleValid <= 1'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:177:27
+      scaleReg <= 8'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:178:27
     end
-    else begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
-      automatic logic        isFp32Src;	// src/foragerbee/scala/main/FbMxQuantizer.scala:173:36
-      automatic logic [6:0]  _remaining_T_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:189:36
-      automatic logic [6:0]  take;	// src/foragerbee/scala/main/FbMxQuantizer.scala:190:22
-      automatic logic [5:0]  _x16_T_2 = {1'h0, io_in_bits[14:10]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:54, :196:27
-      automatic logic        _f32Elem_T_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:97:37
-      automatic logic        _expv_T_46 = io_cfg_srcFmt == 4'h2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:98:37
-      automatic logic        slotContrib_0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:200:25
-      automatic logic [5:0]  _x16_T_7 = {1'h0, io_in_bits[30:26]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:54, :196:27
-      automatic logic        slotContrib_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:200:25
-      automatic logic [5:0]  _x16_T_12 = {1'h0, io_in_bits[46:42]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:54, :196:27
-      automatic logic        slotContrib_2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:200:25
-      automatic logic [5:0]  _x16_T_17 = {1'h0, io_in_bits[62:58]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:54, :196:27
-      automatic logic        slotContrib_3;	// src/foragerbee/scala/main/FbMxQuantizer.scala:200:25
-      automatic logic [5:0]  _x16_T_22 = {1'h0, io_in_bits[78:74]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:54, :196:27
-      automatic logic        slotContrib_4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:200:25
-      automatic logic [5:0]  _x16_T_27 = {1'h0, io_in_bits[94:90]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:54, :196:27
-      automatic logic        slotContrib_5;	// src/foragerbee/scala/main/FbMxQuantizer.scala:200:25
-      automatic logic [5:0]  _x16_T_32 = {1'h0, io_in_bits[110:106]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:54, :196:27
-      automatic logic        slotContrib_6;	// src/foragerbee/scala/main/FbMxQuantizer.scala:200:25
-      automatic logic [5:0]  _x16_T_37 = {1'h0, io_in_bits[126:122]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:54, :196:27
-      automatic logic        slotContrib_7;	// src/foragerbee/scala/main/FbMxQuantizer.scala:200:25
-      automatic logic [5:0]  _x16_T_42 = {1'h0, io_in_bits[142:138]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:54, :196:27
-      automatic logic        slotContrib_8;	// src/foragerbee/scala/main/FbMxQuantizer.scala:200:25
-      automatic logic [5:0]  _x16_T_47 = {1'h0, io_in_bits[158:154]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:54, :196:27
-      automatic logic        slotContrib_9;	// src/foragerbee/scala/main/FbMxQuantizer.scala:200:25
-      automatic logic [5:0]  _x16_T_52 = {1'h0, io_in_bits[174:170]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:54, :196:27
-      automatic logic        slotContrib_10;	// src/foragerbee/scala/main/FbMxQuantizer.scala:200:25
-      automatic logic [5:0]  _x16_T_57 = {1'h0, io_in_bits[190:186]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:54, :196:27
-      automatic logic        slotContrib_11;	// src/foragerbee/scala/main/FbMxQuantizer.scala:200:25
-      automatic logic [5:0]  _x16_T_62 = {1'h0, io_in_bits[206:202]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:54, :196:27
-      automatic logic        slotContrib_12;	// src/foragerbee/scala/main/FbMxQuantizer.scala:200:25
-      automatic logic [5:0]  _x16_T_67 = {1'h0, io_in_bits[222:218]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:54, :196:27
-      automatic logic        slotContrib_13;	// src/foragerbee/scala/main/FbMxQuantizer.scala:200:25
-      automatic logic [5:0]  _x16_T_72 = {1'h0, io_in_bits[238:234]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:54, :196:27
-      automatic logic        slotContrib_14;	// src/foragerbee/scala/main/FbMxQuantizer.scala:200:25
-      automatic logic [5:0]  _x16_T_77 = {1'h0, io_in_bits[254:250]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:54, :196:27
-      automatic logic        slotContrib_15;	// src/foragerbee/scala/main/FbMxQuantizer.scala:200:25
-      automatic logic [15:0] _anyContrib_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:203:32
-      automatic logic [8:0]  _beatMax_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8
-      automatic logic [8:0]  _beatMax_T_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8
-      automatic logic [8:0]  _beatMax_T_2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8
-      automatic logic [8:0]  _beatMax_T_3;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8
-      automatic logic [8:0]  _beatMax_T_4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8
-      automatic logic [8:0]  _beatMax_T_5;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8
-      automatic logic [8:0]  _beatMax_T_6;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8
-      automatic logic [8:0]  _beatMax_T_7;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8
-      automatic logic [8:0]  _beatMax_T_8;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8
-      automatic logic [8:0]  _beatMax_T_9;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8
-      automatic logic [8:0]  _beatMax_T_10;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8
-      automatic logic [8:0]  _beatMax_T_11;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8
-      automatic logic [8:0]  _beatMax_T_12;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8
-      automatic logic [8:0]  _beatMax_T_13;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8
-      automatic logic [8:0]  _beatMax_T_14;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8
-      automatic logic [8:0]  _beatMax_T_15;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8
-      automatic logic [8:0]  _beatMax_T_17;	// src/foragerbee/scala/main/FbMxQuantizer.scala:206:25
-      automatic logic [8:0]  _beatMax_T_19;	// src/foragerbee/scala/main/FbMxQuantizer.scala:206:25
-      automatic logic [8:0]  _beatMax_T_21;	// src/foragerbee/scala/main/FbMxQuantizer.scala:206:25
-      automatic logic [8:0]  _beatMax_T_23;	// src/foragerbee/scala/main/FbMxQuantizer.scala:206:25
-      automatic logic [8:0]  _beatMax_T_25;	// src/foragerbee/scala/main/FbMxQuantizer.scala:206:25
-      automatic logic [8:0]  _beatMax_T_27;	// src/foragerbee/scala/main/FbMxQuantizer.scala:206:25
-      automatic logic [8:0]  _beatMax_T_29;	// src/foragerbee/scala/main/FbMxQuantizer.scala:206:25
-      automatic logic [8:0]  _beatMax_T_31;	// src/foragerbee/scala/main/FbMxQuantizer.scala:206:25
-      automatic logic [8:0]  _beatMax_T_33;	// src/foragerbee/scala/main/FbMxQuantizer.scala:206:25
-      automatic logic [8:0]  _beatMax_T_35;	// src/foragerbee/scala/main/FbMxQuantizer.scala:206:25
-      automatic logic [8:0]  _beatMax_T_37;	// src/foragerbee/scala/main/FbMxQuantizer.scala:206:25
-      automatic logic [8:0]  _beatMax_T_39;	// src/foragerbee/scala/main/FbMxQuantizer.scala:206:25
-      automatic logic [8:0]  _beatMax_T_41;	// src/foragerbee/scala/main/FbMxQuantizer.scala:206:25
-      automatic logic [8:0]  _beatMax_T_43;	// src/foragerbee/scala/main/FbMxQuantizer.scala:206:25
-      automatic logic [8:0]  beatMax;	// src/foragerbee/scala/main/FbMxQuantizer.scala:206:25
-      automatic logic [7:0]  _elemCnt_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:26
-      automatic logic        _finalMax_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:213:34
-      automatic logic        _GEN_2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:27, :208:28, :209:22, :216:49, :220:20
-      automatic logic        lastElem;	// src/foragerbee/scala/main/FbMxQuantizer.scala:250:28
+    else begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
+      automatic logic        isFp32Src;	// src/foragerbee/scala/main/FbMxQuantizer.scala:181:36
+      automatic logic [6:0]  _remaining_T_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:197:36
+      automatic logic [6:0]  take;	// src/foragerbee/scala/main/FbMxQuantizer.scala:198:22
+      automatic logic [5:0]  _x16_T_2 = {1'h0, io_in_bits[14:10]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:54, :204:27
+      automatic logic        _f32Elem_T_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:98:37
+      automatic logic        _expv_T_46 = io_cfg_srcFmt == 4'h2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:99:37
+      automatic logic        slotContrib_0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:25
+      automatic logic [5:0]  _x16_T_7 = {1'h0, io_in_bits[30:26]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:54, :204:27
+      automatic logic        slotContrib_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:25
+      automatic logic [5:0]  _x16_T_12 = {1'h0, io_in_bits[46:42]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:54, :204:27
+      automatic logic        _slotContrib_5_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:65
+      automatic logic        slotContrib_2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:25
+      automatic logic [5:0]  _x16_T_17 = {1'h0, io_in_bits[62:58]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:54, :204:27
+      automatic logic        slotContrib_3;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:25
+      automatic logic [5:0]  _x16_T_22 = {1'h0, io_in_bits[78:74]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:54, :204:27
+      automatic logic        _slotContrib_9_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:65
+      automatic logic        slotContrib_4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:25
+      automatic logic [5:0]  _x16_T_27 = {1'h0, io_in_bits[94:90]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:54, :204:27
+      automatic logic        _slotContrib_11_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:65
+      automatic logic        slotContrib_5;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:25
+      automatic logic [5:0]  _x16_T_32 = {1'h0, io_in_bits[110:106]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:54, :204:27
+      automatic logic        _slotContrib_13_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:65
+      automatic logic        slotContrib_6;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:25
+      automatic logic [5:0]  _x16_T_37 = {1'h0, io_in_bits[126:122]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:54, :204:27
+      automatic logic        slotContrib_7;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:25
+      automatic logic [5:0]  _x16_T_42 = {1'h0, io_in_bits[142:138]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:54, :204:27
+      automatic logic        slotContrib_8;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:25
+      automatic logic [5:0]  _x16_T_47 = {1'h0, io_in_bits[158:154]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:54, :204:27
+      automatic logic        slotContrib_9;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:25
+      automatic logic [5:0]  _x16_T_52 = {1'h0, io_in_bits[174:170]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:54, :204:27
+      automatic logic        slotContrib_10;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:25
+      automatic logic [5:0]  _x16_T_57 = {1'h0, io_in_bits[190:186]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:54, :204:27
+      automatic logic        slotContrib_11;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:25
+      automatic logic [5:0]  _x16_T_62 = {1'h0, io_in_bits[206:202]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:54, :204:27
+      automatic logic        slotContrib_12;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:25
+      automatic logic [5:0]  _x16_T_67 = {1'h0, io_in_bits[222:218]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:54, :204:27
+      automatic logic        slotContrib_13;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:25
+      automatic logic [5:0]  _x16_T_72 = {1'h0, io_in_bits[238:234]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:54, :204:27
+      automatic logic        slotContrib_14;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:25
+      automatic logic [5:0]  _x16_T_77 = {1'h0, io_in_bits[254:250]} - 6'hF;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:54, :204:27
+      automatic logic        slotContrib_15;	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:25
+      automatic logic [15:0] _anyContrib_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:210:32
+      automatic logic [8:0]  _beatMax_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8
+      automatic logic [8:0]  _beatMax_T_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8
+      automatic logic [8:0]  _beatMax_T_2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8
+      automatic logic [8:0]  _beatMax_T_3;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8
+      automatic logic [8:0]  _beatMax_T_4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8
+      automatic logic [8:0]  _beatMax_T_5;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8
+      automatic logic [8:0]  _beatMax_T_6;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8
+      automatic logic [8:0]  _beatMax_T_7;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8
+      automatic logic [8:0]  _beatMax_T_8;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8
+      automatic logic [8:0]  _beatMax_T_9;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8
+      automatic logic [8:0]  _beatMax_T_10;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8
+      automatic logic [8:0]  _beatMax_T_11;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8
+      automatic logic [8:0]  _beatMax_T_12;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8
+      automatic logic [8:0]  _beatMax_T_13;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8
+      automatic logic [8:0]  _beatMax_T_14;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8
+      automatic logic [8:0]  _beatMax_T_15;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8
+      automatic logic [8:0]  _beatMax_T_17;	// src/foragerbee/scala/main/FbMxQuantizer.scala:213:25
+      automatic logic [8:0]  _beatMax_T_19;	// src/foragerbee/scala/main/FbMxQuantizer.scala:213:25
+      automatic logic [8:0]  _beatMax_T_21;	// src/foragerbee/scala/main/FbMxQuantizer.scala:213:25
+      automatic logic [8:0]  _beatMax_T_23;	// src/foragerbee/scala/main/FbMxQuantizer.scala:213:25
+      automatic logic [8:0]  _beatMax_T_25;	// src/foragerbee/scala/main/FbMxQuantizer.scala:213:25
+      automatic logic [8:0]  _beatMax_T_27;	// src/foragerbee/scala/main/FbMxQuantizer.scala:213:25
+      automatic logic [8:0]  _beatMax_T_29;	// src/foragerbee/scala/main/FbMxQuantizer.scala:213:25
+      automatic logic [8:0]  _beatMax_T_31;	// src/foragerbee/scala/main/FbMxQuantizer.scala:213:25
+      automatic logic [8:0]  _beatMax_T_33;	// src/foragerbee/scala/main/FbMxQuantizer.scala:213:25
+      automatic logic [8:0]  _beatMax_T_35;	// src/foragerbee/scala/main/FbMxQuantizer.scala:213:25
+      automatic logic [8:0]  _beatMax_T_37;	// src/foragerbee/scala/main/FbMxQuantizer.scala:213:25
+      automatic logic [8:0]  _beatMax_T_39;	// src/foragerbee/scala/main/FbMxQuantizer.scala:213:25
+      automatic logic [8:0]  _beatMax_T_41;	// src/foragerbee/scala/main/FbMxQuantizer.scala:213:25
+      automatic logic [8:0]  _beatMax_T_43;	// src/foragerbee/scala/main/FbMxQuantizer.scala:213:25
+      automatic logic [8:0]  beatMax;	// src/foragerbee/scala/main/FbMxQuantizer.scala:213:25
+      automatic logic [7:0]  _elemCnt_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:219:26
+      automatic logic        _finalMax_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:220:34
+      automatic logic        _GEN_2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:178:27, :215:28, :216:22, :223:49, :227:20
+      automatic logic        _GEN_3;	// src/foragerbee/scala/main/FbMxQuantizer.scala:177:27, :215:28, :216:22, :223:49, :228:20
+      automatic logic        lastElem;	// src/foragerbee/scala/main/FbMxQuantizer.scala:257:28
       automatic logic        _baseBeat_T;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      automatic logic        stall;	// src/foragerbee/scala/main/FbMxQuantizer.scala:254:30
-      automatic logic        _GEN_3;	// src/foragerbee/scala/main/FbMxQuantizer.scala:208:28, :233:26, :257:18, :258:18
+      automatic logic        stall;	// src/foragerbee/scala/main/FbMxQuantizer.scala:261:30
+      automatic logic        _GEN_4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:215:28, :240:26, :264:18, :265:18
+      automatic logic        _GEN_5;	// src/foragerbee/scala/main/FbMxQuantizer.scala:215:28, :240:26, :283:28, :284:18, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
       automatic logic        _dataDone_T_1;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
       automatic logic        _scaleDone_T_1;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      automatic logic        _GEN_4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:233:26, :278:26, :282:27, :283:20, :301:18, :307:18
-      isFp32Src = io_cfg_srcFmt == 4'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:173:36
-      _remaining_T_1 = io_cfg_blockSize - elemCnt[6:0];	// src/foragerbee/scala/main/FbMxQuantizer.scala:164:27, :189:{36,45}
+      automatic logic        _GEN_6;	// src/foragerbee/scala/main/FbMxQuantizer.scala:240:26, :292:26, :296:27, :297:20, :315:18, :321:18
+      isFp32Src = io_cfg_srcFmt == 4'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:181:36
+      _remaining_T_1 = io_cfg_blockSize - elemCnt[6:0];	// src/foragerbee/scala/main/FbMxQuantizer.scala:172:27, :197:{36,45}
       take =
         (isFp32Src ? 9'h8 : 9'h10) < {2'h0, _remaining_T_1}
           ? (isFp32Src ? 7'h8 : 7'h10)
-          : _remaining_T_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :160:22, :173:36, :174:25, :189:36, :190:{22,36,61}
-      _f32Elem_T_1 = io_cfg_srcFmt == 4'h1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:97:37
+          : _remaining_T_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :168:22, :181:36, :182:25, :197:36, :198:{22,36,61}
+      _f32Elem_T_1 = io_cfg_srcFmt == 4'h1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:98:37
       slotContrib_0 =
         (_f32Elem_T_1
            ? (|(io_in_bits[14:10]))
@@ -191,13 +197,15 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                ? (|(io_in_bits[14:7]))
                  & (io_in_bits[14:7] != 8'hFF | io_in_bits[6:0] == 7'h0)
                : (|(io_in_bits[30:23]))
-                 & (io_in_bits[30:23] != 8'hFF | io_in_bits[22:0] == 23'h0)) & (|take);	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :85:{20,45}, :86:{20,29,37,46,53}, :89:{20,44}, :90:{20,29,37,47,54}, :93:{20,45}, :94:{20,29,37,47,54}, :97:{22,37}, :98:{22,37}, :190:22, :196:27, :197:27, :200:{25,33}
+                 & (io_in_bits[30:23] != 8'hFF | io_in_bits[22:0] == 23'h0)) & (|take);	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :86:{20,45}, :87:{20,29,37,46,53}, :90:{20,44}, :91:{20,29,37,47,54}, :94:{20,45}, :95:{20,29,37,47,54}, :98:{22,37}, :99:{22,37}, :198:22, :204:27, :205:27, :207:{25,53}
       slotContrib_1 =
         (_f32Elem_T_1
            ? (|(io_in_bits[30:26]))
              & (io_in_bits[30:26] != 5'h1F | io_in_bits[25:16] == 10'h0)
            : _expv_T_46 & (|(io_in_bits[30:23]))
-             & (io_in_bits[30:23] != 8'hFF | io_in_bits[22:16] == 7'h0)) & (|(take[6:1]));	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :85:{20,45}, :86:{20,29,37,46,53}, :89:{20,44}, :90:{20,29,37,47,54}, :97:{22,37}, :98:{22,37}, :190:22, :196:27, :200:{25,33}
+             & (io_in_bits[30:23] != 8'hFF | io_in_bits[22:16] == 7'h0))
+        & (isFp32Src ? (|take) : (|(take[6:1])));	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :86:{20,45}, :87:{20,29,37,46,53}, :90:{20,44}, :91:{20,29,37,47,54}, :98:{22,37}, :99:{22,37}, :181:36, :198:22, :204:27, :207:{25,31,53,65}
+      _slotContrib_5_T = take > 7'h2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :198:22, :207:65
       slotContrib_2 =
         (_f32Elem_T_1
            ? (|(io_in_bits[46:42]))
@@ -207,13 +215,15 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                  & (io_in_bits[46:39] != 8'hFF | io_in_bits[38:32] == 7'h0)
                : (|(io_in_bits[62:55]))
                  & (io_in_bits[62:55] != 8'hFF | io_in_bits[54:32] == 23'h0))
-        & take > 7'h2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :85:{20,45}, :86:{20,29,37,46,53}, :89:{20,44}, :90:{20,29,37,47,54}, :93:{20,45}, :94:{20,29,37,47,54}, :97:{22,37}, :98:{22,37}, :190:22, :196:27, :197:27, :200:{25,33}
+        & (isFp32Src ? (|(take[6:1])) : _slotContrib_5_T);	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :86:{20,45}, :87:{20,29,37,46,53}, :90:{20,44}, :91:{20,29,37,47,54}, :94:{20,45}, :95:{20,29,37,47,54}, :98:{22,37}, :99:{22,37}, :181:36, :198:22, :204:27, :205:27, :207:{25,31,65}
       slotContrib_3 =
         (_f32Elem_T_1
            ? (|(io_in_bits[62:58]))
              & (io_in_bits[62:58] != 5'h1F | io_in_bits[57:48] == 10'h0)
            : _expv_T_46 & (|(io_in_bits[62:55]))
-             & (io_in_bits[62:55] != 8'hFF | io_in_bits[54:48] == 7'h0)) & (|(take[6:2]));	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :85:{20,45}, :86:{20,29,37,46,53}, :89:{20,44}, :90:{20,29,37,47,54}, :97:{22,37}, :98:{22,37}, :190:22, :196:27, :200:{25,33}
+             & (io_in_bits[62:55] != 8'hFF | io_in_bits[54:48] == 7'h0))
+        & (isFp32Src ? (|(take[6:1])) : (|(take[6:2])));	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :86:{20,45}, :87:{20,29,37,46,53}, :90:{20,44}, :91:{20,29,37,47,54}, :98:{22,37}, :99:{22,37}, :181:36, :198:22, :204:27, :207:{25,31,65}
+      _slotContrib_9_T = take > 7'h4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :198:22, :207:65
       slotContrib_4 =
         (_f32Elem_T_1
            ? (|(io_in_bits[78:74]))
@@ -223,13 +233,16 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                  & (io_in_bits[78:71] != 8'hFF | io_in_bits[70:64] == 7'h0)
                : (|(io_in_bits[94:87]))
                  & (io_in_bits[94:87] != 8'hFF | io_in_bits[86:64] == 23'h0))
-        & take > 7'h4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :85:{20,45}, :86:{20,29,37,46,53}, :89:{20,44}, :90:{20,29,37,47,54}, :93:{20,45}, :94:{20,29,37,47,54}, :97:{22,37}, :98:{22,37}, :190:22, :196:27, :197:27, :200:{25,33}
+        & (isFp32Src ? _slotContrib_5_T : _slotContrib_9_T);	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :86:{20,45}, :87:{20,29,37,46,53}, :90:{20,44}, :91:{20,29,37,47,54}, :94:{20,45}, :95:{20,29,37,47,54}, :98:{22,37}, :99:{22,37}, :181:36, :204:27, :205:27, :207:{25,31,65}
+      _slotContrib_11_T = take > 7'h5;	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :198:22, :207:65
       slotContrib_5 =
         (_f32Elem_T_1
            ? (|(io_in_bits[94:90]))
              & (io_in_bits[94:90] != 5'h1F | io_in_bits[89:80] == 10'h0)
            : _expv_T_46 & (|(io_in_bits[94:87]))
-             & (io_in_bits[94:87] != 8'hFF | io_in_bits[86:80] == 7'h0)) & take > 7'h5;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :85:{20,45}, :86:{20,29,37,46,53}, :89:{20,44}, :90:{20,29,37,47,54}, :97:{22,37}, :98:{22,37}, :190:22, :196:27, :200:{25,33}
+             & (io_in_bits[94:87] != 8'hFF | io_in_bits[86:80] == 7'h0))
+        & (isFp32Src ? _slotContrib_5_T : _slotContrib_11_T);	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :86:{20,45}, :87:{20,29,37,46,53}, :90:{20,44}, :91:{20,29,37,47,54}, :98:{22,37}, :99:{22,37}, :181:36, :204:27, :207:{25,31,65}
+      _slotContrib_13_T = take > 7'h6;	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :198:22, :207:65
       slotContrib_6 =
         (_f32Elem_T_1
            ? (|(io_in_bits[110:106]))
@@ -239,14 +252,14 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                  & (io_in_bits[110:103] != 8'hFF | io_in_bits[102:96] == 7'h0)
                : (|(io_in_bits[126:119]))
                  & (io_in_bits[126:119] != 8'hFF | io_in_bits[118:96] == 23'h0))
-        & take > 7'h6;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :85:{20,45}, :86:{20,29,37,46,53}, :89:{20,44}, :90:{20,29,37,47,54}, :93:{20,45}, :94:{20,29,37,47,54}, :97:{22,37}, :98:{22,37}, :190:22, :196:27, :197:27, :200:{25,33}
+        & (isFp32Src ? (|(take[6:2])) : _slotContrib_13_T);	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :86:{20,45}, :87:{20,29,37,46,53}, :90:{20,44}, :91:{20,29,37,47,54}, :94:{20,45}, :95:{20,29,37,47,54}, :98:{22,37}, :99:{22,37}, :181:36, :198:22, :204:27, :205:27, :207:{25,31,65}
       slotContrib_7 =
         (_f32Elem_T_1
            ? (|(io_in_bits[126:122]))
              & (io_in_bits[126:122] != 5'h1F | io_in_bits[121:112] == 10'h0)
            : _expv_T_46 & (|(io_in_bits[126:119]))
              & (io_in_bits[126:119] != 8'hFF | io_in_bits[118:112] == 7'h0))
-        & (|(take[6:3]));	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :85:{20,45}, :86:{20,29,37,46,53}, :89:{20,44}, :90:{20,29,37,47,54}, :97:{22,37}, :98:{22,37}, :190:22, :196:27, :200:{25,33}
+        & (isFp32Src ? (|(take[6:2])) : (|(take[6:3])));	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :86:{20,45}, :87:{20,29,37,46,53}, :90:{20,44}, :91:{20,29,37,47,54}, :98:{22,37}, :99:{22,37}, :181:36, :198:22, :204:27, :207:{25,31,65}
       slotContrib_8 =
         (_f32Elem_T_1
            ? (|(io_in_bits[142:138]))
@@ -256,14 +269,14 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                  & (io_in_bits[142:135] != 8'hFF | io_in_bits[134:128] == 7'h0)
                : (|(io_in_bits[158:151]))
                  & (io_in_bits[158:151] != 8'hFF | io_in_bits[150:128] == 23'h0))
-        & take > 7'h8;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :85:{20,45}, :86:{20,29,37,46,53}, :89:{20,44}, :90:{20,29,37,47,54}, :93:{20,45}, :94:{20,29,37,47,54}, :97:{22,37}, :98:{22,37}, :190:22, :196:27, :197:27, :200:{25,33}
+        & (isFp32Src ? _slotContrib_9_T : take > 7'h8);	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :86:{20,45}, :87:{20,29,37,46,53}, :90:{20,44}, :91:{20,29,37,47,54}, :94:{20,45}, :95:{20,29,37,47,54}, :98:{22,37}, :99:{22,37}, :181:36, :198:22, :204:27, :205:27, :207:{25,31,65}
       slotContrib_9 =
         (_f32Elem_T_1
            ? (|(io_in_bits[158:154]))
              & (io_in_bits[158:154] != 5'h1F | io_in_bits[153:144] == 10'h0)
            : _expv_T_46 & (|(io_in_bits[158:151]))
              & (io_in_bits[158:151] != 8'hFF | io_in_bits[150:144] == 7'h0))
-        & take > 7'h9;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :85:{20,45}, :86:{20,29,37,46,53}, :89:{20,44}, :90:{20,29,37,47,54}, :97:{22,37}, :98:{22,37}, :190:22, :196:27, :200:{25,33}
+        & (isFp32Src ? _slotContrib_9_T : take > 7'h9);	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :86:{20,45}, :87:{20,29,37,46,53}, :90:{20,44}, :91:{20,29,37,47,54}, :98:{22,37}, :99:{22,37}, :181:36, :198:22, :204:27, :207:{25,31,65}
       slotContrib_10 =
         (_f32Elem_T_1
            ? (|(io_in_bits[174:170]))
@@ -273,14 +286,14 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                  & (io_in_bits[174:167] != 8'hFF | io_in_bits[166:160] == 7'h0)
                : (|(io_in_bits[190:183]))
                  & (io_in_bits[190:183] != 8'hFF | io_in_bits[182:160] == 23'h0))
-        & take > 7'hA;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :85:{20,45}, :86:{20,29,37,46,53}, :89:{20,44}, :90:{20,29,37,47,54}, :93:{20,45}, :94:{20,29,37,47,54}, :97:{22,37}, :98:{22,37}, :190:22, :196:27, :197:27, :200:{25,33}
+        & (isFp32Src ? _slotContrib_11_T : take > 7'hA);	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :86:{20,45}, :87:{20,29,37,46,53}, :90:{20,44}, :91:{20,29,37,47,54}, :94:{20,45}, :95:{20,29,37,47,54}, :98:{22,37}, :99:{22,37}, :181:36, :198:22, :204:27, :205:27, :207:{25,31,65}
       slotContrib_11 =
         (_f32Elem_T_1
            ? (|(io_in_bits[190:186]))
              & (io_in_bits[190:186] != 5'h1F | io_in_bits[185:176] == 10'h0)
            : _expv_T_46 & (|(io_in_bits[190:183]))
              & (io_in_bits[190:183] != 8'hFF | io_in_bits[182:176] == 7'h0))
-        & take > 7'hB;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :85:{20,45}, :86:{20,29,37,46,53}, :89:{20,44}, :90:{20,29,37,47,54}, :97:{22,37}, :98:{22,37}, :190:22, :196:27, :200:{25,33}
+        & (isFp32Src ? _slotContrib_11_T : take > 7'hB);	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :86:{20,45}, :87:{20,29,37,46,53}, :90:{20,44}, :91:{20,29,37,47,54}, :98:{22,37}, :99:{22,37}, :181:36, :198:22, :204:27, :207:{25,31,65}
       slotContrib_12 =
         (_f32Elem_T_1
            ? (|(io_in_bits[206:202]))
@@ -290,14 +303,14 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                  & (io_in_bits[206:199] != 8'hFF | io_in_bits[198:192] == 7'h0)
                : (|(io_in_bits[222:215]))
                  & (io_in_bits[222:215] != 8'hFF | io_in_bits[214:192] == 23'h0))
-        & take > 7'hC;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :85:{20,45}, :86:{20,29,37,46,53}, :89:{20,44}, :90:{20,29,37,47,54}, :93:{20,45}, :94:{20,29,37,47,54}, :97:{22,37}, :98:{22,37}, :190:22, :196:27, :197:27, :200:{25,33}
+        & (isFp32Src ? _slotContrib_13_T : take > 7'hC);	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :86:{20,45}, :87:{20,29,37,46,53}, :90:{20,44}, :91:{20,29,37,47,54}, :94:{20,45}, :95:{20,29,37,47,54}, :98:{22,37}, :99:{22,37}, :181:36, :198:22, :204:27, :205:27, :207:{25,31,65}
       slotContrib_13 =
         (_f32Elem_T_1
            ? (|(io_in_bits[222:218]))
              & (io_in_bits[222:218] != 5'h1F | io_in_bits[217:208] == 10'h0)
            : _expv_T_46 & (|(io_in_bits[222:215]))
              & (io_in_bits[222:215] != 8'hFF | io_in_bits[214:208] == 7'h0))
-        & take > 7'hD;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :85:{20,45}, :86:{20,29,37,46,53}, :89:{20,44}, :90:{20,29,37,47,54}, :97:{22,37}, :98:{22,37}, :190:22, :196:27, :200:{25,33}
+        & (isFp32Src ? _slotContrib_13_T : take > 7'hD);	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :86:{20,45}, :87:{20,29,37,46,53}, :90:{20,44}, :91:{20,29,37,47,54}, :98:{22,37}, :99:{22,37}, :181:36, :198:22, :204:27, :207:{25,31,65}
       slotContrib_14 =
         (_f32Elem_T_1
            ? (|(io_in_bits[238:234]))
@@ -307,14 +320,14 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                  & (io_in_bits[238:231] != 8'hFF | io_in_bits[230:224] == 7'h0)
                : (|(io_in_bits[254:247]))
                  & (io_in_bits[254:247] != 8'hFF | io_in_bits[246:224] == 23'h0))
-        & take > 7'hE;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :85:{20,45}, :86:{20,29,37,46,53}, :89:{20,44}, :90:{20,29,37,47,54}, :93:{20,45}, :94:{20,29,37,47,54}, :97:{22,37}, :98:{22,37}, :190:22, :196:27, :197:27, :200:{25,33}
+        & (isFp32Src ? (|(take[6:3])) : take > 7'hE);	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :86:{20,45}, :87:{20,29,37,46,53}, :90:{20,44}, :91:{20,29,37,47,54}, :94:{20,45}, :95:{20,29,37,47,54}, :98:{22,37}, :99:{22,37}, :181:36, :198:22, :204:27, :205:27, :207:{25,31,65}
       slotContrib_15 =
         (_f32Elem_T_1
            ? (|(io_in_bits[254:250]))
              & (io_in_bits[254:250] != 5'h1F | io_in_bits[249:240] == 10'h0)
            : _expv_T_46 & (|(io_in_bits[254:247]))
              & (io_in_bits[254:247] != 8'hFF | io_in_bits[246:240] == 7'h0))
-        & (|(take[6:4]));	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :85:{20,45}, :86:{20,29,37,46,53}, :89:{20,44}, :90:{20,29,37,47,54}, :97:{22,37}, :98:{22,37}, :190:22, :196:27, :200:{25,33}
+        & (isFp32Src ? (|(take[6:3])) : (|(take[6:4])));	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :86:{20,45}, :87:{20,29,37,46,53}, :90:{20,44}, :91:{20,29,37,47,54}, :98:{22,37}, :99:{22,37}, :181:36, :198:22, :204:27, :207:{25,31,65}
       _anyContrib_T =
         {slotContrib_15,
          slotContrib_14,
@@ -331,7 +344,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
          slotContrib_3,
          slotContrib_2,
          slotContrib_1,
-         slotContrib_0};	// src/foragerbee/scala/main/FbMxQuantizer.scala:200:25, :203:32
+         slotContrib_0};	// src/foragerbee/scala/main/FbMxQuantizer.scala:207:25, :210:32
       _beatMax_T =
         slotContrib_0
           ? (_f32Elem_T_1
@@ -339,7 +352,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                : _expv_T_46
                    ? ((&(io_in_bits[14:7])) ? 9'h7F : {1'h0, io_in_bits[14:7]} - 9'h7F)
                    : (&(io_in_bits[30:23])) ? 9'h7F : {1'h0, io_in_bits[30:23]} - 9'h7F)
-          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:{18,23,54}, :89:20, :91:{18,23,55}, :93:20, :95:{18,23,55}, :97:37, :98:37, :99:22, :100:22, :165:27, :196:27, :197:27, :200:25, :205:8
+          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:{18,23,54}, :90:20, :92:{18,23,55}, :94:20, :96:{18,23,55}, :98:37, :99:37, :100:22, :101:22, :173:27, :204:27, :205:27, :207:25, :212:8
       _beatMax_T_1 =
         slotContrib_1
           ? (_f32Elem_T_1
@@ -347,7 +360,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                : _expv_T_46
                    ? ((&(io_in_bits[30:23])) ? 9'h7F : {1'h0, io_in_bits[30:23]} - 9'h7F)
                    : (&(io_in_bits[30:23])) ? 9'h7F : {1'h0, io_in_bits[30:23]} - 9'h7F)
-          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:{18,23,54}, :89:20, :91:{18,23,55}, :93:20, :95:{18,23,55}, :97:37, :98:37, :99:22, :100:22, :165:27, :196:27, :197:27, :200:25, :205:8
+          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:{18,23,54}, :90:20, :92:{18,23,55}, :94:20, :96:{18,23,55}, :98:37, :99:37, :100:22, :101:22, :173:27, :204:27, :205:27, :207:25, :212:8
       _beatMax_T_2 =
         slotContrib_2
           ? (_f32Elem_T_1
@@ -355,7 +368,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                : _expv_T_46
                    ? ((&(io_in_bits[46:39])) ? 9'h7F : {1'h0, io_in_bits[46:39]} - 9'h7F)
                    : (&(io_in_bits[62:55])) ? 9'h7F : {1'h0, io_in_bits[62:55]} - 9'h7F)
-          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:{18,23,54}, :89:20, :91:{18,23,55}, :93:20, :95:{18,23,55}, :97:37, :98:37, :99:22, :100:22, :165:27, :196:27, :197:27, :200:25, :205:8
+          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:{18,23,54}, :90:20, :92:{18,23,55}, :94:20, :96:{18,23,55}, :98:37, :99:37, :100:22, :101:22, :173:27, :204:27, :205:27, :207:25, :212:8
       _beatMax_T_3 =
         slotContrib_3
           ? (_f32Elem_T_1
@@ -363,7 +376,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                : _expv_T_46
                    ? ((&(io_in_bits[62:55])) ? 9'h7F : {1'h0, io_in_bits[62:55]} - 9'h7F)
                    : (&(io_in_bits[62:55])) ? 9'h7F : {1'h0, io_in_bits[62:55]} - 9'h7F)
-          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:{18,23,54}, :89:20, :91:{18,23,55}, :93:20, :95:{18,23,55}, :97:37, :98:37, :99:22, :100:22, :165:27, :196:27, :197:27, :200:25, :205:8
+          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:{18,23,54}, :90:20, :92:{18,23,55}, :94:20, :96:{18,23,55}, :98:37, :99:37, :100:22, :101:22, :173:27, :204:27, :205:27, :207:25, :212:8
       _beatMax_T_4 =
         slotContrib_4
           ? (_f32Elem_T_1
@@ -371,7 +384,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                : _expv_T_46
                    ? ((&(io_in_bits[78:71])) ? 9'h7F : {1'h0, io_in_bits[78:71]} - 9'h7F)
                    : (&(io_in_bits[94:87])) ? 9'h7F : {1'h0, io_in_bits[94:87]} - 9'h7F)
-          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:{18,23,54}, :89:20, :91:{18,23,55}, :93:20, :95:{18,23,55}, :97:37, :98:37, :99:22, :100:22, :165:27, :196:27, :197:27, :200:25, :205:8
+          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:{18,23,54}, :90:20, :92:{18,23,55}, :94:20, :96:{18,23,55}, :98:37, :99:37, :100:22, :101:22, :173:27, :204:27, :205:27, :207:25, :212:8
       _beatMax_T_5 =
         slotContrib_5
           ? (_f32Elem_T_1
@@ -379,7 +392,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                : _expv_T_46
                    ? ((&(io_in_bits[94:87])) ? 9'h7F : {1'h0, io_in_bits[94:87]} - 9'h7F)
                    : (&(io_in_bits[94:87])) ? 9'h7F : {1'h0, io_in_bits[94:87]} - 9'h7F)
-          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:{18,23,54}, :89:20, :91:{18,23,55}, :93:20, :95:{18,23,55}, :97:37, :98:37, :99:22, :100:22, :165:27, :196:27, :197:27, :200:25, :205:8
+          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:{18,23,54}, :90:20, :92:{18,23,55}, :94:20, :96:{18,23,55}, :98:37, :99:37, :100:22, :101:22, :173:27, :204:27, :205:27, :207:25, :212:8
       _beatMax_T_6 =
         slotContrib_6
           ? (_f32Elem_T_1
@@ -391,7 +404,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                    : (&(io_in_bits[126:119]))
                        ? 9'h7F
                        : {1'h0, io_in_bits[126:119]} - 9'h7F)
-          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:{18,23,54}, :89:20, :91:{18,23,55}, :93:20, :95:{18,23,55}, :97:37, :98:37, :99:22, :100:22, :165:27, :196:27, :197:27, :200:25, :205:8
+          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:{18,23,54}, :90:20, :92:{18,23,55}, :94:20, :96:{18,23,55}, :98:37, :99:37, :100:22, :101:22, :173:27, :204:27, :205:27, :207:25, :212:8
       _beatMax_T_7 =
         slotContrib_7
           ? (_f32Elem_T_1
@@ -403,7 +416,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                    : (&(io_in_bits[126:119]))
                        ? 9'h7F
                        : {1'h0, io_in_bits[126:119]} - 9'h7F)
-          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:{18,23,54}, :89:20, :91:{18,23,55}, :93:20, :95:{18,23,55}, :97:37, :98:37, :99:22, :100:22, :165:27, :196:27, :197:27, :200:25, :205:8
+          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:{18,23,54}, :90:20, :92:{18,23,55}, :94:20, :96:{18,23,55}, :98:37, :99:37, :100:22, :101:22, :173:27, :204:27, :205:27, :207:25, :212:8
       _beatMax_T_8 =
         slotContrib_8
           ? (_f32Elem_T_1
@@ -415,7 +428,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                    : (&(io_in_bits[158:151]))
                        ? 9'h7F
                        : {1'h0, io_in_bits[158:151]} - 9'h7F)
-          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:{18,23,54}, :89:20, :91:{18,23,55}, :93:20, :95:{18,23,55}, :97:37, :98:37, :99:22, :100:22, :165:27, :196:27, :197:27, :200:25, :205:8
+          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:{18,23,54}, :90:20, :92:{18,23,55}, :94:20, :96:{18,23,55}, :98:37, :99:37, :100:22, :101:22, :173:27, :204:27, :205:27, :207:25, :212:8
       _beatMax_T_9 =
         slotContrib_9
           ? (_f32Elem_T_1
@@ -427,7 +440,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                    : (&(io_in_bits[158:151]))
                        ? 9'h7F
                        : {1'h0, io_in_bits[158:151]} - 9'h7F)
-          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:{18,23,54}, :89:20, :91:{18,23,55}, :93:20, :95:{18,23,55}, :97:37, :98:37, :99:22, :100:22, :165:27, :196:27, :197:27, :200:25, :205:8
+          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:{18,23,54}, :90:20, :92:{18,23,55}, :94:20, :96:{18,23,55}, :98:37, :99:37, :100:22, :101:22, :173:27, :204:27, :205:27, :207:25, :212:8
       _beatMax_T_10 =
         slotContrib_10
           ? (_f32Elem_T_1
@@ -439,7 +452,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                    : (&(io_in_bits[190:183]))
                        ? 9'h7F
                        : {1'h0, io_in_bits[190:183]} - 9'h7F)
-          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:{18,23,54}, :89:20, :91:{18,23,55}, :93:20, :95:{18,23,55}, :97:37, :98:37, :99:22, :100:22, :165:27, :196:27, :197:27, :200:25, :205:8
+          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:{18,23,54}, :90:20, :92:{18,23,55}, :94:20, :96:{18,23,55}, :98:37, :99:37, :100:22, :101:22, :173:27, :204:27, :205:27, :207:25, :212:8
       _beatMax_T_11 =
         slotContrib_11
           ? (_f32Elem_T_1
@@ -451,7 +464,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                    : (&(io_in_bits[190:183]))
                        ? 9'h7F
                        : {1'h0, io_in_bits[190:183]} - 9'h7F)
-          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:{18,23,54}, :89:20, :91:{18,23,55}, :93:20, :95:{18,23,55}, :97:37, :98:37, :99:22, :100:22, :165:27, :196:27, :197:27, :200:25, :205:8
+          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:{18,23,54}, :90:20, :92:{18,23,55}, :94:20, :96:{18,23,55}, :98:37, :99:37, :100:22, :101:22, :173:27, :204:27, :205:27, :207:25, :212:8
       _beatMax_T_12 =
         slotContrib_12
           ? (_f32Elem_T_1
@@ -463,7 +476,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                    : (&(io_in_bits[222:215]))
                        ? 9'h7F
                        : {1'h0, io_in_bits[222:215]} - 9'h7F)
-          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:{18,23,54}, :89:20, :91:{18,23,55}, :93:20, :95:{18,23,55}, :97:37, :98:37, :99:22, :100:22, :165:27, :196:27, :197:27, :200:25, :205:8
+          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:{18,23,54}, :90:20, :92:{18,23,55}, :94:20, :96:{18,23,55}, :98:37, :99:37, :100:22, :101:22, :173:27, :204:27, :205:27, :207:25, :212:8
       _beatMax_T_13 =
         slotContrib_13
           ? (_f32Elem_T_1
@@ -475,7 +488,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                    : (&(io_in_bits[222:215]))
                        ? 9'h7F
                        : {1'h0, io_in_bits[222:215]} - 9'h7F)
-          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:{18,23,54}, :89:20, :91:{18,23,55}, :93:20, :95:{18,23,55}, :97:37, :98:37, :99:22, :100:22, :165:27, :196:27, :197:27, :200:25, :205:8
+          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:{18,23,54}, :90:20, :92:{18,23,55}, :94:20, :96:{18,23,55}, :98:37, :99:37, :100:22, :101:22, :173:27, :204:27, :205:27, :207:25, :212:8
       _beatMax_T_14 =
         slotContrib_14
           ? (_f32Elem_T_1
@@ -487,7 +500,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                    : (&(io_in_bits[254:247]))
                        ? 9'h7F
                        : {1'h0, io_in_bits[254:247]} - 9'h7F)
-          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:{18,23,54}, :89:20, :91:{18,23,55}, :93:20, :95:{18,23,55}, :97:37, :98:37, :99:22, :100:22, :165:27, :196:27, :197:27, :200:25, :205:8
+          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:{18,23,54}, :90:20, :92:{18,23,55}, :94:20, :96:{18,23,55}, :98:37, :99:37, :100:22, :101:22, :173:27, :204:27, :205:27, :207:25, :212:8
       _beatMax_T_15 =
         slotContrib_15
           ? (_f32Elem_T_1
@@ -499,90 +512,91 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                    : (&(io_in_bits[254:247]))
                        ? 9'h7F
                        : {1'h0, io_in_bits[254:247]} - 9'h7F)
-          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:85:20, :87:{18,23,54}, :89:20, :91:{18,23,55}, :93:20, :95:{18,23,55}, :97:37, :98:37, :99:22, :100:22, :165:27, :196:27, :197:27, :200:25, :205:8
+          : 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:86:20, :88:{18,23,54}, :90:20, :92:{18,23,55}, :94:20, :96:{18,23,55}, :98:37, :99:37, :100:22, :101:22, :173:27, :204:27, :205:27, :207:25, :212:8
       _beatMax_T_17 =
-        $signed(_beatMax_T) > $signed(_beatMax_T_1) ? _beatMax_T : _beatMax_T_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8, :206:{25,28}
+        $signed(_beatMax_T) > $signed(_beatMax_T_1) ? _beatMax_T : _beatMax_T_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8, :213:{25,28}
       _beatMax_T_19 =
-        $signed(_beatMax_T_17) > $signed(_beatMax_T_2) ? _beatMax_T_17 : _beatMax_T_2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8, :206:{25,28}
+        $signed(_beatMax_T_17) > $signed(_beatMax_T_2) ? _beatMax_T_17 : _beatMax_T_2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8, :213:{25,28}
       _beatMax_T_21 =
-        $signed(_beatMax_T_19) > $signed(_beatMax_T_3) ? _beatMax_T_19 : _beatMax_T_3;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8, :206:{25,28}
+        $signed(_beatMax_T_19) > $signed(_beatMax_T_3) ? _beatMax_T_19 : _beatMax_T_3;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8, :213:{25,28}
       _beatMax_T_23 =
-        $signed(_beatMax_T_21) > $signed(_beatMax_T_4) ? _beatMax_T_21 : _beatMax_T_4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8, :206:{25,28}
+        $signed(_beatMax_T_21) > $signed(_beatMax_T_4) ? _beatMax_T_21 : _beatMax_T_4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8, :213:{25,28}
       _beatMax_T_25 =
-        $signed(_beatMax_T_23) > $signed(_beatMax_T_5) ? _beatMax_T_23 : _beatMax_T_5;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8, :206:{25,28}
+        $signed(_beatMax_T_23) > $signed(_beatMax_T_5) ? _beatMax_T_23 : _beatMax_T_5;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8, :213:{25,28}
       _beatMax_T_27 =
-        $signed(_beatMax_T_25) > $signed(_beatMax_T_6) ? _beatMax_T_25 : _beatMax_T_6;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8, :206:{25,28}
+        $signed(_beatMax_T_25) > $signed(_beatMax_T_6) ? _beatMax_T_25 : _beatMax_T_6;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8, :213:{25,28}
       _beatMax_T_29 =
-        $signed(_beatMax_T_27) > $signed(_beatMax_T_7) ? _beatMax_T_27 : _beatMax_T_7;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8, :206:{25,28}
+        $signed(_beatMax_T_27) > $signed(_beatMax_T_7) ? _beatMax_T_27 : _beatMax_T_7;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8, :213:{25,28}
       _beatMax_T_31 =
-        $signed(_beatMax_T_29) > $signed(_beatMax_T_8) ? _beatMax_T_29 : _beatMax_T_8;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8, :206:{25,28}
+        $signed(_beatMax_T_29) > $signed(_beatMax_T_8) ? _beatMax_T_29 : _beatMax_T_8;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8, :213:{25,28}
       _beatMax_T_33 =
-        $signed(_beatMax_T_31) > $signed(_beatMax_T_9) ? _beatMax_T_31 : _beatMax_T_9;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8, :206:{25,28}
+        $signed(_beatMax_T_31) > $signed(_beatMax_T_9) ? _beatMax_T_31 : _beatMax_T_9;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8, :213:{25,28}
       _beatMax_T_35 =
-        $signed(_beatMax_T_33) > $signed(_beatMax_T_10) ? _beatMax_T_33 : _beatMax_T_10;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8, :206:{25,28}
+        $signed(_beatMax_T_33) > $signed(_beatMax_T_10) ? _beatMax_T_33 : _beatMax_T_10;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8, :213:{25,28}
       _beatMax_T_37 =
-        $signed(_beatMax_T_35) > $signed(_beatMax_T_11) ? _beatMax_T_35 : _beatMax_T_11;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8, :206:{25,28}
+        $signed(_beatMax_T_35) > $signed(_beatMax_T_11) ? _beatMax_T_35 : _beatMax_T_11;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8, :213:{25,28}
       _beatMax_T_39 =
-        $signed(_beatMax_T_37) > $signed(_beatMax_T_12) ? _beatMax_T_37 : _beatMax_T_12;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8, :206:{25,28}
+        $signed(_beatMax_T_37) > $signed(_beatMax_T_12) ? _beatMax_T_37 : _beatMax_T_12;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8, :213:{25,28}
       _beatMax_T_41 =
-        $signed(_beatMax_T_39) > $signed(_beatMax_T_13) ? _beatMax_T_39 : _beatMax_T_13;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8, :206:{25,28}
+        $signed(_beatMax_T_39) > $signed(_beatMax_T_13) ? _beatMax_T_39 : _beatMax_T_13;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8, :213:{25,28}
       _beatMax_T_43 =
-        $signed(_beatMax_T_41) > $signed(_beatMax_T_14) ? _beatMax_T_41 : _beatMax_T_14;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8, :206:{25,28}
+        $signed(_beatMax_T_41) > $signed(_beatMax_T_14) ? _beatMax_T_41 : _beatMax_T_14;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8, :213:{25,28}
       beatMax =
-        $signed(_beatMax_T_43) > $signed(_beatMax_T_15) ? _beatMax_T_43 : _beatMax_T_15;	// src/foragerbee/scala/main/FbMxQuantizer.scala:205:8, :206:{25,28}
-      _elemCnt_T = elemCnt + {1'h0, take};	// src/foragerbee/scala/main/FbMxQuantizer.scala:164:27, :190:22, :212:26
-      _finalMax_T = $signed(beatMax) > $signed(maxExp);	// src/foragerbee/scala/main/FbMxQuantizer.scala:165:27, :206:25, :213:34
-      _GEN_2 = _io_in_ready_T & _GEN_1 & _elemCnt_T == {1'h0, io_cfg_blockSize};	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:27, :182:30, :189:36, :208:28, :209:22, :212:26, :216:{27,49}, :220:20, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      lastElem = elemIdx == io_cfg_blockSize - 7'h1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:166:27, :250:{28,49}
-      _baseBeat_T = io_outData_ready & outDataValid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:168:29, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      stall = outDataValid & ~_baseBeat_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:168:29, :254:{30,33}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      _GEN_3 = _GEN & ~stall;	// src/foragerbee/scala/main/FbMxQuantizer.scala:208:28, :233:{14,26}, :254:30, :257:{10,18}, :258:18
-      _dataDone_T_1 = io_outData_ready & outDataValid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:168:29, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      _scaleDone_T_1 = io_outScale_ready & scaleValid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:169:27, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      _GEN_4 = io_flush | _GEN_0 & _dataDone_T_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:233:26, :278:{14,26}, :282:27, :283:20, :301:18, :307:18, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+        $signed(_beatMax_T_43) > $signed(_beatMax_T_15) ? _beatMax_T_43 : _beatMax_T_15;	// src/foragerbee/scala/main/FbMxQuantizer.scala:212:8, :213:{25,28}
+      _elemCnt_T = elemCnt + {1'h0, take};	// src/foragerbee/scala/main/FbMxQuantizer.scala:172:27, :198:22, :219:26
+      _finalMax_T = $signed(beatMax) > $signed(maxExp);	// src/foragerbee/scala/main/FbMxQuantizer.scala:173:27, :213:25, :220:34
+      _GEN_2 = _io_in_ready_T & _GEN_1 & _elemCnt_T == {1'h0, io_cfg_blockSize};	// src/foragerbee/scala/main/FbMxQuantizer.scala:178:27, :190:30, :197:36, :215:28, :216:22, :219:26, :223:{27,49}, :227:20, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      _GEN_3 = _GEN_2 | scaleValid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:177:27, :178:27, :215:28, :216:22, :223:49, :227:20, :228:20
+      lastElem = elemIdx == io_cfg_blockSize - 7'h1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:174:27, :257:{28,49}
+      _baseBeat_T = io_outData_ready & outDataValid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:176:29, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      stall = outDataValid & ~_baseBeat_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:176:29, :261:{30,33}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      _GEN_4 = _GEN & ~stall;	// src/foragerbee/scala/main/FbMxQuantizer.scala:215:28, :240:{14,26}, :261:30, :264:{10,18}, :265:18
+      _GEN_5 = _GEN & io_outScale_ready & scaleValid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:177:27, :215:28, :240:{14,26}, :283:28, :284:18, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      _dataDone_T_1 = io_outData_ready & outDataValid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:176:29, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      _scaleDone_T_1 = io_outScale_ready & scaleValid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:177:27, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      _GEN_6 = io_flush | _GEN_0 & _dataDone_T_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:240:26, :292:{14,26}, :296:27, :297:20, :315:18, :321:18, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
       if (io_flush | _GEN_0 & (~outDataValid | _dataDone_T_1)
-          & (~scaleValid | _scaleDone_T_1)) begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:168:29, :169:27, :208:28, :233:26, :278:{14,26}, :280:{21,35}, :281:{21,33}, :289:{19,33}, :290:15, :293:15, :301:18, :302:18, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-        state <= 2'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:160:22
-        beatCnt <= 3'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:163:27
-        elemCnt <= 8'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:164:27
-        maxExp <= 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:165:27
+          & (~scaleValid | _scaleDone_T_1)) begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:176:29, :177:27, :215:28, :240:26, :292:{14,26}, :294:{21,35}, :295:{21,33}, :303:{19,33}, :304:15, :307:15, :315:18, :316:18, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+        state <= 2'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:168:22
+        beatCnt <= 3'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:171:27
+        elemCnt <= 8'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:172:27
+        maxExp <= 9'h180;	// src/foragerbee/scala/main/FbMxQuantizer.scala:173:27
       end
-      else begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:233:26, :278:26, :289:33, :293:15, :301:18, :302:18
-        if (_GEN & ~stall & lastElem)	// src/foragerbee/scala/main/FbMxQuantizer.scala:208:28, :233:{14,26}, :250:28, :254:30, :257:{10,18}, :262:22, :264:17
-          state <= 2'h2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:98:37, :160:22
-        else if (_GEN_2)	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:27, :208:28, :209:22, :216:49, :220:20
-          state <= 2'h1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:160:22, :224:20
-        if (_io_in_ready_T & _GEN_1) begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:163:27, :182:30, :208:28, :209:22, :211:15, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-          beatCnt <= beatCnt + 3'h1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:163:27, :211:26
-          elemCnt <= _elemCnt_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:164:27, :212:26
+      else begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:240:26, :292:26, :303:33, :307:15, :315:18, :316:18
+        if (_GEN & ~stall & lastElem)	// src/foragerbee/scala/main/FbMxQuantizer.scala:215:28, :240:{14,26}, :257:28, :261:30, :264:{10,18}, :269:22, :271:17
+          state <= 2'h2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:99:37, :168:22
+        else if (_GEN_2)	// src/foragerbee/scala/main/FbMxQuantizer.scala:178:27, :215:28, :216:22, :223:49, :227:20
+          state <= 2'h1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:168:22, :231:20
+        if (_io_in_ready_T & _GEN_1) begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:171:27, :190:30, :215:28, :216:22, :218:15, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+          beatCnt <= beatCnt + 3'h1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:171:27, :218:26
+          elemCnt <= _elemCnt_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:172:27, :219:26
         end
-        if (_io_in_ready_T & _GEN_1 & (|_anyContrib_T) & _finalMax_T)	// src/foragerbee/scala/main/FbMxQuantizer.scala:165:27, :182:30, :203:{32,39}, :208:28, :209:22, :213:{23,34,44}, :214:16, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-          maxExp <= beatMax;	// src/foragerbee/scala/main/FbMxQuantizer.scala:165:27, :206:25
+        if (_io_in_ready_T & _GEN_1 & (|_anyContrib_T) & _finalMax_T)	// src/foragerbee/scala/main/FbMxQuantizer.scala:173:27, :190:30, :210:{32,39}, :215:28, :216:22, :220:{23,34,44}, :221:16, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+          maxExp <= beatMax;	// src/foragerbee/scala/main/FbMxQuantizer.scala:173:27, :213:25
       end
-      if (io_flush)	// src/foragerbee/scala/main/FbMxQuantizer.scala:35:14
-        elemIdx <= 7'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :166:27
-      else if (_GEN_3)	// src/foragerbee/scala/main/FbMxQuantizer.scala:208:28, :233:26, :257:18, :258:18
-        elemIdx <= lastElem ? 7'h0 : elemIdx + 7'h1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :166:27, :250:28, :262:22, :263:17, :266:{17,28}
-      else if (_GEN_2)	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:27, :208:28, :209:22, :216:49, :220:20
-        elemIdx <= 7'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :166:27
-      if (_GEN_4)	// src/foragerbee/scala/main/FbMxQuantizer.scala:233:26, :278:26, :282:27, :283:20, :301:18, :307:18
-        outBeatReg <= 256'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:167:27
-      else if (_GEN_3) begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:208:28, :233:26, :257:18, :258:18
-        automatic logic              dstE4 = io_cfg_dstFmt == 4'h4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:175:36
-        automatic logic [2:0]        epbLog;	// src/foragerbee/scala/main/FbMxQuantizer.scala:237:22
-        automatic logic [6:0]        beatIdx;	// src/foragerbee/scala/main/FbMxQuantizer.scala:238:27
-        automatic logic [7:0][255:0] _GEN_5;	// src/foragerbee/scala/main/FbMxQuantizer.scala:241:24
-        automatic logic [255:0]      rawElem;	// src/foragerbee/scala/main/FbMxQuantizer.scala:241:24
-        automatic logic              _f32Elem_T_3;	// src/foragerbee/scala/main/FbMxQuantizer.scala:72:26
-        automatic logic [31:0]       f32Elem;	// src/foragerbee/scala/main/FbMxQuantizer.scala:242:22
-        automatic logic [8:0]        _qByte_newExpS_T_3;	// src/foragerbee/scala/main/FbMxQuantizer.scala:118:36
-        automatic logic [3:0]        qByte_mr4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:124:19
-        automatic logic [2:0]        qByte_mr5;	// src/foragerbee/scala/main/FbMxQuantizer.scala:129:19
-        automatic logic [8:0]        _qByte_newExpF_T_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:133:27
-        automatic logic [510:0]      _outBeatReg_T_2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:258:54
-        epbLog = isFp32Src ? 3'h3 : 3'h4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:173:36, :237:22
-        beatIdx = elemIdx >> epbLog;	// src/foragerbee/scala/main/FbMxQuantizer.scala:166:27, :237:22, :238:27
-        _GEN_5 =
+      if (io_flush)	// src/foragerbee/scala/main/FbMxQuantizer.scala:36:14
+        elemIdx <= 7'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :174:27
+      else if (_GEN_4)	// src/foragerbee/scala/main/FbMxQuantizer.scala:215:28, :240:26, :264:18, :265:18
+        elemIdx <= lastElem ? 7'h0 : elemIdx + 7'h1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :174:27, :257:28, :269:22, :270:17, :273:{17,28}
+      else if (_GEN_2)	// src/foragerbee/scala/main/FbMxQuantizer.scala:178:27, :215:28, :216:22, :223:49, :227:20
+        elemIdx <= 7'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :174:27
+      if (_GEN_6)	// src/foragerbee/scala/main/FbMxQuantizer.scala:240:26, :292:26, :296:27, :297:20, :315:18, :321:18
+        outBeatReg <= 256'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:175:27
+      else if (_GEN_4) begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:215:28, :240:26, :264:18, :265:18
+        automatic logic              dstE4 = io_cfg_dstFmt == 4'h4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:183:36
+        automatic logic [2:0]        epbLog;	// src/foragerbee/scala/main/FbMxQuantizer.scala:244:22
+        automatic logic [6:0]        beatIdx;	// src/foragerbee/scala/main/FbMxQuantizer.scala:245:27
+        automatic logic [7:0][255:0] _GEN_7;	// src/foragerbee/scala/main/FbMxQuantizer.scala:248:24
+        automatic logic [255:0]      rawElem;	// src/foragerbee/scala/main/FbMxQuantizer.scala:248:24
+        automatic logic              _f32Elem_T_3;	// src/foragerbee/scala/main/FbMxQuantizer.scala:73:26
+        automatic logic [31:0]       f32Elem;	// src/foragerbee/scala/main/FbMxQuantizer.scala:249:22
+        automatic logic [3:0]        qByte_mr4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:125:19
+        automatic logic [2:0]        qByte_mr5;	// src/foragerbee/scala/main/FbMxQuantizer.scala:130:19
+        automatic logic [8:0]        _qByte_newExpF_T_1;	// src/foragerbee/scala/main/FbMxQuantizer.scala:119:36, :138:27
+        automatic logic [510:0]      _outBeatReg_T_2;	// src/foragerbee/scala/main/FbMxQuantizer.scala:265:54
+        epbLog = isFp32Src ? 3'h3 : 3'h4;	// src/foragerbee/scala/main/FbMxQuantizer.scala:181:36, :244:22
+        beatIdx = elemIdx >> epbLog;	// src/foragerbee/scala/main/FbMxQuantizer.scala:174:27, :244:22, :245:27
+        _GEN_7 =
           {{blockBuf_7},
            {blockBuf_6},
            {blockBuf_5},
@@ -590,12 +604,12 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
            {blockBuf_3},
            {blockBuf_2},
            {blockBuf_1},
-           {blockBuf_0}};	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23, :241:24
+           {blockBuf_0}};	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23, :248:24
         rawElem =
-          _GEN_5[beatIdx[2:0]]
+          _GEN_7[beatIdx[2:0]]
           >> ({7'h0, {7'h0, elemIdx} - ({7'h0, beatIdx} << epbLog)}
-              << {20'h2, isFp32Src});	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :61:68, :166:27, :173:36, :237:22, :238:27, :239:{27,38}, :241:{24,32}
-        _f32Elem_T_3 = rawElem[14:10] == 5'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:70:17, :72:26, :241:24, :243:75
+              << {20'h2, isFp32Src});	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :62:68, :174:27, :181:36, :244:22, :245:27, :246:{27,38}, :248:{24,32}
+        _f32Elem_T_3 = rawElem[14:10] == 5'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:71:17, :73:26, :248:24, :250:75
         f32Elem =
           isFp32Src
             ? rawElem[31:0]
@@ -608,17 +622,16 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                           : (&(rawElem[14:10])) ? 8'hFF : {3'h0, rawElem[14:10]} + 8'h70,
                         rawElem[9:0],
                         13'h0}}
-                : {rawElem[15:0], 16'h0};	// src/foragerbee/scala/main/FbMxQuantizer.scala:69:17, :70:17, :71:17, :72:{21,26}, :73:{21,26}, :74:23, :75:21, :76:{8,21,28,40}, :77:12, :86:53, :90:37, :97:37, :173:36, :241:24, :242:{22,41}, :243:{22,75}, :244:26
-        _qByte_newExpS_T_3 =
-          {1'h0, f32Elem[30:23]} - 9'h7F - maxExp + {5'h0, ~dstE4, 3'h7};	// src/foragerbee/scala/main/FbMxQuantizer.scala:108:19, :116:28, :117:22, :118:{27,36}, :165:27, :175:36, :242:22
+                : {rawElem[15:0], 16'h0};	// src/foragerbee/scala/main/FbMxQuantizer.scala:70:17, :71:17, :72:17, :73:{21,26}, :74:{21,26}, :75:23, :76:21, :77:{8,21,28,40}, :78:12, :87:53, :91:37, :98:37, :181:36, :248:24, :249:{22,41}, :250:{22,75}, :251:26
         qByte_mr4 =
           {1'h0, f32Elem[22:20]}
-          + {3'h0, f32Elem[19] & ((|(f32Elem[18:0])) | f32Elem[20])};	// src/foragerbee/scala/main/FbMxQuantizer.scala:109:19, :122:18, :123:{18,23,30,38,42,48}, :124:19, :242:22
+          + {3'h0, f32Elem[19] & ((|(f32Elem[18:0])) | f32Elem[20])};	// src/foragerbee/scala/main/FbMxQuantizer.scala:110:19, :123:18, :124:{18,23,30,38,42,48}, :125:19, :249:22
         qByte_mr5 =
           {1'h0, f32Elem[22:21]}
-          + {2'h0, f32Elem[20] & ((|(f32Elem[19:0])) | f32Elem[21])};	// src/foragerbee/scala/main/FbMxQuantizer.scala:109:19, :127:18, :128:{18,23,30,38,42,48}, :129:19, :160:22, :242:22
+          + {2'h0, f32Elem[20] & ((|(f32Elem[19:0])) | f32Elem[21])};	// src/foragerbee/scala/main/FbMxQuantizer.scala:110:19, :128:18, :129:{18,23,30,38,42,48}, :130:19, :168:22, :249:22
         _qByte_newExpF_T_1 =
-          _qByte_newExpS_T_3 + {9{dstE4 ? qByte_mr4[3] : qByte_mr5[2]}};	// src/foragerbee/scala/main/FbMxQuantizer.scala:118:36, :124:19, :125:18, :129:19, :130:18, :132:22, :133:27, :175:36
+          {1'h0, f32Elem[30:23]} - 9'h7F - maxExp + {5'h0, ~dstE4, 3'h7}
+          + {8'h0, dstE4 ? qByte_mr4[3] : qByte_mr5[2]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:109:19, :117:28, :118:22, :119:{27,36}, :125:19, :126:18, :130:19, :131:18, :133:22, :138:27, :173:27, :183:36, :249:22
         _outBeatReg_T_2 =
           {503'h0,
            f32Elem[31],
@@ -629,61 +642,62 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
                  : (&(f32Elem[30:23]))
                    | $signed(_qByte_newExpF_T_1) > $signed({4'h0, ~dstE4, 4'hE})
                      ? (dstE4 ? 7'h77 : 7'h7B)
-                     : $signed(_qByte_newExpS_T_3) < 9'sh1
+                     : $signed(_qByte_newExpF_T_1) < 9'sh1
                          ? 7'h0
                          : dstE4
                              ? {_qByte_newExpF_T_1[3:0],
                                 qByte_mr4[3] ? 3'h0 : qByte_mr4[2:0]}
                              : {_qByte_newExpF_T_1[4:0],
                                 qByte_mr5[2] ? 2'h0 : qByte_mr5[1:0]}}
-          << {503'h0, elemIdx[4:0], 3'h0};	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :107:19, :108:19, :109:19, :111:25, :112:25, :113:{30,37}, :117:22, :118:36, :124:19, :125:18, :129:19, :130:18, :133:27, :136:29, :137:{29,34}, :138:{24,35}, :139:33, :140:24, :142:24, :143:{10,24,42,60}, :144:{10,24,42,60}, :146:8, :147:{8,19}, :148:{8,18}, :149:8, :160:22, :166:27, :175:36, :242:22, :249:27, :258:54
-        outBeatReg <= (_baseBeat_T ? 256'h0 : outBeatReg) | _outBeatReg_T_2[255:0];	// src/foragerbee/scala/main/FbMxQuantizer.scala:167:27, :255:23, :258:{30,54,74}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+          << {503'h0, elemIdx[4:0], 3'h0};	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :108:19, :109:19, :110:19, :112:25, :113:25, :114:{30,37}, :118:22, :119:36, :125:19, :126:18, :130:19, :131:18, :138:27, :144:29, :145:{29,34}, :146:{24,35}, :147:33, :148:24, :150:24, :151:{10,24,42,60}, :152:{10,24,42,60}, :154:8, :155:{8,19}, :156:{8,18}, :157:8, :168:22, :174:27, :183:36, :249:22, :256:27, :265:54
+        outBeatReg <= (_baseBeat_T ? 256'h0 : outBeatReg) | _outBeatReg_T_2[255:0];	// src/foragerbee/scala/main/FbMxQuantizer.scala:175:27, :262:23, :265:{30,54,74}, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
       end
-      else if (_GEN_2)	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:27, :208:28, :209:22, :216:49, :220:20
-        outBeatReg <= 256'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:167:27
+      else if (_GEN_2)	// src/foragerbee/scala/main/FbMxQuantizer.scala:178:27, :215:28, :216:22, :223:49, :227:20
+        outBeatReg <= 256'h0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:175:27
       outDataValid <=
-        ~_GEN_4
+        ~_GEN_6
         & (_GEN
              ? ~_baseBeat_T & (~stall & ((&(elemIdx[4:0])) | lastElem) | outDataValid)
-             : outDataValid);	// src/foragerbee/scala/main/FbMxQuantizer.scala:166:27, :168:29, :233:{14,26}, :249:27, :250:28, :251:{28,53}, :254:30, :257:{10,18}, :259:22, :260:22, :269:27, :270:20, :278:26, :282:27, :283:20, :301:18, :307:18, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      scaleValid <= ~(io_flush | _GEN_0 & _scaleDone_T_1) & (_GEN_2 | scaleValid);	// src/foragerbee/scala/main/FbMxQuantizer.scala:169:27, :170:27, :208:28, :209:22, :216:49, :220:20, :221:20, :278:{14,26}, :286:28, :287:18, :301:18, :308:18, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      if (_GEN_2) begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:27, :208:28, :209:22, :216:49, :220:20
-        automatic logic [8:0] _sumExp_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:219:33
-        _sumExp_T = ((|_anyContrib_T) & _finalMax_T ? beatMax : maxExp) + 9'h7F;	// src/foragerbee/scala/main/FbMxQuantizer.scala:165:27, :203:{32,39}, :206:25, :213:34, :218:{27,39}, :219:33
-        scaleReg <= $signed(_sumExp_T) < 9'sh1 ? 8'h0 : _sumExp_T[7:0];	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:27, :219:33, :220:{26,34,58}
+             : outDataValid);	// src/foragerbee/scala/main/FbMxQuantizer.scala:174:27, :176:29, :240:{14,26}, :256:27, :257:28, :258:{28,53}, :261:30, :264:{10,18}, :266:22, :267:22, :276:27, :277:20, :292:26, :296:27, :297:20, :315:18, :321:18, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      scaleValid <=
+        ~io_flush & (_GEN_0 ? ~(_scaleDone_T_1 | _GEN_5) & _GEN_3 : ~_GEN_5 & _GEN_3);	// src/foragerbee/scala/main/FbMxQuantizer.scala:177:27, :215:28, :216:22, :223:49, :228:20, :240:26, :283:28, :284:18, :292:{14,26}, :300:28, :301:18, :315:18, :322:18, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      if (_GEN_2) begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:178:27, :215:28, :216:22, :223:49, :227:20
+        automatic logic [8:0] _sumExp_T;	// src/foragerbee/scala/main/FbMxQuantizer.scala:226:33
+        _sumExp_T = ((|_anyContrib_T) & _finalMax_T ? beatMax : maxExp) + 9'h7F;	// src/foragerbee/scala/main/FbMxQuantizer.scala:173:27, :210:{32,39}, :213:25, :220:34, :225:{27,39}, :226:33
+        scaleReg <= $signed(_sumExp_T) < 9'sh1 ? 8'h0 : _sumExp_T[7:0];	// src/foragerbee/scala/main/FbMxQuantizer.scala:178:27, :226:33, :227:{26,34,58}
       end
     end
-    if (_io_in_ready_T & _GEN_1 & beatCnt == 3'h0)	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23, :163:27, :182:30, :208:28, :209:22, :210:33, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      blockBuf_0 <= io_in_bits;	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23
-    if (_io_in_ready_T & _GEN_1 & beatCnt == 3'h1)	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23, :163:27, :182:30, :208:28, :209:22, :210:33, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      blockBuf_1 <= io_in_bits;	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23
-    if (_io_in_ready_T & _GEN_1 & beatCnt == 3'h2)	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23, :163:27, :182:30, :208:28, :209:22, :210:33, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      blockBuf_2 <= io_in_bits;	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23
-    if (_io_in_ready_T & _GEN_1 & beatCnt == 3'h3)	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23, :163:27, :182:30, :208:28, :209:22, :210:33, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      blockBuf_3 <= io_in_bits;	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23
-    if (_io_in_ready_T & _GEN_1 & beatCnt == 3'h4)	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23, :163:27, :182:30, :208:28, :209:22, :210:33, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      blockBuf_4 <= io_in_bits;	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23
-    if (_io_in_ready_T & _GEN_1 & beatCnt == 3'h5)	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23, :163:27, :182:30, :208:28, :209:22, :210:33, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      blockBuf_5 <= io_in_bits;	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23
-    if (_io_in_ready_T & _GEN_1 & beatCnt == 3'h6)	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23, :163:27, :182:30, :208:28, :209:22, :210:33, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      blockBuf_6 <= io_in_bits;	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23
-    if (_io_in_ready_T & _GEN_1 & (&beatCnt))	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23, :163:27, :182:30, :208:28, :209:22, :210:33, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
-      blockBuf_7 <= io_in_bits;	// src/foragerbee/scala/main/FbMxQuantizer.scala:162:23
+    if (_io_in_ready_T & _GEN_1 & beatCnt == 3'h0)	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23, :171:27, :190:30, :215:28, :216:22, :217:33, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      blockBuf_0 <= io_in_bits;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23
+    if (_io_in_ready_T & _GEN_1 & beatCnt == 3'h1)	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23, :171:27, :190:30, :215:28, :216:22, :217:33, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      blockBuf_1 <= io_in_bits;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23
+    if (_io_in_ready_T & _GEN_1 & beatCnt == 3'h2)	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23, :171:27, :190:30, :215:28, :216:22, :217:33, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      blockBuf_2 <= io_in_bits;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23
+    if (_io_in_ready_T & _GEN_1 & beatCnt == 3'h3)	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23, :171:27, :190:30, :215:28, :216:22, :217:33, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      blockBuf_3 <= io_in_bits;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23
+    if (_io_in_ready_T & _GEN_1 & beatCnt == 3'h4)	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23, :171:27, :190:30, :215:28, :216:22, :217:33, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      blockBuf_4 <= io_in_bits;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23
+    if (_io_in_ready_T & _GEN_1 & beatCnt == 3'h5)	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23, :171:27, :190:30, :215:28, :216:22, :217:33, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      blockBuf_5 <= io_in_bits;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23
+    if (_io_in_ready_T & _GEN_1 & beatCnt == 3'h6)	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23, :171:27, :190:30, :215:28, :216:22, :217:33, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      blockBuf_6 <= io_in_bits;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23
+    if (_io_in_ready_T & _GEN_1 & (&beatCnt))	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23, :171:27, :190:30, :215:28, :216:22, :217:33, src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
+      blockBuf_7 <= io_in_bits;	// src/foragerbee/scala/main/FbMxQuantizer.scala:170:23
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
-      `FIRRTL_BEFORE_INITIAL	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
+  `ifdef ENABLE_INITIAL_REG_	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
+      `FIRRTL_BEFORE_INITIAL	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
-      automatic logic [31:0] _RANDOM[0:73];	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
-      `ifdef INIT_RANDOM_PROLOG_	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
-        `INIT_RANDOM_PROLOG_	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
+    initial begin	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
+      automatic logic [31:0] _RANDOM[0:73];	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
+      `ifdef INIT_RANDOM_PROLOG_	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
+        `INIT_RANDOM_PROLOG_	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
+      `ifdef RANDOMIZE_REG_INIT	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
         for (logic [6:0] i = 7'h0; i < 7'h4A; i += 7'h1) begin
-          _RANDOM[i] = `RANDOM;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
-        end	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
-        state = _RANDOM[7'h0][1:0];	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :160:22
+          _RANDOM[i] = `RANDOM;	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
+        end	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
+        state = _RANDOM[7'h0][1:0];	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :168:22
         blockBuf_0 =
           {_RANDOM[7'h0][31:2],
            _RANDOM[7'h1],
@@ -693,7 +707,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
            _RANDOM[7'h5],
            _RANDOM[7'h6],
            _RANDOM[7'h7],
-           _RANDOM[7'h8][1:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :160:22, :162:23
+           _RANDOM[7'h8][1:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :168:22, :170:23
         blockBuf_1 =
           {_RANDOM[7'h8][31:2],
            _RANDOM[7'h9],
@@ -703,7 +717,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
            _RANDOM[7'hD],
            _RANDOM[7'hE],
            _RANDOM[7'hF],
-           _RANDOM[7'h10][1:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :162:23
+           _RANDOM[7'h10][1:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :170:23
         blockBuf_2 =
           {_RANDOM[7'h10][31:2],
            _RANDOM[7'h11],
@@ -713,7 +727,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
            _RANDOM[7'h15],
            _RANDOM[7'h16],
            _RANDOM[7'h17],
-           _RANDOM[7'h18][1:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :162:23
+           _RANDOM[7'h18][1:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :170:23
         blockBuf_3 =
           {_RANDOM[7'h18][31:2],
            _RANDOM[7'h19],
@@ -723,7 +737,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
            _RANDOM[7'h1D],
            _RANDOM[7'h1E],
            _RANDOM[7'h1F],
-           _RANDOM[7'h20][1:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :162:23
+           _RANDOM[7'h20][1:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :170:23
         blockBuf_4 =
           {_RANDOM[7'h20][31:2],
            _RANDOM[7'h21],
@@ -733,7 +747,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
            _RANDOM[7'h25],
            _RANDOM[7'h26],
            _RANDOM[7'h27],
-           _RANDOM[7'h28][1:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :162:23
+           _RANDOM[7'h28][1:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :170:23
         blockBuf_5 =
           {_RANDOM[7'h28][31:2],
            _RANDOM[7'h29],
@@ -743,7 +757,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
            _RANDOM[7'h2D],
            _RANDOM[7'h2E],
            _RANDOM[7'h2F],
-           _RANDOM[7'h30][1:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :162:23
+           _RANDOM[7'h30][1:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :170:23
         blockBuf_6 =
           {_RANDOM[7'h30][31:2],
            _RANDOM[7'h31],
@@ -753,7 +767,7 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
            _RANDOM[7'h35],
            _RANDOM[7'h36],
            _RANDOM[7'h37],
-           _RANDOM[7'h38][1:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :162:23
+           _RANDOM[7'h38][1:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :170:23
         blockBuf_7 =
           {_RANDOM[7'h38][31:2],
            _RANDOM[7'h39],
@@ -763,11 +777,11 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
            _RANDOM[7'h3D],
            _RANDOM[7'h3E],
            _RANDOM[7'h3F],
-           _RANDOM[7'h40][1:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :162:23
-        beatCnt = _RANDOM[7'h40][4:2];	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :162:23, :163:27
-        elemCnt = _RANDOM[7'h40][12:5];	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :162:23, :164:27
-        maxExp = _RANDOM[7'h40][21:13];	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :162:23, :165:27
-        elemIdx = _RANDOM[7'h40][28:22];	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :162:23, :166:27
+           _RANDOM[7'h40][1:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :170:23
+        beatCnt = _RANDOM[7'h40][4:2];	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :170:23, :171:27
+        elemCnt = _RANDOM[7'h40][12:5];	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :170:23, :172:27
+        maxExp = _RANDOM[7'h40][21:13];	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :170:23, :173:27
+        elemIdx = _RANDOM[7'h40][28:22];	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :170:23, :174:27
         outBeatReg =
           {_RANDOM[7'h40][31:29],
            _RANDOM[7'h41],
@@ -777,20 +791,20 @@ module Fb_FbMxQuantizer(	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
            _RANDOM[7'h45],
            _RANDOM[7'h46],
            _RANDOM[7'h47],
-           _RANDOM[7'h48][28:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :162:23, :167:27
-        outDataValid = _RANDOM[7'h48][29];	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :167:27, :168:29
-        scaleValid = _RANDOM[7'h48][30];	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :167:27, :169:27
-        scaleReg = {_RANDOM[7'h48][31], _RANDOM[7'h49][6:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :167:27, :170:27
+           _RANDOM[7'h48][28:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :170:23, :175:27
+        outDataValid = _RANDOM[7'h48][29];	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :175:27, :176:29
+        scaleValid = _RANDOM[7'h48][30];	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :175:27, :177:27
+        scaleReg = {_RANDOM[7'h48][31], _RANDOM[7'h49][6:0]};	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :175:27, :178:27
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
-      `FIRRTL_AFTER_INITIAL	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7
+    `ifdef FIRRTL_AFTER_INITIAL	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
+      `FIRRTL_AFTER_INITIAL	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_in_ready = io_in_ready_0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :182:21, :233:26, :234:17, :278:26, :279:17
-  assign io_outData_valid = outDataValid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :168:29
-  assign io_outData_bits = outBeatReg;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :167:27
-  assign io_outScale_valid = scaleValid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :169:27
-  assign io_outScale_bits = scaleReg;	// src/foragerbee/scala/main/FbMxQuantizer.scala:31:7, :170:27
+  assign io_in_ready = io_in_ready_0;	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :190:21, :240:26, :241:17, :292:26, :293:17
+  assign io_outData_valid = outDataValid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :176:29
+  assign io_outData_bits = outBeatReg;	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :175:27
+  assign io_outScale_valid = scaleValid;	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :177:27
+  assign io_outScale_bits = scaleReg;	// src/foragerbee/scala/main/FbMxQuantizer.scala:32:7, :178:27
 endmodule
 
