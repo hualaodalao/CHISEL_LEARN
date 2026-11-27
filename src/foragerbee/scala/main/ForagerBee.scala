@@ -47,8 +47,8 @@ class ForagerBee(cfg: ForagerBeeConfig = ForagerBeeConfig(),
   })
 
   private val fb = Module(new FbCore(cfg))
-  // flushReq 期间复位 RegIf（含公共契约区），满足 13.10.5 第 4 条；RegIf 本身无 flush 端口。
-  private val regIf = withReset(reset.asBool || io.flushReq) { Module(new QueenDsaRegIf(rcfg)) }
+  // flush 不复位寄存器值（与 WorkerBee 一致）：只丢弃在途槽/pending 与核心排队命令，配置保持。
+  private val regIf = Module(new QueenDsaRegIf(rcfg))
 
   regIf.io.cmd <> io.cmd
   io.resp <> regIf.io.resp

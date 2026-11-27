@@ -1,6 +1,6 @@
 # ForagerBee DMA 硬件规格
 
-文档版本：`v6.0.0`
+文档版本：`v6.0.1`
 
 修订日期：`2026-11-25`
 
@@ -16,6 +16,7 @@
 
 | 版本号 | 日期 | 修改内容 | 相关 Feature ID |
 |---|---|---|---|
+| v6.0.1 | 2026-11-25 | 勘误：flush 不再复位 RegIf 寄存器值（去掉 withReset(reset||flushReq)，与 WorkerBee 一致）；flush 仅丢弃在途上下文槽/pending 与核心排队命令，shadow/live 配置、TRACE_TAG、hwSignal、中断寄存器保持；flush 用例补寄存器保持断言 | FB-F031 |
 | v6.0.0 | 2026-11-25 | **顶层 ABI 变更（Queen 设备化）**：ForagerBee 顶层即 Queen 设备（镜像 WorkerBee），外露 native beat/resp/wrErr/completion/deviceIdle/flushReq/flushAck/irq；原始 Stream 核心降为内部 FbCore（新增每引擎 errPulse 输出），删除包装层 ForagerBeeReg；错误中断 errPulse→regIf.intrSrc（intrWidth=numPorts）；hwSignal/traceTag RUN 当拍采样随 completion 回传；发射入口 ForagerBeeElaborate 发射 Queen 顶层 | FB-F031 |
 | v5.0.0 | 2026-11-25 | **寄存器接口 ABI 变更（Queen 对齐）**：删除自研 FbRegIf，ForagerBeeReg 改为复用 Queen 公共模块 QueenDsaRegIf/QueenDsaCompletion；cmd 改 native beat（WRITE1/WRITE2/READ/RUN，单 ready）、resp 仅 QRD、非法写走 wrErr 脉冲；RUN 取代 START 寄存器并反压而非 err；完成走 completion 端口（swTag/hwTag/error/code/hwSignal），删除 DONE/DONE_CNT/CREDIT 寄存器；credit=N 上下文槽按完成归还、RUN 当拍采样延迟一拍发射；新增公共契约区（中断/hwSignal/TRACE_TAG）与核心最小 flush、flush 四相、强 deviceIdle | FB-F031 |
 | v4.0.0 | 2026-11-17 | **寄存器接口 ABI 变更**：cmd 由单 lane 改为 4 lane、resp 1 lane 带 laneId；batch 接收、4 路并行写、回执按 lane 优先级排空（读按 lane 序返回）；跨 lane 同址写冲突 err、同 batch 多 START 仅授权最低 lane；credit/双 bank 语义不变 | FB-F031 |
@@ -737,7 +738,7 @@ SG 硬件额外要求 dataWidth>=addressWidth+16，否则该通道 SG 命令报�
 - **多引擎 done 可乱序**：按 `FbCmd.tag` 取槽回传 completion（swTag/hwTag/hwSignal 取自该槽采样副本），`done.fire` 清槽并归还 1 credit。能接受多少在途 RUN 就保存多少份采样副本（13.10.4）。
 - **swTag**：RUN rs2 非 0 覆盖，为 0 沿用 TRACE_TAG（QueenDsaRegIf `startSwTag`）；hwTag=槽号。hwSignal/swTag 均 RUN 当拍采样、随 completion 一并回传。
 - **错误中断**：每引擎错误完成脉冲（`FbCore.errPulse(p) = done.fire && err`）路由到 `regIf.intrSrc`（intrWidth=numPorts，每引擎一位），置位 IntrRaw（0x60），软件经 IntrMask（0x68）屏蔽/解除、IntrStatus（0x6C）观测、W1C 清 IntrRaw；`irq=(intrRaw&~intrMask).orR`。命令错误同时经 completion.error/code 回传。
-- **deviceIdle（强 idle）** = 核心 idle 且无在途上下文槽。**flush 四相** req↑→ack↑→req↓→ack↓：`flushReq` 拉起复位 RegIf（含公共契约区，`withReset`）、作废所有槽与 pending、核心最小 flush（FIFO flush + 派发门控 + 等引擎自然结束，无安全 abort）；核心 idle 后 `flushAck=1`。
+- **deviceIdle（强 idle）** = 核心 idle 且无在途上下文槽。**flush 四相** req↑→ack↑→req↓→ack↓：`flushReq` 拉起作废所有上下文槽与 pending、核心最小 flush（FIFO flush + 派发门控 + 等引擎自然结束，无安全 abort）；核心 idle 后 `flushAck=1`。**flush 不复位寄存器值**（与 WorkerBee 一致）：shadow/live 配置、TRACE_TAG、hwSignal、中断寄存器均保持，仅丢弃在途工作。
 
 #### 8.3.5 验证状态
 

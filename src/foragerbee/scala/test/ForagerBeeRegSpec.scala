@@ -286,6 +286,7 @@ class ForagerBeeRegSpec extends AnyFlatSpec with Matchers {
     withSim(prefill = mem, writeDelay = 60) { sim =>
       sim.copy1D(s1, dst, 16); sim.run(1) shouldBe true
       sim.copy1D(s2, dst, 16); sim.run(2) shouldBe true // 第二条 WAW 排队
+      sim.writeReg(0xA0, BigInt(0x9999)) // TRACE_TAG，flush 后须保持
       sim.idle(4)
       sim.setFlush(true)
       // flushReq 拉起后等 ack（运行中引擎自然结束、排队命令丢弃）
@@ -297,6 +298,10 @@ class ForagerBeeRegSpec extends AnyFlatSpec with Matchers {
       sim.idle(2)
       sim.flushAck shouldBe false
       sim.deviceIdle shouldBe true
+      // flush 不复位寄存器值：配置与公共契约区保持
+      sim.readReg(0x00)._1 shouldBe 0xCC8
+      sim.readReg(0x03)._1 shouldBe (s2 & 0xffffffffL)
+      sim.readReg(0xA0)._1 shouldBe 0x9999
       // flush 后可重新接受 RUN
       sim.copy1D(s1, dst, 16); sim.run(3) shouldBe true
       sim.waitComps(1)
