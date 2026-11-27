@@ -169,7 +169,7 @@ module LlcWriteMergeBuffer(	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7
     {{entryStrb_3_1}, {entryStrb_2_1}, {entryStrb_1_1}, {entryStrb_0_1}};	// src/llc/scala/main/LlcWriteMergeBuffer.scala:71:28, :179:58
   wire [3:0][1:0]   _GEN_8 =
     {{entryPendResps_3}, {entryPendResps_2}, {entryPendResps_1}, {entryPendResps_0}};	// src/llc/scala/main/LlcWriteMergeBuffer.scala:77:32, :181:56
-  wire              _GEN_9 = state == 2'h1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:81:29, :139:17, :244:42
+  wire              _GEN_9 = state == 2'h1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:81:29, :139:17, :245:42
   wire              infoDone = bInfoSent | io_bRespOut_valid_0 & io_bRespOut_ready;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:85:28, :124:23, :139:17, :214:32, :215:24, src/utils/Stream/Stream.scala:43:26
   assign io_bRespOut_valid_0 = ~_GEN & _GEN_9 & ~bInfoSent;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:69:28, :85:28, :124:23, :139:17, :142:31, :215:{12,24}
   wire [3:0][3:0]   _GEN_10 = {{entryId_3}, {entryId_2}, {entryId_1}, {entryId_0}};	// src/llc/scala/main/LlcWriteMergeBuffer.scala:74:28, :217:36
@@ -221,12 +221,12 @@ module LlcWriteMergeBuffer(	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7
     automatic logic       _GEN_42;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:194:39, :199:40
     automatic logic       _GEN_43;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:194:39, :199:40
     automatic logic       _GEN_44;	// src/utils/Stream/Stream.scala:43:26
-    matchIdx = matchVec_0 ? 2'h0 : matchVec_1 ? 2'h1 : {1'h1, ~matchVec_2};	// src/llc/scala/main/LlcWriteMergeBuffer.scala:92:{19,38}, :244:42, src/main/scala/chisel3/util/Mux.scala:58:84
-    freeIdx = entryValid_0 ? (entryValid_1 ? {1'h1, entryValid_2} : 2'h1) : 2'h0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :244:42, src/main/scala/chisel3/util/Mux.scala:58:84
+    matchIdx = matchVec_0 ? 2'h0 : matchVec_1 ? 2'h1 : {1'h1, ~matchVec_2};	// src/llc/scala/main/LlcWriteMergeBuffer.scala:92:{19,38}, :245:42, src/main/scala/chisel3/util/Mux.scala:58:84
+    freeIdx = entryValid_0 ? (entryValid_1 ? {1'h1, entryValid_2} : 2'h1) : 2'h0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :245:42, src/main/scala/chisel3/util/Mux.scala:58:84
     _GEN_18 = matchIdx == 2'h0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:178:34, src/main/scala/chisel3/util/Mux.scala:58:84
     _GEN_19 = _GEN_18 & ~io_writeIn_payload_beatIdx;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:70:28, :178:34
     _GEN_20 = _GEN_18 & io_writeIn_payload_beatIdx;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:70:28, :178:34
-    _GEN_21 = matchIdx == 2'h1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:178:34, :244:42, src/main/scala/chisel3/util/Mux.scala:58:84
+    _GEN_21 = matchIdx == 2'h1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:178:34, :245:42, src/main/scala/chisel3/util/Mux.scala:58:84
     _GEN_22 = _GEN_21 & ~io_writeIn_payload_beatIdx;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:70:28, :178:34
     _GEN_23 = _GEN_21 & io_writeIn_payload_beatIdx;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:70:28, :178:34
     _GEN_24 = matchIdx == 2'h2;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:178:34, src/main/scala/chisel3/util/Mux.scala:58:84
@@ -235,7 +235,7 @@ module LlcWriteMergeBuffer(	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7
     _GEN_27 = (&matchIdx) & ~io_writeIn_payload_beatIdx;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:70:28, :178:34, src/main/scala/chisel3/util/Mux.scala:58:84
     _GEN_28 = (&matchIdx) & io_writeIn_payload_beatIdx;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:70:28, :178:34, src/main/scala/chisel3/util/Mux.scala:58:84
     _GEN_29 = freeIdx == 2'h0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:187:29, src/main/scala/chisel3/util/Mux.scala:58:84
-    _GEN_30 = freeIdx == 2'h1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:187:29, :244:42, src/main/scala/chisel3/util/Mux.scala:58:84
+    _GEN_30 = freeIdx == 2'h1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:187:29, :245:42, src/main/scala/chisel3/util/Mux.scala:58:84
     _GEN_31 = freeIdx == 2'h2;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:187:29, src/main/scala/chisel3/util/Mux.scala:58:84
     _GEN_32 = ~_GEN | _GEN_2 | ~_GEN_3 | (|_matchIdx_T) | ~_GEN_29;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:69:28, :93:{27,34}, :121:23, :139:17, :142:31, :153:29, :158:50, :166:26, :168:31, :175:26, :187:29, :188:29, src/utils/Stream/Stream.scala:43:26
     _GEN_33 = ~_GEN | _GEN_2 | ~_GEN_3 | (|_matchIdx_T) | ~_GEN_30;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:69:28, :93:{27,34}, :121:23, :139:17, :142:31, :153:29, :158:50, :166:26, :168:31, :175:26, :187:29, :188:29, src/utils/Stream/Stream.scala:43:26
@@ -275,7 +275,7 @@ module LlcWriteMergeBuffer(	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7
       bInfoSent <= 1'h0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:85:28
     end
     else begin	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7
-      automatic logic [3:0][1:0] _GEN_45;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:81:29, :139:17, :142:31, :226:38, :263:13
+      automatic logic [3:0][1:0] _GEN_45;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:81:29, :139:17, :142:31, :226:38, :264:13
       if (_GEN) begin	// src/llc/scala/main/LlcWriteMergeBuffer.scala:139:17
         entryValid_0 <= ~_GEN_2 & _GEN_3 & ~(|_matchIdx_T) & _GEN_29 | entryValid_0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :93:{27,34}, :121:23, :142:31, :153:29, :158:50, :166:26, :168:31, :175:26, :187:29, src/utils/Stream/Stream.scala:43:26
         entryValid_1 <= ~_GEN_2 & _GEN_3 & ~(|_matchIdx_T) & _GEN_30 | entryValid_1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :93:{27,34}, :121:23, :142:31, :153:29, :158:50, :166:26, :168:31, :175:26, :187:29, src/utils/Stream/Stream.scala:43:26
@@ -368,57 +368,57 @@ module LlcWriteMergeBuffer(	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7
         automatic logic _GEN_49;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:222:36
         automatic logic _GEN_50;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:222:36
         _GEN_48 = flushIdx == 2'h0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:82:25, :222:36
-        _GEN_49 = flushIdx == 2'h1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:82:25, :222:36, :244:42
+        _GEN_49 = flushIdx == 2'h1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:82:25, :222:36, :245:42
         _GEN_50 = flushIdx == 2'h2;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:82:25, :222:36
         if (_GEN_9) begin	// src/llc/scala/main/LlcWriteMergeBuffer.scala:139:17
-          automatic logic _GEN_51;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :237:28, :240:34
-          automatic logic _GEN_52;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :236:31, :237:28, :240:34
-          automatic logic _GEN_53;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :237:28, :240:34
-          automatic logic _GEN_54;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :236:31, :237:28, :240:34
-          automatic logic _GEN_55;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :237:28, :240:34
-          automatic logic _GEN_56;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :236:31, :237:28, :240:34
-          automatic logic _GEN_57;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :237:28, :240:34
-          automatic logic _GEN_58;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :236:31, :237:28, :240:34
-          automatic logic _GEN_59;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :247:28, :249:26, :251:32
-          automatic logic _GEN_60;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :247:28, :249:26, :251:32
-          automatic logic _GEN_61;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :247:28, :249:26, :251:32
-          automatic logic _GEN_62;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :247:28, :249:26, :251:32
-          _GEN_51 = flushBeatIdx & _GEN_48;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :83:25, :222:36, :237:28, :240:34
-          _GEN_52 = _GEN_44 & _GEN_51;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :236:31, :237:28, :240:34, src/utils/Stream/Stream.scala:43:26
-          _GEN_53 = flushBeatIdx & _GEN_49;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :83:25, :222:36, :237:28, :240:34
-          _GEN_54 = _GEN_44 & _GEN_53;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :236:31, :237:28, :240:34, src/utils/Stream/Stream.scala:43:26
-          _GEN_55 = flushBeatIdx & _GEN_50;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :83:25, :222:36, :237:28, :240:34
-          _GEN_56 = _GEN_44 & _GEN_55;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :236:31, :237:28, :240:34, src/utils/Stream/Stream.scala:43:26
-          _GEN_57 = flushBeatIdx & (&flushIdx);	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :82:25, :83:25, :222:36, :237:28, :240:34
-          _GEN_58 = _GEN_44 & _GEN_57;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :236:31, :237:28, :240:34, src/utils/Stream/Stream.scala:43:26
-          _GEN_59 = infoDone & _GEN_51;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :214:32, :237:28, :240:34, :247:28, :249:26, :251:32
-          _GEN_60 = infoDone & _GEN_53;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :214:32, :237:28, :240:34, :247:28, :249:26, :251:32
-          _GEN_61 = infoDone & _GEN_55;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :214:32, :237:28, :240:34, :247:28, :249:26, :251:32
-          _GEN_62 = infoDone & _GEN_57;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :214:32, :237:28, :240:34, :247:28, :249:26, :251:32
-          entryValid_0 <= _GEN_15 ? ~_GEN_52 & entryValid_0 : ~_GEN_59 & entryValid_0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :226:{21,38}, :236:31, :237:28, :240:34, :247:28, :249:26, :251:32
-          entryValid_1 <= _GEN_15 ? ~_GEN_54 & entryValid_1 : ~_GEN_60 & entryValid_1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :226:{21,38}, :236:31, :237:28, :240:34, :247:28, :249:26, :251:32
-          entryValid_2 <= _GEN_15 ? ~_GEN_56 & entryValid_2 : ~_GEN_61 & entryValid_2;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :226:{21,38}, :236:31, :237:28, :240:34, :247:28, :249:26, :251:32
-          entryValid_3 <= _GEN_15 ? ~_GEN_58 & entryValid_3 : ~_GEN_62 & entryValid_3;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :226:{21,38}, :236:31, :237:28, :240:34, :247:28, :249:26, :251:32
+          automatic logic _GEN_51;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :238:28, :241:34
+          automatic logic _GEN_52;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :237:31, :238:28, :241:34
+          automatic logic _GEN_53;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :238:28, :241:34
+          automatic logic _GEN_54;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :237:31, :238:28, :241:34
+          automatic logic _GEN_55;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :238:28, :241:34
+          automatic logic _GEN_56;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :237:31, :238:28, :241:34
+          automatic logic _GEN_57;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :238:28, :241:34
+          automatic logic _GEN_58;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :237:31, :238:28, :241:34
+          automatic logic _GEN_59;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :248:28, :250:26, :252:32
+          automatic logic _GEN_60;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :248:28, :250:26, :252:32
+          automatic logic _GEN_61;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :248:28, :250:26, :252:32
+          automatic logic _GEN_62;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :248:28, :250:26, :252:32
+          _GEN_51 = flushBeatIdx & _GEN_48;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :83:25, :222:36, :238:28, :241:34
+          _GEN_52 = _GEN_44 & _GEN_51;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :237:31, :238:28, :241:34, src/utils/Stream/Stream.scala:43:26
+          _GEN_53 = flushBeatIdx & _GEN_49;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :83:25, :222:36, :238:28, :241:34
+          _GEN_54 = _GEN_44 & _GEN_53;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :237:31, :238:28, :241:34, src/utils/Stream/Stream.scala:43:26
+          _GEN_55 = flushBeatIdx & _GEN_50;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :83:25, :222:36, :238:28, :241:34
+          _GEN_56 = _GEN_44 & _GEN_55;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :237:31, :238:28, :241:34, src/utils/Stream/Stream.scala:43:26
+          _GEN_57 = flushBeatIdx & (&flushIdx);	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :82:25, :83:25, :222:36, :238:28, :241:34
+          _GEN_58 = _GEN_44 & _GEN_57;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :237:31, :238:28, :241:34, src/utils/Stream/Stream.scala:43:26
+          _GEN_59 = infoDone & _GEN_51;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :214:32, :238:28, :241:34, :248:28, :250:26, :252:32
+          _GEN_60 = infoDone & _GEN_53;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :214:32, :238:28, :241:34, :248:28, :250:26, :252:32
+          _GEN_61 = infoDone & _GEN_55;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :214:32, :238:28, :241:34, :248:28, :250:26, :252:32
+          _GEN_62 = infoDone & _GEN_57;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :214:32, :238:28, :241:34, :248:28, :250:26, :252:32
+          entryValid_0 <= _GEN_15 ? ~_GEN_52 & entryValid_0 : ~_GEN_59 & entryValid_0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :226:{21,38}, :237:31, :238:28, :241:34, :248:28, :250:26, :252:32
+          entryValid_1 <= _GEN_15 ? ~_GEN_54 & entryValid_1 : ~_GEN_60 & entryValid_1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :226:{21,38}, :237:31, :238:28, :241:34, :248:28, :250:26, :252:32
+          entryValid_2 <= _GEN_15 ? ~_GEN_56 & entryValid_2 : ~_GEN_61 & entryValid_2;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :226:{21,38}, :237:31, :238:28, :241:34, :248:28, :250:26, :252:32
+          entryValid_3 <= _GEN_15 ? ~_GEN_58 & entryValid_3 : ~_GEN_62 & entryValid_3;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :226:{21,38}, :237:31, :238:28, :241:34, :248:28, :250:26, :252:32
           entryBeatValids_0_0 <=
-            _GEN_15 ? ~_GEN_52 & entryBeatValids_0_0 : ~_GEN_59 & entryBeatValids_0_0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :72:32, :226:{21,38}, :236:31, :237:28, :240:34, :242:39, :247:28, :249:26, :251:32, :253:37
+            _GEN_15 ? ~_GEN_52 & entryBeatValids_0_0 : ~_GEN_59 & entryBeatValids_0_0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :72:32, :226:{21,38}, :237:31, :238:28, :241:34, :243:39, :248:28, :250:26, :252:32, :254:37
           entryBeatValids_0_1 <=
-            _GEN_15 ? ~_GEN_52 & entryBeatValids_0_1 : ~_GEN_59 & entryBeatValids_0_1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :72:32, :226:{21,38}, :236:31, :237:28, :240:34, :242:39, :247:28, :249:26, :251:32, :253:37
+            _GEN_15 ? ~_GEN_52 & entryBeatValids_0_1 : ~_GEN_59 & entryBeatValids_0_1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :72:32, :226:{21,38}, :237:31, :238:28, :241:34, :243:39, :248:28, :250:26, :252:32, :254:37
           entryBeatValids_1_0 <=
-            _GEN_15 ? ~_GEN_54 & entryBeatValids_1_0 : ~_GEN_60 & entryBeatValids_1_0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :72:32, :226:{21,38}, :236:31, :237:28, :240:34, :242:39, :247:28, :249:26, :251:32, :253:37
+            _GEN_15 ? ~_GEN_54 & entryBeatValids_1_0 : ~_GEN_60 & entryBeatValids_1_0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :72:32, :226:{21,38}, :237:31, :238:28, :241:34, :243:39, :248:28, :250:26, :252:32, :254:37
           entryBeatValids_1_1 <=
-            _GEN_15 ? ~_GEN_54 & entryBeatValids_1_1 : ~_GEN_60 & entryBeatValids_1_1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :72:32, :226:{21,38}, :236:31, :237:28, :240:34, :242:39, :247:28, :249:26, :251:32, :253:37
+            _GEN_15 ? ~_GEN_54 & entryBeatValids_1_1 : ~_GEN_60 & entryBeatValids_1_1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :72:32, :226:{21,38}, :237:31, :238:28, :241:34, :243:39, :248:28, :250:26, :252:32, :254:37
           entryBeatValids_2_0 <=
-            _GEN_15 ? ~_GEN_56 & entryBeatValids_2_0 : ~_GEN_61 & entryBeatValids_2_0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :72:32, :226:{21,38}, :236:31, :237:28, :240:34, :242:39, :247:28, :249:26, :251:32, :253:37
+            _GEN_15 ? ~_GEN_56 & entryBeatValids_2_0 : ~_GEN_61 & entryBeatValids_2_0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :72:32, :226:{21,38}, :237:31, :238:28, :241:34, :243:39, :248:28, :250:26, :252:32, :254:37
           entryBeatValids_2_1 <=
-            _GEN_15 ? ~_GEN_56 & entryBeatValids_2_1 : ~_GEN_61 & entryBeatValids_2_1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :72:32, :226:{21,38}, :236:31, :237:28, :240:34, :242:39, :247:28, :249:26, :251:32, :253:37
+            _GEN_15 ? ~_GEN_56 & entryBeatValids_2_1 : ~_GEN_61 & entryBeatValids_2_1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :72:32, :226:{21,38}, :237:31, :238:28, :241:34, :243:39, :248:28, :250:26, :252:32, :254:37
           entryBeatValids_3_0 <=
-            _GEN_15 ? ~_GEN_58 & entryBeatValids_3_0 : ~_GEN_62 & entryBeatValids_3_0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :72:32, :226:{21,38}, :236:31, :237:28, :240:34, :242:39, :247:28, :249:26, :251:32, :253:37
+            _GEN_15 ? ~_GEN_58 & entryBeatValids_3_0 : ~_GEN_62 & entryBeatValids_3_0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :72:32, :226:{21,38}, :237:31, :238:28, :241:34, :243:39, :248:28, :250:26, :252:32, :254:37
           entryBeatValids_3_1 <=
-            _GEN_15 ? ~_GEN_58 & entryBeatValids_3_1 : ~_GEN_62 & entryBeatValids_3_1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :72:32, :226:{21,38}, :236:31, :237:28, :240:34, :242:39, :247:28, :249:26, :251:32, :253:37
-          entryClosed_0 <= _GEN_15 ? ~_GEN_52 & entryClosed_0 : ~_GEN_59 & entryClosed_0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :76:32, :226:{21,38}, :236:31, :237:28, :240:34, :241:35, :247:28, :249:26, :251:32, :252:33
-          entryClosed_1 <= _GEN_15 ? ~_GEN_54 & entryClosed_1 : ~_GEN_60 & entryClosed_1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :76:32, :226:{21,38}, :236:31, :237:28, :240:34, :241:35, :247:28, :249:26, :251:32, :252:33
-          entryClosed_2 <= _GEN_15 ? ~_GEN_56 & entryClosed_2 : ~_GEN_61 & entryClosed_2;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :76:32, :226:{21,38}, :236:31, :237:28, :240:34, :241:35, :247:28, :249:26, :251:32, :252:33
-          entryClosed_3 <= _GEN_15 ? ~_GEN_58 & entryClosed_3 : ~_GEN_62 & entryClosed_3;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :76:32, :226:{21,38}, :236:31, :237:28, :240:34, :241:35, :247:28, :249:26, :251:32, :252:33
+            _GEN_15 ? ~_GEN_58 & entryBeatValids_3_1 : ~_GEN_62 & entryBeatValids_3_1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :72:32, :226:{21,38}, :237:31, :238:28, :241:34, :243:39, :248:28, :250:26, :252:32, :254:37
+          entryClosed_0 <= _GEN_15 ? ~_GEN_52 & entryClosed_0 : ~_GEN_59 & entryClosed_0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :76:32, :226:{21,38}, :237:31, :238:28, :241:34, :242:35, :248:28, :250:26, :252:32, :253:33
+          entryClosed_1 <= _GEN_15 ? ~_GEN_54 & entryClosed_1 : ~_GEN_60 & entryClosed_1;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :76:32, :226:{21,38}, :237:31, :238:28, :241:34, :242:35, :248:28, :250:26, :252:32, :253:33
+          entryClosed_2 <= _GEN_15 ? ~_GEN_56 & entryClosed_2 : ~_GEN_61 & entryClosed_2;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :76:32, :226:{21,38}, :237:31, :238:28, :241:34, :242:35, :248:28, :250:26, :252:32, :253:33
+          entryClosed_3 <= _GEN_15 ? ~_GEN_58 & entryClosed_3 : ~_GEN_62 & entryClosed_3;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :76:32, :226:{21,38}, :237:31, :238:28, :241:34, :242:35, :248:28, :250:26, :252:32, :253:33
         end
         if (_GEN_9 & ~bInfoSent & io_bRespOut_ready & _GEN_48)	// src/llc/scala/main/LlcWriteMergeBuffer.scala:77:32, :85:28, :139:17, :215:{12,24}, :220:33, :222:36
           entryPendResps_0 <= 2'h0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:77:32
@@ -429,14 +429,14 @@ module LlcWriteMergeBuffer(	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7
         if (_GEN_9 & ~bInfoSent & io_bRespOut_ready & (&flushIdx))	// src/llc/scala/main/LlcWriteMergeBuffer.scala:77:32, :82:25, :85:28, :139:17, :215:{12,24}, :220:33, :222:36
           entryPendResps_3 <= 2'h0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:77:32
         bInfoSent <=
-          _GEN_9 ? ~bInfoSent & io_bRespOut_ready | bInfoSent : ~_GEN_17 & bInfoSent;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:85:28, :139:17, :215:{12,24}, :220:33, :221:21, :261:17
+          _GEN_9 ? ~bInfoSent & io_bRespOut_ready | bInfoSent : ~_GEN_17 & bInfoSent;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:85:28, :139:17, :215:{12,24}, :220:33, :221:21, :262:17
       end
       _GEN_45 =
         {{state},
          {2'h0},
          {(_GEN_15 ? _GEN_44 & flushBeatIdx : infoDone & flushBeatIdx) ? 2'h2 : state},
-         {(io_snoop_flushReq ? (|_snoopIdx_T) : _GEN_1) ? 2'h1 : state}};	// src/llc/scala/main/LlcWriteMergeBuffer.scala:81:29, :83:25, :112:{32,39}, :139:17, :142:31, :143:24, :145:24, :153:29, :154:22, :158:50, :160:22, :214:32, :226:{21,38}, :236:31, :237:28, :239:19, :244:42, :247:28, :249:26, :250:17, :263:13, src/utils/Stream/Stream.scala:43:26
-      state <= _GEN_45[state];	// src/llc/scala/main/LlcWriteMergeBuffer.scala:81:29, :139:17, :142:31, :226:38, :263:13
+         {(io_snoop_flushReq ? (|_snoopIdx_T) : _GEN_1) ? 2'h1 : state}};	// src/llc/scala/main/LlcWriteMergeBuffer.scala:81:29, :83:25, :112:{32,39}, :139:17, :142:31, :143:24, :145:24, :153:29, :154:22, :158:50, :160:22, :214:32, :226:{21,38}, :237:31, :238:28, :240:19, :245:42, :248:28, :250:26, :251:17, :264:13, src/utils/Stream/Stream.scala:43:26
+      state <= _GEN_45[state];	// src/llc/scala/main/LlcWriteMergeBuffer.scala:81:29, :139:17, :142:31, :226:38, :264:13
     end
     if (_GEN_32) begin	// src/llc/scala/main/LlcWriteMergeBuffer.scala:69:28, :139:17, :142:31, :153:29, :158:50, :168:31, :175:26, :188:29
     end
@@ -654,19 +654,19 @@ module LlcWriteMergeBuffer(	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7
       if (io_snoop_flushReq) begin	// src/llc/scala/main/LlcWriteMergeBuffer.scala:35:14
         if (|_snoopIdx_T)	// src/llc/scala/main/LlcWriteMergeBuffer.scala:112:{32,39}
           flushIdx <=
-            snoopMatchVec_0 ? 2'h0 : snoopMatchVec_1 ? 2'h1 : {1'h1, ~snoopMatchVec_2};	// src/llc/scala/main/LlcWriteMergeBuffer.scala:82:25, :111:19, :244:42, src/main/scala/chisel3/util/Mux.scala:58:84
+            snoopMatchVec_0 ? 2'h0 : snoopMatchVec_1 ? 2'h1 : {1'h1, ~snoopMatchVec_2};	// src/llc/scala/main/LlcWriteMergeBuffer.scala:82:25, :111:19, :245:42, src/main/scala/chisel3/util/Mux.scala:58:84
       end
       else if (|_closedIdx_T)	// src/llc/scala/main/LlcWriteMergeBuffer.scala:102:{29,36}
-        flushIdx <= closedVec_0 ? 2'h0 : closedVec_1 ? 2'h1 : {1'h1, ~closedVec_2};	// src/llc/scala/main/LlcWriteMergeBuffer.scala:82:25, :101:71, :244:42, src/main/scala/chisel3/util/Mux.scala:58:84
+        flushIdx <= closedVec_0 ? 2'h0 : closedVec_1 ? 2'h1 : {1'h1, ~closedVec_2};	// src/llc/scala/main/LlcWriteMergeBuffer.scala:82:25, :101:71, :245:42, src/main/scala/chisel3/util/Mux.scala:58:84
       else if (_GEN_0)	// src/llc/scala/main/LlcWriteMergeBuffer.scala:158:29
-        flushIdx <= entryValid_0 ? 2'h0 : entryValid_1 ? 2'h1 : {1'h1, ~entryValid_2};	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :82:25, :244:42, src/main/scala/chisel3/util/Mux.scala:58:84
+        flushIdx <= entryValid_0 ? 2'h0 : entryValid_1 ? 2'h1 : {1'h1, ~entryValid_2};	// src/llc/scala/main/LlcWriteMergeBuffer.scala:68:32, :82:25, :245:42, src/main/scala/chisel3/util/Mux.scala:58:84
       flushBeatIdx <=
         io_snoop_flushReq ? ~(|_snoopIdx_T) & flushBeatIdx : ~_GEN_1 & flushBeatIdx;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:81:29, :83:25, :112:{32,39}, :142:31, :143:24, :147:24, :153:29, :154:22, :156:22, :158:50, :160:22, :162:22
       flushIsSnoop <=
         io_snoop_flushReq ? (|_snoopIdx_T) | flushIsSnoop : ~_GEN_1 & flushIsSnoop;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:81:29, :83:25, :84:25, :112:{32,39}, :142:31, :143:24, :148:24, :153:29, :154:22, :156:22, :157:22, :158:50, :160:22, :162:22, :163:22
     end
     else if (_GEN_9)	// src/llc/scala/main/LlcWriteMergeBuffer.scala:139:17
-      flushBeatIdx <= _GEN_15 ? _GEN_44 | flushBeatIdx : infoDone | flushBeatIdx;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:83:25, :214:32, :226:{21,38}, :236:31, :237:28, :247:28, :249:26, src/utils/Stream/Stream.scala:43:26
+      flushBeatIdx <= _GEN_15 ? _GEN_44 | flushBeatIdx : infoDone | flushBeatIdx;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:83:25, :214:32, :226:{21,38}, :237:31, :238:28, :248:28, :250:26, src/utils/Stream/Stream.scala:43:26
   end // always @(posedge)
   `ifdef ENABLE_INITIAL_REG_	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7
     `ifdef FIRRTL_BEFORE_INITIAL	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7
@@ -823,7 +823,7 @@ module LlcWriteMergeBuffer(	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7
   assign io_bRespOut_payload_beats = {1'h0, _GEN_12} + {1'h0, _GEN_14};	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7, :219:{47,74}
   assign io_snoop_hit = |_snoopIdx_T;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7, :112:{32,39}
   assign io_snoop_flushDone =
-    _GEN ? io_snoop_flushReq & ~(|_snoopIdx_T) : ~_GEN_9 & _GEN_17 & flushIsSnoop;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7, :84:25, :112:{32,39}, :126:23, :139:17, :142:31, :143:24, :151:30, :262:26
+    _GEN ? io_snoop_flushReq & ~(|_snoopIdx_T) : ~_GEN_9 & _GEN_17 & flushIsSnoop;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7, :84:25, :112:{32,39}, :126:23, :139:17, :142:31, :143:24, :151:30, :263:26
   assign io_empty = {entryValid_3, entryValid_2, entryValid_1, entryValid_0} == 4'h0;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7, :68:32, :93:34, :117:{30,37}
   assign io_flushing = |state;	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7, :81:29, :118:25
   assign io_mergeEvent = _GEN & ~_GEN_2 & _GEN_3 & (|_matchIdx_T);	// src/llc/scala/main/LlcWriteMergeBuffer.scala:34:7, :93:{27,34}, :121:23, :127:23, :139:17, :142:31, :153:29, :158:50, :166:26, :168:31, :175:26, src/utils/Stream/Stream.scala:43:26

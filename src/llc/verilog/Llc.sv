@@ -147,7 +147,7 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
 
   wire            doRead;	// src/utils/bus/regif/AxiLite4BusInterface.scala:62:40
   wire            doWrite;	// src/utils/bus/regif/AxiLite4BusInterface.scala:59:30, :61:38
-  wire            io_mem_ar_valid_0;	// src/llc/scala/main/Llc.scala:466:48
+  wire            io_mem_ar_valid_0;	// src/llc/scala/main/Llc.scala:467:48
   wire [63:0]     _perfCounters_io_counters_0;	// src/llc/scala/main/Llc.scala:26:28
   wire [63:0]     _perfCounters_io_counters_1;	// src/llc/scala/main/Llc.scala:26:28
   wire [63:0]     _perfCounters_io_counters_2;	// src/llc/scala/main/Llc.scala:26:28
@@ -257,35 +257,35 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
   wire            wrWmBufReq_last = _GEN_1 == wrLen;	// src/llc/scala/main/Llc.scala:62:23, :203:36
   wire            wmBuf_io_writeIn_valid = wrState == 2'h2 & _GEN_1 <= wrLen;	// src/llc/scala/main/Llc.scala:59:27, :62:23, :203:36, :205:{40,53,67}
   reg             snoopFlushReq;	// src/llc/scala/main/Llc.scala:221:30
-  wire            rdWantsPipe = rdReqValid & rdState == 3'h3;	// src/llc/scala/main/Llc.scala:44:26, :52:27, :233:17, :260:{32,44}
-  wire            pipeline_io_reqIn_valid = _wmBuf_io_pipeOut_valid | rdWantsPipe;	// src/llc/scala/main/Llc.scala:25:24, :260:32, :268:21, :269:31, :272:27
-  wire            wmBuf_io_bRespOut_ready = bFifoNum != 3'h4;	// src/llc/scala/main/Llc.scala:96:28, :97:30, :302:30
+  wire            rdWantsPipe = rdReqValid & rdState == 3'h3;	// src/llc/scala/main/Llc.scala:44:26, :52:27, :233:17, :261:{32,44}
+  wire            pipeline_io_reqIn_valid = _wmBuf_io_pipeOut_valid | rdWantsPipe;	// src/llc/scala/main/Llc.scala:25:24, :261:32, :269:21, :270:31, :273:27
+  wire            wmBuf_io_bRespOut_ready = bFifoNum != 3'h4;	// src/llc/scala/main/Llc.scala:96:28, :97:30, :303:30
   wire [3:0][1:0] _GEN_2 =
-    {{bFifoCount_3}, {bFifoCount_2}, {bFifoCount_1}, {bFifoCount_0}};	// src/llc/scala/main/Llc.scala:92:24, :304:66
-  wire [1:0]      _GEN_3 = _GEN_2[bFifoHead];	// src/llc/scala/main/Llc.scala:94:28, :304:66
-  wire            io_cpu_r_valid_0 = rdState == 3'h4;	// src/llc/scala/main/Llc.scala:44:26, :97:30, :317:30
-  wire            io_cpu_r_payload_last_0 = rdBeatCnt == rdLen;	// src/llc/scala/main/Llc.scala:47:22, :51:26, :321:49
-  wire            bReady = bErrFire | (|bFifoNum) & _GEN_0 == 2'h0 & (|_GEN_3);	// src/llc/scala/main/Llc.scala:96:28, :98:30, :105:24, :114:{29,47}, :169:42, :304:66, :333:{25,41,66,74,99}
-  wire [3:0][3:0] _GEN_4 = {{bFifoId_3}, {bFifoId_2}, {bFifoId_1}, {bFifoId_0}};	// src/llc/scala/main/Llc.scala:91:24, :335:39
-  reg  [1:0]      memWrState;	// src/llc/scala/main/Llc.scala:350:29
-  wire            pipeline_io_wbIdle = memWrState == 2'h0;	// src/llc/scala/main/Llc.scala:169:42, :350:29, :352:37
-  reg  [31:0]     memWrAddr;	// src/llc/scala/main/Llc.scala:353:25
-  reg  [255:0]    memWrData_0;	// src/llc/scala/main/Llc.scala:354:25
-  reg  [255:0]    memWrData_1;	// src/llc/scala/main/Llc.scala:354:25
-  reg  [1:0]      memWrOwner;	// src/llc/scala/main/Llc.scala:355:25
-  reg  [1:0]      memWrBeatCnt;	// src/llc/scala/main/Llc.scala:356:29
-  wire            io_mem_aw_valid_0 = memWrState == 2'h1;	// src/llc/scala/main/Llc.scala:350:29, :396:34
-  wire            io_mem_w_valid_0 = memWrState == 2'h2;	// src/llc/scala/main/Llc.scala:350:29, :411:33
-  reg  [1:0]      memRdState;	// src/llc/scala/main/Llc.scala:423:29
-  reg  [31:0]     memRdAddr;	// src/llc/scala/main/Llc.scala:424:25
-  wire [31:0]     io_mem_ar_payload_addr_0 = memRdAddr;	// src/llc/scala/main/Llc.scala:15:7, :424:25
-  reg  [3:0]      memRdId;	// src/llc/scala/main/Llc.scala:425:25
+    {{bFifoCount_3}, {bFifoCount_2}, {bFifoCount_1}, {bFifoCount_0}};	// src/llc/scala/main/Llc.scala:92:24, :305:66
+  wire [1:0]      _GEN_3 = _GEN_2[bFifoHead];	// src/llc/scala/main/Llc.scala:94:28, :305:66
+  wire            io_cpu_r_valid_0 = rdState == 3'h4;	// src/llc/scala/main/Llc.scala:44:26, :97:30, :318:30
+  wire            io_cpu_r_payload_last_0 = rdBeatCnt == rdLen;	// src/llc/scala/main/Llc.scala:47:22, :51:26, :322:49
+  wire            bReady = bErrFire | (|bFifoNum) & _GEN_0 == 2'h0 & (|_GEN_3);	// src/llc/scala/main/Llc.scala:96:28, :98:30, :105:24, :114:{29,47}, :169:42, :305:66, :334:{25,41,66,74,99}
+  wire [3:0][3:0] _GEN_4 = {{bFifoId_3}, {bFifoId_2}, {bFifoId_1}, {bFifoId_0}};	// src/llc/scala/main/Llc.scala:91:24, :336:39
+  reg  [1:0]      memWrState;	// src/llc/scala/main/Llc.scala:351:29
+  wire            pipeline_io_wbIdle = memWrState == 2'h0;	// src/llc/scala/main/Llc.scala:169:42, :351:29, :353:37
+  reg  [31:0]     memWrAddr;	// src/llc/scala/main/Llc.scala:354:25
+  reg  [255:0]    memWrData_0;	// src/llc/scala/main/Llc.scala:355:25
+  reg  [255:0]    memWrData_1;	// src/llc/scala/main/Llc.scala:355:25
+  reg  [1:0]      memWrOwner;	// src/llc/scala/main/Llc.scala:356:25
+  reg  [1:0]      memWrBeatCnt;	// src/llc/scala/main/Llc.scala:357:29
+  wire            io_mem_aw_valid_0 = memWrState == 2'h1;	// src/llc/scala/main/Llc.scala:351:29, :397:34
+  wire            io_mem_w_valid_0 = memWrState == 2'h2;	// src/llc/scala/main/Llc.scala:351:29, :412:33
+  reg  [1:0]      memRdState;	// src/llc/scala/main/Llc.scala:424:29
+  reg  [31:0]     memRdAddr;	// src/llc/scala/main/Llc.scala:425:25
+  wire [31:0]     io_mem_ar_payload_addr_0 = memRdAddr;	// src/llc/scala/main/Llc.scala:15:7, :425:25
+  reg  [3:0]      memRdId;	// src/llc/scala/main/Llc.scala:426:25
   wire            wbLinePending =
-    (|memWrState) & memWrAddr[31:6] == memRdAddr[31:6] | _wbBuffer_io_snoop_hit;	// src/llc/scala/main/Llc.scala:24:24, :350:29, :353:25, :424:25, :432:{36,52,67,79,94,108}
-  wire            _io_mem_ar_valid_T_layerCapture = memRdState == 2'h1;	// src/llc/scala/main/Llc.scala:423:29, :437:34
-  wire            _layerCapture = io_mem_ar_valid_0 & io_mem_ar_ready;	// src/llc/scala/main/Llc.scala:466:48, src/utils/Stream/Stream.scala:43:26
-  assign io_mem_ar_valid_0 = _io_mem_ar_valid_T_layerCapture & ~wbLinePending;	// src/llc/scala/main/Llc.scala:432:108, :437:{34,70}, :466:48
-  wire            io_mem_r_ready_0 = memRdState == 2'h2;	// src/llc/scala/main/Llc.scala:423:29, :480:33
+    (|memWrState) & memWrAddr[31:6] == memRdAddr[31:6] | _wbBuffer_io_snoop_hit;	// src/llc/scala/main/Llc.scala:24:24, :351:29, :354:25, :425:25, :433:{36,52,67,79,94,108}
+  wire            _io_mem_ar_valid_T_layerCapture = memRdState == 2'h1;	// src/llc/scala/main/Llc.scala:424:29, :438:34
+  wire            _layerCapture = io_mem_ar_valid_0 & io_mem_ar_ready;	// src/llc/scala/main/Llc.scala:467:48, src/utils/Stream/Stream.scala:43:26
+  assign io_mem_ar_valid_0 = _io_mem_ar_valid_T_layerCapture & ~wbLinePending;	// src/llc/scala/main/Llc.scala:433:108, :438:{34,70}, :467:48
+  wire            io_mem_r_ready_0 = memRdState == 2'h2;	// src/llc/scala/main/Llc.scala:424:29, :481:33
   reg  [31:0]     reg_rdata;	// src/utils/bus/regif/AxiLite4BusInterface.scala:24:32
   reg             axiAr_rValid;	// src/utils/Stream/Stream.scala:153:25
   reg  [7:0]      axiAr_rData_addr;	// src/utils/Stream/Stream.scala:154:20
@@ -304,11 +304,11 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
   reg             ctrlEnable;	// src/utils/bus/regif/RegInst.scala:76:16
   reg             ctrlFlush;	// src/utils/bus/regif/RegInst.scala:76:16
   reg             ctrlInvalidate;	// src/utils/bus/regif/RegInst.scala:76:16
-  wire            ctrlFlushReq = ctrlFlush | ctrlInvalidate;	// src/llc/scala/main/Llc.scala:510:36, src/utils/bus/regif/RegInst.scala:76:16
-  reg             ctrlFlushReqPrev;	// src/llc/scala/main/Llc.scala:511:33
+  wire            ctrlFlushReq = ctrlFlush | ctrlInvalidate;	// src/llc/scala/main/Llc.scala:511:36, src/utils/bus/regif/RegInst.scala:76:16
+  reg             ctrlFlushReqPrev;	// src/llc/scala/main/Llc.scala:512:33
   wire            flushStartPulse =
-    ctrlFlushReq & ~ctrlFlushReqPrev & ~_pipeline_io_flushBusy;	// src/llc/scala/main/Llc.scala:23:24, :119:47, :510:36, :511:33, :512:{39,42,60}
-  reg             flushDoneSticky;	// src/llc/scala/main/Llc.scala:518:32
+    ctrlFlushReq & ~ctrlFlushReqPrev & ~_pipeline_io_flushBusy;	// src/llc/scala/main/Llc.scala:23:24, :119:47, :511:36, :512:33, :513:{39,42,60}
+  reg             flushDoneSticky;	// src/llc/scala/main/Llc.scala:519:32
   reg  [15:0]     wayPartCfg;	// src/utils/bus/regif/RegInst.scala:76:16
   reg             cntClrPulse;	// src/utils/bus/regif/RegInst.scala:76:16
   wire [31:0]     pipeline_io_refillReq_bits_address_layerCapture;	// src/llc/scala/main/Llc.scala:23:24
@@ -325,19 +325,19 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
     automatic logic       _GEN_11;	// src/llc/scala/main/Llc.scala:184:25
     automatic logic       _GEN_12;	// src/llc/scala/main/Llc.scala:134:24, :164:19, :183:27, :184:36, :185:22
     automatic logic       _GEN_13;	// src/llc/scala/main/Llc.scala:134:24, :164:19
-    automatic logic       _GEN_14;	// src/llc/scala/main/Llc.scala:49:22, :285:34, :286:48, :288:17
+    automatic logic       _GEN_14;	// src/llc/scala/main/Llc.scala:49:22, :286:34, :287:48, :289:17
     automatic logic       bPush;	// src/utils/Stream/Stream.scala:43:26
     automatic logic       _bPop_T;	// src/utils/Stream/Stream.scala:43:26
-    automatic logic       _GEN_15;	// src/llc/scala/main/Llc.scala:91:24, :305:15, :306:27
-    automatic logic       _GEN_16;	// src/llc/scala/main/Llc.scala:91:24, :305:15, :306:27
-    automatic logic       _GEN_17;	// src/llc/scala/main/Llc.scala:91:24, :305:15, :306:27
-    automatic logic       _GEN_18;	// src/llc/scala/main/Llc.scala:91:24, :305:15, :306:27
-    automatic logic       _GEN_19;	// src/llc/scala/main/Llc.scala:339:22
-    automatic logic [1:0] _bFifoCount_T;	// src/llc/scala/main/Llc.scala:340:52
-    automatic logic       _GEN_20;	// src/llc/scala/main/Llc.scala:340:27
-    automatic logic       _GEN_21;	// src/llc/scala/main/Llc.scala:340:27
-    automatic logic       _GEN_22;	// src/llc/scala/main/Llc.scala:340:27
-    automatic logic       _GEN_23;	// src/llc/scala/main/Llc.scala:445:22
+    automatic logic       _GEN_15;	// src/llc/scala/main/Llc.scala:91:24, :306:15, :307:27
+    automatic logic       _GEN_16;	// src/llc/scala/main/Llc.scala:91:24, :306:15, :307:27
+    automatic logic       _GEN_17;	// src/llc/scala/main/Llc.scala:91:24, :306:15, :307:27
+    automatic logic       _GEN_18;	// src/llc/scala/main/Llc.scala:91:24, :306:15, :307:27
+    automatic logic       _GEN_19;	// src/llc/scala/main/Llc.scala:340:22
+    automatic logic [1:0] _bFifoCount_T;	// src/llc/scala/main/Llc.scala:341:52
+    automatic logic       _GEN_20;	// src/llc/scala/main/Llc.scala:341:27
+    automatic logic       _GEN_21;	// src/llc/scala/main/Llc.scala:341:27
+    automatic logic       _GEN_22;	// src/llc/scala/main/Llc.scala:341:27
+    automatic logic       _GEN_23;	// src/llc/scala/main/Llc.scala:446:22
     awLegal =
       io_cpu_aw_payload_burst == 2'h1 & io_cpu_aw_payload_size == 3'h5
       & io_cpu_aw_payload_addr[4:0] == 5'h0 & {8'h0, io_cpu_aw_payload_addr[5]}
@@ -352,19 +352,19 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
     _GEN_11 = wrDrainCnt == wrLen;	// src/llc/scala/main/Llc.scala:62:23, :68:27, :184:25
     _GEN_12 = (&wrState) & _GEN_8 & _GEN_11;	// src/llc/scala/main/Llc.scala:59:27, :134:24, :156:69, :164:19, :183:27, :184:{25,36}, :185:22, src/utils/Stream/Stream.scala:43:26
     _GEN_13 = _io_cpu_w_ready_T | _io_cpu_w_ready_T_1 | _GEN_10;	// src/llc/scala/main/Llc.scala:129:31, :134:24, :155:54, :164:19
-    _GEN_14 = _pipeline_io_respOut_valid & ~_pipeline_io_respOut_payload_isWrite;	// src/llc/scala/main/Llc.scala:23:24, :49:22, :285:34, :286:{10,48}, :288:17
-    bPush = _wmBuf_io_bRespOut_valid & wmBuf_io_bRespOut_ready;	// src/llc/scala/main/Llc.scala:25:24, :97:30, :302:30, src/utils/Stream/Stream.scala:43:26
-    _bPop_T = bReady & io_cpu_b_ready;	// src/llc/scala/main/Llc.scala:333:25, src/utils/Stream/Stream.scala:43:26
-    _GEN_15 = bPush & bFifoTail == 2'h0;	// src/llc/scala/main/Llc.scala:91:24, :95:28, :169:42, :305:15, :306:27, src/utils/Stream/Stream.scala:43:26
-    _GEN_16 = bPush & bFifoTail == 2'h1;	// src/llc/scala/main/Llc.scala:91:24, :95:28, :305:15, :306:27, src/utils/Stream/Stream.scala:43:26
-    _GEN_17 = bPush & bFifoTail == 2'h2;	// src/llc/scala/main/Llc.scala:91:24, :95:28, :305:15, :306:27, src/utils/Stream/Stream.scala:43:26
-    _GEN_18 = bPush & (&bFifoTail);	// src/llc/scala/main/Llc.scala:91:24, :95:28, :305:15, :306:27, src/utils/Stream/Stream.scala:43:26
-    _GEN_19 = _bPop_T & ~bErrFire;	// src/llc/scala/main/Llc.scala:114:{29,47}, :304:31, :339:22, src/utils/Stream/Stream.scala:43:26
-    _bFifoCount_T = _GEN_3 - 2'h1;	// src/llc/scala/main/Llc.scala:304:66, :340:52
-    _GEN_20 = bFifoHead == 2'h0;	// src/llc/scala/main/Llc.scala:94:28, :169:42, :340:27
-    _GEN_21 = bFifoHead == 2'h1;	// src/llc/scala/main/Llc.scala:94:28, :340:27
-    _GEN_22 = bFifoHead == 2'h2;	// src/llc/scala/main/Llc.scala:94:28, :340:27
-    _GEN_23 = memRdState == 2'h0;	// src/llc/scala/main/Llc.scala:169:42, :423:29, :445:22
+    _GEN_14 = _pipeline_io_respOut_valid & ~_pipeline_io_respOut_payload_isWrite;	// src/llc/scala/main/Llc.scala:23:24, :49:22, :286:34, :287:{10,48}, :289:17
+    bPush = _wmBuf_io_bRespOut_valid & wmBuf_io_bRespOut_ready;	// src/llc/scala/main/Llc.scala:25:24, :97:30, :303:30, src/utils/Stream/Stream.scala:43:26
+    _bPop_T = bReady & io_cpu_b_ready;	// src/llc/scala/main/Llc.scala:334:25, src/utils/Stream/Stream.scala:43:26
+    _GEN_15 = bPush & bFifoTail == 2'h0;	// src/llc/scala/main/Llc.scala:91:24, :95:28, :169:42, :306:15, :307:27, src/utils/Stream/Stream.scala:43:26
+    _GEN_16 = bPush & bFifoTail == 2'h1;	// src/llc/scala/main/Llc.scala:91:24, :95:28, :306:15, :307:27, src/utils/Stream/Stream.scala:43:26
+    _GEN_17 = bPush & bFifoTail == 2'h2;	// src/llc/scala/main/Llc.scala:91:24, :95:28, :306:15, :307:27, src/utils/Stream/Stream.scala:43:26
+    _GEN_18 = bPush & (&bFifoTail);	// src/llc/scala/main/Llc.scala:91:24, :95:28, :306:15, :307:27, src/utils/Stream/Stream.scala:43:26
+    _GEN_19 = _bPop_T & ~bErrFire;	// src/llc/scala/main/Llc.scala:114:{29,47}, :305:31, :340:22, src/utils/Stream/Stream.scala:43:26
+    _bFifoCount_T = _GEN_3 - 2'h1;	// src/llc/scala/main/Llc.scala:305:66, :341:52
+    _GEN_20 = bFifoHead == 2'h0;	// src/llc/scala/main/Llc.scala:94:28, :169:42, :341:27
+    _GEN_21 = bFifoHead == 2'h1;	// src/llc/scala/main/Llc.scala:94:28, :341:27
+    _GEN_22 = bFifoHead == 2'h2;	// src/llc/scala/main/Llc.scala:94:28, :341:27
+    _GEN_23 = memRdState == 2'h0;	// src/llc/scala/main/Llc.scala:169:42, :424:29, :446:22
     if (reset) begin	// src/llc/scala/main/Llc.scala:15:7
       rdState <= 3'h0;	// src/llc/scala/main/Llc.scala:44:26
       rdLegal <= 1'h1;	// src/llc/scala/main/Llc.scala:48:26
@@ -384,9 +384,9 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
       bFifoNum <= 3'h0;	// src/llc/scala/main/Llc.scala:96:28
       bErrValid <= 1'h0;	// src/llc/scala/main/Llc.scala:112:26
       snoopFlushReq <= 1'h0;	// src/llc/scala/main/Llc.scala:221:30
-      memWrState <= 2'h0;	// src/llc/scala/main/Llc.scala:169:42, :350:29
-      memWrBeatCnt <= 2'h0;	// src/llc/scala/main/Llc.scala:169:42, :356:29
-      memRdState <= 2'h0;	// src/llc/scala/main/Llc.scala:169:42, :423:29
+      memWrState <= 2'h0;	// src/llc/scala/main/Llc.scala:169:42, :351:29
+      memWrBeatCnt <= 2'h0;	// src/llc/scala/main/Llc.scala:169:42, :357:29
+      memRdState <= 2'h0;	// src/llc/scala/main/Llc.scala:169:42, :424:29
       reg_rdata <= 32'h0;	// src/utils/bus/regif/AxiLite4BusInterface.scala:24:32
       axiAr_rValid <= 1'h0;	// src/utils/Stream/Stream.scala:153:25
       axiRValid <= 1'h0;	// src/utils/bus/regif/AxiLite4BusInterface.scala:28:26
@@ -396,8 +396,8 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
       ctrlEnable <= 1'h0;	// src/utils/bus/regif/RegInst.scala:76:16
       ctrlFlush <= 1'h0;	// src/utils/bus/regif/RegInst.scala:76:16
       ctrlInvalidate <= 1'h0;	// src/utils/bus/regif/RegInst.scala:76:16
-      ctrlFlushReqPrev <= 1'h0;	// src/llc/scala/main/Llc.scala:511:33
-      flushDoneSticky <= 1'h0;	// src/llc/scala/main/Llc.scala:518:32
+      ctrlFlushReqPrev <= 1'h0;	// src/llc/scala/main/Llc.scala:512:33
+      flushDoneSticky <= 1'h0;	// src/llc/scala/main/Llc.scala:519:32
       wayPartCfg <= 16'h0;	// src/utils/bus/regif/RegInst.scala:76:16
       cntClrPulse <= 1'h0;	// src/utils/bus/regif/RegInst.scala:76:16
     end
@@ -413,13 +413,13 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
       automatic logic            _GEN_28 = _GEN_27 & wrWmBufReq_last;	// src/llc/scala/main/Llc.scala:164:19, :203:36, :209:31, :211:31, :213:17, src/utils/Stream/Stream.scala:43:26
       automatic logic            _GEN_29;	// src/llc/scala/main/Llc.scala:224:19
       automatic logic            _GEN_30;	// src/llc/scala/main/Llc.scala:221:30, :224:19, :237:38, :238:23
-      automatic logic [1:0]      _bFifoBeats_T;	// src/llc/scala/main/Llc.scala:294:56
-      automatic logic            bPop;	// src/llc/scala/main/Llc.scala:304:{28,41}
-      automatic logic            _GEN_31 = io_cpu_r_valid_0 & io_cpu_r_ready;	// src/llc/scala/main/Llc.scala:317:30, src/utils/Stream/Stream.scala:43:26
+      automatic logic [1:0]      _bFifoBeats_T;	// src/llc/scala/main/Llc.scala:295:56
+      automatic logic            bPop;	// src/llc/scala/main/Llc.scala:305:{28,41}
+      automatic logic            _GEN_31 = io_cpu_r_valid_0 & io_cpu_r_ready;	// src/llc/scala/main/Llc.scala:318:30, src/utils/Stream/Stream.scala:43:26
       automatic logic            _GEN_32;	// src/utils/Stream/Stream.scala:43:26
       automatic logic [1:0]      wstrb;	// src/utils/bus/regif/AxiLite4BusInterface.scala:40:19
       automatic logic [1:0]      _zeros_T;	// src/utils/bus/regif/BusIfBase.scala:144:38
-      automatic logic [3:0][1:0] _GEN_33;	// src/llc/scala/main/Llc.scala:352:37, :360:22, :362:35, :372:28, :377:27
+      automatic logic [3:0][1:0] _GEN_33;	// src/llc/scala/main/Llc.scala:353:37, :361:22, :363:35, :373:28, :378:27
       arLegal =
         io_cpu_ar_payload_burst == 2'h1 & io_cpu_ar_payload_size == 3'h5
         & io_cpu_ar_payload_addr[4:0] == 5'h0 & {8'h0, io_cpu_ar_payload_addr[5]}
@@ -433,14 +433,14 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
       _GEN_26 = wrAwValid & {7'h0, wrBeatRecv} == {1'h0, wrLen} + 9'h1;	// src/llc/scala/main/Llc.scala:62:23, :65:27, :67:27, :78:25, :143:48, :166:{22,36,47}
       _GEN_29 = rdState == 3'h1;	// src/llc/scala/main/Llc.scala:44:26, :224:19
       _GEN_30 = rdState == 3'h2 & _wmBuf_io_snoop_flushDone;	// src/llc/scala/main/Llc.scala:25:24, :44:26, :221:30, :224:19, :229:17, :237:38, :238:23
-      _bFifoBeats_T = _GEN[_bTrackIdx_T_7] - 2'h1;	// src/llc/scala/main/Llc.scala:105:24, :108:29, :294:56
-      bPop = _bPop_T & ~bErrFire & _GEN_3 == 2'h1;	// src/llc/scala/main/Llc.scala:114:{29,47}, :304:{28,31,41,66}, src/utils/Stream/Stream.scala:43:26
-      _GEN_32 = io_mem_w_valid_0 & io_mem_w_ready;	// src/llc/scala/main/Llc.scala:411:33, src/utils/Stream/Stream.scala:43:26
+      _bFifoBeats_T = _GEN[_bTrackIdx_T_7] - 2'h1;	// src/llc/scala/main/Llc.scala:105:24, :108:29, :295:56
+      bPop = _bPop_T & ~bErrFire & _GEN_3 == 2'h1;	// src/llc/scala/main/Llc.scala:114:{29,47}, :305:{28,31,41,66}, src/utils/Stream/Stream.scala:43:26
+      _GEN_32 = io_mem_w_valid_0 & io_mem_w_ready;	// src/llc/scala/main/Llc.scala:412:33, src/utils/Stream/Stream.scala:43:26
       wstrb = axiAr_rValid ? 2'h3 : axiW_rData_strb[1:0];	// src/utils/Stream/Stream.scala:153:25, :154:20, src/utils/bus/regif/AxiLite4BusInterface.scala:40:19
       _zeros_T = ~wstrb;	// src/utils/bus/regif/AxiLite4BusInterface.scala:40:19, src/utils/bus/regif/BusIfBase.scala:144:38
-      if (_GEN_31 & io_cpu_r_payload_last_0)	// src/llc/scala/main/Llc.scala:285:34, :321:49, :324:23, :326:31, :327:17, src/utils/Stream/Stream.scala:43:26
+      if (_GEN_31 & io_cpu_r_payload_last_0)	// src/llc/scala/main/Llc.scala:286:34, :322:49, :325:23, :327:31, :328:17, src/utils/Stream/Stream.scala:43:26
         rdState <= 3'h0;	// src/llc/scala/main/Llc.scala:44:26
-      else if (_GEN_14)	// src/llc/scala/main/Llc.scala:49:22, :285:34, :286:48, :288:17
+      else if (_GEN_14)	// src/llc/scala/main/Llc.scala:49:22, :286:34, :287:48, :289:17
         rdState <= 3'h4;	// src/llc/scala/main/Llc.scala:44:26, :97:30
       else if (_GEN_29)	// src/llc/scala/main/Llc.scala:224:19
         rdState <= {2'h1, ~_wmBuf_io_snoop_hit};	// src/llc/scala/main/Llc.scala:25:24, :44:26, :52:27, :226:32, :229:17, :232:20, :233:17
@@ -451,13 +451,13 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
       if (_GEN_6)	// src/utils/Stream/Stream.scala:43:26
         rdLegal <= arLegal;	// src/llc/scala/main/Llc.scala:48:26, :76:{33,75}, :77:56
       if (_GEN_31)	// src/utils/Stream/Stream.scala:43:26
-        rdBeatCnt <= io_cpu_r_payload_last_0 ? 8'h0 : rdBeatCnt + 8'h1;	// src/llc/scala/main/Llc.scala:51:26, :321:49, :325:{15,28}, :326:31, :328:17
-      else if (_GEN_14)	// src/llc/scala/main/Llc.scala:49:22, :285:34, :286:48, :288:17
+        rdBeatCnt <= io_cpu_r_payload_last_0 ? 8'h0 : rdBeatCnt + 8'h1;	// src/llc/scala/main/Llc.scala:51:26, :322:49, :326:{15,28}, :327:31, :329:17
+      else if (_GEN_14)	// src/llc/scala/main/Llc.scala:49:22, :286:34, :287:48, :289:17
         rdBeatCnt <= 8'h0;	// src/llc/scala/main/Llc.scala:51:26
       rdReqValid <=
         ~(pipeline_io_reqIn_valid & _pipeline_io_reqIn_ready & rdWantsPipe
           & ~_wmBuf_io_pipeOut_valid)
-        & (_GEN_29 ? ~_wmBuf_io_snoop_hit | rdReqValid : _GEN_30 | rdReqValid);	// src/llc/scala/main/Llc.scala:23:24, :25:24, :52:27, :221:30, :224:19, :226:32, :232:20, :237:38, :238:23, :239:20, :260:32, :268:21, :269:31, :272:27, :278:{31,46,49,63}, :279:16, src/utils/Stream/Stream.scala:43:26
+        & (_GEN_29 ? ~_wmBuf_io_snoop_hit | rdReqValid : _GEN_30 | rdReqValid);	// src/llc/scala/main/Llc.scala:23:24, :25:24, :52:27, :221:30, :224:19, :226:32, :232:20, :237:38, :238:23, :239:20, :261:32, :269:21, :270:31, :273:27, :279:{31,46,49,63}, :280:16, src/utils/Stream/Stream.scala:43:26
       if (_GEN_28) begin	// src/llc/scala/main/Llc.scala:164:19, :209:31, :211:31, :213:17
         wrState <= 2'h0;	// src/llc/scala/main/Llc.scala:59:27, :169:42
         wrBeatRecv <= 2'h0;	// src/llc/scala/main/Llc.scala:65:27, :169:42
@@ -494,40 +494,40 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
       end
       else	// src/llc/scala/main/Llc.scala:134:24, :164:19, :183:27, :184:36
         wrDrainCnt <= wrDrainCnt + 8'h1;	// src/llc/scala/main/Llc.scala:68:27, :189:36
-      if (_GEN_19 & bPop & _GEN_20)	// src/llc/scala/main/Llc.scala:304:{28,41}, :305:15, :339:{22,36}, :340:27, :341:16, :344:29
+      if (_GEN_19 & bPop & _GEN_20)	// src/llc/scala/main/Llc.scala:305:{28,41}, :306:15, :340:{22,36}, :341:27, :342:16, :345:29
         bFifoBeats_0 <= 2'h0;	// src/llc/scala/main/Llc.scala:93:28, :169:42
-      else if (_GEN_15)	// src/llc/scala/main/Llc.scala:91:24, :305:15, :306:27
+      else if (_GEN_15)	// src/llc/scala/main/Llc.scala:91:24, :306:15, :307:27
         bFifoBeats_0 <= _wmBuf_io_bRespOut_payload_beats;	// src/llc/scala/main/Llc.scala:25:24, :93:28
       else if (_pipeline_io_respOut_valid & _pipeline_io_respOut_payload_isWrite
-               & (|_GEN_25) & _bTrackIdx_T_7 == 2'h0)	// src/llc/scala/main/Llc.scala:23:24, :93:28, :107:{41,59}, :108:29, :169:42, :285:34, :286:48, :293:23, :294:31
-        bFifoBeats_0 <= _bFifoBeats_T;	// src/llc/scala/main/Llc.scala:93:28, :294:56
-      if (_GEN_19 & bPop & _GEN_21)	// src/llc/scala/main/Llc.scala:304:{28,41}, :305:15, :339:{22,36}, :340:27, :341:16, :344:29
+               & (|_GEN_25) & _bTrackIdx_T_7 == 2'h0)	// src/llc/scala/main/Llc.scala:23:24, :93:28, :107:{41,59}, :108:29, :169:42, :286:34, :287:48, :294:23, :295:31
+        bFifoBeats_0 <= _bFifoBeats_T;	// src/llc/scala/main/Llc.scala:93:28, :295:56
+      if (_GEN_19 & bPop & _GEN_21)	// src/llc/scala/main/Llc.scala:305:{28,41}, :306:15, :340:{22,36}, :341:27, :342:16, :345:29
         bFifoBeats_1 <= 2'h0;	// src/llc/scala/main/Llc.scala:93:28, :169:42
-      else if (_GEN_16)	// src/llc/scala/main/Llc.scala:91:24, :305:15, :306:27
+      else if (_GEN_16)	// src/llc/scala/main/Llc.scala:91:24, :306:15, :307:27
         bFifoBeats_1 <= _wmBuf_io_bRespOut_payload_beats;	// src/llc/scala/main/Llc.scala:25:24, :93:28
       else if (_pipeline_io_respOut_valid & _pipeline_io_respOut_payload_isWrite
-               & (|_GEN_25) & _bTrackIdx_T_7 == 2'h1)	// src/llc/scala/main/Llc.scala:23:24, :93:28, :107:{41,59}, :108:29, :285:34, :286:48, :293:23, :294:31
-        bFifoBeats_1 <= _bFifoBeats_T;	// src/llc/scala/main/Llc.scala:93:28, :294:56
-      if (_GEN_19 & bPop & _GEN_22)	// src/llc/scala/main/Llc.scala:304:{28,41}, :305:15, :339:{22,36}, :340:27, :341:16, :344:29
+               & (|_GEN_25) & _bTrackIdx_T_7 == 2'h1)	// src/llc/scala/main/Llc.scala:23:24, :93:28, :107:{41,59}, :108:29, :286:34, :287:48, :294:23, :295:31
+        bFifoBeats_1 <= _bFifoBeats_T;	// src/llc/scala/main/Llc.scala:93:28, :295:56
+      if (_GEN_19 & bPop & _GEN_22)	// src/llc/scala/main/Llc.scala:305:{28,41}, :306:15, :340:{22,36}, :341:27, :342:16, :345:29
         bFifoBeats_2 <= 2'h0;	// src/llc/scala/main/Llc.scala:93:28, :169:42
-      else if (_GEN_17)	// src/llc/scala/main/Llc.scala:91:24, :305:15, :306:27
+      else if (_GEN_17)	// src/llc/scala/main/Llc.scala:91:24, :306:15, :307:27
         bFifoBeats_2 <= _wmBuf_io_bRespOut_payload_beats;	// src/llc/scala/main/Llc.scala:25:24, :93:28
       else if (_pipeline_io_respOut_valid & _pipeline_io_respOut_payload_isWrite
-               & (|_GEN_25) & _bTrackIdx_T_7 == 2'h2)	// src/llc/scala/main/Llc.scala:23:24, :93:28, :107:{41,59}, :108:29, :285:34, :286:48, :293:23, :294:31
-        bFifoBeats_2 <= _bFifoBeats_T;	// src/llc/scala/main/Llc.scala:93:28, :294:56
-      if (_GEN_19 & bPop & (&bFifoHead))	// src/llc/scala/main/Llc.scala:94:28, :304:{28,41}, :305:15, :339:{22,36}, :340:27, :341:16, :344:29
+               & (|_GEN_25) & _bTrackIdx_T_7 == 2'h2)	// src/llc/scala/main/Llc.scala:23:24, :93:28, :107:{41,59}, :108:29, :286:34, :287:48, :294:23, :295:31
+        bFifoBeats_2 <= _bFifoBeats_T;	// src/llc/scala/main/Llc.scala:93:28, :295:56
+      if (_GEN_19 & bPop & (&bFifoHead))	// src/llc/scala/main/Llc.scala:94:28, :305:{28,41}, :306:15, :340:{22,36}, :341:27, :342:16, :345:29
         bFifoBeats_3 <= 2'h0;	// src/llc/scala/main/Llc.scala:93:28, :169:42
-      else if (_GEN_18)	// src/llc/scala/main/Llc.scala:91:24, :305:15, :306:27
+      else if (_GEN_18)	// src/llc/scala/main/Llc.scala:91:24, :306:15, :307:27
         bFifoBeats_3 <= _wmBuf_io_bRespOut_payload_beats;	// src/llc/scala/main/Llc.scala:25:24, :93:28
       else if (_pipeline_io_respOut_valid & _pipeline_io_respOut_payload_isWrite
-               & (|_GEN_25) & (&_bTrackIdx_T_7))	// src/llc/scala/main/Llc.scala:23:24, :93:28, :107:{41,59}, :108:29, :285:34, :286:48, :293:23, :294:31
-        bFifoBeats_3 <= _bFifoBeats_T;	// src/llc/scala/main/Llc.scala:93:28, :294:56
-      if (_GEN_19 & bPop)	// src/llc/scala/main/Llc.scala:94:28, :304:{28,41}, :339:{22,36}, :341:16, :342:17
+               & (|_GEN_25) & (&_bTrackIdx_T_7))	// src/llc/scala/main/Llc.scala:23:24, :93:28, :107:{41,59}, :108:29, :286:34, :287:48, :294:23, :295:31
+        bFifoBeats_3 <= _bFifoBeats_T;	// src/llc/scala/main/Llc.scala:93:28, :295:56
+      if (_GEN_19 & bPop)	// src/llc/scala/main/Llc.scala:94:28, :305:{28,41}, :340:{22,36}, :342:16, :343:17
         bFifoHead <= _bFifoHead_T;	// src/llc/scala/main/Llc.scala:94:28, :105:49
       if (bPush)	// src/utils/Stream/Stream.scala:43:26
-        bFifoTail <= bFifoTail + 2'h1;	// src/llc/scala/main/Llc.scala:95:28, :309:28
-      if (bPush != bPop)	// src/llc/scala/main/Llc.scala:96:28, :304:{28,41}, :311:{14,24}, :312:14, src/utils/Stream/Stream.scala:43:26
-        bFifoNum <= bPush ? bFifoNum + 3'h1 : bFifoNum - 3'h1;	// src/llc/scala/main/Llc.scala:96:28, :312:{20,37,53}, src/utils/Stream/Stream.scala:43:26
+        bFifoTail <= bFifoTail + 2'h1;	// src/llc/scala/main/Llc.scala:95:28, :310:28
+      if (bPush != bPop)	// src/llc/scala/main/Llc.scala:96:28, :305:{28,41}, :312:{14,24}, :313:14, src/utils/Stream/Stream.scala:43:26
+        bFifoNum <= bPush ? bFifoNum + 3'h1 : bFifoNum - 3'h1;	// src/llc/scala/main/Llc.scala:96:28, :313:{20,37,53}, src/utils/Stream/Stream.scala:43:26
       bErrValid <=
         ~_GEN_13 & _GEN_12 | _wrIllegalAw_T & ~awLegal & _GEN_7 | ~bErrFire & bErrValid;	// src/llc/scala/main/Llc.scala:76:{33,75}, :77:56, :112:26, :114:{29,47}, :115:{18,30}, :134:24, :138:19, :143:{18,56}, :164:19, :183:27, :184:36, :185:22, src/utils/Stream/Stream.scala:43:26
       snoopFlushReq <=
@@ -536,27 +536,27 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
         {{(&memWrState) & io_mem_b_valid & (&memWrState) ? 2'h0 : memWrState},
          {_GEN_32 & memWrBeatCnt == 2'h1 ? 2'h3 : memWrState},
          {io_mem_aw_valid_0 & io_mem_aw_ready ? 2'h2 : memWrState},
-         {_wbBuffer_io_deq_valid ? 2'h1 : memWrState}};	// src/llc/scala/main/Llc.scala:24:24, :169:42, :350:29, :352:37, :356:29, :360:22, :362:35, :367:23, :372:28, :373:20, :377:27, :379:{27,57}, :380:22, :385:27, :386:20, :392:43, :396:34, src/utils/Stream/Stream.scala:43:26
-      memWrState <= _GEN_33[memWrState];	// src/llc/scala/main/Llc.scala:350:29, :352:37, :360:22, :362:35, :372:28, :377:27
-      if (pipeline_io_wbIdle) begin	// src/llc/scala/main/Llc.scala:352:37
+         {_wbBuffer_io_deq_valid ? 2'h1 : memWrState}};	// src/llc/scala/main/Llc.scala:24:24, :169:42, :351:29, :353:37, :357:29, :361:22, :363:35, :368:23, :373:28, :374:20, :378:27, :380:{27,57}, :381:22, :386:27, :387:20, :393:43, :397:34, src/utils/Stream/Stream.scala:43:26
+      memWrState <= _GEN_33[memWrState];	// src/llc/scala/main/Llc.scala:351:29, :353:37, :361:22, :363:35, :373:28, :378:27
+      if (pipeline_io_wbIdle) begin	// src/llc/scala/main/Llc.scala:353:37
         if (_wbBuffer_io_deq_valid)	// src/llc/scala/main/Llc.scala:24:24
-          memWrBeatCnt <= 2'h0;	// src/llc/scala/main/Llc.scala:169:42, :356:29
+          memWrBeatCnt <= 2'h0;	// src/llc/scala/main/Llc.scala:169:42, :357:29
       end
-      else if (memWrState == 2'h1 | ~(memWrState == 2'h2 & _GEN_32)) begin	// src/llc/scala/main/Llc.scala:350:29, :356:29, :360:22, :377:27, :378:22, src/utils/Stream/Stream.scala:43:26
+      else if (memWrState == 2'h1 | ~(memWrState == 2'h2 & _GEN_32)) begin	// src/llc/scala/main/Llc.scala:351:29, :357:29, :361:22, :378:27, :379:22, src/utils/Stream/Stream.scala:43:26
       end
-      else	// src/llc/scala/main/Llc.scala:356:29, :360:22
-        memWrBeatCnt <= memWrBeatCnt + 2'h1;	// src/llc/scala/main/Llc.scala:356:29, :378:38
-      if (_GEN_23) begin	// src/llc/scala/main/Llc.scala:445:22
+      else	// src/llc/scala/main/Llc.scala:357:29, :361:22
+        memWrBeatCnt <= memWrBeatCnt + 2'h1;	// src/llc/scala/main/Llc.scala:357:29, :379:38
+      if (_GEN_23) begin	// src/llc/scala/main/Llc.scala:446:22
         if (_pipeline_io_refillReq_valid)	// src/llc/scala/main/Llc.scala:23:24
-          memRdState <= 2'h1;	// src/llc/scala/main/Llc.scala:423:29
+          memRdState <= 2'h1;	// src/llc/scala/main/Llc.scala:424:29
       end
-      else if (_io_mem_ar_valid_T_layerCapture) begin	// src/llc/scala/main/Llc.scala:437:34
+      else if (_io_mem_ar_valid_T_layerCapture) begin	// src/llc/scala/main/Llc.scala:438:34
         if (_layerCapture)	// src/utils/Stream/Stream.scala:43:26
-          memRdState <= 2'h2;	// src/llc/scala/main/Llc.scala:423:29
+          memRdState <= 2'h2;	// src/llc/scala/main/Llc.scala:424:29
       end
       else if (memRdState == 2'h2 & io_mem_r_valid & io_mem_r_ready_0
-               & io_mem_r_payload_last)	// src/llc/scala/main/Llc.scala:423:29, :445:22, :459:{26,70}, :460:20, :480:33, src/utils/Stream/Stream.scala:43:26
-        memRdState <= 2'h0;	// src/llc/scala/main/Llc.scala:169:42, :423:29
+               & io_mem_r_payload_last)	// src/llc/scala/main/Llc.scala:424:29, :446:22, :460:{26,70}, :461:20, :481:33, src/utils/Stream/Stream.scala:43:26
+        memRdState <= 2'h0;	// src/llc/scala/main/Llc.scala:169:42, :424:29
       reg_rdata <=
         axiAr_rValid | axiRValid & ~io_ctrl_r_ready
           ? (axiAr_rData_addr[7:2] == 6'h24
@@ -625,7 +625,7 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
                                                                                                                   ctrlFlush,
                                                                                                                   ctrlEnable}
                                                                                                                : 32'h0)
-          : 32'h0;	// src/llc/scala/main/Llc.scala:15:7, :23:24, :24:24, :25:24, :26:28, :518:32, :550:41, :554:41, src/utils/Stream/Stream.scala:153:25, :154:20, src/utils/bus/regif/AxiLite4BusInterface.scala:24:32, :28:26, :60:{29,44,47}, :78:27, src/utils/bus/regif/BusIf.scala:298:15, :315:19, :319:17, src/utils/bus/regif/RegBase.scala:38:8, src/utils/bus/regif/RegInst.scala:76:16, :303:{27,39}, :304:20
+          : 32'h0;	// src/llc/scala/main/Llc.scala:15:7, :23:24, :24:24, :25:24, :26:28, :519:32, :551:41, :555:41, src/utils/Stream/Stream.scala:153:25, :154:20, src/utils/bus/regif/AxiLite4BusInterface.scala:24:32, :28:26, :60:{29,44,47}, :78:27, src/utils/bus/regif/BusIf.scala:298:15, :315:19, :319:17, src/utils/bus/regif/RegBase.scala:38:8, src/utils/bus/regif/RegInst.scala:76:16, :303:{27,39}, :304:20
       if (io_ctrl_ar_ready_0)	// src/utils/Stream/Stream.scala:156:16, :158:{21,34}
         axiAr_rValid <= io_ctrl_ar_valid;	// src/utils/Stream/Stream.scala:153:25
       axiRValid <= doRead | ~io_ctrl_r_ready & axiRValid;	// src/utils/bus/regif/AxiLite4BusInterface.scala:28:26, :62:40, :67:{20,32}, :68:{16,28}
@@ -639,8 +639,8 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
         ctrlFlush <= ctrlFlush & _zeros_T[0] | axiW_rData_data[1] & wstrb[0];	// src/utils/Stream/Stream.scala:154:20, src/utils/bus/regif/AxiLite4BusInterface.scala:40:19, src/utils/bus/regif/BusIfBase.scala:13:36, :143:33, :144:{34,38}, :162:{32,47,65}, src/utils/bus/regif/RegInst.scala:76:16
         ctrlInvalidate <= ctrlInvalidate & _zeros_T[0] | axiW_rData_data[2] & wstrb[0];	// src/utils/Stream/Stream.scala:154:20, src/utils/bus/regif/AxiLite4BusInterface.scala:40:19, src/utils/bus/regif/BusIfBase.scala:13:36, :143:33, :144:{34,38}, :162:{32,47,65}, src/utils/bus/regif/RegInst.scala:76:16
       end
-      ctrlFlushReqPrev <= ctrlFlushReq;	// src/llc/scala/main/Llc.scala:510:36, :511:33
-      flushDoneSticky <= ~flushStartPulse & (_pipeline_io_flushDone | flushDoneSticky);	// src/llc/scala/main/Llc.scala:23:24, :512:{39,60}, :518:32, :519:{31,49}, :520:{31,49}
+      ctrlFlushReqPrev <= ctrlFlushReq;	// src/llc/scala/main/Llc.scala:511:36, :512:33
+      flushDoneSticky <= ~flushStartPulse & (_pipeline_io_flushDone | flushDoneSticky);	// src/llc/scala/main/Llc.scala:23:24, :513:{39,60}, :519:32, :520:{31,49}, :521:{31,49}
       if (axiAw_rData_addr == 8'h8 & doWrite)	// src/utils/Stream/Stream.scala:154:20, src/utils/bus/regif/AxiLite4BusInterface.scala:59:30, :61:38, src/utils/bus/regif/RegBase.scala:29:{63,74}
         wayPartCfg <=
           wayPartCfg & {{8{_zeros_T[1]}}, {8{_zeros_T[0]}}} | axiW_rData_data[15:0]
@@ -654,7 +654,7 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
       rdId <= io_cpu_ar_payload_id;	// src/llc/scala/main/Llc.scala:46:22
       rdLen <= io_cpu_ar_payload_len;	// src/llc/scala/main/Llc.scala:47:22
     end
-    if (_GEN_14) begin	// src/llc/scala/main/Llc.scala:49:22, :285:34, :286:48, :288:17
+    if (_GEN_14) begin	// src/llc/scala/main/Llc.scala:49:22, :286:34, :287:48, :289:17
       rdData_0 <= _pipeline_io_respOut_payload_data_0;	// src/llc/scala/main/Llc.scala:23:24, :49:22
       rdData_1 <= _pipeline_io_respOut_payload_data_1;	// src/llc/scala/main/Llc.scala:23:24, :49:22
     end
@@ -663,37 +663,37 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
       wrId <= io_cpu_aw_payload_id;	// src/llc/scala/main/Llc.scala:61:23
       wrLen <= io_cpu_aw_payload_len;	// src/llc/scala/main/Llc.scala:62:23
     end
-    if (_GEN_9 & ~(wrBeatRecv[0])) begin	// <stdin>:9742:19, src/llc/scala/main/Llc.scala:63:23, :65:27, :157:{22,38,63}, :158:27
+    if (_GEN_9 & ~(wrBeatRecv[0])) begin	// <stdin>:9749:19, src/llc/scala/main/Llc.scala:63:23, :65:27, :157:{22,38,63}, :158:27
       wrBuf_0 <= io_cpu_w_payload_data;	// src/llc/scala/main/Llc.scala:63:23
       wrStrbBuf_0 <= io_cpu_w_payload_strb;	// src/llc/scala/main/Llc.scala:64:23
     end
-    if (_GEN_9 & wrBeatRecv[0]) begin	// <stdin>:9742:19, src/llc/scala/main/Llc.scala:63:23, :65:27, :157:{22,38,63}, :158:27
+    if (_GEN_9 & wrBeatRecv[0]) begin	// <stdin>:9749:19, src/llc/scala/main/Llc.scala:63:23, :65:27, :157:{22,38,63}, :158:27
       wrBuf_1 <= io_cpu_w_payload_data;	// src/llc/scala/main/Llc.scala:63:23
       wrStrbBuf_1 <= io_cpu_w_payload_strb;	// src/llc/scala/main/Llc.scala:64:23
     end
-    if (_GEN_15)	// src/llc/scala/main/Llc.scala:91:24, :305:15, :306:27
+    if (_GEN_15)	// src/llc/scala/main/Llc.scala:91:24, :306:15, :307:27
       bFifoId_0 <= _wmBuf_io_bRespOut_payload_id;	// src/llc/scala/main/Llc.scala:25:24, :91:24
-    if (_GEN_16)	// src/llc/scala/main/Llc.scala:91:24, :305:15, :306:27
+    if (_GEN_16)	// src/llc/scala/main/Llc.scala:91:24, :306:15, :307:27
       bFifoId_1 <= _wmBuf_io_bRespOut_payload_id;	// src/llc/scala/main/Llc.scala:25:24, :91:24
-    if (_GEN_17)	// src/llc/scala/main/Llc.scala:91:24, :305:15, :306:27
+    if (_GEN_17)	// src/llc/scala/main/Llc.scala:91:24, :306:15, :307:27
       bFifoId_2 <= _wmBuf_io_bRespOut_payload_id;	// src/llc/scala/main/Llc.scala:25:24, :91:24
-    if (_GEN_18)	// src/llc/scala/main/Llc.scala:91:24, :305:15, :306:27
+    if (_GEN_18)	// src/llc/scala/main/Llc.scala:91:24, :306:15, :307:27
       bFifoId_3 <= _wmBuf_io_bRespOut_payload_id;	// src/llc/scala/main/Llc.scala:25:24, :91:24
-    if (_GEN_19 & _GEN_20)	// src/llc/scala/main/Llc.scala:305:15, :339:{22,36}, :340:27
-      bFifoCount_0 <= _bFifoCount_T;	// src/llc/scala/main/Llc.scala:92:24, :340:52
-    else if (_GEN_15)	// src/llc/scala/main/Llc.scala:91:24, :305:15, :306:27
+    if (_GEN_19 & _GEN_20)	// src/llc/scala/main/Llc.scala:306:15, :340:{22,36}, :341:27
+      bFifoCount_0 <= _bFifoCount_T;	// src/llc/scala/main/Llc.scala:92:24, :341:52
+    else if (_GEN_15)	// src/llc/scala/main/Llc.scala:91:24, :306:15, :307:27
       bFifoCount_0 <= _wmBuf_io_bRespOut_payload_count;	// src/llc/scala/main/Llc.scala:25:24, :92:24
-    if (_GEN_19 & _GEN_21)	// src/llc/scala/main/Llc.scala:305:15, :339:{22,36}, :340:27
-      bFifoCount_1 <= _bFifoCount_T;	// src/llc/scala/main/Llc.scala:92:24, :340:52
-    else if (_GEN_16)	// src/llc/scala/main/Llc.scala:91:24, :305:15, :306:27
+    if (_GEN_19 & _GEN_21)	// src/llc/scala/main/Llc.scala:306:15, :340:{22,36}, :341:27
+      bFifoCount_1 <= _bFifoCount_T;	// src/llc/scala/main/Llc.scala:92:24, :341:52
+    else if (_GEN_16)	// src/llc/scala/main/Llc.scala:91:24, :306:15, :307:27
       bFifoCount_1 <= _wmBuf_io_bRespOut_payload_count;	// src/llc/scala/main/Llc.scala:25:24, :92:24
-    if (_GEN_19 & _GEN_22)	// src/llc/scala/main/Llc.scala:305:15, :339:{22,36}, :340:27
-      bFifoCount_2 <= _bFifoCount_T;	// src/llc/scala/main/Llc.scala:92:24, :340:52
-    else if (_GEN_17)	// src/llc/scala/main/Llc.scala:91:24, :305:15, :306:27
+    if (_GEN_19 & _GEN_22)	// src/llc/scala/main/Llc.scala:306:15, :340:{22,36}, :341:27
+      bFifoCount_2 <= _bFifoCount_T;	// src/llc/scala/main/Llc.scala:92:24, :341:52
+    else if (_GEN_17)	// src/llc/scala/main/Llc.scala:91:24, :306:15, :307:27
       bFifoCount_2 <= _wmBuf_io_bRespOut_payload_count;	// src/llc/scala/main/Llc.scala:25:24, :92:24
-    if (_GEN_19 & (&bFifoHead))	// src/llc/scala/main/Llc.scala:94:28, :305:15, :339:{22,36}, :340:27
-      bFifoCount_3 <= _bFifoCount_T;	// src/llc/scala/main/Llc.scala:92:24, :340:52
-    else if (_GEN_18)	// src/llc/scala/main/Llc.scala:91:24, :305:15, :306:27
+    if (_GEN_19 & (&bFifoHead))	// src/llc/scala/main/Llc.scala:94:28, :306:15, :340:{22,36}, :341:27
+      bFifoCount_3 <= _bFifoCount_T;	// src/llc/scala/main/Llc.scala:92:24, :341:52
+    else if (_GEN_18)	// src/llc/scala/main/Llc.scala:91:24, :306:15, :307:27
       bFifoCount_3 <= _wmBuf_io_bRespOut_payload_count;	// src/llc/scala/main/Llc.scala:25:24, :92:24
     if (_GEN_13 | ~_GEN_12) begin	// src/llc/scala/main/Llc.scala:134:24, :164:19, :183:27, :184:36, :185:22
       if (~_wrIllegalAw_T | awLegal | ~_GEN_7) begin	// src/llc/scala/main/Llc.scala:65:27, :76:{33,75}, :77:56, :113:22, :134:24, :138:19, :143:{18,56}, src/utils/Stream/Stream.scala:43:26
@@ -703,15 +703,15 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
     end
     else	// src/llc/scala/main/Llc.scala:134:24, :164:19
       bErrId <= wrId;	// src/llc/scala/main/Llc.scala:61:23, :113:22
-    if (pipeline_io_wbIdle & _wbBuffer_io_deq_valid) begin	// src/llc/scala/main/Llc.scala:24:24, :352:37, :353:25, :360:22, :362:35, :363:23
-      memWrAddr <= _wbBuffer_io_deq_bits_address;	// src/llc/scala/main/Llc.scala:24:24, :353:25
-      memWrData_0 <= _wbBuffer_io_deq_bits_data_0;	// src/llc/scala/main/Llc.scala:24:24, :354:25
-      memWrData_1 <= _wbBuffer_io_deq_bits_data_1;	// src/llc/scala/main/Llc.scala:24:24, :354:25
-      memWrOwner <= _wbBuffer_io_deq_bits_owner;	// src/llc/scala/main/Llc.scala:24:24, :355:25
+    if (pipeline_io_wbIdle & _wbBuffer_io_deq_valid) begin	// src/llc/scala/main/Llc.scala:24:24, :353:37, :354:25, :361:22, :363:35, :364:23
+      memWrAddr <= _wbBuffer_io_deq_bits_address;	// src/llc/scala/main/Llc.scala:24:24, :354:25
+      memWrData_0 <= _wbBuffer_io_deq_bits_data_0;	// src/llc/scala/main/Llc.scala:24:24, :355:25
+      memWrData_1 <= _wbBuffer_io_deq_bits_data_1;	// src/llc/scala/main/Llc.scala:24:24, :355:25
+      memWrOwner <= _wbBuffer_io_deq_bits_owner;	// src/llc/scala/main/Llc.scala:24:24, :356:25
     end
-    if (_GEN_23 & _pipeline_io_refillReq_valid) begin	// src/llc/scala/main/Llc.scala:23:24, :424:25, :445:22, :447:41, :448:20
-      memRdAddr <= pipeline_io_refillReq_bits_address_layerCapture;	// src/llc/scala/main/Llc.scala:23:24, :424:25
-      memRdId <= _pipeline_io_refillReq_bits_id;	// src/llc/scala/main/Llc.scala:23:24, :425:25
+    if (_GEN_23 & _pipeline_io_refillReq_valid) begin	// src/llc/scala/main/Llc.scala:23:24, :425:25, :446:22, :448:41, :449:20
+      memRdAddr <= pipeline_io_refillReq_bits_address_layerCapture;	// src/llc/scala/main/Llc.scala:23:24, :425:25
+      memRdId <= _pipeline_io_refillReq_bits_id;	// src/llc/scala/main/Llc.scala:23:24, :426:25
     end
     if (io_ctrl_ar_ready_0)	// src/utils/Stream/Stream.scala:156:16, :158:{21,34}
       axiAr_rData_addr <= io_ctrl_ar_payload_addr;	// src/utils/Stream/Stream.scala:154:20
@@ -810,8 +810,8 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
         bErrValid = _RANDOM[6'h26][27];	// src/llc/scala/main/Llc.scala:15:7, :91:24, :112:26
         bErrId = _RANDOM[6'h26][31:28];	// src/llc/scala/main/Llc.scala:15:7, :91:24, :113:22
         snoopFlushReq = _RANDOM[6'h27][0];	// src/llc/scala/main/Llc.scala:15:7, :221:30
-        memWrState = _RANDOM[6'h27][2:1];	// src/llc/scala/main/Llc.scala:15:7, :221:30, :350:29
-        memWrAddr = {_RANDOM[6'h27][31:3], _RANDOM[6'h28][2:0]};	// src/llc/scala/main/Llc.scala:15:7, :221:30, :353:25
+        memWrState = _RANDOM[6'h27][2:1];	// src/llc/scala/main/Llc.scala:15:7, :221:30, :351:29
+        memWrAddr = {_RANDOM[6'h27][31:3], _RANDOM[6'h28][2:0]};	// src/llc/scala/main/Llc.scala:15:7, :221:30, :354:25
         memWrData_0 =
           {_RANDOM[6'h28][31:3],
            _RANDOM[6'h29],
@@ -821,7 +821,7 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
            _RANDOM[6'h2D],
            _RANDOM[6'h2E],
            _RANDOM[6'h2F],
-           _RANDOM[6'h30][2:0]};	// src/llc/scala/main/Llc.scala:15:7, :353:25, :354:25
+           _RANDOM[6'h30][2:0]};	// src/llc/scala/main/Llc.scala:15:7, :354:25, :355:25
         memWrData_1 =
           {_RANDOM[6'h30][31:3],
            _RANDOM[6'h31],
@@ -831,13 +831,13 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
            _RANDOM[6'h35],
            _RANDOM[6'h36],
            _RANDOM[6'h37],
-           _RANDOM[6'h38][2:0]};	// src/llc/scala/main/Llc.scala:15:7, :354:25
-        memWrOwner = _RANDOM[6'h38][4:3];	// src/llc/scala/main/Llc.scala:15:7, :354:25, :355:25
-        memWrBeatCnt = _RANDOM[6'h38][6:5];	// src/llc/scala/main/Llc.scala:15:7, :354:25, :356:29
-        memRdState = _RANDOM[6'h38][8:7];	// src/llc/scala/main/Llc.scala:15:7, :354:25, :423:29
-        memRdAddr = {_RANDOM[6'h38][31:9], _RANDOM[6'h39][8:0]};	// src/llc/scala/main/Llc.scala:15:7, :354:25, :424:25
-        memRdId = _RANDOM[6'h39][12:9];	// src/llc/scala/main/Llc.scala:15:7, :424:25, :425:25
-        reg_rdata = {_RANDOM[6'h39][31:14], _RANDOM[6'h3A][13:0]};	// src/llc/scala/main/Llc.scala:15:7, :424:25, src/utils/bus/regif/AxiLite4BusInterface.scala:24:32
+           _RANDOM[6'h38][2:0]};	// src/llc/scala/main/Llc.scala:15:7, :355:25
+        memWrOwner = _RANDOM[6'h38][4:3];	// src/llc/scala/main/Llc.scala:15:7, :355:25, :356:25
+        memWrBeatCnt = _RANDOM[6'h38][6:5];	// src/llc/scala/main/Llc.scala:15:7, :355:25, :357:29
+        memRdState = _RANDOM[6'h38][8:7];	// src/llc/scala/main/Llc.scala:15:7, :355:25, :424:29
+        memRdAddr = {_RANDOM[6'h38][31:9], _RANDOM[6'h39][8:0]};	// src/llc/scala/main/Llc.scala:15:7, :355:25, :425:25
+        memRdId = _RANDOM[6'h39][12:9];	// src/llc/scala/main/Llc.scala:15:7, :425:25, :426:25
+        reg_rdata = {_RANDOM[6'h39][31:14], _RANDOM[6'h3A][13:0]};	// src/llc/scala/main/Llc.scala:15:7, :425:25, src/utils/bus/regif/AxiLite4BusInterface.scala:24:32
         axiAr_rValid = _RANDOM[6'h3A][14];	// src/llc/scala/main/Llc.scala:15:7, src/utils/Stream/Stream.scala:153:25, src/utils/bus/regif/AxiLite4BusInterface.scala:24:32
         axiAr_rData_addr = _RANDOM[6'h3A][22:15];	// src/llc/scala/main/Llc.scala:15:7, src/utils/Stream/Stream.scala:154:20, src/utils/bus/regif/AxiLite4BusInterface.scala:24:32
         axiRValid = _RANDOM[6'h3A][26];	// src/llc/scala/main/Llc.scala:15:7, src/utils/bus/regif/AxiLite4BusInterface.scala:24:32, :28:26
@@ -850,8 +850,8 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
         ctrlEnable = _RANDOM[6'h3C][13];	// src/llc/scala/main/Llc.scala:15:7, src/utils/Stream/Stream.scala:154:20, src/utils/bus/regif/RegInst.scala:76:16
         ctrlFlush = _RANDOM[6'h3C][14];	// src/llc/scala/main/Llc.scala:15:7, src/utils/Stream/Stream.scala:154:20, src/utils/bus/regif/RegInst.scala:76:16
         ctrlInvalidate = _RANDOM[6'h3C][15];	// src/llc/scala/main/Llc.scala:15:7, src/utils/Stream/Stream.scala:154:20, src/utils/bus/regif/RegInst.scala:76:16
-        ctrlFlushReqPrev = _RANDOM[6'h3C][16];	// src/llc/scala/main/Llc.scala:15:7, :511:33, src/utils/Stream/Stream.scala:154:20
-        flushDoneSticky = _RANDOM[6'h3C][17];	// src/llc/scala/main/Llc.scala:15:7, :518:32, src/utils/Stream/Stream.scala:154:20
+        ctrlFlushReqPrev = _RANDOM[6'h3C][16];	// src/llc/scala/main/Llc.scala:15:7, :512:33, src/utils/Stream/Stream.scala:154:20
+        flushDoneSticky = _RANDOM[6'h3C][17];	// src/llc/scala/main/Llc.scala:15:7, :519:32, src/utils/Stream/Stream.scala:154:20
         wayPartCfg = {_RANDOM[6'h3C][31:18], _RANDOM[6'h3D][1:0]};	// src/llc/scala/main/Llc.scala:15:7, src/utils/Stream/Stream.scala:154:20, src/utils/bus/regif/RegInst.scala:76:16
         cntClrPulse = _RANDOM[6'h3D][2];	// src/llc/scala/main/Llc.scala:15:7, src/utils/bus/regif/RegInst.scala:76:16
       `endif // RANDOMIZE_REG_INIT
@@ -863,19 +863,20 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
   LlcPipeline pipeline (	// src/llc/scala/main/Llc.scala:23:24
     .clock                        (clock),
     .reset                        (reset),
-    .io_reqIn_valid               (pipeline_io_reqIn_valid),	// src/llc/scala/main/Llc.scala:268:21, :269:31, :272:27
+    .io_reqIn_valid               (pipeline_io_reqIn_valid),	// src/llc/scala/main/Llc.scala:269:21, :270:31, :273:27
     .io_reqIn_ready               (_pipeline_io_reqIn_ready),
     .io_reqIn_payload_isWrite     (_wmBuf_io_pipeOut_valid),	// src/llc/scala/main/Llc.scala:25:24
     .io_reqIn_payload_address
-      (_wmBuf_io_pipeOut_valid ? _wmBuf_io_pipeOut_payload_address : rdAddr),	// src/llc/scala/main/Llc.scala:25:24, :45:22, :268:21, :270:31, :272:27
+      (_wmBuf_io_pipeOut_valid ? _wmBuf_io_pipeOut_payload_address : rdAddr),	// src/llc/scala/main/Llc.scala:25:24, :45:22, :269:21, :271:31, :273:27
     .io_reqIn_payload_id
-      (_wmBuf_io_pipeOut_valid ? _wmBuf_io_pipeOut_payload_id : rdId),	// src/llc/scala/main/Llc.scala:25:24, :46:22, :268:21, :270:31, :272:27
+      (_wmBuf_io_pipeOut_valid ? _wmBuf_io_pipeOut_payload_id : rdId),	// src/llc/scala/main/Llc.scala:25:24, :46:22, :269:21, :271:31, :273:27
     .io_reqIn_payload_writeData
-      (_wmBuf_io_pipeOut_valid ? _wmBuf_io_pipeOut_payload_writeData : 256'h0),	// src/llc/scala/main/Llc.scala:25:24, :268:21, :270:31, :272:27
+      (_wmBuf_io_pipeOut_valid ? _wmBuf_io_pipeOut_payload_writeData : 256'h0),	// src/llc/scala/main/Llc.scala:25:24, :269:21, :271:31, :273:27
     .io_reqIn_payload_writeStrb
-      (_wmBuf_io_pipeOut_valid ? _wmBuf_io_pipeOut_payload_writeStrb : 32'h0),	// src/llc/scala/main/Llc.scala:25:24, :268:21, :270:31, :272:27
+      (_wmBuf_io_pipeOut_valid ? _wmBuf_io_pipeOut_payload_writeStrb : 32'h0),	// src/llc/scala/main/Llc.scala:25:24, :269:21, :271:31, :273:27
     .io_reqIn_payload_beatIdx
-      (_wmBuf_io_pipeOut_valid ? _wmBuf_io_pipeOut_payload_beatIdx : rdAddr[5]),	// src/llc/scala/main/Llc.scala:25:24, :45:22, :54:28, :268:21, :270:31, :272:27
+      (_wmBuf_io_pipeOut_valid ? _wmBuf_io_pipeOut_payload_beatIdx : rdAddr[5]),	// src/llc/scala/main/Llc.scala:25:24, :45:22, :54:28, :269:21, :271:31, :273:27
+    .io_reqIn_payload_singleBeat  (~_wmBuf_io_pipeOut_valid & rdLen == 8'h0),	// src/llc/scala/main/Llc.scala:25:24, :47:22, :259:33, :269:21, :271:31, :273:27
     .io_respOut_valid             (_pipeline_io_respOut_valid),
     .io_respOut_payload_isWrite   (_pipeline_io_respOut_payload_isWrite),
     .io_respOut_payload_data_0    (_pipeline_io_respOut_payload_data_0),
@@ -885,14 +886,14 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
     .io_wbReq_bits_data_0         (_pipeline_io_wbReq_bits_data_0),
     .io_wbReq_bits_data_1         (_pipeline_io_wbReq_bits_data_1),
     .io_wbReq_bits_owner          (_pipeline_io_wbReq_bits_owner),
-    .io_wbDone_valid              ((&memWrState) & io_mem_b_valid),	// src/llc/scala/main/Llc.scala:350:29, :392:{43,59}, src/utils/Stream/Stream.scala:43:26
-    .io_wbDone_bits               (memWrOwner),	// src/llc/scala/main/Llc.scala:355:25
+    .io_wbDone_valid              ((&memWrState) & io_mem_b_valid),	// src/llc/scala/main/Llc.scala:351:29, :393:{43,59}, src/utils/Stream/Stream.scala:43:26
+    .io_wbDone_bits               (memWrOwner),	// src/llc/scala/main/Llc.scala:356:25
     .io_refillReq_valid           (_pipeline_io_refillReq_valid),
     .io_refillReq_bits_address    (pipeline_io_refillReq_bits_address_layerCapture),
     .io_refillReq_bits_id         (_pipeline_io_refillReq_bits_id),
     .io_refillReady
-      (_io_mem_ar_valid_T_layerCapture & io_mem_ar_ready & ~wbLinePending),	// src/llc/scala/main/Llc.scala:432:108, :437:{34,48,67,70}
-    .io_refillData_valid          (io_mem_r_valid & io_mem_r_ready_0),	// src/llc/scala/main/Llc.scala:480:33, src/utils/Stream/Stream.scala:43:26
+      (_io_mem_ar_valid_T_layerCapture & io_mem_ar_ready & ~wbLinePending),	// src/llc/scala/main/Llc.scala:433:108, :438:{34,48,67,70}
+    .io_refillData_valid          (io_mem_r_valid & io_mem_r_ready_0),	// src/llc/scala/main/Llc.scala:481:33, src/utils/Stream/Stream.scala:43:26
     .io_refillData_bits_data      (io_mem_r_payload_data),
     .io_refillData_bits_last      (io_mem_r_payload_last),
     .io_perfEvents_readHit        (_pipeline_io_perfEvents_readHit),
@@ -903,13 +904,13 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
     .io_perfEvents_cleanEvict     (_pipeline_io_perfEvents_cleanEvict),
     .io_perfEvents_mshrFullStall  (_pipeline_io_perfEvents_mshrFullStall),
     .io_perfEvents_refillComplete (_pipeline_io_perfEvents_refillComplete),
-    .io_flushStart                (flushStartPulse),	// src/llc/scala/main/Llc.scala:512:{39,60}
+    .io_flushStart                (flushStartPulse),	// src/llc/scala/main/Llc.scala:513:{39,60}
     .io_flushIsInvalidate         (ctrlInvalidate),	// src/utils/bus/regif/RegInst.scala:76:16
     .io_flushBusy                 (_pipeline_io_flushBusy),
     .io_flushDone                 (_pipeline_io_flushDone),
     .io_wbBufEmpty                (_wbBuffer_io_empty),	// src/llc/scala/main/Llc.scala:24:24
     .io_wbBufEnqReady             (_wbBuffer_io_enqReady),	// src/llc/scala/main/Llc.scala:24:24
-    .io_wbIdle                    (pipeline_io_wbIdle),	// src/llc/scala/main/Llc.scala:352:37
+    .io_wbIdle                    (pipeline_io_wbIdle),	// src/llc/scala/main/Llc.scala:353:37
     .io_wmBufEmpty                (_wmBuf_io_empty),	// src/llc/scala/main/Llc.scala:25:24
     .io_wrPortIdle                (_io_cpu_w_ready_T & ~wrAwValid)	// src/llc/scala/main/Llc.scala:67:27, :129:{31,47}, :130:51
   );	// src/llc/scala/main/Llc.scala:23:24
@@ -927,10 +928,10 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
     .io_deq_bits_data_0  (_wbBuffer_io_deq_bits_data_0),
     .io_deq_bits_data_1  (_wbBuffer_io_deq_bits_data_1),
     .io_deq_bits_owner   (_wbBuffer_io_deq_bits_owner),
-    .io_deqReady         (pipeline_io_wbIdle & _wbBuffer_io_deq_valid),	// src/llc/scala/main/Llc.scala:24:24, :352:37, :358:24, :360:22, :362:35
+    .io_deqReady         (pipeline_io_wbIdle & _wbBuffer_io_deq_valid),	// src/llc/scala/main/Llc.scala:24:24, :353:37, :359:24, :361:22, :363:35
     .io_empty            (_wbBuffer_io_empty),
     .io_full             (_wbBuffer_io_full),
-    .io_snoop_query      (memRdAddr),	// src/llc/scala/main/Llc.scala:424:25
+    .io_snoop_query      (memRdAddr),	// src/llc/scala/main/Llc.scala:425:25
     .io_snoop_hit        (_wbBuffer_io_snoop_hit)
   );	// src/llc/scala/main/Llc.scala:24:24
   LlcWriteMergeBuffer wmBuf (	// src/llc/scala/main/Llc.scala:25:24
@@ -945,14 +946,14 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
     .io_writeIn_payload_id        (wrId),	// src/llc/scala/main/Llc.scala:61:23
     .io_writeIn_payload_last      (wrWmBufReq_last),	// src/llc/scala/main/Llc.scala:203:36
     .io_pipeOut_valid             (_wmBuf_io_pipeOut_valid),
-    .io_pipeOut_ready             (_wmBuf_io_pipeOut_valid & _pipeline_io_reqIn_ready),	// src/llc/scala/main/Llc.scala:23:24, :25:24, :266:29, :268:21, :271:31
+    .io_pipeOut_ready             (_wmBuf_io_pipeOut_valid & _pipeline_io_reqIn_ready),	// src/llc/scala/main/Llc.scala:23:24, :25:24, :267:29, :269:21, :272:31
     .io_pipeOut_payload_address   (_wmBuf_io_pipeOut_payload_address),
     .io_pipeOut_payload_id        (_wmBuf_io_pipeOut_payload_id),
     .io_pipeOut_payload_writeData (_wmBuf_io_pipeOut_payload_writeData),
     .io_pipeOut_payload_writeStrb (_wmBuf_io_pipeOut_payload_writeStrb),
     .io_pipeOut_payload_beatIdx   (_wmBuf_io_pipeOut_payload_beatIdx),
     .io_bRespOut_valid            (_wmBuf_io_bRespOut_valid),
-    .io_bRespOut_ready            (wmBuf_io_bRespOut_ready),	// src/llc/scala/main/Llc.scala:97:30, :302:30
+    .io_bRespOut_ready            (wmBuf_io_bRespOut_ready),	// src/llc/scala/main/Llc.scala:97:30, :303:30
     .io_bRespOut_payload_id       (_wmBuf_io_bRespOut_payload_id),
     .io_bRespOut_payload_count    (_wmBuf_io_bRespOut_payload_count),
     .io_bRespOut_payload_beats    (_wmBuf_io_bRespOut_payload_beats),
@@ -991,44 +992,44 @@ module Llc(	// src/llc/scala/main/Llc.scala:15:7
   );	// src/llc/scala/main/Llc.scala:26:28
   assign io_cpu_aw_ready = io_cpu_aw_ready_0;	// src/llc/scala/main/Llc.scala:15:7, :129:{44,58}
   assign io_cpu_w_ready = io_cpu_w_ready_0;	// src/llc/scala/main/Llc.scala:15:7, :156:57
-  assign io_cpu_b_valid = bReady;	// src/llc/scala/main/Llc.scala:15:7, :333:25
-  assign io_cpu_b_payload_id = bErrFire ? bErrId : _GEN_4[bFifoHead];	// src/llc/scala/main/Llc.scala:15:7, :94:28, :113:22, :114:{29,47}, :335:39
-  assign io_cpu_b_payload_resp = {bErrFire, 1'h0};	// src/llc/scala/main/Llc.scala:15:7, :114:{29,47}, :336:41
+  assign io_cpu_b_valid = bReady;	// src/llc/scala/main/Llc.scala:15:7, :334:25
+  assign io_cpu_b_payload_id = bErrFire ? bErrId : _GEN_4[bFifoHead];	// src/llc/scala/main/Llc.scala:15:7, :94:28, :113:22, :114:{29,47}, :336:39
+  assign io_cpu_b_payload_resp = {bErrFire, 1'h0};	// src/llc/scala/main/Llc.scala:15:7, :114:{29,47}, :337:41
   assign io_cpu_ar_ready = io_cpu_ar_ready_0;	// src/llc/scala/main/Llc.scala:15:7, :119:44
-  assign io_cpu_r_valid = io_cpu_r_valid_0;	// src/llc/scala/main/Llc.scala:15:7, :317:30
+  assign io_cpu_r_valid = io_cpu_r_valid_0;	// src/llc/scala/main/Llc.scala:15:7, :318:30
   assign io_cpu_r_payload_data =
-    rdLegal ? (rdAddr[5] + rdBeatCnt[0] ? rdData_1 : rdData_0) : 256'h0;	// src/llc/scala/main/Llc.scala:15:7, :45:22, :48:26, :49:22, :51:26, :54:28, :318:{31,62}
+    rdLegal ? (rdAddr[5] + rdBeatCnt[0] ? rdData_1 : rdData_0) : 256'h0;	// src/llc/scala/main/Llc.scala:15:7, :45:22, :48:26, :49:22, :51:26, :54:28, :319:{31,62}
   assign io_cpu_r_payload_id = rdId;	// src/llc/scala/main/Llc.scala:15:7, :46:22
-  assign io_cpu_r_payload_resp = {~rdLegal, 1'h0};	// src/llc/scala/main/Llc.scala:15:7, :48:26, :320:41
-  assign io_cpu_r_payload_last = io_cpu_r_payload_last_0;	// src/llc/scala/main/Llc.scala:15:7, :321:49
-  assign io_mem_aw_valid = io_mem_aw_valid_0;	// src/llc/scala/main/Llc.scala:15:7, :396:34
-  assign io_mem_aw_payload_addr = memWrAddr;	// src/llc/scala/main/Llc.scala:15:7, :353:25
-  assign io_mem_aw_payload_id = 4'h0;	// src/llc/scala/main/Llc.scala:15:7, :398:34
-  assign io_mem_aw_payload_region = 4'h0;	// src/llc/scala/main/Llc.scala:15:7, :398:34
+  assign io_cpu_r_payload_resp = {~rdLegal, 1'h0};	// src/llc/scala/main/Llc.scala:15:7, :48:26, :321:41
+  assign io_cpu_r_payload_last = io_cpu_r_payload_last_0;	// src/llc/scala/main/Llc.scala:15:7, :322:49
+  assign io_mem_aw_valid = io_mem_aw_valid_0;	// src/llc/scala/main/Llc.scala:15:7, :397:34
+  assign io_mem_aw_payload_addr = memWrAddr;	// src/llc/scala/main/Llc.scala:15:7, :354:25
+  assign io_mem_aw_payload_id = 4'h0;	// src/llc/scala/main/Llc.scala:15:7, :399:34
+  assign io_mem_aw_payload_region = 4'h0;	// src/llc/scala/main/Llc.scala:15:7, :399:34
   assign io_mem_aw_payload_len = 8'h1;	// src/llc/scala/main/Llc.scala:15:7
   assign io_mem_aw_payload_size = 3'h5;	// src/llc/scala/main/Llc.scala:15:7, :76:42
   assign io_mem_aw_payload_burst = 2'h1;	// src/llc/scala/main/Llc.scala:15:7
   assign io_mem_aw_payload_lock = 1'h0;	// src/llc/scala/main/Llc.scala:15:7
-  assign io_mem_aw_payload_cache = 4'h0;	// src/llc/scala/main/Llc.scala:15:7, :398:34
-  assign io_mem_aw_payload_qos = 4'h0;	// src/llc/scala/main/Llc.scala:15:7, :398:34
+  assign io_mem_aw_payload_cache = 4'h0;	// src/llc/scala/main/Llc.scala:15:7, :399:34
+  assign io_mem_aw_payload_qos = 4'h0;	// src/llc/scala/main/Llc.scala:15:7, :399:34
   assign io_mem_aw_payload_prot = 3'h0;	// src/llc/scala/main/Llc.scala:15:7
-  assign io_mem_w_valid = io_mem_w_valid_0;	// src/llc/scala/main/Llc.scala:15:7, :411:33
-  assign io_mem_w_payload_data = memWrBeatCnt[0] ? memWrData_1 : memWrData_0;	// <stdin>:10030:37, src/llc/scala/main/Llc.scala:15:7, :354:25, :356:29, :412:25
-  assign io_mem_w_payload_strb = 32'hFFFFFFFF;	// src/llc/scala/main/Llc.scala:15:7, :413:42
-  assign io_mem_w_payload_last = memWrBeatCnt == 2'h1;	// src/llc/scala/main/Llc.scala:15:7, :356:29, :414:52
-  assign io_mem_b_ready = &memWrState;	// src/llc/scala/main/Llc.scala:15:7, :350:29, :392:43
-  assign io_mem_ar_valid = io_mem_ar_valid_0;	// src/llc/scala/main/Llc.scala:15:7, :466:48
+  assign io_mem_w_valid = io_mem_w_valid_0;	// src/llc/scala/main/Llc.scala:15:7, :412:33
+  assign io_mem_w_payload_data = memWrBeatCnt[0] ? memWrData_1 : memWrData_0;	// <stdin>:10042:37, src/llc/scala/main/Llc.scala:15:7, :355:25, :357:29, :413:25
+  assign io_mem_w_payload_strb = 32'hFFFFFFFF;	// src/llc/scala/main/Llc.scala:15:7, :414:42
+  assign io_mem_w_payload_last = memWrBeatCnt == 2'h1;	// src/llc/scala/main/Llc.scala:15:7, :357:29, :415:52
+  assign io_mem_b_ready = &memWrState;	// src/llc/scala/main/Llc.scala:15:7, :351:29, :393:43
+  assign io_mem_ar_valid = io_mem_ar_valid_0;	// src/llc/scala/main/Llc.scala:15:7, :467:48
   assign io_mem_ar_payload_addr = io_mem_ar_payload_addr_0;	// src/llc/scala/main/Llc.scala:15:7
-  assign io_mem_ar_payload_id = memRdId;	// src/llc/scala/main/Llc.scala:15:7, :425:25
-  assign io_mem_ar_payload_region = 4'h0;	// src/llc/scala/main/Llc.scala:15:7, :398:34
+  assign io_mem_ar_payload_id = memRdId;	// src/llc/scala/main/Llc.scala:15:7, :426:25
+  assign io_mem_ar_payload_region = 4'h0;	// src/llc/scala/main/Llc.scala:15:7, :399:34
   assign io_mem_ar_payload_len = 8'h1;	// src/llc/scala/main/Llc.scala:15:7
   assign io_mem_ar_payload_size = 3'h5;	// src/llc/scala/main/Llc.scala:15:7, :76:42
   assign io_mem_ar_payload_burst = 2'h1;	// src/llc/scala/main/Llc.scala:15:7
   assign io_mem_ar_payload_lock = 1'h0;	// src/llc/scala/main/Llc.scala:15:7
-  assign io_mem_ar_payload_cache = 4'h0;	// src/llc/scala/main/Llc.scala:15:7, :398:34
-  assign io_mem_ar_payload_qos = 4'h0;	// src/llc/scala/main/Llc.scala:15:7, :398:34
+  assign io_mem_ar_payload_cache = 4'h0;	// src/llc/scala/main/Llc.scala:15:7, :399:34
+  assign io_mem_ar_payload_qos = 4'h0;	// src/llc/scala/main/Llc.scala:15:7, :399:34
   assign io_mem_ar_payload_prot = 3'h0;	// src/llc/scala/main/Llc.scala:15:7
-  assign io_mem_r_ready = io_mem_r_ready_0;	// src/llc/scala/main/Llc.scala:15:7, :480:33
+  assign io_mem_r_ready = io_mem_r_ready_0;	// src/llc/scala/main/Llc.scala:15:7, :481:33
   assign io_ctrl_aw_ready = io_ctrl_aw_ready_0;	// src/llc/scala/main/Llc.scala:15:7, src/utils/Stream/Stream.scala:156:16, :158:{21,34}
   assign io_ctrl_w_ready = io_ctrl_w_ready_0;	// src/llc/scala/main/Llc.scala:15:7, src/utils/Stream/Stream.scala:156:16, :158:{21,34}
   assign io_ctrl_b_valid = axiBValid;	// src/llc/scala/main/Llc.scala:15:7, src/utils/bus/regif/AxiLite4BusInterface.scala:33:26

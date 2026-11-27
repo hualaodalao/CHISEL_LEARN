@@ -9,6 +9,8 @@ class LlcReq(cfg: LlcConfig) extends Bundle {
   val writeData = UInt(cfg.dataWidth.W)
   val writeStrb = UInt(cfg.bytePerBeat.W)
   val beatIdx   = UInt(log2Ceil(cfg.beatsPerLine).W)
+  // The read needs its target beat only: a longer burst needs the whole line
+  val singleBeat = Bool()
 }
 
 // Response bundle from the LLC pipeline
@@ -121,7 +123,8 @@ class LlcPipeline(cfg: LlcConfig) extends Module {
     respValidReg        := true.B
     respDataReg.isWrite := false.B  // early resp is always for read misses
     respDataReg.id      := earlyRespBits.id
-    // Fill data vector: only the target beat has meaningful data, others are zero-padded
+    // Fill data vector: only the target beat has meaning, the rest is zero. The
+  // early response is limited to single-beat reads for that reason.
     for (i <- 0 until cfg.beatsPerLine) {
       respDataReg.data(i) := Mux(i.U === earlyRespBits.beatIdx,
         earlyRespBits.data, 0.U)
@@ -425,6 +428,7 @@ class LlcPipeline(cfg: LlcConfig) extends Module {
   mshr.io.allocReq.bits.writeData     := s2Req.writeData
   mshr.io.allocReq.bits.writeStrb     := s2Req.writeStrb
   mshr.io.allocReq.bits.writeBeatIdx  := s2Req.beatIdx
+  mshr.io.allocReq.bits.singleBeat    := s2Req.singleBeat
 
   // The victim way holds the old line until refill completion, so its tag is
   // invalidated here: a later access to the old line must miss and refill it

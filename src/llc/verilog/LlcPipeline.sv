@@ -43,161 +43,165 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
-  input          clock,	// src/llc/scala/main/LlcPipeline.scala:27:7
-                 reset,	// src/llc/scala/main/LlcPipeline.scala:27:7
-                 io_reqIn_valid,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  output         io_reqIn_ready,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  input          io_reqIn_payload_isWrite,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  input  [31:0]  io_reqIn_payload_address,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  input  [3:0]   io_reqIn_payload_id,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  input  [255:0] io_reqIn_payload_writeData,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  input  [31:0]  io_reqIn_payload_writeStrb,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  input          io_reqIn_payload_beatIdx,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  output         io_respOut_valid,	// src/llc/scala/main/LlcPipeline.scala:28:14
-                 io_respOut_payload_isWrite,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  output [255:0] io_respOut_payload_data_0,	// src/llc/scala/main/LlcPipeline.scala:28:14
-                 io_respOut_payload_data_1,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  output         io_wbReq_valid,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  output [31:0]  io_wbReq_bits_address,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  output [255:0] io_wbReq_bits_data_0,	// src/llc/scala/main/LlcPipeline.scala:28:14
-                 io_wbReq_bits_data_1,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  output [1:0]   io_wbReq_bits_owner,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  input          io_wbDone_valid,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  input  [1:0]   io_wbDone_bits,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  output         io_refillReq_valid,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  output [31:0]  io_refillReq_bits_address,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  output [3:0]   io_refillReq_bits_id,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  input          io_refillReady,	// src/llc/scala/main/LlcPipeline.scala:28:14
-                 io_refillData_valid,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  input  [255:0] io_refillData_bits_data,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  input          io_refillData_bits_last,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  output         io_perfEvents_readHit,	// src/llc/scala/main/LlcPipeline.scala:28:14
-                 io_perfEvents_readMiss,	// src/llc/scala/main/LlcPipeline.scala:28:14
-                 io_perfEvents_writeHit,	// src/llc/scala/main/LlcPipeline.scala:28:14
-                 io_perfEvents_writeMiss,	// src/llc/scala/main/LlcPipeline.scala:28:14
-                 io_perfEvents_dirtyEvict,	// src/llc/scala/main/LlcPipeline.scala:28:14
-                 io_perfEvents_cleanEvict,	// src/llc/scala/main/LlcPipeline.scala:28:14
-                 io_perfEvents_mshrFullStall,	// src/llc/scala/main/LlcPipeline.scala:28:14
-                 io_perfEvents_refillComplete,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  input          io_flushStart,	// src/llc/scala/main/LlcPipeline.scala:28:14
-                 io_flushIsInvalidate,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  output         io_flushBusy,	// src/llc/scala/main/LlcPipeline.scala:28:14
-                 io_flushDone,	// src/llc/scala/main/LlcPipeline.scala:28:14
-  input          io_wbBufEmpty,	// src/llc/scala/main/LlcPipeline.scala:28:14
-                 io_wbBufEnqReady,	// src/llc/scala/main/LlcPipeline.scala:28:14
-                 io_wbIdle,	// src/llc/scala/main/LlcPipeline.scala:28:14
-                 io_wmBufEmpty,	// src/llc/scala/main/LlcPipeline.scala:28:14
-                 io_wrPortIdle	// src/llc/scala/main/LlcPipeline.scala:28:14
+module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:29:7
+  input          clock,	// src/llc/scala/main/LlcPipeline.scala:29:7
+                 reset,	// src/llc/scala/main/LlcPipeline.scala:29:7
+                 io_reqIn_valid,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  output         io_reqIn_ready,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  input          io_reqIn_payload_isWrite,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  input  [31:0]  io_reqIn_payload_address,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  input  [3:0]   io_reqIn_payload_id,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  input  [255:0] io_reqIn_payload_writeData,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  input  [31:0]  io_reqIn_payload_writeStrb,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  input          io_reqIn_payload_beatIdx,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_reqIn_payload_singleBeat,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  output         io_respOut_valid,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_respOut_payload_isWrite,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  output [255:0] io_respOut_payload_data_0,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_respOut_payload_data_1,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  output         io_wbReq_valid,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  output [31:0]  io_wbReq_bits_address,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  output [255:0] io_wbReq_bits_data_0,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_wbReq_bits_data_1,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  output [1:0]   io_wbReq_bits_owner,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  input          io_wbDone_valid,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  input  [1:0]   io_wbDone_bits,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  output         io_refillReq_valid,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  output [31:0]  io_refillReq_bits_address,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  output [3:0]   io_refillReq_bits_id,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  input          io_refillReady,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_refillData_valid,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  input  [255:0] io_refillData_bits_data,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  input          io_refillData_bits_last,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  output         io_perfEvents_readHit,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_perfEvents_readMiss,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_perfEvents_writeHit,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_perfEvents_writeMiss,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_perfEvents_dirtyEvict,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_perfEvents_cleanEvict,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_perfEvents_mshrFullStall,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_perfEvents_refillComplete,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  input          io_flushStart,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_flushIsInvalidate,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  output         io_flushBusy,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_flushDone,	// src/llc/scala/main/LlcPipeline.scala:30:14
+  input          io_wbBufEmpty,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_wbBufEnqReady,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_wbIdle,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_wmBufEmpty,	// src/llc/scala/main/LlcPipeline.scala:30:14
+                 io_wrPortIdle	// src/llc/scala/main/LlcPipeline.scala:30:14
 );
 
-  wire             flushWalking;	// src/llc/scala/main/LlcPipeline.scala:505:31
-  wire             s2Done;	// src/llc/scala/main/LlcPipeline.scala:375:78, :444:{23,36}
-  wire             _s2Stall_T_4;	// src/llc/scala/main/LlcPipeline.scala:359:{23,33}
-  wire             s2HitDefer;	// src/llc/scala/main/LlcPipeline.scala:358:37
-  wire             io_reqIn_ready_0;	// src/llc/scala/main/LlcPipeline.scala:218:{36,48,63}
-  wire             _mshr_io_allocReady;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire             _mshr_io_wbReq_valid;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [31:0]      _mshr_io_wbReq_bits_address;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [255:0]     _mshr_io_wbReq_bits_data_0;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [255:0]     _mshr_io_wbReq_bits_data_1;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [1:0]       _mshr_io_wbReq_bits_owner;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire             _mshr_io_complete_valid;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [8:0]       _mshr_io_complete_bits_set;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [2:0]       _mshr_io_complete_bits_way;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [16:0]      _mshr_io_complete_bits_tag;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [255:0]     _mshr_io_complete_bits_data_0;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [255:0]     _mshr_io_complete_bits_data_1;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire             _mshr_io_complete_bits_dirty;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire             _mshr_io_complete_bits_reqType;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire             _mshr_io_complete_bits_earlyRespDone;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire             _mshr_io_earlyResp_valid;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [255:0]     _mshr_io_earlyResp_bits_data;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire             _mshr_io_earlyResp_bits_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire             _mshr_io_allIdle;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire             _mshr_io_inflight_0_valid;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [8:0]       _mshr_io_inflight_0_bits_set;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [2:0]       _mshr_io_inflight_0_bits_way;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire             _mshr_io_inflight_1_valid;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [8:0]       _mshr_io_inflight_1_bits_set;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [2:0]       _mshr_io_inflight_1_bits_way;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire             _mshr_io_inflight_2_valid;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [8:0]       _mshr_io_inflight_2_bits_set;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [2:0]       _mshr_io_inflight_2_bits_way;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire             _mshr_io_inflight_3_valid;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [8:0]       _mshr_io_inflight_3_bits_set;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [2:0]       _mshr_io_inflight_3_bits_way;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire             _mshr_io_addrMatch_hit;	// src/llc/scala/main/LlcPipeline.scala:82:28
-  wire [2:0]       _wayPartition_io_victimWay;	// src/llc/scala/main/LlcPipeline.scala:81:28
-  wire [2:0]       _plru_io_queryResp_victimWay;	// src/llc/scala/main/LlcPipeline.scala:80:28
-  wire [255:0]     _dataArray_io_readResp_data_0;	// src/llc/scala/main/LlcPipeline.scala:79:28
-  wire [255:0]     _dataArray_io_readResp_data_1;	// src/llc/scala/main/LlcPipeline.scala:79:28
-  wire [16:0]      _tagArray_io_readResp_tags_0;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire [16:0]      _tagArray_io_readResp_tags_1;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire [16:0]      _tagArray_io_readResp_tags_2;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire [16:0]      _tagArray_io_readResp_tags_3;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire [16:0]      _tagArray_io_readResp_tags_4;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire [16:0]      _tagArray_io_readResp_tags_5;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire [16:0]      _tagArray_io_readResp_tags_6;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire [16:0]      _tagArray_io_readResp_tags_7;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire             _tagArray_io_readResp_valids_0;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire             _tagArray_io_readResp_valids_1;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire             _tagArray_io_readResp_valids_2;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire             _tagArray_io_readResp_valids_3;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire             _tagArray_io_readResp_valids_4;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire             _tagArray_io_readResp_valids_5;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire             _tagArray_io_readResp_valids_6;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire             _tagArray_io_readResp_valids_7;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire             _tagArray_io_readResp_dirtys_0;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire             _tagArray_io_readResp_dirtys_1;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire             _tagArray_io_readResp_dirtys_2;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire             _tagArray_io_readResp_dirtys_3;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire             _tagArray_io_readResp_dirtys_4;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire             _tagArray_io_readResp_dirtys_5;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire             _tagArray_io_readResp_dirtys_6;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  wire             _tagArray_io_readResp_dirtys_7;	// src/llc/scala/main/LlcPipeline.scala:78:28
-  reg              respValidReg;	// src/llc/scala/main/LlcPipeline.scala:107:29
-  reg              respDataReg_isWrite;	// src/llc/scala/main/LlcPipeline.scala:108:25
-  reg  [255:0]     respDataReg_data_0;	// src/llc/scala/main/LlcPipeline.scala:108:25
-  reg  [255:0]     respDataReg_data_1;	// src/llc/scala/main/LlcPipeline.scala:108:25
-  reg              s1Valid;	// src/llc/scala/main/LlcPipeline.scala:132:24
-  reg              s2Valid;	// src/llc/scala/main/LlcPipeline.scala:133:24
-  reg              replayValid;	// src/llc/scala/main/LlcPipeline.scala:136:29
-  reg              replayReq_isWrite;	// src/llc/scala/main/LlcPipeline.scala:137:25
-  reg  [31:0]      replayReq_address;	// src/llc/scala/main/LlcPipeline.scala:137:25
-  reg  [3:0]       replayReq_id;	// src/llc/scala/main/LlcPipeline.scala:137:25
-  reg  [255:0]     replayReq_writeData;	// src/llc/scala/main/LlcPipeline.scala:137:25
-  reg  [31:0]      replayReq_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:137:25
-  reg              replayReq_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:137:25
-  reg              replay2Valid;	// src/llc/scala/main/LlcPipeline.scala:138:29
-  reg              replay2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:139:25
-  reg  [31:0]      replay2Req_address;	// src/llc/scala/main/LlcPipeline.scala:139:25
-  reg  [3:0]       replay2Req_id;	// src/llc/scala/main/LlcPipeline.scala:139:25
-  reg  [255:0]     replay2Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:139:25
-  reg  [31:0]      replay2Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:139:25
-  reg              replay2Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:139:25
-  wire             replayPend = replayValid | replay2Valid;	// src/llc/scala/main/LlcPipeline.scala:136:29, :138:29, :140:32
-  wire             _pipelineStall_T = _mshr_io_complete_valid | _s2Stall_T_4 | s2HitDefer;	// src/llc/scala/main/LlcPipeline.scala:82:28, :146:34, :358:37, :359:{23,33,84}
+  wire             flushWalking;	// src/llc/scala/main/LlcPipeline.scala:509:31
+  wire             s2Done;	// src/llc/scala/main/LlcPipeline.scala:378:78, :448:{23,36}
+  wire             _s2Stall_T_4;	// src/llc/scala/main/LlcPipeline.scala:362:{23,33}
+  wire             s2HitDefer;	// src/llc/scala/main/LlcPipeline.scala:361:37
+  wire             io_reqIn_ready_0;	// src/llc/scala/main/LlcPipeline.scala:221:{36,48,63}
+  wire             _mshr_io_allocReady;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire             _mshr_io_wbReq_valid;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [31:0]      _mshr_io_wbReq_bits_address;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [255:0]     _mshr_io_wbReq_bits_data_0;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [255:0]     _mshr_io_wbReq_bits_data_1;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [1:0]       _mshr_io_wbReq_bits_owner;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire             _mshr_io_complete_valid;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [8:0]       _mshr_io_complete_bits_set;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [2:0]       _mshr_io_complete_bits_way;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [16:0]      _mshr_io_complete_bits_tag;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [255:0]     _mshr_io_complete_bits_data_0;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [255:0]     _mshr_io_complete_bits_data_1;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire             _mshr_io_complete_bits_dirty;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire             _mshr_io_complete_bits_reqType;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire             _mshr_io_complete_bits_earlyRespDone;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire             _mshr_io_earlyResp_valid;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [255:0]     _mshr_io_earlyResp_bits_data;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire             _mshr_io_earlyResp_bits_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire             _mshr_io_allIdle;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire             _mshr_io_inflight_0_valid;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [8:0]       _mshr_io_inflight_0_bits_set;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [2:0]       _mshr_io_inflight_0_bits_way;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire             _mshr_io_inflight_1_valid;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [8:0]       _mshr_io_inflight_1_bits_set;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [2:0]       _mshr_io_inflight_1_bits_way;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire             _mshr_io_inflight_2_valid;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [8:0]       _mshr_io_inflight_2_bits_set;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [2:0]       _mshr_io_inflight_2_bits_way;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire             _mshr_io_inflight_3_valid;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [8:0]       _mshr_io_inflight_3_bits_set;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [2:0]       _mshr_io_inflight_3_bits_way;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire             _mshr_io_addrMatch_hit;	// src/llc/scala/main/LlcPipeline.scala:84:28
+  wire [2:0]       _wayPartition_io_victimWay;	// src/llc/scala/main/LlcPipeline.scala:83:28
+  wire [2:0]       _plru_io_queryResp_victimWay;	// src/llc/scala/main/LlcPipeline.scala:82:28
+  wire [255:0]     _dataArray_io_readResp_data_0;	// src/llc/scala/main/LlcPipeline.scala:81:28
+  wire [255:0]     _dataArray_io_readResp_data_1;	// src/llc/scala/main/LlcPipeline.scala:81:28
+  wire [16:0]      _tagArray_io_readResp_tags_0;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire [16:0]      _tagArray_io_readResp_tags_1;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire [16:0]      _tagArray_io_readResp_tags_2;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire [16:0]      _tagArray_io_readResp_tags_3;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire [16:0]      _tagArray_io_readResp_tags_4;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire [16:0]      _tagArray_io_readResp_tags_5;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire [16:0]      _tagArray_io_readResp_tags_6;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire [16:0]      _tagArray_io_readResp_tags_7;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire             _tagArray_io_readResp_valids_0;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire             _tagArray_io_readResp_valids_1;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire             _tagArray_io_readResp_valids_2;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire             _tagArray_io_readResp_valids_3;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire             _tagArray_io_readResp_valids_4;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire             _tagArray_io_readResp_valids_5;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire             _tagArray_io_readResp_valids_6;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire             _tagArray_io_readResp_valids_7;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire             _tagArray_io_readResp_dirtys_0;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire             _tagArray_io_readResp_dirtys_1;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire             _tagArray_io_readResp_dirtys_2;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire             _tagArray_io_readResp_dirtys_3;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire             _tagArray_io_readResp_dirtys_4;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire             _tagArray_io_readResp_dirtys_5;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire             _tagArray_io_readResp_dirtys_6;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  wire             _tagArray_io_readResp_dirtys_7;	// src/llc/scala/main/LlcPipeline.scala:80:28
+  reg              respValidReg;	// src/llc/scala/main/LlcPipeline.scala:109:29
+  reg              respDataReg_isWrite;	// src/llc/scala/main/LlcPipeline.scala:110:25
+  reg  [255:0]     respDataReg_data_0;	// src/llc/scala/main/LlcPipeline.scala:110:25
+  reg  [255:0]     respDataReg_data_1;	// src/llc/scala/main/LlcPipeline.scala:110:25
+  reg              s1Valid;	// src/llc/scala/main/LlcPipeline.scala:135:24
+  reg              s2Valid;	// src/llc/scala/main/LlcPipeline.scala:136:24
+  reg              replayValid;	// src/llc/scala/main/LlcPipeline.scala:139:29
+  reg              replayReq_isWrite;	// src/llc/scala/main/LlcPipeline.scala:140:25
+  reg  [31:0]      replayReq_address;	// src/llc/scala/main/LlcPipeline.scala:140:25
+  reg  [3:0]       replayReq_id;	// src/llc/scala/main/LlcPipeline.scala:140:25
+  reg  [255:0]     replayReq_writeData;	// src/llc/scala/main/LlcPipeline.scala:140:25
+  reg  [31:0]      replayReq_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:140:25
+  reg              replayReq_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:140:25
+  reg              replayReq_singleBeat;	// src/llc/scala/main/LlcPipeline.scala:140:25
+  reg              replay2Valid;	// src/llc/scala/main/LlcPipeline.scala:141:29
+  reg              replay2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:142:25
+  reg  [31:0]      replay2Req_address;	// src/llc/scala/main/LlcPipeline.scala:142:25
+  reg  [3:0]       replay2Req_id;	// src/llc/scala/main/LlcPipeline.scala:142:25
+  reg  [255:0]     replay2Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:142:25
+  reg  [31:0]      replay2Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:142:25
+  reg              replay2Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:142:25
+  reg              replay2Req_singleBeat;	// src/llc/scala/main/LlcPipeline.scala:142:25
+  wire             replayPend = replayValid | replay2Valid;	// src/llc/scala/main/LlcPipeline.scala:139:29, :141:29, :143:32
+  wire             _pipelineStall_T = _mshr_io_complete_valid | _s2Stall_T_4 | s2HitDefer;	// src/llc/scala/main/LlcPipeline.scala:84:28, :149:34, :361:37, :362:{23,33,84}
   wire             s0Fire =
     (io_reqIn_valid & io_reqIn_ready_0 | replayPend) & ~_pipelineStall_T & ~s1Valid
-    & ~flushWalking;	// src/llc/scala/main/LlcPipeline.scala:132:24, :140:32, :146:34, :203:{31,46,49,64,67,76,79}, :218:{36,48,63}, :359:84, :505:31, src/utils/Stream/Stream.scala:43:26
+    & ~flushWalking;	// src/llc/scala/main/LlcPipeline.scala:135:24, :143:32, :149:34, :206:{31,46,49,64,67,76,79}, :221:{36,48,63}, :362:84, :509:31, src/utils/Stream/Stream.scala:43:26
   wire [31:0]      s0Req_address =
     replayPend
       ? (replayValid ? replayReq_address : replay2Req_address)
-      : io_reqIn_payload_address;	// src/llc/scala/main/LlcPipeline.scala:136:29, :137:25, :139:25, :140:32, :141:23, :204:19
-  assign io_reqIn_ready_0 = ~_pipelineStall_T & ~s1Valid & ~replayPend & ~flushWalking;	// src/llc/scala/main/LlcPipeline.scala:132:24, :140:32, :146:34, :203:{49,67,79}, :218:{36,48,51,63}, :359:84, :505:31
-  reg              s1Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:221:18
-  reg  [31:0]      s1Req_address;	// src/llc/scala/main/LlcPipeline.scala:221:18
-  reg  [3:0]       s1Req_id;	// src/llc/scala/main/LlcPipeline.scala:221:18
-  reg  [255:0]     s1Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:221:18
-  reg  [31:0]      s1Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:221:18
-  reg              s1Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:221:18
-  reg  [8:0]       s1Set;	// src/llc/scala/main/LlcPipeline.scala:222:18
-  reg  [16:0]      s1Tag;	// src/llc/scala/main/LlcPipeline.scala:223:18
-  wire             _s2VictimWasBusy_T = _mshr_io_inflight_0_bits_set == s1Set;	// src/llc/scala/main/LlcPipeline.scala:82:28, :222:18, :250:31
-  wire             _s2VictimWasBusy_T_4 = _mshr_io_inflight_1_bits_set == s1Set;	// src/llc/scala/main/LlcPipeline.scala:82:28, :222:18, :250:31
-  wire             _s2VictimWasBusy_T_8 = _mshr_io_inflight_2_bits_set == s1Set;	// src/llc/scala/main/LlcPipeline.scala:82:28, :222:18, :250:31
-  wire             _s2VictimWasBusy_T_12 = _mshr_io_inflight_3_bits_set == s1Set;	// src/llc/scala/main/LlcPipeline.scala:82:28, :222:18, :250:31
+      : io_reqIn_payload_address;	// src/llc/scala/main/LlcPipeline.scala:139:29, :140:25, :142:25, :143:32, :144:23, :207:19
+  assign io_reqIn_ready_0 = ~_pipelineStall_T & ~s1Valid & ~replayPend & ~flushWalking;	// src/llc/scala/main/LlcPipeline.scala:135:24, :143:32, :149:34, :206:{49,67,79}, :221:{36,48,51,63}, :362:84, :509:31
+  reg              s1Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:224:18
+  reg  [31:0]      s1Req_address;	// src/llc/scala/main/LlcPipeline.scala:224:18
+  reg  [3:0]       s1Req_id;	// src/llc/scala/main/LlcPipeline.scala:224:18
+  reg  [255:0]     s1Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:224:18
+  reg  [31:0]      s1Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:224:18
+  reg              s1Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:224:18
+  reg              s1Req_singleBeat;	// src/llc/scala/main/LlcPipeline.scala:224:18
+  reg  [8:0]       s1Set;	// src/llc/scala/main/LlcPipeline.scala:225:18
+  reg  [16:0]      s1Tag;	// src/llc/scala/main/LlcPipeline.scala:226:18
+  wire             _s2VictimWasBusy_T = _mshr_io_inflight_0_bits_set == s1Set;	// src/llc/scala/main/LlcPipeline.scala:84:28, :225:18, :253:31
+  wire             _s2VictimWasBusy_T_4 = _mshr_io_inflight_1_bits_set == s1Set;	// src/llc/scala/main/LlcPipeline.scala:84:28, :225:18, :253:31
+  wire             _s2VictimWasBusy_T_8 = _mshr_io_inflight_2_bits_set == s1Set;	// src/llc/scala/main/LlcPipeline.scala:84:28, :225:18, :253:31
+  wire             _s2VictimWasBusy_T_12 = _mshr_io_inflight_3_bits_set == s1Set;	// src/llc/scala/main/LlcPipeline.scala:84:28, :225:18, :253:31
   wire [7:0]       s1BusyMask =
     (_mshr_io_inflight_0_valid & _s2VictimWasBusy_T
        ? 8'h1 << _mshr_io_inflight_0_bits_way
@@ -210,28 +214,28 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
          : 8'h0)
     | (_mshr_io_inflight_3_valid & _s2VictimWasBusy_T_12
          ? 8'h1 << _mshr_io_inflight_3_bits_way
-         : 8'h0);	// src/llc/scala/main/LlcPipeline.scala:82:28, :250:{8,17,31}, :251:14, src/main/scala/chisel3/util/OneHot.scala:65:12
+         : 8'h0);	// src/llc/scala/main/LlcPipeline.scala:84:28, :253:{8,17,31}, :254:14, src/main/scala/chisel3/util/OneHot.scala:65:12
   wire             hitVec_1 =
     _tagArray_io_readResp_valids_1 & ~(s1BusyMask[1])
-    & _tagArray_io_readResp_tags_1 == s1Tag;	// src/llc/scala/main/LlcPipeline.scala:78:28, :223:18, :251:14, :256:{17,20,31,35,49}
+    & _tagArray_io_readResp_tags_1 == s1Tag;	// src/llc/scala/main/LlcPipeline.scala:80:28, :226:18, :254:14, :259:{17,20,31,35,49}
   wire             hitVec_2 =
     _tagArray_io_readResp_valids_2 & ~(s1BusyMask[2])
-    & _tagArray_io_readResp_tags_2 == s1Tag;	// src/llc/scala/main/LlcPipeline.scala:78:28, :223:18, :251:14, :256:{17,20,31,35,49}
+    & _tagArray_io_readResp_tags_2 == s1Tag;	// src/llc/scala/main/LlcPipeline.scala:80:28, :226:18, :254:14, :259:{17,20,31,35,49}
   wire             hitVec_3 =
     _tagArray_io_readResp_valids_3 & ~(s1BusyMask[3])
-    & _tagArray_io_readResp_tags_3 == s1Tag;	// src/llc/scala/main/LlcPipeline.scala:78:28, :223:18, :251:14, :256:{17,20,31,35,49}
+    & _tagArray_io_readResp_tags_3 == s1Tag;	// src/llc/scala/main/LlcPipeline.scala:80:28, :226:18, :254:14, :259:{17,20,31,35,49}
   wire             hitVec_4 =
     _tagArray_io_readResp_valids_4 & ~(s1BusyMask[4])
-    & _tagArray_io_readResp_tags_4 == s1Tag;	// src/llc/scala/main/LlcPipeline.scala:78:28, :223:18, :251:14, :256:{17,20,31,35,49}
+    & _tagArray_io_readResp_tags_4 == s1Tag;	// src/llc/scala/main/LlcPipeline.scala:80:28, :226:18, :254:14, :259:{17,20,31,35,49}
   wire             hitVec_5 =
     _tagArray_io_readResp_valids_5 & ~(s1BusyMask[5])
-    & _tagArray_io_readResp_tags_5 == s1Tag;	// src/llc/scala/main/LlcPipeline.scala:78:28, :223:18, :251:14, :256:{17,20,31,35,49}
+    & _tagArray_io_readResp_tags_5 == s1Tag;	// src/llc/scala/main/LlcPipeline.scala:80:28, :226:18, :254:14, :259:{17,20,31,35,49}
   wire             hitVec_6 =
     _tagArray_io_readResp_valids_6 & ~(s1BusyMask[6])
-    & _tagArray_io_readResp_tags_6 == s1Tag;	// src/llc/scala/main/LlcPipeline.scala:78:28, :223:18, :251:14, :256:{17,20,31,35,49}
+    & _tagArray_io_readResp_tags_6 == s1Tag;	// src/llc/scala/main/LlcPipeline.scala:80:28, :226:18, :254:14, :259:{17,20,31,35,49}
   wire             hitVec_7 =
     _tagArray_io_readResp_valids_7 & ~(s1BusyMask[7])
-    & _tagArray_io_readResp_tags_7 == s1Tag;	// src/llc/scala/main/LlcPipeline.scala:78:28, :223:18, :251:14, :256:{17,20,31,35,49}
+    & _tagArray_io_readResp_tags_7 == s1Tag;	// src/llc/scala/main/LlcPipeline.scala:80:28, :226:18, :254:14, :259:{17,20,31,35,49}
   wire [7:0]       _hitWay_T =
     {hitVec_7,
      hitVec_6,
@@ -241,28 +245,29 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
      hitVec_2,
      hitVec_1,
      _tagArray_io_readResp_valids_0 & ~(s1BusyMask[0])
-       & _tagArray_io_readResp_tags_0 == s1Tag};	// src/llc/scala/main/LlcPipeline.scala:78:28, :223:18, :251:14, :256:{17,20,31,35,49}, :257:24
+       & _tagArray_io_readResp_tags_0 == s1Tag};	// src/llc/scala/main/LlcPipeline.scala:80:28, :226:18, :254:14, :259:{17,20,31,35,49}, :260:24
   wire [2:0]       _hitWay_T_2 =
-    {hitVec_7, hitVec_6, hitVec_5} | {hitVec_3, hitVec_2, hitVec_1};	// src/llc/scala/main/LlcPipeline.scala:256:{17,35}, src/main/scala/chisel3/util/OneHot.scala:30:18, :31:18, :32:28
+    {hitVec_7, hitVec_6, hitVec_5} | {hitVec_3, hitVec_2, hitVec_1};	// src/llc/scala/main/LlcPipeline.scala:259:{17,35}, src/main/scala/chisel3/util/OneHot.scala:30:18, :31:18, :32:28
   wire [2:0]       hitWay =
     {|{hitVec_7, hitVec_6, hitVec_5, hitVec_4},
      |(_hitWay_T_2[2:1]),
-     _hitWay_T_2[2] | _hitWay_T_2[0]};	// src/llc/scala/main/LlcPipeline.scala:256:{17,35}, src/main/scala/chisel3/util/OneHot.scala:30:18, :31:18, :32:{10,14,28}
-  reg              s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:272:25
-  reg  [31:0]      s2Req_address;	// src/llc/scala/main/LlcPipeline.scala:272:25
-  reg  [3:0]       s2Req_id;	// src/llc/scala/main/LlcPipeline.scala:272:25
-  reg  [255:0]     s2Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:272:25
-  reg  [31:0]      s2Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:272:25
-  reg              s2Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:272:25
-  reg  [8:0]       s2Set;	// src/llc/scala/main/LlcPipeline.scala:273:25
-  reg  [16:0]      s2Tag;	// src/llc/scala/main/LlcPipeline.scala:274:25
-  reg              s2Hit;	// src/llc/scala/main/LlcPipeline.scala:275:29
-  reg  [2:0]       s2HitWay;	// src/llc/scala/main/LlcPipeline.scala:276:25
-  reg  [2:0]       s2VictimWay;	// src/llc/scala/main/LlcPipeline.scala:277:25
-  reg              s2VictimValid;	// src/llc/scala/main/LlcPipeline.scala:278:26
-  reg              s2VictimDirty;	// src/llc/scala/main/LlcPipeline.scala:279:26
-  reg  [16:0]      s2VictimTag;	// src/llc/scala/main/LlcPipeline.scala:280:25
-  reg              s2VictimWasBusy;	// src/llc/scala/main/LlcPipeline.scala:283:32
+     _hitWay_T_2[2] | _hitWay_T_2[0]};	// src/llc/scala/main/LlcPipeline.scala:259:{17,35}, src/main/scala/chisel3/util/OneHot.scala:30:18, :31:18, :32:{10,14,28}
+  reg              s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:275:25
+  reg  [31:0]      s2Req_address;	// src/llc/scala/main/LlcPipeline.scala:275:25
+  reg  [3:0]       s2Req_id;	// src/llc/scala/main/LlcPipeline.scala:275:25
+  reg  [255:0]     s2Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:275:25
+  reg  [31:0]      s2Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:275:25
+  reg              s2Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:275:25
+  reg              s2Req_singleBeat;	// src/llc/scala/main/LlcPipeline.scala:275:25
+  reg  [8:0]       s2Set;	// src/llc/scala/main/LlcPipeline.scala:276:25
+  reg  [16:0]      s2Tag;	// src/llc/scala/main/LlcPipeline.scala:277:25
+  reg              s2Hit;	// src/llc/scala/main/LlcPipeline.scala:278:29
+  reg  [2:0]       s2HitWay;	// src/llc/scala/main/LlcPipeline.scala:279:25
+  reg  [2:0]       s2VictimWay;	// src/llc/scala/main/LlcPipeline.scala:280:25
+  reg              s2VictimValid;	// src/llc/scala/main/LlcPipeline.scala:281:26
+  reg              s2VictimDirty;	// src/llc/scala/main/LlcPipeline.scala:282:26
+  reg  [16:0]      s2VictimTag;	// src/llc/scala/main/LlcPipeline.scala:283:25
+  reg              s2VictimWasBusy;	// src/llc/scala/main/LlcPipeline.scala:286:32
   wire [7:0]       _GEN =
     {{_tagArray_io_readResp_valids_7},
      {_tagArray_io_readResp_valids_6},
@@ -271,12 +276,12 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
      {_tagArray_io_readResp_valids_3},
      {_tagArray_io_readResp_valids_2},
      {_tagArray_io_readResp_valids_1},
-     {_tagArray_io_readResp_valids_0}};	// src/llc/scala/main/LlcPipeline.scala:78:28, :290:24
-  wire             _GEN_0 = _GEN[_wayPartition_io_victimWay];	// src/llc/scala/main/LlcPipeline.scala:81:28, :290:24
-  wire             s1DataRead = s1Valid & ~_pipelineStall_T & ((|_hitWay_T) | _GEN_0);	// src/llc/scala/main/LlcPipeline.scala:132:24, :146:34, :203:49, :257:{24,31}, :290:24, :291:{28,46}, :359:84
-  wire [31:0]      mshr_io_addrMatch_query = {s2Req_address[31:6], 6'h0};	// src/llc/scala/main/LlcPipeline.scala:272:25, :348:44
-  wire             s2Miss = s2Valid & ~s2Hit;	// src/llc/scala/main/LlcPipeline.scala:133:24, :275:29, :352:{32,35}
-  wire             s2MshrFull = s2Miss & ~_mshr_io_allocReady & ~_mshr_io_addrMatch_hit;	// src/llc/scala/main/LlcPipeline.scala:82:28, :352:32, :354:{31,34,54,57}
+     {_tagArray_io_readResp_valids_0}};	// src/llc/scala/main/LlcPipeline.scala:80:28, :293:24
+  wire             _GEN_0 = _GEN[_wayPartition_io_victimWay];	// src/llc/scala/main/LlcPipeline.scala:83:28, :293:24
+  wire             s1DataRead = s1Valid & ~_pipelineStall_T & ((|_hitWay_T) | _GEN_0);	// src/llc/scala/main/LlcPipeline.scala:135:24, :149:34, :206:49, :260:{24,31}, :293:24, :294:{28,46}, :362:84
+  wire [31:0]      mshr_io_addrMatch_query = {s2Req_address[31:6], 6'h0};	// src/llc/scala/main/LlcPipeline.scala:275:25, :351:44
+  wire             s2Miss = s2Valid & ~s2Hit;	// src/llc/scala/main/LlcPipeline.scala:136:24, :278:29, :355:{32,35}
+  wire             s2MshrFull = s2Miss & ~_mshr_io_allocReady & ~_mshr_io_addrMatch_hit;	// src/llc/scala/main/LlcPipeline.scala:84:28, :355:32, :357:{31,34,54,57}
   wire             s2VictimBusy =
     s2Miss
     & (_mshr_io_inflight_0_valid & _mshr_io_inflight_0_bits_set == s2Set
@@ -286,56 +291,56 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
        & _mshr_io_inflight_2_bits_set == s2Set
        & _mshr_io_inflight_2_bits_way == s2VictimWay | _mshr_io_inflight_3_valid
        & _mshr_io_inflight_3_bits_set == s2Set
-       & _mshr_io_inflight_3_bits_way == s2VictimWay);	// src/llc/scala/main/LlcPipeline.scala:82:28, :96:{39,53,61,75,93}, :273:25, :277:25, :352:32, :355:31
-  wire             _hitFire_T = s2Valid & s2Hit;	// src/llc/scala/main/LlcPipeline.scala:133:24, :275:29, :358:28
-  assign s2HitDefer = _hitFire_T & _mshr_io_earlyResp_valid;	// src/llc/scala/main/LlcPipeline.scala:82:28, :358:{28,37}
+       & _mshr_io_inflight_3_bits_way == s2VictimWay);	// src/llc/scala/main/LlcPipeline.scala:84:28, :98:{39,53,61,75,93}, :276:25, :280:25, :355:32, :358:31
+  wire             _hitFire_T = s2Valid & s2Hit;	// src/llc/scala/main/LlcPipeline.scala:136:24, :278:29, :361:28
+  assign s2HitDefer = _hitFire_T & _mshr_io_earlyResp_valid;	// src/llc/scala/main/LlcPipeline.scala:84:28, :361:{28,37}
   assign _s2Stall_T_4 =
-    s2Valid & ~s2Hit & (s2MshrFull | s2Miss & _mshr_io_addrMatch_hit | s2VictimBusy);	// src/llc/scala/main/LlcPipeline.scala:82:28, :133:24, :275:29, :352:{32,35}, :353:31, :354:{31,54}, :355:31, :359:{23,33,48,66}
-  wire             s2HitFire = _hitFire_T & ~_mshr_io_complete_valid & ~s2HitDefer;	// src/llc/scala/main/LlcPipeline.scala:82:28, :358:{28,37}, :361:54, :378:{36,66,69}
-  wire             dataArray_io_write_enable = s2HitFire & s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:169:32, :272:25, :378:{36,66}, :379:19, :380:25
-  wire             _GEN_1 = s2HitFire & s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:170:32, :272:25, :378:{36,66}, :379:19, :380:25, :383:34
-  wire [2:0]       dataArray_io_write_way = _GEN_1 ? s2HitWay : 3'h0;	// src/llc/scala/main/LlcPipeline.scala:170:32, :171:32, :276:25, :379:19, :380:25, :383:34, :384:34
+    s2Valid & ~s2Hit & (s2MshrFull | s2Miss & _mshr_io_addrMatch_hit | s2VictimBusy);	// src/llc/scala/main/LlcPipeline.scala:84:28, :136:24, :278:29, :355:{32,35}, :356:31, :357:{31,54}, :358:31, :362:{23,33,48,66}
+  wire             s2HitFire = _hitFire_T & ~_mshr_io_complete_valid & ~s2HitDefer;	// src/llc/scala/main/LlcPipeline.scala:84:28, :361:{28,37}, :364:54, :381:{36,66,69}
+  wire             dataArray_io_write_enable = s2HitFire & s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:172:32, :275:25, :381:{36,66}, :382:19, :383:25
+  wire             _GEN_1 = s2HitFire & s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:173:32, :275:25, :381:{36,66}, :382:19, :383:25, :386:34
+  wire [2:0]       dataArray_io_write_way = _GEN_1 ? s2HitWay : 3'h0;	// src/llc/scala/main/LlcPipeline.scala:173:32, :174:32, :279:25, :382:19, :383:25, :386:34, :387:34
   wire             allocFire =
     s2Valid & ~s2Hit & ~_mshr_io_addrMatch_hit & _mshr_io_allocReady
-    & ~_mshr_io_complete_valid & ~s2VictimBusy & ~s2VictimWasBusy;	// src/llc/scala/main/LlcPipeline.scala:82:28, :133:24, :275:29, :283:32, :352:35, :354:57, :355:31, :361:{18,54}, :414:{27,37,53,75,90}, :415:{33,36}
-  wire             _io_perfEvents_cleanEvict_T = allocFire & s2VictimValid;	// src/llc/scala/main/LlcPipeline.scala:278:26, :414:{27,37,53,75,90}, :415:33, :432:18
-  wire             _GEN_2 = ~_io_perfEvents_cleanEvict_T & dataArray_io_write_enable;	// src/llc/scala/main/LlcPipeline.scala:169:32, :379:19, :380:25, :432:{18,36}, :437:31
+    & ~_mshr_io_complete_valid & ~s2VictimBusy & ~s2VictimWasBusy;	// src/llc/scala/main/LlcPipeline.scala:84:28, :136:24, :278:29, :286:32, :355:35, :357:57, :358:31, :364:{18,54}, :417:{27,37,53,75,90}, :418:{33,36}
+  wire             _io_perfEvents_cleanEvict_T = allocFire & s2VictimValid;	// src/llc/scala/main/LlcPipeline.scala:281:26, :417:{27,37,53,75,90}, :418:33, :436:18
+  wire             _GEN_2 = ~_io_perfEvents_cleanEvict_T & dataArray_io_write_enable;	// src/llc/scala/main/LlcPipeline.scala:172:32, :382:19, :383:25, :436:{18,36}, :441:31
   assign s2Done =
     s2HitFire | allocFire | s2Miss & ~s2VictimBusy & s2VictimWasBusy
     & ~_mshr_io_complete_valid | _mshr_io_complete_valid & s2Valid & ~s2Hit
-    & s2Set == _mshr_io_complete_bits_set & s2Tag == _mshr_io_complete_bits_tag;	// src/llc/scala/main/LlcPipeline.scala:82:28, :133:24, :273:25, :274:25, :275:29, :283:32, :352:{32,35}, :355:31, :361:{18,54}, :375:{26,43,62,78}, :376:{34,45,55}, :377:{26,53,63}, :378:{36,66}, :414:{27,37,53,75,90}, :415:33, :444:{23,36}
-  wire             _GEN_3 = _mshr_io_complete_valid | _io_perfEvents_cleanEvict_T;	// src/llc/scala/main/LlcPipeline.scala:82:28, :379:19, :432:{18,36}, :433:30, :447:24, :455:30
-  reg  [3:0]       flushState;	// src/llc/scala/main/LlcPipeline.scala:490:27
-  reg              flushInv;	// src/llc/scala/main/LlcPipeline.scala:491:27
-  reg  [8:0]       curSet;	// src/llc/scala/main/LlcPipeline.scala:492:27
-  reg  [2:0]       curWay;	// src/llc/scala/main/LlcPipeline.scala:493:27
-  reg  [16:0]      latchedTags_0;	// src/llc/scala/main/LlcPipeline.scala:496:25
-  reg  [16:0]      latchedTags_1;	// src/llc/scala/main/LlcPipeline.scala:496:25
-  reg  [16:0]      latchedTags_2;	// src/llc/scala/main/LlcPipeline.scala:496:25
-  reg  [16:0]      latchedTags_3;	// src/llc/scala/main/LlcPipeline.scala:496:25
-  reg  [16:0]      latchedTags_4;	// src/llc/scala/main/LlcPipeline.scala:496:25
-  reg  [16:0]      latchedTags_5;	// src/llc/scala/main/LlcPipeline.scala:496:25
-  reg  [16:0]      latchedTags_6;	// src/llc/scala/main/LlcPipeline.scala:496:25
-  reg  [16:0]      latchedTags_7;	// src/llc/scala/main/LlcPipeline.scala:496:25
-  reg  [7:0]       latchedDirtys;	// src/llc/scala/main/LlcPipeline.scala:497:26
-  reg  [7:0]       walkNeed;	// src/llc/scala/main/LlcPipeline.scala:500:25
-  reg  [255:0]     flushLineData_0;	// src/llc/scala/main/LlcPipeline.scala:502:26
-  reg  [255:0]     flushLineData_1;	// src/llc/scala/main/LlcPipeline.scala:502:26
-  assign flushWalking = (|flushState) & flushState != 4'h1;	// src/llc/scala/main/LlcPipeline.scala:490:27, :504:30, :505:{31,45}
-  wire             _walkWayDirty_T = flushState == 4'h3;	// src/llc/scala/main/LlcPipeline.scala:490:27, :529:37
-  wire             _GEN_4 = flushState == 4'h0;	// src/llc/scala/main/LlcPipeline.scala:196:38, :490:27, :547:22
-  wire             _GEN_5 = flushState == 4'h1;	// src/llc/scala/main/LlcPipeline.scala:490:27, :505:45, :547:22
-  wire             _GEN_6 = flushState == 4'h2;	// src/llc/scala/main/LlcPipeline.scala:490:27, :547:22, :556:40
-  wire             _GEN_7 = _GEN_4 | _GEN_5;	// src/llc/scala/main/LlcPipeline.scala:236:27, :547:22
-  wire             _GEN_8 = flushState == 4'h4;	// src/llc/scala/main/LlcPipeline.scala:490:27, :547:22
-  wire             _GEN_9 = flushState == 4'h5;	// src/llc/scala/main/LlcPipeline.scala:490:27, :538:24, :547:22
-  wire             _GEN_10 = _GEN_4 | _GEN_5 | _GEN_6 | _walkWayDirty_T | _GEN_8;	// src/llc/scala/main/LlcPipeline.scala:293:28, :529:37, :547:22
-  wire             _GEN_11 = _GEN_10 | ~_GEN_9;	// src/llc/scala/main/LlcPipeline.scala:293:28, :294:28, :547:22
-  wire             _GEN_12 = flushState == 4'h6;	// src/llc/scala/main/LlcPipeline.scala:490:27, :547:22, :577:18
-  wire             _GEN_13 = flushState == 4'h7;	// src/llc/scala/main/LlcPipeline.scala:490:27, :547:22, :582:18
+    & s2Set == _mshr_io_complete_bits_set & s2Tag == _mshr_io_complete_bits_tag;	// src/llc/scala/main/LlcPipeline.scala:84:28, :136:24, :276:25, :277:25, :278:29, :286:32, :355:{32,35}, :358:31, :364:{18,54}, :378:{26,43,62,78}, :379:{34,45,55}, :380:{26,53,63}, :381:{36,66}, :417:{27,37,53,75,90}, :418:33, :448:{23,36}
+  wire             _GEN_3 = _mshr_io_complete_valid | _io_perfEvents_cleanEvict_T;	// src/llc/scala/main/LlcPipeline.scala:84:28, :382:19, :436:{18,36}, :437:30, :451:24, :459:30
+  reg  [3:0]       flushState;	// src/llc/scala/main/LlcPipeline.scala:494:27
+  reg              flushInv;	// src/llc/scala/main/LlcPipeline.scala:495:27
+  reg  [8:0]       curSet;	// src/llc/scala/main/LlcPipeline.scala:496:27
+  reg  [2:0]       curWay;	// src/llc/scala/main/LlcPipeline.scala:497:27
+  reg  [16:0]      latchedTags_0;	// src/llc/scala/main/LlcPipeline.scala:500:25
+  reg  [16:0]      latchedTags_1;	// src/llc/scala/main/LlcPipeline.scala:500:25
+  reg  [16:0]      latchedTags_2;	// src/llc/scala/main/LlcPipeline.scala:500:25
+  reg  [16:0]      latchedTags_3;	// src/llc/scala/main/LlcPipeline.scala:500:25
+  reg  [16:0]      latchedTags_4;	// src/llc/scala/main/LlcPipeline.scala:500:25
+  reg  [16:0]      latchedTags_5;	// src/llc/scala/main/LlcPipeline.scala:500:25
+  reg  [16:0]      latchedTags_6;	// src/llc/scala/main/LlcPipeline.scala:500:25
+  reg  [16:0]      latchedTags_7;	// src/llc/scala/main/LlcPipeline.scala:500:25
+  reg  [7:0]       latchedDirtys;	// src/llc/scala/main/LlcPipeline.scala:501:26
+  reg  [7:0]       walkNeed;	// src/llc/scala/main/LlcPipeline.scala:504:25
+  reg  [255:0]     flushLineData_0;	// src/llc/scala/main/LlcPipeline.scala:506:26
+  reg  [255:0]     flushLineData_1;	// src/llc/scala/main/LlcPipeline.scala:506:26
+  assign flushWalking = (|flushState) & flushState != 4'h1;	// src/llc/scala/main/LlcPipeline.scala:494:27, :508:30, :509:{31,45}
+  wire             _walkWayDirty_T = flushState == 4'h3;	// src/llc/scala/main/LlcPipeline.scala:494:27, :533:37
+  wire             _GEN_4 = flushState == 4'h0;	// src/llc/scala/main/LlcPipeline.scala:199:38, :494:27, :551:22
+  wire             _GEN_5 = flushState == 4'h1;	// src/llc/scala/main/LlcPipeline.scala:494:27, :509:45, :551:22
+  wire             _GEN_6 = flushState == 4'h2;	// src/llc/scala/main/LlcPipeline.scala:494:27, :551:22, :560:40
+  wire             _GEN_7 = _GEN_4 | _GEN_5;	// src/llc/scala/main/LlcPipeline.scala:239:27, :551:22
+  wire             _GEN_8 = flushState == 4'h4;	// src/llc/scala/main/LlcPipeline.scala:494:27, :551:22
+  wire             _GEN_9 = flushState == 4'h5;	// src/llc/scala/main/LlcPipeline.scala:494:27, :542:24, :551:22
+  wire             _GEN_10 = _GEN_4 | _GEN_5 | _GEN_6 | _walkWayDirty_T | _GEN_8;	// src/llc/scala/main/LlcPipeline.scala:296:28, :533:37, :551:22
+  wire             _GEN_11 = _GEN_10 | ~_GEN_9;	// src/llc/scala/main/LlcPipeline.scala:296:28, :297:28, :551:22
+  wire             _GEN_12 = flushState == 4'h6;	// src/llc/scala/main/LlcPipeline.scala:494:27, :551:22, :581:18
+  wire             _GEN_13 = flushState == 4'h7;	// src/llc/scala/main/LlcPipeline.scala:494:27, :551:22, :586:18
   wire             _GEN_14 =
-    _GEN_4 | _GEN_5 | _GEN_6 | _walkWayDirty_T | _GEN_8 | _GEN_9 | _GEN_12;	// src/llc/scala/main/LlcPipeline.scala:518:22, :529:37, :547:22
-  wire             _GEN_15 = ~_GEN_14 & _GEN_13;	// src/llc/scala/main/LlcPipeline.scala:518:22, :547:22
+    _GEN_4 | _GEN_5 | _GEN_6 | _walkWayDirty_T | _GEN_8 | _GEN_9 | _GEN_12;	// src/llc/scala/main/LlcPipeline.scala:522:22, :533:37, :551:22
+  wire             _GEN_15 = ~_GEN_14 & _GEN_13;	// src/llc/scala/main/LlcPipeline.scala:522:22, :551:22
   wire [7:0][16:0] _GEN_16 =
     {{latchedTags_7},
      {latchedTags_6},
@@ -344,44 +349,44 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
      {latchedTags_3},
      {latchedTags_2},
      {latchedTags_1},
-     {latchedTags_0}};	// src/llc/scala/main/LlcPipeline.scala:496:25, :586:35
-  wire [16:0]      _GEN_17 = _GEN_16[curWay];	// src/llc/scala/main/LlcPipeline.scala:493:27, :586:35
-  wire             _GEN_18 = _GEN_14 | ~_GEN_13;	// src/llc/scala/main/LlcPipeline.scala:518:22, :547:22
-  wire             _GEN_19 = flushState == 4'h8;	// src/llc/scala/main/LlcPipeline.scala:490:27, :538:24, :547:22
-  wire             _GEN_20 = _GEN_8 | _GEN_9 | _GEN_12 | _GEN_13;	// src/llc/scala/main/LlcPipeline.scala:447:24, :547:22
-  wire             _GEN_21 = _GEN_4 | _GEN_5 | _GEN_6 | _walkWayDirty_T | _GEN_20;	// src/llc/scala/main/LlcPipeline.scala:447:24, :529:37, :547:22
-  wire             _GEN_22 = _GEN_21 | ~_GEN_19;	// src/llc/scala/main/LlcPipeline.scala:447:24, :547:22
-  wire             hitFire = _hitFire_T & ~_mshr_io_complete_valid & ~s2HitDefer;	// src/llc/scala/main/LlcPipeline.scala:82:28, :358:{28,37}, :361:54, :378:69, :620:{34,64}
-  always @(posedge clock) begin	// src/llc/scala/main/LlcPipeline.scala:27:7
-    automatic logic       _GEN_23;	// src/llc/scala/main/LlcPipeline.scala:209:{19,37}
-    automatic logic       _GEN_24;	// src/llc/scala/main/LlcPipeline.scala:136:29, :209:50, :210:23, :211:19
-    automatic logic       _GEN_25;	// src/llc/scala/main/LlcPipeline.scala:297:16
-    automatic logic       s2OnRefill;	// src/llc/scala/main/LlcPipeline.scala:316:{30,40}, :317:41
-    automatic logic       s2TakesHead;	// src/llc/scala/main/LlcPipeline.scala:318:34
-    automatic logic       _GEN_26;	// src/llc/scala/main/LlcPipeline.scala:209:50, :319:22, :320:26, :321:21
-    automatic logic       _GEN_27;	// src/llc/scala/main/LlcPipeline.scala:209:50, :319:22, :320:26
-    automatic logic       _GEN_28;	// src/llc/scala/main/LlcPipeline.scala:319:22, :329:19, :330:26
-    automatic logic       _GEN_29;	// src/llc/scala/main/LlcPipeline.scala:361:{15,32,51}
-    automatic logic       _GEN_30;	// src/llc/scala/main/LlcPipeline.scala:315:24, :361:67, :362:24, :363:19
-    automatic logic       _GEN_31;	// src/llc/scala/main/LlcPipeline.scala:315:24, :361:67, :362:24
+     {latchedTags_0}};	// src/llc/scala/main/LlcPipeline.scala:500:25, :590:35
+  wire [16:0]      _GEN_17 = _GEN_16[curWay];	// src/llc/scala/main/LlcPipeline.scala:497:27, :590:35
+  wire             _GEN_18 = _GEN_14 | ~_GEN_13;	// src/llc/scala/main/LlcPipeline.scala:522:22, :551:22
+  wire             _GEN_19 = flushState == 4'h8;	// src/llc/scala/main/LlcPipeline.scala:494:27, :542:24, :551:22
+  wire             _GEN_20 = _GEN_8 | _GEN_9 | _GEN_12 | _GEN_13;	// src/llc/scala/main/LlcPipeline.scala:451:24, :551:22
+  wire             _GEN_21 = _GEN_4 | _GEN_5 | _GEN_6 | _walkWayDirty_T | _GEN_20;	// src/llc/scala/main/LlcPipeline.scala:451:24, :533:37, :551:22
+  wire             _GEN_22 = _GEN_21 | ~_GEN_19;	// src/llc/scala/main/LlcPipeline.scala:451:24, :551:22
+  wire             hitFire = _hitFire_T & ~_mshr_io_complete_valid & ~s2HitDefer;	// src/llc/scala/main/LlcPipeline.scala:84:28, :361:{28,37}, :364:54, :381:69, :624:{34,64}
+  always @(posedge clock) begin	// src/llc/scala/main/LlcPipeline.scala:29:7
+    automatic logic       _GEN_23;	// src/llc/scala/main/LlcPipeline.scala:212:{19,37}
+    automatic logic       _GEN_24;	// src/llc/scala/main/LlcPipeline.scala:139:29, :212:50, :213:23, :214:19
+    automatic logic       _GEN_25;	// src/llc/scala/main/LlcPipeline.scala:300:16
+    automatic logic       s2OnRefill;	// src/llc/scala/main/LlcPipeline.scala:319:{30,40}, :320:41
+    automatic logic       s2TakesHead;	// src/llc/scala/main/LlcPipeline.scala:321:34
+    automatic logic       _GEN_26;	// src/llc/scala/main/LlcPipeline.scala:212:50, :322:22, :323:26, :324:21
+    automatic logic       _GEN_27;	// src/llc/scala/main/LlcPipeline.scala:212:50, :322:22, :323:26
+    automatic logic       _GEN_28;	// src/llc/scala/main/LlcPipeline.scala:322:22, :332:19, :333:26
+    automatic logic       _GEN_29;	// src/llc/scala/main/LlcPipeline.scala:364:{15,32,51}
+    automatic logic       _GEN_30;	// src/llc/scala/main/LlcPipeline.scala:318:24, :364:67, :365:24, :366:19
+    automatic logic       _GEN_31;	// src/llc/scala/main/LlcPipeline.scala:318:24, :364:67, :365:24
     automatic logic       _GEN_32 =
-      _mshr_io_complete_valid & ~_mshr_io_complete_bits_earlyRespDone;	// src/llc/scala/main/LlcPipeline.scala:82:28, :379:19, :447:24, :469:{10,44}, :471:27
-    automatic logic [7:0] _latchedDirtys_T;	// src/llc/scala/main/LlcPipeline.scala:528:45
-    automatic logic       _GEN_33;	// src/llc/scala/main/LlcPipeline.scala:496:25, :547:22
-    automatic logic       _GEN_34;	// src/llc/scala/main/LlcPipeline.scala:496:25, :547:22
-    _GEN_23 = replayPend & ~_pipelineStall_T & ~s1Valid;	// src/llc/scala/main/LlcPipeline.scala:132:24, :140:32, :146:34, :203:{49,67}, :209:{19,37}, :359:84
-    _GEN_24 = _GEN_23 & replayValid;	// src/llc/scala/main/LlcPipeline.scala:136:29, :209:{19,37,50}, :210:23, :211:19
-    _GEN_25 = s1Valid & ~_pipelineStall_T;	// src/llc/scala/main/LlcPipeline.scala:132:24, :146:34, :203:49, :297:16, :359:84
+      _mshr_io_complete_valid & ~_mshr_io_complete_bits_earlyRespDone;	// src/llc/scala/main/LlcPipeline.scala:84:28, :382:19, :451:24, :473:{10,44}, :475:27
+    automatic logic [7:0] _latchedDirtys_T;	// src/llc/scala/main/LlcPipeline.scala:532:45
+    automatic logic       _GEN_33;	// src/llc/scala/main/LlcPipeline.scala:500:25, :551:22
+    automatic logic       _GEN_34;	// src/llc/scala/main/LlcPipeline.scala:500:25, :551:22
+    _GEN_23 = replayPend & ~_pipelineStall_T & ~s1Valid;	// src/llc/scala/main/LlcPipeline.scala:135:24, :143:32, :149:34, :206:{49,67}, :212:{19,37}, :362:84
+    _GEN_24 = _GEN_23 & replayValid;	// src/llc/scala/main/LlcPipeline.scala:139:29, :212:{19,37,50}, :213:23, :214:19
+    _GEN_25 = s1Valid & ~_pipelineStall_T;	// src/llc/scala/main/LlcPipeline.scala:135:24, :149:34, :206:49, :300:16, :362:84
     s2OnRefill =
       s2Valid & ~s2Hit & s2Set == _mshr_io_complete_bits_set
-      & s2Tag == _mshr_io_complete_bits_tag;	// src/llc/scala/main/LlcPipeline.scala:82:28, :133:24, :273:25, :274:25, :275:29, :316:{30,33,40}, :317:{14,41,51}
-    s2TakesHead = s2OnRefill & ~replayValid;	// src/llc/scala/main/LlcPipeline.scala:136:29, :316:{30,40}, :317:41, :318:{34,37}
-    _GEN_26 = s2OnRefill & ~replayValid;	// src/llc/scala/main/LlcPipeline.scala:136:29, :209:50, :316:{30,40}, :317:41, :318:37, :319:22, :320:26, :321:21
-    _GEN_27 = s2OnRefill & replayValid;	// src/llc/scala/main/LlcPipeline.scala:136:29, :209:50, :316:{30,40}, :317:41, :319:22, :320:26
-    _GEN_28 = s1Valid & s2TakesHead;	// src/llc/scala/main/LlcPipeline.scala:132:24, :318:34, :319:22, :329:19, :330:26
-    _GEN_29 = s2Miss & ~s2VictimBusy & s2VictimWasBusy & ~_mshr_io_complete_valid;	// src/llc/scala/main/LlcPipeline.scala:82:28, :283:32, :352:32, :355:31, :361:{15,18,32,51,54}
-    _GEN_30 = _GEN_29 & ~replayValid;	// src/llc/scala/main/LlcPipeline.scala:136:29, :315:24, :361:{15,32,51,67}, :362:{10,24}, :363:19
-    _GEN_31 = _GEN_29 & replayValid;	// src/llc/scala/main/LlcPipeline.scala:136:29, :315:24, :361:{15,32,51,67}, :362:24
+      & s2Tag == _mshr_io_complete_bits_tag;	// src/llc/scala/main/LlcPipeline.scala:84:28, :136:24, :276:25, :277:25, :278:29, :319:{30,33,40}, :320:{14,41,51}
+    s2TakesHead = s2OnRefill & ~replayValid;	// src/llc/scala/main/LlcPipeline.scala:139:29, :319:{30,40}, :320:41, :321:{34,37}
+    _GEN_26 = s2OnRefill & ~replayValid;	// src/llc/scala/main/LlcPipeline.scala:139:29, :212:50, :319:{30,40}, :320:41, :321:37, :322:22, :323:26, :324:21
+    _GEN_27 = s2OnRefill & replayValid;	// src/llc/scala/main/LlcPipeline.scala:139:29, :212:50, :319:{30,40}, :320:41, :322:22, :323:26
+    _GEN_28 = s1Valid & s2TakesHead;	// src/llc/scala/main/LlcPipeline.scala:135:24, :321:34, :322:22, :332:19, :333:26
+    _GEN_29 = s2Miss & ~s2VictimBusy & s2VictimWasBusy & ~_mshr_io_complete_valid;	// src/llc/scala/main/LlcPipeline.scala:84:28, :286:32, :355:32, :358:31, :364:{15,18,32,51,54}
+    _GEN_30 = _GEN_29 & ~replayValid;	// src/llc/scala/main/LlcPipeline.scala:139:29, :318:24, :364:{15,32,51,67}, :365:{10,24}, :366:19
+    _GEN_31 = _GEN_29 & replayValid;	// src/llc/scala/main/LlcPipeline.scala:139:29, :318:24, :364:{15,32,51,67}, :365:24
     _latchedDirtys_T =
       {_tagArray_io_readResp_dirtys_7,
        _tagArray_io_readResp_dirtys_6,
@@ -390,34 +395,34 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
        _tagArray_io_readResp_dirtys_3,
        _tagArray_io_readResp_dirtys_2,
        _tagArray_io_readResp_dirtys_1,
-       _tagArray_io_readResp_dirtys_0};	// src/llc/scala/main/LlcPipeline.scala:78:28, :528:45
-    _GEN_33 = _GEN_5 | _GEN_6;	// src/llc/scala/main/LlcPipeline.scala:496:25, :547:22
-    _GEN_34 = _GEN_4 | _GEN_33;	// src/llc/scala/main/LlcPipeline.scala:496:25, :547:22
-    if (reset) begin	// src/llc/scala/main/LlcPipeline.scala:27:7
-      respValidReg <= 1'h0;	// src/llc/scala/main/LlcPipeline.scala:107:29
-      s1Valid <= 1'h0;	// src/llc/scala/main/LlcPipeline.scala:107:29, :132:24
-      s2Valid <= 1'h0;	// src/llc/scala/main/LlcPipeline.scala:107:29, :133:24
-      replayValid <= 1'h0;	// src/llc/scala/main/LlcPipeline.scala:107:29, :136:29
-      replay2Valid <= 1'h0;	// src/llc/scala/main/LlcPipeline.scala:107:29, :138:29
-      s2Hit <= 1'h0;	// src/llc/scala/main/LlcPipeline.scala:107:29, :275:29
-      s2VictimWasBusy <= 1'h0;	// src/llc/scala/main/LlcPipeline.scala:107:29, :283:32
-      flushState <= 4'h0;	// src/llc/scala/main/LlcPipeline.scala:196:38, :490:27
-      flushInv <= 1'h0;	// src/llc/scala/main/LlcPipeline.scala:107:29, :491:27
-      curSet <= 9'h0;	// src/llc/scala/main/LlcPipeline.scala:492:27
-      curWay <= 3'h0;	// src/llc/scala/main/LlcPipeline.scala:493:27
-      walkNeed <= 8'h0;	// src/llc/scala/main/LlcPipeline.scala:250:8, :500:25
+       _tagArray_io_readResp_dirtys_0};	// src/llc/scala/main/LlcPipeline.scala:80:28, :532:45
+    _GEN_33 = _GEN_5 | _GEN_6;	// src/llc/scala/main/LlcPipeline.scala:500:25, :551:22
+    _GEN_34 = _GEN_4 | _GEN_33;	// src/llc/scala/main/LlcPipeline.scala:500:25, :551:22
+    if (reset) begin	// src/llc/scala/main/LlcPipeline.scala:29:7
+      respValidReg <= 1'h0;	// src/llc/scala/main/LlcPipeline.scala:109:29
+      s1Valid <= 1'h0;	// src/llc/scala/main/LlcPipeline.scala:109:29, :135:24
+      s2Valid <= 1'h0;	// src/llc/scala/main/LlcPipeline.scala:109:29, :136:24
+      replayValid <= 1'h0;	// src/llc/scala/main/LlcPipeline.scala:109:29, :139:29
+      replay2Valid <= 1'h0;	// src/llc/scala/main/LlcPipeline.scala:109:29, :141:29
+      s2Hit <= 1'h0;	// src/llc/scala/main/LlcPipeline.scala:109:29, :278:29
+      s2VictimWasBusy <= 1'h0;	// src/llc/scala/main/LlcPipeline.scala:109:29, :286:32
+      flushState <= 4'h0;	// src/llc/scala/main/LlcPipeline.scala:199:38, :494:27
+      flushInv <= 1'h0;	// src/llc/scala/main/LlcPipeline.scala:109:29, :495:27
+      curSet <= 9'h0;	// src/llc/scala/main/LlcPipeline.scala:496:27
+      curWay <= 3'h0;	// src/llc/scala/main/LlcPipeline.scala:497:27
+      walkNeed <= 8'h0;	// src/llc/scala/main/LlcPipeline.scala:253:8, :504:25
     end
-    else begin	// src/llc/scala/main/LlcPipeline.scala:27:7
-      automatic logic             _GEN_35;	// src/llc/scala/main/LlcPipeline.scala:136:29, :209:50, :210:23, :211:19
-      automatic logic             _GEN_36;	// src/llc/scala/main/LlcPipeline.scala:132:24, :225:16, :226:13
-      automatic logic [7:0]       rdNeed;	// src/llc/scala/main/LlcPipeline.scala:527:51
-      automatic logic [7:0]       walkNeedNow;	// src/llc/scala/main/LlcPipeline.scala:529:25
+    else begin	// src/llc/scala/main/LlcPipeline.scala:29:7
+      automatic logic             _GEN_35;	// src/llc/scala/main/LlcPipeline.scala:139:29, :212:50, :213:23, :214:19
+      automatic logic             _GEN_36;	// src/llc/scala/main/LlcPipeline.scala:135:24, :228:16, :229:13
+      automatic logic [7:0]       rdNeed;	// src/llc/scala/main/LlcPipeline.scala:531:51
+      automatic logic [7:0]       walkNeedNow;	// src/llc/scala/main/LlcPipeline.scala:533:25
       automatic logic [2:0]       walkWay;	// src/main/scala/chisel3/util/Mux.scala:58:84
-      automatic logic [7:0]       _walkWayDirty_T_3;	// src/llc/scala/main/LlcPipeline.scala:532:76
-      automatic logic [3:0]       _GEN_37;	// src/llc/scala/main/LlcPipeline.scala:539:45, :540:18, :543:18
-      automatic logic [15:0][3:0] _GEN_38;	// src/llc/scala/main/LlcPipeline.scala:490:27, :529:37, :536:27, :547:22, :549:27, :556:27, :561:18, :577:18, :582:18, :589:30, :601:18, :606:40, :609:18
-      _GEN_35 = _GEN_24 ? replay2Valid : replayValid;	// src/llc/scala/main/LlcPipeline.scala:136:29, :138:29, :209:50, :210:23, :211:19
-      _GEN_36 = s0Fire | s1Valid;	// src/llc/scala/main/LlcPipeline.scala:132:24, :203:{46,64,76}, :225:16, :226:13
+      automatic logic [7:0]       _walkWayDirty_T_3;	// src/llc/scala/main/LlcPipeline.scala:536:76
+      automatic logic [3:0]       _GEN_37;	// src/llc/scala/main/LlcPipeline.scala:543:45, :544:18, :547:18
+      automatic logic [15:0][3:0] _GEN_38;	// src/llc/scala/main/LlcPipeline.scala:494:27, :533:37, :540:27, :551:22, :553:27, :560:27, :565:18, :581:18, :586:18, :593:30, :605:18, :610:40, :613:18
+      _GEN_35 = _GEN_24 ? replay2Valid : replayValid;	// src/llc/scala/main/LlcPipeline.scala:139:29, :141:29, :212:50, :213:23, :214:19
+      _GEN_36 = s0Fire | s1Valid;	// src/llc/scala/main/LlcPipeline.scala:135:24, :206:{46,64,76}, :228:16, :229:13
       rdNeed =
         {_tagArray_io_readResp_valids_7,
          _tagArray_io_readResp_valids_6,
@@ -426,8 +431,8 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
          _tagArray_io_readResp_valids_3,
          _tagArray_io_readResp_valids_2,
          _tagArray_io_readResp_valids_1,
-         _tagArray_io_readResp_valids_0} & (_latchedDirtys_T | {8{flushInv}});	// src/llc/scala/main/LlcPipeline.scala:78:28, :491:27, :527:{44,51}, :528:{45,52,58}
-      walkNeedNow = _walkWayDirty_T ? rdNeed : walkNeed;	// src/llc/scala/main/LlcPipeline.scala:500:25, :527:51, :529:{25,37}
+         _tagArray_io_readResp_valids_0} & (_latchedDirtys_T | {8{flushInv}});	// src/llc/scala/main/LlcPipeline.scala:80:28, :495:27, :531:{44,51}, :532:{45,52,58}
+      walkNeedNow = _walkWayDirty_T ? rdNeed : walkNeed;	// src/llc/scala/main/LlcPipeline.scala:504:25, :531:51, :533:{25,37}
       walkWay =
         walkNeedNow[0]
           ? 3'h0
@@ -439,27 +444,27 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
                       ? 3'h3
                       : walkNeedNow[4]
                           ? 3'h4
-                          : walkNeedNow[5] ? 3'h5 : {2'h3, ~(walkNeedNow[6])};	// src/llc/scala/main/LlcPipeline.scala:529:25, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
-      _walkWayDirty_T_3 = (_walkWayDirty_T ? _latchedDirtys_T : latchedDirtys) >> walkWay;	// src/llc/scala/main/LlcPipeline.scala:497:26, :528:45, :529:37, :531:25, :532:76, src/main/scala/chisel3/util/Mux.scala:58:84
-      _GEN_37 = (&curSet) ? 4'h9 : 4'h2;	// src/llc/scala/main/LlcPipeline.scala:492:27, :539:{23,45}, :540:18, :543:18, :556:40
+                          : walkNeedNow[5] ? 3'h5 : {2'h3, ~(walkNeedNow[6])};	// src/llc/scala/main/LlcPipeline.scala:533:25, src/main/scala/chisel3/util/Mux.scala:58:84, src/main/scala/chisel3/util/OneHot.scala:48:45
+      _walkWayDirty_T_3 = (_walkWayDirty_T ? _latchedDirtys_T : latchedDirtys) >> walkWay;	// src/llc/scala/main/LlcPipeline.scala:501:26, :532:45, :533:37, :535:25, :536:76, src/main/scala/chisel3/util/Mux.scala:58:84
+      _GEN_37 = (&curSet) ? 4'h9 : 4'h2;	// src/llc/scala/main/LlcPipeline.scala:496:27, :543:{23,45}, :544:18, :547:18, :560:40
       respValidReg <=
         _mshr_io_complete_valid & ~_mshr_io_complete_bits_earlyRespDone | s2HitFire
-        | _mshr_io_earlyResp_valid;	// src/llc/scala/main/LlcPipeline.scala:82:28, :107:29, :111:25, :120:24, :121:25, :378:{36,66}, :379:19, :399:22, :447:24, :469:{10,44}
+        | _mshr_io_earlyResp_valid;	// src/llc/scala/main/LlcPipeline.scala:84:28, :109:29, :113:25, :122:24, :123:25, :381:{36,66}, :382:19, :402:22, :451:24, :473:{10,44}
       s1Valid <=
-        _mshr_io_complete_valid ? ~(s1Valid | _GEN_25) & _GEN_36 : ~_GEN_25 & _GEN_36;	// src/llc/scala/main/LlcPipeline.scala:82:28, :132:24, :225:16, :226:13, :297:{16,35}, :309:19, :315:24, :329:19, :337:15
+        _mshr_io_complete_valid ? ~(s1Valid | _GEN_25) & _GEN_36 : ~_GEN_25 & _GEN_36;	// src/llc/scala/main/LlcPipeline.scala:84:28, :135:24, :228:16, :229:13, :300:{16,35}, :312:19, :318:24, :332:19, :340:15
       s2Valid <=
         ~(allocFire | s2HitFire | _GEN_29 | _mshr_io_complete_valid & s2OnRefill)
-        & (_GEN_25 | s2Valid);	// src/llc/scala/main/LlcPipeline.scala:82:28, :133:24, :297:{16,35}, :298:19, :315:24, :316:{30,40}, :317:41, :319:22, :327:15, :361:{15,32,51,67}, :369:13, :378:{36,66}, :379:19, :410:13, :414:{27,37,53,75,90}, :415:33, :441:19, :442:13
+        & (_GEN_25 | s2Valid);	// src/llc/scala/main/LlcPipeline.scala:84:28, :136:24, :300:{16,35}, :301:19, :318:24, :319:{30,40}, :320:41, :322:22, :330:15, :364:{15,32,51,67}, :372:13, :381:{36,66}, :382:19, :413:13, :417:{27,37,53,75,90}, :418:33, :445:19, :446:13
       replayValid <=
         _GEN_30
         | (_mshr_io_complete_valid
              ? (s1Valid ? ~s2TakesHead | _GEN_26 | _GEN_35 : _GEN_26 | _GEN_35)
-             : _GEN_35);	// src/llc/scala/main/LlcPipeline.scala:82:28, :132:24, :136:29, :209:50, :210:23, :211:19, :315:24, :318:34, :319:22, :320:26, :321:21, :329:19, :330:{12,26}, :331:21, :361:67, :362:24, :363:19
+             : _GEN_35);	// src/llc/scala/main/LlcPipeline.scala:84:28, :135:24, :139:29, :212:50, :213:23, :214:19, :318:24, :321:34, :322:22, :323:26, :324:21, :332:19, :333:{12,26}, :334:21, :364:67, :365:24, :366:19
       replay2Valid <=
         _GEN_31 | _mshr_io_complete_valid & (_GEN_28 | _GEN_27) | (~_GEN_23 | replayValid)
-        & replay2Valid;	// src/llc/scala/main/LlcPipeline.scala:82:28, :136:29, :138:29, :209:{19,37,50}, :210:23, :315:24, :319:22, :320:26, :329:19, :330:26, :361:67, :362:24
-      if (_GEN_25) begin	// src/llc/scala/main/LlcPipeline.scala:297:16
-        s2Hit <= |_hitWay_T;	// src/llc/scala/main/LlcPipeline.scala:257:{24,31}, :275:29
+        & replay2Valid;	// src/llc/scala/main/LlcPipeline.scala:84:28, :139:29, :141:29, :212:{19,37,50}, :213:23, :318:24, :322:22, :323:26, :332:19, :333:26, :364:67, :365:24
+      if (_GEN_25) begin	// src/llc/scala/main/LlcPipeline.scala:300:16
+        s2Hit <= |_hitWay_T;	// src/llc/scala/main/LlcPipeline.scala:260:{24,31}, :278:29
         s2VictimWasBusy <=
           _mshr_io_inflight_0_valid & _s2VictimWasBusy_T
           & _mshr_io_inflight_0_bits_way == _wayPartition_io_victimWay
@@ -468,7 +473,7 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
           | _mshr_io_inflight_2_valid & _s2VictimWasBusy_T_8
           & _mshr_io_inflight_2_bits_way == _wayPartition_io_victimWay
           | _mshr_io_inflight_3_valid & _s2VictimWasBusy_T_12
-          & _mshr_io_inflight_3_bits_way == _wayPartition_io_victimWay;	// src/llc/scala/main/LlcPipeline.scala:81:28, :82:28, :96:{39,61,75,93}, :250:31, :283:32
+          & _mshr_io_inflight_3_bits_way == _wayPartition_io_victimWay;	// src/llc/scala/main/LlcPipeline.scala:83:28, :84:28, :98:{39,61,75,93}, :253:31, :286:32
       end
       _GEN_38 =
         {{flushState},
@@ -489,146 +494,158 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
           & io_wrPortIdle
             ? 4'h2
             : flushState},
-         {io_flushStart ? 4'h1 : flushState}};	// src/llc/scala/main/LlcPipeline.scala:82:28, :132:24, :133:24, :140:32, :196:38, :203:67, :218:51, :490:27, :505:45, :511:{32,35,44,59,78}, :512:37, :529:{25,37}, :532:76, :536:{22,27}, :538:{18,24}, :539:45, :540:18, :543:18, :547:22, :549:27, :552:20, :556:{27,40}, :561:18, :577:18, :582:18, :589:30, :590:20, :601:18, :606:{26,40,53}, :609:18
-      flushState <= _GEN_38[flushState];	// src/llc/scala/main/LlcPipeline.scala:490:27, :529:37, :536:27, :547:22, :549:27, :556:27, :561:18, :577:18, :582:18, :589:30, :601:18, :606:40, :609:18
-      if (_GEN_4 & io_flushStart)	// src/llc/scala/main/LlcPipeline.scala:491:27, :547:22, :549:27, :550:20
-        flushInv <= io_flushIsInvalidate;	// src/llc/scala/main/LlcPipeline.scala:491:27
-      if (_GEN_4) begin	// src/llc/scala/main/LlcPipeline.scala:547:22
-        if (io_flushStart)	// src/llc/scala/main/LlcPipeline.scala:28:14
-          curSet <= 9'h0;	// src/llc/scala/main/LlcPipeline.scala:492:27
+         {io_flushStart ? 4'h1 : flushState}};	// src/llc/scala/main/LlcPipeline.scala:84:28, :135:24, :136:24, :143:32, :199:38, :206:67, :221:51, :494:27, :509:45, :515:{32,35,44,59,78}, :516:37, :533:{25,37}, :536:76, :540:{22,27}, :542:{18,24}, :543:45, :544:18, :547:18, :551:22, :553:27, :556:20, :560:{27,40}, :565:18, :581:18, :586:18, :593:30, :594:20, :605:18, :610:{26,40,53}, :613:18
+      flushState <= _GEN_38[flushState];	// src/llc/scala/main/LlcPipeline.scala:494:27, :533:37, :540:27, :551:22, :553:27, :560:27, :565:18, :581:18, :586:18, :593:30, :605:18, :610:40, :613:18
+      if (_GEN_4 & io_flushStart)	// src/llc/scala/main/LlcPipeline.scala:495:27, :551:22, :553:27, :554:20
+        flushInv <= io_flushIsInvalidate;	// src/llc/scala/main/LlcPipeline.scala:495:27
+      if (_GEN_4) begin	// src/llc/scala/main/LlcPipeline.scala:551:22
+        if (io_flushStart)	// src/llc/scala/main/LlcPipeline.scala:30:14
+          curSet <= 9'h0;	// src/llc/scala/main/LlcPipeline.scala:496:27
       end
-      else if (~_GEN_33) begin	// src/llc/scala/main/LlcPipeline.scala:496:25, :547:22
-        automatic logic _GEN_39;	// src/llc/scala/main/LlcPipeline.scala:492:27, :536:27, :539:45, :542:18
-        _GEN_39 = (|walkNeedNow) | (&curSet);	// src/llc/scala/main/LlcPipeline.scala:492:27, :529:25, :536:{22,27}, :539:{23,45}, :542:18
-        if (_walkWayDirty_T) begin	// src/llc/scala/main/LlcPipeline.scala:529:37
-          if (~_GEN_39)	// src/llc/scala/main/LlcPipeline.scala:492:27, :536:27, :539:45, :542:18
-            curSet <= curSet + 9'h1;	// src/llc/scala/main/LlcPipeline.scala:492:27, :542:28
+      else if (~_GEN_33) begin	// src/llc/scala/main/LlcPipeline.scala:500:25, :551:22
+        automatic logic _GEN_39;	// src/llc/scala/main/LlcPipeline.scala:496:27, :540:27, :543:45, :546:18
+        _GEN_39 = (|walkNeedNow) | (&curSet);	// src/llc/scala/main/LlcPipeline.scala:496:27, :533:25, :540:{22,27}, :543:{23,45}, :546:18
+        if (_walkWayDirty_T) begin	// src/llc/scala/main/LlcPipeline.scala:533:37
+          if (~_GEN_39)	// src/llc/scala/main/LlcPipeline.scala:496:27, :540:27, :543:45, :546:18
+            curSet <= curSet + 9'h1;	// src/llc/scala/main/LlcPipeline.scala:496:27, :546:28
         end
-        else if (~_GEN_8 | _GEN_39) begin	// src/llc/scala/main/LlcPipeline.scala:492:27, :536:27, :539:45, :542:18, :547:22
+        else if (~_GEN_8 | _GEN_39) begin	// src/llc/scala/main/LlcPipeline.scala:496:27, :540:27, :543:45, :546:18, :551:22
         end
-        else	// src/llc/scala/main/LlcPipeline.scala:492:27, :536:27, :547:22
-          curSet <= curSet + 9'h1;	// src/llc/scala/main/LlcPipeline.scala:492:27, :542:28
+        else	// src/llc/scala/main/LlcPipeline.scala:496:27, :540:27, :551:22
+          curSet <= curSet + 9'h1;	// src/llc/scala/main/LlcPipeline.scala:496:27, :546:28
       end
-      if (_GEN_34 | ~((_walkWayDirty_T | _GEN_8) & (|walkNeedNow))) begin	// src/llc/scala/main/LlcPipeline.scala:493:27, :496:25, :529:{25,37}, :536:{22,27}, :537:14, :547:22
+      if (_GEN_34 | ~((_walkWayDirty_T | _GEN_8) & (|walkNeedNow))) begin	// src/llc/scala/main/LlcPipeline.scala:497:27, :500:25, :533:{25,37}, :540:{22,27}, :541:14, :551:22
       end
-      else	// src/llc/scala/main/LlcPipeline.scala:493:27, :547:22
-        curWay <= walkWay;	// src/llc/scala/main/LlcPipeline.scala:493:27, src/main/scala/chisel3/util/Mux.scala:58:84
-      if (~_GEN_34)	// src/llc/scala/main/LlcPipeline.scala:496:25, :547:22
+      else	// src/llc/scala/main/LlcPipeline.scala:497:27, :551:22
+        curWay <= walkWay;	// src/llc/scala/main/LlcPipeline.scala:497:27, src/main/scala/chisel3/util/Mux.scala:58:84
+      if (~_GEN_34)	// src/llc/scala/main/LlcPipeline.scala:500:25, :551:22
         walkNeed <=
           _walkWayDirty_T
             ? rdNeed
-            : ({8{_GEN_20}} | {8{~_GEN_19}} | ~(8'h1 << curWay)) & walkNeed;	// src/llc/scala/main/LlcPipeline.scala:447:24, :493:27, :500:25, :527:51, :529:37, :547:22, :567:20, :600:{16,30}, src/main/scala/chisel3/util/OneHot.scala:65:12
+            : ({8{_GEN_20}} | {8{~_GEN_19}} | ~(8'h1 << curWay)) & walkNeed;	// src/llc/scala/main/LlcPipeline.scala:451:24, :497:27, :504:25, :531:51, :533:37, :551:22, :571:20, :604:{16,30}, src/main/scala/chisel3/util/OneHot.scala:65:12
     end
     respDataReg_isWrite <=
       _GEN_32
         ? _mshr_io_complete_bits_reqType
-        : s2HitFire ? s2Req_isWrite : ~_mshr_io_earlyResp_valid & respDataReg_isWrite;	// src/llc/scala/main/LlcPipeline.scala:82:28, :108:25, :120:24, :122:25, :272:25, :378:{36,66}, :379:19, :400:25, :447:24, :469:44, :471:27
-    if (_GEN_32) begin	// src/llc/scala/main/LlcPipeline.scala:379:19, :447:24, :469:44, :471:27
-      respDataReg_data_0 <= _mshr_io_complete_bits_data_0;	// src/llc/scala/main/LlcPipeline.scala:82:28, :108:25
-      respDataReg_data_1 <= _mshr_io_complete_bits_data_1;	// src/llc/scala/main/LlcPipeline.scala:82:28, :108:25
+        : s2HitFire ? s2Req_isWrite : ~_mshr_io_earlyResp_valid & respDataReg_isWrite;	// src/llc/scala/main/LlcPipeline.scala:84:28, :110:25, :122:24, :124:25, :275:25, :381:{36,66}, :382:19, :403:25, :451:24, :473:44, :475:27
+    if (_GEN_32) begin	// src/llc/scala/main/LlcPipeline.scala:382:19, :451:24, :473:44, :475:27
+      respDataReg_data_0 <= _mshr_io_complete_bits_data_0;	// src/llc/scala/main/LlcPipeline.scala:84:28, :110:25
+      respDataReg_data_1 <= _mshr_io_complete_bits_data_1;	// src/llc/scala/main/LlcPipeline.scala:84:28, :110:25
     end
-    else if (s2HitFire) begin	// src/llc/scala/main/LlcPipeline.scala:378:{36,66}
-      respDataReg_data_0 <= _dataArray_io_readResp_data_0;	// src/llc/scala/main/LlcPipeline.scala:79:28, :108:25
-      respDataReg_data_1 <= _dataArray_io_readResp_data_1;	// src/llc/scala/main/LlcPipeline.scala:79:28, :108:25
+    else if (s2HitFire) begin	// src/llc/scala/main/LlcPipeline.scala:381:{36,66}
+      respDataReg_data_0 <= _dataArray_io_readResp_data_0;	// src/llc/scala/main/LlcPipeline.scala:81:28, :110:25
+      respDataReg_data_1 <= _dataArray_io_readResp_data_1;	// src/llc/scala/main/LlcPipeline.scala:81:28, :110:25
     end
-    else if (_mshr_io_earlyResp_valid) begin	// src/llc/scala/main/LlcPipeline.scala:82:28
+    else if (_mshr_io_earlyResp_valid) begin	// src/llc/scala/main/LlcPipeline.scala:84:28
       respDataReg_data_0 <=
-        _mshr_io_earlyResp_bits_beatIdx ? 256'h0 : _mshr_io_earlyResp_bits_data;	// src/llc/scala/main/LlcPipeline.scala:82:28, :108:25, :126:33
+        _mshr_io_earlyResp_bits_beatIdx ? 256'h0 : _mshr_io_earlyResp_bits_data;	// src/llc/scala/main/LlcPipeline.scala:84:28, :110:25, :129:33
       respDataReg_data_1 <=
-        _mshr_io_earlyResp_bits_beatIdx ? _mshr_io_earlyResp_bits_data : 256'h0;	// src/llc/scala/main/LlcPipeline.scala:82:28, :108:25, :126:33
+        _mshr_io_earlyResp_bits_beatIdx ? _mshr_io_earlyResp_bits_data : 256'h0;	// src/llc/scala/main/LlcPipeline.scala:84:28, :110:25, :129:33
     end
-    if (_GEN_30) begin	// src/llc/scala/main/LlcPipeline.scala:315:24, :361:67, :362:24, :363:19
-      replayReq_isWrite <= s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:137:25, :272:25
-      replayReq_address <= s2Req_address;	// src/llc/scala/main/LlcPipeline.scala:137:25, :272:25
-      replayReq_id <= s2Req_id;	// src/llc/scala/main/LlcPipeline.scala:137:25, :272:25
-      replayReq_writeData <= s2Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:137:25, :272:25
-      replayReq_writeStrb <= s2Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:137:25, :272:25
-      replayReq_beatIdx <= s2Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:137:25, :272:25
+    if (_GEN_30) begin	// src/llc/scala/main/LlcPipeline.scala:318:24, :364:67, :365:24, :366:19
+      replayReq_isWrite <= s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:140:25, :275:25
+      replayReq_address <= s2Req_address;	// src/llc/scala/main/LlcPipeline.scala:140:25, :275:25
+      replayReq_id <= s2Req_id;	// src/llc/scala/main/LlcPipeline.scala:140:25, :275:25
+      replayReq_writeData <= s2Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:140:25, :275:25
+      replayReq_writeStrb <= s2Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:140:25, :275:25
+      replayReq_beatIdx <= s2Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:140:25, :275:25
+      replayReq_singleBeat <= s2Req_singleBeat;	// src/llc/scala/main/LlcPipeline.scala:140:25, :275:25
     end
-    else if (_mshr_io_complete_valid) begin	// src/llc/scala/main/LlcPipeline.scala:82:28
-      if (s1Valid & ~s2TakesHead) begin	// src/llc/scala/main/LlcPipeline.scala:132:24, :318:34, :319:22, :329:19, :330:{12,26}, :332:21
-        replayReq_isWrite <= s1Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:137:25, :221:18
-        replayReq_address <= s1Req_address;	// src/llc/scala/main/LlcPipeline.scala:137:25, :221:18
-        replayReq_id <= s1Req_id;	// src/llc/scala/main/LlcPipeline.scala:137:25, :221:18
-        replayReq_writeData <= s1Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:137:25, :221:18
-        replayReq_writeStrb <= s1Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:137:25, :221:18
-        replayReq_beatIdx <= s1Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:137:25, :221:18
+    else if (_mshr_io_complete_valid) begin	// src/llc/scala/main/LlcPipeline.scala:84:28
+      if (s1Valid & ~s2TakesHead) begin	// src/llc/scala/main/LlcPipeline.scala:135:24, :321:34, :322:22, :332:19, :333:{12,26}, :335:21
+        replayReq_isWrite <= s1Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:140:25, :224:18
+        replayReq_address <= s1Req_address;	// src/llc/scala/main/LlcPipeline.scala:140:25, :224:18
+        replayReq_id <= s1Req_id;	// src/llc/scala/main/LlcPipeline.scala:140:25, :224:18
+        replayReq_writeData <= s1Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:140:25, :224:18
+        replayReq_writeStrb <= s1Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:140:25, :224:18
+        replayReq_beatIdx <= s1Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:140:25, :224:18
+        replayReq_singleBeat <= s1Req_singleBeat;	// src/llc/scala/main/LlcPipeline.scala:140:25, :224:18
       end
-      else if (_GEN_26) begin	// src/llc/scala/main/LlcPipeline.scala:209:50, :319:22, :320:26, :321:21
-        replayReq_isWrite <= s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:137:25, :272:25
-        replayReq_address <= s2Req_address;	// src/llc/scala/main/LlcPipeline.scala:137:25, :272:25
-        replayReq_id <= s2Req_id;	// src/llc/scala/main/LlcPipeline.scala:137:25, :272:25
-        replayReq_writeData <= s2Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:137:25, :272:25
-        replayReq_writeStrb <= s2Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:137:25, :272:25
-        replayReq_beatIdx <= s2Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:137:25, :272:25
+      else if (_GEN_26) begin	// src/llc/scala/main/LlcPipeline.scala:212:50, :322:22, :323:26, :324:21
+        replayReq_isWrite <= s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:140:25, :275:25
+        replayReq_address <= s2Req_address;	// src/llc/scala/main/LlcPipeline.scala:140:25, :275:25
+        replayReq_id <= s2Req_id;	// src/llc/scala/main/LlcPipeline.scala:140:25, :275:25
+        replayReq_writeData <= s2Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:140:25, :275:25
+        replayReq_writeStrb <= s2Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:140:25, :275:25
+        replayReq_beatIdx <= s2Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:140:25, :275:25
+        replayReq_singleBeat <= s2Req_singleBeat;	// src/llc/scala/main/LlcPipeline.scala:140:25, :275:25
       end
-      else if (_GEN_24) begin	// src/llc/scala/main/LlcPipeline.scala:136:29, :209:50, :210:23, :211:19
-        replayReq_isWrite <= replay2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:137:25, :139:25
-        replayReq_address <= replay2Req_address;	// src/llc/scala/main/LlcPipeline.scala:137:25, :139:25
-        replayReq_id <= replay2Req_id;	// src/llc/scala/main/LlcPipeline.scala:137:25, :139:25
-        replayReq_writeData <= replay2Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:137:25, :139:25
-        replayReq_writeStrb <= replay2Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:137:25, :139:25
-        replayReq_beatIdx <= replay2Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:137:25, :139:25
-      end
-    end
-    else if (_GEN_24) begin	// src/llc/scala/main/LlcPipeline.scala:136:29, :209:50, :210:23, :211:19
-      replayReq_isWrite <= replay2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:137:25, :139:25
-      replayReq_address <= replay2Req_address;	// src/llc/scala/main/LlcPipeline.scala:137:25, :139:25
-      replayReq_id <= replay2Req_id;	// src/llc/scala/main/LlcPipeline.scala:137:25, :139:25
-      replayReq_writeData <= replay2Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:137:25, :139:25
-      replayReq_writeStrb <= replay2Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:137:25, :139:25
-      replayReq_beatIdx <= replay2Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:137:25, :139:25
-    end
-    if (_GEN_31) begin	// src/llc/scala/main/LlcPipeline.scala:315:24, :361:67, :362:24
-      replay2Req_isWrite <= s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:139:25, :272:25
-      replay2Req_address <= s2Req_address;	// src/llc/scala/main/LlcPipeline.scala:139:25, :272:25
-      replay2Req_id <= s2Req_id;	// src/llc/scala/main/LlcPipeline.scala:139:25, :272:25
-      replay2Req_writeData <= s2Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:139:25, :272:25
-      replay2Req_writeStrb <= s2Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:139:25, :272:25
-      replay2Req_beatIdx <= s2Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:139:25, :272:25
-    end
-    else if (_mshr_io_complete_valid) begin	// src/llc/scala/main/LlcPipeline.scala:82:28
-      if (_GEN_28) begin	// src/llc/scala/main/LlcPipeline.scala:319:22, :329:19, :330:26
-        replay2Req_isWrite <= s1Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:139:25, :221:18
-        replay2Req_address <= s1Req_address;	// src/llc/scala/main/LlcPipeline.scala:139:25, :221:18
-        replay2Req_id <= s1Req_id;	// src/llc/scala/main/LlcPipeline.scala:139:25, :221:18
-        replay2Req_writeData <= s1Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:139:25, :221:18
-        replay2Req_writeStrb <= s1Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:139:25, :221:18
-        replay2Req_beatIdx <= s1Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:139:25, :221:18
-      end
-      else if (_GEN_27) begin	// src/llc/scala/main/LlcPipeline.scala:139:25, :209:50, :319:22, :320:26
-        replay2Req_isWrite <= s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:139:25, :272:25
-        replay2Req_address <= s2Req_address;	// src/llc/scala/main/LlcPipeline.scala:139:25, :272:25
-        replay2Req_id <= s2Req_id;	// src/llc/scala/main/LlcPipeline.scala:139:25, :272:25
-        replay2Req_writeData <= s2Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:139:25, :272:25
-        replay2Req_writeStrb <= s2Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:139:25, :272:25
-        replay2Req_beatIdx <= s2Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:139:25, :272:25
+      else if (_GEN_24) begin	// src/llc/scala/main/LlcPipeline.scala:139:29, :212:50, :213:23, :214:19
+        replayReq_isWrite <= replay2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:140:25, :142:25
+        replayReq_address <= replay2Req_address;	// src/llc/scala/main/LlcPipeline.scala:140:25, :142:25
+        replayReq_id <= replay2Req_id;	// src/llc/scala/main/LlcPipeline.scala:140:25, :142:25
+        replayReq_writeData <= replay2Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:140:25, :142:25
+        replayReq_writeStrb <= replay2Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:140:25, :142:25
+        replayReq_beatIdx <= replay2Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:140:25, :142:25
+        replayReq_singleBeat <= replay2Req_singleBeat;	// src/llc/scala/main/LlcPipeline.scala:140:25, :142:25
       end
     end
-    if (s0Fire) begin	// src/llc/scala/main/LlcPipeline.scala:203:{46,64,76}
+    else if (_GEN_24) begin	// src/llc/scala/main/LlcPipeline.scala:139:29, :212:50, :213:23, :214:19
+      replayReq_isWrite <= replay2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:140:25, :142:25
+      replayReq_address <= replay2Req_address;	// src/llc/scala/main/LlcPipeline.scala:140:25, :142:25
+      replayReq_id <= replay2Req_id;	// src/llc/scala/main/LlcPipeline.scala:140:25, :142:25
+      replayReq_writeData <= replay2Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:140:25, :142:25
+      replayReq_writeStrb <= replay2Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:140:25, :142:25
+      replayReq_beatIdx <= replay2Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:140:25, :142:25
+      replayReq_singleBeat <= replay2Req_singleBeat;	// src/llc/scala/main/LlcPipeline.scala:140:25, :142:25
+    end
+    if (_GEN_31) begin	// src/llc/scala/main/LlcPipeline.scala:318:24, :364:67, :365:24
+      replay2Req_isWrite <= s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:142:25, :275:25
+      replay2Req_address <= s2Req_address;	// src/llc/scala/main/LlcPipeline.scala:142:25, :275:25
+      replay2Req_id <= s2Req_id;	// src/llc/scala/main/LlcPipeline.scala:142:25, :275:25
+      replay2Req_writeData <= s2Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:142:25, :275:25
+      replay2Req_writeStrb <= s2Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:142:25, :275:25
+      replay2Req_beatIdx <= s2Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:142:25, :275:25
+      replay2Req_singleBeat <= s2Req_singleBeat;	// src/llc/scala/main/LlcPipeline.scala:142:25, :275:25
+    end
+    else if (_mshr_io_complete_valid) begin	// src/llc/scala/main/LlcPipeline.scala:84:28
+      if (_GEN_28) begin	// src/llc/scala/main/LlcPipeline.scala:322:22, :332:19, :333:26
+        replay2Req_isWrite <= s1Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:142:25, :224:18
+        replay2Req_address <= s1Req_address;	// src/llc/scala/main/LlcPipeline.scala:142:25, :224:18
+        replay2Req_id <= s1Req_id;	// src/llc/scala/main/LlcPipeline.scala:142:25, :224:18
+        replay2Req_writeData <= s1Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:142:25, :224:18
+        replay2Req_writeStrb <= s1Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:142:25, :224:18
+        replay2Req_beatIdx <= s1Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:142:25, :224:18
+        replay2Req_singleBeat <= s1Req_singleBeat;	// src/llc/scala/main/LlcPipeline.scala:142:25, :224:18
+      end
+      else if (_GEN_27) begin	// src/llc/scala/main/LlcPipeline.scala:142:25, :212:50, :322:22, :323:26
+        replay2Req_isWrite <= s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:142:25, :275:25
+        replay2Req_address <= s2Req_address;	// src/llc/scala/main/LlcPipeline.scala:142:25, :275:25
+        replay2Req_id <= s2Req_id;	// src/llc/scala/main/LlcPipeline.scala:142:25, :275:25
+        replay2Req_writeData <= s2Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:142:25, :275:25
+        replay2Req_writeStrb <= s2Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:142:25, :275:25
+        replay2Req_beatIdx <= s2Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:142:25, :275:25
+        replay2Req_singleBeat <= s2Req_singleBeat;	// src/llc/scala/main/LlcPipeline.scala:142:25, :275:25
+      end
+    end
+    if (s0Fire) begin	// src/llc/scala/main/LlcPipeline.scala:206:{46,64,76}
       s1Req_isWrite <=
         replayPend
           ? (replayValid ? replayReq_isWrite : replay2Req_isWrite)
-          : io_reqIn_payload_isWrite;	// src/llc/scala/main/LlcPipeline.scala:136:29, :137:25, :139:25, :140:32, :141:23, :204:19, :221:18
-      s1Req_address <= s0Req_address;	// src/llc/scala/main/LlcPipeline.scala:204:19, :221:18
+          : io_reqIn_payload_isWrite;	// src/llc/scala/main/LlcPipeline.scala:139:29, :140:25, :142:25, :143:32, :144:23, :207:19, :224:18
+      s1Req_address <= s0Req_address;	// src/llc/scala/main/LlcPipeline.scala:207:19, :224:18
       s1Req_id <=
-        replayPend ? (replayValid ? replayReq_id : replay2Req_id) : io_reqIn_payload_id;	// src/llc/scala/main/LlcPipeline.scala:136:29, :137:25, :139:25, :140:32, :141:23, :204:19, :221:18
+        replayPend ? (replayValid ? replayReq_id : replay2Req_id) : io_reqIn_payload_id;	// src/llc/scala/main/LlcPipeline.scala:139:29, :140:25, :142:25, :143:32, :144:23, :207:19, :224:18
       s1Req_writeData <=
         replayPend
           ? (replayValid ? replayReq_writeData : replay2Req_writeData)
-          : io_reqIn_payload_writeData;	// src/llc/scala/main/LlcPipeline.scala:136:29, :137:25, :139:25, :140:32, :141:23, :204:19, :221:18
+          : io_reqIn_payload_writeData;	// src/llc/scala/main/LlcPipeline.scala:139:29, :140:25, :142:25, :143:32, :144:23, :207:19, :224:18
       s1Req_writeStrb <=
         replayPend
           ? (replayValid ? replayReq_writeStrb : replay2Req_writeStrb)
-          : io_reqIn_payload_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:136:29, :137:25, :139:25, :140:32, :141:23, :204:19, :221:18
+          : io_reqIn_payload_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:139:29, :140:25, :142:25, :143:32, :144:23, :207:19, :224:18
       s1Req_beatIdx <=
         replayPend
           ? (replayValid ? replayReq_beatIdx : replay2Req_beatIdx)
-          : io_reqIn_payload_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:136:29, :137:25, :139:25, :140:32, :141:23, :204:19, :221:18
-      s1Set <= s0Req_address[14:6];	// src/llc/scala/main/LlcPipeline.scala:204:19, :205:29, :222:18
-      s1Tag <= s0Req_address[31:15];	// src/llc/scala/main/LlcPipeline.scala:204:19, :206:29, :223:18
+          : io_reqIn_payload_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:139:29, :140:25, :142:25, :143:32, :144:23, :207:19, :224:18
+      s1Req_singleBeat <=
+        replayPend
+          ? (replayValid ? replayReq_singleBeat : replay2Req_singleBeat)
+          : io_reqIn_payload_singleBeat;	// src/llc/scala/main/LlcPipeline.scala:139:29, :140:25, :142:25, :143:32, :144:23, :207:19, :224:18
+      s1Set <= s0Req_address[14:6];	// src/llc/scala/main/LlcPipeline.scala:207:19, :208:29, :225:18
+      s1Tag <= s0Req_address[31:15];	// src/llc/scala/main/LlcPipeline.scala:207:19, :209:29, :226:18
     end
-    if (_GEN_25) begin	// src/llc/scala/main/LlcPipeline.scala:297:16
+    if (_GEN_25) begin	// src/llc/scala/main/LlcPipeline.scala:300:16
       automatic logic [7:0]       _GEN_40 =
         {{_tagArray_io_readResp_dirtys_7},
          {_tagArray_io_readResp_dirtys_6},
@@ -637,7 +654,7 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
          {_tagArray_io_readResp_dirtys_3},
          {_tagArray_io_readResp_dirtys_2},
          {_tagArray_io_readResp_dirtys_1},
-         {_tagArray_io_readResp_dirtys_0}};	// src/llc/scala/main/LlcPipeline.scala:78:28, :306:19
+         {_tagArray_io_readResp_dirtys_0}};	// src/llc/scala/main/LlcPipeline.scala:80:28, :309:19
       automatic logic [7:0][16:0] _GEN_41 =
         {{_tagArray_io_readResp_tags_7},
          {_tagArray_io_readResp_tags_6},
@@ -646,56 +663,57 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
          {_tagArray_io_readResp_tags_3},
          {_tagArray_io_readResp_tags_2},
          {_tagArray_io_readResp_tags_1},
-         {_tagArray_io_readResp_tags_0}};	// src/llc/scala/main/LlcPipeline.scala:78:28, :307:19
-      s2Req_isWrite <= s1Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:221:18, :272:25
-      s2Req_address <= s1Req_address;	// src/llc/scala/main/LlcPipeline.scala:221:18, :272:25
-      s2Req_id <= s1Req_id;	// src/llc/scala/main/LlcPipeline.scala:221:18, :272:25
-      s2Req_writeData <= s1Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:221:18, :272:25
-      s2Req_writeStrb <= s1Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:221:18, :272:25
-      s2Req_beatIdx <= s1Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:221:18, :272:25
-      s2Set <= s1Set;	// src/llc/scala/main/LlcPipeline.scala:222:18, :273:25
-      s2Tag <= s1Tag;	// src/llc/scala/main/LlcPipeline.scala:223:18, :274:25
-      s2HitWay <= hitWay;	// src/llc/scala/main/LlcPipeline.scala:276:25, src/main/scala/chisel3/util/OneHot.scala:32:10
-      s2VictimWay <= _wayPartition_io_victimWay;	// src/llc/scala/main/LlcPipeline.scala:81:28, :277:25
-      s2VictimValid <= _GEN_0;	// src/llc/scala/main/LlcPipeline.scala:278:26, :290:24
-      s2VictimDirty <= _GEN_40[_wayPartition_io_victimWay];	// src/llc/scala/main/LlcPipeline.scala:81:28, :279:26, :306:19
-      s2VictimTag <= _GEN_41[_wayPartition_io_victimWay];	// src/llc/scala/main/LlcPipeline.scala:81:28, :280:25, :307:19
+         {_tagArray_io_readResp_tags_0}};	// src/llc/scala/main/LlcPipeline.scala:80:28, :310:19
+      s2Req_isWrite <= s1Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:224:18, :275:25
+      s2Req_address <= s1Req_address;	// src/llc/scala/main/LlcPipeline.scala:224:18, :275:25
+      s2Req_id <= s1Req_id;	// src/llc/scala/main/LlcPipeline.scala:224:18, :275:25
+      s2Req_writeData <= s1Req_writeData;	// src/llc/scala/main/LlcPipeline.scala:224:18, :275:25
+      s2Req_writeStrb <= s1Req_writeStrb;	// src/llc/scala/main/LlcPipeline.scala:224:18, :275:25
+      s2Req_beatIdx <= s1Req_beatIdx;	// src/llc/scala/main/LlcPipeline.scala:224:18, :275:25
+      s2Req_singleBeat <= s1Req_singleBeat;	// src/llc/scala/main/LlcPipeline.scala:224:18, :275:25
+      s2Set <= s1Set;	// src/llc/scala/main/LlcPipeline.scala:225:18, :276:25
+      s2Tag <= s1Tag;	// src/llc/scala/main/LlcPipeline.scala:226:18, :277:25
+      s2HitWay <= hitWay;	// src/llc/scala/main/LlcPipeline.scala:279:25, src/main/scala/chisel3/util/OneHot.scala:32:10
+      s2VictimWay <= _wayPartition_io_victimWay;	// src/llc/scala/main/LlcPipeline.scala:83:28, :280:25
+      s2VictimValid <= _GEN_0;	// src/llc/scala/main/LlcPipeline.scala:281:26, :293:24
+      s2VictimDirty <= _GEN_40[_wayPartition_io_victimWay];	// src/llc/scala/main/LlcPipeline.scala:83:28, :282:26, :309:19
+      s2VictimTag <= _GEN_41[_wayPartition_io_victimWay];	// src/llc/scala/main/LlcPipeline.scala:83:28, :283:25, :310:19
     end
-    if (_GEN_34 | ~_walkWayDirty_T) begin	// src/llc/scala/main/LlcPipeline.scala:496:25, :497:26, :529:37, :547:22
+    if (_GEN_34 | ~_walkWayDirty_T) begin	// src/llc/scala/main/LlcPipeline.scala:500:25, :501:26, :533:37, :551:22
     end
-    else begin	// src/llc/scala/main/LlcPipeline.scala:497:26, :547:22
-      latchedTags_0 <= _tagArray_io_readResp_tags_0;	// src/llc/scala/main/LlcPipeline.scala:78:28, :496:25
-      latchedTags_1 <= _tagArray_io_readResp_tags_1;	// src/llc/scala/main/LlcPipeline.scala:78:28, :496:25
-      latchedTags_2 <= _tagArray_io_readResp_tags_2;	// src/llc/scala/main/LlcPipeline.scala:78:28, :496:25
-      latchedTags_3 <= _tagArray_io_readResp_tags_3;	// src/llc/scala/main/LlcPipeline.scala:78:28, :496:25
-      latchedTags_4 <= _tagArray_io_readResp_tags_4;	// src/llc/scala/main/LlcPipeline.scala:78:28, :496:25
-      latchedTags_5 <= _tagArray_io_readResp_tags_5;	// src/llc/scala/main/LlcPipeline.scala:78:28, :496:25
-      latchedTags_6 <= _tagArray_io_readResp_tags_6;	// src/llc/scala/main/LlcPipeline.scala:78:28, :496:25
-      latchedTags_7 <= _tagArray_io_readResp_tags_7;	// src/llc/scala/main/LlcPipeline.scala:78:28, :496:25
-      latchedDirtys <= _latchedDirtys_T;	// src/llc/scala/main/LlcPipeline.scala:497:26, :528:45
+    else begin	// src/llc/scala/main/LlcPipeline.scala:501:26, :551:22
+      latchedTags_0 <= _tagArray_io_readResp_tags_0;	// src/llc/scala/main/LlcPipeline.scala:80:28, :500:25
+      latchedTags_1 <= _tagArray_io_readResp_tags_1;	// src/llc/scala/main/LlcPipeline.scala:80:28, :500:25
+      latchedTags_2 <= _tagArray_io_readResp_tags_2;	// src/llc/scala/main/LlcPipeline.scala:80:28, :500:25
+      latchedTags_3 <= _tagArray_io_readResp_tags_3;	// src/llc/scala/main/LlcPipeline.scala:80:28, :500:25
+      latchedTags_4 <= _tagArray_io_readResp_tags_4;	// src/llc/scala/main/LlcPipeline.scala:80:28, :500:25
+      latchedTags_5 <= _tagArray_io_readResp_tags_5;	// src/llc/scala/main/LlcPipeline.scala:80:28, :500:25
+      latchedTags_6 <= _tagArray_io_readResp_tags_6;	// src/llc/scala/main/LlcPipeline.scala:80:28, :500:25
+      latchedTags_7 <= _tagArray_io_readResp_tags_7;	// src/llc/scala/main/LlcPipeline.scala:80:28, :500:25
+      latchedDirtys <= _latchedDirtys_T;	// src/llc/scala/main/LlcPipeline.scala:501:26, :532:45
     end
-    if (_GEN_4 | _GEN_5 | _GEN_6 | _walkWayDirty_T | _GEN_8 | _GEN_9 | ~_GEN_12) begin	// src/llc/scala/main/LlcPipeline.scala:502:26, :529:37, :547:22
+    if (_GEN_4 | _GEN_5 | _GEN_6 | _walkWayDirty_T | _GEN_8 | _GEN_9 | ~_GEN_12) begin	// src/llc/scala/main/LlcPipeline.scala:506:26, :533:37, :551:22
     end
-    else begin	// src/llc/scala/main/LlcPipeline.scala:502:26, :547:22
-      flushLineData_0 <= _dataArray_io_readResp_data_0;	// src/llc/scala/main/LlcPipeline.scala:79:28, :502:26
-      flushLineData_1 <= _dataArray_io_readResp_data_1;	// src/llc/scala/main/LlcPipeline.scala:79:28, :502:26
+    else begin	// src/llc/scala/main/LlcPipeline.scala:506:26, :551:22
+      flushLineData_0 <= _dataArray_io_readResp_data_0;	// src/llc/scala/main/LlcPipeline.scala:81:28, :506:26
+      flushLineData_1 <= _dataArray_io_readResp_data_1;	// src/llc/scala/main/LlcPipeline.scala:81:28, :506:26
     end
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// src/llc/scala/main/LlcPipeline.scala:27:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/llc/scala/main/LlcPipeline.scala:27:7
-      `FIRRTL_BEFORE_INITIAL	// src/llc/scala/main/LlcPipeline.scala:27:7
+  `ifdef ENABLE_INITIAL_REG_	// src/llc/scala/main/LlcPipeline.scala:29:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/llc/scala/main/LlcPipeline.scala:29:7
+      `FIRRTL_BEFORE_INITIAL	// src/llc/scala/main/LlcPipeline.scala:29:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/llc/scala/main/LlcPipeline.scala:27:7
-      automatic logic [31:0] _RANDOM[0:80];	// src/llc/scala/main/LlcPipeline.scala:27:7
-      `ifdef INIT_RANDOM_PROLOG_	// src/llc/scala/main/LlcPipeline.scala:27:7
-        `INIT_RANDOM_PROLOG_	// src/llc/scala/main/LlcPipeline.scala:27:7
+    initial begin	// src/llc/scala/main/LlcPipeline.scala:29:7
+      automatic logic [31:0] _RANDOM[0:80];	// src/llc/scala/main/LlcPipeline.scala:29:7
+      `ifdef INIT_RANDOM_PROLOG_	// src/llc/scala/main/LlcPipeline.scala:29:7
+        `INIT_RANDOM_PROLOG_	// src/llc/scala/main/LlcPipeline.scala:29:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/llc/scala/main/LlcPipeline.scala:27:7
+      `ifdef RANDOMIZE_REG_INIT	// src/llc/scala/main/LlcPipeline.scala:29:7
         for (logic [6:0] i = 7'h0; i < 7'h51; i += 7'h1) begin
-          _RANDOM[i] = `RANDOM;	// src/llc/scala/main/LlcPipeline.scala:27:7
-        end	// src/llc/scala/main/LlcPipeline.scala:27:7
-        respValidReg = _RANDOM[7'h0][0];	// src/llc/scala/main/LlcPipeline.scala:27:7, :107:29
-        respDataReg_isWrite = _RANDOM[7'h0][1];	// src/llc/scala/main/LlcPipeline.scala:27:7, :107:29, :108:25
+          _RANDOM[i] = `RANDOM;	// src/llc/scala/main/LlcPipeline.scala:29:7
+        end	// src/llc/scala/main/LlcPipeline.scala:29:7
+        respValidReg = _RANDOM[7'h0][0];	// src/llc/scala/main/LlcPipeline.scala:29:7, :109:29
+        respDataReg_isWrite = _RANDOM[7'h0][1];	// src/llc/scala/main/LlcPipeline.scala:29:7, :109:29, :110:25
         respDataReg_data_0 =
           {_RANDOM[7'h0][31:6],
            _RANDOM[7'h1],
@@ -705,7 +723,7 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
            _RANDOM[7'h5],
            _RANDOM[7'h6],
            _RANDOM[7'h7],
-           _RANDOM[7'h8][5:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :107:29, :108:25
+           _RANDOM[7'h8][5:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :109:29, :110:25
         respDataReg_data_1 =
           {_RANDOM[7'h8][31:6],
            _RANDOM[7'h9],
@@ -715,13 +733,13 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
            _RANDOM[7'hD],
            _RANDOM[7'hE],
            _RANDOM[7'hF],
-           _RANDOM[7'h10][5:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :108:25
-        s1Valid = _RANDOM[7'h10][6];	// src/llc/scala/main/LlcPipeline.scala:27:7, :108:25, :132:24
-        s2Valid = _RANDOM[7'h10][7];	// src/llc/scala/main/LlcPipeline.scala:27:7, :108:25, :133:24
-        replayValid = _RANDOM[7'h10][8];	// src/llc/scala/main/LlcPipeline.scala:27:7, :108:25, :136:29
-        replayReq_isWrite = _RANDOM[7'h10][9];	// src/llc/scala/main/LlcPipeline.scala:27:7, :108:25, :137:25
-        replayReq_address = {_RANDOM[7'h10][31:10], _RANDOM[7'h11][9:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :108:25, :137:25
-        replayReq_id = _RANDOM[7'h11][13:10];	// src/llc/scala/main/LlcPipeline.scala:27:7, :137:25
+           _RANDOM[7'h10][5:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :110:25
+        s1Valid = _RANDOM[7'h10][6];	// src/llc/scala/main/LlcPipeline.scala:29:7, :110:25, :135:24
+        s2Valid = _RANDOM[7'h10][7];	// src/llc/scala/main/LlcPipeline.scala:29:7, :110:25, :136:24
+        replayValid = _RANDOM[7'h10][8];	// src/llc/scala/main/LlcPipeline.scala:29:7, :110:25, :139:29
+        replayReq_isWrite = _RANDOM[7'h10][9];	// src/llc/scala/main/LlcPipeline.scala:29:7, :110:25, :140:25
+        replayReq_address = {_RANDOM[7'h10][31:10], _RANDOM[7'h11][9:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :110:25, :140:25
+        replayReq_id = _RANDOM[7'h11][13:10];	// src/llc/scala/main/LlcPipeline.scala:29:7, :140:25
         replayReq_writeData =
           {_RANDOM[7'h11][31:14],
            _RANDOM[7'h12],
@@ -731,15 +749,16 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
            _RANDOM[7'h16],
            _RANDOM[7'h17],
            _RANDOM[7'h18],
-           _RANDOM[7'h19][13:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :137:25
-        replayReq_writeStrb = {_RANDOM[7'h19][31:14], _RANDOM[7'h1A][13:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :137:25
-        replayReq_beatIdx = _RANDOM[7'h1A][14];	// src/llc/scala/main/LlcPipeline.scala:27:7, :137:25
-        replay2Valid = _RANDOM[7'h1A][15];	// src/llc/scala/main/LlcPipeline.scala:27:7, :137:25, :138:29
-        replay2Req_isWrite = _RANDOM[7'h1A][16];	// src/llc/scala/main/LlcPipeline.scala:27:7, :137:25, :139:25
-        replay2Req_address = {_RANDOM[7'h1A][31:17], _RANDOM[7'h1B][16:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :137:25, :139:25
-        replay2Req_id = _RANDOM[7'h1B][20:17];	// src/llc/scala/main/LlcPipeline.scala:27:7, :139:25
+           _RANDOM[7'h19][13:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :140:25
+        replayReq_writeStrb = {_RANDOM[7'h19][31:14], _RANDOM[7'h1A][13:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :140:25
+        replayReq_beatIdx = _RANDOM[7'h1A][14];	// src/llc/scala/main/LlcPipeline.scala:29:7, :140:25
+        replayReq_singleBeat = _RANDOM[7'h1A][15];	// src/llc/scala/main/LlcPipeline.scala:29:7, :140:25
+        replay2Valid = _RANDOM[7'h1A][16];	// src/llc/scala/main/LlcPipeline.scala:29:7, :140:25, :141:29
+        replay2Req_isWrite = _RANDOM[7'h1A][17];	// src/llc/scala/main/LlcPipeline.scala:29:7, :140:25, :142:25
+        replay2Req_address = {_RANDOM[7'h1A][31:18], _RANDOM[7'h1B][17:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :140:25, :142:25
+        replay2Req_id = _RANDOM[7'h1B][21:18];	// src/llc/scala/main/LlcPipeline.scala:29:7, :142:25
         replay2Req_writeData =
-          {_RANDOM[7'h1B][31:21],
+          {_RANDOM[7'h1B][31:22],
            _RANDOM[7'h1C],
            _RANDOM[7'h1D],
            _RANDOM[7'h1E],
@@ -747,14 +766,15 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
            _RANDOM[7'h20],
            _RANDOM[7'h21],
            _RANDOM[7'h22],
-           _RANDOM[7'h23][20:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :139:25
-        replay2Req_writeStrb = {_RANDOM[7'h23][31:21], _RANDOM[7'h24][20:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :139:25
-        replay2Req_beatIdx = _RANDOM[7'h24][21];	// src/llc/scala/main/LlcPipeline.scala:27:7, :139:25
-        s1Req_isWrite = _RANDOM[7'h24][22];	// src/llc/scala/main/LlcPipeline.scala:27:7, :139:25, :221:18
-        s1Req_address = {_RANDOM[7'h24][31:23], _RANDOM[7'h25][22:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :139:25, :221:18
-        s1Req_id = _RANDOM[7'h25][26:23];	// src/llc/scala/main/LlcPipeline.scala:27:7, :221:18
+           _RANDOM[7'h23][21:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :142:25
+        replay2Req_writeStrb = {_RANDOM[7'h23][31:22], _RANDOM[7'h24][21:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :142:25
+        replay2Req_beatIdx = _RANDOM[7'h24][22];	// src/llc/scala/main/LlcPipeline.scala:29:7, :142:25
+        replay2Req_singleBeat = _RANDOM[7'h24][23];	// src/llc/scala/main/LlcPipeline.scala:29:7, :142:25
+        s1Req_isWrite = _RANDOM[7'h24][24];	// src/llc/scala/main/LlcPipeline.scala:29:7, :142:25, :224:18
+        s1Req_address = {_RANDOM[7'h24][31:25], _RANDOM[7'h25][24:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :142:25, :224:18
+        s1Req_id = _RANDOM[7'h25][28:25];	// src/llc/scala/main/LlcPipeline.scala:29:7, :224:18
         s1Req_writeData =
-          {_RANDOM[7'h25][31:27],
+          {_RANDOM[7'h25][31:29],
            _RANDOM[7'h26],
            _RANDOM[7'h27],
            _RANDOM[7'h28],
@@ -762,16 +782,17 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
            _RANDOM[7'h2A],
            _RANDOM[7'h2B],
            _RANDOM[7'h2C],
-           _RANDOM[7'h2D][26:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :221:18
-        s1Req_writeStrb = {_RANDOM[7'h2D][31:27], _RANDOM[7'h2E][26:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :221:18
-        s1Req_beatIdx = _RANDOM[7'h2E][27];	// src/llc/scala/main/LlcPipeline.scala:27:7, :221:18
-        s1Set = {_RANDOM[7'h2E][31:28], _RANDOM[7'h2F][4:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :221:18, :222:18
-        s1Tag = _RANDOM[7'h2F][21:5];	// src/llc/scala/main/LlcPipeline.scala:27:7, :222:18, :223:18
-        s2Req_isWrite = _RANDOM[7'h2F][22];	// src/llc/scala/main/LlcPipeline.scala:27:7, :222:18, :272:25
-        s2Req_address = {_RANDOM[7'h2F][31:23], _RANDOM[7'h30][22:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :222:18, :272:25
-        s2Req_id = _RANDOM[7'h30][26:23];	// src/llc/scala/main/LlcPipeline.scala:27:7, :272:25
+           _RANDOM[7'h2D][28:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :224:18
+        s1Req_writeStrb = {_RANDOM[7'h2D][31:29], _RANDOM[7'h2E][28:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :224:18
+        s1Req_beatIdx = _RANDOM[7'h2E][29];	// src/llc/scala/main/LlcPipeline.scala:29:7, :224:18
+        s1Req_singleBeat = _RANDOM[7'h2E][30];	// src/llc/scala/main/LlcPipeline.scala:29:7, :224:18
+        s1Set = {_RANDOM[7'h2E][31], _RANDOM[7'h2F][7:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :224:18, :225:18
+        s1Tag = _RANDOM[7'h2F][24:8];	// src/llc/scala/main/LlcPipeline.scala:29:7, :225:18, :226:18
+        s2Req_isWrite = _RANDOM[7'h2F][25];	// src/llc/scala/main/LlcPipeline.scala:29:7, :225:18, :275:25
+        s2Req_address = {_RANDOM[7'h2F][31:26], _RANDOM[7'h30][25:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :225:18, :275:25
+        s2Req_id = _RANDOM[7'h30][29:26];	// src/llc/scala/main/LlcPipeline.scala:29:7, :275:25
         s2Req_writeData =
-          {_RANDOM[7'h30][31:27],
+          {_RANDOM[7'h30][31:30],
            _RANDOM[7'h31],
            _RANDOM[7'h32],
            _RANDOM[7'h33],
@@ -779,34 +800,35 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
            _RANDOM[7'h35],
            _RANDOM[7'h36],
            _RANDOM[7'h37],
-           _RANDOM[7'h38][26:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :272:25
-        s2Req_writeStrb = {_RANDOM[7'h38][31:27], _RANDOM[7'h39][26:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :272:25
-        s2Req_beatIdx = _RANDOM[7'h39][27];	// src/llc/scala/main/LlcPipeline.scala:27:7, :272:25
-        s2Set = {_RANDOM[7'h39][31:28], _RANDOM[7'h3A][4:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :272:25, :273:25
-        s2Tag = _RANDOM[7'h3A][21:5];	// src/llc/scala/main/LlcPipeline.scala:27:7, :273:25, :274:25
-        s2Hit = _RANDOM[7'h3A][22];	// src/llc/scala/main/LlcPipeline.scala:27:7, :273:25, :275:29
-        s2HitWay = _RANDOM[7'h3A][25:23];	// src/llc/scala/main/LlcPipeline.scala:27:7, :273:25, :276:25
-        s2VictimWay = _RANDOM[7'h3A][28:26];	// src/llc/scala/main/LlcPipeline.scala:27:7, :273:25, :277:25
-        s2VictimValid = _RANDOM[7'h3A][29];	// src/llc/scala/main/LlcPipeline.scala:27:7, :273:25, :278:26
-        s2VictimDirty = _RANDOM[7'h3A][30];	// src/llc/scala/main/LlcPipeline.scala:27:7, :273:25, :279:26
-        s2VictimTag = {_RANDOM[7'h3A][31], _RANDOM[7'h3B][15:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :273:25, :280:25
-        s2VictimWasBusy = _RANDOM[7'h3B][16];	// src/llc/scala/main/LlcPipeline.scala:27:7, :280:25, :283:32
-        flushState = _RANDOM[7'h3B][20:17];	// src/llc/scala/main/LlcPipeline.scala:27:7, :280:25, :490:27
-        flushInv = _RANDOM[7'h3B][21];	// src/llc/scala/main/LlcPipeline.scala:27:7, :280:25, :491:27
-        curSet = _RANDOM[7'h3B][30:22];	// src/llc/scala/main/LlcPipeline.scala:27:7, :280:25, :492:27
-        curWay = {_RANDOM[7'h3B][31], _RANDOM[7'h3C][1:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :280:25, :493:27
-        latchedTags_0 = _RANDOM[7'h3C][18:2];	// src/llc/scala/main/LlcPipeline.scala:27:7, :493:27, :496:25
-        latchedTags_1 = {_RANDOM[7'h3C][31:19], _RANDOM[7'h3D][3:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :493:27, :496:25
-        latchedTags_2 = _RANDOM[7'h3D][20:4];	// src/llc/scala/main/LlcPipeline.scala:27:7, :496:25
-        latchedTags_3 = {_RANDOM[7'h3D][31:21], _RANDOM[7'h3E][5:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :496:25
-        latchedTags_4 = _RANDOM[7'h3E][22:6];	// src/llc/scala/main/LlcPipeline.scala:27:7, :496:25
-        latchedTags_5 = {_RANDOM[7'h3E][31:23], _RANDOM[7'h3F][7:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :496:25
-        latchedTags_6 = _RANDOM[7'h3F][24:8];	// src/llc/scala/main/LlcPipeline.scala:27:7, :496:25
-        latchedTags_7 = {_RANDOM[7'h3F][31:25], _RANDOM[7'h40][9:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :496:25
-        latchedDirtys = _RANDOM[7'h40][17:10];	// src/llc/scala/main/LlcPipeline.scala:27:7, :496:25, :497:26
-        walkNeed = _RANDOM[7'h40][25:18];	// src/llc/scala/main/LlcPipeline.scala:27:7, :496:25, :500:25
+           _RANDOM[7'h38][29:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :275:25
+        s2Req_writeStrb = {_RANDOM[7'h38][31:30], _RANDOM[7'h39][29:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :275:25
+        s2Req_beatIdx = _RANDOM[7'h39][30];	// src/llc/scala/main/LlcPipeline.scala:29:7, :275:25
+        s2Req_singleBeat = _RANDOM[7'h39][31];	// src/llc/scala/main/LlcPipeline.scala:29:7, :275:25
+        s2Set = _RANDOM[7'h3A][8:0];	// src/llc/scala/main/LlcPipeline.scala:29:7, :276:25
+        s2Tag = _RANDOM[7'h3A][25:9];	// src/llc/scala/main/LlcPipeline.scala:29:7, :276:25, :277:25
+        s2Hit = _RANDOM[7'h3A][26];	// src/llc/scala/main/LlcPipeline.scala:29:7, :276:25, :278:29
+        s2HitWay = _RANDOM[7'h3A][29:27];	// src/llc/scala/main/LlcPipeline.scala:29:7, :276:25, :279:25
+        s2VictimWay = {_RANDOM[7'h3A][31:30], _RANDOM[7'h3B][0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :276:25, :280:25
+        s2VictimValid = _RANDOM[7'h3B][1];	// src/llc/scala/main/LlcPipeline.scala:29:7, :280:25, :281:26
+        s2VictimDirty = _RANDOM[7'h3B][2];	// src/llc/scala/main/LlcPipeline.scala:29:7, :280:25, :282:26
+        s2VictimTag = _RANDOM[7'h3B][19:3];	// src/llc/scala/main/LlcPipeline.scala:29:7, :280:25, :283:25
+        s2VictimWasBusy = _RANDOM[7'h3B][20];	// src/llc/scala/main/LlcPipeline.scala:29:7, :280:25, :286:32
+        flushState = _RANDOM[7'h3B][24:21];	// src/llc/scala/main/LlcPipeline.scala:29:7, :280:25, :494:27
+        flushInv = _RANDOM[7'h3B][25];	// src/llc/scala/main/LlcPipeline.scala:29:7, :280:25, :495:27
+        curSet = {_RANDOM[7'h3B][31:26], _RANDOM[7'h3C][2:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :280:25, :496:27
+        curWay = _RANDOM[7'h3C][5:3];	// src/llc/scala/main/LlcPipeline.scala:29:7, :496:27, :497:27
+        latchedTags_0 = _RANDOM[7'h3C][22:6];	// src/llc/scala/main/LlcPipeline.scala:29:7, :496:27, :500:25
+        latchedTags_1 = {_RANDOM[7'h3C][31:23], _RANDOM[7'h3D][7:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :496:27, :500:25
+        latchedTags_2 = _RANDOM[7'h3D][24:8];	// src/llc/scala/main/LlcPipeline.scala:29:7, :500:25
+        latchedTags_3 = {_RANDOM[7'h3D][31:25], _RANDOM[7'h3E][9:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :500:25
+        latchedTags_4 = _RANDOM[7'h3E][26:10];	// src/llc/scala/main/LlcPipeline.scala:29:7, :500:25
+        latchedTags_5 = {_RANDOM[7'h3E][31:27], _RANDOM[7'h3F][11:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :500:25
+        latchedTags_6 = _RANDOM[7'h3F][28:12];	// src/llc/scala/main/LlcPipeline.scala:29:7, :500:25
+        latchedTags_7 = {_RANDOM[7'h3F][31:29], _RANDOM[7'h40][13:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :500:25
+        latchedDirtys = _RANDOM[7'h40][21:14];	// src/llc/scala/main/LlcPipeline.scala:29:7, :500:25, :501:26
+        walkNeed = _RANDOM[7'h40][29:22];	// src/llc/scala/main/LlcPipeline.scala:29:7, :500:25, :504:25
         flushLineData_0 =
-          {_RANDOM[7'h40][31:26],
+          {_RANDOM[7'h40][31:30],
            _RANDOM[7'h41],
            _RANDOM[7'h42],
            _RANDOM[7'h43],
@@ -814,9 +836,9 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
            _RANDOM[7'h45],
            _RANDOM[7'h46],
            _RANDOM[7'h47],
-           _RANDOM[7'h48][25:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :496:25, :502:26
+           _RANDOM[7'h48][29:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :500:25, :506:26
         flushLineData_1 =
-          {_RANDOM[7'h48][31:26],
+          {_RANDOM[7'h48][31:30],
            _RANDOM[7'h49],
            _RANDOM[7'h4A],
            _RANDOM[7'h4B],
@@ -824,18 +846,18 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
            _RANDOM[7'h4D],
            _RANDOM[7'h4E],
            _RANDOM[7'h4F],
-           _RANDOM[7'h50][25:0]};	// src/llc/scala/main/LlcPipeline.scala:27:7, :502:26
+           _RANDOM[7'h50][29:0]};	// src/llc/scala/main/LlcPipeline.scala:29:7, :506:26
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/llc/scala/main/LlcPipeline.scala:27:7
-      `FIRRTL_AFTER_INITIAL	// src/llc/scala/main/LlcPipeline.scala:27:7
+    `ifdef FIRRTL_AFTER_INITIAL	// src/llc/scala/main/LlcPipeline.scala:29:7
+      `FIRRTL_AFTER_INITIAL	// src/llc/scala/main/LlcPipeline.scala:29:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  LlcTagArray tagArray (	// src/llc/scala/main/LlcPipeline.scala:78:28
+  LlcTagArray tagArray (	// src/llc/scala/main/LlcPipeline.scala:80:28
     .clock                (clock),
     .reset                (reset),
-    .io_read_enable       (~_GEN_7 & _GEN_6 | s0Fire),	// src/llc/scala/main/LlcPipeline.scala:203:{46,64,76}, :236:27, :547:22
-    .io_read_set          (_GEN_7 | ~_GEN_6 ? s0Req_address[14:6] : curSet),	// src/llc/scala/main/LlcPipeline.scala:204:19, :205:29, :236:27, :237:27, :492:27, :547:22
+    .io_read_enable       (~_GEN_7 & _GEN_6 | s0Fire),	// src/llc/scala/main/LlcPipeline.scala:206:{46,64,76}, :239:27, :551:22
+    .io_read_set          (_GEN_7 | ~_GEN_6 ? s0Req_address[14:6] : curSet),	// src/llc/scala/main/LlcPipeline.scala:207:19, :208:29, :239:27, :240:27, :496:27, :551:22
     .io_readResp_tags_0   (_tagArray_io_readResp_tags_0),
     .io_readResp_tags_1   (_tagArray_io_readResp_tags_1),
     .io_readResp_tags_2   (_tagArray_io_readResp_tags_2),
@@ -863,98 +885,99 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
     .io_write_enable
       (_GEN_21
          ? _GEN_3 | dataArray_io_write_enable
-         : _GEN_19 | _GEN_3 | dataArray_io_write_enable),	// src/llc/scala/main/LlcPipeline.scala:169:32, :379:19, :380:25, :432:36, :433:30, :447:24, :455:30, :547:22, :594:32
+         : _GEN_19 | _GEN_3 | dataArray_io_write_enable),	// src/llc/scala/main/LlcPipeline.scala:172:32, :382:19, :383:25, :436:36, :437:30, :451:24, :459:30, :551:22, :598:32
     .io_write_set
       (_GEN_22
          ? (_mshr_io_complete_valid
               ? _mshr_io_complete_bits_set
               : _io_perfEvents_cleanEvict_T | _GEN_1 ? s2Set : 9'h0)
-         : curSet),	// src/llc/scala/main/LlcPipeline.scala:82:28, :162:28, :170:32, :273:25, :379:19, :380:25, :383:34, :391:32, :432:{18,36}, :434:31, :447:24, :456:30, :492:27, :547:22
+         : curSet),	// src/llc/scala/main/LlcPipeline.scala:84:28, :165:28, :173:32, :276:25, :382:19, :383:25, :386:34, :394:32, :436:{18,36}, :438:31, :451:24, :460:30, :496:27, :551:22
     .io_write_way
       (_GEN_22
          ? (_mshr_io_complete_valid
               ? _mshr_io_complete_bits_way
               : _io_perfEvents_cleanEvict_T ? s2VictimWay : dataArray_io_write_way)
-         : curWay),	// src/llc/scala/main/LlcPipeline.scala:82:28, :171:32, :277:25, :379:19, :380:25, :384:34, :432:{18,36}, :435:31, :447:24, :457:30, :493:27, :547:22
+         : curWay),	// src/llc/scala/main/LlcPipeline.scala:84:28, :174:32, :280:25, :382:19, :383:25, :387:34, :436:{18,36}, :439:31, :451:24, :461:30, :497:27, :551:22
     .io_write_tag
       (_GEN_22
          ? (_mshr_io_complete_valid
               ? _mshr_io_complete_bits_tag
               : _io_perfEvents_cleanEvict_T ? s2VictimTag : _GEN_1 ? s2Tag : 17'h0)
-         : _GEN_17),	// src/llc/scala/main/LlcPipeline.scala:82:28, :164:28, :170:32, :274:25, :280:25, :379:19, :380:25, :383:34, :393:32, :432:{18,36}, :436:31, :447:24, :458:30, :547:22, :586:35
-    .io_write_valid       (_GEN_22 ? _mshr_io_complete_valid | _GEN_2 : ~flushInv),	// src/llc/scala/main/LlcPipeline.scala:82:28, :379:19, :432:36, :437:31, :447:24, :459:30, :491:27, :547:22, :598:35
+         : _GEN_17),	// src/llc/scala/main/LlcPipeline.scala:84:28, :167:28, :173:32, :277:25, :283:25, :382:19, :383:25, :386:34, :396:32, :436:{18,36}, :440:31, :451:24, :462:30, :551:22, :590:35
+    .io_write_valid       (_GEN_22 ? _mshr_io_complete_valid | _GEN_2 : ~flushInv),	// src/llc/scala/main/LlcPipeline.scala:84:28, :382:19, :436:36, :441:31, :451:24, :463:30, :495:27, :551:22, :602:35
     .io_write_dirty
-      (_GEN_22 & (_mshr_io_complete_valid ? _mshr_io_complete_bits_dirty : _GEN_2))	// src/llc/scala/main/LlcPipeline.scala:82:28, :379:19, :432:36, :437:31, :447:24, :460:30, :547:22
-  );	// src/llc/scala/main/LlcPipeline.scala:78:28
-  LlcDataArray dataArray (	// src/llc/scala/main/LlcPipeline.scala:79:28
+      (_GEN_22 & (_mshr_io_complete_valid ? _mshr_io_complete_bits_dirty : _GEN_2))	// src/llc/scala/main/LlcPipeline.scala:84:28, :382:19, :436:36, :441:31, :451:24, :464:30, :551:22
+  );	// src/llc/scala/main/LlcPipeline.scala:80:28
+  LlcDataArray dataArray (	// src/llc/scala/main/LlcPipeline.scala:81:28
     .clock               (clock),
     .io_read_enable
-      (~_GEN_10 & _GEN_9 | s1DataRead | s2Valid & ~s2Done & (s2Hit | s2VictimValid)),	// src/llc/scala/main/LlcPipeline.scala:133:24, :275:29, :278:26, :291:{28,46}, :292:{28,31,39,49}, :293:{28,42}, :375:78, :444:{23,36}, :547:22
-    .io_read_set         (_GEN_11 ? (s1DataRead ? s1Set : s2Set) : curSet),	// src/llc/scala/main/LlcPipeline.scala:222:18, :273:25, :291:{28,46}, :294:{28,34}, :492:27, :547:22
+      (~_GEN_10 & _GEN_9 | s1DataRead | s2Valid & ~s2Done & (s2Hit | s2VictimValid)),	// src/llc/scala/main/LlcPipeline.scala:136:24, :278:29, :281:26, :294:{28,46}, :295:{28,31,39,49}, :296:{28,42}, :378:78, :448:{23,36}, :551:22
+    .io_read_set         (_GEN_11 ? (s1DataRead ? s1Set : s2Set) : curSet),	// src/llc/scala/main/LlcPipeline.scala:225:18, :276:25, :294:{28,46}, :297:{28,34}, :496:27, :551:22
     .io_read_way
       (_GEN_11
          ? (s1DataRead
               ? ((|_hitWay_T) ? hitWay : _wayPartition_io_victimWay)
               : s2Hit ? s2HitWay : s2VictimWay)
-         : curWay),	// src/llc/scala/main/LlcPipeline.scala:81:28, :257:{24,31}, :275:29, :276:25, :277:25, :289:24, :291:{28,46}, :294:28, :295:{28,34,63}, :493:27, :547:22, src/main/scala/chisel3/util/OneHot.scala:32:10
+         : curWay),	// src/llc/scala/main/LlcPipeline.scala:83:28, :260:{24,31}, :278:29, :279:25, :280:25, :292:24, :294:{28,46}, :297:28, :298:{28,34,63}, :497:27, :551:22, src/main/scala/chisel3/util/OneHot.scala:32:10
     .io_readResp_data_0  (_dataArray_io_readResp_data_0),
     .io_readResp_data_1  (_dataArray_io_readResp_data_1),
-    .io_write_enable     (dataArray_io_write_enable),	// src/llc/scala/main/LlcPipeline.scala:169:32, :379:19, :380:25
-    .io_write_set        (_GEN_1 ? s2Set : 9'h0),	// src/llc/scala/main/LlcPipeline.scala:170:32, :273:25, :379:19, :380:25, :383:34
-    .io_write_way        (dataArray_io_write_way),	// src/llc/scala/main/LlcPipeline.scala:171:32, :379:19, :380:25, :384:34
-    .io_write_beatIdx    (_GEN_1 & s2Req_beatIdx),	// src/llc/scala/main/LlcPipeline.scala:170:32, :172:32, :272:25, :379:19, :380:25, :383:34, :385:34
-    .io_write_data       (_GEN_1 ? s2Req_writeData : 256'h0),	// src/llc/scala/main/LlcPipeline.scala:170:32, :173:32, :272:25, :379:19, :380:25, :383:34, :386:34
-    .io_write_strb       (_GEN_1 ? s2Req_writeStrb : 32'h0),	// src/llc/scala/main/LlcPipeline.scala:170:32, :174:32, :272:25, :379:19, :380:25, :383:34, :387:34
-    .io_writeLine_enable (_mshr_io_complete_valid),	// src/llc/scala/main/LlcPipeline.scala:82:28
-    .io_writeLine_set    (_mshr_io_complete_valid ? _mshr_io_complete_bits_set : 9'h0),	// src/llc/scala/main/LlcPipeline.scala:82:28, :176:32, :447:24, :450:35
-    .io_writeLine_way    (_mshr_io_complete_valid ? _mshr_io_complete_bits_way : 3'h0),	// src/llc/scala/main/LlcPipeline.scala:82:28, :177:32, :447:24, :451:35
+    .io_write_enable     (dataArray_io_write_enable),	// src/llc/scala/main/LlcPipeline.scala:172:32, :382:19, :383:25
+    .io_write_set        (_GEN_1 ? s2Set : 9'h0),	// src/llc/scala/main/LlcPipeline.scala:173:32, :276:25, :382:19, :383:25, :386:34
+    .io_write_way        (dataArray_io_write_way),	// src/llc/scala/main/LlcPipeline.scala:174:32, :382:19, :383:25, :387:34
+    .io_write_beatIdx    (_GEN_1 & s2Req_beatIdx),	// src/llc/scala/main/LlcPipeline.scala:173:32, :175:32, :275:25, :382:19, :383:25, :386:34, :388:34
+    .io_write_data       (_GEN_1 ? s2Req_writeData : 256'h0),	// src/llc/scala/main/LlcPipeline.scala:173:32, :176:32, :275:25, :382:19, :383:25, :386:34, :389:34
+    .io_write_strb       (_GEN_1 ? s2Req_writeStrb : 32'h0),	// src/llc/scala/main/LlcPipeline.scala:173:32, :177:32, :275:25, :382:19, :383:25, :386:34, :390:34
+    .io_writeLine_enable (_mshr_io_complete_valid),	// src/llc/scala/main/LlcPipeline.scala:84:28
+    .io_writeLine_set    (_mshr_io_complete_valid ? _mshr_io_complete_bits_set : 9'h0),	// src/llc/scala/main/LlcPipeline.scala:84:28, :179:32, :451:24, :454:35
+    .io_writeLine_way    (_mshr_io_complete_valid ? _mshr_io_complete_bits_way : 3'h0),	// src/llc/scala/main/LlcPipeline.scala:84:28, :180:32, :451:24, :455:35
     .io_writeLine_data_0
-      (_mshr_io_complete_valid ? _mshr_io_complete_bits_data_0 : 256'h0),	// src/llc/scala/main/LlcPipeline.scala:82:28, :178:32, :447:24, :452:35
+      (_mshr_io_complete_valid ? _mshr_io_complete_bits_data_0 : 256'h0),	// src/llc/scala/main/LlcPipeline.scala:84:28, :181:32, :451:24, :456:35
     .io_writeLine_data_1
-      (_mshr_io_complete_valid ? _mshr_io_complete_bits_data_1 : 256'h0)	// src/llc/scala/main/LlcPipeline.scala:82:28, :178:32, :447:24, :452:35
-  );	// src/llc/scala/main/LlcPipeline.scala:79:28
-  LlcPlru plru (	// src/llc/scala/main/LlcPipeline.scala:80:28
+      (_mshr_io_complete_valid ? _mshr_io_complete_bits_data_1 : 256'h0)	// src/llc/scala/main/LlcPipeline.scala:84:28, :181:32, :451:24, :456:35
+  );	// src/llc/scala/main/LlcPipeline.scala:81:28
+  LlcPlru plru (	// src/llc/scala/main/LlcPipeline.scala:82:28
     .clock                  (clock),
     .reset                  (reset),
-    .io_query_enable        (s0Fire),	// src/llc/scala/main/LlcPipeline.scala:203:{46,64,76}
-    .io_query_set           (s0Req_address[14:6]),	// src/llc/scala/main/LlcPipeline.scala:204:19, :205:29
+    .io_query_enable        (s0Fire),	// src/llc/scala/main/LlcPipeline.scala:206:{46,64,76}
+    .io_query_set           (s0Req_address[14:6]),	// src/llc/scala/main/LlcPipeline.scala:207:19, :208:29
     .io_queryResp_victimWay (_plru_io_queryResp_victimWay),
-    .io_update_enable       (_mshr_io_complete_valid | s2HitFire),	// src/llc/scala/main/LlcPipeline.scala:82:28, :378:{36,66}, :379:19, :447:24, :463:27
+    .io_update_enable       (_mshr_io_complete_valid | s2HitFire),	// src/llc/scala/main/LlcPipeline.scala:84:28, :381:{36,66}, :382:19, :451:24, :467:27
     .io_update_set
-      (_mshr_io_complete_valid ? _mshr_io_complete_bits_set : s2HitFire ? s2Set : 9'h0),	// src/llc/scala/main/LlcPipeline.scala:82:28, :182:26, :273:25, :378:{36,66}, :379:19, :406:27, :447:24, :464:27
+      (_mshr_io_complete_valid ? _mshr_io_complete_bits_set : s2HitFire ? s2Set : 9'h0),	// src/llc/scala/main/LlcPipeline.scala:84:28, :185:26, :276:25, :381:{36,66}, :382:19, :409:27, :451:24, :468:27
     .io_update_way
-      (_mshr_io_complete_valid ? _mshr_io_complete_bits_way : s2HitFire ? s2HitWay : 3'h0)	// src/llc/scala/main/LlcPipeline.scala:82:28, :183:26, :276:25, :378:{36,66}, :379:19, :407:27, :447:24, :465:27
-  );	// src/llc/scala/main/LlcPipeline.scala:80:28
-  LlcWayPartition wayPartition (	// src/llc/scala/main/LlcPipeline.scala:81:28
-    .io_partitionId (s1Req_id[0]),	// src/llc/scala/main/LlcPipeline.scala:221:18, :264:13
-    .io_plruVictim  (_plru_io_queryResp_victimWay),	// src/llc/scala/main/LlcPipeline.scala:80:28
-    .io_wayValids_0 (_tagArray_io_readResp_valids_0),	// src/llc/scala/main/LlcPipeline.scala:78:28
-    .io_wayValids_1 (_tagArray_io_readResp_valids_1),	// src/llc/scala/main/LlcPipeline.scala:78:28
-    .io_wayValids_2 (_tagArray_io_readResp_valids_2),	// src/llc/scala/main/LlcPipeline.scala:78:28
-    .io_wayValids_3 (_tagArray_io_readResp_valids_3),	// src/llc/scala/main/LlcPipeline.scala:78:28
-    .io_wayValids_4 (_tagArray_io_readResp_valids_4),	// src/llc/scala/main/LlcPipeline.scala:78:28
-    .io_wayValids_5 (_tagArray_io_readResp_valids_5),	// src/llc/scala/main/LlcPipeline.scala:78:28
-    .io_wayValids_6 (_tagArray_io_readResp_valids_6),	// src/llc/scala/main/LlcPipeline.scala:78:28
-    .io_wayValids_7 (_tagArray_io_readResp_valids_7),	// src/llc/scala/main/LlcPipeline.scala:78:28
-    .io_busyMask    (s1BusyMask),	// src/llc/scala/main/LlcPipeline.scala:251:14
+      (_mshr_io_complete_valid ? _mshr_io_complete_bits_way : s2HitFire ? s2HitWay : 3'h0)	// src/llc/scala/main/LlcPipeline.scala:84:28, :186:26, :279:25, :381:{36,66}, :382:19, :410:27, :451:24, :469:27
+  );	// src/llc/scala/main/LlcPipeline.scala:82:28
+  LlcWayPartition wayPartition (	// src/llc/scala/main/LlcPipeline.scala:83:28
+    .io_partitionId (s1Req_id[0]),	// src/llc/scala/main/LlcPipeline.scala:224:18, :267:13
+    .io_plruVictim  (_plru_io_queryResp_victimWay),	// src/llc/scala/main/LlcPipeline.scala:82:28
+    .io_wayValids_0 (_tagArray_io_readResp_valids_0),	// src/llc/scala/main/LlcPipeline.scala:80:28
+    .io_wayValids_1 (_tagArray_io_readResp_valids_1),	// src/llc/scala/main/LlcPipeline.scala:80:28
+    .io_wayValids_2 (_tagArray_io_readResp_valids_2),	// src/llc/scala/main/LlcPipeline.scala:80:28
+    .io_wayValids_3 (_tagArray_io_readResp_valids_3),	// src/llc/scala/main/LlcPipeline.scala:80:28
+    .io_wayValids_4 (_tagArray_io_readResp_valids_4),	// src/llc/scala/main/LlcPipeline.scala:80:28
+    .io_wayValids_5 (_tagArray_io_readResp_valids_5),	// src/llc/scala/main/LlcPipeline.scala:80:28
+    .io_wayValids_6 (_tagArray_io_readResp_valids_6),	// src/llc/scala/main/LlcPipeline.scala:80:28
+    .io_wayValids_7 (_tagArray_io_readResp_valids_7),	// src/llc/scala/main/LlcPipeline.scala:80:28
+    .io_busyMask    (s1BusyMask),	// src/llc/scala/main/LlcPipeline.scala:254:14
     .io_victimWay   (_wayPartition_io_victimWay)
-  );	// src/llc/scala/main/LlcPipeline.scala:81:28
-  LlcMshr mshr (	// src/llc/scala/main/LlcPipeline.scala:82:28
+  );	// src/llc/scala/main/LlcPipeline.scala:83:28
+  LlcMshr mshr (	// src/llc/scala/main/LlcPipeline.scala:84:28
     .clock                          (clock),
     .reset                          (reset),
-    .io_allocReq_valid              (allocFire),	// src/llc/scala/main/LlcPipeline.scala:414:{27,37,53,75,90}, :415:33
-    .io_allocReq_bits_address       (mshr_io_addrMatch_query),	// src/llc/scala/main/LlcPipeline.scala:348:44
-    .io_allocReq_bits_set           (s2Set),	// src/llc/scala/main/LlcPipeline.scala:273:25
-    .io_allocReq_bits_way           (s2VictimWay),	// src/llc/scala/main/LlcPipeline.scala:277:25
-    .io_allocReq_bits_dirtyEvict    (s2VictimValid & s2VictimDirty),	// src/llc/scala/main/LlcPipeline.scala:278:26, :279:26, :420:56
-    .io_allocReq_bits_evictTag      (s2VictimTag),	// src/llc/scala/main/LlcPipeline.scala:280:25
-    .io_allocReq_bits_evictData_0   (_dataArray_io_readResp_data_0),	// src/llc/scala/main/LlcPipeline.scala:79:28
-    .io_allocReq_bits_evictData_1   (_dataArray_io_readResp_data_1),	// src/llc/scala/main/LlcPipeline.scala:79:28
-    .io_allocReq_bits_reqId         (s2Req_id),	// src/llc/scala/main/LlcPipeline.scala:272:25
-    .io_allocReq_bits_reqType       (s2Req_isWrite),	// src/llc/scala/main/LlcPipeline.scala:272:25
-    .io_allocReq_bits_writeData     (s2Req_writeData),	// src/llc/scala/main/LlcPipeline.scala:272:25
-    .io_allocReq_bits_writeStrb     (s2Req_writeStrb),	// src/llc/scala/main/LlcPipeline.scala:272:25
-    .io_allocReq_bits_writeBeatIdx  (s2Req_beatIdx),	// src/llc/scala/main/LlcPipeline.scala:272:25
+    .io_allocReq_valid              (allocFire),	// src/llc/scala/main/LlcPipeline.scala:417:{27,37,53,75,90}, :418:33
+    .io_allocReq_bits_address       (mshr_io_addrMatch_query),	// src/llc/scala/main/LlcPipeline.scala:351:44
+    .io_allocReq_bits_set           (s2Set),	// src/llc/scala/main/LlcPipeline.scala:276:25
+    .io_allocReq_bits_way           (s2VictimWay),	// src/llc/scala/main/LlcPipeline.scala:280:25
+    .io_allocReq_bits_dirtyEvict    (s2VictimValid & s2VictimDirty),	// src/llc/scala/main/LlcPipeline.scala:281:26, :282:26, :423:56
+    .io_allocReq_bits_evictTag      (s2VictimTag),	// src/llc/scala/main/LlcPipeline.scala:283:25
+    .io_allocReq_bits_evictData_0   (_dataArray_io_readResp_data_0),	// src/llc/scala/main/LlcPipeline.scala:81:28
+    .io_allocReq_bits_evictData_1   (_dataArray_io_readResp_data_1),	// src/llc/scala/main/LlcPipeline.scala:81:28
+    .io_allocReq_bits_reqId         (s2Req_id),	// src/llc/scala/main/LlcPipeline.scala:275:25
+    .io_allocReq_bits_reqType       (s2Req_isWrite),	// src/llc/scala/main/LlcPipeline.scala:275:25
+    .io_allocReq_bits_writeData     (s2Req_writeData),	// src/llc/scala/main/LlcPipeline.scala:275:25
+    .io_allocReq_bits_writeStrb     (s2Req_writeStrb),	// src/llc/scala/main/LlcPipeline.scala:275:25
+    .io_allocReq_bits_writeBeatIdx  (s2Req_beatIdx),	// src/llc/scala/main/LlcPipeline.scala:275:25
+    .io_allocReq_bits_singleBeat    (s2Req_singleBeat),	// src/llc/scala/main/LlcPipeline.scala:275:25
     .io_allocReady                  (_mshr_io_allocReady),
     .io_wbReq_valid                 (_mshr_io_wbReq_valid),
     .io_wbReq_bits_address          (_mshr_io_wbReq_bits_address),
@@ -997,33 +1020,33 @@ module LlcPipeline(	// src/llc/scala/main/LlcPipeline.scala:27:7
     .io_inflight_3_valid            (_mshr_io_inflight_3_valid),
     .io_inflight_3_bits_set         (_mshr_io_inflight_3_bits_set),
     .io_inflight_3_bits_way         (_mshr_io_inflight_3_bits_way),
-    .io_addrMatch_query             (mshr_io_addrMatch_query),	// src/llc/scala/main/LlcPipeline.scala:348:44
+    .io_addrMatch_query             (mshr_io_addrMatch_query),	// src/llc/scala/main/LlcPipeline.scala:351:44
     .io_addrMatch_hit               (_mshr_io_addrMatch_hit)
-  );	// src/llc/scala/main/LlcPipeline.scala:82:28
-  assign io_reqIn_ready = io_reqIn_ready_0;	// src/llc/scala/main/LlcPipeline.scala:27:7, :218:{36,48,63}
-  assign io_respOut_valid = respValidReg;	// src/llc/scala/main/LlcPipeline.scala:27:7, :107:29
-  assign io_respOut_payload_isWrite = respDataReg_isWrite;	// src/llc/scala/main/LlcPipeline.scala:27:7, :108:25
-  assign io_respOut_payload_data_0 = respDataReg_data_0;	// src/llc/scala/main/LlcPipeline.scala:27:7, :108:25
-  assign io_respOut_payload_data_1 = respDataReg_data_1;	// src/llc/scala/main/LlcPipeline.scala:27:7, :108:25
-  assign io_wbReq_valid = _GEN_15 | ~flushWalking & _mshr_io_wbReq_valid;	// src/llc/scala/main/LlcPipeline.scala:27:7, :82:28, :85:12, :505:31, :518:22, :519:27, :547:22
+  );	// src/llc/scala/main/LlcPipeline.scala:84:28
+  assign io_reqIn_ready = io_reqIn_ready_0;	// src/llc/scala/main/LlcPipeline.scala:29:7, :221:{36,48,63}
+  assign io_respOut_valid = respValidReg;	// src/llc/scala/main/LlcPipeline.scala:29:7, :109:29
+  assign io_respOut_payload_isWrite = respDataReg_isWrite;	// src/llc/scala/main/LlcPipeline.scala:29:7, :110:25
+  assign io_respOut_payload_data_0 = respDataReg_data_0;	// src/llc/scala/main/LlcPipeline.scala:29:7, :110:25
+  assign io_respOut_payload_data_1 = respDataReg_data_1;	// src/llc/scala/main/LlcPipeline.scala:29:7, :110:25
+  assign io_wbReq_valid = _GEN_15 | ~flushWalking & _mshr_io_wbReq_valid;	// src/llc/scala/main/LlcPipeline.scala:29:7, :84:28, :87:12, :509:31, :522:22, :523:27, :551:22
   assign io_wbReq_bits_address =
     _GEN_18
       ? (flushWalking ? 32'h0 : _mshr_io_wbReq_bits_address)
-      : {_GEN_17, curSet, 6'h0};	// src/llc/scala/main/LlcPipeline.scala:27:7, :82:28, :85:12, :174:32, :492:27, :505:31, :518:22, :520:27, :547:22, :586:35
+      : {_GEN_17, curSet, 6'h0};	// src/llc/scala/main/LlcPipeline.scala:29:7, :84:28, :87:12, :177:32, :496:27, :509:31, :522:22, :524:27, :551:22, :590:35
   assign io_wbReq_bits_data_0 =
-    _GEN_18 ? (flushWalking ? 256'h0 : _mshr_io_wbReq_bits_data_0) : flushLineData_0;	// src/llc/scala/main/LlcPipeline.scala:27:7, :82:28, :85:12, :502:26, :505:31, :518:22, :521:27, :547:22
+    _GEN_18 ? (flushWalking ? 256'h0 : _mshr_io_wbReq_bits_data_0) : flushLineData_0;	// src/llc/scala/main/LlcPipeline.scala:29:7, :84:28, :87:12, :506:26, :509:31, :522:22, :525:27, :551:22
   assign io_wbReq_bits_data_1 =
-    _GEN_18 ? (flushWalking ? 256'h0 : _mshr_io_wbReq_bits_data_1) : flushLineData_1;	// src/llc/scala/main/LlcPipeline.scala:27:7, :82:28, :85:12, :502:26, :505:31, :518:22, :521:27, :547:22
-  assign io_wbReq_bits_owner = _GEN_15 | flushWalking ? 2'h0 : _mshr_io_wbReq_bits_owner;	// src/llc/scala/main/LlcPipeline.scala:27:7, :82:28, :85:12, :505:31, :518:22, :522:27, :547:22, :588:29
-  assign io_perfEvents_readHit = hitFire & ~s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:27:7, :272:25, :620:{34,64}, :621:{43,46}
-  assign io_perfEvents_readMiss = allocFire & ~s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:27:7, :272:25, :414:{27,37,53,75,90}, :415:33, :621:46, :624:45
-  assign io_perfEvents_writeHit = hitFire & s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:27:7, :272:25, :620:{34,64}, :622:43
-  assign io_perfEvents_writeMiss = allocFire & s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:27:7, :272:25, :414:{27,37,53,75,90}, :415:33, :625:45
-  assign io_perfEvents_dirtyEvict = _io_perfEvents_cleanEvict_T & s2VictimDirty;	// src/llc/scala/main/LlcPipeline.scala:27:7, :279:26, :432:18, :627:62
-  assign io_perfEvents_cleanEvict = _io_perfEvents_cleanEvict_T & ~s2VictimDirty;	// src/llc/scala/main/LlcPipeline.scala:27:7, :279:26, :432:18, :628:{62,65}
-  assign io_perfEvents_mshrFullStall = s2MshrFull;	// src/llc/scala/main/LlcPipeline.scala:27:7, :354:{31,54}
-  assign io_perfEvents_refillComplete = _mshr_io_complete_valid;	// src/llc/scala/main/LlcPipeline.scala:27:7, :82:28
-  assign io_flushBusy = |flushState;	// src/llc/scala/main/LlcPipeline.scala:27:7, :490:27, :504:30
-  assign io_flushDone = flushState == 4'hA;	// src/llc/scala/main/LlcPipeline.scala:27:7, :490:27, :606:53, :614:31
+    _GEN_18 ? (flushWalking ? 256'h0 : _mshr_io_wbReq_bits_data_1) : flushLineData_1;	// src/llc/scala/main/LlcPipeline.scala:29:7, :84:28, :87:12, :506:26, :509:31, :522:22, :525:27, :551:22
+  assign io_wbReq_bits_owner = _GEN_15 | flushWalking ? 2'h0 : _mshr_io_wbReq_bits_owner;	// src/llc/scala/main/LlcPipeline.scala:29:7, :84:28, :87:12, :509:31, :522:22, :526:27, :551:22, :592:29
+  assign io_perfEvents_readHit = hitFire & ~s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:29:7, :275:25, :624:{34,64}, :625:{43,46}
+  assign io_perfEvents_readMiss = allocFire & ~s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:29:7, :275:25, :417:{27,37,53,75,90}, :418:33, :625:46, :628:45
+  assign io_perfEvents_writeHit = hitFire & s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:29:7, :275:25, :624:{34,64}, :626:43
+  assign io_perfEvents_writeMiss = allocFire & s2Req_isWrite;	// src/llc/scala/main/LlcPipeline.scala:29:7, :275:25, :417:{27,37,53,75,90}, :418:33, :629:45
+  assign io_perfEvents_dirtyEvict = _io_perfEvents_cleanEvict_T & s2VictimDirty;	// src/llc/scala/main/LlcPipeline.scala:29:7, :282:26, :436:18, :631:62
+  assign io_perfEvents_cleanEvict = _io_perfEvents_cleanEvict_T & ~s2VictimDirty;	// src/llc/scala/main/LlcPipeline.scala:29:7, :282:26, :436:18, :632:{62,65}
+  assign io_perfEvents_mshrFullStall = s2MshrFull;	// src/llc/scala/main/LlcPipeline.scala:29:7, :357:{31,54}
+  assign io_perfEvents_refillComplete = _mshr_io_complete_valid;	// src/llc/scala/main/LlcPipeline.scala:29:7, :84:28
+  assign io_flushBusy = |flushState;	// src/llc/scala/main/LlcPipeline.scala:29:7, :494:27, :508:30
+  assign io_flushDone = flushState == 4'hA;	// src/llc/scala/main/LlcPipeline.scala:29:7, :494:27, :610:53, :618:31
 endmodule
 

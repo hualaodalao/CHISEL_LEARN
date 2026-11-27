@@ -14,6 +14,8 @@ class MshrAllocReq(cfg: LlcConfig) extends Bundle {
   val writeData    = UInt(cfg.dataWidth.W)
   val writeStrb    = UInt((cfg.dataWidth / 8).W)
   val writeBeatIdx = UInt(log2Ceil(cfg.beatsPerLine).W)
+  // The request needs its target beat only
+  val singleBeat = Bool()
 }
 
 // Writeback request bundle
@@ -132,6 +134,7 @@ class LlcMshr(cfg: LlcConfig) extends Module {
   val writeData   = Reg(Vec(numEntries, UInt(cfg.dataWidth.W)))
   val writeStrb   = Reg(Vec(numEntries, UInt((cfg.dataWidth / 8).W)))
   val writeBeatIdx = Reg(Vec(numEntries, UInt(log2Ceil(cfg.beatsPerLine).W)))
+  val singleBeat   = Reg(Vec(numEntries, Bool()))
   val earlyRespSent = RegInit(VecInit(Seq.fill(numEntries)(false.B)))
 
   // ---- Allocation logic (first-free) ----
@@ -164,6 +167,7 @@ class LlcMshr(cfg: LlcConfig) extends Module {
     writeData(idx)   := io.allocReq.bits.writeData
     writeStrb(idx)   := io.allocReq.bits.writeStrb
     writeBeatIdx(idx) := io.allocReq.bits.writeBeatIdx
+    singleBeat(idx)   := io.allocReq.bits.singleBeat
     beatCounter(idx) := 0.U
     earlyRespSent(idx) := false.B
 
@@ -243,11 +247,13 @@ class LlcMshr(cfg: LlcConfig) extends Module {
   }
 
   // ---- Early response output (Critical-Word-First) ----
-  // Only for read misses: when the target beat arrives during refill and the
-  // pipeline takes it, fire earlyResp. If it cannot be taken, completion sends
-  // the whole line instead.
+  // Only for single-beat read misses: when the target beat arrives during
+  // refill and the pipeline takes it, fire earlyResp. If it cannot be taken,
+  // completion sends the whole line instead; a longer read always needs the
+  // whole line and is answered at completion only.
   val earlyRespFire = io.earlyRespReady && io.refillData.valid && refillRecvValid &&
     !reqType(refillRecvIdx) && // read miss only
+    singleBeat(refillRecvIdx) &&
     !earlyRespSent(refillRecvIdx) &&
     (beatCounter(refillRecvIdx) === writeBeatIdx(refillRecvIdx))
 

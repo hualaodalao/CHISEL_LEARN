@@ -232,6 +232,7 @@ class LlcWriteMergeBuffer(cfg: LlcConfig) extends Module {
         io.pipeOut.payload.writeData  := entryData(flushIdx)(flushBeatIdx)
         io.pipeOut.payload.writeStrb  := entryStrb(flushIdx)(flushBeatIdx)
         io.pipeOut.payload.beatIdx    := flushBeatIdx
+        io.pipeOut.payload.singleBeat := false.B
 
         when(io.pipeOut.fire) {
           when(isLastBeat) {

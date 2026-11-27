@@ -915,4 +915,18 @@ class LlcSimSpec extends AnyFlatSpec with Matchers with ChiselSim {
       b.memReads shouldBe 16
     }
   }
+
+  behavior of "K21 a multi-beat read miss returns every beat"
+
+  it should "return both beats of a 2-beat read on a miss and on a hit" in {
+    // rLat 2 with idle downstream beats lets the early response through; rIdle 20
+    // makes the second beat arrive long after the first
+    for ((lat, idle) <- Seq((2, 0), (2, 20), (0, 0))) simulate(new Llc(small)) { dut =>
+      val b = new LlcAxiBench(dut, small, rLat = lat, rIdle = idle)
+      b.read(line, len = 1) shouldBe Vector(b.pat(line), b.pat(line + 32))
+      b.memReads shouldBe 1
+      b.read(line, len = 1) shouldBe Vector(b.pat(line), b.pat(line + 32))
+      b.memReads shouldBe 1
+    }
+  }
 }

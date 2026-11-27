@@ -256,6 +256,7 @@ class Llc(cfg: LlcConfig) extends Module {
   rdPipeReq.writeData := 0.U
   rdPipeReq.writeStrb := 0.U
   rdPipeReq.beatIdx   := rdBeatInLine
+  rdPipeReq.singleBeat := rdLen === 0.U
 
   val rdWantsPipe = rdReqValid && (rdState === sRdPending)
   val wrWantsPipe = wmBuf.io.pipeOut.valid
