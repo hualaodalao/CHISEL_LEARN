@@ -10,7 +10,7 @@
 > 方法论（IR→门禁→CDG 无环证明→发射→形式化/签核）不变。
 
 > 状态：v1.1 发布（2026-11-20，历史正文） | 发布记录见 [release_notes_v1.0.md](release_notes_v1.0.md)、[release_notes_v1.1.md](release_notes_v1.1.md) | 范围：可重构、可自动化、构造性无死锁的片内互联生成套件
-> 上游调研：[DEEP_RESEARCH_selfdeveloped_interconnect.md](../../../DEEP_RESEARCH_selfdeveloped_interconnect.md)
+> 上游调研：DEEP_RESEARCH_selfdeveloped_interconnect.md（已归档，见 git 历史）
 
 ## 0. 范围、裁定与术语
 
