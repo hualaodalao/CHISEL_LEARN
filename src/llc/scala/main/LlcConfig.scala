@@ -10,6 +10,8 @@ case class LlcConfig(
   idWidth:       Int = 4,           // AXI4 ID width
   mshrEntries:   Int = 4,           // Number of MSHR entries
   wbBufEntries:  Int = 4,           // Write-back buffer entries
+  wmBufEntries:  Int = 4,           // Write-merge buffer entries (one per outstanding write burst)
+  bFifoDepth:    Int = 4,           // B response tracking entries (one per write burst in flight)
   wayPartitions: Int = 2,           // Number of way partitions for QoS
   ctrlAddrWidth: Int = 8,           // AxiLite4 address width for ctrl port (256 bytes)
   ctrlDataWidth: Int = 32           // AxiLite4 data width for ctrl port
@@ -23,6 +25,7 @@ case class LlcConfig(
   val tagBits: Int = addressWidth - setBits - offsetBits  // 17
   val beatsPerLine: Int = lineBytes * 8 / dataWidth       // 2 (for 256-bit bus)
   val bytePerBeat: Int = dataWidth / 8                    // 32
+  val mshrIdxBits: Int = math.max(1, log2Ceil(mshrEntries))
 
   // Way partition derived
   val waysPerPartition: Int = ways / wayPartitions  // 4
@@ -60,6 +63,8 @@ case class LlcConfig(
   require(ways % wayPartitions == 0, s"ways($ways) must be divisible by wayPartitions($wayPartitions)")
   require(mshrEntries >= 1, s"mshrEntries must be >= 1, got $mshrEntries")
   require(wbBufEntries >= 1, s"wbBufEntries must be >= 1, got $wbBufEntries")
+  require(wmBufEntries >= 1, s"wmBufEntries must be >= 1, got $wmBufEntries")
+  require(isPow2(bFifoDepth), s"bFifoDepth must be power of 2, got $bFifoDepth")
   require(lineBytes * 8 >= dataWidth, s"lineBytes*8(${lineBytes * 8}) must be >= dataWidth($dataWidth)")
   require(addressWidth > setBits + offsetBits, s"addressWidth too small for sets and lineBytes")
 }

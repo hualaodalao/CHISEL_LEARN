@@ -3,7 +3,6 @@ import chisel3.util._
 
 class TagEntry(cfg: LlcConfig) extends Bundle {
   val tag   = UInt(cfg.tagBits.W)
-  val valid = Bool()
   val dirty = Bool()
 }
 
@@ -34,24 +33,28 @@ class LlcTagArray(cfg: LlcConfig) extends Module {
     val write    = new TagArrayWritePort(cfg)
   })
 
-  // Storage: SyncReadMem of Vec(ways, TagEntry)
+  // valid lives in registers so reset alone yields an empty cache; SRAM contents
+  // are undefined at reset. tag and dirty stay in the SRAM.
   val tagMem = SyncReadMem(cfg.sets, Vec(cfg.ways, new TagEntry(cfg)))
+  val validRegs = RegInit(VecInit(Seq.fill(cfg.sets)(VecInit(Seq.fill(cfg.ways)(false.B)))))
+  val rdValids  = RegInit(VecInit(Seq.fill(cfg.ways)(false.B)))
 
   // --- Read path ---
   val rdData = tagMem.read(io.read.set, io.read.enable)
+  when(io.read.enable) { rdValids := validRegs(io.read.set) }
 
   for (w <- 0 until cfg.ways) {
     io.readResp.tags(w)   := rdData(w).tag
-    io.readResp.valids(w) := rdData(w).valid
+    io.readResp.valids(w) := rdValids(w)
     io.readResp.dirtys(w) := rdData(w).dirty
   }
 
   // --- Write path ---
-  // Read-modify-write: read the full Vec for the set, modify the specific way, write back
   when(io.write.enable) {
+    validRegs(io.write.set)(io.write.way) := io.write.valid
+
     val writeEntry = Wire(new TagEntry(cfg))
     writeEntry.tag   := io.write.tag
-    writeEntry.valid := io.write.valid
     writeEntry.dirty := io.write.dirty
 
     // Use masked write: create a mask Vec(ways, Bool) with only the target way set

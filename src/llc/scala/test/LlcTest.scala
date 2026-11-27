@@ -29,6 +29,14 @@ class LlcTest extends AnyFlatSpec with Matchers {
     v should include("module Llc")
   }
 
+  it should "elaborate with single-entry write-merge buffer and B response tracking" in {
+    val v = ChiselStage.emitSystemVerilog(
+      new Llc(LlcConfig(capacity = 8 * 1024, wmBufEntries = 1, bFifoDepth = 1))
+    )
+    v should include("module Llc")
+    v should include("module LlcWriteMergeBuffer")
+  }
+
   it should "elaborate with a single way partition" in {
     val v = ChiselStage.emitSystemVerilog(new Llc(LlcConfig(wayPartitions = 1)))
     v should include("module Llc")
@@ -78,6 +86,8 @@ class LlcTest extends AnyFlatSpec with Matchers {
     v should include("flushDoneSticky")
     // Ctrl flush request handling
     v should include("ctrlFlushReq")
+    // Ways of the current set still waiting for an action
+    v should include("walkNeed")
   }
 
   it should "elaborate LlcPipeline with flush inputs and invalidate support" in {
@@ -92,5 +102,44 @@ class LlcTest extends AnyFlatSpec with Matchers {
     // WbBuffer status feedback for flush FSM
     v should include("io_wbBufEmpty")
     v should include("io_wbBufEnqReady")
+  }
+
+  it should "emit the data array SRAM with a byte mask on a single write port" in {
+    val v = ChiselStage.emitSystemVerilog(new Llc(LlcConfig(capacity = 8 * 1024)))
+    val begin = v.indexOf("module dataMems")
+    val mod = v.slice(begin, v.indexOf("endmodule", begin))
+    mod should include("W0_mask")
+    mod should include("if (W0_en & W0_mask[0])")
+    val writePort = """input\s+(\[[^\]]+\]\s+)?W\d+_addr""".r
+    writePort.findAllIn(mod).size shouldBe 1
+  }
+
+  it should "enable a data array read only on the selected way" in {
+    val v = ChiselStage.emitSystemVerilog(new Llc(LlcConfig(capacity = 8 * 1024)))
+    val begin = v.indexOf("module LlcDataArray")
+    val mod = v.slice(begin, v.indexOf("endmodule", begin))
+    val bankEn = """\.R0_en\s*\(([^)]*)\)""".r
+    val enables = bankEn.findAllIn(mod).toList
+    enables.size shouldBe 8
+    all (enables) should include("io_read_enable &")
+    all (enables) should include("io_read_way")
+  }
+
+  it should "store PLRU state in a masked-write SRAM read in S0" in {
+    val v = ChiselStage.emitSystemVerilog(new Llc(LlcConfig(capacity = 8 * 1024)))
+    v should include("module plruState_16x7")
+    val begin = v.indexOf("module plruState_16x7")
+    val mod = v.slice(begin, v.indexOf("endmodule", begin))
+    mod should include("W0_mask")
+    val pipe = v.slice(v.indexOf("module LlcPipeline"), v.length)
+    pipe should include regex """.io_query_enable\s*\(\s*s0Fire\s*\)"""
+  }
+
+  it should "elaborate with 4-way and 16-way configs" in {
+    for ((ways, sets) <- Seq((4, "16x3"), (16, "16x15"))) {
+      val v = ChiselStage.emitSystemVerilog(new Llc(LlcConfig(capacity = ways * 1024, ways = ways)))
+      v should include("module Llc")
+      v should include(s"module plruState_$sets")
+    }
   }
 }

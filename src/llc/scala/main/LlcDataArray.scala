@@ -40,8 +40,11 @@ class LlcDataArray(cfg: LlcConfig) extends Module {
   val dataMems = Seq.fill(cfg.ways)(SyncReadMem(cfg.sets, Vec(cfg.lineBytes, UInt(8.W))))
 
   // --- Read path ---
-  // Read ALL ways in parallel, mux result next cycle using registered way select
-  val rdResults = VecInit(dataMems.map(_.read(io.read.set, io.read.enable)))
+  // A lookup reads one way only, so only that bank's read port is enabled;
+  // the result is muxed next cycle using registered way select
+  val rdResults = VecInit(dataMems.zipWithIndex.map { case (mem, w) =>
+    mem.read(io.read.set, io.read.enable && (io.read.way === w.U))
+  })
   val wayReg = RegNext(io.read.way)
 
   // Select the way and repack bytes into beats
@@ -53,44 +56,28 @@ class LlcDataArray(cfg: LlcConfig) extends Module {
     io.readResp.data(beat) := beatBytes.asUInt
   }
 
-  // --- Write path (per-beat with byte strobe) ---
-  when(io.write.enable) {
-    // Build the write mask and data for the full line (lineBytes entries)
-    // Use static iteration to avoid dynamic LHS indexing issues
-    val writeMask = Wire(Vec(cfg.lineBytes, Bool()))
-    val writeData = Wire(Vec(cfg.lineBytes, UInt(8.W)))
+  // --- Write path ---
+  // Per-beat and full-line writes share one masked port: a SyncReadMem with both a
+  // masked and an unmasked write port loses its mask during emission.
+  val wrSet = Mux(io.write.enable, io.write.set, io.writeLine.set)
+  val wrWay = Mux(io.write.enable, io.write.way, io.writeLine.way)
+  val writeData = Wire(Vec(cfg.lineBytes, UInt(8.W)))
+  val writeMask = Wire(Vec(cfg.lineBytes, Bool()))
 
-    for (i <- 0 until cfg.lineBytes) {
-      val beatOfThisByte = (i / cfg.bytePerBeat).U
-      val byteInBeat = i % cfg.bytePerBeat
-      writeMask(i) := (io.write.beatIdx === beatOfThisByte) && io.write.strb(byteInBeat)
-      writeData(i) := io.write.data(byteInBeat * 8 + 7, byteInBeat * 8)
-    }
-
-    // Write to the selected way's SyncReadMem with mask
-    for (w <- 0 until cfg.ways) {
-      when(io.write.way === w.U) {
-        dataMems(w).write(io.write.set, writeData, writeMask)
-      }
-    }
+  for (i <- 0 until cfg.lineBytes) {
+    val beat       = i / cfg.bytePerBeat
+    val byteInBeat = i % cfg.bytePerBeat
+    writeMask(i) := Mux(io.write.enable,
+      (io.write.beatIdx === beat.U) && io.write.strb(byteInBeat), true.B)
+    writeData(i) := Mux(io.write.enable,
+      io.write.data(byteInBeat * 8 + 7, byteInBeat * 8),
+      io.writeLine.data(beat)(byteInBeat * 8 + 7, byteInBeat * 8))
   }
 
-  // --- WriteLine path (full cache line refill) ---
-  when(io.writeLine.enable) {
-    val writeData = Wire(Vec(cfg.lineBytes, UInt(8.W)))
-    val writeMask = VecInit(Seq.fill(cfg.lineBytes)(true.B))
-
-    // Unpack beats into bytes
-    for (beat <- 0 until cfg.beatsPerLine) {
-      for (b <- 0 until cfg.bytePerBeat) {
-        writeData(beat * cfg.bytePerBeat + b) := io.writeLine.data(beat)(b * 8 + 7, b * 8)
-      }
-    }
-
-    // Write to the selected way
+  when(io.write.enable || io.writeLine.enable) {
     for (w <- 0 until cfg.ways) {
-      when(io.writeLine.way === w.U) {
-        dataMems(w).write(io.writeLine.set, writeData, writeMask)
+      when(wrWay === w.U) {
+        dataMems(w).write(wrSet, writeData, writeMask)
       }
     }
   }

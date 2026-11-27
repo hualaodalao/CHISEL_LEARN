@@ -20,6 +20,8 @@ class MshrAllocReq(cfg: LlcConfig) extends Bundle {
 class MshrWbReq(cfg: LlcConfig) extends Bundle {
   val address = UInt(cfg.addressWidth.W)
   val data    = Vec(cfg.beatsPerLine, UInt(cfg.dataWidth.W))
+  // The entry that owns the writeback; it comes back with wbDone
+  val owner   = UInt(cfg.mshrIdxBits.W)
 }
 
 // Refill request bundle
@@ -53,6 +55,12 @@ class MshrCompleteReq(cfg: LlcConfig) extends Bundle {
   val earlyRespDone = Bool() // true if early response already sent (skip re-send)
 }
 
+// Location an MSHR entry is refilling
+class MshrInflight(cfg: LlcConfig) extends Bundle {
+  val set = UInt(cfg.setBits.W)
+  val way = UInt(log2Ceil(cfg.ways).W)
+}
+
 // MSHR IO
 class LlcMshrIO(cfg: LlcConfig) extends Bundle {
   // Allocate interface (from pipeline on miss)
@@ -60,8 +68,9 @@ class LlcMshrIO(cfg: LlcConfig) extends Bundle {
   val allocReady = Output(Bool())
 
   // Writeback request to downstream (AXI4 master AW+W)
-  val wbReq  = Valid(new MshrWbReq(cfg))
-  val wbDone = Input(Bool())
+  val wbReq    = Valid(new MshrWbReq(cfg))
+  val wbReady  = Input(Bool()) // the write-back buffer can take wbReq this cycle
+  val wbDone   = Input(Valid(UInt(cfg.mshrIdxBits.W)))
 
   // Refill request to downstream (AXI4 master AR)
   val refillReq   = Valid(new MshrRefillReq(cfg))
@@ -74,12 +83,16 @@ class LlcMshrIO(cfg: LlcConfig) extends Bundle {
   val complete = Valid(new MshrCompleteReq(cfg))
 
   // Early response output (critical-word-first for read misses)
-  val earlyResp = Output(Valid(new MshrEarlyResp(cfg)))
+  val earlyResp      = Output(Valid(new MshrEarlyResp(cfg)))
+  val earlyRespReady = Input(Bool()) // the pipeline can take earlyResp this cycle
 
   // Status
   val full = Output(Bool())
   // All entries idle (no valid in-flight miss/writeback/refill); used by flush FSM quiesce
   val allIdle = Output(Bool())
+
+  // Set/way each valid entry is refilling
+  val inflight = Output(Vec(cfg.mshrEntries, Valid(new MshrInflight(cfg))))
 
   // Check if address is already pending (for same-line merging)
   val addrMatch = new Bundle {
@@ -130,6 +143,11 @@ class LlcMshr(cfg: LlcConfig) extends Module {
   io.full       := !hasFree
   // All entries free/idle => no in-flight miss, writeback, or refill
   io.allIdle    := !valid.reduce(_ || _)
+  for (i <- 0 until numEntries) {
+    io.inflight(i).valid    := valid(i)
+    io.inflight(i).bits.set := set(i)
+    io.inflight(i).bits.way := way(i)
+  }
 
   // Allocate on valid request when we have space
   when(io.allocReq.valid && hasFree) {
@@ -166,7 +184,12 @@ class LlcMshr(cfg: LlcConfig) extends Module {
   // Priority encoder among entries needing refill
   val refillPendingVec = (0 until numEntries).map(i => valid(i) && state(i) === MshrState.sRefillSend)
   val refillSelValid   = refillPendingVec.reduce(_ || _)
-  val refillSelIdx     = PriorityEncoder(refillPendingVec)
+  // The top level latches the address of the request it first sees and holds
+  // the AR until downstream takes it, so the request must not change until then
+  val refillHoldIdx  = Reg(UInt(log2Ceil(numEntries).W))
+  val refillHold     = RegInit(false.B)
+  val refillHeld     = refillHold && valid(refillHoldIdx) && state(refillHoldIdx) === MshrState.sRefillSend
+  val refillSelIdx   = Mux(refillHeld, refillHoldIdx, PriorityEncoder(refillPendingVec))
 
   // Priority encoder among entries receiving refill data
   val refillRecvVec = (0 until numEntries).map(i => valid(i) && state(i) === MshrState.sRefillRecv)
@@ -185,22 +208,23 @@ class LlcMshr(cfg: LlcConfig) extends Module {
   io.wbReq.valid        := wbSelValid
   io.wbReq.bits.address := wbAddress
   io.wbReq.bits.data    := evictData(wbSelIdx)
+  io.wbReq.bits.owner   := wbSelIdx
 
-  // Transition: sWbSend -> sWbWait (when wb request is accepted externally)
-  // The external module signals acceptance by later asserting wbDone
-  // We move to sWbWait immediately to free the wb port for other entries
-  when(wbSelValid) {
+  // The request stays on the port until the write-back buffer takes it; the
+  // entry then waits for the write-back to complete (wbDone).
+  when(wbSelValid && io.wbReady) {
     state(wbSelIdx) := MshrState.sWbWait
   }
 
   // ---- Writeback done handling ----
-  // When wbDone is asserted, find the entry in sWbWait state and advance it
-  val wbWaitVec   = (0 until numEntries).map(i => valid(i) && state(i) === MshrState.sWbWait)
-  val wbWaitValid = wbWaitVec.reduce(_ || _)
-  val wbWaitIdx   = PriorityEncoder(wbWaitVec)
-
-  when(io.wbDone && wbWaitValid) {
-    state(wbWaitIdx) := MshrState.sRefillSend
+  // Only the entry that owns the finished writeback resumes; several entries
+  // can wait at once and the lowest-numbered one need not be first
+  when(io.wbDone.valid) {
+    for (i <- 0 until numEntries) {
+      when(valid(i) && state(i) === MshrState.sWbWait && io.wbDone.bits === i.U) {
+        state(i) := MshrState.sRefillSend
+      }
+    }
   }
 
   // ---- Refill request output ----
@@ -212,11 +236,17 @@ class LlcMshr(cfg: LlcConfig) extends Module {
   when(refillSelValid && io.refillReady) {
     state(refillSelIdx)       := MshrState.sRefillRecv
     beatCounter(refillSelIdx) := 0.U
+    refillHold := false.B
+  }.elsewhen(refillSelValid) {
+    refillHold    := true.B
+    refillHoldIdx := refillSelIdx
   }
 
   // ---- Early response output (Critical-Word-First) ----
-  // Only for read misses: when the target beat arrives during refill, fire earlyResp
-  val earlyRespFire = io.refillData.valid && refillRecvValid &&
+  // Only for read misses: when the target beat arrives during refill and the
+  // pipeline takes it, fire earlyResp. If it cannot be taken, completion sends
+  // the whole line instead.
+  val earlyRespFire = io.earlyRespReady && io.refillData.valid && refillRecvValid &&
     !reqType(refillRecvIdx) && // read miss only
     !earlyRespSent(refillRecvIdx) &&
     (beatCounter(refillRecvIdx) === writeBeatIdx(refillRecvIdx))

@@ -5,18 +5,21 @@ class WayPartitionIO(cfg: LlcConfig) extends Bundle {
   val partitionId     = Input(UInt(log2Ceil(cfg.wayPartitions).W))
   val plruVictim      = Input(UInt(log2Ceil(cfg.ways).W))
   val wayValids       = Input(Vec(cfg.ways, Bool()))
+  val busyMask        = Input(UInt(cfg.ways.W))
   val wayPartitionMap = Input(Vec(cfg.ways, UInt(log2Ceil(cfg.wayPartitions).W)))
   val victimWay       = Output(UInt(log2Ceil(cfg.ways).W))
+  // Falls back to ignoring busyMask when every way of the partition is busy
   val hitMask         = Output(UInt(cfg.ways.W))
 }
 
 /** Way partitioning logic for QoS.
   *
   * - hitMask is always all-1s: hit lookup checks all ways regardless of partition.
-  * - victimWay selection priority:
-  *   1. Find an invalid (free) way within the request's partition
-  *   2. Use PLRU victim if it belongs to the request's partition
-  *   3. Fallback: first way that belongs to the partition
+  * - victimWay selection priority, among the ways of the request's partition
+  *   that are not in busyMask (being refilled by an MSHR entry):
+  *   1. Find an invalid (free) way
+  *   2. Use PLRU victim
+  *   3. Fallback: first such way
   */
 class LlcWayPartition(cfg: LlcConfig) extends Module {
   val io = IO(new WayPartitionIO(cfg))
@@ -29,21 +32,19 @@ class LlcWayPartition(cfg: LlcConfig) extends Module {
     io.wayPartitionMap(w) === io.partitionId
   })
 
-  // Priority 1: Find an invalid (free) way within the partition
-  val invalidInPartition = VecInit(Seq.tabulate(cfg.ways) { w =>
-    inPartition(w) && !io.wayValids(w)
-  })
-  val hasInvalidInPartition = invalidInPartition.asUInt.orR
-  val firstInvalidWay = PriorityEncoder(invalidInPartition.asUInt)
+  val partitionMask = inPartition.asUInt
+  val validMask     = io.wayValids.asUInt
 
-  // Priority 2: Check if PLRU victim is within the partition
-  val plruInPartition = inPartition(io.plruVictim)
+  // Ways of the partition that no MSHR entry is refilling
+  val availMask    = partitionMask & ~io.busyMask
+  val invalidAvail = availMask & ~validMask
+  val plruAvail    = availMask(io.plruVictim)
 
-  // Priority 3: Fallback - first way that belongs to the partition
-  val firstPartitionWay = PriorityEncoder(inPartition.asUInt)
+  val plainMask    = partitionMask & ~validMask
 
-  // victimWay selection with priority
-  io.victimWay := Mux(hasInvalidInPartition, firstInvalidWay,
-                  Mux(plruInPartition, io.plruVictim,
-                      firstPartitionWay))
+  val pick = Mux(invalidAvail.orR, PriorityEncoder(invalidAvail),
+             Mux(plruAvail, io.plruVictim, PriorityEncoder(availMask)))
+  val fallback = Mux(plainMask.orR, PriorityEncoder(plainMask), PriorityEncoder(partitionMask))
+
+  io.victimWay := Mux(availMask.orR, pick, fallback)
 }

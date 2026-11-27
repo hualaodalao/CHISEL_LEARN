@@ -1,0 +1,14 @@
+tagMem_512x144.sv
+LlcTagArray.sv
+dataMems_512x512.sv
+LlcDataArray.sv
+plruState_512x7.sv
+LlcPlru.sv
+LlcWayPartition.sv
+LlcMshr.sv
+LlcPipeline.sv
+LlcWbBuffer.sv
+LlcWriteMergeBuffer.sv
+LlcPerfCounters.sv
+verification/assert/Llc_Verification_Assert.sv
+Llc.sv

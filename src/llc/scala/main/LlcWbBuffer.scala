@@ -5,12 +5,14 @@ import chisel3.util._
 class WbBufEnqReq(cfg: LlcConfig) extends Bundle {
   val address = UInt(cfg.addressWidth.W)
   val data    = Vec(cfg.beatsPerLine, UInt(cfg.dataWidth.W))
+  val owner   = UInt(cfg.mshrIdxBits.W) // MSHR entry waiting on this writeback
 }
 
 // Write-Back Buffer dequeue bundle
 class WbBufDeqResp(cfg: LlcConfig) extends Bundle {
   val address = UInt(cfg.addressWidth.W)
   val data    = Vec(cfg.beatsPerLine, UInt(cfg.dataWidth.W))
+  val owner   = UInt(cfg.mshrIdxBits.W)
 }
 
 // Write-Back Buffer IO
@@ -43,6 +45,7 @@ class LlcWbBuffer(cfg: LlcConfig) extends Module {
   val entryValid   = RegInit(VecInit(Seq.fill(numEntries)(false.B)))
   val entryAddress = Reg(Vec(numEntries, UInt(cfg.addressWidth.W)))
   val entryData    = Reg(Vec(numEntries, Vec(cfg.beatsPerLine, UInt(cfg.dataWidth.W))))
+  val entryOwner   = Reg(Vec(numEntries, UInt(cfg.mshrIdxBits.W)))
 
   // ---- Circular buffer pointers ----
   val head = RegInit(0.U(log2Ceil(numEntries).W)) // dequeue pointer (oldest)
@@ -61,6 +64,7 @@ class LlcWbBuffer(cfg: LlcConfig) extends Module {
     entryValid(tail)   := true.B
     entryAddress(tail) := io.enq.bits.address
     entryData(tail)    := io.enq.bits.data
+    entryOwner(tail)   := io.enq.bits.owner
     tail := Mux(tail === (numEntries - 1).U, 0.U, tail + 1.U)
     count := count + 1.U
   }
@@ -69,6 +73,7 @@ class LlcWbBuffer(cfg: LlcConfig) extends Module {
   io.deq.valid        := !isEmpty
   io.deq.bits.address := entryAddress(head)
   io.deq.bits.data    := entryData(head)
+  io.deq.bits.owner   := entryOwner(head)
 
   when(io.deqReady && !isEmpty) {
     entryValid(head) := false.B
