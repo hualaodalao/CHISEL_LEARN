@@ -8,7 +8,7 @@
 > 硬件 owner 裁定（2026-11-25，详见 §4）：HW-01…HW-07 全部已确认（HW-01 HN-I/MN 都需要；HW-02 删约束；HW-03 ChiTop 退役；HW-04/06 硬件侧提供模块 GEN 例化；HW-05 NI 就地 NDERR；HW-07 恒双向+depth 可配）；HQ-01 已答复。
 > 待 GEN 回答（详见 §5）：AQ-01/AQ-02 **已答复并经用户确认（2026-11-25，见 §5.1）**，S2/S3 对齐口径已冻结。
 >
-> **硬件总体完成状态（2026-11-27，wave1–7 闭合）**：HW-01…HW-17（含 HW-11 NoC 间桥/多 outstanding、HW-15 子系统独立根时钟、HW-16 子系统宽度适配钩子、HW-17 outstanding 透传）+ HQ-01 + A1～A4 **全部硬件落地并验证**。loom.Chi* **23 suite/92 test 绿**，formal **12/12 PASS**，protocol_spec **v1.9.0**。明细：§11（HW-11）/§11.5（多 outstanding）/§13.1（HW-17）/§13.5（HW-15）/§17（HW-16）；wave1 §6、wave3 §6.1、wave4 §9。**GEN 待办：按 §17.4 接入 mkNet 工厂（需 Module() 包装）+ ports.json datWidth/protocol + 解 hierarchicalAdaptGuard + 联合回归**。已记录后续：axi4-in-subsystem、异 cfg 子系统、异宽多 outstanding（W17）、dvmForward=true。硬件不再阻塞。
+> **硬件总体完成状态（2026-11-27，wave1–7 闭合）**：HW-01…HW-17（含 HW-11 NoC 间桥/多 outstanding、HW-15 子系统独立根时钟、HW-16 子系统宽度适配钩子、HW-17 outstanding 透传）+ HQ-01 + A1～A4 **全部硬件落地并验证**。**联合回归（硬件 + GEN golden）loom.Chi* 96 test 绿**，formal **12/12 PASS**，protocol_spec **v1.9.0**。明细：§11（HW-11）/§11.5（多 outstanding）/§13.1（HW-17）/§13.5（HW-15）/§17（HW-16）；wave1 §6、wave3 §6.1、wave4 §9。RTL 已随 GEN 提交 843cedd（HW-15/17）/f3512f4（HW-16/W19）入库。已记录后续：axi4-in-subsystem、异 cfg 子系统、异宽多 outstanding（W17）、dvmForward=true。硬件不再阻塞。
 
 ## 1. 修正/新增项（HW）
 
@@ -479,3 +479,14 @@ object ChiNodeWidths {
 - **验证**：IR 驱动失配宽度 golden（B 子系统 sB=128b / fabric 256b，sync 桥，远端 ChiReadSource 128b）跨桥读在 A 的 RN 累积 2×256b CompData 逐位一致；平铺 ChiAdaptedNetworkSpec 与全量回归绿（31 suite/361 test，含硬件 ChiSystemSpec 5 例）。
 - **提交说明**：硬件 W19 文件（ChiNetworkIO.scala/ChiSystemTop.scala/ChiSystemSpec.scala）为 GEN 代码编译前置件，随 GEN commit 纳入；protocol_spec/wave7 plan/本清单留硬件批次。
 - **剩余后续（均非阻塞，已记录）**：axi4-in-subsystem（CHK-63 守护）、异 cfg 子系统、异宽多 outstanding（W17）、dvmForward=true、节点频率失配 CDC、32/64/1024 节点宽度档。
+
+## 19. 硬件收口确认（2026-11-27，回应 §18）
+
+> **HW-11…HW-17 全线双侧闭合**。硬件在**已提交状态**（GEN 843cedd/f3512f4 + S13）上复跑验证，确认联合行为一致。
+
+- **联合回归**：`loom.Chi*` **96 test 绿**（硬件 92 + GEN `ChiSystemGenSpec` golden 4；GEN 侧全量 31 suite/361 test 见 §18）。此前硬件批次因 GEN 在建 `ChiSystemGenSpec` 缺 import 而用会话级 sbt 排除该文件跑测试（未改 GEN 文件）；GEN 修好后本轮**已取消排除、纳入联合验证**。
+- **formal**：**12/12 PASS**（含 token_chi_noc_bridge 死锁自由、token_chi_noc_bridge_mo 多 outstanding exact-once）。
+- **规格**：protocol_spec **v1.9.0**（§6.24 桥多 outstanding、§6.25 ChiDatWidth、§6.26 系统顶层含 subDomain 时钟域 + mkNet 工厂 + MixedVec 边界；LM-F028/F029/F030；§14.1 限制同步）。
+- **契约确认**：GEN 已按 §17.2 在工厂侧包 `Module()`、nodeWidth/cfgOf/needed 委托 `ChiNodeWidths`（两侧规则不漂移）、桥槽不变式 GEN 构造 + 硬件 require 双守 —— 与硬件交付一致，无追加动作。
+- **本批次提交范围**：protocol_spec + 本清单（§15/§17/§19）+ 移除已落地的 wave7 计划文档（RTL/测试已随 GEN 843cedd/f3512f4 入库，见 §18 提交说明）。
+- **后续立项待用户裁定**（均非阻塞）：axi4-in-subsystem、异 cfg 子系统、异宽多 outstanding（W17）、dvmForward=true 跨桥 DVM、节点频率失配 CDC、非 CHI 档节点宽度。
