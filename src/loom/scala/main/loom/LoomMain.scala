@@ -198,18 +198,6 @@ object LoomMain {
     * GEN-owned ChiAdaptedNetworkTop wraps the network with ChiNiAdapt
     * gearboxes (HW-12 §9.3, GEN-24).
     */
-  /** GEN-25a emit guard, pure for testability (sys.exit is not trap-able on
-    * modern JDKs). HW-11 closed the hierarchical guard; the remaining v1
-    * limit is async bridges: ChiSystemTop hardwires the bridge dstClk to
-    * io.domClk(0), which is empty on all-single-domain systems and is not
-    * generally the to-side clock (HW-15). Some(message) ⇒ refuse emission;
-    * check/estimate still accept async declarations.
-    */
-  private[loom] def hierarchicalEmitGuard(v2: IrV2): Option[String] =
-    if (v2.nocLinks.exists(_.asyncFifoDepth >= 2))
-      Some("ERROR: async inter-NoC bridge emission requires HW-15 (ChiSystemTop dstClk wiring); v1 emits sync bridges only, check/estimate accept async declarations")
-    else None
-
   /** GEN-25a: ChiSystemTop instantiates ChiNetworkTop directly, so the flat
     * path's ChiAdaptedNetworkTop gearboxes have no hierarchical equivalent
     * yet (HW-16). Refuse emission rather than silently drop node width
@@ -232,12 +220,8 @@ object LoomMain {
       sys.exit(3)
     }
 
-    // GEN-25a (UP-07 phase 2): sync hierarchical systems emit ChiSystemTop;
-    // async nocLinks stay guarded until HW-15 fixes the dstClk wiring.
-    hierarchicalEmitGuard(v.ir).foreach { msg =>
-      println(msg)
-      sys.exit(3)
-    }
+    // GEN-25a/GEN-25b: hierarchical systems emit ChiSystemTop; async bridge
+    // domain correctness is statically guaranteed by CHK-62 (HW-15 closed).
     hierarchicalAdaptGuard(v.ir).foreach { msg =>
       println(msg)
       sys.exit(3)
@@ -355,8 +339,11 @@ object LoomMain {
       }
     // ChiSystemTop requires a uniform ChiConfig (CHK-60 covers the chi block;
     // topology-derived cfg fields such as nHalf surface here as a clear error).
+    // GEN-25b (SEM-20b): subDomains assigns each subsystem its root clock;
+    // CHK-62 already guarantees the sync-same/async-different domain rule.
     try ChiselStage.emitSystemVerilogFile(
-      new ChiSystemTop(nets, bridges), Array("--target-dir", out))
+      new ChiSystemTop(nets, bridges, ChiAssemble.subDomains(v.ir)),
+      Array("--target-dir", out))
     catch {
       case e: Throwable =>
         println(s"ERROR: ${e.getMessage}")
@@ -484,7 +471,8 @@ object LoomMain {
       ("token_chi_pcrd", "src/loom/formal/token_chi_pcrd.sv", 12, "CHI P-Credit retry no-loss"),
       ("token_chi_dvm", "src/loom/formal/token_chi_dvm.sv", 12, "CHI DVM collect completeness"),
       ("token_chi_async_credit", "src/loom/formal/token_chi_async_credit.sv", 12, "CHI async link cross-domain credit"),
-      ("token_chi_noc_bridge", "src/loom/formal/token_chi_noc_bridge.sv", 12, "CHI inter-NoC bridge cross-domain deadlock freedom")
+      ("token_chi_noc_bridge", "src/loom/formal/token_chi_noc_bridge.sv", 12, "CHI inter-NoC bridge cross-domain deadlock freedom"),
+      ("token_chi_noc_bridge_mo", "src/loom/formal/token_chi_noc_bridge_mo.sv", 12, "CHI bridge multi-outstanding pool bound + exact-once + deadlock freedom")
     )
     val checks = models.map { case (top, src, depth, prop) =>
       val log = dir.resolve(s"${top}.log")

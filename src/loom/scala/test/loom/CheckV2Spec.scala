@@ -941,6 +941,18 @@ class CheckV2Spec extends AnyFlatSpec with Matchers {
   private def withNocLink(f: NocLinkSpec => NocLinkSpec): IrV2 =
     hierarchical.copy(nocLinks = Seq(f(bridgeAB)))
 
+  /** B on its own root clock (io@500): every B node/router moves to io so
+    * the projection stays domain-0 clean (CHK-54); root key differs from A. */
+  private def subBIo: SubsystemSpec = {
+    val s = subB
+    s.copy(clockDomains = Seq(ClockDomain("io", 500)),
+      nodes = s.nodes.map(_.copy(clock = "io")),
+      routers = s.routers.map(_.copy(clock = "io")))
+  }
+
+  private def hierDiffRoot: IrV2 =
+    hierarchical.copy(subsystems = Seq(subA, subBIo))
+
   it should "accept a valid two-subsystem config with one nocLink at zero errors (P-UP07)" in {
     val r = ChecksV2.run(hierarchical)
     r.errors shouldBe Nil
@@ -1060,11 +1072,13 @@ class CheckV2Spec extends AnyFlatSpec with Matchers {
       "C0: [CHK-59] nocLink 'A->B' dvmForward=true is not supported (HW-11 v1 keeps per-NoC MN autonomy)")
     ChecksV2.runC0(withNocLink(_.copy(cdc = "async", asyncFifoDepth = 3))) should contain(
       "C0: [CHK-59] nocLink 'A->B' asyncFifoDepth 3 must be a power of two for cdc async")
-    // positive: sync default and legal async depths pass the check gate
-    // (async emission is a separate pure guard, HW-15)
+    // positive: sync default passes; legal async depths pass on different
+    // root domains (SEM-20b/CHK-62 requires them for async bridges)
     ChecksV2.runC0(hierarchical) shouldBe Nil
-    ChecksV2.runC0(withNocLink(_.copy(cdc = "async", asyncFifoDepth = 4))) shouldBe Nil
-    ChecksV2.runC0(withNocLink(_.copy(cdc = "async", asyncFifoDepth = 8))) shouldBe Nil
+    ChecksV2.runC0(hierDiffRoot.copy(nocLinks =
+      Seq(bridgeAB.copy(cdc = "async", asyncFifoDepth = 4)))) shouldBe Nil
+    ChecksV2.runC0(hierDiffRoot.copy(nocLinks =
+      Seq(bridgeAB.copy(cdc = "async", asyncFifoDepth = 8)))) shouldBe Nil
   }
 
   it should "reject non-uniform subsystem chi blocks with CHK-60 (reference = first)" in {
@@ -1156,5 +1170,38 @@ class CheckV2Spec extends AnyFlatSpec with Matchers {
     ChecksV2.runC0(withNocLink(_.copy(outstanding = 1))) shouldBe Nil
     ChecksV2.runC0(withNocLink(_.copy(outstanding = 4))) shouldBe Nil
     ChecksV2.runC0(withNocLink(_.copy(outstanding = max))) shouldBe Nil
+  }
+
+  // ---- S12: cdc/depth consistency + root clock domains (CHK-59/CHK-62) ----
+
+  behavior of "ChecksV2 nocLink cdc/depth consistency and root domains (CHK-59/CHK-62, SEM-20b)"
+
+  it should "reject cdc/asyncFifoDepth inconsistency with CHK-59 (IR-92, v1.8.0)" in {
+    ChecksV2.runC0(withNocLink(_.copy(cdc = "async", asyncFifoDepth = 0))) should contain(
+      "C0: [CHK-59] nocLink 'A->B' cdc 'async' requires asyncFifoDepth >= 2 (got 0)")
+    ChecksV2.runC0(withNocLink(_.copy(cdc = "async", asyncFifoDepth = 1))) should contain(
+      "C0: [CHK-59] nocLink 'A->B' cdc 'async' requires asyncFifoDepth >= 2 (got 1)")
+    ChecksV2.runC0(withNocLink(_.copy(cdc = "sync", asyncFifoDepth = 4))) should contain(
+      "C0: [CHK-59] nocLink 'A->B' cdc 'sync' requires asyncFifoDepth 0 (got 4)")
+    // consistent pairs raise no CHK-59 (async domain rule is CHK-62's job)
+    ChecksV2.runC0(hierarchical).filter(_.contains("[CHK-59]")) shouldBe Nil
+    ChecksV2.runC0(hierDiffRoot.copy(nocLinks =
+      Seq(bridgeAB.copy(cdc = "async", asyncFifoDepth = 4))))
+      .filter(_.contains("[CHK-59]")) shouldBe Nil
+  }
+
+  it should "require sync bridges to share a subsystem root clock domain (CHK-62)" in {
+    // same root key (core@1000) on both subsystems ⇒ domain 0 shared
+    ChecksV2.runC0(hierarchical).filter(_.contains("[CHK-62]")) shouldBe Nil
+    ChecksV2.runC0(hierDiffRoot) should contain(
+      "C0: [CHK-62] nocLink 'A->B' sync bridge requires the same subsystem root clock domain (A=0, B=1)")
+  }
+
+  it should "require async bridges to cross different subsystem root clock domains (CHK-62)" in {
+    ChecksV2.runC0(withNocLink(_.copy(cdc = "async", asyncFifoDepth = 4))) should contain(
+      "C0: [CHK-62] nocLink 'A->B' async bridge requires different subsystem root clock domains (both 0)")
+    val asyncDiff = hierDiffRoot.copy(nocLinks =
+      Seq(bridgeAB.copy(cdc = "async", asyncFifoDepth = 4)))
+    ChecksV2.run(asyncDiff).errors shouldBe Nil
   }
 }

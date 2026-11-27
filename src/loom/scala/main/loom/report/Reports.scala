@@ -614,9 +614,11 @@ object Reports {
       else Vector(
         "subsystems = independent NoCs (SEM-20: local NodeID/SAM/chi/clock domains); nocLinks = " +
           "dependency-terminating bridge endpoints, bridges.noc is a count-only proxy; " +
-          "hierarchical emission emits ChiSystemTop (HW-11/GEN-25a): each bridge is a " +
-          "single-outstanding terminating proxy, v1 requires a uniform ChiConfig across " +
-          "subsystems (CHK-60) and emits sync bridges only (async emission pending HW-15)")
+          "hierarchical emission emits ChiSystemTop (HW-11/GEN-25a/GEN-25b): each bridge is a " +
+          "terminating proxy with outstanding = nocLinks[].outstanding (HW-17); v1 requires a " +
+          "uniform ChiConfig across subsystems (CHK-60); async bridges are emittable when the " +
+          "two subsystem root clock domains differ (SEM-20b/CHK-62, HW-15 closed); subsystem " +
+          "node width adaptation pending HW-16")
 
     JObj(Vector(
       "schema" -> JStr("loom/estimate/v1"),
@@ -876,13 +878,16 @@ object Reports {
     ) ++ clockingField)
   }
 
-  /** GEN-25a (UP-07 phase 2): system-level ports.json for the hierarchical
-    * ChiSystemTop emission. freeRn/freeSn mirror the hardware aggregation
-    * order (subsystem declaration order, NodeID-sorted vectors) and exclude
-    * the bridge-consumed slots; bridges[] carries the ChiBridgeLink index
-    * mapping plus the synthetic endpoint names. domClk/domReset follow the
-    * SEM-14 convention: flattened per-subsystem extra domains, integrator-
-    * supplied inputs, no GEN clock wrapper.
+  /** GEN-25a/GEN-25b (UP-07, SEM-20a/SEM-20b): system-level ports.json for
+    * the hierarchical ChiSystemTop emission. freeRn/freeSn mirror the
+    * hardware aggregation order (subsystem declaration order, NodeID-sorted
+    * vectors) and exclude the bridge-consumed slots; each free port carries
+    * its owning subsystem's system root clock domain (clockDomain index +
+    * root clock id/freqMHz). bridges[] carries the ChiBridgeLink index
+    * mapping plus the synthetic endpoint names. subClk/subReset (system
+    * root domains 1..n-1) and domClk/domReset (per-subsystem extra domains)
+    * follow the SEM-14 convention: integrator-supplied inputs, no GEN
+    * clock wrapper.
     */
   def systemPortsJsonV2(
       v2: IrV2,
@@ -893,6 +898,8 @@ object Reports {
   ): JValue = {
     val usedSn = bridges.map(b => (b.fromSub, b.fromSn)).toSet
     val usedRn = bridges.map(b => (b.toSub, b.toRn)).toSet
+    val doms = ChiAssemble.subDomains(v2)
+    val roots = v2.subsystems.map(_.clockDomains.head)
     val nameOfId = projs.map { p =>
       p.nodes.map(_.id).zip(ChiAssemble.nodeIds(p)).map { case (n, i) => i -> n }.toMap
     }
@@ -904,7 +911,10 @@ object Reports {
         "kind" -> JStr(kindName(n.kind)),
         "nodeId" -> JNum(BigDecimal(n.nodeId)),
         "router" -> JStr(routerName(n.router)),
-        "port" -> JNum(BigDecimal(n.localPort))))
+        "port" -> JNum(BigDecimal(n.localPort)),
+        "clockDomain" -> JNum(BigDecimal(doms(s))),
+        "rootClock" -> JStr(roots(s).id),
+        "rootClockMHz" -> JNum(BigDecimal(roots(s).freqMHz))))
     }
     val freeRn = for (s <- nets.indices; i <- nets(s).rn.indices if !usedRn((s, i)))
       yield epObj(s, nets(s).rn(i))
@@ -925,8 +935,11 @@ object Reports {
         "dvmForward" -> JBool(b.dvmForward)))
     }
     val nDomExtra = nets.map(_.nDomain - 1).sum
+    val nSubDom = if (doms.isEmpty) 1 else doms.max + 1
     val clockingField =
-      if (nDomExtra > 0) Vector(
+      if (nSubDom > 1) Vector(
+        "clocking" -> JStr(s"system spans $nSubDom subsystem root clock domains (index = first-occurrence order of the subsystem root clock (id,freqMHz) key, domain 0 = top module clock); subClk/subReset expose ${nSubDom - 1} integrator-supplied input pair(s) for root domains 1..n-1 (SEM-20b/HW-15), plus $nDomExtra domClk/domReset pair(s) for per-subsystem domains 1..n-1 flattened in subsystem declaration order (SEM-14/HW-14); no GEN clock wrapper"))
+      else if (nDomExtra > 0) Vector(
         "clocking" -> JStr(s"system exposes $nDomExtra domClk/domReset input pair(s) (per-subsystem domains 1..n-1 flattened in subsystem declaration order; domain 0 of each subsystem is its top module clock); integrator-supplied, no GEN clock wrapper (SEM-14/HW-14)"))
       else Vector.empty
     JObj(Vector(

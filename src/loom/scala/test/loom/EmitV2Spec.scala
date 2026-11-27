@@ -559,20 +559,52 @@ class EmitV2Spec extends AnyFlatSpec with Matchers {
         Seq((65536L, 4096L)), "sync", 0, false)))
   }
 
-  it should "guard async inter-NoC bridges with HW-15; sync hierarchical and flat pass (GEN-25a)" in {
-    // Guard is a pure function (sys.exit cannot be trapped on modern JDKs).
-    // HW-11 closed: sync hierarchical configs now emit.
-    LoomMain.hierarchicalEmitGuard(hierCfg) shouldBe None
-    LoomMain.hierarchicalEmitGuard(loom.ir.IrV2.load(Paths.get(v2Cfg))) shouldBe None
+  /** B on its own root clock io@500 (all B nodes/routers move with it so the
+    * projection stays domain-0 clean); root key differs from A's core@1000. */
+  private def subChainIo(name: String, rn: String, sn: String, r0: String, r1: String,
+      samBase: Long): loom.ir.SubsystemSpec = {
+    val s = subChain(name, rn, sn, r0, r1, samBase)
+    s.copy(clockDomains = Seq(loom.ir.ClockDomain("io", 500)),
+      nodes = s.nodes.map(_.copy(clock = "io")),
+      routers = s.routers.map(_.copy(clock = "io")))
+  }
+
+  private def hierAsyncCfg: loom.ir.IrV2 = hierCfg.copy(
+    subsystems = Seq(hierCfg.subsystems.head,
+      subChainIo("B", "m1", "s1", "rB0", "rB1", 65536L)),
+    nocLinks = Seq(hierCfg.nocLinks.head.copy(cdc = "async", asyncFifoDepth = 4)))
+
+  it should "catch same-root async bridges with CHK-62; sync hierarchical and flat still emit (GEN-25b)" in {
+    // HW-15 closed: the async emit guard is gone, CHK-62 guarantees domains.
     val async = hierCfg.copy(nocLinks =
       Seq(hierCfg.nocLinks.head.copy(cdc = "async", asyncFifoDepth = 4)))
-    val g = LoomMain.hierarchicalEmitGuard(async)
-    g.isDefined shouldBe true
-    g.get should include("HW-15")
+    loom.check.ChecksV2.runC0(async) should contain(
+      "C0: [CHK-62] nocLink 'A->B' async bridge requires different subsystem root clock domains (both 0)")
+    loom.check.ChecksV2.runC0(hierCfg) shouldBe Nil
+    // sync hierarchical configs keep emitting
+    val hierOut = Files.createTempDirectory("loom-emitv2-hier-sync")
+    capture(LoomMain.runEmit(List("--config", writeCfg(hierCfg), "--out", hierOut.toString)))
+    Files.exists(hierOut.resolve("ChiSystemTop.sv")) shouldBe true
     // flat configs keep emitting through the same command
     val flatOut = Files.createTempDirectory("loom-emitv2-hier-flat")
     capture(LoomMain.runEmit(List("--config", v2Cfg, "--out", flatOut.toString)))
     Files.exists(flatOut.resolve("ChiNetworkTop.sv")) shouldBe true
+  }
+
+  it should "derive subDomains by first occurrence of the root clock key (SEM-20b)" in {
+    loom.gen.ChiAssemble.subDomains(hierCfg) shouldBe Seq(0, 0)
+    loom.gen.ChiAssemble.subDomains(hierAsyncCfg) shouldBe Seq(0, 1)
+    // a third subsystem sharing A's root key reuses domain 0
+    val third = subChain("C", "m2", "s2", "rC0", "rC1", 131072L)
+    loom.gen.ChiAssemble.subDomains(hierAsyncCfg.copy(
+      subsystems = hierAsyncCfg.subsystems :+ third)) shouldBe Seq(0, 1, 0)
+    // same id but different freqMHz is a different root key
+    val freqB = subChain("D", "m3", "s3", "rD0", "rD1", 196608L)
+    val freqVariant = freqB.copy(clockDomains = Seq(loom.ir.ClockDomain("core", 500)))
+    loom.gen.ChiAssemble.subDomains(hierCfg.copy(
+      subsystems = hierCfg.subsystems :+ freqVariant)) shouldBe Seq(0, 0, 1)
+    // flat configs derive nothing
+    loom.gen.ChiAssemble.subDomains(loom.ir.IrV2.load(Paths.get(v2Cfg))) shouldBe Nil
   }
 
   it should "guard subsystem node width adaptation with HW-16; matched widths pass (GEN-25a)" in {
@@ -591,6 +623,12 @@ class EmitV2Spec extends AnyFlatSpec with Matchers {
     loom.gen.ChiAssemble.bridgeParams(hierCfg).head.outstanding shouldBe 1
     val multi = hierCfg.copy(nocLinks = Seq(hierCfg.nocLinks.head.copy(outstanding = 4)))
     loom.gen.ChiAssemble.bridgeParams(multi).head.outstanding shouldBe 4
+  }
+
+  it should "pass nocLink outstanding through systemParams into ChiBridgeLink (HW-17)" in {
+    loom.gen.ChiAssemble.systemParams(hierCfg)._2.head.outstanding shouldBe 1
+    val multi = hierCfg.copy(nocLinks = Seq(hierCfg.nocLinks.head.copy(outstanding = 4)))
+    loom.gen.ChiAssemble.systemParams(multi)._2.head.outstanding shouldBe 4
   }
 
   it should "assemble subsystemParams projections and BridgeParams for HW-11 (GEN-25)" in {
@@ -743,5 +781,35 @@ class EmitV2Spec extends AnyFlatSpec with Matchers {
     a.foreach { case (rel, bytes) =>
       withClue(s"file $rel: ") { bytes shouldBe b(rel) }
     }
+  }
+
+  it should "emit an async cross-root-clock system with clockDomain port annotations (GEN-25b, HW-15)" in {
+    loom.check.ChecksV2.run(hierAsyncCfg).errors shouldBe Nil
+    val out = Files.createTempDirectory("loom-emitv2-hier-async")
+    val log = capture(LoomMain.runEmit(List("--config", writeCfg(hierAsyncCfg), "--out", out.toString)))
+    log should include("emitted hier_ok (2 subsystem(s), 1 inter-NoC bridge(s))")
+    val sv = Files.readString(out.resolve("ChiSystemTop.sv"))
+    sv should include("module ChiSystemTop")
+    sv should include("io_subClk_0")
+    sv should include("io_subReset_0")
+
+    val ports = Json.parse(Files.readString(out.resolve("ports.json"))).asInstanceOf[JObj]
+    def eps(key: String): Seq[JObj] =
+      ports.get(key).get.asInstanceOf[loom.ir.JArr].items.map(_.asInstanceOf[JObj])
+    // per free port: owning subsystem's system root domain + root clock key
+    val rn = eps("freeRn")
+    rn.map(_.get("id")) shouldBe Seq(Some(JStr("m0")), Some(JStr("m1")))
+    rn.map(_.get("clockDomain")) shouldBe Seq(Some(JNum(BigDecimal(0))), Some(JNum(BigDecimal(1))))
+    rn.map(_.get("rootClock")) shouldBe Seq(Some(JStr("core")), Some(JStr("io")))
+    rn.map(_.get("rootClockMHz")) shouldBe Seq(Some(JNum(BigDecimal(1000))), Some(JNum(BigDecimal(500))))
+    val sn = eps("freeSn")
+    sn.map(_.get("id")) shouldBe Seq(Some(JStr("s0")), Some(JStr("s1")))
+    sn.map(_.get("clockDomain")) shouldBe Seq(Some(JNum(BigDecimal(0))), Some(JNum(BigDecimal(1))))
+    val br = ports.get("bridges").get.asInstanceOf[loom.ir.JArr].items.head.asInstanceOf[JObj]
+    br.get("asyncFifoDepth") shouldBe Some(JNum(BigDecimal(4)))
+    // system clocking note describes the integrator-supplied subClk/subReset
+    val clocking = ports.get("clocking").collect { case JStr(s) => s }.get
+    clocking should include("subClk/subReset")
+    clocking should include("2 subsystem root clock domains")
   }
 }

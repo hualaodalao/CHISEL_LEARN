@@ -460,11 +460,12 @@ class LoomApiSpec extends AnyFlatSpec with Matchers {
     fields(est("bridges"))("rnAxi") shouldBe JNum(BigDecimal(0))
     fields(est("bridges"))("snAxi") shouldBe JNum(BigDecimal(0))
     val assumptions = strs(est("assumptions"))
-    assumptions.exists(s => s.contains("single-outstanding") &&
-      s.contains("uniform ChiConfig") && s.contains("HW-15")) shouldBe true
+    assumptions.exists(s => s.contains("outstanding = nocLinks[].outstanding") &&
+      s.contains("uniform ChiConfig") && s.contains("CHK-62") &&
+      s.contains("HW-17")) shouldBe true
     // flat configs keep neither the noc count nor the hierarchical note
     val flat = fields(fields(LoomApi.evaluate(v2Text))("estimate"))
     fields(flat("bridges")).contains("noc") shouldBe false
-    strs(flat("assumptions")).exists(_.contains("single-outstanding")) shouldBe false
+    strs(flat("assumptions")).exists(_.contains("ChiSystemTop")) shouldBe false
   }
 }

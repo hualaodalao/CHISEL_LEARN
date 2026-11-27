@@ -167,4 +167,85 @@ class ChiSystemGenSpec extends AnyFlatSpec with Matchers with ChiselSim {
       dut.io.wrData.bits.expect((BigInt(0x2222) << 256 | BigInt(0x1111)).U)
     }
   }
+
+  // ---- S12 (GEN-25b/SEM-20b): IR-derived async cross-root-clock golden ----
+
+  /** B on its own root clock io@500 (A stays core@1000): every B node/router
+    * moves to io so the projection stays domain-0 clean. */
+  private def subIo(name: String, rn: String, sn: String, router: String,
+      samBase: Long): SubsystemSpec = {
+    val s = sub(name, rn, sn, router, samBase)
+    s.copy(clockDomains = Seq(ClockDomain("io", 500)),
+      nodes = s.nodes.map(_.copy(clock = "io")),
+      routers = s.routers.map(_.copy(clock = "io")))
+  }
+
+  private val irAsync: IrV2 = ir.copy(
+    meta = ir.meta.copy(name = "gen_hier_async"),
+    subsystems = Seq(ir.subsystems.head, subIo("B", "mB", "sB", "rB0", 0x2000L)),
+    nocLinks = Seq(NocLinkSpec("A", "B", "rA0", "rB0",
+      Seq((0x2000L, 0x1000L)), "async", 4, false)))
+
+  private val (netsAsync, bridgesAsync) = ChiAssemble.systemParams(irAsync)
+
+  /** Mirrors ChiSystemSpec's HW-15 case: the remote storage lives in B's
+    * root clock domain, driven through the system subClk/subReset inputs. */
+  private class AsyncReadNet extends Module {
+    val io = IO(new Bundle {
+      val rn = Flipped(new ChiRnPort(c))
+      val rdData = Input(UInt(512.W))
+      val subClk = Input(Bool())
+      val subReset = Input(Bool())
+    })
+    val sys = Module(new ChiSystemTop(netsAsync, bridgesAsync, ChiAssemble.subDomains(irAsync)))
+    val src = withClockAndReset(io.subClk.asClock, io.subReset.asAsyncReset) {
+      Module(new ChiReadSource(c))
+    }
+    sys.io.subClk(0) := io.subClk
+    sys.io.subReset(0) := io.subReset
+    sys.io.rn(0) <> io.rn
+    LmWire.link(sys.io.sn(1).req, src.io.req)
+    LmWire.link(src.io.dat, sys.io.sn(1).dat)
+    sys.io.sn(1).rsp.valid := false.B
+    sys.io.sn(1).rsp.bits := 0.U.asTypeOf(new ChiRspFlit(c))
+    sys.io.sn(1).rxDat.ready := true.B
+    idleUnused(sys)
+    src.io.rdData := io.rdData
+  }
+
+  it should "cross an async bridge between IR-derived root clocks bit-exact (GEN-25b golden, HW-15)" in {
+    loom.check.ChecksV2.run(irAsync).errors shouldBe Nil
+    ChiAssemble.subDomains(irAsync) shouldBe Seq(0, 1)
+    bridgesAsync.head.asyncFifoDepth shouldBe 4
+    simulate(new AsyncReadNet) { dut =>
+      dut.io.subReset.poke(true.B); dut.reset.poke(true.B)
+      // Toggle the remote clock during reset so its domain sees reset edges.
+      for (i <- 0 until 4) { dut.io.subClk.poke((i % 2 == 0).B); dut.clock.step() }
+      dut.reset.poke(false.B); dut.io.subReset.poke(false.B)
+      val word = (BigInt(0xAAAA) << 256) | BigInt(0xBBBB)
+      dut.io.rdData.poke(word.U)
+      dut.io.rn.rsp.ready.poke(true.B); dut.io.rn.dat.ready.poke(true.B)
+      dut.io.rn.snp.ready.poke(true.B)
+      dut.io.rn.txRsp.valid.poke(false.B); dut.io.rn.txDat.valid.poke(false.B)
+      dut.io.rn.req.bits.opcode.poke(ChiOp.ReadNoSnp.U)
+      dut.io.rn.req.bits.addr.poke(0x2000L.U)
+      dut.io.rn.req.bits.txnId.poke(7.U); dut.io.rn.req.bits.srcId.poke(0.U)
+      dut.io.rn.req.valid.poke(true.B)
+      val nFlits = ChiWidths.flitCount(64, c.datWidth)
+      var acc = BigInt(0); var got = 0; var n = 0; var clk = false
+      while (got < nFlits && n < 800) {
+        if (dut.io.rn.dat.valid.peek().litToBoolean) {
+          dut.io.rn.dat.bits.opcode.expect(ChiOp.DatCompData.U)
+          val id = dut.io.rn.dat.bits.dataId.peek().litValue.toInt
+          acc |= dut.io.rn.dat.bits.data.peek().litValue << (id * 128)
+          dut.io.rn.dat.bits.txnId.expect(7.U)
+          got += 1
+        }
+        dut.io.subClk.poke(clk.B); clk = !clk
+        dut.clock.step(); n += 1
+      }
+      assert(got == nFlits, s"expected $nFlits flits, got $got")
+      assert(acc == word, s"async IR golden read ${acc.toString(16)} != ${word.toString(16)}")
+    }
+  }
 }

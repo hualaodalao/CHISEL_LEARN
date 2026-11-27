@@ -493,9 +493,9 @@ object ChiAssemble {
     * are looked up by synthetic name in the FINAL params.sn/rn vectors
     * (networkParams sorts by NodeID, never insertion order). toDatWidth=0
     * (uniform cfg, CHK-60) and dvmForward=false are the HW-11 v1 contract;
-    * asyncFifoDepth passes through (emit guards async, HW-15). outstanding
-    * stays at the ChiBridgeLink default 1 until HW-17 adds the field there;
-    * the declared value is carried by bridgeParams (IR-94/CHK-61).
+    * asyncFifoDepth passes through (domain correctness is CHK-62's job,
+    * HW-15 closed). outstanding = nocLinks[].outstanding (IR-94/CHK-61,
+    * system-level passthrough landed with HW-17).
     */
   def systemParams(v2: IrV2): (Seq[ChiNetworkParams], Seq[ChiBridgeLink]) = {
     val projs = systemProjections(v2)
@@ -517,8 +517,24 @@ object ChiAssemble {
         throw Ir.IrException(s"nocLink to '${l.to}' is not a declared subsystem (CHK-55)"))
       ChiBridgeLink(fi, slot(fi, nocSnName(l, i), nets(fi).sn),
         ti, slot(ti, nocRnName(l, i), nets(ti).rn),
-        l.windows, asyncFifoDepth = l.asyncFifoDepth, toDatWidth = 0, dvmForward = false)
+        l.windows, asyncFifoDepth = l.asyncFifoDepth, toDatWidth = 0, dvmForward = false,
+        outstanding = l.outstanding)
     }
     (nets, bridges)
+  }
+
+  /** SEM-20b (HW-15/W18): system root clock domain per subsystem. Each
+    * subsystem's root clock is its clockDomains.head; the domain index is
+    * the first-occurrence order of the (id, freqMHz) key across subsystems
+    * in declaration order (0 = top module clock, routerDomain convention).
+    * Subsystems sharing a key share a root domain. Empty without subsystems.
+    */
+  def subDomains(v2: IrV2): Seq[Int] = {
+    val roots = v2.subsystems.map { s =>
+      val c = s.clockDomains.head
+      (c.id, c.freqMHz)
+    }
+    val indexOf = roots.distinct.zipWithIndex.toMap
+    roots.map(indexOf)
   }
 }

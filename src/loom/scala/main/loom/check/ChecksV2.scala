@@ -382,14 +382,19 @@ object ChecksV2 {
 
     // CHK-59 (UP-07 phase 2, IR-92/93): HW-11 v1 bridge limits — dvmForward
     // is require(false) in ChiNocBridge; async FIFO depths must be powers of
-    // two (ChiAsyncLink). Async declarations stay check-legal; the sync-only
-    // restriction is an emit guard (HW-15), not a check gate.
+    // two (ChiAsyncLink); cdc and asyncFifoDepth must agree (async ⇔ >=2,
+    // v1.8.0). Domain assignment correctness is CHK-62 (HW-15 closed).
     v2.nocLinks.foreach { l =>
       val p = s"C0: [CHK-59] nocLink '${l.from}->${l.to}'"
       if (l.dvmForward)
         errs += s"$p dvmForward=true is not supported (HW-11 v1 keeps per-NoC MN autonomy)"
       if (l.cdc == "async" && !pow2(l.asyncFifoDepth.toLong))
         errs += s"$p asyncFifoDepth ${l.asyncFifoDepth} must be a power of two for cdc async"
+      if ((l.cdc == "async") != (l.asyncFifoDepth >= 2))
+        errs += (if (l.cdc == "async")
+          s"$p cdc 'async' requires asyncFifoDepth >= 2 (got ${l.asyncFifoDepth})"
+        else
+          s"$p cdc '${l.cdc}' requires asyncFifoDepth 0 (got ${l.asyncFifoDepth})")
     }
 
     // CHK-60 (UP-07 phase 2, IR-86): ChiSystemTop v1 requires a uniform
@@ -419,6 +424,24 @@ object ChecksV2 {
         .map(_.chi.txnIdWidth).getOrElse(v2.chi.txnIdWidth)
       if (l.outstanding < 1 || l.outstanding > max)
         errs += s"C0: [CHK-61] nocLink '${l.from}->${l.to}' outstanding ${l.outstanding} must be in [1, $max] (2^txnIdWidth)"
+    }
+
+    // CHK-62 (SEM-20b, HW-15/W18): bridge kind must match the derived root
+    // clock domains — mirrors ChiSystemTop's require so a bad assignment
+    // fails at check time instead of elaboration. Skipped when a subsystem
+    // has no clock domain (other gates report that).
+    if (v2.subsystems.nonEmpty && v2.subsystems.forall(_.clockDomains.nonEmpty)) {
+      val domOf = v2.subsystems.map(_.name).zip(ChiAssemble.subDomains(v2)).toMap
+      v2.nocLinks.foreach { l =>
+        for (df <- domOf.get(l.from); dt <- domOf.get(l.to)) {
+          val p = s"C0: [CHK-62] nocLink '${l.from}->${l.to}'"
+          if (l.asyncFifoDepth >= 2) {
+            if (df == dt)
+              errs += s"$p async bridge requires different subsystem root clock domains (both $df)"
+          } else if (df != dt)
+            errs += s"$p sync bridge requires the same subsystem root clock domain (${l.from}=$df, ${l.to}=$dt)"
+        }
+      }
     }
 
     // Remaining unknown keys keep the S1 generic C0 error (spec §3: unknown
