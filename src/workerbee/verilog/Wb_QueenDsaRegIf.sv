@@ -43,211 +43,211 @@
     `define INIT_RANDOM_PROLOG_
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
-module Wb_QueenDsaRegIf(	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
-  input         clock,	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
-                reset,	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
-  output        io_cmd_ready,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input         io_cmd_valid,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cmd_bits_0_valid,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input  [1:0]  io_cmd_bits_0_bits_op,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input  [9:0]  io_cmd_bits_0_bits_reg0Addr,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cmd_bits_0_bits_reg1Addr,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input  [31:0] io_cmd_bits_0_bits_data0,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cmd_bits_0_bits_data1,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cmd_bits_0_bits_swTag,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input         io_cmd_bits_1_valid,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input  [1:0]  io_cmd_bits_1_bits_op,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input  [9:0]  io_cmd_bits_1_bits_reg0Addr,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cmd_bits_1_bits_reg1Addr,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input  [31:0] io_cmd_bits_1_bits_data0,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cmd_bits_1_bits_data1,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cmd_bits_1_bits_swTag,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input         io_cmd_bits_2_valid,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input  [1:0]  io_cmd_bits_2_bits_op,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input  [9:0]  io_cmd_bits_2_bits_reg0Addr,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cmd_bits_2_bits_reg1Addr,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input  [31:0] io_cmd_bits_2_bits_data0,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cmd_bits_2_bits_data1,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cmd_bits_2_bits_swTag,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input         io_cmd_bits_3_valid,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input  [1:0]  io_cmd_bits_3_bits_op,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input  [9:0]  io_cmd_bits_3_bits_reg0Addr,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cmd_bits_3_bits_reg1Addr,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input  [31:0] io_cmd_bits_3_bits_data0,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cmd_bits_3_bits_data1,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cmd_bits_3_bits_swTag,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input         io_resp_ready,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  output        io_resp_valid,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  output [31:0] io_resp_bits_data,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  output        io_resp_bits_err,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_wrErr_0,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_wrErr_1,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_wrErr_2,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_wrErr_3,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  output [31:0] io_cfgRegs_0,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cfgRegs_1,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cfgRegs_2,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cfgRegs_3,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cfgRegs_4,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cfgRegs_5,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cfgRegs_6,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cfgRegs_7,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cfgRegs_8,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cfgRegs_9,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cfgRegs_10,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_cfgRegs_11,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input  [31:0] io_statusRegs_0,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_statusRegs_1,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input  [7:0]  io_intrSrc,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  output        io_irq,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_start,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  input         io_startReady,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  output [31:0] io_startSwTag,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  output        io_hwSignal_enable,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-                io_hwSignal_isTimeline,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  output [4:0]  io_hwSignal_group,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  output [31:0] io_hwSignal_mask,	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
-  output [2:0]  io_hwSignal_timeline	// src/queen/scala/common/QueenDsaRegIf.scala:61:16
+module Wb_QueenDsaRegIf(	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
+  input         clock,	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
+                reset,	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
+  output        io_cmd_ready,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input         io_cmd_valid,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cmd_bits_0_valid,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input  [1:0]  io_cmd_bits_0_bits_op,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input  [9:0]  io_cmd_bits_0_bits_reg0Addr,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cmd_bits_0_bits_reg1Addr,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input  [31:0] io_cmd_bits_0_bits_data0,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cmd_bits_0_bits_data1,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cmd_bits_0_bits_swTag,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input         io_cmd_bits_1_valid,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input  [1:0]  io_cmd_bits_1_bits_op,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input  [9:0]  io_cmd_bits_1_bits_reg0Addr,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cmd_bits_1_bits_reg1Addr,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input  [31:0] io_cmd_bits_1_bits_data0,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cmd_bits_1_bits_data1,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cmd_bits_1_bits_swTag,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input         io_cmd_bits_2_valid,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input  [1:0]  io_cmd_bits_2_bits_op,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input  [9:0]  io_cmd_bits_2_bits_reg0Addr,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cmd_bits_2_bits_reg1Addr,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input  [31:0] io_cmd_bits_2_bits_data0,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cmd_bits_2_bits_data1,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cmd_bits_2_bits_swTag,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input         io_cmd_bits_3_valid,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input  [1:0]  io_cmd_bits_3_bits_op,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input  [9:0]  io_cmd_bits_3_bits_reg0Addr,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cmd_bits_3_bits_reg1Addr,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input  [31:0] io_cmd_bits_3_bits_data0,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cmd_bits_3_bits_data1,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cmd_bits_3_bits_swTag,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input         io_resp_ready,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  output        io_resp_valid,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  output [31:0] io_resp_bits_data,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  output        io_resp_bits_err,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_wrErr_0,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_wrErr_1,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_wrErr_2,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_wrErr_3,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  output [31:0] io_cfgRegs_0,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cfgRegs_1,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cfgRegs_2,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cfgRegs_3,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cfgRegs_4,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cfgRegs_5,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cfgRegs_6,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cfgRegs_7,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cfgRegs_8,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cfgRegs_9,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cfgRegs_10,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_cfgRegs_11,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input  [31:0] io_statusRegs_0,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_statusRegs_1,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input  [7:0]  io_intrSrc,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  output        io_irq,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_start,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  input         io_startReady,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  output [31:0] io_startSwTag,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  output        io_hwSignal_enable,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+                io_hwSignal_isTimeline,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  output [4:0]  io_hwSignal_group,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  output [31:0] io_hwSignal_mask,	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
+  output [2:0]  io_hwSignal_timeline	// src/queen/scala/common/QueenDsaRegIf.scala:60:16
 );
 
-  reg  [31:0]       shadow_0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-  reg  [31:0]       shadow_1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-  reg  [31:0]       shadow_2;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-  reg  [31:0]       shadow_3;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-  reg  [31:0]       shadow_4;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-  reg  [31:0]       shadow_5;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-  reg  [31:0]       shadow_6;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-  reg  [31:0]       shadow_7;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-  reg  [31:0]       shadow_8;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-  reg  [31:0]       shadow_9;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-  reg  [31:0]       shadow_10;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-  reg  [31:0]       shadow_11;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-  reg  [31:0]       live_0;	// src/queen/scala/common/QueenDsaRegIf.scala:76:31
-  reg  [31:0]       live_1;	// src/queen/scala/common/QueenDsaRegIf.scala:76:31
-  reg  [31:0]       live_2;	// src/queen/scala/common/QueenDsaRegIf.scala:76:31
-  reg  [31:0]       live_3;	// src/queen/scala/common/QueenDsaRegIf.scala:76:31
-  reg  [31:0]       live_4;	// src/queen/scala/common/QueenDsaRegIf.scala:76:31
-  reg  [31:0]       live_5;	// src/queen/scala/common/QueenDsaRegIf.scala:76:31
-  reg  [31:0]       live_6;	// src/queen/scala/common/QueenDsaRegIf.scala:76:31
-  reg  [31:0]       live_7;	// src/queen/scala/common/QueenDsaRegIf.scala:76:31
-  reg  [31:0]       live_8;	// src/queen/scala/common/QueenDsaRegIf.scala:76:31
-  reg  [31:0]       live_9;	// src/queen/scala/common/QueenDsaRegIf.scala:76:31
-  reg  [31:0]       live_10;	// src/queen/scala/common/QueenDsaRegIf.scala:76:31
-  reg  [31:0]       live_11;	// src/queen/scala/common/QueenDsaRegIf.scala:76:31
-  reg  [7:0]        intrRaw;	// src/queen/scala/common/QueenDsaRegIf.scala:77:34
-  reg  [7:0]        intrMask;	// src/queen/scala/common/QueenDsaRegIf.scala:78:35
-  reg  [31:0]       sigTarget;	// src/queen/scala/common/QueenDsaRegIf.scala:79:36
-  reg  [31:0]       sigMask;	// src/queen/scala/common/QueenDsaRegIf.scala:80:34
-  reg  [31:0]       traceTag;	// src/queen/scala/common/QueenDsaRegIf.scala:81:35
-  wire              _wrOk_T_13 = io_cmd_bits_0_bits_op == 2'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:93:31
-  wire              _isWr_T_1 = io_cmd_bits_0_bits_op == 2'h1;	// src/queen/scala/common/QueenDsaRegIf.scala:93:69
-  wire              _wrOk_T_42 = io_cmd_bits_1_bits_op == 2'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:93:31
-  wire              _isWr_T_5 = io_cmd_bits_1_bits_op == 2'h1;	// src/queen/scala/common/QueenDsaRegIf.scala:93:69
-  wire              _wrOk_T_71 = io_cmd_bits_2_bits_op == 2'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:93:31
-  wire              _isWr_T_9 = io_cmd_bits_2_bits_op == 2'h1;	// src/queen/scala/common/QueenDsaRegIf.scala:93:69
-  wire              _wrOk_T_100 = io_cmd_bits_3_bits_op == 2'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:93:31
-  wire              _isWr_T_13 = io_cmd_bits_3_bits_op == 2'h1;	// src/queen/scala/common/QueenDsaRegIf.scala:93:69
-  wire              isRun_0_layerCapture = io_cmd_bits_0_valid & (&io_cmd_bits_0_bits_op);	// src/queen/scala/common/QueenDsaRegIf.scala:94:{55,68}
-  wire              isRun_1_layerCapture = io_cmd_bits_1_valid & (&io_cmd_bits_1_bits_op);	// src/queen/scala/common/QueenDsaRegIf.scala:94:{55,68}
-  wire              isRun_2_layerCapture = io_cmd_bits_2_valid & (&io_cmd_bits_2_bits_op);	// src/queen/scala/common/QueenDsaRegIf.scala:94:{55,68}
-  wire              isRun_3_layerCapture = io_cmd_bits_3_valid & (&io_cmd_bits_3_bits_op);	// src/queen/scala/common/QueenDsaRegIf.scala:94:{55,68}
+  reg  [31:0]       shadow_0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+  reg  [31:0]       shadow_1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+  reg  [31:0]       shadow_2;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+  reg  [31:0]       shadow_3;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+  reg  [31:0]       shadow_4;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+  reg  [31:0]       shadow_5;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+  reg  [31:0]       shadow_6;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+  reg  [31:0]       shadow_7;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+  reg  [31:0]       shadow_8;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+  reg  [31:0]       shadow_9;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+  reg  [31:0]       shadow_10;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+  reg  [31:0]       shadow_11;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+  reg  [31:0]       live_0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:31
+  reg  [31:0]       live_1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:31
+  reg  [31:0]       live_2;	// src/queen/scala/common/QueenDsaRegIf.scala:75:31
+  reg  [31:0]       live_3;	// src/queen/scala/common/QueenDsaRegIf.scala:75:31
+  reg  [31:0]       live_4;	// src/queen/scala/common/QueenDsaRegIf.scala:75:31
+  reg  [31:0]       live_5;	// src/queen/scala/common/QueenDsaRegIf.scala:75:31
+  reg  [31:0]       live_6;	// src/queen/scala/common/QueenDsaRegIf.scala:75:31
+  reg  [31:0]       live_7;	// src/queen/scala/common/QueenDsaRegIf.scala:75:31
+  reg  [31:0]       live_8;	// src/queen/scala/common/QueenDsaRegIf.scala:75:31
+  reg  [31:0]       live_9;	// src/queen/scala/common/QueenDsaRegIf.scala:75:31
+  reg  [31:0]       live_10;	// src/queen/scala/common/QueenDsaRegIf.scala:75:31
+  reg  [31:0]       live_11;	// src/queen/scala/common/QueenDsaRegIf.scala:75:31
+  reg  [7:0]        intrRaw;	// src/queen/scala/common/QueenDsaRegIf.scala:76:34
+  reg  [7:0]        intrMask;	// src/queen/scala/common/QueenDsaRegIf.scala:77:35
+  reg  [31:0]       sigTarget;	// src/queen/scala/common/QueenDsaRegIf.scala:78:36
+  reg  [31:0]       sigMask;	// src/queen/scala/common/QueenDsaRegIf.scala:79:34
+  reg  [31:0]       traceTag;	// src/queen/scala/common/QueenDsaRegIf.scala:80:35
+  wire              _wrOk_T_13 = io_cmd_bits_0_bits_op == 2'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:92:31
+  wire              _isWr_T_1 = io_cmd_bits_0_bits_op == 2'h1;	// src/queen/scala/common/QueenDsaRegIf.scala:92:69
+  wire              _wrOk_T_42 = io_cmd_bits_1_bits_op == 2'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:92:31
+  wire              _isWr_T_5 = io_cmd_bits_1_bits_op == 2'h1;	// src/queen/scala/common/QueenDsaRegIf.scala:92:69
+  wire              _wrOk_T_71 = io_cmd_bits_2_bits_op == 2'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:92:31
+  wire              _isWr_T_9 = io_cmd_bits_2_bits_op == 2'h1;	// src/queen/scala/common/QueenDsaRegIf.scala:92:69
+  wire              _wrOk_T_100 = io_cmd_bits_3_bits_op == 2'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:92:31
+  wire              _isWr_T_13 = io_cmd_bits_3_bits_op == 2'h1;	// src/queen/scala/common/QueenDsaRegIf.scala:92:69
+  wire              isRun_0_layerCapture = io_cmd_bits_0_valid & (&io_cmd_bits_0_bits_op);	// src/queen/scala/common/QueenDsaRegIf.scala:93:{55,68}
+  wire              isRun_1_layerCapture = io_cmd_bits_1_valid & (&io_cmd_bits_1_bits_op);	// src/queen/scala/common/QueenDsaRegIf.scala:93:{55,68}
+  wire              isRun_2_layerCapture = io_cmd_bits_2_valid & (&io_cmd_bits_2_bits_op);	// src/queen/scala/common/QueenDsaRegIf.scala:93:{55,68}
+  wire              isRun_3_layerCapture = io_cmd_bits_3_valid & (&io_cmd_bits_3_bits_op);	// src/queen/scala/common/QueenDsaRegIf.scala:93:{55,68}
   wire              isRd_0_layerCapture =
-    io_cmd_bits_0_valid & io_cmd_bits_0_bits_op == 2'h2;	// src/queen/scala/common/QueenDsaRegIf.scala:95:{54,67}
+    io_cmd_bits_0_valid & io_cmd_bits_0_bits_op == 2'h2;	// src/queen/scala/common/QueenDsaRegIf.scala:94:{54,67}
   wire              isRd_1_layerCapture =
-    io_cmd_bits_1_valid & io_cmd_bits_1_bits_op == 2'h2;	// src/queen/scala/common/QueenDsaRegIf.scala:95:{54,67}
+    io_cmd_bits_1_valid & io_cmd_bits_1_bits_op == 2'h2;	// src/queen/scala/common/QueenDsaRegIf.scala:94:{54,67}
   wire              isRd_2_layerCapture =
-    io_cmd_bits_2_valid & io_cmd_bits_2_bits_op == 2'h2;	// src/queen/scala/common/QueenDsaRegIf.scala:95:{54,67}
+    io_cmd_bits_2_valid & io_cmd_bits_2_bits_op == 2'h2;	// src/queen/scala/common/QueenDsaRegIf.scala:94:{54,67}
   wire              isRd_3_layerCapture =
-    io_cmd_bits_3_valid & io_cmd_bits_3_bits_op == 2'h2;	// src/queen/scala/common/QueenDsaRegIf.scala:95:{54,67}
+    io_cmd_bits_3_valid & io_cmd_bits_3_bits_op == 2'h2;	// src/queen/scala/common/QueenDsaRegIf.scala:94:{54,67}
   wire [3:0]        _hasRun_T =
     {isRun_3_layerCapture,
      isRun_2_layerCapture,
      isRun_1_layerCapture,
-     isRun_0_layerCapture};	// src/queen/scala/common/QueenDsaRegIf.scala:94:55, :96:32
+     isRun_0_layerCapture};	// src/queen/scala/common/QueenDsaRegIf.scala:93:55, :95:32
   wire [3:0]        _hasRd_T =
-    {isRd_3_layerCapture, isRd_2_layerCapture, isRd_1_layerCapture, isRd_0_layerCapture};	// src/queen/scala/common/QueenDsaRegIf.scala:95:54, :97:30
+    {isRd_3_layerCapture, isRd_2_layerCapture, isRd_1_layerCapture, isRd_0_layerCapture};	// src/queen/scala/common/QueenDsaRegIf.scala:94:54, :96:30
   wire              io_cmd_ready_0 =
-    (|_hasRun_T) ? io_startReady : ~(|_hasRd_T) | io_resp_ready;	// src/queen/scala/common/QueenDsaRegIf.scala:96:{32,39}, :97:{30,37}, :99:{24,51}
-  wire              accept = io_cmd_ready_0 & io_cmd_valid;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/common/QueenDsaRegIf.scala:99:24
-  wire              _wrOk_T = io_cmd_bits_0_bits_reg0Addr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:119:11
-  wire              _wrOk_T_1 = io_cmd_bits_0_bits_reg0Addr == 10'h60;	// src/queen/scala/common/QueenDsaRegIf.scala:119:35, :134:36
-  wire              _wrOk_T_3 = io_cmd_bits_0_bits_reg0Addr == 10'h64;	// src/queen/scala/common/QueenDsaRegIf.scala:119:56, :134:36
-  wire              _wrOk_T_5 = io_cmd_bits_0_bits_reg0Addr == 10'h68;	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :134:36
-  wire              _wrOk_T_7 = io_cmd_bits_0_bits_reg0Addr == 10'h80;	// src/queen/scala/common/QueenDsaRegIf.scala:120:37, :134:36
-  wire              _wrOk_T_9 = io_cmd_bits_0_bits_reg0Addr == 10'h81;	// src/queen/scala/common/QueenDsaRegIf.scala:120:65, :134:36
-  wire              _wrOk_T_11 = io_cmd_bits_0_bits_reg0Addr == 10'hA0;	// src/queen/scala/common/QueenDsaRegIf.scala:121:15, :134:36
-  wire              _wrOk_T_14 = io_cmd_bits_0_bits_reg1Addr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:119:11
-  wire              _wrOk_T_15 = io_cmd_bits_0_bits_reg1Addr == 10'h60;	// src/queen/scala/common/QueenDsaRegIf.scala:119:35, :134:36
-  wire              _wrOk_T_17 = io_cmd_bits_0_bits_reg1Addr == 10'h64;	// src/queen/scala/common/QueenDsaRegIf.scala:119:56, :134:36
-  wire              _wrOk_T_19 = io_cmd_bits_0_bits_reg1Addr == 10'h68;	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :134:36
-  wire              _wrOk_T_21 = io_cmd_bits_0_bits_reg1Addr == 10'h80;	// src/queen/scala/common/QueenDsaRegIf.scala:120:37, :134:36
-  wire              _wrOk_T_23 = io_cmd_bits_0_bits_reg1Addr == 10'h81;	// src/queen/scala/common/QueenDsaRegIf.scala:120:65, :134:36
-  wire              _wrOk_T_25 = io_cmd_bits_0_bits_reg1Addr == 10'hA0;	// src/queen/scala/common/QueenDsaRegIf.scala:121:15, :134:36
+    (|_hasRun_T) ? io_startReady : ~(|_hasRd_T) | io_resp_ready;	// src/queen/scala/common/QueenDsaRegIf.scala:95:{32,39}, :96:{30,37}, :98:{24,51}
+  wire              accept = io_cmd_ready_0 & io_cmd_valid;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/common/QueenDsaRegIf.scala:98:24
+  wire              _wrOk_T = io_cmd_bits_0_bits_reg0Addr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:118:11
+  wire              _wrOk_T_1 = io_cmd_bits_0_bits_reg0Addr == 10'h60;	// src/queen/scala/common/QueenDsaRegIf.scala:118:35, :133:36
+  wire              _wrOk_T_3 = io_cmd_bits_0_bits_reg0Addr == 10'h64;	// src/queen/scala/common/QueenDsaRegIf.scala:118:56, :133:36
+  wire              _wrOk_T_5 = io_cmd_bits_0_bits_reg0Addr == 10'h68;	// src/queen/scala/common/QueenDsaRegIf.scala:119:15, :133:36
+  wire              _wrOk_T_7 = io_cmd_bits_0_bits_reg0Addr == 10'h80;	// src/queen/scala/common/QueenDsaRegIf.scala:119:37, :133:36
+  wire              _wrOk_T_9 = io_cmd_bits_0_bits_reg0Addr == 10'h81;	// src/queen/scala/common/QueenDsaRegIf.scala:119:65, :133:36
+  wire              _wrOk_T_11 = io_cmd_bits_0_bits_reg0Addr == 10'hA0;	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :133:36
+  wire              _wrOk_T_14 = io_cmd_bits_0_bits_reg1Addr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:118:11
+  wire              _wrOk_T_15 = io_cmd_bits_0_bits_reg1Addr == 10'h60;	// src/queen/scala/common/QueenDsaRegIf.scala:118:35, :133:36
+  wire              _wrOk_T_17 = io_cmd_bits_0_bits_reg1Addr == 10'h64;	// src/queen/scala/common/QueenDsaRegIf.scala:118:56, :133:36
+  wire              _wrOk_T_19 = io_cmd_bits_0_bits_reg1Addr == 10'h68;	// src/queen/scala/common/QueenDsaRegIf.scala:119:15, :133:36
+  wire              _wrOk_T_21 = io_cmd_bits_0_bits_reg1Addr == 10'h80;	// src/queen/scala/common/QueenDsaRegIf.scala:119:37, :133:36
+  wire              _wrOk_T_23 = io_cmd_bits_0_bits_reg1Addr == 10'h81;	// src/queen/scala/common/QueenDsaRegIf.scala:119:65, :133:36
+  wire              _wrOk_T_25 = io_cmd_bits_0_bits_reg1Addr == 10'hA0;	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :133:36
   wire              wrOk_0 =
     (_wrOk_T | _wrOk_T_1 | _wrOk_T_3 | _wrOk_T_5 | _wrOk_T_7 | _wrOk_T_9 | _wrOk_T_11)
     & (_wrOk_T_13 | _wrOk_T_14 | _wrOk_T_15 | _wrOk_T_17 | _wrOk_T_19 | _wrOk_T_21
-       | _wrOk_T_23 | _wrOk_T_25);	// src/queen/scala/common/QueenDsaRegIf.scala:93:31, :119:{11,30,35,51,56,74}, :120:{15,32,37,60,65,86}, :121:15, :144:34, :145:49
-  wire              _wrOk_T_29 = io_cmd_bits_1_bits_reg0Addr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:119:11
-  wire              _wrOk_T_30 = io_cmd_bits_1_bits_reg0Addr == 10'h60;	// src/queen/scala/common/QueenDsaRegIf.scala:119:35, :134:36
-  wire              _wrOk_T_32 = io_cmd_bits_1_bits_reg0Addr == 10'h64;	// src/queen/scala/common/QueenDsaRegIf.scala:119:56, :134:36
-  wire              _wrOk_T_34 = io_cmd_bits_1_bits_reg0Addr == 10'h68;	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :134:36
-  wire              _wrOk_T_36 = io_cmd_bits_1_bits_reg0Addr == 10'h80;	// src/queen/scala/common/QueenDsaRegIf.scala:120:37, :134:36
-  wire              _wrOk_T_38 = io_cmd_bits_1_bits_reg0Addr == 10'h81;	// src/queen/scala/common/QueenDsaRegIf.scala:120:65, :134:36
-  wire              _wrOk_T_40 = io_cmd_bits_1_bits_reg0Addr == 10'hA0;	// src/queen/scala/common/QueenDsaRegIf.scala:121:15, :134:36
-  wire              _wrOk_T_43 = io_cmd_bits_1_bits_reg1Addr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:119:11
-  wire              _wrOk_T_44 = io_cmd_bits_1_bits_reg1Addr == 10'h60;	// src/queen/scala/common/QueenDsaRegIf.scala:119:35, :134:36
-  wire              _wrOk_T_46 = io_cmd_bits_1_bits_reg1Addr == 10'h64;	// src/queen/scala/common/QueenDsaRegIf.scala:119:56, :134:36
-  wire              _wrOk_T_48 = io_cmd_bits_1_bits_reg1Addr == 10'h68;	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :134:36
-  wire              _wrOk_T_50 = io_cmd_bits_1_bits_reg1Addr == 10'h80;	// src/queen/scala/common/QueenDsaRegIf.scala:120:37, :134:36
-  wire              _wrOk_T_52 = io_cmd_bits_1_bits_reg1Addr == 10'h81;	// src/queen/scala/common/QueenDsaRegIf.scala:120:65, :134:36
-  wire              _wrOk_T_54 = io_cmd_bits_1_bits_reg1Addr == 10'hA0;	// src/queen/scala/common/QueenDsaRegIf.scala:121:15, :134:36
+       | _wrOk_T_23 | _wrOk_T_25);	// src/queen/scala/common/QueenDsaRegIf.scala:92:31, :118:{11,30,35,51,56,74}, :119:{15,32,37,60,65,86}, :120:15, :143:34, :144:49
+  wire              _wrOk_T_29 = io_cmd_bits_1_bits_reg0Addr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:118:11
+  wire              _wrOk_T_30 = io_cmd_bits_1_bits_reg0Addr == 10'h60;	// src/queen/scala/common/QueenDsaRegIf.scala:118:35, :133:36
+  wire              _wrOk_T_32 = io_cmd_bits_1_bits_reg0Addr == 10'h64;	// src/queen/scala/common/QueenDsaRegIf.scala:118:56, :133:36
+  wire              _wrOk_T_34 = io_cmd_bits_1_bits_reg0Addr == 10'h68;	// src/queen/scala/common/QueenDsaRegIf.scala:119:15, :133:36
+  wire              _wrOk_T_36 = io_cmd_bits_1_bits_reg0Addr == 10'h80;	// src/queen/scala/common/QueenDsaRegIf.scala:119:37, :133:36
+  wire              _wrOk_T_38 = io_cmd_bits_1_bits_reg0Addr == 10'h81;	// src/queen/scala/common/QueenDsaRegIf.scala:119:65, :133:36
+  wire              _wrOk_T_40 = io_cmd_bits_1_bits_reg0Addr == 10'hA0;	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :133:36
+  wire              _wrOk_T_43 = io_cmd_bits_1_bits_reg1Addr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:118:11
+  wire              _wrOk_T_44 = io_cmd_bits_1_bits_reg1Addr == 10'h60;	// src/queen/scala/common/QueenDsaRegIf.scala:118:35, :133:36
+  wire              _wrOk_T_46 = io_cmd_bits_1_bits_reg1Addr == 10'h64;	// src/queen/scala/common/QueenDsaRegIf.scala:118:56, :133:36
+  wire              _wrOk_T_48 = io_cmd_bits_1_bits_reg1Addr == 10'h68;	// src/queen/scala/common/QueenDsaRegIf.scala:119:15, :133:36
+  wire              _wrOk_T_50 = io_cmd_bits_1_bits_reg1Addr == 10'h80;	// src/queen/scala/common/QueenDsaRegIf.scala:119:37, :133:36
+  wire              _wrOk_T_52 = io_cmd_bits_1_bits_reg1Addr == 10'h81;	// src/queen/scala/common/QueenDsaRegIf.scala:119:65, :133:36
+  wire              _wrOk_T_54 = io_cmd_bits_1_bits_reg1Addr == 10'hA0;	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :133:36
   wire              wrOk_1 =
     (_wrOk_T_29 | _wrOk_T_30 | _wrOk_T_32 | _wrOk_T_34 | _wrOk_T_36 | _wrOk_T_38
      | _wrOk_T_40)
     & (_wrOk_T_42 | _wrOk_T_43 | _wrOk_T_44 | _wrOk_T_46 | _wrOk_T_48 | _wrOk_T_50
-       | _wrOk_T_52 | _wrOk_T_54);	// src/queen/scala/common/QueenDsaRegIf.scala:93:31, :119:{11,30,35,51,56,74}, :120:{15,32,37,60,65,86}, :121:15, :144:34, :145:49
-  wire              _wrOk_T_58 = io_cmd_bits_2_bits_reg0Addr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:119:11
-  wire              _wrOk_T_59 = io_cmd_bits_2_bits_reg0Addr == 10'h60;	// src/queen/scala/common/QueenDsaRegIf.scala:119:35, :134:36
-  wire              _wrOk_T_61 = io_cmd_bits_2_bits_reg0Addr == 10'h64;	// src/queen/scala/common/QueenDsaRegIf.scala:119:56, :134:36
-  wire              _wrOk_T_63 = io_cmd_bits_2_bits_reg0Addr == 10'h68;	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :134:36
-  wire              _wrOk_T_65 = io_cmd_bits_2_bits_reg0Addr == 10'h80;	// src/queen/scala/common/QueenDsaRegIf.scala:120:37, :134:36
-  wire              _wrOk_T_67 = io_cmd_bits_2_bits_reg0Addr == 10'h81;	// src/queen/scala/common/QueenDsaRegIf.scala:120:65, :134:36
-  wire              _wrOk_T_69 = io_cmd_bits_2_bits_reg0Addr == 10'hA0;	// src/queen/scala/common/QueenDsaRegIf.scala:121:15, :134:36
-  wire              _wrOk_T_72 = io_cmd_bits_2_bits_reg1Addr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:119:11
-  wire              _wrOk_T_73 = io_cmd_bits_2_bits_reg1Addr == 10'h60;	// src/queen/scala/common/QueenDsaRegIf.scala:119:35, :134:36
-  wire              _wrOk_T_75 = io_cmd_bits_2_bits_reg1Addr == 10'h64;	// src/queen/scala/common/QueenDsaRegIf.scala:119:56, :134:36
-  wire              _wrOk_T_77 = io_cmd_bits_2_bits_reg1Addr == 10'h68;	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :134:36
-  wire              _wrOk_T_79 = io_cmd_bits_2_bits_reg1Addr == 10'h80;	// src/queen/scala/common/QueenDsaRegIf.scala:120:37, :134:36
-  wire              _wrOk_T_81 = io_cmd_bits_2_bits_reg1Addr == 10'h81;	// src/queen/scala/common/QueenDsaRegIf.scala:120:65, :134:36
-  wire              _wrOk_T_83 = io_cmd_bits_2_bits_reg1Addr == 10'hA0;	// src/queen/scala/common/QueenDsaRegIf.scala:121:15, :134:36
+       | _wrOk_T_52 | _wrOk_T_54);	// src/queen/scala/common/QueenDsaRegIf.scala:92:31, :118:{11,30,35,51,56,74}, :119:{15,32,37,60,65,86}, :120:15, :143:34, :144:49
+  wire              _wrOk_T_58 = io_cmd_bits_2_bits_reg0Addr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:118:11
+  wire              _wrOk_T_59 = io_cmd_bits_2_bits_reg0Addr == 10'h60;	// src/queen/scala/common/QueenDsaRegIf.scala:118:35, :133:36
+  wire              _wrOk_T_61 = io_cmd_bits_2_bits_reg0Addr == 10'h64;	// src/queen/scala/common/QueenDsaRegIf.scala:118:56, :133:36
+  wire              _wrOk_T_63 = io_cmd_bits_2_bits_reg0Addr == 10'h68;	// src/queen/scala/common/QueenDsaRegIf.scala:119:15, :133:36
+  wire              _wrOk_T_65 = io_cmd_bits_2_bits_reg0Addr == 10'h80;	// src/queen/scala/common/QueenDsaRegIf.scala:119:37, :133:36
+  wire              _wrOk_T_67 = io_cmd_bits_2_bits_reg0Addr == 10'h81;	// src/queen/scala/common/QueenDsaRegIf.scala:119:65, :133:36
+  wire              _wrOk_T_69 = io_cmd_bits_2_bits_reg0Addr == 10'hA0;	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :133:36
+  wire              _wrOk_T_72 = io_cmd_bits_2_bits_reg1Addr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:118:11
+  wire              _wrOk_T_73 = io_cmd_bits_2_bits_reg1Addr == 10'h60;	// src/queen/scala/common/QueenDsaRegIf.scala:118:35, :133:36
+  wire              _wrOk_T_75 = io_cmd_bits_2_bits_reg1Addr == 10'h64;	// src/queen/scala/common/QueenDsaRegIf.scala:118:56, :133:36
+  wire              _wrOk_T_77 = io_cmd_bits_2_bits_reg1Addr == 10'h68;	// src/queen/scala/common/QueenDsaRegIf.scala:119:15, :133:36
+  wire              _wrOk_T_79 = io_cmd_bits_2_bits_reg1Addr == 10'h80;	// src/queen/scala/common/QueenDsaRegIf.scala:119:37, :133:36
+  wire              _wrOk_T_81 = io_cmd_bits_2_bits_reg1Addr == 10'h81;	// src/queen/scala/common/QueenDsaRegIf.scala:119:65, :133:36
+  wire              _wrOk_T_83 = io_cmd_bits_2_bits_reg1Addr == 10'hA0;	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :133:36
   wire              wrOk_2 =
     (_wrOk_T_58 | _wrOk_T_59 | _wrOk_T_61 | _wrOk_T_63 | _wrOk_T_65 | _wrOk_T_67
      | _wrOk_T_69)
     & (_wrOk_T_71 | _wrOk_T_72 | _wrOk_T_73 | _wrOk_T_75 | _wrOk_T_77 | _wrOk_T_79
-       | _wrOk_T_81 | _wrOk_T_83);	// src/queen/scala/common/QueenDsaRegIf.scala:93:31, :119:{11,30,35,51,56,74}, :120:{15,32,37,60,65,86}, :121:15, :144:34, :145:49
-  wire              _wrOk_T_87 = io_cmd_bits_3_bits_reg0Addr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:119:11
-  wire              _wrOk_T_88 = io_cmd_bits_3_bits_reg0Addr == 10'h60;	// src/queen/scala/common/QueenDsaRegIf.scala:119:35, :134:36
-  wire              _wrOk_T_90 = io_cmd_bits_3_bits_reg0Addr == 10'h64;	// src/queen/scala/common/QueenDsaRegIf.scala:119:56, :134:36
-  wire              _wrOk_T_92 = io_cmd_bits_3_bits_reg0Addr == 10'h68;	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :134:36
-  wire              _wrOk_T_94 = io_cmd_bits_3_bits_reg0Addr == 10'h80;	// src/queen/scala/common/QueenDsaRegIf.scala:120:37, :134:36
-  wire              _wrOk_T_96 = io_cmd_bits_3_bits_reg0Addr == 10'h81;	// src/queen/scala/common/QueenDsaRegIf.scala:120:65, :134:36
-  wire              _wrOk_T_98 = io_cmd_bits_3_bits_reg0Addr == 10'hA0;	// src/queen/scala/common/QueenDsaRegIf.scala:121:15, :134:36
-  wire              _wrOk_T_101 = io_cmd_bits_3_bits_reg1Addr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:119:11
-  wire              _wrOk_T_102 = io_cmd_bits_3_bits_reg1Addr == 10'h60;	// src/queen/scala/common/QueenDsaRegIf.scala:119:35, :134:36
-  wire              _wrOk_T_104 = io_cmd_bits_3_bits_reg1Addr == 10'h64;	// src/queen/scala/common/QueenDsaRegIf.scala:119:56, :134:36
-  wire              _wrOk_T_106 = io_cmd_bits_3_bits_reg1Addr == 10'h68;	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :134:36
-  wire              _wrOk_T_108 = io_cmd_bits_3_bits_reg1Addr == 10'h80;	// src/queen/scala/common/QueenDsaRegIf.scala:120:37, :134:36
-  wire              _wrOk_T_110 = io_cmd_bits_3_bits_reg1Addr == 10'h81;	// src/queen/scala/common/QueenDsaRegIf.scala:120:65, :134:36
-  wire              _wrOk_T_112 = io_cmd_bits_3_bits_reg1Addr == 10'hA0;	// src/queen/scala/common/QueenDsaRegIf.scala:121:15, :134:36
+       | _wrOk_T_81 | _wrOk_T_83);	// src/queen/scala/common/QueenDsaRegIf.scala:92:31, :118:{11,30,35,51,56,74}, :119:{15,32,37,60,65,86}, :120:15, :143:34, :144:49
+  wire              _wrOk_T_87 = io_cmd_bits_3_bits_reg0Addr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:118:11
+  wire              _wrOk_T_88 = io_cmd_bits_3_bits_reg0Addr == 10'h60;	// src/queen/scala/common/QueenDsaRegIf.scala:118:35, :133:36
+  wire              _wrOk_T_90 = io_cmd_bits_3_bits_reg0Addr == 10'h64;	// src/queen/scala/common/QueenDsaRegIf.scala:118:56, :133:36
+  wire              _wrOk_T_92 = io_cmd_bits_3_bits_reg0Addr == 10'h68;	// src/queen/scala/common/QueenDsaRegIf.scala:119:15, :133:36
+  wire              _wrOk_T_94 = io_cmd_bits_3_bits_reg0Addr == 10'h80;	// src/queen/scala/common/QueenDsaRegIf.scala:119:37, :133:36
+  wire              _wrOk_T_96 = io_cmd_bits_3_bits_reg0Addr == 10'h81;	// src/queen/scala/common/QueenDsaRegIf.scala:119:65, :133:36
+  wire              _wrOk_T_98 = io_cmd_bits_3_bits_reg0Addr == 10'hA0;	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :133:36
+  wire              _wrOk_T_101 = io_cmd_bits_3_bits_reg1Addr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:118:11
+  wire              _wrOk_T_102 = io_cmd_bits_3_bits_reg1Addr == 10'h60;	// src/queen/scala/common/QueenDsaRegIf.scala:118:35, :133:36
+  wire              _wrOk_T_104 = io_cmd_bits_3_bits_reg1Addr == 10'h64;	// src/queen/scala/common/QueenDsaRegIf.scala:118:56, :133:36
+  wire              _wrOk_T_106 = io_cmd_bits_3_bits_reg1Addr == 10'h68;	// src/queen/scala/common/QueenDsaRegIf.scala:119:15, :133:36
+  wire              _wrOk_T_108 = io_cmd_bits_3_bits_reg1Addr == 10'h80;	// src/queen/scala/common/QueenDsaRegIf.scala:119:37, :133:36
+  wire              _wrOk_T_110 = io_cmd_bits_3_bits_reg1Addr == 10'h81;	// src/queen/scala/common/QueenDsaRegIf.scala:119:65, :133:36
+  wire              _wrOk_T_112 = io_cmd_bits_3_bits_reg1Addr == 10'hA0;	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :133:36
   wire              wrOk_3 =
     (_wrOk_T_87 | _wrOk_T_88 | _wrOk_T_90 | _wrOk_T_92 | _wrOk_T_94 | _wrOk_T_96
      | _wrOk_T_98)
     & (_wrOk_T_100 | _wrOk_T_101 | _wrOk_T_102 | _wrOk_T_104 | _wrOk_T_106 | _wrOk_T_108
-       | _wrOk_T_110 | _wrOk_T_112);	// src/queen/scala/common/QueenDsaRegIf.scala:93:31, :119:{11,30,35,51,56,74}, :120:{15,32,37,60,65,86}, :121:15, :144:34, :145:49
-  wire              _en_T = accept & io_cmd_bits_0_valid & (_wrOk_T_13 | _isWr_T_1);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/common/QueenDsaRegIf.scala:93:{17,31,56,69}, :148:31
-  wire              _en_T_1 = accept & io_cmd_bits_1_valid & (_wrOk_T_42 | _isWr_T_5);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/common/QueenDsaRegIf.scala:93:{17,31,56,69}, :148:31
-  wire              _en_T_2 = accept & io_cmd_bits_2_valid & (_wrOk_T_71 | _isWr_T_9);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/common/QueenDsaRegIf.scala:93:{17,31,56,69}, :148:31
-  wire              _en_T_3 = accept & io_cmd_bits_3_valid & (_wrOk_T_100 | _isWr_T_13);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/common/QueenDsaRegIf.scala:93:{17,31,56,69}, :148:31
+       | _wrOk_T_110 | _wrOk_T_112);	// src/queen/scala/common/QueenDsaRegIf.scala:92:31, :118:{11,30,35,51,56,74}, :119:{15,32,37,60,65,86}, :120:15, :143:34, :144:49
+  wire              _en_T = accept & io_cmd_bits_0_valid & (_wrOk_T_13 | _isWr_T_1);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/common/QueenDsaRegIf.scala:92:{17,31,56,69}, :147:31
+  wire              _en_T_1 = accept & io_cmd_bits_1_valid & (_wrOk_T_42 | _isWr_T_5);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/common/QueenDsaRegIf.scala:92:{17,31,56,69}, :147:31
+  wire              _en_T_2 = accept & io_cmd_bits_2_valid & (_wrOk_T_71 | _isWr_T_9);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/common/QueenDsaRegIf.scala:92:{17,31,56,69}, :147:31
+  wire              _en_T_3 = accept & io_cmd_bits_3_valid & (_wrOk_T_100 | _isWr_T_13);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/common/QueenDsaRegIf.scala:92:{17,31,56,69}, :147:31
   wire [9:0]        rdAddr =
     isRd_0_layerCapture
       ? io_cmd_bits_0_bits_reg0Addr
@@ -255,8 +255,8 @@ module Wb_QueenDsaRegIf(	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
           ? io_cmd_bits_1_bits_reg0Addr
           : isRd_2_layerCapture
               ? io_cmd_bits_2_bits_reg0Addr
-              : isRd_3_layerCapture ? io_cmd_bits_3_bits_reg0Addr : 10'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:95:54, :181:30, :183:{26,32}
-  wire              _io_resp_bits_err_T = rdAddr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:119:11, :130:48, :183:{26,32}
+              : isRd_3_layerCapture ? io_cmd_bits_3_bits_reg0Addr : 10'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:94:54, :180:30, :182:{26,32}
+  wire              _io_resp_bits_err_T = rdAddr < 10'hC;	// src/queen/scala/common/QueenDsaRegIf.scala:118:11, :129:48, :182:{26,32}
   wire [15:0][31:0] _GEN =
     {{shadow_0},
      {shadow_0},
@@ -273,10 +273,10 @@ module Wb_QueenDsaRegIf(	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
      {shadow_3},
      {shadow_2},
      {shadow_1},
-     {shadow_0}};	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :110:17
-  wire              _io_resp_bits_err_T_2 = rdAddr < 10'h42;	// src/queen/scala/common/QueenDsaRegIf.scala:132:38, :183:{26,32}
-  wire [9:0]        _io_resp_bits_data_T_7 = rdAddr - 10'h40;	// src/queen/scala/common/QueenDsaRegIf.scala:133:36, :183:{26,32}
-  wire              io_start_0 = accept & (|_hasRun_T);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/common/QueenDsaRegIf.scala:96:{32,39}, :193:24
+     {shadow_0}};	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :109:17
+  wire              _io_resp_bits_err_T_2 = rdAddr < 10'h42;	// src/queen/scala/common/QueenDsaRegIf.scala:131:38, :182:{26,32}
+  wire [9:0]        _io_resp_bits_data_T_7 = rdAddr - 10'h40;	// src/queen/scala/common/QueenDsaRegIf.scala:132:36, :182:{26,32}
+  wire              io_start_0 = accept & (|_hasRun_T);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/common/QueenDsaRegIf.scala:95:{32,39}, :192:24
   wire [31:0]       runSwTag =
     isRun_0_layerCapture
       ? io_cmd_bits_0_bits_swTag
@@ -284,261 +284,261 @@ module Wb_QueenDsaRegIf(	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
           ? io_cmd_bits_1_bits_swTag
           : isRun_2_layerCapture
               ? io_cmd_bits_2_bits_swTag
-              : isRun_3_layerCapture ? io_cmd_bits_3_bits_swTag : 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:41, :94:55, :181:30, :183:{26,32}
-  always @(posedge clock) begin	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
-    if (reset) begin	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
-      shadow_0 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:{33,41}
-      shadow_1 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:{33,41}
-      shadow_2 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:{33,41}
-      shadow_3 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:{33,41}
-      shadow_4 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:{33,41}
-      shadow_5 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:{33,41}
-      shadow_6 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:{33,41}
-      shadow_7 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:{33,41}
-      shadow_8 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:{33,41}
-      shadow_9 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:{33,41}
-      shadow_10 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:{33,41}
-      shadow_11 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:{33,41}
-      live_0 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:41, :76:31
-      live_1 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:41, :76:31
-      live_2 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:41, :76:31
-      live_3 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:41, :76:31
-      live_4 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:41, :76:31
-      live_5 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:41, :76:31
-      live_6 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:41, :76:31
-      live_7 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:41, :76:31
-      live_8 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:41, :76:31
-      live_9 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:41, :76:31
-      live_10 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:41, :76:31
-      live_11 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:41, :76:31
-      intrRaw <= 8'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:77:34
-      intrMask <= 8'hFF;	// src/queen/scala/common/QueenDsaRegIf.scala:78:35
-      sigTarget <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:41, :79:36
-      sigMask <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:41, :80:34
-      traceTag <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:41, :81:35
+              : isRun_3_layerCapture ? io_cmd_bits_3_bits_swTag : 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:41, :93:55, :180:30, :182:{26,32}
+  always @(posedge clock) begin	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
+    if (reset) begin	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
+      shadow_0 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:{33,41}
+      shadow_1 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:{33,41}
+      shadow_2 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:{33,41}
+      shadow_3 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:{33,41}
+      shadow_4 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:{33,41}
+      shadow_5 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:{33,41}
+      shadow_6 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:{33,41}
+      shadow_7 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:{33,41}
+      shadow_8 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:{33,41}
+      shadow_9 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:{33,41}
+      shadow_10 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:{33,41}
+      shadow_11 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:{33,41}
+      live_0 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:41, :75:31
+      live_1 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:41, :75:31
+      live_2 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:41, :75:31
+      live_3 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:41, :75:31
+      live_4 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:41, :75:31
+      live_5 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:41, :75:31
+      live_6 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:41, :75:31
+      live_7 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:41, :75:31
+      live_8 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:41, :75:31
+      live_9 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:41, :75:31
+      live_10 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:41, :75:31
+      live_11 <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:41, :75:31
+      intrRaw <= 8'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:76:34
+      intrMask <= 8'hFF;	// src/queen/scala/common/QueenDsaRegIf.scala:77:35
+      sigTarget <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:41, :78:36
+      sigMask <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:41, :79:34
+      traceTag <= 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:41, :80:35
     end
-    else begin	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
-      automatic logic en;	// src/queen/scala/common/QueenDsaRegIf.scala:169:36
-      automatic logic _GEN_0;	// src/queen/scala/common/QueenDsaRegIf.scala:171:42
-      automatic logic en_1;	// src/queen/scala/common/QueenDsaRegIf.scala:169:36
-      automatic logic _GEN_1;	// src/queen/scala/common/QueenDsaRegIf.scala:171:42
-      automatic logic en_2;	// src/queen/scala/common/QueenDsaRegIf.scala:169:36
-      automatic logic _GEN_2;	// src/queen/scala/common/QueenDsaRegIf.scala:171:42
-      automatic logic en_3;	// src/queen/scala/common/QueenDsaRegIf.scala:169:36
-      automatic logic _GEN_3;	// src/queen/scala/common/QueenDsaRegIf.scala:171:42
-      en = _en_T & wrOk_0;	// src/queen/scala/common/QueenDsaRegIf.scala:93:17, :144:34, :148:31, :169:36
-      _GEN_0 = en & _isWr_T_1;	// src/queen/scala/common/QueenDsaRegIf.scala:93:69, :169:36, :171:42
-      en_1 = _en_T_1 & wrOk_1;	// src/queen/scala/common/QueenDsaRegIf.scala:93:17, :144:34, :148:31, :169:36
-      _GEN_1 = en_1 & _isWr_T_5;	// src/queen/scala/common/QueenDsaRegIf.scala:93:69, :169:36, :171:42
-      en_2 = _en_T_2 & wrOk_2;	// src/queen/scala/common/QueenDsaRegIf.scala:93:17, :144:34, :148:31, :169:36
-      _GEN_2 = en_2 & _isWr_T_9;	// src/queen/scala/common/QueenDsaRegIf.scala:93:69, :169:36, :171:42
-      en_3 = _en_T_3 & wrOk_3;	// src/queen/scala/common/QueenDsaRegIf.scala:93:17, :144:34, :148:31, :169:36
-      _GEN_3 = en_3 & _isWr_T_13;	// src/queen/scala/common/QueenDsaRegIf.scala:93:69, :169:36, :171:42
-      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h0)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_0 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h0)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_0 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h0)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_0 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h0)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_0 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h0)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_0 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h0)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_0 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h0)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_0 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h0)	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_0 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h1)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_1 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h1)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_1 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h1)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_1 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h1)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_1 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h1)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_1 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h1)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_1 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h1)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_1 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h1)	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_1 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h2)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_2 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h2)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_2 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h2)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_2 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h2)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_2 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h2)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_2 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h2)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_2 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h2)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_2 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h2)	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_2 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h3)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_3 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h3)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_3 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h3)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_3 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h3)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_3 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h3)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_3 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h3)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_3 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h3)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_3 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h3)	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_3 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h4)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_4 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h4)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_4 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h4)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_4 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h4)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_4 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h4)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_4 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h4)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_4 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h4)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_4 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h4)	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_4 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h5)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_5 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h5)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_5 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h5)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_5 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h5)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_5 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h5)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_5 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h5)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_5 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h5)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_5 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h5)	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_5 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h6)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_6 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h6)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_6 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h6)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_6 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h6)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_6 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h6)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_6 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h6)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_6 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h6)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_6 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h6)	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_6 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h7)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_7 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h7)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_7 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h7)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_7 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h7)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_7 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h7)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_7 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h7)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_7 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h7)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_7 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h7)	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_7 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h8)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_8 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h8)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_8 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h8)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_8 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h8)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_8 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h8)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_8 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h8)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_8 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h8)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_8 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h8)	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_8 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h9)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_9 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h9)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_9 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h9)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_9 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h9)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_9 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h9)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_9 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h9)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_9 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h9)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_9 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h9)	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_9 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'hA)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_10 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'hA)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_10 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'hA)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_10 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'hA)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_10 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'hA)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_10 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'hA)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_10 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'hA)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_10 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'hA)	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_10 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'hB)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_11 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'hB)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_11 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'hB)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_11 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'hB)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_11 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'hB)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_11 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'hB)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_11 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'hB)	// src/queen/scala/common/QueenDsaRegIf.scala:114:44, :115:{24,59}, :119:11, :156:18, :171:42
-        shadow_11 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'hB)	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :114:44, :115:{24,59}, :119:11, :156:18, :169:36
-        shadow_11 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33
-      if (io_start_0) begin	// src/queen/scala/common/QueenDsaRegIf.scala:193:24
-        live_0 <= shadow_0;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :76:31
-        live_1 <= shadow_1;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :76:31
-        live_2 <= shadow_2;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :76:31
-        live_3 <= shadow_3;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :76:31
-        live_4 <= shadow_4;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :76:31
-        live_5 <= shadow_5;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :76:31
-        live_6 <= shadow_6;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :76:31
-        live_7 <= shadow_7;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :76:31
-        live_8 <= shadow_8;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :76:31
-        live_9 <= shadow_9;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :76:31
-        live_10 <= shadow_10;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :76:31
-        live_11 <= shadow_11;	// src/queen/scala/common/QueenDsaRegIf.scala:75:33, :76:31
+    else begin	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
+      automatic logic en;	// src/queen/scala/common/QueenDsaRegIf.scala:168:36
+      automatic logic _GEN_0;	// src/queen/scala/common/QueenDsaRegIf.scala:170:42
+      automatic logic en_1;	// src/queen/scala/common/QueenDsaRegIf.scala:168:36
+      automatic logic _GEN_1;	// src/queen/scala/common/QueenDsaRegIf.scala:170:42
+      automatic logic en_2;	// src/queen/scala/common/QueenDsaRegIf.scala:168:36
+      automatic logic _GEN_2;	// src/queen/scala/common/QueenDsaRegIf.scala:170:42
+      automatic logic en_3;	// src/queen/scala/common/QueenDsaRegIf.scala:168:36
+      automatic logic _GEN_3;	// src/queen/scala/common/QueenDsaRegIf.scala:170:42
+      en = _en_T & wrOk_0;	// src/queen/scala/common/QueenDsaRegIf.scala:92:17, :143:34, :147:31, :168:36
+      _GEN_0 = en & _isWr_T_1;	// src/queen/scala/common/QueenDsaRegIf.scala:92:69, :168:36, :170:42
+      en_1 = _en_T_1 & wrOk_1;	// src/queen/scala/common/QueenDsaRegIf.scala:92:17, :143:34, :147:31, :168:36
+      _GEN_1 = en_1 & _isWr_T_5;	// src/queen/scala/common/QueenDsaRegIf.scala:92:69, :168:36, :170:42
+      en_2 = _en_T_2 & wrOk_2;	// src/queen/scala/common/QueenDsaRegIf.scala:92:17, :143:34, :147:31, :168:36
+      _GEN_2 = en_2 & _isWr_T_9;	// src/queen/scala/common/QueenDsaRegIf.scala:92:69, :168:36, :170:42
+      en_3 = _en_T_3 & wrOk_3;	// src/queen/scala/common/QueenDsaRegIf.scala:92:17, :143:34, :147:31, :168:36
+      _GEN_3 = en_3 & _isWr_T_13;	// src/queen/scala/common/QueenDsaRegIf.scala:92:69, :168:36, :170:42
+      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h0)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_0 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h0)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_0 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h0)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_0 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h0)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_0 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h0)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_0 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h0)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_0 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h0)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_0 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h0)	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_0 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h1)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_1 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h1)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_1 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h1)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_1 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h1)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_1 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h1)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_1 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h1)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_1 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h1)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_1 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h1)	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_1 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h2)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_2 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h2)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_2 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h2)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_2 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h2)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_2 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h2)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_2 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h2)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_2 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h2)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_2 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h2)	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_2 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h3)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_3 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h3)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_3 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h3)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_3 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h3)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_3 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h3)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_3 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h3)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_3 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h3)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_3 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h3)	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_3 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h4)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_4 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h4)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_4 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h4)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_4 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h4)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_4 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h4)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_4 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h4)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_4 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h4)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_4 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h4)	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_4 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h5)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_5 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h5)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_5 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h5)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_5 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h5)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_5 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h5)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_5 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h5)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_5 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h5)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_5 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h5)	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_5 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h6)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_6 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h6)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_6 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h6)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_6 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h6)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_6 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h6)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_6 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h6)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_6 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h6)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_6 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h6)	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_6 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h7)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_7 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h7)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_7 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h7)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_7 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h7)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_7 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h7)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_7 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h7)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_7 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h7)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_7 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h7)	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_7 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h8)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_8 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h8)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_8 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h8)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_8 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h8)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_8 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h8)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_8 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h8)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_8 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h8)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_8 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h8)	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_8 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'h9)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_9 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'h9)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_9 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'h9)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_9 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'h9)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_9 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'h9)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_9 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'h9)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_9 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'h9)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_9 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'h9)	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_9 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'hA)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_10 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'hA)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_10 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'hA)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_10 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'hA)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_10 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'hA)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_10 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'hA)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_10 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'hA)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_10 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'hA)	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_10 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      if (_GEN_3 & _wrOk_T_101 & io_cmd_bits_3_bits_reg1Addr[3:0] == 4'hB)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_11 <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_3 & _wrOk_T_87 & io_cmd_bits_3_bits_reg0Addr[3:0] == 4'hB)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_11 <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_2 & _wrOk_T_72 & io_cmd_bits_2_bits_reg1Addr[3:0] == 4'hB)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_11 <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_2 & _wrOk_T_58 & io_cmd_bits_2_bits_reg0Addr[3:0] == 4'hB)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_11 <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_1 & _wrOk_T_43 & io_cmd_bits_1_bits_reg1Addr[3:0] == 4'hB)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_11 <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en_1 & _wrOk_T_29 & io_cmd_bits_1_bits_reg0Addr[3:0] == 4'hB)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_11 <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (_GEN_0 & _wrOk_T_14 & io_cmd_bits_0_bits_reg1Addr[3:0] == 4'hB)	// src/queen/scala/common/QueenDsaRegIf.scala:113:44, :114:{24,59}, :118:11, :155:18, :170:42
+        shadow_11 <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      else if (en & _wrOk_T & io_cmd_bits_0_bits_reg0Addr[3:0] == 4'hB)	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :113:44, :114:{24,59}, :118:11, :155:18, :168:36
+        shadow_11 <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33
+      if (io_start_0) begin	// src/queen/scala/common/QueenDsaRegIf.scala:192:24
+        live_0 <= shadow_0;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :75:31
+        live_1 <= shadow_1;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :75:31
+        live_2 <= shadow_2;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :75:31
+        live_3 <= shadow_3;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :75:31
+        live_4 <= shadow_4;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :75:31
+        live_5 <= shadow_5;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :75:31
+        live_6 <= shadow_6;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :75:31
+        live_7 <= shadow_7;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :75:31
+        live_8 <= shadow_8;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :75:31
+        live_9 <= shadow_9;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :75:31
+        live_10 <= shadow_10;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :75:31
+        live_11 <= shadow_11;	// src/queen/scala/common/QueenDsaRegIf.scala:74:33, :75:31
       end
       intrRaw <=
         intrRaw
@@ -557,123 +557,123 @@ module Wb_QueenDsaRegIf(	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
         | (en_2 & _wrOk_T_61 ? io_cmd_bits_2_bits_data0[7:0] : 8'h0)
         | (_GEN_2 & _wrOk_T_75 ? io_cmd_bits_2_bits_data1[7:0] : 8'h0)
         | (en_3 & _wrOk_T_90 ? io_cmd_bits_3_bits_data0[7:0] : 8'h0)
-        | (_GEN_3 & _wrOk_T_104 ? io_cmd_bits_3_bits_data1[7:0] : 8'h0) | io_intrSrc;	// src/queen/scala/common/QueenDsaRegIf.scala:77:34, :119:{35,56}, :163:26, :164:26, :169:36, :171:42, :175:{39,44}, :176:39, :178:{25,27,51,75}
-      if (_GEN_3 & _wrOk_T_106)	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :156:18, :158:{38,49}, :171:42
-        intrMask <= io_cmd_bits_3_bits_data1[7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:78:35, :158:53
-      else if (en_3 & _wrOk_T_92)	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :156:18, :158:{38,49}, :169:36
-        intrMask <= io_cmd_bits_3_bits_data0[7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:78:35, :158:53
-      else if (_GEN_2 & _wrOk_T_77)	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :156:18, :158:{38,49}, :171:42
-        intrMask <= io_cmd_bits_2_bits_data1[7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:78:35, :158:53
-      else if (en_2 & _wrOk_T_63)	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :156:18, :158:{38,49}, :169:36
-        intrMask <= io_cmd_bits_2_bits_data0[7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:78:35, :158:53
-      else if (_GEN_1 & _wrOk_T_48)	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :156:18, :158:{38,49}, :171:42
-        intrMask <= io_cmd_bits_1_bits_data1[7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:78:35, :158:53
-      else if (en_1 & _wrOk_T_34)	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :156:18, :158:{38,49}, :169:36
-        intrMask <= io_cmd_bits_1_bits_data0[7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:78:35, :158:53
-      else if (_GEN_0 & _wrOk_T_19)	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :156:18, :158:{38,49}, :171:42
-        intrMask <= io_cmd_bits_0_bits_data1[7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:78:35, :158:53
-      else if (en & _wrOk_T_5)	// src/queen/scala/common/QueenDsaRegIf.scala:78:35, :120:15, :156:18, :158:{38,49}, :169:36
-        intrMask <= io_cmd_bits_0_bits_data0[7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:78:35, :158:53
-      if (_GEN_3 & _wrOk_T_108)	// src/queen/scala/common/QueenDsaRegIf.scala:120:37, :156:18, :159:{44,56}, :171:42
-        sigTarget <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:79:36
-      else if (en_3 & _wrOk_T_94)	// src/queen/scala/common/QueenDsaRegIf.scala:120:37, :156:18, :159:{44,56}, :169:36
-        sigTarget <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:79:36
-      else if (_GEN_2 & _wrOk_T_79)	// src/queen/scala/common/QueenDsaRegIf.scala:120:37, :156:18, :159:{44,56}, :171:42
-        sigTarget <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:79:36
-      else if (en_2 & _wrOk_T_65)	// src/queen/scala/common/QueenDsaRegIf.scala:120:37, :156:18, :159:{44,56}, :169:36
-        sigTarget <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:79:36
-      else if (_GEN_1 & _wrOk_T_50)	// src/queen/scala/common/QueenDsaRegIf.scala:120:37, :156:18, :159:{44,56}, :171:42
-        sigTarget <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:79:36
-      else if (en_1 & _wrOk_T_36)	// src/queen/scala/common/QueenDsaRegIf.scala:120:37, :156:18, :159:{44,56}, :169:36
-        sigTarget <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:79:36
-      else if (_GEN_0 & _wrOk_T_21)	// src/queen/scala/common/QueenDsaRegIf.scala:120:37, :156:18, :159:{44,56}, :171:42
-        sigTarget <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:79:36
-      else if (en & _wrOk_T_7)	// src/queen/scala/common/QueenDsaRegIf.scala:79:36, :120:37, :156:18, :159:{44,56}, :169:36
-        sigTarget <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:79:36
-      if (_GEN_3 & _wrOk_T_110)	// src/queen/scala/common/QueenDsaRegIf.scala:120:65, :156:18, :160:{42,52}, :171:42
-        sigMask <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:80:34
-      else if (en_3 & _wrOk_T_96)	// src/queen/scala/common/QueenDsaRegIf.scala:120:65, :156:18, :160:{42,52}, :169:36
-        sigMask <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:80:34
-      else if (_GEN_2 & _wrOk_T_81)	// src/queen/scala/common/QueenDsaRegIf.scala:120:65, :156:18, :160:{42,52}, :171:42
-        sigMask <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:80:34
-      else if (en_2 & _wrOk_T_67)	// src/queen/scala/common/QueenDsaRegIf.scala:120:65, :156:18, :160:{42,52}, :169:36
-        sigMask <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:80:34
-      else if (_GEN_1 & _wrOk_T_52)	// src/queen/scala/common/QueenDsaRegIf.scala:120:65, :156:18, :160:{42,52}, :171:42
-        sigMask <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:80:34
-      else if (en_1 & _wrOk_T_38)	// src/queen/scala/common/QueenDsaRegIf.scala:120:65, :156:18, :160:{42,52}, :169:36
-        sigMask <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:80:34
-      else if (_GEN_0 & _wrOk_T_23)	// src/queen/scala/common/QueenDsaRegIf.scala:120:65, :156:18, :160:{42,52}, :171:42
-        sigMask <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:80:34
-      else if (en & _wrOk_T_9)	// src/queen/scala/common/QueenDsaRegIf.scala:80:34, :120:65, :156:18, :160:{42,52}, :169:36
-        sigMask <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:80:34
-      if (_GEN_3 & _wrOk_T_112)	// src/queen/scala/common/QueenDsaRegIf.scala:121:15, :156:18, :161:{38,49}, :171:42
-        traceTag <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:81:35
-      else if (en_3 & _wrOk_T_98)	// src/queen/scala/common/QueenDsaRegIf.scala:121:15, :156:18, :161:{38,49}, :169:36
-        traceTag <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:81:35
-      else if (_GEN_2 & _wrOk_T_83)	// src/queen/scala/common/QueenDsaRegIf.scala:121:15, :156:18, :161:{38,49}, :171:42
-        traceTag <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:81:35
-      else if (en_2 & _wrOk_T_69)	// src/queen/scala/common/QueenDsaRegIf.scala:121:15, :156:18, :161:{38,49}, :169:36
-        traceTag <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:81:35
-      else if (_GEN_1 & _wrOk_T_54)	// src/queen/scala/common/QueenDsaRegIf.scala:121:15, :156:18, :161:{38,49}, :171:42
-        traceTag <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:81:35
-      else if (en_1 & _wrOk_T_40)	// src/queen/scala/common/QueenDsaRegIf.scala:121:15, :156:18, :161:{38,49}, :169:36
-        traceTag <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:81:35
-      else if (_GEN_0 & _wrOk_T_25)	// src/queen/scala/common/QueenDsaRegIf.scala:121:15, :156:18, :161:{38,49}, :171:42
-        traceTag <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:81:35
-      else if (en & _wrOk_T_11)	// src/queen/scala/common/QueenDsaRegIf.scala:81:35, :121:15, :156:18, :161:{38,49}, :169:36
-        traceTag <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:81:35
+        | (_GEN_3 & _wrOk_T_104 ? io_cmd_bits_3_bits_data1[7:0] : 8'h0) | io_intrSrc;	// src/queen/scala/common/QueenDsaRegIf.scala:76:34, :118:{35,56}, :162:26, :163:26, :168:36, :170:42, :174:{39,44}, :175:39, :177:{25,27,51,75}
+      if (_GEN_3 & _wrOk_T_106)	// src/queen/scala/common/QueenDsaRegIf.scala:119:15, :155:18, :157:{38,49}, :170:42
+        intrMask <= io_cmd_bits_3_bits_data1[7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:77:35, :157:53
+      else if (en_3 & _wrOk_T_92)	// src/queen/scala/common/QueenDsaRegIf.scala:119:15, :155:18, :157:{38,49}, :168:36
+        intrMask <= io_cmd_bits_3_bits_data0[7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:77:35, :157:53
+      else if (_GEN_2 & _wrOk_T_77)	// src/queen/scala/common/QueenDsaRegIf.scala:119:15, :155:18, :157:{38,49}, :170:42
+        intrMask <= io_cmd_bits_2_bits_data1[7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:77:35, :157:53
+      else if (en_2 & _wrOk_T_63)	// src/queen/scala/common/QueenDsaRegIf.scala:119:15, :155:18, :157:{38,49}, :168:36
+        intrMask <= io_cmd_bits_2_bits_data0[7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:77:35, :157:53
+      else if (_GEN_1 & _wrOk_T_48)	// src/queen/scala/common/QueenDsaRegIf.scala:119:15, :155:18, :157:{38,49}, :170:42
+        intrMask <= io_cmd_bits_1_bits_data1[7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:77:35, :157:53
+      else if (en_1 & _wrOk_T_34)	// src/queen/scala/common/QueenDsaRegIf.scala:119:15, :155:18, :157:{38,49}, :168:36
+        intrMask <= io_cmd_bits_1_bits_data0[7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:77:35, :157:53
+      else if (_GEN_0 & _wrOk_T_19)	// src/queen/scala/common/QueenDsaRegIf.scala:119:15, :155:18, :157:{38,49}, :170:42
+        intrMask <= io_cmd_bits_0_bits_data1[7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:77:35, :157:53
+      else if (en & _wrOk_T_5)	// src/queen/scala/common/QueenDsaRegIf.scala:77:35, :119:15, :155:18, :157:{38,49}, :168:36
+        intrMask <= io_cmd_bits_0_bits_data0[7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:77:35, :157:53
+      if (_GEN_3 & _wrOk_T_108)	// src/queen/scala/common/QueenDsaRegIf.scala:119:37, :155:18, :158:{44,56}, :170:42
+        sigTarget <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:78:36
+      else if (en_3 & _wrOk_T_94)	// src/queen/scala/common/QueenDsaRegIf.scala:119:37, :155:18, :158:{44,56}, :168:36
+        sigTarget <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:78:36
+      else if (_GEN_2 & _wrOk_T_79)	// src/queen/scala/common/QueenDsaRegIf.scala:119:37, :155:18, :158:{44,56}, :170:42
+        sigTarget <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:78:36
+      else if (en_2 & _wrOk_T_65)	// src/queen/scala/common/QueenDsaRegIf.scala:119:37, :155:18, :158:{44,56}, :168:36
+        sigTarget <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:78:36
+      else if (_GEN_1 & _wrOk_T_50)	// src/queen/scala/common/QueenDsaRegIf.scala:119:37, :155:18, :158:{44,56}, :170:42
+        sigTarget <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:78:36
+      else if (en_1 & _wrOk_T_36)	// src/queen/scala/common/QueenDsaRegIf.scala:119:37, :155:18, :158:{44,56}, :168:36
+        sigTarget <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:78:36
+      else if (_GEN_0 & _wrOk_T_21)	// src/queen/scala/common/QueenDsaRegIf.scala:119:37, :155:18, :158:{44,56}, :170:42
+        sigTarget <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:78:36
+      else if (en & _wrOk_T_7)	// src/queen/scala/common/QueenDsaRegIf.scala:78:36, :119:37, :155:18, :158:{44,56}, :168:36
+        sigTarget <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:78:36
+      if (_GEN_3 & _wrOk_T_110)	// src/queen/scala/common/QueenDsaRegIf.scala:119:65, :155:18, :159:{42,52}, :170:42
+        sigMask <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:79:34
+      else if (en_3 & _wrOk_T_96)	// src/queen/scala/common/QueenDsaRegIf.scala:119:65, :155:18, :159:{42,52}, :168:36
+        sigMask <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:79:34
+      else if (_GEN_2 & _wrOk_T_81)	// src/queen/scala/common/QueenDsaRegIf.scala:119:65, :155:18, :159:{42,52}, :170:42
+        sigMask <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:79:34
+      else if (en_2 & _wrOk_T_67)	// src/queen/scala/common/QueenDsaRegIf.scala:119:65, :155:18, :159:{42,52}, :168:36
+        sigMask <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:79:34
+      else if (_GEN_1 & _wrOk_T_52)	// src/queen/scala/common/QueenDsaRegIf.scala:119:65, :155:18, :159:{42,52}, :170:42
+        sigMask <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:79:34
+      else if (en_1 & _wrOk_T_38)	// src/queen/scala/common/QueenDsaRegIf.scala:119:65, :155:18, :159:{42,52}, :168:36
+        sigMask <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:79:34
+      else if (_GEN_0 & _wrOk_T_23)	// src/queen/scala/common/QueenDsaRegIf.scala:119:65, :155:18, :159:{42,52}, :170:42
+        sigMask <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:79:34
+      else if (en & _wrOk_T_9)	// src/queen/scala/common/QueenDsaRegIf.scala:79:34, :119:65, :155:18, :159:{42,52}, :168:36
+        sigMask <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:79:34
+      if (_GEN_3 & _wrOk_T_112)	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :155:18, :160:{38,49}, :170:42
+        traceTag <= io_cmd_bits_3_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:80:35
+      else if (en_3 & _wrOk_T_98)	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :155:18, :160:{38,49}, :168:36
+        traceTag <= io_cmd_bits_3_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:80:35
+      else if (_GEN_2 & _wrOk_T_83)	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :155:18, :160:{38,49}, :170:42
+        traceTag <= io_cmd_bits_2_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:80:35
+      else if (en_2 & _wrOk_T_69)	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :155:18, :160:{38,49}, :168:36
+        traceTag <= io_cmd_bits_2_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:80:35
+      else if (_GEN_1 & _wrOk_T_54)	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :155:18, :160:{38,49}, :170:42
+        traceTag <= io_cmd_bits_1_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:80:35
+      else if (en_1 & _wrOk_T_40)	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :155:18, :160:{38,49}, :168:36
+        traceTag <= io_cmd_bits_1_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:80:35
+      else if (_GEN_0 & _wrOk_T_25)	// src/queen/scala/common/QueenDsaRegIf.scala:120:15, :155:18, :160:{38,49}, :170:42
+        traceTag <= io_cmd_bits_0_bits_data1;	// src/queen/scala/common/QueenDsaRegIf.scala:80:35
+      else if (en & _wrOk_T_11)	// src/queen/scala/common/QueenDsaRegIf.scala:80:35, :120:15, :155:18, :160:{38,49}, :168:36
+        traceTag <= io_cmd_bits_0_bits_data0;	// src/queen/scala/common/QueenDsaRegIf.scala:80:35
     end
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
-      `FIRRTL_BEFORE_INITIAL	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
+  `ifdef ENABLE_INITIAL_REG_	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
+      `FIRRTL_BEFORE_INITIAL	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
-      automatic logic [31:0] _RANDOM[0:27];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
-      `ifdef INIT_RANDOM_PROLOG_	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
-        `INIT_RANDOM_PROLOG_	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
+    initial begin	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
+      automatic logic [31:0] _RANDOM[0:27];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
+      `ifdef INIT_RANDOM_PROLOG_	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
+        `INIT_RANDOM_PROLOG_	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
+      `ifdef RANDOMIZE_REG_INIT	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
         for (logic [4:0] i = 5'h0; i < 5'h1C; i += 5'h1) begin
-          _RANDOM[i] = `RANDOM;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
-        end	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
-        shadow_0 = _RANDOM[5'h0];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :75:33
-        shadow_1 = _RANDOM[5'h1];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :75:33
-        shadow_2 = _RANDOM[5'h2];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :75:33
-        shadow_3 = _RANDOM[5'h3];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :75:33
-        shadow_4 = _RANDOM[5'h4];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :75:33
-        shadow_5 = _RANDOM[5'h5];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :75:33
-        shadow_6 = _RANDOM[5'h6];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :75:33
-        shadow_7 = _RANDOM[5'h7];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :75:33
-        shadow_8 = _RANDOM[5'h8];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :75:33
-        shadow_9 = _RANDOM[5'h9];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :75:33
-        shadow_10 = _RANDOM[5'hA];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :75:33
-        shadow_11 = _RANDOM[5'hB];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :75:33
-        live_0 = _RANDOM[5'hC];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-        live_1 = _RANDOM[5'hD];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-        live_2 = _RANDOM[5'hE];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-        live_3 = _RANDOM[5'hF];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-        live_4 = _RANDOM[5'h10];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-        live_5 = _RANDOM[5'h11];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-        live_6 = _RANDOM[5'h12];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-        live_7 = _RANDOM[5'h13];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-        live_8 = _RANDOM[5'h14];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-        live_9 = _RANDOM[5'h15];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-        live_10 = _RANDOM[5'h16];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-        live_11 = _RANDOM[5'h17];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-        intrRaw = _RANDOM[5'h18][7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :77:34
-        intrMask = _RANDOM[5'h18][15:8];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :77:34, :78:35
-        sigTarget = {_RANDOM[5'h18][31:16], _RANDOM[5'h19][15:0]};	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :77:34, :79:36
-        sigMask = {_RANDOM[5'h19][31:16], _RANDOM[5'h1A][15:0]};	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :79:36, :80:34
-        traceTag = {_RANDOM[5'h1A][31:16], _RANDOM[5'h1B][15:0]};	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :80:34, :81:35
+          _RANDOM[i] = `RANDOM;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
+        end	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
+        shadow_0 = _RANDOM[5'h0];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :74:33
+        shadow_1 = _RANDOM[5'h1];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :74:33
+        shadow_2 = _RANDOM[5'h2];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :74:33
+        shadow_3 = _RANDOM[5'h3];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :74:33
+        shadow_4 = _RANDOM[5'h4];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :74:33
+        shadow_5 = _RANDOM[5'h5];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :74:33
+        shadow_6 = _RANDOM[5'h6];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :74:33
+        shadow_7 = _RANDOM[5'h7];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :74:33
+        shadow_8 = _RANDOM[5'h8];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :74:33
+        shadow_9 = _RANDOM[5'h9];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :74:33
+        shadow_10 = _RANDOM[5'hA];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :74:33
+        shadow_11 = _RANDOM[5'hB];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :74:33
+        live_0 = _RANDOM[5'hC];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+        live_1 = _RANDOM[5'hD];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+        live_2 = _RANDOM[5'hE];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+        live_3 = _RANDOM[5'hF];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+        live_4 = _RANDOM[5'h10];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+        live_5 = _RANDOM[5'h11];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+        live_6 = _RANDOM[5'h12];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+        live_7 = _RANDOM[5'h13];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+        live_8 = _RANDOM[5'h14];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+        live_9 = _RANDOM[5'h15];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+        live_10 = _RANDOM[5'h16];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+        live_11 = _RANDOM[5'h17];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+        intrRaw = _RANDOM[5'h18][7:0];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :76:34
+        intrMask = _RANDOM[5'h18][15:8];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :76:34, :77:35
+        sigTarget = {_RANDOM[5'h18][31:16], _RANDOM[5'h19][15:0]};	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :76:34, :78:36
+        sigMask = {_RANDOM[5'h19][31:16], _RANDOM[5'h1A][15:0]};	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :78:36, :79:34
+        traceTag = {_RANDOM[5'h1A][31:16], _RANDOM[5'h1B][15:0]};	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :79:34, :80:35
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
-      `FIRRTL_AFTER_INITIAL	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
+    `ifdef FIRRTL_AFTER_INITIAL	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
+      `FIRRTL_AFTER_INITIAL	// src/queen/scala/common/QueenDsaRegIf.scala:55:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_cmd_ready = io_cmd_ready_0;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :99:24
-  assign io_resp_valid = accept & (|_hasRd_T);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/common/QueenDsaRegIf.scala:56:7, :97:{30,37}, :189:29
+  assign io_cmd_ready = io_cmd_ready_0;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :98:24
+  assign io_resp_valid = accept & (|_hasRd_T);	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35, src/queen/scala/common/QueenDsaRegIf.scala:55:7, :96:{30,37}, :188:29
   assign io_resp_bits_data =
     _io_resp_bits_err_T
       ? _GEN[rdAddr[3:0]]
@@ -693,34 +693,34 @@ module Wb_QueenDsaRegIf(	// src/queen/scala/common/QueenDsaRegIf.scala:56:7
                               ? {24'h0, intrMask}
                               : rdAddr == 10'h64 | rdAddr == 10'h60
                                   ? {24'h0, intrRaw}
-                                  : 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :75:41, :77:34, :78:35, :79:36, :80:34, :81:35, :89:26, :110:{17,22,34}, :130:{45,48}, :132:{12,15,33,38}, :133:36, :134:36, :135:47, :137:49, :138:{48,64}, :183:{26,32}
+                                  : 32'h0;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :74:41, :76:34, :77:35, :78:36, :79:34, :80:35, :88:26, :109:{17,22,34}, :129:{45,48}, :131:{12,15,33,38}, :132:36, :133:36, :134:47, :136:49, :137:{48,64}, :182:{26,32}
   assign io_resp_bits_err =
     ~(_io_resp_bits_err_T | (|(rdAddr[9:6])) & _io_resp_bits_err_T_2 | rdAddr == 10'h60
       | rdAddr == 10'h64 | rdAddr == 10'h68 | rdAddr == 10'h6C | rdAddr == 10'h80
-      | rdAddr == 10'h81 | rdAddr == 10'hA0);	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :124:30, :125:{34,79}, :126:{15,31,36,54,59,76}, :127:{15,34,39,62,67,88}, :128:15, :130:48, :132:{15,38}, :134:36, :183:{26,32}, :191:25
-  assign io_wrErr_0 = _en_T & ~wrOk_0;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :93:17, :144:34, :148:{31,42,45}
-  assign io_wrErr_1 = _en_T_1 & ~wrOk_1;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :93:17, :144:34, :148:{31,42,45}
-  assign io_wrErr_2 = _en_T_2 & ~wrOk_2;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :93:17, :144:34, :148:{31,42,45}
-  assign io_wrErr_3 = _en_T_3 & ~wrOk_3;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :93:17, :144:34, :148:{31,42,45}
-  assign io_cfgRegs_0 = live_0;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-  assign io_cfgRegs_1 = live_1;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-  assign io_cfgRegs_2 = live_2;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-  assign io_cfgRegs_3 = live_3;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-  assign io_cfgRegs_4 = live_4;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-  assign io_cfgRegs_5 = live_5;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-  assign io_cfgRegs_6 = live_6;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-  assign io_cfgRegs_7 = live_7;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-  assign io_cfgRegs_8 = live_8;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-  assign io_cfgRegs_9 = live_9;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-  assign io_cfgRegs_10 = live_10;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-  assign io_cfgRegs_11 = live_11;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :76:31
-  assign io_irq = |(intrRaw & ~intrMask);	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :77:34, :78:35, :89:{24,26,37}
-  assign io_start = io_start_0;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :193:24
-  assign io_startSwTag = (|runSwTag) ? runSwTag : traceTag;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :81:35, :183:{26,32}, :196:{25,35}
-  assign io_hwSignal_enable = sigTarget[0];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :79:36, :84:36
-  assign io_hwSignal_isTimeline = sigTarget[1];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :79:36, :85:40
-  assign io_hwSignal_group = sigTarget[6:2];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :79:36, :86:35
-  assign io_hwSignal_mask = sigMask;	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :80:34
-  assign io_hwSignal_timeline = sigTarget[9:7];	// src/queen/scala/common/QueenDsaRegIf.scala:56:7, :79:36, :87:38
+      | rdAddr == 10'h81 | rdAddr == 10'hA0);	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :123:30, :124:{34,79}, :125:{15,31,36,54,59,76}, :126:{15,34,39,62,67,88}, :127:15, :129:48, :131:{15,38}, :133:36, :182:{26,32}, :190:25
+  assign io_wrErr_0 = _en_T & ~wrOk_0;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :92:17, :143:34, :147:{31,42,45}
+  assign io_wrErr_1 = _en_T_1 & ~wrOk_1;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :92:17, :143:34, :147:{31,42,45}
+  assign io_wrErr_2 = _en_T_2 & ~wrOk_2;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :92:17, :143:34, :147:{31,42,45}
+  assign io_wrErr_3 = _en_T_3 & ~wrOk_3;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :92:17, :143:34, :147:{31,42,45}
+  assign io_cfgRegs_0 = live_0;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+  assign io_cfgRegs_1 = live_1;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+  assign io_cfgRegs_2 = live_2;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+  assign io_cfgRegs_3 = live_3;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+  assign io_cfgRegs_4 = live_4;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+  assign io_cfgRegs_5 = live_5;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+  assign io_cfgRegs_6 = live_6;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+  assign io_cfgRegs_7 = live_7;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+  assign io_cfgRegs_8 = live_8;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+  assign io_cfgRegs_9 = live_9;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+  assign io_cfgRegs_10 = live_10;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+  assign io_cfgRegs_11 = live_11;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :75:31
+  assign io_irq = |(intrRaw & ~intrMask);	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :76:34, :77:35, :88:{24,26,37}
+  assign io_start = io_start_0;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :192:24
+  assign io_startSwTag = (|runSwTag) ? runSwTag : traceTag;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :80:35, :182:{26,32}, :195:{25,35}
+  assign io_hwSignal_enable = sigTarget[0];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :78:36, :83:36
+  assign io_hwSignal_isTimeline = sigTarget[1];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :78:36, :84:40
+  assign io_hwSignal_group = sigTarget[6:2];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :78:36, :85:35
+  assign io_hwSignal_mask = sigMask;	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :79:34
+  assign io_hwSignal_timeline = sigTarget[9:7];	// src/queen/scala/common/QueenDsaRegIf.scala:55:7, :78:36, :86:38
 endmodule
 
