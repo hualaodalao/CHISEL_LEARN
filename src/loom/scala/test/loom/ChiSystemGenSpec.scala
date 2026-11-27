@@ -5,7 +5,7 @@ import chisel3.util._
 import chisel3.simulator.HasSimulator
 import chisel3.simulator.scalatest._
 import loom.chi._
-import loom.gen.ChiAssemble
+import loom.gen.{ChiAdaptedNetworkTop, ChiAssemble}
 import loom.ir._
 import loom.rtl.LmWire
 import org.scalatest.flatspec.AnyFlatSpec
@@ -58,24 +58,29 @@ class ChiSystemGenSpec extends AnyFlatSpec with Matchers with ChiselSim {
   private val bridgeSnId = nets(0).sn(bridges.head.fromSn).nodeId
   private val sinkNodeId = nets(1).sn.head.nodeId
 
+  // System boundary ports are MixedVec[Data] (per-free-slot widths, HW-16);
+  // cast at the access site like ChiSystemSpec.
+  private def rnOf(sys: ChiSystemTop, k: Int): ChiRnPort = sys.io.rn(k).asInstanceOf[ChiRnPort]
+  private def snOf(sys: ChiSystemTop, k: Int): ChiSnPort = sys.io.sn(k).asInstanceOf[ChiSnPort]
+
   /** Idle the endpoints the stimulus does not use: A's local SN (freeSn 0)
     * and B's free RN (freeRn 1). freeRn 0 = mA, freeSn 1 = sB. */
   private def idleUnused(sys: ChiSystemTop): Unit = {
-    sys.io.sn(0).req.ready := false.B
-    sys.io.sn(0).rsp.valid := false.B
-    sys.io.sn(0).rsp.bits := 0.U.asTypeOf(new ChiRspFlit(c))
-    sys.io.sn(0).dat.valid := false.B
-    sys.io.sn(0).dat.bits := 0.U.asTypeOf(new ChiDatFlit(c))
-    sys.io.sn(0).rxDat.ready := false.B
-    sys.io.rn(1).req.valid := false.B
-    sys.io.rn(1).req.bits := 0.U.asTypeOf(new ChiReqFlit(c))
-    sys.io.rn(1).txRsp.valid := false.B
-    sys.io.rn(1).txRsp.bits := 0.U.asTypeOf(new ChiRspFlit(c))
-    sys.io.rn(1).txDat.valid := false.B
-    sys.io.rn(1).txDat.bits := 0.U.asTypeOf(new ChiDatFlit(c))
-    sys.io.rn(1).rsp.ready := false.B
-    sys.io.rn(1).dat.ready := false.B
-    sys.io.rn(1).snp.ready := false.B
+    snOf(sys, 0).req.ready := false.B
+    snOf(sys, 0).rsp.valid := false.B
+    snOf(sys, 0).rsp.bits := 0.U.asTypeOf(new ChiRspFlit(c))
+    snOf(sys, 0).dat.valid := false.B
+    snOf(sys, 0).dat.bits := 0.U.asTypeOf(new ChiDatFlit(c))
+    snOf(sys, 0).rxDat.ready := false.B
+    rnOf(sys, 1).req.valid := false.B
+    rnOf(sys, 1).req.bits := 0.U.asTypeOf(new ChiReqFlit(c))
+    rnOf(sys, 1).txRsp.valid := false.B
+    rnOf(sys, 1).txRsp.bits := 0.U.asTypeOf(new ChiRspFlit(c))
+    rnOf(sys, 1).txDat.valid := false.B
+    rnOf(sys, 1).txDat.bits := 0.U.asTypeOf(new ChiDatFlit(c))
+    rnOf(sys, 1).rsp.ready := false.B
+    rnOf(sys, 1).dat.ready := false.B
+    rnOf(sys, 1).snp.ready := false.B
   }
 
   private class ReadNet extends Module {
@@ -85,12 +90,12 @@ class ChiSystemGenSpec extends AnyFlatSpec with Matchers with ChiselSim {
     })
     val sys = Module(new ChiSystemTop(nets, bridges))
     val src = Module(new ChiReadSource(c))
-    sys.io.rn(0) <> io.rn
-    LmWire.link(sys.io.sn(1).req, src.io.req)
-    LmWire.link(src.io.dat, sys.io.sn(1).dat)
-    sys.io.sn(1).rsp.valid := false.B
-    sys.io.sn(1).rsp.bits := 0.U.asTypeOf(new ChiRspFlit(c))
-    sys.io.sn(1).rxDat.ready := true.B
+    rnOf(sys, 0) <> io.rn
+    LmWire.link(snOf(sys, 1).req, src.io.req)
+    LmWire.link(src.io.dat, snOf(sys, 1).dat)
+    snOf(sys, 1).rsp.valid := false.B
+    snOf(sys, 1).rsp.bits := 0.U.asTypeOf(new ChiRspFlit(c))
+    snOf(sys, 1).rxDat.ready := true.B
     idleUnused(sys)
     src.io.rdData := io.rdData
   }
@@ -127,12 +132,12 @@ class ChiSystemGenSpec extends AnyFlatSpec with Matchers with ChiselSim {
     })
     val sys = Module(new ChiSystemTop(nets, bridges))
     val sink = Module(new ChiWriteSink(c, 2, sinkNodeId))
-    sys.io.rn(0) <> io.rn
-    LmWire.link(sys.io.sn(1).req, sink.io.req)
-    LmWire.link(sink.io.rsp, sys.io.sn(1).rsp)
-    LmWire.link(sys.io.sn(1).rxDat, sink.io.dat)
-    sys.io.sn(1).dat.valid := false.B
-    sys.io.sn(1).dat.bits := 0.U.asTypeOf(new ChiDatFlit(c))
+    rnOf(sys, 0) <> io.rn
+    LmWire.link(snOf(sys, 1).req, sink.io.req)
+    LmWire.link(sink.io.rsp, snOf(sys, 1).rsp)
+    LmWire.link(snOf(sys, 1).rxDat, sink.io.dat)
+    snOf(sys, 1).dat.valid := false.B
+    snOf(sys, 1).dat.bits := 0.U.asTypeOf(new ChiDatFlit(c))
     idleUnused(sys)
     LmWire.link(sink.io.wrDone, io.wrData)
   }
@@ -203,12 +208,12 @@ class ChiSystemGenSpec extends AnyFlatSpec with Matchers with ChiselSim {
     }
     sys.io.subClk(0) := io.subClk
     sys.io.subReset(0) := io.subReset
-    sys.io.rn(0) <> io.rn
-    LmWire.link(sys.io.sn(1).req, src.io.req)
-    LmWire.link(src.io.dat, sys.io.sn(1).dat)
-    sys.io.sn(1).rsp.valid := false.B
-    sys.io.sn(1).rsp.bits := 0.U.asTypeOf(new ChiRspFlit(c))
-    sys.io.sn(1).rxDat.ready := true.B
+    rnOf(sys, 0) <> io.rn
+    LmWire.link(snOf(sys, 1).req, src.io.req)
+    LmWire.link(src.io.dat, snOf(sys, 1).dat)
+    snOf(sys, 1).rsp.valid := false.B
+    snOf(sys, 1).rsp.bits := 0.U.asTypeOf(new ChiRspFlit(c))
+    snOf(sys, 1).rxDat.ready := true.B
     idleUnused(sys)
     src.io.rdData := io.rdData
   }
@@ -246,6 +251,85 @@ class ChiSystemGenSpec extends AnyFlatSpec with Matchers with ChiselSim {
       }
       assert(got == nFlits, s"expected $nFlits flits, got $got")
       assert(acc == word, s"async IR golden read ${acc.toString(16)} != ${word.toString(16)}")
+    }
+  }
+
+  // ---- S13 (GEN-26/HW-16): IR-driven width-adapted subsystem golden ----
+
+  /** B's sn-f declares dataWidth=128 against the 256b fabric: networkParams
+    * derives the adapt row (SEM-19), so the emitSystem mkNet dispatch selects
+    * ChiAdaptedNetworkTop for B while A stays uniform. Mirrors ChiSystemSpec
+    * case 5's stimulus, adapted to the IR geometry (B's window 0x2000). */
+  private val irAdapt: IrV2 = {
+    val b = ir.subsystems(1)
+    ir.copy(meta = ir.meta.copy(name = "gen_hier_adapt"),
+      subsystems = Seq(ir.subsystems.head,
+        b.copy(nodes = b.nodes.map(n => if (n.id == "sB") n.copy(dataWidth = 128) else n))))
+  }
+  private val (netsAdapt, bridgesAdapt) = ChiAssemble.systemParams(irAdapt)
+  private val cn = c.copy(datWidth = 128)
+
+  private class AdaptedReadNet extends Module {
+    val io = IO(new Bundle {
+      val rn = Flipped(new ChiRnPort(c))
+      val rdData = Input(UInt(512.W))
+    })
+    // Same dispatch as LoomMain.emitSystem; the factory wraps in Module().
+    val sys = Module(new ChiSystemTop(netsAdapt, bridgesAdapt, ChiAssemble.subDomains(irAdapt),
+      mkNet = p => Module(
+        if (ChiAdaptedNetworkTop.needed(p)) new ChiAdaptedNetworkTop(p)
+        else new ChiNetworkUniform(p))))
+    // Remote storage runs at the adapted node width on B's SN port.
+    val src = Module(new ChiReadSource(cn))
+    rnOf(sys, 0) <> io.rn
+    private val mem = snOf(sys, 1)
+    LmWire.link(mem.req, src.io.req)
+    LmWire.link(src.io.dat, mem.dat)
+    mem.rsp.valid := false.B
+    mem.rsp.bits := 0.U.asTypeOf(new ChiRspFlit(cn))
+    mem.rxDat.ready := true.B
+    idleUnused(sys)
+    src.io.rdData := io.rdData
+  }
+
+  it should "read cross-bridge from an IR-declared adapted 128b SN bit-exact (GEN-26 golden, HW-16)" in {
+    loom.check.ChecksV2.run(irAdapt).errors shouldBe Nil
+    ChiAdaptedNetworkTop.needed(netsAdapt.head) shouldBe false
+    ChiAdaptedNetworkTop.needed(netsAdapt(1)) shouldBe true
+    ChiNodeWidths.cfgOf(netsAdapt(1), netsAdapt(1).sn.head).datWidth shouldBe 128
+    // ports.json caliber: the adapted free SN carries its node width
+    val ports = loom.report.Reports.systemPortsJsonV2(irAdapt,
+      ChiAssemble.systemProjections(irAdapt), netsAdapt, bridgesAdapt, IrV2.hash(irAdapt))
+      .asInstanceOf[JObj]
+    val freeSn = ports.get("freeSn").get.asInstanceOf[JArr].items.map(_.asInstanceOf[JObj])
+    freeSn.map(_.get("datWidth")) shouldBe
+      Seq(Some(JNum(BigDecimal(256))), Some(JNum(BigDecimal(128))))
+    simulate(new AdaptedReadNet) { dut =>
+      dut.reset.poke(true.B); dut.clock.step(2); dut.reset.poke(false.B)
+      val word = (BigInt(0xAAAA) << 256) | BigInt(0xBBBB)
+      dut.io.rdData.poke(word.U)
+      dut.io.rn.rsp.ready.poke(true.B); dut.io.rn.dat.ready.poke(true.B)
+      dut.io.rn.snp.ready.poke(true.B)
+      dut.io.rn.txRsp.valid.poke(false.B); dut.io.rn.txDat.valid.poke(false.B)
+      dut.io.rn.req.bits.opcode.poke(ChiOp.ReadNoSnp.U)
+      dut.io.rn.req.bits.addr.poke(0x2000L.U)
+      dut.io.rn.req.bits.txnId.poke(7.U); dut.io.rn.req.bits.srcId.poke(0.U)
+      dut.io.rn.req.valid.poke(true.B)
+      val nFlits = ChiWidths.flitCount(64, c.datWidth)
+      var acc = BigInt(0); var got = 0; var n = 0
+      while (got < nFlits && n < 400) {
+        if (dut.io.rn.dat.valid.peek().litToBoolean) {
+          dut.io.rn.dat.bits.opcode.expect(ChiOp.DatCompData.U)
+          val id = dut.io.rn.dat.bits.dataId.peek().litValue.toInt
+          acc |= dut.io.rn.dat.bits.data.peek().litValue << (id * 128)
+          dut.io.rn.dat.bits.txnId.expect(7.U)
+          got += 1
+        }
+        dut.clock.step(); n += 1
+      }
+      dut.io.rn.req.valid.poke(false.B)
+      assert(got == nFlits, s"expected $nFlits fabric flits, got $got")
+      assert(acc == word, s"adapted IR golden read ${acc.toString(16)} != ${word.toString(16)}")
     }
   }
 }

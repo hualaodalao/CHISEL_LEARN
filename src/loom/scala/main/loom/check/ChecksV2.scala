@@ -444,6 +444,14 @@ object ChecksV2 {
       }
     }
 
+    // CHK-63 (GEN-26, HW-16/W19): hierarchical width adaptation is chi-only
+    // this round; axi4-in-subsystem needs ChiAxiNetworkTop domClk/domReset
+    // exposure (recorded follow-up, dependency list §17.5).
+    v2.subsystems.foreach { s =>
+      if (s.nodes.exists(_.protocol == "axi4"))
+        errs += s"C0: [CHK-63] subsystem '${s.name}' axi4 nodes are not supported in hierarchical emission yet"
+    }
+
     // Remaining unknown keys keep the S1 generic C0 error (spec §3: unknown
     // fields must be rejected; retired direction/switch already mapped above).
     v2.unknown.foreach {

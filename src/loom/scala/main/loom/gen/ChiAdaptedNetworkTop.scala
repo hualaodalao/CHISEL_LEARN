@@ -12,8 +12,8 @@ import loom.rtl.LmWire
   * width-mismatched CHI-protocol node boundary (node.dataWidth !=
   * chi.datWidth). All other ports pass through unchanged; AXI nodes keep
   * bridge-layer width adaptation (no double adaptation). This is sanctioned
-  * GEN instantiation/wiring — hardware auto-insertion is pending per-node
-  * width ports in ChiNetworkTop.
+  * GEN instantiation/wiring — the W19 thin-wrapper ruling keeps ChiNetworkTop
+  * unmodified and the gearbox insertion GEN-owned (dependency list §16).
   *
   * DAT flit <-> ChiNiBeat mapping (dataId alignment, PS DAT conventions):
   *  - DataID counts 16B units within the 64B line (ChiWidths.dataIdWidth=2;
@@ -33,22 +33,19 @@ import loom.rtl.LmWire
   * Frequency-mismatch adaptation is NOT inserted here: HW-14 first version
   * keeps local nodes on domain-0 routers (CHK-54) and node-boundary CDC is
   * pending; the ChiNiAdapt instances run synchronously (async=false).
+  *
+  * GEN-26 (HW-16/W19): implements ChiNetworkLike so emitSystem can select it
+  * per subsystem through the ChiSystemTop mkNet factory; the io keeps the
+  * exact MixedVec per-port construction and node widths follow the shared
+  * ChiNodeWidths rule so the system boundary and the wrapper never drift.
   */
-class ChiAdaptedNetworkTop(p: ChiNetworkParams) extends Module {
+class ChiAdaptedNetworkTop(p: ChiNetworkParams) extends ChiNetworkLike(p) {
   private val c = p.cfg
   private val adaptOf: Map[Int, ChiAdapt] = p.adapt.map(a => a.nodeId -> a).toMap
 
-  /** Node bus width when GEN adapts this chi node's DAT boundary; the fabric
-    * width otherwise (matched nodes, axi4 nodes, unsupported width tiers).
-    */
-  private def nodeWidth(n: ChiNetNode): Int =
-    adaptOf.get(n.nodeId).filter { a =>
-      n.protocol != "axi4" && a.mismatch && a.dataWidth != c.datWidth &&
-        ChiAdaptedNetworkTop.SupportedNodeWidths.contains(a.dataWidth)
-    }.map(_.dataWidth).getOrElse(c.datWidth)
+  private def nodeWidth(n: ChiNetNode): Int = ChiNodeWidths.nodeWidth(p, n)
 
-  private def cfgOf(n: ChiNetNode): ChiConfig =
-    if (nodeWidth(n) == c.datWidth) c else c.copy(datWidth = nodeWidth(n))
+  private def cfgOf(n: ChiNetNode): ChiConfig = ChiNodeWidths.cfgOf(p, n)
 
   private val anyAxi = (p.rn ++ p.sn).exists(_.protocol == "axi4")
   // ChiAxiNetworkTop does not expose the inner domClk/domReset ports, so a
@@ -56,7 +53,7 @@ class ChiAdaptedNetworkTop(p: ChiNetworkParams) extends Module {
   require(!anyAxi || p.nDomain == 1,
     "ChiAdaptedNetworkTop: flat async (nDomain>1) with axi4 nodes needs ChiAxiNetworkTop domClk/domReset exposure (pending)")
 
-  val io = IO(new Bundle {
+  override val io = IO(new ChiNetworkIO {
     val rn = MixedVec(p.rn.map { n =>
       if (n.protocol == "axi4") new ChiAxiRnPort(c): Data
       else Flipped(new ChiRnPort(cfgOf(n)))
@@ -210,17 +207,14 @@ class ChiAdaptedNetworkTop(p: ChiNetworkParams) extends Module {
 }
 
 object ChiAdaptedNetworkTop {
-  /** Node bus widths expressible as CHI flit tiers (DataID in 16B units). */
-  val SupportedNodeWidths: Set[Int] = Set(128, 256, 512)
+  /** Node bus widths expressible as CHI flit tiers (DataID in 16B units);
+    * aliased to the shared rule so wrapper and system boundary never drift. */
+  val SupportedNodeWidths: Set[Int] = ChiNodeWidths.Supported
 
   /** True when at least one chi-protocol RN/SN node needs GEN-side DAT width
-    * adaptation (HW-12 §9.3); selects the wrapper as the emitted flat top.
+    * adaptation (HW-12 §9.3); selects the wrapper as the emitted flat top and
+    * as the per-subsystem mkNet choice in hierarchical emission (GEN-26).
     */
   def needed(p: ChiNetworkParams): Boolean =
-    (p.rn ++ p.sn).exists { n =>
-      n.protocol != "axi4" && p.adapt.exists { a =>
-        a.nodeId == n.nodeId && a.mismatch && a.dataWidth != p.cfg.datWidth &&
-          SupportedNodeWidths.contains(a.dataWidth)
-      }
-    }
+    (p.rn ++ p.sn).exists(n => ChiNodeWidths.nodeWidth(p, n) != p.cfg.datWidth)
 }

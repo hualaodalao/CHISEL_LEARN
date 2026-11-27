@@ -34,6 +34,7 @@
 | v1.6.0 | 2026-11-26 | HW-11 闭合消费（依赖清单 §11）：SEM-20a 桥端点装配（合成 SN/RN 槽+from SAM 增补+单 outstanding）、GEN-25a 分层发射 ChiSystemTop（守护解除）、BridgeParams→ChiBridgeLink 序号映射；CHK-59（dvmForward=true/async 非 2 幂拒绝）、CHK-60（uniform chi）；IR-86/93 v1 限制收口；v1 发射仅同步桥（async 待 HW-15） | SEM-20a、GEN-25a、CHK-59/CHK-60、IR-86/IR-92/IR-93 |
 | v1.7.0 | 2026-11-26 | phase 2 收口 + wave6 声明消费：CHK-60 扩至装配后 ChiConfig（含 nHalf）；宽度适配 emit 守护（HW-16）；IR-94 nocLinks[].outstanding + CHK-61 + BridgeParams.outstanding（系统层透传待 HW-17） | IR-94、CHK-60/CHK-61、GEN-25a |
 | v1.8.0 | 2026-11-27 | HW-15/17 闭合消费（依赖清单 §13）：SEM-20b 系统根时钟域（subDomains 按根时钟 (id,freqMHz) 首次出现序派生、同步桥同域/async 桥异域 CHK-62、subClk/subReset 集成方供给、ports.json 逐端口时钟域标注）；GEN-25b 域装配；async emit 守护解除；CHK-59 增 cdc/depth 一致性；outstanding 系统层透传（HW-17） | SEM-20b、GEN-25b、CHK-59/CHK-62、IR-92/IR-94 |
+| v1.9.0 | 2026-11-27 | HW-16/W19 闭合消费（依赖清单 §17，薄包装变体 §16 裁定）：GEN-26 ChiAdaptedNetworkTop extends ChiNetworkLike + mkNet 工厂（Module() 包装在工厂侧）+ ChiNodeWidths 共享宽度规则 + ports.json datWidth/protocol；hierarchicalAdaptGuard 解除；CHK-63 axi4-in-subsystem 拒绝（留后续） | GEN-26、CHK-63 |
 
 ## 1. 文档说明
 
@@ -531,9 +532,16 @@ C0 失败时返回仅含 `schema/ok/hash/errors/warnings` 的失败对象（CURR
 
 **GEN-25 层次装配（UP-07，GEN 先行）**。`ChiAssemble.subsystemParams(v2): Seq[(String, ChiNetworkParams)]`——每子系统投影为独立 IrV2（meta.name=子系统名，clockDomains/nodes/sam/qos/chi/fabric 取子系统值或顶层默认，partitions/routes 空）后走既有 networkParams；`BridgeParams(fromSub, toSub, fromRouter, toRouter, windows, asyncFifoDepth, dvmForward, fromDatWidth, toDatWidth)` 供 HW-11 消费。G1 门禁按子系统出 `gatesBySubsystem`（additive），顶层 G1 键 = 各子系统 AND。estimate additive `subsystems[]{name,nodes,routers,sam,chi}` + `nocLinks` 回显 + bridges 计数；LoomApi additive 同键。**emit 守护**：subsystems 非空 ⇒ 明确报错"分层发射待 HW-11 ChiNocBridge"，不静默发射平坦子集。
 
-**GEN-25a 分层发射（HW-11 闭合，v1.6.0，守护解除）**。`ChiAssemble.systemParams(v2)`：subsystemParams 投影 + 每 nocLink 合成桥端点（SEM-20a）+ from SAM 增补 + `ChiBridgeLink(fromSubIdx, fromSnIdx, toSubIdx, toRnIdx, windows, asyncFifoDepth, toDatWidth, dvmForward=false)` 序号映射（ subsystemParams 序对齐）。LoomMain emit：subsystems 非空 ⇒ 发射 `ChiSystemTop`（内含子系统 ChiNetworkTop + ChiNocBridge），ports/manifest 同既有口径；estimate bridges.noc 计数 + 单 outstanding/uniform cfg assumptions。CG2 逐文件确定性适用。**async nocLink 守护已解除（HW-15 闭合，v1.8.0）**：域指派正确性改由 CHK-62 静态保证。**宽度适配守护**：任一子系统含失配 chi 节点（ChiAdaptedNetworkTop.needed）⇒ emit 报错待 HW-16（ChiSystemTop 直例化 ChiNetworkTop，无 ChiAdaptedNetworkTop 包装层；方案 A trait+mkNet 工厂已对齐，见依赖清单 §14.2），不静默丢弃适配。**outstanding 系统层透传已落地（HW-17）**：systemParams 传 ChiBridgeLink.outstanding = nocLinks[].outstanding。
+**GEN-25a 分层发射（HW-11 闭合，v1.6.0，守护解除）**。`ChiAssemble.systemParams(v2)`：subsystemParams 投影 + 每 nocLink 合成桥端点（SEM-20a）+ from SAM 增补 + `ChiBridgeLink(fromSubIdx, fromSnIdx, toSubIdx, toRnIdx, windows, asyncFifoDepth, toDatWidth, dvmForward=false)` 序号映射（ subsystemParams 序对齐）。LoomMain emit：subsystems 非空 ⇒ 发射 `ChiSystemTop`（内含子系统 ChiNetworkTop + ChiNocBridge），ports/manifest 同既有口径；estimate bridges.noc 计数 + 单 outstanding/uniform cfg assumptions。CG2 逐文件确定性适用。**async nocLink 守护已解除（HW-15 闭合，v1.8.0）**：域指派正确性改由 CHK-62 静态保证。**宽度适配已消费（HW-16/W19，v1.9.0，GEN-26）**：hierarchicalAdaptGuard 解除，emitSystem 经 mkNet 工厂接入 ChiAdaptedNetworkTop。**axi4-in-subsystem 仍后续**（CHK-63 拒绝，§17.5 边界）。**outstanding 系统层透传已落地（HW-17）**：systemParams 传 ChiBridgeLink.outstanding = nocLinks[].outstanding。
 
 **GEN-25b 系统域装配（HW-15/W18，v1.8.0）**。emitSystem：`subDomains(v2)` 派生域向量传入 ChiSystemTop；ports.json 逐 free 端口增 `clockDomain`（系统域索引）+ 根时钟 (id,freqMHz) 标注，系统 clocking 字段描述 subClk/subReset 向量（nSubDom-1，集成方供给）；estimate assumptions 更新（async 桥可发射、域规则）。CG2 确定性适用。
+
+**GEN-26 分层宽度适配消费（HW-16/W19，v1.9.0）**。硬件契约（依赖清单 §17）：`ChiNetworkIO`（abstract class extends Bundle，rn/sn MixedVec[Data]+domClk/domReset，抽象 val 可匿名实例化）、`ChiNetworkLike(p)`、`ChiNetworkUniform`（默认工厂，内含未改动 ChiNetworkTop）、`ChiNodeWidths`（共享节点宽度规则：chi 协议+mismatch+∈{128,256,512}+≠fabric 宽才适配）。GEN 接入：
+1. `ChiAdaptedNetworkTop extends ChiNetworkLike(p)`，io 以 `IO(new ChiNetworkIO {...})` 匿名实例化（现有 MixedVec 构造沿用）；节点宽度判定改用 `ChiNodeWidths`（防两侧规则漂移）。
+2. emitSystem 传 `mkNet = p => Module(if (ChiAdaptedNetworkTop.needed(p)) new ChiAdaptedNetworkTop(p) else new ChiNetworkUniform(p))`——**工厂自身负责 Module() 包装**（Chisel 例化约束）；matched 子系统走 Uniform，发射输出与默认路径逐字节一致。
+3. ports.json 逐 free 端口 additive `datWidth`（=ChiNodeWidths.cfgOf(...).datWidth）/`protocol`；clockDomain 既有（GEN-25b）。
+4. hierarchicalAdaptGuard 删除；**桥槽不变式**（合成端点恒 fabric 宽原生 chi）由 GEN 构造保证 + 硬件 require 双守，不另立 CHK（不可达路径）。
+5. axi4-in-subsystem：CHK-63 拒绝（ChiAxiNetworkTop 无 domClk/domReset 暴露，留后续）。
 
 ## 6. 校验规则表（CHK）
 
@@ -600,6 +608,7 @@ C0 失败时返回仅含 `schema/ok/hash/errors/warnings` 的失败对象（CURR
 | CHK-60 | 各子系统装配后 ChiConfig（含拓扑派生 nHalf）不一致（HW-11 v1 uniform ChiConfig；装配失败回退比较解析 chi 块） | `C0: [CHK-60] subsystem '<name>' chi differs from subsystem '<ref>'; uniform ChiConfig required (per-subsystem DAT width is a follow-up)` | §3.15 |
 | CHK-61 | nocLink.outstanding ∉ [1, 2^txnIdWidth]（from 子系统） | `C0: [CHK-61] nocLink '<from>-><to>' outstanding <v> must be in [1, <max>] (2^txnIdWidth)` | §3.15 |
 | CHK-62 | 同步桥两端子系统根域不同；async 桥两端根域相同（SEM-20b，与 ChiSystemTop require 对齐） | `C0: [CHK-62] nocLink '<from>-><to>' sync bridge requires the same subsystem root clock domain (<from>=<d>, <to>=<d>)` / `... async bridge requires different subsystem root clock domains (both <d>)` | §3.15 |
+| CHK-63 | 子系统含 axi4 协议节点（分层发射本轮仅 chi，axi4-in-subsystem 留后续） | `C0: [CHK-63] subsystem '<name>' axi4 nodes are not supported in hierarchical emission yet` | §3.15 |
 
 #### C2：QoS 映射完整性（S2）
 

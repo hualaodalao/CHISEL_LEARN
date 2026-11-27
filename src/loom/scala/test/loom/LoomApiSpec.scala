@@ -463,6 +463,11 @@ class LoomApiSpec extends AnyFlatSpec with Matchers {
     assumptions.exists(s => s.contains("outstanding = nocLinks[].outstanding") &&
       s.contains("uniform ChiConfig") && s.contains("CHK-62") &&
       s.contains("HW-17")) shouldBe true
+    // GEN-26 (HW-16 closed): width adaptation consumed via the mkNet factory;
+    // axi4-in-subsystem stays a recorded follow-up (CHK-63)
+    assumptions.exists(s => s.contains("mkNet") && s.contains("GEN-26") &&
+      s.contains("CHK-63")) shouldBe true
+    assumptions.exists(_.contains("pending HW-16")) shouldBe false
     // flat configs keep neither the noc count nor the hierarchical note
     val flat = fields(fields(LoomApi.evaluate(v2Text))("estimate"))
     fields(flat("bridges")).contains("noc") shouldBe false

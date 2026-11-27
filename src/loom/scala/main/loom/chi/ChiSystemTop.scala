@@ -36,7 +36,8 @@ final case class ChiBridgeLink(
   * of the subsystem that owns that free slot.
   */
 class ChiSystemTop(subsystems: Seq[ChiNetworkParams], bridges: Seq[ChiBridgeLink],
-                   subDomain: Seq[Int] = Seq.empty) extends Module {
+                   subDomain: Seq[Int] = Seq.empty,
+                   mkNet: ChiNetworkParams => ChiNetworkLike = p => Module(new ChiNetworkUniform(p))) extends Module {
   require(subsystems.nonEmpty, "ChiSystemTop needs at least one subsystem")
   private val c = subsystems.head.cfg
   require(subsystems.forall(_.cfg == c), "ChiSystemTop v1: uniform ChiConfig across subsystems")
@@ -50,6 +51,12 @@ class ChiSystemTop(subsystems: Seq[ChiNetworkParams], bridges: Seq[ChiBridgeLink
       require(df != dt, s"async bridge ${b.fromSub}->${b.toSub} needs different subDomain (both $df)")
     else
       require(df == dt, s"sync bridge ${b.fromSub}->${b.toSub} needs the same subDomain ($df vs $dt)")
+    // Bridge endpoints are synthetic fabric-width native chi slots (SEM-20a),
+    // so the bridge wiring is independent of any free-port width adaptation.
+    require(ChiNodeWidths.nodeWidth(subsystems(b.fromSub), subsystems(b.fromSub).sn(b.fromSn)) == c.datWidth,
+      "bridge from-slot must be fabric-width native chi")
+    require(ChiNodeWidths.nodeWidth(subsystems(b.toSub), subsystems(b.toSub).rn(b.toRn)) == c.datWidth,
+      "bridge to-slot must be fabric-width native chi")
   }
 
   private val usedSn = bridges.map(b => (b.fromSub, b.fromSn)).toSet
@@ -59,8 +66,10 @@ class ChiSystemTop(subsystems: Seq[ChiNetworkParams], bridges: Seq[ChiBridgeLink
   private val nDomExtra = subsystems.map(_.nDomain - 1).sum
 
   val io = IO(new Bundle {
-    val rn = Vec(freeRn.size, Flipped(new ChiRnPort(c)))
-    val sn = Vec(freeSn.size, Flipped(new ChiSnPort(c)))
+    val rn = MixedVec(freeRn.map { case (s, i) =>
+      Flipped(new ChiRnPort(ChiNodeWidths.cfgOf(subsystems(s), subsystems(s).rn(i)))): Data })
+    val sn = MixedVec(freeSn.map { case (s, j) =>
+      Flipped(new ChiSnPort(ChiNodeWidths.cfgOf(subsystems(s), subsystems(s).sn(j)))): Data })
     val domClk = Vec(nDomExtra, Input(Bool()))
     val domReset = Vec(nDomExtra, Input(Bool()))
     val subClk = Vec(nSubDom - 1, Input(Bool()))
@@ -77,7 +86,7 @@ class ChiSystemTop(subsystems: Seq[ChiNetworkParams], bridges: Seq[ChiBridgeLink
     if (domOfSub(s) == 0) reset.asBool else io.subReset(domOfSub(s) - 1)
 
   private val nets = subsystems.zipWithIndex.map { case (p, s) =>
-    withClockAndReset(subClkOf(s), subRstOf(s)) { Module(new ChiNetworkTop(p)) }
+    withClockAndReset(subClkOf(s), subRstOf(s)) { mkNet(p) }
   }
 
   private var off = 0

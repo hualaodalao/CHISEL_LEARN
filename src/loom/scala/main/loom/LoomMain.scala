@@ -4,7 +4,8 @@ import java.nio.file.{Files, Path, Paths}
 import java.security.MessageDigest
 
 import _root_.circt.stage.ChiselStage
-import loom.chi.{ChiAxiNetworkTop, ChiNetworkTop, ChiPartitionStub, ChiPartitionTop, ChiSystemTop, ChiWrapperTop}
+import chisel3.Module
+import loom.chi.{ChiAxiNetworkTop, ChiNetworkTop, ChiNetworkUniform, ChiPartitionStub, ChiPartitionTop, ChiSystemTop, ChiWrapperTop}
 import loom.gen.{ChiAdaptedNetworkTop, ChiAssemble}
 import loom.graph.FabricGraph
 import loom.ir.{Canonical, Ir, IrV2, JArr, JBool, JObj, JStr, JValue, Json, Upgrade}
@@ -198,17 +199,11 @@ object LoomMain {
     * GEN-owned ChiAdaptedNetworkTop wraps the network with ChiNiAdapt
     * gearboxes (HW-12 §9.3, GEN-24).
     */
-  /** GEN-25a: ChiSystemTop instantiates ChiNetworkTop directly, so the flat
-    * path's ChiAdaptedNetworkTop gearboxes have no hierarchical equivalent
-    * yet (HW-16). Refuse emission rather than silently drop node width
-    * adaptation; matched-width subsystems are unaffected.
+  /** GEN-26 (HW-16/W19): subsystem width adaptation is consumed through the
+    * ChiSystemTop mkNet factory — needed() subsystems run ChiAdaptedNetworkTop,
+    * matched ones stay on ChiNetworkUniform (byte-identical to the default
+    * factory). axi4-in-subsystem is refused by CHK-63 (follow-up, §17.5).
     */
-  private[loom] def hierarchicalAdaptGuard(v2: IrV2): Option[String] =
-    if (v2.subsystems.exists(s =>
-      ChiAdaptedNetworkTop.needed(ChiAssemble.networkParams(IrV2.projectSubsystem(v2, s)))))
-      Some("ERROR: node width adaptation inside subsystems requires HW-16 (ChiSystemTop adapt integration); v1 hierarchical emission supports matched-width chi nodes only")
-    else None
-
   private[loom] def runEmit(xs: List[String]): Unit = {
     val cfg = must(xs, "--config")
     val out = must(xs, "--out")
@@ -217,13 +212,6 @@ object LoomMain {
     if (v.errors.nonEmpty) {
       writeJson(out, "checks.json", checksJsonV2(v))
       v.errors.foreach(e => println(s"ERROR: $e"))
-      sys.exit(3)
-    }
-
-    // GEN-25a/GEN-25b: hierarchical systems emit ChiSystemTop; async bridge
-    // domain correctness is statically guaranteed by CHK-62 (HW-15 closed).
-    hierarchicalAdaptGuard(v.ir).foreach { msg =>
-      println(msg)
       sys.exit(3)
     }
 
@@ -341,8 +329,12 @@ object LoomMain {
     // topology-derived cfg fields such as nHalf surface here as a clear error).
     // GEN-25b (SEM-20b): subDomains assigns each subsystem its root clock;
     // CHK-62 already guarantees the sync-same/async-different domain rule.
+    // GEN-26: the factory itself wraps in Module() (Chisel instantiation rule).
     try ChiselStage.emitSystemVerilogFile(
-      new ChiSystemTop(nets, bridges, ChiAssemble.subDomains(v.ir)),
+      new ChiSystemTop(nets, bridges, ChiAssemble.subDomains(v.ir),
+        mkNet = p => Module(
+          if (ChiAdaptedNetworkTop.needed(p)) new ChiAdaptedNetworkTop(p)
+          else new ChiNetworkUniform(p))),
       Array("--target-dir", out))
     catch {
       case e: Throwable =>

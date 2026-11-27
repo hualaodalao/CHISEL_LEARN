@@ -607,16 +607,36 @@ class EmitV2Spec extends AnyFlatSpec with Matchers {
     loom.gen.ChiAssemble.subDomains(loom.ir.IrV2.load(Paths.get(v2Cfg))) shouldBe Nil
   }
 
-  it should "guard subsystem node width adaptation with HW-16; matched widths pass (GEN-25a)" in {
-    LoomMain.hierarchicalAdaptGuard(hierCfg) shouldBe None
-    LoomMain.hierarchicalAdaptGuard(loom.ir.IrV2.load(Paths.get(v2Cfg))) shouldBe None
-    val a = hierCfg.subsystems.head
-    val mismatched = hierCfg.copy(subsystems = Seq(
-      a.copy(nodes = a.nodes.map(n => if (n.id == "m0") n.copy(dataWidth = 128) else n)),
-      hierCfg.subsystems(1)))
-    val g = LoomMain.hierarchicalAdaptGuard(mismatched)
-    g.isDefined shouldBe true
-    g.get should include("HW-16")
+  it should "check and emit width-mismatched subsystems via the mkNet factory (GEN-26, HW-16)" in {
+    // HW-16 closed: the emit guard is gone; B's SN runs 128b in a 256b fabric.
+    val b = hierCfg.subsystems(1)
+    val mismatched = hierCfg.copy(subsystems = Seq(hierCfg.subsystems.head,
+      b.copy(nodes = b.nodes.map(n => if (n.id == "s1") n.copy(dataWidth = 128) else n))))
+    loom.check.ChecksV2.run(mismatched).errors shouldBe Nil
+    val (nets, _) = loom.gen.ChiAssemble.systemParams(mismatched)
+    loom.gen.ChiAdaptedNetworkTop.needed(nets.head) shouldBe false
+    loom.gen.ChiAdaptedNetworkTop.needed(nets(1)) shouldBe true
+    val out = Files.createTempDirectory("loom-emitv2-hier-adapt")
+    val log = capture(LoomMain.runEmit(List("--config", writeCfg(mismatched), "--out", out.toString)))
+    log should not include "ERROR"
+    Files.exists(out.resolve("ChiSystemTop.sv")) shouldBe true
+    val sv = Files.readString(out.resolve("ChiSystemTop.sv"))
+    sv should include("module ChiSystemTop")
+    // adapted subsystem selects the GEN wrapper; matched stays on Uniform
+    sv should include("ChiAdaptedNetworkTop")
+    sv should include("ChiNetworkUniform")
+    Files.readString(out.resolve("ChiAdaptedNetworkTop.sv")) should include("ChiNiAdapt")
+
+    val ports = Json.parse(Files.readString(out.resolve("ports.json"))).asInstanceOf[JObj]
+    def eps(key: String): Seq[JObj] =
+      ports.get(key).get.asInstanceOf[loom.ir.JArr].items.map(_.asInstanceOf[JObj])
+    val sn = eps("freeSn")
+    sn.map(_.get("id")) shouldBe Seq(Some(JStr("s0")), Some(JStr("s1")))
+    // GEN-26 additive keys: adapted free port carries its node width
+    sn.map(_.get("datWidth")) shouldBe Seq(Some(JNum(BigDecimal(256))), Some(JNum(BigDecimal(128))))
+    sn.map(_.get("protocol")) shouldBe Seq(Some(JStr("chi")), Some(JStr("chi")))
+    eps("freeRn").map(_.get("datWidth")) shouldBe
+      Seq(Some(JNum(BigDecimal(256))), Some(JNum(BigDecimal(256))))
   }
 
   it should "carry nocLink outstanding into BridgeParams (IR-94, wave6 declaration caliber)" in {

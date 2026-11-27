@@ -1,7 +1,7 @@
 package loom.report
 
 import loom.check.ChecksV2
-import loom.chi.{ChiBridgeLink, ChiNetNode, ChiNetworkParams, ChiNodeKind, ChiPartitionParams, ChiWidths}
+import loom.chi.{ChiBridgeLink, ChiNetNode, ChiNetworkParams, ChiNodeKind, ChiNodeWidths, ChiPartitionParams, ChiWidths}
 import loom.gen.ChiAssemble
 import loom.ir._
 
@@ -618,7 +618,9 @@ object Reports {
           "terminating proxy with outstanding = nocLinks[].outstanding (HW-17); v1 requires a " +
           "uniform ChiConfig across subsystems (CHK-60); async bridges are emittable when the " +
           "two subsystem root clock domains differ (SEM-20b/CHK-62, HW-15 closed); subsystem " +
-          "node width adaptation pending HW-16")
+          "node width adaptation is consumed via the mkNet factory (GEN-26/HW-16: " +
+          "width-mismatched chi nodes run ChiAdaptedNetworkTop, matched subsystems stay " +
+          "uniform); axi4-in-subsystem is a recorded follow-up (CHK-63)")
 
     JObj(Vector(
       "schema" -> JStr("loom/estimate/v1"),
@@ -883,7 +885,9 @@ object Reports {
     * hardware aggregation order (subsystem declaration order, NodeID-sorted
     * vectors) and exclude the bridge-consumed slots; each free port carries
     * its owning subsystem's system root clock domain (clockDomain index +
-    * root clock id/freqMHz). bridges[] carries the ChiBridgeLink index
+    * root clock id/freqMHz) and, per GEN-26, its concrete boundary datWidth
+    * (shared ChiNodeWidths rule) and node protocol. bridges[] carries the
+    * ChiBridgeLink index
     * mapping plus the synthetic endpoint names. subClk/subReset (system
     * root domains 1..n-1) and domClk/domReset (per-subsystem extra domains)
     * follow the SEM-14 convention: integrator-supplied inputs, no GEN
@@ -914,7 +918,11 @@ object Reports {
         "port" -> JNum(BigDecimal(n.localPort)),
         "clockDomain" -> JNum(BigDecimal(doms(s))),
         "rootClock" -> JStr(roots(s).id),
-        "rootClockMHz" -> JNum(BigDecimal(roots(s).freqMHz))))
+        "rootClockMHz" -> JNum(BigDecimal(roots(s).freqMHz)),
+        // GEN-26 (HW-16/W19): concrete boundary width after the shared node
+        // width rule (adapted chi nodes differ from the fabric flit width).
+        "datWidth" -> JNum(BigDecimal(ChiNodeWidths.cfgOf(nets(s), n).datWidth)),
+        "protocol" -> JStr(n.protocol)))
     }
     val freeRn = for (s <- nets.indices; i <- nets(s).rn.indices if !usedRn((s, i)))
       yield epObj(s, nets(s).rn(i))

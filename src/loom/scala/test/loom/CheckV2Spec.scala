@@ -1204,4 +1204,19 @@ class CheckV2Spec extends AnyFlatSpec with Matchers {
       Seq(bridgeAB.copy(cdc = "async", asyncFifoDepth = 4)))
     ChecksV2.run(asyncDiff).errors shouldBe Nil
   }
+
+  // ---- S13: axi4-in-subsystem rejection (CHK-63, GEN-26/HW-16) ----
+
+  it should "reject axi4 nodes inside subsystems with CHK-63 (GEN-26)" in {
+    val axiB = subB.copy(nodes = subB.nodes.map(n =>
+      if (n.id == "s1") n.copy(protocol = "axi4") else n))
+    ChecksV2.runC0(hierarchical.copy(subsystems = Seq(subA, axiB))) should contain(
+      "C0: [CHK-63] subsystem 'B' axi4 nodes are not supported in hierarchical emission yet")
+    // all-chi subsystems stay clean; flat axi4 configs are not CHK-63's scope
+    ChecksV2.runC0(hierarchical) shouldBe Nil
+    val flatAxi = base.copy(
+      chi = base.chi.copy(portMode = "axi4"),
+      nodes = base.nodes.map(_.copy(protocol = "axi4")))
+    ChecksV2.runC0(flatAxi).filter(_.contains("[CHK-63]")) shouldBe Nil
+  }
 }
