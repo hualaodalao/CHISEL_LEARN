@@ -36,7 +36,7 @@ case class ForagerBeeConfig(
     channelIm2col: Seq[Boolean] = Seq.empty,  // 每通道是否支持 im2col（默认全 true）
     channelScatterGather: Seq[Boolean] = Seq.empty,  // 每通道是否支持 scatter/gather
     enableSharedWritePorts: Boolean = false,  // 编译时开关：写端口共享仲裁（默认关闭，保持每引擎 1:1 直连）
-    writeOutstandingDepth: Int = 1        // 最大在途写突发数：1 为阻塞式，>1 为非阻塞式
+    writeOutstandingDepth: Int = 64        // 最大在途写突发数：1 为阻塞式，>1 为非阻塞式
 ) {
   /** 实际数据 Queue 深度（≤0 时自动取 max(maxBurstLen, 4)） */
   val resolvedDataQueueDepth: Int =

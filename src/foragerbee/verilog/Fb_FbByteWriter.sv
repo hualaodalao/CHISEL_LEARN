@@ -82,15 +82,15 @@ module Fb_FbByteWriter(	// src/foragerbee/scala/main/FbByteTransfer.scala:148:7
   reg          burstFirst;	// src/foragerbee/scala/main/FbByteTransfer.scala:181:27
   reg  [8:0]   burstBeats;	// src/foragerbee/scala/main/FbByteTransfer.scala:182:27
   reg  [8:0]   burstRemaining;	// src/foragerbee/scala/main/FbByteTransfer.scala:183:31
-  reg          outstanding;	// src/foragerbee/scala/main/FbByteTransfer.scala:184:28
+  reg  [6:0]   outstanding;	// src/foragerbee/scala/main/FbByteTransfer.scala:184:28
   wire         _haveBeat_T_1 = inputRemaining == 24'h0;	// src/foragerbee/scala/main/FbByteTransfer.scala:175:31, :194:54
   wire         io_bus_wr_valid_0 =
     busy & burstValid & ((|(buffered[6:5])) | _haveBeat_T_1 & (|buffered))
-    & (~burstFirst | ~outstanding);	// src/foragerbee/scala/main/FbByteTransfer.scala:169:21, :179:25, :180:27, :181:27, :184:28, :193:31, :194:{27,35,54,62,74}, :195:{27,41,53,57,69}
+    & (~burstFirst | ~(outstanding[6]));	// src/foragerbee/scala/main/FbByteTransfer.scala:169:21, :179:25, :180:27, :181:27, :184:28, :193:31, :194:{27,35,54,62,74}, :195:{27,41,53,57,69}
   wire         io_bus_wr_payload_eof_0 = burstRemaining == 9'h1;	// src/foragerbee/scala/main/FbByteTransfer.scala:183:31, :202:43
   wire         _eofFire_T = io_bus_wr_valid_0 & io_bus_wr_ready;	// src/foragerbee/scala/main/FbByteTransfer.scala:195:{27,41,53}, src/utils/Stream/Stream.scala:43:26
   wire         eofFire = _eofFire_T & io_bus_wr_payload_eof_0;	// src/foragerbee/scala/main/FbByteTransfer.scala:202:43, :203:32, src/utils/Stream/Stream.scala:43:26
-  wire         io_bus_wrResp_ready_0 = busy & (outstanding | eofFire);	// src/foragerbee/scala/main/FbByteTransfer.scala:169:21, :184:28, :203:32, :206:{31,55}
+  wire         io_bus_wrResp_ready_0 = busy & ((|outstanding) | eofFire);	// src/foragerbee/scala/main/FbByteTransfer.scala:169:21, :184:28, :203:32, :206:{31,47,55}
   wire         io_in_ready_0 =
     busy & (|inputRemaining) & buffered < 7'h21 & ~io_bus_wr_valid_0;	// src/foragerbee/scala/main/FbByteTransfer.scala:169:21, :175:31, :179:25, :195:{27,41,53}, :210:{23,41,49,61,69,72}
   always @(posedge clock) begin	// src/foragerbee/scala/main/FbByteTransfer.scala:148:7
@@ -108,18 +108,20 @@ module Fb_FbByteWriter(	// src/foragerbee/scala/main/FbByteTransfer.scala:148:7
       burstFirst <= 1'h0;	// src/foragerbee/scala/main/FbByteTransfer.scala:181:27
       burstBeats <= 9'h0;	// src/foragerbee/scala/main/FbByteTransfer.scala:182:27
       burstRemaining <= 9'h0;	// src/foragerbee/scala/main/FbByteTransfer.scala:183:31
-      outstanding <= 1'h0;	// src/foragerbee/scala/main/FbByteTransfer.scala:184:28
+      outstanding <= 7'h0;	// src/foragerbee/scala/main/FbByteTransfer.scala:184:28
     end
     else begin	// src/foragerbee/scala/main/FbByteTransfer.scala:148:7
       automatic logic begin_0;	// src/foragerbee/scala/main/FbByteTransfer.scala:172:24
-      automatic logic responseFire = io_bus_wrResp_valid & io_bus_wrResp_ready_0;	// src/foragerbee/scala/main/FbByteTransfer.scala:206:31, src/utils/Stream/Stream.scala:43:26
+      automatic logic responseFire;	// src/utils/Stream/Stream.scala:43:26
       automatic logic _physicalRemaining_T;	// src/foragerbee/scala/main/FbByteTransfer.scala:223:26
       automatic logic _GEN;	// src/foragerbee/scala/main/FbByteTransfer.scala:237:{22,51}
       automatic logic _GEN_0;	// src/foragerbee/scala/main/FbByteTransfer.scala:169:21, :236:20, :263:{33,62}, :264:{19,43}, :265:12
       begin_0 = io_start & ~busy;	// src/foragerbee/scala/main/FbByteTransfer.scala:169:21, :172:{24,27}
+      responseFire = io_bus_wrResp_valid & io_bus_wrResp_ready_0;	// src/foragerbee/scala/main/FbByteTransfer.scala:206:31, src/utils/Stream/Stream.scala:43:26
       _physicalRemaining_T = io_byteCount == 24'h0;	// src/foragerbee/scala/main/FbByteTransfer.scala:175:31, :223:26
-      _GEN = ~burstValid & (|physicalRemaining) & ~outstanding;	// src/foragerbee/scala/main/FbByteTransfer.scala:174:34, :180:27, :184:28, :193:31, :237:{10,22,43,51}
-      _GEN_0 = busy & _haveBeat_T_1 & ~(|physicalRemaining) & ~burstValid & ~outstanding;	// src/foragerbee/scala/main/FbByteTransfer.scala:169:21, :174:34, :180:27, :184:28, :194:54, :236:20, :237:{10,43}, :263:{33,54,62}, :264:{19,34,43}, :265:12
+      _GEN = ~burstValid & (|physicalRemaining) & ~(outstanding[6]);	// src/foragerbee/scala/main/FbByteTransfer.scala:174:34, :180:27, :184:28, :193:31, :237:{10,22,43,51}
+      _GEN_0 =
+        busy & _haveBeat_T_1 & ~(|physicalRemaining) & ~burstValid & outstanding == 7'h0;	// src/foragerbee/scala/main/FbByteTransfer.scala:169:21, :174:34, :180:27, :184:28, :194:54, :236:20, :237:{10,43}, :263:{33,54,62}, :264:{19,34,43}, :265:12
       busy <= begin_0 ? (|io_byteCount) : ~_GEN_0 & busy;	// src/foragerbee/scala/main/FbByteTransfer.scala:169:21, :172:24, :221:15, :222:{10,26}, :236:20, :263:{33,62}, :264:{19,43}, :265:12
       done <= begin_0 ? _physicalRemaining_T : _GEN_0 | done;	// src/foragerbee/scala/main/FbByteTransfer.scala:169:21, :170:21, :172:24, :221:15, :223:{10,26}, :236:20, :263:{33,62}, :264:{19,43}, :265:12, :266:12
       err <= ~begin_0 & (responseFire & io_bus_wrResp_payload_err | err);	// src/foragerbee/scala/main/FbByteTransfer.scala:171:20, :172:24, :221:15, :224:9, :232:16, :236:20, :262:{24,30}, src/utils/Stream/Stream.scala:43:26
@@ -135,6 +137,7 @@ module Fb_FbByteWriter(	// src/foragerbee/scala/main/FbByteTransfer.scala:148:7
         buffered <= {2'h0, io_dstAddr[4:0]};	// src/foragerbee/scala/main/FbByteTransfer.scala:179:25, :218:27, :230:14
         burstBeats <= 9'h0;	// src/foragerbee/scala/main/FbByteTransfer.scala:182:27
         burstRemaining <= 9'h0;	// src/foragerbee/scala/main/FbByteTransfer.scala:183:31
+        outstanding <= 7'h0;	// src/foragerbee/scala/main/FbByteTransfer.scala:184:28
       end
       else begin	// src/foragerbee/scala/main/FbByteTransfer.scala:172:24
         automatic logic [5:0] boundedBytes =
@@ -297,14 +300,13 @@ module Fb_FbByteWriter(	// src/foragerbee/scala/main/FbByteTransfer.scala:148:7
         end
         if (busy & _GEN)	// src/foragerbee/scala/main/FbByteTransfer.scala:169:21, :182:27, :236:20, :237:{22,51,65}, :240:18
           burstBeats <= nextBeats;	// src/foragerbee/scala/main/FbByteTransfer.scala:182:27, :216:22
+        if (~busy | eofFire == responseFire) begin	// src/foragerbee/scala/main/FbByteTransfer.scala:169:21, :184:28, :203:32, :236:20, :259:{18,36}, :260:19, src/utils/Stream/Stream.scala:43:26
+        end
+        else	// src/foragerbee/scala/main/FbByteTransfer.scala:184:28, :236:20, :259:36
+          outstanding <= eofFire ? outstanding + 7'h1 : outstanding - 7'h1;	// src/foragerbee/scala/main/FbByteTransfer.scala:184:28, :203:32, :260:{25,47,66}
       end
       burstValid <= ~begin_0 & (busy ? ~eofFire & (_GEN | burstValid) : burstValid);	// src/foragerbee/scala/main/FbByteTransfer.scala:169:21, :172:24, :180:27, :203:32, :221:15, :231:16, :232:16, :236:20, :237:{22,51,65}, :238:18, :249:26, :257:{21,34}
       burstFirst <= ~begin_0 & (busy ? ~_eofFire_T & (_GEN | burstFirst) : burstFirst);	// src/foragerbee/scala/main/FbByteTransfer.scala:169:21, :172:24, :181:27, :221:15, :232:16, :236:20, :237:{22,51,65}, :239:18, :249:26, :255:18, src/utils/Stream/Stream.scala:43:26
-      outstanding <=
-        ~begin_0
-        & (~busy | eofFire == responseFire
-             ? outstanding
-             : eofFire ? outstanding - 1'h1 : outstanding - 1'h1);	// src/foragerbee/scala/main/FbByteTransfer.scala:169:21, :172:24, :184:28, :203:32, :221:15, :232:16, :235:17, :236:20, :259:{18,36}, :260:{19,25,47,66}, src/utils/Stream/Stream.scala:43:26
     end
   end // always @(posedge)
   `ifdef ENABLE_INITIAL_REG_	// src/foragerbee/scala/main/FbByteTransfer.scala:148:7
@@ -350,7 +352,7 @@ module Fb_FbByteWriter(	// src/foragerbee/scala/main/FbByteTransfer.scala:148:7
         burstFirst = _RANDOM[5'h15][4];	// src/foragerbee/scala/main/FbByteTransfer.scala:148:7, :179:25, :181:27
         burstBeats = _RANDOM[5'h15][13:5];	// src/foragerbee/scala/main/FbByteTransfer.scala:148:7, :179:25, :182:27
         burstRemaining = _RANDOM[5'h15][22:14];	// src/foragerbee/scala/main/FbByteTransfer.scala:148:7, :179:25, :183:31
-        outstanding = _RANDOM[5'h15][23];	// src/foragerbee/scala/main/FbByteTransfer.scala:148:7, :179:25, :184:28
+        outstanding = _RANDOM[5'h15][29:23];	// src/foragerbee/scala/main/FbByteTransfer.scala:148:7, :179:25, :184:28
       `endif // RANDOMIZE_REG_INIT
     end // initial
     `ifdef FIRRTL_AFTER_INITIAL	// src/foragerbee/scala/main/FbByteTransfer.scala:148:7

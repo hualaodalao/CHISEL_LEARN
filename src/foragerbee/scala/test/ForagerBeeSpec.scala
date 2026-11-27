@@ -2662,15 +2662,20 @@ class ForagerBeeSpec extends AnyFlatSpec with Matchers {
     v2 should include("ownerFifo")
   }
 
-  it should "nbwr: default depth uses one-bit writer credit and no shared owner FIFO" in {
-    val v = ChiselStage.emitSystemVerilog(new FbCore(ForagerBeeConfig()))
-    v should include("module FbCore")
-    v should include regex """reg\s+outstanding;"""
-    v should not include "FbWrPortArbiter"
-    val v2 = ChiselStage.emitSystemVerilog(new FbCore(ForagerBeeConfig(enableSharedWritePorts = true)))
-    v2 should include("FbWrPortArbiter")
-    v2 should include regex """reg\s+outstanding;"""
-    v2 should not include "ownerFifo"
+  it should "nbwr: writer credit width tracks writeOutstandingDepth and shared owner FIFO" in {
+    // depth=1 阻塞：1-bit credit，直连无仲裁
+    val v1 = ChiselStage.emitSystemVerilog(new FbCore(ForagerBeeConfig(writeOutstandingDepth = 1)))
+    v1 should include("module FbCore")
+    v1 should include regex """reg\s+outstanding;"""
+    v1 should not include "FbWrPortArbiter"
+    // depth=1 + 共享写：有仲裁器但 owner FIFO 深度 1 不生成
+    val v1s = ChiselStage.emitSystemVerilog(new FbCore(ForagerBeeConfig(writeOutstandingDepth = 1, enableSharedWritePorts = true)))
+    v1s should include("FbWrPortArbiter")
+    v1s should not include "ownerFifo"
+    // 默认 depth=64 非阻塞：多 bit credit（log2Ceil(65)=7），直连无仲裁
+    val v64 = ChiselStage.emitSystemVerilog(new FbCore(ForagerBeeConfig()))
+    v64 should include regex """reg\s+\[6:0\]\s+outstanding;"""
+    v64 should not include "FbWrPortArbiter"
   }
 
   it should "nbwr: 1D COPY with writeDelay=8 completes and data correct" in {

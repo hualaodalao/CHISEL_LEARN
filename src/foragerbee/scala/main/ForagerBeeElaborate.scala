@@ -1,20 +1,13 @@
 /** ForagerBee SystemVerilog 固定导出入口
   *
   * 用法：sbt "runMain ForagerBeeElaborate"
-  * 输出：
-  *   - 基线配置（写端口 1:1 直连）：src/foragerbee/verilog/ 下生成 Fb_ForagerBee.sv 及全部子模块，
-  *     打包为 ForagerBee_rtl.zip
-  *   - 写端口共享仲裁配置（enableSharedWritePorts=true）：src/foragerbee/verilog_wrshared/，
-  *     打包为 ForagerBee_wrshared_rtl.zip
-  *   - 非阻塞写配置（writeOutstandingDepth=4）：src/foragerbee/verilog_nbwr/，
-  *     打包为 ForagerBee_nbwr_rtl.zip
-  *   - 非阻塞写 + 共享写端口配置：src/foragerbee/verilog_nbwr_shared/，
-  *     打包为 ForagerBee_nbwr_shared_rtl.zip
+  * 输出：仅默认配置一套 —— src/foragerbee/verilog/ 下生成 Fb_ForagerBee.sv 及全部子模块，
+  *       打包为 ForagerBee_rtl.zip。
   *
-  * 流程（每套配置）：
-  *   1. 清理输出目录
-  *   2. ChiselStage 生成 RTL + filelist 等
-  *   3. 递归打包所有生成文件为 zip
+  * 其余编译期配置（共享写端口、非阻塞写深度等）仍是合法 ForagerBeeConfig 选项，
+  * 其 elaboration 守卫由 ForagerBeeSpec 覆盖，但不再随仓库交付现成 RTL。
+  *
+  * 流程：1. 清理输出目录  2. ChiselStage 生成 RTL + filelist 等  3. 递归打包为 zip
   */
 
 import chisel3._
@@ -28,7 +21,8 @@ import scala.collection.JavaConverters._
 
 object ForagerBeeElaborate extends App {
 
-  // 基线配置：写端口 1:1 直连（enableSharedWritePorts 默认关闭）
+  // 默认交付配置：写端口 1:1 直连（enableSharedWritePorts 默认关闭），
+  // writeOutstandingDepth 继承 ForagerBeeConfig 默认值。
   val cfg = ForagerBeeConfig(
     numPorts = 2,
     queueDepth = 4,
@@ -43,15 +37,6 @@ object ForagerBeeElaborate extends App {
     channelIm2col = Seq(false, true),
     channelScatterGather = Seq(true, true)
   )
-
-  // 写端口共享仲裁配置（仅验证开关开启时的 elaboration，其余参数与基线一致）
-  val cfgWrShared = cfg.copy(enableSharedWritePorts = true)
-
-  // 非阻塞写配置（写 outstanding 深度 4，验证 nbWr 编译期分支可正常发射；其余参数与基线一致）
-  val cfgNbWr = cfg.copy(writeOutstandingDepth = 4)
-
-  // 非阻塞写 + 共享写端口配置（验证仲裁器归属 FIFO 分支可正常发射）
-  val cfgNbWrShared = cfg.copy(writeOutstandingDepth = 4, enableSharedWritePorts = true)
 
   def deleteRecursively(path: Path): Unit = {
     if (Files.exists(path)) {
@@ -110,15 +95,6 @@ object ForagerBeeElaborate extends App {
     println(s"[ForagerBeeElaborate] Packaged ${allFiles.length} files into ${zipFile.getPath}")
   }
 
-  // --- 基线配置（1:1 直连，产物路径与打包名保持不变） ---
+  // --- 默认配置（唯一交付产物，产物路径与打包名保持不变） ---
   emitAndZip(cfg, "src/foragerbee/verilog", "ForagerBee_rtl.zip")
-
-  // --- 写端口共享仲裁配置 ---
-  emitAndZip(cfgWrShared, "src/foragerbee/verilog_wrshared", "ForagerBee_wrshared_rtl.zip")
-
-  // --- 非阻塞写配置（writeOutstandingDepth=4，独立目录，不参与零回归对比） ---
-  emitAndZip(cfgNbWr, "src/foragerbee/verilog_nbwr", "ForagerBee_nbwr_rtl.zip")
-
-  // --- 非阻塞写 + 共享写端口配置（仲裁器归属 FIFO 分支，独立目录） ---
-  emitAndZip(cfgNbWrShared, "src/foragerbee/verilog_nbwr_shared", "ForagerBee_nbwr_shared_rtl.zip")
 }

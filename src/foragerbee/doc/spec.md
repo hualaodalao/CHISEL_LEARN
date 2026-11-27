@@ -1,8 +1,8 @@
 # ForagerBee DMA 硬件规格
 
-文档版本：`v6.0.1`
+文档版本：`v6.1.0`
 
-修订日期：`2026-11-25`
+修订日期：`2026-11-27`
 
 ## 版本控制
 
@@ -16,6 +16,7 @@
 
 | 版本号 | 日期 | 修改内容 | 相关 Feature ID |
 |---|---|---|---|
+| v6.1.0 | 2026-11-27 | 默认 writeOutstandingDepth 1→64（非阻塞写）；RTL 交付面收为默认配置一套（src/foragerbee/verilog/），ForagerBeeElaborate 仅发射基线，删除 verilog_wrshared/verilog_nbwr/verilog_nbwr_shared 三套产物目录；共享写/其他深度仍为合法编译期选项，elaboration 守卫由 ForagerBeeSpec 覆盖 | FB-F016/FB-F017 |
 | v6.0.1 | 2026-11-25 | 勘误：flush 不再复位 RegIf 寄存器值（去掉 withReset(reset||flushReq)，与 WorkerBee 一致）；flush 仅丢弃在途上下文槽/pending 与核心排队命令，shadow/live 配置、TRACE_TAG、hwSignal、中断寄存器保持；flush 用例补寄存器保持断言 | FB-F031 |
 | v6.0.0 | 2026-11-25 | **顶层 ABI 变更（Queen 设备化）**：ForagerBee 顶层即 Queen 设备（镜像 WorkerBee），外露 native beat/resp/wrErr/completion/deviceIdle/flushReq/flushAck/irq；原始 Stream 核心降为内部 FbCore（新增每引擎 errPulse 输出），删除包装层 ForagerBeeReg；错误中断 errPulse→regIf.intrSrc（intrWidth=numPorts）；hwSignal/traceTag RUN 当拍采样随 completion 回传；发射入口 ForagerBeeElaborate 发射 Queen 顶层 | FB-F031 |
 | v5.0.0 | 2026-11-25 | **寄存器接口 ABI 变更（Queen 对齐）**：删除自研 FbRegIf，ForagerBeeReg 改为复用 Queen 公共模块 QueenDsaRegIf/QueenDsaCompletion；cmd 改 native beat（WRITE1/WRITE2/READ/RUN，单 ready）、resp 仅 QRD、非法写走 wrErr 脉冲；RUN 取代 START 寄存器并反压而非 err；完成走 completion 端口（swTag/hwTag/error/code/hwSignal），删除 DONE/DONE_CNT/CREDIT 寄存器；credit=N 上下文槽按完成归还、RUN 当拍采样延迟一拍发射；新增公共契约区（中断/hwSignal/TRACE_TAG）与核心最小 flush、flush 四相、强 deviceIdle | FB-F031 |
@@ -642,7 +643,7 @@ TILE2LINEAR：源 tiled、目的 linear；LINEAR2TILE：反之。
 | enableConversion | false | 生成 float converter 和 MX quantizer；不生成 cvt* IO |
 | converterPipeStages | 1 | 当前传入但不改变转换结构；不能当作有效流水深度 |
 | enableSharedWritePorts | false | 生成写仲裁器 |
-| writeOutstandingDepth | 1 | >=1，1 阻塞、>1 单 transfer 内 NB |
+| writeOutstandingDepth | 64 | >=1，1 阻塞、>1 单 transfer 内 NB |
 
 SG 硬件额外要求 dataWidth>=addressWidth+16，否则该通道 SG 命令报错；40 bit 地址要求至少 56 bit 数据容纳描述符，在合法 2 次幂数据位宽中至少 64 bit，默认 128 bit 满足。转换器另要求 dataWidth 为 32 的整数倍、MX 要求 >=32 的 2 次幂，配置已涵盖。maxDims 的 4D expander 限制没有在配置 require 完整检查，不能只看配置通过就声明完整顶层支持 1..3。
 
@@ -650,7 +651,7 @@ SG 硬件额外要求 dataWidth>=addressWidth+16，否则该通道 SG 命令报�
 
 显式 ForagerBeeConfig(addressWidth=32) 仍产生 32 bit 接口，并覆盖默认值。命令源与下游须匹配实际配置；SG 描述符地址/长度位域随该参数变化，默认 40 bit 布局见 7.2.5，不能继续使用旧 32 bit 地址布局。
 
-上述为 ForagerBeeConfig 默认值。当前 ForagerBeeElaborate 导出入口继承 addressWidth=40，采用 numPorts=2、queueDepth=4、maxDims=5、tileSize=16、dataWidth=256、maxBurstLen=64、enableConversion=true，transpose=[true,false]、permute=[true,true]、im2col=[false,true]、SG=[true,true]；另选择共享写、depth=4、两者组合。导出配置/入口存在不表示这些配置仿真或 PPA 已验证；已有生成 RTL 不会随源码配置自动更新。
+上述为 ForagerBeeConfig 默认值。当前 ForagerBeeElaborate 导出入口**仅交付默认配置一套**（src/foragerbee/verilog/），继承 addressWidth=40、writeOutstandingDepth=64，采用 numPorts=2、queueDepth=4、maxDims=5、tileSize=16、dataWidth=256、maxBurstLen=64、enableConversion=true，transpose=[true,false]、permute=[true,true]、im2col=[false,true]、SG=[true,true]。共享写端口、其他非阻塞深度等仍是合法编译期选项，其 elaboration 守卫由 ForagerBeeSpec 覆盖，但不再随仓库交付现成 RTL。导出配置/入口存在不表示这些配置仿真或 PPA 已验证；已有生成 RTL 不会随源码配置自动更新。
 
 ### 8.2 运行期配置
 
@@ -821,7 +822,7 @@ idle 不额外与 `!cmd.valid` 相与，也不是 cmd.ready 门控。尚未握�
 | 每引擎物理读队列 | resolvedDataQueueDepth beat | 64 beat |
 | reader/writer 字节储存 | 各 2*dataWidth bit；writer 另有 2*BB strobe | 各 32 B 数据 |
 | 单引擎读请求在途 | 1 | 1 |
-| 写完成 burst 等响应 | <=writeOutstandingDepth | 1 |
+| 写完成 burst 等响应 | <=writeOutstandingDepth | 64 |
 | 转置缓冲 | tileSize²*32 bit | 8×8×32 bit |
 | MX block 缓冲 | max(1,2048/dataWidth) beat | 16 beat |
 | MX scale 累积 | BB 个字节 | 16 B |
