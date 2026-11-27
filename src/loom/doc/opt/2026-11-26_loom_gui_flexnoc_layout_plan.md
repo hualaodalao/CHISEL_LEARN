@@ -1,6 +1,6 @@
 # Loom GUI → FlexNoC 风格布局迁移计划 — 2026-11-26
 
-> 状态：**提案（未实施）**。本计划只规划 GUI **界面布局/导航范式**向 FlexNoC 风格的重构，**不是**已完成的 G1–G7 数据模型迁移（见 `2026-11-26_loom_gui_chi_adaptation_plan.md`，G1–G7 已全绿）。两者正交：G1–G7 解决"GUI 消费 v2 口径"，本计划解决"GUI 如何组织视图与交互"。
+> 状态：**F1–F7 落地**（2026-11-27；上游 UP-01/02/04/07/08 已由其他 agent 落实后消费。浏览器结构/功能级验证 + node:test 16/16 + LoomApiSpec 23/23 绿 + 11 示例×5 phase 回归 hash 稳定。视口隐藏，无视觉截图，已如实标注验证级别。代码未提交，git 写需授权）。本计划只规划 GUI **界面布局/导航范式**向 FlexNoC 风格的重构，**不是**已完成的 G1–G7 数据模型迁移（见 `2026-11-26_loom_gui_chi_adaptation_plan.md`，G1–G7 已全绿）。两者正交：G1–G7 解决"GUI 消费 v2 口径"，本计划解决"GUI 如何组织视图与交互"。
 > 分工：本 agent 只改 GUI 资产；凡需 IR/GEN/RTL 能力支撑的特性，**提出上游改动需求（§6 UP-01/02/04/07/08）交其他 agent 实施**，GUI 侧列为条件特性 F7，待上游落地后消费。UP-03/05/06 已撤销（2026-11-26 用户裁定）。
 >
 > 调研基础（2026-11-26，公开资料；**像素级截图公开不可得**，下文严格区分"文档证实"与"推断"）：
@@ -135,43 +135,43 @@ dock(底部可折叠): IR JSON 编辑器 + Canonicalize/Export（跨 phase 可�
 
 ## 5. Story 波次（blocker 序，每个 fits-one-run）
 
-### F1 工作流骨架（phase-tabs + spec 树 + inspector/dock 常驻）
+### F1 工作流骨架（phase-tabs + spec 树 + inspector/dock 常驻）✅（2026-11-27 落地：5 phase 切换仅切显示、ir/hash/selection 不变；spec 树选中→inspector；IR dock 跨 phase 回路；11 示例各 phase 渲染无报错）
 - tasks：index.html 增 phase-tabs 与视图容器；app.js 增 `setPhase()`/视图切换（只切换显示，不动 ir/selection/commit/evaluate）；左栏 8 block 重组为单一 spec 树（复用 renderStructure/renderClocks 逻辑，合并为树形导航）；inspector 与 IR dock 改为跨 phase 常驻；现有 render* 函数按视图归组（行为保持重组，不重写）。
 - blockedBy：[]
 - demoBoundary：浏览器在 5 个 phase 间切换，ir/hash/selection 不变；spec 树选中 node → inspector 正确分发；IR dock 在任意 phase 可 Apply/Canonicalize；11 示例加载后各 phase 渲染无报错。
 - techGuidance：视图切换为纯显示层（CSS hidden / 容器切换），**不得**在切换时触发 evaluate 或改写 ir；spec 树复用现有 mutation/级联，不新建数据路径；本 story 后各 phase 内容允许临时占位（F2–F6 接管），但导航与 inspector/dock 必须通。
 
-### F2 Spec 视图（全局 CHI + 域表 + socket/node 表）
+### F2 Spec 视图（全局 CHI + 域表 + socket/node 表）✅（2026-11-27 落地：Design/CHI/Nodes/Subsystems 归入 Spec 视图；clocks+structure 树常驻 rail；datWidth 联动与创建护栏沿用 G2/G3 逻辑回归绿）
 - tasks：Spec 视图整合 renderChi（12 字段 + 派生只读）+ clock/partition 域表 + node 表（kind/nodeId/protocol/dataWidth/outstanding/qos/attach）；spec 树与 Spec 视图双向联动（树选中 → 视图高亮 + inspector）；创建护栏保留（CHK-19 mn≤1、rn-d⇒恰 1 mn、dvmEnable 联动）。
 - blockedBy：[F1]
 - demoBoundary：Spec 视图改 datWidth 256→128 → flitCount64B 2→4 联动；创建第 2 个 mn 就地阻止；dvmEnable 关闭提示既有 snp/rn-d/mn 将非法；树选中与视图高亮一致。
 - techGuidance：派生量只读 data.chi（不 JS 复刻）；node 表与 spec 树共享同一 selection 状态，避免两份选中态漂移。
 
-### F3 Topology 画布增强（floorplan 叠加 + 拖拽连线 + 工具条）
+### F3 Topology 画布增强（floorplan 叠加 + 拖拽连线 + 工具条）✅（2026-11-27 落地：工具条 zoom±/fit/floorplan/reset/clear-hl；floorplan 网格 32 线开关；shift-drag r0→r2 生成合法 link 且 13/13；拖拽 +40/+20 持久化 localStorage。视口隐藏：connect 以 stub elementFromPoint 验证处理路径、drag 以显式坐标验证，已如实标注）
 - tasks：Topology 视图以画布为中心；增 floorplan 网格叠加层（坐标存 localStorage 旁路，键含 meta.name，**不进 IR**）；画布工具条（zoom/fit/reset layout）；**拖拽连线**：从 router/node 端口拖出 → 落点创建 link（复用现有 link 护栏 channels/lcreditDepth/dateline，IR-56–63）；保留 G5 拖拽摆放与位置缓存；边去重 + class/dateline/async 图例不变。
 - blockedBy：[F1]（可与 F2 并行）
 - demoBoundary：拖拽 r0→r1 生成合法 link 且 gates 全绿；非法连线（如缺 channels）就地阻止；floorplan 网格开关与坐标刷新页面保留、reset 复位；同一 IR 两次渲染逐坐标一致（G5 不回归）；mesh 网格布局不回归。
 - techGuidance：floorplan/拖拽坐标一律 localStorage 旁路（约束 6），读不到静默回退；拖拽连线生成走现有 addLink/mutation 路径，不绕过 CHK；布局纯函数 autoLayout/computeLayout 不动，作为 node:test 锚点。
 
-### F4 Address 视图（SAM + 连接矩阵同视图）
+### F4 Address 视图（SAM + 连接矩阵同视图）✅（2026-11-27 落地：SAM+矩阵+Routes 同视图；矩阵改消费 API connectivity；SAM 重叠/auto 4K/多窗口沿用 G3 回归绿）
 - tasks：Address 视图整合 renderSam（tgtNode 下拉/base/size/增删/auto 4K）+ renderMatrix（RN×SN 跳数，只读）；SAM 行以 tgtNode 为主键；多窗口合法（HW-02）；矩阵随 attach 邻接 BFS 刷新。
 - blockedBy：[F1]
 - demoBoundary：SAM 制造重叠 → CHK-29 就地报错；auto 4K 恢复派生（explicit=false）；同 SN 第二窗口合法；矩阵跳数与 mesh 拓扑一致；矩阵只读不可编辑（F-OQ-05 默认）。
 - techGuidance：base/size 复用 parseAddress（0x/64K）；矩阵保持只读派生（SEM-01），不开放编辑（越界见 §8）。
 
-### F5 QoS 视图（per-node + class/VC + mapping 只读）
+### F5 QoS 视图（per-node + class/VC + mapping 只读）✅（2026-11-27 落地：per-node 优先级表 4 行可编辑；class/mapping 沿用；qosGen 子面板见 F7）
 - tasks：QoS 视图整合 per-node qos(0–15) 编辑 + class 表（vcs/depth/arbitration/weight）+ mapping 只读表（CHK-34 注明"自定义阈值待硬件次版本"）；**诚实呈现 Loom 字段**，不伪造 bandwidth/saturation 控件（F-OQ-04 默认）。
 - blockedBy：[F1]
 - demoBoundary：改 node.qos 数值写回 ir.nodes 且 evaluate 通过；class vcs/depth 编辑联动 estimate；mapping 只读不可改且注明原因；dvmEnable 与 QoS 视图无耦合错误。
 - techGuidance：QoS 视图只暴露 IR-25–34 实际字段；FlexNoC regulator/limiter 为带宽模型，Loom 无对应 IR，**不引入**（§8）。
 
-### F6 Verify 视图 + 文案/样式 + 全量回归
+### F6 Verify 视图 + 文案/样式 + 全量回归 ✅（2026-11-27 落地：Gates/Estimate(+Bridges)/Nodes-report/Gates-by-subsystem 归入 Verify；11 示例×5 phase 回归 13/13 且 hash 稳定；node:test 16/16；LoomApiSpec 23/23；grep 无 v1 残留；git diff 仅 gui/ 三文件，后端零改动）
 - tasks：Verify 视图整合 showGates（G1 四键 + snpEnable + upgraded 横幅）+ showEstimate（分组）+ showNodesReport；index.html/style.css 增补 phase-tabs/spec 树/画布工具条/dock 样式（既有视觉语言不动）；全量浏览器回归：11 示例 × {5 phase 切换/编辑/evaluate/canonical/export/workspace 往返} + 负例集（CHK-06/16/19/29/38/40）+ 拓扑稳定性/拖拽/floorplan 持久化；grep 确认无 v1 口径残留；git diff 仅 gui/ 资产。
 - blockedBy：[F2, F3, F4, F5]
 - demoBoundary：回归清单全绿；crosswalk（§4）逐行核对无遗漏；后端零改动；node:test（model.mjs）全绿不回归；LoomApiSpec 抽查绿（确认 API 契约未触碰）。
 - techGuidance：回归用应用内浏览器实测留快照证据；视口隐藏用 take_snapshot + evaluate_script 并如实标注级别；发现 API gap 记录升级，不夹带后端修改。
 
-### F7 条件特性（依赖上游需求 UP-xx，上游落地后另行排期）
+### F7 条件特性（依赖上游需求 UP-xx，上游落地后另行排期）✅（2026-11-27 上游落实后消费：UP-01 矩阵点击 forbid 写回 routes[]+×标记+Routes 表编辑+双击高亮路径；UP-02 qosGen 子面板写回 node.qosGen；UP-08 node inspector adaptFifoDepth+adapt 行；UP-04 Estimate Bridges{rnAxi,snAxi,noc}；UP-07 Subsystems 面板+Gates-by-subsystem+分层画布（2 子系统框/8 顶点/1 桥边）。修复：raw JSON subsystem 用 fabric 包装，布局兼容 s.routers 与 s.fabric.routers 两形状）
 - tasks：按 §6 上游需求落地情况，逐项解锁 GUI 消费——UP-01→Address 矩阵可编辑 + Topology 路径高亮；UP-02→QoS 视图 per-node generator 子面板 + 带宽可视化；UP-04→Spec portMode 端到端生效 + Estimate 桥接指标；UP-07→spec 树 subsystem 层 + 分层画布；UP-08→node inspector 速率适配提示。
 - blockedBy：[F6] + **对应 UP-xx 已由其他 agent 落地**（外部依赖，非本 agent 实施）。
 - demoBoundary：每项以其 UP-xx 的 IR/GEN 契约验收为准 + GUI 消费冒烟；上游未落地前该特性**不渲染伪造控件**（占位注明"待上游 UP-xx"）。
@@ -191,13 +191,14 @@ dock(底部可折叠): IR JSON 编辑器 + Canonicalize/Export（跨 phase 可�
 
 **已撤销（2026-11-26 用户裁定）**：UP-03（per-SN atomic）、UP-05（probes/observability）、UP-06（floorplan 物理感知自动 pipeline）。编号保留不复用，F7 与 crosswalk 不再引用。
 
-**上游落地状态（2026-11-26）**：**UP-01 已落地**（ir_gen_spec v1.1.0：IR-70–74/SEM-17/GEN-21/CHK-49–51；LoomApi additive `connectivity`/`routes` 键可供 F7 消费；全量 22 suite/248 test 绿）。**UP-04 已落地**（v1.2.0 GEN-22：portMode/protocol 端到端生效，axi4 节点发射 ChiAxiNetworkTop 混合边界，estimate additive `bridges{rnAxi,snAxi}` 代理计数；F7 可消费）。**UP-01 forbid 升级执行型**（A4/HW-13：samByRn per-source 过滤+NDERR，CHK-51 退役，可达禁止对合法，connectivity 记 unreachable）。UP-02/07/08 硬件前置 HW-10/11/12 待 GEN IR 参数先行（§7.3）；flat async 待 HW-14。**UP-02/UP-08 GEN 先行已落地（v1.3.0，S8）**：node.qosGen/adaptFifoDepth IR+CHK-52/53+装配参数+estimate/API additive `qosGen`/`adapt` 键（声明口径，F7 可渲染声明值；注入/适配 RTL 待 HW-10/HW-12，硬件参数已就绪可开工）。UP-07 仍待立项。**UP-07 已立项（用户 2026-11-26）且 GEN phase 1 落地**（v1.5.0：subsystems[]/nocLinks[] schema+CHK-55–58+装配参数+gatesBySubsystem+estimate/API additive `subsystems`/`nocLinks` 键，F7 spec 树 subsystem 层可消费；分层发射待 HW-11 ChiNocBridge，硬件行动通知见依赖清单 §10）。**UP-07 GEN phase 2 已落地（v1.6.0/v1.7.0，HW-11 闭合消费）**：分层发射 ChiSystemTop 可用（同步桥；合成桥端点装配 SEM-20a、CHK-59–61、ports/manifest/estimate bridges.noc），F7 可消费分层发射与 subsystem 层；**async 桥待 HW-15、子系统内节点宽度适配待 HW-16、桥 outstanding 系统层透传待 HW-17**（依赖清单 §12，GUI 不渲染伪造控件）。
+**上游落地状态（2026-11-26）**：**UP-01 已落地**（ir_gen_spec v1.1.0：IR-70–74/SEM-17/GEN-21/CHK-49–51；LoomApi additive `connectivity`/`routes` 键可供 F7 消费；全量 22 suite/248 test 绿）。**UP-04 已落地**（v1.2.0 GEN-22：portMode/protocol 端到端生效，axi4 节点发射 ChiAxiNetworkTop 混合边界，estimate additive `bridges{rnAxi,snAxi}` 代理计数；F7 可消费）。**UP-01 forbid 升级执行型**（A4/HW-13：samByRn per-source 过滤+NDERR，CHK-51 退役，可达禁止对合法，connectivity 记 unreachable）。UP-02/07/08 硬件前置 HW-10/11/12 待 GEN IR 参数先行（§7.3）；flat async 待 HW-14。**UP-02/UP-08 GEN 先行已落地（v1.3.0，S8）**：node.qosGen/adaptFifoDepth IR+CHK-52/53+装配参数+estimate/API additive `qosGen`/`adapt` 键（声明口径，F7 可渲染声明值；注入/适配 RTL 待 HW-10/HW-12，硬件参数已就绪可开工）。UP-07 仍待立项。**UP-07 已立项（用户 2026-11-26）且 GEN phase 1 落地**（v1.5.0：subsystems[]/nocLinks[] schema+CHK-55–58+装配参数+gatesBySubsystem+estimate/API additive `subsystems`/`nocLinks` 键，F7 spec 树 subsystem 层可消费；分层发射待 HW-11 ChiNocBridge，硬件行动通知见依赖清单 §10）。**UP-07 GEN phase 2 已落地（v1.6.0/v1.7.0，HW-11 闭合消费）**：分层发射 ChiSystemTop 可用（同步桥；合成桥端点装配 SEM-20a、CHK-59–61、ports/manifest/estimate bridges.noc），F7 可消费分层发射与 subsystem 层；**async 桥待 HW-15、子系统内节点宽度适配待 HW-16、桥 outstanding 系统层透传待 HW-17**（依赖清单 §12，GUI 不渲染伪造控件）。**2026-11-27 闭合**：HW-15/16/17 落地（依赖清单 wave1–7 闭合，23 suite/92 test + formal 12/12），UP-01/02/04/07/08 全部可供 GUI 消费；F7 已消费并浏览器验证（见 F7 ✅）。
 
 **需求纪律**：UP-xx 均为 additive 扩展（不破坏 MIG-10 冻结契约与现有 v2 示例）；实施 agent 须同步更新 `ir_gen_spec.md` 编号与 CHK 门禁，并在 `LoomApi` 快照 additive 暴露新键，GUI 方能消费。floorplan 仅作视图叠加，物理坐标不进 IR（约束 6，原 UP-06 已撤销）。
 
 ## 7. 验收
 
 - §4 crosswalk 每行在 F1–F6 有归属 story，验收引用 IR/SEM/GEN/CHK/ENC/MIG 编号；无编号即未覆盖。
+- 验证记录（2026-11-27）：应用内浏览器**结构/功能级**验证（视口隐藏，无视觉截图）——5 phase 切换、spec 树→inspector、IR dock 回路、floorplan 网格开关、zoom、shift-drag connect（stub elementFromPoint 验证处理路径）、drag 显式坐标 +40/+20 持久化、qosGen/forbid/routes/adapt 写回、Bridges 计数、hier 画布 2 框/8 顶点/1 桥边；11 示例×5 phase 回归 13/13 且 hash 稳定；node:test 16/16；LoomApiSpec 23/23；git diff 仅 gui/ 三文件。
 - 每个 story 的 demoBoundary 在应用内浏览器实测通过（golden + 负路径），非仅代码审查。
 - 布局重组为**行为保持**：同一 IR 在重组前后 evaluate/hash/canonical 逐一致；model.mjs 纯函数 node:test 全绿不回归。
 - 5 phase 切换不改 ir/selection/commit；spec 树/inspector/dock 跨 phase 一致。

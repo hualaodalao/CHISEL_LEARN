@@ -743,3 +743,39 @@ label {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- workflow phases (FlexNoC-style layout) ---------- */
+
+.phase-tabs { display: flex; gap: 6px; padding: 0 18px 10px; flex-wrap: wrap; }
+.phase-tab {
+  font: 500 13px/1 "Space Grotesk", sans-serif;
+  letter-spacing: 0.04em;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.phase-tab:hover { border-color: var(--ink-soft); color: var(--ink); }
+.phase-tab.active { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.phase-view { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.phase-view[hidden] { display: none; }
+.create-row { margin: 8px 0 10px; }
+.topo-toolbar { margin: 0 0 8px; }
+
+/* ---------- topology canvas (F3) ---------- */
+
+.topology { overflow: auto; }
+.floorplan-grid line { stroke: rgba(23, 27, 33, 0.07); stroke-width: 1; pointer-events: none; }
+.edge.connect { stroke: var(--teal); stroke-width: 2; stroke-dasharray: 4 3; pointer-events: none; }
+.edge.hl { stroke: var(--teal); stroke-width: 3; }
+.topo-toolbar .ghost.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.topo-toolbar .hint { align-self: center; }
+
+/* ---------- UP-01/07 additive views ---------- */
+
+.matrix td.forbid { color: var(--copper); font-weight: 700; }
+.subsystem-box { fill: none; stroke: var(--line); stroke-dasharray: 4 3; }
+.subsystem-label { font: 600 11px "Space Grotesk", sans-serif; fill: var(--ink-soft); }
+.edge.noc { stroke: var(--teal); stroke-dasharray: 5 4; stroke-width: 2; }

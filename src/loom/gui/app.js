@@ -20,6 +20,23 @@ let last = null;
 let selection = null;
 let upgradeWarnings = [];
 
+/* Workflow phases (FlexNoC-style): switching only toggles view visibility,
+ * never touches ir/selection/commit/evaluate. */
+const PHASES = ["spec", "topology", "address", "qos", "verify"];
+let phase = "spec";
+
+function setPhase(p) {
+  if (!PHASES.includes(p)) return;
+  phase = p;
+  for (const b of document.querySelectorAll(".phase-tab")) {
+    b.classList.toggle("active", b.dataset.phase === p);
+  }
+  for (const v of document.querySelectorAll(".phase-view")) {
+    v.hidden = v.dataset.phase !== p;
+  }
+  if (p === "topology") showTopology(last || {});
+}
+
 /* ------------------------------------------------------------------ */
 /* small helpers                                                       */
 /* ------------------------------------------------------------------ */
@@ -179,6 +196,8 @@ async function evaluate() {
     showEstimate(data);
     showSam(data);
     showNodesReport(data);
+    showSubsystems(data);
+    showGatesBySubsystem(data);
     showTopology(data);
   } catch (e) {
     if (seq === evalSeq) showProblem("evaluate: " + e.message);
@@ -309,6 +328,7 @@ function renderAll() {
   renderNodes();
   renderSam();
   renderMatrix();
+  renderRoutes();
   renderInspector();
   renderSummary();
 }
@@ -646,6 +666,12 @@ function renderMatrix() {
     box.appendChild(el("tr")).appendChild(el("td", "na", "Needs at least one RN and one SN."));
     return;
   }
+  /* UP-01: prefer the server connectivity matrix (final route tables);
+   * fall back to local BFS hops when elaboration is unavailable. */
+  const conn = (last && Array.isArray(last.connectivity)) ? last.connectivity : null;
+  const connOf = new Map();
+  if (conn) for (const r of conn) connOf.set(r.from + ">" + r.to, r);
+  const forbidOf = new Set((Array.isArray(ir.routes) ? ir.routes : []).filter((r) => r.forbid).map((r) => r.from + ">" + r.to));
   const adj = routerAdjacency();
   const head = el("tr");
   head.appendChild(el("th", "row-head", "RN \\ SN"));
@@ -655,16 +681,110 @@ function renderMatrix() {
     const tr = el("tr");
     tr.appendChild(el("th", "row-head", m.id));
     for (const s of sns) {
-      const hops = hopCount(adj, m.attach, s.attach);
-      const cls = hops === null ? "na" : (hops === 0 ? "h0" : "hn");
-      const td = el("td", cls, hops === null ? "—" : String(hops));
-      td.title = hops === null
-        ? `${m.id} cannot reach ${s.id}`
-        : `${m.id} → ${s.id}: ${hops} router hop${hops === 1 ? "" : "s"}`;
+      const key = m.id + ">" + s.id;
+      const row = connOf.get(key);
+      let cls, txt, title, path = null;
+      if (forbidOf.has(key)) {
+        cls = "na forbid"; txt = "×";
+        title = `${m.id} → ${s.id} forbidden (routes[].forbid); click to allow`;
+      } else if (row) {
+        if (row.reachable) {
+          const h = Math.max(0, (row.path || []).length - 1);
+          cls = h === 0 ? "h0" : "hn"; txt = String(h); path = row.path || [];
+          title = `${m.id} → ${s.id}: ${path.join(" → ")} (click forbid, double-click highlight)`;
+        } else {
+          cls = "na"; txt = "—";
+          title = `${m.id} cannot reach ${s.id}; click to forbid`;
+        }
+      } else {
+        const hops = hopCount(adj, m.attach, s.attach);
+        cls = hops === null ? "na" : (hops === 0 ? "h0" : "hn");
+        txt = hops === null ? "—" : String(hops);
+        title = hops === null ? `${m.id} cannot reach ${s.id}` : `${m.id} → ${s.id}: ${hops} router hop${hops === 1 ? "" : "s"}`;
+      }
+      const td = el("td", cls, txt);
+      td.title = title;
+      td.style.cursor = "pointer";
+      td.addEventListener("click", () => toggleForbid(m.id, s.id));
+      td.addEventListener("dblclick", () => { highlightPath = path; setPhase("topology"); });
       tr.appendChild(td);
     }
     box.appendChild(tr);
   }
+}
+
+/* UP-01 editable connectivity: a matrix click toggles a forbid constraint
+ * (SEM-17); explicit paths are edited in the Routes panel. */
+function toggleForbid(from, to) {
+  if (!Array.isArray(ir.routes)) ir.routes = [];
+  const i = ir.routes.findIndex((r) => r.from === from && r.to === to);
+  if (i >= 0 && ir.routes[i].forbid) {
+    ir.routes.splice(i, 1);
+    if (!ir.routes.length) delete ir.routes;
+  } else {
+    if (i >= 0) ir.routes.splice(i, 1);
+    ir.routes.push({ from, to, forbid: true });
+  }
+  commit();
+}
+
+function renderRoutes() {
+  const box = $("routes");
+  const note = $("routes-note");
+  if (!box) return;
+  clear(box);
+  const routes = Array.isArray(ir.routes) ? ir.routes : [];
+  if (!routes.length) {
+    box.appendChild(el("div", "empty", "No explicit routes. SAM-derived BFS routing applies; click a matrix cell to forbid a pair."));
+    note.textContent = "";
+    return;
+  }
+  const rns = ir.nodes.filter(isRequest).map((n) => n.id);
+  const sns = ir.nodes.filter(isSubordinate).map((n) => n.id);
+  const table = el("table", "ep-table");
+  const head = el("tr");
+  for (const h of ["from", "to", "path (routers)", "forbid", ""]) head.appendChild(el("th", null, h));
+  table.appendChild(head);
+  routes.forEach((r, idx) => {
+    const tr = el("tr");
+    const f = el("td"); f.appendChild(selectInput(rns, r.from, (v) => { r.from = v; commit(); })); tr.appendChild(f);
+    const t = el("td"); t.appendChild(selectInput(sns, r.to, (v) => { r.to = v; commit(); })); tr.appendChild(t);
+    const p = el("td");
+    if (r.forbid) p.textContent = "—";
+    else p.appendChild(textInput((r.path || []).join(","), (v) => {
+      r.path = v.split(",").map((x) => x.trim()).filter(Boolean);
+      commit();
+    }));
+    tr.appendChild(p);
+    const fb = el("td");
+    fb.appendChild(checkboxInput(!!r.forbid, (v) => {
+      r.forbid = v;
+      if (v) delete r.path;
+      commit();
+    }));
+    tr.appendChild(fb);
+    const act = el("td");
+    act.appendChild(dangerButton("×", () => {
+      ir.routes.splice(idx, 1);
+      if (!ir.routes.length) delete ir.routes;
+      commit();
+    }));
+    tr.appendChild(act);
+    table.appendChild(tr);
+  });
+  box.appendChild(table);
+  note.textContent = "Explicit path overrides BFS (CHK-50); forbid is a reachability constraint (SEM-17). Empty routes[] is omitted to keep the hash baseline.";
+}
+
+function addRoute() {
+  const rns = ir.nodes.filter(isRequest).map((n) => n.id);
+  const sns = ir.nodes.filter(isSubordinate).map((n) => n.id);
+  if (!rns.length || !sns.length) { toast("Need an RN and an SN first."); return; }
+  if (!Array.isArray(ir.routes)) ir.routes = [];
+  const from = rns[0], to = sns[0];
+  const conn = ((last && last.connectivity) || []).find((c) => c.from === from && c.to === to && c.reachable);
+  ir.routes.push({ from, to, path: conn ? (conn.path || []).slice() : [] });
+  commit();
 }
 
 /* ------------------------------------------------------------------ */
@@ -822,7 +942,16 @@ function inspectNode(box, id) {
     n.qos = v;
     commit();
   })));
+  grid.appendChild(field("Adapt FIFO depth", numberInput(n.adaptFifoDepth != null ? n.adaptFifoDepth : 4, 1, 64, (v) => {
+    n.adaptFifoDepth = v;
+    commit();
+  })));
   box.appendChild(grid);
+  const adaptRow = ((last && last.adapt) || []).find((a) => a.node === n.id);
+  if (adaptRow) {
+    box.appendChild(el("p", "meta-line",
+      `NIU adapt: ${adaptRow.dataWidth}↔${adaptRow.datWidth} · fifo ${adaptRow.fifoDepth} · mismatch ${adaptRow.mismatch} (SEM-19/HW-12)`));
+  }
   const nid = assignedNodeId(n.id);
   box.appendChild(el("p", "meta-line",
     `Clock: ${n.clock} (follows attach router) · assigned NodeID: ${nid == null ? "—" : nid}`));
@@ -1173,6 +1302,20 @@ function showEstimate(data) {
     tr.appendChild(el("td", null, String(v)));
     table.appendChild(tr);
   }
+  const br = data.estimate.bridges;
+  if (br) {
+    const hr = el("tr");
+    const th = el("td", "group-head", "Bridges");
+    th.colSpan = 2;
+    hr.appendChild(th);
+    table.appendChild(hr);
+    for (const [k, v] of Object.entries(br)) {
+      const tr = el("tr");
+      tr.appendChild(el("td", null, k));
+      tr.appendChild(el("td", null, String(v)));
+      table.appendChild(tr);
+    }
+  }
   box.appendChild(table);
   const notes = (data.estimate.assumptions || []).slice(0, 3);
   box.appendChild(el("p", "hint", notes.join(" · ")));
@@ -1419,6 +1562,24 @@ function editQosClass(name, key, value) {
 function renderQos() {
   const box = $("qos");
   clear(box);
+  /* per-node injection priority (IR-21): editable 0–15 */
+  if (ir.nodes.length) {
+    box.appendChild(el("p", "kind", "Per-node priority"));
+    const ntable = el("table", "ep-table");
+    const nh = el("tr");
+    for (const h of ["node", "kind", "qos (0–15)"]) nh.appendChild(el("th", null, h));
+    ntable.appendChild(nh);
+    for (const n of ir.nodes) {
+      const tr = el("tr");
+      tr.appendChild(el("td", null, n.id));
+      tr.appendChild(el("td", null, n.kind));
+      const td = el("td");
+      td.appendChild(numberInput(n.qos != null ? n.qos : 0, 0, 15, (v) => { n.qos = v; commit(); }));
+      tr.appendChild(td);
+      ntable.appendChild(tr);
+    }
+    box.appendChild(ntable);
+  }
   const mapping = (ir.qos && ir.qos.mapping) || DEFAULT_QOS_MAPPING;
   const mtable = el("table", "ep-table");
   const mh = el("tr");
@@ -1447,6 +1608,34 @@ function renderQos() {
     ctable.appendChild(tr);
   }
   box.appendChild(ctable);
+
+  /* UP-02: per-node bandwidth generator declaration (IR-75–78). */
+  box.appendChild(el("p", "kind", "Bandwidth generator (qosGen)"));
+  const gtable = el("table", "ep-table");
+  const gh = el("tr");
+  for (const h of ["node", "kind", "bandwidth MB/s", "saturation B", ""]) gh.appendChild(el("th", null, h));
+  gtable.appendChild(gh);
+  for (const n of ir.nodes) {
+    const tr = el("tr");
+    tr.appendChild(el("td", null, n.id));
+    const q = n.qosGen;
+    if (q) {
+      const k = el("td"); k.appendChild(selectInput(["fixed", "limiter", "regulator"], q.kind, (v) => { q.kind = v; commit(); })); tr.appendChild(k);
+      const b = el("td"); b.appendChild(numberInput(q.bandwidth != null ? q.bandwidth : 1000, 1, 1048576, (v) => { q.bandwidth = v; commit(); })); tr.appendChild(b);
+      const s = el("td"); s.appendChild(numberInput(q.saturation != null ? q.saturation : 0, 0, 1 << 30, (v) => { q.saturation = v; commit(); })); tr.appendChild(s);
+      const act = el("td"); act.appendChild(dangerButton("×", () => { delete n.qosGen; commit(); })); tr.appendChild(act);
+    } else {
+      const td = el("td"); td.colSpan = 3; td.textContent = "—"; tr.appendChild(td);
+      const act = el("td");
+      const add = el("button", "ghost", "+ gen");
+      add.type = "button";
+      add.addEventListener("click", () => { n.qosGen = { kind: "regulator", bandwidth: 1000, saturation: 0 }; commit(); });
+      act.appendChild(add); tr.appendChild(act);
+    }
+    gtable.appendChild(tr);
+  }
+  box.appendChild(gtable);
+  box.appendChild(el("p", "hint", "qosGen regulates RN injection (SEM-18/HW-10); active rows are echoed by the API qosGen key."));
 }
 
 /* ------------------------------------------------------------------ */
@@ -1454,6 +1643,35 @@ function renderQos() {
 /* ------------------------------------------------------------------ */
 
 let posCache = new Map();
+
+/* Topology canvas state (F3): zoom / floorplan overlay / connect-drag /
+ * highlighted route path. All view-only; never written into the IR. */
+let topoZoom = 1;
+let floorplanOn = false;
+let highlightPath = null;
+
+function renderTopoToolbar() {
+  const box = $("topo-toolbar");
+  if (!box) return;
+  clear(box);
+  const mk = (label, fn, title) => {
+    const b = el("button", "ghost", label);
+    b.type = "button";
+    if (title) b.title = title;
+    b.addEventListener("click", fn);
+    box.appendChild(b);
+    return b;
+  };
+  mk("zoom +", () => { topoZoom = Math.min(3, topoZoom * 1.2); showTopology(last || {}); });
+  mk("zoom −", () => { topoZoom = Math.max(0.4, topoZoom / 1.2); showTopology(last || {}); });
+  mk("fit", () => { topoZoom = 1; showTopology(last || {}); });
+  const fp = mk("floorplan", () => { floorplanOn = !floorplanOn; showTopology(last || {}); },
+    "toggle a physical floorplan grid overlay (view-only)");
+  fp.classList.toggle("active", floorplanOn);
+  mk("reset layout", resetLayout);
+  mk("clear hl", () => { highlightPath = null; showTopology(last || {}); }, "clear highlighted route path");
+  box.appendChild(el("span", "hint", "shift-drag a router onto another router to create a link"));
+}
 
 /* Surviving entities keep their cached coordinates (no drift on edits);
  * new entities take their auto slot. Drag overrides live in posCache. */
@@ -1497,6 +1715,8 @@ function showTopology(data) {
   const legend = $("topology-legend");
   clear(box);
   clear(legend);
+  renderTopoToolbar();
+  if (Array.isArray(ir.subsystems) && ir.subsystems.length) { showHierTopology(data); return; }
   $("cdg").textContent = data.graph
     ? (data.graph.acyclic ? "CDG acyclic — constructively deadlock free" : "CDG has a cycle — rejected by G1")
     : "";
@@ -1542,7 +1762,7 @@ function showTopology(data) {
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", `0 0 ${maxX} ${maxY}`);
-  svg.style.width = "100%";
+  svg.style.width = (100 * topoZoom) + "%";
   const defs = document.createElementNS(ns, "defs");
   defs.innerHTML =
     '<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">' +
@@ -1551,13 +1771,33 @@ function showTopology(data) {
     '<path d="M0,0 L10,5 L0,10 z" fill="#a4532c"/></marker>';
   svg.appendChild(defs);
 
+  /* floorplan grid overlay: purely visual, never persisted into the IR */
+  if (floorplanOn) {
+    const grid = document.createElementNS(ns, "g");
+    grid.setAttribute("class", "floorplan-grid");
+    for (let x = 0; x <= maxX; x += 40) {
+      const ln = document.createElementNS(ns, "line");
+      ln.setAttribute("x1", String(x)); ln.setAttribute("y1", "0");
+      ln.setAttribute("x2", String(x)); ln.setAttribute("y2", String(maxY));
+      grid.appendChild(ln);
+    }
+    for (let y = 0; y <= maxY; y += 40) {
+      const ln = document.createElementNS(ns, "line");
+      ln.setAttribute("x1", "0"); ln.setAttribute("y1", String(y));
+      ln.setAttribute("x2", String(maxX)); ln.setAttribute("y2", String(y));
+      grid.appendChild(ln);
+    }
+    svg.appendChild(grid);
+  }
+
   const lineEls = [];
   for (const e of edges.values()) {
     const a = pos.get(e.from);
     const b = pos.get(e.to);
     if (!a || !b) continue;
     const line = document.createElementNS(ns, "line");
-    line.setAttribute("class", "edge" + (e.async ? " async" : "") + (e.dateline ? " dateline" : ""));
+    const hl = highlightPath && highlightPath.some((r, i) => i > 0 && pairKey(highlightPath[i - 1], r) === pairKey(e.from, e.to));
+    line.setAttribute("class", "edge" + (e.async ? " async" : "") + (e.dateline ? " dateline" : "") + (hl ? " hl" : ""));
     line.setAttribute("x1", String(a.x + NODE_W));
     line.setAttribute("y1", String(a.y + NODE_H / 2));
     line.setAttribute("x2", String(b.x - 2));
@@ -1593,11 +1833,22 @@ function showTopology(data) {
   }
   box.appendChild(svg);
 
-  /* manual drag: positions persist to localStorage, never into the IR */
+  /* manual drag: positions persist to localStorage, never into the IR.
+   * shift-drag from a router starts a connect gesture (F3): releasing over
+   * another router creates a router↔router link through the normal guard. */
   let dragging = null;
+  let connecting = null;
+  let tempLine = null;
+  const gToName = new Map();
+  for (const [name, g] of nodeG) gToName.set(g, name);
   const scale = () => {
     const rect = svg.getBoundingClientRect();
     return rect.width > 0 ? maxX / rect.width : 1;
+  };
+  const svgPoint = (e) => {
+    const rect = svg.getBoundingClientRect();
+    const s = scale();
+    return { x: (e.clientX - rect.left) * s, y: (e.clientY - rect.top) * s };
   };
   const updateLines = (name) => {
     const p = pos.get(name);
@@ -1616,11 +1867,30 @@ function showTopology(data) {
     g.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       try { g.setPointerCapture(e.pointerId); } catch { /* synthetic events */ }
+      if (e.shiftKey && routers.has(name)) {
+        connecting = { from: name };
+        tempLine = document.createElementNS(ns, "line");
+        tempLine.setAttribute("class", "edge connect");
+        const p = pos.get(name);
+        tempLine.setAttribute("x1", String(p.x + NODE_W));
+        tempLine.setAttribute("y1", String(p.y + NODE_H / 2));
+        tempLine.setAttribute("x2", String(p.x + NODE_W));
+        tempLine.setAttribute("y2", String(p.y + NODE_H / 2));
+        svg.appendChild(tempLine);
+        g.style.cursor = "crosshair";
+        return;
+      }
       const orig = { ...pos.get(name) };
       dragging = { name, sx: e.clientX, sy: e.clientY, orig };
       g.style.cursor = "grabbing";
     });
     g.addEventListener("pointermove", (e) => {
+      if (connecting && connecting.from === name && tempLine) {
+        const p = svgPoint(e);
+        tempLine.setAttribute("x2", String(p.x));
+        tempLine.setAttribute("y2", String(p.y));
+        return;
+      }
       if (!dragging || dragging.name !== name) return;
       const s = scale();
       const np = { x: dragging.orig.x + (e.clientX - dragging.sx) * s, y: dragging.orig.y + (e.clientY - dragging.sy) * s };
@@ -1629,7 +1899,19 @@ function showTopology(data) {
       g.setAttribute("transform", `translate(${np.x},${np.y})`);
       updateLines(name);
     });
-    const end = () => {
+    const end = (e) => {
+      if (connecting && connecting.from === name) {
+        const from = connecting.from;
+        connecting = null;
+        if (tempLine) { tempLine.remove(); tempLine = null; }
+        g.style.cursor = "grab";
+        const under = document.elementFromPoint(e.clientX, e.clientY);
+        const targetG = under && under.closest ? under.closest("g") : null;
+        const to = targetG && gToName.get(targetG);
+        if (to && to !== from && routers.has(to)) addLink(from, to, "sync");
+        else if (to && to !== from) toast("Links join routers; node attachment is automatic.");
+        return;
+      }
       if (dragging && dragging.name === name) {
         dragging = null;
         g.style.cursor = "grab";
@@ -1751,6 +2033,9 @@ async function main() {
     return;
   }
 
+  for (const b of document.querySelectorAll(".phase-tab")) {
+    b.addEventListener("click", () => setPhase(b.dataset.phase));
+  }
   $("add-clock").addEventListener("click", addClock);
   $("add-partition").addEventListener("click", addPartition);
   $("add-node").addEventListener("click", () => {
@@ -1759,6 +2044,7 @@ async function main() {
     addNode("rn-i", rname);
   });
   $("addr-auto").addEventListener("click", autoWindows);
+  $("add-route").addEventListener("click", addRoute);
   $("evaluate").addEventListener("click", evaluate);
   $("load").addEventListener("click", loadExample);
   $("workspace").addEventListener("click", openWsDialog);
@@ -1828,7 +2114,161 @@ async function main() {
     }
   }
   if (!workspace) openWsDialog();
+  setPhase(phase);
   requestAnimationFrame(() => document.body.classList.add("ready"));
 }
 
 main().catch((e) => showProblem("startup: " + e.message));
+
+/* ------------------------------------------------------------------ */
+/* UP-07 hierarchical multi-NoC views                                  */
+/* ------------------------------------------------------------------ */
+
+function showSubsystems(data) {
+  const box = $("subsystems");
+  if (!box) return;
+  clear(box);
+  const subs = data.subsystems;
+  if (!Array.isArray(subs) || !subs.length) {
+    box.appendChild(el("div", "empty", "Flat fabric (no subsystems)."));
+    return;
+  }
+  const table = el("table", "ep-table");
+  const head = el("tr");
+  for (const h of ["name", "nodes", "routers", "sam", "datWidth"]) head.appendChild(el("th", null, h));
+  table.appendChild(head);
+  for (const s of subs) {
+    const tr = el("tr");
+    tr.appendChild(el("td", null, s.name));
+    tr.appendChild(el("td", null, String(s.nodes)));
+    tr.appendChild(el("td", null, String(s.routers)));
+    tr.appendChild(el("td", null, String(s.sam)));
+    tr.appendChild(el("td", null, String((s.chi || {}).datWidth)));
+    table.appendChild(tr);
+  }
+  box.appendChild(table);
+  for (const nl of (data.nocLinks || [])) {
+    box.appendChild(el("p", "meta-line",
+      `bridge ${nl.from} → ${nl.to} via ${nl.fromRouter} ↔ ${nl.toRouter} · ${nl.cdc}${nl.dvmForward ? " · dvmForward" : ""}`));
+  }
+}
+
+function showGatesBySubsystem(data) {
+  const box = $("gates-sub");
+  if (!box) return;
+  clear(box);
+  const g = data.gatesBySubsystem;
+  if (!g || !Object.keys(g).length) {
+    box.appendChild(el("div", "empty", "Flat fabric."));
+    return;
+  }
+  for (const [name, gates] of Object.entries(g)) {
+    let pass = 0, total = 0;
+    for (const [k, ok] of Object.entries(gates)) {
+      if (k === "G7") continue;
+      total += 1;
+      if (ok) pass += 1;
+    }
+    box.appendChild(el("div", "gate " + (pass === total ? "pass" : "fail"), `${name} ${pass}/${total}`));
+  }
+}
+
+/* Hierarchical canvas: each subsystem laid out independently and stacked;
+ * nocLinks drawn as dashed inter-subsystem bridge edges. View-only. */
+function showHierTopology(data) {
+  const box = $("topology");
+  const legend = $("topology-legend");
+  clear(box);
+  clear(legend);
+  const ns = "http://www.w3.org/2000/svg";
+  const pos = new Map();
+  const routers = new Set();
+  const clockOf = new Map();
+  const edges = [];
+  const groups = [];
+  let offsetY = 0;
+  for (const s of ir.subsystems) {
+    const sRouters = s.routers || (s.fabric && s.fabric.routers) || [];
+    const sLinks = s.links || (s.fabric && s.fabric.links) || [];
+    const pseudo = {
+      meta: ir.meta, chi: s.chi || ir.chi,
+      clockDomains: s.clockDomains || ir.clockDomains,
+      nodes: s.nodes || [], partitions: [],
+      fabric: { routers: sRouters, links: sLinks }
+    };
+    const lp = modelComputeLayout(pseudo, new Map()).pos;
+    let hSub = 0;
+    for (const [name, p] of lp) {
+      const key = s.name + "/" + name;
+      pos.set(key, { x: p.x, y: p.y + offsetY });
+      routers.add(key);
+      const obj = sRouters.find((r) => r.name === name) || pseudo.nodes.find((n) => n.id === name);
+      clockOf.set(key, obj ? obj.clock : "");
+      hSub = Math.max(hSub, p.y + NODE_H);
+    }
+    for (const l of sLinks) {
+      edges.push({
+        from: s.name + "/" + l.from, to: s.name + "/" + l.to,
+        async: l.cdc === "async", dateline: !!l.dateline,
+        classes: l.channels || ["req", "rsp", "dat"]
+      });
+    }
+    groups.push({ name: s.name, y: offsetY, h: hSub + 24 });
+    offsetY += hSub + 70;
+  }
+  for (const nl of (ir.nocLinks || [])) {
+    edges.push({
+      from: nl.from + "/" + nl.fromRouter, to: nl.to + "/" + nl.toRouter,
+      async: nl.cdc === "async", dateline: false, classes: ["noc"], noc: true
+    });
+  }
+  const maxX = Math.max(320, ...[...pos.values()].map((p) => p.x + NODE_W + 30));
+  const maxY = Math.max(120, offsetY);
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${maxX} ${maxY}`);
+  svg.style.width = (100 * topoZoom) + "%";
+  for (const g of groups) {
+    const r = document.createElementNS(ns, "rect");
+    r.setAttribute("class", "subsystem-box");
+    r.setAttribute("x", "4"); r.setAttribute("y", String(g.y - 18));
+    r.setAttribute("width", String(maxX - 8)); r.setAttribute("height", String(g.h + 18));
+    r.setAttribute("rx", "6");
+    svg.appendChild(r);
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("class", "subsystem-label");
+    t.setAttribute("x", "10"); t.setAttribute("y", String(g.y - 6));
+    t.textContent = g.name;
+    svg.appendChild(t);
+  }
+  for (const e of edges) {
+    const a = pos.get(e.from);
+    const b = pos.get(e.to);
+    if (!a || !b) continue;
+    const line = document.createElementNS(ns, "line");
+    line.setAttribute("class", "edge" + (e.async ? " async" : "") + (e.noc ? " noc" : "") + (e.dateline ? " dateline" : ""));
+    line.setAttribute("x1", String(a.x + NODE_W)); line.setAttribute("y1", String(a.y + NODE_H / 2));
+    line.setAttribute("x2", String(b.x - 2)); line.setAttribute("y2", String(b.y + NODE_H / 2));
+    const title = document.createElementNS(ns, "title");
+    title.textContent = `${e.from} ↔ ${e.to} · [${e.classes.join(",")}]`;
+    line.appendChild(title);
+    svg.appendChild(line);
+  }
+  for (const [name, p] of pos) {
+    const g = document.createElementNS(ns, "g");
+    g.setAttribute("transform", `translate(${p.x},${p.y})`);
+    const rect = document.createElementNS(ns, "rect");
+    rect.setAttribute("class", "node-shape" + (routers.has(name) ? " router" : ""));
+    rect.setAttribute("width", String(NODE_W)); rect.setAttribute("height", String(NODE_H)); rect.setAttribute("rx", "4");
+    rect.style.stroke = domainColor(clockOf.get(name));
+    g.appendChild(rect);
+    const label = document.createElementNS(ns, "text");
+    label.setAttribute("class", "node-label");
+    label.setAttribute("x", String(NODE_W / 2)); label.setAttribute("y", String(NODE_H / 2));
+    label.textContent = name.split("/").pop();
+    g.appendChild(label);
+    svg.appendChild(g);
+  }
+  box.appendChild(svg);
+  legend.appendChild(el("span", "key", "hierarchical multi-NoC (UP-07); bridges dashed"));
+  legend.appendChild(el("span", "hint", "drag disabled in hierarchical view"));
+}

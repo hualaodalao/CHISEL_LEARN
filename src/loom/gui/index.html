@@ -29,95 +29,115 @@
   </div>
 </header>
 
+<nav class="phase-tabs" aria-label="Workflow phases">
+  <button class="phase-tab" data-phase="spec" type="button">Spec</button>
+  <button class="phase-tab" data-phase="topology" type="button">Topology</button>
+  <button class="phase-tab" data-phase="address" type="button">Address</button>
+  <button class="phase-tab" data-phase="qos" type="button">QoS</button>
+  <button class="phase-tab" data-phase="verify" type="button">Verify</button>
+</nav>
+
 <main class="workspace">
-  <aside class="panel rail" aria-label="Structure">
+  <aside class="panel rail" aria-label="Specification tree">
     <section class="block">
       <div class="block-head">
-        <h2>Design</h2>
+        <h2>Specification</h2>
         <span id="summary" class="subtle"></span>
       </div>
-      <div class="field-grid">
-        <label>Name <input id="design-name" type="text" spellcheck="false"></label>
-        <label>Address width
-          <select id="addr-width"></select>
-        </label>
-        <label>Data width
-          <select id="data-width"></select>
-        </label>
-      </div>
-    </section>
-
-    <section class="block">
-      <div class="block-head">
-        <h2>CHI</h2>
-        <span id="chi-derived" class="subtle"></span>
-      </div>
-      <div id="chi" class="field-grid"></div>
-    </section>
-
-    <section class="block">
-      <div class="block-head">
-        <h2>QoS</h2>
-        <span class="subtle">mapping locked (CHK-34)</span>
-      </div>
-      <div id="qos"></div>
-    </section>
-
-    <section class="block">
-      <div class="block-head">
-        <h2>Clocks</h2>
-        <button id="add-clock" class="ghost">+ clock</button>
-      </div>
       <div id="clocks" class="chip-list"></div>
-      <p class="hint">Router and node clocks can only use these domains.</p>
-    </section>
-
-    <section class="block">
-      <div class="block-head">
-        <h2>Structure</h2>
+      <div class="row create-row">
+        <button id="add-clock" class="ghost">+ clock</button>
         <button id="add-partition" class="ghost">+ partition</button>
+        <button id="add-node" class="ghost">+ node</button>
       </div>
       <div id="structure" class="tree"></div>
       <p class="hint">Node ↔ router attachment links are generated automatically: RN injects (node → router), SN receives (router → node). CHI links are bidirectional.</p>
     </section>
-
-    <section class="block">
-      <div class="block-head">
-        <h2>Router links</h2>
-      </div>
-      <div id="links" class="link-list"></div>
-      <div class="inline-form" id="link-form"></div>
-    </section>
-
-    <section class="block">
-      <div class="block-head">
-        <h2>Nodes</h2>
-        <button id="add-node" class="ghost">+ node</button>
-      </div>
-      <div id="nodes"></div>
-    </section>
-
-    <section class="block">
-      <div class="block-head">
-        <h2>SAM</h2>
-        <button id="addr-auto" class="ghost">auto 4K</button>
-      </div>
-      <div id="address-map" class="addr-map"></div>
-      <p id="addr-note" class="hint"></p>
-    </section>
   </aside>
 
   <section class="stage">
-    <section class="panel viz">
-      <div class="block-head">
-        <h2>Topology</h2>
-        <span id="cdg" class="subtle"></span>
-      </div>
-      <div id="topology" class="topology"></div>
-      <div id="topology-legend" class="legend"></div>
-    </section>
+    <div class="phase-view" data-phase="spec">
+      <section class="panel">
+        <div class="block-head"><h2>Design</h2></div>
+        <div class="field-grid">
+          <label>Name <input id="design-name" type="text" spellcheck="false"></label>
+          <label>Address width
+            <select id="addr-width"></select>
+          </label>
+          <label>Data width
+            <select id="data-width"></select>
+          </label>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="block-head">
+          <h2>CHI</h2>
+          <span id="chi-derived" class="subtle"></span>
+        </div>
+        <div id="chi" class="field-grid"></div>
+      </section>
+      <section class="panel">
+        <div class="block-head"><h2>Nodes</h2></div>
+        <div id="nodes"></div>
+      </section>
+      <section class="panel">
+        <div class="block-head"><h2>Subsystems</h2></div>
+        <div id="subsystems"></div>
+      </section>
+    </div>
 
-    <div class="split">
+    <div class="phase-view" data-phase="topology">
+      <section class="panel viz">
+        <div class="block-head">
+          <h2>Topology</h2>
+          <span id="cdg" class="subtle"></span>
+        </div>
+        <div id="topo-toolbar" class="row topo-toolbar"></div>
+        <div id="topology" class="topology"></div>
+        <div id="topology-legend" class="legend"></div>
+      </section>
+      <section class="panel">
+        <div class="block-head"><h2>Router links</h2></div>
+        <div id="links" class="link-list"></div>
+        <div class="inline-form" id="link-form"></div>
+      </section>
+    </div>
+
+    <div class="phase-view" data-phase="address">
+      <section class="panel">
+        <div class="block-head">
+          <h2>SAM</h2>
+          <button id="addr-auto" class="ghost">auto 4K</button>
+        </div>
+        <div id="address-map" class="addr-map"></div>
+        <p id="addr-note" class="hint"></p>
+      </section>
+      <section class="panel">
+        <div class="block-head">
+          <h2>Routes</h2>
+          <button id="add-route" class="ghost">+ route</button>
+        </div>
+        <div id="routes"></div>
+        <p id="routes-note" class="hint"></p>
+      </section>
+      <details class="panel matrix-panel" open>
+        <summary>Connection matrix</summary>
+        <div class="matrix-wrap"><table id="matrix" class="matrix"></table></div>
+        <p class="hint">Cell = router hops from RN to SN; — = unreachable. CHI links are bidirectional.</p>
+      </details>
+    </div>
+
+    <div class="phase-view" data-phase="qos">
+      <section class="panel">
+        <div class="block-head">
+          <h2>QoS</h2>
+          <span class="subtle">mapping locked (CHK-34)</span>
+        </div>
+        <div id="qos"></div>
+      </section>
+    </div>
+
+    <div class="phase-view" data-phase="verify">
       <section class="panel">
         <div class="block-head">
           <h2>Gates</h2>
@@ -126,7 +146,10 @@
         <div id="gates" class="gate-grid"></div>
         <div id="problems" class="problems"></div>
       </section>
-
+      <section class="panel">
+        <div class="block-head"><h2>Gates by subsystem</h2></div>
+        <div id="gates-sub" class="gate-grid"></div>
+      </section>
       <section class="panel">
         <div class="block-head">
           <h2>Estimate</h2>
@@ -134,20 +157,13 @@
         </div>
         <div id="estimate"></div>
       </section>
+      <details class="panel nodes-panel" open>
+        <summary>Nodes (CHI report)</summary>
+        <div id="nodes-report"></div>
+      </details>
     </div>
 
-    <details class="panel matrix-panel" open>
-      <summary>Connection matrix</summary>
-      <div class="matrix-wrap"><table id="matrix" class="matrix"></table></div>
-      <p class="hint">Cell = router hops from RN to SN; — = unreachable. CHI links are bidirectional.</p>
-    </details>
-
-    <details class="panel nodes-panel" open>
-      <summary>Nodes (CHI report)</summary>
-      <div id="nodes-report"></div>
-    </details>
-
-    <details class="panel ir-panel">
+    <details class="panel ir-dock">
       <summary>IR JSON</summary>
       <textarea id="editor" spellcheck="false" aria-label="IR JSON"></textarea>
       <div class="row">
