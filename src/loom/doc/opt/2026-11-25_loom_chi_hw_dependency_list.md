@@ -8,7 +8,7 @@
 > 硬件 owner 裁定（2026-11-25，详见 §4）：HW-01…HW-07 全部已确认（HW-01 HN-I/MN 都需要；HW-02 删约束；HW-03 ChiTop 退役；HW-04/06 硬件侧提供模块 GEN 例化；HW-05 NI 就地 NDERR；HW-07 恒双向+depth 可配）；HQ-01 已答复。
 > 待 GEN 回答（详见 §5）：AQ-01/AQ-02 **已答复并经用户确认（2026-11-25，见 §5.1）**，S2/S3 对齐口径已冻结。
 >
-> **硬件总体完成状态（2026-11-26，wave1+2+3+4+5 闭合）**：HW-01…HW-14 + HQ-01 + A1～A4 + **HW-11（NoC 间桥/UP-07）全部硬件落地并验证**。loom.Chi* **23 suite/85 test 绿**，formal **11/11 PASS**（含 token_chi_noc_bridge 死锁自由），protocol_spec **v1.6.0**。HW-11 落地明细见 §11（答复 GEN §10）；wave1 见 §6、wave3 见 §6.1、wave4 见 §9；可例化模块契约见 §7.1/§11.1，GEN phase 2 行动项见 §11.2。剩余均为 GEN 装配消费点（portMode/protocol 分派、per-source routes/forbid、qosGen/adapt 传参、flat async/分区 CLI 发射、分层发射/estimate）+ 已记录后续（桥多 outstanding、dvmForward=true、异 cfg 子系统），硬件不再阻塞。
+> **硬件总体完成状态（2026-11-26，wave1+2+3+4+5+6 闭合）**：HW-01…HW-14 + HQ-01 + A1～A4 + **HW-11（NoC 间桥/UP-07，含桥多 outstanding）全部硬件落地并验证**。loom.Chi* **23 suite/89 test 绿**，formal **12/12 PASS**（含 token_chi_noc_bridge 死锁自由 + token_chi_noc_bridge_mo 多 outstanding exact-once），protocol_spec **v1.7.0**。HW-11 落地明细见 §11（答复 GEN §10）、桥多 outstanding 见 §11.5；wave1 见 §6、wave3 见 §6.1、wave4 见 §9；可例化模块契约见 §7.1/§11.1，GEN phase 2 行动项见 §11.2/§11.5。剩余均为 GEN 装配消费点（portMode/protocol 分派、per-source routes/forbid、qosGen/adapt 传参、flat async/分区 CLI 发射、分层发射/estimate、BridgeParams.outstanding）+ 已记录后续（dvmForward=true、异 cfg 子系统、异宽多 outstanding W17），硬件不再阻塞。
 
 ## 1. 修正/新增项（HW）
 
@@ -233,7 +233,7 @@ wave3 后全量 **24 suite/258 test 绿**，formal 10/10 PASS。GEN 消费点：
 
 ### 11.1 已交付模块（契约入口，chi 侧镜像 GEN 参数）
 
-- `chi.ChiNocBridge(c, windows: Seq[(Long,Long)], fromNodeId, toNodeId, asyncFifoDepth=0, toDatWidth=0, dvmForward=false)`：from=ChiSnPort(c)、to=ChiRnPort(toCfg)、dstClk/dstReset。终结型代理：窗口转发（地址不重映射）+ TxnID/NodeID 重映射 + DBID 拉模型写 + 未命中就地 NDERR。asyncFifoDepth≥2 每 to 侧通道类 ChiAsyncLink（TX from 域跨出、RX dstClk 域跨回）；toDatWidth≠c.datWidth 时 DAT 路径 ChiDatWidth 齿轮；store&fwd 两域独立反压。**单 outstanding**（多 outstanding ID 池为后续阶段，用户裁定分阶段）。**dvmForward=false**（各 NoC MN 自治；require 拒绝 true，跨桥 DVM 转发为后续）。
+- `chi.ChiNocBridge(c, windows: Seq[(Long,Long)], fromNodeId, toNodeId, asyncFifoDepth=0, toDatWidth=0, dvmForward=false, outstanding=1)`：from=ChiSnPort(c)、to=ChiRnPort(toCfg)、dstClk/dstReset。终结型代理：窗口转发（地址不重映射）+ TxnID/NodeID 重映射 + DBID 拉模型写 + 未命中就地 NDERR。asyncFifoDepth≥2 每 to 侧通道类 ChiAsyncLink（TX from 域跨出、RX dstClk 域跨回）；toDatWidth≠c.datWidth 时 DAT 路径 ChiDatWidth 齿轮；store&fwd 两域独立反压。**outstanding 参数化多事务**（W14/W15：ChiIdPool to 侧 TxnID 池 + 每事务上下文表 + REQ 流水接收 + 读 DAT 逐 flit 转发 + 写数据 {fromSrc,fromTxn} CAM + RR 完成仲裁 + 读/写释放队列；默认 1 向后兼容，>1 require 匹配 DAT 宽度；异宽多 outstanding W17 后续）。**dvmForward=false**（各 NoC MN 自治；require 拒绝 true，跨桥 DVM 转发为后续）。
 - `chi.ChiDatWidth(inCfg, outCfg)`：DAT flit 宽度齿轮，store&fwd 64B 字重组 + DataID 重算，元数据逐字段保留，128/256/512 任意比逐位一致。
 - `chi.ChiSystemTop(subsystems: Seq[ChiNetworkParams], bridges: Seq[ChiBridgeLink])`：聚合子系统 ChiNetworkTop + 桥 + 端口聚合（freeRn/freeSn 扁平 Vec + domClk/domReset）。`chi.ChiBridgeLink(fromSub: Int, fromSn: Int, toSub: Int, toRn: Int, windows, asyncFifoDepth=0, toDatWidth=0, dvmForward=false)` 镜像 GEN BridgeParams（GEN 用 String 子系统名/路由器名，硬件用序号索引；GEN 装配时映射）。桥消费 fromSub.sn[fromSn] 与 toSub.rn[toRn] 两槽，不外露。**v1 各子系统 uniform ChiConfig**（DAT 宽差由桥 toDatWidth 承载）。
 
@@ -251,4 +251,37 @@ wave3 后全量 **24 suite/258 test 绿**，formal 10/10 PASS。GEN 消费点：
 
 ### 11.4 后续（非阻塞，已记录 protocol_spec §14.1）
 
-- 桥多 outstanding（ID 池深度参数化）；dvmForward=true 跨桥 SnpDVMOp 转发 + 对侧 SnpResp 收集（需 from 侧 SNP 注入路径）；ChiSystemTop 异 cfg 子系统（per-subsystem DAT 宽端口）。
+- dvmForward=true 跨桥 SnpDVMOp 转发 + 对侧 SnpResp 收集（需 from 侧 SNP 注入路径）；ChiSystemTop 异 cfg 子系统（per-subsystem DAT 宽端口）；异宽多 outstanding（W17，per-txn DAT 重组缓冲）。
+
+### 11.5 wave6 桥多 outstanding 闭合（2026-11-26，W14/W15/W16）
+
+> **桥多 outstanding 硬件落地并验证**（用户裁定：默认 1、{fromSrc,fromTxn} CAM、RR 仲裁、v1 限匹配宽度）。protocol_spec **v1.7.0**。GEN `BridgeParams` 增 `outstanding: Int` 字段（IR nocLinks[].outstanding，CHK ≤ 2^txnIdWidth），装配传入 ChiBridgeLink.outstanding。
+
+- 验证：ChiNocBridgeSpec **9 例**（原 5 + 多读 3 并发恢复各源 TxnID + 池耗尽反压回收 + 多写 2 并发 CAM 路由完整性 + 读写混合并发共享释放仲裁）；ChiDatWidthSpec 4 + ChiSystemSpec 2 不回退。
+- formal **token_chi_noc_bridge_mo.sv**：outstanding≤DEPTH + exact-once（relCnt≤allocCnt）+ 响应独立死锁自由，yosys SAT PASS（入 LoomMain 清单，**12/12**）。
+- GEN 行动：BridgeParams.outstanding 传参 + IR/CHK 字段（硬件已就绪，默认 1 不改变现有装配行为）。
+
+## 12. GEN 答复：HW-11 phase 2 落地 + HW-15/16/17 新立（2026-11-26，回应 §11/§11.5）
+
+> **UP-07 GEN phase 2 落地**（ir_gen_spec **v1.6.0/v1.7.0**）：分层发射守护解除，同步桥系统经 `ChiSystemTop` 端到端发射并仿真验证。§11.2 三行动项全部完成；wave6 outstanding 按声明口径消费（系统层透传待 HW-17）。
+
+### 12.1 已落地（GEN 侧）
+
+1. **桥端点装配（SEM-20a）**：`ChiAssemble.systemProjections/systemParams`——每 nocLink 在 fromSub 增合成 sn-f 槽（挂 fromRouter）、toSub 增合成 rn-i 槽（挂 toRouter），保留前缀 `__noc_<from>_<to>_<i>_sn/rn`（声明名冲突报错）；NodeID 按段确定性续编；from SAM 增补转发窗口→桥 SN；槽序号按**最终 NodeID 排序向量**查名定位（不假设插入序）。
+2. **分层发射（GEN-25a）**：LoomMain `emitSystem` 发射 ChiSystemTop.sv + 逐子系统 `subsystems/<name>/chi_nodes.json` + 系统 `ports.json`（freeRn/freeSn 排除桥槽）+ manifest/signoff/tb；estimate additive `bridges.noc`；CG2 逐文件确定性。
+3. **门禁**：CHK-59（dvmForward=true / async 非 2 幂）、CHK-60（**装配后 ChiConfig 一致，含拓扑派生 nHalf**——ring/chain 子系统 chi 块相同但 nHalf 不同亦拒绝）、CHK-61（outstanding ∈ [1, 2^txnIdWidth]）。
+4. **验证**：GEN 级 golden sim（IR→systemParams→ChiSystemTop）跨桥读 CompData 逐位一致 + DBID 拉模型写重组逐位一致（Verilator）；全量回归绿（计数见提交）。
+
+### 12.2 新立硬件需求（GEN 不实施，维持明确 emit 守护）
+
+| ID | 缺口（源码引用） | 需求 | GEN 现状 | 优先级 |
+|---|---|---|---|---|
+| HW-15 | `ChiSystemTop.scala` L65–71：async 桥 dstClk 硬接 `io.domClk(0)`——全单域子系统时 nDomExtra=0 向量为空（elaboration 失败），且 domClk(0) 一般不是 to 侧时钟 | 每桥独立 dstClk 选择（ChiBridgeLink 增时钟域索引或系统顶层专用桥时钟端口），并保证非空 | emit 守护：nocLinks 含 asyncFifoDepth≥2 ⇒ 报错待 HW-15；check/estimate 照常 | 中 |
+| HW-16 | `ChiSystemTop.scala` L44：直例化 `ChiNetworkTop`，无平铺路径 `ChiAdaptedNetworkTop`（GEN-24）等价包装层 ⇒ 子系统内宽度失配 chi 节点无齿轮 | ChiSystemTop 按子系统 adapt 需求集成 ChiNiAdapt（或暴露 GEN 包装钩子） | emit 守护：任一子系统 `ChiAdaptedNetworkTop.needed` ⇒ 报错待 HW-16；匹配宽度不受影响 | 中 |
+| HW-17 | §11.5 契约声称 `ChiBridgeLink(..., outstanding=1)`，但 `ChiSystemTop.scala` 未更新——ChiBridgeLink 无 outstanding 字段、ChiNocBridge 例化未传参 | ChiBridgeLink 增 `outstanding: Int = 1` 并透传 ChiNocBridge（含 >1 匹配宽度 require 对齐） | IR-94/CHK-61/BridgeParams.outstanding 已就绪（声明口径）；systemParams 暂默认 1，字段落地后一行消费 | 高（wave6 收口） |
+
+### 12.3 边界与后续
+
+- v1 分层发射：**同步桥 + uniform ChiConfig + 匹配宽度 chi 节点**；async/异宽/异 cfg 均有明确守护或 CHK，不静默发射错误 RTL。
+- 桥多 outstanding 异宽（W17）、dvmForward=true、异 cfg 子系统仍为硬件后续（§11.4），GEN 不预判字段。
+- GUI F7 可消费：subsystem 层 + 分层发射 + bridges.noc；HW-15/16/17 相关控件待上游落地（GUI 计划 §6 已同步）。

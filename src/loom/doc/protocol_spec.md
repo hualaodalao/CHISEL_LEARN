@@ -17,6 +17,7 @@
 | 1.4.0 | 2026-11-26 | Wave3 A1～A4 落地：ChiSnPort 补 RX DAT 写数据投递 + 写桥 dat.tgtId 从 DBIDResp.srcId 捕获（A1）、ChiAxiSnBridge SN CHI→AXI 反向桥（A2）、ChiAxiNetworkTop per-node 混合协议边界（按 node.protocol 拆分 rnAxi/rnChi/snAxi/snChi，A3）、ChiNetworkParams.samByRn per-source SAM 过滤/禁止对 NDERR（A4） |
 | 1.5.0 | 2026-11-26 | Wave4 HW-14/10/12 落地（GEN §8 解阻塞）：ChiNetLink.asyncFifoDepth + ChiNetworkParams.routerDomain，ChiNetworkTop 按域 withClockAndReset + link 级 ChiAsyncLink（HW-14 方案①，首版节点挂 domain 0）；ChiQosRegulator NIU 令牌桶带宽调节 fixed/limiter/regulator（HW-10）；ChiNiWidth/ChiNiAdapt store&fwd 宽度 gearbox + 频率异步 FIFO（HW-12，GEN 例化）；ChiNetworkParams.qosGen/adapt 参数 |
 | 1.6.0 | 2026-11-26 | Wave5 HW-11 闭合（UP-07，GEN §10 解阻塞）：ChiNocBridge 跨 NoC 桥终结型协议代理（窗口转发+TxnID/NodeID 重映射+DBID 拉模型写+未命中 NDERR，asyncFifoDepth 跨时钟+toDatWidth DAT 齿轮+store&fwd 流控隔离，单 outstanding/dvmForward=false）；ChiDatWidth DAT flit 宽度齿轮；ChiSystemTop 多子系统聚合 + ChiBridgeLink；formal token_chi_noc_bridge 死锁自由；LM-F028/F029/F030 + §6.24/6.25/6.26 |
+| 1.7.0 | 2026-11-26 | Wave6 桥多 outstanding（W14/W15/W16）：ChiNocBridge outstanding 参数化（ChiIdPool to 侧 TxnID 池 + 每事务上下文表 + REQ 流水接收 + 读 DAT 逐 flit 转发 + 写数据 {fromSrc,fromTxn} CAM + RR 完成仲裁 + 读/写释放队列），默认 1 向后兼容、>1 限匹配 DAT 宽度；formal token_chi_noc_bridge_mo（池有界+exact-once+死锁自由）；ChiNocBridgeSpec 9 例（多读/多写/混合并发+池反压）；异宽多 outstanding（W17）/dvmForward=true 仍后续 |
 
 ## 1. 文档说明
 
@@ -97,7 +98,7 @@ ID 不是 opcode/地址/错误码，不重排不复用。性能条目只索引�
 | LM-F025 | flat link 级 CDC | 已实现 | ChiNetLink.asyncFifoDepth + routerDomain，ChiNetworkTop 按域 withClockAndReset + 跨域 link 每通道 ChiAsyncLink（HW-14 方案①；首版节点挂 domain 0） | 6.9、6.19 |
 | LM-F026 | NIU QoS 带宽调节 | 已实现 | ChiQosRegulator 令牌桶（fixed/limiter/regulator，bytesPerCycle 定点累加 + saturationBytes 突发），反压不丢 flit、速率收敛；ChiNetworkParams.qosGen 按 nodeId 串入 RN 入口（HW-10） | 6.22 |
 | LM-F027 | NIU 速率适配 | 已实现 | ChiNiWidth store&fwd 宽度 gearbox（任意 2 幂比，逐位一致）+ ChiNiAdapt 频率异步 FIFO（fifoDepth）；ChiNetworkParams.adapt，GEN 在失配节点 DAT 边界例化（HW-12） | 6.23 |
-| LM-F028 | 跨 NoC 桥协议代理 | 已实现 | ChiNocBridge 终结型 from=SN/to=RN，窗口转发+TxnID/NodeID 重映射+DBID 拉模型写+未命中 NDERR；asyncFifoDepth 跨时钟、toDatWidth DAT 齿轮、store&fwd 流控隔离；单 outstanding（多 outstanding 后续）；formal token_chi_noc_bridge 死锁自由（HW-11/W11/W12） | 6.24 |
+| LM-F028 | 跨 NoC 桥协议代理 | 已实现 | ChiNocBridge 终结型 from=SN/to=RN，窗口转发+TxnID/NodeID 重映射+DBID 拉模型写+未命中 NDERR；asyncFifoDepth 跨时钟、toDatWidth DAT 齿轮、store&fwd 流控隔离；outstanding 参数化多事务（ID 池+上下文表+{src,TxnID} CAM+RR 完成仲裁，默认 1，>1 限匹配宽度）；formal token_chi_noc_bridge(_mo) 死锁自由/exact-once（HW-11/W11/W12/W14/W15） | 6.24 |
 | LM-F029 | DAT flit 宽度齿轮 | 已实现 | ChiDatWidth store&fwd 64B 字重组 + DataID 重算，元数据逐字段保留，128/256/512 任意比逐位一致（HW-11/W12） | 6.25 |
 | LM-F030 | 多子系统系统顶层 | 已实现 | ChiSystemTop 聚合子系统 ChiNetworkTop + ChiNocBridge + 端口聚合；ChiBridgeLink 镜像 GEN BridgeParams；v1 uniform cfg、DVM 各 NoC MN 自治（dvmForward=true 后续）（HW-11/W13） | 6.26 |
 
@@ -841,9 +842,9 @@ families=TLBI/BPI/VIC/SYNC；tlbiSubtypes=VMALL/VMALLS1/ASID/VA/VAA/IPAS2/IPA；
 
 **功能**：终结型跨 NoC 桥。from 侧作 from-NoC 的从端点（ChiSnPort：req RX、rsp/dat TX、rxDat RX），to 侧作 to-NoC 的请求节点（ChiRnPort：req TX、rsp/dat/snp RX、txRsp/txDat TX）。译码转发窗口（to-NoC SAM 别名，地址不重映射），以独立 to 侧 TxnID/NodeID 重发 REQ，响应合并回 from 源。切断跨 NoC 依赖环（G1 按子系统成立，SEM-20）。
 
-**参数**：`ChiNocBridge(c, windows: Seq[(Long,Long)], fromNodeId, toNodeId, asyncFifoDepth=0, toDatWidth=0, dvmForward=false)`。toDatWidth=0 取 c.datWidth；asyncFifoDepth≥2（2 幂）启用跨时钟。
+**参数**：`ChiNocBridge(c, windows: Seq[(Long,Long)], fromNodeId, toNodeId, asyncFifoDepth=0, toDatWidth=0, dvmForward=false, outstanding=1)`。toDatWidth=0 取 c.datWidth；asyncFifoDepth≥2（2 幂）启用跨时钟；outstanding∈[1, 2^txnIdWidth]，>1 时 require 匹配 DAT 宽度。
 
-**FSM**：sIdle/sFwdReq/sRdData/sWrDbid/sWrData/sWrComp/sMiss。读 ReadNoSnp→CompData（恢复 fromTxn/fromSrc）；写 WriteNoSnpFull→DBIDResp→写数据（DBID 拉模型，toDbid/toTgt 从 DBIDResp 捕获）→Comp；窗口未命中→就地 Comp NDERR 不转发。单 outstanding（多 outstanding ID 池为后续阶段）。
+**架构（W14/W15 多 outstanding）**：to 侧 TxnID 池（ChiIdPool 自由列表，深度=outstanding）+ 每事务上下文表（按 toTxn 索引：fromTxn/fromSrc/isWrite/toTgt/toDbid/state）。四通道解耦：REQ 接收组合转发并 alloc ID（canAlloc 门控反压）；读 DAT/to.rsp 按 toTxn 匹配；写数据按 {fromSrc,fromTxn} CAM 匹配上下文重标 toDbid/toTgt；完成（DBIDResp/Comp/未命中 NDERR）经 RR 仲裁上 from.rsp；读末 flit/写 Comp 各入释放队列经 RR 回池。读 ReadNoSnp→CompData（恢复 fromTxn/fromSrc，逐 flit 转发）；写 WriteNoSnpFull→DBIDResp→写数据（DBID 拉模型）→Comp；窗口未命中→就地 Comp NDERR 不占池。outstanding=1 退化等价单事务行为。
 
 **跨时钟（W12）**：asyncFifoDepth≥2 时每 to 侧通道类插 ChiAsyncLink；FSM 留 from 时钟域，io.to 跑 dstClk 域。TX 在 from 域例化跨出；RX 在 dstClk 域例化跨回 from 时钟。store&fwd 缓冲两域独立终结反压（一侧反压不拖死另一侧）。
 
@@ -851,9 +852,9 @@ families=TLBI/BPI/VIC/SYNC；tlbiSubtypes=VMALL/VMALLS1/ASID/VA/VAA/IPAS2/IPA；
 
 **DVM 策略（W13）**：v1 dvmForward=false，各 NoC MN 自治，DVMOp 不跨桥（from 侧 SN 口无 SNP 注入路径）；require 拒绝 dvmForward=true（跨桥 SnpDVMOp 转发 + 对侧 SnpResp 收集为后续）。
 
-**形式化**：token_chi_noc_bridge.sv 证两域缓冲有界（reqUsed/rspUsed≤DEPTH）+ 响应路径独立于请求缓冲（busy&&!rspPending→canRsp，无循环等待=死锁自由），yosys SAT PASS。
+**形式化**：token_chi_noc_bridge.sv 证两域缓冲有界 + 响应路径独立于请求缓冲（无循环等待=死锁自由）；token_chi_noc_bridge_mo.sv 证多 outstanding 池有界（outstanding≤DEPTH）+ exact-once（relCnt≤allocCnt 无双重释放）+ 响应独立死锁自由，yosys SAT PASS。
 
-**验证**：ChiNocBridgeSpec 读代理/写 DBID 拉模型逐位一致/窗口未命中 NDERR/异宽 256→128 端到端/异频双时钟读，5 例绿。
+**验证**：ChiNocBridgeSpec 9 例绿——读代理/写 DBID 拉模型逐位一致/窗口未命中 NDERR/异宽 256→128/异频双时钟读/多读 3 并发恢复各源 TxnID/池耗尽反压回收/多写 2 并发 {src,TxnID} CAM 路由完整性/读写混合并发共享释放仲裁。
 
 ### 6.25 ChiDatWidth —— DAT flit 宽度齿轮（HW-11/W12）
 
@@ -1023,7 +1024,7 @@ chain_4r.json（4 router 链，RN@r0/SN@r3）验证多跳 REQ 正向/DAT 反向�
 - ChiTop 已退役（emit-chi 单/多 router 统一 ChiNetworkTop）；源码保留作 building-block 单测。
 - `LoomMain.usage()` 尚未列出 `emit-chi` 子命令（命令本身可用）。
 - QoS/VC 三级仲裁已落地（per-VC 队列 + input RR/half RR/class WRR + cut 翻半区，nHalf 参数化）；dateline 半区 cut 标志由 GEN 拓扑派生（ChiNetRouter.outCut），首版默认空（无 cut）。
-- ChiNocBridge/ChiSystemTop（HW-11/W11/W12/W13）已落地：跨 NoC 桥协议代理（窗口转发+TxnID/NodeID 重映射+DBID 拉模型写+未命中 NDERR）、跨时钟（asyncFifoDepth）+ DAT 异宽齿轮（ChiDatWidth）+ store&fwd 流控隔离、双子系统端到端；formal token_chi_noc_bridge 死锁自由 PASS。**桥单 outstanding**（多 outstanding ID 池深度参数化为后续阶段）；**dvmForward=false**（各 NoC MN 自治，跨桥 SnpDVMOp 转发+对侧 SnpResp 收集为后续，require 拒绝 true）；**ChiSystemTop v1 各子系统 uniform ChiConfig**（DAT 宽差由桥 toDatWidth 承载）；桥端点节点装配（子系统 params 增桥从/至槽 + 接线）归 GEN。
+- ChiNocBridge/ChiSystemTop（HW-11/W11/W12/W13/W14/W15）已落地：跨 NoC 桥协议代理（窗口转发+TxnID/NodeID 重映射+DBID 拉模型写+未命中 NDERR）、跨时钟（asyncFifoDepth）+ DAT 异宽齿轮（ChiDatWidth）+ store&fwd 流控隔离、双子系统端到端；**outstanding 参数化多事务**（ID 池+上下文表+{src,TxnID} CAM+RR 完成仲裁，默认 1）；formal token_chi_noc_bridge(_mo) 死锁自由/exact-once PASS。**多 outstanding 限匹配 DAT 宽度**（异宽多 outstanding 需 per-txn DAT 重组缓冲，W17 后续）；**dvmForward=false**（各 NoC MN 自治，跨桥 SnpDVMOp 转发+对侧 SnpResp 收集为后续，require 拒绝 true）；**ChiSystemTop v1 各子系统 uniform ChiConfig**（DAT 宽差由桥 toDatWidth 承载）；桥端点节点装配（子系统 params 增桥从/至槽 + 接线）+ BridgeParams.outstanding 传参归 GEN。
 
 ### 14.2 预留（编码空间存在，不实现，门禁拒绝）
 

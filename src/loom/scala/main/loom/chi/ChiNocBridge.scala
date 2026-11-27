@@ -13,22 +13,36 @@ import loom.rtl.LmWire
   * NDERR locally. Crossing cuts the inter-NoC dependency ring (G1 per subsystem).
   *
   * W12: asyncFifoDepth>=2 inserts a per-channel ChiAsyncLink on every to-side
-  * channel (FSM stays in the from clock domain; io.to runs in dstClk domain),
+  * channel (control stays in the from clock domain; io.to runs in dstClk domain),
   * with store&fwd buffering so one side's backpressure does not stall the other.
   * asyncFifoDepth=0 wires directly (W11 sync behavior).
+  *
+  * W14/W15: outstanding>1 tracks multiple in-flight transactions in a context
+  * table indexed by the to-side TxnID (ChiIdPool free-list). REQ intake forwards
+  * combinationally and allocates an ID; read DAT / to.rsp match by to TxnID;
+  * write data matches by {fromSrc,fromTxn} CAM; completions arbitrate (RR) onto
+  * from.rsp. outstanding=1 degenerates to single-transaction behavior. v1
+  * multi-outstanding requires matched DAT width (per-txn gearbox reassembly for
+  * mixed width is a follow-up).
   */
 class ChiNocBridge(c: ChiConfig, windows: Seq[(Long, Long)], fromNodeId: Int, toNodeId: Int,
-                   asyncFifoDepth: Int = 0, toDatWidth: Int = 0, dvmForward: Boolean = false) extends Module {
+                   asyncFifoDepth: Int = 0, toDatWidth: Int = 0, dvmForward: Boolean = false,
+                   outstanding: Int = 1) extends Module {
   private val toW = if (toDatWidth == 0) c.datWidth else toDatWidth
   private val toCfg = if (toW == c.datWidth) c else c.copy(datWidth = toW)
   private val nFlits = ChiWidths.flitCount(64, c.datWidth)
-  private val bw = math.max(1, log2Ceil(nFlits))
+  private val idStep = c.datWidth / 128
+  private val lastDataId = (nFlits - 1) * idStep
   private val async = asyncFifoDepth >= 2
   if (async) require((asyncFifoDepth & (asyncFifoDepth - 1)) == 0, "asyncFifoDepth must be power of two")
   // v1 DVM policy: each NoC's MN is autonomous; DVMOp does not cross the bridge
   // (the from-side SN port has no SNP injection path). Cross-bridge SnpDVMOp
   // forwarding + remote SnpResp collection (dvmForward=true) is a follow-up.
   require(!dvmForward, "dvmForward=true (cross-bridge DVM) is a follow-up; v1 keeps per-NoC MN autonomy")
+  require(outstanding >= 1 && outstanding <= (1 << c.txnIdWidth),
+    s"outstanding must be in [1, ${1 << c.txnIdWidth}], got $outstanding")
+  require(outstanding == 1 || toW == c.datWidth,
+    "multi-outstanding (outstanding>1) requires matched DAT width; mixed-width multi-outstanding is a follow-up")
 
   val io = IO(new Bundle {
     val from = new ChiSnPort(c)
@@ -37,15 +51,27 @@ class ChiNocBridge(c: ChiConfig, windows: Seq[(Long, Long)], fromNodeId: Int, to
     val dstReset = Input(Bool())
   })
 
-  private val sIdle :: sFwdReq :: sRdData :: sWrDbid :: sWrData :: sWrComp :: sMiss :: Nil = Enum(7)
-  private val st = RegInit(sIdle)
-  private val fromTxn = Reg(UInt(c.txnIdWidth.W))
-  private val fromSrc = Reg(UInt(c.nodeIdWidth.W))
-  private val reqBits = Reg(new ChiReqFlit(c))
-  private val isWrite = Reg(Bool())
-  private val toDbid = Reg(UInt(c.txnIdWidth.W))
-  private val toTgt = Reg(UInt(c.nodeIdWidth.W))
-  private val beat = RegInit(0.U(bw.W))
+  // Per-transaction context, indexed by to-side TxnID (= pool allocId).
+  private val sRdData :: sWrDbid :: sWrDbidFwd :: sWrData :: sWrCompWait :: sWrCompFwd :: Nil = Enum(6)
+  private class Ctx extends Bundle {
+    val valid = Bool()
+    val fromTxn = UInt(c.txnIdWidth.W)
+    val fromSrc = UInt(c.nodeIdWidth.W)
+    val isWrite = Bool()
+    val toTgt = UInt(c.nodeIdWidth.W)
+    val toDbid = UInt(c.txnIdWidth.W)
+    val state = UInt(3.W)
+  }
+  private val ctx = RegInit(VecInit(Seq.fill(outstanding)(0.U.asTypeOf(new Ctx))))
+  private val pool = Module(new ChiIdPool(outstanding, c.txnIdWidth))
+  pool.io.alloc := false.B
+  pool.io.release := false.B
+  pool.io.releaseId := 0.U
+
+  // Window-miss completion (does not occupy a pool slot).
+  private val missPend = RegInit(false.B)
+  private val missTxn = Reg(UInt(c.txnIdWidth.W))
+  private val missSrc = Reg(UInt(c.nodeIdWidth.W))
 
   // FSM-facing to-side wires (from clock domain); async links cross to io.to.
   private val toReq = Wire(Decoupled(new ChiReqFlit(c)))
@@ -96,67 +122,114 @@ class ChiNocBridge(c: ChiConfig, windows: Seq[(Long, Long)], fromNodeId: Int, to
 
   private val addr = io.from.req.bits.addr
   private val hit = windows.map { case (b, s) => addr >= b.U && addr <= (b + s - 1).U }.reduceOption(_ || _).getOrElse(false.B)
+  private val reqIsWr = io.from.req.bits.opcode === ChiOp.WriteNoSnpFull.U
 
-  io.from.req.ready := st === sIdle
-  toReq.valid := st === sFwdReq
-  toReq.bits := reqBits
-  toReq.bits.txnId := 0.U
+  // REQ intake: hit forwards combinationally and allocates a to-side TxnID;
+  // miss is answered locally (NDERR) without occupying a pool slot.
+  private val reqFireHit = io.from.req.valid && hit && pool.io.canAlloc && toReq.ready
+  private val reqFireMiss = io.from.req.valid && !hit && !missPend
+  io.from.req.ready := Mux(hit, pool.io.canAlloc && toReq.ready, !missPend)
+  toReq.valid := io.from.req.valid && hit && pool.io.canAlloc
+  toReq.bits := io.from.req.bits
+  toReq.bits.txnId := pool.io.allocId
   toReq.bits.srcId := toNodeId.U
+  pool.io.alloc := reqFireHit
+  when(reqFireHit) {
+    val e = ctx(pool.io.allocId)
+    e.valid := true.B
+    e.fromTxn := io.from.req.bits.txnId
+    e.fromSrc := io.from.req.bits.srcId
+    e.isWrite := reqIsWr
+    e.state := Mux(reqIsWr, sWrDbid, sRdData)
+    e.toTgt := 0.U; e.toDbid := 0.U
+  }
+  when(reqFireMiss) { missPend := true.B; missTxn := io.from.req.bits.txnId; missSrc := io.from.req.bits.srcId }
 
-  io.from.dat.valid := st === sRdData && toDat.valid
+  // Read data: match by to-side TxnID, remap back to the from source, forward
+  // flit-by-flit (matched width needs no reassembly); last flit releases the ID.
+  private val rdCtx = ctx(toDat.bits.txnId)
+  private val rdOk = toDat.valid && rdCtx.valid && rdCtx.state === sRdData
+  io.from.dat.valid := rdOk
   io.from.dat.bits := toDat.bits
-  io.from.dat.bits.txnId := fromTxn
-  io.from.dat.bits.tgtId := fromSrc
-  toDat.ready := st === sRdData && io.from.dat.ready
+  io.from.dat.bits.txnId := rdCtx.fromTxn
+  io.from.dat.bits.tgtId := rdCtx.fromSrc
+  toDat.ready := rdOk && io.from.dat.ready
 
-  io.from.rxDat.ready := st === sWrData
-  toTxDat.valid := st === sWrData && io.from.rxDat.valid
+  // to-side RSP: DBIDResp opens the write-data phase; Comp closes the transaction.
+  private val rspCtx = ctx(toRsp.bits.txnId)
+  private val isDbid = toRsp.bits.opcode === ChiOp.RspDBIDResp.U
+  private val isComp = toRsp.bits.opcode === ChiOp.RspComp.U
+  private val rspAccept = toRsp.valid && ((rspCtx.state === sWrDbid && isDbid) || (rspCtx.state === sWrCompWait && isComp))
+  toRsp.ready := rspAccept
+  when(rspAccept) {
+    when(isDbid) { rspCtx.toDbid := toRsp.bits.dbid; rspCtx.toTgt := toRsp.bits.srcId; rspCtx.state := sWrDbidFwd }
+      .otherwise { rspCtx.state := sWrCompFwd }
+  }
+
+  // Write data: CAM match {fromSrc,fromTxn} to the in-flight write context,
+  // re-tag with the to-side DBID/TgtID and forward; last flit awaits Comp.
+  private val rxSrc = io.from.rxDat.bits.srcId
+  private val rxTxn = io.from.rxDat.bits.txnId
+  private val wrHits = VecInit(ctx.map(e => e.valid && e.state === sWrData && e.fromSrc === rxSrc && e.fromTxn === rxTxn))
+  private val wrIdx = PriorityEncoder(wrHits.asUInt)
+  private val wrFound = wrHits.asUInt.orR
+  private val wrCtx = ctx(wrIdx)
+  io.from.rxDat.ready := wrFound && toTxDat.ready
+  toTxDat.valid := io.from.rxDat.valid && wrFound
   toTxDat.bits := io.from.rxDat.bits
-  toTxDat.bits.txnId := toDbid
-  toTxDat.bits.tgtId := toTgt
+  toTxDat.bits.txnId := wrCtx.toDbid
+  toTxDat.bits.tgtId := wrCtx.toTgt
+  when(toTxDat.fire && io.from.rxDat.bits.dataId === lastDataId.U) { wrCtx.state := sWrCompWait }
 
-  private val rspFwd = (st === sWrDbid || st === sWrComp) && toRsp.valid
-  io.from.rsp.valid := rspFwd || st === sMiss
-  io.from.rsp.bits := 0.U.asTypeOf(new ChiRspFlit(c))
-  io.from.rsp.bits.txnId := fromTxn
-  io.from.rsp.bits.tgtId := fromSrc
-  io.from.rsp.bits.srcId := fromNodeId.U
-  io.from.rsp.bits.dbid := fromTxn
-  io.from.rsp.bits.opcode := Mux(st === sWrDbid, ChiOp.RspDBIDResp.U, ChiOp.RspComp.U)
-  io.from.rsp.bits.respErr := Mux(st === sMiss, ChiRespErr.NDERR.U, ChiRespErr.OK.U)
-  toRsp.ready := (st === sWrDbid || st === sWrComp) && io.from.rsp.ready
+  // Completion arbitration (RR): per-context DBIDResp/Comp plus the miss NDERR.
+  private val rspArb = Module(new Arbiter(new ChiRspFlit(c), outstanding + 1))
+  for (i <- 0 until outstanding) {
+    val e = ctx(i)
+    rspArb.io.in(i).valid := e.valid && (e.state === sWrDbidFwd || e.state === sWrCompFwd)
+    rspArb.io.in(i).bits := 0.U.asTypeOf(new ChiRspFlit(c))
+    rspArb.io.in(i).bits.txnId := e.fromTxn
+    rspArb.io.in(i).bits.tgtId := e.fromSrc
+    rspArb.io.in(i).bits.srcId := fromNodeId.U
+    rspArb.io.in(i).bits.dbid := e.fromTxn
+    rspArb.io.in(i).bits.opcode := Mux(e.state === sWrDbidFwd, ChiOp.RspDBIDResp.U, ChiOp.RspComp.U)
+    rspArb.io.in(i).bits.respErr := ChiRespErr.OK.U
+  }
+  rspArb.io.in(outstanding).valid := missPend
+  rspArb.io.in(outstanding).bits := 0.U.asTypeOf(new ChiRspFlit(c))
+  rspArb.io.in(outstanding).bits.txnId := missTxn
+  rspArb.io.in(outstanding).bits.tgtId := missSrc
+  rspArb.io.in(outstanding).bits.srcId := fromNodeId.U
+  rspArb.io.in(outstanding).bits.dbid := missTxn
+  rspArb.io.in(outstanding).bits.opcode := ChiOp.RspComp.U
+  rspArb.io.in(outstanding).bits.respErr := ChiRespErr.NDERR.U
+  LmWire.link(rspArb.io.out, io.from.rsp)
+
+  private val rspCh = rspArb.io.chosen
+  private val wrCompFire = rspArb.io.out.fire && rspCh =/= outstanding.U && ctx(rspCh).state === sWrCompFwd
+  when(rspArb.io.out.fire) {
+    when(rspCh === outstanding.U) { missPend := false.B }
+      .otherwise {
+        val e = ctx(rspCh)
+        when(e.state === sWrDbidFwd) { e.state := sWrData }
+          .otherwise { e.valid := false.B }
+      }
+  }
+
+  // ID release: read-last-flit and write-Comp each enqueue; RR drains to the
+  // single-release pool port. Queue depth = outstanding bounds pending releases.
+  private val rdQ = Module(new Queue(UInt(c.txnIdWidth.W), outstanding))
+  rdQ.io.enq.valid := toDat.fire && toDat.bits.dataId === lastDataId.U
+  rdQ.io.enq.bits := toDat.bits.txnId
+  private val wrQ = Module(new Queue(UInt(c.txnIdWidth.W), outstanding))
+  wrQ.io.enq.valid := wrCompFire
+  wrQ.io.enq.bits := rspCh
+  private val relArb = Module(new Arbiter(UInt(c.txnIdWidth.W), 2))
+  LmWire.link(rdQ.io.deq, relArb.io.in(0))
+  LmWire.link(wrQ.io.deq, relArb.io.in(1))
+  relArb.io.out.ready := true.B
+  pool.io.release := relArb.io.out.fire
+  pool.io.releaseId := relArb.io.out.bits
 
   toTxRsp.valid := false.B; toTxRsp.bits := 0.U.asTypeOf(new ChiRspFlit(c))
   toSnp.ready := true.B
-
-  switch(st) {
-    is(sIdle) {
-      when(io.from.req.fire) {
-        fromTxn := io.from.req.bits.txnId
-        fromSrc := io.from.req.bits.srcId
-        reqBits := io.from.req.bits
-        isWrite := io.from.req.bits.opcode === ChiOp.WriteNoSnpFull.U
-        beat := 0.U
-        st := Mux(hit, sFwdReq, sMiss)
-      }
-    }
-    is(sFwdReq) { when(toReq.fire) { beat := 0.U; st := Mux(isWrite, sWrDbid, sRdData) } }
-    is(sRdData) {
-      when(io.from.dat.fire) {
-        when(beat === (nFlits - 1).U) { st := sIdle }
-        beat := beat + 1.U
-      }
-    }
-    is(sWrDbid) {
-      when(io.from.rsp.fire) { toDbid := toRsp.bits.dbid; toTgt := toRsp.bits.srcId; beat := 0.U; st := sWrData }
-    }
-    is(sWrData) {
-      when(toTxDat.fire) {
-        when(beat === (nFlits - 1).U) { st := sWrComp }
-        beat := beat + 1.U
-      }
-    }
-    is(sWrComp) { when(io.from.rsp.fire) { st := sIdle } }
-    is(sMiss) { when(io.from.rsp.fire) { st := sIdle } }
-  }
 }
