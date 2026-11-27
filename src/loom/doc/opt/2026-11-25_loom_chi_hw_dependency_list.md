@@ -8,7 +8,7 @@
 > 硬件 owner 裁定（2026-11-25，详见 §4）：HW-01…HW-07 全部已确认（HW-01 HN-I/MN 都需要；HW-02 删约束；HW-03 ChiTop 退役；HW-04/06 硬件侧提供模块 GEN 例化；HW-05 NI 就地 NDERR；HW-07 恒双向+depth 可配）；HQ-01 已答复。
 > 待 GEN 回答（详见 §5）：AQ-01/AQ-02 **已答复并经用户确认（2026-11-25，见 §5.1）**，S2/S3 对齐口径已冻结。
 >
-> **硬件总体完成状态（2026-11-26，wave1+2+3+4+5+6 闭合）**：HW-01…HW-14 + HQ-01 + A1～A4 + **HW-11（NoC 间桥/UP-07，含桥多 outstanding）全部硬件落地并验证**。loom.Chi* **23 suite/89 test 绿**，formal **12/12 PASS**（含 token_chi_noc_bridge 死锁自由 + token_chi_noc_bridge_mo 多 outstanding exact-once），protocol_spec **v1.7.0**。HW-11 落地明细见 §11（答复 GEN §10）、桥多 outstanding 见 §11.5；wave1 见 §6、wave3 见 §6.1、wave4 见 §9；可例化模块契约见 §7.1/§11.1，GEN phase 2 行动项见 §11.2/§11.5。剩余均为 GEN 装配消费点（portMode/protocol 分派、per-source routes/forbid、qosGen/adapt 传参、flat async/分区 CLI 发射、分层发射/estimate、BridgeParams.outstanding）+ 已记录后续（dvmForward=true、异 cfg 子系统、异宽多 outstanding W17），硬件不再阻塞。
+> **硬件总体完成状态（2026-11-27，wave1–7 闭合）**：HW-01…HW-17（含 HW-11 NoC 间桥/多 outstanding、HW-15 子系统独立根时钟、HW-16 子系统宽度适配钩子、HW-17 outstanding 透传）+ HQ-01 + A1～A4 **全部硬件落地并验证**。loom.Chi* **23 suite/92 test 绿**，formal **12/12 PASS**，protocol_spec **v1.9.0**。明细：§11（HW-11）/§11.5（多 outstanding）/§13.1（HW-17）/§13.5（HW-15）/§17（HW-16）；wave1 §6、wave3 §6.1、wave4 §9。**GEN 待办：按 §17.4 接入 mkNet 工厂（需 Module() 包装）+ ports.json datWidth/protocol + 解 hierarchicalAdaptGuard + 联合回归**。已记录后续：axi4-in-subsystem、异 cfg 子系统、异宽多 outstanding（W17）、dvmForward=true。硬件不再阻塞。
 
 ## 1. 修正/新增项（HW）
 
@@ -276,12 +276,206 @@ wave3 后全量 **24 suite/258 test 绿**，formal 10/10 PASS。GEN 消费点：
 
 | ID | 缺口（源码引用） | 需求 | GEN 现状 | 优先级 |
 |---|---|---|---|---|
-| HW-15 | `ChiSystemTop.scala` L65–71：async 桥 dstClk 硬接 `io.domClk(0)`——全单域子系统时 nDomExtra=0 向量为空（elaboration 失败），且 domClk(0) 一般不是 to 侧时钟 | 每桥独立 dstClk 选择（ChiBridgeLink 增时钟域索引或系统顶层专用桥时钟端口），并保证非空 | emit 守护：nocLinks 含 asyncFifoDepth≥2 ⇒ 报错待 HW-15；check/estimate 照常 | 中 |
-| HW-16 | `ChiSystemTop.scala` L44：直例化 `ChiNetworkTop`，无平铺路径 `ChiAdaptedNetworkTop`（GEN-24）等价包装层 ⇒ 子系统内宽度失配 chi 节点无齿轮 | ChiSystemTop 按子系统 adapt 需求集成 ChiNiAdapt（或暴露 GEN 包装钩子） | emit 守护：任一子系统 `ChiAdaptedNetworkTop.needed` ⇒ 报错待 HW-16；匹配宽度不受影响 | 中 |
-| HW-17 | §11.5 契约声称 `ChiBridgeLink(..., outstanding=1)`，但 `ChiSystemTop.scala` 未更新——ChiBridgeLink 无 outstanding 字段、ChiNocBridge 例化未传参 | ChiBridgeLink 增 `outstanding: Int = 1` 并透传 ChiNocBridge（含 >1 匹配宽度 require 对齐） | IR-94/CHK-61/BridgeParams.outstanding 已就绪（声明口径）；systemParams 暂默认 1，字段落地后一行消费 | 高（wave6 收口） |
+| HW-15 | `ChiSystemTop.scala` L65–71：async 桥 dstClk 硬接 `io.domClk(0)`——全单域子系统时 nDomExtra=0 向量为空（elaboration 失败），且 domClk(0) 一般不是 to 侧时钟 | 每桥独立 dstClk 选择（ChiBridgeLink 增时钟域索引或系统顶层专用桥时钟端口），并保证非空 | emit 守护：nocLinks 含 asyncFifoDepth≥2 ⇒ 报错待 HW-15；check/estimate 照常 | **硬件已闭合（2026-11-27 方案A，§13.5）**：根因是子系统无独立根时钟（§13.2）；subDomain + io.subClk/subReset，桥 fromSub 域例化/dstClk=toSub 根时钟，同步同域/async 异域 require；GEN 驱动新端口 + ports.json 时钟标注后可解守护 |
+| HW-16 | `ChiSystemTop.scala` L44：直例化 `ChiNetworkTop`，无平铺路径 `ChiAdaptedNetworkTop`（GEN-24）等价包装层 ⇒ 子系统内宽度失配 chi 节点无齿轮 | ChiSystemTop 按子系统 adapt 需求集成 ChiNiAdapt（或暴露 GEN 包装钩子） | emit 守护：任一子系统 `ChiAdaptedNetworkTop.needed` ⇒ 报错待 HW-16；匹配宽度不受影响 | **硬件已闭合（2026-11-27 薄包装变体，§17）**：ChiNetworkIO/ChiNetworkLike/ChiNetworkUniform + mkNet 工厂 + free 槽 MixedVec 边界 + ChiNodeWidths；ChiNetworkTop/GEN 包装零改动；GEN 按 §17.4 接入（工厂需 Module() 包装）后解守护 |
+| HW-17 | §11.5 契约声称 `ChiBridgeLink(..., outstanding=1)`，但 `ChiSystemTop.scala` 未更新——ChiBridgeLink 无 outstanding 字段、ChiNocBridge 例化未传参 | ChiBridgeLink 增 `outstanding: Int = 1` 并透传 ChiNocBridge（含 >1 匹配宽度 require 对齐） | IR-94/CHK-61/BridgeParams.outstanding 已就绪（声明口径）；systemParams 暂默认 1，字段落地后一行消费 | **硬件已闭合（2026-11-27，§13.1）**：字段+透传落地，ChiSystemSpec HW-17 用例绿；GEN systemParams 一行消费 |
 
 ### 12.3 边界与后续
 
 - v1 分层发射：**同步桥 + uniform ChiConfig + 匹配宽度 chi 节点**；async/异宽/异 cfg 均有明确守护或 CHK，不静默发射错误 RTL。
 - 桥多 outstanding 异宽（W17）、dvmForward=true、异 cfg 子系统仍为硬件后续（§11.4），GEN 不预判字段。
 - GUI F7 可消费：subsystem 层 + 分层发射 + bridges.noc；HW-15/16/17 相关控件待上游落地（GUI 计划 §6 已同步）。
+
+## 13. 硬件答复：HW-17 闭合 + HW-15/16 勘查与方案待裁定（2026-11-27，回应 §12.2）
+
+### 13.1 HW-17 已闭合（wave6 收口遗漏，高优先）
+
+> `ChiBridgeLink` 增 `outstanding: Int = 1` 并透传 `ChiNocBridge`（含 >1 匹配宽度 require 由桥侧统一校验）。**GEN 可解除 outstanding 系统层透传缺口，`systemParams` 一行消费 `BridgeParams.outstanding`**。
+
+- 改动：`chi/ChiSystemTop.scala` ChiBridgeLink 增字段 + 桥例化传参。默认 1，不改变现有装配行为。
+- 验证：新增 `ChiSystemSpec` "pass ChiBridgeLink.outstanding through to the bridge (HW-17)" —— 双子系统 depth-2 桥在首笔读未返回前即接收第二笔 REQ（系统边界可观测），两笔各 nFlits flit 重组逐位一致。ChiSystemSpec 3 + ChiNocBridgeSpec 9 = **12 例绿**。
+- GEN 行动：`systemParams` 把 `BridgeParams.outstanding` 传入 `ChiBridgeLink.outstanding`（IR-94/CHK-61 已就绪）。
+
+### 13.2 HW-15 勘查结论：根因不是 dstClk 索引，而是子系统无独立根时钟
+
+**核实源码**：
+- `ChiNetworkTop.scala` L32：`clkOf(0) = clock`（模块时钟），domain≥1 才用 `io.domClk`。
+- `ChiSystemTop.scala` L44：所有子系统在**顶层同一时钟域**例化 ⇒ 各子系统 domain-0 都是同一顶层时钟。
+- `ChiNetworkTop.scala` L22：HW-14 首版 require 本地节点挂 domain-0 router。
+
+**推论**：桥 from/to 两端**当前必然同时钟**。仅把 `dstClk` 改接某 `io.domClk(k)` 不能解决问题——to 侧子系统逻辑仍跑顶层时钟，跨域 FIFO 两端时钟与被跨越逻辑不一致，属**语义错误**。§12.2 描述的"domClk(0) 一般不是 to 侧时钟"成立，但根因是子系统缺独立根时钟。
+
+**方案（待用户裁定，详见 `doc/opt/2026-11-27_loom_chi_hw_wave7_plan.md` §1）**：
+- **A（推荐）**：`ChiSystemTop` 增 `subClk/subReset`，子系统按各自根时钟 `withClockAndReset` 例化；桥在 fromSub 域例化、`dstClk := subClk(toSub)`。async 桥两端真实异钟。同步桥 require 两子系统同时钟。**GEN 影响**：emitSystem 需驱动新增系统级 subClk/subReset；同步桥系统可全接同一时钟保持现状；freeRn/freeSn 端口时钟归属需在 ports.json/spec 明确。
+- **B（不推荐）**：仅暴露每桥 dstClk 端口——不解决根因，只把错误接线变为外部可控的错误接线。
+- **C（低成本兜底）**：仅修 `nDomExtra=0` 空向量 elaboration 崩溃为明确 require 报错，async 跨子系统能力留后续；GEN 守护不变。
+
+### 13.3 HW-16 方案（待用户裁定）
+
+现状 `ChiSystemTop` 直例化 `ChiNetworkTop`，子系统内失配 chi 节点无齿轮。GEN 已有 `ChiAdaptedNetworkTop`（GEN-owned，MixedVec 按节点宽度暴露端口）；硬件不得 import loom.gen（既定边界）。
+
+- **A（推荐）**：硬件定义共享端口 trait（rn/sn MixedVec + domClk/domReset），`ChiNetworkTop` 实现；`ChiSystemTop` 增可选工厂 `mkNet`（默认 ChiNetworkTop）。**需 GEN 让 `ChiAdaptedNetworkTop` 实现该 trait 并在 emitSystem 传工厂**（跨侧契约，GEN 一行接入）。端口 Vec→MixedVec 化会影响桥接线与 ports.json 形态，需同步。
+- **B（不推荐）**：硬件在 ChiSystemTop 内自插 ChiNiAdapt——与 HW-12 裁定（GEN 在节点边界例化）冲突，两处适配逻辑重复易漂移。
+- **C（体量大）**：ChiSystemTop 退化为仅桥聚合器，GEN 在外层例化各子系统顶层并接线；ownership 最干净但 emitSystem 需重写。
+
+### 13.4 接下来的动作
+
+- HW-17：**已闭合**，GEN 可消费。
+- HW-15/16：属深改，已出 wave7 plan 待用户裁定方案（HW-15 A/B/C、HW-16 A/B/C、是否本轮做 HW-16、同步桥同时钟 require）。裁定后按 W18（HW-15）→ W19（HW-16）→ W20（收口）推进，每故事仿真绿再进下一个。
+- GEN 守护建议维持现状直至对应方案落地；HW-15 方案 A 落地后 async 守护可解除（需 GEN 驱动 subClk/subReset），HW-16 方案 A 落地后适配守护可解除（需 GEN 实现 trait + 传工厂）。
+
+### 13.5 HW-15 已闭合（2026-11-27，用户裁定方案 A，W18）
+
+> **子系统独立根时钟落地**。`ChiSystemTop` 增 `subDomain: Seq[Int] = Seq.empty` + `io.subClk/subReset`；**GEN 可解除 async 桥 emit 守护**（需按下述契约驱动新端口）。protocol_spec **v1.8.0**。
+
+**契约（GEN 消费）**：
+- `ChiSystemTop(subsystems, bridges, subDomain: Seq[Int] = Seq.empty)`：subDomain 给每子系统指派系统级时钟域，**0 = 模块时钟**（沿用 routerDomain 惯例），长度 = subsystems 数；空则全 0（默认，无额外端口，行为与现有单时钟系统一致）。
+- `io.subClk/subReset = Vec(nSubDom-1, Input(Bool()))`，nSubDom = subDomain.max+1。GEN 按域索引驱动（域 0 无需端口）。
+- 各子系统网络在**自己的根时钟**下例化；子系统 domain-0 = 其根时钟，domain≥1 仍接 `io.domClk`（偏移不变）。
+- 桥在 **fromSub 域**例化，`dstClk := toSub 根时钟` ⇒ async 桥真实跨异钟（修 §13.2 语义根因）。
+- **require：同步桥（asyncFifoDepth=0）两端 subDomain 相同；async 桥（≥2）两端 subDomain 不同**。后者同时保证 subClk 向量非空（修空向量 elaboration 崩溃）。
+- **端口时钟归属**：`io.rn/io.sn` 第 k 项属于其自由槽所属子系统的时钟域 ⇒ **GEN ports.json 需标注每端口时钟域**。
+
+**GEN 行动项**：
+1. IR/装配：子系统级时钟域声明（可复用 subsystem.clock 或新增 subDomain 派生），映射为 `subDomain` 序号向量；CHK 建议增"同步桥两端同域 / async 桥两端异域"静态校验（与硬件 require 对齐，提前报错）。
+2. emitSystem：驱动 `subClk/subReset`（域 0 接顶层 clock/reset）；ports.json 增端口时钟域标注。
+3. 解除 async 桥 emit 守护（`nocLinks.asyncFifoDepth≥2` 不再报错），改由上述 CHK 保证域指派正确。
+
+**验证**：ChiSystemSpec **4 例绿**——同步桥端到端读/写、outstanding 透传（HW-17）、**两子系统异根时钟（subDomain=Seq(0,1)）经 asyncFifoDepth=4 桥端到端读逐位一致**（远端存储例化在 subClk 域，复位期翻转远端时钟）。默认全 0 路径不回退。
+
+### 13.6 HW-16 待 GEN 对齐（用户裁定方案 A，本轮不做）
+
+硬件侧方案已定：定义共享端口 trait（rn/sn MixedVec + domClk/domReset），`ChiNetworkTop` 实现；`ChiSystemTop` 增可选工厂 `mkNet`（默认 ChiNetworkTop）。**需 GEN 让 `ChiAdaptedNetworkTop` 实现该 trait 并在 emitSystem 传工厂**。因端口 Vec→MixedVec 化会影响桥接线与 ports.json 形态，且需 GEN 侧同步接入，用户裁定**待 GEN 对齐后开工**（W19）。GEN 适配 emit 守护维持现状。
+
+## 14. GEN 答复：HW-16 方案 A 对齐契约（2026-11-27，回应 §13.6）+ HW-15/17 消费
+
+### 14.1 HW-16 方案 A：GEN 对齐契约（同意方案 A，W19 可开工）
+
+GEN 确认方案 A 并给出跨侧契约细节（硬件定 trait/工厂，GEN 实现接入；硬件不 import loom.gen 边界不变）：
+
+1. **trait 归属与形态**：`loom.chi.ChiNetworkIO extends Bundle`，`rn/sn: MixedVec[Data]` + `domClk/domReset: Vec[Bool]`。**ChiNetworkTop 的 Vec 须 MixedVec 化**（Vec[ChiRnPort] 不是 MixedVec[Data] 子类型，无法直接 override）；元素具体类型 = `Flipped(new ChiRnPort(cfgOf(node)))`（chi 节点，逐节点宽度）或 `ChiAxiRnPort(c)`（axi4 节点，非 Flipped）——与 GEN `ChiAdaptedNetworkTop` 现有 io 形态逐元素一致（见 ChiAdaptedNetworkTop.scala io 定义），uniform ChiNetworkTop 即全 fabric 宽特例。
+2. **工厂签名**：建议 `abstract class ChiNetworkLike(val p: ChiNetworkParams) extends Module { val io: ChiNetworkIO }`；`ChiSystemTop(..., mkNet: ChiNetworkParams => ChiNetworkLike = new ChiNetworkTop(_))`。默认工厂保持现有行为不回退。GEN 侧 `ChiAdaptedNetworkTop extends ChiNetworkLike`，emitSystem 在任一子系统 `ChiAdaptedNetworkTop.needed` 时传 `p => new ChiAdaptedNetworkTop(p)`（可统一全子系统传工厂，matched 子系统行为等价）。
+3. **桥槽不变式（GEN 保证）**：SEM-20a 合成桥端点恒为 fabric 宽原生 chi（无 adapt 行）⇒ 桥消费槽在两种顶层下端口形态相同，`nets(fromSub).io.sn(fromSn) <> br.io.from` 接线不变；适配只影响 free 槽。
+4. **系统边界 MixedVec 化**：io.rn/io.sn 须按 free 槽逐端口类型构造 MixedVec（失配节点宽度/axi4 协议外溢到系统边界）。**ports.json 同步**：GEN 逐 free 端口增 `datWidth`/`protocol` additive 键 + HW-15 `clockDomain` 标注；GUI F7 后续消费。
+5. **W19 范围建议**：本轮仅 chi 宽度适配；**axi4-in-subsystem 留后续**（ChiAxiNetworkTop 无 domClk/domReset 暴露，ChiAdaptedNetworkTop 现有 require nDomain==1 约束沿用），不扩大本轮面。
+6. **落地序**：硬件 W19 先落 trait + ChiNetworkLike + mkNet + ChiNetworkTop MixedVec 化（默认工厂行为保持，硬件仿真绿）→ GEN 接入（ChiAdaptedNetworkTop extends ChiNetworkLike + emitSystem 传工厂 + ports.json 键 + 解除 hierarchicalAdaptGuard）→ 联合回归。GEN 在 trait 落地前不预写实现（无法编译 against 不存在类型），本对齐即开工依据。
+
+### 14.2 HW-15/17 消费（S12，ir_gen_spec v1.8.0）
+
+**已落地（2026-11-27，S12）**：
+
+- **HW-17**：`ChiAssemble.systemParams` 传 `ChiBridgeLink.outstanding = nocLinks[].outstanding`（IR-94/CHK-61 既有，一行消费）。
+- **HW-15/W18**：`ChiAssemble.subDomains(v2)` 按子系统根时钟 `(id, freqMHz)` 键首次出现序派生域向量（SEM-20b，0 = 模块时钟）；`emitSystem` 传入 `ChiSystemTop(nets, bridges, subDomain)`。
+- **CHK-62**（新增 C0）：同步桥两端根域不同 / async 桥两端根域相同 ⇒ 报错（与 ChiSystemTop require 对齐）；**CHK-59 扩**：cdc 与 asyncFifoDepth 一致性（async⇔≥2）。
+- **守护解除**：`hierarchicalEmitGuard`（async）删除，域正确性由 CHK-62 静态保证；`hierarchicalAdaptGuard`（HW-16）维持。
+- **报告**：ports.json 逐 free 端口 additive `clockDomain`/`rootClock`/`rootClockMHz`；多根域系统 clocking 字段描述 subClk/subReset（nSubDom-1，集成方供给）；estimate assumptions 去除"sync bridges only/HW-15 pending"，标注 outstanding 透传与域规则（HW-16 注记保留）。
+- **验证**：CheckV2Spec CHK-59/62 正负例、EmitV2Spec subDomains 派生/outstanding 透传/async 发射+端口标注、ChiSystemGenSpec IR 驱动 async 跨根时钟 golden（subDomain=Seq(0,1)、远端存储在 subClk 域、ReadNoSnp 逐位一致）；loom 全量回归绿。
+
+## 15. 硬件答复：HW-15/17 消费确认 + HW-16 项1 实现形式请 GEN 确认（2026-11-27，回应 §14）
+
+### 15.1 HW-15/17 消费确认
+
+GEN S12（§14.2）已消费 HW-15/17：`subDomains(v2)` 派生 + `emitSystem` 传 subDomain、`systemParams` 传 outstanding、CHK-62 与硬件 require 对齐、async 守护解除、ports.json 时钟标注。**与硬件 §13.1/§13.5 契约一致，硬件侧无追加动作**。HW-15/17 视为双侧闭合。
+
+### 15.2 HW-16 项1（ChiNetworkTop io MixedVec 化）：请 GEN 确认实现形式
+
+硬件同意方案 A 的**跨侧接口**（`ChiNetworkIO` / `ChiNetworkLike` / `mkNet` 工厂，GEN `ChiAdaptedNetworkTop extends ChiNetworkLike` + emitSystem 传工厂）。但 §14.1 **项1 要求"ChiNetworkTop 的 Vec 须 MixedVec 化"**，勘查后发现其代价与越界风险显著，提出等价变体请 GEN 确认。
+
+**量化证据（MixedVec 元素擦除为 Data，所有 `.req/.rsp` 访问需 asInstanceOf，参照 GEN 自己的 ChiAdaptedNetworkSpec L37/39 写法）**：
+
+| 形式 | 波及范围 |
+|---|---|
+| **严格按项1**（MixedVec 化 `ChiNetworkTop.io`） | `ChiNetworkTop` 内部 16 处 + `ChiAxiNetworkTop` 4 处 + **`gen/ChiAdaptedNetworkTop` 6 处** + `ChiNetworkSpec` 77 处 + `ChiDvmNetworkSpec` 36 处 ≈ **139 处** cast 改动；且**必须修改 GEN-owned `ChiAdaptedNetworkTop`**（其 inner ChiNetworkTop 接线依赖 Vec 形态）——违反硬件不改 GEN 文件的既定边界，并与 GEN 在建工作碰撞 |
+| **变体：薄包装层**（推荐） | 新增 `loom.chi.ChiNetworkIO`（rn/sn MixedVec + domClk/domReset）+ `abstract class ChiNetworkLike(val p) extends Module { val io: ChiNetworkIO }` + uniform 包装 `ChiNetworkUniform extends ChiNetworkLike`（内含 `ChiNetworkTop`，做 MixedVec↔Vec 转接）。**`ChiNetworkTop` 及其全部测试、GEN `ChiAdaptedNetworkTop` 全部不动**；仅 `ChiSystemTop` 边界按 free 槽 MixedVec 化 → `ChiSystemSpec` 20 处（硬件自有文件） |
+
+**变体对 GEN 的影响（接口不变）**：
+- `mkNet: ChiNetworkParams => ChiNetworkLike` 签名不变；默认工厂改为 `p => new ChiNetworkUniform(p)`（行为等价，仅多一层包装 hierarchy，综合会展平）。
+- GEN 侧接入完全照 §14.1 项2/项6 执行：`ChiAdaptedNetworkTop extends ChiNetworkLike`（其 io 已是 MixedVec，只需声明为 `ChiNetworkIO` 类型）+ emitSystem 传工厂 + ports.json 键 + 解 `hierarchicalAdaptGuard`。**GEN 无需改 inner ChiNetworkTop 接线**。
+- §14.1 项3（桥槽恒 fabric 宽原生 chi）、项4（系统边界 MixedVec + ports.json datWidth/protocol/clockDomain）、项5（本轮仅 chi 宽度适配，axi4-in-subsystem 后续）**全部沿用不变**。
+- 唯一差异：发射 hierarchy 中默认子系统顶层名从 `ChiNetworkTop` 变为 `ChiNetworkUniform`（内含 ChiNetworkTop）⇒ **CG2 确定性基线需 GEN 重取**；若 GEN 介意顶层名，可将包装命名保持为 GEN 期望名。
+
+**请 GEN 确认**：接受变体（推荐，省 ~119 处改动且不越界改 GEN 文件），还是坚持项1 原形（则需 GEN 自行承接 `ChiAdaptedNetworkTop` 的 6 处 cast 改动，硬件只改 hardware-owned 部分，两侧分别提交后联合回归）。
+
+**用户裁定**：先跟 GEN 确认实现形式再开工 W19。硬件在收到确认前不动 RTL；`hierarchicalAdaptGuard` 维持。
+
+## 16. GEN 答复：接受 HW-16 项1 薄包装变体，W19 可开工（2026-11-27，回应 §15.2）
+
+### 16.1 裁定：接受变体（ChiNetworkUniform 薄包装）
+
+**接受 §15.2 变体，放弃项1 原形**。理由：
+1. **边界**：项1 原形迫使硬件改 GEN-owned `ChiAdaptedNetworkTop`（6 处 cast），违反既定 ownership 边界；变体把全部 MixedVec↔Vec cast 收口在硬件自有 `ChiNetworkUniform` 包装内，GEN 文件零被动改动。
+2. **代价**：~139 处擦除 cast（含 ChiNetworkSpec 77 + ChiDvmNetworkSpec 36 测试波及）vs 包装内 ~20 处；Data 擦除后 `.req/.rsp` 全量 asInstanceOf 是长期维护负担，变体保留 ChiNetworkTop 强类型 io。
+3. **行为等价**：包装仅转接，综合展平；默认工厂 `p => new ChiNetworkUniform(p)` 与现行为逐拍一致（硬件以默认路径仿真绿为准）。
+
+### 16.2 GEN 侧确认事项
+
+- **接入范围照 §14.1 项2/6 不变**：`ChiAdaptedNetworkTop extends ChiNetworkLike`（io 已是 MixedVec，改声明为 `ChiNetworkIO` 类型）+ emitSystem 按需传 `mkNet` + ports.json `datWidth`/`protocol` additive 键（`clockDomain` 已随 S12 落地）+ 解 `hierarchicalAdaptGuard`。项3/4/5（桥槽不变式/系统边界 MixedVec/本轮仅 chi 宽度）全部沿用。
+- **trait 实例化形态**：请保证 `ChiNetworkIO extends Bundle` 以抽象 val 声明（`val rn: MixedVec[Data]` 等），使 GEN 可用 `IO(new ChiNetworkIO { val rn = MixedVec(...); ... })` 匿名实例化直接承接现有 io 构造，无需重构逐端口逻辑。
+- **顶层名**：接受 `ChiNetworkUniform`，无改名要求；ports.json `top` 仍为 `ChiSystemTop`。
+- **CG2 基线澄清（无需重取）**：GEN 侧 CG2 为**同配置双发射逐字节自洽**断言（EmitV2Spec L771），非固定 golden 文件；SV 内容断言仅 `module ChiSystemTop`/`ChiNocBridge`（变体下均保留）。包装层级变化后双发射自洽自动适配，**平铺发射（ChiNetworkTop.sv）完全不受影响**。硬件担心的"基线重取"不构成 GEN 工作量；W19 落地后 GEN 跑全量回归即完成确认。
+
+### 16.3 落地序（不变）
+
+硬件 W19：`ChiNetworkIO` + `ChiNetworkLike` + `ChiNetworkUniform` + `ChiSystemTop` mkNet 工厂 + 系统边界 free 槽 MixedVec 化（默认工厂行为保持，硬件仿真绿，含 ChiSystemSpec 适配）→ 通知 GEN → GEN 接入（§16.2）+ 解适配守护 + 失配宽度子系统 golden sim → 联合全量回归。GEN 在 trait 落地前不预写实现。
+
+## 17. 硬件答复：HW-16/W19 落地，GEN 可接入（2026-11-27，回应 §16）
+
+> **薄包装变体已落地并验证**（按 §16.1 裁定）。`ChiNetworkTop` 及其全部测试、GEN `ChiAdaptedNetworkTop` **零改动**。GEN 可按 §16.2 接入并解 `hierarchicalAdaptGuard`。
+
+### 17.1 已交付契约（`loom/chi/ChiNetworkIO.scala`，新文件）
+
+```scala
+abstract class ChiNetworkIO extends Bundle {
+  val rn: MixedVec[Data]; val sn: MixedVec[Data]
+  val domClk: Vec[Bool];  val domReset: Vec[Bool]
+}
+abstract class ChiNetworkLike(val p: ChiNetworkParams) extends Module { val io: ChiNetworkIO }
+class ChiNetworkUniform(p: ChiNetworkParams) extends ChiNetworkLike(p)   // 默认：内含未改动的 ChiNetworkTop
+object ChiNodeWidths {
+  val Supported: Set[Int] = Set(128, 256, 512)
+  def nodeWidth(p: ChiNetworkParams, n: ChiNetNode): Int
+  def cfgOf(p: ChiNetworkParams, n: ChiNetNode): ChiConfig
+}
+```
+
+- **抽象 val 形态照 §16.2 要求**：GEN 可 `IO(new ChiNetworkIO { val rn = MixedVec(...); ... })` 匿名实例化，沿用现有逐端口 io 构造，无需重构。
+- **`ChiNodeWidths` 为共享节点宽度规则**（chi 协议 + mismatch + 宽度 ∈ {128,256,512} 且 ≠ fabric 宽才适配），与 GEN `ChiAdaptedNetworkTop.nodeWidth` 现有判定一致。**建议 GEN 改用此 helper** 以免两侧规则漂移（系统边界端口宽度由它决定，必须与包装内部一致）。
+
+### 17.2 ChiSystemTop 变更
+
+- 新增第 4 参数 `mkNet: ChiNetworkParams => ChiNetworkLike = p => Module(new ChiNetworkUniform(p))`。
+- **⚠ 契约细节（与 §14.1 项2 示例的差异）**：Chisel 要求模块例化包在 `Module()` 内，故**工厂自身负责 `Module()` 包装**（§14.1 示例 `new ChiNetworkTop(_)` 会抛 "attempted to instantiate a Module without wrapping it in Module()"）。GEN 接入须写 **`p => Module(new ChiAdaptedNetworkTop(p))`**。
+- `io.rn/io.sn` 改为 **MixedVec**，逐 free 槽类型 = `Flipped(new ChiRnPort/ChiSnPort(ChiNodeWidths.cfgOf(sub, node)))` ⇒ 失配节点宽度外溢到系统边界（§14.1 项4）。**GEN ports.json 逐 free 端口 `datWidth`/`protocol` additive 键照此 helper 取值**。
+- 新增 require：**桥从/至槽必须 fabric 宽原生 chi**（把 §14.1 项3 的 GEN 不变式在硬件侧也守住，违反给明确报错）。
+- 桥接线不变（`nets(fromSub).io.sn(fromSn) <> br.io.from`，Data `<>` Bundle 结构化连接）；HW-15 subDomain/时钟域逻辑不变。
+
+### 17.3 验证
+
+- `ChiSystemSpec` **5 例绿**：同步桥端到端读/写、outstanding 透传（HW-17）、异根时钟 async 桥（HW-15）、**自定义 mkNet 工厂 + 子系统内 128b 适配 SN 节点（fabric 256b）经桥端到端读逐位一致（HW-16）**。
+  - HW-16 用例形态：测试侧 `AdaptedSnNet extends ChiNetworkLike`（匿名 `ChiNetworkIO`，sn 元素 `ChiSnPort(128)`，节点边界插 `ChiDatWidth` 双向齿轮），`sub("b").copy(adapt = Seq(ChiAdapt(1, 128, 256, 0, mismatch = true)))`，`mkNet` 按 `p.adapt.nonEmpty` 分派 ⇒ 证明工厂钩子 + 边界宽度派生 + 子系统内适配三者贯通。**GEN 接入后应以 IR 驱动等价 golden 复现**。
+- 默认工厂路径（全 fabric 宽）行为不回退；`ChiNetworkTop`/`ChiAxiNetworkTop`/`ChiAdaptedNetworkTop` 源码未改。
+
+### 17.4 GEN 行动项（解适配守护）
+
+1. `ChiAdaptedNetworkTop extends ChiNetworkLike(p)`，io 声明为 `ChiNetworkIO` 匿名实例化（现有 MixedVec 构造可直接沿用）。
+2. `emitSystem` 在任一子系统 `ChiAdaptedNetworkTop.needed` 时传 `mkNet = p => Module(new ChiAdaptedNetworkTop(p))`（可统一全子系统传，matched 子系统行为等价）。
+3. ports.json 逐 free 端口 `datWidth`/`protocol` 取 `ChiNodeWidths.cfgOf`；`clockDomain` 已随 S12 落地。
+4. 解除 `hierarchicalAdaptGuard`；建议 CHK 增"桥槽不得为适配节点"与硬件 require 对齐。
+5. 联合全量回归 + 失配宽度子系统 IR golden sim。
+
+### 17.5 本轮边界（沿用 §14.1 项5）
+
+仅 chi 宽度适配；**axi4-in-subsystem 仍后续**（`ChiAxiNetworkTop` 未暴露 domClk/domReset，`ChiAdaptedNetworkTop` 现有 `nDomain==1` 约束沿用）；异 cfg 子系统、异宽多 outstanding（W17）、dvmForward=true 仍为已记录后续。
+
+## 18. GEN 答复：HW-16/W19 消费落地，HW-16 双侧闭合（2026-11-27，S13，回应 §17）
+
+> **§17.4 五项行动全部完成**（ir_gen_spec **v1.9.0**，GEN-26）。HW-16 视为双侧闭合；分层发射至此支持**同步/async 桥 + 多 outstanding + 子系统内 chi 宽度适配 + 多根时钟域**。
+
+- **接入**：`ChiAdaptedNetworkTop extends ChiNetworkLike(p)`，io 以 `IO(new ChiNetworkIO {...})` 匿名实例化（逐端口构造原样沿用）；nodeWidth/cfgOf/needed 全部委托 `ChiNodeWidths` 共享规则（两侧不漂移）。
+- **工厂**：emitSystem 传 `mkNet = p => Module(if (needed(p)) new ChiAdaptedNetworkTop(p) else new ChiNetworkUniform(p))`（Module() 包装在工厂侧，照 §17.2 契约）；matched 子系统走 Uniform，**既有 matched 分层发射 CG2 逐字节不变**。
+- **守护解除**：`hierarchicalAdaptGuard` 删除；桥槽不变式由 GEN 构造 + 硬件 require 双守（不另立 CHK）。
+- **CHK-63**（新增 C0）：子系统含 axi4 节点 ⇒ 拒绝（axi4-in-subsystem 后续，§17.5 边界静态守住）。
+- **ports.json**：逐 free 端口 additive `datWidth`（ChiNodeWidths.cfgOf）/`protocol`；estimate assumptions 去除 HW-16-pending。
+- **验证**：IR 驱动失配宽度 golden（B 子系统 sB=128b / fabric 256b，sync 桥，远端 ChiReadSource 128b）跨桥读在 A 的 RN 累积 2×256b CompData 逐位一致；平铺 ChiAdaptedNetworkSpec 与全量回归绿（31 suite/361 test，含硬件 ChiSystemSpec 5 例）。
+- **提交说明**：硬件 W19 文件（ChiNetworkIO.scala/ChiSystemTop.scala/ChiSystemSpec.scala）为 GEN 代码编译前置件，随 GEN commit 纳入；protocol_spec/wave7 plan/本清单留硬件批次。
+- **剩余后续（均非阻塞，已记录）**：axi4-in-subsystem（CHK-63 守护）、异 cfg 子系统、异宽多 outstanding（W17）、dvmForward=true、节点频率失配 CDC、32/64/1024 节点宽度档。
