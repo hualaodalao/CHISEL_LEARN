@@ -485,40 +485,40 @@ module Queen_QueenSchedCtrl(	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
       `FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
     `endif // FIRRTL_BEFORE_INITIAL
     initial begin	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
-      automatic logic [31:0] _RANDOM[0:22];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
+      automatic logic [31:0] _RANDOM[0:18];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
       `ifdef INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
         `INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
       `endif // INIT_RANDOM_PROLOG_
       `ifdef RANDOMIZE_REG_INIT	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
-        for (logic [4:0] i = 5'h0; i < 5'h17; i += 5'h1) begin
+        for (logic [4:0] i = 5'h0; i < 5'h13; i += 5'h1) begin
           _RANDOM[i] = `RANDOM;	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
         end	// src/queen/scala/main/QueenSchedCtrl.scala:17:7
         active = _RANDOM[5'h0][0];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:33
         pkt_0_valid = _RANDOM[5'h0][1];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:33, :46:26
         pkt_0_bits_inst = {_RANDOM[5'h0][31:2], _RANDOM[5'h1][1:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :45:33, :46:26
-        pkt_0_bits_rs1 = {_RANDOM[5'h2][31:2], _RANDOM[5'h3][1:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
-        pkt_0_bits_rs2 = {_RANDOM[5'h3][31:2], _RANDOM[5'h4][1:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
-        pkt_1_valid = _RANDOM[5'h4][2];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
-        pkt_1_bits_inst = {_RANDOM[5'h4][31:3], _RANDOM[5'h5][2:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
-        pkt_1_bits_rs1 = {_RANDOM[5'h6][31:3], _RANDOM[5'h7][2:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
-        pkt_1_bits_rs2 = {_RANDOM[5'h7][31:3], _RANDOM[5'h8][2:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
-        pkt_2_valid = _RANDOM[5'h8][3];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
-        pkt_2_bits_inst = {_RANDOM[5'h8][31:4], _RANDOM[5'h9][3:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
-        pkt_2_bits_rs1 = {_RANDOM[5'hA][31:4], _RANDOM[5'hB][3:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
-        pkt_2_bits_rs2 = {_RANDOM[5'hB][31:4], _RANDOM[5'hC][3:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
-        pkt_3_valid = _RANDOM[5'hC][4];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
-        pkt_3_bits_inst = {_RANDOM[5'hC][31:5], _RANDOM[5'hD][4:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
-        pkt_3_bits_rs1 = {_RANDOM[5'hE][31:5], _RANDOM[5'hF][4:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
-        pkt_3_bits_rs2 = {_RANDOM[5'hF][31:5], _RANDOM[5'h10][4:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
-        base = _RANDOM[5'h10][7:5];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26, :47:31
-        pollInterval = {_RANDOM[5'h10][31:8], _RANDOM[5'h11][7:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26, :48:39
-        pollTimeoutReg = {_RANDOM[5'h11][31:8], _RANDOM[5'h12][7:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :48:39, :49:41
-        pollBusy = _RANDOM[5'h12][8];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :49:41, :154:35
-        pollWait = _RANDOM[5'h12][9];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :49:41, :155:35
-        pollTimer = {_RANDOM[5'h12][31:10], _RANDOM[5'h13][9:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :49:41, :156:36
-        pollAddr = {_RANDOM[5'h13][31:10], _RANDOM[5'h14][9:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :156:36, :157:31
-        pollExp = {_RANDOM[5'h14][31:10], _RANDOM[5'h15][9:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :157:31, :158:30
-        timeoutCnt = {_RANDOM[5'h15][31:10], _RANDOM[5'h16][9:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :158:30, :159:37
+        pkt_0_bits_rs1 = {_RANDOM[5'h1][31:2], _RANDOM[5'h2][1:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_0_bits_rs2 = {_RANDOM[5'h2][31:2], _RANDOM[5'h3][1:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_1_valid = _RANDOM[5'h3][2];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_1_bits_inst = {_RANDOM[5'h3][31:3], _RANDOM[5'h4][2:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_1_bits_rs1 = {_RANDOM[5'h4][31:3], _RANDOM[5'h5][2:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_1_bits_rs2 = {_RANDOM[5'h5][31:3], _RANDOM[5'h6][2:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_2_valid = _RANDOM[5'h6][3];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_2_bits_inst = {_RANDOM[5'h6][31:4], _RANDOM[5'h7][3:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_2_bits_rs1 = {_RANDOM[5'h7][31:4], _RANDOM[5'h8][3:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_2_bits_rs2 = {_RANDOM[5'h8][31:4], _RANDOM[5'h9][3:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_3_valid = _RANDOM[5'h9][4];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_3_bits_inst = {_RANDOM[5'h9][31:5], _RANDOM[5'hA][4:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_3_bits_rs1 = {_RANDOM[5'hA][31:5], _RANDOM[5'hB][4:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        pkt_3_bits_rs2 = {_RANDOM[5'hB][31:5], _RANDOM[5'hC][4:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26
+        base = _RANDOM[5'hC][7:5];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26, :47:31
+        pollInterval = {_RANDOM[5'hC][31:8], _RANDOM[5'hD][7:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :46:26, :48:39
+        pollTimeoutReg = {_RANDOM[5'hD][31:8], _RANDOM[5'hE][7:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :48:39, :49:41
+        pollBusy = _RANDOM[5'hE][8];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :49:41, :154:35
+        pollWait = _RANDOM[5'hE][9];	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :49:41, :155:35
+        pollTimer = {_RANDOM[5'hE][31:10], _RANDOM[5'hF][9:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :49:41, :156:36
+        pollAddr = {_RANDOM[5'hF][31:10], _RANDOM[5'h10][9:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :156:36, :157:31
+        pollExp = {_RANDOM[5'h10][31:10], _RANDOM[5'h11][9:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :157:31, :158:30
+        timeoutCnt = {_RANDOM[5'h11][31:10], _RANDOM[5'h12][9:0]};	// src/queen/scala/main/QueenSchedCtrl.scala:17:7, :158:30, :159:37
       `endif // RANDOMIZE_REG_INIT
     end // initial
     `ifdef FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenSchedCtrl.scala:17:7

@@ -89,26 +89,29 @@ inst(i).fire 不依赖 inst(j).fire，j != i
 
 接收单位是整包。同一周期所有 fire 的 lane 合并为一个包，在次拍写入资源；包内未 fire 的 lane 在该包中标记无效。一个包最多含 `instructionLanes` 条指令，与包内有效条数无关。
 
-GEMM 与 DMA 共用一个命令 ring，一包占一个 ring 槽；SCHED 单独走 1 级暂存，一包占该暂存。`inst.ready(i)` 按 lane 目标 endpoint 独立生成：
+GEMM 与 DMA 各持一条私有命令 FIFO，一包在每条被命中的 FIFO 中各占一个槽；SCHED 单独走 1 级暂存，一包占该暂存。`inst.ready(i)` 按 lane 目标 endpoint 独立生成：
 
 ```text
-ringUsed   = writePtr - min(gemmCursor, dmaCursor)     // 回绕计数
-ringReady  = ringUsed + enq.valid < cmdRingDepth
+gemmUsed   = gemmFifo.count - gemmDeq.fire     // count 即 SRAM 内尚未出队的包数
+dmaUsed    = dmaFifo.count  - dmaDeq.fire
+gemmReady  = gemmUsed + gemmEnq.valid < cmdRingDepth
+dmaReady   = dmaUsed  + dmaEnq.valid  < cmdRingDepth
 
 schedUsed  = schedCount + schedEnq.valid - schedDeq.fire
 schedReady = schedUsed < 1
 
 ready(i) =
-  endpoint ∈ {GEMM, DMA} ? ringReady :
-  endpoint = SCHED        ? schedReady : 0
+  endpoint = GEMM  ? gemmReady :
+  endpoint = DMA   ? dmaReady  :
+  endpoint = SCHED ? schedReady : 0
 ```
 
-容量在 fire 时预约，因为下一拍的操作数不可暂停：被接受的 lane 必须保证次拍一定能入队。GEMM 与 DMA 共享容量池，两者各自持有游标，一侧停住只钉住它尚未释放的槽，不会阻塞另一侧已可出队的包。SCHED 深度固定为 1，接受一条后需要空一拍才能再接受，即连续 SCHED 指令最快 1 条/2 周期。
+容量在 fire 时预约，因为下一拍的操作数不可暂停：被接受的 lane 必须保证次拍一定能入队。`cmdRingDepth` 是**每端点**的槽数，两端点容量不共享：一侧停住只钉住自己的队列，不会阻塞另一侧，但单端点突发也最多只能用满自己的 `cmdRingDepth` 个槽。SCHED 深度固定为 1，接受一条后需要空一拍才能再接受，即连续 SCHED 指令最快 1 条/2 周期。
 
 `frontendCanAccept` 必须同时考虑：
 
 - CPU frontend reservation entry 是否充足；
-- 指令所需 endpoint 的入口容量：GEMM/DMA 看 ring 余量，SCHED 看暂存是否空闲；
+- 指令所需 endpoint 的入口容量：GEMM/DMA 各看自己 FIFO 的余量，SCHED 看暂存是否空闲；
 - QRD 顺序表和读响应缓存是否有空位；
 - 容量按包计，不按指令条数计：同包命中同一资源的 lane 合占一个槽。
 
@@ -298,7 +301,7 @@ Queen idle 必须同时满足：
 
 Queen 内部只接收 GEMM、DMA 和 SCHED 的指令，不包含 VPU command queue。已实现的三级结构：
 
-1. **指令接收级**（`QueenDsaDecoder`）：接收 QWR/QCTRL，按 endpoint 分流并保持程序序；GEMM/DMA 共享整包 ring，SCHED 走 1 级暂存。
+1. **指令接收级**（`QueenDsaDecoder`）：接收 QWR/QCTRL，按 endpoint 分流并保持程序序；GEMM/DMA 各走一条私有整包 FIFO，SCHED 走 1 级暂存。
 2. **端点控制器**（`QueenEndpointCtrl`，GEMM/DMA 各一个）：整包寄存 + lane 游标，按 lane 序消费 `FENCE/WAIT_*/TRACE_TAG`，把队头连续的 QWR/RUN 切片转发给 adapter。条件未满足时只停本端点队头，其后 lane 不越过。转发切片按原序压缩到 lane 0 起，不改变相对顺序。
 3. **派发 adapter**（`QueenDsaAdapter`）：把切片展开为设备 native beat，只处理 QWR/RUN。
 
@@ -450,7 +453,7 @@ val deviceIdle = Input(Bool())   // QueenTop 视角：设备 → Queen
 
 Queen 侧的强 idle 分三层合成，`QueenTop.idle` 是三层之与：
 
-1. 前端 `QueenDsaDecoder.idle`：ring 写指针与两个消费游标相等、SCHED 暂存空、无待配操作数的 pending lane。
+1. 前端 `QueenDsaDecoder.idle`：两条命令 FIFO 的 `count` 均为 0、SCHED 暂存空、无待配操作数的 pending lane。
 2. 每端点 `QueenDsaAdapter.idle = !active && deviceIdle`：本级整包已发完且设备强 idle。
 3. 顶层 `idle = decoder.idle && gemmAdapter.idle && dmaAdapter.idle`。
 
@@ -515,16 +518,16 @@ val dmaFlushAck  = Input(Bool())
 
 flush 期间（`flushing` 电平有效）的行为：
 
-- **前端接受并丢弃**：合法指令照常 `fire`（CPU 不 stall），但不入 ring、不入 SCHED 暂存、不派发。非法指令仍报 trap。
+- **前端接受并丢弃**：合法指令照常 `fire`（CPU 不 stall），但不入命令 FIFO、不入 SCHED 暂存、不派发。非法指令仍报 trap。
 - **QRD 回 dummy**：在途表里的读以及 flush 期间新接收的读，一律以 `asyncRd` 回 `data=0xdeadbeef`（`rd=x0` 则不回写），不记 fault，不等设备响应。旧响应被排空丢弃。
-- **DSA 侧队列全丢**：ring 游标与写指针复位，端点控制器/adapter/SCHED 控制器的整包寄存清零，polling 状态机中止。
+- **DSA 侧队列全丢**：两条命令 FIFO 的读写指针与 `maybe_full` 清零（`Queue` 的 `flush` 端口），端点控制器/adapter/SCHED 控制器的整包寄存清零，polling 状态机中止。
 - **迟到 completion 丢弃**：不置同步状态、不记 fault。
 - **内存事务不可撤销**：只停发新请求，等已发出的响应回来。
 - `idle` 端口在 flush 期间为 0。
 
 `flushAck` 拉起只能在以下条件全部满足后产生：
 
-- 前端 ring 游标对齐、SCHED 暂存空、无 pending lane；
+- 前端两条命令 FIFO 全空、SCHED 暂存空、无 pending lane；
 - 两个端点控制器与两个 adapter 无在途整包；
 - SCHED 控制器空闲且 polling 状态机已中止；
 - 在途 QRD 表空且三个响应 FIFO 空；
@@ -545,7 +548,7 @@ flush 期间（`flushing` 电平有效）的行为：
 - `RUN` 被设备接受即占用一个 credit；ready 为 0 时该 beat 在派发级停等，该端点后续指令按程序序等待，另一端点不受影响。
 - 同一端点的 beat 是按序流且每个 `RUN` beat 只含一条 `RUN`，credit 只会被 Queen 自己发出的 `RUN` 占用，因此电平检查无竞争。
 - openGroup 为 0 时的 `RUN` 是非法指令，在前端报 trap。
-- 第一版不把设备 ready 纳入前端 ring 准入判定：派发级停等即可，共享 ring 的 per-consumer 游标已容得下单侧停顿。
+- 第一版不把设备 ready 纳入前端 FIFO 准入判定：派发级停等即可，每端点私有队列已容得下单侧停顿。
 
 设备侧义务（实现不在本文范围内）：`RUN` 被接受后，后续 `QWR` 不得改变该 `RUN` 已提交的配置；要重叠配置准备与执行，设备需自行保证这一点（通常需要双缓冲）；flush/reset 后 credit 必须与 Queen 重新对齐。
 
@@ -846,7 +849,7 @@ elaboration 阶段至少检查：
 11. 验证同一 GEMM/DMA endpoint 的 QWR/RUN/FENCE/WAIT/TRACE 不越过。
 12. 验证同一配置组的寄存器写与启动不与其他配置组交错。
 13. 验证设备在 `start` 当拍采样 `swTag/hwSignal` 并随 completion 原样回传，包括任务飞行中改写配置的情形。
-14. 验证强 idle 三层合成：前端 ring/SCHED/pending 空、adapter 整包发完、设备 `deviceIdle`（含命令、执行、内存响应与未回传 completion 全部退出）。
+14. 验证强 idle 三层合成：前端命令 FIFO/SCHED/pending 空、adapter 整包发完、设备 `deviceIdle`（含命令、执行、内存响应与未回传 completion 全部退出）。
 15. 验证目标为 VPU 的指令由 Scalar Core decoder 直发 VPU，Queen 不存在 VPU command queue 或命令输出；`endpoint=2` 若到达 Queen 前端报 cause 4。
 16. 验证 VPU WAIT 查询不修改同步资源。
 17. 验证 Queen 不产生任何完成通知 pulse，设备中断是唯一的单引擎完成通路（trace 记录端口不是完成通知）。
@@ -1005,7 +1008,7 @@ elaboration 阶段至少检查：
 
 - `deviceIdle` 必须是**强 idle**：命令队列空、无执行、无未完成内存请求/响应、无未回传 completion（见 5.3）。`busy=0` 或输入 FIFO 空都不足以作为 idle。
 - credit 可收性只由 `RUN` beat 的 `cmd.ready` 表达，Queen 与软件都不需要 credit 计数——发不进去就停等，因此不设 `CFG_CREDIT`。
-- 设备内部 occupancy 是设备自己的量，Queen 的准入只看自己的 ring 与 `cmd.ready`，因此不设 `DEV_STATUS`。
+- 设备内部 occupancy 是设备自己的量，Queen 的准入只看自己的命令 FIFO 与 `cmd.ready`，因此不设 `DEV_STATUS`。
 
 ### 13.6 单一 ready 与写/读通道分离
 

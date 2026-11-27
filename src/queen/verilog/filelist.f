@@ -1,5 +1,5 @@
-verification/assert/Queen_QueenDsaDecoder_Verification_Assert.sv
-Queen_ring_64x388.sv
+Queen_ram_16x388.sv
+Queen_Queue16_Vec4_Valid_QueenDsaCommand.sv
 Queen_QueenDsaDecoder.sv
 verification/assert/Queen_QueenEndpointCtrl_Verification_Assert.sv
 Queen_QueenEndpointCtrl.sv

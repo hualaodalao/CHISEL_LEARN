@@ -356,7 +356,8 @@ class QueenTopSpec extends AnyFlatSpec with Matchers with ChiselSim {
             val g = qwr1(Gemm, 1, 0x77, pc = 0x90)
             val m = qwr1(Dma, 2, 0x88, pc = 0x94)
             d.offer(0 -> g, 1 -> m)
-            for (_ <- 0 until 4) d.step(gemmReady = false)
+            // 前端 FIFO + 端点控制器 + adapter 到顶层 beat 需数拍，留 8 拍余量。
+            for (_ <- 0 until 8) d.step(gemmReady = false)
             d.gemmBeats shouldBe empty
             d.dmaBeats shouldBe Vector(Vector(expected(m)))
             d.settle()

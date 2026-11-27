@@ -62,7 +62,7 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
         dut.io.in.valid.poke(false.B)
         dut.io.in.bits.foreach { l =>
             l.valid.poke(false.B)
-            l.bits.inst.poke(0.U); l.bits.pc.poke(0.U)
+            l.bits.inst.poke(0.U)
             l.bits.rs1.poke(0.U); l.bits.rs2.poke(0.U)
         }
         dut.io.out.ready.poke(false.B)
@@ -89,7 +89,6 @@ class QueenDsaAdapterSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 val c = offered.flatMap(_(i))
                 lane.valid.poke(c.nonEmpty.B)
                 lane.bits.inst.poke(c.map(_.inst).getOrElse(BigInt(0)).U)
-                lane.bits.pc.poke(c.map(_.pc).getOrElse(BigInt(0)).U)
                 lane.bits.rs1.poke(c.map(_.rs1).getOrElse(BigInt(0)).U)
                 lane.bits.rs2.poke(c.map(_.rs2).getOrElse(BigInt(0)).U)
             }

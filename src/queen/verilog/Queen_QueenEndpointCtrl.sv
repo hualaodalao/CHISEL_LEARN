@@ -160,35 +160,35 @@ module Queen_QueenEndpointCtrl(	// src/queen/scala/main/QueenEndpointCtrl.scala:
   wire [31:0]      _GEN_4 = _GEN_3[base[1:0]];	// src/queen/scala/main/QueenEndpointCtrl.scala:26:31, :34:42, :42:36
   wire [3:0][31:0] _GEN_5 =
     {{pkt_3_bits_rs2}, {pkt_2_bits_rs2}, {pkt_1_bits_rs2}, {pkt_0_bits_rs2}};	// src/queen/scala/main/QueenEndpointCtrl.scala:25:26, :42:36
-  wire             cand_0_valid = inRange & _GEN < 4'h4 & _GEN_0[base[1:0]];	// src/queen/scala/main/QueenEndpointCtrl.scala:24:33, :26:31, :32:34, :34:42, :40:24, :42:36, :44:{34,41,51}
+  wire             cand_0_valid = inRange & _GEN < 4'h4 & _GEN_0[base[1:0]];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :24:33, :26:31, :32:34, :34:42, :40:24, :42:36, :44:{34,41,51}
   wire             candCtrl_0 =
     cand_0_valid
     & ~(cand_0_valid
-        & (_GEN_2[14:12] < 3'h3 | _GEN_2[14:12] == 3'h3 & _GEN_2[29:26] == 4'h9));	// src/queen/scala/main/QueenEndpointCtrl.scala:42:36, :43:33, :44:{34,51}, :46:37, :47:{21,28,39,47,54}, :48:{38,41}
-  wire [3:0]       idx_1 = _GEN + 4'h1;	// src/queen/scala/main/QueenEndpointCtrl.scala:24:33, :40:24
+        & (_GEN_2[14:12] < 3'h3 | _GEN_2[14:12] == 3'h3 & _GEN_2[29:26] == 4'h9));	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :43:33, :44:{34,51}, :46:37, :47:{21,28,39,47,54}, :48:{38,41}
+  wire [3:0]       idx_1 = _GEN + 4'h1;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :24:33, :40:24
   wire [31:0]      _GEN_6 = _GEN_1[idx_1[1:0]];	// src/queen/scala/main/QueenEndpointCtrl.scala:34:42, :40:24, :42:36
   wire [31:0]      _GEN_7 = _GEN_3[idx_1[1:0]];	// src/queen/scala/main/QueenEndpointCtrl.scala:34:42, :40:24, :42:36
-  wire             cand_1_valid = inRange & idx_1 < 4'h4 & _GEN_0[idx_1[1:0]];	// src/queen/scala/main/QueenEndpointCtrl.scala:32:34, :34:42, :40:24, :42:36, :44:{34,41,51}
+  wire             cand_1_valid = inRange & idx_1 < 4'h4 & _GEN_0[idx_1[1:0]];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :32:34, :34:42, :40:24, :42:36, :44:{34,41,51}
   wire             candCtrl_1 =
     cand_1_valid
     & ~(cand_1_valid
-        & (_GEN_6[14:12] < 3'h3 | _GEN_6[14:12] == 3'h3 & _GEN_6[29:26] == 4'h9));	// src/queen/scala/main/QueenEndpointCtrl.scala:42:36, :43:33, :44:{34,51}, :46:37, :47:{21,28,39,47,54}, :48:{38,41}
-  wire [3:0]       idx_2 = _GEN + 4'h2;	// src/queen/scala/main/QueenEndpointCtrl.scala:24:33, :40:24
+        & (_GEN_6[14:12] < 3'h3 | _GEN_6[14:12] == 3'h3 & _GEN_6[29:26] == 4'h9));	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :43:33, :44:{34,51}, :46:37, :47:{21,28,39,47,54}, :48:{38,41}
+  wire [3:0]       idx_2 = _GEN + 4'h2;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :24:33, :40:24
   wire [31:0]      _GEN_8 = _GEN_1[idx_2[1:0]];	// src/queen/scala/main/QueenEndpointCtrl.scala:34:42, :40:24, :42:36
   wire [31:0]      _GEN_9 = _GEN_3[idx_2[1:0]];	// src/queen/scala/main/QueenEndpointCtrl.scala:34:42, :40:24, :42:36
-  wire             cand_2_valid = inRange & idx_2 < 4'h4 & _GEN_0[idx_2[1:0]];	// src/queen/scala/main/QueenEndpointCtrl.scala:32:34, :34:42, :40:24, :42:36, :44:{34,41,51}
+  wire             cand_2_valid = inRange & idx_2 < 4'h4 & _GEN_0[idx_2[1:0]];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :32:34, :34:42, :40:24, :42:36, :44:{34,41,51}
   wire             candCtrl_2 =
     cand_2_valid
     & ~(cand_2_valid
-        & (_GEN_8[14:12] < 3'h3 | _GEN_8[14:12] == 3'h3 & _GEN_8[29:26] == 4'h9));	// src/queen/scala/main/QueenEndpointCtrl.scala:42:36, :43:33, :44:{34,51}, :46:37, :47:{21,28,39,47,54}, :48:{38,41}
-  wire [3:0]       idx_3 = _GEN + 4'h3;	// src/queen/scala/main/QueenEndpointCtrl.scala:24:33, :40:24
+        & (_GEN_8[14:12] < 3'h3 | _GEN_8[14:12] == 3'h3 & _GEN_8[29:26] == 4'h9));	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :43:33, :44:{34,51}, :46:37, :47:{21,28,39,47,54}, :48:{38,41}
+  wire [3:0]       idx_3 = _GEN + 4'h3;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :24:33, :40:24
   wire [31:0]      _GEN_10 = _GEN_1[idx_3[1:0]];	// src/queen/scala/main/QueenEndpointCtrl.scala:34:42, :40:24, :42:36
   wire [31:0]      _GEN_11 = _GEN_3[idx_3[1:0]];	// src/queen/scala/main/QueenEndpointCtrl.scala:34:42, :40:24, :42:36
-  wire             cand_3_valid = inRange & idx_3 < 4'h4 & _GEN_0[idx_3[1:0]];	// src/queen/scala/main/QueenEndpointCtrl.scala:32:34, :34:42, :40:24, :42:36, :44:{34,41,51}
+  wire             cand_3_valid = inRange & idx_3 < 4'h4 & _GEN_0[idx_3[1:0]];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :32:34, :34:42, :40:24, :42:36, :44:{34,41,51}
   wire             candCtrl_3 =
     cand_3_valid
     & ~(cand_3_valid
-        & (_GEN_10[14:12] < 3'h3 | _GEN_10[14:12] == 3'h3 & _GEN_10[29:26] == 4'h9));	// src/queen/scala/main/QueenEndpointCtrl.scala:42:36, :43:33, :44:{34,51}, :46:37, :47:{21,28,39,47,54}, :48:{38,41}
+        & (_GEN_10[14:12] < 3'h3 | _GEN_10[14:12] == 3'h3 & _GEN_10[29:26] == 4'h9));	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :43:33, :44:{34,51}, :46:37, :47:{21,28,39,47,54}, :48:{38,41}
   wire [3:0]       _hasCtrl_T = {candCtrl_3, candCtrl_2, candCtrl_1, candCtrl_0};	// src/queen/scala/main/QueenEndpointCtrl.scala:48:38, :67:36
   wire [2:0]       firstCtrlIdx =
     candCtrl_0 ? 3'h0 : candCtrl_1 ? 3'h1 : candCtrl_2 ? 3'h2 : candCtrl_3 ? 3'h3 : 3'h0;	// src/queen/scala/main/QueenEndpointCtrl.scala:48:38, :52:30, :54:{26,32}
@@ -215,16 +215,16 @@ module Queen_QueenEndpointCtrl(	// src/queen/scala/main/QueenEndpointCtrl.scala:
       ? _GEN_2[29:7]
       : ctrlSel_1
           ? _GEN_6[29:7]
-          : ctrlSel_2 ? _GEN_8[29:7] : ctrlSel_3 ? _GEN_10[29:7] : 23'h0;	// <stdin>:1472:51, :1767:51, src/queen/scala/main/QueenEndpointCtrl.scala:42:36, :60:30, :62:{26,32}, :84:66
+          : ctrlSel_2 ? _GEN_8[29:7] : ctrlSel_3 ? _GEN_10[29:7] : 23'h0;	// <stdin>:1558:51, :1849:51, src/queen/scala/main/QueenEndpointCtrl.scala:42:36, :60:30, :62:{26,32}, :84:66
   wire [31:0]      ctrlRs1 =
     ctrlSel_0
       ? _GEN_4
-      : ctrlSel_1 ? _GEN_7 : ctrlSel_2 ? _GEN_9 : ctrlSel_3 ? _GEN_11 : 32'h0;	// <stdin>:1472:51, :1767:51, src/queen/scala/main/QueenEndpointCtrl.scala:42:36, :60:30, :62:{26,32}, :84:66
+      : ctrlSel_1 ? _GEN_7 : ctrlSel_2 ? _GEN_9 : ctrlSel_3 ? _GEN_11 : 32'h0;	// <stdin>:1558:51, :1849:51, src/queen/scala/main/QueenEndpointCtrl.scala:42:36, :60:30, :62:{26,32}, :84:66
   wire             isCtrl = ctrlInst[7:5] == 3'h3;	// src/queen/scala/main/QueenEndpointCtrl.scala:62:{26,32}, :90:{34,43}
-  wire             isFence_layerCapture = isCtrl & ctrlInst[22:19] == 4'h0;	// src/queen/scala/main/QueenEndpointCtrl.scala:62:{26,32}, :67:43, :87:31, :90:43, :91:{34,41}
-  wire             isWaitEvent_layerCapture = isCtrl & ctrlInst[22:19] == 4'h1;	// src/queen/scala/main/QueenEndpointCtrl.scala:40:24, :62:{26,32}, :87:31, :90:43, :92:{38,45}
-  wire             isWaitTimeline_layerCapture = isCtrl & ctrlInst[22:19] == 4'h2;	// src/queen/scala/main/QueenEndpointCtrl.scala:40:24, :62:{26,32}, :87:31, :90:43, :93:{41,48}
-  wire             isTrace_layerCapture = isCtrl & ctrlInst[22:19] == 4'h5;	// src/queen/scala/main/QueenEndpointCtrl.scala:62:{26,32}, :87:31, :90:43, :94:{34,41}
+  wire             isFence_layerCapture = isCtrl & ctrlInst[22:19] == 4'h0;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :62:{26,32}, :87:31, :90:43, :91:{34,41}
+  wire             isWaitEvent_layerCapture = isCtrl & ctrlInst[22:19] == 4'h1;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :62:{26,32}, :87:31, :90:43, :92:{38,45}
+  wire             isWaitTimeline_layerCapture = isCtrl & ctrlInst[22:19] == 4'h2;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :62:{26,32}, :87:31, :90:43, :93:{41,48}
+  wire             isTrace_layerCapture = isCtrl & ctrlInst[22:19] == 4'h5;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :62:{26,32}, :87:31, :90:43, :94:{34,41}
   always @(posedge clock) begin	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7
     automatic logic _GEN_12;	// src/main/scala/chisel3/util/ReadyValidIO.scala:48:35
     automatic logic _GEN_13;	// src/queen/scala/main/QueenEndpointCtrl.scala:113:21
@@ -315,32 +315,32 @@ module Queen_QueenEndpointCtrl(	// src/queen/scala/main/QueenEndpointCtrl.scala:
       `FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7
     `endif // FIRRTL_BEFORE_INITIAL
     initial begin	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7
-      automatic logic [31:0] _RANDOM[0:16];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7
+      automatic logic [31:0] _RANDOM[0:12];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7
       `ifdef INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7
         `INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7
       `endif // INIT_RANDOM_PROLOG_
       `ifdef RANDOMIZE_REG_INIT	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7
-        for (logic [4:0] i = 5'h0; i < 5'h11; i += 5'h1) begin
+        for (logic [3:0] i = 4'h0; i < 4'hD; i += 4'h1) begin
           _RANDOM[i] = `RANDOM;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7
         end	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7
-        active = _RANDOM[5'h0][0];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :24:33
-        pkt_0_valid = _RANDOM[5'h0][1];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :24:33, :25:26
-        pkt_0_bits_inst = {_RANDOM[5'h0][31:2], _RANDOM[5'h1][1:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :24:33, :25:26
-        pkt_0_bits_rs1 = {_RANDOM[5'h2][31:2], _RANDOM[5'h3][1:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
-        pkt_0_bits_rs2 = {_RANDOM[5'h3][31:2], _RANDOM[5'h4][1:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
-        pkt_1_valid = _RANDOM[5'h4][2];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
-        pkt_1_bits_inst = {_RANDOM[5'h4][31:3], _RANDOM[5'h5][2:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
-        pkt_1_bits_rs1 = {_RANDOM[5'h6][31:3], _RANDOM[5'h7][2:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
-        pkt_1_bits_rs2 = {_RANDOM[5'h7][31:3], _RANDOM[5'h8][2:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
-        pkt_2_valid = _RANDOM[5'h8][3];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
-        pkt_2_bits_inst = {_RANDOM[5'h8][31:4], _RANDOM[5'h9][3:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
-        pkt_2_bits_rs1 = {_RANDOM[5'hA][31:4], _RANDOM[5'hB][3:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
-        pkt_2_bits_rs2 = {_RANDOM[5'hB][31:4], _RANDOM[5'hC][3:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
-        pkt_3_valid = _RANDOM[5'hC][4];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
-        pkt_3_bits_inst = {_RANDOM[5'hC][31:5], _RANDOM[5'hD][4:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
-        pkt_3_bits_rs1 = {_RANDOM[5'hE][31:5], _RANDOM[5'hF][4:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
-        pkt_3_bits_rs2 = {_RANDOM[5'hF][31:5], _RANDOM[5'h10][4:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
-        base = _RANDOM[5'h10][7:5];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26, :26:31
+        active = _RANDOM[4'h0][0];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :24:33
+        pkt_0_valid = _RANDOM[4'h0][1];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :24:33, :25:26
+        pkt_0_bits_inst = {_RANDOM[4'h0][31:2], _RANDOM[4'h1][1:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :24:33, :25:26
+        pkt_0_bits_rs1 = {_RANDOM[4'h1][31:2], _RANDOM[4'h2][1:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
+        pkt_0_bits_rs2 = {_RANDOM[4'h2][31:2], _RANDOM[4'h3][1:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
+        pkt_1_valid = _RANDOM[4'h3][2];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
+        pkt_1_bits_inst = {_RANDOM[4'h3][31:3], _RANDOM[4'h4][2:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
+        pkt_1_bits_rs1 = {_RANDOM[4'h4][31:3], _RANDOM[4'h5][2:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
+        pkt_1_bits_rs2 = {_RANDOM[4'h5][31:3], _RANDOM[4'h6][2:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
+        pkt_2_valid = _RANDOM[4'h6][3];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
+        pkt_2_bits_inst = {_RANDOM[4'h6][31:4], _RANDOM[4'h7][3:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
+        pkt_2_bits_rs1 = {_RANDOM[4'h7][31:4], _RANDOM[4'h8][3:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
+        pkt_2_bits_rs2 = {_RANDOM[4'h8][31:4], _RANDOM[4'h9][3:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
+        pkt_3_valid = _RANDOM[4'h9][4];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
+        pkt_3_bits_inst = {_RANDOM[4'h9][31:5], _RANDOM[4'hA][4:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
+        pkt_3_bits_rs1 = {_RANDOM[4'hA][31:5], _RANDOM[4'hB][4:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
+        pkt_3_bits_rs2 = {_RANDOM[4'hB][31:5], _RANDOM[4'hC][4:0]};	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26
+        base = _RANDOM[4'hC][7:5];	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :25:26, :26:31
       `endif // RANDOMIZE_REG_INIT
     end // initial
     `ifdef FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7
@@ -350,21 +350,21 @@ module Queen_QueenEndpointCtrl(	// src/queen/scala/main/QueenEndpointCtrl.scala:
   assign io_in_ready = io_in_ready_0;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :29:28
   assign io_out_valid = io_out_valid_0;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :82:36
   assign io_out_bits_0_valid = fwd_0;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :77:{16,33}
-  assign io_out_bits_0_bits_inst = fwd_0 ? _GEN_2 : 32'h0;	// <stdin>:1472:51, :1767:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :77:{16,33}, :80:35
-  assign io_out_bits_0_bits_rs1 = fwd_0 ? _GEN_4 : 32'h0;	// <stdin>:1472:51, :1767:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :77:{16,33}, :80:35
-  assign io_out_bits_0_bits_rs2 = fwd_0 ? _GEN_5[base[1:0]] : 32'h0;	// <stdin>:1472:51, :1767:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :26:31, :34:42, :42:36, :77:{16,33}, :80:35
+  assign io_out_bits_0_bits_inst = fwd_0 ? _GEN_2 : 32'h0;	// <stdin>:1558:51, :1849:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :77:{16,33}, :80:35
+  assign io_out_bits_0_bits_rs1 = fwd_0 ? _GEN_4 : 32'h0;	// <stdin>:1558:51, :1849:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :77:{16,33}, :80:35
+  assign io_out_bits_0_bits_rs2 = fwd_0 ? _GEN_5[base[1:0]] : 32'h0;	// <stdin>:1558:51, :1849:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :26:31, :34:42, :42:36, :77:{16,33}, :80:35
   assign io_out_bits_1_valid = fwd_1;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :77:{16,33}
-  assign io_out_bits_1_bits_inst = fwd_1 ? _GEN_6 : 32'h0;	// <stdin>:1472:51, :1767:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :77:{16,33}, :80:35
-  assign io_out_bits_1_bits_rs1 = fwd_1 ? _GEN_7 : 32'h0;	// <stdin>:1472:51, :1767:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :77:{16,33}, :80:35
-  assign io_out_bits_1_bits_rs2 = fwd_1 ? _GEN_5[idx_1[1:0]] : 32'h0;	// <stdin>:1472:51, :1767:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :34:42, :40:24, :42:36, :77:{16,33}, :80:35
+  assign io_out_bits_1_bits_inst = fwd_1 ? _GEN_6 : 32'h0;	// <stdin>:1558:51, :1849:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :77:{16,33}, :80:35
+  assign io_out_bits_1_bits_rs1 = fwd_1 ? _GEN_7 : 32'h0;	// <stdin>:1558:51, :1849:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :77:{16,33}, :80:35
+  assign io_out_bits_1_bits_rs2 = fwd_1 ? _GEN_5[idx_1[1:0]] : 32'h0;	// <stdin>:1558:51, :1849:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :34:42, :40:24, :42:36, :77:{16,33}, :80:35
   assign io_out_bits_2_valid = fwd_2;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :77:{16,33}
-  assign io_out_bits_2_bits_inst = fwd_2 ? _GEN_8 : 32'h0;	// <stdin>:1472:51, :1767:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :77:{16,33}, :80:35
-  assign io_out_bits_2_bits_rs1 = fwd_2 ? _GEN_9 : 32'h0;	// <stdin>:1472:51, :1767:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :77:{16,33}, :80:35
-  assign io_out_bits_2_bits_rs2 = fwd_2 ? _GEN_5[idx_2[1:0]] : 32'h0;	// <stdin>:1472:51, :1767:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :34:42, :40:24, :42:36, :77:{16,33}, :80:35
+  assign io_out_bits_2_bits_inst = fwd_2 ? _GEN_8 : 32'h0;	// <stdin>:1558:51, :1849:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :77:{16,33}, :80:35
+  assign io_out_bits_2_bits_rs1 = fwd_2 ? _GEN_9 : 32'h0;	// <stdin>:1558:51, :1849:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :77:{16,33}, :80:35
+  assign io_out_bits_2_bits_rs2 = fwd_2 ? _GEN_5[idx_2[1:0]] : 32'h0;	// <stdin>:1558:51, :1849:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :34:42, :40:24, :42:36, :77:{16,33}, :80:35
   assign io_out_bits_3_valid = fwd_3;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :77:{16,33}
-  assign io_out_bits_3_bits_inst = fwd_3 ? _GEN_10 : 32'h0;	// <stdin>:1472:51, :1767:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :77:{16,33}, :80:35
-  assign io_out_bits_3_bits_rs1 = fwd_3 ? _GEN_11 : 32'h0;	// <stdin>:1472:51, :1767:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :77:{16,33}, :80:35
-  assign io_out_bits_3_bits_rs2 = fwd_3 ? _GEN_5[idx_3[1:0]] : 32'h0;	// <stdin>:1472:51, :1767:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :34:42, :40:24, :42:36, :77:{16,33}, :80:35
+  assign io_out_bits_3_bits_inst = fwd_3 ? _GEN_10 : 32'h0;	// <stdin>:1558:51, :1849:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :77:{16,33}, :80:35
+  assign io_out_bits_3_bits_rs1 = fwd_3 ? _GEN_11 : 32'h0;	// <stdin>:1558:51, :1849:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :42:36, :77:{16,33}, :80:35
+  assign io_out_bits_3_bits_rs2 = fwd_3 ? _GEN_5[idx_3[1:0]] : 32'h0;	// <stdin>:1558:51, :1849:51, src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :34:42, :40:24, :42:36, :77:{16,33}, :80:35
   assign io_trace_valid = inRange & alone & isTrace_layerCapture & ~io_flushing;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :32:34, :71:33, :82:39, :94:34, :106:{31,40,51}
   assign io_trace_bits_swTag = ctrlRs1;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :62:{26,32}
   assign io_idle = ~active;	// src/queen/scala/main/QueenEndpointCtrl.scala:10:7, :24:33, :29:20

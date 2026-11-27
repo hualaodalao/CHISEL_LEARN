@@ -2,7 +2,6 @@
 `ifndef layers_Queen_QueenTop_Verification_Assert	// src/queen/scala/main/QueenTop.scala:12:7
   `define layers_Queen_QueenTop_Verification_Assert
   `include "layers-Queen_QueenTop-Verification.sv"	// src/queen/scala/main/QueenTop.scala:12:7
-  `include "layers-Queen_QueenDsaDecoder-Verification-Assert.sv"	// src/queen/scala/main/QueenTop.scala:12:7
   `include "layers-Queen_QueenEndpointCtrl-Verification-Assert.sv"	// src/queen/scala/main/QueenTop.scala:12:7
   `include "layers-Queen_QueenDsaAdapter-Verification-Assert.sv"	// src/queen/scala/main/QueenTop.scala:12:7
   `include "layers-Queen_QueenSchedCtrl-Verification-Assert.sv"	// src/queen/scala/main/QueenTop.scala:12:7

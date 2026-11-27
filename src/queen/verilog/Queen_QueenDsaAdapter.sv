@@ -130,45 +130,45 @@ module Queen_QueenDsaAdapter(	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
   wire [3:0][31:0] _GEN_4 =
     {{pkt_3_bits_rs2}, {pkt_2_bits_rs2}, {pkt_1_bits_rs2}, {pkt_0_bits_rs2}};	// src/queen/scala/main/QueenDsaAdapter.scala:34:26, :53:36
   wire [31:0]      _GEN_5 = _GEN_4[base[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:35:31, :43:42, :53:36
-  wire             cand_0_valid_layerCapture = inRange & _GEN < 4'h4 & _GEN_0[base[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:33:33, :35:31, :40:34, :43:42, :51:24, :53:36, :54:{34,41,51}
+  wire             cand_0_valid_layerCapture = inRange & _GEN < 4'h4 & _GEN_0[base[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :33:33, :35:31, :40:34, :43:42, :51:24, :53:36, :54:{34,41,51}
   wire             candWr_0 =
     cand_0_valid_layerCapture & (_GEN_2[14:12] == 3'h0 | _GEN_2[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :54:51, :56:{36,47,55,65}, :65:32
   wire             candOther_0 = cand_0_valid_layerCapture & ~candWr_0;	// src/queen/scala/main/QueenDsaAdapter.scala:54:51, :56:36, :57:{39,42}
   wire             candRun_0_layerCapture =
-    candOther_0 & _GEN_2[14:12] == 3'h3 & _GEN_2[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :57:39, :58:{36,46,54,71,80}, :65:32
+    candOther_0 & _GEN_2[14:12] == 3'h3 & _GEN_2[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :57:39, :58:{36,46,54,71,80}, :65:32
   wire             candRd_0_layerCapture = candOther_0 & _GEN_2[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :57:39, :59:{35,45}, :65:32
-  wire [3:0]       idx_1 = _GEN + 4'h1;	// src/queen/scala/main/QueenDsaAdapter.scala:33:33, :51:24
+  wire [3:0]       idx_1 = _GEN + 4'h1;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :33:33, :51:24
   wire [31:0]      _GEN_6 = _GEN_1[idx_1[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:43:42, :51:24, :53:36
   wire [31:0]      _GEN_7 = _GEN_4[idx_1[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:43:42, :51:24, :53:36
   wire             cand_1_valid_layerCapture =
-    inRange & idx_1 < 4'h4 & _GEN_0[idx_1[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:40:34, :43:42, :51:24, :53:36, :54:{34,41,51}
+    inRange & idx_1 < 4'h4 & _GEN_0[idx_1[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :40:34, :43:42, :51:24, :53:36, :54:{34,41,51}
   wire             candWr_1 =
     cand_1_valid_layerCapture & (_GEN_6[14:12] == 3'h0 | _GEN_6[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :54:51, :56:{36,47,55,65}, :65:32
   wire             candOther_1 = cand_1_valid_layerCapture & ~candWr_1;	// src/queen/scala/main/QueenDsaAdapter.scala:54:51, :56:36, :57:{39,42}
   wire             candRun_1_layerCapture =
-    candOther_1 & _GEN_6[14:12] == 3'h3 & _GEN_6[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :57:39, :58:{36,46,54,71,80}, :65:32
+    candOther_1 & _GEN_6[14:12] == 3'h3 & _GEN_6[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :57:39, :58:{36,46,54,71,80}, :65:32
   wire             candRd_1_layerCapture = candOther_1 & _GEN_6[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :57:39, :59:{35,45}, :65:32
-  wire [3:0]       idx_2 = _GEN + 4'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:33:33, :51:24
+  wire [3:0]       idx_2 = _GEN + 4'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :33:33, :51:24
   wire [31:0]      _GEN_8 = _GEN_1[idx_2[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:43:42, :51:24, :53:36
   wire [31:0]      _GEN_9 = _GEN_4[idx_2[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:43:42, :51:24, :53:36
   wire             cand_2_valid_layerCapture =
-    inRange & idx_2 < 4'h4 & _GEN_0[idx_2[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:40:34, :43:42, :51:24, :53:36, :54:{34,41,51}
+    inRange & idx_2 < 4'h4 & _GEN_0[idx_2[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :40:34, :43:42, :51:24, :53:36, :54:{34,41,51}
   wire             candWr_2 =
     cand_2_valid_layerCapture & (_GEN_8[14:12] == 3'h0 | _GEN_8[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :54:51, :56:{36,47,55,65}, :65:32
   wire             candOther_2 = cand_2_valid_layerCapture & ~candWr_2;	// src/queen/scala/main/QueenDsaAdapter.scala:54:51, :56:36, :57:{39,42}
   wire             candRun_2_layerCapture =
-    candOther_2 & _GEN_8[14:12] == 3'h3 & _GEN_8[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :57:39, :58:{36,46,54,71,80}, :65:32
+    candOther_2 & _GEN_8[14:12] == 3'h3 & _GEN_8[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :57:39, :58:{36,46,54,71,80}, :65:32
   wire             candRd_2_layerCapture = candOther_2 & _GEN_8[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :57:39, :59:{35,45}, :65:32
-  wire [3:0]       idx_3 = _GEN + 4'h3;	// src/queen/scala/main/QueenDsaAdapter.scala:33:33, :51:24
+  wire [3:0]       idx_3 = _GEN + 4'h3;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :33:33, :51:24
   wire [31:0]      _GEN_10 = _GEN_1[idx_3[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:43:42, :51:24, :53:36
   wire [31:0]      _GEN_11 = _GEN_4[idx_3[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:43:42, :51:24, :53:36
   wire             cand_3_valid_layerCapture =
-    inRange & idx_3 < 4'h4 & _GEN_0[idx_3[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:40:34, :43:42, :51:24, :53:36, :54:{34,41,51}
+    inRange & idx_3 < 4'h4 & _GEN_0[idx_3[1:0]];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :40:34, :43:42, :51:24, :53:36, :54:{34,41,51}
   wire             candWr_3 =
     cand_3_valid_layerCapture & (_GEN_10[14:12] == 3'h0 | _GEN_10[14:12] == 3'h1);	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :54:51, :56:{36,47,55,65}, :65:32
   wire             candOther_3 = cand_3_valid_layerCapture & ~candWr_3;	// src/queen/scala/main/QueenDsaAdapter.scala:54:51, :56:36, :57:{39,42}
   wire             candRun_3_layerCapture =
-    candOther_3 & _GEN_10[14:12] == 3'h3 & _GEN_10[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :57:39, :58:{36,46,54,71,80}, :65:32
+    candOther_3 & _GEN_10[14:12] == 3'h3 & _GEN_10[29:26] == 4'h9;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :53:36, :57:39, :58:{36,46,54,71,80}, :65:32
   wire             candRd_3_layerCapture = candOther_3 & _GEN_10[14:12] == 3'h2;	// src/queen/scala/main/QueenDsaAdapter.scala:53:36, :57:39, :59:{35,45}, :65:32
   wire [2:0]       firstOtherIdx =
     candOther_0
@@ -246,32 +246,32 @@ module Queen_QueenDsaAdapter(	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
       `FIRRTL_BEFORE_INITIAL	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
     `endif // FIRRTL_BEFORE_INITIAL
     initial begin	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
-      automatic logic [31:0] _RANDOM[0:16];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
+      automatic logic [31:0] _RANDOM[0:12];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
       `ifdef INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
         `INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
       `endif // INIT_RANDOM_PROLOG_
       `ifdef RANDOMIZE_REG_INIT	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
-        for (logic [4:0] i = 5'h0; i < 5'h11; i += 5'h1) begin
+        for (logic [3:0] i = 4'h0; i < 4'hD; i += 4'h1) begin
           _RANDOM[i] = `RANDOM;	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
         end	// src/queen/scala/main/QueenDsaAdapter.scala:21:7
-        active = _RANDOM[5'h0][0];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :33:33
-        pkt_0_valid = _RANDOM[5'h0][1];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :33:33, :34:26
-        pkt_0_bits_inst = {_RANDOM[5'h0][31:2], _RANDOM[5'h1][1:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :33:33, :34:26
-        pkt_0_bits_rs1 = {_RANDOM[5'h2][31:2], _RANDOM[5'h3][1:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
-        pkt_0_bits_rs2 = {_RANDOM[5'h3][31:2], _RANDOM[5'h4][1:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
-        pkt_1_valid = _RANDOM[5'h4][2];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
-        pkt_1_bits_inst = {_RANDOM[5'h4][31:3], _RANDOM[5'h5][2:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
-        pkt_1_bits_rs1 = {_RANDOM[5'h6][31:3], _RANDOM[5'h7][2:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
-        pkt_1_bits_rs2 = {_RANDOM[5'h7][31:3], _RANDOM[5'h8][2:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
-        pkt_2_valid = _RANDOM[5'h8][3];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
-        pkt_2_bits_inst = {_RANDOM[5'h8][31:4], _RANDOM[5'h9][3:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
-        pkt_2_bits_rs1 = {_RANDOM[5'hA][31:4], _RANDOM[5'hB][3:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
-        pkt_2_bits_rs2 = {_RANDOM[5'hB][31:4], _RANDOM[5'hC][3:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
-        pkt_3_valid = _RANDOM[5'hC][4];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
-        pkt_3_bits_inst = {_RANDOM[5'hC][31:5], _RANDOM[5'hD][4:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
-        pkt_3_bits_rs1 = {_RANDOM[5'hE][31:5], _RANDOM[5'hF][4:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
-        pkt_3_bits_rs2 = {_RANDOM[5'hF][31:5], _RANDOM[5'h10][4:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
-        base = _RANDOM[5'h10][7:5];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26, :35:31
+        active = _RANDOM[4'h0][0];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :33:33
+        pkt_0_valid = _RANDOM[4'h0][1];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :33:33, :34:26
+        pkt_0_bits_inst = {_RANDOM[4'h0][31:2], _RANDOM[4'h1][1:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :33:33, :34:26
+        pkt_0_bits_rs1 = {_RANDOM[4'h1][31:2], _RANDOM[4'h2][1:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_0_bits_rs2 = {_RANDOM[4'h2][31:2], _RANDOM[4'h3][1:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_1_valid = _RANDOM[4'h3][2];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_1_bits_inst = {_RANDOM[4'h3][31:3], _RANDOM[4'h4][2:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_1_bits_rs1 = {_RANDOM[4'h4][31:3], _RANDOM[4'h5][2:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_1_bits_rs2 = {_RANDOM[4'h5][31:3], _RANDOM[4'h6][2:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_2_valid = _RANDOM[4'h6][3];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_2_bits_inst = {_RANDOM[4'h6][31:4], _RANDOM[4'h7][3:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_2_bits_rs1 = {_RANDOM[4'h7][31:4], _RANDOM[4'h8][3:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_2_bits_rs2 = {_RANDOM[4'h8][31:4], _RANDOM[4'h9][3:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_3_valid = _RANDOM[4'h9][4];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_3_bits_inst = {_RANDOM[4'h9][31:5], _RANDOM[4'hA][4:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_3_bits_rs1 = {_RANDOM[4'hA][31:5], _RANDOM[4'hB][4:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        pkt_3_bits_rs2 = {_RANDOM[4'hB][31:5], _RANDOM[4'hC][4:0]};	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26
+        base = _RANDOM[4'hC][7:5];	// src/queen/scala/main/QueenDsaAdapter.scala:21:7, :34:26, :35:31
       `endif // RANDOMIZE_REG_INIT
     end // initial
     `ifdef FIRRTL_AFTER_INITIAL	// src/queen/scala/main/QueenDsaAdapter.scala:21:7

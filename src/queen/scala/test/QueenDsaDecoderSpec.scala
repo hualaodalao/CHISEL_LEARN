@@ -16,8 +16,8 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
                                rs1Valid: Boolean = false, rs2Valid: Boolean = false,
                                pc: BigInt = 0) {
         def endpoint: Int = ((inst >> 30) & 3).toInt
-        def payload: (BigInt, BigInt, BigInt, BigInt) =
-            (inst, pc, if (rs1Valid) rs1 else BigInt(0), if (rs2Valid) rs2 else BigInt(0))
+        def payload: (BigInt, BigInt, BigInt) =
+            (inst, if (rs1Valid) rs1 else BigInt(0), if (rs2Valid) rs2 else BigInt(0))
     }
 
     private def qwr2(endpoint: Int, regBase: Int, rsv: Int = 0): BigInt =
@@ -88,22 +88,39 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
         else QueenTrapCause.none
     }
 
+    /** 私有命令 FIFO 的软件模型。Queue(useSyncReadMem) 的出口就是 SRAM 自身的输出寄存，
+      * 本拍入队的包次拍即可见，没有额外出口级，故模型就是一个普通队列。 */
+    private class FifoModel(depth: Int) {
+        private val q = mutable.Queue.empty[Vector[Option[Command]]]
+        def used: Int = q.size
+        def head: Option[Vector[Option[Command]]] = q.headOption
+        def isEmpty: Boolean = q.isEmpty
+
+        /** 推进一拍并返回本拍是否出队。used 取拍首值，与 RTL 的指针口径一致。 */
+        def step(ready: Boolean, enq: Option[Vector[Option[Command]]]): Boolean = {
+            val consume = q.nonEmpty && ready
+            val enqFire = enq.nonEmpty && q.size < depth
+            if (consume) q.dequeue()
+            if (enqFire) q.enqueue(enq.get)
+            consume
+        }
+    }
+
     private class Driver(dut: QueenDsaDecoder, cfg: QueenConfig) {
         private val ports = Vector(dut.io.gemm, dut.io.dma, dut.io.scheduler)
         private val endpoints = Vector(0, 1, 3)
-        private val ringDepth = cfg.cmdRingDepth
-        private val entries = mutable.HashMap.empty[BigInt, Vector[Option[Command]]]
+        private val fifoDepth = cfg.cmdRingDepth
+        private val fifos = Vector.fill(2)(new FifoModel(fifoDepth))
         private val sched = mutable.Queue.empty[Vector[Option[Command]]]
-        private var writePtr = BigInt(0)
-        private var gemmCursor = BigInt(0)
-        private var dmaCursor = BigInt(0)
         private var gemmOpen = false
         private var dmaOpen = false
         private var pending = Vector.fill[Option[Command]](cfg.instructionLanes)(None)
-        private var held = Vector.fill(3)(Option.empty[Vector[(Boolean, BigInt, BigInt, BigInt, BigInt)]])
+        private var held = Vector.fill(3)(Option.empty[Vector[(Boolean, BigInt, BigInt, BigInt)]])
         val empty: Vector[Option[Command]] = Vector.fill(cfg.instructionLanes)(None)
         var lastOutput = Vector.fill(3)(Vector.empty[(BigInt, BigInt, BigInt)])
         var lastMask = Vector.fill(3)(Vector.fill(cfg.instructionLanes)(false))
+        var fired = Vector.fill(3)(Vector.empty[Vector[Option[Command]]])
+        var lastPresented = Vector.fill(3)(false)
         var acceptedCount = 0
         var outputCount = 0
         var trapCount = 0
@@ -122,12 +139,6 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
         private def maskOf(packet: Vector[Option[Command]], e: Int): Vector[Option[Command]] =
             packet.map(_.filter(_.endpoint == endpoints(e)))
-
-        private def ringHead(cursor: BigInt): Option[Vector[Option[Command]]] =
-            if (cursor == writePtr) None else Some(entries(cursor % ringDepth))
-
-        private def hasRingLane(packet: Vector[Option[Command]], e: Int): Boolean =
-            maskOf(packet, e).exists(_.nonEmpty)
 
         def offer(commands: (Int, Command)*): Vector[Option[Command]] = {
             require(commands.map(_._1).distinct.size == commands.size)
@@ -151,19 +162,19 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
             ports.zip(ready).foreach { case (port, value) => port.ready.poke(value.B) }
             dut.io.qrdUsed.poke(qrdUsed.U)
 
-            val gemmHead = ringHead(gemmCursor)
-            val dmaHead = ringHead(dmaCursor)
+            val gemmHead = fifos(0).head
+            val dmaHead = fifos(1).head
             val schedHead = sched.headOption
-            val heads = Vector(gemmHead.map(maskOf(_, 0)), dmaHead.map(maskOf(_, 1)),
-                schedHead.map(maskOf(_, 2)))
+            val heads = Vector(gemmHead, dmaHead, schedHead)
             val presenting = heads.map(_.exists(_.exists(_.nonEmpty)))
+            lastPresented = presenting
 
             for (e <- 0 until 3) {
                 val port = ports(e)
                 port.valid.expect(presenting(e).B)
                 heads(e).filter(_ => presenting(e)).foreach { packet =>
                     packet.zip(port.bits).zipWithIndex.foreach { case ((command, lane), i) =>
-                        val actual = (lane.bits.inst.peek().litValue, lane.bits.pc.peek().litValue,
+                        val actual = (lane.bits.inst.peek().litValue,
                             lane.bits.rs1.peek().litValue, lane.bits.rs2.peek().litValue)
                         withClue(s"cycle=$cycleNo port=$e lane=$i " +
                             s"expected=${command.map(_.payload)} actual=$actual ") {
@@ -174,8 +185,7 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 }
                 val snapshot = port.bits.map { lane =>
                     (lane.valid.peek().litToBoolean, lane.bits.inst.peek().litValue,
-                        lane.bits.pc.peek().litValue, lane.bits.rs1.peek().litValue,
-                        lane.bits.rs2.peek().litValue)
+                        lane.bits.rs1.peek().litValue, lane.bits.rs2.peek().litValue)
                 }.toVector
                 if (presenting(e) && !ready(e)) {
                     held(e).foreach(previous => snapshot shouldBe previous)
@@ -185,21 +195,20 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 }
                 lastMask = lastMask.updated(e, snapshot.map(_._1))
                 lastOutput = lastOutput.updated(e,
-                    snapshot.collect { case (true, inst, _, rs1, rs2) => (inst, rs1, rs2) })
+                    snapshot.collect { case (true, inst, rs1, rs2) => (inst, rs1, rs2) })
             }
 
-            val gemmAdvance = gemmHead.exists(p => !hasRingLane(p, 0) || ready(0))
-            val dmaAdvance = dmaHead.exists(p => !hasRingLane(p, 1) || ready(1))
             val schedFire = schedHead.nonEmpty && ready(2)
-            val gemmFire = gemmHead.exists(hasRingLane(_, 0)) && ready(0)
-            val dmaFire = dmaHead.exists(hasRingLane(_, 1)) && ready(1)
+            val gemmFire = gemmHead.nonEmpty && ready(0)
+            val dmaFire = dmaHead.nonEmpty && ready(1)
 
-            val pendingRing = pending.exists(_.exists(c => c.endpoint == 0 || c.endpoint == 1))
+            val pendingGemm = pending.exists(_.exists(_.endpoint == 0))
+            val pendingDma = pending.exists(_.exists(_.endpoint == 1))
             val pendingSched = pending.exists(_.exists(_.endpoint == 3))
-            val gemmNext = gemmCursor + (if (gemmAdvance) 1 else 0)
-            val dmaNext = dmaCursor + (if (dmaAdvance) 1 else 0)
-            val nextCommit = gemmNext.min(dmaNext)
-            val ringReady = writePtr + (if (pendingRing) 1 else 0) - nextCommit < BigInt(ringDepth)
+            val gemmReady = fifos(0).used - (if (gemmFire) 1 else 0) +
+                (if (pendingGemm) 1 else 0) < fifoDepth
+            val dmaReady = fifos(1).used - (if (dmaFire) 1 else 0) +
+                (if (pendingDma) 1 else 0) < fifoDepth
             val schedNext = sched.size + (if (pendingSched) 1 else 0) - (if (schedFire) 1 else 0)
             val schedReady = schedNext < 1
 
@@ -218,7 +227,8 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
                     !blocked && (!isQrd || qrdRoom) && (c.endpoint match {
                         case 3 => schedReady
                         case 2 => false
-                        case _ => ringReady
+                        case 0 => gemmReady
+                        case _ => dmaReady
                     })
                 }
                 withClue(s"cycle=$cycleNo lane=$i cause=${causes(i)} blocked=$blocked ") {
@@ -260,16 +270,21 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
             }
             if (firstIllegal.nonEmpty) trapCount += 1
 
-            if (gemmFire) outputCount += maskOf(gemmHead.get, 0).flatten.size
-            if (dmaFire) outputCount += maskOf(dmaHead.get, 1).flatten.size
-            if (schedFire) outputCount += maskOf(schedHead.get, 2).flatten.size
-            if (gemmAdvance) gemmCursor += 1
-            if (dmaAdvance) dmaCursor += 1
-            if (schedFire) sched.dequeue()
-            if (pendingRing) {
-                entries(writePtr % ringDepth) = pending
-                writePtr += 1
+            if (gemmFire) {
+                outputCount += gemmHead.get.flatten.size
+                fired = fired.updated(0, fired(0) :+ gemmHead.get)
             }
+            if (dmaFire) {
+                outputCount += dmaHead.get.flatten.size
+                fired = fired.updated(1, fired(1) :+ dmaHead.get)
+            }
+            if (schedFire) {
+                outputCount += schedHead.get.flatten.size
+                fired = fired.updated(2, fired(2) :+ schedHead.get)
+            }
+            fifos(0).step(ready(0), if (pendingGemm) Some(maskOf(pending, 0)) else None)
+            fifos(1).step(ready(1), if (pendingDma) Some(maskOf(pending, 1)) else None)
+            if (schedFire) sched.dequeue()
             if (pendingSched) {
                 sched.enqueue(maskOf(pending, 2))
             }
@@ -282,36 +297,47 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
 
         def drain(): Unit = {
             var cycles = 0
-            while ((pending.exists(_.nonEmpty) || sched.nonEmpty || writePtr != gemmCursor ||
-                writePtr != dmaCursor) && cycles < 200) {
+            while ((pending.exists(_.nonEmpty) || sched.nonEmpty ||
+                fifos.exists(!_.isEmpty)) && cycles < 400) {
                 cycle(ready = Vector(true, true, true))
                 cycles += 1
             }
             pending.forall(_.isEmpty) shouldBe true
-            writePtr shouldBe gemmCursor
-            writePtr shouldBe dmaCursor
+            fifos.foreach(_.isEmpty shouldBe true)
             sched.isEmpty shouldBe true
             outputCount shouldBe acceptedCount
+        }
+
+        /** 空转直到端点 e 的出口在本拍 presenting；ready 保持 false，故不消费。
+          * 至少走一拍：上一拍可能刚把旧队头消费掉，lastPresented 仍是旧队头的值。 */
+        def awaitHead(e: Int, limit: Int = 40): Unit = {
+            var n = 0
+            cycle()
+            while (!lastPresented(e) && n < limit) { cycle(); n += 1 }
+            lastPresented(e) shouldBe true
         }
     }
 
     behavior of "QueenDsaDecoder"
 
-    it should "keep sparse lane masks and input batch boundaries in each ring slot" in {
+    it should "keep sparse lane masks and input batch boundaries in each FIFO slot" in {
         val cfg = QueenConfig(cmdRingDepth = 3)
         simulate(new QueenDsaDecoder(cfg)) { dut =>
             val d = new Driver(dut, cfg)
             d.cycle(d.offer(0 -> write2(0, 1), 3 -> write2(0, 2))) shouldBe
                 Vector(true, false, false, true)
             d.cycle(d.offer(1 -> write2(0, 3))) shouldBe Vector(false, true, false, false)
-            d.cycle()
+            d.awaitHead(0)
             d.lastMask(0) shouldBe Vector(true, false, false, true)
             d.cycle(ready = Vector(true, false, false))
             d.lastOutput(0).size shouldBe 2
-            d.cycle(ready = Vector(true, false, false))
+            d.awaitHead(0)
             d.lastMask(0) shouldBe Vector(false, true, false, false)
+            d.cycle(ready = Vector(true, false, false))
             d.lastOutput(0).size shouldBe 1
             d.drain()
+            d.fired(0).map(_.map(_.nonEmpty)) shouldBe Vector(
+                Vector(true, false, false, true), Vector(false, true, false, false))
         }
     }
 
@@ -337,43 +363,39 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
             }
             d.cycle()
             d.cycle()
-            d.lastOutput.map(_.size) shouldBe Vector(4, 4, 4)
             d.drain()
+            d.fired.map(_.size) shouldBe Vector(1, 1, 1)
+            d.fired.foreach(_.head.flatten.size shouldBe 4)
         }
     }
 
-    it should "pack a whole batch into one ring slot and keep SCHED flowing while the ring is full" in {
+    it should "pack a whole batch into one slot and keep DMA/SCHED flowing while GEMM is full" in {
         val cfg = QueenConfig(cmdRingDepth = 2)
         simulate(new QueenDsaDecoder(cfg)) { dut =>
             val d = new Driver(dut, cfg)
             d.cycle(d.offer((0 until 4).map(i => i -> write2(0, i)): _*)) shouldBe Vector.fill(4)(true)
-            d.cycle(d.offer((0 until 4).map(i => i -> write2(1, 10 + i)): _*)) shouldBe Vector.fill(4)(true)
-            // Both GEMM and DMA slots are live, so only the SCHED bypass can be accepted.
-            d.cycle(d.offer(0 -> write2(0, 20), 3 -> write2(3, 30))) shouldBe
-                Vector(false, false, false, true)
-            // GEMM drains its slot this cycle, so its slot is reusable in the same cycle.
-            d.cycle(d.offer(0 -> write2(0, 21)), Vector(true, false, false)) shouldBe
-                Vector(true, false, false, false)
+            d.cycle(d.offer((0 until 4).map(i => i -> write2(0, 10 + i)): _*)) shouldBe Vector.fill(4)(true)
+            // GEMM 两条占满深度 2；DMA 与 SCHED 各持自己的容量，不受影响。
+            d.cycle(d.offer(0 -> write2(0, 20), 1 -> write2(1, 30), 3 -> write2(3, 40))) shouldBe
+                Vector(false, true, false, true)
             d.drain()
+            d.fired(0).map(_.flatten.size) shouldBe Vector(4, 4)
         }
     }
 
-    it should "keep GEMM flowing while a DMA packet holds the ring head" in {
+    it should "keep GEMM flowing while DMA is backpressured" in {
         val cfg = QueenConfig(cmdRingDepth = 4)
         simulate(new QueenDsaDecoder(cfg)) { dut =>
             val d = new Driver(dut, cfg)
             d.cycle(d.offer(0 -> write2(1, 1))) shouldBe Vector(true, false, false, false)
             d.cycle(d.offer(0 -> write2(0, 2))) shouldBe Vector(true, false, false, false)
             d.cycle(d.offer(0 -> write2(1, 3))) shouldBe Vector(true, false, false, false)
-            d.cycle(ready = Vector(true, false, false))
-            d.lastOutput(1).size shouldBe 1
-            d.lastOutput(0).size shouldBe 1
-            d.cycle(ready = Vector(true, false, false))
-            d.lastOutput(1).size shouldBe 1
-            d.lastOutput(0).size shouldBe 0
-            d.cycle(ready = Vector(true, true, true))
-            d.lastOutput(1).size shouldBe 1
+            // DMA 一直不 ready，GEMM 仍须排空自己的队列。
+            for (_ <- 0 until 12) d.cycle(ready = Vector(true, false, false))
+            d.fired(0).map(_.flatten.size) shouldBe Vector(1)
+            d.fired(1) shouldBe empty
             d.drain()
+            d.fired(1).map(_.flatten.size) shouldBe Vector(1, 1)
         }
     }
 
@@ -384,15 +406,16 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
             d.cycle(d.offer(3 -> write2(0, 1))) shouldBe Vector(false, false, false, true)
             d.cycle(d.offer(0 -> write2(0, 2), 2 -> write2(0, 3), 3 -> write2(0, 4))) shouldBe
                 Vector(true, false, true, true)
+            d.awaitHead(0)
+            d.lastOutput(0).size shouldBe 1
+            val heldMask = d.lastMask(0)
             d.cycle()
-            d.lastOutput(0).size shouldBe 1
-            d.cycle()
-            d.lastOutput(0).size shouldBe 1
+            d.lastMask(0) shouldBe heldMask
             d.cycle(ready = Vector(true, false, false))
-            d.lastOutput(0).size shouldBe 1
-            d.cycle(ready = Vector(true, false, false))
+            d.awaitHead(0)
             d.lastOutput(0).size shouldBe 3
             d.drain()
+            d.fired(0).map(_.flatten.size) shouldBe Vector(1, 3)
         }
     }
 
@@ -527,12 +550,12 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
         }
     }
 
-    for ((lanes, ringDepth) <- Vector(4 -> 2, 4 -> 8, 1 -> 2)) {
-        it should s"match an ordered software ring with $lanes lanes and depth $ringDepth" in {
-            val cfg = QueenConfig(instructionLanes = lanes, cmdRingDepth = ringDepth)
+    for ((lanes, fifoDepth) <- Vector(4 -> 2, 4 -> 3, 4 -> 8, 1 -> 2)) {
+        it should s"match an ordered software FIFO with $lanes lanes and depth $fifoDepth" in {
+            val cfg = QueenConfig(instructionLanes = lanes, cmdRingDepth = fifoDepth)
             simulate(new QueenDsaDecoder(cfg)) { dut =>
                 val d = new Driver(dut, cfg)
-                val rng = new Random(100 + ringDepth + lanes)
+                val rng = new Random(100 + fifoDepth + lanes)
                 var offered = d.empty
                 var tag = 1000
                 for (_ <- 0 until 500) {
@@ -550,7 +573,7 @@ class QueenDsaDecoderSpec extends AnyFlatSpec with Matchers with ChiselSim {
         }
     }
 
-    it should "reject a command ring shallower than two slots" in {
+    it should "reject a command FIFO shallower than two slots" in {
         an[IllegalArgumentException] should be thrownBy QueenConfig(cmdRingDepth = 1)
         an[IllegalArgumentException] should be thrownBy QueenConfig(cmdRingDepth = 0)
     }

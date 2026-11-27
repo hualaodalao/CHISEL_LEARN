@@ -3,7 +3,6 @@ import chisel3.util._
 
 class QueenDsaCommand(val cfg: QueenConfig) extends Bundle {
     val inst = UInt(32.W)
-    val pc = UInt(cfg.pcWidth.W)
     val rs1 = UInt(cfg.xlen.W)
     val rs2 = UInt(cfg.xlen.W)
 }
@@ -42,75 +41,51 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
 
     private val pending = RegInit(VecInit(Seq.fill(cfg.instructionLanes)(false.B)))
     private val pendingInst = Reg(Vec(cfg.instructionLanes, UInt(32.W)))
-    private val pendingPc = Reg(Vec(cfg.instructionLanes, UInt(cfg.pcWidth.W)))
     private val batch = Wire(Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg))))
 
     for (i <- 0 until cfg.instructionLanes) {
         pending(i) := io.inst(i).fire && !io.flushing
         when(io.inst(i).fire && !io.flushing) {
             pendingInst(i) := io.inst(i).bits.inst
-            pendingPc(i) := io.inst(i).bits.pc
         }
         batch(i).valid := pending(i)
         batch(i).bits.inst := Mux(pending(i), pendingInst(i), 0.U)
-        batch(i).bits.pc := Mux(pending(i), pendingPc(i), 0.U)
         val r1 = io.regRead(2 * i)
         val r2 = io.regRead(2 * i + 1)
         batch(i).bits.rs1 := Mux(pending(i) && r1.valid, r1.bits, 0.U)
         batch(i).bits.rs2 := Mux(pending(i) && r2.valid, r2.bits, 0.U)
     }
 
-    // GEMM and DMA share one command ring so that a stalled consumer only pins the
-    // slots it still owns instead of a private FIFO's head.
-    private val ringDepth = cfg.cmdRingDepth
-    private val ringIdxW = log2Ceil(ringDepth)
-    private val ptrW = ringIdxW + 2
-    private val ring = Mem(ringDepth, Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg))))
-    private val writePtr = RegInit(0.U(ptrW.W))
-    private val gemmCursor = RegInit(0.U(ptrW.W))
-    private val dmaCursor = RegInit(0.U(ptrW.W))
+    // GEMM 与 DMA 各持一条私有 1R1W FIFO，存储可推断 SRAM；一侧停住只钉住自己的队列。
+    // Queue 的 useSyncReadMem 靠前瞻读地址让 SRAM 自身的输出寄存直接充当出口，
+    // 不需要额外出口寄存即维持每拍一条，故出口延迟与组合读版本相同。
+    // WriteFirst 是空队列同拍写入即可读出的前提，由库内固定，不可改。
+    private val fifoDepth = cfg.cmdRingDepth
+    private val gemmFifo = Module(new Queue(
+        Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg))),
+        fifoDepth, useSyncReadMem = true, hasFlush = true))
+    private val dmaFifo = Module(new Queue(
+        Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg))),
+        fifoDepth, useSyncReadMem = true, hasFlush = true))
 
-    private val gemmPresent = gemmCursor =/= writePtr
-    private val dmaPresent = dmaCursor =/= writePtr
-    private val gemmHead = ring(gemmCursor % ringDepth.U)
-    private val dmaHead = ring(dmaCursor % ringDepth.U)
-    private val gemmHas = hasLane(gemmHead, GEMM)
-    private val dmaHas = hasLane(dmaHead, DMA)
+    private val gemmEnqValid = hasLane(batch, GEMM) && !io.flushing
+    private val dmaEnqValid = hasLane(batch, DMA) && !io.flushing
+    gemmFifo.io.enq.valid := gemmEnqValid
+    gemmFifo.io.enq.bits := selectLanes(batch, GEMM)
+    dmaFifo.io.enq.valid := dmaEnqValid
+    dmaFifo.io.enq.bits := selectLanes(batch, DMA)
+    gemmFifo.io.flush.get := io.flushStart
+    dmaFifo.io.flush.get := io.flushStart
+    io.gemm <> gemmFifo.io.deq
+    io.dma <> dmaFifo.io.deq
 
-    io.gemm.valid := gemmPresent && gemmHas
-    io.gemm.bits := selectLanes(gemmHead, GEMM)
-    io.dma.valid := dmaPresent && dmaHas
-    io.dma.bits := selectLanes(dmaHead, DMA)
+    // 记入本拍入队、抵扣本拍出队，使本拍释放的槽能被本拍接受的命令预约。
+    private val gemmUsed = gemmFifo.io.count - io.gemm.fire.asUInt
+    private val dmaUsed = dmaFifo.io.count - io.dma.fire.asUInt
+    private val gemmReady = (gemmUsed +& gemmEnqValid.asUInt) < fifoDepth.U
+    private val dmaReady = (dmaUsed +& dmaEnqValid.asUInt) < fifoDepth.U
 
-    private val gemmAdvance = gemmPresent && (!gemmHas || io.gemm.fire)
-    private val dmaAdvance = dmaPresent && (!dmaHas || io.dma.fire)
-    when(gemmAdvance) { gemmCursor := (gemmCursor + 1.U)(ptrW - 1, 0) }
-    when(dmaAdvance) { dmaCursor := (dmaCursor + 1.U)(ptrW - 1, 0) }
-
-    private val ringEnqValid = (hasLane(batch, GEMM) || hasLane(batch, DMA)) && !io.flushing
-    private val half = (BigInt(1) << (ptrW - 1)).U(ptrW.W)
-    private val gemmNext = gemmCursor + gemmAdvance.asUInt
-    private val dmaNext = dmaCursor + dmaAdvance.asUInt
-    // The slot is released once every consumer has retired it.
-    private val nextCommit = Mux((gemmNext - dmaNext) < half, dmaNext, gemmNext)
-    // Charge this cycle's enqueue and credit this cycle's release so that a slot
-    // freed by a dequeue can be reserved by a command accepted in the same cycle.
-    private val ringUsed = (writePtr - nextCommit)(ptrW - 1, 0)
-    private val ringHasRoom = ringUsed < ringDepth.U
-    private val ringReady = (ringUsed +& ringEnqValid.asUInt) < ringDepth.U
-
-    assert(!ringEnqValid || ringHasRoom)
-    when(ringEnqValid) {
-        ring(writePtr % ringDepth.U) := batch
-        writePtr := (writePtr + 1.U)(ptrW - 1, 0)
-    }
-    when(io.flushStart) {
-        writePtr := 0.U
-        gemmCursor := 0.U
-        dmaCursor := 0.U
-    }
-
-    // SCHED never waits, so it bypasses the ring and keeps a single entry.
+    // SCHED never waits, so it bypasses the command FIFOs and keeps a single entry.
     private val schedValid = RegInit(false.B)
     private val schedBits = Reg(Vec(cfg.instructionLanes, Valid(new QueenDsaCommand(cfg))))
     io.scheduler.valid := schedValid
@@ -189,7 +164,8 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
         val isRun = inst(14, 12) === 3.U && inst(29, 26) === 9.U
         val isQrd = inst(14, 12) === 2.U
         val resourceReady = io.flushing ||
-            ((endpoint === GEMM.U) || (endpoint === DMA.U)) && ringReady ||
+            (endpoint === GEMM.U) && gemmReady ||
+            (endpoint === DMA.U) && dmaReady ||
             (endpoint === SCHED.U) && schedReady
         val qrdRoom = (io.qrdUsed +& qrdCnt +& isQrd.asUInt) <= cfg.qrdDepth.U
         ready(i) := resourceReady && !blocked(i) && (!isQrd || qrdRoom)
@@ -221,6 +197,6 @@ class QueenDsaDecoder(val cfg: QueenConfig) extends Module {
         io.inst(i).ready := ready(i)
     }
 
-    io.idle := writePtr === gemmCursor && writePtr === dmaCursor &&
+    io.idle := gemmFifo.io.count === 0.U && dmaFifo.io.count === 0.U &&
         !schedValid && !pending.asUInt.orR
 }

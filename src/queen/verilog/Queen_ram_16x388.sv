@@ -57,41 +57,50 @@
   `endif // RANDOMIZE
 `endif // not def INIT_RANDOM_PROLOG_
 // VCS coverage exclude_file
-module Queen_ring_64x388(	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
-  input  [5:0]   R0_addr,
+module Queen_ram_16x388(	// src/main/scala/chisel3/util/Queue.scala:73:44
+  input  [3:0]   R0_addr,
   input          R0_en,
                  R0_clk,
   output [387:0] R0_data,
-  input  [5:0]   R1_addr,
-  input          R1_en,
-                 R1_clk,
-  output [387:0] R1_data,
-  input  [5:0]   W0_addr,
+  input  [3:0]   W0_addr,
   input          W0_en,
                  W0_clk,
   input  [387:0] W0_data
 );
 
-  reg [387:0] Memory[0:63];	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
-  always @(posedge W0_clk) begin	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
-    if (W0_en)	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
-      Memory[W0_addr] <= W0_data;	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
+  reg [387:0] Memory[0:15];	// src/main/scala/chisel3/util/Queue.scala:73:44
+  reg         _R0_en_d0;	// src/main/scala/chisel3/util/Queue.scala:73:44
+  reg [3:0]   _R0_addr_d0;	// src/main/scala/chisel3/util/Queue.scala:73:44
+  always @(posedge R0_clk) begin	// src/main/scala/chisel3/util/Queue.scala:73:44
+    _R0_en_d0 <= R0_en;	// src/main/scala/chisel3/util/Queue.scala:73:44
+    _R0_addr_d0 <= R0_addr;	// src/main/scala/chisel3/util/Queue.scala:73:44
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_MEM_	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
-    reg [415:0] _RANDOM_MEM;	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
-    initial begin	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
-      `INIT_RANDOM_PROLOG_	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
-      `ifdef RANDOMIZE_MEM_INIT	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
-        for (logic [6:0] i = 7'h0; i < 7'h40; i += 7'h1) begin
+  always @(posedge W0_clk) begin	// src/main/scala/chisel3/util/Queue.scala:73:44
+    if (W0_en)	// src/main/scala/chisel3/util/Queue.scala:73:44
+      Memory[W0_addr] <= W0_data;	// src/main/scala/chisel3/util/Queue.scala:73:44
+  end // always @(posedge)
+  `ifdef ENABLE_INITIAL_MEM_	// src/main/scala/chisel3/util/Queue.scala:73:44
+    `ifdef RANDOMIZE_REG_INIT	// src/main/scala/chisel3/util/Queue.scala:73:44
+      reg [31:0] _RANDOM;	// src/main/scala/chisel3/util/Queue.scala:73:44
+    `endif // RANDOMIZE_REG_INIT
+    reg [415:0] _RANDOM_MEM;	// src/main/scala/chisel3/util/Queue.scala:73:44
+    initial begin	// src/main/scala/chisel3/util/Queue.scala:73:44
+      `INIT_RANDOM_PROLOG_	// src/main/scala/chisel3/util/Queue.scala:73:44
+      `ifdef RANDOMIZE_MEM_INIT	// src/main/scala/chisel3/util/Queue.scala:73:44
+        for (logic [4:0] i = 5'h0; i < 5'h10; i += 5'h1) begin
           for (logic [8:0] j = 9'h0; j < 9'h1A0; j += 9'h20) begin
-            _RANDOM_MEM[j +: 32] = `RANDOM;	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
+            _RANDOM_MEM[j +: 32] = `RANDOM;	// src/main/scala/chisel3/util/Queue.scala:73:44
           end
-          Memory[i[5:0]] = _RANDOM_MEM[387:0];	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
+          Memory[i[3:0]] = _RANDOM_MEM[387:0];	// src/main/scala/chisel3/util/Queue.scala:73:44
         end
       `endif // RANDOMIZE_MEM_INIT
+      `ifdef RANDOMIZE_REG_INIT	// src/main/scala/chisel3/util/Queue.scala:73:44
+        _RANDOM = {`RANDOM};	// src/main/scala/chisel3/util/Queue.scala:73:44
+        _R0_en_d0 = _RANDOM[0];	// src/main/scala/chisel3/util/Queue.scala:73:44
+        _R0_addr_d0 = _RANDOM[4:1];	// src/main/scala/chisel3/util/Queue.scala:73:44
+      `endif // RANDOMIZE_REG_INIT
     end // initial
   `endif // ENABLE_INITIAL_MEM_
-  assign R0_data = R0_en ? Memory[R0_addr] : 388'bx;	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
-  assign R1_data = R1_en ? Memory[R1_addr] : 388'bx;	// src/queen/scala/main/QueenDsaDecoder.scala:68:27
+  assign R0_data = _R0_en_d0 ? Memory[_R0_addr_d0] : 388'bx;	// src/main/scala/chisel3/util/Queue.scala:73:44
 endmodule
 

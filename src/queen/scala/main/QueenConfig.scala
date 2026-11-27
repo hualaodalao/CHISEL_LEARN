@@ -7,7 +7,8 @@ case class QueenConfig(
     val xlen: Int = 32,
     val instructionLanes: Int = 4,
     val nativeLanes: Int = 0,
-    val cmdRingDepth: Int = 64,
+    // GEMM/DMA 各一条私有命令 FIFO，此深度是**每端点**的槽数，不共享。
+    val cmdRingDepth: Int = 16,
     val trapCauseWidth: Int = 8,
     val faultCodeWidth: Int = 8,
     val faultKindWidth: Int = 3,

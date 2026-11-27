@@ -57,7 +57,7 @@ class QueenEndpointCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
         dut.io.in.valid.poke(false.B)
         dut.io.in.bits.foreach { l =>
             l.valid.poke(false.B); l.bits.inst.poke(0.U)
-            l.bits.pc.poke(0.U); l.bits.rs1.poke(0.U); l.bits.rs2.poke(0.U)
+            l.bits.rs1.poke(0.U); l.bits.rs2.poke(0.U)
         }
         dut.io.out.ready.poke(false.B)
         dut.io.backendIdle.poke(true.B)
@@ -85,7 +85,6 @@ class QueenEndpointCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
                 val c = offered.flatMap(_(i))
                 l.valid.poke(c.nonEmpty.B)
                 l.bits.inst.poke(c.map(_.inst).getOrElse(BigInt(0)).U)
-                l.bits.pc.poke(c.map(_.pc).getOrElse(BigInt(0)).U)
                 l.bits.rs1.poke(c.map(_.rs1).getOrElse(BigInt(0)).U)
                 l.bits.rs2.poke(0.U)
             }
@@ -124,7 +123,6 @@ class QueenEndpointCtrlSpec extends AnyFlatSpec with Matchers with ChiselSim {
                     withClue(s"cycle=$cycleNo base=$base lane=$j ") {
                         port.bits.inst.peek().litValue shouldBe e.inst
                         port.bits.rs1.peek().litValue shouldBe e.rs1
-                        port.bits.pc.peek().litValue shouldBe e.pc
                     }
                 }
             }
